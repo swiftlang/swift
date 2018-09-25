@@ -938,6 +938,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::GraphOperationInst: {
+    // TODO(SR-8848): Serialize attributes.
     const GraphOperationInst *GI = cast<GraphOperationInst>(&SI);
     assert(GI->getNumAttributes() == 0 &&
            "attribute serialization not implemented");

@@ -396,18 +396,18 @@ static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
   };
 
   // If we don't have to change any operands, don't rewrite the graph_op.
-  bool mustChangeBuiltin = false;
+  bool mustChangeGraphOp = false;
   for (auto &operand : origOperands) {
     assert(operand.getKind() == GraphOperationInfo::SOK_Single &&
            "SILGen should not have generated a list operand");
     if (canSimplifyOperand(operand.getSingleOperand()->getType(),
                            std::get<1>(operand.decodeName()))) {
-      mustChangeBuiltin = true;
+      mustChangeGraphOp = true;
       break;
     }
   }
 
-  if (!mustChangeBuiltin) return origInst;
+  if (!mustChangeGraphOp) return origInst;
 
   // Mark the function as being mutated.
   TFDA.aboutToChangeFunction();
@@ -417,8 +417,6 @@ static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
   GraphOperationBuilder opBuilder(origName);
   SILValue outParameterAddress;
   for (auto &operand : origOperands) {
-    // auto operand = std::get<0>(operandAndClass).get();
-    // auto operandClass = std::get<1>(operandAndClass);
     assert(operand.getKind() == GraphOperationInfo::SOK_Single &&
            "SILGen should not have generated a list operand");
     auto operandValue = operand.getSingleOperand();

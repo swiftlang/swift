@@ -1444,6 +1444,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::GraphOperationInst: {
+    // TODO(SR-8848): Deserialize attributes.
     auto EndOfArgValues = 3 * NumArguments;
     Identifier MangledName = MF->getIdentifier(ValID);
     SmallVector<SILValue, 4> Args;

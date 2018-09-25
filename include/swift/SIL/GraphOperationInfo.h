@@ -79,7 +79,7 @@ struct GraphOperationInfo {
   };
 
   /// Return the string suffix for the specified OperandLowering.
-  static const char * getOperandLoweringSuffix(OperandLowering lowering);
+  static const char *getOperandLoweringSuffix(OperandLowering lowering);
 
   /// The instruction being analyzed.
   GraphOperationInst *inst;
@@ -146,8 +146,7 @@ struct GraphOperationInfo {
       return OperandList;
     }
 
-    /// Returns the result of GraphOperationInfo::decodeOperandName on this
-    /// operand.
+    /// Returns this operand's name, without suffix, and the OperandLowering.
     std::pair<StringRef, OperandLowering> decodeName() const;
   };
 
