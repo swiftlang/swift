@@ -108,3 +108,8 @@ public struct ClassToStruct {}
 public enum ProtocolToEnum {}
 
 public class SuperClassChange: C8 {}
+
+
+public class GenericClass<T> {}
+
+public class SubGenericClass: GenericClass<P2> {}

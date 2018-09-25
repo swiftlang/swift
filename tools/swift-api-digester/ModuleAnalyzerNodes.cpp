@@ -827,7 +827,7 @@ public:
 };
 
 static StringRef getPrintedName(SDKContext &Ctx, Type Ty,
-                                bool IsImplicitlyUnwrappedOptional) {
+                                bool IsImplicitlyUnwrappedOptional = false) {
   std::string S;
   llvm::raw_string_ostream OS(S);
   PrintOptions PO;
@@ -1082,9 +1082,8 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
   if (auto *CD = dyn_cast_or_null<ClassDecl>(VD)) {
     if (auto *Super = CD->getSuperclassDecl()) {
       SuperclassUsr = calculateUsr(Ctx, Super);
-      while(Super) {
-        SuperclassNames.push_back(Super->getName().str());
-        Super = Super->getSuperclassDecl();
+      for (auto T = CD->getSuperclass(); T; T = T->getSuperclass()) {
+        SuperclassNames.push_back(getPrintedName(Ctx, T));
       }
     }
   }

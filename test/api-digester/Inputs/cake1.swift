@@ -99,3 +99,7 @@ public class ClassToStruct {}
 public protocol ProtocolToEnum {}
 
 public class SuperClassChange: C7 {}
+
+public class GenericClass<T> {}
+
+public class SubGenericClass: GenericClass<P1> {}
