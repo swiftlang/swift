@@ -99,6 +99,9 @@ public protocol RequiementChanges {
   var addedVar: Int { get }
 }
 
+/// This protocol shouldn't be complained because its requirements are all derived.
+public protocol DerivedProtocolRequiementChanges: RequiementChanges {}
+
 public class SuperClassRemoval {}
 
 public struct ClassToStruct {}
