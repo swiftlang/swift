@@ -562,7 +562,7 @@ tryRemappingLocToLatestSnapshot(SwiftLangSupport &Lang,
                                 StringRef Filename,
                          ArrayRef<ImmutableTextSnapshotRef> PreviousASTSnaps) {
   ImmutableTextSnapshotRef LatestSnap;
-  if (auto EditorDoc = Lang.getEditorDocuments().findByPath(Filename))
+  if (auto EditorDoc = Lang.getEditorDocuments()->findByPath(Filename))
     LatestSnap = EditorDoc->getLatestSnapshot();
   if (!LatestSnap)
     return Range;
@@ -1143,7 +1143,7 @@ public:
     // blocked waiting on the AST to be fully typechecked.
 
     ImmutableTextSnapshotRef InputSnap;
-    if (auto EditorDoc = Lang.getEditorDocuments().findByPath(InputFile))
+    if (auto EditorDoc = Lang.getEditorDocuments()->findByPath(InputFile))
       InputSnap = EditorDoc->getLatestSnapshot();
       if (!InputSnap)
         return false;

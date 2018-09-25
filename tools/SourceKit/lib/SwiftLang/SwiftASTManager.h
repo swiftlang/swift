@@ -49,7 +49,7 @@ public:
   struct Implementation;
   Implementation &Impl;
 
-  explicit ASTUnit(uint64_t Generation, SwiftStatistics &Statistics);
+  explicit ASTUnit(uint64_t Generation, std::shared_ptr<SwiftStatistics> Stats);
   ~ASTUnit();
 
   swift::CompilerInstance &getCompilerInstance() const;
@@ -86,7 +86,9 @@ typedef std::shared_ptr<SwiftASTConsumer> SwiftASTConsumerRef;
 
 class SwiftASTManager : public std::enable_shared_from_this<SwiftASTManager> {
 public:
-  explicit SwiftASTManager(SwiftLangSupport &LangSupport);
+  explicit SwiftASTManager(std::shared_ptr<SwiftEditorDocumentFileMap>,
+                           std::shared_ptr<SwiftStatistics> Stats,
+                           StringRef RuntimeResourcePath);
   ~SwiftASTManager();
 
   SwiftInvocationRef getInvocation(ArrayRef<const char *> Args,

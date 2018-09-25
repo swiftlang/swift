@@ -274,13 +274,13 @@ class SwiftLangSupport : public LangSupport {
   std::weak_ptr<NotificationCenter> NotificationCtr;
   std::string RuntimeResourcePath;
   std::shared_ptr<SwiftASTManager> ASTMgr;
-  SwiftEditorDocumentFileMap EditorDocuments;
+  std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocuments;
   SwiftInterfaceGenMap IFaceGenContexts;
   ThreadSafeRefCntPtr<SwiftCompletionCache> CCCache;
   ThreadSafeRefCntPtr<SwiftPopularAPI> PopularAPI;
   CodeCompletion::SessionCacheMap CCSessions;
   ThreadSafeRefCntPtr<SwiftCustomCompletions> CustomCompletions;
-  SwiftStatistics Stats;
+  std::shared_ptr<SwiftStatistics> Stats;
 
 public:
   explicit SwiftLangSupport(SourceKit::Context &SKCtx);
@@ -294,13 +294,11 @@ public:
 
   SwiftASTManager &getASTManager() { return *ASTMgr; }
 
-  SwiftEditorDocumentFileMap &getEditorDocuments() { return EditorDocuments; }
+  std::shared_ptr<SwiftEditorDocumentFileMap> getEditorDocuments() { return EditorDocuments; }
   SwiftInterfaceGenMap &getIFaceGenContexts() { return IFaceGenContexts; }
   IntrusiveRefCntPtr<SwiftCompletionCache> getCodeCompletionCache() {
     return CCCache;
   }
-
-  SwiftStatistics &getStatistics() { return Stats; }
 
   static SourceKit::UIdent getUIDForDecl(const swift::Decl *D,
                                          bool IsRef = false);

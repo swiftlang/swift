@@ -2034,19 +2034,19 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
                                   ArrayRef<const char *> Args) {
 
   ImmutableTextSnapshotRef Snapshot = nullptr;
-  auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);
+  auto EditorDoc = EditorDocuments->getByUnresolvedName(Name);
   if (!EditorDoc) {
     EditorDoc = new SwiftEditorDocument(Name, *this);
     Snapshot = EditorDoc->initializeText(Buf, Args);
     EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled());
-    if (EditorDocuments.getOrUpdate(Name, *this, EditorDoc)) {
+    if (EditorDocuments->getOrUpdate(Name, *this, EditorDoc)) {
       // Document already exists, re-initialize it. This should only happen
       // if we get OPEN request while the previous document is not closed.
       LOG_WARN_FUNC("Document already exists in editorOpen(..): " << Name);
       Snapshot = nullptr;
     }
-    auto numOpen = ++Stats.numOpenDocs;
-    Stats.maxOpenDocs.updateMax(numOpen);
+    auto numOpen = ++Stats->numOpenDocs;
+    Stats->maxOpenDocs.updateMax(numOpen);
   }
 
   if (!Snapshot) {
@@ -2075,9 +2075,9 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
 //===----------------------------------------------------------------------===//
 
 void SwiftLangSupport::editorClose(StringRef Name, bool RemoveCache) {
-  auto Removed = EditorDocuments.remove(Name);
+  auto Removed = EditorDocuments->remove(Name);
   if (Removed) {
-    --Stats.numOpenDocs;
+    --Stats->numOpenDocs;
   } else {
     IFaceGenContexts.remove(Name);
   }
@@ -2186,7 +2186,7 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
   bool LogReuseRegions = ::getenv("SOURCEKIT_LOG_INCREMENTAL_REUSE_REGIONS");
   bool ValidateSyntaxTree = ::getenv("SOURCEKIT_INCREMENTAL_PARSE_VALIDATION");
 
-  auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);
+  auto EditorDoc = EditorDocuments->getByUnresolvedName(Name);
   if (!EditorDoc) {
     Consumer.handleRequestError("No associated Editor Document");
     return;
@@ -2272,7 +2272,7 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
 //===----------------------------------------------------------------------===//
 void SwiftLangSupport::editorApplyFormatOptions(StringRef Name,
                                                 OptionsDictionary &FmtOptions) {
-  auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);
+  auto EditorDoc = EditorDocuments->getByUnresolvedName(Name);
   if (EditorDoc)
     EditorDoc->applyFormatOptions(FmtOptions);
 }
@@ -2280,7 +2280,7 @@ void SwiftLangSupport::editorApplyFormatOptions(StringRef Name,
 void SwiftLangSupport::editorFormatText(StringRef Name, unsigned Line,
                                         unsigned Length,
                                         EditorConsumer &Consumer) {
-  auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);
+  auto EditorDoc = EditorDocuments->getByUnresolvedName(Name);
   if (!EditorDoc) {
     Consumer.handleRequestError("No associated Editor Document");
     return;
@@ -2318,7 +2318,7 @@ void SwiftLangSupport::editorConvertMarkupToXML(StringRef Source,
 void SwiftLangSupport::editorExpandPlaceholder(StringRef Name, unsigned Offset,
                                                unsigned Length,
                                                EditorConsumer &Consumer) {
-  auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);
+  auto EditorDoc = EditorDocuments->getByUnresolvedName(Name);
   if (!EditorDoc) {
     Consumer.handleRequestError("No associated Editor Document");
     return;
