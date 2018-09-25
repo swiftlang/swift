@@ -34,7 +34,11 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/SIL/GraphOperationInfo.h"
 #include "swift/SIL/PrettyStackTrace.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILLinkage.h"
@@ -81,6 +85,7 @@
 
 using namespace swift;
 using namespace irgen;
+using swift::tf::GraphOperationInfo;
 
 // FIXME: Remove this option entirely and turn this on by default.
 llvm::cl::opt<bool> DebugInfoInlinedGenerics(
@@ -1875,9 +1880,6 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   if (!llvm::TFDynamicCompilation)
     llvm_unreachable("graph_op is not valid in canonical SIL");
 
-  auto &llvmModule = IGM.Module;
-  auto &llvmContext = llvmModule.getContext();
-
   tf::GraphOperationInfo opInfo(i);
   SmallVector<tf::GraphOperationInfo::StructuredOperand, 4> structuredOperands;
   auto opName = opInfo.decodeName(structuredOperands);
@@ -1895,20 +1897,64 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   // 2. Run the graph_op
   // 3. Set the output tensor handles via setLoweredExplosion()
 
+  auto &silModule = CurSILFn->getModule();
+
   // The true return type is TFE_Context*, which is an opaque pointer, so it
-  // maps to void* in the Swift-C calling convention.
-  auto getContextFn = llvmModule.getOrInsertFunction(
-      "_swift_tfc_GetGlobalEagerContext",
-      llvm::TypeBuilder<void *(), /*cross_compilable=*/false>::get(
-          llvmContext));
+  // maps to void* in the Swift-C calling convention. `eagerContext` has type
+  // void*, or i8* in LLVM type system.
+  auto getContextSilFn = silModule.findFunction(
+      "_swift_tfc_GetGlobalEagerContext", SILLinkage::PublicExternal);
+  assert(getContextSilFn);
+  llvm::Constant *getContextFn =
+      IGM.getAddrOfSILFunction(getContextSilFn, NotForDefinition);
+  assert(getContextFn);
   auto eagerContext = Builder.CreateCall(getContextFn, {});
 
-  // The true function type is TFE_Context* -> TFE_TensorHandle*.
-  auto testFunc = llvmModule.getOrInsertFunction(
-      "_swift_tfc_RunEagerConstTest",
-      llvm::TypeBuilder<void *(void *), false>::get(llvmContext));
-  auto tensorHandle = Builder.CreateCall(testFunc, {eagerContext});
+  // For now we call a hard-coded C API to run a const op:
+  //   TFE_TensorHandle* TFE_RunConstOp(TFE_Context* ctx)
+  // TODO: Remove this hard-coded C API call.
+  LLVM_DEBUG(llvm::dbgs() << "IRGen for TFE_RunConstOp().\n");
+  auto TFERunConstSilFn =
+      silModule.findFunction("TFE_RunConstOp", SILLinkage::PublicExternal);
+  assert(TFERunConstSilFn);
+  llvm::Function *TFERunConstFn =
+      IGM.getAddrOfSILFunction(TFERunConstSilFn, NotForDefinition);
+  assert(TFERunConstFn);
 
+  // We need to cast `eagerContext` of type i8* to %struct.TFE_Context*
+  auto *funcTy = TFERunConstFn->getFunctionType();
+  assert(funcTy->getNumParams() == 1);
+  auto *tfeContextTy = funcTy->getParamType(0);
+  LLVM_DEBUG(llvm::dbgs() << "  Param 0 of TFE_RunConstOp() has type "
+                          << *tfeContextTy << ".\n");
+  auto eagerContextTyped = Builder.CreateBitCast(eagerContext, tfeContextTy);
+
+  LLVM_DEBUG(llvm::dbgs() << "  Creating call over TFE_RunConstOp().\n");
+  auto cTensorHandle = Builder.CreateCall(TFERunConstFn, {eagerContextTyped});
+
+  // Wrap `cTensorHandle` into a TensorHandle<T> object.
+  // This requires casting `cTensorHandle` of i8* type to
+  // %struct.TFE_TensorHandle*.
+  LLVM_DEBUG(llvm::dbgs() << "IRGen for creating result TensorHandle.\n");
+  auto createHandleSilFn = silModule.findFunction(
+      "_swift_tfc_CreateFloatTensorHandleFromCTensorHandle",
+      SILLinkage::PublicExternal);
+  assert(createHandleSilFn);
+  llvm::Function *createHandleFn =
+      IGM.getAddrOfSILFunction(createHandleSilFn, NotForDefinition);
+  assert(createHandleFn);
+  auto *createHandleFnTy = createHandleFn->getFunctionType();
+  assert(createHandleFnTy->getNumParams() == 1);
+  auto *cTensorHandleTy = createHandleFnTy->getParamType(0);
+  LLVM_DEBUG(llvm::dbgs() << "  Param 0 of tensor handle creation fn has type "
+                          << *cTensorHandleTy << ".\n");
+  auto cTensorHandleTyped =
+      Builder.CreateBitCast(cTensorHandle, cTensorHandleTy);
+  LLVM_DEBUG(llvm::dbgs() << "  Creating call over tensor handle creation.\n");
+  auto tensorHandle = Builder.CreateCall(createHandleFn, {cTensorHandleTyped});
+
+  LLVM_DEBUG(
+      llvm::dbgs() << "Done with IRGen for graph_op; setting explosion.\n");
   Explosion e;
   e.add(tensorHandle);
 

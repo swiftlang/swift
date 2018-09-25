@@ -1166,3 +1166,20 @@ public func _GetGlobalEagerContext() -> CTFEContext {
   return _ExecutionContext.global.eagerContext
 }
 
+// TODO: replace these functions with the generic versions commented out below.
+@inlinable
+@_silgen_name("_swift_tfc_ExtractFloatCTensorHandle")
+public func _ExtractCTensorHandle(
+  _ handle: TensorHandle<Float>
+) -> CTensorHandle {
+  return handle.cTensorHandle
+}
+
+@inlinable
+@_silgen_name("_swift_tfc_CreateFloatTensorHandleFromCTensorHandle")
+public func _CreateTensorHandleFromCTensorHandle(
+  _ ownedCHandle: CTensorHandle
+) -> TensorHandle<Float> {
+  return TensorHandle<Float>(owning: ownedCHandle)
+}
+
