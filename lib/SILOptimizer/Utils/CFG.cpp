@@ -405,7 +405,11 @@ bool swift::isCriticalEdge(TermInst *T, unsigned EdgeIdx) {
   assert(T->getSuccessors().size() > EdgeIdx && "Not enough successors");
 
   auto SrcSuccs = T->getSuccessors();
-  if (SrcSuccs.size() <= 1)
+  
+  if (SrcSuccs.size() <= 1 &&
+      // Also consider non-branch instructions with a single successor for
+      // critical edges, for example: a switch_enum of a single-case enum.
+      (isa<BranchInst>(T) || isa<CondBranchInst>(T)))
     return false;
 
   SILBasicBlock *DestBB = SrcSuccs[EdgeIdx];

@@ -677,6 +677,15 @@ static bool isOwnershipEquivalent(ReferenceOwnership Left,
 static void diagnoseNominalTypeDeclChange(SDKNodeDeclType *L, SDKNodeDeclType *R) {
   auto &Ctx = L->getSDKContext();
   auto &Diags = Ctx.getDiags();
+
+  if (L->getDeclKind() != R->getDeclKind()) {
+    Diags.diagnose(SourceLoc(), diag::nominal_type_kind_changed,
+      L->getScreenInfo(), getDeclKindStr(R->getDeclKind()));
+    return;
+  }
+
+  assert(L->getDeclKind() == R->getDeclKind());
+  auto DKind = L->getDeclKind();
   std::vector<StringRef> LeftMinusRight;
   std::vector<StringRef> RightMinusLeft;
   swift::ide::api::stringSetDifference(L->getAllProtocols(), R->getAllProtocols(),
@@ -686,13 +695,30 @@ static void diagnoseNominalTypeDeclChange(SDKNodeDeclType *L, SDKNodeDeclType *R
     Diags.diagnose(SourceLoc(), diag::conformance_removed, L->getScreenInfo(), Name,
                    isProtocol);
   });
-
-  // Adding inherited protocols can be API breaking.
-  if (isProtocol) {
+  switch (DKind) {
+  case DeclKind::Protocol: {
     std::for_each(RightMinusLeft.begin(), RightMinusLeft.end(), [&](StringRef Name) {
       Diags.diagnose(SourceLoc(), diag::conformance_added, L->getScreenInfo(),
                      Name);
     });
+    break;
+  }
+  case DeclKind::Class: {
+    auto LSuperClass = L->getSuperClassName();
+    auto RSuperClass = R->getSuperClassName();
+    if (!LSuperClass.empty() && LSuperClass != RSuperClass) {
+      if (RSuperClass.empty()) {
+        Diags.diagnose(SourceLoc(), diag::super_class_removed, L->getScreenInfo(),
+                       LSuperClass);
+      } else if (!contains(R->getClassInheritanceChain(), LSuperClass)) {
+        Diags.diagnose(SourceLoc(), diag::super_class_changed, L->getScreenInfo(),
+                       LSuperClass, RSuperClass);
+      }
+    }
+    break;
+  }
+  default:
+    break;
   }
 }
 

@@ -2487,6 +2487,11 @@ for host in "${ALL_HOSTS[@]}"; do
                   continue
                 ;;
                 *)
+                  # FIXME: Always re-build XCTest on non-darwin platforms.
+                  # Remove this when products build in the CMake system.
+                  echo "Cleaning the XCTest build directory"
+                  call rm -rf "${XCTEST_BUILD_DIR}"
+
                   cmake_options=(
                     ${cmake_options[@]}
                     -DCMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"

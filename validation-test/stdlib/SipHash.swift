@@ -245,7 +245,7 @@ struct Loop<C: Collection>: Sequence, IteratorProtocol {
 
 SipHashTests.test("${Self}/combine(UnsafeRawBufferPointer)")
   .forEach(in: ${tests}) { test in
-  var hasher = ${Self}(_seed: test.seed)
+  var hasher = ${Self}(_rawSeed: test.seed)
   test.input.withUnsafeBytes { hasher.combine(bytes: $0) }
   let hash = hasher.finalize()
   expectEqual(${Self}.HashValue(truncatingIfNeeded: test.output), hash)
@@ -255,7 +255,7 @@ SipHashTests.test("${Self}/combine(UnsafeRawBufferPointer)/pattern")
   .forEach(in: cartesianProduct(${tests}, incrementalPatterns)) { test_ in
   let (test, pattern) = test_
 
-  var hasher = ${Self}(_seed: test.seed)
+  var hasher = ${Self}(_rawSeed: test.seed)
   var chunkSizes = Loop(pattern).makeIterator()
   var startIndex = 0
   while startIndex != test.input.endIndex {
@@ -274,7 +274,7 @@ SipHashTests.test("${Self}/combine(UnsafeRawBufferPointer)/pattern")
 SipHashTests.test("${Self}._combine(${data_type})")
   .forEach(in: ${tests}) { test in
 
-  var hasher = ${Self}(_seed: test.seed)
+  var hasher = ${Self}(_rawSeed: test.seed)
 
   // Load little-endian chunks and combine them into the hasher.
   let bitWidth = ${data_type}.bitWidth
@@ -303,7 +303,7 @@ SipHashTests.test("${Self}._combine(${data_type})")
 
 SipHashTests.test("${Self}/OperationsAfterFinalize") {
   // Verify that finalize is nonmutating.
-  var hasher1 = ${Self}(_seed: (0, 0))
+  var hasher1 = ${Self}(_rawSeed: (0, 0))
   hasher1._combine(1 as UInt8)
   _ = hasher1.finalize()
   // Hasher is now consumed. The operations below are illegal, but this isn't
@@ -314,7 +314,7 @@ SipHashTests.test("${Self}/OperationsAfterFinalize") {
   let hash1b = hasher1.finalize()
   expectEqual(hash1a, hash1b)
 
-  var hasher2 = ${Self}(_seed: (0, 0))
+  var hasher2 = ${Self}(_rawSeed: (0, 0))
   hasher2._combine(1 as UInt8)
   hasher2._combine(2 as UInt16)
   let hash2 = hasher2.finalize()

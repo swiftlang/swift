@@ -407,12 +407,17 @@ public:
 
 class SDKNodeDeclType : public SDKNodeDecl {
   StringRef SuperclassUsr;
+  std::vector<StringRef> SuperclassNames;
   std::vector<StringRef> ConformingProtocols;
   StringRef EnumRawTypeName;
 public:
   SDKNodeDeclType(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
   StringRef getSuperClassUsr() const { return SuperclassUsr; }
+  ArrayRef<StringRef> getClassInheritanceChain() const { return SuperclassNames; }
+  StringRef getSuperClassName() const {
+    return SuperclassNames.empty() ? StringRef() : SuperclassNames.front();
+  };
   ArrayRef<StringRef> getAllProtocols() const { return ConformingProtocols; }
 
 #define NOMINAL_TYPE_DECL(ID, PARENT) \
@@ -542,6 +547,20 @@ public:
 
   void printTopLevelNames();
 
+  bool shouldIgnore(Decl *D, const Decl* Parent);
+  void addMembersToRoot(SDKNode *Root, IterableDeclContext *Context);
+  SDKNode *constructSubscriptDeclNode(SubscriptDecl *SD);
+  SDKNode *constructAssociatedTypeNode(AssociatedTypeDecl *ATD);
+  SDKNode *constructTypeAliasNode(TypeAliasDecl *TAD);
+  SDKNode *constructVarNode(ValueDecl *VD);
+  SDKNode *constructExternalExtensionNode(NominalTypeDecl *NTD,
+                                          ArrayRef<ExtensionDecl*> AllExts);
+  SDKNode *constructTypeDeclNode(NominalTypeDecl *NTD);
+  SDKNode *constructInitNode(ConstructorDecl *CD);
+  SDKNode *constructFunctionNode(FuncDecl* FD, SDKNodeKind Kind);
+  std::vector<SDKNode*> createParameterNodes(ParameterList *PL);
+  SDKNode *constructTypeNode(Type T, bool IsImplicitlyUnwrappedOptional = false,
+    bool hasDefaultArgument = false);
 public:
   void lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules);
   void processDecl(ValueDecl *VD);

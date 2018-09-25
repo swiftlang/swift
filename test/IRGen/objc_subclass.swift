@@ -13,7 +13,7 @@
 // CHECK: [[OPAQUE:%swift.opaque]] = type
 // CHECK: [[INT:%TSi]] = type <{ [[LLVM_PTRSIZE_INT:i(32|64)]] }>
 // CHECK: [[TYPE:%swift.type]] = type
-// CHECK-DAG: [[GIZMO:%TSo5GizmoC]] = type opaque
+// CHECK-DAG: [[GIZMO:%TSo5GizmoC]] = type <{ %objc_class* }>
 // CHECK-DAG: [[OBJC:%objc_object]] = type opaque
 
 

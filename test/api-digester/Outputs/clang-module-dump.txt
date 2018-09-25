@@ -12,6 +12,9 @@
       "location": "",
       "moduleName": "Foo",
       "superclassUsr": "c:objc(cs)NSObject",
+      "superclassNames": [
+        "NSObject"
+      ],
       "conformingProtocols": [
         "ObjcProt",
         "NSObjectProtocol"

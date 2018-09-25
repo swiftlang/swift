@@ -16,6 +16,8 @@ cake1: Var RemoveSetters.Value has removed its setter
 cake1: Var RequiementChanges.removedVar has been removed
 
 /* Moved Decls */
+cake1: Class ClassToStruct has been changed to a Struct
+cake1: Protocol ProtocolToEnum has been changed to a Enum
 
 /* Renamed Decls */
 cake1: Func S1.foo5(x:y:) has been renamed to Func S1.foo5(x:y:z:)
@@ -45,3 +47,7 @@ cake1: AssociatedType AssociatedTypePro.T1 has removed default type Int
 cake2: AssociatedType RequiementChanges.addedTypeWithoutDefault has been added as a protocol requirement
 cake2: Func RequiementChanges.addedFunc() has been added as a protocol requirement
 cake2: Var RequiementChanges.addedVar has been added as a protocol requirement
+
+/* Class Inheritance Change */
+cake1: Class C4 has changed its super class from OldType to NewType
+cake1: Class SuperClassRemoval has removed its super class C3
