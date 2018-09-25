@@ -31,6 +31,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
+#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILLocation.h"
@@ -8056,6 +8057,13 @@ inline DestructureTupleInst *DestructureTupleResult::getParent() {
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
+/// A graph operation attribute, used by GraphOperationInst.
+/// Attributes have a name and a constant value.
+struct GraphOperationAttribute {
+  Identifier name;
+  SymbolicValue value;
+};
+
 /// A result for the graph_op instruction. See documentation for
 /// graph_op for more information.
 class GraphOperationResult final : public MultipleValueInstructionResult {
@@ -8079,7 +8087,6 @@ public:
   }
 };
 
-/// SWIFT_ENABLE_TENSORFLOW
 /// A graph operation. This instruction will be extracted to a graph program
 /// via graph program extraction passes.
 class GraphOperationInst final

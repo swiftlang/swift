@@ -800,8 +800,8 @@ static bool emitNoteDiagnostic(SILInstruction *badInst, UnknownReason reason,
   }
 
   auto &module = badInst->getModule();
-  diagnose(module.getASTContext(), loc.getSourceLoc(), diag::tf_op_misuse_note,
-           error)
+  diagnose(module.getASTContext(), loc.getSourceLoc(),
+           diag::constexpr_unknown_reason, error)
       .highlight(loc.getSourceRange());
   return true;
 }

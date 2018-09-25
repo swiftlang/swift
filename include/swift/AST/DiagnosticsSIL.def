@@ -221,6 +221,7 @@ WARNING(designated_init_in_cross_module_extension,none,
 NOTE(designated_init_c_struct_fix,none,
      "use \"self.init()\" to initialize the struct with zero values", ())
 
+NOTE(constexpr_unknown_reason, none, "%0", (StringRef))
 NOTE(constexpr_called_from, none, "when called from here", ())
 NOTE(constexpr_not_evaluable, none,
      "expression not evaluable as constant here", ())
