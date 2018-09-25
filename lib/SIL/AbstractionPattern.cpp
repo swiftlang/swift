@@ -751,6 +751,10 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
   }
 }
 
+unsigned AbstractionPattern::getNumFunctionParams() const {
+  return cast<AnyFunctionType>(getType()).getParams().size();
+}
+
 static CanType getOptionalObjectType(CanType type) {
   auto objectType = type.getOptionalObjectType();
   assert(objectType && "type was not optional");
