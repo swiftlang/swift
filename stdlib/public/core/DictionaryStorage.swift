@@ -41,7 +41,11 @@ internal class _RawDictionaryStorage: __SwiftNativeNSDictionary {
   /// power of `scale`.
   @usableFromInline
   @nonobjc
-  internal final var _scale: Int
+  internal final var _scale: Int8
+
+  @usableFromInline
+  @nonobjc
+  internal final var _mutationCount: Int32
 
   @usableFromInline
   internal final var _seed: Int
@@ -242,7 +246,11 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     _sanityCheck(capacity >= original._count)
     let scale = _HashTable.scale(forCapacity: capacity)
     let rehash = (scale != original._scale)
-    let newStorage = _DictionaryStorage<Key, Value>.allocate(scale: scale)
+    let newStorage = _DictionaryStorage<Key, Value>.allocate(
+      scale: scale,
+      // Invalidate indices if we're rehashing.
+      mutationCount: rehash ? nil : original._mutationCount
+    )
     return (newStorage, rehash)
   }
 
@@ -250,15 +258,18 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
   @_effects(releasenone)
   static internal func allocate(capacity: Int) -> _DictionaryStorage {
     let scale = _HashTable.scale(forCapacity: capacity)
-    return allocate(scale: scale)
+    return allocate(scale: scale, mutationCount: nil)
   }
 
-  static internal func allocate(scale: Int) -> _DictionaryStorage {
+  static internal func allocate(
+    scale: Int8,
+    mutationCount: Int32?
+  ) -> _DictionaryStorage {
     // The entry count must be representable by an Int value; hence the scale's
     // peculiar upper bound.
     _sanityCheck(scale >= 0 && scale < Int.bitWidth - 1)
 
-    let bucketCount = 1 &<< scale
+    let bucketCount = (1 as Int) &<< scale
     let wordCount = _UnsafeBitset.wordCount(forCapacity: bucketCount)
     let storage = Builtin.allocWithTailElems_3(
       _DictionaryStorage<Key, Value>.self,
@@ -276,6 +287,16 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     storage._count = 0
     storage._capacity = _HashTable.capacity(forScale: scale)
     storage._scale = scale
+
+    if let mutationCount = mutationCount {
+      storage._mutationCount = mutationCount
+    } else {
+      // The default mutation count is simply a scrambled version of the storage
+      // address.
+      storage._mutationCount = Int32(truncatingIfNeeded:
+        unsafeBitCast(storage, to: Int.self).hashValue)
+    }
+
     storage._rawKeys = UnsafeMutableRawPointer(keysAddr)
     storage._rawValues = UnsafeMutableRawPointer(valuesAddr)
 
@@ -287,7 +308,7 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     // FIXME: Use true per-instance seeding instead. Per-capacity seeding still
     // leaves hash values the same in same-sized tables, which may affect
     // operations on two tables at once. (E.g., union.)
-    storage._seed = scale
+    storage._seed = Int(scale)
 
     // Initialize hash table metadata.
     storage._hashTable.clear()

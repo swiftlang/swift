@@ -60,12 +60,12 @@ extension _HashTable {
     @inline(__always) get { return 3 / 4 }
   }
 
-  internal static func capacity(forScale scale: Int) -> Int {
-    let bucketCount = 1 &<< scale
+  internal static func capacity(forScale scale: Int8) -> Int {
+    let bucketCount = (1 as Int) &<< scale
     return Int(Double(bucketCount) * maxLoadFactor)
   }
 
-  internal static func scale(forCapacity capacity: Int) -> Int {
+  internal static func scale(forCapacity capacity: Int) -> Int8 {
     let capacity = Swift.max(capacity, 1)
     // Calculate the minimum number of entries we need to allocate to satisfy
     // the maximum load factor. `capacity + 1` below ensures that we always
@@ -78,9 +78,10 @@ extension _HashTable {
     // exponent.
     let exponent = (Swift.max(minimumEntries, 2) - 1)._binaryLogarithm() + 1
     _sanityCheck(exponent >= 0 && exponent < Int.bitWidth)
-    _sanityCheck(self.capacity(forScale: exponent) >= capacity)
     // The scale is the exponent corresponding to the bucket count.
-    return exponent
+    let scale = Int8(truncatingIfNeeded: exponent)
+    _sanityCheck(self.capacity(forScale: scale) >= capacity)
+    return scale
   }
 }
 

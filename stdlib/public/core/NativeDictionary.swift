@@ -35,11 +35,9 @@ internal struct _NativeDictionary<Key: Hashable, Value> {
     self._storage = storage
   }
 
-  @usableFromInline
-  @_effects(releasenone)
+  @inlinable
   internal init(capacity: Int) {
-    let scale = _HashTable.scale(forCapacity: capacity)
-    self._storage = _DictionaryStorage<Key, Value>.allocate(scale: scale)
+    self._storage = _DictionaryStorage<Key, Value>.allocate(capacity: capacity)
   }
 
 #if _runtime(_ObjC)
@@ -86,6 +84,12 @@ extension _NativeDictionary { // Primitive fields
   @inlinable
   internal var _values: UnsafeMutablePointer<Value> {
     return _storage._rawValues.assumingMemoryBound(to: Value.self)
+  }
+
+  @inlinable
+  @inline(__always)
+  internal func invalidateIndices() {
+    _storage._mutationCount &+= 1
   }
 }
 
@@ -465,6 +469,7 @@ extension _NativeDictionary { // Deletion
     hashTable.delete(at: index, with: self)
     _storage._count -= 1
     _sanityCheck(_storage._count >= 0)
+    invalidateIndices()
   }
 
   @inlinable
@@ -493,7 +498,9 @@ extension _NativeDictionary { // Deletion
   internal mutating func removeAll(isUnique: Bool) {
     guard isUnique else {
       let scale = self._storage._scale
-      _storage = _DictionaryStorage<Key, Value>.allocate(scale: scale)
+      _storage = _DictionaryStorage<Key, Value>.allocate(
+        scale: scale,
+        mutationCount: nil)
       return
     }
     for index in hashTable {
@@ -502,6 +509,7 @@ extension _NativeDictionary { // Deletion
     }
     hashTable.clear()
     _storage._count = 0
+    invalidateIndices()
   }
 }
 

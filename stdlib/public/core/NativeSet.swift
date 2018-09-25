@@ -34,11 +34,9 @@ internal struct _NativeSet<Element: Hashable> {
     self._storage = storage
   }
 
-  @usableFromInline
-  @_effects(releasenone)
+  @inlinable
   internal init(capacity: Int) {
-    let scale = _HashTable.scale(forCapacity: capacity)
-    self._storage = _SetStorage<Element>.allocate(scale: scale)
+    self._storage = _SetStorage<Element>.allocate(capacity: capacity)
   }
 
 #if _runtime(_ObjC)
@@ -79,6 +77,12 @@ extension _NativeSet { // Primitive fields
   @inlinable
   internal var _elements: UnsafeMutablePointer<Element> {
     return _storage._rawElements.assumingMemoryBound(to: Element.self)
+  }
+
+  @inlinable
+  @inline(__always)
+  internal func invalidateIndices() {
+    _storage._mutationCount &+= 1
   }
 }
 
@@ -373,6 +377,8 @@ extension _NativeSet { // Deletion
   internal mutating func _delete(at index: Index) {
     hashTable.delete(at: index, with: self)
     _storage._count -= 1
+    _sanityCheck(_storage._count >= 0)
+    invalidateIndices()
   }
 
   @inlinable
@@ -399,7 +405,7 @@ extension _NativeSet { // Deletion
   internal mutating func removeAll(isUnique: Bool) {
     guard isUnique else {
       let scale = self._storage._scale
-      _storage = _SetStorage<Element>.allocate(scale: scale)
+      _storage = _SetStorage<Element>.allocate(scale: scale, mutationCount: nil)
       return
     }
     for index in hashTable {
@@ -407,6 +413,7 @@ extension _NativeSet { // Deletion
     }
     hashTable.clear()
     _storage._count = 0
+    invalidateIndices()
   }
 }
 
