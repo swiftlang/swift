@@ -63,28 +63,41 @@ public protocol RandomNumberGenerator {
   mutating func next() -> UInt64
 
   // FIXME: De-underscore after swift-evolution amendment
-  mutating func _fill(bytes buffer: UnsafeMutableRawBufferPointer)
+  mutating func fillBytes(_ buffer: UnsafeMutableRawBufferPointer)
 }
 
 extension RandomNumberGenerator {
+  
   @inlinable
-  public mutating func _fill(bytes buffer: UnsafeMutableRawBufferPointer) {
-    // FIXME: Optimize
-    var chunk: UInt64 = 0
-    var chunkBytes = 0
-    for i in 0..<buffer.count {
-      if chunkBytes == 0 {
-        chunk = next()
-        chunkBytes = UInt64.bitWidth / 8
-      }
-      buffer[i] = UInt8(truncatingIfNeeded: chunk)
-      chunk >>= UInt8.bitWidth
-      chunkBytes -= 1
+  public mutating func fillBytes(_ buffer: UnsafeMutableRawBufferPointer) {
+    guard let dest = buffer.baseAddress else {
+      return
     }
+    
+    let blocks = buffer.count / MemoryLayout<UInt64>.size
+    
+    for i in 0 ..< blocks {
+      buffer.storeBytes(
+        of: next(),
+        toByteOffset: i * MemoryLayout<UInt64>.size,
+        as: UInt64.self
+      )
+    }
+    
+    let bytesWritten = blocks * MemoryLayout<UInt64>.size
+    
+    guard bytesWritten != buffer.count else {
+      return
+    }
+    
+    var tmp = next()
+    _memcpy(
+      dest: dest.advanced(by: bytesWritten),
+      src: &tmp,
+      size: UInt(buffer.count - bytesWritten)
+    )
   }
-}
-
-extension RandomNumberGenerator {
+  
   /// Returns a value from a uniform, independent distribution of binary data.
   ///
   /// Use this method when you need random binary data to generate another
@@ -95,7 +108,7 @@ extension RandomNumberGenerator {
   /// - Returns: A random value of `T`. Bits are randomly distributed so that
   ///   every value of `T` is equally likely to be returned.
   @inlinable
-  public mutating func next<T: FixedWidthInteger & UnsignedInteger>() -> T {
+  public mutating func next<T: FixedWidthInteger>() -> T {
     return T._random(using: &self)
   }
 
@@ -111,10 +124,10 @@ extension RandomNumberGenerator {
   /// - Returns: A random value of `T` in the range `0..<upperBound`. Every
   ///   value in the range `0..<upperBound` is equally likely to be returned.
   @inlinable
-  public mutating func next<T: FixedWidthInteger & UnsignedInteger>(
+  public mutating func next<T: FixedWidthInteger>(
     upperBound: T
   ) -> T {
-    _precondition(upperBound != 0, "upperBound cannot be zero.")
+    _precondition(upperBound > 0, "upperBound must not be lower than zero.")
     let tmp = (T.max % upperBound) + 1
     let range = tmp == upperBound ? 0 : tmp
     var random: T = 0
@@ -164,14 +177,14 @@ public struct SystemRandomNumberGenerator : RandomNumberGenerator {
   @inlinable
   public mutating func next() -> UInt64 {
     var random: UInt64 = 0
-    _stdlib_random(&random, MemoryLayout<UInt64>.size)
+    swift_stdlib_random(&random, MemoryLayout<UInt64>.size)
     return random
   }
 
   @inlinable
-  public mutating func _fill(bytes buffer: UnsafeMutableRawBufferPointer) {
-    if !buffer.isEmpty {
-      _stdlib_random(buffer.baseAddress!, buffer.count)
+  public mutating func fillBytes(_ buffer: UnsafeMutableRawBufferPointer) {
+    if let dest = buffer.baseAddress {
+      swift_stdlib_random(dest, buffer.count)
     }
   }
 }

@@ -445,7 +445,6 @@ extension MutableCollection where Self : RandomAccessCollection {
   public mutating func shuffle<T: RandomNumberGenerator>(
     using generator: inout T
   ) {
-    let count = self.count
     guard count > 1 else { return }
     var amount = count
     var currentIndex = startIndex

@@ -144,8 +144,8 @@ SWIFT_READNONE SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_size_t _stdlib_malloc_size(const void *ptr);
 
 // Random number for stdlib
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void _stdlib_random(void *buf, __swift_size_t nbytes);
+SWIFT_RUNTIME_STDLIB_API
+void swift_stdlib_random(void *buf, __swift_size_t nbytes);
 
 // Math library functions
 static inline SWIFT_ALWAYS_INLINE
