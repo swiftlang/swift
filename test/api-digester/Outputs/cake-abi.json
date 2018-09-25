@@ -199,7 +199,7 @@
       "moduleName": "cake",
       "superclassUsr": "s:4cake2C0C",
       "superclassNames": [
-        "C0"
+        "C0<S1, S1, S1>"
       ],
       "children": [
         {
@@ -379,6 +379,7 @@
           "usr": "s:4cake2C1CACycfc",
           "location": "",
           "moduleName": "cake",
+          "overriding": true,
           "implicit": true,
           "children": [
             {
@@ -1078,6 +1079,93 @@
               "name": "Int",
               "printedName": "Int",
               "usr": "s:Si"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "PSuper",
+      "printedName": "PSuper",
+      "declKind": "Protocol",
+      "usr": "s:4cake6PSuperP",
+      "location": "",
+      "moduleName": "cake",
+      "children": [
+        {
+          "kind": "AssociatedType",
+          "name": "T",
+          "printedName": "T",
+          "declKind": "AssociatedType",
+          "usr": "s:4cake6PSuperP1TQa",
+          "location": "",
+          "moduleName": "cake",
+          "protocolReq": true
+        },
+        {
+          "kind": "Function",
+          "name": "foo",
+          "printedName": "foo()",
+          "declKind": "Func",
+          "usr": "s:4cake6PSuperP3fooyyF",
+          "location": "",
+          "moduleName": "cake",
+          "genericSig": "<τ_0_0 where τ_0_0 : PSuper>",
+          "protocolReq": true,
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "PSub",
+      "printedName": "PSub",
+      "declKind": "Protocol",
+      "usr": "s:4cake4PSubP",
+      "location": "",
+      "moduleName": "cake",
+      "genericSig": "<τ_0_0 : PSuper>",
+      "conformingProtocols": [
+        "PSuper"
+      ],
+      "children": [
+        {
+          "kind": "AssociatedType",
+          "name": "T",
+          "printedName": "T",
+          "declKind": "AssociatedType",
+          "usr": "s:4cake4PSubP1TQa",
+          "location": "",
+          "moduleName": "cake",
+          "protocolReq": true,
+          "overriding": true
+        },
+        {
+          "kind": "Function",
+          "name": "foo",
+          "printedName": "foo()",
+          "declKind": "Func",
+          "usr": "s:4cake4PSubP3fooyyF",
+          "location": "",
+          "moduleName": "cake",
+          "genericSig": "<τ_0_0 where τ_0_0 : PSub>",
+          "protocolReq": true,
+          "overriding": true,
+          "declAttributes": [
+            "Override"
+          ],
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
             }
           ]
         }

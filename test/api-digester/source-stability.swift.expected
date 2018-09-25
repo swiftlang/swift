@@ -90,15 +90,10 @@ Var Dictionary.values has declared type change from LazyMapCollection<[Key : Val
 /* Decl Attribute changes */
 
 /* Protocol Requirement Changes */
-AssociatedType BidirectionalCollection.Element has been added as a protocol requirement
-AssociatedType BidirectionalCollection.Index has been added as a protocol requirement
-AssociatedType BidirectionalCollection.Indices has been added as a protocol requirement
-AssociatedType BidirectionalCollection.SubSequence has been added as a protocol requirement
 AssociatedType BinaryFloatingPoint.RawExponent has been added as a protocol requirement
 AssociatedType BinaryFloatingPoint.RawSignificand has been added as a protocol requirement
 AssociatedType BinaryInteger.Words has been added as a protocol requirement
 AssociatedType CaseIterable.AllCases has been added as a protocol requirement
-AssociatedType Collection.Element has been added as a protocol requirement
 AssociatedType Collection.Index has been added as a protocol requirement
 AssociatedType ExpressibleByArrayLiteral.ArrayLiteralElement has been added as a protocol requirement
 AssociatedType ExpressibleByBooleanLiteral.BooleanLiteralType has been added as a protocol requirement
@@ -113,16 +108,8 @@ AssociatedType FloatingPoint.Exponent has been added as a protocol requirement
 AssociatedType IteratorProtocol.Element has been added as a protocol requirement
 AssociatedType KeyedDecodingContainerProtocol.Key has been added as a protocol requirement
 AssociatedType KeyedEncodingContainerProtocol.Key has been added as a protocol requirement
-AssociatedType MutableCollection.Element has been added as a protocol requirement
-AssociatedType MutableCollection.Index has been added as a protocol requirement
-AssociatedType MutableCollection.SubSequence has been added as a protocol requirement
 AssociatedType Numeric.Magnitude has been added as a protocol requirement
-AssociatedType RandomAccessCollection.Element has been added as a protocol requirement
-AssociatedType RandomAccessCollection.Index has been added as a protocol requirement
-AssociatedType RandomAccessCollection.Indices has been added as a protocol requirement
-AssociatedType RandomAccessCollection.SubSequence has been added as a protocol requirement
 AssociatedType RangeExpression.Bound has been added as a protocol requirement
-AssociatedType RangeReplaceableCollection.SubSequence has been added as a protocol requirement
 AssociatedType RawRepresentable.RawValue has been added as a protocol requirement
 AssociatedType Sequence.Element has been added as a protocol requirement
 AssociatedType Sequence.Iterator has been added as a protocol requirement
@@ -135,8 +122,4 @@ AssociatedType _SequenceWrapper.Base has been added as a protocol requirement
 Func BinaryInteger.isMultiple(of:) has been added as a protocol requirement
 
 // The subscript changes are bogus because we don't have subscript decls in the baseline.
-Subscript BidirectionalCollection.subscript(_:) has been added as a protocol requirement
 Subscript Collection.subscript(_:) has been added as a protocol requirement
-Subscript MutableCollection.subscript(_:) has been added as a protocol requirement
-Subscript RandomAccessCollection.subscript(_:) has been added as a protocol requirement
-Subscript RangeReplaceableCollection.subscript(_:) has been added as a protocol requirement

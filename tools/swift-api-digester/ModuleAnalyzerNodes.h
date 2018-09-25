@@ -279,6 +279,7 @@ class SDKNodeDecl: public SDKNode {
   bool IsStatic;
   bool IsDeprecated;
   bool IsProtocolReq;
+  bool IsOverriding;
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
 
@@ -306,6 +307,7 @@ public:
   bool hasDeclAttribute(DeclAttrKind DAKind) const;
   bool isImplicit() const { return IsImplicit; };
   bool isStatic() const { return IsStatic; };
+  bool isOverriding() const { return IsOverriding; };
   StringRef getGenericSignature() const { return GenericSig; }
   StringRef getScreenInfo() const;
 };
