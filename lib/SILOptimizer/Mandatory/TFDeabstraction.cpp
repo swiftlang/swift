@@ -1860,6 +1860,7 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
           opInfo->opName == "tfc.configureCPU")
         continue;
       formGraphOp(*opInfo, constants, deviceInfo);
+      continue;
     }
 
     // Take a look at the various well known function calls that we can promote

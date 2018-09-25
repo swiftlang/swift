@@ -3446,7 +3446,11 @@ bool PartitionCloner::finalizeOriginal() {
 
     // Now remove the formal values provided by any branches that jump to that
     // block, as indicated by the BitVector.
-    for (auto pi : bb->getPredecessorBlocks()) {
+    //
+    // Collect all predecessor blocks before removing values from branches as
+    // invaldiate pred_iterators when removing formal values.
+    SmallPtrSet<SILBasicBlock*, 8> predBlocks(bb->pred_begin(), bb->pred_end());
+    for (auto pi : predBlocks) {
       auto *br = cast<BranchInst>(pi->getTerminator());
       SmallVector<SILValue, 8> operands;
       for (unsigned i = 0, e = br->getNumOperands(); i != e; ++i)
