@@ -1216,20 +1216,6 @@ extension ContiguousArray: Equatable where Element: Equatable {
 
     return true
   }
-
-  /// Returns a Boolean value indicating whether two arrays are not equal.
-  ///
-  /// Two arrays are equal if they contain the same elements in the same order.
-  /// You can use the not-equal-to operator (`!=`) to compare any two arrays
-  /// that store the same, `Equatable`-conforming element type.
-  ///
-  /// - Parameters:
-  ///   - lhs: An array to compare.
-  ///   - rhs: Another array to compare.
-  @inlinable
-  public static func !=(lhs: ContiguousArray<Element>, rhs: ContiguousArray<Element>) -> Bool {
-    return !(lhs == rhs)
-  }
 }
 
 extension ContiguousArray: Hashable where Element: Hashable {
