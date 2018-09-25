@@ -318,8 +318,8 @@ extension _SetStorage {
     } else {
       // The default mutation count is simply a scrambled version of the storage
       // address.
-      storage._mutationCount = Int32(truncatingIfNeeded:
-        unsafeBitCast(storage, to: Int.self).hashValue)
+      storage._mutationCount = Int32(
+        truncatingIfNeeded: ObjectIdentifier(storage).hashValue)
     }
 
     storage._rawElements = UnsafeMutableRawPointer(elementsAddr)

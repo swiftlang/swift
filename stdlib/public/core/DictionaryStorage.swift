@@ -293,8 +293,8 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     } else {
       // The default mutation count is simply a scrambled version of the storage
       // address.
-      storage._mutationCount = Int32(truncatingIfNeeded:
-        unsafeBitCast(storage, to: Int.self).hashValue)
+      storage._mutationCount = Int32(
+        truncatingIfNeeded: ObjectIdentifier(storage).hashValue)
     }
 
     storage._rawKeys = UnsafeMutableRawPointer(keysAddr)
