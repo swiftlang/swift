@@ -271,7 +271,7 @@ struct SwiftStatistics {
 };
 
 class SwiftLangSupport : public LangSupport {
-  std::weak_ptr<NotificationCenter> NotificationCtr;
+  std::shared_ptr<NotificationCenter> NotificationCtr;
   std::string RuntimeResourcePath;
   std::shared_ptr<SwiftASTManager> ASTMgr;
   std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocuments;
@@ -287,7 +287,7 @@ public:
   ~SwiftLangSupport();
 
   std::shared_ptr<NotificationCenter> getNotificationCenter() const {
-    return NotificationCtr.lock();
+    return NotificationCtr;
   }
 
   StringRef getRuntimeResourcePath() const { return RuntimeResourcePath; }

@@ -596,7 +596,7 @@ class SwiftDocumentSemanticInfo :
 
   const std::string Filename;
   std::weak_ptr<SwiftASTManager> ASTMgr;
-  std::weak_ptr<NotificationCenter> NotificationCtr;
+  std::shared_ptr<NotificationCenter> NotificationCtr;
   ThreadSafeRefCntPtr<SwiftInvocation> InvokRef;
   std::string CompilerArgsError;
 
@@ -612,7 +612,7 @@ class SwiftDocumentSemanticInfo :
 public:
   SwiftDocumentSemanticInfo(StringRef Filename,
                             std::weak_ptr<SwiftASTManager> ASTMgr,
-                            std::weak_ptr<NotificationCenter> NotificationCtr)
+                            std::shared_ptr<NotificationCenter> NotificationCtr)
       : Filename(Filename), ASTMgr(ASTMgr), NotificationCtr(NotificationCtr) {}
 
   SwiftInvocationRef getInvocation() const {
@@ -878,8 +878,7 @@ void SwiftDocumentSemanticInfo::updateSemanticInfo(
   }
 
   LOG_INFO_FUNC(High, "posted document update notification for: " << Filename);
-  if (auto notifications = NotificationCtr.lock())
-    notifications->postDocumentUpdateNotification(Filename);
+  NotificationCtr->postDocumentUpdateNotification(Filename);
 }
 
 namespace {
@@ -1030,7 +1029,7 @@ void SwiftDocumentSemanticInfo::processLatestSnapshotAsync(
 
 struct SwiftEditorDocument::Implementation {
   std::weak_ptr<SwiftASTManager> ASTMgr;
-  std::weak_ptr<NotificationCenter> NotificationCtr;
+  std::shared_ptr<NotificationCenter> NotificationCtr;
 
   const std::string FilePath;
   EditableTextBufferRef EditableBuffer;
