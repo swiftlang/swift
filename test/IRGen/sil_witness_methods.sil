@@ -148,7 +148,7 @@ entry:
 // CHECK:         [[CONTEXT:%.*]] = call noalias %swift.refcounted* @swift_allocObject({{.*}})
 // CHECK:         [[LAYOUT:%.*]] = bitcast %swift.refcounted* [[CONTEXT]] to <{ %swift.refcounted, i8* }>*
 // CHECK:         [[WTABLE:%.*]] = getelementptr inbounds <{ %swift.refcounted, i8* }>, <{ %swift.refcounted, i8* }>* [[LAYOUT]], i32 0, i32 1
-// CHECK:         store i8* null, i8** [[WTABLE]]
+// CHECK:         store i8* bitcast (i8** @"$s19sil_witness_methods3BarCyxq_q0_GAA1PAAWP" to i8*), i8** [[WTABLE]]
 // CHECK:         [[RESULT:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (%swift.type* (%T19sil_witness_methods3BarCyAA3FooVA2EG**, %swift.refcounted*)* @"$s36generic_type_concrete_method_witnessTA" to i8*), %swift.refcounted* undef }, %swift.refcounted* [[CONTEXT]], 1
 // CHECK:         ret { i8*, %swift.refcounted* } [[RESULT]]
 
