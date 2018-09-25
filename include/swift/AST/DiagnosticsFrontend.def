@@ -235,6 +235,10 @@ WARNING(cannot_assign_value_to_conditional_compilation_flag,none,
 ERROR(error_optimization_remark_pattern, none, "%0 in '%1'",
       (StringRef, StringRef))
 
+ERROR(error_invalid_debug_prefix_map, none,
+      "invalid argument '%0' to -debug-prefix-map; it must be of the form "
+      "'original=remapped'", (StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

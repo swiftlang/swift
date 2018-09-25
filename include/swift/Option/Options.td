@@ -472,6 +472,9 @@ def gline_tables_only : Flag<["-"], "gline-tables-only">,
 def gdwarf_types : Flag<["-"], "gdwarf-types">,
   Group<g_Group>, Flags<[FrontendOption]>,
   HelpText<"Emit full DWARF type info.">;
+def debug_prefix_map : Separate<["-"], "debug-prefix-map">,
+    Flags<[FrontendOption]>,
+    HelpText<"Remap source paths in debug info">;
 
 // Verify debug info
 def verify_debug_info : Flag<["-"], "verify-debug-info">,
