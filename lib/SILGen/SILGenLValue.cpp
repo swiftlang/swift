@@ -2748,14 +2748,7 @@ static SGFAccessKind getBaseAccessKind(SILGenModule &SGM,
 }
 
 static CanType getBaseFormalType(Expr *baseExpr) {
-  auto type = baseExpr->getType()->getCanonicalType();
-  if (auto lv = dyn_cast<LValueType>(type)) {
-    return lv.getObjectType();
-  } else if (auto inout = dyn_cast<InOutType>(type)) {
-    return inout.getObjectType();
-  } else {
-    return type;
-  }
+  return baseExpr->getType()->getWithoutSpecifierType()->getCanonicalType();
 }
 
 LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
