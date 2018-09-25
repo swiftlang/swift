@@ -99,6 +99,11 @@ static bool isUserIgnoredByPartitioning(SILInstruction *inst) {
 /// unexpected.
 static CanType getSingleElementDeclFieldType(NominalTypeDecl *decl) {
   auto *field = tf::getFieldIfContainsSingleField(decl);
+  if (!field)
+    if (auto *cd = decl->getAsClassOrClassExtensionContext())
+      if (auto superclass = cd->getSuperclass())
+        if (auto *superclassDecl = superclass->getAnyNominal())
+          field = getFieldIfContainsSingleField(superclassDecl);
   assert(field && "Struct should have one member");
   return field->getType()->getCanonicalType();
 }
@@ -3775,7 +3780,13 @@ void TFFunctionPartition::insertTensorComputationStartEndTerminate(
   auto tensorHandleDecl = ctx.getTensorHandleDecl();
   assert(getSingleElementDeclFieldType(tensorHandleDecl) &&
          "TensorHandle should have exactly one field");
-  auto tensorHandleMember = *tensorHandleDecl->getStoredProperties().begin();
+  auto *anyTensorHandleClass =
+      tensorHandleDecl->getSuperclass()->getAnyNominal();
+  auto anyTensorHandleSILTy = SILType::getPrimitiveObjectType(
+      anyTensorHandleClass->getDeclaredType()->getCanonicalType());
+  assert(anyTensorHandleClass);
+  auto *tensorHandleMember =
+      *anyTensorHandleClass->getStoredProperties().begin();
 
   // Ownership markers for CTensorHandle accesses.
   auto loadOwnership = hostFn.hasQualifiedOwnership()
@@ -3837,6 +3848,8 @@ void TFFunctionPartition::insertTensorComputationStartEndTerminate(
     // it.  If it is a scalar, then we need to box the scalar in a
     // CTensorHandle.
     if (isTensorHandle(tensorValue->getType().getASTType())) {
+      // Upcast to _AnyTensorHandle.
+      tensorValue = B.createUpcast(loc, tensorValue, anyTensorHandleSILTy);
       auto fieldAddress =
           B.createRefElementAddr(loc, tensorValue, tensorHandleMember);
       tensorValue = B.createLoad(loc, fieldAddress, loadOwnership);
@@ -3975,8 +3988,9 @@ void TFFunctionPartition::insertTensorComputationStartEndTerminate(
                                   /*objc*/ false, /*canAllocOnStack*/ false,
                                   /*elementTypes*/ {},
                                   /*elementCountOperands*/ {});
+    auto baseTH = B.createUpcast(loc, newTH, anyTensorHandleSILTy);
     auto fieldAddress =
-        B.createRefElementAddr(result.getLoc(), newTH, tensorHandleMember);
+        B.createRefElementAddr(result.getLoc(), baseTH, tensorHandleMember);
 
     B.createStore(result.getLoc(), newValue, fieldAddress, storeOwnership);
 
