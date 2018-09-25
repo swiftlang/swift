@@ -66,3 +66,13 @@ public extension ProWithAssociatedType {
   var NonReqVar: Int { return 1 }
   typealias NonReqAlias = Int
 }
+
+public protocol PSuper {
+  associatedtype T
+  func foo()
+}
+
+public protocol PSub: PSuper {
+  associatedtype T
+  func foo()
+}
