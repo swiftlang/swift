@@ -488,3 +488,28 @@ extension ClosedRange {
 // shorthand. TODO: Add documentation
 public typealias CountableClosedRange<Bound: Strideable> = ClosedRange<Bound>
   where Bound.Stride : SignedInteger
+
+extension ClosedRange: Codable where Bound: Codable {
+  private enum CodingKeys: String, CodingKey {
+    case from
+    case to
+  }
+
+  @inlinable
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let lowerBound = try container.decode(Bound.self, forKey: .from)
+    let upperBound = try container.decode(Bound.self, forKey: .to)
+    guard lowerBound <= upperBound else {
+      throw DecodingError.dataCorruptedError(forKey: CodingKeys.to, in: container, debugDescription: "upperBound (to) cannot be lower than lowerBound (from)")
+    }
+    self = lowerBound...upperBound
+  }
+
+  @inlinable
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(self.lowerBound, forKey: .from)
+    try container.encode(self.upperBound, forKey: .to)
+  }
+}
