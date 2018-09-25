@@ -363,7 +363,7 @@ extension Dictionary._Variant {
 
   @inlinable
   internal mutating func updateValue(
-    _ value: Value,
+    _ value: __owned Value,
     forKey key: Key
   ) -> Value? {
     switch self {
@@ -385,7 +385,7 @@ extension Dictionary._Variant {
   }
 
   @inlinable
-  internal mutating func setValue(_ value: Value, forKey key: Key) {
+  internal mutating func setValue(_ value: __owned Value, forKey key: Key) {
     switch self {
     case .native:
       let isUnique = self.isUniquelyReferenced()
@@ -461,7 +461,7 @@ extension Dictionary._Variant {
   /// - Complexity: O(1).
   @inlinable
   @inline(__always)
-  internal func makeIterator() -> Dictionary<Key, Value>.Iterator {
+  __consuming internal func makeIterator() -> Dictionary<Key, Value>.Iterator {
     switch self {
     case .native(let native):
       return Dictionary.Iterator(_native: native.makeIterator())
@@ -492,7 +492,7 @@ extension Dictionary._Variant {
 
   @inlinable
   internal mutating func merge<S: Sequence>(
-    _ keysAndValues: S,
+    _ keysAndValues: __owned S,
     uniquingKeysWith combine: (Value, Value) throws -> Value
   ) rethrows where S.Element == (Key, Value) {
     switch self {

@@ -30,7 +30,7 @@ internal struct _NativeSet<Element: Hashable> {
   /// Constructs a native set adopting the given storage.
   @inlinable
   @inline(__always)
-  internal init(_ storage: _RawSetStorage) {
+  internal init(_ storage: __owned _RawSetStorage) {
     self._storage = storage
   }
 
@@ -43,12 +43,12 @@ internal struct _NativeSet<Element: Hashable> {
 
 #if _runtime(_ObjC)
   @inlinable
-  internal init(_ cocoa: _CocoaSet) {
+  internal init(_ cocoa: __owned _CocoaSet) {
     self.init(cocoa, capacity: cocoa.count)
   }
 
   @inlinable
-  internal init(_ cocoa: _CocoaSet, capacity: Int) {
+  internal init(_ cocoa: __owned _CocoaSet, capacity: Int) {
     _sanityCheck(cocoa.count <= capacity)
     self.init(capacity: capacity)
     for element in cocoa {
@@ -272,7 +272,7 @@ extension _NativeSet { // Insertions
   /// Storage must be uniquely referenced with adequate capacity.
   /// The `element` must not be already present in the Set.
   @inlinable
-  internal func _unsafeInsertNew(_ element: Element) {
+  internal func _unsafeInsertNew(_ element: __owned Element) {
     _sanityCheck(count + 1 <= capacity)
     let hashValue = self.hashValue(for: element)
     if _isDebugAssertConfiguration() {
@@ -297,13 +297,13 @@ extension _NativeSet { // Insertions
   /// Storage must be uniquely referenced.
   /// The `element` must not be already present in the Set.
   @inlinable
-  internal mutating func insertNew(_ element: Element, isUnique: Bool) {
+  internal mutating func insertNew(_ element: __owned Element, isUnique: Bool) {
     _ = ensureUnique(isUnique: isUnique, capacity: count + 1)
     _unsafeInsertNew(element)
   }
 
   @inlinable
-  internal func _unsafeInsertNew(_ element: Element, at index: Index) {
+  internal func _unsafeInsertNew(_ element: __owned Element, at index: Index) {
     hashTable.insert(index)
     uncheckedInitialize(at: index, to: element)
     _storage._count += 1
@@ -311,7 +311,7 @@ extension _NativeSet { // Insertions
 
   @inlinable
   internal mutating func insertNew(
-    _ element: Element,
+    _ element: __owned Element,
     at index: Index,
     isUnique: Bool
   ) {
@@ -329,7 +329,7 @@ extension _NativeSet { // Insertions
 
   @inlinable
   internal mutating func update(
-    with element: Element,
+    with element: __owned Element,
     isUnique: Bool
   ) -> Element? {
     var (index, found) = find(element)
@@ -422,14 +422,14 @@ extension _NativeSet: Sequence {
     internal var iterator: _HashTable.Iterator
 
     @inlinable
-    init(_ base: _NativeSet) {
+    init(_ base: __owned _NativeSet) {
       self.base = base
       self.iterator = base.hashTable.makeIterator()
     }
   }
 
   @inlinable
-  __consuming internal func makeIterator() -> Iterator {
+  internal __consuming func makeIterator() -> Iterator {
     return Iterator(self)
   }
 }

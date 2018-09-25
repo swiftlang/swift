@@ -30,7 +30,7 @@ internal func _stdlib_NSDictionary_allKeys(
 
 extension _NativeDictionary { // Bridging
   @usableFromInline
-  internal func bridged() -> _NSDictionary {
+  __consuming internal func bridged() -> _NSDictionary {
     // We can zero-cost bridge if our keys are verbatim
     // or if we're the empty singleton.
 
@@ -70,7 +70,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
     _sanityCheckFailure("don't call this designated initializer")
   }
 
-  internal init(_ base: _NativeDictionary<Key, Value>) {
+  internal init(_ base: __owned _NativeDictionary<Key, Value>) {
     _sanityCheck(_isBridgedVerbatimToObjectiveC(Key.self))
     self.base = base
     self.bridgedKeys = nil
@@ -79,7 +79,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
   }
 
   @nonobjc
-  internal init(_ deferred: _SwiftDeferredNSDictionary<Key, Value>) {
+  internal init(_ deferred: __owned _SwiftDeferredNSDictionary<Key, Value>) {
     _sanityCheck(!_isBridgedVerbatimToObjectiveC(Key.self))
     self.base = deferred.native
     self.bridgedKeys = deferred.bridgeKeys()
@@ -158,7 +158,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   /// The unbridged elements.
   internal var native: _NativeDictionary<Key, Value>
 
-  internal init(_ native: _NativeDictionary<Key, Value>) {
+  internal init(_ native: __owned _NativeDictionary<Key, Value>) {
     _sanityCheck(native.count > 0)
     _sanityCheck(!_isBridgedVerbatimToObjectiveC(Key.self) ||
       !_isBridgedVerbatimToObjectiveC(Value.self))
@@ -427,7 +427,7 @@ internal struct _CocoaDictionary {
   internal let object: _NSDictionary
 
   @inlinable
-  internal init(_ object: _NSDictionary) {
+  internal init(_ object: __owned _NSDictionary) {
     self.object = object
   }
 }
@@ -580,14 +580,14 @@ extension _CocoaDictionary {
     internal var currentKeyIndex: Int
 
     @inlinable // FIXME(sil-serialize-all)
-    internal init(_ base: _CocoaDictionary, startIndex: ()) {
+    internal init(_ base: __owned _CocoaDictionary, startIndex: ()) {
       self.base = base
       self.allKeys = _stdlib_NSDictionary_allKeys(base.object)
       self.currentKeyIndex = 0
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    internal init(_ base: _CocoaDictionary, endIndex: ()) {
+    internal init(_ base: __owned _CocoaDictionary, endIndex: ()) {
       self.base = base
       self.allKeys = _stdlib_NSDictionary_allKeys(base.object)
       self.currentKeyIndex = allKeys.value
@@ -595,8 +595,8 @@ extension _CocoaDictionary {
 
     @inlinable // FIXME(sil-serialize-all)
     internal init(
-      _ base: _CocoaDictionary,
-      _ allKeys: _HeapBuffer<Int, AnyObject>,
+      _ base: __owned _CocoaDictionary,
+      _ allKeys: __owned _HeapBuffer<Int, AnyObject>,
       _ currentKeyIndex: Int
     ) {
       self.base = base
@@ -667,14 +667,14 @@ extension _CocoaDictionary: Sequence {
     internal var itemIndex: Int = 0
     internal var itemCount: Int = 0
 
-    internal init(_ base: _CocoaDictionary) {
+    internal init(_ base: __owned _CocoaDictionary) {
       self.base = base
     }
   }
 
   @usableFromInline
   @_effects(releasenone)
-  internal func makeIterator() -> Iterator {
+  internal __consuming func makeIterator() -> Iterator {
     return Iterator(self)
   }
 }
@@ -721,7 +721,7 @@ extension _CocoaDictionary.Iterator: IteratorProtocol {
 
 extension Dictionary {
   @inlinable
-  public func _bridgeToObjectiveCImpl() -> _NSDictionaryCore {
+  public __consuming func _bridgeToObjectiveCImpl() -> _NSDictionaryCore {
     switch _variant {
     case .native(let nativeDictionary):
       return nativeDictionary.bridged()
@@ -733,7 +733,7 @@ extension Dictionary {
   /// Returns the native Dictionary hidden inside this NSDictionary;
   /// returns nil otherwise.
   public static func _bridgeFromObjectiveCAdoptingNativeStorageOf(
-    _ s: AnyObject
+    _ s: __owned AnyObject
   ) -> Dictionary<Key, Value>? {
 
     // Try all three NSDictionary impls that we currently provide.
