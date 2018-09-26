@@ -1424,21 +1424,6 @@ extension FloatingPoint {
   public static func < (lhs: Self, rhs: Self) -> Bool {
     return lhs.isLess(than: rhs)
   }
-
-  @_transparent
-  public static func <= (lhs: Self, rhs: Self) -> Bool {
-    return lhs.isLessThanOrEqualTo(rhs)
-  }
-
-  @_transparent
-  public static func > (lhs: Self, rhs: Self) -> Bool {
-    return rhs.isLess(than: lhs)
-  }
-
-  @_transparent
-  public static func >= (lhs: Self, rhs: Self) -> Bool {
-    return rhs.isLessThanOrEqualTo(lhs)
-  }
 }
 
 /// A radix-2 (binary) floating-point type.

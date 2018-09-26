@@ -1771,20 +1771,6 @@ ${assignmentOperatorComment(x.operator, True)}
 
 %   end
 
-  @_transparent
-  public static func <= (lhs: ${Self}, rhs: ${Self}) -> Bool {
-    return !(rhs < lhs)
-  }
-
-  @_transparent
-  public static func >= (lhs: ${Self}, rhs: ${Self}) -> Bool {
-    return !(lhs < rhs)
-  }
-
-  @_transparent
-  public static func > (lhs: ${Self}, rhs: ${Self}) -> Bool {
-    return rhs < lhs
-  }
 }
 
 

@@ -183,7 +183,8 @@ extension Comparable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
-  @inlinable
+  // Transparent because some use with literals generate compile-time warnings.
+  @_transparent
   public static func > (lhs: Self, rhs: Self) -> Bool {
     return rhs < lhs
   }
@@ -197,7 +198,8 @@ extension Comparable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
-  @inlinable
+  // Transparent because some use with literals generate compile-time warnings.
+  @_transparent
   public static func <= (lhs: Self, rhs: Self) -> Bool {
     return !(rhs < lhs)
   }
@@ -213,7 +215,8 @@ extension Comparable {
   ///   - rhs: Another value to compare.
   /// - Returns: `true` if `lhs` is greater than or equal to `rhs`; otherwise,
   ///   `false`.
-  @inlinable
+  // Transparent because some use with literals generate compile-time warnings.
+  @_transparent
   public static func >= (lhs: Self, rhs: Self) -> Bool {
     return !(lhs < rhs)
   }
