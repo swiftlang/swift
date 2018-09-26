@@ -463,7 +463,7 @@ void swift::findClosuresForFunctionValue(
     // Look through Phis.
     //
     // This should be done before calling findClosureStoredIntoBlock.
-    if (auto *arg = dyn_cast<SILPHIArgument>(V)) {
+    if (auto *arg = dyn_cast<SILPhiArgument>(V)) {
       SmallVector<std::pair<SILBasicBlock *, SILValue>, 2> blockArgs;
       arg->getIncomingPhiValues(blockArgs);
       for (auto &blockAndArg : blockArgs)

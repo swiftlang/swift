@@ -63,7 +63,7 @@ class SILInstructionResultArray;
 class SILOpenedArchetypesState;
 class SILType;
 class SILArgument;
-class SILPHIArgument;
+class SILPhiArgument;
 class SILUndef;
 class Stmt;
 class StringLiteralExpr;
@@ -6608,7 +6608,7 @@ public:
 
   using SuccessorBlockArgumentsListTy =
       TransformRange<ConstSuccessorListTy,
-                     function_ref<PHIArgumentArrayRef(const SILSuccessor &)>>;
+                     function_ref<PhiArgumentArrayRef(const SILSuccessor &)>>;
 
   /// Return the range of Argument arrays for each successor of this
   /// block.
@@ -6827,10 +6827,10 @@ public:
   unsigned getNumArgs() const { return getAllOperands().size(); }
   SILValue getArg(unsigned i) const { return getAllOperands()[i].get(); }
 
-  /// Return the SILPHIArgument for the given operand.
+  /// Return the SILPhiArgument for the given operand.
   ///
   /// See SILArgument.cpp.
-  const SILPHIArgument *getArgForOperand(const Operand *oper) const;
+  const SILPhiArgument *getArgForOperand(const Operand *oper) const;
 };
 
 /// A conditional branch.
@@ -6972,14 +6972,14 @@ public:
   SILValue getArgForDestBB(const SILBasicBlock *DestBB,
                            unsigned ArgIndex) const;
 
-  /// Return the SILPHIArgument from either the true or false destination for
+  /// Return the SILPhiArgument from either the true or false destination for
   /// the given operand.
   ///
   /// Returns nullptr for an operand with no block argument
   /// (i.e the branch condition).
   ///
   /// See SILArgument.cpp.
-  const SILPHIArgument *getArgForOperand(const Operand *oper) const;
+  const SILPhiArgument *getArgForOperand(const Operand *oper) const;
 
   void swapSuccessors();
 };

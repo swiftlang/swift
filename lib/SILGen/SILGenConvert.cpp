@@ -242,7 +242,7 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
   SILType payloadType = optional.getType().getOptionalObjectType();
 
   if (payloadType.isObject()) {
-    result = B.createOwnedPHIArgument(payloadType);
+    result = B.createOwnedPhiArgument(payloadType);
   } else {
     result =
         B.createUncheckedTakeEnumDataAddr(loc, optional, someDecl, payloadType);
@@ -419,7 +419,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
         emitTemporaryAllocation(loc, resultTy), resultTL);
   } else {
     SILGenSavedInsertionPoint IP(*this, contBB);
-    finalResult = B.createOwnedPHIArgument(resultTL.getLoweredType());
+    finalResult = B.createOwnedPhiArgument(resultTL.getLoweredType());
   }
 
   SEBuilder.addOptionalSomeCase(
@@ -727,7 +727,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
         // layering reasons, so perform an unchecked cast down to NSError.
         SILType anyObjectTy =
             potentialNSError.getType().getOptionalObjectType();
-        ManagedValue nsError = B.createOwnedPHIArgument(anyObjectTy);
+        ManagedValue nsError = B.createOwnedPhiArgument(anyObjectTy);
         nsError = B.createUncheckedRefCast(loc, nsError, 
                                            getLoweredType(nsErrorType));
 
@@ -756,7 +756,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       // Continue.
       B.emitBlock(contBB);
 
-      SILValue existentialResult = contBB->createPHIArgument(
+      SILValue existentialResult = contBB->createPhiArgument(
           existentialTL.getLoweredType(), ValueOwnershipKind::Owned);
       return emitManagedRValueWithCleanup(existentialResult, existentialTL);
     }

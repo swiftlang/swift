@@ -271,7 +271,7 @@ SILGenFunction::emitFormalEvaluationManagedBorrowedRValueWithCleanup(
 }
 
 ManagedValue
-SILGenFunction::emitManagedBorrowedArgumentWithCleanup(SILPHIArgument *arg) {
+SILGenFunction::emitManagedBorrowedArgumentWithCleanup(SILPhiArgument *arg) {
   if (arg->getOwnershipKind() == ValueOwnershipKind::Trivial ||
       arg->getType().isTrivial(arg->getModule())) {
     return ManagedValue::forUnmanaged(arg);
@@ -1293,7 +1293,7 @@ void SILGenFunction::ForceTryEmission::finish() {
     SILGenSavedInsertionPoint scope(SGF, catchBB, FunctionSection::Postmatter);
 
     ASTContext &ctx = SGF.getASTContext();
-    auto error = catchBB->createPHIArgument(SILType::getExceptionType(ctx),
+    auto error = catchBB->createPhiArgument(SILType::getExceptionType(ctx),
                                             ValueOwnershipKind::Owned);
     SGF.B.createBuiltin(Loc, ctx.getIdentifier("unexpectedError"),
                         SGF.SGM.Types.getEmptyTupleType(), {}, {error});
@@ -1388,7 +1388,7 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   SGF.B.emitBlock(catchBB);
   FullExpr catchCleanups(SGF.Cleanups, E);
   auto *errorArg =
-      catchBB->createPHIArgument(SILType::getExceptionType(SGF.getASTContext()),
+      catchBB->createPhiArgument(SILType::getExceptionType(SGF.getASTContext()),
                                  ValueOwnershipKind::Owned);
   (void) SGF.emitManagedRValueWithCleanup(errorArg);
   catchCleanups.pop();
@@ -1408,7 +1408,7 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   // If this was done in SSA registers, then the value is provided as an
   // argument to the block.
   if (!isByAddress) {
-    auto arg = contBB->createPHIArgument(optTL.getLoweredType(),
+    auto arg = contBB->createPhiArgument(optTL.getLoweredType(),
                                          ValueOwnershipKind::Owned);
     return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(arg, optTL));
   }
@@ -3350,7 +3350,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     
     subSGF.B.emitBlock(returnBB);
     scope.pop();
-    SILValue returnVal = returnBB->createPHIArgument(i1Ty,
+    SILValue returnVal = returnBB->createPhiArgument(i1Ty,
                                                    ValueOwnershipKind::Trivial);
     auto returnBoolVal = subSGF.B.createStruct(loc,
       SILType::getPrimitiveObjectType(boolTy), returnVal);
@@ -4021,7 +4021,7 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
   if (resultTL.isAddressOnly()) {
     addrOnlyResultBuf = SGF.emitTemporary(loc, resultTL);
   } else {
-    contBBArg = contBB->createPHIArgument(resultTy, ValueOwnershipKind::Owned);
+    contBBArg = contBB->createPhiArgument(resultTy, ValueOwnershipKind::Owned);
   }
 
   SwitchEnumBuilder SEB(SGF.B, loc, optVal);
@@ -5012,14 +5012,14 @@ void SILGenFunction::emitOptionalEvaluation(SILLocation loc, Type optType,
   if (isByAddress) {
     assert(results[0].isInContext());
   } else {
-    auto arg = contBB->createPHIArgument(optTL.getLoweredType(),
+    auto arg = contBB->createPhiArgument(optTL.getLoweredType(),
                                          ValueOwnershipKind::Owned);
     results[0] = emitManagedRValueWithCleanup(arg, optTL);
   }
 
   // Create PHIs for all the secondary results and manage them.
   for (auto &result : MutableArrayRef<ManagedValue>(results).slice(1)) {
-    auto arg = contBB->createPHIArgument(result.getType(),
+    auto arg = contBB->createPhiArgument(result.getType(),
                                          ValueOwnershipKind::Owned);
     result = emitManagedRValueWithCleanup(arg);
   }

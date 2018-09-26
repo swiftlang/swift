@@ -1808,7 +1808,7 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
       auto *eltTL = &SGF.getTypeLowering(eltTy);
 
       SILValue eltValue =
-          caseBB->createPHIArgument(eltTy, ValueOwnershipKind::Owned);
+          caseBB->createPhiArgument(eltTy, ValueOwnershipKind::Owned);
 
       // We performed a copy early, so we get a +1 value here.
       origCMV = getManagedSubobject(SGF, eltValue, *eltTL,
@@ -1855,7 +1855,7 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
   // Emit the default block if we needed one.
   if (SILBasicBlock *defaultBB = blocks.getDefaultBlock()) {
     SGF.B.setInsertionPoint(defaultBB);
-    SGF.B.createOwnedPHIArgument(src.getType());
+    SGF.B.createOwnedPhiArgument(src.getType());
     outerFailure(rows.back().Pattern);
   }
 }
@@ -2015,7 +2015,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
           eltValue = eltTL->emitLoad(SGF.B, loc, eltValue,
                                      LoadOwnershipQualifier::Take);
       } else {
-        eltValue = caseBB->createPHIArgument(eltTy, ValueOwnershipKind::Owned);
+        eltValue = caseBB->createPhiArgument(eltTy, ValueOwnershipKind::Owned);
       }
 
       origCMV = getManagedSubobject(SGF, eltValue, *eltTL, eltConsumption);
@@ -2217,7 +2217,7 @@ void PatternMatchEmission::initSharedCaseBlockDest(CaseStmt *caseBlock,
       SILType ty = SGF.getLoweredType(V->getType());
       if (ty.isAddressOnly(SGF.F.getModule()))
         return;
-      block->createPHIArgument(ty, ValueOwnershipKind::Owned, V);
+      block->createPhiArgument(ty, ValueOwnershipKind::Owned, V);
     });
   }
 }

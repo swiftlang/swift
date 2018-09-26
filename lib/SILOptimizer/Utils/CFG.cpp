@@ -463,7 +463,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     assert(SuccBB->getNumArguments() < 2 && "Can take at most one argument");
     if (!SuccBB->getNumArguments())
       return;
-    Args.push_back(NewEdgeBB->createPHIArgument(
+    Args.push_back(NewEdgeBB->createPhiArgument(
         SuccBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
     return;
   }
@@ -475,7 +475,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
         (EdgeIdx == 0) ? DMBI->getHasMethodBB() : DMBI->getNoMethodBB();
     if (!SuccBB->getNumArguments())
       return;
-    Args.push_back(NewEdgeBB->createPHIArgument(
+    Args.push_back(NewEdgeBB->createPhiArgument(
         SuccBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
     return;
   }
@@ -486,7 +486,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!SuccBB->getNumArguments())
       return;
-    Args.push_back(NewEdgeBB->createPHIArgument(
+    Args.push_back(NewEdgeBB->createPhiArgument(
         SuccBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
     return;
   }
@@ -495,7 +495,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!SuccBB->getNumArguments())
       return;
-    Args.push_back(NewEdgeBB->createPHIArgument(
+    Args.push_back(NewEdgeBB->createPhiArgument(
         SuccBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
     return;
   }
@@ -504,7 +504,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!SuccBB->getNumArguments())
       return;
-    Args.push_back(NewEdgeBB->createPHIArgument(
+    Args.push_back(NewEdgeBB->createPhiArgument(
         SuccBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
     return;
   }
@@ -514,7 +514,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     auto *SuccBB = EdgeIdx == 0 ? TAI->getNormalBB() : TAI->getErrorBB();
     if (!SuccBB->getNumArguments())
       return;
-    Args.push_back(NewEdgeBB->createPHIArgument(
+    Args.push_back(NewEdgeBB->createPhiArgument(
         SuccBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
     return;
   }

@@ -1063,9 +1063,9 @@ bool TermInst::isFunctionExiting() const {
 
 TermInst::SuccessorBlockArgumentsListTy
 TermInst::getSuccessorBlockArguments() const {
-  function_ref<PHIArgumentArrayRef(const SILSuccessor &)> op;
-  op = [](const SILSuccessor &succ) -> PHIArgumentArrayRef {
-    return succ.getBB()->getPHIArguments();
+  function_ref<PhiArgumentArrayRef(const SILSuccessor &)> op;
+  op = [](const SILSuccessor &succ) -> PhiArgumentArrayRef {
+    return succ.getBB()->getPhiArguments();
   };
   return SuccessorBlockArgumentsListTy(getSuccessors(), op);
 }

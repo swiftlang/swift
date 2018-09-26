@@ -266,7 +266,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
       B.createReturn(ctor, emitEmptyTuple(ctor));
     } else {
       // Pass 'nil' as the return value to the exit BB.
-      failureExitArg = failureExitBB->createPHIArgument(
+      failureExitArg = failureExitBB->createPhiArgument(
           resultLowering.getLoweredType(), ValueOwnershipKind::Owned);
       SILValue nilResult =
           B.createEnum(ctor, SILValue(), getASTContext().getOptionalNoneDecl(),
@@ -651,7 +651,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
                                       FunctionSection::Postmatter);
 
     failureExitBB = createBasicBlock();
-    failureExitArg = failureExitBB->createPHIArgument(
+    failureExitArg = failureExitBB->createPhiArgument(
         resultLowering.getLoweredType(), ValueOwnershipKind::Owned);
 
     Cleanups.emitCleanupsForReturn(ctor, IsForUnwind);

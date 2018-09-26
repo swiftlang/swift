@@ -27,11 +27,11 @@
 namespace swift {
 
 class SILArgument;
-class SILPHIArgument;
+class SILPhiArgument;
 class SILFunctionArgument;
 
-using PHIArgumentArrayRef =
-    TransformArrayRef<function_ref<SILPHIArgument *(SILArgument *)>>;
+using PhiArgumentArrayRef =
+    TransformArrayRef<function_ref<SILPhiArgument *(SILArgument *)>>;
 
 using FunctionArgumentArrayRef =
     TransformArrayRef<function_ref<SILFunctionArgument *(SILArgument *)>>;

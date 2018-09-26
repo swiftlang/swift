@@ -358,10 +358,10 @@ public:
 
     // Create block arguments.
     for (unsigned ArgIdx : range(EdgeBB->getNumArguments())) {
-      auto *DestPHIArg = cast<SILPHIArgument>(EdgeBB->getArgument(ArgIdx));
+      auto *DestPHIArg = cast<SILPhiArgument>(EdgeBB->getArgument(ArgIdx));
       assert(BI->getArg(ArgIdx)->getType() == DestPHIArg->getType() &&
              "Types must match");
-      auto *BlockArg = DestBB->createPHIArgument(
+      auto *BlockArg = DestBB->createPhiArgument(
           DestPHIArg->getType(), DestPHIArg->getOwnershipKind());
       ValueMap[DestPHIArg] = SILValue(BlockArg);
       AvailVals.push_back(std::make_pair(DestPHIArg, BlockArg));

@@ -24,14 +24,14 @@ namespace llvm {
 
 namespace swift {
 
-class SILPHIArgument;
+class SILPhiArgument;
 class SILBasicBlock;
 class SILType;
 class SILUndef;
 
 /// Independent utility that canonicalizes BB arguments by reusing structurally
 /// equivalent arguments and replacing the original arguments with casts.
-SILValue replaceBBArgWithCast(SILPHIArgument *Arg);
+SILValue replaceBBArgWithCast(SILPhiArgument *Arg);
 
 /// This class updates SSA for a set of SIL instructions defined in multiple
 /// blocks.
@@ -49,7 +49,7 @@ class SILSSAUpdater {
   std::unique_ptr<SILUndef, void(*)(SILUndef *)> PHISentinel;
 
   // If not null updated with inserted 'phi' nodes (SILArgument).
-  SmallVectorImpl<SILPHIArgument *> *InsertedPHIs;
+  SmallVectorImpl<SILPhiArgument *> *InsertedPHIs;
 
   // Not copyable.
   void operator=(const SILSSAUpdater &) = delete;
@@ -57,7 +57,7 @@ class SILSSAUpdater {
 
 public:
   explicit SILSSAUpdater(
-      SmallVectorImpl<SILPHIArgument *> *InsertedPHIs = nullptr);
+      SmallVectorImpl<SILPhiArgument *> *InsertedPHIs = nullptr);
   ~SILSSAUpdater();
 
   /// \brief Initialize for a use of a value of type.

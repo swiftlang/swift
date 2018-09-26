@@ -1520,7 +1520,7 @@ public:
         if (SGF.B.hasValidInsertionPoint())
           SGF.B.createBranch(returnLoc, returnBB, returnValue);
         returnValue =
-            returnBB->createPHIArgument(returnType, ValueOwnershipKind::Owned);
+            returnBB->createPhiArgument(returnType, ValueOwnershipKind::Owned);
         SGF.B.emitBlock(returnBB);
 
         // Emit the rethrow block.
