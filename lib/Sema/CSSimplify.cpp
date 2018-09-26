@@ -2701,6 +2701,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     return result;
   }
 
+  // Let's not try to fix missing conformance for Void
+  // and Never because that doesn't really make sense.
+  if (type->isVoid() || type->isUninhabited())
+    return SolutionKind::Error;
+
   // If this is a generic requirement let's try to record that
   // conformance is missing and consider this a success, which
   // makes it much easier to diagnose problems like that.
