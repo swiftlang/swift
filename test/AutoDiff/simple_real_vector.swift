@@ -1,10 +1,11 @@
 // RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
 
 @_fixed_layout
-public struct Vector : VectorNumeric {
+public struct Vector : VectorNumeric, Differentiable {
   public var x: Float
   public var y: Float
 
+  public typealias TangentVector = Vector
   public typealias ScalarElement = Float
   public typealias Dimensionality = ()
 

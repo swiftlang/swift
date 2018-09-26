@@ -3865,6 +3865,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::TensorProtocol:
   case KnownProtocolKind::TensorSendableReceivable:
   case KnownProtocolKind::VectorNumeric:
+  case KnownProtocolKind::Differentiable:
     return SpecialProtocol::None;
   }
 

@@ -57,36 +57,24 @@ public protocol VectorNumeric {
   static func * (lhs: ScalarElement, rhs: Self) -> Self
 }
 
-/// A type that represents an vector space that corresponds to a differentiable
-/// manifold. A differentiable vector space defines a corresponding tangent
-/// space and a corresponding cotangent space, i.e. the dual space of the
-/// tangent space.
+/// A type that mathematically represents a differentiable manifold.
 ///
-/// In automatic differentiation, forward-mode differentiation will produce
-/// Jacobian-vector products of `Tangent` type; reverse-mode differentiation
-/// will produce vector-Jacobian products of `Cotangent` type.
-public protocol DifferentiableVectorNumeric : VectorNumeric
-  where ScalarElement : FloatingPoint {
-  /// The tangent space of the vector space represented by the enclosing type.
-  associatedtype Tangent : VectorNumeric
+/// In automatic differentiation, differentiation will produce a Jacobian whose
+/// elements are of `Tangent` type.
+public protocol Differentiable {
+  /// The tangent vector space of this differentiable manifold.
+  associatedtype TangentVector : VectorNumeric
+    where TangentVector.ScalarElement : FloatingPoint
 
-  /// The cotangent space of the vector space represented by the enclosing type.
-  associatedtype Cotangent : VectorNumeric
-
-  var tangent: Tangent { get }
-
-  var cotangent: Cotangent { get }
+  /// Move `self` along the value space towards the given tangent vector. In
+  /// Riemannian geometry (mathematics), this represents an exponential map.
+  func moved(toward direction: TangentVector) -> Self
 }
 
-public extension DifferentiableVectorNumeric where Tangent == Self {
-  var tangent: Tangent {
-    return self
-  }
-}
-
-public extension DifferentiableVectorNumeric where Cotangent == Self {
-  var cotangent: Cotangent {
-    return self
+public extension Differentiable
+  where Self : VectorNumeric, TangentVector == Self {
+  func moved(toward direction: TangentVector) -> Self {
+    return self + direction
   }
 }
 
@@ -145,8 +133,8 @@ func _valueAndGradientBodyUnreachable() {
 
 @inlinable // FIXME(sil-serialize-all)
 @_transparent @_semantics("typechecker.gradient(of:)")
-public func gradient<T, R>(of function: (T) -> R) -> (T) -> T.Cotangent
-  where T : DifferentiableVectorNumeric, R : DifferentiableVectorNumeric {
+public func gradient<T, R>(of function: (T) -> R) -> (T) -> T.TangentVector
+  where T : Differentiable, R : Differentiable {
   _gradientBodyUnreachable()
 }
 
@@ -155,9 +143,9 @@ public func gradient<T, R>(of function: (T) -> R) -> (T) -> T.Cotangent
 @_semantics("typechecker.gradient(of:)")
 public func gradient<T, U, R>(
   of function: (T, U) -> R
-) -> (T, U) -> (T.Cotangent, U.Cotangent)
-  where T : DifferentiableVectorNumeric, U : DifferentiableVectorNumeric,
-        R : DifferentiableVectorNumeric {
+) -> (T, U) -> (T.TangentVector, U.TangentVector)
+  where T : Differentiable, U : Differentiable,
+        R : Differentiable {
   _gradientBodyUnreachable()
 }
 
@@ -166,9 +154,9 @@ public func gradient<T, U, R>(
 @_semantics("typechecker.gradient(of:)")
 public func gradient<T, U, V, R>(
   of function: (T, U, V) -> R
-) -> (T, U, V) -> (T.Cotangent, U.Cotangent, V.Cotangent)
-  where T : DifferentiableVectorNumeric, U : DifferentiableVectorNumeric,
-        V : DifferentiableVectorNumeric, R : DifferentiableVectorNumeric {
+) -> (T, U, V) -> (T.TangentVector, U.TangentVector, V.TangentVector)
+  where T : Differentiable, U : Differentiable,
+        V : Differentiable, R : Differentiable {
   _gradientBodyUnreachable()
 }
 
@@ -177,10 +165,11 @@ public func gradient<T, U, V, R>(
 @_semantics("typechecker.gradient(of:)")
 public func gradient<T, U, V, W, R>(
   of function: (T, U, V, W) -> R
-) -> (T, U, V, W) -> (T.Cotangent, U.Cotangent, V.Cotangent, W.Cotangent)
-  where T : DifferentiableVectorNumeric, U : DifferentiableVectorNumeric,
-        V : DifferentiableVectorNumeric, W : DifferentiableVectorNumeric,
-        R : DifferentiableVectorNumeric {
+) -> (T, U, V, W) -> (T.TangentVector, U.TangentVector, V.TangentVector,
+                      W.TangentVector)
+  where T : Differentiable, U : Differentiable,
+        V : Differentiable, W : Differentiable,
+        R : Differentiable {
   _gradientBodyUnreachable()
 }
 
@@ -189,8 +178,8 @@ public func gradient<T, U, V, W, R>(
 @_semantics("typechecker.valueAndGradient(of:)")
 public func valueAndGradient<T, R>(
   of function: (T) -> R
-) -> (T) -> (value: R, gradient: T.Cotangent)
-  where T : DifferentiableVectorNumeric, R : DifferentiableVectorNumeric {
+) -> (T) -> (value: R, gradient: T.TangentVector)
+  where T : Differentiable, R : Differentiable {
   _valueAndGradientBodyUnreachable()
 }
 
@@ -199,9 +188,9 @@ public func valueAndGradient<T, R>(
 @_semantics("typechecker.valueAndGradient(of:)")
 public func valueAndGradient<T, U, R>(
   of function: (T, U) -> R
-) -> (T, U) -> (value: R, gradient: (T.Cotangent, U.Cotangent))
-  where T : DifferentiableVectorNumeric, U : DifferentiableVectorNumeric,
-        R : DifferentiableVectorNumeric {
+) -> (T, U) -> (value: R, gradient: (T.TangentVector, U.TangentVector))
+  where T : Differentiable, U : Differentiable,
+        R : Differentiable {
   _valueAndGradientBodyUnreachable()
 }
 
@@ -210,9 +199,10 @@ public func valueAndGradient<T, U, R>(
 @_semantics("typechecker.valueAndGradient(of:)")
 public func valueAndGradient<T, U, V, R>(
   of function: (T, U, V) -> R
-) -> (T, U, V) -> (value: R, gradient: (T.Cotangent, U.Cotangent, V.Cotangent))
-  where T : DifferentiableVectorNumeric, U : DifferentiableVectorNumeric,
-        V : DifferentiableVectorNumeric, R : DifferentiableVectorNumeric {
+) -> (T, U, V) -> (value: R, gradient: (T.TangentVector, U.TangentVector,
+                                        V.TangentVector))
+  where T : Differentiable, U : Differentiable,
+        V : Differentiable, R : Differentiable {
   _valueAndGradientBodyUnreachable()
 }
 
@@ -222,10 +212,11 @@ public func valueAndGradient<T, U, V, R>(
 public func valueAndGradient<T, U, V, W, R>(
   of function: (T, U, V, W) -> R
 ) -> (T, U, V, W)
-  -> (value: R, gradient: (T.Cotangent, U.Cotangent, V.Cotangent, W.Cotangent))
-  where T : DifferentiableVectorNumeric, U : DifferentiableVectorNumeric,
-        V : DifferentiableVectorNumeric, W : DifferentiableVectorNumeric,
-        R : DifferentiableVectorNumeric {
+  -> (value: R, gradient: (T.TangentVector, U.TangentVector, V.TangentVector,
+                           W.TangentVector))
+  where T : Differentiable, U : Differentiable,
+        V : Differentiable, W : Differentiable,
+        R : Differentiable {
   _valueAndGradientBodyUnreachable()
 }
 

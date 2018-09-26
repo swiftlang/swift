@@ -75,6 +75,7 @@ PROTOCOL(Parameterized)
 PROTOCOL(TensorProtocol)
 PROTOCOL(TensorSendableReceivable)
 PROTOCOL(VectorNumeric)
+PROTOCOL(Differentiable)
 
 PROTOCOL_(ObjectiveCBridgeable)
 PROTOCOL_(DestructorSafeContainer)

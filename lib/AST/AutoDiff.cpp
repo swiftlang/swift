@@ -12,6 +12,7 @@
 
 #include "swift/AST/AutoDiff.h"
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 
