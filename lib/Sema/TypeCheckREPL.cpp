@@ -308,7 +308,7 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
   E = TC.coerceToRValue(E);
 
   // Create the meta-variable, let the typechecker name it.
-  Identifier name = TC.getNextResponseVariableName(SF.getParentModule());
+  Identifier name = TC.getNextResponseVariableName(&SF);
   VarDecl *vd = new (Context) VarDecl(/*IsStatic*/false,
                                       VarDecl::Specifier::Let,
                                       /*IsCaptureList*/false, E->getStartLoc(),
@@ -456,5 +456,6 @@ void TypeChecker::processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
   }
 
   contextualizeTopLevelCode(TLC, llvm::makeArrayRef(SF.Decls).slice(FirstDecl));
+  SF.clearLookupCache();
 }
 

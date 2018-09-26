@@ -1305,6 +1305,12 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
     if (next->getName() == getParentModule()->getName())
       return true;
 
+    // Hack: Assume other REPL files already have their libraries linked.
+    if (!next->getFiles().empty())
+      if (auto *nextSource = dyn_cast<SourceFile>(next->getFiles().front()))
+        if (nextSource->Kind == SourceFileKind::REPL)
+          return true;
+
     next->collectLinkLibraries(callback);
     return true;
   });

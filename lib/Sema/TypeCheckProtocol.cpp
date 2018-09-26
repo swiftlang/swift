@@ -1156,6 +1156,8 @@ bool WitnessChecker::checkWitnessAccess(AccessScope &requiredAccessScope,
                                         ValueDecl *witness,
                                         bool *isSetter) {
   *isSetter = false;
+  if (!TC.getLangOpts().EnableAccessControl)
+    return false;
 
   // Compute the intersection of the conforming type's access scope
   // and the protocol's access scope.
