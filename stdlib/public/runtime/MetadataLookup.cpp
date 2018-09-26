@@ -958,120 +958,72 @@ public:
     // Figure out the various levels of generic parameters we have in
     // this type.
     std::vector<unsigned> genericParamCounts;
-    bool innermostIsGeneric;
+    (void)_gatherGenericParameterCounts(typeDecl, genericParamCounts);
 
-    // If we have no parent given, try to form the whole type in one go.
-    if (!parent) {
-      innermostIsGeneric = !genericArgs.empty();
-      if (innermostIsGeneric) {
-        genericParamCounts.push_back(genericArgs.size());
-      }
-    // Otherwise, we'll need to steal the generic arguments from the parent
-    // type to build a nested type.
-    } else {
-      innermostIsGeneric = _gatherGenericParameterCounts(typeDecl,
-                                                         genericParamCounts);
-    }
-    bool isGeneric = !genericParamCounts.empty();
+    // Check whether we have the right number of innermost generic arguments.
+    if (genericArgs.size() != getLocalGenericParams(typeDecl).size())
+      return BuiltType();
 
-    // Gather the generic arguments.
     std::vector<const void *> allGenericArgsVec;
-    ArrayRef<const void *> allGenericArgs;
 
-    // If the innermost type is generic, we need to gather arguments and
-    // check requirements.
-    if (innermostIsGeneric) {
-      // If no generic arguments were provided at this level, fail.
-      if (genericArgs.empty()) return BuiltType();
+    // If there are generic parameters at any level, check the generic
+    // requirements and fill in the generic arguments vector.
+    if (!genericParamCounts.empty()) {
+      // Compute the set of generic arguments "as written".
+      std::vector<const Metadata *> allGenericArgs;
 
-      unsigned startParamIndex;
-      if (genericParamCounts.size() > 1) {
-        // When there is more than one level of generic parameters, copy all of
-        // the key type parameters from the parent (but not any of the other
-        // requirements, e.g., witness tables are excluded).
-        auto parentGenericArgs = parent->getGenericArgs();
-        auto parentGenericParams =
-          typeDecl->Parent->getGenericContext()->getGenericParams();
-        unsigned parentArgIndex = 0;
-        for (const auto &parentGenericParam : parentGenericParams) {
-          if (parentGenericParam.hasKeyArgument())
-            allGenericArgsVec.push_back(parentGenericArgs[parentArgIndex++]);
+      // If we have a parent, gather it's generic arguments "as written".
+      if (parent) {
+        gatherWrittenGenericArgs(parent, parent->getTypeContextDescriptor(),
+                                 allGenericArgs);
+      }
+
+      // Add this level of arguments.
+      allGenericArgs.insert(allGenericArgs.end(),
+                            genericArgs.begin(), genericArgs.end());
+
+      // Copy the generic arguments needed for metadata from the generic
+      // arguments "as written".
+      auto genericContext = typeDecl->getGenericContext();
+      {
+        auto genericParams = genericContext->getGenericParams();
+        for (unsigned i = 0, n = genericParams.size(); i != n; ++i) {
+          const auto &param = genericParams[i];
+          if (param.getKind() != GenericParamKind::Type)
+            return BuiltType();
+          if (param.hasExtraArgument())
+            return BuiltType();
+
+          if (param.hasKeyArgument())
+            allGenericArgsVec.push_back(allGenericArgs[i]);
         }
-
-        startParamIndex = parentGenericParams.size();
-      } else {
-        startParamIndex = 0;
       }
 
       // If we have the wrong number of generic arguments, fail.
-      auto genericContext = typeDecl->getGenericContext();
-      auto genericParams = genericContext->getGenericParams();
-      if (genericArgs.size() != genericParamCounts.back() - startParamIndex)
-        return BuiltType();
-
-      // Add generic arguments for the key parameters at this level.
-      unsigned genericArgIndex = 0;
-      for (const auto &genericParam : genericParams.slice(startParamIndex)) {
-        if (genericParam.hasKeyArgument())
-          allGenericArgsVec.push_back(genericArgs[genericArgIndex++]);
-      }
 
       // Check whether the generic requirements are satisfied, collecting
       // any extra arguments we need for the instantiation function.
+      SubstGenericParametersFromWrittenArgs substitutions(allGenericArgs,
+                                                          genericParamCounts);
       bool failed =
         _checkGenericRequirements(genericContext->getGenericRequirements(),
-                                  allGenericArgsVec,
-            [&](unsigned flatIndex) -> BuiltType {
-              // FIXME: Wrong for same-type-to-concrete
-              // constraints.
-              if (flatIndex < allGenericArgsVec.size())
-                return static_cast<BuiltType>(allGenericArgsVec[flatIndex]);
-
-              return BuiltType();
-            },
-            [&](unsigned depth, unsigned index) -> BuiltType {
-              auto flatIndex = _depthIndexToFlatIndex(depth, index,
-                                                      genericParamCounts);
-              // FIXME: Wrong for same-type-to-concrete
-              // constraints.
-              if (flatIndex && *flatIndex < allGenericArgsVec.size())
-                return static_cast<BuiltType>(allGenericArgsVec[*flatIndex]);
-
-              return BuiltType();
-            });
+                                  allGenericArgsVec, substitutions,
+                                  substitutions);
       if (failed)
         return BuiltType();
 
       // If we still have the wrong number of generic arguments, this is
       // some kind of metadata mismatch.
-      // FIXME: Fail silently? Complain loudly?
-      assert(typeDecl->getGenericContextHeader().getNumArguments() ==
-             allGenericArgsVec.size());
-
-      allGenericArgs = allGenericArgsVec;
-    } else {
-      // If generic arguments were provided at this level, fail.
-      if (!genericArgs.empty()) return BuiltType();
-
-      // If this is a generic context, get all of the arguments from our
-      // parent.
-      if (isGeneric) {
-        if (!parent) return BuiltType();
-
-        auto numGenericArgs =
-          typeDecl->getGenericContextHeader().getNumArguments();
-        auto parentGenericArgs =
-          reinterpret_cast<const void * const *>(parent->getGenericArgs());
-        allGenericArgs =
-          llvm::makeArrayRef(parentGenericArgs, numGenericArgs);
-      }
+      if (typeDecl->getGenericContextHeader().getNumArguments() !=
+            allGenericArgsVec.size())
+        return BuiltType();
     }
 
     // Call the access function.
     auto accessFunction = typeDecl->getAccessFunction();
     if (!accessFunction) return BuiltType();
 
-    return accessFunction(MetadataState::Abstract, allGenericArgs).Value;
+    return accessFunction(MetadataState::Abstract, allGenericArgsVec).Value;
   }
 
   BuiltType createBuiltinType(StringRef mangledName) const {
@@ -1466,6 +1418,9 @@ void swift::gatherWrittenGenericArgs(
     // If we don't yet have an argument for this parameter, it's a
     // same-type-to-concrete constraint.
     unsigned lhsFlatIndex = req.Param.getRootParamIndex();
+    if (lhsFlatIndex >= allGenericArgs.size())
+      continue;
+
     if (!allGenericArgs[lhsFlatIndex]) {
       // Substitute into the right-hand side.
       SubstGenericParametersFromWrittenArgs substitutions(allGenericArgs,
@@ -1493,7 +1448,7 @@ void swift::gatherWrittenGenericArgs(
       _depthIndexToFlatIndex(node->getChild(0)->getIndex(),
                              node->getChild(1)->getIndex(),
                              genericParamCounts);
-    if (!rhsFlatIndex || *rhsFlatIndex > allGenericArgs.size())
+    if (!rhsFlatIndex || *rhsFlatIndex >= allGenericArgs.size())
       continue;
 
     if (allGenericArgs[*rhsFlatIndex] || !allGenericArgs[lhsFlatIndex])
