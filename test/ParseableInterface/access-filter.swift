@@ -47,7 +47,11 @@ internal struct UFIStruct {
 
 // CHECK: public protocol PublicProto {{[{]$}}
 public protocol PublicProto {
-} // CHECK: {{^[}]$}}
+  // CHECK-NEXT: associatedtype Assoc = Swift.Int
+  associatedtype Assoc = Int
+  // CHECK-NEXT: func requirement()
+  func requirement()
+} // CHECK-NEXT: {{^[}]$}}
 
 // CHECK: extension PublicProto {{[{]$}}
 extension PublicProto {
@@ -72,6 +76,8 @@ public extension PublicProto {
 }
 
 internal protocol InternalProto_BAD {
+  associatedtype AssocBAD = Int
+  func requirementBAD()
 }
 
 extension InternalProto_BAD {
@@ -84,7 +90,11 @@ extension InternalProto_BAD {
 // CHECK-NEXT: internal protocol UFIProto {{[{]$}}
 @usableFromInline
 internal protocol UFIProto {
-} // CHECK: {{^[}]$}}
+  // CHECK-NEXT: associatedtype Assoc = Swift.Int
+  associatedtype Assoc = Int
+  // CHECK-NEXT: func requirement()
+  func requirement()
+} // CHECK-NEXT: {{^[}]$}}
 
 // CHECK: extension UFIProto {{[{]$}}
 extension UFIProto {
@@ -104,10 +114,38 @@ extension PublicStruct {
 } // CHECK: {{^[}]$}}
 
 extension InternalStruct_BAD: PublicProto {
+  func requirement() {}
   internal static var dummy: Int { return 0 }
 }
 
 // CHECK: extension UFIStruct : PublicProto {{[{]$}}
 extension UFIStruct: PublicProto {
+  // CHECK-NEXT: @usableFromInline
+  // CHECK-NEXT: internal typealias Assoc = Swift.Int
+
+  // FIXME: Is it okay for this non-@usableFromInline implementation to satisfy
+  // the protocol?
+  func requirement() {}
   internal static var dummy: Int { return 0 }
+} // CHECK-NEXT: {{^[}]$}}
+
+// CHECK: public enum PublicEnum {{[{]$}}
+public enum PublicEnum {
+  // CHECK-NEXT: case x
+  case x
+  // CHECK-NEXT: case y(Int)
+  case y(Int)
+} // CHECK-NEXT: {{^[}]$}}
+
+enum InternalEnum_BAD {
+  case xBAD
+}
+
+// CHECK: @usableFromInline
+// CHECK-NEXT: internal enum UFIEnum {{[{]$}}
+@usableFromInline enum UFIEnum {
+  // CHECK-NEXT: case x
+  case x
+  // CHECK-NEXT: case y(Int)
+  case y(Int)
 } // CHECK-NEXT: {{^[}]$}}
