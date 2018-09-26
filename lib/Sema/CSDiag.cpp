@@ -181,6 +181,15 @@ void constraints::simplifyLocator(Expr *&anchor,
         path = path.slice(1);
         continue;
       }
+
+      if (auto *poundAssertExpr = dyn_cast<PoundAssertExpr>(anchor)) {
+        targetAnchor = nullptr;
+        targetPath.clear();
+
+        anchor = poundAssertExpr->getCondition();
+        path = path.slice(1);
+        continue;
+      }
       break;
     }
 
@@ -575,6 +584,7 @@ private:
   bool visitCaptureListExpr(CaptureListExpr *CLE);
   bool visitClosureExpr(ClosureExpr *CE);
   bool visitKeyPathExpr(KeyPathExpr *KPE);
+  bool visitPoundAssertExpr(PoundAssertExpr *PAE);
 };
 } // end anonymous namespace
 
@@ -6882,6 +6892,12 @@ bool FailureDiagnosis::visitKeyPathExpr(KeyPathExpr *KPE) {
   // if there is something wrong with the path itself, maybe one of the
   // components is incorrectly typed or doesn't exist...
   return diagnoseKeyPathComponents(CS, KPE, rootType);
+}
+
+bool FailureDiagnosis::visitPoundAssertExpr(PoundAssertExpr *PAE) {
+  auto boolType = CS.getASTContext().getBoolDecl()->getDeclaredType();
+  return !typeCheckChildIndependently(PAE->getCondition(), boolType,
+                                      CTP_CallArgument);
 }
 
 bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {

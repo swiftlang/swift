@@ -2631,6 +2631,13 @@ public:
     printCommon(E, "key_path_dot_expr");
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+
+  void visitPoundAssertExpr(PoundAssertExpr *E) {
+    printCommon(E, "pound_assert");
+    OS << " message=" << QuotedString(E->getMessage()) << "\n";
+    printRec(E->getCondition());
+    OS << ")";
+  }
 };
 
 } // end anonymous namespace

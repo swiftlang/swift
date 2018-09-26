@@ -1246,6 +1246,17 @@ ERROR(expr_typeof_expected_rparen,PointsToFirstBadToken,
 ERROR(expr_dynamictype_deprecated,PointsToFirstBadToken,
       "'.dynamicType' is deprecated. Use 'type(of: ...)' instead", ())
 
+ERROR(pound_assert_disabled,PointsToFirstBadToken,
+      "#assert is an experimental feature that is currently disabled", ())
+ERROR(pound_assert_expected,PointsToFirstBadToken,
+      "expected '%0' in #assert directive", (StringRef))
+ERROR(pound_assert_expected_expression,PointsToFirstBadToken,
+      "expected a condition expression", ())
+ERROR(pound_assert_expected_string_literal,PointsToFirstBadToken,
+      "expected a string literal", ())
+ERROR(pound_assert_string_interpolation,PointsToFirstBadToken,
+      "interpolated strings not allowed as #assert messages", ())
+
 //------------------------------------------------------------------------------
 // MARK: Attribute-parsing diagnostics
 //------------------------------------------------------------------------------
