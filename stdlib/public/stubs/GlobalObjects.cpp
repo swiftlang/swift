@@ -66,6 +66,8 @@ swift::_SwiftEmptyDictionarySingleton swift::_swiftEmptyDictionarySingleton = {
     0, // int count;
     0, // int capacity;                                    
     0, // int8 scale;
+    0, // int8 reservedScale;
+    0, // int16 extra;
     0, // int32 age;
     0, // int seed;
     (void *)1, // void* keys; (non-null garbage)
@@ -91,6 +93,8 @@ swift::_SwiftEmptySetSingleton swift::_swiftEmptySetSingleton = {
     0, // int count;
     0, // int capacity;                                    
     0, // int8 scale;
+    0, // int8 reservedScale;
+    0, // int16 extra;
     0, // int32 age;
     0, // int seed;
     (void *)1, // void *rawElements; (non-null garbage)
