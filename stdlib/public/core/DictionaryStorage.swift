@@ -16,16 +16,14 @@ import SwiftShims
 /// Enough bytes are allocated to hold the bitmap for marking valid entries,
 /// keys, and values. The data layout starts with the bitmap, followed by the
 /// keys, followed by the values.
-//
-// See the docs at the top of the file for more details on this type
-//
-// NOTE: The precise layout of this type is relied on in the runtime
-// to provide a statically allocated empty singleton.
-// See stdlib/public/stubs/GlobalObjects.cpp for details.
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 @_objc_non_lazy_realization
 internal class _RawDictionaryStorage: __SwiftNativeNSDictionary {
+  // NOTE: The precise layout of this type is relied on in the runtime to
+  // provide a statically allocated empty singleton.  See
+  // stdlib/public/stubs/GlobalObjects.cpp for details.
+
   /// The current number of occupied entries in this dictionary.
   @usableFromInline
   @nonobjc
@@ -61,13 +59,17 @@ internal class _RawDictionaryStorage: __SwiftNativeNSDictionary {
   @nonobjc
   internal final var _age: Int32
 
+  /// The hash seed used to hash elements in this dictionary instance.
   @usableFromInline
   internal final var _seed: Int
 
+  /// A raw pointer to the start of the tail-allocated hash buffer holding keys.
   @usableFromInline
   @nonobjc
   internal final var _rawKeys: UnsafeMutableRawPointer
 
+  /// A raw pointer to the start of the tail-allocated hash buffer holding
+  /// values.
   @usableFromInline
   @nonobjc
   internal final var _rawValues: UnsafeMutableRawPointer
