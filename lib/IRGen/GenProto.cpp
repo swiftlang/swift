@@ -1267,13 +1267,9 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
     /// Add reference to the protocol conformance descriptor that generated
     /// this table.
     void addProtocolConformanceDescriptor() {
-      if (Conformance.isBehaviorConformance()) {
-        Table.addNullPointer(IGM.Int8PtrTy);
-      } else {
-        auto descriptor =
-          IGM.getAddrOfProtocolConformanceDescriptor(&Conformance);
-        Table.addBitCast(descriptor, IGM.Int8PtrTy);
-      }
+      auto descriptor =
+        IGM.getAddrOfProtocolConformanceDescriptor(&Conformance);
+      Table.addBitCast(descriptor, IGM.Int8PtrTy);
     }
 
     /// A base protocol is witnessed by a pointer to the conformance
@@ -2483,11 +2479,11 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Always emit an accessor function.
   wtableBuilder.buildAccessFunction(global);
 
+  addProtocolConformance(conf);
+
   // Behavior conformances can't be reflected.
   if (conf->isBehaviorConformance())
     return;
-
-  addProtocolConformance(conf);
 
   // Trigger the lazy emission of the foreign type metadata.
   CanType conformingType = conf->getType()->getCanonicalType();
