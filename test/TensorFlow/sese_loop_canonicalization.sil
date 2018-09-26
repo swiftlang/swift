@@ -266,3 +266,93 @@ bb2:
 bb3 (%9 : $Builtin.Int32):
 	return %9 : $Builtin.Int32
 }
+
+// The SIL code is a vastly simplified version of the SIL obtained from swift
+// for the following function in -O mode:
+// public func natSumWithBreak(_ breakIndex: Int32) -> Tensor<Int32>{
+//   var i: Int32 = 1
+//   var sum = Tensor<Int32>(0)
+//   let maxCount: Int32 = 100
+//   while i <= maxCount {
+//     sum += i
+//     i += 1
+//     var j = Tensor<Int32>(breakIndex * i)
+//     if (i == breakIndex) {
+//       sum -= j
+//       break
+//     }
+//     j -= j
+//     sum += j
+//   }
+//   sum += sum
+//   return sum
+// }
+//
+// This is an example where the nodes that lead to the common post dominator of all exit nodes
+// is also reachable from nodes outside of the loop. The key issue is that bb9 is the common
+// post dominator of the exit blocks bb5 and bb8 of the loop. As a first step, we attempt to
+// make the common post dominator the single exit block. In order to do that, we need to
+// move the blocks reachable from exit blocks bb5 and bb8 up to, but excluding bb9, into the loop.
+// In this example, bb3 needs to be moved into the loop, but is reachable from from bb1 (outside
+// the loop) and bb8 (which will be moved inside the loop). To deal with this case, we simply clone
+// bb3 before moving.
+//
+// CHECK-LABEL: --- XLA CFG Canonicalize: $loopThatRequiresNodeCloning
+// CHECK: [sequence
+// CHECK:   {condition Header: bb0
+// CHECK:     block bb1
+// CHECK:     [sequence
+// CHECK:       <while Preheader: bb2, Header: bb9, exit: bb11
+// CHECK:         [sequence
+// CHECK:           {condition Header: bb3
+// CHECK:             block bb4
+// CHECK:             {condition Header: bb5
+// CHECK:               block bb7
+// CHECK:               block bb6}}
+// CHECK:           block bb10]>
+// CHECK:       block bb11]}
+// CHECK:   block bb8]
+// CHECK: --- XLA CFG Canonicalize end
+sil @$loopThatRequiresNodeCloning : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = integer_literal $Builtin.Int32, 100
+  %4 = builtin "sadd_with_overflow_Int32"(%0 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32
+  %5 = builtin "cmp_slt_Int32"(%4 : $Builtin.Int32, %3 : $Builtin.Int32) : $Builtin.Int1
+	cond_br %5, bb1, bb2
+
+bb1:
+  // First arg is sum, the second arg is loop counter.
+  br bb3(%4 : $Builtin.Int32, %0 : $Builtin.Int32)
+
+bb2:
+  br bb4(%4 : $Builtin.Int32, %0 : $Builtin.Int32)
+
+bb3(%6 : $Builtin.Int32, %7 : $Builtin.Int32):
+  %8 = builtin "ssub_with_overflow_Int32"(%6 : $Builtin.Int32, %7 : $Builtin.Int32) : $Builtin.Int32
+  br bb9(%8 : $Builtin.Int32)
+
+bb4(%9 : $Builtin.Int32, %10 : $Builtin.Int32):
+  %11 = builtin "sadd_with_overflow_Int32"(%10 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32
+  %12 = builtin "sadd_with_overflow_Int32"(%9 : $Builtin.Int32, %10 : $Builtin.Int32) : $Builtin.Int32
+  %13 = builtin "cmp_slt_Int32"(%11 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %13, bb5, bb6
+
+bb5:
+  br bb9(%12 : $Builtin.Int32)
+
+bb6:
+  %14 = builtin "sadd_with_overflow_Int32"(%11 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32
+  %15 = builtin "sadd_with_overflow_Int32"(%12 : $Builtin.Int32, %14 : $Builtin.Int32) : $Builtin.Int32
+  %16 = builtin "cmp_slt_Int32"(%14 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %16, bb8, bb7
+
+bb7:
+  br bb4(%15 : $Builtin.Int32, %14 : $Builtin.Int32)
+
+bb8:
+  br bb3(%15 : $Builtin.Int32, %14 : $Builtin.Int32)
+
+bb9(%18 : $Builtin.Int32):
+  return %18 : $Builtin.Int32
+}
