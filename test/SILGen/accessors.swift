@@ -38,16 +38,13 @@ func test0(_ ref: A) {
 // CHECK-NEXT: [[T0:%.*]] = function_ref @$s9accessors6index1SiyF
 // CHECK-NEXT: [[INDEX1:%.*]] = apply [[T0]]()
 //   Formal access to RHS.
-// CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $OrdinarySub
 // CHECK-NEXT: [[T0:%.*]] = class_method [[ARG]] : $A, #A.array!getter.1
-// CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[ARG]])
-// CHECK-NEXT: store [[T1]] to [init] [[TEMP]]
-// CHECK-NEXT: [[T0:%.*]] = load_borrow [[TEMP]]
+// CHECK-NEXT: [[OWNED_SELF:%.*]] = apply [[T0]]([[ARG]])
+// CHECK-NEXT: [[SELF:%.*]] = begin_borrow [[OWNED_SELF]]
 // CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.getter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T1:%.*]] = function_ref @$s9accessors11OrdinarySubVyS2icig
-// CHECK-NEXT: [[VALUE:%.*]] = apply [[T1]]([[INDEX1]], [[T0]])
-// CHECK-NEXT: end_borrow [[T0]]
-// CHECK-NEXT: destroy_addr [[TEMP]]
+// CHECK-NEXT: [[VALUE:%.*]] = apply [[T1]]([[INDEX1]], [[SELF]])
+// CHECK-NEXT: end_borrow [[SELF]]
 //   Formal access to LHS.
 // CHECK-NEXT: [[T0:%.*]] = class_method [[ARG]] : $A, #A.array!modify.1
 // CHECK-NEXT: ([[T1:%.*]], [[T2:%.*]]) = begin_apply [[T0]]([[ARG]])
@@ -55,7 +52,7 @@ func test0(_ ref: A) {
 // CHECK-NEXT: [[SETTER:%.*]] = function_ref @$s9accessors11OrdinarySubVyS2icis
 // CHECK-NEXT: apply [[SETTER]]([[VALUE]], [[INDEX0]], [[T1]])
 // CHECK-NEXT: end_apply [[T2]]
-// CHECK-NEXT: dealloc_stack [[TEMP]]
+// CHECK-NEXT: destroy_value [[OWNED_SELF]]
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 

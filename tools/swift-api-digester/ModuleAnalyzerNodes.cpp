@@ -1158,6 +1158,10 @@ SwiftDeclCollector::shouldIgnore(Decl *D, const Decl* Parent) {
       return true;
     if (VD->getBaseName().empty())
       return true;
+
+    // Exclude type alias decls because they should have no impact on ABI.
+    if (isa<TypeAliasDecl>(VD) && Ctx.checkingABI())
+      return true;
     switch (VD->getFormalAccess()) {
     case AccessLevel::Internal:
     case AccessLevel::Private:
