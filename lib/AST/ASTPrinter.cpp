@@ -109,6 +109,14 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
         }
       }
 
+      // Skip extensions that extend things we wouldn't print.
+      if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+        if (!shouldPrint(ED->getExtendedNominal(), options))
+          return false;
+        // FIXME: We also need to check the generic signature for constraints
+        // that we can't reference.
+      }
+
       // Skip typealiases that just redeclare generic parameters.
       if (auto *alias = dyn_cast<TypeAliasDecl>(D)) {
         if (alias->isImplicit()) {

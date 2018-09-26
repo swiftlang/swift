@@ -102,3 +102,12 @@ extension PublicStruct {
   // CHECK: public private(set) static var secretlySettable: Int{{$}}
   public private(set) static var secretlySettable: Int = 0
 } // CHECK: {{^[}]$}}
+
+extension InternalStruct_BAD: PublicProto {
+  internal static var dummy: Int { return 0 }
+}
+
+// CHECK: extension UFIStruct : PublicProto {{[{]$}}
+extension UFIStruct: PublicProto {
+  internal static var dummy: Int { return 0 }
+} // CHECK-NEXT: {{^[}]$}}
