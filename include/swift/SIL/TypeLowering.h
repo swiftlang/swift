@@ -64,6 +64,20 @@ inline bool shouldExpandTupleType(TupleType *type) {
   return false;
 }
 
+/// A version of the above for parameter lists.
+///
+/// FIXME: Should also remove this soon.
+inline bool shouldExpandParams(AnyFunctionType::CanParamArrayRef params) {
+  for (auto param : params)
+    if (param.getValueOwnership() != ValueOwnership::Default)
+      return true;
+
+  if (params.size() == 1)
+    return params[0].isVariadic();
+
+  return false;
+}
+
 /// The default convention for handling the callee object on thick
 /// callees.
 const ParameterConvention DefaultThickCalleeConvention =

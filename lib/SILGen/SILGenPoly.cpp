@@ -357,9 +357,6 @@ ManagedValue Transform::transform(ManagedValue v,
                                   AbstractionPattern outputOrigType,
                                   CanType outputSubstType,
                                   SGFContext ctxt) {
-  // Look through inout types.
-  inputSubstType = inputSubstType->getInOutObjectType()->getCanonicalType();
-
   // Load if the result isn't address-only.  All the translation routines
   // expect this.
   if (v.getType().isAddress()) {
@@ -816,16 +813,6 @@ static void emitForceInto(SILGenFunction &SGF, SILLocation loc,
   temp.finishInitialization(SGF);
 }
 
-/// If the type is a single-element tuple, return the element type.
-static CanType getSingleTupleElement(CanType type) {
-  if (auto tupleType = dyn_cast<TupleType>(type)) {
-    if (tupleType->getNumElements() == 1)
-      return tupleType.getElementType(0);
-  }
-
-  return type;
-}
-
 namespace {
   class TranslateIndirect : public Cleanup {
     AbstractionPattern InputOrigType, OutputOrigType;
@@ -892,11 +879,102 @@ namespace {
                    AnyFunctionType::CanParamArrayRef inputSubstTypes,
                    AbstractionPattern outputOrigFunctionType,
                    AnyFunctionType::CanParamArrayRef outputSubstTypes) {
+      // FIXME: Do we ever do opaque-to-opaque reabstractions?
+      assert(!inputOrigFunctionType.isTypeParameter() ||
+             !outputOrigFunctionType.isTypeParameter());
+
+      auto getSubstTupleType = [&](AnyFunctionType::CanParamArrayRef params) {
+        return cast<TupleType>(
+          AnyFunctionType::composeInput(SGF.getASTContext(),
+                                        params, /*canonicalVararg=*/true)
+            ->getCanonicalType());
+      };
+
+      auto getOrigParamTypes = [&](AbstractionPattern origFunctionType) {
+        SmallVector<AbstractionPattern, 8> origTypes;
+        for (unsigned i = 0, e = origFunctionType.getNumFunctionParams();
+             i < e; ++i) {
+          origTypes.push_back(origFunctionType.getFunctionParamType(i));
+        }
+
+        return origTypes;
+      };
+
+      if (inputOrigFunctionType.isTypeParameter() &&
+          !outputOrigFunctionType.isTypeParameter() &&
+          inputSubstTypes.size() != 1 &&
+          !shouldExpandParams(inputSubstTypes)) {
+        // The output is exploded and the input is not. Decompose an
+        // input tuple and translate the elements.
+        auto inputTupleType = getSubstTupleType(inputSubstTypes);
+        auto outputTupleType = getSubstTupleType(outputSubstTypes);
+
+        auto outputOrigTypes = getOrigParamTypes(outputOrigFunctionType);
+        auto outputOrigType = AbstractionPattern::getTuple(outputOrigTypes);
+
+        translateAndExplodeOutOf(AbstractionPattern::getOpaque(),
+                                 inputTupleType,
+                                 outputOrigType,
+                                 outputTupleType,
+                                 claimNextInput());
+        return;
+      }
+
+      if (!inputOrigFunctionType.isTypeParameter() &&
+          outputOrigFunctionType.isTypeParameter() &&
+          outputSubstTypes.size() != 1 &&
+          !shouldExpandParams(outputSubstTypes)) {
+        // The input is exploded and the output is not. Translate values
+        // and store them to a result tuple in memory.
+        auto inputTupleType = getSubstTupleType(inputSubstTypes);
+        auto outputTupleType = getSubstTupleType(outputSubstTypes);
+
+        auto inputOrigTypes = getOrigParamTypes(inputOrigFunctionType);
+        auto inputOrigType = AbstractionPattern::getTuple(inputOrigTypes);
+
+        auto outputTy = SGF.getSILType(claimNextOutputType());
+        auto &outputTL = SGF.getTypeLowering(outputTy);
+        if (SGF.silConv.useLoweredAddresses()) {
+          auto temp = SGF.emitTemporary(Loc, outputTL);
+          translateAndImplodeInto(
+              inputOrigType,
+              inputTupleType,
+              AbstractionPattern::getOpaque(),
+              outputTupleType,
+              *temp);
+          Outputs.push_back(temp->getManagedAddress());
+        } else {
+          auto result = translateAndImplodeIntoValue(
+              inputOrigType,
+              inputTupleType,
+              AbstractionPattern::getOpaque(),
+              outputTupleType,
+              outputTL.getLoweredType());
+          Outputs.push_back(result);
+        }
+        return;
+      }
+
+      if (inputSubstTypes.size() == 1 &&
+          outputSubstTypes.size() != 1) {
+        // SE-0110 tuple splat. Turn the output into a single value of tuple
+        // type, and translate.
+        auto inputOrigType = inputOrigFunctionType.getFunctionParamType(0);
+        auto inputSubstType = inputSubstTypes[0].getPlainType();
+
+        auto outputOrigTypes = getOrigParamTypes(outputOrigFunctionType);
+        auto outputOrigType = AbstractionPattern::getTuple(outputOrigTypes);
+        auto outputSubstType = getSubstTupleType(outputSubstTypes);
+
+        translate(inputOrigType, inputSubstType,
+                  outputOrigType, outputSubstType);
+        return;
+      }
+
       assert(inputSubstTypes.size() == outputSubstTypes.size());
 
       SmallVector<AbstractionPattern, 8> inputOrigTypes;
       SmallVector<AbstractionPattern, 8> outputOrigTypes;
-
       for (auto i : indices(inputSubstTypes)) {
         inputOrigTypes.push_back(inputOrigFunctionType.getFunctionParamType(i));
         outputOrigTypes.push_back(outputOrigFunctionType.getFunctionParamType(i));
@@ -950,42 +1028,6 @@ namespace {
       // as one or many values, with varying levels of indirection.
       auto inputTupleType = dyn_cast<TupleType>(inputSubstType);
       auto outputTupleType = dyn_cast<TupleType>(outputSubstType);
-
-      // Look inside one-element exploded tuples, but not if both input
-      // and output types are *both* one-element tuples.
-      if (!(inputTupleType && outputTupleType &&
-            inputTupleType.getElementTypes().size() == 1 &&
-            outputTupleType.getElementTypes().size() == 1)) {
-        if (inputOrigType.isTuple() &&
-            inputOrigType.getNumTupleElements() == 1) {
-          inputOrigType = inputOrigType.getTupleElementType(0);
-          inputSubstType = getSingleTupleElement(inputSubstType);
-          return translate(inputOrigType, inputSubstType,
-                           outputOrigType, outputSubstType);
-        }
-
-        if (outputOrigType.isTuple() &&
-            outputOrigType.getNumTupleElements() == 1) {
-          outputOrigType = outputOrigType.getTupleElementType(0);
-          outputSubstType = getSingleTupleElement(outputSubstType);
-          return translate(inputOrigType, inputSubstType,
-                           outputOrigType, outputSubstType);
-        }
-      }
-
-      // Special-case: tuples containing inouts, __shared or __owned,
-      // and one-element vararg tuples.
-      if (inputTupleType && shouldExpandTupleType(inputTupleType)) {
-        // Non-materializable tuple types cannot be bound as generic
-        // arguments, so none of the remaining transformations apply.
-        // Instead, the outermost tuple layer is exploded, even when
-        // they are being passed opaquely. See the comment in
-        // AbstractionPattern.h for a discussion.
-        return translateParallelExploded(inputOrigType,
-                                         inputTupleType,
-                                         outputOrigType,
-                                         outputTupleType);
-      }
 
       // Case where the input type is an exploded tuple.
       if (inputOrigType.isTuple()) {
@@ -1247,11 +1289,7 @@ namespace {
                                    CanTupleType outputSubstType) {
       assert(inputOrigType.matchesTuple(inputSubstType));
       assert(outputOrigType.matchesTuple(outputSubstType));
-      // Non-materializable input and materializable output occurs
-      // when witness method thunks re-abstract a non-mutating
-      // witness for a mutating requirement. The inout self is just
-      // loaded to produce a value in this case.
-      assert(inputSubstType->hasElementWithOwnership() ||
+      assert(!inputSubstType->hasElementWithOwnership() &&
              !outputSubstType->hasElementWithOwnership());
       assert(inputSubstType->getNumElements() ==
              outputSubstType->getNumElements());
@@ -1456,13 +1494,6 @@ namespace {
         translateIntoGuaranteed(inputOrigType, inputSubstType, outputOrigType,
                                 outputSubstType, input);
         return;
-      case ParameterConvention::Indirect_Inout:
-        translateInOut(inputOrigType.getWithoutSpecifierType(),
-                       inputSubstType.getWithoutSpecifierType(),
-                       outputOrigType.getWithoutSpecifierType(),
-                       outputSubstType.getWithoutSpecifierType(),
-                       input, result);
-        return;
       case ParameterConvention::Indirect_In: {
         if (SGF.silConv.useLoweredAddresses()) {
           translateIndirect(inputOrigType, inputSubstType, outputOrigType,
@@ -1485,6 +1516,8 @@ namespace {
         assert(Outputs.back().getType() == SGF.getSILType(result));
         return;
       }
+      case ParameterConvention::Indirect_Inout:
+        llvm_unreachable("inout reabstraction handled elsewhere");
       case ParameterConvention::Indirect_InoutAliasable:
         llvm_unreachable("abstraction difference in aliasable argument not "
                          "allowed");
@@ -2854,10 +2887,10 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
   // like a normal Int when calling the inner function).
   SmallVector<ManagedValue, 8> args;
   TranslateArguments(SGF, loc, params, args, argTypes)
-    .translate(outputOrigType.getFunctionInputType(),
-               outputSubstType.getInput(),
-               inputOrigType.getFunctionInputType(),
-               inputSubstType.getInput());
+    .translate(outputOrigType,
+               outputSubstType.getParams(),
+               inputOrigType,
+               inputSubstType.getParams());
 
   SmallVector<SILValue, 8> argValues;
 

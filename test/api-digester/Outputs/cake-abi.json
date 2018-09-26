@@ -487,23 +487,6 @@
           "fixedbinaryorder": 0
         },
         {
-          "kind": "TypeAlias",
-          "name": "RawValue",
-          "printedName": "RawValue",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Int",
-              "printedName": "Int",
-              "usr": "s:Si"
-            }
-          ],
-          "declKind": "TypeAlias",
-          "usr": "s:4cake6NumberO8RawValuea",
-          "moduleName": "cake",
-          "implicit": true
-        },
-        {
           "kind": "Var",
           "name": "hashValue",
           "printedName": "hashValue",
@@ -970,23 +953,6 @@
           "declKind": "Var",
           "usr": "s:4cake21ProWithAssociatedTypePAAE9NonReqVarSivp",
           "moduleName": "cake"
-        },
-        {
-          "kind": "TypeAlias",
-          "name": "NonReqAlias",
-          "printedName": "NonReqAlias",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Int",
-              "printedName": "Int",
-              "usr": "s:Si"
-            }
-          ],
-          "declKind": "TypeAlias",
-          "usr": "s:4cake21ProWithAssociatedTypePAAE11NonReqAliasa",
-          "moduleName": "cake",
-          "genericSig": "<τ_0_0 where τ_0_0 : ProWithAssociatedType>"
         }
       ],
       "declKind": "Protocol",

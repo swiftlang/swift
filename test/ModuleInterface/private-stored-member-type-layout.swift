@@ -17,10 +17,10 @@
 // These two appear out-of-order between run lines
 
 // CHECK-DAG: [[MYCLASS:%T20PrivateStoredMembers7MyClassC]] = type opaque
-// CHECK-DAG: [[MYSTRUCT:%T20PrivateStoredMembers8MyStructV]] = type <{ %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V }>
+// CHECK-DAG: [[MYSTRUCT:%T20PrivateStoredMembers8MyStructV]] = type <{ %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V }>
 
-// CHECK-MAIN-DAG: [[MYCLASS:%T4main7MyClassC]] = type <{ %swift.refcounted, %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V }>
-// CHECK-MAIN-DAG: [[MYSTRUCT:%T4main8MyStructV]] = type <{ %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V }>
+// CHECK-MAIN-DAG: [[MYCLASS:%T4main7MyClassC]] = type <{ %swift.refcounted, %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V }>
+// CHECK-MAIN-DAG: [[MYSTRUCT:%T4main8MyStructV]] = type <{ %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V, %TSb, [7 x i8], %Ts5Int64V }>
 
 #if SHOULD_IMPORT
 import PrivateStoredMembers
@@ -29,7 +29,7 @@ import PrivateStoredMembers
 // CHECK-EXEC: swiftcc void @"$s{{[^ ]+}}8makeUseryyF"() #0 {
 public func makeUser() {
   let ptr = UnsafeMutablePointer<MyStruct>.allocate(capacity: 1)
-  // CHECK-EXEC: %.publicEndVar = getelementptr inbounds [[MYSTRUCT]], [[MYSTRUCT]]* %{{[0-9]+}}, i32 0, i32 [[PUBLIC_END_VAR_IDX:9]]
+  // CHECK-EXEC: %.publicEndVar = getelementptr inbounds [[MYSTRUCT]], [[MYSTRUCT]]* %{{[0-9]+}}, i32 0, i32 [[PUBLIC_END_VAR_IDX:12]]
   // CHECK-EXEC: %.publicEndVar._value = getelementptr inbounds %Ts5Int64V, %Ts5Int64V* %.publicEndVar, i32 0, i32 0
   // CHECK-EXEC: store i64 4, i64* %.publicEndVar._value
   ptr.pointee.publicEndVar = 4

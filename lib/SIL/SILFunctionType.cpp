@@ -608,13 +608,7 @@ private:
     // If the abstraction pattern is opaque and the parameter list is a valid
     // target for substitution, implode it into a single tuple parameter.
     if (!hasSelf) {
-      bool canImplode = true;
-      for (auto param : params)
-        canImplode &= (param.getValueOwnership() == ValueOwnership::Default);
-      if (params.size() == 1)
-        canImplode &= !params[0].isVariadic();
-
-      if (canImplode && origType.isTypeParameter()) {
+      if (origType.isTypeParameter() && !shouldExpandParams(params)) {
         CanType ty = AnyFunctionType::composeInput(M.getASTContext(), params,
                                                    /*canonicalVararg*/true)
                                                      ->getCanonicalType();
