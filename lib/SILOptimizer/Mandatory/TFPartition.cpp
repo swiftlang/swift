@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "tf-partition"
+#include "TFCanonicalizeCFG.h"
 #include "TFUtilities.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
@@ -4047,41 +4048,6 @@ bool TFFunctionPartition::partitionAndLowerGraph(bool isTest) {
   return partition(isTest) || lowerGraph(isTest);
 }
 
-// Our partitioning can leave around lots of unconditional branches between
-// blocks that formerly had control edges.  Go through and merge those to make
-// later passes simpler.
-static void contractUncondBranches(SILFunction *fn) {
-  // Iterate carefully to avoid invalidating iterators: we mutate the block list
-  // while we walk it.
-  for (auto bbi = fn->begin(), e = fn->end(); bbi != e;) {
-    auto *bb = &*bbi;
-    ++bbi; // Increment the iterator in case we do no transformation.
-
-    if (auto succ = bb->getSingleSuccessorBlock()) {
-      if (succ != bb && succ->getSinglePredecessorBlock()) {
-        if (auto *BI = dyn_cast<BranchInst>(bb->getTerminator())) {
-          // If there are any BB arguments in the destination, replace them with
-          // the branch operands, since they must dominate the dest block.
-          for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
-            assert(succ->getArgument(i) != BI->getArg(i) &&
-                   "Cloned code regions are always reachable");
-            succ->getArgument(i)->replaceAllUsesWith(BI->getArg(i));
-          }
-
-          // Zap BI and move all of the instructions from DestBB into this one.
-          BI->eraseFromParent();
-          bb->spliceAtEnd(succ);
-          succ->eraseFromParent();
-
-          // Revisit this node: we have new successor(s) and may need to
-          // contract them as well.  Also, bbi may be invalidated at this point.
-          bbi = SILFunction::iterator(bb);
-        }
-      }
-    }
-  }
-}
-
 /// Return true if a user instruction is returning or forming a return value.
 static bool isReturning(SILInstruction *user) {
   if (isa<ReturnInst>(user)) return true;
@@ -4272,7 +4238,7 @@ bool TFFunctionPartition::partition(bool isTest) {
   // Our partitioning can leave around lots of unconditional branches between
   // blocks that formerly had control edges.  Go through and merge those to
   // make later passes simpler.
-  contractUncondBranches(acceleratorFn);
+  contractUncondBranches(acceleratorFn, /*DI*/ nullptr, /*LI*/ nullptr);
 
   if (auto outs = getTFDumpIntermediateStream()) {
     *outs << "--- TFPartition Accelerator Result: " << acceleratorFn->getName()
