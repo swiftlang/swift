@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o /dev/null -disable-objc-attr-requires-foundation-module -emit-interface-path %t/dynamic_accessors.swiftinterface %s
-// RUN: %target-swift-emit-silgen -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen -disable-objc-attr-requires-foundation-module %t/dynamic_accessors.swiftinterface | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o /dev/null -disable-objc-attr-requires-foundation-module -enable-objc-interop -emit-interface-path %t/dynamic_accessors.swiftinterface %s
+// RUN: %target-swift-emit-silgen -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -disable-objc-attr-requires-foundation-module -enable-objc-interop %t/dynamic_accessors.swiftinterface | %FileCheck %s
 
 public class MyObjCClass {
   @objc public dynamic var a: Int {
