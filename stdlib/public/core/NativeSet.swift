@@ -34,11 +34,9 @@ internal struct _NativeSet<Element: Hashable> {
     self._storage = storage
   }
 
-  @usableFromInline
-  @_effects(releasenone)
+  @inlinable
   internal init(capacity: Int) {
-    let scale = _HashTable.scale(forCapacity: capacity)
-    self._storage = _SetStorage<Element>.allocate(scale: scale)
+    self._storage = _SetStorage<Element>.allocate(capacity: capacity)
   }
 
 #if _runtime(_ObjC)

@@ -35,11 +35,9 @@ internal struct _NativeDictionary<Key: Hashable, Value> {
     self._storage = storage
   }
 
-  @usableFromInline
-  @_effects(releasenone)
+  @inlinable
   internal init(capacity: Int) {
-    let scale = _HashTable.scale(forCapacity: capacity)
-    self._storage = _DictionaryStorage<Key, Value>.allocate(scale: scale)
+    self._storage = _DictionaryStorage<Key, Value>.allocate(capacity: capacity)
   }
 
 #if _runtime(_ObjC)
