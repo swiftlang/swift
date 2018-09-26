@@ -342,6 +342,22 @@ public:
 
   void *allocateMetadata(size_t size, size_t align);
 
+  /// Gather the set of generic arguments that would be written in the
+  /// source, as a f
+  ///
+  /// This function computes generic arguments even when they are not
+  /// directly represented in the metadata, e.g., generic parameters that
+  /// are canonicalized away by same-type constraints and are therefore not
+  /// "key" parameters.
+  ///
+  /// \code
+  ///   extension Array where Element == String { }
+  ///   extension Dictionary where Key == Value { }
+  /// \endcode
+  void gatherWrittenGenericArgs(const Metadata *metadata,
+                                const TypeContextDescriptor *description,
+                                std::vector<const Metadata *> &allGenericArgs);
+
   Demangle::NodePointer
   _buildDemanglingForContext(const ContextDescriptor *context,
                              llvm::ArrayRef<NodePointer> demangledGenerics,

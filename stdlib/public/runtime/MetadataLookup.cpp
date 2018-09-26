@@ -1373,5 +1373,122 @@ SubstGenericParametersFromMetadata::operator()(
   return base->getGenericArgs()[flatIndex];
 }
 
+void swift::gatherWrittenGenericArgs(
+                             const Metadata *metadata,
+                             const TypeContextDescriptor *description,
+                             std::vector<const Metadata *> &allGenericArgs) {
+  auto generics = description->getGenericContext();
+  if (!generics)
+    return;
+
+  bool missingWrittenArguments = false;
+  auto genericArgs = description->getGenericArguments(metadata);
+  for (auto param : generics->getGenericParams()) {
+    switch (param.getKind()) {
+    case GenericParamKind::Type:
+      // The type should have a key argument unless it's been same-typed to
+      // another type.
+      if (param.hasKeyArgument()) {
+        auto genericArg = *genericArgs++;
+        allGenericArgs.push_back(genericArg);
+      } else {
+        // Leave a gap for us to fill in by looking at same type info.
+        allGenericArgs.push_back(nullptr);
+        missingWrittenArguments = true;
+      }
+
+      // We don't know about type parameters with extra arguments. Leave
+      // a hole for it.
+      if (param.hasExtraArgument()) {
+        allGenericArgs.push_back(nullptr);
+        ++genericArgs;
+      }
+      break;
+
+    default:
+      // We don't know about this kind of parameter. Create placeholders where
+      // needed.
+      if (param.hasKeyArgument()) {
+        allGenericArgs.push_back(nullptr);
+        ++genericArgs;
+      }
+
+      if (param.hasExtraArgument()) {
+        allGenericArgs.push_back(nullptr);
+        ++genericArgs;
+      }
+      break;
+    }
+  }
+
+  // If there is no follow-up work to do, we're done.
+  if (!missingWrittenArguments)
+    return;
+
+  // We have generic arguments that would be written, but have been
+  // canonicalized away. Use same-type requirements to reconstitute them.
+
+  // Retrieve the mapping information needed for depth/index -> flat index.
+  std::vector<unsigned> genericParamCounts;
+  (void)_gatherGenericParameterCounts(description, genericParamCounts);
+
+  // Walk through the generic requirements to evaluate same-type
+  // constraints that are needed to fill in missing generic arguments.
+  for (const auto &req : generics->getGenericRequirements()) {
+    // We only care about same-type constraints.
+    if (req.Flags.getKind() != GenericRequirementKind::SameType)
+      continue;
+
+    // Where the left-hand side is a generic parameter.
+    if (req.Param.begin() != req.Param.end())
+      continue;
+
+    // If we don't yet have an argument for this parameter, it's a
+    // same-type-to-concrete constraint.
+    unsigned lhsFlatIndex = req.Param.getRootParamIndex();
+    if (!allGenericArgs[lhsFlatIndex]) {
+      // Substitute into the right-hand side.
+      auto genericArg =
+          _getTypeByMangledName(req.getMangledTypeName(),
+                                [&](unsigned depth, unsigned index) {
+            if (auto flatIndex = _depthIndexToFlatIndex(depth, index,
+                                                        genericParamCounts))
+              return allGenericArgs[*flatIndex];
+
+            return (const Metadata *)nullptr;
+          });
+
+      allGenericArgs[lhsFlatIndex] = genericArg;
+      continue;
+    }
+
+    // If we do have an argument for this parameter, it might be that
+    // the right-hand side is itself a generic parameter, which means
+    // we have a same-type constraint A == B where A is already filled in.
+    Demangler demangler;
+    NodePointer node = demangler.demangleType(req.getMangledTypeName());
+    if (!node)
+      continue;
+
+    // Find the flat index that the right-hand side refers to.
+    if (node->getKind() == Demangle::Node::Kind::Type)
+      node = node->getChild(0);
+    if (node->getKind() != Demangle::Node::Kind::DependentGenericParamType)
+      continue;
+
+    auto rhsFlatIndex =
+      _depthIndexToFlatIndex(node->getChild(0)->getIndex(),
+                             node->getChild(1)->getIndex(),
+                             genericParamCounts);
+    if (!rhsFlatIndex || *rhsFlatIndex > allGenericArgs.size())
+      continue;
+
+    if (allGenericArgs[*rhsFlatIndex] || !allGenericArgs[lhsFlatIndex])
+      continue;
+
+    allGenericArgs[*rhsFlatIndex] = allGenericArgs[lhsFlatIndex];
+  }
+}
+
 #define OVERRIDE_METADATALOOKUP COMPATIBILITY_OVERRIDE
 #include "CompatibilityOverride.def"
