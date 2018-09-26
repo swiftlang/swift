@@ -938,7 +938,25 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::GraphOperationInst: {
-    llvm_unreachable("Unimplemented");
+    // TODO(SR-8848): Serialize attributes.
+    const GraphOperationInst *GI = cast<GraphOperationInst>(&SI);
+    assert(GI->getNumAttributes() == 0 &&
+           "attribute serialization not implemented");
+    SmallVector<ValueID, 4> ListOfValues;
+    for (auto Arg : GI->getArguments()) {
+      ListOfValues.push_back(addValueRef(Arg));
+      ListOfValues.push_back(S.addTypeRef(Arg->getType().getASTType()));
+      ListOfValues.push_back((unsigned)Arg->getType().getCategory());
+    }
+    for (auto ResultTy : GI->getResultTypes()) {
+      ListOfValues.push_back(S.addTypeRef(ResultTy.getASTType()));
+      ListOfValues.push_back((unsigned)ResultTy.getCategory());
+    }
+    SILInstGraphOperationLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILInstGraphOperationLayout::Code],
+        S.addDeclBaseNameRef(GI->getName()), GI->getArguments().size(),
+        ListOfValues);
+    break;
   }
   case SILInstructionKind::ApplyInst: {
     // Format: attributes such as transparent and number of substitutions,
@@ -2443,6 +2461,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILSpecializeAttrLayout>();
   // SWIFT_ENABLE_TENSORFLOW
   registerSILAbbr<SILReverseDifferentiableAttrLayout>();
+  registerSILAbbr<SILInstGraphOperationLayout>();
 
   // Register the abbreviation codes so these layouts can exist in both
   // decl blocks and sil blocks.

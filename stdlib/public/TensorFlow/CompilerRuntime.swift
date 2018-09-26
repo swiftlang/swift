@@ -1165,6 +1165,15 @@ public func _GetGlobalEagerContext() -> CTFEContext {
   return _ExecutionContext.global.eagerContext
 }
 
+// TODO: replace these functions with generic ones that do not hard-code Float.
+@inlinable
+@_silgen_name("_swift_tfc_ExtractFloatCTensorHandle")
+public func _ExtractCTensorHandle(
+  _ handle: TensorHandle<Float>
+) -> CTensorHandle {
+  return handle.cTensorHandle
+}
+
 @inlinable
 @_silgen_name("_swift_tfc_GetCTensorHandleFromSwift")
 public func _GetCTensorHandleFromSwift(
@@ -1194,4 +1203,11 @@ public func _CreateTensorHandleFromC(
   case TF_BOOL: return TensorHandle<Bool>(owning: cHandle)
   default: fatalError("Unsupported dtype \(dtype)")
   }
+}
+
+@_silgen_name("_swift_tfc_CreateFloatTensorHandleFromCTensorHandle")
+public func _CreateTensorHandleFromCTensorHandle(
+  _ ownedCHandle: CTensorHandle
+) -> TensorHandle<Float> {
+  return TensorHandle<Float>(owning: ownedCHandle)
 }
