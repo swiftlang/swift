@@ -3166,7 +3166,14 @@ public:
 
     return false;
   }
-  
+
+  // Partition the choices in the disjunction into groups that we will
+  // iterate over in an order appropriate to attempt to stop before we
+  // have to visit all of the options.
+  void partitionDisjunction(ArrayRef<Constraint *> Choices,
+                            SmallVectorImpl<unsigned> &Ordering,
+                            SmallVectorImpl<unsigned> &PartitionBeginning);
+
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
@@ -3349,13 +3356,13 @@ class DisjunctionChoice {
   unsigned Index;
   Constraint *Choice;
   bool ExplicitConversion;
-  bool IsEndOfDisjunctionPartition;
+  bool IsBeginningOfPartition;
 
 public:
   DisjunctionChoice(unsigned index, Constraint *choice, bool explicitConversion,
-                    bool isEndOfDisjunctionPartition)
+                    bool isBeginningOfPartition)
       : Index(index), Choice(choice), ExplicitConversion(explicitConversion),
-        IsEndOfDisjunctionPartition(isEndOfDisjunctionPartition) {}
+        IsBeginningOfPartition(isBeginningOfPartition) {}
 
   unsigned getIndex() const { return Index; }
 
@@ -3369,9 +3376,7 @@ public:
     return false;
   }
 
-  bool isEndOfDisjunctionPartition() const {
-    return IsEndOfDisjunctionPartition;
-  }
+  bool isBeginningOfPartition() const { return IsBeginningOfPartition; }
 
   // FIXME: Both of the accessors below are required to support
   //        performance optimization hacks in constraint solver.
@@ -3515,14 +3520,14 @@ class DisjunctionChoiceProducer : public BindingProducer<DisjunctionChoice> {
   // the order we want to visit them.
   SmallVector<unsigned, 8> Ordering;
 
-  // The index after the last element in a partition of the
-  // disjunction choices. The choices are split into partitions where
-  // we will visit all elements within a single partition before
-  // moving to the elements of the next partition. If we visit all
-  // choices within a single partition and have found a successful
-  // solution with one of the choices in that partition, we stop
-  // looking for other solutions
-  SmallVector<unsigned, 4> PartitionEnd;
+  // The index of the first element in a partition of the disjunction
+  // choices. The choices are split into partitions where we will
+  // visit all elements within a single partition before moving to the
+  // elements of the next partition. If we visit all choices within a
+  // single partition and have found a successful solution with one of
+  // the choices in that partition, we stop looking for other
+  // solutions.
+  SmallVector<unsigned, 4> PartitionBeginning;
 
   // The index in the current partition of disjunction choices that we
   // are iterating over.
@@ -3545,7 +3550,7 @@ public:
     assert(!disjunction->shouldRememberChoice() || disjunction->getLocator());
 
     // Order and partition the disjunction choices.
-    partitionDisjunction();
+    CS.partitionDisjunction(Choices, Ordering, PartitionBeginning);
   }
 
   DisjunctionChoiceProducer(ConstraintSystem &cs,
@@ -3555,7 +3560,7 @@ public:
         IsExplicitConversion(explicitConversion) {
 
     // Order and partition the disjunction choices.
-    partitionDisjunction();
+    CS.partitionDisjunction(Choices, Ordering, PartitionBeginning);
   }
 
   Optional<Element> operator()() override {
@@ -3563,31 +3568,15 @@ public:
     if (currIndex >= Choices.size())
       return None;
 
+    bool isBeginningOfPartition = PartitionIndex < PartitionBeginning.size() &&
+                                  PartitionBeginning[PartitionIndex] == Index;
+    if (isBeginningOfPartition)
+      ++PartitionIndex;
+
     ++Index;
 
-    bool endOfPartition = false;
-
-    if (PartitionEnd[PartitionIndex] == Index) {
-      endOfPartition = true;
-      ++PartitionIndex;
-      assert(PartitionIndex >= PartitionEnd.size() ||
-             Index < PartitionEnd[PartitionIndex]);
-    }
-
     return DisjunctionChoice(currIndex, Choices[Ordering[currIndex]],
-                             IsExplicitConversion, endOfPartition);
-  }
-
-  // Partition the choices in the disjunction into groups that we will
-  // iterate over in an order appropriate to attempt to stop before we
-  // have to visit all of the options.
-  void partitionDisjunction() {
-    // Temporarily keep the initial ordering and make them all part of
-    // a single partition.
-    for (unsigned long i = 0, e = Choices.size(); i != e; ++i)
-      Ordering.push_back(i);
-
-    PartitionEnd.push_back(Choices.size());
+                             IsExplicitConversion, isBeginningOfPartition);
   }
 };
 } // end namespace constraints
