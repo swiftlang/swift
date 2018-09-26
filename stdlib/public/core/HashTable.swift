@@ -413,34 +413,3 @@ extension _HashTable {
     words[hole.word].uncheckedRemove(hole.bit)
   }
 }
-
-extension _HashTable {
-  /// Check for consistency and return the count of occupied entries.
-  internal func _invariantCheck(with delegate: _HashTableDelegate) -> Int {
-#if INTERNAL_CHECKS_ENABLED
-    _sanityCheck(bucketCount > 0 && bucketCount & (bucketCount &- 1) == 0,
-      "Invalid bucketCount")
-    _sanityCheck(_isValidAddress(UInt(bitPattern: words)),
-      "Invalid words pointer")
-    _sanityCheck(_isValidAddress(UInt(bitPattern: words + wordCount - 1)),
-      "Invalid words buffer")
-
-    var occupiedCount = 0
-    for i in self {
-      occupiedCount += 1
-      let hashValue = delegate.hashValue(at: i)
-      var c = idealIndex(forHashValue: hashValue)
-      // There must be no holes between the ideal and actual buckets for this
-      // hash value.
-      while c != i {
-        _sanityCheck(_isOccupied(c),
-          "Some hash table elements are stored outside their collision chain")
-        c = index(wrappedAfter: c)
-      }
-    }
-    return occupiedCount
-#else
-    return 0
-#endif
-  }
-}
