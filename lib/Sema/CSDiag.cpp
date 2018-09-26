@@ -6271,7 +6271,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
       // Before doing so, strip attributes off the function type so that they
       // don't confuse the issue.
       fnType = FunctionType::get(fnType->getParams(), fnType->getResult(),
-                                 fnType->getExtInfo(), false);
+                                 fnType->getExtInfo());
       auto diag = diagnose(
           params->getStartLoc(), diag::closure_argument_list_tuple, fnType,
           inferredArgCount, actualArgCount, (actualArgCount == 1));

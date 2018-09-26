@@ -2612,19 +2612,15 @@ getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 }
 
-/// AnyFunctionType - A function type has a single input and result, but
-/// these types may be tuples, for example:
+/// AnyFunctionType - A function type has zero or more input parameters and a
+/// single result. The result type may be a tuple. For example:
 ///   "(int) -> int" or "(a : int, b : int) -> (int, int)".
-/// Note that the parser requires that the input to a function type be a Tuple
-/// or ParenType, but ParenType desugars to its element, so the input to a
-/// function may be an arbitrary type.
 ///
 /// There are two kinds of function types:  monomorphic (FunctionType) and
 /// polymorphic (GenericFunctionType). Both type families additionally can
 /// be 'thin', indicating that a function value has no capture context and can be
 /// represented at the binary level as a single function pointer.
 class AnyFunctionType : public TypeBase {
-  const Type Input;
   const Type Output;
   
 public:
@@ -2911,9 +2907,9 @@ public:
 
 protected:
   AnyFunctionType(TypeKind Kind, const ASTContext *CanTypeContext,
-                  Type Input, Type Output, RecursiveTypeProperties properties,
+                  Type Output, RecursiveTypeProperties properties,
                   unsigned NumParams, ExtInfo Info)
-  : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output) {
+  : TypeBase(Kind, CanTypeContext, properties), Output(Output) {
     Bits.AnyFunctionType.ExtInfo = Info.Bits;
     Bits.AnyFunctionType.NumParams = NumParams;
     assert(Bits.AnyFunctionType.NumParams == NumParams && "Params dropped!");
@@ -2950,7 +2946,6 @@ public:
   static void relabelParams(MutableArrayRef<Param> params,
                             ArrayRef<Identifier> labels);
 
-  Type getInput() const { return Input; }
   Type getResult() const { return Output; }
   ArrayRef<Param> getParams() const;
   unsigned getNumParams() const { return Bits.AnyFunctionType.NumParams; }
@@ -3007,10 +3002,6 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
 
   CanGenericSignature getOptGenericSignature() const;
 
-  CanType getInput() const {
-    return getPointer()->getInput()->getCanonicalType();
-  }
-
   CanParamArrayRef getParams() const {
     return CanParamArrayRef(getPointer()->getParams());
   }
@@ -3037,10 +3028,8 @@ class FunctionType final : public AnyFunctionType,
       
 public:
   /// 'Constructor' Factory Function
-  static FunctionType *get(ArrayRef<Param> params,
-                           Type result,
-                           ExtInfo info = ExtInfo(),
-                           bool canonicalVararg = false);
+  static FunctionType *get(ArrayRef<Param> params, Type result,
+                           ExtInfo info = ExtInfo());
 
   // Retrieve the input parameters of this function type.
   ArrayRef<Param> getParams() const {
@@ -3061,17 +3050,13 @@ public:
   }
       
 private:
-  FunctionType(ArrayRef<Param> params,
-               Type input, Type result,
-               ExtInfo info,
-               const ASTContext *ctx,
-               RecursiveTypeProperties properties);
+  FunctionType(ArrayRef<Param> params, Type result, ExtInfo info,
+               const ASTContext *ctx, RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
   static CanFunctionType get(CanParamArrayRef params, CanType result,
                              ExtInfo info = ExtInfo()) {
-    auto fnType = FunctionType::get(params.getOriginalArray(),
-                                    result, info, /*canonicalVararg=*/true);
+    auto fnType = FunctionType::get(params.getOriginalArray(), result, info);
     return cast<FunctionType>(fnType->getCanonicalType());
   }
 
@@ -3108,7 +3093,6 @@ class GenericFunctionType final : public AnyFunctionType,
   /// Construct a new generic function type.
   GenericFunctionType(GenericSignature *sig,
                       ArrayRef<Param> params,
-                      Type input,
                       Type result,
                       ExtInfo info,
                       const ASTContext *ctx,
@@ -3119,8 +3103,7 @@ public:
   static GenericFunctionType *get(GenericSignature *sig,
                                   ArrayRef<Param> params,
                                   Type result,
-                                  ExtInfo info = ExtInfo(),
-                                  bool canonicalVararg = false);
+                                  ExtInfo info = ExtInfo());
 
   // Retrieve the input parameters of this function type.
   ArrayRef<Param> getParams() const {
@@ -3167,8 +3150,7 @@ BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
     // Knowing that the argument types are independently canonical is
     // not sufficient to guarantee that the function type will be canonical.
     auto fnType = GenericFunctionType::get(sig, params.getOriginalArray(),
-                                           result, info,
-                                           /*canonicalVararg=*/true);
+                                           result, info);
     return cast<GenericFunctionType>(fnType->getCanonicalType());
   }
 

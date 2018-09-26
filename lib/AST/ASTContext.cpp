@@ -3669,13 +3669,11 @@ isGenericFunctionTypeCanonical(GenericSignature *sig,
 
 AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
   if (isa<FunctionType>(this))
-    return FunctionType::get(getParams(), getResult(), info,
-                             /*canonicalVararg=*/isCanonical());
+    return FunctionType::get(getParams(), getResult(), info);
 
   auto *genFnTy = cast<GenericFunctionType>(this);
   return GenericFunctionType::get(genFnTy->getGenericSignature(),
-                                  getParams(), getResult(), info,
-                                  /*canonicalVararg=*/isCanonical());
+                                  getParams(), getResult(), info);
 }
 
 void AnyFunctionType::decomposeInput(
@@ -3792,9 +3790,7 @@ void FunctionType::Profile(llvm::FoldingSetNodeID &ID,
 }
 
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
-                                Type result, ExtInfo info,
-                                bool canonicalVararg) {
-  auto input = composeInput(result->getASTContext(), params, canonicalVararg);
+                                Type result, ExtInfo info) {
   auto properties = getFunctionRecursiveProperties(params, result);
   auto arena = getArena(properties);
 
@@ -3815,7 +3811,7 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
                            alignof(FunctionType), arena);
 
   bool isCanonical = isFunctionTypeCanonical(params, result);
-  auto funcTy = new (mem) FunctionType(params, input, result, info,
+  auto funcTy = new (mem) FunctionType(params, result, info,
                                        isCanonical ? &ctx : nullptr,
                                        properties);
   ctx.getImpl().getArena(arena).FunctionTypes.InsertNode(funcTy, insertPos);
@@ -3824,12 +3820,11 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
 
 // If the input and result types are canonical, then so is the result.
 FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
-                           Type input, Type output,
-                           ExtInfo info,
+                           Type output, ExtInfo info,
                            const ASTContext *ctx,
                            RecursiveTypeProperties properties)
     : AnyFunctionType(TypeKind::Function, ctx,
-                      input, output, properties, params.size(), info) {
+                      output, properties, params.size(), info) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
 }
@@ -3848,17 +3843,14 @@ void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
 GenericFunctionType *GenericFunctionType::get(GenericSignature *sig,
                                               ArrayRef<Param> params,
                                               Type result,
-                                              ExtInfo info,
-                                              bool canonicalVararg) {
+                                              ExtInfo info) {
   assert(sig && "no generic signature for generic function type?!");
-
-  auto input = composeInput(result->getASTContext(), params, canonicalVararg);
   assert(!result->hasTypeVariable());
 
   llvm::FoldingSetNodeID id;
   GenericFunctionType::Profile(id, sig, params, result, info);
 
-  const ASTContext &ctx = input->getASTContext();
+  const ASTContext &ctx = result->getASTContext();
 
   // Do we already have this generic function type?
   void *insertPos;
@@ -3883,7 +3875,7 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature *sig,
                            alignof(GenericFunctionType));
 
   auto properties = getGenericFunctionRecursiveProperties(params, result);
-  auto funcTy = new (mem) GenericFunctionType(sig, params, input, result, info,
+  auto funcTy = new (mem) GenericFunctionType(sig, params, result, info,
                                               isCanonical ? &ctx : nullptr,
                                               properties);
 
@@ -3894,12 +3886,11 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature *sig,
 GenericFunctionType::GenericFunctionType(
                        GenericSignature *sig,
                        ArrayRef<AnyFunctionType::Param> params,
-                       Type input,
                        Type result,
                        ExtInfo info,
                        const ASTContext *ctx,
                        RecursiveTypeProperties properties)
-  : AnyFunctionType(TypeKind::GenericFunction, ctx, input, result,
+  : AnyFunctionType(TypeKind::GenericFunction, ctx, result,
                     properties, params.size(), info), Signature(sig) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());

@@ -1119,12 +1119,10 @@ CanType TypeBase::computeCanonicalType() {
 
     if (genericSig) {
       Result = GenericFunctionType::get(genericSig, canParams, resultTy,
-                                        funcTy->getExtInfo(),
-                                        /*canonicalVararg=*/true);
+                                        funcTy->getExtInfo());
     } else {
       Result = FunctionType::get(canParams, resultTy,
-                                 funcTy->getExtInfo(),
-                                 /*canonicalVararg=*/true);
+                                 funcTy->getExtInfo());
     }
     assert(Result->isCanonical());
     break;
@@ -3740,15 +3738,13 @@ case TypeKind::Id:
 
       auto genericSig = genericFnType->getGenericSignature();
       return GenericFunctionType::get(genericSig, substParams, resultTy,
-                                      function->getExtInfo(),
-                                   /*canonicalVararg=*/function->isCanonical());
+                                      function->getExtInfo());
     }
 
     if (isUnchanged) return *this;
 
     return FunctionType::get(substParams, resultTy,
-                             function->getExtInfo(),
-                             /*canonicalVararg=*/function->isCanonical());
+                             function->getExtInfo());
   }
 
   case TypeKind::ArraySlice: {
