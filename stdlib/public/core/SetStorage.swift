@@ -41,7 +41,12 @@ internal class _RawSetStorage: __SwiftNativeNSSet {
   /// power of `scale`.
   @usableFromInline
   @nonobjc
-  internal final var _scale: Int
+  internal final var _scale: Int8
+
+  /// A mutation count, enabling stricter index validation.
+  @usableFromInline
+  @nonobjc
+  internal final var _age: Int32
 
   @usableFromInline
   internal final var _seed: Int
@@ -272,7 +277,11 @@ extension _SetStorage {
     _sanityCheck(capacity >= original._count)
     let scale = _HashTable.scale(forCapacity: capacity)
     let rehash = (scale != original._scale)
-    let newStorage = _SetStorage<Element>.allocate(scale: scale)
+    let newStorage = _SetStorage<Element>.allocate(
+      scale: scale,
+      // Invalidate indices if we're rehashing.
+      age: rehash ? nil : original._age
+    )
     return (newStorage, rehash)
   }
 
@@ -280,15 +289,18 @@ extension _SetStorage {
   @_effects(releasenone)
   static internal func allocate(capacity: Int) -> _SetStorage {
     let scale = _HashTable.scale(forCapacity: capacity)
-    return allocate(scale: scale)
+    return allocate(scale: scale, age: nil)
   }
 
-  static internal func allocate(scale: Int) -> _SetStorage {
+  static internal func allocate(
+    scale: Int8,
+    age: Int32?
+  ) -> _SetStorage {
     // The entry count must be representable by an Int value; hence the scale's
     // peculiar upper bound.
     _sanityCheck(scale >= 0 && scale < Int.bitWidth - 1)
 
-    let bucketCount = 1 &<< scale
+    let bucketCount = (1 as Int) &<< scale
     let wordCount = _UnsafeBitset.wordCount(forCapacity: bucketCount)
     let storage = Builtin.allocWithTailElems_2(
       _SetStorage<Element>.self,
@@ -302,6 +314,16 @@ extension _SetStorage {
     storage._count = 0
     storage._capacity = _HashTable.capacity(forScale: scale)
     storage._scale = scale
+
+    if let age = age {
+      storage._age = age
+    } else {
+      // The default mutation count is simply a scrambled version of the storage
+      // address.
+      storage._age = Int32(
+        truncatingIfNeeded: ObjectIdentifier(storage).hashValue)
+    }
+
     storage._rawElements = UnsafeMutableRawPointer(elementsAddr)
 
     // We use a slightly different hash seed whenever we change the size of the
@@ -312,7 +334,7 @@ extension _SetStorage {
     // FIXME: Use true per-instance seeding instead. Per-capacity seeding still
     // leaves hash values the same in same-sized tables, which may affect
     // operations on two tables at once. (E.g., union.)
-    storage._seed = scale
+    storage._seed = Int(scale)
 
     // Initialize hash table metadata.
     storage._hashTable.clear()

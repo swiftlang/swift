@@ -88,6 +88,12 @@ extension _NativeDictionary { // Primitive fields
   internal var _values: UnsafeMutablePointer<Value> {
     return _storage._rawValues.assumingMemoryBound(to: Value.self)
   }
+
+  @inlinable
+  @inline(__always)
+  internal func invalidateIndices() {
+    _storage._age &+= 1
+  }
 }
 
 extension _NativeDictionary { // Low-level unchecked operations
@@ -468,6 +474,7 @@ extension _NativeDictionary { // Deletion
     hashTable.delete(at: bucket, with: self)
     _storage._count -= 1
     _sanityCheck(_storage._count >= 0)
+    invalidateIndices()
   }
 
   @inlinable
@@ -496,7 +503,9 @@ extension _NativeDictionary { // Deletion
   internal mutating func removeAll(isUnique: Bool) {
     guard isUnique else {
       let scale = self._storage._scale
-      _storage = _DictionaryStorage<Key, Value>.allocate(scale: scale)
+      _storage = _DictionaryStorage<Key, Value>.allocate(
+        scale: scale,
+        age: nil)
       return
     }
     for bucket in hashTable {
@@ -505,6 +514,7 @@ extension _NativeDictionary { // Deletion
     }
     hashTable.clear()
     _storage._count = 0
+    invalidateIndices()
   }
 }
 
