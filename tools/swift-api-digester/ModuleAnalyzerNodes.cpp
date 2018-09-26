@@ -158,16 +158,12 @@ NodePtr UpdatedNodesMap::findUpdateCounterpart(const SDKNode *Node) const {
   return Node == FoundPair->first ? FoundPair->second : FoundPair->first;
 }
 
-bool SDKNodeType::classof(const SDKNode *N) {
-  switch (N->getKind()) {
-  case SDKNodeKind::TypeNominal:
-  case SDKNodeKind::TypeFunc:
-  case SDKNodeKind::TypeAlias:
-    return true;
-  default:
-    return false;
-  }
+#define NODE_KIND_RANGE(ID, FIRST, LAST)                                      \
+bool SDKNode##ID::classof(const SDKNode *N) {                                 \
+  return N->getKind() >= SDKNodeKind::FIRST &&                                \
+    N->getKind() <= SDKNodeKind::LAST;                                        \
 }
+#include "swift/IDE/DigesterEnums.def"
 
 unsigned SDKNode::getChildIndex(const SDKNode* Child) const {
   auto It = std::find(Children.begin(), Children.end(), Child);
@@ -351,28 +347,6 @@ StringRef SDKNodeDecl::getFullyQualifiedName() const {
   return getSDKContext().buffer(OS.str());
 }
 
-bool SDKNodeDecl::classof(const SDKNode *N) {
-  switch (N->getKind()) {
-    case SDKNodeKind::DeclConstructor:
-    case SDKNodeKind::DeclFunction:
-    case SDKNodeKind::DeclGetter:
-    case SDKNodeKind::DeclSetter:
-    case SDKNodeKind::DeclTypeAlias:
-    case SDKNodeKind::DeclType:
-    case SDKNodeKind::DeclVar:
-    case SDKNodeKind::DeclAssociatedType:
-    case SDKNodeKind::DeclSubscript:
-      return true;
-    case SDKNodeKind::Root:
-    case SDKNodeKind::TypeNominal:
-    case SDKNodeKind::TypeFunc:
-    case SDKNodeKind::TypeAlias:
-      return false;
-  }
-
-  llvm_unreachable("Unhandled SDKNodeKind in switch.");
-}
-
 bool SDKNodeDecl::hasDeclAttribute(DeclAttrKind DAKind) const {
   return std::find(DeclAttributes.begin(), DeclAttributes.end(), DAKind) !=
     DeclAttributes.end();
@@ -443,20 +417,6 @@ bool SDKNodeDeclType::isConformingTo(KnownProtocolKind Kind) const {
   }
 }
 
-bool SDKNodeDeclAbstractFunc::classof(const SDKNode *N) {
-  switch (N->getKind()) {
-    case SDKNodeKind::DeclFunction:
-    case SDKNodeKind::DeclSetter:
-    case SDKNodeKind::DeclGetter:
-    case SDKNodeKind::DeclConstructor:
-    case SDKNodeKind::DeclSubscript:
-      return true;
-
-    default:
-      return false;
-  }
-}
-
 StringRef SDKNodeDeclAbstractFunc::getTypeRoleDescription(SDKContext &Ctx,
                                                       unsigned Index) {
   if (Index == 0) {
@@ -501,7 +461,11 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   static auto getAsInt = [&](llvm::yaml::Node *N) -> int {
     return std::stoi(cast<llvm::yaml::ScalarNode>(N)->getRawValue());
   };
-
+  static auto getAsBool = [&](llvm::yaml::Node *N) -> bool {
+    auto txt = cast<llvm::yaml::ScalarNode>(N)->getRawValue();
+    assert(txt.startswith("false") || txt.startswith("true"));
+    return txt.startswith("true");
+  };
   SDKNodeKind Kind;
   SDKNodeInitInfo Info(Ctx);
   NodeVector Children;
@@ -524,7 +488,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
 #define KEY_STRING(X, Y)                                                      \
   case KeyKind::KK_##Y: Info.X = GetScalarString(Pair.getValue()); break;
 #include "swift/IDE/DigesterEnums.def"
-#define KEY_BOOL(X, Y) case KeyKind::KK_##Y: Info.X = true; break;
+#define KEY_BOOL(X, Y) case KeyKind::KK_##Y: Info.X = getAsBool(Pair.getValue()); break;
 #include "swift/IDE/DigesterEnums.def"
       case KeyKind::KK_children:
         for (auto &Mapping : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
@@ -1369,6 +1333,81 @@ void SwiftDeclCollector::foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) {
   processDecl(VD);
 }
 
+static void output(json::Output &out, StringRef Key, bool Value) {
+  if (Value)
+    out.mapRequired(Key, Value);
+}
+
+static void output(json::Output &out, StringRef Key, StringRef Value) {
+  if (!Value.empty())
+    out.mapRequired(Key, Value);
+}
+
+void SDKNode::jsonize(json::Output &out) {
+  auto Kind = getKind();
+  out.mapRequired(getKeyContent(Ctx, KeyKind::KK_kind).data(), Kind);
+  output(out, getKeyContent(Ctx, KeyKind::KK_name).data(), Name);
+  output(out, getKeyContent(Ctx, KeyKind::KK_printedName).data(), PrintedName);
+  out.mapOptional(getKeyContent(Ctx, KeyKind::KK_children).data(), Children);
+}
+
+void SDKNodeDecl::jsonize(json::Output &out) {
+  SDKNode::jsonize(out);
+  out.mapRequired(getKeyContent(Ctx, KeyKind::KK_declKind).data(), DKind);
+  output(out, getKeyContent(Ctx, KeyKind::KK_usr).data(), Usr);
+  output(out, getKeyContent(Ctx, KeyKind::KK_location).data(), Location);
+  output(out, getKeyContent(Ctx, KeyKind::KK_moduleName).data(), ModuleName);
+  output(out, getKeyContent(Ctx, KeyKind::KK_genericSig), GenericSig);
+  output(out, getKeyContent(Ctx, KeyKind::KK_static).data(), IsStatic);
+  output(out, getKeyContent(Ctx, KeyKind::KK_deprecated).data(),IsDeprecated);
+  output(out, getKeyContent(Ctx, KeyKind::KK_protocolReq).data(), IsProtocolReq);
+  output(out, getKeyContent(Ctx, KeyKind::KK_overriding).data(), IsOverriding);
+  output(out, getKeyContent(Ctx, KeyKind::KK_implicit).data(), IsImplicit);
+  out.mapOptional(getKeyContent(Ctx, KeyKind::KK_declAttributes).data(), DeclAttributes);
+  // Strong reference is implied, no need for serialization.
+  if (getReferenceOwnership() != ReferenceOwnership::Strong) {
+    uint8_t Raw = uint8_t(getReferenceOwnership());
+    out.mapRequired(getKeyContent(Ctx, KeyKind::KK_ownership).data(), Raw);
+  }
+}
+
+void SDKNodeDeclAbstractFunc::jsonize(json::Output &out) {
+  SDKNodeDecl::jsonize(out);
+  output(out, getKeyContent(Ctx, KeyKind::KK_throwing).data(), IsThrowing);
+  output(out, getKeyContent(Ctx, KeyKind::KK_mutating).data(), IsMutating);
+  out.mapOptional(getKeyContent(Ctx, KeyKind::KK_selfIndex).data(), SelfIndex);
+}
+
+void SDKNodeDeclType::jsonize(json::Output &out) {
+  SDKNodeDecl::jsonize(out);
+  output(out, getKeyContent(Ctx, KeyKind::KK_superclassUsr).data(), SuperclassUsr);
+  output(out, getKeyContent(Ctx, KeyKind::KK_enumRawTypeName).data(), EnumRawTypeName);
+  out.mapOptional(getKeyContent(Ctx, KeyKind::KK_superclassNames).data(), SuperclassNames);
+  out.mapOptional(getKeyContent(Ctx, KeyKind::KK_conformingProtocols).data(), ConformingProtocols);
+}
+
+void SDKNodeType::jsonize(json::Output &out) {
+  SDKNode::jsonize(out);
+  out.mapOptional(getKeyContent(Ctx, KeyKind::KK_typeAttributes).data(), TypeAttributes);
+  output(out, getKeyContent(Ctx, KeyKind::KK_hasDefaultArg).data(), HasDefaultArg);
+}
+
+void SDKNodeTypeNominal::jsonize(json::Output &out) {
+  SDKNodeType::jsonize(out);
+  out.mapOptional(getKeyContent(Ctx, KeyKind::KK_usr).data(), USR);
+}
+
+void SDKNodeDeclSubscript::jsonize(json::Output &out) {
+  SDKNodeDeclAbstractFunc::jsonize(out);
+  output(out, getKeyContent(Ctx, KeyKind::KK_hasSetter).data(), HasSetter);
+}
+
+void SDKNodeDeclVar::jsonize(json::Output &out) {
+  SDKNodeDecl::jsonize(out);
+  out.mapOptional(getKeyContent(Ctx, KeyKind::KK_fixedbinaryorder).data(),
+                  FixedBinaryOrder);
+}
+
 namespace swift {
 namespace json {
 // In the namespace of swift::json, we define several functions so that the
@@ -1401,127 +1440,7 @@ struct ScalarEnumerationTraits<DeclKind> {
 template<>
 struct ObjectTraits<SDKNode *> {
   static void mapping(Output &out, SDKNode *&value) {
-    auto Kind = value->getKind();
-    auto Name = value->getName();
-    auto PrintedName = value->getPrintedName();
-    auto &Ctx = value->getSDKContext();
-    out.mapRequired(getKeyContent(Ctx, KeyKind::KK_kind).data(), Kind);
-    out.mapRequired(getKeyContent(Ctx, KeyKind::KK_name).data(), Name);
-    out.mapRequired(getKeyContent(Ctx, KeyKind::KK_printedName).data(),
-                    PrintedName);
-
-    if (auto D = dyn_cast<SDKNodeDecl>(value)) {
-      DeclKind DK = D->getDeclKind();
-      StringRef Usr = D->getUsr();
-      StringRef Location = D->getLocation();
-      StringRef ModuleName = D->getModuleName();
-      out.mapRequired(getKeyContent(Ctx, KeyKind::KK_declKind).data(), DK);
-      out.mapRequired(getKeyContent(Ctx, KeyKind::KK_usr).data(), Usr);
-      out.mapRequired(getKeyContent(Ctx, KeyKind::KK_location).data(), Location);
-      out.mapRequired(getKeyContent(Ctx, KeyKind::KK_moduleName).data(),
-                      ModuleName);
-      auto GSig = D->getGenericSignature();
-      if (!GSig.empty())
-        out.mapRequired(getKeyContent(Ctx, KeyKind::KK_genericSig), GSig);
-
-      if (auto isStatic = D->isStatic())
-        out.mapRequired(getKeyContent(Ctx, KeyKind::KK_static).data(), isStatic);
-      if (bool isDeprecated = D->isDeprecated())
-        out.mapRequired(getKeyContent(Ctx, KeyKind::KK_deprecated).data(),
-                        isDeprecated);
-      if (bool isProtocolReq = D->isProtocolRequirement()) {
-        out.mapRequired(getKeyContent(Ctx, KeyKind::KK_protocolReq).data(),
-                        isProtocolReq);
-      }
-      if (bool isOverriding = D->isOverriding()) {
-        out.mapRequired(getKeyContent(Ctx, KeyKind::KK_overriding).data(),
-                        isOverriding);
-      }
-
-      if (bool isImplicit = D->isImplicit())
-        out.mapRequired(getKeyContent(Ctx, KeyKind::KK_implicit).data(),
-                        isImplicit);
-      if (auto V = dyn_cast<SDKNodeDeclVar>(value)) {
-        if (V->hasFixedBinaryOrder()) {
-          auto Order = V->getFixedBinaryOrder();
-          out.mapRequired(getKeyContent(Ctx, KeyKind::KK_fixedbinaryorder).data(),
-                          Order);
-        }
-      }
-      if (auto F = dyn_cast<SDKNodeDeclAbstractFunc>(value)) {
-        if (bool isThrowing = F->isThrowing())
-          out.mapRequired(getKeyContent(Ctx, KeyKind::KK_throwing).data(),
-                          isThrowing);
-        if (bool isMutating = F->isMutating())
-          out.mapRequired(getKeyContent(Ctx, KeyKind::KK_mutating).data(),
-                          isMutating);
-        if (F->hasSelfIndex()) {
-          auto Index = F->getSelfIndex();
-          out.mapRequired(getKeyContent(Ctx, KeyKind::KK_selfIndex).data(),
-                          Index);
-        }
-        if (auto S = dyn_cast<SDKNodeDeclSubscript>(value)) {
-          if (bool hasSetter = S->hasSetter()) {
-            out.mapRequired(getKeyContent(Ctx, KeyKind::KK_hasSetter).data(),
-                            hasSetter);
-          }
-        }
-      }
-      if (auto *TD = dyn_cast<SDKNodeDeclType>(value)) {
-        auto Super = TD->getSuperClassUsr();
-        if (!Super.empty()) {
-          out.mapRequired(getKeyContent(Ctx, KeyKind::KK_superclassUsr).data(),
-                          Super);
-        }
-        auto SuperNames = TD->getClassInheritanceChain();
-        if (!SuperNames.empty()) {
-          out.mapRequired(getKeyContent(Ctx, KeyKind::KK_superclassNames).data(),
-                          SuperNames);
-        }
-        auto Pros = TD->getAllProtocols();
-        if (!Pros.empty()) {
-          out.mapRequired(getKeyContent(Ctx,
-                                    KeyKind::KK_conformingProtocols).data(),
-                          Pros);
-        }
-
-        auto RawTypeName = TD->isEnum() ? TD->getEnumRawTypeName() : StringRef();
-        if (!RawTypeName.empty()) {
-          out.mapRequired(getKeyContent(Ctx,
-                                        KeyKind::KK_enumRawTypeName).data(),
-                          RawTypeName);
-        }
-
-      }
-      auto Attributes = D->getDeclAttributes();
-      if (!Attributes.empty())
-        out.mapRequired(getKeyContent(Ctx, KeyKind::KK_declAttributes).data(),
-                        Attributes);
-      // Strong reference is implied, no need for serialization.
-      if (D->getReferenceOwnership() != ReferenceOwnership::Strong) {
-        uint8_t Raw = uint8_t(D->getReferenceOwnership());
-        out.mapRequired(getKeyContent(Ctx, KeyKind::KK_ownership).data(), Raw);
-      }
-    } else if (auto T = dyn_cast<SDKNodeType>(value)) {
-      auto Attributes = T->getTypeAttributes();
-      if (!Attributes.empty())
-        out.mapRequired(getKeyContent(Ctx, KeyKind::KK_typeAttributes).data(),
-                        Attributes);
-      if (bool HasDefault = T->hasDefaultArgument()) {
-        out.mapRequired(getKeyContent(Ctx, KeyKind::KK_hasDefaultArg).data(),
-                        HasDefault);
-      }
-      // Serialize nominal type's USR.
-      if (auto NT = dyn_cast<SDKNodeTypeNominal>(value)) {
-        auto Usr = NT->getUsr();
-        if (!Usr.empty())
-          out.mapRequired(getKeyContent(Ctx, KeyKind::KK_usr).data(), Usr);
-      }
-    }
-    if (!value->isLeaf()) {
-      ArrayRef<SDKNode *> Children = value->getChildren();
-      out.mapRequired(getKeyContent(Ctx, KeyKind::KK_children).data(), Children);
-    }
+    value->jsonize(out);
   }
 };
 
