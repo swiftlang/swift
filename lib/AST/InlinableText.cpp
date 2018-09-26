@@ -122,7 +122,7 @@ struct ExtractInactiveRanges : public ASTWalker {
     // Passing them to walkToDeclPre is sufficient to remove all conditionals.
     if (auto *collection = dyn_cast<CollectionExpr>(e))
       for (auto &icds : collection->ConditionalsMap)
-        for (auto &icd : icds.second)
+        for (IfConfigDecl *icd : icds.second)
           walkToDeclPre(icd);
 
     return {true, e};

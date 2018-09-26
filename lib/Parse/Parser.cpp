@@ -942,8 +942,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   ParserStatus Status;
 
   auto IsConditionalsEnd = [&]() -> bool {
-    return Elements && (Tok.is(tok::pound_elseif) ||
-      Tok.is(tok::pound_else) || Tok.is(tok::pound_endif));
+    return Elements && Tok.isAny(tok::pound_elseif,
+                                 tok::pound_else, tok::pound_endif);
   };
 
   while (true) {
@@ -954,13 +954,12 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     }
 
     if (IfConfigMap) {
-      while (true) {
-        if (Tok.isNot(tok::pound_if))
-          break;
+      while (Tok.is(tok::pound_if)) {
         if (!Elements)
           IfConfigMap->newOuterConditionalStarts();
         auto IfConfigResult = parseIfConfig(
           [&](SmallVectorImpl<ASTNode> &Elements, bool SubIsActive) {
+            IfConfigMap->resetFirst();
             Status |= parseList(RightK, LeftLoc, RightLoc, AllowSepAfterLast,
                                 ErrorDiag, Kind, callback, IfConfigMap,
                                 &Elements, IsActive && SubIsActive);
@@ -982,7 +981,16 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     SyntaxParsingContext ElementContext(SyntaxContext, ElementKind);
     if (ElementKind == SyntaxKind::Unknown)
       ElementContext.setTransparent();
+
     Status |= callback(Elements, IsActive);
+
+    // If Array or Dictionary report first element missing comma.
+    if (IfConfigMap && IfConfigMap->isFirst() &&
+        Tok.isNot(tok::r_square) && Tok.isNot(tok::comma)) {
+      diagnose(Tok, diag::expected_separator, ",").
+        fixItInsertAfter(PreviousLoc, ",");
+    }
+
     if (Tok.is(RightK) || IsConditionalsEnd())
       break;
     // If the lexer stopped with an EOF token whose spelling is ")", then this
