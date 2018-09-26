@@ -47,8 +47,7 @@ import Darwin
 #else
 import Glibc
 #endif
-// Export the TF C APIs, so that IRGen can use them (in eager mode).
-@_exported import CTensorFlow
+import CTensorFlow
 
 // If `serverAddress` is nil, use local session (good for forge testing).
 //
