@@ -1577,8 +1577,9 @@ Constraint *ConstraintSystem::selectDisjunction() {
   if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
     return disjunction;
 
-  if (auto *disjunction = selectApplyDisjunction())
-    return disjunction;
+  if (getASTContext().isSwiftVersionAtLeast(5))
+    if (auto *disjunction = selectApplyDisjunction())
+      return disjunction;
 
   // Pick the disjunction with the smallest number of active choices.
   auto minDisjunction =

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4 -solver-expression-time-threshold=1
+// RUN: %target-typecheck-verify-swift -swift-version 4 -solver-expression-time-threshold=1 -swift-version 5
 // REQUIRES: tools-release,no_asserts
 
 func test(_ i: Int, _ j: Int) -> Int {
