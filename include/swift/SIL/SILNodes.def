@@ -319,6 +319,14 @@
 #define VALUE_RANGE(ID, FIRST, LAST) NODE_RANGE(ID, FIRST, LAST)
 #endif
 
+/// ARGUMENT_RANGE(ID, FIRST, LAST)
+///
+///   The enumerator range of an abstract class in the SILArgument
+///   hierarchy.
+#ifndef ARGUMENT_RANGE
+#define ARGUMENT_RANGE(ID, FIRST, LAST) VALUE_RANGE(ID, FIRST, LAST)
+#endif
+
 /// INST_RANGE(ID, PARENT)
 ///
 ///   The enumerator range of an abstract class in the SILInstruction
@@ -332,7 +340,7 @@ ABSTRACT_NODE(ValueBase, SILNode)
 ABSTRACT_VALUE(SILArgument, ValueBase)
   ARGUMENT(SILPhiArgument, SILArgument)
   ARGUMENT(SILFunctionArgument, SILArgument)
-  VALUE_RANGE(SILArgument, SILPhiArgument, SILFunctionArgument)
+  ARGUMENT_RANGE(SILArgument, SILPhiArgument, SILFunctionArgument)
 
 ABSTRACT_VALUE(MultipleValueInstructionResult, ValueBase)
   MULTIPLE_VALUE_INST_RESULT(BeginApplyResult, MultipleValueInstructionResult)
@@ -780,6 +788,7 @@ NODE_RANGE(SILNode, SILPhiArgument, DestructureTupleInst)
 
 #undef SINGLE_VALUE_INST_RANGE
 #undef INST_RANGE
+#undef ARGUMENT_RANGE
 #undef VALUE_RANGE
 #undef NODE_RANGE
 #undef ABSTRACT_SINGLE_VALUE_INST

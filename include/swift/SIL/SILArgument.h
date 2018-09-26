@@ -37,6 +37,30 @@ SILFunctionConventions::getSILArgumentConvention(unsigned index) const {
   }
 }
 
+struct SILArgumentKind {
+  enum innerty : std::underlying_type<ValueKind>::type {
+#define ARGUMENT(ID, PARENT) ID = unsigned(SILNodeKind::ID),
+#define ARGUMENT_RANGE(ID, FIRST, LAST) First_##ID = FIRST, Last_##ID = LAST,
+#include "swift/SIL/SILNodes.def"
+  } value;
+
+  explicit SILArgumentKind(ValueKind kind)
+      : value(*SILArgumentKind::fromValueKind(kind)) {}
+  SILArgumentKind(innerty value) : value(value) {}
+  operator innerty() const { return value; }
+
+  static Optional<SILArgumentKind> fromValueKind(ValueKind kind) {
+    switch (kind) {
+#define ARGUMENT(ID, PARENT)                                                   \
+  case ValueKind::ID:                                                          \
+    return SILArgumentKind(ID);
+#include "swift/SIL/SILNodes.def"
+    default:
+      return None;
+    }
+  }
+};
+
 class SILArgument : public ValueBase {
   void operator=(const SILArgument &) = delete;
   void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED
@@ -122,6 +146,11 @@ public:
   /// argument value. E.g. the incoming value for a switch_enum payload argument
   /// is the enum itself (the operand of the switch_enum).
   SILValue getSingleTerminatorOperand() const;
+
+  /// Return the SILArgumentKind of this argument.
+  SILArgumentKind getKind() const {
+    return SILArgumentKind(ValueBase::getKind());
+  }
 
 protected:
   SILArgument(ValueKind SubClassKind, SILBasicBlock *ParentBB, SILType Ty,
