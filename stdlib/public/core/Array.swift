@@ -1620,20 +1620,6 @@ extension Array: Equatable where Element: Equatable {
 
     return true
   }
-
-  /// Returns a Boolean value indicating whether two arrays are not equal.
-  ///
-  /// Two arrays are equal if they contain the same elements in the same order.
-  /// You can use the not-equal-to operator (`!=`) to compare any two arrays
-  /// that store the same, `Equatable`-conforming element type.
-  ///
-  /// - Parameters:
-  ///   - lhs: An array to compare.
-  ///   - rhs: Another array to compare.
-  @inlinable
-  public static func !=(lhs: Array<Element>, rhs: Array<Element>) -> Bool {
-    return !(lhs == rhs)
-  }
 }
 
 extension Array: Hashable where Element: Hashable {
