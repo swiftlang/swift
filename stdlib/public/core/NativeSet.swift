@@ -391,6 +391,7 @@ extension _NativeSet { // Deletion
   internal mutating func _delete(at bucket: Bucket) {
     hashTable.delete(at: bucket, with: self)
     _storage._count -= 1
+    _sanityCheck(_storage._count >= 0)
     invalidateIndices()
   }
 
