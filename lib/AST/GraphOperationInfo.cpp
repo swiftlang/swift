@@ -19,49 +19,70 @@ using llvm::SmallVectorImpl;
 using llvm::StringRef;
 using namespace swift;
 using namespace tf;
-typedef GraphOperationInfo::OperandClass OperandClass;
 
-/// Return the string suffix for the specified attribute modifier.
-const char *GraphOperationInfo::getOperandClassSuffix(OperandClass opClass) {
-  switch (opClass) {
-  case OperandClass::Input:
-    return "$in";
-  case OperandClass::Normal:
-    return "";
-  case OperandClass::Tensor:
-    return "$tensor";
-  case OperandClass::Shape:
-    return "$shape";
-  case OperandClass::UnknownShapeList:
-    return "$unknownShapeList";
-  case OperandClass::Array:
-    return "$array";
-  case OperandClass::Out:
-    return "$out";
+GraphOperationInfo::GraphOperationInfo(GraphOperationInst *inst) : inst(inst) {
+  PrettyStackTraceSILNode X("decoding graph_op name", inst);
+
+  ArrayRef<Operand> remainingOperands = inst->getAllOperands();
+  StringRef remainingMangled = inst->getName().str();
+  auto nextMarkerPos = remainingMangled.find(',');
+  OperationName = remainingMangled.substr(0, nextMarkerPos);
+
+  while (nextMarkerPos != StringRef::npos) {
+    remainingMangled = remainingMangled.drop_front(nextMarkerPos);
+    nextMarkerPos = remainingMangled.find(',', 1);
+
+    StringRef thisMarker = remainingMangled.substr(0, nextMarkerPos);
+    StringRef thisMarkerName = thisMarker.drop_front(2);
+    assert(thisMarker.size() >= 2 && "marker too short");
+    switch (thisMarker[1]) {
+    case 'i':
+      // Push a SAK_Single.
+      StructuredArguments.emplace_back(SAK_Single, thisMarkerName,
+                                      remainingOperands.front().get());
+      remainingOperands = remainingOperands.drop_front(1);
+      break;
+    case 'L':
+      // Push a SAK_List with ArgumentList of size 0 pointing at the right place
+      // in the inst's arguments.
+      StructuredArguments.emplace_back(SAK_List, thisMarkerName,
+                                      remainingOperands.take_front(0));
+      break;
+    case 'e':
+      // Extend the ArgumentList of the curent SAK_List by 1 to include the next
+      // of the inst's arguments.
+      assert(StructuredArguments.size() > 0 && "list element not in list");
+      assert(StructuredArguments.back().Kind == SAK_List &&
+             "list element not in list");
+      assert(thisMarkerName.empty() && "list element should not have name");
+      StructuredArguments.back().ArgumentList = ArrayRef<Operand>(
+          StructuredArguments.back().ArgumentList.data(),
+          StructuredArguments.back().ArgumentList.size() + 1);
+      remainingOperands = remainingOperands.drop_front(1);
+      break;
+    default:
+      llvm_unreachable("unknown marker kind");
+    }
   }
 }
 
-/// Return the operand class of the specified string form like "tensor"
-llvm::Optional<OperandClass>
-GraphOperationInfo::getOperandClass(StringRef suffix) {
-  return llvm::StringSwitch<llvm::Optional<OperandClass>>(suffix)
-      .Case("in", OperandClass::Input)
-      .Case("", OperandClass::Normal)
-      .Case("tensor", OperandClass::Tensor)
-      .Case("shape", OperandClass::Shape)
-      .Case("unknownShapeList", OperandClass::UnknownShapeList)
-      .Case("array", OperandClass::Array)
-      .Case("out", OperandClass::Out)
-      .Default(None);
+int64_t GraphOperationInfo::getIntAttr(unsigned attrIdx,
+                                       StringRef attrName) const {
+  auto attr = inst->getAttribute(attrIdx);
+  auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
+  assert(attrInfo.first == attrName);
+  auto attrValue = attr.value;
+  return attrValue.getIntegerValue().getLimitedValue();
 }
 
-/// Return the device attribute associated with `inst`, which is required to
-/// exist.
-// StringRef GraphOperationInfo::getDeviceString() const {
-//   auto attr = inst->getAttributeNamed(DEVICE_ATTR);
-//   assertWithDump(attr.hasValue(), "Tensor op instruction has no device
-//   string"); return attr.getValue().getStringValue();
-// }
+std::string GraphOperationInfo::getStringAttr(unsigned attrIdx,
+                                              StringRef attrName) const {
+  auto attr = inst->getAttribute(attrIdx);
+  auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
+  assert(attrInfo.first == attrName);
+  auto attrValue = attr.value;
+  return attrValue.getStringValue().str();
+}
 
 void GraphOperationInfo::assertWithDump(bool cond,
                                         const char *assertMsg) const {
@@ -73,94 +94,58 @@ void GraphOperationInfo::assertWithDump(bool cond,
 #endif // NDEBUG
 }
 
-/// Decode the name of a graph_op into its TensorFlow op name and a list of
-/// information about the operands.
-StringRef GraphOperationInfo::decodeName(
-    SmallVectorImpl<StructuredOperand> &structuredOperands) const {
-  PrettyStackTraceSILNode X("decoding graph_op name", inst);
-
-  ArrayRef<Operand> remainingOperands = inst->getAllOperands();
-  StringRef remainingMangled = inst->getName().str();
-  auto nextMarkerPos = remainingMangled.find(',');
-  StringRef opName = remainingMangled.substr(0, nextMarkerPos);
-
-  while (nextMarkerPos != StringRef::npos) {
-    remainingMangled = remainingMangled.drop_front(nextMarkerPos);
-    nextMarkerPos = remainingMangled.find(',', 1);
-
-    StringRef thisMarker = remainingMangled.substr(0, nextMarkerPos);
-    StringRef thisMarkerName = thisMarker.drop_front(2);
-    assert(thisMarker.size() >= 2 && "marker too short");
-    switch (thisMarker[1]) {
-    case 'i':
-      // Push a SOK_Single.
-      structuredOperands.emplace_back(SOK_Single, thisMarkerName,
-                                      remainingOperands.front().get());
-      remainingOperands = remainingOperands.drop_front(1);
-      break;
-    case 'L':
-      // Push a SOK_List with OperandList of size 0 pointing at the right place
-      // in the inst's operands.
-      structuredOperands.emplace_back(SOK_List, thisMarkerName,
-                                      remainingOperands.take_front(0));
-      break;
-    case 'e':
-      // Extend the OperandList of the curent SOK_List by 1 to include the next
-      // of the inst's operands.
-      assert(structuredOperands.size() > 0 && "list element not in list");
-      assert(structuredOperands.back().Kind == SOK_List &&
-             "list element not in list");
-      assert(thisMarkerName.empty() && "list element should not have name");
-      structuredOperands.back().OperandList = ArrayRef<Operand>(
-          structuredOperands.back().OperandList.data(),
-          structuredOperands.back().OperandList.size() + 1);
-      remainingOperands = remainingOperands.drop_front(1);
-      break;
-    default:
-      llvm_unreachable("unknown marker kind");
-    }
+/// Return the string suffix for the specified ArgumentLowering.
+const char *
+GraphOperationInfo::getArgumentLoweringSuffix(ArgumentLowering lowering) {
+  switch (lowering) {
+  case ArgumentLowering::Input:
+    return "";
+  case ArgumentLowering::NormalAttribute:
+    return "";
+  case ArgumentLowering::TensorAttribute:
+    return "$tensor";
+  case ArgumentLowering::ShapeAttribute:
+    return "$shape";
+  case ArgumentLowering::UnknownShapeListAttribute:
+    return "$unknownShapeList";
+  case ArgumentLowering::TypeListAttribute:
+    return "$typeList";
+  case ArgumentLowering::Out:
+    return "$out";
   }
-
-  return opName;
 }
 
-/// Given an attribute name like foo$tensor, decode the name and the class.  If
-/// there is no modifier specified, this defaults to OperandClass::Normal.
-std::pair<StringRef, GraphOperationInfo::OperandClass>
-GraphOperationInfo::decodeAttributeName(Identifier name) {
-  auto nameStr = name.str();
-  // Figure out what the suffix is (if any).
-  auto dollarLoc = nameStr.find('$');
+/// Given an argument name like foo$tensor, decode the name and the
+/// ArgumentLowering.  If the name is empty, this defaults to
+/// ArgumentLowering::Input.  If the name is non-empty but there is no
+/// modifier specified, then this defaults to
+/// ArgumentLowering::NormalAttribute.
+std::pair<StringRef, GraphOperationInfo::ArgumentLowering>
+GraphOperationInfo::decodeArgumentName(StringRef Name) {
+  if (Name.empty())
+    return {Name, ArgumentLowering::Input};
 
-  auto opClass = OperandClass::Normal;
+  auto dollarLoc = Name.find('$');
+  auto lowering = ArgumentLowering::NormalAttribute;
   if (dollarLoc != StringRef::npos) {
-    auto suffix = nameStr.drop_front(dollarLoc + 1);
-    if (auto res = getOperandClass(suffix))
-      opClass = res.getValue();
-    else {
-      std::string msg = "invalid attribute modifier '" + name.str().str() + "'";
-      llvm_unreachable(msg.c_str());
-    }
+    auto suffix = Name.drop_front(dollarLoc + 1);
+    auto loweringOpt =
+        llvm::StringSwitch<llvm::Optional<ArgumentLowering>>(suffix)
+          .Case("", ArgumentLowering::NormalAttribute)
+          .Case("tensor", ArgumentLowering::TensorAttribute)
+          .Case("shape", ArgumentLowering::ShapeAttribute)
+          .Case("unknownShapeList", ArgumentLowering::UnknownShapeListAttribute)
+          .Case("typeList", ArgumentLowering::TypeListAttribute)
+          .Case("out", ArgumentLowering::Out)
+          .Default(None);
+    assert(loweringOpt && "invalid attribute modifier");
+    lowering = *loweringOpt;
   }
-
-  // Slice the suffix off the attribute name and add the decoded version.
-  return {nameStr.substr(0, dollarLoc), opClass};
+  return {Name.substr(0, dollarLoc), lowering};
 }
 
-int64_t GraphOperationInfo::getIntAttr(unsigned attrIdx,
-                                       StringRef attrName) const {
-  auto attr = inst->getAttribute(attrIdx);
-  auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
-  assert(attrInfo.first == attrName);
-  auto attrValue = attr.value;
-  return attrValue.getIntegerValue().getLimitedValue();
-}
-
-std::string GraphOperationInfo::getStringAttr(unsigned attrIdx,
-                                              StringRef attrName) const {
-  auto attr = inst->getAttribute(attrIdx);
-  auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
-  assert(attrInfo.first == attrName);
-  auto attrValue = attr.value;
-  return attrValue.getStringValue().str();
+/// Returns this argument's name, without suffix, and the ArgumentLowering.
+std::pair<StringRef, GraphOperationInfo::ArgumentLowering>
+GraphOperationInfo::StructuredArgument::getArgumentNameAndLowering() const {
+  return decodeArgumentName(Name);
 }

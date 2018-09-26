@@ -597,14 +597,6 @@ UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(ZeroInitializer)
 
 ValueOwnershipKind
 ValueOwnershipKindClassifier::visitBuiltinInst(BuiltinInst *BI) {
-  // SWIFT_ENABLE_TENSORFLOW
-  if (BI->getName().str().startswith("__tfop")) {
-    assert(BI->getNumResults() == 1);
-    auto type = BI->getResults()[0]->getType();
-    return type.isVoid() ? ValueOwnershipKind::Trivial
-                         : ValueOwnershipKind::Owned;
-  }
-
   // For now, just conservatively say builtins are None. We need to use a
   // builtin in here to guarantee correctness.
   return ValueOwnershipKindBuiltinVisitor().visit(BI);

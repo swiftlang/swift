@@ -173,6 +173,7 @@ namespace sil_block {
     SIL_TWO_OPERANDS_EXTRA_ATTR,
     // SWIFT_ENABLE_TENSORFLOW
     SIL_REVERSE_DIFFERENTIABLE_ATTR,
+    SIL_INST_GRAPH_OPERATION,
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
@@ -407,6 +408,16 @@ namespace sil_block {
     TypeIDField,          // callee substituted type
     ValueIDField,         // callee value
     BCArray<ValueIDField> // a list of arguments
+  >;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  using SILInstGraphOperationLayout = BCRecordLayout<
+      SIL_INST_GRAPH_OPERATION,
+      ValueIDField,          // the (mangled) graph_op name
+      BCVBR<8>,              // number of arguments
+      BCArray<ValueIDField>  // 3 entries per argument (value, type, and type
+                             // category)
+      // followed by 2 entries per result type (type, and type category)
   >;
 
   // SIL instructions with one type. (alloc_stack)

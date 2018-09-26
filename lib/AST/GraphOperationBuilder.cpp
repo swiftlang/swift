@@ -25,21 +25,21 @@ GraphOperationBuilder::GraphOperationBuilder(StringRef OpName)
          "graph_op name cannot include ','");
 }
 
-/// Add a single operand to the GraphOperationInst, with an optional name.
-void GraphOperationBuilder::addOperand(SILValue operand, StringRef name) {
+/// Add a single argument to the GraphOperationInst, with an optional name.
+void GraphOperationBuilder::addArgument(SILValue argument, StringRef name) {
   MangledName += ",i";
   MangledName += name;
-  Operands.push_back(operand);
+  Operands.push_back(argument);
 }
 
-/// Add a list operand to the GraphOperationInst, with an optional name.
-void GraphOperationBuilder::addListOperand(ArrayRef<SILValue> operands,
-                                           StringRef name) {
+/// Add a list argument to the GraphOperationInst, with an optional name.
+void GraphOperationBuilder::addListArgument(ArrayRef<SILValue> arguments,
+                                            StringRef name) {
   MangledName += ",L";
   MangledName += name;
-  for (auto operand : operands) {
+  for (auto argument : arguments) {
     MangledName += ",e";
-    Operands.push_back(operand);
+    Operands.push_back(argument);
   }
 }
 

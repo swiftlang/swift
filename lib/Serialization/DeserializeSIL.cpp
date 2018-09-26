@@ -959,6 +959,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   Builder.setCurrentDebugScope(Fn->getDebugScope());
   unsigned RawOpCode = 0, TyCategory = 0, TyCategory2 = 0, TyCategory3 = 0,
            Attr = 0, NumSubs = 0, NumConformances = 0, IsNonThrowingApply = 0;
+  // SWIFT_ENABLE_TENSORFLOW
+  unsigned NumArguments = 0;
   ValueID ValID, ValID2, ValID3;
   TypeID TyID, TyID2, TyID3;
   TypeID ConcreteTyID;
@@ -1059,6 +1061,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     }
     break;
   }
+  // SWIFT_ENABLE_TENSORFLOW
+  case SIL_INST_GRAPH_OPERATION:
+    SILInstGraphOperationLayout::readRecord(scratch, ValID, NumArguments,
+                                            ListOfValues);
+    RawOpCode = (unsigned)SILInstructionKind::GraphOperationInst;
+    break;
   case SIL_INST_NO_OPERAND:
     SILInstNoOperandLayout::readRecord(scratch, RawOpCode);
     break;
@@ -1437,7 +1445,26 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::GraphOperationInst: {
-    llvm_unreachable("Unimplemented");
+    // TODO(SR-8848): Deserialize attributes.
+    auto EndOfArgValues = 3 * NumArguments;
+    Identifier MangledName = MF->getIdentifier(ValID);
+    SmallVector<SILValue, 4> Args;
+    for (unsigned i = 0, e = EndOfArgValues; i < e; i += 3) {
+      auto ArgASTTy = MF->getType(ListOfValues[i+1]);
+      auto ArgTy = getSILType(ArgASTTy,
+                              (SILValueCategory)(unsigned)ListOfValues[i+2]);
+      Args.push_back(getLocalValue(ListOfValues[i], ArgTy));
+    }
+    SmallVector<SILType, 4> ResultSILTypes;
+    for (unsigned i = EndOfArgValues, e = ListOfValues.size(); i < e; i += 2) {
+      auto ASTTy = MF->getType(ListOfValues[i]);
+      auto Ty = getSILType(ASTTy,
+                           (SILValueCategory)(unsigned)ListOfValues[i+1]);
+      ResultSILTypes.push_back(Ty);
+    }
+    ResultVal = Builder.createGraphOperation(Loc, MangledName, Args, {},
+                                             ResultSILTypes);
+    break;
   }
   case SILInstructionKind::AllocGlobalInst: {
     // Format: Name and type. Use SILOneOperandLayout.
