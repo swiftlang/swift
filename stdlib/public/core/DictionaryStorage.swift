@@ -179,7 +179,6 @@ extension _RawDictionaryStorage {
   }
 }
 
-// See the docs at the top of this file for a description of this type
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 final internal class _DictionaryStorage<Key: Hashable, Value>
@@ -190,17 +189,6 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
   override internal init(_doNotCallMe: ()) {
     _sanityCheckFailure("This class cannot be directly initialized")
   }
-
-#if _runtime(_ObjC)
-  @objc
-  internal required init(
-    objects: UnsafePointer<AnyObject?>,
-    forKeys: UnsafeRawPointer,
-    count: Int
-  ) {
-    _sanityCheckFailure("This class cannot be directly initialized")
-  }
-#endif
 
   deinit {
     guard _count > 0 else { return }
@@ -240,6 +228,122 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     return _NativeDictionary(self)
   }
 
+#if _runtime(_ObjC)
+  @objc
+  internal required init(
+    objects: UnsafePointer<AnyObject?>,
+    forKeys: UnsafeRawPointer,
+    count: Int
+  ) {
+    _sanityCheckFailure("This class cannot be directly initialized")
+  }
+
+  @objc(copyWithZone:)
+  internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
+    return self
+  }
+
+  @objc
+  internal var count: Int {
+    return _count
+  }
+
+  @objc(keyEnumerator)
+  internal func keyEnumerator() -> _NSEnumerator {
+    return _SwiftDictionaryNSEnumerator<Key, Value>(asNative)
+  }
+
+  @objc(countByEnumeratingWithState:objects:count:)
+  internal func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>?, count: Int
+  ) -> Int {
+    defer { _fixLifetime(self) }
+    let hashTable = _hashTable
+
+    var theState = state.pointee
+    if theState.state == 0 {
+      theState.state = 1 // Arbitrary non-zero value.
+      theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
+      theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
+      theState.extra.0 = CUnsignedLong(hashTable.startIndex.bucket)
+    }
+
+    // Test 'objects' rather than 'count' because (a) this is very rare anyway,
+    // and (b) the optimizer should then be able to optimize away the
+    // unwrapping check below.
+    if _slowPath(objects == nil) {
+      return 0
+    }
+
+    let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
+    var bucket = _HashTable.Bucket(bucket: Int(theState.extra.0))
+    let endBucket = hashTable.endIndex
+    _precondition(bucket == endBucket || _hashTable.isOccupied(bucket),
+      "Invalid fast enumeration state")
+    var stored = 0
+    for i in 0..<count {
+      if bucket == endBucket { break }
+
+      let key = _keys[bucket.bucket]
+      unmanagedObjects[i] = _bridgeAnythingToObjectiveC(key)
+
+      stored += 1
+      bucket = hashTable.index(after: bucket)
+    }
+    theState.extra.0 = CUnsignedLong(bucket.bucket)
+    state.pointee = theState
+    return stored
+  }
+
+  @objc(objectForKey:)
+  internal func object(forKey aKey: AnyObject) -> AnyObject? {
+    guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
+    else { return nil }
+
+    let (bucket, found) = asNative.find(nativeKey)
+    guard found else { return nil }
+    let value = asNative.uncheckedValue(at: bucket)
+    return _bridgeAnythingToObjectiveC(value)
+  }
+
+  @objc(getObjects:andKeys:count:)
+  internal func getObjects(
+    _ objects: UnsafeMutablePointer<AnyObject>?,
+    andKeys keys: UnsafeMutablePointer<AnyObject>?,
+    count: Int) {
+    _precondition(count >= 0, "Invalid count")
+    guard count > 0 else { return }
+    var i = 0 // Current position in the output buffers
+    switch (_UnmanagedAnyObjectArray(keys), _UnmanagedAnyObjectArray(objects)) {
+    case (let unmanagedKeys?, let unmanagedObjects?):
+      for (key, value) in asNative {
+        unmanagedObjects[i] = _bridgeAnythingToObjectiveC(value)
+        unmanagedKeys[i] = _bridgeAnythingToObjectiveC(key)
+        i += 1
+        guard i < count else { break }
+      }
+    case (let unmanagedKeys?, nil):
+      for (key, _) in asNative {
+        unmanagedKeys[i] = _bridgeAnythingToObjectiveC(key)
+        i += 1
+        guard i < count else { break }
+      }
+    case (nil, let unmanagedObjects?):
+      for (_, value) in asNative {
+        unmanagedObjects[i] = _bridgeAnythingToObjectiveC(value)
+        i += 1
+        guard i < count else { break }
+      }
+    case (nil, nil):
+      // Do nothing.
+      break
+    }
+  }
+#endif
+}
+
+extension _DictionaryStorage {
   @usableFromInline
   @_effects(releasenone)
   internal static func reallocate(
@@ -317,106 +421,4 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     storage._hashTable.clear()
     return storage
   }
-
-#if _runtime(_ObjC)
-  @objc(copyWithZone:)
-  internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
-    return self
-  }
-
-  @objc
-  internal var count: Int {
-    return _count
-  }
-
-  @objc(keyEnumerator)
-  internal func keyEnumerator() -> _NSEnumerator {
-    return _SwiftDictionaryNSEnumerator<Key, Value>(asNative)
-  }
-
-  @objc(countByEnumeratingWithState:objects:count:)
-  internal func countByEnumerating(
-    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>?, count: Int
-  ) -> Int {
-    var theState = state.pointee
-    if theState.state == 0 {
-      theState.state = 1 // Arbitrary non-zero value.
-      theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
-      theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      theState.extra.0 = CUnsignedLong(asNative.startIndex.bucket)
-    }
-
-    // Test 'objects' rather than 'count' because (a) this is very rare anyway,
-    // and (b) the optimizer should then be able to optimize away the
-    // unwrapping check below.
-    if _slowPath(objects == nil) {
-      return 0
-    }
-
-    let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
-    var index = _HashTable.Index(bucket: Int(theState.extra.0))
-    let endIndex = asNative.endIndex
-    _precondition(index == endIndex || _hashTable.isOccupied(index))
-    var stored = 0
-    for i in 0..<count {
-      if index == endIndex { break }
-
-      let key = asNative.uncheckedKey(at: index)
-      unmanagedObjects[i] = _bridgeAnythingToObjectiveC(key)
-
-      stored += 1
-      index = asNative.index(after: index)
-    }
-    theState.extra.0 = CUnsignedLong(index.bucket)
-    state.pointee = theState
-    return stored
-  }
-
-  @objc(objectForKey:)
-  internal func object(forKey aKey: AnyObject) -> AnyObject? {
-    guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
-    else { return nil }
-
-    let (index, found) = asNative.find(nativeKey)
-    guard found else { return nil }
-    let value = asNative.uncheckedValue(at: index)
-    return _bridgeAnythingToObjectiveC(value)
-  }
-
-  @objc(getObjects:andKeys:count:)
-  internal func getObjects(
-    _ objects: UnsafeMutablePointer<AnyObject>?,
-    andKeys keys: UnsafeMutablePointer<AnyObject>?,
-    count: Int) {
-    _precondition(count >= 0, "Invalid count")
-    guard count > 0 else { return }
-    var i = 0 // Current position in the output buffers
-    switch (_UnmanagedAnyObjectArray(keys), _UnmanagedAnyObjectArray(objects)) {
-    case (let unmanagedKeys?, let unmanagedObjects?):
-      for (key, value) in asNative {
-        unmanagedObjects[i] = _bridgeAnythingToObjectiveC(value)
-        unmanagedKeys[i] = _bridgeAnythingToObjectiveC(key)
-        i += 1
-        guard i < count else { break }
-      }
-    case (let unmanagedKeys?, nil):
-      for (key, _) in asNative {
-        unmanagedKeys[i] = _bridgeAnythingToObjectiveC(key)
-        i += 1
-        guard i < count else { break }
-      }
-    case (nil, let unmanagedObjects?):
-      for (_, value) in asNative {
-        unmanagedObjects[i] = _bridgeAnythingToObjectiveC(value)
-        i += 1
-        guard i < count else { break }
-      }
-    case (nil, nil):
-      // Do nothing.
-      break
-    }
-  }
-#endif
 }
-

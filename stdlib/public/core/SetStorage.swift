@@ -162,7 +162,6 @@ extension _EmptySetSingleton: _NSSetCore {
 #endif
 }
 
-// See the docs at the top of this file for a description of this type
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 final internal class _SetStorage<Element: Hashable>

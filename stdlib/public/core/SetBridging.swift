@@ -250,6 +250,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
   ) -> Int {
     defer { _fixLifetime(self) }
     let hashTable = native.hashTable
+
     var theState = state.pointee
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
