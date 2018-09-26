@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: echo 'client()' >%t/main.swift
-// RUN: %target-swiftc_driver -module-name AttrImplFP -emit-module -emit-module-path %t/AttrImplFP.swiftmodule -emit-library -o %t/library.%target-dylib-extension %S/attr_implements_fp.swift
-// RUN: %target-swiftc_driver -I %t -o %t/a.out %s %t/main.swift %t/library.%target-dylib-extension
+// RUN: %target-build-swift-dylib(%t/library.%target-dylib-extension) -module-name AttrImplFP -emit-module -emit-module-path %t/AttrImplFP.swiftmodule %S/attr_implements_fp.swift
+// RUN: %target-build-swift -I %t -o %t/a.out %s %t/main.swift %t/library.%target-dylib-extension
 // RUN: %target-codesign %t/a.out
 // RUN: %target-codesign %t/library.%target-dylib-extension
 // RUN: %target-run %t/a.out %t/library.%target-dylib-extension | %FileCheck %s
@@ -13,23 +13,23 @@
 import AttrImplFP
 
 public func client() {
-  assert(compare_Comparables(Fauxt.one, Fauxt.two))
-  assert(comparedAsComparablesCount == 1)
+  precondition(compare_Comparables(Fauxt.one, Fauxt.two))
+  precondition(comparedAsComparablesCount == 1)
   // CHECK: compared as Comparables
-  assert(compare_Comparables(Fauxt.one, Fauxt.nan))
-  assert(comparedAsComparablesCount == 2)
+  precondition(compare_Comparables(Fauxt.one, Fauxt.nan))
+  precondition(comparedAsComparablesCount == 2)
   // CHECK: compared as Comparables
-  assert(!compare_Comparables(Fauxt.nan, Fauxt.one))
-  assert(comparedAsComparablesCount == 3)
+  precondition(!compare_Comparables(Fauxt.nan, Fauxt.one))
+  precondition(comparedAsComparablesCount == 3)
   // CHECK: compared as Comparables
 
-  assert(compare_Fauxts(Fauxt.one, Fauxt.two))
-  assert(comparedAsFauxtsCount == 1)
+  precondition(compare_Fauxts(Fauxt.one, Fauxt.two))
+  precondition(comparedAsFauxtsCount == 1)
   // CHECK: compared as Fauxts
-  assert(!compare_Fauxts(Fauxt.one, Fauxt.nan))
-  assert(comparedAsFauxtsCount == 2)
+  precondition(!compare_Fauxts(Fauxt.one, Fauxt.nan))
+  precondition(comparedAsFauxtsCount == 2)
   // CHECK: compared as Fauxts
-  assert(!compare_Fauxts(Fauxt.nan, Fauxt.one))
-  assert(comparedAsFauxtsCount == 3)
+  precondition(!compare_Fauxts(Fauxt.nan, Fauxt.one))
+  precondition(comparedAsFauxtsCount == 3)
   // CHECK: compared as Fauxts
 }
