@@ -595,8 +595,8 @@ class SwiftDocumentSemanticInfo :
     public ThreadSafeRefCountedBase<SwiftDocumentSemanticInfo> {
 
   const std::string Filename;
-  SwiftASTManager &ASTMgr;
-  NotificationCenter &NotificationCtr;
+  std::weak_ptr<SwiftASTManager> ASTMgr;
+  std::shared_ptr<NotificationCenter> NotificationCtr;
   ThreadSafeRefCntPtr<SwiftInvocation> InvokRef;
   std::string CompilerArgsError;
 
@@ -610,10 +610,10 @@ class SwiftDocumentSemanticInfo :
   mutable llvm::sys::Mutex Mtx;
 
 public:
-  SwiftDocumentSemanticInfo(StringRef Filename, SwiftLangSupport &LangSupport)
-    : Filename(Filename),
-      ASTMgr(LangSupport.getASTManager()),
-      NotificationCtr(LangSupport.getContext().getNotificationCenter()) {}
+  SwiftDocumentSemanticInfo(StringRef Filename,
+                            std::weak_ptr<SwiftASTManager> ASTMgr,
+                            std::shared_ptr<NotificationCenter> NotificationCtr)
+      : Filename(Filename), ASTMgr(ASTMgr), NotificationCtr(NotificationCtr) {}
 
   SwiftInvocationRef getInvocation() const {
     return InvokRef;
@@ -622,7 +622,9 @@ public:
   uint64_t getASTGeneration() const;
 
   void setCompilerArgs(ArrayRef<const char *> Args) {
-    InvokRef = ASTMgr.getInvocation(Args, Filename, CompilerArgsError);
+    if (auto ASTMgr = this->ASTMgr.lock()) {
+      InvokRef = ASTMgr->getInvocation(Args, Filename, CompilerArgsError);
+    }
   }
 
   void readSemanticInfo(ImmutableTextSnapshotRef NewSnapshot,
@@ -637,8 +639,11 @@ public:
                           ImmutableTextSnapshotRef Snapshot,
                           uint64_t ASTGeneration);
   void removeCachedAST() {
-    if (InvokRef)
-      ASTMgr.removeCachedAST(InvokRef);
+    if (InvokRef) {
+      if (auto ASTMgr = this->ASTMgr.lock()) {
+        ASTMgr->removeCachedAST(InvokRef);
+      }
+    }
   }
 
 private:
@@ -873,7 +878,7 @@ void SwiftDocumentSemanticInfo::updateSemanticInfo(
   }
 
   LOG_INFO_FUNC(High, "posted document update notification for: " << Filename);
-  NotificationCtr.postDocumentUpdateNotification(Filename);
+  NotificationCtr->postDocumentUpdateNotification(Filename);
 }
 
 namespace {
@@ -1017,11 +1022,15 @@ void SwiftDocumentSemanticInfo::processLatestSnapshotAsync(
   // previously queued queries for the same document. Each document has a
   // SwiftDocumentSemanticInfo pointer so use that for the token.
   const void *OncePerASTToken = SemaInfoRef.get();
-  ASTMgr.processASTAsync(Invok, std::move(Consumer), OncePerASTToken);
+  if (auto ASTMgr = this->ASTMgr.lock()) {
+    ASTMgr->processASTAsync(Invok, std::move(Consumer), OncePerASTToken);
+  }
 }
 
 struct SwiftEditorDocument::Implementation {
-  SwiftLangSupport &LangSupport;
+  std::weak_ptr<SwiftASTManager> ASTMgr;
+  std::shared_ptr<NotificationCenter> NotificationCtr;
+
   const std::string FilePath;
   EditableTextBufferRef EditableBuffer;
 
@@ -1049,8 +1058,11 @@ struct SwiftEditorDocument::Implementation {
 
   Implementation(StringRef FilePath, SwiftLangSupport &LangSupport,
                  CodeFormatOptions options)
-    : LangSupport(LangSupport), FilePath(FilePath), FormatOptions(options) {
-      SemanticInfo = new SwiftDocumentSemanticInfo(FilePath, LangSupport);
+      : ASTMgr(LangSupport.getASTManager()),
+        NotificationCtr(LangSupport.getNotificationCenter()),
+        FilePath(FilePath), FormatOptions(options) {
+    SemanticInfo =
+        new SwiftDocumentSemanticInfo(FilePath, ASTMgr, NotificationCtr);
   }
 };
 
@@ -1625,8 +1637,8 @@ ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
   Impl.SyntaxMap.Tokens.clear();
   Impl.AffectedRange = {0, static_cast<unsigned>(Buf->getBufferSize())};
 
-  Impl.SemanticInfo =
-      new SwiftDocumentSemanticInfo(Impl.FilePath, Impl.LangSupport);
+  Impl.SemanticInfo = new SwiftDocumentSemanticInfo(Impl.FilePath, Impl.ASTMgr,
+                                                    Impl.NotificationCtr);
   Impl.SemanticInfo->setCompilerArgs(Args);
   return Impl.EditableBuffer->getSnapshot();
 }
@@ -1723,7 +1735,7 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
     Args.push_back("-");
     std::string Error;
     // Ignore possible error(s)
-    Lang.getASTManager().
+    Lang.getASTManager()->
       initCompilerInvocation(CompInv, Args, StringRef(), Error);
   }
   CompInv.getLangOptions().BuildSyntaxTree = BuildSyntaxTree;
@@ -2023,19 +2035,19 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
                                   ArrayRef<const char *> Args) {
 
   ImmutableTextSnapshotRef Snapshot = nullptr;
-  auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);
+  auto EditorDoc = EditorDocuments->getByUnresolvedName(Name);
   if (!EditorDoc) {
     EditorDoc = new SwiftEditorDocument(Name, *this);
     Snapshot = EditorDoc->initializeText(Buf, Args);
     EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled());
-    if (EditorDocuments.getOrUpdate(Name, *this, EditorDoc)) {
+    if (EditorDocuments->getOrUpdate(Name, *this, EditorDoc)) {
       // Document already exists, re-initialize it. This should only happen
       // if we get OPEN request while the previous document is not closed.
       LOG_WARN_FUNC("Document already exists in editorOpen(..): " << Name);
       Snapshot = nullptr;
     }
-    auto numOpen = ++Stats.numOpenDocs;
-    Stats.maxOpenDocs.updateMax(numOpen);
+    auto numOpen = ++Stats->numOpenDocs;
+    Stats->maxOpenDocs.updateMax(numOpen);
   }
 
   if (!Snapshot) {
@@ -2064,9 +2076,9 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
 //===----------------------------------------------------------------------===//
 
 void SwiftLangSupport::editorClose(StringRef Name, bool RemoveCache) {
-  auto Removed = EditorDocuments.remove(Name);
+  auto Removed = EditorDocuments->remove(Name);
   if (Removed) {
-    --Stats.numOpenDocs;
+    --Stats->numOpenDocs;
   } else {
     IFaceGenContexts.remove(Name);
   }
@@ -2175,7 +2187,7 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
   bool LogReuseRegions = ::getenv("SOURCEKIT_LOG_INCREMENTAL_REUSE_REGIONS");
   bool ValidateSyntaxTree = ::getenv("SOURCEKIT_INCREMENTAL_PARSE_VALIDATION");
 
-  auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);
+  auto EditorDoc = EditorDocuments->getByUnresolvedName(Name);
   if (!EditorDoc) {
     Consumer.handleRequestError("No associated Editor Document");
     return;
@@ -2261,7 +2273,7 @@ void SwiftLangSupport::editorReplaceText(StringRef Name,
 //===----------------------------------------------------------------------===//
 void SwiftLangSupport::editorApplyFormatOptions(StringRef Name,
                                                 OptionsDictionary &FmtOptions) {
-  auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);
+  auto EditorDoc = EditorDocuments->getByUnresolvedName(Name);
   if (EditorDoc)
     EditorDoc->applyFormatOptions(FmtOptions);
 }
@@ -2269,7 +2281,7 @@ void SwiftLangSupport::editorApplyFormatOptions(StringRef Name,
 void SwiftLangSupport::editorFormatText(StringRef Name, unsigned Line,
                                         unsigned Length,
                                         EditorConsumer &Consumer) {
-  auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);
+  auto EditorDoc = EditorDocuments->getByUnresolvedName(Name);
   if (!EditorDoc) {
     Consumer.handleRequestError("No associated Editor Document");
     return;
@@ -2307,7 +2319,7 @@ void SwiftLangSupport::editorConvertMarkupToXML(StringRef Source,
 void SwiftLangSupport::editorExpandPlaceholder(StringRef Name, unsigned Offset,
                                                unsigned Length,
                                                EditorConsumer &Consumer) {
-  auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);
+  auto EditorDoc = EditorDocuments->getByUnresolvedName(Name);
   if (!EditorDoc) {
     Consumer.handleRequestError("No associated Editor Document");
     return;

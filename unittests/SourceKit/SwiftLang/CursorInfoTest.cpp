@@ -122,7 +122,7 @@ public:
   }
 
   void addNotificationReceiver(DocumentUpdateNotificationReceiver Receiver) {
-    Ctx.getNotificationCenter().addDocumentUpdateNotificationReceiver(Receiver);
+    Ctx.getNotificationCenter()->addDocumentUpdateNotificationReceiver(Receiver);
   }
 
   void open(const char *DocName, StringRef Text,
