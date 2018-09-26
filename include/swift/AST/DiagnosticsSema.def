@@ -3844,9 +3844,6 @@ WARNING(inlinable_implies_usable_from_inline,none,
 ERROR(usable_from_inline_attr_in_protocol,none,
       "'@usableFromInline' attribute cannot be used in protocols", ())
 
-ERROR(usable_from_inline_dynamic_not_supported,none,
-      "'@usableFromInline' attribute cannot be applied to 'dynamic' declarations", ())
-
 #define FRAGILE_FUNC_KIND \
   "%select{a '@_transparent' function|" \
   "an '@inline(__always)' function|" \
