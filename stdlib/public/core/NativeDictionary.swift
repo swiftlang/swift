@@ -478,7 +478,7 @@ extension _NativeDictionary {
     let io = i.bucket.offset
     let jo = j.bucket.offset
     let value = (_values + io).move()
-    (_values + io).moveInitialize(from: _values + j.bucket.offset, count: 1)
+    (_values + io).moveInitialize(from: _values + jo, count: 1)
     (_values + jo).initialize(to: value)
   }
 }
