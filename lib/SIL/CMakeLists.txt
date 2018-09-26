@@ -18,6 +18,7 @@ add_swift_library(swiftSIL STATIC
   SILArgument.cpp
   SILBasicBlock.cpp
   SILBuilder.cpp
+  SILConstants.cpp
   SILCoverageMap.cpp
   SILDebugScope.cpp
   SILDeclRef.cpp

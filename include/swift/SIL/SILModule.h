@@ -266,10 +266,6 @@ private:
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
 
-  /// Method which returns the SerializedSILLoader, creating the loader if it
-  /// has not been created yet.
-  SerializedSILLoader *getSILLoader();
-
   /// Folding set for key path patterns.
   llvm::FoldingSet<KeyPathPattern> KeyPathPatterns;
 
@@ -319,6 +315,10 @@ public:
   const Lowering::TypeLowering &getTypeLowering(SILType t) {
     return Types.getTypeLowering(t);
   }
+
+  /// Method which returns the SerializedSILLoader, creating the loader if it
+  /// has not been created yet.
+  SerializedSILLoader *getSILLoader();
 
   /// Invalidate cached entries in SIL Loader.
   void invalidateSILLoaderCaches();
