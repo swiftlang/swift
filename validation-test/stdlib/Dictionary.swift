@@ -411,7 +411,7 @@ DictionaryTestSuite.test("COW.Fast.UpdateValueForKeyDoesNotReallocate") {
   }
 }
 
-DictionaryTestSuite.test("COW.Slow.UpdateValueForKeyDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.AddDoesNotReallocate") {
   do {
     var d1 = getCOWSlowDictionary()
     let identity1 = d1._rawIdentifier()
@@ -4640,32 +4640,6 @@ DictionaryTestSuite.test("removeAt") {
     let origKeys: [Int] = [10, 20, 30]
     expectEqual(origKeys.filter { $0 != (i*10) }, d.keys.sorted())
   }
-}
-
-DictionaryTestSuite.test("updateValue") {
-  let key1 = TestKeyTy(42)
-  let key2 = TestKeyTy(42)
-  let value1 = TestValueTy(1)
-  let value2 = TestValueTy(2)
-
-  var d: [TestKeyTy: TestValueTy] = [:]
-
-  expectNil(d.updateValue(value1, forKey: key1))
-
-  expectEqual(d.count, 1)
-  let index1 = d.index(forKey: key2)
-  expectNotNil(index1)
-  expectTrue(d[index1!].key === key1)
-  expectTrue(d[index1!].value === value1)
-
-  expectTrue(d.updateValue(value2, forKey: key2) === value1)
-
-  expectEqual(d.count, 1)
-  let index2 = d.index(forKey: key2)
-  expectEqual(index1, index2)
-  // We expect updateValue to keep the original key in place.
-  expectTrue(d[index2!].key === key1) // Not key2
-  expectTrue(d[index2!].value === value2)
 }
 
 DictionaryTestSuite.test("localHashSeeds") {
