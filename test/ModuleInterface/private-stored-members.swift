@@ -29,6 +29,14 @@ public struct MyStruct {
 // RESILIENT-NOT: internal let _: [[BOOL]]{{$}}
   let internalLet: Bool
 
+// COMMON-NEXT: @usableFromInline
+// COMMON-NEXT: internal var ufiVar: [[INT64]]{{$}}
+  @usableFromInline var ufiVar: Int64
+
+// COMMON-NEXT: @usableFromInline
+// COMMON-NEXT: internal let ufiLet: [[BOOL]]{{$}}
+  @usableFromInline let ufiLet: Bool
+
 // CHECK-NEXT: private var _: [[INT64]]{{$}}
 // RESILIENT-NOT: private var _: [[INT64]]{{$}}
   private var privateVar: Int64
@@ -68,6 +76,14 @@ public class MyClass {
 // CHECK-NEXT: internal let _: [[BOOL]]{{$}}
 // RESILIENT-NOT: internal let _: [[BOOL]]{{$}}
   let internalLet: Bool = true
+
+// COMMON-NEXT: @usableFromInline
+// COMMON-NEXT: internal var ufiVar: [[INT64]]{{$}}
+  @usableFromInline var ufiVar: Int64 = 0
+
+// COMMON-NEXT: @usableFromInline
+// COMMON-NEXT: internal let ufiLet: [[BOOL]]{{$}}
+  @usableFromInline let ufiLet: Bool = true
 
 // CHECK-NEXT: private var _: [[INT64]]{{$}}
 // RESILIENT-NOT: private var _: [[INT64]]{{$}}
