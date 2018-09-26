@@ -85,11 +85,19 @@ extension _HashTable {
 }
 
 extension _HashTable {
+  @usableFromInline
+  internal typealias Bucket = Index
+
   @_fixed_layout
   @usableFromInline
   internal struct Index {
     @usableFromInline
-    internal var bucket: Int
+    internal var offset: Int
+
+    internal var bucket: Int {
+      @inline(__always) get { return offset }
+      @inline(__always) set { offset = newValue }
+    }
 
     @inlinable
     @inline(__always)
