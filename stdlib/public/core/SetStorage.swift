@@ -43,6 +43,19 @@ internal class _RawSetStorage: __SwiftNativeNSSet {
   @nonobjc
   internal final var _scale: Int8
 
+  /// The scale corresponding to the highest `reserveCapacity(_:)` call so far,
+  /// or 0 if there were none. This may be used later to allow removals to
+  /// resize storage.
+  ///
+  /// FIXME: <rdar://problem/18114559> Shrink storage on deletion
+  @usableFromInline
+  @nonobjc
+  internal final var _reservedScale: Int8
+
+  // Currently unused, set to zero.
+  @nonobjc
+  internal final var _extra: Int16
+
   /// A mutation count, enabling stricter index validation.
   @usableFromInline
   @nonobjc
@@ -314,6 +327,8 @@ extension _SetStorage {
     storage._count = 0
     storage._capacity = _HashTable.capacity(forScale: scale)
     storage._scale = scale
+    storage._reservedScale = 0
+    storage._extra = 0
 
     if let age = age {
       storage._age = age
