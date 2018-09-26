@@ -928,7 +928,23 @@ public:
       }
     }
   }
-  
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Returns the LLVM function with `funcName`. It must exist.
+  llvm::Function *findFunction(StringRef funcName, SILModule &silModule) {
+    LLVM_DEBUG(llvm::dbgs() << "IRGen for calling " << funcName << "().\n");
+    auto silFn = silModule.findFunction(funcName, SILLinkage::PublicExternal);
+    assert(silFn);
+    llvm::Function *fn = IGM.getAddrOfSILFunction(silFn, NotForDefinition);
+    assert(fn);
+    return fn;
+  }
+
+  void checkOk(llvm::Value *status) {
+    auto *checkOkFn = IGM.getTFC_CheckOkFn();
+    Builder.CreateCall(checkOkFn, {status});
+  }
+
   //===--------------------------------------------------------------------===//
   // SIL instruction lowering
   //===--------------------------------------------------------------------===//
@@ -1897,6 +1913,23 @@ static void abortOnGraphOp(IRGenFunction &IGF, llvm::StringRef errMessage) {
   IGF.Builder.CreateCall(abortFunc, {});
 }
 
+// Create and return a (i8*-typed) address value to a constant string.
+static llvm::Value *createStringValAddr(IRGenModule &IGM, StringRef strVal) {
+  auto &llvmModule = IGM.Module;
+  auto &llvmContext = llvmModule.getContext();
+  auto opNameVal = llvm::ConstantDataArray::getString(llvmContext, strVal);
+  auto global =
+      new llvm::GlobalVariable(IGM.Module, opNameVal->getType(), true,
+                               llvm::GlobalValue::PrivateLinkage, opNameVal);
+
+  // Make an i8*.
+  auto zero = llvm::ConstantInt::get(IGM.Int32Ty, 0);
+  llvm::Constant *indices[] = {zero, zero};
+  auto opNameValAddr = llvm::ConstantExpr::getInBoundsGetElementPtr(
+      global->getValueType(), global, indices);
+  return opNameValAddr;
+}
+
 /// For now we lower any graph_op inst into a const TF node. (super fast tensor
 /// computation, but those who don't care about correctness. :-) )
 /// TODO: Fix this mis-compilation.
@@ -1938,59 +1971,127 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
   auto &silModule = CurSILFn->getModule();
 
+  auto *TFNewStatusFn = IGM.getTF_NewStatusFn();
+  auto status = Builder.CreateCall(TFNewStatusFn, {});
+
+  if (opInfo.getOperationName() != "Const") {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Done with IRGen for dummy graph_op; setting explosion.\n");
+    // The added explosion is incorrect, but is good enough for unit testing.
+    Explosion e;
+    e.add(TFNewStatusFn);
+
+    SILValue result = i->getResults()[0];
+    setLoweredExplosion(result, e);
+    return;
+  }
+
   // The true return type is TFE_Context*, which is an opaque pointer, so it
   // maps to void* in the Swift-C calling convention. `eagerContext` has type
   // void*, or i8* in LLVM type system.
-  auto getContextSilFn = silModule.findFunction(
-      "_swift_tfc_GetGlobalEagerContext", SILLinkage::PublicExternal);
-  assert(getContextSilFn);
-  llvm::Constant *getContextFn =
-      IGM.getAddrOfSILFunction(getContextSilFn, NotForDefinition);
-  assert(getContextFn);
+  auto *getContextFn = IGM.getTFC_GetGlobalEagerContextFn();
   auto eagerContext = Builder.CreateCall(getContextFn, {});
 
-  // For now we call a hard-coded C API to run a const op:
-  //   TFE_TensorHandle* TFE_RunConstOp(TFE_Context* ctx)
-  // TODO: Remove this hard-coded C API call.
-  LLVM_DEBUG(llvm::dbgs() << "IRGen for TFE_RunConstOp().\n");
-  auto TFERunConstSilFn =
-      silModule.findFunction("TFE_RunConstOp", SILLinkage::PublicExternal);
-  assert(TFERunConstSilFn);
-  llvm::Function *TFERunConstFn =
-      IGM.getAddrOfSILFunction(TFERunConstSilFn, NotForDefinition);
-  assert(TFERunConstFn);
+  // Create a TFE op as in:
+  //   auto* op = TFE_NewOp(ctx, "Const", status);
+  auto *TFENewOpFn = IGM.getTFE_NewOpFn();
+  // TODO: remove the hard-coded "Const"
+  auto opNameValAddr = createStringValAddr(IGM, "Const");
+  auto op =
+      Builder.CreateCall(TFENewOpFn, {eagerContext, opNameValAddr, status});
+  checkOk(status);
 
-  // We need to cast `eagerContext` of type i8* to %struct.TFE_Context*
-  auto *funcTy = TFERunConstFn->getFunctionType();
-  assert(funcTy->getNumParams() == 1);
-  auto *tfeContextTy = funcTy->getParamType(0);
-  LLVM_DEBUG(llvm::dbgs() << "  Param 0 of TFE_RunConstOp() has type "
-                          << *tfeContextTy << ".\n");
-  auto eagerContextTyped = Builder.CreateBitCast(eagerContext, tfeContextTy);
+  // Set up dtype attr as in:
+  //   TFE_OpSetAttrType(op, "dtype", TF_FLOAT);
+  auto *setAttrTypeFn = IGM.getTFE_OpSetAttrTypeFn();
+  auto dtypeValAddr = createStringValAddr(IGM, "dtype");
+  // TODO: do not hard-code 1 as the TF_FLOAT enum value.
+  Builder.CreateCall(
+      setAttrTypeFn,
+      {op, dtypeValAddr, llvm::ConstantInt::get(IGM.Int32Ty, 1 /*TF_FLOAT*/)});
 
-  LLVM_DEBUG(llvm::dbgs() << "  Creating call over TFE_RunConstOp().\n");
-  auto cTensorHandle = Builder.CreateCall(TFERunConstFn, {eagerContextTyped});
+  auto typeAttr = i->getAttribute(0);
+  auto typeAttrInfo =
+      GraphOperationInfo::decodeArgumentName(typeAttr.name.str());
+  assert(typeAttrInfo.first == "dtype");
+  assert(typeAttr.value.getKind() == SymbolicValue::Metatype);
+
+  auto valueAttr = i->getAttribute(1);
+  auto valueAttrInfo =
+      GraphOperationInfo::decodeArgumentName(valueAttr.name.str());
+  assert(valueAttrInfo.first == "value");
+  assert(valueAttr.value.getKind() == SymbolicValue::Float);
+  assert(valueAttrInfo.second ==
+         GraphOperationInfo::ArgumentLowering::TensorAttribute);
+  auto apfloat = valueAttr.value.getFloatValue();
+  // CreateScalarFloatTensor() takes an int instead of float, as runtime
+  // functions that take/return float values do not yet exist.
+  auto constVal = llvm::ConstantInt::get(IGM.Int32Ty, apfloat.convertToFloat());
+  LLVM_DEBUG(llvm::dbgs() << "The const value is " << *constVal << ".\n");
+
+  auto *createTensorFn = IGM.getTFC_CreateScalarFloatTensorFn();
+  auto tensor = Builder.CreateCall(createTensorFn, {constVal});
+
+  // Set up the tensor-typed value attr as in:
+  //   TFE_OpSetAttrTensor(op, "value", tensor, status);
+  auto *setTensorAttrFn = IGM.getTFE_OpSetAttrTensorFn();
+  auto valueAttrAddr = createStringValAddr(IGM, "value");
+  Builder.CreateCall(setTensorAttrFn, {op, valueAttrAddr, tensor, status});
+  checkOk(status);
+
+  auto *deleteTensorFn = IGM.getTF_DeleteTensorFn();
+  Builder.CreateCall(deleteTensorFn, {tensor});
+
+  // Now we execute the TFE op as in:
+  //   TFE_TensorHandle* retval;
+  //   int num_retvals = 1;
+  //   TFE_Execute(op, &retval, &num_retvals, status);
+  //
+  // The LLVM IR code looks like:
+  //   %returnValues = alloca %struct.TFE_TensorHandle*, align 8
+  //   %returnValueCount = alloca i32, align 8
+  //   store i32 1, i32* %returnValueCount, align 8
+  //   %134 = bitcast i8** %returnValues to %struct.TFE_TensorHandle**
+  //   call void @TFE_Execute(%struct.TFE_Op* %130,
+  //                          %struct.TFE_TensorHandle** %134,
+  //                          i32* %returnValueCount,
+  //                          %struct.TF_Status* %128)
+  //   %135 = load %struct.TFE_TensorHandle*, %struct.TFE_TensorHandle** %134,
+  //
+  // FIXME: getPointerAlignment is likely excessive. "align 4" might be
+  // sufficient.
+  auto returnValueCount =
+      createAlloca(IGM.Int32Ty, IGM.getPointerAlignment(), "returnValueCount");
+  auto expectedReturnValueCount =
+      llvm::ConstantInt::get(IGM.Int32Ty, i->getNumResults());
+  Builder.CreateStore(expectedReturnValueCount, returnValueCount);
+  auto returnValues = createAlloca(IGM.Int8PtrTy, expectedReturnValueCount,
+                                   IGM.getPointerAlignment(), "returnValues");
+  auto *tfeExecuteFn = IGM.getTFE_ExecuteFn();
+  Builder.CreateCall(tfeExecuteFn, {op, returnValues.getAddress(),
+                                    returnValueCount.getAddress(), status});
+  checkOk(status);
+
+  // TODO: add sanity check that the returned returnValueCount has value equal
+  // to expectedReturnValueCount.
+
+  // Clean up env as in:
+  //   TFE_DeleteOp(op);
+  //   TF_DeleteStatus(status);
+  auto *deleteOpFn = IGM.getTFE_DeleteOpFn();
+  Builder.CreateCall(deleteOpFn, {op});
+  auto *deleteStatusFn = IGM.getTF_DeleteStatusFn();
+  Builder.CreateCall(deleteStatusFn, {status});
+
+  auto cTensorHandle =
+      Builder.CreateLoad(returnValues.getAddress(), IGM.getPointerAlignment());
+  LLVM_DEBUG(llvm::dbgs() << "The returned tensor handle is " << *cTensorHandle
+                          << ".\n");
 
   // Wrap `cTensorHandle` into a TensorHandle<T> object.
-  // This requires casting `cTensorHandle` of i8* type to
-  // %struct.TFE_TensorHandle*.
-  LLVM_DEBUG(llvm::dbgs() << "IRGen for creating result TensorHandle.\n");
-  auto createHandleSilFn = silModule.findFunction(
-      "_swift_tfc_CreateFloatTensorHandleFromCTensorHandle",
-      SILLinkage::PublicExternal);
-  assert(createHandleSilFn);
-  llvm::Function *createHandleFn =
-      IGM.getAddrOfSILFunction(createHandleSilFn, NotForDefinition);
-  assert(createHandleFn);
-  auto *createHandleFnTy = createHandleFn->getFunctionType();
-  assert(createHandleFnTy->getNumParams() == 1);
-  auto *cTensorHandleTy = createHandleFnTy->getParamType(0);
-  LLVM_DEBUG(llvm::dbgs() << "  Param 0 of tensor handle creation fn has type "
-                          << *cTensorHandleTy << ".\n");
-  auto cTensorHandleTyped =
-      Builder.CreateBitCast(cTensorHandle, cTensorHandleTy);
-  LLVM_DEBUG(llvm::dbgs() << "  Creating call over tensor handle creation.\n");
-  auto tensorHandle = Builder.CreateCall(createHandleFn, {cTensorHandleTyped});
+  llvm::Function *createHandleFn = findFunction(
+      "_swift_tfc_CreateFloatTensorHandleFromCTensorHandle", silModule);
+  auto tensorHandle = Builder.CreateCall(createHandleFn, {cTensorHandle});
 
   LLVM_DEBUG(
       llvm::dbgs() << "Done with IRGen for graph_op; setting explosion.\n");

@@ -8,16 +8,14 @@ class Dynamic {
 }
 
 public func unknownAttribute() {
-  let x: TensorHandle<Float> = #tfop("Dummy1", value$tensor: Dynamic.float)
-  _hostOp(x)
+  _ = #tfop("Dummy1", value$tensor: Dynamic.float) as TensorHandle<Float>
   // CHECK-LABEL: IRGen for graph_op: Dummy1
   // CHECK-NEXT: operand: value$tensor
   // CHECK-NEXT: end operands
 }
 
 public func knownAttribute() {
-  let x: TensorHandle<Float> = #tfop("Dummy2", value$tensor: 1.0)
-  _hostOp(x)
+  _ = #tfop("Dummy2", value$tensor: 1.0) as TensorHandle<Float>
   // CHECK-LABEL: IRGen for graph_op: Dummy2
   // CHECK-NEXT: end operands
 }

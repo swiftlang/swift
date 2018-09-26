@@ -17,10 +17,9 @@ var DynamicCompilationTests = TestSuite("DynamicCompilation")
 
 DynamicCompilationTests.testCPUOrGPU("Const") {
   _RuntimeConfig.printsDebugLog = true
-  let x: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0)
+  let x: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: Float(1.0))
   _hostOp(x)
-  // FIXME: The above returns the fixed const value 17.0, but it should be 1.0.
-  expectNearlyEqualWithScalarTensor(17.0, Tensor<Float>(handle: x))
+  expectNearlyEqualWithScalarTensor(1.0, Tensor<Float>(handle: x))
 }
 
 #endif // !CUDA
