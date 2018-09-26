@@ -2515,7 +2515,9 @@ ConstraintSystem::simplifyConstructionConstraint(
 
   case TypeKind::Tuple: {
     // Tuple construction is simply tuple conversion.
-    Type argType = fnType->getInput();
+    Type argType = AnyFunctionType::composeInput(getASTContext(),
+                                                 fnType->getParams(),
+                                                 /*canonicalVararg=*/false);
     Type resultType = fnType->getResult();
 
     if (matchTypes(resultType, desugarValueType,
@@ -2923,35 +2925,37 @@ ConstraintSystem::simplifyFunctionComponentConstraint(
                                         Type first, Type second,
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator) {
-  auto funcTy = simplifyType(first);
+  auto simplified = simplifyType(first);
 
   unsigned unwrapCount = 0;
   if (shouldAttemptFixes()) {
-    while (auto objectTy = funcTy->getOptionalObjectType()) {
-      funcTy = objectTy;
+    while (auto objectTy = simplified->getOptionalObjectType()) {
+      simplified = objectTy;
 
       // Track how many times we do this so that we can record a fix for each.
       ++unwrapCount;
     }
   }
 
-  if (funcTy->isTypeVariableOrMember()) {
+  if (simplified->isTypeVariableOrMember()) {
     if (!flags.contains(TMF_GenerateConstraints))
       return SolutionKind::Unsolved;
 
     addUnsolvedConstraint(
-      Constraint::create(*this, kind, funcTy, second,
+      Constraint::create(*this, kind, simplified, second,
                          getConstraintLocator(locator)));
-  } else if (funcTy->is<FunctionType>()) {
+  } else if (auto *funcTy = simplified->getAs<FunctionType>()) {
     // Equate it to the other type in the constraint.
     Type type;
     ConstraintLocator::PathElementKind locKind;
 
     if (kind == ConstraintKind::FunctionInput) {
-      type = funcTy->castTo<FunctionType>()->getInput();
+      type = AnyFunctionType::composeInput(getASTContext(),
+                                           funcTy->getParams(),
+                                           /*canonicalVararg=*/false);
       locKind = ConstraintLocator::FunctionArgument;
     } else if (kind == ConstraintKind::FunctionResult) {
-      type = funcTy->castTo<FunctionType>()->getResult();
+      type = funcTy->getResult();
       locKind = ConstraintLocator::FunctionResult;
     } else {
       llvm_unreachable("Bad function component constraint kind");
@@ -3330,7 +3334,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
       // Only try and favor monomorphic initializers.
       if (!ctor->isGenericContext()) {
-        auto argType = ctor->getArgumentInterfaceType();
+        auto args = ctor->getMethodInterfaceType()
+                        ->castTo<FunctionType>()->getParams();
+        auto argType = AnyFunctionType::composeInput(getASTContext(), args,
+                                                     /*canonicalVarargs=*/false);
         if (argType->isEqual(favoredType))
           if (!decl->getAttrs().isUnavailable(getASTContext()))
             result.FavoredChoice = result.ViableCandidates.size();

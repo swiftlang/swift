@@ -5489,7 +5489,9 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         if (locator->getAnchor() == callExpr) {
           auto calleeType = CS.simplifyType(constraint->getSecondType());
           if (auto *fnType = calleeType->getAs<FunctionType>())
-            argType = fnType->getInput();
+            argType = AnyFunctionType::composeInput(fnType->getASTContext(),
+                                                    fnType->getParams(),
+                                                    /*canonicalVararg=*/false);
         }
       }
     }

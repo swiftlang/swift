@@ -1758,7 +1758,11 @@ static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
 
   // For a constructor, we only care about the parameter types.
   if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-    return ctor->getArgumentInterfaceType();
+    return AnyFunctionType::composeInput(module->getASTContext(),
+                                         ctor->getMethodInterfaceType()
+                                             ->castTo<FunctionType>()
+                                             ->getParams(),
+                                         /*canonicalVararg=*/false);
   }
 
   // We have something function-like, so we want to strip off the 'self'.

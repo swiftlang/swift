@@ -5765,7 +5765,9 @@ Type EnumElementDecl::getArgumentInterfaceType() const {
 
   auto funcTy = interfaceType->castTo<AnyFunctionType>();
   funcTy = funcTy->getResult()->castTo<FunctionType>();
-  return funcTy->getInput();
+  return AnyFunctionType::composeInput(funcTy->getASTContext(),
+                                       funcTy->getParams(),
+                                       /*canonicalVararg=*/false);
 }
 
 EnumCaseDecl *EnumElementDecl::getParentCase() const {
@@ -5799,13 +5801,6 @@ SourceRange ConstructorDecl::getSourceRange() const {
     End = getSignatureSourceRange().End;
 
   return { getConstructorLoc(), End };
-}
-
-Type ConstructorDecl::getArgumentInterfaceType() const {
-  Type ArgTy = getInterfaceType();
-  ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
-  ArgTy = ArgTy->castTo<AnyFunctionType>()->getInput();
-  return ArgTy;
 }
 
 Type ConstructorDecl::getResultInterfaceType() const {

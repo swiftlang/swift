@@ -5954,9 +5954,6 @@ public:
   SourceLoc getStartLoc() const { return getConstructorLoc(); }
   SourceRange getSourceRange() const;
 
-  /// getArgumentInterfaceType - get the interface type of the argument tuple
-  Type getArgumentInterfaceType() const;
-
   /// \brief Get the interface type of the constructed object.
   Type getResultInterfaceType() const;
 
