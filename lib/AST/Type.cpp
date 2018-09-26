@@ -1538,8 +1538,8 @@ bool TypeBase::isBindableTo(Type b) {
           return false;
         
         for (unsigned i : indices(func->getParams())) {
-          if (!visit(func->getParams()[i].getType(),
-                     substFunc.getParams()[i].getType()))
+          if (!visit(func->getParams()[i].getOldType(),
+                     substFunc.getParams()[i].getOldType()))
             return false;
         }
         
@@ -1916,7 +1916,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     for (const auto &param : functionType->getParams()) {
       if (param.isVariadic())
         return failure();
-      if (recurse(param.getType()))
+      if (recurse(param.getOldType()))
         return failure();
     }
 
@@ -2277,7 +2277,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
 
       // Inputs are contravariant.
       for (auto i : indices(fn2.getParams())) {
-        if (!matches(fn2Params[i].getType(), fn1Params[i].getType(),
+        if (!matches(fn2Params[i].getOldType(), fn1Params[i].getOldType(),
                      matchMode, ParameterPosition::ParameterTupleElement,
                      OptionalUnwrapping::None)) {
           return false;

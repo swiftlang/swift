@@ -935,7 +935,7 @@ static void VisitNodeConstructor(
             // inits are typed as (Foo.Type) -> (args...) -> Foo, but don't
             // assert that in case we're dealing with broken code.
             if (identifier_func->getParams().size() == 1 &&
-                identifier_func->getParams()[0].getType()->is<AnyMetatypeType>() &&
+                identifier_func->getParams()[0].getOldType()->is<AnyMetatypeType>() &&
                 identifier_func->getResult()->is<AnyFunctionType>()) {
               identifier_func =
                   identifier_func->getResult()->getAs<AnyFunctionType>();
@@ -1227,7 +1227,8 @@ static bool CompareFunctionTypes(const AnyFunctionType *f,
     auto label1 = getLabel(fLabels, param1, i);
     auto label2 = getLabel(gLabels, param2, i);
 
-    if (label1.equals(label2) && param1.getType()->isEqual(param2.getType()))
+    if (label1.equals(label2) &&
+        param1.getOldType()->isEqual(param2.getOldType()))
       continue;
 
     in_matches = false;

@@ -2647,13 +2647,21 @@ public:
     ParameterTypeFlags Flags = {};
     
   public:
-    /// FIXME(Remove InOutType): This is mostly for copying between param
-    /// types and should go away.
-    Type getType() const;
+    /// FIXME: Remove this. Return the formal type of the parameter in the
+    /// function type, including the InOutType if there is one.
+    ///
+    /// For example, 'inout Int' => 'inout Int', 'Int...' => 'Int'.
+    Type getOldType() const;
 
+    /// Return the formal type of the parameter.
+    ///
+    /// For example, 'inout Int' => 'Int', 'Int...' => 'Int'.
     Type getPlainType() const { return Ty; }
 
-    /// The type of the parameter.  Adjusts for varargs, but not inout.
+    /// The type of the parameter when referenced inside the function body
+    /// as an rvalue.
+    ///
+    /// For example, 'inout Int' => 'Int', 'Int...' => '[Int]'.
     Type getParameterType(bool forCanonical = false,
                           ASTContext *ctx = nullptr) const;
 
@@ -2699,7 +2707,7 @@ public:
   public:
     static CanParam getFromParam(const Param &param) { return CanParam(param); }
 
-    CanType getType() const { return CanType(Param::getType()); }
+    CanType getOldType() const { return CanType(Param::getOldType()); }
     CanType getPlainType() const { return CanType(Param::getPlainType()); }
     CanType getParameterType() const {
       return CanType(Param::getParameterType(/*forCanonical*/ true));

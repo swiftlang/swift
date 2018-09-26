@@ -833,14 +833,14 @@ constraints::matchCallArguments(ConstraintSystem &cs, bool isOperator,
 
     // Determine the parameter type.
     const auto &param = params[paramIdx];
-    auto paramTy = param.getType();
+    auto paramTy = param.getOldType();
 
     // Compare each of the bound arguments for this parameter.
     for (auto argIdx : parameterBindings[paramIdx]) {
       auto loc = locator.withPathElement(LocatorPathElt::
                                             getApplyArgToParam(argIdx,
                                                                paramIdx));
-      auto argTy = argsWithLabels[argIdx].getType();
+      auto argTy = argsWithLabels[argIdx].getOldType();
 
       // FIXME: This should be revisited. If one of argTy or paramTy
       // is a type variable, matchTypes() will add a constraint, and
@@ -1191,7 +1191,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (last != path.rend()) {
       if (last->getKind() == ConstraintLocator::ApplyArgToParam) {
         if (isSingleParam(func1Params) &&
-            func1Params[0].getType()->isVoid()) {
+            func1Params[0].getOldType()->isVoid()) {
           if (func2Params.empty()) {
             func2Params.emplace_back(getASTContext().TheEmptyTupleType);
           }
@@ -1227,8 +1227,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     // trivial because of inout-to-pointer conversions.
 
     // Compare the parameter types.
-    auto result = matchTypes(func2Param.getType(),
-                             func1Param.getType(),
+    auto result = matchTypes(func2Param.getOldType(),
+                             func1Param.getOldType(),
                              subKind, subflags,
                              (func1Params.size() == 1
                               ? argumentLocator

@@ -819,7 +819,7 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   if (SubscriptType->getParams().size() != 1)
     return false;
 
-  Type IndicesType = SubscriptType->getParams()[0].getType();
+  Type IndicesType = SubscriptType->getParams()[0].getOldType();
   if (IndicesType->hasError())
     return false;
 

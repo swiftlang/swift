@@ -166,7 +166,7 @@ public:
       });
 
       for (const auto &param : gft->getParams())
-        param.getType().walk(walker);
+        param.getOldType().walk(walker);
 
       gft->getResult().walk(walker);
     }

@@ -1909,7 +1909,7 @@ private:
     if (!FT->getParams().empty()) {
       interleave(FT->getParams(),
                  [this](const AnyFunctionType::Param &param) {
-                   print(param.getType(), OTK_None, param.getLabel(),
+                   print(param.getOldType(), OTK_None, param.getLabel(),
                          IsFunctionParam);
                  },
                  [this] { os << ", "; });
@@ -2061,7 +2061,7 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
 
   void visitAnyFunctionType(AnyFunctionType *fnTy) {
     for (auto &param : fnTy->getParams())
-      visit(param.getType());
+      visit(param.getOldType());
     visit(fnTy->getResult());
   }
 

@@ -1029,8 +1029,8 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
                                  intType, [=](FunctionType *type) {
     // Check for the signature: (Int, Int) -> Bool
     if (type->getParams().size() != 2) return false;
-    if (!type->getParams()[0].getType()->isEqual(intType) ||
-        !type->getParams()[1].getType()->isEqual(intType)) return false;
+    if (!type->getParams()[0].getOldType()->isEqual(intType) ||
+        !type->getParams()[1].getOldType()->isEqual(intType)) return false;
     return type->getResult()->isEqual(boolType);
   });
   getImpl().EqualIntDecl = decl;
@@ -1046,7 +1046,7 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
                                          resolver, [=](FunctionType *type) {
     // Look for the signature (Builtin.Int1) -> Bool
     if (type->getParams().size() != 1) return false;
-    if (!isBuiltinInt1Type(type->getParams()[0].getType())) return false;
+    if (!isBuiltinInt1Type(type->getParams()[0].getOldType())) return false;
     return type->getResult()->isEqual(boolType);
   });
   getImpl().GetBoolDecl = decl;
@@ -1238,7 +1238,7 @@ FuncDecl *ASTContext::getIsOSVersionAtLeastDecl(LazyResolver *resolver) const {
     return nullptr;
 
   if (llvm::any_of(intrinsicsParams, [](const AnyFunctionType::Param &p) {
-    return !isBuiltinWordType(p.getType());
+    return !isBuiltinWordType(p.getOldType());
   })) {
     return nullptr;
   }
@@ -3155,11 +3155,8 @@ Type TupleTypeElt::getType() const {
   return ElementType;
 }
 
-Type AnyFunctionType::Param::getType() const {
+Type AnyFunctionType::Param::getOldType() const {
   if (Flags.isInOut()) return InOutType::get(Ty);
-  // FIXME: Callers are inconsistenly setting this flag and retrieving this
-  // type with and without the Array Slice type.
-//  if (Flags.isVariadic()) return ArraySliceType::get(Ty);
   return Ty;
 }
 

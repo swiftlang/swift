@@ -3772,7 +3772,7 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   if (auto funcTy = type->getAs<AnyFunctionType>()) {
     auto inputKind = SelfReferenceKind::None();
     for (auto &elt : funcTy->getParams()) {
-      inputKind |= findProtocolSelfReferences(proto, elt.getType(),
+      inputKind |= findProtocolSelfReferences(proto, elt.getOldType(),
                                               skipAssocTypes);
     }
     auto resultKind = findProtocolSelfReferences(proto, funcTy->getResult(),
@@ -3882,7 +3882,7 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
     if (!allowCovariantParameters) {
       auto inputKind = SelfReferenceKind::None();
       for (auto &elt : type->castTo<AnyFunctionType>()->getParams()) {
-        inputKind |= ::findProtocolSelfReferences(this, elt.getType(),
+        inputKind |= ::findProtocolSelfReferences(this, elt.getOldType(),
                                                   skipAssocTypes);
       }
 
