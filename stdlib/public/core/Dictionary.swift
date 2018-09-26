@@ -792,7 +792,7 @@ extension Dictionary {
       // FIXME: This code should be moved to _variant, with Dictionary.subscript
       // yielding `&_variant[key]`.
 
-      let (index, found) = _variant.mutatingFind(key)
+      let (bucket, found) = _variant.mutatingFind(key)
 
       // FIXME: Mark this entry as being modified in hash table metadata
       // so that lldb can recognize it's not valid.
@@ -800,7 +800,12 @@ extension Dictionary {
       // Move the old value (if any) out of storage, wrapping it into an
       // optional before yielding it.
       let native = _variant.asNative
-      var value: Value? = found ? (native._values + index.bucket).move() : nil
+      var value: Value?
+      if found {
+        value = (native._values + bucket.offset).move()
+      } else {
+        value = nil
+      }
       yield &value
 
       // Value is now potentially different. Check which one of the four
@@ -808,15 +813,15 @@ extension Dictionary {
       switch (value, found) {
       case (let value?, true): // Mutation
         // Initialize storage to new value.
-        (native._values + index.bucket).initialize(to: value)
+        (native._values + bucket.offset).initialize(to: value)
       case (let value?, false): // Insertion
         // Insert the new entry at the correct place.
         // We've already ensured we have enough capacity.
-        native._insert(at: index, key: key, value: value)
+        native._insert(at: bucket, key: key, value: value)
       case (nil, true): // Removal
         // We've already removed the value; deinitialize and remove the key too.
-        (native._values + index.bucket).deinitialize(count: 1)
-        native._delete(at: index)
+        (native._values + bucket.offset).deinitialize(count: 1)
+        native._delete(at: bucket)
       case (nil, false): // Noop
         // Easy!
         break
@@ -848,9 +853,9 @@ extension Dictionary: ExpressibleByDictionaryLiteral {
   public init(dictionaryLiteral elements: (Key, Value)...) {
     let native = _NativeDictionary<Key, Value>(capacity: elements.count)
     for (key, value) in elements {
-      let (index, found) = native.find(key)
+      let (bucket, found) = native.find(key)
       _precondition(!found, "Dictionary literal contains duplicate keys")
-      native._insert(at: index, key: key, value: value)
+      native._insert(at: bucket, key: key, value: value)
     }
     self.init(_native: native)
   }
@@ -916,13 +921,13 @@ extension Dictionary {
       return _variant.lookup(key) ?? defaultValue()
     }
     _modify {
-      let (index, found) = _variant.mutatingFind(key)
+      let (bucket, found) = _variant.mutatingFind(key)
       let native = _variant.asNative
       if !found {
         let value = defaultValue()
-        native._insert(at: index, key: key, value: value)
+        native._insert(at: bucket, key: key, value: value)
       }
-      let address = native._values + index.bucket
+      let address = native._values + bucket.offset
       yield &address.pointee
       _fixLifetime(self)
     }
@@ -1451,7 +1456,7 @@ extension Dictionary {
       }
       _modify {
         let index = _variant.ensureUniqueNative(preserving: position)
-        let address = _variant.asNative._values + index.bucket
+        let address = _variant.asNative._values + index.offset
         yield &address.pointee
         _fixLifetime(self)
       }
@@ -1498,8 +1503,8 @@ extension Dictionary: Equatable where Value: Equatable {
       }
 
       for (k, v) in lhs {
-        let (index, found) = rhsNative.find(k)
-        guard found, rhsNative.uncheckedValue(at: index) == v else {
+        let (bucket, found) = rhsNative.find(k)
+        guard found, rhsNative.uncheckedValue(at: bucket) == v else {
           return false
         }
       }
@@ -1515,8 +1520,9 @@ extension Dictionary: Equatable where Value: Equatable {
       }
 
       defer { _fixLifetime(lhsNative) }
-      for index in lhsNative.hashTable {
-        let (key, value) = lhsNative.lookup(index)
+      for bucket in lhsNative.hashTable {
+        let key = lhsNative.uncheckedKey(at: bucket)
+        let value = lhsNative.uncheckedValue(at: bucket)
         guard
           let rhsValue = rhsCocoa.lookup(_bridgeAnythingToObjectiveC(key)),
           value == _forceBridgeFromObjectiveC(rhsValue, Value.self)
@@ -1805,7 +1811,7 @@ extension Dictionary.Index: Hashable {
     switch _variant {
     case .native(let nativeIndex):
       hasher.combine(0 as UInt8)
-      hasher.combine(nativeIndex.bucket)
+      hasher.combine(nativeIndex.offset)
     case .cocoa(let cocoaIndex):
       _cocoaPath()
       hasher.combine(1 as UInt8)

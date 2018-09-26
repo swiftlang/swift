@@ -62,8 +62,8 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
 
   @nonobjc internal var base: _NativeDictionary<Key, Value>
   @nonobjc internal var bridgedKeys: _BridgingHashBuffer?
-  @nonobjc internal var nextIndex: _NativeDictionary<Key, Value>.Index
-  @nonobjc internal var endIndex: _NativeDictionary<Key, Value>.Index
+  @nonobjc internal var nextBucket: _NativeDictionary<Key, Value>.Bucket
+  @nonobjc internal var endBucket: _NativeDictionary<Key, Value>.Bucket
 
   @objc
   internal override required init() {
@@ -74,8 +74,8 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
     _sanityCheck(_isBridgedVerbatimToObjectiveC(Key.self))
     self.base = base
     self.bridgedKeys = nil
-    self.nextIndex = base.startIndex
-    self.endIndex = base.endIndex
+    self.nextBucket = base.hashTable.startBucket
+    self.endBucket = base.hashTable.endBucket
   }
 
   @nonobjc
@@ -83,26 +83,26 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
     _sanityCheck(!_isBridgedVerbatimToObjectiveC(Key.self))
     self.base = deferred.native
     self.bridgedKeys = deferred.bridgeKeys()
-    self.nextIndex = base.startIndex
-    self.endIndex = base.endIndex
+    self.nextBucket = base.hashTable.startBucket
+    self.endBucket = base.hashTable.endBucket
   }
 
-  private func bridgedKey(at index: _HashTable.Index) -> AnyObject {
-    _sanityCheck(base.hashTable.isOccupied(index))
+  private func bridgedKey(at bucket: _HashTable.Bucket) -> AnyObject {
+    _sanityCheck(base.hashTable.isOccupied(bucket))
     if let bridgedKeys = self.bridgedKeys {
-      return bridgedKeys[index]
+      return bridgedKeys[bucket]
     }
-    return _bridgeAnythingToObjectiveC(base.uncheckedKey(at: index))
+    return _bridgeAnythingToObjectiveC(base.uncheckedKey(at: bucket))
   }
 
   @objc
   internal func nextObject() -> AnyObject? {
-    if nextIndex == endIndex {
+    if nextBucket == endBucket {
       return nil
     }
-    let index = nextIndex
-    nextIndex = base.index(after: nextIndex)
-    return self.bridgedKey(at: index)
+    let bucket = nextBucket
+    nextBucket = base.hashTable.occupiedBucket(after: nextBucket)
+    return self.bridgedKey(at: bucket)
   }
 
   @objc(countByEnumeratingWithState:objects:count:)
@@ -118,7 +118,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
     }
 
-    if nextIndex == endIndex {
+    if nextBucket == endBucket {
       state.pointee = theState
       return 0
     }
@@ -126,8 +126,8 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
     // Return only a single element so that code can start iterating via fast
     // enumeration, terminate it, and continue via NSEnumerator.
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
-    unmanagedObjects[0] = self.bridgedKey(at: nextIndex)
-    nextIndex = base.index(after: nextIndex)
+    unmanagedObjects[0] = self.bridgedKey(at: nextBucket)
+    nextBucket = base.hashTable.occupiedBucket(after: nextBucket)
     state.pointee = theState
     return 1
   }
@@ -140,6 +140,9 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
 /// of AnyObject will be constructed containing all the bridged elements.
 final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   : __SwiftNativeNSDictionary, _NSDictionaryCore {
+
+  @usableFromInline
+  internal typealias Bucket = _HashTable.Bucket
 
   // This stored property must be stored at offset zero.  We perform atomic
   // operations on it.
@@ -225,9 +228,9 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     let bridged = _BridgingHashBuffer.allocate(
       owner: native._storage,
       hashTable: native.hashTable)
-    for index in native.hashTable {
-      let object = _bridgeAnythingToObjectiveC(native.uncheckedKey(at: index))
-      bridged.initialize(at: index, to: object)
+    for bucket in native.hashTable {
+      let object = _bridgeAnythingToObjectiveC(native.uncheckedKey(at: bucket))
+      bridged.initialize(at: bucket, to: object)
     }
 
     // Atomically put the bridged keys in place.
@@ -244,18 +247,16 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     let bridged = _BridgingHashBuffer.allocate(
       owner: native._storage,
       hashTable: native.hashTable)
-    for index in native.hashTable {
-      let object = _bridgeAnythingToObjectiveC(native.uncheckedValue(at: index))
-      bridged.initialize(at: index, to: object)
+    for bucket in native.hashTable {
+      let value = native.uncheckedValue(at: bucket)
+      let cocoaValue = _bridgeAnythingToObjectiveC(value)
+      bridged.initialize(at: bucket, to: cocoaValue)
     }
 
     // Atomically put the bridged values in place.
     _initializeBridgedValues(bridged)
     return _bridgedValues!
   }
-
-  @usableFromInline
-  internal typealias Index = _HashTable.Index
 
   @objc(copyWithZone:)
   internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
@@ -264,39 +265,36 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     return self
   }
 
+  @inline(__always)
+  private func _key(
+    at bucket: Bucket,
+    bridgedKeys: _BridgingHashBuffer?
+  ) -> AnyObject {
+    if let bridgedKeys = bridgedKeys {
+      return bridgedKeys[bucket]
+    }
+    return _bridgeAnythingToObjectiveC(native.uncheckedKey(at: bucket))
+  }
+
+  @inline(__always)
+  private func _value(
+    at bucket: Bucket,
+    bridgedValues: _BridgingHashBuffer?
+  ) -> AnyObject {
+    if let bridgedValues = bridgedValues {
+      return bridgedValues[bucket]
+    }
+    return _bridgeAnythingToObjectiveC(native.uncheckedValue(at: bucket))
+  }
+
   @objc(objectForKey:)
   internal func object(forKey aKey: AnyObject) -> AnyObject? {
     guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
     else { return nil }
 
-    let (index, found) = native.find(nativeKey)
+    let (bucket, found) = native.find(nativeKey)
     guard found else { return nil }
-    if let bridgedValues = bridgeValues() {
-      return bridgedValues[index]
-    }
-    return _bridgeAnythingToObjectiveC(native.uncheckedValue(at: index))
-  }
-
-  @inline(__always)
-  private func _key(
-    at index: Index,
-    bridgedKeys: _BridgingHashBuffer?
-  ) -> AnyObject {
-    if let bridgedKeys = bridgedKeys {
-      return bridgedKeys[index]
-    }
-    return _bridgeAnythingToObjectiveC(native.uncheckedKey(at: index))
-  }
-
-  @inline(__always)
-  private func _value(
-    at index: Index,
-    bridgedValues: _BridgingHashBuffer?
-  ) -> AnyObject {
-    if let bridgedValues = bridgedValues {
-      return bridgedValues[index]
-    }
-    return _bridgeAnythingToObjectiveC(native.uncheckedValue(at: index))
+    return _value(at: bucket, bridgedValues: bridgeValues())
   }
 
   @objc
@@ -324,21 +322,21 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
 
     switch (_UnmanagedAnyObjectArray(keys), _UnmanagedAnyObjectArray(objects)) {
     case (let unmanagedKeys?, let unmanagedObjects?):
-      for index in native.hashTable {
-        unmanagedKeys[i] = _key(at: index, bridgedKeys: bridgedKeys)
-        unmanagedObjects[i] = _value(at: index, bridgedValues: bridgedValues)
+      for bucket in native.hashTable {
+        unmanagedKeys[i] = _key(at: bucket, bridgedKeys: bridgedKeys)
+        unmanagedObjects[i] = _value(at: bucket, bridgedValues: bridgedValues)
         i += 1
         guard i < count else { break }
       }
     case (let unmanagedKeys?, nil):
-      for index in native.hashTable {
-        unmanagedKeys[i] = _key(at: index, bridgedKeys: bridgedKeys)
+      for bucket in native.hashTable {
+        unmanagedKeys[i] = _key(at: bucket, bridgedKeys: bridgedKeys)
         i += 1
         guard i < count else { break }
       }
     case (nil, let unmanagedObjects?):
-      for index in native.hashTable {
-        unmanagedObjects[i] = _value(at: index, bridgedValues: bridgedValues)
+      for bucket in native.hashTable {
+        unmanagedObjects[i] = _value(at: bucket, bridgedValues: bridgedValues)
         i += 1
         guard i < count else { break }
       }
@@ -362,9 +360,9 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     defer { _fixLifetime(self) }
 
     var stop: UInt8 = 0
-    for index in native.hashTable {
-      let key = _key(at: index, bridgedKeys: bridgedKeys)
-      let value = _value(at: index, bridgedValues: bridgedValues)
+    for bucket in native.hashTable {
+      let key = _key(at: bucket, bridgedKeys: bridgedKeys)
+      let value = _value(at: bucket, bridgedValues: bridgedValues)
       block(
         Unmanaged.passUnretained(key),
         Unmanaged.passUnretained(value),
@@ -384,12 +382,15 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     objects: UnsafeMutablePointer<AnyObject>?,
     count: Int
   ) -> Int {
+    defer { _fixLifetime(self) }
+    let hashTable = native.hashTable
+
     var theState = state.pointee
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      theState.extra.0 = CUnsignedLong(native.startIndex.bucket)
+      theState.extra.0 = CUnsignedLong(hashTable.startBucket.offset)
     }
 
     // Test 'objects' rather than 'count' because (a) this is very rare anyway,
@@ -400,21 +401,21 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     }
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
-    var index = _HashTable.Index(bucket: Int(theState.extra.0))
-    let endIndex = native.endIndex
-    _precondition(index == endIndex || native.hashTable.isOccupied(index))
+    var bucket = _HashTable.Bucket(offset: Int(theState.extra.0))
+    let endBucket = hashTable.endBucket
+    _precondition(bucket == endBucket || hashTable.isOccupied(bucket))
     var stored = 0
 
     // Only need to bridge once, so we can hoist it out of the loop.
     let bridgedKeys = bridgeKeys()
     for i in 0..<count {
-      if index == endIndex { break }
+      if bucket == endBucket { break }
 
-      unmanagedObjects[i] = _key(at: index, bridgedKeys: bridgedKeys)
+      unmanagedObjects[i] = _key(at: bucket, bridgedKeys: bridgedKeys)
       stored += 1
-      index = native.index(after: index)
+      bucket = hashTable.occupiedBucket(after: bucket)
     }
-    theState.extra.0 = CUnsignedLong(index.bucket)
+    theState.extra.0 = CUnsignedLong(bucket.offset)
     state.pointee = theState
     return stored
   }
