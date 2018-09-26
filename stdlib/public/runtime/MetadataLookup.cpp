@@ -959,10 +959,17 @@ public:
     // this type.
     std::vector<unsigned> genericParamCounts;
     (void)_gatherGenericParameterCounts(typeDecl, genericParamCounts);
+    unsigned numTotalGenericParams =
+        genericParamCounts.empty() ? 0 : genericParamCounts.back();
 
-    // Check whether we have the right number of innermost generic arguments.
-    if (genericArgs.size() != getLocalGenericParams(typeDecl).size())
+    // Check whether we have the right number of generic arguments.
+    if (genericArgs.size() == getLocalGenericParams(typeDecl).size()) {
+      // Okay: genericArgs is the innermost set of generic arguments.
+    } else if (genericArgs.size() == numTotalGenericParams && !parent) {
+      // Okay: genericArgs is the complete set of generic arguments.
+    } else {
       return BuiltType();
+    }
 
     std::vector<const void *> allGenericArgsVec;
 
@@ -978,7 +985,7 @@ public:
                                  allGenericArgs);
       }
 
-      // Add this level of arguments.
+      // Add the generic arguments we were given.
       allGenericArgs.insert(allGenericArgs.end(),
                             genericArgs.begin(), genericArgs.end());
 
