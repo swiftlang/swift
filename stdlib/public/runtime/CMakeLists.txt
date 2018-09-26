@@ -26,6 +26,9 @@ endif()
 list(APPEND swift_runtime_compile_flags
      "-D__SWIFT_CURRENT_DYLIB=swiftCore")
 
+# SWIFT_ENABLE_TENSORFLOW
+include_directories(BEFORE "${TF_INCLUDE_DIR}")
+
 set(swift_runtime_objc_sources
     ErrorObject.mm
     SwiftObject.mm
@@ -69,6 +72,8 @@ set(swift_runtime_sources
     RefCount.cpp
     RuntimeInvocationsTracking.cpp
     SwiftDtoa.cpp
+    # SWIFT_ENABLE_TENSORFLOW
+    TensorFlow.cpp
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldDemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Demangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/NodePrinter.cpp"

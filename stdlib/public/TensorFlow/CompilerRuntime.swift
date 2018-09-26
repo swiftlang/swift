@@ -47,7 +47,8 @@ import Darwin
 #else
 import Glibc
 #endif
-import CTensorFlow
+// Export the TF C APIs, so that IRGen can use them (in eager mode).
+@_exported import CTensorFlow
 
 // If `serverAddress` is nil, use local session (good for forge testing).
 //
@@ -1150,15 +1151,6 @@ public func _TFCCreateCTensorHandle<T>(_ value : T,
 // - MARK: Dynamic compilation (per-op dispatch) entrypoints
 //===----------------------------------------------------------------------===//
 
-// TODO: Remove the RunXXXTest method with hard-coded tensor computation.
-@inlinable
-@_silgen_name("_swift_tfc_RunEagerConstTest")
-public func _RunEagerConstTest(_ ctx: CTFEContext) -> TensorHandle<Float> {
-  debugLog("Calling _RunEagerConstTest()")
-  let cHandle: CTensorHandle! = TFE_RunConstOp(ctx)
-  return TensorHandle<Float>(owning: cHandle)
-}
-
 @inlinable
 @_silgen_name("_swift_tfc_GetGlobalEagerContext")
 public func _GetGlobalEagerContext() -> CTFEContext {
@@ -1183,3 +1175,8 @@ public func _CreateTensorHandleFromCTensorHandle(
   return TensorHandle<Float>(owning: ownedCHandle)
 }
 
+@inlinable
+@_silgen_name("_swift_tfc_CheckOk")
+public func _CheckOk(_ s: CTFStatus) {
+  checkOk(s)
+}
