@@ -47,6 +47,7 @@
 //   | _count                                                    |
 //   | _capacity                                                 |
 //   | _scale                                                    |
+//   | _age                                                      |
 //   | _seed                                                     |
 //   | _rawKeys                                                  |
 //   | _rawValue                                                 |
@@ -149,6 +150,13 @@
 // dictionary storage are bounds-checked, this scheme never compromises memory
 // safety.
 //
+// As a safeguard against using invalid indices, Set and Dictionary maintain a
+// mutation counter in their storage header (`_age`). This counter gets bumped
+// every time an element is removed and whenever the contents are
+// rehashed. Native indices include a copy of this counter so that index
+// validation can verify it matches with current storage. This can't catch all
+// misuse, because counters may match by accident; but it does make indexing a
+// lot more reliable.
 //
 // Bridging
 // ========
