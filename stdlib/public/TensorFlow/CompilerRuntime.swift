@@ -1151,13 +1151,17 @@ public func _TFCCreateCTensorHandle<T>(_ value : T,
 //===----------------------------------------------------------------------===//
 
 @inlinable
-@_silgen_name("_swift_tfc_GetGlobalEagerContext")
+@_cdecl("_swift_tfc_GetGlobalEagerContext")
 public func _GetGlobalEagerContext() -> CTFEContext {
   debugLog("Calling _GetGlobalEagerContext()")
   return _ExecutionContext.global.eagerContext
 }
 
 // TODO: replace these functions with generic ones that do not hard-code Float.
+
+// TODO: use @_cdecl instead, once we make the input/output data types C-compatible.
+// Current compiler error if we use @_cdecl: method cannot be marked @_cdecl
+// because the type of the parameter cannot be represented in Objective-C
 @inlinable
 @_silgen_name("_swift_tfc_ExtractFloatCTensorHandle")
 public func _ExtractCTensorHandle(
@@ -1175,7 +1179,7 @@ public func _CreateTensorHandleFromCTensorHandle(
 }
 
 @inlinable
-@_silgen_name("_swift_tfc_CheckOk")
+@_cdecl("_swift_tfc_CheckOk")
 public func _CheckOk(_ s: CTFStatus) {
   checkOk(s)
 }

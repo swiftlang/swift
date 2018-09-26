@@ -940,10 +940,9 @@ public:
     return fn;
   }
 
-  void checkOk(llvm::Value *status, SILModule &silModule) {
-    auto checkOkFn = findFunction("_swift_tfc_CheckOk", silModule);
-    auto statusUntyped = Builder.CreateBitCast(status, IGM.Int8PtrTy);
-    Builder.CreateCall(checkOkFn, {statusUntyped});
+  void checkOk(llvm::Value *status) {
+    auto *checkOkFn = IGM.getCheckOkFn();
+    Builder.CreateCall(checkOkFn, {status});
   }
 
   //===--------------------------------------------------------------------===//
@@ -1990,8 +1989,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   // The true return type is TFE_Context*, which is an opaque pointer, so it
   // maps to void* in the Swift-C calling convention. `eagerContext` has type
   // void*, or i8* in LLVM type system.
-  llvm::Function *getContextFn =
-      findFunction("_swift_tfc_GetGlobalEagerContext", silModule);
+  auto *getContextFn = IGM.getGetGlobalEagerContextFn();
   auto eagerContext = Builder.CreateCall(getContextFn, {});
 
   // Create a TFE op as in:
@@ -2001,7 +1999,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   auto opNameValAddr = createStringValAddr(IGM, "Const");
   auto op =
       Builder.CreateCall(TFENewOpFn, {eagerContext, opNameValAddr, status});
-  checkOk(status, silModule);
+  checkOk(status);
 
   // Set up dtype attr as in:
   //   TFE_OpSetAttrType(op, "dtype", TF_FLOAT);
@@ -2039,7 +2037,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   auto *setTensorAttrFn = IGM.getTFE_OpSetAttrTensorFn();
   auto valueAttrAddr = createStringValAddr(IGM, "value");
   Builder.CreateCall(setTensorAttrFn, {op, valueAttrAddr, tensor, status});
-  checkOk(status, silModule);
+  checkOk(status);
 
   auto *deleteTensorFn = IGM.getTF_DeleteTensorFn();
   Builder.CreateCall(deleteTensorFn, {tensor});
@@ -2072,7 +2070,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   auto *tfeExecuteFn = IGM.getTFE_ExecuteFn();
   Builder.CreateCall(tfeExecuteFn, {op, returnValues.getAddress(),
                                     returnValueCount.getAddress(), status});
-  checkOk(status, silModule);
+  checkOk(status);
 
   // TODO: add sanity check that the returned returnValueCount has value equal
   // to expectedReturnValueCount.
@@ -2080,7 +2078,6 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   // Clean up env as in:
   //   TFE_DeleteOp(op);
   //   TF_DeleteStatus(status);
-  // auto deleteOpFn = findFunction("TFE_DeleteOp", silModule);
   auto *deleteOpFn = IGM.getTFE_DeleteOpFn();
   Builder.CreateCall(deleteOpFn, {op});
   auto *deleteStatusFn = IGM.getTF_DeleteStatusFn();
