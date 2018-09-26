@@ -5471,10 +5471,6 @@ public:
     Bits.FuncDecl.SelfAccess = static_cast<unsigned>(mod);
   }
 
-  /// \returns true if this is non-mutating due to applying a 'mutating'
-  /// attribute. For example a "mutating set" accessor.
-  bool isExplicitNonMutating() const;
-
   SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
 
@@ -5681,6 +5677,13 @@ public:
     }
     llvm_unreachable("bad accessor kind");
   }
+
+  /// \returns true if this is non-mutating due to applying a 'mutating'
+  /// attribute. For example a "mutating set" accessor.
+  bool isExplicitNonMutating() const;
+
+  /// Is the accesor one of the kinds that's assumed nonmutating by default?
+  bool isAssumedNonMutating() const;
 
   /// Is this accessor one of the kinds that's implicitly a coroutine?
   bool isCoroutine() const {

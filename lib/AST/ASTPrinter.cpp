@@ -659,6 +659,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
   void printAttributes(const Decl *D);
   void printTypedPattern(const TypedPattern *TP);
   void printBraceStmt(const BraceStmt *stmt, bool newlineIfEmpty = true);
+  void printAccessorDecl(const AccessorDecl *decl);
 
 public:
   void printPattern(const Pattern *pattern);
@@ -692,7 +693,8 @@ private:
   bool shouldPrint(const Decl *D, bool Notify = false);
   bool shouldPrintPattern(const Pattern *P);
   void printPatternType(const Pattern *P);
-  void printAccessors(AbstractStorageDecl *ASD);
+  void printAccessors(const AbstractStorageDecl *ASD);
+  void printMutatingModifiersIfNeeded(const AccessorDecl *accessor);
   void printMembersOfDecl(Decl * NTD, bool needComma = false,
                           bool openBracket = true, bool closeBracket = true);
   void printMembers(ArrayRef<Decl *> members, bool needComma = false,
@@ -813,6 +815,16 @@ static StaticSpellingKind getCorrectStaticSpelling(const Decl *D) {
   }
 }
 
+static bool hasMutatingGetter(const AbstractStorageDecl *ASD) {
+  return ASD->getGetter() && ASD->isGetterMutating();
+}
+
+static bool hasNonMutatingSetter(const AbstractStorageDecl *ASD) {
+  if (!ASD->isSettable(nullptr)) return false;
+  auto setter = ASD->getSetter();
+  return setter && setter->isExplicitNonMutating();
+}
+
 void PrintAST::printAttributes(const Decl *D) {
   if (Options.SkipAttributes)
     return;
@@ -825,9 +837,14 @@ void PrintAST::printAttributes(const Decl *D) {
     Options.ExcludeAttrList.push_back(DAK_Final);
   }
 
-  // Don't print 'final' on accessors.
+  // Don't print any contextual decl modifiers.
+  // We will handle 'mutating' and 'nonmutating' separately.
   if (Options.PrintImplicitAttrs && isa<AccessorDecl>(D)) {
-    Options.ExcludeAttrList.push_back(DAK_Final);
+#define EXCLUDE_ATTR(Class) Options.ExcludeAttrList.push_back(DAK_##Class);
+#define CONTEXTUAL_DECL_ATTR(X, Class, Y, Z) EXCLUDE_ATTR(Class)
+#define CONTEXTUAL_SIMPLE_DECL_ATTR(X, Class, Y, Z) EXCLUDE_ATTR(Class)
+#define CONTEXTUAL_DECL_ATTR_ALIAS(X, Class) EXCLUDE_ATTR(Class)
+#include "swift/AST/Attr.def"
   }
 
   // If the declaration is implicitly @objc, print the attribute now.
@@ -841,6 +858,12 @@ void PrintAST::printAttributes(const Decl *D) {
   }
 
   D->getAttrs().print(Printer, Options, D);
+
+  // Explicitly print 'mutating' and 'nonmutating' before getters and setters
+  // for which that is true.
+  if (auto accessor = dyn_cast<AccessorDecl>(D)) {
+    printMutatingModifiersIfNeeded(accessor);
+  }
 
   Options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
@@ -1514,23 +1537,6 @@ void PrintAST::printBodyIfNecessary(const AbstractFunctionDecl *decl) {
   printBraceStmt(decl->getBody(), /*newlineIfEmpty*/!isa<AccessorDecl>(decl));
 }
 
-static bool isAccessorAssumedNonMutating(AccessorKind kind) {
-  switch (kind) {
-  case AccessorKind::Get:
-  case AccessorKind::Address:
-  case AccessorKind::Read:
-    return true;
-
-  case AccessorKind::Set:
-  case AccessorKind::WillSet:
-  case AccessorKind::DidSet:
-  case AccessorKind::MutableAddress:
-  case AccessorKind::Modify:
-    return false;
-  }
-  llvm_unreachable("bad addressor kind");
-}
-
 static StringRef getAccessorLabel(AccessorDecl *accessor) {
   switch (accessor->getAccessorKind()) {
 #define SINGLETON_ACCESSOR(ID, KEYWORD) \
@@ -1561,7 +1567,17 @@ static StringRef getAccessorLabel(AccessorDecl *accessor) {
   llvm_unreachable("bad accessor kind");
 }
 
-void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
+void PrintAST::printMutatingModifiersIfNeeded(const AccessorDecl *accessor) {
+  if (accessor->isAssumedNonMutating() && accessor->isMutating()) {
+    Printer.printKeyword("mutating");
+    Printer << " ";
+  } else if (accessor->isExplicitNonMutating()) {
+    Printer.printKeyword("nonmutating");
+    Printer << " ";
+  }
+}
+
+void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   if (isa<VarDecl>(ASD) && !Options.PrintPropertyAccessors)
     return;
 
@@ -1590,13 +1606,9 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   bool inProtocol = isa<ProtocolDecl>(ASD->getDeclContext());
   if ((inProtocol && !Options.PrintAccessorBodiesInProtocols) ||
       PrintAbstract) {
-    bool mutatingGetter = ASD->getGetter() && ASD->isGetterMutating();
     bool settable = ASD->isSettable(nullptr);
-    bool nonmutatingSetter = false;
-    if (settable && !ASD->isSetterMutating() && ASD->isInstanceMember() &&
-        !ASD->getDeclContext()->getDeclaredInterfaceType()
-            ->hasReferenceSemantics())
-      nonmutatingSetter = true;
+    bool mutatingGetter = hasMutatingGetter(ASD);
+    bool nonmutatingSetter = hasNonMutatingSetter(ASD);
 
     // We're about to print something like this:
     //   { mutating? get (nonmutating? set)? }
@@ -1660,18 +1672,8 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     if (!Accessor || !shouldPrint(Accessor))
       return true;
     if (!PrintAccessorBody) {
-      if (isAccessorAssumedNonMutating(Accessor->getAccessorKind())) {
-        if (Accessor->isMutating()) {
-          Printer << " ";
-          Printer.printKeyword("mutating");
-        }
-      } else {
-        if (Accessor->isExplicitNonMutating()) {
-          Printer << " ";
-          Printer.printKeyword("nonmutating");
-        }
-      }
       Printer << " ";
+      printMutatingModifiersIfNeeded(Accessor);
       Printer.printKeyword(getAccessorLabel(Accessor));
     } else {
       {
