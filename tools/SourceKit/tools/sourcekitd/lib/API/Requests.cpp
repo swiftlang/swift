@@ -111,7 +111,7 @@ void sourcekitd::initialize() {
   llvm::EnablePrettyStackTrace();
   GlobalCtx = new SourceKit::Context(sourcekitd::getRuntimeLibPath(),
                                      SourceKit::createSwiftLangSupport);
-  GlobalCtx->getNotificationCenter().addDocumentUpdateNotificationReceiver(
+  GlobalCtx->getNotificationCenter()->addDocumentUpdateNotificationReceiver(
     onDocumentUpdateNotification);
 }
 void sourcekitd::shutdown() {

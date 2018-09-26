@@ -114,7 +114,7 @@ public:
                                  SourceKit::createSwiftLangSupport,
                                  /*dispatchOnMain=*/false);
     auto localDocUpdState = std::make_shared<DocUpdateMutexState>();
-    Ctx->getNotificationCenter().addDocumentUpdateNotificationReceiver(
+    Ctx->getNotificationCenter()->addDocumentUpdateNotificationReceiver(
         [localDocUpdState](StringRef docName) {
           std::unique_lock<std::mutex> lk(localDocUpdState->Mtx);
           localDocUpdState->HasUpdate = true;
@@ -133,7 +133,7 @@ public:
   }
 
   void addNotificationReceiver(DocumentUpdateNotificationReceiver Receiver) {
-    Ctx->getNotificationCenter().addDocumentUpdateNotificationReceiver(Receiver);
+    Ctx->getNotificationCenter()->addDocumentUpdateNotificationReceiver(Receiver);
   }
 
   bool waitForDocUpdate(bool reset = false) {
