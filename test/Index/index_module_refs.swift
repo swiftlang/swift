@@ -1,7 +1,15 @@
-// RUN: %target-swift-ide-test -print-indexed-symbols -source-filename %s | %FileCheck %s
+// RUN: %target-swift-ide-test -print-indexed-symbols -source-filename %s -I %S/Store/Inputs | %FileCheck %s
 
 import Foundation
 // CHECK: [[@LINE-1]]:8 | module/Swift | Foundation | c:@M@Foundation | Ref | rel: 0
+import ClangModuleB
+// CHECK: [[@LINE-1]]:8 | module/Swift | ClangModuleB | c:@M@ClangModuleB | Ref | rel: 0
+import ClangModuleC.Sub1
+// CHECK: [[@LINE-1]]:8 | module/Swift | ClangModuleC | c:@M@ClangModuleC | Ref | rel: 0
+// CHECK: [[@LINE-2]]:21 | module/Swift | Sub1 | c:@M@ClangModuleC@M@Sub1 | Ref | rel: 0
+import ClangModuleC.Sub2
+// CHECK: [[@LINE-1]]:8 | module/Swift | ClangModuleC | c:@M@ClangModuleC | Ref | rel: 0
+// CHECK: [[@LINE-2]]:21 | module/Swift | Sub2 | c:@M@ClangModuleC@M@Sub2 | Ref | rel: 0
 import func Darwin.glob
 // CHECK: [[@LINE-1]]:13 | module/Swift | Darwin | c:@M@Darwin | Ref | rel: 0
 
