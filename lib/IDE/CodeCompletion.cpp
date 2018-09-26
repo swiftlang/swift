@@ -3752,33 +3752,45 @@ public:
     }
   }
 
+  void getUnresolvedMemberCompletions(Type T) {
+    if (!T->getNominalOrBoundGenericNominal())
+      return;
+
+    // We can only say .foo where foo is a static member of the contextual
+    // type and has the same type (or if the member is a function, then the
+    // same result type) as the contextual type.
+    FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD, DeclVisibilityKind reason) {
+      if (!VD->hasInterfaceType()) {
+        TypeResolver->resolveDeclSignature(VD);
+        if (!VD->hasInterfaceType())
+          return false;
+      }
+
+      auto declTy = VD->getInterfaceType();
+      while (auto FT = declTy->getAs<AnyFunctionType>())
+        declTy = FT->getResult();
+      return declTy->isEqual(T);
+    });
+
+    auto baseType = MetatypeType::get(T);
+    llvm::SaveAndRestore<LookupKind> SaveLook(Kind, LookupKind::ValueExpr);
+    llvm::SaveAndRestore<Type> SaveType(ExprType, baseType);
+    llvm::SaveAndRestore<bool> SaveUnresolved(IsUnresolvedMember, true);
+    lookupVisibleMemberDecls(consumer, baseType, CurrDeclContext,
+                             TypeResolver.get(),
+                             /*includeInstanceMembers=*/false);
+  }
+
   void getUnresolvedMemberCompletions(ArrayRef<Type> Types) {
     NeedLeadingDot = !HaveDot;
     for (auto T : Types) {
-      if (T && T->getNominalOrBoundGenericNominal()) {
-        // We can only say .foo where foo is a static member of the contextual
-        // type and has the same type (or if the member is a function, then the
-        // same result type) as the contextual type.
-        FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD, DeclVisibilityKind reason) {
-          if (!VD->hasInterfaceType()) {
-            TypeResolver->resolveDeclSignature(VD);
-            if (!VD->hasInterfaceType())
-              return false;
-          }
-
-          auto declTy = VD->getInterfaceType();
-          while (auto FT = declTy->getAs<AnyFunctionType>())
-            declTy = FT->getResult();
-          return declTy->isEqual(T);
-        });
-
-        auto baseType = MetatypeType::get(T);
-        llvm::SaveAndRestore<LookupKind> SaveLook(Kind, LookupKind::ValueExpr);
-        llvm::SaveAndRestore<Type> SaveType(ExprType, baseType);
-        llvm::SaveAndRestore<bool> SaveUnresolved(IsUnresolvedMember, true);
-        lookupVisibleMemberDecls(consumer, baseType, CurrDeclContext,
-                                 TypeResolver.get(),
-                                 /*includeInstanceMembers=*/false);
+      if (T) {
+        // FIXME: we should also include .some/.none from optional itself but
+        // getUnresolvedMemberCompletions doesn't ever return them since the
+        // interface type in the FilteredDeclConsumer will not match the bound
+        // generic type expected.
+        T = T->lookThroughAllOptionalTypes();
+        getUnresolvedMemberCompletions(T);
       }
     }
   }
