@@ -527,7 +527,7 @@ _findNominalTypeDescriptor(Demangle::NodePointer node,
                          [&](const void *context) -> NodePointer {
                            return _buildDemanglingForContext(
                                (const ContextDescriptor *) context,
-                               {}, false, Dem);
+                               {}, Dem);
                          });
 
   // Look for an existing entry.
@@ -662,7 +662,7 @@ _findProtocolDescriptor(const Demangle::NodePointer &node,
                          [&](const void *context) -> NodePointer {
                            return _buildDemanglingForContext(
                                (const ContextDescriptor *) context,
-                               {}, false, Dem);
+                               {}, Dem);
                          });
 
   // Look for an existing entry.
