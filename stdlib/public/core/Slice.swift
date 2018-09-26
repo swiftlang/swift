@@ -135,6 +135,9 @@ public struct Slice<Base: Collection> {
   public var base: Base {
     return _base
   }
+
+  /// Test cost of making Slice artificially address-only
+  internal var _lode: Any = 0
 }
 
 extension Slice: Collection {
