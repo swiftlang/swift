@@ -43,9 +43,10 @@ internal class _RawSetStorage: __SwiftNativeNSSet {
   @nonobjc
   internal final var _scale: Int8
 
+  /// A mutation count, enabling stricter index validation.
   @usableFromInline
   @nonobjc
-  internal final var _mutationCount: Int32
+  internal final var _age: Int32
 
   @usableFromInline
   internal final var _seed: Int
@@ -278,7 +279,7 @@ extension _SetStorage {
     let newStorage = _SetStorage<Element>.allocate(
       scale: scale,
       // Invalidate indices if we're rehashing.
-      mutationCount: rehash ? nil : original._mutationCount
+      age: rehash ? nil : original._age
     )
     return (newStorage, rehash)
   }
@@ -287,12 +288,12 @@ extension _SetStorage {
   @_effects(releasenone)
   static internal func allocate(capacity: Int) -> _SetStorage {
     let scale = _HashTable.scale(forCapacity: capacity)
-    return allocate(scale: scale, mutationCount: nil)
+    return allocate(scale: scale, age: nil)
   }
 
   static internal func allocate(
     scale: Int8,
-    mutationCount: Int32?
+    age: Int32?
   ) -> _SetStorage {
     // The entry count must be representable by an Int value; hence the scale's
     // peculiar upper bound.
@@ -313,12 +314,12 @@ extension _SetStorage {
     storage._capacity = _HashTable.capacity(forScale: scale)
     storage._scale = scale
 
-    if let mutationCount = mutationCount {
-      storage._mutationCount = mutationCount
+    if let age = age {
+      storage._age = age
     } else {
       // The default mutation count is simply a scrambled version of the storage
       // address.
-      storage._mutationCount = Int32(
+      storage._age = Int32(
         truncatingIfNeeded: ObjectIdentifier(storage).hashValue)
     }
 

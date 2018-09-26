@@ -89,7 +89,7 @@ extension _NativeDictionary { // Primitive fields
   @inlinable
   @inline(__always)
   internal func invalidateIndices() {
-    _storage._mutationCount &+= 1
+    _storage._age &+= 1
   }
 }
 
@@ -500,7 +500,7 @@ extension _NativeDictionary { // Deletion
       let scale = self._storage._scale
       _storage = _DictionaryStorage<Key, Value>.allocate(
         scale: scale,
-        mutationCount: nil)
+        age: nil)
       return
     }
     for index in hashTable {

@@ -73,6 +73,13 @@ extension _NativeSet { // Primitive fields
     }
   }
 
+  @inlinable
+  internal var age: Int32 {
+    @inline(__always) get {
+      return _storage._age
+    }
+  }
+
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   @inlinable
   internal var _elements: UnsafeMutablePointer<Element> {
@@ -82,7 +89,7 @@ extension _NativeSet { // Primitive fields
   @inlinable
   @inline(__always)
   internal func invalidateIndices() {
-    _storage._mutationCount &+= 1
+    _storage._age &+= 1
   }
 }
 
@@ -405,7 +412,7 @@ extension _NativeSet { // Deletion
   internal mutating func removeAll(isUnique: Bool) {
     guard isUnique else {
       let scale = self._storage._scale
-      _storage = _SetStorage<Element>.allocate(scale: scale, mutationCount: nil)
+      _storage = _SetStorage<Element>.allocate(scale: scale, age: nil)
       return
     }
     for index in hashTable {
