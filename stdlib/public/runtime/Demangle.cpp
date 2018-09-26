@@ -275,138 +275,32 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
   default:
     return nullptr;
   }
-  
+
+  // Gather the complete set of generic arguments that must be written to
+  // form this type.
+  std::vector<const Metadata *> allGenericArgs;
+  gatherWrittenGenericArgs(type, description, allGenericArgs);
+
   // Demangle the generic arguments.
   std::vector<NodePointer> demangledGenerics;
-
-  if (auto generics = description->getGenericContext()) {
-    std::vector<const Metadata *> allGenericArgs;
-    bool concretizedGenerics = false;
-    auto genericArgs = description->getGenericArguments(type);
-    for (auto param : generics->getGenericParams()) {
-      switch (param.getKind()) {
-      case GenericParamKind::Type:
-        // We don't know about type parameters with extra arguments.
-        if (param.hasExtraArgument()) {
-          genericArgs += param.hasExtraArgument() + param.hasKeyArgument();
-          goto unknown_param;
-        }
-
-        // The type should have a key argument unless it's been same-typed to
-        // another type.
-        if (param.hasKeyArgument()) {
-          auto paramType = *genericArgs++;
-          auto paramDemangling =
-            _swift_buildDemanglingForMetadata(paramType, Dem);
-          if (!paramDemangling)
-            return nullptr;
-          allGenericArgs.push_back(paramType);
-          demangledGenerics.push_back(paramDemangling);
-        } else {
-          // Leave a gap for us to fill in by looking at same type info.
-          demangledGenerics.push_back(nullptr);
-          allGenericArgs.push_back(nullptr);
-          concretizedGenerics = true;
-        }
-        break;
-       
-      unknown_param:
-      default: {
-        // We don't know about this kind of parameter. Create a placeholder
-        // mangling.
-        // ABI TODO: Mangle some kind of unique "unknown parameter"
-        // representation here.
-        auto placeholder = Dem.createNode(Node::Kind::Tuple);
-        auto emptyList = Dem.createNode(Node::Kind::TypeList);
-        placeholder->addChild(emptyList, Dem);
-        auto type = Dem.createNode(Node::Kind::Type);
-        type->addChild(placeholder, Dem);
-        demangledGenerics.push_back(type);
-      }
-      }
+  for (auto genericArg : allGenericArgs) {
+    // When there is no generic argument, put in a placeholder.
+    if (!genericArg) {
+      auto placeholder = Dem.createNode(Node::Kind::Tuple);
+      auto emptyList = Dem.createNode(Node::Kind::TypeList);
+      placeholder->addChild(emptyList, Dem);
+      auto type = Dem.createNode(Node::Kind::Type);
+      type->addChild(placeholder, Dem);
+      demangledGenerics.push_back(type);
+      continue;
     }
-    
-    // If we have concretized generic arguments, check for same type
-    // requirements to get the argument values.
-    if (concretizedGenerics) {
-      // Retrieve the mapping information needed for depth/index -> flat index.
-      std::vector<unsigned> genericParamCounts;
-      (void)_gatherGenericParameterCounts(description, genericParamCounts);
 
-      // Walk through the generic requirements to evaluate same-type
-      // constraints that are needed to fill in missing generic arguments.
-      for (const auto &req : generics->getGenericRequirements()) {
-        // We only care about same-type constraints.
-        if (req.Flags.getKind() != GenericRequirementKind::SameType)
-          continue;
-
-        // Where the left-hand side is a generic parameter.
-        if (req.Param.begin() != req.Param.end())
-          continue;
-
-        // If we don't yet have an argument for this parameter, it's a
-        // same-type-to-concrete constraint.
-        unsigned lhsFlatIndex = req.Param.getRootParamIndex();
-        if (!allGenericArgs[lhsFlatIndex]) {
-          // Substitute into the right-hand side.
-          auto genericArg =
-              _getTypeByMangledName(req.getMangledTypeName(),
-                                    [&](unsigned depth, unsigned index) {
-                if (auto flatIndex = _depthIndexToFlatIndex(depth, index,
-                                                            genericParamCounts))
-                  return allGenericArgs[*flatIndex];
-
-                return (const Metadata *)nullptr;
-              });
-          if (!genericArg)
-            return nullptr;
-
-          allGenericArgs[lhsFlatIndex] = genericArg;
-
-          // Form a demangling for this argument.
-          auto argDemangling =
-            _swift_buildDemanglingForMetadata(genericArg, Dem);
-          if (!argDemangling)
-            return nullptr;
-
-          demangledGenerics[lhsFlatIndex] = argDemangling;
-          continue;
-        }
-
-        // If we do have an argument for this parameter, it might be that
-        // the right-hand side is itself a generic parameter, which means
-        // we have a same-type constraint A == B where A is already filled in.
-        Demangler demangler;
-        NodePointer node = demangler.demangleType(req.getMangledTypeName());
-        if (!node)
-          continue;
-
-        // Find the flat index that the right-hand side refers to.
-        if (node->getKind() == Demangle::Node::Kind::Type)
-          node = node->getChild(0);
-        if (node->getKind() != Demangle::Node::Kind::DependentGenericParamType)
-          continue;
-
-        auto rhsFlatIndex =
-          _depthIndexToFlatIndex(node->getChild(0)->getIndex(),
-                                 node->getChild(1)->getIndex(),
-                                 genericParamCounts);
-        if (!rhsFlatIndex || *rhsFlatIndex > allGenericArgs.size())
-          return nullptr;
-
-        if (allGenericArgs[*rhsFlatIndex] || !allGenericArgs[lhsFlatIndex])
-          continue;
-
-        allGenericArgs[*rhsFlatIndex] = allGenericArgs[lhsFlatIndex];
-        demangledGenerics[*rhsFlatIndex] = demangledGenerics[lhsFlatIndex];
-      }
-
-      // Make sure that all of the demangled generics are filled in now.
-      for (const auto node : demangledGenerics) {
-        if (!node)
-          return nullptr;
-      }
-    }
+    // Demangle this argument.
+    auto genericArgDemangling =
+      _swift_buildDemanglingForMetadata(genericArg, Dem);
+    if (!genericArgDemangling)
+      return nullptr;
+    demangledGenerics.push_back(genericArgDemangling);
   }
   
   return _buildDemanglingForContext(description, demangledGenerics, Dem);
