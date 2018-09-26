@@ -1184,7 +1184,7 @@ public func _GetCTensorHandleFromSwift(
 
 @inlinable
 @_silgen_name("_swift_tfc_CreateTensorHandleFromC")
-public func _CreateTensorHandleFromC(
+public func _TFCCreateTensorHandleFromC(
   _ cHandle: CTensorHandle
 ) -> _AnyTensorHandle {
   let dtype = TFE_TensorHandleDataType(cHandle)
@@ -1207,7 +1207,7 @@ public func _CreateTensorHandleFromC(
 
 @inlinable
 @_silgen_name("_swift_tfc_CreateFloatTensorHandleFromCTensorHandle")
-public func _CreateTensorHandleFromCTensorHandle(
+public func _TFCCreateTensorHandleFromCTensorHandle(
   _ ownedCHandle: CTensorHandle
 ) -> TensorHandle<Float> {
   return TensorHandle<Float>(owning: ownedCHandle)
