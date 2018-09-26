@@ -932,7 +932,7 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   // Returns the LLVM function with `funcName`. It must exist.
   llvm::Function *findFunction(StringRef funcName, SILModule &silModule) {
-    LLVM_DEBUG(llvm::dbgs() << "IRGen for " << funcName << "().\n");
+    LLVM_DEBUG(llvm::dbgs() << "IRGen for calling " << funcName << "().\n");
     auto silFn = silModule.findFunction(funcName, SILLinkage::PublicExternal);
     assert(silFn);
     llvm::Function *fn = IGM.getAddrOfSILFunction(silFn, NotForDefinition);
@@ -941,7 +941,7 @@ public:
   }
 
   void checkOk(llvm::Value *status) {
-    auto *checkOkFn = IGM.getCheckOkFn();
+    auto *checkOkFn = IGM.getTFC_CheckOkFn();
     Builder.CreateCall(checkOkFn, {status});
   }
 
@@ -1989,7 +1989,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   // The true return type is TFE_Context*, which is an opaque pointer, so it
   // maps to void* in the Swift-C calling convention. `eagerContext` has type
   // void*, or i8* in LLVM type system.
-  auto *getContextFn = IGM.getGetGlobalEagerContextFn();
+  auto *getContextFn = IGM.getTFC_GetGlobalEagerContextFn();
   auto eagerContext = Builder.CreateCall(getContextFn, {});
 
   // Create a TFE op as in:
@@ -2029,7 +2029,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   auto constVal = llvm::ConstantInt::get(IGM.Int32Ty, apfloat.convertToFloat());
   LLVM_DEBUG(llvm::dbgs() << "The const value is " << *constVal << ".\n");
 
-  auto *createTensorFn = IGM.getCreateScalarFloatTensorFn();
+  auto *createTensorFn = IGM.getTFC_CreateScalarFloatTensorFn();
   auto tensor = Builder.CreateCall(createTensorFn, {constVal});
 
   // Set up the tensor-typed value attr as in:

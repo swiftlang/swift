@@ -1150,9 +1150,9 @@ public func _TFCCreateCTensorHandle<T>(_ value : T,
 // - MARK: Dynamic compilation (per-op dispatch) entrypoints
 //===----------------------------------------------------------------------===//
 
-@inlinable
+@usableFromInline
 @_cdecl("_swift_tfc_GetGlobalEagerContext")
-public func _GetGlobalEagerContext() -> CTFEContext {
+func _TFCGetGlobalEagerContext() -> CTFEContext {
   debugLog("Calling _GetGlobalEagerContext()")
   return _ExecutionContext.global.eagerContext
 }
@@ -1164,7 +1164,7 @@ public func _GetGlobalEagerContext() -> CTFEContext {
 // because the type of the parameter cannot be represented in Objective-C
 @inlinable
 @_silgen_name("_swift_tfc_ExtractFloatCTensorHandle")
-public func _ExtractCTensorHandle(
+public func _TFCExtractCTensorHandle(
   _ handle: TensorHandle<Float>
 ) -> CTensorHandle {
   return handle.cTensorHandle
@@ -1172,14 +1172,14 @@ public func _ExtractCTensorHandle(
 
 @inlinable
 @_silgen_name("_swift_tfc_CreateFloatTensorHandleFromCTensorHandle")
-public func _CreateTensorHandleFromCTensorHandle(
+public func _TFCCreateTensorHandleFromCTensorHandle(
   _ ownedCHandle: CTensorHandle
 ) -> TensorHandle<Float> {
   return TensorHandle<Float>(owning: ownedCHandle)
 }
 
-@inlinable
+@usableFromInline
 @_cdecl("_swift_tfc_CheckOk")
-public func _CheckOk(_ s: CTFStatus) {
+func _TFCCheckOk(_ s: CTFStatus) {
   checkOk(s)
 }
