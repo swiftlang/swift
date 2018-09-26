@@ -1149,26 +1149,21 @@ public func _TFCCreateCTensorHandle<T>(_ value: T,
 // - MARK: Dynamic compilation (per-op dispatch) entrypoints
 //===----------------------------------------------------------------------===//
 
-// TODO: Remove the RunXXXTest method with hard-coded tensor computation.
-@inlinable
-@_silgen_name("_swift_tfc_RunEagerConstTest")
-public func _RunEagerConstTest(_ ctx: CTFEContext) -> TensorHandle<Float> {
-  debugLog("Calling _RunEagerConstTest()")
-  let cHandle: CTensorHandle! = TFE_RunConstOp(ctx)
-  return TensorHandle<Float>(owning: cHandle)
-}
-
-@inlinable
-@_silgen_name("_swift_tfc_GetGlobalEagerContext")
-public func _GetGlobalEagerContext() -> CTFEContext {
+@usableFromInline
+@_cdecl("_swift_tfc_GetGlobalEagerContext")
+func _TFCGetGlobalEagerContext() -> CTFEContext {
   debugLog("Calling _GetGlobalEagerContext()")
   return _ExecutionContext.global.eagerContext
 }
 
 // TODO: replace these functions with generic ones that do not hard-code Float.
+
+// TODO: use @_cdecl instead, once we make the input/output data types C-compatible.
+// Current compiler error if we use @_cdecl: method cannot be marked @_cdecl
+// because the type of the parameter cannot be represented in Objective-C
 @inlinable
 @_silgen_name("_swift_tfc_ExtractFloatCTensorHandle")
-public func _ExtractCTensorHandle(
+public func _TFCExtractCTensorHandle(
   _ handle: TensorHandle<Float>
 ) -> CTensorHandle {
   return handle.cTensorHandle
@@ -1211,4 +1206,10 @@ public func _TFCCreateTensorHandleFromCTensorHandle(
   _ ownedCHandle: CTensorHandle
 ) -> TensorHandle<Float> {
   return TensorHandle<Float>(owning: ownedCHandle)
+}
+
+@usableFromInline
+@_cdecl("_swift_tfc_CheckOk")
+func _TFCCheckOk(_ s: CTFStatus) {
+  checkOk(s)
 }

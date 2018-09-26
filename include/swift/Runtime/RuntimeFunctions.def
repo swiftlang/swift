@@ -1306,6 +1306,83 @@ FUNCTION(AutoDiffPopFromTape, swift_autodiffPopFromTape, C_CC,
          ARGS(OpaquePtrTy),
          ATTRS(NoUnwind))
 
+// SWIFT_ENABLE_TENSORFLOW
+//===----------------------------------------------------------------------===//
+// - MARK: Runtime functions issued by IRGen in dynamic compilation mode.
+// - Naming convention:
+//   - TF_XXX functions correspond to TF C APIs
+//   - TFE_XXX functions correspond to TF eager C APIs
+//   - TFC_XXX functions are C functions defined in the compiler runtime
+//===----------------------------------------------------------------------===//
+
+// Function declarations, with the definitions are in the C API impl.
+FUNCTION(TF_NewStatus, TF_NewStatus, C_CC,
+         RETURNS(Int8PtrTy),
+         ARGS(),
+         ATTRS(NoUnwind))
+
+FUNCTION(TF_DeleteStatus, TF_DeleteStatus, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFE_NewOp, TFE_NewOp, C_CC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFE_DeleteOp, TFE_DeleteOp, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFE_OpSetAttrType, TFE_OpSetAttrType, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFE_OpSetAttrTensor, TFE_OpSetAttrTensor, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(TF_DeleteTensor, TF_DeleteTensor, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
+
+// Functions with definitions in runtime library.
+FUNCTION(TFC_CreateScalarFloatTensor, swift_tfc_CreateScalarFloatTensor, C_CC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int32Ty),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFE_Execute, swift_tfc_TFE_Execute, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrPtrTy, Int32PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFC_GetGlobalEagerContext, _swift_tfc_GetGlobalEagerContext, C_CC,
+         RETURNS(Int8PtrTy),
+         ARGS(),
+         ATTRS(NoUnwind))
+
+// TODO: enable these decls once we have AnyTensorHandle.
+// FUNCTION(TFC_ExtractFloatCTensorHandle, _swift_tfc_ExtractFloatCTensorHandle, C_CC,
+//          RETURNS(Int8PtrTy),
+//          ARGS(Int8PtrTy),
+//          ATTRS(NoUnwind))
+
+// FUNCTION(TFC_CreateFloatTensorHandleFromCTensorHandle, _swift_tfc_CreateFloatTensorHandleFromCTensorHandle, C_CC,
+//          RETURNS(Int8PtrTy),
+//          ARGS(Int8PtrTy),
+//          ATTRS(NoUnwind))
+
+FUNCTION(TFC_CheckOk, _swift_tfc_CheckOk, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
+
 #undef RETURNS
 #undef ARGS
 #undef ATTRS
