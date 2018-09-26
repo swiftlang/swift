@@ -504,24 +504,6 @@
           ]
         },
         {
-          "kind": "TypeAlias",
-          "name": "RawValue",
-          "printedName": "RawValue",
-          "declKind": "TypeAlias",
-          "usr": "s:4cake6NumberO8RawValuea",
-          "location": "",
-          "moduleName": "cake",
-          "implicit": true,
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Int",
-              "printedName": "Int",
-              "usr": "s:Si"
-            }
-          ]
-        },
-        {
           "kind": "Var",
           "name": "hashValue",
           "printedName": "hashValue",
@@ -999,24 +981,6 @@
                   "usr": "s:Si"
                 }
               ]
-            }
-          ]
-        },
-        {
-          "kind": "TypeAlias",
-          "name": "NonReqAlias",
-          "printedName": "NonReqAlias",
-          "declKind": "TypeAlias",
-          "usr": "s:4cake21ProWithAssociatedTypePAAE11NonReqAliasa",
-          "location": "",
-          "moduleName": "cake",
-          "genericSig": "<τ_0_0 where τ_0_0 : ProWithAssociatedType>",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "Int",
-              "printedName": "Int",
-              "usr": "s:Si"
             }
           ]
         }
