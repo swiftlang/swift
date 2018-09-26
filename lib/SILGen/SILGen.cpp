@@ -1024,6 +1024,12 @@ void SILGenModule::
 emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
   const PatternBindingEntry &pbdEntry = pbd->getPatternList()[i];
   auto *var = pbdEntry.getAnchoringVarDecl();
+
+  // Nameless vars in interface files should not emit any stored property
+  // initializers.
+  if (var->getBaseName().empty())
+    return;
+
   auto *init = pbdEntry.getInit();
   auto *initDC = pbdEntry.getInitContext();
   assert(!pbdEntry.isInitializerLazy());

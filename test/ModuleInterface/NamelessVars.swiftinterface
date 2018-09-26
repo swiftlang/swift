@@ -1,0 +1,7 @@
+// RUN: %target-swift-frontend -emit-module -o /dev/null %s
+
+public struct PublicStruct {
+  @_hasInitialValue
+  internal var _: Int
+  public var x: Bool
+}
