@@ -16,16 +16,14 @@ import SwiftShims
 /// Enough bytes are allocated to hold the bitmap for marking valid entries,
 /// keys, and values. The data layout starts with the bitmap, followed by the
 /// keys, followed by the values.
-//
-// See the docs at the top of the file for more details on this type
-//
-// NOTE: The precise layout of this type is relied on in the runtime
-// to provide a statically allocated empty singleton.
-// See stdlib/public/stubs/GlobalObjects.cpp for details.
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 @_objc_non_lazy_realization
 internal class _RawDictionaryStorage: __SwiftNativeNSDictionary {
+  // NOTE: The precise layout of this type is relied on in the runtime to
+  // provide a statically allocated empty singleton.  See
+  // stdlib/public/stubs/GlobalObjects.cpp for details.
+
   /// The current number of occupied entries in this dictionary.
   @usableFromInline
   @nonobjc
@@ -41,15 +39,37 @@ internal class _RawDictionaryStorage: __SwiftNativeNSDictionary {
   /// power of `scale`.
   @usableFromInline
   @nonobjc
-  internal final var _scale: Int
+  internal final var _scale: Int8
 
+  /// The scale corresponding to the highest `reserveCapacity(_:)` call so far,
+  /// or 0 if there were none. This may be used later to allow removals to
+  /// resize storage.
+  ///
+  /// FIXME: <rdar://problem/18114559> Shrink storage on deletion
+  @usableFromInline
+  @nonobjc
+  internal final var _reservedScale: Int8
+
+  // Currently unused, set to zero.
+  @nonobjc
+  internal final var _extra: Int16
+
+  /// A mutation count, enabling stricter index validation.
+  @usableFromInline
+  @nonobjc
+  internal final var _age: Int32
+
+  /// The hash seed used to hash elements in this dictionary instance.
   @usableFromInline
   internal final var _seed: Int
 
+  /// A raw pointer to the start of the tail-allocated hash buffer holding keys.
   @usableFromInline
   @nonobjc
   internal final var _rawKeys: UnsafeMutableRawPointer
 
+  /// A raw pointer to the start of the tail-allocated hash buffer holding
+  /// values.
   @usableFromInline
   @nonobjc
   internal final var _rawValues: UnsafeMutableRawPointer
@@ -172,7 +192,6 @@ extension _RawDictionaryStorage {
   }
 }
 
-// See the docs at the top of this file for a description of this type
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 final internal class _DictionaryStorage<Key: Hashable, Value>
@@ -184,29 +203,18 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     _sanityCheckFailure("This class cannot be directly initialized")
   }
 
-#if _runtime(_ObjC)
-  @objc
-  internal required init(
-    objects: UnsafePointer<AnyObject?>,
-    forKeys: UnsafeRawPointer,
-    count: Int
-  ) {
-    _sanityCheckFailure("This class cannot be directly initialized")
-  }
-#endif
-
   deinit {
     guard _count > 0 else { return }
     if !_isPOD(Key.self) {
       let keys = self._keys
-      for index in _hashTable {
-        (keys + index.bucket).deinitialize(count: 1)
+      for bucket in _hashTable {
+        (keys + bucket.offset).deinitialize(count: 1)
       }
     }
     if !_isPOD(Value.self) {
       let values = self._values
-      for index in _hashTable {
-        (values + index.bucket).deinitialize(count: 1)
+      for bucket in _hashTable {
+        (values + bucket.offset).deinitialize(count: 1)
       }
     }
     _count = 0
@@ -233,68 +241,16 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     return _NativeDictionary(self)
   }
 
-  @usableFromInline
-  @_effects(releasenone)
-  internal static func reallocate(
-    original: _RawDictionaryStorage,
-    capacity: Int
-  ) -> (storage: _DictionaryStorage, rehash: Bool) {
-    _sanityCheck(capacity >= original._count)
-    let scale = _HashTable.scale(forCapacity: capacity)
-    let rehash = (scale != original._scale)
-    let newStorage = _DictionaryStorage<Key, Value>.allocate(scale: scale)
-    return (newStorage, rehash)
-  }
-
-  @usableFromInline
-  @_effects(releasenone)
-  static internal func allocate(capacity: Int) -> _DictionaryStorage {
-    let scale = _HashTable.scale(forCapacity: capacity)
-    return allocate(scale: scale)
-  }
-
-  static internal func allocate(scale: Int) -> _DictionaryStorage {
-    // The entry count must be representable by an Int value; hence the scale's
-    // peculiar upper bound.
-    _sanityCheck(scale >= 0 && scale < Int.bitWidth - 1)
-
-    let bucketCount = 1 &<< scale
-    let wordCount = _UnsafeBitset.wordCount(forCapacity: bucketCount)
-    let storage = Builtin.allocWithTailElems_3(
-      _DictionaryStorage<Key, Value>.self,
-      wordCount._builtinWordValue, _HashTable.Word.self,
-      bucketCount._builtinWordValue, Key.self,
-      bucketCount._builtinWordValue, Value.self)
-
-    let metadataAddr = Builtin.projectTailElems(storage, _HashTable.Word.self)
-    let keysAddr = Builtin.getTailAddr_Word(
-      metadataAddr, wordCount._builtinWordValue, _HashTable.Word.self,
-      Key.self)
-    let valuesAddr = Builtin.getTailAddr_Word(
-      keysAddr, bucketCount._builtinWordValue, Key.self,
-      Value.self)
-    storage._count = 0
-    storage._capacity = _HashTable.capacity(forScale: scale)
-    storage._scale = scale
-    storage._rawKeys = UnsafeMutableRawPointer(keysAddr)
-    storage._rawValues = UnsafeMutableRawPointer(valuesAddr)
-
-    // We use a slightly different hash seed whenever we change the size of the
-    // hash table, so that we avoid certain copy operations becoming quadratic,
-    // without breaking value semantics. (For background details, see
-    // https://bugs.swift.org/browse/SR-3268)
-
-    // FIXME: Use true per-instance seeding instead. Per-capacity seeding still
-    // leaves hash values the same in same-sized tables, which may affect
-    // operations on two tables at once. (E.g., union.)
-    storage._seed = scale
-
-    // Initialize hash table metadata.
-    storage._hashTable.clear()
-    return storage
-  }
-
 #if _runtime(_ObjC)
+  @objc
+  internal required init(
+    objects: UnsafePointer<AnyObject?>,
+    forKeys: UnsafeRawPointer,
+    count: Int
+  ) {
+    _sanityCheckFailure("This class cannot be directly initialized")
+  }
+
   @objc(copyWithZone:)
   internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     return self
@@ -315,12 +271,15 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int {
+    defer { _fixLifetime(self) }
+    let hashTable = _hashTable
+
     var theState = state.pointee
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      theState.extra.0 = CUnsignedLong(asNative.startIndex.bucket)
+      theState.extra.0 = CUnsignedLong(hashTable.startBucket.offset)
     }
 
     // Test 'objects' rather than 'count' because (a) this is very rare anyway,
@@ -331,20 +290,21 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     }
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
-    var index = _HashTable.Index(bucket: Int(theState.extra.0))
-    let endIndex = asNative.endIndex
-    _precondition(index == endIndex || _hashTable.isOccupied(index))
+    var bucket = _HashTable.Bucket(offset: Int(theState.extra.0))
+    let endBucket = hashTable.endBucket
+    _precondition(bucket == endBucket || _hashTable.isOccupied(bucket),
+      "Invalid fast enumeration state")
     var stored = 0
     for i in 0..<count {
-      if index == endIndex { break }
+      if bucket == endBucket { break }
 
-      let key = asNative.uncheckedKey(at: index)
+      let key = _keys[bucket.offset]
       unmanagedObjects[i] = _bridgeAnythingToObjectiveC(key)
 
       stored += 1
-      index = asNative.index(after: index)
+      bucket = hashTable.occupiedBucket(after: bucket)
     }
-    theState.extra.0 = CUnsignedLong(index.bucket)
+    theState.extra.0 = CUnsignedLong(bucket.offset)
     state.pointee = theState
     return stored
   }
@@ -354,9 +314,9 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
     else { return nil }
 
-    let (index, found) = asNative.find(nativeKey)
+    let (bucket, found) = asNative.find(nativeKey)
     guard found else { return nil }
-    let value = asNative.uncheckedValue(at: index)
+    let value = asNative.uncheckedValue(at: bucket)
     return _bridgeAnythingToObjectiveC(value)
   }
 
@@ -396,3 +356,84 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
 #endif
 }
 
+extension _DictionaryStorage {
+  @usableFromInline
+  @_effects(releasenone)
+  internal static func reallocate(
+    original: _RawDictionaryStorage,
+    capacity: Int
+  ) -> (storage: _DictionaryStorage, rehash: Bool) {
+    _sanityCheck(capacity >= original._count)
+    let scale = _HashTable.scale(forCapacity: capacity)
+    let rehash = (scale != original._scale)
+    let newStorage = _DictionaryStorage<Key, Value>.allocate(
+      scale: scale,
+      // Invalidate indices if we're rehashing.
+      age: rehash ? nil : original._age
+    )
+    return (newStorage, rehash)
+  }
+
+  @usableFromInline
+  @_effects(releasenone)
+  static internal func allocate(capacity: Int) -> _DictionaryStorage {
+    let scale = _HashTable.scale(forCapacity: capacity)
+    return allocate(scale: scale, age: nil)
+  }
+
+  static internal func allocate(
+    scale: Int8,
+    age: Int32?
+  ) -> _DictionaryStorage {
+    // The entry count must be representable by an Int value; hence the scale's
+    // peculiar upper bound.
+    _sanityCheck(scale >= 0 && scale < Int.bitWidth - 1)
+
+    let bucketCount = (1 as Int) &<< scale
+    let wordCount = _UnsafeBitset.wordCount(forCapacity: bucketCount)
+    let storage = Builtin.allocWithTailElems_3(
+      _DictionaryStorage<Key, Value>.self,
+      wordCount._builtinWordValue, _HashTable.Word.self,
+      bucketCount._builtinWordValue, Key.self,
+      bucketCount._builtinWordValue, Value.self)
+
+    let metadataAddr = Builtin.projectTailElems(storage, _HashTable.Word.self)
+    let keysAddr = Builtin.getTailAddr_Word(
+      metadataAddr, wordCount._builtinWordValue, _HashTable.Word.self,
+      Key.self)
+    let valuesAddr = Builtin.getTailAddr_Word(
+      keysAddr, bucketCount._builtinWordValue, Key.self,
+      Value.self)
+    storage._count = 0
+    storage._capacity = _HashTable.capacity(forScale: scale)
+    storage._scale = scale
+    storage._reservedScale = 0
+    storage._extra = 0
+
+    if let age = age {
+      storage._age = age
+    } else {
+      // The default mutation count is simply a scrambled version of the storage
+      // address.
+      storage._age = Int32(
+        truncatingIfNeeded: ObjectIdentifier(storage).hashValue)
+    }
+
+    storage._rawKeys = UnsafeMutableRawPointer(keysAddr)
+    storage._rawValues = UnsafeMutableRawPointer(valuesAddr)
+
+    // We use a slightly different hash seed whenever we change the size of the
+    // hash table, so that we avoid certain copy operations becoming quadratic,
+    // without breaking value semantics. (For background details, see
+    // https://bugs.swift.org/browse/SR-3268)
+
+    // FIXME: Use true per-instance seeding instead. Per-capacity seeding still
+    // leaves hash values the same in same-sized tables, which may affect
+    // operations on two tables at once. (E.g., union.)
+    storage._seed = Int(scale)
+
+    // Initialize hash table metadata.
+    storage._hashTable.clear()
+    return storage
+  }
+}

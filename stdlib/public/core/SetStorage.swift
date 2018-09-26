@@ -16,16 +16,14 @@ import SwiftShims
 /// Enough bytes are allocated to hold the bitmap for marking valid entries,
 /// keys, and values. The data layout starts with the bitmap, followed by the
 /// keys, followed by the values.
-//
-// See the docs at the top of the file for more details on this type
-//
-// NOTE: The precise layout of this type is relied on in the runtime
-// to provide a statically allocated empty singleton.
-// See stdlib/public/stubs/GlobalObjects.cpp for details.
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 @_objc_non_lazy_realization
 internal class _RawSetStorage: __SwiftNativeNSSet {
+  // NOTE: The precise layout of this type is relied on in the runtime to
+  // provide a statically allocated empty singleton.  See
+  // stdlib/public/stubs/GlobalObjects.cpp for details.
+
   /// The current number of occupied entries in this set.
   @usableFromInline
   @nonobjc
@@ -41,11 +39,32 @@ internal class _RawSetStorage: __SwiftNativeNSSet {
   /// power of `scale`.
   @usableFromInline
   @nonobjc
-  internal final var _scale: Int
+  internal final var _scale: Int8
 
+  /// The scale corresponding to the highest `reserveCapacity(_:)` call so far,
+  /// or 0 if there were none. This may be used later to allow removals to
+  /// resize storage.
+  ///
+  /// FIXME: <rdar://problem/18114559> Shrink storage on deletion
+  @usableFromInline
+  @nonobjc
+  internal final var _reservedScale: Int8
+
+  // Currently unused, set to zero.
+  @nonobjc
+  internal final var _extra: Int16
+
+  /// A mutation count, enabling stricter index validation.
+  @usableFromInline
+  @nonobjc
+  internal final var _age: Int32
+
+  /// The hash seed used to hash elements in this set instance.
   @usableFromInline
   internal final var _seed: Int
 
+  /// A raw pointer to the start of the tail-allocated hash buffer holding set
+  /// members.
   @usableFromInline
   @nonobjc
   internal final var _rawElements: UnsafeMutableRawPointer
@@ -156,7 +175,6 @@ extension _EmptySetSingleton: _NSSetCore {
 #endif
 }
 
-// See the docs at the top of this file for a description of this type
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 final internal class _SetStorage<Element: Hashable>
@@ -172,8 +190,8 @@ final internal class _SetStorage<Element: Hashable>
     guard _count > 0 else { return }
     if !_isPOD(Element.self) {
       let elements = _elements
-      for index in _hashTable {
-        (elements + index.bucket).deinitialize(count: 1)
+      for bucket in _hashTable {
+        (elements + bucket.offset).deinitialize(count: 1)
       }
     }
     _fixLifetime(self)
@@ -217,12 +235,14 @@ final internal class _SetStorage<Element: Hashable>
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int {
+    defer { _fixLifetime(self) }
+    let hashTable = _hashTable
     var theState = state.pointee
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      theState.extra.0 = CUnsignedLong(asNative.startIndex.bucket)
+      theState.extra.0 = CUnsignedLong(hashTable.startBucket.offset)
     }
 
     // Test 'objects' rather than 'count' because (a) this is very rare anyway,
@@ -233,18 +253,19 @@ final internal class _SetStorage<Element: Hashable>
     }
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
-    var index = _HashTable.Index(bucket: Int(theState.extra.0))
-    let endIndex = asNative.endIndex
-    _precondition(index == endIndex || _hashTable.isValid(index))
+    var bucket = _HashTable.Bucket(offset: Int(theState.extra.0))
+    let endBucket = hashTable.endBucket
+    _precondition(bucket == endBucket || hashTable.isOccupied(bucket),
+      "Invalid fast enumeration state")
     var stored = 0
     for i in 0..<count {
-      if index == endIndex { break }
-      let element = _elements[index.bucket]
+      if bucket == endBucket { break }
+      let element = _elements[bucket.offset]
       unmanagedObjects[i] = _bridgeAnythingToObjectiveC(element)
       stored += 1
-      index = asNative.index(after: index)
+      bucket = hashTable.occupiedBucket(after: bucket)
     }
-    theState.extra.0 = CUnsignedLong(index.bucket)
+    theState.extra.0 = CUnsignedLong(bucket.offset)
     state.pointee = theState
     return stored
   }
@@ -254,9 +275,9 @@ final internal class _SetStorage<Element: Hashable>
     guard let native = _conditionallyBridgeFromObjectiveC(object, Element.self)
     else { return nil }
 
-    let (index, found) = asNative.find(native)
+    let (bucket, found) = asNative.find(native)
     guard found else { return nil }
-    return _bridgeAnythingToObjectiveC(_elements[index.bucket])
+    return _bridgeAnythingToObjectiveC(_elements[bucket.offset])
   }
 #endif
 }
@@ -271,7 +292,11 @@ extension _SetStorage {
     _sanityCheck(capacity >= original._count)
     let scale = _HashTable.scale(forCapacity: capacity)
     let rehash = (scale != original._scale)
-    let newStorage = _SetStorage<Element>.allocate(scale: scale)
+    let newStorage = _SetStorage<Element>.allocate(
+      scale: scale,
+      // Invalidate indices if we're rehashing.
+      age: rehash ? nil : original._age
+    )
     return (newStorage, rehash)
   }
 
@@ -279,15 +304,18 @@ extension _SetStorage {
   @_effects(releasenone)
   static internal func allocate(capacity: Int) -> _SetStorage {
     let scale = _HashTable.scale(forCapacity: capacity)
-    return allocate(scale: scale)
+    return allocate(scale: scale, age: nil)
   }
 
-  static internal func allocate(scale: Int) -> _SetStorage {
+  static internal func allocate(
+    scale: Int8,
+    age: Int32?
+  ) -> _SetStorage {
     // The entry count must be representable by an Int value; hence the scale's
     // peculiar upper bound.
     _sanityCheck(scale >= 0 && scale < Int.bitWidth - 1)
 
-    let bucketCount = 1 &<< scale
+    let bucketCount = (1 as Int) &<< scale
     let wordCount = _UnsafeBitset.wordCount(forCapacity: bucketCount)
     let storage = Builtin.allocWithTailElems_2(
       _SetStorage<Element>.self,
@@ -301,6 +329,18 @@ extension _SetStorage {
     storage._count = 0
     storage._capacity = _HashTable.capacity(forScale: scale)
     storage._scale = scale
+    storage._reservedScale = 0
+    storage._extra = 0
+
+    if let age = age {
+      storage._age = age
+    } else {
+      // The default mutation count is simply a scrambled version of the storage
+      // address.
+      storage._age = Int32(
+        truncatingIfNeeded: ObjectIdentifier(storage).hashValue)
+    }
+
     storage._rawElements = UnsafeMutableRawPointer(elementsAddr)
 
     // We use a slightly different hash seed whenever we change the size of the
@@ -311,7 +351,7 @@ extension _SetStorage {
     // FIXME: Use true per-instance seeding instead. Per-capacity seeding still
     // leaves hash values the same in same-sized tables, which may affect
     // operations on two tables at once. (E.g., union.)
-    storage._seed = scale
+    storage._seed = Int(scale)
 
     // Initialize hash table metadata.
     storage._hashTable.clear()

@@ -63,8 +63,8 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
 
   @nonobjc internal var base: _NativeSet<Element>
   @nonobjc internal var bridgedElements: _BridgingHashBuffer?
-  @nonobjc internal var nextIndex: _NativeSet<Element>.Index
-  @nonobjc internal var endIndex: _NativeSet<Element>.Index
+  @nonobjc internal var nextBucket: _NativeSet<Element>.Bucket
+  @nonobjc internal var endBucket: _NativeSet<Element>.Bucket
 
   @objc
   internal override required init() {
@@ -75,8 +75,8 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
     _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self))
     self.base = base
     self.bridgedElements = nil
-    self.nextIndex = base.startIndex
-    self.endIndex = base.endIndex
+    self.nextBucket = base.hashTable.startBucket
+    self.endBucket = base.hashTable.endBucket
   }
 
   @nonobjc
@@ -84,16 +84,16 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
     _sanityCheck(!_isBridgedVerbatimToObjectiveC(Element.self))
     self.base = deferred.native
     self.bridgedElements = deferred.bridgeElements()
-    self.nextIndex = base.startIndex
-    self.endIndex = base.endIndex
+    self.nextBucket = base.hashTable.startBucket
+    self.endBucket = base.hashTable.endBucket
   }
 
-  private func bridgedElement(at index: _HashTable.Index) -> AnyObject {
-    _sanityCheck(base.hashTable.isOccupied(index))
+  private func bridgedElement(at bucket: _HashTable.Bucket) -> AnyObject {
+    _sanityCheck(base.hashTable.isOccupied(bucket))
     if let bridgedElements = self.bridgedElements {
-      return bridgedElements[index]
+      return bridgedElements[bucket]
     }
-    return _bridgeAnythingToObjectiveC(base.element(at: index))
+    return _bridgeAnythingToObjectiveC(base.uncheckedElement(at: bucket))
   }
 
   //
@@ -104,12 +104,12 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
 
   @objc
   internal func nextObject() -> AnyObject? {
-    if nextIndex == endIndex {
+    if nextBucket == endBucket {
       return nil
     }
-    let index = nextIndex
-    nextIndex = base.index(after: nextIndex)
-    return self.bridgedElement(at: index)
+    let bucket = nextBucket
+    nextBucket = base.hashTable.occupiedBucket(after: nextBucket)
+    return self.bridgedElement(at: bucket)
   }
 
   @objc(countByEnumeratingWithState:objects:count:)
@@ -125,7 +125,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
     }
 
-    if nextIndex == endIndex {
+    if nextBucket == endBucket {
       state.pointee = theState
       return 0
     }
@@ -133,8 +133,8 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
     // Return only a single element so that code can start iterating via fast
     // enumeration, terminate it, and continue via NSEnumerator.
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
-    unmanagedObjects[0] = self.bridgedElement(at: nextIndex)
-    nextIndex = base.index(after: nextIndex)
+    unmanagedObjects[0] = self.bridgedElement(at: nextBucket)
+    nextBucket = base.hashTable.occupiedBucket(after: nextBucket)
     state.pointee = theState
     return 1
   }
@@ -198,9 +198,10 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     let bridged = _BridgingHashBuffer.allocate(
       owner: native._storage,
       hashTable: native.hashTable)
-    for index in native.hashTable {
-      let object = _bridgeAnythingToObjectiveC(native.element(at: index))
-      bridged.initialize(at: index, to: object)
+    for bucket in native.hashTable {
+      let object = _bridgeAnythingToObjectiveC(
+        native.uncheckedElement(at: bucket))
+      bridged.initialize(at: bucket, to: object)
     }
 
     // Atomically put the bridged elements in place.
@@ -225,10 +226,10 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     guard let element = _conditionallyBridgeFromObjectiveC(object, Element.self)
     else { return nil }
 
-    let (index, found) = native.find(element)
+    let (bucket, found) = native.find(element)
     guard found else { return nil }
     let bridged = bridgeElements()
-    return bridged[index]
+    return bridged[bucket]
   }
 
   @objc
@@ -247,12 +248,15 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     objects: UnsafeMutablePointer<AnyObject>?,
     count: Int
   ) -> Int {
+    defer { _fixLifetime(self) }
+    let hashTable = native.hashTable
+
     var theState = state.pointee
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      theState.extra.0 = CUnsignedLong(native.startIndex.bucket)
+      theState.extra.0 = CUnsignedLong(hashTable.startBucket.offset)
     }
 
     // Test 'objects' rather than 'count' because (a) this is very rare anyway,
@@ -263,21 +267,22 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     }
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
-    var index = _NativeSet<Element>.Index(bucket: Int(theState.extra.0))
-    let endIndex = native.endIndex
-    _precondition(index == endIndex || native.hashTable.isValid(index))
+    var bucket = _HashTable.Bucket(offset: Int(theState.extra.0))
+    let endBucket = hashTable.endBucket
+    _precondition(bucket == endBucket || hashTable.isOccupied(bucket),
+      "Invalid fast enumeration state")
 
     // Only need to bridge once, so we can hoist it out of the loop.
     let bridgedElements = bridgeElements()
 
     var stored = 0
     for i in 0..<count {
-      if index == endIndex { break }
-      unmanagedObjects[i] = bridgedElements[index]
+      if bucket == endBucket { break }
+      unmanagedObjects[i] = bridgedElements[bucket]
       stored += 1
-      index = native.index(after: index)
+      bucket = hashTable.occupiedBucket(after: bucket)
     }
-    theState.extra.0 = CUnsignedLong(index.bucket)
+    theState.extra.0 = CUnsignedLong(bucket.offset)
     state.pointee = theState
     return stored
   }
