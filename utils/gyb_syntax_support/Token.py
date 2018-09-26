@@ -268,6 +268,8 @@ SYNTAX_TOKENS = [
                  serialization_code=72),
     PoundKeyword('PoundDsohandle', 'dsohandle', text='#dsohandle',
                  serialization_code=71),
+    PoundKeyword('PoundAssert', 'assert', text='#assert',
+                 serialization_code=117),
 
     PoundDirectiveKeyword('PoundSourceLocation', 'sourceLocation',
                           text='#sourceLocation', serialization_code=65),

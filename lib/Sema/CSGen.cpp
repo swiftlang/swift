@@ -3103,6 +3103,18 @@ namespace {
       llvm_unreachable("found KeyPathDotExpr in CSGen");
     }
 
+    Type visitPoundAssertExpr(PoundAssertExpr *PAE) {
+      // Constrain the condition argument to be Bool.
+      auto boolType = CS.getASTContext().getBoolDecl()->getDeclaredType();
+      CS.addConstraint(
+          ConstraintKind::ArgumentConversion, CS.getType(PAE->getCondition()),
+          boolType,
+          CS.getConstraintLocator(PAE, ConstraintLocator::ApplyArgument));
+
+      // #assert(...) has type Void.
+      return CS.getASTContext().TheEmptyTupleType;
+    }
+
     enum class TypeOperation { None,
                                Join,
                                JoinInout,

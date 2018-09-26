@@ -1051,6 +1051,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) { return E; }
 
+  Expr *visitPoundAssertExpr(PoundAssertExpr *E) {
+    if (auto *condition = doIt(E->getCondition())) {
+      E->setCondition(condition);
+    } else {
+      return nullptr;
+    }
+    return E;
+  }
+
   //===--------------------------------------------------------------------===//
   //                           Everything Else
   //===--------------------------------------------------------------------===//

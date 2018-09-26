@@ -4564,6 +4564,15 @@ namespace {
       llvm_unreachable("found KeyPathDotExpr in CSApply");
     }
 
+    Expr *visitPoundAssertExpr(PoundAssertExpr *E) {
+      // Convert the condition to a logic value.
+      auto condition = solution.convertBooleanTypeToBuiltinI1(
+          E->getCondition(), cs.getConstraintLocator(E));
+      E->setCondition(condition);
+      // CSGen already set this expression's type to Void.
+      return E;
+    }
+
     /// Interface for ExprWalker
     void walkToExprPre(Expr *expr) {
       ExprStack.push_back(expr);

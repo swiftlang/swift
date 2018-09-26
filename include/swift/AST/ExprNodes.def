@@ -188,7 +188,8 @@ EXPR(EditorPlaceholder, Expr)
 EXPR(ObjCSelector, Expr)
 EXPR(KeyPath, Expr)
 UNCHECKED_EXPR(KeyPathDot, Expr)
-LAST_EXPR(KeyPathDot)
+EXPR(PoundAssert, Expr)
+LAST_EXPR(PoundAssert)
 
 #undef EXPR_RANGE
 #undef LITERAL_EXPR

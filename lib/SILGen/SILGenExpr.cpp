@@ -497,6 +497,8 @@ namespace {
                                             SGFContext C);
     RValue visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
                                         SGFContext C);
+
+    RValue visitPoundAssertExpr(PoundAssertExpr *E, SGFContext C);
   };
 } // end anonymous namespace
 
@@ -5549,6 +5551,28 @@ RValue RValueEmitter::visitForeignObjectConversionExpr(
 RValue RValueEmitter::visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
                                                    SGFContext C) {
   llvm_unreachable("unevaluated_instance expression can never be evaluated");
+}
+
+RValue RValueEmitter::visitPoundAssertExpr(PoundAssertExpr *E, SGFContext C) {
+  SILValue condition;
+  {
+    FullExpr scope(SGF.Cleanups, CleanupLocation(E));
+    condition =
+        SGF.emitRValueAsSingleValue(E->getCondition()).getUnmanagedValue();
+  }
+
+  // Sema forces conditions to have Builtin.i1 type.
+  assert(condition->getType().castTo<BuiltinIntegerType>()->isFixedWidth(1));
+
+  SILValue message = SGF.B.createStringLiteral(
+      E, E->getMessage(), StringLiteralInst::Encoding::UTF8);
+
+  auto resultType = SGF.getASTContext().TheEmptyTupleType;
+  SILValue result = SGF.B.createBuiltin(
+      E, SGF.getASTContext().getIdentifier("poundAssert"),
+      SGF.getLoweredType(resultType), {}, {condition, message});
+
+  return RValue(SGF, E, ManagedValue::forUnmanaged(result));
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {
