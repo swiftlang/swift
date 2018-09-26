@@ -43,7 +43,8 @@ struct _SwiftEmptyArrayStorage _swiftEmptyArrayStorage;
 struct _SwiftDictionaryBodyStorage {
   __swift_intptr_t count;
   __swift_intptr_t capacity;
-  __swift_intptr_t scale;
+  __swift_int8_t scale;
+  __swift_int32_t age;
   __swift_intptr_t seed;
   void *rawKeys;
   void *rawValues;
@@ -52,7 +53,8 @@ struct _SwiftDictionaryBodyStorage {
 struct _SwiftSetBodyStorage {
   __swift_intptr_t count;
   __swift_intptr_t capacity;
-  __swift_intptr_t scale;
+  __swift_int8_t scale;
+  __swift_int32_t age;
   __swift_intptr_t seed;
   void *rawElements;
 };

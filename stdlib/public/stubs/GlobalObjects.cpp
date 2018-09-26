@@ -65,7 +65,8 @@ swift::_SwiftEmptyDictionarySingleton swift::_swiftEmptyDictionarySingleton = {
     // 0 so that any insertion will lead to real storage being allocated.
     0, // int count;
     0, // int capacity;                                    
-    0, // int scale;
+    0, // int8 scale;
+    0, // int32 age;
     0, // int seed;
     (void *)1, // void* keys; (non-null garbage)
     (void *)1  // void* values; (non-null garbage)
@@ -89,7 +90,8 @@ swift::_SwiftEmptySetSingleton swift::_swiftEmptySetSingleton = {
     // 0 so that any insertion will lead to real storage being allocated.
     0, // int count;
     0, // int capacity;                                    
-    0, // int scale;
+    0, // int8 scale;
+    0, // int32 age;
     0, // int seed;
     (void *)1, // void *rawElements; (non-null garbage)
   },
