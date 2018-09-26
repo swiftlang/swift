@@ -790,6 +790,11 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::GetAsyncContinuationInst:
     return InlineCost::Free;
 
+  // Unconditional branch is free in empty blocks.
+  case SILInstructionKind::BranchInst:
+    return (I.getIterator() == I.getParent()->begin())
+      ? InlineCost::Free : InlineCost::Expensive;
+
   case SILInstructionKind::AbortApplyInst:
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst:
@@ -804,7 +809,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::WitnessMethodInst:
   case SILInstructionKind::AssignInst:
   case SILInstructionKind::AssignByWrapperInst:
-  case SILInstructionKind::BranchInst:
   case SILInstructionKind::CheckedCastBranchInst:
   case SILInstructionKind::CheckedCastValueBranchInst:
   case SILInstructionKind::CheckedCastAddrBranchInst:
