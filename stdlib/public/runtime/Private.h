@@ -345,7 +345,6 @@ public:
   Demangle::NodePointer
   _buildDemanglingForContext(const ContextDescriptor *context,
                              llvm::ArrayRef<NodePointer> demangledGenerics,
-                             bool concretizedGenerics,
                              Demangle::Demangler &Dem);
   
   /// Symbolic reference resolver that produces the demangling tree for the
@@ -360,7 +359,7 @@ public:
       auto descriptor =
         (const ContextDescriptor *)detail::applyRelativeOffset(base, offset);
       
-      return _buildDemanglingForContext(descriptor, {}, false, Dem);
+      return _buildDemanglingForContext(descriptor, {}, Dem);
     }
   };
 

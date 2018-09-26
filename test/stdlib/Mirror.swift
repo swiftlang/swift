@@ -1822,9 +1822,8 @@ mirrors.test("GenericNestedWithSameTypeConstraints") {
   var output = ""
   dump(value, to: &output)
 
-  // FIXME: The generic arguments are in the wrong place
   let expected =
-    "▿ (extension in Mirror):Mirror.OuterTwoParams.InnerEqualParams<Mirror.ConformsToP1AndP2, Mirror.ConformsToP3>\n" +
+    "▿ (extension in Mirror):Mirror.OuterTwoParams<Mirror.ConformsToP1AndP2, Mirror.ConformsToP1AndP2>.InnerEqualParams<Mirror.ConformsToP3>\n" +
     "  - x: Mirror.ConformsToP1AndP2\n" +
     "  - y: Mirror.ConformsToP1AndP2\n" +
     "  - z: Mirror.ConformsToP3\n"
