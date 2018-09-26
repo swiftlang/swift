@@ -222,12 +222,12 @@ extension Set: ExpressibleByArrayLiteral {
     }
     let native = _NativeSet<Element>(capacity: elements.count)
     for element in elements {
-      let (index, found) = native.find(element)
+      let (bucket, found) = native.find(element)
       if found {
         // FIXME: Shouldn't this trap?
         continue
       }
-      native._unsafeInsertNew(element, at: index)
+      native._unsafeInsertNew(element, at: bucket)
     }
     self.init(_native: native)
   }
@@ -441,8 +441,8 @@ extension Set: Equatable {
       }
 
       defer { _fixLifetime(lhsNative) }
-      for i in lhsNative.hashTable {
-        let key = lhsNative.element(at: i)
+      for bucket in lhsNative.hashTable {
+        let key = lhsNative.uncheckedElement(at: bucket)
         let bridgedKey = _bridgeAnythingToObjectiveC(key)
         if rhsCocoa.contains(bridgedKey) {
           continue
@@ -1422,7 +1422,7 @@ extension Set.Index: Hashable {
     switch _variant {
     case .native(let nativeIndex):
       hasher.combine(0 as UInt8)
-      hasher.combine(nativeIndex.bucket)
+      hasher.combine(nativeIndex.bucket.bucket)
     case .cocoa(let cocoaIndex):
       _cocoaPath()
       hasher.combine(1 as UInt8)

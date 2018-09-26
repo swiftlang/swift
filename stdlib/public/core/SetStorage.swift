@@ -178,8 +178,8 @@ final internal class _SetStorage<Element: Hashable>
     guard _count > 0 else { return }
     if !_isPOD(Element.self) {
       let elements = _elements
-      for index in _hashTable {
-        (elements + index.bucket).deinitialize(count: 1)
+      for bucket in _hashTable {
+        (elements + bucket.bucket).deinitialize(count: 1)
       }
     }
     _fixLifetime(self)
@@ -223,12 +223,14 @@ final internal class _SetStorage<Element: Hashable>
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int {
+    defer { _fixLifetime(self) }
+    let hashTable = _hashTable
     var theState = state.pointee
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      theState.extra.0 = CUnsignedLong(asNative.startIndex.bucket)
+      theState.extra.0 = CUnsignedLong(hashTable.startIndex.bucket)
     }
 
     // Test 'objects' rather than 'count' because (a) this is very rare anyway,
@@ -239,18 +241,19 @@ final internal class _SetStorage<Element: Hashable>
     }
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
-    var index = _HashTable.Index(bucket: Int(theState.extra.0))
-    let endIndex = asNative.endIndex
-    _precondition(index == endIndex || _hashTable.isValid(index))
+    var bucket = _HashTable.Index(bucket: Int(theState.extra.0))
+    let endBucket = hashTable.endIndex
+    _precondition(bucket == endBucket || hashTable.isOccupied(bucket),
+      "Invalid fast enumeration state")
     var stored = 0
     for i in 0..<count {
-      if index == endIndex { break }
-      let element = _elements[index.bucket]
+      if bucket == endBucket { break }
+      let element = _elements[bucket.bucket]
       unmanagedObjects[i] = _bridgeAnythingToObjectiveC(element)
       stored += 1
-      index = asNative.index(after: index)
+      bucket = hashTable.index(after: bucket)
     }
-    theState.extra.0 = CUnsignedLong(index.bucket)
+    theState.extra.0 = CUnsignedLong(bucket.bucket)
     state.pointee = theState
     return stored
   }
@@ -260,9 +263,9 @@ final internal class _SetStorage<Element: Hashable>
     guard let native = _conditionallyBridgeFromObjectiveC(object, Element.self)
     else { return nil }
 
-    let (index, found) = asNative.find(native)
+    let (bucket, found) = asNative.find(native)
     guard found else { return nil }
-    return _bridgeAnythingToObjectiveC(_elements[index.bucket])
+    return _bridgeAnythingToObjectiveC(_elements[bucket.bucket])
   }
 #endif
 }
