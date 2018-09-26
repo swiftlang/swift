@@ -158,16 +158,12 @@ NodePtr UpdatedNodesMap::findUpdateCounterpart(const SDKNode *Node) const {
   return Node == FoundPair->first ? FoundPair->second : FoundPair->first;
 }
 
-bool SDKNodeType::classof(const SDKNode *N) {
-  switch (N->getKind()) {
-  case SDKNodeKind::TypeNominal:
-  case SDKNodeKind::TypeFunc:
-  case SDKNodeKind::TypeAlias:
-    return true;
-  default:
-    return false;
-  }
+#define NODE_KIND_RANGE(ID, FIRST, LAST)                                      \
+bool SDKNode##ID::classof(const SDKNode *N) {                                 \
+  return N->getKind() >= SDKNodeKind::FIRST &&                                \
+    N->getKind() <= SDKNodeKind::LAST;                                        \
 }
+#include "swift/IDE/DigesterEnums.def"
 
 unsigned SDKNode::getChildIndex(const SDKNode* Child) const {
   auto It = std::find(Children.begin(), Children.end(), Child);
@@ -351,28 +347,6 @@ StringRef SDKNodeDecl::getFullyQualifiedName() const {
   return getSDKContext().buffer(OS.str());
 }
 
-bool SDKNodeDecl::classof(const SDKNode *N) {
-  switch (N->getKind()) {
-    case SDKNodeKind::DeclConstructor:
-    case SDKNodeKind::DeclFunction:
-    case SDKNodeKind::DeclGetter:
-    case SDKNodeKind::DeclSetter:
-    case SDKNodeKind::DeclTypeAlias:
-    case SDKNodeKind::DeclType:
-    case SDKNodeKind::DeclVar:
-    case SDKNodeKind::DeclAssociatedType:
-    case SDKNodeKind::DeclSubscript:
-      return true;
-    case SDKNodeKind::Root:
-    case SDKNodeKind::TypeNominal:
-    case SDKNodeKind::TypeFunc:
-    case SDKNodeKind::TypeAlias:
-      return false;
-  }
-
-  llvm_unreachable("Unhandled SDKNodeKind in switch.");
-}
-
 bool SDKNodeDecl::hasDeclAttribute(DeclAttrKind DAKind) const {
   return std::find(DeclAttributes.begin(), DeclAttributes.end(), DAKind) !=
     DeclAttributes.end();
@@ -440,20 +414,6 @@ bool SDKNodeDeclType::isConformingTo(KnownProtocolKind Kind) const {
                        ConformingProtocols.end(),                           \
                        #NAME) != ConformingProtocols.end();
 #include "swift/IDE/DigesterEnums.def"
-  }
-}
-
-bool SDKNodeDeclAbstractFunc::classof(const SDKNode *N) {
-  switch (N->getKind()) {
-    case SDKNodeKind::DeclFunction:
-    case SDKNodeKind::DeclSetter:
-    case SDKNodeKind::DeclGetter:
-    case SDKNodeKind::DeclConstructor:
-    case SDKNodeKind::DeclSubscript:
-      return true;
-
-    default:
-      return false;
   }
 }
 

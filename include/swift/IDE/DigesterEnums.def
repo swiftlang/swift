@@ -50,19 +50,28 @@
 #define SPECIAL_CASE_ID(NAME)
 #endif
 
+#ifndef NODE_KIND_RANGE
+#define NODE_KIND_RANGE(ID, First, Last)
+#endif
+
 NODE_KIND(Root, Root)
 NODE_KIND(TypeNominal, TypeNominal)
 NODE_KIND(TypeFunc, TypeFunc)
 NODE_KIND(TypeAlias, TypeNameAlias)
-NODE_KIND(DeclType, TypeDecl)
+NODE_KIND_RANGE(Type, TypeNominal, TypeAlias)
+
 NODE_KIND(DeclFunction, Function)
 NODE_KIND(DeclConstructor, Constructor)
 NODE_KIND(DeclGetter, Getter)
 NODE_KIND(DeclSetter, Setter)
+NODE_KIND(DeclSubscript, Subscript)
+NODE_KIND_RANGE(DeclAbstractFunc, DeclFunction, DeclSubscript)
+
+NODE_KIND(DeclType, TypeDecl)
 NODE_KIND(DeclVar, Var)
 NODE_KIND(DeclTypeAlias, TypeAlias)
 NODE_KIND(DeclAssociatedType, AssociatedType)
-NODE_KIND(DeclSubscript, Subscript)
+NODE_KIND_RANGE(Decl, DeclFunction, DeclAssociatedType)
 
 NODE_ANNOTATION(Added)
 NODE_ANNOTATION(Removed)
@@ -105,7 +114,6 @@ NODE_ANNOTATION_CHANGE_KIND(Rename)
 
 // Keep type rewritten the last one.
 NODE_ANNOTATION_CHANGE_KIND(TypeRewritten)
-
 
 KEY_BOOL(IsImplicit, implicit)
 KEY_BOOL(IsThrowing, throwing)
@@ -194,6 +202,7 @@ SPECIAL_CASE_ID(ToIntMax)
 SPECIAL_CASE_ID(ToUIntMax)
 SPECIAL_CASE_ID(UIApplicationMain)
 
+#undef NODE_KIND_RANGE
 #undef SPECIAL_CASE_ID
 #undef DIFF_ITEM_KEY_KIND_INT
 #undef DIFF_ITEM_KEY_KIND_STRING
