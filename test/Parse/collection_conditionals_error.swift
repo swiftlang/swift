@@ -5,8 +5,7 @@
   "foo",
   #else
   "foo": 12, // expected-error {{expected ',' separator}}
-  // expected-error@-1{{expected ',' separator}}
-  // expected-error@-2{{expected expression in container literal}}
+  // expected-error@-1{{expected expression in container literal}}
   #endif
 ]
 
@@ -42,7 +41,7 @@
 _ = [
   42,
 #if true
-  12 // expected-error {{expected ',' separator}}
+  12, 2 // expected-error {{expected ',' separator}}
 #endif
   0
 ]

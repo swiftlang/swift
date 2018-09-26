@@ -30,7 +30,6 @@ let a4: [Any] = [
 ]
 
 let d2 = [
-  "a": 1,
   #if false
 // CHECK:  #if:
 // CHECK:    (boolean_literal_expr type='<null>' value=false)

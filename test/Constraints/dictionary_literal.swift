@@ -110,7 +110,7 @@ func testDefaultExistentials() {
 // SR-4952, rdar://problem/32330004 - Assertion failure during swift::ASTVisitor<::FailureDiagnosis,...>::visit
 func rdar32330004_1() -> [String: Any] {
   return ["a""one": 1, "two": 2, "three": 3] // expected-note {{did you mean to use a dictionary literal instead?}}
-  // expected-error@-1 2 {{expected ',' separator}}
+  // expected-error@-1 {{expected ',' separator}}
   // expected-error@-2 {{dictionary of type '[String : Any]' cannot be used with array literal}}
 }
 

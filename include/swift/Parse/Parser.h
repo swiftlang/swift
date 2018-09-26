@@ -714,21 +714,9 @@ public:
   class ConfigMap {
     std::vector <IfConfigDecl *> OuterDecls, *PendingConditionals = &OuterDecls;
     std::map<const void *,std::vector <IfConfigDecl *>> ConditionalsMap;
-    bool HasConditionals = false, First = true;
-;
+    bool HasConditionals = false;
+
   public:
-
-    bool isFirst() {
-      if (!First)
-        return false;
-      First = false;
-      return true;
-    }
-
-    void resetFirst() {
-      First = true;
-    }
-
     Expr *registerActiveDataElement(Expr *expr) {
       if (PendingConditionals == &OuterDecls) {
         const void *Start = expr->getSourceRange().Start.getOpaquePointerValue();

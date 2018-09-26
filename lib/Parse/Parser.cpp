@@ -959,7 +959,6 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
           IfConfigMap->newOuterConditionalStarts();
         auto IfConfigResult = parseIfConfig(
           [&](SmallVectorImpl<ASTNode> &Elements, bool SubIsActive) {
-            IfConfigMap->resetFirst();
             Status |= parseList(RightK, LeftLoc, RightLoc, AllowSepAfterLast,
                                 ErrorDiag, Kind, callback, IfConfigMap,
                                 &Elements, IsActive && SubIsActive);
@@ -984,14 +983,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 
     Status |= callback(Elements, IsActive);
 
-    // If Array or Dictionary report first element missing comma.
-    if (IfConfigMap && IfConfigMap->isFirst() &&
-        Tok.isNot(tok::r_square) && Tok.isNot(tok::comma)) {
-      diagnose(Tok, diag::expected_separator, ",").
-        fixItInsertAfter(PreviousLoc, ",");
-    }
-
-    if (Tok.is(RightK) || IsConditionalsEnd())
+    if (Tok.is(RightK))
       break;
     // If the lexer stopped with an EOF token whose spelling is ")", then this
     // is actually the tuple that is a string literal interpolation context.
@@ -1022,8 +1014,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
         (Tok.is(tok::r_brace) || isStartOfDecl() || isStartOfStmt())) {
       break;
     }
-    // If we found EOF or such, bailout.
-    if (Tok.isAny(tok::eof, tok::pound_endif)) {
+    // If we found EOF, bailout.
+    if (Tok.is(tok::eof)) {
       IsInputIncomplete = true;
       break;
     }
@@ -1031,6 +1023,9 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     diagnose(Tok, diag::expected_separator, ",")
       .fixItInsertAfter(PreviousLoc, ",");
     Status.setIsParseError();
+
+    if (IsConditionalsEnd())
+      break;
   }
 
   ListContext.reset();
