@@ -5562,6 +5562,30 @@ AccessorDecl *AccessorDecl::create(ASTContext &ctx,
   return D;
 }
 
+bool AccessorDecl::isAssumedNonMutating() const {
+  switch (getAccessorKind()) {
+  case AccessorKind::Get:
+  case AccessorKind::Address:
+  case AccessorKind::Read:
+    return true;
+
+  case AccessorKind::Set:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
+  case AccessorKind::MutableAddress:
+  case AccessorKind::Modify:
+    return false;
+  }
+  llvm_unreachable("bad accessor kind");
+}
+
+bool AccessorDecl::isExplicitNonMutating() const {
+  return !isMutating() &&
+    !isAssumedNonMutating() &&
+    isInstanceMember() &&
+    !getDeclContext()->getDeclaredInterfaceType()->hasReferenceSemantics();
+}
+
 StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
   assert(getDeclContext()->isTypeContext());
   if (!isStatic())
@@ -5570,16 +5594,6 @@ StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
     return getStaticSpelling();
 
   return getCorrectStaticSpellingForDecl(this);
-}
-
-bool FuncDecl::isExplicitNonMutating() const {
-  if (auto accessor = dyn_cast<AccessorDecl>(this)) {
-    return !isMutating() &&
-         !accessor->isGetter() &&
-         isInstanceMember() &&
-         !getDeclContext()->getDeclaredInterfaceType()->hasReferenceSemantics();
-  }
-  return false;
 }
 
 Type FuncDecl::getResultInterfaceType() const {
