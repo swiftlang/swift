@@ -555,7 +555,7 @@ void StackAllocationPromoter::addBlockArguments(BlockSet &PhiBlocks) {
   LLVM_DEBUG(llvm::dbgs() << "*** Adding new block arguments.\n");
 
   for (auto *Block : PhiBlocks)
-    Block->createPHIArgument(ASI->getElementType(), ValueOwnershipKind::Owned);
+    Block->createPhiArgument(ASI->getElementType(), ValueOwnershipKind::Owned);
 }
 
 SILValue

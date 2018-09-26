@@ -277,7 +277,7 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitSILUndef(SILUndef *Arg) {
 }
 
 ValueOwnershipKind
-ValueOwnershipKindClassifier::visitSILPHIArgument(SILPHIArgument *Arg) {
+ValueOwnershipKindClassifier::visitSILPhiArgument(SILPhiArgument *Arg) {
   return Arg->getOwnershipKind();
 }
 

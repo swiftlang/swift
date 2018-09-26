@@ -64,13 +64,13 @@ SILModule &SILArgument::getModule() const {
 //                              SILBlockArgument
 //===----------------------------------------------------------------------===//
 
-// FIXME: SILPHIArgument should only refer to branch arguments. They usually
+// FIXME: SILPhiArgument should only refer to branch arguments. They usually
 // need to be distinguished from projections and casts. Actual phi block
 // arguments are substitutable with their incoming values. It is also needlessly
 // expensive to call this helper instead of simply specifying phis with an
 // opcode. It results in repeated CFG traversals and repeated, unnecessary
 // switching over terminator opcodes.
-bool SILPHIArgument::isPhiArgument() {
+bool SILPhiArgument::isPhiArgument() {
   // No predecessors indicates an unreachable block.
   if (getParent()->pred_empty())
     return false;
@@ -98,7 +98,7 @@ static SILValue getIncomingPhiValueForPred(const SILBasicBlock *BB,
   return cast<CondBranchInst>(TI)->getArgForDestBB(BB, Index);
 }
 
-SILValue SILPHIArgument::getIncomingPhiValue(SILBasicBlock *predBB) {
+SILValue SILPhiArgument::getIncomingPhiValue(SILBasicBlock *predBB) {
   if (!isPhiArgument())
     return SILValue();
 
@@ -113,7 +113,7 @@ SILValue SILPHIArgument::getIncomingPhiValue(SILBasicBlock *predBB) {
   return getIncomingPhiValueForPred(Parent, predBB, Index);
 }
 
-bool SILPHIArgument::getIncomingPhiValues(
+bool SILPhiArgument::getIncomingPhiValues(
     llvm::SmallVectorImpl<SILValue> &ReturnedPhiValues) {
   if (!isPhiArgument())
     return false;
@@ -130,7 +130,7 @@ bool SILPHIArgument::getIncomingPhiValues(
   return true;
 }
 
-bool SILPHIArgument::getIncomingPhiValues(
+bool SILPhiArgument::getIncomingPhiValues(
     llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
         &ReturnedPredBBAndPhiValuePairs) {
   if (!isPhiArgument())
@@ -180,7 +180,7 @@ static SILValue getSingleTerminatorOperandForPred(const SILBasicBlock *BB,
   llvm_unreachable("Unhandled TermKind?!");
 }
 
-bool SILPHIArgument::getSingleTerminatorOperands(
+bool SILPhiArgument::getSingleTerminatorOperands(
     llvm::SmallVectorImpl<SILValue> &OutArray) {
   SILBasicBlock *Parent = getParent();
 
@@ -198,7 +198,7 @@ bool SILPHIArgument::getSingleTerminatorOperands(
   return true;
 }
 
-bool SILPHIArgument::getSingleTerminatorOperands(
+bool SILPhiArgument::getSingleTerminatorOperands(
     llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>> &OutArray) {
   SILBasicBlock *Parent = getParent();
 
@@ -216,7 +216,7 @@ bool SILPHIArgument::getSingleTerminatorOperands(
   return true;
 }
 
-SILValue SILPHIArgument::getSingleTerminatorOperand() const {
+SILValue SILPhiArgument::getSingleTerminatorOperand() const {
   const SILBasicBlock *Parent = getParent();
   const SILBasicBlock *PredBB = Parent->getSinglePredecessorBlock();
   if (!PredBB)
@@ -224,23 +224,23 @@ SILValue SILPHIArgument::getSingleTerminatorOperand() const {
   return getSingleTerminatorOperandForPred(Parent, PredBB, getIndex());
 }
 
-const SILPHIArgument *BranchInst::getArgForOperand(const Operand *oper) const {
+const SILPhiArgument *BranchInst::getArgForOperand(const Operand *oper) const {
   assert(oper->getUser() == this);
-  return cast<SILPHIArgument>(
+  return cast<SILPhiArgument>(
       getDestBB()->getArgument(oper->getOperandNumber()));
 }
 
-const SILPHIArgument *
+const SILPhiArgument *
 CondBranchInst::getArgForOperand(const Operand *oper) const {
   assert(oper->getUser() == this);
 
   unsigned operIdx = oper->getOperandNumber();
   if (isTrueOperandIndex(operIdx)) {
-    return cast<SILPHIArgument>(getTrueBB()->getArgument(
+    return cast<SILPhiArgument>(getTrueBB()->getArgument(
         operIdx - getTrueOperands().front().getOperandNumber()));
   }
   if (isFalseOperandIndex(operIdx)) {
-    return cast<SILPHIArgument>(getFalseBB()->getArgument(
+    return cast<SILPhiArgument>(getFalseBB()->getArgument(
         operIdx - getFalseOperands().front().getOperandNumber()));
   }
   return nullptr;

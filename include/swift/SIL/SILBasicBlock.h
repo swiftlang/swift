@@ -27,7 +27,7 @@ namespace swift {
 
 class SILFunction;
 class SILArgument;
-class SILPHIArgument;
+class SILPhiArgument;
 class SILFunctionArgument;
 class SILPrintContext;
 
@@ -165,7 +165,7 @@ public:
   /// Iterator over the PHI arguments of a basic block.
   /// Defines an implicit cast operator on the iterator, so that this iterator
   /// can be used in the SSAUpdaterImpl.
-  template <typename PHIArgT = SILPHIArgument,
+  template <typename PHIArgT = SILPhiArgument,
             typename IteratorT = arg_iterator>
   class phi_iterator_impl {
   private:
@@ -180,7 +180,7 @@ public:
     bool operator!=(const phi_iterator_impl& x) const { return !operator==(x); }
   };
   typedef phi_iterator_impl<> phi_iterator;
-  typedef phi_iterator_impl<const SILPHIArgument,
+  typedef phi_iterator_impl<const SILPhiArgument,
                             SILBasicBlock::const_arg_iterator>
       const_phi_iterator;
 
@@ -194,9 +194,9 @@ public:
 
   ArrayRef<SILArgument *> getArguments() const { return ArgumentList; }
 
-  /// Returns a transform array ref that performs llvm::cast<SILPHIArgument> on
+  /// Returns a transform array ref that performs llvm::cast<SILPhiArgument> on
   /// each argument and then returns the downcasted value.
-  PHIArgumentArrayRef getPHIArguments() const;
+  PhiArgumentArrayRef getPhiArguments() const;
 
   /// Returns a transform array ref that performs
   /// llvm::cast<SILFunctionArgument> on each argument and then returns the
@@ -234,27 +234,27 @@ public:
   /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and
   /// ValueDecl
   /// \p D.
-  SILPHIArgument *replacePHIArgument(unsigned i, SILType Ty,
+  SILPhiArgument *replacePhiArgument(unsigned i, SILType Ty,
                                      ValueOwnershipKind Kind,
                                      const ValueDecl *D = nullptr);
 
   /// Allocate a new argument of type \p Ty and append it to the argument
   /// list. Optionally you can pass in a value decl parameter.
-  SILPHIArgument *createPHIArgument(SILType Ty, ValueOwnershipKind Kind,
+  SILPhiArgument *createPhiArgument(SILType Ty, ValueOwnershipKind Kind,
                                     const ValueDecl *D = nullptr);
 
-  /// Insert a new SILPHIArgument with type \p Ty and \p Decl at position \p
+  /// Insert a new SILPhiArgument with type \p Ty and \p Decl at position \p
   /// Pos.
-  SILPHIArgument *insertPHIArgument(arg_iterator Pos, SILType Ty,
+  SILPhiArgument *insertPhiArgument(arg_iterator Pos, SILType Ty,
                                     ValueOwnershipKind Kind,
                                     const ValueDecl *D = nullptr);
 
-  SILPHIArgument *insertPHIArgument(unsigned Index, SILType Ty,
+  SILPhiArgument *insertPhiArgument(unsigned Index, SILType Ty,
                                     ValueOwnershipKind Kind,
                                     const ValueDecl *D = nullptr) {
     arg_iterator Pos = ArgumentList.begin();
     std::advance(Pos, Index);
-    return insertPHIArgument(Pos, Ty, Kind, D);
+    return insertPhiArgument(Pos, Ty, Kind, D);
   }
 
   /// \brief Remove all block arguments.

@@ -80,7 +80,7 @@ void LoopCloner::cloneLoop() {
 
   // Clone the arguments.
   for (auto *Arg : Header->getArguments()) {
-    SILValue MappedArg = ClonedHeader->createPHIArgument(
+    SILValue MappedArg = ClonedHeader->createPhiArgument(
         getOpType(Arg->getType()), ValueOwnershipKind::Owned);
     ValueMap.insert(std::make_pair(Arg, MappedArg));
   }
@@ -119,7 +119,7 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
     return None;
 
   // Match an add 1 recurrence.
-  SILPHIArgument *RecArg;
+  SILPhiArgument *RecArg;
   IntegerLiteralInst *End;
   SILValue RecNext;
 
@@ -142,7 +142,7 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
 
   if (!match(RecNext,
              m_TupleExtractInst(m_ApplyInst(BuiltinValueKind::SAddOver,
-                                            m_SILPHIArgument(RecArg), m_One()),
+                                            m_SILPhiArgument(RecArg), m_One()),
                                 0)))
     return None;
 

@@ -633,7 +633,7 @@ public:
     return M.getStage() == SILStage::Raw;
   }
 
-  void visitSILPHIArgument(SILPHIArgument *arg) {
+  void visitSILPhiArgument(SILPhiArgument *arg) {
     // Verify that the `isPhiArgument` property is sound:
     // - Phi arguments come from branches.
     // - Non-phi arguments have a single predecessor.
@@ -663,9 +663,9 @@ public:
     CurArgument = arg;
     checkLegalType(arg->getFunction(), arg, nullptr);
     checkValueBaseOwnership(arg);
-    if (auto *phiArg = dyn_cast<SILPHIArgument>(arg)) {
+    if (auto *phiArg = dyn_cast<SILPhiArgument>(arg)) {
       if (phiArg->isPhiArgument())
-        visitSILPHIArgument(phiArg);
+        visitSILPhiArgument(phiArg);
       else {
         // A non-phi BlockArgument must have a single predecessor unless it is
         // unreachable.

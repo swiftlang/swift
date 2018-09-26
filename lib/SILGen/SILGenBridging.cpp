@@ -1526,7 +1526,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     {
       B.emitBlock(normalBB);
       SILValue nativeResult =
-          normalBB->createPHIArgument(swiftResultTy, ValueOwnershipKind::Owned);
+          normalBB->createPhiArgument(swiftResultTy, ValueOwnershipKind::Owned);
 
       if (substConv.hasIndirectSILResults()) {
         assert(substTy->getNumResults() == 1);
@@ -1548,7 +1548,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     // Emit the error destination.
     {
       B.emitBlock(errorBB);
-      SILValue nativeError = errorBB->createPHIArgument(
+      SILValue nativeError = errorBB->createPhiArgument(
           substConv.getSILErrorType(), ValueOwnershipKind::Owned);
 
       // In this branch, the eventual return value is mostly invented.
@@ -1561,7 +1561,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
 
     // Emit the join block.
     B.emitBlock(contBB);
-    result = contBB->createPHIArgument(objcResultTy, ValueOwnershipKind::Owned);
+    result = contBB->createPhiArgument(objcResultTy, ValueOwnershipKind::Owned);
 
     // Leave the scope now.
     argScope.pop();

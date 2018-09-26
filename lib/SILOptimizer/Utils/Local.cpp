@@ -542,7 +542,7 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
     auto *CurBB = B->getInsertionPoint()->getParent();
 
     auto *ContBB = CurBB->split(B->getInsertionPoint());
-    ContBB->createPHIArgument(DestTy, ValueOwnershipKind::Owned);
+    ContBB->createPhiArgument(DestTy, ValueOwnershipKind::Owned);
 
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> CaseBBs;
     CaseBBs.push_back(std::make_pair(SomeDecl, SomeBB));

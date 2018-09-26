@@ -773,7 +773,7 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
       Arg = CurrentBB->createFunctionArgument(SILArgTy);
     } else {
       auto OwnershipKind = ValueOwnershipKind((Args[I + 1] >> 8) & 0xF);
-      Arg = CurrentBB->createPHIArgument(SILArgTy, OwnershipKind);
+      Arg = CurrentBB->createPhiArgument(SILArgTy, OwnershipKind);
     }
     LastValueID = LastValueID + 1;
     setLocalValue(Arg, LastValueID);

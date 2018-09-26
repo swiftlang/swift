@@ -191,8 +191,8 @@ public:
                                              ManagedValue originalValue);
 #include "swift/AST/ReferenceStorage.def"
 
-  ManagedValue createOwnedPHIArgument(SILType type);
-  ManagedValue createGuaranteedPHIArgument(SILType type);
+  ManagedValue createOwnedPhiArgument(SILType type);
+  ManagedValue createGuaranteedPhiArgument(SILType type);
 
   using SILBuilder::createMarkUninitialized;
   ManagedValue createMarkUninitialized(ValueDecl *decl, ManagedValue operand,

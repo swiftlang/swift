@@ -148,7 +148,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
       // from ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
       if (isConditional) {
         SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-        CastSuccessBB->createPHIArgument(SILBridgedTy,
+        CastSuccessBB->createPhiArgument(SILBridgedTy,
                                          ValueOwnershipKind::Owned);
         Builder.createBranch(Loc, CastSuccessBB, SILValue(Load));
         Builder.setInsertionPoint(CastSuccessBB);
@@ -158,7 +158,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
       }
     } else if (isConditional) {
       SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-      CastSuccessBB->createPHIArgument(SILBridgedTy, ValueOwnershipKind::Owned);
+      CastSuccessBB->createPhiArgument(SILBridgedTy, ValueOwnershipKind::Owned);
       auto *CCBI = Builder.createCheckedCastBranch(Loc, false, Load,
                                       SILBridgedTy, CastSuccessBB, ConvFailBB);
       NewI = CCBI;
@@ -564,7 +564,7 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
         // In case of a conditional cast, we should handle it gracefully.
         auto CondBrSuccessBB =
             NewAI->getFunction()->createBasicBlockAfter(NewAI->getParent());
-        CondBrSuccessBB->createPHIArgument(DestTy, ValueOwnershipKind::Owned,
+        CondBrSuccessBB->createPhiArgument(DestTy, ValueOwnershipKind::Owned,
                                            nullptr);
         Builder.createCheckedCastBranch(Loc, /* isExact*/ false, NewAI, DestTy,
                                         CondBrSuccessBB, FailureBB);
@@ -1057,7 +1057,7 @@ SILInstruction *CastOptimizer::optimizeCheckedCastAddrBranchInst(
               Loc, false /*isExact*/, MI, Dest->getType().getObjectType(),
               SuccessBB, FailureBB, Inst->getTrueBBCount(),
               Inst->getFalseBBCount());
-          SuccessBB->createPHIArgument(Dest->getType().getObjectType(),
+          SuccessBB->createPhiArgument(Dest->getType().getObjectType(),
                                        ValueOwnershipKind::Owned);
           B.setInsertionPoint(SuccessBB->begin());
           // Store the result
