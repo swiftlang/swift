@@ -118,6 +118,29 @@ void ConditionalSESERegion::print(llvm::raw_ostream &OS, unsigned indent) const 
 // CFG Canonicalization Implementation
 //===----------------------------------------------------------------------===//
 
+// Our partitioning and other transformations can leave around lots of
+// unconditional branches between blocks that formerly had control edges.  Go
+// through and merge those to make later passes simpler.
+bool tf::contractUncondBranches(SILFunction *fn, DominanceInfo* DI, SILLoopInfo *LI) {
+  bool changed = false;
+  // Iterate carefully to avoid invalidating iterators: we mutate the block list
+  // while we walk it.
+  for (auto bbi = fn->begin(), e = fn->end(); bbi != e;) {
+    auto *bb = &*bbi;
+    if (mergeBasicBlockWithSuccessor(bb, DI, LI)) {
+      // The block was merged with this successor. Therefore, revisit this node:
+      // we have new successor(s) and may need to contract them as well.  Also,
+      // bbi may be invalidated at this point.
+      changed = true;
+      bbi = SILFunction::iterator(bb);
+    } else {
+      // Move to the next block if this was not merged.
+      ++bbi;
+    }
+  }
+  return changed;
+}
+
 namespace {
   class SESERegionBuilder {
     DominanceInfo DI;
@@ -1156,8 +1179,8 @@ namespace {
     /// The entry point to the transformation.
     void run() override {
       auto fn = getFunction();
+      contractUncondBranches(fn, /*DI*/nullptr, /*LI*/ nullptr);
       auto region = canonicalizeCFGForXLA(fn);
-
       llvm::outs() << "--- XLA CFG Canonicalize: " << fn->getName() << "\n";
       region->print(llvm::outs());
       llvm::outs() << "\n--- XLA CFG Canonicalize end\n";
