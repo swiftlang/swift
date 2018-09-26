@@ -287,6 +287,39 @@ public:
   TypeInfo _getTypeByMangledName(StringRef typeName,
                                  SubstGenericParameterFn substGenericParam);
 
+  /// Function object that produces substitutions for the generic parameters
+  /// that occur within a mangled name, using the complete set of generic
+  /// arguments "as written".
+  ///
+  /// Use with \c _getTypeByMangledName to decode potentially-generic types.
+  class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromWrittenArgs {
+    /// The complete set of generic arguments.
+    const std::vector<const Metadata *> &allGenericArgs;
+
+    /// The counts of generic parameters at each level.
+    const std::vector<unsigned> &genericParamCounts;
+
+  public:
+    /// Initialize a new function object to handle substitutions. Both
+    /// parameters are references to vectors that must live longer than
+    /// this function object.
+    ///
+    /// \param allGenericArgs The complete set of generic arguments, as written.
+    /// This could come directly from "source" (where all generic arguments are
+    /// encoded) or from metadata via gatherWrittenGenericArgs().
+    ///
+    /// \param genericParamCounts The count of generic parameters at each
+    /// generic level, typically gathered by _gatherGenericParameterCounts.
+    explicit SubstGenericParametersFromWrittenArgs(
+        const std::vector<const Metadata *> &allGenericArgs,
+        const std::vector<unsigned> &genericParamCounts)
+      : allGenericArgs(allGenericArgs), genericParamCounts(genericParamCounts) {
+    }
+
+    const Metadata *operator()(unsigned flatIndex) const;
+    const Metadata *operator()(unsigned depth, unsigned index) const;
+  };
+
   /// Gather generic parameter counts from a context descriptor.
   ///
   /// \returns true if the innermost descriptor is generic.

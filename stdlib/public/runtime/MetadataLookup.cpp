@@ -1373,6 +1373,26 @@ SubstGenericParametersFromMetadata::operator()(
   return base->getGenericArgs()[flatIndex];
 }
 
+const Metadata *SubstGenericParametersFromWrittenArgs::operator()(
+                                                    unsigned flatIndex) const {
+  if (flatIndex < allGenericArgs.size())
+    return allGenericArgs[flatIndex];
+
+  return nullptr;
+}
+
+const Metadata *SubstGenericParametersFromWrittenArgs::operator()(
+                                                        unsigned depth,
+                                                        unsigned index) const {
+  if (auto flatIndex =
+          _depthIndexToFlatIndex(depth, index, genericParamCounts)) {
+    if (*flatIndex < allGenericArgs.size())
+      return allGenericArgs[*flatIndex];
+  }
+
+  return nullptr;
+}
+
 void swift::gatherWrittenGenericArgs(
                              const Metadata *metadata,
                              const TypeContextDescriptor *description,
@@ -1448,17 +1468,10 @@ void swift::gatherWrittenGenericArgs(
     unsigned lhsFlatIndex = req.Param.getRootParamIndex();
     if (!allGenericArgs[lhsFlatIndex]) {
       // Substitute into the right-hand side.
-      auto genericArg =
-          _getTypeByMangledName(req.getMangledTypeName(),
-                                [&](unsigned depth, unsigned index) {
-            if (auto flatIndex = _depthIndexToFlatIndex(depth, index,
-                                                        genericParamCounts))
-              return allGenericArgs[*flatIndex];
-
-            return (const Metadata *)nullptr;
-          });
-
-      allGenericArgs[lhsFlatIndex] = genericArg;
+      SubstGenericParametersFromWrittenArgs substitutions(allGenericArgs,
+                                                          genericParamCounts);
+      allGenericArgs[lhsFlatIndex] =
+          _getTypeByMangledName(req.getMangledTypeName(), substitutions);
       continue;
     }
 
