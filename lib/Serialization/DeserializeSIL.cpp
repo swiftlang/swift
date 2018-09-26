@@ -430,8 +430,9 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     break;
     
   case SILStage::Lowered:
-    llvm_unreachable("cannot deserialize into a module that has entered "
-                     "Lowered stage");
+    if (!declarationOnly)
+      llvm_unreachable("cannot deserialize into a module that has entered "
+                       "Lowered stage");
   }
   
   if (FID == 0)
