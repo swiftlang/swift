@@ -320,6 +320,14 @@ LogicalPathComponent::projectForRead(SILGenFunction &SGF, SILLocation loc,
   TemporaryInitializationPtr tempInit;
   RValue rvalue;
 
+  // If the access doesn't require us to make an owned address, don't
+  // force a materialization.
+  if (accessKind != SGFAccessKind::OwnedAddressRead &&
+      accessKind != SGFAccessKind::BorrowedAddressRead) {
+    auto rvalue = std::move(*this).get(SGF, loc, base, SGFContext());
+    return std::move(rvalue).getAsSingleValue(SGF, loc);
+  }
+
   // If the RValue type has an openedExistential, then the RValue must be
   // materialized before allocating a temporary for the RValue type. In that
   // case, the RValue cannot be emitted directly into the temporary.
@@ -744,6 +752,10 @@ namespace {
     ManagedValue project(SILGenFunction &SGF, SILLocation loc,
                          ManagedValue base) && override {
       assert(base && "invalid value for element base");
+      if (base.getType().isObject()) {
+        return SGF.B.createTupleExtract(loc, base, ElementIndex);
+      }
+
       // TODO: if the base is +1, break apart its cleanup.
       auto Res = SGF.B.createTupleElementAddr(loc, base.getValue(),
                                               ElementIndex,
@@ -770,6 +782,10 @@ namespace {
     ManagedValue project(SILGenFunction &SGF, SILLocation loc,
                          ManagedValue base) && override {
       assert(base && "invalid value for element base");
+      if (base.getType().isObject()) {
+        return SGF.B.createStructExtract(loc, base, Field);
+      }
+
       // TODO: if the base is +1, break apart its cleanup.
       auto Res = SGF.B.createStructElementAddr(loc, base.getValue(),
                                                Field, SubstFieldType);
@@ -831,9 +847,14 @@ namespace {
           getOpenedExistentialAccessFor(getFormalAccessKind(getAccessKind())));
         break;
       case ExistentialRepresentation::Boxed: {
-        auto &TL = SGF.getTypeLowering(base.getType());
-        auto error = SGF.emitLoad(loc, base.getValue(), TL,
-                                  SGFContext(), IsNotTake);
+        ManagedValue error;
+        if (base.getType().isObject()) {
+          error = base;
+        } else {
+          auto &TL = SGF.getTypeLowering(base.getType());
+          error = SGF.emitLoad(loc, base.getValue(), TL,
+                               SGFContext(), IsNotTake);
+        }
         addr = SGF.B.createOpenExistentialBox(
           loc, error.getValue(), getTypeOfRValue().getAddressType());
         break;
@@ -3710,12 +3731,18 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
 
   // If the last component is physical, drill down and load from it.
   if (component.isPhysical()) {
-    addr = std::move(component).project(*this, loc, addr);
-    return RValue(*this, loc, substFormalType,
-                  emitLoad(loc, addr.getValue(),
-                           origFormalType, substFormalType,
-                           rvalueTL, C, IsNotTake,
-                           isBaseGuaranteed));
+    auto projection = std::move(component).project(*this, loc, addr);
+    if (projection.getType().isAddress()) {
+      projection = emitLoad(loc, projection.getValue(),
+                            origFormalType, substFormalType,
+                            rvalueTL, C, IsNotTake,
+                            isBaseGuaranteed);
+    } else if (isReadAccessResultOwned(src.getAccessKind()) &&
+               !projection.isPlusOne(*this)) {
+      projection = projection.copy(*this, loc);
+    }
+
+    return RValue(*this, loc, substFormalType, projection);
   }
 
   // If the last component is logical, emit a get.
@@ -3849,6 +3876,7 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
   if (component.isPhysical()) {
     auto finalDestAddr =
       std::move(component).project(*this, loc, destAddr);
+    assert(finalDestAddr.getType().isAddress());
 
     auto value = std::move(src).getAsRValue(*this).ensurePlusOne(*this, loc);
     std::move(value).assignInto(*this, loc, finalDestAddr.getValue());

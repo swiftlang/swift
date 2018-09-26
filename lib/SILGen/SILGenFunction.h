@@ -166,6 +166,12 @@ static inline bool isReadAccess(SGFAccessKind kind) {
   return uint8_t(kind) <= uint8_t(SGFAccessKind::OwnedObjectRead);
 }
 
+/// Given a read access kind, does it require an owned result?
+static inline bool isReadAccessResultOwned(SGFAccessKind kind) {
+  assert(isReadAccess(kind));
+  return uint8_t(kind) >= uint8_t(SGFAccessKind::OwnedAddressRead);
+}
+
 /// Return an address-preferring version of the given access kind.
 static inline SGFAccessKind getAddressAccessKind(SGFAccessKind kind) {
   switch (kind) {
