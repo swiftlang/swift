@@ -460,12 +460,12 @@ public:
 };
 
 class SDKNodeDeclVar : public SDKNodeDecl {
-  Optional<unsigned> FixedBinaryOrder;
+  Optional<uint8_t> FixedBinaryOrder;
 public:
   SDKNodeDeclVar(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
   bool hasFixedBinaryOrder() const { return FixedBinaryOrder.hasValue(); }
-  unsigned getFixedBinaryOrder() const { return *FixedBinaryOrder; }
+  uint8_t getFixedBinaryOrder() const { return *FixedBinaryOrder; }
   SDKNodeDeclGetter *getGetter() const;
   SDKNodeDeclSetter *getSetter() const;
   SDKNodeType *getType() const;

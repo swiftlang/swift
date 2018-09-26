@@ -29,31 +29,20 @@ static StringRef getAttrName(DeclAttrKind Kind) {
 
 struct swift::ide::api::SDKNodeInitInfo {
   SDKContext &Ctx;
-  StringRef Name;
-  StringRef PrintedName;
   DeclKind DKind;
-  StringRef USR;
-  StringRef Location;
-  StringRef ModuleName;
-  bool IsImplicit = false;
-  bool IsThrowing = false;
-  bool IsMutating = false;
-  bool IsStatic = false;
-  bool IsDeprecated = false;
-  bool IsProtocolReq = false;
-  bool IsOverriding = false;
-  Optional<uint8_t> SelfIndex;
-  Optional<unsigned> FixedBinaryOrder;
+
+#define KEY_STRING(X, Y) StringRef X;
+#include "swift/IDE/DigesterEnums.def"
+#define KEY_BOOL(X, Y) bool X = false;
+#include "swift/IDE/DigesterEnums.def"
+#define KEY_UINT(X, Y) Optional<uint8_t> X;
+#include "swift/IDE/DigesterEnums.def"
+#define KEY_STRING_ARR(X, Y) std::vector<StringRef> X;
+#include "swift/IDE/DigesterEnums.def"
+
   ReferenceOwnership ReferenceOwnership = ReferenceOwnership::Strong;
   std::vector<DeclAttrKind> DeclAttrs;
   std::vector<TypeAttrKind> TypeAttrs;
-  std::vector<StringRef> ConformingProtocols;
-  StringRef SuperclassUsr;
-  std::vector<StringRef> SuperclassNames;
-  StringRef EnumRawTypeName;
-  bool hasDefaultArgument = false;
-  StringRef GenericSig;
-  bool HasSetter = false;
 
   SDKNodeInitInfo(SDKContext &Ctx) : Ctx(Ctx) {}
   SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD);
@@ -79,7 +68,7 @@ SDKNode::SDKNode(SDKNodeInitInfo Info, SDKNodeKind Kind): Ctx(Info.Ctx),
 SDKNodeRoot::SDKNodeRoot(SDKNodeInitInfo Info): SDKNode(Info, SDKNodeKind::Root) {}
 
 SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
-      : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.USR),
+      : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.Usr),
         Location(Info.Location), ModuleName(Info.ModuleName),
         DeclAttributes(Info.DeclAttrs), IsImplicit(Info.IsImplicit),
         IsStatic(Info.IsStatic), IsDeprecated(Info.IsDeprecated),
@@ -90,10 +79,10 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
 
 SDKNodeType::SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind):
   SDKNode(Info, Kind), TypeAttributes(Info.TypeAttrs),
-  HasDefaultArg(Info.hasDefaultArgument) {}
+  HasDefaultArg(Info.HasDefaultArg) {}
 
 SDKNodeTypeNominal::SDKNodeTypeNominal(SDKNodeInitInfo Info):
-  SDKNodeType(Info, SDKNodeKind::TypeNominal), USR(Info.USR) {}
+  SDKNodeType(Info, SDKNodeKind::TypeNominal), USR(Info.Usr) {}
 
 SDKNodeTypeFunc::SDKNodeTypeFunc(SDKNodeInitInfo Info):
   SDKNodeType(Info, SDKNodeKind::TypeFunc) {}
@@ -529,86 +518,28 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
                        GetScalarString(Pair.getValue()));
         }
         break;
-      case KeyKind::KK_name:
-        Info.Name = GetScalarString(Pair.getValue());
-        break;
-      case KeyKind::KK_selfIndex:
-        Info.SelfIndex = getAsInt(Pair.getValue());
-        break;
-      case KeyKind::KK_fixedbinaryorder:
-        Info.FixedBinaryOrder = getAsInt(Pair.getValue());
-        break;
-      case KeyKind::KK_usr:
-        Info.USR = GetScalarString(Pair.getValue());
-        break;
-
-      case KeyKind::KK_location:
-        Info.Location = GetScalarString(Pair.getValue());
-        break;
+#define KEY_UINT(X, Y)                                                        \
+        case KeyKind::KK_##Y: Info.X = getAsInt(Pair.getValue()); break;
+#include "swift/IDE/DigesterEnums.def"
+#define KEY_STRING(X, Y)                                                      \
+  case KeyKind::KK_##Y: Info.X = GetScalarString(Pair.getValue()); break;
+#include "swift/IDE/DigesterEnums.def"
+#define KEY_BOOL(X, Y) case KeyKind::KK_##Y: Info.X = true; break;
+#include "swift/IDE/DigesterEnums.def"
       case KeyKind::KK_children:
         for (auto &Mapping : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
           Children.push_back(constructSDKNode(Ctx,
                                         cast<llvm::yaml::MappingNode>(&Mapping)));
         }
         break;
-      case KeyKind::KK_conformingProtocols: {
-        assert(Info.ConformingProtocols.empty());
-        for (auto &Name : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
-          Info.ConformingProtocols.push_back(GetScalarString(&Name));
-        }
+#define KEY_STRING_ARR(X, Y)                                                  \
+      case KeyKind::KK_##Y:                                                   \
+        assert(Info.X.empty());                                               \
+        for (auto &Name : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) { \
+          Info.X.push_back(GetScalarString(&Name));                           \
+        }                                                                     \
         break;
-      }
-      case KeyKind::KK_enumRawTypeName: {
-        assert(Info.DKind == DeclKind::Enum);
-        Info.EnumRawTypeName = GetScalarString(Pair.getValue());
-        break;
-      }
-      case KeyKind::KK_printedName:
-        Info.PrintedName = GetScalarString(Pair.getValue());
-        break;
-      case KeyKind::KK_moduleName:
-        Info.ModuleName = GetScalarString(Pair.getValue());
-        break;
-      case KeyKind::KK_superclassUsr:
-        Info.SuperclassUsr = GetScalarString(Pair.getValue());
-        break;
-      case KeyKind::KK_superclassNames:
-        assert(Info.SuperclassNames.empty());
-        for (auto &Name : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
-          Info.SuperclassNames.push_back(GetScalarString(&Name));
-        }
-        break;
-        break;
-      case KeyKind::KK_genericSig:
-        Info.GenericSig = GetScalarString(Pair.getValue());
-        break;
-      case KeyKind::KK_throwing:
-        Info.IsThrowing = true;
-        break;
-      case KeyKind::KK_mutating:
-        Info.IsMutating = true;
-        break;
-      case KeyKind::KK_hasDefaultArg:
-        Info.hasDefaultArgument = true;
-        break;
-      case KeyKind::KK_static:
-        Info.IsStatic = true;
-        break;
-      case KeyKind::KK_deprecated:
-        Info.IsDeprecated = true;
-        break;
-      case KeyKind::KK_overriding:
-        Info.IsOverriding = true;
-        break;
-      case KeyKind::KK_protocolReq:
-        Info.IsProtocolReq = true;
-        break;
-      case KeyKind::KK_implicit:
-        Info.IsImplicit = true;
-        break;
-      case KeyKind::KK_hasSetter:
-        Info.HasSetter = true;
-        break;
+#include "swift/IDE/DigesterEnums.def"
       case KeyKind::KK_ownership:
         Info.ReferenceOwnership =
             swift::ReferenceOwnership(getAsInt(Pair.getValue()));
@@ -1015,7 +946,7 @@ static StringRef printGenericSignature(SDKContext &Ctx, ValueDecl *VD) {
   return StringRef();
 }
 
-static Optional<unsigned> getFixedBinaryOrder(ValueDecl *VD) {
+static Optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) {
   auto D = VD->getDeclContext()->getAsDecl();
   if (!D)
     return None;
@@ -1053,30 +984,30 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty,
                                  bool hasDefaultArgument = false) :
     Ctx(Ctx), Name(getTypeName(Ctx, Ty, IsImplicitlyUnwrappedOptional)),
     PrintedName(getPrintedName(Ctx, Ty, IsImplicitlyUnwrappedOptional)),
-    hasDefaultArgument(hasDefaultArgument) {
+    HasDefaultArg(hasDefaultArgument) {
   if (isFunctionTypeNoEscape(Ty))
     TypeAttrs.push_back(TypeAttrKind::TAK_noescape);
   // If this is a nominal type, get its Usr.
   if (auto *ND = Ty->getAnyNominal()) {
-    USR = calculateUsr(Ctx, ND);
+    Usr = calculateUsr(Ctx, ND);
   }
 }
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
-    : Ctx(Ctx),
+    : Ctx(Ctx), DKind(VD->getKind()),
       Name(VD->hasName() ? getEscapedName(VD->getBaseName()) : Ctx.buffer("_")),
-      PrintedName(getPrintedName(Ctx, VD)), DKind(VD->getKind()),
-      USR(calculateUsr(Ctx, VD)), Location(calculateLocation(Ctx, VD)),
+      PrintedName(getPrintedName(Ctx, VD)),
+      Usr(calculateUsr(Ctx, VD)), Location(calculateLocation(Ctx, VD)),
       ModuleName(VD->getModuleContext()->getName().str()),
+      GenericSig(printGenericSignature(Ctx, VD)),
       IsImplicit(VD->isImplicit()),
       IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
       IsStatic(VD->isStatic()),
       IsDeprecated(VD->getAttrs().getDeprecated(VD->getASTContext())),
-      IsProtocolReq(isa<ProtocolDecl>(VD->getDeclContext()) && VD->isProtocolRequirement()),
       IsOverriding(VD->getOverriddenDecl()),
+      IsProtocolReq(isa<ProtocolDecl>(VD->getDeclContext()) && VD->isProtocolRequirement()),
       SelfIndex(getSelfIndex(VD)), FixedBinaryOrder(getFixedBinaryOrder(VD)),
-      ReferenceOwnership(getReferenceOwnership(VD)),
-      GenericSig(printGenericSignature(Ctx, VD)) {
+      ReferenceOwnership(getReferenceOwnership(VD)) {
 
   // Calculate usr for its super class.
   if (auto *CD = dyn_cast_or_null<ClassDecl>(VD)) {
