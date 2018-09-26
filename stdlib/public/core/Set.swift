@@ -1429,7 +1429,7 @@ extension Set.Index: Hashable {
       hasher.combine(cocoaIndex.currentKeyIndex)
     }
   #else
-    hasher.combine(_asNative.bucket)
+    hasher.combine(_asNative.bucket.offset)
   #endif
   }
 }
