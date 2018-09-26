@@ -3349,13 +3349,13 @@ class DisjunctionChoice {
   unsigned Index;
   Constraint *Choice;
   bool ExplicitConversion;
-  bool IsEndOfPartition;
+  bool IsEndOfDisjunctionPartition;
 
 public:
   DisjunctionChoice(unsigned index, Constraint *choice, bool explicitConversion,
-                    bool isEndOfPartition)
+                    bool isEndOfDisjunctionPartition)
       : Index(index), Choice(choice), ExplicitConversion(explicitConversion),
-        IsEndOfPartition(isEndOfPartition) {}
+        IsEndOfDisjunctionPartition(isEndOfDisjunctionPartition) {}
 
   unsigned getIndex() const { return Index; }
 
@@ -3369,7 +3369,9 @@ public:
     return false;
   }
 
-  bool isEndOfPartition() const { return IsEndOfPartition; }
+  bool isEndOfDisjunctionPartition() const {
+    return IsEndOfDisjunctionPartition;
+  }
 
   // FIXME: Both of the accessors below are required to support
   //        performance optimization hacks in constraint solver.
@@ -3449,7 +3451,10 @@ public:
 
   /// Check whether generator would have to compute next
   /// batch of bindings because it freshly ran out of current one.
-  virtual bool isEndOfPartition() const = 0;
+  /// This is useful to be able to exhaustively attempt bindings
+  /// for type variables found at one level, before proceeding to
+  /// supertypes or literal defaults etc.
+  virtual bool needsToComputeNext() const { return false; }
 };
 
 class TypeVarBindingProducer : public BindingProducer<TypeVariableBinding> {
@@ -3480,16 +3485,13 @@ public:
     // Once we reach the end of the current bindings
     // let's try to compute new ones, e.g. supertypes,
     // literal defaults, if that fails, we are done.
-    if (isEndOfPartition() && !computeNext())
+    if (needsToComputeNext() && !computeNext())
       return None;
 
     return TypeVariableBinding(TypeVar, Bindings[Index++]);
   }
 
-  /// This is useful to be able to exhaustively attempt bindings
-  /// for type variables found at one level, before proceeding to
-  /// supertypes or literal defaults etc.
-  bool isEndOfPartition() const override { return Index >= Bindings.size(); }
+  bool needsToComputeNext() const override { return Index >= Bindings.size(); }
 
 private:
   /// Compute next batch of bindings if possible, this could
@@ -3556,25 +3558,24 @@ public:
     partitionDisjunction();
   }
 
-  bool isEndOfPartition() const override {
-    return PartitionEnd[PartitionIndex] == Index;
-  }
-
   Optional<Element> operator()() override {
     unsigned currIndex = Index;
     if (currIndex >= Choices.size())
       return None;
 
-    if (isEndOfPartition()) {
-      ++PartitionIndex;
-      assert(PartitionIndex < PartitionEnd.size());
-      assert(Index < PartitionEnd[PartitionIndex]);
-    }
-
     ++Index;
 
+    bool endOfPartition = false;
+
+    if (PartitionEnd[PartitionIndex] == Index) {
+      endOfPartition = true;
+      ++PartitionIndex;
+      assert(PartitionIndex >= PartitionEnd.size() ||
+             Index < PartitionEnd[PartitionIndex]);
+    }
+
     return DisjunctionChoice(currIndex, Choices[Ordering[currIndex]],
-                             IsExplicitConversion, isEndOfPartition());
+                             IsExplicitConversion, endOfPartition);
   }
 
   // Partition the choices in the disjunction into groups that we will

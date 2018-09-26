@@ -479,15 +479,9 @@ protected:
   /// Check whether attempting binding choices should be stopped,
   /// after current choice has been attempted, because optimal
   /// solution has already been found,
-  bool shouldStopAfter(const typename P::Element &choice) const {
-    // If there has been at least one solution so far
-    // at a current batch of bindings is done it's a
-    // success because each new batch would be less
-    // and less precise.
-    return AnySolved && isEndOfPartition();
-  }
+  virtual bool shouldStopAfter(const typename P::Element &choice) const = 0;
 
-  bool isEndOfPartition() const { return Producer.isEndOfPartition(); }
+  bool needsToComputeNext() const { return Producer.needsToComputeNext(); }
 
   ConstraintLocator *getLocator() const { return Producer.getLocator(); }
 };
@@ -539,6 +533,14 @@ protected:
     // default literals, don't bother looking at default literals.
     return AnySolved && choice.hasDefaultedProtocol() &&
            !SawFirstLiteralConstraint;
+  }
+
+  bool shouldStopAfter(const TypeVariableBinding &choice) const override {
+    // If there has been at least one solution so far
+    // at a current batch of bindings is done it's a
+    // success because each new batch would be less
+    // and less precise.
+    return AnySolved && needsToComputeNext();
   }
 };
 
@@ -593,6 +595,10 @@ private:
   bool shouldStopAt(const DisjunctionChoice &choice) const override;
   bool shortCircuitDisjunctionAt(Constraint *currentChoice,
                                  Constraint *lastSuccessfulChoice) const;
+
+  bool shouldStopAfter(const DisjunctionChoice &choice) const override {
+    return AnySolved && choice.isEndOfDisjunctionPartition();
+  }
 
   /// Attempt to apply given disjunction choice to constraint system.
   /// This action is going to establish "active choice" of this disjunction
