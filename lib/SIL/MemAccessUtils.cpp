@@ -210,7 +210,7 @@ static bool isUnsafePointerExtraction(StructExtractInst *SEI) {
 // projected from a switch_enum. This is a valid pattern at any SIL stage
 // resulting in a block-type phi. In later SIL stages, the optimizer may form
 // address-type phis, causing this assert if called on those cases.
-static void checkSwitchEnumBlockArg(SILPHIArgument *arg) {
+static void checkSwitchEnumBlockArg(SILPhiArgument *arg) {
   assert(!arg->getType().isAddress());
   SILBasicBlock *Pred = arg->getParent()->getSinglePredecessorBlock();
   if (!Pred || !isa<SwitchEnumInst>(Pred->getTerminator())) {
@@ -289,11 +289,11 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
 
     // A block argument may be a box value projected out of
     // switch_enum. Address-type block arguments are not allowed.
-    case ValueKind::SILPHIArgument:
+    case ValueKind::SILPhiArgument:
       if (address->getType().isAddress())
         return AccessedStorage();
 
-      checkSwitchEnumBlockArg(cast<SILPHIArgument>(address));
+      checkSwitchEnumBlockArg(cast<SILPhiArgument>(address));
       return AccessedStorage(address, AccessedStorage::Unidentified);
 
     // Load a box from an indirect payload of an opaque enum.
@@ -471,8 +471,8 @@ bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
     if (isAddressForLocalInitOnly(storage.getValue()))
       return false;
 
-    if (isa<SILPHIArgument>(storage.getValue())) {
-      checkSwitchEnumBlockArg(cast<SILPHIArgument>(storage.getValue()));
+    if (isa<SILPhiArgument>(storage.getValue())) {
+      checkSwitchEnumBlockArg(cast<SILPhiArgument>(storage.getValue()));
       return false;
     }
     // Pointer-to-address exclusivity cannot be enforced. `baseAddress` may be

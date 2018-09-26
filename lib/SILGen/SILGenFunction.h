@@ -1276,7 +1276,7 @@ public:
                                                     SILValue borrowedValue);
   ManagedValue emitManagedBorrowedRValueWithCleanup(
       SILValue original, SILValue borrowedValue, const TypeLowering &lowering);
-  ManagedValue emitManagedBorrowedArgumentWithCleanup(SILPHIArgument *arg);
+  ManagedValue emitManagedBorrowedArgumentWithCleanup(SILPhiArgument *arg);
   ManagedValue emitFormalEvaluationManagedBorrowedRValueWithCleanup(
       SILLocation loc, SILValue original, SILValue borrowedValue);
   ManagedValue emitFormalEvaluationManagedBorrowedRValueWithCleanup(

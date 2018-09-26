@@ -1676,7 +1676,7 @@ static void emitRawApply(SILGenFunction &SGF,
   } else {
     SILBasicBlock *normalBB = SGF.createBasicBlock();
     auto result =
-      normalBB->createPHIArgument(resultType, ValueOwnershipKind::Owned);
+      normalBB->createPhiArgument(resultType, ValueOwnershipKind::Owned);
     rawResults.push_back(result);
 
     SILBasicBlock *errorBB =
@@ -4742,7 +4742,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   // Emit the rethrow logic.
   {
     B.emitBlock(errorBB);
-    SILValue error = errorBB->createPHIArgument(fnConv.getSILErrorType(),
+    SILValue error = errorBB->createPhiArgument(fnConv.getSILErrorType(),
                                                 ValueOwnershipKind::Owned);
 
     B.createBuiltin(loc, SGM.getASTContext().getIdentifier("willThrow"),
@@ -4754,7 +4754,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
 
   // Enter the normal path.
   B.emitBlock(normalBB);
-  return normalBB->createPHIArgument(resultType, ValueOwnershipKind::Owned);
+  return normalBB->createPhiArgument(resultType, ValueOwnershipKind::Owned);
 }
 
 SILValue SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
@@ -5936,7 +5936,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
 
     auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
                                                        memberFnTy);
-    SILValue memberArg = hasMemberBB->createPHIArgument(
+    SILValue memberArg = hasMemberBB->createPhiArgument(
         loweredMethodTy, ValueOwnershipKind::Owned);
 
     // Create the result value.
@@ -6033,7 +6033,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     auto functionTy = CanFunctionType::get({baseArg}, methodTy);
     auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
                                                        functionTy);
-    SILValue memberArg = hasMemberBB->createPHIArgument(
+    SILValue memberArg = hasMemberBB->createPhiArgument(
         loweredMethodTy, ValueOwnershipKind::Owned);
     // Emit the application of 'self'.
     Scope applyScope(Cleanups, CleanupLocation(e));

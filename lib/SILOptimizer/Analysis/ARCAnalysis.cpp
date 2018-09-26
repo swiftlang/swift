@@ -662,7 +662,7 @@ findMatchingRetains(SILBasicBlock *BB) {
 
       // If this is a SILArgument of current basic block, we can split it up to
       // values in the predecessors.
-      auto *SA = dyn_cast<SILPHIArgument>(R.second);
+      auto *SA = dyn_cast<SILPhiArgument>(R.second);
       if (SA && SA->getParent() != R.first)
         SA = nullptr;
 

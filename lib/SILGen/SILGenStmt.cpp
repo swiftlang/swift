@@ -177,7 +177,7 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
   SILBasicBlock *ContBB = createBasicBlock();
 
   for (SILType argTy : contArgs) {
-    ContBB->createPHIArgument(argTy, ValueOwnershipKind::Owned);
+    ContBB->createPhiArgument(argTy, ValueOwnershipKind::Owned);
   }
   
   SILBasicBlock *FalseBB, *FalseDestBB;
@@ -685,7 +685,7 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   // Create the throw destination at the end of the function.
   JumpDest throwDest = createJumpDest(S->getBody(),
                                       FunctionSection::Postmatter);
-  SILArgument *exnArg = throwDest.getBlock()->createPHIArgument(
+  SILArgument *exnArg = throwDest.getBlock()->createPhiArgument(
       exnTL.getLoweredType(), ValueOwnershipKind::Owned);
 
   // We always need a continuation block because we might fall out of
@@ -991,7 +991,7 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
   // For now, don't try to re-use destination blocks for multiple
   // failure sites.
   SILBasicBlock *destBB = createBasicBlock(FunctionSection::Postmatter);
-  SILValue exn = destBB->createPHIArgument(getSILType(exnResult),
+  SILValue exn = destBB->createPhiArgument(getSILType(exnResult),
                                            ValueOwnershipKind::Owned);
 
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());
