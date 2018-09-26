@@ -88,7 +88,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
     self.endBucket = base.hashTable.endIndex
   }
 
-  private func bridgedElement(at bucket: _HashTable.Index) -> AnyObject {
+  private func bridgedElement(at bucket: _HashTable.Bucket) -> AnyObject {
     _sanityCheck(base.hashTable.isOccupied(bucket))
     if let bridgedElements = self.bridgedElements {
       return bridgedElements[bucket]
@@ -266,7 +266,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     }
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
-    var bucket = _HashTable.Index(bucket: Int(theState.extra.0))
+    var bucket = _HashTable.Bucket(bucket: Int(theState.extra.0))
     let endBucket = hashTable.endIndex
     _precondition(bucket == endBucket || hashTable.isOccupied(bucket),
       "Invalid fast enumeration state")

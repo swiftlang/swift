@@ -12,8 +12,8 @@
 
 @usableFromInline
 internal protocol _HashTableDelegate {
-  func hashValue(at index: _HashTable.Index) -> Int
-  func moveEntry(from source: _HashTable.Index, to target: _HashTable.Index)
+  func hashValue(at index: _HashTable.Bucket) -> Int
+  func moveEntry(from source: _HashTable.Bucket, to target: _HashTable.Bucket)
 }
 
 @usableFromInline
@@ -86,11 +86,14 @@ extension _HashTable {
 }
 
 extension _HashTable {
+  @usableFromInline
+  internal typealias Index = Bucket // FIXME: Remove
+
   @_fixed_layout
   @usableFromInline
-  internal struct Index {
+  internal struct Bucket {
     @usableFromInline
-    internal var bucket: Int
+    internal var bucket: Int // FIXME: Rename to offset
 
     @inlinable
     @inline(__always)
@@ -121,20 +124,62 @@ extension _HashTable {
   }
 }
 
-extension _HashTable.Index: Equatable {
+extension _HashTable.Bucket: Equatable {
   @inlinable
   @inline(__always)
   internal
-  static func == (lhs: _HashTable.Index, rhs: _HashTable.Index) -> Bool {
+  static func == (lhs: _HashTable.Bucket, rhs: _HashTable.Bucket) -> Bool {
     return lhs.bucket == rhs.bucket
   }
 }
 
-extension _HashTable.Index: Comparable {
+extension _HashTable.Bucket: Comparable {
   @inlinable
   @inline(__always)
   internal
-  static func < (lhs: _HashTable.Index, rhs: _HashTable.Index) -> Bool {
+  static func < (lhs: _HashTable.Bucket, rhs: _HashTable.Bucket) -> Bool {
+    return lhs.bucket < rhs.bucket
+  }
+}
+
+extension _HashTable {
+  @usableFromInline
+  @_fixed_layout
+  internal struct AgedIndex { // FIXME: Rename to Index
+    @usableFromInline
+    let bucket: Bucket
+
+    @usableFromInline
+    let age: Int32
+
+    @inlinable
+    internal init(bucket: Bucket, age: Int32) {
+      self.bucket = bucket
+      self.age = age
+    }
+  }
+}
+
+extension _HashTable.AgedIndex: Equatable {
+  @inlinable
+  internal static func ==(
+    lhs: _HashTable.AgedIndex,
+    rhs: _HashTable.AgedIndex
+  ) -> Bool {
+    _precondition(lhs.age == rhs.age,
+      "Can't compare indices belonging to different collections")
+    return lhs.bucket == rhs.bucket
+  }
+}
+
+extension _HashTable.AgedIndex: Comparable {
+  @inlinable
+  internal static func <(
+    lhs: _HashTable.AgedIndex,
+    rhs: _HashTable.AgedIndex
+  ) -> Bool {
+    _precondition(lhs.age == rhs.age,
+      "Can't compare indices belonging to different collections")
     return lhs.bucket < rhs.bucket
   }
 }

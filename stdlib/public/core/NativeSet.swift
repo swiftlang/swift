@@ -59,7 +59,7 @@ internal struct _NativeSet<Element: Hashable> {
 
 extension _NativeSet { // Primitive fields
   @usableFromInline
-  internal typealias Bucket = _HashTable.Index
+  internal typealias Bucket = _HashTable.Bucket
 
   @inlinable
   internal var capacity: Int {
@@ -214,47 +214,8 @@ extension _NativeSet { // ensureUnique
 
 extension _NativeSet {
   @usableFromInline
-  @_fixed_layout
-  internal struct Index {
-    @usableFromInline
-    let bucket: Bucket
+  internal typealias Index = _HashTable.AgedIndex
 
-    @usableFromInline
-    let age: Int32
-
-    @inlinable
-    internal init(bucket: Bucket, age: Int32) {
-      self.bucket = bucket
-      self.age = age
-    }
-  }
-}
-
-extension _NativeSet.Index: Equatable {
-  @inlinable
-  internal static func ==(
-    lhs: _NativeSet.Index,
-    rhs: _NativeSet.Index
-  ) -> Bool {
-    _precondition(lhs.age == rhs.age,
-      "Can't compare indices belonging to different Sets")
-    return lhs.bucket == rhs.bucket
-  }
-}
-
-extension _NativeSet.Index: Comparable {
-  @inlinable
-  internal static func <(
-    lhs: _NativeSet.Index,
-    rhs: _NativeSet.Index
-  ) -> Bool {
-    _precondition(lhs.age == rhs.age,
-      "Can't compare indices belonging to different Sets")
-    return lhs.bucket < rhs.bucket
-  }
-}
-
-extension _NativeSet {
   @inlinable
   @inline(__always)
   func validate(_ index: Index) {
