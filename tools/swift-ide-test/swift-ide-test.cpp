@@ -2433,17 +2433,10 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
       continue;
     }
 
-    auto isClangModule = [](const ModuleDecl *M) -> bool {
-      if (!M->getFiles().empty())
-        if (M->getFiles().front()->getKind() == FileUnitKind::ClangModule)
-          return true;
-      return false;
-    };
-
     SmallVector<ModuleDecl::ImportedModule, 16> scratch;
     M->forAllVisibleModules({}, [&](const ModuleDecl::ImportedModule &next) {
       llvm::outs() << next.second->getName();
-      if (isClangModule(next.second))
+      if (next.second->isClangModule())
         llvm::outs() << " (Clang)";
       llvm::outs() << ":\n";
 
@@ -2455,7 +2448,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
           llvm::outs() << "." << accessPathPiece.first;
         }
 
-        if (isClangModule(import.second))
+        if (import.second->isClangModule())
           llvm::outs() << " (Clang)";
         llvm::outs() << "\n";
       }
