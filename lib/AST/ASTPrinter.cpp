@@ -64,6 +64,13 @@ void PrintOptions::clearSynthesizedExtension() {
   TransformContext.reset();
 }
 
+static bool isPublicOrUsableFromInline(const ValueDecl *VD) {
+  AccessScope scope =
+      VD->getFormalAccessScope(/*useDC*/nullptr,
+                               /*treatUsableFromInlineAsPublic*/true);
+  return scope.isPublic();
+}
+
 static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
   auto *DC = ASD->getDeclContext()->getAsDecl();
   if (!DC) return false;
@@ -96,10 +103,7 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
     bool shouldPrint(const Decl *D, const PrintOptions &options) override {
       // Skip anything that isn't 'public' or '@usableFromInline'.
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
-        AccessScope accessScope =
-            VD->getFormalAccessScope(/*useDC*/nullptr,
-                                     /*treatUsableFromInlineAsPublic*/true);
-        if (!accessScope.isPublic()) {
+        if (!isPublicOrUsableFromInline(VD)) {
           // We do want to print private stored properties, without their
           // original names present.
           if (auto *ASD = dyn_cast<AbstractStorageDecl>(VD))
@@ -894,7 +898,7 @@ void PrintAST::printPattern(const Pattern *pattern) {
     recordDeclLoc(decl, [&]{
       if (Options.OmitNameOfInaccessibleProperties &&
           contributesToParentTypeStorage(decl) &&
-          decl->getFormalAccess() < AccessLevel::Public)
+          !isPublicOrUsableFromInline(decl))
         Printer << "_";
       else
         Printer.printName(named->getBoundName());
