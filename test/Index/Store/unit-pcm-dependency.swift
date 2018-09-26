@@ -74,6 +74,7 @@ func test() {
 // FILE2-NOT: Unit |{{.*}}ClangModuleB
 // FILE2-NOT: Record
 // FILE2: Unit | user | ClangModuleA | {{.*}}ClangModuleA-{{[A-Z0-9]*}}.pcm | ClangModuleA-{{[A-Z0-9]*}}.pcm-
+// FILE2: Record | user | {{.*}}unit-pcm-dependency.swift.tmp/s2.swift | s2.swift-
 // FILE2-NOT: Unit |{{.*}}ClangModuleB
 // FILE2-NOT: Record
 // FILE2: DEPEND END
