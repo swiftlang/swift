@@ -1,5 +1,8 @@
 #include "ctensorflow_init.h"
 
+#include "tensorflow/c/c_api.h"
+#include "tensorflow/c/c_api_experimental.h"
+#include "tensorflow/c/eager/c_api.h"
 #include "tensorflow/core/platform/init_main.h"
 
 #include <assert.h>
@@ -29,6 +32,24 @@ void InitTensorFlowRuntime(unsigned char enable_debug_logging,
   char** tmpArgv = my_argv.data();
   // Initialize GPU devices.
   tensorflow::port::InitMain(/*usage=*/nullptr, &my_argc, &tmpArgv);
+}
+
+void *swift_tfc_CreateScalarFloatTensor(int32_t val) {
+  auto *tensor =
+      TF_AllocateTensor(TF_FLOAT, /*shape.data()*/ nullptr, /*shape.size()*/ 0,
+                        TF_DataTypeSize(TF_FLOAT) * 1);
+  auto *ptr = reinterpret_cast<char *>(TF_TensorData(tensor));
+  *reinterpret_cast<float *>(ptr) = static_cast<float>(val);
+  return tensor;
+}
+
+void swift_tfc_TFE_Execute(void *op, void **retvals, int32_t *num_retvals,
+                           void *status) {
+  int int_num_retvals = *num_retvals;
+  TFE_Execute(reinterpret_cast<TFE_Op *>(op),
+              reinterpret_cast<TFE_TensorHandle **>(retvals), &int_num_retvals,
+              reinterpret_cast<TF_Status *>(status));
+  *num_retvals = int_num_retvals;
 }
 
 }  // extern "C"
