@@ -477,70 +477,15 @@ static bool isFormallyPassedIndirectly(SILModule &M,
   }
 }
 
-/// A visitor for turning formal input types into SILParameterInfos,
-/// matching the abstraction patterns of the original type.
+/// A visitor for turning formal input types into SILParameterInfos, matching
+/// the abstraction patterns of the original type.
 ///
-/// If the original abstraction pattern is fully opaque, we must
-/// pass the function's inputs as if the original type were the most
-/// general function signature (expressed entirely in type
-/// variables) which can be substituted to equal the given
-/// signature.
+/// If the original abstraction pattern is fully opaque, we must pass the
+/// function's parameters and results indirectly, as if the original type were
+/// the most general function signature (expressed entirely in generic
+/// parameters) which can be substituted to equal the given signature.
 ///
-/// The goal of the most general type is to be (1) unambiguous to
-/// compute from the substituted type and (2) the same for every
-/// possible generalization of that type.  For example, suppose we
-/// have a Vector<(Int,Int)->Bool>.  Obviously, we would prefer to
-/// store optimal function pointers directly in this array; and if
-/// all uses of it are ungeneralized, we'd get away with that.  But
-/// suppose the vector is passed to a function like this:
-///   func satisfiesAll<T>(v : Vector<(T,T)->Bool>, x : T, y : T) -> Bool
-/// That function will expect to be able to pull values out with the
-/// proper abstraction.  The only type we can possibly expect to agree
-/// upon is the most general form.
-///
-/// The precise way this works is that Vector's subscript operation
-/// (assuming that's how it's being accessed) has this signature:
-///   <X> Vector<X> -> Int -> X
-/// which 'satisfiesAll' is calling with this substitution:
-///   X := (T, T) -> Bool
-/// Since 'satisfiesAll' has a function type substituting for an
-/// unrestricted archetype, it expects the value returned to have the
-/// most general possible form 'A -> B', which it will need to
-/// de-generalize (by thunking) if it needs to pass it around as
-/// a '(T, T) -> Bool' value.
-///
-/// It is only this sort of direct substitution in types that forces
-/// the most general possible type to be selected; declarations will
-/// generally provide a target generalization level.  For example,
-/// in a Vector<IntPredicate>, where IntPredicate is a struct (not a
-/// tuple) with one field of type (Int, Int) -> Bool, all the
-/// function pointers will be stored ungeneralized.  Of course, such
-/// a vector couldn't be passed to 'satisfiesAll'.
-///
-/// For most types, the most general type is simply a fresh,
-/// unrestricted type variable.  But unmaterializable types are not
-/// valid results of substitutions, so this does not apply.  The
-/// most general form of an unmaterializable type preserves the
-/// basic structure of the unmaterializable components, replacing
-/// any materializable components with fresh type variables.
-///
-/// That is, if we have a substituted function type:
-///   (UnicodeScalar, (Int, Float), Double) -> Bool
-/// then its most general form is
-///   A -> B
-///
-/// because there is a valid substitution
-///   A := (UnicodeScalar, (Int, Float), Double)
-///   B := Bool
-///
-/// But if we have a substituted function type:
-///   (UnicodeScalar, (Int, Float), inout Double) -> Bool
-/// then its most general form is
-///   (A, B, inout C) -> D
-/// because the substitution
-///   X := (UnicodeScalar, (Int, Float), inout Double)
-/// is invalid substitution, ultimately because 'inout Double'
-/// is not materializable.
+/// See the comment in AbstractionPattern.h for details.
 class DestructureInputs {
   SILModule &M;
   const Conventions &Convs;
@@ -602,21 +547,6 @@ private:
 
     // Add any leading foreign parameters.
     maybeAddForeignParameters();
-
-    // FIXME(swift3): Remove this.
-    //
-    // If the abstraction pattern is opaque and the parameter list is a valid
-    // target for substitution, implode it into a single tuple parameter.
-    if (!hasSelf) {
-      if (origType.isTypeParameter() && !shouldExpandParams(params)) {
-        CanType ty = AnyFunctionType::composeInput(M.getASTContext(), params,
-                                                   /*canonicalVararg*/true)
-                                                     ->getCanonicalType();
-        visit(ValueOwnership::Default, /*forSelf=*/false,
-              origType, ty, silRepresentation);
-        return;
-      }
-    }
 
     // Process all the non-self parameters.
     for (unsigned i = 0; i != numNonSelfParams; ++i) {

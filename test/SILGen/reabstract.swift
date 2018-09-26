@@ -57,8 +57,8 @@ func test0() {
 // CHECK-NEXT: return
 
 // CHECK-LABEL: sil hidden @$s10reabstract10testThrowsyyypF
-// CHECK:         function_ref @$sytytIegnr_Ieg_TR
-// CHECK:         function_ref @$sytyts5Error_pIegnrzo_sAA_pIegzo_TR
+// CHECK:         function_ref @$sytIegr_Ieg_TR
+// CHECK:         function_ref @$syts5Error_pIegrzo_sAA_pIegzo_TR
 func testThrows(_ x: Any) {
   _ = x as? () -> ()
   _ = x as? () throws -> ()
