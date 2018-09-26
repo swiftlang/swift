@@ -118,8 +118,11 @@ Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
     return None;
   }
 
-  // Don't bind to a dependent member type.
-  if (type->is<DependentMemberType>()) return None;
+  // Don't bind to a dependent member type, even if it's currently
+  // wrapped in any number of optionals, because binding producer
+  // might unwrap and try to attempt it directly later.
+  if (type->lookThroughAllOptionalTypes()->is<DependentMemberType>())
+    return None;
 
   // Okay, allow the binding (with the simplified type).
   return type;
