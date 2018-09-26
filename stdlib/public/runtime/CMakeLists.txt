@@ -27,6 +27,7 @@ list(APPEND swift_runtime_compile_flags
      "-D__SWIFT_CURRENT_DYLIB=swiftCore")
 
 # SWIFT_ENABLE_TENSORFLOW
+find_package(TensorFlow REQUIRED)
 include_directories(BEFORE "${TF_INCLUDE_DIR}")
 
 set(swift_runtime_objc_sources
