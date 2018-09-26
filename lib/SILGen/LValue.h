@@ -161,6 +161,12 @@ public:
   TranslationPathComponent &asTranslation();
   const TranslationPathComponent &asTranslation() const;
 
+  /// Apply this component as a projection to the given base component,
+  /// producing something usable as the base of the next component.
+  virtual ManagedValue project(SILGenFunction &SGF,
+                               SILLocation loc,
+                               ManagedValue base) && = 0;
+
   /// Is this some form of open-existential component?
   bool isOpenExistential() const {
     return getKind() == OpenOpaqueExistentialKind ||
@@ -196,6 +202,8 @@ public:
 /// An abstract class for "physical" path components, i.e. path
 /// components that can be accessed as address manipulations.  See the
 /// comment for PathComponent for more information.
+///
+/// The only operation on this component is `project`.
 class PhysicalPathComponent : public PathComponent {
   virtual void _anchor() override;
 
@@ -204,14 +212,6 @@ protected:
     : PathComponent(typeData, Kind) {
     assert(isPhysical() && "PhysicalPathComponent Kind isn't physical");
   }
-
-public:
-  /// Derive the address of this component given the address of the base.
-  ///
-  /// \param base - always an address, but possibly an r-value
-  virtual ManagedValue offset(SILGenFunction &SGF,
-                              SILLocation loc,
-                              ManagedValue base) && = 0;
 };
 
 inline PhysicalPathComponent &PathComponent::asPhysical() {
@@ -227,18 +227,16 @@ inline const PhysicalPathComponent &PathComponent::asPhysical() const {
 /// components that require getter/setter methods to access.  See the
 /// comment for PathComponent for more information.
 class LogicalPathComponent : public PathComponent {
-  virtual void _anchor();
-
 protected:
   LogicalPathComponent(LValueTypeData typeData, KindTy Kind)
     : PathComponent(typeData, Kind) {
     assert(isLogical() && "LogicalPathComponent Kind isn't logical");
   }
 
-  /// Materialize this component into a temporary and return the temporary's
-  /// address.
-  ManagedValue materializeIntoTemporary(SILGenFunction &SGF, SILLocation loc,
-                                        ManagedValue base) &&;
+  /// Read the value of this component, producing the right kind of result
+  /// for the given access kind (which is always some kind of read access).
+  ManagedValue projectForRead(SILGenFunction &SGF, SILLocation loc,
+                              ManagedValue base, SGFAccessKind kind) &&;
 
 public:
   /// Clone the path component onto the heap.
@@ -257,6 +255,11 @@ public:
   virtual RValue get(SILGenFunction &SGF, SILLocation loc,
                      ManagedValue base, SGFContext c) && = 0;
 
+  /// The default implementation of project performs a get or materializes
+  /// to a temporary as necessary.
+  ManagedValue project(SILGenFunction &SGF, SILLocation loc,
+                       ManagedValue base) && override;
+
   struct AccessedStorage {
     AbstractStorageDecl *Storage;
     bool IsSuper;
@@ -266,15 +269,6 @@ public:
 
   /// Get the storage accessed by this component.
   virtual Optional<AccessedStorage> getAccessedStorage() const = 0;
-
-
-  /// Materialize the storage into memory.  If the access is for
-  /// mutation, ensure that modifications to the memory will
-  /// eventually be reflected in the original storage.
-  ///
-  /// \param base - always an address, but possibly an r-value
-  virtual ManagedValue getMaterialized(SILGenFunction &SGF, SILLocation loc,
-                                       ManagedValue base) &&;
 
   /// Perform a writeback on the property.
   ///
