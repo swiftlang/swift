@@ -97,37 +97,26 @@ llvm::raw_ostream *tf::getTFDumpIntermediateStream() {
   return &fileStream;
 }
 
-/// Given a class decl, return true if the decl or its superclass decls have any
-/// fields.
-static bool hasAnyFieldsInInheritanceHierarchy(ClassDecl *decl) {
-  if (!decl->getStoredProperties().empty())
-    return true;
-  if (auto *superclass = decl->getSuperclassDecl())
-    return hasAnyFieldsInInheritanceHierarchy(decl->getSuperclassDecl());
-  return false;
+/// Given a nominal type decl, collect all fields. If it's a class decl, collect
+/// all fields along the inheritance hierarchy.
+static void getAllFields(NominalTypeDecl *decl,
+                         SmallVectorImpl<VarDecl *> &fields) {
+  for (auto *field : decl->getStoredProperties())
+    fields.push_back(field);
+  if (auto *classdecl = decl->getAsClassOrClassExtensionContext())
+    if (auto *superclass = classdecl->getSuperclassDecl())
+      getAllFields(superclass, fields);
 }
 
 /// If the specified decl has a single stored field, return it.  If it's a class
 /// type, return there's exactly one field in the entire inheritance hierarchy.
 /// Otherwise return null.
 VarDecl *tf::getFieldIfContainsSingleField(NominalTypeDecl *decl) {
-  // Check to see if there is a single stored field.
-  auto fieldIt = decl->getStoredProperties().begin();
-  if (fieldIt == decl->getStoredProperties().end()) {
-    // If it's a class type, then its superclasses may have fields.
-    if (auto *cd = decl->getAsClassOrClassExtensionContext())
-      return getFieldIfContainsSingleField(cd->getSuperclassDecl());
-    return nullptr;
-  }
-  auto result = *fieldIt++;
-  // Now that we've found a single field, if this is a class type, its
-  // superclasses must not have any fields.
-  if (auto *classDecl = decl->getAsClassOrClassExtensionContext())
-    if (hasAnyFieldsInInheritanceHierarchy(classDecl->getSuperclassDecl()))
-      return nullptr;
-  if (fieldIt != decl->getStoredProperties().end())
-    return nullptr;
-  return result;
+  SmallVector<VarDecl *, 4> fields;
+  getAllFields(decl, fields);
+  if (fields.size() == 1)
+    return fields.front();
+  return nullptr;
 }
 
 bool tf::isTensorHandle(SILType ty) {
