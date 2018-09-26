@@ -1335,10 +1335,6 @@ void TypeConverter::insert(TypeKey k, const TypeLowering *tl) {
 static CanTupleType getLoweredTupleType(TypeConverter &tc,
                                         AbstractionPattern origType,
                                         CanTupleType substType) {
-  // We can't lower InOutType, and we can't lower an unlabeled one
-  // element vararg tuple either, because lowering strips off flags,
-  // which would end up producing a ParenType.
-  assert(!shouldExpandTupleType(substType));
   assert(origType.matchesTuple(substType));
 
   // Does the lowered tuple type differ from the substituted type in
@@ -1356,6 +1352,7 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
     // Make sure we don't have something non-materializable.
     auto Flags = substElt.getParameterFlags();
     assert(Flags.getValueOwnership() == ValueOwnership::Default);
+    assert(!Flags.isVariadic());
 
     SILType silType = tc.getLoweredType(origEltType, substEltType);
     CanType loweredSubstEltType = silType.getASTType();
@@ -1363,8 +1360,8 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
     changed = (changed || substEltType != loweredSubstEltType ||
                !Flags.isNone());
 
-    // Note: we drop any parameter flags such as @escaping, @autoclosure and
-    // varargs.
+    // Note: we drop @escaping and @autoclosure which can still appear on
+    // materializable tuple types.
     //
     // FIXME: Replace this with an assertion that the original tuple element
     // did not have any flags.
@@ -1372,7 +1369,7 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
                              substElt.getName(),
                              ParameterTypeFlags());
   }
-  
+
   if (!changed) return substType;
 
   // The cast should succeed, because if we end up with a one-element
