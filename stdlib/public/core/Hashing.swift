@@ -131,7 +131,7 @@ internal final class _BridgingHashBuffer
 
   deinit {
     for bucket in header.hashTable {
-      (firstElementAddress + bucket.bucket).deinitialize(count: 1)
+      (firstElementAddress + bucket.offset).deinitialize(count: 1)
     }
     _fixLifetime(self)
   }
@@ -140,14 +140,14 @@ internal final class _BridgingHashBuffer
     @inline(__always) get {
       _sanityCheck(header.hashTable.isOccupied(bucket))
       defer { _fixLifetime(self) }
-      return firstElementAddress[bucket.bucket]
+      return firstElementAddress[bucket.offset]
     }
   }
 
   @inline(__always)
   internal func initialize(at bucket: _HashTable.Bucket, to object: AnyObject) {
     _sanityCheck(header.hashTable.isOccupied(bucket))
-    (firstElementAddress + bucket.bucket).initialize(to: object)
+    (firstElementAddress + bucket.offset).initialize(to: object)
     _fixLifetime(self)
   }
 }

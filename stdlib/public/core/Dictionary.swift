@@ -810,7 +810,7 @@ extension Dictionary {
       let native = _variant.asNative
       var value: Value?
       if found {
-        value = (native._values + bucket.bucket).move()
+        value = (native._values + bucket.offset).move()
       } else {
         value = nil
       }
@@ -821,14 +821,14 @@ extension Dictionary {
       switch (value, found) {
       case (let value?, true): // Mutation
         // Initialize storage to new value.
-        (native._values + bucket.bucket).initialize(to: value)
+        (native._values + bucket.offset).initialize(to: value)
       case (let value?, false): // Insertion
         // Insert the new entry at the correct place.
         // We've already ensured we have enough capacity.
         native._insert(at: bucket, key: key, value: value)
       case (nil, true): // Removal
         // We've already removed the value; deinitialize and remove the key too.
-        (native._values + bucket.bucket).deinitialize(count: 1)
+        (native._values + bucket.offset).deinitialize(count: 1)
         native._delete(at: bucket)
       case (nil, false): // Noop
         // Easy!
@@ -935,7 +935,7 @@ extension Dictionary {
         let value = defaultValue()
         native._insert(at: bucket, key: key, value: value)
       }
-      let address = native._values + bucket.bucket
+      let address = native._values + bucket.offset
       yield &address.pointee
       _fixLifetime(self)
     }
@@ -1465,7 +1465,7 @@ extension Dictionary {
       _modify {
         let index = _variant.ensureUniqueNative(preserving: position)
         _variant.asNative.validate(index)
-        let address = _variant.asNative._values + index.bucket.bucket
+        let address = _variant.asNative._values + index.bucket.offset
         yield &address.pointee
         _fixLifetime(self)
       }
@@ -1820,7 +1820,7 @@ extension Dictionary.Index: Hashable {
     switch _variant {
     case .native(let nativeIndex):
       hasher.combine(0 as UInt8)
-      hasher.combine(nativeIndex.bucket.bucket)
+      hasher.combine(nativeIndex.bucket.offset)
     case .cocoa(let cocoaIndex):
       _cocoaPath()
       hasher.combine(1 as UInt8)

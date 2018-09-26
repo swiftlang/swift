@@ -75,8 +75,8 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
     _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self))
     self.base = base
     self.bridgedElements = nil
-    self.nextBucket = base.hashTable.startIndex
-    self.endBucket = base.hashTable.endIndex
+    self.nextBucket = base.hashTable.startBucket
+    self.endBucket = base.hashTable.endBucket
   }
 
   @nonobjc
@@ -84,8 +84,8 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
     _sanityCheck(!_isBridgedVerbatimToObjectiveC(Element.self))
     self.base = deferred.native
     self.bridgedElements = deferred.bridgeElements()
-    self.nextBucket = base.hashTable.startIndex
-    self.endBucket = base.hashTable.endIndex
+    self.nextBucket = base.hashTable.startBucket
+    self.endBucket = base.hashTable.endBucket
   }
 
   private func bridgedElement(at bucket: _HashTable.Bucket) -> AnyObject {
@@ -108,7 +108,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
       return nil
     }
     let bucket = nextBucket
-    nextBucket = base.hashTable.index(after: nextBucket)
+    nextBucket = base.hashTable.occupiedBucket(after: nextBucket)
     return self.bridgedElement(at: bucket)
   }
 
@@ -134,7 +134,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
     // enumeration, terminate it, and continue via NSEnumerator.
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
     unmanagedObjects[0] = self.bridgedElement(at: nextBucket)
-    nextBucket = base.hashTable.index(after: nextBucket)
+    nextBucket = base.hashTable.occupiedBucket(after: nextBucket)
     state.pointee = theState
     return 1
   }
@@ -256,7 +256,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      theState.extra.0 = CUnsignedLong(hashTable.startIndex.bucket)
+      theState.extra.0 = CUnsignedLong(hashTable.startBucket.offset)
     }
 
     // Test 'objects' rather than 'count' because (a) this is very rare anyway,
@@ -267,8 +267,8 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     }
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
-    var bucket = _HashTable.Bucket(bucket: Int(theState.extra.0))
-    let endBucket = hashTable.endIndex
+    var bucket = _HashTable.Bucket(offset: Int(theState.extra.0))
+    let endBucket = hashTable.endBucket
     _precondition(bucket == endBucket || hashTable.isOccupied(bucket),
       "Invalid fast enumeration state")
 
@@ -280,9 +280,9 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
       if bucket == endBucket { break }
       unmanagedObjects[i] = bridgedElements[bucket]
       stored += 1
-      bucket = hashTable.index(after: bucket)
+      bucket = hashTable.occupiedBucket(after: bucket)
     }
-    theState.extra.0 = CUnsignedLong(bucket.bucket)
+    theState.extra.0 = CUnsignedLong(bucket.offset)
     state.pointee = theState
     return stored
   }

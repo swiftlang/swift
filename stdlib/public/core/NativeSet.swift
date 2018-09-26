@@ -102,14 +102,14 @@ extension _NativeSet { // Low-level unchecked operations
   internal func uncheckedElement(at bucket: Bucket) -> Element {
     defer { _fixLifetime(self) }
     _sanityCheck(hashTable.isOccupied(bucket))
-    return _elements[bucket.bucket]
+    return _elements[bucket.offset]
   }
 
   @inlinable
   @inline(__always)
   internal func uncheckedInitialize(at bucket: Bucket, to element: Element) {
     _sanityCheck(hashTable.isValid(bucket))
-    (_elements + bucket.bucket).initialize(to: element)
+    (_elements + bucket.offset).initialize(to: element)
   }
 }
 
@@ -137,12 +137,12 @@ extension _NativeSet { // Low-level lookup operations
     hashValue: Int
   ) -> (bucket: Bucket, found: Bool) {
     let hashTable = self.hashTable
-    var bucket = hashTable.idealIndex(forHashValue: hashValue)
+    var bucket = hashTable.idealBucket(forHashValue: hashValue)
     while hashTable._isOccupied(bucket) {
       if uncheckedElement(at: bucket) == element {
         return (bucket, true)
       }
-      bucket = hashTable.index(wrappedAfter: bucket)
+      bucket = hashTable.bucket(wrappedAfter: bucket)
     }
     return (bucket, false)
   }
@@ -155,7 +155,7 @@ extension _NativeSet { // ensureUnique
     let result = _NativeSet(_SetStorage<Element>.allocate(capacity: capacity))
     if count > 0 {
       for bucket in hashTable {
-        let element = (self._elements + bucket.bucket).move()
+        let element = (self._elements + bucket.offset).move()
         result._unsafeInsertNew(element)
       }
       // Clear out old storage, ensuring that its deinit won't overrelease the
@@ -214,7 +214,7 @@ extension _NativeSet { // ensureUnique
 
 extension _NativeSet {
   @usableFromInline
-  internal typealias Index = _HashTable.AgedIndex
+  internal typealias Index = _HashTable.Index
 
   @inlinable
   @inline(__always)
@@ -227,20 +227,20 @@ extension _NativeSet {
 extension _NativeSet: _SetBuffer {
   @inlinable
   internal var startIndex: Index {
-    let bucket = hashTable.startIndex
+    let bucket = hashTable.startBucket
     return Index(bucket: bucket, age: age)
   }
 
   @inlinable
   internal var endIndex: Index {
-    let bucket = hashTable.endIndex
+    let bucket = hashTable.endBucket
     return Index(bucket: bucket, age: age)
   }
 
   @inlinable
   internal func index(after index: Index) -> Index {
     validate(index)
-    let bucket = hashTable.index(after: index.bucket)
+    let bucket = hashTable.occupiedBucket(after: index.bucket)
     return Index(bucket: bucket, age: age)
   }
 
@@ -373,7 +373,7 @@ extension _NativeSet { // Insertions
       bucket = b
     }
     if found {
-      let old = (_elements + bucket.bucket).move()
+      let old = (_elements + bucket.offset).move()
       uncheckedInitialize(at: bucket, to: element)
       return old
     }
@@ -392,8 +392,8 @@ extension _NativeSet: _HashTableDelegate {
   @inlinable
   @inline(__always)
   internal func moveEntry(from source: Bucket, to target: Bucket) {
-    (_elements + target.bucket)
-      .moveInitialize(from: _elements + source.bucket, count: 1)
+    (_elements + target.offset)
+      .moveInitialize(from: _elements + source.offset, count: 1)
   }
 }
 
@@ -414,7 +414,7 @@ extension _NativeSet { // Deletion
     _sanityCheck(hashTable.isOccupied(bucket))
     let rehashed = ensureUnique(isUnique: isUnique, capacity: capacity)
     _sanityCheck(!rehashed)
-    let old = (_elements + bucket.bucket).move()
+    let old = (_elements + bucket.offset).move()
     _delete(at: bucket)
     return old
   }
@@ -434,7 +434,7 @@ extension _NativeSet { // Deletion
       return
     }
     for bucket in hashTable {
-      (_elements + bucket.bucket).deinitialize(count: 1)
+      (_elements + bucket.offset).deinitialize(count: 1)
     }
     hashTable.clear()
     _storage._count = 0

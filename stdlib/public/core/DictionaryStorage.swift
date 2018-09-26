@@ -194,14 +194,14 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     guard _count > 0 else { return }
     if !_isPOD(Key.self) {
       let keys = self._keys
-      for index in _hashTable {
-        (keys + index.bucket).deinitialize(count: 1)
+      for bucket in _hashTable {
+        (keys + bucket.offset).deinitialize(count: 1)
       }
     }
     if !_isPOD(Value.self) {
       let values = self._values
-      for index in _hashTable {
-        (values + index.bucket).deinitialize(count: 1)
+      for bucket in _hashTable {
+        (values + bucket.offset).deinitialize(count: 1)
       }
     }
     _count = 0
@@ -266,7 +266,7 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      theState.extra.0 = CUnsignedLong(hashTable.startIndex.bucket)
+      theState.extra.0 = CUnsignedLong(hashTable.startBucket.offset)
     }
 
     // Test 'objects' rather than 'count' because (a) this is very rare anyway,
@@ -277,21 +277,21 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     }
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
-    var bucket = _HashTable.Bucket(bucket: Int(theState.extra.0))
-    let endBucket = hashTable.endIndex
+    var bucket = _HashTable.Bucket(offset: Int(theState.extra.0))
+    let endBucket = hashTable.endBucket
     _precondition(bucket == endBucket || _hashTable.isOccupied(bucket),
       "Invalid fast enumeration state")
     var stored = 0
     for i in 0..<count {
       if bucket == endBucket { break }
 
-      let key = _keys[bucket.bucket]
+      let key = _keys[bucket.offset]
       unmanagedObjects[i] = _bridgeAnythingToObjectiveC(key)
 
       stored += 1
-      bucket = hashTable.index(after: bucket)
+      bucket = hashTable.occupiedBucket(after: bucket)
     }
-    theState.extra.0 = CUnsignedLong(bucket.bucket)
+    theState.extra.0 = CUnsignedLong(bucket.offset)
     state.pointee = theState
     return stored
   }

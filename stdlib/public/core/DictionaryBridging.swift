@@ -74,8 +74,8 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
     _sanityCheck(_isBridgedVerbatimToObjectiveC(Key.self))
     self.base = base
     self.bridgedKeys = nil
-    self.nextBucket = base.hashTable.startIndex
-    self.endBucket = base.hashTable.endIndex
+    self.nextBucket = base.hashTable.startBucket
+    self.endBucket = base.hashTable.endBucket
   }
 
   @nonobjc
@@ -83,8 +83,8 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
     _sanityCheck(!_isBridgedVerbatimToObjectiveC(Key.self))
     self.base = deferred.native
     self.bridgedKeys = deferred.bridgeKeys()
-    self.nextBucket = base.hashTable.startIndex
-    self.endBucket = base.hashTable.endIndex
+    self.nextBucket = base.hashTable.startBucket
+    self.endBucket = base.hashTable.endBucket
   }
 
   private func bridgedKey(at bucket: _HashTable.Bucket) -> AnyObject {
@@ -101,7 +101,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
       return nil
     }
     let bucket = nextBucket
-    nextBucket = base.hashTable.index(after: nextBucket)
+    nextBucket = base.hashTable.occupiedBucket(after: nextBucket)
     return self.bridgedKey(at: bucket)
   }
 
@@ -127,7 +127,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
     // enumeration, terminate it, and continue via NSEnumerator.
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
     unmanagedObjects[0] = self.bridgedKey(at: nextBucket)
-    nextBucket = base.hashTable.index(after: nextBucket)
+    nextBucket = base.hashTable.occupiedBucket(after: nextBucket)
     state.pointee = theState
     return 1
   }
@@ -390,7 +390,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      theState.extra.0 = CUnsignedLong(hashTable.startIndex.bucket)
+      theState.extra.0 = CUnsignedLong(hashTable.startBucket.offset)
     }
 
     // Test 'objects' rather than 'count' because (a) this is very rare anyway,
@@ -401,8 +401,8 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     }
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
-    var bucket = _HashTable.Bucket(bucket: Int(theState.extra.0))
-    let endBucket = hashTable.endIndex
+    var bucket = _HashTable.Bucket(offset: Int(theState.extra.0))
+    let endBucket = hashTable.endBucket
     _precondition(bucket == endBucket || hashTable.isOccupied(bucket))
     var stored = 0
 
@@ -413,9 +413,9 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
 
       unmanagedObjects[i] = _key(at: bucket, bridgedKeys: bridgedKeys)
       stored += 1
-      bucket = hashTable.index(after: bucket)
+      bucket = hashTable.occupiedBucket(after: bucket)
     }
-    theState.extra.0 = CUnsignedLong(bucket.bucket)
+    theState.extra.0 = CUnsignedLong(bucket.offset)
     state.pointee = theState
     return stored
   }

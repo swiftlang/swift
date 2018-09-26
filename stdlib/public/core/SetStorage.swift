@@ -178,7 +178,7 @@ final internal class _SetStorage<Element: Hashable>
     if !_isPOD(Element.self) {
       let elements = _elements
       for bucket in _hashTable {
-        (elements + bucket.bucket).deinitialize(count: 1)
+        (elements + bucket.offset).deinitialize(count: 1)
       }
     }
     _fixLifetime(self)
@@ -229,7 +229,7 @@ final internal class _SetStorage<Element: Hashable>
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      theState.extra.0 = CUnsignedLong(hashTable.startIndex.bucket)
+      theState.extra.0 = CUnsignedLong(hashTable.startBucket.offset)
     }
 
     // Test 'objects' rather than 'count' because (a) this is very rare anyway,
@@ -240,19 +240,19 @@ final internal class _SetStorage<Element: Hashable>
     }
 
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
-    var bucket = _HashTable.Bucket(bucket: Int(theState.extra.0))
-    let endBucket = hashTable.endIndex
+    var bucket = _HashTable.Bucket(offset: Int(theState.extra.0))
+    let endBucket = hashTable.endBucket
     _precondition(bucket == endBucket || hashTable.isOccupied(bucket),
       "Invalid fast enumeration state")
     var stored = 0
     for i in 0..<count {
       if bucket == endBucket { break }
-      let element = _elements[bucket.bucket]
+      let element = _elements[bucket.offset]
       unmanagedObjects[i] = _bridgeAnythingToObjectiveC(element)
       stored += 1
-      bucket = hashTable.index(after: bucket)
+      bucket = hashTable.occupiedBucket(after: bucket)
     }
-    theState.extra.0 = CUnsignedLong(bucket.bucket)
+    theState.extra.0 = CUnsignedLong(bucket.offset)
     state.pointee = theState
     return stored
   }
@@ -264,7 +264,7 @@ final internal class _SetStorage<Element: Hashable>
 
     let (bucket, found) = asNative.find(native)
     guard found else { return nil }
-    return _bridgeAnythingToObjectiveC(_elements[bucket.bucket])
+    return _bridgeAnythingToObjectiveC(_elements[bucket.offset])
   }
 #endif
 }

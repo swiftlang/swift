@@ -109,7 +109,7 @@ extension _NativeDictionary { // Low-level unchecked operations
   internal func uncheckedKey(at bucket: Bucket) -> Key {
     defer { _fixLifetime(self) }
     _sanityCheck(hashTable.isOccupied(bucket))
-    return _keys[bucket.bucket]
+    return _keys[bucket.offset]
   }
 
   @inlinable
@@ -117,7 +117,7 @@ extension _NativeDictionary { // Low-level unchecked operations
   internal func uncheckedValue(at bucket: Bucket) -> Value {
     defer { _fixLifetime(self) }
     _sanityCheck(hashTable.isOccupied(bucket))
-    return _values[bucket.bucket]
+    return _values[bucket.offset]
   }
 
   @usableFromInline
@@ -128,8 +128,8 @@ extension _NativeDictionary { // Low-level unchecked operations
     value: Value) {
     defer { _fixLifetime(self) }
     _sanityCheck(hashTable.isValid(bucket))
-    (_keys + bucket.bucket).initialize(to: key)
-    (_values + bucket.bucket).initialize(to: value)
+    (_keys + bucket.offset).initialize(to: key)
+    (_values + bucket.offset).initialize(to: value)
   }
 
   @usableFromInline
@@ -137,8 +137,8 @@ extension _NativeDictionary { // Low-level unchecked operations
   internal func uncheckedDestroy(at bucket: Bucket) {
     defer { _fixLifetime(self) }
     _sanityCheck(hashTable.isOccupied(bucket))
-    (_keys + bucket.bucket).deinitialize(count: 1)
-    (_values + bucket.bucket).deinitialize(count: 1)
+    (_keys + bucket.offset).deinitialize(count: 1)
+    (_values + bucket.offset).deinitialize(count: 1)
   }
 }
 
@@ -166,12 +166,12 @@ extension _NativeDictionary { // Low-level lookup operations
     hashValue: Int
   ) -> (bucket: Bucket, found: Bool) {
     let hashTable = self.hashTable
-    var bucket = hashTable.idealIndex(forHashValue: hashValue)
+    var bucket = hashTable.idealBucket(forHashValue: hashValue)
     while hashTable._isOccupied(bucket) {
       if uncheckedKey(at: bucket) == key {
         return (bucket, true)
       }
-      bucket = hashTable.index(wrappedAfter: bucket)
+      bucket = hashTable.bucket(wrappedAfter: bucket)
     }
     return (bucket, false)
   }
@@ -185,8 +185,8 @@ extension _NativeDictionary { // ensureUnique
       _DictionaryStorage<Key, Value>.allocate(capacity: capacity))
     if count > 0 {
       for bucket in hashTable {
-        let key = (_keys + bucket.bucket).move()
-        let value = (_values + bucket.bucket).move()
+        let key = (_keys + bucket.offset).move()
+        let value = (_values + bucket.offset).move()
         result._unsafeInsertNew(key: key, value: value)
       }
       // Clear out old storage, ensuring that its deinit won't overrelease the
@@ -248,7 +248,7 @@ extension _NativeDictionary { // ensureUnique
 
 extension _NativeDictionary {
   @usableFromInline
-  internal typealias Index = _HashTable.AgedIndex
+  internal typealias Index = _HashTable.Index
 
   @inlinable
   @inline(__always)
@@ -261,20 +261,20 @@ extension _NativeDictionary {
 extension _NativeDictionary: _DictionaryBuffer {
   @inlinable
   internal var startIndex: Index {
-    let bucket = hashTable.startIndex
+    let bucket = hashTable.startBucket
     return Index(bucket: bucket, age: age)
   }
 
   @inlinable
   internal var endIndex: Index {
-    let bucket = hashTable.endIndex
+    let bucket = hashTable.endBucket
     return Index(bucket: bucket, age: age)
   }
 
   @inlinable
   internal func index(after index: Index) -> Index {
     validate(index)
-    let bucket = hashTable.index(after: index.bucket)
+    let bucket = hashTable.occupiedBucket(after: index.bucket)
     return Index(bucket: bucket, age: age)
   }
 
@@ -437,12 +437,12 @@ extension _NativeDictionary { // Insertions
   ) -> Value? {
     let (bucket, found) = mutatingFind(key, isUnique: isUnique)
     if found {
-      let oldValue = (_values + bucket.bucket).move()
-      (_values + bucket.bucket).initialize(to: value)
+      let oldValue = (_values + bucket.offset).move()
+      (_values + bucket.offset).initialize(to: value)
       // FIXME: Replacing the old key with the new is unnecessary, unintuitive,
       // and actively harmful to some usecases. We shouldn't do it.
       // rdar://problem/32144087
-      (_keys + bucket.bucket).pointee = key
+      (_keys + bucket.offset).pointee = key
       return oldValue
     }
     _insert(at: bucket, key: key, value: value)
@@ -457,11 +457,11 @@ extension _NativeDictionary { // Insertions
   ) {
     let (bucket, found) = mutatingFind(key, isUnique: isUnique)
     if found {
-      (_values + bucket.bucket).pointee = value
+      (_values + bucket.offset).pointee = value
       // FIXME: Replacing the old key with the new is unnecessary, unintuitive,
       // and actively harmful to some usecases. We shouldn't do it.
       // rdar://problem/32144087
-      (_keys + bucket.bucket).pointee = key
+      (_keys + bucket.offset).pointee = key
     } else {
       _insert(at: bucket, key: key, value: value)
     }
@@ -478,10 +478,10 @@ extension _NativeDictionary: _HashTableDelegate {
   @inlinable
   @inline(__always)
   internal func moveEntry(from source: Bucket, to target: Bucket) {
-    (_keys + target.bucket)
-      .moveInitialize(from: _keys + source.bucket, count: 1)
-    (_values + target.bucket)
-      .moveInitialize(from: _values + source.bucket, count: 1)
+    (_keys + target.offset)
+      .moveInitialize(from: _keys + source.offset, count: 1)
+    (_values + target.offset)
+      .moveInitialize(from: _values + source.offset, count: 1)
   }
 }
 
@@ -503,8 +503,8 @@ extension _NativeDictionary { // Deletion
     _sanityCheck(hashTable.isOccupied(bucket))
     let rehashed = ensureUnique(isUnique: isUnique, capacity: capacity)
     _sanityCheck(!rehashed)
-    let oldKey = (_keys + bucket.bucket).move()
-    let oldValue = (_values + bucket.bucket).move()
+    let oldKey = (_keys + bucket.offset).move()
+    let oldValue = (_values + bucket.offset).move()
     _delete(at: bucket)
     return (oldKey, oldValue)
   }
@@ -526,8 +526,8 @@ extension _NativeDictionary { // Deletion
       return
     }
     for bucket in hashTable {
-      (_keys + bucket.bucket).deinitialize(count: 1)
-      (_values + bucket.bucket).deinitialize(count: 1)
+      (_keys + bucket.offset).deinitialize(count: 1)
+      (_values + bucket.offset).deinitialize(count: 1)
     }
     hashTable.clear()
     _storage._count = 0
@@ -564,9 +564,9 @@ extension _NativeDictionary { // High-level operations
       isUnique = true
       if found {
         do {
-          let v = (_values + bucket.bucket).move()
+          let v = (_values + bucket.offset).move()
           let newValue = try combine(v, value)
-          (_values + bucket.bucket).initialize(to: newValue)
+          (_values + bucket.offset).initialize(to: newValue)
         } catch _MergeError.keyCollision {
           fatalError("Duplicate values for key: '\(key)'")
         }
@@ -587,7 +587,7 @@ extension _NativeDictionary { // High-level operations
       let key = try keyForValue(value)
       let (bucket, found) = mutatingFind(key, isUnique: true)
       if found {
-        _values[bucket.bucket].append(value)
+        _values[bucket.offset].append(value)
       } else {
         _insert(at: bucket, key: key, value: [value])
       }

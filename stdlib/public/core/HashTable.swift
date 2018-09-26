@@ -12,7 +12,7 @@
 
 @usableFromInline
 internal protocol _HashTableDelegate {
-  func hashValue(at index: _HashTable.Bucket) -> Int
+  func hashValue(at bucket: _HashTable.Bucket) -> Int
   func moveEntry(from source: _HashTable.Bucket, to target: _HashTable.Bucket)
 }
 
@@ -86,39 +86,36 @@ extension _HashTable {
 }
 
 extension _HashTable {
-  @usableFromInline
-  internal typealias Index = Bucket // FIXME: Remove
-
   @_fixed_layout
   @usableFromInline
   internal struct Bucket {
     @usableFromInline
-    internal var bucket: Int // FIXME: Rename to offset
+    internal var offset: Int
 
     @inlinable
     @inline(__always)
-    internal init(bucket: Int) {
-      _sanityCheck(bucket >= 0)
-      self.bucket = bucket
+    internal init(offset: Int) {
+      _sanityCheck(offset >= 0)
+      self.offset = offset
     }
 
     @inlinable
     @inline(__always)
     internal init(word: Int, bit: Int) {
-      self.bucket = _UnsafeBitset.join(word: word, bit: bit)
+      self.offset = _UnsafeBitset.join(word: word, bit: bit)
     }
 
     @inlinable
     internal var word: Int {
       @inline(__always) get {
-        return _UnsafeBitset.word(for: bucket)
+        return _UnsafeBitset.word(for: offset)
       }
     }
 
     @inlinable
     internal var bit: Int {
       @inline(__always) get {
-        return _UnsafeBitset.bit(for: bucket)
+        return _UnsafeBitset.bit(for: offset)
       }
     }
   }
@@ -129,7 +126,7 @@ extension _HashTable.Bucket: Equatable {
   @inline(__always)
   internal
   static func == (lhs: _HashTable.Bucket, rhs: _HashTable.Bucket) -> Bool {
-    return lhs.bucket == rhs.bucket
+    return lhs.offset == rhs.offset
   }
 }
 
@@ -138,14 +135,14 @@ extension _HashTable.Bucket: Comparable {
   @inline(__always)
   internal
   static func < (lhs: _HashTable.Bucket, rhs: _HashTable.Bucket) -> Bool {
-    return lhs.bucket < rhs.bucket
+    return lhs.offset < rhs.offset
   }
 }
 
 extension _HashTable {
   @usableFromInline
   @_fixed_layout
-  internal struct AgedIndex { // FIXME: Rename to Index
+  internal struct Index {
     @usableFromInline
     let bucket: Bucket
 
@@ -160,11 +157,11 @@ extension _HashTable {
   }
 }
 
-extension _HashTable.AgedIndex: Equatable {
+extension _HashTable.Index: Equatable {
   @inlinable
   internal static func ==(
-    lhs: _HashTable.AgedIndex,
-    rhs: _HashTable.AgedIndex
+    lhs: _HashTable.Index,
+    rhs: _HashTable.Index
   ) -> Bool {
     _precondition(lhs.age == rhs.age,
       "Can't compare indices belonging to different collections")
@@ -172,11 +169,11 @@ extension _HashTable.AgedIndex: Equatable {
   }
 }
 
-extension _HashTable.AgedIndex: Comparable {
+extension _HashTable.Index: Comparable {
   @inlinable
   internal static func <(
-    lhs: _HashTable.AgedIndex,
-    rhs: _HashTable.AgedIndex
+    lhs: _HashTable.Index,
+    rhs: _HashTable.Index
   ) -> Bool {
     _precondition(lhs.age == rhs.age,
       "Can't compare indices belonging to different collections")
@@ -207,15 +204,15 @@ extension _HashTable: Sequence {
 
     @inlinable
     @inline(__always)
-    internal mutating func next() -> Index? {
+    internal mutating func next() -> Bucket? {
       if let bit = word.next() {
-        return Index(word: wordIndex, bit: bit)
+        return Bucket(word: wordIndex, bit: bit)
       }
       while wordIndex + 1 < hashTable.wordCount {
         wordIndex += 1
         word = hashTable.words[wordIndex]
         if let bit = word.next() {
-          return Index(word: wordIndex, bit: bit)
+          return Bucket(word: wordIndex, bit: bit)
         }
       }
       return nil
@@ -231,64 +228,64 @@ extension _HashTable: Sequence {
 extension _HashTable {
   @inlinable
   @inline(__always)
-  internal func isValid(_ index: Index) -> Bool {
-    return index.bucket >= 0 && index.bucket < bucketCount
+  internal func isValid(_ bucket: Bucket) -> Bool {
+    return bucket.offset >= 0 && bucket.offset < bucketCount
   }
 
   @inlinable
   @inline(__always)
-  internal func _isOccupied(_ index: Index) -> Bool {
-    _sanityCheck(isValid(index))
-    return words[index.word].uncheckedContains(index.bit)
+  internal func _isOccupied(_ bucket: Bucket) -> Bool {
+    _sanityCheck(isValid(bucket))
+    return words[bucket.word].uncheckedContains(bucket.bit)
   }
 
   @inlinable
   @inline(__always)
-  internal func isOccupied(_ index: Index) -> Bool {
-    return isValid(index) && _isOccupied(index)
+  internal func isOccupied(_ bucket: Bucket) -> Bool {
+    return isValid(bucket) && _isOccupied(bucket)
   }
 
   @inlinable
   @inline(__always)
-  internal func checkOccupied(_ i: Index) {
-    _precondition(isOccupied(i),
+  internal func checkOccupied(_ bucket: Bucket) {
+    _precondition(isOccupied(bucket),
       "Attempting to access Collection elements using an invalid Index")
   }
 
   @inlinable
   @inline(__always)
-  internal func _firstOccupiedIndex(fromWord word: Int) -> Index {
+  internal func _firstOccupiedBucket(fromWord word: Int) -> Bucket {
     _sanityCheck(word >= 0 && word <= wordCount)
     var word = word
     while word < wordCount {
       if let bit = words[word].minimum {
-        return Index(word: word, bit: bit)
+        return Bucket(word: word, bit: bit)
       }
       word += 1
     }
-    return endIndex
+    return endBucket
   }
 
   @inlinable
-  internal func index(after index: Index) -> Index {
-    _sanityCheck(isValid(index))
-    let word = index.word
-    if let bit = words[word].intersecting(elementsAbove: index.bit).minimum {
-      return Index(word: word, bit: bit)
+  internal func occupiedBucket(after bucket: Bucket) -> Bucket {
+    _sanityCheck(isValid(bucket))
+    let word = bucket.word
+    if let bit = words[word].intersecting(elementsAbove: bucket.bit).minimum {
+      return Bucket(word: word, bit: bit)
     }
-    return _firstOccupiedIndex(fromWord: word + 1)
+    return _firstOccupiedBucket(fromWord: word + 1)
   }
 
   @inlinable
-  internal var startIndex: Index {
-    return _firstOccupiedIndex(fromWord: 0)
+  internal var startBucket: Bucket {
+    return _firstOccupiedBucket(fromWord: 0)
   }
 
   @inlinable
-  internal var endIndex: Index {
+  internal var endBucket: Bucket {
     @inline(__always)
     get {
-      return Index(bucket: bucketCount)
+      return Bucket(offset: bucketCount)
     }
   }
 }
@@ -296,33 +293,33 @@ extension _HashTable {
 extension _HashTable {
   @inlinable
   @inline(__always)
-  internal func idealIndex(forHashValue hashValue: Int) -> Index {
-    return Index(bucket: hashValue & bucketMask)
+  internal func idealBucket(forHashValue hashValue: Int) -> Bucket {
+    return Bucket(offset: hashValue & bucketMask)
   }
 
   /// The next bucket after `bucket`, with wraparound at the end of the table.
   @inlinable
   @inline(__always)
-  internal func index(wrappedAfter index: Index) -> Index {
+  internal func bucket(wrappedAfter bucket: Bucket) -> Bucket {
     // The bucket is less than bucketCount, which is power of two less than
     // Int.max. Therefore adding 1 does not overflow.
-    return Index(bucket: (index.bucket &+ 1) & bucketMask)
+    return Bucket(offset: (bucket.offset &+ 1) & bucketMask)
   }
 }
 
 extension _HashTable {
   @inlinable
-  internal func previousHole(before index: Index) -> Index {
-    _sanityCheck(isValid(index))
+  internal func previousHole(before bucket: Bucket) -> Bucket {
+    _sanityCheck(isValid(bucket))
     // Note that if we have only a single partial word, its out-of-bounds bits
     // are guaranteed to be all set, so the formula below gives correct results.
-    var word = index.word
+    var word = bucket.word
     if let bit =
       words[word]
         .complement
-        .intersecting(elementsBelow: index.bit)
+        .intersecting(elementsBelow: bucket.bit)
         .maximum {
-      return Index(word: word, bit: bit)
+      return Bucket(word: word, bit: bit)
     }
     var wrap = false
     while true {
@@ -333,23 +330,23 @@ extension _HashTable {
         word = wordCount - 1
       }
       if let bit = words[word].complement.maximum {
-        return Index(word: word, bit: bit)
+        return Bucket(word: word, bit: bit)
       }
     }
   }
 
   @inlinable
-  internal func nextHole(atOrAfter index: Index) -> Index {
-    _sanityCheck(isValid(index))
+  internal func nextHole(atOrAfter bucket: Bucket) -> Bucket {
+    _sanityCheck(isValid(bucket))
     // Note that if we have only a single partial word, its out-of-bounds bits
     // are guaranteed to be all set, so the formula below gives correct results.
-    var word = index.word
+    var word = bucket.word
     if let bit =
       words[word]
         .complement
-        .subtracting(elementsBelow: index.bit)
+        .subtracting(elementsBelow: bucket.bit)
         .minimum {
-      return Index(word: word, bit: bit)
+      return Bucket(word: word, bit: bit)
     }
     var wrap = false
     while true {
@@ -360,7 +357,7 @@ extension _HashTable {
         word = 0
       }
       if let bit = words[word].complement.minimum {
-        return Index(word: word, bit: bit)
+        return Bucket(word: word, bit: bit)
       }
     }
   }
@@ -379,8 +376,8 @@ extension _HashTable {
   /// The entry must not already exist in the table -- duplicates are ignored.
   @inlinable
   @inline(__always)
-  internal func insertNew(hashValue: Int) -> Index {
-    let hole = nextHole(atOrAfter: idealIndex(forHashValue: hashValue))
+  internal func insertNew(hashValue: Int) -> Bucket {
+    let hole = nextHole(atOrAfter: idealBucket(forHashValue: hashValue))
     insert(hole)
     return hole
   }
@@ -388,9 +385,9 @@ extension _HashTable {
   /// Insert a new entry for an element at `index`.
   @inlinable
   @inline(__always)
-  internal func insert(_ index: Index) {
-    _sanityCheck(!isOccupied(index))
-    words[index.word].uncheckedInsert(index.bit)
+  internal func insert(_ bucket: Bucket) {
+    _sanityCheck(!isOccupied(bucket))
+    words[bucket.word].uncheckedInsert(bucket.bit)
   }
 
   @inlinable
@@ -398,8 +395,8 @@ extension _HashTable {
   internal func clear() {
     if bucketCount < Word.capacity {
       // We have only a single partial word. Set all out of bounds bits, so that
-      // `index(after:)` and `nextHole(atOrAfter:)` works correctly without a
-      // special case.
+      // `occupiedBucket(after:)` and `nextHole(atOrAfter:)` works correctly
+      // without a special case.
       words[0] = Word.allBits.subtracting(elementsBelow: bucketCount)
     } else {
       words.assign(repeating: .empty, count: wordCount)
@@ -409,16 +406,16 @@ extension _HashTable {
   @inline(__always)
   @inlinable
   internal func delete<D: _HashTableDelegate>(
-    at index: Index,
+    at bucket: Bucket,
     with delegate: D
   ) {
-    _sanityCheck(isOccupied(index))
+    _sanityCheck(isOccupied(bucket))
 
     // If we've put a hole in a chain of contiguous elements, some element after
     // the hole may belong where the new hole is.
 
-    var hole = index
-    var candidate = self.index(wrappedAfter: hole)
+    var hole = bucket
+    var candidate = self.bucket(wrappedAfter: hole)
 
     guard _isOccupied(candidate) else {
       // Fast path: Don't get the first bucket when there's nothing to do.
@@ -428,13 +425,13 @@ extension _HashTable {
 
     // Find the first bucket in the contiguous chain that contains the entry
     // we've just deleted.
-    let start = self.index(wrappedAfter: previousHole(before: index))
+    let start = self.bucket(wrappedAfter: previousHole(before: bucket))
 
     // Relocate out-of-place elements in the chain, repeating until we get to
     // the end of the chain.
     while _isOccupied(candidate) {
       let candidateHash = delegate.hashValue(at: candidate)
-      let ideal = idealIndex(forHashValue: candidateHash)
+      let ideal = idealBucket(forHashValue: candidateHash)
 
       // Does this element belong between start and hole?  We need two
       // separate tests depending on whether [start, hole] wraps around the
@@ -445,7 +442,7 @@ extension _HashTable {
         delegate.moveEntry(from: candidate, to: hole)
         hole = candidate
       }
-      candidate = self.index(wrappedAfter: candidate)
+      candidate = self.bucket(wrappedAfter: candidate)
     }
 
     words[hole.word].uncheckedRemove(hole.bit)
