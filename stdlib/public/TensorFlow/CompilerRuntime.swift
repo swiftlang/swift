@@ -1205,6 +1205,7 @@ public func _CreateTensorHandleFromC(
   }
 }
 
+@inlinable
 @_silgen_name("_swift_tfc_CreateFloatTensorHandleFromCTensorHandle")
 public func _CreateTensorHandleFromCTensorHandle(
   _ ownedCHandle: CTensorHandle
