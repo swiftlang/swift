@@ -94,7 +94,9 @@ extension _NativeSet { // Low-level unchecked operations
 
   @inlinable
   @inline(__always)
-  internal func uncheckedInitialize(at bucket: Bucket, to element: Element) {
+  internal func uncheckedInitialize(
+    at bucket: Bucket,
+    to element: __owned Element) {
     _sanityCheck(hashTable.isValid(bucket))
     (_elements + bucket.offset).initialize(to: element)
   }

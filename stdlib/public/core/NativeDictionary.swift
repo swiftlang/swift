@@ -111,8 +111,8 @@ extension _NativeDictionary { // Low-level unchecked operations
   @inline(__always)
   internal func uncheckedInitialize(
     at bucket: Bucket,
-    toKey key: Key,
-    value: Value) {
+    toKey key: __owned Key,
+    value: __owned Value) {
     defer { _fixLifetime(self) }
     _sanityCheck(hashTable.isValid(bucket))
     (_keys + bucket.offset).initialize(to: key)
