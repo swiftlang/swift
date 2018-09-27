@@ -304,7 +304,7 @@ extension _CocoaSet {
   @usableFromInline
   @_effects(releasenone)
   internal func member(for index: Index) -> AnyObject {
-    return index.allKeys[index.currentKeyIndex]
+    return index.element
   }
 
   @inlinable
@@ -385,9 +385,9 @@ extension _CocoaSet: _SetBuffer {
 
   @usableFromInline
   internal func element(at i: Index) -> AnyObject {
-    let value: AnyObject? = i.allKeys[i.currentKeyIndex]
-    _sanityCheck(value != nil, "Item not found in underlying NSSet")
-    return value!
+    let element: AnyObject? = i.element
+    _sanityCheck(element != nil, "Item not found in underlying NSSet")
+    return element!
   }
 }
 
@@ -440,6 +440,16 @@ extension _CocoaSet {
       self.allKeys = allKeys
       self.currentKeyIndex = currentKeyIndex
     }
+  }
+}
+
+extension _CocoaSet.Index {
+  @inlinable
+  @nonobjc
+  internal var element: AnyObject {
+    _precondition(currentKeyIndex < allKeys.value,
+      "Attempting to access Set elements using an invalid index")
+    return allKeys[currentKeyIndex]
   }
 }
 

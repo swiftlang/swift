@@ -529,7 +529,7 @@ extension _CocoaDictionary: _DictionaryBuffer {
   @inline(__always)
   func key(at index: Index) -> Key {
     _precondition(index.base.object === self.object, "Invalid index")
-    return index.allKeys[index.currentKeyIndex]
+    return index.key
   }
 
   @inlinable
@@ -605,6 +605,16 @@ extension _CocoaDictionary {
       self.allKeys = allKeys
       self.currentKeyIndex = currentKeyIndex
     }
+  }
+}
+
+extension _CocoaDictionary.Index {
+  @inlinable
+  @nonobjc
+  internal var key: AnyObject {
+    _precondition(currentKeyIndex < allKeys.value,
+      "Attempting to access Dictionary elements using an invalid index")
+    return allKeys[currentKeyIndex]
   }
 }
 
