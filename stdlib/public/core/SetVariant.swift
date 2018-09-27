@@ -271,12 +271,12 @@ extension Set._Variant {
   ) -> (inserted: Bool, memberAfterInsert: Element) {
     switch self {
     case .native:
-      let (index, found) = asNative.find(element)
+      let (bucket, found) = asNative.find(element)
       if found {
-        return (false, asNative.uncheckedElement(at: index))
+        return (false, asNative.uncheckedElement(at: bucket))
       }
       let isUnique = self.isUniquelyReferenced()
-      asNative.insertNew(element, at: index, isUnique: isUnique)
+      asNative.insertNew(element, at: bucket, isUnique: isUnique)
       return (true, element)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
@@ -318,10 +318,10 @@ extension Set._Variant {
   internal mutating func remove(_ member: Element) -> Element? {
     switch self {
     case .native:
-      let (index, found) = asNative.find(member)
+      let (bucket, found) = asNative.find(member)
       guard found else { return nil }
       let isUnique = isUniquelyReferenced()
-      return asNative.uncheckedRemove(at: index, isUnique: isUnique)
+      return asNative.uncheckedRemove(at: bucket, isUnique: isUnique)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       cocoaPath()
@@ -341,9 +341,9 @@ extension Set._Variant {
     // FIXME(performance): fuse data migration and element deletion into one
     // operation.
     var native = _NativeSet<Element>(cocoa)
-    let (index, found) = native.find(member)
+    let (bucket, found) = native.find(member)
     _precondition(found, "Bridging did not preserve equality")
-    let old = native.remove(at: index, isUnique: true)
+    let old = native.uncheckedRemove(at: bucket, isUnique: true)
     _precondition(member == old, "Bridging did not preserve equality")
     self = .native(native)
     return old

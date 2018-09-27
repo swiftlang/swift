@@ -1361,6 +1361,21 @@ static Constraint *selectBestBindingDisjunction(
   return firstBindDisjunction;
 }
 
+void ConstraintSystem::partitionDisjunction(
+    ArrayRef<Constraint *> Choices, SmallVectorImpl<unsigned> &Ordering,
+    SmallVectorImpl<unsigned> &PartitionBeginning) {
+  // Maintain the original ordering, and make a single partition of
+  // disjunction choices.
+  auto originalOrdering = [&]() {
+    for (unsigned long i = 0, e = Choices.size(); i != e; ++i)
+      Ordering.push_back(i);
+
+    PartitionBeginning.push_back(0);
+  };
+
+  originalOrdering();
+}
+
 Constraint *ConstraintSystem::selectDisjunction() {
   SmallVector<Constraint *, 4> disjunctions;
 

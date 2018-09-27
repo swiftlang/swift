@@ -3166,7 +3166,14 @@ public:
 
     return false;
   }
-  
+
+  // Partition the choices in the disjunction into groups that we will
+  // iterate over in an order appropriate to attempt to stop before we
+  // have to visit all of the options.
+  void partitionDisjunction(ArrayRef<Constraint *> Choices,
+                            SmallVectorImpl<unsigned> &Ordering,
+                            SmallVectorImpl<unsigned> &PartitionBeginning);
+
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
@@ -3349,10 +3356,13 @@ class DisjunctionChoice {
   unsigned Index;
   Constraint *Choice;
   bool ExplicitConversion;
+  bool IsBeginningOfPartition;
 
 public:
-  DisjunctionChoice(unsigned index, Constraint *choice, bool explicitConversion)
-      : Index(index), Choice(choice), ExplicitConversion(explicitConversion) {}
+  DisjunctionChoice(unsigned index, Constraint *choice, bool explicitConversion,
+                    bool isBeginningOfPartition)
+      : Index(index), Choice(choice), ExplicitConversion(explicitConversion),
+        IsBeginningOfPartition(isBeginningOfPartition) {}
 
   unsigned getIndex() const { return Index; }
 
@@ -3365,6 +3375,8 @@ public:
       return decl->getAttrs().isUnavailable(decl->getASTContext());
     return false;
   }
+
+  bool isBeginningOfPartition() const { return IsBeginningOfPartition; }
 
   // FIXME: Both of the accessors below are required to support
   //        performance optimization hacks in constraint solver.
@@ -3500,7 +3512,27 @@ private:
 /// easy to work with disjunction and encapsulates
 /// some other important information such as locator.
 class DisjunctionChoiceProducer : public BindingProducer<DisjunctionChoice> {
+  // The disjunciton choices that this producer will iterate through.
   ArrayRef<Constraint *> Choices;
+
+  // The ordering of disjunction choices. We index into Choices
+  // through this vector in order to visit the disjunction choices in
+  // the order we want to visit them.
+  SmallVector<unsigned, 8> Ordering;
+
+  // The index of the first element in a partition of the disjunction
+  // choices. The choices are split into partitions where we will
+  // visit all elements within a single partition before moving to the
+  // elements of the next partition. If we visit all choices within a
+  // single partition and have found a successful solution with one of
+  // the choices in that partition, we stop looking for other
+  // solutions.
+  SmallVector<unsigned, 4> PartitionBeginning;
+
+  // The index in the current partition of disjunction choices that we
+  // are iterating over.
+  unsigned PartitionIndex = 0;
+
   bool IsExplicitConversion;
 
   unsigned Index = 0;
@@ -3516,22 +3548,35 @@ public:
         IsExplicitConversion(disjunction->isExplicitConversion()) {
     assert(disjunction->getKind() == ConstraintKind::Disjunction);
     assert(!disjunction->shouldRememberChoice() || disjunction->getLocator());
+
+    // Order and partition the disjunction choices.
+    CS.partitionDisjunction(Choices, Ordering, PartitionBeginning);
   }
 
   DisjunctionChoiceProducer(ConstraintSystem &cs,
                             ArrayRef<Constraint *> choices,
                             ConstraintLocator *locator, bool explicitConversion)
       : BindingProducer(cs, locator), Choices(choices),
-        IsExplicitConversion(explicitConversion) {}
+        IsExplicitConversion(explicitConversion) {
+
+    // Order and partition the disjunction choices.
+    CS.partitionDisjunction(Choices, Ordering, PartitionBeginning);
+  }
 
   Optional<Element> operator()() override {
     unsigned currIndex = Index;
     if (currIndex >= Choices.size())
       return None;
 
+    bool isBeginningOfPartition = PartitionIndex < PartitionBeginning.size() &&
+                                  PartitionBeginning[PartitionIndex] == Index;
+    if (isBeginningOfPartition)
+      ++PartitionIndex;
+
     ++Index;
-    return DisjunctionChoice(currIndex, Choices[currIndex],
-                             IsExplicitConversion);
+
+    return DisjunctionChoice(currIndex, Choices[Ordering[currIndex]],
+                             IsExplicitConversion, isBeginningOfPartition);
   }
 };
 } // end namespace constraints
