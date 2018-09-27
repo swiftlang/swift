@@ -1645,7 +1645,7 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
   // sorting, implicit initializer synthesis), so for the time being we have to
   // turn it off for them entirely.
   if (name.getBaseName() == DeclBaseName::createConstructor())
-    useNamedLazyMemberLoading = false;
+    /*useNamedLazyMemberLoading = false*/;
 
   LLVM_DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect(" << name << ")"
         << ", lookupTable.getInt()=" << LookupTable.getInt()
@@ -1716,6 +1716,7 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
         populateLookupTableEntryFromExtensions(ctx, Table, this, name,
                                                ignoreNewExtensions)) {
       useNamedLazyMemberLoading = false;
+      break;
     }
   }
 
