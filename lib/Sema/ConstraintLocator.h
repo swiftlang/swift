@@ -593,6 +593,17 @@ public:
     return nullptr;
   }
 
+  /// Get anchor expression associated with this locator builder.
+  Expr *getAnchor() const {
+    for (auto prev = this; prev;
+         prev = prev->previous.dyn_cast<ConstraintLocatorBuilder *>()) {
+      if (auto *locator = prev->previous.dyn_cast<ConstraintLocator *>())
+        return locator->getAnchor();
+    }
+
+    return nullptr;
+  }
+
   /// \brief Retrieve the components of the complete locator, which includes
   /// the anchor expression and the path.
   Expr *getLocatorParts(SmallVectorImpl<LocatorPathElt> &path) const {

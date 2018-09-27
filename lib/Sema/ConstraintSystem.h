@@ -2006,9 +2006,6 @@ public:
 
     /// Indicates that we are applying a fix.
     TMF_ApplyingFix = 0x02,
-
-    /// Indicates we're matching an operator parameter.
-    TMF_ApplyingOperatorParameter = 0x4,
   };
 
   /// Options that govern how type matching should proceed.
@@ -3305,7 +3302,6 @@ bool matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
 
 ConstraintSystem::TypeMatchResult
 matchCallArguments(ConstraintSystem &cs,
-                   bool isOperator,
                    ArrayRef<AnyFunctionType::Param> args,
                    ArrayRef<AnyFunctionType::Param> params,
                    ConstraintLocatorBuilder locator);

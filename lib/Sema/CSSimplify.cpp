@@ -756,11 +756,9 @@ public:
 };
 
 // Match the argument of a call to the parameter.
-ConstraintSystem::TypeMatchResult
-constraints::matchCallArguments(ConstraintSystem &cs, bool isOperator,
-                                ArrayRef<AnyFunctionType::Param> args,
-                                ArrayRef<AnyFunctionType::Param> params,
-                                ConstraintLocatorBuilder locator) {
+ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
+    ConstraintSystem &cs, ArrayRef<AnyFunctionType::Param> args,
+    ArrayRef<AnyFunctionType::Param> params, ConstraintLocatorBuilder locator) {
   // Extract the parameters.
   ValueDecl *callee;
   unsigned calleeLevel;
@@ -821,6 +819,15 @@ constraints::matchCallArguments(ConstraintSystem &cs, bool isOperator,
   // Check the argument types for each of the parameters.
   ConstraintSystem::TypeMatchOptions subflags =
     ConstraintSystem::TMF_GenerateConstraints;
+
+  // If this application is part of an operator, then we allow an implicit
+  // lvalue to be compatible with inout arguments.  This is used by
+  // assignment operators.
+  auto *anchor = locator.getAnchor();
+  assert(anchor && "locator without anchor expression?");
+  bool isOperator = (isa<PrefixUnaryExpr>(anchor) ||
+                     isa<PostfixUnaryExpr>(anchor) || isa<BinaryExpr>(anchor));
+
   ConstraintKind subKind = (isOperator
                             ? ConstraintKind::OperatorArgumentConversion
                             : ConstraintKind::ArgumentConversion);
@@ -841,15 +848,6 @@ constraints::matchCallArguments(ConstraintSystem &cs, bool isOperator,
                                             getApplyArgToParam(argIdx,
                                                                paramIdx));
       auto argTy = argsWithLabels[argIdx].getOldType();
-
-      // FIXME: This should be revisited. If one of argTy or paramTy
-      // is a type variable, matchTypes() will add a constraint, and
-      // when the constraint is later solved, we will have lost the
-      // value of 'subflags'.
-      if (isOperator) {
-        subflags |= ConstraintSystem::TMF_ApplyingOperatorParameter;
-      }
-
       auto result = cs.matchTypes(argTy, paramTy, subKind, subflags, loc);
       if (result.isFailure())
         return result;
@@ -2196,11 +2194,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                   ConversionRestrictionKind::InoutToPointer);
             }
           }
-          
-          if (!flags.contains(TMF_ApplyingOperatorParameter) &&
-              // Operators cannot use these implicit conversions.
-              kind == ConstraintKind::ArgumentConversion) {
 
+          // Operators cannot use these implicit conversions.
+          if (kind == ConstraintKind::ArgumentConversion) {
             // We can potentially convert from an UnsafeMutablePointer
             // of a different type, if we're a void pointer.
             Type unwrappedType1 = type1;
@@ -3846,7 +3842,6 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
 
   // Explicit bridging from a value type to an Objective-C class type.
   if (unwrappedFromType->isPotentiallyBridgedValueType() &&
-      !flags.contains(TMF_ApplyingOperatorParameter) &&
       (unwrappedToType->isBridgeableObjectType() ||
        (unwrappedToType->isExistentialType() &&
         !unwrappedToType->isAny()))) {
@@ -4450,19 +4445,11 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // For a function, bind the output and convert the argument to the input.
   auto func1 = type1->castTo<FunctionType>();
   if (auto func2 = dyn_cast<FunctionType>(desugar2)) {
-    // If this application is part of an operator, then we allow an implicit
-    // lvalue to be compatible with inout arguments.  This is used by
-    // assignment operators.
-    bool isOperator = (isa<PrefixUnaryExpr>(anchor) ||
-                       isa<PostfixUnaryExpr>(anchor) ||
-                       isa<BinaryExpr>(anchor));
-
     // The argument type must be convertible to the input type.
-    if (::matchCallArguments(*this, isOperator,
-                             func1->getParams(),
-                             func2->getParams(),
-                             outerLocator.withPathElement(
-                               ConstraintLocator::ApplyArgument)).isFailure())
+    if (::matchCallArguments(
+            *this, func1->getParams(), func2->getParams(),
+            outerLocator.withPathElement(ConstraintLocator::ApplyArgument))
+            .isFailure())
       return SolutionKind::Error;
 
     // The result types are equivalent.
@@ -4564,12 +4551,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     
     return SolutionKind::Unsolved;
   };
-
-  // We'll apply user conversions for operator arguments at the application
-  // site.
-  if (matchKind == ConstraintKind::OperatorArgumentConversion) {
-    flags |= TMF_ApplyingOperatorParameter;
-  }
 
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
