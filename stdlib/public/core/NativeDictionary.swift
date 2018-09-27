@@ -416,10 +416,6 @@ extension _NativeDictionary { // Insertions
     if found {
       let oldValue = (_values + bucket.offset).move()
       (_values + bucket.offset).initialize(to: value)
-      // FIXME: Replacing the old key with the new is unnecessary, unintuitive,
-      // and actively harmful to some usecases. We shouldn't do it.
-      // rdar://problem/32144087
-      (_keys + bucket.offset).pointee = key
       return oldValue
     }
     _insert(at: bucket, key: key, value: value)
@@ -435,10 +431,6 @@ extension _NativeDictionary { // Insertions
     let (bucket, found) = mutatingFind(key, isUnique: isUnique)
     if found {
       (_values + bucket.offset).pointee = value
-      // FIXME: Replacing the old key with the new is unnecessary, unintuitive,
-      // and actively harmful to some usecases. We shouldn't do it.
-      // rdar://problem/32144087
-      (_keys + bucket.offset).pointee = key
     } else {
       _insert(at: bucket, key: key, value: value)
     }
