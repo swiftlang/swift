@@ -251,7 +251,7 @@ extension _NativeDictionary {
   @inline(__always)
   func validate(_ index: Index) {
     _precondition(hashTable.isOccupied(index.bucket) && index.age == age,
-      "Attempting to access Dictionary elements using an invalid Index")
+      "Attempting to access Dictionary elements using an invalid index")
   }
 
   @inlinable
@@ -269,7 +269,7 @@ extension _NativeDictionary {
       let key = _forceBridgeFromObjectiveC(cocoa.key, Key.self)
       guard let index = self.index(forKey: key) else {
         _preconditionFailure(
-          "Attempting to access Dictionary elements using an invalid Index")
+          "Attempting to access Dictionary elements using an invalid index")
       }
       return index.bucket
 #endif
