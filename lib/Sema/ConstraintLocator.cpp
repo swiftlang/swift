@@ -45,10 +45,6 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
       id.AddPointer(elt.getWitness());
       break;
 
-    case AssociatedType:
-      id.AddPointer(elt.getAssociatedType());
-      break;
-
     case ApplyArgument:
     case ApplyFunction:
     case FunctionArgument:
@@ -115,11 +111,6 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
     switch (elt.getKind()) {
     case Archetype:
       out << "archetype '" << elt.getArchetype()->getString() << "'";
-      break;
-
-    case AssociatedType:
-      out << "associated type '"
-          << elt.getAssociatedType()->getNameStr() << "'";
       break;
 
     case ApplyArgument:
