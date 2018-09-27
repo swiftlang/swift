@@ -63,10 +63,6 @@ public:
     ///
     /// Also contains the archetype itself.
     Archetype,
-    /// An associated type reference.
-    ///
-    /// Contains the associated type itself.
-    AssociatedType,
     /// \brief The argument type of a function.
     FunctionArgument,
     /// \brief The result type of a function.
@@ -138,7 +134,6 @@ public:
     case ApplyArgument:
     case ApplyFunction:
     case Archetype:
-    case AssociatedType:
     case FunctionArgument:
     case FunctionResult:
     case OptionalPayload:
@@ -211,7 +206,6 @@ public:
     case SubscriptMember:
     case OpenedGeneric:
     case Archetype:
-    case AssociatedType:
     case GenericArgument:
     case NamedTupleElement:
     case TupleElement:
@@ -316,13 +310,6 @@ public:
               (kind == Witness && getWitness() == decl)));
     }
 
-    PathElement(AssociatedTypeDecl *decl)
-      : storage((reinterpret_cast<uintptr_t>(decl) >> 2)),
-        storedKind(StoredRequirement)
-    {
-      assert(getAssociatedType() == decl);
-    }
-
     /// \brief Retrieve a path element for a tuple element referred to by
     /// its position.
     static PathElement getTupleElement(unsigned position) {
@@ -370,8 +357,7 @@ public:
         return Archetype;
 
       case StoredRequirement:
-        return isa<AssociatedTypeDecl>(getRequirement()) ? AssociatedType
-                                                         : Requirement;
+        return Requirement;
 
       case StoredWitness:
         return Witness;
@@ -425,12 +411,6 @@ public:
       assert((static_cast<StoredKind>(storedKind) == StoredRequirement) &&
              "Is not a requirement");
       return reinterpret_cast<ValueDecl *>(storage << 2);
-    }
-
-    /// Retrieve the declaration for an associated type path element.
-    AssociatedTypeDecl *getAssociatedType() const {
-      assert(getKind() == AssociatedType && "Is not an associated type");
-      return reinterpret_cast<AssociatedTypeDecl *>(storage << 2);
     }
 
     /// \brief Return the summary flags for this particular element.

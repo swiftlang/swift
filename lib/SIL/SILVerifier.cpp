@@ -2527,7 +2527,7 @@ public:
     assert(!methodTy->isCoroutine());
 
     // Map interface types to archetypes.
-    if (auto *env = constantInfo.GenericEnv) {
+    if (auto *env = F.getModule().Types.getConstantGenericEnvironment(method)) {
       auto subs = env->getForwardingSubstitutionMap();
       methodTy = methodTy->substGenericArgs(F.getModule(), subs);
     }
