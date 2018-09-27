@@ -1462,7 +1462,7 @@ public:
 };
 
 // A private class for forcing exact field layout.
-class _GenericContext {
+class alignas(8) _GenericContext {
 // Not really public. See GenericContext.
 public:
   GenericParamList *GenericParams = nullptr;
