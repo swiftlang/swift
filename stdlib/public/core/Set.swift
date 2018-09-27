@@ -1352,7 +1352,8 @@ extension Set.Index {
       return nativeIndex
 #if _runtime(_ObjC)
     case .cocoa:
-      _sanityCheckFailure("internal error: does not contain a native index")
+      _preconditionFailure(
+        "Attempting to access Set elements using an invalid index")
 #endif
     }
   }
@@ -1362,7 +1363,8 @@ extension Set.Index {
   internal var _asCocoa: _CocoaSet.Index {
     switch _variant {
     case .native:
-      _sanityCheckFailure("internal error: does not contain a Cocoa index")
+      _preconditionFailure(
+        "Attempting to access Set elements using an invalid index")
     case .cocoa(let cocoaIndex):
       return cocoaIndex
     }
