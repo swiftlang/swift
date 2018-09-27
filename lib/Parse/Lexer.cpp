@@ -1817,6 +1817,12 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
         // Successfully scanned the body of the expression literal.
         ++CurPtr;
         continue;
+      } else if ((*CurPtr == '\r' || *CurPtr == '\n') && IsMultilineString) {
+        // The only case we reach here is unterminated single line string in the
+        // interpolation. For better recovery, go on after emitting an error.
+        diagnose(CurPtr, diag::lex_unterminated_string);
+        wasErroneous = true;
+        continue;
       }
 
       // Being diagnosed below.

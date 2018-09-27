@@ -56,7 +56,7 @@ NullablePtr<SILInstruction> createDecrementBefore(SILValue Ptr,
 /// \brief For each of the given instructions, if they are dead delete them
 /// along with their dead operands.
 ///
-/// \param I The instruction to be deleted.
+/// \param I The ArrayRef of instructions to be deleted.
 /// \param Force If Force is set, don't check if the top level instructions
 ///        are considered dead - delete them regardless.
 /// \param C a callback called whenever an instruction is deleted.
@@ -358,10 +358,10 @@ public:
 
     // Create block arguments.
     for (unsigned ArgIdx : range(EdgeBB->getNumArguments())) {
-      auto *DestPHIArg = cast<SILPHIArgument>(EdgeBB->getArgument(ArgIdx));
+      auto *DestPHIArg = cast<SILPhiArgument>(EdgeBB->getArgument(ArgIdx));
       assert(BI->getArg(ArgIdx)->getType() == DestPHIArg->getType() &&
              "Types must match");
-      auto *BlockArg = DestBB->createPHIArgument(
+      auto *BlockArg = DestBB->createPhiArgument(
           DestPHIArg->getType(), DestPHIArg->getOwnershipKind());
       ValueMap[DestPHIArg] = SILValue(BlockArg);
       AvailVals.push_back(std::make_pair(DestPHIArg, BlockArg));

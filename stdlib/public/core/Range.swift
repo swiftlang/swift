@@ -619,7 +619,7 @@ extension PartialRangeFrom: Sequence
 
   /// Returns an iterator for this sequence.
   @inlinable
-  public func makeIterator() -> Iterator { 
+  public __consuming func makeIterator() -> Iterator { 
     return Iterator(_current: lowerBound) 
   }
 }

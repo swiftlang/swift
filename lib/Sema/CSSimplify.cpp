@@ -114,7 +114,7 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
   }
   
   auto params = levelTy->getParams();
-  llvm::SmallBitVector defaultMap =
+  SmallBitVector defaultMap =
     computeDefaultMap(params, decl, parameterDepth);
 
   MatchCallArgumentListener listener;
@@ -138,7 +138,7 @@ static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
 bool constraints::
 matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
                    ArrayRef<AnyFunctionType::Param> params,
-                   const llvm::SmallBitVector &defaultMap,
+                   const SmallBitVector &defaultMap,
                    bool hasTrailingClosure,
                    bool allowFixes,
                    MatchCallArgumentListener &listener,
@@ -770,7 +770,7 @@ constraints::matchCallArguments(ConstraintSystem &cs, bool isOperator,
   std::tie(callee, calleeLevel, argLabels, hasTrailingClosure) =
     getCalleeDeclAndArgs(cs, locator, argLabelsScratch);
 
-  llvm::SmallBitVector defaultMap =
+  SmallBitVector defaultMap =
     computeDefaultMap(params, callee, calleeLevel);
 
   // Apply labels to arguments.
@@ -2700,6 +2700,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     }
     return result;
   }
+
+  // Let's not try to fix missing conformance for Void
+  // and Never because that doesn't really make sense.
+  if (type->isVoid() || type->isUninhabited())
+    return SolutionKind::Error;
 
   // If this is a generic requirement let's try to record that
   // conformance is missing and consider this a success, which

@@ -118,8 +118,11 @@ Optional<Type> ConstraintSystem::checkTypeOfBinding(TypeVariableType *typeVar,
     return None;
   }
 
-  // Don't bind to a dependent member type.
-  if (type->is<DependentMemberType>()) return None;
+  // Don't bind to a dependent member type, even if it's currently
+  // wrapped in any number of optionals, because binding producer
+  // might unwrap and try to attempt it directly later.
+  if (type->lookThroughAllOptionalTypes()->is<DependentMemberType>())
+    return None;
 
   // Okay, allow the binding (with the simplified type).
   return type;
@@ -1565,6 +1568,21 @@ Constraint *ConstraintSystem::selectApplyDisjunction() {
   }
 
   return nullptr;
+}
+
+void ConstraintSystem::partitionDisjunction(
+    ArrayRef<Constraint *> Choices, SmallVectorImpl<unsigned> &Ordering,
+    SmallVectorImpl<unsigned> &PartitionBeginning) {
+  // Maintain the original ordering, and make a single partition of
+  // disjunction choices.
+  auto originalOrdering = [&]() {
+    for (unsigned long i = 0, e = Choices.size(); i != e; ++i)
+      Ordering.push_back(i);
+
+    PartitionBeginning.push_back(0);
+  };
+
+  originalOrdering();
 }
 
 Constraint *ConstraintSystem::selectDisjunction() {

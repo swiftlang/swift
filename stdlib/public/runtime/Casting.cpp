@@ -667,7 +667,7 @@ static bool _dynamicCastFromAnyHashable(OpaqueValue *destination,
 /******************************** Existentials ********************************/
 /******************************************************************************/
 
-#if !SWIFT_OBJC_INTEROP // _SwiftValue is a native class
+#if !SWIFT_OBJC_INTEROP // __SwiftValue is a native class
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 bool swift_swiftValueConformsTo(const Metadata *destinationType);
 
@@ -771,7 +771,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
         maybeDeallocateSource(true);
         return true;
       }
-#else // !SWIFT_OBJC_INTEROP -- _SwiftValue is a native class
+#else // !SWIFT_OBJC_INTEROP -- __SwiftValue is a native class
 	  bool isMetatype = kind == MetadataKind::ExistentialMetatype || kind == MetadataKind::Metatype;
 	  if (!isMetatype && (isTargetTypeAnyObject || swift_swiftValueConformsTo(targetType))) {
 		  auto object = _bridgeAnythingToObjectiveC(src, srcType);
@@ -1887,17 +1887,17 @@ checkDynamicCastFromOptional(OpaqueValue *dest,
 }
 
 /******************************************************************************/
-/**************************** Bridging _SwiftValue ****************************/
+/**************************** Bridging __SwiftValue ****************************/
 /******************************************************************************/
 
-#if !SWIFT_OBJC_INTEROP // _SwiftValue is a native class
+#if !SWIFT_OBJC_INTEROP // __SwiftValue is a native class
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 bool swift_unboxFromSwiftValueWithType(OpaqueValue *source,
                                        OpaqueValue *result,
                                        const Metadata *destinationType);
 #endif
 
-/// Try to unbox a _SwiftValue box to perform a dynamic cast.
+/// Try to unbox a __SwiftValue box to perform a dynamic cast.
 static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
                                           OpaqueValue *src,
                                           const Metadata *srcType,
@@ -1914,18 +1914,18 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
       return false;
   }
   
-#if !SWIFT_OBJC_INTEROP // _SwiftValue is a native class:
+#if !SWIFT_OBJC_INTEROP // __SwiftValue is a native class:
   if (swift_unboxFromSwiftValueWithType(src, dest, targetType)) {
     return true;
   }
 #endif
   
-#if SWIFT_OBJC_INTEROP // _SwiftValue is an ObjC class:
+#if SWIFT_OBJC_INTEROP // __SwiftValue is an ObjC class:
   id srcObject;
   memcpy(&srcObject, src, sizeof(id));
   
-  // Do we have a _SwiftValue?
-  _SwiftValue *srcSwiftValue = getAsSwiftValue(srcObject);
+  // Do we have a __SwiftValue?
+  __SwiftValue *srcSwiftValue = getAsSwiftValue(srcObject);
   if (!srcSwiftValue)
     return false;
   
@@ -2258,7 +2258,7 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
   if (!srcType)
     return unwrapResult.success;
 
-  // A class or AnyObject reference may point to a _SwiftValue box.
+  // A class or AnyObject reference may point to a __SwiftValue box.
   {
     auto innerFlags = flags - DynamicCastFlags::Unconditional
                             - DynamicCastFlags::DestroyOnFailure;
@@ -2268,8 +2268,8 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
       return true;
     } else {
       // Couldn't cast boxed value to targetType.
-      // Fall through and try to cast the _SwiftValue box itself to targetType.
-      // (for example, casting _SwiftValue to NSObject will be successful)
+      // Fall through and try to cast the __SwiftValue box itself to targetType.
+      // (for example, casting __SwiftValue to NSObject will be successful)
     }
   }
 
@@ -2718,7 +2718,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
   return success;
 }
 
-#if !SWIFT_OBJC_INTEROP // _SwiftValue is a native class:
+#if !SWIFT_OBJC_INTEROP // __SwiftValue is a native class:
 
 
 

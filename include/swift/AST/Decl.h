@@ -3116,6 +3116,16 @@ public:
   /// called to make it immediately visible.
   void makeMemberVisible(ValueDecl *member);
 
+  /// Special-behaviour flags passed to lookupDirect()
+  enum class LookupDirectFlags {
+    /// Whether to avoid loading any new extension.
+    /// Used by the module loader to break recursion.
+    IgnoreNewExtensions = 1 << 0,
+    /// Whether to include @_implements members.
+    /// Used by conformance-checking to find special @_implements members.
+    IncludeAttrImplements = 1 << 1,
+  };
+
   /// Find all of the declarations with the given name within this nominal type
   /// and its extensions.
   ///
@@ -3123,11 +3133,9 @@ public:
   /// protocols to which the nominal type conforms. Furthermore, the resulting
   /// set of declarations has not been filtered for visibility, nor have
   /// overridden declarations been removed.
-  ///
-  /// \param ignoreNewExtensions Whether to avoid loading any new extension.
-  /// Used by the module loader to break recursion.
   TinyPtrVector<ValueDecl *> lookupDirect(DeclName name,
-                                          bool ignoreNewExtensions = false);
+                                          OptionSet<LookupDirectFlags> flags =
+                                          OptionSet<LookupDirectFlags>());
 
   /// Collect the set of protocols to which this type should implicitly
   /// conform, such as AnyObject (for classes).
@@ -5463,10 +5471,6 @@ public:
     Bits.FuncDecl.SelfAccess = static_cast<unsigned>(mod);
   }
 
-  /// \returns true if this is non-mutating due to applying a 'mutating'
-  /// attribute. For example a "mutating set" accessor.
-  bool isExplicitNonMutating() const;
-
   SourceLoc getStaticLoc() const { return StaticLoc; }
   SourceLoc getFuncLoc() const { return FuncLoc; }
 
@@ -5673,6 +5677,13 @@ public:
     }
     llvm_unreachable("bad accessor kind");
   }
+
+  /// \returns true if this is non-mutating due to applying a 'mutating'
+  /// attribute. For example a "mutating set" accessor.
+  bool isExplicitNonMutating() const;
+
+  /// Is the accesor one of the kinds that's assumed nonmutating by default?
+  bool isAssumedNonMutating() const;
 
   /// Is this accessor one of the kinds that's implicitly a coroutine?
   bool isCoroutine() const {

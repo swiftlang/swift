@@ -30,11 +30,11 @@ internal struct _SipHashState {
   fileprivate var v3: UInt64 = 0x7465646279746573
 
   @inline(__always)
-  fileprivate init(seed: (UInt64, UInt64)) {
-    v3 ^= seed.1
-    v2 ^= seed.0
-    v1 ^= seed.1
-    v0 ^= seed.0
+  fileprivate init(rawSeed: (UInt64, UInt64)) {
+    v3 ^= rawSeed.1
+    v2 ^= rawSeed.0
+    v1 ^= rawSeed.1
+    v0 ^= rawSeed.0
   }
 
   @inline(__always)
@@ -65,11 +65,6 @@ internal struct _SipHashState {
   fileprivate func _extract() -> UInt64 {
     return v0 ^ v1 ^ v2 ^ v3
   }
-
-  @inline(__always)
-  fileprivate func _generateSeed() -> (UInt64, UInt64) {
-    return (v0 &+ v1, v2 ^ v3)
-  }
 }
 
 // FIXME: Remove @usableFromInline and @_fixed_layout once Hasher is resilient.
@@ -79,8 +74,8 @@ internal struct _SipHash13Core: _HasherCore {
   private var _state: _SipHashState
 
   @inline(__always)
-  internal init(seed: (UInt64, UInt64)) {
-    _state = _SipHashState(seed: seed)
+  internal init(rawSeed: (UInt64, UInt64)) {
+    _state = _SipHashState(rawSeed: rawSeed)
   }
 
   @inline(__always)
@@ -99,19 +94,14 @@ internal struct _SipHash13Core: _HasherCore {
     }
     return _state._extract()
   }
-
-  @inline(__always)
-  internal func _generateSeed() -> (UInt64, UInt64) {
-    return _state._generateSeed()
-  }
 }
 
 internal struct _SipHash24Core: _HasherCore {
   private var _state: _SipHashState
 
   @inline(__always)
-  internal init(seed: (UInt64, UInt64)) {
-    _state = _SipHashState(seed: seed)
+  internal init(rawSeed: (UInt64, UInt64)) {
+    _state = _SipHashState(rawSeed: rawSeed)
   }
 
   @inline(__always)
@@ -132,23 +122,20 @@ internal struct _SipHash24Core: _HasherCore {
     }
     return _state._extract()
   }
-
-  @inline(__always)
-  internal func _generateSeed() -> (UInt64, UInt64) {
-    return _state._generateSeed()
-  }
 }
 
 // FIXME: This type only exists to facilitate testing, and should not exist in
 // production builds.
 @usableFromInline // @testable
 internal struct _SipHash13 {
-  internal typealias Core = _BufferingHasher<_SipHash13Core>
+  internal typealias Core = _SipHash13Core
 
-  internal var _core: Core
+  internal var _core: _BufferingHasher<Core>
 
   @usableFromInline // @testable
-  internal init(_seed: (UInt64, UInt64)) { _core = Core(seed: _seed) }
+  internal init(_rawSeed: (UInt64, UInt64)) {
+    _core = _BufferingHasher(core: Core(rawSeed: _rawSeed))
+  }
   @usableFromInline // @testable
   internal mutating func _combine(_ v: UInt) { _core.combine(v) }
   @usableFromInline // @testable
@@ -178,12 +165,14 @@ internal struct _SipHash13 {
 // production builds.
 @usableFromInline // @testable
 internal struct _SipHash24 {
-  internal typealias Core = _BufferingHasher<_SipHash24Core>
+  internal typealias Core = _SipHash24Core
 
-  internal var _core: Core
+  internal var _core: _BufferingHasher<Core>
 
   @usableFromInline // @testable
-  internal init(_seed: (UInt64, UInt64)) { _core = Core(seed: _seed) }
+  internal init(_rawSeed: (UInt64, UInt64)) {
+    _core = _BufferingHasher(core: Core(rawSeed: _rawSeed))
+  }
   @usableFromInline // @testable
   internal mutating func _combine(_ v: UInt) { _core.combine(v) }
   @usableFromInline // @testable

@@ -30,28 +30,79 @@ func unsupportedOn32bit() -> Never { _conditionallyUnreachable() }
 @_fixed_layout public struct _SmallUTF8String {}
 
 #else
+//
+// The low byte of the first word (low) stores the first code unit. Up to 15
+// such code units are encodable, with the second-highest byte of the second
+// word (high) being the final code unit. The high byte of the final word
+// stores the count.
+//
+// The low and high values are automatically stored in little-endian byte order
+// by the _RawBitPattern struct, which reverses the byte order as needed to
+// convert between the little-endian storage format and the host byte order.
+// The memory layout of the _RawBitPattern struct will therefore be identical
+// on both big- and little-endian machines. The values of 'high' and 'low'
+// will also appear to be identical. Routines which build, manipulate and
+// convert small strings should therefore always assume little-endian byte
+// order.
+//
+// Storage layout:
+//
+//   |0 1 2 3 4 5 6 7 8 9 a b c d e f| ← offset
+//   |      low      |     high      | ← properties
+//   |            string           | | ← encoded layout
+//    ↑                             ↑
+//    first (low) byte          count
+//
+// Examples:
+//                                                  ! o l l e H         6
+//   |H e l l o ! ░ ░ ░ ░ ░ ░ ░ ░ ░|6| → low=0x0000216f6c6c6548 high=0x0600000000000000
+//
+//                                              W   , o l l e H        13     ! d l r o
+//   |H e l l o ,   W o r l d ! ░ ░|d| → low=0x57202c6f6c6c6548 high=0x0d000021646c726f
+//
 @_fixed_layout
 @usableFromInline
 internal struct _SmallUTF8String {
+  @_fixed_layout
   @usableFromInline
-  typealias _RawBitPattern = (low: UInt, high: UInt)
+  internal struct _RawBitPattern: Equatable {
+    // high and low are stored in little-endian byte order
+    @usableFromInline
+    internal var _storage: (low: UInt, high: UInt)
 
-  //
-  // TODO: pretty ASCII art.
-  //
-  // TODO: endianess awareness day
-  //
-  // The low byte of the first word stores the first code unit. There is up to
-  // 15 such code units encodable, with the second-highest byte of the second
-  // word being the final code unit. The high byte of the final word stores the
-  // count.
-  //
+    @inlinable
+    var low: UInt {
+      @inline(__always) get { return _storage.low.littleEndian }
+      @inline(__always) set { _storage.low = newValue.littleEndian }
+    }
+
+    @inlinable
+    var high: UInt {
+      @inline(__always) get { return _storage.high.littleEndian }
+      @inline(__always) set { _storage.high = newValue.littleEndian }
+    }
+
+    @inlinable
+    @inline(__always)
+    init(low l: UInt, high h: UInt) {
+      // host byte order to little-endian byte order
+      _storage.low = l.littleEndian
+      _storage.high = h.littleEndian
+    }
+
+    @inlinable
+    @inline(__always)
+    static func == (lhs: _RawBitPattern, rhs: _RawBitPattern) -> Bool {
+      return lhs._storage == rhs._storage
+    }
+  }
+
   @usableFromInline
-  var _storage: _RawBitPattern = (0,0)
+  var _storage: _RawBitPattern
   @inlinable
   @inline(__always)
   init() {
-    self._storage = (0,0)
+    self._storage = _RawBitPattern(low: 0, high: 0)
   }
 }
 #endif // 64-bit
@@ -150,7 +201,7 @@ extension _SmallUTF8String {
     }
     high |= (UInt(count) &<< (8*15))
     let low = _bytesToUInt(addr, lowCount)
-    _storage = (low, high)
+    _storage = _RawBitPattern(low: low, high: high)
 
     // FIXME: support transcoding
     if !self.isASCII { return nil }
@@ -585,7 +636,8 @@ extension _SmallUTF8String {
 extension _SmallUTF8String {
   @inlinable
   @inline(__always)
-  init(_rawBits: _RawBitPattern) {
+  init(_rawBits: (low: UInt, high: UInt)) {
+    self.init()
     self._storage.low = _rawBits.low
     self._storage.high = _rawBits.high
     _invariantCheck()
@@ -831,8 +883,6 @@ func _castBufPtr<A, B>(
 
 extension UInt {
   // Fetches the `i`th byte, from least-significant to most-significant
-  //
-  // TODO: endianess awareness day
   @inlinable
   @inline(__always)
   func _uncheckedGetByte(at i: Int) -> UInt8 {

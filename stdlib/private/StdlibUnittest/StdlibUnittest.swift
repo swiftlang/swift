@@ -2378,7 +2378,7 @@ public func checkHashable<Instances: Collection>(
           """,
           stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
         expectEqual(
-          x._rawHashValue(seed: (0, 0)), y._rawHashValue(seed: (0, 0)),
+          x._rawHashValue(seed: 0), y._rawHashValue(seed: 0),
           """
           _rawHashValue expected to match, found to differ
           lhs (at index \(i)): \(x)
@@ -2399,8 +2399,8 @@ public func checkHashable<Instances: Collection>(
           """,
           stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
         expectTrue(
-          (0..<10 as Range<UInt64>).contains { i in
-            x._rawHashValue(seed: (0, i)) != y._rawHashValue(seed: (0, i))
+          (0..<10).contains { i in
+            x._rawHashValue(seed: i) != y._rawHashValue(seed: i)
           },
           """
           _rawHashValue(seed:) expected to differ, found to match

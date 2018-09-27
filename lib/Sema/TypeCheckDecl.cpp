@@ -3828,7 +3828,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (!defaultDefinition.isNull()) {
       if (validateType(
             defaultDefinition,
-            TypeResolution::forContextual(
+            TypeResolution::forInterface(
               assocType->getDeclContext()),
             None)) {
         defaultDefinition.setInvalidType(Context);
@@ -3836,7 +3836,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         // associatedtype X = X is invalid
         auto mentionsItself =
             defaultDefinition.getType().findIf([&](Type type) {
-              if (auto DMT = type->getAs<ArchetypeType>()) {
+              if (auto DMT = type->getAs<DependentMemberType>()) {
                 return DMT->getAssocType() == assocType;
               }
               return false;
@@ -4884,9 +4884,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
                                          ext, inferExtendedTypeReqs,
                                          mustInferRequirements);
 
-  Type extContextType =
-    env->mapTypeIntoContext(extInterfaceType);
-  return { env, extContextType };
+  return { env, extInterfaceType };
 }
 
 void TypeChecker::validateExtension(ExtensionDecl *ext) {
@@ -4910,7 +4908,7 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
   if (validateType(ext->getExtendedTypeLoc(),
-                   TypeResolution::forContextual(dc), options)) {
+                   TypeResolution::forInterface(dc), options)) {
     ext->setInvalid();
     ext->getExtendedTypeLoc().setInvalidType(Context);
     return;

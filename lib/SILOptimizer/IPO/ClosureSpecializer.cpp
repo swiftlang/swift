@@ -410,21 +410,29 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
 
   Builder.setInsertionPoint(AI.getInstruction());
   FullApplySite NewAI;
-  if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
+  switch (AI.getKind()) {
+  case FullApplySiteKind::TryApplyInst: {
+    auto *TAI = cast<TryApplyInst>(AI);
     NewAI = Builder.createTryApply(AI.getLoc(), FRI,
                                    SubstitutionMap(), NewArgs,
                                    TAI->getNormalBB(), TAI->getErrorBB());
     // If we passed in the original closure as @owned, then insert a release
     // right after NewAI. This is to balance the +1 from being an @owned
     // argument to AI.
-    if (CSDesc.isClosureConsumed() && CSDesc.closureHasRefSemanticContext()) {
-      Builder.setInsertionPoint(TAI->getNormalBB()->begin());
-      Builder.createReleaseValue(Closure->getLoc(), Closure, Builder.getDefaultAtomicity());
-      Builder.setInsertionPoint(TAI->getErrorBB()->begin());
-      Builder.createReleaseValue(Closure->getLoc(), Closure, Builder.getDefaultAtomicity());
-      Builder.setInsertionPoint(AI.getInstruction());
+    if (!CSDesc.isClosureConsumed() || !CSDesc.closureHasRefSemanticContext()) {
+      break;
     }
-  } else {
+
+    Builder.setInsertionPoint(TAI->getNormalBB()->begin());
+    Builder.createReleaseValue(Closure->getLoc(), Closure,
+                               Builder.getDefaultAtomicity());
+    Builder.setInsertionPoint(TAI->getErrorBB()->begin());
+    Builder.createReleaseValue(Closure->getLoc(), Closure,
+                               Builder.getDefaultAtomicity());
+    Builder.setInsertionPoint(AI.getInstruction());
+    break;
+  }
+  case FullApplySiteKind::ApplyInst: {
     auto oldApply = cast<ApplyInst>(AI);
     auto newApply = Builder.createApply(oldApply->getLoc(), FRI,
                                         SubstitutionMap(),
@@ -438,6 +446,10 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
 
     // Replace all uses of the old apply with the new apply.
     oldApply->replaceAllUsesWith(newApply);
+    break;
+  }
+  case FullApplySiteKind::BeginApplyInst:
+    llvm_unreachable("Unhandled case");
   }
     
   // Erase the old apply.
@@ -937,6 +949,16 @@ static bool isClosureAppliedIn(SILFunction *Callee, unsigned closureArgIdx,
   return false;
 }
 
+static bool canSpecializeFullApplySite(FullApplySiteKind kind) {
+  switch (kind) {
+  case FullApplySiteKind::TryApplyInst:
+  case FullApplySiteKind::ApplyInst:
+    return true;
+  case FullApplySiteKind::BeginApplyInst:
+    return false;
+  }
+}
+
 bool SILClosureSpecializerTransform::gatherCallSites(
     SILFunction *Caller,
     llvm::SmallVectorImpl<std::unique_ptr<ClosureInfo>> &ClosureCandidates,
@@ -986,7 +1008,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
           Uses.append(CFI->getUses().begin(), CFI->getUses().end());
           continue;
         }
-        if (auto *Cvt= dyn_cast<ConvertEscapeToNoEscapeInst>(Use->getUser())) {
+        if (auto *Cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(Use->getUser())) {
           Uses.append(Cvt->getUses().begin(), Cvt->getUses().end());
           continue;
         }
@@ -1010,11 +1032,12 @@ bool SILClosureSpecializerTransform::gatherCallSites(
           continue;
         }
 
-        // If this use is not an apply inst or an apply inst with
-        // substitutions, there is nothing interesting for us to do, so
-        // continue...
+        // If this use is not a full apply site that we can process or an apply
+        // inst with substitutions, there is nothing interesting for us to do,
+        // so continue...
         auto AI = FullApplySite::isa(Use->getUser());
-        if (!AI || AI.hasSubstitutions())
+        if (!AI || AI.hasSubstitutions() ||
+            !canSpecializeFullApplySite(AI.getKind()))
           continue;
 
         // Check if we have already associated this apply inst with a closure to

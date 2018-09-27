@@ -563,13 +563,12 @@ void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
 
       auto selfTy = FnType->getSelfInstanceType();
       CanType argTy = getTypeInContext(selfTy);
-      if (auto archetype = dyn_cast<ArchetypeType>(argTy)) {
-        setProtocolWitnessTableName(IGF.IGM, selfTable, argTy, selfProto);
-        IGF.setUnscopedLocalTypeData(
-            archetype,
-            LocalTypeDataKind::forAbstractProtocolWitnessTable(selfProto),
-            selfTable);
-      }
+
+      setProtocolWitnessTableName(IGF.IGM, selfTable, argTy, selfProto);
+      IGF.setUnscopedLocalTypeData(
+          argTy,
+          LocalTypeDataKind::forProtocolWitnessTable(conformance),
+          selfTable);
 
       if (conformance.isConcrete()) {
         IGF.bindLocalTypeDataFromSelfWitnessTable(
@@ -1268,13 +1267,9 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
     /// Add reference to the protocol conformance descriptor that generated
     /// this table.
     void addProtocolConformanceDescriptor() {
-      if (Conformance.isBehaviorConformance()) {
-        Table.addNullPointer(IGM.Int8PtrTy);
-      } else {
-        auto descriptor =
-          IGM.getAddrOfProtocolConformanceDescriptor(&Conformance);
-        Table.addBitCast(descriptor, IGM.Int8PtrTy);
-      }
+      auto descriptor =
+        IGM.getAddrOfProtocolConformanceDescriptor(&Conformance);
+      Table.addBitCast(descriptor, IGM.Int8PtrTy);
     }
 
     /// A base protocol is witnessed by a pointer to the conformance
@@ -2196,6 +2191,135 @@ llvm::Constant *WitnessTableBuilder::buildInstantiationFunction() {
   return fn;
 }
 
+namespace {
+  /// Builds a protocol conformance descriptor.
+  class ProtocolConformanceDescriptorBuilder {
+    IRGenModule &IGM;
+    ConstantStructBuilder &B;
+    const NormalProtocolConformance *Conformance;
+    ConformanceFlags Flags;
+
+  public:
+    ProtocolConformanceDescriptorBuilder(
+                                 IRGenModule &IGM,
+                                 ConstantStructBuilder &B,
+                                 const NormalProtocolConformance *conformance)
+    : IGM(IGM), B(B), Conformance(conformance) { }
+
+    void layout() {
+      addProtocol();
+      addConformingType();
+      addWitnessTable();
+      addFlags();
+      addContext();
+      addConditionalRequirements();
+
+      B.suggestType(IGM.ProtocolConformanceDescriptorTy);
+    }
+
+    void addProtocol() {
+      // Relative reference to the protocol descriptor.
+      auto protocol = Conformance->getProtocol();
+      auto descriptorRef = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+                    LinkEntity::forProtocolDescriptor(protocol),
+                    IGM.getPointerAlignment(), IGM.ProtocolDescriptorStructTy);
+      B.addRelativeAddress(descriptorRef);
+    }
+
+    void addConformingType() {
+      // Add a relative reference to the type, with the type reference
+      // kind stored in the flags.
+      auto ref =
+        IGM.getTypeEntityReference(Conformance->getType()->getAnyNominal());
+      B.addRelativeAddress(ref.getValue());
+      Flags = Flags.withTypeReferenceKind(ref.getKind());
+    }
+
+    void addWitnessTable() {
+      using ConformanceKind = ConformanceFlags::ConformanceKind;
+
+      // Figure out what kind of witness table we have.
+      llvm::Constant *witnessTableVar;
+
+      if (Conformance->getConditionalRequirements().empty()) {
+        if (!isDependentConformance(Conformance) &&
+            !Conformance->isSynthesizedNonUnique()) {
+          Flags = Flags.withConformanceKind(ConformanceKind::WitnessTable);
+          witnessTableVar = IGM.getAddrOfWitnessTable(Conformance);
+        } else {
+          Flags = Flags.withConformanceKind(
+                                        ConformanceKind::WitnessTableAccessor);
+          witnessTableVar = IGM.getAddrOfWitnessTableAccessFunction(
+              Conformance, ForDefinition);
+        }
+      } else {
+        Flags =
+          Flags.withConformanceKind(
+              ConformanceKind::ConditionalWitnessTableAccessor)
+            .withNumConditionalRequirements(
+              Conformance->getConditionalRequirements().size());
+
+        witnessTableVar = IGM.getAddrOfWitnessTableAccessFunction(
+          Conformance, ForDefinition);
+      }
+
+      // Relative reference to the witness table.
+      auto witnessTableRef =
+        ConstantReference(witnessTableVar, ConstantReference::Direct);
+      B.addRelativeAddress(witnessTableRef);
+    }
+
+    void addFlags() {
+      // Miscellaneous flags.
+      Flags = Flags.withIsRetroactive(Conformance->isRetroactive());
+      Flags =
+        Flags.withIsSynthesizedNonUnique(Conformance->isSynthesizedNonUnique());
+
+      // Add the flags.
+      B.addInt32(Flags.getIntValue());
+    }
+
+    void addContext() {
+      if (!Conformance->isRetroactive())
+        return;
+
+      auto moduleContext =
+        Conformance->getDeclContext()->getModuleScopeContext();
+      ConstantReference moduleContextRef =
+        IGM.getAddrOfParentContextDescriptor(moduleContext);
+      B.addRelativeAddress(moduleContextRef);
+    }
+
+    void addConditionalRequirements() {
+      if (Conformance->getConditionalRequirements().empty())
+        return;
+
+      auto nominal = Conformance->getType()->getAnyNominal();
+      irgen::addGenericRequirements(IGM, B,
+        nominal->getGenericSignatureOfContext(),
+        Conformance->getConditionalRequirements());
+    }
+  };
+}
+
+void IRGenModule::emitProtocolConformance(
+                                const NormalProtocolConformance *conformance) {
+  // Emit additional metadata to be used by reflection.
+  emitAssociatedTypeMetadataRecord(conformance);
+
+  // Form the protocol conformance descriptor.
+  ConstantInitBuilder initBuilder(*this);
+  auto init = initBuilder.beginStruct();
+  ProtocolConformanceDescriptorBuilder builder(*this, init, conformance);
+  builder.layout();
+
+  auto var =
+    cast<llvm::GlobalVariable>(
+          getAddrOfProtocolConformanceDescriptor(conformance,
+                                                 init.finishAndCreateFuture()));
+  var->setConstant(true);
+}
+
 void IRGenModule::ensureRelativeSymbolCollocation(SILWitnessTable &wt) {
   // Only resilient conformances use relative pointers for witness methods.
   if (wt.isDeclaration() || isAvailableExternally(wt.getLinkage()) ||
@@ -2355,11 +2479,11 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Always emit an accessor function.
   wtableBuilder.buildAccessFunction(global);
 
+  addProtocolConformance(conf);
+
   // Behavior conformances can't be reflected.
   if (conf->isBehaviorConformance())
     return;
-
-  addProtocolConformance(conf);
 
   // Trigger the lazy emission of the foreign type metadata.
   CanType conformingType = conf->getType()->getCanonicalType();
@@ -2508,8 +2632,7 @@ MetadataResponse MetadataPath::follow(IRGenFunction &IGF,
       auto skipRequest =
         (skipI == end ? finalRequest : MetadataState::Abstract);
       if (auto skipResponse =
-            IGF.tryGetConcreteLocalTypeData(skipKey.getCachingKey(),
-                                            skipRequest)) {
+            IGF.tryGetConcreteLocalTypeData(skipKey, skipRequest)) {
         // Advance the baseline information for the source to the current
         // point in the path, then continue the search.
         sourceKey = skipKey;
@@ -2992,19 +3115,17 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   auto concreteConformance = conformance.getConcrete();
   assert(concreteConformance->getProtocol() == proto);
 
+  auto cacheKind =
+    LocalTypeDataKind::forConcreteProtocolWitnessTable(concreteConformance);
+
   // Check immediately for an existing cache entry.
-  auto wtable = IGF.tryGetLocalTypeData(
-    srcType,
-    LocalTypeDataKind::forConcreteProtocolWitnessTable(concreteConformance));
+  auto wtable = IGF.tryGetLocalTypeData(srcType, cacheKind);
   if (wtable) return wtable;
 
   auto &conformanceI = IGF.IGM.getConformanceInfo(proto, concreteConformance);
   wtable = conformanceI.getTable(IGF, srcMetadataCache);
 
-  IGF.setScopedLocalTypeData(
-    srcType,
-    LocalTypeDataKind::forConcreteProtocolWitnessTable(concreteConformance),
-    wtable);
+  IGF.setScopedLocalTypeData(srcType, cacheKind, wtable);
   return wtable;
 }
 

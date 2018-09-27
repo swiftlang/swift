@@ -742,10 +742,10 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
   return FunctionType::get(inputType, resultType, fnType->getExtInfo());
 }
 
-llvm::SmallBitVector
+SmallBitVector
 swift::computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
                          const ValueDecl *paramOwner, unsigned level) {
-  llvm::SmallBitVector resultVector(params.size());
+  SmallBitVector resultVector(params.size());
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
   //

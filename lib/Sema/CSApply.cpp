@@ -639,20 +639,6 @@ namespace {
                               /*isDynamic=*/false);
       }
 
-      auto type = solution.simplifyType(openedType);
-
-      // If we've ended up trying to assign an inout type here, it means we're
-      // missing an ampersand in front of the ref.
-      //
-      // FIXME: This is the wrong place for this diagnostic.
-      if (auto inoutType = type->getAs<InOutType>()) {
-        auto &tc = cs.getTypeChecker();
-        tc.diagnose(loc.getBaseNameLoc(), diag::missing_address_of,
-                    inoutType->getInOutObjectType())
-          .fixItInsert(loc.getBaseNameLoc(), "&");
-        return nullptr;
-      }
-
       SubstitutionMap substitutions;
 
       // Due to a SILGen quirk, unqualified property references do not
@@ -664,6 +650,7 @@ namespace {
             locator);
       }
 
+      auto type = solution.simplifyType(openedType);
       auto declRefExpr =
         new (ctx) DeclRefExpr(ConcreteDeclRef(decl, substitutions),
                               loc, implicit, semantics, type);
@@ -3413,8 +3400,11 @@ namespace {
       // If the destination value type is 'AnyObject' when performing a
       // bridging operation, or if the destination value type could dynamically
       // be an optional type, leave any extra optionals on the source in place.
-      if (isBridgeToAnyObject || destValueType->canDynamicallyBeOptionalType(
-                                              /* includeExistential */ false)) {
+      // Only apply the latter condition in Swift 5 mode to best preserve
+      // compatibility with Swift 4.1's casting behaviour.
+      if (isBridgeToAnyObject || (tc.Context.isSwiftVersionAtLeast(5) &&
+                                  destValueType->canDynamicallyBeOptionalType(
+                                      /*includeExistential*/ false))) {
         auto destOptionalsCount = destOptionals.size() - destExtraOptionals;
         if (srcOptionals.size() > destOptionalsCount) {
           srcType = srcOptionals[destOptionalsCount];
@@ -5520,7 +5510,7 @@ Expr *ExprRewriter::coerceCallArguments(
   unsigned level = apply ? computeCallLevel(cs, callee, apply) : 0;
 
   // Determine the parameter bindings.
-  llvm::SmallBitVector defaultMap
+  SmallBitVector defaultMap
     = computeDefaultMap(params, callee.getDecl(), level);
 
   SmallVector<AnyFunctionType::Param, 8> args;

@@ -128,18 +128,19 @@ class KlassWithBuffer {
   // then return that value.
   // CHECK-LABEL: sil hidden @$ss15KlassWithBufferC03getC14AsNativeObjectBoyF : $@convention(method) (@guaranteed KlassWithBuffer) -> @owned Builtin.NativeObject {
   // CHECK: bb0([[SELF:%.*]] : @guaranteed $KlassWithBuffer):
-  // CHECK:   [[BUF_BOX:%.*]] = alloc_stack $Buffer
   // CHECK:   [[METHOD:%.*]] = class_method [[SELF]] : $KlassWithBuffer, #KlassWithBuffer.buffer!getter.1
   // CHECK:   [[BUF:%.*]] = apply [[METHOD]]([[SELF]])
-  // CHECK:   store [[BUF]] to [init] [[BUF_BOX]]
-  // CHECK:   [[GEP:%.*]] = struct_element_addr [[BUF_BOX]] : $*Buffer, #Buffer.k
-  // CHECK:   [[BUF_KLASS:%.*]] = load [copy] [[GEP]]
-  // CHECK:   destroy_addr [[BUF_BOX]]
-  // CHECK:   [[BORROWED_BUF_KLASS:%.*]] = begin_borrow [[BUF_KLASS]]
-  // CHECK:   [[CASTED_BORROWED_BUF_KLASS:%.*]] = unchecked_ref_cast [[BORROWED_BUF_KLASS]]
+  // CHECK:   [[BUF_BORROW:%.*]] = begin_borrow [[BUF]]
+  // CHECK:   [[K:%.*]] = struct_extract [[BUF_BORROW]] : $Buffer, #Buffer.k
+  // CHECK:   [[COPIED_K:%.*]] = copy_value [[K]]
+  //   FIXME: this borrow-and-copy is really dumb and unnecessary
+  // CHECK:   [[COPIED_BORROWED_K:%.*]] = begin_borrow [[COPIED_K]]
+  // CHECK:   [[CASTED_BORROWED_BUF_KLASS:%.*]] = unchecked_ref_cast [[COPIED_BORROWED_K]]
   // CHECK:   [[COPY_CASTED_BORROWED_BUF_KLASS:%.*]] = copy_value [[CASTED_BORROWED_BUF_KLASS]]
-  // CHECK:   end_borrow [[BORROWED_BUF_KLASS]]
-  // CHECK:   destroy_value [[BUF_KLASS]]
+  // CHECK:   end_borrow  [[COPIED_BORROWED_K]]
+  // CHECK:   destroy_value [[COPIED_K]]
+  // CHECK:   end_borrow [[BUF_BORROW]]
+  // CHECK:   destroy_value [[BUF]]
   // CHECK:   return [[COPY_CASTED_BORROWED_BUF_KLASS]]
   // CHECK: } // end sil function '$ss15KlassWithBufferC03getC14AsNativeObjectBoyF'
   func getBufferAsNativeObject() -> Builtin.NativeObject {

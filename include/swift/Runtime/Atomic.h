@@ -22,7 +22,7 @@
 // is formally UB by C++11 language rules, we should be OK because neither
 // the processor model nor the optimizer can realistically reorder our uses
 // of 'consume'.
-#if __arm64__ || __arm__
+#if defined(__arm__) || defined(_M_ARM) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
 #  define SWIFT_MEMORY_ORDER_CONSUME (std::memory_order_relaxed)
 #else
 #  define SWIFT_MEMORY_ORDER_CONSUME (std::memory_order_consume)

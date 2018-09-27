@@ -152,11 +152,31 @@ bb0:
   // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s18static_initializer16TestArrayStorageCMa"(i64 0)
   // CHECK: [[MD:%[0-9]+]] = extractvalue %swift.metadata_response [[TMP]], 0
   // CHECK: [[O:%[0-9a-z]+]] = call %swift.refcounted* @swift_initStaticObject(%swift.type* [[MD]], %swift.refcounted* getelementptr inbounds (%T18static_initializer16TestArrayStorageC_tailelems0c, %T18static_initializer16TestArrayStorageC_tailelems0c* @static_array, i32 0, i32 1, i32 0))
-  // CHECK: [[R:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %T18static_initializer16TestArrayStorageC_tailelems0*
-  // CHECK: [[R2:%[0-9]+]] = bitcast %T18static_initializer16TestArrayStorageC_tailelems0* [[R]] to %T18static_initializer16TestArrayStorageC*
-  // CHECK: ret %T18static_initializer16TestArrayStorageC* [[R2]]
+  // CHECK: [[R:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %T18static_initializer16TestArrayStorageC*
+  // CHECK: ret %T18static_initializer16TestArrayStorageC* [[R]]
   %0 = global_value @static_array : $TestArrayStorage
   %1 = struct $TestArray (%0 : $TestArrayStorage)
   return %1 : $TestArray
 }
 
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %T18static_initializer16TestArrayStorageC* @phi_nodes(i1, %T18static_initializer16TestArrayStorageC*)
+// CHECK: [[T0:%.*]] = call %swift.refcounted* @swift_initStaticObject
+// CHECK: [[T1:%.*]] = bitcast %swift.refcounted* [[T0]] to %T18static_initializer16TestArrayStorageC*
+// CHECK: br
+// CHECK: br
+// CHECK: [[T3:%.*]] = phi %T18static_initializer16TestArrayStorageC* [ %1, {{.*}} ], [ [[T1]], {{.*}} ]
+// CHECK: ret %T18static_initializer16TestArrayStorageC* [[T3]]
+sil @phi_nodes : $@convention(thin) (Builtin.Int1, TestArrayStorage) -> TestArrayStorage {
+bb0(%0 : $Builtin.Int1, %1 : $TestArrayStorage):
+ cond_br %0, bb1, bb2
+
+bb1:
+  %2 = global_value @static_array : $TestArrayStorage
+  br bb3(%2 : $TestArrayStorage)
+
+bb2:
+  br bb3(%1 : $TestArrayStorage)
+
+bb3(%3 : $TestArrayStorage):
+  return %3 : $TestArrayStorage
+}

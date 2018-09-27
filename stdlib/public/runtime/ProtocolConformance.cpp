@@ -177,26 +177,11 @@ ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
 
   case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor: {
     // Check the conditional requirements.
-    std::vector<unsigned> genericParamCounts;
-    (void)_gatherGenericParameterCounts(type->getTypeContextDescriptor(),
-                                        genericParamCounts);
-    auto genericArgs = type->getGenericArgs();
+    SubstGenericParametersFromMetadata substitutions(type);
     std::vector<const void *> conditionalArgs;
     bool failed =
       _checkGenericRequirements(getConditionalRequirements(), conditionalArgs,
-        [&](unsigned flatIndex) {
-          // FIXME: Adjust for non-key type parameters.
-          return genericArgs[flatIndex];
-        },
-        [&](unsigned depth, unsigned index) -> const Metadata *  {
-          // FIXME: Adjust for non-key type parameters.
-          if (auto flatIndex = _depthIndexToFlatIndex(depth, index,
-                                                      genericParamCounts)) {
-            return genericArgs[*flatIndex];
-          }
-
-          return nullptr;
-        });
+                                substitutions, substitutions);
     if (failed) return nullptr;
 
     return getWitnessTableAccessor()(
@@ -689,12 +674,10 @@ static const Metadata *resolveGenericParamRef(
         protocolDescriptor->getRequirements().data();
 
     // Call the associated type access function.
-    using AssociatedTypeAccessFn =
-      const Metadata *(*)(const Metadata *base, const WitnessTable *);
     unsigned adjustedIndex = index + WitnessTableFirstRequirementOffset;
     current =
-      ((const AssociatedTypeAccessFn *)witnessTable)[adjustedIndex]
-        (current, witnessTable);
+      ((AssociatedTypeAccessFunction * const *)witnessTable)[adjustedIndex]
+        (MetadataState::Abstract, current, witnessTable).Value;
     if (!current) return nullptr;
   }
 
@@ -766,6 +749,8 @@ bool swift::_checkGenericRequirements(
 
       // Check whether it's dynamically castable, which works as a superclass
       // check.
+      // FIXME: We should be explicitly checking the superclass, so we
+      // don't require the subject type to be complete.
       if (!swift_dynamicCastMetatype(subjectType, baseType)) return true;
 
       continue;

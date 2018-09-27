@@ -126,7 +126,7 @@ extension JoinedSequence: Sequence {
   ///
   /// - Complexity: O(1).
   @inlinable // lazy-performance
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(base: _base.makeIterator(), separator: _separator)
   }
 
@@ -184,7 +184,7 @@ extension Sequence where Element : Sequence {
   ///   sequence's elements.
   /// - Returns: The joined sequence of elements.
   @inlinable // lazy-performance
-  public func joined<Separator : Sequence>(
+  public __consuming func joined<Separator : Sequence>(
     separator: Separator
   ) -> JoinedSequence<Self>
     where Separator.Element == Element.Element {

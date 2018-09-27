@@ -104,7 +104,7 @@ extension ReversedCollection: Sequence {
 
   @inlinable
   @inline(__always)
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_base: _base)
   }
 }

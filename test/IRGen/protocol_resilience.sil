@@ -51,7 +51,7 @@ import resilient_protocol
 
 // Requirement signature
 // CHECK-SAME:   i32 128,
-// CHECK-SAME:   @"$sx1T_MXA"
+// CHECK-SAME:   @"$sx1T19protocol_resilience17ResilientProtocolP_MXA"
 // CHECK-SAME:   @"$s19protocol_resilience17ResilientProtocolMp"
 
 // Protocol requirements
@@ -308,7 +308,7 @@ bb0(%0 : $*ConformingStruct):
   // concrete Self type.
 
   // CHECK-NEXT: [[SELF:%.*]] = bitcast %T19protocol_resilience16ConformingStructV* %0 to %swift.opaque*
-  // CHECK-NEXT: call swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself [[SELF]], %swift.type* bitcast ({{i32|i64}}* {{.*}}) to %swift.type*), i8** getelementptr inbounds ([9 x i8*], [9 x i8*]* @"$s19protocol_resilience16ConformingStructVAA17ResilientProtocolAAWP", i32 0, i32 0))
+  // CHECK-NEXT: call swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself [[SELF]], %swift.type* bitcast ({{i32|i64}}* {{.*}}) to %swift.type*), i8** %SelfWitnessTable)
   %fn1 = function_ref @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
   %ignore1 = apply %fn1<ConformingStruct>(%0) : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
 
@@ -325,11 +325,11 @@ sil @noDefaultB : $@convention(witness_method: ResilientProtocol) (@in_guarantee
 bb0(%0 : $*ConformingStruct):
 
   // Make sure we can partially apply direct references to default implementations
-
+  // CHECK-NEXT: [[CONF:%.*]] = bitcast i8** %SelfWitnessTable to i8*
   // CHECK-NEXT: [[CONTEXT:%.*]] = call noalias %swift.refcounted* @swift_allocObject({{.*}})
   // CHECK-NEXT: [[LAYOUT:%.*]] = bitcast %swift.refcounted* [[CONTEXT]] to <{ %swift.refcounted, i8* }>*
   // CHECK-NEXT: [[WTABLE:%.*]] = getelementptr inbounds <{ %swift.refcounted, i8* }>, <{ %swift.refcounted, i8* }>* [[LAYOUT]], i32 0, i32 1
-  // CHECK-NEXT: store i8* bitcast ([9 x i8*]* @"$s19protocol_resilience16ConformingStructVAA17ResilientProtocolAAWP" to i8*), i8** [[WTABLE]]
+  // CHECK-NEXT: store i8* [[CONF]], i8** [[WTABLE]]
 
   %fn1 = function_ref @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
   %ignore1 = partial_apply %fn1<ConformingStruct>() : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()

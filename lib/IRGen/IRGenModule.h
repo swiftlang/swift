@@ -1095,7 +1095,7 @@ public:
 
   llvm::LLVMContext &getLLVMContext() const { return LLVMContext; }
 
-  void emitSourceFile(SourceFile &SF, unsigned StartElem);
+  void emitSourceFile(SourceFile &SF);
   void addLinkLibrary(const LinkLibrary &linkLib);
 
   /// Attempt to finalize the module.

@@ -244,7 +244,6 @@ public:
 
 public:
   constexpr TargetExtraInhabitantFlags() : Data(0) {}
-
   /// The number of extra inhabitants in the type's representation.
   int getNumExtraInhabitants() const { return Data & NumExtraInhabitantsMask; }
 

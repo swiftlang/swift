@@ -382,7 +382,7 @@ extension BidirectionalCollection {
   ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
   ///   elements to drop.
   @inlinable // protocol-only
-  public func dropLast(_ k: Int) -> SubSequence {
+  public __consuming func dropLast(_ k: Int) -> SubSequence {
     _precondition(
       k >= 0, "Can't drop a negative number of elements from a collection")
     let end = index(
@@ -413,7 +413,7 @@ extension BidirectionalCollection {
   ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is equal to
   ///   `maxLength`.
   @inlinable // protocol-only
-  public func suffix(_ maxLength: Int) -> SubSequence {
+  public __consuming func suffix(_ maxLength: Int) -> SubSequence {
     _precondition(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")

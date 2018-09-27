@@ -1676,7 +1676,7 @@ static void emitRawApply(SILGenFunction &SGF,
   } else {
     SILBasicBlock *normalBB = SGF.createBasicBlock();
     auto result =
-      normalBB->createPHIArgument(resultType, ValueOwnershipKind::Owned);
+      normalBB->createPhiArgument(resultType, ValueOwnershipKind::Owned);
     rawResults.push_back(result);
 
     SILBasicBlock *errorBB =
@@ -2487,7 +2487,24 @@ public:
     assert(!specialDests || specialDests->size() == paramInfos.size());
   }
 
-  void emitTopLevel(ArgumentSource &&arg, AbstractionPattern origParamType) {
+  // origParamType is a parameter type.
+  void emitSingleArg(ArgumentSource &&arg, AbstractionPattern origParamType) {
+    emit(std::move(arg), origParamType);
+    maybeEmitForeignErrorArgument();
+  }
+
+  // origFormalType is a function type.
+  //
+  // FIXME: This is all a bunch of hacks that can be removed once "scalar"
+  // PreparedArguments goes away.
+  void emitTopLevel(ArgumentSource &&arg, AbstractionPattern origFormalType) {
+    SmallVector<AbstractionPattern, 8> origParamTypes;
+    for (unsigned i = 0, e = origFormalType.getNumFunctionParams(); i < e; ++i) {
+      origParamTypes.push_back(origFormalType.getFunctionParamType(i));
+    }
+
+    auto origParamType = AbstractionPattern::getTuple(origParamTypes);
+
     if (arg.isShuffle()) {
       auto *shuffle = cast<TupleShuffleExpr>(std::move(arg).asKnownExpr());
       emitShuffle(shuffle, origParamType);
@@ -2495,10 +2512,33 @@ public:
       return;
     }
 
-    emit(std::move(arg), origParamType);
-    maybeEmitForeignErrorArgument();
+    if (arg.isLValue()) {
+      assert(origParamTypes.size() == 1);
+      emitSingleArg(std::move(arg), origParamTypes[0]);
+      return;
+    }
+
+    if (arg.isExpr()) {
+      if (origParamTypes.size() == 1) {
+        auto *e = std::move(arg).asKnownExpr();
+
+        origParamType = origParamTypes[0];
+        if (auto *paren = dyn_cast<ParenExpr>(e))
+          e = paren->getSubExpr();
+        else if (auto *tuple = dyn_cast<TupleExpr>(e)) {
+          assert(tuple->getNumElements() == 1);
+          e = tuple->getElement(0);
+        }
+
+        emitSingleArg(e, origParamType);
+        return;
+      }
+    }
+
+    emitSingleArg(std::move(arg), origParamType);
   }
 
+  // origFormalType is a function type.
   void emitPreparedArgs(PreparedArguments &&args,
                         AbstractionPattern origFormalType) {
     assert(args.isValid());
@@ -2506,13 +2546,11 @@ public:
 
     if (args.isScalar()) {
       assert(argSources.size() == 1);
-      emitTopLevel(std::move(argSources[0]),
-                   origFormalType.getFunctionInputType());
+      emitTopLevel(std::move(argSources[0]), origFormalType);
     } else {
       for (auto i : indices(argSources)) {
-        emit(std::move(argSources[i]),
-             origFormalType.getFunctionParamType(i));
-        maybeEmitForeignErrorArgument();
+        emitSingleArg(std::move(argSources[i]),
+                      origFormalType.getFunctionParamType(i));
       }
     }
   }
@@ -2564,8 +2602,6 @@ private:
     // If the caller takes the argument indirectly, the argument has an
     // inout type.
     if (param.isIndirectInOut()) {
-      origParamType = origParamType.getWithoutSpecifierType();
-
       assert(!specialDest);
       emitInOut(std::move(arg), loweredSubstArgType, loweredSubstParamType,
                 origParamType, substArgType);
@@ -2622,6 +2658,9 @@ private:
       if (CanTupleType substArgType =
               dyn_cast<TupleType>(arg.getSubstRValueType())) {
         // The original type isn't necessarily a tuple.
+        if (!origParamType.matchesTuple(substArgType))
+          origParamType = origParamType.getTupleElementType(0);
+
         assert(origParamType.matchesTuple(substArgType));
 
         auto loc = arg.getKnownRValueLocation();
@@ -3011,8 +3050,8 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
                             loweredArgs, delayedArgs,
                             errorConvention, ImportAsMemberStatus());
   
-  emitter.emitTopLevel(ArgumentSource(info.loc, std::move(value)),
-                       info.origResultType);
+  emitter.emitSingleArg(ArgumentSource(info.loc, std::move(value)),
+                        info.origResultType);
   assert(delayedArgs.empty());
   assert(!errorConvention);
   
@@ -3132,12 +3171,8 @@ private:
   void emitDefaultArgsAndFinalize(ArgEmitter &parent);
 
   AbstractionPattern getOutputOrigElementType(unsigned index) {
-    if (isResultScalar) {
-      assert(index == 0);
-      return origParamType;
-    } else {
-      return origParamType.getTupleElementType(index);
-    }
+    assert(!isResultScalar || index == 0);
+    return origParamType.getTupleElementType(index);
   }
 
   VarargExpansionExpr *getVarargExpansion(unsigned innerIndex) {
@@ -3414,13 +3449,12 @@ void TupleShuffleArgEmitter::emit(ArgEmitter &parent) {
   // opaque pattern; otherwise, it's a tuple of the de-shuffled
   // tuple elements.
   innerOrigParamType = origParamType;
-  if (!origParamType.isTypeParameter()) {
-    // That "tuple" might not actually be a tuple.
-    if (innerElts.size() == 1 && !innerElts[0].hasName()) {
-      innerOrigParamType = origInnerElts[0];
-    } else {
-      innerOrigParamType = AbstractionPattern::getTuple(origInnerElts);
-    }
+
+  // That "tuple" might not actually be a tuple.
+  if (innerElts.size() == 1 && !innerElts[0].hasName()) {
+    innerOrigParamType = origInnerElts[0];
+  } else {
+    innerOrigParamType = AbstractionPattern::getTuple(origInnerElts);
   }
 
   flattenPatternFromInnerExtendIntoInnerParams(parent);
@@ -3432,7 +3466,7 @@ void TupleShuffleArgEmitter::emit(ArgEmitter &parent) {
                /*foreign error*/ None, /*foreign self*/ ImportAsMemberStatus(),
                (innerSpecialDests ? ArgSpecialDestArray(*innerSpecialDests)
                                   : Optional<ArgSpecialDestArray>()))
-        .emitTopLevel(ArgumentSource(inner), innerOrigParamType);
+        .emitSingleArg(ArgumentSource(inner), innerOrigParamType);
   }
 
   // Make a second pass to split the inner arguments correctly.
@@ -3650,9 +3684,10 @@ public:
     assert(Args.isValid());
   }
 
-  // FIXME: Remove this entry point.
-  CallSite(SILLocation loc, ArgumentSource &&value, CanType resultType,
-           bool throws)
+  // FIXME: Remove this entry point or refactor it so that isScalar is always
+  // false.
+  CallSite(SILLocation loc, ArgumentSource &&value, bool isScalar,
+           CanType resultType, bool throws)
       : Loc(loc), SubstResultType(resultType), Throws(throws) {
 
     auto type = (value.hasLValueType()
@@ -3660,13 +3695,15 @@ public:
                  : value.getSubstRValueType());
     SmallVector<AnyFunctionType::Param, 8> params;
     AnyFunctionType::decomposeInput(type, params);
-    Args.emplace(params, /*scalar*/true);
+    Args.emplace(params, isScalar);
     Args.addArbitrary(std::move(value));
     assert(Args.isValid());
   }
 
-  CallSite(SILLocation loc, ArgumentSource &&value, CanAnyFunctionType fnType)
-      : CallSite(loc, std::move(value), fnType.getResult(), fnType->throws()) {}
+  CallSite(SILLocation loc, ArgumentSource &&value, bool isScalar,
+           CanAnyFunctionType fnType)
+      : CallSite(loc, std::move(value), isScalar,
+                 fnType.getResult(), fnType->throws()) {}
 
   CallSite(SILLocation loc, PreparedArguments &&args, CanAnyFunctionType fnType)
       : CallSite(loc, std::move(args), fnType.getResult(), fnType->throws()) {}
@@ -4435,7 +4472,8 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, Expr *e) {
 
   // Apply 'self' if provided.
   if (apply.selfParam) {
-    emission.addCallSite(RegularLocation(e), std::move(apply.selfParam),
+    emission.addCallSite(RegularLocation(e),
+                         std::move(apply.selfParam), /*scalar*/ false,
                          apply.selfType->getCanonicalType(), /*throws*/ false);
   }
 
@@ -4558,7 +4596,7 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   }
 
   // Emit the raw application.
-  auto genericSig =
+  GenericSignature *genericSig =
     fn.getType().castTo<SILFunctionType>()->getGenericSignature();
 
   // When calling a closure that's defined in a generic context but does not
@@ -4704,7 +4742,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   // Emit the rethrow logic.
   {
     B.emitBlock(errorBB);
-    SILValue error = errorBB->createPHIArgument(fnConv.getSILErrorType(),
+    SILValue error = errorBB->createPhiArgument(fnConv.getSILErrorType(),
                                                 ValueOwnershipKind::Owned);
 
     B.createBuiltin(loc, SGM.getASTContext().getIdentifier("willThrow"),
@@ -4716,7 +4754,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
 
   // Enter the normal path.
   B.emitBlock(normalBB);
-  return normalBB->createPHIArgument(resultType, ValueOwnershipKind::Owned);
+  return normalBB->createPhiArgument(resultType, ValueOwnershipKind::Owned);
 }
 
 SILValue SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
@@ -4770,7 +4808,7 @@ void SILGenFunction::emitYield(SILLocation loc,
                      ImportAsMemberStatus());
 
   for (auto i : indices(valueSources)) {
-    emitter.emitTopLevel(std::move(valueSources[i]), origTypes[i]);
+    emitter.emitSingleArg(std::move(valueSources[i]), origTypes[i]);
   }
 
   if (!delayedArgs.empty())
@@ -5056,10 +5094,13 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
                                              selfMetaVal.getType()
                                                .getASTType(),
                                              std::move(selfMetaVal))),
+                       /*scalar*/ false,
                        substFormalType);
 
-  // Arguments
-  emission.addCallSite(loc, ArgumentSource(loc, std::move(args)),
+  // Arguments.
+  // FIXME: Rework this so that scalar=false.
+  emission.addCallSite(loc,
+                       ArgumentSource(loc, std::move(args)), /*scalar*/ true,
                        cast<FunctionType>(substFormalType.getResult()));
 
   // Perform the call.
@@ -5552,8 +5593,7 @@ SILGenFunction::prepareSubscriptIndices(SubscriptDecl *subscript,
                      /*foreign error*/None,
                      ImportAsMemberStatus());
 
-  emitter.emitTopLevel(indexExpr,
-                       AbstractionPattern(substFnType).getFunctionInputType());
+  emitter.emitTopLevel(indexExpr, AbstractionPattern(substFnType));
 
   // TODO: do something to preserve LValues in the delayed arguments?
   if (!delayedArgs.empty())
@@ -5599,7 +5639,8 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
   CallEmission emission(*this, std::move(getter), std::move(writebackScope));
   // Self ->
   if (hasSelf) {
-    emission.addCallSite(loc, std::move(selfValue), accessType);
+    emission.addCallSite(loc, std::move(selfValue), /*scalar*/ false,
+                         accessType);
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.
@@ -5630,16 +5671,16 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
   CallEmission emission(*this, std::move(setter), std::move(writebackScope));
   // Self ->
   if (hasSelf) {
-    emission.addCallSite(loc, std::move(selfValue), accessType);
+    emission.addCallSite(loc, std::move(selfValue), /*scalar*/ false,
+                         accessType);
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
 
   // (value)  or (value, indices...)
-  bool isScalar = subscriptIndices.isNull() ||
-                  std::move(subscriptIndices).getSources().empty();
-  PreparedArguments values(accessType->getParams(), isScalar);
+  PreparedArguments values(accessType->getParams(), /*scalar*/ false);
   values.addArbitrary(std::move(setValue));
-  if (!isScalar) {
+
+  if (!subscriptIndices.isNull()) {
     unsigned paramIndex = 1;
     for (auto &component : std::move(subscriptIndices).getSources()) {
       auto param = accessType.getParams()[paramIndex++];
@@ -5682,7 +5723,8 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
   CallEmission emission(*this, std::move(callee), std::move(writebackScope));
   // Self ->
   if (hasSelf) {
-    emission.addCallSite(loc, std::move(selfValue), accessType);
+    emission.addCallSite(loc, std::move(selfValue), /*scalar*/ false,
+                         accessType);
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.
@@ -5770,7 +5812,8 @@ SILGenFunction::emitCoroutineAccessor(SILLocation loc, SILDeclRef accessor,
   CallEmission emission(*this, std::move(callee), std::move(writebackScope));
   // Self ->
   if (hasSelf) {
-    emission.addCallSite(loc, std::move(selfValue), accessType);
+    emission.addCallSite(loc, std::move(selfValue), /*scalar*/ false,
+                         accessType);
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.
@@ -5893,7 +5936,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
 
     auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
                                                        memberFnTy);
-    SILValue memberArg = hasMemberBB->createPHIArgument(
+    SILValue memberArg = hasMemberBB->createPhiArgument(
         loweredMethodTy, ValueOwnershipKind::Owned);
 
     // Create the result value.
@@ -5990,7 +6033,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     auto functionTy = CanFunctionType::get({baseArg}, methodTy);
     auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
                                                        functionTy);
-    SILValue memberArg = hasMemberBB->createPHIArgument(
+    SILValue memberArg = hasMemberBB->createPhiArgument(
         loweredMethodTy, ValueOwnershipKind::Owned);
     // Emit the application of 'self'.
     Scope applyScope(Cleanups, CleanupLocation(e));

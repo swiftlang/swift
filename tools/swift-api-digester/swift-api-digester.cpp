@@ -674,6 +674,54 @@ static bool isOwnershipEquivalent(ReferenceOwnership Left,
   return false;
 }
 
+static void diagnoseNominalTypeDeclChange(SDKNodeDeclType *L, SDKNodeDeclType *R) {
+  auto &Ctx = L->getSDKContext();
+  auto &Diags = Ctx.getDiags();
+
+  if (L->getDeclKind() != R->getDeclKind()) {
+    Diags.diagnose(SourceLoc(), diag::nominal_type_kind_changed,
+      L->getScreenInfo(), getDeclKindStr(R->getDeclKind()));
+    return;
+  }
+
+  assert(L->getDeclKind() == R->getDeclKind());
+  auto DKind = L->getDeclKind();
+  std::vector<StringRef> LeftMinusRight;
+  std::vector<StringRef> RightMinusLeft;
+  swift::ide::api::stringSetDifference(L->getAllProtocols(), R->getAllProtocols(),
+                                       LeftMinusRight, RightMinusLeft);
+  bool isProtocol = L->getDeclKind() == DeclKind::Protocol;
+  std::for_each(LeftMinusRight.begin(), LeftMinusRight.end(), [&](StringRef Name) {
+    Diags.diagnose(SourceLoc(), diag::conformance_removed, L->getScreenInfo(), Name,
+                   isProtocol);
+  });
+  switch (DKind) {
+  case DeclKind::Protocol: {
+    std::for_each(RightMinusLeft.begin(), RightMinusLeft.end(), [&](StringRef Name) {
+      Diags.diagnose(SourceLoc(), diag::conformance_added, L->getScreenInfo(),
+                     Name);
+    });
+    break;
+  }
+  case DeclKind::Class: {
+    auto LSuperClass = L->getSuperClassName();
+    auto RSuperClass = R->getSuperClassName();
+    if (!LSuperClass.empty() && LSuperClass != RSuperClass) {
+      if (RSuperClass.empty()) {
+        Diags.diagnose(SourceLoc(), diag::super_class_removed, L->getScreenInfo(),
+                       LSuperClass);
+      } else if (!contains(R->getClassInheritanceChain(), LSuperClass)) {
+        Diags.diagnose(SourceLoc(), diag::super_class_changed, L->getScreenInfo(),
+                       LSuperClass, RSuperClass);
+      }
+    }
+    break;
+  }
+  default:
+    break;
+  }
+}
+
 static void detectDeclChange(NodePtr L, NodePtr R, SDKContext &Ctx) {
   assert(L->getKind() == R->getKind());
   auto &Diags = Ctx.getDiags();
@@ -726,6 +774,12 @@ static void detectDeclChange(NodePtr L, NodePtr R, SDKContext &Ctx) {
     if (LD->getGenericSignature() != RD->getGenericSignature()) {
       Diags.diagnose(SourceLoc(), diag::generic_sig_change, LD->getScreenInfo(),
         LD->getGenericSignature(), RD->getGenericSignature());
+    }
+
+    if (auto *LDT = dyn_cast<SDKNodeDeclType>(L)) {
+      if (auto *RDT = dyn_cast<SDKNodeDeclType>(R)) {
+        diagnoseNominalTypeDeclChange(LDT, RDT);
+      }
     }
     detectRename(L, R);
   }
@@ -785,10 +839,31 @@ public:
           }
         }
       }
+      // Complain about added protocol requirements
+      if (auto *D = dyn_cast<SDKNodeDecl>(Right)) {
+        if (D->isProtocolRequirement()) {
+          bool ShouldComplain = !D->isOverriding();
+          // We should allow added associated types with default.
+          if (auto ATD = dyn_cast<SDKNodeDeclAssociatedType>(D)) {
+            if (ATD->getDefault())
+              ShouldComplain = false;
+          }
+          if (ShouldComplain)
+            Ctx.getDiags().diagnose(SourceLoc(), diag::protocol_req_added,
+                                    D->getScreenInfo());
+        }
+      }
       return;
     case NodeMatchReason::Removed:
       assert(!Right);
       Left->annotate(NodeAnnotation::Removed);
+      if (auto *LT = dyn_cast<SDKNodeType>(Left)) {
+        if (auto *AT = dyn_cast<SDKNodeDeclAssociatedType>(LT->getParent())) {
+          Ctx.getDiags().diagnose(SourceLoc(),
+                                  diag::default_associated_type_removed,
+                                  AT->getScreenInfo(), LT->getPrintedName());
+        }
+      }
       return;
     case NodeMatchReason::FuncToProperty:
     case NodeMatchReason::ModernizeEnum:
@@ -832,6 +907,17 @@ public:
       break;
     }
 
+    case SDKNodeKind::DeclSubscript: {
+      if (auto *LS = dyn_cast<SDKNodeDeclSubscript>(Left)) {
+        auto *RS = cast<SDKNodeDeclSubscript>(Right);
+        if (LS->hasSetter() && !RS->hasSetter()) {
+          Ctx.getDiags().diagnose(SourceLoc(), diag::removed_setter,
+                                  LS->getScreenInfo());
+        }
+      }
+      LLVM_FALLTHROUGH;
+    }
+    case SDKNodeKind::DeclAssociatedType:
     case SDKNodeKind::DeclFunction:
     case SDKNodeKind::DeclSetter:
     case SDKNodeKind::DeclGetter:
@@ -849,10 +935,16 @@ public:
     }
 
     case SDKNodeKind::DeclVar: {
-      auto LC = Left->getChildren()[0];
-      auto RC = Right->getChildren()[0];
+      auto LVar = cast<SDKNodeDeclVar>(Left);
+      auto RVar = cast<SDKNodeDeclVar>(Right);
+      auto LC = LVar->getType();
+      auto RC = RVar->getType();
       if (!(*LC == *RC))
         foundMatch(LC, RC, NodeMatchReason::Sequential);
+      if (LVar->getSetter() && !RVar->getSetter()) {
+          Ctx.getDiags().diagnose(SourceLoc(), diag::removed_setter,
+                                  LVar->getScreenInfo());
+      }
       break;
     }
     }
@@ -1703,6 +1795,10 @@ void DiagnosisEmitter::visitType(SDKNodeType *Node) {
       if (Node->getPrintedName() != Count->getPrintedName())
         Diags.diagnose(SourceLoc(), diag::decl_type_change, Parent->getScreenInfo(),
           Descriptor, Node->getPrintedName(), Count->getPrintedName());
+      break;
+    case SDKNodeKind::DeclAssociatedType:
+      Diags.diagnose(SourceLoc(), diag::decl_type_change, Parent->getScreenInfo(),
+                     "default", Node->getPrintedName(), Count->getPrintedName());
       break;
     default:
       break;

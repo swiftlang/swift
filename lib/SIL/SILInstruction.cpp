@@ -17,6 +17,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/Basic/Unicode.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILDebugScope.h"

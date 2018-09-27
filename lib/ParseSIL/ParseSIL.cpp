@@ -5094,7 +5094,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
       return true;
 
     BB = getBBForDefinition(BBName, NameLoc);
-    // For now, since we always assume that PHIArguments have
+    // For now, since we always assume that PhiArguments have
     // ValueOwnershipKind::Any, do not parse or do anything special. Eventually
     // we will parse the convention.
     bool IsEntry = BB->isEntry();
@@ -5126,7 +5126,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
         if (IsEntry) {
           Arg = BB->createFunctionArgument(Ty);
         } else {
-          Arg = BB->createPHIArgument(Ty, OwnershipKind);
+          Arg = BB->createPhiArgument(Ty, OwnershipKind);
         }
         setLocalValue(Arg, Name, NameLoc);
       } while (P.consumeIf(tok::comma));

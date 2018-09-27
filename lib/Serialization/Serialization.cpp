@@ -1814,6 +1814,16 @@ void Serializer::writeMembers(DeclID parentID,
         (*memberTable)[parentID].push_back(memberID);
       }
 
+      // Same as above, but for @_implements attributes
+      if (auto A = VD->getAttrs().getAttribute<ImplementsAttr>()) {
+        std::unique_ptr<DeclMembersTable> &memberTable =
+          DeclMemberNames[A->getMemberName().getBaseName()].second;
+        if (!memberTable) {
+          memberTable = llvm::make_unique<DeclMembersTable>();
+        }
+        (*memberTable)[parentID].push_back(memberID);
+      }
+
       // Possibly add a record to ClassMembersForDynamicLookup too.
       if (isClass) {
         if (VD->canBeAccessedByDynamicLookup()) {
@@ -2704,6 +2714,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(extension->getDeclContext());
     Type baseTy = extension->getExtendedType();
     assert(!baseTy->hasUnboundGenericType());
+    assert(!baseTy->hasArchetype());
 
     // FIXME: Use the canonical type here in order to minimize circularity
     // issues at deserialization time. A known problematic case here is

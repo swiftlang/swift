@@ -66,7 +66,7 @@ class Target : NSObject, NSKeyValueObservingCustomization {
 
 class ObserverKVO : NSObject {
     var target: Target?
-    var observation: NSKeyValueObservation? = nil
+    var observation: _NSKeyValueObservation? = nil
     
     override init() { target = nil; super.init() }
     

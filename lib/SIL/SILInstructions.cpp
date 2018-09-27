@@ -1061,6 +1061,15 @@ bool TermInst::isFunctionExiting() const {
   llvm_unreachable("Unhandled TermKind in switch.");
 }
 
+TermInst::SuccessorBlockArgumentsListTy
+TermInst::getSuccessorBlockArguments() const {
+  function_ref<PhiArgumentArrayRef(const SILSuccessor &)> op;
+  op = [](const SILSuccessor &succ) -> PhiArgumentArrayRef {
+    return succ.getBB()->getPhiArguments();
+  };
+  return SuccessorBlockArgumentsListTy(getSuccessors(), op);
+}
+
 YieldInst *YieldInst::create(SILDebugLocation loc,
                              ArrayRef<SILValue> yieldedValues,
                              SILBasicBlock *normalBB, SILBasicBlock *unwindBB,

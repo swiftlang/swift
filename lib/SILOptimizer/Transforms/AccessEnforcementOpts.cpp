@@ -654,6 +654,26 @@ void AccessConflictAndMergeAnalysis::visitBeginAccess(
   // It can potentially be folded
   // regardless of whether it may conflict with an outer access.
   addInScopeAccess(info, beginAccess);
+  // We can merge out-of-scope regardless of having a conflict within a scope,
+  // normally, it would have made more sense to add it to out-of-scope set
+  // *only* after encountering the end_access instruction.
+  // However, that will lose us some valid optimization potential:
+  // consider the following pseudo-SIL:
+  // begin_access %x
+  // end_access %x
+  // begin_access %x
+  // conflict
+  // end_access %x
+  // we can merge both of these scopes
+  // but, if we only add the instr. after seeing end_access,
+  // then we would not have the first begin_access in out-of-scope
+  // set when encoutnering the 2nd end_access due to "conflict"
+  // NOTE: What we really want to do here is to check if
+  // we should add the new beginAccess to 'mergePairs' structure
+  // the reason for calling this method is to check for that.
+  // logically, we only need to add an instructio to
+  // out-of-scope conflict-free set when we visit end_access
+  addOutOfScopeAccess(info, beginAccess);
 }
 
 void AccessConflictAndMergeAnalysis::visitEndAccess(EndAccessInst *endAccess,
@@ -669,10 +689,18 @@ void AccessConflictAndMergeAnalysis::visitEndAccess(EndAccessInst *endAccess,
     removeInScopeAccess(info, beginAccess);
   }
 
-  // We can merge out-of-scope regardless of having a conflict within a scope,
-  // when encountering an end access instruction,
-  // regardless of having it in the In scope set,
-  // add it to the out of scope set.
+  // If this exact instruction is already in out-of-scope - skip:
+  if (info.outOfScopeConflictFreeAccesses.conflictFreeAccesses.count(
+          beginAccess) > 0) {
+    return;
+  }
+  // Else we have the opposite situation to the one described in
+  // visitBeginAccess: the first scope is the one conflicting while the second
+  // does not - begin_access %x conflict end_access %x begin_access %x
+  // end_access %x
+  // when seeing the conflict we remove the first begin instruction
+  // but, we can still merge those scopes *UNLESS* there's a conflict
+  // between the first end_access and the second begin_access
   LLVM_DEBUG(llvm::dbgs() << "Got out of scope from " << *beginAccess << " to "
                           << *endAccess << "\n");
 

@@ -753,7 +753,7 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
   //   %57 = load %56 : $*Builtin.BridgeObject from Array<Int>
   //   %58 = unchecked_ref_cast %57 : $Builtin.BridgeObject to
   //   $_ContiguousArray
-  //   %59 = unchecked_ref_cast %58 : $_ContiguousArrayStorageBase to
+  //   %59 = unchecked_ref_cast %58 : $__ContiguousArrayStorageBase to
   //   $Builtin.NativeObject
   //   %60 = struct_extract %53 : $UnsafeMutablePointer<Int>,
   //   #UnsafeMutablePointer
@@ -1979,7 +1979,7 @@ public:
 
     // Clone the arguments.
     for (auto &Arg : StartBB->getArguments()) {
-      SILValue MappedArg = ClonedStartBB->createPHIArgument(
+      SILValue MappedArg = ClonedStartBB->createPhiArgument(
           getOpType(Arg->getType()), ValueOwnershipKind::Owned);
       ValueMap.insert(std::make_pair(Arg, MappedArg));
     }

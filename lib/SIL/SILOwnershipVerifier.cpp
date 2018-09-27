@@ -799,7 +799,7 @@ OwnershipCompatibilityUseChecker::visitEndBorrowInst(EndBorrowInst *I) {
   // If we are checking a subobject, make sure that we are from a guaranteed
   // basic block argument.
   if (isCheckingSubObject()) {
-    auto *phiArg = cast<SILPHIArgument>(Op.get());
+    auto *phiArg = cast<SILPhiArgument>(Op.get());
     (void)phiArg;
     assert(phiArg->getOwnershipKind() == ValueOwnershipKind::Guaranteed &&
            "Expected an end_borrow paired with an argument.");
@@ -1575,7 +1575,7 @@ void SILValueOwnershipChecker::gatherUsers(
       //
       // TODO: We could ignore this error and emit a more specific error on the
       // actual terminator.
-      for (auto *BBArg : BB->getPHIArguments()) {
+      for (auto *BBArg : BB->getPhiArguments()) {
         // *NOTE* We do not emit an error here since we want to allow for more
         // specific errors to be found during use_verification.
         //

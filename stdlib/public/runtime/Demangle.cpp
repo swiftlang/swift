@@ -28,7 +28,6 @@ using namespace swift;
 Demangle::NodePointer
 swift::_buildDemanglingForContext(const ContextDescriptor *context,
                                   llvm::ArrayRef<NodePointer> demangledGenerics,
-                                  bool concretizedGenerics,
                                   Demangle::Demangler &Dem) {
   unsigned usedDemangledGenerics = 0;
   NodePointer node = nullptr;
@@ -45,13 +44,6 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
 
   auto getGenericArgsTypeListForContext =
     [&](const ContextDescriptor *context) -> NodePointer {
-      // ABI TODO: As a hack to maintain existing broken behavior,
-      // if there were any generic arguments eliminated by same type
-      // constraints, we don't mangle any of them into intermediate contexts,
-      // and pile all of the non-concrete arguments into the innermost context.
-      if (concretizedGenerics)
-        return nullptr;
-      
       if (demangledGenerics.empty())
         return nullptr;
       
@@ -73,7 +65,6 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
       return genericArgsList;
     };
   
-  auto innermostComponent = descriptorPath.front();
   for (auto component : reversed(descriptorPath)) {
     switch (auto kind = component->getKind()) {
     case ContextDescriptorKind::Module: {
@@ -87,13 +78,10 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
       auto extension = llvm::cast<ExtensionContextDescriptor>(component);
       // Demangle the extension self type.
       auto selfType = Dem.demangleType(extension->getMangledExtendedContext());
-      assert(selfType->getKind() == Node::Kind::Type);
-      selfType = selfType->getChild(0);
+      if (selfType->getKind() == Node::Kind::Type)
+        selfType = selfType->getChild(0);
       
       // Substitute in the generic arguments.
-      // TODO: This kludge only kinda works if there are no same-type
-      // constraints. We'd need to handle those correctly everywhere else too
-      // though.
       auto genericArgsList = getGenericArgsTypeListForContext(component);
       
       if (selfType->getKind() == Node::Kind::BoundGenericEnum
@@ -197,28 +185,6 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
           node = genericNode;
         }
         
-        // ABI TODO: If there were concretized generic arguments, just pile
-        // all the non-concretized generic arguments into the innermost context.
-        if (concretizedGenerics
-            && !demangledGenerics.empty()
-            && component == innermostComponent) {
-          auto unspecializedType = Dem.createNode(Node::Kind::Type);
-          unspecializedType->addChild(node, Dem);
-
-          auto genericTypeList = Dem.createNode(Node::Kind::TypeList);
-          for (auto arg : demangledGenerics) {
-            if (!arg) continue;
-            genericTypeList->addChild(arg, Dem);
-          }
-          
-          if (genericTypeList->getNumChildren() > 0) {
-            auto genericNode = Dem.createNode(genericNodeKind);
-            genericNode->addChild(unspecializedType, Dem);
-            genericNode->addChild(genericTypeList, Dem);
-            node = genericNode;
-          }
-        }
-        
         break;
       }
 
@@ -309,60 +275,35 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
   default:
     return nullptr;
   }
-  
+
+  // Gather the complete set of generic arguments that must be written to
+  // form this type.
+  std::vector<const Metadata *> allGenericArgs;
+  gatherWrittenGenericArgs(type, description, allGenericArgs);
+
   // Demangle the generic arguments.
   std::vector<NodePointer> demangledGenerics;
-  bool concretizedGenerics = false;
-  if (auto generics = description->getGenericContext()) {
-    auto genericArgs = description->getGenericArguments(type);
-    for (auto param : generics->getGenericParams()) {
-      switch (param.getKind()) {
-      case GenericParamKind::Type:
-        // We don't know about type parameters with extra arguments.
-        if (param.hasExtraArgument()) {
-          genericArgs += param.hasExtraArgument() + param.hasKeyArgument();
-          goto unknown_param;
-        }
-
-        // The type should have a key argument unless it's been same-typed to
-        // another type.
-        if (param.hasKeyArgument()) {
-          auto paramType = *genericArgs++;
-          auto paramDemangling =
-            _swift_buildDemanglingForMetadata(paramType, Dem);
-          if (!paramDemangling)
-            return nullptr;
-          demangledGenerics.push_back(paramDemangling);
-        } else {
-          // Leave a gap for us to fill in by looking at same type info.
-          demangledGenerics.push_back(nullptr);
-          concretizedGenerics = true;
-        }
-        break;
-       
-      unknown_param:
-      default: {
-        // We don't know about this kind of parameter. Create a placeholder
-        // mangling.
-        // ABI TODO: Mangle some kind of unique "unknown parameter"
-        // representation here.
-        auto placeholder = Dem.createNode(Node::Kind::Tuple);
-        auto emptyList = Dem.createNode(Node::Kind::TypeList);
-        placeholder->addChild(emptyList, Dem);
-        auto type = Dem.createNode(Node::Kind::Type);
-        type->addChild(placeholder, Dem);
-        demangledGenerics.push_back(type);
-      }
-      }
+  for (auto genericArg : allGenericArgs) {
+    // When there is no generic argument, put in a placeholder.
+    if (!genericArg) {
+      auto placeholder = Dem.createNode(Node::Kind::Tuple);
+      auto emptyList = Dem.createNode(Node::Kind::TypeList);
+      placeholder->addChild(emptyList, Dem);
+      auto type = Dem.createNode(Node::Kind::Type);
+      type->addChild(placeholder, Dem);
+      demangledGenerics.push_back(type);
+      continue;
     }
-    
-    // If we have concretized generic arguments, check for same type
-    // requirements to get the argument values.
-    // ABI TODO
+
+    // Demangle this argument.
+    auto genericArgDemangling =
+      _swift_buildDemanglingForMetadata(genericArg, Dem);
+    if (!genericArgDemangling)
+      return nullptr;
+    demangledGenerics.push_back(genericArgDemangling);
   }
   
-  return _buildDemanglingForContext(description, demangledGenerics,
-                                    concretizedGenerics, Dem);
+  return _buildDemanglingForContext(description, demangledGenerics, Dem);
 }
 
 // Build a demangled type tree for a type.
@@ -449,8 +390,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
 #endif
 
       auto protocolNode =
-          _buildDemanglingForContext(protocol.getSwiftProtocol(), { }, false,
-                                     Dem);
+          _buildDemanglingForContext(protocol.getSwiftProtocol(), { }, Dem);
       if (!protocolNode)
         return nullptr;
 

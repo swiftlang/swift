@@ -471,10 +471,10 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       //    }
       //
       if (tc.Context.isSwiftVersionAtLeast(5) && !isDynamicOverloadComparison) {
-        auto *proto1 = dyn_cast<ProtocolDecl>(outerDC1);
-        auto *proto2 = dyn_cast<ProtocolDecl>(outerDC2);
-        if (proto1 != proto2)
-          return proto2;
+        auto inProto1 = isa<ProtocolDecl>(outerDC1);
+        auto inProto2 = isa<ProtocolDecl>(outerDC2);
+        if (inProto1 != inProto2)
+          return inProto2;
       }
 
       Type type1 = decl1->getInterfaceType();
@@ -1463,7 +1463,7 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {
 }
 
 InputMatcher::InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
-                           const llvm::SmallBitVector &defaultValueMap)
+                           const SmallBitVector &defaultValueMap)
     : NumSkippedParameters(0), DefaultValueMap(defaultValueMap),
       Params(params) {}
 

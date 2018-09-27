@@ -351,7 +351,7 @@ void SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
 
     // Create an argument on the return-to BB representing the returned value.
     if (auto apply = dyn_cast<ApplyInst>(AI.getInstruction())) {
-      auto *RetArg = ReturnToBB->createPHIArgument(apply->getType(),
+      auto *RetArg = ReturnToBB->createPhiArgument(apply->getType(),
                                                    ValueOwnershipKind::Owned);
       // Replace all uses of the ApplyInst with the new argument.
       apply->replaceAllUsesWith(RetArg);

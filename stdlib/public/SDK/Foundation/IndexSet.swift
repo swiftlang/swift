@@ -661,7 +661,7 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
         return _handle.reference
     }
     
-    fileprivate init(reference: NSIndexSet) {
+    fileprivate init(reference: __shared NSIndexSet) {
         _handle = _MutablePairHandle(reference)
     }
 }

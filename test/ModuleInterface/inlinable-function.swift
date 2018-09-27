@@ -37,7 +37,9 @@ public struct Foo: Hashable {
 
 
   // CHECK: @_transparent public var transparent: [[INT]] {
+  // CHECK-NEXT:   get {
   // CHECK-NEXT:   return 34
+  // CHECK-NEXT: }
   // CHECK-NEXT: }
   @_transparent
   public var transparent: Int {
@@ -98,6 +100,78 @@ public struct Foo: Hashable {
       #else
       print("I should not appear")
       #endif
+    }
+    // CHECK-NEXT: }
+  }
+
+  // CHECK: @inlinable public var inlinableReadAndModify: [[INT]] {
+  @inlinable
+  public var inlinableReadAndModify: Int {
+    // CHECK: _read {
+    // CHECK-NEXT: yield 0
+    // CHECK-NEXT: }
+    _read {
+      yield 0
+    }
+    // CHECK: _modify {
+    // CHECK-NEXT: var x = 0
+    // CHECK-NEXT: yield &x
+    // CHECK-NEXT: }
+    _modify {
+      var x = 0
+      yield &x
+    }
+    // CHECK-NEXT: }
+  }
+
+  // CHECK: public var inlinableReadNormalModify: [[INT]] {
+  public var inlinableReadNormalModify: Int {
+    // CHECK: @inlinable _read {
+    // CHECK-NEXT: yield 0
+    // CHECK-NEXT: }
+    @inlinable _read {
+      yield 0
+    }
+
+    // CHECK: _modify{{$}}
+    // CHECK-NOT: var x = 0
+    // CHECK-NOT: yield &x
+    // CHECK-NOT: }
+    _modify {
+      var x = 0
+      yield &x
+    }
+    // CHECK-NEXT: }
+  }
+
+  // CHECK: public var normalReadInlinableModify: [[INT]] {
+  public var normalReadInlinableModify: Int {
+    // CHECK: _read{{$}}
+    // CHECK-NOT: yield 0
+    // CHECK-NOT: }
+    _read {
+      yield 0
+    }
+
+    // CHECK: @inlinable _modify {
+    // CHECK-NEXT: var x = 0
+    // CHECK-NEXT: yield &x
+    // CHECK-NEXT: }
+    @inlinable _modify {
+      var x = 0
+      yield &x
+    }
+    // CHECK-NEXT: }
+  }
+
+  // CHECK: public var normalReadAndModify: [[INT]] {
+  public var normalReadAndModify: Int {
+    // CHECK-NEXT: _read{{$}}
+    _read { yield 0 }
+    // CHECK-NEXT: _modify{{$}}
+    _modify {
+      var x = 0
+      yield &x
     }
     // CHECK-NEXT: }
   }

@@ -236,7 +236,7 @@ extension _Pointer /*: Hashable */ {
   }
 
   @inlinable
-  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+  public func _rawHashValue(seed: Int) -> Int {
     return Hasher._hash(seed: seed, UInt(bitPattern: self))
   }
 }

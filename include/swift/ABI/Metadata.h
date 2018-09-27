@@ -1443,7 +1443,7 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
   using StoredSize = typename Runtime::StoredSize;
   TargetTupleTypeMetadata() = default;
   constexpr TargetTupleTypeMetadata(const TargetMetadata<Runtime> &base,
-                                    StoredSize numElements,
+                                    uint32_t numElements,
                                     TargetPointer<Runtime, const char> labels)
     : TargetMetadata<Runtime>(base),
       NumElements(numElements),
@@ -1487,14 +1487,19 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
     return getElements()[i];
   }
 
-  static constexpr StoredSize OffsetToNumElements = sizeof(TargetMetadata<Runtime>);
-
+  static constexpr StoredSize getOffsetToNumElements();
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Tuple;
   }
 };
 using TupleTypeMetadata = TargetTupleTypeMetadata<InProcess>;
   
+template <typename Runtime>
+constexpr inline auto
+TargetTupleTypeMetadata<Runtime>::getOffsetToNumElements() -> StoredSize {
+  return offsetof(TargetTupleTypeMetadata<Runtime>, NumElements);
+}
+
 template <typename Runtime> struct TargetProtocolDescriptor;
 
 #if SWIFT_OBJC_INTEROP

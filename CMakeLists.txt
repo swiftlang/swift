@@ -187,8 +187,6 @@ set(SWIFT_ANDROID_NDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android NDK tools that are executable on the build machine")
 set(SWIFT_ANDROID_NDK_GCC_VERSION "" CACHE STRING
   "The GCC version to use when building for Android. Currently only 4.9 is supported.")
-set(SWIFT_ANDROID_SDK_PATH "" CACHE STRING
-  "Path to the directory that contains the Android SDK tools that will be passed to the swiftc frontend")
 set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
   "Path on an Android device where build products will be pushed. These are used when running the test suite against the device")
 
@@ -637,7 +635,6 @@ endif()
 # To fix it, we would need to append the architecture to the SDKs,
 # for example: 'OSX-x86_64;IOS-armv7;...etc'.
 # We could easily do that - we have all of that information in build-script-impl.
-# Also, we would need to be provided with the sysroot for each SDK (see SWIFT_ANDROID_SDK_PATH/SWIFT_SDK_ANDROID_PATH).
 # Darwin targets cheat and use `xcrun`.
 
 if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
@@ -760,22 +757,29 @@ endif()
 # Should we cross-compile the standard library for Android?
 is_sdk_requested(ANDROID swift_build_android)
 if(swift_build_android AND NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
-
-  configure_sdk_unix(ANDROID "Android" "android" "android" "armv7" "armv7-none-linux-androideabi" "${SWIFT_ANDROID_SDK_PATH}")
-
-  if (NOT ("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Linux"))
+  if (NOT ("${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Darwin" OR "${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Linux"))
     message(FATAL_ERROR "A Darwin or Linux host is required to build the Swift runtime for Android")
-  elseif(("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT swift_build_osx) OR
-         ("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux" AND NOT swift_build_linux))
+  endif()
+
+  if(("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT swift_build_osx) OR
+     ("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux" AND NOT swift_build_linux))
     set(SWIFT_PRIMARY_VARIANT_SDK_default "ANDROID")
     set(SWIFT_PRIMARY_VARIANT_ARCH_default "armv7")
   endif()
+
+  if("${SWIFT_SDK_ANDROID_ARCHITECTURES}" STREQUAL "")
+    set(SWIFT_SDK_ANDROID_ARCHITECTURES armv7;aarch)
+  endif()
+  configure_sdk_unix(ANDROID "Android" "android" "android" "${SWIFT_SDK_ANDROID_ARCHITECTURES}" "" "")
 endif()
 
 # Should we cross-compile the standard library for Windows?
 is_sdk_requested(WINDOWS swift_build_windows)
 if(swift_build_windows AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-  configure_sdk_windows(WINDOWS "Windows" "msvc" "aarch64;armv7;i686;x86_64")
+  if("${SWIFT_SDK_WINDOWS_ARCHITECTURES}" STREQUAL "")
+    set(SWIFT_SDK_WINDOWS_ARCHITECTURES aarch64;armv7;i686;x86_64)
+  endif()
+  configure_sdk_windows(WINDOWS "Windows" "msvc" "${SWIFT_SDK_WINDOWS_ARCHITECTURES}")
 endif()
 
 if("${SWIFT_SDKS}" STREQUAL "")
@@ -860,15 +864,14 @@ function(swift_icu_variables_set sdk arch result)
   endif()
 endfunction()
 
-# ICU is provided through CoreFoundation on Darwin.  On other hosts, assume that
-# we are compiling for the build as the host.  In such a case, if the ICU
+# ICU is provided through CoreFoundation on Darwin.  On other hosts, if the ICU
 # unicode and i18n include and library paths are not defined, perform a standard
 # package lookup.  Otherwise, rely on the paths specified by the user.  These
 # need to be defined when cross-compiling.
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
-    swift_icu_variables_set("${SWIFT_HOST_VARIANT_SDK_default}"
-                            "${SWIFT_HOST_VARIANT_ARCH_default}"
+    swift_icu_variables_set("${SWIFT_PRIMARY_VARIANT_SDK}"
+                            "${SWIFT_PRIMARY_VARIANT_ARCH}"
                             ICU_CONFIGURED)
     if("${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "" AND NOT ${ICU_CONFIGURED})
       find_package(ICU REQUIRED COMPONENTS uc i18n)

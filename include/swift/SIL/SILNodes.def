@@ -9,10 +9,62 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file defines macros used for macro-metaprogramming with SIL nodes.
-//
+///
+/// \file
+///
+/// This file defines macros used for macro-metaprogramming with SIL nodes. It
+/// supports changing how macros expand by #defining an auxillary variable
+/// before including SILNodes.def as summarized in the chart below:
+///
+/// | #define            | Operation                                               |
+/// |--------------------+---------------------------------------------------------|
+/// | N/A                | Visit single value insts as insts                       |
+/// | VALUE              | Visit single value insts as values                      |
+/// | ABSTRACT_VALUE     | Visit abstract single value insts as values             |
+/// | APPLYSITE_INST     | Visit full and partial apply site insts as apply sites. |
+/// | FULLAPPLYSITE_INST | Visit full apply site insts as apply sites.             |
+///
+/// We describe the triggering variables below:
+///
+/// 1. VALUE(ID, PARENT).
+///
+///     If defined will cause SingleValueInsts to passed to VALUE(ID, PARENT)
+///     instead of to FULL_INST.
+///
+/// 2. ABSTRACT_VALUE(ID, PARENT).
+///
+///     If defined this will cause ABSTRACT_SINGLE_VALUE_INST to expand to
+///     ABSTRACT_VALUE INSTEAD OF ABSTRACT_INST.
+///
+/// 3. FULLAPPLYSITE_INST(ID, PARENT).
+///
+///   If defined this will cause:
+///
+///       * FULLAPPLYSITE_SINGLE_VALUE_INST,
+///       * FULLAPPLYSITE_MULTIPLE_VALUE_INST,
+///       * FULLAPPLYSITE_TERMINATOR_INST,
+///
+///   To expand to FULLAPPLYSITE_INST(ID, PARENT) instead of SINGLE_VALUE_INST,
+///   MULTIPLE_VALUE_INST, or TERMINATOR_INST.
+///
+/// 4. APPLYSITE_INST(ID, PARENT)
+///
+///   If defined this will cuase:
+///
+///         * APPLYSITE_SINGLE_VALUE_INST
+///         * APPLYSITE_MULTIPLE_VALUE_INST
+///         * APPLYSITE_TERMINATOR_INST
+///
+///   to expand to APPLYSITE_INST(ID, PARENT) instead of delegating to
+///   SINGLE_VALUE_INST.
+///
 //===----------------------------------------------------------------------===//
+
+#ifdef APPLYSITE_INST
+#ifdef FULLAPPLYSITE_INST
+#error "Can not query for apply site and full apply site in one include"
+#endif
+#endif
 
 /// NODE(ID, PARENT)
 ///
@@ -38,6 +90,26 @@
 #endif
 #endif
 
+#ifndef APPLYSITE_SINGLE_VALUE_INST
+#ifdef APPLYSITE_INST
+#define APPLYSITE_SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  APPLYSITE_INST(ID, PARENT)
+#else
+#define APPLYSITE_SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
+#endif
+
+#ifndef FULLAPPLYSITE_SINGLE_VALUE_INST
+#ifdef FULLAPPLYSITE_INST
+#define FULLAPPLYSITE_SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  FULLAPPLYSITE_INST(ID, PARENT)
+#else
+#define FULLAPPLYSITE_SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  APPLYSITE_SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
+#endif
+
 /// MULTIPLE_VALUE_INST(Id, TextualName, Parent, MemBehavior, MayRelease)
 ///
 ///   A concrete subclass of MultipleValueInstruction. ID is a member of
@@ -46,6 +118,26 @@
 #ifndef MULTIPLE_VALUE_INST
 #define MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
   FULL_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
+
+#ifndef APPLYSITE_MULTIPLE_VALUE_INST
+#ifdef APPLYSITE_INST
+#define APPLYSITE_MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  APPLYSITE_INST(ID, PARENT)
+#else
+#define APPLYSITE_MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
+#endif
+
+#ifndef FULLAPPLYSITE_MULTIPLE_VALUE_INST
+#ifdef FULLAPPLYSITE_INST
+#define FULLAPPLYSITE_MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  FULLAPPLYSITE_INST(ID, PARENT)
+#else
+#define FULLAPPLYSITE_MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  APPLYSITE_MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
 #endif
 
 /// MULTIPLE_VALUE_INST_RESULT(ID, PARENT)
@@ -113,6 +205,34 @@
 #ifndef TERMINATOR
 #define TERMINATOR(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
   NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
+
+/// APPLYSITE_TERMINATOR_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+///
+/// ID is a member of ApplySiteKind, TerminatorKind, and ApplySiteKind and name
+/// of a subclass of TermInst.
+#ifndef APPLYSITE_TERMINATOR_INST
+#ifdef APPLYSITE_INST
+#define APPLYSITE_TERMINATOR_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  APPLYSITE_INST(ID, NAME)
+#else
+#define APPLYSITE_TERMINATOR_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  TERMINATOR(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
+#endif
+
+/// FULLAPPLYSITE_TERMINATOR(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+///
+/// ID is a member of FullApplySiteKind, TerminatorKind, and ApplySiteKind and
+/// name of a subclass of TermInst.
+#ifndef FULLAPPLYSITE_TERMINATOR_INST
+#ifdef FULLAPPLYSITE_INST
+#define FULLAPPLYSITE_TERMINATOR_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  FULLAPPLYSITE_INST(ID, PARENT)
+#else
+#define FULLAPPLYSITE_TERMINATOR_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  APPLYSITE_TERMINATOR_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
 #endif
 
 /// ABSTRACT_NODE(ID, PARENT)
@@ -199,6 +319,14 @@
 #define VALUE_RANGE(ID, FIRST, LAST) NODE_RANGE(ID, FIRST, LAST)
 #endif
 
+/// ARGUMENT_RANGE(ID, FIRST, LAST)
+///
+///   The enumerator range of an abstract class in the SILArgument
+///   hierarchy.
+#ifndef ARGUMENT_RANGE
+#define ARGUMENT_RANGE(ID, FIRST, LAST) VALUE_RANGE(ID, FIRST, LAST)
+#endif
+
 /// INST_RANGE(ID, PARENT)
 ///
 ///   The enumerator range of an abstract class in the SILInstruction
@@ -210,9 +338,9 @@
 ABSTRACT_NODE(ValueBase, SILNode)
 
 ABSTRACT_VALUE(SILArgument, ValueBase)
-  ARGUMENT(SILPHIArgument, SILArgument)
+  ARGUMENT(SILPhiArgument, SILArgument)
   ARGUMENT(SILFunctionArgument, SILArgument)
-  VALUE_RANGE(SILArgument, SILPHIArgument, SILFunctionArgument)
+  ARGUMENT_RANGE(SILArgument, SILPhiArgument, SILFunctionArgument)
 
 ABSTRACT_VALUE(MultipleValueInstructionResult, ValueBase)
   MULTIPLE_VALUE_INST_RESULT(BeginApplyResult, MultipleValueInstructionResult)
@@ -405,13 +533,13 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
 
   // Function Application
-  SINGLE_VALUE_INST(ApplyInst, apply,
-                    SingleValueInstruction, MayHaveSideEffects, MayRelease)
+  FULLAPPLYSITE_SINGLE_VALUE_INST(ApplyInst, apply,
+                                  SingleValueInstruction, MayHaveSideEffects, MayRelease)
   SINGLE_VALUE_INST(BuiltinInst, builtin,
                     SingleValueInstruction, MayHaveSideEffects, MayRelease)
-  SINGLE_VALUE_INST(PartialApplyInst, partial_apply,
-                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
-  
+  APPLYSITE_SINGLE_VALUE_INST(PartialApplyInst, partial_apply,
+                              SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+
   // Metatypes
   SINGLE_VALUE_INST(MetatypeInst, metatype,
                     SingleValueInstruction, None, DoesNotRelease)
@@ -494,7 +622,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
 
   SINGLE_VALUE_INST_RANGE(SingleValueInstruction, AllocStackInst, KeyPathInst)
 
-NODE_RANGE(ValueBase, SILPHIArgument, KeyPathInst)
+NODE_RANGE(ValueBase, SILPhiArgument, KeyPathInst)
 
 // Terminators
 ABSTRACT_INST(TermInst, SILInstruction)
@@ -508,8 +636,8 @@ ABSTRACT_INST(TermInst, SILInstruction)
              TermInst, MayHaveSideEffects, MayRelease)
   TERMINATOR(UnwindInst, unwind,
              TermInst, None, DoesNotRelease)
-  TERMINATOR(TryApplyInst, try_apply,
-             TermInst, MayHaveSideEffects, MayRelease)
+  FULLAPPLYSITE_TERMINATOR_INST(TryApplyInst, try_apply,
+                                TermInst, MayHaveSideEffects, MayRelease)
   TERMINATOR(BranchInst, br,
              TermInst, None, DoesNotRelease)
   TERMINATOR(CondBranchInst, cond_br,
@@ -647,19 +775,20 @@ NON_VALUE_INST(CondFailInst, cond_fail,
 NODE_RANGE(NonValueInstruction, UnreachableInst, CondFailInst)
 
 ABSTRACT_INST(MultipleValueInstruction, SILInstruction)
-MULTIPLE_VALUE_INST(BeginApplyInst, begin_apply,
-                    SILInstruction, MayHaveSideEffects, MayRelease)
+FULLAPPLYSITE_MULTIPLE_VALUE_INST(BeginApplyInst, begin_apply,
+                                  MultipleValueInstruction, MayHaveSideEffects, MayRelease)
 MULTIPLE_VALUE_INST(DestructureStructInst, destructure_struct,
-                    SILInstruction, None, DoesNotRelease)
+                    MultipleValueInstruction, None, DoesNotRelease)
 MULTIPLE_VALUE_INST(DestructureTupleInst, destructure_tuple,
-                    SILInstruction, None, DoesNotRelease)
+                    MultipleValueInstruction, None, DoesNotRelease)
 INST_RANGE(MultipleValueInstruction, BeginApplyInst, DestructureTupleInst)
 
 NODE_RANGE(SILInstruction, AllocStackInst, DestructureTupleInst)
-NODE_RANGE(SILNode, SILPHIArgument, DestructureTupleInst)
+NODE_RANGE(SILNode, SILPhiArgument, DestructureTupleInst)
 
 #undef SINGLE_VALUE_INST_RANGE
 #undef INST_RANGE
+#undef ARGUMENT_RANGE
 #undef VALUE_RANGE
 #undef NODE_RANGE
 #undef ABSTRACT_SINGLE_VALUE_INST
@@ -667,13 +796,21 @@ NODE_RANGE(SILNode, SILPHIArgument, DestructureTupleInst)
 #undef ABSTRACT_VALUE
 #undef ABSTRACT_NODE
 #undef ABSTRACT_VALUE_AND_INST
+#undef FULLAPPLYSITE_TERMINATOR_INST
+#undef APPLYSITE_TERMINATOR_INST
 #undef TERMINATOR
 #undef NON_VALUE_INST
 #undef MULTIPLE_VALUE_INST_RESULT
+#undef FULLAPPLYSITE_MULTIPLE_VALUE_INST
+#undef APPLYSITE_MULTIPLE_VALUE_INST
 #undef MULTIPLE_VALUE_INST
+#undef FULLAPPLYSITE_SINGLE_VALUE_INST
+#undef APPLYSITE_SINGLE_VALUE_INST
 #undef SINGLE_VALUE_INST
 #undef FULL_INST
 #undef INST
 #undef ARGUMENT
 #undef VALUE
 #undef NODE
+#undef APPLYSITE_INST
+#undef FULLAPPLYSITE_INST

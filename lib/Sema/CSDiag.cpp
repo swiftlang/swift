@@ -3039,7 +3039,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     
     // If we have a candidate function around, compute the position of its
     // default arguments.
-    llvm::SmallBitVector defaultMap(params.size());
+    SmallBitVector defaultMap(params.size());
     if (!candidates.empty()) {
       defaultMap = computeDefaultMap(params, candidates[0].getDecl(),
                                      candidates[0].level);
@@ -3649,7 +3649,7 @@ class ArgumentMatcher : public MatchCallArgumentListener {
   Expr *FnExpr;
   Expr *ArgExpr;
   ArrayRef<AnyFunctionType::Param> &Parameters;
-  const llvm::SmallBitVector &DefaultMap;
+  const SmallBitVector &DefaultMap;
   SmallVectorImpl<AnyFunctionType::Param> &Arguments;
 
   CalleeCandidateInfo CandidateInfo;
@@ -3667,7 +3667,7 @@ class ArgumentMatcher : public MatchCallArgumentListener {
 public:
   ArgumentMatcher(Expr *fnExpr, Expr *argExpr,
                   ArrayRef<AnyFunctionType::Param> &params,
-                  const llvm::SmallBitVector &defaultMap,
+                  const SmallBitVector &defaultMap,
                   SmallVectorImpl<AnyFunctionType::Param> &args,
                   CalleeCandidateInfo &CCI, bool isSubscript)
       : TC(CCI.CS.TC), FnExpr(fnExpr), ArgExpr(argExpr), Parameters(params),
@@ -4009,7 +4009,7 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
 
   auto params = candidate.getParameters();
 
-  llvm::SmallBitVector defaultMap =
+  SmallBitVector defaultMap =
     computeDefaultMap(params, candidate.getDecl(), candidate.level);
   auto args = decomposeArgType(CCI.CS.getType(argExpr), argLabels);
 
@@ -4657,7 +4657,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     return false;
 
   auto params = candidate.getParameters();
-  llvm::SmallBitVector defaultMap =
+  SmallBitVector defaultMap =
     computeDefaultMap(params, candidate.getDecl(), candidate.level);
   auto args = decomposeArgType(CS.getType(argExpr), argLabels);
 
@@ -6308,20 +6308,6 @@ bool FailureDiagnosis::diagnoseClosureExpr(
     // Coerce parameter types here only if there are no unresolved
     if (CS.TC.coerceParameterListToType(params, CE, fnType))
       return true;
-
-    for (auto param : *params) {
-      auto paramType = param->getType();
-      // If this is unresolved 'inout' parameter, it's better to drop
-      // 'inout' from type because that might help to diagnose actual problem
-      // e.g. type inference doesn't give us much information anyway.
-      if (param->isInOut() && paramType->hasUnresolvedType()) {
-        assert(!param->isImmutable() || !paramType->is<InOutType>());
-        param->setType(CS.getASTContext().TheUnresolvedType);
-        param->setInterfaceType(paramType->getInOutObjectType());
-        param->setSpecifier(swift::VarDecl::Specifier::Default);
-      }
-    }
-
     expectedResultType = fnType->getResult();
   }
 

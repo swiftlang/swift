@@ -32,7 +32,7 @@ void SILGenFunction::prepareEpilog(Type resultType, bool isThrowing,
     for (auto directResult : fnConv.getDirectSILResults()) {
       SILType resultType =
           F.mapTypeIntoContext(fnConv.getSILType(directResult));
-      epilogBB->createPHIArgument(resultType, ValueOwnershipKind::Owned);
+      epilogBB->createPhiArgument(resultType, ValueOwnershipKind::Owned);
     }
   }
 
@@ -50,7 +50,7 @@ void SILGenFunction::prepareEpilog(Type resultType, bool isThrowing,
 void SILGenFunction::prepareRethrowEpilog(CleanupLocation cleanupLoc) {
   auto exnType = SILType::getExceptionType(getASTContext());
   SILBasicBlock *rethrowBB = createBasicBlock(FunctionSection::Postmatter);
-  rethrowBB->createPHIArgument(exnType, ValueOwnershipKind::Owned);
+  rethrowBB->createPhiArgument(exnType, ValueOwnershipKind::Owned);
   ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), cleanupLoc);
 }
 

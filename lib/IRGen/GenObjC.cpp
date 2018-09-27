@@ -589,7 +589,7 @@ static llvm::Value *emitSuperArgument(IRGenFunction &IGF,
   } else {
     searchClass = cast<MetatypeType>(searchClass).getInstanceType();
     ClassDecl *searchClassDecl = searchClass.getClassOrBoundGenericClass();
-    if (doesClassMetadataRequireInitialization(IGF.IGM, searchClassDecl)) {
+    if (doesClassMetadataRequireUpdate(IGF.IGM, searchClassDecl)) {
       searchValue = emitClassHeapMetadataRef(IGF, searchClass,
                                              MetadataValueType::ObjCClass,
                                              MetadataState::Complete,

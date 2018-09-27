@@ -1339,8 +1339,11 @@ void MemberLookupTable::addMember(Decl *member) {
   if (!vd)
     return;
 
-  // Unnamed entities cannot be found by name lookup.
-  if (!vd->hasName())
+  // @_implements members get added under their declared name.
+  auto A = vd->getAttrs().getAttribute<ImplementsAttr>();
+
+  // Unnamed entities w/o @_implements synonyms cannot be found by name lookup.
+  if (!A && !vd->hasName())
     return;
 
   // If this declaration is already in the lookup table, don't add it
@@ -1353,6 +1356,10 @@ void MemberLookupTable::addMember(Decl *member) {
   // Add this declaration to the lookup set under its compound name and simple
   // name.
   vd->getFullName().addToLookupTable(Lookup, vd);
+
+  // And if given a synonym, under that name too.
+  if (A)
+    A->getMemberName().addToLookupTable(Lookup, vd);
 }
 
 void MemberLookupTable::addMembers(DeclRange members) {
@@ -1592,9 +1599,31 @@ void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
   LookupTable.getPointer()->addMember(member);
 }
 
+
+static TinyPtrVector<ValueDecl *>
+maybeFilterOutAttrImplements(TinyPtrVector<ValueDecl *> decls,
+                             DeclName name,
+                             bool includeAttrImplements) {
+  if (includeAttrImplements)
+    return decls;
+  TinyPtrVector<ValueDecl*> result;
+  for (auto V : decls) {
+    // Filter-out any decl that doesn't have the name we're looking for
+    // (asserting as a consistency-check that such entries all have
+    // @_implements attrs for the name!)
+    if (V->getFullName().matchesRef(name)) {
+      result.push_back(V);
+    } else {
+      auto A = V->getAttrs().getAttribute<ImplementsAttr>();
+      assert(A && A->getMemberName().matchesRef(name));
+    }
+  }
+  return result;
+}
+
 TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
                                                   DeclName name,
-                                                  bool ignoreNewExtensions) {
+                                                  OptionSet<LookupDirectFlags> flags) {
   ASTContext &ctx = getASTContext();
   if (auto s = ctx.Stats) {
     ++s->getFrontendCounters().NominalTypeLookupDirectCount;
@@ -1604,6 +1633,12 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
   // not yet loaded all the members into the IDC list in the first place.
   bool useNamedLazyMemberLoading = (ctx.LangOpts.NamedLazyMemberLoading &&
                                     hasLazyMembers());
+
+  bool ignoreNewExtensions =
+      flags.contains(LookupDirectFlags::IgnoreNewExtensions);
+
+  bool includeAttrImplements =
+      flags.contains(LookupDirectFlags::IncludeAttrImplements);
 
   // FIXME: At present, lazy member loading conflicts with a bunch of other code
   // that appears to special-case initializers (clang-imported initializer
@@ -1663,7 +1698,8 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
 
     // We found something; return it.
     if (known != LookupTable.getPointer()->end())
-      return known->second;
+      return maybeFilterOutAttrImplements(known->second, name,
+                                          includeAttrImplements);
 
     // If we have no more second chances, stop now.
     if (!useNamedLazyMemberLoading || i > 0)
@@ -2004,7 +2040,10 @@ bool DeclContext::lookupQualified(ArrayRef<TypeDecl *> typeDecls,
 
     // Look for results within the current nominal type and its extensions.
     bool currentIsProtocol = isa<ProtocolDecl>(current);
-    for (auto decl : current->lookupDirect(member)) {
+    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+    if (options & NL_IncludeAttributeImplements)
+      flags |= NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements;
+    for (auto decl : current->lookupDirect(member, flags)) {
       // If we're performing a type lookup, don't even attempt to validate
       // the decl if its not a type.
       if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))

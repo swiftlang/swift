@@ -50,6 +50,9 @@
 #include <functional>
 
 namespace swift {
+namespace json {
+class Output;
+}
 namespace ide {
 namespace api {
 
@@ -207,11 +210,13 @@ enum class KnownProtocolKind: uint8_t {
 };
 
 class SDKNodeRoot;
-
+class SDKNodeDeclGetter;
+class SDKNodeDeclSetter;
 struct SDKNodeInitInfo;
 
 class SDKNode {
   typedef std::vector<SDKNode*>::iterator ChildIt;
+protected:
   SDKContext &Ctx;
   StringRef Name;
   StringRef PrintedName;
@@ -220,9 +225,8 @@ class SDKNode {
   std::set<NodeAnnotation> Annotations;
   std::map<NodeAnnotation, StringRef> AnnotateComments;
   NodePtr Parent = nullptr;
-protected:
   SDKNode(SDKNodeInitInfo Info, SDKNodeKind Kind);
-
+  virtual ~SDKNode() = default;
 public:
   static SDKNode *constructSDKNode(SDKContext &Ctx, llvm::yaml::MappingNode *Node);
   static void preorderVisit(NodePtr Root, SDKNodeVisitor &Visitor);
@@ -256,6 +260,7 @@ public:
   SDKNode* getOnlyChild() const;
   SDKContext &getSDKContext() const { return Ctx; }
   SDKNodeRoot *getRootNode() const;
+  virtual void jsonize(json::Output &Out);
   template <typename T> const T *getAs() const {
     if (T::classof(this))
       return static_cast<const T*>(this);
@@ -277,12 +282,14 @@ class SDKNodeDecl: public SDKNode {
   bool IsImplicit;
   bool IsStatic;
   bool IsDeprecated;
+  bool IsProtocolReq;
+  bool IsOverriding;
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
 
 protected:
   SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind);
-
+  virtual ~SDKNodeDecl() = default;
 public:
   StringRef getUsr() const { return Usr; }
   StringRef getLocation() const { return Location; }
@@ -300,11 +307,14 @@ public:
   StringRef getFullyQualifiedName() const;
   bool isSDKPrivate() const;
   bool isDeprecated() const { return IsDeprecated; };
+  bool isProtocolRequirement() const { return IsProtocolReq; }
   bool hasDeclAttribute(DeclAttrKind DAKind) const;
   bool isImplicit() const { return IsImplicit; };
   bool isStatic() const { return IsStatic; };
+  bool isOverriding() const { return IsOverriding; };
   StringRef getGenericSignature() const { return GenericSig; }
   StringRef getScreenInfo() const;
+  virtual void jsonize(json::Output &Out) override;
 };
 
 class SDKNodeRoot: public SDKNode {
@@ -333,7 +343,7 @@ class SDKNodeType : public SDKNode {
 protected:
   bool hasTypeAttribute(TypeAttrKind DAKind) const;
   SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind);
-
+  ~SDKNodeType() = default;
 public:
   KnownTypeKind getTypeKind() const;
   void addTypeAttribute(TypeAttrKind AttrKind);
@@ -345,6 +355,7 @@ public:
   bool hasDefaultArgument() const { return HasDefaultArg; }
   bool isTopLevelType() const { return !isa<SDKNodeType>(getParent()); }
   static bool classof(const SDKNode *N);
+  virtual void jsonize(json::Output &Out) override;
 };
 
 class SDKNodeTypeNominal : public SDKNodeType {
@@ -354,6 +365,7 @@ public:
   // Get the usr of the correspoding nominal type decl.
   StringRef getUsr() const { return USR; }
   static bool classof(const SDKNode *N);
+  void jsonize(json::Output &Out) override;
 };
 
 class SDKNodeTypeFunc : public SDKNodeType {
@@ -404,12 +416,17 @@ public:
 
 class SDKNodeDeclType : public SDKNodeDecl {
   StringRef SuperclassUsr;
+  std::vector<StringRef> SuperclassNames;
   std::vector<StringRef> ConformingProtocols;
   StringRef EnumRawTypeName;
 public:
   SDKNodeDeclType(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
   StringRef getSuperClassUsr() const { return SuperclassUsr; }
+  ArrayRef<StringRef> getClassInheritanceChain() const { return SuperclassNames; }
+  StringRef getSuperClassName() const {
+    return SuperclassNames.empty() ? StringRef() : SuperclassNames.front();
+  };
   ArrayRef<StringRef> getAllProtocols() const { return ConformingProtocols; }
 
 #define NOMINAL_TYPE_DECL(ID, PARENT) \
@@ -429,6 +446,7 @@ public:
   Optional<SDKNodeDecl*> lookupChildByPrintedName(StringRef Name) const;
   SDKNodeType *getRawValueType() const;
   bool isConformingTo(KnownProtocolKind Kind) const;
+  void jsonize(json::Output &out) override;
 };
 
 class SDKNodeDeclTypeAlias : public SDKNodeDecl {
@@ -440,22 +458,36 @@ public:
   static bool classof(const SDKNode *N);
 };
 
+class SDKNodeDeclAssociatedType: public SDKNodeDecl {
+public:
+  SDKNodeDeclAssociatedType(SDKNodeInitInfo Info);
+  const SDKNodeType* getDefault() const {
+    return getChildrenCount() ? getOnlyChild()->getAs<SDKNodeType>(): nullptr;
+  }
+  static bool classof(const SDKNode *N);
+};
+
 class SDKNodeDeclVar : public SDKNodeDecl {
-  Optional<unsigned> FixedBinaryOrder;
+  Optional<uint8_t> FixedBinaryOrder;
 public:
   SDKNodeDeclVar(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
   bool hasFixedBinaryOrder() const { return FixedBinaryOrder.hasValue(); }
-  unsigned getFixedBinaryOrder() const { return *FixedBinaryOrder; }
+  uint8_t getFixedBinaryOrder() const { return *FixedBinaryOrder; }
+  SDKNodeDeclGetter *getGetter() const;
+  SDKNodeDeclSetter *getSetter() const;
+  SDKNodeType *getType() const;
+  void jsonize(json::Output &Out) override;
 };
 
 class SDKNodeDeclAbstractFunc : public SDKNodeDecl {
-  const bool IsThrowing;
-  const bool IsMutating;
-  const Optional<uint8_t> SelfIndex;
+  bool IsThrowing;
+  bool IsMutating;
+  Optional<uint8_t> SelfIndex;
 
 protected:
   SDKNodeDeclAbstractFunc(SDKNodeInitInfo Info, SDKNodeKind Kind);
+  virtual ~SDKNodeDeclAbstractFunc() = default;
 public:
   bool isThrowing() const { return IsThrowing; }
   bool isMutating() const { return IsMutating; }
@@ -463,7 +495,17 @@ public:
   Optional<uint8_t> getSelfIndexOptional() const { return SelfIndex; }
   bool hasSelfIndex() const { return SelfIndex.hasValue(); }
   static bool classof(const SDKNode *N);
+  virtual void jsonize(json::Output &out) override;
   static StringRef getTypeRoleDescription(SDKContext &Ctx, unsigned Index);
+};
+
+class SDKNodeDeclSubscript: public SDKNodeDeclAbstractFunc {
+  bool HasSetter;
+public:
+  SDKNodeDeclSubscript(SDKNodeInitInfo Info);
+  static bool classof(const SDKNode *N);
+  bool hasSetter() const { return HasSetter; }
+  void jsonize(json::Output &Out) override;
 };
 
 class SDKNodeDeclFunction: public SDKNodeDeclAbstractFunc {
@@ -495,7 +537,7 @@ class SwiftDeclCollector: public VisibleDeclConsumer {
   SDKContext &Ctx;
   std::vector<std::unique_ptr<llvm::MemoryBuffer>> OwnedBuffers;
   SDKNode *RootNode;
-  llvm::DenseSet<Decl*> KnownDecls;
+  llvm::SetVector<Decl*> KnownDecls;
   // Collected and sorted after we get all of them.
   std::vector<ValueDecl *> ClangMacros;
   std::set<ExtensionDecl*> HandledExtensions;
@@ -519,6 +561,20 @@ public:
 
   void printTopLevelNames();
 
+  bool shouldIgnore(Decl *D, const Decl* Parent);
+  void addMembersToRoot(SDKNode *Root, IterableDeclContext *Context);
+  SDKNode *constructSubscriptDeclNode(SubscriptDecl *SD);
+  SDKNode *constructAssociatedTypeNode(AssociatedTypeDecl *ATD);
+  SDKNode *constructTypeAliasNode(TypeAliasDecl *TAD);
+  SDKNode *constructVarNode(ValueDecl *VD);
+  SDKNode *constructExternalExtensionNode(NominalTypeDecl *NTD,
+                                          ArrayRef<ExtensionDecl*> AllExts);
+  SDKNode *constructTypeDeclNode(NominalTypeDecl *NTD);
+  SDKNode *constructInitNode(ConstructorDecl *CD);
+  SDKNode *constructFunctionNode(FuncDecl* FD, SDKNodeKind Kind);
+  std::vector<SDKNode*> createParameterNodes(ParameterList *PL);
+  SDKNode *constructTypeNode(Type T, bool IsImplicitlyUnwrappedOptional = false,
+    bool hasDefaultArgument = false);
 public:
   void lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules);
   void processDecl(ValueDecl *VD);
@@ -542,6 +598,9 @@ int deserializeSDKDump(StringRef dumpPath, StringRef OutputPath,
                        CheckerOptions Opts);
 
 int findDeclUsr(StringRef dumpPath, CheckerOptions Opts);
+
+void stringSetDifference(ArrayRef<StringRef> Left, ArrayRef<StringRef> Right,
+  std::vector<StringRef> &LeftMinusRight, std::vector<StringRef> &RightMinusLeft);
 
 } // end of abi namespace
 } // end of ide namespace

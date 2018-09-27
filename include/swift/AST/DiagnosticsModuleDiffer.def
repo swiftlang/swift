@@ -42,6 +42,8 @@ ERROR(raw_type_change,none,"%0(%1) is now %2 representable", (StringRef, StringR
 
 ERROR(removed_decl,none,"%0 has been removed%select{| (deprecated)}1", (StringRef, bool))
 
+ERROR(removed_setter,none,"%0 has removed its setter", (StringRef))
+
 ERROR(moved_decl,none,"%0 has been moved to %1", (StringRef, StringRef))
 
 ERROR(renamed_decl,none,"%0 has been renamed to %1", (StringRef, StringRef))
@@ -57,6 +59,20 @@ ERROR(decl_reorder,none,"%0 in a non-resilient type changes position from %1 to 
 ERROR(decl_added,none,"%0 is added to a non-resilient type", (StringRef))
 
 ERROR(default_arg_removed,none,"%0 has removed default argument from %1", (StringRef, StringRef))
+
+ERROR(conformance_removed,none,"%0 has removed %select{conformance to|inherited protocol}2 %1", (StringRef, StringRef, bool))
+
+ERROR(conformance_added,none,"%0 has added inherited protocol %1", (StringRef, StringRef))
+
+ERROR(default_associated_type_removed,none,"%0 has removed default type %1", (StringRef, StringRef))
+
+ERROR(protocol_req_added,none,"%0 has been added as a protocol requirement", (StringRef))
+
+ERROR(super_class_removed,none,"%0 has removed its super class %1", (StringRef, StringRef))
+
+ERROR(super_class_changed,none,"%0 has changed its super class from %1 to %2", (StringRef, StringRef, StringRef))
+
+ERROR(nominal_type_kind_changed,none,"%0 has been changed to a %1", (StringRef, StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

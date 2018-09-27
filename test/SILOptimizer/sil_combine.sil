@@ -3546,11 +3546,11 @@ bb0(%0 : $_ContiguousArrayStorage<B>):
 // CHECK: bb0(%0
 // CHECK-NEXT: %1 = upcast %0
 // CHECK-NEXT: return %1
-sil @bridge_cast_noop_fold : $@convention(thin) (@owned _ContiguousArrayStorage<B>) -> _ContiguousArrayStorageBase {
+sil @bridge_cast_noop_fold : $@convention(thin) (@owned _ContiguousArrayStorage<B>) -> __ContiguousArrayStorageBase {
 bb0(%0 : $_ContiguousArrayStorage<B>):
   %1 = unchecked_ref_cast %0 : $_ContiguousArrayStorage<B> to $Builtin.BridgeObject
-  %2 = bridge_object_to_ref %1 : $Builtin.BridgeObject to $_ContiguousArrayStorageBase
-  return %2 : $_ContiguousArrayStorageBase
+  %2 = bridge_object_to_ref %1 : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
+  return %2 : $__ContiguousArrayStorageBase
 }
 
 sil @returnInt : $@convention(thin) () -> Builtin.Int32

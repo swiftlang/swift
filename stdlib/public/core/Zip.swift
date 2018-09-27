@@ -140,7 +140,7 @@ extension Zip2Sequence: Sequence {
 
   /// Returns an iterator over the elements of this sequence.
   @inlinable // generic-performance
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(
       _sequence1.makeIterator(),
       _sequence2.makeIterator())

@@ -253,7 +253,7 @@ struct V27515965 {
 
 func test(x: S27515965) -> V27515965 {
   return V27515965(x)
-  // expected-error@-1 {{initializer 'init' requires the types 'Any' and 'Float' be equivalent}}
+  // expected-error@-1 {{initializer 'init(_:)' requires the types 'Any' and 'Float' be equivalent}}
 }
 
 protocol BaseProto {}

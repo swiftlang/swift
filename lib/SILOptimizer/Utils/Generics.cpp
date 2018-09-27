@@ -1980,7 +1980,7 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
       Builder.setInsertionPoint(ResultBB->begin());
       fixUsedVoidType(ResultBB->getArgument(0), Loc, Builder);
 
-      SILArgument *Arg = ResultBB->replacePHIArgument(
+      SILArgument *Arg = ResultBB->replacePhiArgument(
           0, StoreResultTo->getType().getObjectType(),
           ValueOwnershipKind::Owned);
       // Store the direct result to the original result address.
@@ -2161,12 +2161,12 @@ SILValue ReabstractionThunkGenerator::createReabstractionThunkApply(
   SILBasicBlock *NormalBB = Thunk->createBasicBlock();
   SILBasicBlock *ErrorBB = Thunk->createBasicBlock();
   Builder.createTryApply(Loc, FRI, Subs, Arguments, NormalBB, ErrorBB);
-  auto *ErrorVal = ErrorBB->createPHIArgument(
+  auto *ErrorVal = ErrorBB->createPhiArgument(
       SpecializedFunc->mapTypeIntoContext(specConv.getSILErrorType()),
       ValueOwnershipKind::Owned);
   Builder.setInsertionPoint(ErrorBB);
   Builder.createThrow(Loc, ErrorVal);
-  SILValue ReturnValue = NormalBB->createPHIArgument(
+  SILValue ReturnValue = NormalBB->createPhiArgument(
       SpecializedFunc->mapTypeIntoContext(specConv.getSILResultType()),
       ValueOwnershipKind::Owned);
   Builder.setInsertionPoint(NormalBB);

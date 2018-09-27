@@ -173,12 +173,16 @@ UIdent UIdentVisitor::visitExtensionDecl(const ExtensionDecl *D) {
 }
 
 SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
-    : SKCtx(SKCtx), CCCache(new SwiftCompletionCache) {
+    : NotificationCtr(SKCtx.getNotificationCenter()),
+      CCCache(new SwiftCompletionCache) {
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
   RuntimeResourcePath = LibPath.str();
 
-  ASTMgr.reset(new SwiftASTManager(*this));
+  Stats = std::make_shared<SwiftStatistics>();
+  EditorDocuments = std::make_shared<SwiftEditorDocumentFileMap>();
+  ASTMgr = std::make_shared<SwiftASTManager>(EditorDocuments, Stats,
+                                             RuntimeResourcePath);
   // By default, just use the in-memory cache.
   CCCache->inMemory = llvm::make_unique<ide::CodeCompletionCache>();
 }
@@ -765,7 +769,7 @@ std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
 
 void SwiftLangSupport::getStatistics(StatisticsReceiver receiver) {
   std::vector<Statistic *> stats = {
-#define SWIFT_STATISTIC(VAR, UID, DESC) &Stats.VAR,
+#define SWIFT_STATISTIC(VAR, UID, DESC) &Stats->VAR,
 #include "SwiftStatistics.def"
   };
   receiver(stats);

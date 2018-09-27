@@ -253,6 +253,9 @@ StepResult ComponentStep::take(bool prevFailed) {
   if (prevFailed || CS.getExpressionTooComplex(Solutions))
     return done(/*isSuccess=*/false);
 
+  // Setup active scope, only if previous component didn't fail.
+  setupScope();
+
   /// Try to figure out what this step is going to be,
   /// after the scope has been established.
   auto *disjunction = CS.selectDisjunction();
@@ -476,13 +479,15 @@ bool DisjunctionStep::shouldStopAt(const DisjunctionChoice &choice) const {
   auto delta = LastSolvedChoice->second - getCurrentScore();
   bool hasUnavailableOverloads = delta.Data[SK_Unavailable] > 0;
   bool hasFixes = delta.Data[SK_Fix] > 0;
+  auto isBeginningOfPartition = choice.isBeginningOfPartition();
 
   // Attempt to short-circuit evaluation of this disjunction only
   // if the disjunction choice we are comparing to did not involve
   // selecting unavailable overloads or result in fixes being
   // applied to reach a solution.
   return !hasUnavailableOverloads && !hasFixes &&
-         shortCircuitDisjunctionAt(choice, lastChoice);
+         (isBeginningOfPartition ||
+          shortCircuitDisjunctionAt(choice, lastChoice));
 }
 
 bool DisjunctionStep::shortCircuitDisjunctionAt(

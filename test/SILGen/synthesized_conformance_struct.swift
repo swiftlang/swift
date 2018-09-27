@@ -65,7 +65,7 @@ extension Struct: Codable where T: Codable {}
 // CHECK-NEXT:   base_protocol Equatable: <T where T : Equatable> Struct<T>: Equatable module synthesized_conformance_struct
 // CHECK-NEXT:   method #Hashable.hashValue!getter.1: <Self where Self : Hashable> (Self) -> () -> Int : @$s30synthesized_conformance_struct6StructVyxGSHAASHRzlSH9hashValueSivgTW	// protocol witness for Hashable.hashValue.getter in conformance <A> Struct<A>
 // CHECK-NEXT:   method #Hashable.hash!1: <Self where Self : Hashable> (Self) -> (inout Hasher) -> () : @$s30synthesized_conformance_struct6StructVyxGSHAASHRzlSH4hash4intoys6HasherVz_tFTW	// protocol witness for Hashable.hash(into:) in conformance <A> Struct<A>
-// CHECK-NEXT:   method #Hashable._rawHashValue!1: <Self where Self : Hashable> (Self) -> ((UInt64, UInt64)) -> Int : @$s30synthesized_conformance_struct6StructVyxGSHAASHRzlSH13_rawHashValue4seedSis6UInt64V_AHt_tFTW	// protocol witness for Hashable._rawHashValue(seed:) in conformance <A> Struct<A>
+// CHECK-NEXT:   method #Hashable._rawHashValue!1: <Self where Self : Hashable> (Self) -> (Int) -> Int : @$s30synthesized_conformance_struct6StructVyxGSHAASHRzlSH13_rawHashValue4seedS2i_tFTW // protocol witness for Hashable._rawHashValue(seed:) in conformance <A> Struct<A>
 // CHECK-NEXT:   conditional_conformance (T: Hashable): dependent
 // CHECK-NEXT: }
 
