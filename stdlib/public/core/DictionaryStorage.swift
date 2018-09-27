@@ -356,7 +356,7 @@ extension _DictionaryStorage {
     return allocate(scale: scale)
   }
 
-  static internal func allocate(scale: Int) -> _DictionaryStorage {
+  static internal func allocate(scale: Int, dummy: Int = 42) -> _DictionaryStorage {
     // The entry count must be representable by an Int value; hence the scale's
     // peculiar upper bound.
     _sanityCheck(scale >= 0 && scale < Int.bitWidth - 1)
