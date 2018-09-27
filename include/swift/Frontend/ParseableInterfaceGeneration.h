@@ -14,6 +14,7 @@
 #define SWIFT_FRONTEND_PARSEABLEINTERFACEGENERATION_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/Support/Regex.h"
 
 namespace swift {
 
@@ -26,6 +27,9 @@ struct TextualInterfaceOptions {
   /// back .swiftinterface and reconstructing .swiftmodule.
   std::string TextualInterfaceFlags;
 };
+
+llvm::Regex getSwiftInterfaceToolsVersionRegex();
+llvm::Regex getSwiftInterfaceModuleFlagsRegex();
 
 /// Emit a stable, parseable interface for \p M, which can be used by a client
 /// source file to import this module, subject to options given by \p Opts.

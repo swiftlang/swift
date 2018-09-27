@@ -16,11 +16,12 @@
 #include "swift/AST/Module.h"
 #include "swift/Frontend/ParseableInterfaceGeneration.h"
 #include "clang/Basic/Module.h"
+#include "llvm/Support/Regex.h"
 
 using namespace swift;
 
-static std::string SWIFT_TOOLS_VERSION_KEY = "swift-tools-version";
-static std::string SWIFT_MODULE_FLAGS_KEY = "swift-module-flags";
+#define SWIFT_TOOLS_VERSION_KEY "swift-tools-version"
+#define SWIFT_MODULE_FLAGS_KEY "swift-module-flags"
 
 /// Diagnose any scoped imports in \p imports, i.e. those with a non-empty
 /// access path. These are not yet supported by parseable interfaces, since the
@@ -45,10 +46,20 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
                                             TextualInterfaceOptions const &Opts,
                                             ModuleDecl *M) {
   auto &Ctx = M->getASTContext();
-  out << "// " << SWIFT_TOOLS_VERSION_KEY << ": "
+  out << "// " SWIFT_TOOLS_VERSION_KEY ": "
       << Ctx.LangOpts.EffectiveLanguageVersion << "\n";
-  out << "// " << SWIFT_MODULE_FLAGS_KEY << ": "
+  out << "// " SWIFT_MODULE_FLAGS_KEY ": "
       << Opts.TextualInterfaceFlags << "\n";
+}
+
+llvm::Regex swift::getSwiftInterfaceToolsVersionRegex() {
+  return llvm::Regex("^// " SWIFT_TOOLS_VERSION_KEY ": ([0-9\\.]+)$",
+                     llvm::Regex::Newline);
+}
+
+llvm::Regex swift::getSwiftInterfaceModuleFlagsRegex() {
+  return llvm::Regex("^// " SWIFT_MODULE_FLAGS_KEY ": (.*)$",
+                     llvm::Regex::Newline);
 }
 
 /// Prints the imported modules in \p M to \p out in the form of \c import
