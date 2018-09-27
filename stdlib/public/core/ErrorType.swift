@@ -178,8 +178,20 @@ public func _bridgeErrorToNSError(_ error: __owned Error) -> AnyObject
 /// Invoked by the compiler when the subexpression of a `try!` expression
 /// throws an error.
 @_silgen_name("swift_unexpectedError")
-public func _unexpectedError(_ error: Error) {
-  preconditionFailure("'try!' expression unexpectedly raised an error: \(String(reflecting: error))")
+public func _unexpectedError(
+  _ error: __owned Error,
+  filenameStart: Builtin.RawPointer,
+  filenameLength: Builtin.Word,
+  filenameIsASCII: Builtin.Int1,
+  line: Builtin.Word
+) {
+  preconditionFailure(
+    "'try!' expression unexpectedly raised an error: \(String(reflecting: error))",
+    file: StaticString(
+      _start: filenameStart,
+      utf8CodeUnitCount: filenameLength,
+      isASCII: filenameIsASCII),
+    line: UInt(line))
 }
 
 /// Invoked by the compiler when code at top level throws an uncaught error.
