@@ -447,6 +447,8 @@ extension _CocoaSet.Index {
   @inlinable
   @nonobjc
   internal var element: AnyObject {
+    _precondition(currentKeyIndex < allKeys.count,
+      "Attempting to access Set elements using an invalid index")
     return allKeys[currentKeyIndex]
   }
 }

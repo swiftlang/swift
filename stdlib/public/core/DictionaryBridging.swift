@@ -612,6 +612,8 @@ extension _CocoaDictionary.Index {
   @inlinable
   @nonobjc
   internal var key: AnyObject {
+    _precondition(currentKeyIndex < allKeys.count,
+      "Attempting to access Dictionary elements using an invalid index")
     return allKeys[currentKeyIndex]
   }
 }
