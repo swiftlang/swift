@@ -15,7 +15,9 @@ extension S1: P2 {}
 
 public class C0<T1, T2, T3> {}
 
-public class C1: C0<S1, S1, S1> {
+public typealias C0Alias = C0<S1, S1, S1>
+
+public class C1: C0Alias {
 	open class func foo1() {}
 	public weak var Ins : C1?
 	public unowned var Ins2 : C1 = C1()

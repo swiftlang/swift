@@ -978,7 +978,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
     if (auto *Super = CD->getSuperclassDecl()) {
       SuperclassUsr = calculateUsr(Ctx, Super);
       for (auto T = CD->getSuperclass(); T; T = T->getSuperclass()) {
-        SuperclassNames.push_back(getPrintedName(Ctx, T));
+        SuperclassNames.push_back(getPrintedName(Ctx, T->getCanonicalType()));
       }
     }
   }

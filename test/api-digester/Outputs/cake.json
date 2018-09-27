@@ -194,6 +194,42 @@
       "genericSig": "<T1, T2, T3>"
     },
     {
+      "kind": "TypeAlias",
+      "name": "C0Alias",
+      "printedName": "C0Alias",
+      "children": [
+        {
+          "kind": "TypeNominal",
+          "name": "C0",
+          "printedName": "C0<S1, S1, S1>",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "S1",
+              "printedName": "S1",
+              "usr": "s:4cake2S1V"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "S1",
+              "printedName": "S1",
+              "usr": "s:4cake2S1V"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "S1",
+              "printedName": "S1",
+              "usr": "s:4cake2S1V"
+            }
+          ],
+          "usr": "s:4cake2C0C"
+        }
+      ],
+      "declKind": "TypeAlias",
+      "usr": "s:4cake7C0Aliasa",
+      "moduleName": "cake"
+    },
+    {
       "kind": "TypeDecl",
       "name": "C1",
       "printedName": "C1",
