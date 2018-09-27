@@ -2561,11 +2561,6 @@ for host in "${ALL_HOSTS[@]}"; do
                   continue
                 ;;
                 *)
-                  # FIXME: Always re-build libdispatch on non-darwin platforms.
-                  # Remove this when products build in the CMake system.
-                  echo "Cleaning the libdispatch build directory"
-                  call rm -rf "${LIBDISPATCH_BUILD_DIR}"
-
                   cmake_options=(
                     ${cmake_options[@]}
                     -DCMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
