@@ -74,6 +74,8 @@ ERROR(super_class_changed,none,"%0 has changed its super class from %1 to %2", (
 
 ERROR(nominal_type_kind_changed,none,"%0 has been changed to a %1", (StringRef, StringRef))
 
+ERROR(optional_req_changed,none,"%0 is %select{now|no longer}1 an optional requirement", (StringRef, bool))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

@@ -775,7 +775,17 @@ static void detectDeclChange(NodePtr L, NodePtr R, SDKContext &Ctx) {
       Diags.diagnose(SourceLoc(), diag::generic_sig_change, LD->getScreenInfo(),
         LD->getGenericSignature(), RD->getGenericSignature());
     }
-
+    if (LD->isOptional() != RD->isOptional()) {
+      if (Ctx.checkingABI()) {
+        // Both adding/removing optional is ABI-breaking.
+        Diags.diagnose(SourceLoc(), diag::optional_req_changed,
+                       LD->getScreenInfo(), LD->isOptional());
+      } else if (LD->isOptional()) {
+        // Removing optional is source-breaking.
+        Diags.diagnose(SourceLoc(), diag::optional_req_changed,
+                       LD->getScreenInfo(), LD->isOptional());
+      }
+    }
     if (auto *LDT = dyn_cast<SDKNodeDeclType>(L)) {
       if (auto *RDT = dyn_cast<SDKNodeDeclType>(R)) {
         diagnoseNominalTypeDeclChange(LDT, RDT);

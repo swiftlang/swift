@@ -55,6 +55,7 @@ static StringRef getCategoryName(uint32_t ID) {
     return "/* Fixed-layout Type Changes */";
   case LocalDiagID::conformance_added:
   case LocalDiagID::conformance_removed:
+  case LocalDiagID::optional_req_changed:
     return "/* Protocol Conformance Change */";
   case LocalDiagID::default_associated_type_removed:
   case LocalDiagID::protocol_req_added:

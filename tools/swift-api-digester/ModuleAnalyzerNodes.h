@@ -317,6 +317,7 @@ public:
   bool isImplicit() const { return IsImplicit; };
   bool isStatic() const { return IsStatic; };
   bool isOverriding() const { return IsOverriding; };
+  bool isOptional() const { return hasDeclAttribute(DeclAttrKind::DAK_Optional); }
   StringRef getGenericSignature() const { return GenericSig; }
   StringRef getScreenInfo() const;
   virtual void jsonize(json::Output &Out) override;

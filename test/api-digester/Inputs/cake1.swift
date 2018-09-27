@@ -103,3 +103,11 @@ public class SuperClassChange: C7 {}
 public class GenericClass<T> {}
 
 public class SubGenericClass: GenericClass<P1> {}
+
+@objc
+public protocol ObjCProtocol {
+  @objc
+  optional func removeOptional()
+  @objc
+  func addOptional()
+}

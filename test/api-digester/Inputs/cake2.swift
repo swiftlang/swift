@@ -113,3 +113,11 @@ public class SuperClassChange: C8 {}
 public class GenericClass<T> {}
 
 public class SubGenericClass: GenericClass<P2> {}
+
+@objc
+public protocol ObjCProtocol {
+  @objc
+  func removeOptional()
+  @objc
+  optional func addOptional()
+}
