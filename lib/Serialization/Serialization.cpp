@@ -1595,18 +1595,9 @@ void Serializer::writeNormalConformance(
       // If there is no witness, we're done.
       if (!witness.getDecl()) return;
 
-      if (auto *genericEnv = witness.getSyntheticEnvironment()) {
-        // Generic signature.
-        auto *genericSig = genericEnv->getGenericSignature();
-        data.push_back(addGenericSignatureRef(genericSig));
-      } else {
-        data.push_back(/*null generic signature*/0);
-      }
-
+      auto subs = witness.getSubstitutions();
       data.push_back(
-        addSubstitutionMapRef(witness.getRequirementToSyntheticSubs()));
-      data.push_back(
-        addSubstitutionMapRef(witness.getSubstitutions()));
+        addSubstitutionMapRef(subs.mapReplacementTypesOutOfContext()));
   });
 
   unsigned numSignatureConformances =
