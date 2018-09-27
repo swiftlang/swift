@@ -63,6 +63,7 @@ static StringRef getCategoryName(uint32_t ID) {
     return "/* Protocol Requirement Change */";
   case LocalDiagID::super_class_removed:
   case LocalDiagID::super_class_changed:
+  case LocalDiagID::no_longer_open:
     return "/* Class Inheritance Change */";
   default:
     return StringRef();

@@ -318,6 +318,7 @@ public:
   bool isStatic() const { return IsStatic; };
   bool isOverriding() const { return IsOverriding; };
   bool isOptional() const { return hasDeclAttribute(DeclAttrKind::DAK_Optional); }
+  bool isOpen() const { return IsOpen; }
   StringRef getGenericSignature() const { return GenericSig; }
   StringRef getScreenInfo() const;
   virtual void jsonize(json::Output &Out) override;

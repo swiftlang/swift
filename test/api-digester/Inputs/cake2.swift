@@ -124,3 +124,9 @@ public protocol ObjCProtocol {
 
 public var GlobalLetChangedToVar = 1
 public let GlobalVarChangedToLet = 1
+
+public class ClassWithOpenMember {
+  public class func foo() {}
+  public var property: Int {get { return 1}}
+  public func bar() {}
+}

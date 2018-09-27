@@ -690,7 +690,8 @@ bool SDKNode::operator==(const SDKNode &Other) const {
         return false;
       if (Left->getGenericSignature() != Right->getGenericSignature())
         return false;
-
+      if (Left->isOpen() != Right->isOpen())
+        return false;
       LLVM_FALLTHROUGH;
     }
     case SDKNodeKind::Root: {

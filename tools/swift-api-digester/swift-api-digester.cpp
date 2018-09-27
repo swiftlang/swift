@@ -727,6 +727,9 @@ static void detectDeclChange(NodePtr L, NodePtr R, SDKContext &Ctx) {
   auto &Diags = Ctx.getDiags();
   if (auto LD = dyn_cast<SDKNodeDecl>(L)) {
     auto *RD = R->getAs<SDKNodeDecl>();
+    if (!Ctx.checkingABI() && LD->isOpen() && !RD->isOpen()) {
+      Diags.diagnose(SourceLoc(), diag::no_longer_open, LD->getScreenInfo());
+    }
 
     // Diagnose static attribute change.
     if (LD->isStatic() ^ RD->isStatic()) {

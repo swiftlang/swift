@@ -78,6 +78,8 @@ ERROR(optional_req_changed,none,"%0 is %select{now|no longer}1 an optional requi
 
 ERROR(var_let_changed,none,"%0 changes from %select{var|let}1 to %select{let|var}1", (StringRef, bool))
 
+ERROR(no_longer_open,none,"%0 is no longer open for subclassing", (StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
