@@ -11,6 +11,8 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_8 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_9 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_OPT_1 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_OPT_2 | %FileCheck %s -check-prefix=UNRESOLVED_3
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_12 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_13 | %FileCheck %s -check-prefix=UNRESOLVED_3
@@ -116,6 +118,7 @@ func OptionSetTaker6(_ Op1: SomeOptions2, _ Op2: SomeOptions1) {}
 func OptionSetTaker7(_ Op1: SomeOptions1, _ Op2: SomeOptions2) -> Int {return 0}
 
 func EnumTaker1(_ E : SomeEnum1) {}
+func optionalEnumTaker1(_ : SomeEnum1?) {}
 
 class OptionTakerContainer1 {
   func OptionSetTaker1(_ op : SomeOptions1) {}
@@ -178,6 +181,12 @@ class C4 {
   }
   func f3() {
     OptionSetTaker5(.Option1, .Option4, .#^UNRESOLVED_12^#, .West)
+  }
+  func f4() {
+    var _: SomeEnum1? = .#^UNRESOLVED_OPT_1^#
+  }
+  func f5() {
+    optionalEnumTaker1(.#^UNRESOLVED_OPT_2^#)
   }
 }
 // UNRESOLVED_3: Begin completions
