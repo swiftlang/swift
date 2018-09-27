@@ -592,6 +592,9 @@ public:
         abort();
       }
 
+      if (!type->hasArchetype())
+        return;
+
       bool foundError = type->getCanonicalType().findIf([&](Type type) -> bool {
         if (auto archetype = type->getAs<ArchetypeType>()) {
           // Only visit each archetype once.

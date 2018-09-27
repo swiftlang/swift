@@ -801,8 +801,7 @@ void ConstraintSystem::recordOpenedTypes(
   SmallVector<LocatorPathElt, 2> pathElts;
   Expr *anchor = locator.getLocatorParts(pathElts);
   if (!pathElts.empty() &&
-      (pathElts.back().getKind() == ConstraintLocator::Archetype ||
-       pathElts.back().getKind() == ConstraintLocator::AssociatedType))
+      pathElts.back().getKind() == ConstraintLocator::Archetype)
     return;
 
   // If the locator is empty, ignore it.
@@ -1017,8 +1016,6 @@ static void bindArchetypesFromContext(
     ConstraintLocator *locatorPtr,
     const OpenedTypeMap &replacements) {
 
-  auto *genericEnv = cs.DC->getGenericEnvironmentOfContext();
-
   auto bindContextArchetype = [&](Type paramTy, Type contextTy) {
     auto found = replacements.find(cast<GenericTypeParamType>(
                                      paramTy->getCanonicalType()));
@@ -1054,7 +1051,7 @@ static void bindArchetypesFromContext(
       break;
 
     for (auto *paramTy : genericSig->getGenericParams()) {
-      Type contextTy = genericEnv->mapTypeIntoContext(paramTy);
+      Type contextTy = cs.DC->mapTypeIntoContext(paramTy);
       bindContextArchetype(paramTy, contextTy);
     }
 
