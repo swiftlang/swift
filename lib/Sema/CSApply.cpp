@@ -547,7 +547,7 @@ namespace {
       if (wantsRValueInstanceType)
         return base.getPlainType()->getMetatypeInstanceType();
 
-      return base.getType();
+      return base.getOldType();
     }
 
   public:
@@ -1441,7 +1441,7 @@ namespace {
         // Dig the key path expression out of the arguments.
         auto indexKP = cast<TupleExpr>(index)->getElement(0);
         auto keyPathExprTy = cs.getType(indexKP);
-        auto keyPathTy = applicationTy->getParams().front().getType();
+        auto keyPathTy = applicationTy->getParams().front().getOldType();
 
         Type valueTy;
         Type baseTy;
@@ -5584,7 +5584,7 @@ Expr *ExprRewriter::coerceCallArguments(
         return nullptr;
 
       // Record this parameter.
-      auto paramBaseType = param.getType();
+      auto paramBaseType = param.getOldType();
       assert(sliceType.isNull() && "Multiple variadic parameters?");
       sliceType = tc.getArraySliceType(arg->getLoc(), paramBaseType);
       toSugarFields.push_back(
@@ -5632,8 +5632,8 @@ Expr *ExprRewriter::coerceCallArguments(
       toSugarFields.push_back(TupleTypeElt(
                                 param.isVariadic()
                                   ? tc.getArraySliceType(arg->getLoc(),
-                                                         param.getType())
-                                  : param.getType(),
+                                                         param.getOldType())
+                                  : param.getOldType(),
                                 param.getLabel(),
                                 param.getParameterFlags()));
 
@@ -5657,7 +5657,7 @@ Expr *ExprRewriter::coerceCallArguments(
     sources.push_back(argIdx);
 
     // If the types exactly match, this is easy.
-    auto paramType = param.getType();
+    auto paramType = param.getOldType();
     if (argType->isEqual(paramType)) {
       toSugarFields.push_back(
           TupleTypeElt(param.getPlainType(), getArgLabel(argIdx),
@@ -6298,7 +6298,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
             // This handles situations like argument: (()), parameter: ().
             if (params1.size() == 1 && params2.empty()) {
-              auto tupleTy = params1.front().getType()->getAs<TupleType>();
+              auto tupleTy = params1.front().getOldType()->getAs<TupleType>();
               if (tupleTy && tupleTy->getNumElements() == 0)
                 break;
             }
@@ -7127,7 +7127,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         
         auto escapable = new (tc.Context)
           OpaqueValueExpr(apply->getFn()->getLoc(), Type());
-        cs.setType(escapable, escapableParams[0].getType());
+        cs.setType(escapable, escapableParams[0].getOldType());
 
         auto getType = [&](const Expr *E) -> Type {
           return cs.getType(E);

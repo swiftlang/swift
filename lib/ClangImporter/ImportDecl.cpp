@@ -1648,7 +1648,7 @@ static std::pair<Type, ParamDecl *> decomposeSubscriptSetter(FuncDecl *setter) {
                          ->castTo<AnyFunctionType>()
                          ->getResult()
                          ->castTo<AnyFunctionType>()
-                         ->getParams().front().getType();
+                         ->getParams().front().getOldType();
   ParamDecl *keyDecl = PL->get(1);
 
   return {elementType, keyDecl};

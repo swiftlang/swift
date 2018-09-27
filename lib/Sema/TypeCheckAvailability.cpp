@@ -2111,7 +2111,7 @@ bool isSubscriptReturningString(const ValueDecl *D, ASTContext &Context) {
   if (param.hasLabel() || param.isVariadic())
     return false;
 
-  auto inputTy = param.getType()->getAs<BoundGenericStructType>();
+  auto inputTy = param.getOldType()->getAs<BoundGenericStructType>();
   if (!inputTy)
     return false;
 

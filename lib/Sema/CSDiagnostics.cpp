@@ -216,7 +216,7 @@ bool MissingConformanceFailure::diagnoseAsError() {
     if (auto *fnType = ownerType->getAs<AnyFunctionType>()) {
       auto parameters = fnType->getParams();
       for (auto index : indices(parameters)) {
-        if (parameters[index].getType()->isEqual(nonConformingType)) {
+        if (parameters[index].getOldType()->isEqual(nonConformingType)) {
           atParameterPos = index;
           break;
         }

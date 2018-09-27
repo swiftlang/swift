@@ -3404,7 +3404,7 @@ namespace {
         if (param.hasLabel())
           printField("name", param.getLabel().str());
         dumpParameterFlags(param.getParameterFlags());
-        printRec(param.getType());
+        printRec(param.getOldType());
         OS << ")";
       }
       Indent -= 2;

@@ -833,14 +833,14 @@ constraints::matchCallArguments(ConstraintSystem &cs, bool isOperator,
 
     // Determine the parameter type.
     const auto &param = params[paramIdx];
-    auto paramTy = param.getType();
+    auto paramTy = param.getOldType();
 
     // Compare each of the bound arguments for this parameter.
     for (auto argIdx : parameterBindings[paramIdx]) {
       auto loc = locator.withPathElement(LocatorPathElt::
                                             getApplyArgToParam(argIdx,
                                                                paramIdx));
-      auto argTy = argsWithLabels[argIdx].getType();
+      auto argTy = argsWithLabels[argIdx].getOldType();
 
       // FIXME: This should be revisited. If one of argTy or paramTy
       // is a type variable, matchTypes() will add a constraint, and
@@ -1191,7 +1191,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (last != path.rend()) {
       if (last->getKind() == ConstraintLocator::ApplyArgToParam) {
         if (isSingleParam(func1Params) &&
-            func1Params[0].getType()->isVoid()) {
+            func1Params[0].getOldType()->isVoid()) {
           if (func2Params.empty()) {
             func2Params.emplace_back(getASTContext().TheEmptyTupleType);
           }
@@ -1227,8 +1227,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     // trivial because of inout-to-pointer conversions.
 
     // Compare the parameter types.
-    auto result = matchTypes(func2Param.getType(),
-                             func1Param.getType(),
+    auto result = matchTypes(func2Param.getOldType(),
+                             func1Param.getOldType(),
                              subKind, subflags,
                              (func1Params.size() == 1
                               ? argumentLocator
@@ -2515,7 +2515,9 @@ ConstraintSystem::simplifyConstructionConstraint(
 
   case TypeKind::Tuple: {
     // Tuple construction is simply tuple conversion.
-    Type argType = fnType->getInput();
+    Type argType = AnyFunctionType::composeInput(getASTContext(),
+                                                 fnType->getParams(),
+                                                 /*canonicalVararg=*/false);
     Type resultType = fnType->getResult();
 
     if (matchTypes(resultType, desugarValueType,
@@ -2928,35 +2930,37 @@ ConstraintSystem::simplifyFunctionComponentConstraint(
                                         Type first, Type second,
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator) {
-  auto funcTy = simplifyType(first);
+  auto simplified = simplifyType(first);
 
   unsigned unwrapCount = 0;
   if (shouldAttemptFixes()) {
-    while (auto objectTy = funcTy->getOptionalObjectType()) {
-      funcTy = objectTy;
+    while (auto objectTy = simplified->getOptionalObjectType()) {
+      simplified = objectTy;
 
       // Track how many times we do this so that we can record a fix for each.
       ++unwrapCount;
     }
   }
 
-  if (funcTy->isTypeVariableOrMember()) {
+  if (simplified->isTypeVariableOrMember()) {
     if (!flags.contains(TMF_GenerateConstraints))
       return SolutionKind::Unsolved;
 
     addUnsolvedConstraint(
-      Constraint::create(*this, kind, funcTy, second,
+      Constraint::create(*this, kind, simplified, second,
                          getConstraintLocator(locator)));
-  } else if (funcTy->is<FunctionType>()) {
+  } else if (auto *funcTy = simplified->getAs<FunctionType>()) {
     // Equate it to the other type in the constraint.
     Type type;
     ConstraintLocator::PathElementKind locKind;
 
     if (kind == ConstraintKind::FunctionInput) {
-      type = funcTy->castTo<FunctionType>()->getInput();
+      type = AnyFunctionType::composeInput(getASTContext(),
+                                           funcTy->getParams(),
+                                           /*canonicalVararg=*/false);
       locKind = ConstraintLocator::FunctionArgument;
     } else if (kind == ConstraintKind::FunctionResult) {
-      type = funcTy->castTo<FunctionType>()->getResult();
+      type = funcTy->getResult();
       locKind = ConstraintLocator::FunctionResult;
     } else {
       llvm_unreachable("Bad function component constraint kind");
@@ -3335,7 +3339,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
       // Only try and favor monomorphic initializers.
       if (!ctor->isGenericContext()) {
-        auto argType = ctor->getArgumentInterfaceType();
+        auto args = ctor->getMethodInterfaceType()
+                        ->castTo<FunctionType>()->getParams();
+        auto argType = AnyFunctionType::composeInput(getASTContext(), args,
+                                                     /*canonicalVarargs=*/false);
         if (argType->isEqual(favoredType))
           if (!decl->getAttrs().isUnavailable(getASTContext()))
             result.FavoredChoice = result.ViableCandidates.size();
