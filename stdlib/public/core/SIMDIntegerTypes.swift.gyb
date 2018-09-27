@@ -169,7 +169,7 @@ public extension ${Element} {
       let rhsValue = rhs._value
 %   end
 %   if signed:
-      _precondition(!any((lhs .== .min) & (rhs .== -1)),
+      _precondition(!any(lhs .== .min && rhs .== -1),
                     "Division results in an overflow.")
       return ${Self}(Builtin.sdiv_${LLVM}(lhs._value, rhsValue))
 %   else:
@@ -191,7 +191,7 @@ public extension ${Element} {
       let rhsValue = rhs._value
 %   end
 %   if signed:
-      _precondition(!any((lhs .== .min) & (rhs .== -1)),
+      _precondition(!any(lhs .== .min && rhs .== -1),
                     "Division results in an overflow in remainder operation.")
       return ${Self}(Builtin.srem_${LLVM}(lhs._value, rhsValue))
 %   else:

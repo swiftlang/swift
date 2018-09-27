@@ -80,13 +80,15 @@ from SwiftVectorTypes import all_vector_counts
       }
 
       // SIMDMaskVector conformance -----------------------------------------
-%   for op in ['&','|','^']:
       @_transparent
-      public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-        return ${Self}(lhs._value ${op} rhs._value)
+      public static func &&(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+        return ${Self}(lhs._value & rhs._value)
       }
 
-%   end
+      @_transparent
+      public static func ||(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+        return ${Self}(lhs._value | rhs._value)
+      }
 
       // TODO: replace with call to header inline C func specialized on
       // architecture once we have importer support.
