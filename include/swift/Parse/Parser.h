@@ -739,7 +739,7 @@ public:
       if (HasConditionals) {
         if (PendingConditionals == &OuterDecls && OuterDecls.size())
           registerActiveDataElement(expr);
-        expr->ConditionalsMap = ConditionalsMap;
+        expr->getConditionalsMapRef() = ConditionalsMap;
       }
       return expr;
     }

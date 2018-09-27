@@ -50,6 +50,40 @@ class C {
     _ = [1:1, 2:2, 3:3, 4:4]
     _ = [bar3(a:1), bar3(a:1), bar3(a:1), bar3(a:1)]
     _ = ["a": bar3(a:1), "b": bar3(a:1), "c": bar3(a:1), "d": bar3(a:1)]
+    _ = [
+      #if CONDITIONAL
+        bar3(a:1), bar3(a:1),
+      #else
+        bar3(a:1), bar3(a:1),
+      #endif
+    ]
+    _ = [
+      #if CONDITIONAL
+        #if CONDITIONAL2
+          "a": bar3(a:1), "b": bar3(a:1),
+        #else
+        #endif
+      #else
+        "c": bar3(a:1), "d": bar3(a:1),
+      #endif
+    ]
+    _ = [
+      #if !CONDITIONAL
+        #if CONDITIONAL2
+        #elseif CONDITIONAL3
+          bar3(a:1), bar3(a:1),
+        #endif
+      #else
+        bar3(a:1), bar3(a:1),
+      #endif
+    ]
+    _ = [
+      #if !CONDITIONAL
+        "a": bar3(a:1), "b": bar3(a:1),
+      #else
+        "c": bar3(a:1), "d": bar3(a:1),
+      #endif
+    ]
     foo(nil, nil, nil)
     _ = type(of: a).self
     _ = A -> B.C<Int>

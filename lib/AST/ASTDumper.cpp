@@ -2016,9 +2016,10 @@ public:
   }
   void printRelatedIfConfigDecls(Expr *E, CollectionExpr *C) {
     const void *Start = E->getSourceRange().Start.getOpaquePointerValue();
-    if (C->ConditionalsMap.find(Start) != C->ConditionalsMap.end()) {
+    const auto &ConditionalsMap = C->getConditionalsMapRef();
+    if (ConditionalsMap.find(Start) != ConditionalsMap.end()) {
       PrintDecl P(OS, Indent + 2);
-      for (IfConfigDecl *ICD : C->ConditionalsMap[Start]) {
+      for (IfConfigDecl *ICD : ConditionalsMap.at(Start)) {
         OS << '\n';
         P.visitIfConfigDecl(ICD);
         OS << '\n';

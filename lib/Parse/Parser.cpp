@@ -1014,8 +1014,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
         (Tok.is(tok::r_brace) || isStartOfDecl() || isStartOfStmt())) {
       break;
     }
-    // If we found EOF, bailout.
-    if (Tok.is(tok::eof)) {
+    // If we found EOF or such, bailout.
+    if (Tok.is(tok::eof) || (!Elements && Tok.is(tok::pound_endif))) {
       IsInputIncomplete = true;
       break;
     }
@@ -1023,9 +1023,6 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     diagnose(Tok, diag::expected_separator, ",")
       .fixItInsertAfter(PreviousLoc, ",");
     Status.setIsParseError();
-
-    if (IsConditionalsEnd())
-      break;
   }
 
   ListContext.reset();

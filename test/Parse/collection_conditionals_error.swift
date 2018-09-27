@@ -11,7 +11,6 @@
 
 [ // expected-warning {{expression of type '[String : Int]' is unused}}
 #if FLAG
-  // FIXME: commenting out until blah blah...
   /* "foo": 1000, */
 #else
   "bar": 42,
