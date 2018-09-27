@@ -318,6 +318,20 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   if (!type->isTypeParameter())
     return None;
 
+  auto genericSig = getGenericSignature();
+
+  // Fast path
+  unsigned index = 0;
+  for (auto reqt : genericSig->getRequirements()) {
+    if (reqt.getKind() == RequirementKind::Conformance) {
+      if (reqt.getFirstType()->isEqual(type) &&
+          reqt.getSecondType()->isEqual(proto->getDeclaredType()))
+        return getConformances()[index];
+
+      index++;
+    }
+  }
+
   // Retrieve the starting conformance from the conformance map.
   auto getInitialConformance =
     [&](Type type, ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
@@ -337,8 +351,6 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
       return None;
     };
-
-  auto genericSig = getGenericSignature();
 
   // If the type doesn't conform to this protocol, the result isn't formed
   // from these requirements.
