@@ -149,3 +149,9 @@ std::pair<StringRef, GraphOperationInfo::ArgumentLowering>
 GraphOperationInfo::StructuredArgument::getArgumentNameAndLowering() const {
   return decodeArgumentName(Name);
 }
+
+/// Determine whether the specified type is one of our well-known types, and
+/// if so, which one it is.
+TFValueKind tf::classifyTensorFlowValue(SILType ty) {
+  return classifyTensorFlowValue(ty.getASTType());
+}

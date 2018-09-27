@@ -1336,6 +1336,11 @@ FUNCTION(TFE_DeleteOp, TFE_DeleteOp, C_CC,
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind))
 
+FUNCTION(TFE_OpAddInput, TFE_OpAddInput, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
 FUNCTION(TFE_OpSetAttrType, TFE_OpSetAttrType, C_CC,
          RETURNS(),
          ARGS(Int8PtrTy, Int8PtrTy, Int32Ty),
