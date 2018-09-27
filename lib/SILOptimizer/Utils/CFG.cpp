@@ -822,7 +822,7 @@ bool swift::mergeBasicBlockWithSuccessor(SILBasicBlock *BB, DominanceInfo *DT,
       auto *BBNode = DT->getNode(BB);
       SmallVector<DominanceInfoNode *, 8> Children(SuccBBNode->begin(),
                                                    SuccBBNode->end());
-      for (auto *ChildNode : *SuccBBNode)
+      for (auto *ChildNode : Children)
         DT->changeImmediateDominator(ChildNode, BBNode);
 
       DT->eraseNode(SuccBB);
