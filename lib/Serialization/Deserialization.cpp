@@ -5305,15 +5305,6 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       conformance->setWitness(req, Witness::forOpaque(req));
     };
 
-    // Requirement -> synthetic map.
-    if (auto syntheticSig = getGenericSignature(*rawIDIter++)) {
-      // Create the synthetic environment.
-      syntheticEnv = syntheticSig->createGenericEnvironment();
-    }
-
-    // Requirement -> synthetic substitutions.
-    SubstitutionMap reqToSyntheticSubs = getSubstitutionMap(*rawIDIter++);
-
     // Witness substitutions.
     SubstitutionMap witnessSubstitutions = getSubstitutionMap(*rawIDIter++);
 
@@ -5324,8 +5315,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     }
 
     // Set the witness.
-    trySetWitness(Witness(witness, witnessSubstitutions,
-                          syntheticEnv, reqToSyntheticSubs));
+    trySetWitness(Witness::forDeserialized(witness, witnessSubstitutions));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
   
