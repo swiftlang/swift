@@ -656,7 +656,7 @@ FUNCTION(GetAssociatedTypeWitness, swift_getAssociatedTypeWitness, C_CC,
               WitnessTablePtrTy,
               TypeMetadataPtrTy,
               ProtocolRequirementStructTy->getPointerTo()),
-         ATTRS(NoUnwind))
+         ATTRS(NoUnwind, ReadNone))
 
 // Metadata *swift_getMetatypeMetadata(Metadata *instanceTy);
 FUNCTION(GetMetatypeMetadata, swift_getMetatypeMetadata, C_CC,
