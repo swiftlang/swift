@@ -8,21 +8,30 @@
 // on all x86 host processors.
 
 // CHECK-LABEL: define {{.*}}charArray
-// CHECK:  store <2 x i64> <i64 97, i64 98>
-// CHECK:  store <2 x i64> <i64 99, i64 100>
+// CHECK:  store i64 97
+// CHECK:  store i64 98
+// CHECK:  store i64 99
+// CHECK:  store i64 100
 // CHECK:  ret
 public func charArray(_ i: Int) -> [Character] {
   return [ "a", "b", "c", "d" ]
 }
 
 // CHECK-LABEL: define {{.*}}singleChar
+// CHECK: tail call swiftcc {{.*}}singleChar
+// CHECK-LABEL: define {{.*}}singleNonAsciiChar
+// CHECK: tail call swiftcc {{.*}}singleNonAsciiChar
+
+// CHECK-LABEL: define linkonce_odr hidden {{.*}}singleChar
 // CHECK: ret {{.*}} 97
 public func singleChar() -> Character {
   return "a"
 }
 
-// CHECK-LABEL: define {{.*}}singleNonAsciiChar
-// CHECK: ret {{.*}} 26085
+// NOTE: 10852326 is base-10 little-endian for E6 97 A5, the encoding of U+65E5
+//
+// CHECK-LABEL: define linkonce_odr hidden {{.*}}singleNonAsciiChar
+// CHECK: ret {{.*}} 10852326
 public func singleNonAsciiChar() -> Character {
   return "日"
 }
