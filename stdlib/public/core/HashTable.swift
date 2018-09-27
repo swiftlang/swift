@@ -83,6 +83,32 @@ extension _HashTable {
     _sanityCheck(self.capacity(forScale: scale) >= capacity)
     return scale
   }
+
+  internal static func hashSeed(
+    for object: AnyObject,
+    scale: Int8
+  ) -> Int {
+    // We generate a new hash seed whenever a new hash table is allocated and
+    // whenever an existing table is resized, so that we avoid certain copy
+    // operations becoming quadratic.  (For background details, see
+    // https://bugs.swift.org/browse/SR-3268)
+    //
+    // Note that we do reuse the existing seed when making copy-on-write copies
+    // so that we avoid breaking value semantics.
+    if Hasher._isDeterministic {
+      // When we're using deterministic hashing, the scale value as the seed is
+      // still allowed, and it covers most cases. (Unfortunately some operations
+      // that merge two similar-sized hash tables will still be quadratic.)
+      return Int(scale)
+    }
+    // Use the object address as the hash seed. This is cheaper than
+    // SystemRandomNumberGenerator, while it has the same practical effect.
+    // Addresses aren't entirely random, but that's not the goal here -- the
+    // 128-bit execution seed takes care of randomization. We only need to
+    // guarantee that no two tables with the same seed can coexist at the same
+    // time (apart from copy-on-write derivatives of the same table).
+    return unsafeBitCast(object, to: Int.self)
+  }
 }
 
 extension _HashTable {

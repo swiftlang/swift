@@ -292,11 +292,16 @@ extension _SetStorage {
     _sanityCheck(capacity >= original._count)
     let scale = _HashTable.scale(forCapacity: capacity)
     let rehash = (scale != original._scale)
-    let newStorage = _SetStorage<Element>.allocate(
-      scale: scale,
-      // Invalidate indices if we're rehashing.
-      age: rehash ? nil : original._age
-    )
+    let newStorage: _SetStorage<Element>
+    if rehash {
+      // Invalidate indices and generate a new seed.
+      newStorage = .allocate(scale: scale, age: nil, seed: nil)
+    } else {
+      newStorage = .allocate(
+        scale: scale,
+        age: original._age,
+        seed: original._seed)
+    }
     return (newStorage, rehash)
   }
 
@@ -304,12 +309,13 @@ extension _SetStorage {
   @_effects(releasenone)
   static internal func allocate(capacity: Int) -> _SetStorage {
     let scale = _HashTable.scale(forCapacity: capacity)
-    return allocate(scale: scale, age: nil)
+    return allocate(scale: scale, age: nil, seed: nil)
   }
 
   static internal func allocate(
     scale: Int8,
-    age: Int32?
+    age: Int32?,
+    seed: Int?
   ) -> _SetStorage {
     // The entry count must be representable by an Int value; hence the scale's
     // peculiar upper bound.
@@ -341,17 +347,8 @@ extension _SetStorage {
         truncatingIfNeeded: ObjectIdentifier(storage).hashValue)
     }
 
+    storage._seed = seed ?? _HashTable.hashSeed(for: storage, scale: scale)
     storage._rawElements = UnsafeMutableRawPointer(elementsAddr)
-
-    // We use a slightly different hash seed whenever we change the size of the
-    // hash table, so that we avoid certain copy operations becoming quadratic,
-    // without breaking value semantics. (For background details, see
-    // https://bugs.swift.org/browse/SR-3268)
-
-    // FIXME: Use true per-instance seeding instead. Per-capacity seeding still
-    // leaves hash values the same in same-sized tables, which may affect
-    // operations on two tables at once. (E.g., union.)
-    storage._seed = Int(scale)
 
     // Initialize hash table metadata.
     storage._hashTable.clear()

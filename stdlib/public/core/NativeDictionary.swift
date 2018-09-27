@@ -535,10 +535,10 @@ extension _NativeDictionary { // Deletion
   @usableFromInline
   internal mutating func removeAll(isUnique: Bool) {
     guard isUnique else {
-      let scale = self._storage._scale
       _storage = _DictionaryStorage<Key, Value>.allocate(
-        scale: scale,
-        age: nil)
+        scale: _storage._scale,
+        age: nil,
+        seed: nil)
       return
     }
     for bucket in hashTable {
