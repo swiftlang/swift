@@ -263,6 +263,10 @@ ERROR(invalid_vfs_overlay_file,none,
 WARNING(parseable_interface_scoped_import_unsupported,none,
         "scoped imports are not yet supported in parseable module interfaces",
         ())
+ERROR(error_extracting_version_from_textual_interface,none,
+      "error extracting version from textual module interface", ())
+ERROR(error_extracting_flags_from_textual_interface,none,
+      "error extracting flags from textual module interface", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
