@@ -2986,6 +2986,8 @@ private:
   /// \returns The selected disjunction.
   Constraint *selectDisjunction();
 
+  Constraint *selectApplyDisjunction();
+
   bool simplifyForConstraintPropagation();
   void collectNeighboringBindOverloadDisjunctions(
       llvm::SetVector<Constraint *> &neighbors);
