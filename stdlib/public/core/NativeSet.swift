@@ -241,6 +241,7 @@ extension _NativeSet: _SetBuffer {
 
   @inlinable
   internal func index(after index: Index) -> Index {
+    validate(index)
     let bucket = hashTable.occupiedBucket(after: index.bucket)
     return Index(bucket: bucket, age: age)
   }
