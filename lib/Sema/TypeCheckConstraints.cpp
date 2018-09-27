@@ -73,14 +73,16 @@ void SavedTypeVariableBinding::restore() {
   typeVar->getImpl().ParentOrFixed = ParentOrFixed;
 }
 
-ArchetypeType *TypeVariableType::Implementation::getArchetype() const {
-  // Check whether we have a path that terminates at an archetype locator.
+GenericTypeParamType *
+TypeVariableType::Implementation::getGenericParameter() const {
+  // Check whether we have a path that terminates at a generic parameter
+  // locator.
   if (!locator || locator->getPath().empty() ||
-      locator->getPath().back().getKind() != ConstraintLocator::Archetype)
+      locator->getPath().back().getKind() != ConstraintLocator::GenericParameter)
     return nullptr;
 
   // Retrieve the archetype.
-  return locator->getPath().back().getArchetype();
+  return locator->getPath().back().getGenericParameter();
 }
 
 // Only allow allocation of resolved overload set list items using the
