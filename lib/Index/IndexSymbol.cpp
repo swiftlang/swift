@@ -13,6 +13,7 @@
 #include "swift/Index/IndexSymbol.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 
@@ -140,7 +141,7 @@ SymbolInfo index::getSymbolInfoForModule(ModuleEntity Mod) {
   info.SubKind = SymbolSubKind::None;
   info.Properties = SymbolPropertySet();
   if (auto *D = Mod.getAsSwiftModule()) {
-    if (!D->isClangModule()) {
+    if (!D->findUnderlyingClangModule()) {
       info.Lang = SymbolLanguage::Swift;
     } else {
       info.Lang = SymbolLanguage::C;
@@ -157,7 +158,6 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
   SymbolInfo info{ SymbolKind::Unknown, SymbolSubKind::None,
                    SymbolLanguage::Swift, SymbolPropertySet() };
   switch (D->getKind()) {
-    case DeclKind::Module:           info.Kind = SymbolKind::Module; break;
     case DeclKind::Enum:             info.Kind = SymbolKind::Enum; break;
     case DeclKind::Struct:           info.Kind = SymbolKind::Struct; break;
     case DeclKind::Protocol:         info.Kind = SymbolKind::Protocol; break;
@@ -232,6 +232,7 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
     case DeclKind::IfConfig:
     case DeclKind::PoundDiagnostic:
     case DeclKind::MissingMember:
+    case DeclKind::Module:
       break;
   }
 

@@ -170,6 +170,8 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator, const ValueDecl* D) 
     return std::string(); // Ignore.
   if (D->getModuleContext()->isBuiltinModule())
     return std::string(); // Ignore.
+  if (isa<ModuleDecl>(D))
+    return std::string(); // Ignore.
 
   auto interpretAsClangNode = [](const ValueDecl *D)->ClangNode {
     ClangNode ClangN = D->getClangNode();
@@ -202,17 +204,6 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator, const ValueDecl* D) 
 
   llvm::SmallString<128> Buffer;
   llvm::raw_svector_ostream OS(Buffer);
-
-  if (auto ModuleD = dyn_cast<ModuleDecl>(D)) {
-    StringRef moduleName = ModuleD->getName().str();
-    bool Ignore = clang::index::generateFullUSRForTopLevelModuleName(moduleName,
-                                                                     OS);
-    if (!Ignore) {
-      return Buffer.str();
-    } else {
-      return std::string();
-    }
-  }
 
   if (ClangNode ClangN = interpretAsClangNode(D)) {
     if (auto ClangD = ClangN.getAsDecl()) {

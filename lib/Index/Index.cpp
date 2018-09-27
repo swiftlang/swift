@@ -159,7 +159,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
     StringRef name;
   };
   typedef llvm::PointerIntPair<Decl *, 3> DeclAccessorPair;
-  llvm::DenseMap<Decl *, NameAndUSR> nameAndUSRCache;
+  llvm::DenseMap<void *, NameAndUSR> nameAndUSRCache;
   llvm::DenseMap<DeclAccessorPair, NameAndUSR> accessorNameAndUSRCache;
   StringScratchSpace stringStorage;
 
@@ -193,14 +193,25 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
     return false;
   }
 
-  bool getModuleUSR(ModuleEntity Mod, StringRef &USR) {
-    SmallString<128> storage;
-    {
-      llvm::raw_svector_ostream OS(storage);
-      if (ide::printModuleUSR(Mod, OS))
-        return true;
-      USR = stringStorage.copyString(OS.str());
+  bool getModuleNameAndUSR(ModuleEntity Mod, StringRef &name, StringRef &USR) {
+    auto &result = nameAndUSRCache[Mod.getOpaqueValue()];
+    if (result.USR.empty()) {
+      SmallString<128> storage;
+      {
+        llvm::raw_svector_ostream OS(storage);
+        if (ide::printModuleUSR(Mod, OS))
+          return true;
+        result.USR = stringStorage.copyString(OS.str());
+      }
+      storage.clear();
+      {
+        llvm::raw_svector_ostream OS(storage);
+        OS << Mod.getFullName();
+        result.name = stringStorage.copyString(OS.str());
+      }
     }
+    name = result.name;
+    USR = result.USR;
     return false;
   }
 
@@ -397,9 +408,8 @@ private:
     IndexSymbol Info;
     std::tie(Info.line, Info.column) = getLineCol(Loc);
     Info.roles |= (unsigned)SymbolRole::Reference;
-    Info.name = Mod.getName();
     Info.symInfo = getSymbolInfoForModule(Mod);
-    getModuleUSR(Mod, Info.USR);
+    getModuleNameAndUSR(Mod, Info.name, Info.USR);
 
     if (!IdxConsumer.startSourceEntity(Info)) {
       Cancelled = true;

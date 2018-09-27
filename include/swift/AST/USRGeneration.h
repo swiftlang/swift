@@ -13,13 +13,13 @@
 #ifndef SWIFT_AST_USRGENERATION_H
 #define SWIFT_AST_USRGENERATION_H
 
-#include "swift/AST/Module.h"
 #include "swift/Basic/LLVM.h"
 
 namespace swift {
 class AbstractStorageDecl;
 class ValueDecl;
 class ExtensionDecl;
+class ModuleEntity;
 enum class AccessorKind;
 class Type;
 
