@@ -4570,6 +4570,7 @@ namespace {
         return E;
 
       // Construct an implicit closure which applies this KeyPath.
+      auto resultTy = cs.getType(E);
       auto &ctx = cs.getASTContext();
       auto toFunc = exprType->getAs<FunctionType>();
       auto argTy = toFunc->getParams()[0].getType();
@@ -4581,19 +4582,26 @@ namespace {
                                        ctx.getIdentifier("$0"), closure);
       param->setType(argTy);
       param->setInterfaceType(argTy->mapTypeOutOfContext());
-      auto *paramRef =
-          new (ctx) DeclRefExpr(param, DeclNameLoc(), /*Implicit=*/true);
+      auto *paramRef = new (ctx)
+          DeclRefExpr(param, DeclNameLoc(E->getLoc()), /*Implicit=*/true);
       paramRef->setType(argTy);
       cs.cacheType(paramRef);
+
+      if (resultTy->is<FunctionType>()) {
+        auto kpDecl = cs.getASTContext().getKeyPathDecl();
+        E->setType(BoundGenericType::get(kpDecl, nullptr,
+                                         {argTy, toFunc->getResult()}));
+        cs.cacheType(E);
+      }
       auto *application = new (ctx)
-          KeyPathApplicationExpr(paramRef, SourceLoc(), E, SourceLoc(),
+          KeyPathApplicationExpr(paramRef, E->getStartLoc(), E, E->getEndLoc(),
                                  toFunc->getResult(), /*implicit=*/true);
       cs.cacheType(application);
       closure->setParameterList(ParameterList::create(ctx, {param}));
       closure->setBody(application);
 
-      auto resultTy = toFunc->withExtInfo(
-          toFunc->getExtInfo().withNoEscape(true).withThrows(false));
+      if (!resultTy->is<FunctionType>())
+        resultTy = toFunc->withExtInfo(toFunc->getExtInfo().withThrows(false));
       closure->setType(resultTy);
       cs.cacheType(closure);
       return coerceToType(closure, exprType, cs.getConstraintLocator(E));

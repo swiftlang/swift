@@ -3082,19 +3082,13 @@ namespace {
 
       auto rvalueBase = CS.createTypeVariable(locator);
       CS.addConstraint(ConstraintKind::Equal, base, rvalueBase, locator);
-      
+
       // The result is a KeyPath from the root to the end component.
-      Type kpTy;
-      if (didOptionalChain) {
-        // Optional-chaining key paths are always read-only.
-        kpTy = BoundGenericType::get(kpDecl, Type(), {root, rvalueBase});
-      } else {
-        // The type of key path depends on the overloads chosen for the key
-        // path components.
-        kpTy = CS.createTypeVariable(CS.getConstraintLocator(E));
-        CS.addKeyPathConstraint(kpTy, root, rvalueBase,
-                                CS.getConstraintLocator(E));
-      }
+      // The type of key path depends on the overloads chosen for the key
+      // path components, or may also end up as function type.
+      Type kpTy = CS.createTypeVariable(CS.getConstraintLocator(E));
+      CS.addKeyPathConstraint(kpTy, root, rvalueBase,
+                              CS.getConstraintLocator(E));
       return kpTy;
     }
 

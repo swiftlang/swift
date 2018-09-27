@@ -4259,9 +4259,8 @@ done:
   }
 
   Type resolvedKPTy = BoundGenericType::get(kpDecl, nullptr, {rootTy, valueTy});
-  Type fnType = FunctionType::get(
-      {AnyFunctionType::Param(rootTy)}, valueTy,
-      AnyFunctionType::ExtInfo().withNoEscape(true).withThrows(false));
+  Type fnType = FunctionType::get({AnyFunctionType::Param(rootTy)}, valueTy,
+                                  AnyFunctionType::ExtInfo().withThrows(false));
   llvm::SmallVector<Constraint *, 2> constraints;
   auto loc = locator.getBaseLocator();
   constraints.push_back(Constraint::create(*this, ConstraintKind::Bind,
