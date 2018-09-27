@@ -52,3 +52,13 @@ public func use_global() -> Int {
 // arm64-NEXT:    bl _swift_beginAccess
 // arm64-NEXT:    ldr [[REG2:x[0-9]+]], {{\[}}sp, #16{{\]}}
 // arm64-NEXT:    ldr {{x[0-9]+}}, {{\[}}[[REG2]]{{\]}}
+
+// aarch64-LABEL: {{_?}}$s4main10use_globalSiyF:
+// aarch64:         adrp [[REG1:x[0-9]+]], _$s4main6globalSivp@PAGE
+// aarch64:         add [[REG1]], [[REG1]], _$s4main6globalSivp@PAGEOFF
+// This is a spill around beginAccess that is not strictly necessary.
+// aarch64:         str [[REG1]], {{\[}}sp, #16{{\]}}
+// aarch64-NEXT:    str
+// aarch64-NEXT:    bl _swift_beginAccess
+// aarch64-NEXT:    ldr [[REG2:x[0-9]+]], {{\[}}sp, #16{{\]}}
+// aarch64-NEXT:    ldr {{x[0-9]+}}, {{\[}}[[REG2]]{{\]}}
