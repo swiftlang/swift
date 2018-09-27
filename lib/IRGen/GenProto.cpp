@@ -238,9 +238,10 @@ irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
   if (!signature) return;
 
   // Get all of the type metadata.
-  for (auto gp : signature->getSubstitutableParams()) {
-    callback({CanType(gp), nullptr});
-  }
+  signature->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
+    if (canonical)
+      callback({CanType(gp), nullptr});
+  });
 
   // Get the protocol conformances.
   for (auto &reqt : signature->getRequirements()) {

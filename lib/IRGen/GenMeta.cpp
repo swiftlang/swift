@@ -313,15 +313,15 @@ namespace {
       GenericSignature *sig = asImpl().getGenericSignature();
       assert(sig);
       auto canSig = sig->getCanonicalSignature();
-      
-      for (auto param : canSig->getGenericParams()) {
+
+      canSig->forEachParam([&](GenericTypeParamType *param, bool canonical) {
         // Currently, there are only type parameters. The parameter is a key
         // argument if it's canonical in its generic context.
         asImpl().addGenericParameter(GenericParamKind::Type,
-                 /*key argument*/ canSig->isCanonicalTypeInContext(param),
-                 /*extra argument*/ false);
-      }
-      
+                                     /*key argument*/ canonical,
+                                     /*extra argument*/ false);
+      });
+
       // Pad the structure up to four bytes for the following requirements.
       unsigned padding = (unsigned) -canSig->getGenericParams().size() & 3;
       for (unsigned i = 0; i < padding; ++i)

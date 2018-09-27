@@ -200,18 +200,19 @@ SubstitutionMap SubstitutionMap::get(GenericSignature *genericSig,
   // Form the replacement types.
   SmallVector<Type, 4> replacementTypes;
   replacementTypes.reserve(genericSig->getGenericParams().size());
-  for (auto gp : genericSig->getGenericParams()) {
+
+  genericSig->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
     // Don't eagerly form replacements for non-canonical generic parameters.
-    if (!genericSig->isCanonicalTypeInContext(gp->getCanonicalType())) {
+    if (!canonical) {
       replacementTypes.push_back(Type());
-      continue;
+      return;
     }
 
     // Record the replacement.
     Type replacement = Type(gp).subst(subs, lookupConformance,
                                       SubstFlags::UseErrorType);
     replacementTypes.push_back(replacement);
-  }
+  });
 
   // Form the stored conformances.
   SmallVector<ProtocolConformanceRef, 4> conformances;

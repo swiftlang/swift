@@ -625,10 +625,15 @@ static bool shouldSkipApplyDuringEarlyInlining(FullApplySite AI) {
 static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
   SILFunction *Callee = AI.getReferencedFunction();
   auto CalleeSig = Callee->getLoweredFunctionType()->getGenericSignature();
-  auto SubstParams = CalleeSig->getSubstitutableParams();
   auto AISubs = AI.getSubstitutionMap();
-  for (auto idx : indices(SubstParams)) {
-    auto Param = SubstParams[idx];
+
+  SmallVector<GenericTypeParamType *, 4> SubstParams;
+  CalleeSig->forEachParam([&](GenericTypeParamType *Param, bool Canonical) {
+    if (Canonical)
+      SubstParams.push_back(Param);
+  });
+
+  for (auto Param : SubstParams) {
     // Map the parameter into context
     auto ContextTy = Callee->mapTypeIntoContext(Param->getCanonicalType());
     auto Archetype = ContextTy->getAs<ArchetypeType>();

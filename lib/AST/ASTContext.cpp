@@ -4384,14 +4384,15 @@ void SubstitutionMap::Storage::Profile(
   // Profile those replacement types that corresponding to canonical generic
   // parameters within the generic signature.
   id.AddInteger(replacementTypes.size());
-  auto genericParams = genericSig->getGenericParams();
-  for (unsigned i : indices(genericParams)) {
-    auto gp = genericParams[i];
-    if (genericSig->isCanonicalTypeInContext(gp->getCanonicalType()))
+
+  unsigned i = 0;
+  genericSig->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
+    if (canonical)
       id.AddPointer(replacementTypes[i].getPointer());
     else
       id.AddPointer(nullptr);
-  }
+    i++;
+  });
 
   // Conformances.
   id.AddInteger(conformances.size());
