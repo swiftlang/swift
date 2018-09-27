@@ -324,24 +324,31 @@ extension _CocoaSet: _SetBuffer {
   @usableFromInline
   internal typealias Element = AnyObject
 
-  @inlinable
+  @usableFromInline // FIXME(cocoa-index): Should be inlinable
   internal var startIndex: Index {
-    return Index(self, startIndex: ())
+    @_effects(releasenone)
+    get {
+      return Index(self, startIndex: ())
+    }
   }
 
-  @inlinable
+  @usableFromInline // FIXME(cocoa-index): Should be inlinable
   internal var endIndex: Index {
-    return Index(self, endIndex: ())
+    @_effects(releasenone)
+    get {
+      return Index(self, endIndex: ())
+    }
   }
 
-  @inlinable
+  @usableFromInline // FIXME(cocoa-index): Should be inlinable
+  @_effects(releasenone)
   internal func index(after i: Index) -> Index {
     var i = i
     formIndex(after: &i)
     return i
   }
 
-  @usableFromInline
+  @usableFromInline // FIXME(cocoa-index): Should be inlinable
   @_effects(releasenone)
   internal func formIndex(after i: inout Index) {
     _precondition(i.base.object === self.object, "Invalid index")
@@ -350,7 +357,8 @@ extension _CocoaSet: _SetBuffer {
     i.currentKeyIndex += 1
   }
 
-  @usableFromInline
+  @usableFromInline // FIXME(cocoa-index): Should be inlinable
+  @_effects(releasenone)
   internal func index(for element: AnyObject) -> Index? {
     // Fast path that does not involve creating an array of all keys.  In case
     // the key is present, this lookup is a penalty for the slow path, but the
@@ -384,6 +392,7 @@ extension _CocoaSet: _SetBuffer {
   }
 
   @usableFromInline
+  @_effects(releasenone)
   internal func element(at i: Index) -> AnyObject {
     let element: AnyObject? = i.element
     _sanityCheck(element != nil, "Item not found in underlying NSSet")
@@ -392,7 +401,7 @@ extension _CocoaSet: _SetBuffer {
 }
 
 extension _CocoaSet {
-  @_fixed_layout // FIXME(sil-serialize-all)
+  // FIXME(cocoa-index): Overhaul and make @_fixed_layout
   @usableFromInline
   internal struct Index {
     // Assumption: we rely on NSDictionary.getObjects when being
@@ -402,35 +411,29 @@ extension _CocoaSet {
 
     /// A reference to the NSSet, which owns members in `allObjects`,
     /// or `allKeys`, for NSSet and NSDictionary respectively.
-    @usableFromInline // FIXME(sil-serialize-all)
     internal let base: _CocoaSet
     // FIXME: swift-3-indexing-model: try to remove the cocoa reference, but
     // make sure that we have a safety check for accessing `allKeys`.  Maybe
     // move both into the dictionary/set itself.
 
     /// An unowned array of keys.
-    @usableFromInline // FIXME(sil-serialize-all)
     internal var allKeys: _HeapBuffer<Int, AnyObject>
 
     /// Index into `allKeys`
-    @usableFromInline // FIXME(sil-serialize-all)
     internal var currentKeyIndex: Int
 
-    @inlinable // FIXME(sil-serialize-all)
     internal init(_ base: __owned _CocoaSet, startIndex: ()) {
       self.base = base
       self.allKeys = _stdlib_NSSet_allObjects(base.object)
       self.currentKeyIndex = 0
     }
 
-    @inlinable // FIXME(sil-serialize-all)
     internal init(_ base: __owned _CocoaSet, endIndex: ()) {
       self.base = base
       self.allKeys = _stdlib_NSSet_allObjects(base.object)
       self.currentKeyIndex = allKeys.value
     }
 
-    @inlinable // FIXME(sil-serialize-all)
     internal init(
       _ base: __owned _CocoaSet,
       _ allKeys: __owned _HeapBuffer<Int, AnyObject>,
@@ -463,7 +466,8 @@ extension _CocoaSet.Index {
 }
 
 extension _CocoaSet.Index: Equatable {
-  @inlinable
+  @usableFromInline // FIXME(cocoa-index): Make inlinable
+  @_effects(readonly)
   internal static func == (lhs: _CocoaSet.Index, rhs: _CocoaSet.Index) -> Bool {
     _precondition(lhs.base.object === rhs.base.object,
       "Comparing indexes from different sets")
@@ -472,7 +476,8 @@ extension _CocoaSet.Index: Equatable {
 }
 
 extension _CocoaSet.Index: Comparable {
-  @inlinable
+  @usableFromInline // FIXME(cocoa-index): Make inlinable
+  @_effects(readonly)
   internal static func < (lhs: _CocoaSet.Index, rhs: _CocoaSet.Index) -> Bool {
     _precondition(lhs.base.object === rhs.base.object,
       "Comparing indexes from different sets")

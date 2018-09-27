@@ -1418,7 +1418,7 @@ extension Set.Index: Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable
+  @_effects(readonly) // FIXME(cocoa-index): Make inlinable
   public func hash(into hasher: inout Hasher) {
   #if _runtime(_ObjC)
     switch _variant {

@@ -450,24 +450,31 @@ extension _CocoaDictionary: _DictionaryBuffer {
   @usableFromInline
   internal typealias Value = AnyObject
 
-  @inlinable
+  @usableFromInline // FIXME(cocoa-index): Should be inlinable
   internal var startIndex: Index {
-    return Index(self, startIndex: ())
+    @_effects(releasenone)
+    get {
+      return Index(self, startIndex: ())
+    }
   }
 
-  @inlinable
+  @usableFromInline // FIXME(cocoa-index): Should be inlinable
   internal var endIndex: Index {
-    return Index(self, endIndex: ())
+    @_effects(releasenone)
+    get {
+      return Index(self, endIndex: ())
+    }
   }
 
-  @inlinable
+  @usableFromInline // FIXME(cocoa-index): Should be inlinable
+  @_effects(releasenone)
   internal func index(after i: Index) -> Index {
     var i = i
     formIndex(after: &i)
     return i
   }
 
-  @usableFromInline
+  @usableFromInline // FIXME(cocoa-index): Should be inlinable
   @_effects(releasenone)
   internal func formIndex(after i: inout Index) {
     _precondition(i.base.object === self.object, "Invalid index")
@@ -476,7 +483,8 @@ extension _CocoaDictionary: _DictionaryBuffer {
     i.currentKeyIndex += 1
   }
 
-  @usableFromInline
+  @usableFromInline // FIXME(cocoa-index): Should be inlinable
+  @_effects(releasenone)
   internal func index(forKey key: Key) -> Index? {
     // Fast path that does not involve creating an array of all keys.  In case
     // the key is present, this lookup is a penalty for the slow path, but the
@@ -516,8 +524,8 @@ extension _CocoaDictionary: _DictionaryBuffer {
     return object.object(forKey: key)
   }
 
-  @inlinable
-  @inline(__always)
+  @usableFromInline // FIXME(cocoa-index): Should be inlinable
+  @_effects(releasenone)
   internal func lookup(_ index: Index) -> (key: Key, value: Value) {
     _precondition(index.base.object === self.object, "Invalid index")
     let key: Key = index.allKeys[index.currentKeyIndex]
@@ -525,15 +533,15 @@ extension _CocoaDictionary: _DictionaryBuffer {
     return (key, value)
   }
 
-  @inlinable
-  @inline(__always)
+  @usableFromInline // FIXME(cocoa-index): Make inlinable
+  @_effects(releasenone)
   func key(at index: Index) -> Key {
     _precondition(index.base.object === self.object, "Invalid index")
     return index.key
   }
 
-  @inlinable
-  @inline(__always)
+  @usableFromInline // FIXME(cocoa-index): Make inlinable
+  @_effects(releasenone)
   func value(at index: Index) -> Value {
     _precondition(index.base.object === self.object, "Invalid index")
     let key = index.allKeys[index.currentKeyIndex]
@@ -557,7 +565,7 @@ extension _CocoaDictionary {
 }
 
 extension _CocoaDictionary {
-  @_fixed_layout // FIXME(sil-serialize-all)
+  // FIXME(cocoa-index): Overhaul and make @_fixed_layout
   @usableFromInline
   internal struct Index {
     // Assumption: we rely on NSDictionary.getObjects when being
@@ -567,35 +575,29 @@ extension _CocoaDictionary {
 
     /// A reference to the NSDictionary, which owns members in `allObjects`,
     /// or `allKeys`, for NSSet and NSDictionary respectively.
-    @usableFromInline // FIXME(sil-serialize-all)
     internal let base: _CocoaDictionary
     // FIXME: swift-3-indexing-model: try to remove the cocoa reference, but
     // make sure that we have a safety check for accessing `allKeys`.  Maybe
     // move both into the dictionary/set itself.
 
     /// An unowned array of keys.
-    @usableFromInline // FIXME(sil-serialize-all)
     internal var allKeys: _HeapBuffer<Int, AnyObject>
 
     /// Index into `allKeys`
-    @usableFromInline // FIXME(sil-serialize-all)
     internal var currentKeyIndex: Int
 
-    @inlinable // FIXME(sil-serialize-all)
     internal init(_ base: __owned _CocoaDictionary, startIndex: ()) {
       self.base = base
       self.allKeys = _stdlib_NSDictionary_allKeys(base.object)
       self.currentKeyIndex = 0
     }
 
-    @inlinable // FIXME(sil-serialize-all)
     internal init(_ base: __owned _CocoaDictionary, endIndex: ()) {
       self.base = base
       self.allKeys = _stdlib_NSDictionary_allKeys(base.object)
       self.currentKeyIndex = allKeys.value
     }
 
-    @inlinable // FIXME(sil-serialize-all)
     internal init(
       _ base: __owned _CocoaDictionary,
       _ allKeys: __owned _HeapBuffer<Int, AnyObject>,
@@ -628,7 +630,8 @@ extension _CocoaDictionary.Index {
 }
 
 extension _CocoaDictionary.Index: Equatable {
-  @inlinable
+  @usableFromInline // FIXME(cocoa-index): Make inlinable
+  @_effects(readonly)
   internal static func == (
     lhs: _CocoaDictionary.Index,
     rhs: _CocoaDictionary.Index
@@ -640,7 +643,8 @@ extension _CocoaDictionary.Index: Equatable {
 }
 
 extension _CocoaDictionary.Index: Comparable {
-  @inlinable
+  @usableFromInline // FIXME(cocoa-index): Make inlinable
+  @_effects(readonly)
   internal static func < (
     lhs: _CocoaDictionary.Index,
     rhs: _CocoaDictionary.Index
