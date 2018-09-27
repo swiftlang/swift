@@ -1296,7 +1296,7 @@ extension Set {
     @_frozen
     @usableFromInline
     internal enum _Variant {
-      case native(_NativeSet<Element>.Index)
+      case native(_HashTable.Index)
 #if _runtime(_ObjC)
       case cocoa(_CocoaSet.Index)
 #endif
@@ -1313,7 +1313,7 @@ extension Set {
 
     @inlinable
     @inline(__always)
-    internal init(_native index: _NativeSet<Element>.Index) {
+    internal init(_native index: _HashTable.Index) {
       self.init(_variant: .native(index))
     }
 
@@ -1346,13 +1346,14 @@ extension Set.Index {
 #endif
 
   @usableFromInline @_transparent
-  internal var _asNative: _NativeSet<Element>.Index {
+  internal var _asNative: _HashTable.Index {
     switch _variant {
     case .native(let nativeIndex):
       return nativeIndex
 #if _runtime(_ObjC)
     case .cocoa:
-      _sanityCheckFailure("internal error: does not contain a native index")
+      _preconditionFailure(
+        "Attempting to access Set elements using an invalid index")
 #endif
     }
   }
@@ -1362,7 +1363,8 @@ extension Set.Index {
   internal var _asCocoa: _CocoaSet.Index {
     switch _variant {
     case .native:
-      _sanityCheckFailure("internal error: does not contain a Cocoa index")
+      _preconditionFailure(
+        "Attempting to access Set elements using an invalid index")
     case .cocoa(let cocoaIndex):
       return cocoaIndex
     }
@@ -1422,14 +1424,14 @@ extension Set.Index: Hashable {
     switch _variant {
     case .native(let nativeIndex):
       hasher.combine(0 as UInt8)
-      hasher.combine(nativeIndex.offset)
+      hasher.combine(nativeIndex.bucket.offset)
     case .cocoa(let cocoaIndex):
       _cocoaPath()
       hasher.combine(1 as UInt8)
       hasher.combine(cocoaIndex.currentKeyIndex)
     }
   #else
-    hasher.combine(_asNative.offset)
+    hasher.combine(_asNative.bucket.offset)
   #endif
   }
 }

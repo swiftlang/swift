@@ -147,8 +147,8 @@ extension Set._Variant: _SetBuffer {
   @inlinable
   internal var startIndex: Index {
     switch self {
-    case .native:
-      return Index(_native: asNative.startIndex)
+    case .native(let native):
+      return native.startIndex
 #if _runtime(_ObjC)
     case .cocoa(let cocoaSet):
       cocoaPath()
@@ -160,8 +160,8 @@ extension Set._Variant: _SetBuffer {
   @inlinable
   internal var endIndex: Index {
     switch self {
-    case .native:
-      return Index(_native: asNative.endIndex)
+    case .native(let native):
+      return native.endIndex
 #if _runtime(_ObjC)
     case .cocoa(let cocoaSet):
       cocoaPath()
@@ -171,14 +171,14 @@ extension Set._Variant: _SetBuffer {
   }
 
   @inlinable
-  internal func index(after i: Index) -> Index {
+  internal func index(after index: Index) -> Index {
     switch self {
-    case .native:
-      return Index(_native: asNative.index(after: i._asNative))
+    case .native(let native):
+      return native.index(after: index)
 #if _runtime(_ObjC)
     case .cocoa(let cocoaSet):
       cocoaPath()
-      return Index(_cocoa: cocoaSet.index(after: i._asCocoa))
+      return Index(_cocoa: cocoaSet.index(after: index._asCocoa))
 #endif
     }
   }
@@ -187,9 +187,8 @@ extension Set._Variant: _SetBuffer {
   @inline(__always)
   internal func index(for element: Element) -> Index? {
     switch self {
-    case .native:
-      guard let index = asNative.index(for: element) else { return nil }
-      return Index(_native: index)
+    case .native(let native):
+      return native.index(for: element)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       cocoaPath()
@@ -205,8 +204,8 @@ extension Set._Variant: _SetBuffer {
     @inline(__always)
     get {
       switch self {
-      case .native:
-        return asNative.count
+      case .native(let native):
+        return native.count
 #if _runtime(_ObjC)
       case .cocoa(let cocoa):
         cocoaPath()
@@ -220,8 +219,8 @@ extension Set._Variant: _SetBuffer {
   @inline(__always)
   internal func contains(_ member: Element) -> Bool {
     switch self {
-    case .native:
-      return asNative.contains(member)
+    case .native(let native):
+      return native.contains(member)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       cocoaPath()
@@ -232,14 +231,14 @@ extension Set._Variant: _SetBuffer {
 
   @inlinable
   @inline(__always)
-  internal func element(at i: Index) -> Element {
+  internal func element(at index: Index) -> Element {
     switch self {
-    case .native:
-      return asNative.element(at: i._asNative)
+    case .native(let native):
+      return native.element(at: index)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       cocoaPath()
-      let cocoaMember = cocoa.element(at: i._asCocoa)
+      let cocoaMember = cocoa.element(at: index._asCocoa)
       return _forceBridgeFromObjectiveC(cocoaMember, Element.self)
 #endif
     }
@@ -300,7 +299,8 @@ extension Set._Variant {
     switch self {
     case .native:
       let isUnique = isUniquelyReferenced()
-      return asNative.remove(at: index._asNative, isUnique: isUnique)
+      let bucket = asNative.validatedBucket(for: index)
+      return asNative.uncheckedRemove(at: bucket, isUnique: isUnique)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       cocoaPath()

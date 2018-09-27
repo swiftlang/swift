@@ -60,12 +60,12 @@ extension _HashTable {
     @inline(__always) get { return 3 / 4 }
   }
 
-  internal static func capacity(forScale scale: Int) -> Int {
-    let bucketCount = 1 &<< scale
+  internal static func capacity(forScale scale: Int8) -> Int {
+    let bucketCount = (1 as Int) &<< scale
     return Int(Double(bucketCount) * maxLoadFactor)
   }
 
-  internal static func scale(forCapacity capacity: Int) -> Int {
+  internal static func scale(forCapacity capacity: Int) -> Int8 {
     let capacity = Swift.max(capacity, 1)
     // Calculate the minimum number of entries we need to allocate to satisfy
     // the maximum load factor. `capacity + 1` below ensures that we always
@@ -78,9 +78,42 @@ extension _HashTable {
     // exponent.
     let exponent = (Swift.max(minimumEntries, 2) - 1)._binaryLogarithm() + 1
     _sanityCheck(exponent >= 0 && exponent < Int.bitWidth)
-    _sanityCheck(self.capacity(forScale: exponent) >= capacity)
     // The scale is the exponent corresponding to the bucket count.
-    return exponent
+    let scale = Int8(truncatingIfNeeded: exponent)
+    _sanityCheck(self.capacity(forScale: scale) >= capacity)
+    return scale
+  }
+
+  internal static func hashSeed(
+    for object: AnyObject,
+    scale: Int8
+  ) -> Int {
+    // We generate a new hash seed whenever a new hash table is allocated and
+    // whenever an existing table is resized, so that we avoid certain copy
+    // operations becoming quadratic.  (For background details, see
+    // https://bugs.swift.org/browse/SR-3268)
+    //
+    // Note that we do reuse the existing seed when making copy-on-write copies
+    // so that we avoid breaking value semantics.
+    if Hasher._isDeterministic {
+      // When we're using deterministic hashing, the scale value as the seed is
+      // still allowed, and it covers most cases. (Unfortunately some operations
+      // that merge two similar-sized hash tables will still be quadratic.)
+      return Int(scale)
+    }
+    // Use the object address as the hash seed. This is cheaper than
+    // SystemRandomNumberGenerator, while it has the same practical effect.
+    // Addresses aren't entirely random, but that's not the goal here -- the
+    // 128-bit execution seed takes care of randomization. We only need to
+    // guarantee that no two tables with the same seed can coexist at the same
+    // time (apart from copy-on-write derivatives of the same table).
+    return unsafeBitCast(object, to: Int.self)
+  }
+
+  // The initial age to use for native copies of a Cocoa NSSet/NSDictionary.
+  internal static func age(for cocoa: AnyObject) -> Int32 {
+    let hash = ObjectIdentifier(cocoa).hashValue
+    return Int32(truncatingIfNeeded: hash)
   }
 }
 
@@ -135,6 +168,51 @@ extension _HashTable.Bucket: Comparable {
   internal
   static func < (lhs: _HashTable.Bucket, rhs: _HashTable.Bucket) -> Bool {
     return lhs.offset < rhs.offset
+  }
+}
+
+extension _HashTable {
+  @usableFromInline
+  @_fixed_layout
+  internal struct Index {
+    @usableFromInline
+    let bucket: Bucket
+
+    @usableFromInline
+    let age: Int32
+
+    @inlinable
+    @inline(__always)
+    internal init(bucket: Bucket, age: Int32) {
+      self.bucket = bucket
+      self.age = age
+    }
+  }
+}
+
+extension _HashTable.Index: Equatable {
+  @inlinable
+  @inline(__always)
+  internal static func ==(
+    lhs: _HashTable.Index,
+    rhs: _HashTable.Index
+  ) -> Bool {
+    _precondition(lhs.age == rhs.age,
+      "Can't compare indices belonging to different collections")
+    return lhs.bucket == rhs.bucket
+  }
+}
+
+extension _HashTable.Index: Comparable {
+  @inlinable
+  @inline(__always)
+  internal static func <(
+    lhs: _HashTable.Index,
+    rhs: _HashTable.Index
+  ) -> Bool {
+    _precondition(lhs.age == rhs.age,
+      "Can't compare indices belonging to different collections")
+    return lhs.bucket < rhs.bucket
   }
 }
 

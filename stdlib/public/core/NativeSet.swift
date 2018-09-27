@@ -48,7 +48,7 @@ internal struct _NativeSet<Element: Hashable> {
   @inlinable
   internal init(_ cocoa: __owned _CocoaSet, capacity: Int) {
     _sanityCheck(cocoa.count <= capacity)
-    self.init(capacity: capacity)
+    self._storage = _SetStorage<Element>.convert(cocoa, capacity: capacity)
     for element in cocoa {
       let nativeElement = _forceBridgeFromObjectiveC(element, Element.self)
       insertNew(nativeElement, isUnique: true)
@@ -76,10 +76,23 @@ extension _NativeSet { // Primitive fields
     }
   }
 
+  @inlinable
+  internal var age: Int32 {
+    @inline(__always) get {
+      return _storage._age
+    }
+  }
+
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   @inlinable
   internal var _elements: UnsafeMutablePointer<Element> {
     return _storage._rawElements.assumingMemoryBound(to: Element.self)
+  }
+
+  @inlinable
+  @inline(__always)
+  internal func invalidateIndices() {
+    _storage._age &+= 1
   }
 }
 
@@ -201,23 +214,62 @@ extension _NativeSet { // ensureUnique
   }
 }
 
+extension _NativeSet {
+  @inlinable
+  @inline(__always)
+  func validatedBucket(for index: _HashTable.Index) -> Bucket {
+    _precondition(hashTable.isOccupied(index.bucket) && index.age == age,
+      "Attempting to access Set elements using an invalid index")
+    return index.bucket
+  }
+
+  @inlinable
+  @inline(__always)
+  func validatedBucket(for index: Set<Element>.Index) -> Bucket {
+    switch index._variant {
+    case .native(let native):
+      return validatedBucket(for: native)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      index._cocoaPath()
+      // Accept Cocoa indices as long as they contain an element that exists in
+      // this set, and the address of their Cocoa object generates the same age.
+      if cocoa.age == self.age {
+        let element = _forceBridgeFromObjectiveC(cocoa.element, Element.self)
+        let (bucket, found) = find(element)
+        if found {
+          return bucket
+        }
+      }
+      _preconditionFailure(
+        "Attempting to access Set elements using an invalid index")
+#endif
+    }
+  }
+}
+
 extension _NativeSet: _SetBuffer {
   @usableFromInline
-  internal typealias Index = Bucket
+  internal typealias Index = Set<Element>.Index
 
   @inlinable
   internal var startIndex: Index {
-    return hashTable.startBucket
+    let bucket = hashTable.startBucket
+    return Index(_native: _HashTable.Index(bucket: bucket, age: age))
   }
 
   @inlinable
   internal var endIndex: Index {
-    return hashTable.endBucket
+    let bucket = hashTable.endBucket
+    return Index(_native: _HashTable.Index(bucket: bucket, age: age))
   }
 
   @inlinable
   internal func index(after index: Index) -> Index {
-    return hashTable.occupiedBucket(after: index)
+    // Note that _asNative forces this not to work on Cocoa indices.
+    let bucket = validatedBucket(for: index._asNative)
+    let next = hashTable.occupiedBucket(after: bucket)
+    return Index(_native: _HashTable.Index(bucket: next, age: age))
   }
 
   @inlinable
@@ -229,7 +281,7 @@ extension _NativeSet: _SetBuffer {
     }
     let (bucket, found) = find(element)
     guard found else { return nil }
-    return bucket
+    return Index(_native: _HashTable.Index(bucket: bucket, age: age))
   }
 
   @inlinable
@@ -250,8 +302,8 @@ extension _NativeSet: _SetBuffer {
   @inlinable
   @inline(__always)
   internal func element(at index: Index) -> Element {
-    hashTable.checkOccupied(index)
-    return _elements[index.offset]
+    let bucket = validatedBucket(for: index)
+    return uncheckedElement(at: bucket)
   }
 }
 
@@ -378,6 +430,8 @@ extension _NativeSet { // Deletion
   internal mutating func _delete(at bucket: Bucket) {
     hashTable.delete(at: bucket, with: self)
     _storage._count -= 1
+    _sanityCheck(_storage._count >= 0)
+    invalidateIndices()
   }
 
   @inlinable
@@ -393,18 +447,13 @@ extension _NativeSet { // Deletion
     return old
   }
 
-  @inlinable
-  @inline(__always)
-  internal mutating func remove(at index: Index, isUnique: Bool) -> Element {
-    _precondition(hashTable.isOccupied(index), "Invalid index")
-    return uncheckedRemove(at: index, isUnique: isUnique)
-  }
-
   @usableFromInline
   internal mutating func removeAll(isUnique: Bool) {
     guard isUnique else {
-      let scale = self._storage._scale
-      _storage = _SetStorage<Element>.allocate(scale: scale)
+      _storage = _SetStorage<Element>.allocate(
+        scale: _storage._scale,
+        age: nil,
+        seed: nil)
       return
     }
     for bucket in hashTable {
@@ -412,6 +461,7 @@ extension _NativeSet { // Deletion
     }
     hashTable.clear()
     _storage._count = 0
+    invalidateIndices()
   }
 }
 

@@ -403,7 +403,8 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
     var bucket = _HashTable.Bucket(offset: Int(theState.extra.0))
     let endBucket = hashTable.endBucket
-    _precondition(bucket == endBucket || hashTable.isOccupied(bucket))
+    _precondition(bucket == endBucket || hashTable.isOccupied(bucket),
+      "Invalid fast enumeration state")
     var stored = 0
 
     // Only need to bridge once, so we can hoist it out of the loop.
@@ -528,7 +529,7 @@ extension _CocoaDictionary: _DictionaryBuffer {
   @inline(__always)
   func key(at index: Index) -> Key {
     _precondition(index.base.object === self.object, "Invalid index")
-    return index.allKeys[index.currentKeyIndex]
+    return index.key
   }
 
   @inlinable
@@ -603,6 +604,25 @@ extension _CocoaDictionary {
       self.base = base
       self.allKeys = allKeys
       self.currentKeyIndex = currentKeyIndex
+    }
+  }
+}
+
+extension _CocoaDictionary.Index {
+  @inlinable
+  @nonobjc
+  internal var key: AnyObject {
+    _precondition(currentKeyIndex < allKeys.value,
+      "Attempting to access Dictionary elements using an invalid index")
+    return allKeys[currentKeyIndex]
+  }
+
+  @usableFromInline
+  @nonobjc
+  internal var age: Int32 {
+    @_effects(releasenone)
+    get {
+      return _HashTable.age(for: base.object)
     }
   }
 }
