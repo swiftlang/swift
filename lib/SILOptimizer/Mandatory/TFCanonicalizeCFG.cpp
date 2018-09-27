@@ -585,31 +585,31 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
         // appropriately and not deal with touching stale memory.
         auto succs = current->getSuccessors();
         auto *succ = succs[edgeIdx].getBB();
-        // Skip if (1) already processed, (2) reached common pd, or (3)
-        // block has in edges from outside the loop. In the last case, we will
-        // need to clone the blocks.
+        // Skip if (1) already processed or (2) reached common pd.
         if (blocksToBeMoved.count(succ) > 0 || succ == nearestCommonPD) {
           continue;
         }
-        // Clone `succ` if it is reachable by a node outside of this loop.
-        if (!DI->properlyDominates(header, succ)) {
-          // Backedge of a parent loop? This can happen when we have labeled
-          // breaks in loops. We cannot clone the blocks in this case.
-          if (DI->properlyDominates(succ, header)) {
-            // Split this edge so that we don't mess up arguments passed in
-            // from other predecessors of succ.
-            if (succ->getNumArguments() > 0) {
-              splitEdge(current->getTerminator(), edgeIdx, DI, LI);
-            }
-            continue;
-          }
-          SILBasicBlock *clonedSucc = cloner.cloneBlock(succ);
-          changeBranchTarget(current->getTerminator(), edgeIdx, clonedSucc,
-                             /*preserveArgs*/ true);
-          worklist.insert(clonedSucc);
+
+        if (DI->properlyDominates(header, succ)) {
+          worklist.insert(succ);
           continue;
         }
-        worklist.insert(succ);
+        // If `succ` is not dominated by `header`, then `succ` is reachable from
+        // a node outside of this loop. We might have to clone `succ` in such
+        // cases.
+
+        // Before cloning make sure that header -> succ is *not* backedge of a
+        // parent loop. This can happen when we have labeled breaks in loops. We
+        // cannot clone the blocks in such cases. Simply continue. This is still
+        // OK for our purposes because we will find an equivalent value at the
+        // header for any value that escapes along this edge.
+        if (DI->properlyDominates(succ, header)) continue;
+
+        // Clone the block and rewire the edge.
+        SILBasicBlock *clonedSucc = cloner.cloneBlock(succ);
+        changeBranchTarget(current->getTerminator(), edgeIdx, clonedSucc,
+                           /*preserveArgs*/ true);
+        worklist.insert(clonedSucc);
       }
     }
   }
@@ -983,9 +983,9 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
     return newBlock;
   };
 
-  // Create a new exit block. Strictly, we don't need this block, but it makes
-  // it slightly easier to implement the demux blocks. contractUncondEdges will
-  // merge this block away if appropriate.
+  // Create a new exit block. Strictly, we don't always need this block, but it
+  // makes it slightly easier to implement the demux blocks. contractUncondEdges
+  // will merge this block away if appropriate.
   SILBasicBlock *newExitBlock = createBlockOutsideLoop();
 
   SILBuilder builder(newExitBlock);
