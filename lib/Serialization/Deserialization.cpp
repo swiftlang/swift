@@ -5290,29 +5290,12 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       continue;
     }
 
-    // Generic environment.
-    GenericEnvironment *syntheticEnv = nullptr;
-    
     auto trySetOpaqueWitness = [&]{
       if (!req)
         return;
       
-      // We shouldn't yet need to worry about generic requirements, since
-      // an imported ObjC method should never be generic.
-      assert(syntheticEnv == nullptr &&
-             "opaque witness shouldn't be generic yet. when this is "
-             "possible, it should use forwarding substitutions");
       conformance->setWitness(req, Witness::forOpaque(req));
     };
-
-    // Requirement -> synthetic map.
-    if (auto syntheticSig = getGenericSignature(*rawIDIter++)) {
-      // Create the synthetic environment.
-      syntheticEnv = syntheticSig->createGenericEnvironment();
-    }
-
-    // Requirement -> synthetic substitutions.
-    SubstitutionMap reqToSyntheticSubs = getSubstitutionMap(*rawIDIter++);
 
     // Witness substitutions.
     SubstitutionMap witnessSubstitutions = getSubstitutionMap(*rawIDIter++);
@@ -5325,7 +5308,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
     // Set the witness.
     trySetWitness(Witness(witness, witnessSubstitutions,
-                          syntheticEnv, reqToSyntheticSubs));
+                          nullptr, SubstitutionMap()));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
   

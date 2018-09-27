@@ -612,6 +612,32 @@ SmallVector<Requirement, 4> GenericSignature::requirementsNotSatisfiedBy(
   return result;
 }
 
+bool isTriviallyCanonical(GenericSignature *sig, Type type) {
+  if (type.findIf([](Type t) {
+        return isa<DependentMemberType>(t.getPointer());
+      })) {
+    // The type contains dependent member types; we must take the
+    // slow path.
+    return false;
+  }
+
+  for (auto req : sig->getRequirements()) {
+    if (req.getKind() != RequirementKind::SameType) continue;
+
+    if (!req.getFirstType()->is<GenericTypeParamType>() &&
+        !req.getSecondType()->is<GenericTypeParamType>())
+      continue;
+
+    // We have a same-type constraint involving at least one generic
+    // parameter; we must take the slow path.
+    return false;
+  }
+
+  // All generic parameters are canonical, and the type does not contain any
+  // member types, so the type is already canonical.
+  return true;
+}
+
 bool GenericSignature::isCanonicalTypeInContext(Type type) {
   // If the type isn't independently canonical, it's certainly not canonical
   // in this context.
@@ -621,6 +647,11 @@ bool GenericSignature::isCanonicalTypeInContext(Type type) {
   // All the contextual canonicality rules apply to type parameters, so if the
   // type doesn't involve any type parameters, it's already canonical.
   if (!type->hasTypeParameter())
+    return true;
+
+  // Fast path to avoid creating a GenericSignatureBuilder when we already know
+  // the answer.
+  if (isTriviallyCanonical(this, type))
     return true;
 
   auto &builder = *getGenericSignatureBuilder();
@@ -696,6 +727,11 @@ CanType GenericSignature::getCanonicalTypeInContext(Type type) {
   // All the contextual canonicality rules apply to type parameters, so if the
   // type doesn't involve any type parameters, it's already canonical.
   if (!type->hasTypeParameter())
+    return CanType(type);
+
+  // Fast path to avoid creating a GenericSignatureBuilder when we already know
+  // the answer.
+  if (isTriviallyCanonical(this, type))
     return CanType(type);
 
   auto &builder = *getGenericSignatureBuilder();

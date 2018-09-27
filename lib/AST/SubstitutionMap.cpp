@@ -318,6 +318,20 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   if (!type->isTypeParameter())
     return None;
 
+  auto genericSig = getGenericSignature();
+
+  // Fast path
+  unsigned index = 0;
+  for (auto reqt : genericSig->getRequirements()) {
+    if (reqt.getKind() == RequirementKind::Conformance) {
+      if (reqt.getFirstType()->isEqual(type) &&
+          reqt.getSecondType()->isEqual(proto->getDeclaredType()))
+        return getConformances()[index];
+
+      index++;
+    }
+  }
+
   // Retrieve the starting conformance from the conformance map.
   auto getInitialConformance =
     [&](Type type, ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
@@ -337,8 +351,6 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
       return None;
     };
-
-  auto genericSig = getGenericSignature();
 
   // If the type doesn't conform to this protocol, the result isn't formed
   // from these requirements.
@@ -481,27 +493,9 @@ SubstitutionMap
 SubstitutionMap::getProtocolSubstitutions(ProtocolDecl *protocol,
                                           Type selfType,
                                           ProtocolConformanceRef conformance) {
-  auto protocolSelfType = protocol->getSelfInterfaceType();
-
-  return get(
-    protocol->getGenericSignature(),
-    [&](SubstitutableType *type) -> Type {
-      if (type->isEqual(protocolSelfType))
-        return selfType;
-
-      // This will need to change if we ever support protocols
-      // inside generic types.
-      return Type();
-    },
-    [&](CanType origType, Type replacementType, ProtocolDecl *protoType)
-      -> Optional<ProtocolConformanceRef> {
-      if (origType->isEqual(protocolSelfType) && protoType == protocol)
-        return conformance;
-
-      // This will need to change if we ever support protocols
-      // inside generic types.
-      return None;
-    });
+  Type replacements[] = {selfType};
+  return get(protocol->getGenericSignature(), llvm::makeArrayRef(replacements),
+             {conformance});
 }
 
 SubstitutionMap

@@ -2069,7 +2069,7 @@ static void checkDesignatedProtocol(OperatorDecl *OD, Identifier name,
   TypeLoc typeLoc = TypeLoc(TyR);
 
   TypeResolutionOptions options = TypeResolverContext::TypeAliasDecl;
-  if (tc.validateType(typeLoc, TypeResolution::forContextual(dc), options)) {
+  if (tc.validateType(typeLoc, TypeResolution::forInterface(dc), options)) {
     typeLoc.setInvalidType(ctx);
   }
 
@@ -3456,7 +3456,7 @@ static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
   }
 
   if (tc.validateType(typeAlias->getUnderlyingTypeLoc(),
-                      TypeResolution::forContextual(typeAlias), options)) {
+                      TypeResolution::forInterface(typeAlias), options)) {
     typeAlias->setInvalid();
     typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
   }
@@ -3933,8 +3933,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           // and validate them again.
           aliasDecl->getUnderlyingTypeLoc().setType(Type());
           aliasDecl->setInterfaceType(Type());
-
-          (void) aliasDecl->getFormalAccess();
 
           // Check generic parameters, if needed.
           if (aliasDecl->hasValidationStarted()) {
@@ -4444,8 +4442,6 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
     for (auto paramDecl : *gp)
       paramDecl->setDepth(depth);
 
-    (void) proto->getFormalAccess();
-
     for (auto ATD : proto->getAssociatedTypeMembers()) {
       validateDeclForNameLookup(ATD);
     }
@@ -4468,7 +4464,6 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
     if (assocType->hasInterfaceType())
       return;
     assocType->computeType();
-    (void) assocType->getFormalAccess();
     break;
   }
   case DeclKind::TypeAlias: {
@@ -4482,8 +4477,6 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
         if (typealias->isBeingValidated()) return;
 
         auto helper = [&] {
-          (void) typealias->getFormalAccess();
-
           TypeResolutionOptions options(TypeResolverContext::TypeAliasDecl);
           if (validateType(typealias->getUnderlyingTypeLoc(),
                            TypeResolution::forStructural(typealias), options)) {

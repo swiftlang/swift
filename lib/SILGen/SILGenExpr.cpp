@@ -2871,7 +2871,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   // If the storage declaration is from a protocol, chase the override chain
   // back to the declaration whose getter introduced the witness table
   // entry.
-  if (auto origProto = dyn_cast<ProtocolDecl>(property->getDeclContext())) {
+  if (isa<ProtocolDecl>(property->getDeclContext())) {
     auto getter = property->getGetter();
     if (!SILDeclRef::requiresNewWitnessTableEntry(getter)) {
       // Find the getter that does have a witness table entry.
@@ -3002,7 +3002,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   // If the storage declaration is from a protocol, chase the override chain
   // back to the declaration whose setter introduced the witness table
   // entry.
-  if (auto origProto = dyn_cast<ProtocolDecl>(property->getDeclContext())) {
+  if (isa<ProtocolDecl>(property->getDeclContext())) {
     auto setter = property->getSetter();
     if (!SILDeclRef::requiresNewWitnessTableEntry(setter)) {
       // Find the setter that does have a witness table entry.

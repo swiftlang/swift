@@ -886,7 +886,6 @@ SpecializedProtocolConformance::SpecializedProtocolConformance(
     GenericSubstitutions(substitutions)
 {
   assert(genericConformance->getKind() != ProtocolConformanceKind::Specialized);
-  computeConditionalRequirements();
 }
 
 void SpecializedProtocolConformance::computeConditionalRequirements() const {

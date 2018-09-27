@@ -561,6 +561,8 @@ public:
       return {DeclBaseName::Kind::Subscript, StringRef()};
     case static_cast<uint8_t>(DeclNameKind::Destructor):
       return {DeclBaseName::Kind::Destructor, StringRef()};
+    case static_cast<uint8_t>(DeclNameKind::Constructor):
+      return {DeclBaseName::Kind::Constructor, StringRef()};
     default:
       llvm_unreachable("Unknown DeclNameKind");
     }
