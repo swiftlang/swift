@@ -334,9 +334,7 @@ extension Dictionary._Variant {
   /// corresponding native representation. Otherwise it's kept the same.)
   @inlinable
   @inline(__always)
-  internal mutating func ensureUniqueNative(
-    preserving index: Index
-  ) -> _NativeDictionary<Key, Value>.Index {
+  internal mutating func ensureUniqueNative() -> _NativeDictionary<Key, Value> {
     switch self {
     case .native:
       let isUnique = isUniquelyReferenced()
@@ -344,21 +342,13 @@ extension Dictionary._Variant {
         let rehashed = asNative.copy(capacity: asNative.capacity)
         _sanityCheck(!rehashed)
       }
-      return index._asNative
+      return asNative
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       cocoaPath()
-      // We have to migrate the data first.  But after we do so, the Cocoa
-      // index becomes useless, so get the key first.
-      let cocoaKey = cocoa.key(at: index._asCocoa)
       let native = _NativeDictionary<Key, Value>(cocoa)
       self = .native(native)
-      let nativeKey = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
-      let (bucket, found) = native.find(nativeKey)
-      _precondition(found, "Bridging did not preserve equality")
-      return _NativeDictionary<Key, Value>.Index(
-        bucket: bucket,
-        age: native.age)
+      return native
 #endif
     }
   }
@@ -409,8 +399,9 @@ extension Dictionary._Variant {
   internal mutating func remove(at index: Index) -> Element {
     // FIXME(performance): fuse data migration and element deletion into one
     // operation.
-    let index = ensureUniqueNative(preserving: index)
-    return asNative.remove(at: index, isUnique: true)
+    let native = ensureUniqueNative()
+    let bucket = native.validatedBucket(for: index)
+    return asNative.uncheckedRemove(at: bucket, isUnique: true)
   }
 
   @inlinable
