@@ -16,11 +16,19 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "irgensil"
+#include "llvm/IR/DIBuilder.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/InlineAsm.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/Intrinsics.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SubstitutionMap.h"
+// SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/TensorFlow.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/ExternalUnion.h"
@@ -28,13 +36,6 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
-#include "llvm/IR/DIBuilder.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/InlineAsm.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/IntrinsicInst.h"
-#include "llvm/IR/Intrinsics.h"
-#include "llvm/IR/Module.h"
 // SWIFT_ENABLE_TENSORFLOW
 #include "swift/SIL/GraphOperationInfo.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -1931,6 +1932,8 @@ static llvm::Value *createStringValAddr(IRGenModule &IGM, StringRef strVal) {
   return opNameValAddr;
 }
 
+// The code structure resembles
+// TFGraphFunctionLowering::visitGraphOperationInst().
 void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   tf::GraphOperationInfo opInfo(i);
 
