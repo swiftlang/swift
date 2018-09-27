@@ -20,56 +20,56 @@ public func loopTest(breakCount:Int32) -> Int32 {
 */
 // CHECK-LABEL:--- XLA CFG Canonicalize: $loopWithBreak
 // CHECK: [sequence
-// CHECK:   <while Preheader: bb0, Header: bb7, exit: bb6
+// CHECK:   <while Preheader: [[PHDR:bb[0-9]+]], Header: [[HDR:bb[0-9]+]], exit: [[EXIT:bb[0-9]+]]
 // CHECK:     [sequence
-// CHECK:       {condition Header: bb1
-// CHECK:         {condition Header: bb3
-// CHECK:           block bb5
-// CHECK:           block bb4}
-// CHECK:         block bb2}
-// CHECK:       block bb8]>
-// CHECK:   block bb6]
+// CHECK:       {condition Header: [[ORIG_HDR:bb[0-9]+]]
+// CHECK:         {condition Header: [[BRK_COND:bb[0-9]+]]
+// CHECK:           block [[BRK_TRUE:bb[0-9]+]]
+// CHECK:           block [[BRK_FALSE:bb[0-9]+]]}
+// CHECK:         block [[ORIG_EXIT:bb[0-9]+]]}
+// CHECK:       block [[LATCH:bb[0-9]+]]
+// CHECK:   block [[EXIT]]]
 // CHECK: --- XLA CFG Canonicalize end
 
 //-- Preheader sets up the undefs, exit index, and stayInLoop flag.
-// CHECK: bb0(%0 : $Builtin.Int32):
+// CHECK: [[PHDR]](%0 : $Builtin.Int32):
 // CHECK: [[CONST_ONE:%.*]] =  integer_literal $Builtin.Int32, 1
 // CHECK: [[PHDR_EXIT:%.*]] = graph_op "Const"() {dtype: $Builtin.Int32, value$tensor: i32 0, __device: "ALL_DEVICES"}
 // CHECK: [[PHDR_FLAG:%.*]] = graph_op "Const"() {dtype: $Builtin.Int1, value$tensor: i1 -1, __device: "ALL_DEVICES"}
-// CHECK: br bb7([[A:%.*]] : $Builtin.Int32, [[A]] : $Builtin.Int32, [[A]] : $Builtin.Int32, [[PHDR_EXIT]] : $TensorHandle<Builtin.Int32>, [[PHDR_FLAG]] : $TensorHandle<Builtin.Int1>)
+// CHECK: br [[HDR]]([[A:%.*]] : $Builtin.Int32, [[A]] : $Builtin.Int32, [[A]] : $Builtin.Int32, [[PHDR_EXIT]] : $TensorHandle<Builtin.Int32>, [[PHDR_FLAG]] : $TensorHandle<Builtin.Int1>)
 
 // Original header
-// CHECK: bb1:
+// CHECK: [[ORIG_HDR]]:
 // CHECK:  [[A:%.*]] = builtin "cmp_slt_Int32"
-// CHECK:  cond_br [[A]], bb3, bb2
+// CHECK:  cond_br [[A]], [[BRK_COND]], [[ORIG_EXIT]]
 
 //- Sets up index to 1 and flag to false on the exit branch of the original header to latch.
-// CHECK: bb2:
+// CHECK: [[ORIG_EXIT]]:
 // CHECK:   [[LOCAL_EXIT_INDEX:%.*]] = graph_op "Const"() {dtype: $Builtin.Int32, value$tensor: i32 1, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int32>
 // CHECK:   [[LOCAL_STAY_FLAG:%.*]] = graph_op "Const"() {dtype: $Builtin.Int1, value$tensor: i1 0, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int1>
-// CHECK:  br bb8([[SUM_AT_HDR:%.*]] : $Builtin.Int32, [[COUNT_AT_HDR:%.*]] : $Builtin.Int32, [[SUM_AT_HDR]] : $Builtin.Int32, [[LOCAL_EXIT_INDEX]] : $TensorHandle<Builtin.Int32>, [[LOCAL_STAY_FLAG]] : $TensorHandle<Builtin.Int1>)
+// CHECK:  br [[LATCH]]([[SUM_AT_HDR:%.*]] : $Builtin.Int32, [[COUNT_AT_HDR:%.*]] : $Builtin.Int32, [[SUM_AT_HDR]] : $Builtin.Int32, [[LOCAL_EXIT_INDEX]] : $TensorHandle<Builtin.Int32>, [[LOCAL_STAY_FLAG]] : $TensorHandle<Builtin.Int1>)
 
-// CHECK: bb3:
+// CHECK: [[BRK_COND]]:
 // CHECK:  [[SUM_ESCAPING:%.*]] = builtin "sadd_with_overflow_Int32"([[SUM_AT_HDR]] : $Builtin.Int32, [[COUNT_AT_HDR]] : $Builtin.Int32) : $Builtin.Int32
 // CHECK:  [[COUNT_ESCAPING:%.*]] = builtin "sadd_with_overflow_Int32"([[COUNT_AT_HDR]] : $Builtin.Int32, [[CONST_ONE]] : $Builtin.Int32) : $Builtin.Int32
-// CHECK: cond_br {{.*}}, bb5, bb4
+// CHECK: cond_br {{.*}}, [[BRK_TRUE]], [[BRK_FALSE]]
 
 //- Sets up index to 0 and flag to true on the false branch of the if with break to latch.
-// CHECK: bb4:
+// CHECK: [[BRK_FALSE]]:
 // CHECK: [[LOCAL_EXIT_INDEX:%.*]] = graph_op "Const"() {dtype: $Builtin.Int32, value$tensor: i32 0, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int32>
 // CHECK: [[LOCAL_STAY_FLAG:%.*]] = graph_op "Const"() {dtype: $Builtin.Int1, value$tensor: i1 -1, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int1>
-// CHECK:  br bb8([[SUM_ESCAPING]] : $Builtin.Int32, [[COUNT_ESCAPING]] : $Builtin.Int32, [[SUM_ESCAPING_AT_HDR:%.*]] : $Builtin.Int32, [[LOCAL_EXIT_INDEX]] : $TensorHandle<Builtin.Int32>, [[LOCAL_STAY_FLAG]] : $TensorHandle<Builtin.Int1>)
+// CHECK:  br [[LATCH]]([[SUM_ESCAPING]] : $Builtin.Int32, [[COUNT_ESCAPING]] : $Builtin.Int32, [[SUM_ESCAPING_AT_HDR:%.*]] : $Builtin.Int32, [[LOCAL_EXIT_INDEX]] : $TensorHandle<Builtin.Int32>, [[LOCAL_STAY_FLAG]] : $TensorHandle<Builtin.Int1>)
 
 //- Sets up index to 1 and flag to false on the true branch of the if with break to latch.
-// CHECK: bb5:
+// CHECK: [[BRK_TRUE]]:
 // CHECK:  [[LOCAL_EXIT_INDEX:%.*]] = graph_op "Const"() {dtype: $Builtin.Int32, value$tensor: i32 1, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int32>
 // CHECK:  [[LOCAL_STAY_FLAG:%.*]] = graph_op "Const"() {dtype: $Builtin.Int1, value$tensor: i1 0, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int1>
-// CHECK: br bb8([[SUM_AT_HDR]] : $Builtin.Int32, [[COUNT_AT_HDR]] : $Builtin.Int32, [[SUM_ESCAPING]] : $Builtin.Int32, [[LOCAL_EXIT_INDEX]] : $TensorHandle<Builtin.Int32>, [[LOCAL_STAY_FLAG]] : $TensorHandle<Builtin.Int1>)
+// CHECK: br [[LATCH]]([[SUM_AT_HDR]] : $Builtin.Int32, [[COUNT_AT_HDR]] : $Builtin.Int32, [[SUM_ESCAPING]] : $Builtin.Int32, [[LOCAL_EXIT_INDEX]] : $TensorHandle<Builtin.Int32>, [[LOCAL_STAY_FLAG]] : $TensorHandle<Builtin.Int1>)
 
 //-- New Header simply checks flag
-// CHECK: bb7([[SUM_AT_HDR]] : $Builtin.Int32, [[COUNT_AT_HDR]] : $Builtin.Int32, [[SUM_ESCAPING_AT_HDR]] : $Builtin.Int32, [[HDR_EXIT_ARG:%.*]] : $TensorHandle<Builtin.Int32>, [[HDR_FLAG_ARG:%.*]] : $TensorHandle<Builtin.Int1>):
+// CHECK: [[HDR]]([[SUM_AT_HDR]] : $Builtin.Int32, [[COUNT_AT_HDR]] : $Builtin.Int32, [[SUM_ESCAPING_AT_HDR]] : $Builtin.Int32, [[HDR_EXIT_ARG:%.*]] : $TensorHandle<Builtin.Int32>, [[HDR_FLAG_ARG:%.*]] : $TensorHandle<Builtin.Int1>):
 // CHECK:  [[B:%.*]] = graph_op "tf_tensor_to_i1"([[HDR_FLAG_ARG]] : $TensorHandle<Builtin.Int1>) {{.*}} : $Builtin.Int1
-// CHECK:  cond_br [[B]], bb1, bb6
+// CHECK:  cond_br [[B]], [[ORIG_HDR]], [[EXIT]]
 
 sil @$loopWithBreak : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
 // %0                                             // user: %12
@@ -130,31 +130,31 @@ public func nestedLoopWithBreak(breakCount:Int32) -> Int32 {
 */
 // CHECK-LABEL: --- XLA CFG Canonicalize: $nestedLoopWithBreak
 // CHECK:[sequence
-// CHECK:  <while Preheader: bb0, Header: bb15, exit: bb12
+// CHECK:  <while Preheader: [[OPHDR:bb[0-9]+]], Header: [[OHDR:bb[0-9]+]], exit: [[OEXIT:bb[0-9]+]]
 // CHECK:    [sequence
-// CHECK:      {condition Header: bb1
+// CHECK:      {condition Header: [[OCOND:bb[0-9]+]]
 // CHECK:        [sequence
-// CHECK:          <while Preheader: bb3, Header: bb13, exit: bb9
+// CHECK:          <while Preheader: [[IPHDR:bb[0-9]+]], Header: [[IHDR:bb[0-9]+]], exit: [[IEXIT:bb[0-9]+]]
 // CHECK:            [sequence
-// CHECK:              {condition Header: bb4
-// CHECK:                {condition Header: bb6
-// CHECK:                  block bb8
-// CHECK:                  block bb7}
-// CHECK:                block bb5}
-// CHECK:              block bb14]>
-// CHECK:          {condition Header: bb9
-// CHECK:            block bb10
-// CHECK:            block bb11}]
-// CHECK:        block bb2}
-// CHECK:      block bb16]>
-// CHECK:  block bb12]
+// CHECK:              {condition Header: {{bb[0-9]+}}
+// CHECK:                {condition Header: {{bb[0-9]+}}
+// CHECK:                  block {{bb[0-9]+}}
+// CHECK:                  block {{bb[0-9]+}}
+// CHECK:                block {{bb[0-9]+}}
+// CHECK:              block {{bb[0-9]+}}]>
+// CHECK:          {condition Header: {{bb[0-9]+}}
+// CHECK:            block {{bb[0-9]+}}
+// CHECK:            block {{bb[0-9]+}}}]
+// CHECK:        block {{bb[0-9]+}}}
+// CHECK:      block {{bb[0-9]+}}]>
+// CHECK:  block [[OEXIT]]]
 //-- Loop preheaders have appropriate number of additional arguments
 //-- Outer loop
-// CHECK: bb0(%0 : $Builtin.Int32):
-// CHECK: br bb15([[A:%.*]] : $Builtin.Int32, [[A]] : $Builtin.Int32, [[A]] : $Builtin.Int32, [[A]] : $Builtin.Int32, {{.*}} : $TensorHandle<Builtin.Int32>, {{.*}} : $TensorHandle<Builtin.Int1>)
+// CHECK: [[OPHDR]](%0 : $Builtin.Int32):
+// CHECK: br [[OHDR]]([[A:%.*]] : $Builtin.Int32, [[A]] : $Builtin.Int32, [[A]] : $Builtin.Int32, [[A]] : $Builtin.Int32, {{.*}} : $TensorHandle<Builtin.Int32>, {{.*}} : $TensorHandle<Builtin.Int1>)
 //-- Inner loop
-// CHECK: bb3:                                              // Preds: bb1
-// CHECK:  br bb13({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, [[B:%[0-9]+]] : $Builtin.Int32, [[B]] : $Builtin.Int32, {{.*}} : $TensorHandle<Builtin.Int32>, {{.*}} : $TensorHandle<Builtin.Int1>)
+// CHECK: [[IPHDR]]:                                              // Preds: [[OCOND]]
+// CHECK:  br [[IHDR]]({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, [[B:%[0-9]+]] : $Builtin.Int32, [[B]] : $Builtin.Int32, {{.*}} : $TensorHandle<Builtin.Int32>, {{.*}} : $TensorHandle<Builtin.Int1>)
 
 sil @$nestedLoopWithBreak : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
 // %0                                             // users: %27, %26, %19
@@ -231,20 +231,20 @@ public func nestedLoopWithBreak(breakCount:Int32) -> Int32 {
 
 // CHECK-LABEL: --- XLA CFG Canonicalize: $doWhileLoop
 // CHECK: [sequence
-// CHECK:   <while Preheader: bb0, Header: bb7, exit: bb6
+// CHECK:   <while Preheader: [[PHDR:bb[0-9]+]], Header: [[HDR:bb[0-9]+]], exit: [[EXIT:bb[0-9]+]]
 // CHECK:     [sequence
-// CHECK:       {condition Header: bb1
-// CHECK:         {condition Header: bb3
-// CHECK:           block bb4
-// CHECK:           block bb5}
-// CHECK:         block bb2}
-// CHECK:       block bb8]>
-// CHECK:   block bb6]
+// CHECK:       {condition Header: {{bb[0-9]+}}
+// CHECK:         {condition Header: {{bb[0-9]+}}
+// CHECK:           block {{bb[0-9]+}}
+// CHECK:           block {{bb[0-9]+}}}
+// CHECK:         block {{bb[0-9]+}}}
+// CHECK:       block {{bb[0-9]+}}]>
+// CHECK:   block {{bb[0-9]+}}]
 
 // Make sure undef is still left in this case for now.
 // CHECK: sil @$doWhileLoop : {{.*}} (Builtin.Int32) -> Builtin.Int32 {
-// CHECK: bb0({{.*}} : $Builtin.Int32):
-// CHECK: br bb7({{.*}} : $Builtin.Int32, undef : $Builtin.Int32, {{.*}} : $TensorHandle<Builtin.Int32>, {{.*}} : $TensorHandle<Builtin.Int1>)
+// CHECK: [[PHDR]]({{.*}} : $Builtin.Int32):
+// CHECK: br [[HDR]]({{.*}} : $Builtin.Int32, undef : $Builtin.Int32, {{.*}} : $TensorHandle<Builtin.Int32>, {{.*}} : $TensorHandle<Builtin.Int1>)
 
 sil @$doWhileLoop : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32):
