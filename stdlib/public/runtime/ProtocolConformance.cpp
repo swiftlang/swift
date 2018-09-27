@@ -173,7 +173,7 @@ ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
     return getStaticWitnessTable();
 
   case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
-    return getWitnessTableAccessor()(type, nullptr, 0);
+    return getWitnessTableAccessor()(type, nullptr);
 
   case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor: {
     // Check the conditional requirements.
@@ -186,8 +186,7 @@ ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
 
     return getWitnessTableAccessor()(
                            type,
-                           (const swift::WitnessTable**)conditionalArgs.data(),
-                           conditionalArgs.size());
+                           (const swift::WitnessTable**)conditionalArgs.data());
   }
   }
   return nullptr;

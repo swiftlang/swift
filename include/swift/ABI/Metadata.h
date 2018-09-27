@@ -2245,8 +2245,7 @@ struct TargetProtocolConformanceDescriptor final
 public:
   using WitnessTableAccessorFn
     = const TargetWitnessTable<Runtime> *(const TargetMetadata<Runtime>*,
-                                          const TargetWitnessTable<Runtime> **,
-                                          size_t);
+                                          const TargetWitnessTable<Runtime> **);
 
   using GenericRequirementDescriptor =
     TargetGenericRequirementDescriptor<Runtime>;
