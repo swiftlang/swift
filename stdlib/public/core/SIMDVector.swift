@@ -1,3 +1,42 @@
+infix operator .== : ComparisonPrecedence
+infix operator .!= : ComparisonPrecedence
+infix operator .<= : ComparisonPrecedence
+infix operator .>= : ComparisonPrecedence
+infix operator .<  : ComparisonPrecedence
+infix operator .>  : ComparisonPrecedence
+
+infix operator .+ : AdditionPrecedence
+infix operator .- : AdditionPrecedence
+infix operator .* : MultiplicationPrecedence
+infix operator ./ : MultiplicationPrecedence
+infix operator .+= : AssignmentPrecedence
+infix operator .-= : AssignmentPrecedence
+infix operator .*= : AssignmentPrecedence
+infix operator ./= : AssignmentPrecedence
+
+infix operator .&+ : AdditionPrecedence
+infix operator .&- : AdditionPrecedence
+infix operator .&* : MultiplicationPrecedence
+infix operator .% : MultiplicationPrecedence
+infix operator .&+= : AssignmentPrecedence
+infix operator .&-= : AssignmentPrecedence
+infix operator .&*= : AssignmentPrecedence
+
+prefix operator .~
+prefix operator .!
+infix operator .^ : AdditionPrecedence
+infix operator .| : AdditionPrecedence
+infix operator .& : MultiplicationPrecedence
+infix operator .>> : BitwiseShiftPrecedence
+infix operator .<< : BitwiseShiftPrecedence
+infix operator .&>> : BitwiseShiftPrecedence
+infix operator .&<< : BitwiseShiftPrecedence
+infix operator .^= : AssignmentPrecedence
+infix operator .|= : AssignmentPrecedence
+infix operator .&= : AssignmentPrecedence
+infix operator .&>>= : AssignmentPrecedence
+infix operator .&<<= : AssignmentPrecedence
+
 /// A computational vector type.
 public protocol SIMDVector : Hashable,
                              CustomStringConvertible,
@@ -55,7 +94,7 @@ public protocol SIMDVector : Hashable,
   // Note: the corresponding `!=` operator and the `Bool` operators are defined
   // in terms of this operation in extensions. SIMD types should only define
   // this operator, and use the default implementations of the others.
-  static func ==(lhs: Self, rhs: Self) -> Mask
+  static func .==(lhs: Self, rhs: Self) -> Mask
   
   /// A vector formed from the corresponding lane of this vector where
   /// prediate is false, and from the corresponding lane of other where
@@ -72,36 +111,36 @@ public extension SIMDVector {
   /// A mask vector where each lane is `true` if and only if the
   /// corresponding lane of the vector `rhs` is equal to `lhs`.
   @_transparent
-  static func ==(lhs: Element, rhs: Self) -> Mask {
-    return Self(repeating: lhs) == rhs
+  static func .==(lhs: Element, rhs: Self) -> Mask {
+    return Self(repeating: lhs) .== rhs
   }
   
   /// A mask vector where each lane is `true` if and only if the
   /// corresponding lane of the vector `lhs` is equal to `rhs`.
   @_transparent
-  static func ==(lhs: Self, rhs: Element) -> Mask {
-    return rhs == lhs
+  static func .==(lhs: Self, rhs: Element) -> Mask {
+    return rhs .== lhs
   }
   
   /// A mask vector where each lane is `true` if and only if the
   /// corresponding lanes of the two arguments are not equal.
   @_transparent
-  static func !=(lhs: Self, rhs: Self) -> Mask {
-    return !(lhs == rhs)
+  static func .!=(lhs: Self, rhs: Self) -> Mask {
+    return .!(lhs .== rhs)
   }
   
   /// A mask vector where each lane is `true` if and only if the
   /// corresponding lane of the vector `rhs` is not equal to `lhs`.
   @_transparent
-  static func !=(lhs: Element, rhs: Self) -> Mask {
-    return !(lhs == rhs)
+  static func .!=(lhs: Element, rhs: Self) -> Mask {
+    return .!(lhs .== rhs)
   }
   
   /// A mask vector where each lane is `true` if and only if the
   /// corresponding lane of the vector `lhs` is not equal to `rhs`.
   @_transparent
-  static func !=(lhs: Self, rhs: Element) -> Mask {
-    return !(lhs == rhs)
+  static func .!=(lhs: Self, rhs: Element) -> Mask {
+    return .!(lhs .== rhs)
   }
   
   /// Replaces elements of this vector with elements of `other` in the lanes
@@ -130,7 +169,7 @@ public extension SIMDVector {
 public extension SIMDVector {
   @_transparent
   static func ==(lhs: Self, rhs: Self) -> Bool {
-    return all(lhs == rhs)
+    return all(lhs .== rhs)
   }
 }
 

@@ -2,21 +2,23 @@ public protocol SIMDFloatingPointVector : SIMDVector
                           where Element : BinaryFloatingPoint,
                  Element.RawSignificand : FixedWidthInteger {
   
-  static func <(lhs: Self, rhs: Self) -> Mask
+  static var zero: Self { get }
   
-  static func <=(lhs: Self, rhs: Self) -> Mask
+  static func .<(lhs: Self, rhs: Self) -> Mask
   
-  static func >(lhs: Self, rhs: Self) -> Mask
+  static func .<=(lhs: Self, rhs: Self) -> Mask
   
-  static func >=(lhs: Self, rhs: Self) -> Mask
+  static func .>(lhs: Self, rhs: Self) -> Mask
   
-  static func +(lhs: Self, rhs: Self) -> Self
+  static func .>=(lhs: Self, rhs: Self) -> Mask
   
-  static func -(lhs: Self, rhs: Self) -> Self
+  static func .+(lhs: Self, rhs: Self) -> Self
   
-  static func *(lhs: Self, rhs: Self) -> Self
+  static func .-(lhs: Self, rhs: Self) -> Self
   
-  static func /(lhs: Self, rhs: Self) -> Self
+  static func .*(lhs: Self, rhs: Self) -> Self
+  
+  static func ./(lhs: Self, rhs: Self) -> Self
   
   func addingProduct(_ lhs: Self, _ rhs: Self) -> Self
   
@@ -27,147 +29,150 @@ public protocol SIMDFloatingPointVector : SIMDVector
 
 public extension SIMDFloatingPointVector {
   
+  /// The zero vector.
+  static var zero: Self { return Self() }
+  
   // MARK: Vector-scalar comparisons
   @inlinable
-  static func ==(lhs: Self, rhs: Element) -> Mask {
-    return lhs == Self(repeating: rhs)
+  static func .==(lhs: Self, rhs: Element) -> Mask {
+    return lhs .== Self(repeating: rhs)
   }
   
   @inlinable
-  static func !=(lhs: Self, rhs: Element) -> Mask {
-    return lhs != Self(repeating: rhs)
+  static func .!=(lhs: Self, rhs: Element) -> Mask {
+    return lhs .!= Self(repeating: rhs)
   }
 
   @inlinable
-  static func <(lhs: Self, rhs: Element) -> Mask {
-    return lhs < Self(repeating: rhs)
+  static func .<(lhs: Self, rhs: Element) -> Mask {
+    return lhs .< Self(repeating: rhs)
   }
   
   @inlinable
-  static func <=(lhs: Self, rhs: Element) -> Mask {
-    return lhs <= Self(repeating: rhs)
+  static func .<=(lhs: Self, rhs: Element) -> Mask {
+    return lhs .<= Self(repeating: rhs)
   }
   
   @inlinable
-  static func >(lhs: Self, rhs: Element) -> Mask {
-    return lhs > Self(repeating: rhs)
+  static func .>(lhs: Self, rhs: Element) -> Mask {
+    return lhs .> Self(repeating: rhs)
   }
   
   @inlinable
-  static func >=(lhs: Self, rhs: Element) -> Mask {
-    return lhs >= Self(repeating: rhs)
+  static func .>=(lhs: Self, rhs: Element) -> Mask {
+    return lhs .>= Self(repeating: rhs)
   }
   
   @inlinable
-  static func ==(lhs: Element, rhs: Self) -> Mask {
-    return Self(repeating: lhs) == rhs
+  static func .==(lhs: Element, rhs: Self) -> Mask {
+    return Self(repeating: lhs) .== rhs
   }
   
   @inlinable
-  static func !=(lhs: Element, rhs: Self) -> Mask {
-    return Self(repeating: lhs) != rhs
+  static func .!=(lhs: Element, rhs: Self) -> Mask {
+    return Self(repeating: lhs) .!= rhs
   }
   
   @inlinable
-  static func <(lhs: Element, rhs: Self) -> Mask {
-    return Self(repeating: lhs) < rhs
+  static func .<(lhs: Element, rhs: Self) -> Mask {
+    return Self(repeating: lhs) .< rhs
   }
   
   @inlinable
-  static func <=(lhs: Element, rhs: Self) -> Mask {
-    return Self(repeating: lhs) <= rhs
+  static func .<=(lhs: Element, rhs: Self) -> Mask {
+    return Self(repeating: lhs) .<= rhs
   }
   
   @inlinable
-  static func >(lhs: Element, rhs: Self) -> Mask {
-    return Self(repeating: lhs) > rhs
+  static func .>(lhs: Element, rhs: Self) -> Mask {
+    return Self(repeating: lhs) .> rhs
   }
   
   @inlinable
-  static func >=(lhs: Element, rhs: Self) -> Mask {
-    return Self(repeating: lhs) >= rhs
+  static func .>=(lhs: Element, rhs: Self) -> Mask {
+    return Self(repeating: lhs) .>= rhs
   }
   
   // MARK: Arithmetic operators
   @_transparent
-  static func +(lhs: Self, rhs: Element) -> Self {
-    return lhs + Self(repeating: rhs)
+  static func .+(lhs: Self, rhs: Element) -> Self {
+    return lhs .+ Self(repeating: rhs)
   }
   
   @_transparent
-  static func +(lhs: Element, rhs: Self) -> Self {
-    return rhs + lhs
+  static func .+(lhs: Element, rhs: Self) -> Self {
+    return rhs .+ lhs
   }
   
   @_transparent
-  static func -(lhs: Self, rhs: Element) -> Self {
-    return lhs - Self(repeating: rhs)
+  static func .-(lhs: Self, rhs: Element) -> Self {
+    return lhs .- Self(repeating: rhs)
   }
   
   @_transparent
-  static func -(lhs: Element, rhs: Self) -> Self {
-    return Self(repeating: lhs) - rhs
+  static func .-(lhs: Element, rhs: Self) -> Self {
+    return Self(repeating: lhs) .- rhs
   }
   
   @_transparent
-  static func *(lhs: Self, rhs: Element) -> Self {
-    return lhs * Self(repeating: rhs)
+  static func .*(lhs: Self, rhs: Element) -> Self {
+    return lhs .* Self(repeating: rhs)
   }
   
   @_transparent
-  static func *(lhs: Element, rhs: Self) -> Self {
-    return rhs * lhs
+  static func .*(lhs: Element, rhs: Self) -> Self {
+    return rhs .* lhs
   }
   
   @_transparent
-  static func /(lhs: Self, rhs: Element) -> Self {
-    return lhs / Self(repeating: rhs)
+  static func ./(lhs: Self, rhs: Element) -> Self {
+    return lhs ./ Self(repeating: rhs)
   }
   
   @_transparent
-  static func /(lhs: Element, rhs: Self) -> Self {
-    return Self(repeating: lhs) / rhs
+  static func ./(lhs: Element, rhs: Self) -> Self {
+    return Self(repeating: lhs) ./ rhs
   }
   
   // MARK: In-place arithmetic operators
   @_transparent
-  static func +=(lhs: inout Self, rhs: Self) {
-    lhs = lhs + rhs
+  static func .+=(lhs: inout Self, rhs: Self) {
+    lhs = lhs .+ rhs
   }
   
   @_transparent
-  static func +=(lhs: inout Self, rhs: Element) {
-    lhs = lhs + rhs
+  static func .+=(lhs: inout Self, rhs: Element) {
+    lhs = lhs .+ rhs
   }
   
   @_transparent
-  static func -=(lhs: inout Self, rhs: Self) {
-    lhs = lhs - rhs
+  static func .-=(lhs: inout Self, rhs: Self) {
+    lhs = lhs .- rhs
   }
   
   @_transparent
-  static func -=(lhs: inout Self, rhs: Element) {
-    lhs = lhs - rhs
+  static func .-=(lhs: inout Self, rhs: Element) {
+    lhs = lhs .- rhs
   }
   
   @_transparent
-  static func *=(lhs: inout Self, rhs: Self) {
-    lhs = lhs * rhs
+  static func .*=(lhs: inout Self, rhs: Self) {
+    lhs = lhs .* rhs
   }
   
   @_transparent
-  static func *=(lhs: inout Self, rhs: Element) {
-    lhs = lhs * rhs
+  static func .*=(lhs: inout Self, rhs: Element) {
+    lhs = lhs .* rhs
   }
   
   @_transparent
-  static func /=(lhs: inout Self, rhs: Self) {
-    lhs = lhs / rhs
+  static func ./=(lhs: inout Self, rhs: Self) {
+    lhs = lhs ./ rhs
   }
   
   @_transparent
-  static func /=(lhs: inout Self, rhs: Element) {
-    lhs = lhs / rhs
+  static func ./=(lhs: inout Self, rhs: Element) {
+    lhs = lhs ./ rhs
   }
   
   // MARK: Arithmetic functions
