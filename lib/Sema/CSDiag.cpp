@@ -3078,7 +3078,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
           options |= TCC_AllowLValue;
 
         // Look at each of the arguments assigned to this parameter.
-        auto currentParamType = param.getType();
+        auto currentParamType = param.getOldType();
         for (auto inArgNo : paramBindings[paramIdx]) {
           // Determine the argument type.
           auto currentArgType = TE->getElement(inArgNo);
@@ -3554,8 +3554,8 @@ static bool diagnoseTupleParameterMismatch(CalleeCandidateInfo &CCI,
   }
 
   if (params.size() == 1 && args.size() == 1) {
-    auto paramType = params.front().getType();
-    auto argType = args.front().getType();
+    auto paramType = params.front().getOldType();
+    auto argType = args.front().getOldType();
 
     if (auto *paramFnType = paramType->getAs<AnyFunctionType>()) {
       // Only if both of the parameter and argument types are functions
@@ -3571,10 +3571,10 @@ static bool diagnoseTupleParameterMismatch(CalleeCandidateInfo &CCI,
   if (params.size() != 1 || args.empty())
     return false;
 
-  auto paramType = params.front().getType();
+  auto paramType = params.front().getOldType();
 
   if (args.size() == 1) {
-    auto argType = args.front().getType();
+    auto argType = args.front().getOldType();
     if (auto *paramFnType = paramType->getAs<AnyFunctionType>()) {
       // Only if both of the parameter and argument types are functions
       // let's recur into diagnosing their arguments.
@@ -3737,14 +3737,14 @@ public:
       insertText << ", ";
     if (!name.empty())
       insertText << name.str() << ": ";
-    Type Ty = param.getType();
+    Type Ty = param.getOldType();
     // Explode inout type.
     if (param.isInOut()) {
       insertText << "&";
       Ty = param.getPlainType();
     }
     // @autoclosure; the type should be the result type.
-    if (auto FT = param.getType()->getAs<AnyFunctionType>())
+    if (auto FT = param.getOldType()->getAs<AnyFunctionType>())
       if (FT->isAutoClosure())
         Ty = FT->getResult();
     insertText << "<#" << Ty << "#>";
@@ -4029,7 +4029,7 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
     auto resTy =
         candidate.getResultType()->lookThroughAllOptionalTypes();
     auto rawTy = isRawRepresentable(resTy, CCI.CS);
-    if (rawTy && arg.getType() && resTy->isEqual(arg.getType())) {
+    if (rawTy && arg.getOldType() && resTy->isEqual(arg.getOldType())) {
       auto getInnerExpr = [](Expr *E) -> Expr * {
         auto *parenE = dyn_cast<ParenExpr>(E);
         if (!parenE)
@@ -4153,8 +4153,8 @@ static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
       continue;
 
     for (unsigned i = 0, n = parameters.size(); i != n; ++i) {
-      auto paramType = parameters[i].getType();
-      auto argType = arguments[i].getType();
+      auto paramType = parameters[i].getOldType();
+      auto argType = arguments[i].getOldType();
 
       for (auto kind : rawRepresentableProtocols) {
         // If trying to convert from raw type to raw representable,
@@ -4181,8 +4181,8 @@ static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
   expr = expr->getValueProvidingExpr();
 
   auto parameters = bestMatchCandidate->getParameters();
-  auto paramType = parameters[bestMatchIndex].getType();
-  auto singleArgType = arguments[bestMatchIndex].getType();
+  auto paramType = parameters[bestMatchIndex].getOldType();
+  auto singleArgType = arguments[bestMatchIndex].getOldType();
 
   auto diag = CS.TC.diagnose(expr->getLoc(),
                              diag::cannot_convert_argument_value,
@@ -4684,7 +4684,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     // this returns a non-singular value is when there are varargs in play.
     for (auto argNo : bindings[i]) {
       auto argType = args[argNo]
-                         .getType()
+                         .getOldType()
                          ->getWithoutSpecifierType();
 
       if (argType->is<ArchetypeType>()) {
@@ -4854,8 +4854,8 @@ static bool diagnoseClosureExplicitParameterMismatch(
     return false;
 
   for (unsigned i = 0, n = params.size(); i != n; ++i) {
-    auto paramType = params[i].getType();
-    auto argType = args[i].getType();
+    auto paramType = params[i].getOldType();
+    auto argType = args[i].getOldType();
 
     if (auto paramFnType = paramType->getAs<AnyFunctionType>()) {
       if (auto argFnType = argType->getAs<AnyFunctionType>())
@@ -4968,7 +4968,7 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
     if (params.size() != 1)
       return false;
 
-    Type paramType = params.front().getType();
+    Type paramType = params.front().getOldType();
     if (auto paramFnType = paramType->getAs<AnyFunctionType>()) {
       auto closureType = CS.getType(closureExpr);
       if (auto *argFnType = closureType->getAs<AnyFunctionType>()) {
@@ -5122,9 +5122,9 @@ bool FailureDiagnosis::diagnoseSubscriptMisuse(ApplyExpr *callExpr) {
       return {CC_GeneralMismatch, {}};
 
     for (unsigned i = 0, e = params.size(); i < e; i ++) {
-      if (CS.TC.isConvertibleTo(params[i].getType(),
-                                candParams[i].getType(), CS.DC) ||
-          candParams[i].getType()->is<GenericTypeParamType>())
+      if (CS.TC.isConvertibleTo(params[i].getOldType(),
+                                candParams[i].getOldType(), CS.DC) ||
+          candParams[i].getOldType()->is<GenericTypeParamType>())
         continue;
       return {CC_GeneralMismatch, {}};
     }
@@ -5489,7 +5489,9 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         if (locator->getAnchor() == callExpr) {
           auto calleeType = CS.simplifyType(constraint->getSecondType());
           if (auto *fnType = calleeType->getAs<FunctionType>())
-            argType = fnType->getInput();
+            argType = AnyFunctionType::composeInput(fnType->getASTContext(),
+                                                    fnType->getParams(),
+                                                    /*canonicalVararg=*/false);
         }
       }
     }
@@ -5641,8 +5643,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         if (params.size() != 2)
           return false;
 
-        auto lhsCandidate = params[0].getType();
-        auto rhsCandidate = params[1].getType();
+        auto lhsCandidate = params[0].getOldType();
+        auto rhsCandidate = params[1].getOldType();
         auto lhsIsCandidate = lhsType->isEqual(lhsCandidate);
         auto rhsIsCandidate = rhsType->isEqual(rhsCandidate);
 
@@ -6126,7 +6128,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
       }
 
       if (inferredArgCount == 1 && actualArgCount > 1) {
-        auto *argTupleTy = inferredArgs.front().getType()->getAs<TupleType>();
+        auto *argTupleTy = inferredArgs.front().getOldType()->getAs<TupleType>();
         // Let's see if inferred argument is actually a tuple inside of Paren.
         if (argTupleTy) {
           // Looks like the number of closure parameters matches number
@@ -6269,7 +6271,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
       // Before doing so, strip attributes off the function type so that they
       // don't confuse the issue.
       fnType = FunctionType::get(fnType->getParams(), fnType->getResult(),
-                                 fnType->getExtInfo(), false);
+                                 fnType->getExtInfo());
       auto diag = diagnose(
           params->getStartLoc(), diag::closure_argument_list_tuple, fnType,
           inferredArgCount, actualArgCount, (actualArgCount == 1));

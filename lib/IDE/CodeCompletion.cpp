@@ -1567,7 +1567,7 @@ static bool hasTrivialTrailingClosure(const FuncDecl *FD,
   if (defaultMap.size() - defaultMap.count() == 1) {
     auto param = funcType->getParams().back();
     if (!param.isAutoClosure()) {
-      if (auto Fn = param.getType()->getAs<AnyFunctionType>()) {
+      if (auto Fn = param.getOldType()->getAs<AnyFunctionType>()) {
         return Fn->getParams().empty() && Fn->getResult()->isVoid();
       }
     }
@@ -3885,8 +3885,8 @@ public:
           if (seenNames.insert(Param.getLabel()).second)
             ExpectedNames.push_back(Param.getLabel().str());
         } else {
-          if (seenTypes.insert(Param.getType().getPointer()).second)
-            ExpectedTypes.push_back(Param.getType());
+          if (seenTypes.insert(Param.getOldType().getPointer()).second)
+            ExpectedTypes.push_back(Param.getOldType());
         }
       }
     }

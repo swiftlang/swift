@@ -913,8 +913,8 @@ namespace {
       if (params.size() != 2)
         return false;
 
-      auto firstParamTy = params[0].getType();
-      auto secondParamTy = params[1].getType();
+      auto firstParamTy = params[0].getOldType();
+      auto secondParamTy = params[1].getOldType();
 
       auto resultTy = fnTy->getResult();
       auto contextualTy = CS.getContextualType(expr);

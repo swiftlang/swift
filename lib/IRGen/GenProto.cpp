@@ -3046,7 +3046,7 @@ void NecessaryBindings::addTypeMetadata(CanType type) {
   }
   if (auto fn = dyn_cast<FunctionType>(type)) {
     for (const auto &elt : fn.getParams())
-      addTypeMetadata(elt.getType());
+      addTypeMetadata(elt.getOldType());
     addTypeMetadata(fn.getResult());
     return;
   }

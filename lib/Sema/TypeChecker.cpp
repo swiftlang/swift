@@ -192,17 +192,17 @@ DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
 /// unambiguous name.
 Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
                                                 ConstructorDecl *ctor) {
-  Type argType = ctor->getArgumentInterfaceType();
-  auto argTuple = argType->getAs<TupleType>();
-  if (!argTuple) return argType;
+  auto params = ctor->getMethodInterfaceType()
+                    ->castTo<FunctionType>()->getParams();
+  SmallVector<AnyFunctionType::Param, 8> newParams;
+  newParams.append(params.begin(), params.end());
 
   auto replace = [&](StringRef replacement) -> Type {
-    SmallVector<TupleTypeElt, 4> elements;
-    elements.append(argTuple->getElements().begin(),
-                    argTuple->getElements().end());
-    elements[0] = TupleTypeElt(elements[0].getType(),
-                               Context.getIdentifier(replacement));
-    return TupleType::get(elements, Context);
+    newParams[0] = AnyFunctionType::Param(newParams[0].getPlainType(),
+                                          Context.getIdentifier(replacement),
+                                          newParams[0].getParameterFlags());
+    return AnyFunctionType::composeInput(Context, newParams,
+                                         /*canonicalVararg=*/false);
   };
 
   switch (expr->getLiteralKind()) {

@@ -227,7 +227,7 @@ static unsigned getNumArgs(ValueDecl *value) {
     if (param.hasLabel() || param.isVariadic())
       return 1;
 
-    if (auto *tuple = param.getType()->getAs<TupleType>())
+    if (auto *tuple = param.getOldType()->getAs<TupleType>())
       return tuple->getNumElements();
   }
 

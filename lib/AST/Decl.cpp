@@ -3772,7 +3772,7 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   if (auto funcTy = type->getAs<AnyFunctionType>()) {
     auto inputKind = SelfReferenceKind::None();
     for (auto &elt : funcTy->getParams()) {
-      inputKind |= findProtocolSelfReferences(proto, elt.getType(),
+      inputKind |= findProtocolSelfReferences(proto, elt.getOldType(),
                                               skipAssocTypes);
     }
     auto resultKind = findProtocolSelfReferences(proto, funcTy->getResult(),
@@ -3882,7 +3882,7 @@ ProtocolDecl::findProtocolSelfReferences(const ValueDecl *value,
     if (!allowCovariantParameters) {
       auto inputKind = SelfReferenceKind::None();
       for (auto &elt : type->castTo<AnyFunctionType>()->getParams()) {
-        inputKind |= ::findProtocolSelfReferences(this, elt.getType(),
+        inputKind |= ::findProtocolSelfReferences(this, elt.getOldType(),
                                                   skipAssocTypes);
       }
 
@@ -5765,7 +5765,9 @@ Type EnumElementDecl::getArgumentInterfaceType() const {
 
   auto funcTy = interfaceType->castTo<AnyFunctionType>();
   funcTy = funcTy->getResult()->castTo<FunctionType>();
-  return funcTy->getInput();
+  return AnyFunctionType::composeInput(funcTy->getASTContext(),
+                                       funcTy->getParams(),
+                                       /*canonicalVararg=*/false);
 }
 
 EnumCaseDecl *EnumElementDecl::getParentCase() const {
@@ -5799,13 +5801,6 @@ SourceRange ConstructorDecl::getSourceRange() const {
     End = getSignatureSourceRange().End;
 
   return { getConstructorLoc(), End };
-}
-
-Type ConstructorDecl::getArgumentInterfaceType() const {
-  Type ArgTy = getInterfaceType();
-  ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
-  ArgTy = ArgTy->castTo<AnyFunctionType>()->getInput();
-  return ArgTy;
 }
 
 Type ConstructorDecl::getResultInterfaceType() const {
