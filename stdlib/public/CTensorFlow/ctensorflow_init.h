@@ -24,6 +24,10 @@ extern void InitTensorFlowRuntime(unsigned char enable_debug_logging,
 // TODO: Generalize to create tensors from other shapes and dtypes.
 void *swift_tfc_CreateScalarFloatTensor(int32_t val);
 
+struct TF_Status;
+void *swift_tfc_CreateScalarIntTensor(int64_t val, int32_t dtype,
+                                      TF_Status *status);
+
 void swift_tfc_TFE_Execute(void *op, void **retvals, int32_t *num_retvals,
                            void *status);
 

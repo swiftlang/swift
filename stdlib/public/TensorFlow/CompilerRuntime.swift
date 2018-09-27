@@ -1156,19 +1156,9 @@ func _TFCGetGlobalEagerContext() -> CTFEContext {
   return _ExecutionContext.global.eagerContext
 }
 
-// TODO: replace these functions with generic ones that do not hard-code Float.
-
-// TODO: use @_cdecl instead, once we make the input/output data types C-compatible.
-// Current compiler error if we use @_cdecl: method cannot be marked @_cdecl
-// because the type of the parameter cannot be represented in Objective-C
-@inlinable
-@_silgen_name("_swift_tfc_ExtractFloatCTensorHandle")
-public func _TFCExtractCTensorHandle(
-  _ handle: TensorHandle<Float>
-) -> CTensorHandle {
-  return handle.cTensorHandle
-}
-
+// Some of the functions are marked with @silgen_name instead of @_cdecl,
+// because their input/output data types are not C-compatible
+// (e.g. AnyTensorHandle).
 @inlinable
 @_silgen_name("_swift_tfc_GetCTensorHandleFromSwift")
 public func _TFCGetCTensorHandleFromSwift(
@@ -1198,14 +1188,6 @@ public func _TFCCreateTensorHandleFromC(
   case TF_BOOL: return TensorHandle<Bool>(owning: cHandle)
   default: fatalError("Unsupported dtype \(dtype)")
   }
-}
-
-@inlinable
-@_silgen_name("_swift_tfc_CreateFloatTensorHandleFromCTensorHandle")
-public func _TFCCreateTensorHandleFromCTensorHandle(
-  _ ownedCHandle: CTensorHandle
-) -> TensorHandle<Float> {
-  return TensorHandle<Float>(owning: ownedCHandle)
 }
 
 @usableFromInline
