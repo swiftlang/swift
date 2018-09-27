@@ -1172,7 +1172,7 @@ SetTestSuite.test("deleteChainCollisionRandomized") {
     if Int.random(in: 0 ..< (chainLength * 2), using: &generator) == 0 {
       s.remove(key)
     } else {
-      s.insert(TestKeyTy(key.value))
+      s.insert(key)
     }
     check(s)
   }
