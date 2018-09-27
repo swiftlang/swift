@@ -470,7 +470,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       //      x.i // ensure ambiguous.
       //    }
       //
-      if (tc.Context.isSwiftVersionAtLeast(5) && !isDynamicOverloadComparison) {
+      if (!isDynamicOverloadComparison) {
         auto inProto1 = isa<ProtocolDecl>(outerDC1);
         auto inProto2 = isa<ProtocolDecl>(outerDC2);
         if (inProto1 != inProto2)
