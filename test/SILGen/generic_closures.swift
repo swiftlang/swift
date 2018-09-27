@@ -131,7 +131,7 @@ class NestedGeneric<U> {
   }
 
   // CHECK-LABEL: sil hidden @$s16generic_closures13NestedGenericC20nested_reabstraction{{[_0-9a-zA-Z]*}}F
-  //   CHECK:       [[REABSTRACT:%.*]] = function_ref @$sIeg_ytytIegnr_TR
+  //   CHECK:       [[REABSTRACT:%.*]] = function_ref @$sIeg_ytIegr_TR
   //   CHECK:       partial_apply [callee_guaranteed] [[REABSTRACT]]
   func nested_reabstraction<T>(_ x: T) -> Optionable<() -> ()> {
     return .some({})

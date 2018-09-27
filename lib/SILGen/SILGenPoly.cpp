@@ -18,11 +18,12 @@
 // Re-abstraction thunks
 // =====================
 // After SIL type lowering, generic substitutions become explicit, for example
-// the AST type Int -> Int passes the Ints directly, whereas T -> T with Int
+// the AST type (Int) -> Int passes the Ints directly, whereas (T) -> T with Int
 // substituted for T will pass the Ints like a T, as an address-only value with
 // opaque type metadata. Such a thunk is called a "re-abstraction thunk" -- the
 // AST-level type of the function value does not change, only the manner in
-// which parameters and results are passed.
+// which parameters and results are passed. See the comment in
+// AbstractionPattern.h for details.
 //
 // Function conversion thunks
 // ==========================
@@ -32,12 +33,12 @@
 // type to an existential type for the protocol requires packaging the
 // payload together with type metadata and witness tables.
 //
-// Between function types, the type A -> B is defined to be a subtype of
-// A' -> B' iff A' is a subtype of A, and B is a subtype of B' -- parameters
+// Between function types, the type (A) -> B is defined to be a subtype of
+// (A') -> B' iff A' is a subtype of A, and B is a subtype of B' -- parameters
 // are contravariant, and results are covariant.
 //
-// A subtype conversion of a function value A -> B is performed by wrapping
-// the function value in a thunk of type A' -> B'. The thunk takes an A' and
+// A subtype conversion of a function value (A) -> B is performed by wrapping
+// the function value in a thunk of type (A') -> B'. The thunk takes an A' and
 // converts it into an A, calls the inner function value, and converts the
 // result from B to B'.
 //
@@ -879,82 +880,6 @@ namespace {
                    AnyFunctionType::CanParamArrayRef inputSubstTypes,
                    AbstractionPattern outputOrigFunctionType,
                    AnyFunctionType::CanParamArrayRef outputSubstTypes) {
-      // FIXME: Do we ever do opaque-to-opaque reabstractions?
-      assert(!inputOrigFunctionType.isTypeParameter() ||
-             !outputOrigFunctionType.isTypeParameter());
-
-      auto getSubstTupleType = [&](AnyFunctionType::CanParamArrayRef params) {
-        return cast<TupleType>(
-          AnyFunctionType::composeInput(SGF.getASTContext(),
-                                        params, /*canonicalVararg=*/true)
-            ->getCanonicalType());
-      };
-
-      auto getOrigParamTypes = [&](AbstractionPattern origFunctionType) {
-        SmallVector<AbstractionPattern, 8> origTypes;
-        for (unsigned i = 0, e = origFunctionType.getNumFunctionParams();
-             i < e; ++i) {
-          origTypes.push_back(origFunctionType.getFunctionParamType(i));
-        }
-
-        return origTypes;
-      };
-
-      if (inputOrigFunctionType.isTypeParameter() &&
-          !outputOrigFunctionType.isTypeParameter() &&
-          inputSubstTypes.size() != 1 &&
-          !shouldExpandParams(inputSubstTypes)) {
-        // The output is exploded and the input is not. Decompose an
-        // input tuple and translate the elements.
-        auto inputTupleType = getSubstTupleType(inputSubstTypes);
-        auto outputTupleType = getSubstTupleType(outputSubstTypes);
-
-        auto outputOrigTypes = getOrigParamTypes(outputOrigFunctionType);
-        auto outputOrigType = AbstractionPattern::getTuple(outputOrigTypes);
-
-        translateAndExplodeOutOf(AbstractionPattern::getOpaque(),
-                                 inputTupleType,
-                                 outputOrigType,
-                                 outputTupleType,
-                                 claimNextInput());
-        return;
-      }
-
-      if (!inputOrigFunctionType.isTypeParameter() &&
-          outputOrigFunctionType.isTypeParameter() &&
-          outputSubstTypes.size() != 1 &&
-          !shouldExpandParams(outputSubstTypes)) {
-        // The input is exploded and the output is not. Translate values
-        // and store them to a result tuple in memory.
-        auto inputTupleType = getSubstTupleType(inputSubstTypes);
-        auto outputTupleType = getSubstTupleType(outputSubstTypes);
-
-        auto inputOrigTypes = getOrigParamTypes(inputOrigFunctionType);
-        auto inputOrigType = AbstractionPattern::getTuple(inputOrigTypes);
-
-        auto outputTy = SGF.getSILType(claimNextOutputType());
-        auto &outputTL = SGF.getTypeLowering(outputTy);
-        if (SGF.silConv.useLoweredAddresses()) {
-          auto temp = SGF.emitTemporary(Loc, outputTL);
-          translateAndImplodeInto(
-              inputOrigType,
-              inputTupleType,
-              AbstractionPattern::getOpaque(),
-              outputTupleType,
-              *temp);
-          Outputs.push_back(temp->getManagedAddress());
-        } else {
-          auto result = translateAndImplodeIntoValue(
-              inputOrigType,
-              inputTupleType,
-              AbstractionPattern::getOpaque(),
-              outputTupleType,
-              outputTL.getLoweredType());
-          Outputs.push_back(result);
-        }
-        return;
-      }
-
       if (inputSubstTypes.size() == 1 &&
           outputSubstTypes.size() != 1) {
         // SE-0110 tuple splat. Turn the output into a single value of tuple
@@ -962,15 +887,33 @@ namespace {
         auto inputOrigType = inputOrigFunctionType.getFunctionParamType(0);
         auto inputSubstType = inputSubstTypes[0].getPlainType();
 
-        auto outputOrigTypes = getOrigParamTypes(outputOrigFunctionType);
+        // Build an abstraction pattern for the output.
+        SmallVector<AbstractionPattern, 8> outputOrigTypes;
+        for (unsigned i = 0, e = outputOrigFunctionType.getNumFunctionParams();
+             i < e; ++i) {
+          outputOrigTypes.push_back(
+            outputOrigFunctionType.getFunctionParamType(i));
+        }
         auto outputOrigType = AbstractionPattern::getTuple(outputOrigTypes);
-        auto outputSubstType = getSubstTupleType(outputSubstTypes);
 
+        // Build the substituted output tuple type.
+        auto outputSubstType = cast<TupleType>(
+            AnyFunctionType::composeInput(SGF.getASTContext(),
+                                          outputSubstTypes,
+                                          /*canonicalVararg=*/true)
+              ->getCanonicalType());
+
+        // Translate the input tuple value into the output tuple value. Note
+        // that the output abstraction pattern is a tuple, and we explode tuples
+        // into multiple parameters, so if the input abstraction pattern is
+        // opaque, this will explode the input value. Otherwise, the input
+        // parameters will be mapped one-to-one to the output parameters.
         translate(inputOrigType, inputSubstType,
                   outputOrigType, outputSubstType);
         return;
       }
 
+      // Otherwise, parameters are always reabstracted one-to-one.
       assert(inputSubstTypes.size() == outputSubstTypes.size());
 
       SmallVector<AbstractionPattern, 8> inputOrigTypes;

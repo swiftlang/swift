@@ -1712,13 +1712,11 @@ static unsigned getFlattenedValueCount(AbstractionPattern origType,
 
   // The count is always 1 unless the substituted type is a tuple.
   auto substTuple = dyn_cast<TupleType>(substType);
-  if (!substTuple) return 1;
+  if (!substTuple)
+    return 1;
 
-  // If the original type is opaque and the substituted type is
-  // materializable, the count is 1 anyway.
-  //
-  // FIXME: Should always be materializable here.
-  if (origType.isTypeParameter() && substTuple->isMaterializable())
+  // If the original type is opaque, the count is 1 anyway.
+  if (origType.isTypeParameter())
     return 1;
 
   // Otherwise, add up the elements.
