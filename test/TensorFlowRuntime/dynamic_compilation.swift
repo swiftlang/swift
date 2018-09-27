@@ -6,6 +6,7 @@
 // This file contains testing over a dataset as a global variable. This requires
 // sends/recvs support for variant handles.
 
+import CTensorFlow
 import TensorFlow
 import TensorFlowUnittest
 import StdlibUnittest

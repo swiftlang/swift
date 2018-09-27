@@ -495,9 +495,8 @@ internal func dumpCTensorHandleContent(
   let dType: TF_DataType = TFE_TensorHandleDataType(inputTensorHandle)
   debugLog("Tensor \(idx) has TF data type \(dType).")
   switch dType {
-  case TF_INT8: dumpTensorContent(inputTensorHandle, Int8.self)
   case TF_UINT8: dumpTensorContent(inputTensorHandle, UInt8.self)
-  case TF_INT16: dumpTensorContent(inputTensorHandle, Int16.self)
+  case TF_INT8: dumpTensorContent(inputTensorHandle, Int8.self)
   case TF_UINT16: dumpTensorContent(inputTensorHandle, UInt16.self)
   case TF_INT16: dumpTensorContent(inputTensorHandle, Int16.self)
   case TF_UINT32: dumpTensorContent(inputTensorHandle, UInt32.self)
@@ -1132,7 +1131,7 @@ public func _TFCTerminateTensorComputation(_ computation: _TensorComputation) {
 ///   function.
 @inlinable
 @_silgen_name("_swift_tfc_CreateCTensorHandle")
-public func _TFCCreateCTensorHandle<T>(_ value : T,
+public func _TFCCreateCTensorHandle<T>(_ value: T,
                                        _ dtype: TF_DataType) -> CTensorHandle {
   // Create a new CTensor and initialize it to the scalar value.
   let tensor = TF_AllocateTensor(dtype, nil, 0, MemoryLayout<T>.stride)
@@ -1168,6 +1167,37 @@ public func _TFCExtractCTensorHandle(
   _ handle: TensorHandle<Float>
 ) -> CTensorHandle {
   return handle.cTensorHandle
+}
+
+@inlinable
+@_silgen_name("_swift_tfc_GetCTensorHandleFromSwift")
+public func _TFCGetCTensorHandleFromSwift(
+  _ handle: _AnyTensorHandle
+) -> CTensorHandle {
+  return handle.cTensorHandle
+}
+
+@inlinable
+@_silgen_name("_swift_tfc_CreateTensorHandleFromC")
+public func _TFCCreateTensorHandleFromC(
+  _ cHandle: CTensorHandle
+) -> _AnyTensorHandle {
+  let dtype = TFE_TensorHandleDataType(cHandle)
+  switch dtype {
+  case TF_BFLOAT16: return TensorHandle<BFloat16>(owning: cHandle)
+  case TF_UINT8: return TensorHandle<UInt8>(owning: cHandle)
+  case TF_INT8: return TensorHandle<Int8>(owning: cHandle)
+  case TF_UINT16: return TensorHandle<UInt16>(owning: cHandle)
+  case TF_INT16: return TensorHandle<Int16>(owning: cHandle)
+  case TF_UINT32: return TensorHandle<UInt32>(owning: cHandle)
+  case TF_INT32: return TensorHandle<Int32>(owning: cHandle)
+  case TF_UINT64: return TensorHandle<UInt64>(owning: cHandle)
+  case TF_INT64: return TensorHandle<Int64>(owning: cHandle)
+  case TF_FLOAT: return TensorHandle<Float>(owning: cHandle)
+  case TF_DOUBLE: return TensorHandle<Double>(owning: cHandle)
+  case TF_BOOL: return TensorHandle<Bool>(owning: cHandle)
+  default: fatalError("Unsupported dtype \(dtype)")
+  }
 }
 
 @inlinable
