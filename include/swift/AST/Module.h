@@ -264,6 +264,7 @@ public:
     return { Files.begin(), Files.size() };
   }
 
+  bool isClangModule() const;
   void addFile(FileUnit &newFile);
   void removeFile(FileUnit &existingFile);
 

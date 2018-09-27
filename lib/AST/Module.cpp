@@ -365,6 +365,12 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   setAccess(AccessLevel::Public);
 }
 
+bool ModuleDecl::isClangModule() const {
+  if (findUnderlyingClangModule())
+    return true;
+  return false;
+}
+
 void ModuleDecl::addFile(FileUnit &newFile) {
   // Require Main and REPL files to be the first file added.
   assert(Files.empty() ||
