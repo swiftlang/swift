@@ -1296,7 +1296,7 @@ extension Set {
     @_frozen
     @usableFromInline
     internal enum _Variant {
-      case native(_NativeSet<Element>.Index)
+      case native(_HashTable.Index)
 #if _runtime(_ObjC)
       case cocoa(_CocoaSet.Index)
 #endif
@@ -1313,7 +1313,7 @@ extension Set {
 
     @inlinable
     @inline(__always)
-    internal init(_native index: _NativeSet<Element>.Index) {
+    internal init(_native index: _HashTable.Index) {
       self.init(_variant: .native(index))
     }
 
@@ -1346,7 +1346,7 @@ extension Set.Index {
 #endif
 
   @usableFromInline @_transparent
-  internal var _asNative: _NativeSet<Element>.Index {
+  internal var _asNative: _HashTable.Index {
     switch _variant {
     case .native(let nativeIndex):
       return nativeIndex
