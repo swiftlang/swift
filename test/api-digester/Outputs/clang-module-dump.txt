@@ -29,6 +29,7 @@
           "declKind": "Func",
           "usr": "c:objc(cs)ClangInterface(im)someFunction",
           "moduleName": "Foo",
+          "isOpen": true,
           "declAttributes": [
             "ObjC"
           ]
@@ -59,6 +60,7 @@
       "declKind": "Class",
       "usr": "c:objc(cs)ClangInterface",
       "moduleName": "Foo",
+      "isOpen": true,
       "declAttributes": [
         "ObjC"
       ],

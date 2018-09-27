@@ -125,6 +125,7 @@ KEY_BOOL(IsProtocolReq, protocolReq)
 KEY_BOOL(HasDefaultArg, hasDefaultArg)
 KEY_BOOL(HasSetter, hasSetter)
 KEY_BOOL(IsLet, isLet)
+KEY_BOOL(IsOpen, isOpen)
 
 KEY(kind)
 

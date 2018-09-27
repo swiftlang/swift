@@ -288,6 +288,7 @@ class SDKNodeDecl: public SDKNode {
   bool IsDeprecated;
   bool IsProtocolReq;
   bool IsOverriding;
+  bool IsOpen;
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
 

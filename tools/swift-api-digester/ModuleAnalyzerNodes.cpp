@@ -68,6 +68,7 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
         IsStatic(Info.IsStatic), IsDeprecated(Info.IsDeprecated),
         IsProtocolReq(Info.IsProtocolReq),
         IsOverriding(Info.IsOverriding),
+        IsOpen(Info.IsOpen),
         ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
         GenericSig(Info.GenericSig) {}
 
@@ -964,6 +965,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
       IsDeprecated(VD->getAttrs().getDeprecated(VD->getASTContext())),
       IsOverriding(VD->getOverriddenDecl()),
       IsProtocolReq(isa<ProtocolDecl>(VD->getDeclContext()) && VD->isProtocolRequirement()),
+      IsOpen(VD->getFormalAccess() == AccessLevel::Open),
       SelfIndex(getSelfIndex(VD)), FixedBinaryOrder(getFixedBinaryOrder(VD)),
       ReferenceOwnership(getReferenceOwnership(VD)) {
 
@@ -1363,6 +1365,7 @@ void SDKNodeDecl::jsonize(json::Output &out) {
   output(out, KeyKind::KK_protocolReq, IsProtocolReq);
   output(out, KeyKind::KK_overriding, IsOverriding);
   output(out, KeyKind::KK_implicit, IsImplicit);
+  output(out, KeyKind::KK_isOpen, IsOpen);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_declAttributes).data(), DeclAttributes);
   // Strong reference is implied, no need for serialization.
   if (getReferenceOwnership() != ReferenceOwnership::Strong) {

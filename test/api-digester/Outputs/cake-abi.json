@@ -197,7 +197,8 @@
           "declKind": "Func",
           "usr": "s:4cake2C1C4foo1yyFZ",
           "moduleName": "cake",
-          "static": true
+          "static": true,
+          "isOpen": true
         },
         {
           "kind": "Var",
