@@ -384,22 +384,31 @@ static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
   };
 
   // Predicate that returns true if an argument of the specified type should be
-  // rewritten - either to load an address argument or expand a struct
-  // parameter.
-  auto canSimplifyOperand =
-      [&](SILType type, GraphOperationInfo::ArgumentLowering lowering) -> bool {
+  // rewritten to load an address argument or expand a struct parameter.
+  auto canSimplifyArgumentType = [&](SILType type) -> bool {
     return isLoadableAddressType(type) ||
-           getPrimitiveStructField(type.getASTType()) != nullptr ||
-           lowering == GraphOperationInfo::ArgumentLowering::Out;
+           getPrimitiveStructField(type.getASTType()) != nullptr;
+  };
+
+  // Predicate that returns true if an argument should be rewritten.
+  auto canSimplifyArgument =
+      [&](const GraphOperationInfo::StructuredArgument &argument) -> bool {
+    switch (argument.getKind()) {
+    case GraphOperationInfo::SAK_Single:
+      return canSimplifyArgumentType(argument.getSingleArgument()->getType()) ||
+             std::get<1>(argument.getArgumentNameAndLowering()) ==
+                 GraphOperationInfo::ArgumentLowering::Out;
+    case GraphOperationInfo::SAK_List:
+      // We can get SAK_List arguments from inlining functions that have already
+      // been deabstracted. These arguments do not need further simplification.
+      return false;
+    }
   };
 
   // If we don't have to change any arguments, don't rewrite the graph_op.
   bool mustChangeGraphOp = false;
   for (auto &argument : opInfo.getStructuredArguments()) {
-    assert(argument.getKind() == GraphOperationInfo::SAK_Single &&
-           "SILGen should not have generated a list argument");
-    if (canSimplifyOperand(argument.getSingleArgument()->getType(),
-                           std::get<1>(argument.getArgumentNameAndLowering()))) {
+    if (canSimplifyArgument(argument)) {
       mustChangeGraphOp = true;
       break;
     }
@@ -413,10 +422,21 @@ static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
   // Okay, we do have to simplify something.  Scan through and rewrite arguments.
   SILBuilder B(origInst);
   GraphOperationBuilder opBuilder(opInfo.getOperationName());
+  // Pass attributes through.
+  for (auto &attr : origInst->getAttributes())
+    opBuilder.addAttribute(attr);
   SILValue outParameterAddress;
   for (auto &argument : opInfo.getStructuredArguments()) {
+    if (argument.getKind() == GraphOperationInfo::SAK_List) {
+      // We can get SAK_List arguments from inlining functions that have already
+      // been deabstracted. Pass these arguments through.
+      opBuilder.addListArgument(argument.getArgumentList(),
+                                argument.getArgumentNameWithSuffix());
+      continue;
+    }
+
     assert(argument.getKind() == GraphOperationInfo::SAK_Single &&
-           "SILGen should not have generated a list argument");
+           "should have already handled all other argument kinds");
     auto argumentValue = argument.getSingleArgument();
     auto argumentLowering = std::get<1>(argument.getArgumentNameAndLowering());
 
@@ -2126,6 +2146,14 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
   // Find the device attribute specified for the instruction if present.
   StringRef opDevice;
 
+  // Pass attributes through.
+  for (auto &attr : origInst->getAttributes()) {
+    if (attr.name.str() == DEVICE_ATTR) {
+      opDevice = attr.value.getStringValue();
+    }
+    opBuilder.addAttribute(attr);
+  }
+
   // It is common to have input lists with repeated elements.  These will
   // generally be uniqued on entry to this routine.  We cache the projections in
   // these maps so that we can reuse them and avoid code bloat.
@@ -2137,8 +2165,17 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
 
   for (auto i : range(opInfo.getStructuredArguments().size())) {
     auto argument = opInfo.getStructuredArguments()[i];
+
+    if (argument.getKind() == GraphOperationInfo::SAK_List) {
+      // We can get SAK_List arguments from inlining functions that have already
+      // been deabstracted. Pass these arguments through.
+      opBuilder.addListArgument(argument.getArgumentList(),
+                                argument.getArgumentNameWithSuffix());
+      continue;
+    }
+
     assert(argument.getKind() == GraphOperationInfo::SAK_Single &&
-           "SILGen should not have generated a list argument");
+           "should have already handled all other argument kinds");
     auto argumentValue = argument.getSingleArgument();
     auto argumentTy = argumentValue->getType();
     auto argumentNameAndLowering = argument.getArgumentNameAndLowering();
