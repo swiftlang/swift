@@ -1171,7 +1171,7 @@ public func _TFCExtractCTensorHandle(
 
 @inlinable
 @_silgen_name("_swift_tfc_GetCTensorHandleFromSwift")
-public func _GetCTensorHandleFromSwift(
+public func _TFCGetCTensorHandleFromSwift(
   _ handle: _AnyTensorHandle
 ) -> CTensorHandle {
   return handle.cTensorHandle
