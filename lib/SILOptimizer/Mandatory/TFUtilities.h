@@ -53,17 +53,9 @@ bool isTensorHandle(SILType ty);
 /// as VariantHandle and ResourceHandle.
 bool isOpaqueHandle(SILType ty);
 
-/// Determine whether the specified type is one of our well-known types, and
-/// if so, which one it is.
-TFValueKind classifyTensorFlowValue(SILType ty);
-
 /// Return true if the specified type is TensorHandle<T>, ResourceHandle, or
 /// VariantHandle.
 bool isTensorFlowValue(SILType ty);
-
-/// This function maps a Swift type (either a language type like Float or an
-/// LLVM Builtin type like Builtin.f32) into the TensorFlow TF_DataType value.
-unsigned convertSwiftTypeToTF(Type ty);
 
 /// `ty` must be a valid TensorFlow element type "T", like Builtin.Int32. Turn
 /// it into a TensorHandle<T> type.

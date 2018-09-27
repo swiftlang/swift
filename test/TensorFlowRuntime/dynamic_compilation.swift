@@ -23,6 +23,15 @@ DynamicCompilationTests.testCPUOrGPU("Const") {
   expectNearlyEqualWithScalarTensor(1.0, Tensor<Float>(handle: x))
 }
 
+DynamicCompilationTests.testCPUOrGPU("Add") {
+  _RuntimeConfig.printsDebugLog = true
+  let x = Tensor<Float>(1.0)
+  let y = Tensor<Float>(2.0)
+  let z = x + y
+  _hostOp(z)
+  expectNearlyEqualWithScalarTensor(3.0, z)
+}
+
 #endif // !CUDA
 
 runAllTests()

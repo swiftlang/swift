@@ -3,6 +3,11 @@ if (SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
   set(EXTRA_AST_FLAGS "FORCE_BUILD_OPTIMIZED")
 endif()
 
+if(SWIFT_ENABLE_TENSORFLOW)
+  find_package(TensorFlow REQUIRED)
+  include_directories(BEFORE "${TF_INCLUDE_DIR}")
+endif()
+
 add_swift_library(swiftAST STATIC
   AccessScopeChecker.cpp
   AccessRequests.cpp

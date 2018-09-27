@@ -19,6 +19,8 @@
 #define SWIFT_SIL_GRAPH_OPERATION_INFO_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/AST/TensorFlow.h"
+#include "swift/SIL/SILType.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -185,6 +187,11 @@ public:
   static std::pair<llvm::StringRef, ArgumentLowering>
   decodeArgumentName(StringRef Name);
 };
+
+/// Determine whether the specified type is one of our well-known types, and
+/// if so, which one it is.
+TFValueKind classifyTensorFlowValue(SILType ty);
+
 } // end namespace tf
 } // end namespace swift
 #endif // SWIFT_SIL_GRAPH_OPERATION_INFO_H

@@ -28,6 +28,8 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SubstitutionMap.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/TensorFlow.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
@@ -56,7 +58,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Transforms/Utils/Local.h"
-#include "swift/SIL/GraphOperationInfo.h"
 
 #include "CallEmission.h"
 #include "Explosion.h"
@@ -85,7 +86,8 @@
 
 using namespace swift;
 using namespace irgen;
-using swift::tf::GraphOperationInfo;
+// SWIFT_ENABLE_TENSORFLOW
+using namespace tf;
 
 // FIXME: Remove this option entirely and turn this on by default.
 llvm::cl::opt<bool> DebugInfoInlinedGenerics(
@@ -1930,9 +1932,8 @@ static llvm::Value *createStringValAddr(IRGenModule &IGM, StringRef strVal) {
   return opNameValAddr;
 }
 
-/// For now we lower any graph_op inst into a const TF node. (super fast tensor
-/// computation, but those who don't care about correctness. :-) )
-/// TODO: Fix this mis-compilation.
+// The code structure resembles
+// TFGraphFunctionLowering::visitGraphOperationInst().
 void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   tf::GraphOperationInfo opInfo(i);
 
@@ -1954,8 +1955,6 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     return;
   }
 
-  // TODO: Remove these. They are a temporary way of testing that dynamic
-  // attributes make it here.
   LLVM_DEBUG(llvm::dbgs() << "IRGen for graph_op: "
                           << opInfo.getOperationName() << "\n");
   LLVM_DEBUG(for (auto structuredArgument : opInfo.getStructuredArguments()) {
@@ -1974,9 +1973,11 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   auto *TFNewStatusFn = IGM.getTF_NewStatusFn();
   auto status = Builder.CreateCall(TFNewStatusFn, {});
 
-  if (opInfo.getOperationName() != "Const") {
+  // TODO: Remove these. They are a temporary way of testing that dynamic
+  // attributes make it here.
+  if (opInfo.getOperationName() == "_DynamicOp") {
     LLVM_DEBUG(llvm::dbgs()
-               << "Done with IRGen for dummy graph_op; setting explosion.\n");
+               << "Done with IRGen for dynamic graph_op; setting explosion.\n");
     // The added explosion is incorrect, but is good enough for unit testing.
     Explosion e;
     e.add(TFNewStatusFn);
@@ -1993,54 +1994,131 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   auto eagerContext = Builder.CreateCall(getContextFn, {});
 
   // Create a TFE op as in:
-  //   auto* op = TFE_NewOp(ctx, "Const", status);
+  //   auto* op = TFE_NewOp(ctx, "OpName", status);
   auto *TFENewOpFn = IGM.getTFE_NewOpFn();
-  // TODO: remove the hard-coded "Const"
-  auto opNameValAddr = createStringValAddr(IGM, "Const");
+  auto opNameValAddr = createStringValAddr(IGM, opInfo.getOperationName());
   auto op =
       Builder.CreateCall(TFENewOpFn, {eagerContext, opNameValAddr, status});
   checkOk(status);
 
-  // Set up dtype attr as in:
-  //   TFE_OpSetAttrType(op, "dtype", TF_FLOAT);
-  auto *setAttrTypeFn = IGM.getTFE_OpSetAttrTypeFn();
-  auto dtypeValAddr = createStringValAddr(IGM, "dtype");
-  // TODO: do not hard-code 1 as the TF_FLOAT enum value.
-  Builder.CreateCall(
-      setAttrTypeFn,
-      {op, dtypeValAddr, llvm::ConstantInt::get(IGM.Int32Ty, 1 /*TF_FLOAT*/)});
+  // Handle inputs.
+  for (auto structuredArgument : opInfo.getStructuredArguments()) {
+    assert(structuredArgument.getArgumentNameWithSuffix().empty() &&
+           "cannot lower named arguments");
+    switch (structuredArgument.getKind()) {
+    case GraphOperationInfo::SAK_Single: {
+      // Normal tensor inputs.
+      auto tensorHandleSilValue = structuredArgument.getSingleArgument();
+      auto valueKind = classifyTensorFlowValue(tensorHandleSilValue->getType());
+      assert(valueKind != TFValueKind::Nope &&
+             "all op inputs should be TensorFlow values");
 
-  auto typeAttr = i->getAttribute(0);
-  auto typeAttrInfo =
-      GraphOperationInfo::decodeArgumentName(typeAttr.name.str());
-  assert(typeAttrInfo.first == "dtype");
-  assert(typeAttr.value.getKind() == SymbolicValue::Metatype);
+      auto tensorHandleValue =
+          getLoweredSingletonExplosion(tensorHandleSilValue);
+      llvm::Function *extractHandleFn =
+          findFunction("_swift_tfc_ExtractFloatCTensorHandle", silModule);
+      auto cHandle = Builder.CreateCall(extractHandleFn, {tensorHandleValue});
 
-  auto valueAttr = i->getAttribute(1);
-  auto valueAttrInfo =
-      GraphOperationInfo::decodeArgumentName(valueAttr.name.str());
-  assert(valueAttrInfo.first == "value");
-  assert(valueAttr.value.getKind() == SymbolicValue::Float);
-  assert(valueAttrInfo.second ==
-         GraphOperationInfo::ArgumentLowering::TensorAttribute);
-  auto apfloat = valueAttr.value.getFloatValue();
-  // CreateScalarFloatTensor() takes an int instead of float, as runtime
-  // functions that take/return float values do not yet exist.
-  auto constVal = llvm::ConstantInt::get(IGM.Int32Ty, apfloat.convertToFloat());
-  LLVM_DEBUG(llvm::dbgs() << "The const value is " << *constVal << ".\n");
+      // Add an op input as in:
+      //   TFE_OpAddInput(op, cHandle);
+      auto *opAddInputFn = IGM.getTFE_OpAddInputFn();
+      Builder.CreateCall(opAddInputFn, {op, cHandle, status});
+      checkOk(status);
+      break;
+    }
+    case GraphOperationInfo::SAK_List:
+      llvm_unreachable("TODO: implement this");
+    }
+  }
 
-  auto *createTensorFn = IGM.getTFC_CreateScalarFloatTensorFn();
-  auto tensor = Builder.CreateCall(createTensorFn, {constVal});
+  // Handle attributes.
+  unsigned dtypeAttr = 0;
+  for (unsigned nextAttributeNumber = 0, e = i->getNumAttributes();
+       nextAttributeNumber != e;) {
+    auto attr = i->getAttribute(nextAttributeNumber++);
+    auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
+    std::string attrName = attrInfo.first.str();
 
-  // Set up the tensor-typed value attr as in:
-  //   TFE_OpSetAttrTensor(op, "value", tensor, status);
-  auto *setTensorAttrFn = IGM.getTFE_OpSetAttrTensorFn();
-  auto valueAttrAddr = createStringValAddr(IGM, "value");
-  Builder.CreateCall(setTensorAttrFn, {op, valueAttrAddr, tensor, status});
-  checkOk(status);
+    switch (attrInfo.second) {
+    case GraphOperationInfo::ArgumentLowering::Input:
+      llvm_unreachable("Input classes cannot exist for attributes");
+    case GraphOperationInfo::ArgumentLowering::Out:
+      llvm_unreachable("Attributes cannot be output parameters");
+    case GraphOperationInfo::ArgumentLowering::UnknownShapeListAttribute:
+      llvm_unreachable("UnknownShapeListAttribute should have been eliminated "
+                       "by deabstraction");
+    case GraphOperationInfo::ArgumentLowering::TypeListAttribute:
+      llvm_unreachable("TypeListAttribute should have been eliminated by "
+                       "deabstraction");
+    case GraphOperationInfo::ArgumentLowering::NormalAttribute: // No modifier.
+      // We add attributes based on what the type of the value is.
+      switch (attr.value.getKind()) {
+      case SymbolicValue::Unknown:
+      case SymbolicValue::UninitMemory:
+      case SymbolicValue::Enum:
+      case SymbolicValue::EnumWithPayload:
+      case SymbolicValue::Address:
+      case SymbolicValue::Aggregate: // Tuples and structs
+        llvm_unreachable("These attribute kinds cannot happen here");
+      case SymbolicValue::Integer:
+      case SymbolicValue::Float:
+      case SymbolicValue::Function:
+      case SymbolicValue::Array:
+        llvm_unreachable("TODO: implement this");
+      case SymbolicValue::String:
+        // TODO: move the DEVICE_ATTR string def to a place accessible here.
+        if (attrName == "__device") {
+          // TODO: set device via TFE_OpGetDevice()
+        } else {
+          llvm_unreachable("TODO: implement this");
+        }
+        break;
+      case SymbolicValue::Metatype:
+        // Set up dtype attr as in:
+        //   TFE_OpSetAttrType(op, "dtype", TF_FLOAT);
+        auto *setAttrTypeFn = IGM.getTFE_OpSetAttrTypeFn();
+        auto dtypeValAddr = createStringValAddr(IGM, attrName.c_str());
+        dtypeAttr = convertSwiftTypeToTF(attr.value.getMetatypeValue());
+        Builder.CreateCall(
+            setAttrTypeFn,
+            {op, dtypeValAddr, llvm::ConstantInt::get(IGM.Int32Ty, dtypeAttr)});
+        break;
+      }
+      // Done with normal attributes.
+      break;
+    case GraphOperationInfo::ArgumentLowering::TensorAttribute: {
+      if (!dtypeAttr) {
+        i->dump();
+        llvm_unreachable("dtype attr must have been processed!");
+      }
+      if (attr.value.getKind() != SymbolicValue::Float) {
+        llvm_unreachable("TODO: support other dtypes for tensor attr.");
+      }
+      auto apfloat = attr.value.getFloatValue();
+      // CreateScalarFloatTensor() takes an int instead of float, as runtime
+      // functions that take/return float values do not yet exist.
+      auto constVal =
+          llvm::ConstantInt::get(IGM.Int32Ty, apfloat.convertToFloat());
+      LLVM_DEBUG(llvm::dbgs() << "The const value is " << *constVal << ".\n");
 
-  auto *deleteTensorFn = IGM.getTF_DeleteTensorFn();
-  Builder.CreateCall(deleteTensorFn, {tensor});
+      auto *createTensorFn = IGM.getTFC_CreateScalarFloatTensorFn();
+      auto tensor = Builder.CreateCall(createTensorFn, {constVal});
+
+      // Set up the tensor-typed value attr as in:
+      //   TFE_OpSetAttrTensor(op, "value", tensor, status);
+      auto *setTensorAttrFn = IGM.getTFE_OpSetAttrTensorFn();
+      auto valueAttrAddr = createStringValAddr(IGM, "value");
+      Builder.CreateCall(setTensorAttrFn, {op, valueAttrAddr, tensor, status});
+      checkOk(status);
+
+      auto *deleteTensorFn = IGM.getTF_DeleteTensorFn();
+      Builder.CreateCall(deleteTensorFn, {tensor});
+      break;
+    }
+    case GraphOperationInfo::ArgumentLowering::ShapeAttribute:
+      llvm_unreachable("TODO: implement this");
+    }
+  }
 
   // Now we execute the TFE op as in:
   //   TFE_TensorHandle* retval;
