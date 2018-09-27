@@ -25,7 +25,6 @@
 #include "llvm/Support/TrailingObjects.h"
 
 using namespace swift;
-using namespace tf;
 
 static llvm::cl::opt<unsigned>
     ConstExprLimit("constexpr-limit", llvm::cl::init(512),

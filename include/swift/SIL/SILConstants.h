@@ -444,15 +444,6 @@ private:
   SymbolicValueMemoryObject(const SymbolicValueMemoryObject &) = delete;
   void operator=(const SymbolicValueMemoryObject &) = delete;
 };
-
-/// SWIFT_ENABLE_TENSORFLOW
-/// A graph operation attribute, used by GraphOperationInst.
-/// Attributes have a name and a constant value.
-struct GraphOperationAttribute {
-  Identifier name;
-  SymbolicValue value;
-};
-
 } // end namespace swift
 
 #endif

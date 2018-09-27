@@ -1474,7 +1474,7 @@ struct ArrayElementDecoder {
     uint64_t numElements =
         cast<IntegerLiteralInst>(numElementsVal)->getValue().getLimitedValue();
 
-    return !tf::ConstExprEvaluator::decodeAllocUninitializedArray(
+    return !ConstExprEvaluator::decodeAllocUninitializedArray(
         apply, numElements, elementsAtInit, &arrayInsts);
   }
 
