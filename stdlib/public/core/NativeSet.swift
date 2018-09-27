@@ -214,23 +214,35 @@ extension _NativeSet { // ensureUnique
   }
 }
 
+extension _NativeSet {
+  @inlinable
+  @inline(__always)
+  func validate(_ index: Index) {
+    _precondition(hashTable.isOccupied(index.bucket) && index.age == age,
+      "Attempting to access Set elements using an invalid Index")
+  }
+}
+
 extension _NativeSet: _SetBuffer {
   @usableFromInline
-  internal typealias Index = Bucket
+  internal typealias Index = _HashTable.Index
 
   @inlinable
   internal var startIndex: Index {
-    return hashTable.startBucket
+    let bucket = hashTable.startBucket
+    return Index(bucket: bucket, age: age)
   }
 
   @inlinable
   internal var endIndex: Index {
-    return hashTable.endBucket
+    let bucket = hashTable.endBucket
+    return Index(bucket: bucket, age: age)
   }
 
   @inlinable
   internal func index(after index: Index) -> Index {
-    return hashTable.occupiedBucket(after: index)
+    let bucket = hashTable.occupiedBucket(after: index.bucket)
+    return Index(bucket: bucket, age: age)
   }
 
   @inlinable
@@ -242,7 +254,7 @@ extension _NativeSet: _SetBuffer {
     }
     let (bucket, found) = find(element)
     guard found else { return nil }
-    return bucket
+    return Index(bucket: bucket, age: age)
   }
 
   @inlinable
@@ -263,8 +275,8 @@ extension _NativeSet: _SetBuffer {
   @inlinable
   @inline(__always)
   internal func element(at index: Index) -> Element {
-    hashTable.checkOccupied(index)
-    return _elements[index.offset]
+    validate(index)
+    return uncheckedElement(at: index.bucket)
   }
 }
 
@@ -411,8 +423,8 @@ extension _NativeSet { // Deletion
   @inlinable
   @inline(__always)
   internal mutating func remove(at index: Index, isUnique: Bool) -> Element {
-    _precondition(hashTable.isOccupied(index), "Invalid index")
-    return uncheckedRemove(at: index, isUnique: isUnique)
+    validate(index)
+    return uncheckedRemove(at: index.bucket, isUnique: isUnique)
   }
 
   @usableFromInline

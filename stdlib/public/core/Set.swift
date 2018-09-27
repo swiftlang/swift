@@ -1422,14 +1422,14 @@ extension Set.Index: Hashable {
     switch _variant {
     case .native(let nativeIndex):
       hasher.combine(0 as UInt8)
-      hasher.combine(nativeIndex.offset)
+      hasher.combine(nativeIndex.bucket.offset)
     case .cocoa(let cocoaIndex):
       _cocoaPath()
       hasher.combine(1 as UInt8)
       hasher.combine(cocoaIndex.currentKeyIndex)
     }
   #else
-    hasher.combine(_asNative.offset)
+    hasher.combine(_asNative.bucket.offset)
   #endif
   }
 }
