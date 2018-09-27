@@ -83,6 +83,12 @@ extension _HashTable {
     _sanityCheck(self.capacity(forScale: scale) >= capacity)
     return scale
   }
+
+  // The initial age to use for native copies of a Cocoa NSSet/NSDictionary.
+  internal static func age(for cocoa: AnyObject) -> Int32 {
+    let hash = ObjectIdentifier(cocoa).hashValue
+    return Int32(truncatingIfNeeded: hash)
+  }
 }
 
 extension _HashTable {
