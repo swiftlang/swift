@@ -386,6 +386,17 @@ extension _DictionaryStorage {
     return allocate(scale: scale, age: nil, seed: nil)
   }
 
+  @usableFromInline
+  @_effects(releasenone)
+  static internal func convert(
+    _ cocoa: _CocoaDictionary,
+    capacity: Int
+  ) -> _DictionaryStorage {
+    let scale = _HashTable.scale(forCapacity: capacity)
+    let age = _HashTable.age(for: cocoa.object)
+    return allocate(scale: scale, age: age, seed: nil)
+  }
+
   static internal func allocate(
     scale: Int8,
     age: Int32?,

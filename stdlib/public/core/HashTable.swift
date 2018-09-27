@@ -109,6 +109,12 @@ extension _HashTable {
     // time (apart from copy-on-write derivatives of the same table).
     return unsafeBitCast(object, to: Int.self)
   }
+
+  // The initial age to use for native copies of a Cocoa NSSet/NSDictionary.
+  internal static func age(for cocoa: AnyObject) -> Int32 {
+    let hash = ObjectIdentifier(cocoa).hashValue
+    return Int32(truncatingIfNeeded: hash)
+  }
 }
 
 extension _HashTable {

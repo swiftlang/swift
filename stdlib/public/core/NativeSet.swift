@@ -48,7 +48,7 @@ internal struct _NativeSet<Element: Hashable> {
   @inlinable
   internal init(_ cocoa: __owned _CocoaSet, capacity: Int) {
     _sanityCheck(cocoa.count <= capacity)
-    self.init(capacity: capacity)
+    self._storage = _SetStorage<Element>.convert(cocoa, capacity: capacity)
     for element in cocoa {
       let nativeElement = _forceBridgeFromObjectiveC(element, Element.self)
       insertNew(nativeElement, isUnique: true)
@@ -231,15 +231,17 @@ extension _NativeSet {
       return validatedBucket(for: native)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
-      // Accept Cocoa indices as long as they contain an element that exists in
-      // this set.
       index._cocoaPath()
-      let element = _forceBridgeFromObjectiveC(cocoa.element, Element.self)
-      guard let index = self.index(for: element) else {
-        _preconditionFailure(
-          "Attempting to access Set elements using an invalid index")
+      // Accept Cocoa indices as long as they contain an element that exists in
+      // this set, and the address of their Cocoa object generates the same age.
+      if cocoa.age == self.age {
+        let element = _forceBridgeFromObjectiveC(cocoa.element, Element.self)
+        if let index = self.index(for: element) {
+          return index.bucket
+        }
       }
-      return index.bucket
+      _preconditionFailure(
+        "Attempting to access Set elements using an invalid index")
 #endif
     }
   }

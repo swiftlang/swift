@@ -49,7 +49,8 @@ internal struct _NativeDictionary<Key: Hashable, Value> {
   @inlinable
   internal init(_ cocoa: __owned _CocoaDictionary, capacity: Int) {
     _sanityCheck(cocoa.count <= capacity)
-    self.init(capacity: capacity)
+    self._storage =
+      _DictionaryStorage<Key, Value>.convert(cocoa, capacity: capacity)
     for (key, value) in cocoa {
       insertNew(
         key: _forceBridgeFromObjectiveC(key, Key.self),
@@ -263,15 +264,18 @@ extension _NativeDictionary {
       return validatedBucket(for: native)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
-      // Accept Cocoa indices as long as they contain a key that exists in
-      // this dictionary.
       index._cocoaPath()
-      let key = _forceBridgeFromObjectiveC(cocoa.key, Key.self)
-      guard let index = self.index(forKey: key) else {
-        _preconditionFailure(
-          "Attempting to access Dictionary elements using an invalid index")
+      // Accept Cocoa indices as long as they contain a key that exists in this
+      // dictionary, and the address of their Cocoa object generates the same
+      // age.
+      if cocoa.age == self.age {
+        let key = _forceBridgeFromObjectiveC(cocoa.key, Key.self)
+        if let index = self.index(forKey: key) {
+          return index.bucket
+        }
       }
-      return index.bucket
+      _preconditionFailure(
+        "Attempting to access Dictionary elements using an invalid index")
 #endif
     }
   }

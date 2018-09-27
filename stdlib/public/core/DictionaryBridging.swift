@@ -616,6 +616,15 @@ extension _CocoaDictionary.Index {
       "Attempting to access Dictionary elements using an invalid index")
     return allKeys[currentKeyIndex]
   }
+
+  @usableFromInline
+  @nonobjc
+  internal var age: Int32 {
+    @_effects(releasenone)
+    get {
+      return _HashTable.age(for: base.object)
+    }
+  }
 }
 
 extension _CocoaDictionary.Index: Equatable {
