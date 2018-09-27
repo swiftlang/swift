@@ -96,17 +96,26 @@ llvm::raw_ostream *tf::getTFDumpIntermediateStream() {
   return &fileStream;
 }
 
-/// If the specified decl has a single stored field, return it.  Otherwise
-/// return null.
+/// Given a nominal type decl, collect all fields. If it's a class decl, collect
+/// all fields along the inheritance hierarchy.
+static void getAllFields(NominalTypeDecl *decl,
+                         SmallVectorImpl<VarDecl *> &fields) {
+  for (auto *field : decl->getStoredProperties())
+    fields.push_back(field);
+  if (auto *classdecl = decl->getAsClassOrClassExtensionContext())
+    if (auto *superclass = classdecl->getSuperclassDecl())
+      getAllFields(superclass, fields);
+}
+
+/// If the specified decl has a single stored field, return it.  If it's a class
+/// type, return there's exactly one field in the entire inheritance hierarchy.
+/// Otherwise return null.
 VarDecl *tf::getFieldIfContainsSingleField(NominalTypeDecl *decl) {
-  // Check to see if there is a single stored field.
-  auto fieldIt = decl->getStoredProperties().begin();
-  if (fieldIt == decl->getStoredProperties().end())
-    return nullptr;
-  auto result = *fieldIt++;
-  if (fieldIt != decl->getStoredProperties().end())
-    return nullptr;
-  return result;
+  SmallVector<VarDecl *, 4> fields;
+  getAllFields(decl, fields);
+  if (fields.size() == 1)
+    return fields.front();
+  return nullptr;
 }
 
 bool tf::isTensorHandle(SILType ty) {

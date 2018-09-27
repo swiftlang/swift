@@ -16,34 +16,52 @@
 
 import CTensorFlow
 
+/// `_AnyTensorHandle` is the scalar-agnostic base type for `TensorHandle`, used
+/// specifically for low-level, type-erased passings of Swift-level tensor
+/// handles in the compiler.
+@_fixed_layout // required because the compiler accesses cTensorHandle directly.
+public class _AnyTensorHandle {
+  /// The underlying `TF_TensorHandle *`.
+  ///
+  /// - Note: The compiler knows that `_AnyTensorHandle` has a single stored
+  /// property, and assumes that this is it. Changing the design of
+  /// `TensorHandle` will require tweaking the compiler.
+  @usableFromInline let cTensorHandle: CTensorHandle
+  
+  /// Private initializer from a `CTensorHandle`. Should only be called from
+  /// `TensorHandle<Scalar>.init`.
+  fileprivate init(base: CTensorHandle) {
+    self.cTensorHandle = base
+  }
+}
+
 /// `TensorHandle` is the type used by ops and the `#tfop()` syntax
 /// specifically. It includes a `Scalar` type, which compiler internals depend
 /// on to determine the datatypes of parameters when they are extracted
 /// into a tensor program.
 @_fixed_layout // required because the compiler accesses cTensorHandle directly.
-public final class TensorHandle<Scalar : AccelerableByTensorFlow> {
-  /// The underlying `TF_TensorHandle *`.
-  ///
-  /// - Note: The compiler knows that `TensorHandle` has a single stored
-  /// property, and assumes that this is it. Changing the design of
-  /// `TensorHandle` will require tweaking the compiler.
-  public let cTensorHandle: CTensorHandle
-
+public final class TensorHandle<Scalar> : _AnyTensorHandle
+  where Scalar : AccelerableByTensorFlow {
   @usableFromInline
-  init(copyingFromCTensor cTensor: CTensor) {
+  init(owning cTensorHandle: CTensorHandle) {
+    super.init(base: cTensorHandle)
+  }
+  
+  @usableFromInline
+  convenience init(copyingFromCTensor cTensor: CTensor) {
     let status = TF_NewStatus()
     let cTensorHandle = TFE_NewTensorHandle(cTensor, status)
     checkOk(status)
-    self.cTensorHandle = cTensorHandle!
-
+    self.init(owning: cTensorHandle!)
     TF_DeleteStatus(status)
   }
 
-  @usableFromInline
-  init(owning cTensorHandle: CTensorHandle) {
-    self.cTensorHandle = cTensorHandle
+  deinit {
+    debugLog("De-initializing TensorHandle.")
+    TFE_DeleteTensorHandle(cTensorHandle)
+    debugLog("Returning from deinit of TensorHandle.")
   }
-
+  
   /// Create a `TensorHandle` with a closure that initializes the underlying
   /// buffer.
   ///
@@ -70,12 +88,6 @@ public final class TensorHandle<Scalar : AccelerableByTensorFlow> {
 
     self.init(copyingFromCTensor: cTensor)
     TF_DeleteTensor(cTensor)
-  }
-
-  deinit {
-    debugLog("De-initializing TensorHandle.")
-    TFE_DeleteTensorHandle(cTensorHandle)
-    debugLog("Returning from deinit of TensorHandle.")
   }
 }
 
