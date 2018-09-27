@@ -217,9 +217,10 @@ extension _NativeSet { // ensureUnique
 extension _NativeSet {
   @inlinable
   @inline(__always)
-  func validate(_ index: Index) {
+  func validatedBucket(for index: Index) -> Bucket {
     _precondition(hashTable.isOccupied(index.bucket) && index.age == age,
       "Attempting to access Set elements using an invalid index")
+    return index.bucket
   }
 
   @inlinable
@@ -227,8 +228,7 @@ extension _NativeSet {
   func validatedBucket(for index: Set<Element>.Index) -> Bucket {
     switch index._variant {
     case .native(let native):
-      validate(native)
-      return native.bucket
+      return validatedBucket(for: native)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       // Accept Cocoa indices as long as they contain an element that exists in
@@ -263,9 +263,9 @@ extension _NativeSet: _SetBuffer {
 
   @inlinable
   internal func index(after index: Index) -> Index {
-    validate(index)
-    let bucket = hashTable.occupiedBucket(after: index.bucket)
-    return Index(bucket: bucket, age: age)
+    let bucket = validatedBucket(for: index)
+    let next = hashTable.occupiedBucket(after: bucket)
+    return Index(bucket: next, age: age)
   }
 
   @inlinable
@@ -298,8 +298,8 @@ extension _NativeSet: _SetBuffer {
   @inlinable
   @inline(__always)
   internal func element(at index: Index) -> Element {
-    validate(index)
-    return uncheckedElement(at: index.bucket)
+    let bucket = validatedBucket(for: index)
+    return uncheckedElement(at: bucket)
   }
 }
 
@@ -446,8 +446,8 @@ extension _NativeSet { // Deletion
   @inlinable
   @inline(__always)
   internal mutating func remove(at index: Index, isUnique: Bool) -> Element {
-    validate(index)
-    return uncheckedRemove(at: index.bucket, isUnique: isUnique)
+    let bucket = validatedBucket(for: index)
+    return uncheckedRemove(at: bucket, isUnique: isUnique)
   }
 
   @usableFromInline
