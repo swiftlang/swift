@@ -106,7 +106,7 @@ public:
                            SubstitutionMap Subs)
       : SuperTy(*NewF, *OrigF, Subs), OrigF(OrigF), IsCloningConstant(false) {}
 
-  void cloneBlocks(OperandValueArrayRef Args);
+  void cloneClosure(OperandValueArrayRef Args);
 
 protected:
   /// Literals cloned from the caller drop their location so the debug line
@@ -139,11 +139,11 @@ protected:
 /// Clone a constant value. Recursively walk the operand chain through cast
 /// instructions to ensure that all dependents are cloned. Note that the
 /// original value may not belong to the same function as the one being cloned
-/// by cloneBlocks() (they may be from the partial apply caller).
+/// by cloneClosure() (they may be from the partial apply caller).
 void CapturePropagationCloner::cloneConstValue(SILValue Val) {
   assert(IsCloningConstant && "incorrect mode");
 
-  if (ValueMap.find(Val) != ValueMap.end())
+  if (isValueCloned(Val))
     return;
 
   // TODO: MultiValueInstruction?
@@ -161,8 +161,8 @@ void CapturePropagationCloner::cloneConstValue(SILValue Val) {
 
 /// Clone the original partially applied function into the new specialized
 /// function, replacing some arguments with literals.
-void CapturePropagationCloner::cloneBlocks(
-  OperandValueArrayRef PartialApplyArgs) {
+void CapturePropagationCloner::cloneClosure(
+    OperandValueArrayRef PartialApplyArgs) {
 
   SILFunction &CloneF = getBuilder().getFunction();
 
@@ -174,21 +174,24 @@ void CapturePropagationCloner::cloneBlocks(
   // Only clone the arguments that remain in the new function type. The trailing
   // arguments are now propagated through the partial apply.
   assert(!IsCloningConstant && "incorrect mode");
-  unsigned ParamIdx = 0;
-  for (unsigned NewParamEnd = cloneConv.getNumSILArguments();
-       ParamIdx != NewParamEnd; ++ParamIdx) {
 
-    SILArgument *Arg = OrigEntryBB->getArgument(ParamIdx);
+  SmallVector<SILValue, 4> entryArgs;
+  entryArgs.reserve(OrigEntryBB->getArguments().size());
+
+  unsigned ArgIdx = 0;
+  for (unsigned NewArgEnd = cloneConv.getNumSILArguments(); ArgIdx != NewArgEnd;
+       ++ArgIdx) {
+
+    SILArgument *Arg = OrigEntryBB->getArgument(ArgIdx);
 
     SILValue MappedValue = ClonedEntryBB->createFunctionArgument(
         remapType(Arg->getType()), Arg->getDecl());
-    ValueMap.insert(std::make_pair(Arg, MappedValue));
+    entryArgs.push_back(MappedValue);
   }
-  assert(OrigEntryBB->args_size() - ParamIdx == PartialApplyArgs.size() &&
-         "unexpected number of partial apply arguments");
+  assert(OrigEntryBB->args_size() - ArgIdx == PartialApplyArgs.size()
+         && "unexpected number of partial apply arguments");
 
   // Replace the rest of the old arguments with constants.
-  BBMap.insert(std::make_pair(OrigEntryBB, ClonedEntryBB));
   getBuilder().setInsertionPoint(ClonedEntryBB);
   IsCloningConstant = true;
   for (SILValue PartialApplyArg : PartialApplyArgs) {
@@ -199,20 +202,17 @@ void CapturePropagationCloner::cloneBlocks(
 
     // The PartialApplyArg from the caller is now mapped to its cloned
     // instruction.  Also map the original argument to the cloned instruction.
-    SILArgument *InArg = OrigEntryBB->getArgument(ParamIdx);
-    ValueMap.insert(std::make_pair(InArg, remapValue(PartialApplyArg)));
-    ++ParamIdx;
+    entryArgs.push_back(remapValue(PartialApplyArg));
+    ++ArgIdx;
   }
   IsCloningConstant = false;
-  // Recursively visit original BBs in depth-first preorder, starting with the
-  // entry block, cloning all instructions other than terminators.
-  visitSILBasicBlock(OrigEntryBB);
 
-  // Now iterate over the BBs and fix up the terminators.
-  for (auto BI = BBMap.begin(), BE = BBMap.end(); BI != BE; ++BI) {
-    getBuilder().setInsertionPoint(BI->second);
-    visit(BI->first->getTerminator());
-  }
+  // Clear information about cloned values from the caller function.
+  clearClonerState();
+
+  // Visit original BBs in depth-first preorder, starting with the
+  // entry block, cloning all instructions and terminators.
+  cloneFunctionBody(OrigF, ClonedEntryBB, entryArgs);
 }
 
 CanSILFunctionType getPartialApplyInterfaceResultType(PartialApplyInst *PAI) {
@@ -277,7 +277,7 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
     PAI->dumpInContext();
   });
   CapturePropagationCloner cloner(OrigF, NewF, PAI->getSubstitutionMap());
-  cloner.cloneBlocks(PAI->getArguments());
+  cloner.cloneClosure(PAI->getArguments());
   assert(OrigF->getDebugScope()->Parent != NewF->getDebugScope()->Parent);
   return NewF;
 }

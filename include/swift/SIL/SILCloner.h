@@ -39,24 +39,56 @@ class SILCloner : protected SILInstructionVisitor<ImplClass> {
   friend class SILVisitorBase<ImplClass>;
   friend class SILInstructionVisitor<ImplClass>;
 
+
+protected:
+  /// MARK: Context shared with CRTP extensions.
+
+  SILBuilder Builder;
+  TypeSubstitutionMap OpenedExistentialSubs;
+  SILOpenedArchetypesTracker OpenedArchetypesTracker;
+
+private:
+  /// MARK: Private state hidden from CRTP extensions.
+
+  // The old-to-new value map.
+  llvm::DenseMap<SILValue, SILValue> ValueMap;
+
+  /// The old-to-new block map. Some entries may be premapped with original
+  /// blocks.
+  llvm::DenseMap<SILBasicBlock*, SILBasicBlock*> BBMap;
+
+  // The original blocks in DFS preorder. All blocks in this list are mapped.
+  // After cloning, this represents the entire cloned CFG.
+  //
+  // This could always be rediscovered by the client, but caching it is a
+  // convenient way to iterate over the cloned region.
+  SmallVector<SILBasicBlock *, 8> preorderBlocks;
+
+  /// Set of basic blocks where unreachable was inserted.
+  SmallPtrSet<SILBasicBlock *, 32> BlocksWithUnreachables;
+
 public:
   using SILInstructionVisitor<ImplClass>::asImpl;
 
   explicit SILCloner(SILFunction &F,
                      SILOpenedArchetypesTracker &OpenedArchetypesTracker)
-      : Builder(F), InsertBeforeBB(nullptr),
-        OpenedArchetypesTracker(OpenedArchetypesTracker) {
+      : Builder(F), OpenedArchetypesTracker(OpenedArchetypesTracker) {
     Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
   }
 
-  explicit SILCloner(SILFunction &F)
-      : Builder(F), InsertBeforeBB(nullptr), OpenedArchetypesTracker(&F) {
+  explicit SILCloner(SILFunction &F) : Builder(F), OpenedArchetypesTracker(&F) {
     Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
   }
 
   explicit SILCloner(SILGlobalVariable *GlobVar)
-      : Builder(GlobVar), InsertBeforeBB(nullptr),
-        OpenedArchetypesTracker(nullptr) { }
+      : Builder(GlobVar), OpenedArchetypesTracker(nullptr) {}
+
+  void clearClonerState() {
+    ValueMap.clear();
+    BBMap.clear();
+    preorderBlocks.clear();
+    BlocksWithUnreachables.clear();
+  }
 
   /// Clients of SILCloner who want to know about any newly created
   /// instructions can install a SmallVector into the builder to collect them.
@@ -70,46 +102,76 @@ public:
 
   SILBuilder &getBuilder() { return Builder; }
 
-protected:
-  void beforeVisit(SILInstruction *I) {
-    // Update the set of available opened archetypes with the opened
-    // archetypes used by the current instruction.
-    doPreProcess(I);
+  /// Visit all blocks reachable from the given `StartBB` and all instructions
+  /// in those blocks.
+  ///
+  /// This is used to clone a region within a function and mutates the original
+  /// function. `StartBB` cannot be the function entry block.
+  ///
+  /// The entire CFG is discovered in DFS preorder while cloning non-terminator
+  /// instructions. `visitTerminator` is called in the same order, but only
+  /// after mapping all blocks.
+  void cloneReachableBlocks(SILBasicBlock *startBB,
+                            ArrayRef<SILBasicBlock *> exitBlocks);
+
+  /// Clone all blocks in this function and all instructions in those
+  /// blocks.
+  ///
+  /// This is used to clone an entire function and should not mutate the
+  /// original function.
+  ///
+  /// entryArgs must have a SILValue from the cloned function corresponding to
+  /// each argument in the original function `F`.
+  ///
+  /// Cloned instructions are inserted starting at the end of clonedEntryBB.
+  void cloneFunctionBody(SILFunction *F, SILBasicBlock *clonedEntryBB,
+                         ArrayRef<SILValue> entryArgs);
+
+  /// MARK: Callback utilities used from CRTP extensions during cloning.
+  /// These should only be called from within an instruction cloning visitor.
+
+  /// Visitor callback that registers a cloned instruction. CRTP extensions can
+  /// override the implementation via `postProcess`.
+  void doPostProcess(SILInstruction *Orig, SILInstruction *Cloned) {
+    asImpl().postProcess(Orig, Cloned);
+    assert((Orig->getDebugScope() ? Cloned->getDebugScope() != nullptr : true)
+           && "cloned instruction dropped debug scope");
   }
 
-#define INST(CLASS, PARENT) \
-  void visit##CLASS(CLASS *I);
-#include "swift/SIL/SILNodes.def"
-
-  void visitSILBasicBlock(SILBasicBlock* BB);
-
-  void visitSILFunction(SILFunction *F);
-
-  // Derived classes of SILCloner using the CRTP can implement the following
-  // functions to customize behavior; the remap functions are called before
-  // cloning to modify constructor arguments and the post process function is
-  // called afterwards on the result.
-  SILLocation remapLocation(SILLocation Loc) { return Loc; }
-  const SILDebugScope *remapScope(const SILDebugScope *DS) { return DS; }
-  SILType remapType(SILType Ty) { return Ty; }
-  CanType remapASTType(CanType Ty) { return Ty; }
-  ProtocolConformanceRef remapConformance(Type Ty, ProtocolConformanceRef C){
-    return C;
+  /// Visitor callback that maps an original value to an existing value. Called
+  /// whenever the visitor that clones an instruction skips doPostProcess().
+  void foldValue(SILValue origValue, SILValue mappedValue) {
+    ValueMap.insert({origValue, mappedValue});
   }
-  SILValue remapValue(SILValue Value);
-  SILFunction *remapFunction(SILFunction *Func) { return Func; }
-  SILBasicBlock *remapBasicBlock(SILBasicBlock *BB);
-  void postProcess(SILInstruction *Orig, SILInstruction *Cloned);
+
+  /// Mark a block containing an unreachable instruction for use in the `fixUp`
+  /// callback.
+  void addBlockWithUnreachable(SILBasicBlock *BB) {
+    BlocksWithUnreachables.insert(BB);
+  }
+
+  /// Register a re-mapping for opened existentials.
+  void registerOpenedExistentialRemapping(ArchetypeType *From,
+                                          ArchetypeType *To) {
+    auto result = OpenedExistentialSubs.insert(
+        std::make_pair(CanArchetypeType(From), CanType(To)));
+    assert(result.second);
+    (void)result;
+  }
+
+  /// MARK: Public access to the cloned state, during and after cloning.
+
+  /// After cloning, provides a list of all cloned blocks in DFS preorder.
+  ArrayRef<SILBasicBlock *> originalPreorderBlocks() const {
+    return preorderBlocks;
+  }
 
   SILLocation getOpLocation(SILLocation Loc) {
     return asImpl().remapLocation(Loc);
   }
+
   const SILDebugScope *getOpScope(const SILDebugScope *DS) {
     return asImpl().remapScope(DS);
-  }
-
-  SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
-    return Subs;
   }
 
   SubstitutionMap getOpSubstitutionMap(SubstitutionMap Subs) {
@@ -203,7 +265,15 @@ protected:
       newConformances.push_back(getOpConformance(ty, conformance));
     return ty->getASTContext().AllocateCopy(newConformances);
   }
-  
+
+  bool isValueCloned(SILValue OrigValue) const {
+    return ValueMap.count(OrigValue);
+  }
+
+  /// Return the possibly new value representing the given value within the
+  /// cloned region.
+  ///
+  /// Assumes that `isValueCloned` is true.
   SILValue getOpValue(SILValue Value) {
     return asImpl().remapValue(Value);
   }
@@ -214,57 +284,98 @@ protected:
       Ret[i] = asImpl().remapValue(Values[i]);
     return Ret;
   }
+
   SILFunction *getOpFunction(SILFunction *Func) {
     return asImpl().remapFunction(Func);
   }
+
+  bool isBlockCloned(SILBasicBlock *OrigBB) const {
+    auto bbIter = BBMap.find(OrigBB);
+    if (bbIter == BBMap.end())
+      return false;
+
+    // Exit blocks are mapped to themselves during region cloning.
+    return bbIter->second != OrigBB;
+  }
+
+  /// Return the new block within the cloned region analagous to the given
+  /// original block.
+  ///
+  /// Assumes that `isBlockCloned` is true.
   SILBasicBlock *getOpBasicBlock(SILBasicBlock *BB) {
     return asImpl().remapBasicBlock(BB);
   }
-  void addBlockWithUnreachable(SILBasicBlock *BB) {
-    BlocksWithUnreachables.insert(BB);
+
+protected:
+  /// MARK: CRTP visitors and other CRTP overrides.
+
+#define INST(CLASS, PARENT) void visit##CLASS(CLASS *I);
+#include "swift/SIL/SILNodes.def"
+
+  // Visit the instructions in a single basic block, not including the block
+  // terminator.
+  void visitInstructionsInBlock(SILBasicBlock *BB);
+
+  // Visit a block's terminator. This is called with each block in DFS predorder
+  // after visiting and mapping all basic blocks and after visiting all
+  // non-terminator instructions in the block.
+  void visitTerminator(SILBasicBlock *BB) {
+    asImpl().visit(BB->getTerminator());
   }
 
-  void cleanUp(SILFunction *F);
+  // CFG cloning requires cloneFunction() or cloneReachableBlocks().
+  void visitSILBasicBlock(SILFunction *F) = delete;
 
-public:
-  void doPreProcess(SILInstruction *Orig) {
-    // Extend the set of available opened archetypes by the opened archetypes
-    // used by the instruction being cloned.
+  // Function cloning requires cloneFunction().
+  void visitSILFunction(SILFunction *F) = delete;
+
+  // MARK: SILCloner subclasses use the CRTP to customize the following callback
+  // implementations. Remap functions are called before cloning to modify
+  // constructor arguments. The postProcess function is called afterwards on
+  // the result.
+
+  SILLocation remapLocation(SILLocation Loc) { return Loc; }
+  const SILDebugScope *remapScope(const SILDebugScope *DS) { return DS; }
+  SILType remapType(SILType Ty) { return Ty; }
+  CanType remapASTType(CanType Ty) { return Ty; }
+  ProtocolConformanceRef remapConformance(Type Ty, ProtocolConformanceRef C) {
+    return C;
+  }
+  SILValue remapValue(SILValue Value);
+  SILFunction *remapFunction(SILFunction *Func) { return Func; }
+  SILBasicBlock *remapBasicBlock(SILBasicBlock *BB);
+  void postProcess(SILInstruction *Orig, SILInstruction *Cloned);
+
+  SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) { return Subs; }
+
+  /// This is called by either of the top-level visitors, cloneReachableBlocks
+  /// or cloneSILFunction, after all other visitors are have been called.
+  ///
+  /// After fixUp, the SIL must be valid and semantically equivalent to the SIL
+  /// before cloning.
+  ///
+  /// Common fix-ups are handled first in `doFixUp` and may not be overridden.
+  void fixUp(SILFunction *F) {}
+private:
+  /// MARK: SILCloner implementation details hidden from CRTP extensions.
+
+  /// SILVisitor CRTP callback. Preprocess any instruction before cloning.
+  void beforeVisit(SILInstruction *Orig) {
+    // Update the set of available opened archetypes with the opened
+    // archetypes used by the current instruction.
     auto TypeDependentOperands = Orig->getTypeDependentOperands();
     Builder.getOpenedArchetypes().addOpenedArchetypeOperands(
         TypeDependentOperands);
   }
 
-  void doPostProcess(SILInstruction *Orig, SILInstruction *Cloned) {
-    asImpl().postProcess(Orig, Cloned);
-    assert((Orig->getDebugScope() ? Cloned->getDebugScope()!=nullptr : true) &&
-           "cloned instruction dropped debug scope");
-  }
+  void clonePhiArgs(SILBasicBlock *oldBB);
 
-  // Register a re-mapping for opened existentials.
-  void registerOpenedExistentialRemapping(ArchetypeType *From, ArchetypeType *To) {
-    auto result =
-      OpenedExistentialSubs.insert(std::make_pair(CanArchetypeType(From),
-                                                  CanType(To)));
-    assert(result.second);
-    (void) result;
-  }
+  void visitBlocksDepthFirst(SILBasicBlock *StartBB,
+                             SILBasicBlock *insertBeforeBB = nullptr);
 
-protected:
-
-  SILBuilder Builder;
-  SILBasicBlock *InsertBeforeBB;
-  llvm::DenseMap<SILValue, SILValue> ValueMap;
-
-  // Use MapVector to ensure that the order of block predecessors is
-  // deterministic.
-  llvm::MapVector<SILBasicBlock*, SILBasicBlock*> BBMap;
-
-  TypeSubstitutionMap OpenedExistentialSubs;
-  SILOpenedArchetypesTracker OpenedArchetypesTracker;
-
-  /// Set of basic blocks where unreachable was inserted.
-  SmallPtrSet<SILBasicBlock *, 32> BlocksWithUnreachables;
+  /// Also perform fundamental cleanup first, then call the CRTP extension,
+  /// `fixUp`.
+  void doFixUp(SILFunction *F);
 };
 
 /// \brief A SILBuilder that automatically invokes postprocess on each
@@ -399,50 +510,148 @@ SILCloner<ImplClass>::postProcess(SILInstruction *orig,
   }
 }
 
-/// \brief Recursively visit a callee's BBs in depth-first preorder (only
-/// processing blocks on the first visit), mapping newly visited BBs to new BBs
-/// in the caller and cloning all instructions into the caller other than
-/// terminators which should be handled separately later by subclasses
 template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitSILBasicBlock(SILBasicBlock* BB) {
-  SILFunction &F = getBuilder().getFunction();
+void SILCloner<ImplClass>::visitInstructionsInBlock(SILBasicBlock* BB) {
   // Iterate over and visit all instructions other than the terminator to clone.
   for (auto I = BB->begin(), E = --BB->end(); I != E; ++I) {
     asImpl().visit(&*I);
   }
-  // Iterate over successors to do the depth-first search.
-  for (auto &Succ : BB->getSuccessors()) {
-    auto BBI = BBMap.find(Succ);
-    // Only visit a successor that has not already been visited.
-    if (BBI == BBMap.end()) {
-      // Map the successor to a new BB.
-      auto *MappedBB = F.createBasicBlock();
-      BBMap.insert(std::make_pair(Succ.getBB(), MappedBB));
-      // Create new arguments for each of the original block's arguments.
-      for (auto *Arg : Succ.getBB()->getPhiArguments()) {
-        SILValue MappedArg = MappedBB->createPhiArgument(
-            getOpType(Arg->getType()), Arg->getOwnershipKind());
+}
 
-        ValueMap.insert(std::make_pair(Arg, MappedArg));
-      }
+template <typename ImplClass>
+void SILCloner<ImplClass>::cloneReachableBlocks(
+    SILBasicBlock *startBB, ArrayRef<SILBasicBlock *> exitBlocks) {
+  SILFunction *F = startBB->getParent();
+  assert(F == &Builder.getFunction()
+         && "cannot clone region across functions.");
+  assert(BBMap.empty() && "This API does not allow clients to map blocks.");
+  assert(ValueMap.empty() && "Stale ValueMap.");
+
+  auto *ClonedStart = F->createBasicBlock();
+  BBMap.insert(std::make_pair(startBB, ClonedStart));
+  getBuilder().setInsertionPoint(ClonedStart);
+  clonePhiArgs(startBB);
+
+  // Premap exit blocks to terminate so that visitBlocksDepthFirst terminates
+  // after discovering the cloned region. Mappint an exit block to itself
+  // provide the correct destination block during visitTerminator.
+  for (auto *exitBB : exitBlocks)
+    BBMap[exitBB] = exitBB;
+
+  // Discover and map the region to be cloned.
+  visitBlocksDepthFirst(startBB);
+
+  doFixUp(F);
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::cloneFunctionBody(SILFunction *F,
+                                             SILBasicBlock *clonedEntryBB,
+                                             ArrayRef<SILValue> entryArgs) {
+
+  assert(F != clonedEntryBB->getParent() && "Must clone into a new function.");
+  assert(BBMap.empty() && "This API does not allow clients to map blocks.");
+  assert(ValueMap.empty() && "Stale ValueMap.");
+
+  assert(entryArgs.size() == F->getArguments().size());
+  for (unsigned i = 0, e = entryArgs.size(); i != e; ++i)
+    ValueMap[F->getArgument(i)] = entryArgs[i];
+
+  BBMap.insert(std::make_pair(&*F->begin(), clonedEntryBB));
+
+  Builder.setInsertionPoint(clonedEntryBB);
+
+  // If the caller's BB is not the last BB in the calling function, then keep
+  // track of the next BB so we always insert new BBs before it; otherwise,
+  // we just leave the new BBs at the end as they are by default.
+  auto *callerF = clonedEntryBB->getParent();
+  auto IBI = std::next(SILFunction::iterator(clonedEntryBB));
+  SILBasicBlock *insertBeforeBB = IBI != callerF->end() ? &*IBI : nullptr;
+
+  // Visiting in pre-order provides a nice property for the individual
+  // instruction visitors. It allows those visitors to make use of dominance
+  // relationships, particularly the fact that operand values will be mapped.
+  visitBlocksDepthFirst(&*F->begin(), insertBeforeBB);
+
+  doFixUp(F);
+}
+
+template<typename ImplClass>
+void SILCloner<ImplClass>::clonePhiArgs(SILBasicBlock *oldBB) {
+  auto *mappedBB = BBMap[oldBB];
+
+  // Create new arguments for each of the original block's arguments.
+  for (auto *Arg : oldBB->getPhiArguments()) {
+    SILValue mappedArg = mappedBB->createPhiArgument(
+      getOpType(Arg->getType()), Arg->getOwnershipKind());
+
+    ValueMap.insert(std::make_pair(Arg, mappedArg));
+  }
+}
+
+// This private helper visits BBs in depth-first preorder (only processing
+// blocks on the first visit), mapping newly visited BBs to new BBs and cloning
+// all instructions into the caller.
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitBlocksDepthFirst(
+    SILBasicBlock *startBB, SILBasicBlock *insertBeforeBB) {
+  SILFunction &newF = getBuilder().getFunction();
+
+  // The caller clones startBB because it may be a function header, which
+  // requires special handling.
+  assert(BBMap.count(startBB) && "The caller must map the first BB.");
+
+  assert(preorderBlocks.empty());
+
+  // First clone the CFG region.
+  SmallVector<SILBasicBlock *, 8> dfsWorklist(1, startBB);
+  while (!dfsWorklist.empty()) {
+    auto *BB = dfsWorklist.pop_back_val();
+    preorderBlocks.push_back(BB);
+
+    // Visit all dominating instructions before visiting block phi arguments so
+    // that all opened existentials are registered with the
+    // OpenedArchetypesTracker before subsituting the phi argument types.
+    getBuilder().setInsertionPoint(BBMap[BB]);
+    asImpl().visitInstructionsInBlock(BB);
+
+    unsigned succStartIdx = dfsWorklist.size();
+    for (auto &Succ : BB->getSuccessors()) {
+      // Only visit a successor that has not already been visited and was not
+      // premapped by the client.
+      if (BBMap.count(Succ))
+        continue;
+
+      // Map the successor to a new BB.
+      auto *MappedBB = newF.createBasicBlock();
+      BBMap.insert(std::make_pair(Succ.getBB(), MappedBB));
+
+      clonePhiArgs(Succ);
+
       // Also, move the new mapped BB to the right position in the caller
-      if (InsertBeforeBB)
-        F.getBlocks().splice(SILFunction::iterator(InsertBeforeBB),
-                             F.getBlocks(), SILFunction::iterator(MappedBB));
-      // Set the insertion point to the new mapped BB
-      getBuilder().setInsertionPoint(MappedBB);
-      // Recurse into the successor
-      visitSILBasicBlock(Succ.getBB());
+      if (insertBeforeBB) {
+        newF.getBlocks().splice(SILFunction::iterator(insertBeforeBB),
+                                newF.getBlocks(),
+                                SILFunction::iterator(MappedBB));
+      }
+
+      dfsWorklist.push_back(Succ);
     }
+    // Reverse the worklist to pop the successors in forward order.
+    std::reverse(dfsWorklist.begin() + succStartIdx, dfsWorklist.end());
+  }
+  // Visit terminators only after the CFG is valid so all branch targets exist.
+  for (auto *origBB : preorderBlocks) {
+    // Set the insertion point to the new mapped BB
+    getBuilder().setInsertionPoint(BBMap[origBB]);
+    asImpl().visitTerminator(origBB);
   }
 }
 
 /// \brief Clean-up after cloning.
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::cleanUp(SILFunction *F) {
-
+SILCloner<ImplClass>::doFixUp(SILFunction *F) {
   // Remove any code after unreachable instructions.
 
   // NOTE: It is unfortunate that it essentially duplicates
@@ -469,16 +678,10 @@ SILCloner<ImplClass>::cleanUp(SILFunction *F) {
   }
 
   BlocksWithUnreachables.clear();
-}
 
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitSILFunction(SILFunction *F) {
-  for (auto &BB : *F)
-    asImpl().visitSILBasicBlock(&BB);
-  cleanUp(F);
+  // Call any cleanup specific to the CRTP extensions.
+  asImpl().fixUp(F);
 }
-
 
 template<typename ImplClass>
 void

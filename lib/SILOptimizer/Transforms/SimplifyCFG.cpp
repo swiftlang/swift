@@ -320,8 +320,7 @@ public:
     auto *SrcTerm = cast<BranchInst>(Src->getTerminator());
 
     EdgeThreadingCloner Cloner(SrcTerm);
-    for (auto &I : *Dest)
-      Cloner.process(&I);
+    Cloner.cloneFrom(Dest);
 
     // We have copied the threaded block into the edge.
     Src = Cloner.getEdgeBB();
@@ -1053,8 +1052,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // destination block into this one, rewriting uses of the BBArgs to use the
   // branch arguments as we go.
   EdgeThreadingCloner Cloner(BI);
-  for (auto &I : *DestBB)
-    Cloner.process(&I);
+  Cloner.cloneFrom(DestBB);
 
   // Does not currently update DominanceInfo.
   Cloner.splitCriticalEdges(nullptr, nullptr);
@@ -2434,9 +2432,7 @@ bool SimplifyCFG::tailDuplicateObjCMethodCallSuccessorBlocks() {
     // destination block into this one, rewriting uses of the BBArgs to use the
     // branch arguments as we go.
     EdgeThreadingCloner Cloner(Branch);
-
-    for (auto &I : *DestBB)
-      Cloner.process(&I);
+    Cloner.cloneFrom(DestBB);
 
     // Does not currently update DominanceInfo.
     Cloner.splitCriticalEdges(nullptr, nullptr);

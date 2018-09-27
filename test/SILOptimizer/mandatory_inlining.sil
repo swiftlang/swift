@@ -612,15 +612,12 @@ sil @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
 
 // CHECK-LABEL: sil @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
 
-  // CHECK: cond_br {{%.*}}, [[BB1:bb[0-9]+]], [[BB3:bb[0-9]+]]
+  // CHECK: cond_br {{%.*}}, [[BB1:bb[0-9]+]], [[BB2:bb[0-9]+]]
 
 // CHECK: bb1:
-  // CHECK: br [[BB2:.*]](
+  // CHECK: br [[BB3:.*]](
 
-// CHECK: [[BB2]](
-  // CHECK: br [[BB4:.*]](
-
-// CHECK: bb3:
+// CHECK: bb2:
   // CHECK: [[OLD_CALLEE:%.*]] = load {{%[0-9]+}} :
   // CHECK: strong_retain [[OLD_CALLEE]]
   // Separation marker
@@ -631,7 +628,10 @@ sil @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
   // CHECK: {{%.*}} = tuple ()
   // CHECK: {{%.*}} = load [[ADDR4]]
   // CHECK: strong_release [[VAL4]]
-  // CHECK: br [[BB2]](
+  // CHECK: br [[BB3]](
+
+// CHECK: [[BB3]](
+  // CHECK: br [[BB4:.*]](
 
 // CHECK: [[BB4]](
   // CHECK: strong_release [[VAL4]]
@@ -660,15 +660,12 @@ sil @test_short_circuit2 : $@convention(thin) (Bool, Bool) -> Bool {
 
 // CHECK-LABEL: sil @test_short_circuit2 : $@convention(thin) (Bool, Bool) -> Bool {
 
-  // CHECK: cond_br {{%.*}}, [[BB1:bb[0-9]+]], [[BB3:bb[0-9]+]]
+  // CHECK: cond_br {{%.*}}, [[BB1:bb[0-9]+]], [[BB2:bb[0-9]+]]
 
 // CHECK: bb1:
-  // CHECK: br [[BB2:.*]](
+  // CHECK: br [[BB3:.*]](
 
-// CHECK: [[BB2]](
-  // CHECK: br [[BB5:.*]](
-
-// CHECK: [[BB3]]:
+// CHECK: [[BB2]]:
   // Marker -
   // CHECK: integer_literal $Builtin.Int32, 2
   // CHECK: [[OLD_CALLEE:%.*]] = load {{%.*}}
@@ -681,9 +678,12 @@ sil @test_short_circuit2 : $@convention(thin) (Bool, Bool) -> Bool {
   // CHECK: {{%.*}} = tuple ()
   // CHECK: {{%.*}} = load [[ADDR4]]
   // CHECK: strong_release [[VAL4]]
-  // CHECK: br [[BB2]](
+  // CHECK: br [[BB3]](
 
-// CHECK: [[BB5]](
+// CHECK: [[BB3]](
+  // CHECK: br [[BB4:.*]](
+
+// CHECK: [[BB4]](
   // CHECK: strong_release [[VAL3]]
   // CHECK: return {{.*}}
 

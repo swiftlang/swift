@@ -1519,35 +1519,32 @@ namespace {
 /// Clone a single exit multiple exit region starting at basic block and ending
 /// in a set of basic blocks. Updates the dominator tree with the cloned blocks.
 /// However, the client needs to update the dominator of the exit blocks.
+///
+/// FIXME: SILCloner is used to cloned CFG regions by multiple clients. All
+/// functionality for generating valid SIL (including the DomTree) should be
+/// handled by the common SILCloner.
 class RegionCloner : public SILCloner<RegionCloner> {
   DominanceInfo &DomTree;
   SILBasicBlock *StartBB;
-  SmallPtrSet<SILBasicBlock *, 16> OutsideBBs;
 
   friend class SILInstructionVisitor<RegionCloner>;
   friend class SILCloner<RegionCloner>;
 
 public:
-  RegionCloner(SILBasicBlock *EntryBB,
-               SmallVectorImpl<SILBasicBlock *> &ExitBlocks, DominanceInfo &DT)
+  RegionCloner(SILBasicBlock *EntryBB, DominanceInfo &DT)
       : SILCloner<RegionCloner>(*EntryBB->getParent()), DomTree(DT),
-        StartBB(EntryBB), OutsideBBs(ExitBlocks.begin(), ExitBlocks.end()) {}
+        StartBB(EntryBB) {}
 
-  SILBasicBlock *cloneRegion() {
+  SILBasicBlock *cloneRegion(ArrayRef<SILBasicBlock *> exitBBs) {
     assert (DomTree.getNode(StartBB) != nullptr && "Can't cloned dead code");
-    auto CurFun = StartBB->getParent();
-
-    // We don't want to visit blocks outside of the region. visitSILBasicBlocks
-    // checks BBMap before it clones a block. So we mark exiting blocks as
-    // visited by putting them in the BBMap.
-    for (auto *BB : OutsideBBs)
-      BBMap[BB] = BB;
 
     // We need to split any edge from a non cond_br basic block leading to a
     // exit block. After cloning this edge will become critical if it came from
     // inside the cloned region. The SSAUpdater can't handle critical non
     // cond_br edges.
-    for (auto *BB : OutsideBBs) {
+    //
+    // FIXME: remove this in the next commit. The SILCloner will always do it.
+    for (auto *BB : exitBBs) {
       SmallVector<SILBasicBlock *, 8> Preds(BB->getPredecessorBlocks());
       for (auto *Pred : Preds)
         if (!isa<CondBranchInst>(Pred->getTerminator()) &&
@@ -1555,72 +1552,32 @@ public:
           splitEdgesFromTo(Pred, BB, &DomTree, nullptr);
     }
 
-    // Create the cloned start basic block.
-    auto *ClonedStartBB = CurFun->createBasicBlock();
-    BBMap[StartBB] = ClonedStartBB;
-
-    // Clone the arguments.
-    for (auto &Arg : StartBB->getArguments()) {
-      SILValue MappedArg = ClonedStartBB->createPhiArgument(
-          getOpType(Arg->getType()), ValueOwnershipKind::Owned);
-      ValueMap.insert(std::make_pair(Arg, MappedArg));
-    }
-
-    // Clone the instructions in this basic block and recursively clone
-    // successor blocks.
-    getBuilder().setInsertionPoint(ClonedStartBB);
-    visitSILBasicBlock(StartBB);
-
-    // Fix-up terminators.
-    for (auto BBPair : BBMap)
-      if (BBPair.first != BBPair.second) {
-        getBuilder().setInsertionPoint(BBPair.second);
-        visit(BBPair.first->getTerminator());
-      }
+    cloneReachableBlocks(StartBB, exitBBs);
 
     // Add dominator tree nodes for the new basic blocks.
-    fixDomTreeNodes(DomTree.getNode(StartBB));
+    fixDomTree();
 
     // Update SSA form for values used outside of the copied region.
     updateSSAForm();
-    return ClonedStartBB;
+    return getOpBasicBlock(StartBB);
   }
-
-  llvm::MapVector<SILBasicBlock *, SILBasicBlock *> &getBBMap() { return BBMap; }
 
 protected:
   /// Clone the dominator tree from the original region to the cloned region.
-  void fixDomTreeNodes(DominanceInfoNode *OrigNode) {
-    auto *BB = OrigNode->getBlock();
-    auto MapIt = BBMap.find(BB);
-    // Outside the cloned region.
-    if (MapIt == BBMap.end())
-      return;
-
-    auto *ClonedBB = MapIt->second;
-    // Exit blocks (BBMap[BB] == BB) end the recursion.
-    if (ClonedBB == BB)
-      return;
-
-    auto *OrigDom = OrigNode->getIDom();
-    assert(OrigDom);
-
-    if (BB == StartBB) {
-      // The cloned start node shares the same dominator as the original node.
-      auto *ClonedNode = DomTree.addNewBlock(ClonedBB, OrigDom->getBlock());
-      (void) ClonedNode;
-      assert(ClonedNode);
-    } else {
+  void fixDomTree() {
+    for (auto *BB : originalPreorderBlocks()) {
+      auto *ClonedBB = getOpBasicBlock(BB);
+      auto *OrigDomBB = DomTree.getNode(BB)->getIDom()->getBlock();
+      if (BB == StartBB) {
+        // The cloned start node shares the same dominator as the original node.
+        auto *ClonedNode = DomTree.addNewBlock(ClonedBB, OrigDomBB);
+        (void)ClonedNode;
+        assert(ClonedNode);
+        continue;
+      }
       // Otherwise, map the dominator structure using the mapped block.
-      auto *OrigDomBB = OrigDom->getBlock();
-      assert(BBMap.count(OrigDomBB) && "Must have visited dominating block");
-      auto *MappedDomBB = BBMap[OrigDomBB];
-      assert(MappedDomBB);
-      DomTree.addNewBlock(ClonedBB, MappedDomBB);
+      DomTree.addNewBlock(ClonedBB, getOpBasicBlock(OrigDomBB));
     }
-
-    for (auto *Child : *OrigNode)
-      fixDomTreeNodes(Child);
   }
 
   SILValue remapValue(SILValue V) {
@@ -1645,8 +1602,7 @@ protected:
     // Collect outside uses.
     SmallVector<UseWrapper, 16> UseList;
     for (auto Use : V->getUses())
-      if (OutsideBBs.count(Use->getUser()->getParent()) ||
-          !BBMap.count(Use->getUser()->getParent())) {
+      if (!isBlockCloned(Use->getUser()->getParent())) {
         UseList.push_back(UseWrapper(Use));
       }
     if (UseList.empty())
@@ -1656,7 +1612,7 @@ protected:
     SSAUp.Initialize(V->getType());
     SSAUp.AddAvailableValue(OrigBB, V);
     SILValue NewVal = remapValue(V);
-    SSAUp.AddAvailableValue(BBMap[OrigBB], NewVal);
+    SSAUp.AddAvailableValue(getOpBasicBlock(OrigBB), NewVal);
     for (auto U : UseList) {
       Operand *Use = U;
       SSAUp.RewriteUse(*Use);
@@ -1665,20 +1621,15 @@ protected:
 
   void updateSSAForm() {
     SILSSAUpdater SSAUp;
-    for (auto Entry : BBMap) {
-      // Ignore exit blocks.
-      if (Entry.first == Entry.second)
-        continue;
-      auto *OrigBB = Entry.first;
-
+    for (auto *origBB : originalPreorderBlocks()) {
       // Update outside used phi values.
-      for (auto *Arg : OrigBB->getArguments())
-        updateSSAForValue(OrigBB, Arg, SSAUp);
+      for (auto *arg : origBB->getArguments())
+        updateSSAForValue(origBB, arg, SSAUp);
 
       // Update outside used instruction values.
-      for (auto &Inst : *OrigBB) {
-        for (auto result : Inst.getResults())
-          updateSSAForValue(OrigBB, result, SSAUp);
+      for (auto &inst : *origBB) {
+        for (auto result : inst.getResults())
+          updateSSAForValue(origBB, result, SSAUp);
       }
     }
   }
@@ -1767,21 +1718,17 @@ createFastNativeArraysCheck(SmallVectorImpl<ArraySemanticsCall> &ArrayProps,
 
 /// Collect all array.props calls in the cloned basic blocks stored in the map,
 /// asserting that we found at least one.
-static void collectArrayPropsCalls(
-    llvm::MapVector<SILBasicBlock *, SILBasicBlock *> &OrigToClonedBBMap,
-    SmallVectorImpl<SILBasicBlock *> &ExitBlocks,
-    SmallVectorImpl<ArraySemanticsCall> &Calls) {
-  for (auto &P : OrigToClonedBBMap) {
-    // Collect array.props calls in all cloned blocks, excluding the exit
-    // blocks.
-    if (std::find(ExitBlocks.begin(), ExitBlocks.end(), P.second) ==
-        ExitBlocks.end())
-      for (auto &Inst : *P.second) {
-        ArraySemanticsCall ArrayProps(&Inst, "array.props", true);
-        if (!ArrayProps)
-          continue;
-        Calls.push_back(ArrayProps);
-      }
+static void collectArrayPropsCalls(RegionCloner &Cloner,
+                                   SmallVectorImpl<SILBasicBlock *> &ExitBlocks,
+                                   SmallVectorImpl<ArraySemanticsCall> &Calls) {
+  for (auto *origBB : Cloner.originalPreorderBlocks()) {
+    auto clonedBB = Cloner.getOpBasicBlock(origBB);
+    for (auto &Inst : *clonedBB) {
+      ArraySemanticsCall ArrayProps(&Inst, "array.props", true);
+      if (!ArrayProps)
+        continue;
+      Calls.push_back(ArrayProps);
+    }
   }
   assert(!Calls.empty() && "Should have a least one array.props call");
 }
@@ -1854,13 +1801,13 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
 
   // Clone the region from the new preheader up to (not including) the exit
   // blocks. This creates a second loop nest.
-  RegionCloner Cloner(NewPreheader, ExitBlocks, *DomTree);
-  auto *ClonedPreheader = Cloner.cloneRegion();
+  RegionCloner Cloner(NewPreheader, *DomTree);
+  auto *ClonedPreheader = Cloner.cloneRegion(ExitBlocks);
 
   // Collect the array.props call that we will specialize on that we have
   // cloned in the cloned loop.
   SmallVector<ArraySemanticsCall, 16> ArrayPropCalls;
-  collectArrayPropsCalls(Cloner.getBBMap(), ExitBlocks, ArrayPropCalls);
+  collectArrayPropsCalls(Cloner, ExitBlocks, ArrayPropCalls);
 
   // Move them to the check block.
   SmallVector<ArraySemanticsCall, 16> HoistedArrayPropCalls;

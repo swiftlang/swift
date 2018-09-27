@@ -136,7 +136,6 @@ public:
   using SILClonerWithScopes<ImplClass>::getOpType;
   using SILClonerWithScopes<ImplClass>::getOpBasicBlock;
   using SILClonerWithScopes<ImplClass>::doPostProcess;
-  using SILClonerWithScopes<ImplClass>::ValueMap;
   using SILClonerWithScopes<ImplClass>::addBlockWithUnreachable;
   using SILClonerWithScopes<ImplClass>::OpenedArchetypesTracker;
 
@@ -258,7 +257,7 @@ protected:
     // there is no need for an upcast and we can just use the operand.
     if (getOpType(Upcast->getType()) ==
         getOpValue(Upcast->getOperand())->getType()) {
-      ValueMap.insert({SILValue(Upcast), getOpValue(Upcast->getOperand())});
+      super::foldValue(SILValue(Upcast), getOpValue(Upcast->getOperand()));
       return;
     }
     super::visitUpcastInst(Upcast);
@@ -268,7 +267,7 @@ protected:
     // If the substituted type is trivial, ignore the copy.
     SILType copyTy = getOpType(Copy->getType());
     if (copyTy.isTrivial(Copy->getModule())) {
-      ValueMap.insert({SILValue(Copy), getOpValue(Copy->getOperand())});
+      super::foldValue(SILValue(Copy), getOpValue(Copy->getOperand()));
       return;
     }
     super::visitCopyValueInst(Copy);
