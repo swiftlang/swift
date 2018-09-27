@@ -78,6 +78,13 @@ extension _NativeDictionary { // Primitive fields
     }
   }
 
+  @inlinable
+  internal var age: Int32 {
+    @inline(__always) get {
+      return _storage._age
+    }
+  }
+
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   @inlinable
   internal var _keys: UnsafeMutablePointer<Key> {
@@ -239,23 +246,35 @@ extension _NativeDictionary { // ensureUnique
   }
 }
 
+extension _NativeDictionary {
+  @inlinable
+  @inline(__always)
+  func validate(_ index: Index) {
+    _precondition(hashTable.isOccupied(index.bucket) && index.age == age,
+      "Attempting to access Dictionary elements using an invalid Index")
+  }
+}
+
 extension _NativeDictionary: _DictionaryBuffer {
   @usableFromInline
-  internal typealias Index = Bucket
+  internal typealias Index = _HashTable.Index
 
   @inlinable
   internal var startIndex: Index {
-    return hashTable.startBucket
+    let bucket = hashTable.startBucket
+    return Index(bucket: bucket, age: age)
   }
 
   @inlinable
   internal var endIndex: Index {
-    return hashTable.endBucket
+    let bucket = hashTable.endBucket
+    return Index(bucket: bucket, age: age)
   }
 
   @inlinable
   internal func index(after index: Index) -> Index {
-    return hashTable.occupiedBucket(after: index)
+    let bucket = hashTable.occupiedBucket(after: index.bucket)
+    return Index(bucket: bucket, age: age)
   }
 
   @inlinable
@@ -266,7 +285,7 @@ extension _NativeDictionary: _DictionaryBuffer {
     }
     let (bucket, found) = find(key)
     guard found else { return nil }
-    return bucket
+    return Index(bucket: bucket, age: age)
   }
 
   @inlinable
@@ -297,27 +316,24 @@ extension _NativeDictionary: _DictionaryBuffer {
   @inlinable
   @inline(__always)
   func lookup(_ index: Index) -> (key: Key, value: Value) {
-    _precondition(hashTable.isOccupied(index),
-      "Attempting to access Dictionary elements using an invalid Index")
-    let key = self.uncheckedKey(at: index)
-    let value = self.uncheckedValue(at: index)
+    validate(index)
+    let key = self.uncheckedKey(at: index.bucket)
+    let value = self.uncheckedValue(at: index.bucket)
     return (key, value)
   }
 
   @inlinable
   @inline(__always)
   func key(at index: Index) -> Key {
-    _precondition(hashTable.isOccupied(index),
-      "Attempting to access Dictionary elements using an invalid Index")
-    return self.uncheckedKey(at: index)
+    validate(index)
+    return self.uncheckedKey(at: index.bucket)
   }
 
   @inlinable
   @inline(__always)
   func value(at index: Index) -> Value {
-    _precondition(hashTable.isOccupied(index),
-      "Attempting to access Dictionary elements using an invalid Index")
-    return self.uncheckedValue(at: index)
+    validate(index)
+    return self.uncheckedValue(at: index.bucket)
   }
 }
 
@@ -495,8 +511,8 @@ extension _NativeDictionary { // Deletion
   @inlinable
   @inline(__always)
   internal mutating func remove(at index: Index, isUnique: Bool) -> Element {
-    _precondition(hashTable.isOccupied(index), "Invalid index")
-    return uncheckedRemove(at: index, isUnique: isUnique)
+    validate(index)
+    return uncheckedRemove(at: index.bucket, isUnique: isUnique)
   }
 
   @usableFromInline

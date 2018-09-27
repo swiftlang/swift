@@ -356,7 +356,9 @@ extension Dictionary._Variant {
       let nativeKey = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
       let (bucket, found) = native.find(nativeKey)
       _precondition(found, "Bridging did not preserve equality")
-      return bucket
+      return _NativeDictionary<Key, Value>.Index(
+        bucket: bucket,
+        age: native.age)
 #endif
     }
   }
