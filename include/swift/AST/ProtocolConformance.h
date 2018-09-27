@@ -415,7 +415,6 @@ class NormalProtocolConformance : public ProtocolConformance,
   {
     assert(!conformingType->hasArchetype() &&
            "ProtocolConformances should store interface types");
-    differenceAndStoreConditionalRequirements();
   }
 
   NormalProtocolConformance(Type conformingType,
@@ -428,7 +427,6 @@ class NormalProtocolConformance : public ProtocolConformance,
   {
     assert(!conformingType->hasArchetype() &&
            "ProtocolConformances should store interface types");
-    differenceAndStoreConditionalRequirements();
   }
 
   void resolveLazyInfo() const;
