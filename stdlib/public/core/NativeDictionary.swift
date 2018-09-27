@@ -468,6 +468,22 @@ extension _NativeDictionary { // Insertions
   }
 }
 
+extension _NativeDictionary {
+  @inlinable
+  @inline(__always)
+  internal mutating func swapValuesAt(_ i: Index, _ j: Index, isUnique: Bool) {
+    let rehashed = ensureUnique(isUnique: isUnique, capacity: capacity)
+    _sanityCheck(!rehashed)
+    validate(i)
+    validate(j)
+    let a = i.bucket.offset
+    let b = j.bucket.offset
+    let value = (_values + a).move()
+    (_values + a).moveInitialize(from: _values + b, count: 1)
+    (_values + b).initialize(to: value)
+  }
+}
+
 extension _NativeDictionary: _HashTableDelegate {
   @inlinable
   @inline(__always)

@@ -1494,6 +1494,33 @@ extension Dictionary {
     public var debugDescription: String {
       return _makeCollectionDescription(withTypeName: "Dictionary.Values")
     }
+
+    @inlinable
+    public mutating func swapAt(_ i: Index, _ j: Index) {
+      guard i != j else { return }
+#if _runtime(_ObjC)
+      if case .cocoa(let cocoa) = _variant {
+        _variant.cocoaPath()
+        let cocoaKey1 = cocoa.key(at: i._asCocoa)
+        let cocoaKey2 = cocoa.key(at: j._asCocoa)
+        var native = _NativeDictionary<Key, Value>(cocoa)
+        let nativeKey1 = _forceBridgeFromObjectiveC(cocoaKey1, Key.self)
+        let nativeKey2 = _forceBridgeFromObjectiveC(cocoaKey2, Key.self)
+        guard
+          let index1 = native.index(forKey: nativeKey1),
+          let index2 = native.index(forKey: nativeKey2)
+        else {
+          _preconditionFailure("Invalid index")
+        }
+        _variant = .native(native)
+      }
+#endif
+      let isUnique = _variant.isUniquelyReferenced()
+      _variant.asNative.swapValuesAt(
+        i._asNative,
+        j._asNative,
+        isUnique: isUnique)
+    }
   }
 }
 
