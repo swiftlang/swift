@@ -139,6 +139,51 @@ extension _HashTable.Bucket: Comparable {
   }
 }
 
+extension _HashTable {
+  @usableFromInline
+  @_fixed_layout
+  internal struct Index {
+    @usableFromInline
+    let bucket: Bucket
+
+    @usableFromInline
+    let age: Int32
+
+    @inlinable
+    @inline(__always)
+    internal init(bucket: Bucket, age: Int32) {
+      self.bucket = bucket
+      self.age = age
+    }
+  }
+}
+
+extension _HashTable.Index: Equatable {
+  @inlinable
+  @inline(__always)
+  internal static func ==(
+    lhs: _HashTable.Index,
+    rhs: _HashTable.Index
+  ) -> Bool {
+    _precondition(lhs.age == rhs.age,
+      "Can't compare indices belonging to different collections")
+    return lhs.bucket == rhs.bucket
+  }
+}
+
+extension _HashTable.Index: Comparable {
+  @inlinable
+  @inline(__always)
+  internal static func <(
+    lhs: _HashTable.Index,
+    rhs: _HashTable.Index
+  ) -> Bool {
+    _precondition(lhs.age == rhs.age,
+      "Can't compare indices belonging to different collections")
+    return lhs.bucket < rhs.bucket
+  }
+}
+
 extension _HashTable: Sequence {
   @usableFromInline
   @_fixed_layout
