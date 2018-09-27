@@ -279,13 +279,13 @@ public func SR8191() {
 
 // CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}SR8191{{.*}}
 // CHECK: [sequence
-// CHECK:   <while Preheader: bb0, Header: bb5, exit: bb4
+// CHECK:   <while Preheader: {{bb[0-9]+}}, Header: {{bb[0-9]+}}, exit: [[EXIT:bb[0-9]+]]
 // CHECK:     [sequence
-// CHECK:       {condition Header: bb1
-// CHECK:         block bb3
-// CHECK:         block bb2}
-// CHECK:       block bb6]>
-// CHECK:   block bb4]
+// CHECK:       {condition Header: {{bb[0-9]+}}
+// CHECK:         block {{bb[0-9]+}}
+// CHECK:         block {{bb[0-9]+}}}
+// CHECK:       block {{bb[0-9]+}}]>
+// CHECK:   block [[EXIT]]]
 
 // `a` and `b` are both arguments to the tensor program, which starts at
 // "let _= a + b", and ends in that BB. So the tensor start point and tensor end
