@@ -221,6 +221,28 @@ extension _NativeSet {
     _precondition(hashTable.isOccupied(index.bucket) && index.age == age,
       "Attempting to access Set elements using an invalid Index")
   }
+
+  @inlinable
+  @inline(__always)
+  func validatedBucket(for index: Set<Element>.Index) -> Bucket {
+    switch index._variant {
+    case .native(let native):
+      validate(native)
+      return native.bucket
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      // Accept Cocoa indices as long as they contain an element that exists in
+      // this set.
+      index._cocoaPath()
+      let element = _forceBridgeFromObjectiveC(cocoa.element, Element.self)
+      guard let index = self.index(for: element) else {
+        _preconditionFailure(
+          "Attempting to access Set elements using an invalid Index")
+      }
+      return index.bucket
+#endif
+    }
+  }
 }
 
 extension _NativeSet: _SetBuffer {

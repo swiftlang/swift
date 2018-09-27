@@ -253,6 +253,28 @@ extension _NativeDictionary {
     _precondition(hashTable.isOccupied(index.bucket) && index.age == age,
       "Attempting to access Dictionary elements using an invalid Index")
   }
+
+  @inlinable
+  @inline(__always)
+  func validatedBucket(for index: Dictionary<Key, Value>.Index) -> Bucket {
+    switch index._variant {
+    case .native(let native):
+      validate(native)
+      return native.bucket
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      // Accept Cocoa indices as long as they contain a key that exists in
+      // this dictionary.
+      index._cocoaPath()
+      let key = _forceBridgeFromObjectiveC(cocoa.key, Key.self)
+      guard let index = self.index(forKey: key) else {
+        _preconditionFailure(
+          "Attempting to access Dictionary elements using an invalid Index")
+      }
+      return index.bucket
+#endif
+    }
+  }
 }
 
 extension _NativeDictionary: _DictionaryBuffer {
