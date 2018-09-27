@@ -249,9 +249,10 @@ extension _NativeDictionary { // ensureUnique
 extension _NativeDictionary {
   @inlinable
   @inline(__always)
-  func validate(_ index: Index) {
+  func validatedBucket(for index: Index) -> Bucket {
     _precondition(hashTable.isOccupied(index.bucket) && index.age == age,
       "Attempting to access Dictionary elements using an invalid index")
+    return index.bucket
   }
 
   @inlinable
@@ -259,8 +260,7 @@ extension _NativeDictionary {
   func validatedBucket(for index: Dictionary<Key, Value>.Index) -> Bucket {
     switch index._variant {
     case .native(let native):
-      validate(native)
-      return native.bucket
+      return validatedBucket(for: native)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       // Accept Cocoa indices as long as they contain a key that exists in
@@ -295,9 +295,9 @@ extension _NativeDictionary: _DictionaryBuffer {
 
   @inlinable
   internal func index(after index: Index) -> Index {
-    validate(index)
-    let bucket = hashTable.occupiedBucket(after: index.bucket)
-    return Index(bucket: bucket, age: age)
+    let bucket = validatedBucket(for: index)
+    let next = hashTable.occupiedBucket(after: bucket)
+    return Index(bucket: next, age: age)
   }
 
   @inlinable
@@ -339,24 +339,24 @@ extension _NativeDictionary: _DictionaryBuffer {
   @inlinable
   @inline(__always)
   func lookup(_ index: Index) -> (key: Key, value: Value) {
-    validate(index)
-    let key = self.uncheckedKey(at: index.bucket)
-    let value = self.uncheckedValue(at: index.bucket)
+    let bucket = validatedBucket(for: index)
+    let key = self.uncheckedKey(at: bucket)
+    let value = self.uncheckedValue(at: bucket)
     return (key, value)
   }
 
   @inlinable
   @inline(__always)
   func key(at index: Index) -> Key {
-    validate(index)
-    return self.uncheckedKey(at: index.bucket)
+    let bucket = validatedBucket(for: index)
+    return self.uncheckedKey(at: bucket)
   }
 
   @inlinable
   @inline(__always)
   func value(at index: Index) -> Value {
-    validate(index)
-    return self.uncheckedValue(at: index.bucket)
+    let bucket = validatedBucket(for: index)
+    return self.uncheckedValue(at: bucket)
   }
 }
 
