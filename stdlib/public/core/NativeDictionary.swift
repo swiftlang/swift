@@ -571,8 +571,13 @@ extension _NativeDictionary { // High-level operations
   internal func mapValues<T>(
     _ transform: (Value) throws -> T
   ) rethrows -> _NativeDictionary<Key, T> {
-    let result = _NativeDictionary<Key, T>(capacity: capacity)
-    // Because the keys in the current and new buffer are the same, we can
+    let (resultStorage, rehash) = _DictionaryStorage<Key, T>.reallocate(
+      original: _storage,
+      capacity: capacity)
+    _sanityCheck(!rehash)
+    _sanityCheck(resultStorage._seed == _storage._seed)
+    let result = _NativeDictionary<Key, T>(resultStorage)
+    // Because the current and new buffer have the same scale and seed, we can
     // initialize to the same locations in the new buffer, skipping hash value
     // recalculations.
     for bucket in hashTable {
