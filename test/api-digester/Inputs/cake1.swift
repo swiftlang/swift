@@ -111,3 +111,6 @@ public protocol ObjCProtocol {
   @objc
   func addOptional()
 }
+
+public let GlobalLetChangedToVar = 1
+public var GlobalVarChangedToLet = 1

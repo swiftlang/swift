@@ -648,6 +648,8 @@ bool SDKNode::operator==(const SDKNode &Other) const {
               if (LV->getFixedBinaryOrder() != RV->getFixedBinaryOrder())
                 return false;
             }
+            if (LV->isLet() != RV->isLet())
+              return false;
           }
         }
       }

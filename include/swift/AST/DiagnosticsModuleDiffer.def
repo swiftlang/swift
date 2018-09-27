@@ -76,6 +76,8 @@ ERROR(nominal_type_kind_changed,none,"%0 has been changed to a %1", (StringRef, 
 
 ERROR(optional_req_changed,none,"%0 is %select{now|no longer}1 an optional requirement", (StringRef, bool))
 
+ERROR(var_let_changed,none,"%0 changes from %select{var|let}1 to %select{let|var}1", (StringRef, bool))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

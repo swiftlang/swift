@@ -12,6 +12,7 @@ cake1: Constructor fixedLayoutStruct.init(b:a:) has been removed
 cake1: Func C4.foo() has been removed
 cake1: Func RequiementChanges.removedFunc() has been removed
 cake1: Subscript RemoveSetters.subscript(_:) has removed its setter
+cake1: Var GlobalVarChangedToLet has removed its setter
 cake1: Var RemoveSetters.Value has removed its setter
 cake1: Var RequiementChanges.removedVar has been removed
 
