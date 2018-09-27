@@ -1909,11 +1909,11 @@ public:
 
   class ForceTryEmission {
     SILGenFunction &SGF;
-    Expr *Loc;
+    ForceTryExpr *Loc;
     JumpDest OldThrowDest;
 
   public:
-    ForceTryEmission(SILGenFunction &SGF, Expr *loc);
+    ForceTryEmission(SILGenFunction &SGF, ForceTryExpr *loc);
 
     ForceTryEmission(const ForceTryEmission &) = delete;
     ForceTryEmission &operator=(const ForceTryEmission &) = delete;
