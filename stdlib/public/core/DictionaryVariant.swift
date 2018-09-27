@@ -154,8 +154,8 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inlinable
   internal var startIndex: Index {
     switch self {
-    case .native:
-      return Index(_native: asNative.startIndex)
+    case .native(let native):
+      return native.startIndex
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       cocoaPath()
@@ -167,8 +167,8 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inlinable
   internal var endIndex: Index {
     switch self {
-    case .native:
-      return Index(_native: asNative.endIndex)
+    case .native(let native):
+      return native.endIndex
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       cocoaPath()
@@ -178,14 +178,14 @@ extension Dictionary._Variant: _DictionaryBuffer {
   }
 
   @inlinable
-  internal func index(after i: Index) -> Index {
+  internal func index(after index: Index) -> Index {
     switch self {
-    case .native:
-      return Index(_native: asNative.index(after: i._asNative))
+    case .native(let native):
+      return native.index(after: index)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       cocoaPath()
-      return Index(_cocoa: cocoa.index(after: i._asCocoa))
+      return Index(_cocoa: cocoa.index(after: index._asCocoa))
 #endif
     }
   }
@@ -194,9 +194,8 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inline(__always)
   internal func index(forKey key: Key) -> Index? {
     switch self {
-    case .native:
-      guard let index = asNative.index(forKey: key) else { return nil }
-      return Index(_native: index)
+    case .native(let native):
+      return native.index(forKey: key)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       cocoaPath()
@@ -212,8 +211,8 @@ extension Dictionary._Variant: _DictionaryBuffer {
     @inline(__always)
     get {
       switch self {
-      case .native:
-        return asNative.count
+      case .native(let native):
+        return native.count
 #if _runtime(_ObjC)
       case .cocoa(let cocoa):
         cocoaPath()
@@ -227,8 +226,8 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inline(__always)
   func contains(_ key: Key) -> Bool {
     switch self {
-    case .native:
-      return asNative.contains(key)
+    case .native(let native):
+      return native.contains(key)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       cocoaPath()
@@ -242,8 +241,8 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inline(__always)
   func lookup(_ key: Key) -> Value? {
     switch self {
-    case .native:
-      return asNative.lookup(key)
+    case .native(let native):
+      return native.lookup(key)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       cocoaPath()
@@ -258,8 +257,8 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inline(__always)
   func lookup(_ index: Index) -> (key: Key, value: Value) {
     switch self {
-    case .native:
-      return asNative.lookup(index._asNative)
+    case .native(let native):
+      return native.lookup(index)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       cocoaPath()
@@ -275,8 +274,8 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inline(__always)
   func key(at index: Index) -> Key {
     switch self {
-    case .native:
-      return asNative.key(at: index._asNative)
+    case .native(let native):
+      return native.key(at: index)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       cocoaPath()
@@ -290,8 +289,8 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inline(__always)
   func value(at index: Index) -> Value {
     switch self {
-    case .native:
-      return asNative.value(at: index._asNative)
+    case .native(let native):
+      return native.value(at: index)
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       cocoaPath()

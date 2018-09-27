@@ -250,7 +250,7 @@ extension _NativeDictionary { // ensureUnique
 extension _NativeDictionary {
   @inlinable
   @inline(__always)
-  func validatedBucket(for index: Index) -> Bucket {
+  func validatedBucket(for index: _HashTable.Index) -> Bucket {
     _precondition(hashTable.isOccupied(index.bucket) && index.age == age,
       "Attempting to access Dictionary elements using an invalid index")
     return index.bucket
@@ -270,8 +270,9 @@ extension _NativeDictionary {
       // age.
       if cocoa.age == self.age {
         let key = _forceBridgeFromObjectiveC(cocoa.key, Key.self)
-        if let index = self.index(forKey: key) {
-          return index.bucket
+        let (bucket, found) = find(key)
+        if found {
+          return bucket
         }
       }
       _preconditionFailure(
@@ -283,25 +284,26 @@ extension _NativeDictionary {
 
 extension _NativeDictionary: _DictionaryBuffer {
   @usableFromInline
-  internal typealias Index = _HashTable.Index
+  internal typealias Index = Dictionary<Key, Value>.Index
 
   @inlinable
   internal var startIndex: Index {
     let bucket = hashTable.startBucket
-    return Index(bucket: bucket, age: age)
+    return Index(_native: _HashTable.Index(bucket: bucket, age: age))
   }
 
   @inlinable
   internal var endIndex: Index {
     let bucket = hashTable.endBucket
-    return Index(bucket: bucket, age: age)
+    return Index(_native: _HashTable.Index(bucket: bucket, age: age))
   }
 
   @inlinable
   internal func index(after index: Index) -> Index {
-    let bucket = validatedBucket(for: index)
+    // Note that _asNative forces this not to work on Cocoa indices.
+    let bucket = validatedBucket(for: index._asNative)
     let next = hashTable.occupiedBucket(after: bucket)
-    return Index(bucket: next, age: age)
+    return Index(_native: _HashTable.Index(bucket: next, age: age))
   }
 
   @inlinable
@@ -312,7 +314,7 @@ extension _NativeDictionary: _DictionaryBuffer {
     }
     let (bucket, found) = find(key)
     guard found else { return nil }
-    return Index(bucket: bucket, age: age)
+    return Index(_native: _HashTable.Index(bucket: bucket, age: age))
   }
 
   @inlinable

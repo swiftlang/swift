@@ -1721,7 +1721,7 @@ extension Dictionary {
     @_frozen
     @usableFromInline
     internal enum _Variant {
-      case native(_NativeDictionary<Key, Value>.Index)
+      case native(_HashTable.Index)
 #if _runtime(_ObjC)
       case cocoa(_CocoaDictionary.Index)
 #endif
@@ -1738,7 +1738,7 @@ extension Dictionary {
 
     @inlinable
     @inline(__always)
-    internal init(_native index: _NativeDictionary<Key, Value>.Index) {
+    internal init(_native index: _HashTable.Index) {
       self.init(_variant: .native(index))
     }
 
@@ -1770,7 +1770,7 @@ extension Dictionary.Index {
 #endif
 
   @usableFromInline @_transparent
-  internal var _asNative: _NativeDictionary<Key, Value>.Index {
+  internal var _asNative: _HashTable.Index {
     switch _variant {
     case .native(let nativeIndex):
       return nativeIndex
