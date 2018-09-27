@@ -55,7 +55,7 @@ public struct _FDInputStream {
       (_buffer) in
       let addr = _buffer.baseAddress! + self._bufferUsed
       let size = bufferFree
-      return _stdlib_read(fd, addr, size)
+      return _swift_stdlib_read(fd, addr, size)
     }
     if readResult == 0 {
       isEOF = true
@@ -71,7 +71,7 @@ public struct _FDInputStream {
     if isClosed {
       return
     }
-    let result = _stdlib_close(fd)
+    let result = _swift_stdlib_close(fd)
     if result < 0 {
       fatalError("close() returned an error")
     }
@@ -104,7 +104,7 @@ public struct _FDOutputStream : TextOutputStream {
       var writtenBytes = 0
       let bufferSize = utf8CStr.count - 1
       while writtenBytes != bufferSize {
-        let result = _stdlib_write(
+        let result = _swift_stdlib_write(
           self.fd, UnsafeRawPointer(utf8CStr.baseAddress! + Int(writtenBytes)),
           bufferSize - writtenBytes)
         if result < 0 {
@@ -119,7 +119,7 @@ public struct _FDOutputStream : TextOutputStream {
     if isClosed {
       return
     }
-    let result = _stdlib_close(fd)
+    let result = _swift_stdlib_close(fd)
     if result < 0 {
       fatalError("close() returned an error")
     }

@@ -115,8 +115,8 @@ static swift::_SwiftHashingParameters initializeHashingParameters() {
     return { 0, 0, true };
   }
   __swift_uint64_t seed0 = 0, seed1 = 0;
-  swift::_stdlib_random(&seed0, sizeof(seed0));
-  swift::_stdlib_random(&seed1, sizeof(seed1));
+  swift::_swift_stdlib_random(&seed0, sizeof(seed0));
+  swift::_swift_stdlib_random(&seed1, sizeof(seed1));
   return { seed0, seed1, false };
 }
 

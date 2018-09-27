@@ -66,86 +66,86 @@ typedef __swift_uint16_t __swift_mode_t;
 
 // General utilities <stdlib.h>
 // Memory management functions
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void _stdlib_free(void *ptr);
+SWIFT_RUNTIME_STDLIB_SPI
+void _swift_stdlib_free(void *ptr);
 
 // Input/output <stdio.h>
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_putchar_unlocked(int c);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_size_t _stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
+SWIFT_RUNTIME_STDLIB_SPI
+int _swift_stdlib_putchar_unlocked(int c);
+SWIFT_RUNTIME_STDLIB_SPI
+__swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
                                      __swift_size_t nitems);
 
 // String handling <string.h>
-SWIFT_READONLY SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_size_t _stdlib_strlen(const char *s);
+SWIFT_READONLY SWIFT_RUNTIME_STDLIB_SPI
+__swift_size_t _swift_stdlib_strlen(const char *s);
 
-SWIFT_READONLY SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_size_t _stdlib_strlen_unsigned(const unsigned char *s);
+SWIFT_READONLY SWIFT_RUNTIME_STDLIB_SPI
+__swift_size_t _swift_stdlib_strlen_unsigned(const unsigned char *s);
 
 SWIFT_READONLY
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_memcmp(const void *s1, const void *s2, __swift_size_t n);
+SWIFT_RUNTIME_STDLIB_SPI
+int _swift_stdlib_memcmp(const void *s1, const void *s2, __swift_size_t n);
 
 // <unistd.h>
-SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_ssize_t _stdlib_read(int fd, void *buf, __swift_size_t nbyte);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_ssize_t _stdlib_write(int fd, const void *buf, __swift_size_t nbyte);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_close(int fd);
+SWIFT_RUNTIME_STDLIB_SPI
+__swift_ssize_t _swift_stdlib_read(int fd, void *buf, __swift_size_t nbyte);
+SWIFT_RUNTIME_STDLIB_SPI
+__swift_ssize_t _swift_stdlib_write(int fd, const void *buf, __swift_size_t nbyte);
+SWIFT_RUNTIME_STDLIB_SPI
+int _swift_stdlib_close(int fd);
 
 // Semaphores <semaphore.h>
 #if !defined(_WIN32) || defined(__CYGWIN__)
 // We can't use sem_t itself here, nor is there a platform-consistent
 // definition to copy for a __swift_sem_t type. Instead we use
 // void* in place of sem_t* and cast it back on the Swift side.
-SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_RUNTIME_STDLIB_SPI
 void *_stdlib_sem_open2(const char *name, int oflag);
-SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_RUNTIME_STDLIB_SPI
 void *_stdlib_sem_open4(const char *name, int oflag,
                         __swift_mode_t mode, unsigned int value);
 #endif
 
 // File control <fcntl.h>
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_open(const char *path, int oflag, __swift_mode_t mode);
+SWIFT_RUNTIME_STDLIB_SPI
+int _swift_stdlib_open(const char *path, int oflag, __swift_mode_t mode);
 #if !defined(_WIN32) || defined(__CYGWIN__)
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_openat(int fd, const char *path, int oflag, __swift_mode_t mode);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_fcntl(int fd, int cmd, int value);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_fcntlPtr(int fd, int cmd, void* ptr);
+SWIFT_RUNTIME_STDLIB_SPI
+int _swift_stdlib_openat(int fd, const char *path, int oflag, __swift_mode_t mode);
+SWIFT_RUNTIME_STDLIB_SPI
+int _swift_stdlib_fcntl(int fd, int cmd, int value);
+SWIFT_RUNTIME_STDLIB_SPI
+int _swift_stdlib_fcntlPtr(int fd, int cmd, void* ptr);
 #endif
 
 // I/O control <ioctl.h>
 #if !defined(_WIN32) || defined(__CYGWIN__)
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_ioctl(int fd, unsigned long int request, int value);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_ioctlPtr(int fd, unsigned long int request, void* ptr);
+SWIFT_RUNTIME_STDLIB_SPI
+int _swift_stdlib_ioctl(int fd, unsigned long int request, int value);
+SWIFT_RUNTIME_STDLIB_SPI
+int _swift_stdlib_ioctlPtr(int fd, unsigned long int request, void* ptr);
 #endif
 
 // Environment
 #if defined(__APPLE__) || defined(__FreeBSD__)
-SWIFT_RUNTIME_STDLIB_INTERNAL
-char * _Nullable * _Null_unspecified _stdlib_getEnviron();
+SWIFT_RUNTIME_STDLIB_SPI
+char * _Nullable * _Null_unspecified _swift_stdlib_getEnviron();
 #endif
 
 // System error numbers <errno.h>
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int _stdlib_getErrno();
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void _stdlib_setErrno(int value);
+SWIFT_RUNTIME_STDLIB_SPI
+int _swift_stdlib_getErrno();
+SWIFT_RUNTIME_STDLIB_SPI
+void _swift_stdlib_setErrno(int value);
 
 // Non-standard extensions
-SWIFT_READNONE SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_size_t _stdlib_malloc_size(const void *ptr);
+SWIFT_READNONE SWIFT_RUNTIME_STDLIB_SPI
+__swift_size_t _swift_stdlib_malloc_size(const void *ptr);
 
 // Random number for stdlib
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void _stdlib_random(void *buf, __swift_size_t nbytes);
+SWIFT_RUNTIME_STDLIB_SPI
+void _swift_stdlib_random(void *buf, __swift_size_t nbytes);
 
 // Math library functions
 static inline SWIFT_ALWAYS_INLINE

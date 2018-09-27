@@ -60,13 +60,13 @@ static_assert(std::is_same<mode_t, swift::__swift_mode_t>::value,
               "__swift_mode_t must be defined as equivalent to mode_t in LibcShims.h");
 #endif
 
-SWIFT_RUNTIME_STDLIB_API
-void swift::_stdlib_free(void *ptr) {
+SWIFT_RUNTIME_STDLIB_SPI
+void swift::_swift_stdlib_free(void *ptr) {
   free(ptr);
 }
 
-SWIFT_RUNTIME_STDLIB_API
-int swift::_stdlib_putchar_unlocked(int c) {
+SWIFT_RUNTIME_STDLIB_SPI
+int swift::_swift_stdlib_putchar_unlocked(int c) {
 #if defined(_WIN32)
   return _putc_nolock(c, stdout);
 #else
@@ -74,32 +74,32 @@ int swift::_stdlib_putchar_unlocked(int c) {
 #endif
 }
 
-SWIFT_RUNTIME_STDLIB_API
-__swift_size_t swift::_stdlib_fwrite_stdout(const void *ptr,
-                                         __swift_size_t size,
-                                         __swift_size_t nitems) {
+SWIFT_RUNTIME_STDLIB_SPI
+__swift_size_t swift::_swift_stdlib_fwrite_stdout(const void *ptr,
+                                                  __swift_size_t size,
+                                                  __swift_size_t nitems) {
     return fwrite(ptr, size, nitems, stdout);
 }
 
-SWIFT_RUNTIME_STDLIB_API
-__swift_size_t swift::_stdlib_strlen(const char *s) {
+SWIFT_RUNTIME_STDLIB_SPI
+__swift_size_t swift::_swift_stdlib_strlen(const char *s) {
     return strlen(s);
 }
 
-SWIFT_RUNTIME_STDLIB_API
-__swift_size_t swift::_stdlib_strlen_unsigned(const unsigned char *s) {
+SWIFT_RUNTIME_STDLIB_SPI
+__swift_size_t swift::_swift_stdlib_strlen_unsigned(const unsigned char *s) {
   return strlen(reinterpret_cast<const char *>(s));
 }
 
-SWIFT_RUNTIME_STDLIB_API
-int swift::_stdlib_memcmp(const void *s1, const void *s2,
-                       __swift_size_t n) {
+SWIFT_RUNTIME_STDLIB_SPI
+int swift::_swift_stdlib_memcmp(const void *s1, const void *s2,
+                                __swift_size_t n) {
   return memcmp(s1, s2, n);
 }
 
-SWIFT_RUNTIME_STDLIB_API
+SWIFT_RUNTIME_STDLIB_SPI
 __swift_ssize_t
-swift::_stdlib_read(int fd, void *buf, __swift_size_t nbyte) {
+swift::_swift_stdlib_read(int fd, void *buf, __swift_size_t nbyte) {
 #if defined(_WIN32)
   return _read(fd, buf, nbyte);
 #else
@@ -107,9 +107,9 @@ swift::_stdlib_read(int fd, void *buf, __swift_size_t nbyte) {
 #endif
 }
 
-SWIFT_RUNTIME_STDLIB_API
+SWIFT_RUNTIME_STDLIB_SPI
 __swift_ssize_t
-swift::_stdlib_write(int fd, const void *buf, __swift_size_t nbyte) {
+swift::_swift_stdlib_write(int fd, const void *buf, __swift_size_t nbyte) {
 #if defined(_WIN32)
   return _write(fd, buf, nbyte);
 #else
@@ -117,8 +117,8 @@ swift::_stdlib_write(int fd, const void *buf, __swift_size_t nbyte) {
 #endif
 }
 
-SWIFT_RUNTIME_STDLIB_API
-int swift::_stdlib_close(int fd) {
+SWIFT_RUNTIME_STDLIB_SPI
+int swift::_swift_stdlib_close(int fd) {
 #if defined(_WIN32)
   return _close(fd);
 #else
@@ -130,65 +130,65 @@ int swift::_stdlib_close(int fd) {
 #if defined(_WIN32) && !defined(__CYGWIN__)
 // Windows
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int swift::_stdlib_open(const char *path, int oflag, __swift_mode_t mode) {
+SWIFT_RUNTIME_STDLIB_SPI
+int swift::_swift_stdlib_open(const char *path, int oflag, __swift_mode_t mode) {
   return _open(path, oflag, static_cast<int>(mode));
 }
 
 #else
 // not Windows
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int swift::_stdlib_open(const char *path, int oflag, __swift_mode_t mode) {
+SWIFT_RUNTIME_STDLIB_SPI
+int swift::_swift_stdlib_open(const char *path, int oflag, __swift_mode_t mode) {
   return open(path, oflag, mode);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int swift::_stdlib_openat(int fd, const char *path, int oflag,
-                          __swift_mode_t mode) {
+SWIFT_RUNTIME_STDLIB_SPI
+int swift::_swift_stdlib_openat(int fd, const char *path, int oflag,
+                                __swift_mode_t mode) {
   return openat(fd, path, oflag, mode);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_RUNTIME_STDLIB_SPI
 void *swift::_stdlib_sem_open2(const char *name, int oflag) {
   return sem_open(name, oflag);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_RUNTIME_STDLIB_SPI
 void *swift::_stdlib_sem_open4(const char *name, int oflag,
                                __swift_mode_t mode, unsigned int value) {
   return sem_open(name, oflag, mode, value);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int swift::_stdlib_fcntl(int fd, int cmd, int value) {
+SWIFT_RUNTIME_STDLIB_SPI
+int swift::_swift_stdlib_fcntl(int fd, int cmd, int value) {
   return fcntl(fd, cmd, value);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int swift::_stdlib_fcntlPtr(int fd, int cmd, void* ptr) {
+SWIFT_RUNTIME_STDLIB_SPI
+int swift::_swift_stdlib_fcntlPtr(int fd, int cmd, void* ptr) {
   return fcntl(fd, cmd, ptr);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int swift::_stdlib_ioctl(int fd, unsigned long int request, int value) {
+SWIFT_RUNTIME_STDLIB_SPI
+int swift::_swift_stdlib_ioctl(int fd, unsigned long int request, int value) {
   return ioctl(fd, request, value);
 }
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int swift::_stdlib_ioctlPtr(int fd, unsigned long int request, void* ptr) {
+SWIFT_RUNTIME_STDLIB_SPI
+int swift::_swift_stdlib_ioctlPtr(int fd, unsigned long int request, void* ptr) {
   return ioctl(fd, request, ptr);
 }
 
 #if defined(__FreeBSD__)
-SWIFT_RUNTIME_STDLIB_INTERNAL
-char * _Nullable * _Null_unspecified swift::_stdlib_getEnviron() {
+SWIFT_RUNTIME_STDLIB_SPI
+char * _Nullable * _Null_unspecified swift::_swift_stdlib_getEnviron() {
   extern char **environ;
   return environ;
 }
 #elif defined(__APPLE__)
-SWIFT_RUNTIME_STDLIB_INTERNAL
-char * _Nullable *swift::_stdlib_getEnviron() {
+SWIFT_RUNTIME_STDLIB_SPI
+char * _Nullable *swift::_swift_stdlib_getEnviron() {
   extern char * _Nullable **_NSGetEnviron(void);
   return *_NSGetEnviron();
 }
@@ -196,20 +196,20 @@ char * _Nullable *swift::_stdlib_getEnviron() {
 
 #endif // !(defined(_WIN32) && !defined(__CYGWIN__))
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-int swift::_stdlib_getErrno() {
+SWIFT_RUNTIME_STDLIB_SPI
+int swift::_swift_stdlib_getErrno() {
   return errno;
 }
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void swift::_stdlib_setErrno(int value) {
+SWIFT_RUNTIME_STDLIB_SPI
+void swift::_swift_stdlib_setErrno(int value) {
   errno = value;
 }
 
 #if defined(__APPLE__)
 #include <malloc/malloc.h>
-SWIFT_RUNTIME_STDLIB_API
-size_t swift::_stdlib_malloc_size(const void *ptr) {
+SWIFT_RUNTIME_STDLIB_SPI
+size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
   return malloc_size(ptr);
 }
 #elif defined(__GNU_LIBRARY__) || defined(__CYGWIN__) || defined(__ANDROID__) || defined(__HAIKU__)
@@ -217,27 +217,27 @@ size_t swift::_stdlib_malloc_size(const void *ptr) {
 #define _GNU_SOURCE
 #endif
 #include <malloc.h>
-SWIFT_RUNTIME_STDLIB_API
-size_t swift::_stdlib_malloc_size(const void *ptr) {
+SWIFT_RUNTIME_STDLIB_SPI
+size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
   return malloc_usable_size(const_cast<void *>(ptr));
 }
 #elif defined(_WIN32)
 #include <malloc.h>
-SWIFT_RUNTIME_STDLIB_API
-size_t swift::_stdlib_malloc_size(const void *ptr) {
+SWIFT_RUNTIME_STDLIB_SPI
+size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
   return _msize(const_cast<void *>(ptr));
 }
 #elif defined(__FreeBSD__)
 #include <malloc_np.h>
-SWIFT_RUNTIME_STDLIB_API
-size_t swift::_stdlib_malloc_size(const void *ptr) {
+SWIFT_RUNTIME_STDLIB_SPI
+size_t swift::_swift_stdlib_malloc_size(const void *ptr) {
   return malloc_usable_size(const_cast<void *>(ptr));
 }
 #else
 #error No malloc_size analog known for this platform/libc.
 #endif
 
-// _stdlib_random
+// _swift_stdlib_random
 //
 // Should the implementation of this function add a new platform/change for a
 // platform, make sure to also update the documentation regarding platform
@@ -246,16 +246,16 @@ size_t swift::_stdlib_malloc_size(const void *ptr) {
 
 #if defined(__APPLE__)
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
+SWIFT_RUNTIME_STDLIB_SPI
+void swift::_swift_stdlib_random(void *buf, __swift_size_t nbytes) {
   arc4random_buf(buf, nbytes);
 }
 
 #elif defined(_WIN32) && !defined(__CYGWIN__)
-#warning TODO: Test _stdlib_random on Windows
+#warning TODO: Test _swift_stdlib_random on Windows
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
+SWIFT_RUNTIME_STDLIB_SPI
+void swift::_swift_stdlib_random(void *buf, __swift_size_t nbytes) {
   NTSTATUS status = BCryptGenRandom(nullptr,
                                     static_cast<PUCHAR>(buf),
                                     static_cast<ULONG>(nbytes),
@@ -274,8 +274,8 @@ void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
   result;                                                                      \
 })
 
-SWIFT_RUNTIME_STDLIB_INTERNAL
-void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
+SWIFT_RUNTIME_STDLIB_SPI
+void swift::_swift_stdlib_random(void *buf, __swift_size_t nbytes) {
   while (nbytes > 0) {
     __swift_ssize_t actual_nbytes = -1;
 
@@ -296,12 +296,12 @@ void swift::_stdlib_random(void *buf, __swift_size_t nbytes) {
 
     if (actual_nbytes == -1) {
       static const int fd = 
-        WHILE_EINTR(_stdlib_open("/dev/urandom", O_RDONLY | O_CLOEXEC, 0));
+        WHILE_EINTR(_swift_stdlib_open("/dev/urandom", O_RDONLY | O_CLOEXEC, 0));
         
       if (fd != -1) {
         static StaticMutex mutex;
         mutex.withLock([&] {
-          actual_nbytes = WHILE_EINTR(_stdlib_read(fd, buf, nbytes));
+          actual_nbytes = WHILE_EINTR(_swift_stdlib_read(fd, buf, nbytes));
         });
       }
     }

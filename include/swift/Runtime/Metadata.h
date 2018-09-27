@@ -812,7 +812,7 @@ void swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
 /// Return the superclass, if any.  The result is nullptr for root
 /// classes and class protocol types.
 SWIFT_CC(swift)
-SWIFT_RUNTIME_STDLIB_API
+SWIFT_RUNTIME_STDLIB_INTERNAL
 const Metadata *_swift_class_getSuperclass(const Metadata *theClass);
 
 #if !NDEBUG
