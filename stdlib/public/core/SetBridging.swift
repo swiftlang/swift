@@ -269,7 +269,8 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
     var bucket = _HashTable.Bucket(offset: Int(theState.extra.0))
     let endBucket = hashTable.endBucket
-    _precondition(bucket == endBucket || native.hashTable.isValid(bucket))
+    _precondition(bucket == endBucket || hashTable.isOccupied(bucket),
+      "Invalid fast enumeration state")
 
     // Only need to bridge once, so we can hoist it out of the loop.
     let bridgedElements = bridgeElements()

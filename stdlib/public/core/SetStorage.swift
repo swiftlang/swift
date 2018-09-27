@@ -255,7 +255,8 @@ final internal class _SetStorage<Element: Hashable>
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
     var bucket = _HashTable.Bucket(offset: Int(theState.extra.0))
     let endBucket = hashTable.endBucket
-    _precondition(bucket == endBucket || _hashTable.isValid(bucket))
+    _precondition(bucket == endBucket || hashTable.isOccupied(bucket),
+      "Invalid fast enumeration state")
     var stored = 0
     for i in 0..<count {
       if bucket == endBucket { break }

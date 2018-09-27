@@ -403,7 +403,8 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
     var bucket = _HashTable.Bucket(offset: Int(theState.extra.0))
     let endBucket = hashTable.endBucket
-    _precondition(bucket == endBucket || hashTable.isOccupied(bucket))
+    _precondition(bucket == endBucket || hashTable.isOccupied(bucket),
+      "Invalid fast enumeration state")
     var stored = 0
 
     // Only need to bridge once, so we can hoist it out of the loop.
