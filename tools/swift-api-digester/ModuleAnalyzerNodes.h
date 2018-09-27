@@ -473,6 +473,7 @@ public:
 
 class SDKNodeDeclVar : public SDKNodeDecl {
   Optional<uint8_t> FixedBinaryOrder;
+  bool IsLet;
 public:
   SDKNodeDeclVar(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
@@ -481,6 +482,7 @@ public:
   SDKNodeDeclGetter *getGetter() const;
   SDKNodeDeclSetter *getSetter() const;
   SDKNodeType *getType() const;
+  bool isLet() const { return IsLet; }
   void jsonize(json::Output &Out) override;
 };
 

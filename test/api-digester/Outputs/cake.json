@@ -1084,6 +1084,26 @@
       ]
     },
     {
+      "kind": "Var",
+      "name": "GlobalVar",
+      "printedName": "GlobalVar",
+      "children": [
+        {
+          "kind": "TypeNominal",
+          "name": "Int",
+          "printedName": "Int",
+          "usr": "s:Si"
+        }
+      ],
+      "declKind": "Var",
+      "usr": "s:4cake9GlobalVarSivp",
+      "moduleName": "cake",
+      "declAttributes": [
+        "HasInitialValue"
+      ],
+      "isLet": true
+    },
+    {
       "kind": "TypeDecl",
       "name": "Int",
       "printedName": "Int",

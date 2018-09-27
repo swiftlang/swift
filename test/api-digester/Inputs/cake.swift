@@ -78,3 +78,5 @@ public protocol PSub: PSuper {
   associatedtype T
   func foo()
 }
+
+public let GlobalVar = 1

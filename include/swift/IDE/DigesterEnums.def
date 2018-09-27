@@ -124,6 +124,7 @@ KEY_BOOL(IsOverriding, overriding)
 KEY_BOOL(IsProtocolReq, protocolReq)
 KEY_BOOL(HasDefaultArg, hasDefaultArg)
 KEY_BOOL(HasSetter, hasSetter)
+KEY_BOOL(IsLet, isLet)
 
 KEY(kind)
 

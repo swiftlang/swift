@@ -95,7 +95,7 @@ SDKNodeDeclTypeAlias::SDKNodeDeclTypeAlias(SDKNodeInitInfo Info):
 
 SDKNodeDeclVar::SDKNodeDeclVar(SDKNodeInitInfo Info): 
   SDKNodeDecl(Info, SDKNodeKind::DeclVar),
-  FixedBinaryOrder(Info.FixedBinaryOrder) {}
+  FixedBinaryOrder(Info.FixedBinaryOrder), IsLet(Info.IsLet) {}
 
 SDKNodeDeclAbstractFunc::SDKNodeDeclAbstractFunc(SDKNodeInitInfo Info,
   SDKNodeKind Kind): SDKNodeDecl(Info, Kind), IsThrowing(Info.IsThrowing),
@@ -997,7 +997,9 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
       }
     }
   }
-
+  if (auto *VAD = dyn_cast<VarDecl>(VD)) {
+    IsLet = VAD->isLet();
+  }
   // Record whether a subscript has getter/setter.
   if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
     HasSetter = SD->getSetter();
@@ -1403,6 +1405,7 @@ void SDKNodeDeclSubscript::jsonize(json::Output &out) {
 void SDKNodeDeclVar::jsonize(json::Output &out) {
   SDKNodeDecl::jsonize(out);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_fixedbinaryorder).data(), FixedBinaryOrder);
+  output(out, KeyKind::KK_isLet, IsLet);
 }
 
 namespace swift {
