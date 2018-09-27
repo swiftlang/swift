@@ -1464,6 +1464,7 @@ extension Dictionary {
       }
       _modify {
         let index = _variant.ensureUniqueNative(preserving: position)
+        _variant.asNative.validate(index)
         let address = _variant.asNative._values + index.bucket.offset
         yield &address.pointee
         _fixLifetime(self)
