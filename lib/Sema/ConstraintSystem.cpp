@@ -1016,8 +1016,6 @@ static void bindArchetypesFromContext(
     ConstraintLocator *locatorPtr,
     const OpenedTypeMap &replacements) {
 
-  auto *genericEnv = cs.DC->getGenericEnvironmentOfContext();
-
   auto bindContextArchetype = [&](Type paramTy, Type contextTy) {
     auto found = replacements.find(cast<GenericTypeParamType>(
                                      paramTy->getCanonicalType()));
@@ -1053,7 +1051,7 @@ static void bindArchetypesFromContext(
       break;
 
     for (auto *paramTy : genericSig->getGenericParams()) {
-      Type contextTy = genericEnv->mapTypeIntoContext(paramTy);
+      Type contextTy = cs.DC->mapTypeIntoContext(paramTy);
       bindContextArchetype(paramTy, contextTy);
     }
 
