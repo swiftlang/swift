@@ -411,6 +411,16 @@ SILBasicBlock *swift::splitCriticalEdge(TermInst *T, unsigned EdgeIdx,
   return splitEdge(T, EdgeIdx, DT, LI);
 }
 
+bool swift::splitCriticalEdgesFrom(SILBasicBlock *fromBB, DominanceInfo *DT,
+                                   SILLoopInfo *LI) {
+  bool Changed = false;
+  for (unsigned idx = 0, e = fromBB->getSuccessors().size(); idx != e; ++idx) {
+    auto *NewBB = splitCriticalEdge(fromBB->getTerminator(), idx, DT, LI);
+    Changed |= (NewBB != nullptr);
+  }
+  return Changed;
+}
+
 bool swift::hasCriticalEdges(SILFunction &F, bool OnlyNonCondBr) {
   for (SILBasicBlock &BB : F) {
     // Only consider critical edges for terminators that don't support block

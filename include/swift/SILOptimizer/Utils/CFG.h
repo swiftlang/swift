@@ -76,6 +76,10 @@ SILBasicBlock *splitIfCriticalEdge(SILBasicBlock *From, SILBasicBlock *To,
                                    DominanceInfo *DT = nullptr,
                                    SILLoopInfo *LI = nullptr);
 
+/// Splits all critical edges originating from `fromBB`.
+bool splitCriticalEdgesFrom(SILBasicBlock *fromBB, DominanceInfo *DT = nullptr,
+                            SILLoopInfo *LI = nullptr);
+
 /// \brief Splits the edges between two basic blocks.
 ///
 /// Updates dominance information and loop information if not null.
