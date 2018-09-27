@@ -312,7 +312,7 @@ extension Dictionary._Variant {
   @inline(__always)
   internal mutating func mutatingFind(
     _ key: Key
-  ) -> (index: _NativeDictionary<Key, Value>.Index, found: Bool) {
+  ) -> (bucket: _NativeDictionary<Key, Value>.Bucket, found: Bool) {
     switch self {
     case .native:
       let isUnique = isUniquelyReferenced()
@@ -354,9 +354,9 @@ extension Dictionary._Variant {
       let native = _NativeDictionary<Key, Value>(cocoa)
       self = .native(native)
       let nativeKey = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
-      let (nativeIndex, found) = native.find(nativeKey)
+      let (bucket, found) = native.find(nativeKey)
       _precondition(found, "Bridging did not preserve equality")
-      return nativeIndex
+      return bucket
 #endif
     }
   }
@@ -415,19 +415,19 @@ extension Dictionary._Variant {
   internal mutating func removeValue(forKey key: Key) -> Value? {
     switch self {
     case .native:
-      let (index, found) = asNative.find(key)
+      let (bucket, found) = asNative.find(key)
       guard found else { return nil }
       let isUnique = isUniquelyReferenced()
-      return asNative.uncheckedRemove(at: index, isUnique: isUnique).value
+      return asNative.uncheckedRemove(at: bucket, isUnique: isUnique).value
 #if _runtime(_ObjC)
     case .cocoa(let cocoa):
       cocoaPath()
       let cocoaKey = _bridgeAnythingToObjectiveC(key)
       guard cocoa.lookup(cocoaKey) != nil else { return nil }
       var native = _NativeDictionary<Key, Value>(cocoa)
-      let (index, found) = native.find(key)
+      let (bucket, found) = native.find(key)
       _precondition(found, "Bridging did not preserve equality")
-      let old = native.uncheckedRemove(at: index, isUnique: true).value
+      let old = native.uncheckedRemove(at: bucket, isUnique: true).value
       self = .native(native)
       return old
 #endif
