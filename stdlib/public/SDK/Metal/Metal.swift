@@ -102,7 +102,7 @@ extension MTLDevice {
 public func MTLCopyAllDevicesWithObserver(handler: @escaping MTLDeviceNotificationHandler) -> (devices:[MTLDevice], observer:NSObject) {
     var observer: NSObjectProtocol?
     let devices = __MTLCopyAllDevicesWithObserver(&observer, handler)
-    // FIX-ME: The force cast here isn't great – ideally we would return the
+    // FIXME: The force cast here isn't great – ideally we would return the
     // observer as an NSObjectProtocol.
     return (devices, observer as! NSObject)
 }
