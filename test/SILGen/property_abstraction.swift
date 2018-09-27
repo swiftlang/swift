@@ -115,7 +115,7 @@ struct T20341012 {
     private var options: ArrayLike<Test20341012> { get {} set {} }
 
     // CHECK-LABEL: sil hidden @$s20property_abstraction9T20341012V1t{{[_0-9a-zA-Z]*}}F
-    // CHECK:         [[TMP1:%.*]] = alloc_stack $(title: (), action: @callee_guaranteed (@in_guaranteed ()) -> @out ())
+    // CHECK:         [[TMP1:%.*]] = alloc_stack $(title: (), action: @callee_guaranteed () -> @out ())
     // CHECK:         apply {{.*}}<(title: (), action: () -> ())>([[TMP1]],
     mutating func t() {
         _ = self.options[()].title

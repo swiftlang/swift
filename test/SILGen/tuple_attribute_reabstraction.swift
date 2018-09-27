@@ -16,7 +16,7 @@ public func f() {
 
 // We shouldn't have @autoclosure and @escaping attributes in the lowered tuple type:
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$sIg_Ieg_Iegyg_ytytIgnr__ytytIegnr_tytIegnr_TR : $@convention(thin) (@in_guaranteed (@noescape @callee_guaranteed (@in_guaranteed ()) -> @out (), @callee_guaranteed (@in_guaranteed ()) -> @out ()), @guaranteed @callee_guaranteed (@noescape @callee_guaranteed () -> (), @guaranteed @callee_guaranteed () -> ()) -> ()) -> @out ()
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$sIg_Ieg_Iegyg_ytIgr_ytIegr_ytIegnnr_TR : $@convention(thin) (@in_guaranteed @noescape @callee_guaranteed () -> @out (), @in_guaranteed @callee_guaranteed () -> @out (), @guaranteed @callee_guaranteed (@noescape @callee_guaranteed () -> (), @guaranteed @callee_guaranteed () -> ()) -> ()) -> @out ()
 
 // The one-element vararg tuple ([Int]...) should be exploded and not treated as opaque,
 // even though its materializable:

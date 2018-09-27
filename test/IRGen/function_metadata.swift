@@ -25,7 +25,7 @@ func test_arch() {
   arch({(x: (Int, Float)) -> () in })
 
   // CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden swiftcc %swift.metadata_response @"$sySiz_SitcMa"
-  // CHECK: call %swift.type* @swift_getFunctionTypeMetadata([[WORD]] 100663298, %swift.type** {{%.*}}, i32* getelementptr inbounds ([2 x i32], [2 x i32]* @parameter-flags.17, i32 0, i32 0), %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sytN", i32 0, i32 1))
+  // CHECK: call %swift.type* @swift_getFunctionTypeMetadata([[WORD]] 100663298, %swift.type** {{%.*}}, i32* getelementptr inbounds ([2 x i32], [2 x i32]* @parameter-flags.16, i32 0, i32 0), %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sytN", i32 0, i32 1))
   arch({(x: inout Int, y: Int) -> () in })
 
   // CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden swiftcc %swift.metadata_response @"$sySf_SitcMa"
@@ -33,7 +33,7 @@ func test_arch() {
   arch({(a: Float, b: Int) -> () in })
 
   // CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden swiftcc %swift.metadata_response @"$sySiz_SfSStcMa"
-  // CHECK: call %swift.type* @swift_getFunctionTypeMetadata([[WORD]] 100663299, %swift.type** {{%.*}}, i32* getelementptr inbounds ([3 x i32], [3 x i32]* @parameter-flags.24, i32 0, i32 0), %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sytN", i32 0, i32 1))
+  // CHECK: call %swift.type* @swift_getFunctionTypeMetadata([[WORD]] 100663299, %swift.type** {{%.*}}, i32* getelementptr inbounds ([3 x i32], [3 x i32]* @parameter-flags.23, i32 0, i32 0), %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sytN", i32 0, i32 1))
   arch({(x: inout Int, y: Float, z: String) -> () in })
 
   // CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden swiftcc %swift.metadata_response @"$sySf_SfSitcMa"

@@ -260,7 +260,7 @@ entry:
 
   %k = keypath $KeyPath<S, Int>, (root $S; gettable_property $Int, id @k_id : $@convention(thin) () -> (), getter @k_get : $@convention(thin) (@in_guaranteed S) -> @out Int)
   %l = keypath $KeyPath<C, Int>, (root $C; settable_property $Int, id #C.w!getter.1, getter @l_get : $@convention(thin) (@in_guaranteed C) -> @out Int, setter @l_set : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ())
-  %m = keypath $KeyPath<S, () -> ()>, (root $S; settable_property $() -> (), id ##S.reabstracted, getter @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed (@in_guaranteed ()) -> @out (), setter @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed (@in_guaranteed ()) -> @out (), @inout S) -> ())
+  %m = keypath $KeyPath<S, () -> ()>, (root $S; settable_property $() -> (), id ##S.reabstracted, getter @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed () -> @out (), setter @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed () -> @out (), @inout S) -> ())
 
   return undef : $()
 }
@@ -271,8 +271,8 @@ sil @k_get : $@convention(thin) (@in_guaranteed S) -> @out Int
 sil @l_get : $@convention(thin) (@in_guaranteed C) -> @out Int
 sil @l_set : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ()
 
-sil @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed (@in_guaranteed ()) -> @out ()
-sil @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed (@in_guaranteed ()) -> @out (), @inout S) -> ()
+sil @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed () -> @out ()
+sil @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed () -> @out (), @inout S) -> ()
 
 struct Gen<T, U> {
   var x: T

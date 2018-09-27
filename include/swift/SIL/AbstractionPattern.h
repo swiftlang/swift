@@ -34,8 +34,7 @@ namespace clang {
 namespace swift {
 namespace Lowering {
 
-/// A pattern for the abstraction of a value.  See the large comment
-/// in SILGenPoly.cpp.
+/// A pattern for the abstraction of a value.
 ///
 /// The representation of values in Swift can vary according to how
 /// their type is abstracted: which is to say, according to the pattern
@@ -93,32 +92,20 @@ namespace Lowering {
 /// this representation when made abstract.  Unfortunately, there
 /// are a lot of obvious situations where this is sub-optimal:
 /// for example, in totally non-generic code that just passes around
-/// a value of type (Int,Int)->Bool.  It's particularly bad because
-/// Swift functions take multiple arguments as just a tuple, and that
-/// tuple is usually abstractable: e.g., '<' above could also be
-/// passed to this:
-///   func fred<T>(f : T -> Bool)
+/// a value of type (Int,Int)->Bool.
 ///
 /// 3. Permit the representation of values to vary by abstraction.
 /// Values require coercion when changing abstraction patterns.
-/// For example, the argument to 'fred' would be expected to return
-/// its Bool result directly but take a single T parameter indirectly.
+/// For example, the argument to 'bar' would be expected to return
+/// its Bool result directly but take the T and U parameters indirectly.
 /// When '<' is passed to this, what must actually be passed is a
-/// thunk that expects a tuple of type (Int,Int) to be stored at
-/// the input address.
+/// thunk that loads both indirect parameters before calling '<'.
 ///
 /// There is one major risk with (3): naively implemented, a single
 /// function value which undergoes many coercions could build up a
 /// linear number of re-abstraction thunks.  However, this can be
 /// solved dynamically by applying thunks with a runtime function that
 /// can recognize and bypass its own previous handiwork.
-///
-/// There is one major exception to what sub-expressions in a type
-/// expression can be abstracted with type variables: a type substitution
-/// must always be materializable.  For example:
-///   func f(inout Int, Int) -> Bool
-/// 'f' cannot be passed to 'foo' above: T=inout Int is not a legal
-/// substitution.  Nor can it be passed to 'fred'.
 ///
 /// In general, abstraction patterns are derived from some explicit
 /// type expression, such as the written type of a variable or
@@ -129,24 +116,25 @@ namespace Lowering {
 /// not provide structure at the appropriate level, i.e. when that
 /// level is substituted in: when the original type is merely T.  In
 /// these cases, we must devolve to a representation which all legal
-/// substitutors will agree upon.  In general, this is the
-/// representation of the type which replaces all materializable
-/// sub-expressions with a fresh type variable.
+/// substitutors will agree upon.
 ///
-/// For example, when applying the substitution
-///   T=(Int,Int)->Bool
-/// values of T are abstracted as if they were of type U->V, i.e.
-/// taking one indirect parameter and returning one indirect result.
+/// The most general type of a function type replaces all parameters and the
+/// result with fresh, unrestricted generic parameters.
 ///
-/// But under the substitution
-///   T=(inout Int,Int)->Bool
-/// values of T are abstracted as if they were of type (inout U,V)->W,
-/// i.e. taking one parameter inout, another indirectly, and returning
-/// one indirect result.
+/// That is, if we have a substituted function type:
 ///
-/// An abstraction pattern is represented with an original,
-/// unsubstituted type.  The archetypes or generic parameters
-/// naturally fall at exactly the specified abstraction points.
+///   (UnicodeScalar, (Int, Float), Double) -> (Bool, String)
+///
+/// then its most general form is
+///
+///   (A, B, C) -> D
+///
+/// because there is a valid substitution
+///   A := UnicodeScalar
+///   B := (Int, Float)
+///   C := Double
+///   D := (Bool, String)
+///
 class AbstractionPattern {
   enum class Kind {
     /// A type reference.  OrigType is valid.
