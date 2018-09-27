@@ -32,8 +32,7 @@
             {
               "kind": "TypeNominal",
               "name": "Void",
-              "printedName": "()",
-              "usr": ""
+              "printedName": "()"
             }
           ],
           "declKind": "Func",
@@ -49,8 +48,7 @@
             {
               "kind": "TypeNominal",
               "name": "Void",
-              "printedName": "()",
-              "usr": ""
+              "printedName": "()"
             }
           ],
           "declKind": "Func",
@@ -71,8 +69,7 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Void",
-                  "printedName": "()",
-                  "usr": ""
+                  "printedName": "()"
                 }
               ]
             }
@@ -128,20 +125,17 @@
                 {
                   "kind": "TypeNominal",
                   "name": "GenericTypeParam",
-                  "printedName": "T1",
-                  "usr": ""
+                  "printedName": "T1"
                 },
                 {
                   "kind": "TypeNominal",
                   "name": "GenericTypeParam",
-                  "printedName": "T2",
-                  "usr": ""
+                  "printedName": "T2"
                 },
                 {
                   "kind": "TypeNominal",
                   "name": "GenericTypeParam",
-                  "printedName": "T3",
-                  "usr": ""
+                  "printedName": "T3"
                 }
               ],
               "usr": "s:4cake2C0C"
@@ -161,8 +155,7 @@
             {
               "kind": "TypeNominal",
               "name": "Void",
-              "printedName": "()",
-              "usr": ""
+              "printedName": "()"
             }
           ],
           "declKind": "Func",
@@ -178,8 +171,7 @@
             {
               "kind": "TypeNominal",
               "name": "Void",
-              "printedName": "()",
-              "usr": ""
+              "printedName": "()"
             }
           ],
           "declKind": "Func",
@@ -242,8 +234,7 @@
             {
               "kind": "TypeNominal",
               "name": "Void",
-              "printedName": "()",
-              "usr": ""
+              "printedName": "()"
             }
           ],
           "declKind": "Func",
@@ -259,8 +250,7 @@
             {
               "kind": "TypeNominal",
               "name": "WeakStorage",
-              "printedName": "C1?",
-              "usr": ""
+              "printedName": "C1?"
             },
             {
               "kind": "Getter",
@@ -298,8 +288,7 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Void",
-                  "printedName": "()",
-                  "usr": ""
+                  "printedName": "()"
                 },
                 {
                   "kind": "TypeNominal",
@@ -342,8 +331,7 @@
             {
               "kind": "TypeNominal",
               "name": "UnownedStorage",
-              "printedName": "C1",
-              "usr": ""
+              "printedName": "C1"
             },
             {
               "kind": "Getter",
@@ -373,8 +361,7 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Void",
-                  "printedName": "()",
-                  "usr": ""
+                  "printedName": "()"
                 },
                 {
                   "kind": "TypeNominal",
@@ -436,8 +423,7 @@
         {
           "kind": "TypeNominal",
           "name": "Void",
-          "printedName": "()",
-          "usr": ""
+          "printedName": "()"
         },
         {
           "kind": "TypeNominal",
@@ -465,8 +451,7 @@
         {
           "kind": "TypeNominal",
           "name": "Void",
-          "printedName": "()",
-          "usr": ""
+          "printedName": "()"
         },
         {
           "kind": "TypeNominal",
@@ -523,11 +508,9 @@
                           "printedName": "Number",
                           "usr": "s:4cake6NumberO"
                         }
-                      ],
-                      "usr": ""
+                      ]
                     }
-                  ],
-                  "usr": ""
+                  ]
                 }
               ]
             }
@@ -596,8 +579,7 @@
             {
               "kind": "TypeNominal",
               "name": "Void",
-              "printedName": "()",
-              "usr": ""
+              "printedName": "()"
             },
             {
               "kind": "TypeNominal",
@@ -701,8 +683,7 @@
         {
           "kind": "TypeNominal",
           "name": "Void",
-          "printedName": "()",
-          "usr": ""
+          "printedName": "()"
         },
         {
           "kind": "TypeNominal",
@@ -773,8 +754,7 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Void",
-                  "printedName": "()",
-                  "usr": ""
+                  "printedName": "()"
                 },
                 {
                   "kind": "TypeNominal",
@@ -900,8 +880,7 @@
             {
               "kind": "TypeNominal",
               "name": "Void",
-              "printedName": "()",
-              "usr": ""
+              "printedName": "()"
             }
           ],
           "declKind": "Func",
@@ -1045,8 +1024,7 @@
             {
               "kind": "TypeNominal",
               "name": "Void",
-              "printedName": "()",
-              "usr": ""
+              "printedName": "()"
             }
           ],
           "declKind": "Func",
@@ -1083,8 +1061,7 @@
             {
               "kind": "TypeNominal",
               "name": "Void",
-              "printedName": "()",
-              "usr": ""
+              "printedName": "()"
             }
           ],
           "declKind": "Func",
@@ -1119,8 +1096,7 @@
             {
               "kind": "TypeNominal",
               "name": "Void",
-              "printedName": "()",
-              "usr": ""
+              "printedName": "()"
             }
           ],
           "declKind": "Func",
@@ -1135,8 +1111,7 @@
             {
               "kind": "TypeNominal",
               "name": "Void",
-              "printedName": "()",
-              "usr": ""
+              "printedName": "()"
             }
           ],
           "declKind": "Func",

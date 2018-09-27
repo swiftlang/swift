@@ -218,6 +218,7 @@ class SDKNode {
   typedef std::vector<SDKNode*>::iterator ChildIt;
 protected:
   SDKContext &Ctx;
+private:
   StringRef Name;
   StringRef PrintedName;
   unsigned TheKind : 4;
@@ -225,6 +226,7 @@ protected:
   std::set<NodeAnnotation> Annotations;
   std::map<NodeAnnotation, StringRef> AnnotateComments;
   NodePtr Parent = nullptr;
+protected:
   SDKNode(SDKNodeInitInfo Info, SDKNodeKind Kind);
   virtual ~SDKNode() = default;
 public:
@@ -234,6 +236,8 @@ public:
 
   bool operator==(const SDKNode &Other) const;
   bool operator!=(const SDKNode &Other) const { return !((*this) == Other); }
+  void output(json::Output &out, KeyKind Key, bool Value);
+  void output(json::Output &out, KeyKind Key, StringRef Value);
 
   ArrayRef<NodeAnnotation>
     getAnnotations(std::vector<NodeAnnotation> &Scratch) const;

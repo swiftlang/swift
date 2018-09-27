@@ -21,8 +21,7 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Void",
-                  "printedName": "()",
-                  "usr": ""
+                  "printedName": "()"
                 }
               ]
             }
@@ -90,8 +89,7 @@
                 {
                   "kind": "TypeNominal",
                   "name": "Void",
-                  "printedName": "()",
-                  "usr": ""
+                  "printedName": "()"
                 }
               ]
             }
