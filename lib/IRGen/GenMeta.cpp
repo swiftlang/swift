@@ -768,7 +768,8 @@ namespace {
         auto witness =
           entry.getAssociatedTypeWitness().Witness->mapTypeOutOfContext()
             ->getCanonicalType();
-        return IGM.getAssociatedTypeWitness(witness);
+        return IGM.getAssociatedTypeWitness(witness,
+                                            /*inProtocolContext=*/true);
       }
 
       return nullptr;

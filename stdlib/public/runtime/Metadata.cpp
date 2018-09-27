@@ -3977,7 +3977,7 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
     WitnessTableFirstRequirementOffset;
   auto witness = ((const void* const *)wtable)[witnessIndex];
   if ((uintptr_t(witness) &
-         ProtocolRequirementFlags::AssociatedTypeMangledNameMask) == 0) {
+         ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0) {
     return swift_checkMetadataState(request, (const Metadata *)witness);
   }
 
@@ -3988,7 +3988,8 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
                      ~ProtocolRequirementFlags::AssociatedTypeMangledNameMask));
 
   const Metadata *assocTypeMetadata;
-  if (witness == req.DefaultImplementation) {
+  if ((uintptr_t(witness) &
+         ProtocolRequirementFlags::AssociatedTypeProtocolContextBit)) {
     // The protocol's Self is the only generic parameter that can occur in the
     // type.
     assocTypeMetadata =
@@ -4027,7 +4028,7 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
 
   // Update the witness table.
   assert((uintptr_t(assocTypeMetadata) &
-            ProtocolRequirementFlags::AssociatedTypeMangledNameMask) == 0);
+            ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0);
   reinterpret_cast<const void**>(wtable)[witnessIndex] = assocTypeMetadata;
   return swift_checkMetadataState(request, assocTypeMetadata);
 }

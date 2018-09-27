@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 
 // Resilient protocol definition
-// RUN: %target-swift-frontend -emit-ir -enable-resilience -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift | %FileCheck -check-prefix=CHECK-DEFINITION %s
+// RUN: %target-swift-frontend -emit-ir -enable-resilience -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift | %FileCheck -DINT=i%target-ptrsize -check-prefix=CHECK-DEFINITION %s
 
 // Resilient protocol usage
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift
@@ -15,6 +15,11 @@
 // Protocol descriptor
 // CHECK-DEFINITION-LABEL: @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsMp" ={{( protected)?}} constant
 // CHECK-DEFINITION-SAME: @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2AC_AA014OtherResilientC0TN"
+
+// Associated type default + flags
+// CHECK-DEFINITION-SAME: [[INT]] add
+// CHECK-DEFINITION-SAME: @"symbolic \01____y2T118resilient_protocol29ProtocolWithAssocTypeDefaultsPQzG 18resilient_protocol7WrapperV"
+// CHECK-DEFINITION-SAME: [[INT]] 3
 
 // Protocol requirements base descriptor
 // CHECK-DEFINITION: @"$s18resilient_protocol21ResilientBaseProtocolTL" ={{( dllexport)?}}{{( protected)?}} alias %swift.protocol_requirement, getelementptr (%swift.protocol_requirement, %swift.protocol_requirement* getelementptr inbounds (<{ i32, i32, i32, i32, i32, i32, %swift.protocol_requirement }>, <{ i32, i32, i32, i32, i32, i32, %swift.protocol_requirement }>* @"$s18resilient_protocol21ResilientBaseProtocolMp", i32 0, i32 6), i32 -1)

@@ -1004,7 +1004,8 @@ public:
   llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
 
   /// Produce an associated type witness that refers to the given type.
-  llvm::Constant *getAssociatedTypeWitness(CanType type);
+  llvm::Constant *getAssociatedTypeWitness(CanType type,
+                                           bool inProtocolContext);
 
   void emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance);
   void emitFieldMetadataRecord(const NominalTypeDecl *Decl);
