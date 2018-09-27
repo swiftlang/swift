@@ -98,7 +98,7 @@ public extension ${Element} {
     // Conformance to SIMDFloatingPointVector --------------------------------
 %   for (op, inst) in [('<','lt'), ('<=','le'), ('>','gt'), ('>=','ge')]:
     @_transparent
-    public static func .${op}(lhs: ${Self}, rhs: ${Self}) -> Mask {
+    public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> Mask {
       return Mask(Int${bits}.Vector${N}(${sext}(
         Builtin.fcmp_o${inst}_${LLVM}(lhs._value, rhs._value)
       )))
@@ -106,9 +106,9 @@ public extension ${Element} {
 
 %   end
     // MARK: Arithmetic operators
-%   for (op, inst) in [('+','add'), ('-','sub'), ('*','mul'), ('/','div')]:
+%   for (op, inst) in [('+','add'), ('-','sub'), ('.*','mul'), ('/','div')]:
     @_transparent
-    public static func .${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+    public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
       return ${Self}(Builtin.f${inst}_${LLVM}(lhs._value, rhs._value))
     }
 
@@ -130,7 +130,7 @@ public extension ${Element} {
       case .awayFromZero:
         let roundedUp = ${Self}(Builtin.int_ceil_${LLVM}(_value))
         let roundedDown = ${Self}(Builtin.int_floor_${LLVM}(_value))
-        self = roundedUp.replacing(with: roundedDown, where: self .< 0)
+        self = roundedUp.replacing(with: roundedDown, where: self < 0)
       case .up:
         _value = Builtin.int_ceil_${LLVM}(_value)
       case .down:

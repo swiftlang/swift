@@ -82,8 +82,8 @@ from SwiftVectorTypes import all_vector_counts
       // SIMDMaskVector conformance -----------------------------------------
 %   for op in ['&','|','^']:
       @_transparent
-      public static func .${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-        return ${Self}(lhs._value .${op} rhs._value)
+      public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+        return ${Self}(lhs._value ${op} rhs._value)
       }
 
 %   end

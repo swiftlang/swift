@@ -114,7 +114,7 @@ public extension ${Element} {
     // - Bitwise operators
 %   for (op, inst) in [('&','and'), ('|','or'), ('^','xor')]:
     @_transparent
-    public static func .${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+    public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
       return ${Self}(Builtin.${inst}_${LLVM}(lhs._value, rhs._value))
     }
 
@@ -123,7 +123,7 @@ public extension ${Element} {
 %   prefix = 's' if signed else 'u'
 %   for (op, inst) in [('<','lt'), ('<=','le'), ('>','gt'), ('>=','ge')]:
     @_transparent
-    public static func .${op}(lhs: ${Self}, rhs: ${Self}) -> Mask {
+    public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> Mask {
       return Mask(Int${bits}.Vector${count}(${sext}(
         Builtin.cmp_${prefix}${inst}_${LLVM}(lhs._value, rhs._value)
       )))
@@ -132,8 +132,8 @@ public extension ${Element} {
 %   end
 
     @_transparent
-    public static func .&>>(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-      let masked = rhs .& ${Self}(repeating: ${bits-1})
+    public static func &>>(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+      let masked = rhs & ${Self}(repeating: ${bits-1})
 %   if signed:
       return ${Self}(Builtin.ashr_${LLVM}(lhs._value, masked._value))
 %   else:
@@ -142,21 +142,21 @@ public extension ${Element} {
     }
 
     @_transparent
-    public static func .&<<(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-      let masked = rhs .& ${Self}(repeating: ${bits-1})
+    public static func &<<(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+      let masked = rhs & ${Self}(repeating: ${bits-1})
       return ${Self}(Builtin.shl_${LLVM}(lhs._value, masked._value))
     }
 
     // MARK: Arithmetic operators
-%   for (op, inst) in [('&+','add'), ('&-','sub'), ('&*','mul')]:
+%   for (op, inst) in [('&+','add'), ('&-','sub'), ('.&*','mul')]:
     @_transparent
-    public static func .${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+    public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
       return ${Self}(Builtin.${inst}_${LLVM}(lhs._value, rhs._value))
     }
 
 %   end
     @_transparent
-    public static func ./(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+    public static func /(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
       _precondition(all(rhs .!= 0), "Division by zero.")
 %   if count == 3:
 %   # special handling for the 3-element case: insert a 1 in the unused
@@ -169,7 +169,7 @@ public extension ${Element} {
       let rhsValue = rhs._value
 %   end
 %   if signed:
-      _precondition(!any((lhs .== .min) .& (rhs .== -1)),
+      _precondition(!any((lhs .== .min) & (rhs .== -1)),
                     "Division results in an overflow.")
       return ${Self}(Builtin.sdiv_${LLVM}(lhs._value, rhsValue))
 %   else:
@@ -178,7 +178,7 @@ public extension ${Element} {
     }
 
     @_transparent
-    public static func .%(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+    public static func %(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
       _precondition(all(rhs .!= 0), "Division by zero in remainder operation.")
 %   if count == 3:
 %   # special handling for the 3-element case: insert a 1 in the unused
@@ -191,7 +191,7 @@ public extension ${Element} {
       let rhsValue = rhs._value
 %   end
 %   if signed:
-      _precondition(!any((lhs .== .min) .& (rhs .== -1)),
+      _precondition(!any((lhs .== .min) & (rhs .== -1)),
                     "Division results in an overflow in remainder operation.")
       return ${Self}(Builtin.srem_${LLVM}(lhs._value, rhsValue))
 %   else:

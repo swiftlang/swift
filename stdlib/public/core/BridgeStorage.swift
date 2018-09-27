@@ -100,10 +100,10 @@ struct _BridgeStorage<
   @inline(__always)
   public // @testable
   func isNativeWithClearedSpareBits(_ bits: Int) -> Bool {
-    return (_bitPattern(rawValue) &
-            (_bridgeObjectTaggedPointerBits | _objCTaggedPointerBits |
-             _objectPointerIsObjCBit |
-             (UInt(bits)) << _objectPointerLowSpareBitShift)) == 0
+    let fixMask = _bridgeObjectTaggedPointerBits |
+      _objCTaggedPointerBits | _objectPointerIsObjCBit
+    let varMask = UInt(bits) << _objectPointerLowSpareBitShift
+    return _bitPattern(rawValue) & (fixMask | varMask) == 0
   }
 
   @inlinable // FIXME(sil-serialize-all)
