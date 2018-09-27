@@ -1463,9 +1463,9 @@ extension Dictionary {
         return _variant.value(at: position)
       }
       _modify {
-        let index = _variant.ensureUniqueNative(preserving: position)
-        _variant.asNative.validate(index)
-        let address = _variant.asNative._values + index.bucket.offset
+        let native = _variant.ensureUniqueNative()
+        let bucket = native.validatedBucket(for: position)
+        let address = native._values + bucket.offset
         yield &address.pointee
         _fixLifetime(self)
       }
@@ -1498,28 +1498,22 @@ extension Dictionary {
     @inlinable
     public mutating func swapAt(_ i: Index, _ j: Index) {
       guard i != j else { return }
+      let (a, b): (_HashTable.Bucket, _HashTable.Bucket)
+      switch _variant {
+      case .native(let native):
+        a = native.validatedBucket(for: i)
+        b = native.validatedBucket(for: j)
 #if _runtime(_ObjC)
-      if case .cocoa(let cocoa) = _variant {
+      case .cocoa(let cocoa):
         _variant.cocoaPath()
-        let cocoaKey1 = cocoa.key(at: i._asCocoa)
-        let cocoaKey2 = cocoa.key(at: j._asCocoa)
-        var native = _NativeDictionary<Key, Value>(cocoa)
-        let nativeKey1 = _forceBridgeFromObjectiveC(cocoaKey1, Key.self)
-        let nativeKey2 = _forceBridgeFromObjectiveC(cocoaKey2, Key.self)
-        guard
-          let index1 = native.index(forKey: nativeKey1),
-          let index2 = native.index(forKey: nativeKey2)
-        else {
-          _preconditionFailure("Invalid index")
-        }
+        let native = _NativeDictionary<Key, Value>(cocoa)
+        a = native.validatedBucket(for: i)
+        b = native.validatedBucket(for: j)
         _variant = .native(native)
-      }
 #endif
+      }
       let isUnique = _variant.isUniquelyReferenced()
-      _variant.asNative.swapValuesAt(
-        i._asNative,
-        j._asNative,
-        isUnique: isUnique)
+      _variant.asNative.swapValuesAt(a, b, isUnique: isUnique)
     }
   }
 }

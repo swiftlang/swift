@@ -493,16 +493,17 @@ extension _NativeDictionary { // Insertions
 extension _NativeDictionary {
   @inlinable
   @inline(__always)
-  internal mutating func swapValuesAt(_ i: Index, _ j: Index, isUnique: Bool) {
+  internal mutating func swapValuesAt(
+    _ a: Bucket,
+    _ b: Bucket,
+    isUnique: Bool
+  ) {
     let rehashed = ensureUnique(isUnique: isUnique, capacity: capacity)
     _sanityCheck(!rehashed)
-    validate(i)
-    validate(j)
-    let a = i.bucket.offset
-    let b = j.bucket.offset
-    let value = (_values + a).move()
-    (_values + a).moveInitialize(from: _values + b, count: 1)
-    (_values + b).initialize(to: value)
+    _sanityCheck(hashTable.isOccupied(a) && hashTable.isOccupied(b))
+    let value = (_values + a.offset).move()
+    (_values + a.offset).moveInitialize(from: _values + b.offset, count: 1)
+    (_values + b.offset).initialize(to: value)
   }
 }
 
@@ -545,13 +546,6 @@ extension _NativeDictionary { // Deletion
     let oldValue = (_values + bucket.offset).move()
     _delete(at: bucket)
     return (oldKey, oldValue)
-  }
-
-  @inlinable
-  @inline(__always)
-  internal mutating func remove(at index: Index, isUnique: Bool) -> Element {
-    validate(index)
-    return uncheckedRemove(at: index.bucket, isUnique: isUnique)
   }
 
   @usableFromInline
