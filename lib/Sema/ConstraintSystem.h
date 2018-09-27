@@ -279,8 +279,8 @@ public:
     return locator;
   }
 
-  /// \brief Retrieve the archetype opened by this type variable.
-  ArchetypeType *getArchetype() const;
+  /// \brief Retrieve the generic parameter opened by this type variable.
+  GenericTypeParamType *getGenericParameter() const;
 
   /// \brief Retrieve the representative of the equivalence class to which this
   /// type variable belongs.

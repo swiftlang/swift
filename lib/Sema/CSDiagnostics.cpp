@@ -271,12 +271,12 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseAsError() {
     return false;
 
   auto &last = path.back();
-  if (last.getKind() != ConstraintLocator::Archetype)
+  if (last.getKind() != ConstraintLocator::GenericParameter)
     return false;
 
-  auto *archetype = last.getArchetype();
+  auto *paramTy = last.getGenericParameter();
   emitDiagnostic(anchor->getLoc(), diag::converting_noescape_to_type,
-                 archetype);
+                 paramTy);
   return true;
 }
 
