@@ -1340,9 +1340,8 @@ namespace {
       AnyFunctionType::decomposeInput(constrParamType, params);
 
       ::matchCallArguments(
-          CS, /*isOperator=*/false, args, params,
-          CS.getConstraintLocator(expr,
-                                  ConstraintLocator::ApplyArgument));
+          CS, args, params,
+          CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
 
       Type result = tv;
       if (constr->getFailability() != OTK_None)
