@@ -157,6 +157,8 @@ class SDKContext {
 
   CheckerOptions Opts;
   std::vector<ABIAttributeInfo> ABIAttrs;
+  /// This is to cache the equal comparison results between nodes.
+  llvm::DenseMap<const SDKNode*, llvm::DenseMap<const SDKNode*, bool>> EqualCache;
 
 public:
   SDKContext(CheckerOptions Options);
@@ -184,6 +186,7 @@ public:
   DiagnosticEngine &getDiags() {
     return Diags;
   }
+  bool isEqual(const SDKNode &Left, const SDKNode &Right);
   bool checkingABI() const { return Opts.ABI; }
   const CheckerOptions &getOpts() const { return Opts; }
   ArrayRef<ABIAttributeInfo> getABIAttributeInfo() const { return ABIAttrs; }
