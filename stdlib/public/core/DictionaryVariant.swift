@@ -109,7 +109,6 @@ extension Dictionary._Variant {
 
   /// Reserves enough space for the specified number of elements to be stored
   /// without reallocating additional storage.
-  @inlinable
   internal mutating func reserveCapacity(_ capacity: Int) {
     switch self {
     case .native:
