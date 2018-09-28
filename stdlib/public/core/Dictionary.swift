@@ -47,6 +47,7 @@
 //   | _count                                                    |
 //   | _capacity                                                 |
 //   | _scale                                                    |
+//   | _age                                                      |
 //   | _seed                                                     |
 //   | _rawKeys                                                  |
 //   | _rawValue                                                 |
@@ -149,6 +150,13 @@
 // dictionary storage are bounds-checked, this scheme never compromises memory
 // safety.
 //
+// As a safeguard against using invalid indices, Set and Dictionary maintain a
+// mutation counter in their storage header (`_age`). This counter gets bumped
+// every time an element is removed and whenever the contents are
+// rehashed. Native indices include a copy of this counter so that index
+// validation can verify it matches with current storage. This can't catch all
+// misuse, because counters may match by accident; but it does make indexing a
+// lot more reliable.
 //
 // Bridging
 // ========
@@ -1455,8 +1463,9 @@ extension Dictionary {
         return _variant.value(at: position)
       }
       _modify {
-        let index = _variant.ensureUniqueNative(preserving: position)
-        let address = _variant.asNative._values + index.offset
+        let native = _variant.ensureUniqueNative()
+        let bucket = native.validatedBucket(for: position)
+        let address = native._values + bucket.offset
         yield &address.pointee
         _fixLifetime(self)
       }
@@ -1484,6 +1493,27 @@ extension Dictionary {
 
     public var debugDescription: String {
       return _makeCollectionDescription(withTypeName: "Dictionary.Values")
+    }
+
+    @inlinable
+    public mutating func swapAt(_ i: Index, _ j: Index) {
+      guard i != j else { return }
+      let (a, b): (_HashTable.Bucket, _HashTable.Bucket)
+      switch _variant {
+      case .native(let native):
+        a = native.validatedBucket(for: i)
+        b = native.validatedBucket(for: j)
+#if _runtime(_ObjC)
+      case .cocoa(let cocoa):
+        _variant.cocoaPath()
+        let native = _NativeDictionary<Key, Value>(cocoa)
+        a = native.validatedBucket(for: i)
+        b = native.validatedBucket(for: j)
+        _variant = .native(native)
+#endif
+      }
+      let isUnique = _variant.isUniquelyReferenced()
+      _variant.asNative.swapValuesAt(a, b, isUnique: isUnique)
     }
   }
 }
@@ -1691,7 +1721,7 @@ extension Dictionary {
     @_frozen
     @usableFromInline
     internal enum _Variant {
-      case native(_NativeDictionary<Key, Value>.Index)
+      case native(_HashTable.Index)
 #if _runtime(_ObjC)
       case cocoa(_CocoaDictionary.Index)
 #endif
@@ -1708,7 +1738,7 @@ extension Dictionary {
 
     @inlinable
     @inline(__always)
-    internal init(_native index: _NativeDictionary<Key, Value>.Index) {
+    internal init(_native index: _HashTable.Index) {
       self.init(_variant: .native(index))
     }
 
@@ -1740,13 +1770,14 @@ extension Dictionary.Index {
 #endif
 
   @usableFromInline @_transparent
-  internal var _asNative: _NativeDictionary<Key, Value>.Index {
+  internal var _asNative: _HashTable.Index {
     switch _variant {
     case .native(let nativeIndex):
       return nativeIndex
 #if _runtime(_ObjC)
     case .cocoa:
-      _sanityCheckFailure("internal error: does not contain a native index")
+      _preconditionFailure(
+        "Attempting to access Dictionary elements using an invalid index")
 #endif
     }
   }
@@ -1756,7 +1787,8 @@ extension Dictionary.Index {
   internal var _asCocoa: _CocoaDictionary.Index {
     switch _variant {
     case .native:
-      _sanityCheckFailure("internal error: does not contain a Cocoa index")
+      _preconditionFailure(
+        "Attempting to access Dictionary elements using an invalid index")
     case .cocoa(let cocoaIndex):
       return cocoaIndex
     }
@@ -1811,14 +1843,14 @@ extension Dictionary.Index: Hashable {
     switch _variant {
     case .native(let nativeIndex):
       hasher.combine(0 as UInt8)
-      hasher.combine(nativeIndex.offset)
+      hasher.combine(nativeIndex.bucket.offset)
     case .cocoa(let cocoaIndex):
       _cocoaPath()
       hasher.combine(1 as UInt8)
       hasher.combine(cocoaIndex.currentKeyIndex)
     }
   #else
-    hasher.combine(_asNative.offset)
+    hasher.combine(_asNative.bucket.offset)
   #endif
   }
 }

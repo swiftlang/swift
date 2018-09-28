@@ -43,7 +43,10 @@ struct _SwiftEmptyArrayStorage _swiftEmptyArrayStorage;
 struct _SwiftDictionaryBodyStorage {
   __swift_intptr_t count;
   __swift_intptr_t capacity;
-  __swift_intptr_t scale;
+  __swift_int8_t scale;
+  __swift_int8_t reservedScale;
+  __swift_int16_t extra;
+  __swift_int32_t age;
   __swift_intptr_t seed;
   void *rawKeys;
   void *rawValues;
@@ -52,7 +55,10 @@ struct _SwiftDictionaryBodyStorage {
 struct _SwiftSetBodyStorage {
   __swift_intptr_t count;
   __swift_intptr_t capacity;
-  __swift_intptr_t scale;
+  __swift_int8_t scale;
+  __swift_int8_t reservedScale;
+  __swift_int16_t extra;
+  __swift_int32_t age;
   __swift_intptr_t seed;
   void *rawElements;
 };
@@ -85,6 +91,16 @@ SWIFT_RUNTIME_STDLIB_API
 struct _SwiftHashingParameters _swift_stdlib_Hashing_parameters;
 
 #ifdef __cplusplus
+
+static_assert(
+  sizeof(_SwiftDictionaryBodyStorage) ==
+    5 * sizeof(__swift_intptr_t) + sizeof(__swift_int64_t),
+  "_SwiftDictionaryBodyStorage has unexpected size");
+
+static_assert(
+  sizeof(_SwiftSetBodyStorage) ==
+    4 * sizeof(__swift_intptr_t) + sizeof(__swift_int64_t),
+  "_SwiftSetBodyStorage has unexpected size");
 
 static_assert(std::is_pod<_SwiftEmptyArrayStorage>::value,
               "empty array type should be POD");
