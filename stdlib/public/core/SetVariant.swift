@@ -58,20 +58,30 @@ extension Set._Variant {
 
   @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {
-    // Note that &self drills down through .native(_NativeSet) to the first
-    // property in _NativeSet, which is the reference to the storage.
-    switch self {
-    case .native:
-      return _isUnique_native(&self)
 #if _runtime(_ObjC)
-    case .cocoa:
-      cocoaPath()
+    guard isNative else {
       // Don't consider Cocoa buffer mutable, even if it is mutable and is
       // uniquely referenced.
       return false
+    }
 #endif
+    // Note that &self drills down through .native(_NativeSet) to the first
+    // property in _NativeSet, which is the reference to the storage.
+    return _isUnique_native(&self)
+  }
+
+#if _runtime(_ObjC)
+  @usableFromInline @_transparent
+  internal var isNative: Bool {
+    switch self {
+    case .native:
+      return true
+    case .cocoa:
+      cocoaPath()
+      return false
     }
   }
+#endif
 
   @usableFromInline @_transparent
   internal var asNative: _NativeSet<Element> {
@@ -105,17 +115,16 @@ extension Set._Variant {
   /// Reserves enough space for the specified number of elements to be stored
   /// without reallocating additional storage.
   internal mutating func reserveCapacity(_ capacity: Int) {
-    switch self {
-    case .native:
-      let isUnique = isUniquelyReferenced()
-      asNative.reserveCapacity(capacity, isUnique: isUnique)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoa):
-      cocoaPath()
+    guard isNative else {
+      let cocoa = asCocoa
       let capacity = Swift.max(cocoa.count, capacity)
       self = .native(_NativeSet(cocoa, capacity: capacity))
-#endif
+      return
     }
+#endif
+    let isUnique = isUniquelyReferenced()
+    asNative.reserveCapacity(capacity, isUnique: isUnique)
   }
 
   /// The number of elements that can be stored without expanding the current
@@ -127,15 +136,12 @@ extension Set._Variant {
   /// at which adding any more elements will exceed the load factor.
   @inlinable
   internal var capacity: Int {
-    switch self {
-    case .native:
-      return asNative.capacity
 #if _runtime(_ObjC)
-    case .cocoa(let cocoa):
-      cocoaPath()
-      return cocoa.count
-#endif
+    guard isNative else {
+      return asCocoa.count
     }
+#endif
+    return asNative.capacity
   }
 }
 
@@ -145,41 +151,32 @@ extension Set._Variant: _SetBuffer {
 
   @inlinable
   internal var startIndex: Index {
-    switch self {
-    case .native(let native):
-      return native.startIndex
 #if _runtime(_ObjC)
-    case .cocoa(let cocoaSet):
-      cocoaPath()
-      return Index(_cocoa: cocoaSet.startIndex)
-#endif
+    guard isNative else {
+      return Index(_cocoa: asCocoa.startIndex)
     }
+#endif
+    return asNative.startIndex
   }
 
   @inlinable
   internal var endIndex: Index {
-    switch self {
-    case .native(let native):
-      return native.endIndex
 #if _runtime(_ObjC)
-    case .cocoa(let cocoaSet):
-      cocoaPath()
-      return Index(_cocoa: cocoaSet.endIndex)
-#endif
+    guard isNative else {
+      return Index(_cocoa: asCocoa.endIndex)
     }
+#endif
+    return asNative.endIndex
   }
 
   @inlinable
   internal func index(after index: Index) -> Index {
-    switch self {
-    case .native(let native):
-      return native.index(after: index)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoaSet):
-      cocoaPath()
-      return Index(_cocoa: cocoaSet.index(after: index._asCocoa))
-#endif
+    guard isNative else {
+      return Index(_cocoa: asCocoa.index(after: index._asCocoa))
     }
+#endif
+    return asNative.index(after: index)
   }
 
   @inlinable
@@ -199,102 +196,78 @@ extension Set._Variant: _SetBuffer {
   @inlinable
   @inline(__always)
   internal func index(for element: Element) -> Index? {
-    switch self {
-    case .native(let native):
-      return native.index(for: element)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoa):
-      cocoaPath()
+    guard isNative else {
       let cocoaElement = _bridgeAnythingToObjectiveC(element)
-      guard let index = cocoa.index(for: cocoaElement) else { return nil }
+      guard let index = asCocoa.index(for: cocoaElement) else { return nil }
       return Index(_cocoa: index)
-#endif
     }
+#endif
+    return asNative.index(for: element)
   }
 
   @inlinable
   internal var count: Int {
     @inline(__always)
     get {
-      switch self {
-      case .native(let native):
-        return native.count
 #if _runtime(_ObjC)
-      case .cocoa(let cocoa):
-        cocoaPath()
-        return cocoa.count
-#endif
+      guard isNative else {
+        return asCocoa.count
       }
+#endif
+      return asNative.count
     }
   }
 
   @inlinable
   @inline(__always)
   internal func contains(_ member: Element) -> Bool {
-    switch self {
-    case .native(let native):
-      return native.contains(member)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoa):
-      cocoaPath()
-      return cocoa.contains(_bridgeAnythingToObjectiveC(member))
-#endif
+    guard isNative else {
+      return asCocoa.contains(_bridgeAnythingToObjectiveC(member))
     }
+#endif
+    return asNative.contains(member)
   }
 
   @inlinable
   @inline(__always)
   internal func element(at index: Index) -> Element {
-    switch self {
-    case .native(let native):
-      return native.element(at: index)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoa):
-      cocoaPath()
-      let cocoaMember = cocoa.element(at: index._asCocoa)
+    guard isNative else {
+      let cocoaMember = asCocoa.element(at: index._asCocoa)
       return _forceBridgeFromObjectiveC(cocoaMember, Element.self)
-#endif
     }
+#endif
+    return asNative.element(at: index)
   }
 }
 
 extension Set._Variant {
   @inlinable
   internal mutating func update(with value: __owned Element) -> Element? {
-    switch self {
-    case .native:
-      let isUnique = self.isUniquelyReferenced()
-      return asNative.update(with: value, isUnique: isUnique)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoa):
-      cocoaPath()
+    guard isNative else {
       // Make sure we have space for an extra element.
-      var native = _NativeSet<Element>(cocoa, capacity: cocoa.count + 1)
+      var native = _NativeSet<Element>(asCocoa, capacity: asCocoa.count + 1)
       let old = native.update(with: value, isUnique: true)
       self = .native(native)
       return old
-#endif
     }
+#endif
+    let isUnique = self.isUniquelyReferenced()
+    return asNative.update(with: value, isUnique: isUnique)
   }
 
   @inlinable
   internal mutating func insert(
     _ element: __owned Element
   ) -> (inserted: Bool, memberAfterInsert: Element) {
-    switch self {
-    case .native:
-      let (bucket, found) = asNative.find(element)
-      if found {
-        return (false, asNative.uncheckedElement(at: bucket))
-      }
-      let isUnique = self.isUniquelyReferenced()
-      asNative.insertNew(element, at: bucket, isUnique: isUnique)
-      return (true, element)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoa):
-      cocoaPath()
+    guard isNative else {
       // Make sure we have space for an extra element.
       let cocoaMember = _bridgeAnythingToObjectiveC(element)
+      let cocoa = asCocoa
       if let m = cocoa.member(for: cocoaMember) {
         return (false, _forceBridgeFromObjectiveC(m, Element.self))
       }
@@ -302,47 +275,50 @@ extension Set._Variant {
       native.insertNew(element, isUnique: true)
       self = .native(native)
       return (true, element)
-#endif
     }
+#endif
+    let (bucket, found) = asNative.find(element)
+    if found {
+      return (false, asNative.uncheckedElement(at: bucket))
+    }
+    let isUnique = self.isUniquelyReferenced()
+    asNative.insertNew(element, at: bucket, isUnique: isUnique)
+    return (true, element)
   }
 
   @inlinable
   @discardableResult
   internal mutating func remove(at index: Index) -> Element {
-    switch self {
-    case .native:
-      let isUnique = isUniquelyReferenced()
-      let bucket = asNative.validatedBucket(for: index)
-      return asNative.uncheckedRemove(at: bucket, isUnique: isUnique)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoa):
-      cocoaPath()
+    guard isNative else {
       // We have to migrate the data first.  But after we do so, the Cocoa
       // index becomes useless, so get the element first.
+      let cocoa = asCocoa
       let cocoaMember = cocoa.member(for: index._asCocoa)
       let nativeMember = _forceBridgeFromObjectiveC(cocoaMember, Element.self)
       return _migrateToNative(cocoa, removing: nativeMember)
-#endif
     }
+#endif
+    let isUnique = isUniquelyReferenced()
+    let bucket = asNative.validatedBucket(for: index)
+    return asNative.uncheckedRemove(at: bucket, isUnique: isUnique)
   }
 
   @inlinable
   @discardableResult
   internal mutating func remove(_ member: Element) -> Element? {
-    switch self {
-    case .native:
-      let (bucket, found) = asNative.find(member)
-      guard found else { return nil }
-      let isUnique = isUniquelyReferenced()
-      return asNative.uncheckedRemove(at: bucket, isUnique: isUnique)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoa):
-      cocoaPath()
+    guard isNative else {
+      let cocoa = asCocoa
       let cocoaMember = _bridgeAnythingToObjectiveC(member)
       guard cocoa.contains(cocoaMember) else { return nil }
       return _migrateToNative(cocoa, removing: member)
-#endif
     }
+#endif
+    let (bucket, found) = asNative.find(member)
+    guard found else { return nil }
+    let isUnique = isUniquelyReferenced()
+    return asNative.uncheckedRemove(at: bucket, isUnique: isUnique)
   }
 
 #if _runtime(_ObjC)
@@ -371,16 +347,14 @@ extension Set._Variant {
     }
     guard count > 0 else { return }
 
-    switch self {
-    case .native:
-      let isUnique = isUniquelyReferenced()
-      asNative.removeAll(isUnique: isUnique)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoa):
-      cocoaPath()
-      self = .native(_NativeSet(capacity: cocoa.count))
-#endif
+    guard isNative else {
+      self = .native(_NativeSet(capacity: asCocoa.count))
+      return
     }
+#endif
+    let isUnique = isUniquelyReferenced()
+    asNative.removeAll(isUnique: isUnique)
   }
 }
 
@@ -391,15 +365,12 @@ extension Set._Variant {
   @inlinable
   @inline(__always)
   internal __consuming func makeIterator() -> Set<Element>.Iterator {
-    switch self {
-    case .native(let native):
-      return Set.Iterator(_native: native.makeIterator())
 #if _runtime(_ObjC)
-    case .cocoa(let cocoa):
-      cocoaPath()
-      return Set.Iterator(_cocoa: cocoa.makeIterator())
-#endif
+    guard isNative else {
+      return Set.Iterator(_cocoa: asCocoa.makeIterator())
     }
+#endif
+    return Set.Iterator(_native: asNative.makeIterator())
   }
 }
 

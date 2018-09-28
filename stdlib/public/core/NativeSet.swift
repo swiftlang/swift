@@ -241,12 +241,10 @@ extension _NativeSet {
   @inlinable
   @inline(__always)
   func validatedBucket(for index: Set<Element>.Index) -> Bucket {
-    switch index._variant {
-    case .native(let native):
-      return validatedBucket(for: native)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoa):
+    guard index._isNative else {
       index._cocoaPath()
+      let cocoa = index._asCocoa
       // Accept Cocoa indices as long as they contain an element that exists in
       // this set, and the address of their Cocoa object generates the same age.
       if cocoa.age == self.age {
@@ -258,8 +256,9 @@ extension _NativeSet {
       }
       _preconditionFailure(
         "Attempting to access Set elements using an invalid index")
-#endif
     }
+#endif
+    return validatedBucket(for: index._asNative)
   }
 }
 

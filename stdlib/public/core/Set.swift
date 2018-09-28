@@ -1358,6 +1358,19 @@ extension Set.Index {
   }
 #endif
 
+#if _runtime(_ObjC)
+  @usableFromInline @_transparent
+  internal var _isNative: Bool {
+    switch _variant {
+    case .native:
+      return true
+    case .cocoa:
+      _cocoaPath()
+      return false
+    }
+  }
+#endif
+
   @usableFromInline @_transparent
   internal var _asNative: _HashTable.Index {
     switch _variant {
@@ -1446,19 +1459,17 @@ extension Set.Index: Hashable {
   ///   of this instance.
   public // FIXME(cocoa-index): Make inlinable
   func hash(into hasher: inout Hasher) {
-  #if _runtime(_ObjC)
-    switch _variant {
-    case .native(let nativeIndex):
-      hasher.combine(0 as UInt8)
-      hasher.combine(nativeIndex.bucket.offset)
-    case .cocoa(let cocoaIndex):
-      _cocoaPath()
+#if _runtime(_ObjC)
+    guard _isNative else {
       hasher.combine(1 as UInt8)
-      hasher.combine(cocoaIndex.storage.currentKeyIndex)
+      hasher.combine(_asCocoa.storage.currentKeyIndex)
+      return
     }
-  #else
+    hasher.combine(0 as UInt8)
     hasher.combine(_asNative.bucket.offset)
-  #endif
+#else
+    hasher.combine(_asNative.bucket.offset)
+#endif
   }
 }
 
@@ -1523,6 +1534,19 @@ extension Set.Iterator {
   }
 #endif
 
+#if _runtime(_ObjC)
+  @usableFromInline @_transparent
+  internal var _isNative: Bool {
+    switch _variant {
+    case .native:
+      return true
+    case .cocoa:
+      _cocoaPath()
+      return false
+    }
+  }
+#endif
+
   @usableFromInline @_transparent
   internal var _asNative: _NativeSet<Element>.Iterator {
     get {
@@ -1539,6 +1563,20 @@ extension Set.Iterator {
       self._variant = .native(newValue)
     }
   }
+
+#if _runtime(_ObjC)
+  @usableFromInline @_transparent
+  internal var _asCocoa: _CocoaSet.Iterator {
+    get {
+      switch _variant {
+      case .native:
+        _sanityCheckFailure("internal error: does not contain a Cocoa index")
+      case .cocoa(let cocoa):
+        return cocoa
+      }
+    }
+  }
+#endif
 }
 
 extension Set.Iterator: IteratorProtocol {
@@ -1550,19 +1588,12 @@ extension Set.Iterator: IteratorProtocol {
   @inline(__always)
   public mutating func next() -> Element? {
 #if _runtime(_ObjC)
-    switch _variant {
-    case .native:
-      return _asNative.next()
-    case .cocoa(let cocoaIterator):
-      _cocoaPath()
-      if let cocoaElement = cocoaIterator.next() {
-        return _forceBridgeFromObjectiveC(cocoaElement, Element.self)
-      }
-      return nil
+    guard _isNative else {
+      guard let cocoaElement = _asCocoa.next() else { return nil }
+      return _forceBridgeFromObjectiveC(cocoaElement, Element.self)
     }
-#else
-    return _asNative.next()
 #endif
+    return _asNative.next()
   }
 }
 
