@@ -324,33 +324,51 @@ extension _CocoaSet: _SetBuffer {
   @usableFromInline
   internal typealias Element = AnyObject
 
-  @inlinable
+  @usableFromInline // FIXME(cocoa-index): Should be inlinable
   internal var startIndex: Index {
-    return Index(self, startIndex: ())
+    @_effects(releasenone)
+    get {
+      let allKeys = _stdlib_NSSet_allObjects(self.object)
+      return Index(Index.Storage(self, allKeys, 0))
+    }
   }
 
-  @inlinable
+  @usableFromInline // FIXME(cocoa-index): Should be inlinable
   internal var endIndex: Index {
-    return Index(self, endIndex: ())
+    @_effects(releasenone)
+    get {
+      let allKeys = _stdlib_NSSet_allObjects(self.object)
+      return Index(Index.Storage(self, allKeys, allKeys.value))
+    }
   }
 
-  @inlinable
-  internal func index(after i: Index) -> Index {
-    var i = i
-    formIndex(after: &i)
-    return i
-  }
-
-  @usableFromInline
+  @usableFromInline // FIXME(cocoa-index): Should be inlinable
   @_effects(releasenone)
-  internal func formIndex(after i: inout Index) {
-    _precondition(i.base.object === self.object, "Invalid index")
-    _precondition(i.currentKeyIndex < i.allKeys.value,
-      "Cannot increment endIndex")
-    i.currentKeyIndex += 1
+  internal func index(after index: Index) -> Index {
+    var result = index
+    formIndex(after: &result)
+    return result
   }
 
-  @usableFromInline
+  internal func validate(_ index: Index) {
+    _precondition(index.storage.base.object === self.object,
+      "Invalid index")
+    _precondition(index.storage.currentKeyIndex < index.storage.allKeys.value,
+      "Attempt to access endIndex")
+  }
+
+  @usableFromInline // FIXME(cocoa-index): Should be inlinable
+  @_effects(releasenone)
+  internal func formIndex(after index: inout Index) {
+    validate(index)
+    let isUnique = index.isUniquelyReferenced()
+    if !isUnique { index.storage = index.copy() }
+    let storage = index.storage // FIXME: rdar://problem/44863751
+    storage.currentKeyIndex += 1
+  }
+
+  @usableFromInline // FIXME(cocoa-index): Should be inlinable
+  @_effects(releasenone)
   internal func index(for element: AnyObject) -> Index? {
     // Fast path that does not involve creating an array of all keys.  In case
     // the key is present, this lookup is a penalty for the slow path, but the
@@ -361,16 +379,13 @@ extension _CocoaSet: _SetBuffer {
     }
 
     let allKeys = _stdlib_NSSet_allObjects(object)
-    var keyIndex = -1
     for i in 0..<allKeys.value {
       if _stdlib_NSObject_isEqual(element, allKeys[i]) {
-        keyIndex = i
-        break
+        return Index(Index.Storage(self, allKeys, i))
       }
     }
-    _sanityCheck(keyIndex >= 0,
-        "Key was found in fast path, but not found later?")
-    return Index(self, allKeys, keyIndex)
+    _sanityCheckFailure(
+      "An NSSet member wasn't listed amongst its enumerated contents")
   }
 
   @inlinable
@@ -383,7 +398,8 @@ extension _CocoaSet: _SetBuffer {
     return object.member(element) != nil
   }
 
-  @usableFromInline
+  @usableFromInline // FIXME(cocoa-index): Make inlinable
+  @_effects(releasenone)
   internal func element(at i: Index) -> AnyObject {
     let element: AnyObject? = i.element
     _sanityCheck(element != nil, "Item not found in underlying NSSet")
@@ -392,9 +408,22 @@ extension _CocoaSet: _SetBuffer {
 }
 
 extension _CocoaSet {
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_fixed_layout
   @usableFromInline
   internal struct Index {
+    @usableFromInline
+    internal var storage: Storage
+
+    internal init(_ storage: __owned Storage) {
+      self.storage = storage
+    }
+  }
+}
+
+extension _CocoaSet.Index {
+  // FIXME(cocoa-index): Try using an NSEnumerator to speed this up.
+  @usableFromInline
+  internal class Storage {
     // Assumption: we rely on NSDictionary.getObjects when being
     // repeatedly called on the same NSDictionary, returning items in the same
     // order every time.
@@ -402,35 +431,17 @@ extension _CocoaSet {
 
     /// A reference to the NSSet, which owns members in `allObjects`,
     /// or `allKeys`, for NSSet and NSDictionary respectively.
-    @usableFromInline // FIXME(sil-serialize-all)
     internal let base: _CocoaSet
     // FIXME: swift-3-indexing-model: try to remove the cocoa reference, but
     // make sure that we have a safety check for accessing `allKeys`.  Maybe
     // move both into the dictionary/set itself.
 
     /// An unowned array of keys.
-    @usableFromInline // FIXME(sil-serialize-all)
     internal var allKeys: _HeapBuffer<Int, AnyObject>
 
     /// Index into `allKeys`
-    @usableFromInline // FIXME(sil-serialize-all)
     internal var currentKeyIndex: Int
 
-    @inlinable // FIXME(sil-serialize-all)
-    internal init(_ base: __owned _CocoaSet, startIndex: ()) {
-      self.base = base
-      self.allKeys = _stdlib_NSSet_allObjects(base.object)
-      self.currentKeyIndex = 0
-    }
-
-    @inlinable // FIXME(sil-serialize-all)
-    internal init(_ base: __owned _CocoaSet, endIndex: ()) {
-      self.base = base
-      self.allKeys = _stdlib_NSSet_allObjects(base.object)
-      self.currentKeyIndex = allKeys.value
-    }
-
-    @inlinable // FIXME(sil-serialize-all)
     internal init(
       _ base: __owned _CocoaSet,
       _ allKeys: __owned _HeapBuffer<Int, AnyObject>,
@@ -445,38 +456,56 @@ extension _CocoaSet {
 
 extension _CocoaSet.Index {
   @inlinable
-  @nonobjc
-  internal var element: AnyObject {
-    _precondition(currentKeyIndex < allKeys.value,
-      "Attempting to access Set elements using an invalid index")
-    return allKeys[currentKeyIndex]
+  internal mutating func isUniquelyReferenced() -> Bool {
+    return _isUnique_native(&storage)
   }
 
   @usableFromInline
+  internal mutating func copy() -> Storage {
+    let storage = self.storage
+    return Storage(storage.base, storage.allKeys, storage.currentKeyIndex)
+  }
+}
+
+extension _CocoaSet.Index {
+  @usableFromInline // FIXME(cocoa-index): Make inlinable
+  @nonobjc
+  internal var element: AnyObject {
+    @_effects(readonly)
+    get {
+      _precondition(storage.currentKeyIndex < storage.allKeys.value,
+        "Attempting to access Set elements using an invalid index")
+      return storage.allKeys[storage.currentKeyIndex]
+    }
+  }
+
+  @usableFromInline // FIXME(cocoa-index): Make inlinable
   @nonobjc
   internal var age: Int32 {
     @_effects(releasenone)
     get {
-      return _HashTable.age(for: base.object)
+      return _HashTable.age(for: storage.base.object)
     }
   }
 }
 
 extension _CocoaSet.Index: Equatable {
-  @inlinable
+  @usableFromInline // FIXME(cocoa-index): Make inlinable
+  @_effects(readonly)
   internal static func == (lhs: _CocoaSet.Index, rhs: _CocoaSet.Index) -> Bool {
-    _precondition(lhs.base.object === rhs.base.object,
+    _precondition(lhs.storage.base.object === rhs.storage.base.object,
       "Comparing indexes from different sets")
-    return lhs.currentKeyIndex == rhs.currentKeyIndex
+    return lhs.storage.currentKeyIndex == rhs.storage.currentKeyIndex
   }
 }
 
 extension _CocoaSet.Index: Comparable {
-  @inlinable
+  @usableFromInline // FIXME(cocoa-index): Make inlinable
+  @_effects(readonly)
   internal static func < (lhs: _CocoaSet.Index, rhs: _CocoaSet.Index) -> Bool {
-    _precondition(lhs.base.object === rhs.base.object,
+    _precondition(lhs.storage.base.object === rhs.storage.base.object,
       "Comparing indexes from different sets")
-    return lhs.currentKeyIndex < rhs.currentKeyIndex
+    return lhs.storage.currentKeyIndex < rhs.storage.currentKeyIndex
   }
 }
 

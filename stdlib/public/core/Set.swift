@@ -1418,7 +1418,7 @@ extension Set.Index: Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable
+  @_effects(readonly) // FIXME(cocoa-index): Make inlinable
   public func hash(into hasher: inout Hasher) {
   #if _runtime(_ObjC)
     switch _variant {
@@ -1428,7 +1428,7 @@ extension Set.Index: Hashable {
     case .cocoa(let cocoaIndex):
       _cocoaPath()
       hasher.combine(1 as UInt8)
-      hasher.combine(cocoaIndex.currentKeyIndex)
+      hasher.combine(cocoaIndex.storage.currentKeyIndex)
     }
   #else
     hasher.combine(_asNative.bucket.offset)

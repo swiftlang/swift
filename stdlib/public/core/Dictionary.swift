@@ -1897,7 +1897,7 @@ extension Dictionary.Index: Comparable {
 }
 
 extension Dictionary.Index: Hashable {
-  @inlinable
+  @_effects(readonly) // FIXME(cocoa-index): Make inlinable
   public func hash(into hasher: inout Hasher) {
   #if _runtime(_ObjC)
     switch _variant {
@@ -1907,7 +1907,7 @@ extension Dictionary.Index: Hashable {
     case .cocoa(let cocoaIndex):
       _cocoaPath()
       hasher.combine(1 as UInt8)
-      hasher.combine(cocoaIndex.currentKeyIndex)
+      hasher.combine(cocoaIndex.storage.currentKeyIndex)
     }
   #else
     hasher.combine(_asNative.bucket.offset)
