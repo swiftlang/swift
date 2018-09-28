@@ -517,7 +517,7 @@ extension CGAffineTransform : Codable {
 
 extension CGImage {
   public func copy(maskingColorComponents components: [CGFloat]) -> CGImage? {
-    return self.__copy(maskingColorComponents: UnsafePointer(components))
+    return self.__copy(maskingColorComponents: components)
   }
 }
 
