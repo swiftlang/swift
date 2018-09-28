@@ -46,54 +46,41 @@ extension String {
   internal static func _tryFromUTF8(
     _ input: UnsafeBufferPointer<UInt8>
   ) -> String? {
-    // TODO(UTF8 perf): More efficient validation
+    guard case .success(let extraInfo) = validateUTF8(input) else {
+        return nil
+    }
 
-    // TODO(UTF8 perf): Skip intermediary array
-    var contents: [UInt8] = []
-    contents.reserveCapacity(input.count)
-    let repaired = transcode(
-      input.makeIterator(),
-      from: UTF8.self,
-      to: UTF8.self,
-      stoppingOnError: true,
-      into: { contents.append($0) })
-    guard !repaired else { return nil }
-
-    return contents.withUnsafeBufferPointer { String._uncheckedFromUTF8($0) }
+    return String._uncheckedFromUTF8(input, isASCII: extraInfo.isASCII)
   }
 
   @usableFromInline
   internal static func _fromUTF8Repairing(
     _ input: UnsafeBufferPointer<UInt8>
   ) -> (result: String, repairsMade: Bool) {
-    if _allASCII(input) {
-      return (String._uncheckedFromUTF8(input, asciiPreScanResult: true), false)
+    switch validateUTF8(input) {
+    case .success(let extraInfo):
+        return (String._uncheckedFromUTF8(input, asciiPreScanResult: extraInfo.isASCII), false)
+    case .error(let initialRange):
+        return (repairUTF8(input, firstKnownBrokenRange: initialRange), true)
     }
-
-    // TODO(UTF8 perf): More efficient validation
-
-    // TODO(UTF8 perf): Skip intermediary array
-    var contents: [UInt8] = []
-    contents.reserveCapacity(input.count)
-    let repaired = transcode(
-      input.makeIterator(),
-      from: UTF8.self,
-      to: UTF8.self,
-      stoppingOnError: false,
-      into: { contents.append($0) })
-    let str = contents.withUnsafeBufferPointer { String._uncheckedFromUTF8($0) }
-    return (str, repaired)
   }
 
   @usableFromInline
   internal static func _uncheckedFromUTF8(
     _ input: UnsafeBufferPointer<UInt8>
   ) -> String {
+    return _uncheckedFromUTF8(input, isASCII: _allASCII(input))
+  }
+
+  @usableFromInline
+  internal static func _uncheckedFromUTF8(
+    _ input: UnsafeBufferPointer<UInt8>,
+    isASCII: Bool
+  ) -> String {
     if let smol = _SmallString(input) {
       return String(_StringGuts(smol))
     }
 
-    let isASCII = _allASCII(input)
     let storage = _StringStorage.create(
       initializingFrom: input, isASCII: isASCII)
     return storage.asString
