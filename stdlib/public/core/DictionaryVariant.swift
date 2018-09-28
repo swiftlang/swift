@@ -327,28 +327,22 @@ extension Dictionary._Variant {
     }
   }
 
-  /// Ensure uniquely held native storage, while preserving the given index.
-  /// (If the variant had bridged storage, then the returned index will be the
-  /// corresponding native representation. Otherwise it's kept the same.)
   @inlinable
   @inline(__always)
   internal mutating func ensureUniqueNative() -> _NativeDictionary<Key, Value> {
-    switch self {
-    case .native:
-      let isUnique = isUniquelyReferenced()
-      if !isUnique {
-        let rehashed = asNative.copy(capacity: asNative.capacity)
-        _sanityCheck(!rehashed)
-      }
-      return asNative
 #if _runtime(_ObjC)
-    case .cocoa(let cocoa):
+    if case .cocoa(let cocoa) = self {
       cocoaPath()
       let native = _NativeDictionary<Key, Value>(cocoa)
       self = .native(native)
       return native
-#endif
     }
+#endif
+    let isUnique = isUniquelyReferenced()
+    if !isUnique {
+      asNative.copy()
+    }
+    return asNative
   }
 
   @inlinable
