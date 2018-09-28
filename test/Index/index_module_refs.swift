@@ -1,5 +1,8 @@
 // RUN: %target-swift-ide-test -print-indexed-symbols -enable-source-import -source-filename %s -I %S/Store/Inputs | %FileCheck %s
 
+import NonExistingModuleName // Make sure invalid imports aren't affecting results
+// CHECK-NOT: {{.*}} | NonExistingModuleName
+
 import ClangModuleB
 // CHECK: [[@LINE-1]]:8 | module/C | ClangModuleB | c:@M@ClangModuleB | Ref | rel: 0
 import ClangModuleC.Sub1
