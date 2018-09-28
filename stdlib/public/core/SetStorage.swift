@@ -16,7 +16,6 @@ import SwiftShims
 /// Enough bytes are allocated to hold the bitmap for marking valid entries,
 /// keys, and values. The data layout starts with the bitmap, followed by the
 /// keys, followed by the values.
-@_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 @_objc_non_lazy_realization
 internal class _RawSetStorage: __SwiftNativeNSSet {
@@ -104,7 +103,6 @@ internal class _RawSetStorage: __SwiftNativeNSSet {
 
 /// The storage class for the singleton empty set.
 /// The single instance of this class is created by the runtime.
-@_fixed_layout
 @usableFromInline
 internal class _EmptySetSingleton: _RawSetStorage {
   @nonobjc
@@ -175,7 +173,6 @@ extension _EmptySetSingleton: _NSSetCore {
 #endif
 }
 
-@_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 final internal class _SetStorage<Element: Hashable>
   : _RawSetStorage, _NSSetCore {

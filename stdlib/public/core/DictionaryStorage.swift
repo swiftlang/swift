@@ -16,7 +16,6 @@ import SwiftShims
 /// Enough bytes are allocated to hold the bitmap for marking valid entries,
 /// keys, and values. The data layout starts with the bitmap, followed by the
 /// keys, followed by the values.
-@_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 @_objc_non_lazy_realization
 internal class _RawDictionaryStorage: __SwiftNativeNSDictionary {
@@ -109,7 +108,6 @@ internal class _RawDictionaryStorage: __SwiftNativeNSDictionary {
 
 /// The storage class for the singleton empty set.
 /// The single instance of this class is created by the runtime.
-@_fixed_layout
 @usableFromInline
 internal class _EmptyDictionarySingleton: _RawDictionaryStorage {
   @nonobjc
@@ -192,7 +190,6 @@ extension _RawDictionaryStorage {
   }
 }
 
-@_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 final internal class _DictionaryStorage<Key: Hashable, Value>
   : _RawDictionaryStorage, _NSDictionaryCore {
