@@ -287,11 +287,11 @@ private:
   /// Cache of module names that fail the 'canImport' test in this context.
   llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
   
-public:
   /// \brief Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
 
+public:
   /// Allocate - Allocate memory from the ASTContext bump pointer.
   void *Allocate(unsigned long bytes, unsigned alignment,
                  AllocationArena arena = AllocationArena::Permanent) const {
