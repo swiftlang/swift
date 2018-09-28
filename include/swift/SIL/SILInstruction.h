@@ -8097,8 +8097,8 @@ public:
 /// stored in the GraphOperationInst.
 ///
 /// Results can be represented in 3 different ways:
-/// 1. As an output parameter with type that is a TensorFlow value or aggregate
-///    of TensorFlow values.
+/// 1. As a single output parameter with type that is a TensorFlow value or
+///    aggregate of TensorFlow values.
 /// 2. As a single result that is a TensorFlow value or aggregate of TensorFlow
 ///    values.
 /// 3. As multiple results, where each result is a TensorFlow value (not an
@@ -8106,6 +8106,8 @@ public:
 /// The later result representations are "better" than the earlier ones because
 /// code performing the operations has to do less work to deal with the results.
 /// Various compiler passes try to improve the result representations.
+/// Successful deabstraction currently guarantees that the result will be in
+/// form 3.
 class GraphOperationInst final
   : public InstructionBase<
                SILInstructionKind::GraphOperationInst,

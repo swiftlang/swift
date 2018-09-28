@@ -457,6 +457,8 @@ static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
              origInst->getResult(0)->getType().getASTType() ==
                 ctx.TheEmptyTupleType &&
              "graph_op with out parameter must return the empty tuple");
+      // There should only be one output parameter because output parameter is
+      // still a single value or single aggregate.
       assert(!outParameterAddress && "there is more than one out parameter");
       outParameterAddress = argumentValue;
       continue;
@@ -494,23 +496,18 @@ static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
   if (outParameterAddress) {
     newInst = opBuilder.build(B, ctx, origInst->getLoc(),
                               {outParameterAddress->getType().getObjectType()});
+
+    // Store the new instruction's result to the outParameterAddress.
+    auto hasOwnership = newInst->getFunction()->hasQualifiedOwnership();
+    auto storeOwnership = hasOwnership ? StoreOwnershipQualifier::Trivial
+                                       : StoreOwnershipQualifier::Unqualified;
+    B.createStore(origInst->getLoc(), newInst->getResult(0),
+                  outParameterAddress, storeOwnership);
   } else {
     SmallVector<SILType, 4> origResultTypes(origInst->getResultTypes());
     newInst = opBuilder.build(B, ctx, origInst->getLoc(), origResultTypes);
   }
   newInst->setDebugLocation(origInst->getDebugLocation());
-
-  // If the original instruction had an out parameter, store the new
-  // instruction's value to that address.
-  if (outParameterAddress) {
-    auto hasOwnership = newInst->getFunction()->hasQualifiedOwnership();
-    auto storeOwnership = hasOwnership ? StoreOwnershipQualifier::Trivial
-                                       : StoreOwnershipQualifier::Unqualified;
-    assert(newInst->getNumResults() == 1 &&
-           "out parameter should turn into 1 result");
-    B.createStore(origInst->getLoc(), newInst->getResult(0),
-                  outParameterAddress, storeOwnership);
-  }
 
   // Replace the old with the new and delete the old instruction.
   origInst->replaceAllUsesPairwiseWith(newInst);
@@ -2612,6 +2609,9 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
   // replace users, without doing any packing.
   else {
     SmallVector<SILType, 4> origResultTypes(origInst->getResultTypes());
+    for (auto resultType : origResultTypes)
+      assert(isTensorFlowValue(resultType) &&
+             "when there are multiple results, they should be tf types");
     auto op = opBuilder.build(B, context, loc, origResultTypes);
     origInst->replaceAllUsesPairwiseWith(op);
   }
