@@ -25,6 +25,8 @@ extern void InitTensorFlowRuntime(unsigned char enable_debug_logging,
 void *swift_tfc_CreateScalarFloatTensor(int32_t val);
 
 struct TF_Status;
+//`val` will be cast to the C data type based on `dtype`, which is then used to
+// create the scalar tensor. e.g. For dtype = TF_INT8, int8_t will be used.
 void *swift_tfc_CreateScalarIntTensor(int64_t val, int32_t dtype,
                                       TF_Status *status);
 
