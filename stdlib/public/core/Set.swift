@@ -161,8 +161,8 @@ public struct Set<Element: Hashable> {
   /// - Parameter minimumCapacity: The minimum number of elements that the
   ///   newly created set should be able to store without reallocating its
   ///   storage buffer.
-  @inlinable
-  public init(minimumCapacity: Int) {
+  public // FIXME(reserveCapacity): Should be inlinable
+  init(minimumCapacity: Int) {
     _variant = .native(_NativeSet(capacity: minimumCapacity))
   }
 
@@ -1590,8 +1590,8 @@ extension Set {
   ///
   /// - Parameter minimumCapacity: The requested number of elements to
   ///   store.
-  @inlinable
-  public mutating func reserveCapacity(_ minimumCapacity: Int) {
+  public // FIXME(reserveCapacity): Should be inlinable
+  mutating func reserveCapacity(_ minimumCapacity: Int) {
     _variant.reserveCapacity(minimumCapacity)
     _sanityCheck(self.capacity >= minimumCapacity)
   }

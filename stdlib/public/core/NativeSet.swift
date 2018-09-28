@@ -208,7 +208,6 @@ extension _NativeSet { // ensureUnique
     return true
   }
 
-  @inlinable
   internal mutating func reserveCapacity(_ capacity: Int, isUnique: Bool) {
     _ = ensureUnique(isUnique: isUnique, capacity: capacity)
   }
