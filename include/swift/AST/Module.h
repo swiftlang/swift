@@ -1291,7 +1291,7 @@ public:
   const ModuleDecl *getAsSwiftModule() const;
   const clang::Module *getAsClangModule() const;
 
-  inline void *getOpaqueValue() const {
+  void *getOpaqueValue() const {
     assert(!Mod.isNull());
     return Mod.getOpaqueValue();
   }

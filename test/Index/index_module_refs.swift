@@ -19,7 +19,11 @@ extension SwiftModuleC.MyType {
   // CHECK: [[@LINE-1]]:11 | module/Swift | SwiftModuleC | [[SwiftModuleC_USR]] | Ref | rel: 0
   func myMethod() {
     _ = SwiftModuleC.MyGeneric<SwiftModuleC.MyType, MyType>()
-    // CHECK: [[@LINE-1]]:9 | module/Swift | SwiftModuleC | [[SwiftModuleC_USR]] | Ref | rel: 0
-    // CHECK: [[@LINE-2]]:32 | module/Swift | SwiftModuleC | [[SwiftModuleC_USR]] | Ref | rel: 0
+    // CHECK: [[@LINE-1]]:9 | module/Swift | SwiftModuleC | [[SwiftModuleC_USR]] | Ref,RelCont | rel: 1
+    // CHECK-NEXT: RelCont | instance-method/Swift | myMethod() | [[myMethod_USR:.*]]
+    // CHECK: [[@LINE-3]]:22 | struct/Swift | MyGeneric | {{.*}} | Ref
+    // CHECK: [[@LINE-4]]:32 | module/Swift | SwiftModuleC | [[SwiftModuleC_USR]] | Ref,RelCont | rel: 1
+    // CHECK-NEXT: RelCont | instance-method/Swift | myMethod() | [[myMethod_USR]]
+    // CHECK: [[@LINE-6]]:45 | struct/Swift | MyType | {{.*}} | Ref
   }
 }

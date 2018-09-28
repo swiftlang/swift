@@ -411,6 +411,10 @@ private:
     Info.symInfo = getSymbolInfoForModule(Mod);
     getModuleNameAndUSR(Mod, Info.name, Info.USR);
 
+    auto Parent = getParentDecl();
+    if (Parent && isa<AbstractFunctionDecl>(Parent))
+      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Parent);
+
     if (!IdxConsumer.startSourceEntity(Info)) {
       Cancelled = true;
       return true;
