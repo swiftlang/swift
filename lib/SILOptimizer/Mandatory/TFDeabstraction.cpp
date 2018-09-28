@@ -344,10 +344,7 @@ static SILValue lookThroughSingleElementStructInsts(SILValue value) {
 ///
 static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
                                             TFDeabstraction &TFDA) {
-  assert(origInst->getNumResults() == 1 &&
-         "SILGen should have generated a graph_op with 1 result");
-  auto origResult = origInst->getResult(0);
-  auto &ctx = origResult->getType().getASTContext();
+  auto &ctx = origInst->getFunction()->getASTContext();
   GraphOperationInfo opInfo(origInst);
 
   /// Return a VarDecl if this is a struct wrapping a single field which is a
@@ -456,6 +453,10 @@ static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
         }
         return nullptr;
       }
+      assert(origInst->getNumResults() == 1 &&
+             origInst->getResult(0)->getType().getASTType() ==
+                ctx.TheEmptyTupleType &&
+             "graph_op with out parameter must return the empty tuple");
       assert(!outParameterAddress && "there is more than one out parameter");
       outParameterAddress = argumentValue;
       continue;
@@ -489,9 +490,14 @@ static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
 
   // Now that we've rebuilt the argument list, create a new graph_op and replace
   // the old one.
-  auto newType = outParameterAddress ?
-      outParameterAddress->getType().getObjectType() : origResult->getType();
-  auto newInst = opBuilder.build(B, ctx, origInst->getLoc(), newType);
+  GraphOperationInst *newInst;
+  if (outParameterAddress) {
+    newInst = opBuilder.build(B, ctx, origInst->getLoc(),
+                              {outParameterAddress->getType().getObjectType()});
+  } else {
+    SmallVector<SILType, 4> origResultTypes(origInst->getResultTypes());
+    newInst = opBuilder.build(B, ctx, origInst->getLoc(), origResultTypes);
+  }
   newInst->setDebugLocation(origInst->getDebugLocation());
 
   // If the original instruction had an out parameter, store the new
@@ -501,7 +507,7 @@ static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
     auto storeOwnership = hasOwnership ? StoreOwnershipQualifier::Trivial
                                        : StoreOwnershipQualifier::Unqualified;
     assert(newInst->getNumResults() == 1 &&
-           "simplified graph_op should still only have one result");
+           "out parameter should turn into 1 result");
     B.createStore(origInst->getLoc(), newInst->getResult(0),
                   outParameterAddress, storeOwnership);
   }
@@ -2123,9 +2129,6 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
     GraphOperationInfo &opInfo, DenseMap<SILValue, SymbolicValue> &constants,
     GraphFunctionDeviceInfo &deviceInfo) {
   auto *origInst = opInfo.getInst();
-  assert(origInst->getNumResults() == 1 &&
-         "SILGen should have generated a graph_op with 1 result");
-  auto origResult = origInst->getResult(0);
   auto &context = origInst->getFunction()->getASTContext();
   auto &allocator = context.getAllocator();
   SILBuilder B(origInst);
@@ -2186,6 +2189,10 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
         GraphOperationInfo::ArgumentLowering::Input) {
       // If this is tfc.scalarToTensor, then the input must be a valid scalar.
       if (opInfo.getOperationName() == "tfc.scalarToTensor") {
+        assert(origInst->getNumResults() == 1 &&
+               "tfc.scalarToTensor must have 1 result");
+        auto origResult = origInst->getResult(0);
+
         auto scalarType = argumentTy.getASTType();
         if (convertSwiftTypeToTF(scalarType) == 0) {
           diagnoseInvalid(origInstLoc,
@@ -2552,49 +2559,63 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
                                      context, &opBuilder);
   }
   // Okay, if we got this far then we have all valid attributes and inputs.
-  // Figure out the result list.
-  SmallVector<Type, 4> resultTypes;
-  auto userResultTy = origResult->getType().getASTType();
-  if (!tf::flattenTensorFlowValueAggregate(userResultTy, resultTypes)) {
-    auto loc = getUserSourceLocation(origInst);
-    diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
-             diag::tf_op_result_not_value_or_aggregate, userResultTy)
-      .highlight(loc.getSourceRange());
-    return;
-  }
-  auto resultSILTypes = map<SmallVector<SILType, 8>>(resultTypes, [&](Type ty) {
-      return SILType::getPrimitiveObjectType(ty->getCanonicalType()); });
 
+  // Time to create the op and deal with results.
   auto loc = getUserSourceLocation(origInst);
-  auto op = opBuilder.build(B, context, loc, resultSILTypes);
 
-  // Recursively pack results to a value with the user-specified aggregate type.
-  auto resultIt = op->getResults().begin();
-  std::function<SILValue(SILType)> packResultsToAggregate;
-  packResultsToAggregate = [&](SILType aggregateTy) -> SILValue {
-    if (isTensorFlowValue(aggregateTy))
-      return *resultIt++;
-    if (auto tupleTy = aggregateTy.getAs<TupleType>()) {
-      SmallVector<SILValue, 8> elts;
-      for (auto i : range(tupleTy->getNumElements()))
-        elts.push_back(
-            packResultsToAggregate(aggregateTy.getTupleElementType(i)));
-      return B.createTuple(loc, aggregateTy, elts);
+  // If there is only one result, it may be an aggregate that we have to pack.
+  if (origInst->getNumResults() == 1) {
+    auto origResult = origInst->getResults()[0];
+    SmallVector<Type, 4> resultTypes;
+    auto userResultTy = origResult->getType().getASTType();
+    if (!tf::flattenTensorFlowValueAggregate(userResultTy, resultTypes)) {
+      auto loc = getUserSourceLocation(origInst);
+      diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
+               diag::tf_op_result_not_value_or_aggregate, userResultTy)
+        .highlight(loc.getSourceRange());
+      return;
     }
-    if (auto *decl = aggregateTy.getStructOrBoundGenericStruct()) {
-      SmallVector<SILValue, 8> elts;
-      for (auto *field : decl->getStoredProperties())
-        elts.push_back(packResultsToAggregate(
-            aggregateTy.getFieldType(field, B.getModule())));
-      return B.createStruct(loc, aggregateTy, elts);
-    }
-    llvm_unreachable("Non-TF type should have been diagnosed");
-  };
-  auto result = packResultsToAggregate(origResult->getType());
-  assert(resultIt == op->getResults().end()
-         && "All result types should've been processed");
-  // Replace any use of the old graph_op result with the newly packed aggregate.
-  origResult->replaceAllUsesWith(result);
+    auto resultSILTypes = map<SmallVector<SILType, 8>>(resultTypes, [&](Type ty) {
+        return SILType::getPrimitiveObjectType(ty->getCanonicalType()); });
+
+    auto op = opBuilder.build(B, context, loc, resultSILTypes);
+
+    // Recursively pack results to a value with the user-specified aggregate type.
+    auto resultIt = op->getResults().begin();
+    std::function<SILValue(SILType)> packResultsToAggregate;
+    packResultsToAggregate = [&](SILType aggregateTy) -> SILValue {
+      if (isTensorFlowValue(aggregateTy))
+        return *resultIt++;
+      if (auto tupleTy = aggregateTy.getAs<TupleType>()) {
+        SmallVector<SILValue, 8> elts;
+        for (auto i : range(tupleTy->getNumElements()))
+          elts.push_back(
+              packResultsToAggregate(aggregateTy.getTupleElementType(i)));
+        return B.createTuple(loc, aggregateTy, elts);
+      }
+      if (auto *decl = aggregateTy.getStructOrBoundGenericStruct()) {
+        SmallVector<SILValue, 8> elts;
+        for (auto *field : decl->getStoredProperties())
+          elts.push_back(packResultsToAggregate(
+              aggregateTy.getFieldType(field, B.getModule())));
+        return B.createStruct(loc, aggregateTy, elts);
+      }
+      llvm_unreachable("Non-TF type should have been diagnosed");
+    };
+    auto result = packResultsToAggregate(origResult->getType());
+    assert(resultIt == op->getResults().end()
+           && "All result types should've been processed");
+    // Replace any use of the old graph_op result with the newly packed aggregate.
+    origResult->replaceAllUsesWith(result);
+  }
+  // There are multiple results, so each one must be a TensorFlow value. Simply
+  // replace users, without doing any packing.
+  else {
+    SmallVector<SILType, 4> origResultTypes(origInst->getResultTypes());
+    auto op = opBuilder.build(B, context, loc, origResultTypes);
+    origInst->replaceAllUsesPairwiseWith(op);
+  }
+
   origInst->eraseFromParent();
 
   // TODO: Analyze the operands to the instruction and remove them if they are

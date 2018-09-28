@@ -8087,8 +8087,25 @@ public:
   }
 };
 
-/// A graph operation. This instruction will be extracted to a graph program
-/// via graph program extraction passes.
+/// A graph operation, which takes operands and attributes and returns results.
+///
+/// Operands have values that are possibly unknown at compile time. Operands
+/// are grouped into `GraphOperationInfo::StructuredArgument`s. See there for
+/// more documentation. This structure is mangled into `Name`.
+///
+/// Attributes have values that are known at compile time, and these values are
+/// stored in the GraphOperationInst.
+///
+/// Results can be represented in 3 different ways:
+/// 1. As an output parameter with type that is a TensorFlow value or aggregate
+///    of TensorFlow values.
+/// 2. As a single result that is a TensorFlow value or aggregate of TensorFlow
+///    values.
+/// 3. As multiple results, where each result is a TensorFlow value (not an
+///    aggregate of TensorFlow values!).
+/// The later result representations are "better" than the earlier ones because
+/// code performing the operations has to do less work to deal with the results.
+/// Various compiler passes try to improve the result representations.
 class GraphOperationInst final
   : public InstructionBase<
                SILInstructionKind::GraphOperationInst,
