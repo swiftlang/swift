@@ -285,19 +285,22 @@ final internal class _SetStorage<Element: Hashable>
 extension _SetStorage {
   @usableFromInline
   @_effects(releasenone)
-  internal static func reallocate(
+  internal static func copy(original: _RawSetStorage) -> _SetStorage {
+    return .allocate(
+      scale: original._scale,
+      age: original._age,
+      seed: original._seed)
+  }
+
+  @usableFromInline
+  @_effects(releasenone)
+  static internal func resize(
     original: _RawSetStorage,
-    capacity: Int
-  ) -> (storage: _SetStorage, rehash: Bool) {
-    _sanityCheck(capacity >= original._count)
+    capacity: Int,
+    move: Bool
+  ) -> _SetStorage {
     let scale = _HashTable.scale(forCapacity: capacity)
-    let rehash = (scale != original._scale)
-    if rehash {
-      return .allocate(scale: scale, age: nil, seed: nil)
-    }
-    return (
-      .allocate(scale: scale, age: original._age, seed: original._seed),
-      rehash)
+    return allocate(scale: scale, age: nil, seed: nil)
   }
 
   @usableFromInline

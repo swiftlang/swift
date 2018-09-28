@@ -92,7 +92,7 @@ extension _HashTable {
 
   internal static func hashSeed(
     for object: AnyObject,
-    scale: Int
+    scale: Int8
   ) -> Int {
 #if false // FIXME: Enable per-instance seeding
     // We generate a new hash seed whenever a new hash table is allocated and
@@ -106,7 +106,7 @@ extension _HashTable {
       // When we're using deterministic hashing, the scale value as the seed is
       // still allowed, and it covers most cases. (Unfortunately some operations
       // that merge two similar-sized hash tables will still be quadratic.)
-      return scale
+      return Int(scale)
     }
     // Use the object address as the hash seed. This is cheaper than
     // SystemRandomNumberGenerator, while it has the same practical effect.
@@ -117,7 +117,7 @@ extension _HashTable {
     return unsafeBitCast(object, to: Int.self)
 #else
     // Use per-capacity seeding for now.
-    return scale
+    return Int(scale)
 #endif
   }
 }

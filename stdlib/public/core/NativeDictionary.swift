@@ -182,8 +182,11 @@ extension _NativeDictionary { // ensureUnique
   @inlinable
   internal mutating func resize(capacity: Int) {
     let capacity = Swift.max(capacity, self.capacity)
-    let result = _NativeDictionary(
-      _DictionaryStorage<Key, Value>.allocate(capacity: capacity))
+    let newStorage = _DictionaryStorage<Key, Value>.resize(
+      original: _storage,
+      capacity: capacity,
+      move: true)
+    let result = _NativeDictionary(newStorage)
     if count > 0 {
       for bucket in hashTable {
         let key = (_keys + bucket.offset).move()
@@ -199,31 +202,40 @@ extension _NativeDictionary { // ensureUnique
   }
 
   @inlinable
-  internal mutating func copy(capacity: Int) -> Bool {
+  internal mutating func copyAndResize(capacity: Int) {
     let capacity = Swift.max(capacity, self.capacity)
-    let (newStorage, rehash) = _DictionaryStorage<Key, Value>.reallocate(
+    let newStorage = _DictionaryStorage<Key, Value>.resize(
       original: _storage,
-      capacity: capacity)
+      capacity: capacity,
+      move: false)
     let result = _NativeDictionary(newStorage)
     if count > 0 {
-      if rehash {
-        for bucket in hashTable {
-          result._unsafeInsertNew(
-            key: self.uncheckedKey(at: bucket),
-            value: self.uncheckedValue(at: bucket))
-        }
-      } else {
-        result.hashTable.copyContents(of: hashTable)
-        result._storage._count = self.count
-        for bucket in hashTable {
-          let key = uncheckedKey(at: bucket)
-          let value = uncheckedValue(at: bucket)
-          result.uncheckedInitialize(at: bucket, toKey: key, value: value)
-        }
+      for bucket in hashTable {
+        result._unsafeInsertNew(
+          key: self.uncheckedKey(at: bucket),
+          value: self.uncheckedValue(at: bucket))
       }
     }
     _storage = result._storage
-    return rehash
+  }
+
+  @inlinable
+  internal mutating func copy() {
+    let newStorage = _DictionaryStorage<Key, Value>.copy(original: _storage)
+    _sanityCheck(newStorage._scale == _storage._scale)
+    _sanityCheck(newStorage._age == _storage._age)
+    _sanityCheck(newStorage._seed == _storage._seed)
+    let result = _NativeDictionary(newStorage)
+    if count > 0 {
+      result.hashTable.copyContents(of: hashTable)
+      result._storage._count = self.count
+      for bucket in hashTable {
+        let key = uncheckedKey(at: bucket)
+        let value = uncheckedValue(at: bucket)
+        result.uncheckedInitialize(at: bucket, toKey: key, value: value)
+      }
+    }
+    _storage = result._storage
   }
 
   /// Ensure storage of self is uniquely held and can hold at least `capacity`
@@ -234,10 +246,15 @@ extension _NativeDictionary { // ensureUnique
     if _fastPath(capacity <= self.capacity && isUnique) {
       return false
     }
-    guard isUnique else {
-      return copy(capacity: capacity)
+    if isUnique {
+      resize(capacity: capacity)
+      return true
     }
-    resize(capacity: capacity)
+    if capacity <= self.capacity {
+      copy()
+      return false
+    }
+    copyAndResize(capacity: capacity)
     return true
   }
 
@@ -571,10 +588,7 @@ extension _NativeDictionary { // High-level operations
   internal func mapValues<T>(
     _ transform: (Value) throws -> T
   ) rethrows -> _NativeDictionary<Key, T> {
-    let (resultStorage, rehash) = _DictionaryStorage<Key, T>.reallocate(
-      original: _storage,
-      capacity: capacity)
-    _sanityCheck(!rehash)
+    let resultStorage = _DictionaryStorage<Key, T>.copy(original: _storage)
     _sanityCheck(resultStorage._seed == _storage._seed)
     let result = _NativeDictionary<Key, T>(resultStorage)
     // Because the current and new buffer have the same scale and seed, we can

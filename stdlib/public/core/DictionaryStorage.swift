@@ -359,21 +359,24 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
 extension _DictionaryStorage {
   @usableFromInline
   @_effects(releasenone)
-  internal static func reallocate(
+  internal static func copy(
+    original: _RawDictionaryStorage
+  ) -> _DictionaryStorage {
+    return allocate(
+      scale: original._scale,
+      age: original._age,
+      seed: original._seed)
+  }
+
+  @usableFromInline
+  @_effects(releasenone)
+  static internal func resize(
     original: _RawDictionaryStorage,
-    capacity: Int
-  ) -> (storage: _DictionaryStorage, rehash: Bool) {
-    _sanityCheck(capacity >= original._count)
+    capacity: Int,
+    move: Bool
+  ) -> _DictionaryStorage {
     let scale = _HashTable.scale(forCapacity: capacity)
-    let rehash = (scale != original._scale)
-    if rehash {
-      return (.allocate(scale: scale, age: nil, seed: nil), rehash)
-    }
-    return (
-      .allocate(scale: scale, age: original._age, seed: original._seed),
-      rehash)
-    }
-    return (newStorage, rehash)
+    return allocate(scale: scale, age: nil, seed: nil)
   }
 
   @usableFromInline
@@ -392,7 +395,7 @@ extension _DictionaryStorage {
   ) -> _DictionaryStorage {
     let scale = _HashTable.scale(forCapacity: capacity)
     let age = _HashTable.age(for: cocoa.object)
-    return allocate(scale: scale, age: age)
+    return allocate(scale: scale, age: age, seed: nil)
   }
 #endif
 
