@@ -365,6 +365,10 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   setAccess(AccessLevel::Public);
 }
 
+bool ModuleDecl::isClangModule() const {
+  return findUnderlyingClangModule() != nullptr;
+}
+
 void ModuleDecl::addFile(FileUnit &newFile) {
   // Require Main and REPL files to be the first file added.
   assert(Files.empty() ||
@@ -1634,6 +1638,13 @@ const ModuleDecl* ModuleEntity::getAsSwiftModule() const {
   if (auto SwiftMod = Mod.dyn_cast<const ModuleDecl*>())
     return SwiftMod;
   return nullptr;
+}
+
+const clang::Module* ModuleEntity::getAsClangModule() const {
+  assert(!Mod.isNull());
+  if (Mod.is<const ModuleDecl*>())
+    return nullptr;
+  return getClangModule(Mod);
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing SourceFiles, is

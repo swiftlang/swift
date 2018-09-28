@@ -13,6 +13,7 @@
 #include "swift/Index/IndexSymbol.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 
@@ -132,6 +133,25 @@ static SymbolKind getVarSymbolKind(const VarDecl *VD) {
     return SymbolKind::InstanceProperty;
   }
   return SymbolKind::Variable;
+}
+
+SymbolInfo index::getSymbolInfoForModule(ModuleEntity Mod) {
+  SymbolInfo info;
+  info.Kind = SymbolKind::Module;
+  info.SubKind = SymbolSubKind::None;
+  info.Properties = SymbolPropertySet();
+  if (auto *D = Mod.getAsSwiftModule()) {
+    if (!D->isClangModule()) {
+      info.Lang = SymbolLanguage::Swift;
+    } else {
+      info.Lang = SymbolLanguage::C;
+    }
+  } else if (Mod.getAsClangModule()) {
+    info.Lang = SymbolLanguage::C;
+  } else {
+    llvm_unreachable("unexpected module kind");
+  }
+  return info;
 }
 
 SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
