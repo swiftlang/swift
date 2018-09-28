@@ -1362,6 +1362,11 @@ FUNCTION(TFC_CreateScalarFloatTensor, swift_tfc_CreateScalarFloatTensor, C_CC,
          ARGS(Int32Ty),
          ATTRS(NoUnwind))
 
+FUNCTION(TFC_CreateScalarIntTensor, swift_tfc_CreateScalarIntTensor, C_CC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int64Ty, Int32Ty, Int8PtrTy),
+         ATTRS(NoUnwind))
+
 FUNCTION(TFE_Execute, swift_tfc_TFE_Execute, C_CC,
          RETURNS(),
          ARGS(Int8PtrTy, Int8PtrPtrTy, Int32PtrTy, Int8PtrTy),
@@ -1373,15 +1378,15 @@ FUNCTION(TFC_GetGlobalEagerContext, _swift_tfc_GetGlobalEagerContext, C_CC,
          ATTRS(NoUnwind))
 
 // TODO: enable these decls once we have AnyTensorHandle.
-// FUNCTION(TFC_ExtractFloatCTensorHandle, _swift_tfc_ExtractFloatCTensorHandle, C_CC,
-//          RETURNS(Int8PtrTy),
-//          ARGS(Int8PtrTy),
-//          ATTRS(NoUnwind))
+FUNCTION(TFC_GetCTensorHandleFromSwift, _swift_tfc_GetCTensorHandleFromSwift, C_CC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
 
-// FUNCTION(TFC_CreateFloatTensorHandleFromCTensorHandle, _swift_tfc_CreateFloatTensorHandleFromCTensorHandle, C_CC,
-//          RETURNS(Int8PtrTy),
-//          ARGS(Int8PtrTy),
-//          ATTRS(NoUnwind))
+FUNCTION(TFC_CreateTensorHandleFromC, _swift_tfc_CreateTensorHandleFromC, C_CC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
 
 FUNCTION(TFC_CheckOk, _swift_tfc_CheckOk, C_CC,
          RETURNS(),
