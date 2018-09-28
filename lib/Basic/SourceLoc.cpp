@@ -161,6 +161,8 @@ Optional<unsigned> SourceManager::getIDForBufferIdentifier(
 
 StringRef SourceManager::bufferedCompilationFlag(StringRef Name,
                                                  const LangOptions &LangOpts) {
+  if (Name[0] == '#')
+    Name = Name.drop_front();
   const auto &Custom = LangOpts.getCustomCompilationFlags();
   if (Custom.find(Name) != Custom.end()) {
     unsigned BufferId = addMemBufferCopy(Custom.at(Name));

@@ -643,6 +643,42 @@ tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
   return tok::identifier;
 }
 
+/// adjustKindForCompilationFlag - Detect and parse custom compilation flags.
+static bool adjustKindForCompilationFlag(StringRef Identifier, tok &Kind,
+                                         const LangOptions &LangOpts,
+                                         DiagnosticEngine *Diags) {
+  const auto &Custom = LangOpts.getCustomCompilationFlags();
+  bool IsCustomCompilationFlag = Custom.find(Identifier) != Custom.end();
+  if (IsCustomCompilationFlag) {
+    std::string Value = Custom.at(Identifier);
+    const char *Start = Value.data(), *End = Value.data() + Value.size();
+
+    if (End - Start >= 2 && *Start == '"' && *(End - 1) == '"')
+      Kind = tok::string_literal;
+    else if (Value == "true")
+      Kind = tok::kw_true;
+    else if (Value == "false")
+      Kind = tok::kw_false;
+    else {
+      char *Parsed;
+      (void)strtoll(Start, &Parsed, 10);
+      if (Parsed == End)
+        Kind = tok::integer_literal;
+      else {
+        (void)strtod(Start, &Parsed);
+        if (Parsed == End)
+          Kind = tok::floating_literal;
+        else if (Diags)
+          Diags->diagnose(Lexer::getSourceLoc(Identifier.data()),
+                          diag::lex_invalid_compilation_flag,
+                          StringRef(Value), Identifier);
+      }
+    }
+  }
+
+  return IsCustomCompilationFlag;
+}
+
 /// lexIdentifier - Match [a-zA-Z_][a-zA-Z_$0-9]*
 void Lexer::lexIdentifier() {
   const char *TokStart = CurPtr-1;
@@ -656,30 +692,8 @@ void Lexer::lexIdentifier() {
 
   StringRef Identifier(TokStart, CurPtr-TokStart);
   tok Kind = kindOfIdentifier(Identifier, InSILMode);
-  const auto &Custom = LangOpts.getCustomCompilationFlags();
-  bool IsCustomCompilationFlag = Custom.find(Identifier) != Custom.end();
-  if (IsCustomCompilationFlag) {
-    std::string Value = Custom.at(Identifier);
-    const char *Start = Value.data(), *End = Value.data() + Value.size();
-
-    if (End - Start >= 2 && *Start == '"' && *(End - 1) == '"')
-      Kind = tok::string_literal;
-    else {
-      char *Parsed;
-      (void)strtoll(Start, &Parsed, 10);
-      if (Parsed == End)
-        Kind = tok::integer_literal;
-      else {
-        (void)strtod(Start, &Parsed);
-        if (Parsed == End)
-          Kind = tok::floating_literal;
-        else if (Value != "true" && Value != "false")
-          diagnose(TokStart, diag::lex_invalid_compilation_flag,
-                   StringRef(Value), Identifier);
-      }
-    }
-  }
-
+  bool IsCustomCompilationFlag = adjustKindForCompilationFlag(Identifier, Kind,
+                                                              LangOpts, Diags);
   formToken(Kind, TokStart);
   NextToken.setCustomCompilationFlag(IsCustomCompilationFlag);
 }
@@ -703,15 +717,25 @@ void Lexer::lexHash() {
 #include "swift/Syntax/TokenKinds.def"
   .Default(tok::pound);
 
-  // If we didn't find a match, then just return tok::pound.  This is highly
-  // dubious in terms of error recovery, but is useful for code completion and
-  // SIL parsing.
-  if (Kind == tok::pound)
-    return formToken(tok::pound, TokStart);
+  bool IsCustomCompilationFlag = false;
+  if (Kind == tok::pound) {
+    tmpPtr = CurPtr;
+    while (advanceIfValidContinuationOfIdentifier(tmpPtr, BufferEnd));
+    StringRef Identifier = StringRef(CurPtr, tmpPtr-CurPtr);
+    IsCustomCompilationFlag = adjustKindForCompilationFlag(Identifier, Kind,
+                                                           LangOpts, Diags);
+
+    // If we didn't find a match, then just return tok::pound.  This is highly
+    // dubious in terms of error recovery, but is useful for code completion
+    // and SIL parsing.
+    if (!IsCustomCompilationFlag)
+      return formToken(tok::pound, TokStart);
+  }
 
   // If we found something specific, return it.
   CurPtr = tmpPtr;
-  return formToken(Kind, TokStart);
+  formToken(Kind, TokStart);
+  NextToken.setCustomCompilationFlag(IsCustomCompilationFlag);
 }
 
 
@@ -2251,11 +2275,10 @@ void Lexer::getStringLiteralSegments(
                                      const SourceManager *SourceMgr) {
   assert(Str.is(tok::string_literal));
   // Get the bytes behind the string literal, dropping any double quotes.
-  StringRef Bytes = getStringLiteralContent(Str);
-  if (Str.isCustomCompilationFlag() && LangOpts && SourceMgr)
-    Bytes = const_cast<SourceManager *>(SourceMgr)
-              ->bufferedCompilationFlag(Str.getText(), *LangOpts)
-                  .drop_front().drop_back();
+  StringRef Bytes = Str.isCustomCompilationFlag() && LangOpts && SourceMgr ?
+    const_cast<SourceManager *>(SourceMgr)
+      ->bufferedCompilationFlag(Str.getText(), *LangOpts)
+          .drop_front().drop_back() : getStringLiteralContent(Str);
 
   // Are substitutions required either for indent stripping or line ending
   // normalization?
@@ -2278,7 +2301,7 @@ void Lexer::getStringLiteralSegments(
       continue;
 
     if (Str.isCustomCompilationFlag() && Diags) {
-      Diags->diagnose(Lexer::getSourceLoc(BytesPtr),
+      Diags->diagnose(Lexer::getSourceLoc(BytesPtr-2),
                       diag::lex_invalid_interpolation_in_flag);
       continue;
     }
