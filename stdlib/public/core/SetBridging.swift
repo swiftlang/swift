@@ -599,12 +599,10 @@ extension _CocoaSet.Iterator: IteratorProtocol {
 extension Set {
   @inlinable
   public __consuming func _bridgeToObjectiveCImpl() -> _NSSetCore {
-    switch _variant {
-    case .native(let nativeSet):
-      return nativeSet.bridged()
-    case .cocoa(let cocoaSet):
-      return cocoaSet.object
+    guard _variant.isNative else {
+      return _variant.asCocoa.object
     }
+    return _variant.asNative.bridged()
   }
 
   /// Returns the native Dictionary hidden inside this NSDictionary;

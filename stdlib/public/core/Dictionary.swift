@@ -1498,20 +1498,14 @@ extension Dictionary {
     @inlinable
     public mutating func swapAt(_ i: Index, _ j: Index) {
       guard i != j else { return }
-      let (a, b): (_HashTable.Bucket, _HashTable.Bucket)
-      switch _variant {
-      case .native(let native):
-        a = native.validatedBucket(for: i)
-        b = native.validatedBucket(for: j)
 #if _runtime(_ObjC)
-      case .cocoa(let cocoa):
-        _variant.cocoaPath()
-        let native = _NativeDictionary<Key, Value>(cocoa)
-        a = native.validatedBucket(for: i)
-        b = native.validatedBucket(for: j)
-        _variant = .native(native)
-#endif
+      if !_variant.isNative {
+        _variant = .native(_NativeDictionary<Key, Value>(_variant.asCocoa))
       }
+#endif
+      let native = _variant.asNative
+      let a = native.validatedBucket(for: i)
+      let b = native.validatedBucket(for: j)
       let isUnique = _variant.isUniquelyReferenced()
       _variant.asNative.swapValuesAt(a, b, isUnique: isUnique)
     }
@@ -1827,6 +1821,17 @@ extension Dictionary.Index {
       _conditionallyUnreachable()
     }
   }
+
+  @usableFromInline @_transparent
+  internal var _isNative: Bool {
+    switch _variant {
+    case .native:
+      return true
+    case .cocoa:
+      _cocoaPath()
+      return false
+    }
+  }
 #endif
 
   @usableFromInline @_transparent
@@ -1899,16 +1904,14 @@ extension Dictionary.Index: Comparable {
 extension Dictionary.Index: Hashable {
   @_effects(readonly) // FIXME(cocoa-index): Make inlinable
   public func hash(into hasher: inout Hasher) {
-  #if _runtime(_ObjC)
-    switch _variant {
-    case .native(let nativeIndex):
-      hasher.combine(0 as UInt8)
-      hasher.combine(nativeIndex.bucket.offset)
-    case .cocoa(let cocoaIndex):
-      _cocoaPath()
+#if _runtime(_ObjC)
+    guard _isNative else {
       hasher.combine(1 as UInt8)
-      hasher.combine(cocoaIndex.storage.currentKeyIndex)
+      hasher.combine(_asCocoa.storage.currentKeyIndex)
+      return
     }
+    hasher.combine(0 as UInt8)
+    hasher.combine(_asNative.bucket.offset)
   #else
     hasher.combine(_asNative.bucket.offset)
   #endif
@@ -1975,6 +1978,17 @@ extension Dictionary.Iterator {
       _conditionallyUnreachable()
     }
   }
+
+  @usableFromInline @_transparent
+  internal var _isNative: Bool {
+    switch _variant {
+    case .native:
+      return true
+    case .cocoa:
+      _cocoaPath()
+      return false
+    }
+  }
 #endif
 
   @usableFromInline @_transparent
@@ -1993,6 +2007,21 @@ extension Dictionary.Iterator {
       self._variant = .native(newValue)
     }
   }
+
+#if _runtime(_ObjC)
+  @usableFromInline @_transparent
+  internal var _asCocoa: _CocoaDictionary.Iterator {
+    get {
+      switch _variant {
+      case .native:
+        _sanityCheckFailure("internal error: does not contain a Cocoa index")
+      case .cocoa(let cocoa):
+        return cocoa
+      }
+    }
+  }
+#endif
+
 }
 
 extension Dictionary.Iterator: IteratorProtocol {
@@ -2003,20 +2032,17 @@ extension Dictionary.Iterator: IteratorProtocol {
   @inlinable
   @inline(__always)
   public mutating func next() -> (key: Key, value: Value)? {
-    switch _variant {
-    case .native:
-      return _asNative.next()
 #if _runtime(_ObjC)
-    case .cocoa(let cocoaIterator):
-      _cocoaPath()
-      if let (cocoaKey, cocoaValue) = cocoaIterator.next() {
+    guard _isNative else {
+      if let (cocoaKey, cocoaValue) = _asCocoa.next() {
         let nativeKey = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
         let nativeValue = _forceBridgeFromObjectiveC(cocoaValue, Value.self)
         return (nativeKey, nativeValue)
       }
       return nil
-#endif
     }
+#endif
+    return _asNative.next()
   }
 }
 

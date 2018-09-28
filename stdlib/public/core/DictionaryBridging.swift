@@ -776,12 +776,10 @@ extension _CocoaDictionary.Iterator: IteratorProtocol {
 extension Dictionary {
   @inlinable
   public __consuming func _bridgeToObjectiveCImpl() -> _NSDictionaryCore {
-    switch _variant {
-    case .native(let nativeDictionary):
-      return nativeDictionary.bridged()
-    case .cocoa(let cocoaDictionary):
-      return cocoaDictionary.object
+    guard _variant.isNative else {
+      return _variant.asCocoa.object
     }
+    return _variant.asNative.bridged()
   }
 
   /// Returns the native Dictionary hidden inside this NSDictionary;
