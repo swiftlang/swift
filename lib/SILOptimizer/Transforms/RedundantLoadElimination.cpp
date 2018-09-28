@@ -416,8 +416,6 @@ public:
 
 namespace {
 
-using BBValueMap = llvm::DenseMap<SILBasicBlock *, SILValue>;
-
 /// This class stores global state that we use when computing redundant load and
 /// their replacement in each basic block.
 class RLEContext {
@@ -1248,7 +1246,7 @@ BlockState::ValueState BlockState::getValueStateAtEndOfBlock(RLEContext &Ctx,
 
 SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
                                                      LSLocation &L) {
-  BBValueMap Values;
+  llvm::SmallVector<std::pair<SILBasicBlock *, SILValue>, 8> Values;
   llvm::DenseSet<SILBasicBlock *> HandledBBs;
   llvm::SmallVector<SILBasicBlock *, 8> WorkList;
 
@@ -1277,7 +1275,7 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
     // locations, collect and reduce them into a single value in the current
     // basic block.
     if (Forwarder.isConcreteValues(*this, L)) {
-      Values[CurBB] = Forwarder.reduceValuesAtEndOfBlock(*this, L);
+      Values.push_back({CurBB, Forwarder.reduceValuesAtEndOfBlock(*this, L)});
       continue;
     }
 
@@ -1301,7 +1299,7 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
 
     // Reduce the available values into a single SILValue we can use to forward
     SILInstruction *IPt = CurBB->getTerminator();
-    Values[CurBB] = LSValue::reduce(L, &BB->getModule(), LSValues, IPt);
+    Values.push_back({CurBB, LSValue::reduce(L, &BB->getModule(), LSValues, IPt)});
   }
 
   // Finally, collect all the values for the SILArgument, materialize it using
@@ -1317,7 +1315,7 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
 bool RLEContext::collectLocationValues(SILBasicBlock *BB, LSLocation &L,
                                        LSLocationValueMap &Values,
                                        ValueTableMap &VM) {
-  LSLocationSet CSLocs;
+  LSLocationList CSLocs;
   LSLocationList Locs;
   LSLocation::expand(L, &BB->getModule(), Locs, TE);
 
@@ -1328,7 +1326,7 @@ bool RLEContext::collectLocationValues(SILBasicBlock *BB, LSLocation &L,
     Values[X] = getValue(VM[getLocationBit(X)]);
     if (!Values[X].isCoveringValue())
       continue;
-    CSLocs.insert(X);
+    CSLocs.push_back(X);
   }
 
   // For locations which we do not have concrete values for in this basic
@@ -1563,7 +1561,7 @@ bool RLEContext::run() {
   processBasicBlocksForRLE(Optimistic);
 
   // Finally, perform the redundant load replacements.
-  llvm::DenseSet<SILInstruction *> InstsToDelete;
+  llvm::SmallVector<SILInstruction *, 16> InstsToDelete;
   bool SILChanged = false;
   for (auto &B : *Fn) {
     auto &State = BBToLocState[&B];
@@ -1587,7 +1585,7 @@ bool RLEContext::run() {
                               << "With " << Iter->second);
       SILChanged = true;
       Iter->first->replaceAllUsesWith(Iter->second);
-      InstsToDelete.insert(Iter->first);
+      InstsToDelete.push_back(Iter->first);
       ++NumForwardedLoads;
     }
   }

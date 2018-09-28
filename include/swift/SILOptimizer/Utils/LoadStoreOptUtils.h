@@ -289,7 +289,6 @@ static inline llvm::hash_code hash_value(const LSValue &V) {
 //===----------------------------------------------------------------------===//
 //                            Load Store Location
 //===----------------------------------------------------------------------===//
-using LSLocationSet = llvm::DenseSet<LSLocation>;
 using LSLocationList = llvm::SmallVector<LSLocation, 8>;
 using LSLocationIndexMap = llvm::SmallDenseMap<LSLocation, unsigned, 32>;
 using LSLocationBaseMap = llvm::DenseMap<SILValue, LSLocation>;
@@ -357,7 +356,7 @@ public:
 
   /// Given a set of locations derived from the same base, try to merge/reduce
   /// them into smallest number of LSLocations possible.
-  static bool reduce(LSLocation Base, SILModule *Mod, LSLocationSet &Locs);
+  static void reduce(LSLocation Base, SILModule *Mod, LSLocationList &Locs);
 
   /// Enumerate the given Mem LSLocation.
   static void enumerateLSLocation(SILModule *M, SILValue Mem,
