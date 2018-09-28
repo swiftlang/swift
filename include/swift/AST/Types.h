@@ -3646,23 +3646,6 @@ public:
       llvm_unreachable("Unhandled Representation in switch.");
     }
 
-    bool hasGuaranteedSelfParam() const {
-      switch (getRepresentation()) {
-      case Representation::Thick:
-      case Representation::Block:
-      case Representation::Thin:
-      case Representation::CFunctionPointer:
-      case Representation::ObjCMethod:
-      case Representation::Closure:
-        return false;
-      case Representation::Method:
-      case Representation::WitnessMethod:
-        return true;
-      }
-
-      llvm_unreachable("Unhandled Representation in switch.");
-    }
-
     /// True if the function representation carries context.
     bool hasContext() const {
       switch (getRepresentation()) {

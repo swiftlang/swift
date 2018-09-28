@@ -3179,12 +3179,12 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     return AnyFunctionType::Param(ErrorType::get(Ctx));
 
   bool isStatic = false;
-  bool isMutating = false;
+  SelfAccessKind selfAccess = SelfAccessKind::NonMutating;
   bool isDynamicSelf = false;
 
   if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
     isStatic = FD->isStatic();
-    isMutating = FD->isMutating();
+    selfAccess = FD->getSelfAccessKind();
 
     // Methods returning 'Self' have a dynamic 'self'.
     //
@@ -3195,7 +3195,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     if (isInitializingCtor) {
       // initializing constructors of value types always have an implicitly
       // inout self.
-      isMutating = true;
+      selfAccess = SelfAccessKind::Mutating;
     } else {
       // allocating constructors have metatype 'self'.
       isStatic = true;
@@ -3209,8 +3209,11 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
             isDynamicSelf = true;
     }
   } else if (isa<DestructorDecl>(AFD)) {
-    // destructors of value types always have an implicitly inout self.
-    isMutating = true;
+    // Destructors only correctly appear on classes today. (If move-only types
+    // have destructors, they probably would want to consume self.)
+    // Note that we can't assert(containerTy->hasReferenceSemantics()) here
+    // since incorrect or incomplete code could have deinit decls in invalid
+    // contexts, and we need to recover gracefully in those cases.
   }
 
   if (isDynamicSelf)
@@ -3224,8 +3227,20 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
   if (containerTy->hasReferenceSemantics())
     return AnyFunctionType::Param(selfTy);
 
-  return AnyFunctionType::Param(selfTy, Identifier(),
-                                ParameterTypeFlags().withInOut(isMutating));
+  auto flags = ParameterTypeFlags();
+  switch (selfAccess) {
+  case SelfAccessKind::__Consuming:
+    flags = flags.withOwned(true);
+    break;
+  case SelfAccessKind::Mutating:
+    flags = flags.withInOut(true);
+    break;
+  case SelfAccessKind::NonMutating:
+    // The default flagless state.
+    break;
+  }
+
+  return AnyFunctionType::Param(selfTy, Identifier(), flags);
 }
 
 void UnboundGenericType::Profile(llvm::FoldingSetNodeID &ID,
