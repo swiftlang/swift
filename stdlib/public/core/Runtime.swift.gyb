@@ -500,25 +500,19 @@ internal class __SwiftNativeNSArray {
   deinit {}
 }
 
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
+@usableFromInline
 @objc @_swift_native_objc_runtime_base(__SwiftNativeNSDictionaryBase)
 internal class __SwiftNativeNSDictionary {
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal init() {}
-  @inlinable // FIXME(sil-serialize-all)
   deinit {}
 }
 
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
+@usableFromInline
 @objc @_swift_native_objc_runtime_base(__SwiftNativeNSSetBase)
 internal class __SwiftNativeNSSet {
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal init() {}
-  @inlinable // FIXME(sil-serialize-all)
   deinit {}
 }
 
