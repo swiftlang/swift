@@ -897,10 +897,41 @@ class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
   SDKContext &Ctx;
   UpdatedNodesMap &UpdateMap;
 
+  static void printSpaces(llvm::raw_ostream &OS, SDKNode *N) {
+    assert(N);
+    for (auto P = N; !isa<SDKNodeRoot>(P); P = P->getParent())
+      OS << "        ";
+  }
+
+  static void debugMatch(SDKNode *Left, SDKNode *Right, NodeMatchReason Reason,
+                         llvm::raw_ostream &OS) {
+    if (Left && isa<SDKNodeType>(Left))
+      return;
+    if (Right && isa<SDKNodeType>(Right))
+      return;
+    StringRef Arrow = "  <-------->  ";
+    switch (Reason) {
+    case NodeMatchReason::Added:
+      printSpaces(OS, Right);
+      OS << "<NULL>" << Arrow << Right->getPrintedName() << "\n";
+      return;
+    case NodeMatchReason::Removed:
+      printSpaces(OS, Left);
+      OS << Left->getPrintedName() << Arrow << "<NULL>\n";
+      return;
+    default:
+      printSpaces(OS, Left);
+      OS << Left->getPrintedName() << Arrow << Right->getPrintedName() << "\n";
+      return;
+    }
+  }
+
 public:
   PrunePass(SDKContext &Ctx): Ctx(Ctx), UpdateMap(Ctx.getNodeUpdateMap()) {}
 
   void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) override {
+    if (options::Verbose)
+      debugMatch(Left, Right, Reason, llvm::errs());
     switch (Reason) {
     case NodeMatchReason::Added:
       assert(!Left);
