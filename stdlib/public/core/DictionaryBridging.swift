@@ -611,18 +611,21 @@ extension _CocoaDictionary {
 }
 
 extension _CocoaDictionary.Index {
-  @inlinable
+  @usableFromInline // FIXME(cocoa-index): Make inlinable
   @nonobjc
   internal var key: AnyObject {
-    _precondition(currentKeyIndex < allKeys.value,
-      "Attempting to access Dictionary elements using an invalid index")
-    return allKeys[currentKeyIndex]
+    @_effects(readonly)
+    get {
+      _precondition(currentKeyIndex < allKeys.value,
+        "Attempting to access Dictionary elements using an invalid index")
+      return allKeys[currentKeyIndex]
+    }
   }
 
-  @usableFromInline
+  @usableFromInline // FIXME(cocoa-index): Make inlinable
   @nonobjc
   internal var age: Int32 {
-    @_effects(releasenone)
+    @_effects(readonly)
     get {
       return _HashTable.age(for: base.object)
     }

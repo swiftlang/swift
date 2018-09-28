@@ -391,7 +391,7 @@ extension _CocoaSet: _SetBuffer {
     return object.member(element) != nil
   }
 
-  @usableFromInline
+  @usableFromInline // FIXME(cocoa-index): Make inlinable
   @_effects(releasenone)
   internal func element(at i: Index) -> AnyObject {
     let element: AnyObject? = i.element
@@ -447,15 +447,18 @@ extension _CocoaSet {
 }
 
 extension _CocoaSet.Index {
-  @inlinable
+  @usableFromInline // FIXME(cocoa-index): Make inlinable
   @nonobjc
   internal var element: AnyObject {
-    _precondition(currentKeyIndex < allKeys.value,
-      "Attempting to access Set elements using an invalid index")
-    return allKeys[currentKeyIndex]
+    @_effects(readonly)
+    get {
+      _precondition(currentKeyIndex < allKeys.value,
+        "Attempting to access Set elements using an invalid index")
+      return allKeys[currentKeyIndex]
+    }
   }
 
-  @usableFromInline
+  @usableFromInline // FIXME(cocoa-index): Make inlinable
   @nonobjc
   internal var age: Int32 {
     @_effects(releasenone)
