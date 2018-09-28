@@ -1290,7 +1290,11 @@ public:
   bool isBuiltinModule() const;
   const ModuleDecl *getAsSwiftModule() const;
   const clang::Module *getAsClangModule() const;
-  void *getOpaqueValue() const;
+
+  inline void *getOpaqueValue() const {
+    assert(!Mod.isNull());
+    return Mod.getOpaqueValue();
+  }
 
   explicit operator bool() const { return !Mod.isNull(); }
 };

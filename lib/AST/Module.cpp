@@ -366,9 +366,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
 }
 
 bool ModuleDecl::isClangModule() const {
-  if (findUnderlyingClangModule())
-    return true;
-  return false;
+  return findUnderlyingClangModule() != nullptr;
 }
 
 void ModuleDecl::addFile(FileUnit &newFile) {
@@ -1641,11 +1639,6 @@ const clang::Module* ModuleEntity::getAsClangModule() const {
   if (Mod.is<const ModuleDecl*>())
     return nullptr;
   return getClangModule(Mod);
-}
-
-void* ModuleEntity::getOpaqueValue() const {
-  assert(!Mod.isNull());
-  return Mod.getOpaqueValue();
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing SourceFiles, is
