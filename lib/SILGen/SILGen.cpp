@@ -904,7 +904,7 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
                                                DestructorDecl *dd) {
   // Emit the native deallocating destructor for -dealloc.
   // Destructors are a necessary part of class metadata, so can't be delayed.
-  {
+  if (dd->hasBody()) {
     SILDeclRef dealloc(dd, SILDeclRef::Kind::Deallocator);
     SILFunction *f = getFunction(dealloc, ForDefinition);
     preEmitFunction(dealloc, dd, f, dd);
@@ -916,7 +916,7 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
 
   // Emit the Objective-C -dealloc entry point if it has
   // something to do beyond messaging the superclass's -dealloc.
-  if (dd->getBody()->getNumElements() != 0)
+  if (dd->hasBody() && dd->getBody()->getNumElements() != 0)
     emitObjCDestructorThunk(dd);
 
   // Emit the ivar initializer, if needed.
