@@ -1907,7 +1907,7 @@ extension Dictionary.Index: Hashable {
     case .cocoa(let cocoaIndex):
       _cocoaPath()
       hasher.combine(1 as UInt8)
-      hasher.combine(cocoaIndex.currentKeyIndex)
+      hasher.combine(cocoaIndex.storage.currentKeyIndex)
     }
   #else
     hasher.combine(_asNative.bucket.offset)

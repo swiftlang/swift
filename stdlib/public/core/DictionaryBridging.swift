@@ -454,7 +454,8 @@ extension _CocoaDictionary: _DictionaryBuffer {
   internal var startIndex: Index {
     @_effects(releasenone)
     get {
-      return Index(self, startIndex: ())
+      let allKeys = _stdlib_NSDictionary_allKeys(self.object)
+      return Index(Index.Storage(self, allKeys, 0))
     }
   }
 
@@ -462,25 +463,33 @@ extension _CocoaDictionary: _DictionaryBuffer {
   internal var endIndex: Index {
     @_effects(releasenone)
     get {
-      return Index(self, endIndex: ())
+      let allKeys = _stdlib_NSDictionary_allKeys(self.object)
+      return Index(Index.Storage(self, allKeys, allKeys.value))
     }
   }
 
   @usableFromInline // FIXME(cocoa-index): Should be inlinable
   @_effects(releasenone)
-  internal func index(after i: Index) -> Index {
-    var i = i
-    formIndex(after: &i)
-    return i
+  internal func index(after index: Index) -> Index {
+    var result = index
+    formIndex(after: &result)
+    return result
+  }
+
+  internal func validate(_ index: Index) {
+    _precondition(index.storage.base.object === self.object, "Invalid index")
+    _precondition(index.storage.currentKeyIndex < index.storage.allKeys.value,
+      "Attempt to access endIndex")
   }
 
   @usableFromInline // FIXME(cocoa-index): Should be inlinable
   @_effects(releasenone)
-  internal func formIndex(after i: inout Index) {
-    _precondition(i.base.object === self.object, "Invalid index")
-    _precondition(i.currentKeyIndex < i.allKeys.value,
-      "Cannot increment endIndex")
-    i.currentKeyIndex += 1
+  internal func formIndex(after index: inout Index) {
+    validate(index)
+    let isUnique = index.isUniquelyReferenced()
+    if !isUnique { index.storage = index.copy() }
+    let storage = index.storage // FIXME: rdar://problem/44863751
+    storage.currentKeyIndex += 1
   }
 
   @usableFromInline // FIXME(cocoa-index): Should be inlinable
@@ -495,16 +504,13 @@ extension _CocoaDictionary: _DictionaryBuffer {
     }
 
     let allKeys = _stdlib_NSDictionary_allKeys(object)
-    var keyIndex = -1
     for i in 0..<allKeys.value {
       if _stdlib_NSObject_isEqual(key, allKeys[i]) {
-        keyIndex = i
-        break
+        return Index(Index.Storage(self, allKeys, i))
       }
     }
-    _sanityCheck(keyIndex >= 0,
-        "Key was found in fast path, but not found later?")
-    return Index(self, allKeys, keyIndex)
+    _sanityCheckFailure(
+      "An NSDictionary key wassn't listed amongst its enumerated contents")
   }
 
   @inlinable
@@ -527,25 +533,25 @@ extension _CocoaDictionary: _DictionaryBuffer {
   @usableFromInline // FIXME(cocoa-index): Should be inlinable
   @_effects(releasenone)
   internal func lookup(_ index: Index) -> (key: Key, value: Value) {
-    _precondition(index.base.object === self.object, "Invalid index")
-    let key: Key = index.allKeys[index.currentKeyIndex]
-    let value: Value = index.base.object.object(forKey: key)!
+    _precondition(index.storage.base.object === self.object, "Invalid index")
+    let key: Key = index.storage.allKeys[index.storage.currentKeyIndex]
+    let value: Value = index.storage.base.object.object(forKey: key)!
     return (key, value)
   }
 
   @usableFromInline // FIXME(cocoa-index): Make inlinable
   @_effects(releasenone)
   func key(at index: Index) -> Key {
-    _precondition(index.base.object === self.object, "Invalid index")
+    _precondition(index.storage.base.object === self.object, "Invalid index")
     return index.key
   }
 
   @usableFromInline // FIXME(cocoa-index): Make inlinable
   @_effects(releasenone)
   func value(at index: Index) -> Value {
-    _precondition(index.base.object === self.object, "Invalid index")
-    let key = index.allKeys[index.currentKeyIndex]
-    return index.base.object.object(forKey: key)!
+    _precondition(index.storage.base.object === self.object, "Invalid index")
+    let key = index.storage.allKeys[index.storage.currentKeyIndex]
+    return index.storage.base.object.object(forKey: key)!
   }
 }
 
@@ -565,10 +571,23 @@ extension _CocoaDictionary {
 }
 
 extension _CocoaDictionary {
-  // FIXME(cocoa-index): Overhaul and make @_fixed_layout
+  @_fixed_layout
   @usableFromInline
   internal struct Index {
-    // Assumption: we rely on NSDictionary.getObjects when being
+    @usableFromInline
+    internal var storage: Storage
+
+    internal init(_ storage: Storage) {
+      self.storage = storage
+    }
+  }
+}
+
+extension _CocoaDictionary.Index {
+  // FIXME(cocoa-index): Try using an NSEnumerator to speed this up.
+  @usableFromInline
+  internal class Storage {
+  // Assumption: we rely on NSDictionary.getObjects when being
     // repeatedly called on the same NSDictionary, returning items in the same
     // order every time.
     // Similarly, the same assumption holds for NSSet.allObjects.
@@ -586,18 +605,6 @@ extension _CocoaDictionary {
     /// Index into `allKeys`
     internal var currentKeyIndex: Int
 
-    internal init(_ base: __owned _CocoaDictionary, startIndex: ()) {
-      self.base = base
-      self.allKeys = _stdlib_NSDictionary_allKeys(base.object)
-      self.currentKeyIndex = 0
-    }
-
-    internal init(_ base: __owned _CocoaDictionary, endIndex: ()) {
-      self.base = base
-      self.allKeys = _stdlib_NSDictionary_allKeys(base.object)
-      self.currentKeyIndex = allKeys.value
-    }
-
     internal init(
       _ base: __owned _CocoaDictionary,
       _ allKeys: __owned _HeapBuffer<Int, AnyObject>,
@@ -611,14 +618,27 @@ extension _CocoaDictionary {
 }
 
 extension _CocoaDictionary.Index {
+  @inlinable
+  internal mutating func isUniquelyReferenced() -> Bool {
+    return _isUnique_native(&storage)
+  }
+
+  @usableFromInline
+  internal mutating func copy() -> Storage {
+    let storage = self.storage
+    return Storage(storage.base, storage.allKeys, storage.currentKeyIndex)
+  }
+}
+
+extension _CocoaDictionary.Index {
   @usableFromInline // FIXME(cocoa-index): Make inlinable
   @nonobjc
   internal var key: AnyObject {
     @_effects(readonly)
     get {
-      _precondition(currentKeyIndex < allKeys.value,
+      _precondition(storage.currentKeyIndex < storage.allKeys.value,
         "Attempting to access Dictionary elements using an invalid index")
-      return allKeys[currentKeyIndex]
+      return storage.allKeys[storage.currentKeyIndex]
     }
   }
 
@@ -627,7 +647,7 @@ extension _CocoaDictionary.Index {
   internal var age: Int32 {
     @_effects(readonly)
     get {
-      return _HashTable.age(for: base.object)
+      return _HashTable.age(for: storage.base.object)
     }
   }
 }
@@ -639,9 +659,9 @@ extension _CocoaDictionary.Index: Equatable {
     lhs: _CocoaDictionary.Index,
     rhs: _CocoaDictionary.Index
   ) -> Bool {
-    _precondition(lhs.base.object === rhs.base.object,
+    _precondition(lhs.storage.base.object === rhs.storage.base.object,
       "Comparing indexes from different dictionaries")
-    return lhs.currentKeyIndex == rhs.currentKeyIndex
+    return lhs.storage.currentKeyIndex == rhs.storage.currentKeyIndex
   }
 }
 
@@ -652,9 +672,9 @@ extension _CocoaDictionary.Index: Comparable {
     lhs: _CocoaDictionary.Index,
     rhs: _CocoaDictionary.Index
   ) -> Bool {
-    _precondition(lhs.base.object === rhs.base.object,
+    _precondition(lhs.storage.base.object === rhs.storage.base.object,
       "Comparing indexes from different dictionaries")
-    return lhs.currentKeyIndex < rhs.currentKeyIndex
+    return lhs.storage.currentKeyIndex < rhs.storage.currentKeyIndex
   }
 }
 
