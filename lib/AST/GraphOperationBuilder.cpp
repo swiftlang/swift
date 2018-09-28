@@ -43,6 +43,17 @@ void GraphOperationBuilder::addListArgument(ArrayRef<SILValue> arguments,
   }
 }
 
+/// Add a list argument to the GraphOperationInst, with an optional name.
+void GraphOperationBuilder::addListArgument(OperandValueArrayRef arguments,
+                                            StringRef name) {
+  MangledName += ",L";
+  MangledName += name;
+  for (auto argument : arguments) {
+    MangledName += ",e";
+    Operands.push_back(argument);
+  }
+}
+
 /// Add an attribute with known constant value to the GraphOperationInst.
 /// Returns a reference to the attribute, valid for the lifetime of the
 /// GraphOperationBuilder, that you can use to mutate the attribute before

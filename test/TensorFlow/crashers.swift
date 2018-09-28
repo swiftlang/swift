@@ -372,3 +372,21 @@ public func SR8419(iterationCount: Int) {
     }
   }
 }
+
+// If `deabstractedCallee` gets deabstracted before `inlineDeabstracted_*`,
+// then the insts in `deabstractedCallee` get deabstracted twice. There was
+// a bug where the compiler crashed when deabstracting certain graph_ops twice.
+// There is no guaranteed deabstraction order, so this test isn't guaranteed to
+// catch the problem. Sandwiching `deabstractedCallee` between two callers
+// makes this test catch the problem as long as the order happens to be linear
+// up or down.
+public func inlineDeabstracted_a() -> Tensor<Float> {
+  return deabstractedCallee([1, 2, 3])
+}
+// expected-warning @+1 {{implicitly copied}}
+public func deabstractedCallee(_ t: Tensor<Float>) -> Tensor<Float> {
+  return t ++ Tensor<Float>([1, 2, 3]) // expected-note {{value used here}}
+}
+public func inlineDeabstracted_b() -> Tensor<Float> {
+  return deabstractedCallee([1, 2, 3])
+}
