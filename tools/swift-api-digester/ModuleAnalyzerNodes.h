@@ -157,6 +157,8 @@ class SDKContext {
 
   CheckerOptions Opts;
   std::vector<ABIAttributeInfo> ABIAttrs;
+  /// This is to cache the equal comparison results between nodes.
+  llvm::DenseMap<const SDKNode*, llvm::DenseMap<const SDKNode*, bool>> EqualCache;
 
 public:
   SDKContext(CheckerOptions Options);
@@ -184,6 +186,7 @@ public:
   DiagnosticEngine &getDiags() {
     return Diags;
   }
+  bool isEqual(const SDKNode &Left, const SDKNode &Right);
   bool checkingABI() const { return Opts.ABI; }
   const CheckerOptions &getOpts() const { return Opts; }
   ArrayRef<ABIAttributeInfo> getABIAttributeInfo() const { return ABIAttrs; }
@@ -478,6 +481,7 @@ public:
 class SDKNodeDeclVar : public SDKNodeDecl {
   Optional<uint8_t> FixedBinaryOrder;
   bool IsLet;
+  bool HasStorage;
 public:
   SDKNodeDeclVar(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
@@ -488,6 +492,7 @@ public:
   SDKNodeType *getType() const;
   bool isLet() const { return IsLet; }
   void jsonize(json::Output &Out) override;
+  bool hasStorage() const { return HasStorage; }
 };
 
 class SDKNodeDeclAbstractFunc : public SDKNodeDecl {
@@ -511,10 +516,12 @@ public:
 
 class SDKNodeDeclSubscript: public SDKNodeDeclAbstractFunc {
   bool HasSetter;
+  bool HasStorage;
 public:
   SDKNodeDeclSubscript(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
   bool hasSetter() const { return HasSetter; }
+  bool hasStorage() const { return HasStorage; }
   void jsonize(json::Output &Out) override;
 };
 
