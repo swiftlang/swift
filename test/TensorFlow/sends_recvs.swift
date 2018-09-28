@@ -280,8 +280,8 @@ public func test1RecvScalarTPU() {
 // compilation. The shape array attr gets propagated to TensorTransfer.
 //
 // CHECK-LABEL: --- TFDevicePartition Cross Device Tensor Transfer Annotation Result: {{.*}}test1RecvScalarTPU{{.*}}
-// CHECK:      [[X_SCALAR_CPU:%.*]] = graph_op "tfc.RecvFromHost"() {tensorId: i32 0, __device: "/device:CPU:0", __shapes: [$TensorShape: [$Int32: ]]} : $TensorHandle
-// CHECK:      [[X_SCALAR_TPU:%.*]] = graph_op "tfc.TensorTransfer"([[X_SCALAR_CPU]] : $TensorHandle{{.*}}) {transferId: i32 0, srcDevice: "/device:CPU:0", destDevice: "ALL_DEVICES", __shapes
+// CHECK:      [[X_SCALAR_CPU:%.*]] = graph_op "tfc.RecvFromHost"() {tensorId: i32 0, __device: "/job:localhost/replica:0/task:0/device:CPU:0", __shapes: [$TensorShape: [$Int32: ]]} : $TensorHandle
+// CHECK:      [[X_SCALAR_TPU:%.*]] = graph_op "tfc.TensorTransfer"([[X_SCALAR_CPU]] : $TensorHandle{{.*}}) {transferId: i32 0, srcDevice: "/job:localhost/replica:0/task:0/device:CPU:0", destDevice: "ALL_DEVICES", __shapes
 // This is the promoted scalar add that computes x.scalar! + 2
 // CHECK-NEXT: graph_op "Add"([[X_SCALAR_TPU]] : $TensorHandle
 // This is z + z
@@ -366,7 +366,7 @@ public func test1RecvTensorTPU_ToAcceleratorNoShape_Error() {
 // Specifying shapes for CPU<->GPU sends/recvs should not hurt.
 public func test1RecvTensorGPU_WithShapes() {
   TensorFlow.enableGPU()
-  let a_gpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "/device:CPU:0")
+  let a_gpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "/job:localhost/replica:0/task:0/device:CPU:0")
   let a_gpu = Tensor<Float>(handle: a_gpu_h)
   // One send.
   // Tensor transfer for the param of atariSim(): GPU->CPU, and then CPU->host.

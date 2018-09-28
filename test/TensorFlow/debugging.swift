@@ -28,7 +28,7 @@ public func noCopyForOpaqueHandles() {
 // CHECK: @{{.*}}basicDebugValues{{.*}}.tf
 // CHECK: [[ONE:%.*]] = graph_op "Const"
 // CHECK: [[ADD_RESULT:%.*]] = graph_op "Add"
-// CHECK: graph_op "Square"([[ADD_RESULT]] : $TensorHandle<Float>) {T: $Float, __device: "/device:CPU:0"} : $TensorHandle<Float>
+// CHECK: graph_op "Square"([[ADD_RESULT]] : $TensorHandle<Float>) {T: $Float, __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
 
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}debugValuesInLoop
