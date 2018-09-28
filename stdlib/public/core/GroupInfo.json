@@ -36,6 +36,7 @@
     "StringTesting.swift",
     "StringUTF16View.swift",
     "StringUTF8View.swift",
+    "StringUTF8Validation.swift",
     "StringUnicodeScalarView.swift",
     "StringVariant.swift",
     "Substring.swift",

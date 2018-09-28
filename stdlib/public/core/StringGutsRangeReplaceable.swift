@@ -176,7 +176,7 @@ extension _StringGuts {
     _foreignAppendInPlace(slicedOther)
   }
 
-  private mutating func appendInPlace(
+  internal mutating func appendInPlace(
     _ other: UnsafeBufferPointer<UInt8>, isASCII: Bool
   ) {
     self._object.nativeStorage.appendInPlace(other, isASCII: isASCII)

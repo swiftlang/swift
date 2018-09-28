@@ -163,6 +163,7 @@ set(SWIFTLIB_ESSENTIAL
   StringUnicodeScalarView.swift
   StringUTF16View.swift
   StringUTF8View.swift
+  StringUTF8Validation.swift
   StringVariant.swift
   Substring.swift
   SwiftNativeNSArray.swift
