@@ -811,13 +811,68 @@ static void diagnoseTypeChange(SDKNode* L, SDKNode* R) {
   auto *RT = dyn_cast<SDKNodeType>(R);
   if (!LT || !RT)
     return;
+  assert(LT->isTopLevelType() == RT->isTopLevelType());
+  if (!LT->isTopLevelType())
+    return;
+  StringRef Descriptor;
+  auto LParent = cast<SDKNodeDecl>(LT->getParent());
+  auto RParent = cast<SDKNodeDecl>(RT->getParent());
+  assert(LParent->getKind() == RParent->getKind());
+  if (LParent->isSDKPrivate())
+    return;
+  switch(LParent->getKind()) {
+  case SDKNodeKind::Root:
+  case SDKNodeKind::TypeNominal:
+  case SDKNodeKind::TypeFunc:
+  case SDKNodeKind::TypeAlias:
+  case SDKNodeKind::DeclType:
+    llvm_unreachable("Type Parent is wrong");
+  case SDKNodeKind::DeclFunction:
+  case SDKNodeKind::DeclConstructor:
+  case SDKNodeKind::DeclGetter:
+  case SDKNodeKind::DeclSetter:
+  case SDKNodeKind::DeclSubscript:
+    Descriptor = SDKNodeDeclAbstractFunc::
+      getTypeRoleDescription(Ctx, LParent->getChildIndex(LT));
+    break;
+  case SDKNodeKind::DeclVar:
+    Descriptor = "declared";
+    break;
+  case SDKNodeKind::DeclTypeAlias:
+    Descriptor = "underlying";
+    break;
+  case SDKNodeKind::DeclAssociatedType:
+    Descriptor = "default";
+    break;
+  }
+
+  if (LT->getPrintedName() != RT->getPrintedName()) {
+    Diags.diagnose(SourceLoc(), diag::decl_type_change, LParent->getScreenInfo(),
+                   Descriptor, LT->getPrintedName(), RT->getPrintedName());
+    return;
+  }
+
   if (LT->hasDefaultArgument() && !RT->hasDefaultArgument()) {
-    auto *Func = cast<SDKNodeDeclAbstractFunc>(LT->getClosestParentDecl());
-    Diags.diagnose(SourceLoc(), diag::default_arg_removed, Func->getScreenInfo(),
-                   Func->getTypeRoleDescription(Ctx, Func->getChildIndex(LT)));
+    Diags.diagnose(SourceLoc(), diag::default_arg_removed,
+                   LParent->getScreenInfo(), Descriptor);
+  }
+  if (LT->getKind() != RT->getKind())
+    return;
+  assert(LT->getKind() == RT->getKind());
+  switch (LT->getKind()) {
+  case SDKNodeKind::TypeFunc: {
+    auto *LFT = cast<SDKNodeTypeFunc>(LT);
+    auto *RFT = cast<SDKNodeTypeFunc>(RT);
+    if (Ctx.checkingABI() && LFT->isEscaping() != RFT->isEscaping()) {
+      Diags.diagnose(SourceLoc(), diag::func_type_escaping_changed,
+                     LParent->getScreenInfo(), Descriptor, LFT->isEscaping());
+    }
+    break;
+  }
+  default:
+    break;
   }
 }
-
 
 // This is first pass on two given SDKNode trees. This pass removes the common part
 // of two versions of SDK, leaving only the changed part.
@@ -1656,7 +1711,6 @@ public:
 
 class DiagnosisEmitter : public SDKNodeVisitor {
   void handle(const SDKNodeDecl *D, NodeAnnotation Anno);
-  void visitType(SDKNodeType *T);
   void visitDecl(SDKNodeDecl *D);
   void visit(NodePtr Node) override;
   SDKNodeDecl *findAddedDecl(const SDKNodeDecl *Node);
@@ -1796,41 +1850,9 @@ void DiagnosisEmitter::visitDecl(SDKNodeDecl *Node) {
     handle(Node, Anno);
 }
 
-void DiagnosisEmitter::visitType(SDKNodeType *Node) {
-  auto *Parent = dyn_cast<SDKNodeDecl>(Node->getParent());
-  if (!Parent || Parent->isSDKPrivate())
-    return;
-  SDKContext &Ctx = Node->getSDKContext();
-  if (Node->isAnnotatedAs(NodeAnnotation::Updated)) {
-    auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeType>();
-    StringRef Descriptor;
-    switch (Parent->getKind()) {
-    case SDKNodeKind::DeclConstructor:
-    case SDKNodeKind::DeclFunction:
-    case SDKNodeKind::DeclVar:
-      Descriptor = isa<SDKNodeDeclAbstractFunc>(Parent) ?
-        SDKNodeDeclAbstractFunc::getTypeRoleDescription(Ctx, Parent->getChildIndex(Node)) :
-        Ctx.buffer("declared");
-      if (Node->getPrintedName() != Count->getPrintedName())
-        Diags.diagnose(SourceLoc(), diag::decl_type_change, Parent->getScreenInfo(),
-          Descriptor, Node->getPrintedName(), Count->getPrintedName());
-      break;
-    case SDKNodeKind::DeclAssociatedType:
-      Diags.diagnose(SourceLoc(), diag::decl_type_change, Parent->getScreenInfo(),
-                     "default", Node->getPrintedName(), Count->getPrintedName());
-      break;
-    default:
-      break;
-    }
-  }
-}
-
 void DiagnosisEmitter::visit(NodePtr Node) {
   if (auto *DNode = dyn_cast<SDKNodeDecl>(Node)) {
     visitDecl(DNode);
-  }
-  if (auto *TNode = dyn_cast<SDKNodeType>(Node)) {
-    visitType(TNode);
   }
 }
 

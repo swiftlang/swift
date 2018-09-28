@@ -130,3 +130,8 @@ public class ClassWithOpenMember {
   public var property: Int {get { return 1}}
   public func bar() {}
 }
+
+public class EscapingFunctionType {
+  public func removedEscaping(_ a: ()->()) {}
+  public func addedEscaping(_ a: @escaping ()->()) {}
+}

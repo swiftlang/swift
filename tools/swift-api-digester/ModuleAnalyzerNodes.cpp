@@ -352,13 +352,19 @@ ArrayRef<DeclAttrKind> SDKNodeDecl::getDeclAttributes() const {
 }
 
 bool SDKNodeDecl::hasAttributeChange(const SDKNodeDecl &Another) const {
-  if (getDeclAttributes().size() != Another.getDeclAttributes().size())
-    return true;
-  for (auto K: getDeclAttributes()) {
-    if (!Another.hasDeclAttribute(K))
-      return true;
-  }
-  return false;
+  std::set<DeclAttrKind> Left(getDeclAttributes().begin(),
+                              getDeclAttributes().end());
+  std::set<DeclAttrKind> Right(Another.getDeclAttributes().begin(),
+                               Another.getDeclAttributes().end());
+  return Left != Right;
+}
+
+bool SDKNodeType::hasAttributeChange(const SDKNodeType &Another) const {
+  std::set<TypeAttrKind> Left(getTypeAttributes().begin(),
+                              getTypeAttributes().end());
+  std::set<TypeAttrKind> Right(Another.getTypeAttributes().begin(),
+                               Another.getTypeAttributes().end());
+  return Left != Right;
 }
 
 SDKNodeDecl *SDKNodeType::getClosestParentDecl() const {
@@ -614,7 +620,7 @@ bool SDKNode::operator==(const SDKNode &Other) const {
     case SDKNodeKind::TypeFunc: {
       auto Left = this->getAs<SDKNodeType>();
       auto Right = (&Other)->getAs<SDKNodeType>();
-      if (!Left->getTypeAttributes().equals(Right->getTypeAttributes()))
+      if (Left->hasAttributeChange(*Right))
         return false;
       if (Left->hasDefaultArgument() != Right->hasDefaultArgument())
         return false;

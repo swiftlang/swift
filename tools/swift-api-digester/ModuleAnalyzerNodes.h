@@ -348,10 +348,10 @@ class SDKNodeType : public SDKNode {
   bool HasDefaultArg;
 
 protected:
-  bool hasTypeAttribute(TypeAttrKind DAKind) const;
   SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind);
   ~SDKNodeType() = default;
 public:
+  bool hasTypeAttribute(TypeAttrKind DAKind) const;
   KnownTypeKind getTypeKind() const;
   void addTypeAttribute(TypeAttrKind AttrKind);
   ArrayRef<TypeAttrKind> getTypeAttributes() const;
@@ -363,6 +363,7 @@ public:
   bool isTopLevelType() const { return !isa<SDKNodeType>(getParent()); }
   static bool classof(const SDKNode *N);
   virtual void jsonize(json::Output &Out) override;
+  bool hasAttributeChange(const SDKNodeType &Another) const;
 };
 
 class SDKNodeTypeNominal : public SDKNodeType {
@@ -378,7 +379,7 @@ public:
 class SDKNodeTypeFunc : public SDKNodeType {
 public:
   SDKNodeTypeFunc(SDKNodeInitInfo Info);
-  bool isEscaping() const { return !hasTypeAttribute(TypeAttrKind::TAK_noescape); }
+  bool isEscaping() const { return hasTypeAttribute(TypeAttrKind::TAK_noescape); }
   static bool classof(const SDKNode *N);
 };
 

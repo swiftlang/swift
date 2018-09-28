@@ -31,6 +31,8 @@ cake1: Constructor S1.init(_:) has parameter 0 type change from Int to Double
 cake1: Func C1.foo2(_:) has parameter 0 type change from Int to () -> ()
 cake1: Func C7.foo(_:_:) has removed default argument from parameter 0
 cake1: Func C7.foo(_:_:) has removed default argument from parameter 1
+cake1: Func EscapingFunctionType.addedEscaping(_:) has added @escaping in parameter 0
+cake1: Func EscapingFunctionType.removedEscaping(_:) has removed @escaping in parameter 0
 cake1: Func Somestruct2.foo1(_:) has parameter 0 type change from C3 to C1
 
 /* Decl Attribute changes */
