@@ -583,6 +583,9 @@ UIdent SwiftLangSupport::getUIDForSymbol(SymbolInfo sym, bool isRef) {
       llvm_unreachable("missing extension sub kind");
     }
 
+  case SymbolKind::Module:
+    return KindRefModule;
+
   default:
     // TODO: reconsider whether having a default case is a good idea.
     return UIdent();

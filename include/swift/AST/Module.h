@@ -264,6 +264,7 @@ public:
     return { Files.begin(), Files.size() };
   }
 
+  bool isClangModule() const;
   void addFile(FileUnit &newFile);
   void removeFile(FileUnit &existingFile);
 
@@ -1288,6 +1289,12 @@ public:
   bool isSystemModule() const;
   bool isBuiltinModule() const;
   const ModuleDecl *getAsSwiftModule() const;
+  const clang::Module *getAsClangModule() const;
+
+  void *getOpaqueValue() const {
+    assert(!Mod.isNull());
+    return Mod.getOpaqueValue();
+  }
 
   explicit operator bool() const { return !Mod.isNull(); }
 };
