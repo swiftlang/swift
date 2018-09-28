@@ -442,8 +442,8 @@ public struct Dictionary<Key: Hashable, Value> {
   /// - Parameter minimumCapacity: The minimum number of key-value pairs that
   ///   the newly created dictionary should be able to store without
   ///   reallocating its storage buffer.
-  @inlinable
-  public init(minimumCapacity: Int) {
+  public // FIXME(reserveCapacity): Should be inlinable
+  init(minimumCapacity: Int) {
     _variant = .native(_NativeDictionary(capacity: minimumCapacity))
   }
 
@@ -2074,8 +2074,8 @@ extension Dictionary {
   ///
   /// - Parameter minimumCapacity: The requested number of key-value pairs to
   ///   store.
-  @inlinable
-  public mutating func reserveCapacity(_ minimumCapacity: Int) {
+  public // FIXME(reserveCapacity): Should be inlinable
+  mutating func reserveCapacity(_ minimumCapacity: Int) {
     _variant.reserveCapacity(minimumCapacity)
     _sanityCheck(self.capacity >= minimumCapacity)
   }

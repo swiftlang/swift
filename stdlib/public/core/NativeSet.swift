@@ -154,7 +154,10 @@ extension _NativeSet { // ensureUnique
   @inlinable
   internal mutating func resize(capacity: Int) {
     let capacity = Swift.max(capacity, self.capacity)
-    let result = _NativeSet(_SetStorage<Element>.allocate(capacity: capacity))
+    let result = _NativeSet(_SetStorage<Element>.resize(
+        original: _storage,
+        capacity: capacity,
+        move: true))
     if count > 0 {
       for bucket in hashTable {
         let element = (self._elements + bucket.offset).move()
@@ -169,28 +172,36 @@ extension _NativeSet { // ensureUnique
   }
 
   @inlinable
-  internal mutating func copy(capacity: Int) -> Bool {
+  internal mutating func copyAndResize(capacity: Int) {
     let capacity = Swift.max(capacity, self.capacity)
-    let (newStorage, rehash) = _SetStorage<Element>.reallocate(
-      original: _storage,
-      capacity: capacity)
-    let result = _NativeSet(newStorage)
+    let result = _NativeSet(_SetStorage<Element>.resize(
+        original: _storage,
+        capacity: capacity,
+        move: false))
     if count > 0 {
-      if rehash {
-        for bucket in hashTable {
-          result._unsafeInsertNew(self.uncheckedElement(at: bucket))
-        }
-      } else {
-        result.hashTable.copyContents(of: hashTable)
-        result._storage._count = self.count
-        for bucket in hashTable {
-          let element = uncheckedElement(at: bucket)
-          result.uncheckedInitialize(at: bucket, to: element)
-        }
+      for bucket in hashTable {
+        result._unsafeInsertNew(self.uncheckedElement(at: bucket))
       }
     }
     _storage = result._storage
-    return rehash
+  }
+
+  @inlinable
+  internal mutating func copy() {
+    let newStorage = _SetStorage<Element>.copy(original: _storage)
+    _sanityCheck(newStorage._scale == _storage._scale)
+    _sanityCheck(newStorage._age == _storage._age)
+    _sanityCheck(newStorage._seed == _storage._seed)
+    let result = _NativeSet(newStorage)
+    if count > 0 {
+      result.hashTable.copyContents(of: hashTable)
+      result._storage._count = self.count
+      for bucket in hashTable {
+        let element = uncheckedElement(at: bucket)
+        result.uncheckedInitialize(at: bucket, to: element)
+      }
+    }
+    _storage = result._storage
   }
 
   /// Ensure storage of self is uniquely held and can hold at least `capacity`
@@ -201,14 +212,18 @@ extension _NativeSet { // ensureUnique
     if _fastPath(capacity <= self.capacity && isUnique) {
       return false
     }
-    guard isUnique else {
-      return copy(capacity: capacity)
+    if isUnique {
+      resize(capacity: capacity)
+      return true
     }
-    resize(capacity: capacity)
+    if capacity <= self.capacity {
+      copy()
+      return false
+    }
+    copyAndResize(capacity: capacity)
     return true
   }
 
-  @inlinable
   internal mutating func reserveCapacity(_ capacity: Int, isUnique: Bool) {
     _ = ensureUnique(isUnique: isUnique, capacity: capacity)
   }
@@ -451,7 +466,10 @@ extension _NativeSet { // Deletion
   internal mutating func removeAll(isUnique: Bool) {
     guard isUnique else {
       let scale = self._storage._scale
-      _storage = _SetStorage<Element>.allocate(scale: scale, age: nil)
+      _storage = _SetStorage<Element>.allocate(
+        scale: scale,
+        age: nil,
+        seed: nil)
       return
     }
     for bucket in hashTable {
