@@ -96,7 +96,8 @@ SDKNodeDeclTypeAlias::SDKNodeDeclTypeAlias(SDKNodeInitInfo Info):
 
 SDKNodeDeclVar::SDKNodeDeclVar(SDKNodeInitInfo Info): 
   SDKNodeDecl(Info, SDKNodeKind::DeclVar),
-  FixedBinaryOrder(Info.FixedBinaryOrder), IsLet(Info.IsLet) {}
+  FixedBinaryOrder(Info.FixedBinaryOrder), IsLet(Info.IsLet),
+  HasStorage(Info.HasStorage) {}
 
 SDKNodeDeclAbstractFunc::SDKNodeDeclAbstractFunc(SDKNodeInitInfo Info,
   SDKNodeKind Kind): SDKNodeDecl(Info, Kind), IsThrowing(Info.IsThrowing),
@@ -119,7 +120,7 @@ SDKNodeDeclAssociatedType::SDKNodeDeclAssociatedType(SDKNodeInitInfo Info):
 
 SDKNodeDeclSubscript::SDKNodeDeclSubscript(SDKNodeInitInfo Info):
   SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclSubscript),
-  HasSetter(Info.HasSetter) {}
+  HasSetter(Info.HasSetter), HasStorage(Info.HasStorage) {}
 
 StringRef SDKNodeDecl::getHeaderName() const {
   if (Location.empty())
@@ -656,6 +657,8 @@ bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
             }
             if (LV->isLet() != RV->isLet())
               return false;
+            if (LV->hasStorage() != RV->hasStorage())
+              return false;
           }
         }
       }
@@ -679,10 +682,14 @@ bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
     }
     case SDKNodeKind::DeclAssociatedType:
     case SDKNodeKind::DeclSubscript: {
-      auto *Left = dyn_cast<SDKNodeDeclSubscript>(&L);
-      auto *Right = dyn_cast<SDKNodeDeclSubscript>(&R);
-      if (Left && Right && Left->hasSetter() != Right->hasSetter())
-        return false;
+      if (auto *Left = dyn_cast<SDKNodeDeclSubscript>(&L)) {
+        if (auto *Right = dyn_cast<SDKNodeDeclSubscript>(&R)) {
+          if (Left->hasSetter() != Right->hasSetter())
+            return false;
+          if (Left->hasStorage() != Right->hasStorage())
+            return false;
+        }
+      }
       LLVM_FALLTHROUGH;
     }
     case SDKNodeKind::DeclTypeAlias: {
@@ -1025,6 +1032,10 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
   // Record whether a subscript has getter/setter.
   if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
     HasSetter = SD->getSetter();
+  }
+
+  if (auto *VAR = dyn_cast<AbstractStorageDecl>(VD)) {
+    HasStorage = VAR->hasStorage();
   }
 }
 
@@ -1423,12 +1434,14 @@ void SDKNodeTypeNominal::jsonize(json::Output &out) {
 void SDKNodeDeclSubscript::jsonize(json::Output &out) {
   SDKNodeDeclAbstractFunc::jsonize(out);
   output(out, KeyKind::KK_hasSetter, HasSetter);
+  output(out, KeyKind::KK_hasStorage, HasStorage);
 }
 
 void SDKNodeDeclVar::jsonize(json::Output &out) {
   SDKNodeDecl::jsonize(out);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_fixedbinaryorder).data(), FixedBinaryOrder);
   output(out, KeyKind::KK_isLet, IsLet);
+  output(out, KeyKind::KK_hasStorage, HasStorage);
 }
 
 namespace swift {
