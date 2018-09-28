@@ -30,6 +30,7 @@ add_swift_tool_subdirectory(swift-llvm-opt)
 add_swift_tool_subdirectory(swift-api-digester)
 add_swift_tool_subdirectory(swift-syntax-test)
 add_swift_tool_subdirectory(swift-refactor)
+add_swift_tool_subdirectory(swift-config)
 
 if(LLVM_USE_SANITIZE_COVERAGE)
 add_swift_tool_subdirectory(swift-demangle-fuzzer)
