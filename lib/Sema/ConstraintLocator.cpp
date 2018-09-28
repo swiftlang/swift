@@ -33,8 +33,8 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
   for (auto elt : path) {
     id.AddInteger(elt.getKind());
     switch (elt.getKind()) {
-    case Archetype:
-      id.AddPointer(elt.getArchetype()->getCanonicalType().getPointer());
+    case GenericParameter:
+      id.AddPointer(elt.getGenericParameter());
       break;
 
     case Requirement:
@@ -109,8 +109,8 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
   for (auto elt : getPath()) {
     out << " -> ";
     switch (elt.getKind()) {
-    case Archetype:
-      out << "archetype '" << elt.getArchetype()->getString() << "'";
+    case GenericParameter:
+      out << "generic parameter '" << elt.getGenericParameter()->getString() << "'";
       break;
 
     case ApplyArgument:

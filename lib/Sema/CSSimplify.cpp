@@ -1532,7 +1532,7 @@ ConstraintSystem::matchTypesBindTypeVar(
   // represent an opened archetype. If we allowed this it would allow
   // the noescape function to potentially escape.
   if (auto *fnTy = type->getAs<FunctionType>()) {
-    if (fnTy->isNoEscape() && typeVar->getImpl().getArchetype()) {
+    if (fnTy->isNoEscape() && typeVar->getImpl().getGenericParameter()) {
       if (shouldAttemptFixes()) {
         auto *fix = MarkExplicitlyEscaping::create(
             *this, getConstraintLocator(locator));

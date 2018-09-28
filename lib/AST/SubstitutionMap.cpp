@@ -200,18 +200,19 @@ SubstitutionMap SubstitutionMap::get(GenericSignature *genericSig,
   // Form the replacement types.
   SmallVector<Type, 4> replacementTypes;
   replacementTypes.reserve(genericSig->getGenericParams().size());
-  for (auto gp : genericSig->getGenericParams()) {
+
+  genericSig->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
     // Don't eagerly form replacements for non-canonical generic parameters.
-    if (!genericSig->isCanonicalTypeInContext(gp->getCanonicalType())) {
+    if (!canonical) {
       replacementTypes.push_back(Type());
-      continue;
+      return;
     }
 
     // Record the replacement.
     Type replacement = Type(gp).subst(subs, lookupConformance,
                                       SubstFlags::UseErrorType);
     replacementTypes.push_back(replacement);
-  }
+  });
 
   // Form the stored conformances.
   SmallVector<ProtocolConformanceRef, 4> conformances;
@@ -318,6 +319,20 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   if (!type->isTypeParameter())
     return None;
 
+  auto genericSig = getGenericSignature();
+
+  // Fast path
+  unsigned index = 0;
+  for (auto reqt : genericSig->getRequirements()) {
+    if (reqt.getKind() == RequirementKind::Conformance) {
+      if (reqt.getFirstType()->isEqual(type) &&
+          reqt.getSecondType()->isEqual(proto->getDeclaredType()))
+        return getConformances()[index];
+
+      index++;
+    }
+  }
+
   // Retrieve the starting conformance from the conformance map.
   auto getInitialConformance =
     [&](Type type, ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
@@ -337,8 +352,6 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
       return None;
     };
-
-  auto genericSig = getGenericSignature();
 
   // If the type doesn't conform to this protocol, the result isn't formed
   // from these requirements.

@@ -472,15 +472,16 @@ private:
   /// true.
   bool diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure);
 
-  /// Check the associated constraint system to see if it has any archetypes
-  /// not properly resolved or missing. If so, diagnose the problem with
-  /// an error and return true.
-  bool diagnoseArchetypeAmbiguity();
+  /// Check the associated constraint system to see if it has any opened generic
+  /// parameters that were not bound to a fixed type. If so, diagnose the
+  /// problem with an error and return true.
+  bool diagnoseAmbiguousGenericParameters();
 
-  /// Emit an error message about an unbound generic parameter existing, and
-  /// emit notes referring to the target of a diagnostic, e.g., the function
-  /// or parameter being used.
-  void diagnoseUnboundArchetype(ArchetypeType *archetype, Expr *anchor);
+  /// Emit an error message about an unbound generic parameter, and emit notes
+  /// referring to the target of a diagnostic, e.g., the function or parameter
+  /// being used.
+  void diagnoseAmbiguousGenericParameter(GenericTypeParamType *paramTy,
+                                         Expr *anchor);
 
   /// Produce a diagnostic for a general member-lookup failure (irrespective of
   /// the exact expression kind).
@@ -4687,9 +4688,12 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
                          .getOldType()
                          ->getWithoutSpecifierType();
 
-      if (argType->is<ArchetypeType>()) {
-        diagnoseUnboundArchetype(archetype, fnExpr);
-        return true;
+      if (auto *archetype = argType->getAs<ArchetypeType>()) {
+        auto interfaceTy = archetype->getInterfaceType();
+        if (auto *paramTy = interfaceTy->getAs<GenericTypeParamType>()) {
+          diagnoseAmbiguousGenericParameter(paramTy, fnExpr);
+          return true;
+        }
       }
 
       if (isUnresolvedOrTypeVarType(argType) || argType->hasError())
@@ -7735,22 +7739,18 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   diagnosis.diagnoseAmbiguity(expr);
 }
 
-// FIXME: Instead of doing this, we should store the decl in the type
-// variable, or in the locator.
-static bool hasArchetype(const GenericTypeDecl *generic,
-                         ArchetypeType *archetype) {
-  assert(!archetype->getOpenedExistentialType() &&
-         !archetype->getParent());
-
-  auto genericEnv = generic->getGenericEnvironment();
-  if (!genericEnv)
+static bool hasGenericParameter(const GenericTypeDecl *generic,
+                                GenericTypeParamType *paramTy) {
+  auto *decl = paramTy->getDecl();
+  if (!decl)
     return false;
 
-  return archetype->getGenericEnvironment() == genericEnv;
+  return decl->getDeclContext() == generic;
 }
 
-static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
-                                ConstraintSystem &cs) {
+static void noteGenericParameterSource(const TypeLoc &loc,
+                                       GenericTypeParamType *paramTy,
+                                       ConstraintSystem &cs) {
   const GenericTypeDecl *FoundDecl = nullptr;
   const ComponentIdentTypeRepr *FoundGenericTypeBase = nullptr;
 
@@ -7759,10 +7759,10 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
     struct FindGenericTypeDecl : public ASTWalker {
       const GenericTypeDecl *FoundDecl = nullptr;
       const ComponentIdentTypeRepr *FoundGenericTypeBase = nullptr;
-      ArchetypeType *Archetype;
+      GenericTypeParamType *ParamTy;
 
-      FindGenericTypeDecl(ArchetypeType *Archetype)
-          : Archetype(Archetype) {}
+      FindGenericTypeDecl(GenericTypeParamType *ParamTy)
+          : ParamTy(ParamTy) {}
       
       bool walkToTypeReprPre(TypeRepr *T) override {
         // If we already emitted the note, we're done.
@@ -7771,7 +7771,7 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
         if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
           auto *generic =
               dyn_cast_or_null<GenericTypeDecl>(ident->getBoundDecl());
-          if (generic && hasArchetype(generic, Archetype)) {
+          if (generic && hasGenericParameter(generic, ParamTy)) {
             FoundDecl = generic;
             FoundGenericTypeBase = ident;
             return false;
@@ -7780,7 +7780,7 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
         // Keep walking.
         return true;
       }
-    } findGenericTypeDecl(archetype);
+    } findGenericTypeDecl(paramTy);
 
     typerepr->walk(findGenericTypeDecl);
     FoundDecl = findGenericTypeDecl.FoundDecl;
@@ -7791,7 +7791,7 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
   // type checked expression.
   if (!FoundDecl) {
     if (const GenericTypeDecl *generic = loc.getType()->getAnyGeneric())
-      if (hasArchetype(generic, archetype))
+      if (hasGenericParameter(generic, paramTy))
         FoundDecl = generic;
   }
 
@@ -7804,7 +7804,7 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
       type = typeAlias->getUnboundGenericType();
     else
       type = FoundDecl->getDeclaredInterfaceType();
-    tc.diagnose(FoundDecl, diag::archetype_declared_in_type, archetype, type);
+    tc.diagnose(FoundDecl, diag::archetype_declared_in_type, paramTy, type);
   }
 
   if (FoundGenericTypeBase && !isa<GenericIdentTypeRepr>(FoundGenericTypeBase)){
@@ -8065,25 +8065,23 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
 /// Check the associated constraint system to see if it has any archetypes
 /// not properly resolved or missing. If so, diagnose the problem with
 /// an error and return true.
-bool FailureDiagnosis::diagnoseArchetypeAmbiguity() {
-  using Archetype = std::tuple<ArchetypeType *, ConstraintLocator *, unsigned>;
+bool FailureDiagnosis::diagnoseAmbiguousGenericParameters() {
+  using GenericParameter = std::tuple<GenericTypeParamType *,
+                                      ConstraintLocator *,
+                                      unsigned>;
 
-  llvm::SmallVector<Archetype, 2> unboundParams;
-  // Check out all of the type variables lurking in the system.  If any are
-  // unbound archetypes, then the problem is that it couldn't be resolved.
+  llvm::SmallVector<GenericParameter, 2> unboundParams;
+  // Check out all of the type variables lurking in the system.  If any free
+  // type variables were created when opening generic parameters, diagnose
+  // that the generic parameter could not be inferred.
   for (auto tv : CS.getTypeVariables()) {
     auto &impl = tv->getImpl();
 
     if (impl.hasRepresentativeOrFixed())
       continue;
 
-    // If this is a conversion to a type variable used to form an archetype,
-    // Then diagnose this as a generic parameter that could not be resolved.
-    auto archetype = impl.getArchetype();
-
-    // Only diagnose archetypes that don't have a parent, i.e., ones
-    // that correspond to generic parameters.
-    if (!archetype || archetype->getParent())
+    auto *paramTy = impl.getGenericParameter();
+    if (!paramTy)
       continue;
 
     // Number of constraints related to particular unbound parameter
@@ -8117,22 +8115,22 @@ bool FailureDiagnosis::diagnoseArchetypeAmbiguity() {
     }
 
     auto locator = impl.getLocator();
-    unboundParams.push_back(
-        std::make_tuple(archetype, locator, numConstraints));
+    unboundParams.emplace_back(paramTy, locator, numConstraints);
   }
 
   // We've found unbound generic parameters, let's diagnose
   // based on the number of constraints each one is related to.
   if (!unboundParams.empty()) {
-    // Let's prioritize archetypes that don't have any constraints associated.
+    // Let's prioritize generic parameters that don't have any constraints
+    // associated.
     std::stable_sort(unboundParams.begin(), unboundParams.end(),
-                     [](Archetype a, Archetype b) {
+                     [](GenericParameter a, GenericParameter b) {
                        return std::get<2>(a) < std::get<2>(b);
                      });
 
     auto param = unboundParams.front();
-    diagnoseUnboundArchetype(std::get<0>(param),
-                             std::get<1>(param)->getAnchor());
+    diagnoseAmbiguousGenericParameter(std::get<0>(param),
+                                      std::get<1>(param)->getAnchor());
     return true;
   }
 
@@ -8142,18 +8140,19 @@ bool FailureDiagnosis::diagnoseArchetypeAmbiguity() {
 /// Emit an error message about an unbound generic parameter existing, and
 /// emit notes referring to the target of a diagnostic, e.g., the function
 /// or parameter being used.
-void FailureDiagnosis::diagnoseUnboundArchetype(ArchetypeType *archetype,
-                                                Expr *anchor) {
+void FailureDiagnosis::
+diagnoseAmbiguousGenericParameter(GenericTypeParamType *paramTy,
+                                  Expr *anchor) {
   auto &tc = CS.getTypeChecker();
 
-  // The archetype may come from the explicit type in a cast expression.
+  // The generic parameter may come from the explicit type in a cast expression.
   if (auto *ECE = dyn_cast_or_null<ExplicitCastExpr>(anchor)) {
     tc.diagnose(ECE->getLoc(), diag::unbound_generic_parameter_cast,
-                archetype, ECE->getCastTypeLoc().getType())
+                paramTy, ECE->getCastTypeLoc().getType())
       .highlight(ECE->getCastTypeLoc().getSourceRange());
 
     // Emit a note specifying where this came from, if we can find it.
-    noteArchetypeSource(ECE->getCastTypeLoc(), archetype, CS);
+    noteGenericParameterSource(ECE->getCastTypeLoc(), paramTy, CS);
     return;
   }
 
@@ -8173,17 +8172,17 @@ void FailureDiagnosis::diagnoseUnboundArchetype(ArchetypeType *archetype,
 
   
   // Otherwise, emit an error message on the expr we have, and emit a note
-  // about where the archetype came from.
-  tc.diagnose(expr->getLoc(), diag::unbound_generic_parameter, archetype);
+  // about where the generic parameter came from.
+  tc.diagnose(expr->getLoc(), diag::unbound_generic_parameter, paramTy);
   
   // If we have an anchor, drill into it to emit a
-  // "note: archetype declared here".
+  // "note: generic parameter declared here".
   if (!anchor) return;
 
 
   if (auto TE = dyn_cast<TypeExpr>(anchor)) {
     // Emit a note specifying where this came from, if we can find it.
-    noteArchetypeSource(TE->getTypeLoc(), archetype, CS);
+    noteGenericParameterSource(TE->getTypeLoc(), paramTy, CS);
     return;
   }
 
@@ -8232,8 +8231,8 @@ void FailureDiagnosis::diagnoseUnboundArchetype(ArchetypeType *archetype,
 /// Emit an ambiguity diagnostic about the specified expression.
 void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   // First, let's try to diagnose any problems related to ambiguous
-  // archetypes (generic parameters) present in the constraint system.
-  if (diagnoseArchetypeAmbiguity())
+  // generic parameters present in the constraint system.
+  if (diagnoseAmbiguousGenericParameters())
     return;
 
   // Unresolved/Anonymous ClosureExprs are common enough that we should give

@@ -190,9 +190,10 @@ public:
   Optional<ProtocolConformanceRef>
   lookupConformance(CanType depTy, ProtocolDecl *proto) const;
 
-  /// Return a vector of all generic parameters that are not subject to
-  /// a concrete same-type constraint.
-  SmallVector<GenericTypeParamType *, 2> getSubstitutableParams() const;
+  /// Iterate over all generic parameters, passing a flag to the callback
+  /// indicating if the generic parameter is canonical or not.
+  void forEachParam(
+    llvm::function_ref<void(GenericTypeParamType *, bool)> callback) const;
 
   /// Check if the generic signature makes all generic parameters
   /// concrete.
