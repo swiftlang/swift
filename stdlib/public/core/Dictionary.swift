@@ -1488,6 +1488,66 @@ extension Dictionary {
   }
 }
 
+extension Dictionary.Keys {
+  @_fixed_layout
+  public struct Iterator: IteratorProtocol {
+    @usableFromInline
+    internal var _base: Dictionary<Key, Value>.Iterator
+
+    @inlinable
+    internal init(_ base: Dictionary<Key, Value>.Iterator) {
+      self._base = base
+    }
+
+    @inlinable
+    public mutating func next() -> Key? {
+#if _runtime(_ObjC)
+      if case .cocoa(let cocoa) = _base._variant {
+        _base._cocoaPath()
+        guard let cocoaKey = cocoa.nextKey() else { return nil }
+        return _forceBridgeFromObjectiveC(cocoaKey, Key.self)
+      }
+#endif
+      return _base._asNative.nextKey()
+    }
+  }
+
+  @inlinable
+  public func makeIterator() -> Iterator {
+    return Iterator(_variant.makeIterator())
+  }
+}
+
+extension Dictionary.Values {
+  @_fixed_layout
+  public struct Iterator: IteratorProtocol {
+    @usableFromInline
+    internal var _base: Dictionary<Key, Value>.Iterator
+
+    @inlinable
+    internal init(_ base: Dictionary<Key, Value>.Iterator) {
+      self._base = base
+    }
+
+    @inlinable
+    public mutating func next() -> Value? {
+#if _runtime(_ObjC)
+      if case .cocoa(let cocoa) = _base._variant {
+        _base._cocoaPath()
+        guard let (_, cocoaValue) = cocoa.next() else { return nil }
+        return _forceBridgeFromObjectiveC(cocoaValue, Value.self)
+      }
+#endif
+      return _base._asNative.nextValue()
+    }
+  }
+
+  @inlinable
+  public func makeIterator() -> Iterator {
+    return Iterator(_variant.makeIterator())
+  }
+}
+
 extension Dictionary: Equatable where Value: Equatable {
   @inlinable
   public static func == (lhs: [Key: Value], rhs: [Key: Value]) -> Bool {
