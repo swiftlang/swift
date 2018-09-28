@@ -3955,29 +3955,19 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
   const ProtocolDescriptor *protocol = conformance->getProtocol();
 
   auto requirements = protocol->getRequirements();
-  if (assocType < requirements.begin() ||
-      assocType >= requirements.end()) {
-    fatalError(0,
-               "associated type descriptor %p is out of range for protocol %s;"
-               "requirement range is %p--%p\n",
-               assocType, protocol->Name.get(), requirements.begin(),
-               requirements.end());
-  }
-
+  assert(assocType >= requirements.begin() &&
+         assocType < requirements.end());
   const auto &req = *assocType;
-  if (req.Flags.getKind() !=
-        ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction) {
-    fatalError(0, "associated type descriptor %p refers to non-associated "
-               "type requirement in protocol %s\n",
-               assocType, protocol->Name.get());
-  }
+  (void)req;
+  assert(req.Flags.getKind() ==
+           ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction);
 
   // If the low bit of the witness is clear, it's already a metadata pointer.
   unsigned witnessIndex = (assocType - requirements.begin()) +
     WitnessTableFirstRequirementOffset;
   auto witness = ((const void* const *)wtable)[witnessIndex];
-  if ((uintptr_t(witness) &
-         ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0) {
+  if (LLVM_LIKELY((uintptr_t(witness) &
+         ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
     return swift_checkMetadataState(request, (const Metadata *)witness);
   }
 
