@@ -275,15 +275,13 @@ extension _NativeDictionary {
   @inlinable
   @inline(__always)
   func validatedBucket(for index: Dictionary<Key, Value>.Index) -> Bucket {
-    switch index._variant {
-    case .native(let native):
-      return validatedBucket(for: native)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoa):
+    guard index._isNative else {
       index._cocoaPath()
       // Accept Cocoa indices as long as they contain a key that exists in this
       // dictionary, and the address of their Cocoa object generates the same
       // age.
+      let cocoa = index._asCocoa
       if cocoa.age == self.age {
         let key = _forceBridgeFromObjectiveC(cocoa.key, Key.self)
         let (bucket, found) = find(key)
@@ -293,8 +291,9 @@ extension _NativeDictionary {
       }
       _preconditionFailure(
         "Attempting to access Dictionary elements using an invalid index")
-#endif
     }
+#endif
+    return validatedBucket(for: index._asNative)
   }
 }
 
