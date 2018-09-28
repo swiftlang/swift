@@ -2929,21 +2929,6 @@ bool TypeChecker::isSubtypeOf(Type type1, Type type2, DeclContext *dc) {
                                 ConstraintKind::Subtype, dc);
 }
 
-bool TypeChecker::isSubclassOf(Type type1, Type type2, DeclContext *dc) {
-  assert(type2->getClassOrBoundGenericClass());
-
-  if (!typesSatisfyConstraint(type1,
-                              Context.getAnyObjectType(),
-                              /*openArchetypes=*/false,
-                              ConstraintKind::ConformsTo, dc)) {
-    return false;
-  }
-
-  return typesSatisfyConstraint(type1, type2,
-                                /*openArchetypes=*/false,
-                                ConstraintKind::Subtype, dc);
-}
-
 bool TypeChecker::isConvertibleTo(Type type1, Type type2, DeclContext *dc,
                                   bool *unwrappedIUO) {
   return typesSatisfyConstraint(type1, type2,
