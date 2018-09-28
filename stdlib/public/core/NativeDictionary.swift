@@ -49,7 +49,8 @@ internal struct _NativeDictionary<Key: Hashable, Value> {
   @inlinable
   internal init(_ cocoa: __owned _CocoaDictionary, capacity: Int) {
     _sanityCheck(cocoa.count <= capacity)
-    self.init(capacity: capacity)
+    self._storage =
+      _DictionaryStorage<Key, Value>.convert(cocoa, capacity: capacity)
     for (key, value) in cocoa {
       insertNew(
         key: _forceBridgeFromObjectiveC(key, Key.self),
@@ -78,6 +79,13 @@ extension _NativeDictionary { // Primitive fields
     }
   }
 
+  @inlinable
+  internal var age: Int32 {
+    @inline(__always) get {
+      return _storage._age
+    }
+  }
+
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   @inlinable
   internal var _keys: UnsafeMutablePointer<Key> {
@@ -87,6 +95,12 @@ extension _NativeDictionary { // Primitive fields
   @inlinable
   internal var _values: UnsafeMutablePointer<Value> {
     return _storage._rawValues.assumingMemoryBound(to: Value.self)
+  }
+
+  @inlinable
+  @inline(__always)
+  internal func invalidateIndices() {
+    _storage._age &+= 1
   }
 }
 
@@ -233,23 +247,63 @@ extension _NativeDictionary { // ensureUnique
   }
 }
 
+extension _NativeDictionary {
+  @inlinable
+  @inline(__always)
+  func validatedBucket(for index: _HashTable.Index) -> Bucket {
+    _precondition(hashTable.isOccupied(index.bucket) && index.age == age,
+      "Attempting to access Dictionary elements using an invalid index")
+    return index.bucket
+  }
+
+  @inlinable
+  @inline(__always)
+  func validatedBucket(for index: Dictionary<Key, Value>.Index) -> Bucket {
+    switch index._variant {
+    case .native(let native):
+      return validatedBucket(for: native)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      index._cocoaPath()
+      // Accept Cocoa indices as long as they contain a key that exists in this
+      // dictionary, and the address of their Cocoa object generates the same
+      // age.
+      if cocoa.age == self.age {
+        let key = _forceBridgeFromObjectiveC(cocoa.key, Key.self)
+        let (bucket, found) = find(key)
+        if found {
+          return bucket
+        }
+      }
+      _preconditionFailure(
+        "Attempting to access Dictionary elements using an invalid index")
+#endif
+    }
+  }
+}
+
 extension _NativeDictionary: _DictionaryBuffer {
   @usableFromInline
-  internal typealias Index = Bucket
+  internal typealias Index = Dictionary<Key, Value>.Index
 
   @inlinable
   internal var startIndex: Index {
-    return hashTable.startBucket
+    let bucket = hashTable.startBucket
+    return Index(_native: _HashTable.Index(bucket: bucket, age: age))
   }
 
   @inlinable
   internal var endIndex: Index {
-    return hashTable.endBucket
+    let bucket = hashTable.endBucket
+    return Index(_native: _HashTable.Index(bucket: bucket, age: age))
   }
 
   @inlinable
   internal func index(after index: Index) -> Index {
-    return hashTable.occupiedBucket(after: index)
+    // Note that _asNative forces this not to work on Cocoa indices.
+    let bucket = validatedBucket(for: index._asNative)
+    let next = hashTable.occupiedBucket(after: bucket)
+    return Index(_native: _HashTable.Index(bucket: next, age: age))
   }
 
   @inlinable
@@ -260,7 +314,7 @@ extension _NativeDictionary: _DictionaryBuffer {
     }
     let (bucket, found) = find(key)
     guard found else { return nil }
-    return bucket
+    return Index(_native: _HashTable.Index(bucket: bucket, age: age))
   }
 
   @inlinable
@@ -291,27 +345,24 @@ extension _NativeDictionary: _DictionaryBuffer {
   @inlinable
   @inline(__always)
   func lookup(_ index: Index) -> (key: Key, value: Value) {
-    _precondition(hashTable.isOccupied(index),
-      "Attempting to access Dictionary elements using an invalid Index")
-    let key = self.uncheckedKey(at: index)
-    let value = self.uncheckedValue(at: index)
+    let bucket = validatedBucket(for: index)
+    let key = self.uncheckedKey(at: bucket)
+    let value = self.uncheckedValue(at: bucket)
     return (key, value)
   }
 
   @inlinable
   @inline(__always)
   func key(at index: Index) -> Key {
-    _precondition(hashTable.isOccupied(index),
-      "Attempting to access Dictionary elements using an invalid Index")
-    return self.uncheckedKey(at: index)
+    let bucket = validatedBucket(for: index)
+    return self.uncheckedKey(at: bucket)
   }
 
   @inlinable
   @inline(__always)
   func value(at index: Index) -> Value {
-    _precondition(hashTable.isOccupied(index),
-      "Attempting to access Dictionary elements using an invalid Index")
-    return self.uncheckedValue(at: index)
+    let bucket = validatedBucket(for: index)
+    return self.uncheckedValue(at: bucket)
   }
 }
 
@@ -437,6 +488,23 @@ extension _NativeDictionary { // Insertions
   }
 }
 
+extension _NativeDictionary {
+  @inlinable
+  @inline(__always)
+  internal mutating func swapValuesAt(
+    _ a: Bucket,
+    _ b: Bucket,
+    isUnique: Bool
+  ) {
+    let rehashed = ensureUnique(isUnique: isUnique, capacity: capacity)
+    _sanityCheck(!rehashed)
+    _sanityCheck(hashTable.isOccupied(a) && hashTable.isOccupied(b))
+    let value = (_values + a.offset).move()
+    (_values + a.offset).moveInitialize(from: _values + b.offset, count: 1)
+    (_values + b.offset).initialize(to: value)
+  }
+}
+
 extension _NativeDictionary: _HashTableDelegate {
   @inlinable
   @inline(__always)
@@ -460,6 +528,7 @@ extension _NativeDictionary { // Deletion
     hashTable.delete(at: bucket, with: self)
     _storage._count -= 1
     _sanityCheck(_storage._count >= 0)
+    invalidateIndices()
   }
 
   @inlinable
@@ -477,18 +546,13 @@ extension _NativeDictionary { // Deletion
     return (oldKey, oldValue)
   }
 
-  @inlinable
-  @inline(__always)
-  internal mutating func remove(at index: Index, isUnique: Bool) -> Element {
-    _precondition(hashTable.isOccupied(index), "Invalid index")
-    return uncheckedRemove(at: index, isUnique: isUnique)
-  }
-
   @usableFromInline
   internal mutating func removeAll(isUnique: Bool) {
     guard isUnique else {
       let scale = self._storage._scale
-      _storage = _DictionaryStorage<Key, Value>.allocate(scale: scale)
+      _storage = _DictionaryStorage<Key, Value>.allocate(
+        scale: scale,
+        age: nil)
       return
     }
     for bucket in hashTable {
@@ -497,6 +561,7 @@ extension _NativeDictionary { // Deletion
     }
     hashTable.clear()
     _storage._count = 0
+    invalidateIndices()
   }
 }
 
