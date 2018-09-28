@@ -189,6 +189,10 @@ struct PrintOptions {
   /// ([] and ?), even if there are no sugar type nodes.
   bool SynthesizeSugarOnTypes = false;
 
+  /// \brief If true, null types in the AST will be printed as "<null>". If
+  /// false, the compiler will trap.
+  bool AllowNullTypes = true;
+
   /// \brief If true, the printer will explode a pattern like this:
   /// \code
   ///   var (a, b) = f()

@@ -85,6 +85,7 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
   result.TypeDefinitions = true;
   result.PrintIfConfig = false;
   result.FullyQualifiedTypes = true;
+  result.AllowNullTypes = false;
   result.SkipImports = true;
   result.OmitNameOfInaccessibleProperties = true;
   result.FunctionDefinitions = true;
@@ -4020,10 +4021,15 @@ void Type::print(raw_ostream &OS, const PrintOptions &PO) const {
   print(Printer, PO);
 }
 void Type::print(ASTPrinter &Printer, const PrintOptions &PO) const {
-  if (isNull())
+  if (isNull()) {
+    if (!PO.AllowNullTypes) {
+      // Use report_fatal_error instead of assert to trap in release builds too.
+      llvm::report_fatal_error("Cannot pretty-print a null type");
+    }
     Printer << "<null>";
-  else
-    TypePrinter(Printer, PO).visit(*this);
+    return;
+  }
+  TypePrinter(Printer, PO).visit(*this);
 }
 
 void AnyFunctionType::printParams(raw_ostream &OS, const
