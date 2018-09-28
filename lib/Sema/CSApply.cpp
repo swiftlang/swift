@@ -7916,11 +7916,8 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   // Add the conversion from the argument to the function parameter type.
   auto openedFuncType = openedType->castTo<FunctionType>();
   ::matchCallArguments(
-      cs, /*isOperator=*/false,
-      args,
-      openedFuncType->getParams(),
-      cs.getConstraintLocator(call,
-                              ConstraintLocator::ApplyArgument));
+      cs, args, openedFuncType->getParams(),
+      cs.getConstraintLocator(call, ConstraintLocator::ApplyArgument));
 
   // Solve the system.
   SmallVector<Solution, 1> solutions;
