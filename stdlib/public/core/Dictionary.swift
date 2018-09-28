@@ -1897,8 +1897,8 @@ extension Dictionary.Index: Comparable {
 }
 
 extension Dictionary.Index: Hashable {
-  @_effects(readonly) // FIXME(cocoa-index): Make inlinable
-  public func hash(into hasher: inout Hasher) {
+  public // FIXME(cocoa-index): Make inlinable
+  func hash(into hasher: inout Hasher) {
   #if _runtime(_ObjC)
     switch _variant {
     case .native(let nativeIndex):
