@@ -96,7 +96,8 @@ SDKNodeDeclTypeAlias::SDKNodeDeclTypeAlias(SDKNodeInitInfo Info):
 
 SDKNodeDeclVar::SDKNodeDeclVar(SDKNodeInitInfo Info): 
   SDKNodeDecl(Info, SDKNodeKind::DeclVar),
-  FixedBinaryOrder(Info.FixedBinaryOrder), IsLet(Info.IsLet) {}
+  FixedBinaryOrder(Info.FixedBinaryOrder), IsLet(Info.IsLet),
+  HasStorage(Info.HasStorage) {}
 
 SDKNodeDeclAbstractFunc::SDKNodeDeclAbstractFunc(SDKNodeInitInfo Info,
   SDKNodeKind Kind): SDKNodeDecl(Info, Kind), IsThrowing(Info.IsThrowing),
@@ -119,7 +120,7 @@ SDKNodeDeclAssociatedType::SDKNodeDeclAssociatedType(SDKNodeInitInfo Info):
 
 SDKNodeDeclSubscript::SDKNodeDeclSubscript(SDKNodeInitInfo Info):
   SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclSubscript),
-  HasSetter(Info.HasSetter) {}
+  HasSetter(Info.HasSetter), HasStorage(Info.HasStorage) {}
 
 StringRef SDKNodeDecl::getHeaderName() const {
   if (Location.empty())
@@ -600,26 +601,26 @@ static bool hasSameContents(ArrayRef<StringRef> Left,
   return LeftMinusRight.empty() && RightMinusLeft.empty();
 }
 
-bool SDKNode::operator==(const SDKNode &Other) const {
-  auto *LeftAlias = dyn_cast<SDKNodeTypeAlias>(this);
-  auto *RightAlias = dyn_cast<SDKNodeTypeAlias>(&Other);
+bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) {
+  auto *LeftAlias = dyn_cast<SDKNodeTypeAlias>(&L);
+  auto *RightAlias = dyn_cast<SDKNodeTypeAlias>(&R);
   if (LeftAlias || RightAlias) {
     // Comparing the underlying types if any of the inputs are alias.
-    const SDKNode *Left = LeftAlias ? LeftAlias->getUnderlyingType() : this;
-    const SDKNode *Right = RightAlias ? RightAlias->getUnderlyingType() : &Other;
+    const SDKNode *Left = LeftAlias ? LeftAlias->getUnderlyingType() : &L;
+    const SDKNode *Right = RightAlias ? RightAlias->getUnderlyingType() : &R;
     return *Left == *Right;
   }
 
-  if (getKind() != Other.getKind())
+  if (L.getKind() != R.getKind())
     return false;
 
-  switch(getKind()) {
+  switch(L.getKind()) {
     case SDKNodeKind::TypeAlias:
       llvm_unreachable("Should be handled above.");
     case SDKNodeKind::TypeNominal:
     case SDKNodeKind::TypeFunc: {
-      auto Left = this->getAs<SDKNodeType>();
-      auto Right = (&Other)->getAs<SDKNodeType>();
+      auto Left = L.getAs<SDKNodeType>();
+      auto Right = R.getAs<SDKNodeType>();
       if (Left->hasAttributeChange(*Right))
         return false;
       if (Left->hasDefaultArgument() != Right->hasDefaultArgument())
@@ -634,8 +635,8 @@ bool SDKNode::operator==(const SDKNode &Other) const {
     case SDKNodeKind::DeclConstructor:
     case SDKNodeKind::DeclGetter:
     case SDKNodeKind::DeclSetter: {
-      auto Left = this->getAs<SDKNodeDeclAbstractFunc>();
-      auto Right = (&Other)->getAs<SDKNodeDeclAbstractFunc>();
+      auto Left = L.getAs<SDKNodeDeclAbstractFunc>();
+      auto Right = R.getAs<SDKNodeDeclAbstractFunc>();
       if (Left->isMutating() ^ Right->isMutating())
         return false;
       if (Left->isThrowing() ^ Right->isThrowing())
@@ -644,17 +645,19 @@ bool SDKNode::operator==(const SDKNode &Other) const {
     }
 
     case SDKNodeKind::DeclVar: {
-      if (getSDKContext().checkingABI()) {
+      if (Ctx.checkingABI()) {
         // If we're checking ABI, the definition order matters.
         // If they're both members for fixed layout types, we never consider
         // them equal because we need to check definition orders.
-        if (auto *LV = dyn_cast<SDKNodeDeclVar>(this)) {
-          if (auto *RV = dyn_cast<SDKNodeDeclVar>(&Other)) {
+        if (auto *LV = dyn_cast<SDKNodeDeclVar>(&L)) {
+          if (auto *RV = dyn_cast<SDKNodeDeclVar>(&R)) {
             if (LV->hasFixedBinaryOrder() && RV->hasFixedBinaryOrder()) {
               if (LV->getFixedBinaryOrder() != RV->getFixedBinaryOrder())
                 return false;
             }
             if (LV->isLet() != RV->isLet())
+              return false;
+            if (LV->hasStorage() != RV->hasStorage())
               return false;
           }
         }
@@ -662,8 +665,8 @@ bool SDKNode::operator==(const SDKNode &Other) const {
       LLVM_FALLTHROUGH;
     }
     case SDKNodeKind::DeclType: {
-      auto *Left = dyn_cast<SDKNodeDeclType>(this);
-      auto *Right = dyn_cast<SDKNodeDeclType>(&Other);
+      auto *Left = dyn_cast<SDKNodeDeclType>(&L);
+      auto *Right = dyn_cast<SDKNodeDeclType>(&R);
       if (Left && Right) {
         if (!hasSameContents(Left->getAllProtocols(), Right->getAllProtocols())) {
           return false;
@@ -679,15 +682,19 @@ bool SDKNode::operator==(const SDKNode &Other) const {
     }
     case SDKNodeKind::DeclAssociatedType:
     case SDKNodeKind::DeclSubscript: {
-      auto *Left = dyn_cast<SDKNodeDeclSubscript>(this);
-      auto *Right = dyn_cast<SDKNodeDeclSubscript>(&Other);
-      if (Left && Right && Left->hasSetter() != Right->hasSetter())
-        return false;
+      if (auto *Left = dyn_cast<SDKNodeDeclSubscript>(&L)) {
+        if (auto *Right = dyn_cast<SDKNodeDeclSubscript>(&R)) {
+          if (Left->hasSetter() != Right->hasSetter())
+            return false;
+          if (Left->hasStorage() != Right->hasStorage())
+            return false;
+        }
+      }
       LLVM_FALLTHROUGH;
     }
     case SDKNodeKind::DeclTypeAlias: {
-      auto Left = this->getAs<SDKNodeDecl>();
-      auto Right = (&Other)->getAs<SDKNodeDecl>();
+      auto Left = L.getAs<SDKNodeDecl>();
+      auto Right = R.getAs<SDKNodeDecl>();
       if (Left->isStatic() ^ Right->isStatic())
         return false;
       if (Left->getReferenceOwnership() != Right->getReferenceOwnership())
@@ -701,12 +708,23 @@ bool SDKNode::operator==(const SDKNode &Other) const {
       LLVM_FALLTHROUGH;
     }
     case SDKNodeKind::Root: {
-      return getPrintedName() == Other.getPrintedName() &&
-        hasSameChildren(Other);
+      return L.getPrintedName() == R.getPrintedName() &&
+        L.hasSameChildren(R);
     }
   }
 
   llvm_unreachable("Unhanlded SDKNodeKind in switch.");
+}
+
+bool SDKContext::isEqual(const SDKNode &Left, const SDKNode &Right) {
+  if (!EqualCache[&Left].count(&Right)) {
+    EqualCache[&Left][&Right] = isSDKNodeEqual(*this, Left, Right);
+  }
+  return EqualCache[&Left][&Right];
+}
+
+bool SDKNode::operator==(const SDKNode &Other) const {
+  return Ctx.isEqual(*this, Other);
 }
 
 // The pretty printer of a tree of SDKNode
@@ -1014,6 +1032,10 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
   // Record whether a subscript has getter/setter.
   if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
     HasSetter = SD->getSetter();
+  }
+
+  if (auto *VAR = dyn_cast<AbstractStorageDecl>(VD)) {
+    HasStorage = VAR->hasStorage();
   }
 }
 
@@ -1412,12 +1434,14 @@ void SDKNodeTypeNominal::jsonize(json::Output &out) {
 void SDKNodeDeclSubscript::jsonize(json::Output &out) {
   SDKNodeDeclAbstractFunc::jsonize(out);
   output(out, KeyKind::KK_hasSetter, HasSetter);
+  output(out, KeyKind::KK_hasStorage, HasStorage);
 }
 
 void SDKNodeDeclVar::jsonize(json::Output &out) {
   SDKNodeDecl::jsonize(out);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_fixedbinaryorder).data(), FixedBinaryOrder);
   output(out, KeyKind::KK_isLet, IsLet);
+  output(out, KeyKind::KK_hasStorage, HasStorage);
 }
 
 namespace swift {

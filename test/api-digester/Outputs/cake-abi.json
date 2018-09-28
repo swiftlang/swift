@@ -279,7 +279,8 @@
             "HasInitialValue",
             "ReferenceOwnership"
           ],
-          "ownership": 1
+          "ownership": 1,
+          "hasStorage": true
         },
         {
           "kind": "Var",
@@ -344,7 +345,8 @@
             "HasInitialValue",
             "ReferenceOwnership"
           ],
-          "ownership": 2
+          "ownership": 2,
+          "hasStorage": true
         },
         {
           "kind": "Constructor",
@@ -713,7 +715,8 @@
           "declAttributes": [
             "HasInitialValue"
           ],
-          "fixedbinaryorder": 0
+          "fixedbinaryorder": 0,
+          "hasStorage": true
         },
         {
           "kind": "Var",
@@ -753,7 +756,8 @@
           "declAttributes": [
             "HasInitialValue"
           ],
-          "fixedbinaryorder": 1
+          "fixedbinaryorder": 1,
+          "hasStorage": true
         },
         {
           "kind": "Var",
@@ -793,7 +797,8 @@
           "declAttributes": [
             "HasInitialValue"
           ],
-          "fixedbinaryorder": 2
+          "fixedbinaryorder": 2,
+          "hasStorage": true
         },
         {
           "kind": "Constructor",
@@ -1098,7 +1103,8 @@
       "declAttributes": [
         "HasInitialValue"
       ],
-      "isLet": true
+      "isLet": true,
+      "hasStorage": true
     },
     {
       "kind": "TypeDecl",
