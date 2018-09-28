@@ -1,0 +1,164 @@
+private func _isUTF8MultiByteLeading(_ x: UInt8) -> Bool {
+  return (0xC2...0xF4).contains(x)
+}
+
+private func _isNotOverlong_F0(_ x: UInt8) -> Bool {
+  return (0x90...0xBF).contains(x)
+}
+
+private func _isNotOverlong_F4(_ x: UInt8) -> Bool {
+  return _isContinuation(x) && x <= 0x8F
+}
+
+private func _isNotOverlong_E0(_ x: UInt8) -> Bool {
+  return (0xA0...0xBF).contains(x)
+}
+
+private func _isNotOverlong_ED(_ x: UInt8) -> Bool {
+  return _isContinuation(x) && x <= 0x9F
+}
+
+private func _isASCII_cmp(_ x: UInt8) -> Bool {
+  return x <= 0x7F
+}
+
+internal struct UTF8ExtraInfo: Equatable {
+  public var isASCII: Bool
+}
+
+internal enum UTF8ValidationResult {
+  case success(UTF8ExtraInfo)
+  case error(toBeReplaced: Range<Int>)
+}
+
+extension UTF8ValidationResult: Equatable {}
+
+private struct UTF8ValidationError: Error {}
+
+internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationResult {
+  var iter = buf.makeIterator()
+  var lastValidIndex = buf.startIndex
+
+  @inline(__always) func guaranteeIn(_ f: (UInt8) -> Bool) throws {
+    guard let cu = iter.next() else { throw UTF8ValidationError() }
+    guard f(cu) else { throw UTF8ValidationError() }
+  }
+  @inline(__always) func guaranteeContinuation() throws {
+    try guaranteeIn(_isContinuation)
+  }
+
+  func findInvalidRange(_ buf: Slice<UnsafeBufferPointer<UInt8>>) -> Range<Int> {
+    var endIndex = buf.startIndex
+    var iter = buf.makeIterator()
+    _ = iter.next()
+    while let cu = iter.next(), !_isASCII(cu) && !_isUTF8MultiByteLeading(cu) {
+      endIndex += 1
+    }
+    let illegalRange = Range(buf.startIndex...endIndex)
+    _sanityCheck(illegalRange.clamped(to: (buf.startIndex..<buf.endIndex)) == illegalRange,
+                 "illegal range out of full range")
+    return illegalRange
+  }
+
+  do {
+    var isASCII = true
+    while let cu = iter.next() {
+      if _isASCII(cu) { lastValidIndex &+= 1; continue }
+      isASCII = false
+      if _slowPath(!_isUTF8MultiByteLeading(cu)) {
+        throw UTF8ValidationError()
+      }
+      switch cu {
+      case 0xC2...0xDF:
+        try guaranteeContinuation()
+        lastValidIndex &+= 2
+      case 0xE0:
+        try guaranteeIn(_isNotOverlong_E0)
+        try guaranteeContinuation()
+        lastValidIndex &+= 3
+      case 0xE1...0xEC:
+        try guaranteeContinuation()
+        try guaranteeContinuation()
+        lastValidIndex &+= 3
+      case 0xED:
+        try guaranteeIn(_isNotOverlong_ED)
+        try guaranteeContinuation()
+        lastValidIndex &+= 3
+      case 0xEE...0xEF:
+        try guaranteeContinuation()
+        try guaranteeContinuation()
+        lastValidIndex &+= 3
+      case 0xF0:
+        try guaranteeIn(_isNotOverlong_F0)
+        try guaranteeContinuation()
+        try guaranteeContinuation()
+        lastValidIndex &+= 4
+      case 0xF1...0xF3:
+        try guaranteeContinuation()
+        try guaranteeContinuation()
+        try guaranteeContinuation()
+        lastValidIndex &+= 4
+      case 0xF4:
+        try guaranteeIn(_isNotOverlong_F4)
+        try guaranteeContinuation()
+        try guaranteeContinuation()
+        lastValidIndex &+= 4
+      default:
+        Builtin.unreachable()
+      }
+    }
+    return .success(UTF8ExtraInfo(isASCII: isASCII))
+  } catch {
+    return .error(toBeReplaced: findInvalidRange(buf[lastValidIndex...]))
+  }
+}
+
+internal func repairUTF8(_ input: UnsafeBufferPointer<UInt8>, firstKnownBrokenRange: Range<Int>) -> String {
+  _sanityCheck(input.count > 0, "empty input doesn't need to be repaired")
+  _sanityCheck(firstKnownBrokenRange.clamped(to: input.indices) == firstKnownBrokenRange)
+  // During this process, `remainingInput` contains the remaining bytes to process. It's split into three
+  // non-overlapping sub-regions:
+  //
+  //  1. `goodChunk` (may be empty) containing bytes that are known good UTF-8 and can be copied into the output String
+  //  2. `brokenRange` (never empty) the next range of broken bytes,
+  //  3. the remainder (implicit, will become the next `remainingInput`)
+  //
+  // At the beginning of the process, the `goodChunk` starts at the beginning and extends to just before the first
+  // known broken byte. The known broken bytes are covered in the `brokenRange` and everything following that is
+  // the remainder.
+  // We then copy the `goodChunk` into the target buffer and append a UTF8 replacement character. `brokenRange` is
+  // skipped (replaced by the replacement character) and we restart the same process. This time, `goodChunk` extends
+  // from the byte after the previous `brokenRange` to the next `brokenRange`.
+  var result = _StringGuts()
+  let replacementCharacterCount = Unicode.Scalar._replacementCharacter.withUTF8CodeUnits { $0.count }
+  result.reserveCapacity(input.count + 5 * replacementCharacterCount) // extra space for some replacement characters
+
+  var brokenRange: Range<Int> = firstKnownBrokenRange
+  var remainingInput = input
+  repeat {
+    _sanityCheck(brokenRange.count > 0, "broken range empty")
+    _sanityCheck(remainingInput.count > 0, "empty remaining input doesn't need to be repaired")
+    let goodChunk = remainingInput[..<brokenRange.startIndex]
+
+    // very likely this capacity reservation does not actually do anything because we reserved space for the entire
+    // input plus up to five replacement characters up front
+    result.reserveCapacity(result.count + remainingInput.count + replacementCharacterCount)
+
+    // we can now safely append the next known good bytes and a replacement character
+    result.appendInPlace(UnsafeBufferPointer(rebasing: goodChunk),
+                         isASCII: false /* appending replacement character anyway, so let's not bother */)
+    Unicode.Scalar._replacementCharacter.withUTF8CodeUnits {
+      result.appendInPlace($0, isASCII: false)
+    }
+
+    remainingInput = UnsafeBufferPointer(rebasing: remainingInput[brokenRange.endIndex...])
+    switch validateUTF8(remainingInput) {
+    case .success:
+      result.appendInPlace(remainingInput, isASCII: false)
+      return String(result)
+    case .error(let newBrokenRange):
+      brokenRange = newBrokenRange
+    }
+  } while remainingInput.count > 0
+  return String(result)
+}
