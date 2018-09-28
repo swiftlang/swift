@@ -42,9 +42,11 @@ static StringRef getCategoryName(uint32_t ID) {
     return "/* Renamed Decls */";
   case LocalDiagID::decl_attr_change:
   case LocalDiagID::decl_new_attr:
+  case LocalDiagID::var_let_changed:
     return "/* Decl Attribute changes */";
   case LocalDiagID::default_arg_removed:
   case LocalDiagID::decl_type_change:
+  case LocalDiagID::func_type_escaping_changed:
     return "/* Type Changes */";
   case LocalDiagID::raw_type_change:
     return "/* RawRepresentable Changes */";
@@ -55,12 +57,14 @@ static StringRef getCategoryName(uint32_t ID) {
     return "/* Fixed-layout Type Changes */";
   case LocalDiagID::conformance_added:
   case LocalDiagID::conformance_removed:
+  case LocalDiagID::optional_req_changed:
     return "/* Protocol Conformance Change */";
   case LocalDiagID::default_associated_type_removed:
   case LocalDiagID::protocol_req_added:
     return "/* Protocol Requirement Change */";
   case LocalDiagID::super_class_removed:
   case LocalDiagID::super_class_changed:
+  case LocalDiagID::no_longer_open:
     return "/* Class Inheritance Change */";
   default:
     return StringRef();

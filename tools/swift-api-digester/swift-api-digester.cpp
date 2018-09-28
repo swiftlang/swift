@@ -727,6 +727,9 @@ static void detectDeclChange(NodePtr L, NodePtr R, SDKContext &Ctx) {
   auto &Diags = Ctx.getDiags();
   if (auto LD = dyn_cast<SDKNodeDecl>(L)) {
     auto *RD = R->getAs<SDKNodeDecl>();
+    if (!Ctx.checkingABI() && LD->isOpen() && !RD->isOpen()) {
+      Diags.diagnose(SourceLoc(), diag::no_longer_open, LD->getScreenInfo());
+    }
 
     // Diagnose static attribute change.
     if (LD->isStatic() ^ RD->isStatic()) {
@@ -760,13 +763,19 @@ static void detectDeclChange(NodePtr L, NodePtr R, SDKContext &Ctx) {
       // Detect re-ordering if they're from structs with a fixed layout.
       auto *LV = dyn_cast<SDKNodeDeclVar>(L);
       auto *RV = dyn_cast<SDKNodeDeclVar>(R);
-      if (LV && RV &&
-          LV->hasFixedBinaryOrder() && RV->hasFixedBinaryOrder() &&
-          LV->getFixedBinaryOrder() != RV->getFixedBinaryOrder()) {
-        Ctx.getDiags().diagnose(SourceLoc(), diag::decl_reorder,
-                                LV->getScreenInfo(),
-                                LV->getFixedBinaryOrder(),
-                                RV->getFixedBinaryOrder());
+      if (LV && RV) {
+        if (LV->hasFixedBinaryOrder() && RV->hasFixedBinaryOrder() &&
+            LV->getFixedBinaryOrder() != RV->getFixedBinaryOrder()) {
+          Ctx.getDiags().diagnose(SourceLoc(), diag::decl_reorder,
+                                  LV->getScreenInfo(),
+                                  LV->getFixedBinaryOrder(),
+                                  RV->getFixedBinaryOrder());
+        }
+        if (LV->isLet() != RV->isLet()) {
+          Ctx.getDiags().diagnose(SourceLoc(), diag::var_let_changed,
+                                  LV->getScreenInfo(),
+                                  LV->isLet());
+        }
       }
     }
 
@@ -775,7 +784,17 @@ static void detectDeclChange(NodePtr L, NodePtr R, SDKContext &Ctx) {
       Diags.diagnose(SourceLoc(), diag::generic_sig_change, LD->getScreenInfo(),
         LD->getGenericSignature(), RD->getGenericSignature());
     }
-
+    if (LD->isOptional() != RD->isOptional()) {
+      if (Ctx.checkingABI()) {
+        // Both adding/removing optional is ABI-breaking.
+        Diags.diagnose(SourceLoc(), diag::optional_req_changed,
+                       LD->getScreenInfo(), LD->isOptional());
+      } else if (LD->isOptional()) {
+        // Removing optional is source-breaking.
+        Diags.diagnose(SourceLoc(), diag::optional_req_changed,
+                       LD->getScreenInfo(), LD->isOptional());
+      }
+    }
     if (auto *LDT = dyn_cast<SDKNodeDeclType>(L)) {
       if (auto *RDT = dyn_cast<SDKNodeDeclType>(R)) {
         diagnoseNominalTypeDeclChange(LDT, RDT);
@@ -792,13 +811,68 @@ static void diagnoseTypeChange(SDKNode* L, SDKNode* R) {
   auto *RT = dyn_cast<SDKNodeType>(R);
   if (!LT || !RT)
     return;
+  assert(LT->isTopLevelType() == RT->isTopLevelType());
+  if (!LT->isTopLevelType())
+    return;
+  StringRef Descriptor;
+  auto LParent = cast<SDKNodeDecl>(LT->getParent());
+  auto RParent = cast<SDKNodeDecl>(RT->getParent());
+  assert(LParent->getKind() == RParent->getKind());
+  if (LParent->isSDKPrivate())
+    return;
+  switch(LParent->getKind()) {
+  case SDKNodeKind::Root:
+  case SDKNodeKind::TypeNominal:
+  case SDKNodeKind::TypeFunc:
+  case SDKNodeKind::TypeAlias:
+  case SDKNodeKind::DeclType:
+    llvm_unreachable("Type Parent is wrong");
+  case SDKNodeKind::DeclFunction:
+  case SDKNodeKind::DeclConstructor:
+  case SDKNodeKind::DeclGetter:
+  case SDKNodeKind::DeclSetter:
+  case SDKNodeKind::DeclSubscript:
+    Descriptor = SDKNodeDeclAbstractFunc::
+      getTypeRoleDescription(Ctx, LParent->getChildIndex(LT));
+    break;
+  case SDKNodeKind::DeclVar:
+    Descriptor = "declared";
+    break;
+  case SDKNodeKind::DeclTypeAlias:
+    Descriptor = "underlying";
+    break;
+  case SDKNodeKind::DeclAssociatedType:
+    Descriptor = "default";
+    break;
+  }
+
+  if (LT->getPrintedName() != RT->getPrintedName()) {
+    Diags.diagnose(SourceLoc(), diag::decl_type_change, LParent->getScreenInfo(),
+                   Descriptor, LT->getPrintedName(), RT->getPrintedName());
+    return;
+  }
+
   if (LT->hasDefaultArgument() && !RT->hasDefaultArgument()) {
-    auto *Func = cast<SDKNodeDeclAbstractFunc>(LT->getClosestParentDecl());
-    Diags.diagnose(SourceLoc(), diag::default_arg_removed, Func->getScreenInfo(),
-                   Func->getTypeRoleDescription(Ctx, Func->getChildIndex(LT)));
+    Diags.diagnose(SourceLoc(), diag::default_arg_removed,
+                   LParent->getScreenInfo(), Descriptor);
+  }
+  if (LT->getKind() != RT->getKind())
+    return;
+  assert(LT->getKind() == RT->getKind());
+  switch (LT->getKind()) {
+  case SDKNodeKind::TypeFunc: {
+    auto *LFT = cast<SDKNodeTypeFunc>(LT);
+    auto *RFT = cast<SDKNodeTypeFunc>(RT);
+    if (Ctx.checkingABI() && LFT->isEscaping() != RFT->isEscaping()) {
+      Diags.diagnose(SourceLoc(), diag::func_type_escaping_changed,
+                     LParent->getScreenInfo(), Descriptor, LFT->isEscaping());
+    }
+    break;
+  }
+  default:
+    break;
   }
 }
-
 
 // This is first pass on two given SDKNode trees. This pass removes the common part
 // of two versions of SDK, leaving only the changed part.
@@ -1637,7 +1711,6 @@ public:
 
 class DiagnosisEmitter : public SDKNodeVisitor {
   void handle(const SDKNodeDecl *D, NodeAnnotation Anno);
-  void visitType(SDKNodeType *T);
   void visitDecl(SDKNodeDecl *D);
   void visit(NodePtr Node) override;
   SDKNodeDecl *findAddedDecl(const SDKNodeDecl *Node);
@@ -1777,41 +1850,9 @@ void DiagnosisEmitter::visitDecl(SDKNodeDecl *Node) {
     handle(Node, Anno);
 }
 
-void DiagnosisEmitter::visitType(SDKNodeType *Node) {
-  auto *Parent = dyn_cast<SDKNodeDecl>(Node->getParent());
-  if (!Parent || Parent->isSDKPrivate())
-    return;
-  SDKContext &Ctx = Node->getSDKContext();
-  if (Node->isAnnotatedAs(NodeAnnotation::Updated)) {
-    auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeType>();
-    StringRef Descriptor;
-    switch (Parent->getKind()) {
-    case SDKNodeKind::DeclConstructor:
-    case SDKNodeKind::DeclFunction:
-    case SDKNodeKind::DeclVar:
-      Descriptor = isa<SDKNodeDeclAbstractFunc>(Parent) ?
-        SDKNodeDeclAbstractFunc::getTypeRoleDescription(Ctx, Parent->getChildIndex(Node)) :
-        Ctx.buffer("declared");
-      if (Node->getPrintedName() != Count->getPrintedName())
-        Diags.diagnose(SourceLoc(), diag::decl_type_change, Parent->getScreenInfo(),
-          Descriptor, Node->getPrintedName(), Count->getPrintedName());
-      break;
-    case SDKNodeKind::DeclAssociatedType:
-      Diags.diagnose(SourceLoc(), diag::decl_type_change, Parent->getScreenInfo(),
-                     "default", Node->getPrintedName(), Count->getPrintedName());
-      break;
-    default:
-      break;
-    }
-  }
-}
-
 void DiagnosisEmitter::visit(NodePtr Node) {
   if (auto *DNode = dyn_cast<SDKNodeDecl>(Node)) {
     visitDecl(DNode);
-  }
-  if (auto *TNode = dyn_cast<SDKNodeType>(Node)) {
-    visitType(TNode);
   }
 }
 
