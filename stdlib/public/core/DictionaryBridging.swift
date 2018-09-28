@@ -705,7 +705,7 @@ extension _CocoaDictionary.Iterator: IteratorProtocol {
   internal typealias Element = (key: AnyObject, value: AnyObject)
 
   @usableFromInline
-  internal func next() -> Element? {
+  internal func nextKey() -> AnyObject? {
     if itemIndex < 0 {
       return nil
     }
@@ -733,6 +733,12 @@ extension _CocoaDictionary.Iterator: IteratorProtocol {
     let itemsPtr = _UnmanagedAnyObjectArray(itemsPtrUP)
     let key: AnyObject = itemsPtr[itemIndex]
     itemIndex += 1
+    return key
+  }
+
+  @usableFromInline
+  internal func next() -> Element? {
+    guard let key = nextKey() else { return nil }
     let value: AnyObject = base.object.object(forKey: key)!
     return (key, value)
   }
