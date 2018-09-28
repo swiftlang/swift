@@ -297,12 +297,15 @@ protected:
     if (SubsMap.empty())
       return false;
 
-    for (auto ParamType : Sig->getSubstitutableParams()) {
+    bool Result = false;
+    Sig->forEachParam([&](GenericTypeParamType *ParamType, bool Canonical) {
+      if (!Canonical)
+        return;
       if (!Type(ParamType).subst(SubsMap)->isEqual(ParamType))
-        return true;
-    }
+        Result = true;
+    });
 
-    return false;
+    return Result;
   }
 
   enum { ForInlining = true };

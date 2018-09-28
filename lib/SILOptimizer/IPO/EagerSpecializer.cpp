@@ -347,7 +347,11 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
   auto GenericSig =
     GenericFunc->getLoweredFunctionType()->getGenericSignature();
   auto SubMap = ReInfo.getClonerParamSubstitutionMap();
-  for (auto ParamTy : GenericSig->getSubstitutableParams()) {
+
+  GenericSig->forEachParam([&](GenericTypeParamType *ParamTy, bool Canonical) {
+    if (!Canonical)
+      return;
+
     auto Replacement = Type(ParamTy).subst(SubMap);
     assert(!Replacement->hasTypeParameter());
 
@@ -368,7 +372,8 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
                                   Replacement, LayoutInfo);
       }
     }
-  }
+  });
+
   static_cast<void>(FailedTypeCheckBB);
 
   if (OldReturnBB == &EntryBB) {

@@ -434,7 +434,11 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   bool HasConcreteGenericParams = false;
   bool HasNonArchetypeGenericParams = false;
   HasUnboundGenericParams = false;
-  for (auto GP : CalleeGenericSig->getSubstitutableParams()) {
+
+  CalleeGenericSig->forEachParam([&](GenericTypeParamType *GP, bool Canonical) {
+    if (!Canonical)
+      return;
+
     // Check only the substitutions for the generic parameters.
     // Ignore any dependent types, etc.
     auto Replacement = Type(GP).subst(CalleeParamSubMap);
@@ -458,11 +462,10 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
             HasNonArchetypeGenericParams = true;
         }
       }
-      continue;
+    } else {
+      HasConcreteGenericParams = true;
     }
-
-    HasConcreteGenericParams = true;
-  }
+  });
 
   if (HasUnboundGenericParams) {
     // Bail if we cannot specialize generic substitutions, but all substitutions
@@ -1561,14 +1564,16 @@ void FunctionSignaturePartialSpecializer::
   // Simply create a set of same-type requirements based on concrete
   // substitutions.
   SmallVector<Requirement, 4> Requirements;
-  for (auto GP : CalleeGenericSig->getSubstitutableParams()) {
+  CalleeGenericSig->forEachParam([&](GenericTypeParamType *GP, bool Canonical) {
+    if (!Canonical)
+      return;
     auto Replacement = Type(GP).subst(CalleeInterfaceToCallerArchetypeMap);
     if (Replacement->hasArchetype())
-      continue;
+      return;
     // Replacement is concrete. Add a same type requirement.
     Requirement Req(RequirementKind::SameType, GP, Replacement);
     Requirements.push_back(Req);
-  }
+  });
 
   // Create a new generic signature by taking the existing one
   // and adding new requirements to it. No need to introduce

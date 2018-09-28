@@ -178,7 +178,12 @@ public:
 
     // Build a SubstitutionMap.
     auto *genericSig = decl->getGenericSignature();
-    auto genericParams = genericSig->getSubstitutableParams();
+
+    SmallVector<GenericTypeParamType *, 4> genericParams;
+    genericSig->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
+      if (canonical)
+        genericParams.push_back(gp);
+    });
     if (genericParams.size() != args.size())
       return Type();
 

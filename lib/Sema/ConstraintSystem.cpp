@@ -801,7 +801,7 @@ void ConstraintSystem::recordOpenedTypes(
   SmallVector<LocatorPathElt, 2> pathElts;
   Expr *anchor = locator.getLocatorParts(pathElts);
   if (!pathElts.empty() &&
-      pathElts.back().getKind() == ConstraintLocator::Archetype)
+      pathElts.back().getKind() == ConstraintLocator::GenericParameter)
     return;
 
   // If the locator is empty, ignore it.
@@ -1070,14 +1070,11 @@ void ConstraintSystem::openGeneric(
     return;
 
   auto locatorPtr = getConstraintLocator(locator);
-  auto *genericEnv = innerDC->getGenericEnvironmentOfContext();
 
   // Create the type variables for the generic parameters.
   for (auto gp : sig->getGenericParams()) {
-    auto contextTy = GenericEnvironment::mapTypeIntoContext(genericEnv, gp);
-    if (auto *archetype = contextTy->getAs<ArchetypeType>())
-      locatorPtr = getConstraintLocator(
-          locator.withPathElement(LocatorPathElt(archetype)));
+    locatorPtr = getConstraintLocator(
+        locator.withPathElement(LocatorPathElt(gp)));
 
     auto typeVar = createTypeVariable(locatorPtr,
                                       TVO_PrefersSubtypeBinding);
