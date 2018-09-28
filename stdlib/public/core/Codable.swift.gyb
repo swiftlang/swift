@@ -85,7 +85,6 @@ public protocol CodingKey :
 
 extension CodingKey {
   /// A textual representation of this key.
-  @inlinable // FIXME(sil-serialize-all)
   public var description: String {
     let intValue = self.intValue?.description ?? "nil"
     return "\(type(of: self))(stringValue: \"\(stringValue)\", intValue: \(intValue))"
@@ -288,7 +287,6 @@ public protocol KeyedEncodingContainerProtocol {
 
 /// A concrete container that provides a view into an encoder's storage, making
 /// the encoded properties of an encodable type accessible by keys.
-@_fixed_layout // FIXME(sil-serialize-all)
 public struct KeyedEncodingContainer<K : CodingKey> :
   KeyedEncodingContainerProtocol
 {
@@ -296,13 +294,11 @@ public struct KeyedEncodingContainer<K : CodingKey> :
 
   /// The container for the concrete encoder. The type is _*Base so that it's
   /// generic on the key type.
-  @usableFromInline
   internal var _box: _KeyedEncodingContainerBase<Key>
 
   /// Creates a new instance with the given container.
   ///
   /// - parameter container: The container to hold.
-  @inlinable // FIXME(sil-serialize-all)
   public init<Container : KeyedEncodingContainerProtocol>(
     _ container: Container) where Container.Key == Key
   {
@@ -310,7 +306,6 @@ public struct KeyedEncodingContainer<K : CodingKey> :
   }
 
   /// The path of coding keys taken to get to this point in encoding.
-  @inlinable // FIXME(sil-serialize-all)
   public var codingPath: [CodingKey] {
     return _box.codingPath
   }
@@ -320,7 +315,6 @@ public struct KeyedEncodingContainer<K : CodingKey> :
   /// - parameter key: The key to associate the value with.
   /// - throws: `EncodingError.invalidValue` if a null value is invalid in the
   ///   current context for this format.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func encodeNil(forKey key: Key) throws {
     try _box.encodeNil(forKey: key)
   }
@@ -332,7 +326,6 @@ public struct KeyedEncodingContainer<K : CodingKey> :
   /// - parameter key: The key to associate the value with.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func encode(_ value: ${type}, forKey key: Key) throws {
     try _box.encode(value, forKey: key)
   }
@@ -344,7 +337,6 @@ public struct KeyedEncodingContainer<K : CodingKey> :
   /// - parameter key: The key to associate the value with.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func encode<T : Encodable>(
     _ value: T, forKey key: Key) throws
   {
@@ -361,7 +353,6 @@ public struct KeyedEncodingContainer<K : CodingKey> :
   /// - parameter key: The key to associate the object with.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func encodeConditional<T : AnyObject & Encodable>(
     _ object: T, forKey key: Key) throws
   {
@@ -375,7 +366,6 @@ public struct KeyedEncodingContainer<K : CodingKey> :
   /// - parameter key: The key to associate the value with.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func encodeIfPresent(
     _ value: ${type}?, forKey key: Key) throws
   {
@@ -389,7 +379,6 @@ public struct KeyedEncodingContainer<K : CodingKey> :
   /// - parameter key: The key to associate the value with.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func encodeIfPresent<T : Encodable>(
     _ value: T?, forKey key: Key) throws
   {
@@ -401,7 +390,6 @@ public struct KeyedEncodingContainer<K : CodingKey> :
   /// - parameter keyType: The key type to use for the container.
   /// - parameter key: The key to encode the container for.
   /// - returns: A new keyed encoding container.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func nestedContainer<NestedKey>(
     keyedBy keyType: NestedKey.Type, forKey key: Key
   ) -> KeyedEncodingContainer<NestedKey> {
@@ -412,7 +400,6 @@ public struct KeyedEncodingContainer<K : CodingKey> :
   ///
   /// - parameter key: The key to encode the container for.
   /// - returns: A new unkeyed encoding container.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func nestedUnkeyedContainer(
     forKey key: Key) -> UnkeyedEncodingContainer
   {
@@ -426,7 +413,6 @@ public struct KeyedEncodingContainer<K : CodingKey> :
   /// `Key(stringValue: "super", intValue: 0)`.
   ///
   /// - returns: A new encoder to pass to `super.encode(to:)`.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func superEncoder() -> Encoder {
     return _box.superEncoder()
   }
@@ -436,7 +422,6 @@ public struct KeyedEncodingContainer<K : CodingKey> :
   ///
   /// - parameter key: The key to encode `super` for.
   /// - returns: A new encoder to pass to `super.encode(to:)`.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func superEncoder(forKey key: Key) -> Encoder {
     return _box.superEncoder(forKey: key)
   }
@@ -594,7 +579,6 @@ public protocol KeyedDecodingContainerProtocol {
 
 /// A concrete container that provides a view into a decoder's storage, making
 /// the encoded properties of a decodable type accessible by keys.
-@_fixed_layout // FIXME(sil-serialize-all)
 public struct KeyedDecodingContainer<K : CodingKey> :
   KeyedDecodingContainerProtocol
 {
@@ -602,13 +586,11 @@ public struct KeyedDecodingContainer<K : CodingKey> :
 
   /// The container for the concrete decoder. The type is _*Base so that it's
   /// generic on the key type.
-  @usableFromInline
   internal var _box: _KeyedDecodingContainerBase<Key>
 
   /// Creates a new instance with the given container.
   ///
   /// - parameter container: The container to hold.
-  @inlinable // FIXME(sil-serialize-all)
   public init<Container : KeyedDecodingContainerProtocol>(
     _ container: Container) where Container.Key == Key
   {
@@ -616,7 +598,6 @@ public struct KeyedDecodingContainer<K : CodingKey> :
   }
 
   /// The path of coding keys taken to get to this point in decoding.
-  @inlinable // FIXME(sil-serialize-all)
   public var codingPath: [CodingKey] {
     return _box.codingPath
   }
@@ -627,7 +608,6 @@ public struct KeyedDecodingContainer<K : CodingKey> :
   /// keys here, because it is possible to encode with multiple key types
   /// which are not convertible to one another. This should report all keys
   /// present which are convertible to the requested type.
-  @inlinable // FIXME(sil-serialize-all)
   public var allKeys: [Key] {
     return _box.allKeys
   }
@@ -640,7 +620,6 @@ public struct KeyedDecodingContainer<K : CodingKey> :
   ///
   /// - parameter key: The key to search for.
   /// - returns: Whether the `Decoder` has an entry for the given key.
-  @inlinable // FIXME(sil-serialize-all)
   public func contains(_ key: Key) -> Bool {
     return _box.contains(key)
   }
@@ -651,7 +630,6 @@ public struct KeyedDecodingContainer<K : CodingKey> :
   /// - returns: Whether the encountered value was null.
   /// - throws: `DecodingError.keyNotFound` if `self` does not have an entry
   ///   for the given key.
-  @inlinable // FIXME(sil-serialize-all)
   public func decodeNil(forKey key: Key) throws -> Bool {
     return try _box.decodeNil(forKey: key)
   }
@@ -669,7 +647,6 @@ public struct KeyedDecodingContainer<K : CodingKey> :
   ///   for the given key.
   /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
   ///   the given key.
-  @inlinable // FIXME(sil-serialize-all)
   public func decode(_ type: ${type}.Type, forKey key: Key) throws -> ${type} {
     return try _box.decode(${type}.self, forKey: key)
   }
@@ -687,7 +664,6 @@ public struct KeyedDecodingContainer<K : CodingKey> :
   ///   for the given key.
   /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
   ///   the given key.
-  @inlinable // FIXME(sil-serialize-all)
   public func decode<T : Decodable>(_ type: T.Type, forKey key: Key) throws -> T {
     return try _box.decode(T.self, forKey: key)
   }
@@ -706,7 +682,6 @@ public struct KeyedDecodingContainer<K : CodingKey> :
   ///   the value is a null value.
   /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
   ///   is not convertible to the requested type.
-  @inlinable // FIXME(sil-serialize-all)
   public func decodeIfPresent(
     _ type: ${type}.Type, forKey key: Key) throws -> ${type}?
   {
@@ -727,7 +702,6 @@ public struct KeyedDecodingContainer<K : CodingKey> :
   ///   the value is a null value.
   /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
   ///   is not convertible to the requested type.
-  @inlinable // FIXME(sil-serialize-all)
   public func decodeIfPresent<T : Decodable>(
     _ type: T.Type, forKey key: Key) throws -> T?
   {
@@ -742,7 +716,6 @@ public struct KeyedDecodingContainer<K : CodingKey> :
   /// - returns: A keyed decoding container view into `self`.
   /// - throws: `DecodingError.typeMismatch` if the encountered stored value is
   ///   not a keyed container.
-  @inlinable // FIXME(sil-serialize-all)
   public func nestedContainer<NestedKey>(
     keyedBy type: NestedKey.Type, forKey key: Key
   ) throws -> KeyedDecodingContainer<NestedKey> {
@@ -756,7 +729,6 @@ public struct KeyedDecodingContainer<K : CodingKey> :
   /// - returns: An unkeyed decoding container view into `self`.
   /// - throws: `DecodingError.typeMismatch` if the encountered stored value is
   ///   not an unkeyed container.
-  @inlinable // FIXME(sil-serialize-all)
   public func nestedUnkeyedContainer(
     forKey key: Key) throws -> UnkeyedDecodingContainer
   {
@@ -773,7 +745,6 @@ public struct KeyedDecodingContainer<K : CodingKey> :
   ///   for the default `super` key.
   /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
   ///   the default `super` key.
-  @inlinable // FIXME(sil-serialize-all)
   public func superDecoder() throws -> Decoder {
     return try _box.superDecoder()
   }
@@ -787,7 +758,6 @@ public struct KeyedDecodingContainer<K : CodingKey> :
   ///   for the given key.
   /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
   ///   the given key.
-  @inlinable // FIXME(sil-serialize-all)
   public func superDecoder(forKey key: Key) throws -> Decoder {
     return try _box.superDecoder(forKey: key)
   }
@@ -1066,7 +1036,6 @@ public protocol SingleValueDecodingContainer {
 //===----------------------------------------------------------------------===//
 
 /// A user-defined key for providing context during encoding and decoding.
-@_fixed_layout // FIXME(sil-serialize-all)
 public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
   public typealias RawValue = String
 
@@ -1076,7 +1045,6 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
   /// Creates a new instance with the given raw value.
   ///
   /// - parameter rawValue: The value of the key.
-  @inlinable // FIXME(sil-serialize-all)
   public init?(rawValue: String) {
     self.rawValue = rawValue
   }
@@ -1085,7 +1053,6 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
   ///
   /// - parameter lhs: The key to compare against.
   /// - parameter rhs: The key to compare with.
-  @inlinable // FIXME(sil-serialize-all)
   public static func ==(
     lhs: CodingUserInfoKey, rhs: CodingUserInfoKey) -> Bool
   {
@@ -1093,7 +1060,6 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
   }
 
   /// The key's hash value.
-  @inlinable
   public var hashValue: Int {
     return self.rawValue.hashValue
   }
@@ -1103,7 +1069,6 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(self.rawValue)
   }
@@ -1304,20 +1269,14 @@ public enum DecodingError : Error {
 
 // The following extensions allow for easier error construction.
 
-@usableFromInline // FIXME(sil-serialize-all)
-@_fixed_layout // FIXME(sil-serialize-all)
 internal struct _GenericIndexKey : CodingKey {
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal var stringValue: String
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal var intValue: Int?
+    internal var stringValue: String
+    internal var intValue: Int?
 
-  @inlinable // FIXME(sil-serialize-all)
   internal init?(stringValue: String) {
     return nil
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal init?(intValue: Int) {
     self.stringValue = "Index \(intValue)"
     self.intValue = intValue
@@ -1337,7 +1296,6 @@ extension DecodingError {
   /// - param debugDescription: A description of the error to aid in debugging.
   ///
   /// - Returns: A new `.dataCorrupted` error with the given information.
-  @inlinable // FIXME(sil-serialize-all)
   public static func dataCorruptedError<C : KeyedDecodingContainerProtocol>(
     forKey key: C.Key, in container: C, debugDescription: String
   ) -> DecodingError {
@@ -1358,7 +1316,6 @@ extension DecodingError {
   /// - param debugDescription: A description of the error to aid in debugging.
   ///
   /// - Returns: A new `.dataCorrupted` error with the given information.
-  @inlinable // FIXME(sil-serialize-all)
   public static func dataCorruptedError(
     in container: UnkeyedDecodingContainer,
     debugDescription: String
@@ -1381,7 +1338,6 @@ extension DecodingError {
   /// - param debugDescription: A description of the error to aid in debugging.
   ///
   /// - Returns: A new `.dataCorrupted` error with the given information.
-  @inlinable // FIXME(sil-serialize-all)
   public static func dataCorruptedError(
     in container: SingleValueDecodingContainer, debugDescription: String
   ) -> DecodingError {
@@ -1395,39 +1351,30 @@ extension DecodingError {
 // Keyed Encoding Container Implementations
 //===----------------------------------------------------------------------===//
 
-@_fixed_layout
-@usableFromInline
 internal class _KeyedEncodingContainerBase<Key : CodingKey> {
-  @inlinable // FIXME(sil-serialize-all)
   internal init(){}
 
-  @inlinable // FIXME(sil-serialize-all)
   deinit {}
 
   // These must all be given a concrete implementation in _*Box.
-  @inlinable
   internal var codingPath: [CodingKey] {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
 
-  @inlinable
   internal func encodeNil(forKey key: Key) throws {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
 
 % for type in codable_types:
-  @inlinable
   internal func encode(_ value: ${type}, forKey key: Key) throws {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
 % end
 
-  @inlinable
   internal func encode<T : Encodable>(_ value: T, forKey key: Key) throws {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
 
-  @inlinable
   internal func encodeConditional<T : AnyObject & Encodable>(
     _ object: T, forKey key: Key) throws
   {
@@ -1435,84 +1382,68 @@ internal class _KeyedEncodingContainerBase<Key : CodingKey> {
   }
 
 % for type in codable_types:
-  @inlinable
   internal func encodeIfPresent(_ value: ${type}?, forKey key: Key) throws {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
 % end
 
-  @inlinable
   internal func encodeIfPresent<T : Encodable>(
     _ value: T?, forKey key: Key) throws
   {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
 
-  @inlinable
   internal func nestedContainer<NestedKey>(
     keyedBy keyType: NestedKey.Type, forKey key: Key
   ) -> KeyedEncodingContainer<NestedKey> {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
 
-  @inlinable
   internal func nestedUnkeyedContainer(
     forKey key: Key) -> UnkeyedEncodingContainer {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
 
-  @inlinable
   internal func superEncoder() -> Encoder {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
 
-  @inlinable
   internal func superEncoder(forKey key: Key) -> Encoder {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
 }
 
-@_fixed_layout
-@usableFromInline
 internal final class _KeyedEncodingContainerBox<
   Concrete : KeyedEncodingContainerProtocol
 > : _KeyedEncodingContainerBase<Concrete.Key> {
-  @usableFromInline
   typealias Key = Concrete.Key
 
-  @usableFromInline
   internal var concrete: Concrete
 
-  @inlinable
   internal init(_ container: Concrete) {
     concrete = container
   }
 
-  @inlinable
   override internal var codingPath: [CodingKey] {
     return concrete.codingPath
   }
 
-  @inlinable
   override internal func encodeNil(forKey key: Key) throws {
     try concrete.encodeNil(forKey: key)
   }
 
 % for type in codable_types:
-  @inlinable
   override internal func encode(_ value: ${type}, forKey key: Key) throws {
     try concrete.encode(value, forKey: key)
   }
 % end
 
-  @inlinable
   override internal func encode<T : Encodable>(
     _ value: T, forKey key: Key) throws
   {
     try concrete.encode(value, forKey: key)
   }
 
-  @inlinable
   override internal func encodeConditional<T : AnyObject & Encodable>(
     _ object: T, forKey key: Key) throws
   {
@@ -1520,7 +1451,6 @@ internal final class _KeyedEncodingContainerBox<
   }
 
 % for type in codable_types:
-  @inlinable
   override internal func encodeIfPresent(
     _ value: ${type}?, forKey key: Key) throws
   {
@@ -1528,69 +1458,55 @@ internal final class _KeyedEncodingContainerBox<
   }
 % end
 
-  @inlinable
   override internal func encodeIfPresent<T : Encodable>(
     _ value: T?, forKey key: Key) throws
   {
     try concrete.encodeIfPresent(value, forKey: key)
   }
 
-  @inlinable
   override internal func nestedContainer<NestedKey>(
     keyedBy keyType: NestedKey.Type, forKey key: Key
   ) -> KeyedEncodingContainer<NestedKey> {
     return concrete.nestedContainer(keyedBy: NestedKey.self, forKey: key)
   }
 
-  @inlinable
   override internal func nestedUnkeyedContainer(
     forKey key: Key) -> UnkeyedEncodingContainer
   {
     return concrete.nestedUnkeyedContainer(forKey: key)
   }
 
-  @inlinable
   override internal func superEncoder() -> Encoder {
     return concrete.superEncoder()
   }
 
-  @inlinable
   override internal func superEncoder(forKey key: Key) -> Encoder {
     return concrete.superEncoder(forKey: key)
   }
 }
 
-@_fixed_layout
-@usableFromInline
 internal class _KeyedDecodingContainerBase<Key : CodingKey> {
-  @inlinable // FIXME(sil-serialize-all)
   internal init(){}
 
-  @inlinable // FIXME(sil-serialize-all)
   deinit {}
 
-  @inlinable
   internal var codingPath: [CodingKey] {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
   }
 
-  @inlinable
   internal var allKeys: [Key] {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
   }
 
-  @inlinable
   internal func contains(_ key: Key) -> Bool {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
   }
 
-  @inlinable
   internal func decodeNil(forKey key: Key) throws -> Bool {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
   }
 
 % for type in codable_types:
-  @inlinable
   internal func decode(
     _ type: ${type}.Type, forKey key: Key) throws -> ${type}
   {
@@ -1598,7 +1514,6 @@ internal class _KeyedDecodingContainerBase<Key : CodingKey> {
   }
 % end
 
-  @inlinable
   internal func decode<T : Decodable>(
     _ type: T.Type, forKey key: Key) throws -> T
   {
@@ -1606,7 +1521,6 @@ internal class _KeyedDecodingContainerBase<Key : CodingKey> {
   }
 
 % for type in codable_types:
-  @inlinable
   internal func decodeIfPresent(
     _ type: ${type}.Type, forKey key: Key) throws -> ${type}?
   {
@@ -1614,76 +1528,61 @@ internal class _KeyedDecodingContainerBase<Key : CodingKey> {
   }
 % end
 
-  @inlinable
   internal func decodeIfPresent<T : Decodable>(
     _ type: T.Type, forKey key: Key) throws -> T?
   {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
   }
 
-  @inlinable
   internal func nestedContainer<NestedKey>(
     keyedBy type: NestedKey.Type, forKey key: Key
   ) throws -> KeyedDecodingContainer<NestedKey> {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
   }
 
-  @inlinable
   internal func nestedUnkeyedContainer(
     forKey key: Key) throws -> UnkeyedDecodingContainer
   {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
   }
 
-  @inlinable
   internal func superDecoder() throws -> Decoder {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
   }
 
-  @inlinable
   internal func superDecoder(forKey key: Key) throws -> Decoder {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
   }
 }
 
-@_fixed_layout
-@usableFromInline
 internal final class _KeyedDecodingContainerBox<
   Concrete : KeyedDecodingContainerProtocol
 > : _KeyedDecodingContainerBase<Concrete.Key> {
-  @usableFromInline
   typealias Key = Concrete.Key
 
-  @usableFromInline
   internal var concrete: Concrete
 
-  @inlinable
   internal init(_ container: Concrete) {
     concrete = container
   }
 
-  @inlinable
   override var codingPath: [CodingKey] {
     return concrete.codingPath
   }
 
-  @inlinable
   override var allKeys: [Key] {
     return concrete.allKeys
   }
 
-  @inlinable
   override internal func contains(_ key: Key) -> Bool {
     return concrete.contains(key)
   }
 
-  @inlinable
   override internal func decodeNil(forKey key: Key) throws -> Bool {
     return try concrete.decodeNil(forKey: key)
   }
 
 % for type in codable_types:
-  @inlinable
   override internal func decode(
     _ type: ${type}.Type, forKey key: Key) throws -> ${type}
   {
@@ -1691,7 +1590,6 @@ internal final class _KeyedDecodingContainerBox<
   }
 % end
 
-  @inlinable
   override internal func decode<T : Decodable>(
     _ type: T.Type, forKey key: Key) throws -> T
   {
@@ -1699,7 +1597,6 @@ internal final class _KeyedDecodingContainerBox<
   }
 
 % for type in codable_types:
-  @inlinable
   override internal func decodeIfPresent(
     _ type: ${type}.Type, forKey key: Key) throws -> ${type}?
   {
@@ -1707,33 +1604,28 @@ internal final class _KeyedDecodingContainerBox<
   }
 % end
 
-  @inlinable
   override internal func decodeIfPresent<T : Decodable>(
     _ type: T.Type, forKey key: Key) throws -> T?
   {
     return try concrete.decodeIfPresent(T.self, forKey: key)
   }
 
-  @inlinable
   override internal func nestedContainer<NestedKey>(
     keyedBy type: NestedKey.Type, forKey key: Key
   ) throws -> KeyedDecodingContainer<NestedKey> {
     return try concrete.nestedContainer(keyedBy: NestedKey.self, forKey: key)
   }
 
-  @inlinable
   override internal func nestedUnkeyedContainer(
     forKey key: Key) throws -> UnkeyedDecodingContainer
   {
     return try concrete.nestedUnkeyedContainer(forKey: key)
   }
 
-  @inlinable
   override internal func superDecoder() throws -> Decoder {
     return try concrete.superDecoder()
   }
 
-  @inlinable
   override internal func superDecoder(forKey key: Key) throws -> Decoder {
     return try concrete.superDecoder(forKey: key)
   }
@@ -1751,7 +1643,6 @@ extension ${type} : Codable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  @inlinable // FIXME(sil-serialize-all)
   public init(from decoder: Decoder) throws {
     self = try decoder.singleValueContainer().decode(${type}.self)
   }
@@ -1762,7 +1653,6 @@ extension ${type} : Codable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  @inlinable // FIXME(sil-serialize-all)
   public func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self)
@@ -1777,7 +1667,6 @@ extension RawRepresentable where RawValue == ${type}, Self : Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  @inlinable // FIXME(sil-serialize-all)
   public func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(self.rawValue)
@@ -1792,7 +1681,6 @@ extension RawRepresentable where RawValue == ${type}, Self : Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  @inlinable // FIXME(sil-serialize-all)
   public init(from decoder: Decoder) throws {
     let decoded = try decoder.singleValueContainer().decode(RawValue.self)
     guard let value = Self(rawValue: decoded) else {
@@ -1818,7 +1706,6 @@ extension Optional : Encodable where Wrapped : Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  @inlinable // FIXME(sil-serialize-all)
   public func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
     switch self {
@@ -1835,7 +1722,6 @@ extension Optional : Decodable where Wrapped : Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  @inlinable // FIXME(sil-serialize-all)
   public init(from decoder: Decoder) throws {
     let container = try decoder.singleValueContainer()
     if container.decodeNil() {
@@ -1855,7 +1741,6 @@ extension Array : Encodable where Element : Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  @inlinable // FIXME(sil-serialize-all)
   public func encode(to encoder: Encoder) throws {
     var container = encoder.unkeyedContainer()
     for element in self {
@@ -1871,7 +1756,6 @@ extension Array : Decodable where Element : Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  @inlinable // FIXME(sil-serialize-all)
   public init(from decoder: Decoder) throws {
     self.init()
 
@@ -1891,7 +1775,6 @@ extension Set : Encodable where Element : Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  @inlinable // FIXME(sil-serialize-all)
   public func encode(to encoder: Encoder) throws {
     var container = encoder.unkeyedContainer()
     for element in self {
@@ -1907,7 +1790,6 @@ extension Set : Decodable where Element : Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  @inlinable // FIXME(sil-serialize-all)
   public init(from decoder: Decoder) throws {
     self.init()
 
@@ -1920,21 +1802,15 @@ extension Set : Decodable where Element : Decodable {
 }
 
 /// A wrapper for dictionary keys which are Strings or Ints.
-@usableFromInline // FIXME(sil-serialize-all)
-@_fixed_layout // FIXME(sil-serialize-all)
 internal struct _DictionaryCodingKey : CodingKey {
-  @usableFromInline // FIXME(sil-serialize-all)
   internal let stringValue: String
-  @usableFromInline // FIXME(sil-serialize-all)
   internal let intValue: Int?
 
-  @inlinable // FIXME(sil-serialize-all)
   internal init?(stringValue: String) {
     self.stringValue = stringValue
     self.intValue = Int(stringValue)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal init?(intValue: Int) {
     self.stringValue = "\(intValue)"
     self.intValue = intValue
@@ -1952,7 +1828,6 @@ extension Dictionary : Encodable where Key : Encodable, Value : Encodable {
   /// encoder's format.
   ///
   /// - Parameter encoder: The encoder to write data to.
-  @inlinable // FIXME(sil-serialize-all)
   public func encode(to encoder: Encoder) throws {
     if Key.self == String.self {
       // Since the keys are already Strings, we can use them as keys directly.
@@ -1988,7 +1863,6 @@ extension Dictionary : Decodable where Key : Decodable, Value : Decodable {
   /// if the data read is corrupted or otherwise invalid.
   ///
   /// - Parameter decoder: The decoder to read data from.
-  @inlinable // FIXME(sil-serialize-all)
   public init(from decoder: Decoder) throws {
     self.init()
 
@@ -2059,7 +1933,6 @@ extension Dictionary : Decodable where Key : Decodable, Value : Decodable {
 // Default implementation of encodeConditional(_:forKey:) in terms of
 // encode(_:forKey:)
 extension KeyedEncodingContainerProtocol {
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func encodeConditional<T : AnyObject & Encodable>(
     _ object: T, forKey key: Key) throws
   {
@@ -2071,7 +1944,6 @@ extension KeyedEncodingContainerProtocol {
 // encode(_:forKey:)
 extension KeyedEncodingContainerProtocol {
 % for type in codable_types:
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func encodeIfPresent(
     _ value: ${type}?, forKey key: Key) throws
   {
@@ -2080,7 +1952,6 @@ extension KeyedEncodingContainerProtocol {
   }
 % end
 
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func encodeIfPresent<T : Encodable>(
     _ value: T?, forKey key: Key) throws
   {
@@ -2093,7 +1964,6 @@ extension KeyedEncodingContainerProtocol {
 // decode(_:forKey:) and decodeNil(forKey:)
 extension KeyedDecodingContainerProtocol {
 % for type in codable_types:
-  @inlinable // FIXME(sil-serialize-all)
   public func decodeIfPresent(
     _ type: ${type}.Type, forKey key: Key) throws -> ${type}?
   {
@@ -2103,7 +1973,6 @@ extension KeyedDecodingContainerProtocol {
   }
 % end
 
-  @inlinable // FIXME(sil-serialize-all)
   public func decodeIfPresent<T : Decodable>(
     _ type: T.Type, forKey key: Key) throws -> T?
   {
@@ -2116,7 +1985,6 @@ extension KeyedDecodingContainerProtocol {
 // Default implementation of encodeConditional(_:) in terms of encode(_:),
 // and encode(contentsOf:) in terms of encode(_:) loop.
 extension UnkeyedEncodingContainer {
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func encodeConditional<T : AnyObject & Encodable>(
     _ object: T) throws
   {
@@ -2124,7 +1992,6 @@ extension UnkeyedEncodingContainer {
   }
 
 % for type in codable_types:
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func encode<T : Sequence>(
     contentsOf sequence: T) throws where T.Element == ${type}
   {
@@ -2134,7 +2001,6 @@ extension UnkeyedEncodingContainer {
   }
 % end
 
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func encode<T : Sequence>(
     contentsOf sequence: T) throws where T.Element : Encodable
   {
@@ -2148,7 +2014,6 @@ extension UnkeyedEncodingContainer {
 // decodeNil()
 extension UnkeyedDecodingContainer {
 % for type in codable_types:
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func decodeIfPresent(
     _ type: ${type}.Type) throws -> ${type}?
   {
@@ -2157,7 +2022,6 @@ extension UnkeyedDecodingContainer {
   }
 % end
 
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func decodeIfPresent<T : Decodable>(
     _ type: T.Type) throws -> T?
   {
