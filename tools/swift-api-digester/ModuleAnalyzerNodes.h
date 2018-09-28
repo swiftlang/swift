@@ -218,6 +218,7 @@ class SDKNode {
   typedef std::vector<SDKNode*>::iterator ChildIt;
 protected:
   SDKContext &Ctx;
+private:
   StringRef Name;
   StringRef PrintedName;
   unsigned TheKind : 4;
@@ -225,6 +226,7 @@ protected:
   std::set<NodeAnnotation> Annotations;
   std::map<NodeAnnotation, StringRef> AnnotateComments;
   NodePtr Parent = nullptr;
+protected:
   SDKNode(SDKNodeInitInfo Info, SDKNodeKind Kind);
   virtual ~SDKNode() = default;
 public:
@@ -234,6 +236,8 @@ public:
 
   bool operator==(const SDKNode &Other) const;
   bool operator!=(const SDKNode &Other) const { return !((*this) == Other); }
+  void output(json::Output &out, KeyKind Key, bool Value);
+  void output(json::Output &out, KeyKind Key, StringRef Value);
 
   ArrayRef<NodeAnnotation>
     getAnnotations(std::vector<NodeAnnotation> &Scratch) const;
@@ -284,6 +288,7 @@ class SDKNodeDecl: public SDKNode {
   bool IsDeprecated;
   bool IsProtocolReq;
   bool IsOverriding;
+  bool IsOpen;
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
 
@@ -312,6 +317,8 @@ public:
   bool isImplicit() const { return IsImplicit; };
   bool isStatic() const { return IsStatic; };
   bool isOverriding() const { return IsOverriding; };
+  bool isOptional() const { return hasDeclAttribute(DeclAttrKind::DAK_Optional); }
+  bool isOpen() const { return IsOpen; }
   StringRef getGenericSignature() const { return GenericSig; }
   StringRef getScreenInfo() const;
   virtual void jsonize(json::Output &Out) override;
@@ -341,10 +348,10 @@ class SDKNodeType : public SDKNode {
   bool HasDefaultArg;
 
 protected:
-  bool hasTypeAttribute(TypeAttrKind DAKind) const;
   SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind);
   ~SDKNodeType() = default;
 public:
+  bool hasTypeAttribute(TypeAttrKind DAKind) const;
   KnownTypeKind getTypeKind() const;
   void addTypeAttribute(TypeAttrKind AttrKind);
   ArrayRef<TypeAttrKind> getTypeAttributes() const;
@@ -356,6 +363,7 @@ public:
   bool isTopLevelType() const { return !isa<SDKNodeType>(getParent()); }
   static bool classof(const SDKNode *N);
   virtual void jsonize(json::Output &Out) override;
+  bool hasAttributeChange(const SDKNodeType &Another) const;
 };
 
 class SDKNodeTypeNominal : public SDKNodeType {
@@ -371,7 +379,7 @@ public:
 class SDKNodeTypeFunc : public SDKNodeType {
 public:
   SDKNodeTypeFunc(SDKNodeInitInfo Info);
-  bool isEscaping() const { return !hasTypeAttribute(TypeAttrKind::TAK_noescape); }
+  bool isEscaping() const { return hasTypeAttribute(TypeAttrKind::TAK_noescape); }
   static bool classof(const SDKNode *N);
 };
 
@@ -469,6 +477,7 @@ public:
 
 class SDKNodeDeclVar : public SDKNodeDecl {
   Optional<uint8_t> FixedBinaryOrder;
+  bool IsLet;
 public:
   SDKNodeDeclVar(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
@@ -477,6 +486,7 @@ public:
   SDKNodeDeclGetter *getGetter() const;
   SDKNodeDeclSetter *getSetter() const;
   SDKNodeType *getType() const;
+  bool isLet() const { return IsLet; }
   void jsonize(json::Output &Out) override;
 };
 

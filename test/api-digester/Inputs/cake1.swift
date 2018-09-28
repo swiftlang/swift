@@ -103,3 +103,25 @@ public class SuperClassChange: C7 {}
 public class GenericClass<T> {}
 
 public class SubGenericClass: GenericClass<P1> {}
+
+@objc
+public protocol ObjCProtocol {
+  @objc
+  optional func removeOptional()
+  @objc
+  func addOptional()
+}
+
+public let GlobalLetChangedToVar = 1
+public var GlobalVarChangedToLet = 1
+
+public class ClassWithOpenMember {
+  open class func foo() {}
+  open var property: Int {get { return 1}}
+  open func bar() {}
+}
+
+public class EscapingFunctionType {
+  public func removedEscaping(_ a: @escaping ()->()) {}
+  public func addedEscaping(_ a: ()->()) {}
+}

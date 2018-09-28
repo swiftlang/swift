@@ -27,6 +27,11 @@ class DiagnosticEngine;
 namespace ide {
 namespace api {
 
+enum class KeyKind {
+#define KEY(NAME) KK_##NAME,
+#include "swift/IDE/DigesterEnums.def"
+};
+
 // The node kind appearing in the tree that describes the content of the SDK
 enum class SDKNodeKind: uint8_t {
 #define NODE_KIND(NAME, VALUE) NAME,
