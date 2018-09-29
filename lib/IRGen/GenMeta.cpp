@@ -603,7 +603,6 @@ namespace {
       auto var = cast<llvm::GlobalVariable>(addr);
 
       var->setConstant(true);
-      disableAddressSanitizer(IGM, var);
       IGM.setTrueConstGlobal(var);
     }
 
