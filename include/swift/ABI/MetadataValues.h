@@ -582,17 +582,16 @@ public:
   int_type getIntValue() const { return Value; }
 
   enum : uintptr_t {
-    /// Mask used to retrieve the mangled name from an associated type witness.
-    AssociatedTypeMangledNameMask = 0x03,
-
     /// Bit used to indicate that an associated type witness is a pointer to
     /// a mangled name (vs. a pointer to metadata).
     AssociatedTypeMangledNameBit = 0x01,
+  };
 
-    /// Bit used to indicate that the associated type mangled name is a
-    /// in the context of the protocol (based on Self) rather than in the
-    /// context of the conforming type.
-    AssociatedTypeProtocolContextBit = 0x02,
+  enum : uint8_t {
+    /// Prefix byte used to identify an associated type whose mangled name
+    /// is relative to the protocol's context rather than the conforming
+    /// type's context.
+    AssociatedTypeInProtocolContextByte = 0xFF
   };
 };
 

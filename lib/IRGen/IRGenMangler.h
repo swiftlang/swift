@@ -25,6 +25,8 @@ class NormalProtocolConformance;
 
 namespace irgen {
 
+enum class MangledTypeRefRole;
+
 /// A mangling string that includes embedded symbolic references.
 struct SymbolicMangling {
   std::string String;
@@ -426,7 +428,8 @@ public:
   std::string mangleProtocolForLLVMTypeName(ProtocolCompositionType *type);
 
   std::string mangleSymbolNameForSymbolicMangling(
-                                              const SymbolicMangling &mangling);
+                                              const SymbolicMangling &mangling,
+                                              MangledTypeRefRole role);
 protected:
 
   std::string mangleTypeSymbol(Type type, const char *Op) {

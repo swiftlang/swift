@@ -164,10 +164,10 @@ public:
   }
 };
 
-llvm::Constant *IRGenModule::getTypeRef(CanType type, unsigned alignment) {
+llvm::Constant *IRGenModule::getTypeRef(CanType type, MangledTypeRefRole role) {
   IRGenMangler Mangler;
   auto SymbolicName = Mangler.mangleTypeForReflection(*this, type);
-  return getAddrOfStringForTypeRef(SymbolicName, alignment);
+  return getAddrOfStringForTypeRef(SymbolicName, role);
 }
 
 class ReflectionMetadataBuilder {
@@ -210,7 +210,7 @@ protected:
   /// Add a 32-bit relative offset to a mangled typeref string
   /// in the typeref reflection section.
   void addTypeRef(CanType type) {
-    B.addRelativeAddress(IGM.getTypeRef(type));
+    B.addRelativeAddress(IGM.getTypeRef(type, MangledTypeRefRole::Reflection));
   }
 
   /// Add a 32-bit relative offset to a mangled nominal type string
@@ -220,11 +220,14 @@ protected:
       IRGenMangler mangler;
       SymbolicMangling mangledStr;
       mangledStr.String = mangler.mangleBareProtocol(proto);
-      auto mangledName = IGM.getAddrOfStringForTypeRef(mangledStr);
+      auto mangledName =
+        IGM.getAddrOfStringForTypeRef(mangledStr,
+                                      MangledTypeRefRole::Reflection);
       B.addRelativeAddress(mangledName);
     } else {
       CanType type = nominal->getDeclaredType()->getCanonicalType();
-      B.addRelativeAddress(IGM.getTypeRef(type));
+      B.addRelativeAddress(
+        IGM.getTypeRef(type, MangledTypeRefRole::Reflection));
     }
   }
 
@@ -607,7 +610,8 @@ public:
       MetadataSourceEncoder Encoder(OS);
       Encoder.visit(Source);
 
-      auto EncodedSource = IGM.getAddrOfStringForTypeRef(OS.str());
+      auto EncodedSource =
+        IGM.getAddrOfStringForTypeRef(OS.str(), MangledTypeRefRole::Metadata);
       B.addRelativeAddress(EncodedSource);
     }
   }

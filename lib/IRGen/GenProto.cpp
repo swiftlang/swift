@@ -1509,17 +1509,16 @@ llvm::Constant *IRGenModule::getAssociatedTypeWitness(CanType type,
 
   // Form a reference to the mangled name for this type.
   assert(!type->hasArchetype() && "type cannot contain archetypes");
-  auto typeRef = getTypeRef(type, /*alignment=*/4);
+  auto role = inProtocolContext
+    ? MangledTypeRefRole::DefaultAssociatedTypeWitness
+    : MangledTypeRefRole::Metadata;
+  auto typeRef = getTypeRef(type, role);
 
   // Set the low bit to indicate that this is a mangled name.
   auto witness = llvm::ConstantExpr::getPtrToInt(typeRef, IntPtrTy);
-  unsigned bits = ProtocolRequirementFlags::AssociatedTypeMangledNameBit;
-  if (inProtocolContext) {
-    bits |= ProtocolRequirementFlags::AssociatedTypeProtocolContextBit;
-  }
-
-  auto bitsConstant = llvm::ConstantInt::get(IntPtrTy, bits);
-  witness = llvm::ConstantExpr::getAdd(witness, bitsConstant);
+  unsigned bit = ProtocolRequirementFlags::AssociatedTypeMangledNameBit;
+  auto bitConstant = llvm::ConstantInt::get(IntPtrTy, bit);
+  witness = llvm::ConstantExpr::getAdd(witness, bitConstant);
   return llvm::ConstantExpr::getIntToPtr(witness, Int8PtrTy);
 }
 

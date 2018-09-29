@@ -436,6 +436,17 @@ public:
   llvm::Constant *getValue() const { return Value; }
 };
 
+/// Describes the role of a mangled type reference string.
+enum class MangledTypeRefRole {
+  /// The mangled type reference is used for normal metadata.
+  Metadata,
+  /// The mangled type reference is used for reflection metadata.
+  Reflection,
+  /// The mangled type reference is used for a default associated type
+  /// witness.
+  DefaultAssociatedTypeWitness,
+};
+
 /// IRGenModule - Primary class for emitting IR for global declarations.
 /// 
 class IRGenModule {
@@ -991,10 +1002,11 @@ public:
   /// reflection metadata.
   llvm::SetVector<const StructDecl *> ImportedStructs;
 
-  llvm::Constant *getTypeRef(CanType type, unsigned alignment = 1);
-  llvm::Constant *getAddrOfStringForTypeRef(StringRef mangling);
+  llvm::Constant *getTypeRef(CanType type, MangledTypeRefRole role);
+  llvm::Constant *getAddrOfStringForTypeRef(StringRef mangling,
+                                            MangledTypeRefRole role);
   llvm::Constant *getAddrOfStringForTypeRef(const SymbolicMangling &mangling,
-                                            unsigned alignment = 1);
+                                            MangledTypeRefRole role);
   llvm::Constant *getAddrOfFieldName(StringRef Name);
   llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
                                              CanSILFunctionType origCalleeType,

@@ -457,7 +457,8 @@ namespace {
     
     void addExtendedContext() {
       auto string = IGM.getTypeRef(
-          E->getSelfInterfaceType()->getCanonicalType());
+          E->getSelfInterfaceType()->getCanonicalType(),
+          MangledTypeRefRole::Metadata);
       B.addRelativeAddress(string);
     }
     
@@ -4202,7 +4203,8 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
 
       auto flags = GenericRequirementFlags(abiKind, false, false);
       auto typeName =
-        IGM.getTypeRef(requirement.getSecondType()->getCanonicalType());
+        IGM.getTypeRef(requirement.getSecondType()->getCanonicalType(),
+                       MangledTypeRefRole::Metadata);
 
       addGenericRequirement(IGM, B, metadata, sig, flags,
                             requirement.getFirstType(),

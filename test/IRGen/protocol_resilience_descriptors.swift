@@ -12,14 +12,19 @@
 // Resilient protocol definition
 // ----------------------------------------------------------------------------
 
+// CHECK: @"default assoc type x" = linkonce_odr hidden constant
+// CHECK-SAME: i8 -1, [1 x i8] c"x", i8 0
+
+// CHECK: @"default assoc type \01____y2T118resilient_protocol29ProtocolWithAssocTypeDefaultsPQzG 18resilient_protocol7WrapperV" =
+
 // Protocol descriptor
 // CHECK-DEFINITION-LABEL: @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsMp" ={{( protected)?}} constant
 // CHECK-DEFINITION-SAME: @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2AC_AA014OtherResilientC0TN"
 
 // Associated type default + flags
 // CHECK-DEFINITION-SAME: [[INT]] add
-// CHECK-DEFINITION-SAME: @"symbolic \01____y2T118resilient_protocol29ProtocolWithAssocTypeDefaultsPQzG 18resilient_protocol7WrapperV"
-// CHECK-DEFINITION-SAME: [[INT]] 3
+// CHECK-DEFINITION-SAME: @"default assoc type \01____y2T118resilient_protocol29ProtocolWithAssocTypeDefaultsPQzG 18resilient_protocol7WrapperV"
+// CHECK-DEFINITION-SAME: [[INT]] 1
 
 // Protocol requirements base descriptor
 // CHECK-DEFINITION: @"$s18resilient_protocol21ResilientBaseProtocolTL" ={{( dllexport)?}}{{( protected)?}} alias %swift.protocol_requirement, getelementptr (%swift.protocol_requirement, %swift.protocol_requirement* getelementptr inbounds (<{ i32, i32, i32, i32, i32, i32, %swift.protocol_requirement }>, <{ i32, i32, i32, i32, i32, i32, %swift.protocol_requirement }>* @"$s18resilient_protocol21ResilientBaseProtocolMp", i32 0, i32 6), i32 -1)

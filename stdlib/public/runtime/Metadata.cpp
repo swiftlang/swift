@@ -3971,15 +3971,27 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
     return swift_checkMetadataState(request, (const Metadata *)witness);
   }
 
-  // Demangle the associated type name.
-  StringRef mangledName =
-    Demangle::makeSymbolicMangledNameStringRef(
-      (const char *)(uintptr_t(witness) &
-                     ~ProtocolRequirementFlags::AssociatedTypeMangledNameMask));
+  // Find the mangled name.
+  const char *mangledNameBase =
+    (const char *)(uintptr_t(witness) &
+                   ~ProtocolRequirementFlags::AssociatedTypeMangledNameBit);
 
+  // Check whether the mangled name has the prefix byte indicating that
+  // the mangled name is relative to the protocol itself.
+  bool inProtocolContext = false;
+  if ((uint8_t)*mangledNameBase ==
+        ProtocolRequirementFlags::AssociatedTypeInProtocolContextByte) {
+    inProtocolContext = true;
+    ++mangledNameBase;
+  }
+
+  // Extract the mangled name itself.
+  StringRef mangledName =
+    Demangle::makeSymbolicMangledNameStringRef(mangledNameBase);
+
+  // Demangle the associated type.
   const Metadata *assocTypeMetadata;
-  if ((uintptr_t(witness) &
-         ProtocolRequirementFlags::AssociatedTypeProtocolContextBit)) {
+  if (inProtocolContext) {
     // The protocol's Self is the only generic parameter that can occur in the
     // type.
     assocTypeMetadata =
