@@ -1129,8 +1129,6 @@ SwiftDeclCollector::shouldIgnore(Decl *D, const Decl* Parent) {
   if (isa<OperatorDecl>(D))
     return true;
   if (auto VD = dyn_cast<ValueDecl>(D)) {
-    if (VD->isOperator())
-      return true;
     if (VD->getBaseName().empty())
       return true;
 
@@ -1325,12 +1323,12 @@ void SwiftDeclCollector::processDecl(ValueDecl *VD) {
     RootNode->addChild(constructFunctionNode(FD, SDKNodeKind::DeclFunction));
   } else if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
     RootNode->addChild(constructTypeDeclNode(NTD));
-  }
-  if (auto VAD = dyn_cast<VarDecl>(VD)) {
+  } else if (auto VAD = dyn_cast<VarDecl>(VD)) {
     RootNode->addChild(constructVarNode(VAD));
-  }
-  if (auto TAD = dyn_cast<TypeAliasDecl>(VD)) {
+  } else if (auto TAD = dyn_cast<TypeAliasDecl>(VD)) {
     RootNode->addChild(constructTypeAliasNode(TAD));
+  } else {
+    llvm_unreachable("unhandled value decl");
   }
 }
 

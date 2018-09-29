@@ -119,7 +119,43 @@ AssociatedType StringProtocol.UTF16View has been added as a protocol requirement
 AssociatedType StringProtocol.UTF8View has been added as a protocol requirement
 AssociatedType StringProtocol.UnicodeScalarView has been added as a protocol requirement
 AssociatedType _SequenceWrapper.Base has been added as a protocol requirement
+
+
+// These operator changes are false positive because the baseline doesn't have operators.
+Func BinaryInteger.%(_:_:) has been added as a protocol requirement
+Func BinaryInteger.%=(_:_:) has been added as a protocol requirement
+Func BinaryInteger.&(_:_:) has been added as a protocol requirement
+Func BinaryInteger.&=(_:_:) has been added as a protocol requirement
+Func BinaryInteger.<<(_:_:) has been added as a protocol requirement
+Func BinaryInteger.<<=(_:_:) has been added as a protocol requirement
+Func BinaryInteger.>>(_:_:) has been added as a protocol requirement
+Func BinaryInteger.>>=(_:_:) has been added as a protocol requirement
+Func BinaryInteger.\/(_:_:) has been added as a protocol requirement
+Func BinaryInteger.\/=(_:_:) has been added as a protocol requirement
+Func BinaryInteger.^(_:_:) has been added as a protocol requirement
+Func BinaryInteger.^=(_:_:) has been added as a protocol requirement
 Func BinaryInteger.isMultiple(of:) has been added as a protocol requirement
+Func BinaryInteger.|(_:_:) has been added as a protocol requirement
+Func BinaryInteger.|=(_:_:) has been added as a protocol requirement
+Func BinaryInteger.~(_:) has been added as a protocol requirement
+Func Comparable.<(_:_:) has been added as a protocol requirement
+Func Comparable.<=(_:_:) has been added as a protocol requirement
+Func Comparable.>(_:_:) has been added as a protocol requirement
+Func Comparable.>=(_:_:) has been added as a protocol requirement
+Func Equatable.==(_:_:) has been added as a protocol requirement
+Func FixedWidthInteger.&<<(_:_:) has been added as a protocol requirement
+Func FixedWidthInteger.&<<=(_:_:) has been added as a protocol requirement
+Func FixedWidthInteger.&>>(_:_:) has been added as a protocol requirement
+Func FixedWidthInteger.&>>=(_:_:) has been added as a protocol requirement
+Func FloatingPoint.\/(_:_:) has been added as a protocol requirement
+Func FloatingPoint.\/=(_:_:) has been added as a protocol requirement
+Func Numeric.*(_:_:) has been added as a protocol requirement
+Func Numeric.*=(_:_:) has been added as a protocol requirement
+Func Numeric.+(_:_:) has been added as a protocol requirement
+Func Numeric.+=(_:_:) has been added as a protocol requirement
+Func Numeric.-(_:_:) has been added as a protocol requirement
+Func Numeric.-=(_:_:) has been added as a protocol requirement
+Func SignedNumeric.-(_:) has been added as a protocol requirement
 
 // The subscript changes are bogus because we don't have subscript decls in the baseline.
 Subscript Collection.subscript(_:) has been added as a protocol requirement
