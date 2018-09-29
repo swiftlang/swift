@@ -483,7 +483,6 @@ extension _CocoaDictionary: _DictionaryBuffer {
   }
 
   @usableFromInline // FIXME(cocoa-index): Should be inlinable
-  @_effects(releasenone)
   internal func formIndex(after index: inout Index, isUnique: Bool) {
     validate(index)
     if !isUnique { index = index.copy() }
