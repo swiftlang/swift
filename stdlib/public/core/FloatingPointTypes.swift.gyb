@@ -1581,8 +1581,16 @@ extension ${Self} {
 // Explicit conversions between types.
 //===----------------------------------------------------------------------===//
 
-// Construction from other floating point numbers.
+// Construction from other concrete types.
 extension ${Self} {
+
+  // We "shouldn't" need this, but the typechecker barfs on an expression
+  // in the test suite without it.
+  @_transparent
+  public init(_ v: Int) {
+    _value = Builtin.sitofp_Int${word_bits}_FPIEEE${bits}(v._value)
+  }
+
 % for src_type in all_floating_point_types():
 %   srcBits = src_type.bits
 %   That = src_type.stdlib_name

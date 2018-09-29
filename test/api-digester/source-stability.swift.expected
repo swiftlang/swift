@@ -5,6 +5,12 @@ Protocol BinaryInteger has generic signature change from <Self : CustomStringCon
 /* RawRepresentable Changes */
 
 /* Removed Decls */
+Constructor Double.init(_:) has been removed
+Constructor Double.init(exactly:) has been removed
+Constructor Float.init(_:) has been removed
+Constructor Float.init(exactly:) has been removed
+Constructor Float80.init(_:) has been removed
+Constructor Float80.init(exactly:) has been removed
 Constructor Int.init(truncatingBitPattern:) has been removed
 Constructor Int16.init(truncatingBitPattern:) has been removed
 Constructor Int32.init(truncatingBitPattern:) has been removed
