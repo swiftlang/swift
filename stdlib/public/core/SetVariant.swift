@@ -183,6 +183,20 @@ extension Set._Variant: _SetBuffer {
   }
 
   @inlinable
+  internal func formIndex(after index: inout Index) {
+    switch self {
+    case .native(let native):
+      index = native.index(after: index)
+#if _runtime(_ObjC)
+    case .cocoa(let cocoa):
+      cocoaPath()
+      let isUnique = index._isUniquelyReferenced()
+      cocoa.formIndex(after: &index._asCocoa, isUnique: isUnique)
+#endif
+    }
+  }
+
+  @inlinable
   @inline(__always)
   internal func index(for element: Element) -> Index? {
     switch self {

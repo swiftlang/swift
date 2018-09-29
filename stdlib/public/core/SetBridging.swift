@@ -345,8 +345,8 @@ extension _CocoaSet: _SetBuffer {
   @usableFromInline // FIXME(cocoa-index): Should be inlinable
   @_effects(releasenone)
   internal func index(after index: Index) -> Index {
-    var result = index
-    formIndex(after: &result)
+    var result = index.copy()
+    formIndex(after: &result, isUnique: true)
     return result
   }
 
@@ -358,11 +358,9 @@ extension _CocoaSet: _SetBuffer {
   }
 
   @usableFromInline // FIXME(cocoa-index): Should be inlinable
-  @_effects(releasenone)
-  internal func formIndex(after index: inout Index) {
+  internal func formIndex(after index: inout Index, isUnique: Bool) {
     validate(index)
-    let isUnique = index.isUniquelyReferenced()
-    if !isUnique { index.storage = index.copy() }
+    if !isUnique { index = index.copy() }
     let storage = index.storage // FIXME: rdar://problem/44863751
     storage.currentKeyIndex += 1
   }
@@ -412,17 +410,34 @@ extension _CocoaSet {
   @usableFromInline
   internal struct Index {
     @usableFromInline
-    internal var storage: Storage
+    internal var _object: Builtin.BridgeObject
+    @usableFromInline
+    internal var _storage: Builtin.BridgeObject
+
+    internal var object: AnyObject {
+      @inline(__always)
+      get {
+        return _bridgeObject(toNonTaggedObjC: _object)
+      }
+    }
+
+    internal var storage: Storage {
+      @inline(__always)
+      get {
+        let storage = _bridgeObject(toNative: _storage)
+        return unsafeDowncast(storage, to: Storage.self)
+      }
+    }
 
     internal init(_ storage: __owned Storage) {
-      self.storage = storage
+      self._object = _bridgeObject(fromNonTaggedObjC: storage.base.object)
+      self._storage = _bridgeObject(fromNative: storage)
     }
   }
 }
 
 extension _CocoaSet.Index {
   // FIXME(cocoa-index): Try using an NSEnumerator to speed this up.
-  @usableFromInline
   internal class Storage {
     // Assumption: we rely on NSDictionary.getObjects when being
     // repeatedly called on the same NSDictionary, returning items in the same
@@ -455,15 +470,20 @@ extension _CocoaSet.Index {
 }
 
 extension _CocoaSet.Index {
-  @inlinable
-  internal mutating func isUniquelyReferenced() -> Bool {
-    return _isUnique_native(&storage)
+  @usableFromInline
+  internal var handleBitPattern: UInt {
+    @_effects(readonly)
+    get {
+      return unsafeBitCast(storage, to: UInt.self)
+    }
   }
 
-  @usableFromInline
-  internal mutating func copy() -> Storage {
+  internal func copy() -> _CocoaSet.Index {
     let storage = self.storage
-    return Storage(storage.base, storage.allKeys, storage.currentKeyIndex)
+    return _CocoaSet.Index(Storage(
+        storage.base,
+        storage.allKeys,
+        storage.currentKeyIndex))
   }
 }
 
@@ -484,7 +504,7 @@ extension _CocoaSet.Index {
   internal var age: Int32 {
     @_effects(releasenone)
     get {
-      return _HashTable.age(for: storage.base.object)
+      return _HashTable.age(for: object)
     }
   }
 }

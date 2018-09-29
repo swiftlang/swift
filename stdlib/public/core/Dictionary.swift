@@ -647,6 +647,11 @@ extension Dictionary: Collection {
     return _variant.index(after: i)
   }
 
+  @inlinable
+  public func formIndex(after i: inout Index) {
+    _variant.formIndex(after: &i)
+  }
+
   /// Returns the index for the given key.
   ///
   /// If the given key is found in the dictionary, this method returns an index
@@ -1351,6 +1356,11 @@ extension Dictionary {
     }
 
     @inlinable
+    public func formIndex(after i: inout Index) {
+      _variant.formIndex(after: &i)
+    }
+
+    @inlinable
     public subscript(position: Index) -> Element {
       return _variant.key(at: position)
     }
@@ -1454,6 +1464,11 @@ extension Dictionary {
     @inlinable
     public func index(after i: Index) -> Index {
       return _variant.index(after: i)
+    }
+
+    @inlinable
+    public func formIndex(after i: inout Index) {
+      _variant.formIndex(after: &i)
     }
 
     @inlinable
@@ -1827,6 +1842,14 @@ extension Dictionary.Index {
       _conditionallyUnreachable()
     }
   }
+
+  @inlinable
+  @inline(__always)
+  internal mutating func _isUniquelyReferenced() -> Bool {
+    defer { _fixLifetime(self) }
+    var handle = _asCocoa.handleBitPattern
+    return handle == 0 || _isUnique_native(&handle)
+  }
 #endif
 
   @usableFromInline @_transparent
@@ -1843,14 +1866,27 @@ extension Dictionary.Index {
   }
 
 #if _runtime(_ObjC)
-  @usableFromInline @_transparent
+  @usableFromInline
   internal var _asCocoa: _CocoaDictionary.Index {
-    switch _variant {
-    case .native:
-      _preconditionFailure(
-        "Attempting to access Dictionary elements using an invalid index")
-    case .cocoa(let cocoaIndex):
-      return cocoaIndex
+    @_transparent
+    get {
+      switch _variant {
+      case .native:
+        _preconditionFailure(
+          "Attempting to access Dictionary elements using an invalid index")
+      case .cocoa(let cocoaIndex):
+        return cocoaIndex
+      }
+    }
+    _modify {
+      guard case .cocoa(var cocoa) = _variant else {
+        _preconditionFailure(
+          "Attempting to access Dictionary elements using an invalid index")
+      }
+      let dummy = _HashTable.Index(bucket: _HashTable.Bucket(offset: 0), age: 0)
+      _variant = .native(dummy)
+      yield &cocoa
+      _variant = .cocoa(cocoa)
     }
   }
 #endif
@@ -1897,8 +1933,8 @@ extension Dictionary.Index: Comparable {
 }
 
 extension Dictionary.Index: Hashable {
-  @_effects(readonly) // FIXME(cocoa-index): Make inlinable
-  public func hash(into hasher: inout Hasher) {
+  public // FIXME(cocoa-index): Make inlinable
+  func hash(into hasher: inout Hasher) {
   #if _runtime(_ObjC)
     switch _variant {
     case .native(let nativeIndex):
