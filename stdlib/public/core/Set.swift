@@ -1343,6 +1343,14 @@ extension Set.Index {
       _conditionallyUnreachable()
     }
   }
+
+  @inlinable
+  @inline(__always)
+  internal mutating func _isUniquelyReferenced() -> Bool {
+    defer { _fixLifetime(self) }
+    var handle = _asCocoa.handleBitPattern
+    return handle == 0 || _isUnique_native(&handle)
+  }
 #endif
 
   @usableFromInline @_transparent
@@ -1359,14 +1367,27 @@ extension Set.Index {
   }
 
 #if _runtime(_ObjC)
-  @usableFromInline @_transparent
+  @usableFromInline
   internal var _asCocoa: _CocoaSet.Index {
-    switch _variant {
-    case .native:
-      _preconditionFailure(
-        "Attempting to access Set elements using an invalid index")
-    case .cocoa(let cocoaIndex):
-      return cocoaIndex
+    @_transparent
+    get {
+      switch _variant {
+      case .native:
+        _preconditionFailure(
+          "Attempting to access Set elements using an invalid index")
+      case .cocoa(let cocoaIndex):
+        return cocoaIndex
+      }
+    }
+    _modify {
+      guard case .cocoa(var cocoa) = _variant else {
+        _preconditionFailure(
+          "Attempting to access Set elements using an invalid index")
+      }
+      let dummy = _HashTable.Index(bucket: _HashTable.Bucket(offset: 0), age: 0)
+      _variant = .native(dummy)
+      yield &cocoa
+      _variant = .cocoa(cocoa)
     }
   }
 #endif

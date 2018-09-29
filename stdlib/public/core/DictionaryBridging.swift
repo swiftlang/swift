@@ -471,8 +471,8 @@ extension _CocoaDictionary: _DictionaryBuffer {
   @usableFromInline // FIXME(cocoa-index): Should be inlinable
   @_effects(releasenone)
   internal func index(after index: Index) -> Index {
-    var result = index
-    formIndex(after: &result)
+    var result = index.copy()
+    formIndex(after: &result, isUnique: true)
     return result
   }
 
@@ -484,11 +484,9 @@ extension _CocoaDictionary: _DictionaryBuffer {
 
   @usableFromInline // FIXME(cocoa-index): Should be inlinable
   @_effects(releasenone)
-  internal func formIndex(after index: inout Index) {
+  internal func formIndex(after index: inout Index, isUnique: Bool) {
     validate(index)
-    let isUnique = index.isUniquelyReferenced()
     if !isUnique { index = index.copy() }
-    _sanityCheck(index.isUniquelyReferenced())
     let storage = index.storage // FIXME: rdar://problem/44863751
     storage.currentKeyIndex += 1
   }
@@ -636,18 +634,16 @@ extension _CocoaDictionary.Index {
 }
 
 extension _CocoaDictionary.Index {
-  @inlinable
-  internal mutating func isUniquelyReferenced() -> Bool {
-    defer { _fixLifetime(self) }
-    guard _isNativePointer(_storage) else {
-      return false
+  @usableFromInline
+  internal var handleBitPattern: UInt {
+    @_effects(readonly)
+    get {
+      return unsafeBitCast(storage, to: UInt.self)
     }
-    unowned(unsafe) var storage = _bridgeObject(toNative: _storage)
-    return _isUnique_native(&storage)
   }
 
   @usableFromInline
-  internal mutating func copy() -> _CocoaDictionary.Index {
+  internal func copy() -> _CocoaDictionary.Index {
     let storage = self.storage
     return _CocoaDictionary.Index(Storage(
         storage.base,
