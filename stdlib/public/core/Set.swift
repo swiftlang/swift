@@ -340,6 +340,11 @@ extension Set: Collection {
     return _variant.index(after: i)
   }
 
+  @inlinable
+  public func formIndex(after i: inout Index) {
+    _variant.formIndex(after: &i)
+  }
+
   // APINAMING: complexity docs are broadly missing in this file.
 
   /// Returns the index of the given element in the set, or `nil` if the

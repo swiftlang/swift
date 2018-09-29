@@ -647,6 +647,11 @@ extension Dictionary: Collection {
     return _variant.index(after: i)
   }
 
+  @inlinable
+  public func formIndex(after i: inout Index) {
+    _variant.formIndex(after: &i)
+  }
+
   /// Returns the index for the given key.
   ///
   /// If the given key is found in the dictionary, this method returns an index
@@ -1351,6 +1356,11 @@ extension Dictionary {
     }
 
     @inlinable
+    public func formIndex(after i: inout Index) {
+      _variant.formIndex(after: &i)
+    }
+
+    @inlinable
     public subscript(position: Index) -> Element {
       return _variant.key(at: position)
     }
@@ -1454,6 +1464,11 @@ extension Dictionary {
     @inlinable
     public func index(after i: Index) -> Index {
       return _variant.index(after: i)
+    }
+
+    @inlinable
+    public func formIndex(after i: inout Index) {
+      _variant.formIndex(after: &i)
     }
 
     @inlinable
