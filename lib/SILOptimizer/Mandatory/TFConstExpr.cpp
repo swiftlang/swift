@@ -779,15 +779,6 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
 
   SILFunction *callee = calleeFn.getFunctionValue();
 
-  // If we reached an external function that hasn't been deserialized yet, make
-  // sure to pull it in so we can see its body.  If that fails, then we can't
-  // analyze the function.
-  if (callee->isExternalDeclaration()) {
-    callee->getModule().loadFunction(callee);
-    if (callee->isExternalDeclaration())
-      return computeOpaqueCallResult(apply, callee);
-  }
-
   // TODO: Verify that the callee was defined as a @constexpr function.
 
   // If this is a well-known function, do not step into it.
@@ -894,6 +885,15 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
                                                 evaluator.getAllocator()));
     return None;
   }
+  }
+
+  // If we reached an external function that hasn't been deserialized yet, make
+  // sure to pull it in so we can see its body.  If that fails, then we can't
+  // analyze the function.
+  if (callee->isExternalDeclaration()) {
+    callee->getModule().loadFunction(callee);
+    if (callee->isExternalDeclaration())
+      return computeOpaqueCallResult(apply, callee);
   }
 
   // Verify that we can fold all of the arguments to the call.

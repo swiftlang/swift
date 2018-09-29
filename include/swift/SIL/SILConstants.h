@@ -139,12 +139,6 @@ private:
 
     SILFunction *function;
 
-    /// When this SymbolicValue is of "Inst" kind, this contains a
-    /// pointer to the instruction whose value this holds.  This is known to
-    /// be one of a closed set of constant instructions:
-    ///    IntegerLiteralInst, FloatLiteralInst, StringLiteralInst
-    SingleValueInstruction *inst;
-
     /// When this SymbolicValue is of "Integer" kind, this pointer stores
     /// the words of the APInt value it holds.
     uint64_t *integer;

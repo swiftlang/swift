@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// SWIFT_ENABLE_TENSORFLOW
-
 #include "swift/SIL/SILConstants.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Demangling/Demangle.h"

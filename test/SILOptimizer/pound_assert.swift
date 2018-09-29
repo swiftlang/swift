@@ -83,6 +83,8 @@ func test_loops() {
 
 //===----------------------------------------------------------------------===//
 // Reduced testcase propagating substitutions around.
+//===----------------------------------------------------------------------===//
+
 protocol SubstitutionsP {
   init<T: SubstitutionsP>(something: T)
 
@@ -194,3 +196,41 @@ func testCallStack() {
 }
 
 //===----------------------------------------------------------------------===//
+// Array functions.
+//===----------------------------------------------------------------------===//
+
+func testArrayInit() {
+  // We do not yet support functions that let us statically inspect the arrays
+  // we initialize, so we put them in structs (not tuples, which get expanded
+  // in SILGen) to force the evaluator to initialize them. Then we assert
+  // things about other components of the structs.
+
+  struct IntArrayPair {
+    let i: Int
+    let a: [Int]
+  }
+
+  #assert(IntArrayPair(i: 0, a: []).i == 0)
+  #assert(IntArrayPair(i: 0, a: [1]).i == 0)
+  #assert(IntArrayPair(i: 0, a: [1, 2]).i == 0)
+}
+
+//===----------------------------------------------------------------------===//
+// String functions.
+//===----------------------------------------------------------------------===//
+
+func testStringInit() {
+  // We do not yet support functions that let us statically inspect the strings
+  // we initialize, so we put them in structs (not tuples, which get expanded
+  // in SILGen) to force the evaluator to initialize them. Then we assert
+  // things about other components of the structs.
+
+  struct IntStringPair {
+    let i: Int
+    let s: String
+  }
+
+  #assert(IntStringPair(i: 0, s: "").i == 0)
+  #assert(IntStringPair(i: 0, s: String()).i == 0)
+  #assert(IntStringPair(i: 0, s: "hello world").i == 0)
+}
