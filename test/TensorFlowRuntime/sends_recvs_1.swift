@@ -110,7 +110,7 @@ SendsRecvsTests.testAllBackends("testSendsInALoopWithNoResultTensor",
 // Utilities.swift in TensorFlow stdlib.
 @inline(__always)
 func _scalarTensorWithShapeOnCPU<T>(_ x: Tensor<T>) -> Tensor<T> {
-  let ret: TensorHandle<T> = #tfop("Identity", x, __shapes: [TensorShape()], __device: "/device:CPU:0")
+  let ret: TensorHandle<T> = #tfop("Identity", x, __shapes: [TensorShape()], __device: "/job:localhost/replica:0/task:0/device:CPU:0")
   return Tensor<T>(handle: ret)
 }
 

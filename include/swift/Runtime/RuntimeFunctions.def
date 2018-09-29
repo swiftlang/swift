@@ -1341,6 +1341,11 @@ FUNCTION(TFE_OpAddInput, TFE_OpAddInput, C_CC,
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
+FUNCTION(TFE_OpSetDevice, TFE_OpSetDevice, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
 FUNCTION(TFE_OpSetAttrType, TFE_OpSetAttrType, C_CC,
          RETURNS(),
          ARGS(Int8PtrTy, Int8PtrTy, Int32Ty),

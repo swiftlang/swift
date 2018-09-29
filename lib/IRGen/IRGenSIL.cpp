@@ -2065,7 +2065,14 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       case SymbolicValue::String:
         // TODO: move the DEVICE_ATTR string def to a place accessible here.
         if (attrName == "__device") {
-          // TODO: set device via TFE_OpGetDevice()
+          auto deviceStr = attr.value.getStringValue();
+          // In this case, just let eager pick a default device.
+          if (deviceStr == "ALL_DEVICES")
+            break;
+          auto *setDeviceFn = IGM.getTFE_OpSetDeviceFn();
+          auto device = createStringValAddr(IGM, deviceStr);
+          Builder.CreateCall(setDeviceFn, {op, device, status});
+          checkOk(status);
         } else {
           llvm_unreachable("TODO: implement this");
         }

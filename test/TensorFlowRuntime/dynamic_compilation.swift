@@ -13,9 +13,6 @@ import StdlibUnittest
 
 var DynamicCompilationTests = TestSuite("DynamicCompilation")
 
-// TODO: add GPU support.
-#if !CUDA
-
 DynamicCompilationTests.testCPUOrGPU("Const") {
   _RuntimeConfig.printsDebugLog = true
   let x: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: Float(1.0))
@@ -49,7 +46,5 @@ DynamicCompilationTests.testCPUOrGPU("AddInt32") {
   _hostOp(z)
   expectEqualWithScalarTensor(3, z)
 }
-
-#endif // !CUDA
 
 runAllTests()
