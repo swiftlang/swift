@@ -56,14 +56,14 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
   && _isClassOrObjCExistential(DerivedKey.self)
   && _isClassOrObjCExistential(DerivedValue.self) {
 
-    switch source._variant {
-    case .native(let native):
-      // Note: it is safe to treat the buffer as immutable here because
-      // Dictionary will not mutate buffer with reference count greater than 1.
-      return Dictionary(_immutableCocoaDictionary: native.bridged())
-    case .cocoa(let cocoa):
-      return Dictionary(_immutableCocoaDictionary: cocoa.object)
+    guard source._variant.isNative else {
+      return Dictionary(
+        _immutableCocoaDictionary: source._variant.asCocoa.object)
     }
+    // Note: it is safe to treat the buffer as immutable here because
+    // Dictionary will not mutate buffer with reference count greater than 1.
+    return Dictionary(
+      _immutableCocoaDictionary: source._variant.asNative.bridged())
   }
 #endif
   return _dictionaryDownCastConditional(source)!

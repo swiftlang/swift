@@ -16,9 +16,6 @@
 
 import SwiftShims
 
-// FIXME: Remove @usableFromInline once Hasher is resilient.
-// rdar://problem/38549901
-@usableFromInline
 internal protocol _HasherCore {
   init(rawSeed: (UInt64, UInt64))
   mutating func compress(_ value: UInt64)
@@ -84,9 +81,6 @@ internal func _loadPartialUnalignedUInt64LE(
 /// trailing bytes, while the most significant 8 bits hold the count of bytes
 /// appended so far, modulo 256. The count of bytes currently stored in the
 /// buffer is in the lower three bits of the byte count.)
-// FIXME: Remove @usableFromInline and @_fixed_layout once Hasher is resilient.
-// rdar://problem/38549901
-@usableFromInline @_fixed_layout
 internal struct _HasherTailBuffer {
   // msb                                                             lsb
   // +---------+-------+-------+-------+-------+-------+-------+-------+
@@ -140,8 +134,7 @@ internal struct _HasherTailBuffer {
   }
 
   @inline(__always)
-  internal
-  mutating func append(_ bytes: UInt64, count: UInt64) -> UInt64? {
+  internal mutating func append(_ bytes: UInt64, count: UInt64) -> UInt64? {
     _sanityCheck(count >= 0 && count < 8)
     _sanityCheck(bytes & ~((1 &<< (count &<< 3)) &- 1) == 0)
     let c = byteCount & 7
@@ -159,9 +152,6 @@ internal struct _HasherTailBuffer {
   }
 }
 
-// FIXME: Remove @usableFromInline and @_fixed_layout once Hasher is resilient.
-// rdar://problem/38549901
-@usableFromInline @_fixed_layout
 internal struct _BufferingHasher<RawCore: _HasherCore> {
   private var _buffer: _HasherTailBuffer
   private var _core: RawCore
@@ -295,15 +285,8 @@ internal struct _BufferingHasher<RawCore: _HasherCore> {
 ///   different values on every new execution of your program. The hash
 ///   algorithm implemented by `Hasher` may itself change between any two
 ///   versions of the standard library.
-@_fixed_layout // FIXME: Should be resilient (rdar://problem/38549901)
 public struct Hasher {
-  // FIXME: Remove @usableFromInline once Hasher is resilient.
-  // rdar://problem/38549901
-  @usableFromInline
   internal typealias RawCore = _SipHash13Core
-  // FIXME: Remove @usableFromInline once Hasher is resilient.
-  // rdar://problem/38549901
-  @usableFromInline
   internal typealias Core = _BufferingHasher<RawCore>
 
   internal var _core: Core
