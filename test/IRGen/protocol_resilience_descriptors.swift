@@ -82,7 +82,7 @@ where Element: ProtocolWithRequirements, Element.T == Y {
 
 // CHECK-USAGE: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @"$s31protocol_resilience_descriptors17assocTypeMetadatay1TQzmxm010resilient_A024ProtocolWithRequirementsRzlF"(%swift.type*, %swift.type* [[PWD:%.*]], i8** [[WTABLE:%.*]])
 public func assocTypeMetadata<PWR: ProtocolWithRequirements>(_: PWR.Type) -> PWR.T.Type {
-  // CHECK-USAGE: call %swift.metadata_response @swift_getAssociatedTypeWitness(i64 0, i8** %PWR.ProtocolWithRequirements, %swift.type* %PWR, %swift.protocol_requirement* @"$s1T18resilient_protocol24ProtocolWithRequirementsPTl")
+  // CHECK-USAGE: call %swift.metadata_response @swift_getAssociatedTypeWitness([[INT]] 0, i8** %PWR.ProtocolWithRequirements, %swift.type* %PWR, %swift.protocol_requirement* @"$s1T18resilient_protocol24ProtocolWithRequirementsPTl")
   return PWR.T.self
 }
 
@@ -90,7 +90,7 @@ func useOtherResilientProtocol<T: OtherResilientProtocol>(_: T.Type) { }
 
 // CHECK-USAGE: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s31protocol_resilience_descriptors23extractAssocConformanceyyx010resilient_A0012ProtocolWithE12TypeDefaultsRzlF"
 public func extractAssocConformance<T: ProtocolWithAssocTypeDefaults>(_: T) {
-  // CHECK-USAGE: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.ProtocolWithAssocTypeDefaults, i64 udiv (i64 sub (i64 ptrtoint (%swift.protocol_requirement* @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2AC_AA014OtherResilientC0Tn" to i64), i64 ptrtoint (%swift.protocol_requirement* @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsTL" to i64)), i64 8)
+  // CHECK-USAGE: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.ProtocolWithAssocTypeDefaults, [[INT]] udiv ([[INT]] sub ([[INT]] ptrtoint (%swift.protocol_requirement* @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2AC_AA014OtherResilientC0Tn" to [[INT]]), [[INT]] ptrtoint (%swift.protocol_requirement* @"$s18resilient_protocol29ProtocolWithAssocTypeDefaultsTL" to [[INT]])), [[INT]] 8)
   // CHECK-USAGE: load i8*, i8** [[WITNESS_ADDR]]
   useOtherResilientProtocol(T.T2.self)
 }
