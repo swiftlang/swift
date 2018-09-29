@@ -8,7 +8,6 @@ if exists("b:current_syntax")
 endif
 
 syn keyword swiftKeyword
-      \ associatedtype
       \ break
       \ case
       \ catch
@@ -83,6 +82,7 @@ syn keyword swiftTypeDefinition skipwhite skipempty nextgroup=swiftTypeName
       \ protocol
       \ struct
       \ typealias
+      \ associatedtype
 
 syn match swiftMultiwordTypeDefinition skipwhite skipempty nextgroup=swiftTypeName
       \ "indirect enum"
@@ -109,7 +109,7 @@ syn match swiftImportModule contained nextgroup=swiftImportComponent
 syn match swiftImportComponent contained nextgroup=swiftImportComponent
       \ /\.\<[A-Za-z_][A-Za-z_0-9]*\>/
 
-syn match swiftTypeName contained skipwhite skipempty nextgroup=swiftTypeParameters
+syn match swiftTypeName contained skipwhite skipempty nextgroup=swiftTypeParameters,swiftTypealiasDeclaration
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>/
 syn match swiftVarName contained skipwhite skipempty nextgroup=swiftTypeDeclaration
       \ /\<[A-Za-z_][A-Za-z_0-9]*\>/
@@ -131,7 +131,7 @@ syn region swiftType contained contains=swiftType,swiftParamDelim
 syn match swiftParamDelim contained
       \ /,/
 " <Generic Clause> (generics)
-syn region swiftTypeParameters contained contains=swiftVarName,swiftConstraint
+syn region swiftTypeParameters contained contains=swiftVarName,swiftConstraint skipwhite skipempty nextgroup=swiftTypealiasDeclaration
       \ matchgroup=Delimiter start="<" end=">" matchgroup=NONE skip=","
 syn keyword swiftConstraint contained
       \ where
@@ -140,6 +140,8 @@ syn match swiftTypeDeclaration skipwhite skipempty nextgroup=swiftType,swiftInOu
       \ /:/
 syn match swiftTypeDeclaration skipwhite skipempty nextgroup=swiftType
       \ /->/
+syn match swiftTypealiasDeclaration contained skipwhite skipempty nextgroup=swiftType
+      \ /=/
 
 syn region swiftParenthesisRegion matchgroup=NONE start=/(/ end=/)/ contains=TOP
 
@@ -200,6 +202,7 @@ hi def link swiftVarName Identifier
 hi def link swiftImplicitVarName Identifier
 hi def link swiftIdentifierKeyword Identifier
 hi def link swiftTypeDeclaration Delimiter
+hi def link swiftTypealiasDeclaration Delimiter
 hi def link swiftTypeParameters Delimiter
 hi def link swiftBoolean Boolean
 hi def link swiftString String
