@@ -69,15 +69,13 @@ private:
 
 public:
   enum LocationKind : unsigned {
-    // FIXME: NoneKind is to be removed.
-    NoneKind = 0,
-    RegularKind = 1,
-    ReturnKind = 2,
-    ImplicitReturnKind = 3,
-    InlinedKind = 4,
-    MandatoryInlinedKind = 5,
-    CleanupKind = 6,
-    ArtificialUnreachableKind = 7
+    RegularKind = 0,
+    ReturnKind = 1,
+    ImplicitReturnKind = 2,
+    InlinedKind = 3,
+    MandatoryInlinedKind = 4,
+    CleanupKind = 5,
+    ArtificialUnreachableKind = 6
   };
 
   enum StorageKind : unsigned {
