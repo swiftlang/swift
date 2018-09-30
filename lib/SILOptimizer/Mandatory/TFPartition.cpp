@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "tf-partition"
+#include "TFCanonicalizeCFG.h"
 #include "TFUtilities.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
@@ -25,6 +26,7 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/GraphOperationBuilder.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILConstants.h"
@@ -64,6 +66,12 @@ static llvm::cl::opt<bool> TFWarnScalarTransfer(
         "Emit warnings for sends/receives that transfer values that are "
         "known to be scalar."));
 
+// TODO: Remove this short-term flag once we migrate over all unit tests.
+static llvm::cl::opt<bool> TFSendRecvOpaqueHandle(
+    "tf-send-recv-opaque-handle", llvm::cl::init(false),
+    llvm::cl::desc("When true, variant and resource handles can be sent via "
+                   "eager API as tensor handles."));
+
 template <typename... T, typename... U>
 static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
                                    Diag<T...> diag, U &&... args) {
@@ -86,10 +94,10 @@ static bool isUserIgnoredByPartitioning(SILInstruction *inst) {
   return isa<RefCountingInst>(inst);
 }
 
-/// Given a decl for a struct that has a single field (typically because it is
-/// known to be a standard library type like Int or Float), return the canonical
-/// type of the single member, asserting and aborting if we get something
-/// unexpected.
+/// Given a decl for a struct or class that has a single field (typically
+/// because it is known to be a standard library type like Int or Float), return
+/// the canonical type of the single member, asserting and aborting if we get
+/// something unexpected.
 static CanType getSingleElementDeclFieldType(NominalTypeDecl *decl) {
   auto *field = tf::getFieldIfContainsSingleField(decl);
   assert(field && "Struct should have one member");
@@ -913,12 +921,13 @@ void TFFunctionPartition::diagnoseCopyToAccelerator(
 
   // Try to determine a good source location to report.
   auto loc = getUserSourceLocation(value);
-  
+
   // Opaque handles can never be sent or passed as tensor program arguments.
   // Type checking must have rejected host functions that are either a)
   // public with private ABI or b) marked @inline(never).
-  assert(!isOpaqueHandle(value->getType()) &&
-         "Opaque handles should never have been on the host");
+  assert(TFSendRecvOpaqueHandle ||
+         (!isOpaqueHandle(value->getType()) &&
+          "Opaque handles should never have been on the host"));
 
   // Try to make a useful description of the value being copied to help
   // disambiguate.
@@ -995,7 +1004,7 @@ void TFFunctionPartition::diagnoseCopyToAccelerator(
        SM.getLineNumber(loc.getSourceLoc()) !=
            SM.getLineNumber(userLoc.getSourceLoc()))) {
     diagnose(ctx, userLoc.getSourceLoc(),
-             diag::tf_value_implicitly_copied_to_host_computed_used_here)
+             diag::tf_value_used_here)
         .highlight(userLoc.getSourceRange());
   }
 }
@@ -1020,9 +1029,9 @@ void TFFunctionPartition::diagnoseUsesFromHost(SILValue value,
     // here.  It won't be very useful.
     if (isUserIgnoredByPartitioning(user))
       continue;
-    
+
     // If the value is a non-copyable opaque handle, emit an error.
-    if (isOpaqueHandle(value->getType())) {
+    if (!TFSendRecvOpaqueHandle && isOpaqueHandle(value->getType())) {
       diagnoseOpaqueHandleCopy(value, user);
       continue;
     }
@@ -1081,7 +1090,7 @@ void TFFunctionPartition::diagnoseCopyToHost(SILValue value,
   // If the use is at a different position, emit a note showing where it is.
   if (!userLoc.isNull() && loc.getSourceLoc() != userLoc.getSourceLoc()) {
     diagnose(ctx, userLoc.getSourceLoc(),
-             diag::tf_value_implicitly_copied_to_host_computed_used_here)
+             diag::tf_value_used_here)
         .highlight(userLoc.getSourceRange());
   }
 }
@@ -1089,6 +1098,7 @@ void TFFunctionPartition::diagnoseCopyToHost(SILValue value,
 /// Emit an error for invalid send/receive of opaque handles.
 void TFFunctionPartition::diagnoseOpaqueHandleCopy(SILValue value,
                                                    SILInstruction *user) {
+  assert(!TFSendRecvOpaqueHandle);
   assert(isOpaqueHandle(value->getType()) &&
          "Shouldn't emit an error for opaque handle copy when the value is not "
          "an opaque handle");
@@ -1096,7 +1106,7 @@ void TFFunctionPartition::diagnoseOpaqueHandleCopy(SILValue value,
   diagnose(ctx, getUserSourceLocation(value).getSourceLoc(),
            diag::tfop_value_no_send_receive);
   diagnose(ctx, getUserSourceLocation(user).getSourceLoc(),
-           diag::tf_value_implicitly_copied_to_host_computed_used_here);
+           diag::tf_value_used_here);
 }
 
 /// Some instruction in the specified block needs to be split out to the
@@ -1540,6 +1550,10 @@ static bool hoistValueAboveStartPoint(SILInstruction *inst,
   // go.  Don't move anything.
   if (DI.properlyDominates(inst, tensorStartPoint))
     return true;
+
+  // It doesn't make sense to hoist the start point above itself.
+  if (inst == tensorStartPoint)
+    return false;
 
   // In general, we need to check to see if we have a chain of side-effect free
   // instructions whose ultimate inputs dominate the start point.
@@ -2019,9 +2033,6 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
     for (auto bbi = BB->begin(), e = BB->end(); bbi != e; ++bbi) {
       auto *inst = &*bbi;
 
-      assert(!SILTensorOpInfo::decode(inst) &&
-             "The input to partition pass should not have any builtin TFops!");
-
       // Graph operations are tensor ops.
       auto *graphOp = dyn_cast<GraphOperationInst>(inst);
       if (!graphOp)
@@ -2030,7 +2041,7 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
       tensorOps.push_back(inst);
       tensorOpsSet.insert(inst);
 
-      auto opDevice = GraphOperationInfo(graphOp).getDeviceType();
+      auto opDevice = getDeviceType(GraphOperationInfo(graphOp));
       deviceInfo.markDeviceUsed(opDevice);
     }
   }
@@ -2396,7 +2407,7 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
 
 void PartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
   // Handle special case "ops".
-  if (inst->getName().is("tfc.scalarToTensor,s")) {
+  if (inst->getName().is("tfc.scalarToTensor,i")) {
     assert(inst->getNumOperands() == 1 && "invalid tfc.scalarToTensor!");
     // We just lower the result as the input, since the scalar input will have
     // been promoted to a tensor already.  It is possible that the input will
@@ -2433,24 +2444,23 @@ void PartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
 /// constructed const tensor inst get lowered.
 static void createConstTensorAttrsOnAccel(
     SymbolicValue constVal, SILType valTy, ASTContext &ctx,
-    SmallVectorImpl<GraphOperationAttribute> &attributes) {
+    GraphOperationBuilder *opBuilder) {
   // Literals take attributes specifying the dtype and value.
-  attributes.push_back(
-      {ctx.getIdentifier("dtype$dtype"),
+  opBuilder->addAttribute(
+      {ctx.getIdentifier("dtype"),
        SymbolicValue::getMetatype(valTy.getASTType()->getCanonicalType())});
-  attributes.push_back({ctx.getIdentifier("value$tensor"), constVal});
+  opBuilder->addAttribute({ctx.getIdentifier("value$tensor"), constVal});
 }
 
 static void
-addScalarShapeArrayAttr(SmallVectorImpl<GraphOperationAttribute> &attributes,
-                        ASTContext &ctx) {
+addScalarShapeArrayAttr(ASTContext &ctx, GraphOperationBuilder *opBuilder) {
   // For TPU graph, set a scalar shape array, with attr name "__shapes".
   auto attrName = std::string(SHAPE_ARRAY_ATTR);
   // A shape is an array of ints -- empty array means it's a scalar (0d) shape.
   auto scalarShape = SymbolicValue::getArray(
       {}, ctx.getInt32Decl()->getDeclaredType()->getCanonicalType(),
       ctx.getAllocator());
-  attributes.push_back(
+  opBuilder->addAttribute(
       {ctx.getIdentifier(attrName),
        SymbolicValue::getArray(
            {scalarShape},
@@ -2477,7 +2487,7 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     return;
   }
 
-  std::string opName = opInfo.first;
+  GraphOperationBuilder opBuilder(opInfo.first);
 
   // Start remapping the operand list.
   auto operandRange = inst->getAllOperands();
@@ -2487,9 +2497,8 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
   if (opKind == PromotedScalarKind::OverflowingBinary)
     operandRange = operandRange.drop_back();
 
-  SmallVector<SILValue, 4> operands;
   for (auto &op : operandRange)
-    operands.push_back(remapValue(op.get()));
+    opBuilder.addArgument(remapValue(op.get()));
 
   // The type of the new builtin is usually the same as the input type, but
   // "remapped", which turns Float into TensorHandle<Float>.
@@ -2503,7 +2512,6 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
 
   auto &B = getBuilder();
   auto &ctx = B.getASTContext();
-  SmallVector<GraphOperationAttribute, 4> attributes;
 
   // Handle opKind-specific issues.
   switch (opKind) {
@@ -2513,8 +2521,6 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     assert(0 && "Handled above");
   case PromotedScalarKind::Binary:
   case PromotedScalarKind::OverflowingBinary:
-    opName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
-    opName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
     break;
   case PromotedScalarKind::Literal: {
     SymbolicValue constVal;
@@ -2539,14 +2545,13 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     assert((TF_DataType)dtype == TF_BOOL || bitWidth == dtypeSize * 8);
 #endif // NDEBUG
     (void)bitWidth;
-    createConstTensorAttrsOnAccel(constVal, inst->getType(), ctx, attributes);
+    createConstTensorAttrsOnAccel(constVal, inst->getType(), ctx, &opBuilder);
     break;
   }
   case PromotedScalarKind::Conversion: {
     // Conversions get an attribute specifying the result dtype, named "DstT".
-    opName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
-    attributes.push_back(
-        {ctx.getIdentifier("DstT$dtype"),
+    opBuilder.addAttribute(
+        {ctx.getIdentifier("DstT"),
          SymbolicValue::getMetatype(
              inst->getType().getASTType()->getCanonicalType())});
     break;
@@ -2557,14 +2562,12 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
   // should get pruned away in the later graph lowering pass.
   FP.deviceInfo.handleDevicePlacement(
       opInfo.first, /*opDevice*/ getDeviceString(DeviceType::ALL),
-      B.getModule().getASTContext(), attributes);
+      B.getModule().getASTContext(), &opBuilder);
 
   if (FP.deviceInfo.primaryDeviceType == DeviceType::TPU)
-    addScalarShapeArrayAttr(attributes, ctx);
+    addScalarShapeArrayAttr(ctx, &opBuilder);
 
-  auto *result =
-      B.createGraphOperation(loc, ctx.getIdentifier(opName), operands,
-                             attributes, {remapType(resultType)});
+  auto *result = opBuilder.build(B, ctx, loc, {remapType(resultType)});
 
   ValueMap[inst] = getSingleValueResult(result);
 }
@@ -2638,7 +2641,7 @@ static SILValue createIntValue(intmax_t value, SILBuilder &B, SILLocation loc,
   return createSomeIntegerValue(value, B, loc, intDecl, ILI);
 }
 
-/// Add a RecvFromHost builtin to the accelerator function, as a placeholder for
+/// Add a RecvFromHost graph_op to the accelerator function, as a placeholder for
 /// the subsequent graph lowering pass to generate the appropriate TF graph
 /// nodes to receive tensors from Swift host.
 /// `isScalar` specifies whether the value being received is a promoted scalar.
@@ -2652,13 +2655,12 @@ static SILValue createAcceleratorReceive(SILBuilder &B, SILLocation loc,
                                          GraphFunctionDeviceInfo &deviceInfo) {
   auto &ctx = B.getASTContext();
   auto opType = "tfc.RecvFromHost";
-  std::string instName = opType;
+  GraphOperationBuilder opBuilder(opType);
 
-  SmallVector<GraphOperationAttribute, 3> attributes;
-  attributes.push_back(
+  opBuilder.addAttribute(
       {ctx.getIdentifier("tensorId"), SymbolicValue::getInteger(idNumber, 32)});
   deviceInfo.handleDevicePlacement(opType, /*opDevice*/ "",
-                                   B.getModule().getASTContext(), attributes);
+                                   B.getModule().getASTContext(), &opBuilder);
 
   // For XLA compilation, and when receiving a promoted scalar from the host,
   // add a __shapes pseudo-attr to assist the XLA compiler. This special case is
@@ -2669,11 +2671,8 @@ static SILValue createAcceleratorReceive(SILBuilder &B, SILLocation loc,
   // TODO: Do this also for XLA-based GPU (and CPU) execution. Consider
   // extending `deviceInfo` with a bool indicating if we are targeting XLA.
   if (deviceInfo.primaryDeviceType == DeviceType::TPU && isScalar)
-    addScalarShapeArrayAttr(attributes, ctx);
-  auto name = ctx.getIdentifier(instName);
-  return getSingleValueResult(B.createGraphOperation(loc, name,
-                                                     /*operands*/ {},
-                                                     attributes, {valueTy}));
+    addScalarShapeArrayAttr(ctx, &opBuilder);
+  return getSingleValueResult(opBuilder.build(B, ctx, loc, {valueTy}));
 }
 
 static void
@@ -2710,17 +2709,28 @@ static SILValue createHostReceive(SILBuilder &B, SILLocation loc,
   // %4 = apply %2<Float>(..., %1, %3)
   auto tensorId = createIntValue(idNumber, B, loc);
 
+  LLVM_DEBUG(llvm::dbgs() << "Creating host receive with valueTy: " << valueTy
+                          << "\n");
+
   auto scalarType = getTensorHandleElementType(valueTy.getASTType());
-  assert(scalarType && "valueTy is not TensorHandle<T>");
-  auto subMap =
-      getSingleSubstitutionMapForElementType(scalarType, B.getASTContext());
+  SubstitutionMap subMap;
+  if (scalarType) {
+    // This is for TensorHandle<Scalar>, so the submap has one entry for Scalar.
+    subMap =
+        getSingleSubstitutionMapForElementType(scalarType, B.getASTContext());
+  }
+  // Otherwise, this is for VariantHandle, which uses an empty submap.
 
   // Generate an instruction like:
   // %3 = metatype $@thick TensorHandle<Float>.Type
-  auto tensorHandleType =
+  // The type can also be VariantHandle.
+  auto tensorflowValueType =
       convertElementTypeToTensorValueType(valueTy).getASTType();
+  LLVM_DEBUG(llvm::dbgs() << "The created tensor type is: "
+                          << tensorflowValueType << "\n");
+
   auto metatypeType =
-      MetatypeType::get(tensorHandleType, MetatypeRepresentation::Thick)
+      MetatypeType::get(tensorflowValueType, MetatypeRepresentation::Thick)
           ->getCanonicalType();
   auto *metaTypeInst =
       B.createMetatype(loc, SILType::getPrimitiveObjectType(metatypeType));
@@ -2733,7 +2743,7 @@ static SILValue createHostReceive(SILBuilder &B, SILLocation loc,
                        /*isNonThrowing*/ false);
 }
 
-/// Add a SendToHost builtin to the accelerator function, as a placeholder for
+/// Add a SendToHost graph_op to the accelerator function, as a placeholder for
 /// the subsequent graph lowering pass to generate the appropriate TF graph
 /// nodes to send tensors to Swift host.
 ///
@@ -2744,15 +2754,13 @@ void createAcceleratorSend(SILBuilder &B, SILLocation loc, SILValue value,
   auto &ctx = B.getASTContext();
   auto voidTy = B.getModule().Types.getEmptyTupleType();
   auto opType = "tfc.SendToHost";
-  std::string instName = opType;
-  instName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
-  SmallVector<GraphOperationAttribute, 2> attributes;
-  attributes.push_back(
+  GraphOperationBuilder opBuilder(opType);
+  opBuilder.addArgument({value});
+  opBuilder.addAttribute(
       {ctx.getIdentifier("tensorId"), SymbolicValue::getInteger(idNumber, 32)});
   deviceInfo.handleDevicePlacement(opType, /*opDevice*/ "",
-                                   B.getModule().getASTContext(), attributes);
-  B.createGraphOperation(loc, ctx.getIdentifier(instName),
-                         /*operands*/ {value}, attributes, {voidTy});
+                                   B.getModule().getASTContext(), &opBuilder);
+  opBuilder.build(B, ctx, loc, {voidTy});
 }
 
 template <typename T> static T *castWithDebugInfo(SILInstruction *inst) {
@@ -2833,16 +2841,27 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
   auto tensorId = createIntValue(idNumber, B, loc);
 
   auto &ctx = B.getASTContext();
-  Type scalarValueTy, tensorValueTy;
-  if (isTensorHandle(value->getType().getASTType())) {
-    tensorValueTy = value->getType().getASTType();
-    scalarValueTy = getTensorHandleElementType(tensorValueTy);
+  SubstitutionMap subMap;
+  if (isOpaqueHandle(value->getType().getASTType())) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Sending a variant typed tensor: " << value << "\n");
+    // `subMap` should remain empty.
+  } else if (isTensorHandle(value->getType().getASTType())) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Sending a tensor handle typed tensor: " << value << "\n");
+
+    auto tensorValueTy = value->getType().getASTType();
+    auto scalarValueTy = getTensorHandleElementType(tensorValueTy);
+    subMap = getSingleSubstitutionMapForElementType(scalarValueTy,
+                                                    B.getASTContext());
   } else {
+    LLVM_DEBUG(llvm::dbgs() << "Sending a scalar tensor: " << value << "\n");
+
     assert(createScalarTensorFn);
     // Here scalar type is something like $Builtin.FPIEEE32 -- convert it to an
     // AccelerableByTensorFlow conforming type like Float first, and then create
     // a scalar tensor to send that value.
-    scalarValueTy = value->getType().getASTType();
+    auto scalarValueTy = value->getType().getASTType();
     if (!scalarValueTy->getAs<StructType>()) {
       assert(value->getDefiningInstruction());
       auto *typeDecl =
@@ -2855,7 +2874,8 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
       scalarValueTy = value->getType().getASTType();
     }
     assert(scalarValueTy->getAs<StructType>());
-    tensorValueTy =
+    assert(isTensorFlowDType(value->getType().getASTType()));
+    auto tensorValueTy =
         convertElementTypeToTensorValueType(scalarValueTy, ctx).getASTType();
 
     // Convert the scalar to a tensor value.
@@ -2883,22 +2903,23 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
 
     auto createScalarTensorFnRef =
         B.createFunctionRef(loc, createScalarTensorFn);
-    SubstitutionMap subMap = getSingleSubstitutionMapForElementType(
+    SubstitutionMap scalarSubMap = getSingleSubstitutionMapForElementType(
         scalarValueTy, B.getASTContext());
-    value = B.createApply(loc, createScalarTensorFnRef, subMap,
+    value = B.createApply(loc, createScalarTensorFnRef, scalarSubMap,
                           /*args*/ {access, metaTypeInst},
                           /*isNonThrowing*/ false);
 
     // Finish our read access and free the stack memory.
     B.createEndAccess(loc, access, /*aborted*/ false);
     B.createDeallocStack(loc, stackAlloc);
+
+    subMap = getSingleSubstitutionMapForElementType(scalarValueTy,
+                                                    B.getASTContext());
   }
 
   auto sendFnRef = B.createFunctionRef(loc, sendFn);
   // Verify that tensorComputation is passed in as a guaranteed parameter below.
   verifyTensorComputationArgAsGuaranteedParam(sendFnRef);
-  SubstitutionMap subMap =
-      getSingleSubstitutionMapForElementType(scalarValueTy, B.getASTContext());
   // This is a member method of the class of `value`, so we add it as the last
   // parameter.
   return B.createApply(loc, sendFnRef, subMap,
@@ -2909,6 +2930,9 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
 SILFunction *PartitionCloner::lookupSendReceiveFunction(StringRef fnName,
                                                         SILType type,
                                                         SILLocation loc) {
+  LLVM_DEBUG(llvm::dbgs() << "Looking up send/recv func " << fnName
+                          << " with type " << type << "\n");
+
   auto &ctx = FP.hostFn.getASTContext();
   // If `value` is not receivable, reject the program with diagnostics.
   auto proto = ctx.getProtocol(KnownProtocolKind::TensorSendableReceivable);
@@ -2917,8 +2941,10 @@ SILFunction *PartitionCloner::lookupSendReceiveFunction(StringRef fnName,
   auto nominal = tensorValueTy.getASTType()->getAnyNominal();
   auto lookup =
       nominal->lookupConformance(&tensorFlowModule, proto, conformances);
-  assert(lookup && "No conformance to TensorSendableReceivable found. "
-         "Is it a sendable/receivable TensorFlow value?");
+  if (!lookup) {
+    type.dump();
+    llvm_unreachable("No conformance to TensorSendableReceivable found.");
+  }
   assert(conformances.size() == 1 && "Found multiple conformance candidates.");
   DeclName fnDeclName(ctx.getIdentifier(fnName));
   auto *fn = findSILFunctionForRequiredProtocolMember(
@@ -3018,18 +3044,16 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
     // Create a scalar const tensor i, to compare with case id.
     SILValue constTensorWithCaseId;
     {
-      std::string constOpName = "Const";
-      SmallVector<GraphOperationAttribute, 2> attributes;
+      GraphOperationBuilder constOpBuilder("Const");
       createConstTensorAttrsOnAccel(SymbolicValue::getInteger(caseId, 32),
-                                    int32SILType, ctx, attributes);
+                                    int32SILType, ctx, &constOpBuilder);
       FP.deviceInfo.handleDevicePlacement(
           "Const", /*opDevice*/ getDeviceString(DeviceType::ALL),
-          BA.getModule().getASTContext(), attributes);
+          BA.getModule().getASTContext(), &constOpBuilder);
       auto tensorHandleInt32Ty =
           convertElementTypeToTensorValueType(int32SILType);
-      auto *caseIdInst = BA.createGraphOperation(
-          loc, ctx.getIdentifier(constOpName),
-          /*operands*/ {}, attributes, {tensorHandleInt32Ty});
+      auto *caseIdInst = constOpBuilder.build(BA, ctx, loc,
+                                              {tensorHandleInt32Ty});
       constTensorWithCaseId = getSingleValueResult(caseIdInst);
     }
 
@@ -3038,26 +3062,21 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
     {
       // Omit the metatype attr T for simplicity, and TF graphDef compiler can
       // infer the type.
-      std::string equalOpName = "Equal";
-      equalOpName +=
-          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
-      equalOpName +=
-          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+      GraphOperationBuilder equalOpBuilder("Equal");
+      equalOpBuilder.addArgument(receivedCaseId);
+      equalOpBuilder.addArgument(constTensorWithCaseId);
 
       auto boolFieldSILType =
           extractBuiltinTypeFromStdlibNumericType(ctx.getBoolDecl());
       auto tensorHandleI1Ty =
           convertElementTypeToTensorValueType(boolFieldSILType);
 
-      SmallVector<GraphOperationAttribute, 2> attributes;
       FP.deviceInfo.handleDevicePlacement(
           "Equal", /*opDevice*/ getDeviceString(DeviceType::ALL),
-          BA.getModule().getASTContext(), attributes);
+          BA.getModule().getASTContext(), &equalOpBuilder);
 
-      auto *equalComparisonInst = BA.createGraphOperation(
-          loc, ctx.getIdentifier(equalOpName),
-          /*operands*/ {receivedCaseId, constTensorWithCaseId}, attributes,
-          {tensorHandleI1Ty});
+      auto *equalComparisonInst = equalOpBuilder.build(BA, ctx, loc,
+                                                       {tensorHandleI1Ty});
       auto *condBrInst = createTensorToInt1Inst(
           getSingleValueResult(equalComparisonInst), BA, loc, FP.deviceInfo);
       condBrOperand = getSingleValueResult(condBrInst);
@@ -3340,7 +3359,7 @@ bool PartitionCloner::finalizeOriginal() {
     auto inst = instructionsToRemove[idx];
 
 #ifndef NDEBUG
-    // When removing a builtin or ApplyInst tensor op instruction TO, for each
+    // When removing a graph_op or ApplyInst tensor op instruction TO, for each
     // tensor argument TA of it, since we know TA is taken at +0, we need not
     // rebalance the retain/release count of TA.
     if (isa<BuiltinInst>(inst)) {
@@ -3426,7 +3445,11 @@ bool PartitionCloner::finalizeOriginal() {
 
     // Now remove the formal values provided by any branches that jump to that
     // block, as indicated by the BitVector.
-    for (auto pi : bb->getPredecessorBlocks()) {
+    //
+    // Collect all predecessor blocks before removing values from branches as
+    // pred_iterators get invalidated when removing formal values.
+    SmallPtrSet<SILBasicBlock*, 8> predBlocks(bb->pred_begin(), bb->pred_end());
+    for (auto pi : predBlocks) {
       auto *br = cast<BranchInst>(pi->getTerminator());
       SmallVector<SILValue, 8> operands;
       for (unsigned i = 0, e = br->getNumOperands(); i != e; ++i)
@@ -3655,12 +3678,6 @@ void TFFunctionPartition::balanceRetainReleaseCount(SILValue oldResult,
       continue;
     }
 
-    // FIXME: properly handle BranchInst.
-    if (isa<BranchInst>(user)) {
-      retainReleaseBalance += 5;
-      continue;
-    }
-
     user->dump();
     oldResult->dump();
     llvm_unreachable(
@@ -3761,7 +3778,13 @@ void TFFunctionPartition::insertTensorComputationStartEndTerminate(
   auto tensorHandleDecl = ctx.getTensorHandleDecl();
   assert(getSingleElementDeclFieldType(tensorHandleDecl) &&
          "TensorHandle should have exactly one field");
-  auto tensorHandleMember = *tensorHandleDecl->getStoredProperties().begin();
+  auto *anyTensorHandleClass =
+      tensorHandleDecl->getSuperclass()->getAnyNominal();
+  auto anyTensorHandleSILTy = SILType::getPrimitiveObjectType(
+      anyTensorHandleClass->getDeclaredType()->getCanonicalType());
+  assert(anyTensorHandleClass);
+  auto *tensorHandleMember =
+      *anyTensorHandleClass->getStoredProperties().begin();
 
   // Ownership markers for CTensorHandle accesses.
   auto loadOwnership = hostFn.hasQualifiedOwnership()
@@ -3823,6 +3846,8 @@ void TFFunctionPartition::insertTensorComputationStartEndTerminate(
     // it.  If it is a scalar, then we need to box the scalar in a
     // CTensorHandle.
     if (isTensorHandle(tensorValue->getType().getASTType())) {
+      // Upcast to _AnyTensorHandle.
+      tensorValue = B.createUpcast(loc, tensorValue, anyTensorHandleSILTy);
       auto fieldAddress =
           B.createRefElementAddr(loc, tensorValue, tensorHandleMember);
       tensorValue = B.createLoad(loc, fieldAddress, loadOwnership);
@@ -3961,8 +3986,9 @@ void TFFunctionPartition::insertTensorComputationStartEndTerminate(
                                   /*objc*/ false, /*canAllocOnStack*/ false,
                                   /*elementTypes*/ {},
                                   /*elementCountOperands*/ {});
+    auto baseTH = B.createUpcast(loc, newTH, anyTensorHandleSILTy);
     auto fieldAddress =
-        B.createRefElementAddr(result.getLoc(), newTH, tensorHandleMember);
+        B.createRefElementAddr(result.getLoc(), baseTH, tensorHandleMember);
 
     B.createStore(result.getLoc(), newValue, fieldAddress, storeOwnership);
 
@@ -4021,41 +4047,6 @@ void TFFunctionPartition::insertTensorComputationStartEndTerminate(
 bool TFFunctionPartition::partitionAndLowerGraph(bool isTest) {
   // If partition() returns true, short circuit the execution and error out.
   return partition(isTest) || lowerGraph(isTest);
-}
-
-// Our partitioning can leave around lots of unconditional branches between
-// blocks that formerly had control edges.  Go through and merge those to make
-// later passes simpler.
-static void contractUncondBranches(SILFunction *fn) {
-  // Iterate carefully to avoid invalidating iterators: we mutate the block list
-  // while we walk it.
-  for (auto bbi = fn->begin(), e = fn->end(); bbi != e;) {
-    auto *bb = &*bbi;
-    ++bbi; // Increment the iterator in case we do no transformation.
-
-    if (auto succ = bb->getSingleSuccessorBlock()) {
-      if (succ != bb && succ->getSinglePredecessorBlock()) {
-        if (auto *BI = dyn_cast<BranchInst>(bb->getTerminator())) {
-          // If there are any BB arguments in the destination, replace them with
-          // the branch operands, since they must dominate the dest block.
-          for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i) {
-            assert(succ->getArgument(i) != BI->getArg(i) &&
-                   "Cloned code regions are always reachable");
-            succ->getArgument(i)->replaceAllUsesWith(BI->getArg(i));
-          }
-
-          // Zap BI and move all of the instructions from DestBB into this one.
-          BI->eraseFromParent();
-          bb->spliceAtEnd(succ);
-          succ->eraseFromParent();
-
-          // Revisit this node: we have new successor(s) and may need to
-          // contract them as well.  Also, bbi may be invalidated at this point.
-          bbi = SILFunction::iterator(bb);
-        }
-      }
-    }
-  }
 }
 
 /// Return true if a user instruction is returning or forming a return value.
@@ -4135,11 +4126,11 @@ bool TFFunctionPartition::partition(bool isTest) {
                  argInfo->second.first == Marking::Delete))
               continue;
           }
-          
+
           // If it's an opaque handle such as VariantHandle or ResourceHandle,
           // it cannot be a result except when it's being returned in an
           // accelerator-only function.
-          if (isOpaqueHandle(result->getType()) &&
+          if (!TFSendRecvOpaqueHandle && isOpaqueHandle(result->getType()) &&
               !(isAcceleratorOnly(hostFn) && isReturning(user))) {
             diagnoseOpaqueHandleCopy(result, user);
             return true;
@@ -4248,7 +4239,7 @@ bool TFFunctionPartition::partition(bool isTest) {
   // Our partitioning can leave around lots of unconditional branches between
   // blocks that formerly had control edges.  Go through and merge those to
   // make later passes simpler.
-  contractUncondBranches(acceleratorFn);
+  contractUncondBranches(acceleratorFn, /*DI*/ nullptr, /*LI*/ nullptr);
 
   if (auto outs = getTFDumpIntermediateStream()) {
     *outs << "--- TFPartition Accelerator Result: " << acceleratorFn->getName()
@@ -4526,7 +4517,9 @@ bool TFPartition::partitionFunction(
   // isolation.
   LLVM_DEBUG(llvm::dbgs() << "Processing SIL function " << hostFn->getName()
                           << " in TFPartition::partitionFunction().\n");
-  if (!tfc.shouldBePartitioned(hostFn))
+
+  if (!tfc.shouldBePartitioned(hostFn, /*forceTFFunctions=*/true) ||
+      llvm::TFDynamicCompilation)
     return false;
 
   LLVM_DEBUG(llvm::dbgs() << "  " << hostFn->getName()

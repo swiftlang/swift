@@ -32,7 +32,7 @@ extension ShapedArray : ConvertibleFromNumpyArray
     }
     // Check if the dtype of the `ndarray` is compatible with the `Scalar`
     // type.
-    guard Scalar.isCompatible(withNumpyScalarType: numpyArray.dtype) else {
+    guard Scalar.numpyScalarTypes.contains(numpyArray.dtype) else {
       return nil
     }
 
@@ -40,8 +40,13 @@ extension ShapedArray : ConvertibleFromNumpyArray
     guard let shape = Array<Int>(pyShape) else {
       return nil
     }
+
+    // Make sure that the array is contiguous in memory. This does a copy if
+    // the array is not already contiguous in memory.
+    let contiguousNumpyArray = np.ascontiguousarray(numpyArray)
+
     guard let ptrVal =
-      UInt(numpyArray.__array_interface__["data"].tuple2.0) else {
+      UInt(contiguousNumpyArray.__array_interface__["data"].tuple2.0) else {
       return nil
     }
     // Note: `ptr` is not nil even if the `ndarray` is empty (i.e. has a shape
@@ -75,7 +80,7 @@ extension Tensor : ConvertibleFromNumpyArray
     }
     // Check if the dtype of the `ndarray` is compatible with the `Scalar`
     // type.
-    guard Scalar.isCompatible(withNumpyScalarType: numpyArray.dtype) else {
+    guard Scalar.numpyScalarTypes.contains(numpyArray.dtype) else {
       return nil
     }
 
@@ -84,8 +89,13 @@ extension Tensor : ConvertibleFromNumpyArray
       return nil
     }
     let shape = TensorShape(dimensions)
+
+    // Make sure that the array is contiguous in memory. This does a copy if
+    // the array is not already contiguous in memory.
+    let contiguousNumpyArray = np.ascontiguousarray(numpyArray)
+
     guard let ptrVal =
-      UInt(numpyArray.__array_interface__["data"].tuple2.0) else {
+      UInt(contiguousNumpyArray.__array_interface__["data"].tuple2.0) else {
       return nil
     }
     // Note: `ptr` is not nil even if the `ndarray` is empty (i.e. has a shape

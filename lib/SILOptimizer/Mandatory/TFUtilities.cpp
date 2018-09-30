@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
+#include "swift/SIL/GraphOperationBuilder.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILModule.h"
@@ -30,7 +31,6 @@
 
 using namespace swift;
 using namespace tf;
-typedef SILTensorOpInfo::OperandClass OperandClass;
 
 template <typename... T, typename... U>
 static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
@@ -46,6 +46,20 @@ static llvm::cl::opt<bool> TFDumpIntermediatesToTmp(
     "tf-dump-intermediates-tmp", llvm::cl::init(false),
     llvm::cl::desc("Dump intermediate results in "
                    "TensorFlow passes to files in /tmp"));
+
+// The flag below is referenced in multiple translation units.
+namespace llvm {
+// This flag is used as a crutch to develop and test IRGen code that handles
+// graph_op insts.
+// TODO: Fold this flag into -Onone mode.
+llvm::cl::opt<bool> TFDynamicCompilation(
+    "tf-dynamic-compilation", llvm::cl::init(false),
+    llvm::cl::desc(
+        "When true, skip the partitioning and lowering pass, so that graph_op "
+        "instructions flow to IRGen. This flag should not be turned on by end "
+        "users, due to many restrictions (e.g. it will not work with "
+        "tensorflow convention functions)."));
+} // namespace llvm
 
 static raw_ostream &getTmpLoggingStream() {
   // If we are supposed to dump the intermediates into /tmp, set that up now.
@@ -82,17 +96,26 @@ llvm::raw_ostream *tf::getTFDumpIntermediateStream() {
   return &fileStream;
 }
 
-/// If the specified decl has a single stored field, return it.  Otherwise
-/// return null.
+/// Given a nominal type decl, collect all fields. If it's a class decl, collect
+/// all fields along the inheritance hierarchy.
+static void getAllFields(NominalTypeDecl *decl,
+                         SmallVectorImpl<VarDecl *> &fields) {
+  for (auto *field : decl->getStoredProperties())
+    fields.push_back(field);
+  if (auto *classdecl = decl->getAsClassOrClassExtensionContext())
+    if (auto *superclass = classdecl->getSuperclassDecl())
+      getAllFields(superclass, fields);
+}
+
+/// If the specified decl has a single stored field, return it.  If it's a class
+/// type, return there's exactly one field in the entire inheritance hierarchy.
+/// Otherwise return null.
 VarDecl *tf::getFieldIfContainsSingleField(NominalTypeDecl *decl) {
-  // Check to see if there is a single stored field.
-  auto fieldIt = decl->getStoredProperties().begin();
-  if (fieldIt == decl->getStoredProperties().end())
-    return nullptr;
-  auto result = *fieldIt++;
-  if (fieldIt != decl->getStoredProperties().end())
-    return nullptr;
-  return result;
+  SmallVector<VarDecl *, 4> fields;
+  getAllFields(decl, fields);
+  if (fields.size() == 1)
+    return fields.front();
+  return nullptr;
 }
 
 bool tf::isTensorHandle(SILType ty) {
@@ -103,98 +126,10 @@ bool tf::isOpaqueHandle(SILType ty) {
   return isOpaqueHandle(ty.getASTType());
 }
 
-/// Determine whether the specified type is one of our well-known types, and
-/// if so, which one it is.
-TFValueKind tf::classifyTensorFlowValue(SILType ty) {
-  return classifyTensorFlowValue(ty.getASTType());
-}
-
 /// Return true if the specified type is TensorHandle<T>, ResourceHandle, or
 /// VariantHandle.
 bool tf::isTensorFlowValue(SILType ty) {
   return (bool)isTensorFlowValue(ty.getASTType());
-}
-
-static bool is64(Type ty) {
-  return ty->getASTContext().LangOpts.Target.isArch64Bit();
-}
-
-/// This function maps a Swift type (either a language type like Float or an
-/// LLVM Builtin type like Builtin.f32) into the TensorFlow TF_DataType value.
-///
-/// This returns 0 (which is an invalid tensorflow type ID) on error.
-///
-unsigned tf::convertSwiftTypeToTF(Type ty) {
-#ifdef SWIFT_ENABLE_TENSORFLOW
-  // Handle wrappers like Float, which come up in TensorHandle<Float>
-  if (auto *s = ty->getAs<StructType>()) {
-    // Make sure the type is defined inside the Swift module.
-    auto context = s->getDecl()->getDeclContext()->getParentModule();
-    if (!context || context->getName().str() != "Swift")
-      return 0;
-
-    return llvm::StringSwitch<unsigned>(s->getDecl()->getNameStr())
-        .Case("Bool", TF_BOOL)
-        .Case("Int8", TF_INT8)
-        .Case("UInt8", TF_UINT8)
-        .Case("Int16", TF_INT16)
-        .Case("UInt16", TF_UINT16)
-        .Case("Int32", TF_INT32)
-        .Case("UInt32", TF_UINT32)
-        .Case("Int64", TF_INT64)
-        .Case("UInt64", TF_UINT64)
-        .Case("Int8", TF_INT8)
-        .Case("UInt8", TF_UINT8)
-        .Case("BFloat16", TF_BFLOAT16)
-        .Case("Float", TF_FLOAT)
-        .Case("Double", TF_DOUBLE)
-        .Case("Int", is64(s) ? TF_INT64 : TF_INT32)
-        .Case("UInt", is64(s) ? TF_UINT64 : TF_UINT32)
-        .Case("String", TF_STRING)
-        .Default(0);
-  }
-
-  // BuiltinIntegerType doesn't carry sign information, which TensorFlow needs,
-  // so we can't rely on getting type information from the builtin types
-  // themselves.  For now we'll just use signed types.
-  if (auto *BII = ty->getAs<BuiltinIntegerType>()) {
-    if (BII->getWidth().isPointerWidth())
-      return is64(ty) ? TF_INT64 : TF_INT32;
-
-    switch (BII->getFixedWidth()) {
-    case 1:
-      return TF_BOOL;
-    case 8:
-      return TF_INT8;
-    case 16:
-      return TF_INT16;
-    case 32:
-      return TF_INT32;
-    case 64:
-      return TF_INT64;
-    }
-  }
-
-  if (auto *BIF = ty->getAs<BuiltinFloatType>()) {
-    switch (BIF->getFPKind()) {
-    case BuiltinFloatType::IEEE16:
-      return TF_HALF;
-    case BuiltinFloatType::IEEE32:
-      return TF_FLOAT;
-    case BuiltinFloatType::IEEE64:
-      return TF_DOUBLE;
-    case BuiltinFloatType::IEEE80:
-    case BuiltinFloatType::IEEE128:
-    case BuiltinFloatType::PPC128:
-      return 0;
-    }
-  }
-
-  if (auto *BRPT = ty->getAs<BuiltinRawPointerType>()) {
-    return TF_STRING;
-  }
-#endif
-  return 0;
 }
 
 /// `ty` must be a valid TensorFlow element type "T", like Builtin.Int32. Turn
@@ -270,241 +205,6 @@ SubstitutionMap tf::getSingleSubstitutionMapForElementType(Type ty,
   return getSingleSubstitutionMapForElementTypeAndSignature(ty, genericSig);
 }
 
-/// Analyze the specified SIL instruction and return a SILTensorOpInfo result if
-/// the instruction is a valid tensor operation.  This is the way that
-/// SILTensorOpInfo's are created.
-Optional<SILTensorOpInfo> SILTensorOpInfo::decode(SILInstruction *inst) {
-  // Tensor operations are builtin instructions and apply instructions.
-  if (auto *builtin = dyn_cast<BuiltinInst>(inst)) {
-    SILTensorOpInfo toiInfo(builtin);
-    if (toiInfo.decodeBuiltin())
-      return toiInfo;
-  }
-  return None;
-}
-
-typedef std::pair<StringRef, OperandClass> AttributeEntry;
-
-/// Given a builtin name that refer to a tensorflow op function, this returns
-/// the op name and operand clases and returns an empty string.  If the string
-/// provided is invalid, this returns an error message to present.
-static std::string
-decodeTensorOpName(StringRef name, StringRef &opName,
-                   SmallVectorImpl<AttributeEntry> &operandClasses) {
-  // Decode the base name for the op.
-  auto pos = name.find(",");
-  opName = name.substr(0, pos);
-  if (pos == StringRef::npos)
-    return "";
-  name = name.substr(pos);
-
-  // Parse out operand information.
-  while (!name.empty()) {
-    assert(name[0] == ',');
-    name = name.drop_front(1);
-
-    pos = name.find(",");
-    if (pos == StringRef::npos)
-      pos = name.size();
-
-    // Parse out the attribute name.  If it contains a $, then parse out the
-    // OperandClass as well.
-    auto attrName = name.substr(0, pos);
-
-    // Figure out what the suffix is (if any) and reject invalid suffixes if
-    // present.
-    auto dollarLoc = attrName.find('$');
-
-    auto opClass = OperandClass::Normal;
-    if (dollarLoc != StringRef::npos) {
-      auto suffix = attrName.drop_front(dollarLoc + 1);
-      if (auto res = SILTensorOpInfo::getOperandClass(suffix))
-        opClass = res.getValue();
-      else {
-        return "invalid attribute modifier '" + attrName.str() + "'";
-      }
-    }
-
-    // Slice the suffix off the attribute name and add the decoded version.
-    operandClasses.push_back({attrName.substr(0, dollarLoc), opClass});
-    name = name.substr(pos);
-  }
-
-  return "";
-}
-
-/// The vast majority of interesting tensor operations are builtin instructions,
-/// which come from the user-exposed #tfop() syntax.
-bool SILTensorOpInfo::decodeBuiltin() {
-  builtinName = inst->getName().str();
-
-  // If the builtin doesn't start with our magic prefix, then it isn't an op.
-  if (!builtinName.startswith("__tfop_"))
-    return false;
-
-  // This helper emits a diagnostic if the #tfop descriptor is malformed in a
-  // way that prevents it from ever working.  Errors that are a result of a
-  // client's misuse of the op is checked by checkAttributeConstants, because
-  // the location information is far more important to get right there.
-  auto diagInvalid = [&](std::string problem) {
-    diagnose(inst->getModule().getASTContext(), inst->getLoc().getSourceLoc(),
-             diag::tfop_invalid_tfop, problem);
-  };
-
-  // Ok, it is, decode and validate it.
-  auto errStr = decodeTensorOpName(builtinName.substr(strlen("__tfop_")),
-                                   opName, operandClasses);
-  if (!errStr.empty()) {
-    diagInvalid(errStr);
-    return false;
-  }
-
-  // Validate that this instruction is ok.
-  if (inst->getNumOperands() != operandClasses.size()) {
-    diagInvalid("op has " + llvm::utostr(operandClasses.size()) +
-                " operand classes, but " +
-                llvm::utostr(inst->getNumOperands()) +
-                " inputs and attributes");
-    return false;
-  }
-
-  return true;
-}
-
-/// Return the string suffix for the specified attribute modifier.
-const char *SILTensorOpInfo::getOperandClassSuffix(OperandClass opClass) {
-  switch (opClass) {
-  case OperandClass::Input:
-    return "$in";
-  case OperandClass::InputElt:
-    return "$inelt";
-  case OperandClass::Normal:
-    return "";
-  case OperandClass::DType:
-    return "$dtype";
-  case OperandClass::Tensor:
-    return "$tensor";
-  case OperandClass::Shape:
-    return "$shape";
-  case OperandClass::Array:
-    return "$array";
-  case OperandClass::ArrayElement:
-    return "$elt";
-  case OperandClass::ShapeArray:
-    return "$shapearray";
-  }
-}
-
-/// Return the operand class of the specified string form like "tensor"
-llvm::Optional<OperandClass>
-SILTensorOpInfo::getOperandClass(StringRef suffix) {
-  return llvm::StringSwitch<llvm::Optional<OperandClass>>(suffix)
-      .Case("in", OperandClass::Input)
-      .Case("inelt", OperandClass::InputElt)
-      .Case("", OperandClass::Normal)
-      .Case("tensor", OperandClass::Tensor)
-      .Case("shape", OperandClass::Shape)
-      .Case("dtype", OperandClass::DType)
-      .Case("array", OperandClass::Array)
-      .Case("elt", OperandClass::ArrayElement)
-      .Case("shapearray", OperandClass::ShapeArray)
-      .Default(None);
-}
-
-//===----------------------------------------------------------------------===//
-// GraphOperationDecoder implementation
-//===----------------------------------------------------------------------===//
-
-/// Return the device attribute associated with `inst`, which is required to
-/// exist.
-StringRef GraphOperationInfo::getDeviceString() const {
-  auto attr = inst->getAttributeNamed(DEVICE_ATTR);
-  assertWithDump(attr.hasValue(), "Tensor op instruction has no device string");
-  return attr.getValue().getStringValue();
-}
-
-void GraphOperationInfo::assertWithDump(bool cond,
-                                        const char *assertMsg) const {
-#ifndef NDEBUG
-  if (cond)
-    return;
-  inst->dump();
-  llvm_unreachable(assertMsg);
-#endif // NDEBUG
-}
-
-/// Decode the name of a graph_op into its TensorFlow op name and a list of
-/// information about the operands.
-StringRef
-GraphOperationInfo::decodeName(SmallVectorImpl<InputMarker> &inputInfo) {
-  auto name = inst->getName().str();
-  auto pos = name.find(',');
-  auto opName = name.substr(0, pos);
-
-  while (pos != StringRef::npos) {
-    name = name.drop_front(pos + 1);
-    pos = name.find(',');
-    auto letter = name.substr(0, pos);
-    assertWithDump(letter.size() == 1, "malformed graph_op instruction");
-    InputMarker kind;
-    switch (letter[0]) {
-    case 's':
-      kind = InputMarker::IM_Scalar;
-      break;
-    case 'i':
-      kind = InputMarker::IM_Normal;
-      break;
-    case 'L':
-      kind = InputMarker::IM_InputList;
-      break;
-    case 'e':
-      kind = InputMarker::IM_InputListElt;
-      break;
-    default:
-      assertWithDump(false, "malformed graph_op instruction");
-    }
-    inputInfo.push_back(kind);
-  }
-
-  return opName;
-}
-
-/// Given an attribute name like foo$dtype, decode the name and the class.  If
-/// there is no modifier specified, this defaults to OperandClass::Normal.
-std::pair<StringRef, SILTensorOpInfo::OperandClass>
-GraphOperationInfo::decodeAttributeName(Identifier name) {
-  auto nameStr = name.str();
-  // Figure out what the suffix is (if any).
-  auto dollarLoc = nameStr.find('$');
-
-  auto opClass = OperandClass::Normal;
-  if (dollarLoc != StringRef::npos) {
-    auto suffix = nameStr.drop_front(dollarLoc + 1);
-    opClass = SILTensorOpInfo::getOperandClass(suffix).getValue();
-  }
-
-  // Slice the suffix off the attribute name and add the decoded version.
-  return {nameStr.substr(0, dollarLoc), opClass};
-}
-
-int64_t GraphOperationInfo::getIntAttr(unsigned attrIdx,
-                                       StringRef attrName) const {
-  auto attr = inst->getAttribute(attrIdx);
-  auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
-  assert(attrInfo.first == attrName);
-  auto attrValue = attr.value;
-  return attrValue.getIntegerValue().getLimitedValue();
-}
-
-std::string GraphOperationInfo::getStringAttr(unsigned attrIdx,
-                                              StringRef attrName) const {
-  auto attr = inst->getAttribute(attrIdx);
-  auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
-  assert(attrInfo.first == attrName);
-  auto attrValue = attr.value;
-  return attrValue.getStringValue().str();
-}
-
 //===----------------------------------------------------------------------===//
 // Source Location Manipulation Helpers
 //===----------------------------------------------------------------------===//
@@ -537,7 +237,7 @@ SILDebugLocation tf::skipInternalLocations(SILDebugLocation loc) {
 }
 
 SILLocation tf::getUserSourceLocation(SILValue value) {
-  if (auto *inst = dyn_cast<SILInstruction>((SILNode *)value))
+  if (auto *inst = value->getDefiningInstruction())
     return getUserSourceLocation(inst);
   return getUserSourceLocation(value.getDebugLocation());
 }
@@ -580,35 +280,34 @@ tf::createConstTensor(Type elementType, SymbolicValue scalars,
   assert(shape.getKind() == SymbolicValue::Array &&
          "expected array constants for scalars and shape");
 
-  SmallVector<GraphOperationAttribute, 8> attributes;
+  GraphOperationBuilder opBuilder("Const");
 
   // Add a dtype attribute for the array element.
-  attributes.push_back(
+  opBuilder.addAttribute(
       {context.getIdentifier("dtype"),
        SymbolicValue::getMetatype(elementType->getCanonicalType())});
 
   // Add an attribute for the value$tensor attribute.
-  auto tensorSuffix = SILTensorOpInfo::getOperandClassSuffix(
-      SILTensorOpInfo::OperandClass::Tensor);
-  attributes.push_back(
+  auto tensorSuffix = GraphOperationInfo::getArgumentLoweringSuffix(
+      GraphOperationInfo::ArgumentLowering::TensorAttribute);
+  opBuilder.addAttribute(
       {context.getIdentifier(std::string("value") + tensorSuffix), scalars});
 
-  // Add the value$shape attribute if we have an array value.
+  // Add the shape$shape attribute if we have an array value.
   if (scalars.getKind() == SymbolicValue::Array) {
-    auto shapeId = SILTensorOpInfo::OperandClass::Shape;
-    auto shapeSuffix = SILTensorOpInfo::getOperandClassSuffix(shapeId);
-    attributes.push_back(
-        {context.getIdentifier(std::string("value") + shapeSuffix), shape});
+    auto shapeId = GraphOperationInfo::ArgumentLowering::ShapeAttribute;
+    auto shapeSuffix = GraphOperationInfo::getArgumentLoweringSuffix(shapeId);
+    opBuilder.addAttribute(
+        {context.getIdentifier(std::string("shape") + shapeSuffix), shape});
   }
 
   // All graph_op's get a device.
-  attributes.push_back(
+  opBuilder.addAttribute(
       {context.getIdentifier(DEVICE_ATTR),
        SymbolicValue::getString(getDeviceString(targetDevice), allocator)});
 
   // Finally build a new graphop instruction with the simplified operands.
-  return B.createGraphOperation(loc, context.getIdentifier("Const"),
-                                /*operands*/ {}, attributes, resultType);
+  return opBuilder.build(B, context, loc, resultType);
 }
 
 GraphOperationInst *
@@ -616,14 +315,14 @@ tf::createTensorToInt1Inst(SILValue value, SILBuilder &builder,
                            SILLocation location,
                            GraphFunctionDeviceInfo &deviceInfo) {
   ASTContext &context = builder.getASTContext();
-  SmallVector<GraphOperationAttribute, 1> attributes;
+  GraphOperationBuilder opBuilder("tf_tensor_to_i1");
+  opBuilder.addArgument(value);
   deviceInfo.handleDevicePlacement(
       "tf_tensor_to_i1",
       /*opDevice*/ getDeviceString(DeviceType::ALL),
-      builder.getModule().getASTContext(), attributes);
-  GraphOperationInst *condValue = builder.createGraphOperation(
-      location, context.getIdentifier("tf_tensor_to_i1"),
-      /*operands*/ {value}, attributes,
+      builder.getModule().getASTContext(), &opBuilder);
+  GraphOperationInst *condValue = opBuilder.build(
+      builder, context, location,
       {SILType::getBuiltinIntegerType(1, context)});
   assert(condValue->getNumResults() == 1);
   return condValue;
@@ -633,12 +332,8 @@ tf::createTensorToInt1Inst(SILValue value, SILBuilder &builder,
 // TensorFunctionClassifier Implementation
 //===----------------------------------------------------------------------===//
 
-/// Return true if the specified function is the top-level context that
-/// tensor partitioning should be applied to.  This returns false (for
-/// example) for inlined functions that take and return tensors, since we
-/// know that they are either unreachable or will be inlined into any
-/// clients that use them.
-bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn) {
+bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn,
+                                                   bool forceTFFunctions) {
   // Ignore transparent functions.
   if (fn->isTransparent())
     return false;
@@ -711,8 +406,16 @@ bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn) {
   // takes TensorHandle values as arguments or results.  If so, then we know
   // that it will be inlined away by deabstraction, and we don't need to touch
   // it.
-  if (containsTensorFlowValue(fn->getLoweredFunctionType()))
-    return false;
+  if (containsTensorFlowValue(fn->getLoweredFunctionType())) {
+    if (forceTFFunctions) {
+      // Return true if it is referenced somewhere.
+      // TODO: There might be a better check other than fn->getRefCount() > 0.
+      // See the clean up code in TFDeabstraction::inlineCalls() function.
+      return fn->getRefCount() > 0;
+    } else {
+      return false;
+    }
+  }
 
   // If it contains no tensor inputs or results, then we are willing to
   // transform it!

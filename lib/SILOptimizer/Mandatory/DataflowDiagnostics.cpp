@@ -25,7 +25,6 @@
 #include "swift/SIL/SILVisitor.h"
 
 using namespace swift;
-using namespace tf;
 
 template<typename...T, typename...U>
 static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
@@ -118,18 +117,13 @@ static void diagnoseStaticReports(const SILInstruction *I,
 // SWIFT_ENABLE_TENSORFLOW
 /// \brief Emit a diagnostic for `poundAssert` builtins whose condition is
 /// false or whose condition cannot be evaluated.
-static void diagnosePoundAssert(const SILInstruction *I, SILModule &M) {
+static void diagnosePoundAssert(const SILInstruction *I,
+                                SILModule &M,
+                                ConstExprEvaluator &constantEvaluator) {
   auto *builtinInst = dyn_cast<BuiltinInst>(I);
   if (!builtinInst ||
       builtinInst->getBuiltinKind() != BuiltinValueKind::PoundAssert)
     return;
-
-  // TODO(marcrasi): Instantiate this earlier so that its cache
-  // is useful. We don't right now, because instantiating one for every
-  // function greatly slows down or hangs compilation (e.g. compiling
-  // libswiftStdlibUnicodeUnittest.so slows down from <1min to >1hr).
-  //
-  ConstExprEvaluator constantEvaluator(M);
 
   SmallVector<SymbolicValue, 1> values;
   constantEvaluator.computeConstantValues({builtinInst->getArguments()[0]},
@@ -170,13 +164,14 @@ class EmitDFDiagnostics : public SILFunctionTransform {
       return;
 
     SILModule &M = getFunction()->getModule();
+    ConstExprEvaluator constantEvaluator(M);
     for (auto &BB : *getFunction())
       for (auto &I : BB) {
         diagnoseUnreachable(&I, M.getASTContext());
         diagnoseStaticReports(&I, M);
 
         // SWIFT_ENABLE_TENSORFLOW
-        diagnosePoundAssert(&I, M);
+        diagnosePoundAssert(&I, M, constantEvaluator);
       }
   }
 };

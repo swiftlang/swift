@@ -23,14 +23,13 @@ bb2:                                              // Preds: bb1
 
 // CHECK-LABEL: --- XLA CFG Canonicalize: $loopWithCriticalEdge
 // CHECK: [sequence
-// CHECK:   <while Preheader: bb0, Header: bb5, exit: bb7
+// CHECK:   <while Preheader: {{bb[0-9]+}}, Header: {{bb[0-9]+}}, exit: [[EXIT:bb[0-9]+]]
 // CHECK:     [sequence
-// CHECK:       {condition Header: bb1
-// CHECK:         block bb3
-// CHECK:         block bb2}
-// CHECK:       block bb6]>
-// CHECK:   block bb7
-// CHECK:   block bb4]
+// CHECK:       {condition Header: {{bb[0-9]+}}
+// CHECK:         block {{bb[0-9]+}}
+// CHECK:         block {{bb[0-9]+}}}
+// CHECK:       block {{bb[0-9]+}}]>
+// CHECK:   block [[EXIT]]]
 // CHECK: --- XLA CFG Canonicalize end
 
 //--------------------------------------------------------------------------
@@ -58,14 +57,13 @@ bb3:                                              // Preds: bb2
 
 // CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}receiveFromHostGraphOp{{.*}}
 // CHECK: [sequence
-// CHECK:   <while Preheader: bb0, Header: bb5, exit: bb7
+// CHECK:   <while Preheader: {{bb[0-9]+}}, Header: {{bb[0-9]+}}, exit: [[EXIT:bb[0-9]+]]
 // CHECK:     [sequence
-// CHECK:       {condition Header: bb2
-// CHECK:         block bb1
-// CHECK:         block bb3}
-// CHECK:       block bb6]>
-// CHECK:   block bb7
-// CHECK:   block bb4]
+// CHECK:       {condition Header: {{bb[0-9]+}}
+// CHECK:         block {{bb[0-9]+}}
+// CHECK:         block {{bb[0-9]+}}}
+// CHECK:       block {{bb[0-9]+}}]>
+// CHECK:   block [[EXIT]]]
 
 // sendToHost
 sil private @sendToHost : $@convention(thin) @callee_owned () -> Builtin.Int32 {
@@ -79,7 +77,7 @@ bb0:
 bb1(%4 : $Builtin.Int32):                         // Preds: bb2 bb0
   %5 = builtin "sadd_with_overflow_Int32"(%4 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32 // users: %10, %9, %6
   %6 = builtin "cmp_slt_Int32"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1 // users: %8, %7
-  %7 = graph_op "tfc.SendToHost,i"(%6 : $Builtin.Int1) {tensorId: i32 1, __device: "/device:CPU:0"} : $()
+  %7 = graph_op "tfc.SendToHost"(%6 : $Builtin.Int1) {tensorId: i32 1, __device: "/device:CPU:0"} : $()
   cond_br %6, bb2, bb3                            // id: %8
 
 bb2:                                              // Preds: bb1
@@ -90,12 +88,11 @@ bb3:                                              // Preds: bb1
 } // end sil function 'sendToHost'
 // CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}sendToHost{{.*}}
 // CHECK: [sequence
-// CHECK:   <while Preheader: bb0, Header: bb5, exit: bb7
+// CHECK:   <while Preheader: {{bb[0-9]+}}, Header: {{bb[0-9]+}}, exit: [[EXIT:bb[0-9]+]]
 // CHECK:     [sequence
-// CHECK:       {condition Header: bb1
-// CHECK:         block bb3
-// CHECK:         block bb2}
-// CHECK:       block bb6]>
-// CHECK:   block bb7
-// CHECK:   block bb4]
+// CHECK:       {condition Header: {{bb[0-9]+}}
+// CHECK:         block {{bb[0-9]+}}
+// CHECK:         block {{bb[0-9]+}}}
+// CHECK:       block {{bb[0-9]+}}]>
+// CHECK:   block [[EXIT]]]
 

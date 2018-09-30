@@ -12,7 +12,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLBoolG/device_CPU_0"
+// CHECK:      name: "UndefConstDTensorHandleLBoolG/job_localhost/replica_0/task_0/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -43,7 +43,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLInt8G/device_CPU_0"
+// CHECK:      name: "UndefConstDTensorHandleLInt8G/job_localhost/replica_0/task_0/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -74,7 +74,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLUInt8G/device_CPU_0"
+// CHECK:      name: "UndefConstDTensorHandleLUInt8G/job_localhost/replica_0/task_0/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -105,7 +105,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLInt16G/device_CPU_0"
+// CHECK:      name: "UndefConstDTensorHandleLInt16G/job_localhost/replica_0/task_0/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -136,7 +136,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLUInt16G/device_CPU_0"
+// CHECK:      name: "UndefConstDTensorHandleLUInt16G/job_localhost/replica_0/task_0/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -168,7 +168,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLInt32G/device_CPU_0"
+// CHECK:      name: "UndefConstDTensorHandleLInt32G/job_localhost/replica_0/task_0/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -199,7 +199,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLUInt32G/device_CPU_0"
+// CHECK:      name: "UndefConstDTensorHandleLUInt32G/job_localhost/replica_0/task_0/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -230,7 +230,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLInt64G/device_CPU_0"
+// CHECK:      name: "UndefConstDTensorHandleLInt64G/job_localhost/replica_0/task_0/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -261,7 +261,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLUInt64G/device_CPU_0"
+// CHECK:      name: "UndefConstDTensorHandleLUInt64G/job_localhost/replica_0/task_0/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -293,7 +293,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLFloatG/device_CPU_0"
+// CHECK:      name: "UndefConstDTensorHandleLFloatG/job_localhost/replica_0/task_0/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -324,7 +324,7 @@ bb0:
 // CHECK: library {
 // CHECK:  function {
 // CHECK:  node_def {
-// CHECK:      name: "UndefConstDTensorHandleLDoubleG/device_CPU_0"
+// CHECK:      name: "UndefConstDTensorHandleLDoubleG/job_localhost/replica_0/task_0/device_CPU_0"
 // CHECK:      op: "Const"
 // CHECK:      attr {
 // CHECK:        key: "dtype"
@@ -355,7 +355,7 @@ bb1(%0 : $TensorHandle<Bool>):
 }
 // CHECK-LABEL: --- TFPartition GraphDef Proto: $undefDuplicates
 // CHECK:     node_def {
-// CHECK:       name: "UndefConstDTensorHandleLBoolG/device_CPU_0"
+// CHECK:       name: "UndefConstDTensorHandleLBoolG/job_localhost/replica_0/task_0/device_CPU_0"
 // CHECK:       op: "Const"
 // CHECK:       attr {
 // CHECK:         key: "dtype"
@@ -376,7 +376,7 @@ bb1(%0 : $TensorHandle<Bool>):
 // CHECK:       }
 // CHECK:     }
 // CHECK:     node_def {
-// CHECK:       name: "UndefConstDTensorHandleLBoolG/device_CPU_0_1"
+// CHECK:       name: "UndefConstDTensorHandleLBoolG/job_localhost/replica_0/task_0/device_CPU_0_1"
 // CHECK:       op: "Const"
 // CHECK:       attr {
 // CHECK:         key: "dtype"

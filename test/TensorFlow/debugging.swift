@@ -27,26 +27,26 @@ public func noCopyForOpaqueHandles() {
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}basicDebugValues
 // CHECK: @{{.*}}basicDebugValues{{.*}}.tf
 // CHECK: [[ONE:%.*]] = graph_op "Const"
-// CHECK: [[ADD_RESULT:%.*]] = graph_op "Add,i,i"
-// CHECK: graph_op "Square,i"([[ADD_RESULT]] : $TensorHandle<Float>) {T: $Float, __device: "/device:CPU:0"} : $TensorHandle<Float>
+// CHECK: [[ADD_RESULT:%.*]] = graph_op "Add"
+// CHECK: graph_op "Square"([[ADD_RESULT]] : $TensorHandle<Float>) {T: $Float, __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
 
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}debugValuesInLoop
 // CHECK: bb0
-// CHECK:   [[SQUARED:%.*]] = graph_op "Square,i"
+// CHECK:   [[SQUARED:%.*]] = graph_op "Square"
 // CHECK-NEXT:   br bb1([[SQUARED]] : $TensorHandle<Float>)
 // CHECK: bb1
 // CHECK:   graph_op "tfc.RecvFromHost"()
 // CHECK:   [[COND:%.*]] = graph_op "tf_tensor_to_i1"
 // CHECK:   cond_br [[COND]], bb2, bb3
 // CHECK: bb2:
-// CHECK:   [[ADD_RESULT:%.*]] = graph_op "Add,i,i"
+// CHECK:   [[ADD_RESULT:%.*]] = graph_op "Add"
 // CHECK-NEXT:   br bb1([[ADD_RESULT]]
 
 
 // CHECK-LABEL: ---- PARTITION STATE FOR FUNCTION ${{.*}}noCopyForOpaqueHandle
 // CHECK: result values:
-// CHECK-NOT: graph_op "TensorSliceDataset,L,e"(%4 : $TensorHandle<Float>)
+// CHECK-NOT: graph_op "TensorSliceDataset"([%4 : $TensorHandle<Float>])
 
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}basicDebugValues

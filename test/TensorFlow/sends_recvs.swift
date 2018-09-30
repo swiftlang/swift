@@ -224,10 +224,10 @@ public func test1RecvScalarCPU() {
 // Ideally this generic type should be changed to TensorHandle<Float>
 // CHECK:      [[X2:%.*]] = graph_op "tfc.RecvFromHost
 // the promoted tensor add on "x.scalar! + 2.0"
-// CHECK:      graph_op "Add,i,i"([[X2]] : $TensorHandle<Builtin.FPIEEE32>, {{.*}} : $TensorHandle<Builtin.FPIEEE32>
+// CHECK:      graph_op "Add"([[X2]] : $TensorHandle<Builtin.FPIEEE32>, {{.*}} : $TensorHandle<Builtin.FPIEEE32>
 // z + z
-// CHECK:      graph_op "Add,i,i"
-// CHECK:      graph_op "Add,i,i"({{.*}}) {T: $Float, __device
+// CHECK:      graph_op "Add"
+// CHECK:      graph_op "Add"({{.*}}) {T: $Float, __device
 
 // On host, we receive x, extract its scalar value, and then make a scalar
 // tensor to send back to device.
@@ -280,10 +280,10 @@ public func test1RecvScalarTPU() {
 // compilation. The shape array attr gets propagated to TensorTransfer.
 //
 // CHECK-LABEL: --- TFDevicePartition Cross Device Tensor Transfer Annotation Result: {{.*}}test1RecvScalarTPU{{.*}}
-// CHECK:      [[X_SCALAR_CPU:%.*]] = graph_op "tfc.RecvFromHost"() {tensorId: i32 0, __device: "/device:CPU:0", __shapes: [$TensorShape: [$Int32: ]]} : $TensorHandle
-// CHECK:      [[X_SCALAR_TPU:%.*]] = graph_op "tfc.TensorTransfer,i"([[X_SCALAR_CPU]] : $TensorHandle{{.*}}) {transferId: i32 0, srcDevice: "/device:CPU:0", destDevice: "ALL_DEVICES", __shapes
+// CHECK:      [[X_SCALAR_CPU:%.*]] = graph_op "tfc.RecvFromHost"() {tensorId: i32 0, __device: "/job:localhost/replica:0/task:0/device:CPU:0", __shapes: [$TensorShape: [$Int32: ]]} : $TensorHandle
+// CHECK:      [[X_SCALAR_TPU:%.*]] = graph_op "tfc.TensorTransfer"([[X_SCALAR_CPU]] : $TensorHandle{{.*}}) {transferId: i32 0, srcDevice: "/job:localhost/replica:0/task:0/device:CPU:0", destDevice: "ALL_DEVICES", __shapes
 // This is the promoted scalar add that computes x.scalar! + 2
-// CHECK-NEXT: graph_op "Add,i,i"([[X_SCALAR_TPU]] : $TensorHandle
+// CHECK-NEXT: graph_op "Add"([[X_SCALAR_TPU]] : $TensorHandle
 // This is z + z
 // CHECK:      [[RESULT:%.*]] = graph_op "Add
 // CHECK-NEXT: return [[RESULT]]
@@ -307,7 +307,7 @@ public func test1RecvTensorCPU() {
 //
 // CHECK:      graph_op "tfc.SendToHost{{.*}}([[A:%.*]] : $TensorHandle<Float>
 // CHECK:      [[B:%.*]] = graph_op "tfc.RecvFromHost
-// CHECK:      graph_op "Add,i,i"([[B]] : $TensorHandle<Float>, [[A]] : $TensorHandle<Float>
+// CHECK:      graph_op "Add"([[B]] : $TensorHandle<Float>, [[A]] : $TensorHandle<Float>
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test1RecvTensor{{.*}}
 // CHECK:      function_ref @_swift_tfc_StartTensorComputation
@@ -366,7 +366,7 @@ public func test1RecvTensorTPU_ToAcceleratorNoShape_Error() {
 // Specifying shapes for CPU<->GPU sends/recvs should not hurt.
 public func test1RecvTensorGPU_WithShapes() {
   TensorFlow.enableGPU()
-  let a_gpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "/device:CPU:0")
+  let a_gpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "/job:localhost/replica:0/task:0/device:CPU:0")
   let a_gpu = Tensor<Float>(handle: a_gpu_h)
   // One send.
   // Tensor transfer for the param of atariSim(): GPU->CPU, and then CPU->host.

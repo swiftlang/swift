@@ -27,6 +27,13 @@ namespace swift {
   class Type;
 
 namespace tf {
+  /// Return true if the given type represents a TensorFlow dtype.
+  bool isTensorFlowDType(Type ty);
+
+  /// This function maps a Swift type (either a language type like Float or an
+  /// LLVM Builtin type like Builtin.f32) into the TensorFlow TF_DataType value.
+  unsigned convertSwiftTypeToTF(Type ty);
+
   /// If the specified type is the well-known TensorHandle<T> type, then return
   /// "T".  If not, return a null type.
   Type getTensorHandleElementType(Type ty);
@@ -55,9 +62,15 @@ namespace tf {
   /// VariantHandle.
   bool isTensorFlowValue(Type ty);
 
-  /// Returns true if the specified type is a TensorFlow value or an tuple or
+  /// Return true if the specified type is a TensorFlow value or an tuple or
   /// struct of such.
   bool isTensorFlowValueOrAggregate(Type ty);
+
+  /// Flatten an aggregate of TensorFlow value types and push them to the result
+  /// array. If the given type itself is a TensorFlow value type, it will be
+  /// pushed to the array. If any terminal type is not a TensorFlow value type,
+  /// return false and the result will be empty.
+  bool flattenTensorFlowValueAggregate(Type ty, SmallVectorImpl<Type> &result);
 
   /// This class provides an efficient implementation of a predicate that
   /// determines whether a type is or contains a TensorFlow value that will be

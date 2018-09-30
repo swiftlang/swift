@@ -20,12 +20,18 @@
 
 #include "TFDeviceSupport.h"
 #include "swift/AST/TensorFlow.h"
+#include "swift/SIL/GraphOperationInfo.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "llvm/Support/CommandLine.h"
 #ifdef SWIFT_ENABLE_TENSORFLOW
 #include "tensorflow/c/c_api.h"
 #endif
+
+namespace llvm {
+extern cl::opt<bool> TFDynamicCompilation;
+}
 
 namespace swift {
 namespace tf {
@@ -48,17 +54,9 @@ bool isTensorHandle(SILType ty);
 /// as VariantHandle and ResourceHandle.
 bool isOpaqueHandle(SILType ty);
 
-/// Determine whether the specified type is one of our well-known types, and
-/// if so, which one it is.
-TFValueKind classifyTensorFlowValue(SILType ty);
-
 /// Return true if the specified type is TensorHandle<T>, ResourceHandle, or
 /// VariantHandle.
 bool isTensorFlowValue(SILType ty);
-
-/// This function maps a Swift type (either a language type like Float or an
-/// LLVM Builtin type like Builtin.f32) into the TensorFlow TF_DataType value.
-unsigned convertSwiftTypeToTF(Type ty);
 
 /// `ty` must be a valid TensorFlow element type "T", like Builtin.Int32. Turn
 /// it into a TensorHandle<T> type.
@@ -95,135 +93,6 @@ SubstitutionMap getSingleSubstitutionMapForElementTypeAndSignature(
 /// for calling a builtin or function with this single-entry substitution.
 SubstitutionMap getSingleSubstitutionMapForElementType(Type ty,
                                                        ASTContext &ctx);
-
-/// Holds information about a TensorFlow operation as represented in SIL
-/// as Builtin instructions.
-struct SILTensorOpInfo {
-  /// The instruction being analyzed.
-  BuiltinInst *inst;
-
-  /// This is the name for the entire builtin that we'll partition out.
-  StringRef builtinName;
-
-  /// This is the TensorFlow name for the op.
-  StringRef opName;
-
-  /// One of these records exists for every operand that the BuiltinInst has,
-  /// classifying the operand into a couple of buckets.  The most coarse grain
-  /// classification is "input" vs "attribute": the inputs come first,
-  /// followed by the attributes.  However, we need to be able to model the
-  /// fact that some input arguments are aggregated together into a single
-  /// input that is an array of tensors.  An integer attribute may be either
-  /// a Tensor value or an integer-encoded DType, etc.
-  enum class OperandClass {
-    /// This marks three sorts of things:
-    /// 1) A normal tensor input: the value is a TensorHandle.
-    /// 2) A scalar input suitable for scalar promotion, used by the
-    ///    tf.scalarToTensor pseudo-op, the value is a scalar value.
-    /// 3) A tensor array (TensorFlow "InputList").  The value is a metatype
-    ///    marker value (so we can represent empty arrays) followed by
-    ///    InputElt elements that make up the array.
-    Input,
-    InputElt, // Element of an input list.  Always a TensorHandle.
-
-    Normal, // No modifier.
-    DType,  // This integer value is a dtype.
-    Tensor, // This array or scalar should be turned into a TF_Tensor.
-    Shape,  // This array of integers is a shape specifier.
-
-    Array,        // This marks a normal array value, the value is a metatype.
-    ArrayElement, // This is a continuation element of an attribute array.
-
-    // This is the start of a shape array.  The value is the # elements.
-    ShapeArray,
-  };
-
-  /// Return the string suffix for the specified attribute modifier.
-  static const char *getOperandClassSuffix(OperandClass opClass);
-
-  /// Return the operand class of the specified string form like "tensor"
-  static llvm::Optional<OperandClass> getOperandClass(StringRef suffix);
-
-  /// These are the names of any attribute operands at the end of the list.
-  SmallVector<std::pair<StringRef, OperandClass>, 4> operandClasses;
-
-  /// Return true if the specified operand is an input (not an attribute).
-  bool isInput(unsigned operandNumber) const {
-    return operandClasses[operandNumber].second == OperandClass::Input ||
-           operandClasses[operandNumber].second == OperandClass::InputElt;
-  }
-
-  /// Analyze the specified SIL instruction and return a SILTensorOpInfo
-  /// result if the instruction is a valid tensor operation.  This is the
-  /// way that SILTensorOpInfo's are created.
-  static Optional<SILTensorOpInfo> decode(SILInstruction *inst);
-
-private:
-  SILTensorOpInfo(BuiltinInst *inst) : inst(inst) {}
-  bool decodeBuiltin();
-};
-
-/// Holds information about a TensorFlow operation as represented in SIL
-/// as GraphOperationInst.
-struct GraphOperationInfo {
-  /// The instruction being analyzed.
-  GraphOperationInst *inst;
-
-  explicit GraphOperationInfo(GraphOperationInst *inst) : inst(inst) {}
-
-  /// Return the device attribute associated with `inst`, which is required to
-  /// exist.
-  StringRef getDeviceString() const;
-
-  /// Return the device type for this instruction.
-  DeviceType getDeviceType() const {
-    return getOpDeviceType(getDeviceString());
-  }
-
-  enum InputMarker {
-    /// Scalar input, used by tfc.scalarToTensor only.
-    IM_Scalar,
-    /// Normal tensor, variant or resource input.
-    IM_Normal,
-    /// Marker for the start of an input list, has no corresponding operand.
-    IM_InputList,
-    /// Element of an input list.
-    IM_InputListElt,
-  };
-
-  /// Return a comma and letter identifier whose letter corresponds to the
-  /// specified InputMarker.
-  static const char *getInputMarker(InputMarker kind) {
-    switch (kind) {
-    case IM_Scalar:
-      return ",s";
-    case IM_Normal:
-      return ",i";
-    case IM_InputList:
-      return ",L";
-    case IM_InputListElt:
-      return ",e";
-    }
-  }
-
-  /// Decode the name of a graph_op into its TensorFlow op name and a list of
-  /// information about the operands.
-  StringRef decodeName(SmallVectorImpl<InputMarker> &inputInfo);
-
-  /// Given an attribute name like foo$dtype, decode the name and the class.
-  /// If there is no modifier specified, this defaults to
-  /// OperandClass::Normal.
-  static std::pair<StringRef, SILTensorOpInfo::OperandClass>
-  decodeAttributeName(Identifier name);
-
-  /// Get an int-typed attribute at `attrIdx`, which must have `attrName`.
-  int64_t getIntAttr(unsigned attrIdx, StringRef attrName) const;
-
-  /// Get a string-typed attribute at `attrIdx`, which must have `attrName`.
-  std::string getStringAttr(unsigned attrIdx, StringRef attrName) const;
-
-  void assertWithDump(bool cond, const char *assertMsg) const;
-};
 
 /// `inst` must have a single result, and return that result value.
 static inline SILValue getSingleValueResult(GraphOperationInst *inst) {
@@ -287,7 +156,10 @@ public:
   /// example) for inlined functions that take and return tensors, since we
   /// know that they are either unreachable or will be inlined into any
   /// clients that use them.
-  bool shouldBePartitioned(SILFunction *fn);
+  ///
+  /// If the flag forceTFFunctions is true, forces partitioning of functions
+  /// that operate on Tensors even if it would have been rejected otherwise.
+  bool shouldBePartitioned(SILFunction *fn, bool forceTFFunctions);
 
   /// Return true if the specified function type has TensorFlow values in its
   /// argument or result list (and do so recursively, if `fnType` has an

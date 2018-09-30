@@ -16,7 +16,7 @@ public func testDatasetWithFakeData() {
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testDatasetWithFakeData{{.*}}
 // CHECK: bb0:
 // CHECK:        [[GETNEXT:%[0-9]+]] = graph_op "tfc.makeIteratorGetNextWithDatasets{{.*}} : $TensorHandle<Float>
-// CHECK:        [[RESULT:%[0-9]+]] = graph_op "Add,i,i"([[GETNEXT]] : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>
+// CHECK:        [[RESULT:%[0-9]+]] = graph_op "Add"([[GETNEXT]] : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>
 // CHECK-NEXT:   return [[RESULT]] : $TensorHandle<Float>
 
 public func testDatasetWithMNIST() {
@@ -39,8 +39,8 @@ public func testDatasetWithMNIST() {
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testDatasetWithMNIST{{.*}}
 // CHECK: bb0:
 // CHECK:  (%0, %1) = graph_op "tfc.makeIteratorGetNextWithDatasets{{.*}} : $TensorHandle<Float>, $TensorHandle<Int32>
-// CHECK: graph_op "Add,i,i"(
-// CHECK: graph_op "Add,i,i"(
+// CHECK: graph_op "Add"(
+// CHECK: graph_op "Add"(
 // The operands can appear in arbitrary order here.
 // CHECK:  [[RESULT:%.*]] = tuple ({{.*}} : $TensorHandle<{{.*}}>, {{.*}} : $TensorHandle<{{.*}}>)
 // CHECK-NEXT:  return [[RESULT]] : $(TensorHandle<{{.*}}>, TensorHandle<{{.*}}>)

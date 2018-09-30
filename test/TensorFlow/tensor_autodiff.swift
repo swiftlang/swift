@@ -1,20 +1,24 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %target-sil-opt -differentiation -sil-print-all -verify | %FileCheck %s
-
-// TODO(SWIFT-8146): Re-enable this test.
-// UNSUPPORTED: tensorflow
+// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
 
 import TensorFlow
 
-@differentiable(reverse, adjoint: dConcreteTanh)
-func concreteTanh(_ x: Tensor<Float>) -> Tensor<Float> {
-  return tanh(x)
+public func matsquare(_ x: Tensor<Float>) -> Tensor<Float> {
+  return matmul(x, x)
 }
 
-func dConcreteTanh(_ x: Tensor<Float>, tanhx: Tensor<Float>, seed: Tensor<Float>) -> Tensor<Float> {
-  return seed * (1 - tanhx * tanhx)
+public func test1() {
+  _ = #gradient(matsquare)(Tensor([[1, 1], [1, 1]]))
 }
 
-_ = #gradient(concreteTanh)([1,2,3,4,5])
+// CHECK: @{{.*}}matsquare{{.*}}__grad_src_0_wrt_0
 
-// CHECK: @{{.*}}concreteTanh{{.*}}__grad_src_0_wrt_0_s_p
-// CHECK: @{{.*}}concreteTanh{{.*}}__grad_src_0_wrt_0
+// SR-8709
+public func selfmin(_ x: Tensor<Float>) -> Tensor<Float> {
+  return min(x, x)
+}
+
+public func test2() {
+  _ = #gradient(selfmin)(Tensor(1))
+}
+
+// CHECK: @{{.*}}selfmin{{.*}}__grad_src_0_wrt_0

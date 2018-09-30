@@ -17,6 +17,9 @@ using namespace swift;
 
 SILReverseAutoDiffIndices::SILReverseAutoDiffIndices(
     unsigned source, ArrayRef<unsigned> parameters) : source(source) {
+  if (parameters.empty())
+    return;
+
   auto max = *std::max_element(parameters.begin(), parameters.end());
   this->parameters.resize(max + 1);
   int last = -1;
@@ -25,4 +28,18 @@ SILReverseAutoDiffIndices::SILReverseAutoDiffIndices(
     last = paramIdx;
     this->parameters.set(paramIdx);
   }
+}
+
+bool SILReverseAutoDiffIndices::operator==(
+    const SILReverseAutoDiffIndices &other) const {
+  if (source != other.source)
+    return false;
+
+  // The parameters are the same when they have exactly the same set bit
+  // indices, even if they have different sizes.
+  llvm::SmallBitVector buffer(std::max(parameters.size(),
+                                       other.parameters.size()));
+  buffer ^= parameters;
+  buffer ^= other.parameters;
+  return buffer.none();
 }

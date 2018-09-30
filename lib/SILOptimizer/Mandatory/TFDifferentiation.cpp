@@ -31,6 +31,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILBuilder.h"
@@ -41,8 +42,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
-#include "swift/Serialization/SerializedSILLoader.h"
+#include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/ADT/DenseSet.h"
 
@@ -108,7 +108,6 @@ static void createEntryArguments(SILFunction *f) {
 /// Otherwise, attempt to link it from imported modules. Returns null if such
 /// function name does not exist.
 static SILFunction *lookupOrLinkFunction(StringRef name, SILModule &module) {
-  LLVM_DEBUG(getADDebugStream() << "Looking up function " << name << '\n');
   assert(!name.empty());
   if (auto *localFn = module.lookUpFunction(name))
     return localFn;
@@ -173,13 +172,14 @@ static void collectAllActualResultsInTypeOrder(
     ApplyInst *ai, ArrayRef<SILValue> extractedDirectResults,
     IndResRange &&indirectResults, SmallVectorImpl<SILValue> &results) {
   auto callee = ai->getCallee();
-  SILFunctionConventions calleeConvs(callee->getType().getAs<SILFunctionType>(),
-                                     ai->getModule());
+  SILFunctionConventions calleeConvs(
+      callee->getType().castTo<SILFunctionType>(), ai->getModule());
   unsigned indResIdx = 0, dirResIdx = 0;
-  for (auto &resInfo : calleeConvs.getResults())
+  for (auto &resInfo : calleeConvs.getResults()) {
     results.push_back(resInfo.isFormalDirect()
                           ? extractedDirectResults[dirResIdx++]
                           : indirectResults[indResIdx++]);
+  }
 }
 
 /// Given a range of types, joins these into a single type. If there's exactly
@@ -240,18 +240,12 @@ static FuncDecl *findAssociativeOperatorDeclInProtocol(DeclName operatorName,
   // Find the `+` with type siguature `(Self, Self) -> Self`.
   for (auto *decl : plusLookup) {
     auto *fd = dyn_cast<FuncDecl>(decl);
-    if (!fd || !fd->isBinaryOperator())
+    if (!fd || !fd->isBinaryOperator() || !fd->isStatic())
       continue;
-    auto *paramList = fd->getParameters();
-    auto *protoSelfTy = fd->getProtocolSelfType();
-    // Make sure parameters have `Self` type.
-    for (auto *param : paramList->getArray())
-      if (!param->getType()->isEqual(protoSelfTy))
-        continue;
-    // Make sure the result type is also `Self`.
-    if (!fd->getResultInterfaceType()->isEqual(protoSelfTy))
+    auto *methodType = fd->getMethodInterfaceType()->castTo<AnyFunctionType>();
+    // Make sure there are two parameters.
+    if (methodType->getNumParams() != 2)
       continue;
-    // This is the function type we want: `(Self, Self) -> Self`.
     return fd;
   }
   // Not found.
@@ -309,6 +303,11 @@ public:
     // Invoked by a `@differentiable` attribute in the Swift source. This case
     // has an associated `@differentiable` attribute.
     DifferentiableAttribute,
+    
+    // Invoker by a `[reverse_differentiable]` attribute in SIL **without**
+    // being lined to a Swift AST attribute. This case has an associated
+    // `[reverse_differentiable]` attribute.
+    SILReverseDifferentiableAttribute
   };
 
 private:
@@ -334,6 +333,13 @@ private:
     std::pair<DifferentiableAttr *, FuncDecl *> differentiableAttribute;
     Value(DifferentiableAttr *attr, FuncDecl *fd)
         : differentiableAttribute({attr, fd}) {}
+    
+    /// The `[reverse_differentiable]` attribute associated with the
+    /// `SILReverseDifferentiableAttribute` case.
+    std::pair<SILReverseDifferentiableAttr *, SILFunction *>
+        silReverseDifferentiableAttribute;
+    Value(SILReverseDifferentiableAttr *attr, SILFunction *f)
+        : silReverseDifferentiableAttribute({attr, f}) {}
   } value;
 
   /*implicit*/
@@ -348,6 +354,8 @@ public:
       : kind(Kind::DifferentialOperator), value(expr) {}
   DifferentiationInvoker(DifferentiableAttr *attr, FuncDecl *fd)
       : kind(Kind::DifferentiableAttribute), value(attr, fd) {}
+  DifferentiationInvoker(SILReverseDifferentiableAttr *attr, SILFunction *f)
+      : kind(Kind::SILReverseDifferentiableAttribute), value(attr, f) {}
 
   Kind getKind() const { return kind; }
 
@@ -371,6 +379,16 @@ public:
   getDifferentiableAttribute() const {
     assert(kind == Kind::DifferentiableAttribute);
     return value.differentiableAttribute;
+  }
+  
+  std::pair<SILReverseDifferentiableAttr *, SILFunction *>
+  getSILReverseDifferentiableAttribute() const {
+    assert(kind == Kind::SILReverseDifferentiableAttribute);
+    return value.silReverseDifferentiableAttribute;
+  }
+  
+  bool isAnyDifferentialOperator() const {
+    return kind == Kind::DifferentialOperator || kind == Kind::GradientInst;
   }
 
   void print(llvm::raw_ostream &os) const;
@@ -510,6 +528,11 @@ private:
     auto *varDecl = new (ctx) VarDecl(
         /*IsStatic*/ false, VarDecl::Specifier::Var,
         /*IsCaptureList*/ false, SourceLoc(), id, primalValueStruct);
+    if (primalValueStruct->getEffectiveAccess() < AccessLevel::Public)
+      varDecl->getAttrs().add(
+          new (ctx) UsableFromInlineAttr(/*implicit*/ true));
+    else
+      varDecl->setAccess(AccessLevel::Public);
     varDecl->setInterfaceType(type);
     primalValueStruct->addMember(varDecl);
     return varDecl;
@@ -562,7 +585,9 @@ public:
   /// of an `apply` instruction in the original function.
   VarDecl *addNestedStaticPrimalValueDecl(ApplyInst *inst,
                                           CanType primalValueType) {
-    auto *decl = addVarDecl("pv_", primalValueType);
+    auto *decl = addVarDecl(
+        "pv_" + llvm::itostr(nestedStaticPrimalValueMap.size()),
+        primalValueType);
     nestedStaticPrimalValueMap.insert({inst, decl});
     return decl;
   }
@@ -742,13 +767,20 @@ void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
   case Kind::DifferentialOperator:
     os << "differential_operator=(";
     getDifferentialOperator()->print(os);
-    os << ")";
+    os << ')';
     break;
   case Kind::DifferentiableAttribute: {
     auto diffAttr = getDifferentiableAttribute();
     os << "differentiable_attribute=(attr=(";
     diffAttr.first->print(os);
     os << ") func_decl=" << diffAttr.second->getFullName();
+    break;
+  }
+  case Kind::SILReverseDifferentiableAttribute: {
+    auto diffAttr = getSILReverseDifferentiableAttribute();
+    os << "sil_reverse_differentiable_attribute=(attr=(";
+    diffAttr.first->print(os);
+    os << ") function=" << diffAttr.second->getName();
     break;
   }
   }
@@ -791,6 +823,112 @@ enum class PrimalValueKind {
   /// The value is pushed onto the differentiation tape in the struct and can be
   /// accessed when popped from the tape.
   TapeCheckpoint
+};
+
+/// A conceptual cotangent space representing the type of the adjoint.
+class CotangentSpace {
+public:
+  /// A cotangent space kind.
+  enum class Kind {
+    /// `Builtin.FP<...>`.
+    BuiltinRealScalar,
+    /// A type that conforms to `FloatingPoint`.
+    RealScalar,
+    /// A type that conforms to `VectorNumeric` where the associated
+    /// `ScalarElement` conforms to `FloatingPoint`.
+    RealVector,
+    /// A product of cotangent spaces as a struct.
+    ProductStruct,
+    /// A product of cotangent spaces as a tuple.
+    ProductTuple,
+    /// A sum of cotangent spaces.
+    Sum
+  };
+  
+private:
+  Kind kind;
+  union Value {
+    // BuiltinRealScalar
+    BuiltinFloatType *builtinFPType;
+    // RealScalar or RealVector
+    NominalTypeDecl *realNominalType;
+    // ProductStruct
+    StructDecl *structDecl;
+    // ProductTuple
+    TupleType *tupleType;
+    // Sum
+    EnumDecl *enumDecl;
+    
+    Value(BuiltinFloatType *builtinFP) : builtinFPType(builtinFP) {}
+    Value(NominalTypeDecl *nominal) : realNominalType(nominal) {}
+    Value(StructDecl *structDecl) : structDecl(structDecl) {}
+    Value(TupleType *tupleType) : tupleType(tupleType) {}
+    Value(EnumDecl *enumDecl) : enumDecl(enumDecl) {}
+  } value;
+  
+  CotangentSpace(Kind kind, Value value)
+      : kind(kind), value(value) {}
+  
+public:
+  CotangentSpace() = delete;
+  
+  static CotangentSpace
+  getBuiltinRealScalarSpace(BuiltinFloatType *builtinFP) {
+    return {Kind::BuiltinRealScalar, builtinFP};
+  }
+  static CotangentSpace getRealScalarSpace(NominalTypeDecl *typeDecl) {
+    return {Kind::RealScalar, typeDecl};
+  }
+  static CotangentSpace getRealVectorSpace(NominalTypeDecl *typeDecl) {
+    return {Kind::RealVector, typeDecl};
+  }
+  static CotangentSpace getProductStruct(StructDecl *structDecl) {
+    return {Kind::ProductStruct, structDecl};
+  }
+  static CotangentSpace getProductTuple(TupleType *tupleTy) {
+    return {Kind::ProductTuple, tupleTy};
+  }
+  static CotangentSpace getSum(EnumDecl *enumDecl) {
+    return {Kind::Sum, enumDecl};
+  }
+  
+  bool isBuiltinRealScalarSpace() const {
+    return kind == Kind::BuiltinRealScalar;
+  }
+  bool isRealScalarSpace() const { return kind == Kind::RealScalar; }
+  bool isRealVectorSpace() const { return kind == Kind::RealVector; }
+  bool isProductStruct() const { return kind == Kind::ProductStruct; }
+  bool isProductTuple() const { return kind == Kind::ProductTuple; }
+  
+  Kind getKind() const { return kind; }
+  BuiltinFloatType *getBuiltinRealScalarSpace() const {
+    assert(kind == Kind::BuiltinRealScalar);
+    return value.builtinFPType;
+  }
+  NominalTypeDecl *getRealScalarSpace() const {
+    assert(kind == Kind::RealScalar);
+    return value.realNominalType;
+  }
+  NominalTypeDecl *getRealVectorSpace() const {
+    assert(kind == Kind::RealVector);
+    return value.realNominalType;
+  }
+  NominalTypeDecl *getRealScalarOrVectorSpace() const {
+    assert(kind == Kind::RealScalar || kind == Kind::RealVector);
+    return value.realNominalType;
+  }
+  StructDecl *getProductStruct() const {
+    assert(kind == Kind::ProductStruct);
+    return value.structDecl;
+  }
+  TupleType *getProductTuple() const {
+    assert(kind == Kind::ProductTuple);
+    return value.tupleType;
+  }
+  EnumDecl *getSum() const {
+    assert(kind == Kind::Sum);
+    return value.enumDecl;
+  }
 };
 
 using GradientLookupKey = std::pair<SILFunction *, SILReverseAutoDiffConfig>;
@@ -840,9 +978,12 @@ private:
       astCtx.getProtocol(KnownProtocolKind::FloatingPoint);
 
   /// `VectorNumeric.+` declaration.
-  FuncDecl *cachedVectorPlusFn = nullptr;
+  mutable FuncDecl *cachedVectorPlusFn = nullptr;
   /// `Numeric.+` declaration.
-  FuncDecl *cachedNumericPlusFn = nullptr;
+  mutable FuncDecl *cachedNumericPlusFn = nullptr;
+  
+  /// Cache of computed cotangent spaces for types.
+  mutable DenseMap<CanType, Optional<CotangentSpace>> cachedCotangentSpaces;
 
 public:
   /// Construct an ADContext for the given module.
@@ -859,56 +1000,38 @@ public:
     return differentiationTasks;
   }
 
-  /// Finds a witness table for the specified conformance in the current module.
-  /// If it doesn't exist, then tries to find it in all imported modules and
-  /// links it to the current module. Returns null if no witness table can be
-  /// found.
-  SILWitnessTable *lookupOrLinkWitnessTable(ProtocolConformanceRef confRef) {
-    auto *conf = confRef.getConcrete();
-    if (auto existingTable = module.lookUpWitnessTable(confRef))
-      return existingTable;
-    auto *decl = conf->getDeclContext()->getSelfNominalTypeDecl();
-    auto linkage = getSILLinkage(getDeclLinkage(decl), NotForDefinition);
-    auto *newTable = module.createWitnessTableDeclaration(conf, linkage);
-    newTable = silLoader->lookupWitnessTable(newTable);
-    // Update linkage for witness methods.
-    // FIXME: Figure out why witnesses have shared linkage by default.
-    for (auto &entry : newTable->getEntries())
-      if (entry.getKind() == SILWitnessTable::WitnessKind::Method)
-        entry.getMethodWitness().Witness->setLinkage(linkage);
-    return newTable;
-  }
-
   ProtocolDecl *getVectorNumericProtocol() const {
     return vectorNumericProtocol;
   }
 
-  ProtocolDecl *getNumericProtocol() const { return numericProtocol; }
+  ProtocolDecl *getNumericProtocol() const {
+    return numericProtocol;
+  }
 
   ProtocolDecl *getFloatingPointProtocol() const {
     return floatingPointProtocol;
   }
 
-  FuncDecl *getVectorPlusDecl() {
-    if (cachedVectorPlusFn)
-      return cachedVectorPlusFn;
-    return cachedVectorPlusFn = findAssociativeOperatorDeclInProtocol(
-               astCtx.getIdentifier("+"), vectorNumericProtocol);
+  FuncDecl *getVectorPlusDecl() const {
+    if (!cachedVectorPlusFn) {
+      cachedVectorPlusFn = findAssociativeOperatorDeclInProtocol(
+          astCtx.getIdentifier("+"), vectorNumericProtocol);
+      assert(cachedVectorPlusFn && "VectorNumeric.+ not found");
+    }
+    return cachedVectorPlusFn;
   }
 
-  FuncDecl *getNumericPlusDecl() {
-    if (cachedNumericPlusFn)
-      return cachedNumericPlusFn;
-    return cachedNumericPlusFn = findAssociativeOperatorDeclInProtocol(
-               astCtx.getIdentifier("+"), numericProtocol);
+  FuncDecl *getNumericPlusDecl() const {
+    if (!cachedNumericPlusFn) {
+      cachedNumericPlusFn = findAssociativeOperatorDeclInProtocol(
+          astCtx.getIdentifier("+"), numericProtocol);
+      assert(cachedNumericPlusFn && "Numeric.+ not found");
+    }
+    return cachedNumericPlusFn;
   }
 
-  /// Determines whether the given type conforms to VectorNumeric while the
-  /// ScalarElement associated type conforms to FloatingPoint.
-  bool supportsVectorDifferentiation(Type type) const;
-
-  /// Determines whether the given type conforms to FloatingPoint.
-  bool supportsScalarDifferentiation(Type type) const;
+  /// Determines the cotangent space (or none) of the specified type.
+  Optional<CotangentSpace> getCotangentSpace(CanType type) const;
 
   /// Retrieves the file unit that contains implicit declarations in the
   /// current Swift module. If it does not exist, create one.
@@ -926,7 +1049,7 @@ public:
   /// Creates a struct declaration (without contents) for storing primal values
   /// of a function. The newly created struct will have the same generic
   /// parameters as the function.
-  StructDecl *createPrimalValueStructForFunction(SILFunction *function);
+  StructDecl *createPrimalValueStruct(const DifferentiationTask *task);
 
   void insertGradient(const GradientLookupKey &key, SILFunction *gradient) {
     gradientMap.insert({key, gradient});
@@ -979,11 +1102,8 @@ public:
   /// Finds a differentiation task on a function such that the task produces
   /// adjoints for the specified indices.
   DifferentiationTask *
-  lookupDifferentiationTask(SILFunction *original,
+  lookUpDifferentiationTask(SILFunction *original,
                             const SILReverseAutoDiffIndices &indices) {
-    auto *attr = lookupReverseDifferentiableAttr(original, indices);
-    if (!attr)
-      return nullptr;
     auto existing = enqueuedTaskIndices.find({original, indices});
     if (existing == enqueuedTaskIndices.end())
       return nullptr;
@@ -1012,14 +1132,29 @@ public:
   /// that a `[reverse_differentiable]` attribute will be generated for the
   /// specified indices, and that primal/adjoint synthesis will be run in the
   /// Differentiation pass.
+  ///
+  /// The function must either be a definition or be serialized.
   DifferentiationTask *
   registerDifferentiationTask(SILFunction *original,
                               const SILReverseAutoDiffIndices &indices,
                               DifferentiationInvoker invoker) {
+    // Make sure this pair of original and indices is unique.
+    assert(!lookUpDifferentiationTask(original, indices));
+    // Make sure this function either has a body or has a
+    // `[reverse_differentiable]` attribute that is a superset of all the
+    if (original->isExternalDeclaration()) {
+      // If it's serialized, deserialize it.
+      assert(original->isSerialized() &&
+             "Differentiation task cannot be on a function without a body");
+      auto *deserializedFn = silLoader->lookupSILFunction(original);
+      assert(deserializedFn && "Cannot deserialize original function");
+      (void)deserializedFn;
+    }
     auto *attr = getOrCreateReverseDifferentiableAttr(original, indices);
     std::unique_ptr<DifferentiationTask> task(
         new DifferentiationTask(original, std::move(attr), module, invoker));
     differentiationTasks.push_back(std::move(task));
+    enqueuedTaskIndices.insert({{original, indices}, differentiationTasks.size() - 1});
     return differentiationTasks.back().get();
   }
 
@@ -1027,7 +1162,7 @@ public:
   lookUpOrRegisterDifferentiationTask(SILFunction *original,
                                       const SILReverseAutoDiffIndices &indices,
                                       DifferentiationInvoker invoker) {
-    if (auto *existingTask = lookupDifferentiationTask(original, indices))
+    if (auto *existingTask = lookUpDifferentiationTask(original, indices))
       return existingTask;
     return registerDifferentiationTask(original, indices, invoker);
   }
@@ -1073,9 +1208,11 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
              << "\n"
              << "while performing differentiation task\n\t" << task << '\n');
   switch (invoker.getKind()) {
-  // For a gradient instruction that is not associated with any source
-  // location, we emit a diagnostic without source location.
+  // For a gradient instruction or a `[reverse_differentiable]` attribute that
+  // is not associated with any source location, we emit a diagnostic at the
+  // instruction source location.
   case DifferentiationInvoker::Kind::GradientInst:
+  case DifferentiationInvoker::Kind::SILReverseDifferentiableAttribute:
     diagnose(opLoc,
              diag.getValueOr(diag::autodiff_expression_is_not_differentiable));
     break;
@@ -1120,31 +1257,113 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
 /// Determines whether the type supports vector differentiation. We say that a
 /// type supports vector differentiation if it conforms to `VectorNumeric` and
 /// the associated type `ScalarElement` conforms to `FloatingPoint`.
-bool ADContext::supportsVectorDifferentiation(Type type) const {
-  auto *swiftModule = module.getSwiftModule();
+static NominalTypeDecl *getAnyRealVectorTypeDecl(CanType type,
+                                                 const ADContext &context) {
+  auto *swiftModule = context.getModule().getSwiftModule();
+  auto *floatingPointProtocol = context.getFloatingPointProtocol();
+  auto *vectorNumericProtocol = context.getVectorNumericProtocol();
   // Look up conformance.
   auto maybeConf = swiftModule->lookupConformance(type, vectorNumericProtocol);
   if (!maybeConf)
-    return false;
+    return nullptr;
   auto conf = *maybeConf;
   // See if the `ScalarElement` associated type conforms to `FloatingPoint`.
-  DeclName scalarDeclName(getASTContext().getIdentifier("ScalarElement"));
+  DeclName scalarDeclName(
+      context.getASTContext().getIdentifier("ScalarElement"));
   auto lookup = vectorNumericProtocol->lookupDirect(scalarDeclName);
   auto scalarAssocTy =
       cast<AssociatedTypeDecl>(lookup[0])->getDeclaredInterfaceType();
   auto scalarTy = conf.getAssociatedType(type, scalarAssocTy);
   auto scalarConf =
       swiftModule->lookupConformance(scalarTy, floatingPointProtocol);
-  return scalarConf.hasValue();
+  if (!scalarConf.hasValue())
+    return nullptr;
+  auto *nominal = type->getAnyNominal();
+  assert(nominal && "Should've been nominal since it conforms to protocols");
+  return nominal;
 }
 
 /// Determines whether the type supports scalar differentiation. We say that a
 /// type supports scalar differentiation if it conforms to `FloatingPoint` and
 /// the associated type `ScalarElement` conforms to `FloatingPoint`.
-bool ADContext::supportsScalarDifferentiation(Type type) const {
-  auto *swiftModule = module.getSwiftModule();
-  auto fpConf = swiftModule->lookupConformance(type, floatingPointProtocol);
-  return fpConf.hasValue();
+static NominalTypeDecl *getAnyRealScalarTypeDecl(CanType type,
+                                                 const ADContext &context) {
+  auto *swiftModule = context.getModule().getSwiftModule();
+  if (!swiftModule->lookupConformance(type, context.getFloatingPointProtocol()))
+    return nullptr;
+  auto *nominal = type->getAnyNominal();
+  assert(nominal && "Should've been nominal since it conforms to protocols");
+  return nominal;
+}
+
+/// Determines the cotangent space of a type.
+Optional<CotangentSpace> ADContext::getCotangentSpace(CanType type) const {
+  LLVM_DEBUG(getADDebugStream() << "Classifying cotangent space for "
+             << type << '\n');
+  auto lookup = cachedCotangentSpaces.find(type);
+  if (lookup != cachedCotangentSpaces.end())
+    return lookup->getSecond();
+  // A helper that is used to cache the computed cotangent space for the
+  // specified type and retuns the same cotangent space.
+  auto cache = [&](Optional<CotangentSpace> cotangentSpace) {
+    cachedCotangentSpaces.insert({type, cotangentSpace});
+    return cotangentSpace;
+  };
+  // `Builtin.FP<...>` is a builtin real scalar space.
+  if (auto *fpType = type->getAs<BuiltinFloatType>())
+    return cache(CotangentSpace::getBuiltinRealScalarSpace(fpType));
+  // Types that conform to `FloatingPoint` are a real scalar space.
+  if (auto *nomTy = getAnyRealScalarTypeDecl(type, *this))
+    return cache(CotangentSpace::getRealScalarSpace(nomTy));
+  // Types that conform to `VectorNumeric` where the associated `ScalarElement`
+  // conforms to `FloatingPoint` are a real vector space.
+  if (auto *nomTy = getAnyRealVectorTypeDecl(type, *this))
+    return cache(CotangentSpace::getRealVectorSpace(nomTy));
+  // Nominal types can be either a struct or an enum.
+  if (auto *nominal = type->getAnyNominal()) {
+    // Fixed-layout struct types, each of whose elements has a cotangent space,
+    // are a product of those cotangent spaces.
+    if (auto *structDecl = dyn_cast<StructDecl>(nominal)) {
+      if (structDecl->getFormalAccess() >= AccessLevel::Public &&
+          !structDecl->getAttrs().hasAttribute<FixedLayoutAttr>())
+        return cache(None);
+      auto allMembersHaveCotangentSpace =
+          llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
+            return (bool)getCotangentSpace(v->getType()->getCanonicalType());
+          });
+      if (allMembersHaveCotangentSpace)
+        return cache(CotangentSpace::getProductStruct(structDecl));
+    }
+    // Frozen enum types, all of whose payloads have a cotangent space, are a
+    // sum of the product of payloads in each case.
+    if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
+      if (enumDecl->getFormalAccess() >= AccessLevel::Public &&
+          !enumDecl->getAttrs().hasAttribute<FrozenAttr>())
+        return cache(None);
+      if (enumDecl->isIndirect())
+        return cache(None);
+      auto allMembersHaveCotangentSpace =
+        llvm::all_of(enumDecl->getAllCases(), [&](EnumCaseDecl *cd) {
+          return llvm::all_of(cd->getElements(), [&](EnumElementDecl *eed) {
+            return llvm::all_of(*eed->getParameterList(), [&](ParamDecl *pd) {
+              return (bool)
+                  getCotangentSpace(pd->getType()->getCanonicalType());
+            });
+          });
+        });
+      if (allMembersHaveCotangentSpace)
+        return cache(CotangentSpace::getSum(enumDecl));
+    }
+  }
+  // Tuple types, each of whose elements has a cotangent space, are a product of
+  // those cotangent space.
+  if (TupleType *tupleType = type->getAs<TupleType>())
+    if (llvm::all_of(tupleType->getElementTypes(), [&](Type t) {
+            return (bool)getCotangentSpace(t->getCanonicalType()); }))
+      return cache(CotangentSpace::getProductTuple(tupleType));
+  // Otherwise, the type does not have a cotangent space. That is, it does not
+  // support differentiation.
+  return cache(None);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1247,6 +1466,18 @@ public:
 } // end anonymous namespace
 
 namespace {
+/// Represents the differentiation activity associated with a SIL value.
+enum class ActivityFlags : unsigned {
+  /// The value depends on a function parameter.
+  Varied = 1 << 1,
+  /// The value contributes to a result.
+  Useful = 1 << 2,
+  /// The value is both varied and useful.
+  Active = Varied | Useful,
+};
+
+using Activity = OptionSet<ActivityFlags>;
+
 /// Result of activity analysis on a function. Accepts queries for whether a
 /// value is "varied", "useful" or "active" against certain differentiation
 /// indices.
@@ -1282,6 +1513,11 @@ public:
   bool isVaried(SILValue value,
                 const llvm::SmallBitVector &parameterIndices) const;
   bool isActive(SILValue value, const SILReverseAutoDiffIndices &indices) const;
+
+  Activity getActivity(SILValue value,
+                       const SILReverseAutoDiffIndices &indices) const;
+  Activity getActivity(SILInstruction *inst,
+                       const SILReverseAutoDiffIndices &indices) const;
 };
 } // end anonymous namespace
 
@@ -1430,17 +1666,36 @@ bool DifferentiableActivityInfo::isActive(
   return isVaried(value, indices.parameters) && isUseful(value, indices.source);
 }
 
+Activity DifferentiableActivityInfo::getActivity(
+    SILValue value, const SILReverseAutoDiffIndices &indices) const {
+  Activity activity;
+  if (isVaried(value, indices.parameters))
+    activity |= ActivityFlags::Varied;
+  if (isUseful(value, indices.source))
+    activity |= ActivityFlags::Useful;
+  return activity;
+}
+
+Activity DifferentiableActivityInfo::getActivity(
+    SILInstruction *inst, const SILReverseAutoDiffIndices &indices) const {
+  Activity activity;
+  for (auto result : inst->getResults())
+    activity |= getActivity(result, indices);
+  return activity;
+}
+
 static void dumpActivityInfo(SILValue value,
                              const SILReverseAutoDiffIndices &indices,
                              const DifferentiableActivityInfo &activityInfo,
                              llvm::raw_ostream &s = llvm::dbgs()) {
   s << '[';
-  if (activityInfo.isActive(value, indices))
-    s << "ACTIVE";
-  else if (activityInfo.isVaried(value, indices.parameters))
-    s << "VARIED";
-  else if (activityInfo.isUseful(value, indices.source))
-    s << "USEFUL";
+  auto activity = activityInfo.getActivity(value, indices);
+  switch (activity.toRaw()) {
+  case 0: s << "NONE"; break;
+  case (unsigned)ActivityFlags::Varied: s << "VARIED"; break;
+  case (unsigned)ActivityFlags::Useful: s << "USEFUL"; break;
+  case (unsigned)ActivityFlags::Active: s << "ACTIVE"; break;
+  }
   s << "] " << value;
 }
 
@@ -1524,10 +1779,24 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
   llvm_unreachable("Unhandled function convertion instruction");
 }
 
+/// Create a builtin floating point value. The specified type must be a builtin
+/// float type.
+static SILValue createBuiltinFPScalar(intmax_t scalar, CanType type,
+                                      SILLocation loc, SILBuilder &builder) {
+  auto *fpType = type->castTo<BuiltinFloatType>();
+  return builder.createFloatLiteral(
+      loc, SILType::getPrimitiveObjectType(type),
+      APFloat(fpType->getAPFloatSemantics(), scalar));
+}
+
 /// Convert an integer literal to a type that is expressible by integer literal.
-static void convertIntToIndirectExpressible(intmax_t value,
+///
+/// The root address derivation of `resultBufAccess` must be the result of a
+/// `begin_access`.
+static void convertIntToIndirectExpressible(intmax_t scalar,
                                             NominalTypeDecl *targetTypeDecl,
-                                            SILValue resultBuf, SILLocation loc,
+                                            SILValue resultBufAccess,
+                                            SILLocation loc,
                                             SILBuilder &builder,
                                             ADContext &context) {
   auto &module = builder.getModule();
@@ -1542,15 +1811,17 @@ static void convertIntToIndirectExpressible(intmax_t value,
                                   /*typeResolver*/ nullptr,
                                   intLitTypeLookupResults);
   assert(intLitTypeLookupResults.size() == 1);
-  auto intLitTypeAliasDecl = cast<TypeAliasDecl>(intLitTypeLookupResults[0]);
+  auto intLitTypeAliasDecl =
+      cast<TypeAliasDecl>(intLitTypeLookupResults[0]);
   // Now we have the IntegerLiteralType type.
-  auto intLitTy =
-      intLitTypeAliasDecl->getUnderlyingTypeLoc().getType()->getCanonicalType();
+  auto intLitTy = intLitTypeAliasDecl
+      ->getUnderlyingTypeLoc().getType()->getCanonicalType();
   auto *intLitTypeDecl = intLitTy->getAnyNominal();
   assert(intLitTypeDecl);
-  // %1 = integer_literal $Builtin.Int2048, <value>
-  auto builtinIntTy = SILType::getBuiltinIntegerType(2048, astCtx);
-  auto *builtinInt = builder.createIntegerLiteral(loc, builtinIntTy, value);
+  // %1 = float_literal $Builtin.FPIEEE80, <value>
+  auto builtinIntegerTy = SILType::getBuiltinIntegerType(2048, astCtx);
+  auto builtinInteger = builder.createIntegerLiteral(
+      loc, builtinIntegerTy, APInt(2048, scalar));
   // %2 = metatype $@thin <target type>.IntegerLiteralType.Type
   auto intLitMetatypeTy = SILType::getPrimitiveObjectType(
       CanMetatypeType::get(intLitTy, MetatypeRepresentation::Thick));
@@ -1560,175 +1831,294 @@ static void convertIntToIndirectExpressible(intmax_t value,
       astCtx.getProtocol(KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral);
   // `init(_builtinIntegerLiteral:)`
   DeclName builtinLitInitName(astCtx, DeclBaseName::createConstructor(),
-                              {astCtx.getIdentifier("_builtinIntegerLiteral")});
+                              {astCtx.Id_builtinIntegerLiteral});
   auto *initBILDecl =
       cast<ConstructorDecl>(ebilProto->lookupDirect(builtinLitInitName)[0]);
   SILDeclRef initBILDeclRef(initBILDecl);
   auto initBILType = context.getTypeConverter().getConstantType(initBILDeclRef);
   // Look up `IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral`. This is
   // guaranteed to be a normal conformance.
-  auto *ebilConf =
-      astCtx.getConformance(intLitTy, ebilProto, intLitTypeDecl->getLoc(),
-                            intLitTypeDecl, ProtocolConformanceState::Complete);
+  auto *ebilConf = astCtx.getConformance(intLitTy, ebilProto,
+                                         intLitTypeDecl->getLoc(),
+                                         intLitTypeDecl,
+                                         ProtocolConformanceState::Complete);
   ProtocolConformanceRef ebilConfRef(ebilConf);
-  // Link witness table.
-  context.lookupOrLinkWitnessTable(ebilConfRef);
   // %3 = witness_method ...
   auto initBILFn = builder.createWitnessMethod(loc, intLitTy, ebilConfRef,
                                                initBILDeclRef, initBILType);
+  // Ensure the witness method is linked.
+  module.lookUpFunctionInWitnessTable(ebilConfRef, initBILDeclRef);
   // Get substitutions.
   auto intLitSubMap = SubstitutionMap::getProtocolSubstitutions(
       ebilProto, intLitTy, ebilConfRef);
   // Allocate result buffer.
   // %intLitBuf = alloc_stack $IntegerLiteralType
-  auto *intLitBuf =
-      builder.createAllocStack(loc, SILType::getPrimitiveObjectType(intLitTy));
+  auto *intLitBuf = builder.createAllocStack(
+      loc, SILType::getPrimitiveObjectType(intLitTy));
   SWIFT_DEFER {
     // dealloc_stack %intLitBuf : $*IntegerLiteralType
     builder.createDeallocStack(loc, intLitBuf);
   };
   // %4 = apply %3 <...>(%intLitBuf, %1, %2)
   builder.createApply(loc, initBILFn, intLitSubMap,
-                      {intLitBuf, builtinInt, intLitMetatype},
+                      {intLitBuf, builtinInteger, intLitMetatype},
                       /*isNonThrowing*/ false);
-
   // Step 2. Initialize a value of type `<target type>` by calling
+  // `ExpressibleByIntegerLiteral.init(integerLiteral: %4)`.
   // %5 = metatype $@thin <target type>.IntegerLiteralType.Type
   auto targetMetatypeTy = SILType::getPrimitiveObjectType(
       CanMetatypeType::get(targetTy, MetatypeRepresentation::Thick));
   auto *targetMetatype = builder.createMetatype(loc, targetMetatypeTy);
-  // `ExpressibleByIntegerLiteral.init(integerLiteral: %4)`.
   auto *eilProto =
       astCtx.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
   DeclName intLitInitName(astCtx, DeclBaseName::createConstructor(),
-                          {astCtx.getIdentifier("integerLiteral")});
+                          {astCtx.Id_integerLiteral});
   auto *initILDecl =
       cast<ConstructorDecl>(eilProto->lookupDirect(intLitInitName)[0]);
   SILDeclRef initILDeclRef(initILDecl);
   auto initILType = context.getTypeConverter().getConstantType(initILDeclRef);
-  // Lookup `<target type> : ExpressibleByIntegerLiteral` (could be specialized
-  // or inherited).
+  // Lookup `<target type> : ExpressibleByIntegerLiteral`.
   auto *parentModule = targetTypeDecl->getModuleContext();
   auto eilConf = *parentModule->lookupConformance(targetTy, eilProto);
   ProtocolConformanceRef eilConfRef(eilConf);
-  context.lookupOrLinkWitnessTable(eilConfRef);
+  // context.lookupOrLinkWitnessTable(eilConfRef);
   // %6 = witness_method ...
   auto initILFn = builder.createWitnessMethod(loc, targetTy, eilConfRef,
                                               initILDeclRef, initILType);
+  // Ensure the witness method is linked.
+  module.lookUpFunctionInWitnessTable(eilConfRef, initILDeclRef);
   // Get substitutions.
   auto targetSubMap =
       SubstitutionMap::getProtocolSubstitutions(eilProto, targetTy, eilConfRef);
   // %7 = apply %6 <...>(%resultBuf, %intLitBuf, %5)
   builder.createApply(loc, initILFn, targetSubMap,
-                      {resultBuf, intLitBuf, targetMetatype},
+                      {resultBufAccess, intLitBuf, targetMetatype},
                       /*isNonThrowing*/ false);
 }
 
-/// Create a seed value.
+/// Create a scalar value in the specified type indirectly in a buffer.
 ///
-/// NOTE: This will be reduced to only support scalar AD when vector AD supports
-/// optional seeds, because a vector of 1s as seed doesn't make mathematical
-/// sense in vector AD.
-static void convertToIndirectSeed(intmax_t value, CanType type,
-                                  SILValue seedBuf, SILLocation loc,
-                                  SILBuilder &builder, ADContext &context) {
+/// The specified type must satisfy **one** of these requirements:
+/// - It is a builtin floating point type like `Builtin.FPIEEE32`.
+/// - It conforms to `FloatingPoint`.
+/// - It conforms `VectorNumeric` and its nested type `ScalarElement` conforms
+///   to `FloatingPoint`.
+///
+/// The root address derivation of `seedBufAccess` must be the result of
+/// a `begin_access`.
+static void createScalarValueIndirect(intmax_t scalar, CanType type,
+                                      SILValue seedBufAccess, SILLocation loc,
+                                      SILBuilder &builder, ADContext &context) {
+  auto cotangentSpace = context.getCotangentSpace(type);
+  assert(cotangentSpace && "No cotangent space for this type");
   // See if the type is a builtin float. If so, we don't do protocol
   // conformance-based conversion.
-  if (auto fpType = type->getAs<BuiltinFloatType>()) {
-    auto one = builder.createFloatLiteral(
-        loc, SILType::getPrimitiveObjectType(type),
-        APFloat(fpType->getAPFloatSemantics(), value));
-    auto access = builder.createBeginAccess(loc, seedBuf, SILAccessKind::Init,
-                                            SILAccessEnforcement::Static,
-                                            /*noNestedConflict*/ true,
-                                            /*fromBuiltin*/ false);
-    builder.createStore(loc, one, access,
+  switch (cotangentSpace->getKind()) {
+  // Builtin scalar is just a `float_literal` instruction.
+  case CotangentSpace::Kind::BuiltinRealScalar: {
+    auto *fpType = type->castTo<BuiltinFloatType>();
+    auto scalarVal =
+        createBuiltinFPScalar(scalar, fpType->getCanonicalType(), loc, builder);
+    builder.createStore(loc, scalarVal, seedBufAccess,
                         getBufferSOQ(type, builder.getFunction()));
-    builder.createEndAccess(loc, access, /*aborted*/ false);
     return;
   }
+  // Real scalar gets initialized through
+  // `<target_type>.IntegerLiteralType.init(_builtinIntegerLiteral:)` and
+  // `<target_type>.init(integerLiteral:)`.
+  case CotangentSpace::Kind::RealScalar: {
+    auto *decl = cotangentSpace->getRealScalarSpace();
+    convertIntToIndirectExpressible(scalar, decl, seedBufAccess, loc, builder,
+                                    context);
+    return;
+  }
+  // Real vector gets initialized through
+  // `<target_type>.ScalarElement.IntegerLiteralType
+  //     .init(_builtinIntegerLiteral:)`,
+  // `<target_type>.ScalarElement.init(integerLiteral:)` and
+  // `<target_type>.init(_:)`.
+  case CotangentSpace::Kind::RealVector: {
+    auto *targetTypeDecl = cotangentSpace->getRealVectorSpace();
+    auto &astCtx = context.getASTContext();
+    auto &module = context.getModule();
+    // Create a scalar value from the specified integer literal.
+    DeclName scalarDeclName(astCtx.getIdentifier("ScalarElement"));
+    auto currencyDeclLookupResult =
+        targetTypeDecl->lookupDirect(scalarDeclName);
+    auto *scalarElemAlias = cast<TypeAliasDecl>(currencyDeclLookupResult[0]);
+    auto scalarTy =
+        scalarElemAlias->getDeclaredInterfaceType()->getCanonicalType();
+    auto currencySubMap =
+        type->getMemberSubstitutionMap(module.getSwiftModule(),
+                                       scalarElemAlias);
+    scalarTy = scalarTy.subst(currencySubMap)->getCanonicalType();
+    auto *scalarTyDecl = scalarTy.getAnyNominal();
+    assert(scalarTyDecl && "ScalarElement must be a nominal type");
+    // %0 = ... : $<scalar type>
+    auto scalarBuf = builder.createAllocStack(
+        loc, SILType::getPrimitiveObjectType(scalarTy));
+    auto scalarBufInitAccess = builder.createBeginAccess(
+        loc, scalarBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
+        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+    convertIntToIndirectExpressible(scalar, scalarTyDecl, scalarBufInitAccess,
+                                    loc, builder, context);
+    builder.createEndAccess(loc, scalarBufInitAccess, /*aborted*/ false);
+    // Prepare to call `VectorNumeric.init(_:)` on the scalar.
+    auto *vecNumProto = context.getVectorNumericProtocol();
+    DeclName initName(astCtx, DeclBaseName::createConstructor(),
+                      {Identifier()});
+    auto *reqr =
+        cast<ConstructorDecl>(vecNumProto->lookupDirect(initName).front());
+    SILDeclRef reqrRef(reqr, SILDeclRef::Kind::Allocator);
+    auto silInitTy = context.getTypeConverter().getConstantType(reqrRef);
+    LLVM_DEBUG({
+      auto &s = getADDebugStream();
+      s << "VectorNumeric.init(_:) definition: ";
+      reqr->print(s);
+      s << '\n' << reqrRef << " : " << silInitTy << '\n';
+    });
 
-  auto *targetTypeDecl = type->getAnyNominal();
-  assert(targetTypeDecl && "Target type must be a nominal type");
-  auto &astCtx = context.getASTContext();
-  auto &module = context.getModule();
-  auto &typeConv = context.getTypeConverter();
-  // If it's scalar differentiation, just convert the literal to the requested
-  // type.
-  if (context.supportsScalarDifferentiation(type)) {
-    convertIntToIndirectExpressible(value, targetTypeDecl, seedBuf, loc,
-                                    builder, context);
+    // Get the target type's conformance to `VectorNumeric`.
+    llvm::SmallVector<ProtocolConformance*, 1> confs;
+    targetTypeDecl->lookupConformance(module.getSwiftModule(), vecNumProto,
+                                      confs);
+    assert(confs.size() == 1);
+    auto *genericConf = confs[0];
+    auto typeSubMap = type->getContextSubstitutionMap(
+        module.getSwiftModule(), genericConf->getDeclContext());
+    auto *conf = astCtx.getSpecializedConformance(type, genericConf,
+                                                  typeSubMap);
+    LLVM_DEBUG({
+      auto &s = getADDebugStream() << "Found conformance ";
+      conf->dump(s);
+      s << '\n';
+    });
+    ProtocolConformanceRef confRef(conf);
+
+    // Make sure the witness table is linked.
+    module.lookUpFunctionInWitnessTable(confRef, reqrRef);
+    // $4 = witness_method ...
+    auto initFnRef =
+        builder.createWitnessMethod(loc, type, confRef, reqrRef, silInitTy);
+    // debugDump(builder.getModule());
+    LLVM_DEBUG({
+      auto &s = getADDebugStream();
+      s << "Real vector initialization function: " << *initFnRef << '\n';
+    });
+    auto initSubMap =
+        SubstitutionMap::getProtocolSubstitutions(vecNumProto, type, confRef);
+    LLVM_DEBUG({
+      auto &s = getADDebugStream()
+          << "Substitution map for real vector " << type << ": ";
+      initSubMap.dump(s);
+      s << '\n';
+    });
+    // %type = metatype $<scalar type>.Type
+    auto metatypeTy = SILType::getPrimitiveObjectType(
+        CanMetatypeType::get(type, MetatypeRepresentation::Thick));
+    auto *metatype = builder.createMetatype(loc, metatypeTy);
+    auto scalarReadAccess = builder.createBeginAccess(
+        loc, scalarBuf, SILAccessKind::Read, SILAccessEnforcement::Static,
+        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+    // %5 = apply %4(%3, %2, %type)
+    builder.createApply(loc, initFnRef, initSubMap,
+                        {seedBufAccess, scalarReadAccess, metatype},
+                        /*isNonThrowing*/ false);
+    builder.createEndAccess(loc, scalarReadAccess, /*aborted*/ false);
+    // dealloc_stack %0 : $*<scalar type>
+    builder.createDeallocStack(loc, scalarBuf);
     return;
   }
-  // Otherwise it must be vector differentiation, call
-  // `VectorNumeric.init(_:)`.
-  assert(context.supportsVectorDifferentiation(type));
-  // Create a scalar value from the specified integer literal.
-  DeclName scalarDeclName(astCtx.getIdentifier("ScalarElement"));
-  auto currencyDeclLookupResult = targetTypeDecl->lookupDirect(scalarDeclName);
-  auto *scalarElemAlias = cast<TypeAliasDecl>(currencyDeclLookupResult[0]);
-  auto scalarTy =
-      scalarElemAlias->getDeclaredInterfaceType()->getCanonicalType();
-  auto currencySubMap =
-      type->getMemberSubstitutionMap(module.getSwiftModule(), scalarElemAlias);
-  scalarTy = scalarTy.subst(currencySubMap)->getCanonicalType();
-  auto *scalarTyDecl = scalarTy.getAnyNominal();
-  assert(scalarTyDecl && "ScalarElement must be a nominal type");
-  // %0 = ... : $<scalar type>
-  auto scalarBuf =
-      builder.createAllocStack(loc, SILType::getPrimitiveObjectType(scalarTy));
-  convertIntToIndirectExpressible(value, scalarTyDecl, scalarBuf, loc, builder,
-                                  context);
-  auto scalarLOQ = getBufferLOQ(scalarTy, builder.getFunction());
-  auto loadAccess = builder.createBeginAccess(
-      loc, scalarBuf, SILAccessKind::Read, SILAccessEnforcement::Static,
-      /*noNestedConflict*/ true,
-      /*fromBuiltin*/ false);
-  auto scalarVal = builder.createLoad(loc, loadAccess, scalarLOQ);
-  builder.createEndAccess(loc, loadAccess, /*aborted*/ false);
-  // dealloc_stack %0 : $*<scalar type>
-  builder.createDeallocStack(loc, scalarBuf);
-  // %1 = metatype $<scalar type>.Type
-  auto metatypeTy = SILType::getPrimitiveObjectType(
-      CanMetatypeType::get(type, MetatypeRepresentation::Thick));
-  auto *metatype = builder.createMetatype(loc, metatypeTy);
-  // Call `init(_:)` through `VectorNumeric` protocol.
-  DeclName initName(astCtx, DeclBaseName::createConstructor(), {Identifier()});
-  // Allocate buffer for passing the indirect scalar value.
-  // %2 = alloc_stack $<scalar type>
-  auto scalarValBuf =
-      builder.createAllocStack(loc, typeConv.getLoweredType(scalarTy));
-  SWIFT_DEFER {
-    // dealloc_stack %2 : $<scalar type>
-    builder.createDeallocStack(loc, scalarValBuf);
-  };
-  auto *bufAccess = builder.createBeginAccess(
-      loc, scalarValBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
-      /*noNestedConflict*/ true,
-      /*fromBuiltin*/ false);
-  // store %0 : $<scalar type> to $*<scalar type>
-  builder.createStore(loc, scalarVal, bufAccess,
-                      getBufferSOQ(scalarTy, builder.getFunction()));
-  builder.createEndAccess(loc, bufAccess, /*aborted*/ false);
-  auto *vecNumProto = context.getVectorNumericProtocol();
-  auto *reqr =
-      cast<ConstructorDecl>(vecNumProto->lookupDirect(initName).front());
-  SILDeclRef reqrRef(reqr, SILDeclRef::Kind::Allocator);
-  auto silInitTy = context.getTypeConverter().getConstantType(reqrRef);
-  // Get scalar's conformance to `FloatingPoint`.
-  auto conf =
-      astCtx.getConformance(type, vecNumProto, targetTypeDecl->getLoc(),
-                            targetTypeDecl, ProtocolConformanceState::Complete);
-  ProtocolConformanceRef confRef(conf);
-  // $4 = witness_method ...
-  auto initFnRef =
-      builder.createWitnessMethod(loc, type, confRef, reqrRef, silInitTy);
-  auto initSubMap =
-      SubstitutionMap::getProtocolSubstitutions(vecNumProto, type, confRef);
-  // %5 = apply %4(%3, %2, %1)
-  builder.createApply(loc, initFnRef, initSubMap,
-                      {seedBuf, scalarValBuf, metatype},
-                      /*isNonThrowing*/ false);
+  // Struct gets member-wise initialized.
+  case CotangentSpace::Kind::ProductStruct: {
+    auto *decl = cotangentSpace->getProductStruct();
+    SmallVector<SILValue, 8> elements;
+    for (auto *field : decl->getStoredProperties()) {
+      auto *eltAddr =
+          builder.createStructElementAddr(loc, seedBufAccess, field);
+      createScalarValueIndirect(scalar, eltAddr->getType().getASTType(),
+                                eltAddr, loc, builder, context);
+    }
+    return;
+  }
+  // Tuple gets member-wise initialized.
+  case CotangentSpace::Kind::ProductTuple: {
+    auto tupleType = cotangentSpace->getProductTuple();
+    SmallVector<SILValue, 8> elements;
+    for (auto i : indices(tupleType->getElementTypes())) {
+      auto *eltAddr = builder.createTupleElementAddr(loc, seedBufAccess, i);
+      createScalarValueIndirect(scalar, eltAddr->getType().getASTType(),
+                                eltAddr, loc, builder, context);
+    }
+    return;
+  }
+  case CotangentSpace::Kind::Sum: {
+    llvm_unreachable("Differentiating sum types is not supported yet");
+  }
+  }
+}
+
+/// Creates and returns a scalar value in the specified type. The specified type
+/// must be a loadable type and must have a cotangent space.
+static SILValue createScalarValueDirect(intmax_t scalar, CanType type,
+                                        SILLocation loc,
+                                        SILBuilder &builder,
+                                        ADContext &context) {
+  LLVM_DEBUG(getADDebugStream() << "Creating a scalar value " << scalar <<
+        " of type " << type << '\n');
+  auto cotangentSpace = context.getCotangentSpace(type);
+  assert(cotangentSpace && "No cotangent space for this type");
+  switch (cotangentSpace->getKind()) {
+  case CotangentSpace::Kind::BuiltinRealScalar:
+    return createBuiltinFPScalar(scalar, type, loc, builder);
+  case CotangentSpace::Kind::RealScalar:
+  case CotangentSpace::Kind::RealVector: {
+    // Otherwise, initiailize the value through protocol calls.
+    auto *buffer =
+        builder.createAllocStack(loc, SILType::getPrimitiveObjectType(type));
+    auto *access =
+        builder.createBeginAccess(loc, buffer, SILAccessKind::Init,
+                                  SILAccessEnforcement::Static,
+                                  /*noNestedConflict*/ true,
+                                  /*fromBuiltin*/ false);
+    createScalarValueIndirect(scalar, type, access, loc, builder, context);
+    builder.createEndAccess(loc, access, /*aborted*/ false);
+    access = builder.createBeginAccess(loc, buffer, SILAccessKind::Read,
+                                       SILAccessEnforcement::Static,
+                                       /*noNestedConflict*/ true,
+                                       /*fromBuiltin*/ false);
+    auto *loadedValue = builder.createLoad(
+        loc, access, getBufferLOQ(type, builder.getFunction()));
+    builder.createEndAccess(loc, access, /*aborted*/ false);
+    builder.createDeallocStack(loc, buffer);
+    return loadedValue;
+  }
+  case CotangentSpace::Kind::ProductStruct: {
+    auto *structDecl = cotangentSpace->getProductStruct();
+    SmallVector<SILValue, 8> elements;
+    for (auto *field : structDecl->getStoredProperties()) {
+      auto eltVal = createScalarValueDirect(
+          scalar, field->getType()->getCanonicalType(), loc, builder, context);
+      elements.push_back(eltVal);
+    }
+    return builder.createStruct(
+        loc, SILType::getPrimitiveObjectType(type), elements);
+  }
+  case CotangentSpace::Kind::ProductTuple: {
+    auto tupleType = cotangentSpace->getProductTuple();
+    SmallVector<SILValue, 8> elements;
+    for (auto eltType : tupleType->getElementTypes()) {
+      auto eltVal = createScalarValueDirect(
+          scalar, eltType->getCanonicalType(), loc, builder, context);
+      elements.push_back(eltVal);
+    }
+    return builder.createTuple(
+        loc, SILType::getPrimitiveObjectType(type), elements);
+  }
+  case CotangentSpace::Kind::Sum: {
+    llvm_unreachable("Differentiating sum types is not supported yet");
+  }
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -1774,14 +2164,14 @@ private:
 } // end anonymous namespace
 
 StructDecl *
-ADContext::createPrimalValueStructForFunction(SILFunction *function) {
+ADContext::createPrimalValueStruct(const DifferentiationTask *task) {
+  auto *function = task->getOriginal();
   assert(&function->getModule() == &module &&
          "The function must be in the same module");
   auto &file = getPrimalValueDeclContainer();
   // Create a `<fn_name>__Type` struct.
-  std::string pvStructName;
-  pvStructName += function->getName();
-  pvStructName += "__Type";
+  std::string pvStructName = "AD__" + function->getName().str() + "__Type__" +
+                             mangleADIndices(task->getIndices());
   auto structId = astCtx.getIdentifier(pvStructName);
   SourceLoc loc = function->getLocation().getSourceLoc();
   auto pvStruct =
@@ -1791,10 +2181,18 @@ ADContext::createPrimalValueStructForFunction(SILFunction *function) {
                               /*DC*/ &file);
   pvStruct->computeType();
   if (auto *dc = function->getDeclContext()) {
-    if (auto *afd = dyn_cast<AbstractFunctionDecl>(dc))
-      pvStruct->setAccess(afd->getEffectiveAccess());
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(dc)) {
+      auto funcAccess = afd->getEffectiveAccess();
+      if (funcAccess >= AccessLevel::Public) {
+        pvStruct->getAttrs().add(
+            new (astCtx) FixedLayoutAttr(/*implicit*/ true));
+      }
+      pvStruct->setAccess(funcAccess);
+    }
   } else {
     pvStruct->setAccess(AccessLevel::Internal);
+    pvStruct->getAttrs().add(
+        new (astCtx) UsableFromInlineAttr(/*implicit*/ true));
   }
   // If the original function has generic parameters, clone them.
   auto *genEnv = function->getGenericEnvironment();
@@ -1813,11 +2211,25 @@ ADContext::createPrimalValueStructForFunction(SILFunction *function) {
   return pvStruct;
 }
 
+/// Given an parameter argument (not indirect result) and some differentiation
+/// indices, figure out whether the parent function is being differentiated with
+/// respect to this parameter, according to the indices.
+static bool isDifferentiationParameter(SILArgument *argument,
+                                       llvm::SmallBitVector indices) {
+  if (!argument) return false;
+  auto *function = argument->getFunction();
+  auto paramArgs = function->getArgumentsWithoutIndirectResults();
+  for (unsigned i : indices.set_bits())
+    if (paramArgs[i] == argument)
+      return true;
+  return false;
+}
+
 /// For a nested function call whose result tuple is active on the
 /// differentiation path, compute the set of minimal indices for differentiating
 /// this function as required by the data flow.
 static void collectMinimalIndicesForFunctionCall(
-    ApplyInst *ai, SILReverseAutoDiffIndices parentIndices,
+    ApplyInst *ai, const SILReverseAutoDiffIndices &parentIndices,
     const DifferentiableActivityInfo &activityInfo,
     SmallVectorImpl<unsigned> &paramIndices,
     SmallVectorImpl<unsigned> &resultIndices) {
@@ -1827,10 +2239,12 @@ static void collectMinimalIndicesForFunctionCall(
   SILFunctionConventions convs(fnTy, ai->getModule());
   auto arguments = ai->getArgumentOperands();
   // Parameter indices are indices (in the type signature) of parameter
-  // arguments that are useful.
+  // arguments that are varied or are arguments.
   unsigned currentParamIdx = 0;
-  for (auto arg : ai->getArgumentsWithoutIndirectResults()) {
-    if (activityInfo.isUseful(arg, parentIndices.source))
+  for (auto applyArg : ai->getArgumentsWithoutIndirectResults()) {
+    if (activityInfo.isVaried(applyArg, parentIndices.parameters) ||
+        isDifferentiationParameter(dyn_cast<SILArgument>(applyArg),
+                                   parentIndices.parameters))
       paramIndices.push_back(currentParamIdx);
     ++currentParamIdx;
   }
@@ -2036,6 +2450,9 @@ public:
     if (errorOccurred)
       return;
     SILClonerWithScopes::postProcess(orig, cloned);
+    auto &indices = getDifferentiationTask()->getIndices();
+    if (!(activityInfo.getActivity(orig, indices) & ActivityFlags::Active))
+      return;
     switch (classifyPrimalValue(orig)) {
     case PrimalValueKind::Conversion:
       break;
@@ -2196,6 +2613,7 @@ public:
       errorOccurred = true;
       return;
     }
+    auto calleeOriginType = calleeOriginFnRef->getFunctionType();
     // Find or register a differentiation task for this function.
     auto *newTask = context.lookUpOrRegisterDifferentiationTask(
         calleeOriginFnRef->getReferencedFunction(), indices,
@@ -2231,18 +2649,32 @@ public:
       llvm_unreachable("FIXME: Some primal values are indirect");
     }
     // Collect substituted arguments.
-    for (auto origArg : ai->getArguments())
+    LLVM_DEBUG(getADDebugStream() << "Retrieving original arguments:\n");
+    for (auto origArg : ai->getArguments()) {
+      LLVM_DEBUG(getADDebugStream() << "Original argument " << origArg);
       newArgs.push_back(getOpValue(origArg));
+    }
     // %2 = apply %1(...)
-    auto primalCall = builder.createApply(ai->getLoc(), convertedPrimal,
-                                          ai->getSubstitutionMap(), newArgs,
-                                          ai->isNonThrowing());
+    auto *primalCall = builder.createApply(ai->getLoc(), convertedPrimal,
+                                           ai->getSubstitutionMap(), newArgs,
+                                           ai->isNonThrowing());
+    LLVM_DEBUG(getADDebugStream()
+               << "Applied primal function\n" << *primalCall);
     // After applying the primal, we need to handle the primal's direct results.
     // These results include direct primal values and direct original results.
     SmallVector<SILValue, 8> primVals, origResults, allDirResults;
     extractAllElements(primalCall, builder, allDirResults);
-    collectPrimalValuesAndOriginalResults(primalFnTy, primalCall, allDirResults,
-                                          primVals, origResults);
+    collectPrimalValuesAndOriginalResults(calleeOriginType, primalCall,
+                                          allDirResults, primVals, origResults);
+    LLVM_DEBUG({
+      auto &s = getADDebugStream();
+      s << "All direct results returned by the primal function: \n";
+      llvm::for_each(allDirResults, [&](SILValue v) { s << v; });
+      s << "Primal values returned by the primal function: \n";
+      llvm::for_each(primVals, [&](SILValue v) { s << v; });
+      s << "Original results returned by the primal function: \n";
+      llvm::for_each(origResults, [&](SILValue v) { s << v; });
+    });
 
     // Get original direct results for cloning.
     SmallVector<SILValue, 8> origDirResults;
@@ -2315,6 +2747,9 @@ public:
 } // end anonymous namespace
 
 bool PrimalGen::performSynthesis(FunctionSynthesisItem item) {
+  LLVM_DEBUG(getADDebugStream() << "Performing primal synthesis for original"
+             << item.original->getName() << " and its corresponding adjoint "
+             << item.target->getName() << '\n');
   // FIXME: If the original function has multiple basic blocks, bail out since
   // AD does not support control flow yet.
   if (diagnoseUnsupportedControlFlow(context, item.task)) {
@@ -2350,9 +2785,8 @@ PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
   auto *original = task->getOriginal();
   auto &module = context.getModule();
   std::string primalName =
-      original->getName().str() + "__primal_" + mangleADIndices(indices);
-  StructDecl *primalValueStructDecl =
-      context.createPrimalValueStructForFunction(original);
+      "AD__" + original->getName().str() + "__primal_" + mangleADIndices(indices);
+  StructDecl *primalValueStructDecl = context.createPrimalValueStruct(task);
   task->initializePrimalInfo(primalValueStructDecl, module);
   auto pvType = primalValueStructDecl->getDeclaredType()->getCanonicalType();
   auto objTy = SILType::getPrimitiveObjectType(pvType);
@@ -2370,8 +2804,11 @@ PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
       originalTy->getParameters(), originalTy->getYields(), results,
       originalTy->getOptionalErrorResult(), context.getASTContext());
   SILOptFunctionBuilder fb(context.getTransform());
+  auto linkage = original->getLinkage();
+  if (linkage == SILLinkage::Public)
+    linkage = SILLinkage::PublicNonABI;
   auto *primal = fb.getOrCreateFunction(
-      original->getLocation(), primalName, original->getLinkage(), primalTy,
+      original->getLocation(), primalName, linkage, primalTy,
       original->isBare(), original->isTransparent(), original->isSerialized());
   primal->setUnqualifiedOwnership();
   LLVM_DEBUG(getADDebugStream() << "Primal function created \n"
@@ -2460,10 +2897,19 @@ SILFunction *AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
   SmallVector<SILParameterInfo, 8> adjParams;
   SmallVector<SILResultInfo, 8> adjResults;
   auto origTy = original->getLoweredFunctionType();
-  for (auto &param : origTy->getParameters()) {
+  auto origParams = origTy->getParameters();
+  assert((!origTy->hasSelfParam() ||
+          origParams.back() == origTy->getSelfParameter()) &&
+         "self argument should be the last one");
+  auto origParamsWithoutSelf = origTy->hasSelfParam() ?
+      origParams.slice(0, origParams.size() - 1) : origParams;
+
+  // Add adjoint parameters for the original non-self parameters. If there is a
+  // self parameter, we'll push it later as the last adjoint parameter, because
+  // Swift's method convention always has self last.
+  for (auto &param : origParamsWithoutSelf)
     adjParams.push_back(param);
-    adjResults.push_back(getFormalResultInfo(param.getType(), module));
-  }
+
   // If there's a generated primal, accept a primal value struct in the adjoint
   // parameter list.
   if (auto *pi = task->getPrimalInfo()) {
@@ -2472,21 +2918,44 @@ SILFunction *AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
                       ->getCanonicalType();
     adjParams.push_back(getFormalParameterInfo(pvType, module));
   }
-  // Add parameter types.
+
+  // Add adjoint parameters for the original results.
   for (auto &origRes : origTy->getResults())
     adjParams.push_back(getFormalParameterInfo(origRes.getType(), module));
-  // Add seed type.
+
+  // Add adjoint parameter for the seed.
   adjParams.push_back(getFormalParameterInfo(
       origTy->getResults()[task->getIndices().source].getType(), module));
-  auto adjName = original->getName().str() + "__adjoint_" +
+
+  // Add adjoint parameter for the original self parameter, if applicable.
+  if (origTy->hasSelfParam())
+    adjParams.push_back(origTy->getSelfParameter());
+
+  // Add adjoint result for the wrt self parameter, if it was requested.
+  auto selfParamIndex = origParams.size() - 1;
+  if (origTy->hasSelfParam() &&
+      task->getIndices().isWrtParameter(selfParamIndex))
+    adjResults.push_back(getFormalResultInfo(
+        origParams[selfParamIndex].getType(), module));
+
+  // Add adjoint results for the requested non-self wrt parameters.
+  for (auto i : task->getIndices().parameters.set_bits()) {
+    if (origTy->hasSelfParam() && i == selfParamIndex)
+      continue;
+    adjResults.push_back(getFormalResultInfo(origParams[i].getType(), module));
+  }
+
+  auto adjName = "AD__" + original->getName().str() + "__adjoint_" +
                  mangleADIndices(task->getIndices());
   auto adjType = SILFunctionType::get(
       origTy->getGenericSignature(), origTy->getExtInfo(),
       origTy->getCoroutineKind(), origTy->getCalleeConvention(), adjParams, {},
       adjResults, None, original->getASTContext());
   SILOptFunctionBuilder fb(context.getTransform());
-  auto *adjoint = fb.createFunction(
-      original->getLinkage(), adjName, adjType,
+  auto linkage = original->getLinkage();
+  if (linkage == SILLinkage::Public)
+    linkage = SILLinkage::PublicNonABI;
+  auto *adjoint = fb.createFunction(linkage, adjName, adjType,
       original->getGenericEnvironment(), original->getLocation(),
       original->isBare(), original->isTransparent(), original->isSerialized());
   adjoint->setUnqualifiedOwnership();
@@ -2498,10 +2967,10 @@ SILFunction *AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
 
 SILFunction *
 AdjointGen::lookupAdjointOrScheduleSynthesis(DifferentiationTask *task) {
-  // If the original function already has a primal, skip this task.
+  // If the original function already has an adjoint, skip this task.
   if (auto *existingAdjoint = task->getAdjoint())
     return existingAdjoint;
-  // Create a primal function.
+  // Create an adjoint function.
   SILFunction *newAdjoint = createEmptyAdjoint(task);
   // Create a synthesis item and push it to the worklist.
   FunctionSynthesisItem synthesis{task->getOriginal(), newAdjoint,
@@ -2544,8 +3013,8 @@ public:
     /// fanout).
     Zero,
 
-    /// A tuple of adjoint values.
-    Tuple,
+    /// An aggregate of adjoint values.
+    Aggregate,
 
     /// A materialized SIL value.
     Materialized,
@@ -2570,7 +3039,8 @@ private:
   Value value;
 
   AdjointValue(Kind kind, SILType type, Value value)
-      : kind(kind), type(type), value(value) {}
+      : kind(kind), type(type), value(value) {
+  }
 
 public:
   AdjointValue(SILValue materializedValue)
@@ -2580,32 +3050,37 @@ public:
 
   Kind getKind() const { return kind; }
   SILType getType() const { return type; }
-  Type getSwiftType() const { return type.getASTType(); }
+  CanType getSwiftType() const { return type.getASTType(); }
 
-  NominalTypeDecl *getNominalType() const {
+  NominalTypeDecl *getAnyNominal() const {
     return getSwiftType()->getAnyNominal();
   }
 
   bool isZero() const { return kind == Kind::Zero; }
-  bool isTuple() const { return kind == Kind::Tuple; }
+  bool isAggregate() const { return kind == Kind::Aggregate; }
   bool isMaterialized() const { return kind == Kind::Materialized; }
 
   static AdjointValue getZero(SILType type) { return {Kind::Zero, type, {}}; }
 
   static AdjointValue getMaterialized(SILValue value) {
+    assert(value);
     return {Kind::Materialized, value->getType(), value};
   }
 
-  static AdjointValue getTuple(TupleType *type, ArrayRef<AdjointValue> elements,
-                               llvm::BumpPtrAllocator &allocator) {
-    auto silTy = SILType::getPrimitiveObjectType(type->getCanonicalType());
+  static AdjointValue getAggregate(SILType type,
+                                   ArrayRef<AdjointValue> elements,
+                                   llvm::BumpPtrAllocator &allocator) {
     // Tuple type elements must match the type of each adjoint value element.
-    assert(aggregateElementTypesEqual(elements, type->getElementTypes()));
-    return getAggregate(Kind::Tuple, silTy, elements, allocator);
+    assert(isLegalAggregate(elements, type));
+    AdjointValue *buf = reinterpret_cast<AdjointValue *>(allocator.Allocate(
+        elements.size() * sizeof(AdjointValue), alignof(AdjointValue)));
+    MutableArrayRef<AdjointValue> array(buf, elements.size());
+    std::uninitialized_copy(elements.begin(), elements.end(), array.begin());
+    return {Kind::Aggregate, type, array};
   }
 
-  ArrayRef<AdjointValue> getTupleElements() const {
-    assert(isTuple());
+  ArrayRef<AdjointValue> getAggregateElements() const {
+    assert(isAggregate());
     return value.aggregate;
   }
 
@@ -2615,24 +3090,22 @@ public:
   }
 
 private:
-  template <typename TypeRange>
-  static bool aggregateElementTypesEqual(ArrayRef<AdjointValue> elements,
-                                         TypeRange &&types) {
-    for (auto pair : llvm::zip(types, elements))
-      if (!std::get<0>(pair)->isEqual(std::get<1>(pair).getSwiftType()))
-        return false;
+  static bool isLegalAggregate(ArrayRef<AdjointValue> elements, SILType type) {
+    if (auto *structDecl =
+            dyn_cast_or_null<StructDecl>(type.getASTType()->getAnyNominal())) {
+      // TODO: Check whether this struct is @_fixed_layout and ABI public.
+      for (auto pair : llvm::zip(structDecl->getStoredProperties(), elements))
+        if (!std::get<0>(pair)->getType()->getCanonicalType()
+                ->isEqual(std::get<1>(pair).getSwiftType()))
+          return false;
+    } else if (auto tupleTy = type.getAs<TupleType>()) {
+      for (auto pair : llvm::zip(tupleTy->getElementTypes(), elements))
+        if (!std::get<0>(pair)->isEqual(std::get<1>(pair).getSwiftType()))
+          return false;
+    } else {
+      llvm_unreachable("Not an aggregate type");
+    }
     return true;
-  }
-
-  /// Helper for creating aggregate values, such as tuples and structs.
-  static AdjointValue getAggregate(Kind kind, SILType type,
-                                   ArrayRef<AdjointValue> elements,
-                                   llvm::BumpPtrAllocator &allocator) {
-    AdjointValue *buf = reinterpret_cast<AdjointValue *>(allocator.Allocate(
-        elements.size() * sizeof(AdjointValue), alignof(AdjointValue)));
-    MutableArrayRef<AdjointValue> array(buf, elements.size());
-    std::uninitialized_copy(elements.begin(), elements.end(), array.begin());
-    return {kind, type, elements};
   }
 
 public:
@@ -2641,10 +3114,25 @@ public:
     case Kind::Zero:
       s << "Zero";
       break;
-    case Kind::Tuple:
-      s << "Tuple(";
-      interleave(getTupleElements(), [&s](AdjointValue elt) { elt.print(s); },
-                 [&s] { s << ", "; });
+    case Kind::Aggregate:
+      s << "Aggregate<";
+      if (auto *decl = dyn_cast_or_null<StructDecl>(
+              type.getASTType()->getAnyNominal())) {
+        s << "Struct>(";
+        interleave(llvm::zip(decl->getStoredProperties(),
+                             getAggregateElements()),
+                   [&s](std::tuple<VarDecl *, AdjointValue> elt) {
+                     s << std::get<0>(elt)->getName() << ": ";
+                     std::get<1>(elt).print(s);
+                   }, [&s] { s << ", "; });
+      } else if (auto tupleType = type.getAs<TupleType>()) {
+        s << "Tuple>(";
+        interleave(getAggregateElements(),
+                   [&s](AdjointValue elt) { elt.print(s); },
+                   [&s] { s << ", "; });
+      } else {
+        llvm_unreachable("Invalid aggregate");
+      }
       s << ')';
       break;
     case Kind::Materialized:
@@ -2653,6 +3141,12 @@ public:
     }
   }
 };
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     const AdjointValue &adjVal) {
+  adjVal.print(os);
+  return os;
+}
 
 } // end anonymous namespace
 
@@ -2678,6 +3172,13 @@ public:
   void insertValueMapping(SILValue valueInOriginal, SILValue valueInAdjoint) {
     auto insertion = ValueMap.insert({valueInOriginal, valueInAdjoint});
     assert(insertion.second && "The original value was mapped before");
+  }
+
+  SILValue lookUpValue(SILValue valueInOriginal) {
+    auto lookup = ValueMap.find(valueInOriginal);
+    if (lookup == ValueMap.end())
+      return nullptr;
+    return lookup->getSecond();
   }
 
   void setInsertionPointBeforeAnyTerminator(SILBasicBlock *bb) {
@@ -2718,8 +3219,12 @@ private:
   /// blocks.
   DenseMap<SILBasicBlock *, SILBasicBlock *> adjointBBMap;
 
-  /// The range of original parameters in the adjoint function.
-  ArrayRef<SILArgument *> originalParametersInAdj;
+  /// Original parameters passed to the adjoint function, in the same order as
+  /// they appear in the adjoint function. Note that these parameters are not
+  /// necessarily contiguous in the adjoint function signature because the
+  /// non-self original parameters are at the beginning and the self parameter
+  /// (if any) is at the end.
+  SmallVector<SILArgument *, 8> originalParametersInAdj;
 
   /// The primal value aggregate passed to the adjoint function.
   SILArgument *primalValueAggregateInAdj = nullptr;
@@ -2773,23 +3278,24 @@ protected:
 
   /// Materialize an adjoint value. The type of the given adjoint value must be
   /// loadable.
-  SILValue materializeAdjoint(AdjointValue val, SILLocation loc);
+  SILValue materializeAdjointDirect(AdjointValue val, SILLocation loc);
 
   /// Materialize an adjoint value indirectly to a SIL buffer.
   void materializeAdjointIndirect(AdjointValue val, SILValue destBuffer);
 
   /// Given an two adjoint values, accumulate them.
-  AdjointValue accumulateAdjoints(AdjointValue lhs, AdjointValue rhs);
+  AdjointValue accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs);
 
   /// Given two materialized adjoint values, accumulate them. These two
   /// adjoints must be objects of loadable type.
-  SILValue accumulateMaterializedAdjoints(SILValue lhs, SILValue rhs);
+  SILValue accumulateMaterializedAdjointsDirect(SILValue lhs, SILValue rhs);
 
   /// Given two materialize adjoint values, accumulate them using
   /// `VectorNumeric.+` or `FloatingPoint.+`, depending on the differentiation
   /// mode.
-  void accumulateMaterializedAdjointsIndirect(SILValue lhs, SILValue rhs,
-                                              SILValue resultBuffer);
+  void accumulateMaterializedAdjointsIndirect(SILValue lhsBufAccess,
+                                              SILValue rhsBufAccess,
+                                              SILValue resultBufAcess);
 
   /// Get the adjoint for an original value. The given value must be in the
   /// original function.
@@ -2797,6 +3303,7 @@ protected:
   /// This method first tries to find an entry in `adjointMap`. If an adjoint
   /// doesn't exist, create a zero adjoint.
   AdjointValue getAdjointValue(SILValue originalValue) {
+    assert(originalValue->getFunction() == &getOriginal());
     auto insertion = adjointMap.try_emplace(
         originalValue, AdjointValue::getZero(originalValue->getType()));
     return insertion.first->getSecond();
@@ -2806,6 +3313,7 @@ protected:
   /// value
   AdjointValue &addAdjointValue(SILValue originalValue,
                                 AdjointValue adjointValue) {
+    assert(originalValue->getFunction() == &getOriginal());
     LLVM_DEBUG(getADDebugStream() << "Adding adjoint for " << originalValue);
     auto insertion = adjointMap.try_emplace(originalValue, adjointValue);
     auto inserted = insertion.second;
@@ -2813,7 +3321,7 @@ protected:
     // If adjoint already exists, accumulate the adjoint onto the existing
     // adjoint.
     if (!inserted)
-      value = accumulateAdjoints(value, adjointValue);
+      value = accumulateAdjointsDirect(value, adjointValue);
     return value;
   }
 
@@ -2828,6 +3336,7 @@ public:
     auto &original = getOriginal();
     auto &adjoint = getAdjoint();
     auto adjLoc = getAdjoint().getLocation();
+    auto *task = getDifferentiationTask();
     LLVM_DEBUG(getADDebugStream() << "Running AdjointGen on\n" << original);
     auto origTy = original.getLoweredFunctionType();
     // Create entry BB and arguments.
@@ -2840,18 +3349,32 @@ public:
     // `originalResults` and `seed`.
     auto adjParamArgs = getAdjoint().getArgumentsWithoutIndirectResults();
     auto origNumParams = origConv.getNumParameters();
+    auto origNumParamsWithoutSelf = origTy->hasSelfParam() ? origNumParams - 1
+                                                           : origNumParams;
     auto origNumResults = origTy->getNumResults();
     // The adjoint function has type
-    //   (arg0, ..., argn, pv0, ..., pvn, origres, seed) -> (arg0, ..., argn).
+    //   (arg0, ..., argn, pv0, ..., pvn, origres, seed, [self])
+    //       -> ([self], [arg0], ..., [argn]).
+    // Square brackets denote [] elements that are not always in the signature:
+    //   * "self" is present in the argument list when it's present in the
+    //      original's argument list.
+    //   * Results are present when the adjoint is with respect to the
+    //     corresponding original argument.
+    //
     // We get each range of arguments by shifting the `paramArgsData` pointer.
     auto *paramArgsData = adjParamArgs.data();
-    originalParametersInAdj = {paramArgsData, origNumParams};
-    paramArgsData += origNumParams;
+    originalParametersInAdj.reserve(origNumParams);
+    for (auto i : range(origNumParamsWithoutSelf)) {
+      (void)i;
+      originalParametersInAdj.push_back(*paramArgsData++);
+    }
     primalValueAggregateInAdj = *paramArgsData++;
     originalResultsInAdj = {paramArgsData, origNumResults};
     paramArgsData += origNumResults;
-    seed = *paramArgsData;
-    assert(seed == adjParamArgs.back());
+    seed = *paramArgsData++;
+    if (origTy->hasSelfParam())
+      originalParametersInAdj.push_back(*paramArgsData++);
+    assert(paramArgsData == adjParamArgs.data() + adjParamArgs.size());
 
     // Map the original's parameters to the adjoint's corresponding "original
     // parameters".
@@ -2869,7 +3392,7 @@ public:
     //     else zeros
     SmallVector<SILValue, 8> formalResults;
     collectAllFormalResultsInTypeOrder(original, formalResults);
-    auto srcIdx = getDifferentiationTask()->getIndices().source;
+    auto srcIdx = task->getIndices().source;
     addAdjointValue(formalResults[srcIdx], AdjointValue::getMaterialized(seed));
     LLVM_DEBUG(getADDebugStream()
                << "Assigned seed " << *seed << " as the adjoint of "
@@ -2891,24 +3414,38 @@ public:
     // there.
     getBuilder().setInsertionPoint(adjointEntry);
 
+    // This vector will contain all the materialized return elements.
     SmallVector<SILValue, 8> retElts;
-    for (auto paramPair : zip(original.getArgumentsWithoutIndirectResults(),
-                              originalParametersInAdj)) {
-      auto origParam = std::get<0>(paramPair);
-      auto adjParam = std::get<1>(paramPair);
+    auto origParams = original.getArgumentsWithoutIndirectResults();
+
+    // Materializes the return element corresponding to the parameter
+    // `parameterIndex` into the `retElts` vector.
+    auto addRetElt = [&](unsigned parameterIndex) -> void {
+      auto origParam = origParams[parameterIndex];
+      auto adjParam = originalParametersInAdj[parameterIndex];
       auto adjVal = getAdjointValue(origParam);
       if (adjParam->getType().isObject())
-        retElts.push_back(materializeAdjoint(adjVal, adjLoc));
+        retElts.push_back(materializeAdjointDirect(adjVal, adjLoc));
       else
         materializeAdjointIndirect(adjVal, adjParam);
-    }
-    SILValue retVal;
-    if (retElts.size() == 1)
-      retVal = retElts[0];
-    else
-      retVal = getBuilder().createTuple(adjLoc, retElts);
-    getBuilder().createReturn(adjLoc, retVal);
+    };
 
+    // The original's self parameter, if present, is the last parameter. But we
+    // want its gradient, if present, to be the first return element.
+    auto selfParamIndex = origParams.size() - 1;
+    if (origTy->hasSelfParam() &&
+        task->getIndices().isWrtParameter(selfParamIndex))
+      addRetElt(selfParamIndex);
+
+    // Add the non-self parameters that are differentiated with respect to.
+    for (auto i : task->getIndices().parameters.set_bits()) {
+      // Do not add the self parameter because we have already added it at the
+      // beginning.
+      if (origTy->hasSelfParam() && i == selfParamIndex)
+        continue;
+      addRetElt(i);
+    }
+    getBuilder().createReturn(adjLoc, joinElements(retElts, builder, adjLoc));
     return errorOccurred;
   }
 
@@ -2968,6 +3505,11 @@ public:
   // original results. When `nested` is true, `value` must be an `apply`
   // instruction.
   SILValue extractPrimalValueIfAny(SILValue value, bool nested = false) {
+    // If the non-nested primal value has been extracted before, use that.
+    if (!nested)
+      if (auto val = rematCloner.lookUpValue(value))
+        return val;
+    // Do primal value extraction.
     auto &pi = getPrimalInfo();
     VarDecl *field = nullptr;
     SILValue extracted;
@@ -2997,10 +3539,9 @@ public:
             loc, primalValueAggregateInAdj, field);
       // Otherwise, the primal value struct is a normal SSA value. Emit a
       // `struct_extract`.
-      else {
+      else
         extracted = getBuilder().createStructExtract(
             remapLocation(value.getLoc()), primalValueAggregateInAdj, field);
-      }
     }
     // Memorize this value mapping in the remat cloner, when we are not
     // extracting a nested primal value aggregate.
@@ -3045,7 +3586,6 @@ public:
     // Parameters: (orig_args..., prim_val_struct?, orig_res..., seed...)
     // Results: (derivatives...)
     SmallVector<SILValue, 8> args;
-    args.reserve(adjoint->getArguments().size());
     // For each indirect result, allocate a local buffer and add it to the
     // argument list.
     SmallVector<SILValue, 8> allocsToCleanUp;
@@ -3055,18 +3595,29 @@ public:
       args.push_back(buf);
       allocsToCleanUp.push_back(buf);
     }
-    // For each original parameter, push the mapped parameter.
-    SILFunctionConventions origConv(origTy, getModule());
-    for (auto param : ai->getArgumentsWithoutIndirectResults())
+
+    // For each non-self original parameter, push the mapped parameter. If
+    // there is a self parameter, we'll push it later as the last argument,
+    // because Swift's method convention always has self last.
+    auto originalParams = ai->getArgumentsWithoutIndirectResults();
+    assert((!ai->hasSelfArgument() ||
+           originalParams.back() == ai->getSelfArgument()) &&
+           "self argument should be the last one");
+    auto originalParamsWithoutSelf = ai->hasSelfArgument() ?
+        originalParams.slice(0, originalParams.size() - 1) : originalParams;
+    for (auto param : originalParamsWithoutSelf)
       args.push_back(remapValue(param));
 
-    // Add original values and nested primal values.
-    auto origResultAggr = extractPrimalValueIfAny(ai, /*nested*/ false);
-    SmallVector<SILValue, 8> origResults, nestedPrimVals;
+    // Add nested primal values.
+    if (auto nestedPrimValAggr = extractPrimalValueIfAny(ai, /*nested*/ true)) {
+      SmallVector<SILValue, 8> nestedPrimVals;
+      extractAllElements(nestedPrimValAggr, builder, nestedPrimVals);
+      args.append(nestedPrimVals.begin(), nestedPrimVals.end());
+    }
+    // Add original results.
+    auto origResultAggr = remapValue(ai);
+    SmallVector<SILValue, 8> origResults;
     extractAllElements(origResultAggr, builder, origResults);
-    auto nestedPrimValAggr = extractPrimalValueIfAny(ai, /*nested*/ true);
-    extractAllElements(nestedPrimValAggr, builder, nestedPrimVals);
-    args.append(nestedPrimVals.begin(), nestedPrimVals.end());
     args.append(origResults.begin(), origResults.end());
 
     // Add seed.
@@ -3084,32 +3635,58 @@ public:
           loc, access, getBufferLOQ(seed.getSwiftType(), getAdjoint())));
       getBuilder().createEndAccess(loc, access, /*aborted*/ false);
     }
+
+    // Push the mapped self parameter, if any.
+    if (ai->hasSelfArgument())
+      args.push_back(remapValue(ai->getSelfArgument()));
+
     // Call the adjoint function.
     auto *adjointRef = getBuilder().createFunctionRef(ai->getLoc(), adjoint);
     auto origFnRef = ai->getCalleeOrigin();
     auto convertedAdjFn = reapplyFunctionConversion(
         adjointRef, origFnRef, ai->getCallee(), getBuilder(), ai->getLoc());
     auto *applyAdj = getBuilder().createApply(ai->getLoc(), convertedAdjFn,
-                                              args, /*isNonThrowing*/ false);
+                                              ai->getSubstitutionMap(), args,
+                                              /*isNonThrowing*/ false);
     // Clean up seed allocation.
     getBuilder().createDeallocStack(loc, seedBuf);
     // If `applyAdj` is a tuple, extract all results.
     SmallVector<SILValue, 8> dirResults;
-    if (auto adjDirResTupTy = applyAdj->getType().getAs<TupleType>())
-      for (auto i : range(adjDirResTupTy->getNumElements()))
-        dirResults.push_back(
-            getBuilder().createTupleExtract(applyAdj->getLoc(), applyAdj, i));
-    else
-      dirResults.push_back(applyAdj);
+    extractAllElements(applyAdj, builder, dirResults);
     // Get all results in type-defined order.
     SmallVector<SILValue, 8> allResults;
     collectAllActualResultsInTypeOrder(
-        ai, dirResults, applyAdj->getIndirectSILResults(), allResults);
+        applyAdj, dirResults, applyAdj->getIndirectSILResults(), allResults);
+    LLVM_DEBUG({
+      auto &s = getADDebugStream();
+      s << "All direct results of the nested adjoint call: \n";
+      interleave(dirResults, [&](SILValue v) { s << v; }, [&]{});
+      s << "All indirect results of the nested adjoint call: \n";
+      interleave(applyAdj->getIndirectSILResults(),
+                 [&](SILValue v) { s << v; }, [&]{});
+      s << "All results of the nested adjoint call: \n";
+      interleave(allResults, [&](SILValue v) { s << v; }, [&]{});
+    });
     // Set adjoints for all original parameters.
-    for (auto i : range(origConvs.getSILArgIndexOfFirstParam(),
-                        origConvs.getNumParameters()))
-      addAdjointValue(applyAdj->getArgument(i),
-                      AdjointValue::getMaterialized(allResults[i]));
+    auto origNumIndRes = origConvs.getNumIndirectSILResults();
+    auto allResultsIt = allResults.begin();
+    // If the applied adjoint returns the adjoint of the original self
+    // parameter, then it returns it first. Set the adjoint of the original
+    // self parameter.
+    auto selfParamIndex = originalParams.size() - 1;
+    if (ai->hasSelfArgument() &&
+        otherTask->getIndices().isWrtParameter(selfParamIndex))
+      addAdjointValue(ai->getArgument(origNumIndRes + selfParamIndex),
+                      AdjointValue::getMaterialized(*allResultsIt++));
+    // Set adjoints for the remaining non-self original parameters.
+    for (unsigned i : otherTask->getIndices().parameters.set_bits()) {
+      // Do not set the adjoint of the original self parameter because we
+      // already added it at the beginning.
+      if (ai->hasSelfArgument() && i == selfParamIndex)
+        continue;
+      addAdjointValue(ai->getArgument(origNumIndRes + i),
+                      AdjointValue::getMaterialized(*allResultsIt++));
+    }
   }
 
   /// Handle `gradient` instruction.
@@ -3123,6 +3700,8 @@ public:
   /// Handle `struct` instruction.
   ///   y = struct (x0, x1, x2, ...)
   ///   adj[x0] = struct_extract #0, adj[y]
+  ///   adj[x1] = struct_extract #1, adj[y]
+  ///   adj[x2] = struct_extract #2, adj[y]
   ///   ...
   void visitStructInst(StructInst *si) {
     auto *decl = si->getStructDecl();
@@ -3130,30 +3709,31 @@ public:
     auto loc = si->getLoc();
     switch (av.getKind()) {
     case AdjointValue::Zero:
-      for (auto *member : decl->getStoredProperties())
-        addAdjointValue(si->getFieldValue(member),
-                        AdjointValue::getZero(SILType::getPrimitiveObjectType(
-                            member->getInterfaceType()->getCanonicalType())));
+      for (auto *field : decl->getStoredProperties()) {
+        auto fv = si->getFieldValue(field);
+        addAdjointValue(fv, AdjointValue::getZero(fv->getType()));
+      }
       break;
     case AdjointValue::Materialized: {
       auto adjY = av.getMaterializedValue();
-      for (auto *member : decl->getStoredProperties())
-        addAdjointValue(si->getFieldValue(member),
-                        getBuilder().createStructExtract(loc, adjY, member));
+      for (auto *field : decl->getStoredProperties())
+        addAdjointValue(si->getFieldValue(field),
+                        getBuilder().createStructExtract(loc, adjY, field));
       break;
     }
-    case AdjointValue::Tuple:
-      llvm_unreachable("Tuple adjoint value for `struct` ?");
+    case AdjointValue::Aggregate: {
+      for (auto pair : llvm::zip(si->getElements(), av.getAggregateElements()))
+        addAdjointValue(std::get<0>(pair), std::get<1>(pair));
+      break;
+    }
     }
   }
 
   /// Handle `struct_extract` instruction.
   ///   y = struct_extract <key>, x
-  ///   adj[x] = struct (0, ..., adj[y], ..., 0)
+  ///   adj[x] = struct (0, ..., key: adj[y], ..., 0)
   void visitStructExtractInst(StructExtractInst *sei) {
     auto *structDecl = sei->getStructDecl();
-    auto structDeclSILTy = SILType::getPrimitiveObjectType(
-        structDecl->getDeclaredInterfaceType()->getCanonicalType());
     auto av = getAdjointValue(sei);
     switch (av.getKind()) {
     case AdjointValue::Kind::Zero:
@@ -3161,47 +3741,20 @@ public:
                       AdjointValue::getZero(sei->getOperand()->getType()));
       break;
     case AdjointValue::Kind::Materialized:
-    case AdjointValue::Kind::Tuple:
-      SmallVector<SILValue, 8> eltVals;
-      auto adj = materializeAdjoint(av, sei->getLoc());
-      auto *structBuf =
-          getBuilder().createAllocStack(sei->getLoc(), structDeclSILTy);
-      auto *bufAccess = builder.createBeginAccess(
-          sei->getLoc(), structBuf, SILAccessKind::Init,
-          SILAccessEnforcement::Static, /*noNestedConflict*/ true,
-          /*fromBuiltin*/ false);
-      SWIFT_DEFER {
-        getBuilder().createDeallocStack(sei->getLoc(), structBuf);
-      };
-      // Emit and store each element to corresponding fields.
-      for (auto *varDecl : structDecl->getStoredProperties()) {
-        auto *eltBufAddr = getBuilder().createStructElementAddr(
-            sei->getLoc(), bufAccess, varDecl);
-        if (varDecl == sei->getField()) {
-          getBuilder().createStore(
-              bufAccess->getLoc(), adj, eltBufAddr,
-              getBufferSOQ(sei->getType().getASTType(), getAdjoint()));
-        } else {
-          auto eltType = varDecl->getType()->getCanonicalType();
-          auto zero =
-              AdjointValue::getZero(SILType::getPrimitiveObjectType(eltType));
-          materializeAdjointIndirect(zero, eltBufAddr);
-        }
+    case AdjointValue::Kind::Aggregate: {
+      SmallVector<AdjointValue, 8> eltVals;
+      for (auto *field : structDecl->getStoredProperties()) {
+        if (field == sei->getField())
+          eltVals.push_back(av);
+        else
+          eltVals.push_back(AdjointValue::getZero(
+              SILType::getPrimitiveObjectType(
+                  field->getType()->getCanonicalType())));
       }
-      builder.createEndAccess(bufAccess->getLoc(), bufAccess,
-                              /*aborted*/ false);
-      auto access = getBuilder().createBeginAccess(sei->getLoc(), structBuf,
-                                                   SILAccessKind::Read,
-                                                   SILAccessEnforcement::Static,
-                                                   /*noNestedConflict*/ true,
-                                                   /*fromBuiltin*/ false);
       addAdjointValue(sei->getOperand(),
-                      getBuilder().createLoad(
-                          sei->getLoc(), access,
-                          getBufferLOQ(structDecl->getDeclaredInterfaceType(),
-                                       getAdjoint())));
-      getBuilder().createEndAccess(sei->getLoc(), access, /*aborted*/ false);
-      break;
+          AdjointValue::getAggregate(sei->getOperand()->getType(),
+                                     eltVals, allocator));
+    }
     }
   }
 
@@ -3221,8 +3774,8 @@ public:
         addAdjointValue(ti->getOperand(i),
                         getBuilder().createTupleExtract(ti->getLoc(), ti, i));
       break;
-    case AdjointValue::Kind::Tuple:
-      for (auto pair : llvm::zip(ti->getElements(), av.getTupleElements()))
+    case AdjointValue::Kind::Aggregate:
+      for (auto pair : llvm::zip(ti->getElements(), av.getAggregateElements()))
         addAdjointValue(std::get<0>(pair), std::get<1>(pair));
       break;
     }
@@ -3230,6 +3783,7 @@ public:
 
   /// Handle `tuple_extract` instruction.
   ///   y = tuple_extract <n>, x
+  ///                                 |--- n-th element
   ///   adj[x] = tuple (0, 0, ..., adj[y], ..., 0, 0)
   void visitTupleExtractInst(TupleExtractInst *tei) {
     auto *tupleTy = tei->getTupleType();
@@ -3240,24 +3794,30 @@ public:
                       AdjointValue::getZero(SILType::getPrimitiveObjectType(
                           tupleTy->getCanonicalType())));
       break;
+    case AdjointValue::Kind::Aggregate:
     case AdjointValue::Kind::Materialized: {
       SmallVector<AdjointValue, 8> elements;
-      for (unsigned i : range(tupleTy->getNumElements()))
-        elements.push_back(i == tei->getFieldNo()
-                               ? av
-                               : AdjointValue::getZero(tei->getType()));
+      for (unsigned i : range(tupleTy->getNumElements())) {
+        if (tei->getFieldNo() == i)
+          elements.push_back(av);
+        else {
+          auto eltTy = SILType::getPrimitiveObjectType(
+              tupleTy->getElementType(i)->getCanonicalType());
+          elements.push_back(AdjointValue::getZero(eltTy));
+        }
+      }
       addAdjointValue(tei->getOperand(),
-                      AdjointValue::getTuple(tupleTy, elements, allocator));
+          AdjointValue::getAggregate(tei->getOperand()->getType(),
+                                     elements, allocator));
       break;
     }
-    case AdjointValue::Kind::Tuple:
-      llvm_unreachable("Adjoint of a tuple element cannot be a tuple");
     }
   }
 
   /// Handle floating-point arithmetics: `fadd`, `fsub`, `fneg`, `fmul`, and
   /// `fdiv`.
   void visitBuiltinInst(BuiltinInst *bi) {
+    LLVM_DEBUG(getADDebugStream() << "Differentiating " << *bi);
     auto &info = bi->getBuiltinInfo();
     auto adj = getAdjointValue(bi);
     auto &builder = getBuilder();
@@ -3269,7 +3829,7 @@ public:
       addAdjointValue(bi->getOperand(1), adj);
       break;
     case BuiltinValueKind::FSub: {
-      auto adjVal = materializeAdjoint(adj, opLoc);
+      auto adjVal = materializeAdjointDirect(adj, opLoc);
       addAdjointValue(bi->getOperand(0), adjVal);
       // NOTE: `createBuiltinBinaryFunction` is general enough to work on
       // builtin functions with arbitrary arity.
@@ -3279,14 +3839,14 @@ public:
       break;
     }
     case BuiltinValueKind::FNeg: {
-      auto adjVal = materializeAdjoint(adj, opLoc);
+      auto adjVal = materializeAdjointDirect(adj, opLoc);
       auto *neg = builder.createBuiltinBinaryFunction(opLoc, "fneg", opType,
                                                       opType, {adjVal});
       addAdjointValue(bi->getOperand(0), neg);
       break;
     }
     case BuiltinValueKind::FMul: {
-      auto adjVal = materializeAdjoint(adj, opLoc);
+      auto adjVal = materializeAdjointDirect(adj, opLoc);
       auto *adjLHS = builder.createBuiltinBinaryFunction(
           opLoc, "fmul", opType, opType,
           {adjVal, remapValue(bi->getOperand(1))});
@@ -3298,7 +3858,7 @@ public:
       break;
     }
     case BuiltinValueKind::FDiv: {
-      auto adjVal = materializeAdjoint(adj, opLoc);
+      auto adjVal = materializeAdjointDirect(adj, opLoc);
       auto lhs = remapValue(bi->getOperand(0));
       auto rhs = remapValue(bi->getOperand(1));
       // x' = seed / y
@@ -3313,7 +3873,7 @@ public:
       auto div = builder.createBuiltinBinaryFunction(
           opLoc, "fdiv", opType, opType, {minusLHS, squareRHS});
       auto adjRHS = builder.createBuiltinBinaryFunction(opLoc, "fmul", opType,
-                                                        {}, {adjVal, div});
+                                                        opType, {adjVal, div});
       addAdjointValue(bi->getOperand(1), adjRHS);
       break;
     }
@@ -3348,27 +3908,42 @@ void AdjointEmitter::rematerializeOriginalInstruction(SILInstruction *inst) {
   rematCloner.visit(inst);
 }
 
-// TODO: What if value was not loadable? Consider removing this functon entirely
-// and force indirect for all cases for the ease of implementation.
-SILValue AdjointEmitter::materializeAdjoint(AdjointValue value,
-                                            SILLocation loc) {
-  auto valueBuf = getBuilder().createAllocStack(loc, value.getType());
-  SWIFT_DEFER { getBuilder().createDeallocStack(loc, valueBuf); };
-  materializeAdjointIndirect(value, valueBuf);
-  auto access = getBuilder().createBeginAccess(
-      loc, valueBuf, SILAccessKind::Read, SILAccessEnforcement::Static,
-      /*noNestedConflict*/ true,
-      /*fromBuiltin*/ false);
-  auto loq = getBufferLOQ(value.getType().getASTType(), getAdjoint());
-  auto val = getBuilder().createLoad(loc, valueBuf, loq);
-  getBuilder().createEndAccess(loc, access, /*aborted*/ false);
-  return val;
+SILValue AdjointEmitter::materializeAdjointDirect(AdjointValue val,
+                                                  SILLocation loc) {
+  auto &builder = getBuilder();
+  auto &ctx = getContext();
+  LLVM_DEBUG(getADDebugStream() <<
+             "Materializing adjoints for " << val << '\n');
+  auto cotangentSpace = ctx.getCotangentSpace(val.getType().getASTType());
+  assert(cotangentSpace && "No cotangent space for this type");
+  switch (val.getKind()) {
+  case AdjointValue::Kind::Zero:
+    return createScalarValueDirect(
+        0, val.getType().getASTType(), loc, builder, ctx);
+  case AdjointValue::Kind::Aggregate: {
+    SmallVector<SILValue, 8> elements;
+    for (auto &eltAdjVal : val.getAggregateElements())
+      elements.push_back(materializeAdjointDirect(eltAdjVal, loc));
+    if (auto tupleTy = val.getType().getAs<TupleType>()) {
+      return builder.createTuple(loc, val.getType(), elements);
+    } else {
+      return builder.createStruct(loc, val.getType(), elements);
+    }
+  }
+  case AdjointValue::Kind::Materialized:
+    return val.getMaterializedValue();
+  }
 }
 
-void AdjointEmitter::materializeAdjointIndirect(AdjointValue val,
-                                                SILValue destBuffer) {
-  auto loc = destBuffer.getLoc();
-  auto soq = getBufferSOQ(val.getType().getASTType(), getAdjoint());
+/// Materialize the given adjoint value indirectly to the specified buffer.
+/// The root address derivation of `seedBufAccess` must be the result of
+/// a `begin_access`.
+static void materializeAdjointIndirectHelper(AdjointValue val,
+                                             SILValue destBufferAccess,
+                                             SILBuilder &builder,
+                                             ADContext &context) {
+  auto loc = destBufferAccess.getLoc();
+  auto soq = getBufferSOQ(val.getType().getASTType(), builder.getFunction());
   switch (val.getKind()) {
   /// Given a `%buf : *T, emit instructions that produce a zero or an aggregate
   /// of zeros of the expected type. When `T` conforms to
@@ -3383,55 +3958,66 @@ void AdjointEmitter::materializeAdjointIndirect(AdjointValue val,
     if (auto tupleTy = val.getType().getAs<TupleType>()) {
       SmallVector<SILValue, 8> eltVals;
       for (unsigned i : range(tupleTy->getNumElements())) {
-        auto eltAddr = getBuilder().createTupleElementAddr(loc, destBuffer, i);
-        auto elt = tupleTy->getElement(i);
-        convertIntToIndirectExpressible(0, elt.getType()->getAnyNominal(),
-                                        eltAddr, loc, getBuilder(),
-                                        getContext());
+        auto eltAddr = builder.createTupleElementAddr(loc, destBufferAccess, i);
+        createScalarValueIndirect(0, tupleTy, eltAddr, loc, builder, context);
       }
-    } else if (auto builtinFP = val.getType().getAs<BuiltinFloatType>()) {
-      auto *access = getBuilder().createBeginAccess(
-          loc, destBuffer, SILAccessKind::Init, SILAccessEnforcement::Static,
-          /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-      auto *zero = getBuilder().createFloatLiteral(
-          loc, val.getType(), APFloat(builtinFP->getAPFloatSemantics(), 0));
-      getBuilder().createStore(loc, zero, access,
-                               getBufferSOQ(builtinFP, getAdjoint()));
-      getBuilder().createEndAccess(loc, access, /*aborted*/ false);
     } else {
-      auto *nomTy = val.getSwiftType()->getAnyNominal();
-      assert(nomTy);
-      convertIntToIndirectExpressible(0, nomTy, destBuffer, loc, getBuilder(),
-                                      getContext());
+      createScalarValueIndirect(0, val.getSwiftType(),
+                                destBufferAccess, loc, builder, context);
     }
     break;
-  /// Given a `%buf : *(T0, T1, T2, ...)`, recursively emit instructions to
-  /// materialize the symbolic tuple, filling the buffer.
-  case AdjointValue::Kind::Tuple: {
-    SmallVector<SILValue, 8> elements;
-    for (auto eltAndIdx : enumerate(val.getTupleElements())) {
-      auto idx = eltAndIdx.index();
-      auto *tupTy = val.getSwiftType()->castTo<TupleType>();
-      auto eltTy = SILType::getPrimitiveObjectType(tupTy->getCanonicalType());
-      auto *eltBuf =
-          getBuilder().createTupleElementAddr(loc, destBuffer, idx, eltTy);
-      materializeAdjointIndirect(eltAndIdx.value(), eltBuf);
+  /// Given a `%buf : *(T0, T1, T2, ...)` or `%buf : *Struct` recursively emit
+  /// instructions to materialize the symbolic tuple or struct, filling the
+  /// buffer.
+  case AdjointValue::Kind::Aggregate: {
+    if (auto *tupTy = val.getSwiftType()->getAs<TupleType>()) {
+      for (auto eltAndIdx : enumerate(val.getAggregateElements())) {
+        auto idx = eltAndIdx.index();
+        auto eltTy = SILType::getPrimitiveObjectType(tupTy->getCanonicalType());
+        auto *eltBuf =
+            builder.createTupleElementAddr(loc, destBufferAccess, idx, eltTy);
+        materializeAdjointIndirectHelper(
+            eltAndIdx.value(), eltBuf, builder, context);
+      }
+    } else if (auto *structDecl = dyn_cast_or_null<StructDecl>(
+                   val.getSwiftType()->getAnyNominal())) {
+      for (auto eltAndField : zip(val.getAggregateElements(),
+                                  structDecl->getStoredProperties())) {
+        auto elt = std::get<0>(eltAndField);
+        auto field = std::get<1>(eltAndField);
+        auto *eltBuf = builder.createStructElementAddr(loc, destBufferAccess,
+                                                       field);
+        materializeAdjointIndirectHelper(elt, eltBuf, builder, context);
+      }
+    } else {
+      llvm_unreachable("Not an aggregate type");
     }
     break;
   }
   /// Value is already materialized!
   case AdjointValue::Kind::Materialized:
-    auto *access = getBuilder().createBeginAccess(
-        loc, destBuffer, SILAccessKind::Init, SILAccessEnforcement::Static,
-        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-    getBuilder().createStore(loc, val.getMaterializedValue(), access, soq);
-    getBuilder().createEndAccess(loc, access, /*aborted*/ false);
+    auto *access = builder.createBeginAccess(
+        loc, destBufferAccess, SILAccessKind::Init,
+        SILAccessEnforcement::Static, /*noNestedConflict*/ true,
+        /*fromBuiltin*/ false);
+    builder.createStore(loc, val.getMaterializedValue(), access, soq);
+    builder.createEndAccess(loc, access, /*aborted*/ false);
     break;
   }
 }
 
-AdjointValue AdjointEmitter::accumulateAdjoints(AdjointValue lhs,
-                                                AdjointValue rhs) {
+void AdjointEmitter::materializeAdjointIndirect(AdjointValue val,
+                                                SILValue destBuffer) {
+  auto *access = getBuilder().createBeginAccess(
+      destBuffer.getLoc(), destBuffer, SILAccessKind::Init,
+      SILAccessEnforcement::Static, /*noNestedConflict*/ true,
+      /*fromBuiltin*/ false);
+  materializeAdjointIndirectHelper(val, access, builder, getContext());
+  getBuilder().createEndAccess(destBuffer.getLoc(), access, /*aborted*/ false);
+}
+
+AdjointValue AdjointEmitter::accumulateAdjointsDirect(AdjointValue lhs,
+                                                      AdjointValue rhs) {
   switch (lhs.getKind()) {
   // x
   case AdjointValue::Kind::Materialized: {
@@ -3440,23 +4026,24 @@ AdjointValue AdjointEmitter::accumulateAdjoints(AdjointValue lhs,
     // x + y
     case AdjointValue::Kind::Materialized:
       return AdjointValue::getMaterialized(
-          accumulateMaterializedAdjoints(lhsVal, rhs.getMaterializedValue()));
+          accumulateMaterializedAdjointsDirect(lhsVal,
+                                               rhs.getMaterializedValue()));
     // x + 0 => x
     case AdjointValue::Kind::Zero:
       return lhs;
     // x + (y, z) => (x.0 + y, x.1 + z)
-    case AdjointValue::Kind::Tuple:
+    case AdjointValue::Kind::Aggregate:
       SmallVector<AdjointValue, 8> newElements;
-      auto rhsElements = rhs.getTupleElements();
+      auto rhsElements = rhs.getAggregateElements();
       for (auto i : indices(rhsElements)) {
         auto lhsElt =
             getBuilder().createTupleExtract(lhsVal.getLoc(), lhsVal, i);
-        auto newElt = accumulateAdjoints(AdjointValue::getMaterialized(lhsElt),
-                                         rhsElements[i]);
+        auto newElt = accumulateAdjointsDirect(
+            AdjointValue::getMaterialized(lhsElt), rhsElements[i]);
         newElements.push_back(newElt);
       }
-      return AdjointValue::getTuple(lhsVal->getType().castTo<TupleType>(),
-                                    newElements, allocator);
+      return AdjointValue::getAggregate(
+          lhsVal->getType(), newElements, allocator);
     }
   }
   // 0
@@ -3464,7 +4051,7 @@ AdjointValue AdjointEmitter::accumulateAdjoints(AdjointValue lhs,
     // 0 + x => x
     return rhs;
   // (x, y)
-  case AdjointValue::Kind::Tuple:
+  case AdjointValue::Kind::Aggregate:
     switch (rhs.getKind()) {
     // (x, y) + z => (x + z.0, y + z.1)
     case AdjointValue::Kind::Materialized:
@@ -3472,105 +4059,215 @@ AdjointValue AdjointEmitter::accumulateAdjoints(AdjointValue lhs,
     case AdjointValue::Kind::Zero:
       return lhs;
     // (x, y) + (z, w) => (x + z, y + w)
-    case AdjointValue::Kind::Tuple: {
+    case AdjointValue::Kind::Aggregate: {
       SmallVector<AdjointValue, 8> newElements;
-      for (auto elt : llvm::zip(lhs.getTupleElements(), rhs.getTupleElements()))
+      for (auto elt : llvm::zip(lhs.getAggregateElements(),
+                                rhs.getAggregateElements()))
         newElements.push_back(
-            accumulateAdjoints(std::get<0>(elt), std::get<1>(elt)));
-      return AdjointValue::getTuple(lhs.getType().castTo<TupleType>(),
-                                    newElements, allocator);
+            accumulateAdjointsDirect(std::get<0>(elt), std::get<1>(elt)));
+      return AdjointValue::getAggregate(lhs.getType(), newElements, allocator);
     }
     }
   }
 }
 
-SILValue AdjointEmitter::accumulateMaterializedAdjoints(SILValue lhs,
-                                                        SILValue rhs) {
-  // If the type is a builtin float, use `fadd` directly.
+SILValue AdjointEmitter::accumulateMaterializedAdjointsDirect(SILValue lhs,
+                                                              SILValue rhs) {
+  // TODO: Optimize for the case when lhs == rhs.
+  assert(lhs->getType() == rhs->getType() && "Adjoints must have equal types!");
+  assert(lhs->getType().isObject() && rhs->getType().isObject() &&
+         "Adjoint types must be both object types!");
   auto adjointTy = lhs->getType();
-  if (auto fpType = adjointTy.getAs<BuiltinFloatType>()) {
-    return getBuilder().createBuiltinBinaryFunction(
-        lhs.getLoc(), "fadd", adjointTy, adjointTy, {lhs, rhs});
-  }
-  // TODO: Handle tuples?
+  auto adjointASTTy = adjointTy.getASTType();
+  auto loc = lhs.getLoc();
+  auto &builder = getBuilder();
+  auto cotangentSpace = getContext().getCotangentSpace(adjointASTTy);
+  assert(cotangentSpace && "No cotangent space for this type");
+  switch (cotangentSpace->getKind()) {
+  case CotangentSpace::Kind::BuiltinRealScalar:
+    return builder.createBuiltinBinaryFunction(
+        loc, "fadd", adjointTy, adjointTy, {lhs, rhs});
+    case CotangentSpace::Kind::RealScalar:
+    case CotangentSpace::Kind::RealVector: {
+      // Handle any nominal type value.
 
-  // Handle any nominal type value.
-  auto resultBuf = getBuilder().createAllocStack(lhs.getLoc(), adjointTy);
-  accumulateMaterializedAdjointsIndirect(lhs, rhs, resultBuf);
-  getBuilder().createDeallocStack(resultBuf->getLoc(), resultBuf);
-  auto access = getBuilder().createBeginAccess(resultBuf->getLoc(), resultBuf,
-                                               SILAccessKind::Read,
-                                               SILAccessEnforcement::Static,
-                                               /*noNestedConflict*/ true,
-                                               /*fromBuiltin*/ false);
-  auto val = getBuilder().createLoad(
-      resultBuf->getLoc(), access,
-      getBufferLOQ(lhs->getType().getASTType(), getAdjoint()));
-  getBuilder().createEndAccess(val->getLoc(), access, /*aborted*/ false);
-  return val;
+      // Allocate buffers for inputs and output.
+      auto *resultBuf = builder.createAllocStack(loc, adjointTy);
+      auto *lhsBuf = builder.createAllocStack(loc, adjointTy);
+      auto *rhsBuf = builder.createAllocStack(loc, adjointTy);
+
+      // Initialize input buffers.
+      auto *lhsBufInitAccess = builder.createBeginAccess(
+          loc, lhsBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
+          /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+      auto *rhsBufInitAccess = builder.createBeginAccess(
+          loc, rhsBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
+          /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+      builder.createStore(loc, lhs, lhsBufInitAccess,
+                          getBufferSOQ(adjointASTTy, getAdjoint()));
+      builder.createStore(loc, rhs, rhsBufInitAccess,
+                          getBufferSOQ(adjointASTTy, getAdjoint()));
+      builder.createEndAccess(loc, lhsBufInitAccess, /*aborted*/ false);
+      builder.createEndAccess(loc, rhsBufInitAccess, /*aborted*/ false);
+
+      // Accumulate the adjoints.
+      auto *resultBufAccess = builder.createBeginAccess(
+          loc, resultBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
+          /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+      auto *lhsBufReadAccess = builder.createBeginAccess(loc, lhsBuf,
+          SILAccessKind::Read, SILAccessEnforcement::Static,
+          /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+      auto *rhsBufReadAccess = builder.createBeginAccess(loc, rhsBuf,
+          SILAccessKind::Read, SILAccessEnforcement::Static,
+          /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+      accumulateMaterializedAdjointsIndirect(lhsBufReadAccess, rhsBufReadAccess,
+                                             resultBufAccess);
+      builder.createEndAccess(loc, resultBufAccess, /*aborted*/ false);
+      builder.createEndAccess(loc, rhsBufReadAccess, /*aborted*/ false);
+      builder.createEndAccess(loc, lhsBufReadAccess, /*aborted*/ false);
+
+      // Deallocate input buffers.
+      builder.createDeallocStack(loc, rhsBuf);
+      builder.createDeallocStack(loc, lhsBuf);
+
+      // Load result.
+      resultBufAccess = builder.createBeginAccess(loc, resultBuf,
+          SILAccessKind::Read, SILAccessEnforcement::Static,
+          /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+      auto val = builder.createLoad(loc, resultBufAccess,
+          getBufferLOQ(lhs->getType().getASTType(), getAdjoint()));
+      builder.createEndAccess(loc, resultBufAccess, /*aborted*/ false);
+
+      // Deallocate result buffer.
+      builder.createDeallocStack(loc, resultBuf);
+
+      return val;
+    }
+    case CotangentSpace::Kind::ProductStruct: {
+      auto *structDecl = cotangentSpace->getProductStruct();
+      SmallVector<SILValue, 8> adjElements;
+      for (auto *field : structDecl->getStoredProperties()) {
+        auto *eltLHS = builder.createStructExtract(loc, lhs, field);
+        auto *eltRHS = builder.createStructExtract(loc, rhs, field);
+        adjElements.push_back(
+            accumulateMaterializedAdjointsDirect(eltLHS, eltRHS));
+      }
+      return builder.createStruct(loc, adjointTy, adjElements);
+    }
+    case CotangentSpace::Kind::ProductTuple: {
+      auto tupleType = cotangentSpace->getProductTuple();
+      SmallVector<SILValue, 8> adjElements;
+      for (unsigned i : range(tupleType->getNumElements())) {
+        auto *eltLHS = builder.createTupleExtract(loc, lhs, i);
+        auto *eltRHS = builder.createTupleExtract(loc, rhs, i);
+        adjElements.push_back(
+            accumulateMaterializedAdjointsDirect(eltLHS, eltRHS));
+      }
+      return builder.createTuple(loc, adjointTy, adjElements);
+    }
+    case CotangentSpace::Kind::Sum: {
+      llvm_unreachable("Differentiating sum types is not supported yet");
+    }
+  }
 }
 
 void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
-    SILValue lhs, SILValue rhs, SILValue resultBuffer) {
-  auto loc = resultBuffer.getLoc();
-  auto adjointTy = lhs->getType().getASTType();
-  assert(adjointTy->isEqual(lhs->getType().getASTType()) &&
-         "Adjoints must have equal types!");
-  // The type of the adjoint can be a builtin, a tuple, or a nominal type.
-  if (auto *fpType = adjointTy->getAs<BuiltinFloatType>()) {
-    auto *bufAccess = getBuilder().createBeginAccess(
-        loc, resultBuffer, SILAccessKind::Init, SILAccessEnforcement::Static,
-        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-    auto *sum = getBuilder().createBuiltinBinaryFunction(
-        loc, "fadd", lhs->getType(), lhs->getType(), {lhs, rhs});
-    getBuilder().createStore(loc, sum, bufAccess,
-                             getBufferSOQ(adjointTy, getAdjoint()));
-    getBuilder().createEndAccess(loc, bufAccess, /*aborted*/ false);
+    SILValue lhsBufAccess, SILValue rhsBufAccess, SILValue resultBufAccess) {
+  // TODO: Optimize for the case when lhs == rhs.
+  assert(lhsBufAccess->getType() == rhsBufAccess->getType()
+         && "Adjoints must have equal types!");
+  assert(lhsBufAccess->getType().isAddress() &&
+         rhsBufAccess->getType().isAddress()
+         && "Adjoint types must be both address types!");
+  auto loc = resultBufAccess.getLoc();
+  auto adjointTy = lhsBufAccess->getType();
+  auto adjointASTTy = adjointTy.getASTType();
+  auto &context = getContext();
+  auto cotangentSpace = context.getCotangentSpace(adjointASTTy);
+  assert(cotangentSpace && "No cotangent space for this type");
+  switch (cotangentSpace->getKind()) {
+  case CotangentSpace::Kind::BuiltinRealScalar: {
+    auto *sum = builder.createBuiltinBinaryFunction(
+        loc, "fadd", lhsBufAccess->getType(), lhsBufAccess->getType(),
+        {lhsBufAccess, rhsBufAccess});
+    builder.createStore(loc, sum, resultBufAccess,
+                             getBufferSOQ(adjointASTTy, getAdjoint()));
+    builder.createEndAccess(loc, resultBufAccess, /*aborted*/ false);
     return;
   }
-
-  // TODO: Handle tuples?
-
-  // Now we assume it to be a nominal type.
-  auto adjointTyDecl = adjointTy->getAnyNominal();
-  // If the type conforms to `VectorNumeric`, then combine them using
-  // `VectorNumeric.+`. If the type conforms to `FloatingPoint`, then use
-  // `Numeric.+`.
-  FuncDecl *combinerFuncDecl = nullptr;
-  ProtocolDecl *proto = nullptr;
-  if (getContext().supportsVectorDifferentiation(adjointTy)) {
-    combinerFuncDecl = getContext().getVectorPlusDecl();
-    proto = getContext().getVectorNumericProtocol();
-  } else if (getContext().supportsScalarDifferentiation(adjointTy)) {
-    combinerFuncDecl = getContext().getNumericPlusDecl();
-    proto = getContext().getFloatingPointProtocol();
-  } else
-    llvm_unreachable("Invalid adjoint type!");
-
-  // Call the combiner function and return.
-  auto adjointParentModule = adjointTyDecl->getModuleContext();
-  auto confRef = *adjointParentModule->lookupConformance(adjointTy, proto);
-  auto fnTy = combinerFuncDecl->getInterfaceType();
-  auto silFnTy = SILType::getPrimitiveObjectType(fnTy->getCanonicalType());
-  SILDeclRef declRef(combinerFuncDecl, SILDeclRef::Kind::Func);
-  // Link witness table.
-  getContext().lookupOrLinkWitnessTable(confRef);
-  // %0 = witness_method @+
-  auto witnessMethod = getBuilder().createWitnessMethod(loc, adjointTy, confRef,
-                                                        declRef, silFnTy);
-  auto subMap =
-      SubstitutionMap::getProtocolSubstitutions(proto, adjointTy, confRef);
-  // %1 = metatype $T.Type
-  auto metatypeType = MetatypeType::get(adjointTy)->getCanonicalType();
-  auto metatypeSILType = SILType::getPrimitiveObjectType(metatypeType);
-  auto metatype = getBuilder().createMetatype(loc, metatypeSILType);
-  // %2 = apply $0(%result, %new, %old, %1)
-  getBuilder().createApply(loc, witnessMethod, subMap,
-                           {resultBuffer, rhs, lhs, metatype},
-                           /*isNonThrowing*/ false);
+  case CotangentSpace::Kind::RealScalar:
+  case CotangentSpace::Kind::RealVector: {
+    FuncDecl *combinerFuncDecl = nullptr;
+    ProtocolDecl *proto = nullptr;
+    auto *adjointTyDecl = cotangentSpace->getRealScalarOrVectorSpace();
+    // If the type conforms to `VectorNumeric`, then combine them using
+    // `VectorNumeric.+`.
+    if (cotangentSpace->isRealVectorSpace()) {
+      combinerFuncDecl = getContext().getVectorPlusDecl();
+      proto = getContext().getVectorNumericProtocol();
+    }
+    // If the type conforms to `FloatingPoint`, then use `Numeric.+`.
+    else {
+      assert(cotangentSpace->isRealScalarSpace());
+      combinerFuncDecl = getContext().getNumericPlusDecl();
+      proto = getContext().getNumericProtocol();
+    }
+    // Call the combiner function and return.
+    auto adjointParentModule = adjointTyDecl->getModuleContext();
+    auto confRef = *adjointParentModule->lookupConformance(adjointASTTy, proto);
+    SILDeclRef declRef(combinerFuncDecl, SILDeclRef::Kind::Func);
+    auto silFnTy = getContext().getTypeConverter().getConstantType(declRef);
+    // %0 = witness_method @+
+    auto witnessMethod = builder.createWitnessMethod(loc, adjointASTTy,
+                                                     confRef, declRef, silFnTy);
+    // Ensure the witness method is linked.
+    getModule().lookUpFunctionInWitnessTable(confRef, declRef);
+    auto subMap =
+        SubstitutionMap::getProtocolSubstitutions(proto, adjointASTTy, confRef);
+    // %1 = metatype $T.Type
+    auto metatypeType =
+        CanMetatypeType::get(adjointASTTy, MetatypeRepresentation::Thick);
+    auto metatypeSILType = SILType::getPrimitiveObjectType(metatypeType);
+    auto metatype = builder.createMetatype(loc, metatypeSILType);
+    // %2 = apply $0(%result, %new, %old, %1)
+    builder.createApply(loc, witnessMethod, subMap,
+                        {resultBufAccess, rhsBufAccess, lhsBufAccess, metatype},
+                        /*isNonThrowing*/ false);
+    return;
+  }
+  case CotangentSpace::Kind::ProductTuple: {
+    auto tupleType = cotangentSpace->getProductTuple();
+    for (unsigned i : range(tupleType->getNumElements())) {
+      auto *eltAddrLHS = builder.createTupleElementAddr(loc, lhsBufAccess, i);
+      auto *eltAddrRHS = builder.createTupleElementAddr(loc, rhsBufAccess, i);
+      auto *destAddr = builder.createTupleElementAddr(loc, resultBufAccess, i);
+      accumulateMaterializedAdjointsIndirect(eltAddrLHS, eltAddrRHS, destAddr);
+    }
+    return;
+  }
+  case CotangentSpace::Kind::ProductStruct: {
+    auto *structDecl = cotangentSpace->getProductStruct();
+    for (auto *field : structDecl->getStoredProperties()) {
+      auto *eltAddrLHS =
+          builder.createStructElementAddr(loc, lhsBufAccess, field);
+      auto *eltAddrRHS =
+          builder.createStructElementAddr(loc, rhsBufAccess, field);
+      auto *destAddr =
+          builder.createStructElementAddr(loc, resultBufAccess, field);
+      accumulateMaterializedAdjointsIndirect(eltAddrLHS, eltAddrRHS, destAddr);
+    }
+    return;
+  }
+  case CotangentSpace::Kind::Sum: {
+    llvm_unreachable("Differentiating a sum type is not supported yet");
+  }
+  }
 }
 
 bool AdjointGen::performSynthesis(FunctionSynthesisItem item) {
+  LLVM_DEBUG(getADDebugStream() << "Performing adjoint synthesis for original"
+             << item.original->getName() << " and its corresponding adjoint "
+             << item.target->getName() << '\n');
   auto &passManager = context.getPassManager();
   auto *activityAnalysis =
       passManager.getAnalysis<DifferentiableActivityAnalysis>();
@@ -3604,17 +4301,20 @@ static SILFunction *lookupOrSynthesizeGradient(ADContext &context,
   auto &module = original->getModule();
   auto &astCtx = module.getASTContext();
   auto origTy = original->getLoweredFunctionType();
-  auto config = gradInst->getConfig();
+  auto &config = gradInst->getConfig();
 
   // Creates a gradient function based on the configuration.
   auto createGradFunction = [&](const SILReverseAutoDiffConfig &config) {
     auto gradType = origTy->getGradientType(config, module);
     std::string gradName =
-        original->getName().str() + "__" + mangleADConfig(config);
+        "AD__" + original->getName().str() + "__" + mangleADConfig(config);
     auto gradNameId = astCtx.getIdentifier(gradName);
-    SILOptFunctionBuilder FB(context.getTransform());
+    SILOptFunctionBuilder fb(context.getTransform());
+    auto linkage = original->getLinkage();
+    if (linkage == SILLinkage::Public)
+      linkage = SILLinkage::PublicNonABI;
     auto *gradFn =
-        FB.createFunction(original->getLinkage(), gradNameId.str(), gradType,
+        FB.createFunction(linkage, gradNameId.str(), gradType,
                           original->getGenericEnvironment(),
                           original->getLocation(), original->isBare(),
                           original->isTransparent(), original->isSerialized());
@@ -3639,9 +4339,11 @@ static SILFunction *lookupOrSynthesizeGradient(ADContext &context,
     context.insertGradient({original, masterConfig}, canonicalGrad);
     // Enqueue a new differentiation task in the global context.
     if (auto *diffOp = findDifferentialOperator(gradInst))
-      context.registerDifferentiationTask(original, config.indices, diffOp);
+      context.lookUpOrRegisterDifferentiationTask(
+          original, config.indices, diffOp);
     else
-      context.registerDifferentiationTask(original, config.indices, gradInst);
+      context.lookUpOrRegisterDifferentiationTask(
+          original, config.indices, gradInst);
   }
 
   // If the requested gradient is not *both seedable and result-preserving*,
@@ -3676,7 +4378,7 @@ static SILFunction *lookupOrSynthesizeGradient(ADContext &context,
       // Call `<seed type>.init(1)` to create a default
       // seed to feed into the canonical gradient.
       auto *seedBuf = builder.createAllocStack(loc, seedSILTy);
-      convertToIndirectSeed(1, seedTy, seedBuf, loc, builder, context);
+      createScalarValueIndirect(1, seedTy, seedBuf, loc, builder, context);
       // If seed is address only, we'll clean up the buffer after calling the
       // canonical gradient Otherwise, we just load the seed and deallocate the
       // buffer.
@@ -3825,7 +4527,7 @@ static void fillCanonicalGradient(SILFunction &canGrad,
   // If the original result is a direct return, add it to the direct return list
   // of the canonical gradient.
   if (primalConv.getResults().back().isFormalDirect())
-    directResults.push_back(*primalResults.rbegin());
+    directResults.push_back(primalResults.back());
   // Add the adjoint's results to the direct return list.
   if (adjointConv.getNumDirectSILResults() == 1)
     directResults.push_back(adjApply);
@@ -3909,23 +4611,46 @@ bool Differentiation::processGradientInst(GradientInst *gi,
 /// AD pass entry.
 void Differentiation::run() {
   auto &module = *getModule();
+  auto &astCtx = module.getASTContext();
+  debugDump(module);
 
   // Collect gradient instructions to process.
+  SmallVector<std::pair<SILFunction *,
+                        SILReverseDifferentiableAttr *>, 8> emptyDiffAttrs;
   SmallVector<GradientInst *, 16> gradInsts;
-  // Handle each `gradient` instruction in the module.
-  for (SILFunction &f : module)
-    for (SILBasicBlock &bb : f)
-      for (SILInstruction &i : bb)
+  // Handle each `gradient` instruction and each `reverse_differentiable`
+  // attribute in the module.
+  for (SILFunction &f : module) {
+    // If `f` has a `[reverse_differentiable]` attribute without specifying a
+    // primal or an adjoint, push it to the work list.
+    for (auto *diffAttr : f.getReverseDifferentiableAttrs()) {
+      if (diffAttr->hasPrimal() && diffAttr->hasAdjoint())
+        continue;
+      if (!diffAttr->hasPrimal() && !diffAttr->hasAdjoint()) {
+        emptyDiffAttrs.push_back({&f, diffAttr});
+        continue;
+      }
+      // If only primal or adjoint is specified, it's an incomplete attribute.
+      astCtx.Diags.diagnose(f.getLocation().getSourceLoc(),
+                            diag::autodiff_incomplete_differentiable_attr);
+    }
+    for (SILBasicBlock &bb : f) {
+      for (SILInstruction &i : bb) {
+        // If `i` is a `gradient` instruction, i.e. the SIL-level differential
+        // operator, push it to the work list.
         if (auto *gi = dyn_cast<GradientInst>(&i))
           gradInsts.push_back(gi);
+      }
+    }
+  }
 
-  // If there's no `gradient` instruction, there's no AD to do.
-  if (gradInsts.empty())
+  // If there's no `gradient` instruction or no empty `[reverse_differentiable]`
+  // attributes to process, there's no AD to do.
+  if (gradInsts.empty() && emptyDiffAttrs.empty())
     return;
 
   // AD relies on stdlib (the Swift module). If it's not imported, it's an
   // internal error.
-  auto &astCtx = module.getSwiftModule()->getASTContext();
   if (!astCtx.getStdlibModule()) {
     astCtx.Diags.diagnose(SourceLoc(),
                           diag::autodiff_internal_swift_not_imported);
@@ -3934,6 +4659,13 @@ void Differentiation::run() {
 
   // A global differentiation context.
   ADContext context(*this);
+
+  // For every empty `[reverse_differentiable]` attribute, create a
+  // differentiation task.
+  for (auto &fnAndAttr : emptyDiffAttrs)
+    context.registerDifferentiationTask(
+        fnAndAttr.first, fnAndAttr.second->getIndices(),
+        DifferentiationInvoker(fnAndAttr.second, fnAndAttr.first));
 
   // Lower each gradient instruction to a function reference and replaces its
   // uses with a function reference to its gradient.
@@ -3974,6 +4706,10 @@ void Differentiation::run() {
   // Fill the body of each empty canonical gradient function corresponding to
   // each differentiation task.
   for (auto &task : context.getDifferentiationTasks()) {
+    // If the invoker is not a differential operator, there's no need to
+    // synthesize any canonical gradient for it.
+    if (!task->getInvoker().isAnyDifferentialOperator())
+      continue;
     auto *canGradFn = context.lookupCanonicalGradient(task.get());
     assert(canGradFn && "Cannot find the canonical gradient function");
     fillCanonicalGradient(*canGradFn, task.get(), context);
@@ -3982,6 +4718,8 @@ void Differentiation::run() {
   // Remove all remaining `gradient` instructions.
   for (auto *gi : gradInsts)
     recursivelyDeleteTriviallyDeadInstructions(gi);
+  
+  LLVM_DEBUG(getADDebugStream() << "All differentiation finished\n");
 }
 
 //===----------------------------------------------------------------------===//

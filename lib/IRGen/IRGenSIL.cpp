@@ -23,33 +23,41 @@
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Intrinsics.h"
-#include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/SmallBitVector.h"
-#include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/Support/SaveAndRestore.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Transforms/Utils/Local.h"
-#include "clang/AST/ASTContext.h"
-#include "clang/Basic/TargetInfo.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/IRGenOptions.h"
+#include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
+#include "swift/AST/SubstitutionMap.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/TensorFlow.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/AST/ASTContext.h"
-#include "swift/AST/IRGenOptions.h"
-#include "swift/AST/Pattern.h"
-#include "swift/AST/ParameterList.h"
-#include "swift/AST/SubstitutionMap.h"
-#include "swift/AST/Types.h"
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/InstructionUtils.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/SIL/GraphOperationInfo.h"
 #include "swift/SIL/PrettyStackTrace.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/InstructionUtils.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
+#include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SmallBitVector.h"
+#include "llvm/ADT/TinyPtrVector.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "llvm/IR/TypeBuilder.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Transforms/Utils/Local.h"
 
 #include "CallEmission.h"
 #include "Explosion.h"
@@ -78,11 +86,18 @@
 
 using namespace swift;
 using namespace irgen;
+// SWIFT_ENABLE_TENSORFLOW
+using namespace tf;
 
 // FIXME: Remove this option entirely and turn this on by default.
 llvm::cl::opt<bool> DebugInfoInlinedGenerics(
     "debug-info-inlined-generics", llvm::cl::init(false),
     llvm::cl::desc("Emit variable debug info for inlined generic functions"));
+
+// SWIFT_ENABLE_TENSORFLOW
+namespace llvm {
+extern cl::opt<bool> TFDynamicCompilation;
+}
 
 namespace {
 
@@ -915,7 +930,23 @@ public:
       }
     }
   }
-  
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Returns the LLVM function with `funcName`. It must exist.
+  llvm::Function *findFunction(StringRef funcName, SILModule &silModule) {
+    LLVM_DEBUG(llvm::dbgs() << "IRGen for calling " << funcName << "().\n");
+    auto silFn = silModule.findFunction(funcName, SILLinkage::PublicExternal);
+    assert(silFn);
+    llvm::Function *fn = IGM.getAddrOfSILFunction(silFn, NotForDefinition);
+    assert(fn);
+    return fn;
+  }
+
+  void checkOk(llvm::Value *status) {
+    auto *checkOkFn = IGM.getTFC_CheckOkFn();
+    Builder.CreateCall(checkOkFn, {status});
+  }
+
   //===--------------------------------------------------------------------===//
   // SIL instruction lowering
   //===--------------------------------------------------------------------===//
@@ -944,9 +975,7 @@ public:
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  void visitGraphOperationInst(GraphOperationInst *i) {
-    llvm_unreachable("graph_op is not valid in canonical SIL");
-  }
+  void visitGraphOperationInst(GraphOperationInst *i);
 
   void visitFunctionRefInst(FunctionRefInst *i);
   void visitAllocGlobalInst(AllocGlobalInst *i);
@@ -1859,6 +1888,318 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   }
 
   assert(Builder.hasPostTerminatorIP() && "SIL bb did not terminate block?!");
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+// Injects printf + abort function calls to abort with an error message.
+static void abortOnGraphOp(IRGenFunction &IGF, llvm::StringRef errMessage) {
+  auto &llvmModule = IGF.IGM.Module;
+  auto &llvmContext = llvmModule.getContext();
+  auto printfFunc = llvmModule.getOrInsertFunction(
+      "printf", llvm::TypeBuilder<int(char *, ...), false>::get(llvmContext));
+  auto strConstant =
+      llvm::ConstantDataArray::getString(llvmContext, errMessage);
+  auto GVStr =
+      new llvm::GlobalVariable(llvmModule, strConstant->getType(), true,
+                               llvm::GlobalValue::InternalLinkage, strConstant);
+  llvm::Constant *zero = llvm::Constant::getNullValue(
+      llvm::IntegerType::getInt32Ty(llvmContext));
+  llvm::Constant *zeroes[] = {zero, zero};
+  llvm::Constant *strVal = llvm::ConstantExpr::getGetElementPtr(
+      GVStr->getValueType(), GVStr, zeroes, true);
+  IGF.Builder.CreateCall(printfFunc, {strVal});
+
+  auto abortFunc = llvmModule.getOrInsertFunction(
+      "abort", llvm::FunctionType::get(
+                   llvm::Type::getVoidTy(llvmContext), {}, false));
+  IGF.Builder.CreateCall(abortFunc, {});
+}
+
+// Create and return a (i8*-typed) address value to a constant string.
+static llvm::Value *createStringValAddr(IRGenModule &IGM, StringRef strVal) {
+  auto &llvmModule = IGM.Module;
+  auto &llvmContext = llvmModule.getContext();
+  auto opNameVal = llvm::ConstantDataArray::getString(llvmContext, strVal);
+  auto global =
+      new llvm::GlobalVariable(IGM.Module, opNameVal->getType(), true,
+                               llvm::GlobalValue::PrivateLinkage, opNameVal);
+
+  // Make an i8*.
+  auto zero = llvm::ConstantInt::get(IGM.Int32Ty, 0);
+  llvm::Constant *indices[] = {zero, zero};
+  auto opNameValAddr = llvm::ConstantExpr::getInBoundsGetElementPtr(
+      global->getValueType(), global, indices);
+  return opNameValAddr;
+}
+
+// The code structure resembles
+// TFGraphFunctionLowering::visitGraphOperationInst().
+void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
+  tf::GraphOperationInfo opInfo(i);
+
+  if (!llvm::TFDynamicCompilation) {
+    // graph_ops do make it here when building the TensorFlow module itself.
+    // For those cases, we abort here with an error message.
+    const std::string errMessage = "!!! Compiler bug -- graph_op " +
+                              opInfo.getOperationName().str() +
+                              " cannot be lowered to LLVM IR !!!\n";
+    abortOnGraphOp(*this, errMessage.c_str());
+
+    // Finally, we set up our explosion results full of undef values.
+    auto result = i->getResult(0);
+    ExplosionSchema schema = getTypeInfo(result->getType()).getSchema();
+    Explosion e;
+    for (auto &elt : schema)
+      e.add(llvm::UndefValue::get(elt.getScalarType()));
+    setLoweredExplosion(result, e);
+    return;
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "IRGen for graph_op: "
+                          << opInfo.getOperationName() << "\n");
+  LLVM_DEBUG(for (auto structuredArgument : opInfo.getStructuredArguments()) {
+    llvm::dbgs() << "  operand: " << structuredArgument.getArgumentNameWithSuffix()
+                 << "\n";
+  });
+  LLVM_DEBUG(llvm::dbgs() << "end operands\n");
+
+  // The overall workflow is:
+  // 1. Prepare the input tensor handles and attributes
+  // 2. Run the graph_op
+  // 3. Set the output tensor handles via setLoweredExplosion()
+
+  auto *TFNewStatusFn = IGM.getTF_NewStatusFn();
+  auto status = Builder.CreateCall(TFNewStatusFn, {});
+
+  // TODO: Remove these. They are a temporary way of testing that dynamic
+  // attributes make it here.
+  if (opInfo.getOperationName() == "_DynamicOp") {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Done with IRGen for dynamic graph_op; setting explosion.\n");
+    // The added explosion is incorrect, but is good enough for unit testing.
+    Explosion e;
+    e.add(TFNewStatusFn);
+
+    SILValue result = i->getResults()[0];
+    setLoweredExplosion(result, e);
+    return;
+  }
+
+  // The true return type is TFE_Context*, which is an opaque pointer, so it
+  // maps to void* in the Swift-C calling convention. `eagerContext` has type
+  // void*, or i8* in LLVM type system.
+  auto *getContextFn = IGM.getTFC_GetGlobalEagerContextFn();
+  auto eagerContext = Builder.CreateCall(getContextFn, {});
+
+  // Create a TFE op as in:
+  //   auto* op = TFE_NewOp(ctx, "OpName", status);
+  auto *TFENewOpFn = IGM.getTFE_NewOpFn();
+  auto opNameValAddr = createStringValAddr(IGM, opInfo.getOperationName());
+  auto op =
+      Builder.CreateCall(TFENewOpFn, {eagerContext, opNameValAddr, status});
+  checkOk(status);
+
+  // Handle inputs.
+  for (auto structuredArgument : opInfo.getStructuredArguments()) {
+    assert(structuredArgument.getArgumentNameWithSuffix().empty() &&
+           "cannot lower named arguments");
+    switch (structuredArgument.getKind()) {
+    case GraphOperationInfo::SAK_Single: {
+      // Normal tensor inputs.
+      auto tensorHandleSilValue = structuredArgument.getSingleArgument();
+      auto valueKind = classifyTensorFlowValue(tensorHandleSilValue->getType());
+      assert(valueKind != TFValueKind::Nope &&
+             "all op inputs should be TensorFlow values");
+
+      auto tensorHandleValue =
+          getLoweredSingletonExplosion(tensorHandleSilValue);
+      auto *extractHandleFn = IGM.getTFC_GetCTensorHandleFromSwiftFn();
+      auto cHandle = Builder.CreateCall(extractHandleFn, {tensorHandleValue});
+
+      // Add an op input as in:
+      //   TFE_OpAddInput(op, cHandle);
+      auto *opAddInputFn = IGM.getTFE_OpAddInputFn();
+      Builder.CreateCall(opAddInputFn, {op, cHandle, status});
+      checkOk(status);
+      break;
+    }
+    case GraphOperationInfo::SAK_List:
+      llvm_unreachable("TODO: implement this");
+    }
+  }
+
+  // Handle attributes.
+  unsigned dtypeAttr = 0;
+  for (unsigned nextAttributeNumber = 0, e = i->getNumAttributes();
+       nextAttributeNumber != e;) {
+    auto attr = i->getAttribute(nextAttributeNumber++);
+    auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
+    std::string attrName = attrInfo.first.str();
+
+    switch (attrInfo.second) {
+    case GraphOperationInfo::ArgumentLowering::Input:
+      llvm_unreachable("Input classes cannot exist for attributes");
+    case GraphOperationInfo::ArgumentLowering::Out:
+      llvm_unreachable("Attributes cannot be output parameters");
+    case GraphOperationInfo::ArgumentLowering::UnknownShapeListAttribute:
+      llvm_unreachable("UnknownShapeListAttribute should have been eliminated "
+                       "by deabstraction");
+    case GraphOperationInfo::ArgumentLowering::TypeListAttribute:
+      llvm_unreachable("TypeListAttribute should have been eliminated by "
+                       "deabstraction");
+    case GraphOperationInfo::ArgumentLowering::NormalAttribute: // No modifier.
+      // We add attributes based on what the type of the value is.
+      switch (attr.value.getKind()) {
+      case SymbolicValue::Unknown:
+      case SymbolicValue::UninitMemory:
+      case SymbolicValue::Enum:
+      case SymbolicValue::EnumWithPayload:
+      case SymbolicValue::Address:
+      case SymbolicValue::Aggregate: // Tuples and structs
+        llvm_unreachable("These attribute kinds cannot happen here");
+      case SymbolicValue::Integer:
+      case SymbolicValue::Float:
+      case SymbolicValue::Function:
+      case SymbolicValue::Array:
+        llvm_unreachable("TODO: implement this");
+      case SymbolicValue::String:
+        // TODO: move the DEVICE_ATTR string def to a place accessible here.
+        if (attrName == "__device") {
+          auto deviceStr = attr.value.getStringValue();
+          // In this case, just let eager pick a default device.
+          if (deviceStr == "ALL_DEVICES")
+            break;
+          auto *setDeviceFn = IGM.getTFE_OpSetDeviceFn();
+          auto device = createStringValAddr(IGM, deviceStr);
+          Builder.CreateCall(setDeviceFn, {op, device, status});
+          checkOk(status);
+        } else {
+          llvm_unreachable("TODO: implement this");
+        }
+        break;
+      case SymbolicValue::Metatype:
+        // Set up dtype attr as in:
+        //   TFE_OpSetAttrType(op, "dtype", TF_FLOAT);
+        auto *setAttrTypeFn = IGM.getTFE_OpSetAttrTypeFn();
+        auto dtypeValAddr = createStringValAddr(IGM, attrName.c_str());
+        dtypeAttr = convertSwiftTypeToTF(attr.value.getMetatypeValue());
+        Builder.CreateCall(
+            setAttrTypeFn,
+            {op, dtypeValAddr, llvm::ConstantInt::get(IGM.Int32Ty, dtypeAttr)});
+        break;
+      }
+      // Done with normal attributes.
+      break;
+    case GraphOperationInfo::ArgumentLowering::TensorAttribute: {
+      if (!dtypeAttr) {
+        i->dump();
+        llvm_unreachable("dtype attr must have been processed!");
+      }
+
+      llvm::Value *tensor = nullptr;
+      switch (attr.value.getKind()) {
+      case SymbolicValue::Float: {
+        auto apfloat = attr.value.getFloatValue();
+        // CreateScalarFloatTensor() takes an int instead of float, as runtime
+        // functions that take/return float values do not yet exist.
+        auto constVal =
+            llvm::ConstantInt::get(IGM.Int32Ty, apfloat.convertToFloat());
+        LLVM_DEBUG(llvm::dbgs() << "The const value is " << *constVal << ".\n");
+
+        auto *createTensorFn = IGM.getTFC_CreateScalarFloatTensorFn();
+        tensor = Builder.CreateCall(createTensorFn, {constVal});
+        break;
+      }
+      case SymbolicValue::Integer: {
+        auto apint = attr.value.getIntegerValue();
+        auto constVal = llvm::ConstantInt::get(
+            IGM.Int64Ty, apint.sextOrTrunc(64).getLimitedValue());
+        LLVM_DEBUG(llvm::dbgs() << "The const value is " << *constVal << ".\n");
+
+        auto *createTensorFn = IGM.getTFC_CreateScalarIntTensorFn();
+        tensor = Builder.CreateCall(
+            createTensorFn,
+            {constVal, llvm::ConstantInt::get(IGM.Int32Ty, dtypeAttr), status});
+        checkOk(status);
+        break;
+      }
+      default:
+        llvm_unreachable("TODO: support other dtypes for tensor attr.");
+      }
+
+      // Set up the tensor-typed value attr as in:
+      //   TFE_OpSetAttrTensor(op, "value", tensor, status);
+      auto *setTensorAttrFn = IGM.getTFE_OpSetAttrTensorFn();
+      auto valueAttrAddr = createStringValAddr(IGM, "value");
+      Builder.CreateCall(setTensorAttrFn, {op, valueAttrAddr, tensor, status});
+      checkOk(status);
+
+      auto *deleteTensorFn = IGM.getTF_DeleteTensorFn();
+      Builder.CreateCall(deleteTensorFn, {tensor});
+      break;
+    }
+    case GraphOperationInfo::ArgumentLowering::ShapeAttribute:
+      llvm_unreachable("TODO: implement this");
+    }
+  }
+
+  // Now we execute the TFE op as in:
+  //   TFE_TensorHandle* retval;
+  //   int num_retvals = 1;
+  //   TFE_Execute(op, &retval, &num_retvals, status);
+  //
+  // The LLVM IR code looks like:
+  //   %returnValues = alloca %struct.TFE_TensorHandle*, align 8
+  //   %returnValueCount = alloca i32, align 8
+  //   store i32 1, i32* %returnValueCount, align 8
+  //   %134 = bitcast i8** %returnValues to %struct.TFE_TensorHandle**
+  //   call void @TFE_Execute(%struct.TFE_Op* %130,
+  //                          %struct.TFE_TensorHandle** %134,
+  //                          i32* %returnValueCount,
+  //                          %struct.TF_Status* %128)
+  //   %135 = load %struct.TFE_TensorHandle*, %struct.TFE_TensorHandle** %134,
+  //
+  // FIXME: getPointerAlignment is likely excessive. "align 4" might be
+  // sufficient.
+  auto returnValueCount =
+      createAlloca(IGM.Int32Ty, IGM.getPointerAlignment(), "returnValueCount");
+  auto expectedReturnValueCount =
+      llvm::ConstantInt::get(IGM.Int32Ty, i->getNumResults());
+  Builder.CreateStore(expectedReturnValueCount, returnValueCount);
+  auto returnValues = createAlloca(IGM.Int8PtrTy, expectedReturnValueCount,
+                                   IGM.getPointerAlignment(), "returnValues");
+  auto *tfeExecuteFn = IGM.getTFE_ExecuteFn();
+  Builder.CreateCall(tfeExecuteFn, {op, returnValues.getAddress(),
+                                    returnValueCount.getAddress(), status});
+  checkOk(status);
+
+  // TODO: add sanity check that the returned returnValueCount has value equal
+  // to expectedReturnValueCount.
+
+  // Clean up env as in:
+  //   TFE_DeleteOp(op);
+  //   TF_DeleteStatus(status);
+  auto *deleteOpFn = IGM.getTFE_DeleteOpFn();
+  Builder.CreateCall(deleteOpFn, {op});
+  auto *deleteStatusFn = IGM.getTF_DeleteStatusFn();
+  Builder.CreateCall(deleteStatusFn, {status});
+
+  auto cTensorHandle =
+      Builder.CreateLoad(returnValues.getAddress(), IGM.getPointerAlignment());
+  LLVM_DEBUG(llvm::dbgs() << "The returned tensor handle is " << *cTensorHandle
+                          << ".\n");
+
+  // Wrap `cTensorHandle` into a TensorHandle<T> object.
+  auto *createHandleFn = IGM.getTFC_CreateTensorHandleFromCFn();
+  auto tensorHandle = Builder.CreateCall(createHandleFn, {cTensorHandle});
+
+  LLVM_DEBUG(
+      llvm::dbgs() << "Done with IRGen for graph_op; setting explosion.\n");
+  Explosion e;
+  e.add(tensorHandle);
+
+  SILValue result = i->getResults()[0];
+  setLoweredExplosion(result, e);
 }
 
 void IRGenSILFunction::visitFunctionRefInst(FunctionRefInst *i) {

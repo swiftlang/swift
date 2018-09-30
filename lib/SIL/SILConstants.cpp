@@ -52,10 +52,6 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     os << "\n";
     return;
   }
-  case RK_Inst:
-    os << "inst: ";
-    value.inst->dump();
-    return;
   case RK_Integer:
   case RK_IntegerInline:
     os << "int: " << getIntegerValue() << "\n";
@@ -171,14 +167,6 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
   case RK_Array:
   case RK_ArrayAddress:
     return Array;
-  case RK_Inst:
-    auto *inst = value.inst;
-    if (isa<IntegerLiteralInst>(inst))
-      return Integer;
-    if (isa<FloatLiteralInst>(inst))
-      return Float;
-    assert(isa<StringLiteralInst>(inst) && "Unknown ConstantInst kind");
-    return String;
   }
 }
 
@@ -187,22 +175,7 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
 SymbolicValue
 SymbolicValue::cloneInto(llvm::BumpPtrAllocator &allocator) const {
   auto thisRK = representationKind;
-  // If this is an instruction kind, map onto the thing that will cause a copy.
-  if (thisRK == RK_Inst) {
-    auto *inst = value.inst;
-    if (isa<IntegerLiteralInst>(inst))
-      thisRK = RK_Integer;
-    else if (isa<FloatLiteralInst>(inst))
-      thisRK = RK_Float;
-    else {
-      assert(isa<StringLiteralInst>(inst) && "Unknown ConstantInst kind");
-      thisRK = RK_String;
-    }
-  }
-
   switch (thisRK) {
-  case RK_Inst:
-    assert(0 && "should be remapped above");
   case RK_UninitMemory:
   case RK_Unknown:
   case RK_Metatype:
@@ -300,24 +273,17 @@ APInt SymbolicValue::getIntegerValue() const {
     return APInt(numBits, value.integerInline);
   }
 
-  if (representationKind == RK_Integer) {
-    auto numBits = aux.integer_bitwidth;
-    auto numWords = (numBits + 63) / 64;
-    return APInt(numBits, {value.integer, numWords});
-  }
-
-  assert(representationKind == RK_Inst);
-  return cast<IntegerLiteralInst>(value.inst)->getValue();
+  assert(representationKind == RK_Integer);
+  auto numBits = aux.integer_bitwidth;
+  auto numWords = (numBits + 63) / 64;
+  return APInt(numBits, {value.integer, numWords});
 }
 
 unsigned SymbolicValue::getIntegerValueBitWidth() const {
   assert(getKind() == Integer);
-  if (representationKind == RK_IntegerInline ||
-      representationKind == RK_Integer)
-    return aux.integer_bitwidth;
-
-  assert(representationKind == RK_Inst);
-  return cast<IntegerLiteralInst>(value.inst)->getValue().getBitWidth();
+  assert (representationKind == RK_IntegerInline ||
+          representationKind == RK_Integer);
+  return aux.integer_bitwidth;
 }
 
 //===----------------------------------------------------------------------===//
@@ -407,11 +373,8 @@ APFloat SymbolicValue::getFloatValue() const {
   if (representationKind == RK_Float64)
     return APFloat(value.float64);
 
-  if (representationKind == RK_Float)
-    return value.floatingPoint->getValue();
-
-  assert(representationKind == RK_Inst);
-  return cast<FloatLiteralInst>(value.inst)->getValue();
+  assert(representationKind == RK_Float);
+  return value.floatingPoint->getValue();
 }
 
 const llvm::fltSemantics *SymbolicValue::getFloatValueSemantics() const {
@@ -422,11 +385,8 @@ const llvm::fltSemantics *SymbolicValue::getFloatValueSemantics() const {
   if (representationKind == RK_Float64)
     return &APFloat::IEEEdouble();
 
-  if (representationKind == RK_Float)
-    return &value.floatingPoint->semantics;
-
-  assert(representationKind == RK_Inst);
-  return &getFloatValue().getSemantics();
+  assert (representationKind == RK_Float);
+  return &value.floatingPoint->semantics;
 }
 
 //===----------------------------------------------------------------------===//
@@ -453,11 +413,8 @@ SymbolicValue SymbolicValue::getString(StringRef string,
 StringRef SymbolicValue::getStringValue() const {
   assert(getKind() == String);
 
-  if (representationKind == RK_String)
-    return StringRef(value.string, aux.string_numBytes);
-
-  assert(representationKind == RK_Inst);
-  return cast<StringLiteralInst>(value.inst)->getValue();
+  assert(representationKind == RK_String);
+  return StringRef(value.string, aux.string_numBytes);
 }
 
 //===----------------------------------------------------------------------===//
@@ -843,8 +800,8 @@ static bool emitNoteDiagnostic(SILInstruction *badInst, UnknownReason reason,
   }
 
   auto &module = badInst->getModule();
-  diagnose(module.getASTContext(), loc.getSourceLoc(), diag::tf_op_misuse_note,
-           error)
+  diagnose(module.getASTContext(), loc.getSourceLoc(),
+           diag::constexpr_unknown_reason, error)
       .highlight(loc.getSourceRange());
   return true;
 }

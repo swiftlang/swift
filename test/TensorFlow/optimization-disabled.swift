@@ -35,7 +35,7 @@ public func testSendsInALoopGPU() {
 // then sends it to GPU.
 // CHECK:  bb1:
 // CHECK:      [[A:%.*]] = graph_op "tfc.RecvFromHost
-// CHECK:      graph_op "tfc.TensorTransfer,i"([[A]]
+// CHECK:      graph_op "tfc.TensorTransfer"([[A]]
 //
 // Sends/Receives/Transfers correspond to the warnings at 'a += a' within the loop body
 // CHECK:   bb3:

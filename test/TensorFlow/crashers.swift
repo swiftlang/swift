@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify | %FileCheck %s
 
 // This file contains various regression tests that crashed the compiler.
 
@@ -254,9 +254,9 @@ public func testMultiResultOp_send_recv() {
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testMultiResultOp_send_recv{{.*}}
-// CHECK:  builtin "__tfop_tfc.SendToHost
-// CHECK:  builtin "__tfop_tfc.SendToHost
-// CHECK:  builtin "__tfop_tfc.RecvFromHost
+// CHECK:  graph_op "tfc.SendToHost"
+// CHECK:  graph_op "tfc.SendToHost"
+// CHECK:  graph_op "tfc.RecvFromHost"
 
 var globalThing: Int32!
 
@@ -278,10 +278,14 @@ public func SR8191() {
 }
 
 // CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}SR8191{{.*}}
-// CHECK:    [sequence
-// CHECK:      <while Preheader: bb0, Header: bb1, exit: bb3
-// CHECK:        block bb2>
-// CHECK:      block bb3]
+// CHECK: [sequence
+// CHECK:   <while Preheader: {{bb[0-9]+}}, Header: {{bb[0-9]+}}, exit: [[EXIT:bb[0-9]+]]
+// CHECK:     [sequence
+// CHECK:       {condition Header: {{bb[0-9]+}}
+// CHECK:         block {{bb[0-9]+}}
+// CHECK:         block {{bb[0-9]+}}}
+// CHECK:       block {{bb[0-9]+}}]>
+// CHECK:   block [[EXIT]]]
 
 // `a` and `b` are both arguments to the tensor program, which starts at
 // "let _= a + b", and ends in that BB. So the tensor start point and tensor end
@@ -367,4 +371,33 @@ public func SR8419(iterationCount: Int) {
       let _ = Tensor(1)
     }
   }
+}
+
+// If `deabstractedCallee` gets deabstracted before `inlineDeabstracted_*`,
+// then the insts in `deabstractedCallee` get deabstracted twice. There was
+// a bug where the compiler crashed when deabstracting certain graph_ops twice:
+//  - graph_ops with InputLists
+//  - graph_ops that pack results into aggregate structs
+// There is no guaranteed deabstraction order, so this test isn't guaranteed to
+// catch the problem. Sandwiching `deabstractedCallee` between two callers
+// makes this test catch the problem as long as the order happens to be linear
+// up or down.
+struct AggregateStruct {
+  let a, b: Tensor<Float>
+}
+public func inlineDeabstracted_a() -> Tensor<Float> {
+  return deabstractedCallee([1, 2, 3])
+}
+// expected-warning @+1 {{implicitly copied}}
+public func deabstractedCallee(_ t: Tensor<Float>) -> Tensor<Float> {
+  // expected-error @+3 {{op named 'Dummy' is not registered in TensorFlow}}
+  // expected-error @+2 {{op named 'Dummy' is not registered in TensorFlow}}
+  // expected-error @+1 {{op named 'Dummy' is not registered in TensorFlow}}
+  let aggregate: AggregateStruct = #tfop("Dummy") // packs results
+
+  // expected-note @+1 {{value used here}}
+  return t ++ aggregate.a // concat uses an InputList
+}
+public func inlineDeabstracted_b() -> Tensor<Float> {
+  return deabstractedCallee([1, 2, 3])
 }

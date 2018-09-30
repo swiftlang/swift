@@ -134,6 +134,12 @@ extension Tensor : VectorNumeric where Scalar : Numeric {
   }
 }
 
+extension Tensor : DifferentiableVectorNumeric
+  where ScalarElement : FloatingPoint {
+  public typealias Tangent = Tensor
+  public typealias Cotangent = Tensor
+}
+
 public extension Tensor where Scalar : Numeric {
   /// Adds two tensors and stores the result in the left-hand-side variable.
   /// - Note: `+=` supports broadcasting.
@@ -268,9 +274,15 @@ public func matmul<Scalar : Numeric>(
 infix operator • : MultiplicationPrecedence
 
 public extension Tensor where Scalar : Numeric {
+  // TODO: We have to define a custom adjoint on • because AD can't yet
+  // differentiate generic methods. After AD can differentiate generic methods,
+  // remove the custom adjoint.
+
   /// Performs matrix multiplication between two tensors and produces the
   /// result.
   @inlinable @inline(__always)
+  @differentiable(reverse,
+                  adjoint: _adjointMatmulOperator(lhs:rhs:originalValue:seed:))
   static func • (lhs: Tensor, rhs: Tensor) -> Tensor {
     return matmul(lhs, rhs)
   }

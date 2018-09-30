@@ -221,6 +221,7 @@ WARNING(designated_init_in_cross_module_extension,none,
 NOTE(designated_init_c_struct_fix,none,
      "use \"self.init()\" to initialize the struct with zero values", ())
 
+NOTE(constexpr_unknown_reason, none, "%0", (StringRef))
 NOTE(constexpr_called_from, none, "when called from here", ())
 NOTE(constexpr_not_evaluable, none,
      "expression not evaluable as constant here", ())
@@ -246,6 +247,8 @@ ERROR(tf_lowering_unknown_op, none,
       "op named '%0' is not registered in TensorFlow", (StringRef))
 ERROR(tf_convention_tf_host_code_not_allowed, none,
       "host code is not allowed in a TensorFlow function", ())
+ERROR(tf_no_captures_in_tf_functions, none,
+      "TensorFlow functions cannot capture values", ())
 
 WARNING(tf_value_implicitly_copied_to_accel, none,
         "%0 implicitly copied to the accelerator, use .toAccelerator() to make "
@@ -261,12 +264,20 @@ WARNING(tf_value_implicitly_copied_to_host, none,
         "transfer explicit",
         ())
 
-NOTE(tf_value_implicitly_copied_to_host_computed_used_here, none,
+NOTE(tf_value_used_here, none,
      "value used here", ())
 ERROR(tf_op_misuse, none,
       "%0", (StringRef))
 NOTE(tf_op_misuse_note, none,
      "%0", (StringRef))
+
+ERROR(tf_op_result_generic,none,
+      "cannot extract TensorFlow result into type %0, because %0 contains "
+      "unbound generic parameters", (Type))
+ERROR(tf_op_result_not_value_or_aggregate,none,
+      "cannot extract TensorFlow result into type %0, because %0 is not a "
+      "TensorFlow value type or an aggregate of TensorFlow value types",
+      (Type))
 
 // Control flow diagnostics.
 ERROR(missing_return,none,
@@ -358,6 +369,9 @@ ERROR(pound_assert_failure,none,
 // Automatic differentiation diagnostics
 ERROR(autodiff_internal_swift_not_imported,none,
       "AD internal error: the Swift module is not imported", ())
+ERROR(autodiff_incomplete_differentiable_attr,none,
+      "incomplete `reverse_differentiable` attribute; it should specify either "
+      "both primal and adjoint or nothing", ())
 ERROR(autodiff_opaque_function_unsupported,none,
       "differentiating an opaque function is not supported yet", ())
 ERROR(autodiff_cannot_synthesize_primal_yet,none,

@@ -18,11 +18,11 @@ public func test75247714() {
 
 // b/76115311
 func genericMethod76115311<Scalar : Numeric>(with value: Scalar = 0) -> Tensor<Scalar> {
-  // expected-error @+1 {{operand has unrecognized type}}
   return #tfop("FooOp", value)
 }
 
 public func b76115311() {
+  // expected-error @+1 {{argument of type 'Builtin.FPIEEE32' is not a TensorFlow value or an aggregate of TensorFlow values}}
   let matrix: Tensor<Float> = genericMethod76115311()
   _ = matrix+matrix
 }

@@ -29,6 +29,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 /// SWIFT_ENABLE_TENSORFLOW
+#include "swift/SIL/GraphOperationBuilder.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
@@ -1077,7 +1078,8 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
 };
 
 /// SWIFT_ENABLE_TENSORFLOW
-/// Parse an adjoint attribute, e.g. `[differentiable wrt 0, 1 adjoint @other]`.
+/// Parse a `reverse_differentiable` attribute, e.g.
+/// `[reverse_differentiable wrt 0, 1 adjoint @other]`.
 /// Returns true on error.
 static bool parseReverseDifferentiableAttr(
   SmallVectorImpl<SILReverseDifferentiableAttr *> &DAs, SILParser &SP) {
@@ -1126,12 +1128,12 @@ static bool parseReverseDifferentiableAttr(
     P.consumeToken();
     if (parseFnName(PrimName)) return true;
   }
-  // Parse 'adjoint'.
+  // Parse optional 'adjoint'.
   Identifier AdjName;
-  if (P.parseSpecificIdentifier("adjoint", LastLoc,
-        diag::sil_attr_differentiable_expected_adjoint_identifier) ||
-      parseFnName(AdjName))
-    return true;
+  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "adjoint") {
+    P.consumeToken();
+    if (parseFnName(AdjName)) return true;
+  }
   // Parse ']'.
   if (P.parseToken(tok::r_square,
                    diag::sil_attr_differentiable_expected_rsquare))
@@ -2884,38 +2886,29 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     P.Context.TheBuiltinModule->lookupMember(foundBuiltins,
                                              P.Context.TheBuiltinModule, Id,
                                              Identifier());
-    // SWIFT_ENABLE_TENSORFLOW
-    SubstitutionMap subMap;
-    if (!foundBuiltins.empty()) {
-      assert(foundBuiltins.size() == 1 && "ambiguous builtin name?!");
 
-      auto *builtinFunc = cast<FuncDecl>(foundBuiltins[0]);
-      GenericEnvironment *genericEnv = builtinFunc->getGenericEnvironment();
-
-      SmallVector<ParsedSubstitution, 4> parsedSubs;
-      if (parseSubstitutions(parsedSubs))
-        return true;
-
-      if (!parsedSubs.empty()) {
-        if (!genericEnv) {
-          P.diagnose(P.Tok, diag::sil_substitutions_on_non_polymorphic_type);
-          return true;
-        }
-        subMap = getApplySubstitutionsFromParsed(*this, genericEnv, parsedSubs);
-        if (!subMap)
-          return true;
-      }
-      // SWIFT_ENABLE_TENSORFLOW: TODO: We can clean this up once Swift has a
-      // better understanding of the TensorFlow operations.
-    } else if (Id.str().startswith("__tfop") ||
-      // TODO: tf_tensor_to_i1 can become a named builtin in Builtins.def when
-      // TensorHandle become a builtin type.
-               Id.str() == "tf_tensor_to_i1") {
-      // TensorFlow builtins don't have a decl associated with them, and don't
-      // have substitutions.
-    } else {
-      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "builtin name");
+    if (foundBuiltins.empty()) {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr,"builtin name");
       return true;
+    }
+    assert(foundBuiltins.size() == 1 && "ambiguous builtin name?!");
+
+    auto *builtinFunc = cast<FuncDecl>(foundBuiltins[0]);
+    GenericEnvironment *genericEnv = builtinFunc->getGenericEnvironment();
+    
+    SmallVector<ParsedSubstitution, 4> parsedSubs;
+    SubstitutionMap subMap;
+    if (parseSubstitutions(parsedSubs))
+      return true;
+    
+    if (!parsedSubs.empty()) {
+      if (!genericEnv) {
+        P.diagnose(P.Tok, diag::sil_substitutions_on_non_polymorphic_type);
+        return true;
+      }
+      subMap = getApplySubstitutionsFromParsed(*this, genericEnv, parsedSubs);
+      if (!subMap)
+        return true;
     }
 
     if (P.Tok.getKind() != tok::l_paren) {
@@ -2963,35 +2956,73 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "graph_op name");
       return true;
     }
-    StringRef rawString = P.Tok.getText().drop_front().drop_back();
-    Identifier name = P.Context.getIdentifier(rawString);
+    StringRef opName = P.Tok.getText().drop_front().drop_back();
+    if (opName.find(',') != StringRef::npos) {
+      P.diagnose(P.Tok, diag::sil_graph_op_name_comma);
+      return true;
+    }
+    tf::GraphOperationBuilder opBuilder(opName);
     P.consumeToken(tok::string_literal);
 
-    // Parse graph operation arguments.
+    // Parses a top-level operand to the graphop, and add it to `opBuilder`.
+    auto parseOperand = [&]() -> ParserStatus {
+      // Parse the optional operand name.
+      StringRef operandName;
+      if (P.Tok.is(tok::identifier)) {
+        operandName = P.Tok.getText();
+        P.consumeToken();
+      }
+
+      if (P.Tok.is(tok::l_square)) {
+        // It is a list operand.
+        SourceLoc lSquareLoc = P.consumeToken(tok::l_square);
+        SourceLoc rSquareLoc;
+        SmallVector<SILValue, 4> elements;
+
+        // Parses an element of a list operand, and adds it to `elements`.
+        auto parseListOperandElement = [&]() -> ParserStatus {
+          SILValue value;
+          if (parseTypedValueRef(value, B))
+            return makeParserError();
+          elements.push_back(value);
+          return makeParserSuccess();
+        };
+
+        ParserStatus status = P.parseList(tok::r_square, lSquareLoc, rSquareLoc,
+                                          /*AllowSepAfterLast*/ false,
+                                          diag::sil_graph_op_expected_rsquare,
+                                          SyntaxKind::TuplePatternElementList,
+                                          parseListOperandElement);
+        if (status.isError())
+          return status;
+        opBuilder.addListArgument(elements, operandName);
+        return makeParserSuccess();
+      } else {
+        // It is a single operand.
+        SILValue value;
+        if (parseTypedValueRef(value, B))
+          return makeParserError();
+        opBuilder.addArgument(value, operandName);
+        return makeParserSuccess();
+      }
+    };
+
+    // Parse graph operation operands.
     if (P.Tok.isNot(tok::l_paren)) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "(");
       return true;
     }
-    SmallVector<SILValue, 4> arguments;
     SourceLoc lParenLoc = P.consumeToken(tok::l_paren);
     SourceLoc rParenLoc;
-    ParserStatus status =
-      P.parseList(tok::r_paren, lParenLoc, rParenLoc,
-                  /*AllowSepAfterLast*/ false,
-                  diag::sil_graph_op_expected_rparen,
-                  SyntaxKind::TuplePatternElementList,
-                  [&]() -> ParserStatus {
-        SILValue value;
-        if (parseTypedValueRef(value, B))
-          return makeParserError();
-        arguments.push_back(value);
-        return makeParserSuccess();
-      });
+    ParserStatus status = P.parseList(tok::r_paren, lParenLoc, rParenLoc,
+                                      /*AllowSepAfterLast*/ false,
+                                      diag::sil_graph_op_expected_rparen,
+                                      SyntaxKind::TuplePatternElementList,
+                                      parseOperand);
     if (status.isError())
       return true;
 
     // Parse optional graph operation attributes.
-    SmallVector<GraphOperationAttribute, 4> attributes;
     SourceLoc lBraceLoc;
     if (P.consumeIf(tok::l_brace, lBraceLoc)) {
       SourceLoc rBraceLoc;
@@ -3013,7 +3044,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         }
         if (parseSymbolicValue(attrValue, *this, B))
           return makeParserError();
-        attributes.push_back({ attrName, attrValue });
+        opBuilder.addAttribute({ attrName, attrValue });
         return makeParserSuccess();
       });
       if (status.isError())
@@ -3036,8 +3067,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createGraphOperation(InstLoc, name, arguments, attributes,
-                                       resultTypes);
+
+    ResultVal = opBuilder.build(B, P.Context, InstLoc, resultTypes);
     break;
   }
   case SILInstructionKind::OpenExistentialAddrInst:

@@ -44,3 +44,14 @@ print(x * z)
 // CHECK: @{{.*}}sigmoid{{.*}}__grad_src_0_wrt_0
 // CHECK: @{{.*}}sigmoid{{.*}}__grad_src_0_wrt_0_s_p
 // CHECK: @{{.*}}sigmoid{{.*}}__grad_src_0_wrt_0_p
+
+
+public func publicFunc(_ x: Float) -> Float {
+  return x + x
+}
+_ = #gradient(publicFunc)
+
+// CHECK: sil non_abi @{{.*}}publicFunc{{.*}}__grad_src_0_wrt_0
+// CHECK: sil non_abi @{{.*}}publicFunc{{.*}}__primal_src_0_wrt_0
+// CHECK: sil non_abi @{{.*}}publicFunc{{.*}}__adjoint_src_0_wrt_0
+

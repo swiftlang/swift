@@ -27,6 +27,7 @@
 #include "TFConstExpr.h"
 #include "TFUtilities.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/SIL/GraphOperationBuilder.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -110,7 +111,7 @@ namespace {
     bool changedFunction = false;
 
     /// This is the list of tensor operations in the current function, filled in
-    /// by simplifyTensorOperands.  This contains both the builtin instructions
+    /// by simplifyTensorOperands.  This contains both the graph_op instructions
     /// that reflect the #tfop() invocations, as well as any retain/release
     /// instructions using TensorHandle values.
     SmallVector<SILInstruction*, 32> tensorOps;
@@ -138,15 +139,16 @@ namespace {
   private:
     void logCurrentState(const char *name, bool isDetailed);
     void inlineCalls();
-    void simplifyTensorOperands();
+    bool simplifyTensorOperands();
 
     void promoteToSSA(ArrayRef<AllocStackInst *> allocs);
     void prepareStackAllocForPromotion(AllocStackInst *alloc);
     void propagateSSAValues();
     void checkAttributesAndFormGraphOps();
-    void formGraphOp(SILTensorOpInfo &opInfo,
-                     DenseMap<SILValue, SymbolicValue> &constants,
-                     GraphFunctionDeviceInfo &deviceInfo);
+    void evaluateAttributesAndDoPacking(
+        GraphOperationInfo &opInfo,
+        DenseMap<SILValue, SymbolicValue> &constants,
+        GraphFunctionDeviceInfo &deviceInfo);
     void cleanupDeadInstructions();
   };
 }  // end anonymous namespace
@@ -331,14 +333,24 @@ static SILValue lookThroughSingleElementStructInsts(SILValue value) {
   return value;
 }
 
-/// Scan the operand list of the builtin.  If any operand is passed indirectly
+/// Scan the argument list of the graph_op.  If any argument is passed indirectly
 /// (i.e., an address of a stack location is passed instead of the value itself)
-/// then rewrite the builtin to use a loaded version of that value.
+/// then rewrite the graph_op to use a loaded version of that value.
 ///
-/// Similarly, if a primitive integer or floating point value is passed as a
-/// struct value, extract out the underlying integer or float value.
+/// Similarly, if an argument is an indirect output, then rewrite the graph_op to
+/// return the value directly, and emit an instruction that stores the direct
+/// value to the indirect output address.
 ///
-static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
+/// Also, if a primitive integer or floating point value is passed as a struct
+/// value, extract out the underlying integer or float value.
+///
+/// Returns nullptr on error.
+///
+static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
+                                            TFDeabstraction &TFDA) {
+  auto &ctx = origInst->getFunction()->getASTContext();
+  GraphOperationInfo opInfo(origInst);
+
   /// Return a VarDecl if this is a struct wrapping a single field which is a
   /// primitive integer or floating point value.  We accept multiple layers of
   /// struct wrappers as well, but return the decl for the top level field
@@ -369,74 +381,145 @@ static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
   // Predicate that returns true if the specified type is an address type for
   // a loadable (non-address-only) value.
   auto isLoadableAddressType = [&](SILType type) -> bool {
-    return type.isAddress() && type.isLoadable(inst->getModule());
+    return type.isAddress() && type.isLoadable(origInst->getModule());
   };
 
-  // Predicate that returns true if an operand of the specified type should be
-  // rewritten - either to load an address argument or expand a struct
-  // parameter.
-  auto canSimplifyOperand = [&](SILType type) -> bool {
+  // Predicate that returns true if an argument of the specified type should be
+  // rewritten to load an address argument or expand a struct parameter.
+  auto canSimplifyArgumentType = [&](SILType type) -> bool {
     return isLoadableAddressType(type) ||
            getPrimitiveStructField(type.getASTType()) != nullptr;
   };
 
-  // If we don't have to change any operands, don't rewrite the builtin.
-  bool mustChangeBuiltin = false;
-  for (auto &op : inst->getAllOperands()) {
-    if (canSimplifyOperand(op.get()->getType())) {
-      mustChangeBuiltin = true;
+  // Predicate that returns true if an argument should be rewritten.
+  auto canSimplifyArgument =
+      [&](const GraphOperationInfo::StructuredArgument &argument) -> bool {
+    switch (argument.getKind()) {
+    case GraphOperationInfo::SAK_Single:
+      return canSimplifyArgumentType(argument.getSingleArgument()->getType()) ||
+             std::get<1>(argument.getArgumentNameAndLowering()) ==
+                 GraphOperationInfo::ArgumentLowering::Out;
+    case GraphOperationInfo::SAK_List:
+      // We can get SAK_List arguments from inlining functions that have already
+      // been deabstracted. These arguments do not need further simplification.
+      return false;
+    }
+  };
+
+  // If we don't have to change any arguments, don't rewrite the graph_op.
+  bool mustChangeGraphOp = false;
+  for (auto &argument : opInfo.getStructuredArguments()) {
+    if (canSimplifyArgument(argument)) {
+      mustChangeGraphOp = true;
       break;
     }
   }
 
-  if (!mustChangeBuiltin) return inst;
+  if (!mustChangeGraphOp) return origInst;
 
   // Mark the function as being mutated.
   TFDA.aboutToChangeFunction();
 
-  // Okay, we do have to simplify something.  Scan through and rewrite operands.
-  SILBuilder B(inst);
-  SmallVector<SILValue, 8> operands;
-  for (auto &op : inst->getAllOperands()) {
-    auto operand = op.get();
-    // If this is an address operand, emit a load of the value.
-    if (isLoadableAddressType(operand->getType())) {
-      bool hasOwnership = inst->getFunction()->hasQualifiedOwnership();
-      auto loadOwnership = hasOwnership ? LoadOwnershipQualifier::Trivial
-                                        : LoadOwnershipQualifier::Unqualified;
-      auto load = B.createLoad(inst->getLoc(), operand, loadOwnership);
-      load->setDebugLocation(inst->getDebugLocation());
-      operand = load;
+  // Okay, we do have to simplify something.  Scan through and rewrite arguments.
+  SILBuilder B(origInst);
+  GraphOperationBuilder opBuilder(opInfo.getOperationName());
+  // Pass attributes through.
+  for (auto &attr : origInst->getAttributes())
+    opBuilder.addAttribute(attr);
+  SILValue outParameterAddress;
+  for (auto &argument : opInfo.getStructuredArguments()) {
+    if (argument.getKind() == GraphOperationInfo::SAK_List) {
+      // We can get SAK_List arguments from inlining functions that have already
+      // been deabstracted. Pass these arguments through.
+      opBuilder.addListArgument(argument.getArgumentList(),
+                                argument.getArgumentNameWithSuffix());
+      continue;
     }
 
-    // If the operand is a StructInst building the value that we want to
+    assert(argument.getKind() == GraphOperationInfo::SAK_Single &&
+           "should have already handled all other argument kinds");
+    auto argumentValue = argument.getSingleArgument();
+    auto argumentLowering = std::get<1>(argument.getArgumentNameAndLowering());
+
+    // If this is an out parameter, take note of it (so that we can deal with it
+    // later), and exclude it from the list of rewritten arguments.
+    if (argumentLowering == GraphOperationInfo::ArgumentLowering::Out) {
+      auto argumentType = argumentValue->getType();
+      assert(argumentType.isAddress());
+      if (!argumentType.isLoadable(origInst->getModule())) {
+        auto astType = argumentType.getASTType();
+        if (astType->hasArchetype()) {
+          diagnose(ctx, getUserSourceLocation(origInst).getSourceLoc(),
+                   diag::tf_op_result_generic, astType);
+        } else {
+          diagnose(ctx, getUserSourceLocation(origInst).getSourceLoc(),
+                   diag::tf_op_result_not_value_or_aggregate, astType);
+        }
+        return nullptr;
+      }
+      assert(origInst->getNumResults() == 1 &&
+             origInst->getResult(0)->getType().getASTType() ==
+                ctx.TheEmptyTupleType &&
+             "graph_op with out parameter must return the empty tuple");
+      // There should only be one output parameter because output parameter is
+      // still a single value or single aggregate.
+      assert(!outParameterAddress && "there is more than one out parameter");
+      outParameterAddress = argumentValue;
+      continue;
+    }
+
+    // If this is an address argument, emit a load of the value.
+    if (isLoadableAddressType(argumentValue->getType())) {
+      bool hasOwnership = origInst->getFunction()->hasQualifiedOwnership();
+      auto loadOwnership = hasOwnership ? LoadOwnershipQualifier::Trivial
+                                        : LoadOwnershipQualifier::Unqualified;
+      auto load = B.createLoad(origInst->getLoc(), argumentValue, loadOwnership);
+      load->setDebugLocation(origInst->getDebugLocation());
+      argumentValue = load;
+    }
+
+    // If the argument is a StructInst building the value that we want to
     // extract, just get the element out of it, to avoid generating bloated IR.
-    operand = lookThroughSingleElementStructInsts(operand);
+    argumentValue = lookThroughSingleElementStructInsts(argumentValue);
 
     // If this is a struct value, emit struct extraction instruction(s).
     while (auto fieldDecl = getPrimitiveStructField(
-                                     operand->getType().getASTType())) {
-      auto extract = B.createStructExtract(inst->getLoc(), operand, fieldDecl);
-      extract->setDebugLocation(inst->getDebugLocation());
-      operand = extract;
+                                     argumentValue->getType().getASTType())) {
+      auto extract = B.createStructExtract(origInst->getLoc(), argumentValue,
+                                           fieldDecl);
+      extract->setDebugLocation(origInst->getDebugLocation());
+      argumentValue = extract;
     }
 
-    operands.push_back(operand);
+    opBuilder.addArgument(argumentValue, argument.getArgumentNameWithSuffix());
   }
 
-  // Now that we've rebuilt the operand list, create a new builtin and replace
+  // Now that we've rebuilt the argument list, create a new graph_op and replace
   // the old one.
-  auto *newInst =
-    B.createBuiltin(inst->getLoc(), inst->getName(),
-                    inst->getType(), SubstitutionMap(), operands);
-  newInst->setDebugLocation(inst->getDebugLocation());
+  GraphOperationInst *newInst;
+  if (outParameterAddress) {
+    newInst = opBuilder.build(B, ctx, origInst->getLoc(),
+                              {outParameterAddress->getType().getObjectType()});
+
+    // Store the new instruction's result to the outParameterAddress.
+    auto hasOwnership = newInst->getFunction()->hasQualifiedOwnership();
+    auto storeOwnership = hasOwnership ? StoreOwnershipQualifier::Trivial
+                                       : StoreOwnershipQualifier::Unqualified;
+    B.createStore(origInst->getLoc(), newInst->getResult(0),
+                  outParameterAddress, storeOwnership);
+  } else {
+    SmallVector<SILType, 4> origResultTypes(origInst->getResultTypes());
+    newInst = opBuilder.build(B, ctx, origInst->getLoc(), origResultTypes);
+  }
+  newInst->setDebugLocation(origInst->getDebugLocation());
 
   // Replace the old with the new and delete the old instruction.
-  inst->replaceAllUsesPairwiseWith(newInst);
+  origInst->replaceAllUsesPairwiseWith(newInst);
 
   // Remove the StructInst and other random values that we leave around in the
   // program, now that we directly refer to the TensorFlow values.
-  deleteInstAndAbandonedUses(inst);
+  deleteInstAndAbandonedUses(origInst);
+
   return newInst;
 }
 
@@ -521,23 +604,30 @@ static bool explodeAggregateInst(SILInstruction *inst,
 
 /// Identify all of the tensor operations in the current function, and scan them
 /// to see if there are any indirect arguments, where the address of a stack
-/// allocation is passed to the builtin.  These occur when the tensor op was in
+/// allocation is passed to the graph_op.  These occur when the tensor op was in
 /// a generic context and was passed a scalar attribute value of generic type.
 ///
 /// If we find one of these indirect values, transform it into a load of the
 /// address and a use of the loaded value.  This allows the stack allocation to
 /// be promoted, allowing us to construct SSA def-use chains.
 ///
-/// Similarly, if we see a struct operand that wraps a primitive value, we
-/// extract out the underlying scalar value until we get to a builtin integer or
+/// Similarly, if we find an indirect output, replace it with a direct output
+/// and a store of the outputted value.  This occurs when the tfop has been
+/// inlined from a context where its output is address-only.
+///
+/// Also, if we see a struct operand that wraps a primitive value, we extract
+/// out the underlying scalar value until we get to a builtin integer or
 /// floating point value.
 ///
 /// Since we're scanning the function, keep track of all of the tensor
 /// operations to avoid additional linear scans over the function.
 ///
-void TFDeabstraction::simplifyTensorOperands() {
+/// Returns true on error.
+///
+bool TFDeabstraction::simplifyTensorOperands() {
   llvm::PrettyStackTraceFormat X("TFDeabstraction::simplifyTensorOperands");
-  bool containsOpBuiltin = false;
+  bool containsGraphOp = false;
+  bool hasError = false;
 
   bool alreadyPrinted = false;
   auto logIfFirstChange = [&]() {
@@ -552,15 +642,20 @@ void TFDeabstraction::simplifyTensorOperands() {
       auto *inst = &*I++;
 
       // Try to decode this instruction as an op.  If it isn't one, ignore it.
-      if (auto opInfo = SILTensorOpInfo::decode(inst)) {
+      if (auto *graphOpInst = dyn_cast<GraphOperationInst>(inst)) {
         logIfFirstChange();
 
         // Simplify operands if possible.
-        opInfo->inst = simplifyOperands(opInfo->inst, *this);
+        auto newInst = simplifyOperands(graphOpInst, *this);
+
+        if (!newInst) {
+          hasError = true;
+          continue;
+        }
 
         // Remember this for later passes.
-        tensorOps.push_back(opInfo->inst);
-        containsOpBuiltin = true;
+        tensorOps.push_back(newInst);
+        containsGraphOp = true;
         continue;
       }
 
@@ -573,7 +668,7 @@ void TFDeabstraction::simplifyTensorOperands() {
           logIfFirstChange();
           // Remember this for later passes.
           tensorOps.push_back(apply);
-          containsOpBuiltin = true;
+          containsGraphOp = true;
           continue;
         }
       }
@@ -615,11 +710,13 @@ void TFDeabstraction::simplifyTensorOperands() {
   }
 
   // If the tensorOps list just contained retain/release instructions but had
-  // no actual tensor builtins, we'll ignore the function because there is
+  // no actual tensor graph_ops, we'll ignore the function because there is
   // nothing to partition out of it.  This is probably something actually
   // working on the host-side tensor operation.
-  if (!containsOpBuiltin)
+  if (!containsGraphOp)
     tensorOps.clear();
+
+  return hasError;
 }
 
 namespace {
@@ -1404,7 +1501,7 @@ struct ArrayElementDecoder {
     uint64_t numElements =
         cast<IntegerLiteralInst>(numElementsVal)->getValue().getLimitedValue();
 
-    return !tf::ConstExprEvaluator::decodeAllocUninitializedArray(
+    return !ConstExprEvaluator::decodeAllocUninitializedArray(
         apply, numElements, elementsAtInit, &arrayInsts);
   }
 
@@ -1526,7 +1623,7 @@ propagateSSAOperand(SILValue v, SmallPtrSet<SILPHIArgument *, 8> &checkedPhis) {
       // %189 = struct $SimpleIter(...: $ResourceHandle, %188 :$TensorShape)
       // %190 = struct_extract %189 : $SimpleIter, #SimpleIter.elementShape
       // store %190 to %185 : $*TensorShape
-      // %193 = builtin "__tfop_Foo,...,shapes"(..., %181 : $Array<TensorShape>
+      // %193 = graph_op "Foo"(..., shapes %181 : $Array<TensorShape>
       ArrayElementDecoder arrayDecoder;
       if (!arrayDecoder.decode(extract))
         continue;
@@ -1781,17 +1878,21 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
   for (auto *&inst : tensorOps) {
     // If this is a normal tensor operation, validate it and transform it into a
     // graphOp instruction.
-    if (auto opInfo = SILTensorOpInfo::decode(inst)) {
+    if (auto *graphOpInst = dyn_cast<GraphOperationInst>(inst)) {
+      GraphOperationInfo opInfo(graphOpInst);
       // Do not translate this special inst into a graph op, since it will get
       // removed at the beginning of the partition pass.
       // TODO: remove this inst in the getForFunction() call above, once
       // the partition pass is folded into deabstraction.
       // FIXME: consider defining constexpr strings for these literals.
-      if (opInfo->opName == "tfc.configureTPU" ||
-          opInfo->opName == "tfc.configureGPU" ||
-          opInfo->opName == "tfc.configureCPU")
+      if (opInfo.getOperationName() == "tfc.configureTPU" ||
+          opInfo.getOperationName() == "tfc.configureGPU" ||
+          opInfo.getOperationName() == "tfc.configureCPU")
         continue;
-      formGraphOp(*opInfo, constants, deviceInfo);
+      evaluateAttributesAndDoPacking(opInfo, constants, deviceInfo);
+      // evaluateAttributesAndDoPacking deletes inst. So, continue as the rest
+      // of the loop is irrelevant. (This also avoid memory errors.)
+      continue;
     }
 
     // Take a look at the various well known function calls that we can promote
@@ -1878,141 +1979,225 @@ void TFDeabstraction::cleanupDeadInstructions() {
     removeArrayValueIfPossible(inst);
 }
 
-/// If the specified type conforms to the TensorProtocol protocol, return the
-/// Scalar type for it.  Otherwise return a null type.
-static Type conformsToTensorProtocol(Type ty, ModuleDecl *module) {
-  auto nominal = ty->getAnyNominal();
+/// Recursively unwraps a sequence of aggregate construction/extraction
+/// instructions to find the earliest definition of `value`.  May return
+/// `value` if there is nothing to unwrap.
+static SILValue
+unwrapAggregateInstructions(SILValue value,
+                            llvm::DenseMap<SILValue, SILValue> &cache) {
+  auto &unwrapped = cache[value];
+  if (unwrapped)
+    return unwrapped;
 
-  auto &ctx = ty->getASTContext();
-  auto tensorProto = ctx.getProtocol(KnownProtocolKind::TensorProtocol);
-  if (!tensorProto || !nominal)
-    return Type();
-
-  SmallVector<ProtocolConformance *, 2> conformances;
-  nominal->lookupConformance(/*unused module*/ nullptr, tensorProto,
-                             conformances);
-  if (conformances.size() != 1)
-    return Type();
-
-  auto scalarMembers =
-      nominal->lookupDirect(DeclName(ctx.getIdentifier("Scalar")));
-  if (scalarMembers.size() != 1)
-    return Type();
-  if (auto member = dyn_cast<TypeDecl>(scalarMembers[0]))
-    return ty->getTypeOfMember(module, member,
-                               member->getDeclaredInterfaceType());
-  return Type();
-}
-
-/// Given something that conforms to the TensorProtocol protocol, extract the
-/// 'handle' out of it.
-static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
-                                              SILBuilder &B) {
-  // If we already have a TensorHandle, just use it.
-  if (isTensorHandle(v->getType()))
-    return v;
-
-  auto module = B.getFunction().getModule().getSwiftModule();
-
-  auto vType = v->getType().getASTType();
-  if (!vType->getStructOrBoundGenericStruct() ||
-      !conformsToTensorProtocol(vType, module))
-    return SILValue();
-
-  // If this value is just a struct wrapper around a TensorHandle, use the
-  // input of it.  In the case of Tensor2D, we have multiple levels of struct
-  // wrapper.
-  while (1) {
-    auto si = dyn_cast<StructInst>(v);
-    if (!si)
-      break;
-
-    if (si->getNumOperands() != 1)
-      break;
-
-    auto operand = si->getOperand(0);
-    // If we found the TensorHandle itself, then we win - return it.
-    if (isTensorHandle(operand->getType()))
-      return operand;
-
-    // If we found a wrapper around another TensorProtocol, dig deeper.
-    if (!conformsToTensorProtocol(operand->getType().getASTType(), module))
-      break;
-
-    v = operand;
+  if (auto *tei = dyn_cast<TupleExtractInst>(value)) {
+    auto tupleValue = unwrapAggregateInstructions(tei->getOperand(), cache);
+    if (auto *ti = dyn_cast<TupleInst>(tupleValue)) {
+      unwrapped =
+          unwrapAggregateInstructions(ti->getOperand(tei->getFieldNo()),
+                                      cache);
+      return unwrapped;
+    }
   }
 
-  // TODO(clattner): it would be more correct to generate a call to an accessor
-  // to get the handle out, but for now, we know we're always dealing with types
-  // that store the field by-value so we can dig it out in with an easier
-  // approach.  This handles structs of TensorHandle (like Tensor) and structs
-  // of structs of TensorHandle.
-  while (!isTensorHandle(v->getType())) {
-    auto vTy = v->getType().getASTType();
-    auto decl = vTy.getNominalOrBoundGenericNominal();
-    assert(decl && "Type must be nominal to conform to TensorProtocol");
-
-    auto fieldIt = decl->getStoredProperties().begin();
-    assert(fieldIt != decl->getStoredProperties().end() &&
-           "Tensor should have one member");
-    VarDecl *field = *fieldIt++;
-    assert(fieldIt == decl->getStoredProperties().end() &&
-           "Expected one stored field in TensorProtocol type");
-
-    // 'vTy' is usually a bound generic type.  Use getTypeOfMember to substitute
-    // the type bound into the member type.
-    auto fieldTy = vTy->getTypeOfMember(module, field);
-
-    auto silTy = SILType::getPrimitiveObjectType(fieldTy->getCanonicalType());
-    v = B.createStructExtract(loc, v, field, silTy);
+  if (auto *sei = dyn_cast<StructExtractInst>(value)) {
+    auto structValue = unwrapAggregateInstructions(sei->getOperand(), cache);
+    if (auto *si = dyn_cast<StructInst>(structValue)) {
+      unwrapped =
+          unwrapAggregateInstructions(si->getFieldValue(sei->getField()),
+                                      cache);
+      return unwrapped;
+    }
   }
 
-  return v;
+  unwrapped = value;
+  return unwrapped;
 }
 
-/// Replace the specified tensor operation with a GraphOperation instruction,
-/// emitting errors if attribute arguments could not be constant folded, or if
-/// the operand/attribute types are incorrect.
-void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
-                                  DenseMap<SILValue, SymbolicValue> &constants,
-                                  GraphFunctionDeviceInfo &deviceInfo) {
-  auto *inst = opInfo.inst;
-  auto &context = inst->getFunction()->getASTContext();
+/// Recursively unpacks aggregates to `inputList`, using the already-lowered
+/// values when possible to avoid code bloat.  Returns true to represent error
+/// if it detects a non-TensorFlow leaf field.
+static bool unpackTensorAggregates(
+    SILLocation loc, SILBuilder &B, SILValue rootAggregate,
+    llvm::DenseMap<std::pair<SILValue, unsigned>, SILValue> &loweredTupleElts,
+    llvm::DenseMap<std::pair<SILValue, VarDecl*>, SILValue>
+        &loweredStructFields,
+    llvm::DenseMap<SILValue, SILValue> &unwrapCache,
+    SmallVectorImpl<SILValue> &inputList) {
+
+  // Extracts a field from a tuple.  If the tuple comes from a `tuple`
+  // instruction, uses the appropriate operand instead of emitting a new
+  // `tuple_extract`.
+  auto extractElement = [&](SILValue tupleValue, unsigned i) -> SILValue {
+    if (auto *ti = dyn_cast<TupleInst>(tupleValue))
+      return ti->getOperand(i);
+    return B.createTupleExtract(loc, tupleValue, i);
+  };
+
+  // Extracts a field from a struct.  If the struct comes from a `struct`
+  // instruction, uses the appropriate operand instead of emitting a new
+  // `struct_extract`.
+  auto extractField = [&](SILValue structValue, VarDecl *field) -> SILValue {
+    if (auto *si = dyn_cast<StructInst>(structValue))
+      return si->getFieldValue(field);
+    return B.createStructExtract(loc, structValue, field);
+  };
+
+  std::function<bool(SILValue)> recurse;
+  recurse = [&](SILValue aggregate) -> bool {
+    auto aggregateTy = aggregate->getType();
+    if (isTensorFlowValue(aggregateTy)) {
+      inputList.push_back(aggregate);
+      return false;
+    }
+    if (auto tupleTy = aggregateTy.getAs<TupleType>()) {
+      for (auto i : range(tupleTy->getNumElements())) {
+        auto eltIdx = std::pair<SILValue, unsigned>(aggregate, i);
+        auto &eltValue = loweredTupleElts[eltIdx];
+        if (!eltValue) {
+          eltValue =
+              unwrapAggregateInstructions(extractElement(aggregate, i),
+                                          unwrapCache);
+        }
+        if (recurse(eltValue))
+          return true;
+      }
+      return false;
+    }
+    if (auto *decl = aggregateTy.getStructOrBoundGenericStruct()) {
+      for (auto *field : decl->getStoredProperties()) {
+        auto fieldIdx = std::pair<SILValue, VarDecl*>(aggregate, field);
+        auto &fieldValue = loweredStructFields[fieldIdx];
+        if (!fieldValue) {
+          fieldValue =
+              unwrapAggregateInstructions(extractField(aggregate, field),
+                                          unwrapCache);
+        }
+        if (recurse(fieldValue))
+          return true;
+      }
+      return false;
+    }
+    return true;
+  };
+
+  return recurse(unwrapAggregateInstructions(rootAggregate, unwrapCache));
+}
+
+/// Given a type, recursively collect all innermost element types if it's an
+/// aggregate of TensorHandle's or dtypes.
+static bool collectInnermostTensorFlowDTypes(
+    CanType type, SmallVectorImpl<SymbolicValue> &result) {
+  if (isTensorFlowDType(type)) {
+    result.push_back(SymbolicValue::getMetatype(type));
+    return true;
+  }
+  if (tf::isTensorHandle(type)) {
+    auto eltType = getTensorHandleElementType(type)->getCanonicalType();
+    assert(tf::isTensorFlowDType(eltType));
+    result.push_back(SymbolicValue::getMetatype(eltType));
+    return true;
+  }
+  if (auto tupleTy = type->getAs<TupleType>())
+    return llvm::all_of(tupleTy->getElementTypes(),
+                        [&](Type eltTy) {
+                          return collectInnermostTensorFlowDTypes(
+                              eltTy->getCanonicalType(), result);
+                        });
+  if (auto *decl = type->getStructOrBoundGenericStruct())
+    return llvm::all_of(decl->getStoredProperties(),
+                        [&](VarDecl *member) {
+                          auto subMap = type->getMemberSubstitutionMap(
+                              member->getModuleContext(), member);
+                          auto eltTy = member->getType().subst(subMap);
+                          return collectInnermostTensorFlowDTypes(
+                              eltTy->getCanonicalType(), result);
+                        });
+  return false;
+}
+
+/// Replace the specified GraphOperationInst with a new GraphOperationInst
+/// with the following transformations applied:
+///  - attribute arguments with known constant values become GraphOperationInst
+///    attributes.
+///  - inputs get unpacked to raw tensor types before being fed into the
+///    GraphOperationInst.
+///  - outputs are raw tensor types, which get packed into whatever types the
+///    original GraphOperationInst was returning.
+///
+/// This deletes the underlying inst in `opInfo` when a GraphOperation is
+/// created successfully.
+void TFDeabstraction::evaluateAttributesAndDoPacking(
+    GraphOperationInfo &opInfo, DenseMap<SILValue, SymbolicValue> &constants,
+    GraphFunctionDeviceInfo &deviceInfo) {
+  auto *origInst = opInfo.getInst();
+  auto &context = origInst->getFunction()->getASTContext();
   auto &allocator = context.getAllocator();
-  SILBuilder B(opInfo.inst);
+  SILBuilder B(origInst);
+  auto origInstLoc = getUserSourceLocation(origInst);
 
   // This is a helper function to emit a diagnostic.
-  auto diagnoseInvalid = [&](const Twine &message) {
-    auto loc = getUserSourceLocation(inst);
+  auto diagnoseInvalid = [&](SILLocation loc, const Twine &message,
+                             SILLocation userNoteLoc = (Expr *)nullptr) {
     diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
              diag::tf_op_misuse, message.str())
       .highlight(loc.getSourceRange());
+    if (userNoteLoc)
+      diagnose(context, userNoteLoc.getSourceLoc(), diag::tf_value_used_here);
   };
 
-  std::string opName = opInfo.opName.str();
-  SmallVector<SILValue, 4> inputs;
-  SmallVector<GraphOperationAttribute, 4> attributes;
+  GraphOperationBuilder opBuilder(opInfo.getOperationName());
 
   // Find the device attribute specified for the instruction if present.
   StringRef opDevice;
 
-  for (unsigned i = 0, e = opInfo.operandClasses.size(); i != e; ++i) {
-    auto operand = inst->getOperand(i);
-    auto operandTy = operand->getType();
-    auto operandClass = opInfo.operandClasses[i];
+  // Pass attributes through.
+  for (auto &attr : origInst->getAttributes()) {
+    if (attr.name.str() == DEVICE_ATTR) {
+      opDevice = attr.value.getStringValue();
+    }
+    opBuilder.addAttribute(attr);
+  }
 
-    // Collect and validate input operands.
-    if (opInfo.isInput(i)) {
+  // It is common to have input lists with repeated elements.  These will
+  // generally be uniqued on entry to this routine.  We cache the projections in
+  // these maps so that we can reuse them and avoid code bloat.
+  llvm::DenseMap<std::pair<SILValue, unsigned>, SILValue> loweredTupleElts;
+  llvm::DenseMap<std::pair<SILValue, VarDecl*>, SILValue> loweredStructFields;
 
-      // Each input gets a marker mangled into the op name, because we need to
-      // be able to distinguish between normal inputs and elements of an input
-      // list.
+  // A cache for calls to `unwrapAggregateInstructions`.
+  llvm::DenseMap<SILValue, SILValue> unwrapCache;
 
+  for (auto i : range(opInfo.getStructuredArguments().size())) {
+    auto argument = opInfo.getStructuredArguments()[i];
+
+    if (argument.getKind() == GraphOperationInfo::SAK_List) {
+      // We can get SAK_List arguments from inlining functions that have already
+      // been deabstracted. Pass these arguments through.
+      opBuilder.addListArgument(argument.getArgumentList(),
+                                argument.getArgumentNameWithSuffix());
+      continue;
+    }
+
+    assert(argument.getKind() == GraphOperationInfo::SAK_Single &&
+           "should have already handled all other argument kinds");
+    auto argumentValue = argument.getSingleArgument();
+    auto argumentTy = argumentValue->getType();
+    auto argumentNameAndLowering = argument.getArgumentNameAndLowering();
+    auto argumentLoc = getUserSourceLocation(argumentValue);
+
+    // Collect and validate input arguments.
+    if (std::get<1>(argumentNameAndLowering) ==
+        GraphOperationInfo::ArgumentLowering::Input) {
       // If this is tfc.scalarToTensor, then the input must be a valid scalar.
-      if (opInfo.opName == "tfc.scalarToTensor") {
-        auto scalarType = operandTy.getASTType();
+      if (opInfo.getOperationName() == "tfc.scalarToTensor") {
+        assert(origInst->getNumResults() == 1 &&
+               "tfc.scalarToTensor must have 1 result");
+        auto origResult = origInst->getResult(0);
+
+        auto scalarType = argumentTy.getASTType();
         if (convertSwiftTypeToTF(scalarType) == 0) {
-          diagnoseInvalid("scalarToTensor requires scalar value; unrecognized"
+          diagnoseInvalid(origInstLoc,
+                          "scalarToTensor requires scalar value; unrecognized"
                           " type '" + scalarType->getString() +
                           "' is not allowed");
           return;
@@ -2020,116 +2205,127 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
 
         // Check to see if it was constant foldable.  If so, we can turn this
         // into a Const node to avoid a send.
-        auto it = constants.find(operand);
+        auto it = constants.find(argumentValue);
         if (it != constants.end() && it->second.isConstant()) {
           // Dig the element type out of the TensorHandle result type.
           auto eltType =
-            getTensorHandleElementType(inst->getType().getASTType());
+              getTensorHandleElementType(origResult->getType().getASTType());
           // We use int32 as the element type of the zero-d shape array.
           auto int32Ty =
             context.getInt32Decl()->getDeclaredType()->getCanonicalType();
           auto constant =
             createConstTensor(eltType, it->second,
                               SymbolicValue::getArray({}, int32Ty, allocator),
-                              inst->getType(),  getUserSourceLocation(inst),
-                              DeviceType::ALL, B);
-          inst->replaceAllUsesWith(constant->getResult(0));
-          inst->eraseFromParent();
+                              origResult->getType(),
+                              getUserSourceLocation(origInst), DeviceType::ALL, B);
+          origResult->replaceAllUsesWith(constant->getResult(0));
+          origInst->eraseFromParent();
           return;
         }
 
-        opName +=
-          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Scalar);
-
-        inputs.push_back(operand);
+        opBuilder.addArgument(argumentValue);
         continue;
       }
 
-      // Tensor operand type's are ok.
-      if (isTensorFlowValue(operandTy)) {
-        opName +=
-          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
-        inputs.push_back(operand);
-        continue;
-      }
+      // Remove the argument so decodeArrayElements doesn't see the use.
+      origInst->setOperand(i, SILUndef::get(argumentTy, fn.getModule()));
 
-      // Remove the operand so decodeArrayElements doesn't see the use.
-      inst->setOperand(i, SILUndef::get(operand->getType(),
-                                        fn.getModule()));
-
-      // Otherwise this must be an array, representing an input list.
+      // Handle the case where this is an array, representing an input list.
       ArrayElementDecoder arrayDecoder;
-      auto elementType = arrayDecoder.decode(operand);
-      if (!elementType) {
-        diagnoseInvalid("operand has unrecognized type '" +
-                        operandTy.getASTType()->getString() + "'");
-        return;
-      }
+      auto elementType = arrayDecoder.decode(argumentValue);
+      SmallVector<SILValue, 4> inputList;
+      if (elementType) {
+        // Add each element to the input list we're building, drilling down
+        // through any aggregates that may be around it.
+        for (auto *use : arrayDecoder.elementsAtInit) {
+          auto *store = dyn_cast<StoreInst>(use->getUser());
+          if (!store) {
+            diagnoseInvalid(argumentLoc,
+                            "argument of type '" + elementType->getString() +
+                            "' is not a TensorFlow value or an aggregate of "
+                            "TensorFlow values");
+            return;
+          }
 
-      // Remember that we have an input list, this marker is important because
-      // the list may be empty, and we need to know it exists in graph lowering.
-      opName +=
-        GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_InputList);
-      const char *elementMarker =
-        GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_InputListElt);
-
-      // Add each element to the input list we're building, drilling down
-      // through any struct wrappers (like Tensor, etc) that may be around it.
-      //
-      // It is common to have arrays with repeated elements.  These will
-      // generally be uniqued on entry to this routine.  If so, make sure to
-      // reuse them as we project out the .handle members to avoid code bloat.
-      llvm::DenseMap<SILValue, SILValue> loweredElts;
-      for (auto *use : arrayDecoder.elementsAtInit) {
-        auto *store = dyn_cast<StoreInst>(use->getUser());
-        if (!store) {
-          diagnoseInvalid("element initialization error");
-          return;
-        }
-        auto elt = store->getSrc();
-        auto &eltVal = loweredElts[elt];
-        if (!eltVal) {
-          eltVal = getTensorProtocolHandleMember(elt, inst->getLoc(), B);
-          if (!eltVal) {
-            diagnoseInvalid("elements to input list have invalid type '" +
-                            elementType->getString() + "'");
+          if (unpackTensorAggregates(origInst->getLoc(), B, store->getSrc(),
+                                     loweredTupleElts, loweredStructFields,
+                                     unwrapCache, inputList)) {
+            diagnoseInvalid(argumentLoc,
+                            "argument of type '" + elementType->getString() +
+                            "' is not a TensorFlow value or an aggregate of "
+                            "TensorFlow values");
             return;
           }
         }
-
-        opName += elementMarker;
-        inputs.push_back(eltVal);
+        opBuilder.addListArgument(inputList);
+        continue;
       }
+
+      // Otherwise, this must be a single input.
+      if (unpackTensorAggregates(origInst->getLoc(), B, argumentValue,
+                                 loweredTupleElts, loweredStructFields,
+                                 unwrapCache, inputList)) {
+        // FIXME: Since TFDeabstraction happens after mandatory inlining,
+        // numeric arguments will appear as having a builtin type such as
+        // `Builtin.FPIEEE32`. This is undesirable for user-facing diagnostics.
+        auto astTypeString = argumentTy.getASTType().getString();
+        diagnoseInvalid(argumentLoc,
+                        "argument of type '" + astTypeString +
+                        "' is not a TensorFlow value or an aggregate of "
+                        "TensorFlow values");
+        return;
+      }
+      if (inputList.size() != 1) {
+        // We could accept this situation and unpack the input into an input
+        // list.  However, we want users to explicitly indicate that they want
+        // unpacking to an input list by wrapping their input in an array, so we
+        // reject this situation.
+        auto astTypeString = argumentTy.getASTType().getString();
+        // FIXME: We could use `argumentLoc`, but the error would show up on the
+        // type declaration instead. Need to investigate how to get the argument
+        // location.
+        diagnoseInvalid(argumentLoc, "argument of type '" + astTypeString +
+                        "' must contain exactly one TensorFlow value",
+                        origInstLoc);
+        return;
+      }
+      opBuilder.addArgument(inputList[0]);
       continue;
     }
 
     // Helper to diagnose invalid attributes.
     auto diagnoseInvalidAttr = [&](const Twine &message) {
-      diagnoseInvalid(Twine("attribute '") + operandClass.first.str() +
+      diagnoseInvalid(origInstLoc,
+                      Twine("attribute '") +
+                      std::get<0>(argumentNameAndLowering) +
                       "' " + message.str());
     };
 
-    // Ok, we have an attribute operand, we should have been able to fold it
-    // through our constexpr evaluation logic.
-    auto it = constants.find(operand);
+    // Ok, we have an attribute argument, we should have been able to fold it
+    // through our constexpr evaluation logic -- unless we're doing dynamic
+    // compilation.
+    auto it = constants.find(argumentValue);
     if (it == constants.end() || !it->second.isConstant()) {
-      // TODO: improve the diagnostic to talk about the parameter label in
-      // the user code, not the internal op attribute.  The bookkeeping for
-      // this isn't obvious though.
-      diagnoseInvalidAttr("requires a constant argument");
+      if (llvm::TFDynamicCompilation) {
+        // Since we're doing dynamic compilation, we can simply pass this
+        // unknown attribute as a named argument to the graph_op, and IRGen will
+        // deal with it.
+        opBuilder.addArgument(argumentValue, argument.getArgumentNameWithSuffix());
+        continue;
+      } else {
+        // TODO: improve the diagnostic to talk about the parameter label in
+        // the user code, not the internal op attribute.  The bookkeeping for
+        // this isn't obvious though.
+        diagnoseInvalidAttr("requires a constant argument");
 
-      // If we have more specific information about what went wrong, emit
-      // notes.
-      if (it != constants.end() &&
-          it->second.getKind() == SymbolicValue::Unknown)
-        it->second.emitUnknownDiagnosticNotes(opInfo.inst->getLoc());
-      return;
+        // If we have more specific information about what went wrong, emit
+        // notes.
+        if (it != constants.end() &&
+            it->second.getKind() == SymbolicValue::Unknown)
+          it->second.emitUnknownDiagnosticNotes(origInstLoc);
+        return;
+      }
     }
-
-    // Name mangle the attribute classification into the operand list so we can
-    // know the difference between a shape and an array, and a shape array, etc.
-    auto attrName = operandClass.first.str() +
-       SILTensorOpInfo::getOperandClassSuffix(operandClass.second);
 
     // Get the constant, ignoring struct wrappers.
     auto constValue = it->second.lookThroughSingleElementAggregates();
@@ -2137,13 +2333,13 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
     // Clone it out of the ConstExpr pool into the global SILModule pool.
     constValue = constValue.cloneInto(allocator);
 
-    auto attrIdentifier = context.getIdentifier(attrName);
-    attributes.push_back({ attrIdentifier, constValue });
+    auto attrIdentifier = context.getIdentifier(argument.getArgumentNameWithSuffix());
+    auto &currentAttr = opBuilder.addAttribute({ attrIdentifier, constValue });
 
     // FIXME: Do we detect and reject duplicate attribute names already?
 
     // If it's a device attribute, get the device value.
-    if (operandClass.first == DEVICE_ATTR) {
+    if (std::get<0>(argumentNameAndLowering) == DEVICE_ATTR) {
       if (constValue.getKind() != SymbolicValue::String)
         return diagnoseInvalidAttr("must be a string");
       opDevice = constValue.getStringValue();
@@ -2158,10 +2354,11 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       switch (constValue.getKind()) {
       case SymbolicValue::Unknown:
       case SymbolicValue::UninitMemory:
-        assert(0 && "earlier code should have ruled out non-constant values");
+        llvm_unreachable(
+            "earlier code should have ruled out non-constant values");
 
       case SymbolicValue::Address:
-        assert(0 && "it's impossible to pass an address as an attr");
+        llvm_unreachable("it's impossible to pass an address as an attr");
 
       case SymbolicValue::Enum:
       case SymbolicValue::EnumWithPayload:
@@ -2180,74 +2377,103 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
       return false;
     };
 
-    // Emits a diagnostic and returns true if the value is invalid for a shape
-    // attr.
-    auto verifyShapeAttr = [&](SymbolicValue constValue) -> bool {
+    // Emits a diagnostic and returns a negative number if the value is not an
+    // int array.  Otherwise returns the product of the array element
+    // values. e.g. For array [2, 3], return 6.
+    auto getIntArrayProduct = [&](SymbolicValue constValue) -> long long {
       // strip away the possible aggregate wrapper.
       constValue = constValue.lookThroughSingleElementAggregates();
       if (constValue.getKind() != SymbolicValue::Array) {
         diagnoseInvalidAttr("requires an array");
-        return true;
+        return -1;
       }
       CanType eltType;
       auto elements = constValue.getArrayValue(eltType);
       if (!StringRef(eltType->getString()).startswith("Int")) {
         diagnoseInvalidAttr("requires an array of ints");
-        return true;
+        return -1;
       }
+      long long ret = 1;
       for (auto elt : elements) {
         // strip away the possible aggregate wrapper.
         elt = elt.lookThroughSingleElementAggregates();
         if (elt.getKind() != SymbolicValue::Integer) {
           diagnoseInvalidAttr("requires an array of ints");
-          return true;
+          return -1;
         }
+        // It is possible for this to overflow, but the resulting compilation
+        // will still be correct, so for simplicity we do not guard against
+        // overflow. More specifically, when it overflows, we would either
+        // return a negative value and thus reject the input program, or
+        // return an incorrect positive value. In both cases, the input
+        // program will still be eventually rejected (e.g. in TF graph
+        // compiler), since the specified shape is too large. As such, the
+        // correctness of compilation is preserved.
+        ret *= elt.getIntegerValue().getLimitedValue();
       }
-      return false;
+      return ret;
     };
-
-    // Verify that the type of this attribute is ok for the OperandClass we
+    // Verify that the type of this attribute is ok for the ArgumentLowering we
     // have.
-    switch (operandClass.second) {
-    case SILTensorOpInfo::OperandClass::Input:
-    case SILTensorOpInfo::OperandClass::InputElt:
-      assert(0 && "Input classes cannot exist for attributes");
-    case SILTensorOpInfo::OperandClass::Normal:  // No modifier.
+    switch (std::get<1>(argumentNameAndLowering)) {
+    case GraphOperationInfo::ArgumentLowering::Input:
+      llvm_unreachable("Attributes cannot be inputs");
+    case GraphOperationInfo::ArgumentLowering::Out:
+      llvm_unreachable("Attributes cannot be output parameters");
+    case GraphOperationInfo::ArgumentLowering::NormalAttribute:
       if (verifyNormalAttr(constValue))
         return; // error already emitted.
       break;
-    case SILTensorOpInfo::OperandClass::DType:
-      // This integer value is a dtype.
-      if (constValue.getKind() != SymbolicValue::Integer)
-        return diagnoseInvalidAttr("requires a constant integer");
-      break;
-    case SILTensorOpInfo::OperandClass::Array:
-      if (constValue.getKind() != SymbolicValue::Array)
-        return diagnoseInvalidAttr("requires an array");
-      break;
-    case SILTensorOpInfo::OperandClass::Shape:
-      if (verifyShapeAttr(constValue))
-        return; // error already emitted.
-      break;
-    case SILTensorOpInfo::OperandClass::ShapeArray: {
-      if (constValue.getKind() != SymbolicValue::Array)
-        return diagnoseInvalidAttr("requires an array");
-      CanType eltType;
-      auto shapes = constValue.getArrayValue(eltType);
-      if (eltType->getString() != "TensorShape")
-        return diagnoseInvalidAttr("requires an array of TensorShape values");
-      for (auto shape : shapes) {
-        if (verifyShapeAttr(shape))
-          return; // error already emitted.
-      }
+    case GraphOperationInfo::ArgumentLowering::TypeListAttribute: {
+      if (constValue.getKind() != SymbolicValue::Metatype)
+        return diagnoseInvalidAttr("requires a metatype");
+      SmallVector<SymbolicValue, 8> dtypes;
+      if (!collectInnermostTensorFlowDTypes(constValue.getMetatypeValue(),
+                                            dtypes))
+        return diagnoseInvalidAttr("requires a TensorFlow value or an "
+                                   "aggregate of TensorFlow values");
+      // Drop '$typeList' from the attribute name.
+      currentAttr.name = context.getIdentifier(
+          std::get<0>(argumentNameAndLowering));
+      // Replace the single metatype with a list of metatypes each
+      // representing a dtype.
+      auto *dtypeProto =
+          context.getProtocol(KnownProtocolKind::AccelerableByTensorFlow);
+      currentAttr.value = SymbolicValue::getArray(
+          dtypes, dtypeProto->getInterfaceType()->getCanonicalType(),
+          context.getAllocator());
       break;
     }
-    case SILTensorOpInfo::OperandClass::ArrayElement:
-      inst->dump();
-      assert(0 && "FIXME: array elem exprs aren't handled yet");
-    case SILTensorOpInfo::OperandClass::Tensor:
-      // FIXME: There needs to be a dtype attribute before this.
-
+    case GraphOperationInfo::ArgumentLowering::ShapeAttribute:
+      // A shape attr must be an int array.
+      if (getIntArrayProduct(constValue) < 0)
+        return; // error already emitted.
+      break;
+    case GraphOperationInfo::ArgumentLowering::UnknownShapeListAttribute: {
+      if (constValue.getKind() != SymbolicValue::Metatype)
+        return diagnoseInvalidAttr("requires a metatype");
+      auto type = constValue.getMetatypeValue();
+      SmallVector<Type, 8> tfValueTypes;
+      if (!tf::flattenTensorFlowValueAggregate(type, tfValueTypes))
+        return diagnoseInvalidAttr("requires a TensorFlow value or an "
+                                   "aggregate or TensorFlow values");
+      // Drop '$unknownShapeList' from the attribute name.
+      currentAttr.name = context.getIdentifier(
+          std::get<0>(argumentNameAndLowering));
+      auto tensorShapeType =
+          context.getTensorShapeDecl()->getDeclaredInterfaceType();
+      auto tensorShapeOptional =
+          BoundGenericType::get(context.getOptionalDecl(), Type(),
+                                {tensorShapeType})->getCanonicalType();
+      // Create a list of nils representing unknown shape.
+      SmallVector<SymbolicValue, 8> nils(
+          tfValueTypes.size(),
+          SymbolicValue::getEnum(context.getOptionalNoneDecl()));
+      currentAttr.value = SymbolicValue::getArray(nils, tensorShapeOptional,
+                                                  context.getAllocator());
+      break;
+    }
+    case GraphOperationInfo::ArgumentLowering::TensorAttribute:
       if (constValue.getKind() == SymbolicValue::Integer ||
           constValue.getKind() == SymbolicValue::Float   ||
           constValue.getKind() == SymbolicValue::String)
@@ -2257,18 +2483,38 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
         return diagnoseInvalidAttr("requires a constant that is an integer,"
                                    " floating point, or array thereof");
 
+      // Returns a negative number if the next attr is not a shape.  Otherwise
+      // returns the number of elements as given by the shape attr. e.g. a
+      // tensor with shape [2, 3] has 6 elements.
+      auto getNumEltsFromShapeAttr = [&]() -> long long {
+        if (i + 1 >= opInfo.getStructuredArguments().size())
+          return -1;
+        auto nextOperand = opInfo.getStructuredArguments()[i + 1];
+        auto nextArgumentLowering = std::get<1>(
+            nextOperand.getArgumentNameAndLowering());
+        if (nextArgumentLowering !=
+            GraphOperationInfo::ArgumentLowering::ShapeAttribute)
+          return -1;
+        assert(nextOperand.getKind() == GraphOperationInfo::SAK_Single &&
+               "SILGen should not have generated a list argument");
+        auto it = constants.find(nextOperand.getSingleArgument());
+        if (it == constants.end() || !it->second.isConstant())
+          return -1;
+        auto constValue = it->second.lookThroughSingleElementAggregates();
+        return getIntArrayProduct(constValue);
+      };
+      // Shape attr is an int array.
+      auto numEltsFromShapeAttr = getNumEltsFromShapeAttr();
+      if (numEltsFromShapeAttr < 0)
+        return diagnoseInvalidAttr("must be followed by a shape attribute");
+
+      // Validate that the shape matches the # elements we have.
       CanType eltType;
       auto elements = constValue.getArrayValue(eltType);
 
-      /// Tensor array arguments must always be followed by a shape.
-      if (i+1 >= opInfo.operandClasses.size() ||
-          opInfo.operandClasses[i+1].second !=
-                      SILTensorOpInfo::OperandClass::Shape)
-        return diagnoseInvalidAttr("tensor attributes must be followed by "
-                                   "a shape attribute");
-
-      // TODO: Decode the shape and validate that it matches the # elements
-      // we have.
+      if ((size_t)numEltsFromShapeAttr != elements.size())
+        return diagnoseInvalidAttr("does not match the shape attribute in "
+                                   "the number of scalar elements");
 
       // Empty tensor value is ok.
       if (elements.empty()) break;
@@ -2310,38 +2556,71 @@ void TFDeabstraction::formGraphOp(SILTensorOpInfo &opInfo,
   // Finally, set a device attribute for this if there wasn't already one
   // specified.
   if (opDevice.empty()) {
-    deviceInfo.handleDevicePlacement(opInfo.opName, opDevice, context,
-                                     attributes);
+    deviceInfo.handleDevicePlacement(opInfo.getOperationName(), opDevice,
+                                     context, &opBuilder);
   }
   // Okay, if we got this far then we have all valid attributes and inputs.
-  // Figure out the result list.
-  SmallVector<SILType, 4> resultTypes;
-  if (auto tuple = inst->getType().getAs<TupleType>()) {
-    for (auto elt : tuple->getElements()) {
-      auto eltTy = elt.getType()->getCanonicalType();
-      resultTypes.push_back(SILType::getPrimitiveObjectType(eltTy));
+
+  // Time to create the op and deal with results.
+  auto loc = getUserSourceLocation(origInst);
+
+  // If there is only one result, it may be an aggregate that we have to pack.
+  if (origInst->getNumResults() == 1) {
+    auto origResult = origInst->getResults()[0];
+    SmallVector<Type, 4> resultTypes;
+    auto userResultTy = origResult->getType().getASTType();
+    if (!tf::flattenTensorFlowValueAggregate(userResultTy, resultTypes)) {
+      auto loc = getUserSourceLocation(origInst);
+      diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
+               diag::tf_op_result_not_value_or_aggregate, userResultTy)
+        .highlight(loc.getSourceRange());
+      return;
     }
-  } else {
-    resultTypes.push_back(inst->getType());
+    auto resultSILTypes = map<SmallVector<SILType, 8>>(resultTypes, [&](Type ty) {
+        return SILType::getPrimitiveObjectType(ty->getCanonicalType()); });
+
+    auto op = opBuilder.build(B, context, loc, resultSILTypes);
+
+    // Recursively pack results to a value with the user-specified aggregate type.
+    auto resultIt = op->getResults().begin();
+    std::function<SILValue(SILType)> packResultsToAggregate;
+    packResultsToAggregate = [&](SILType aggregateTy) -> SILValue {
+      if (isTensorFlowValue(aggregateTy))
+        return *resultIt++;
+      if (auto tupleTy = aggregateTy.getAs<TupleType>()) {
+        SmallVector<SILValue, 8> elts;
+        for (auto i : range(tupleTy->getNumElements()))
+          elts.push_back(
+              packResultsToAggregate(aggregateTy.getTupleElementType(i)));
+        return B.createTuple(loc, aggregateTy, elts);
+      }
+      if (auto *decl = aggregateTy.getStructOrBoundGenericStruct()) {
+        SmallVector<SILValue, 8> elts;
+        for (auto *field : decl->getStoredProperties())
+          elts.push_back(packResultsToAggregate(
+              aggregateTy.getFieldType(field, B.getModule())));
+        return B.createStruct(loc, aggregateTy, elts);
+      }
+      llvm_unreachable("Non-TF type should have been diagnosed");
+    };
+    auto result = packResultsToAggregate(origResult->getType());
+    assert(resultIt == op->getResults().end()
+           && "All result types should've been processed");
+    // Replace any use of the old graph_op result with the newly packed aggregate.
+    origResult->replaceAllUsesWith(result);
+  }
+  // There are multiple results, so each one must be a TensorFlow value. Simply
+  // replace users, without doing any packing.
+  else {
+    SmallVector<SILType, 4> origResultTypes(origInst->getResultTypes());
+    for (auto resultType : origResultTypes)
+      assert(isTensorFlowValue(resultType) &&
+             "when there are multiple results, they should be tf types");
+    auto op = opBuilder.build(B, context, loc, origResultTypes);
+    origInst->replaceAllUsesPairwiseWith(op);
   }
 
-  auto op = B.createGraphOperation(getUserSourceLocation(inst),
-                                   context.getIdentifier(opName), inputs,
-                                   attributes, resultTypes);
-
-  if (auto tuple = inst->getType().getAs<TupleType>()) {
-    SmallVector<SILValue, 4> elts;
-    for (unsigned i = 0, e = tuple->getNumElements(); i != e; ++i)
-      elts.push_back(op->getResult(i));
-    auto tupleResult = B.createTuple(inst->getLoc(), elts);
-    tupleResult->setDebugLocation(inst->getDebugLocation());
-
-    inst->replaceAllUsesWith(tupleResult);
-    inst->eraseFromParent();
-  } else {
-    inst->replaceAllUsesWith(op->getResult(0));
-    inst->eraseFromParent();
-  }
+  origInst->eraseFromParent();
 
   // TODO: Analyze the operands to the instruction and remove them if they are
   // now dead.
@@ -2366,7 +2645,8 @@ void TFDeabstraction::doIt() {
 
   // Scan for any Tensor operations, removing indirect operands and structs that
   // interfere with SSA construction.
-  simplifyTensorOperands();
+  if (simplifyTensorOperands())
+    return;
 
   // If we didn't find any ops, early exit processing of this function to save
   // compile time.
@@ -2442,6 +2722,8 @@ void TFDeabstractionPass::run() {
   TensorFunctionClassifier tfc;
   ConstExprEvaluator constantEvaluator(*module);
 
+  SmallPtrSet<SILFunction*, 16> partitionedFunctions;
+
   // Loop over all of the functions in the current module processing them -
   // iff they look like they could be the top level of a deabstraction
   // context.
@@ -2449,7 +2731,7 @@ void TFDeabstractionPass::run() {
     // If this function is a building block of larger tensor programs (e.g.
     // the ops defined in the TensorFlow module), then don't transform it in
     // isolation.
-    if (!tfc.shouldBePartitioned(&fn))
+    if (!tfc.shouldBePartitioned(&fn, /*forceTFFunctions*/false))
       continue;
 
     // If something crashes, make sure the pretty stack trace says what we
@@ -2457,13 +2739,47 @@ void TFDeabstractionPass::run() {
     llvm::PrettyStackTraceFormat X("TFDeabstraction on function %s",
                                    fn.getName().str().c_str());
 
-    TFDeabstraction(*this, fn, tfc, constantEvaluator, PM).doIt();
+    TFDeabstraction(fn, tfc, constantEvaluator, PM).doIt();
+    partitionedFunctions.insert(&fn);
 
     // TODO(clattner): This should eventually be the driver that kicks off
     // the partitioning pass as part of it, and the partitioning and later
     // passes are just function passes that are invoked by this one.  Until
     // we are ready for that, let them run later in the pipeline after the
     // other optimization and cleanup passes.
+  }
+
+  // Deabstract stragglers that were left out in the previous iteration. These
+  // are functions that are *still* referred to in the code and operate on
+  // tensor values, but have not been partitioned. It can happen in the
+  // following case, for instance, where `foo` is an external function that has
+  // no body and takes or returns Tensors:
+  //   main() {
+  //     foo() { $0 -= 0.1 * $1 }
+  //   }
+  //
+  // In the common case where we have the body of foo(), it gets inlined, and
+  // therefore, the closure gets inlined too. However, if the body of foo() is
+  // not available, the closure never gets inlined. To ensure that the call to
+  // the closure within foo() works correctly, we will have to deabstract and
+  // partition the closure.
+  //
+  // (Note the body of a function may be missing when we are linking against a
+  // library or in the REPL context where the function was defined on a
+  // different REPL line.)
+  //
+  // We are doing this in two phases because we do not want to partition a
+  // function unless it is absolutely necessary. In the first round, we
+  // inline as much of the functions as possible during deabstraction. Many
+  // of the functions would be dead after the first round, but some stragglers
+  // remain as in the example above.
+  for (auto &fn : *module) {
+    // Skip if it is already partitioned, or if it was ignored only because it
+    // operated on tensor values.
+    if (partitionedFunctions.count(&fn) > 0 ||
+        !tfc.shouldBePartitioned(&fn, /*forceTFFunctions=*/true))
+      continue;
+    TFDeabstraction(fn, tfc, constantEvaluator, PM).doIt();
   }
 }
 

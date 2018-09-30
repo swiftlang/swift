@@ -14,128 +14,191 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// The default graph seed.
+///
+/// - Note: See TensorFlow's `python.framework.random_seed.DEFAULT_GRAPH_SEED`.
+@usableFromInline let _defaultGraphSeed: Int64 = 87654321
+
+/// Returns the local seeds an operation should use given an op-specific seed.
+///
+/// Given operation-specific seed, `seed`, this helper function returns two
+/// seeds derived from graph-level and op-level seeds. Many random operations
+/// internally use the two seeds to allow user to change the seed globally for a
+/// graph, or for only specific operations.
+///
+/// - Note: See TensorFlow's `python.framework.random_seed.get_seed`.
+///
+// TODO: There's no support for TF's "global seed" yet, so we always use the
+// default graph seed as the first seed. Need to investigate the best way to
+// model TF's "global seed".
+@usableFromInline @inline(__always)
+func _tensorSeeds(_ seed: Tensor<Int64>) -> (Tensor<Int64>, Tensor<Int64>) {
+  return (Tensor(_defaultGraphSeed), seed)
+}
+
+//===----------------------------------------------------------------------===//
+// Single value dataset
+//===----------------------------------------------------------------------===//
+
 /// Represents a potentially large set of elements.
 ///
-/// A `SingleValueDataset` can be used to represent an input pipeline as a
+/// A `Dataset` can be used to represent an input pipeline as a
 /// collection of element tensors.
 @_fixed_layout
-public struct SingleValueDataset<ScalarOfElement : AccelerableByTensorFlow> {
+public struct Dataset<Element> {
   @usableFromInline let _handle: VariantHandle
-  public let elementShape: TensorShape
 
   @usableFromInline @inline(__always)
-  internal init(_handle: VariantHandle, elementShape: TensorShape) {
+  internal init(_handle: VariantHandle) {
     self._handle = _handle
-    self.elementShape = elementShape
   }
 }
 
-public extension SingleValueDataset {
-  /// Creates a dataset from a batch of elements as a tensor.
-  ///
-  /// - Parameter
-  ///   - elements: The batch of elements.
-  ///   - elementShape: The shape that the 
+public extension Dataset {
   @inlinable @inline(__always)
-  public init(elements: Tensor<ScalarOfElement>, elementShape: TensorShape) {
-    // A dataset creation op only runs on TF CPU.
-    enableCPU()
+  init(randomSeed: Int64) {
+    let (seed1, seed2) = _tensorSeeds(Tensor(randomSeed))
     self.init(
-      _handle: #tfop(
-        "TensorSliceDataset", [elements],
-        Toutput_types: [ScalarOfElement.self],
-        output_shapes: [elementShape]
-      ),
-      elementShape: elementShape
+      _handle: #tfop("RandomDataset", seed1, seed2,
+                     output_types$typeList: Element.self,
+                     output_shapes$unknownShapeList: Element.self)
     )
   }
 }
 
-extension SingleValueDataset : Sequence {
-  public typealias Element = Tensor<ScalarOfElement>
-
-  public typealias Iterator = SingleValueDatasetIterator
-
-  /// Returns an iterator over the elements of this dataset.
+public extension Dataset {
+  /// Creates a dataset from a batch of elements as a tensor.
   @inlinable @inline(__always)
-  public func makeIterator() -> SingleValueDatasetIterator<ScalarOfElement> {
-    let resource: ResourceHandle = #tfop("AnonymousIterator",
-                                         output_types: [ScalarOfElement.self],
-                                         output_shapes: [elementShape])
-    #tfop("MakeIterator", _handle, resource) as Void
-    return SingleValueDatasetIterator(_handle: resource,
-                                      elementShape: elementShape)
+  public init(elements: Element) {
+    // A dataset creation op only runs on TF CPU.
+    self.init(
+      _handle: #tfop(
+        "TensorSliceDataset", [elements],
+        Toutput_types$typeList: Element.self,
+        output_shapes$unknownShapeList: Element.self
+      )
+    )
   }
 }
 
-public extension SingleValueDataset {
+extension Dataset : Sequence {
+  public typealias Iterator = DatasetIterator<Element>
+
+  /// Returns an iterator over the elements of this dataset.
   @inlinable @inline(__always)
-  func map<T : AccelerableByTensorFlow>(
-    _ transform: @convention(tensorflow) (Tensor<ScalarOfElement>) -> Tensor<T>
-  ) -> SingleValueDataset<T> {
-    // FIXME: If we pass an empty Array<TensorHandle<T>> as other_arguments and
-    // an empty Array<Any.Type> as Targuments, partitioning won't recognize the
-    // attribute:
+  public func makeIterator() -> DatasetIterator<Element> {
+    let resource: ResourceHandle =
+      #tfop("AnonymousIterator", output_types$typeList: Element.self,
+            output_shapes$unknownShapeList: Element.self)
+    #tfop("MakeIterator", _handle, resource) as Void
+    return DatasetIterator(_handle: resource)
+  }
+}
+
+/// FIXME(SR-8684): @convention(tensorflow) types crash SILGen when their
+/// parameters or results have generic parameters. This is blocking generic
+/// higher-order dataset transformation functions.
+public extension Dataset where Element == Tensor<Float> {
+  @inlinable @inline(__always)
+  func map(
+    _ transform: @convention(tensorflow) (Element) -> Element
+  ) -> Dataset {
+    // FIXME(SR-8570): If we pass an empty Array<TensorHandle<T>> as
+    // other_arguments and an empty Array<Any.Type> as Targuments, partitioning
+    // won't recognize the attribute:
     //    error: unknown array attribute
-    return SingleValueDataset<T>(
+    return Dataset(
       _handle: #tfop(
         "MapDataset", _handle, [Tensor<Int32>(0)], f: transform,
         Targuments: [Int32.self],
-        output_types: [T.self], output_shapes: [elementShape]
-      ),
-      elementShape: elementShape
+        output_types$typeList: Element.self,
+        output_shapes$unknownShapeList: Element.self
+      )
     )
   }
 
   @inlinable @inline(__always)
   func filter(
     _ isIncluded:
-      @convention(tensorflow) (Tensor<ScalarOfElement>) -> Tensor<Bool>
-  ) -> SingleValueDataset {
-    // FIXME: If we pass an empty Array<TensorHandle<T>> as other_arguments and
-    // an empty Array<Any.Type> as Targuments, partitioning won't recognize the
-    // attribute:
+      @convention(tensorflow) (Element) -> Tensor<Bool>
+  ) -> Dataset {
+    // FIXME(SR-8570): If we pass an empty Array<TensorHandle<T>> as
+    // other_arguments and an empty Array<Any.Type> as Targuments, partitioning
+    // won't recognize the attribute:
     //    error: unknown array attribute
-    return SingleValueDataset(
+    return Dataset(
       _handle: #tfop(
         "FilterDataset", _handle, [Tensor<Int32>(0)],
         predicate: isIncluded, Targuments: [Int32.self],
-        output_types: [ScalarOfElement.self], output_shapes: [elementShape]
-      ),
-      elementShape: elementShape
+        output_types$typeList: Element.self,
+        output_shapes$unknownShapeList: Element.self
+      )
     )
   }
 }
 
-/// Represents the state of iterating through a `SingleValueDataset`.
-@_fixed_layout
-public struct SingleValueDatasetIterator<ScalarOfElement>
-  where ScalarOfElement : AccelerableByTensorFlow {
-  @usableFromInline let handle: ResourceHandle
-  public let elementShape: TensorShape
+public extension Dataset {
+  @inlinable @inline(__always)
+  func shuffled(
+    sampleCount: Int64, randomSeed: Int64
+  ) -> Dataset {
+    let (seed1, seed2) = _tensorSeeds(Tensor(randomSeed))
+    return Dataset(
+      _handle: #tfop(
+        "ShuffleDataset", _handle, Tensor<Int64>(sampleCount), seed1, seed2,
+        output_types$typeList: Element.self,
+        output_shapes$unknownShapeList: Element.self
+      )
+    )
+  }
 
-  @usableFromInline @inline(__always)
-  internal init(_handle: ResourceHandle, elementShape: TensorShape) {
-    self.handle = _handle
-    self.elementShape = elementShape
+  @inlinable @inline(__always)
+  func batched(_ batchSize: Int64) -> Dataset {
+    return Dataset(
+      _handle: #tfop(
+        "BatchDataset", _handle, Tensor<Int64>(batchSize),
+        output_types$typeList: Element.self,
+        output_shapes$unknownShapeList: Element.self
+      )
+    )
   }
 }
 
-extension SingleValueDatasetIterator : IteratorProtocol {
-  public typealias Element = Tensor<ScalarOfElement>
+/// Represents the state of iterating through a `Dataset`.
+@_fixed_layout
+public struct DatasetIterator<Element> {
+  @usableFromInline let _handle: ResourceHandle
 
+  @usableFromInline @inline(__always)
+  internal init(_handle: ResourceHandle) {
+    self._handle = _handle
+  }
+}
+
+extension DatasetIterator : IteratorProtocol {
   // Advances to the next element and returns it, or nil if no next element
   // exists.
   @inlinable @inline(__always)
-  public mutating func next() -> Tensor<ScalarOfElement>? {
+  public mutating func next() -> Element? {
     let optional: VariantHandle =
-      #tfop("IteratorGetNextAsOptional", handle,
-            output_types: [ScalarOfElement.self], output_shapes: [elementShape])
+      #tfop("IteratorGetNextAsOptional", _handle,
+            output_types$typeList: Element.self,
+            output_shapes$unknownShapeList: Element.self)
     guard _TFGetScalarOrDie(#tfop("OptionalHasValue", optional)) else {
       return nil
     }
-    return Tensor(handle: #tfop("OptionalGetValue", optional,
-                                output_types: [ScalarOfElement.self],
-                                output_shapes: [elementShape]))
+    return #tfop("OptionalGetValue", optional,
+                 output_types$typeList: Element.self,
+                 output_shapes$unknownShapeList: Element.self) as Element
   }
+}
+
+// FIXME: SR-8599 blocks heterogeneous scalar types.
+@inlinable @inline(__always)
+public func zip<T>(
+  _ dataset1: Dataset<T>, _ dataset2: Dataset<T>
+) -> Dataset<(T, T)> {
+  return #tfop("ZipDataset", [dataset1, dataset2],
+               output_types$typeList: (T, T).self,
+               output_shapes$unknownShapeList: (T, T).self)
 }

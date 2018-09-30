@@ -371,7 +371,7 @@ private: // Helpers to create TensorFlow graph nodes.
   /// Provides the context for creating the dataset / iterator node stack, along
   /// with an infeed enqueue node consuming the output of the iterator.
   struct DatasetCreationContext {
-    /// The instruction corresponding to the builtin
+    /// The instruction corresponding to the graph_op
     /// tfc.makeIteratorGetNextWithDatasets.
     SILInstruction *datasetInst = nullptr;
 
@@ -567,7 +567,6 @@ public: // Lowering functionality.
   }
 
   GLStatus visitGraphOperationInst(GraphOperationInst *inst);
-  GLStatus visitBuiltinInst(BuiltinInst *inst);
 
   GLStatus visitTupleInst(TupleInst *inst);
   GLStatus visitUncheckedRefCastInst(UncheckedRefCastInst *inst);
@@ -984,19 +983,6 @@ TF_Output TFGraphFunctionLowering::createUndefNode(SILType type) {
 // Helpers to create TensorFlow graph nodes.
 //===----------------------------------------------------------------------===//
 
-GLStatus TFGraphFunctionLowering::visitBuiltinInst(BuiltinInst *inst) {
-  // If this is the magic tf_tensor_to_i1 builtin, then we completely ignore it.
-  // the only user of it are things that take conditional branches, and they
-  // handle it directly.
-  if (inst->getName().str() == "tf_tensor_to_i1")
-    return GLStatus::Success;
-  if (inst->getName().str().startswith(
-          "__tfop_tfc.makeIteratorGetNextWithDatasets"))
-    return visitTFDataset(inst);
-
-  llvm_unreachable("Unhandled builtin instruction");
-}
-
 bool TFGraphFunctionLowering::createDatasetIteratorNodesWithInfeedEnqueue() {
   assert(datasetCreationContext);
   TF_Operation *getnextOp =
@@ -1045,80 +1031,49 @@ static unsigned getTFDataTypeFromTensorGenericType(Type type) {
   return convertSwiftTypeToTF(genTy->getGenericArgs()[0]);
 }
 
-/// Decode shape elements from the tfop builtin instruction, starting at
-/// operand `operandIdx`, into `shape`.
-static void decodeShapeElements(SILValue attrValue,
-                                const SILTensorOpInfo &tfopInfo,
-                                unsigned &operandIdx, unsigned operandEndIdx,
-                                SmallVectorImpl<int64_t> &shape) {
-  assert(isa<MetatypeInst>(attrValue) && "$shape should start with a metatype");
-  while (operandIdx + 1 < operandEndIdx &&
-         tfopInfo.operandClasses[operandIdx + 1].second ==
-             SILTensorOpInfo::OperandClass::ArrayElement) {
-    auto eltValue = tfopInfo.inst->getOperand(++operandIdx);
-    auto intValue = cast<IntegerLiteralInst>(eltValue);
-    shape.push_back(intValue->getValue().getLimitedValue());
-  }
-}
-
-/// Decode the shape array attribute from the tfop builtin instruction, starting
-/// at operand `operandIdx`, into `dims`, `numDims` and `dimPtrs`.
-static void decodeShapeArrayLegacy(const SILTensorOpInfo &tfopInfo,
-                                   unsigned &operandIdx, unsigned operandEndIdx,
-                                   SmallVectorImpl<int64_t> &dims,
-                                   SmallVectorImpl<int> &numDims,
-                                   SmallVectorImpl<int64_t *> &dimPtrs) {
-  auto *inst = tfopInfo.inst;
-  auto numShapes = cast<IntegerLiteralInst>(inst->getOperand(operandIdx))
-                       ->getValue()
-                       .getLimitedValue();
-  for (unsigned shape = 0; shape != numShapes; ++shape) {
-    auto prevNumDims = dims.size();
-    ++operandIdx; // We consumed an operand.
-    auto nextOperand = inst->getOperand(operandIdx);
-    assert(tfopInfo.operandClasses[operandIdx].second ==
-               SILTensorOpInfo::OperandClass::Shape &&
-           "expected a shape value");
-
-    decodeShapeElements(nextOperand, tfopInfo, operandIdx, operandEndIdx, dims);
-    numDims.push_back(int(dims.size() - prevNumDims));
+/// This helper function decodes a shape attribute of type TensorShape or
+/// Optional<TensorShape>. It stores the dimensions to `result`, and returns
+/// the rank. Note that "nil as Optional<TensorShape>" represents "unknown
+/// rank", and that we return -1 in that case.
+static int decodeShapeAttr(const ASTContext &ctx,
+                           SymbolicValue attr,
+                           SmallVectorImpl<int64_t> &result) {
+  // Handle "nil as Optional<TensorShape>" unknown rank case.
+  if (attr.getKind() == SymbolicValue::Kind::Enum &&
+      attr.getEnumValue() == ctx.getOptionalNoneDecl()) {
+    return -1;
   }
 
-  // Now that we've build the array of dimensions, convert it to the array
-  // of pointers that TensorFlow needs.  This is safe now that the vector
-  // has finished its resizing.
-  auto dimPtr = dims.data();
-  for (unsigned shape = 0; shape != numShapes; ++shape) {
-    dimPtrs.push_back(dimPtr);
-    dimPtr += numDims[shape];
+  // Extract value from Optional<TensorShape>.
+  if (attr.getKind() == SymbolicValue::Kind::EnumWithPayload) {
+    attr = attr.getEnumPayloadValue();
   }
-}
 
-// This helper function decodes a shape attribute into its values.
-static void decodeShapeAttr(SymbolicValue attr,
-                            SmallVectorImpl<int64_t> &result) {
   attr = attr.lookThroughSingleElementAggregates();
+
   CanType eltType;
-  for (auto elt : attr.getArrayValue(eltType)) {
+  auto arrayValue = attr.getArrayValue(eltType);
+  for (auto elt : arrayValue) {
     elt = elt.lookThroughSingleElementAggregates();
-    result.push_back(elt.getIntegerValue().getLimitedValue());
+    result.push_back(elt.getIntegerValue().sextOrTrunc(64).getLimitedValue());
   }
+  return arrayValue.size();
 }
 
 /// Decode the shape array in `attrValue` into `dims`, `numDims` and `dimPtrs`.
-static void decodeShapeArray(SymbolicValue attrValue,
+static void decodeShapeArray(const ASTContext &ctx,
+                             SymbolicValue attrValue,
                              SmallVectorImpl<int64_t> &dims,
                              SmallVectorImpl<int> &numDims,
                              SmallVectorImpl<int64_t *> &dimPtrs) {
   CanType eltType;
   auto shapeArray = attrValue.getArrayValue(eltType);
-  assert(eltType->getString() == "TensorShape");
+  assert(eltType->getString() == "TensorShape" ||
+         eltType->getString() == "Optional<TensorShape>");
   auto numShapes = shapeArray.size();
   for (unsigned shapeIdx = 0; shapeIdx != numShapes; ++shapeIdx) {
-    auto prevNumDims = dims.size();
     auto shape = shapeArray[shapeIdx];
-    decodeShapeAttr(shape, dims);
-    numDims.push_back(int(dims.size() - prevNumDims));
+    numDims.push_back(decodeShapeAttr(ctx, shape, dims));
   }
 
   // Now that we've build the array of dimensions, convert it to the array
@@ -1133,18 +1088,18 @@ static void decodeShapeArray(SymbolicValue attrValue,
 
 /// Decode the shape array attribute at attr `attrIdx` in the graph_op
 /// instruction, into `dims`, `numDims` and `dimPtrs`.
-static void decodeShapeArrayAtAttr(const GraphOperationInfo &graphOpInfo,
+static void decodeShapeArrayAtAttr(const ASTContext &ctx,
+                                   const GraphOperationInfo &graphOpInfo,
                                    StringRef attrName, unsigned attrIdx,
                                    SmallVectorImpl<int64_t> &dims,
                                    SmallVectorImpl<int> &numDims,
                                    SmallVectorImpl<int64_t *> &dimPtrs) {
-  auto *inst = graphOpInfo.inst;
+  auto *inst = graphOpInfo.getInst();
   auto attr = inst->getAttribute(attrIdx);
-  auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
-  assert(attrInfo.second == SILTensorOpInfo::OperandClass::Normal ||
-         attrInfo.second == SILTensorOpInfo::OperandClass::ShapeArray);
+  auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
+  assert(attrInfo.second == GraphOperationInfo::ArgumentLowering::NormalAttribute);
   assert(attrInfo.first == attrName);
-  decodeShapeArray(attr.value, dims, numDims, dimPtrs);
+  decodeShapeArray(ctx, attr.value, dims, numDims, dimPtrs);
 }
 
 GLStatus TFGraphFunctionLowering::visitGraphOpSendToHostInst(
@@ -1157,7 +1112,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpSendToHostInst(
 
   // Type check and process the parameters.
   // SendToHost has type <T> (input$T, tensorId$int, device$str) -> ()
-  auto *inst = graphOpInfo.inst;
+  auto *inst = graphOpInfo.getInst();
   assert(inst->getNumResults() == 1);
   assert(inst->getNumOperands() == 1);
   assert(inst->getNumAttributes() == 2);
@@ -1172,7 +1127,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpSendToHostInst(
     inputType = getTensorFlowDataType(operand->getType(), inst->getLoc());
   }
 
-  assert(graphOpInfo.getDeviceString() == DEFAULT_CPU_DEVICE &&
+  assert(getDeviceString(graphOpInfo) == DEFAULT_CPU_DEVICE &&
          "SendToHost must run on CPU device");
   int tensorId = inst->getAttributeNamed("tensorId")
                      .getValue()
@@ -1254,7 +1209,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpRecvFromHostInst(
   // the while cond function.
   if (!graphFn.shouldLowerEffectfulOps) {
     internalError(
-        getUserSourceLocation(graphOpInfo.inst->getDebugLocation()),
+        getUserSourceLocation(graphOpInfo.getInst()->getDebugLocation()),
         "FIXME: cannot lower a Host->TF tensor transfer in a loop header",
         diag::tfop_invalid_tfop);
     return GLStatus::Error;
@@ -1264,12 +1219,12 @@ GLStatus TFGraphFunctionLowering::visitGraphOpRecvFromHostInst(
   // recvFromHost has type <T> (tensorId$int, device$string) -> (T)
   // Optionally it can carry a shape array attr, only used for shape propagation
   // in XLA compilation.
-  auto *inst = graphOpInfo.inst;
+  auto *inst = graphOpInfo.getInst();
   assert(inst->getNumResults() == 1);
   assert(inst->getNumOperands() == 0);
   assert(inst->getNumAttributes() >= 2);
 
-  assert(graphOpInfo.getDeviceString() == DEFAULT_CPU_DEVICE &&
+  assert(getDeviceString(graphOpInfo) == DEFAULT_CPU_DEVICE &&
          "SendToHost must run on CPU device");
   int tensorId = inst->getAttributeNamed("tensorId")
                      .getValue()
@@ -1459,11 +1414,11 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorRecvInst(
     GraphOperationInfo &graphOpInfo) {
   // Signature: "tfc.D2DTensorRecv {transferId,srcDevice,device}"
   // Can also carry an optional shape array.
-  auto *inst = graphOpInfo.inst;
+  auto *inst = graphOpInfo.getInst();
   assert(inst->getNumResults() == 1);
   assert(inst->getNumOperands() == 0);
   assert(inst->getNumAttributes() == 3 || inst->getNumAttributes() == 4);
-  assert(graphOpInfo.getDeviceString() == thisDeviceTypeStr);
+  assert(getDeviceString(graphOpInfo) == thisDeviceTypeStr);
 
   int transferId = graphOpInfo.getIntAttr(0, "transferId");
   auto srcDeviceStr = graphOpInfo.getStringAttr(1, "srcDevice");
@@ -1475,8 +1430,9 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorRecvInst(
   SmallVector<int64_t *, 8> dimPtrs;
   if (inst->getNumAttributes() == 4) {
     // 3 is the attr idx for the optional shape array attr.
-    decodeShapeArrayAtAttr(graphOpInfo, SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims,
-                           numDims, dimPtrs);
+    decodeShapeArrayAtAttr(SILFn.getASTContext(), graphOpInfo,
+                           SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims, numDims,
+                           dimPtrs);
   }
   if (thisDeviceType == DeviceType::TPU) {
     return addTPUDequeueOp(inst, /* isInfeed */ true, transferId, dims, numDims,
@@ -1586,11 +1542,11 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorSendInst(
     GraphOperationInfo &graphOpInfo) {
   // Signature: "tfc.D2DTensorSend,$in {transferId,destDevice,device}"
   // Can also carry an optional shape array.
-  auto *inst = graphOpInfo.inst;
+  auto *inst = graphOpInfo.getInst();
   assert(inst->getNumResults() == 0);
   assert(inst->getNumOperands() == 1);
   assert(inst->getNumAttributes() == 3 || inst->getNumAttributes() == 4);
-  assert(graphOpInfo.getDeviceString() == thisDeviceTypeStr);
+  assert(getDeviceString(graphOpInfo) == thisDeviceTypeStr);
 
   int transferId = graphOpInfo.getIntAttr(0, "transferId");
   auto destDeviceStr = graphOpInfo.getStringAttr(1, "destDevice");
@@ -1602,8 +1558,9 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorSendInst(
   SmallVector<int64_t *, 8> dimPtrs;
   if (inst->getNumAttributes() == 4)
     // 3 is the attr idx for the optional shape array attr.
-    decodeShapeArrayAtAttr(graphOpInfo, SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims,
-                           numDims, dimPtrs);
+    decodeShapeArrayAtAttr(SILFn.getASTContext(), graphOpInfo,
+                           SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims, numDims,
+                           dimPtrs);
   if (thisDeviceType == DeviceType::TPU) {
     return addTPUEnqueueOp(inst, /* isInfeed */ false, transferId, dims,
                            numDims, dimPtrs);
@@ -1640,7 +1597,7 @@ GLStatus TFGraphFunctionLowering::createDatasetCreationContext(
   SmallVector<int64_t, 8> dims;
   SmallVector<int, 3> numDims;
   SmallVector<int64_t *, 8> dimPtrs;
-  decodeShapeArray(attr.value, dims, numDims, dimPtrs);
+  decodeShapeArray(SILFn.getASTContext(), attr.value, dims, numDims, dimPtrs);
 
   // Even when this built-in returns multiple tensors, they are always presented
   // by a single tuple.
@@ -1671,104 +1628,6 @@ GLStatus TFGraphFunctionLowering::createDatasetCreationContext(
   // infeed dequeue node to feed the user(s) of `inst`.
   datasetCreationContext.reset(new DatasetCreationContext(
       inst, dataSource, filePath, batchSize, dims, numDims, outputTypes));
-
-  return GLStatus::Success;
-}
-
-// TODO: Remove this version when graph op takes over completely.
-template <>
-GLStatus TFGraphFunctionLowering::createDatasetCreationContext(
-    BuiltinInst *inst, std::vector<SILOpResult> &outputResults) {
-  SILTensorOpInfo tfopInfo = SILTensorOpInfo::decode(inst).getValue();
-  // Type check and process the first attribute: dataSource.
-  DatasetCreationContext::DataSource dataSource;
-  {
-    auto operand = inst->getOperand(0);
-    auto opInfo = tfopInfo.operandClasses[0];
-    assert(opInfo.second == SILTensorOpInfo::OperandClass::Normal);
-    auto *sli = cast<StringLiteralInst>(operand);
-    assert(sli->getEncoding() == StringLiteralInst::Encoding::UTF8);
-    if (sli->getValue().str() == "fake") {
-      dataSource = DatasetCreationContext::FAKE;
-    } else if (sli->getValue().str() == "mnist") {
-      dataSource = DatasetCreationContext::MNIST;
-    } else {
-      dataSource = DatasetCreationContext::IMAGENET;
-    }
-  }
-
-  // Type check and process the second attribute: filePath.
-  // When dataSource is FAKE, this attribute needs to be present, but is not
-  // used.
-  StringRef filePath;
-  if (dataSource != DatasetCreationContext::FAKE) {
-    auto operand = inst->getOperand(1);
-    auto *sli = cast<StringLiteralInst>(operand);
-    assert(sli->getEncoding() == StringLiteralInst::Encoding::UTF8);
-    filePath = sli->getValue();
-  }
-
-  // Type check and process the third attribute: batchSize
-  int batchSize;
-  {
-    auto operand = inst->getOperand(2);
-    auto opInfo = tfopInfo.operandClasses[2];
-    assert(opInfo.second == SILTensorOpInfo::OperandClass::Normal);
-    auto *ili = cast<IntegerLiteralInst>(operand);
-    batchSize = ili->getValue().getLimitedValue();
-  }
-
-  // Type check and process the fourth attribute: outputShapes
-  SmallVector<int64_t, 8> dims;
-  SmallVector<int, 3> numDims;
-  SmallVector<int64_t *, 8> dimPtrs;
-  unsigned i = 3;
-  unsigned e = inst->getNumOperands();
-  decodeShapeArrayLegacy(tfopInfo, i, e, dims, numDims, dimPtrs);
-
-  // Even when this built-in returns multiple tensors, they are always presented
-  // by a single tuple.
-  assert(inst->getNumResults() == 1);
-
-  std::vector<TF_DataType> outputTypes;
-  auto outputType = inst->getType().getASTType();
-  if (auto tfType = getTFDataTypeFromTensorGenericType(outputType)) {
-    outputTypes.push_back(static_cast<TF_DataType>(tfType));
-  } else {
-    // This must be a tuple type
-    auto *tt = outputType->getAs<TupleType>();
-    if (!tt) {
-      internalError(getUserSourceLocation(inst->getDebugLocation()),
-                    "The returned datatype of builtin "
-                    "tfc.makeIteratorGetNextWithDatasets "
-                    "should be a single element or a tuple of elements or type "
-                    "Tensor<T> or TensorHandle<T>.",
-                    diag::tfop_invalid_tfop);
-      return GLStatus::Error;
-    }
-    for (unsigned i = 0, n = tt->getNumElements(); i != n; ++i) {
-      auto tfType = getTFDataTypeFromTensorGenericType(tt->getElementType(i));
-      assert(tfType && "Each output tuple element must be a TF type.");
-      outputTypes.push_back(static_cast<TF_DataType>(tfType));
-    }
-  }
-  if (outputTypes.size() != numDims.size()) {
-    internalError(getUserSourceLocation(inst->getDebugLocation()),
-                  "Must specify the same number of shapes and output tensors.",
-                  diag::tfop_invalid_tfop);
-    return GLStatus::Error;
-  }
-
-  // Defer the creation of the dataset / iterator related nodes, along with the
-  // associated infeed enqueue till the creation of top level function
-  // nodes. Here we fill in the dataset creation context, and then create an
-  // infeed dequeue node to feed the user(s) of `inst`.
-  datasetCreationContext.reset(new DatasetCreationContext(
-      inst, dataSource, filePath, batchSize, dims, numDims, outputTypes));
-
-  for (auto i : indices(outputTypes)) {
-    outputResults.emplace_back(inst, i);
-  }
 
   return GLStatus::Success;
 }
@@ -1826,16 +1685,16 @@ void TFGraphFunctionLowering::handleFunctionAttribute(
 ///
 GLStatus
 TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
-  // If this is the magic tf_tensor_to_i1 builtin, then we completely ignore it.
+  // If this is the magic tf_tensor_to_i1 graph_op, then we completely ignore it.
   // the only user of it are things that take conditional branches, and they
   // handle it directly.
-  if (inst->getName().str() == "tf_tensor_to_i1")
+  if (inst->getName().str() == "tf_tensor_to_i1,i")
     return GLStatus::Success;
 
   // Decode information about the graph_op.
   GraphOperationInfo decoder(inst);
-  SmallVector<GraphOperationInfo::InputMarker, 4> inputInfos;
-  auto opName = decoder.decodeName(inputInfos);
+  auto opName = decoder.getOperationName();
+  auto &structuredArguments = decoder.getStructuredArguments();
 
   // Swift host <-> TF device sends/recvs.
   if (opName == "tfc.RecvFromHost")
@@ -1870,45 +1729,36 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
   bool hasDevice = false;
 
   // Process all inputs.
-  unsigned infoIndex = 0;
-  for (unsigned i = 0, e = inst->getNumOperands(); i != e;) {
-    switch (inputInfos[infoIndex++]) {
-    case GraphOperationInfo::IM_Scalar:
-      assert(0 && "tfc.scalarToTensor should be lowered by now");
-    case GraphOperationInfo::IM_InputListElt:
-      assert(0 && "we handle input list elements as part of the list");
-    case GraphOperationInfo::IM_Normal: {
+  for (auto structuredArgument : structuredArguments) {
+    assert(structuredArgument.getArgumentNameWithSuffix().empty() &&
+           "cannot lower named arguments");
+    switch (structuredArgument.getKind()) {
+    case GraphOperationInfo::SAK_Single: {
       // Normal tensor inputs.
-      auto operand = inst->getOperand(i++);
-      auto valueKind = classifyTensorFlowValue(operand->getType());
+      auto argument = structuredArgument.getSingleArgument();
+      auto valueKind = classifyTensorFlowValue(argument->getType());
 
       // Keep track of whether we have any resource inputs.
       opHasSideEffects |= valueKind == TFValueKind::ResourceHandle;
       assert(valueKind != TFValueKind::Nope &&
              "all op inputs should be TensorFlow values");
-      auto opValue = getOperandValue(operand);
+      auto opValue = getOperandValue(argument);
       if (!opValue.oper)
         return GLStatus::Error;
       TF_AddInput(op, opValue);
       break;
     }
-    case GraphOperationInfo::IM_InputList: {
+    case GraphOperationInfo::SAK_List: {
       // Collect all of the elements of the input list.
       SmallVector<TF_Output, 4> elements;
-
-      // Collect all of the elements.
-      while (i < e &&
-             inputInfos[infoIndex] == GraphOperationInfo::IM_InputListElt) {
-        auto operand = inst->getOperand(i++);
-        ++infoIndex;
-
-        auto valueKind = classifyTensorFlowValue(operand->getType());
+      for (auto argument : structuredArgument.getArgumentList()) {
+        auto valueKind = classifyTensorFlowValue(argument->getType());
 
         // Keep track of whether we have any resource inputs.
         opHasSideEffects |= valueKind == TFValueKind::ResourceHandle;
         assert(valueKind != TFValueKind::Nope &&
                "all op inputs should be TensorFlow values");
-        auto opValue = getOperandValue(operand);
+        auto opValue = getOperandValue(argument);
         if (!opValue.oper)
           return GLStatus::Error;
         elements.push_back(opValue);
@@ -1921,7 +1771,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
 
   // Process all of the attributes.
   // For an inst like:
-  //   graph_op "Const"() {dtype$dtype: $Builtin.Int64, value$tensor: i1 0
+  //   graph_op "Const"() {dtype: $Builtin.Int64, value$tensor: i1 0
   // We will use the `dtype` attr value to lower the `value` attr, so we
   // remember the dtype info here.
   // We use unsigned instead of TF_DataType, to express the invalid initial
@@ -1931,7 +1781,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
        nextAttributeNumber != e;) {
     // Look at which attribute comes next.
     auto attr = inst->getAttribute(nextAttributeNumber++);
-    auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
+    auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
     auto attrValue = attr.value;
 
     // Convert the not-necessarily-nul-terminated StringRef to an std::string
@@ -1939,11 +1789,12 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     std::string name = attrInfo.first.str();
 
     switch (attrInfo.second) {
-    case SILTensorOpInfo::OperandClass::Input:
-    case SILTensorOpInfo::OperandClass::InputElt:
+    case GraphOperationInfo::ArgumentLowering::Input:
       assert(0 && "Input classes cannot exist for attributes");
+    case GraphOperationInfo::ArgumentLowering::Out:
+      assert(0 && "Attributes cannot be output parameters");
 
-    case SILTensorOpInfo::OperandClass::Normal: // No modifier.
+    case GraphOperationInfo::ArgumentLowering::NormalAttribute: // No modifier.
       // We add attributes based on what the type of the value is.
       switch (attrValue.getKind()) {
       case SymbolicValue::Unknown:
@@ -2011,11 +1862,12 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         auto rawElements = attrValue.getArrayValue(elementType);
         auto elementTypeString = elementType->getString();
 
-        if (elementTypeString == "TensorShape") {
+        if (elementTypeString == "TensorShape" ||
+            elementTypeString == "Optional<TensorShape>") {
           SmallVector<int64_t, 8> dims;
           SmallVector<int, 3> numDims;
           SmallVector<int64_t *, 8> dimPtrs;
-          decodeShapeArray(attrValue, dims, numDims, dimPtrs);
+          decodeShapeArray(SILFn.getASTContext(), attrValue, dims, numDims, dimPtrs);
           TF_SetAttrShapeList(op, name.c_str(), dimPtrs.data(), numDims.data(),
                               numDims.size());
           break;
@@ -2026,7 +1878,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         for (auto elt : rawElements)
           elements.push_back(elt.lookThroughSingleElementAggregates());
 
-        if (elementType->is<MetatypeType>()) {
+        if (elementType->is<AnyMetatypeType>()) {
           SmallVector<TF_DataType, 4> types;
           for (auto elt : elements) {
             auto dtype = convertSwiftTypeToTF(elt.getMetatypeValue());
@@ -2091,13 +1943,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       }
       // Done with normal attributes.
       break;
-    case SILTensorOpInfo::OperandClass::DType: {
-      auto swiftType = attrValue.getMetatypeValue();
-      dtypeAttr = convertSwiftTypeToTF(swiftType);
-      TF_SetAttrType(op, name.data(), (TF_DataType)dtypeAttr);
-      break;
-    }
-    case SILTensorOpInfo::OperandClass::Tensor: {
+    case GraphOperationInfo::ArgumentLowering::TensorAttribute: {
       if (!dtypeAttr) {
         inst->dump();
         llvm_unreachable("dtype attr must have been processed!");
@@ -2136,7 +1982,9 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
 
         // Decode the shape attribute which must come next.
         auto shapeAttr = inst->getAttribute(nextAttributeNumber++).value;
-        decodeShapeAttr(shapeAttr, shape);
+        auto rank = decodeShapeAttr(SILFn.getASTContext(), shapeAttr, shape);
+        (void)rank;
+        assert(rank != -1 && "we generated a shape with unknown rank");
       }
       // Set the tensor as the attribute on the graph node.
       auto tensor = convertValuesToTensor(elements, shape, dtype);
@@ -2146,27 +1994,18 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         return GLStatus::Error;
       break;
     }
-    case SILTensorOpInfo::OperandClass::Shape: {
+    case GraphOperationInfo::ArgumentLowering::ShapeAttribute: {
       SmallVector<int64_t, 4> shape;
-      decodeShapeAttr(attrValue, shape);
-      TF_SetAttrShape(op, name.c_str(), shape.data(), shape.size());
+      auto rank = decodeShapeAttr(SILFn.getASTContext(), attrValue, shape);
+      TF_SetAttrShape(op, name.c_str(), shape.data(), rank);
       break;
     }
-
-    case SILTensorOpInfo::OperandClass::ShapeArray:
-      // SHAPE_ARRAY_ATTR is a pseudo-attribute used by the compiler's
-      // partitioning and graph lowering passes to propagate shape info for
-      // XLA compilation (e.g. feed shape info to infeed / outfeed ops), and
-      // will not be lowered into this graph op itself.
-      if (isShapeArrayPseudoAttr(name, attrValue))
-        break;
-      internalError(getUserSourceLocation(inst->getDebugLocation()),
-                    "FIXME: Handle shapearray attributes");
-      return GLStatus::Error;
-
-    case SILTensorOpInfo::OperandClass::Array: // Handled as 'normal'
-    case SILTensorOpInfo::OperandClass::ArrayElement:
-      llvm_unreachable("This is a legacy class that shouldn't happen");
+    case GraphOperationInfo::ArgumentLowering::UnknownShapeListAttribute:
+      llvm_unreachable("UnknownShapeListAttribute should have been eliminated "
+                       "by deabstraction");
+    case GraphOperationInfo::ArgumentLowering::TypeListAttribute:
+      llvm_unreachable("TypeListAttribute should have been eliminated by "
+                       "deabstraction");
     }
   }
 
@@ -2331,17 +2170,11 @@ static TF_Output getCondition(CondBranchInst *condBr,
                               TFGraphFunctionLowering &lowering) {
   auto cond = condBr->getCondition();
   SILInstruction *tensorToI1 = nullptr;
-  // TODO: remove the case of BuiltinInst.
-  if (auto *builtinInst = dyn_cast<BuiltinInst>(cond)) {
-    assert(builtinInst->getName().str() == "tf_tensor_to_i1");
-    tensorToI1 = builtinInst;
-  } else {
-    auto *graphOpResult = cast<GraphOperationResult>(cond);
-    auto *graphOpInst = graphOpResult->getParent();
-    assert(graphOpInst->getNumResults() == 1);
-    assert(graphOpInst->getName().str() == "tf_tensor_to_i1");
-    tensorToI1 = graphOpInst;
-  }
+  auto *graphOpResult = cast<GraphOperationResult>(cond);
+  auto *graphOpInst = graphOpResult->getParent();
+  assert(graphOpInst->getNumResults() == 1);
+  assert(graphOpInst->getName().str() == "tf_tensor_to_i1,i");
+  tensorToI1 = graphOpInst;
   assert(tensorToI1->getNumOperands() == 1 &&
          "unexpected branch condition in graph lowering");
   cond = tensorToI1->getOperand(0);

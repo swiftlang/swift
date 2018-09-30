@@ -15,10 +15,15 @@ import StdlibUnittest
 
 var DatasetAPITests = TestSuite("DatasetAPI")
 
+// TODO: fix the test suite for GPU.
+// We have errors like:
+// Not found: No registered 'ZipDataset' OpKernel for GPU devices compatible with node {{node op/_S4mainyycfU4_.tf_GPU.70.64_/device_GPU_0_7}} = ZipDataset[N=2, output_shapes=[<unknown>, <unknown>], output_types=[DT_FLOAT, DT_FLOAT], _device="/device:GPU:0"](tf_recv_55, tf_recv_56)
+#if !CUDA
 DatasetAPITests.testAllBackends("SingleValueManualIterator") {
   // [[1], [2], [3], [4], [5]]
-  let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1).reshaped(to: [5, 1])
-  let dataset = SingleValueDataset(elements: scalars, elementShape: [1])
+  let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
+    .reshaped(to: [5, 1])
+  let dataset = Dataset(elements: scalars)
   var iterator = dataset.makeIterator()
   var i: Int32 = 0
   while let item = iterator.next() {
@@ -27,10 +32,11 @@ DatasetAPITests.testAllBackends("SingleValueManualIterator") {
   }
 }
 
-DatasetAPITests.testAllBackends("SingleValueDatasetIteration") {
+DatasetAPITests.testAllBackends("DatasetIteration") {
   // [[1], [2], [3], [4], [5]]
-  let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1).reshaped(to: [5, 1])
-  let dataset = SingleValueDataset(elements: scalars, elementShape: [1])
+  let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
+    .reshaped(to: [5, 1])
+  let dataset = Dataset(elements: scalars)
   var i: Int32 = 0
   for item in dataset {
     expectEqual(scalars[i].array, item.array)
@@ -38,17 +44,45 @@ DatasetAPITests.testAllBackends("SingleValueDatasetIteration") {
   }
 }
 
-// FIXME: Only public @TensorFlowGraph functions are being partitioned.
-@TensorFlowGraph
-public func addOne(_ x: Tensor<Float>) -> Tensor<Float> {
-  return x + 1
+DatasetAPITests.testAllBackends("SingleValueTransformations") {
+  let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
+  let dataset = Dataset(elements: scalars)
+  let shuffled = dataset.shuffled(sampleCount: 5, randomSeed: 42)
+  expectEqual([0, 4, 1, 3, 2], shuffled.map { $0.scalar! })
 }
 
-DatasetAPITests.testAllBackends("SingleValueMap") {
+DatasetAPITests.testAllBackends("SingleValueHOFs") {
   let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
-  let dataset = SingleValueDataset(elements: scalars, elementShape: [])
-  let result: SingleValueDataset = dataset.map(addOne)
-  expectEqual(result.flatMap { $0.scalars }, [1, 2, 3, 4, 5])
+  let dataset = Dataset(elements: scalars)
+  let addedOne: Dataset = dataset.map { $0 + 1 }
+  expectEqual([1, 2, 3, 4, 5], addedOne.flatMap { $0.scalars })
+  let evens: Dataset = dataset.filter { Tensor($0 % 2 == Tensor(0)) }
+  expectEqual([0, 2, 4], evens.flatMap { $0.scalars })
 }
+
+DatasetAPITests.testAllBackends("SingleValueBatched") {
+  let scalars = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
+  let dataset = Dataset(elements: scalars)
+  let batched = dataset.batched(2)
+
+  var iterator = batched.makeIterator()
+  expectEqual([0, 1], iterator.next()!.scalars)
+  expectEqual([2, 3], iterator.next()!.scalars)
+  expectEqual([4], iterator.next()!.scalars)
+}
+
+DatasetAPITests.testAllBackends("DoubleValueDatasetIteration") {
+  let scalars1 = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
+  let scalars2 = Tensor<Float>(rangeFrom: 5, to: 10, stride: 1)
+  let datasetLeft = Dataset(elements: scalars1)
+  let datasetRight = Dataset(elements: scalars2)
+  var i: Int32 = 0
+  for (item1, item2) in zip(datasetLeft, datasetRight) {
+    expectEqual(scalars1[i].array, item1.array)
+    expectEqual(scalars2[i].array, item2.array)
+    i += 1
+  }
+}
+#endif //!CUDA
 
 runAllTests()

@@ -20,6 +20,7 @@
 #define SWIFT_SILOPTIMIZER_TFCANONICALIZECFG_H
 
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/LoopInfo.h"
 
 namespace swift {
 namespace tf {
@@ -157,6 +158,11 @@ namespace tf {
     }
   };
 
+  // Our partitioning and other transformations can leave around lots of
+  // unconditional branches between blocks that formerly had control edges.  Go
+  // through and merge those to make later passes simpler.
+  bool contractUncondBranches(SILFunction *fn, DominanceInfo *DI,
+                              SILLoopInfo *LI);
 
   /// Transform the function into a properly nested series of
   /// single-entry-single-exit regions and return the data structure that

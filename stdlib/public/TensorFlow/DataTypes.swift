@@ -21,6 +21,7 @@
 
 import CTensorFlow
 
+@_fixed_layout
 public struct _TensorDataType {
   internal var cDataType: TF_DataType
 

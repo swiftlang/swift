@@ -17,10 +17,110 @@
 
 #include "swift/AST/TensorFlow.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
+#ifdef SWIFT_ENABLE_TENSORFLOW
+#include "tensorflow/c/c_api.h"
+#endif
 using namespace swift;
 using namespace tf;
 
+/// Return true if the given type represents a TensorFlow dtype.
+bool tf::isTensorFlowDType(Type ty) {
+  auto nominal = ty->getAnyNominal();
+  if (!nominal)
+    return false;
+  auto &ctx = ty->getASTContext();
+  auto tensorProto =
+      ctx.getProtocol(KnownProtocolKind::AccelerableByTensorFlow);
+  if (!tensorProto)
+    return false;
+  SmallVector<ProtocolConformance *, 2> conformances;
+  nominal->lookupConformance(nullptr, tensorProto, conformances);
+  return !conformances.empty();
+}
+
+static bool is64(Type ty) {
+  return ty->getASTContext().LangOpts.Target.isArch64Bit();
+}
+
+/// This function maps a Swift type (either a language type like Float or an
+/// LLVM Builtin type like Builtin.f32) into the TensorFlow TF_DataType value.
+///
+/// This returns 0 (which is an invalid tensorflow type ID) on error.
+///
+unsigned tf::convertSwiftTypeToTF(Type ty) {
+#ifdef SWIFT_ENABLE_TENSORFLOW
+  // Handle wrappers like Float, which come up in TensorHandle<Float>
+  if (auto *s = ty->getAs<StructType>()) {
+    // Make sure the type is defined inside the Swift module.
+    auto context = s->getDecl()->getDeclContext()->getParentModule();
+    if (!context || context->getName().str() != "Swift")
+      return 0;
+
+    return llvm::StringSwitch<unsigned>(s->getDecl()->getNameStr())
+        .Case("Bool", TF_BOOL)
+        .Case("Int8", TF_INT8)
+        .Case("UInt8", TF_UINT8)
+        .Case("Int16", TF_INT16)
+        .Case("UInt16", TF_UINT16)
+        .Case("Int32", TF_INT32)
+        .Case("UInt32", TF_UINT32)
+        .Case("Int64", TF_INT64)
+        .Case("UInt64", TF_UINT64)
+        .Case("Int8", TF_INT8)
+        .Case("UInt8", TF_UINT8)
+        .Case("BFloat16", TF_BFLOAT16)
+        .Case("Float", TF_FLOAT)
+        .Case("Double", TF_DOUBLE)
+        .Case("Int", is64(s) ? TF_INT64 : TF_INT32)
+        .Case("UInt", is64(s) ? TF_UINT64 : TF_UINT32)
+        .Case("String", TF_STRING)
+        .Default(0);
+  }
+
+  // BuiltinIntegerType doesn't carry sign information, which TensorFlow needs,
+  // so we can't rely on getting type information from the builtin types
+  // themselves.  For now we'll just use signed types.
+  if (auto *BII = ty->getAs<BuiltinIntegerType>()) {
+    if (BII->getWidth().isPointerWidth())
+      return is64(ty) ? TF_INT64 : TF_INT32;
+
+    switch (BII->getFixedWidth()) {
+    case 1:
+      return TF_BOOL;
+    case 8:
+      return TF_INT8;
+    case 16:
+      return TF_INT16;
+    case 32:
+      return TF_INT32;
+    case 64:
+      return TF_INT64;
+    }
+  }
+
+  if (auto *BIF = ty->getAs<BuiltinFloatType>()) {
+    switch (BIF->getFPKind()) {
+    case BuiltinFloatType::IEEE16:
+      return TF_HALF;
+    case BuiltinFloatType::IEEE32:
+      return TF_FLOAT;
+    case BuiltinFloatType::IEEE64:
+      return TF_DOUBLE;
+    case BuiltinFloatType::IEEE80:
+    case BuiltinFloatType::IEEE128:
+    case BuiltinFloatType::PPC128:
+      return 0;
+    }
+  }
+
+  if (auto *BRPT = ty->getAs<BuiltinRawPointerType>()) {
+    return TF_STRING;
+  }
+#endif
+  return 0;
+}
 
 /// If the specified type is the well-known TensorHandle<T> type, then return
 /// "T".  If not, return a null type.
@@ -80,16 +180,37 @@ bool tf::isTensorFlowValueOrAggregate(Type ty) {
       [](Type eltTy) {
         return isTensorFlowValueOrAggregate(eltTy);
       });
-  if (auto *structTy = ty->getAs<StructType>())
-    return llvm::all_of(structTy->getDecl()->getStoredProperties(),
+  if (auto *structDecl = ty->getStructOrBoundGenericStruct())
+    return llvm::all_of(structDecl->getStoredProperties(),
       [](VarDecl *member) {
         return isTensorFlowValueOrAggregate(member->getType());
       });
-  if (auto *genericStructTy = ty->getAs<BoundGenericStructType>())
-    return llvm::all_of(genericStructTy->getDecl()->getStoredProperties(),
-      [](VarDecl *member) {
-        return isTensorFlowValueOrAggregate(member->getType());
-      });
+  return false;
+}
+
+bool tf::flattenTensorFlowValueAggregate(Type ty,
+                                         SmallVectorImpl<Type> &result) {
+  if (isTensorFlowValue(ty)) {
+    result.push_back(ty);
+    return true;
+  }
+  if (auto *tupleTy = ty->getAs<TupleType>())
+    return llvm::all_of(tupleTy->getElementTypes(),
+        [&](Type eltTy) {
+          return flattenTensorFlowValueAggregate(eltTy, result);
+        });
+  if (auto *structDecl = ty->getStructOrBoundGenericStruct()) {
+    auto *module = structDecl->getModuleContext();
+    return llvm::all_of(structDecl->getStoredProperties(),
+        [&](VarDecl *member) {
+          auto subMap = ty->getMemberSubstitutionMap(module, member);
+          auto eltTy = member->getType().subst(subMap);
+          return flattenTensorFlowValueAggregate(eltTy, result);
+        });
+  }
+  // Terminal type is not a TensorFlow value or an aggregate of TensorFlow
+  // values, so it fails.
+  result.clear();
   return false;
 }
 

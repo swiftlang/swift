@@ -24,9 +24,9 @@ public func testSelect(conds1: Tensor<Bool>, x1: Tensor<Float>, y1: Tensor<Float
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testSelect
  CHECK: sil private @{{.*}}testSelect{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Bool>, TensorHandle<Float>) -> TensorHandle<Float> {
  CHECK: bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Bool>, %2 : @unowned $TensorHandle<Float>):
- CHECK:       [[A:%.*]] = graph_op "Add,i,i"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>
- CHECK:       [[B:%.*]] = graph_op "Select,i,i,i"(%1 : $TensorHandle<Bool>, [[A]] : $TensorHandle<Float>, %2 : $TensorHandle<Float>
- CHECK:      [[C:%.*]] = graph_op "Mul,i,i"([[B]] : $TensorHandle<Float>, %2 : $TensorHandle<Float>
+ CHECK:       [[A:%.*]] = graph_op "Add"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>
+ CHECK:       [[B:%.*]] = graph_op "Select"(%1 : $TensorHandle<Bool>, [[A]] : $TensorHandle<Float>, %2 : $TensorHandle<Float>
+ CHECK:      [[C:%.*]] = graph_op "Mul"([[B]] : $TensorHandle<Float>, %2 : $TensorHandle<Float>
  CHECK-NEXT:  return [[C]] : $TensorHandle<Float>
  CHECK-NEXT:}
 */
@@ -39,8 +39,8 @@ public func testEmptyScalarsArray() {
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testEmptyScalarsArray
  CHECK: sil private @{{.*}}testEmptyScalarsArray{{.*}} : $@callee_owned () -> () {
  CHECK: bb0:
- CHECK: graph_op "Const"() {dtype: $Int32, value$tensor: [$Int32: ], value$shape: [$Int32: (i32 0), (i32 20), (i32 30)],
- CHECK: graph_op "Add,i,i"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>
+ CHECK: graph_op "Const"() {dtype: $Int32, value$tensor: [$Int32: ], shape$shape: [$Int32: (i32 0), (i32 20), (i32 30)],
+ CHECK: graph_op "Add"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>
  */
 
 // This tests the attributes necessary to get arrays of integers and strings going.
@@ -52,20 +52,28 @@ public func testConvolution(x: Tensor<Float>, filter: Tensor<Float>) -> Tensor<F
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConvolution
 // CHECK: sil private @{{.*}}testConvolution{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Float>):
-// CHECK: [[A:%.*]] = graph_op "Conv2D,i,i"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {T: $Float, strides: [$Int32: (i32 1), (i32 2), (i32 3), (i32 4)], use_cudnn_on_gpu: i1 -1, padding: "SAME", data_format: "NHWC", dilations: [$Int32: (i32 1), (i32 1), (i32 1), (i32 1)], __device: "/device:CPU:0"} : $TensorHandle<Float>
+// CHECK: [[A:%.*]] = graph_op "Conv2D"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {T: $Float, strides: [$Int32: (i32 1), (i32 2), (i32 3), (i32 4)], use_cudnn_on_gpu: i1 -1, padding: "SAME", data_format: "NHWC", dilations: [$Int32: (i32 1), (i32 1), (i32 1), (i32 1)], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
 // CHECK-NEXT:  return [[A]] : $TensorHandle<Float>
 // CHECK-NEXT:}
 
 // Testcase for an op that uses the $tensor and $shape modifiers.
 public func testConstantArray() -> TensorHandle<Float> {
-  return #tfop("Const", dtype: Float.self, value$tensor: [1.0, 2.0], value$shape: [2])
+  return #tfop("Const", dtype: Float.self, value$tensor: [1.0, 2.0], shape$shape: [2])
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConstantArray
 // CHECK: sil private @{{.*}}testConstantArray{{.*}} : $@callee_owned () -> TensorHandle<Float> {
 // CHECK: bb0:
-// CHECK:  %0 = graph_op "Const"() {dtype: $Float, value$tensor: [$Double: (f64 0x3FF0000000000000 /* 1 */), (f64 0x4000000000000000 /* 2 */)], value$shape: [$Int: (i64 2)], __device: "/device:CPU:0"} : $TensorHandle<Float>
+// CHECK:  %0 = graph_op "Const"() {dtype: $Float, value$tensor: [$Double: (f64 0x3FF0000000000000 /* 1 */), (f64 0x4000000000000000 /* 2 */)], shape$shape: [$Int: (i64 2)], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
 // CHECK-NEXT:  return %0 : $TensorHandle<Float>
+
+// Testcase for an op that uses the $shape modifier.
+public func tensorShapeModifier() {
+  let _ : TensorHandle<Float> = #tfop("ImmutableConst",
+                                      dtype: Float.self,
+                                      shape$shape: [2, 2],
+                                      memory_region_name: "abc")
+}
 
 // Sigmoid shouldn't cause copies.  This should compile with no copy warnings/errors.
 public func testSigmoid(x: Tensor<Float>, y: Tensor<Float>) -> (Tensor<Float>, Tensor<Float>) {
@@ -252,7 +260,7 @@ func createStringTensorConst(_ str: String) -> TensorHandle<String> {
   return #tfop("Const",
                dtype: String.self,
                value$tensor: str,
-               __device: "/device:CPU:0")
+               __device: "/job:localhost/replica:0/task:0/device:CPU:0")
 }
 
 // Consider moving this test to a different test suite, if we add more tests

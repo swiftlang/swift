@@ -2370,7 +2370,6 @@ namespace {
     // SWIFT_ENABLE_TENSORFLOW
     Expr *handleReverseAutoDiffExpr(ReverseAutoDiffExpr *expr,
                                     bool preservingOriginalResult) {
-      auto &TC = cs.getTypeChecker();
       auto gradType = simplifyType(cs.getType(expr));
       auto gradFnType = gradType->getAs<AnyFunctionType>();
       assert(gradFnType &&
@@ -2392,15 +2391,6 @@ namespace {
       } else {
         for (auto &param : expr->getParameters())
           diffParamTypes.push_back(gradParams[param.index].getType());
-      }
-      for (auto &paramTy : diffParamTypes) {
-        if (!(TC.isCompatibleWithScalarAutoDiff(paramTy, dc) ||
-              TC.isCompatibleWithVectorAutoDiff(paramTy, dc))) {
-          TC.diagnose(expr->getLoc(),
-                      diag::gradient_expr_parameter_not_differentiable,
-                      paramTy);
-          return nullptr;
-        }
       }
       return expr;
     }
@@ -2452,63 +2442,8 @@ namespace {
     /// TensorProtocol (like Tensor or TensorElementLiteral), we use the
     /// TensorHandle that they contain instead.
     Expr *visitTFOp(ObjectLiteralExpr *expr) {
-      auto &ctx = cs.getASTContext();
-      auto &tc = cs.getTypeChecker();
-
-      auto tensorProto = ctx.getProtocol(KnownProtocolKind::TensorProtocol);
-
-      // It is theoretically possible for #tfop to have zero operands (other
-      // than the string).  In that case the argument list will not be a tuple
-      // expr, but there are no operands to change anyway.
-      if (auto *tuple = dyn_cast<TupleExpr>(expr->getArg())) {
-        // Check each argument of the #tfop expression to see if any of them
-        // conforms to the TensorProtocol protocol.  If so, project out the
-        // handle value and pass that instead.
-        bool changedArg = false;
-        for (auto &elt : tuple->getElements().drop_front()) {
-          auto eltType = cs.getType(elt);
-          assert(eltType && "elt type cannot be NULL!");
-          if (!tensorProto || eltType->is<UnresolvedType>() ||
-              !tc.conformsToProtocol(eltType, tensorProto, cs.DC,
-                                     ConformanceCheckFlags::Used)) {
-            continue;
-          }
-
-          auto name = ctx.getIdentifier("handle");
-          Expr *newElt =
-            new (ctx) UnresolvedDotExpr(elt, elt->getEndLoc(),
-                                        DeclName(name),
-                                        DeclNameLoc(elt->getEndLoc()),
-                                         /*implicit*/true);
-          cs.setSubExprTypes(newElt);
-
-          bool failed = tc.typeCheckExpressionShallow(newElt, cs.DC);
-          assert(!failed && "Could not access 'handle' member?"); (void)failed;
-          cs.cacheExprTypes(newElt);
-          elt = newElt;
-          changedArg = true;
-        }
-
-        // If we changed any of the arguments, then we need to recompute the
-        // tuple type.
-        if (changedArg) {
-          // Make sure to set all of the types for the tuple, including the
-          // string and any operands we didn't touch.
-          cs.setSubExprTypes(tuple);
-
-          // Clear the type of the tuple so it gets recomputed.
-          Expr *newTuple = tuple;
-          newTuple->setType(Type());
-
-          bool failed = tc.typeCheckExpressionShallow(newTuple, cs.DC);
-          assert(!failed && "Could not retypecheck tuple?"); (void)failed;
-          cs.cacheExprTypes(newTuple);
-          expr->setArg(newTuple);
-        }
-      }
       return expr;
     }
-
 
     Expr *visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
       if (cs.getType(expr) && !cs.getType(expr)->hasTypeVariable())
@@ -6879,9 +6814,26 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     // Coercion from one function type to another, this produces a
     // FunctionConversionExpr in its full generality.
     if (fromFunc) {
+      // SWIFT_ENABLE_TENSORFLOW
+      // If we have a ClosureExpr, then we can safely propagate tensorflow
+      // convention to the closure expression.
+      // NOTE: we also need to check if the closure captures any values.
+      // However, capture information is not available at this point. Therefore,
+      // the check currently happens in the SILGen phase.
+      auto fromEI = fromFunc->getExtInfo();
+      if (toEI.getRepresentation() ==
+              AnyFunctionType::Representation::TensorFlow &&
+          fromEI.getRepresentation() !=
+              AnyFunctionType::Representation::TensorFlow) {
+        auto newFromFuncType = fromFunc->withExtInfo(fromEI.withRepresentation(
+            AnyFunctionType::Representation::TensorFlow));
+        if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
+          fromFunc = newFromFuncType->castTo<FunctionType>();
+        }
+      }
       // If we have a ClosureExpr, then we can safely propagate the 'no escape'
       // bit to the closure without invalidating prior analysis.
-      auto fromEI = fromFunc->getExtInfo();
+      fromEI = fromFunc->getExtInfo();
       if (toEI.isNoEscape() && !fromEI.isNoEscape()) {
         auto newFromFuncType = fromFunc->withExtInfo(fromEI.withNoEscape());
         if (!isInDefaultArgumentContext &&

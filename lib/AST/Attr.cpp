@@ -531,11 +531,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer << "reverse";
       break;
     }
-    Printer << ", ";
     auto params = attr->getParameters();
     // Print differentiation parameters, if any.
     if (!params.empty()) {
-      Printer << "wrt: (";
+      Printer << ", wrt: (";
       interleave(params, [&](const AutoDiffParameter &param) {
         switch (param.getKind()) {
         case AutoDiffParameter::Kind::Index:
@@ -548,13 +547,14 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       }, [&] {
         Printer << ", ";
       });
-      Printer << "), ";
+      Printer << ")";
     }
     // Print primal function name if any.
     if (auto primal = attr->getPrimal())
-      Printer << "primal: " << primal->Name << ", ";
+      Printer << ", primal: " << primal->Name;
     // Print adjoint function name.
-    Printer << "adjoint: " << attr->getAdjoint().Name;
+    if (auto adjoint = attr->getAdjoint())
+      Printer << ", adjoint: " << adjoint->Name;
     // FIXME: Print 'where' clause, if any.
     Printer << ")";
     break;
@@ -968,12 +968,13 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
 DifferentiableAttr::DifferentiableAttr(SourceLoc atLoc, SourceRange baseRange,
                                        AutoDiffMode mode, SourceLoc modeLoc,
                                        ArrayRef<AutoDiffParameter> parameters,
-                                       Optional<FunctionSpecifier> primal,
-                                       FunctionSpecifier adjoint,
+                                       Optional<DeclNameWithLoc> primal,
+                                       Optional<DeclNameWithLoc> adjoint,
                                        TrailingWhereClause *clause)
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, /*Implicit*/false),
     Mode(mode), ModeLoc(modeLoc), NumParameters(parameters.size()),
-    Primal(std::move(primal)), Adjoint(adjoint), WhereClause(clause) {
+    Primal(std::move(primal)), Adjoint(std::move(adjoint)),
+    WhereClause(clause) {
   std::copy(parameters.begin(), parameters.end(), getParametersData());
 }
 
@@ -982,16 +983,16 @@ DifferentiableAttr::create(ASTContext &context, SourceLoc atLoc,
                            SourceRange baseRange, AutoDiffMode mode,
                            SourceLoc modeLoc,
                            ArrayRef<AutoDiffParameter> parameters,
-                           Optional<FunctionSpecifier> primal,
-                           FunctionSpecifier adjoint,
+                           Optional<DeclNameWithLoc> primal,
+                           Optional<DeclNameWithLoc> adjoint,
                            TrailingWhereClause *clause) {
   unsigned numParams = parameters.size();
   unsigned size = sizeof(DifferentiableAttr) +
     numParams * sizeof(AutoDiffParameter);
   void *mem = context.Allocate(size, alignof(DifferentiableAttr));
   return new (mem) DifferentiableAttr(atLoc, baseRange, mode, modeLoc,
-                                      parameters, std::move(primal), adjoint,
-                                      clause);
+                                      parameters, std::move(primal),
+                                      std::move(adjoint), clause);
 }
 
 ArrayRef<AutoDiffParameter>

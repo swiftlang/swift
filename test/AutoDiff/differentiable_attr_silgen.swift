@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -emit-sil -verify %s
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -emit-sil -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -emit-silgen -verify %s | %FileCheck %s
 
 //===----------------------------------------------------------------------===//
 // Normal types
@@ -31,7 +30,7 @@ public func foo_indir_ret<T>(_ x: Float, _ y: T) -> T {
 }
 
 // CHECK-LABEL: sil [reverse_differentiable source 0 wrt 0, 1 primal @foo_indir_ret adjoint @dfoo_indir_ret] @foo_indir_ret : $@convention(thin) <T> (Float, @in_guaranteed T) -> @out T {
-// CHECK: bb0(%0 : $*T, %1 : $Float, %2 : $*T):
+// CHECK: bb0(%0 : @trivial $*T, %1 : @trivial $Float, %2 : @trivial $*T):
 
 @_silgen_name("dfoo_indir_ret")
 public func dfoo_indir_ret<T>(_ x: Float, _ y: T, _ partial: T, _ seed: T) -> (Float, T) {
@@ -39,7 +38,7 @@ public func dfoo_indir_ret<T>(_ x: Float, _ y: T, _ partial: T, _ seed: T) -> (F
 }
 
 // CHECK-LABEL: sil @dfoo_indir_ret : $@convention(thin) <T> (Float, @in_guaranteed T, @in_guaranteed T, @in_guaranteed T) -> (Float, @out T) {
-// CHECK: bb0(%0 : $*T, %1 : $Float, %2 : $*T, %3 : $*T, %4 : $*T):
+// CHECK: bb0(%0 : @trivial $*T, %1 : @trivial $Float, %2 : @trivial $*T, %3 : @trivial $*T, %4 : @trivial $*T):
 
 //===----------------------------------------------------------------------===//
 // Flattened types
@@ -59,3 +58,11 @@ public func dfoo_tuple(_ x: ((Float, (Float, Float)), Float, ((Float))), _ y: Fl
 }
 
 // CHECK-LABEL: sil @dfoo_tuple : $@convention(thin) (Float, Float, Float, Float, Float, Float, Float, Float) -> (Float, Float, Float, Float, Float, Float)
+
+@_silgen_name("no_prim_or_adj")
+@differentiable(reverse) // ok!
+public func no_prim_or_adj(_ x: Float) -> Float {
+  return x * x
+}
+
+// CHECK-LABEL: sil [reverse_differentiable source 0 wrt 0] @no_prim_or_adj : $@convention(thin) (Float) -> Float

@@ -757,8 +757,6 @@ ERROR(gradient_expr_parameter_index_out_of_bounds,none,
 ERROR(gradient_expr_parameter_not_value_type,none,
       "gradient parameter has non-value type %0 and thus cannot be a "
       "differentiation parameter", (Type))
-ERROR(gradient_expr_parameter_not_differentiable,none,
-      "gradient parameter has non-differentiable type %0", (Type))
 ERROR(gradient_expr_incompatible_contextual_type,none,
       "cannot convert gradient expression to incompatible contextual type %0",
       (Type))
@@ -2650,6 +2648,12 @@ ERROR(differentiable_attr_no_parameters,none,
       "%0 has no parameters to differentiate with respect to", (DeclName))
 ERROR(differentiable_attr_void_result,none,
       "cannot differentiate void function %0", (DeclName))
+ERROR(differentiable_attr_has_primal_but_not_adjoint,none,
+      "a corresponding adjoint must be specified when the primal is provided; "
+      "if you want this function to be automatically differentiated, do not "
+      "specify primal or adjoint", ())
+ERROR(differentiable_attr_wrt_nothing,none,
+      "specify at least one parameter to differentiate with respect to", (DeclName))
 ERROR(differentiable_attr_primal_overload_not_found,none,
       "%0 does not have expected parameters' type %1", (DeclName, Type))
 ERROR(differentiable_attr_adjoint_overload_not_found,none,

@@ -861,6 +861,9 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_SPECIALIZE_ATTR);
   BLOCK_RECORD(sil_block, SIL_ONE_OPERAND_EXTRA_ATTR);
   BLOCK_RECORD(sil_block, SIL_TWO_OPERANDS_EXTRA_ATTR);
+  // SWIFT_ENABLE_TENSORFLOW
+  BLOCK_RECORD(sil_block, SIL_REVERSE_DIFFERENTIABLE_ATTR);
+  BLOCK_RECORD(sil_block, SIL_INST_GRAPH_OPERATION);
 
   // These layouts can exist in both decl blocks and sil blocks.
 #define BLOCK_RECORD_WITH_NAMESPACE(K, X) emitRecordID(Out, X, #X, nameBuffer)
@@ -2366,8 +2369,12 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
       primalName = addDeclBaseNameRef(primal->Name.getBaseName());
       primalRef = addDeclRef(attr->getPrimalFunction());
     }
-    auto adjointName = addDeclBaseNameRef(attr->getAdjoint().Name.getBaseName());
-    auto adjointRef = addDeclRef(attr->getAdjointFunction());
+    IdentifierID adjointName = 0;
+    DeclID adjointRef = 0;
+    if (auto adjoint = attr->getAdjoint()) {
+      adjointName = addDeclBaseNameRef(adjoint->Name.getBaseName());
+      adjointRef = addDeclRef(attr->getAdjointFunction());
+    }
 
     SmallVector<uint32_t, 4> parameters;
     for (auto param : attr->getParameters()) {
