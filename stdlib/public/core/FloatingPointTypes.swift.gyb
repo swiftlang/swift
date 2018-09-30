@@ -1717,6 +1717,7 @@ extension ${Self} {
 extension ${Self} {
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
+  @differentiable(reverse, adjoint: _adjointAdd)
   public static func + (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs += rhs
@@ -1725,6 +1726,7 @@ extension ${Self} {
 
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
+  @differentiable(reverse, adjoint: _adjointSubtract)
   public static func - (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs -= rhs
@@ -1733,6 +1735,7 @@ extension ${Self} {
 
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
+  @differentiable(reverse, adjoint: _adjointMultiply)
   public static func * (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs *= rhs
@@ -1741,6 +1744,7 @@ extension ${Self} {
 
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
+  @differentiable(reverse, adjoint: _adjointDivide)
   public static func / (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs /= rhs
