@@ -268,6 +268,7 @@ public:
   SDKContext &getSDKContext() const { return Ctx; }
   SDKNodeRoot *getRootNode() const;
   virtual void jsonize(json::Output &Out);
+  virtual void diagnose(SDKNode *Right) {};
   template <typename T> const T *getAs() const {
     if (T::classof(this))
       return static_cast<const T*>(this);
@@ -325,6 +326,7 @@ public:
   StringRef getGenericSignature() const { return GenericSig; }
   StringRef getScreenInfo() const;
   virtual void jsonize(json::Output &Out) override;
+  virtual void diagnose(SDKNode *Right) override;
 };
 
 class SDKNodeRoot: public SDKNode {
@@ -346,7 +348,7 @@ public:
   }
 };
 
-class SDKNodeType : public SDKNode {
+class SDKNodeType: public SDKNode {
   std::vector<TypeAttrKind> TypeAttributes;
   bool HasDefaultArg;
 
@@ -364,8 +366,10 @@ public:
   // whether the parameter has a default value.
   bool hasDefaultArgument() const { return HasDefaultArg; }
   bool isTopLevelType() const { return !isa<SDKNodeType>(getParent()); }
+  StringRef getTypeRoleDescription() const;
   static bool classof(const SDKNode *N);
   virtual void jsonize(json::Output &Out) override;
+  virtual void diagnose(SDKNode *Right) override;
   bool hasAttributeChange(const SDKNodeType &Another) const;
 };
 
@@ -384,6 +388,7 @@ public:
   SDKNodeTypeFunc(SDKNodeInitInfo Info);
   bool isEscaping() const { return hasTypeAttribute(TypeAttrKind::TAK_noescape); }
   static bool classof(const SDKNode *N);
+  void diagnose(SDKNode *Right) override;
 };
 
 class SDKNodeTypeAlias : public SDKNodeType {
@@ -425,7 +430,7 @@ public:
   const NodePtr& operator*() {return *P;}
 };
 
-class SDKNodeDeclType : public SDKNodeDecl {
+class SDKNodeDeclType: public SDKNodeDecl {
   StringRef SuperclassUsr;
   std::vector<StringRef> SuperclassNames;
   std::vector<StringRef> ConformingProtocols;
@@ -458,6 +463,7 @@ public:
   SDKNodeType *getRawValueType() const;
   bool isConformingTo(KnownProtocolKind Kind) const;
   void jsonize(json::Output &out) override;
+  void diagnose(SDKNode *Right) override;
 };
 
 class SDKNodeDeclTypeAlias : public SDKNodeDecl {
@@ -492,6 +498,7 @@ public:
   SDKNodeType *getType() const;
   bool isLet() const { return IsLet; }
   void jsonize(json::Output &Out) override;
+  void diagnose(SDKNode *Right) override;
   bool hasStorage() const { return HasStorage; }
 };
 
@@ -512,6 +519,7 @@ public:
   static bool classof(const SDKNode *N);
   virtual void jsonize(json::Output &out) override;
   static StringRef getTypeRoleDescription(SDKContext &Ctx, unsigned Index);
+  virtual void diagnose(SDKNode *Right) override;
 };
 
 class SDKNodeDeclSubscript: public SDKNodeDeclAbstractFunc {
@@ -523,6 +531,7 @@ public:
   bool hasSetter() const { return HasSetter; }
   bool hasStorage() const { return HasStorage; }
   void jsonize(json::Output &Out) override;
+  void diagnose(SDKNode *Right) override;
 };
 
 class SDKNodeDeclFunction: public SDKNodeDeclAbstractFunc {
