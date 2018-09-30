@@ -33,6 +33,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
@@ -2739,7 +2740,7 @@ void TFDeabstractionPass::run() {
     llvm::PrettyStackTraceFormat X("TFDeabstraction on function %s",
                                    fn.getName().str().c_str());
 
-    TFDeabstraction(fn, tfc, constantEvaluator, PM).doIt();
+    TFDeabstraction(*this, fn, tfc, constantEvaluator, PM).doIt();
     partitionedFunctions.insert(&fn);
 
     // TODO(clattner): This should eventually be the driver that kicks off
@@ -2779,7 +2780,7 @@ void TFDeabstractionPass::run() {
     if (partitionedFunctions.count(&fn) > 0 ||
         !tfc.shouldBePartitioned(&fn, /*forceTFFunctions=*/true))
       continue;
-    TFDeabstraction(fn, tfc, constantEvaluator, PM).doIt();
+    TFDeabstraction(*this, fn, tfc, constantEvaluator, PM).doIt();
   }
 }
 

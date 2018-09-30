@@ -473,7 +473,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
+      isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       // SWIFT_ENABLE_TENSORFLOW
       optimizationMode, effect, numSpecAttrs, numReverseDifferentiableAttrs,
       hasQualifiedOwnership, isWeakLinked, funcTyID, genericEnvID,
@@ -2573,7 +2573,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
-      isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
+      isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs,
       // SWIFT_ENABLE_TENSORFLOW
       numReverseDifferentiableAttrs, hasQualifiedOwnership, isWeakLinked,

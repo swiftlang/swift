@@ -3121,6 +3121,7 @@ bool TFGraphLowering::lowerTFGraphOrFunction(
     SWIFT_DEFER {
       // Remove the partitioned function so it doesn't go through the normal
       // compiler flow.
+      parentTransform.getPassManager()->notifyWillDeleteFunction(perDeviceFn);
       perDeviceFn->getModule().eraseFunction(perDeviceFn);
     };
     bool isPrimaryFn = deviceType == deviceInfo.primaryDeviceType;

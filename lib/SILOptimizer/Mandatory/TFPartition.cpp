@@ -770,8 +770,10 @@ public:
   ~TFFunctionPartition() {
     // Remove the partitioned function so it doesn't go through the normal
     // compiler flow.
-    if (acceleratorFn)
+    if (acceleratorFn) {
+      transform.getPassManager()->notifyWillDeleteFunction(acceleratorFn);
       acceleratorFn->getModule().eraseFunction(acceleratorFn);
+    }
   }
 
   /// Run the marking/analysis phase on this function. Return true on error.
@@ -4218,8 +4220,10 @@ bool TFFunctionPartition::partition(bool isTest) {
     // If we error out before assigning `resultFn` to the member field
     // `acceleratorFn`, we should make sure this synthensized function is
     // removed, to avoid it going through the normal compiler flow.
-    if (resultFn)
+    if (resultFn) {
+      transform.getPassManager()->notifyWillDeleteFunction(resultFn);
       resultFn->getModule().eraseFunction(resultFn);
+    }
   };
 
   PartitionCloner PC(*this, *resultFn, tensorProgram.theTensorComputation,
@@ -4275,6 +4279,7 @@ bool TFFunctionPartition::lowerGraph(bool isTest) {
 
     // Remove the host function so it doesn't go through the normal
     // compiler flow.
+    transform.getPassManager()->notifyWillDeleteFunction(&hostFn);
     hostFn.getModule().eraseFunction(&hostFn);
   } else {
     if (graphLowering->lowerTFGraph(hostFn.getName(), acceleratorFn,

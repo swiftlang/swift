@@ -42,6 +42,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/ADT/DenseSet.h"
@@ -4314,7 +4315,7 @@ static SILFunction *lookupOrSynthesizeGradient(ADContext &context,
     if (linkage == SILLinkage::Public)
       linkage = SILLinkage::PublicNonABI;
     auto *gradFn =
-        FB.createFunction(linkage, gradNameId.str(), gradType,
+        fb.createFunction(linkage, gradNameId.str(), gradType,
                           original->getGenericEnvironment(),
                           original->getLocation(), original->isBare(),
                           original->isTransparent(), original->isSerialized());
