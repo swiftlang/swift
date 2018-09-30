@@ -384,8 +384,7 @@ DerivedConformance::declareDerivedPropertySetter(TypeChecker &tc,
     AccessorKind::Set, AddressorKind::NotAddressor, property,
     /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,
     /*Throws*/ false, /*ThrowsLoc*/ SourceLoc(),
-    /*GenericParams*/ nullptr, selfDecl, params,
-    TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
+    /*GenericParams*/ nullptr, selfDecl, params, TypeLoc(), parentDC);
   setterDecl->setImplicit();
   setterDecl->setStatic(isStatic);
   setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);

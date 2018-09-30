@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
+// SWIFT_ENABLE_TENSORFLOW
+//
 // This file implements explicit derivation of the Parameterized protocol for a
 // nominal type.
 //
@@ -264,7 +266,6 @@ static void derivedBody_allParametersSetter(AbstractFunctionDecl *setterDecl) {
       BraceStmt::create(C, SourceLoc(), assignNodes, SourceLoc(), true));
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 static ValueDecl *
 deriveParameterized_allParameters(DerivedConformance &derived) {
   auto nominal = derived.Nominal;
