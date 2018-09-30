@@ -210,6 +210,12 @@ struct SILReverseAutoDiffConfig {
   }
 };
 
+class BuiltinFloatType;
+class NominalTypeDecl;
+class StructDecl;
+class TupleType;
+class EnumDecl;
+
 /// A type that represents the tangent space of a differentiable type.
 class TangentSpace {
 public:
