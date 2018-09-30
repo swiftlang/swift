@@ -852,6 +852,12 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
 ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   SyntaxParsingContext TypeContext(SyntaxContext, SyntaxKind::TupleType);
   Parser::StructureMarkerRAII ParsingTypeTuple(*this, Tok);
+   
+  // consumeToken would panic if it saw the eof from StructureMarkerRAII halting the parse.
+  if (ParsingTypeTuple.isFailed()) {
+    return makeParserError();
+  }
+
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
   SourceLoc EllipsisLoc;
   unsigned EllipsisIdx;

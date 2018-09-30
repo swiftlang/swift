@@ -55,6 +55,10 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
     // Note that we're parsing a declaration.
     StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
                                     StructureMarkerKind::Declaration);
+    
+    if (ParsingDecl.isFailed()) {
+      return makeParserError();
+    }
 
     // Parse attributes.
     DeclAttributes attributes;

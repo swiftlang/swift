@@ -757,38 +757,27 @@ bool Parser::parseEndIfDirective(SourceLoc &Loc) {
   return false;
 }
 
-Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser,
-                                                 const Token &tok)
-  : P(parser)
+static Parser::StructureMarkerKind getStructureMarkerKindForToken(const Token &tok)
 {
   switch (tok.getKind()) {
-  case tok::l_brace:
-    P.StructureMarkers.push_back({tok.getLoc(),
-                                  StructureMarkerKind::OpenBrace,
-                                  None});
-    break;
-
-  case tok::l_paren:
-    P.StructureMarkers.push_back({tok.getLoc(),
-                                  StructureMarkerKind::OpenParen,
-                                  None});
-    break;
-
-  case tok::l_square:
-    P.StructureMarkers.push_back({tok.getLoc(),
-                                  StructureMarkerKind::OpenSquare,
-                                  None});
-    break;
-
-  default:
-    llvm_unreachable("Not a matched token");
+    case tok::l_brace:
+      return Parser::StructureMarkerKind::OpenBrace;
+        
+    case tok::l_paren:
+      return Parser::StructureMarkerKind::OpenBrace;
+        
+    case tok::l_square:
+      return Parser::StructureMarkerKind::OpenSquare;
+        
+    default:
+      llvm_unreachable("Not a matched token");
   }
 }
 
-void Parser::StructureMarkerRAII::diagnoseOverflow() {
-  auto Loc = P.StructureMarkers.back().Loc;
-  P.diagnose(Loc, diag::structure_overflow, MaxDepth);
-}
+
+Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser, const Token &tok):
+  StructureMarkerRAII(parser, tok.getLoc(), getStructureMarkerKindForToken(tok)) { }
+
 
 //===----------------------------------------------------------------------===//
 // Primitive Parsing

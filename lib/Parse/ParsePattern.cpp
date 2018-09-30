@@ -1038,6 +1038,9 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
   SyntaxParsingContext TuplePatternCtxt(SyntaxContext,
                                         SyntaxKind::TuplePattern);
   StructureMarkerRAII ParsingPatternTuple(*this, Tok);
+  if (ParsingPatternTuple.isFailed()) {
+    return makeParserError();
+  }
   SourceLoc LPLoc = consumeToken(tok::l_paren);
   SourceLoc RPLoc;
 

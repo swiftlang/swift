@@ -1248,6 +1248,11 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
   }
 
   StructureMarkerRAII ParsingAvailabilitySpecList(*this, Tok);
+
+  if (ParsingAvailabilitySpecList.isFailed()) {
+    return makeParserError();
+  }
+    
   SourceLoc LParenLoc = consumeToken(tok::l_paren);
 
   SmallVector<AvailabilitySpec *, 5> Specs;
