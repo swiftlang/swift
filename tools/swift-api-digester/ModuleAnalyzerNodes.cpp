@@ -296,6 +296,32 @@ bool SDKNodeType::hasTypeAttribute(TypeAttrKind DAKind) const {
     TypeAttributes.end();
 }
 
+StringRef SDKNodeType::getTypeRoleDescription() const {
+  assert(isTopLevelType());
+  auto P = cast<SDKNodeDecl>(getParent());
+  switch(P->getKind()) {
+  case SDKNodeKind::Root:
+  case SDKNodeKind::TypeNominal:
+  case SDKNodeKind::TypeFunc:
+  case SDKNodeKind::TypeAlias:
+  case SDKNodeKind::DeclType:
+    llvm_unreachable("Type Parent is wrong");
+  case SDKNodeKind::DeclFunction:
+  case SDKNodeKind::DeclConstructor:
+  case SDKNodeKind::DeclGetter:
+  case SDKNodeKind::DeclSetter:
+  case SDKNodeKind::DeclSubscript:
+    return SDKNodeDeclAbstractFunc::getTypeRoleDescription(Ctx,
+      P->getChildIndex(this));
+  case SDKNodeKind::DeclVar:
+    return "declared";
+  case SDKNodeKind::DeclTypeAlias:
+    return "underlying";
+  case SDKNodeKind::DeclAssociatedType:
+    return "default";
+  }
+}
+
 SDKNode *SDKNodeRoot::getInstance(SDKContext &Ctx) {
   SDKNodeInitInfo Info(Ctx);
   Info.Name = Ctx.buffer("TopLevel");
