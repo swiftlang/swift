@@ -1,4 +1,4 @@
-//===--- FloatingPoint.swift.gyb ------------------------------*- swift -*-===//
+//===--- FloatingPoint.swift ----------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,15 +9,6 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-
-%{
-
-from SwiftIntTypes import all_integer_types
-
-# Number of bits in the Builtin.Word type
-word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
-
-}%
 
 /// A floating-point numeric type.
 ///
@@ -238,17 +229,16 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   ///   - magnitudeOf: A value from which to use the magnitude. The result of
   ///     the initializer has the same magnitude as `magnitudeOf`.
   init(signOf: Self, magnitudeOf: Self)
-
-% for src_ty in all_integer_types(word_bits):
+  
+  
   /// Creates a new value, rounded to the closest possible representation.
   ///
   /// If two representable values are equally close, the result is the value
   /// with more trailing zeros in its significand bit pattern.
   ///
   /// - Parameter value: The integer to convert to a floating-point value.
-  init(_ value: ${src_ty.stdlib_name})
+  init(_ value: Int)
 
-% end
   /// Creates a new value, rounded to the closest possible representation.
   ///
   /// If two representable values are equally close, the result is the value
@@ -2062,83 +2052,6 @@ extension BinaryFloatingPoint {
 
   @inlinable // FIXME(sil-serialize-all)
   public // @testable
-  static func _convert<Source : BinaryInteger>(
-    from source: Source
-  ) -> (value: Self, exact: Bool) {
-    guard _fastPath(source != 0) else { return (0, true) }
-
-    let magnitude = source.magnitude
-
-    let exponent = magnitude._binaryLogarithm()
-    let exemplar = Self.greatestFiniteMagnitude
-    guard _fastPath(exponent <= exemplar.exponent) else {
-      return Source.isSigned && source < 0
-        ? (-.infinity, false)
-        : (.infinity, false)
-    }
-    let exponentBitPattern =
-      (1 as Self).exponentBitPattern /* (i.e., bias) */
-        + Self.RawExponent(exponent)
-
-    let maxSignificandWidth = exemplar.significandWidth
-    let shift = maxSignificandWidth &- exponent
-    let significandBitPattern = shift >= 0
-      ? Self.RawSignificand(magnitude) << shift & exemplar.significandBitPattern
-      : Self.RawSignificand(
-        magnitude >> -shift & Source.Magnitude(exemplar.significandBitPattern))
-
-    let value = Self(
-      sign: Source.isSigned && source < 0 ? .minus : .plus,
-      exponentBitPattern: exponentBitPattern,
-      significandBitPattern: significandBitPattern)
-
-    if exponent &- magnitude.trailingZeroBitCount <= maxSignificandWidth {
-      return (value, true)
-    }
-    // We promise to round to the closest representation, and if two
-    // representable values are equally close, the value with more trailing
-    // zeros in its significand bit pattern. Therefore, we must take a look at
-    // the bits that we've just truncated.
-    let ulp = (1 as Source.Magnitude) << -shift
-    let truncatedBits = magnitude & (ulp - 1)
-    if truncatedBits < ulp / 2 {
-      return (value, false)
-    }
-    let rounded = Source.isSigned && source < 0 ? value.nextDown : value.nextUp
-    guard _fastPath(
-      truncatedBits != ulp / 2 ||
-        exponentBitPattern.trailingZeroBitCount <
-          rounded.exponentBitPattern.trailingZeroBitCount) else {
-      return (value, false)
-    }
-    return (rounded, false)
-  }
-
-  /// Creates a new value, rounded to the closest possible representation.
-  ///
-  /// If two representable values are equally close, the result is the value
-  /// with more trailing zeros in its significand bit pattern.
-  ///
-  /// - Parameter value: The integer to convert to a floating-point value.
-  @inlinable // FIXME(sil-serialize-all)
-  public init<Source : BinaryInteger>(_ value: Source) {
-    self = Self._convert(from: value).value
-  }
-
-  /// Creates a new value, if the given integer can be represented exactly.
-  ///
-  /// If the given integer cannot be represented exactly, the result is `nil`.
-  ///
-  /// - Parameter value: The integer to convert to a floating-point value.
-  @inlinable // FIXME(sil-serialize-all)
-  public init?<Source : BinaryInteger>(exactly value: Source) {
-    let (value_, exact) = Self._convert(from: value)
-    guard exact else { return nil }
-    self = value_
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public // @testable
   static func _convert<Source : BinaryFloatingPoint>(
     from source: Source
   ) -> (value: Self, exact: Bool) {
@@ -2343,60 +2256,100 @@ extension BinaryFloatingPoint {
     //  Sign, exponent, and significand all match.
     return true
   }
-
-
-  /*  TODO: uncomment these default implementations when it becomes possible
-      to use them.
-  //  TODO: The following comparison implementations are not quite correct for
-  //  the unusual case where one type has more exponent range and the other
-  //  uses more fractional bits, *and* the value with more exponent range is
-  //  subnormal when converted to the other type. This is an extremely niche
-  //  corner case, however (it cannot occur with the usual IEEE 754 floating-
-  //  point types). Nonetheless, this should be fixed someday.
-  public func isEqual<Other: BinaryFloatingPoint>(to other: Other) -> Bool {
-    if Self.significandBitCount >= Other.significandBitCount {
-      return self.isEqual(to: Self(other))
-    }
-    return other.isEqual(to: Other(self))
-  }
-
-  public func isLess<Other: BinaryFloatingPoint>(than other: Other) -> Bool {
-    if Self.significandBitCount >= Other.significandBitCount {
-      return self.isLess(than: Self(other))
-    }
-    return Other(self).isLess(than: other)
-  }
-
-  public func isLessThanOrEqualTo<Other: BinaryFloatingPoint>(other: Other) -> Bool {
-    if Self.significandBitCount >= Other.significandBitCount {
-      return self.isLessThanOrEqualTo(Self(other))
-    }
-    return Other(self).isLessThanOrEqualTo(other)
-  }
-
-  public func isTotallyOrdered<Other: BinaryFloatingPoint>(belowOrEqualTo other: Other) -> Bool {
-    if Self.significandBitCount >= Other.significandBitCount {
-      return self.totalOrder(with: Self(other))
-    }
-    return Other(self).totalOrder(with: other)
-  }
-  */
 }
 
-% for Range in ['Range', 'ClosedRange']:
-%   exampleRange = '10.0..<20.0' if Range == 'Range' else '10.0...20.0'
-extension BinaryFloatingPoint
-where Self.RawSignificand : FixedWidthInteger {
+extension BinaryFloatingPoint where Self.RawSignificand : FixedWidthInteger {
+  
+  @inlinable
+  public // @testable
+  static func _convert<Source : BinaryInteger>(
+    from source: Source
+  ) -> (value: Self, exact: Bool) {
+    //  Useful constants:
+    let exponentBias = (1 as Self).exponentBitPattern
+    let significandMask = ((1 as RawSignificand) << Self.significandBitCount) &- 1
+    //  Zero is really extra simple, and saves us from trying to normalize a
+    //  value that cannot be normalized.
+    if _fastPath(source == 0) { return (0, true) }
+    //  We now have a non-zero value; convert it to a strictly positive value
+    //  by taking the magnitude.
+    let magnitude = source.magnitude
+    var exponent = magnitude._binaryLogarithm()
+    //  If the exponent would be larger than the largest representable
+    //  exponent, the result is just an infinity of the appropriate sign.
+    guard exponent <= Self.greatestFiniteMagnitude.exponent else {
+      return (Source.isSigned && source < 0 ? -.infinity : .infinity, false)
+    }
+    //  If exponent <= significandBitCount, we don't need to round it to
+    //  construct the significand; we just need to left-shift it into place;
+    //  the result is always exact as we've accounted for exponent-too-large
+    //  already and no rounding can occur.
+    if exponent <= Self.significandBitCount {
+      let shift = Self.significandBitCount &- exponent
+      let significand = RawSignificand(magnitude) &<< shift
+      let value = Self(
+        sign: Source.isSigned && source < 0 ? .minus : .plus,
+        exponentBitPattern: exponentBias + RawExponent(exponent),
+        significandBitPattern: significand
+      )
+      return (value, true)
+    }
+    //  exponent > significandBitCount, so we need to do a rounding right
+    //  shift, and adjust exponent if needed
+    let shift = exponent &- Self.significandBitCount
+    let halfway = (1 as Source.Magnitude) << (shift - 1)
+    let mask = 2 * halfway - 1
+    let fraction = magnitude & mask
+    var significand = RawSignificand(truncatingIfNeeded: magnitude >> shift) & significandMask
+    if fraction > halfway || (fraction == halfway && significand & 1 == 1) {
+      var carry = false
+      (significand, carry) = significand.addingReportingOverflow(1)
+      if carry || significand > significandMask {
+        exponent += 1
+        guard exponent <= Self.greatestFiniteMagnitude.exponent else {
+          return (Source.isSigned && source < 0 ? -.infinity : .infinity, false)
+        }
+      }
+    }
+    return (Self(
+      sign: Source.isSigned && source < 0 ? .minus : .plus,
+      exponentBitPattern: exponentBias + RawExponent(exponent),
+      significandBitPattern: significand
+    ), fraction == 0)
+  }
+  
+  /// Creates a new value, rounded to the closest possible representation.
+  ///
+  /// If two representable values are equally close, the result is the value
+  /// with more trailing zeros in its significand bit pattern.
+  ///
+  /// - Parameter value: The integer to convert to a floating-point value.
+  @inlinable // FIXME(sil-serialize-all)
+  public init<Source : BinaryInteger>(_ value: Source) {
+    self = Self._convert(from: value).value
+  }
+  
+  /// Creates a new value, if the given integer can be represented exactly.
+  ///
+  /// If the given integer cannot be represented exactly, the result is `nil`.
+  ///
+  /// - Parameter value: The integer to convert to a floating-point value.
+  @inlinable // FIXME(sil-serialize-all)
+  public init?<Source : BinaryInteger>(exactly value: Source) {
+    let (value_, exact) = Self._convert(from: value)
+    guard exact else { return nil }
+    self = value_
+  }
 
   /// Returns a random value within the specified range, using the given
   /// generator as a source for randomness.
   ///
   /// Use this method to generate a floating-point value within a specific
   /// range when you are using a custom random number generator. This example
-  /// creates three new values in the range `${exampleRange}`.
+  /// creates three new values in the range `10.0 ..< 20.0`.
   ///
   ///     for _ in 1...3 {
-  ///         print(Double.random(in: ${exampleRange}, using: &myGenerator))
+  ///         print(Double.random(in: 10.0 ..< 20.0, using: &myGenerator))
   ///     }
   ///     // Prints "18.1900709259179"
   ///     // Prints "14.2286325689993"
@@ -2416,15 +2369,13 @@ where Self.RawSignificand : FixedWidthInteger {
   ///
   /// - Parameters:
   ///   - range: The range in which to create a random value.
-%   if Range == 'Range':
-  ///     `range` must not be empty and finite.
-%   end
+  ///     `range` must be finite and non-empty.
   ///   - generator: The random number generator to use when creating the
   ///     new random value.
   /// - Returns: A random value within the bounds of `range`.
   @inlinable
   public static func random<T: RandomNumberGenerator>(
-    in range: ${Range}<Self>,
+    in range: Range<Self>,
     using generator: inout T
   ) -> Self {
     _precondition(
@@ -2444,34 +2395,19 @@ where Self.RawSignificand : FixedWidthInteger {
     let rand: Self.RawSignificand
     if Self.RawSignificand.bitWidth == Self.significandBitCount + 1 {
       rand = generator.next()
-%     if 'Closed' in Range:
-      let tmp: UInt8 = generator.next() & 1
-      if rand == Self.RawSignificand.max && tmp == 1 {
-        return range.upperBound
-      }
-%     end
     } else {
       let significandCount = Self.significandBitCount + 1
       let maxSignificand: Self.RawSignificand = 1 << significandCount
-%     if 'Closed' not in Range:
       // Rather than use .next(upperBound:), which has to work with arbitrary
       // upper bounds, and therefore does extra work to avoid bias, we can take
       // a shortcut because we know that maxSignificand is a power of two.
       rand = generator.next() & (maxSignificand - 1)
-%     else:
-      rand = generator.next(upperBound: maxSignificand + 1)
-      if rand == maxSignificand {
-        return range.upperBound
-      }
-%     end
     }
     let unitRandom = Self.init(rand) * (Self.ulpOfOne / 2)
     let randFloat = delta * unitRandom + range.lowerBound
-%   if 'Closed' not in Range:
     if randFloat == range.upperBound {
       return Self.random(in: range, using: &generator)
     }
-%   end
     return randFloat
   }
 
@@ -2479,10 +2415,10 @@ where Self.RawSignificand : FixedWidthInteger {
   ///
   /// Use this method to generate a floating-point value within a specific
   /// range. This example creates three new values in the range
-  /// `${exampleRange}`.
+  /// `10.0 ..< 20.0`.
   ///
   ///     for _ in 1...3 {
-  ///         print(Double.random(in: ${exampleRange}))
+  ///         print(Double.random(in: 10.0 ..< 20.0))
   ///     }
   ///     // Prints "18.1900709259179"
   ///     // Prints "14.2286325689993"
@@ -2498,19 +2434,111 @@ where Self.RawSignificand : FixedWidthInteger {
   /// system's default random generator.
   ///
   /// - Parameter range: The range in which to create a random value.
-%   if Range == 'Range':
-  ///   `range` must not be empty and finite.
-%   end
+  ///   `range` must be finite and non-empty.
   /// - Returns: A random value within the bounds of `range`.
   @inlinable
-  public static func random(in range: ${Range}<Self>) -> Self {
+  public static func random(in range: Range<Self>) -> Self {
+    var g = SystemRandomNumberGenerator()
+    return Self.random(in: range, using: &g)
+  }
+  
+  /// Returns a random value within the specified range, using the given
+  /// generator as a source for randomness.
+  ///
+  /// Use this method to generate a floating-point value within a specific
+  /// range when you are using a custom random number generator. This example
+  /// creates three new values in the range `10.0 ... 20.0`.
+  ///
+  ///     for _ in 1...3 {
+  ///         print(Double.random(in: 10.0 ... 20.0, using: &myGenerator))
+  ///     }
+  ///     // Prints "18.1900709259179"
+  ///     // Prints "14.2286325689993"
+  ///     // Prints "13.1485686260762"
+  ///
+  /// The `random(in:using:)` static method chooses a random value from a
+  /// continuous uniform distribution in `range`, and then converts that value
+  /// to the nearest representable value in this type. Depending on the size
+  /// and span of `range`, some concrete values may be represented more
+  /// frequently than others.
+  ///
+  /// - Note: The algorithm used to create random values may change in a future
+  ///   version of Swift. If you're passing a generator that results in the
+  ///   same sequence of floating-point values each time you run your program,
+  ///   that sequence may change when your program is compiled using a
+  ///   different version of Swift.
+  ///
+  /// - Parameters:
+  ///   - range: The range in which to create a random value. Must be finite.
+  ///   - generator: The random number generator to use when creating the
+  ///     new random value.
+  /// - Returns: A random value within the bounds of `range`.
+  @inlinable
+  public static func random<T: RandomNumberGenerator>(
+    in range: ClosedRange<Self>,
+    using generator: inout T
+  ) -> Self {
+    _precondition(
+      !range.isEmpty,
+      "Can't get random value with an empty range"
+    )
+    let delta = range.upperBound - range.lowerBound
+    //  TODO: this still isn't quite right, because the computation of delta
+    //  can overflow (e.g. if .upperBound = .maximumFiniteMagnitude and
+    //  .lowerBound = -.upperBound); this should be re-written with an
+    //  algorithm that handles that case correctly, but this precondition
+    //  is an acceptable short-term fix.
+    _precondition(
+      delta.isFinite,
+      "There is no uniform distribution on an infinite range"
+    )
+    let rand: Self.RawSignificand
+    if Self.RawSignificand.bitWidth == Self.significandBitCount + 1 {
+      rand = generator.next()
+      let tmp: UInt8 = generator.next() & 1
+      if rand == Self.RawSignificand.max && tmp == 1 {
+        return range.upperBound
+      }
+    } else {
+      let significandCount = Self.significandBitCount + 1
+      let maxSignificand: Self.RawSignificand = 1 << significandCount
+      rand = generator.next(upperBound: maxSignificand + 1)
+      if rand == maxSignificand {
+        return range.upperBound
+      }
+    }
+    let unitRandom = Self.init(rand) * (Self.ulpOfOne / 2)
+    let randFloat = delta * unitRandom + range.lowerBound
+    return randFloat
+  }
+  
+  /// Returns a random value within the specified range.
+  ///
+  /// Use this method to generate a floating-point value within a specific
+  /// range. This example creates three new values in the range
+  /// `10.0 ... 20.0`.
+  ///
+  ///     for _ in 1...3 {
+  ///         print(Double.random(in: 10.0 ... 20.0))
+  ///     }
+  ///     // Prints "18.1900709259179"
+  ///     // Prints "14.2286325689993"
+  ///     // Prints "13.1485686260762"
+  ///
+  /// The `random()` static method chooses a random value from a continuous
+  /// uniform distribution in `range`, and then converts that value to the
+  /// nearest representable value in this type. Depending on the size and span
+  /// of `range`, some concrete values may be represented more frequently than
+  /// others.
+  ///
+  /// This method is equivalent to calling `random(in:using:)`, passing in the
+  /// system's default random generator.
+  ///
+  /// - Parameter range: The range in which to create a random value. Must be finite.
+  /// - Returns: A random value within the bounds of `range`.
+  @inlinable
+  public static func random(in range: ClosedRange<Self>) -> Self {
     var g = SystemRandomNumberGenerator()
     return Self.random(in: range, using: &g)
   }
 }
-
-% end
-
-// ${'Local Variables'}:
-// eval: (read-only-mode 1)
-// End:
