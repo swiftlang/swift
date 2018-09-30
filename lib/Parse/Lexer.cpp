@@ -644,9 +644,7 @@ tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
 }
 
 /// adjustKindForCompilationFlag - Detect and parse custom compilation flags.
-static bool adjustKindForCompilationFlag(StringRef Identifier, tok &Kind,
-                                         const LangOptions &LangOpts,
-                                         DiagnosticEngine *Diags) {
+bool Lexer::adjustKindForCompilationFlag(StringRef Identifier, tok &Kind) {
   const auto &Custom = LangOpts.getCustomCompilationFlags();
   bool IsCustomCompilationFlag = Custom.find(Identifier) != Custom.end();
   if (IsCustomCompilationFlag) {
@@ -659,20 +657,13 @@ static bool adjustKindForCompilationFlag(StringRef Identifier, tok &Kind,
       Kind = tok::kw_true;
     else if (Value == "false")
       Kind = tok::kw_false;
-    else {
-      char *Parsed;
-      (void)strtoll(Start, &Parsed, 10);
-      if (Parsed == End)
-        Kind = tok::integer_literal;
-      else {
-        (void)strtod(Start, &Parsed);
-        if (Parsed == End)
-          Kind = tok::floating_literal;
-        else if (Diags)
-          Diags->diagnose(Lexer::getSourceLoc(Identifier.data()),
-                          diag::lex_invalid_compilation_flag,
-                          StringRef(Value), Identifier);
-      }
+    else if (isDigit(*Start++)) {
+      lexNumber(Start, End);
+      if (Start == End)
+        Kind = NextToken.getKind();
+      else
+        diagnose(Identifier.data(), diag::lex_invalid_compilation_flag,
+                 StringRef(Value), Identifier);
     }
   }
 
@@ -692,8 +683,7 @@ void Lexer::lexIdentifier() {
 
   StringRef Identifier(TokStart, CurPtr-TokStart);
   tok Kind = kindOfIdentifier(Identifier, InSILMode);
-  bool IsCustomCompilationFlag = adjustKindForCompilationFlag(Identifier, Kind,
-                                                              LangOpts, Diags);
+  bool IsCustomCompilationFlag = adjustKindForCompilationFlag(Identifier, Kind);
   formToken(Kind, TokStart);
   NextToken.setCustomCompilationFlag(IsCustomCompilationFlag);
 }
@@ -722,8 +712,7 @@ void Lexer::lexHash() {
     tmpPtr = CurPtr;
     while (advanceIfValidContinuationOfIdentifier(tmpPtr, BufferEnd));
     StringRef Identifier = StringRef(CurPtr, tmpPtr-CurPtr);
-    IsCustomCompilationFlag = adjustKindForCompilationFlag(Identifier, Kind,
-                                                           LangOpts, Diags);
+    IsCustomCompilationFlag = adjustKindForCompilationFlag(Identifier, Kind);
 
     // If we didn't find a match, then just return tok::pound.  This is highly
     // dubious in terms of error recovery, but is useful for code completion
@@ -992,11 +981,12 @@ void Lexer::lexDollarIdent() {
 
 enum class ExpectedDigitKind : unsigned { Binary, Octal, Decimal, Hex };
 
-void Lexer::lexHexNumber() {
+void Lexer::lexHexNumber(const char *&CurPtr, const char *BufferEnd) {
   // We assume we're starting from the 'x' in a '0x...' floating-point literal.
   assert(*CurPtr == 'x' && "not a hex literal");
-  const char *TokStart = CurPtr-1;
-  assert(*TokStart == '0' && "not a hex literal");
+  assert(*(CurPtr - 1) == '0' && "not a hex literal");
+  const char *TokStart = this->CurPtr-1;
+  bool IsFlag = CurPtr != this->CurPtr;
 
   auto expected_digit = [&]() {
     while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
@@ -1004,8 +994,8 @@ void Lexer::lexHexNumber() {
   };
 
   auto expected_hex_digit = [&](const char *loc) {
-    diagnose(loc, diag::lex_invalid_digit_in_int_literal, StringRef(loc, 1),
-             (unsigned)ExpectedDigitKind::Hex);
+    diagnose(IsFlag ? TokStart : loc, diag::lex_invalid_digit_in_int_literal,
+             StringRef(loc, 1), (unsigned)ExpectedDigitKind::Hex);
     return expected_digit();
   };
 
@@ -1048,7 +1038,8 @@ void Lexer::lexHexNumber() {
         CurPtr = PtrOnDot;
         return formToken(tok::integer_literal, TokStart);
       }
-      diagnose(CurPtr, diag::lex_expected_binary_exponent_in_hex_float_literal);
+      diagnose(IsFlag ? TokStart : CurPtr,
+               diag::lex_expected_binary_exponent_in_hex_float_literal);
       return formToken(tok::unknown, TokStart);
     }
   }
@@ -1076,7 +1067,8 @@ void Lexer::lexHexNumber() {
     // non-identifier (empty exponent)
     auto tmp = CurPtr;
     if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd))
-      diagnose(tmp, diag::lex_invalid_digit_in_fp_exponent, StringRef(tmp, 1),
+      diagnose(IsFlag ? TokStart : tmp,
+               diag::lex_invalid_digit_in_fp_exponent, StringRef(tmp, 1),
                *tmp == '_');
     else
       diagnose(CurPtr, diag::lex_expected_digit_in_fp_exponent);
@@ -1089,7 +1081,8 @@ void Lexer::lexHexNumber() {
 
   auto tmp = CurPtr;
   if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd)) {
-    diagnose(tmp, diag::lex_invalid_digit_in_fp_exponent, StringRef(tmp, 1),
+    diagnose(IsFlag ? TokStart : tmp,
+             diag::lex_invalid_digit_in_fp_exponent, StringRef(tmp, 1),
              false);
     return expected_digit();
   }
@@ -1107,9 +1100,10 @@ void Lexer::lexHexNumber() {
 ///   floating_literal ::= [0-9][0-9_]*[eE][+-]?[0-9][0-9_]*
 ///   floating_literal ::= 0x[0-9A-Fa-f][0-9A-Fa-f_]*
 ///                          (\.[0-9A-Fa-f][0-9A-Fa-f_]*)?[pP][+-]?[0-9][0-9_]*
-void Lexer::lexNumber() {
-  const char *TokStart = CurPtr-1;
-  assert((isDigit(*TokStart) || *TokStart == '.') && "Unexpected start");
+void Lexer::lexNumber(const char *&CurPtr, const char *BufferEnd) {
+  const char *TokStart = this->CurPtr-1, *RealTokStart = CurPtr-1;
+  assert((isDigit(*RealTokStart) || *RealTokStart == '.') && "Unexpected start");
+  bool IsFlag = CurPtr != this->CurPtr;
 
   auto expected_digit = [&]() {
     while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
@@ -1117,15 +1111,15 @@ void Lexer::lexNumber() {
   };
 
   auto expected_int_digit = [&](const char *loc, ExpectedDigitKind kind) {
-    diagnose(loc, diag::lex_invalid_digit_in_int_literal, StringRef(loc, 1),
-             (unsigned)kind);
+    diagnose(IsFlag ? TokStart : loc, diag::lex_invalid_digit_in_int_literal,
+             StringRef(loc, 1), (unsigned)kind);
     return expected_digit();
   };
 
-  if (*TokStart == '0' && *CurPtr == 'x')
-    return lexHexNumber();
+  if (*RealTokStart == '0' && *CurPtr == 'x')
+    return lexHexNumber(CurPtr, BufferEnd);
   
-  if (*TokStart == '0' && *CurPtr == 'o') {
+  if (*RealTokStart == '0' && *CurPtr == 'o') {
     // 0o[0-7][0-7_]*
     ++CurPtr;
     if (*CurPtr < '0' || *CurPtr > '7')
@@ -1141,7 +1135,7 @@ void Lexer::lexNumber() {
     return formToken(tok::integer_literal, TokStart);
   }
   
-  if (*TokStart == '0' && *CurPtr == 'b') {
+  if (*RealTokStart && *CurPtr == 'b') {
     // 0b[01][01_]*
     ++CurPtr;
     if (*CurPtr != '0' && *CurPtr != '1')
@@ -2505,7 +2499,7 @@ void Lexer::lexImpl() {
 
   case '0': case '1': case '2': case '3': case '4':
   case '5': case '6': case '7': case '8': case '9':
-    return lexNumber();
+    return lexNumber(CurPtr, BufferEnd);
 
   case '"':
   case '\'':

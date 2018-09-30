@@ -529,8 +529,9 @@ private:
   void lexIdentifier();
   void lexDollarIdent();
   void lexOperatorIdentifier();
-  void lexHexNumber();
-  void lexNumber();
+  void lexNumber(const char *&CurPtr, const char *BufferEnd);
+  void lexHexNumber(const char *&CurPtr, const char *BufferEnd);
+  bool adjustKindForCompilationFlag(StringRef Identifier, tok &Kind);
   void lexTrivia(syntax::Trivia &T, bool IsForTrailingTrivia);
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
