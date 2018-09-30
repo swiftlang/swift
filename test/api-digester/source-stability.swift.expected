@@ -1,10 +1,19 @@
 
 /* Generic Signature Changes */
+Constructor BinaryFloatingPoint.init(_:) has generic signature change from <Self, Source where Self : BinaryFloatingPoint, Source : BinaryInteger> to <Self, Source where Self : BinaryFloatingPoint, Source : BinaryInteger, Self.RawSignificand : FixedWidthInteger>
+Constructor BinaryFloatingPoint.init(exactly:) has generic signature change from <Self, Source where Self : BinaryFloatingPoint, Source : BinaryInteger> to <Self, Source where Self : BinaryFloatingPoint, Source : BinaryInteger, Self.RawSignificand : FixedWidthInteger>
+Constructor Double.init(_:) has generic signature change from to <Source where Source : BinaryInteger>
+Constructor Float.init(_:) has generic signature change from to <Source where Source : BinaryInteger>
+Constructor Float80.init(_:) has generic signature change from to <Source where Source : BinaryInteger>
 Func Substring.replaceSubrange(_:with:) has generic signature change from <C where C : Collection, C.Element == Character> to <C where C : Collection, C.Element == Substring.Iterator.Element>
 Protocol BinaryInteger has generic signature change from <Self : CustomStringConvertible, Self : Hashable, Self : Numeric, Self : Strideable, Self.Magnitude : BinaryInteger, Self.Magnitude == Self.Magnitude.Magnitude, Self.Words : Sequence, Self.Words.Element == UInt> to <Self : CustomStringConvertible, Self : Hashable, Self : Numeric, Self : Strideable, Self.Magnitude : BinaryInteger, Self.Magnitude == Self.Magnitude.Magnitude, Self.Words : RandomAccessCollection, Self.Words.Element == UInt, Self.Words.Index == Int>
 /* RawRepresentable Changes */
 
 /* Removed Decls */
+Constructor Double.init(exactly:) has been removed
+Constructor Float.init(exactly:) has been removed
+Constructor Float80.init(exactly:) has been removed
+Constructor FloatingPoint.init(_:) has been removed
 Constructor Int.init(truncatingBitPattern:) has been removed
 Constructor Int16.init(truncatingBitPattern:) has been removed
 Constructor Int32.init(truncatingBitPattern:) has been removed
@@ -77,6 +86,9 @@ Func Dictionary.filter(_:obsoletedInSwift4:) has been renamed to Func Dictionary
 Func Set.filter(_:obsoletedInSwift4:) has been renamed to Func Set.filter(_:)
 
 /* Type Changes */
+Constructor Double.init(_:) has parameter 0 type change from UInt8 to Source
+Constructor Float.init(_:) has parameter 0 type change from UInt8 to Source
+Constructor Float80.init(_:) has parameter 0 type change from UInt8 to Source
 Constructor Mirror.init(_:children:displayStyle:ancestorRepresentation:) has parameter 1 type change from DictionaryLiteral<String, Any> to KeyValuePairs<String, Any>
 Constructor String.init(_:) has return type change from String? to String
 Func Dictionary.filter(_:obsoletedInSwift4:) has return type change from [Dictionary<Key, Value>.Element] to [Dictionary<Key, Value>.Key : Dictionary<Key, Value>.Value]
