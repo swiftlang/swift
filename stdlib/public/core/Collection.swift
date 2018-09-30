@@ -1335,6 +1335,45 @@ extension Collection {
     return Array(result)
   }
 
+  /// Traverses through a tree of composite objects and map it using provided
+  /// map function.
+  ///
+  /// Suppose you have the following data structure:
+  ///
+  ///     struct SimpleTreeNode {
+  ///         var name: String
+  ///         var children: [SimpleTreeNode]
+  ///     }
+  ///
+  /// You may want to get all the names in a provided "tree" of SimpleTreeNode
+  ///
+  ///     simpleTree.recursiveMap({ $0.name }, { $0.children })
+  ///
+  /// If you have a root object, you can call this function using this syntax
+  ///
+  ///     [rootObject].recursiveMap({ $0.name }, { $0.children })
+  ///
+  /// This traverses through the tree, getting children from the `{ $0.children }`
+  /// function, and mapping each recursive child to its name `{ $0.name }`
+  ///
+  /// - Parameters:
+  ///   - mapper: The function that maps a child into the final wanted value
+  ///   - childrenGetter: The function that gets the children from an element of the
+  ///     array the method is called on
+  /// - Returns: An array with the values mapped from the recursive children of
+  ///   the elements in the calling array
+  public func recursiveMap<T, U: Collection>
+      (_ mapper: (Element) throws -> (T),
+       _ childrenGetter: (Element) throws -> (U)) rethrows -> [T]
+      where U.Element == Element
+  {
+      let topLevelMapped = try map(mapper)
+      return try self.map {
+          try childrenGetter($0).recursiveMap({ try mapper($0) }) { try childrenGetter($0) }
+      }.reduce(topLevelMapped, { $0 + $1 })
+  }
+
+
   /// Returns a subsequence containing all but the given number of initial
   /// elements.
   ///
