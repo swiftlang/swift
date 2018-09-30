@@ -1591,6 +1591,23 @@ extension ${Self} {
     _value = Builtin.sitofp_Int${word_bits}_FPIEEE${bits}(v._value)
   }
 
+  // Fast-path for conversion when the source is representable as a 64-bit int,
+  // falling back on the generic _convert operation otherwise.
+  @_transparent
+  public init<Source : BinaryInteger>(_ value: Source) {
+    if value.bitWidth <= 64 {
+      if Source.isSigned {
+        let asI64 = Int64(truncatingIfNeeded: value)
+        _value = Builtin.sitofp_Int64_FPIEEE${bits}(asI64._value)
+      } else {
+        let asU64 = Int64(truncatingIfNeeded: value)
+        _value = Builtin.uitofp_Int64_FPIEEE${bits}(asU64._value)
+      }
+    } else {
+      self = ${Self}._convert(from: value).value
+    }
+  }
+
 % for src_type in all_floating_point_types():
 %   srcBits = src_type.bits
 %   That = src_type.stdlib_name
