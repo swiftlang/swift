@@ -958,10 +958,26 @@ private:
              cast<ValueDecl>(D)->isInstanceMember()))
           continue;
         
-        if (isa<FuncDecl>(candidate) &&
-            (cast<FuncDecl>(candidate)->getParameters()->size() !=
-             cast<FuncDecl>(D)->getParameters()->size()))
-          continue;
+        if (isa<FuncDecl>(candidate)) {
+          auto cParams = cast<FuncDecl>(candidate)->getParameters();
+          auto dParams = cast<FuncDecl>(D)->getParameters();
+          
+          if (cParams->size() != dParams->size())
+            continue;
+          
+          bool hasSameParameterTypes = true;
+          for (auto index : indices(*cParams)) {
+            if (cParams->get(index)->getType()->getCanonicalType() !=
+                dParams->get(index)->getType()->getCanonicalType()) {
+              hasSameParameterTypes = false;
+              break;
+            }
+          }
+
+          if (!hasSameParameterTypes) {
+            continue;
+          }
+        }
         
         if (renamedDecl) {
           // If we found a duplicated candidate then we would silently fail.

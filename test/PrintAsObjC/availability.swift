@@ -46,22 +46,22 @@
 // CHECK-DAG: SWIFT_AVAILABILITY(tvos_app_extension,unavailable)
 // CHECK-DAG: SWIFT_AVAILABILITY(watchos_app_extension,unavailable)
 // CHECK-SAME: ;
-// CHECK-NEXT: - (void)overloadingMethodWithFirst:(NSInteger)first second:(NSInteger)second;
-// CHECK-NEXT: - (void)deprecatedMethodRenamedToOverloadMethodWithFirst:(NSInteger)first second:(NSInteger)second SWIFT_DEPRECATED_MSG("", "overloadingMethodWithFirst:second:");
-// CHECK-NEXT: - (void)deprecatedOnMacOSMethodRenamedToOverloadMethodWithFirst:(NSInteger)first second:(NSInteger)second SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'deprecatedOnMacOSMethodRenamedToOverloadMethod' has been renamed to 'overloadingMethodWithFirst:second:'");
-// CHECK-NEXT: - (void)unavailableMethodRenamedToOverloadMethodWithFirst:(NSInteger)first second:(NSInteger)second SWIFT_UNAVAILABLE_MSG("'unavailableMethodRenamedToOverloadMethod' has been renamed to 'overloadingMethodWithFirst:second:'");
-// CHECK-NEXT: - (void)unavailableOnMacOSMethodRenamedToOverloadMethodWithFirst:(NSInteger)first second:(NSInteger)second SWIFT_AVAILABILITY(macos,unavailable,message="'unavailableOnMacOSMethodRenamedToOverloadMethod' has been renamed to 'overloadingMethodWithFirst:second:'");
+// CHECK-NEXT: - (void)overloadMethodWithFirst:(NSInteger)first second:(NSInteger)second;
+// CHECK-NEXT: - (void)deprecatedMethodRenamedToOverloadMethodWithFirst:(NSInteger)first second:(NSInteger)second SWIFT_DEPRECATED_MSG("", "overloadMethodWithFirst:second:");
+// CHECK-NEXT: - (void)deprecatedOnMacOSMethodRenamedToOverloadMethodWithFirst:(NSInteger)first second:(NSInteger)second SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'deprecatedOnMacOSMethodRenamedToOverloadMethod' has been renamed to 'overloadMethodWithFirst:second:'");
+// CHECK-NEXT: - (void)unavailableMethodRenamedToOverloadMethodWithFirst:(NSInteger)first second:(NSInteger)second SWIFT_UNAVAILABLE_MSG("'unavailableMethodRenamedToOverloadMethod' has been renamed to 'overloadMethodWithFirst:second:'");
+// CHECK-NEXT: - (void)unavailableOnMacOSMethodRenamedToOverloadMethodWithFirst:(NSInteger)first second:(NSInteger)second SWIFT_AVAILABILITY(macos,unavailable,message="'unavailableOnMacOSMethodRenamedToOverloadMethod' has been renamed to 'overloadMethodWithFirst:second:'");
 
 // CHECK-NEXT: - (void)firstOverloadingMethodWithDiffernceNameWithFirst:(NSInteger)first second:(NSInteger)second;
 // CHECK-NEXT: - (void)secondOverloadingMethodWithDiffernceNameWithFirst:(double)first second:(double)second;
 // CHECK-NEXT: - (void)deprecatedMethodRenamedToOverloadMethodWithDifferenceNameWithFirst:(NSInteger)first second:(NSInteger)second
-// CHECK-SAME: SWIFT_DEPRECATED_MSG("", "overloadMethodWithDifferenceObjCName(first:second:)");
+// CHECK-SAME: SWIFT_DEPRECATED_MSG("", "firstOverloadingMethodWithDiffernceNameWithFirst:second:");
 // CHECK-NEXT: - (void)deprecatedOnMacOSMethodRenamedToOverloadMethodWithDifferenceNameWithFirst:(NSInteger)first second:(NSInteger)second
-// CHECK-SAME: SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'deprecatedOnMacOSMethodRenamedToOverloadMethodWithDifferenceName' has been renamed to 'overloadMethodWithDifferenceObjCName(first:second:)'");
+// CHECK-SAME: SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'deprecatedOnMacOSMethodRenamedToOverloadMethodWithDifferenceName' has been renamed to 'firstOverloadingMethodWithDiffernceNameWithFirst:second:'");
 // CHECK-NEXT: - (void)unavailableMethodRenamedToOverloadMethodWithDifferenceNameWithFirst:(NSInteger)first second:(NSInteger)second
-// CHECK-SAME: SWIFT_UNAVAILABLE_MSG("'unavailableMethodRenamedToOverloadMethodWithDifferenceName' has been renamed to 'overloadMethodWithDifferenceObjCName(first:second:)'");
+// CHECK-SAME: SWIFT_UNAVAILABLE_MSG("'unavailableMethodRenamedToOverloadMethodWithDifferenceName' has been renamed to 'firstOverloadingMethodWithDiffernceNameWithFirst:second:'");
 // CHECK-NEXT: - (void)unavailableOnMacOSMethodRenamedToOverloadMethodWithDifferenceNameWithFirst:(NSInteger)first second:(NSInteger)second
-// CHECK-SAME: SWIFT_AVAILABILITY(macos,unavailable,message="'unavailableOnMacOSMethodRenamedToOverloadMethodWithDifferenceName' has been renamed to 'overloadMethodWithDifferenceObjCName(first:second:)'");
+// CHECK-SAME: SWIFT_AVAILABILITY(macos,unavailable,message="'unavailableOnMacOSMethodRenamedToOverloadMethodWithDifferenceName' has been renamed to 'firstOverloadingMethodWithDiffernceNameWithFirst:second:'");
 
 // CHECK-NEXT: + (void)deprecatedAvailabilityWithValue:(NSInteger)value;
 // CHECK-NEXT: - (void)deprecatedInstanceMethodRenamedToClassMethodWithValue:(NSInteger)value
@@ -293,7 +293,7 @@
     @available(watchOSApplicationExtension, unavailable)
     @objc func extensionUnavailable() {}
   
-    @objc(overloadingMethodWithFirst:second:) func overloadMethod(first: Int, second: Int) {}
+    @objc func overloadMethod(first: Int, second: Int) {}
     func overloadMethod(first: Double, second: Double) {}
 
     @available(*, deprecated, renamed: "overloadMethod(first:second:)")
