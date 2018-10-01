@@ -39,17 +39,17 @@ static bool requiresHeapHeader(LayoutKind kind) {
 }
 
 /// Perform structure layout on the given types.
-StructLayout::StructLayout(IRGenModule &IGM, CanType astTy,
+StructLayout::StructLayout(IRGenModule &IGM,
+                           NominalTypeDecl *decl,
                            LayoutKind layoutKind,
                            LayoutStrategy strategy,
                            ArrayRef<const TypeInfo *> types,
                            llvm::StructType *typeToFill) {
-  ASTTy = astTy;
   Elements.reserve(types.size());
 
   // Fill in the Elements array.
   for (auto type : types)
-    Elements.push_back(ElementLayout::getIncomplete(*type, *type));
+    Elements.push_back(ElementLayout::getIncomplete(*type));
 
   assert(typeToFill == nullptr || typeToFill->isOpaque());
 
@@ -91,28 +91,24 @@ StructLayout::StructLayout(IRGenModule &IGM, CanType astTy,
     }
   }
 
+  assert(typeToFill == nullptr || Ty == typeToFill);
+
   // If the struct is not @_fixed_layout, it will have a dynamic
   // layout outside of its resilience domain.
-  if (astTy && astTy->getAnyNominal())
-    if (IGM.isResilient(astTy->getAnyNominal(), ResilienceExpansion::Minimal))
+  if (decl) {
+    if (IGM.isResilient(decl, ResilienceExpansion::Minimal))
       IsKnownAlwaysFixedSize = IsNotFixedSize;
 
-  assert(typeToFill == nullptr || Ty == typeToFill);
-  if (ASTTy)
-    applyLayoutAttributes(IGM, ASTTy, IsFixedLayout, MinimumAlign);
+    applyLayoutAttributes(IGM, decl, IsFixedLayout, MinimumAlign);
+  }
 }
 
 void irgen::applyLayoutAttributes(IRGenModule &IGM,
-                                  CanType ASTTy,
+                                  NominalTypeDecl *decl,
                                   bool IsFixedLayout,
                                   Alignment &MinimumAlign) {
-  assert(ASTTy && "shouldn't call applyLayoutAttributes without a type");
-  
   auto &Diags = IGM.Context.Diags;
-  auto decl = ASTTy->getAnyNominal();
-  if (!decl)
-    return;
-  
+
   if (auto alignment = decl->getAttrs().getAttribute<AlignmentAttr>()) {
     auto value = alignment->getValue();
     assert(value != 0 && ((value - 1) & value) == 0
@@ -153,7 +149,7 @@ Address ElementLayout::project(IRGenFunction &IGF, Address baseAddr,
                                const llvm::Twine &suffix) const {
   switch (getKind()) {
   case Kind::Empty:
-    return getTypeForAccess().getUndefAddress();
+    return getType().getUndefAddress();
 
   case Kind::Fixed:
     return IGF.Builder.CreateStructGEP(baseAddr,
@@ -165,13 +161,13 @@ Address ElementLayout::project(IRGenFunction &IGF, Address baseAddr,
     assert(offsets.hasValue());
     llvm::Value *offset =
       offsets.getValue()->getOffsetForIndex(IGF, getNonFixedElementIndex());
-    return IGF.emitByteOffsetGEP(baseAddr.getAddress(), offset, getTypeForAccess(),
+    return IGF.emitByteOffsetGEP(baseAddr.getAddress(), offset, getType(),
                                  baseAddr.getAddress()->getName() + suffix);
   }
 
   case Kind::InitialNonFixedSize:
     return IGF.Builder.CreateBitCast(baseAddr,
-                                 getTypeForAccess().getStorageType()->getPointerTo(),
+                                 getType().getStorageType()->getPointerTo(),
                                  baseAddr.getAddress()->getName() + suffix);
   }
   llvm_unreachable("bad element layout kind");
@@ -207,7 +203,7 @@ bool StructLayoutBuilder::addFields(llvm::MutableArrayRef<ElementLayout> elts,
 
 bool StructLayoutBuilder::addField(ElementLayout &elt,
                                   LayoutStrategy strategy) {
-  auto &eltTI = elt.getTypeForLayout();
+  auto &eltTI = elt.getType();
   IsKnownPOD &= eltTI.isPOD(ResilienceExpansion::Maximal);
   IsKnownBitwiseTakable &= eltTI.isBitwiseTakable(ResilienceExpansion::Maximal);
   IsKnownAlwaysFixedSize &= eltTI.isFixedSize(ResilienceExpansion::Minimal);
@@ -235,7 +231,7 @@ bool StructLayoutBuilder::addField(ElementLayout &elt,
 }
 
 void StructLayoutBuilder::addFixedSizeElement(ElementLayout &elt) {
-  auto &eltTI = cast<FixedTypeInfo>(elt.getTypeForLayout());
+  auto &eltTI = cast<FixedTypeInfo>(elt.getType());
 
   // Note that, even in the presence of elements with non-fixed
   // size, we continue to compute the minimum size and alignment
@@ -302,7 +298,7 @@ void StructLayoutBuilder::addNonFixedSizeElement(ElementLayout &elt) {
 
 /// Add an empty element to the aggregate.
 void StructLayoutBuilder::addEmptyElement(ElementLayout &elt) {
-  elt.completeEmpty(elt.getTypeForLayout().isPOD(ResilienceExpansion::Maximal),
+  elt.completeEmpty(elt.getType().isPOD(ResilienceExpansion::Maximal),
                     CurSize);
 }
 
@@ -310,11 +306,11 @@ void StructLayoutBuilder::addEmptyElement(ElementLayout &elt) {
 /// aggregate.
 void StructLayoutBuilder::addElementAtFixedOffset(ElementLayout &elt) {
   assert(isFixedLayout());
-  auto &eltTI = cast<FixedTypeInfo>(elt.getTypeForLayout());
+  auto &eltTI = cast<FixedTypeInfo>(elt.getType());
 
-  elt.completeFixed(elt.getTypeForLayout().isPOD(ResilienceExpansion::Maximal),
+  elt.completeFixed(elt.getType().isPOD(ResilienceExpansion::Maximal),
                     CurSize, StructFields.size());
-  StructFields.push_back(elt.getTypeForLayout().getStorageType());
+  StructFields.push_back(elt.getType().getStorageType());
   
   // Carry over the spare bits from the element.
   CurSpareBits.append(eltTI.getSpareBits());
@@ -323,7 +319,7 @@ void StructLayoutBuilder::addElementAtFixedOffset(ElementLayout &elt) {
 /// Add an element at a non-fixed offset to the aggregate.
 void StructLayoutBuilder::addElementAtNonFixedOffset(ElementLayout &elt) {
   assert(!isFixedLayout());
-  elt.completeNonFixed(elt.getTypeForLayout().isPOD(ResilienceExpansion::Maximal),
+  elt.completeNonFixed(elt.getType().isPOD(ResilienceExpansion::Maximal),
                        NextNonFixedOffsetIndex);
   CurSpareBits.clear();
 }
@@ -331,9 +327,9 @@ void StructLayoutBuilder::addElementAtNonFixedOffset(ElementLayout &elt) {
 /// Add a non-fixed-size element to the aggregate at offset zero.
 void StructLayoutBuilder::addNonFixedSizeElementAtOffsetZero(ElementLayout &elt) {
   assert(isFixedLayout());
-  assert(!isa<FixedTypeInfo>(elt.getTypeForLayout()));
+  assert(!isa<FixedTypeInfo>(elt.getType()));
   assert(CurSize.isZero());
-  elt.completeInitialNonFixedSize(elt.getTypeForLayout().isPOD(ResilienceExpansion::Maximal));
+  elt.completeInitialNonFixedSize(elt.getType().isPOD(ResilienceExpansion::Maximal));
   CurSpareBits.clear();
 }
 

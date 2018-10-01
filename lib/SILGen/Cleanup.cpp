@@ -138,11 +138,12 @@ void CleanupManager::emitBranchAndCleanups(JumpDest dest, SILLocation branchLoc,
   builder.createBranch(branchLoc, dest.getBlock(), args);
 }
 
-void CleanupManager::emitCleanupsForReturn(CleanupLocation loc) {
+void CleanupManager::emitCleanupsForReturn(CleanupLocation loc,
+                                           ForUnwind_t forUnwind) {
   SILGenBuilder &builder = SGF.getBuilder();
   assert(builder.hasValidInsertionPoint() && "Emitting return in invalid spot");
   (void)builder;
-  emitCleanups(stack.stable_end(), loc, NotForUnwind, /*popCleanups=*/false);
+  emitCleanups(stack.stable_end(), loc, forUnwind, /*popCleanups=*/false);
 }
 
 /// Emit a new block that jumps to the specified location and runs necessary

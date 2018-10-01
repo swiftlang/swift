@@ -13,6 +13,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 
 using namespace swift;
@@ -36,7 +37,10 @@ void swift::simple_display(
 
   auto ext = value.get<ExtensionDecl *>();
   out << "extension of ";
-  ext->getAsNominalTypeOrNominalTypeExtensionContext()->dumpRef(out);
+  if (auto typeRepr = ext->getExtendedTypeLoc().getTypeRepr())
+    typeRepr->print(out);
+  else
+    ext->getSelfNominalTypeDecl()->dumpRef(out);
 }
 
 //----------------------------------------------------------------------------//
@@ -164,11 +168,6 @@ void OverriddenDeclsRequest::noteCycleStep(DiagnosticEngine &diags) const {
 // isObjC computation.
 //----------------------------------------------------------------------------//
 
-bool IsObjCRequest::breakCycle() const {
-  auto decl = std::get<0>(getStorage());
-  return decl->getAttrs().hasAttribute<ObjCAttr>();
-}
-
 void IsObjCRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   // FIXME: Improve this diagnostic.
   auto decl = std::get<0>(getStorage());
@@ -197,11 +196,6 @@ void IsObjCRequest::cacheResult(bool value) const {
 //----------------------------------------------------------------------------//
 // isDynamic computation.
 //----------------------------------------------------------------------------//
-
-bool IsDynamicRequest::breakCycle() const {
-  auto decl = std::get<0>(getStorage());
-  return decl->getAttrs().hasAttribute<DynamicAttr>();
-}
 
 void IsDynamicRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   // FIXME: Improve this diagnostic.

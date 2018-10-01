@@ -59,17 +59,23 @@ static const __swift_uint32_t _SwiftKeyPathComponentHeader_ExternalTag
 static const __swift_uint32_t
 _SwiftKeyPathComponentHeader_TrivialPropertyDescriptorMarker = 0U;
 
+static const __swift_uint32_t _SwiftKeyPathComponentHeader_StoredOffsetPayloadMask
+  = 0x007FFFFFU;
+
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_MaximumOffsetPayload
-  = 0x00FFFFFCU;
+  = 0x007FFFFCU;
   
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_UnresolvedIndirectOffsetPayload
-  = 0x00FFFFFDU;
+  = 0x007FFFFDU;
   
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_UnresolvedFieldOffsetPayload
-  = 0x00FFFFFEU;
+  = 0x007FFFFEU;
 
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_OutOfLineOffsetPayload
-  = 0x00FFFFFFU;
+  = 0x007FFFFFU;
+  
+static const __swift_uint32_t _SwiftKeyPathComponentHeader_StoredMutableFlag
+  = 0x00800000U;
 
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_OptionalChainPayload
   = 0;

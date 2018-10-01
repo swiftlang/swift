@@ -22,6 +22,7 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Types.h"
@@ -45,7 +46,6 @@ namespace swift {
 class DeclContext;
 class DependentMemberType;
 class GenericParamList;
-class GenericSignature;
 class GenericSignatureBuilder;
 class GenericTypeParamType;
 class LazyResolver;
@@ -278,6 +278,10 @@ public:
     /// Cached nested-type information, which contains the best declaration
     /// for a given name.
     llvm::SmallDenseMap<Identifier, CachedNestedType> nestedTypeNameCache;
+
+    /// Cached access paths.
+    llvm::SmallDenseMap<const ProtocolDecl *, ConformanceAccessPath, 8>
+        conformanceAccessPathCache;
   };
 
   friend class RequirementSource;

@@ -319,7 +319,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
   StringRef Platform = Tok.getText();
 
   StringRef Message, Renamed;
-  clang::VersionTuple Introduced, Deprecated, Obsoleted;
+  llvm::VersionTuple Introduced, Deprecated, Obsoleted;
   SourceRange IntroducedRange, DeprecatedRange, ObsoletedRange;
   auto PlatformAgnostic = PlatformAgnosticAvailabilityKind::None;
 
@@ -1508,7 +1508,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
       for (auto *Spec : Specs) {
         PlatformKind Platform;
-        clang::VersionTuple Version;
+        llvm::VersionTuple Version;
         SourceRange VersionRange;
         PlatformAgnosticAvailabilityKind PlatformAgnostic;
 
@@ -1538,9 +1538,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                      /*Rename=*/StringRef(),
                                      /*Introduced=*/Version,
                                      /*IntroducedRange=*/VersionRange,
-                                     /*Deprecated=*/clang::VersionTuple(),
+                                     /*Deprecated=*/llvm::VersionTuple(),
                                      /*DeprecatedRange=*/SourceRange(),
-                                     /*Obsoleted=*/clang::VersionTuple(),
+                                     /*Obsoleted=*/llvm::VersionTuple(),
                                      /*ObsoletedRange=*/SourceRange(),
                                      PlatformAgnostic,
                                      /*Implicit=*/false));
@@ -1669,7 +1669,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   return false;
 }
 
-bool Parser::parseVersionTuple(clang::VersionTuple &Version,
+bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
                                SourceRange &Range,
                                const Diagnostic &D) {
   SyntaxParsingContext VersionContext(SyntaxContext, SyntaxKind::VersionTuple);
@@ -1690,7 +1690,7 @@ bool Parser::parseVersionTuple(clang::VersionTuple &Version,
       consumeToken();
       return true;
     }
-    Version = clang::VersionTuple(major);
+    Version = llvm::VersionTuple(major);
     Range = SourceRange(StartLoc, Tok.getLoc());
     consumeToken();
     return false;
@@ -1724,9 +1724,9 @@ bool Parser::parseVersionTuple(clang::VersionTuple &Version,
     Range = SourceRange(StartLoc, Tok.getLoc());
     consumeToken();
     
-    Version = clang::VersionTuple(major, minor, micro);
+    Version = llvm::VersionTuple(major, minor, micro);
   } else {
-    Version = clang::VersionTuple(major, minor);
+    Version = llvm::VersionTuple(major, minor);
   }
 
   return false;
@@ -3512,9 +3512,7 @@ ParserResult<PoundDiagnosticDecl> Parser::parseDeclPoundDiagnostic() {
     // Catch #warning(oops, forgot the quotes)
     SourceLoc wordsStartLoc = Tok.getLoc();
 
-    while (!Tok.isAtStartOfLine() && !Tok.isAny(tok::r_paren, tok::eof)) {
-      skipSingle();
-    }
+    skipUntilTokenOrEndOfLine(tok::r_paren);
 
     SourceLoc wordsEndLoc = getEndOfPreviousLoc();
 
@@ -3973,7 +3971,6 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                      storageParam->getArgumentName(),
                                      storageParam->getNameLoc(),
                                      storageParam->getName(),
-                                     Type(),
                                      P->CurDeclContext);
         accessorParam->setVariadic(storageParam->isVariadic());
 
@@ -4058,7 +4055,7 @@ static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
 
   auto result = new (P.Context)
       ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                Identifier(), nameLoc, name, Type(), P.CurDeclContext);
+                Identifier(), nameLoc, name, P.CurDeclContext);
   if (isNameImplicit)
     result->setImplicit();
 
@@ -4320,11 +4317,23 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
                              SourceLoc &LastValidLoc, SourceLoc StaticLoc,
                              SourceLoc VarLBLoc) {
   // Properties in protocols use a very limited syntax.
-  // SIL mode uses the same syntax.
+  // SIL mode and textual interfaces use the same syntax.
   // Otherwise, we have a normal var or subscript declaration and we need
   // parse the full complement of specifiers, along with their bodies.
-  bool parsingLimitedSyntax =
-    Flags.contains(PD_InProtocol) || isInSILMode();
+  bool parsingLimitedSyntax = Flags.contains(PD_InProtocol);
+  if (!parsingLimitedSyntax) {
+    switch (SF.Kind) {
+    case SourceFileKind::Interface:
+      // FIXME: Textual interfaces /can/ have inlinable code but don't have to.
+    case SourceFileKind::SIL:
+      parsingLimitedSyntax = true;
+      break;
+    case SourceFileKind::Library:
+    case SourceFileKind::Main:
+    case SourceFileKind::REPL:
+      break;
+    }
+  }
 
   // If the body is completely empty, preserve it.  This is at best a getter with
   // an implicit fallthrough off the end.
@@ -4690,7 +4699,7 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
     storage = new (Context) VarDecl(StaticLoc.isValid(),
                                     VarDecl::Specifier::Var,
                                     /*is capture list*/ false,
-                                    VarLoc, Identifier(), Type(),
+                                    VarLoc, Identifier(),
                                     CurDeclContext);
     storage->setImplicit(true);
     storage->setInvalid(true);
@@ -5002,7 +5011,7 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
   // Allow the sil_stored attribute to override all the accessors we parsed
   // when making the final classification.
   if (attrs.hasAttribute<SILStoredAttr>()) {
-    return StorageImplInfo::getSimpleStored(Set != nullptr);
+    return StorageImplInfo::getSimpleStored(StorageIsMutable_t(Set != nullptr));
   }
 
   return StorageImplInfo(readImpl, writeImpl, readWriteImpl);
@@ -5703,6 +5712,8 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
                                         { }, nullptr, CurDeclContext);
   setLocalDiscriminator(ED);
   ED->getAttrs() = Attributes;
+  if (SF.Kind == SourceFileKind::Interface)
+    ED->setAddedImplicitInitializers();
 
   ContextChange CC(*this, ED);
 
@@ -5975,6 +5986,8 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
                                             CurDeclContext);
   setLocalDiscriminator(SD);
   SD->getAttrs() = Attributes;
+  if (SF.Kind == SourceFileKind::Interface)
+    SD->setAddedImplicitInitializers();
 
   ContextChange CC(*this, SD);
 
@@ -6062,9 +6075,9 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
   ClassDecl *CD = new (Context) ClassDecl(ClassLoc, ClassName, ClassNameLoc,
                                           { }, nullptr, CurDeclContext);
   setLocalDiscriminator(CD);
-
-  // Attach attributes.
   CD->getAttrs() = Attributes;
+  if (SF.Kind == SourceFileKind::Interface)
+    CD->setAddedImplicitInitializers();
 
   ContextChange CC(*this, CD);
 
@@ -6539,34 +6552,42 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc DestructorLoc = consumeToken(tok::kw_deinit);
 
   // Parse extraneous parentheses and remove them with a fixit.
-  if (Tok.is(tok::l_paren)) {
-    SourceRange ParenRange;
-    SourceLoc LParenLoc = consumeToken();
+  auto skipParameterListIfPresent = [this] {
+    SourceLoc LParenLoc;
+    if (!consumeIf(tok::l_paren, LParenLoc))
+      return;
     SourceLoc RParenLoc;
     skipUntil(tok::r_paren);
 
     if (Tok.is(tok::r_paren)) {
       SourceLoc RParenLoc = consumeToken();
-      ParenRange = SourceRange(LParenLoc, RParenLoc);
-      
-      diagnose(ParenRange.Start, diag::destructor_params)
-      .fixItRemoveChars(Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                                   DestructorLoc),
-                        Lexer::getLocForEndOfToken(Context.SourceMgr,
-                                                   ParenRange.End));
+      diagnose(LParenLoc, diag::destructor_params)
+        .fixItRemove(SourceRange(LParenLoc, RParenLoc));
     } else {
       diagnose(Tok, diag::opened_destructor_expected_rparen);
       diagnose(LParenLoc, diag::opening_paren);
     }
-  }
+  };
 
   // '{'
   if (!Tok.is(tok::l_brace)) {
-    if (!Tok.is(tok::l_brace) && !isInSILMode()) {
+    switch (SF.Kind) {
+    case SourceFileKind::Interface:
+    case SourceFileKind::SIL:
+      // It's okay to have no body for SIL code or textual interfaces.
+      break;
+    case SourceFileKind::Library:
+    case SourceFileKind::Main:
+    case SourceFileKind::REPL:
       if (Tok.is(tok::identifier)) {
         diagnose(Tok, diag::destructor_has_name).fixItRemove(Tok.getLoc());
-      } else
-        diagnose(Tok, diag::expected_lbrace_destructor);
+        consumeToken();
+      }
+      skipParameterListIfPresent();
+      if (Tok.is(tok::l_brace))
+        break;
+
+      diagnose(Tok, diag::expected_lbrace_destructor);
       return nullptr;
     }
   }

@@ -97,7 +97,7 @@ func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}
 f8(3, f4) // expected-error {{argument type 'Int' does not conform to expected type 'P2'}}
 typealias Tup = (Int, Double)
 func f9(_ x: Tup) -> Tup { return x }
-f8((1,2.0), f9) // expected-error {{'(Tup, @escaping (Tup) -> Tup) -> ()' (aka '((Int, Double), @escaping ((Int, Double)) -> (Int, Double)) -> ()') requires that '(_, _)' conform to 'P2'}}
+f8((1,2.0), f9) // expected-error {{argument type 'Tup' (aka '(Int, Double)') does not conform to expected type 'P2'}}
 
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals
 1.doesntExist(0)  // expected-error {{value of type 'Int' has no member 'doesntExist'}}
@@ -447,7 +447,7 @@ let _: Color = .overload(1)  // expected-error {{ambiguous reference to member '
 let _: Color = .frob(1.0, &i) // expected-error {{missing argument label 'b:' in call}}
 let _: Color = .frob(1.0, b: &i) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: Color = .frob(1, i)  // expected-error {{missing argument label 'b:' in call}}
-let _: Color = .frob(1, b: i)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
+let _: Color = .frob(1, b: i)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{28-28=&}}
 let _: Color = .frob(1, &d) // expected-error {{missing argument label 'b:' in call}}
 let _: Color = .frob(1, b: &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 var someColor : Color = .red // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
@@ -657,7 +657,8 @@ example21890157.property = "confusing"  // expected-error {{value of optional ty
 
 struct UnaryOp {}
 
-_ = -UnaryOp() // expected-error {{argument type 'UnaryOp' does not conform to expected type 'SignedNumeric'}}
+_ = -UnaryOp() // expected-error {{unary operator '-' cannot be applied to an operand of type 'UnaryOp'}}
+// expected-note@-1 {{overloads for '-' exist with these partially matching parameter lists: (Float), (Double)}}
 
 
 // <rdar://problem/23433271> Swift compiler segfault in failure diagnosis
@@ -1188,10 +1189,10 @@ func rdar17170728() {
 
 // https://bugs.swift.org/browse/SR-5934 - failure to emit diagnostic for bad
 // generic constraints
-func elephant<T, U>(_: T) where T : Collection, T.Element == U, T.Element : Hashable {}
+func elephant<T, U>(_: T) where T : Collection, T.Element == U, T.Element : Hashable {} // expected-note {{where 'U' = 'T'}}
 
 func platypus<T>(a: [T]) {
-    _ = elephant(a) // expected-error {{'([T]) -> ()' requires that 'T' conform to 'Hashable'}}
+    _ = elephant(a) // expected-error {{global function 'elephant' requires that 'T' conform to 'Hashable'}}
 }
 
 // Another case of the above.

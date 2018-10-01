@@ -317,7 +317,7 @@ namespace llvm {
   
 template <>
 struct ilist_traits<::swift::SILWitnessTable> :
-public ilist_default_traits<::swift::SILWitnessTable> {
+public ilist_node_traits<::swift::SILWitnessTable> {
   using SILWitnessTable = ::swift::SILWitnessTable;
 
 public:

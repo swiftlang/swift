@@ -65,8 +65,7 @@ DebugTypeInfo DebugTypeInfo::getLocalVariable(DeclContext *DC,
                                               VarDecl *Decl, swift::Type Ty,
                                               const TypeInfo &Info) {
 
-  auto DeclType =
-      Decl->hasInterfaceType() ? Decl->getInterfaceType() : Decl->getType();
+  auto DeclType = Decl->getInterfaceType();
   auto RealType = Ty;
 
   // DynamicSelfType is also sugar as far as debug info is concerned.
@@ -101,9 +100,7 @@ DebugTypeInfo DebugTypeInfo::getGlobal(SILGlobalVariable *GV,
   if (auto *Decl = GV->getDecl()) {
     DC = Decl->getDeclContext();
     GE = DC->getGenericEnvironmentOfContext();
-    auto DeclType =
-        (Decl->hasType() ? Decl->getType()
-                         : DC->mapTypeIntoContext(Decl->getInterfaceType()));
+    auto DeclType = Decl->getType();
     if (DeclType->isEqual(LowTy))
       Type = DeclType.getPointer();
   }

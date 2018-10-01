@@ -35,6 +35,18 @@ void *AttributeBase::operator new(size_t Bytes, ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
+StringRef swift::getAccessLevelSpelling(AccessLevel value) {
+  switch (value) {
+  case AccessLevel::Private: return "private";
+  case AccessLevel::FilePrivate: return "fileprivate";
+  case AccessLevel::Internal: return "internal";
+  case AccessLevel::Public: return "public";
+  case AccessLevel::Open: return "open";
+  }
+
+  llvm_unreachable("Unhandled AccessLevel in switch.");
+}
+
 /// Given a name like "autoclosure", return the type attribute ID that
 /// corresponds to it.  This returns TAK_Count on failure.
 ///
@@ -89,7 +101,7 @@ bool DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK) 
 bool
 DeclAttributes::isUnavailableInSwiftVersion(
   const version::Version &effectiveVersion) const {
-  clang::VersionTuple vers = effectiveVersion;
+  llvm::VersionTuple vers = effectiveVersion;
   for (auto attr : *this) {
     if (auto available = dyn_cast<AvailableAttr>(attr)) {
       if (available->isInvalid())
@@ -158,11 +170,11 @@ DeclAttributes::getDeprecated(const ASTContext &ctx) const {
       if (AvAttr->isUnconditionallyDeprecated())
         return AvAttr;
 
-      Optional<clang::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
+      Optional<llvm::VersionTuple> DeprecatedVersion = AvAttr->Deprecated;
       if (!DeprecatedVersion.hasValue())
         continue;
 
-      clang::VersionTuple MinVersion =
+      llvm::VersionTuple MinVersion =
         AvAttr->isLanguageVersionSpecific() ?
         ctx.LangOpts.EffectiveLanguageVersion :
         ctx.LangOpts.getMinPlatformVersion();
@@ -651,20 +663,10 @@ StringRef DeclAttribute::getAttrName() const {
         return "effects(unspecified)";
     }
   case DAK_AccessControl:
-  case DAK_SetterAccess:
-    switch (cast<AbstractAccessControlAttr>(this)->getAccess()) {
-    case AccessLevel::Private:
-      return "private";
-    case AccessLevel::FilePrivate:
-      return "fileprivate";
-    case AccessLevel::Internal:
-      return "internal";
-    case AccessLevel::Public:
-      return "public";
-    case AccessLevel::Open:
-      return "open";
-    }
-    llvm_unreachable("bad access level");
+  case DAK_SetterAccess: {
+    AccessLevel access = cast<AbstractAccessControlAttr>(this)->getAccess();
+    return getAccessLevelSpelling(access);
+  }
 
   case DAK_ReferenceOwnership:
     return keywordOf(cast<ReferenceOwnershipAttr>(this)->get());
@@ -796,9 +798,9 @@ AvailableAttr::createPlatformAgnostic(ASTContext &C,
                                    StringRef Message,
                                    StringRef Rename,
                                    PlatformAgnosticAvailabilityKind Kind,
-                                   clang::VersionTuple Obsoleted) {
+                                   llvm::VersionTuple Obsoleted) {
   assert(Kind != PlatformAgnosticAvailabilityKind::None);
-  clang::VersionTuple NoVersion;
+  llvm::VersionTuple NoVersion;
   if (Kind == PlatformAgnosticAvailabilityKind::SwiftVersionSpecific) {
     assert(!Obsoleted.empty());
   }
@@ -864,7 +866,7 @@ AvailableVersionComparison AvailableAttr::getVersionAvailability(
   if (isUnconditionallyUnavailable())
     return AvailableVersionComparison::Unavailable;
 
-  clang::VersionTuple queryVersion =
+  llvm::VersionTuple queryVersion =
     isLanguageVersionSpecific() ?
     ctx.LangOpts.EffectiveLanguageVersion :
     ctx.LangOpts.getMinPlatformVersion();

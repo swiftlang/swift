@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -O %s -o %t/a.out
 // RUN: %target-build-swift -O %s -emit-ir | %FileCheck --check-prefix=CHECK-IR %s
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 

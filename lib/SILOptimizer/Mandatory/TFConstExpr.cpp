@@ -175,7 +175,7 @@ static void lookupOrLinkWitnessTable(ProtocolConformanceRef confRef,
     return;
 
   auto *decl =
-      conf->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+      conf->getDeclContext()->getSelfNominalTypeDecl();
   auto linkage = getSILLinkage(getDeclLinkage(decl), NotForDefinition);
   auto *newTable = module.createWitnessTableDeclaration(conf, linkage);
   newTable = module.getSILLoader()->lookupWitnessTable(newTable);

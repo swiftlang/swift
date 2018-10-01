@@ -315,7 +315,8 @@ protected:
     IsInvariant : 1
   );
 
-  UIWTDOB_BITFIELD_EMPTY(ConvertFunctionInst, ConversionInst);
+  UIWTDOB_BITFIELD(ConvertFunctionInst, ConversionInst, 1,
+                   WithoutActuallyEscaping : 1);
   // SWIFT_ENABLE_TENSORFLOW
   UIWTDOB_BITFIELD_EMPTY(GradientInst, SingleValueInstruction);
   UIWTDOB_BITFIELD_EMPTY(PointerToThinFunctionInst, ConversionInst);

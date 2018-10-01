@@ -1223,7 +1223,7 @@ void SILGenFunction::visitVarDecl(VarDecl *D) {
 SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
                                                  const VersionRange &range) {
   // Emit constants for the checked version range.
-  clang::VersionTuple Vers = range.getLowerEndpoint();
+  llvm::VersionTuple Vers = range.getLowerEndpoint();
   unsigned major = Vers.getMajor();
   unsigned minor =
       (Vers.getMinor().hasValue() ? Vers.getMinor().getValue() : 0);

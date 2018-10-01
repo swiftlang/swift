@@ -144,7 +144,7 @@ public:
     class_replaceMethod = IGM.getClassReplaceMethodFn();
     class_addProtocol = IGM.getClassAddProtocolFn();
 
-    CanType origTy = ext->getAsNominalTypeOrNominalTypeExtensionContext()
+    CanType origTy = ext->getSelfNominalTypeDecl()
         ->getDeclaredType()->getCanonicalType();
     classMetadata =
       tryEmitConstantHeapMetadataRef(IGM, origTy, /*allowUninit*/ true);
@@ -920,7 +920,8 @@ llvm::Constant *IRGenModule::getAddrOfAssociatedTypeGenericParamRef(
     
     // Find the offset of the associated type entry in witness tables of this
     // protocol.
-    auto &protoInfo = getProtocolInfo(assocType->getProtocol());
+    auto &protoInfo = getProtocolInfo(assocType->getProtocol(),
+                                      ProtocolInfoKind::RequirementSignature);
     auto index = protoInfo.getAssociatedTypeIndex(AssociatedType(assocType))
       .getValue();
     
@@ -1722,7 +1723,7 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
     if (isDefinition) {
       return std::make_tuple(llvm::GlobalValue::AvailableExternallyLinkage,
                              llvm::GlobalValue::DefaultVisibility,
-                             ExportedStorage);
+                             llvm::GlobalValue::DefaultStorageClass);
     }
 
     auto linkage = isWeakImported ? llvm::GlobalValue::ExternalWeakLinkage
@@ -1733,10 +1734,14 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
 
   case SILLinkage::HiddenExternal:
   case SILLinkage::PrivateExternal:
-    return std::make_tuple(isDefinition
-                               ? llvm::GlobalValue::AvailableExternallyLinkage
-                               : llvm::GlobalValue::ExternalLinkage,
-                           llvm::GlobalValue::HiddenVisibility,
+    if (isDefinition) {
+      return std::make_tuple(llvm::GlobalValue::AvailableExternallyLinkage,
+                             llvm::GlobalValue::HiddenVisibility,
+                             llvm::GlobalValue::DefaultStorageClass);
+    }
+
+    return std::make_tuple(llvm::GlobalValue::ExternalLinkage,
+                           llvm::GlobalValue::DefaultVisibility,
                            ImportedStorage);
 
   }
@@ -3720,7 +3725,6 @@ static Address getAddrOfSimpleVariable(IRGenModule &IGM,
   // Otherwise, we need to create it.
   LinkInfo link = LinkInfo::get(IGM, entity, forDefinition);
   auto addr = createVariable(IGM, link, type, alignment);
-  addr->setConstant(true);
 
   entry = addr;
   return Address(addr, alignment);
@@ -3743,8 +3747,13 @@ Address IRGenModule::getAddrOfFieldOffset(VarDecl *var,
 Address IRGenModule::getAddrOfEnumCase(EnumElementDecl *Case,
                                        ForDefinition_t forDefinition) {
   LinkEntity entity = LinkEntity::forEnumCase(Case);
-  return getAddrOfSimpleVariable(*this, GlobalVars, entity, Int32Ty,
-                                 getPointerAlignment(), forDefinition);
+  auto addr = getAddrOfSimpleVariable(*this, GlobalVars, entity, Int32Ty,
+                                      getPointerAlignment(), forDefinition);
+
+  auto *global = cast<llvm::GlobalVariable>(addr.getAddress());
+  global->setConstant(true);
+
+  return addr;
 }
 
 void IRGenModule::emitNestedTypeDecls(DeclRange members) {
@@ -3834,7 +3843,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
   // Generate a category if the extension either introduces a
   // conformance to an ObjC protocol or introduces a method
   // that requires an Objective-C entry point.
-  ClassDecl *origClass = ext->getAsClassOrClassExtensionContext();
+  ClassDecl *origClass = ext->getSelfClassDecl();
   if (!origClass)
     return;
 

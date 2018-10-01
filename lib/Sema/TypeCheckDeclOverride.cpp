@@ -108,8 +108,7 @@ Type swift::getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
     // For subscripts, we don't have a 'Self' type, but turn it
     // into a monomorphic function type.
     auto funcTy = memberType->castTo<AnyFunctionType>();
-    memberType = FunctionType::get(funcTy->getParams(), funcTy->getResult(),
-                                   FunctionType::ExtInfo());
+    memberType = FunctionType::get(funcTy->getParams(), funcTy->getResult());
   } else {
     // For properties, strip off ownership.
     memberType = memberType->getReferenceStorageReferent();
@@ -163,7 +162,7 @@ static bool areOverrideCompatibleSimple(ValueDecl *decl,
 
   // If the parent declaration is not in a class (or extension thereof), we
   // cannot override it.
-  if (!parentDecl->getDeclContext()->getAsClassOrClassExtensionContext())
+  if (!parentDecl->getDeclContext()->getSelfClassDecl())
     return false;
 
   // The declarations must be of the same kind.
@@ -590,7 +589,7 @@ OverrideMatcher::OverrideMatcher(ValueDecl *decl)
     return;
 
   auto *dc = decl->getDeclContext();
-  auto classDecl = dc->getAsClassOrClassExtensionContext();
+  auto classDecl = dc->getSelfClassDecl();
   if (!classDecl)
     return;
 
@@ -626,10 +625,6 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
   // different name, look them up now.
   if (members.empty() || name != membersName) {
     auto lookupOptions = defaultMemberLookupOptions;
-
-    // Class methods cannot override declarations only
-    // visible via dynamic dispatch.
-    lookupOptions -= NameLookupFlags::DynamicLookup;
 
     // Class methods cannot override declarations only
     // visible as protocol requirements or protocol
@@ -769,7 +764,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   // strips out dynamic self via replaceCovariantResultType(), and that
   // is helpful in several cases - just not this one.
   auto dc = decl->getDeclContext();
-  auto classDecl = dc->getAsClassOrClassExtensionContext();
+  auto classDecl = dc->getSelfClassDecl();
   if (decl->getASTContext().isSwiftVersionAtLeast(5) &&
       baseDecl->getInterfaceType()->hasDynamicSelfType() &&
       !decl->getInterfaceType()->hasDynamicSelfType() &&
@@ -1177,6 +1172,7 @@ namespace  {
     UNINTERESTING_ATTR(ClangImporterSynthesizedType)
     UNINTERESTING_ATTR(WeakLinked)
     UNINTERESTING_ATTR(Frozen)
+    UNINTERESTING_ATTR(HasInitialValue)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -1225,7 +1221,7 @@ namespace  {
                      Override->getDescriptiveKind(),
                      Override->getFullName(),
                      Base->getDeclContext()
-                       ->getAsNominalTypeOrNominalTypeExtensionContext()
+                       ->getSelfNominalTypeDecl()
                        ->getName());
       Diags.diagnose(Base, diag::make_decl_objc, Base->getDescriptiveKind())
         .fixItInsert(Base->getAttributeInsertionLoc(false),
@@ -1525,8 +1521,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   // Overrides of NSObject.hashValue are deprecated; one should override
   // NSObject.hash instead.
   if (auto baseVar = dyn_cast<VarDecl>(base)) {
-    if (auto classDecl =
-          baseVar->getDeclContext()->getAsClassOrClassExtensionContext()) {
+    if (auto classDecl = baseVar->getDeclContext()->getSelfClassDecl()) {
       if (baseVar->getName() == ctx.Id_hashValue &&
           classDecl->getName().is("NSObject") &&
           (classDecl->getModuleContext()->getName() == ctx.Id_Foundation ||
@@ -1635,7 +1630,7 @@ computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
   return overriddenAssocTypes;
 }
 
-llvm::TinyPtrVector<ValueDecl *>
+llvm::Expected<llvm::TinyPtrVector<ValueDecl *>>
 OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // For an associated type, compute the (minimized) set of overridden
   // declarations.
@@ -1643,13 +1638,16 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     return computeOverriddenAssociatedTypes(assocType);
   }
 
+  // Value to return in error cases
+  auto noResults = llvm::TinyPtrVector<ValueDecl *>();
+
   // Only members of classes can override other declarations.
-  if (!decl->getDeclContext()->getAsClassOrClassExtensionContext())
-    return { };
+  if (!decl->getDeclContext()->getSelfClassDecl())
+    return noResults;
 
   // Types that aren't associated types cannot be overridden.
   if (isa<TypeDecl>(decl))
-    return { };
+    return noResults;
 
   // Accessors determine their overrides based on their abstract storage
   // declarations.
@@ -1658,13 +1656,13 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
     // Find the overidden storage declaration. If there isn't one, we're done.
     auto baseASD = overridingASD->getOverriddenDecl();
-    if (!baseASD) return { };
+    if (!baseASD) return noResults;
 
     auto kind = accessor->getAccessorKind();
 
     // Find the base accessor; if there isn't one, we're done.
     auto baseAccessor = baseASD->getAccessor(kind);
-    if (!baseAccessor) return { };
+    if (!baseAccessor) return noResults;
 
     switch (kind) {
       case AccessorKind::Get:
@@ -1675,7 +1673,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
         // forced static dispatch materializeForSet is not itself an
         // override.
         if (baseAccessor->hasForcedStaticDispatch())
-          return { };
+          return noResults;
 
         LLVM_FALLTHROUGH;
 
@@ -1683,7 +1681,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
         // For setter accessors, we need the base's setter to be
         // accessible from the overriding context, or it's not an override.
         if (!baseASD->isSetterAccessibleFrom(overridingASD->getDeclContext()))
-          return { };
+          return noResults;
         break;
 
       case AccessorKind::Address:
@@ -1692,7 +1690,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       case AccessorKind::WillSet:
       case AccessorKind::Read:
       case AccessorKind::Modify:
-        return { };
+        return noResults;
     }
 
     // We are overriding the base accessor.
@@ -1702,7 +1700,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     if (matcher.checkOverride(baseAccessor,
                               OverrideCheckingAttempt::PerfectMatch)) {
       invalidateOverrideAttribute(decl);
-      return { };
+      return noResults;
     }
 
     return llvm::TinyPtrVector<ValueDecl *>{baseAccessor};
@@ -1712,17 +1710,17 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // modifier can override declarations.
   if (!isa<ConstructorDecl>(decl) &&
       !decl->getAttrs().hasAttribute<OverrideAttr>())
-    return { };
+    return noResults;
 
   // Try to match potential overridden declarations.
   OverrideMatcher matcher(decl);
   if (!matcher) {
-    return { };
+    return noResults;
   }
 
   auto matches = matcher.match(OverrideCheckingAttempt::PerfectMatch);
   if (matches.empty()) {
-    return { };
+    return noResults;
   }
 
   // If we have more than one potential match, diagnose the ambiguity and
@@ -1731,14 +1729,14 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     diagnoseGeneralOverrideFailure(decl, matches,
                                    OverrideCheckingAttempt::PerfectMatch);
     invalidateOverrideAttribute(decl);
-    return { };
+    return noResults;
   }
 
   // Check the correctness of the override.
   if (matcher.checkOverride(matches.front().Decl,
                             OverrideCheckingAttempt::PerfectMatch)) {
     invalidateOverrideAttribute(decl);
-    return { };
+    return noResults;
   }
 
   return llvm::TinyPtrVector<ValueDecl *>{matches.front().Decl};

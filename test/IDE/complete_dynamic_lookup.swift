@@ -463,7 +463,7 @@ func testAnyObject11_(_ dl: AnyObject) {
   dl.returnsObjcClass!(#^DL_FUNC_NAME_PAREN_1^#
 }
 // DL_FUNC_NAME_PAREN_1: Begin completions
-// DL_FUNC_NAME_PAREN_1-DAG: Pattern/CurrModule: ['(']{#Int#}[')'][#TopLevelObjcClass#]{{; name=.+$}}
+// DL_FUNC_NAME_PAREN_1-DAG: Pattern/CurrModule: ['(']{#(i): Int#}[')'][#TopLevelObjcClass#]{{; name=.+$}}
 // DL_FUNC_NAME_PAREN_1: End completions
 
 func testAnyObject12(_ dl: AnyObject) {

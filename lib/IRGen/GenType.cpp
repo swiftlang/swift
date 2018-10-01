@@ -471,8 +471,8 @@ llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
 
   // TODO: big endian.
   Builder.CreateMemCpy(
-      Builder.CreateBitCast(extraTagBitsSlot, IGM.Int8PtrTy).getAddress(),
-      extraTagBitsAddr, numExtraTagBytes, 1);
+      Builder.CreateBitCast(extraTagBitsSlot, IGM.Int8PtrTy).getAddress(), 1,
+      extraTagBitsAddr, 1, numExtraTagBytes);
   auto extraTagBits = Builder.CreateLoad(extraTagBitsSlot);
 
   extraTagBitsBB = llvm::BasicBlock::Create(Ctx);
@@ -1058,12 +1058,10 @@ TypeConverter::createImmovable(llvm::Type *type, Size size, Alignment align) {
 }
 
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
-static ProtocolInfo *invalidProtocolInfo() { return (ProtocolInfo*) 1; }
 
 TypeConverter::TypeConverter(IRGenModule &IGM)
   : IGM(IGM),
-    FirstType(invalidTypeInfo()),
-    FirstProtocol(invalidProtocolInfo()) {
+    FirstType(invalidTypeInfo()) {
   // FIXME: In LLDB, everything is completely fragile, so that IRGen can query
   // the size of resilient types. Of course this is not the right long term
   // solution, because it won't work once the swiftmodule file is not in
@@ -1077,12 +1075,6 @@ TypeConverter::~TypeConverter() {
   // Delete all the converted type infos.
   for (const TypeInfo *I = FirstType; I != invalidTypeInfo(); ) {
     const TypeInfo *Cur = I;
-    I = Cur->NextConverted;
-    delete Cur;
-  }
-  
-  for (const ProtocolInfo *I = FirstProtocol; I != invalidProtocolInfo(); ) {
-    const ProtocolInfo *Cur = I;
     I = Cur->NextConverted;
     delete Cur;
   }

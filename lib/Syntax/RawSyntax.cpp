@@ -84,14 +84,7 @@ RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
   Bits.Common.Presence = unsigned(Presence);
   Bits.Common.ManualMemory = unsigned(ManualMemory);
   Bits.Layout.NumChildren = Layout.size();
-
-  // Compute the text length
-  Bits.Layout.TextLength = 0;
-  for (const auto ChildNode : Layout) {
-    if (ChildNode && !ChildNode->isMissing()) {
-      Bits.Layout.TextLength += ChildNode->getTextLength();
-    }
-  }
+  Bits.Layout.TextLength = UINT32_MAX;
 
   // Initialize layout data.
   std::uninitialized_copy(Layout.begin(), Layout.end(),

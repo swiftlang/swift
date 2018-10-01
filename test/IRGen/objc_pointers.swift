@@ -18,3 +18,10 @@ import Foundation
   @objc func pointerMetatypeArguments(x: AutoreleasingUnsafeMutablePointer<AnyClass>,
                                       y: AutoreleasingUnsafeMutablePointer<AnyClass?>) {}
 }
+
+// CHECK-LABEL: S13objc_pointers14returnNSObject3objSo0D0CAE_tF
+func returnNSObject(obj: NSObject) -> NSObject {
+  // CHECK-NOT: return
+  // CHECK: @objc_retain
+  return obj
+}

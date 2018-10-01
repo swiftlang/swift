@@ -108,8 +108,7 @@ static TypeAliasDecl *getParameterTypeAliasDecl(NominalTypeDecl *nominal) {
 
 static void
 deriveBodyParameterAggregate_update(AbstractFunctionDecl *updateDecl) {
-  auto *nominal = updateDecl->getDeclContext()
-                      ->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *nominal = updateDecl->getDeclContext()->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
 
   auto *selfDecl = updateDecl->getImplicitSelfDecl();
@@ -208,20 +207,20 @@ static ValueDecl *deriveParameterAggregate_update(DerivedConformance &derived) {
   auto gradientsDecl =
       new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                         C.getIdentifier("withGradients"), SourceLoc(),
-                        C.getIdentifier("gradients"), parametersType, parentDC);
+                        C.getIdentifier("gradients"), parentDC);
   gradientsDecl->setInterfaceType(parametersInterfaceType);
 
   auto inoutFlag = ParameterTypeFlags().withInOut(true);
-  auto updaterInputType =
-      TupleType::get({TupleTypeElt(parameterType, Identifier(), inoutFlag),
-                      TupleTypeElt(parameterType)},
-                     C);
-  auto updaterType = FunctionType::get(updaterInputType, TupleType::getEmpty(C),
-                                       FunctionType::ExtInfo().withNoEscape());
-
   auto updaterDecl = new (C) ParamDecl(
       VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), Identifier(),
-      SourceLoc(), C.getIdentifier("updater"), updaterType, parentDC);
+      SourceLoc(), C.getIdentifier("updater"), parentDC);
+  FunctionType::Param updaterInputTypes[] = {
+    FunctionType::Param(parameterType, Identifier(), inoutFlag),
+    FunctionType::Param(parameterType)
+  };
+  auto updaterType = FunctionType::get(updaterInputTypes,
+                                       TupleType::getEmpty(C),
+                                       FunctionType::ExtInfo().withNoEscape());
   updaterDecl->setInterfaceType(updaterType);
 
   ParameterList *params =

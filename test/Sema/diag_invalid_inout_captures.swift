@@ -33,3 +33,10 @@ func remember(line: inout String) -> () -> Void {
     return despite_our_estrangement // expected-error {{nested function cannot capture inout parameter and escape}}
 }
 
+// This arrangement should be legal, but the type checker does not currently allow it.
+//
+// TODO: If the type checker is ever fixed, we should enable the corresponding test in
+// SILOptimizer/exclusivity_static_diagnostics.swift.
+func its_complicated(condition: inout Int) {
+  no_escape(condition == 0 ? { condition = 1 } : { condition = 2}) // expected-error 2 {{escaping closures can only capture inout parameters explicitly by value}}
+}

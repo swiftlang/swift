@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-inliner"
+
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
@@ -445,7 +447,7 @@ SILInliner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
   auto *ParentFunction = CalleeScope->Parent.dyn_cast<SILFunction *>();
   if (ParentFunction)
     ParentFunction = remapParentFunction(
-        M, ParentFunction, SubsMap,
+        FuncBuilder, M, ParentFunction, SubsMap,
         CalleeFunction->getLoweredFunctionType()->getGenericSignature(),
         ForInlining);
 

@@ -149,8 +149,12 @@ func test_iuo_result(x : IUOResultTest) {
   x.foo?.negate()   // Test mutating writeback.
   
   let _ : Int = x.bar  // Test implicitly forced optional
-  let b = x.bar        // Should promote to 'Int?'
-  let _ : Int = b // expected-error {{value of optional type 'Int?' must be unwrapped}}
+  let b = x.bar
+  // expected-note@-1{{short-circuit}}
+  // expected-note@-2{{coalesce}}
+  // expected-note@-3{{force-unwrap}}
+
+  let _ : Int = b // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
   // expected-note@-1{{coalesce}}
   // expected-note@-2{{force-unwrap}}
 }

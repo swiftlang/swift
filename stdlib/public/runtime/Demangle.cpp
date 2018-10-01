@@ -226,8 +226,8 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
       // no richer runtime information available about it (such as an anonymous
       // context). Use an unstable mangling to represent the context by its
       // pointer identity.
-      char addressBuf[sizeof(void*) * 2 + 2 + 1];
-      snprintf(addressBuf, sizeof(addressBuf), "0x%" PRIxPTR, (uintptr_t)component);
+      char addressBuf[sizeof(void*) * 2 + 1 + 1];
+      snprintf(addressBuf, sizeof(addressBuf), "$%" PRIxPTR, (uintptr_t)component);
       
       auto anonNode = Dem.createNode(Node::Kind::AnonymousContext);
       CharVector addressStr;

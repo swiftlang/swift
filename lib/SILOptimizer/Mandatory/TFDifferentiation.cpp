@@ -36,13 +36,13 @@
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/ADT/DenseSet.h"
@@ -528,7 +528,7 @@ private:
     auto id = ctx.getIdentifier(name);
     auto *varDecl = new (ctx) VarDecl(
         /*IsStatic*/ false, VarDecl::Specifier::Var,
-        /*IsCaptureList*/ false, SourceLoc(), id, type, primalValueStruct);
+        /*IsCaptureList*/ false, SourceLoc(), id, primalValueStruct);
     if (primalValueStruct->getEffectiveAccess() < AccessLevel::Public)
       varDecl->getAttrs().add(
           new (ctx) UsableFromInlineAttr(/*implicit*/ true));
@@ -834,6 +834,9 @@ using GradientLookupKey = std::pair<SILFunction *, SILReverseAutoDiffConfig>;
 
 class ADContext {
 private:
+  /// Reference to the main transform.
+  SILModuleTransform &transform;
+
   /// The module where Differentiation is performed on.
   SILModule &module;
 
@@ -876,8 +879,9 @@ private:
 
 public:
   /// Construct an ADContext for the given module.
-  explicit ADContext(SILModule &module, SILPassManager &passManager);
+  explicit ADContext(SILModuleTransform &transform);
 
+  SILModuleTransform &getTransform() const { return transform; }
   SILModule &getModule() const { return module; }
   ASTContext &getASTContext() const { return module.getASTContext(); }
   SILPassManager &getPassManager() const { return passManager; }
@@ -1078,8 +1082,9 @@ public:
 };
 } // end anonymous namespace
 
-ADContext::ADContext(SILModule &module, SILPassManager &passManager)
-    : module(module), passManager(passManager) {}
+ADContext::ADContext(SILModuleTransform &transform)
+    : transform(transform), module(*transform.getModule()),
+      passManager(*transform.getPassManager()) {}
 
 void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
                                               const DifferentiationTask *task,
@@ -1230,7 +1235,7 @@ public:
     return k & InvalidationKind::Everything;
   }
 
-  virtual DifferentiableActivityInfo *
+  virtual std::unique_ptr<DifferentiableActivityInfo>
   newFunctionAnalysis(SILFunction *f) override;
 
   virtual void initialize(SILPassManager *pm) override;
@@ -1293,10 +1298,10 @@ public:
 };
 } // end anonymous namespace
 
-DifferentiableActivityInfo *
+std::unique_ptr<DifferentiableActivityInfo>
 DifferentiableActivityAnalysis::newFunctionAnalysis(SILFunction *f) {
   assert(dominanceAnalysis && "Expect a valid dominance anaysis");
-  return new DifferentiableActivityInfo(*f);
+  return llvm::make_unique<DifferentiableActivityInfo>(*f);
 }
 
 void DifferentiableActivityAnalysis::initialize(SILPassManager *pm) {
@@ -2579,11 +2584,11 @@ PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
       originalTy->getCoroutineKind(), originalTy->getCalleeConvention(),
       originalTy->getParameters(), originalTy->getYields(), results,
       originalTy->getOptionalErrorResult(), context.getASTContext());
-  SILFunctionBuilder FB(module);
+  SILOptFunctionBuilder fb(context.getTransform());
   auto linkage = original->getLinkage();
   if (linkage == SILLinkage::Public)
     linkage = SILLinkage::PublicNonABI;
-  auto *primal = FB.getOrCreateFunction(
+  auto *primal = fb.getOrCreateFunction(
       original->getLocation(), primalName, linkage, primalTy,
       original->isBare(), original->isTransparent(), original->isSerialized());
   primal->setUnqualifiedOwnership();
@@ -2727,11 +2732,11 @@ SILFunction *AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
       origTy->getGenericSignature(), origTy->getExtInfo(),
       origTy->getCoroutineKind(), origTy->getCalleeConvention(), adjParams, {},
       adjResults, None, original->getASTContext());
-  SILFunctionBuilder FB(module);
+  SILOptFunctionBuilder fb(context.getTransform());
   auto linkage = original->getLinkage();
   if (linkage == SILLinkage::Public)
     linkage = SILLinkage::PublicNonABI;
-  auto *adjoint = FB.createFunction(linkage, adjName, adjType,
+  auto *adjoint = fb.createFunction(linkage, adjName, adjType,
       original->getGenericEnvironment(), original->getLocation(),
       original->isBare(), original->isTransparent(), original->isSerialized());
   adjoint->setUnqualifiedOwnership();
@@ -4091,12 +4096,12 @@ static SILFunction *lookupOrSynthesizeGradient(ADContext &context,
     std::string gradName =
         "AD__" + original->getName().str() + "__" + mangleADConfig(config);
     auto gradNameId = astCtx.getIdentifier(gradName);
-    SILFunctionBuilder FB(module);
+    SILOptFunctionBuilder fb(context.getTransform());
     auto linkage = original->getLinkage();
     if (linkage == SILLinkage::Public)
       linkage = SILLinkage::PublicNonABI;
     auto *gradFn =
-        FB.createFunction(linkage, gradNameId.str(), gradType,
+        fb.createFunction(linkage, gradNameId.str(), gradType,
                           original->getGenericEnvironment(),
                           original->getLocation(), original->isBare(),
                           original->isTransparent(), original->isSerialized());
@@ -4440,8 +4445,8 @@ void Differentiation::run() {
   }
 
   // A global differentiation context.
-  ADContext context(module, *PM);
-  
+  ADContext context(*this);
+
   // For every empty `[reverse_differentiable]` attribute, create a
   // differentiation task.
   for (auto &fnAndAttr : emptyDiffAttrs)
@@ -4508,4 +4513,6 @@ void Differentiation::run() {
 // Pass creation
 //===----------------------------------------------------------------------===//
 
-SILTransform *swift::createDifferentiation() { return new Differentiation; }
+SILTransform *swift::createDifferentiation() {
+  return new Differentiation;
+}

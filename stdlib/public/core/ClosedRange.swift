@@ -375,7 +375,7 @@ extension ClosedRange: Equatable {
   ///
   /// Two ranges are equal when they have the same lower and upper bounds.
   ///
-  ///     let x: ClosedRange = 5...15
+  ///     let x = 5...15
   ///     print(x == 5...15)
   ///     // Prints "true"
   ///     print(x == 10...20)

@@ -512,7 +512,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
     if (parentTy && extension && extension->isConstrainedExtension()) {
       auto contextSubMap = parentTy->getContextSubstitutionMap(
           extension->getParentModule(),
-          extension->getAsNominalTypeOrNominalTypeExtensionContext());
+          extension->getSelfNominalTypeDecl());
       if (!subMap) {
         // The substitution map wasn't set above, meaning we should grab the map
         // for the extension itself.
@@ -942,11 +942,11 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     // If this is a method whose result type is dynamic Self, replace
     // DynamicSelf with the actual object type.
-    if (!func->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+    if (!func->getDeclContext()->getSelfProtocolDecl()) {
       if (func->hasDynamicSelf()) {
         auto params = openedFnType->getParams();
         assert(params.size() == 1);
-        Type selfTy = params.front().getType()->getRValueInstanceType();
+        Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
         openedType = openedType->replaceCovariantResultType(selfTy, 2);
         openedFnType = openedType->castTo<FunctionType>();
       }
@@ -985,7 +985,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
     // Resolve the reference to this type declaration in our current context.
     auto type = TC.resolveTypeInContext(typeDecl, nullptr, useDC,
-                                        TypeResolutionFlags::InExpression,
+                                        TypeResolverContext::InExpression,
                                         /*isSpecialized=*/false);
 
     // Open the type.
@@ -1093,7 +1093,7 @@ static void bindArchetypesFromContext(
        !parentDC->isModuleScopeContext();
        parentDC = parentDC->getParent()) {
     if (parentDC->isTypeContext()) {
-      if (parentDC != outerDC && parentDC->getAsProtocolOrProtocolExtensionContext()) {
+      if (parentDC != outerDC && parentDC->getSelfProtocolDecl()) {
         auto selfTy = parentDC->getSelfInterfaceType();
         auto contextTy = cs.TC.Context.TheUnresolvedType;
         bindContextArchetype(selfTy, contextTy);
@@ -1193,7 +1193,8 @@ void ConstraintSystem::openGenericRequirements(
     addConstraint(
         *openedReq,
         locator.withPathElement(ConstraintLocator::OpenedGeneric)
-            .withPathElement(LocatorPathElt::getTypeRequirementComponent(pos)));
+            .withPathElement(
+                LocatorPathElt::getTypeRequirementComponent(pos, kind)));
   }
 }
 
@@ -1254,6 +1255,8 @@ ConstraintSystem::getTypeOfMemberReference(
     return getTypeOfReference(value, functionRefKind, locator, useDC, base);
   }
 
+  FunctionType::Param baseObjParam(baseObjTy);
+
   // Don't open existentials when accessing typealias members of
   // protocols.
   if (auto *alias = dyn_cast<TypeAliasDecl>(value)) {
@@ -1262,7 +1265,7 @@ ConstraintSystem::getTypeOfMemberReference(
       // If we end up with a protocol typealias here, it's underlying
       // type must be fully concrete.
       assert(!memberTy->hasTypeParameter());
-      auto openedType = FunctionType::get(baseObjTy, memberTy);
+      auto openedType = FunctionType::get({baseObjParam}, memberTy);
       return { openedType, memberTy };
     }
   }
@@ -1278,7 +1281,7 @@ ConstraintSystem::getTypeOfMemberReference(
     // Wrap it in a metatype.
     memberTy = MetatypeType::get(memberTy);
 
-    auto openedType = FunctionType::get(baseObjTy, memberTy);
+    auto openedType = FunctionType::get({baseObjParam}, memberTy);
     return { openedType, memberTy };
   }
 
@@ -1322,9 +1325,9 @@ ConstraintSystem::getTypeOfMemberReference(
           elementTy = OptionalType::get(elementTy->getRValueType());
       }
 
-      auto indicesTy = subscript->getIndicesInterfaceType();
-      refType = FunctionType::get(indicesTy, elementTy,
-                                  AnyFunctionType::ExtInfo());
+      auto indices = subscript->getInterfaceType()
+                              ->castTo<AnyFunctionType>()->getParams();
+      refType = FunctionType::get(indices, elementTy);
     } else {
       refType = getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy, useDC,
                                            base, /*wantInterfaceType=*/true);
@@ -1341,13 +1344,11 @@ ConstraintSystem::getTypeOfMemberReference(
       selfFlags = selfFlags.withInOut(true);
 
     // If the storage is generic, add a generic signature.
-    auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), selfFlags);
+    FunctionType::Param selfParam(selfTy, Identifier(), selfFlags);
     if (auto *sig = innerDC->getGenericSignatureOfContext()) {
-      funcType = GenericFunctionType::get(sig, {selfParam}, refType,
-                                          AnyFunctionType::ExtInfo());
+      funcType = GenericFunctionType::get(sig, {selfParam}, refType);
     } else {
-      funcType = FunctionType::get({selfParam}, refType,
-                                   AnyFunctionType::ExtInfo());
+      funcType = FunctionType::get({selfParam}, refType);
     }
   }
 
@@ -1355,7 +1356,7 @@ ConstraintSystem::getTypeOfMemberReference(
                                 locator, replacements, innerDC, outerDC,
                                 /*skipProtocolSelfConstraint=*/true);
 
-  if (!outerDC->getAsProtocolOrProtocolExtensionContext()) {
+  if (!outerDC->getSelfProtocolDecl()) {
     // Class methods returning Self as well as constructors get the
     // result replaced with the base object type.
     if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
@@ -1386,8 +1387,8 @@ ConstraintSystem::getTypeOfMemberReference(
   auto openedParams = openedFnType->getParams();
   assert(openedParams.size() == 1);
 
-  Type selfObjTy = openedParams.front().getType()->getRValueInstanceType();
-  if (outerDC->getAsProtocolOrProtocolExtensionContext()) {
+  Type selfObjTy = openedParams.front().getPlainType()->getMetatypeInstanceType();
+  if (outerDC->getSelfProtocolDecl()) {
     // For a protocol, substitute the base object directly. We don't need a
     // conformance constraint because we wouldn't have found the declaration
     // if it didn't conform.
@@ -1415,7 +1416,7 @@ ConstraintSystem::getTypeOfMemberReference(
   // the access will operate on existentials and not type parameters.
   if (!isDynamicResult &&
       baseObjTy->isExistentialType() &&
-      outerDC->getAsProtocolOrProtocolExtensionContext()) {
+      outerDC->getSelfProtocolDecl()) {
     auto selfTy = replacements[
       cast<GenericTypeParamType>(outerDC->getSelfInterfaceType()
                                  ->getCanonicalType())];
@@ -1589,12 +1590,12 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     auto output = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult));
 
-    auto inputArg = TupleTypeElt(input, CS.getASTContext().getIdentifier("of"));
-    auto inputTuple = TupleType::get(inputArg, CS.getASTContext());
+    FunctionType::Param inputArg(input,
+                                 CS.getASTContext().getIdentifier("of"));
     
     CS.addConstraint(ConstraintKind::DynamicTypeOf, output, input,
         CS.getConstraintLocator(locator, ConstraintLocator::RValueAdjustment));
-    refType = FunctionType::get(inputTuple, output);
+    refType = FunctionType::get({inputArg}, output);
     openedFullType = refType;
     return true;
   }
@@ -1611,19 +1612,18 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
          CS.getConstraintLocator(locator, ConstraintLocator::RValueAdjustment));
     auto result = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult));
-    auto bodyClosure = FunctionType::get(
-      ParenType::get(CS.getASTContext(), escapeClosure), result,
+    FunctionType::Param arg(escapeClosure);
+    auto bodyClosure = FunctionType::get(arg, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
                               /*autoclosure*/ false,
                               /*noescape*/ true,
                               /*throws*/ true));
-    TupleTypeElt argTupleElts[] = {
-      TupleTypeElt(noescapeClosure),
-      TupleTypeElt(bodyClosure, CS.getASTContext().getIdentifier("do")),
+    FunctionType::Param args[] = {
+      FunctionType::Param(noescapeClosure),
+      FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
     
-    auto argTuple = TupleType::get(argTupleElts, CS.getASTContext());
-    refType = FunctionType::get(argTuple, result,
+    refType = FunctionType::get(args, result,
       FunctionType::ExtInfo(FunctionType::Representation::Swift,
                             /*autoclosure*/ false,
                             /*noescape*/ false,
@@ -1643,18 +1643,17 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
          CS.getConstraintLocator(locator, ConstraintLocator::RValueAdjustment));
     auto result = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult));
-    auto bodyClosure = FunctionType::get(
-      ParenType::get(CS.getASTContext(), openedTy), result,
+    FunctionType::Param bodyArgs[] = {FunctionType::Param(openedTy)};
+    auto bodyClosure = FunctionType::get(bodyArgs, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
                               /*autoclosure*/ false,
                               /*noescape*/ true,
                               /*throws*/ true));
-    TupleTypeElt argTupleElts[] = {
-      TupleTypeElt(existentialTy),
-      TupleTypeElt(bodyClosure, CS.getASTContext().getIdentifier("do")),
+    FunctionType::Param args[] = {
+      FunctionType::Param(existentialTy),
+      FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
-    auto argTuple = TupleType::get(argTupleElts, CS.getASTContext());
-    refType = FunctionType::get(argTuple, result,
+    refType = FunctionType::get(args, result,
       FunctionType::ExtInfo(FunctionType::Representation::Swift,
                             /*autoclosure*/ false,
                             /*noescape*/ false,
@@ -1894,12 +1893,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     addKeyPathApplicationConstraint(
                   keyPathIndexTy, choice.getBaseType(), elementTy, locator);
     
-    TupleTypeElt indexTupleElts[] = {
-      TupleTypeElt(keyPathIndexTy, getASTContext().Id_keyPath),
+    FunctionType::Param indices[] = {
+      FunctionType::Param(keyPathIndexTy, getASTContext().Id_keyPath),
     };
-    auto indexTuple = TupleType::get(indexTupleElts, getASTContext());
-    auto subscriptTy = FunctionType::get(indexTuple, elementTy);
-    auto fullTy = FunctionType::get(choice.getBaseType(), subscriptTy);
+    auto subscriptTy = FunctionType::get(indices, elementTy);
+
+    FunctionType::Param baseParam(choice.getBaseType());
+    auto fullTy = FunctionType::get({baseParam}, subscriptTy);
     openedFullType = fullTy;
     refType = subscriptTy;
 

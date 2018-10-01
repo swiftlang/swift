@@ -12,7 +12,6 @@
 // This file provides convenient APIs to interpret a SourceKitd response.
 //===----------------------------------------------------------------------===//
 
-import Foundation
 import sourcekitd
 
 public class SourceKitdResponse: CustomStringConvertible {
@@ -253,6 +252,6 @@ extension sourcekitd_variant_t: CustomStringConvertible {
 }
 
 private func fromCStringLen(_ ptr: UnsafePointer<Int8>, length: Int) -> String? {
-  return NSString(bytes: ptr, length: length,
-                  encoding: String.Encoding.utf8.rawValue) as String?
+  return String(decoding: Array(UnsafeBufferPointer(start: ptr, count: length)).map {
+    UInt8(bitPattern: $0) }, as: UTF8.self)
 }

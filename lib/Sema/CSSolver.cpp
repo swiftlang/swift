@@ -129,8 +129,12 @@ Solution ConstraintSystem::finalize(
 
   // Update the best score we've seen so far.
   if (solverState && !retainAllSolutions()) {
-    assert(!solverState->BestScore || CurrentScore <= *solverState->BestScore);
-    solverState->BestScore = CurrentScore;
+    assert(TC.getLangOpts().DisableConstraintSolverPerformanceHacks ||
+           !solverState->BestScore || CurrentScore <= *solverState->BestScore);
+
+    if (!solverState->BestScore || CurrentScore <= *solverState->BestScore) {
+      solverState->BestScore = CurrentScore;
+    }
   }
 
   for (auto tv : TypeVariables) {
@@ -309,21 +313,6 @@ void ConstraintSystem::restoreTypeVariableBindings(unsigned numBindings) {
 static SmallVector<Type, 4> 
 enumerateDirectSupertypes(TypeChecker &tc, Type type) {
   SmallVector<Type, 4> result;
-
-  if (auto tupleTy = type->getAs<TupleType>()) {
-    // A tuple that can be constructed from a scalar has a value of that
-    // scalar type as its supertype.
-    // FIXME: There is a way more general property here, where we can drop
-    // one label from the tuple, maintaining the rest.
-    int scalarIdx = tupleTy->getElementForScalarInit();
-    if (scalarIdx >= 0) {
-      auto &elt = tupleTy->getElement(scalarIdx);
-      if (elt.isVararg()) // FIXME: Should we keep the name?
-        result.push_back(elt.getVarargBaseTy());
-      else if (elt.hasName())
-        result.push_back(elt.getType());
-    }
-  }
 
   if (type->mayHaveSuperclass()) {
     // FIXME: Can also weaken to the set of protocol constraints, but only
@@ -724,17 +713,11 @@ bool ConstraintSystem::tryTypeVariableBindings(
           newBindings.push_back({subtype, binding.Kind, binding.BindingSource});
       }
 
-      if (binding.Kind == AllowedBindingKind::Subtypes) {
-        if (auto tupleTy = type->getAs<TupleType>()) {
-          int scalarIdx = tupleTy->getElementForScalarInit();
-          if (scalarIdx >= 0) {
-            auto eltType = tupleTy->getElementType(scalarIdx);
-            if (exploredTypes.insert(eltType->getCanonicalType()).second)
-              newBindings.push_back(
-                  {eltType, binding.Kind, binding.BindingSource});
-          }
-        }
-
+      // Allow solving for T even for a binding kind where that's invalid
+      // if fixes are allowed, because that gives us the opportunity to
+      // match T? values to the T binding by adding an unwrap fix.
+      if (binding.Kind == AllowedBindingKind::Subtypes ||
+          shouldAttemptFixes()) {
         // If we were unsuccessful solving for T?, try solving for T.
         if (auto objTy = type->getOptionalObjectType()) {
           if (exploredTypes.insert(objTy->getCanonicalType()).second) {
@@ -1215,8 +1198,7 @@ void ConstraintSystem::shrink(Expr *expr) {
             // instead of cloning representative.
             auto coercionRepr = typeRepr->clone(CS.getASTContext());
             // Let's try to resolve coercion type from cloned representative.
-            auto coercionType = CS.TC.resolveType(coercionRepr, CS.DC,
-                                                  TypeResolutionOptions());
+            auto coercionType = CS.TC.resolveType(coercionRepr, CS.DC, None);
 
             // Looks like coercion type is invalid, let's skip this sub-tree.
             if (coercionType->hasError())
@@ -1763,6 +1745,9 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint,
                                       Constraint *successfulConstraint,
                                       ASTContext &ctx) {
 
+  if (ctx.LangOpts.DisableConstraintSolverPerformanceHacks)
+    return false;
+
   // If the successfully applied constraint is favored, we'll consider that to
   // be the "best".
   if (successfulConstraint->isFavored() && !constraint->isFavored()) {
@@ -1832,6 +1817,9 @@ static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
   if (!cs.shouldAttemptFixes() && choice.isUnavailable())
     return true;
 
+  if (cs.TC.getLangOpts().DisableConstraintSolverPerformanceHacks)
+    return false;
+
   // Don't attempt to solve for generic operators if we already have
   // a non-generic solution.
 
@@ -1868,59 +1856,41 @@ static Constraint *selectBestBindingDisjunction(
   if (disjunctions.empty())
     return nullptr;
 
-  // Collect any disjunctions that simply attempt bindings for a
-  // type variable.
-  SmallVector<Constraint *, 8> bindingDisjunctions;
+  auto getAsTypeVar = [&cs](Type type) {
+    return cs.simplifyType(type)->getRValueType()->getAs<TypeVariableType>();
+  };
+
+  Constraint *firstBindDisjunction = nullptr;
   for (auto *disjunction : disjunctions) {
-    llvm::Optional<TypeVariableType *> commonTypeVariable;
-    if (llvm::all_of(
-            disjunction->getNestedConstraints(),
-            [&](Constraint *bindingConstraint) {
-              if (bindingConstraint->getKind() != ConstraintKind::Bind)
-                return false;
+    auto choices = disjunction->getNestedConstraints();
+    assert(!choices.empty());
 
-              auto *tv =
-                  bindingConstraint->getFirstType()->getAs<TypeVariableType>();
-              // Only do this for simple type variable bindings, not for
-              // bindings like: ($T1) -> $T2 bind String -> Int
-              if (!tv)
-                return false;
+    auto *choice = choices.front();
+    if (choice->getKind() != ConstraintKind::Bind)
+      continue;
 
-              if (!commonTypeVariable.hasValue())
-                commonTypeVariable = tv;
+    // We can judge disjunction based on the single choice
+    // because all of choices (of bind overload set) should
+    // have the same left-hand side.
+    // Only do this for simple type variable bindings, not for
+    // bindings like: ($T1) -> $T2 bind String -> Int
+    auto *typeVar = getAsTypeVar(choice->getFirstType());
+    if (!typeVar)
+      continue;
 
-              if (commonTypeVariable.getValue() != tv)
-                return false;
-
-              return true;
-            })) {
-      bindingDisjunctions.push_back(disjunction);
-    }
-  }
-
-  for (auto *disjunction : bindingDisjunctions) {
-    auto nested = disjunction->getNestedConstraints();
-    assert(!nested.empty());
-    auto *tv = cs.simplifyType(nested[0]->getFirstType())
-                   ->getRValueType()
-                   ->getAs<TypeVariableType>();
-    assert(tv);
+    if (!firstBindDisjunction)
+      firstBindDisjunction = disjunction;
 
     llvm::SetVector<Constraint *> constraints;
     cs.getConstraintGraph().gatherConstraints(
-        tv, constraints, ConstraintGraph::GatheringKind::EquivalenceClass,
+        typeVar, constraints, ConstraintGraph::GatheringKind::EquivalenceClass,
         [](Constraint *constraint) {
           return constraint->getKind() == ConstraintKind::Conversion;
         });
 
     for (auto *constraint : constraints) {
-      auto toType =
-          cs.simplifyType(constraint->getSecondType())->getRValueType();
-      auto *toTV = toType->getAs<TypeVariableType>();
-      if (tv != toTV)
-        continue;
-
-      return disjunction;
+      if (typeVar == getAsTypeVar(constraint->getSecondType()))
+        return disjunction;
     }
   }
 
@@ -1928,16 +1898,16 @@ static Constraint *selectBestBindingDisjunction(
   // those. These ensure that we attempt to bind types earlier than
   // trying the elements of other disjunctions, which can often mean
   // we fail faster.
-  if (!bindingDisjunctions.empty())
-    return bindingDisjunctions[0];
-
-  return nullptr;
+  return firstBindDisjunction;
 }
 
 Constraint *ConstraintSystem::selectDisjunction() {
   SmallVector<Constraint *, 4> disjunctions;
 
   collectDisjunctions(disjunctions);
+  if (disjunctions.empty())
+    return nullptr;
+
   if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
     return disjunction;
 

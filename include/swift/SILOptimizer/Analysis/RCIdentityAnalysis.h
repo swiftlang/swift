@@ -118,8 +118,9 @@ public:
 
   virtual void initialize(SILPassManager *PM) override;
   
-  virtual RCIdentityFunctionInfo *newFunctionAnalysis(SILFunction *F) override {
-    return new RCIdentityFunctionInfo(DA);
+  virtual std::unique_ptr<RCIdentityFunctionInfo>
+  newFunctionAnalysis(SILFunction *F) override {
+    return llvm::make_unique<RCIdentityFunctionInfo>(DA);
   }
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {

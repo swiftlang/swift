@@ -118,6 +118,20 @@ void ExtendedNominalRequest::noteCycleStep(DiagnosticEngine &diags) const {
   diags.diagnose(ext, diag::circular_reference_through);
 }
 
+void SelfBoundsFromWhereClauseRequest::diagnoseCycle(
+                                              DiagnosticEngine &diags) const {
+  // FIXME: Improve this diagnostic.
+  auto ext = std::get<0>(getStorage());
+  diags.diagnose(ext, diag::circular_reference);
+}
+
+void SelfBoundsFromWhereClauseRequest::noteCycleStep(
+                                              DiagnosticEngine &diags) const {
+  auto ext = std::get<0>(getStorage());
+  // FIXME: Customize this further.
+  diags.diagnose(ext, diag::circular_reference_through);
+}
+
 // Define request evaluation functions for each of the name lookup requests.
 static AbstractRequestFunction *nameLookupRequestFunctions[] = {
 #define SWIFT_TYPEID(Name)                                    \

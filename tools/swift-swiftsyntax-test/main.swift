@@ -86,7 +86,7 @@ do {
   }
   exit(0)
 } catch {
-  printerr(error.localizedDescription)
+  printerr("\(error)")
   printerr("Run swift-swiftsyntax-test -help for more help.")
   exit(1)
 }

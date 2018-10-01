@@ -707,9 +707,10 @@ private:
                                ParameterTypeFlags paramFlags, CanType ty) {
       CanTupleType tty = dyn_cast<TupleType>(ty);
       // If the abstraction pattern is opaque, and the tuple type is
-      // materializable -- if it doesn't contain an l-value type -- then it's
-      // a valid target for substitution and we should not expand it.
-      if (!tty || (pattern.isTypeParameter() && !tty->hasInOutElement())) {
+      // a valid target for substitution, don't expand it.
+      if (!tty ||
+          (pattern.isTypeParameter() &&
+           !shouldExpandTupleType(tty))) {
         visit(paramFlags.getValueOwnership(), /*forSelf=*/false, pattern, ty,
               silRepresentation);
         return;
@@ -882,7 +883,7 @@ static bool isPseudogeneric(SILDeclRef c) {
   dc = dc->getInnermostTypeContext();
   if (!dc) return false;
 
-  auto classDecl = dc->getAsClassOrClassExtensionContext();
+  auto classDecl = dc->getSelfClassDecl();
   return (classDecl && classDecl->usesObjCGenericsModel());
 }
 
@@ -2100,9 +2101,7 @@ getUncachedSILFunctionTypeForConstant(SILModule &M,
 
     if (extInfo.getSILRepresentation() ==
         SILFunctionTypeRepresentation::WitnessMethod) {
-      auto proto = constant.getDecl()
-                       ->getDeclContext()
-                       ->getAsProtocolOrProtocolExtensionContext();
+      auto proto = constant.getDecl()->getDeclContext()->getSelfProtocolDecl();
       witnessMethodConformance = ProtocolConformanceRef(proto);
     }
 
@@ -2386,7 +2385,7 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
   // (T1 -> T2) +> (S1 -> S2) = (T1 +> S1) -> (T2 +> S2)
   if (auto derivedFunc = dyn_cast<AnyFunctionType>(derived)) {
     if (auto baseFunc = dyn_cast<AnyFunctionType>(base)) {
-      return CanAnyFunctionType::get(
+      return CanAnyFunctionType::getOld(
         baseFunc.getOptGenericSignature(),
         copyOptionalityFromDerivedToBase(tc,
                                          derivedFunc.getInput(),
@@ -2425,7 +2424,9 @@ TypeConverter::getConstantOverrideInfo(SILDeclRef derived, SILDeclRef base) {
   auto baseInterfaceTy = baseInfo.FormalType;
   auto derivedInterfaceTy = derivedInfo.FormalType;
 
-  auto selfInterfaceTy = derivedInterfaceTy.getInput()->getRValueInstanceType();
+  auto params = derivedInterfaceTy.getParams();
+  assert(params.size() == 1);
+  auto selfInterfaceTy = params[0].getPlainType()->getMetatypeInstanceType();
 
   auto overrideInterfaceTy =
       selfInterfaceTy->adjustSuperclassMemberDeclType(
@@ -2551,8 +2552,8 @@ public:
       // The Self type can be nested in a few layers of metatypes (etc.), e.g.
       // for a mutable static variable the materializeForSet currently has its
       // last argument as a Self.Type.Type metatype.
-      while (1) {
-        auto next = selfType->getRValueInstanceType()->getCanonicalType();
+      while (auto metatypeType = dyn_cast<MetatypeType>(selfType)) {
+        auto next = metatypeType->getInstanceType()->getCanonicalType();
         if (next == selfType)
           break;
         selfType = next;
@@ -2702,7 +2703,7 @@ TypeConverter::getBridgedFunctionType(AbstractionPattern pattern,
   CanGenericSignature genericSig = t.getOptGenericSignature();
 
   auto rebuild = [&](CanType input, CanType result) -> CanAnyFunctionType {
-    return CanAnyFunctionType::get(genericSig, input, result, extInfo);
+    return CanAnyFunctionType::getOld(genericSig, input, result, extInfo);
   };
 
   switch (auto rep = t->getExtInfo().getSILRepresentation()) {
@@ -2897,14 +2898,14 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
 
   auto buildFinalFunctionType =
       [&](CanType inputType, CanType resultType) -> CanAnyFunctionType {
-    return CanAnyFunctionType::get(genericSig, inputType, resultType, extInfo);
+    return CanAnyFunctionType::getOld(genericSig, inputType, resultType, extInfo);
   };
 
   // Build the curried function type.
   CanType curriedResultType = resultType;
   for (auto input : llvm::makeArrayRef(inputs).drop_back()) {
-    curriedResultType = CanFunctionType::get(CanType(input.getType()),
-                                             curriedResultType);
+    curriedResultType = CanFunctionType::getOld(CanType(input.getType()),
+                                                curriedResultType);
   }
   auto curried = buildFinalFunctionType(CanType(inputs.back().getType()),
                                         curriedResultType);

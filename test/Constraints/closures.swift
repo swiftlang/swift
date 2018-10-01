@@ -288,6 +288,20 @@ struct S<T> {
   }
 }
 
+// Similar to SR1069 but with multiple generic arguments
+func simplified1069() {
+  class C {}
+  struct S {
+    func genericallyNonOptional<T: AnyObject>(_ a: T, _ b: T, _ c: T) { }
+
+    func f(_ a: C?, _ b: C?, _ c: C) {
+      genericallyNonOptional(a, b, c) // expected-error 2{{value of optional type 'C?' must be unwrapped to a value of type 'C'}}
+      // expected-note @-1 2{{coalesce}}
+      // expected-note @-2 2{{force-unwrap}}
+    }
+  }
+}
+
 // Make sure we cannot infer an () argument from an empty parameter list.
 func acceptNothingToInt (_: () -> Int) {}
 func testAcceptNothingToInt(ac1: @autoclosure () -> Int) {
@@ -712,3 +726,10 @@ extension Node {
       })!
   }
 }
+
+// Make sure we don't allow this anymore
+func takesTwo(_: (Int, Int) -> ()) {}
+func takesTwoInOut(_: (Int, inout Int) -> ()) {}
+
+takesTwo { _ in } // expected-error {{contextual closure type '(Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}}
+takesTwoInOut { _ in } // expected-error {{contextual closure type '(Int, inout Int) -> ()' expects 2 arguments, but 1 was used in closure body}}

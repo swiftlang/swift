@@ -582,7 +582,8 @@ namespace {
     }
 
     StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
-      return StructLayout(IGM, TheStruct, LayoutKind::NonHeapObject,
+      return StructLayout(IGM, TheStruct->getAnyNominal(),
+                          LayoutKind::NonHeapObject,
                           LayoutStrategy::Optimal, fieldTypes, StructTy);
     }
   };
@@ -773,7 +774,7 @@ private:
     NextExplosionIndex += explosionSize;
     unsigned explosionEnd = NextExplosionIndex;
 
-    ElementLayout layout = ElementLayout::getIncomplete(fieldType, fieldType);
+    ElementLayout layout = ElementLayout::getIncomplete(fieldType);
     auto isEmpty = fieldType.isKnownEmpty(ResilienceExpansion::Maximal);
     if (isEmpty)
       layout.completeEmpty(fieldType.isPOD(ResilienceExpansion::Maximal),

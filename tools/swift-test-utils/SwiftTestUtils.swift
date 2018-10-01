@@ -1,17 +1,15 @@
-import Foundation
-
 public struct CommandLineArguments {
-  public struct MissingArgumentError: LocalizedError {
+  public struct MissingArgumentError: Error, CustomStringConvertible {
     let argName: String
 
-    public var errorDescription: String? {
+    public var description: String {
       return "Missing required argument: \(argName)"
     }
   }
-  public struct UnkeyedArgumentError: LocalizedError {
+  public struct UnkeyedArgumentError: Error, CustomStringConvertible {
     let argName: String
 
-    public var errorDescription: String? {
+    public var description: String {
       return "Unexpectedly found command line argument \(argName) without a key"
     }
   }

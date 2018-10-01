@@ -1,0 +1,71 @@
+#include "ArchitectureConfig.h"
+
+#ifndef ARCHINFO
+#define ARCHINFO(arch)
+#endif
+
+///
+/// X86 architectures sorted by cpu type and sub type id.
+///
+
+#ifdef SUPPORT_ARCH_I386
+ARCHINFO(i386, MachO::CPU_TYPE_I386, MachO::CPU_SUBTYPE_I386_ALL)
+#endif
+
+#ifdef SUPPORT_ARCH_X86_64
+ARCHINFO(x86_64, MachO::CPU_TYPE_X86_64, MachO::CPU_SUBTYPE_X86_64_ALL)
+#endif
+
+#ifdef SUPPORT_ARCH_X86_64H
+ARCHINFO(x86_64h, MachO::CPU_TYPE_X86_64, MachO::CPU_SUBTYPE_X86_64_H)
+#endif
+
+
+///
+/// ARM architectures sorted by cpu sub type id.
+///
+
+#ifdef SUPPORT_ARCH_ARMV4T
+ARCHINFO(armv4t, MachO::CPU_TYPE_ARM, MachO::CPU_SUBTYPE_ARM_V4T)
+#endif
+
+#ifdef SUPPORT_ARCH_ARMV6
+ARCHINFO(armv6, MachO::CPU_TYPE_ARM, MachO::CPU_SUBTYPE_ARM_V6)
+#endif
+
+#ifdef SUPPORT_ARCH_ARMV5
+ARCHINFO(armv5, MachO::CPU_TYPE_ARM, MachO::CPU_SUBTYPE_ARM_V5TEJ)
+#endif
+
+#ifdef SUPPORT_ARCH_ARMV7
+ARCHINFO(armv7, MachO::CPU_TYPE_ARM, MachO::CPU_SUBTYPE_ARM_V7)
+#endif
+
+#ifdef SUPPORT_ARCH_ARMV7S
+ARCHINFO(armv7s, MachO::CPU_TYPE_ARM, MachO::CPU_SUBTYPE_ARM_V7S)
+#endif
+
+#ifdef SUPPORT_ARCH_ARMV7K
+ARCHINFO(armv7k, MachO::CPU_TYPE_ARM, MachO::CPU_SUBTYPE_ARM_V7K)
+#endif
+
+#ifdef SUPPORT_ARCH_ARMV6M
+ARCHINFO(armv6m, MachO::CPU_TYPE_ARM, MachO::CPU_SUBTYPE_ARM_V6M)
+#endif
+
+#ifdef SUPPORT_ARCH_ARMV7M
+ARCHINFO(armv7m, MachO::CPU_TYPE_ARM, MachO::CPU_SUBTYPE_ARM_V7M)
+#endif
+
+#ifdef SUPPORT_ARCH_ARMV7EM
+ARCHINFO(armv7em, MachO::CPU_TYPE_ARM, MachO::CPU_SUBTYPE_ARM_V7EM)
+#endif
+
+
+///
+/// ARM64 architectures sorted by cpu sub type id.
+///
+
+#ifdef SUPPORT_ARCH_ARM64
+ARCHINFO(arm64, MachO::CPU_TYPE_ARM64, MachO::CPU_SUBTYPE_ARM64_ALL)
+#endif

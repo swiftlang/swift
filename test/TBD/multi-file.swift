@@ -43,6 +43,8 @@ public func function() {}
 public class Class {
     public var property: Int
 
+    public var propertyWithInit: Int = 0
+
     public init() {
         property = 0
     }

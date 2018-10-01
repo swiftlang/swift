@@ -954,7 +954,7 @@ void ASTProducer::findSnapshotAndOpenFiles(
       LOG_WARN_FUNC("failed getting file contents for " << File << ": "
                                                         << Error);
       // File may not exist, continue and recover as if it was empty.
-      Content.Buffer = llvm::MemoryBuffer::getNewMemBuffer(0, File);
+      Content.Buffer = llvm::WritableMemoryBuffer::getNewMemBuffer(0, File);
     }
     Contents.push_back(std::move(Content));
   }

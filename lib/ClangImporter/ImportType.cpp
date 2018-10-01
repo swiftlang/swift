@@ -223,10 +223,35 @@ namespace {
         return Type();
 
       // FIXME: Types that can be mapped, but aren't yet.
+      case clang::BuiltinType::ShortAccum:
+      case clang::BuiltinType::Accum:
+      case clang::BuiltinType::LongAccum:
+      case clang::BuiltinType::UShortAccum:
+      case clang::BuiltinType::UAccum:
+      case clang::BuiltinType::ULongAccum:
+      case clang::BuiltinType::ShortFract:
+      case clang::BuiltinType::Fract:
+      case clang::BuiltinType::LongFract:
+      case clang::BuiltinType::UShortFract:
+      case clang::BuiltinType::UFract:
+      case clang::BuiltinType::ULongFract:
+      case clang::BuiltinType::SatShortAccum:
+      case clang::BuiltinType::SatAccum:
+      case clang::BuiltinType::SatLongAccum:
+      case clang::BuiltinType::SatUShortAccum:
+      case clang::BuiltinType::SatUAccum:
+      case clang::BuiltinType::SatULongAccum:
+      case clang::BuiltinType::SatShortFract:
+      case clang::BuiltinType::SatFract:
+      case clang::BuiltinType::SatLongFract:
+      case clang::BuiltinType::SatUShortFract:
+      case clang::BuiltinType::SatUFract:
+      case clang::BuiltinType::SatULongFract:
       case clang::BuiltinType::Half:
       case clang::BuiltinType::Float16:
       case clang::BuiltinType::Float128:
       case clang::BuiltinType::NullPtr:
+      case clang::BuiltinType::Char8:
         return Type();
 
       // Objective-C types that aren't mapped directly; rather, pointers to
@@ -498,7 +523,7 @@ namespace {
       if (!resultTy)
         return Type();
 
-      SmallVector<TupleTypeElt, 4> params;
+      SmallVector<FunctionType::Param, 4> params;
       for (auto param = type->param_type_begin(),
              paramEnd = type->param_type_end();
            param != paramEnd; ++param) {
@@ -512,14 +537,11 @@ namespace {
         // names. The probably doesn't matter outside of a FuncDecl, which
         // we'll have to special-case, but it's an interesting bit of data loss.
         // We also lose `noescape`. <https://bugs.swift.org/browse/SR-2529>
-        params.push_back(swiftParamTy);
+        params.push_back(FunctionType::Param(swiftParamTy));
       }
 
-      // Form the parameter tuple.
-      auto paramsTy = TupleType::get(params, Impl.SwiftContext);
-
       // Form the function type.
-      return FunctionType::get(paramsTy, resultTy);
+      return FunctionType::get(params, resultTy);
     }
 
     ImportResult
@@ -531,7 +553,7 @@ namespace {
       if (!resultTy)
         return Type();
 
-      return FunctionType::get(TupleType::getEmpty(Impl.SwiftContext),resultTy);
+      return FunctionType::get({}, resultTy);
     }
 
     ImportResult VisitParenType(const clang::ParenType *type) {
@@ -1607,10 +1629,7 @@ ImportedType ClangImporter::Implementation::importFunctionType(
   if (clangDecl->isNoReturn())
     swiftResultTy = SwiftContext.getNeverType();
 
-  // Form the function type.
-  auto argTy = parameterList->getType(SwiftContext);
-  auto fnTy = FunctionType::get(argTy, swiftResultTy);
-  return {fnTy, importedType.isImplicitlyUnwrapped()};
+  return {swiftResultTy, importedType.isImplicitlyUnwrapped()};
 }
 
 ParameterList *ClangImporter::Implementation::importFunctionParameterList(
@@ -1672,7 +1691,6 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         param, AccessLevel::Private,
         VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), name,
         importSourceLoc(param->getLocation()), bodyName,
-        dc->mapTypeIntoContext(swiftParamTy),
         ImportedHeaderUnit);
 
     paramInfo->setInterfaceType(swiftParamTy);
@@ -1691,7 +1709,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     auto param = new (SwiftContext) ParamDecl(VarDecl::Specifier::Default,
                                               SourceLoc(), SourceLoc(),
                                               Identifier(), SourceLoc(),
-                                              name, paramTy,
+                                              name,
                                               ImportedHeaderUnit);
     param->setInterfaceType(paramTy);
 
@@ -1868,17 +1886,14 @@ getForeignErrorInfo(ForeignErrorConvention::Info errorInfo,
   llvm_unreachable("bad error convention");
 }
 
-// Sometimes re-mapping type from one context to another is required,
-// because the other context might have some of the generic parameters
-// bound to concerete types, which means that we might loose generic
-// signature when converting from class method to constructor and that
-// is going to result in incorrect type interpretation of the method.
-static Type mapTypeIntoContext(const DeclContext *fromDC,
-                               const DeclContext *toDC, Type type) {
+// 'toDC' must be a subclass or a type conforming to the protocol
+// 'fromDC'.
+static Type mapGenericArgs(const DeclContext *fromDC,
+                           const DeclContext *toDC, Type type) {
   if (fromDC == toDC)
-    return toDC->mapTypeIntoContext(type);
+    return type;
 
-  auto subs = toDC->getDeclaredTypeInContext()->getContextSubstitutionMap(
+  auto subs = toDC->getDeclaredInterfaceType()->getContextSubstitutionMap(
                                             toDC->getParentModule(), fromDC);
   return type.subst(subs);
 }
@@ -1978,7 +1993,7 @@ ImportedType ClangImporter::Implementation::importMethodType(
   if (!swiftResultTy)
     return {Type(), false};
 
-  swiftResultTy = mapTypeIntoContext(origDC, dc, swiftResultTy);
+  swiftResultTy = mapGenericArgs(origDC, dc, swiftResultTy);
 
   CanType errorParamType;
 
@@ -1993,7 +2008,7 @@ ImportedType ClangImporter::Implementation::importMethodType(
     auto type = TupleType::getEmpty(SwiftContext);
     auto var = new (SwiftContext) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
                                             SourceLoc(), argName,
-                                            SourceLoc(), argName, type,
+                                            SourceLoc(), argName,
                                             ImportedHeaderUnit);
     var->setInterfaceType(type);
     swiftParams.push_back(var);
@@ -2074,7 +2089,7 @@ ImportedType ClangImporter::Implementation::importMethodType(
     if (!swiftParamTy)
       return {Type(), false};
 
-    swiftParamTy = mapTypeIntoContext(origDC, dc, swiftParamTy);
+    swiftParamTy = mapGenericArgs(origDC, dc, swiftParamTy);
 
     // If this is the error parameter, remember it, but don't build it
     // into the parameter type.
@@ -2118,9 +2133,8 @@ ImportedType ClangImporter::Implementation::importMethodType(
                                            SourceLoc(), SourceLoc(), name,
                                            importSourceLoc(param->getLocation()),
                                            bodyName,
-                                           swiftParamTy,
                                            ImportedHeaderUnit);
-    paramInfo->setInterfaceType(swiftParamTy->mapTypeOutOfContext());
+    paramInfo->setInterfaceType(swiftParamTy);
     recordImplicitUnwrapForDecl(paramInfo, paramIsIUO);
 
     // Determine whether we have a default argument.
@@ -2173,20 +2187,13 @@ ImportedType ClangImporter::Implementation::importMethodType(
     swiftResultTy = SwiftContext.getNeverType();
   }
 
-  FunctionType::ExtInfo extInfo;
-
   if (errorInfo) {
     foreignErrorInfo = getForeignErrorInfo(*errorInfo, errorParamType,
                                            origSwiftResultTy);
-
-    // Mark that the function type throws.
-    extInfo = extInfo.withThrows(true);
   }
 
-  // Form the function type.
-  auto fnTy = FunctionType::get((*bodyParams)->getInterfaceType(SwiftContext),
-                                swiftResultTy->mapTypeOutOfContext(), extInfo);
-  return {fnTy, importedType.isImplicitlyUnwrapped()};
+  return {swiftResultTy,
+          importedType.isImplicitlyUnwrapped()};
 }
 
 ImportedType ClangImporter::Implementation::importAccessorMethodType(
@@ -2218,14 +2225,14 @@ ImportedType ClangImporter::Implementation::importAccessorMethodType(
   if (!importedType)
     return {Type(), false};
 
-  auto propertyTy = mapTypeIntoContext(origDC, dc, importedType.getType());
+  auto propertyTy = mapGenericArgs(origDC, dc, importedType.getType());
   bool isIUO = importedType.isImplicitlyUnwrapped();
 
   // Now build up the resulting FunctionType and parameters.
   Type resultTy;
   if (isGetter) {
     *params = ParameterList::createEmpty(SwiftContext);
-    resultTy = propertyTy->mapTypeOutOfContext();
+    resultTy = propertyTy;
   } else {
     const clang::ParmVarDecl *param = clangDecl->parameters().front();
     ImportedName fullBodyName = importFullName(param, CurrentVersion);
@@ -2238,18 +2245,15 @@ ImportedType ClangImporter::Implementation::importAccessorMethodType(
                                            /*let loc*/SourceLoc(),
                                            /*label loc*/SourceLoc(),
                                            argLabel, nameLoc, bodyName,
-                                           propertyTy,
                                            /*dummy DC*/ImportedHeaderUnit);
-    paramInfo->setInterfaceType(propertyTy->mapTypeOutOfContext());
+    paramInfo->setInterfaceType(propertyTy);
 
     *params = ParameterList::create(SwiftContext, paramInfo);
     resultTy = SwiftContext.getVoidDecl()->getDeclaredInterfaceType();
     isIUO = false;
   }
 
-  auto fnTy =
-      FunctionType::get((*params)->getInterfaceType(SwiftContext), resultTy);
-  return {fnTy, isIUO};
+  return {resultTy, isIUO};
 }
 
 
@@ -2474,9 +2478,7 @@ Type ClangImporter::Implementation::getSugaredTypeReference(TypeDecl *type) {
   if (auto typealias = dyn_cast<TypeAliasDecl>(type)) {
     // If this typealias is nested, retrieve the parent type.
     Type parentType;
-    if (auto nominal =
-          typealias->getDeclContext()
-            ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    if (auto nominal = typealias->getDeclContext()->getSelfNominalTypeDecl()) {
       if (!nominal->getGenericSignature())
         parentType = nominal->getDeclaredInterfaceType();
     }

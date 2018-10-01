@@ -1,0 +1,15 @@
+RUN: %utils/remote-run -n --remote-dir /xyz-REMOTE --output-prefix %t some_user@some_host:12345 cp %t/nested/input %t/nested/output 2>&1 >/dev/null | %FileCheck %s
+
+CHECK: /usr/bin/ssh -n -p 12345 some_user@some_host -- '/usr/bin/env' '/bin/mkdir' '-p' '{{.+}}-REMOTE/output/nested'
+CHECK-NEXT: /usr/bin/sftp
+CHECK-SAME: -P 12345
+CHECK-SAME: some_user@some_host
+CHECK-DAG: -put '{{.+}}/nested/output' '/xyz-REMOTE/output/nested/output'
+CHECK-DAG: -put '{{.+}}/nested/input' '/xyz-REMOTE/output/nested/input'
+CHECK: /usr/bin/ssh -n -p 12345 some_user@some_host -- '/usr/bin/env' 'cp'
+CHECK-NEXT: {{^}}/bin/mkdir -p {{.+}}/nested
+CHECK-NEXT: /usr/bin/sftp
+CHECK-SAME: -P 12345
+CHECK-SAME: some_user@some_host
+CHECK-DAG: -get '/xyz-REMOTE/output/nested/output' '{{.+}}/nested/output'
+CHECK-DAG: -get '/xyz-REMOTE/output/nested/input' '{{.+}}/nested/input'

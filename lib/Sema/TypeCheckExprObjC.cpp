@@ -323,8 +323,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       auto resolved =
         KeyPathExpr::Component::forProperty(varRef, Type(), componentNameLoc);
       resolvedComponents.push_back(resolved);
-      updateState(/*isProperty=*/true,
-                  var->getInterfaceType()->getRValueObjectType());
+      updateState(/*isProperty=*/true, var->getInterfaceType());
 
       // Check that the property is @objc.
       if (!var->isObjC()) {
@@ -344,9 +343,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
               Swift3ObjCInferenceWarnings::Minimal) {
           diagnose(componentNameLoc, diag::expr_keypath_swift3_objc_inference,
                    var->getFullName(),
-                   var->getDeclContext()
-                    ->getAsNominalTypeOrNominalTypeExtensionContext()
-                   ->getName());
+                   var->getDeclContext()->getSelfNominalTypeDecl()->getName());
           diagnose(var, diag::make_decl_objc, var->getDescriptiveKind())
             .fixItInsert(var->getAttributeInsertionLoc(false),
                          "@objc ");

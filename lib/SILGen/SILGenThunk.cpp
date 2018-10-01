@@ -122,8 +122,7 @@ static ManagedValue getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc,
     // witness.
     if (constantInfo.SILFnType->getRepresentation()
           == SILFunctionTypeRepresentation::WitnessMethod) {
-      auto protocol =
-        func->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+      auto protocol = func->getDeclContext()->getSelfProtocolDecl();
       auto origSelfType = protocol->getSelfInterfaceType()->getCanonicalType();
       auto substSelfType = origSelfType.subst(curriedSubs)->getCanonicalType();
       auto conformance = curriedSubs.lookupConformance(origSelfType, protocol);

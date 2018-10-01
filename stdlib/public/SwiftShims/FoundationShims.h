@@ -55,7 +55,7 @@ typedef struct {
 } _SwiftNSOperatingSystemVersion;
 
 SWIFT_RUNTIME_STDLIB_API
-_SwiftNSOperatingSystemVersion _swift_stdlib_operatingSystemVersion();
+_SwiftNSOperatingSystemVersion _swift_stdlib_operatingSystemVersion() __attribute__((const));
 
 #ifdef __cplusplus
 }} // extern "C", namespace swift

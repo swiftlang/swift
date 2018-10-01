@@ -51,6 +51,11 @@ enum class TriviaRetentionMode {
   WithTrivia,
 };
 
+enum class HashbangMode : bool {
+  Disallowed,
+  Allowed,
+};
+
 /// Kinds of conflict marker which the lexer might encounter.
 enum class ConflictMarkerKind {
   /// A normal or diff3 conflict marker, initiated by at least 7 "<"s,
@@ -98,6 +103,9 @@ class Lexer {
   /// file.  This enables the 'sil' keyword.
   const bool InSILMode;
 
+  /// True if we should skip past a `#!` line at the start of the file.
+  const bool IsHashbangAllowed;
+
   const CommentRetentionMode RetainComments;
 
   const TriviaRetentionMode TriviaRetention;
@@ -128,7 +136,7 @@ class Lexer {
   /// everything.
   Lexer(const PrincipalTag &, const LangOptions &LangOpts,
         const SourceManager &SourceMgr, unsigned BufferID,
-        DiagnosticEngine *Diags, bool InSILMode,
+        DiagnosticEngine *Diags, bool InSILMode, HashbangMode HashbangAllowed,
         CommentRetentionMode RetainComments,
         TriviaRetentionMode TriviaRetention);
 
@@ -151,13 +159,14 @@ public:
   Lexer(
       const LangOptions &Options, const SourceManager &SourceMgr,
       unsigned BufferID, DiagnosticEngine *Diags, bool InSILMode,
+      HashbangMode HashbangAllowed = HashbangMode::Disallowed,
       CommentRetentionMode RetainComments = CommentRetentionMode::None,
       TriviaRetentionMode TriviaRetention = TriviaRetentionMode::WithoutTrivia);
 
   /// \brief Create a lexer that scans a subrange of the source buffer.
   Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
         unsigned BufferID, DiagnosticEngine *Diags, bool InSILMode,
-        CommentRetentionMode RetainComments,
+        HashbangMode HashbangAllowed, CommentRetentionMode RetainComments,
         TriviaRetentionMode TriviaRetention, unsigned Offset,
         unsigned EndOffset);
 

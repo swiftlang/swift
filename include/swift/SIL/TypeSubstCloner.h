@@ -30,8 +30,13 @@
 
 namespace swift {
 
-/// TypeSubstCloner - a utility class for cloning code while remapping types.
-template<typename ImplClass>
+/// \brief A utility class for cloning code while remapping types.
+///
+/// \tparam FunctionBuilderTy Function builder type injected by
+/// subclasses. Used to break a circular dependency from SIL <=>
+/// SILOptimizer that would be caused by us needing to use
+/// SILOptFunctionBuilder here.
+template<typename ImplClass, typename FunctionBuilderTy>
 class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
   friend class SILInstructionVisitor<ImplClass>;
   friend class SILCloner<ImplClass>;
@@ -157,7 +162,6 @@ public:
       Original(From),
       Inlining(Inlining) {
   }
-
 
 protected:
   SILType remapType(SILType Ty) {
@@ -309,7 +313,8 @@ protected:
   /// necessary when inlining said function into a new generic context.
   /// \param SubsMap - the substitutions of the inlining/specialization process.
   /// \param RemappedSig - the generic signature.
-  static SILFunction *remapParentFunction(SILModule &M,
+  static SILFunction *remapParentFunction(FunctionBuilderTy &FuncBuilder,
+					  SILModule &M,
                                           SILFunction *ParentFunction,
                                           SubstitutionMap SubsMap,
                                           GenericSignature *RemappedSig,
@@ -344,8 +349,7 @@ protected:
       // Create a new function with this mangled name with an empty
       // body. There won't be any IR generated for it (hence the linkage),
       // but the symbol will be refered to by the debug info metadata.
-      SILFunctionBuilder B(M);
-      ParentFunction = B.getOrCreateFunction(
+      ParentFunction = FuncBuilder.getOrCreateFunction(
           ParentFunction->getLocation(), MangledName, SILLinkage::Shared,
           ParentFunction->getLoweredFunctionType(), ParentFunction->isBare(),
           ParentFunction->isTransparent(), ParentFunction->isSerialized(), 0,
@@ -357,7 +361,7 @@ protected:
         // If the function was newly created with an empty body mark it as
         // undead.
         if (ParentFunction->empty()) {
-          M.eraseFunction(ParentFunction);
+          FuncBuilder.eraseFunction(ParentFunction);
           ParentFunction->setGenericEnvironment(OriginalEnvironment);
         }
       }
@@ -375,7 +379,7 @@ protected:
   SILFunction &Original;
   /// True, if used for inlining.
   bool Inlining;
-  };
+};
 
 } // end namespace swift
 

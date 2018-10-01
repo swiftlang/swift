@@ -1805,7 +1805,7 @@ ASTContext::getBehaviorConformance(Type conformingType,
   auto conformance = new (*this, AllocationArena::Permanent)
     NormalProtocolConformance(conformingType, protocol, loc, storage, state);
 
-  if (auto nominal = conformingType->getRValueInstanceType()->getAnyNominal()) {
+  if (auto nominal = conformingType->getAnyNominal()) {
     // Note: this is an egregious hack. The conformances need to be associated
     // with the actual storage declarations.
     SmallVector<ProtocolConformance *, 2> conformances;
@@ -2490,8 +2490,7 @@ bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
         continue;
     }
 
-    auto classDecl =
-      method->getDeclContext()->getAsClassOrClassExtensionContext();
+    auto classDecl = method->getDeclContext()->getSelfClassDecl();
     if (!classDecl)
       continue; // error-recovery path, only
 
@@ -2770,8 +2769,7 @@ bool ASTContext::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
   bool anyDiagnosed = false;
   for (const auto &unsatisfied : localReqs) {
     // Check whether there is a conflict here.
-    ClassDecl *classDecl =
-      unsatisfied.first->getAsClassOrClassExtensionContext();
+    ClassDecl *classDecl = unsatisfied.first->getSelfClassDecl();
     auto req = unsatisfied.second;
     auto selector = req->getObjCSelector();
     bool isInstanceMethod = req->isInstanceMember();
@@ -3046,7 +3044,7 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
                           Fields[0].getParameterFlags());
 
   RecursiveTypeProperties properties;
-  bool hasInOut = false;
+  bool hasElementWithOwnership = false;
   for (const TupleTypeElt &Elt : Fields) {
     auto eltTy = Elt.getType();
     if (!eltTy) continue;
@@ -3056,11 +3054,13 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
     // non-paren tuples are malformed and will be diagnosed later.
     if (auto *TTy = Elt.getType()->getAs<TupleType>()) {
       if (TTy->getNumElements() == 1)
-        hasInOut |= TTy->hasInOutElement();
+        hasElementWithOwnership |= TTy->hasElementWithOwnership();
     } else if (auto *Pty = dyn_cast<ParenType>(Elt.getType().getPointer())) {
-      hasInOut |= Pty->getParameterFlags().isInOut();
+      hasElementWithOwnership |= (Pty->getParameterFlags().getValueOwnership() !=
+                                  ValueOwnership::Default);
     } else {
-      hasInOut |= Elt.getParameterFlags().isInOut();
+      hasElementWithOwnership |= (Elt.getParameterFlags().getValueOwnership() !=
+                                  ValueOwnership::Default);
     }
   }
 
@@ -3088,7 +3088,7 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
                          sizeof(TupleTypeElt) * Fields.size(),
                          alignof(TupleType), arena);
   auto New = new (mem) TupleType(Fields, IsCanonical ? &C : nullptr, properties,
-                                 hasInOut);
+                                 hasElementWithOwnership);
   C.getImpl().getArena(arena).TupleTypes.InsertNode(New, InsertPos);
   return New;
 }
@@ -3105,20 +3105,6 @@ TupleTypeElt::TupleTypeElt(Type ty, Identifier name,
 Type TupleTypeElt::getType() const {
   if (Flags.isInOut()) return InOutType::get(ElementType);
   return ElementType;
-}
-
-AnyFunctionType::Param::Param(const TupleTypeElt &tte)
-  : Ty(tte.isVararg() ? tte.getVarargBaseTy() : tte.getRawType()),
-    Label(tte.getName()), Flags(tte.getParameterFlags()) {
-  assert(getType()->is<InOutType>() == Flags.isInOut());
-}
-
-AnyFunctionType::Param::Param(Type t, Identifier l, ParameterTypeFlags f)
-  : Ty(t), Label(l), Flags(f) {
-  if (f.isInOut())
-    assert(!t->is<InOutType>() && "caller did not pass a base type");
-  if (!t.isNull() && t->is<InOutType>())
-    assert(f.isInOut() && "caller did not set flags correctly");
 }
 
 Type AnyFunctionType::Param::getType() const {
@@ -3138,14 +3124,12 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
   // Determine the type of the container.
   auto containerTy = dc->getDeclaredInterfaceType();
   if (!containerTy || containerTy->hasError())
-    return AnyFunctionType::Param(ErrorType::get(Ctx), Identifier(),
-                                  ParameterTypeFlags());
+    return AnyFunctionType::Param(ErrorType::get(Ctx));
 
   // Determine the type of 'self' inside the container.
   auto selfTy = dc->getSelfInterfaceType();
   if (!selfTy || selfTy->hasError())
-    return AnyFunctionType::Param(ErrorType::get(Ctx), Identifier(),
-                                  ParameterTypeFlags());
+    return AnyFunctionType::Param(ErrorType::get(Ctx));
 
   bool isStatic = false;
   bool isMutating = false;
@@ -3187,13 +3171,11 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
 
   // 'static' functions have 'self' of type metatype<T>.
   if (isStatic)
-    return AnyFunctionType::Param(MetatypeType::get(selfTy, Ctx), Identifier(),
-                                  ParameterTypeFlags());
+    return AnyFunctionType::Param(MetatypeType::get(selfTy, Ctx));
 
   // Reference types have 'self' of type T.
   if (containerTy->hasReferenceSemantics())
-    return AnyFunctionType::Param(selfTy, Identifier(),
-                                  ParameterTypeFlags());
+    return AnyFunctionType::Param(selfTy);
 
   return AnyFunctionType::Param(selfTy, Identifier(),
                                 ParameterTypeFlags().withInOut(isMutating));
@@ -3610,10 +3592,10 @@ getGenericFunctionRecursiveProperties(Type Input, Type Result) {
 
 AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
   if (isa<FunctionType>(this))
-    return FunctionType::get(getInput(), getResult(), info);
+    return FunctionType::getOld(getInput(), getResult(), info);
   if (auto *genFnTy = dyn_cast<GenericFunctionType>(this))
-    return GenericFunctionType::get(genFnTy->getGenericSignature(),
-                                    getInput(), getResult(), info);
+    return GenericFunctionType::getOld(genFnTy->getGenericSignature(),
+                                       getInput(), getResult(), info);
 
   static_assert(2 - 1 ==
                   static_cast<int>(TypeKind::Last_AnyFunctionType) -
@@ -3628,25 +3610,27 @@ void AnyFunctionType::decomposeInput(
   case TypeKind::Tuple: {
     auto tupleTy = cast<TupleType>(type.getPointer());
     for (auto &elt : tupleTy->getElements()) {
-      result.push_back(AnyFunctionType::Param(elt));
+      result.emplace_back((elt.isVararg()
+                           ? elt.getVarargBaseTy()
+                           : elt.getRawType()),
+                          elt.getName(),
+                          elt.getParameterFlags());
     }
     return;
   }
       
   case TypeKind::Paren: {
     auto pty = cast<ParenType>(type.getPointer());
-    result.push_back(AnyFunctionType::Param(pty->getUnderlyingType()->getInOutObjectType(),
-                                            Identifier(),
-                                            pty->getParameterFlags()));
+    result.emplace_back(pty->getUnderlyingType()->getInOutObjectType(),
+                        Identifier(),
+                        pty->getParameterFlags());
     return;
   }
       
   default:
-//    assert(type->is<InOutType>() && "Found naked inout type");
-    result.push_back(
-        AnyFunctionType::Param(type->getInOutObjectType(), Identifier(),
-                               ParameterTypeFlags::fromParameterType(
-                                   type, false, ValueOwnership::Default)));
+    result.emplace_back(type->getInOutObjectType(), Identifier(),
+                        ParameterTypeFlags::fromParameterType(
+                          type, false, ValueOwnership::Default));
     return;
   }
 }
@@ -3657,13 +3641,15 @@ Type AnyFunctionType::composeInput(ASTContext &ctx, ArrayRef<Param> params,
   for (const auto &param : params) {
     Type eltType = param.getPlainType();
     if (param.isVariadic()) {
-      if (canonicalVararg)
+      if (!ctx.getArrayDecl())
+        eltType = ErrorType::get(ctx);
+      else if (canonicalVararg)
         eltType = BoundGenericType::get(ctx.getArrayDecl(), Type(), {eltType});
       else
         eltType = ArraySliceType::get(eltType);
     }
-    elements.push_back(TupleTypeElt(eltType, param.getLabel(),
-                                    param.getParameterFlags()));
+    elements.emplace_back(eltType, param.getLabel(),
+                          param.getParameterFlags());
   }
   return TupleType::get(elements, ctx);
 }
@@ -3694,14 +3680,14 @@ bool AnyFunctionType::equalParams(CanParamArrayRef a, CanParamArrayRef b) {
 }
 
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
-                                Type result, const ExtInfo &info,
+                                Type result, ExtInfo info,
                                 bool canonicalVararg) {
-  return get(composeInput(result->getASTContext(), params, canonicalVararg),
-             result, info);
+  return getOld(composeInput(result->getASTContext(), params, canonicalVararg),
+                result, info);
 }
 
-FunctionType *FunctionType::get(Type input, Type result,
-                                const ExtInfo &info) {
+FunctionType *FunctionType::getOld(Type input, Type result,
+                                   ExtInfo info) {
   auto properties = getFunctionRecursiveProperties(input, result);
   auto arena = getArena(properties);
   uint16_t attrKey = info.getFuncAttrKey();
@@ -3725,7 +3711,7 @@ FunctionType *FunctionType::get(Type input, Type result,
 FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
                            Type input, Type output,
                            RecursiveTypeProperties properties,
-                           const ExtInfo &Info)
+                           ExtInfo Info)
     : AnyFunctionType(TypeKind::Function,
                       (isCanonicalFunctionInputType(input) &&
                        output->isCanonical())
@@ -3740,7 +3726,7 @@ void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
                                   GenericSignature *sig,
                                   Type input,
                                   Type result,
-                                  const ExtInfo &info) {
+                                  ExtInfo info) {
   ID.AddPointer(sig);
   ID.AddPointer(input.getPointer());
   ID.AddPointer(result.getPointer());
@@ -3759,18 +3745,18 @@ static Type unwrapParenType(Type type) {
 GenericFunctionType *GenericFunctionType::get(GenericSignature *sig,
                                               ArrayRef<Param> params,
                                               Type result,
-                                              const ExtInfo &info,
+                                              ExtInfo info,
                                               bool canonicalVararg) {
-  return get(sig, composeInput(result->getASTContext(), params,
-                               canonicalVararg),
-             result, info);
+  return getOld(sig, composeInput(result->getASTContext(), params,
+                                  canonicalVararg),
+                result, info);
 }
 
 GenericFunctionType *
-GenericFunctionType::get(GenericSignature *sig,
-                         Type input,
-                         Type output,
-                         const ExtInfo &info) {
+GenericFunctionType::getOld(GenericSignature *sig,
+                            Type input,
+                            Type output,
+                            ExtInfo info) {
   assert(sig && "no generic signature for generic function type?!");
   assert(!input->hasTypeVariable() && !output->hasTypeVariable());
 
@@ -3820,7 +3806,7 @@ GenericFunctionType::GenericFunctionType(
                        ArrayRef<AnyFunctionType::Param> params,
                        Type input,
                        Type result,
-                       const ExtInfo &info,
+                       ExtInfo info,
                        const ASTContext *ctx,
                        RecursiveTypeProperties properties)
   : AnyFunctionType(TypeKind::GenericFunction, ctx, input, result,

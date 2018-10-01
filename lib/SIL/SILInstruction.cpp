@@ -1358,33 +1358,6 @@ SILInstructionResultArray::getTypes() const {
   return {llvm::map_iterator(begin(), F), llvm::map_iterator(end(), F)};
 }
 
-SILInstructionResultArray::iterator SILInstructionResultArray::begin() const {
-  return iterator(*this, 0);
-}
-
-SILInstructionResultArray::iterator SILInstructionResultArray::end() const {
-  return iterator(*this, size());
-}
-
-SILInstructionResultArray::reverse_iterator
-SILInstructionResultArray::rbegin() const {
-  return llvm::make_reverse_iterator(end());
-}
-
-SILInstructionResultArray::reverse_iterator
-SILInstructionResultArray::rend() const {
-  return llvm::make_reverse_iterator(begin());
-}
-
-SILInstructionResultArray::range SILInstructionResultArray::getValues() const {
-  return {begin(), end()};
-}
-
-SILInstructionResultArray::reverse_range
-SILInstructionResultArray::getReversedValues() const {
-  return {rbegin(), rend()};
-}
-
 const ValueBase *SILInstructionResultArray::front() const {
   assert(size() && "Can not access front of an empty result array");
   return *begin();

@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignatureBuilder.h"
+#include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Decl.h"
@@ -433,12 +434,10 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
   }
 
   auto selfTy = dc->getDeclaredInterfaceType();
-  auto selfParam = AnyFunctionType::Param(selfTy,
-                                          Identifier(), ParameterTypeFlags());
+  auto selfParam = AnyFunctionType::Param(selfTy);
   if (sig)
-    return GenericFunctionType::get(sig, {selfParam}, type,
-                                    AnyFunctionType::ExtInfo());
-  return FunctionType::get({selfParam}, type, AnyFunctionType::ExtInfo());
+    return GenericFunctionType::get(sig, {selfParam}, type);
+  return FunctionType::get({selfParam}, type);
 }
 
 void
@@ -731,15 +730,6 @@ Type TypeBase::getWithoutParens() {
   return Ty;
 }
 
-Type TypeBase::getWithoutImmediateLabel() {
-  Type Ty = this;
-  if (auto tupleTy = dyn_cast<TupleType>(Ty.getPointer())) {
-    if (tupleTy->hasParenSema(/*allowName*/true))
-      Ty = tupleTy->getElementType(0);
-  }
-  return Ty;
-}
-
 Type TypeBase::replaceCovariantResultType(Type newResultType,
                                           unsigned uncurryLevel) {
   if (uncurryLevel == 0) {
@@ -901,49 +891,46 @@ std::string swift::getParamListAsString(ArrayRef<AnyFunctionType::Param> params)
 
 /// Rebuilds the given 'self' type using the given object type as the
 /// replacement for the object type of self.
-static Type rebuildSelfTypeWithObjectType(Type selfTy, Type objectTy) {
-  auto existingObjectTy = selfTy->getRValueInstanceType();
-  return selfTy.transform([=](Type type) -> Type {
-    if (type->isEqual(existingObjectTy))
-      return objectTy;
-    return type;
-  });
+static AnyFunctionType::Param
+rebuildSelfTypeWithObjectType(AnyFunctionType::Param selfParam,
+                              Type objectTy) {
+  if (selfParam.getPlainType()->getAs<MetatypeType>())
+    objectTy = MetatypeType::get(objectTy);
+
+  return AnyFunctionType::Param(objectTy,
+                                selfParam.getLabel(),
+                                selfParam.getParameterFlags());
 }
 
 /// Returns a new function type exactly like this one but with the self
-/// parameter replaced. Only makes sense for members of types.
+/// parameter replaced. Only makes sense for members of classes.
 Type TypeBase::replaceSelfParameterType(Type newSelf) {
   auto fnTy = castTo<AnyFunctionType>();
-  Type input = rebuildSelfTypeWithObjectType(fnTy->getInput(), newSelf);
+
+  auto params = fnTy->getParams();
+  assert(params.size() == 1);
+  auto selfParam = rebuildSelfTypeWithObjectType(params[0], newSelf);
 
   if (auto genericFnTy = getAs<GenericFunctionType>()) {
     return GenericFunctionType::get(genericFnTy->getGenericSignature(),
-                                    input,
+                                    {selfParam},
                                     fnTy->getResult(),
                                     fnTy->getExtInfo());
   }
 
-  return FunctionType::get(input,
+  return FunctionType::get({selfParam},
                            fnTy->getResult(),
                            fnTy->getExtInfo());
 }
 
-/// Retrieve the object type for a 'self' parameter, digging into one-element
-/// tuples, inout types, and metatypes.
-Type TypeBase::getRValueInstanceType() {
-  Type type = this;
-  
-  // Look through argument list tuples.
-  if (auto tupleTy = type->getAs<TupleType>()) {
-    if (tupleTy->hasParenSema(/*allowName*/true))
-      type = tupleTy->getElementType(0);
-  }
-  
-  if (auto metaTy = type->getAs<AnyMetatypeType>())
+/// Look through a metatype, or just return the original type if it is
+/// not a metatype.
+Type TypeBase::getMetatypeInstanceType() {
+  if (auto metaTy = getAs<AnyMetatypeType>())
     return metaTy->getInstanceType();
 
   // For mutable value type methods, we need to dig through inout types.
-  return type->getInOutObjectType();
+  return this;
 }
 
 /// \brief Collect the protocols in the existential type T into the given
@@ -1197,7 +1184,8 @@ CanType TypeBase::computeCanonicalType() {
     break;
   }
   case TypeKind::LValue:
-    Result = LValueType::get(getRValueType()->getCanonicalType());
+    Result = LValueType::get(cast<LValueType>(this)->getObjectType()
+                               ->getCanonicalType());
     break;
   case TypeKind::InOut:
     Result = InOutType::get(getInOutObjectType()->getCanonicalType());
@@ -1214,8 +1202,8 @@ CanType TypeBase::computeCanonicalType() {
       return type->getCanonicalType(sig);
     });
     auto resultTy = function->getResult()->getCanonicalType(sig);
-    Result = GenericFunctionType::get(sig, inputTy, resultTy,
-                                      function->getExtInfo());
+    Result = GenericFunctionType::getOld(sig, inputTy, resultTy,
+                                         function->getExtInfo());
     assert(Result->isCanonical());
     break;
   }
@@ -1231,7 +1219,7 @@ CanType TypeBase::computeCanonicalType() {
     auto In = getCanonicalInputType(
         FT, [](Type type) -> CanType { return type->getCanonicalType(); });
     Type Out = FT->getResult()->getCanonicalType();
-    Result = FunctionType::get(In, Out, FT->getExtInfo());
+    Result = FunctionType::getOld(In, Out, FT->getExtInfo());
     break;
   }
   case TypeKind::ProtocolComposition: {
@@ -1904,7 +1892,7 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
 
   // Class-constrained generic parameters, from ObjC generic classes.
   if (auto tyContext = dc->getInnermostTypeContext())
-    if (auto clas = tyContext->getAsClassOrClassExtensionContext())
+    if (auto clas = tyContext->getSelfClassDecl())
       if (clas->hasClangNode())
         if (auto archetype = type->getAs<ArchetypeType>())
           if (archetype->requiresClass())
@@ -2438,45 +2426,6 @@ int TupleType::getNamedElementId(Identifier I) const {
 
   // Otherwise, name not found.
   return -1;
-}
-
-/// getElementForScalarInit - If a tuple of this type can be initialized with a
-/// scalar, return the field number that the scalar is assigned to.  If not,
-/// return -1.
-int TupleType::getElementForScalarInit() const {
-  if (Bits.TupleType.Count == 0) return -1;
-  
-  int FieldWithoutDefault = -1;
-  for (unsigned i = 0, e = Bits.TupleType.Count; i != e; ++i) {
-    // If we already saw a non-vararg field missing a default value, then we
-    // cannot assign a scalar to this tuple.
-    if (FieldWithoutDefault != -1) {
-      // Vararg fields are okay; they'll just end up being empty.
-      if (getTrailingObjects<TupleTypeElt>()[i].isVararg())
-        continue;
-    
-      return -1;
-    }
-    
-    // Otherwise, remember this field number.
-    FieldWithoutDefault = i;    
-  }
-  
-  // If all the elements have default values, the scalar initializes the first
-  // value in the tuple.
-  return FieldWithoutDefault == -1 ? 0 : FieldWithoutDefault;
-}
-
-/// If this tuple has a varargs element to it, return the base type of the
-/// varargs element (i.e., if it is "Int...", this returns Int, not [Int]).
-/// Otherwise, this returns Type().
-Type TupleType::getVarArgsBaseType() const {
-  for (unsigned i = 0, e = Bits.TupleType.Count; i != e; ++i) {
-    if (getTrailingObjects<TupleTypeElt>()[i].isVararg())
-      return getTrailingObjects<TupleTypeElt>()[i].getVarargBaseTy();
-  }
-  
-  return Type();
 }
 
 
@@ -3243,7 +3192,17 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
 
     t = t->getSuperclass(useArchetypes);
   }
-  llvm_unreachable("no inheritance relationship between given classes");
+
+#ifndef NDEBUG
+  auto *currentClass = getConcreteTypeForSuperclassTraversing(this)
+      ->getClassOrBoundGenericClass();
+  while (currentClass && currentClass != baseClass)
+    currentClass = currentClass->getSuperclassDecl();
+  assert(currentClass == baseClass &&
+         "no inheritance relationship between given classes");
+#endif
+
+  return ErrorType::get(this);
 }
 
 TypeSubstitutionMap
@@ -3262,7 +3221,7 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
 
   // If the member is part of a protocol or extension thereof, we need
   // to substitute in the type of Self.
-  if (dc->getAsProtocolOrProtocolExtensionContext()) {
+  if (dc->getSelfProtocolDecl()) {
     // FIXME: This feels painfully inefficient. We're creating a dense map
     // for a single substitution.
     substitutions[dc->getSelfInterfaceType()
@@ -3272,7 +3231,7 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   }
 
   // Find the superclass type with the context matching that of the member.
-  auto *ownerNominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *ownerNominal = dc->getSelfNominalTypeDecl();
   if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
     baseTy = baseTy->getSuperclassForDecl(ownerClass);
 
@@ -3851,14 +3810,14 @@ case TypeKind::Id:
       if (isUnchanged) return *this;
       
       auto genericSig = genericFnType->getGenericSignature();
-      return GenericFunctionType::get(genericSig, inputTy, resultTy,
-                                      function->getExtInfo());
+      return GenericFunctionType::getOld(genericSig, inputTy, resultTy,
+                                         function->getExtInfo());
     }
 
     if (isUnchanged) return *this;
 
-    return FunctionType::get(inputTy, resultTy,
-                             function->getExtInfo());
+    return FunctionType::getOld(inputTy, resultTy,
+                                function->getExtInfo());
   }
 
   case TypeKind::ArraySlice: {
@@ -4045,24 +4004,28 @@ bool UnownedStorageType::isLoadable(ResilienceExpansion resilience) const {
   auto ty = getReferentType();
   if (auto underlyingTy = ty->getOptionalObjectType())
     ty = underlyingTy;
-  return ty->usesNativeReferenceCounting(resilience);
+  return ty->getReferenceCounting() == ReferenceCounting::Native;
 }
 
-static bool doesOpaqueClassUseNativeReferenceCounting(const ASTContext &ctx) {
-  return !ctx.LangOpts.EnableObjCInterop;
-}
-
-static bool usesNativeReferenceCounting(ClassDecl *theClass,
-                                        ResilienceExpansion resilience) {
-  // TODO: Resilience? there might be some legal avenue of changing this.
+static ReferenceCounting getClassReferenceCounting(ClassDecl *theClass) {
   while (auto superclass = theClass->getSuperclassDecl()) {
     theClass = superclass;
   }
-  return !theClass->hasClangNode();
+
+  return theClass->hasClangNode()
+           ? ReferenceCounting::ObjC
+           : ReferenceCounting::Native;
 }
 
-bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
+ReferenceCounting TypeBase::getReferenceCounting() {
   CanType type = getCanonicalType();
+  ASTContext &ctx = type->getASTContext();
+
+  // In the absence of Objective-C interoperability, everything uses native
+  // reference counting.
+  if (!ctx.LangOpts.EnableObjCInterop)
+    return ReferenceCounting::Native;
+
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
@@ -4071,27 +4034,26 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
 
   case TypeKind::BuiltinNativeObject:
   case TypeKind::SILBox:
-    return true;
+    return ReferenceCounting::Native;
+
+  case TypeKind::BuiltinBridgeObject:
+    return ReferenceCounting::Bridge;
 
   case TypeKind::BuiltinUnknownObject:
-  case TypeKind::BuiltinBridgeObject:
-    return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+    return ReferenceCounting::Unknown;
 
   case TypeKind::Class:
-    return ::usesNativeReferenceCounting(cast<ClassType>(type)->getDecl(),
-                                         resilience);
+    return getClassReferenceCounting(cast<ClassType>(type)->getDecl());
   case TypeKind::BoundGenericClass:
-    return ::usesNativeReferenceCounting(
-                                  cast<BoundGenericClassType>(type)->getDecl(),
-                                         resilience);
+    return getClassReferenceCounting(
+                                  cast<BoundGenericClassType>(type)->getDecl());
   case TypeKind::UnboundGeneric:
-    return ::usesNativeReferenceCounting(
-                    cast<ClassDecl>(cast<UnboundGenericType>(type)->getDecl()),
-                                         resilience);
+    return getClassReferenceCounting(
+                    cast<ClassDecl>(cast<UnboundGenericType>(type)->getDecl()));
 
   case TypeKind::DynamicSelf:
     return cast<DynamicSelfType>(type).getSelfType()
-             ->usesNativeReferenceCounting(resilience);
+        ->getReferenceCounting();
 
   case TypeKind::Archetype: {
     auto archetype = cast<ArchetypeType>(type);
@@ -4100,17 +4062,17 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
     assert(archetype->requiresClass() ||
            (layout && layout->isRefCounted()));
     if (auto supertype = archetype->getSuperclass())
-      return supertype->usesNativeReferenceCounting(resilience);
-    return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+      return supertype->getReferenceCounting();
+    return ReferenceCounting::Unknown;
   }
 
   case TypeKind::Protocol:
   case TypeKind::ProtocolComposition: {
-    auto layout = getExistentialLayout();
+    auto layout = type->getExistentialLayout();
     assert(layout.requiresClass() && "Opaque existentials don't use refcounting");
     if (auto superclass = layout.getSuperclass())
-      return superclass->usesNativeReferenceCounting(resilience);
-    return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+      return superclass->getReferenceCounting();
+    return ReferenceCounting::Unknown;
   }
 
   case TypeKind::Function:

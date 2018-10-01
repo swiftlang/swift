@@ -673,7 +673,6 @@ public:
         Snapshot->getBuffer()->getText(), FilePath);
 
     BufferID = SM.addNewSourceBuffer(std::move(BufCopy));
-    SM.setHashbangBufferID(BufferID);
     DiagConsumer.setInputBufferIDs(BufferID);
 
     Parser.reset(
@@ -2182,7 +2181,8 @@ void verifyIncrementalParse(SwiftEditorDocumentRef EditorDoc,
       // Write the incremental syntax tree
       auto IncrTreeFilename = DirectoryName + "/incrementalTree.json";
       llvm::raw_fd_ostream IncrementalFilestream(
-          IncrTreeFilename.str(), ErrorCode, llvm::sys::fs::F_RW);
+          IncrTreeFilename.str(), ErrorCode,
+          llvm::sys::fs::FA_Read | llvm::sys::fs::FA_Write);
       IncrementalFilestream << IncrTreeStream.str();
       if (ErrorCode) {
         Log->getOS() << "Failed to write incremental syntax tree to "
@@ -2196,7 +2196,8 @@ void verifyIncrementalParse(SwiftEditorDocumentRef EditorDoc,
       // Write from-scratch syntax tree
       auto ScratchTreeFilename = DirectoryName + "/fromScratchTree.json";
       llvm::raw_fd_ostream ScratchTreeFilestream(
-          ScratchTreeFilename.str(), ErrorCode, llvm::sys::fs::F_RW);
+          ScratchTreeFilename.str(), ErrorCode,
+          llvm::sys::fs::FA_Read | llvm::sys::fs::FA_Write);
       ScratchTreeFilestream << ScratchTreeStream.str();
       if (ErrorCode) {
         Log->getOS() << "Failed to write from-scratch syntax tree to "
@@ -2211,7 +2212,7 @@ void verifyIncrementalParse(SwiftEditorDocumentRef EditorDoc,
       // Write source file
       auto SourceFilename = DirectoryName + "/postEditSource.swift";
       llvm::raw_fd_ostream SourceFilestream(SourceFilename.str(), ErrorCode,
-                                            llvm::sys::fs::F_RW);
+                              llvm::sys::fs::FA_Read | llvm::sys::fs::FA_Write);
       auto FileBuffer = EditorDoc->getLatestSnapshot()->getBuffer();
       SourceFilestream << FileBuffer->getText();
     }

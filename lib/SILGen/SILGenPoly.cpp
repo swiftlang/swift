@@ -872,8 +872,9 @@ namespace {
         }
       }
 
-      // Special-case: tuples containing inouts.
-      if (inputTupleType && inputTupleType->hasInOutElement()) {
+      // Special-case: tuples containing inouts, __shared or __owned,
+      // and one-element vararg tuples.
+      if (inputTupleType && shouldExpandTupleType(inputTupleType)) {
         // Non-materializable tuple types cannot be bound as generic
         // arguments, so none of the remaining transformations apply.
         // Instead, the outermost tuple layer is exploded, even when
@@ -1056,8 +1057,8 @@ namespace {
                                     CanTupleType inputTupleType,
                                     AbstractionPattern outputOrigType,
                                     CanTupleType outputTupleType) {
-      assert(!inputTupleType->hasInOutElement() &&
-             !outputTupleType->hasInOutElement());
+      assert(!inputTupleType->hasElementWithOwnership() &&
+             !outputTupleType->hasElementWithOwnership());
       assert(inputTupleType->getNumElements() ==
              outputTupleType->getNumElements());
 
@@ -1149,8 +1150,8 @@ namespace {
       // when witness method thunks re-abstract a non-mutating
       // witness for a mutating requirement. The inout self is just
       // loaded to produce a value in this case.
-      assert(inputSubstType->hasInOutElement() ||
-             !outputSubstType->hasInOutElement());
+      assert(inputSubstType->hasElementWithOwnership() ||
+             !outputSubstType->hasElementWithOwnership());
       assert(inputSubstType->getNumElements() ==
              outputSubstType->getNumElements());
 
@@ -1171,8 +1172,8 @@ namespace {
                                   ManagedValue inputTupleAddr) {
       assert(inputOrigType.isTypeParameter());
       assert(outputOrigType.matchesTuple(outputSubstType));
-      assert(!inputSubstType->hasInOutElement() &&
-             !outputSubstType->hasInOutElement());
+      assert(!inputSubstType->hasElementWithOwnership() &&
+             !outputSubstType->hasElementWithOwnership());
       assert(inputSubstType->getNumElements() ==
              outputSubstType->getNumElements());
 
@@ -1218,8 +1219,8 @@ namespace {
                                  TemporaryInitialization &tupleInit) {
       assert(inputOrigType.matchesTuple(inputSubstType));
       assert(outputOrigType.matchesTuple(outputSubstType));
-      assert(!inputSubstType->hasInOutElement() &&
-             !outputSubstType->hasInOutElement());
+      assert(!inputSubstType->hasElementWithOwnership() &&
+             !outputSubstType->hasElementWithOwnership());
       assert(inputSubstType->getNumElements() ==
              outputSubstType->getNumElements());
 
@@ -3016,10 +3017,12 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
       thunkType, noEscapingFnTy, escapingFnTy, F.isSerialized());
 
   if (thunk->empty()) {
+    thunk->setWithoutActuallyEscapingThunk();
     thunk->setGenericEnvironment(genericEnv);
     SILGenFunction thunkSGF(SGM, *thunk, FunctionDC);
     buildWithoutActuallyEscapingThunkBody(thunkSGF);
   }
+  assert(thunk->isWithoutActuallyEscapingThunk());
 
   CanSILFunctionType substFnTy = thunkType;
   // Use the subsitution map in the context of the current function.
@@ -3336,7 +3339,7 @@ enum class WitnessDispatchKind {
 static WitnessDispatchKind getWitnessDispatchKind(SILDeclRef witness) {
   auto *decl = witness.getDecl();
 
-  ClassDecl *C = decl->getDeclContext()->getAsClassOrClassExtensionContext();
+  ClassDecl *C = decl->getDeclContext()->getSelfClassDecl();
   if (!C)
     return WitnessDispatchKind::Static;
 

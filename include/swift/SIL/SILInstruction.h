@@ -261,6 +261,36 @@ public:
   friend bool operator!=(iterator lhs, iterator rhs) { return !(lhs == rhs); }
 };
 
+inline SILInstructionResultArray::iterator
+SILInstructionResultArray::begin() const {
+  return iterator(*this, 0);
+}
+
+inline SILInstructionResultArray::iterator
+SILInstructionResultArray::end() const {
+  return iterator(*this, size());
+}
+
+inline SILInstructionResultArray::reverse_iterator
+SILInstructionResultArray::rbegin() const {
+  return llvm::make_reverse_iterator(end());
+}
+
+inline SILInstructionResultArray::reverse_iterator
+SILInstructionResultArray::rend() const {
+  return llvm::make_reverse_iterator(begin());
+}
+
+inline SILInstructionResultArray::range
+SILInstructionResultArray::getValues() const {
+  return {begin(), end()};
+}
+
+inline SILInstructionResultArray::reverse_range
+SILInstructionResultArray::getReversedValues() const {
+  return {rbegin(), rend()};
+}
+
 /// This is the root class for all instructions that can be used as the
 /// contents of a Swift SILBasicBlock.
 ///
@@ -3934,9 +3964,12 @@ class ConvertFunctionInst final
   friend SILBuilder;
 
   ConvertFunctionInst(SILDebugLocation DebugLoc, SILValue Operand,
-                      ArrayRef<SILValue> TypeDependentOperands, SILType Ty)
+                      ArrayRef<SILValue> TypeDependentOperands, SILType Ty,
+                      bool WithoutActuallyEscaping)
       : UnaryInstructionWithTypeDependentOperandsBase(
             DebugLoc, Operand, TypeDependentOperands, Ty) {
+    SILInstruction::Bits.ConvertFunctionInst.WithoutActuallyEscaping =
+        WithoutActuallyEscaping;
     assert((Operand->getType().castTo<SILFunctionType>()->isNoEscape() ==
                 Ty.castTo<SILFunctionType>()->isNoEscape() ||
             Ty.castTo<SILFunctionType>()->getRepresentation() !=
@@ -3944,9 +3977,24 @@ class ConvertFunctionInst final
            "Change of escapeness is not ABI compatible");
   }
 
-  static ConvertFunctionInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+  static ConvertFunctionInst *create(SILDebugLocation DebugLoc,
+                                     SILValue Operand, SILType Ty,
+                                     SILFunction &F,
+                                     SILOpenedArchetypesState &OpenedArchetypes,
+                                     bool WithoutActuallyEscaping);
+
+public:
+  /// Returns `true` if this converts a non-escaping closure into an escaping
+  /// function type. `True` must be returned whenever the closure operand has an
+  /// unboxed capture (via @inout_aliasable) *and* the resulting function type
+  /// is escaping. (This only happens as a result of
+  /// withoutActuallyEscaping()). If `true` is returned, then the resulting
+  /// function type must be escaping, but the operand's function type may or may
+  /// not be @noescape. Note that a non-escaping closure may have unboxed
+  /// captured even though its SIL function type is "escaping".
+  bool withoutActuallyEscaping() const {
+    return SILInstruction::Bits.ConvertFunctionInst.WithoutActuallyEscaping;
+  }
 };
 
 /// ConvertEscapeToNoEscapeInst - Change the type of a escaping function value
@@ -5641,8 +5689,7 @@ class WitnessMethodInst final
 public:
   CanType getLookupType() const { return LookupType; }
   ProtocolDecl *getLookupProtocol() const {
-    return getMember().getDecl()->getDeclContext()
-             ->getAsProtocolOrProtocolExtensionContext();
+    return getMember().getDecl()->getDeclContext()->getSelfProtocolDecl();
   }
 
   ProtocolConformanceRef getConformance() const { return Conformance; }
@@ -8251,7 +8298,7 @@ namespace llvm {
 
 template <>
 struct ilist_traits<::swift::SILInstruction> :
-  public ilist_default_traits<::swift::SILInstruction> {
+  public ilist_node_traits<::swift::SILInstruction> {
   using SILInstruction = ::swift::SILInstruction;
 
 private:

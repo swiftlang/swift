@@ -103,24 +103,6 @@ public:
   virtual bool areSameType(Type type1, Type type2);
 };
 
-/// Generic type resolver that only handles what can appear in a protocol
-/// definition, i.e. Self, and Self.A.B.C dependent types.
-///
-/// This should only be used when resolving/validating where clauses in
-/// protocols.
-class ProtocolRequirementTypeResolver : public GenericTypeResolver {
-public:
-  virtual bool usesArchetypes() { return false; }
-
-  virtual Type mapTypeIntoContext(Type type);
-
-  virtual Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
-                                          SourceRange baseRange,
-                                          ComponentIdentTypeRepr *ref);
-
-  virtual bool areSameType(Type type1, Type type2);
-};
-
 /// Generic type resolver that performs complete resolution of dependent
 /// types based on a given generic signature builder.
 ///

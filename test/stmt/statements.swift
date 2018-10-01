@@ -207,8 +207,15 @@ func IfStmt1() {
 
 func IfStmt2() {
   if 1 > 0 {
-  } else // expected-error {{expected '{' after 'else'}}
+  } else // expected-error {{expected '{' or 'if' after 'else'}}
   _ = 42
+}
+func IfStmt3() {
+  if 1 > 0 {
+  } else 1 < 0 { // expected-error {{expected '{' or 'if' after 'else'; did you mean to write 'if'?}} {{9-9= if}}
+    _ = 42
+  } else {
+  }
 }
 
 //===--- While statement.

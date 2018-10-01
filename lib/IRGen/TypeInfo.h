@@ -26,6 +26,7 @@
 #define SWIFT_IRGEN_TYPEINFO_H
 
 #include "IRGen.h"
+#include "swift/AST/ReferenceCounting.h"
 #include "llvm/ADT/MapVector.h"
 
 namespace llvm {

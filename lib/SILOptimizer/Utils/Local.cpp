@@ -585,7 +585,8 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
                  "Swift thick functions that differ in escapeness are not ABI "
                  "compatible");
       // Insert convert_function.
-      return B->createConvertFunction(Loc, Value, DestTy);
+      return B->createConvertFunction(Loc, Value, DestTy,
+                                      /*WithoutActuallyEscaping=*/false);
     }
   }
 
@@ -1486,8 +1487,7 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
       // Constructors are special: a derived class in another module can
       // "override" a constructor if its class is "open", although the
       // constructor itself is not open.
-      auto *ND = AFD->getDeclContext()
-          ->getAsNominalTypeOrNominalTypeExtensionContext();
+      auto *ND = AFD->getDeclContext()->getSelfNominalTypeDecl();
       if (ND->getEffectiveAccess() == AccessLevel::Open)
         return false;
     }

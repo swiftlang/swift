@@ -21,6 +21,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILLocation.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -244,7 +245,7 @@ class DevicePartitioner {
   DevicePartitionerImpl *impl;
 
 public:
-  DevicePartitioner(SILFunction &srcFn,
+  DevicePartitioner(SILTransform &transform, SILFunction &srcFn,
                     const GraphFunctionDeviceInfo &deviceInfo,
                     int &nextTensorTransferId);
 

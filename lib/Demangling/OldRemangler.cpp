@@ -1248,14 +1248,17 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
   } else if (stripPrefix(text, "Builtin.Float")) {
     Out << 'f' << text << '_';
   } else if (stripPrefix(text, "Builtin.Vec")) {
-    auto split = text.split('x');
-    Out << 'v' << split.first << 'B';
-    if (split.second == "RawPointer") {
+    // Avoid using StringRef::split because its definition is not
+    // provided in the header so that it requires linking with libSupport.a.
+    size_t splitIdx = text.find('x');
+    Out << 'v' << text.substr(0, splitIdx) << 'B';
+    auto element = text.substr(splitIdx).substr(1);
+    if (element == "RawPointer") {
       Out << 'p';
-    } else if (stripPrefix(split.second, "Float")) {
-      Out << 'f' << split.second << '_';
-    } else if (stripPrefix(split.second, "Int")) {
-      Out << 'i' << split.second << '_';
+    } else if (stripPrefix(element, "Float")) {
+      Out << 'f' << element << '_';
+    } else if (stripPrefix(element, "Int")) {
+      Out << 'i' << element << '_';
     } else {
       unreachable("unexpected builtin vector type");
     }

@@ -173,7 +173,7 @@ public:
 
   /// emitCleanupsForReturn - Emit the top-level cleanups needed prior to a
   /// return from the function.
-  void emitCleanupsForReturn(CleanupLocation loc);
+  void emitCleanupsForReturn(CleanupLocation loc, ForUnwind_t forUnwind);
 
   /// Emit a new block that jumps to the specified location and runs necessary
   /// cleanups based on its level.  If there are no cleanups to run, this just

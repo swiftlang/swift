@@ -328,8 +328,8 @@ enum E7: String {
 
 // RUN: %sourcekitd-test -req=cursor -pos=31:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK13 %s
 // CHECK13: source.lang.swift.decl.function.free (31:6-31:37)
-// CHECK13: <Declaration>func testDefaultParam(arg1: <Type usr="s:Si">Int</Type> = default)</Declaration>
-// CHECK13: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>testDefaultParam</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>arg1</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type> = <syntaxtype.keyword>default</syntaxtype.keyword></decl.var.parameter>)</decl.function.free>
+// CHECK13: <Declaration>func testDefaultParam(arg1: <Type usr="s:Si">Int</Type> = 0)</Declaration>
+// CHECK13: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>testDefaultParam</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>arg1</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type> = 0</decl.var.parameter>)</decl.function.free>
 
 // RUN: %sourcekitd-test -req=cursor -pos=34:4 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK14 %s
 // CHECK14: source.lang.swift.ref.function.free ({{.*}}Foo.framework/Frameworks/FooSub.framework/Headers/FooSub.h:4:5-4:16)
@@ -652,13 +652,11 @@ enum E7: String {
 // CHECK73-SAME: = <syntaxtype.keyword>#file</syntaxtype.keyword>
 // CHECK73-SAME: = <syntaxtype.keyword>#line</syntaxtype.keyword>
 // CHECK73-SAME: = <syntaxtype.keyword>#column</syntaxtype.keyword>
-// FIXME: []
-// CHECK73-SAME: = <syntaxtype.keyword>default</syntaxtype.keyword>
-// FIXME: [:]
-// CHECK73-SAME: = <syntaxtype.keyword>default</syntaxtype.keyword>
-// FIXME: keyword nil
-// CHECK73-SAME: = <syntaxtype.keyword>default</syntaxtype.keyword>
-// CHECK73-SAME: = <syntaxtype.keyword>default</syntaxtype.keyword>
+// CHECK73-SAME: = []
+// CHECK73-SAME: = [:]
+// FIXME: should be <syntaxtype.keyword>nil</syntaxtype.keyword>
+// CHECK73-SAME: = nil
+// CHECK73-SAME: = 1
 
 // RUN: %sourcekitd-test -req=cursor -pos=162:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK74
 // CHECK74: source.lang.swift.decl.function.method.instance (162:8-162:20)
