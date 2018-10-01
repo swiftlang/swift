@@ -21,7 +21,9 @@ func spansEqual(_ x: MKCoordinateSpan, _ y: MKCoordinateSpan)
 
 if #available(tvOS 9.2, *) {
   mapKit.test("NSValue bridging")
-    .skip(.iOSMinor(9, 3, reason: "<rdar://problem/41440036>")).code {
+      .xfail(.iOSMinor(9, 3, reason: "<rdar://problem/41440036>"))
+      .xfail(.osxMinorRange(10, 9...10, reason: "<rdar://problem/44866579>"))
+      .code {
     expectBridgeToNSValue(CLLocationCoordinate2D(latitude: 17, longitude: 38),
                           nsValueInitializer: { NSValue(mkCoordinate: $0) },
                           nsValueGetter: { $0.mkCoordinateValue },
