@@ -808,6 +808,10 @@ void swift::ide::api::SDKNodeDeclVar::diagnose(SDKNode *Right) {
                             getScreenInfo());
   }
   if (Ctx.checkingABI()) {
+    if (hasFixedBinaryOrder() != RV->hasFixedBinaryOrder()) {
+      Ctx.getDiags().diagnose(SourceLoc(), diag::decl_has_fixed_order_change,
+                              getScreenInfo(), hasFixedBinaryOrder());
+    }
     if (hasFixedBinaryOrder() && RV->hasFixedBinaryOrder() &&
         getFixedBinaryOrder() != RV->getFixedBinaryOrder()) {
       Ctx.getDiags().diagnose(SourceLoc(), diag::decl_reorder,

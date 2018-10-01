@@ -693,7 +693,9 @@ bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         // them equal because we need to check definition orders.
         if (auto *LV = dyn_cast<SDKNodeDeclVar>(&L)) {
           if (auto *RV = dyn_cast<SDKNodeDeclVar>(&R)) {
-            if (LV->hasFixedBinaryOrder() && RV->hasFixedBinaryOrder()) {
+            if (LV->hasFixedBinaryOrder() != RV->hasFixedBinaryOrder())
+              return false;
+            if (LV->hasFixedBinaryOrder()) {
               if (LV->getFixedBinaryOrder() != RV->getFixedBinaryOrder())
                 return false;
             }
