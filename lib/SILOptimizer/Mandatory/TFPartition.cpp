@@ -4512,7 +4512,8 @@ bool TFPartition::processFunction(
 
 bool TFPartition::partitionFunction(
     SILFunction *hostFn, std::unique_ptr<TFFunctionPartition> &partitioner) {
-  if (isAcceleratorOnly(*hostFn)) {
+  auto &acc = isAcceleratorOnly(*hostFn);
+  if (acc) {
     LLVM_DEBUG(llvm::dbgs() << "SIL function " << hostFn->getName()
                             << " is accelerator-only.\n");
   }
@@ -4523,7 +4524,8 @@ bool TFPartition::partitionFunction(
   LLVM_DEBUG(llvm::dbgs() << "Processing SIL function " << hostFn->getName()
                           << " in TFPartition::partitionFunction().\n");
 
-  if (!tfc.shouldBePartitioned(hostFn, /*forceTFFunctions=*/true) ||
+  if (!isAcceleratorOnly(hostFn) ||
+      !tfc.shouldBePartitioned(hostFn, /*forceTFFunctions=*/true) ||
       llvm::TFDynamicCompilation)
     return false;
 
