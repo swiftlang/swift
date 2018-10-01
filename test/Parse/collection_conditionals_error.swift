@@ -50,3 +50,10 @@ _ = [
   "foo": 42 // expected-error {{expected ',' separator}}
 #endif
 ]
+
+_ = [
+  1 // expected-error {{expected ',' separator}}
+#if true
+  2,
+#endif
+]

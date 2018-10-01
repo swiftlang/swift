@@ -3383,9 +3383,10 @@ ParserResult<Expr> Parser::parseExprCollection() {
     auto HasDelayedDecl = State->hasDelayedDecl();
 
     // Skip any initial conditionals.
-    while (Tok.isAny(tok::pound_if, tok::pound_elseif, tok::pound_else)) {
+    while (Tok.isAny(tok::pound_if, tok::pound_elseif,
+                     tok::pound_else, tok::pound_endif)) {
       consumeToken();
-      skipUntilTokenOrEndOfLine(tok::unknown);
+      skipUntilTokenOrEndOfLine(tok::NUM_TOKENS);
     }
 
     // Parse the first expression.

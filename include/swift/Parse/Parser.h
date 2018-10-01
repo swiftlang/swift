@@ -706,14 +706,18 @@ public:
   /// Tracking IfConfigDecl for conditionals in collections for AST dump.
   /// Since there is no place to directly represent conditionals in the
   /// current AST collection model, a map is generated from the location
-  /// of actual data values to the conditionals that directly preceed them.
+  /// of actual data values to the conditionals that directly precede them.
   /// This is transferred to the CollectionExpr when the collection completes
   /// and is used by the ATSDumper to provide a repsentation of the conditional
-  /// as well as by libSyntax to remove conditionals from module interfaces.
+  /// as well as by libSyntax and to remove conditionals from module interfaces.
   /// Nested conditionals are elements of their outer IfConfigDecl structure.
   class ConfigMap {
+    /// OuterDecls - accumlates outer conditionals before seeing active element.
+    /// PendingConditionals - poitner to current vector to add condtionals to.
     std::vector <IfConfigDecl *> OuterDecls, *PendingConditionals = &OuterDecls;
+    /// ConditionalsMap - Map accumulated of Contiionals preceeding elements.
     std::map<const void *,std::vector <IfConfigDecl *>> ConditionalsMap;
+    /// HasConditionals - true if there are any conditionals inside collection.
     bool HasConditionals = false;
 
   public:

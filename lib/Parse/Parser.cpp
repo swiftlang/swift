@@ -1010,7 +1010,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     }
     // If we're in a comma-separated list, the next token is at the
     // beginning of a new line and can never start an element, break.
-    if (Tok.isAtStartOfLine() &&
+    if (Tok.isAtStartOfLine() && !(IfConfigMap && Tok.is(tok::pound_if)) &&
         (Tok.is(tok::r_brace) || isStartOfDecl() || isStartOfStmt())) {
       break;
     }
