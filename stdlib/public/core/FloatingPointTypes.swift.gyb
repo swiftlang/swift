@@ -1595,13 +1595,13 @@ extension ${Self} {
   // falling back on the generic _convert operation otherwise.
   @_transparent
   public init<Source : BinaryInteger>(_ value: Source) {
-    if value.bitWidth <= 64 {
+    if value.bitWidth <= ${word_bits} {
       if Source.isSigned {
-        let asI64 = Int64(truncatingIfNeeded: value)
-        _value = Builtin.sitofp_Int64_FPIEEE${bits}(asI64._value)
+        let asInt = Int(truncatingIfNeeded: value)
+        _value = Builtin.sitofp_Int${word_bits}_FPIEEE${bits}(asInt._value)
       } else {
-        let asU64 = Int64(truncatingIfNeeded: value)
-        _value = Builtin.uitofp_Int64_FPIEEE${bits}(asU64._value)
+        let asUInt = Int(truncatingIfNeeded: value)
+        _value = Builtin.uitofp_Int${word_bits}_FPIEEE${bits}(asUInt._value)
       }
     } else {
       self = ${Self}._convert(from: value).value
