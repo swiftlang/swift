@@ -1520,10 +1520,9 @@ extension Dictionary {
         _variant = .native(_NativeDictionary<Key, Value>(_variant.asCocoa))
       }
 #endif
-      let native = _variant.asNative
-      let a = native.validatedBucket(for: i)
-      let b = native.validatedBucket(for: j)
       let isUnique = _variant.isUniquelyReferenced()
+      let a = _variant.asNative.validatedBucket(for: i)
+      let b = _variant.asNative.validatedBucket(for: j)
       _variant.asNative.swapValuesAt(a, b, isUnique: isUnique)
     }
   }
