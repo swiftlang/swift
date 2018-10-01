@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftShims
+import SwiftShimsInline
 
 public struct _FDInputStream {
   public let fd: CInt

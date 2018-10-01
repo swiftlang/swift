@@ -84,35 +84,6 @@ int swift::_swift_stdlib_memcmp(const void *s1, const void *s2,
   return memcmp(s1, s2, n);
 }
 
-SWIFT_RUNTIME_STDLIB_SPI
-__swift_ssize_t
-swift::_swift_stdlib_read(int fd, void *buf, __swift_size_t nbyte) {
-#if defined(_WIN32)
-  return _read(fd, buf, nbyte);
-#else
-  return read(fd, buf, nbyte);
-#endif
-}
-
-SWIFT_RUNTIME_STDLIB_SPI
-__swift_ssize_t
-swift::_swift_stdlib_write(int fd, const void *buf, __swift_size_t nbyte) {
-#if defined(_WIN32)
-  return _write(fd, buf, nbyte);
-#else
-  return write(fd, buf, nbyte);
-#endif
-}
-
-SWIFT_RUNTIME_STDLIB_SPI
-int swift::_swift_stdlib_close(int fd) {
-#if defined(_WIN32)
-  return _close(fd);
-#else
-  return close(fd);
-#endif
-}
-
 #if !defined(_WIN32) || defined(__CYGWIN__)
 
 SWIFT_RUNTIME_STDLIB_SPI

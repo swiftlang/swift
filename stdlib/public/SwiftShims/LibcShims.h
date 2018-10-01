@@ -87,14 +87,6 @@ SWIFT_READONLY
 SWIFT_RUNTIME_STDLIB_SPI
 int _swift_stdlib_memcmp(const void *s1, const void *s2, __swift_size_t n);
 
-// <unistd.h>
-SWIFT_RUNTIME_STDLIB_SPI
-__swift_ssize_t _swift_stdlib_read(int fd, void *buf, __swift_size_t nbyte);
-SWIFT_RUNTIME_STDLIB_SPI
-__swift_ssize_t _swift_stdlib_write(int fd, const void *buf, __swift_size_t nbyte);
-SWIFT_RUNTIME_STDLIB_SPI
-int _swift_stdlib_close(int fd);
-
 // Semaphores <semaphore.h>
 #if !defined(_WIN32) || defined(__CYGWIN__)
 // We can't use sem_t itself here, nor is there a platform-consistent

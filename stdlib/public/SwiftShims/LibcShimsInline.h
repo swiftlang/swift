@@ -94,4 +94,30 @@ int static inline _swift_stdlib_openat(int fd, const char *path, int oflag,
 }
 #endif
 
+static inline ssize_t
+_swift_stdlib_read(int fd, void *buf, size_t nbyte) {
+#if defined(_WIN32)
+  return _read(fd, buf, nbyte);
+#else
+  return read(fd, buf, nbyte);
+#endif
+}
+
+static inline ssize_t
+_swift_stdlib_write(int fd, const void *buf, size_t nbyte) {
+#if defined(_WIN32)
+  return _write(fd, buf, nbyte);
+#else
+  return write(fd, buf, nbyte);
+#endif
+}
+
+static inline int _swift_stdlib_close(int fd) {
+#if defined(_WIN32)
+  return _close(fd);
+#else
+  return close(fd);
+#endif
+}
+
 #endif // SWIFT_STDLIB_SHIMS_LIBCSHIMSINLINE_H
