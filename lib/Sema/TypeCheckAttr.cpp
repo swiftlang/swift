@@ -2348,6 +2348,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       // - has the same generic signature as the original function, and
       // - returns a 2-tuple where the second element type is the original
       //   function's result type.
+      TC.validateDeclForNameLookup(primalCandidate);
       auto primalParams = primalCandidate->getParameters();
       auto primalParamTypes = map<SmallVector<TupleTypeElt, 8>>(
           primalParams->getArray(),
