@@ -293,6 +293,7 @@ class SDKNodeDecl: public SDKNode {
   bool IsProtocolReq;
   bool IsOverriding;
   bool IsOpen;
+  bool IsInternal;
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
 
@@ -323,6 +324,7 @@ public:
   bool isOverriding() const { return IsOverriding; };
   bool isOptional() const { return hasDeclAttribute(DeclAttrKind::DAK_Optional); }
   bool isOpen() const { return IsOpen; }
+  bool isInternal() const { return IsInternal; }
   StringRef getGenericSignature() const { return GenericSig; }
   StringRef getScreenInfo() const;
   virtual void jsonize(json::Output &Out) override;
