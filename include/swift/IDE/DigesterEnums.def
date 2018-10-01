@@ -67,6 +67,7 @@ NODE_KIND(DeclSetter, Setter)
 NODE_KIND(DeclSubscript, Subscript)
 NODE_KIND_RANGE(DeclAbstractFunc, DeclFunction, DeclSubscript)
 
+NODE_KIND(DeclOperator, OperatorDecl)
 NODE_KIND(DeclType, TypeDecl)
 NODE_KIND(DeclVar, Var)
 NODE_KIND(DeclTypeAlias, TypeAlias)
