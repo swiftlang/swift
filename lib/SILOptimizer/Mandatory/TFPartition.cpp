@@ -68,7 +68,7 @@ static llvm::cl::opt<bool> TFWarnScalarTransfer(
 
 // TODO: Remove this short-term flag once we migrate over all unit tests.
 static llvm::cl::opt<bool> TFSendRecvOpaqueHandle(
-    "tf-send-recv-opaque-handle", llvm::cl::init(false),
+    "tf-send-recv-opaque-handle", llvm::cl::init(true),
     llvm::cl::desc("When true, variant and resource handles can be sent via "
                    "eager API as tensor handles."));
 
@@ -3700,7 +3700,7 @@ void TFFunctionPartition::insertTensorComputationStartEndTerminate(
   // functions will not generate all host-side code, and thus this method will
   // not be called.
   for (auto resultValue : resultValues) {
-    assert(isTensorHandle(resultValue->getType()) &&
+    assert(TFSendRecvOpaqueHandle || isTensorHandle(resultValue->getType()) &&
            "Cannot return a non-TensorHandle value to host in the TF program "
            "-- should this function use tensorflow convention?");
   }

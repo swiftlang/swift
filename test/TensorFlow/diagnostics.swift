@@ -102,19 +102,19 @@ public func inoutArgumentToAccelerator(t: inout Tensor<Float>) {
   t += 1  // expected-note {{value used here}}
 }
 
-// Opaque handles should not be sent or received.
-public func opaqueHandlesCannotBeSentOrReceived() {
-  // expected-error @+2 {{value cannot be used by non-TensorFlow API}}
+// Resource handles may be sent or received.
+public func resourceHandlesCanBeSentOrReceived() {
+  // expected-warning @+2 {{value implicitly copied to the host}}
   let iterator: ResourceHandle =
-    #tfop("Iterator", shared_name: "foo", container: "bar")
+    #tfop("Iterator", shared_name: "foo", container: "bar",
+          output_types: [Float.self], output_shapes: [TensorShape()])
   _hostOp(iterator) // expected-note {{value used here}}
   let _ = Tensor<Float>(1.0)
 }
 
-// SR-8498: Opaque handles should not be tensor program results.
-public func opaqueHandlesCannotBeResults() {
-  // expected-error @+2 {{value cannot be used by non-TensorFlow API}}
+public func resourceHandlesCanBeResults() {
   let iterator: ResourceHandle =
-    #tfop("Iterator", shared_name: "foo", container: "bar")
-  _hostOp(iterator) // expected-note {{value used here}}
+    #tfop("Iterator", shared_name: "foo", container: "bar",
+		      output_types: [Float.self], output_shapes: [TensorShape()])
+  _hostOp(iterator) 
 }
