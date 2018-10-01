@@ -3968,7 +3968,8 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
   auto witness = ((const void* const *)wtable)[witnessIndex];
   if (LLVM_LIKELY((uintptr_t(witness) &
          ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
-    return swift_checkMetadataState(request, (const Metadata *)witness);
+    // Cached metadata pointers are always complete.
+    return MetadataResponse{(const Metadata *)witness, MetadataState::Complete};
   }
 
   // Find the mangled name.
@@ -4028,11 +4029,19 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
                mangledName.str().c_str());
   }
 
-  // Update the witness table.
+
   assert((uintptr_t(assocTypeMetadata) &
             ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0);
-  reinterpret_cast<const void**>(wtable)[witnessIndex] = assocTypeMetadata;
-  return swift_checkMetadataState(request, assocTypeMetadata);
+
+  // Check the metadata state.
+  auto response = swift_checkMetadataState(request, assocTypeMetadata);
+
+  // If the metadata was completed, record it in the witness table.
+  if (response.State == MetadataState::Complete) {
+    reinterpret_cast<const void**>(wtable)[witnessIndex] = assocTypeMetadata;
+  }
+
+  return response;
 }
 
 /***************************************************************************/
