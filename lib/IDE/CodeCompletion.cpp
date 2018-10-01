@@ -973,6 +973,7 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
         !IsImplicitlyCurriedInstanceMethod)
       funcType = funcType->getResult()->getAs<AnyFunctionType>();
     if (funcType) {
+      funcType = funcType->removeArgumentLabels(1)->castTo<AnyFunctionType>();
       auto relation = calculateTypeRelation(funcType, ExpectedType, DC);
       if (UseFuncResultType)
         relation =
