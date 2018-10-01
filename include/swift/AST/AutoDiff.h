@@ -87,7 +87,6 @@ struct SILReverseAutoDiffIndices {
   unsigned source;
   /// Indices of independent parameters to differentiate with respect to.
   llvm::SmallBitVector parameters;
-  
 
   /// Creates a set of AD indices from the given source index and a bit vector
   /// representing parameter indices.
