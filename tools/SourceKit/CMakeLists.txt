@@ -34,6 +34,11 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT CMAKE_CROSSCOMPILING)
   set(CMAKE_OSX_DEPLOYMENT_TARGET "")
 endif()
 
+# If we were don't have XPC, just build inproc.
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT HAVE_XPC_H)
+  set(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY TRUE)
+endif()
+
 # Now include AddSwiftSourceKit
 include(AddSwiftSourceKit)
 
