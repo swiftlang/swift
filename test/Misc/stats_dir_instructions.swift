@@ -1,3 +1,6 @@
+// SWIFT_ENABLE_TENSORFLOW
+// UNSUPPORTED: tensorflow
+
 // REQUIRES: OS=macosx
 // RUN: %empty-directory(%t)
 // RUN: %target-swiftc_driver -o %t/main -module-name main -stats-output-dir %t %s

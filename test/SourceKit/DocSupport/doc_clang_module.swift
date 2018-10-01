@@ -5,7 +5,7 @@
 // `@compilerEvaluable`. When various features get merged to 'master', a
 // canonical update of these tests will be included.
 //
-// UNSUPPORTED: *
+// UNSUPPORTED: tensorflow
 
 // REQUIRES: objc_interop
 
