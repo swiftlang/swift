@@ -1517,8 +1517,9 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     // the generic error that we would emit before.
     //
     // That is the only case where we support pattern matching a release.
-    if (Release && AI &&
-        !AI->getSubstCalleeType()->getExtInfo().hasGuaranteedSelfParam())
+    if (Release && AI /*
+        && (!AI->getSubstCalleeType()->hasSelfParam()
+            || !AI->getSubstCalleeType()->getSelfParameter().isGuaranteed())*/)
       MI = nullptr;
 
     if (AI && MI) {

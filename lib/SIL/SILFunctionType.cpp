@@ -613,11 +613,8 @@ private:
     if (ownership == ValueOwnership::InOut) {
       convention = ParameterConvention::Indirect_Inout;
     } else if (isFormallyPassedIndirectly(origType, substType, substTL)) {
-      if (forSelf && rep == SILFunctionTypeRepresentation::WitnessMethod)
-        convention = ParameterConvention::Indirect_In_Guaranteed;
-      else
-        convention = Convs.getIndirect(ownership, forSelf, origParamIndex,
-                                       origType, substTL);
+      convention = Convs.getIndirect(ownership, forSelf, origParamIndex,
+                                     origType, substTL);
       assert(isIndirectFormalParameter(convention));
     } else if (substTL.isTrivial()) {
       convention = ParameterConvention::Direct_Unowned;

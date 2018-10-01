@@ -5753,6 +5753,17 @@ Expr *ExprRewriter::coerceCallArguments(
   // If we came from a scalar, create a scalar-to-tuple conversion.
   TupleShuffleExpr::TypeImpact typeImpact;
   if (argTuple == nullptr) {
+    // Deal with a difference in only scalar ownership.
+    if (auto paramParenTy = dyn_cast<ParenType>(paramType.getPointer())) {
+      assert(paramParenTy->getUnderlyingType()
+              ->isEqual(cs.getType(arg)));
+      auto argParen = new (tc.Context) ParenExpr(arg->getStartLoc(),
+                                                 arg, arg->getEndLoc(), false,
+                                                 paramParenTy);
+      argParen->setImplicit();
+      return cs.cacheType(argParen);
+    }
+
     typeImpact = TupleShuffleExpr::ScalarToTuple;
     assert(isa<TupleType>(paramType.getPointer()));
   } else if (isa<TupleType>(paramType.getPointer())) {
