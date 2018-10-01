@@ -734,6 +734,30 @@ DictionaryTestSuite.test("COW.Fast.MergeDictionaryDoesNotReallocate")
   }
 }
 
+
+DictionaryTestSuite.test("Merge.ThrowingIsSafe") {
+  var d: [TestKeyTy: TestValueTy] = [
+    TestKeyTy(10): TestValueTy(1),
+    TestKeyTy(20): TestValueTy(2),
+    TestKeyTy(30): TestValueTy(3),
+  ]
+
+  let d2: [TestKeyTy: TestValueTy] = [
+    TestKeyTy(40): TestValueTy(4),
+    TestKeyTy(50): TestValueTy(5),
+    TestKeyTy(10): TestValueTy(1),
+  ]
+
+  struct TE: Error {}
+  do {
+    // Throwing must not leave the dictionary in an inconsistent state.
+    try d.merge(d2) { v1, v2 in throw TE() }
+    expectTrue(false, "merge did not throw")
+  } catch {
+    expectTrue(error is TE)
+  }
+}
+
 DictionaryTestSuite.test("COW.Fast.DefaultedSubscriptDoesNotReallocate") {
   do {
     var d1 = getCOWFastDictionary()

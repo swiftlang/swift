@@ -613,9 +613,8 @@ extension _NativeDictionary { // High-level operations
       isUnique = true
       if found {
         do {
-          let v = (_values + bucket.offset).move()
-          let newValue = try combine(v, value)
-          (_values + bucket.offset).initialize(to: newValue)
+          let newValue = try combine(uncheckedValue(at: bucket), value)
+          _values[bucket.offset] = newValue
         } catch _MergeError.keyCollision {
           fatalError("Duplicate values for key: '\(key)'")
         }
