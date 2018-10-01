@@ -3573,12 +3573,10 @@ namespace {
 
       auto &tc = cs.getTypeChecker();
 
-      // Since this is literal initialization, we don't
-      // really need to keep wrapping coercion around.
+      // If this is a literal that got converted into constructor call
+      // lets put proper source information in place.
       if (expr->isLiteralInit()) {
         auto *literalInit = expr->getSubExpr();
-        // If literal got converted into constructor call
-        // lets put proper source information in place.
         if (auto *call = dyn_cast<CallExpr>(literalInit)) {
           call->getFn()->forEachChildExpr([&](Expr *subExpr) -> Expr * {
             auto *TE = dyn_cast<TypeExpr>(subExpr);
@@ -3600,7 +3598,10 @@ namespace {
         }
 
         literalInit->setImplicit(false);
-        return literalInit;
+
+        // Keep the coercion around, because it contains the source range
+        // for the original constructor call.
+        return expr;
       }
 
       // Turn the subexpression into an rvalue.
