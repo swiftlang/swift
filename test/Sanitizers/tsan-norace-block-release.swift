@@ -5,6 +5,10 @@
 // REQUIRES: objc_interop
 // REQUIRES: tsan_runtime
 
+// FIXME: This should be covered by "tsan_runtime"; older versions of Apple OSs
+// don't support TSan.
+// UNSUPPORTED: remote_run
+
 // Test that we do not report a race on block release operation.
 import Foundation
 
