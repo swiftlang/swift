@@ -298,6 +298,16 @@ ERROR(shifting_all_significant_bits,none,
 ERROR(static_report_error, none,
       "static report error", ())
 
+ERROR(pound_assert_condition_not_constant,none,
+       "#assert condition not constant", ())
+ERROR(pound_assert_failure,none,
+       "%0", (StringRef))
+
+NOTE(constexpr_unknown_reason, none, "%0", (StringRef))
+NOTE(constexpr_called_from, none, "when called from here", ())
+NOTE(constexpr_not_evaluable, none,
+     "expression not evaluable as constant here", ())
+
 ERROR(non_physical_addressof,none,
       "addressof only works with purely physical lvalues; "
       "use `withUnsafePointer` or `withUnsafeBytes` unless you're implementing "
