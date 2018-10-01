@@ -217,27 +217,42 @@ MetadataDependency MetadataDependencyCollector::finish(IRGenFunction &IGF) {
 }
 
 
-llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef str) {
-  return getAddrOfStringForTypeRef(SymbolicMangling{str,{}});
+llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef str,
+                                                       MangledTypeRefRole role){
+  return getAddrOfStringForTypeRef(SymbolicMangling{str, {}}, role);
 }
 
 llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
-                                             const SymbolicMangling &mangling) {
+                                             const SymbolicMangling &mangling,
+                                             MangledTypeRefRole role) {
   // Create a symbol name for the symbolic mangling. This is used as the
   // uniquing key both for ODR coalescing and within this TU.
   IRGenMangler mangler;
   std::string symbolName =
-    mangler.mangleSymbolNameForSymbolicMangling(mangling);
+    mangler.mangleSymbolNameForSymbolicMangling(mangling, role);
 
   // See if we emitted the constant already.
   auto &entry = StringsForTypeRef[symbolName];
-  if (entry.second)
+  if (entry.second) {
     return entry.second;
+  }
   
   ConstantInitBuilder B(*this);
   auto S = B.beginStruct();
   S.setPacked(true);
-  
+
+  switch (role) {
+  case MangledTypeRefRole::DefaultAssociatedTypeWitness:
+    // The 0xFF prefix identifies a default associated type witness.
+    S.addInt(Int8Ty,
+             ProtocolRequirementFlags::AssociatedTypeInProtocolContextByte);
+    break;
+
+  case MangledTypeRefRole::Metadata:
+  case MangledTypeRefRole::Reflection:
+    break;
+  }
+
   unsigned pos = 0;
   for (auto &symbolic : mangling.SymbolicReferences) {
     assert(symbolic.second >= pos
@@ -284,7 +299,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
                                       nullptr,
                                       symbolName);
   var->setVisibility(llvm::GlobalValue::HiddenVisibility);
-  var->setAlignment(1);
+  var->setAlignment(2);
   setTrueConstGlobal(var);
   var->setSection(getReflectionTypeRefSectionName());
   

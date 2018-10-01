@@ -218,11 +218,6 @@ class LinkEntity {
     /// is stored in the data.
     DefaultAssociatedConformanceAccessor,
 
-    /// A function which returns the default type metadata for the associated
-    /// type of a protocol.  The secondary pointer is a ProtocolDecl*.
-    /// The index of the associated type declaration is stored in the data.
-    DefaultAssociatedTypeMetadataAccessFunction,
-
     /// A SIL function. The pointer is a SILFunction*.
     SILFunction,
 
@@ -262,11 +257,6 @@ class LinkEntity {
 
     /// A list of key/value pairs that resiliently specify a witness table.
     ResilientProtocolWitnessTable,
-
-    /// A function which returns the type metadata for the associated type
-    /// of a protocol.  The secondary pointer is a ProtocolConformance*.
-    /// The index of the associated type declaration is stored in the data.
-    AssociatedTypeMetadataAccessFunction,
 
     /// A function which returns the witness table for a protocol-constrained
     /// associated type of a protocol.  The secondary pointer is a
@@ -336,7 +326,7 @@ class LinkEntity {
   }
 
   static bool isDeclKind(Kind k) {
-    return k <= Kind::DefaultAssociatedTypeMetadataAccessFunction;
+    return k <= Kind::DefaultAssociatedConformanceAccessor;
   }
   static bool isTypeKind(Kind k) {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
@@ -811,24 +801,6 @@ public:
   }
 
   static LinkEntity
-  forAssociatedTypeMetadataAccessFunction(const ProtocolConformance *C,
-                                          AssociatedType association) {
-    LinkEntity entity;
-    entity.setForProtocolConformanceAndAssociatedType(
-                     Kind::AssociatedTypeMetadataAccessFunction, C,
-                     association.getAssociation());
-    return entity;
-  }
-
-  static LinkEntity
-  forDefaultAssociatedTypeMetadataAccessFunction(AssociatedType association) {
-    LinkEntity entity;
-    entity.setForDecl(Kind::DefaultAssociatedTypeMetadataAccessFunction,
-                      association.getAssociation());
-    return entity;
-  }
-
-  static LinkEntity
   forAssociatedTypeWitnessTableAccessFunction(const ProtocolConformance *C,
                                      const AssociatedConformance &association) {
     LinkEntity entity;
@@ -925,12 +897,7 @@ public:
   }
 
   AssociatedTypeDecl *getAssociatedType() const {
-    if (getKind() == Kind::AssociatedTypeMetadataAccessFunction)
-      return getAssociatedTypeByIndex(getProtocolConformance(),
-                              LINKENTITY_GET_FIELD(Data, AssociatedTypeIndex));
-
-    assert(getKind() == Kind::AssociatedTypeDescriptor ||
-           getKind() == Kind::DefaultAssociatedTypeMetadataAccessFunction);
+    assert(getKind() == Kind::AssociatedTypeDescriptor);
     return reinterpret_cast<AssociatedTypeDecl *>(Pointer);
   }
 

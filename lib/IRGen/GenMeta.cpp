@@ -457,7 +457,8 @@ namespace {
     
     void addExtendedContext() {
       auto string = IGM.getTypeRef(
-          E->getSelfInterfaceType()->getCanonicalType());
+          E->getSelfInterfaceType()->getCanonicalType(),
+          MangledTypeRefRole::Metadata);
       B.addRelativeAddress(string);
     }
     
@@ -602,7 +603,6 @@ namespace {
       auto var = cast<llvm::GlobalVariable>(addr);
 
       var->setConstant(true);
-      disableAddressSanitizer(IGM, var);
       IGM.setTrueConstGlobal(var);
     }
 
@@ -765,49 +765,14 @@ namespace {
             entry.getAssociatedTypeWitness().Requirement != assocType)
           continue;
 
-        auto witness = entry.getAssociatedTypeWitness().Witness;
-        return getDefaultAssociatedTypeMetadataAccessFunction(
-                 AssociatedType(assocType), witness);
+        auto witness =
+          entry.getAssociatedTypeWitness().Witness->mapTypeOutOfContext()
+            ->getCanonicalType();
+        return IGM.getAssociatedTypeWitness(witness,
+                                            /*inProtocolContext=*/true);
       }
 
       return nullptr;
-    }
-
-    /// Create an associated type metadata access function for the default
-    /// associated type witness.
-    llvm::Constant *getDefaultAssociatedTypeMetadataAccessFunction(
-                      AssociatedType requirement, CanType witness) {
-      auto accessor =
-        IGM.getAddrOfDefaultAssociatedTypeMetadataAccessFunction(requirement);
-
-      IRGenFunction IGF(IGM, accessor);
-      if (IGM.DebugInfo)
-        IGM.DebugInfo->emitArtificialFunction(IGF, accessor);
-
-      Explosion parameters = IGF.collectParameters();
-      auto request = DynamicMetadataRequest(parameters.claimNext());
-
-      llvm::Value *self = parameters.claimNext();
-      llvm::Value *wtable = parameters.claimNext();
-
-      CanType selfInContext =
-          Proto->mapTypeIntoContext(Proto->getProtocolSelfType())
-            ->getCanonicalType();
-
-      // Bind local Self type data from the metadata argument.
-      IGF.bindLocalTypeDataFromTypeMetadata(selfInContext, IsExact, self,
-                                            MetadataState::Abstract);
-      IGF.setUnscopedLocalTypeData(
-          selfInContext,
-          LocalTypeDataKind::forAbstractProtocolWitnessTable(Proto),
-          wtable);
-
-      // Emit a reference to the type metadata.
-      auto response = IGF.emitTypeMetadataRef(witness, request);
-      response.ensureDynamicState(IGF);
-      auto returnValue = response.combine(IGF);
-      IGF.Builder.CreateRet(returnValue);
-      return accessor;
     }
 
     llvm::Constant *findDefaultAssociatedConformanceWitness(
@@ -4237,7 +4202,8 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
 
       auto flags = GenericRequirementFlags(abiKind, false, false);
       auto typeName =
-        IGM.getTypeRef(requirement.getSecondType()->getCanonicalType());
+        IGM.getTypeRef(requirement.getSecondType()->getCanonicalType(),
+                       MangledTypeRefRole::Metadata);
 
       addGenericRequirement(IGM, B, metadata, sig, flags,
                             requirement.getFirstType(),

@@ -256,10 +256,8 @@ struct GenericLayoutWithAssocType<T: ParentHasAssociatedType> {
 // CHECK: [[T0_GEP:%.*]] = getelementptr inbounds i8*, i8** %T.ParentHasAssociatedType, i32 1
 // CHECK: [[T0:%.*]] = load i8*, i8** [[T0_GEP]]
 // CHECK: [[T1:%.*]] = bitcast i8* [[T0]] to i8**
-// CHECK: [[T2_GEP:%.*]] = getelementptr inbounds i8*, i8** [[T1]], i32 1
-// CHECK: [[T2:%.*]] = load i8*, i8** [[T2_GEP]], align 8, !invariant.load
-// CHECK: [[T3:%.*]] = bitcast i8* [[T2]] to %swift.metadata_response (
-// CHECK: [[T4:%.*]] = call swiftcc %swift.metadata_response [[T3]](i64 0, %swift.type* %T, i8** [[T1]])
+// CHECK: [[T4:%.*]] = call %swift.metadata_response @swift_getAssociatedTypeWitness(i64 0, i8** %T.HasAssociatedType, %swift.type* %T, %swift.protocol_requirement* @"$s5Assoc15generic_structs17HasAssociatedTypePTl")
+
 // CHECK: %T.Assoc = extractvalue %swift.metadata_response [[T4]], 0
 
 // CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** %T.ParentHasAssociatedType, i32 2
@@ -267,8 +265,5 @@ struct GenericLayoutWithAssocType<T: ParentHasAssociatedType> {
 // CHECK:   [[T2:%.*]] = bitcast i8* [[T1]] to i8** (%swift.type*, %swift.type*, i8**)*
 // CHECK:   %T.Assoc.HasAssociatedType = call swiftcc i8** [[T2]](%swift.type* %T.Assoc, %swift.type* %T, i8** %T.ParentHasAssociatedType)
 
-// CHECK:   [[T0_GEP:%.*]] = getelementptr inbounds i8*, i8** %T.Assoc.HasAssociatedType, i32 1
-// CHECK:   [[T0:%.*]] = load i8*, i8** [[T0_GEP]]
-// CHECK:   [[T1:%.*]] = bitcast i8* [[T0]] to %swift.metadata_response (i64, %swift.type*, i8**)*
-// CHECK:   [[T2:%.*]] = call swiftcc %swift.metadata_response [[T1]](i64 0, %swift.type* %T.Assoc, i8** %T.Assoc.HasAssociatedType)
+// CHECK:   [[T2:%.*]] = call %swift.metadata_response @swift_getAssociatedTypeWitness(i64 0, i8** %T.Assoc.HasAssociatedType, %swift.type* %T.Assoc, %swift.protocol_requirement* @"$s5Assoc15generic_structs17HasAssociatedTypePTl")
 // CHECK:   %T.Assoc.Assoc = extractvalue %swift.metadata_response [[T2]], 0

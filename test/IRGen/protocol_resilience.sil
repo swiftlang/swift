@@ -21,8 +21,8 @@ import resilient_protocol
 // -- number of witness table entries
 // CHECK-SAME:   i16 1,
 
-// -- size of private area
-// CHECK-SAME:   i16 0,
+// -- size of private area + 'needs instantiation' bit
+// CHECK-SAME:   i16 1,
 
 // -- the protocol descriptor
 // CHECK-SAME:   @"{{got.|__imp_}}$s18resilient_protocol22OtherResilientProtocolMp"
@@ -123,8 +123,8 @@ protocol InternalProtocol {
 // -- number of witness table entries
 // CHECK-SAME:   i16 1,
 
-// -- size of private area
-// CHECK-SAME:   i16 0,
+// -- size of private area + 'needs instantiation' bit
+// CHECK-SAME:   i16 1,
 
 // -- the protocol descriptor
 // CHECK-SAME:   @"{{got.|__imp_}}$s18resilient_protocol24ProtocolWithRequirementsMp"
@@ -147,7 +147,7 @@ protocol InternalProtocol {
 
 // -- type metadata for associated type
 // CHECK-SAME: @"{{got.|__imp_}}$s1T18resilient_protocol24ProtocolWithRequirementsPTl"
-// CHECK-SAME: @"$s19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AA1TWt"
+// CHECK-SAME: @"symbolic Si"
 
 // CHECK-SAME: @"{{got.|__imp_}}$s18resilient_protocol24ProtocolWithRequirementsP5firstyyFTq"
 // CHECK-SAME: @firstWitness
@@ -160,9 +160,9 @@ protocol InternalProtocol {
 
 // Witness table for conformance with resilient associated type
 
-// CHECK: @"$s19protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWP" = {{(protected )?}}hidden constant [3 x i8*] [
+// CHECK: @"$s19protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWP" = {{(protected )?}}hidden global [3 x i8*] [
 // CHECK-SAME:   i8* bitcast (i8** ()* @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWa" to i8*)
-// CHECK-SAME:   i8* bitcast (%swift.metadata_response ([[INT]])* @"$s19protocol_resilience23ResilientConformingTypeVMa" to i8*)
+// CHECK-SAME:   @"symbolic 19protocol_resilience23ResilientConformingTypeV"
 // CHECK-SAME: ]
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)

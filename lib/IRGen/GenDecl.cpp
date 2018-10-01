@@ -3685,7 +3685,7 @@ llvm::StructType *IRGenModule::getGenericWitnessTableCacheTy() {
     {
       // WitnessTableSizeInWords
       Int16Ty,
-      // WitnessTablePrivateSizeInWords
+      // WitnessTablePrivateSizeInWords + RequiresInstantiation bit
       Int16Ty,
       // Protocol
       RelativeAddressTy,
@@ -3805,27 +3805,6 @@ IRGenModule::getAddrOfWitnessTablePattern(const NormalProtocolConformance *conf,
 }
 
 llvm::Function *
-IRGenModule::getAddrOfAssociatedTypeMetadataAccessFunction(
-                                  const NormalProtocolConformance *conformance,
-                                  AssociatedType association) {
-  auto forDefinition = ForDefinition;
-
-  LinkEntity entity =
-    LinkEntity::forAssociatedTypeMetadataAccessFunction(conformance,
-                                                        association);
-  llvm::Function *&entry = GlobalFuncs[entity];
-  if (entry) {
-    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
-    return entry;
-  }
-
-  auto signature = getAssociatedTypeMetadataAccessFunctionSignature();
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, signature);
-  return entry;
-}
-
-llvm::Function *
 IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
                                   const NormalProtocolConformance *conformance,
                                   const AssociatedConformance &association) {
@@ -3841,25 +3820,6 @@ IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
   }
 
   auto signature = getAssociatedTypeWitnessTableAccessFunctionSignature();
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, signature);
-  return entry;
-}
-
-llvm::Function *
-IRGenModule::getAddrOfDefaultAssociatedTypeMetadataAccessFunction(
-                                  AssociatedType association) {
-  auto forDefinition = ForDefinition;
-
-  LinkEntity entity =
-    LinkEntity::forDefaultAssociatedTypeMetadataAccessFunction(association);
-  llvm::Function *&entry = GlobalFuncs[entity];
-  if (entry) {
-    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
-    return entry;
-  }
-
-  auto signature = getAssociatedTypeMetadataAccessFunctionSignature();
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
   return entry;

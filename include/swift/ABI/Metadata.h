@@ -1700,11 +1700,6 @@ using TargetWitnessTablePointer =
 
 using WitnessTablePointer = TargetWitnessTablePointer<InProcess>;
 
-using AssociatedTypeAccessFunction =
-  SWIFT_CC(swift) MetadataResponse(MetadataRequest request,
-                                  const Metadata *self,
-                                  const WitnessTable *selfConformance);
-
 using AssociatedWitnessTableAccessFunction =
   SWIFT_CC(swift) WitnessTable *(const Metadata *associatedType,
                                  const Metadata *self,
@@ -2013,7 +2008,10 @@ struct TargetGenericWitnessTable {
   /// The amount of private storage to allocate before the address point,
   /// in words. This memory is zeroed out in the instantiated witness table
   /// template.
-  uint16_t WitnessTablePrivateSizeInWords;
+  ///
+  /// The low bit is used to indicate whether this witness table is known
+  /// to require instantiation.
+  uint16_t WitnessTablePrivateSizeInWordsAndRequiresInstantiation;
 
   /// The protocol descriptor. Only used for resilient conformances.
   RelativeIndirectablePointer<ProtocolDescriptor,
@@ -2037,6 +2035,15 @@ struct TargetGenericWitnessTable {
   /// Private data for the instantiator.  Out-of-line so that the rest
   /// of this structure can be constant.
   RelativeDirectPointer<PrivateDataType> PrivateData;
+
+  uint16_t getWitnessTablePrivateSizeInWords() const {
+    return WitnessTablePrivateSizeInWordsAndRequiresInstantiation >> 1;
+  }
+
+  /// Whether the witness table is known to require instantiation.
+  uint16_t requiresInstantiation() const {
+    return WitnessTablePrivateSizeInWordsAndRequiresInstantiation & 0x01;
+  }
 };
 using GenericWitnessTable = TargetGenericWitnessTable<InProcess>;
 
@@ -2238,8 +2245,7 @@ struct TargetProtocolConformanceDescriptor final
 public:
   using WitnessTableAccessorFn
     = const TargetWitnessTable<Runtime> *(const TargetMetadata<Runtime>*,
-                                          const TargetWitnessTable<Runtime> **,
-                                          size_t);
+                                          const TargetWitnessTable<Runtime> **);
 
   using GenericRequirementDescriptor =
     TargetGenericRequirementDescriptor<Runtime>;

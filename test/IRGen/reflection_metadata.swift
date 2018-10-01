@@ -16,7 +16,6 @@
 // STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
 // STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_assocty|.sw5asty\$B}}
 // STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_capture|.sw5cptr\$B}}
-// STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_typeref|.sw5tyrf\$B}}
 // STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
 // STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_builtin|.sw5bltn\$B}}
 
