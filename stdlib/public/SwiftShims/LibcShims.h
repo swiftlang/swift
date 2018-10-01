@@ -143,10 +143,6 @@ void _swift_stdlib_setErrno(int value);
 SWIFT_READNONE SWIFT_RUNTIME_STDLIB_SPI
 __swift_size_t _swift_stdlib_malloc_size(const void *ptr);
 
-// Random number for stdlib
-SWIFT_RUNTIME_STDLIB_SPI
-void _swift_stdlib_random(void *buf, __swift_size_t nbytes);
-
 // Math library functions
 static inline SWIFT_ALWAYS_INLINE
 float _stdlib_remainderf(float _self, float _other) {

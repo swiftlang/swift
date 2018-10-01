@@ -6,6 +6,7 @@ set(sources
   HeapObject.h
   KeyPath.h
   LibcShims.h
+  Random.h
   RefCount.h
   RuntimeShims.h
   RuntimeStubs.h

@@ -17,7 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "../SwiftShims/GlobalObjects.h"
-#include "../SwiftShims/LibcShims.h"
+#include "../SwiftShims/Random.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Debug.h"
 #include <stdlib.h>
