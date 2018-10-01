@@ -645,6 +645,19 @@ FUNCTION(GetGenericWitnessTable, swift_getGenericWitnessTable, C_CC,
               WitnessTablePtrPtrTy),
          ATTRS(NoUnwind, ReadOnly))
 
+// MetadataResponse swift_getAssociatedTypeWitness(
+//                                            MetadataRequest request,
+//                                            WitnessTable *wtable,
+//                                            const Metadata *conformingType,
+//                                            ProtocolRequirement *assocType);
+FUNCTION(GetAssociatedTypeWitness, swift_getAssociatedTypeWitness, C_CC,
+         RETURNS(TypeMetadataResponseTy),
+         ARGS(SizeTy,
+              WitnessTablePtrTy,
+              TypeMetadataPtrTy,
+              ProtocolRequirementStructTy->getPointerTo()),
+         ATTRS(NoUnwind, ReadNone))
+
 // Metadata *swift_getMetatypeMetadata(Metadata *instanceTy);
 FUNCTION(GetMetatypeMetadata, swift_getMetatypeMetadata, C_CC,
          RETURNS(TypeMetadataPtrTy),

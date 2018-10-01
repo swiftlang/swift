@@ -19,9 +19,9 @@ struct SB: B {
   typealias AA = SA
   func foo() {}
 }
-// CHECK-LABEL: @"$s34witness_table_objc_associated_type2SBVAA1BAAWP" = hidden constant [4 x i8*] [
+// CHECK-LABEL: @"$s34witness_table_objc_associated_type2SBVAA1BAAWP" = hidden global [4 x i8*] [
 // CHECK:         i8* bitcast (i8** ()* @"$s34witness_table_objc_associated_type2SAVAA1AAAWa" to i8*)
-// CHECK:         i8* bitcast (%swift.metadata_response ([[INT]])* @"$s34witness_table_objc_associated_type2SAVMa" to i8*)
+// CHECK:         @"symbolic 34witness_table_objc_associated_type2SAV"
 // CHECK:         i8* bitcast {{.*}} @"$s34witness_table_objc_associated_type2SBVAA1BA2aDP3fooyyFTW"
 // CHECK:       ]
 
@@ -30,8 +30,8 @@ struct SO: C {
   typealias OO = CO
   func foo() {}
 }
-// CHECK-LABEL: @"$s34witness_table_objc_associated_type2SOVAA1CAAWP" = hidden constant [3 x i8*] [
-// CHECK:         i8* bitcast (%swift.metadata_response ([[INT]])* @"$s34witness_table_objc_associated_type2COCMa" to i8*)
+// CHECK-LABEL: @"$s34witness_table_objc_associated_type2SOVAA1CAAWP" = hidden global [3 x i8*] [
+// CHECK:         @"symbolic 34witness_table_objc_associated_type2COC"
 // CHECK:         i8* bitcast {{.*}} @"$s34witness_table_objc_associated_type2SOVAA1CA2aDP3fooyyFTW"
 // CHECK:       ]
 

@@ -173,7 +173,7 @@ ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
     return getStaticWitnessTable();
 
   case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
-    return getWitnessTableAccessor()(type, nullptr, 0);
+    return getWitnessTableAccessor()(type, nullptr);
 
   case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor: {
     // Check the conditional requirements.
@@ -186,8 +186,7 @@ ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
 
     return getWitnessTableAccessor()(
                            type,
-                           (const swift::WitnessTable**)conditionalArgs.data(),
-                           conditionalArgs.size());
+                           (const swift::WitnessTable**)conditionalArgs.data());
   }
   }
   return nullptr;
@@ -667,17 +666,12 @@ static const Metadata *resolveGenericParamRef(
       swift_conformsToProtocol(current, assocTypeRef.Protocol);
     if (!witnessTable) return nullptr;
 
-    // Determine the index of the associated type based on its offset
-    // from the beginning of the protocol's requirements.
-    auto protocolDescriptor = witnessTable->Description->getProtocol();
-    unsigned index = assocTypeRef.Requirement.get() -
-        protocolDescriptor->getRequirements().data();
-
-    // Call the associated type access function.
-    unsigned adjustedIndex = index + WitnessTableFirstRequirementOffset;
-    current =
-      ((AssociatedTypeAccessFunction * const *)witnessTable)[adjustedIndex]
-        (MetadataState::Abstract, current, witnessTable).Value;
+    // Retrieve the associated type.
+    auto assocTypeReq = assocTypeRef.Requirement.get();
+    current = swift_getAssociatedTypeWitness(
+                                    MetadataState::Abstract,
+                                    const_cast<WitnessTable *>(witnessTable),
+                                    current, assocTypeReq).Value;
     if (!current) return nullptr;
   }
 
@@ -768,6 +762,22 @@ bool swift::_checkGenericRequirements(
 
   // Success!
   return false;
+}
+
+const Metadata *swift::findConformingSuperclass(
+                                          const Metadata *type,
+                                          const ProtocolDescriptor *protocol) {
+  const Metadata *conformingType = type;
+  while (true) {
+    const Metadata *superclass = _swift_class_getSuperclass(conformingType);
+    if (!superclass)
+      break;
+    if (!swift_conformsToProtocol(superclass, protocol))
+      break;
+    conformingType = superclass;
+  }
+
+  return conformingType;
 }
 
 #define OVERRIDE_PROTOCOLCONFORMANCE COMPATIBILITY_OVERRIDE

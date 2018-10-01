@@ -88,16 +88,8 @@ static const Metadata *findHashableBaseTypeImpl(const Metadata *type) {
   }
   // By this point, `type` is known to conform to `Hashable`.
 
-  const Metadata *baseTypeThatConformsToHashable = type;
-  while (true) {
-    const Metadata *superclass =
-        _swift_class_getSuperclass(baseTypeThatConformsToHashable);
-    if (!superclass)
-      break;
-    if (!swift_conformsToProtocol(superclass, &HashableProtocolDescriptor))
-      break;
-    baseTypeThatConformsToHashable = superclass;
-  }
+  const Metadata *baseTypeThatConformsToHashable =
+    findConformingSuperclass(type, &HashableProtocolDescriptor);
   HashableConformances.getOrInsert(HashableConformanceKey{type},
                                    baseTypeThatConformsToHashable);
   return baseTypeThatConformsToHashable;

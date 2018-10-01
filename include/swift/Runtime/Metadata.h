@@ -410,6 +410,20 @@ swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
                              const Metadata *type,
                              void **const *instantiationArgs);
 
+/// Retrieve an associated type witness from the given witness table.
+///
+/// \param wtable The witness table.
+/// \param conformingType Metadata for the conforming type.
+/// \param assocType Associated type descriptor.
+///
+/// \returns metadata for the associated type witness.
+SWIFT_RUNTIME_EXPORT
+MetadataResponse swift_getAssociatedTypeWitness(
+                                          MetadataRequest request,
+                                          WitnessTable *wtable,
+                                          const Metadata *conformingType,
+                                          const ProtocolRequirement *assocType);
+
 /// \brief Fetch a uniqued metadata for a function type.
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
