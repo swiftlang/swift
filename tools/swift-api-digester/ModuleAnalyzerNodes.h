@@ -339,12 +339,7 @@ public:
   SDKNodeRoot(SDKNodeInitInfo Info);
   static SDKNode *getInstance(SDKContext &Ctx);
   static bool classof(const SDKNode *N);
-  void registerDescendant(SDKNode *D) {
-    if (auto DD = dyn_cast<SDKNodeDecl>(D)) {
-      assert(!DD->getUsr().empty());
-      DescendantDeclTable[DD->getUsr()].insert(DD);
-    }
-  }
+  void registerDescendant(SDKNode *D);
   ArrayRef<SDKNodeDecl*> getDescendantsByUsr(StringRef Usr) {
     return DescendantDeclTable[Usr].getArrayRef();
   }
@@ -466,6 +461,12 @@ public:
   bool isConformingTo(KnownProtocolKind Kind) const;
   void jsonize(json::Output &out) override;
   void diagnose(SDKNode *Right) override;
+};
+
+class SDKNodeDeclOperator : public SDKNodeDecl {
+public:
+  SDKNodeDeclOperator(SDKNodeInitInfo Info);
+  static bool classof(const SDKNode *N);
 };
 
 class SDKNodeDeclTypeAlias : public SDKNodeDecl {
@@ -600,13 +601,15 @@ public:
   SDKNode *constructTypeDeclNode(NominalTypeDecl *NTD);
   SDKNode *constructInitNode(ConstructorDecl *CD);
   SDKNode *constructFunctionNode(FuncDecl* FD, SDKNodeKind Kind);
+  SDKNode *constructOperatorDeclNode(OperatorDecl *OD);
   std::vector<SDKNode*> createParameterNodes(ParameterList *PL);
   SDKNode *constructTypeNode(Type T, bool IsImplicitlyUnwrappedOptional = false,
     bool hasDefaultArgument = false);
+  void processValueDecl(ValueDecl *VD);
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override;
+  void processDecl(Decl *D);
 public:
   void lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules);
-  void processDecl(ValueDecl *VD);
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override;
 };
 
 int dumpSwiftModules(const CompilerInvocation &InitInvok,
