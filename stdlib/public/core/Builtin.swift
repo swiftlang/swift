@@ -178,13 +178,13 @@ internal func _conditionallyUnreachable() -> Never {
   Builtin.conditionallyUnreachable()
 }
 
-@inlinable // FIXME(sil-serialize-all)
+@usableFromInline
 @_silgen_name("_swift_isClassOrObjCExistentialType")
 internal func _swift_isClassOrObjCExistentialType<T>(_ x: T.Type) -> Bool
 
 /// Returns `true` iff `T` is a class type or an `@objc` existential such as
 /// `AnyObject`.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 internal func _isClassOrObjCExistential<T>(_ x: T.Type) -> Bool {
 
@@ -244,7 +244,7 @@ public func _unsafeUncheckedDowncast<T : AnyObject>(_ x: AnyObject, to type: T.T
 
 import SwiftShims
 
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 public func _getUnsafePointerToStoredProperties(_ x: AnyObject)
   -> UnsafeMutableRawPointer {
@@ -298,28 +298,28 @@ public func _onFastPath() {
 // Declare it here instead of RuntimeShims.h, because we need to specify
 // the type of argument to be AnyClass. This is currently not possible
 // when using RuntimeShims.h
-@inlinable // FIXME(sil-serialize-all)
+@usableFromInline
 @_silgen_name("_objcClassUsesNativeSwiftReferenceCounting")
 internal func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool
 #else
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 internal func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool {
   return true
 }
 #endif
 
-@inlinable // FIXME(sil-serialize-all)
+@usableFromInline
 @_silgen_name("_getSwiftClassInstanceExtents")
 internal func getSwiftClassInstanceExtents(_ theClass: AnyClass)
   -> (negative: UInt, positive: UInt)
 
-@inlinable // FIXME(sil-serialize-all)
+@usableFromInline
 @_silgen_name("_getObjCClassInstanceExtents")
 internal func getObjCClassInstanceExtents(_ theClass: AnyClass)
   -> (negative: UInt, positive: UInt)
 
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int {
 #if _runtime(_ObjC)
@@ -330,8 +330,7 @@ internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int 
 }
 
 @inlinable
-internal
-func _isValidAddress(_ address: UInt) -> Bool {
+internal func _isValidAddress(_ address: UInt) -> Bool {
   // TODO: define (and use) ABI max valid pointer value
   return address >= _swift_abi_LeastValidPointerValue
 }
@@ -340,17 +339,17 @@ func _isValidAddress(_ address: UInt) -> Bool {
 
 // TODO(<rdar://problem/34837023>): Get rid of superfluous UInt constructor
 // calls
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 internal var _objCTaggedPointerBits: UInt {
   @inline(__always) get { return UInt(_swift_BridgeObject_TaggedPointerBits) }
 }
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 internal var _objectPointerSpareBits: UInt {
     @inline(__always) get {
       return UInt(_swift_abi_SwiftSpareBitsMask) & ~_objCTaggedPointerBits
     }
 }
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 internal var _objectPointerLowSpareBitShift: UInt {
     @inline(__always) get {
       _sanityCheck(_swift_abi_ObjCReservedLowBits < 2,
@@ -361,37 +360,37 @@ internal var _objectPointerLowSpareBitShift: UInt {
 
 #if arch(i386) || arch(arm) || arch(powerpc64) || arch(powerpc64le) || arch(
   s390x)
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 internal var _objectPointerIsObjCBit: UInt {
     @inline(__always) get { return 0x0000_0002 }
 }
 #else
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 internal var _objectPointerIsObjCBit: UInt {
   @inline(__always) get { return 0x4000_0000_0000_0000 }
 }
 #endif
 
 /// Extract the raw bits of `x`.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 internal func _bitPattern(_ x: Builtin.BridgeObject) -> UInt {
   return UInt(Builtin.castBitPatternFromBridgeObject(x))
 }
 
 /// Extract the raw spare bits of `x`.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 internal func _nonPointerBits(_ x: Builtin.BridgeObject) -> UInt {
   return _bitPattern(x) & _objectPointerSpareBits
 }
 
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 internal func _isObjCTaggedPointer(_ x: AnyObject) -> Bool {
   return (Builtin.reinterpretCast(x) & _objCTaggedPointerBits) != 0
 }
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 internal func _isObjCTaggedPointer(_ x: UInt) -> Bool {
   return (x & _objCTaggedPointerBits) != 0
@@ -507,24 +506,25 @@ public func _bridgeObject(
 // NativeObject
 //
 
-@inline(__always)
 @inlinable
+@inline(__always)
 public func _nativeObject(fromNative x: AnyObject) -> Builtin.NativeObject {
   _sanityCheck(!_isObjCTaggedPointer(x))
   let native = Builtin.unsafeCastToNativeObject(x)
   // _sanityCheck(native == Builtin.castToNativeObject(x))
   return native
 }
-@inline(__always)
+
 @inlinable
+@inline(__always)
 public func _nativeObject(
   fromBridge x: Builtin.BridgeObject
 ) -> Builtin.NativeObject {
   return _nativeObject(fromNative: _bridgeObject(toNative: x))
 }
 
-@inline(__always)
 @inlinable
+@inline(__always)
 public func _nativeObject(toNative x: Builtin.NativeObject) -> AnyObject {
   return Builtin.castFromNativeObject(x)
 }
@@ -547,7 +547,7 @@ extension ManagedBufferPointer {
 ///
 /// - Precondition: `bits & _objectPointerIsObjCBit == 0`,
 ///   `bits & _objectPointerSpareBits == bits`.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 internal func _makeNativeBridgeObject(
   _ nativeObject: AnyObject, _ bits: UInt
@@ -560,7 +560,7 @@ internal func _makeNativeBridgeObject(
 }
 
 /// Create a `BridgeObject` around the given `objCObject`.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 public // @testable
 func _makeObjCBridgeObject(
@@ -580,7 +580,7 @@ func _makeObjCBridgeObject(
 ///   2. if `object` is a tagged pointer, `bits == 0`.  Otherwise,
 ///      `object` is either a native object, or `bits ==
 ///      _objectPointerIsObjCBit`.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 internal func _makeBridgeObject(
   _ object: AnyObject, _ bits: UInt
@@ -609,14 +609,13 @@ internal func _swift_class_getSuperclass(_ t: AnyClass) -> AnyClass?
 
 /// Returns the superclass of `t`, if any.  The result is `nil` if `t` is
 /// a root class or class protocol.
-public
-func _getSuperclass(_ t: AnyClass) -> AnyClass? {
+public func _getSuperclass(_ t: AnyClass) -> AnyClass? {
   return _swift_class_getSuperclass(t)
 }
 
 /// Returns the superclass of `t`, if any.  The result is `nil` if `t` is
 /// not a class, is a root class, or is a class protocol.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 public // @testable
 func _getSuperclass(_ t: Any.Type) -> AnyClass? {
@@ -688,7 +687,7 @@ func _isOptional<T>(_ type: T.Type) -> Bool {
 }
 
 /// Extract an object reference from an Any known to contain an object.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 internal func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
   _sanityCheck(type(of: any) is AnyObject.Type
                || type(of: any) is AnyObject.Protocol,
@@ -712,7 +711,7 @@ internal func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
 // definitions below after the stdlib's diagnostic passes run, so that the
 // `staticReport`s don't fire while building the standard library, but do
 // fire if they ever show up in code that uses the standard library.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 public // internal with availability
 func _trueAfterDiagnostics() -> Builtin.Int1 {
