@@ -17,8 +17,6 @@
 #ifndef SWIFT_TYPES_H
 #define SWIFT_TYPES_H
 
-// SWIFT_ENABLE_TENSORFLOW
-#include "swift/AST/AutoDiff.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/Identifier.h"
@@ -76,6 +74,8 @@ namespace swift {
   class ProtocolConformance;
   enum PointerTypeKind : unsigned;
   struct ValueOwnershipKind;
+  // SWIFT_ENABLE_TENSORFLOW
+  struct SILReverseAutoDiffConfig;
 
   enum class TypeKind : uint8_t {
 #define TYPE(id, parent) id,

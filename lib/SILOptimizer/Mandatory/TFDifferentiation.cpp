@@ -826,112 +826,6 @@ enum class PrimalValueKind {
   TapeCheckpoint
 };
 
-/// A conceptual cotangent space representing the type of the adjoint.
-class CotangentSpace {
-public:
-  /// A cotangent space kind.
-  enum class Kind {
-    /// `Builtin.FP<...>`.
-    BuiltinRealScalar,
-    /// A type that conforms to `FloatingPoint`.
-    RealScalar,
-    /// A type that conforms to `VectorNumeric` where the associated
-    /// `ScalarElement` conforms to `FloatingPoint`.
-    RealVector,
-    /// A product of cotangent spaces as a struct.
-    ProductStruct,
-    /// A product of cotangent spaces as a tuple.
-    ProductTuple,
-    /// A sum of cotangent spaces.
-    Sum
-  };
-  
-private:
-  Kind kind;
-  union Value {
-    // BuiltinRealScalar
-    BuiltinFloatType *builtinFPType;
-    // RealScalar or RealVector
-    NominalTypeDecl *realNominalType;
-    // ProductStruct
-    StructDecl *structDecl;
-    // ProductTuple
-    TupleType *tupleType;
-    // Sum
-    EnumDecl *enumDecl;
-    
-    Value(BuiltinFloatType *builtinFP) : builtinFPType(builtinFP) {}
-    Value(NominalTypeDecl *nominal) : realNominalType(nominal) {}
-    Value(StructDecl *structDecl) : structDecl(structDecl) {}
-    Value(TupleType *tupleType) : tupleType(tupleType) {}
-    Value(EnumDecl *enumDecl) : enumDecl(enumDecl) {}
-  } value;
-  
-  CotangentSpace(Kind kind, Value value)
-      : kind(kind), value(value) {}
-  
-public:
-  CotangentSpace() = delete;
-  
-  static CotangentSpace
-  getBuiltinRealScalarSpace(BuiltinFloatType *builtinFP) {
-    return {Kind::BuiltinRealScalar, builtinFP};
-  }
-  static CotangentSpace getRealScalarSpace(NominalTypeDecl *typeDecl) {
-    return {Kind::RealScalar, typeDecl};
-  }
-  static CotangentSpace getRealVectorSpace(NominalTypeDecl *typeDecl) {
-    return {Kind::RealVector, typeDecl};
-  }
-  static CotangentSpace getProductStruct(StructDecl *structDecl) {
-    return {Kind::ProductStruct, structDecl};
-  }
-  static CotangentSpace getProductTuple(TupleType *tupleTy) {
-    return {Kind::ProductTuple, tupleTy};
-  }
-  static CotangentSpace getSum(EnumDecl *enumDecl) {
-    return {Kind::Sum, enumDecl};
-  }
-  
-  bool isBuiltinRealScalarSpace() const {
-    return kind == Kind::BuiltinRealScalar;
-  }
-  bool isRealScalarSpace() const { return kind == Kind::RealScalar; }
-  bool isRealVectorSpace() const { return kind == Kind::RealVector; }
-  bool isProductStruct() const { return kind == Kind::ProductStruct; }
-  bool isProductTuple() const { return kind == Kind::ProductTuple; }
-  
-  Kind getKind() const { return kind; }
-  BuiltinFloatType *getBuiltinRealScalarSpace() const {
-    assert(kind == Kind::BuiltinRealScalar);
-    return value.builtinFPType;
-  }
-  NominalTypeDecl *getRealScalarSpace() const {
-    assert(kind == Kind::RealScalar);
-    return value.realNominalType;
-  }
-  NominalTypeDecl *getRealVectorSpace() const {
-    assert(kind == Kind::RealVector);
-    return value.realNominalType;
-  }
-  NominalTypeDecl *getRealScalarOrVectorSpace() const {
-    assert(kind == Kind::RealScalar || kind == Kind::RealVector);
-    return value.realNominalType;
-  }
-  StructDecl *getProductStruct() const {
-    assert(kind == Kind::ProductStruct);
-    return value.structDecl;
-  }
-  TupleType *getProductTuple() const {
-    assert(kind == Kind::ProductTuple);
-    return value.tupleType;
-  }
-  EnumDecl *getSum() const {
-    assert(kind == Kind::Sum);
-    return value.enumDecl;
-  }
-};
-
 using GradientLookupKey = std::pair<SILFunction *, SILReverseAutoDiffConfig>;
 
 //===----------------------------------------------------------------------===//
@@ -982,9 +876,6 @@ private:
   mutable FuncDecl *cachedVectorPlusFn = nullptr;
   /// `Numeric.+` declaration.
   mutable FuncDecl *cachedNumericPlusFn = nullptr;
-  
-  /// Cache of computed cotangent spaces for types.
-  mutable DenseMap<CanType, Optional<CotangentSpace>> cachedCotangentSpaces;
 
 public:
   /// Construct an ADContext for the given module.
@@ -1030,9 +921,6 @@ public:
     }
     return cachedNumericPlusFn;
   }
-
-  /// Determines the cotangent space (or none) of the specified type.
-  Optional<CotangentSpace> getCotangentSpace(CanType type) const;
 
   /// Retrieves the file unit that contains implicit declarations in the
   /// current Swift module. If it does not exist, create one.
@@ -1253,118 +1141,6 @@ void ADContext::emitNondifferentiabilityError(SILInstruction *inst,
     break;
   }
   }
-}
-
-/// Determines whether the type supports vector differentiation. We say that a
-/// type supports vector differentiation if it conforms to `VectorNumeric` and
-/// the associated type `ScalarElement` conforms to `FloatingPoint`.
-static NominalTypeDecl *getAnyRealVectorTypeDecl(CanType type,
-                                                 const ADContext &context) {
-  auto *swiftModule = context.getModule().getSwiftModule();
-  auto *floatingPointProtocol = context.getFloatingPointProtocol();
-  auto *vectorNumericProtocol = context.getVectorNumericProtocol();
-  // Look up conformance.
-  auto maybeConf = swiftModule->lookupConformance(type, vectorNumericProtocol);
-  if (!maybeConf)
-    return nullptr;
-  auto conf = *maybeConf;
-  // See if the `ScalarElement` associated type conforms to `FloatingPoint`.
-  DeclName scalarDeclName(
-      context.getASTContext().getIdentifier("ScalarElement"));
-  auto lookup = vectorNumericProtocol->lookupDirect(scalarDeclName);
-  auto scalarAssocTy =
-      cast<AssociatedTypeDecl>(lookup[0])->getDeclaredInterfaceType();
-  auto scalarTy = conf.getAssociatedType(type, scalarAssocTy);
-  auto scalarConf =
-      swiftModule->lookupConformance(scalarTy, floatingPointProtocol);
-  if (!scalarConf.hasValue())
-    return nullptr;
-  auto *nominal = type->getAnyNominal();
-  assert(nominal && "Should've been nominal since it conforms to protocols");
-  return nominal;
-}
-
-/// Determines whether the type supports scalar differentiation. We say that a
-/// type supports scalar differentiation if it conforms to `FloatingPoint` and
-/// the associated type `ScalarElement` conforms to `FloatingPoint`.
-static NominalTypeDecl *getAnyRealScalarTypeDecl(CanType type,
-                                                 const ADContext &context) {
-  auto *swiftModule = context.getModule().getSwiftModule();
-  if (!swiftModule->lookupConformance(type, context.getFloatingPointProtocol()))
-    return nullptr;
-  auto *nominal = type->getAnyNominal();
-  assert(nominal && "Should've been nominal since it conforms to protocols");
-  return nominal;
-}
-
-/// Determines the cotangent space of a type.
-Optional<CotangentSpace> ADContext::getCotangentSpace(CanType type) const {
-  LLVM_DEBUG(getADDebugStream() << "Classifying cotangent space for "
-             << type << '\n');
-  auto lookup = cachedCotangentSpaces.find(type);
-  if (lookup != cachedCotangentSpaces.end())
-    return lookup->getSecond();
-  // A helper that is used to cache the computed cotangent space for the
-  // specified type and retuns the same cotangent space.
-  auto cache = [&](Optional<CotangentSpace> cotangentSpace) {
-    cachedCotangentSpaces.insert({type, cotangentSpace});
-    return cotangentSpace;
-  };
-  // `Builtin.FP<...>` is a builtin real scalar space.
-  if (auto *fpType = type->getAs<BuiltinFloatType>())
-    return cache(CotangentSpace::getBuiltinRealScalarSpace(fpType));
-  // Types that conform to `FloatingPoint` are a real scalar space.
-  if (auto *nomTy = getAnyRealScalarTypeDecl(type, *this))
-    return cache(CotangentSpace::getRealScalarSpace(nomTy));
-  // Types that conform to `VectorNumeric` where the associated `ScalarElement`
-  // conforms to `FloatingPoint` are a real vector space.
-  if (auto *nomTy = getAnyRealVectorTypeDecl(type, *this))
-    return cache(CotangentSpace::getRealVectorSpace(nomTy));
-  // Nominal types can be either a struct or an enum.
-  if (auto *nominal = type->getAnyNominal()) {
-    // Fixed-layout struct types, each of whose elements has a cotangent space,
-    // are a product of those cotangent spaces.
-    if (auto *structDecl = dyn_cast<StructDecl>(nominal)) {
-      if (structDecl->getFormalAccess() >= AccessLevel::Public &&
-          !structDecl->getAttrs().hasAttribute<FixedLayoutAttr>())
-        return cache(None);
-      auto allMembersHaveCotangentSpace =
-          llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
-            return (bool)getCotangentSpace(v->getType()->getCanonicalType());
-          });
-      if (allMembersHaveCotangentSpace)
-        return cache(CotangentSpace::getProductStruct(structDecl));
-    }
-    // Frozen enum types, all of whose payloads have a cotangent space, are a
-    // sum of the product of payloads in each case.
-    if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
-      if (enumDecl->getFormalAccess() >= AccessLevel::Public &&
-          !enumDecl->getAttrs().hasAttribute<FrozenAttr>())
-        return cache(None);
-      if (enumDecl->isIndirect())
-        return cache(None);
-      auto allMembersHaveCotangentSpace =
-        llvm::all_of(enumDecl->getAllCases(), [&](EnumCaseDecl *cd) {
-          return llvm::all_of(cd->getElements(), [&](EnumElementDecl *eed) {
-            return llvm::all_of(*eed->getParameterList(), [&](ParamDecl *pd) {
-              return (bool)
-                  getCotangentSpace(pd->getType()->getCanonicalType());
-            });
-          });
-        });
-      if (allMembersHaveCotangentSpace)
-        return cache(CotangentSpace::getSum(enumDecl));
-    }
-  }
-  // Tuple types, each of whose elements has a cotangent space, are a product of
-  // those cotangent space.
-  if (TupleType *tupleType = type->getAs<TupleType>())
-    if (llvm::all_of(tupleType->getElementTypes(), [&](Type t) {
-            return (bool)getCotangentSpace(t->getCanonicalType()); }))
-      return cache(CotangentSpace::getProductTuple(tupleType));
-  // Otherwise, the type does not have a cotangent space. That is, it does not
-  // support differentiation.
-  return cache(None);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1910,13 +1686,15 @@ static void convertIntToIndirectExpressible(intmax_t scalar,
 static void createScalarValueIndirect(intmax_t scalar, CanType type,
                                       SILValue seedBufAccess, SILLocation loc,
                                       SILBuilder &builder, ADContext &context) {
-  auto cotangentSpace = context.getCotangentSpace(type);
-  assert(cotangentSpace && "No cotangent space for this type");
+  auto &astCtx = context.getASTContext();
+  auto *swiftMod = context.getModule().getSwiftModule();
+  auto tangentSpace = astCtx.getTangentSpace(type, swiftMod);
+  assert(tangentSpace && "No tangent space for this type");
   // See if the type is a builtin float. If so, we don't do protocol
   // conformance-based conversion.
-  switch (cotangentSpace->getKind()) {
+  switch (tangentSpace->getKind()) {
   // Builtin scalar is just a `float_literal` instruction.
-  case CotangentSpace::Kind::BuiltinRealScalar: {
+  case TangentSpace::Kind::BuiltinRealScalar: {
     auto *fpType = type->castTo<BuiltinFloatType>();
     auto scalarVal =
         createBuiltinFPScalar(scalar, fpType->getCanonicalType(), loc, builder);
@@ -1927,8 +1705,8 @@ static void createScalarValueIndirect(intmax_t scalar, CanType type,
   // Real scalar gets initialized through
   // `<target_type>.IntegerLiteralType.init(_builtinIntegerLiteral:)` and
   // `<target_type>.init(integerLiteral:)`.
-  case CotangentSpace::Kind::RealScalar: {
-    auto *decl = cotangentSpace->getRealScalarSpace();
+  case TangentSpace::Kind::RealScalar: {
+    auto *decl = tangentSpace->getRealScalarSpace();
     convertIntToIndirectExpressible(scalar, decl, seedBufAccess, loc, builder,
                                     context);
     return;
@@ -1938,8 +1716,8 @@ static void createScalarValueIndirect(intmax_t scalar, CanType type,
   //     .init(_builtinIntegerLiteral:)`,
   // `<target_type>.ScalarElement.init(integerLiteral:)` and
   // `<target_type>.init(_:)`.
-  case CotangentSpace::Kind::RealVector: {
-    auto *targetTypeDecl = cotangentSpace->getRealVectorSpace();
+  case TangentSpace::Kind::RealVector: {
+    auto *targetTypeDecl = tangentSpace->getRealVectorSpace();
     auto &astCtx = context.getASTContext();
     auto &module = context.getModule();
     // Create a scalar value from the specified integer literal.
@@ -2031,8 +1809,8 @@ static void createScalarValueIndirect(intmax_t scalar, CanType type,
     return;
   }
   // Struct gets member-wise initialized.
-  case CotangentSpace::Kind::ProductStruct: {
-    auto *decl = cotangentSpace->getProductStruct();
+  case TangentSpace::Kind::ProductStruct: {
+    auto *decl = tangentSpace->getProductStruct();
     SmallVector<SILValue, 8> elements;
     for (auto *field : decl->getStoredProperties()) {
       auto *eltAddr =
@@ -2043,8 +1821,8 @@ static void createScalarValueIndirect(intmax_t scalar, CanType type,
     return;
   }
   // Tuple gets member-wise initialized.
-  case CotangentSpace::Kind::ProductTuple: {
-    auto tupleType = cotangentSpace->getProductTuple();
+  case TangentSpace::Kind::ProductTuple: {
+    auto tupleType = tangentSpace->getProductTuple();
     SmallVector<SILValue, 8> elements;
     for (auto i : indices(tupleType->getElementTypes())) {
       auto *eltAddr = builder.createTupleElementAddr(loc, seedBufAccess, i);
@@ -2053,27 +1831,29 @@ static void createScalarValueIndirect(intmax_t scalar, CanType type,
     }
     return;
   }
-  case CotangentSpace::Kind::Sum: {
+  case TangentSpace::Kind::Sum: {
     llvm_unreachable("Differentiating sum types is not supported yet");
   }
   }
 }
 
 /// Creates and returns a scalar value in the specified type. The specified type
-/// must be a loadable type and must have a cotangent space.
+/// must be a loadable type and must have a tangent space.
 static SILValue createScalarValueDirect(intmax_t scalar, CanType type,
                                         SILLocation loc,
                                         SILBuilder &builder,
                                         ADContext &context) {
   LLVM_DEBUG(getADDebugStream() << "Creating a scalar value " << scalar <<
         " of type " << type << '\n');
-  auto cotangentSpace = context.getCotangentSpace(type);
-  assert(cotangentSpace && "No cotangent space for this type");
-  switch (cotangentSpace->getKind()) {
-  case CotangentSpace::Kind::BuiltinRealScalar:
+  auto &astCtx = context.getASTContext();
+  auto *swiftMod = context.getModule().getSwiftModule();
+  auto tangentSpace = astCtx.getTangentSpace(type, swiftMod);
+  assert(tangentSpace && "No tangent space for this type");
+  switch (tangentSpace->getKind()) {
+  case TangentSpace::Kind::BuiltinRealScalar:
     return createBuiltinFPScalar(scalar, type, loc, builder);
-  case CotangentSpace::Kind::RealScalar:
-  case CotangentSpace::Kind::RealVector: {
+  case TangentSpace::Kind::RealScalar:
+  case TangentSpace::Kind::RealVector: {
     // Otherwise, initiailize the value through protocol calls.
     auto *buffer =
         builder.createAllocStack(loc, SILType::getPrimitiveObjectType(type));
@@ -2094,8 +1874,8 @@ static SILValue createScalarValueDirect(intmax_t scalar, CanType type,
     builder.createDeallocStack(loc, buffer);
     return loadedValue;
   }
-  case CotangentSpace::Kind::ProductStruct: {
-    auto *structDecl = cotangentSpace->getProductStruct();
+  case TangentSpace::Kind::ProductStruct: {
+    auto *structDecl = tangentSpace->getProductStruct();
     SmallVector<SILValue, 8> elements;
     for (auto *field : structDecl->getStoredProperties()) {
       auto eltVal = createScalarValueDirect(
@@ -2105,8 +1885,8 @@ static SILValue createScalarValueDirect(intmax_t scalar, CanType type,
     return builder.createStruct(
         loc, SILType::getPrimitiveObjectType(type), elements);
   }
-  case CotangentSpace::Kind::ProductTuple: {
-    auto tupleType = cotangentSpace->getProductTuple();
+  case TangentSpace::Kind::ProductTuple: {
+    auto tupleType = tangentSpace->getProductTuple();
     SmallVector<SILValue, 8> elements;
     for (auto eltType : tupleType->getElementTypes()) {
       auto eltVal = createScalarValueDirect(
@@ -2116,7 +1896,7 @@ static SILValue createScalarValueDirect(intmax_t scalar, CanType type,
     return builder.createTuple(
         loc, SILType::getPrimitiveObjectType(type), elements);
   }
-  case CotangentSpace::Kind::Sum: {
+  case TangentSpace::Kind::Sum: {
     llvm_unreachable("Differentiating sum types is not supported yet");
   }
   }
@@ -3913,10 +3693,12 @@ SILValue AdjointEmitter::materializeAdjointDirect(AdjointValue val,
                                                   SILLocation loc) {
   auto &builder = getBuilder();
   auto &ctx = getContext();
+  auto *swiftMod = ctx.getModule().getSwiftModule();
   LLVM_DEBUG(getADDebugStream() <<
              "Materializing adjoints for " << val << '\n');
-  auto cotangentSpace = ctx.getCotangentSpace(val.getType().getASTType());
-  assert(cotangentSpace && "No cotangent space for this type");
+  auto tangentSpace =
+      getASTContext().getTangentSpace(val.getType().getASTType(), swiftMod);
+  assert(tangentSpace && "No tangent space for this type");
   switch (val.getKind()) {
   case AdjointValue::Kind::Zero:
     return createScalarValueDirect(
@@ -4082,14 +3864,16 @@ SILValue AdjointEmitter::accumulateMaterializedAdjointsDirect(SILValue lhs,
   auto adjointASTTy = adjointTy.getASTType();
   auto loc = lhs.getLoc();
   auto &builder = getBuilder();
-  auto cotangentSpace = getContext().getCotangentSpace(adjointASTTy);
-  assert(cotangentSpace && "No cotangent space for this type");
-  switch (cotangentSpace->getKind()) {
-  case CotangentSpace::Kind::BuiltinRealScalar:
+  auto &astCtx = getContext().getASTContext();
+  auto *swiftMod = getModule().getSwiftModule();
+  auto tangentSpace = astCtx.getTangentSpace(adjointASTTy, swiftMod);
+  assert(tangentSpace && "No tangent space for this type");
+  switch (tangentSpace->getKind()) {
+  case TangentSpace::Kind::BuiltinRealScalar:
     return builder.createBuiltinBinaryFunction(
         loc, "fadd", adjointTy, adjointTy, {lhs, rhs});
-    case CotangentSpace::Kind::RealScalar:
-    case CotangentSpace::Kind::RealVector: {
+    case TangentSpace::Kind::RealScalar:
+    case TangentSpace::Kind::RealVector: {
       // Handle any nominal type value.
 
       // Allocate buffers for inputs and output.
@@ -4144,8 +3928,8 @@ SILValue AdjointEmitter::accumulateMaterializedAdjointsDirect(SILValue lhs,
 
       return val;
     }
-    case CotangentSpace::Kind::ProductStruct: {
-      auto *structDecl = cotangentSpace->getProductStruct();
+    case TangentSpace::Kind::ProductStruct: {
+      auto *structDecl = tangentSpace->getProductStruct();
       SmallVector<SILValue, 8> adjElements;
       for (auto *field : structDecl->getStoredProperties()) {
         auto *eltLHS = builder.createStructExtract(loc, lhs, field);
@@ -4155,8 +3939,8 @@ SILValue AdjointEmitter::accumulateMaterializedAdjointsDirect(SILValue lhs,
       }
       return builder.createStruct(loc, adjointTy, adjElements);
     }
-    case CotangentSpace::Kind::ProductTuple: {
-      auto tupleType = cotangentSpace->getProductTuple();
+    case TangentSpace::Kind::ProductTuple: {
+      auto tupleType = tangentSpace->getProductTuple();
       SmallVector<SILValue, 8> adjElements;
       for (unsigned i : range(tupleType->getNumElements())) {
         auto *eltLHS = builder.createTupleExtract(loc, lhs, i);
@@ -4166,7 +3950,7 @@ SILValue AdjointEmitter::accumulateMaterializedAdjointsDirect(SILValue lhs,
       }
       return builder.createTuple(loc, adjointTy, adjElements);
     }
-    case CotangentSpace::Kind::Sum: {
+    case TangentSpace::Kind::Sum: {
       llvm_unreachable("Differentiating sum types is not supported yet");
     }
   }
@@ -4184,10 +3968,12 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
   auto adjointTy = lhsBufAccess->getType();
   auto adjointASTTy = adjointTy.getASTType();
   auto &context = getContext();
-  auto cotangentSpace = context.getCotangentSpace(adjointASTTy);
-  assert(cotangentSpace && "No cotangent space for this type");
-  switch (cotangentSpace->getKind()) {
-  case CotangentSpace::Kind::BuiltinRealScalar: {
+  auto &astCtx = context.getASTContext();
+  auto *swiftMod = getModule().getSwiftModule();
+  auto tangentSpace = astCtx.getTangentSpace(adjointASTTy, swiftMod);
+  assert(tangentSpace && "No tangent space for this type");
+  switch (tangentSpace->getKind()) {
+  case TangentSpace::Kind::BuiltinRealScalar: {
     auto *sum = builder.createBuiltinBinaryFunction(
         loc, "fadd", lhsBufAccess->getType(), lhsBufAccess->getType(),
         {lhsBufAccess, rhsBufAccess});
@@ -4196,20 +3982,20 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
     builder.createEndAccess(loc, resultBufAccess, /*aborted*/ false);
     return;
   }
-  case CotangentSpace::Kind::RealScalar:
-  case CotangentSpace::Kind::RealVector: {
+  case TangentSpace::Kind::RealScalar:
+  case TangentSpace::Kind::RealVector: {
     FuncDecl *combinerFuncDecl = nullptr;
     ProtocolDecl *proto = nullptr;
-    auto *adjointTyDecl = cotangentSpace->getRealScalarOrVectorSpace();
+    auto *adjointTyDecl = tangentSpace->getRealScalarOrVectorSpace();
     // If the type conforms to `VectorNumeric`, then combine them using
     // `VectorNumeric.+`.
-    if (cotangentSpace->isRealVectorSpace()) {
+    if (tangentSpace->isRealVectorSpace()) {
       combinerFuncDecl = getContext().getVectorPlusDecl();
       proto = getContext().getVectorNumericProtocol();
     }
     // If the type conforms to `FloatingPoint`, then use `Numeric.+`.
     else {
-      assert(cotangentSpace->isRealScalarSpace());
+      assert(tangentSpace->isRealScalarSpace());
       combinerFuncDecl = getContext().getNumericPlusDecl();
       proto = getContext().getNumericProtocol();
     }
@@ -4236,8 +4022,8 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
                         /*isNonThrowing*/ false);
     return;
   }
-  case CotangentSpace::Kind::ProductTuple: {
-    auto tupleType = cotangentSpace->getProductTuple();
+  case TangentSpace::Kind::ProductTuple: {
+    auto tupleType = tangentSpace->getProductTuple();
     for (unsigned i : range(tupleType->getNumElements())) {
       auto *eltAddrLHS = builder.createTupleElementAddr(loc, lhsBufAccess, i);
       auto *eltAddrRHS = builder.createTupleElementAddr(loc, rhsBufAccess, i);
@@ -4246,8 +4032,8 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
     }
     return;
   }
-  case CotangentSpace::Kind::ProductStruct: {
-    auto *structDecl = cotangentSpace->getProductStruct();
+  case TangentSpace::Kind::ProductStruct: {
+    auto *structDecl = tangentSpace->getProductStruct();
     for (auto *field : structDecl->getStoredProperties()) {
       auto *eltAddrLHS =
           builder.createStructElementAddr(loc, lhsBufAccess, field);
@@ -4259,7 +4045,7 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
     }
     return;
   }
-  case CotangentSpace::Kind::Sum: {
+  case TangentSpace::Kind::Sum: {
     llvm_unreachable("Differentiating a sum type is not supported yet");
   }
   }
