@@ -34,34 +34,6 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   return fn;
 }
 
-static bool verifySILSelfParameterType(SILDeclRef DeclRef, SILFunction *F,
-                                       CanSILFunctionType FTy) {
-  SILModule &M = F->getModule();
-  SILParameterInfo PInfo = FTy->getSelfParameter();
-  CanType CTy = PInfo.getType();
-  SILType Ty = SILType::getPrimitiveObjectType(CTy);
-
-  // We do not care about trivial parameters (for now). There seem to be
-  // cases where we lower them as unowned.
-  //
-  // *NOTE* We do not run this check when we have a generic type since
-  // *generic types do not have type lowering and are always treated as
-  // *non-trivial since we do not know the type.
-  if (CTy->hasArchetype() || CTy->hasTypeParameter() ||
-      M.getTypeLowering(Ty).isTrivial())
-    return true;
-
-  // If this function is a constructor or destructor, bail. These have @owned
-  // parameters.
-  if (DeclRef.isConstructor() || DeclRef.isDestructor())
-    return true;
-
-  // Otherwise, if this function type has a guaranteed self parameter type,
-  // make sure that we have a +0 self param.
-  return !FTy->getExtInfo().hasGuaranteedSelfParam() || PInfo.isGuaranteed() ||
-         PInfo.isIndirectMutating();
-}
-
 static void addFunctionAttributes(SILFunction *F, DeclAttributes &Attrs,
                                   SILModule &M) {
   for (auto *A : Attrs.getAttributes<SemanticsAttr>())
@@ -149,17 +121,6 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
       addFunctionAttributes(F, storage->getAttrs(), mod);
     }
     addFunctionAttributes(F, decl->getAttrs(), mod);
-  }
-
-  // If this function has a self parameter, make sure that it has a +0 calling
-  // convention. This cannot be done for general function types, since
-  // function_ref's SILFunctionTypes do not have archetypes associated with
-  // it.
-  CanSILFunctionType FTy = F->getLoweredFunctionType();
-  if (FTy->hasSelfParam()) {
-    (void)&verifySILSelfParameterType;
-    assert(verifySILSelfParameterType(constant, F, FTy) &&
-           "Invalid signature for SIL Self parameter type");
   }
 
   return F;
