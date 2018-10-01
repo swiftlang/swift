@@ -118,7 +118,8 @@
           "declKind": "Constructor",
           "usr": "s:4cake2S1VACycfc",
           "moduleName": "cake",
-          "implicit": true
+          "implicit": true,
+          "isInternal": true
         }
       ],
       "declKind": "Struct",
@@ -170,7 +171,8 @@
           "usr": "s:4cake2C0CACyxq_q0_Gycfc",
           "moduleName": "cake",
           "genericSig": "<τ_0_0, τ_0_1, τ_0_2>",
-          "implicit": true
+          "implicit": true,
+          "isInternal": true
         },
         {
           "kind": "Function",
@@ -396,7 +398,8 @@
           "usr": "s:4cake2C1CACycfc",
           "moduleName": "cake",
           "overriding": true,
-          "implicit": true
+          "implicit": true,
+          "isInternal": true
         }
       ],
       "declKind": "Class",
@@ -777,6 +780,7 @@
               "usr": "s:4cake17fixedLayoutStructV1b33_3D8926C30F7417F2EF9A277D0C73FBDBLLSivg",
               "moduleName": "cake",
               "implicit": true,
+              "isInternal": true,
               "declAttributes": [
                 "Transparent"
               ]
@@ -785,6 +789,7 @@
           "declKind": "Var",
           "usr": "s:4cake17fixedLayoutStructV1b33_3D8926C30F7417F2EF9A277D0C73FBDBLLSivp",
           "moduleName": "cake",
+          "isInternal": true,
           "declAttributes": [
             "HasInitialValue"
           ],
@@ -818,6 +823,7 @@
               "usr": "s:4cake17fixedLayoutStructV1cSivg",
               "moduleName": "cake",
               "implicit": true,
+              "isInternal": true,
               "declAttributes": [
                 "Transparent"
               ]
@@ -826,6 +832,7 @@
           "declKind": "Var",
           "usr": "s:4cake17fixedLayoutStructV1cSivp",
           "moduleName": "cake",
+          "isInternal": true,
           "declAttributes": [
             "HasInitialValue"
           ],
@@ -865,7 +872,8 @@
           "declKind": "Constructor",
           "usr": "s:4cake17fixedLayoutStructV1a1b1cACSi_S2itc33_3D8926C30F7417F2EF9A277D0C73FBDBLlfc",
           "moduleName": "cake",
-          "implicit": true
+          "implicit": true,
+          "isInternal": true
         },
         {
           "kind": "Constructor",
@@ -882,7 +890,8 @@
           "declKind": "Constructor",
           "usr": "s:4cake17fixedLayoutStructVACycfc",
           "moduleName": "cake",
-          "implicit": true
+          "implicit": true,
+          "isInternal": true
         }
       ],
       "declKind": "Struct",

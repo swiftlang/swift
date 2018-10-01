@@ -69,6 +69,7 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
         IsProtocolReq(Info.IsProtocolReq),
         IsOverriding(Info.IsOverriding),
         IsOpen(Info.IsOpen),
+        IsInternal(Info.IsInternal),
         ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
         GenericSig(Info.GenericSig) {}
 
@@ -731,6 +732,8 @@ bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         return false;
       if (Left->isOpen() != Right->isOpen())
         return false;
+      if (Left->isInternal() != Right->isInternal())
+        return false;
       LLVM_FALLTHROUGH;
     }
     case SDKNodeKind::Root: {
@@ -1019,6 +1022,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
       IsOverriding(VD->getOverriddenDecl()),
       IsProtocolReq(isa<ProtocolDecl>(VD->getDeclContext()) && VD->isProtocolRequirement()),
       IsOpen(VD->getFormalAccess() == AccessLevel::Open),
+      IsInternal(VD->getFormalAccess() < AccessLevel::Public),
       SelfIndex(getSelfIndex(VD)), FixedBinaryOrder(getFixedBinaryOrder(VD)),
       ReferenceOwnership(getReferenceOwnership(VD)) {
 
@@ -1421,6 +1425,7 @@ void SDKNodeDecl::jsonize(json::Output &out) {
   output(out, KeyKind::KK_overriding, IsOverriding);
   output(out, KeyKind::KK_implicit, IsImplicit);
   output(out, KeyKind::KK_isOpen, IsOpen);
+  output(out, KeyKind::KK_isInternal, IsInternal);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_declAttributes).data(), DeclAttributes);
   // Strong reference is implied, no need for serialization.
   if (getReferenceOwnership() != ReferenceOwnership::Strong) {
