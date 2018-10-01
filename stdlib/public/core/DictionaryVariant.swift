@@ -56,24 +56,7 @@ extension Dictionary._Variant {
       _conditionallyUnreachable()
     }
   }
-#endif
 
-  @inlinable
-  internal mutating func isUniquelyReferenced() -> Bool {
-#if _runtime(_ObjC)
-    guard isNative else {
-      // Don't consider Cocoa a buffer mutable, even if it is mutable and it is
-      // uniquely referenced.
-      return false
-    }
-#endif
-    // Note that &self drills down through .native(_NativeDictionary) to the
-    // first property in _NativeDictionary, which is the reference to the
-    // storage.
-    return _isUnique_native(&self)
-  }
-
-#if _runtime(_ObjC)
   @usableFromInline @_transparent
   internal var isNative: Bool {
     switch self {
@@ -85,6 +68,23 @@ extension Dictionary._Variant {
     }
   }
 #endif
+
+  @inlinable
+  internal mutating func isUniquelyReferenced() -> Bool {
+#if _runtime(_ObjC)
+    let isNative: Bool
+    do { isNative = self.isNative }
+    guard isNative else {
+      // Don't consider Cocoa a buffer mutable, even if it is mutable and it is
+      // uniquely referenced.
+      return false
+    }
+#endif
+    // Note that &self drills down through .native(_NativeDictionary) to the
+    // first property in _NativeDictionary, which is the reference to the
+    // storage.
+    return _isUnique_native(&self)
+  }
 
   @inlinable
   internal var asNative: _NativeDictionary<Key, Value> {
@@ -121,6 +121,8 @@ extension Dictionary._Variant {
   /// without reallocating additional storage.
   internal mutating func reserveCapacity(_ capacity: Int) {
 #if _runtime(_ObjC)
+    let isNative: Bool
+    do { isNative = self.isNative }
     guard isNative else {
       let cocoa = asCocoa
       let capacity = Swift.max(cocoa.count, capacity)
@@ -142,6 +144,8 @@ extension Dictionary._Variant {
   @inlinable
   internal var capacity: Int {
 #if _runtime(_ObjC)
+    let isNative: Bool
+    do { isNative = self.isNative }
     guard isNative else {
       return asCocoa.count
     }
@@ -159,6 +163,8 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inlinable
   internal var startIndex: Index {
 #if _runtime(_ObjC)
+    let isNative: Bool
+    do { isNative = self.isNative }
     guard isNative else {
       return Index(_cocoa: asCocoa.startIndex)
     }
@@ -169,6 +175,8 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inlinable
   internal var endIndex: Index {
 #if _runtime(_ObjC)
+    let isNative: Bool
+    do { isNative = self.isNative }
     guard isNative else {
       return Index(_cocoa: asCocoa.endIndex)
     }
@@ -179,6 +187,8 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inlinable
   internal func index(after index: Index) -> Index {
 #if _runtime(_ObjC)
+    let isNative: Bool
+    do { isNative = self.isNative }
     guard isNative else {
       return Index(_cocoa: asCocoa.index(after: index._asCocoa))
     }
@@ -204,6 +214,8 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inline(__always)
   internal func index(forKey key: Key) -> Index? {
 #if _runtime(_ObjC)
+    let isNative: Bool
+    do { isNative = self.isNative }
     guard isNative else {
       let cocoaKey = _bridgeAnythingToObjectiveC(key)
       guard let index = asCocoa.index(forKey: cocoaKey) else { return nil }
@@ -218,7 +230,9 @@ extension Dictionary._Variant: _DictionaryBuffer {
     @inline(__always)
     get {
 #if _runtime(_ObjC)
-      guard isNative else {
+    let isNative: Bool
+    do { isNative = self.isNative }
+    guard isNative else {
         return asCocoa.count
       }
 #endif
@@ -230,6 +244,8 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inline(__always)
   func contains(_ key: Key) -> Bool {
 #if _runtime(_ObjC)
+    let isNative: Bool
+    do { isNative = self.isNative }
     guard isNative else {
       let cocoaKey = _bridgeAnythingToObjectiveC(key)
       return asCocoa.contains(cocoaKey)
@@ -242,6 +258,8 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inline(__always)
   func lookup(_ key: Key) -> Value? {
 #if _runtime(_ObjC)
+    let isNative: Bool
+    do { isNative = self.isNative }
     guard isNative else {
       let cocoaKey = _bridgeAnythingToObjectiveC(key)
       guard let cocoaValue = asCocoa.lookup(cocoaKey) else { return nil }
@@ -255,6 +273,8 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inline(__always)
   func lookup(_ index: Index) -> (key: Key, value: Value) {
 #if _runtime(_ObjC)
+    let isNative: Bool
+    do { isNative = self.isNative }
     guard isNative else {
       let (cocoaKey, cocoaValue) = asCocoa.lookup(index._asCocoa)
       let nativeKey = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
@@ -269,6 +289,8 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inline(__always)
   func key(at index: Index) -> Key {
 #if _runtime(_ObjC)
+    let isNative: Bool
+    do { isNative = self.isNative }
     guard isNative else {
       let cocoaKey = asCocoa.key(at: index._asCocoa)
       return _forceBridgeFromObjectiveC(cocoaKey, Key.self)
@@ -281,6 +303,8 @@ extension Dictionary._Variant: _DictionaryBuffer {
   @inline(__always)
   func value(at index: Index) -> Value {
 #if _runtime(_ObjC)
+    let isNative: Bool
+    do { isNative = self.isNative }
     guard isNative else {
       let cocoaValue = asCocoa.value(at: index._asCocoa)
       return _forceBridgeFromObjectiveC(cocoaValue, Value.self)
@@ -302,6 +326,8 @@ extension Dictionary._Variant {
     _ key: Key
   ) -> (bucket: _NativeDictionary<Key, Value>.Bucket, found: Bool) {
 #if _runtime(_ObjC)
+    let isNative: Bool
+    do { isNative = self.isNative }
     guard isNative else {
       let cocoa = asCocoa
       var native = _NativeDictionary<Key, Value>(
@@ -319,6 +345,8 @@ extension Dictionary._Variant {
   @inline(__always)
   internal mutating func ensureUniqueNative() -> _NativeDictionary<Key, Value> {
 #if _runtime(_ObjC)
+    let isNative: Bool
+    do { isNative = self.isNative }
     guard isNative else {
       cocoaPath()
       let native = _NativeDictionary<Key, Value>(asCocoa)
@@ -339,6 +367,8 @@ extension Dictionary._Variant {
     forKey key: Key
   ) -> Value? {
 #if _runtime(_ObjC)
+    let isNative: Bool
+    do { isNative = self.isNative }
     guard isNative else {
       // Make sure we have space for an extra element.
       let cocoa = asCocoa
@@ -381,6 +411,8 @@ extension Dictionary._Variant {
   @inlinable
   internal mutating func removeValue(forKey key: Key) -> Value? {
 #if _runtime(_ObjC)
+    let isNative: Bool
+    do { isNative = self.isNative }
     guard isNative else {
       let cocoaKey = _bridgeAnythingToObjectiveC(key)
       let cocoa = asCocoa
@@ -408,6 +440,8 @@ extension Dictionary._Variant {
     guard count > 0 else { return }
 
 #if _runtime(_ObjC)
+    let isNative: Bool
+    do { isNative = self.isNative }
     guard isNative else {
       self = .native(_NativeDictionary(capacity: asCocoa.count))
       return
@@ -426,6 +460,8 @@ extension Dictionary._Variant {
   @inline(__always)
   __consuming internal func makeIterator() -> Dictionary<Key, Value>.Iterator {
 #if _runtime(_ObjC)
+    let isNative: Bool
+    do { isNative = self.isNative }
     guard isNative else {
       return Dictionary.Iterator(_cocoa: asCocoa.makeIterator())
     }
@@ -440,6 +476,8 @@ extension Dictionary._Variant {
     _ transform: (Value) throws -> T
   ) rethrows -> _NativeDictionary<Key, T> {
 #if _runtime(_ObjC)
+    let isNative: Bool
+    do { isNative = self.isNative }
     guard isNative else {
       return try asCocoa.mapValues(transform)
     }
@@ -453,6 +491,8 @@ extension Dictionary._Variant {
     uniquingKeysWith combine: (Value, Value) throws -> Value
   ) rethrows where S.Element == (Key, Value) {
 #if _runtime(_ObjC)
+    let isNative: Bool
+    do { isNative = self.isNative }
     guard isNative else {
       var native = _NativeDictionary<Key, Value>(asCocoa)
       try native.merge(

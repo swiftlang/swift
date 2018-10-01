@@ -1514,7 +1514,9 @@ extension Dictionary {
     public mutating func swapAt(_ i: Index, _ j: Index) {
       guard i != j else { return }
 #if _runtime(_ObjC)
-      if !_variant.isNative {
+      let isNative: Bool
+      do { isNative = _variant.isNative }
+      if !isNative {
         _variant = .native(_NativeDictionary<Key, Value>(_variant.asCocoa))
       }
 #endif
@@ -1941,7 +1943,9 @@ extension Dictionary.Index: Hashable {
   public // FIXME(cocoa-index): Make inlinable
   func hash(into hasher: inout Hasher) {
 #if _runtime(_ObjC)
-    guard _isNative else {
+    let isNative: Bool
+    do { isNative = _isNative }
+    guard isNative else {
       hasher.combine(1 as UInt8)
       hasher.combine(_asCocoa.storage.currentKeyIndex)
       return
@@ -2069,7 +2073,9 @@ extension Dictionary.Iterator: IteratorProtocol {
   @inline(__always)
   public mutating func next() -> (key: Key, value: Value)? {
 #if _runtime(_ObjC)
-    guard _isNative else {
+    let isNative: Bool
+    do { isNative = _isNative }
+    guard isNative else {
       if let (cocoaKey, cocoaValue) = _asCocoa.next() {
         let nativeKey = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
         let nativeValue = _forceBridgeFromObjectiveC(cocoaValue, Value.self)
