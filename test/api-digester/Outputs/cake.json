@@ -125,7 +125,8 @@
           "declKind": "Constructor",
           "usr": "s:4cake2S1VACycfc",
           "moduleName": "cake",
-          "implicit": true
+          "implicit": true,
+          "isInternal": true
         }
       ],
       "declKind": "Struct",
@@ -177,7 +178,8 @@
           "usr": "s:4cake2C0CACyxq_q0_Gycfc",
           "moduleName": "cake",
           "genericSig": "<T1, T2, T3>",
-          "implicit": true
+          "implicit": true,
+          "isInternal": true
         },
         {
           "kind": "Function",
@@ -439,7 +441,8 @@
           "usr": "s:4cake2C1CACycfc",
           "moduleName": "cake",
           "overriding": true,
-          "implicit": true
+          "implicit": true,
+          "isInternal": true
         }
       ],
       "declKind": "Class",
@@ -850,7 +853,8 @@
           "declKind": "Constructor",
           "usr": "s:4cake17fixedLayoutStructV1a1b1cACSi_S2itc33_3D8926C30F7417F2EF9A277D0C73FBDBLlfc",
           "moduleName": "cake",
-          "implicit": true
+          "implicit": true,
+          "isInternal": true
         },
         {
           "kind": "Constructor",
@@ -867,7 +871,8 @@
           "declKind": "Constructor",
           "usr": "s:4cake17fixedLayoutStructVACycfc",
           "moduleName": "cake",
-          "implicit": true
+          "implicit": true,
+          "isInternal": true
         }
       ],
       "declKind": "Struct",
