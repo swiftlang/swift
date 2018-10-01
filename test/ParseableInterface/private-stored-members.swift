@@ -69,12 +69,12 @@ public class MyClass {
 // COMMON-NEXT: let publicLet: [[BOOL]]{{$}}
   public let publicLet: Bool = true
 
-// CHECK-NEXT: internal var _: [[INT64]]{{$}}
-// RESILIENT-NOT: internal var _: [[INT64]]{{$}}
+// CHECK-NEXT: internal var internalVar: [[INT64]]{{$}}
+// RESILIENT-NOT: internal var internalVar: [[INT64]]{{$}}
   var internalVar: Int64 = 0
 
-// CHECK-NEXT: internal let _: [[BOOL]]{{$}}
-// RESILIENT-NOT: internal let _: [[BOOL]]{{$}}
+// CHECK-NEXT: internal let internalLet: [[BOOL]]{{$}}
+// RESILIENT-NOT: internal let internalLet: [[BOOL]]{{$}}
   let internalLet: Bool = true
 
 // COMMON-NEXT: @usableFromInline
@@ -85,12 +85,12 @@ public class MyClass {
 // COMMON-NEXT: internal let ufiLet: [[BOOL]]{{$}}
   @usableFromInline let ufiLet: Bool = true
 
-// CHECK-NEXT: private var _: [[INT64]]{{$}}
-// RESILIENT-NOT: private var _: [[INT64]]{{$}}
+// CHECK-NEXT: private var privateVar: [[INT64]]{{$}}
+// RESILIENT-NOT: private var privateVar: [[INT64]]{{$}}
   private var privateVar: Int64 = 0
 
-// CHECK-NEXT: private let _: [[BOOL]]{{$}}
-// RESILIENT-NOT: private let _: [[BOOL]]{{$}}
+// CHECK-NEXT: private let privateLet: [[BOOL]]{{$}}
+// RESILIENT-NOT: private let privateLet: [[BOOL]]{{$}}
   private let privateLet: Bool = true
 
 // CHECK-NOT: private var

@@ -1837,6 +1837,9 @@ DeclContext *ModuleFile::getLocalDeclContext(DeclContextID DCID) {
     if (!declContextOrOffset.isComplete())
       declContextOrOffset = new (ctx)
         SerializedPatternBindingInitializer(binding, bindingIndex);
+
+    if (!blobData.empty())
+      binding->setInitStringRepresentation(bindingIndex, blobData);
     break;
   }
 
