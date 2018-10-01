@@ -1000,6 +1000,7 @@ public:
       break;
     }
 
+    case SDKNodeKind::DeclOperator:
     case SDKNodeKind::DeclSubscript:
     case SDKNodeKind::DeclAssociatedType:
     case SDKNodeKind::DeclFunction:

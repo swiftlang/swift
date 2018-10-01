@@ -1146,6 +1146,16 @@
       "hasStorage": true
     },
     {
+      "kind": "OperatorDecl",
+      "name": "..*..",
+      "printedName": "..*..",
+      "declKind": "InfixOperator",
+      "moduleName": "cake",
+      "declAttributes": [
+        "Infix"
+      ]
+    },
+    {
       "kind": "TypeDecl",
       "name": "Int",
       "printedName": "Int",
