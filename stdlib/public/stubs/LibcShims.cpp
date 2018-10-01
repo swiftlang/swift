@@ -21,14 +21,11 @@
 #include <Windows.h>
 #else
 #include <semaphore.h>
-#include <sys/ioctl.h>
 #include <unistd.h>
 #endif
 
 #include <algorithm>
 #include <cmath>
-#include <errno.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -116,28 +113,7 @@ int swift::_swift_stdlib_close(int fd) {
 #endif
 }
 
-
-#if defined(_WIN32) && !defined(__CYGWIN__)
-// Windows
-
-SWIFT_RUNTIME_STDLIB_SPI
-int swift::_swift_stdlib_open(const char *path, int oflag, __swift_mode_t mode) {
-  return _open(path, oflag, static_cast<int>(mode));
-}
-
-#else
-// not Windows
-
-SWIFT_RUNTIME_STDLIB_SPI
-int swift::_swift_stdlib_open(const char *path, int oflag, __swift_mode_t mode) {
-  return open(path, oflag, mode);
-}
-
-SWIFT_RUNTIME_STDLIB_SPI
-int swift::_swift_stdlib_openat(int fd, const char *path, int oflag,
-                                __swift_mode_t mode) {
-  return openat(fd, path, oflag, mode);
-}
+#if !defined(_WIN32) || defined(__CYGWIN__)
 
 SWIFT_RUNTIME_STDLIB_SPI
 void *swift::_stdlib_sem_open2(const char *name, int oflag) {
@@ -150,51 +126,7 @@ void *swift::_stdlib_sem_open4(const char *name, int oflag,
   return sem_open(name, oflag, mode, value);
 }
 
-SWIFT_RUNTIME_STDLIB_SPI
-int swift::_swift_stdlib_fcntl(int fd, int cmd, int value) {
-  return fcntl(fd, cmd, value);
-}
-
-SWIFT_RUNTIME_STDLIB_SPI
-int swift::_swift_stdlib_fcntlPtr(int fd, int cmd, void* ptr) {
-  return fcntl(fd, cmd, ptr);
-}
-
-SWIFT_RUNTIME_STDLIB_SPI
-int swift::_swift_stdlib_ioctl(int fd, unsigned long int request, int value) {
-  return ioctl(fd, request, value);
-}
-
-SWIFT_RUNTIME_STDLIB_SPI
-int swift::_swift_stdlib_ioctlPtr(int fd, unsigned long int request, void* ptr) {
-  return ioctl(fd, request, ptr);
-}
-
-#if defined(__FreeBSD__)
-SWIFT_RUNTIME_STDLIB_SPI
-char * _Nullable * _Null_unspecified swift::_swift_stdlib_getEnviron() {
-  extern char **environ;
-  return environ;
-}
-#elif defined(__APPLE__)
-SWIFT_RUNTIME_STDLIB_SPI
-char * _Nullable *swift::_swift_stdlib_getEnviron() {
-  extern char * _Nullable **_NSGetEnviron(void);
-  return *_NSGetEnviron();
-}
-#endif
-
 #endif // !(defined(_WIN32) && !defined(__CYGWIN__))
-
-SWIFT_RUNTIME_STDLIB_SPI
-int swift::_swift_stdlib_getErrno() {
-  return errno;
-}
-
-SWIFT_RUNTIME_STDLIB_SPI
-void swift::_swift_stdlib_setErrno(int value) {
-  errno = value;
-}
 
 #if defined(__APPLE__)
 #include <malloc/malloc.h>

@@ -107,38 +107,6 @@ void *_stdlib_sem_open4(const char *name, int oflag,
                         __swift_mode_t mode, unsigned int value);
 #endif
 
-// File control <fcntl.h>
-SWIFT_RUNTIME_STDLIB_SPI
-int _swift_stdlib_open(const char *path, int oflag, __swift_mode_t mode);
-#if !defined(_WIN32) || defined(__CYGWIN__)
-SWIFT_RUNTIME_STDLIB_SPI
-int _swift_stdlib_openat(int fd, const char *path, int oflag, __swift_mode_t mode);
-SWIFT_RUNTIME_STDLIB_SPI
-int _swift_stdlib_fcntl(int fd, int cmd, int value);
-SWIFT_RUNTIME_STDLIB_SPI
-int _swift_stdlib_fcntlPtr(int fd, int cmd, void* ptr);
-#endif
-
-// I/O control <ioctl.h>
-#if !defined(_WIN32) || defined(__CYGWIN__)
-SWIFT_RUNTIME_STDLIB_SPI
-int _swift_stdlib_ioctl(int fd, unsigned long int request, int value);
-SWIFT_RUNTIME_STDLIB_SPI
-int _swift_stdlib_ioctlPtr(int fd, unsigned long int request, void* ptr);
-#endif
-
-// Environment
-#if defined(__APPLE__) || defined(__FreeBSD__)
-SWIFT_RUNTIME_STDLIB_SPI
-char * _Nullable * _Null_unspecified _swift_stdlib_getEnviron();
-#endif
-
-// System error numbers <errno.h>
-SWIFT_RUNTIME_STDLIB_SPI
-int _swift_stdlib_getErrno();
-SWIFT_RUNTIME_STDLIB_SPI
-void _swift_stdlib_setErrno(int value);
-
 // Non-standard extensions
 SWIFT_READNONE SWIFT_RUNTIME_STDLIB_SPI
 __swift_size_t _swift_stdlib_malloc_size(const void *ptr);

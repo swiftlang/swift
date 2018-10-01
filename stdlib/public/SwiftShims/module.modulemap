@@ -20,6 +20,11 @@ module SwiftShims {
   export *
 }
 
+module SwiftShimsInline {
+  header "LibcShimsInline.h"
+  export *
+}
+
 // Various headers used to build overlays on Apple platforms.
 // Note: These deliberately do not use "export *" to avoid circularity issues
 // (overlay -> shims -> framework -> overlay)
