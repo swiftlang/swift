@@ -108,7 +108,6 @@ Returns a random number. Only used by allocation profiling tools.
 000000000001cee0 T _swift_release_n
 000000000001ce30 T _swift_retain
 000000000001ce50 T _swift_retain_n
-000000000001d140 T _swift_tryPin
 000000000001d240 T _swift_tryRetain
 0000000000027b10 T _swift_unknownObjectRelease
 0000000000027a70 T _swift_unknownObjectRelease_n
@@ -140,7 +139,6 @@ Returns a random number. Only used by allocation profiling tools.
 000000000001d2b0 T _swift_unownedRetainStrong
 000000000001d310 T _swift_unownedRetainStrongAndRelease
 000000000001d060 T _swift_unownedRetain_n
-000000000001d1b0 T _swift_unpin
 000000000001ca20 T _swift_verifyEndOfLifetime
 000000000001d680 T _swift_weakAssign
 000000000001d830 T _swift_weakCopyAssign
@@ -154,10 +152,6 @@ Returns a random number. Only used by allocation profiling tools.
 000000000002afe0 T _swift_isUniquelyReferencedNonObjC
 000000000002af50 T _swift_isUniquelyReferencedNonObjC_nonNull
 000000000002b060 T _swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject
-000000000002b200 T _swift_isUniquelyReferencedOrPinnedNonObjC_nonNull
-000000000002b130 T _swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject
-000000000002b2f0 T _swift_isUniquelyReferencedOrPinned_native
-000000000002b290 T _swift_isUniquelyReferencedOrPinned_nonNull_native
 000000000002af00 T _swift_isUniquelyReferenced_native
 000000000002aea0 T _swift_isUniquelyReferenced_nonNull_native
 00000000000????? T _swift_setDeallocating

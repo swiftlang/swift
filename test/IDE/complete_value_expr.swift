@@ -182,6 +182,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DOT_EXPR_NON_NOMINAL_1 | %FileCheck %s -check-prefix=DOT_EXPR_NON_NOMINAL_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DOT_EXPR_NON_NOMINAL_2 | %FileCheck %s -check-prefix=DOT_EXPR_NON_NOMINAL_2
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_1 | %FileCheck %s -check-prefix=KEYWORD_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_2 | %FileCheck %s -check-prefix=KEYWORD_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_3 | %FileCheck %s -check-prefix=KEYWORD_3
+
 // Test code completion of expressions that produce a value.
 
 struct FooStruct {
@@ -1992,4 +1996,32 @@ class TestDotExprWithNonNominal {
 // DOT_EXPR_NON_NOMINAL_2-NOT: otherField
 // DOT_EXPR_NON_NOMINAL_2-NOT: firstName
   }
+}
+
+class Cat {
+  struct Inner {
+    var prop1: String
+    var prop2: String
+  }
+  var `class`: Inner
+}
+func testKeyword(cat: Cat) {
+  let _ = cat.#^KEYWORD_1^#
+// KEYWORD_1: Begin completions
+// KEYWORD_1-DAG: Keyword[self]/CurrNominal:          self[#Cat#]; name=self
+// KEYWORD_1-DAG: Decl[InstanceVar]/CurrNominal:      class[#Cat.Inner#]; name=class
+// KEYWORD_1: End completions
+
+  let _ = cat.class#^KEYWORD_2^#
+// KEYWORD_2: Begin completions
+// KEYWORD_2-DAG: Decl[InstanceVar]/CurrNominal:      .prop1[#String#]; name=prop1
+// KEYWORD_2-DAG: Decl[InstanceVar]/CurrNominal:      .prop2[#String#]; name=prop2
+// KEYWORD_2-DAG: BuiltinOperator/None:                = {#Cat.Inner#}[#Void#]; name== Cat.Inner
+// KEYWORD_2: End completions
+
+  let _ = cat.class.#^KEYWORD_3^#
+// KEYWORD_3: Begin completions
+// KEYWORD_3-DAG: Decl[InstanceVar]/CurrNominal:      prop1[#String#]; name=prop1
+// KEYWORD_3-DAG: Decl[InstanceVar]/CurrNominal:      prop2[#String#]; name=prop2
+// KEYWORD_3: End completions
 }

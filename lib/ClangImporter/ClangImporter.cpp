@@ -797,6 +797,7 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
     assert(0 && "unexpected ASTReader failure for PCH validation");
     return false;
   }
+  llvm_unreachable("unhandled result");
 }
 
 Optional<std::string>
@@ -1465,12 +1466,8 @@ void ClangImporter::collectSubModuleNames(
     if (!submodule)
       return;
   }
-  auto submoduleNameLength = submodule->getFullModuleName().length();
-  for (auto sub : submodule->submodules()) {
-    std::string full = sub->getFullModuleName();
-    full.erase(0, submoduleNameLength + 1);
-    names.push_back(std::move(full));
-  }
+  for (auto sub : submodule->submodules())
+    names.push_back(sub->Name);
 }
 
 bool ClangImporter::isModuleImported(const clang::Module *M) {
@@ -2651,7 +2648,9 @@ ClangModuleUnit::lookupNestedType(Identifier name,
       isa<StructDecl>(baseType) && !baseType->hasLazyMembers() &&
       baseType->isChildContextOf(this)) {
     auto *mutableBase = const_cast<NominalTypeDecl *>(baseType);
-    auto codeEnum = mutableBase->lookupDirect(name,/*ignoreNewExtensions*/true);
+    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+    auto codeEnum = mutableBase->lookupDirect(name, flags);
     // Double-check that we actually have a good result. It's possible what we
     // found is /not/ a synthesized error struct, but just something that looks
     // like it. But if we still found a good result we should return that.
@@ -3100,7 +3099,8 @@ void ClangModuleUnit::getImportedModules(
   switch (filter) {
   case ModuleDecl::ImportFilter::All:
   case ModuleDecl::ImportFilter::Private:
-    imports.push_back({ModuleDecl::AccessPathTy(), owner.getStdlibModule()});
+    if (auto stdlib = owner.getStdlibModule())
+      imports.push_back({ModuleDecl::AccessPathTy(), stdlib});
     break;
   case ModuleDecl::ImportFilter::Public:
     break;
@@ -3305,7 +3305,7 @@ bool ClangImporter::Implementation::forEachLookupTable(
   // Collect and sort the set of module names.
   SmallVector<StringRef, 4> moduleNames;
   for (const auto &entry : LookupTables) {
-    moduleNames.push_back(entry.first());
+    moduleNames.push_back(entry.first);
   }
   llvm::array_pod_sort(moduleNames.begin(), moduleNames.end());
 
@@ -3613,7 +3613,7 @@ void ClangImporter::Implementation::dumpSwiftLookupTables() {
   // Sort the module names so we can print in a deterministic order.
   SmallVector<StringRef, 4> moduleNames;
   for (const auto &lookupTable : LookupTables) {
-    moduleNames.push_back(lookupTable.first());
+    moduleNames.push_back(lookupTable.first);
   }
   array_pod_sort(moduleNames.begin(), moduleNames.end());
 

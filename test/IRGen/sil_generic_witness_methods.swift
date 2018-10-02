@@ -13,7 +13,7 @@ protocol P {
 
 struct S {}
 
-// CHECK-LABEL: define hidden swiftcc void @"$S27sil_generic_witness_methods05call_D0{{[_0-9a-zA-Z]*}}F"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T, %swift.type* %U, i8** %T.P)
+// CHECK-LABEL: define hidden swiftcc void @"$s27sil_generic_witness_methods05call_D0{{[_0-9a-zA-Z]*}}F"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T, %swift.type* %U, i8** %T.P)
 func call_methods<T: P, U>(_ x: T, y: S, z: U) {
   // CHECK: [[STATIC_METHOD_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.P, i32 2
   // CHECK: [[STATIC_METHOD_PTR:%.*]] = load i8*, i8** [[STATIC_METHOD_ADDR]], align 8
@@ -29,7 +29,7 @@ func call_methods<T: P, U>(_ x: T, y: S, z: U) {
   // CHECK: [[GENERIC_METHOD_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.P, i32 3
   // CHECK: [[GENERIC_METHOD_PTR:%.*]] = load i8*, i8** [[GENERIC_METHOD_ADDR]], align 8
   // CHECK: [[GENERIC_METHOD:%.*]] = bitcast i8* [[GENERIC_METHOD_PTR]] to void (%swift.opaque*, %swift.type*, %swift.opaque*, %swift.type*, i8**)*
-  // CHECK: call swiftcc void [[GENERIC_METHOD]](%swift.opaque* noalias nocapture {{.*}}, %swift.type* {{.*}} @"$S27sil_generic_witness_methods1SVMf", {{.*}} %swift.opaque* noalias nocapture swiftself {{.*}}, %swift.type* %T, i8** %T.P)
+  // CHECK: call swiftcc void [[GENERIC_METHOD]](%swift.opaque* noalias nocapture {{.*}}, %swift.type* {{.*}} @"$s27sil_generic_witness_methods1SVMf", {{.*}} %swift.opaque* noalias nocapture swiftself {{.*}}, %swift.type* %T, i8** %T.P)
   x.generic_method(y)
   // CHECK: [[GENERIC_METHOD_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.P, i32 3
   // CHECK: [[GENERIC_METHOD_PTR:%.*]] = load i8*, i8** [[GENERIC_METHOD_ADDR]], align 8
@@ -38,7 +38,7 @@ func call_methods<T: P, U>(_ x: T, y: S, z: U) {
   x.generic_method(z)
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$S27sil_generic_witness_methods017call_existential_D0{{[_0-9a-zA-Z]*}}F"(%T27sil_generic_witness_methods1PP* noalias nocapture dereferenceable({{.*}}))
+// CHECK-LABEL: define hidden swiftcc void @"$s27sil_generic_witness_methods017call_existential_D0{{[_0-9a-zA-Z]*}}F"(%T27sil_generic_witness_methods1PP* noalias nocapture dereferenceable({{.*}}))
 func call_existential_methods(_ x: P, y: S) {
   // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %T27sil_generic_witness_methods1PP, %T27sil_generic_witness_methods1PP* [[X:%0]], i32 0, i32 1
   // CHECK: [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]], align 8
@@ -57,6 +57,6 @@ func call_existential_methods(_ x: P, y: S) {
   // CHECK: [[GENERIC_METHOD_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[WTABLE]], i32 3
   // CHECK: [[GENERIC_METHOD_PTR:%.*]] = load i8*, i8** [[GENERIC_METHOD_ADDR]], align 8
   // CHECK: [[GENERIC_METHOD:%.*]] = bitcast i8* [[GENERIC_METHOD_PTR]] to void (%swift.opaque*, %swift.type*, %swift.opaque*, %swift.type*, i8**)*
-  // CHECK: call swiftcc void [[GENERIC_METHOD]](%swift.opaque* noalias nocapture {{.*}}, %swift.type* {{.*}} @"$S27sil_generic_witness_methods1SVMf", {{.*}} %swift.opaque* noalias nocapture swiftself {{%.*}}, %swift.type* [[METADATA]], i8** [[WTABLE]])
+  // CHECK: call swiftcc void [[GENERIC_METHOD]](%swift.opaque* noalias nocapture {{.*}}, %swift.type* {{.*}} @"$s27sil_generic_witness_methods1SVMf", {{.*}} %swift.opaque* noalias nocapture swiftself {{%.*}}, %swift.type* [[METADATA]], i8** [[WTABLE]])
   x.generic_method(y)
 }

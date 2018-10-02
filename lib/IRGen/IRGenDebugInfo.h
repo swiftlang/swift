@@ -45,7 +45,7 @@ enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
 /// \c llvm::DebugLoc.
 class IRGenDebugInfo {
 public:
-  static IRGenDebugInfo *
+  static std::unique_ptr<IRGenDebugInfo>
   createIRGenDebugInfo(const IRGenOptions &Opts, ClangImporter &CI,
                        IRGenModule &IGM, llvm::Module &M,
                        StringRef MainOutputFilenameForDebugInfo);

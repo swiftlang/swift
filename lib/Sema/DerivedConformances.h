@@ -58,8 +58,6 @@ public:
   /// declarations for requirements of the protocol that are not satisfied by
   /// the type's explicit members.
   ///
-  /// \param tc The type checker.
-  ///
   /// \param nominal The nominal type for which we are determining whether to
   /// derive a witness.
   ///
@@ -67,7 +65,7 @@ public:
   ///
   /// \return True if the type can implicitly derive a conformance for the
   /// given protocol.
-  static bool derivesProtocolConformance(TypeChecker &tc, DeclContext *DC,
+  static bool derivesProtocolConformance(DeclContext *DC,
                                          NominalTypeDecl *nominal,
                                          ProtocolDecl *protocol);
 
@@ -120,8 +118,7 @@ public:
   /// associated values, and for structs with all-Equatable stored properties.
   ///
   /// \returns True if the requirement can be derived.
-  static bool canDeriveEquatable(TypeChecker &tc, DeclContext *DC,
-                                 NominalTypeDecl *type);
+  static bool canDeriveEquatable(DeclContext *DC, NominalTypeDecl *type);
 
   /// Derive an Equatable requirement for a type.
   ///

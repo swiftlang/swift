@@ -1346,7 +1346,7 @@ static void convertBBArgType(SILBuilder &argBuilder, SILType newSILType,
       SILUndef::get(newSILType, arg->getFunction()->getModule()));
 
   arg->replaceAllUsesWith(copyArg);
-  arg = arg->getParent()->replacePHIArgument(arg->getIndex(), newSILType,
+  arg = arg->getParent()->replacePhiArgument(arg->getIndex(), newSILType,
                                              arg->getOwnershipKind());
 
   copyArg->replaceAllUsesWith(arg);
@@ -1491,7 +1491,21 @@ void LoadableStorageAllocation::allocateForArg(SILValue value) {
 
   assert(!ApplySite::isa(value) && "Unexpected instruction");
 
-  SILBuilderWithScope allocBuilder(&*pass.F->begin());
+  // Find the first non-AllocStackInst and use its scope when creating
+  // the new SILBuilder. An AllocStackInst does not directly cause any
+  // code to be generated. The location of an AllocStackInst carries information
+  // about the source variable; it doesn't matter where in the instruction
+  // stream the AllocStackInst is located.
+  auto BBIter = pass.F->begin()->begin();
+  SILInstruction *FirstNonAllocStack = &*BBIter;
+  while (isa<AllocStackInst>(FirstNonAllocStack) &&
+         BBIter != pass.F->begin()->end()) {
+    BBIter++;
+    FirstNonAllocStack = &*BBIter;
+  }
+  SILBuilderWithScope allocBuilder(&*pass.F->begin()->begin(),
+                                   FirstNonAllocStack);
+
   AllocStackInst *allocInstr =
       allocBuilder.createAllocStack(value.getLoc(), value->getType());
 
@@ -2149,8 +2163,7 @@ static void rewriteFunction(StructLoweringState &pass,
       break;
     }
     case SILInstructionKind::WitnessMethodInst: {
-      auto *WMI = dyn_cast<WitnessMethodInst>(instr);
-      assert(WMI && "ValueKind is Witness Method but dyn_cast failed");
+      auto *WMI = cast<WitnessMethodInst>(instr);
       newInstr = methodBuilder.createWitnessMethod(
           loc, WMI->getLookupType(), WMI->getConformance(), member, newSILType);
       break;

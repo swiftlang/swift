@@ -27,6 +27,11 @@ class DiagnosticEngine;
 namespace ide {
 namespace api {
 
+enum class KeyKind {
+#define KEY(NAME) KK_##NAME,
+#include "swift/IDE/DigesterEnums.def"
+};
+
 // The node kind appearing in the tree that describes the content of the SDK
 enum class SDKNodeKind: uint8_t {
 #define NODE_KIND(NAME, VALUE) NAME,
@@ -59,6 +64,11 @@ raw_ostream &operator<<(raw_ostream &Out, const NodeAnnotation Value);
 
 // Redefine << so that we can output the name of the node kind.
 raw_ostream &operator<<(raw_ostream &Out, const SDKNodeKind Value);
+
+StringRef getDeclKindStr(const DeclKind Value);
+
+// Redefine << so that we can output the name of decl kind.
+raw_ostream &operator<<(raw_ostream &Out, const DeclKind Value);
 
 struct APIDiffItem {
   virtual void streamDef(llvm::raw_ostream &S) const = 0;

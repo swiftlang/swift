@@ -33,7 +33,7 @@ public struct AffineTransform : ReferenceConvertible, Hashable, CustomStringConv
         self.tY = tY
     }
     
-    fileprivate init(reference: NSAffineTransform) {
+    fileprivate init(reference: __shared NSAffineTransform) {
         m11 = reference.transformStruct.m11
         m12 = reference.transformStruct.m12
         m21 = reference.transformStruct.m21

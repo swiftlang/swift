@@ -120,6 +120,10 @@ def driver_force_one_batch_repartition : Flag<["-"], "driver-force-one-batch-rep
   InternalDebugOpt,
   HelpText<"Force one batch repartitioning for testing">;
 
+def driver_force_response_files : Flag<["-"], "driver-force-response-files">,
+  InternalDebugOpt,
+  HelpText<"Force the use of response files for testing">;
+
 def driver_always_rebuild_dependents :
   Flag<["-"], "driver-always-rebuild-dependents">, InternalDebugOpt,
   HelpText<"Always rebuild dependents of files that have been modified">;
@@ -296,6 +300,10 @@ def emit_module_path_EQ : Joined<["-"], "emit-module-path=">,
          ArgumentIsPath]>,
   Alias<emit_module_path>;
 
+def experimental_emit_interface : Flag<["-"], "experimental-emit-interface">,
+  Flags<[NoInteractiveOption, HelpHidden]>,
+  HelpText<"Test out the textual interfaces feature">;
+
 def emit_objc_header : Flag<["-"], "emit-objc-header">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit an Objective-C header file">;
@@ -354,6 +362,11 @@ def warn_swift3_objc_inference_minimal :
   Flag<["-"], "warn-swift3-objc-inference-minimal">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Warn about deprecated @objc inference in Swift 3 based on direct uses of the Objective-C entrypoint">;
+
+def warn_implicit_overrides :
+  Flag<["-"], "warn-implicit-overrides">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Warn about implicit overrides of protocol members">;
 
 def typo_correction_limit : Separate<["-"], "typo-correction-limit">,
   Flags<[FrontendOption, HelpHidden]>,

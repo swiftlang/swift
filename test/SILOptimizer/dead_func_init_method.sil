@@ -15,28 +15,28 @@ private class Base {
 private class Derived : Base {
 }
 
-sil private @BaseInit : $@convention(method) (@owned Base) -> @owned Base {
-bb0(%4 : $Base):
-  return %4 : $Base
+sil private @BaseInit : $@convention(method) (@thick Base.Type) -> @owned Base {
+bb0(%4 : $@thick Base.Type):
+  return undef : $Base
 }
 
-sil private @DerivedInit : $@convention(method) (@owned Derived) -> @owned Derived {
-bb0(%4 : $Derived):
-  return %4 : $Derived
+sil private @DerivedInit : $@convention(method) (@thick Derived.Type) -> @owned Derived {
+bb0(%4 : $@thick Derived.Type):
+  return undef : $Derived
 }
 
-sil @testit : $@convention(method) (@owned Derived) -> @owned Derived {
-bb0(%1 : $Derived):
-  %157 = class_method %1 : $Derived, #Derived.init!initializer.1 : (Derived.Type) -> () -> Derived, $@convention(method) (@owned Derived) -> @owned Derived
-  return %1 : $Derived
+sil @testit : $@convention(method) (@thick Derived.Type) -> @thick Derived.Type {
+bb0(%1 : $@thick Derived.Type):
+  %157 = class_method %1 : $@thick Derived.Type, #Derived.init!allocator.1 : (Derived.Type) -> () -> Derived, $@convention(method) (@thick Derived.Type) -> @owned Derived
+  return %1 : $@thick Derived.Type
 }
 
 sil_vtable Base {
-  #Base.init!initializer.1: @BaseInit
+  #Base.init!allocator.1: @BaseInit
 }
 
 sil_vtable Derived {
-  #Base.init!initializer.1: @DerivedInit
+  #Base.init!allocator.1: @DerivedInit
 }
 
 

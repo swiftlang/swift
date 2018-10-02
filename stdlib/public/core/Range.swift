@@ -619,7 +619,7 @@ extension PartialRangeFrom: Sequence
 
   /// Returns an iterator for this sequence.
   @inlinable
-  public func makeIterator() -> Iterator { 
+  public __consuming func makeIterator() -> Iterator { 
     return Iterator(_current: lowerBound) 
   }
 }
@@ -762,7 +762,7 @@ extension Comparable {
 ///     let word2 = "grisly"
 ///     let changes = countLetterChanges(word1[...], word2[...])
 ///     // changes == 2
-@_frozen // FIXME(sil-serialize-all)
+@_frozen // namespace
 public enum UnboundedRange_ {
   // FIXME: replace this with a computed var named `...` when the language makes
   // that possible.
@@ -771,7 +771,6 @@ public enum UnboundedRange_ {
   ///
   /// The unbounded range operator (`...`) is valid only within a collection's
   /// subscript.
-  @inlinable // FIXME(sil-serialize-all)
   public static postfix func ... (_: UnboundedRange_) -> () {
     fatalError("uncallable")
   }
@@ -844,7 +843,7 @@ extension MutableCollection {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public subscript(x: UnboundedRange) -> SubSequence {
     get {
       return self[startIndex...]

@@ -10,10 +10,10 @@ import Swift
 //   @callee_guaranteed.
 //   [[B2:%.*]] = begin_borrow [[C1]] : $@noescape @callee_guaranteed () -> Int
 //   [[R:%.*]] = apply [[B2]]() : $@noescape @callee_guaranteed () -> Int
-//   end_borrow [[B2]] from [[C1]] : $@noescape @callee_guaranteed () -> Int, $@noescape @callee_guaranteed () -> Int
+//   end_borrow [[B2]] : $@noescape @callee_guaranteed () -> Int
 //
 //   destroy_value [[C1]] : $@noescape @callee_guaranteed () -> Int
-//   end_borrow [[B1]] from %0 : $@noescape @callee_guaranteed () -> Int, $@noescape @callee_guaranteed () -> Int
+//   end_borrow [[B1]] : $@noescape @callee_guaranteed () -> Int
 //   destroy_value %0 : $@noescape @callee_guaranteed () -> Int
 //   return [[R]] : $Int
 public func apply(_ f : () -> Int) -> Int {

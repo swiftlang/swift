@@ -90,5 +90,62 @@ ProtocolReorderRequirementsTest.test("ReorderProtocolRequirements") {
     ])
 }
 
+struct Adult<Child: Baby> { }
+
+extension Adult: Adoring
+where Child.Onesie == MyOnesie, Child.Bassinet == MyBassinet {
+  func adore() -> String { return "awwwwwww" }
+}
+
+struct MyDiaper : Outfit {
+  let size = 2
+}
+
+struct GrumpyBaby : Baby {
+  func eat() {
+    log.append("waaaaaa!")
+  }
+
+  func sleep(in bassinet: MyBassinet) {
+    bassinet.squiggle()
+  }
+
+  func wear(outfit: MyDiaper) {
+    log.append("waaaaaa!")
+  }
+
+  func poop() {
+    log.append("waaaaah!")
+  }
+
+  func cry() {
+    log.append("waaaaah!")
+  }
+
+  func wiggle() {
+    log.append("waaaaah!")
+  }
+
+  let outfitSize = 2
+}
+
+func adoreIfYouCan(_ value: Any) -> String {
+  if let adoring = value as? Adoring {
+    return adoring.adore()
+  }
+
+  return "bah humbug"
+}
+
+ProtocolReorderRequirementsTest.test("ReorderProtocolRequirements") {
+  let adult1 = Adult<SillyBaby>()
+  let exclamation1 = adoreIfYouCan(adult1)
+  expectEqual(exclamation1, "awwwwwww")
+  let adult2 = Adult<GrumpyBaby>()
+  let exclamation2 = adoreIfYouCan(adult2)
+  expectEqual(exclamation2, "bah humbug")
+  
+}
+
 runAllTests()
 

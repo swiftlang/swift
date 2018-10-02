@@ -44,6 +44,7 @@ add_swift_library(swiftAST STATIC
   GraphOperationBuilder.cpp
   GraphOperationInfo.cpp
   Identifier.cpp
+  InlinableText.cpp
   LayoutConstraint.cpp
   LookupVisibleDecls.cpp
   Module.cpp

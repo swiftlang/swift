@@ -48,7 +48,7 @@ namespace swift {
 ///
 class StackNesting {
 
-  typedef llvm::SmallBitVector BitVector;
+  typedef SmallBitVector BitVector;
 
   /// Data stored for each block (actually for each block which is not dead).
   struct BlockInfo {

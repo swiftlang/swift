@@ -240,7 +240,7 @@ extension NSObject : Equatable, Hashable {
     hasher.combine(hashValue)
   }
 
-  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+  public func _rawHashValue(seed: Int) -> Int {
     // FIXME: We should use self.hash here, but hashValue is currently
     // overridable.
     return self.hashValue._rawHashValue(seed: seed)

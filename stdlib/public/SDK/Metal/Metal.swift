@@ -100,10 +100,11 @@ extension MTLDevice {
 @available(swift 4)
 @available(macOS 10.13, *)
 public func MTLCopyAllDevicesWithObserver(handler: @escaping MTLDeviceNotificationHandler) -> (devices:[MTLDevice], observer:NSObject) {
-    var resultTuple: (devices:[MTLDevice], observer:NSObject)
-    resultTuple.observer = NSObject()
-    resultTuple.devices = __MTLCopyAllDevicesWithObserver(AutoreleasingUnsafeMutablePointer<NSObjectProtocol?>(&resultTuple.observer), handler)
-    return resultTuple
+    var observer: NSObjectProtocol?
+    let devices = __MTLCopyAllDevicesWithObserver(&observer, handler)
+    // FIXME: The force cast here isn't great – ideally we would return the
+    // observer as an NSObjectProtocol.
+    return (devices, observer as! NSObject)
 }
 #endif
 
@@ -156,14 +157,14 @@ extension MTLRenderCommandEncoder {
     public func useHeaps(_ heaps: [MTLHeap]) {
         __use(heaps, count: heaps.count)
     }
-    
-#if os(macOS)
-    @available(macOS 10.13, *)
+
+#if os(macOS) || os(iOS)
+    @available(macOS 10.13, iOS 12.0, *)
     public func setViewports(_ viewports: [MTLViewport]) {
         __setViewports(viewports, count: viewports.count)
     }
     
-    @available(macOS 10.13, *)
+    @available(macOS 10.13, iOS 12.0, *)
     public func setScissorRects(_ scissorRects: [MTLScissorRect]) {
         __setScissorRects(scissorRects, count: scissorRects.count)
     }

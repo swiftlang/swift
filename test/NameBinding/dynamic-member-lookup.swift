@@ -67,7 +67,7 @@ func test(a: Gettable, b: Settable, c: MutGettable, d: NonMutSettable) {
 
 func test_iuo(a : Gettable!, b : Settable!) {
   global = a.wyverns
-  a.flavor = global  // expected-error {{cannot assign through dynamic lookup property: subscript is get-only}}
+  a.flavor = global  // expected-error {{cannot assign through dynamic lookup property: 'a' is a 'let' constant}}
   
   global = b.flavor
   b.universal = global // expected-error {{cannot assign through dynamic lookup property: 'b' is a 'let' constant}}

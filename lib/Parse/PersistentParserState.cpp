@@ -14,11 +14,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/Parse/PersistentParserState.h"
 
 using namespace swift;
+
+PersistentParserState::PersistentParserState(ASTContext &Ctx):
+  Ctx(Ctx) { Ctx.addLazyParser(this); }
+
+PersistentParserState::~PersistentParserState() { Ctx.removeLazyParser(this); }
 
 void PersistentParserState::delayFunctionBodyParsing(AbstractFunctionDecl *AFD,
                                                      SourceRange BodyRange,
@@ -45,25 +51,12 @@ bool PersistentParserState::hasFunctionBodyState(AbstractFunctionDecl *AFD) {
   return DelayedFunctionBodies.find(AFD) != DelayedFunctionBodies.end();
 }
 
-void PersistentParserState::delayAccessorBodyParsing(AbstractFunctionDecl *AFD,
-                                                     SourceRange BodyRange,
-                                                     SourceLoc PreviousLoc,
-                                                     SourceLoc LBLoc) {
-  std::unique_ptr<AccessorBodyState> State;
-  State.reset(new AccessorBodyState(BodyRange, PreviousLoc,
-                                    ScopeInfo.saveCurrentScope(), LBLoc));
-  assert(DelayedAccessorBodies.find(AFD) == DelayedAccessorBodies.end() &&
-         "Already recorded state for this body");
-  DelayedAccessorBodies[AFD] = std::move(State);
-}
-
-std::unique_ptr<PersistentParserState::AccessorBodyState>
-PersistentParserState::takeAccessorBodyState(AbstractFunctionDecl *AFD) {
-  assert(AFD->getBodyKind() == AbstractFunctionDecl::BodyKind::Unparsed);
-  DelayedAccessorBodiesTy::iterator I = DelayedAccessorBodies.find(AFD);
-  assert(I != DelayedAccessorBodies.end() && "State should be saved");
-  std::unique_ptr<AccessorBodyState> State = std::move(I->second);
-  DelayedAccessorBodies.erase(I);
+std::unique_ptr<PersistentParserState::DelayedDeclListState>
+PersistentParserState::takeDelayedDeclListState(IterableDeclContext *IDC) {
+  auto I = DelayedDeclListStates.find(IDC);
+  assert(I != DelayedDeclListStates.end() && "State should be saved");
+  auto State = std::move(I->second);
+  DelayedDeclListStates.erase(I);
   return State;
 }
 
@@ -79,10 +72,28 @@ void PersistentParserState::delayDecl(DelayedDeclKind Kind,
       ScopeInfo.saveCurrentScope()));
 }
 
+void PersistentParserState::delayDeclList(IterableDeclContext* D,
+                                          unsigned Flags,
+                                          DeclContext *ParentContext,
+                                          SourceRange BodyRange,
+                                          SourceLoc PreviousLoc) {
+  DelayedDeclListStates[D] = llvm::make_unique<DelayedDeclListState>(Flags,
+    ParentContext, BodyRange, PreviousLoc, ScopeInfo.saveCurrentScope());
+}
+
+void PersistentParserState::parseAllDelayedDeclLists() {
+  std::vector<IterableDeclContext*> AllDelayed;
+  for (auto &P: DelayedDeclListStates) {
+    AllDelayed.push_back(P.first);
+  }
+  for (auto *D: AllDelayed) {
+    parseMembers(D);
+  }
+}
+
 void PersistentParserState::delayTopLevel(TopLevelCodeDecl *TLCD,
                                           SourceRange BodyRange,
                                           SourceLoc PreviousLoc) {
   delayDecl(DelayedDeclKind::TopLevelCodeDecl, 0U, TLCD, BodyRange,
             PreviousLoc);
 }
-

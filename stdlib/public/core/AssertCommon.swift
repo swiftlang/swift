@@ -20,7 +20,6 @@ import SwiftShims
 // UnsafeMutablePointer
 
 @_transparent
-@compilerEvaluable
 public // @testable
 func _isDebugAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
@@ -31,7 +30,6 @@ func _isDebugAssertConfiguration() -> Bool {
 }
 
 @usableFromInline @_transparent
-@compilerEvaluable
 internal func _isReleaseAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
   // 0: Debug
@@ -41,7 +39,6 @@ internal func _isReleaseAssertConfiguration() -> Bool {
 }
 
 @_transparent
-@compilerEvaluable
 public // @testable
 func _isFastAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
@@ -78,7 +75,7 @@ func _fatalErrorFlags() -> UInt32 {
 ///
 /// This function should not be inlined because it is cold and inlining just
 /// bloats code.
-@usableFromInline // FIXME(sil-serialize-all)
+@usableFromInline
 @inline(never)
 internal func _assertionFailure(
   _ prefix: StaticString, _ message: StaticString,
@@ -108,7 +105,7 @@ internal func _assertionFailure(
 ///
 /// This function should not be inlined because it is cold and inlining just
 /// bloats code.
-@usableFromInline // FIXME(sil-serialize-all)
+@usableFromInline
 @inline(never)
 internal func _assertionFailure(
   _ prefix: StaticString, _ message: String,
@@ -138,7 +135,7 @@ internal func _assertionFailure(
 ///
 /// This function should not be inlined because it is cold and inlining just
 /// bloats code.
-@usableFromInline // FIXME(sil-serialize-all)
+@usableFromInline
 @inline(never)
 internal func _assertionFailure(
   _ prefix: StaticString, _ message: String,
@@ -163,7 +160,7 @@ internal func _assertionFailure(
 ///
 /// This function should not be inlined because it is cold and it inlining just
 /// bloats code.
-@usableFromInline // FIXME(sil-serialize-all)
+@usableFromInline
 @inline(never)
 @_semantics("arc.programtermination_point")
 internal func _fatalErrorMessage(
@@ -249,7 +246,6 @@ func _unimplementedInitializer(className: StaticString,
   Builtin.int_trap()
 }
 
-// FIXME(ABI)#21 (Type Checker): rename to something descriptive.
 @inlinable // FIXME(sil-serialize-all)
 public // COMPILER_INTRINSIC
 func _undefined<T>(

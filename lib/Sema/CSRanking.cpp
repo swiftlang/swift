@@ -357,13 +357,13 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
 
 /// Retrieve the adjusted parameter type for overloading purposes.
 static Type getAdjustedParamType(const AnyFunctionType::Param &param) {
-  if (auto funcTy = param.getType()->getAs<FunctionType>()) {
+  if (auto funcTy = param.getOldType()->getAs<FunctionType>()) {
     if (funcTy->isAutoClosure()) {
       return funcTy->getResult();
     }
   }
 
-  return param.getType();
+  return param.getOldType();
 }
 
 // Is a particular parameter of a function or subscript declaration
@@ -389,7 +389,8 @@ static bool paramIsIUO(Decl *decl, int paramNum) {
 ///
 /// "Specialized" is essentially a form of subtyping, defined below.
 static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
-                                  ValueDecl *decl1, ValueDecl *decl2) {
+                                  ValueDecl *decl1, ValueDecl *decl2,
+                                  bool isDynamicOverloadComparison = false) {
 
   if (tc.getLangOpts().DebugConstraintSolver) {
     auto &log = tc.Context.TypeCheckerDebug->getStream();
@@ -397,7 +398,9 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
     decl1->print(log); 
     log << "\nand\n";
     decl2->print(log);
-    log << "\n";
+    log << "\n(isDynamicOverloadComparison: ";
+    log << isDynamicOverloadComparison;
+    log << ")\n";
   }
 
   auto *innerDC1 = decl1->getInnermostDeclContext();
@@ -406,7 +409,9 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
   auto *outerDC1 = decl1->getDeclContext();
   auto *outerDC2 = decl2->getDeclContext();
 
-  if (!tc.specializedOverloadComparisonCache.count({decl1, decl2})) {
+  auto overloadComparisonKey =
+      std::make_tuple(decl1, decl2, isDynamicOverloadComparison);
+  if (!tc.specializedOverloadComparisonCache.count(overloadComparisonKey)) {
 
     auto compareSpecializations = [&] () -> bool {
       // If the kinds are different, there's nothing we can do.
@@ -444,6 +449,32 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         // One member is in a protocol extension, the other is in a concrete type.
         // Prefer the member in the concrete type.
         return inProtocolExtension2;
+      }
+
+      // A concrete type member is always more specialised than a protocol
+      // member (bearing in mind that we have already handled the case where
+      // exactly one member is in a protocol extension). Only apply this rule in
+      // Swift 5 mode to better maintain source compatibility under Swift 4
+      // mode.
+      //
+      // Don't apply this rule when comparing two overloads found through
+      // dynamic lookup to ensure we keep cases like this ambiguous:
+      //
+      //    @objc protocol P {
+      //      var i: String { get }
+      //    }
+      //    class C {
+      //      @objc var i: Int { return 0 }
+      //    }
+      //    func foo(_ x: AnyObject) {
+      //      x.i // ensure ambiguous.
+      //    }
+      //
+      if (tc.Context.isSwiftVersionAtLeast(5) && !isDynamicOverloadComparison) {
+        auto inProto1 = isa<ProtocolDecl>(outerDC1);
+        auto inProto2 = isa<ProtocolDecl>(outerDC2);
+        if (inProto1 != inProto2)
+          return inProto2;
       }
 
       Type type1 = decl1->getInterfaceType();
@@ -615,8 +646,8 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         // If they both have trailing closures, compare those separately.
         bool compareTrailingClosureParamsSeparately = false;
         if (numParams1 > 0 && numParams2 > 0 &&
-            params1.back().getType()->is<AnyFunctionType>() &&
-            params2.back().getType()->is<AnyFunctionType>()) {
+            params1.back().getOldType()->is<AnyFunctionType>() &&
+            params2.back().getOldType()->is<AnyFunctionType>()) {
           compareTrailingClosureParamsSeparately = true;
         }
 
@@ -697,21 +728,21 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       return false;
     };
 
-    tc.specializedOverloadComparisonCache[{decl1, decl2}] = 
+    tc.specializedOverloadComparisonCache[overloadComparisonKey] =
         compareSpecializations();
   } else if (tc.getLangOpts().DebugConstraintSolver) {
     auto &log = tc.Context.TypeCheckerDebug->getStream();
-    log << "Found cached comparison: " 
-        << tc.specializedOverloadComparisonCache[{decl1, decl2}] << "\n";
+    log << "Found cached comparison: "
+        << tc.specializedOverloadComparisonCache[overloadComparisonKey] << "\n";
   }
 
   if (tc.getLangOpts().DebugConstraintSolver) {
     auto &log = tc.Context.TypeCheckerDebug->getStream();
-    auto result = tc.specializedOverloadComparisonCache[{decl1, decl2}];
+    auto result = tc.specializedOverloadComparisonCache[overloadComparisonKey];
     log << "comparison result: " << (result ? "better" : "not better") << "\n";
   }
 
-  return tc.specializedOverloadComparisonCache[{decl1, decl2}];
+  return tc.specializedOverloadComparisonCache[overloadComparisonKey];
 }
 
 Comparison TypeChecker::compareDeclarations(DeclContext *dc,
@@ -724,6 +755,21 @@ Comparison TypeChecker::compareDeclarations(DeclContext *dc,
     return Comparison::Unordered;
 
   return decl1Better? Comparison::Better : Comparison::Worse;
+}
+
+static Type getUnlabeledType(Type type, ASTContext &ctx) {
+  return type.transform([&](Type type) -> Type {
+    if (auto *tupleType = dyn_cast<TupleType>(type.getPointer())) {
+      SmallVector<TupleTypeElt, 8> elts;
+      for (auto elt : tupleType->getElements()) {
+        elts.push_back(elt.getWithoutName());
+      }
+
+      return TupleType::get(elts, ctx);
+    }
+
+    return type;
+  });
 }
 
 SolutionCompareResult ConstraintSystem::compareSolutions(
@@ -755,6 +801,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
   bool isStdlibOptionalMPlusOperator1 = false;
   bool isStdlibOptionalMPlusOperator2 = false;
+
+  bool isVarAndNotProtocol1 = false;
+  bool isVarAndNotProtocol2 = false;
 
   auto getWeight = [&](ConstraintLocator *locator) -> unsigned {
     if (auto *anchor = locator->getAnchor()) {
@@ -849,15 +898,23 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     case OverloadChoiceKind::DynamicMemberLookup:
       break;
     }
-    
+
+    // We don't apply some ranking rules to overloads found through dynamic
+    // lookup in order to keep a few potentially ill-formed cases ambiguous.
+    bool isDynamicOverloadComparison =
+        choice1.getKind() == OverloadChoiceKind::DeclViaDynamic &&
+        choice2.getKind() == OverloadChoiceKind::DeclViaDynamic;
+
     // Determine whether one declaration is more specialized than the other.
     bool firstAsSpecializedAs = false;
     bool secondAsSpecializedAs = false;
-    if (isDeclAsSpecializedAs(tc, cs.DC, decl1, decl2)) {
+    if (isDeclAsSpecializedAs(tc, cs.DC, decl1, decl2,
+                              isDynamicOverloadComparison)) {
       score1 += weight;
       firstAsSpecializedAs = true;
     }
-    if (isDeclAsSpecializedAs(tc, cs.DC, decl2, decl1)) {
+    if (isDeclAsSpecializedAs(tc, cs.DC, decl2, decl1,
+                              isDynamicOverloadComparison)) {
       score2 += weight;
       secondAsSpecializedAs = true;
     }
@@ -962,6 +1019,32 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       }
     }
 
+    // Swift 4.1 compatibility hack: If everything else is considered equal,
+    // favour a property on a concrete type over a protocol property member.
+    //
+    // This hack is required due to changes in shadowing behaviour where a
+    // protocol property member will no longer shadow a property on a concrete
+    // type, which created unintentional ambiguities in 4.2. This hack ensures
+    // we at least keep these cases unambiguous in Swift 5 under Swift 4
+    // compatibility mode. Don't however apply this hack for decls found through
+    // dynamic lookup, as we want the user to have to disambiguate those.
+    //
+    // This is intentionally narrow in order to best preserve source
+    // compatibility under Swift 4 mode by ensuring we don't introduce any new
+    // ambiguities. This will become a more general "is more specialised" rule
+    // in Swift 5 mode.
+    if (!tc.Context.isSwiftVersionAtLeast(5) &&
+        choice1.getKind() != OverloadChoiceKind::DeclViaDynamic &&
+        choice2.getKind() != OverloadChoiceKind::DeclViaDynamic &&
+        isa<VarDecl>(decl1) && isa<VarDecl>(decl2)) {
+      auto *nominal1 = dc1->getSelfNominalTypeDecl();
+      auto *nominal2 = dc2->getSelfNominalTypeDecl();
+      if (nominal1 && nominal2 && nominal1 != nominal2) {
+        isVarAndNotProtocol1 = !isa<ProtocolDecl>(nominal1);
+        isVarAndNotProtocol2 = !isa<ProtocolDecl>(nominal2);
+      }
+    }
+
     // FIXME: Lousy hack for ?? to prefer the catamorphism (flattening)
     // over the mplus (non-flattening) overload if all else is equal.
     if (decl1->getBaseName() == "??") {
@@ -979,8 +1062,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         auto params = fnTy->getParams();
         assert(params.size() == 2);
 
-        auto param1 = params[0].getType();
-        auto param2 = params[1].getType()->castTo<AnyFunctionType>();
+        auto param1 = params[0].getOldType();
+        auto param2 = params[1].getOldType()->castTo<AnyFunctionType>();
 
         assert(param1->getOptionalObjectType());
         assert(param2->isAutoClosure());
@@ -1033,8 +1116,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         ++score2;
 
       // Prefer the unlabeled form of a type.
-      auto unlabeled1 = type1->getUnlabeledType(cs.getASTContext());
-      auto unlabeled2 = type2->getUnlabeledType(cs.getASTContext());
+      auto unlabeled1 = getUnlabeledType(type1, cs.getASTContext());
+      auto unlabeled2 = getUnlabeledType(type2, cs.getASTContext());
       if (unlabeled1->isEqual(unlabeled2)) {
         if (type1->isEqual(unlabeled1)) {
           ++score1;
@@ -1116,6 +1199,14 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // This is correct: we want to /disprefer/ the mplus.
     score2 += isStdlibOptionalMPlusOperator1;
     score1 += isStdlibOptionalMPlusOperator2;
+  }
+
+  // All other things being equal, apply the Swift 4.1 compatibility hack for
+  // preferring var members in concrete types over a protocol requirement
+  // (see the comment above for the rationale of this hack).
+  if (!tc.Context.isSwiftVersionAtLeast(5) && score1 == score2) {
+    score1 += isVarAndNotProtocol1;
+    score2 += isVarAndNotProtocol2;
   }
 
   // FIXME: There are type variables and overloads not common to both solutions
@@ -1372,7 +1463,7 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {
 }
 
 InputMatcher::InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
-                           const llvm::SmallBitVector &defaultValueMap)
+                           const SmallBitVector &defaultValueMap)
     : NumSkippedParameters(0), DefaultValueMap(defaultValueMap),
       Params(params) {}
 

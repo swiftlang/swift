@@ -57,11 +57,11 @@ struct Subscripts1 {
 }
 
 struct Subscripts2 {
-  subscript (i: Int) -> Int { // expected-note{{'subscript' previously declared here}}
+  subscript (i: Int) -> Int { // expected-note{{'subscript(_:)' previously declared here}}
     get { return i }
   }
 
-  subscript (j: Int) -> Int { // expected-error{{invalid redeclaration of 'subscript'}}
+  subscript (j: Int) -> Int { // expected-error{{invalid redeclaration of 'subscript(_:)'}}
     get { return j }
   }
 }

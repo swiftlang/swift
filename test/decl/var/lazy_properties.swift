@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library -swift-version 4
+// RUN: %target-typecheck-verify-swift -parse-as-library
 
 lazy func lazy_func() {} // expected-error {{'lazy' may only be used on 'var' declarations}} {{1-6=}}
 

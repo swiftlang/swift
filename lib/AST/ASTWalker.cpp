@@ -313,7 +313,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       visitGenericParamList(AFD->getGenericParams());
     }
 
-    if (auto *PD = AFD->getImplicitSelfDecl())
+    if (auto *PD = AFD->getImplicitSelfDecl(/*createIfNeeded=*/false))
       visit(PD);
     visit(AFD->getParameters());
 
@@ -700,6 +700,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return nullptr;
   }
   
+  Expr *visitVarargExpansionExpr(VarargExpansionExpr *E) {
+    if (Expr *E2 = doIt(E->getSubExpr())) {
+      E->setSubExpr(E2);
+      return E;
+    }
+    return nullptr;
+  }
+
   Expr *visitSequenceExpr(SequenceExpr *E) {
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i)
       if (Expr *Elt = doIt(E->getElement(i)))
@@ -1038,6 +1046,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       case KeyPathExpr::Component::Kind::Property:
       case KeyPathExpr::Component::Kind::UnresolvedProperty:
       case KeyPathExpr::Component::Kind::Invalid:
+      case KeyPathExpr::Component::Kind::Identity:
         // No subexpr to visit.
         break;
       }
@@ -1584,8 +1593,9 @@ Pattern *Traversal::visitTypedPattern(TypedPattern *P) {
   else
     return nullptr;
   if (!P->isImplicit())
-    if (doIt(P->getTypeLoc()))
-      return nullptr;
+    if (auto *TR = P->getTypeRepr())
+      if (doIt(TR))
+        return nullptr;
   return P;
 }
 

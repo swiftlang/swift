@@ -5,7 +5,7 @@
 
 // The offset of the typemetadata in the class typemetadata must match.
 
-// FILE1: define hidden swiftcc i64 @"$S4test12AccessorTestCySiAA3SubCyxGcluig"(%T4test3SubC*, %T4test12AccessorTestC* swiftself)
+// FILE1: define hidden swiftcc i64 @"$s4test12AccessorTestCySiAA3SubCyxGcluig"(%T4test3SubC*, %T4test12AccessorTestC* swiftself)
 // FILE1:   [[T1:%.*]] = bitcast %T4test3SubC* %0 to %swift.type**
 // FILE1:   [[TYPEMETADATA:%.*]] = load %swift.type*, %swift.type** [[T1]]
 // FILE1:   [[T2:%.*]] = bitcast %swift.type* [[TYPEMETADATA]] to %swift.type**
@@ -21,7 +21,7 @@ public class AccessorTest {
   }
 }
 
-// FILE2-LABEL: define internal %swift.type* @"$S4test3SubCMi"(%swift.type_descriptor*, i8**, i8**)
+// FILE2-LABEL: define internal %swift.type* @"$s4test3SubCMi"(%swift.type_descriptor*, i8**, i8*)
 // FILE2:   [[T_ADDR:%.*]] = bitcast i8** %1 to %swift.type**
 // FILE2:   [[T:%.*]] = load %swift.type*, %swift.type** [[T_ADDR]]
 // FILE2:   [[CLASSMETADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata

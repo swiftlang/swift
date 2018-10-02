@@ -35,6 +35,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILOpenedArchetypesTracker.h"
 #include "swift/SIL/SILVTable.h"
+#include "swift/SIL/SILVTableVisitor.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/TypeLowering.h"
@@ -386,7 +387,8 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   SILOpenedArchetypesTracker OpenedArchetypes;
   SmallVector<StringRef, 16> DebugVars;
   const SILInstruction *CurInstruction = nullptr;
-  DominanceInfo *Dominance = nullptr;
+  const SILArgument *CurArgument = nullptr;
+  std::unique_ptr<DominanceInfo> Dominance;
 
   // Used for dominance checking within a basic block.
   llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
@@ -412,12 +414,12 @@ public:
     if (CurInstruction) {
       llvm::dbgs() << "Verifying instruction:\n";
       CurInstruction->printInContext(llvm::dbgs());
-      llvm::dbgs() << "In function:\n";
-      F.print(llvm::dbgs());
-    } else {
-      llvm::dbgs() << "In function:\n";
-      F.print(llvm::dbgs());
+    } else if (CurArgument) {
+      llvm::dbgs() << "Verifying argument:\n";
+      CurArgument->printInContext(llvm::dbgs());
     }
+    llvm::dbgs() << "In function:\n";
+    F.print(llvm::dbgs());
 
     // We abort by default because we want to always crash in
     // the debugger.
@@ -597,17 +599,12 @@ public:
         InstNumbers[&I] = InstIdx++;
     }
 
-    Dominance = new DominanceInfo(const_cast<SILFunction *>(&F));
+    Dominance.reset(new DominanceInfo(const_cast<SILFunction *>(&F)));
 
     auto *DebugScope = F.getDebugScope();
     require(DebugScope, "All SIL functions must have a debug scope");
     require(DebugScope->Parent.get<SILFunction *>() == &F,
             "Scope of SIL function points to different function");
-  }
-
-  ~SILVerifier() {
-    if (Dominance)
-      delete Dominance;
   }
 
   // Checks dominance between two instructions.
@@ -645,26 +642,46 @@ public:
     return M.getStage() == SILStage::Raw;
   }
 
-  void visitSILArgument(SILArgument *arg) {
-    checkLegalType(arg->getFunction(), arg, nullptr);
-    checkValueBaseOwnership(arg);
-
-    if (isa<SILPHIArgument>(arg) && prohibitAddressBlockArgs()) {
-      // As a structural SIL property, we disallow address-type block
+  void visitSILPhiArgument(SILPhiArgument *arg) {
+    // Verify that the `isPhiArgument` property is sound:
+    // - Phi arguments come from branches.
+    // - Non-phi arguments have a single predecessor.
+    if (arg->isPhiArgument()) {
+      for (SILBasicBlock *predBB : arg->getParent()->getPredecessorBlocks()) {
+        auto *TI = predBB->getTerminator();
+        // FIXME: when critical edges are removed, only allow BranchInst.
+        require(isa <BranchInst>(TI) || isa<CondBranchInst>(TI),
+                "All phi argument inputs must be from branches.");
+      }
+    } else {
+    }
+    if (arg->isPhiArgument() && prohibitAddressBlockArgs()) {
+      // As a property of well-formed SIL, we disallow address-type block
       // arguments. Supporting them would prevent reliably reasoning about the
       // underlying storage of memory access. This reasoning is important for
       // diagnosing violations of memory access rules and supporting future
       // optimizations such as bitfield packing. Address-type block arguments
       // also create unnecessary complexity for SIL optimization passes that
       // need to reason about memory aliasing.
-      //
-      // Note: We could allow non-phi block arguments to be addresses, because
-      // the address source would still be uniquely recoverable. But then
-      // we would need to separately ensure that something like begin_access is
-      // never passed as a block argument before being used by end_access. For
-      // now, it simpler to have a strict prohibition.
       require(!arg->getType().isAddress(),
               "Block arguments cannot be addresses");
+    }
+  }
+
+  void visitSILArgument(SILArgument *arg) {
+    CurArgument = arg;
+    checkLegalType(arg->getFunction(), arg, nullptr);
+    checkValueBaseOwnership(arg);
+    if (auto *phiArg = dyn_cast<SILPhiArgument>(arg)) {
+      if (phiArg->isPhiArgument())
+        visitSILPhiArgument(phiArg);
+      else {
+        // A non-phi BlockArgument must have a single predecessor unless it is
+        // unreachable.
+        require(arg->getParent()->pred_empty()
+                    || arg->getParent()->getSinglePredecessorBlock(),
+                "Non-branch terminator must have a unique successor.");
+      }
     }
   }
 
@@ -1621,13 +1638,6 @@ public:
     require(
         F.hasQualifiedOwnership(),
         "Inst with qualified ownership in a function that is not qualified");
-    // We allow for end_borrow to express relationships in between addresses and
-    // values, but we require that the types are the same ignoring value
-    // category.
-    require(EBI->getBorrowedValue()->getType().getObjectType() ==
-                EBI->getOriginalValue()->getType().getObjectType(),
-            "end_borrow can only relate the same types ignoring value "
-            "category");
   }
 
   template <class AI>
@@ -2612,6 +2622,9 @@ public:
       require(AMI->getModule().lookUpWitnessTable(conformance, false),
               "Could not find witness table for conformance");
     }
+
+    require(AMI->getMember().requiresNewWitnessTableEntry(),
+            "method does not have a witness table entry");
   }
 
   // Get the expected type of a dynamic method reference.
@@ -2626,7 +2639,7 @@ public:
     assert(!methodTy->isCoroutine());
 
     // Map interface types to archetypes.
-    if (auto *env = constantInfo.GenericEnv) {
+    if (auto *env = F.getModule().Types.getConstantGenericEnvironment(method)) {
       auto subs = env->getForwardingSubstitutionMap();
       methodTy = methodTy->substGenericArgs(F.getModule(), subs);
     }
@@ -2666,7 +2679,56 @@ public:
                                      F.getASTContext());
     return SILType::getPrimitiveObjectType(fnTy);
   }
-  
+
+  /// Visitor class that checks whether a given decl ref has an entry in the
+  /// class's vtable.
+  class VerifyClassMethodVisitor
+      : public SILVTableVisitor<VerifyClassMethodVisitor>
+  {
+  public:
+    SILDeclRef MethodToSee;
+    bool Seen = false;
+    
+    VerifyClassMethodVisitor(ClassDecl *theClass,
+                             SILDeclRef method)
+      : MethodToSee(method)
+    {
+      addVTableEntries(theClass);
+    }
+    
+    bool methodMatches(SILDeclRef method) {
+      auto methodToCheck = MethodToSee;
+      do {
+        if (method == methodToCheck) {
+          return true;
+        }
+      } while ((methodToCheck = methodToCheck.getNextOverriddenVTableEntry()));
+
+      return false;
+    }
+    
+    void addMethod(SILDeclRef method) {
+      if (Seen)
+        return;
+      if (methodMatches(method))
+        Seen = true;
+    }
+    
+    void addMethodOverride(SILDeclRef base, SILDeclRef derived) {
+      if (Seen)
+        return;
+      // The derived method should already have been checked.
+      // Test against the overridden base.
+      if (methodMatches(base))
+        Seen = true;
+    }
+
+    
+    void addPlaceholder(MissingMemberDecl *) {
+      /* no-op */
+    }
+  };
+
   void checkClassMethodInst(ClassMethodInst *CMI) {
     auto member = CMI->getMember();
     auto overrideTy = TC.getConstantOverrideType(member);
@@ -2689,6 +2751,13 @@ public:
             "foreign method cannot be dispatched natively");
     require(!isa<ExtensionDecl>(member.getDecl()->getDeclContext()),
             "extension method cannot be dispatched natively");
+    
+    // The method ought to appear in the class vtable.
+    require(VerifyClassMethodVisitor(
+                             operandType.getASTType()->getMetatypeInstanceType()
+                                       ->getClassOrBoundGenericClass(),
+                             member).Seen,
+            "method does not appear in the class's vtable");
   }
 
   void checkSuperMethodInst(SuperMethodInst *CMI) {
@@ -2719,6 +2788,13 @@ public:
 
     require(methodClass->getClassOrBoundGenericClass(),
             "super_method must look up a class method");
+
+    // The method ought to appear in the class vtable.
+    require(VerifyClassMethodVisitor(
+                             operandType.getASTType()->getMetatypeInstanceType()
+                                       ->getClassOrBoundGenericClass(),
+                             member).Seen,
+            "method does not appear in the class's vtable");    
   }
 
   void checkObjCMethodInst(ObjCMethodInst *OMI) {
@@ -2874,12 +2950,6 @@ public:
         case SILInstructionKind::DestroyAddrInst:
           return true;
         case SILInstructionKind::UncheckedAddrCastInst: {
-          // Don't be too conservative here, we have a new case:
-          // sil-combine producing a new code pattern for devirtualizer
-          // open_existential_addr immutable_access -> witness_method
-          // witness_method gets transformed into unchecked_addr_cast
-          // we are "OK" If one of the new users is an non-consuming apply
-          // we are also "OK" if we have a single non-consuming user
           auto isCastToNonConsuming = [=](UncheckedAddrCastInst *I) -> bool {
             for (auto *use : I->getUses()) {
               auto *inst = use->getUser();
@@ -2887,22 +2957,16 @@ public:
               case SILInstructionKind::ApplyInst:
               case SILInstructionKind::TryApplyInst:
               case SILInstructionKind::PartialApplyInst:
-                if (!isConsumingOrMutatingApplyUse(use))
-                  return true;
-                break;
-              case SILInstructionKind::StructElementAddrInst:
-              case SILInstructionKind::LoadInst:
-              case SILInstructionKind::DebugValueAddrInst:
-                if (I->hasOneUse())
-                  return true;
-                break;
+                if (isConsumingOrMutatingApplyUse(use))
+                  return false;
+                continue;
               default:
-                break;
+                continue;
               }
             }
-            return false;
+            return true;
           };
-          if (isCastToNonConsuming(dyn_cast<UncheckedAddrCastInst>(inst))) {
+          if (isCastToNonConsuming(cast<UncheckedAddrCastInst>(inst))) {
             break;
           }
           return true;
@@ -4421,16 +4485,22 @@ public:
   void verifyEpilogBlocks(SILFunction *F) {
     bool FoundReturnBlock = false;
     bool FoundThrowBlock = false;
+    bool FoundUnwindBlock = false;
     for (auto &BB : *F) {
       if (isa<ReturnInst>(BB.getTerminator())) {
         require(!FoundReturnBlock,
                 "more than one return block in function");
         FoundReturnBlock = true;
-      }
-      if (isa<ThrowInst>(BB.getTerminator())) {
+      } else if (isa<ThrowInst>(BB.getTerminator())) {
         require(!FoundThrowBlock,
                 "more than one throw block in function");
         FoundThrowBlock = true;
+      } else if (isa<UnwindInst>(BB.getTerminator())) {
+        require(!FoundUnwindBlock,
+                "more than one unwind block in function");
+        FoundUnwindBlock = true;
+      } else {
+        assert(!BB.getTerminator()->isFunctionExiting());
       }
     }
   }
@@ -4640,7 +4710,7 @@ public:
     }
   }
 
-  void verifyBranches(SILFunction *F) {
+  void verifyBranches(const SILFunction *F) {
     // Verify that there is no non_condbr critical edge.
     auto isCriticalEdgePred = [](const TermInst *T, unsigned EdgeIdx) {
       assert(T->getSuccessors().size() > EdgeIdx && "Not enough successors");
@@ -4660,26 +4730,24 @@ public:
       return true;
     };
 
-    SILModule &M = F->getModule();
     for (auto &BB : *F) {
-      TermInst *TI = BB.getTerminator();
+      const TermInst *TI = BB.getTerminator();
+      CurInstruction = TI;
 
-      // Check for non-cond_br critical edges in canonical SIL.
-      if (!isa<CondBranchInst>(TI) && M.getStage() == SILStage::Canonical) {
+      // Check for non-cond_br critical edges.
+      auto *CBI = dyn_cast<CondBranchInst>(TI);
+      if (!CBI) {
         for (unsigned Idx = 0, e = BB.getSuccessors().size(); Idx != e; ++Idx) {
           require(!isCriticalEdgePred(TI, Idx),
                   "non cond_br critical edges not allowed");
         }
         continue;
       }
-
       // In ownership qualified SIL, ban critical edges from CondBranchInst that
       // have non-trivial arguments.
+      //
+      // FIXME: it would be far simpler to ban all critical edges in general.
       if (!F->hasQualifiedOwnership())
-        continue;
-
-      auto *CBI = dyn_cast<CondBranchInst>(TI);
-      if (!CBI)
         continue;
 
       if (isCriticalEdgePred(CBI, CondBranchInst::TrueIdx)) {
@@ -4810,6 +4878,7 @@ public:
   }
 
   void visitBasicBlockArguments(SILBasicBlock *BB) {
+    CurInstruction = nullptr;
     for (auto argI = BB->args_begin(), argEnd = BB->args_end(); argI != argEnd;
          ++argI)
       visitSILArgument(*argI);
@@ -4908,6 +4977,14 @@ void SILFunction::verify(bool SingleFunction) const {
   // ensures that the pretty stack trace in the verifier is included with the
   // back trace when the verifier crashes.
   SILVerifier(*this, SingleFunction).verify();
+}
+
+void SILFunction::verifyCriticalEdges() const {
+#ifdef NDEBUG
+  if (!getModule().getOptions().VerifyAll)
+    return;
+#endif
+  SILVerifier(*this, /*SingleFunction=*/true).verifyBranches(this);
 }
 
 /// Verify that a property descriptor follows invariants.
@@ -5066,10 +5143,11 @@ void SILWitnessTable::verify(const SILModule &M) const {
 void SILDefaultWitnessTable::verify(const SILModule &M) const {
 #ifndef NDEBUG
   for (const Entry &E : getEntries()) {
-    if (!E.isValid())
+    // FIXME: associated type witnesses.
+    if (!E.isValid() || E.getKind() != SILWitnessTable::Method)
       continue;
 
-    SILFunction *F = E.getWitness();
+    SILFunction *F = E.getMethodWitness().Witness;
 
 #if 0
     // FIXME: For now, all default witnesses are private.
@@ -5123,7 +5201,7 @@ void SILModule::verify() const {
     return;
 #endif
   // Uniquing set to catch symbol name collisions.
-  llvm::StringSet<> symbolNames;
+  llvm::DenseSet<StringRef> symbolNames;
 
   // When merging partial modules, we only link functions from the current
   // module, without enabling "LinkAll" mode or running the SILLinker pass;

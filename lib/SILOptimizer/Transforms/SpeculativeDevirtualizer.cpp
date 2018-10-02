@@ -29,6 +29,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/AST/ASTContext.h"
@@ -46,6 +47,38 @@ using namespace swift;
 static const int MaxNumSpeculativeTargets = 6;
 
 STATISTIC(NumTargetsPredicted, "Number of monomorphic functions predicted");
+
+/// We want to form a second edge to the given block, but we know
+/// that'll form a critical edge.  Return a basic block to which we can
+/// create an edge essentially like the original edge.
+static SILBasicBlock *cloneEdge(TermInst *TI, unsigned SuccIndex) {
+#ifndef NDEBUG
+  auto origDestBB = TI->getSuccessors()[SuccIndex].getBB();
+#endif
+
+  // Split the edge twice.  The first split will become our cloned
+  // and temporarily-unused edge.  The second split will remain in place
+  // as the original edge.
+  auto clonedEdgeBB = splitEdge(TI, SuccIndex);
+  auto replacementEdgeBB = splitEdge(TI, SuccIndex);
+
+  // Extract the terminators.
+  auto clonedEdgeBranch =
+    cast<BranchInst>(clonedEdgeBB->getTerminator());
+  auto replacementEdgeBranch =
+    cast<BranchInst>(replacementEdgeBB->getTerminator());
+
+  assert(TI->getSuccessors()[SuccIndex].getBB() == replacementEdgeBB);
+  assert(replacementEdgeBranch->getDestBB() == clonedEdgeBB);
+  assert(clonedEdgeBranch->getDestBB() == origDestBB);
+
+  // Change the replacement branch to point to the original destination.
+  // This will leave the cloned edge unused, which is how we wanted it.
+  replacementEdgeBranch->getSuccessors()[0] = clonedEdgeBranch->getDestBB();
+  assert(clonedEdgeBB->pred_empty());
+
+  return clonedEdgeBB;
+}
 
 // A utility function for cloning the apply instruction.
 static FullApplySite CloneApply(FullApplySite AI, SILBuilder &Builder) {
@@ -68,18 +101,17 @@ static FullApplySite CloneApply(FullApplySite AI, SILBuilder &Builder) {
     break;
   case SILInstructionKind::TryApplyInst: {
     auto *TryApplyI = cast<TryApplyInst>(AI.getInstruction());
+    auto NormalBB = cloneEdge(TryApplyI, TryApplyInst::NormalIdx);
+    auto ErrorBB = cloneEdge(TryApplyI, TryApplyInst::ErrorIdx);
     NAI = Builder.createTryApply(AI.getLoc(), AI.getCallee(),
                                  AI.getSubstitutionMap(),
-                                 Ret,
-                                 TryApplyI->getNormalBB(),
-                                 TryApplyI->getErrorBB());
-    }
+                                 Ret, NormalBB, ErrorBB);
     break;
+  }
   default:
     llvm_unreachable("Trying to clone an unsupported apply instruction");
   }
 
-  NAI.getInstruction();
   return NAI;
 }
 
@@ -96,6 +128,10 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   if (SubType.getASTType()->hasDynamicSelfType())
     return FullApplySite();
 
+  // Can't speculate begin_apply yet.
+  if (isa<BeginApplyInst>(AI))
+    return FullApplySite();
+
   // Create a diamond shaped control flow and a checked_cast_branch
   // instruction that checks the exact type of the object.
   // This cast selects between two paths: one that calls the slow dynamic
@@ -108,7 +144,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   SILBasicBlock *Iden = F->createBasicBlock();
   // Virt is the block containing the slow virtual call.
   SILBasicBlock *Virt = F->createBasicBlock();
-  Iden->createPHIArgument(SubType, ValueOwnershipKind::Owned);
+  Iden->createPhiArgument(SubType, ValueOwnershipKind::Owned);
 
   SILBasicBlock *Continue = Entry->split(It);
 
@@ -149,7 +185,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   // Create a PHInode for returning the return value from both apply
   // instructions.
   SILArgument *Arg =
-      Continue->createPHIArgument(AI.getType(), ValueOwnershipKind::Owned);
+      Continue->createPhiArgument(AI.getType(), ValueOwnershipKind::Owned);
   if (!isa<TryApplyInst>(AI)) {
     if (AI.getSubstCalleeType()->isNoReturnFunction()) {
       IdenBuilder.createUnreachable(AI.getLoc());
@@ -182,22 +218,24 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   NumTargetsPredicted++;
 
   // Devirtualize the apply instruction on the identical path.
-  auto NewInstPair =
-      devirtualizeClassMethod(IdenAI, DownCastedClassInstance, nullptr);
-  assert(NewInstPair.first && "Expected to be able to devirtualize apply!");
-  replaceDeadApply(IdenAI, NewInstPair.first);
+  auto NewInst =
+    devirtualizeClassMethod(IdenAI, DownCastedClassInstance, nullptr);
+  assert(NewInst && "Expected to be able to devirtualize apply!");
+  (void)NewInst;
+
+  deleteDevirtualizedApply(IdenAI);
 
   // Split critical edges resulting from VirtAI.
   if (auto *TAI = dyn_cast<TryApplyInst>(VirtAI)) {
     auto *ErrorBB = TAI->getFunction()->createBasicBlock();
-    ErrorBB->createPHIArgument(TAI->getErrorBB()->getArgument(0)->getType(),
+    ErrorBB->createPhiArgument(TAI->getErrorBB()->getArgument(0)->getType(),
                                ValueOwnershipKind::Owned);
     Builder.setInsertionPoint(ErrorBB);
     Builder.createBranch(TAI->getLoc(), TAI->getErrorBB(),
                          {ErrorBB->getArgument(0)});
 
     auto *NormalBB = TAI->getFunction()->createBasicBlock();
-    NormalBB->createPHIArgument(TAI->getNormalBB()->getArgument(0)->getType(),
+    NormalBB->createPhiArgument(TAI->getNormalBB()->getArgument(0)->getType(),
                                 ValueOwnershipKind::Owned);
     Builder.setInsertionPoint(NormalBB);
     Builder.createBranch(TAI->getLoc(), TAI->getNormalBB(),
@@ -366,10 +404,10 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
     // try to devirtualize it completely.
     ClassHierarchyAnalysis::ClassList Subs;
     if (isDefaultCaseKnown(CHA, AI, CD, Subs)) {
-      auto NewInstPair = tryDevirtualizeClassMethod(AI, SubTypeValue, &ORE);
-      if (NewInstPair.first)
-        replaceDeadApply(AI, NewInstPair.first);
-      return NewInstPair.second.getInstruction() != nullptr;
+      auto NewInst = tryDevirtualizeClassMethod(AI, SubTypeValue, &ORE);
+      if (NewInst)
+        deleteDevirtualizedApply(AI);
+      return bool(NewInst);
     }
 
     LLVM_DEBUG(llvm::dbgs() << "Inserting monomorphic speculative call for "
@@ -529,10 +567,10 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
     ORE.emit(RB);
     return true;
   }
-  auto NewInstPair = tryDevirtualizeClassMethod(AI, SubTypeValue, nullptr);
-  if (NewInstPair.first) {
+  auto NewInst = tryDevirtualizeClassMethod(AI, SubTypeValue, nullptr);
+  if (NewInst) {
     ORE.emit(RB);
-    replaceDeadApply(AI, NewInstPair.first);
+    deleteDevirtualizedApply(AI);
     return true;
   }
 

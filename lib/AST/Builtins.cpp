@@ -171,7 +171,6 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
                              Name, /*NameLoc=*/SourceLoc(),
                              /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                              /*GenericParams=*/nullptr,
-                             /*SelfDecl=*/nullptr,
                              paramList,
                              TypeLoc::withoutLoc(ResType), DC);
   FD->computeType(Info);
@@ -219,7 +218,6 @@ getBuiltinGenericFunction(Identifier Id,
                                Name, /*NameLoc=*/SourceLoc(),
                                /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                                GenericParams,
-                               /*SelfDecl=*/nullptr,
                                paramList,
                                TypeLoc::withoutLoc(ResType), DC);
 
@@ -572,6 +570,20 @@ makeTuple(const Gs & ...elementGenerators) {
   };
 }
 
+template <class... Gs>
+static BuiltinGenericSignatureBuilder::LambdaGenerator
+makeBoundGenericType(NominalTypeDecl *decl,
+                     const Gs & ...argumentGenerators) {
+  return {
+    [=](BuiltinGenericSignatureBuilder &builder) -> Type {
+      Type args[] = {
+        argumentGenerators.build(builder)...
+      };
+      return BoundGenericType::get(decl, Type(), args);
+    }
+  };
+}
+
 template <class T>
 static BuiltinGenericSignatureBuilder::MetatypeGenerator<T>
 makeMetatype(const T &object, Optional<MetatypeRepresentation> repr = None) {
@@ -732,6 +744,13 @@ static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context,
 }
 
 static ValueDecl *getIsPODOperation(ASTContext &Context, Identifier Id) {
+  BuiltinGenericSignatureBuilder builder(Context);
+  builder.addParameter(makeMetatype(makeGenericParam()));
+  builder.setResult(makeConcrete(BuiltinIntegerType::get(1,Context)));
+  return builder.build(Id);
+}
+
+static ValueDecl *getIsBitwiseTakable(ASTContext &Context, Identifier Id) {
   BuiltinGenericSignatureBuilder builder(Context);
   builder.addParameter(makeMetatype(makeGenericParam()));
   builder.setResult(makeConcrete(BuiltinIntegerType::get(1,Context)));
@@ -1200,15 +1219,6 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
   }
 }
 
-static ValueDecl *getTryPinOperation(ASTContext &ctx, Identifier name) {
-  // <T> NativeObject -> T
-  // (T must actually be NativeObject?)
-  BuiltinGenericSignatureBuilder builder(ctx);
-  builder.addParameter(makeConcrete(ctx.TheNativeObjectType));
-  builder.setResult(makeGenericParam());
-  return builder.build(name);
-}
-
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -1663,11 +1673,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getAllocWithTailElemsOperation(Context, Id, NumTailTypes);
   }
 
-  auto BV = BuiltinValueKind::None;
-#define BUILTIN(id, name, Attrs) \
-  if (name == OperationName) { BV = BuiltinValueKind::id; } else
+  auto BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
+#define BUILTIN(id, name, Attrs) .Case(name, BuiltinValueKind::id)
 #include "swift/AST/Builtins.def"
-  /* final "else" */ {}
+    .Default(BuiltinValueKind::None);
 
   // Filter out inappropriate overloads.
   OverloadedBuiltinKind OBK = OverloadedBuiltinKinds[unsigned(BV)];
@@ -1746,13 +1755,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 #include "swift/AST/Builtins.def"
     return getCastOperation(Context, Id, BV, Types);
 
-  case BuiltinValueKind::TryPin:
-    return getTryPinOperation(Context, Id);
-
   case BuiltinValueKind::Retain:
   case BuiltinValueKind::Release:
   case BuiltinValueKind::Autorelease:
-  case BuiltinValueKind::Unpin:
     if (!Types.empty()) return nullptr;
     return getRefCountingOperation(Context, Id);
       
@@ -1788,9 +1793,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getTransferArrayOperation(Context, Id);
 
   case BuiltinValueKind::IsUnique:
-  case BuiltinValueKind::IsUniqueOrPinned:
   case BuiltinValueKind::IsUnique_native:
-  case BuiltinValueKind::IsUniqueOrPinned_native:
     if (!Types.empty()) return nullptr;
     return getIsUniqueOperation(Context, Id);
 
@@ -1809,6 +1812,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::IsPOD:
     return getIsPODOperation(Context, Id);
+
+  case BuiltinValueKind::IsBitwiseTakable:
+    return getIsBitwiseTakable(Context, Id);
 
   case BuiltinValueKind::IsOptionalType:
     return getIsOptionalOperation(Context, Id);
@@ -1962,7 +1968,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getTypeJoinInoutOperation(Context, Id);
 
   case BuiltinValueKind::TypeJoinMeta:
-    return getTypeJoinMetaOperation(Context, Id);
+    return getTypeJoinMetaOperation(Context, Id);      
   }
 
   llvm_unreachable("bad builtin value!");

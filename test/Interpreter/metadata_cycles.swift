@@ -5,13 +5,64 @@ import StdlibUnittest
 
 var MetadataCycleTests = TestSuite("Metadata cycle tests")
 
+// This no longer crashes because we emit type layouts and
+// not full metadata for fixed-size class fields.
+class List<T> {
+  var value: T
+  var next: List<T>?
+
+  init(value: T) {
+    self.value = value
+  }
+  init(value: T, next: List<T>) {
+    self.value = value
+    self.next = next
+  }
+}
+
+MetadataCycleTests.test("rdar://18067671") {
+  let a = List(value: 0.0)
+  let b = List(value: 1.0, next: a)
+  let c = List(value: 2.0, next: b)
+  b.value = 4.0
+  a.value = 8.0
+
+  expectEqual(c.value, 2.0)
+  expectEqual(c.next!.value, 4.0)
+  expectEqual(c.next!.next!.value, 8.0)
+}
+
+// This no longer crashes because nested type metadata
+// does not refer to the parent type metadata anymore.
+struct X<T> {
+  enum S {
+    case some(T), none
+  }
+
+  init() { a = .none }
+  var a: S
+}
+
+MetadataCycleTests.test("rdar://33767511") {
+  var str = ""
+  print(X<()>.self, to: &str)
+  expectEqual("X<()>\n", str)
+}
+
+// The remaining test cases are "bona fide" examples of recursive metadata.
+
 // rdar://18448285
 class test0_GenericClass<T> {
   func foo() {}
 }
+
 class test0_GenericSubclass<T> : test0_GenericClass<test0_GenericSubclass> {}
+
+class test0_NonGenericSubclass : test0_GenericSubclass<test0_NonGenericSubclass> {}
+
 MetadataCycleTests.test("rdar://18448285") {
   test0_GenericSubclass<Int>().foo()
+  test0_NonGenericSubclass().foo()
 }
 
 // rdar://18685206

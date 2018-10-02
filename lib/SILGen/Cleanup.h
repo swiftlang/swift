@@ -136,8 +136,7 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
 
   void popTopDeadCleanups(CleanupsDepth end);
   void emitCleanups(CleanupsDepth depth, CleanupLocation l,
-                    ForUnwind_t forUnwind,
-                    bool popCleanups=true);
+                    ForUnwind_t forUnwind, bool popCleanups);
   void endScope(CleanupsDepth depth, CleanupLocation l);
 
   Cleanup &initCleanup(Cleanup &cleanup, size_t allocSize, CleanupState state);
@@ -158,6 +157,10 @@ public:
   CleanupHandle getTopCleanup() const {
     assert(!stack.empty());
     return stack.stable_begin();
+  }
+  
+  Cleanup &getCleanup(CleanupHandle iter) {
+    return *stack.find(iter);
   }
 
   /// \brief Emit a branch to the given jump destination,

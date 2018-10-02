@@ -153,7 +153,7 @@ public:
   /// \param KPE A partial #keyPath expression that can be used to
   /// provide context. This will be \c NULL if no components of the
   /// #keyPath argument have been parsed yet.
-  virtual void completeExprKeyPath(KeyPathExpr *KPE, bool HasDot) = 0;
+  virtual void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) = 0;
 
   /// \brief Complete the beginning of type-simple -- no tokens provided
   /// by user.
@@ -208,7 +208,12 @@ public:
   virtual void completeYieldStmt(CodeCompletionExpr *E,
                                  Optional<unsigned> yieldIndex) = 0;
 
-  virtual void completeAfterPound(CodeCompletionExpr *E, StmtKind ParentKind) = 0;
+  virtual void completeAfterPoundExpr(CodeCompletionExpr *E,
+                                      Optional<StmtKind> ParentKind) = 0;
+
+  virtual void completeAfterPoundDirective() = 0;
+
+  virtual void completePlatformCondition() = 0;
 
   virtual void completeAfterIfStmt(bool hasElse) = 0;
 

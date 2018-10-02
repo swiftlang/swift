@@ -422,10 +422,11 @@ enum Color {
   static func frob(_ a : Int, b : inout Int) -> Color {}
   static var svar: Color { return .Red }
 }
-let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{'map' produces '[T]', not the expected contextual result type '(Int, Color)'}}
 
-// FIXME: rdar://41416346
-let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{'map' produces '[T]', not the expected contextual result type '[(Int, Color)]'}}
+// FIXME: This used to be better: "'map' produces '[T]', not the expected contextual result type '(Int, Color)'"
+let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{expression type '((Int) throws -> _) throws -> [_]' is ambiguous without more context}}
+
+let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{missing argument label 'description:' in call}}
 
 let _: [Color] = [1,2].map { _ in .Unknown("") }// expected-error {{missing argument label 'description:' in call}} {{44-44=description: }}
 
@@ -680,7 +681,7 @@ func r23641896() {
   var g = "Hello World"
   g.replaceSubrange(0...2, with: "ce")  // expected-error {{cannot convert value of type 'ClosedRange<Int>' to expected argument type 'Range<String.Index>'}}
 
-  _ = g[12]  // expected-error {{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
+  _ = g[12]  // expected-error {{'subscript(_:)' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
 
 }
 
@@ -719,14 +720,13 @@ func overloadSetResultType(_ a : Int, b : Int) -> Int {
 }
 
 postfix operator +++
-postfix func +++ <T>(_: inout T) -> T { fatalError() } // expected-note {{in call to operator '+++'}}
+postfix func +++ <T>(_: inout T) -> T { fatalError() }
 
 // <rdar://problem/21523291> compiler error message for mutating immutable field is incorrect
 func r21523291(_ bytes : UnsafeMutablePointer<UInt8>) {
-  let i = 42
+  let i = 42 // expected-note {{change 'let' to 'var' to make it mutable}}
 
-  // FIXME: rdar://41416382
-  _ = bytes[i+++]  // expected-error {{generic parameter 'T' could not be inferred}}
+  _ = bytes[i+++]  // expected-error {{cannot pass immutable value to mutating operator: 'i' is a 'let' constant}}
 }
 
 
@@ -1199,8 +1199,7 @@ func platypus<T>(a: [T]) {
 func badTypes() {
   let sequence:AnySequence<[Int]> = AnySequence() { AnyIterator() { [3] }}
   let array = [Int](sequence)
-  // expected-error@-1 {{type of expression is ambiguous without more context}}
-  // FIXME: terrible diagnostic
+  // expected-error@-1 {{initializer 'init(_:)' requires the types 'Int' and '[Int]' be equivalent}}
 }
 
 // rdar://34357545
@@ -1208,3 +1207,6 @@ func unresolvedTypeExistential() -> Bool {
   return (Int.self==_{})
   // expected-error@-1 {{ambiguous reference to member '=='}}
 }
+
+func rdar43525641(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
+rdar43525641(1, c: 2, 3) // Ok

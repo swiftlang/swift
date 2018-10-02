@@ -1,6 +1,8 @@
 // RUN: %target-swift-emit-silgen -enable-sil-ownership %s -o /dev/null -verify
 // RUN: %target-swift-emit-silgen -enable-sil-ownership -enforce-exclusivity=checked %s -o /dev/null -verify
 
+func takeInOut<T>(_: inout T) {}
+
 struct MutatorStruct {
   mutating func f(_ x : inout MutatorStruct) {}
 }
@@ -69,12 +71,12 @@ var global_array : [[Int]]
 
 func testMultiArray(_ i : Int, j : Int, array : [[Int]]) {
   var array = array
-  swap(&array[i][j],
-       &array[i][i])
-  swap(&array[0][j],
-       &array[0][i])
-  swap(&global_array[0][j],
-       &global_array[0][i])
+  swap(&array[i][j],  // expected-note  {{concurrent writeback occurred here}}
+       &array[i][i])  // expected-error {{inout writeback through subscript occurs in multiple arguments to call, introducing invalid aliasing}}
+  swap(&array[0][j],  // expected-note  {{concurrent writeback occurred here}}
+       &array[0][i])  // expected-error {{inout writeback through subscript occurs in multiple arguments to call, introducing invalid aliasing}}
+  swap(&global_array[0][j],  // expected-note  {{concurrent writeback occurred here}}
+       &global_array[0][i])  // expected-error {{inout writeback through subscript occurs in multiple arguments to call, introducing invalid aliasing}}
   
   // TODO: This is obviously the same writeback problem, but isn't detectable
   // with the current level of sophistication in SILGen.
@@ -111,3 +113,25 @@ func testMultiArrayWithoutAddressors(
   swap(&global_array_without_addressors[0][j], &array[j][i])  // ok
 }
 
+// rdar://43802132
+struct ArrayWithReadModify<T> {
+  init(value: T) { self.property = value }
+  var property: T
+  subscript(i: Int) -> T {
+    _read { yield property }
+    _modify { yield &property }
+  }
+}
+
+func testArrayWithReadModify<T>(array: ArrayWithReadModify<T>) {
+  var copy = array
+  swap(&copy[0], &copy[1])
+  swap(&copy[0], // expected-note {{concurrent writeback occurred here}}
+       &copy[0]) // expected-error {{inout writeback through subscript occurs in multiple arguments to call}}
+}
+
+// rdar://44147745
+func testNestedArrayWithReadModify<T>(array: ArrayWithReadModify<ArrayWithReadModify<T>>) {
+  var copy = array
+  takeInOut(&copy[0][0])
+}

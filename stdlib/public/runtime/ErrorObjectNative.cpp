@@ -94,7 +94,7 @@ swift::swift_allocError(const swift::Metadata *type,
 void
 swift::swift_deallocError(SwiftError *error, const Metadata *type) {
   auto sizeAndAlign = _getErrorAllocatedSizeAndAlignmentMask(type);
-  swift_deallocObject(error, sizeAndAlign.first, sizeAndAlign.second);
+  swift_deallocUninitializedObject(error, sizeAndAlign.first, sizeAndAlign.second);
 }
 
 void
@@ -106,6 +106,11 @@ swift::swift_getErrorValue(const SwiftError *errorObject,
   out->errorConformance = errorObject->errorConformance;
 }
 
-void swift::swift_willThrow(SwiftError *object) { }
+/// Breakpoint hook for debuggers.
+SWIFT_CC(swift) void
+swift::swift_willThrow(SWIFT_CONTEXT void *unused,
+                       SWIFT_ERROR_RESULT SwiftError **error) {
+  // do nothing
+}
 
 #endif

@@ -33,17 +33,22 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                          diag, std::forward<U>(args)...);
 }
 
-SILBasicBlock *SILGenFunction::createBasicBlock(SILBasicBlock *afterBB) {
-  // Honor an explicit placement if given.
-  if (afterBB) {
-    return F.createBasicBlock(afterBB);
+SILBasicBlock *SILGenFunction::createBasicBlockAfter(SILBasicBlock *afterBB) {
+  assert(afterBB);
+  return F.createBasicBlockAfter(afterBB);
+}
 
-    // If we don't have a requested placement, but we do have a current
-    // insertion point, insert there.
-  } else if (B.hasValidInsertionPoint()) {
-    return F.createBasicBlock(B.getInsertionBB());
+SILBasicBlock *SILGenFunction::createBasicBlockBefore(SILBasicBlock *beforeBB) {
+  assert(beforeBB);
+  return F.createBasicBlockBefore(beforeBB);
+}
 
-    // Otherwise, insert at the end of the current section.
+SILBasicBlock *SILGenFunction::createBasicBlock() {
+  // If we have a current insertion point, insert there.
+  if (B.hasValidInsertionPoint()) {
+    return F.createBasicBlockAfter(B.getInsertionBB());
+
+  // Otherwise, insert at the end of the current section.
   } else {
     return createBasicBlock(CurFunctionSection);
   }
@@ -54,16 +59,17 @@ SILBasicBlock *SILGenFunction::createBasicBlock(FunctionSection section) {
   case FunctionSection::Ordinary: {
     // The end of the ordinary section is just the end of the function
     // unless postmatter blocks exist.
-    SILBasicBlock *afterBB = (StartOfPostmatter != F.end())
-                                 ? &*std::prev(StartOfPostmatter)
-                                 : nullptr;
-    return F.createBasicBlock(afterBB);
+    if (StartOfPostmatter != F.end()) {
+      return F.createBasicBlockBefore(&*StartOfPostmatter);
+    } else {
+      return F.createBasicBlock();
+    }
   }
 
   case FunctionSection::Postmatter: {
     // The end of the postmatter section is always the end of the function.
     // Register the new block as the start of the postmatter if needed.
-    SILBasicBlock *newBB = F.createBasicBlock(nullptr);
+    SILBasicBlock *newBB = F.createBasicBlock();
     if (StartOfPostmatter == F.end())
       StartOfPostmatter = newBB->getIterator();
     return newBB;
@@ -171,7 +177,7 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
   SILBasicBlock *ContBB = createBasicBlock();
 
   for (SILType argTy : contArgs) {
-    ContBB->createPHIArgument(argTy, ValueOwnershipKind::Owned);
+    ContBB->createPhiArgument(argTy, ValueOwnershipKind::Owned);
   }
   
   SILBasicBlock *FalseBB, *FalseDestBB;
@@ -679,7 +685,7 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   // Create the throw destination at the end of the function.
   JumpDest throwDest = createJumpDest(S->getBody(),
                                       FunctionSection::Postmatter);
-  SILArgument *exnArg = throwDest.getBlock()->createPHIArgument(
+  SILArgument *exnArg = throwDest.getBlock()->createPhiArgument(
       exnTL.getLoweredType(), ValueOwnershipKind::Owned);
 
   // We always need a continuation block because we might fall out of
@@ -985,7 +991,7 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
   // For now, don't try to re-use destination blocks for multiple
   // failure sites.
   SILBasicBlock *destBB = createBasicBlock(FunctionSection::Postmatter);
-  SILValue exn = destBB->createPHIArgument(getSILType(exnResult),
+  SILValue exn = destBB->createPhiArgument(getSILType(exnResult),
                                            ValueOwnershipKind::Owned);
 
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());

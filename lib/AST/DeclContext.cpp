@@ -92,64 +92,30 @@ GenericTypeParamType *DeclContext::getProtocolSelfType() const {
     const_cast<ProtocolDecl *>(proto)->createGenericParamsIfMissing();
   }
 
-  return getGenericParamsOfContext()->getParams().front()
+  auto *genericParams = getGenericParamsOfContext();
+  if (genericParams == nullptr)
+    return nullptr;
+
+  return genericParams->getParams().front()
       ->getDeclaredInterfaceType()
       ->castTo<GenericTypeParamType>();
 }
 
-enum class DeclTypeKind : unsigned {
-  DeclaredType,
-  DeclaredTypeInContext,
-  DeclaredInterfaceType
-};
-
-static Type computeExtensionType(const ExtensionDecl *ED, DeclTypeKind kind) {
-  auto type = ED->getExtendedType();
-  if (!type) {
-    if (ED->isInvalid())
-      return ErrorType::get(ED->getASTContext());
-    return Type();
-  }
-
-  if (type->is<UnboundGenericType>()) {
-    auto *resolver = ED->getASTContext().getLazyResolver();
-    assert(resolver && "Too late to resolve extensions");
-    resolver->resolveExtension(const_cast<ExtensionDecl *>(ED));
-    type = ED->getExtendedType();
-  }
-
-  if (type->hasError())
-    return type;
-
-  switch (kind) {
-  case DeclTypeKind::DeclaredType:
-    return type->getAnyNominal()->getDeclaredType();
-  case DeclTypeKind::DeclaredTypeInContext:
-    return type;
-  case DeclTypeKind::DeclaredInterfaceType: {
-    // FIXME: Need a sugar-preserving getExtendedInterfaceType for extensions
-    if (auto nominal = type->getAnyNominal())
-      return nominal->getDeclaredInterfaceType();
-
-    auto typealias = cast<TypeAliasDecl>(type->getAnyGeneric());
-    return typealias->getUnderlyingTypeLoc().getType();
-  }
-  }
-
-  llvm_unreachable("Unhandled DeclTypeKind in switch.");
-}
-
 Type DeclContext::getDeclaredTypeInContext() const {
   if (auto *ED = dyn_cast<ExtensionDecl>(this))
-    return computeExtensionType(ED, DeclTypeKind::DeclaredTypeInContext);
+    return ED->mapTypeIntoContext(getDeclaredInterfaceType());
   if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
     return NTD->getDeclaredTypeInContext();
   return Type();
 }
 
 Type DeclContext::getDeclaredInterfaceType() const {
-  if (auto *ED = dyn_cast<ExtensionDecl>(this))
-    return computeExtensionType(ED, DeclTypeKind::DeclaredInterfaceType);
+  if (auto *ED = dyn_cast<ExtensionDecl>(this)) {
+    auto *NTD = ED->getExtendedNominal();
+    if (NTD == nullptr)
+      return ErrorType::get(ED->getASTContext());
+    return NTD->getDeclaredInterfaceType();
+  }
   if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
     return NTD->getDeclaredInterfaceType();
   return Type();
@@ -345,11 +311,6 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
       // we serialize the parent's body.
       if (AFD->getDeclContext()->isLocalContext())
         continue;
-
-      // FIXME: Make sure this method is never called on decls that have not
-      // been fully validated.
-      if (!AFD->hasAccess())
-        break;
 
       auto funcAccess =
         AFD->getFormalAccessScope(/*useDC=*/nullptr,
@@ -759,6 +720,8 @@ void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
 }
 
 void IterableDeclContext::loadAllMembers() const {
+  // Lazily parse members.
+  getASTContext().parseMembers(const_cast<IterableDeclContext*>(this));
   if (!hasLazyMembers())
     return;
 

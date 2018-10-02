@@ -499,7 +499,6 @@ static void countStatsPostSema(UnifiedStatsReporter &Stats,
   auto const &AST = Instance.getASTContext();
   C.NumLoadedModules = AST.LoadedModules.size();
   C.NumImportedExternalDefinitions = AST.ExternalDefinitions.size();
-  C.NumASTBytesAllocated = AST.getAllocator().getBytesAllocated();
 
   if (auto *D = Instance.getDependencyTracker()) {
     C.NumDependencies = D->getDependencies().size();
@@ -819,7 +818,7 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   if (!opts.InputsAndOutputs.hasPrimaryInputs()) {
     // If there are no primary inputs the compiler is in WMO mode and builds one
     // SILModule for the entire module.
-    auto SM = performSILGeneration(mod, SILOpts, true);
+    auto SM = performSILGeneration(mod, SILOpts);
     std::deque<PostSILGenInputs> PSGIs;
     const PrimarySpecificPaths PSPs =
         Instance.getPrimarySpecificPathsForWholeModuleOptimizationMode();
@@ -832,7 +831,7 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   // once for each such input.
   std::deque<PostSILGenInputs> PSGIs;
   for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
-    auto SM = performSILGeneration(*PrimaryFile, SILOpts, None);
+    auto SM = performSILGeneration(*PrimaryFile, SILOpts);
     const PrimarySpecificPaths PSPs =
         Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
     PSGIs.push_back(PostSILGenInputs{std::move(SM), true, PrimaryFile, PSPs});
@@ -846,7 +845,7 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
       if (Invocation.getFrontendOptions().InputsAndOutputs.isInputPrimary(
               SASTF->getFilename())) {
         assert(PSGIs.empty() && "Can only handle one primary AST input");
-        auto SM = performSILGeneration(*SASTF, SILOpts, None);
+        auto SM = performSILGeneration(*SASTF, SILOpts);
         const PrimarySpecificPaths &PSPs =
             Instance.getPrimarySpecificPathsForPrimary(SASTF->getFilename());
         PSGIs.push_back(
@@ -866,13 +865,6 @@ emitIndexData(CompilerInvocation &Invocation, CompilerInstance &Instance) {
     hadEmitIndexDataError = emitIndexDataIfNeeded(SF, Invocation, Instance) ||
                             hadEmitIndexDataError;
   return hadEmitIndexDataError;
-}
-
-/// Emits the request-evaluator graph to the given file in GraphViz format.
-void emitRequestEvaluatorGraphViz(ASTContext &ctx, StringRef graphVizPath) {
-  std::error_code error;
-  llvm::raw_fd_ostream out(graphVizPath, error, llvm::sys::fs::F_Text);
-  ctx.evaluator.printDependenciesGraphviz(out);
 }
 
 static bool performCompileStepsPostSILGen(
@@ -909,24 +901,17 @@ static bool performCompile(CompilerInstance &Instance,
     return compileLLVMIR(Invocation, Instance, Stats);
 
   if (FrontendOptions::shouldActionOnlyParse(Action)) {
+    bool ParseDelayedDeclListsOnEnd =
+      Action == FrontendOptions::ActionType::DumpParse ||
+      Invocation.getDiagnosticOptions().VerifyMode != DiagnosticOptions::NoVerify;
     Instance.performParseOnly(/*EvaluateConditionals*/
-                    Action == FrontendOptions::ActionType::EmitImportedModules);
+                    Action == FrontendOptions::ActionType::EmitImportedModules,
+                              ParseDelayedDeclListsOnEnd);
   } else if (Action == FrontendOptions::ActionType::ResolveImports) {
     Instance.performParseAndResolveImportsOnly();
   } else {
     Instance.performSema();
   }
-
-  SWIFT_DEFER {
-    // Emit request-evaluator graph via GraphViz, if requested.
-    if (!Invocation.getFrontendOptions().RequestEvaluatorGraphVizPath.empty() &&
-        Instance.hasASTContext()) {
-      ASTContext &ctx = Instance.getASTContext();
-      emitRequestEvaluatorGraphViz(
-        ctx,
-        Invocation.getFrontendOptions().RequestEvaluatorGraphVizPath);
-    }
-  };
 
   ASTContext &Context = Instance.getASTContext();
   if (Action == FrontendOptions::ActionType::Parse)
@@ -1144,7 +1129,7 @@ static void generateIR(IRGenOptions &IRGenOpts, std::unique_ptr<SILModule> SM,
   IRModule = MSF.is<SourceFile *>()
                  ? performIRGeneration(IRGenOpts, *MSF.get<SourceFile *>(),
                                        std::move(SM), OutputFilename, PSPs,
-                                       LLVMContext, 0, &HashGlobal)
+                                       LLVMContext, &HashGlobal)
                  : performIRGeneration(IRGenOpts, MSF.get<ModuleDecl *>(),
                                        std::move(SM), OutputFilename, PSPs,
                                        LLVMContext, parallelOutputFilenames,
@@ -1379,6 +1364,16 @@ static bool performCompileStepsPostSILGen(
     return true;
 
   runSILLoweringPasses(*SM);
+
+  // TODO: at this point we need to flush any the _tracing and profiling_
+  // in the UnifiedStatsReporter, because the those subsystems of the USR
+  // retain _pointers into_ the SILModule, and the SILModule's lifecycle is
+  // not presently such that it will outlive the USR (indeed, as it's
+  // destroyed on a separate thread, this fact isn't even _deterministic_
+  // after this point). If future plans require the USR tracing or
+  // profiling entities after this point, more rearranging will be required.
+  if (Stats)
+    Stats->flushTracesAndProfiles();
 
   if (Action == FrontendOptions::ActionType::DumpTypeInfo)
     return performDumpTypeInfo(IRGenOpts, *SM, getGlobalLLVMContext());

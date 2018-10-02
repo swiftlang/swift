@@ -156,7 +156,6 @@ static bool isRLEInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueInst:
-  case SILInstructionKind::IsUniqueOrPinnedInst:
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::CopyUnownedValueInst:
     return true;
@@ -206,27 +205,27 @@ private:
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If the bit is set, then the location currently has an
   /// downward visible value at the beginning of the basic block.
-  llvm::SmallBitVector ForwardSetIn;
+  SmallBitVector ForwardSetIn;
 
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If the bit is set, then the location currently has an
   /// downward visible value at the end of the basic block.
-  llvm::SmallBitVector ForwardSetOut;
+  SmallBitVector ForwardSetOut;
 
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If we ignore all unknown write, what's the maximum set
   /// of available locations at the current position in the basic block.
-  llvm::SmallBitVector ForwardSetMax;
+  SmallBitVector ForwardSetMax;
 
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If the bit is set, then the basic block generates a
   /// value for the location.
-  llvm::SmallBitVector BBGenSet;
+  SmallBitVector BBGenSet;
 
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If the bit is set, then the basic block kills the
   /// value for the location.
-  llvm::SmallBitVector BBKillSet;
+  SmallBitVector BBKillSet;
 
   /// This is map between LSLocations and their available values at the
   /// beginning of this basic block.
@@ -274,9 +273,9 @@ private:
                     SILValue Val, RLEKind Kind);
 
   /// BitVector manipulation functions.
-  void startTrackingLocation(llvm::SmallBitVector &BV, unsigned B);
-  void stopTrackingLocation(llvm::SmallBitVector &BV, unsigned B);
-  bool isTrackingLocation(llvm::SmallBitVector &BV, unsigned B);
+  void startTrackingLocation(SmallBitVector &BV, unsigned B);
+  void stopTrackingLocation(SmallBitVector &BV, unsigned B);
+  bool isTrackingLocation(SmallBitVector &BV, unsigned B);
   void startTrackingValue(ValueTableMap &VM, unsigned L, unsigned V);
   void stopTrackingValue(ValueTableMap &VM, unsigned B);
 
@@ -570,15 +569,15 @@ void BlockState::stopTrackingValue(ValueTableMap &VM, unsigned B) {
   VM.erase(B);
 }
  
-bool BlockState::isTrackingLocation(llvm::SmallBitVector &BV, unsigned B) {
+bool BlockState::isTrackingLocation(SmallBitVector &BV, unsigned B) {
   return BV.test(B);
 }
  
-void BlockState::startTrackingLocation(llvm::SmallBitVector &BV, unsigned B) {
+void BlockState::startTrackingLocation(SmallBitVector &BV, unsigned B) {
   BV.set(B);
 }
  
-void BlockState::stopTrackingLocation(llvm::SmallBitVector &BV, unsigned B) {
+void BlockState::stopTrackingLocation(SmallBitVector &BV, unsigned B) {
   BV.reset(B);
 }
 

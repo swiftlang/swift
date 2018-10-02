@@ -722,6 +722,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       return false;
     }
     }
+    llvm_unreachable("unhandled case");
   }
 
   bool handleTypeHoist(ValueDecl *FD, CallExpr* Call, Expr *Arg) {
@@ -809,6 +810,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       Editor.remove(Arg->getEndLoc());
       return true;
     }
+    llvm_unreachable("unhandled subkind");
   }
 
   void handleFunctionCallToPropertyChange(ValueDecl *FD, Expr* FuncRefContainer,

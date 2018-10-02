@@ -17,7 +17,7 @@ import _SwiftXCTestOverlayShims
 
 // --- XCTest API Swiftification ---
 
-public extension XCTContext {
+extension XCTContext {
 
   /// Create and run a new activity with provided name and block.
   public class func runActivity<Result>(named name: String, block: (XCTActivity) throws -> Result) rethrows -> Result {
@@ -40,7 +40,7 @@ public extension XCTContext {
 #if os(macOS)
 @available(swift 4.0)
 @available(macOS 10.11, *)
-public extension XCUIElement {
+extension XCUIElement {
   /// Types a single key from the XCUIKeyboardKey enumeration with the specified modifier flags.
   @nonobjc public func typeKey(_ key: XCUIKeyboardKey, modifierFlags: XCUIElement.KeyModifierFlags) {
     // Call the version of the method defined in XCTest.framework.

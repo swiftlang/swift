@@ -905,13 +905,9 @@ public:
   /// declaration.
   GenericTypeDecl *getAnyGeneric();
 
-  /// getUnlabeledType - Retrieve a version of this type with all labels
-  /// removed at every level. For example, given a tuple type 
-  /// \code
-  /// (p : (x : int, y : int))
-  /// \endcode
-  /// the result would be the (parenthesized) type ((int, int)).
-  Type getUnlabeledType(ASTContext &Context);
+  /// removeArgumentLabels -  Retrieve a version of this type with all
+  /// argument labels removed.
+  Type removeArgumentLabels(unsigned numArgumentLabels);
 
   /// Retrieve the type without any parentheses around it.
   Type getWithoutParens();
@@ -1801,6 +1797,14 @@ public:
     return YieldTypeFlags(isOwned ? value | Owned : value - Owned);
   }
 
+  /// Return these flags interpreted as parameter flags.
+  ParameterTypeFlags asParamFlags() const {
+    return ParameterTypeFlags(/*variadic*/ false,
+                              /*autoclosure*/ false,
+                              /*escaping*/ false,
+                              getValueOwnership());
+  }
+
   bool operator ==(const YieldTypeFlags &other) const {
     return value.toRaw() == other.value.toRaw();
   }
@@ -2622,19 +2626,15 @@ getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 }
 
-/// AnyFunctionType - A function type has a single input and result, but
-/// these types may be tuples, for example:
+/// AnyFunctionType - A function type has zero or more input parameters and a
+/// single result. The result type may be a tuple. For example:
 ///   "(int) -> int" or "(a : int, b : int) -> (int, int)".
-/// Note that the parser requires that the input to a function type be a Tuple
-/// or ParenType, but ParenType desugars to its element, so the input to a
-/// function may be an arbitrary type.
 ///
 /// There are two kinds of function types:  monomorphic (FunctionType) and
 /// polymorphic (GenericFunctionType). Both type families additionally can
 /// be 'thin', indicating that a function value has no capture context and can be
 /// represented at the binary level as a single function pointer.
 class AnyFunctionType : public TypeBase {
-  const Type Input;
   const Type Output;
   
 public:
@@ -2661,11 +2661,23 @@ public:
     ParameterTypeFlags Flags = {};
     
   public:
-    /// FIXME(Remove InOutType): This is mostly for copying between param
-    /// types and should go away.
-    Type getType() const;
+    /// FIXME: Remove this. Return the formal type of the parameter in the
+    /// function type, including the InOutType if there is one.
+    ///
+    /// For example, 'inout Int' => 'inout Int', 'Int...' => 'Int'.
+    Type getOldType() const;
 
+    /// Return the formal type of the parameter.
+    ///
+    /// For example, 'inout Int' => 'Int', 'Int...' => 'Int'.
     Type getPlainType() const { return Ty; }
+
+    /// The type of the parameter when referenced inside the function body
+    /// as an rvalue.
+    ///
+    /// For example, 'inout Int' => 'Int', 'Int...' => '[Int]'.
+    Type getParameterType(bool forCanonical = false,
+                          ASTContext *ctx = nullptr) const;
 
     bool hasLabel() const { return !Label.empty(); }
     Identifier getLabel() const { return Label; }
@@ -2695,8 +2707,9 @@ public:
     }
 
     bool operator==(Param const &b) const {
-      return Label == b.Label && getType()->isEqual(b.getType()) &&
-             Flags == b.Flags;
+      return (Label == b.Label &&
+              getPlainType()->isEqual(b.getPlainType()) &&
+              Flags == b.Flags);
     }
     bool operator!=(Param const &b) const { return !(*this == b); }
 
@@ -2708,8 +2721,11 @@ public:
   public:
     static CanParam getFromParam(const Param &param) { return CanParam(param); }
 
-    CanType getType() const { return CanType(Param::getType()); }
+    CanType getOldType() const { return CanType(Param::getOldType()); }
     CanType getPlainType() const { return CanType(Param::getPlainType()); }
+    CanType getParameterType() const {
+      return CanType(Param::getParameterType(/*forCanonical*/ true));
+    }
   };
 
   using CanParamArrayRef =
@@ -2733,6 +2749,13 @@ public:
 
     CanYield getCanonical() const;
 
+    /// There are a number of places where it's convenient to re-use
+    /// the call machinery, processing yields as if they were
+    /// parameters of a call.  Return this reinterpreted as a parameter.
+    Param asParam() const {
+      return Param(getType(), Identifier(), getFlags().asParamFlags());
+    }
+
     Yield subst(SubstitutionMap subs, SubstOptions options = None) const {
       return Yield(getType().subst(subs, options), getFlags());
     }
@@ -2752,6 +2775,7 @@ public:
       : Yield(type, flags) {}
 
     CanType getType() const { return CanType(Yield::getType()); }
+    CanParam asParam() const { return CanParam::getFromParam(Yield::asParam());}
 
     CanYield subst(SubstitutionMap subs, SubstOptions options = None) const {
       return CanYield(getType().subst(subs, options)->getCanonicalType(),
@@ -2909,9 +2933,9 @@ public:
 
 protected:
   AnyFunctionType(TypeKind Kind, const ASTContext *CanTypeContext,
-                  Type Input, Type Output, RecursiveTypeProperties properties,
+                  Type Output, RecursiveTypeProperties properties,
                   unsigned NumParams, ExtInfo Info)
-  : TypeBase(Kind, CanTypeContext, properties), Input(Input), Output(Output) {
+  : TypeBase(Kind, CanTypeContext, properties), Output(Output) {
     Bits.AnyFunctionType.ExtInfo = Info.Bits;
     Bits.AnyFunctionType.NumParams = NumParams;
     assert(Bits.AnyFunctionType.NumParams == NumParams && "Params dropped!");
@@ -2943,7 +2967,11 @@ public:
   /// \brief Given two arrays of parameters determine if they are equal.
   static bool equalParams(CanParamArrayRef a, CanParamArrayRef b);
 
-  Type getInput() const { return Input; }
+  /// \brief Given an array of parameters and an array of labels of the
+  /// same length, update each parameter to have the corresponding label.
+  static void relabelParams(MutableArrayRef<Param> params,
+                            ArrayRef<Identifier> labels);
+
   Type getResult() const { return Output; }
   ArrayRef<Param> getParams() const;
   unsigned getNumParams() const { return Bits.AnyFunctionType.NumParams; }
@@ -2975,10 +3003,6 @@ public:
     return getExtInfo().throws();
   }
 
-  /// Determine whether the given function input type is one of the
-  /// canonical forms.
-  static bool isCanonicalFunctionInputType(Type input);
-
   /// Returns a new function type exactly like this one but with the ExtInfo
   /// replaced.
   AnyFunctionType *withExtInfo(ExtInfo info) const;
@@ -2997,19 +3021,12 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
   using ExtInfo = AnyFunctionType::ExtInfo;
   using CanParamArrayRef = AnyFunctionType::CanParamArrayRef;
 
-  static CanAnyFunctionType getOld(CanGenericSignature signature,
-                                   CanType input, CanType result,
-                                   ExtInfo extInfo = ExtInfo());
   static CanAnyFunctionType get(CanGenericSignature signature,
                                 CanParamArrayRef params,
                                 CanType result,
                                 ExtInfo info = ExtInfo());
 
   CanGenericSignature getOptGenericSignature() const;
-
-  CanType getInput() const {
-    return getPointer()->getInput()->getCanonicalType();
-  }
 
   CanParamArrayRef getParams() const {
     return CanParamArrayRef(getPointer()->getParams());
@@ -3031,45 +3048,41 @@ inline AnyFunctionType::CanYield AnyFunctionType::Yield::getCanonical() const {
 /// For example:
 ///   let x : (Float, Int) -> Int
 class FunctionType final : public AnyFunctionType,
+    public llvm::FoldingSetNode,
     private llvm::TrailingObjects<FunctionType, AnyFunctionType::Param> {
   friend TrailingObjects;
       
 public:
   /// 'Constructor' Factory Function
-  static FunctionType *getOld(Type Input, Type Result,
-                              ExtInfo Info = ExtInfo());
-      
-  static FunctionType *get(ArrayRef<Param> params,
-                           Type result,
-                           ExtInfo info = ExtInfo(),
-                           bool canonicalVararg = false);
+  static FunctionType *get(ArrayRef<Param> params, Type result,
+                           ExtInfo info = ExtInfo());
 
   // Retrieve the input parameters of this function type.
   ArrayRef<Param> getParams() const {
     return {getTrailingObjects<Param>(), getNumParams()};
   }
-      
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getParams(), getResult(), getExtInfo());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      ArrayRef<Param> params,
+                      Type result,
+                      ExtInfo info);
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Function;
   }
       
 private:
-  FunctionType(ArrayRef<Param> params,
-               Type Input, Type Result,
-               RecursiveTypeProperties properties,
-               ExtInfo Info);
+  FunctionType(ArrayRef<Param> params, Type result, ExtInfo info,
+               const ASTContext *ctx, RecursiveTypeProperties properties);
 };
 BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
-  static CanFunctionType getOld(CanType input, CanType result,
-                                ExtInfo info = ExtInfo()) {
-    auto fnType = FunctionType::getOld(input, result, info);
-    return cast<FunctionType>(fnType->getCanonicalType());
-  }
   static CanFunctionType get(CanParamArrayRef params, CanType result,
                              ExtInfo info = ExtInfo()) {
-    auto fnType = FunctionType::get(params.getOriginalArray(),
-                                    result, info, /*canonicalVararg=*/true);
+    auto fnType = FunctionType::get(params.getOriginalArray(), result, info);
     return cast<FunctionType>(fnType->getCanonicalType());
   }
 
@@ -3077,18 +3090,11 @@ BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
     return CanFunctionType(cast<FunctionType>(getPointer()->withExtInfo(info)));
   }
 END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
-  
-/// Break an argument type into an array of \c AnyFunctionType::Params.
-///
-/// \param type The type to decompose.
-/// \param argumentLabels The argument labels to use.
-SmallVector<AnyFunctionType::Param, 4>
-decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels);
 
 /// Map the given parameter list onto a bitvector describing whether
 /// the argument type at each index has a default argument associated with
 /// it.
-llvm::SmallBitVector
+SmallBitVector
 computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
                   const ValueDecl *paramOwner, unsigned level);
 
@@ -3113,7 +3119,6 @@ class GenericFunctionType final : public AnyFunctionType,
   /// Construct a new generic function type.
   GenericFunctionType(GenericSignature *sig,
                       ArrayRef<Param> params,
-                      Type input,
                       Type result,
                       ExtInfo info,
                       const ASTContext *ctx,
@@ -3121,17 +3126,10 @@ class GenericFunctionType final : public AnyFunctionType,
       
 public:
   /// Create a new generic function type.
-  static GenericFunctionType *getOld(GenericSignature *sig,
-                                     Type input,
-                                     Type result,
-                                     ExtInfo info = ExtInfo());
-
-  /// Create a new generic function type.
   static GenericFunctionType *get(GenericSignature *sig,
                                   ArrayRef<Param> params,
                                   Type result,
-                                  ExtInfo info = ExtInfo(),
-                                  bool canonicalVararg = false);
+                                  ExtInfo info = ExtInfo());
 
   // Retrieve the input parameters of this function type.
   ArrayRef<Param> getParams() const {
@@ -3154,12 +3152,12 @@ public:
   FunctionType *substGenericArgs(SubstitutionMap subs);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getGenericSignature(), getInput(), getResult(),
+    Profile(ID, getGenericSignature(), getParams(), getResult(),
             getExtInfo());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
                       GenericSignature *sig,
-                      Type input,
+                      ArrayRef<Param> params,
                       Type result,
                       ExtInfo info);
 
@@ -3170,15 +3168,6 @@ public:
 };
 
 BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
-  static CanGenericFunctionType getOld(CanGenericSignature sig,
-                                       CanType input, CanType result,
-                                       ExtInfo info = ExtInfo()) {
-    // Knowing that the argument types are independently canonical is
-    // not sufficient to guarantee that the function type will be canonical.
-    auto fnType = GenericFunctionType::getOld(sig, input, result, info);
-    return cast<GenericFunctionType>(fnType->getCanonicalType());
-  }
-
   /// Create a new generic function type.
   static CanGenericFunctionType get(CanGenericSignature sig,
                                     CanParamArrayRef params,
@@ -3187,8 +3176,7 @@ BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
     // Knowing that the argument types are independently canonical is
     // not sufficient to guarantee that the function type will be canonical.
     auto fnType = GenericFunctionType::get(sig, params.getOriginalArray(),
-                                           result, info,
-                                           /*canonicalVararg=*/true);
+                                           result, info);
     return cast<GenericFunctionType>(fnType->getCanonicalType());
   }
 
@@ -3205,16 +3193,6 @@ BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
                     cast<GenericFunctionType>(getPointer()->withExtInfo(info)));
   }
 END_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
-
-inline CanAnyFunctionType
-CanAnyFunctionType::getOld(CanGenericSignature signature,
-                           CanType input, CanType result, ExtInfo extInfo) {
-  if (signature) {
-    return CanGenericFunctionType::getOld(signature, input, result, extInfo);
-  } else {
-    return CanFunctionType::getOld(input, result, extInfo);
-  }
-}
 
 inline CanAnyFunctionType
 CanAnyFunctionType::get(CanGenericSignature signature, CanParamArrayRef params,
@@ -3684,25 +3662,6 @@ public:
       llvm_unreachable("Unhandled Representation in switch.");
     }
 
-    bool hasGuaranteedSelfParam() const {
-      switch (getRepresentation()) {
-      case Representation::Thick:
-      case Representation::Block:
-      case Representation::Thin:
-      case Representation::CFunctionPointer:
-      case Representation::ObjCMethod:
-      case Representation::Closure:
-      // SWIFT_ENABLE_TENSORFLOW
-      case Representation::TensorFlow:
-        return false;
-      case Representation::Method:
-      case Representation::WitnessMethod:
-        return true;
-      }
-
-      llvm_unreachable("Unhandled Representation in switch.");
-    }
-
     /// True if the function representation carries context.
     bool hasContext() const {
       switch (getRepresentation()) {
@@ -4134,7 +4093,8 @@ public:
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericSignature(), getExtInfo(), getCoroutineKind(),
             getCalleeConvention(), getParameters(), getYields(),
-            getResults(), getOptionalErrorResult());
+            getResults(), getOptionalErrorResult(),
+            getWitnessMethodConformanceOrNone());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
                       GenericSignature *genericSig,
@@ -4144,7 +4104,8 @@ public:
                       ArrayRef<SILParameterInfo> params,
                       ArrayRef<SILYieldInfo> yields,
                       ArrayRef<SILResultInfo> results,
-                      Optional<SILResultInfo> errorResult);
+                      Optional<SILResultInfo> errorResult,
+                      Optional<ProtocolConformanceRef> conformance);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {

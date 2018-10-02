@@ -79,7 +79,7 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
   /// The position of the first element.
   ///
   /// In a `CollectionOfOne` instance, `startIndex` is always `0`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // trivial-implementation
   public var startIndex: Index {
     return 0
   }
@@ -117,7 +117,7 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
   ///
   /// - Complexity: O(1)
   @inlinable // trivial-implementation
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_elements: _element)
   }
 

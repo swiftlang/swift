@@ -68,7 +68,7 @@ extension Int {
   subscript(key: String) -> Double {  get {} }   // expected-note {{found this candidate}}
 }
 
-let _ = 1["1"]  // expected-error {{ambiguous use of 'subscript'}}
+let _ = 1["1"]  // expected-error {{ambiguous use of 'subscript(_:)'}}
 
 let squares = [ 1, 2, 3 ].reduce([:]) { (dict, n) in
   var dict = dict

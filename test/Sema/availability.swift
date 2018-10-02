@@ -41,7 +41,7 @@ class ClassWithUnavailable {
   }
 
   @available(*, unavailable)
-  subscript (i: Int) -> Int { // expected-note{{'subscript' has been explicitly marked unavailable here}}
+  subscript (i: Int) -> Int { // expected-note{{'subscript(_:)' has been explicitly marked unavailable here}}
     return i
   }
 }
@@ -55,7 +55,7 @@ func testInit() {
 }
 
 func testSubscript(cwu: ClassWithUnavailable) {
-  _ = cwu[5] // expected-error{{'subscript' is unavailable}}
+  _ = cwu[5] // expected-error{{'subscript(_:)' is unavailable}}
 }
 
 /* FIXME 'nil == a' fails to type-check with a bogus error message

@@ -9,7 +9,7 @@ import nullability
 import Foundation
 
 // null_resettable properties.
-// CHECK-LABEL: sil hidden @$S18nullability_silgen18testNullResettable{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s18nullability_silgen18testNullResettable{{[_0-9a-zA-Z]*}}F
 func testNullResettable(_ sc: SomeClass) {
   sc.defaultedProperty = nil
   sc.defaultedProperty = "hello"

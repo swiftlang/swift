@@ -427,6 +427,8 @@ protocol ProtRoot {
 
 protocol ProtDerived : ProtRoot {
   func fooCommon()
+  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | fooCommon() | s:14swift_ide_test11ProtDerivedP9fooCommonyyF | Def,Dyn,RelChild,RelOver | rel: 2
+  
   func bar1()
   func bar2()
   func bar3(_ : Int)
@@ -435,9 +437,8 @@ protocol ProtDerived : ProtRoot {
 
 extension ProtDerived {
   func fooCommon() {}
-  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | fooCommon() | s:14swift_ide_test11ProtDerivedPAAE9fooCommonyyF | Def,Dyn,RelChild,RelOver | rel: 3
+  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | fooCommon() | s:14swift_ide_test11ProtDerivedPAAE9fooCommonyyF | Def,Dyn,RelChild,RelOver | rel: 2
   // CHECK-NEXT: RelOver | instance-method/Swift | fooCommon() | s:14swift_ide_test11ProtDerivedP9fooCommonyyF
-  // CHECK-NEXT: RelOver | instance-method/Swift | fooCommon() | s:14swift_ide_test8ProtRootP9fooCommonyyF
 
   func foo1() {}
   // CHECK: [[@LINE-1]]:8 | instance-method/Swift | foo1() | s:14swift_ide_test11ProtDerivedPAAE4foo1yyF | Def,Dyn,RelChild,RelOver | rel: 2

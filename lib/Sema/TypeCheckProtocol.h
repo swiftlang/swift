@@ -33,6 +33,7 @@ class AccessScope;
 class AssociatedTypeDecl;
 class AvailabilityContext;
 class DeclContext;
+class FuncDecl;
 class NormalProtocolConformance;
 class ProtocolDecl;
 class TypeChecker;
@@ -452,6 +453,8 @@ protected:
   WitnessChecker(TypeChecker &tc, ProtocolDecl *proto,
                  Type adoptee, DeclContext *dc);
 
+  bool isMemberOperator(FuncDecl *decl, Type type);
+
   /// Gather the value witnesses for the given requirement.
   ///
   /// \param ignoringNames If non-null and there are no value
@@ -830,6 +833,11 @@ public:
   ///
   /// \returns \c true if an error occurred, \c false otherwise
   Optional<InferredTypeWitnesses> solve(ConformanceChecker &checker);
+
+  /// Find an associated type declaration that provides a default definition.
+  static AssociatedTypeDecl *findDefaultedAssociatedType(
+                                                 TypeChecker &tc,
+                                                 AssociatedTypeDecl *assocType);
 };
 
 /// \brief Match the given witness to the given requirement.

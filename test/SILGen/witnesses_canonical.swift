@@ -52,7 +52,7 @@ struct XQ3 : Q3 {
 }
 
 // CHECK: sil_witness_table hidden XQ3: Q3 module witnesses_canonical {
-// CHECK:  associated_type Assoc: XP
 // CHECK:  associated_type_protocol (Assoc: P1): XP: P1 module witnesses_canonical
 // CHECK:  associated_type_protocol (Assoc: P2): XP: P2 module witnesses_canonical
+// CHECK:  associated_type Assoc: XP
 // CHECK: }

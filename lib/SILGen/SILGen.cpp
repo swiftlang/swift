@@ -214,7 +214,9 @@ FuncDecl *SILGenModule::getBridgeToObjectiveCRequirement(SILLocation loc) {
   auto &ctx = getASTContext();
   FuncDecl *found = nullptr;
   DeclName name(ctx, ctx.Id_bridgeToObjectiveC, llvm::ArrayRef<Identifier>());
-  for (auto member : proto->lookupDirect(name, true)) {
+  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+  for (auto member : proto->lookupDirect(name, flags)) {
     if (auto func = dyn_cast<FuncDecl>(member)) {
       found = func;
       break;
@@ -245,7 +247,9 @@ FuncDecl *SILGenModule::getUnconditionallyBridgeFromObjectiveCRequirement(
   FuncDecl *found = nullptr;
   DeclName name(ctx, ctx.getIdentifier("_unconditionallyBridgeFromObjectiveC"),
                 llvm::makeArrayRef(Identifier()));
-  for (auto member : proto->lookupDirect(name, true)) {
+  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+  for (auto member : proto->lookupDirect(name, flags)) {
     if (auto func = dyn_cast<FuncDecl>(member)) {
       found = func;
       break;
@@ -275,7 +279,9 @@ SILGenModule::getBridgedObjectiveCTypeRequirement(SILLocation loc) {
   auto &ctx = getASTContext();
   AssociatedTypeDecl *found = nullptr;
   DeclName name(ctx.Id_ObjectiveCType);
-  for (auto member : proto->lookupDirect(name, true)) {
+  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+  for (auto member : proto->lookupDirect(name, flags)) {
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
       found = assocType;
       break;
@@ -325,7 +331,9 @@ VarDecl *SILGenModule::getNSErrorRequirement(SILLocation loc) {
   // Look for _nsError.
   auto &ctx = getASTContext();
   VarDecl *found = nullptr;
-  for (auto member : proto->lookupDirect(ctx.Id_nsError, true)) {
+  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+  for (auto member : proto->lookupDirect(ctx.Id_nsError, flags)) {
     if (auto var = dyn_cast<VarDecl>(member)) {
       found = var;
       break;
@@ -480,10 +488,6 @@ static SILFunction *getFunctionToInsertAfter(SILGenModule &SGM,
 }
 
 static bool hasSILBody(FuncDecl *fd) {
-  if (auto accessor = dyn_cast<AccessorDecl>(fd))
-    if (accessor->isMaterializeForSet())
-      return !isa<ProtocolDecl>(accessor->getDeclContext());
-
   return fd->getBody(/*canSynthesize=*/false);
 }
 
@@ -642,7 +646,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
   assert(F->empty() && "already emitted function?!");
 
   if (F->getLoweredFunctionType()->isPolymorphic())
-    F->setGenericEnvironment(Types.getConstantInfo(constant).GenericEnv);
+    F->setGenericEnvironment(Types.getConstantGenericEnvironment(constant));
 
   // Create a debug scope for the function using astNode as source location.
   F->setDebugScope(new (M) SILDebugScope(Loc, F));
@@ -838,7 +842,7 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
   emitAbstractFuncDecl(fd);
 
   if (hasSILBody(fd)) {
-    FrontendStatsTracer Tracer(getASTContext().Stats, "emit-SIL", fd);
+    FrontendStatsTracer Tracer(getASTContext().Stats, "SILGen-funcdecl", fd);
     PrettyStackTraceDecl stackTrace("emitting SIL for", fd);
 
     SILDeclRef constant(decl);
@@ -848,11 +852,7 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
     emitOrDelayFunction(*this, constant, [this,constant,fd](SILFunction *f){
       preEmitFunction(constant, fd, f, fd);
       PrettyStackTraceSILFunction X("silgen emitFunction", f);
-      auto accessor = dyn_cast<AccessorDecl>(fd);
-      if (accessor && accessor->isMaterializeForSet())
-        SILGenFunction(*this, *f, accessor).emitMaterializeForSet(accessor);
-      else
-        SILGenFunction(*this, *f, fd).emitFunction(fd);
+      SILGenFunction(*this, *f, fd).emitFunction(fd);
       postEmitFunction(constant, f);
     }, /*forceEmission=*/ForCoverageMapping);
   }
@@ -884,9 +884,7 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
 
   bool ForCoverageMapping = doesASTRequireProfiling(M, decl);
 
-  if (declCtx->getSelfClassDecl()) {
-    // Class constructors have separate entry points for allocation and
-    // initialization.
+  auto emitClassAllocatorThunk = [&]{
     emitOrDelayFunction(
         *this, constant, [this, constant, decl](SILFunction *f) {
           preEmitFunction(constant, decl, f, decl);
@@ -894,27 +892,8 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
           SILGenFunction(*this, *f, decl).emitClassConstructorAllocator(decl);
           postEmitFunction(constant, f);
         });
-
-    // Constructors may not have bodies if they've been imported, or if they've
-    // been parsed from a textual interface.
-    if (decl->hasBody()) {
-      SILDeclRef initConstant(decl, SILDeclRef::Kind::Initializer);
-      emitOrDelayFunction(
-          *this, initConstant,
-          [this, initConstant, decl, declCtx](SILFunction *initF) {
-            preEmitFunction(initConstant, decl, initF, decl);
-            PrettyStackTraceSILFunction X("silgen constructor initializer",
-                                          initF);
-            initF->setProfiler(
-                getOrCreateProfilerForConstructors(declCtx, decl));
-            SILGenFunction(*this, *initF, decl)
-              .emitClassConstructorInitializer(decl);
-            postEmitFunction(initConstant, initF);
-          },
-          /*forceEmission=*/ForCoverageMapping);
-    }
-  } else {
-    // Struct and enum constructors do everything in a single function.
+  };
+  auto emitValueConstructorIfHasBody = [&]{
     if (decl->hasBody()) {
       emitOrDelayFunction(
           *this, constant, [this, constant, decl, declCtx](SILFunction *f) {
@@ -925,6 +904,47 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
             postEmitFunction(constant, f);
           });
     }
+  };
+  
+  if (declCtx->getSelfClassDecl()) {
+    // Designated initializers for classes have have separate entry points for
+    // allocation and initialization.
+    if (decl->isDesignatedInit()) {
+      emitClassAllocatorThunk();
+
+      // Constructors may not have bodies if they've been imported, or if they've
+      // been parsed from a textual interface.
+      if (decl->hasBody()) {
+        SILDeclRef initConstant(decl, SILDeclRef::Kind::Initializer);
+        emitOrDelayFunction(
+            *this, initConstant,
+            [this, initConstant, decl, declCtx](SILFunction *initF) {
+              preEmitFunction(initConstant, decl, initF, decl);
+              PrettyStackTraceSILFunction X("silgen constructor initializer",
+                                            initF);
+              initF->setProfiler(
+                  getOrCreateProfilerForConstructors(declCtx, decl));
+              SILGenFunction(*this, *initF, decl)
+                .emitClassConstructorInitializer(decl);
+              postEmitFunction(initConstant, initF);
+            },
+            /*forceEmission=*/ForCoverageMapping);
+      }
+    // Convenience initializers for classes behave more like value constructors
+    // in that there's only an allocating entry point that effectively
+    // "constructs" the self reference by invoking another initializer.
+    } else {
+      emitValueConstructorIfHasBody();
+      
+      // If the convenience initializer was imported from ObjC, we still have to
+      // emit the allocator thunk.
+      if (decl->hasClangNode()) {
+        emitClassAllocatorThunk();
+      }
+    }
+  } else {
+    // Struct and enum constructors do everything in a single function.
+    emitValueConstructorIfHasBody();
   }
 }
 
@@ -1003,7 +1023,7 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
                                                DestructorDecl *dd) {
   // Emit the native deallocating destructor for -dealloc.
   // Destructors are a necessary part of class metadata, so can't be delayed.
-  {
+  if (dd->hasBody()) {
     SILDeclRef dealloc(dd, SILDeclRef::Kind::Deallocator);
     SILFunction *f = getFunction(dealloc, ForDefinition);
     preEmitFunction(dealloc, dd, f, dd);
@@ -1015,7 +1035,7 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
 
   // Emit the Objective-C -dealloc entry point if it has
   // something to do beyond messaging the superclass's -dealloc.
-  if (dd->getBody()->getNumElements() != 0)
+  if (dd->hasBody() && dd->getBody()->getNumElements() != 0)
     emitObjCDestructorThunk(dd);
 
   // Emit the ivar initializer, if needed.
@@ -1347,6 +1367,7 @@ TypeConverter::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl) {
   case AccessStrategy::BehaviorStorage:
     llvm_unreachable("should not occur");
   }
+  llvm_unreachable("unhandled strategy");
 }
 
 static bool canStorageUseTrivialDescriptor(SILModule &M,
@@ -1392,6 +1413,7 @@ static bool canStorageUseTrivialDescriptor(SILModule &M,
       && decl->getSetter() == nullptr;
   }
   }
+  llvm_unreachable("unhandled strategy");
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
@@ -1404,7 +1426,9 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   
   if (!decl->exportsPropertyDescriptor())
     return;
-  
+
+  PrettyStackTraceDecl stackTrace("emitting property descriptor for", decl);
+
   Type baseTy;
   if (decl->getDeclContext()->isTypeContext()) {
     // TODO: Static properties should eventually be referenceable as
@@ -1615,7 +1639,7 @@ public:
         if (SGF.B.hasValidInsertionPoint())
           SGF.B.createBranch(returnLoc, returnBB, returnValue);
         returnValue =
-            returnBB->createPHIArgument(returnType, ValueOwnershipKind::Owned);
+            returnBB->createPhiArgument(returnType, ValueOwnershipKind::Owned);
         SGF.B.emitBlock(returnBB);
 
         // Emit the rethrow block.
@@ -1674,13 +1698,18 @@ public:
 
 } // end anonymous namespace
 
-void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
+void SILGenModule::emitSourceFile(SourceFile *sf) {
   SourceFileScope scope(*this, sf);
-  for (Decl *D : llvm::makeArrayRef(sf->Decls).slice(startElem))
+  FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-file", sf);
+  for (Decl *D : sf->Decls) {
+    FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-decl", D);
     visit(D);
+  }
 
-  for (Decl *D : sf->LocalTypeDecls)
+  for (Decl *D : sf->LocalTypeDecls) {
+    FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-tydecl", D);
     visit(D);
+  }
 
   // Mark any conformances as "used".
   for (auto conformance : sf->getUsedConformances())
@@ -1692,29 +1721,22 @@ void SILGenModule::emitSourceFile(SourceFile *sf, unsigned startElem) {
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<SILModule>
-SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF,
-                        Optional<unsigned> startElem,
-                        bool isWholeModule) {
+SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF) {
   SharedTimer timer("SILGen");
   const DeclContext *DC;
-  if (startElem) {
-    assert(SF && "cannot have a start element without a source file");
-    // Because more decls may be added to the SourceFile, we can't assume
-    // anything about the compilation context.
-    DC = nullptr;
-  } else if (SF) {
+  if (SF) {
     DC = SF;
   } else {
     DC = mod;
   }
 
   std::unique_ptr<SILModule> M(
-      new SILModule(mod, options, DC, isWholeModule));
+      new SILModule(mod, options, DC, /*wholeModule*/ SF == nullptr));
   SILGenModule SGM(*M, mod);
 
   if (SF) {
     if (auto *file = dyn_cast<SourceFile>(SF)) {
-      SGM.emitSourceFile(file, startElem.getValueOr(0));
+      SGM.emitSourceFile(file);
     } else if (auto *file = dyn_cast<SerializedASTFile>(SF)) {
       if (file->isSIB())
         M->getSILLoader()->getAllForModule(mod->getName(), file);
@@ -1724,7 +1746,7 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF,
       auto nextSF = dyn_cast<SourceFile>(file);
       if (!nextSF || nextSF->ASTStage != SourceFile::TypeChecked)
         continue;
-      SGM.emitSourceFile(nextSF, 0);
+      SGM.emitSourceFile(nextSF);
     }
 
     // Also make sure to process any intermediate files that may contain SIL
@@ -1766,16 +1788,11 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF,
 }
 
 std::unique_ptr<SILModule>
-swift::performSILGeneration(ModuleDecl *mod,
-                            SILOptions &options,
-                            bool wholeModuleCompilation) {
-  return SILModule::constructSIL(mod, options, nullptr, None,
-                                 wholeModuleCompilation);
+swift::performSILGeneration(ModuleDecl *mod, SILOptions &options) {
+  return SILModule::constructSIL(mod, options, nullptr);
 }
 
 std::unique_ptr<SILModule>
-swift::performSILGeneration(FileUnit &sf, SILOptions &options,
-                            Optional<unsigned> startElem) {
-  return SILModule::constructSIL(sf.getParentModule(), options, &sf, startElem,
-                                 false);
+swift::performSILGeneration(FileUnit &sf, SILOptions &options) {
+  return SILModule::constructSIL(sf.getParentModule(), options, &sf);
 }

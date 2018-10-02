@@ -13,14 +13,14 @@ import Builtin
 import Swift
 
 // CHECK-LABEL: sil @top_level_code
-// CHECK: function_ref @$S11def_generic1AC23convertFromArrayLiteralyACyxGxd_tF
+// CHECK: function_ref @$s11def_generic1AC23convertFromArrayLiteralyACyxGxd_tF
 sil @top_level_code : $@convention(thin) () -> () {
 bb0:
-  %3 = function_ref @$S11def_generic1AC23convertFromArrayLiteralyACyxGxd_tF : $@convention(method) <T> (@guaranteed Array<T>, @guaranteed A<T>) -> @owned A<T>
+  %3 = function_ref @$s11def_generic1AC23convertFromArrayLiteralyACyxGxd_tF : $@convention(method) <T> (@guaranteed Array<T>, @guaranteed A<T>) -> @owned A<T>
   %0 = tuple ()                                   // user: %1
   return %0 : $()                                 // id: %1
 }
 
 // Make sure the function body is deserialized.
-// CHECK-LABEL: sil public_external [serialized] [canonical] @$S11def_generic1AC23convertFromArrayLiteralyACyxGxd_tF : $@convention(method) <T> (@guaranteed Array<T>, @guaranteed A<T>) -> @owned A<T> {
-sil @$S11def_generic1AC23convertFromArrayLiteralyACyxGxd_tF : $@convention(method) <T> (@guaranteed Array<T>, @guaranteed A<T>) -> @owned A<T>
+// CHECK-LABEL: sil public_external [serialized] [canonical] @$s11def_generic1AC23convertFromArrayLiteralyACyxGxd_tF : $@convention(method) <T> (@guaranteed Array<T>, @guaranteed A<T>) -> @owned A<T> {
+sil @$s11def_generic1AC23convertFromArrayLiteralyACyxGxd_tF : $@convention(method) <T> (@guaranteed Array<T>, @guaranteed A<T>) -> @owned A<T>

@@ -4,12 +4,14 @@
 // RUN: (export -n %env-SWIFT_DETERMINISTIC_HASHING; %target-run %t/hash && %target-run %t/hash) | %FileCheck --check-prefixes=RANDOM %s
 // RUN: (export %env-SWIFT_DETERMINISTIC_HASHING=1; %target-run %t/hash && %target-run %t/hash) | %FileCheck --check-prefixes=STABLE %s
 
+// REQUIRES: executable_test
+
 // This check verifies that the hash seed is randomly generated on every
 // execution of a Swift program unless the SWIFT_DETERMINISTIC_HASHING
 // environment variable is set.
 
 print("Deterministic: \(Hasher._isDeterministic)")
-print("Seed: \(Hasher._seed)")
+print("Seed: \(Hasher._executionSeed)")
 print("Hash values: <\(0.hashValue), \(1.hashValue)>")
 
 // With randomized hashing, we get a new seed and a new set of hash values on

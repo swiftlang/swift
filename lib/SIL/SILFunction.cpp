@@ -236,11 +236,17 @@ bool SILFunction::isNoReturnFunction() const {
 }
 
 SILBasicBlock *SILFunction::createBasicBlock() {
-  return new (getModule()) SILBasicBlock(this);
+  return new (getModule()) SILBasicBlock(this, nullptr, false);
 }
 
-SILBasicBlock *SILFunction::createBasicBlock(SILBasicBlock *AfterBlock) {
-  return new (getModule()) SILBasicBlock(this, AfterBlock);
+SILBasicBlock *SILFunction::createBasicBlockAfter(SILBasicBlock *afterBB) {
+  assert(afterBB);
+  return new (getModule()) SILBasicBlock(this, afterBB, /*after*/ true);
+}
+
+SILBasicBlock *SILFunction::createBasicBlockBefore(SILBasicBlock *beforeBB) {
+  assert(beforeBB);
+  return new (getModule()) SILBasicBlock(this, beforeBB, /*after*/ false);
 }
 
 //===----------------------------------------------------------------------===//
@@ -534,7 +540,7 @@ struct SILFunctionTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     if (!Entity)
       return;
     const SILFunction *F = static_cast<const SILFunction *>(Entity);
-    OS << F->getName();
+    F->printName(OS);
   }
 
   void traceLoc(const void *Entity, SourceManager *SM,
@@ -542,6 +548,8 @@ struct SILFunctionTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     if (!Entity)
       return;
     const SILFunction *F = static_cast<const SILFunction *>(Entity);
+    if (!F->hasLocation())
+      return;
     F->getLocation().getSourceRange().print(OS, *SM, false);
   }
 };

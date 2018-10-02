@@ -33,17 +33,11 @@
 public protocol RandomAccessCollection: BidirectionalCollection
 where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
 {
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype Element
-
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype Index
-
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype SubSequence
-
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype Indices
+  // FIXME: Associated type inference requires these.
+  override associatedtype Element
+  override associatedtype Index
+  override associatedtype SubSequence
+  override associatedtype Indices
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
@@ -62,7 +56,7 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
   ///         i = c.index(after: i)
   ///     }
   ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
-  var indices: Indices { get }
+  override var indices: Indices { get }
 
   /// Accesses a contiguous subrange of the collection's elements.
   ///
@@ -87,29 +81,25 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
   ///   the range must be valid indices of the collection.
   ///
   /// - Complexity: O(1)
-  subscript(bounds: Range<Index>) -> SubSequence { get }
+  override subscript(bounds: Range<Index>) -> SubSequence { get }
 
-  // FIXME(ABI): Associated type inference requires this.
-  subscript(position: Index) -> Element { get }
-
-  // FIXME(ABI): Associated type inference requires this.
-  var startIndex: Index { get }
-
-  // FIXME(ABI): Associated type inference requires this.
-  var endIndex: Index { get }
+  // FIXME: Associated type inference requires these.
+  override subscript(position: Index) -> Element { get }
+  override var startIndex: Index { get }
+  override var endIndex: Index { get }
 
   /// Returns the position immediately before the given index.
   ///
   /// - Parameter i: A valid index of the collection. `i` must be greater than
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
-  func index(before i: Index) -> Index
+  override func index(before i: Index) -> Index
 
   /// Replaces the given index with its predecessor.
   ///
   /// - Parameter i: A valid index of the collection. `i` must be greater than
   ///   `startIndex`.
-  func formIndex(before i: inout Index)
+  override func formIndex(before i: inout Index)
 
   /// Returns the position immediately after the given index.
   ///
@@ -120,13 +110,13 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
-  func index(after i: Index) -> Index
+  override func index(after i: Index) -> Index
 
   /// Replaces the given index with its successor.
   ///
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
-  func formIndex(after i: inout Index)
+  override func formIndex(after i: inout Index)
 
   /// Returns an index that is the specified distance from the given index.
   ///
@@ -153,7 +143,7 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
   ///   `index(before:)`.
   ///
   /// - Complexity: O(1)
-  func index(_ i: Index, offsetBy distance: Int) -> Index
+  @_nonoverride func index(_ i: Index, offsetBy distance: Int) -> Index
 
   /// Returns an index that is the specified distance from the given index,
   /// unless that distance is beyond a given limiting index.
@@ -195,7 +185,7 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
   ///   case, the method returns `nil`.
   ///
   /// - Complexity: O(1)
-  func index(
+  @_nonoverride func index(
     _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index?
 
@@ -213,7 +203,7 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
   ///   `BidirectionalCollection` protocol.
   ///
   /// - Complexity: O(1)
-  func distance(from start: Index, to end: Index) -> Int
+  @_nonoverride func distance(from start: Index, to end: Index) -> Int
 }
 
 // TODO: swift-3-indexing-model - (By creating an ambiguity?), try to

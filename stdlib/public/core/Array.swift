@@ -353,7 +353,7 @@ extension Array: RandomAccessCollection, MutableCollection {
   ///     // Prints "[30, 40, 50]"
   ///
   /// If the array is empty, `endIndex` is equal to `startIndex`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var endIndex: Int {
     @inlinable
     get {
@@ -570,10 +570,11 @@ extension Array: RandomAccessCollection, MutableCollection {
         index, wasNativeTypeChecked: wasNativeTypeChecked,
         matchingSubscriptCheck: token)
     }
-    mutableAddressWithPinnedNativeOwner {
-      _makeMutableAndUniqueOrPinned() // makes the array native, too
+    _modify {
+      _makeMutableAndUnique() // makes the array native, too
       _checkSubscript_native(index)
-      return (_getElementAddress(index), Builtin.tryPin(_getOwner_native()))
+      let address = _buffer.subscriptBaseAddress + index
+      yield &address.pointee
     }
   }
 
@@ -646,31 +647,6 @@ extension Array {
     return _buffer.capacity
   }
 
-  /// - Precondition: The array has a native buffer.
-  @inlinable
-  @_semantics("array.owner")
-  internal func _getOwnerWithSemanticLabel_native() -> Builtin.NativeObject {
-    return Builtin.unsafeCastToNativeObject(_buffer.nativeOwner)
-  }
-
-  /// - Precondition: The array has a native buffer.
-  @inlinable
-  @inline(__always)
-  internal func _getOwner_native() -> Builtin.NativeObject {
-#if _runtime(_ObjC)
-    if _isClassOrObjCExistential(Element.self) {
-      // We are hiding the access to '_buffer.owner' behind
-      // _getOwner() to help the compiler hoist uniqueness checks in
-      // the case of class or Objective-C existential typed array
-      // elements.
-      return _getOwnerWithSemanticLabel_native()
-    }
-#endif
-    // In the value typed case the extra call to
-    // _getOwnerWithSemanticLabel_native hinders optimization.
-    return Builtin.unsafeCastToNativeObject(_buffer.owner)
-  }
-
   @inlinable
   @_semantics("array.make_mutable")
   internal mutating func _makeMutableAndUnique() {
@@ -678,15 +654,6 @@ extension Array {
       _buffer = _Buffer(copying: _buffer)
     }
   }
-
-  @inlinable
-  @_semantics("array.make_mutable")
-  internal mutating func _makeMutableAndUniqueOrPinned() {
-    if _slowPath(!_buffer.isMutableAndUniquelyReferencedOrPinned()) {
-      _buffer = _Buffer(copying: _buffer)
-    }
-  }
-
 
   /// Check that the given `index` is valid for subscripting, i.e.
   /// `0 ≤ index < count`.
@@ -1121,7 +1088,7 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   @_semantics("array.mutate_unknown")
   internal mutating func _appendElementAssumeUniqueAndCapacity(
     _ oldCount: Int,
-    newElement: Element
+    newElement: __owned Element
   ) {
     _sanityCheck(_buffer.isMutableAndUniquelyReferenced())
     _sanityCheck(_buffer.capacity >= _buffer.count + 1)
@@ -1153,7 +1120,7 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   ///   same array.
   @inlinable
   @_semantics("array.append_element")
-  public mutating func append(_ newElement: Element) {
+  public mutating func append(_ newElement: __owned Element) {
     _makeUniqueAndReserveCapacityIfNotUnique()
     let oldCount = _getCount()
     _reserveCapacityAssumingUniqueBuffer(oldCount: oldCount)
@@ -1178,7 +1145,7 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   ///   array.
   @inlinable
   @_semantics("array.append_contentsOf")
-  public mutating func append<S: Sequence>(contentsOf newElements: S)
+  public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
 
     let newElementsCount = newElements.underestimatedCount
@@ -1283,7 +1250,7 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   /// - Complexity: O(*n*), where *n* is the length of the array. If
   ///   `i == endIndex`, this method is equivalent to `append(_:)`.
   @inlinable
-  public mutating func insert(_ newElement: Element, at i: Int) {
+  public mutating func insert(_ newElement: __owned Element, at i: Int) {
     _checkIndex(i)
     self.replaceSubrange(i..<i, with: CollectionOfOne(newElement))
   }
@@ -1339,14 +1306,14 @@ extension Array: CustomReflectable {
 extension Array: CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the array and its elements.
   public var description: String {
-    return _makeCollectionDescription(for: self, withTypeName: nil)
+    return _makeCollectionDescription()
   }
 
   /// A textual representation of the array and its elements, suitable for
   /// debugging.
   public var debugDescription: String {
     // Always show sugared representation for Arrays.
-    return _makeCollectionDescription(for: self, withTypeName: nil)
+    return _makeCollectionDescription()
   }
 }
 
@@ -1598,7 +1565,7 @@ extension Array {
   @_semantics("array.mutate_unknown")
   public mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
-    with newElements: C
+    with newElements: __owned C
   ) where C: Collection, C.Element == Element {
     _precondition(subrange.lowerBound >= self._buffer.startIndex,
       "Array replace: subrange start is negative")
@@ -1656,20 +1623,6 @@ extension Array: Equatable where Element: Equatable {
     }
 
     return true
-  }
-
-  /// Returns a Boolean value indicating whether two arrays are not equal.
-  ///
-  /// Two arrays are equal if they contain the same elements in the same order.
-  /// You can use the not-equal-to operator (`!=`) to compare any two arrays
-  /// that store the same, `Equatable`-conforming element type.
-  ///
-  /// - Parameters:
-  ///   - lhs: An array to compare.
-  ///   - rhs: Another array to compare.
-  @inlinable
-  public static func !=(lhs: Array<Element>, rhs: Array<Element>) -> Bool {
-    return !(lhs == rhs)
   }
 }
 
@@ -1798,7 +1751,7 @@ extension Array {
     _ source: AnyObject
   ) -> Array? {
     // If source is deferred, we indirect to get its native storage
-    let maybeNative = (source as? _SwiftDeferredNSArray)?._nativeStorage ?? source
+    let maybeNative = (source as? __SwiftDeferredNSArray)?._nativeStorage ?? source
 
     return (maybeNative as? _ContiguousArrayStorage<Element>).map {
       Array(_ContiguousArrayBuffer($0))
@@ -1821,7 +1774,7 @@ extension Array {
 
 extension Array: _HasCustomAnyHashableRepresentation
   where Element: Hashable {
-  public func _toCustomAnyHashable() -> AnyHashable? {
+  public __consuming func _toCustomAnyHashable() -> AnyHashable? {
     return AnyHashable(_box: _ArrayAnyHashableBox(self))
   }
 }
@@ -1873,7 +1826,7 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
     }
   }
 
-  func _rawHashValue(_seed: (UInt64, UInt64)) -> Int {
+  func _rawHashValue(_seed: Int) -> Int {
     var hasher = Hasher(_seed: _seed)
     self._hash(into: &hasher)
     return hasher._finalize()

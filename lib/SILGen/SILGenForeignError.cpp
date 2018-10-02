@@ -57,7 +57,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &SGF,
 
     // If we have the slot, emit a store to it.
     SGF.B.emitBlock(hasSlotBB);
-    SILValue slot = hasSlotBB->createPHIArgument(errorPtrObjectTy,
+    SILValue slot = hasSlotBB->createPhiArgument(errorPtrObjectTy,
                                                  ValueOwnershipKind::Owned);
     emitStoreToForeignErrorSlot(SGF, loc, slot, errorSrc);
     SGF.B.createBranch(loc, contBB);
@@ -100,7 +100,7 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &SGF,
     SGF.emitPropertyLValue(loc, ManagedValue::forUnmanaged(foreignErrorSlot),
                            bridgedErrorPtrType, pointeeProperty,
                            LValueOptions(),
-                           AccessKind::Write,
+                           SGFAccessKind::Write,
                            AccessSemantics::Ordinary);
   RValue rvalue(SGF, loc, bridgedErrorProto,
                 SGF.emitManagedRValueWithCleanup(bridgedError));
@@ -375,7 +375,7 @@ emitResultIsNilErrorCheck(SILGenFunction &SGF, SILLocation loc,
   // result value.
   SGF.B.emitBlock(contBB);
   SILValue objectResult =
-      contBB->createPHIArgument(resultObjectType, ValueOwnershipKind::Owned);
+      contBB->createPhiArgument(resultObjectType, ValueOwnershipKind::Owned);
   return SGF.emitManagedRValueWithCleanup(objectResult);
 }
 
@@ -393,7 +393,7 @@ emitErrorIsNonNilErrorCheck(SILGenFunction &SGF, SILLocation loc,
 
   // Switch on the optional error.
   SILBasicBlock *errorBB = SGF.createBasicBlock(FunctionSection::Postmatter);
-  errorBB->createPHIArgument(optionalError->getType().unwrapOptionalType(),
+  errorBB->createPhiArgument(optionalError->getType().unwrapOptionalType(),
                              ValueOwnershipKind::Owned);
   SILBasicBlock *contBB = SGF.createBasicBlock();
   SGF.B.createSwitchEnum(loc, optionalError, /*default*/ nullptr,

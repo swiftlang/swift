@@ -217,14 +217,14 @@ class TypeMatcher {
           if (firstElt.getLabel() != secondElt.getLabel() ||
               firstElt.isVariadic() != secondElt.isVariadic() ||
               firstElt.isInOut() != secondElt.isInOut())
-            return mismatch(firstElt.getType().getPointer(),
-                            secondElt.getType(),
-                            sugaredFirstFunc->getParams()[i].getType());
+            return mismatch(firstElt.getOldType().getPointer(),
+                            secondElt.getOldType(),
+                            sugaredFirstFunc->getParams()[i].getOldType());
 
           // Recurse on parameter components.
-          if (!this->visit(firstElt.getType()->getCanonicalType(),
-                           secondElt.getType(),
-                           sugaredFirstFunc->getParams()[i].getType()))
+          if (!this->visit(firstElt.getOldType()->getCanonicalType(),
+                           secondElt.getOldType(),
+                           sugaredFirstFunc->getParams()[i].getOldType()))
             return false;
         }
 

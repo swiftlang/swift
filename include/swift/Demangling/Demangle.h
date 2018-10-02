@@ -274,6 +274,11 @@ bool isProtocol(llvm::StringRef mangledName);
 /// \param mangledName A null-terminated string containing a mangled name.
 bool isStruct(llvm::StringRef mangledName);
 
+/// Returns true if the mangled name is an Objective-C symbol.
+///
+/// \param mangledName A null-terminated string containing a mangled name.
+bool isObjCSymbol(llvm::StringRef mangledName);
+
 /// Returns true if the mangled name has the old scheme of function type
 /// mangling where labels are part of the type.
 ///

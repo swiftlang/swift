@@ -883,3 +883,35 @@ bb0(%0 : $*AClass, %1 : $AClass):
   %999 = tuple ()
   return %999 : $()
 }
+
+// <rdar://problem/43888666> [SR-8526]: Memory leak after switch in release configuration
+// CHECK-LABEL: sil @testGlobalHoistToStoredValue : $@convention(thin) (@owned AClass, @inout AClass) -> () {
+// CHECK: bb0(%0 : $AClass, %1 : $*AClass):
+// CHECK-NEXT:   [[LOCAL:%.*]] = alloc_stack $AClass
+// CHECK-NEXT:   store %0 to [[LOCAL]] : $*AClass
+// CHECK-NEXT:   copy_addr [[LOCAL]] to %1 : $*AClass
+// CHECK-NEXT:   retain_value %0 : $AClass
+// CHECK-NEXT:   store %0 to %1 : $*AClass
+// CHECK-NEXT:   destroy_addr [[LOCAL]] : $*AClass
+// CHECK-NEXT:   br bb1
+// CHECK: bb1:
+// CHECK-NEXT:   dealloc_stack [[LOCAL]] : $*AClass
+// CHECK-NEXT:   release_value %0 : $AClass
+// CHECK-NEXT:   tuple ()
+// CHECK-NEXT:   return
+// CHECK-LABEL: } // end sil function 'testGlobalHoistToStoredValue'
+sil @testGlobalHoistToStoredValue : $@convention(thin) (@owned AClass, @inout AClass) -> () {
+bb0(%obj : $AClass, %ptr : $*AClass ):
+  %local = alloc_stack $AClass
+  store %obj to %local : $*AClass
+  copy_addr %local to %ptr : $*AClass
+  retain_value %obj : $AClass
+  store %obj to %ptr : $*AClass
+  br bb1
+bb1:
+  destroy_addr %local : $*AClass
+  dealloc_stack %local : $*AClass
+  release_value %obj : $AClass
+  %v = tuple ()
+  return %v : $()
+}

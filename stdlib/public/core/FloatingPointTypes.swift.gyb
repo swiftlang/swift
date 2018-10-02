@@ -1043,22 +1043,22 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   @_transparent
-  public static func +=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+  public static func +=(lhs: inout ${Self}, rhs: ${Self}) {
     lhs._value = Builtin.fadd_FPIEEE${bits}(lhs._value, rhs._value)
   }
 
   @_transparent
-  public static func -=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+  public static func -=(lhs: inout ${Self}, rhs: ${Self}) {
     lhs._value = Builtin.fsub_FPIEEE${bits}(lhs._value, rhs._value)
   }
 
   @_transparent
-  public static func *=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+  public static func *=(lhs: inout ${Self}, rhs: ${Self}) {
     lhs._value = Builtin.fmul_FPIEEE${bits}(lhs._value, rhs._value)
   }
 
   @_transparent
-  public static func /=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+  public static func /=(lhs: inout ${Self}, rhs: ${Self}) {
     lhs._value = Builtin.fdiv_FPIEEE${bits}(lhs._value, rhs._value)
   }
 
@@ -1519,7 +1519,7 @@ extension ${Self} : Hashable {
   }
 
   @inlinable
-  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+  public func _rawHashValue(seed: Int) -> Int {
     // To satisfy the axiom that equality implies hash equality, we need to
     // finesse the hash value of -0.0 to match +0.0.
     let v = isZero ? 0 : self
@@ -1581,55 +1581,33 @@ extension ${Self} {
 // Explicit conversions between types.
 //===----------------------------------------------------------------------===//
 
-// Construction from integers.
+// Construction from other concrete types.
 extension ${Self} {
 
-% for self_ty in all_integer_types(word_bits):
-%   That = self_ty.stdlib_name
-%   ThatBuiltinName = self_ty.builtin_name
-%   sign = 's' if self_ty.is_signed else 'u'
-%   srcBits = self_ty.bits
-%
-%   max_required_exponent = srcBits - 1
-%   max_available_exponent = (1 << (ExponentBitCount - 1)) - 1
-%   max_required_precision = srcBits - 1 if self_ty.is_signed else srcBits
-%   max_available_precision = SignificandBitCount + 1
-%   is_always_represented_exactly = \
-%     (max_required_exponent <= max_available_exponent and \
-%       max_required_precision <= max_available_precision)
-
-  /// Creates the closest representable value to the given integer.
-  ///
-  /// - Parameter value: The integer to represent as a floating-point value.
+  // We "shouldn't" need this, but the typechecker barfs on an expression
+  // in the test suite without it.
   @_transparent
-  public init(_ v: ${That}) {
-    _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v._value)
+  public init(_ v: Int) {
+    _value = Builtin.sitofp_Int${word_bits}_FPIEEE${bits}(v._value)
   }
-  
-  /// Creates a value that exactly represents the given integer.
-  ///
-  /// If the given integer is outside the representable range of this type or
-  /// can't be represented exactly, the result is `nil`.
-  ///
-  /// - Parameter value: The integer to represent as a floating-point value.
-%   if is_always_represented_exactly:
-  @available(*, message: "Converting ${That} to ${Self} will always succeed.")
-%   end
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
-  public init?(exactly value: ${That}) {
-    _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(value._value)
-%   if not is_always_represented_exactly:
-    guard let roundTrip = ${That}(exactly: self), roundTrip == value else {
-      return nil
-    }
-%   end
-  }
-% end # all_integer_types
-}
 
-// Construction from other floating point numbers.
-extension ${Self} {
+  // Fast-path for conversion when the source is representable as a 64-bit int,
+  // falling back on the generic _convert operation otherwise.
+  @_transparent
+  public init<Source : BinaryInteger>(_ value: Source) {
+    if value.bitWidth <= 64 {
+      if Source.isSigned {
+        let asI64 = Int64(truncatingIfNeeded: value)
+        _value = Builtin.sitofp_Int64_FPIEEE${bits}(asI64._value)
+      } else {
+        let asU64 = Int64(truncatingIfNeeded: value)
+        _value = Builtin.uitofp_Int64_FPIEEE${bits}(asU64._value)
+      }
+    } else {
+      self = ${Self}._convert(from: value).value
+    }
+  }
+
 % for src_type in all_floating_point_types():
 %   srcBits = src_type.bits
 %   That = src_type.stdlib_name
@@ -1883,7 +1861,7 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
   }
 
   internal var _hashValue: Int {
-    return _rawHashValue(_seed: Hasher._seed)
+    return _rawHashValue(_seed: 0)
   }
 
   internal func _hash(into hasher: inout Hasher) {
@@ -1892,7 +1870,7 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
     hasher.combine(_value)
   }
 
-  internal func _rawHashValue(_seed: (UInt64, UInt64)) -> Int {
+  internal func _rawHashValue(_seed: Int) -> Int {
     var hasher = Hasher(_seed: _seed)
     _hash(into: &hasher)
     return hasher.finalize()

@@ -6,14 +6,14 @@ import Builtin
 
 // Test that foo is specialized on Builtin.Int64 and the copy_values and destroy_values are dropped.
 //
-// CHECK-LABEL: sil shared @$S3fooBi64__Tg5 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+// CHECK-LABEL: sil shared @$s3fooBi64__Tg5 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
 // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
-// CHECK:   [[F:%.*]] = function_ref @$S3fooBi64__Tg5 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
+// CHECK:   [[F:%.*]] = function_ref @$s3fooBi64__Tg5 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
 // CHECK:   %{{.*}} = apply [[F]](%0, %1) : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
 // CHECK-NOT: copy_value
 // CHECK-NOT: destroy_value
 // CHECK:   return %{{.*}} : $()
-// CHECK-LABEL: } // end sil function '$S3fooBi64__Tg5'
+// CHECK-LABEL: } // end sil function '$s3fooBi64__Tg5'
 sil hidden @foo : $@convention(thin) <T> (@in T, @in T) -> () {
 bb0(%0 : $T, %1 : $T):
   %f = function_ref @foo : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> ()

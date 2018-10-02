@@ -1937,6 +1937,12 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
   if (!Attr)
     return;
 
+  // We don't want deprecated declarations to trigger warnings
+  // in synthesized code.
+  if (ReferenceRange.isInvalid() &&
+      isInsideImplicitFunction(ReferenceRange, ReferenceDC)) {
+    return;
+  }
   // We match the behavior of clang to not report deprecation warnings
   // inside declarations that are themselves deprecated on all deployment
   // targets.
@@ -2105,7 +2111,7 @@ bool isSubscriptReturningString(const ValueDecl *D, ASTContext &Context) {
   if (param.hasLabel() || param.isVariadic())
     return false;
 
-  auto inputTy = param.getType()->getAs<BoundGenericStructType>();
+  auto inputTy = param.getOldType()->getAs<BoundGenericStructType>();
   if (!inputTy)
     return false;
 
@@ -2441,6 +2447,7 @@ private:
       case KeyPathExpr::Component::Kind::OptionalChain:
       case KeyPathExpr::Component::Kind::OptionalWrap:
       case KeyPathExpr::Component::Kind::OptionalForce:
+      case KeyPathExpr::Component::Kind::Identity:
         break;
       }
     }

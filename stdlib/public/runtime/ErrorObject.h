@@ -206,14 +206,19 @@ SWIFT_RUNTIME_STDLIB_API
 void swift_errorRelease(SwiftError *object);
 
 /// Breakpoint hook for debuggers.
-SWIFT_RUNTIME_STDLIB_API
-void swift_willThrow(SwiftError *object);
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+void swift_willThrow(SWIFT_CONTEXT void *unused,
+                     SWIFT_ERROR_RESULT SwiftError **object);
 
 /// Halt in response to an error.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API LLVM_ATTRIBUTE_NORETURN
 void swift_errorInMain(SwiftError *object);
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API LLVM_ATTRIBUTE_NORETURN
-void swift_unexpectedError(SwiftError *object);
+void swift_unexpectedError(SwiftError *object,
+                           OpaqueValue *filenameStart,
+                           long filenameLength,
+                           bool isAscii,
+                           unsigned long line);
 
 #if SWIFT_OBJC_INTEROP
 

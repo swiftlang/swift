@@ -65,6 +65,7 @@ namespace swift {
   class LazyGenericContextData;
   class LazyIterableDeclContextData;
   class LazyMemberLoader;
+  class LazyMemberParser;
   class LazyResolver;
   class PatternBindingDecl;
   class PatternBindingInitializer;
@@ -209,6 +210,12 @@ public:
                          DiagnosticEngine &Diags);
   ~ASTContext();
 
+  /// Optional table of counters to report, nullptr when not collecting.
+  ///
+  /// This must be initialized early so that Allocate() doesn't try to access
+  /// it before being set to null.
+  UnifiedStatsReporter *Stats = nullptr;
+
   /// \brief The language options used for translation.
   LangOptions &LangOpts;
 
@@ -262,12 +269,6 @@ public:
   /// Cache of remapped types (useful for diagnostics).
   llvm::StringMap<Type> RemappedTypes;
 
-  /// Optional table of counters to report, nullptr when not collecting.
-  UnifiedStatsReporter *Stats = nullptr;
-
-  /// Set a new stats reporter.
-  void setStatsReporter(UnifiedStatsReporter *stats);
-
 private:
   /// \brief The current generation number, which reflects the number of
   /// times that external modules have been loaded.
@@ -288,11 +289,11 @@ private:
   /// Cache of module names that fail the 'canImport' test in this context.
   llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
   
-public:
   /// \brief Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
 
+public:
   /// Allocate - Allocate memory from the ASTContext bump pointer.
   void *Allocate(unsigned long bytes, unsigned alignment,
                  AllocationArena arena = AllocationArena::Permanent) const {
@@ -301,7 +302,9 @@ public:
 
     if (LangOpts.UseMalloc)
       return AlignedAlloc(bytes, alignment);
-    
+
+    if (arena == AllocationArena::Permanent && Stats)
+      Stats->getFrontendCounters().NumASTBytesAllocated += bytes;
     return getAllocator(arena).Allocate(bytes, alignment);
   }
 
@@ -394,13 +397,22 @@ public:
   }
 
   /// Retrive the syntax node memory manager for this context.
-  syntax::SyntaxArena &getSyntaxArena() const;
+  llvm::IntrusiveRefCntPtr<syntax::SyntaxArena> getSyntaxArena() const;
+
+  /// Set a new stats reporter.
+  void setStatsReporter(UnifiedStatsReporter *stats);
 
   /// Retrieve the lazy resolver for this context.
   LazyResolver *getLazyResolver() const;
 
   /// Set the lazy resolver for this context.
   void setLazyResolver(LazyResolver *resolver);
+
+  /// Add a lazy parser for resolving members later.
+  void addLazyParser(LazyMemberParser *parser);
+
+  /// Remove a lazy parser.
+  void removeLazyParser(LazyMemberParser *parser);
 
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
@@ -791,6 +803,16 @@ public:
   /// across all calls for the same \p func.
   LazyContextData *getOrCreateLazyContextData(const DeclContext *decl,
                                               LazyMemberLoader *lazyLoader);
+
+  /// Use the lazy parsers associated with the context to populate the members
+  /// of the given decl context.
+  ///
+  /// \param IDC The context whose member decls should be lazily parsed.
+  void parseMembers(IterableDeclContext *IDC);
+
+  /// Use the lazy parsers associated with the context to check whether the decl
+  /// context has been parsed.
+  bool hasUnparsedMembers(const IterableDeclContext *IDC) const;
 
   /// Get the lazy function data for the given generic context.
   ///

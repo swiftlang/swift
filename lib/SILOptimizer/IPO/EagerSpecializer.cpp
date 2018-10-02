@@ -117,7 +117,7 @@ static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
       MergedBB = RetBB->split(RetInst->getIterator());
       SILValue OldRetVal = RetInst->getOperand(0);
       RetInst->setOperand(
-          0, MergedBB->createPHIArgument(OldRetVal->getType(),
+          0, MergedBB->createPhiArgument(OldRetVal->getType(),
                                          ValueOwnershipKind::Owned));
       Builder.setInsertionPoint(RetBB);
       Builder.createBranch(Loc, MergedBB, {OldRetVal});
@@ -169,7 +169,7 @@ emitApplyWithRethrow(SILBuilder &Builder,
   {
     // Emit the rethrow logic.
     Builder.emitBlock(ErrorBB);
-    SILValue Error = ErrorBB->createPHIArgument(fnConv.getSILErrorType(),
+    SILValue Error = ErrorBB->createPhiArgument(fnConv.getSILErrorType(),
                                                 ValueOwnershipKind::Owned);
 
     Builder.createBuiltin(Loc,
@@ -185,7 +185,7 @@ emitApplyWithRethrow(SILBuilder &Builder,
   // result value.
   Builder.clearInsertionPoint();
   Builder.emitBlock(NormalBB);
-  return Builder.getInsertionBB()->createPHIArgument(fnConv.getSILResultType(),
+  return Builder.getInsertionBB()->createPhiArgument(fnConv.getSILResultType(),
                                                      ValueOwnershipKind::Owned);
 }
 
@@ -347,7 +347,11 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
   auto GenericSig =
     GenericFunc->getLoweredFunctionType()->getGenericSignature();
   auto SubMap = ReInfo.getClonerParamSubstitutionMap();
-  for (auto ParamTy : GenericSig->getSubstitutableParams()) {
+
+  GenericSig->forEachParam([&](GenericTypeParamType *ParamTy, bool Canonical) {
+    if (!Canonical)
+      return;
+
     auto Replacement = Type(ParamTy).subst(SubMap);
     assert(!Replacement->hasTypeParameter());
 
@@ -368,7 +372,8 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
                                   Replacement, LayoutInfo);
       }
     }
-  }
+  });
+
   static_cast<void>(FailedTypeCheckBB);
 
   if (OldReturnBB == &EntryBB) {

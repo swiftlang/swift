@@ -832,7 +832,8 @@ public:
   const SILBasicBlock *getEntryBlock() const { return &front(); }
 
   SILBasicBlock *createBasicBlock();
-  SILBasicBlock *createBasicBlock(SILBasicBlock *After);
+  SILBasicBlock *createBasicBlockAfter(SILBasicBlock *afterBB);
+  SILBasicBlock *createBasicBlockBefore(SILBasicBlock *beforeBB);
 
   /// Splice the body of \p F into this function at end.
   void spliceBody(SILFunction *F) {
@@ -939,6 +940,11 @@ public:
   /// verify - Run the IR verifier to make sure that the SILFunction follows
   /// invariants.
   void verify(bool SingleFunction = true) const;
+
+  /// Verify that all non-cond-br critical edges have been split.
+  ///
+  /// This is a fast subset of the checks performed in the SILVerifier.
+  void verifyCriticalEdges() const;
 
   /// Pretty-print the SILFunction.
   void dump(bool Verbose) const;

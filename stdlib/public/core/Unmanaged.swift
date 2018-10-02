@@ -89,7 +89,7 @@ public struct Unmanaged<Instance : AnyObject> {
   /// and you know that you're not responsible for releasing the result.
   ///
   /// - Returns: The object referenced by this `Unmanaged` instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // unsafe-performance
   public func takeUnretainedValue() -> Instance {
     return _value
   }
@@ -101,7 +101,7 @@ public struct Unmanaged<Instance : AnyObject> {
   /// and you know that you're responsible for releasing the result.
   ///
   /// - Returns: The object referenced by this `Unmanaged` instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // unsafe-performance
   public func takeRetainedValue() -> Instance {
     let result = _value
     release()
@@ -200,7 +200,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///      }
   ///    }
   ///  }
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // unsafe-performance
   public func _withUnsafeGuaranteedRef<Result>(
     _ body: (Instance) throws -> Result
   ) rethrows -> Result {
