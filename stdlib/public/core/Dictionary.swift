@@ -933,6 +933,7 @@ extension Dictionary {
     get {
       return _variant.lookup(key) ?? defaultValue()
     }
+    @inline(__always)
     _modify {
       let (bucket, found) = _variant.mutatingFind(key)
       let native = _variant.asNative
