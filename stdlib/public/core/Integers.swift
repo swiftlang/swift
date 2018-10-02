@@ -671,6 +671,9 @@ public protocol BinaryInteger :
   /// Returns the sum of this value and the given value, along with a Boolean
   /// value indicating whether overflow occurred in the operation.
   ///
+  /// For arbitrary-width integer types where the result can never overflow,
+  /// the `overflow` field of the result should always be `false`.
+  ///
   /// - Parameter rhs: The value to add to this value.
   /// - Returns: A tuple containing the result of the addition along with a
   ///   Boolean value indicating whether overflow occurred. If the `overflow`
@@ -686,6 +689,9 @@ public protocol BinaryInteger :
   /// value, along with a Boolean value indicating whether overflow occurred in
   /// the operation.
   ///
+  /// For arbitrary-width integer types where the result can never overflow,
+  /// the `overflow` field of the result should always be `false`.
+  ///
   /// - Parameter rhs: The value to subtract from this value.
   /// - Returns: A tuple containing the result of the subtraction along with a
   ///   Boolean value indicating whether overflow occurred. If the `overflow`
@@ -699,6 +705,9 @@ public protocol BinaryInteger :
 
   /// Returns the product of this value and the given value, along with a
   /// Boolean value indicating whether overflow occurred in the operation.
+  ///
+  /// For arbitrary-width integer types where the result can never overflow,
+  /// the `overflow` field of the result should always be `false`.
   ///
   /// - Parameter rhs: The value to multiply by this value.
   /// - Returns: A tuple containing the result of the multiplication along with
@@ -718,6 +727,10 @@ public protocol BinaryInteger :
   /// Dividing by zero is not an error when using this method. For a value `x`,
   /// the result of `x.dividedReportingOverflow(by: 0)` is `(x, true)`.
   ///
+  /// For arbitrary-width integer types where the result can never overflow,
+  /// the `overflow` field of the result should always be `false`, except in
+  /// the case of division by zero.
+  ///
   /// - Parameter rhs: The value to divide this value by.
   /// - Returns: A tuple containing the result of the division along with a
   ///   Boolean value indicating whether overflow occurred. If the `overflow`
@@ -735,6 +748,10 @@ public protocol BinaryInteger :
   /// Dividing by zero is not an error when using this method. For a value `x`,
   /// the result of `x.remainderReportingOverflow(dividingBy: 0)` is
   /// `(x, true)`.
+  ///
+  /// For arbitrary-width integer types where the result can never overflow,
+  /// the `overflow` field of the result should always be `false`, except in
+  /// the case of division by zero.
   ///
   /// - Parameter rhs: The value to divide this value by.
   /// - Returns: A tuple containing the result of the operation along with a
@@ -1352,11 +1369,13 @@ extension BinaryInteger {
   
   @inlinable
   public func dividedReportingOverflow(by rhs: Self) -> (partialValue: Self, overflow: Bool) {
+    guard rhs != 0 else { return (self, true) }
     return (self / rhs, false)
   }
   
   @inlinable
   public func remainderReportingOverflow(dividingBy rhs: Self) -> (partialValue: Self, overflow: Bool) {
+    guard rhs != 0 else { return (self, true) }
     return (self % rhs, false)
   }
 

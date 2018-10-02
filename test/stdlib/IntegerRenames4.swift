@@ -30,8 +30,3 @@ func _signedInteger<T : _SignedInteger>(x: T) {} // expected-error {{'_SignedInt
 func absolutaValuable<T : SignedNumeric & Comparable>(x: T) {
   _ = T.abs(x) // expected-error {{use the 'abs(_:)' free function}}
 }
-
-func signedIntegerMaskingArithmetics<T : SignedInteger>(x: T) {
-  _ = x &+ x // expected-error {{use 'FixedWidthInteger' instead of 'SignedInteger' to get '&+' in generic code}}
-  _ = x &- x // expected-error {{use 'FixedWidthInteger' instead of 'SignedInteger' to get '&-' in generic code}}
-}
