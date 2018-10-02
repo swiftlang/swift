@@ -49,6 +49,8 @@ public struct fixedLayoutStruct {
   public var a = 1
   private var b = 2
   var c = 3
+  @available(*, unavailable)
+  public let unavailableProperty = 1
 }
 
 extension Int: P1 { public func bar() {} }

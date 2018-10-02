@@ -840,6 +840,49 @@
           "hasStorage": true
         },
         {
+          "kind": "Var",
+          "name": "unavailableProperty",
+          "printedName": "unavailableProperty",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            },
+            {
+              "kind": "Getter",
+              "name": "_",
+              "printedName": "_()",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ],
+              "declKind": "Accessor",
+              "usr": "s:4cake17fixedLayoutStructV19unavailablePropertySivg",
+              "moduleName": "cake",
+              "implicit": true,
+              "declAttributes": [
+                "Transparent"
+              ]
+            }
+          ],
+          "declKind": "Var",
+          "usr": "s:4cake17fixedLayoutStructV19unavailablePropertySivp",
+          "moduleName": "cake",
+          "declAttributes": [
+            "HasInitialValue",
+            "Available"
+          ],
+          "fixedbinaryorder": 3,
+          "isLet": true,
+          "hasStorage": true
+        },
+        {
           "kind": "Constructor",
           "name": "init",
           "printedName": "init(a:b:c:)",

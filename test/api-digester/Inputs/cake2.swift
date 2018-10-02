@@ -59,6 +59,12 @@ public struct fixedLayoutStruct {
   private lazy var lazy_d = 4
 }
 
+@_fixed_layout
+public struct fixedLayoutStruct2 {
+  public var NoLongerWithFixedBinaryOrder: Int { return 1 }
+  public var BecomeFixedBinaryOrder = 1
+}
+
 @_frozen
 public enum FrozenKind {
   case Unchanged

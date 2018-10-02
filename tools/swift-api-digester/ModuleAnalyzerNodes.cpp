@@ -693,7 +693,9 @@ bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         // them equal because we need to check definition orders.
         if (auto *LV = dyn_cast<SDKNodeDeclVar>(&L)) {
           if (auto *RV = dyn_cast<SDKNodeDeclVar>(&R)) {
-            if (LV->hasFixedBinaryOrder() && RV->hasFixedBinaryOrder()) {
+            if (LV->hasFixedBinaryOrder() != RV->hasFixedBinaryOrder())
+              return false;
+            if (LV->hasFixedBinaryOrder()) {
               if (LV->getFixedBinaryOrder() != RV->getFixedBinaryOrder())
                 return false;
             }
@@ -1200,6 +1202,17 @@ SwiftDeclCollector::constructInitNode(ConstructorDecl *CD) {
 
 bool swift::ide::api::
 SwiftDeclCollector::shouldIgnore(Decl *D, const Decl* Parent) {
+  if (Ctx.checkingABI()) {
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      // Private vars with fixed binary orders can have ABI-impact, so we should
+      // whitelist them if we're checking ABI.
+      if (getFixedBinaryOrder(VD).hasValue())
+        return false;
+      // Typealias should have no impact on ABI.
+      if (isa<TypeAliasDecl>(VD))
+        return true;
+    }
+  }
   if (D->isPrivateStdlibDecl(false))
     return true;
   if (AvailableAttr::isUnavailable(D))
@@ -1209,18 +1222,10 @@ SwiftDeclCollector::shouldIgnore(Decl *D, const Decl* Parent) {
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     if (VD->getBaseName().empty())
       return true;
-
-    // Exclude type alias decls because they should have no impact on ABI.
-    if (isa<TypeAliasDecl>(VD) && Ctx.checkingABI())
-      return true;
     switch (VD->getFormalAccess()) {
     case AccessLevel::Internal:
     case AccessLevel::Private:
     case AccessLevel::FilePrivate:
-      // Private vars with fixed binary orders can have ABI-impact, so we should
-      // whitelist them if we're checking ABI.
-      if (Ctx.checkingABI() && getFixedBinaryOrder(VD).hasValue())
-        break;
       return true;
     case AccessLevel::Public:
     case AccessLevel::Open:

@@ -54,6 +54,7 @@ static StringRef getCategoryName(uint32_t ID) {
     return "/* Generic Signature Changes */";
   case LocalDiagID::decl_added:
   case LocalDiagID::decl_reorder:
+  case LocalDiagID::decl_has_fixed_order_change:
     return "/* Fixed-layout Type Changes */";
   case LocalDiagID::conformance_added:
   case LocalDiagID::conformance_removed:
