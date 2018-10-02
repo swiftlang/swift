@@ -1383,16 +1383,19 @@ extension Dictionary {
     }
 
     @inlinable
+    @inline(__always)
     public func _customContainsEquatableElement(_ element: Element) -> Bool? {
       return _variant.contains(element)
     }
 
     @inlinable
+    @inline(__always)
     public func _customIndexOfEquatableElement(_ element: Element) -> Index?? {
       return Optional(_variant.index(forKey: element))
     }
 
     @inlinable
+    @inline(__always)
     public func _customLastIndexOfEquatableElement(_ element: Element) -> Index?? {
       // The first and last elements are the same because each element is unique.
       return _customIndexOfEquatableElement(element)
