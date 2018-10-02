@@ -1360,12 +1360,12 @@ public:
 
   ArrayRef<Operand> getAllOperands() const {
     return { getTrailingObjects<Operand>(),
-             SILInstruction::Bits.AllocStackInst.NumOperands };
+             static_cast<size_t>(SILInstruction::Bits.AllocStackInst.NumOperands) };
   }
 
   MutableArrayRef<Operand> getAllOperands() {
     return { getTrailingObjects<Operand>(),
-             SILInstruction::Bits.AllocStackInst.NumOperands };
+             static_cast<size_t>(SILInstruction::Bits.AllocStackInst.NumOperands) };
   }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
