@@ -28,7 +28,9 @@ class SerializedSILLoader;
 
 struct APIntSymbolicValue;
 struct ArraySymbolicValue;
+struct DerivedAddressValue;
 struct EnumWithPayloadSymbolicValue;
+struct SymbolicValueMemoryObject;
 struct UnknownSymbolicValue;
 
 /// When we fail to constant fold a value, this captures a reason why,
@@ -65,6 +67,10 @@ enum class UnknownReason {
 class SymbolicValue {
 private:
   enum RepresentationKind {
+    /// This value is an alloc stack that is has not (yet) been initialized
+    /// by flow-sensitive analysis.
+    RK_UninitMemory,
+
     /// This symbolic value cannot be determined, carries multiple values
     /// (i.e., varies dynamically at the top level), or is of some type that
     /// we cannot analyze and propagate (e.g. NSObject).
@@ -88,6 +94,12 @@ private:
     /// This value is an array, struct, or tuple of constants.  This is
     /// tracked by the "aggregate" member of the value union.
     RK_Aggregate,
+
+    /// This represents a direct reference to the address of a memory object.
+    RK_DirectAddress,
+
+    /// This represents an index *into* a memory object.
+    RK_DerivedAddress,
   };
 
   union {
@@ -111,6 +123,14 @@ private:
     /// When this SymbolicValue is of "Aggregate" kind, this pointer stores
     /// information about the array elements and count.
     const SymbolicValue *aggregate;
+
+    /// When the representationKind is "DirectAddress", this pointer is the
+    /// memory object referenced.
+    SymbolicValueMemoryObject *directAddress;
+
+    /// When this SymbolicValue is of "DerivedAddress" kind, this pointer stores
+    /// information about the memory object and access path of the access.
+    DerivedAddressValue *derivedAddress;
   } value;
 
   RepresentationKind representationKind : 8;
@@ -146,6 +166,13 @@ public:
 
     /// This can be an array, struct, tuple, etc.
     Aggregate,
+
+    /// This value represents the address of, or into, a memory object.
+    Address,
+
+    /// These values are generally only seen internally to the system, external
+    /// clients shouldn't have to deal with them.
+    UninitMemory
   };
 
   /// For constant values, return the type classification of this value.
@@ -154,7 +181,7 @@ public:
   /// Return true if this represents a constant value.
   bool isConstant() const {
     auto kind = getKind();
-    return kind != Unknown;
+    return kind != Unknown && kind != UninitMemory;
   }
 
   static SymbolicValue getUnknown(SILNode *node, UnknownReason reason,
@@ -172,6 +199,12 @@ public:
 
   /// Return the reason an unknown result was generated.
   UnknownReason getUnknownReason() const;
+
+  static SymbolicValue getUninitMemory() {
+    SymbolicValue result;
+    result.representationKind = RK_UninitMemory;
+    return result;
+  }
 
   static SymbolicValue getMetatype(CanType type) {
     SymbolicValue result;
@@ -212,6 +245,25 @@ public:
 
   ArrayRef<SymbolicValue> getAggregateValue() const;
 
+  /// Return a symbolic value that represents the address of a memory object.
+  static SymbolicValue getAddress(SymbolicValueMemoryObject *memoryObject) {
+    SymbolicValue result;
+    result.representationKind = RK_DirectAddress;
+    result.value.directAddress = memoryObject;
+    return result;
+  }
+
+  /// Return a symbolic value that represents the address of a memory object
+  /// indexed by a path.
+  static SymbolicValue getAddress(SymbolicValueMemoryObject *memoryObject,
+                                  ArrayRef<unsigned> indices,
+                                  llvm::BumpPtrAllocator &allocator);
+
+  /// Return the memory object of this reference along with any access path
+  /// indices involved.
+  SymbolicValueMemoryObject *
+  getAddressValue(SmallVectorImpl<unsigned> &accessPath) const;
+
   //===--------------------------------------------------------------------===//
   // Helpers
 
@@ -240,6 +292,29 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os, SymbolicValue val) {
   val.print(os);
   return os;
 }
+
+/// This is a representation of a memory object referred to be an address.
+/// Memory objects may be mutated over their lifetime, but their overall type
+/// remains the same.
+struct SymbolicValueMemoryObject {
+  Type getType() const { return type; }
+
+  SymbolicValue getValue() const { return value; }
+  void setValue(SymbolicValue newValue) { value = newValue; }
+
+  /// Create a new memory object whose overall type is as specified.
+  static SymbolicValueMemoryObject *create(Type type, SymbolicValue value,
+                                           llvm::BumpPtrAllocator &allocator);
+
+private:
+  const Type type;
+  SymbolicValue value;
+
+  SymbolicValueMemoryObject(Type type, SymbolicValue value)
+      : type(type), value(value) {}
+  SymbolicValueMemoryObject(const SymbolicValueMemoryObject &) = delete;
+  void operator=(const SymbolicValueMemoryObject &) = delete;
+};
 
 } // end namespace swift
 
