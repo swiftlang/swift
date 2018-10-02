@@ -15,6 +15,8 @@
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILVisitor.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -26,123 +28,143 @@ using namespace swift;
 
 STATISTIC(NumEliminatedInsts, "number of removed instructions");
 
-static bool optimizeGuaranteedArgument(SILArgument *Arg,
-                                       OwnershipChecker &Checker) {
-  bool MadeChange = false;
+namespace {
 
-  // Gather all copy_value users of Arg.
-  llvm::SmallVector<CopyValueInst *, 4> Worklist;
-  for (auto *Op : Arg->getUses()) {
-    if (auto *CVI = dyn_cast<CopyValueInst>(Op->getUser())) {
-      Worklist.push_back(CVI);
+struct SemanticARCOptVisitor
+    : SILInstructionVisitor<SemanticARCOptVisitor, bool> {
+  bool visitSILInstruction(SILInstruction *i) { return false; }
+  bool visitCopyValueInst(CopyValueInst *cvi);
+  bool visitBeginBorrowInst(BeginBorrowInst *bbi);
+};
+
+} // end anonymous namespace
+
+bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
+  auto kind = bbi->getOperand().getOwnershipKind();
+  SmallVector<EndBorrowInst *, 16> endBorrows;
+  for (auto *op : bbi->getUses()) {
+    auto *user = op->getUser();
+    switch (user->getKind()) {
+    case SILInstructionKind::EndBorrowInst:
+      endBorrows.push_back(cast<EndBorrowInst>(user));
+      break;
+    default:
+      // Make sure that this operand can accept our arguments kind.
+      auto map = op->getOwnershipKindMap();
+      if (map.canAcceptKind(kind))
+        continue;
+      return false;
     }
   }
 
-  // Then until we run out of copies...
-  while (!Worklist.empty()) {
-    auto *CVI = Worklist.pop_back_val();
-
-    // Quickly see if copy has only one use and that use is a destroy_value. In
-    // such a case, we can always eliminate both the copy and the destroy.
-    if (auto *Op = CVI->getSingleUse()) {
-      if (auto *DVI = dyn_cast<DestroyValueInst>(Op->getUser())) {
-        DVI->eraseFromParent();
-        CVI->eraseFromParent();
-        NumEliminatedInsts += 2;
-        continue;
-      }
-    }
-
-    // Ok, now run the checker on the copy value. If it fails, then we just
-    // continue.
-    if (!Checker.checkValue(CVI))
-      continue;
-
-    // Otherwise, lets do a quick check on what the checker thinks the lifetime
-    // ending and non-lifetime ending users. To be conservative, we bail unless
-    // each lifetime ending use is a destroy_value and if each non-lifetime
-    // ending use is one of the following instructions:
-    //
-    // 1. copy_value.
-    // 2. begin_borrow.
-    // 3. end_borrow.
-    if (!all_of(Checker.lifetimeEndingUsers, [](SILInstruction *I) -> bool {
-          return isa<DestroyValueInst>(I);
-        }))
-      continue;
-
-    // Extra copy values that we should visit recursively.
-    llvm::SmallVector<CopyValueInst *, 8> NewCopyInsts;
-    llvm::SmallVector<SILInstruction *, 8> NewBorrowInsts;
-    if (!all_of(Checker.regularUsers, [&](SILInstruction *I) -> bool {
-          if (auto *CVI = dyn_cast<CopyValueInst>(I)) {
-            NewCopyInsts.push_back(CVI);
-            return true;
-          }
-
-          if (!isa<BeginBorrowInst>(I) && !isa<EndBorrowInst>(I))
-            return false;
-
-          NewBorrowInsts.push_back(I);
-          return true;
-        }))
-      continue;
-
-    // Ok! we can remove the copy_value, destroy_values!
-    MadeChange = true;
-    CVI->replaceAllUsesWith(CVI->getOperand());
-    CVI->eraseFromParent();
+  // At this point, we know that the begin_borrow's operand can be
+  // used as an argument to all non-end borrow uses. Eliminate the
+  // begin borrow and end borrows.
+  while (!endBorrows.empty()) {
+    auto *ebi = endBorrows.pop_back_val();
+    ebi->eraseFromParent();
     ++NumEliminatedInsts;
+  }
+  bbi->replaceAllUsesWith(bbi->getOperand());
+  bbi->eraseFromParent();
+  ++NumEliminatedInsts;
+  return true;
+}
 
-    while (!Checker.lifetimeEndingUsers.empty()) {
-      Checker.lifetimeEndingUsers.pop_back_val()->eraseFromParent();
-      ++NumEliminatedInsts;
-    }
+/// TODO: Add support for begin_borrow, load_borrow.
+static bool canHandleOperand(SILValue operand) {
+  if (auto *arg = dyn_cast<SILFunctionArgument>(operand)) {
+    return arg->getOwnershipKind() == ValueOwnershipKind::Guaranteed;
+  }
 
-    // Then add the copy_values that were users of our original copy value to
-    // the worklist.
-    while (!NewCopyInsts.empty()) {
-      Worklist.push_back(NewCopyInsts.pop_back_val());
-    }
+  return false;
+}
 
-    // Then remove any begin/end borrow that we found. These are unneeded since
-    // the lifetime guarantee from the argument exists above and beyond said
-    // scope.
-    while (!NewBorrowInsts.empty()) {
-      SILInstruction *I = NewBorrowInsts.pop_back_val();
-      if (auto *BBI = dyn_cast<BeginBorrowInst>(I)) {
-        // Any copy_value that is used by the begin borrow is added to the
-        // worklist.
-        for (auto *BBIUse : BBI->getUses()) {
-          if (auto *BBIUseCopyValue =
-                  dyn_cast<CopyValueInst>(BBIUse->getUser())) {
-            Worklist.push_back(BBIUseCopyValue);
-          }
-        }
+static bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
+  // Whitelist the operands that we know how to support and make sure
+  // our operand is actually guaranteed.
+  if (!canHandleOperand(cvi->getOperand()))
+    return false;
 
-        // First go through and eliminate all end borrows.
-        SmallVector<EndBorrowInst *, 4> endBorrows;
-        copy(BBI->getEndBorrows(), std::back_inserter(endBorrows));
-        while (!endBorrows.empty()) {
-          endBorrows.pop_back_val()->eraseFromParent();
-          ++NumEliminatedInsts;
-        }
-
-        // Then eliminate BBI itself.
-        BBI->replaceAllUsesWith(BBI->getOperand());
-        BBI->eraseFromParent();
-        ++NumEliminatedInsts;
+  // Then go over all of our uses. Find our destroying instructions
+  // and make sure all of them are destroy_value. For our
+  // non-destroying instructions, make sure that they accept a
+  // guaranteed value. After that, make sure that our destroys are
+  // within the lifetime of our borrowed values.
+  SmallVector<DestroyValueInst *, 16> destroys;
+  for (auto *op : cvi->getUses()) {
+    // We know that a copy_value produces an @owned value. Look
+    // through all of our uses and classify them as either
+    // invalidating or not invalidating. Make sure that all of the
+    // invalidating ones are destroy_value since otherwise the
+    // live_range is not complete.
+    auto map = op->getOwnershipKindMap();
+    auto constraint = map.getLifetimeConstraint(ValueOwnershipKind::Owned);
+    switch (constraint) {
+    case UseLifetimeConstraint::MustBeInvalidated:
+      // And we have a destroy_value, track it and continue.
+      if (auto *dvi = dyn_cast<DestroyValueInst>(op->getUser())) {
+        destroys.push_back(dvi);
         continue;
       }
+      // Otherwise, we found a non-destroy value invalidating owned
+      // user... This is not an unnecessary live range.
+      return false;
+    case UseLifetimeConstraint::MustBeLive:
+      // Ok, this constraint can take something owned as live. Lets
+      // see if it can also take something that is guaranteed. If it
+      // can not, then we bail.
+      if (!map.canAcceptKind(ValueOwnershipKind::Guaranteed)) {
+        return false;
+      }
 
-      // This is not necessary, but it does add a check.
-      auto *EBI = cast<EndBorrowInst>(I);
-      EBI->eraseFromParent();
-      ++NumEliminatedInsts;
+      // Otherwise, continue.
+      continue;
     }
   }
 
-  return MadeChange;
+  // If we reached this point, then we know that all of our users can
+  // accept a guaranteed value and our owned value is destroyed only
+  // by destroy_value. Check if all of our destroys are joint
+  // post-dominated by the end_borrow set. If they do not, then the
+  // copy_value is lifetime extending the guaranteed value, we can not
+  // eliminate it.
+  //
+  // TODO: When we support begin_borrow/load_borrow a linear linfetime
+  // check will be needed here.
+  assert(isa<SILFunctionArgument>(cvi->getOperand()) &&
+         "This code must be updated for begin_borrow/load_borrow?!");
+
+  // Otherwise, we know that our copy_value/destroy_values are all
+  // completely within the guaranteed value scope.
+  while (!destroys.empty()) {
+    auto *dvi = destroys.pop_back_val();
+    dvi->eraseFromParent();
+    ++NumEliminatedInsts;
+  }
+  cvi->replaceAllUsesWith(cvi->getOperand());
+  cvi->eraseFromParent();
+  ++NumEliminatedInsts;
+  return true;
+}
+
+bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
+  // If our copy value inst has a single destroy value user, eliminate
+  // it.
+  if (auto *op = cvi->getSingleUse()) {
+    if (auto *dvi = dyn_cast<DestroyValueInst>(op->getUser())) {
+      dvi->eraseFromParent();
+      cvi->eraseFromParent();
+      NumEliminatedInsts += 2;
+      return true;
+    }
+  }
+
+  // Then try to perform the guaranteed copy value optimization.
+  if (performGuaranteedCopyValueOptimization(cvi))
+    return true;
+
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -156,31 +178,56 @@ namespace {
 // configuration.
 struct SemanticARCOpts : SILFunctionTransform {
   void run() override {
-    bool MadeChange = false;
-    SILFunction *F = getFunction();
-    if (!F->getModule().isStdlibModule()) {
+    SILFunction &f = *getFunction();
+    // Do not run the semantic arc opts unless we are running on the
+    // standard library. This is because this is the only module that
+    // passes the ownership verifier.
+    if (!f.getModule().isStdlibModule())
       return;
-    }
 
-    DeadEndBlocks DEBlocks(F);
-    OwnershipChecker Checker{{}, {}, {}, {}, F->getModule(), DEBlocks};
-
-    // First as a special case, handle guaranteed SIL function arguments.
+    // Iterate over all of the arguments, performing small peephole
+    // ARC optimizations.
     //
-    // The reason that this is special is that we do not need to consider the
-    // end of the borrow scope since the end of the function is the end of the
-    // borrow scope.
-    for (auto *Arg : F->getArguments()) {
-      if (Arg->getOwnershipKind() != ValueOwnershipKind::Guaranteed)
+    // FIXME: Should we iterate or use a RPOT order here?
+    bool madeChange = false;
+    for (auto &bb : f) {
+      auto ii = bb.rend();
+      auto start = bb.rbegin();
+
+      // If the bb is empty, continue.
+      if (start == ii)
         continue;
-      MadeChange |= optimizeGuaranteedArgument(Arg, Checker);
+
+      // Go to the first instruction to process.
+      --ii;
+
+      // Then until we process the first instruction of the block...
+      while (ii != start) {
+        // Move the iterator before ii.
+        auto tmp = std::next(ii);
+
+        // Then try to optimize. If we succeeded, then we deleted
+        // ii. Move ii from the next value back onto the instruction
+        // after ii's old value in the block instruction list and then
+        // process that.
+        if (SemanticARCOptVisitor().visit(&*ii)) {
+          madeChange = true;
+          ii = std::prev(tmp);
+          continue;
+        }
+
+        // Otherwise, we didn't delete ii. Just visit the next instruction.
+        --ii;
+      }
+
+      // Finally visit the first instruction of the block.
+      madeChange |= SemanticARCOptVisitor().visit(&*ii);
     }
 
-    if (MadeChange) {
+    if (madeChange) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
   }
-
 };
 
 } // end anonymous namespace

@@ -10,6 +10,11 @@ import Builtin
 
 sil @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 
+struct NativeObjectPair {
+  var obj1 : Builtin.NativeObject
+  var obj2 : Builtin.NativeObject
+}
+
 ///////////
 // Tests //
 ///////////
@@ -91,6 +96,79 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   destroy_value %3 : $Builtin.NativeObject
   end_borrow %2 : $Builtin.NativeObject
   destroy_value %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @struct_extract_guaranteed_use : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $NativeObjectPair):
+// CHECK-NOT: copy_value
+// CHECK-NOT: begin_borrow
+// CHECK:   [[FIELD:%.*]] = struct_extract [[ARG]]
+// CHECK:   apply {{%.*}}([[FIELD]]) :
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'struct_extract_guaranteed_use'
+sil @struct_extract_guaranteed_use : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
+bb0(%0 : @guaranteed $NativeObjectPair):
+  %1 = copy_value %0 : $NativeObjectPair
+  %2 = begin_borrow %1 : $NativeObjectPair
+  %3 = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  %4 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %4(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $NativeObjectPair
+  destroy_value %1 : $NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @struct_extract_copy_guaranteed_use : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $NativeObjectPair):
+// CHECK:   [[FIELD:%.*]] = struct_extract [[ARG]]
+// CHECK:   apply {{%.*}}([[FIELD]])
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function 'struct_extract_copy_guaranteed_use'
+sil @struct_extract_copy_guaranteed_use : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
+bb0(%0 : @guaranteed $NativeObjectPair):
+  %1 = struct_extract %0 : $NativeObjectPair, #NativeObjectPair.obj1
+  %2 = copy_value %1 : $Builtin.NativeObject
+  %3 = begin_borrow %2 : $Builtin.NativeObject
+  %4 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %4(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %3 : $Builtin.NativeObject
+  destroy_value %2 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// For now we do not support recreating forwarding instructions since we do not
+// dynamically recompute ownership.
+// CHECK-LABEL: sil @do_not_process_forwarding_uses : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'do_not_process_forwarding_uses'
+sil @do_not_process_forwarding_uses : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
+bb0(%0 : @guaranteed $NativeObjectPair):
+  %1 = copy_value %0 : $NativeObjectPair
+  (%2, %3) = destructure_struct %1 : $NativeObjectPair
+  %4 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %4(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %4(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %2 : $Builtin.NativeObject
+  destroy_value %3 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @do_not_process_forwarding_uses_2 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'do_not_process_forwarding_uses_2'
+sil @do_not_process_forwarding_uses_2 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  %2 = unchecked_ref_cast %1 : $Builtin.NativeObject to $Builtin.NativeObject
+  %4 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %4(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %2 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
 }
