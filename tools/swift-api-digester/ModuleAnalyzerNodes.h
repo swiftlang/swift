@@ -467,6 +467,7 @@ class SDKNodeDeclOperator : public SDKNodeDecl {
 public:
   SDKNodeDeclOperator(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
+  void diagnose(SDKNode *Right) override;
 };
 
 class SDKNodeDeclTypeAlias : public SDKNodeDecl {

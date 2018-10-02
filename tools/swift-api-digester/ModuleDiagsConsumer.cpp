@@ -36,7 +36,7 @@ static StringRef getCategoryName(uint32_t ID) {
   case LocalDiagID::removed_setter:
     return "/* Removed Decls */";
   case LocalDiagID::moved_decl:
-  case LocalDiagID::nominal_type_kind_changed:
+  case LocalDiagID::decl_kind_changed:
     return "/* Moved Decls */";
   case LocalDiagID::renamed_decl:
     return "/* Renamed Decls */";
