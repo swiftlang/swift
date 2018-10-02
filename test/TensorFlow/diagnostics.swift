@@ -101,20 +101,3 @@ public func scalarToHost() {
 public func inoutArgumentToAccelerator(t: inout Tensor<Float>) {
   t += 1  // expected-note {{value used here}}
 }
-
-// Resource handles may be sent or received.
-public func resourceHandlesCanBeSentOrReceived() {
-  // expected-warning @+2 {{value implicitly copied to the host}}
-  let iterator: ResourceHandle =
-    #tfop("Iterator", shared_name: "foo", container: "bar",
-          output_types: [Float.self], output_shapes: [TensorShape()])
-  _hostOp(iterator) // expected-note {{value used here}}
-  let _ = Tensor<Float>(1.0)
-}
-
-public func resourceHandlesCanBeResults() {
-  let iterator: ResourceHandle =
-    #tfop("Iterator", shared_name: "foo", container: "bar",
-		      output_types: [Float.self], output_shapes: [TensorShape()])
-  _hostOp(iterator) 
-}
