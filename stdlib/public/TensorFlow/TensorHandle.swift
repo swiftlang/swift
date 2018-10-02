@@ -198,7 +198,6 @@ internal extension ShapedArray where Scalar : AccelerableByTensorFlow {
 /// `ResourceHandle` is the type used by ops and the `#tfop()` syntax to
 /// represent TensorFlow "resource" values.
 public final class ResourceHandle : _AnyTensorHandle {
-
   @usableFromInline
   init(owning cTensorHandle: CTensorHandle) {
     super.init(base: cTensorHandle)
