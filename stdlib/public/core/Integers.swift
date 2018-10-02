@@ -667,6 +667,85 @@ public protocol BinaryInteger :
   ///     // x == -8
   ///     // x.trailingZeroBitCount == 3
   var trailingZeroBitCount: Int { get }
+  
+  /// Returns the sum of this value and the given value, along with a Boolean
+  /// value indicating whether overflow occurred in the operation.
+  ///
+  /// - Parameter rhs: The value to add to this value.
+  /// - Returns: A tuple containing the result of the addition along with a
+  ///   Boolean value indicating whether overflow occurred. If the `overflow`
+  ///   component is `false`, the `partialValue` component contains the entire
+  ///   sum. If the `overflow` component is `true`, an overflow occurred and
+  ///   the `partialValue` component contains the truncated sum of this value
+  ///   and `rhs`.
+  func addingReportingOverflow(
+    _ rhs: Self
+  ) -> (partialValue: Self, overflow: Bool)
+
+  /// Returns the difference obtained by subtracting the given value from this
+  /// value, along with a Boolean value indicating whether overflow occurred in
+  /// the operation.
+  ///
+  /// - Parameter rhs: The value to subtract from this value.
+  /// - Returns: A tuple containing the result of the subtraction along with a
+  ///   Boolean value indicating whether overflow occurred. If the `overflow`
+  ///   component is `false`, the `partialValue` component contains the entire
+  ///   difference. If the `overflow` component is `true`, an overflow occurred
+  ///   and the `partialValue` component contains the truncated result of `rhs`
+  ///   subtracted from this value.
+  func subtractingReportingOverflow(
+    _ rhs: Self
+  ) -> (partialValue: Self, overflow: Bool)
+
+  /// Returns the product of this value and the given value, along with a
+  /// Boolean value indicating whether overflow occurred in the operation.
+  ///
+  /// - Parameter rhs: The value to multiply by this value.
+  /// - Returns: A tuple containing the result of the multiplication along with
+  ///   a Boolean value indicating whether overflow occurred. If the `overflow`
+  ///   component is `false`, the `partialValue` component contains the entire
+  ///   product. If the `overflow` component is `true`, an overflow occurred and
+  ///   the `partialValue` component contains the truncated product of this
+  ///   value and `rhs`.
+  func multipliedReportingOverflow(
+    by rhs: Self
+  ) -> (partialValue: Self, overflow: Bool)
+
+  /// Returns the quotient obtained by dividing this value by the given value,
+  /// along with a Boolean value indicating whether overflow occurred in the
+  /// operation.
+  ///
+  /// Dividing by zero is not an error when using this method. For a value `x`,
+  /// the result of `x.dividedReportingOverflow(by: 0)` is `(x, true)`.
+  ///
+  /// - Parameter rhs: The value to divide this value by.
+  /// - Returns: A tuple containing the result of the division along with a
+  ///   Boolean value indicating whether overflow occurred. If the `overflow`
+  ///   component is `false`, the `partialValue` component contains the entire
+  ///   quotient. If the `overflow` component is `true`, an overflow occurred
+  ///   and the `partialValue` component contains either the truncated quotient
+  ///   or, if the quotient is undefined, the dividend.
+  func dividedReportingOverflow(
+    by rhs: Self
+  ) -> (partialValue: Self, overflow: Bool)
+
+  /// Returns the remainder after dividing this value by the given value, along
+  /// with a Boolean value indicating whether overflow occurred during division.
+  ///
+  /// Dividing by zero is not an error when using this method. For a value `x`,
+  /// the result of `x.remainderReportingOverflow(dividingBy: 0)` is
+  /// `(x, true)`.
+  ///
+  /// - Parameter rhs: The value to divide this value by.
+  /// - Returns: A tuple containing the result of the operation along with a
+  ///   Boolean value indicating whether overflow occurred. If the `overflow`
+  ///   component is `false`, the `partialValue` component contains the entire
+  ///   remainder. If the `overflow` component is `true`, an overflow occurred
+  ///   during division and the `partialValue` component contains either the
+  ///   entire remainder or, if the remainder is undefined, the dividend.
+  func remainderReportingOverflow(
+    dividingBy rhs: Self
+  ) -> (partialValue: Self, overflow: Bool)
 
   /// Returns the quotient of dividing the first value by the second.
   ///
@@ -1247,6 +1326,212 @@ extension BinaryInteger {
     // edge cases. If we write this as `self % other` instead, it could trap
     // for types that are not symmetric around zero.
     return self.magnitude % other.magnitude == 0
+  }
+  
+//===----------------------------------------------------------------------===//
+//===--- Wrapping operators -----------------------------------------------===//
+//===----------------------------------------------------------------------===//
+
+//  Default implementations, which make sense only for arbitrary-size integers.
+//  These are then made unavailable on FixedWidthInteger, and concrete fixed-
+//  width types should implement them.
+  @inlinable
+  public func addingReportingOverflow(_ rhs: Self) -> (partialValue: Self, overflow: Bool) {
+    return (self + rhs, false)
+  }
+  
+  @inlinable
+  public func subtractingReportingOverflow(_ rhs: Self) -> (partialValue: Self, overflow: Bool) {
+    return (self - rhs, false)
+  }
+  
+  @inlinable
+  public func multipliedReportingOverflow(by rhs: Self) -> (partialValue: Self, overflow: Bool) {
+    return (self * rhs, false)
+  }
+  
+  @inlinable
+  public func dividedReportingOverflow(by rhs: Self) -> (partialValue: Self, overflow: Bool) {
+    return (self / rhs, false)
+  }
+  
+  @inlinable
+  public func remainderReportingOverflow(dividingBy rhs: Self) -> (partialValue: Self, overflow: Bool) {
+    return (self % rhs, false)
+  }
+
+  /// Returns the sum of the two given values, wrapping the result in case of
+  /// any overflow.
+  ///
+  /// The overflow addition operator (`&+`) discards any bits that overflow the
+  /// fixed width of the integer type. In the following example, the sum of
+  /// `100` and `121` is greater than the maximum representable `Int8` value,
+  /// so the result is the partial value after discarding the overflowing
+  /// bits.
+  ///
+  ///     let x: Int8 = 10 &+ 21
+  ///     // x == 31
+  ///     let y: Int8 = 100 &+ 121
+  ///     // y == -35 (after overflow)
+  ///
+  /// For more about arithmetic with overflow operators, see [Overflow
+  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  ///
+  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
+  /// [tspl]: https://docs.swift.org/swift-book/
+  ///
+  /// - Parameters:
+  ///   - lhs: The first value to add.
+  ///   - rhs: The second value to add.
+  @_transparent
+  public static func &+ (lhs: Self, rhs: Self) -> Self {
+    return lhs.addingReportingOverflow(rhs).partialValue
+  }
+
+  /// Adds two values and stores the result in the left-hand-side variable,
+  /// wrapping any overflow.
+  ///
+  /// The masking addition assignment operator (`&+=`) silently wraps any
+  /// overflow that occurs during the operation. In the following example, the
+  /// sum of `100` and `121` is greater than the maximum representable `Int8`
+  /// value, so the result is the partial value after discarding the
+  /// overflowing bits.
+  ///
+  ///     var x: Int8 = 10
+  ///     x &+= 21
+  ///     // x == 31
+  ///     var y: Int8 = 100
+  ///     y &+= 121
+  ///     // y == -35 (after overflow)
+  ///
+  /// For more about arithmetic with overflow operators, see [Overflow
+  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  ///
+  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
+  /// [tspl]: https://docs.swift.org/swift-book/
+  ///
+  /// - Parameters:
+  ///   - lhs: The first value to add.
+  ///   - rhs: The second value to add.
+  @_transparent
+  public static func &+= (lhs: inout Self, rhs: Self) {
+    lhs = lhs &+ rhs
+  }
+
+  /// Returns the difference of the two given values, wrapping the result in
+  /// case of any overflow.
+  ///
+  /// The overflow subtraction operator (`&-`) discards any bits that overflow
+  /// the fixed width of the integer type. In the following example, the
+  /// difference of `10` and `21` is less than zero, the minimum representable
+  /// `UInt` value, so the result is the partial value after discarding the
+  /// overflowing bits.
+  ///
+  ///     let x: UInt8 = 21 &- 10
+  ///     // x == 11
+  ///     let y: UInt8 = 10 &- 21
+  ///     // y == 245 (after overflow)
+  ///
+  /// For more about arithmetic with overflow operators, see [Overflow
+  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  ///
+  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
+  /// [tspl]: https://docs.swift.org/swift-book/
+  ///
+  /// - Parameters:
+  ///   - lhs: A numeric value.
+  ///   - rhs: The value to subtract from `lhs`.
+  @_transparent
+  public static func &- (lhs: Self, rhs: Self) -> Self {
+    return lhs.subtractingReportingOverflow(rhs).partialValue
+  }
+
+  /// Subtracts the second value from the first and stores the difference in the
+  /// left-hand-side variable, wrapping any overflow.
+  ///
+  /// The masking subtraction assignment operator (`&-=`) silently wraps any
+  /// overflow that occurs during the operation. In the following example, the
+  /// difference of `10` and `21` is less than zero, the minimum representable
+  /// `UInt` value, so the result is the result is the partial value after
+  /// discarding the overflowing bits.
+  ///
+  ///     var x: Int8 = 21
+  ///     x &-= 10
+  ///     // x == 11
+  ///     var y: UInt8 = 10
+  ///     y &-= 21
+  ///     // y == 245 (after overflow)
+  ///
+  /// For more about arithmetic with overflow operators, see [Overflow
+  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  ///
+  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
+  /// [tspl]: https://docs.swift.org/swift-book/
+  ///
+  /// - Parameters:
+  ///   - lhs: A numeric value.
+  ///   - rhs: The value to subtract from `lhs`.
+  @_transparent
+  public static func &-= (lhs: inout Self, rhs: Self) {
+    lhs = lhs &- rhs
+  }
+
+  /// Returns the product of the two given values, wrapping the result in case
+  /// of any overflow.
+  ///
+  /// The overflow multiplication operator (`&*`) discards any bits that
+  /// overflow the fixed width of the integer type. In the following example,
+  /// the product of `10` and `50` is greater than the maximum representable
+  /// `Int8` value, so the result is the partial value after discarding the
+  /// overflowing bits.
+  ///
+  ///     let x: Int8 = 10 &* 5
+  ///     // x == 50
+  ///     let y: Int8 = 10 &* 50
+  ///     // y == -12 (after overflow)
+  ///
+  /// For more about arithmetic with overflow operators, see [Overflow
+  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  ///
+  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
+  /// [tspl]: https://docs.swift.org/swift-book/
+  ///
+  /// - Parameters:
+  ///   - lhs: The first value to multiply.
+  ///   - rhs: The second value to multiply.
+  @_transparent
+  public static func &* (lhs: Self, rhs: Self) -> Self {
+    return lhs.multipliedReportingOverflow(by: rhs).partialValue
+  }
+
+  /// Multiplies two values and stores the result in the left-hand-side
+  /// variable, wrapping any overflow.
+  ///
+  /// The masking multiplication assignment operator (`&*=`) silently wraps
+  /// any overflow that occurs during the operation. In the following example,
+  /// the product of `10` and `50` is greater than the maximum representable
+  /// `Int8` value, so the result is the partial value after discarding the
+  /// overflowing bits.
+  ///
+  ///     var x: Int8 = 10
+  ///     x &*= 5
+  ///     // x == 50
+  ///     var y: Int8 = 10
+  ///     y &*= 50
+  ///     // y == -12 (after overflow)
+  ///
+  /// For more about arithmetic with overflow operators, see [Overflow
+  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  ///
+  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
+  /// [tspl]: https://docs.swift.org/swift-book/
+  ///
+  /// - Parameters:
+  ///   - lhs: The first value to multiply.
+  ///   - rhs: The second value to multiply.
+  @_transparent
+  public static func &*= (lhs: inout Self, rhs: Self) {
+    lhs = lhs &* rhs
   }
 
 //===----------------------------------------------------------------------===//
@@ -1876,85 +2161,6 @@ where Magnitude : FixedWidthInteger & UnsignedInteger,
   /// types, this value is `-(2 ** (bitWidth - 1))`, where `**` is
   /// exponentiation.
   static var min: Self { get }
-
-  /// Returns the sum of this value and the given value, along with a Boolean
-  /// value indicating whether overflow occurred in the operation.
-  ///
-  /// - Parameter rhs: The value to add to this value.
-  /// - Returns: A tuple containing the result of the addition along with a
-  ///   Boolean value indicating whether overflow occurred. If the `overflow`
-  ///   component is `false`, the `partialValue` component contains the entire
-  ///   sum. If the `overflow` component is `true`, an overflow occurred and
-  ///   the `partialValue` component contains the truncated sum of this value
-  ///   and `rhs`.
-  func addingReportingOverflow(
-    _ rhs: Self
-  ) -> (partialValue: Self, overflow: Bool)
-
-  /// Returns the difference obtained by subtracting the given value from this
-  /// value, along with a Boolean value indicating whether overflow occurred in
-  /// the operation.
-  ///
-  /// - Parameter rhs: The value to subtract from this value.
-  /// - Returns: A tuple containing the result of the subtraction along with a
-  ///   Boolean value indicating whether overflow occurred. If the `overflow`
-  ///   component is `false`, the `partialValue` component contains the entire
-  ///   difference. If the `overflow` component is `true`, an overflow occurred
-  ///   and the `partialValue` component contains the truncated result of `rhs`
-  ///   subtracted from this value.
-  func subtractingReportingOverflow(
-    _ rhs: Self
-  ) -> (partialValue: Self, overflow: Bool)
-
-  /// Returns the product of this value and the given value, along with a
-  /// Boolean value indicating whether overflow occurred in the operation.
-  ///
-  /// - Parameter rhs: The value to multiply by this value.
-  /// - Returns: A tuple containing the result of the multiplication along with
-  ///   a Boolean value indicating whether overflow occurred. If the `overflow`
-  ///   component is `false`, the `partialValue` component contains the entire
-  ///   product. If the `overflow` component is `true`, an overflow occurred and
-  ///   the `partialValue` component contains the truncated product of this
-  ///   value and `rhs`.
-  func multipliedReportingOverflow(
-    by rhs: Self
-  ) -> (partialValue: Self, overflow: Bool)
-
-  /// Returns the quotient obtained by dividing this value by the given value,
-  /// along with a Boolean value indicating whether overflow occurred in the
-  /// operation.
-  ///
-  /// Dividing by zero is not an error when using this method. For a value `x`,
-  /// the result of `x.dividedReportingOverflow(by: 0)` is `(x, true)`.
-  ///
-  /// - Parameter rhs: The value to divide this value by.
-  /// - Returns: A tuple containing the result of the division along with a
-  ///   Boolean value indicating whether overflow occurred. If the `overflow`
-  ///   component is `false`, the `partialValue` component contains the entire
-  ///   quotient. If the `overflow` component is `true`, an overflow occurred
-  ///   and the `partialValue` component contains either the truncated quotient
-  ///   or, if the quotient is undefined, the dividend.
-  func dividedReportingOverflow(
-    by rhs: Self
-  ) -> (partialValue: Self, overflow: Bool)
-
-  /// Returns the remainder after dividing this value by the given value, along
-  /// with a Boolean value indicating whether overflow occurred during division.
-  ///
-  /// Dividing by zero is not an error when using this method. For a value `x`,
-  /// the result of `x.remainderReportingOverflow(dividingBy: 0)` is
-  /// `(x, true)`.
-  ///
-  /// - Parameter rhs: The value to divide this value by.
-  /// - Returns: A tuple containing the result of the operation along with a
-  ///   Boolean value indicating whether overflow occurred. If the `overflow`
-  ///   component is `false`, the `partialValue` component contains the entire
-  ///   remainder. If the `overflow` component is `true`, an overflow occurred
-  ///   during division and the `partialValue` component contains either the
-  ///   entire remainder or, if the remainder is undefined, the dividend.
-  func remainderReportingOverflow(
-    dividingBy rhs: Self
-  ) -> (partialValue: Self, overflow: Bool)
 
   /// Returns a tuple containing the high and low parts of the result of
   /// multiplying this value by the given value.
@@ -3058,179 +3264,33 @@ extension FixedWidthInteger {
   static var _highBitIndex: Self {
     return Self.init(_truncatingBits: UInt(Self.bitWidth._value) &- 1)
   }
-
-  /// Returns the sum of the two given values, wrapping the result in case of
-  /// any overflow.
-  ///
-  /// The overflow addition operator (`&+`) discards any bits that overflow the
-  /// fixed width of the integer type. In the following example, the sum of
-  /// `100` and `121` is greater than the maximum representable `Int8` value,
-  /// so the result is the partial value after discarding the overflowing
-  /// bits.
-  ///
-  ///     let x: Int8 = 10 &+ 21
-  ///     // x == 31
-  ///     let y: Int8 = 100 &+ 121
-  ///     // y == -35 (after overflow)
-  ///
-  /// For more about arithmetic with overflow operators, see [Overflow
-  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
-  ///
-  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
-  /// [tspl]: https://docs.swift.org/swift-book/
-  ///
-  /// - Parameters:
-  ///   - lhs: The first value to add.
-  ///   - rhs: The second value to add.
-  @_transparent
-  public static func &+ (lhs: Self, rhs: Self) -> Self {
-    return lhs.addingReportingOverflow(rhs).partialValue
+  
+  //  Default implementations, which override the BinaryInteger implementations
+  //  and make them unavailable, because they would be incorrect for any
+  //  FixedWidthInteger type. Concrete types must implement these operations.
+  @available(*, unavailable, message: "Concrete types must implement this operation.")
+  public func addingReportingOverflow(_ rhs: Self) -> (partialValue: Self, overflow: Bool) {
+    fatalError()
   }
-
-  /// Adds two values and stores the result in the left-hand-side variable,
-  /// wrapping any overflow.
-  ///
-  /// The masking addition assignment operator (`&+=`) silently wraps any
-  /// overflow that occurs during the operation. In the following example, the
-  /// sum of `100` and `121` is greater than the maximum representable `Int8`
-  /// value, so the result is the partial value after discarding the
-  /// overflowing bits.
-  ///
-  ///     var x: Int8 = 10
-  ///     x &+= 21
-  ///     // x == 31
-  ///     var y: Int8 = 100
-  ///     y &+= 121
-  ///     // y == -35 (after overflow)
-  ///
-  /// For more about arithmetic with overflow operators, see [Overflow
-  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
-  ///
-  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
-  /// [tspl]: https://docs.swift.org/swift-book/
-  ///
-  /// - Parameters:
-  ///   - lhs: The first value to add.
-  ///   - rhs: The second value to add.
-  @_transparent
-  public static func &+= (lhs: inout Self, rhs: Self) {
-    lhs = lhs &+ rhs
+  
+  @available(*, unavailable, message: "Concrete types must implement this operation.")
+  public func subtractingReportingOverflow(_ rhs: Self) -> (partialValue: Self, overflow: Bool) {
+    fatalError()
   }
-
-  /// Returns the difference of the two given values, wrapping the result in
-  /// case of any overflow.
-  ///
-  /// The overflow subtraction operator (`&-`) discards any bits that overflow
-  /// the fixed width of the integer type. In the following example, the
-  /// difference of `10` and `21` is less than zero, the minimum representable
-  /// `UInt` value, so the result is the partial value after discarding the
-  /// overflowing bits.
-  ///
-  ///     let x: UInt8 = 21 &- 10
-  ///     // x == 11
-  ///     let y: UInt8 = 10 &- 21
-  ///     // y == 245 (after overflow)
-  ///
-  /// For more about arithmetic with overflow operators, see [Overflow
-  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
-  ///
-  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
-  /// [tspl]: https://docs.swift.org/swift-book/
-  ///
-  /// - Parameters:
-  ///   - lhs: A numeric value.
-  ///   - rhs: The value to subtract from `lhs`.
-  @_transparent
-  public static func &- (lhs: Self, rhs: Self) -> Self {
-    return lhs.subtractingReportingOverflow(rhs).partialValue
+  
+  @available(*, unavailable, message: "Concrete types must implement this operation.")
+  public func multipliedReportingOverflow(by rhs: Self) -> (partialValue: Self, overflow: Bool) {
+    fatalError()
   }
-
-  /// Subtracts the second value from the first and stores the difference in the
-  /// left-hand-side variable, wrapping any overflow.
-  ///
-  /// The masking subtraction assignment operator (`&-=`) silently wraps any
-  /// overflow that occurs during the operation. In the following example, the
-  /// difference of `10` and `21` is less than zero, the minimum representable
-  /// `UInt` value, so the result is the result is the partial value after
-  /// discarding the overflowing bits.
-  ///
-  ///     var x: Int8 = 21
-  ///     x &-= 10
-  ///     // x == 11
-  ///     var y: UInt8 = 10
-  ///     y &-= 21
-  ///     // y == 245 (after overflow)
-  ///
-  /// For more about arithmetic with overflow operators, see [Overflow
-  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
-  ///
-  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
-  /// [tspl]: https://docs.swift.org/swift-book/
-  ///
-  /// - Parameters:
-  ///   - lhs: A numeric value.
-  ///   - rhs: The value to subtract from `lhs`.
-  @_transparent
-  public static func &-= (lhs: inout Self, rhs: Self) {
-    lhs = lhs &- rhs
+  
+  @available(*, unavailable, message: "Concrete types must implement this operation.")
+  public func dividedReportingOverflow(by rhs: Self) -> (partialValue: Self, overflow: Bool) {
+    fatalError()
   }
-
-  /// Returns the product of the two given values, wrapping the result in case
-  /// of any overflow.
-  ///
-  /// The overflow multiplication operator (`&*`) discards any bits that
-  /// overflow the fixed width of the integer type. In the following example,
-  /// the product of `10` and `50` is greater than the maximum representable
-  /// `Int8` value, so the result is the partial value after discarding the
-  /// overflowing bits.
-  ///
-  ///     let x: Int8 = 10 &* 5
-  ///     // x == 50
-  ///     let y: Int8 = 10 &* 50
-  ///     // y == -12 (after overflow)
-  ///
-  /// For more about arithmetic with overflow operators, see [Overflow
-  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
-  ///
-  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
-  /// [tspl]: https://docs.swift.org/swift-book/
-  ///
-  /// - Parameters:
-  ///   - lhs: The first value to multiply.
-  ///   - rhs: The second value to multiply.
-  @_transparent
-  public static func &* (lhs: Self, rhs: Self) -> Self {
-    return lhs.multipliedReportingOverflow(by: rhs).partialValue
-  }
-
-  /// Multiplies two values and stores the result in the left-hand-side
-  /// variable, wrapping any overflow.
-  ///
-  /// The masking multiplication assignment operator (`&*=`) silently wraps
-  /// any overflow that occurs during the operation. In the following example,
-  /// the product of `10` and `50` is greater than the maximum representable
-  /// `Int8` value, so the result is the partial value after discarding the
-  /// overflowing bits.
-  ///
-  ///     var x: Int8 = 10
-  ///     x &*= 5
-  ///     // x == 50
-  ///     var y: Int8 = 10
-  ///     y &*= 50
-  ///     // y == -12 (after overflow)
-  ///
-  /// For more about arithmetic with overflow operators, see [Overflow
-  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
-  ///
-  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
-  /// [tspl]: https://docs.swift.org/swift-book/
-  ///
-  /// - Parameters:
-  ///   - lhs: The first value to multiply.
-  ///   - rhs: The second value to multiply.
-  @_transparent
-  public static func &*= (lhs: inout Self, rhs: Self) {
-    lhs = lhs &* rhs
+  
+  @available(*, unavailable, message: "Concrete types must implement this operation.")
+  public func remainderReportingOverflow(dividingBy rhs: Self) -> (partialValue: Self, overflow: Bool) {
+    fatalError()
   }
 }
 
@@ -3371,11 +3431,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
 //===----------------------------------------------------------------------===//
 
 /// An integer type that can represent both positive and negative values.
-public protocol SignedInteger : BinaryInteger, SignedNumeric {
-  // These requirements are for the source code compatibility with Swift 3
-  static func _maskingAdd(_ lhs: Self, _ rhs: Self) -> Self
-  static func _maskingSubtract(_ lhs: Self, _ rhs: Self) -> Self
-}
+public protocol SignedInteger : BinaryInteger, SignedNumeric { }
 
 extension SignedInteger {
   /// A Boolean value indicating whether this type is a signed integer type.
@@ -3645,66 +3701,5 @@ extension BinaryInteger {
     _ lhs: Self, _ rhs: Self
   ) -> (Self, overflow: Bool) {
     fatalError("Unavailable")
-  }
-}
-
-// FIXME(integers): Absence of &+ causes ambiguity in the code like the
-// following:
-//    func f<T : SignedInteger>(_ x: T, _ y: T) {
-//      var _  = (x &+ (y - 1)) < x
-//    }
-//  Compiler output:
-//  error: ambiguous reference to member '-'
-//    var _  = (x &+ (y - 1)) < x
-//                      ^
-extension SignedInteger {
-  @_transparent
-  public static func _maskingAdd(_ lhs: Self, _ rhs: Self) -> Self {
-    fatalError("Should be overridden in a more specific type")
-  }
-
-  @_transparent
-  @available(swift, obsoleted: 4.0,
-      message: "Please use 'FixedWidthInteger' instead of 'SignedInteger' to get '&+' in generic code.")
-  public static func &+ (lhs: Self, rhs: Self) -> Self {
-    return _maskingAdd(lhs, rhs)
-  }
-
-  @_transparent
-  public static func _maskingSubtract(_ lhs: Self, _ rhs: Self) -> Self {
-    fatalError("Should be overridden in a more specific type")
-  }
-
-  @_transparent
-  @available(swift, obsoleted: 4.0,
-      message: "Please use 'FixedWidthInteger' instead of 'SignedInteger' to get '&-' in generic code.")
-  public static func &- (lhs: Self, rhs: Self) -> Self {
-    return _maskingSubtract(lhs, rhs)
-  }
-}
-
-extension SignedInteger where Self : FixedWidthInteger {
-  // This overload is supposed to break the ambiguity between the
-  // implementations on SignedInteger and FixedWidthInteger
-  @_transparent
-  public static func &+ (lhs: Self, rhs: Self) -> Self {
-    return _maskingAdd(lhs, rhs)
-  }
-
-  @_transparent
-  public static func _maskingAdd(_ lhs: Self, _ rhs: Self) -> Self {
-    return lhs.addingReportingOverflow(rhs).partialValue
-  }
-
-  // This overload is supposed to break the ambiguity between the
-  // implementations on SignedInteger and FixedWidthInteger
-  @_transparent
-  public static func &- (lhs: Self, rhs: Self) -> Self {
-    return _maskingSubtract(lhs, rhs)
-  }
-
-  @_transparent
-  public static func _maskingSubtract(_ lhs: Self, _ rhs: Self) -> Self {
-    return lhs.subtractingReportingOverflow(rhs).partialValue
   }
 }
