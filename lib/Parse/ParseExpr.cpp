@@ -3451,7 +3451,7 @@ ParserResult<Expr> Parser::parseExprArray(SourceLoc LSquareLoc) {
     return Element;
   }, &IfConfigMap);
 
-  return makeParserResult(Status, IfConfigMap.closeCollection(
+  return makeParserResult(Status, IfConfigMap.closeCollection(Context,
           ArrayExpr::create(Context, LSquareLoc, SubExprs, CommaLocs,
                             RSquareLoc)));
 }
@@ -3515,7 +3515,7 @@ ParserResult<Expr> Parser::parseExprDictionary(SourceLoc LSquareLoc) {
     return ParserStatus(Key) | ParserStatus(Value);
   }, &IfConfigMap);
 
-  return makeParserResult(Status, IfConfigMap.closeCollection(
+  return makeParserResult(Status, IfConfigMap.closeCollection(Context,
           DictionaryExpr::create(Context, LSquareLoc, SubExprs, CommaLocs,
                                  RSquareLoc)));
 }

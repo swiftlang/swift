@@ -120,10 +120,9 @@ struct ExtractInactiveRanges : public ASTWalker {
     // For CollectionExprs, the IfconfigDecls related to elements in the
     // collection are stored in a map keyed on the element they occur before.
     // Passing them to walkToDeclPre is sufficient to remove all conditionals.
-    if (CollectionExpr *collection = dyn_cast<CollectionExpr>(e))
-      for (const auto &icds : collection->getConditionalsMap())
-        for (IfConfigDecl *icd : icds.second)
-          walkToDeclPre(icd);
+    if (CollectionExpr *C = dyn_cast<CollectionExpr>(e))
+      for (const auto &entry : C->getConditionalsMap())
+        walkToDeclPre(std::get<1>(entry));
 
     return {true, e};
   }

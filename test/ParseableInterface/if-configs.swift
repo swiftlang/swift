@@ -130,7 +130,7 @@ public func hasSimpleDefaultArgs(_ x: Int = 0, b: Int = 1) {
 // CHECK-NOT:   #if false
 // CHECK-NOT:     50,
 // CHECK-NOT:   #else
-// CHECK:         5,
+// CHECK-NEXT:    5,
 // CHECK-NOT:   #endif
 // CHECK-NOT: #else
 // CHECK-NOT:   6,

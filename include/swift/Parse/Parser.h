@@ -713,11 +713,11 @@ public:
   /// Nested conditionals are elements of their outer IfConfigDecl structure.
   class ConfigMap {
     /// Map accumulated of conditionals preceeding element number.
-    std::map<unsigned, std::vector <IfConfigDecl *>> ConditionalsMap;
-    /// Pointer to current vector to accumulate conditionals against.
-    std::vector <IfConfigDecl *> *PendingConditionals = nullptr;
+    SmallVector<CollectionExpr::ConditionalsMapPair, 2> ConditionalsMap;
     /// Active element number any #if conditionals will be before.
     unsigned NextActiveIndexNumber = 0;
+    /// Element number to group conditionals under.
+    unsigned PendingIndexNumber = 0;
 
   public:
     Expr *registerActiveDataElement(Expr *expr) {
@@ -726,16 +726,16 @@ public:
     }
 
     void newOuterConditionalStarts() {
-      PendingConditionals = &ConditionalsMap[NextActiveIndexNumber];
+      PendingIndexNumber = NextActiveIndexNumber;
     }
 
     void outerConditionalCompletes(IfConfigDecl *ICD) {
-      PendingConditionals->emplace_back(ICD);
+      ConditionalsMap.emplace_back(std::make_pair(PendingIndexNumber, ICD));
     }
 
-    CollectionExpr *closeCollection(CollectionExpr *expr) {
-      if (PendingConditionals)
-        expr->setConditionalsMap(ConditionalsMap);
+    CollectionExpr *closeCollection(ASTContext &Context, CollectionExpr *expr) {
+      if (!ConditionalsMap.empty())
+        expr->setConditionalsMap(Context.AllocateCopy(ConditionalsMap));
       return expr;
     }
   };

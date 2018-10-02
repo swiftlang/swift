@@ -2016,12 +2016,15 @@ public:
   }
   void printRelatedIfConfigDecls(unsigned ElementNumber, CollectionExpr *C) {
     const auto &ConditionalsMap = C->getConditionalsMap();
-    if (ConditionalsMap.find(ElementNumber) != ConditionalsMap.end()) {
+    if (!ConditionalsMap.empty()) {
       PrintDecl P(OS, Indent + 2);
-      for (IfConfigDecl *ICD : ConditionalsMap.at(ElementNumber)) {
-        OS << '\n';
-        P.visitIfConfigDecl(ICD);
-        OS << '\n';
+
+      for (const auto &entry : ConditionalsMap) {
+        if (std::get<0>(entry) == ElementNumber) {
+          OS << '\n';
+          P.visitIfConfigDecl(std::get<1>(entry));
+          OS << '\n';
+        }
       }
     }
   }
