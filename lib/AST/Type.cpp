@@ -42,6 +42,11 @@
 #include <iterator>
 using namespace swift;
 
+#define TYPE(Id, _) \
+  static_assert(IsTriviallyDestructible<Id##Type>::value, \
+                "Types are BumpPtrAllocated; the destructor is never called");
+#include "swift/AST/TypeNodes.def"
+
 Type QueryTypeSubstitutionMap::operator()(SubstitutableType *type) const {
   auto key = type->getCanonicalType()->castTo<SubstitutableType>();
   auto known = substitutions.find(key);

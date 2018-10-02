@@ -28,6 +28,11 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
+#define TYPEREPR(Id, _) \
+  static_assert(IsTriviallyDestructible<Id##TypeRepr>::value, \
+                "TypeReprs are BumpPtrAllocated; the d'tor is never called");
+#include "swift/AST/TypeReprNodes.def"
+
 SourceLoc TypeRepr::getLoc() const {
   switch (getKind()) {
 #define TYPEREPR(CLASS, PARENT) \
