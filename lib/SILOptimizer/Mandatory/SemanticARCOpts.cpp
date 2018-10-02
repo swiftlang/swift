@@ -158,6 +158,9 @@ struct SemanticARCOpts : SILFunctionTransform {
   void run() override {
     bool MadeChange = false;
     SILFunction *F = getFunction();
+    if (!F->getModule().isStdlibModule()) {
+      return;
+    }
 
     DeadEndBlocks DEBlocks(F);
     OwnershipChecker Checker{{}, {}, {}, {}, F->getModule(), DEBlocks};
