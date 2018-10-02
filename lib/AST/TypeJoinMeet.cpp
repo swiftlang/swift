@@ -51,6 +51,9 @@ struct TypeJoin : CanTypeVisitor<TypeJoin, CanType> {
   }
 
   static CanType getSuperclassJoin(CanType first, CanType second);
+  CanType computeProtocolCompositionJoin(ArrayRef<Type> firstMembers,
+                                         ArrayRef<Type> secondMembers);
+
 
   CanType visitErrorType(CanType second);
   CanType visitTupleType(CanType second);
@@ -105,10 +108,10 @@ public:
 
     // Likewise, rather than making every visitor deal with Any,
     // always dispatch to the protocol composition side of the join.
-    if (first->isAny())
+    if (first->is<ProtocolCompositionType>())
       return TypeJoin(second).visit(first);
 
-    if (second->isAny())
+    if (second->is<ProtocolCompositionType>())
       return TypeJoin(first).visit(second);
 
     // Otherwise the first type might be an optional (or not), so
@@ -182,16 +185,6 @@ CanType TypeJoin::visitStructType(CanType second) {
 
 CanType TypeJoin::visitClassType(CanType second) {
   return getSuperclassJoin(First, second);
-}
-
-CanType TypeJoin::visitProtocolType(CanType second) {
-  assert(First != second);
-
-  // FIXME: We should compute a tighter bound and/or return nullptr if
-  // we cannot. We do this now because existing tests rely on
-  // producing Any for the join of protocols that have a common
-  // supertype.
-  return TheAnyType;
 }
 
 CanType TypeJoin::visitBoundGenericClassType(CanType second) {
@@ -352,16 +345,130 @@ CanType TypeJoin::visitGenericFunctionType(CanType second) {
   return Unimplemented;
 }
 
+// Use the distributive law to compute the join of the protocol
+// compositions.
+//
+//   (A ^ B) v (C ^ D)
+// = (A v C) ^ (A v D) ^ (B v C) ^ (B v D)
+CanType TypeJoin::computeProtocolCompositionJoin(ArrayRef<Type> firstMembers,
+                                                 ArrayRef<Type> secondMembers) {
+  SmallVector<Type, 8> result;
+  for (auto first : firstMembers) {
+    for (auto second : secondMembers) {
+      auto joined = Type::join(first, second);
+      if (!joined)
+        return Unimplemented;
+
+      if ((*joined)->isAny())
+        continue;
+
+      result.push_back(*joined);
+    }
+  }
+
+  if (result.empty())
+    return TheAnyType;
+
+  auto &ctx = result[0]->getASTContext();
+  return ProtocolCompositionType::get(ctx, result, false)->getCanonicalType();
+}
+
 CanType TypeJoin::visitProtocolCompositionType(CanType second) {
+  // The join of Any and a no-escape function doesn't exist; it isn't
+  // Any. If it were Any, it would mean we would allow these functions
+  // to escape through Any.
   if (second->isAny()) {
     auto *fnTy = First->getAs<AnyFunctionType>();
     if (fnTy && fnTy->getExtInfo().isNoEscape())
       return Nonexistent;
 
-    return second;
+    return TheAnyType;
   }
 
-  return Unimplemented;
+  assert(First != second);
+
+  // FIXME: Handle other types here.
+  if (First->getKind() != TypeKind::Protocol &&
+      First->getKind() != TypeKind::ProtocolComposition)
+    return TheAnyType;
+
+  SmallVector<Type, 1> protocolType;
+  ArrayRef<Type> firstMembers;
+  if (First->getKind() == TypeKind::Protocol) {
+    protocolType.push_back(First);
+    firstMembers = protocolType;
+  } else {
+    firstMembers = cast<ProtocolCompositionType>(First)->getMembers();
+  }
+  auto secondMembers = cast<ProtocolCompositionType>(second)->getMembers();
+
+  return computeProtocolCompositionJoin(firstMembers, secondMembers);
+}
+
+// Return true if the first ProtocolDecl is a supertype of the second.
+static bool isSupertypeOf(ProtocolDecl *super, ProtocolDecl *sub) {
+  if (super == sub)
+    return true;
+
+  SmallVector<ProtocolDecl *, 4> worklist;
+  for (auto *decl : sub->getInheritedProtocols())
+    worklist.push_back(decl);
+
+  llvm::SmallPtrSet<ProtocolDecl *, 4> visited;
+  while (!worklist.empty()) {
+    auto *entry = worklist.pop_back_val();
+    if (visited.count(entry))
+      continue;
+    visited.insert(entry);
+
+    if (entry == super)
+      return true;
+
+    for (auto *decl : entry->getInheritedProtocols())
+      worklist.push_back(decl);
+  }
+
+  return false;
+}
+
+CanType TypeJoin::visitProtocolType(CanType second) {
+  assert(First != second);
+
+  assert(First->getKind() != TypeKind::ProtocolComposition &&
+         second->getKind() != TypeKind::ProtocolComposition);
+
+  // FIXME: Handle other types here.
+  if (First->getKind() != second->getKind())
+    return TheAnyType;
+
+  auto *firstDecl =
+    cast<ProtocolDecl>(First->getNominalOrBoundGenericNominal());
+
+  auto *secondDecl =
+    cast<ProtocolDecl>(second->getNominalOrBoundGenericNominal());
+
+  if (firstDecl->getInheritedProtocols().empty() &&
+      secondDecl->getInheritedProtocols().empty())
+    return TheAnyType;
+
+  if (isSupertypeOf(firstDecl, secondDecl))
+    return First;
+
+  if (isSupertypeOf(secondDecl, firstDecl))
+    return second;
+
+  // One isn't the supertype of the other, so instead, treat each as
+  // if it's a protocol composition of its inherited members, and join
+  // those.
+  SmallVector<Type, 4> firstMembers;
+  for (auto *decl : firstDecl->getInheritedProtocols())
+    firstMembers.push_back(decl->getDeclaredInterfaceType());
+
+  SmallVector<Type, 4> secondMembers;
+  for (auto *decl : secondDecl->getInheritedProtocols())
+    secondMembers.push_back(decl->getDeclaredInterfaceType());
+
+  return computeProtocolCompositionJoin(firstMembers, secondMembers);
 }
 
 CanType TypeJoin::visitLValueType(CanType second) { return Unimplemented; }
