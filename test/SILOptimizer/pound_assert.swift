@@ -189,3 +189,67 @@ func functionWithMutations(_ ms: MutableStruct) -> Int {
 func test_functionWithMutations() {
   #assert(functionWithMutations(MutableStruct(x: (1, 2), y: 3)) == 8)
 }
+
+//===----------------------------------------------------------------------===//
+// Evaluating generic functions
+//===----------------------------------------------------------------------===//
+
+func genericAdd<T: Numeric>(_ a: T, _ b: T) -> T {
+  return a + b
+}
+
+func test_genericAdd() {
+  #assert(genericAdd(1, 1) == 2)
+}
+
+func test_tupleAsGeneric() {
+  func identity<T>(_ t: T) -> T {
+    return t
+  }
+
+  // SIL initializes a buffer of type (Int, Int), stores "1" and "2" to the
+  // tuple_element_addr's, and then passes the address of the buffer to
+  // `identity`. Therefore, this test tests that we can evaluate top-level
+  // buffers initialized via tuple_element_addr's.
+  #assert(identity((1, 2)) == (1, 2))
+}
+
+//===----------------------------------------------------------------------===//
+// Reduced testcase propagating substitutions around.
+//===----------------------------------------------------------------------===//
+protocol SubstitutionsP {
+  init<T: SubstitutionsP>(something: T)
+
+  func get() -> Int
+}
+
+struct SubstitutionsX : SubstitutionsP {
+  var state : Int
+  init<T: SubstitutionsP>(something: T) {
+    state = something.get()
+  }
+  func get() -> Int {
+    fatalError()
+  }
+
+  func getState() -> Int {
+    return state
+  }
+}
+
+struct SubstitutionsY : SubstitutionsP {
+  init() {}
+  init<T: SubstitutionsP>(something: T) {
+  }
+
+  func get() -> Int {
+    return 123
+  }
+}
+func substitutionsF<T: SubstitutionsP>(_: T.Type) -> T {
+  return T(something: SubstitutionsY())
+}
+
+func testProto() {
+  #assert(substitutionsF(SubstitutionsX.self).getState() == 123)
+}

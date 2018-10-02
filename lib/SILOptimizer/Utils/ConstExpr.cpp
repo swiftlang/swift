@@ -64,9 +64,6 @@ class ConstExprFunctionState {
   /// substitutionMap specifies a mapping from all of the protocol and type
   /// requirements in the generic signature down to concrete conformances and
   /// concrete types.
-  /// TODO(constexpr patch): I have intentionally included this even though it's
-  /// unused, so that I don't have to add it back to all the function signatures
-  /// when I start using it.
   SubstitutionMap substitutionMap;
 
   /// This keeps track of the number of instructions we've evaluated.  If this
@@ -121,6 +118,7 @@ public:
   llvm::Optional<SymbolicValue> computeOpaqueCallResult(ApplyInst *apply,
                                                         SILFunction *callee);
 
+  SymbolicValue getSingleWriterAddressValue(SILValue addr);
   SymbolicValue getConstAddrAndLoadResult(SILValue addr);
   SymbolicValue loadAddrValue(SILValue addr, SymbolicValue addrVal);
   llvm::Optional<SymbolicValue> computeFSStore(SymbolicValue storedCst,
@@ -134,9 +132,41 @@ Type ConstExprFunctionState::simplifyType(Type ty) {
   return substitutionMap.empty() ? ty : ty.subst(substitutionMap);
 }
 
+// TODO: refactor this out somewhere sharable between autodiff and this code.
+static void lookupOrLinkWitnessTable(ProtocolConformanceRef confRef,
+                                     SILModule &module) {
+  // Cannot resolve abstract conformances.
+  if (!confRef.isConcrete())
+    return;
+
+  auto *conf = confRef.getConcrete();
+  auto wtable = module.lookUpWitnessTable(conf);
+  if (wtable)
+    return;
+
+  auto *decl = conf->getDeclContext()->getSelfNominalTypeDecl();
+  auto linkage = getSILLinkage(getDeclLinkage(decl), NotForDefinition);
+  auto *newTable = module.createWitnessTableDeclaration(conf, linkage);
+  newTable = module.getSILLoader()->lookupWitnessTable(newTable);
+
+  // Update linkage for witness methods.
+  // FIXME: Figure out why witnesses have shared linkage by default.
+  for (auto &entry : newTable->getEntries())
+    if (entry.getKind() == SILWitnessTable::WitnessKind::Method)
+      entry.getMethodWitness().Witness->setLinkage(linkage);
+}
+
 /// Const-evaluate `value`, which must not have been computed.
 SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   assert(!calculatedValues.count(value));
+
+  // If the client is asking for the value of a stack object that hasn't been
+  // computed, then we are in top level code, and the stack object must be a
+  // single store value.  Since this is a very different computation, split it
+  // out to its own path.
+  if (!fn && value->getType().isAddress() && isa<AllocStackInst>(value)) {
+    return getSingleWriterAddressValue(value);
+  }
 
   // If this a trivial constant instruction that we can handle, then fold it
   // immediately.
@@ -220,6 +250,33 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   // must be a single-def value for us to analyze it.
   if (auto li = dyn_cast<LoadInst>(value))
     return getConstAddrAndLoadResult(li->getOperand());
+
+  // Try to resolve a witness method against our known conformances.
+  if (auto *wmi = dyn_cast<WitnessMethodInst>(value)) {
+    auto confResult = substitutionMap.lookupConformance(
+        wmi->getLookupType(), wmi->getConformance().getRequirement());
+    if (!confResult)
+      return evaluator.getUnknown(value, UnknownReason::Default);
+    auto conf = confResult.getValue();
+    auto &module = wmi->getModule();
+
+    // Look up the conformance's withness table and the member out of it.
+    SILFunction *fn =
+        module.lookUpFunctionInWitnessTable(conf, wmi->getMember()).first;
+    if (!fn) {
+      // If that failed, try force loading it, and try again.
+      lookupOrLinkWitnessTable(conf, wmi->getModule());
+      fn = module.lookUpFunctionInWitnessTable(conf, wmi->getMember()).first;
+    }
+
+    // If we were able to resolve it, then we can proceed.
+    if (fn)
+      return SymbolicValue::getFunction(fn);
+
+    LLVM_DEBUG(llvm::dbgs()
+               << "ConstExpr Unresolved witness: " << *value << "\n");
+    return evaluator.getUnknown(value, UnknownReason::Default);
+  }
 
   if (auto *builtin = dyn_cast<BuiltinInst>(value))
     return computeConstantValueBuiltin(builtin);
@@ -494,6 +551,10 @@ ConstExprFunctionState::computeOpaqueCallResult(ApplyInst *apply,
 }
 
 // TODO: Refactor this to someplace common, this is defined in Devirtualize.cpp.
+SubstitutionMap getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI,
+                                              SILFunction *F,
+                                              ProtocolConformanceRef CRef);
+
 /// Given a call to a function, determine whether it is a call to a constexpr
 /// function.  If so, collect its arguments as constants, fold it and return
 /// None.  If not, mark the results as Unknown, and return an Unknown with
@@ -522,10 +583,54 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     paramConstants.push_back(argValue);
   }
 
-  // TODO(constexpr patch): This is currently unused, so we don't need to
-  // calculate the correct value. Eventually, include code that calculates the
-  // correct value.
+  // If we reached an external function that hasn't been deserialized yet, make
+  // sure to pull it in so we can see its body.  If that fails, then we can't
+  // analyze the function.
+  if (callee->isExternalDeclaration()) {
+    callee->getModule().loadFunction(callee);
+    if (callee->isExternalDeclaration())
+      return computeOpaqueCallResult(apply, callee);
+  }
+
+  // Compute the substitution map for the callee, which maps from all of its
+  // generic requirements to concrete conformances and concrete types.
   SubstitutionMap calleeSubMap;
+
+  auto calleeFnType = callee->getLoweredFunctionType();
+  if (calleeFnType->getGenericSignature()) {
+    ApplySite AI(apply);
+
+    // Get the substitution map of the call.  This maps from the callee's space
+    // into the caller's world.
+    SubstitutionMap callSubMap;
+    if (calleeFnType->getRepresentation() ==
+        SILFunctionType::Representation::WitnessMethod) {
+      // Get the conformance out of the SILFunctionType and map it into our
+      // current type space.
+      auto conformance = calleeFnType->getWitnessMethodConformance();
+      auto selfTy = conformance.getRequirement()->getSelfInterfaceType();
+      auto conf = substitutionMap.lookupConformance(
+          selfTy->getCanonicalType(), conformance.getRequirement());
+      if (!conf.hasValue())
+        return evaluator.getUnknown((SILInstruction *)apply,
+                                    UnknownReason::Default);
+
+      // Witness methods have special magic that is required to resolve them.
+      callSubMap = getWitnessMethodSubstitutions(apply->getModule(), AI, callee,
+                                                 conf.getValue());
+    } else {
+      auto requirementSig = AI.getOrigCalleeType()->getGenericSignature();
+      callSubMap =
+          SubstitutionMap::get(requirementSig, apply->getSubstitutionMap());
+    }
+
+    // The substitution map for the callee is the composition of the callers
+    // substitution map (which is always type/conformance to a concrete type
+    // or conformance, with the mapping introduced by the call itself.  This
+    // ensures that the callee's substitution map can map from its type
+    // namespace back to concrete types and conformances.
+    calleeSubMap = callSubMap.subst(substitutionMap);
+  }
 
   // Now that have successfully folded all of the parameters, we can evaluate
   // the call.
@@ -652,7 +757,232 @@ static bool updateIndexedElement(SymbolicValue &aggregate,
   return false;
 }
 
+/// Find the initializer (single writer) of `addr` among it users,
+/// const-evaluate it and store the result into a memory object, and return the
+/// address of that memory object.
+///
+/// Some use cases are:
+/// 1. When analyzing the top-level code involved in a constant expression, we
+/// can end up demanding values that are returned by address.  Handle this by
+/// finding the temporary stack value (an alloc_stack inst), and calling this
+/// method on it.
+/// 2. When const-evaluating an array via decodeAllocUninitializedArray(),
+/// do that by const-evaluating the writers of individual array elements.
+///
+///  There are a few forms of writers, such as:
+/// - store %3 to %4 ...
+/// - %8 = pointer_to_address %7 : $Builtin.RawPointer to [strict] $*Int32
+/// - %14 = index_addr %9 : $*Int32, %13 : $Builtin.Word
+/// - %180 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
+///
+///  Note unlike getConstAddrAndLoadResult(), this method does *not*
+///  const-evaluate the input `addr` by evaluating its operand first, such as %7
+///  above. Instead, it finds a user of %8 who is the initializer, and uses that
+///  to set the const value for %7. In other words, this method propagates const
+///  info from result to operand (e.g. from %8 to %7), while
+///  getConstAddrAndLoadResult() propagates const info from operand to result.
+///
+///  As such, when const-evaluating an address-typed inst such as
+///  pointer_to_address, if the address is to be written to, caller should call
+///  this method (e.g. a[3] = 17). If the address is to be read (e.g. let v =
+///  a[3]), call getConstAddrAndLoadResult().
+SymbolicValue
+ConstExprFunctionState::getSingleWriterAddressValue(SILValue addr) {
+  // Check to see if we already have an answer.
+  auto it = calculatedValues.find(addr);
+  if (it != calculatedValues.end())
+    return it->second;
+
+  assert(addr->getType().isAddress());
+  auto *addrInst = dyn_cast<SingleValueInstruction>(addr);
+  if (!addrInst)
+    return evaluator.getUnknown(addr, UnknownReason::Default);
+
+  // Create a new object to keep track of the value that gets stored. However,
+  // do not point `addr` at this object right now, because we may fail to find a
+  // store. (For example, we can fail when the TupleElementAddrInst code below
+  // uses `getSingleWriterAddressValue` to test whether a TupleElementAddrInst
+  // is really a single writer address value).
+  auto *memoryObject = SymbolicValueMemoryObject::create(
+      simplifyType(addr->getType().getASTType()),
+      SymbolicValue::getUninitMemory(), evaluator.getAllocator());
+  auto memoryAddress = SymbolicValue::getAddress(memoryObject);
+
+  // Okay, check out all of the users of this value looking for semantic stores
+  // into the address.  If we find more than one, then this was a var or
+  // something else we can't handle.
+  // We must iterate over all uses, to make sure there is a single
+  // initializer. The only permitted early exit is when we known for sure
+  // const-evaluation has failed.
+  for (auto *use : addr->getUses()) {
+    auto user = use->getUser();
+
+    // Ignore markers, loads, and other things that aren't stores to this stack
+    // value.
+    if (isa<LoadInst>(user) || isa<DeallocStackInst>(user) ||
+        isa<DestroyAddrInst>(user) || isa<DebugValueAddrInst>(user))
+      continue;
+
+    // TODO: BeginAccess/EndAccess.
+
+    // If this is a store *to* the memory, analyze the input value.
+    if (auto *si = dyn_cast<StoreInst>(user)) {
+      if (use->getOperandNumber() == 1) {
+
+        // If we have already found a value for this stack slot then we're done:
+        // we don't support multiple assignment.
+        if (memoryObject->getValue().getKind() != SymbolicValue::UninitMemory)
+          return evaluator.getUnknown(addr, UnknownReason::Default);
+
+        auto result = getConstantValue(si->getOperand(0));
+        if (!result.isConstant())
+          return evaluator.getUnknown(addr, UnknownReason::Default);
+        memoryObject->setValue(result);
+        continue;
+      }
+    }
+
+    if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
+      // If this is a copy_addr *from* the memory, then it is a load, ignore it.
+      if (use->getOperandNumber() == 0)
+        continue;
+
+      // If this is a copy_addr *to* the memory, analyze the input value.
+      assert(use->getOperandNumber() == 1 && "copy_addr has two operands");
+
+      // If we have already found a value for this stack slot then we're done:
+      // we don't support multiple assignment.
+      if (memoryObject->getValue().getKind() != SymbolicValue::UninitMemory)
+        return evaluator.getUnknown(addr, UnknownReason::Default);
+
+      auto result = getConstAddrAndLoadResult(cai->getOperand(0));
+      if (!result.isConstant())
+        return evaluator.getUnknown(addr, UnknownReason::Default);
+      memoryObject->setValue(result);
+      continue;
+    }
+
+    // If this is an apply_inst passing the memory address as an indirect
+    // result operand, then we have a call that fills in this result.
+    //
+    if (auto *apply = dyn_cast<ApplyInst>(user)) {
+      auto conventions = apply->getSubstCalleeConv();
+
+      // If this is an out-parameter, it is like a store.  If not, this is an
+      // indirect read which is ok.
+      unsigned numIndirectResults = conventions.getNumIndirectSILResults();
+      unsigned opNum = use->getOperandNumber() - 1;
+      if (opNum >= numIndirectResults)
+        continue;
+
+      // Otherwise this is a write.  If we have already found a value for this
+      // stack slot then we're done: we don't support multiple assignment.
+      if (memoryObject->getValue().getKind() != SymbolicValue::UninitMemory)
+        return evaluator.getUnknown(addr, UnknownReason::Default);
+
+      // Set `addr` to the address of the memory we want to initialize, so that
+      // the callee can find and initialize it.
+      setValue(addr, memoryAddress);
+
+      // The callee needs to be a direct call to a constant expression.
+      auto callResult = computeCallResult(apply);
+
+      // If the call failed, we're done.
+      if (callResult.hasValue()) {
+        assert(!callResult.getValue().isConstant());
+        memoryObject->setValue(callResult.getValue());
+        return memoryAddress;
+      }
+
+      // computeCallResult will have figured out the result and cached it for
+      // us.
+      assert(memoryObject->getValue().isConstant() &&
+             "Should have found a constant result value");
+      continue;
+    }
+
+    // If it is an index_addr, make sure it is a different address from base.
+    if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
+      assert(use->get() == iai->getBase());
+      if (auto *ili = dyn_cast<IntegerLiteralInst>(iai->getIndex())) {
+        if (ili->getValue().getLimitedValue() != 0)
+          continue;
+      }
+      return evaluator.getUnknown(addr, UnknownReason::Default);
+    }
+
+    if (auto *teai = dyn_cast<TupleElementAddrInst>(user)) {
+      // Try finding a writer among the users of `teai`. For example:
+      //   copy_addr %114 to [initialization] %183 : $*Int32
+      //   %179 = alloc_stack $(Int32, Int32, Int32, Int32)
+      //   %183 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
+      //   %191 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
+      //   copy_addr [take] %191 to [initialization] %178 : $*Int32
+      //
+      // The workflow is: when const-evaluating %178, we const-evaluate %191,
+      // which in turn triggers const-evaluating %179, thereby enter this
+      // function, where `addrInst` being %179. Among its users, %191 is not an
+      // initializer, so we skip it (`getSingleWriterAddressValue(teai)` below
+      // will return non-const on it). %183 is a good initializer and can be
+      // const-evaluated (by const-evaluating %114).
+      auto *use = teai->getSingleUse();
+      if (!use)
+        continue;
+
+      auto tupleEltAddrValue = getSingleWriterAddressValue(teai);
+      if (!tupleEltAddrValue.isConstant())
+        continue;
+      // If the tuple elt is indeed a const, we write it into (the appropriate
+      // aggregate element slot of the) `memoryObject`, which is the const
+      // value for the entire tuple.
+      SmallVector<unsigned, 4> accessPath;
+      auto *tupleEltMemoryObject =
+          tupleEltAddrValue.getAddressValue(accessPath);
+      assert(accessPath.empty());
+      auto tupleEltValue = tupleEltMemoryObject->getValue();
+      assert(tupleEltValue.isConstant());
+
+      auto objectVal = memoryObject->getValue();
+      auto objectType = memoryObject->getType();
+      auto index = teai->getFieldNo();
+      bool failed = updateIndexedElement(
+          objectVal, /*accessPath*/ {index}, tupleEltValue, objectType,
+          /*writeOnlyOnce*/ true, evaluator.getAllocator());
+      if (failed)
+        return evaluator.getUnknown(addr, UnknownReason::Default);
+      memoryObject->setValue(objectVal);
+#ifndef NDEBUG
+      // If all aggregate elements are const, we have successfully
+      // const-evaluated the entire tuple!
+      if (llvm::all_of(objectVal.getAggregateValue(),
+                       [](SymbolicValue v) { return v.isConstant(); }))
+        LLVM_DEBUG(llvm::dbgs() << "Const-evaluated the entire tuple: ";
+                   objectVal.dump());
+#endif // NDEBUG
+      continue;
+    }
+
+    LLVM_DEBUG(llvm::dbgs()
+               << "Unknown SingleStore ConstExpr user: " << *user << "\n");
+
+    // If this is some other user that we don't know about, then we should
+    // treat it conservatively, because it could store into the address.
+    return evaluator.getUnknown(addr, UnknownReason::Default);
+  }
+
+  // If we found a store of a constant, then return that value!
+  if (memoryObject->getValue().isConstant()) {
+    setValue(addr, memoryAddress);
+    return memoryAddress;
+  }
+
+  // Otherwise, return unknown.
+  return evaluator.getUnknown(addr, UnknownReason::Default);
+}
+
 /// Given the operand to a load, resolve it to a constant if possible.
+/// Also see the comments on getSingleWriterAddressValue() to contrast these 2
+/// APIs.
 SymbolicValue ConstExprFunctionState::getConstAddrAndLoadResult(SILValue addr) {
   auto addrVal = getConstantValue(addr);
   if (!addrVal.isConstant())
