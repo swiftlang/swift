@@ -2129,7 +2129,7 @@ class CollectionExpr : public Expr {
   Expr *SemanticExpr = nullptr;
 
   /// Populated by Parser::ConfigMap to represent conditionals in collections.
-  std::map<const void *,std::vector <IfConfigDecl *>> ConditionalsMap;
+  std::map<unsigned, std::vector <IfConfigDecl *>> ConditionalsMap;
 
   /// Retrieve the intrusive pointer storage from the subtype
   Expr *const *getTrailingObjectsPointer() const;
@@ -2174,8 +2174,11 @@ public:
   void setElement(unsigned i, Expr *E) { getElements()[i] = E; }
   unsigned getNumElements() const { return Bits.CollectionExpr.NumSubExprs; }
 
-  std::map<const void *,std::vector <IfConfigDecl *>> &getConditionalsMapRef() {
+  const std::map<unsigned, std::vector <IfConfigDecl *>> &getConditionalsMap() {
     return ConditionalsMap;
+  }
+  void setConditionalsMap(std::map<unsigned, std::vector <IfConfigDecl *>> &M) {
+    ConditionalsMap = M;
   }
 
   /// Retrieve the comma source locations stored in the collection. Please note

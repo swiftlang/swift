@@ -708,31 +708,25 @@ public:
   /// current AST collection model, a map is generated from the location
   /// of actual data values to the conditionals that directly precede them.
   /// This is transferred to the CollectionExpr when the collection completes
-  /// and is used by the ATSDumper to provide a repsentation of the conditional
+  /// and is used by the ATSDumper to print a repsentation of the conditional
   /// as well as by libSyntax and to remove conditionals from module interfaces.
   /// Nested conditionals are elements of their outer IfConfigDecl structure.
   class ConfigMap {
-    /// OuterDecls - accumlates outer conditionals before seeing active element.
-    /// PendingConditionals - poitner to current vector to add condtionals to.
-    std::vector <IfConfigDecl *> OuterDecls, *PendingConditionals = &OuterDecls;
-    /// ConditionalsMap - Map accumulated of Contiionals preceeding elements.
-    std::map<const void *,std::vector <IfConfigDecl *>> ConditionalsMap;
-    /// HasConditionals - true if there are any conditionals inside collection.
-    bool HasConditionals = false;
+    /// Map accumulated of conditionals preceeding element number.
+    std::map<unsigned, std::vector <IfConfigDecl *>> ConditionalsMap;
+    /// Pointer to current vector to accumulate conditionals against.
+    std::vector <IfConfigDecl *> *PendingConditionals = nullptr;
+    /// Active element number any #if conditionals will be before.
+    unsigned NextActiveIndexNumber = 0;
 
   public:
     Expr *registerActiveDataElement(Expr *expr) {
-      if (PendingConditionals == &OuterDecls) {
-        const void *Start = expr->getSourceRange().Start.getOpaquePointerValue();
-        PendingConditionals = &(ConditionalsMap[Start] = OuterDecls);
-      }
+      ++NextActiveIndexNumber;
       return expr;
     }
 
     void newOuterConditionalStarts() {
-      HasConditionals = true;
-      if (PendingConditionals != &OuterDecls)
-        (PendingConditionals = &OuterDecls)->clear();
+      PendingConditionals = &ConditionalsMap[NextActiveIndexNumber];
     }
 
     void outerConditionalCompletes(IfConfigDecl *ICD) {
@@ -740,11 +734,8 @@ public:
     }
 
     CollectionExpr *closeCollection(CollectionExpr *expr) {
-      if (HasConditionals) {
-        if (PendingConditionals == &OuterDecls && OuterDecls.size())
-          registerActiveDataElement(expr);
-        expr->getConditionalsMapRef() = ConditionalsMap;
-      }
+      if (PendingConditionals)
+        expr->setConditionalsMap(ConditionalsMap);
       return expr;
     }
   };

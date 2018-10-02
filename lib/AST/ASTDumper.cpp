@@ -2014,12 +2014,11 @@ public:
     }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void printRelatedIfConfigDecls(Expr *E, CollectionExpr *C) {
-    const void *Start = E->getSourceRange().Start.getOpaquePointerValue();
-    const auto &ConditionalsMap = C->getConditionalsMapRef();
-    if (ConditionalsMap.find(Start) != ConditionalsMap.end()) {
+  void printRelatedIfConfigDecls(unsigned ElementNumber, CollectionExpr *C) {
+    const auto &ConditionalsMap = C->getConditionalsMap();
+    if (ConditionalsMap.find(ElementNumber) != ConditionalsMap.end()) {
       PrintDecl P(OS, Indent + 2);
-      for (IfConfigDecl *ICD : ConditionalsMap.at(Start)) {
+      for (IfConfigDecl *ICD : ConditionalsMap.at(ElementNumber)) {
         OS << '\n';
         P.visitIfConfigDecl(ICD);
         OS << '\n';
@@ -2028,23 +2027,27 @@ public:
   }
   void visitArrayExpr(ArrayExpr *E) {
     printCommon(E, "array_expr");
+    unsigned ElementNumber = 0;
     for (auto elt : E->getElements()) {
-      printRelatedIfConfigDecls(elt, E);
+      printRelatedIfConfigDecls(ElementNumber, E);
       OS << '\n';
       printRec(elt);
+      ElementNumber++;
     }
-    printRelatedIfConfigDecls(E, E);
+    printRelatedIfConfigDecls(ElementNumber, E);
     printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitDictionaryExpr(DictionaryExpr *E) {
     printCommon(E, "dictionary_expr");
+    unsigned ElementNumber = 0;
     for (auto elt : E->getElements()) {
-      printRelatedIfConfigDecls(elt, E);
+      printRelatedIfConfigDecls(ElementNumber, E);
       OS << '\n';
       printRec(elt);
+      ElementNumber++;
     }
-    printRelatedIfConfigDecls(E, E);
+    printRelatedIfConfigDecls(ElementNumber, E);
     printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
