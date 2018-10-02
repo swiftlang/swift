@@ -808,6 +808,10 @@ void swift::ide::api::SDKNodeDeclVar::diagnose(SDKNode *Right) {
                             getScreenInfo());
   }
   if (Ctx.checkingABI()) {
+    if (hasFixedBinaryOrder() != RV->hasFixedBinaryOrder()) {
+      Ctx.getDiags().diagnose(SourceLoc(), diag::decl_has_fixed_order_change,
+                              getScreenInfo(), hasFixedBinaryOrder());
+    }
     if (hasFixedBinaryOrder() && RV->hasFixedBinaryOrder() &&
         getFixedBinaryOrder() != RV->getFixedBinaryOrder()) {
       Ctx.getDiags().diagnose(SourceLoc(), diag::decl_reorder,
@@ -938,14 +942,7 @@ public:
       }
       // Complain about added protocol requirements
       if (auto *D = dyn_cast<SDKNodeDecl>(Right)) {
-        if (D->isProtocolRequirement()) {
-          bool ShouldComplain = !D->isOverriding();
-          // We should allow added associated types with default.
-          if (auto ATD = dyn_cast<SDKNodeDeclAssociatedType>(D)) {
-            if (ATD->getDefault())
-              ShouldComplain = false;
-          }
-          if (ShouldComplain)
+        if (D->isProtocolRequirement() && !D->isOverriding()) {
             Ctx.getDiags().diagnose(SourceLoc(), diag::protocol_req_added,
                                     D->getScreenInfo());
         }
