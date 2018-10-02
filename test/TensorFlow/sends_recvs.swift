@@ -401,36 +401,36 @@ let globalNextIterator: ResourceHandle =
         output_types: [Float.self], output_shapes: [TensorShape()])
 
 public func resourceHandlesCanBeSentOrReceived() {
-	// The following constant is a workaround to extend the deabstraction scope so
-	// that a resource handle is not an input argument to the tensor program. This
-	// will go away when we convert arg tensors to Swift->TF sends.
+  // The following constant is a workaround to extend the deabstraction scope so
+  // that a resource handle is not an input argument to the tensor program. This
+  // will go away when we convert arg tensors to Swift->TF sends.
   let _ = Tensor<Float>(1.0)
   // expected-warning @+2 {{value implicitly copied to the accelerator}}
   let _: VariantHandle =
     #tfop("IteratorGetNextAsOptional", globalIterator,
     output_types: [Float.self], output_shapes: [TensorShape()])
   // expected-warning @+2 {{value implicitly copied to the host}}
-	let localIterator: ResourceHandle =
+  let localIterator: ResourceHandle =
     #tfop("Iterator", shared_name: "foo", container: "bar",
           output_types: [Float.self], output_shapes: [TensorShape()])
   _hostOp(localIterator) // expected-note {{value used here}}
-	// The following constant is a workaround to extend the deabstraction scope so
-	// that a resource handle is sent back to the host instead of being an output.
+  // The following constant is a workaround to extend the deabstraction scope so
+  // that a resource handle is sent back to the host instead of being an output.
   let _ = Tensor<Float>(1.0)
 }
 
 public func resourceHandlesCanBeResults() {
   let iterator: ResourceHandle =
     #tfop("Iterator", shared_name: "foo", container: "bar",
-		      output_types: [Float.self], output_shapes: [TensorShape()])
+  	      output_types: [Float.self], output_shapes: [TensorShape()])
   _hostOp(iterator)
 }
 
 
 public func variantHandlesCanBeSentOrReceived() {
-	// The following constant is a workaround to extend the deabstraction scope so
-	// that a resource handle is not an input argument to the tensor program. This
-	// will go away when we convert arg tensors to Swift->TF sends.
+  // The following constant is a workaround to extend the deabstraction scope so
+  // that a resource handle is not an input argument to the tensor program. This
+  // will go away when we convert arg tensors to Swift->TF sends.
   let _ = Tensor<Float>(1.0)
   // expected-warning @+2 {{value implicitly copied to the accelerator}}
   let localNextIterator: VariantHandle =
@@ -438,15 +438,15 @@ public func variantHandlesCanBeSentOrReceived() {
     output_types: [Float.self], output_shapes: [TensorShape()])
   // expected-warning @-2 {{value implicitly copied to the host}}
   _hostOp(localNextIterator) // expected-note {{value used here}}
-	// The following constant is a workaround to extend the deabstraction scope so
-	// that a resource handle is sent back to the host instead of being an output.
+  // The following constant is a workaround to extend the deabstraction scope so
+  // that a resource handle is sent back to the host instead of being an output.
   let _ = Tensor<Float>(1.0)
 }
 
 public func variantHandlesCanBeResults() {
   let iterator: ResourceHandle =
     #tfop("Iterator", shared_name: "foo", container: "bar",
-		      output_types: [Float.self], output_shapes: [TensorShape()])
+  	      output_types: [Float.self], output_shapes: [TensorShape()])
   let nextIterator: VariantHandle =
     #tfop("IteratorGetNextAsOptional", iterator,
     output_types: [Float.self], output_shapes: [TensorShape()])
