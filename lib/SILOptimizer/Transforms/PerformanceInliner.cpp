@@ -19,6 +19,7 @@
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
@@ -45,6 +46,8 @@ namespace {
 using Weight = ShortestPathAnalysis::Weight;
 
 class SILPerformanceInliner {
+  SILOptFunctionBuilder &FuncBuilder;
+
   /// Specifies which functions not to inline, based on @_semantics and
   /// global_init attributes.
   InlineSelection WhatToInline;
@@ -164,11 +167,12 @@ class SILPerformanceInliner {
                               SmallVectorImpl<FullApplySite> &Applies);
 
 public:
-  SILPerformanceInliner(InlineSelection WhatToInline, DominanceAnalysis *DA,
+  SILPerformanceInliner(SILOptFunctionBuilder &FuncBuilder,
+			InlineSelection WhatToInline, DominanceAnalysis *DA,
                         SILLoopAnalysis *LA, SideEffectAnalysis *SEA,
                         OptimizationMode OptMode, OptRemark::Emitter &ORE)
-      : WhatToInline(WhatToInline), DA(DA), LA(LA), SEA(SEA), CBI(DA), ORE(ORE),
-        OptMode(OptMode) {}
+      : FuncBuilder(FuncBuilder), WhatToInline(WhatToInline), DA(DA), LA(LA),
+	SEA(SEA), CBI(DA), ORE(ORE), OptMode(OptMode) {}
 
   bool inlineCallsIntoFunction(SILFunction *F);
 };
@@ -826,7 +830,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     // the substitution list.
     OpenedArchetypesTracker.registerUsedOpenedArchetypes(AI.getInstruction());
 
-    SILInliner Inliner(*Caller, *Callee,
+    SILInliner Inliner(FuncBuilder, *Caller, *Callee,
                        SILInliner::InlineKind::PerformanceInline,
                        AI.getSubstitutionMap(),
                        OpenedArchetypesTracker);
@@ -896,7 +900,9 @@ public:
 
     auto OptMode = getFunction()->getEffectiveOptimizationMode();
 
-    SILPerformanceInliner Inliner(WhatToInline, DA, LA, SEA, OptMode, ORE);
+    SILOptFunctionBuilder FuncBuilder(*this);
+    SILPerformanceInliner Inliner(FuncBuilder, WhatToInline, DA, LA, SEA,
+				  OptMode, ORE);
 
     assert(getFunction()->isDefinition() &&
            "Expected only functions with bodies!");

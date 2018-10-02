@@ -488,7 +488,7 @@ protected:
     HasLazyConformances : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+2+8+16,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+8+16,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -510,9 +510,6 @@ protected:
     /// True if the protocol has requirements that cannot be satisfied (e.g.
     /// because they could not be imported from Objective-C).
     HasMissingRequirements : 1,
-
-    /// Whether we are currently computing inherited protocols.
-    ComputingInheritedProtocols : 1,
 
     /// The stage of the circularity check for this protocol.
     Circularity : 2,
@@ -1789,7 +1786,7 @@ public:
     return D->getKind() == DeclKind::Extension;
   }
   static bool classof(const DeclContext *C) {
-    if (auto D = C->getAsDeclOrDeclExtensionContext())
+    if (auto D = C->getAsDecl())
       return classof(D);
     return false;
   }
@@ -2120,7 +2117,7 @@ public:
     return D->getKind() == DeclKind::TopLevelCode;
   }
   static bool classof(const DeclContext *C) {
-    if (auto D = C->getAsDeclOrDeclExtensionContext())
+    if (auto D = C->getAsDecl())
       return classof(D);
     return false;
   }
@@ -2648,7 +2645,7 @@ public:
   using TypeDecl::getDeclaredInterfaceType;
 
   static bool classof(const DeclContext *C) {
-    if (auto D = C->getAsDeclOrDeclExtensionContext())
+    if (auto D = C->getAsDecl())
       return classof(D);
     return false;
   }
@@ -2696,8 +2693,6 @@ public:
     return UnderlyingTy;
   }
 
-  /// Set the underlying type, for deserialization and synthesized
-  /// aliases.
   void setUnderlyingType(Type type);
 
   /// For generic typealiases, return the unbound generic type.
@@ -2724,7 +2719,7 @@ public:
     return D->getKind() == DeclKind::TypeAlias;
   }
   static bool classof(const DeclContext *C) {
-    if (auto D = C->getAsDeclOrDeclExtensionContext())
+    if (auto D = C->getAsDecl())
       return classof(D);
     return false;
   }
@@ -3220,7 +3215,7 @@ public:
   }
 
   static bool classof(const DeclContext *C) {
-    if (auto D = C->getAsDeclOrDeclExtensionContext())
+    if (auto D = C->getAsDecl())
       return classof(D);
     return false;
   }
@@ -3328,7 +3323,7 @@ public:
     return D->getKind() == DeclKind::Enum;
   }
   static bool classof(const DeclContext *C) {
-    if (auto D = C->getAsDeclOrDeclExtensionContext())
+    if (auto D = C->getAsDecl())
       return classof(D);
     return false;
   }
@@ -3423,7 +3418,7 @@ public:
     return D->getKind() == DeclKind::Struct;
   }
   static bool classof(const DeclContext *C) {
-    if (auto D = C->getAsDeclOrDeclExtensionContext())
+    if (auto D = C->getAsDecl())
       return classof(D);
     return false;
   }
@@ -3708,7 +3703,7 @@ public:
     return D->getKind() == DeclKind::Class;
   }
   static bool classof(const DeclContext *C) {
-    if (auto D = C->getAsDeclOrDeclExtensionContext())
+    if (auto D = C->getAsDecl())
       return classof(D);
     return false;
   }
@@ -3793,10 +3788,6 @@ private:
 ///   }
 class ProtocolDecl final : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
-
-  /// The syntactic representation of the where clause in a protocol like
-  /// `protocol ... where ... { ... }`.
-  TrailingWhereClause *TrailingWhere;
 
   llvm::DenseMap<ValueDecl *, Witness> DefaultWitnesses;
 
@@ -4010,11 +4001,6 @@ public:
   /// created yet.
   void createGenericParamsIfMissing();
 
-  /// Retrieve the trailing where clause on this protocol, if it exists.
-  TrailingWhereClause *getTrailingWhereClause() const {
-    return TrailingWhere;
-  }
-
   /// Retrieve the requirements that describe this protocol.
   ///
   /// These are the requirements including any inherited protocols
@@ -4049,7 +4035,7 @@ public:
     return D->getKind() == DeclKind::Protocol;
   }
   static bool classof(const DeclContext *C) {
-    if (auto D = C->getAsDeclOrDeclExtensionContext())
+    if (auto D = C->getAsDecl())
       return classof(D);
     return false;
   }
@@ -4167,7 +4153,7 @@ private:
 
 protected:
   AbstractStorageDecl(DeclKind Kind, DeclContext *DC, DeclName Name,
-                      SourceLoc NameLoc, bool supportsMutation)
+                      SourceLoc NameLoc, StorageIsMutable_t supportsMutation)
     : ValueDecl(Kind, DC, Name, NameLoc) {
     Bits.AbstractStorageDecl.HasStorage = true;
     Bits.AbstractStorageDecl.SupportsMutation = supportsMutation;
@@ -4175,7 +4161,7 @@ protected:
     Bits.AbstractStorageDecl.IsSetterMutating = true;
   }
 
-  void setSupportsMutationIfStillStored(bool supportsMutation) {
+  void setSupportsMutationIfStillStored(StorageIsMutable_t supportsMutation) {
     if (auto ptr = Accessors.getPointer()) {
       auto impl = ptr->getImplInfo();
       if (!impl.isSimpleStored()) return;
@@ -4234,8 +4220,8 @@ public:
   /// don't support mutation (e.g. to initialize them), and sometimes we
   /// can't mutate things that do support mutation (e.g. because their
   /// setter is private).
-  bool supportsMutation() const {
-    return Bits.AbstractStorageDecl.SupportsMutation;
+  StorageIsMutable_t supportsMutation() const {
+    return StorageIsMutable_t(Bits.AbstractStorageDecl.SupportsMutation);
   }
 
   /// Are there any accessors for this declaration, including implicit ones?
@@ -4273,6 +4259,13 @@ public:
     return {};
   }
 
+  /// Visit all the opaque accessors that this storage is expected to have.
+  void visitExpectedOpaqueAccessors(
+                            llvm::function_ref<void (AccessorKind)>) const;
+
+  /// Visit all the opaque accessors of this storage declaration.
+  void visitOpaqueAccessors(llvm::function_ref<void (AccessorDecl*)>) const;
+
   void setAccessors(StorageImplInfo storageImpl,
                     SourceLoc lbraceLoc, ArrayRef<AccessorDecl*> accessors,
                     SourceLoc rbraceLoc);
@@ -4293,6 +4286,9 @@ public:
 
   /// \brief Add a synthesized materializeForSet accessor.
   void setSynthesizedMaterializeForSet(AccessorDecl *materializeForSet);
+
+  /// Does this storage require a materializeForSet accessor?
+  bool requiresMaterializeForSet() const;
 
   SourceRange getBracesRange() const {
     if (auto info = Accessors.getPointer())
@@ -4465,8 +4461,9 @@ protected:
   llvm::PointerUnion<PatternBindingDecl*, Stmt*> ParentPattern;
 
   VarDecl(DeclKind Kind, bool IsStatic, Specifier Sp, bool IsCaptureList,
-          SourceLoc NameLoc, Identifier Name, Type Ty, DeclContext *DC)
-    : AbstractStorageDecl(Kind, DC, Name, NameLoc, !isImmutableSpecifier(Sp))
+          SourceLoc NameLoc, Identifier Name, DeclContext *DC)
+    : AbstractStorageDecl(Kind, DC, Name, NameLoc,
+                          StorageIsMutable_t(!isImmutableSpecifier(Sp)))
   {
     Bits.VarDecl.IsStatic = IsStatic;
     Bits.VarDecl.Specifier = static_cast<unsigned>(Sp);
@@ -4474,7 +4471,6 @@ protected:
     Bits.VarDecl.IsDebuggerVar = false;
     Bits.VarDecl.IsREPLVar = false;
     Bits.VarDecl.HasNonPatternBindingInit = false;
-    setType(Ty);
   }
 
   /// This is the type specified, including location information.
@@ -4484,9 +4480,8 @@ protected:
 
 public:
   VarDecl(bool IsStatic, Specifier Sp, bool IsCaptureList, SourceLoc NameLoc,
-          Identifier Name, Type Ty, DeclContext *DC)
-    : VarDecl(DeclKind::Var, IsStatic, Sp, IsCaptureList, NameLoc, Name, Ty,
-              DC) {}
+          Identifier Name, DeclContext *DC)
+    : VarDecl(DeclKind::Var, IsStatic, Sp, IsCaptureList, NameLoc, Name, DC) {}
 
   SourceRange getSourceRange() const;
 
@@ -4704,6 +4699,7 @@ class ParamDecl : public VarDecl {
   struct StoredDefaultArgument {
     Expr *DefaultArg = nullptr;
     Initializer *InitContext = nullptr;
+    StringRef StringRepresentation;
   };
 
   /// The default value, if any, along with whether this is varargs.
@@ -4713,7 +4709,7 @@ public:
   ParamDecl(VarDecl::Specifier specifier,
             SourceLoc specifierLoc, SourceLoc argumentNameLoc,
             Identifier argumentName, SourceLoc parameterNameLoc,
-            Identifier parameterName, Type ty, DeclContext *dc);
+            Identifier parameterName, DeclContext *dc);
 
   /// Clone constructor, allocates a new ParamDecl identical to the first.
   /// Intentionally not defined as a typical copy constructor to avoid
@@ -4731,10 +4727,6 @@ public:
   /// The resulting source location will be valid if the argument name
   /// was specified separately from the parameter name.
   SourceLoc getArgumentNameLoc() const { return ArgumentNameLoc; }
-  
-  /// Retrieve the parameter type flags corresponding to the declaration of
-  /// this parameter's argument type.
-  ParameterTypeFlags getParameterFlags() const;
   
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
     
@@ -4766,6 +4758,17 @@ public:
   }
 
   void setDefaultArgumentInitContext(Initializer *initContext);
+
+  /// Returns a saved string representation of the parameter's default value.
+  ///
+  /// This should only be called if the default value expression is absent or
+  /// doesn't have a valid source range; otherwise, clients should extract the
+  /// source text from that range.
+  ///
+  /// \sa getDefaultValue
+  StringRef getDefaultValueStringRepresentation() const;
+
+  void setDefaultValueStringRepresentation(StringRef stringRepresentation);
 
   /// Whether or not this parameter is varargs.
   bool isVariadic() const { return DefaultValueAndIsVariadic.getInt(); }
@@ -4814,8 +4817,6 @@ public:
   
 /// Describes the kind of subscripting used in Objective-C.
 enum class ObjCSubscriptKind {
-  /// Not an Objective-C subscripting kind.
-  None,
   /// Objective-C indexed subscripting, which is based on an integral
   /// index.
   Indexed,
@@ -4863,7 +4864,7 @@ public:
                 GenericParamList *GenericParams)
     : GenericContext(DeclContextKind::SubscriptDecl, Parent),
       AbstractStorageDecl(DeclKind::Subscript, Parent, Name, SubscriptLoc,
-                          /*supports mutation (will be overwritten)*/ true),
+                          /*will be overwritten*/ StorageIsNotMutable),
       ArrowLoc(ArrowLoc), Indices(nullptr), ElementTy(ElementTy) {
     setIndices(Indices);
     setGenericParams(GenericParams);
@@ -4909,7 +4910,7 @@ public:
   }
   
   static bool classof(const DeclContext *DC) {
-    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+    if (auto D = DC->getAsDecl())
       return classof(D);
     return false;
   }
@@ -5290,7 +5291,7 @@ public:
   }
 
   static bool classof(const DeclContext *DC) {
-    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+    if (auto D = DC->getAsDecl())
       return classof(D);
     return false;
   }
@@ -5517,7 +5518,7 @@ public:
     return classof(static_cast<const Decl*>(D));
   }
   static bool classof(const DeclContext *DC) {
-    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+    if (auto D = DC->getAsDecl())
       return classof(D);
     return false;
   }
@@ -5657,7 +5658,7 @@ public:
     return classof(static_cast<const Decl*>(D));
   }
   static bool classof(const DeclContext *DC) {
-    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+    if (auto D = DC->getAsDecl())
       return classof(D);
     return false;
   }
@@ -5766,8 +5767,8 @@ public:
   }
 
   /// Set the interface type of this enum element to the constructor function
-  /// type; (Self) -> Result or (Self) -> (Args...) -> Result.
-  bool computeType();
+  /// type; (Self.Type) -> Self or (Self.Type) -> (Args...) -> Self.
+  void computeType();
 
   Type getArgumentInterfaceType() const;
 
@@ -6051,7 +6052,7 @@ public:
     return classof(static_cast<const Decl*>(D));
   }
   static bool classof(const DeclContext *DC) {
-    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+    if (auto D = DC->getAsDecl())
       return classof(D);
     return false;
   }
@@ -6087,7 +6088,7 @@ public:
     return classof(static_cast<const Decl*>(D));
   }
   static bool classof(const DeclContext *DC) {
-    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+    if (auto D = DC->getAsDecl())
       return classof(D);
     return false;
   }
@@ -6516,6 +6517,8 @@ AbstractStorageDecl::overwriteSetterAccess(AccessLevel accessLevel) {
     setter->overwriteAccess(accessLevel);
   if (auto materializeForSet = getMaterializeForSetFunc())
     materializeForSet->overwriteAccess(accessLevel);
+  if (auto modify = getModifyCoroutine())
+    modify->overwriteAccess(accessLevel);
   if (auto mutableAddressor = getMutableAddressor())
     mutableAddressor->overwriteAccess(accessLevel);
 }
@@ -6588,7 +6591,7 @@ inline bool Decl::isPotentiallyOverridable() const {
       isa<SubscriptDecl>(this) ||
       isa<FuncDecl>(this) ||
       isa<DestructorDecl>(this)) {
-    return getDeclContext()->getAsClassOrClassExtensionContext();
+    return getDeclContext()->getSelfClassDecl();
   } else {
     return false;
   }
@@ -6609,7 +6612,7 @@ inline const GenericContext *Decl::getAsGenericContext() const {
 }
 
 inline bool DeclContext::isExtensionContext() const {
-  if (auto D = getAsDeclOrDeclExtensionContext())
+  if (auto D = getAsDecl())
     return ExtensionDecl::classof(D);
   return false;
 }

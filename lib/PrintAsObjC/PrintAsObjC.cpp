@@ -115,7 +115,7 @@ static StringRef maybeGetOSObjectBaseName(const clang::NamedDecl *decl) {
   // Hack: check to see if the name came from a macro in <os/object.h>.
   clang::SourceManager &sourceMgr = decl->getASTContext().getSourceManager();
   clang::SourceLocation expansionLoc =
-      sourceMgr.getImmediateExpansionRange(loc).first;
+      sourceMgr.getImmediateExpansionRange(loc).getBegin();
   clang::SourceLocation spellingLoc = sourceMgr.getSpellingLoc(expansionLoc);
 
   if (!sourceMgr.getFilename(spellingLoc).endswith("/os/object.h"))
@@ -193,7 +193,7 @@ public:
     assert(members.begin() != members.end());
 
     const DeclContext *origDC = (*members.begin())->getDeclContext();
-    auto *baseClass = origDC->getAsClassOrClassExtensionContext();
+    auto *baseClass = origDC->getSelfClassDecl();
 
     os << "@interface " << getNameForObjC(baseClass);
     maybePrintObjCGenericParameters(baseClass);
@@ -365,7 +365,7 @@ private:
     if (isEmptyExtensionDecl(ED))
       return;
 
-    auto baseClass = ED->getAsClassOrClassExtensionContext();
+    auto baseClass = ED->getSelfClassDecl();
 
     if (printAvailability(ED, PrintLeadingSpace::No))
       os << "\n";
@@ -656,9 +656,9 @@ private:
         // inherits from NSObject.
         if (selectorIsInit(selector) && !ctor->getOverriddenDecl()) {
           auto container = ctor->getDeclContext();
-          auto *classDecl = container->getAsClassOrClassExtensionContext();
+          auto *classDecl = container->getSelfClassDecl();
           if (!classDecl) {
-            assert(container->getAsProtocolOrProtocolExtensionContext());
+            assert(container->getSelfProtocolDecl());
           } else {
             while (classDecl->hasSuperclass()) {
               classDecl = classDecl->getSuperclassDecl();
@@ -932,9 +932,9 @@ private:
       renamedDecl = lookup.getSingleTypeResult();
     } else {
       SmallVector<ValueDecl *, 4> lookupResults;
-      declContext->lookupQualified(declContext->getSelfTypeInContext(),
-                                   renamedDeclName, NL_QualifiedDefault, NULL,
-                                   lookupResults);
+      declContext->lookupQualified(
+        declContext->getSelfNominalTypeDecl(),
+        renamedDeclName, NL_QualifiedDefault, lookupResults);
       for (auto candidate : lookupResults) {
         if (!shouldInclude(candidate))
           continue;
@@ -988,8 +988,7 @@ private:
     else
       os << "method";
     os << " '";
-    auto nominal =
-      VD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto nominal = VD->getDeclContext()->getSelfNominalTypeDecl();
     printEncodedString(nominal->getName().str(), /*includeQuotes=*/false);
     os << ".";
     SmallString<32> scratch;
@@ -1841,8 +1840,7 @@ private:
     assert(decl && "can't print canonicalized GenericTypeParamType");
 
     if (auto *extension = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
-      const ClassDecl *extendedClass =
-          extension->getAsClassOrClassExtensionContext();
+      const ClassDecl *extendedClass = extension->getSelfClassDecl();
       assert(extendedClass->isGeneric());
       assert(extension->getGenericParams()->size() ==
              extendedClass->getGenericParams()->size() &&
@@ -2410,7 +2408,7 @@ public:
   bool writeExtension(const ExtensionDecl *ED) {
     bool allRequirementsSatisfied = true;
 
-    const ClassDecl *CD = ED->getAsClassOrClassExtensionContext();
+    const ClassDecl *CD = ED->getSelfClassDecl();
     allRequirementsSatisfied &= require(CD);
     for (auto proto : ED->getLocalProtocols())
       if (printer.shouldInclude(proto))
@@ -2772,7 +2770,7 @@ public:
         return !printer.shouldInclude(VD);
 
       if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-        auto baseClass = ED->getAsClassOrClassExtensionContext();
+        auto baseClass = ED->getSelfClassDecl();
         return !baseClass || !printer.shouldInclude(baseClass) ||
                baseClass->isForeign();
       }
@@ -2796,7 +2794,7 @@ public:
           return VD->getBaseName().userFacingName();
 
         if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-          auto baseClass = ED->getAsClassOrClassExtensionContext();
+          auto baseClass = ED->getSelfClassDecl();
           return baseClass->getName().str();
         }
         llvm_unreachable("unknown top-level ObjC decl");

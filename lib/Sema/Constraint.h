@@ -18,6 +18,7 @@
 #ifndef SWIFT_SEMA_CONSTRAINT_H
 #define SWIFT_SEMA_CONSTRAINT_H
 
+#include "CSFix.h"
 #include "OverloadChoice.h"
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/Identifier.h"
@@ -168,8 +169,6 @@ enum class ConstraintClassification : char {
 enum class ConversionRestrictionKind {
   /// Tuple-to-tuple conversion.
   TupleToTuple,
-  /// Scalar-to-tuple conversion.
-  ScalarToTuple,
   /// Deep equality comparison.
   DeepEquality,
   /// Subclass-to-superclass conversion.
@@ -227,95 +226,6 @@ enum RememberChoice_t : bool {
   RememberChoice = true
 };
 
-/// Describes the kind of fix to apply to the given constraint before
-/// visiting it.
-enum class FixKind : uint8_t {
-  /// Introduce a '!' to force an optional unwrap.
-  ForceOptional,
-
-  /// Unwrap an optional base when we have a member access.
-  UnwrapOptionalBase,
-
-  /// Append 'as! T' to force a downcast to the specified type.
-  ForceDowncast,
-
-  /// Introduce a '&' to take the address of an lvalue.
-  AddressOf,
-
-  /// Replace a coercion ('as') with a forced checked cast ('as!').
-  CoerceToCheckedCast,
-
-  /// Mark function type as explicitly '@escaping'.
-  ExplicitlyEscaping,
-  /// Mark function type as explicitly '@escaping' to be convertable to 'Any'.
-  ExplicitlyEscapingToAny,
-
-  /// Arguments have labeling failures - missing/extraneous or incorrect
-  /// labels attached to the, fix it by suggesting proper labels.
-  RelabelArguments,
-
-  /// Add a new conformance to the type to satisfy a requirement.
-  AddConformance,
-};
-
-/// Describes a fix that can be applied to a constraint before visiting it.
-class Fix {
-  FixKind Kind;
-  uint16_t Data;
-
-  Fix(FixKind kind, uint16_t data) : Kind(kind), Data(data){ }
-
-  uint16_t getData() const { return Data; }
-
-  friend class Constraint;
-
-public:
-  Fix(FixKind kind) : Kind(kind), Data(0) {
-    assert(kind != FixKind::ForceDowncast && "Use getForceDowncast()");
-    assert(kind != FixKind::UnwrapOptionalBase &&
-           "Use getUnwrapOptionalBase()");
-  }
-
-  /// Produce a new fix that performs a forced downcast to the given type.
-  static Fix getForcedDowncast(ConstraintSystem &cs, Type toType);
-
-  /// Produce a new fix that unwraps an optional base for an access to a member
-  /// with the given name.
-  static Fix getUnwrapOptionalBase(ConstraintSystem &cs, DeclName memberName);
-
-  /// Produce a new fix that re-labels existing arguments so they much
-  /// what parameters expect.
-  static Fix fixArgumentLabels(ConstraintSystem &cs,
-                               ArrayRef<Identifier> newLabels);
-
-  /// Retrieve the kind of fix.
-  FixKind getKind() const { return Kind; }
-
-  /// If this fix has a type argument, retrieve it.
-  Type getTypeArgument(ConstraintSystem &cs) const;
-
-  /// If this fix has a name argument, retrieve it.
-  DeclName getDeclNameArgument(ConstraintSystem &cs) const;
-
-  /// If this fix is an argument re-labeling, retrieve new labels.
-  ArrayRef<Identifier> getArgumentLabels(ConstraintSystem &cs) const;
-
-  /// If this fix has optional result info, retrieve it.
-  bool isUnwrapOptionalBaseByOptionalChaining(ConstraintSystem &cs) const;
-
-  /// Return a string representation of a fix.
-  static llvm::StringRef getName(FixKind kind);
-
-  void print(llvm::raw_ostream &Out, ConstraintSystem *cs) const;
-
-  LLVM_ATTRIBUTE_DEPRECATED(void dump(ConstraintSystem *cs) const 
-                              LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
-
-  bool operator==(Fix const &b) { return Kind == b.Kind && Data == b.Data; }
-};
-
-
 /// \brief A constraint between two type variables.
 class Constraint final : public llvm::ilist_node<Constraint>,
     private llvm::TrailingObjects<Constraint, TypeVariableType *> {
@@ -327,17 +237,11 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// The kind of restriction placed on this constraint.
   ConversionRestrictionKind Restriction : 8;
 
-  /// Data associated with the fix.
-  uint16_t FixData;
-
-  /// The kind of fix to be applied to the constraint before visiting it.
-  FixKind TheFix;
+  /// The fix to be applied to the constraint before visiting it.
+  ConstraintFix *TheFix = nullptr;
 
   /// Whether the \c Restriction field is valid.
   unsigned HasRestriction : 1;
-
-  /// Whether the \c Fix field is valid.
-  unsigned HasFix : 1;
 
   /// Whether this constraint is currently active, i.e., stored in the worklist.
   unsigned IsActive : 1;
@@ -442,9 +346,8 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              ArrayRef<TypeVariableType *> typeVars);
   
   /// Construct a relational constraint with a fix.
-  Constraint(ConstraintKind kind, Fix fix,
-             Type first, Type second, ConstraintLocator *locator,
-             ArrayRef<TypeVariableType *> typeVars);
+  Constraint(ConstraintKind kind, ConstraintFix *fix, Type first, Type second,
+             ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Retrieve the type variables buffer, for internal mutation.
   MutableArrayRef<TypeVariableType *> getTypeVariablesBuffer() {
@@ -490,8 +393,7 @@ public:
 
   /// Create a relational constraint with a fix.
   static Constraint *createFixed(ConstraintSystem &cs, ConstraintKind kind,
-                                 Fix fix,
-                                 Type first, Type second,
+                                 ConstraintFix *fix, Type first, Type second,
                                  ConstraintLocator *locator);
 
   /// Create a new disjunction constraint.
@@ -513,12 +415,7 @@ public:
   }
 
   /// Retrieve the fix associated with this constraint.
-  Optional<Fix> getFix() const {
-    if (!HasFix)
-      return None;
-
-    return Fix(TheFix, FixData);
-  }
+  ConstraintFix *getFix() const { return TheFix; }
 
   /// Whether this constraint is active, i.e., in the worklist.
   bool isActive() const { return IsActive; }
@@ -737,7 +634,7 @@ namespace llvm {
 /// Specialization of \c ilist_traits for constraints.
 template<>
 struct ilist_traits<swift::constraints::Constraint>
-         : public ilist_default_traits<swift::constraints::Constraint> {
+         : public ilist_node_traits<swift::constraints::Constraint> {
   using Element = swift::constraints::Constraint;
 
   static Element *createNode(const Element &V) = delete;

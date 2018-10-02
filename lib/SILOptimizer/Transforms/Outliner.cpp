@@ -1229,14 +1229,14 @@ public:
       Fun->dump();
     }
 
-    SILOptFunctionBuilder FuncBuilder(*getPassManager());
+    SILOptFunctionBuilder FuncBuilder(*this);
     SmallVector<SILFunction *, 16> FunctionsAdded;
     bool Changed = tryOutline(FuncBuilder, Fun, FunctionsAdded);
 
     if (!FunctionsAdded.empty()) {
       // Notify the pass manager of any new functions we outlined.
       for (auto *AddedFunc : FunctionsAdded) {
-        notifyAddFunction(AddedFunc, nullptr);
+        addFunctionToPassManagerWorklist(AddedFunc, nullptr);
       }
     }
 

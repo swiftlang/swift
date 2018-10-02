@@ -352,7 +352,7 @@ public:
   /// contained within this Job; if this job is not a BatchJob, just pass \c
   /// this and the provided \p OSPid back to the Callback.
   virtual void forEachContainedJobAndPID(
-      llvm::sys::ProcessInfo::ProcessId OSPid,
+      llvm::sys::procid_t OSPid,
       llvm::function_ref<void(const Job *, Job::PID)> Callback) const {
     Callback(this, static_cast<Job::PID>(OSPid));
   }
@@ -401,7 +401,7 @@ public:
   /// Call the provided callback for each Job in the batch, passing the
   /// corresponding quasi-PID with each Job.
   void forEachContainedJobAndPID(
-      llvm::sys::ProcessInfo::ProcessId OSPid,
+      llvm::sys::procid_t OSPid,
       llvm::function_ref<void(const Job *, Job::PID)> Callback) const override {
     Job::PID QPid = QuasiPIDBase;
     assert(QPid < 0);

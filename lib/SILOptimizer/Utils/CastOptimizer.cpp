@@ -353,8 +353,8 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
   Members = NTD->lookupDirect(M.getASTContext().Id_bridgeToObjectiveC);
   if (Members.empty()) {
     if (NTD->getDeclContext()->lookupQualified(
-            NTD->getDeclaredType(), M.getASTContext().Id_bridgeToObjectiveC,
-            NLOptions::NL_ProtocolMembers, nullptr, FoundMembers)) {
+            NTD, M.getASTContext().Id_bridgeToObjectiveC,
+            NLOptions::NL_ProtocolMembers, FoundMembers)) {
       Members = FoundMembers;
       // Returned members are starting with the most specialized ones.
       // Thus, the first element is what we are looking for.

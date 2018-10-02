@@ -86,6 +86,7 @@ public:
     return None;
   }
 
+  void dump() const;
 };
 
 } // end namespace swift

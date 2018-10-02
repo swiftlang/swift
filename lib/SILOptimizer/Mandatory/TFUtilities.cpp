@@ -102,7 +102,7 @@ static void getAllFields(NominalTypeDecl *decl,
                          SmallVectorImpl<VarDecl *> &fields) {
   for (auto *field : decl->getStoredProperties())
     fields.push_back(field);
-  if (auto *classdecl = decl->getAsClassOrClassExtensionContext())
+  if (auto *classdecl = decl->getSelfClassDecl())
     if (auto *superclass = classdecl->getSuperclassDecl())
       getAllFields(superclass, fields);
 }

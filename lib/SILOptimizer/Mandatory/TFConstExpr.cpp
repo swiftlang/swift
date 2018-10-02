@@ -25,7 +25,6 @@
 #include "llvm/Support/TrailingObjects.h"
 
 using namespace swift;
-using namespace tf;
 
 static llvm::cl::opt<unsigned>
     ConstExprLimit("constexpr-limit", llvm::cl::init(512),
@@ -176,7 +175,7 @@ static void lookupOrLinkWitnessTable(ProtocolConformanceRef confRef,
     return;
 
   auto *decl =
-      conf->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+      conf->getDeclContext()->getSelfNominalTypeDecl();
   auto linkage = getSILLinkage(getDeclLinkage(decl), NotForDefinition);
   auto *newTable = module.createWitnessTableDeclaration(conf, linkage);
   newTable = module.getSILLoader()->lookupWitnessTable(newTable);
@@ -780,15 +779,6 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
 
   SILFunction *callee = calleeFn.getFunctionValue();
 
-  // If we reached an external function that hasn't been deserialized yet, make
-  // sure to pull it in so we can see its body.  If that fails, then we can't
-  // analyze the function.
-  if (callee->isExternalDeclaration()) {
-    callee->getModule().loadFunction(callee);
-    if (callee->isExternalDeclaration())
-      return computeOpaqueCallResult(apply, callee);
-  }
-
   // TODO: Verify that the callee was defined as a @constexpr function.
 
   // If this is a well-known function, do not step into it.
@@ -895,6 +885,15 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
                                                 evaluator.getAllocator()));
     return None;
   }
+  }
+
+  // If we reached an external function that hasn't been deserialized yet, make
+  // sure to pull it in so we can see its body.  If that fails, then we can't
+  // analyze the function.
+  if (callee->isExternalDeclaration()) {
+    callee->getModule().loadFunction(callee);
+    if (callee->isExternalDeclaration())
+      return computeOpaqueCallResult(apply, callee);
   }
 
   // Verify that we can fold all of the arguments to the call.

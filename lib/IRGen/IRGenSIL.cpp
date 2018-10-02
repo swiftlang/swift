@@ -1968,8 +1968,6 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   // 2. Run the graph_op
   // 3. Set the output tensor handles via setLoweredExplosion()
 
-  auto &silModule = CurSILFn->getModule();
-
   auto *TFNewStatusFn = IGM.getTF_NewStatusFn();
   auto status = Builder.CreateCall(TFNewStatusFn, {});
 
@@ -2015,8 +2013,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
       auto tensorHandleValue =
           getLoweredSingletonExplosion(tensorHandleSilValue);
-      llvm::Function *extractHandleFn =
-          findFunction("_swift_tfc_ExtractFloatCTensorHandle", silModule);
+      auto *extractHandleFn = IGM.getTFC_GetCTensorHandleFromSwiftFn();
       auto cHandle = Builder.CreateCall(extractHandleFn, {tensorHandleValue});
 
       // Add an op input as in:
@@ -2068,7 +2065,14 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       case SymbolicValue::String:
         // TODO: move the DEVICE_ATTR string def to a place accessible here.
         if (attrName == "__device") {
-          // TODO: set device via TFE_OpGetDevice()
+          auto deviceStr = attr.value.getStringValue();
+          // In this case, just let eager pick a default device.
+          if (deviceStr == "ALL_DEVICES")
+            break;
+          auto *setDeviceFn = IGM.getTFE_OpSetDeviceFn();
+          auto device = createStringValAddr(IGM, deviceStr);
+          Builder.CreateCall(setDeviceFn, {op, device, status});
+          checkOk(status);
         } else {
           llvm_unreachable("TODO: implement this");
         }
@@ -2091,18 +2095,37 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         i->dump();
         llvm_unreachable("dtype attr must have been processed!");
       }
-      if (attr.value.getKind() != SymbolicValue::Float) {
+
+      llvm::Value *tensor = nullptr;
+      switch (attr.value.getKind()) {
+      case SymbolicValue::Float: {
+        auto apfloat = attr.value.getFloatValue();
+        // CreateScalarFloatTensor() takes an int instead of float, as runtime
+        // functions that take/return float values do not yet exist.
+        auto constVal =
+            llvm::ConstantInt::get(IGM.Int32Ty, apfloat.convertToFloat());
+        LLVM_DEBUG(llvm::dbgs() << "The const value is " << *constVal << ".\n");
+
+        auto *createTensorFn = IGM.getTFC_CreateScalarFloatTensorFn();
+        tensor = Builder.CreateCall(createTensorFn, {constVal});
+        break;
+      }
+      case SymbolicValue::Integer: {
+        auto apint = attr.value.getIntegerValue();
+        auto constVal = llvm::ConstantInt::get(
+            IGM.Int64Ty, apint.sextOrTrunc(64).getLimitedValue());
+        LLVM_DEBUG(llvm::dbgs() << "The const value is " << *constVal << ".\n");
+
+        auto *createTensorFn = IGM.getTFC_CreateScalarIntTensorFn();
+        tensor = Builder.CreateCall(
+            createTensorFn,
+            {constVal, llvm::ConstantInt::get(IGM.Int32Ty, dtypeAttr), status});
+        checkOk(status);
+        break;
+      }
+      default:
         llvm_unreachable("TODO: support other dtypes for tensor attr.");
       }
-      auto apfloat = attr.value.getFloatValue();
-      // CreateScalarFloatTensor() takes an int instead of float, as runtime
-      // functions that take/return float values do not yet exist.
-      auto constVal =
-          llvm::ConstantInt::get(IGM.Int32Ty, apfloat.convertToFloat());
-      LLVM_DEBUG(llvm::dbgs() << "The const value is " << *constVal << ".\n");
-
-      auto *createTensorFn = IGM.getTFC_CreateScalarFloatTensorFn();
-      auto tensor = Builder.CreateCall(createTensorFn, {constVal});
 
       // Set up the tensor-typed value attr as in:
       //   TFE_OpSetAttrTensor(op, "value", tensor, status);
@@ -2167,8 +2190,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
                           << ".\n");
 
   // Wrap `cTensorHandle` into a TensorHandle<T> object.
-  llvm::Function *createHandleFn = findFunction(
-      "_swift_tfc_CreateFloatTensorHandleFromCTensorHandle", silModule);
+  auto *createHandleFn = IGM.getTFC_CreateTensorHandleFromCFn();
   auto tensorHandle = Builder.CreateCall(createHandleFn, {cTensorHandle});
 
   LLVM_DEBUG(
@@ -4336,9 +4358,15 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
   VarDecl *Decl = i->getDecl();
   // Describe the underlying alloca. This way an llvm.dbg.declare instrinsic
   // is used, which is valid for the entire lifetime of the alloca.
-  if (auto *BitCast = dyn_cast<llvm::BitCastInst>(addr))
-    if (auto *Alloca = dyn_cast<llvm::AllocaInst>(BitCast->getOperand(0)))
+  if (auto *BitCast = dyn_cast<llvm::BitCastInst>(addr)) {
+    auto *Op0 = BitCast->getOperand(0);
+    if (auto *Alloca = dyn_cast<llvm::AllocaInst>(Op0))
       addr = Alloca;
+    else if (auto *CoroAllocaGet = dyn_cast<llvm::IntrinsicInst>(Op0)) {
+      if (CoroAllocaGet->getIntrinsicID() == llvm::Intrinsic::coro_alloca_get)
+        addr = CoroAllocaGet;
+    }
+  }
 
   auto DS = i->getDebugScope();
   if (!DS)
@@ -4351,7 +4379,9 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
   StringRef Name = getVarName(i, IsAnonymous);
 
   // At this point addr must be an alloca or an undef.
-  assert(isa<llvm::AllocaInst>(addr) || isa<llvm::UndefValue>(addr));
+  assert(isa<llvm::AllocaInst>(addr) || isa<llvm::UndefValue>(addr) ||
+         isa<llvm::IntrinsicInst>(addr));
+
   auto Indirection = DirectValue;
   if (!IGM.IRGen.Opts.shouldOptimize())
     if (auto *Alloca = dyn_cast<llvm::AllocaInst>(addr))

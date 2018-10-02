@@ -87,13 +87,13 @@ struct SILReverseAutoDiffIndices {
   unsigned source;
   /// Indices of independent parameters to differentiate with respect to.
   llvm::SmallBitVector parameters;
-  
+
   /// Creates a set of AD indices from the given source index and a bit vector
   /// representing parameter indices.
   /*implicit*/ SILReverseAutoDiffIndices(unsigned source,
                                          llvm::SmallBitVector parameters)
     : source(source), parameters(parameters) {}
-  
+
   /// Creates a set of AD indices from the given source index and an array of
   /// parameter indices. Elements in `parameters` must be acending integers.
   /*implicit*/ SILReverseAutoDiffIndices(unsigned source,
@@ -206,6 +206,118 @@ struct SILReverseAutoDiffConfig {
   bool operator==(const SILReverseAutoDiffConfig &other) const {
     return indices == other.indices &&
            options.toRaw() == other.options.toRaw();
+  }
+};
+
+class BuiltinFloatType;
+class NominalTypeDecl;
+class StructDecl;
+class TupleType;
+class EnumDecl;
+
+/// A type that represents the tangent space of a differentiable type.
+class TangentSpace {
+public:
+  /// A tangent space kind.
+  enum class Kind {
+    /// `Builtin.FP<...>`.
+    BuiltinRealScalar,
+    /// A type that conforms to `FloatingPoint`.
+    RealScalar,
+    /// A type that conforms to `VectorNumeric` where the associated
+    /// `ScalarElement` conforms to `FloatingPoint`.
+    RealVector,
+    /// A product of tangent spaces as a struct.
+    ProductStruct,
+    /// A product of tangent spaces as a tuple.
+    ProductTuple,
+    /// A sum of tangent spaces.
+    Sum
+  };
+
+private:
+  Kind kind;
+  union Value {
+    // BuiltinRealScalar
+    BuiltinFloatType *builtinFPType;
+    // RealScalar or RealVector
+    NominalTypeDecl *realNominalType;
+    // ProductStruct
+    StructDecl *structDecl;
+    // ProductTuple
+    TupleType *tupleType;
+    // Sum
+    EnumDecl *enumDecl;
+
+    Value(BuiltinFloatType *builtinFP) : builtinFPType(builtinFP) {}
+    Value(NominalTypeDecl *nominal) : realNominalType(nominal) {}
+    Value(StructDecl *structDecl) : structDecl(structDecl) {}
+    Value(TupleType *tupleType) : tupleType(tupleType) {}
+    Value(EnumDecl *enumDecl) : enumDecl(enumDecl) {}
+  } value;
+
+  TangentSpace(Kind kind, Value value)
+      : kind(kind), value(value) {}
+
+public:
+  TangentSpace() = delete;
+
+  static TangentSpace
+  getBuiltinRealScalarSpace(BuiltinFloatType *builtinFP) {
+    return {Kind::BuiltinRealScalar, builtinFP};
+  }
+  static TangentSpace getRealScalarSpace(NominalTypeDecl *typeDecl) {
+    return {Kind::RealScalar, typeDecl};
+  }
+  static TangentSpace getRealVectorSpace(NominalTypeDecl *typeDecl) {
+    return {Kind::RealVector, typeDecl};
+  }
+  static TangentSpace getProductStruct(StructDecl *structDecl) {
+    return {Kind::ProductStruct, structDecl};
+  }
+  static TangentSpace getProductTuple(TupleType *tupleTy) {
+    return {Kind::ProductTuple, tupleTy};
+  }
+  static TangentSpace getSum(EnumDecl *enumDecl) {
+    return {Kind::Sum, enumDecl};
+  }
+
+  bool isBuiltinRealScalarSpace() const {
+    return kind == Kind::BuiltinRealScalar;
+  }
+  bool isRealScalarSpace() const { return kind == Kind::RealScalar; }
+  bool isRealVectorSpace() const { return kind == Kind::RealVector; }
+  bool isProductStruct() const { return kind == Kind::ProductStruct; }
+  bool isProductTuple() const { return kind == Kind::ProductTuple; }
+
+  Kind getKind() const { return kind; }
+  BuiltinFloatType *getBuiltinRealScalarSpace() const {
+    assert(kind == Kind::BuiltinRealScalar);
+    return value.builtinFPType;
+  }
+  NominalTypeDecl *getRealScalarSpace() const {
+    assert(kind == Kind::RealScalar);
+    return value.realNominalType;
+  }
+  NominalTypeDecl *getRealVectorSpace() const {
+    assert(kind == Kind::RealVector);
+    return value.realNominalType;
+  }
+  NominalTypeDecl *getRealScalarOrVectorSpace() const {
+    assert(kind == Kind::RealScalar || kind == Kind::RealVector);
+    return value.realNominalType;
+  }
+  StructDecl *getProductStruct() const {
+    assert(kind == Kind::ProductStruct);
+    return value.structDecl;
+  }
+  TupleType *getProductTuple() const {
+    assert(kind == Kind::ProductTuple);
+    return value.tupleType;
+  }
+  EnumDecl *getSum() const {
+    assert(kind == Kind::Sum);
+    return value.enumDecl;
   }
 };
 

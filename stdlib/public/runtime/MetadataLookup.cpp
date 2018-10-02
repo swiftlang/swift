@@ -793,14 +793,16 @@ Optional<unsigned> findAssociatedTypeByName(const ProtocolDescriptor *protocol,
   unsigned matchingAssocTypeIdx = 0;
   bool found = false;
   while (!associatedTypeNames.empty()) {
-    auto split = associatedTypeNames.split(' ');
-    if (split.first == name) {
+    // Avoid using StringRef::split because its definition is not
+    // provided in the header so that it requires linking with libSupport.a.
+    auto splitIdx = associatedTypeNames.find(' ');
+    if (associatedTypeNames.substr(0, splitIdx) == name) {
       found = true;
       break;
     }
 
     ++matchingAssocTypeIdx;
-    associatedTypeNames = split.second;
+    associatedTypeNames = associatedTypeNames.substr(splitIdx).substr(1);
   }
 
   if (!found) return None;

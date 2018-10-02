@@ -59,7 +59,8 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
     EndOffset = SM.getRangeForBuffer(BufferID).getByteLength();
 
   Lexer L(LangOpts, SM, BufferID, Diags, /*InSILMode=*/false,
-          RetainComments, TriviaRetention, Offset, EndOffset);
+          HashbangMode::Allowed, RetainComments, TriviaRetention, Offset,
+          EndOffset);
 
   auto TokComp = [&](const Token &A, const Token &B) {
     return SM.isBeforeInBuffer(A.getLoc(), B.getLoc());
@@ -311,15 +312,15 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
   syntax::AbsolutePosition RunningPos;
 
   tokenize(
-      LangOpts, SM, BufferID, Offset, EndOffset,
-      Diags,
+      LangOpts, SM, BufferID, Offset, EndOffset, Diags,
       CommentRetentionMode::AttachToNextToken, TriviaRetentionMode::WithTrivia,
       /*TokenizeInterpolatedString=*/false,
       /*SplitTokens=*/ArrayRef<Token>(),
       [&](const Token &Tok, const Trivia &LeadingTrivia,
           const Trivia &TrailingTrivia) {
+        auto Text = OwnedString::makeRefCounted(Tok.getText());
         auto ThisToken =
-            RawSyntax::make(Tok.getKind(), Tok.getText(), LeadingTrivia.Pieces,
+            RawSyntax::make(Tok.getKind(), Text, LeadingTrivia.Pieces,
                             TrailingTrivia.Pieces, SourcePresence::Present);
 
         auto ThisTokenPos = ThisToken->accumulateAbsolutePosition(RunningPos);
@@ -340,6 +341,9 @@ Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
               SF.getASTContext().LangOpts, SF.getASTContext().SourceMgr,
               BufferID, &SF.getASTContext().Diags,
               /*InSILMode=*/SIL != nullptr,
+              SF.Kind == SourceFileKind::Main
+                  ? HashbangMode::Allowed
+                  : HashbangMode::Disallowed,
               SF.getASTContext().LangOpts.AttachCommentsToDecls
                   ? CommentRetentionMode::AttachToNextToken
                   : CommentRetentionMode::None,
@@ -375,6 +379,7 @@ class TokenRecorder: public ConsumeTokenReceiver {
   void relexComment(CharSourceRange CommentRange,
                     llvm::SmallVectorImpl<Token> &Scracth) {
     Lexer L(Ctx.LangOpts, Ctx.SourceMgr, BufferID, nullptr, /*InSILMode=*/false,
+            HashbangMode::Disallowed,
             CommentRetentionMode::ReturnAsTokens,
             TriviaRetentionMode::WithoutTrivia,
             SM.getLocOffsetInBuffer(CommentRange.getStart(), BufferID),
@@ -709,6 +714,13 @@ void Parser::skipUntilConditionalBlockClose() {
   }
 }
 
+bool Parser::skipUntilTokenOrEndOfLine(tok T1) {
+  while (Tok.isNot(tok::eof, T1) && !Tok.isAtStartOfLine())
+    skipSingle();
+
+  return Tok.is(T1) && !Tok.isAtStartOfLine();
+}
+
 bool Parser::loadCurrentSyntaxNodeFromCache() {
   // Don't do a cache lookup when not building a syntax tree since otherwise
   // the corresponding AST nodes do not get created
@@ -1033,13 +1045,14 @@ ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID,
 }
 
 ParserUnit::ParserUnit(SourceManager &SM, unsigned BufferID,
-             unsigned Offset, unsigned EndOffset)
+                       unsigned Offset, unsigned EndOffset)
   : Impl(*new Implementation(SM, BufferID, LangOptions(), "input")) {
 
   std::unique_ptr<Lexer> Lex;
   Lex.reset(new Lexer(Impl.LangOpts, SM,
                       BufferID, &Impl.Diags,
                       /*InSILMode=*/false,
+                      HashbangMode::Allowed,
                       CommentRetentionMode::None,
                       TriviaRetentionMode::WithoutTrivia,
                       Offset, EndOffset));

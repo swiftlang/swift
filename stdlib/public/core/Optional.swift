@@ -332,8 +332,8 @@ extension Optional : Equatable where Wrapped : Equatable {
   ///     }
   ///     // Prints "The two groups start the same."
   ///
-  /// You can also use this operator to compare a non-optional value to an
-  /// optional that wraps the same type. The non-optional value is wrapped as an
+  /// You can also use this operator to compare a nonoptional value to an
+  /// optional that wraps the same type. The nonoptional value is wrapped as an
   /// optional before the comparison is made. In the following example, the
   /// `numberToMatch` constant is wrapped as an optional before comparing to the
   /// optional `numberFromString`:
@@ -389,8 +389,8 @@ extension Optional : Equatable where Wrapped : Equatable {
   ///     }
   ///     // Prints "The two groups start differently."
   ///
-  /// You can also use this operator to compare a non-optional value to an
-  /// optional that wraps the same type. The non-optional value is wrapped as an
+  /// You can also use this operator to compare a nonoptional value to an
+  /// optional that wraps the same type. The nonoptional value is wrapped as an
   /// optional before the comparison is made. In this example, the
   /// `numberToMatch` constant is wrapped as an optional before comparing to the
   /// optional `numberFromString`:
@@ -694,7 +694,7 @@ public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T)
 ///
 /// If `userPrefs[greetingKey]` has a value, that value is assigned to
 /// `greeting`. If not, any value in `defaults[greetingKey]` will succeed, and
-/// if not that, `greeting` will be set to the non-optional default value,
+/// if not that, `greeting` will be set to the nonoptional default value,
 /// `"Greetings!"`.
 ///
 /// - Parameters:

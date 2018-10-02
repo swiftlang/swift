@@ -72,16 +72,6 @@ public:
   /// considered to be members of the extended type.
   virtual void resolveExtension(ExtensionDecl *ext) = 0;
 
-  using ConformanceConstructionInfo = std::pair<SourceLoc, ProtocolDecl *>;
-  /// Resolve enough of an extension to find which protocols it is declaring
-  /// conformance to.
-  ///
-  /// This can be called to ensure that the "extension Foo: Bar, Baz" part of
-  /// the extension is understood.
-  virtual void resolveExtensionForConformanceConstruction(
-      ExtensionDecl *ext,
-      SmallVectorImpl<ConformanceConstructionInfo> &protocols) = 0;
-
   /// Resolve any implicitly-declared constructors within the given nominal.
   virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) = 0;
 

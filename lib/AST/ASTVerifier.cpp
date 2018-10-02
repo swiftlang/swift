@@ -1406,6 +1406,145 @@ public:
       verifyCheckedBase(E);
     }
 
+    void verifyChecked(ErasureExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying ErasureExpr", E);
+
+      if (!E->getType()->isAnyExistentialType()) {
+        Out << "ErasureExpr result is not an existential: ";
+        E->getType()->print(Out);
+        Out << "\n";
+        abort();
+      }
+
+      auto erasedTy = E->getType();
+      auto concreteTy = E->getSubExpr()->getType();
+      
+      // Erasure can be from concrete to existential or from existential to more
+      // general existential. If we look through metatypes then we're forced
+      // into one or the other by context; otherwise, it doesn't matter.
+      enum {
+        AnyErasure,
+        ConcreteErasureOnly,
+        ExistentialErasureOnly,
+      } knownConcreteErasure = AnyErasure;
+      
+      // Existential metatypes should be erased from (existential or concrete)
+      // metatypes.
+      while (auto meta = erasedTy->getAs<ExistentialMetatypeType>()) {
+        erasedTy = meta->getInstanceType();
+        if (auto concreteMeta = concreteTy->getAs<MetatypeType>()) {
+          // If this is already forced to be an existential erasure, we
+          // shouldn't be here, since (P & Q).Protocol.Type doesn't exist as
+          // a type.
+          assert(knownConcreteErasure != ExistentialErasureOnly);
+          knownConcreteErasure = ConcreteErasureOnly;
+          concreteTy = concreteMeta->getInstanceType();
+        } else if (auto existentialMeta =
+                     concreteTy->getAs<ExistentialMetatypeType>()) {
+          // If this is already forced to be a concrete erasure (say we're going
+          // from (P & Q).Type.Protocol to P.Type.Type), then this is invalid,
+          // because it would require the existential metatype to be
+          // "self-conforming" to the protocol's static requirements (in other
+          // words, (P & Q).Type.self would have to be able to witness all of P's
+          // static requirements), which is currently never the case.
+          if (knownConcreteErasure == true) {
+            Out << "ErasureExpr concrete metatype is not a subtype of the "
+                   "existential metatype\n"
+                   "Destination type: ";
+            E->getType()->print(Out);
+            Out << "\nSource type: ";
+            E->getSubExpr()->getType()->print(Out);
+            Out << "\n";
+            abort();
+          }
+          knownConcreteErasure = ExistentialErasureOnly;
+          concreteTy = concreteMeta->getInstanceType();
+        } else {
+          // Anything else wouldn't be a valid erasure to an existential
+          // metatype.
+          Out << "ErasureExpr from non-metatype to existential metatype\n"
+                 "Destination type: ";
+          E->getType()->print(Out);
+          Out << "\nSource type: ";
+          E->getSubExpr()->getType()->print(Out);
+          Out << "\n";
+          abort();
+        }
+      }
+
+      auto erasedLayout = erasedTy->getCanonicalType()->getExistentialLayout();
+
+      // An existential-to-existential erasure ought to reduce the set of
+      // constraints.
+      if (knownConcreteErasure != ConcreteErasureOnly
+          && concreteTy->isExistentialType()) {
+        // TODO
+      } else {
+        // Check class constraints.
+        if (erasedLayout.requiresClass()) {
+          // A class constraint can be satisfied by a class, class-constrained
+          // archetype, or a class-constrained existential with no witness table
+          // requirements.
+          bool canBeClass;
+          if (concreteTy->mayHaveSuperclass()) {
+            canBeClass = true;
+          } else if (concreteTy->isExistentialType()) {
+            auto concreteLayout = concreteTy->getCanonicalType()
+                                            ->getExistentialLayout();
+            canBeClass = concreteLayout.getKind() == ExistentialLayout::Kind::Class
+              && !concreteLayout.containsNonObjCProtocol;
+          } else {
+            canBeClass = false;
+          }
+          
+          if (!canBeClass) {
+            Out << "ErasureExpr from non-class to existential that requires a "
+                   "class\n"
+                   "Destination type: ";
+            E->getType()->print(Out);
+            Out << "\nSource type: ";
+            E->getSubExpr()->getType()->print(Out);
+            Out << "\n";
+            abort();
+          }
+        }
+        
+        auto superclass = erasedLayout.getSuperclass();
+        if (superclass
+            && !superclass->isExactSuperclassOf(concreteTy)) {
+          Out << "ErasureExpr from class to existential with a superclass "
+                 "constraint that does not match the class\n"
+                 "Destination type: ";
+          E->getType()->print(Out);
+          Out << "\nSource type: ";
+          E->getSubExpr()->getType()->print(Out);
+          Out << "\n";
+          abort();
+        }
+        
+        // A concrete-to-existential erasure should have conformances on hand
+        // for all of the existential's requirements.
+        auto conformances = E->getConformances();
+        for (auto proto : erasedLayout.getProtocols()) {
+          if (std::find_if(conformances.begin(), conformances.end(),
+                           [&](ProtocolConformanceRef ref) -> bool {
+                             return ref.getRequirement() == proto->getDecl();
+                           })
+              == conformances.end()) {
+            Out << "ErasureExpr is missing conformance for required protocol\n";
+            E->getType()->print(Out);
+            Out << "\nSource type: ";
+            E->getSubExpr()->getType()->print(Out);
+            Out << "\n";
+            abort();
+          }
+          // TODO: Verify that the conformance applies to the type?
+        }
+        
+        // TODO: Check layout constraints?
+      }
+    }
+
     void verifyChecked(AnyHashableErasureExpr *E) {
       auto anyHashableDecl = Ctx.getAnyHashableDecl();
       if (!anyHashableDecl) {
@@ -2117,29 +2256,20 @@ public:
       verifyCheckedBase(E);
     }
 
-    static bool hasEnclosingFunctionContext(DeclContext *dc) {
-      switch (dc->getContextKind()) {
-      case DeclContextKind::AbstractClosureExpr:
-      case DeclContextKind::AbstractFunctionDecl:
-      case DeclContextKind::SerializedLocal:
-        return true;
-
-      case DeclContextKind::TopLevelCodeDecl:
-      case DeclContextKind::Module:
-      case DeclContextKind::FileUnit:
-        return false;
-
-      case DeclContextKind::Initializer:
-      case DeclContextKind::GenericTypeDecl:
-      case DeclContextKind::ExtensionDecl:
-      case DeclContextKind::SubscriptDecl:
-        return hasEnclosingFunctionContext(dc->getParent());
+    void verifyChecked(ValueDecl *VD) {
+      if (VD->getInterfaceType()->hasError()) {
+        Out << "checked decl cannot have error type\n";
+        VD->dump(Out);
+        abort();
       }
 
-      llvm_unreachable("Unhandled DeclContextKind in switch.");
-    }
+      // Make sure that there are no archetypes in the interface type.
+      if (!isa<VarDecl>(VD) && VD->getInterfaceType()->hasArchetype()) {
+        Out << "Interface type contains archetypes\n";
+        VD->dump(Out);
+        abort();
+      }
 
-    void verifyChecked(ValueDecl *VD) {
       if (VD->hasAccess()) {
         if (VD->getFormalAccess() == AccessLevel::Open) {
           if (!isa<ClassDecl>(VD) && !VD->isPotentiallyOverridable()) {
@@ -2154,24 +2284,11 @@ public:
           }
         }
       } else {
-        if (!VD->getDeclContext()->isLocalContext() &&
-            !isa<GenericTypeParamDecl>(VD) && !isa<ParamDecl>(VD)) {
+        if (!isa<GenericTypeParamDecl>(VD) && !isa<VarDecl>(VD)) {
           dumpRef(VD);
-          Out << " does not have access";
+          Out << " does not have access\n";
           abort();
         }
-      }
-
-      // Make sure that there are no archetypes in the interface type.
-      if (VD->getDeclContext()->isTypeContext() &&
-          !hasEnclosingFunctionContext(VD->getDeclContext()) &&
-          VD->getInterfaceType()->hasArchetype() &&
-          VD->getInterfaceType().findIf([](Type type) {
-            return type->is<ArchetypeType>();
-          })) {
-        Out << "Interface type contains archetypes\n";
-        VD->dump(Out);
-        abort();
       }
 
       verifyCheckedBase(VD);
@@ -2296,8 +2413,7 @@ public:
         abort();
       }
 
-      Type typeForAccessors =
-          var->getInterfaceType()->getReferenceStorageReferent();
+      Type typeForAccessors = var->getValueInterfaceType();
       if (!var->getDeclContext()->contextHasLazyGenericEnvironment()) {
         typeForAccessors =
             var->getDeclContext()->mapTypeIntoContext(typeForAccessors);
@@ -2372,31 +2488,6 @@ public:
         if (ext->getExtendedType())
           ext->getExtendedType().print(Out);
       }
-    }
-
-    /// Check the given list of protocols.
-    void verifyProtocolList(Decl *decl, ArrayRef<ProtocolDecl *> protocols) {
-      PrettyStackTraceDecl debugStack("verifying ProtocolList", decl);
-
-      // Make sure that the protocol list is fully expanded.
-      SmallVector<ProtocolDecl *, 4> nominalProtocols(protocols.begin(),
-                                                      protocols.end());
-      ProtocolType::canonicalizeProtocols(nominalProtocols);
-
-      SmallVector<Type, 4> protocolTypes;
-      for (auto proto : protocols)
-        protocolTypes.push_back(proto->getDeclaredType());
-      auto type = ProtocolCompositionType::get(Ctx, protocolTypes,
-                                               /*HasExplicitAnyObject=*/false);
-      auto layout = type->getExistentialLayout();
-      SmallVector<ProtocolDecl *, 4> canonicalProtocols;
-      for (auto *protoTy : layout.getProtocols())
-        canonicalProtocols.push_back(protoTy->getDecl());
-      if (nominalProtocols != canonicalProtocols) {
-        dumpRef(decl);
-        Out << " doesn't have a complete set of protocols\n";
-        abort();
-      }      
     }
 
     /// Verify that the given conformance makes sense for the given
@@ -2615,9 +2706,6 @@ public:
     }
 
     void verifyChecked(NominalTypeDecl *nominal) {
-      // Make sure that the protocol list is fully expanded.
-      verifyProtocolList(nominal, nominal->getLocalProtocols());
-
       // Make sure that the protocol conformances are complete.
       // Only do so within the source file of the nominal type,
       // because anywhere else this can trigger new type-check requests.
@@ -2633,9 +2721,6 @@ public:
     }
 
     void verifyChecked(ExtensionDecl *ext) {
-      // Make sure that the protocol list is fully expanded.
-      verifyProtocolList(ext, ext->getLocalProtocols());
-
       // Make sure that the protocol conformances are complete.
       for (auto conformance : ext->getLocalConformances()) {
         verifyConformance(ext, conformance);
@@ -2717,7 +2802,7 @@ public:
     void verifyChecked(ConstructorDecl *CD) {
       PrettyStackTraceDecl debugStack("verifying ConstructorDecl", CD);
 
-      auto *ND = CD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+      auto *ND = CD->getDeclContext()->getSelfNominalTypeDecl();
       if (!isa<ClassDecl>(ND) && !isa<StructDecl>(ND) && !isa<EnumDecl>(ND) &&
           !isa<ProtocolDecl>(ND) && !CD->isInvalid()) {
         Out << "ConstructorDecls outside structs, classes or enums "
@@ -2908,7 +2993,7 @@ public:
     void verifyChecked(DestructorDecl *DD) {
       PrettyStackTraceDecl debugStack("verifying DestructorDecl", DD);
 
-      auto *ND = DD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+      auto *ND = DD->getDeclContext()->getSelfNominalTypeDecl();
       if (!isa<ClassDecl>(ND) && !DD->isInvalid()) {
         Out << "DestructorDecls outside classes should be marked invalid";
         abort();
@@ -2924,7 +3009,7 @@ public:
           Out << "mutating function is not an instance member\n";
           abort();
         }
-        if (FD->getDeclContext()->getAsClassOrClassExtensionContext()) {
+        if (FD->getDeclContext()->getSelfClassDecl()) {
           Out << "mutating function in a class\n";
           abort();
         }

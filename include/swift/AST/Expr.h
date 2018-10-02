@@ -694,19 +694,12 @@ public:
 /// can help us preserve the context of the code completion position.
 class CodeCompletionExpr : public Expr {
   SourceRange Range;
-  bool Activated;
 
 public:
-  CodeCompletionExpr(SourceRange Range, Type Ty = Type()) :
-      Expr(ExprKind::CodeCompletion, /*Implicit=*/true, Ty),
-      Range(Range) {
-    Activated = false;
-  }
+  CodeCompletionExpr(SourceRange Range, Type Ty = Type())
+      : Expr(ExprKind::CodeCompletion, /*Implicit=*/true, Ty), Range(Range) {}
 
   SourceRange getSourceRange() const { return Range; }
-
-  bool isActivated() const { return Activated; }
-  void setActivated() { Activated = true; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::CodeCompletion;
@@ -2570,6 +2563,7 @@ class MakeTemporarilyEscapableExpr : public Expr {
   OpaqueValueExpr *EscapingClosureValue;
   Expr *SubExpr;
   SourceLoc NameLoc, LParenLoc, RParenLoc;
+  Expr *OriginalExpr;
 
 public:
   MakeTemporarilyEscapableExpr(SourceLoc NameLoc,
@@ -2578,12 +2572,14 @@ public:
                                Expr *SubExpr,
                                SourceLoc RParenLoc,
                                OpaqueValueExpr *OpaqueValueForEscapingClosure,
+                               Expr *OriginalExpr,
                                bool implicit = false)
     : Expr(ExprKind::MakeTemporarilyEscapable, implicit, Type()),
       NonescapingClosureValue(NonescapingClosureValue),
       EscapingClosureValue(OpaqueValueForEscapingClosure),
       SubExpr(SubExpr),
-      NameLoc(NameLoc), LParenLoc(LParenLoc), RParenLoc(RParenLoc)
+      NameLoc(NameLoc), LParenLoc(LParenLoc), RParenLoc(RParenLoc),
+      OriginalExpr(OriginalExpr)
   {}
   
   SourceLoc getStartLoc() const {
@@ -2616,6 +2612,12 @@ public:
   }
   void setSubExpr(Expr *e) {
     SubExpr = e;
+  }
+
+  /// Retrieve the original 'withoutActuallyEscaping(closure) { ... }'
+  //  expression.
+  Expr *getOriginalExpr() const {
+    return OriginalExpr;
   }
 
   static bool classof(const Expr *E) {

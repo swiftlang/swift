@@ -76,7 +76,7 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
   auto parentDC = toRawDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto enumDecl = parentDC->getAsEnumOrEnumExtensionContext();
+  auto enumDecl = parentDC->getSelfEnumDecl();
 
   Type rawTy = enumDecl->getRawType();
   assert(rawTy);
@@ -207,7 +207,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
   auto parentDC = initDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto nominalTypeDecl = parentDC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto nominalTypeDecl = parentDC->getSelfNominalTypeDecl();
   auto enumDecl = cast<EnumDecl>(nominalTypeDecl);
 
   Type rawTy = enumDecl->getRawType();
@@ -317,13 +317,14 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   assert(equatableProto);
   assert(tc.conformsToProtocol(rawType, equatableProto, enumDecl, None));
   (void)equatableProto;
+  (void)rawType;
 
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC,
                                          /*static*/false, /*inout*/true);
 
   auto *rawDecl = new (C)
       ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                C.Id_rawValue, SourceLoc(), C.Id_rawValue, rawType, parentDC);
+                C.Id_rawValue, SourceLoc(), C.Id_rawValue, parentDC);
   rawDecl->setInterfaceType(rawInterfaceType);
   rawDecl->setImplicit();
   auto paramList = ParameterList::createWithoutLoc(rawDecl);

@@ -73,6 +73,7 @@ public:
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
   IGNORED_ATTR(Available)
+  IGNORED_ATTR(HasInitialValue)
   IGNORED_ATTR(CDecl)
   IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
@@ -219,9 +220,9 @@ public:
 
     // 'final' only makes sense in the context of a class declaration.
     // Reject it on global functions, protocols, structs, enums, etc.
-    if (!D->getDeclContext()->getAsClassOrClassExtensionContext()) {
+    if (!D->getDeclContext()->getSelfClassDecl()) {
       if (TC.Context.isSwiftVersion3() && 
-          D->getDeclContext()->getAsProtocolExtensionContext())
+          D->getDeclContext()->getExtendedProtocolDecl())
         TC.diagnose(attr->getLocation(), 
           diag::protocol_extension_cannot_be_final)
           .fixItRemove(attr->getRange());
@@ -393,8 +394,7 @@ void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
 void AttributeEarlyChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {
   // Only instance properties can be 'IBInspectable'.
   auto *VD = cast<VarDecl>(D);
-  if (!VD->getDeclContext()->getAsClassOrClassExtensionContext() ||
-      VD->isStatic())
+  if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
     diagnoseAndRemoveAttr(attr, diag::invalid_ibinspectable,
                                  attr->getAttrName());
 }
@@ -402,18 +402,16 @@ void AttributeEarlyChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {
 void AttributeEarlyChecker::visitGKInspectableAttr(GKInspectableAttr *attr) {
   // Only instance properties can be 'GKInspectable'.
   auto *VD = cast<VarDecl>(D);
-  if (!VD->getDeclContext()->getAsClassOrClassExtensionContext() ||
-      VD->isStatic())
+  if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
     diagnoseAndRemoveAttr(attr, diag::invalid_ibinspectable,
                                  attr->getAttrName());
 }
 
 void AttributeEarlyChecker::visitSILStoredAttr(SILStoredAttr *attr) {
   auto *VD = cast<VarDecl>(D);
-  if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
+  if (VD->getDeclContext()->getSelfClassDecl())
     return;
-  auto nominalDecl = VD->getDeclContext()
-      ->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto nominalDecl = VD->getDeclContext()->getSelfNominalTypeDecl();
   if (nominalDecl && isa<StructDecl>(nominalDecl))
     return;
   diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute_simple);
@@ -464,8 +462,7 @@ isAcceptableOutletType(Type type, bool &isArray, TypeChecker &TC) {
 void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   // Only instance properties can be 'IBOutlet'.
   auto *VD = cast<VarDecl>(D);
-  if (!VD->getDeclContext()->getAsClassOrClassExtensionContext() ||
-      VD->isStatic())
+  if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
     diagnoseAndRemoveAttr(attr, diag::invalid_iboutlet);
 
   if (!VD->isSettable(nullptr))
@@ -520,7 +517,7 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
 void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
   // @NSManaged only applies to instance methods and properties within a class.
   if (cast<ValueDecl>(D)->isStatic() ||
-      !D->getDeclContext()->getAsClassOrClassExtensionContext()) {
+      !D->getDeclContext()->getSelfClassDecl()) {
     diagnoseAndRemoveAttr(attr, diag::attr_NSManaged_not_instance_member);
   }
 
@@ -783,6 +780,7 @@ public:
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
     IGNORED_ATTR(Alignment)
+    IGNORED_ATTR(HasInitialValue)
     IGNORED_ATTR(ClangImporterSynthesizedType)
     IGNORED_ATTR(Consuming)
     IGNORED_ATTR(Convenience)
@@ -944,6 +942,7 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *funcDecl, DeclContext *DC,
   //    `ExpressibleByStringLiteral`.
   //    `D.Value` and the return type can be arbitrary.
 
+  TC.validateDeclForNameLookup(funcDecl);
   auto paramList = funcDecl->getParameters();
   if (paramList->size() != 1 || paramList->get(0)->isVariadic()) return false;
   auto argType = paramList->get(0)->getType();
@@ -1092,6 +1091,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   auto oneCandidate = candidates.front();
   candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
     auto cand = cast<SubscriptDecl>(entry.getValueDecl());
+    TC.validateDeclForNameLookup(cand);
     return isAcceptableDynamicMemberLookupSubscript(cand, decl, TC);
   });
 
@@ -1370,7 +1370,7 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   auto *VD = cast<VarDecl>(D);
 
   // It may only be used on class members.
-  auto classDecl = D->getDeclContext()->getAsClassOrClassExtensionContext();
+  auto classDecl = D->getDeclContext()->getSelfClassDecl();
   if (!classDecl) {
     TC.diagnose(attr->getLocation(), diag::nscopying_only_on_class_properties);
     attr->setInvalid();
@@ -1521,7 +1521,7 @@ static bool isObjCClassExtensionInOverlay(DeclContext *dc) {
     return false;
 
   // Find the extended class.
-  auto classDecl = ext->getAsClassOrClassExtensionContext();
+  auto classDecl = ext->getSelfClassDecl();
   if (!classDecl)
     return false;
 
@@ -1899,10 +1899,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   SmallVector<Requirement, 4> convertedRequirements;
   SmallVector<RequirementRepr, 4> resolvedRequirements;
 
-  // Add all requirements from the "where" clause to the old signature
-  // to check if there are any inconsistencies.
-  auto options = TypeResolutionOptions();
-
   // Set of generic parameters being constrained. It is used to
   // determine if a full specialization misses requirements for
   // some of the generic parameters.
@@ -1911,8 +1907,8 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   // Go over the set of requirements and resolve their types.
   for (auto &req : trailingWhereClause->getRequirements()) {
     if (req.getKind() == RequirementReprKind::SameType) {
-      auto firstType = TC.resolveType(req.getFirstTypeRepr(), FD, options);
-      auto secondType = TC.resolveType(req.getSecondTypeRepr(), FD, options);
+      auto firstType = TC.resolveType(req.getFirstTypeRepr(), FD, None);
+      auto secondType = TC.resolveType(req.getSecondTypeRepr(), FD, None);
       Type interfaceFirstType;
       Type interfaceSecondType;
 
@@ -1962,7 +1958,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
     }
 
     if (req.getKind() == RequirementReprKind::LayoutConstraint) {
-      auto subjectType = TC.resolveType(req.getSubjectRepr(), FD, options);
+      auto subjectType = TC.resolveType(req.getSubjectRepr(), FD, None);
       Type interfaceSubjectType;
 
       // Map types to their interface types.
@@ -1998,9 +1994,9 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
     }
 
     if (req.getKind() == RequirementReprKind::TypeConstraint) {
-      auto subjectType = TC.resolveType(req.getSubjectRepr(), FD, options);
+      auto subjectType = TC.resolveType(req.getSubjectRepr(), FD, None);
       auto constraint = TC.resolveType(
-          req.getConstraintLoc().getTypeRepr(), FD, options);
+          req.getConstraintLoc().getTypeRepr(), FD, None);
 
       Type interfaceSubjectType;
 
@@ -2164,11 +2160,11 @@ void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
 
 void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   TypeLoc &ProtoTypeLoc = attr->getProtocolType();
-  auto options = TypeResolutionFlags::AllowUnboundGenerics;
+  TypeResolutionOptions options = None;
+  options |= TypeResolutionFlags::AllowUnboundGenerics;
 
   DeclContext *DC = D->getDeclContext();
-  Type T = TC.resolveType(ProtoTypeLoc.getTypeRepr(),
-                          DC, options);
+  Type T = TC.resolveType(ProtoTypeLoc.getTypeRepr(), DC, options);
   ProtoTypeLoc.setType(T);
 
   // Definite error-types were already diagnosed in resolveType.
@@ -2191,7 +2187,7 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 
     // Check that the decl we're decorating is a member of a type that actually
     // conforms to the specified protocol.
-    NominalTypeDecl *NTD = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+    NominalTypeDecl *NTD = DC->getSelfNominalTypeDecl();
     SmallVector<ProtocolConformance *, 2> conformances;
     if (!NTD->lookupConformance(DC->getParentModule(), PD, conformances)) {
       TC.diagnose(attr->getLocation(),
@@ -2258,24 +2254,25 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return;
   }
 
-  auto originalParamsTy = originalParams.getInterfaceType(ctx);
+  auto originalParamTypes = map<SmallVector<TupleTypeElt, 8>>(
+      originalParams.getArray(),
+      [&](ParamDecl *decl) { return decl->getInterfaceType(); });
+  auto originalParamsTy = TupleType::get(originalParamTypes, ctx);
 
   // If the original function and the primal/adjoint have different parents, or
   // if they both have no type context and are in different modules, then it's
   // an error.
   // Returns true on error.
   std::function<bool(FuncDecl *)> hasValidTypeContext = [&](FuncDecl *func) {
+    // Check if both are top-level.
     if (!original->getInnermostTypeContext() &&
         !func->getInnermostTypeContext() &&
         original->getParentModule() == func->getParentModule())
       return true;
-    if (auto typeCtx1 = original->getInnermostTypeContext()) {
-      if (auto typeCtx2 = func->getInnermostTypeContext()) {
-        auto type1 = typeCtx1->getDeclaredInterfaceType();
-        auto type2 = typeCtx2->getDeclaredInterfaceType();
-        return type1->isEqual(type2);
-      }
-    }
+    if (auto typeCtx1 = original->getInnermostTypeContext())
+      if (auto typeCtx2 = func->getInnermostTypeContext())
+        return typeCtx1->getSelfNominalTypeDecl() ==
+            typeCtx2->getSelfNominalTypeDecl();
     return original->getParent() == func->getParent();
   };
 
@@ -2302,6 +2299,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
   auto originalTypeCtx = original->getInnermostTypeContext();
   if (!originalTypeCtx) originalTypeCtx = original->getParent();
+  assert(originalTypeCtx);
 
   // Set lookup options.
   auto lookupOptions = defaultMemberLookupOptions
@@ -2350,8 +2348,12 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       // - has the same generic signature as the original function, and
       // - returns a 2-tuple where the second element type is the original
       //   function's result type.
+      TC.validateDeclForNameLookup(primalCandidate);
       auto primalParams = primalCandidate->getParameters();
-      auto primalParamsTy = primalParams->getInterfaceType(ctx);
+      auto primalParamTypes = map<SmallVector<TupleTypeElt, 8>>(
+          primalParams->getArray(),
+          [&](ParamDecl *decl) { return decl->getInterfaceType(); });
+      auto primalParamsTy = TupleType::get(primalParamTypes, ctx);
       if (!primalParamsTy->isEqual(originalParamsTy))
         return false;
       auto originalCanGenSig = original->getGenericSignature()
@@ -2577,7 +2579,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   };
 
   auto isValidAdjoint = [&](FuncDecl *adjointCandidate) {
-    // Returns true if adjoint candidate has the expected type.
+    TC.validateDeclForNameLookup(adjointCandidate);
     auto adjointType = adjointCandidate->getInterfaceType()
       ->getUnlabeledType(ctx);
     return adjointType->isEqual(expectedAdjointFnTy);
@@ -2679,8 +2681,11 @@ void AttributeChecker::visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr) {
     return;
   }
   // Only functions taking and returning TensorFlow values are permitted.
-  if (!tf::isTensorFlowValueOrAggregate(
-        FD->getParameters()->getType(FD->getASTContext())) ||
+  auto allParamsAreTFValues = llvm::all_of(FD->getParameters()->getArray(),
+      [&](ParamDecl *decl) {
+        return tf::isTensorFlowValueOrAggregate(decl->getInterfaceType());
+      });
+  if (!allParamsAreTFValues ||
       !tf::isTensorFlowValueOrAggregate(FD->getResultInterfaceType())) {
     diagnoseAndRemoveAttr(attr,
                           diag::tf_graph_attr_function_tensorflow_value_only);
@@ -2714,7 +2719,7 @@ void AttributeChecker::visitTFParameterAttr(TFParameterAttr *attr) {
   // Declaration must be an instance stored property of a nominal type.
   auto *VD = dyn_cast<VarDecl>(D);
   auto *nominal =
-    VD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+    VD->getDeclContext()->getSelfNominalTypeDecl();
   if (!nominal || !VD->hasStorage() || VD->isStatic()) {
     diagnoseAndRemoveAttr(attr,
                           diag::tfparameter_attr_instance_stored_property_only,

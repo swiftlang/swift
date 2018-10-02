@@ -8,7 +8,7 @@
 // RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -o %t/Dictionary -Xfrontend -disable-access-control; \
 // RUN: fi
 //
-// RUN: %line-directive %t/main.swift -- %target-run %t/Dictionary
+// RUN: %target-codesign %t/Dictionary && %line-directive %t/main.swift -- %target-run %t/Dictionary
 // REQUIRES: executable_test
 
 import StdlibUnittest

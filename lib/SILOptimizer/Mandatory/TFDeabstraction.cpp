@@ -33,6 +33,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
@@ -93,6 +94,7 @@ namespace {
   /// specific SIL function, which has been designated as a potential top-level
   /// host for tensor code.
   class TFDeabstraction {
+    SILTransform &transform;
     SILFunction &fn;
     TensorFunctionClassifier &tfc;
     ConstExprEvaluator &constantEvaluator;
@@ -115,9 +117,11 @@ namespace {
     /// instructions using TensorHandle values.
     SmallVector<SILInstruction*, 32> tensorOps;
   public:
-    TFDeabstraction(SILFunction &fn, TensorFunctionClassifier &tfc,
+    TFDeabstraction(SILTransform &transform, SILFunction &fn,
+                    TensorFunctionClassifier &tfc,
                     ConstExprEvaluator &constantEvaluator, SILPassManager *PM)
-      : fn(fn), tfc(tfc), constantEvaluator(constantEvaluator), passManager(PM){
+      : transform(transform), fn(fn), tfc(tfc),
+        constantEvaluator(constantEvaluator), passManager(PM) {
     }
 
     /// Deabstract the specified top level function as a deabstraction context.
@@ -263,7 +267,8 @@ void TFDeabstraction::inlineCalls() {
 
   // Use the mandatory inlining algorithm to expose call sites that contain
   // TensorFlow values as their argument or result lists.
-  inlineForTFDeabstraction(fn,
+  SILOptFunctionBuilder funcBuilder(transform);
+  inlineForTFDeabstraction(funcBuilder, fn,
      [&](FullApplySite site, SILFunction &callee) -> bool {
        if (callee.empty() &&
            !site.getModule().linkFunction(&callee,
@@ -344,10 +349,7 @@ static SILValue lookThroughSingleElementStructInsts(SILValue value) {
 ///
 static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
                                             TFDeabstraction &TFDA) {
-  assert(origInst->getNumResults() == 1 &&
-         "SILGen should have generated a graph_op with 1 result");
-  auto origResult = origInst->getResult(0);
-  auto &ctx = origResult->getType().getASTContext();
+  auto &ctx = origInst->getFunction()->getASTContext();
   GraphOperationInfo opInfo(origInst);
 
   /// Return a VarDecl if this is a struct wrapping a single field which is a
@@ -384,22 +386,31 @@ static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
   };
 
   // Predicate that returns true if an argument of the specified type should be
-  // rewritten - either to load an address argument or expand a struct
-  // parameter.
-  auto canSimplifyOperand =
-      [&](SILType type, GraphOperationInfo::ArgumentLowering lowering) -> bool {
+  // rewritten to load an address argument or expand a struct parameter.
+  auto canSimplifyArgumentType = [&](SILType type) -> bool {
     return isLoadableAddressType(type) ||
-           getPrimitiveStructField(type.getASTType()) != nullptr ||
-           lowering == GraphOperationInfo::ArgumentLowering::Out;
+           getPrimitiveStructField(type.getASTType()) != nullptr;
+  };
+
+  // Predicate that returns true if an argument should be rewritten.
+  auto canSimplifyArgument =
+      [&](const GraphOperationInfo::StructuredArgument &argument) -> bool {
+    switch (argument.getKind()) {
+    case GraphOperationInfo::SAK_Single:
+      return canSimplifyArgumentType(argument.getSingleArgument()->getType()) ||
+             std::get<1>(argument.getArgumentNameAndLowering()) ==
+                 GraphOperationInfo::ArgumentLowering::Out;
+    case GraphOperationInfo::SAK_List:
+      // We can get SAK_List arguments from inlining functions that have already
+      // been deabstracted. These arguments do not need further simplification.
+      return false;
+    }
   };
 
   // If we don't have to change any arguments, don't rewrite the graph_op.
   bool mustChangeGraphOp = false;
   for (auto &argument : opInfo.getStructuredArguments()) {
-    assert(argument.getKind() == GraphOperationInfo::SAK_Single &&
-           "SILGen should not have generated a list argument");
-    if (canSimplifyOperand(argument.getSingleArgument()->getType(),
-                           std::get<1>(argument.getArgumentNameAndLowering()))) {
+    if (canSimplifyArgument(argument)) {
       mustChangeGraphOp = true;
       break;
     }
@@ -413,10 +424,21 @@ static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
   // Okay, we do have to simplify something.  Scan through and rewrite arguments.
   SILBuilder B(origInst);
   GraphOperationBuilder opBuilder(opInfo.getOperationName());
+  // Pass attributes through.
+  for (auto &attr : origInst->getAttributes())
+    opBuilder.addAttribute(attr);
   SILValue outParameterAddress;
   for (auto &argument : opInfo.getStructuredArguments()) {
+    if (argument.getKind() == GraphOperationInfo::SAK_List) {
+      // We can get SAK_List arguments from inlining functions that have already
+      // been deabstracted. Pass these arguments through.
+      opBuilder.addListArgument(argument.getArgumentList(),
+                                argument.getArgumentNameWithSuffix());
+      continue;
+    }
+
     assert(argument.getKind() == GraphOperationInfo::SAK_Single &&
-           "SILGen should not have generated a list argument");
+           "should have already handled all other argument kinds");
     auto argumentValue = argument.getSingleArgument();
     auto argumentLowering = std::get<1>(argument.getArgumentNameAndLowering());
 
@@ -436,6 +458,12 @@ static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
         }
         return nullptr;
       }
+      assert(origInst->getNumResults() == 1 &&
+             origInst->getResult(0)->getType().getASTType() ==
+                ctx.TheEmptyTupleType &&
+             "graph_op with out parameter must return the empty tuple");
+      // There should only be one output parameter because output parameter is
+      // still a single value or single aggregate.
       assert(!outParameterAddress && "there is more than one out parameter");
       outParameterAddress = argumentValue;
       continue;
@@ -469,22 +497,22 @@ static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
 
   // Now that we've rebuilt the argument list, create a new graph_op and replace
   // the old one.
-  auto newType = outParameterAddress ?
-      outParameterAddress->getType().getObjectType() : origResult->getType();
-  auto newInst = opBuilder.build(B, ctx, origInst->getLoc(), newType);
-  newInst->setDebugLocation(origInst->getDebugLocation());
-
-  // If the original instruction had an out parameter, store the new
-  // instruction's value to that address.
+  GraphOperationInst *newInst;
   if (outParameterAddress) {
+    newInst = opBuilder.build(B, ctx, origInst->getLoc(),
+                              {outParameterAddress->getType().getObjectType()});
+
+    // Store the new instruction's result to the outParameterAddress.
     auto hasOwnership = newInst->getFunction()->hasQualifiedOwnership();
     auto storeOwnership = hasOwnership ? StoreOwnershipQualifier::Trivial
                                        : StoreOwnershipQualifier::Unqualified;
-    assert(newInst->getNumResults() == 1 &&
-           "simplified graph_op should still only have one result");
     B.createStore(origInst->getLoc(), newInst->getResult(0),
                   outParameterAddress, storeOwnership);
+  } else {
+    SmallVector<SILType, 4> origResultTypes(origInst->getResultTypes());
+    newInst = opBuilder.build(B, ctx, origInst->getLoc(), origResultTypes);
   }
+  newInst->setDebugLocation(origInst->getDebugLocation());
 
   // Replace the old with the new and delete the old instruction.
   origInst->replaceAllUsesPairwiseWith(newInst);
@@ -1474,7 +1502,7 @@ struct ArrayElementDecoder {
     uint64_t numElements =
         cast<IntegerLiteralInst>(numElementsVal)->getValue().getLimitedValue();
 
-    return !tf::ConstExprEvaluator::decodeAllocUninitializedArray(
+    return !ConstExprEvaluator::decodeAllocUninitializedArray(
         apply, numElements, elementsAtInit, &arrayInsts);
   }
 
@@ -2103,9 +2131,6 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
     GraphOperationInfo &opInfo, DenseMap<SILValue, SymbolicValue> &constants,
     GraphFunctionDeviceInfo &deviceInfo) {
   auto *origInst = opInfo.getInst();
-  assert(origInst->getNumResults() == 1 &&
-         "SILGen should have generated a graph_op with 1 result");
-  auto origResult = origInst->getResult(0);
   auto &context = origInst->getFunction()->getASTContext();
   auto &allocator = context.getAllocator();
   SILBuilder B(origInst);
@@ -2126,6 +2151,14 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
   // Find the device attribute specified for the instruction if present.
   StringRef opDevice;
 
+  // Pass attributes through.
+  for (auto &attr : origInst->getAttributes()) {
+    if (attr.name.str() == DEVICE_ATTR) {
+      opDevice = attr.value.getStringValue();
+    }
+    opBuilder.addAttribute(attr);
+  }
+
   // It is common to have input lists with repeated elements.  These will
   // generally be uniqued on entry to this routine.  We cache the projections in
   // these maps so that we can reuse them and avoid code bloat.
@@ -2137,8 +2170,17 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
 
   for (auto i : range(opInfo.getStructuredArguments().size())) {
     auto argument = opInfo.getStructuredArguments()[i];
+
+    if (argument.getKind() == GraphOperationInfo::SAK_List) {
+      // We can get SAK_List arguments from inlining functions that have already
+      // been deabstracted. Pass these arguments through.
+      opBuilder.addListArgument(argument.getArgumentList(),
+                                argument.getArgumentNameWithSuffix());
+      continue;
+    }
+
     assert(argument.getKind() == GraphOperationInfo::SAK_Single &&
-           "SILGen should not have generated a list argument");
+           "should have already handled all other argument kinds");
     auto argumentValue = argument.getSingleArgument();
     auto argumentTy = argumentValue->getType();
     auto argumentNameAndLowering = argument.getArgumentNameAndLowering();
@@ -2149,6 +2191,10 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
         GraphOperationInfo::ArgumentLowering::Input) {
       // If this is tfc.scalarToTensor, then the input must be a valid scalar.
       if (opInfo.getOperationName() == "tfc.scalarToTensor") {
+        assert(origInst->getNumResults() == 1 &&
+               "tfc.scalarToTensor must have 1 result");
+        auto origResult = origInst->getResult(0);
+
         auto scalarType = argumentTy.getASTType();
         if (convertSwiftTypeToTF(scalarType) == 0) {
           diagnoseInvalid(origInstLoc,
@@ -2515,49 +2561,66 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
                                      context, &opBuilder);
   }
   // Okay, if we got this far then we have all valid attributes and inputs.
-  // Figure out the result list.
-  SmallVector<Type, 4> resultTypes;
-  auto userResultTy = origResult->getType().getASTType();
-  if (!tf::flattenTensorFlowValueAggregate(userResultTy, resultTypes)) {
-    auto loc = getUserSourceLocation(origInst);
-    diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
-             diag::tf_op_result_not_value_or_aggregate, userResultTy)
-      .highlight(loc.getSourceRange());
-    return;
-  }
-  auto resultSILTypes = map<SmallVector<SILType, 8>>(resultTypes, [&](Type ty) {
-      return SILType::getPrimitiveObjectType(ty->getCanonicalType()); });
 
+  // Time to create the op and deal with results.
   auto loc = getUserSourceLocation(origInst);
-  auto op = opBuilder.build(B, context, loc, resultSILTypes);
 
-  // Recursively pack results to a value with the user-specified aggregate type.
-  auto resultIt = op->getResults().begin();
-  std::function<SILValue(SILType)> packResultsToAggregate;
-  packResultsToAggregate = [&](SILType aggregateTy) -> SILValue {
-    if (isTensorFlowValue(aggregateTy))
-      return *resultIt++;
-    if (auto tupleTy = aggregateTy.getAs<TupleType>()) {
-      SmallVector<SILValue, 8> elts;
-      for (auto i : range(tupleTy->getNumElements()))
-        elts.push_back(
-            packResultsToAggregate(aggregateTy.getTupleElementType(i)));
-      return B.createTuple(loc, aggregateTy, elts);
+  // If there is only one result, it may be an aggregate that we have to pack.
+  if (origInst->getNumResults() == 1) {
+    auto origResult = origInst->getResults()[0];
+    SmallVector<Type, 4> resultTypes;
+    auto userResultTy = origResult->getType().getASTType();
+    if (!tf::flattenTensorFlowValueAggregate(userResultTy, resultTypes)) {
+      auto loc = getUserSourceLocation(origInst);
+      diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
+               diag::tf_op_result_not_value_or_aggregate, userResultTy)
+        .highlight(loc.getSourceRange());
+      return;
     }
-    if (auto *decl = aggregateTy.getStructOrBoundGenericStruct()) {
-      SmallVector<SILValue, 8> elts;
-      for (auto *field : decl->getStoredProperties())
-        elts.push_back(packResultsToAggregate(
-            aggregateTy.getFieldType(field, B.getModule())));
-      return B.createStruct(loc, aggregateTy, elts);
-    }
-    llvm_unreachable("Non-TF type should have been diagnosed");
-  };
-  auto result = packResultsToAggregate(origResult->getType());
-  assert(resultIt == op->getResults().end()
-         && "All result types should've been processed");
-  // Replace any use of the old graph_op result with the newly packed aggregate.
-  origResult->replaceAllUsesWith(result);
+    auto resultSILTypes = map<SmallVector<SILType, 8>>(resultTypes, [&](Type ty) {
+        return SILType::getPrimitiveObjectType(ty->getCanonicalType()); });
+
+    auto op = opBuilder.build(B, context, loc, resultSILTypes);
+
+    // Recursively pack results to a value with the user-specified aggregate type.
+    auto resultIt = op->getResults().begin();
+    std::function<SILValue(SILType)> packResultsToAggregate;
+    packResultsToAggregate = [&](SILType aggregateTy) -> SILValue {
+      if (isTensorFlowValue(aggregateTy))
+        return *resultIt++;
+      if (auto tupleTy = aggregateTy.getAs<TupleType>()) {
+        SmallVector<SILValue, 8> elts;
+        for (auto i : range(tupleTy->getNumElements()))
+          elts.push_back(
+              packResultsToAggregate(aggregateTy.getTupleElementType(i)));
+        return B.createTuple(loc, aggregateTy, elts);
+      }
+      if (auto *decl = aggregateTy.getStructOrBoundGenericStruct()) {
+        SmallVector<SILValue, 8> elts;
+        for (auto *field : decl->getStoredProperties())
+          elts.push_back(packResultsToAggregate(
+              aggregateTy.getFieldType(field, B.getModule())));
+        return B.createStruct(loc, aggregateTy, elts);
+      }
+      llvm_unreachable("Non-TF type should have been diagnosed");
+    };
+    auto result = packResultsToAggregate(origResult->getType());
+    assert(resultIt == op->getResults().end()
+           && "All result types should've been processed");
+    // Replace any use of the old graph_op result with the newly packed aggregate.
+    origResult->replaceAllUsesWith(result);
+  }
+  // There are multiple results, so each one must be a TensorFlow value. Simply
+  // replace users, without doing any packing.
+  else {
+    SmallVector<SILType, 4> origResultTypes(origInst->getResultTypes());
+    for (auto resultType : origResultTypes)
+      assert(isTensorFlowValue(resultType) &&
+             "when there are multiple results, they should be tf types");
+    auto op = opBuilder.build(B, context, loc, origResultTypes);
+    origInst->replaceAllUsesPairwiseWith(op);
+  }
+
   origInst->eraseFromParent();
 
   // TODO: Analyze the operands to the instruction and remove them if they are
@@ -2677,7 +2740,7 @@ void TFDeabstractionPass::run() {
     llvm::PrettyStackTraceFormat X("TFDeabstraction on function %s",
                                    fn.getName().str().c_str());
 
-    TFDeabstraction(fn, tfc, constantEvaluator, PM).doIt();
+    TFDeabstraction(*this, fn, tfc, constantEvaluator, PM).doIt();
     partitionedFunctions.insert(&fn);
 
     // TODO(clattner): This should eventually be the driver that kicks off
@@ -2717,7 +2780,7 @@ void TFDeabstractionPass::run() {
     if (partitionedFunctions.count(&fn) > 0 ||
         !tfc.shouldBePartitioned(&fn, /*forceTFFunctions=*/true))
       continue;
-    TFDeabstraction(fn, tfc, constantEvaluator, PM).doIt();
+    TFDeabstraction(*this, fn, tfc, constantEvaluator, PM).doIt();
   }
 }
 

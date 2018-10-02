@@ -516,35 +516,34 @@ internal func _siftDown<C: MutableCollection & RandomAccessCollection>(
   subRange range: Range<C.Index>,
   by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
 ) rethrows {
-
-  let countToIndex = elements.distance(from: range.lowerBound, to: index)
-  let countFromIndex = elements.distance(from: index, to: range.upperBound)
-  // Check if left child is within bounds. If not, return, because there are
+  var i = index
+  var countToIndex = elements.distance(from: range.lowerBound, to: i)
+  var countFromIndex = elements.distance(from: i, to: range.upperBound)
+  // Check if left child is within bounds. If not, stop iterating, because there are
   // no children of the given node in the heap.
-  if countToIndex + 1 >= countFromIndex {
-    return
-  }
-  let left = elements.index(index, offsetBy: countToIndex + 1)
-  var largest = index
-  if (try areInIncreasingOrder(elements[largest], elements[left])) {
-    largest = left
-  }
-  // Check if right child is also within bounds before trying to examine it.
-  if countToIndex + 2 < countFromIndex {
-    let right = elements.index(after: left)
-    if (try areInIncreasingOrder(elements[largest], elements[right])) {
-      largest = right
+  while countToIndex + 1 < countFromIndex {
+    let left = elements.index(i, offsetBy: countToIndex + 1)
+    var largest = i
+    if try areInIncreasingOrder(elements[largest], elements[left]) {
+      largest = left
     }
-  }
-  // If a child is bigger than the current node, swap them and continue sifting
-  // down.
-  if largest != index {
-    elements.swapAt(index, largest)
-    try _siftDown(
-      &elements,
-      index: largest,
-      subRange: range
-      , by: areInIncreasingOrder)
+    // Check if right child is also within bounds before trying to examine it.
+    if countToIndex + 2 < countFromIndex {
+      let right = elements.index(after: left)
+      if try areInIncreasingOrder(elements[largest], elements[right]) {
+        largest = right
+      }
+    }
+    // If a child is bigger than the current node, swap them and continue sifting
+    // down.
+    if largest != i {
+      elements.swapAt(index, largest)
+      i = largest
+      countToIndex = elements.distance(from: range.lowerBound, to: i)
+      countFromIndex = elements.distance(from: i, to: range.upperBound)
+    } else {
+      break
+    }
   }
 }
 

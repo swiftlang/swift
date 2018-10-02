@@ -220,11 +220,13 @@ class ReportFormatter(object):
     `values()` into report table. Supported formats are: `markdown` (used for
     displaying benchmark results on GitHub), `git` and `html`.
     """
-    def __init__(self, comparator, old_branch, new_branch, changes_only):
+    def __init__(self, comparator, old_branch, new_branch, changes_only,
+                 single_table=False):
         self.comparator = comparator
         self.old_branch = old_branch
         self.new_branch = new_branch
         self.changes_only = changes_only
+        self.single_table = single_table
 
     MARKDOWN_DETAIL = """
 <details {3}>
@@ -266,6 +268,7 @@ class ReportFormatter(object):
 
     def _formatted_text(self, ROW, HEADER_SEPARATOR, DETAIL):
         widths = self._column_widths()
+        self.header_printed = False
 
         def justify_columns(contents):
             return tuple([c.ljust(w) for w, c in zip(widths, contents)])
@@ -285,12 +288,24 @@ class ReportFormatter(object):
                 row(format_columns(result_comparison.values(), is_strong))
                 for result_comparison in results
             ]
-            return ('' if not rows else
-                    DETAIL.format(*[
-                        title, len(results),
-                        (header(results[0].header) + ''.join(rows)),
-                        ('open' if is_open else '')
-                    ]))
+            if not rows:
+                return ''
+
+            if self.single_table:
+                t = ''
+                if not self.header_printed:
+                    t += header(results[0].header)
+                    self.header_printed = True
+                t += row(('**' + title + '**', '', '', '', ''))
+                t += ''.join(rows)
+                return t
+
+            return DETAIL.format(
+                *[
+                    title, len(results),
+                    (header(results[0].header) + ''.join(rows)),
+                    ('open' if is_open else '')
+                ])
 
         return ''.join([
             # FIXME print self.old_branch, self.new_branch
@@ -393,6 +408,10 @@ def parse_args(args):
     parser.add_argument('--output', help='Output file name')
     parser.add_argument('--changes-only',
                         help='Output only affected tests', action='store_true')
+    parser.add_argument(
+        '--single-table',
+        help='Combine data in a single table in git and markdown formats',
+        action='store_true')
     parser.add_argument('--new-branch',
                         help='Name of the new branch', default='NEW_MIN')
     parser.add_argument('--old-branch',
@@ -408,7 +427,7 @@ def main():
     comparator = TestComparator(args.old_file, args.new_file,
                                 args.delta_threshold)
     formatter = ReportFormatter(comparator, args.old_branch, args.new_branch,
-                                args.changes_only)
+                                args.changes_only, args.single_table)
     formats = {
         'markdown': formatter.markdown,
         'git': formatter.git,

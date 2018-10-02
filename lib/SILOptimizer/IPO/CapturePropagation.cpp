@@ -93,8 +93,9 @@ namespace {
 /// caller, so the cloned function will have a mix of locations from different
 /// functions.
 class CapturePropagationCloner
-  : public TypeSubstCloner<CapturePropagationCloner> {
-  using SuperTy = TypeSubstCloner<CapturePropagationCloner>;
+  : public TypeSubstCloner<CapturePropagationCloner, SILOptFunctionBuilder> {
+  using SuperTy =
+    TypeSubstCloner<CapturePropagationCloner, SILOptFunctionBuilder>;
   friend class SILInstructionVisitor<CapturePropagationCloner>;
   friend class SILCloner<CapturePropagationCloner>;
 
@@ -257,7 +258,7 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   GenericEnvironment *GenericEnv = nullptr;
   if (NewFTy->getGenericSignature())
     GenericEnv = OrigF->getGenericEnvironment();
-  SILOptFunctionBuilder FuncBuilder(*getPassManager());
+  SILOptFunctionBuilder FuncBuilder(*this);
   SILFunction *NewF = FuncBuilder.createFunction(
       SILLinkage::Shared, Name, NewFTy, GenericEnv, OrigF->getLocation(),
       OrigF->isBare(), OrigF->isTransparent(), Serialized,
@@ -452,13 +453,14 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
   // First possibility: Is it a partial_apply where all partially applied
   // arguments are dead?
   std::pair<SILFunction *, SILFunction *> GenericSpecialized;
-  SILOptFunctionBuilder FuncBuilder(*PM);
+  SILOptFunctionBuilder FuncBuilder(*this);
   if (auto *NewFunc = getSpecializedWithDeadParams(FuncBuilder,
           PAI, SubstF, PAI->getNumArguments(), GenericSpecialized)) {
     rewritePartialApply(PAI, NewFunc);
     if (GenericSpecialized.first) {
       // Notify the pass manager about the new function.
-      notifyAddFunction(GenericSpecialized.first, GenericSpecialized.second);
+      addFunctionToPassManagerWorklist(GenericSpecialized.first,
+                                       GenericSpecialized.second);
     }
     return true;
   }
@@ -478,7 +480,7 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
   SILFunction *NewF = specializeConstClosure(PAI, SubstF);
   rewritePartialApply(PAI, NewF);
 
-  notifyAddFunction(NewF, SubstF);
+  addFunctionToPassManagerWorklist(NewF, SubstF);
   return true;
 }
 

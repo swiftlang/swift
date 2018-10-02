@@ -20,17 +20,12 @@
 #define SWIFT_SIL_GRAPH_OPERATION_BUILDER_H
 
 #include "swift/SIL/SILConstants.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
-class ASTContext;
-class GraphOperationInst;
-class SILBuilder;
-class SILLocation;
-class SILType;
-
 namespace tf {
 
 class GraphOperationBuilder {
@@ -47,6 +42,10 @@ public:
 
   /// Add a list argument to the GraphOperationInst, with an optional name.
   void addListArgument(llvm::ArrayRef<SILValue> arguments,
+                       llvm::StringRef name = llvm::StringRef());
+
+  /// Add a list argument to the GraphOperationInst, with an optional name.
+  void addListArgument(OperandValueArrayRef arguments,
                        llvm::StringRef name = llvm::StringRef());
 
   /// Add an attribute with known constant value to the GraphOperationInst.

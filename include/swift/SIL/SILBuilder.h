@@ -893,9 +893,11 @@ public:
   }
 
   ConvertFunctionInst *createConvertFunction(SILLocation Loc, SILValue Op,
-                                             SILType Ty) {
-    return insert(ConvertFunctionInst::create(
-        getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes));
+                                             SILType Ty,
+                                             bool WithoutActuallyEscaping) {
+    return insert(ConvertFunctionInst::create(getSILDebugLocation(Loc), Op, Ty,
+                                              getFunction(), C.OpenedArchetypes,
+                                              WithoutActuallyEscaping));
   }
 
   ConvertEscapeToNoEscapeInst *

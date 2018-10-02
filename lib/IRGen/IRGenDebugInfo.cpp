@@ -897,7 +897,7 @@ private:
     // throw it away before lowering.
     else if (isa<GenericFunctionType>(BaseTy)) {
       auto *fTy = cast<AnyFunctionType>(BaseTy);
-      auto *nongenericTy = FunctionType::get(fTy->getInput(), fTy->getResult(),
+      auto *nongenericTy = FunctionType::get(fTy->getParams(), fTy->getResult(),
                                              fTy->getExtInfo());
 
       FunTy = IGM.getLoweredType(nongenericTy).castTo<SILFunctionType>();
@@ -1204,7 +1204,7 @@ private:
             ProtocolDecl->getInterfaceType(), IGM.getTypeInfoForLowered(PTy));
         auto PDITy = getOrCreateType(PDbgTy);
         Protocols.push_back(
-            DBuilder.createInheritance(FwdDecl.get(), PDITy, 0, Flags));
+            DBuilder.createInheritance(FwdDecl.get(), PDITy, 0, 0, Flags));
       }
       auto DITy = DBuilder.createStructType(
           Scope, MangledName, File, L.Line, SizeInBits, AlignInBits, Flags,
@@ -1420,7 +1420,7 @@ private:
     llvm::DIScope *Scope = nullptr;
     DeclContext *Context = DbgTy.getType()->getNominalOrBoundGenericNominal();
     if (Context) {
-      if (auto *D = Context->getAsNominalTypeOrNominalTypeExtensionContext())
+      if (auto *D = Context->getSelfNominalTypeDecl())
         if (auto *ClangDecl = D->getClangDecl()) {
           clang::ASTReader &Reader = *CI.getClangInstance().getModuleManager();
           auto Idx = ClangDecl->getOwningModuleID();
@@ -1575,6 +1575,9 @@ void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
   if (!Scope)
     return;
 
+  // NOTE: In CodeView, zero is not an artificial line location. We try to
+  //       avoid those line locations near user code to reduce the number
+  //       of breaks in the linetables.
   SILLocation::DebugLoc L;
   SILFunction *Fn = DS->getInlinedFunction();
   if (Fn && (Fn->isThunk() || Fn->isTransparent())) {
@@ -1583,10 +1586,11 @@ void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
     // Reuse the last source location if we are still in the same
     // scope to get a more contiguous line table.
     L = LastDebugLoc;
-  } else if (DS == LastScope && Loc.is<ArtificialUnreachableLocation>() &&
+  } else if (DS == LastScope &&
+             (Loc.is<ArtificialUnreachableLocation>() || Loc.isLineZero(SM)) &&
              Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView) {
-    // Remove unreachable locations with line zero because line zero does not
-    // represent an artificial location in CodeView.
+    // If the scope has not changed and the line number is either zero or
+    // artificial, we want to keep the most recent debug location.
     L = LastDebugLoc;
   } else {
     // Decode the location.
@@ -1999,9 +2003,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     return;
 
   // A dbg.declare is only meaningful if there is a single alloca for
-  // the variable that is live throughout the function. With SIL
-  // optimizations this is not guaranteed and a variable can end up in
-  // two allocas (for example, one function inlined twice).
+  // the variable that is live throughout the function.
   if (auto *Alloca = dyn_cast<llvm::AllocaInst>(Storage)) {
     auto *ParentBB = Alloca->getParent();
     auto InsertBefore = std::next(Alloca->getIterator());
@@ -2009,11 +2011,17 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
       DBuilder.insertDeclare(Alloca, Var, Expr, DL, &*InsertBefore);
     else
       DBuilder.insertDeclare(Alloca, Var, Expr, DL, ParentBB);
-    return;
+  } else if (isa<llvm::IntrinsicInst>(Storage) &&
+             cast<llvm::IntrinsicInst>(Storage)->getIntrinsicID() ==
+                 llvm::Intrinsic::coro_alloca_get) {
+    // FIXME: The live range of a coroutine alloca within the function may be
+    // limited, so using a dbg.addr instead of a dbg.declare would be more
+    // appropriate.
+    DBuilder.insertDeclare(Storage, Var, Expr, DL, BB);
+  } else {
+    // Insert a dbg.value at the current insertion point.
+    DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, BB);
   }
-
-  // Insert a dbg.value at the current insertion point.
-  DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, BB);
 }
 
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(

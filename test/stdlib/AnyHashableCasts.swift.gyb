@@ -2,8 +2,10 @@
 //
 // RUN: %gyb %s -o %t/AnyHashableCasts.swift
 // RUN: %line-directive %t/AnyHashableCasts.swift -- %target-build-swift -g -module-name a %t/AnyHashableCasts.swift -o %t.out
+// RUN: %target-codesign %t.out
 // RUN: %line-directive %t/AnyHashableCasts.swift -- %target-run %t.out
 // RUN: %line-directive %t/AnyHashableCasts.swift -- %target-build-swift -g -O -module-name a %t/AnyHashableCasts.swift -o %t.out.optimized
+// RUN: %target-codesign %t.out.optimized
 // RUN: %line-directive %t/AnyHashableCasts.swift -- %target-run %t.out.optimized
 // REQUIRES: executable_test
 

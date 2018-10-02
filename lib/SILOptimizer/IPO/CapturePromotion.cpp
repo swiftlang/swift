@@ -1343,13 +1343,13 @@ void CapturePromotionPass::processFunction(SILFunction *F,
 
   // Do the actual promotions; all promotions on a single partial_apply are
   // handled together.
-  SILOptFunctionBuilder FuncBuilder(*getPassManager());
+  SILOptFunctionBuilder FuncBuilder(*this);
   for (auto &IndicesPair : IndicesMap) {
     PartialApplyInst *PAI = IndicesPair.first;
     SILFunction *ClonedFn = processPartialApplyInst(FuncBuilder,
                                                     PAI, IndicesPair.second,
                                                     Worklist);
-    notifyAddFunction(ClonedFn);
+    (void)ClonedFn;
   }
   invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
 }

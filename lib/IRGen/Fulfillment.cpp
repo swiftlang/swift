@@ -209,7 +209,8 @@ bool FulfillmentMap::searchWitnessTable(
 
   bool hadFulfillment = false;
 
-  auto &pi = IGM.getProtocolInfo(protocol);
+  auto &pi = IGM.getProtocolInfo(protocol,
+                                 ProtocolInfoKind::RequirementSignature);
 
   for (auto &entry : pi.getWitnessEntries()) {
     if (!entry.isBase()) continue;

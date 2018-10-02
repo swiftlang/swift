@@ -240,8 +240,9 @@ namespace {
         // If there's no conformance, we have an existential
         // and we found a member from one of the protocols, and
         // not a class constraint if any.
-        assert(foundInType->isExistentialType());
-        addResult(found);
+        assert(foundInType->isExistentialType() || foundInType->hasError());
+        if (foundInType->isExistentialType())
+          addResult(found);
         return;
       }
 
@@ -369,8 +370,6 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   NLOptions subOptions = NL_QualifiedDefault;
   if (options.contains(NameLookupFlags::KnownPrivate))
     subOptions |= NL_KnownNonCascadingDependency;
-  if (options.contains(NameLookupFlags::DynamicLookup))
-    subOptions |= NL_DynamicLookup;
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     subOptions |= NL_IgnoreAccessControl;
 
@@ -418,7 +417,7 @@ bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
   }
 
   if (type->isExistentialType() &&
-      typeDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+      typeDecl->getDeclContext()->getSelfProtocolDecl()) {
     // TODO: Temporarily allow typealias and associated type lookup on
     //       existential type iff it doesn't have any type parameters.
     if (isa<TypeAliasDecl>(typeDecl) || isa<AssociatedTypeDecl>(typeDecl))
@@ -476,7 +475,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     // If we're looking up an associated type of a concrete type,
     // record it later for conformance checking; we might find a more
     // direct typealias with the same name later.
-    if (typeDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+    if (typeDecl->getDeclContext()->getSelfProtocolDecl()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
         if (!type->is<ArchetypeType>() &&
             !type->isTypeParameter()) {

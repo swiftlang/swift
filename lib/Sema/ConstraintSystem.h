@@ -18,12 +18,13 @@
 #ifndef SWIFT_SEMA_CONSTRAINT_SYSTEM_H
 #define SWIFT_SEMA_CONSTRAINT_SYSTEM_H
 
-#include "TypeChecker.h"
+#include "CSFix.h"
 #include "Constraint.h"
 #include "ConstraintGraph.h"
 #include "ConstraintGraphScope.h"
 #include "ConstraintLocator.h"
 #include "OverloadChoice.h"
+#include "TypeChecker.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/AST/ASTVisitor.h"
@@ -92,7 +93,7 @@ class ConstraintLocator;
 struct RestrictionOrFix {
   union {
     ConversionRestrictionKind Restriction;
-    Fix TheFix;
+    ConstraintFix *TheFix;
   };
   bool IsRestriction;
 
@@ -100,9 +101,7 @@ public:
   RestrictionOrFix(ConversionRestrictionKind restriction)
   : Restriction(restriction), IsRestriction(true) { }
 
-  RestrictionOrFix(Fix fix) : TheFix(fix), IsRestriction(false) { }
-
-  RestrictionOrFix(FixKind fix) : TheFix(fix), IsRestriction(false) { }
+  RestrictionOrFix(ConstraintFix *fix) : TheFix(fix), IsRestriction(false) {}
 
   Optional<ConversionRestrictionKind> getRestriction() const {
     if (IsRestriction)
@@ -111,7 +110,7 @@ public:
     return None;
   }
 
-  Optional<Fix> getFix() const {
+  Optional<ConstraintFix *> getFix() const {
     if (!IsRestriction)
       return TheFix;
 
@@ -592,7 +591,7 @@ public:
 
   /// The list of fixes that need to be applied to the initial expression
   /// to make the solution work.
-  llvm::SmallVector<std::pair<Fix, ConstraintLocator *>, 4> Fixes;
+  llvm::SmallVector<ConstraintFix *, 4> Fixes;
 
   /// The set of disjunction choices used to arrive at this solution,
   /// which informs constraint application.
@@ -691,6 +690,22 @@ public:
   /// Try to resolve the given locator to a declaration within this
   /// solution.
   ConcreteDeclRef resolveLocatorToDecl(ConstraintLocator *locator) const;
+
+  /// \brief Retrieve the overload choice associated with the given
+  /// locator.
+  SelectedOverload getOverloadChoice(ConstraintLocator *locator) const {
+    return *getOverloadChoiceIfAvailable(locator);
+  }
+
+  /// \brief Retrieve the overload choice associated with the given
+  /// locator.
+  Optional<SelectedOverload>
+  getOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
+    auto known = overloadChoices.find(locator);
+    if (known != overloadChoices.end())
+      return known->second;
+    return None;
+  }
 
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
@@ -907,6 +922,7 @@ public:
   Optional<ExpressionTimer> Timer;
   
   friend class Fix;
+  friend class ConstraintFix;
   friend class OverloadChoice;
   friend class ConstraintGraph;
   friend class DisjunctionChoice;
@@ -925,10 +941,6 @@ public:
 
   /// \brief The total number of disjunctions created.
   unsigned CountDisjunctions = 0;
-
-  /// \brief Map from disjunction to the number indicating the order it
-  //         was created in.
-  llvm::DenseMap<Constraint *, unsigned> DisjunctionNumber;
 
 private:
 
@@ -1010,24 +1022,7 @@ private:
       ConstraintRestrictions;
 
   /// The set of fixes applied to make the solution work.
-  ///
-  /// Each fix is paired with a locator that describes where the fix occurs.
-  SmallVector<std::pair<Fix, ConstraintLocator *>, 4> Fixes;
-
-  /// Types used in fixes.
-  std::vector<Type> FixedTypes;
-
-  /// Declaration names used in fixes.
-  std::vector<DeclName> FixedDeclNames;
-
-  /// Argument labels fixed by the constraint solver.
-  SmallVector<std::vector<Identifier>, 4> FixedArgLabels;
-
-  /// Conformances which solver "fixed" to help with
-  /// diagnosing problems related to generic requirements.
-  llvm::SmallDenseMap<std::pair<Expr *, unsigned>,
-                      std::pair<TypeBase *, ProtocolDecl *>>
-      MissingConformances;
+  llvm::SmallVector<ConstraintFix *, 4> Fixes;
 
   /// \brief The set of remembered disjunction choices used to reach
   /// the current constraint system.
@@ -1531,12 +1526,6 @@ private:
   /// able to emit an error message, or false if none of the fixits worked out.
   bool applySolutionFixes(Expr *E, const Solution &solution);
 
-  /// \brief Apply the specified Fix to this solution, producing a fix-it hint
-  /// diagnostic for it and returning true.  If the fix-it hint turned out to be
-  /// bogus, this returns false and doesn't emit anything.
-  bool applySolutionFix(Expr *expr, const Solution &solution,
-                        std::pair<Fix, ConstraintLocator *> &fix);
-
   /// \brief If there is more than one viable solution,
   /// attempt to pick the best solution and remove all of the rest.
   ///
@@ -1773,8 +1762,8 @@ public:
 
   /// \brief Log and record the application of the fix. Return true iff any
   /// subsequent solution would be worse than the best known solution.
-  bool recordFix(Fix fix, ConstraintLocatorBuilder locator);
-  
+  bool recordFix(ConstraintFix *fix);
+
   /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
   /// constraint system, return the decl that it references.
   ValueDecl *findResolvedMemberRef(ConstraintLocator *locator);
@@ -1913,11 +1902,6 @@ public:
   void addExplicitConversionConstraint(Type fromType, Type toType,
                                        bool allowFixes,
                                        ConstraintLocatorBuilder locator);
-
-  void noteNewDisjunction(Constraint *constraint) {
-    assert(constraint->getKind() == ConstraintKind::Disjunction);
-    DisjunctionNumber[constraint] = CountDisjunctions++;
-  }
 
   /// \brief Add a disjunction constraint.
   void addDisjunctionConstraint(ArrayRef<Constraint *> constraints,
@@ -2753,8 +2737,7 @@ private:
 
 public: // FIXME: Public for use by static functions.
   /// \brief Simplify a conversion constraint with a fix applied to it.
-  SolutionKind simplifyFixConstraint(Fix fix,
-                                     Type type1, Type type2,
+  SolutionKind simplifyFixConstraint(ConstraintFix *fix, Type type1, Type type2,
                                      ConstraintKind matchKind,
                                      TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator);
@@ -3595,12 +3578,6 @@ public:
   size_t getNumSkippedParameters() const { return NumSkippedParameters; }
 };
 
-/// Diagnose an attempt to recover when we have a value of optional type
-/// that needs to be unwrapped.
-///
-/// \returns true if a diagnostic was produced.
-bool diagnoseUnwrap(TypeChecker &TC, DeclContext *DC, Expr *expr, Type type);
-
 /// Diagnose an attempt to recover from a member access into a value of
 /// optional type which needed to be unwrapped for the member to be found.
 ///
@@ -3622,6 +3599,21 @@ bool exprNeedsParensAfterAddingNilCoalescing(TypeChecker &TC,
                                              DeclContext *DC,
                                              Expr *expr,
                                              Expr *rootExpr);
+
+/// Return true if, when replacing "<expr>" with "<expr> op <something>",
+/// parentheses must be added around "<expr>" to allow the new operator
+/// to bind correctly.
+bool exprNeedsParensInsideFollowingOperator(TypeChecker &TC, DeclContext *DC,
+                                            Expr *expr,
+                                            PrecedenceGroupDecl *followingPG);
+
+/// Return true if, when replacing "<expr>" with "<expr> op <something>"
+/// within the given root expression, parentheses must be added around
+/// the new operator to prevent it from binding incorrectly in the
+/// surrounding context.
+bool exprNeedsParensOutsideFollowingOperator(
+    TypeChecker &TC, DeclContext *DC, Expr *expr, Expr *rootExpr,
+    PrecedenceGroupDecl *followingPG);
 
 } // end namespace swift
 

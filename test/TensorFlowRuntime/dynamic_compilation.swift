@@ -13,9 +13,6 @@ import StdlibUnittest
 
 var DynamicCompilationTests = TestSuite("DynamicCompilation")
 
-// TODO: add GPU support.
-#if !CUDA
-
 DynamicCompilationTests.testCPUOrGPU("Const") {
   _RuntimeConfig.printsDebugLog = true
   let x: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: Float(1.0))
@@ -23,7 +20,7 @@ DynamicCompilationTests.testCPUOrGPU("Const") {
   expectNearlyEqualWithScalarTensor(1.0, Tensor<Float>(handle: x))
 }
 
-DynamicCompilationTests.testCPUOrGPU("Add") {
+DynamicCompilationTests.testCPUOrGPU("AddFloat") {
   _RuntimeConfig.printsDebugLog = true
   let x = Tensor<Float>(1.0)
   let y = Tensor<Float>(2.0)
@@ -32,6 +29,22 @@ DynamicCompilationTests.testCPUOrGPU("Add") {
   expectNearlyEqualWithScalarTensor(3.0, z)
 }
 
-#endif // !CUDA
+DynamicCompilationTests.testCPUOrGPU("AddInt64") {
+  _RuntimeConfig.printsDebugLog = true
+  let x = Tensor<Int64>(1)
+  let y = Tensor<Int64>(2)
+  let z = x + y
+  _hostOp(z)
+  expectEqualWithScalarTensor(3, z)
+}
+
+DynamicCompilationTests.testCPUOrGPU("AddInt32") {
+  _RuntimeConfig.printsDebugLog = true
+  let x = Tensor<Int32>(1)
+  let y = Tensor<Int32>(2)
+  let z = x + y
+  _hostOp(z)
+  expectEqualWithScalarTensor(3, z)
+}
 
 runAllTests()

@@ -3,11 +3,13 @@
 
 // RUN: %target-clang -c -Weverything -Werror -Wno-unused-macros -Wno-incomplete-module -fobjc-arc -fmodules %S/Inputs/arc-conventions.m -o %t/main.o -I %t
 // RUN: %target-build-swift %t/swift.o %t/main.o -o %t/main
+// RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %S/Inputs/arc-conventions.m
 
 // RUN: %target-clang -c -Weverything -Werror -Wno-unused-macros -Wno-incomplete-module -fno-objc-arc -fmodules %S/Inputs/arc-conventions.m -o %t/main.o -I %t
-// RUN: %target-build-swift %t/swift.o %t/main.o -o %t/main
-// RUN: %target-run %t/main | %FileCheck %S/Inputs/arc-conventions.m
+// RUN: %target-build-swift %t/swift.o %t/main.o -o %t/main2
+// RUN: %target-codesign %t/main2
+// RUN: %target-run %t/main2 | %FileCheck %S/Inputs/arc-conventions.m
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop

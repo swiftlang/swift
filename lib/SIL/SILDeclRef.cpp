@@ -40,7 +40,7 @@ swift::getMethodDispatch(AbstractFunctionDecl *method) {
 
   auto dc = method->getDeclContext();
 
-  if (dc->getAsClassOrClassExtensionContext()) {
+  if (dc->getSelfClassDecl()) {
     if (method->isDynamic())
       return MethodDispatch::Class;
 
@@ -454,7 +454,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
     if (kind == SILDeclRef::Kind::Allocator) {
       auto *ctor = cast<ConstructorDecl>(d);
       if (ctor->isDesignatedInit() &&
-          ctor->getDeclContext()->getAsClassOrClassExtensionContext()) {
+          ctor->getDeclContext()->getSelfClassDecl()) {
         if (ctor->getEffectiveAccess() >= AccessLevel::Public &&
             !ctor->hasClangNode())
           return IsSerialized;
@@ -788,7 +788,7 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   if (isDefaultArgGenerator() && !context->getASTContext().isSwiftVersion3())
     return SubclassScope::NotApplicable;
 
-  auto *classType = context->getAsClassOrClassExtensionContext();
+  auto *classType = context->getSelfClassDecl();
   if (!classType || classType->isFinal())
     return SubclassScope::NotApplicable;
 

@@ -26,7 +26,7 @@
 
 using namespace swift;
 
-static bool shouldPrintAsFavorable(const Decl *D, PrintOptions &Options) {
+static bool shouldPrintAsFavorable(const Decl *D, const PrintOptions &Options) {
   if (!Options.TransformContext ||
       !D->getDeclContext()->isExtensionContext() ||
       !Options.TransformContext->isPrintingSynthesizedExtension())
@@ -42,7 +42,7 @@ static bool shouldPrintAsFavorable(const Decl *D, PrintOptions &Options) {
 }
 
 class ModulePrinterPrintableChecker: public ShouldPrintChecker {
-  bool shouldPrint(const Decl *D, PrintOptions &Options) override {
+  bool shouldPrint(const Decl *D, const PrintOptions &Options) override {
     if (!shouldPrintAsFavorable(D, Options))
       return false;
     return ShouldPrintChecker::shouldPrint(D, Options);
@@ -263,13 +263,10 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   InfoMap(collectSynthesizedExtensionInfo(AllGroups)) {}
 
   unsigned countInherits(ExtensionDecl *ED) {
-    unsigned Count = 0;
-    for (auto TL : ED->getInherited()) {
-      auto *nominal = TL.getType()->getAnyNominal();
-      if (nominal && Options.shouldPrint(nominal))
-        Count ++;
-    }
-    return Count;
+    SmallVector<TypeLoc, 4> Results;
+    getInheritedForPrinting(
+        ED, [&](const Decl *D) { return Options.shouldPrint(D); }, Results);
+    return Results.size();
   }
 
   std::pair<SynthesizedExtensionInfo, ExtensionMergeInfo>
@@ -557,7 +554,7 @@ collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                                                        VD->getFullName());
       assert(Result);
       for (auto *Default : Result.getMemberDecls(InterestedMemberKind::All)) {
-        if (PD == Default->getDeclContext()->getAsProtocolExtensionContext()) {
+        if (PD == Default->getDeclContext()->getExtendedProtocolDecl()) {
           DefaultMap.insert({Default, VD});
         }
       }

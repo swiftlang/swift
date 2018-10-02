@@ -1574,7 +1574,10 @@ public:
   }
 
   void visitConvertFunctionInst(ConvertFunctionInst *CI) {
-    printUncheckedConversionInst(CI, CI->getOperand());
+    *this << getIDAndType(CI->getOperand()) << " to ";
+    if (CI->withoutActuallyEscaping())
+      *this << "[without_actually_escaping] ";
+    *this << CI->getType();
   }
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *CI) {
     *this << (CI->isLifetimeGuaranteed() ? "" : "[not_guaranteed] ")
@@ -2449,6 +2452,8 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     break;
   case IsReabstractionThunk: OS << "[reabstraction_thunk] "; break;
   }
+  if (isWithoutActuallyEscapingThunk())
+    OS << "[without_actually_escaping] ";
 
   if (isGlobalInit())
     OS << "[global_init] ";

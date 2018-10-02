@@ -372,3 +372,32 @@ public func SR8419(iterationCount: Int) {
     }
   }
 }
+
+// If `deabstractedCallee` gets deabstracted before `inlineDeabstracted_*`,
+// then the insts in `deabstractedCallee` get deabstracted twice. There was
+// a bug where the compiler crashed when deabstracting certain graph_ops twice:
+//  - graph_ops with InputLists
+//  - graph_ops that pack results into aggregate structs
+// There is no guaranteed deabstraction order, so this test isn't guaranteed to
+// catch the problem. Sandwiching `deabstractedCallee` between two callers
+// makes this test catch the problem as long as the order happens to be linear
+// up or down.
+struct AggregateStruct {
+  let a, b: Tensor<Float>
+}
+public func inlineDeabstracted_a() -> Tensor<Float> {
+  return deabstractedCallee([1, 2, 3])
+}
+// expected-warning @+1 {{implicitly copied}}
+public func deabstractedCallee(_ t: Tensor<Float>) -> Tensor<Float> {
+  // expected-error @+3 {{op named 'Dummy' is not registered in TensorFlow}}
+  // expected-error @+2 {{op named 'Dummy' is not registered in TensorFlow}}
+  // expected-error @+1 {{op named 'Dummy' is not registered in TensorFlow}}
+  let aggregate: AggregateStruct = #tfop("Dummy") // packs results
+
+  // expected-note @+1 {{value used here}}
+  return t ++ aggregate.a // concat uses an InputList
+}
+public func inlineDeabstracted_b() -> Tensor<Float> {
+  return deabstractedCallee([1, 2, 3])
+}

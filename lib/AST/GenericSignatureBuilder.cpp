@@ -2176,8 +2176,8 @@ TypeDecl *EquivalenceClass::lookupNestedType(
     if (decl) {
       SmallVector<ValueDecl *, 2> foundMembers;
       decl->getParentModule()->lookupQualified(
-          typeToSearch, name,
-          NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers, nullptr,
+          decl, name,
+          NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers,
           foundMembers);
       for (auto member : foundMembers) {
         if (auto type = dyn_cast<TypeDecl>(member)) {
@@ -2280,34 +2280,24 @@ Type EquivalenceClass::getAnchor(
     return substAnchor();
   }
 
-  // Form the anchor.
-  bool updatedAnchor = false;
+  // Record the cache miss and update the cache.
+  ++NumArchetypeAnchorCacheMisses;
+  archetypeAnchorCache.anchor =
+    builder.getCanonicalTypeParameter(
+      members.front()->getDependentType(genericParams));
+  archetypeAnchorCache.lastGeneration = builder.Impl->Generation;
+
+#ifndef NDEBUG
+  // All members must produce the same anchor.
   for (auto member : members) {
     auto anchorType =
       builder.getCanonicalTypeParameter(
                                     member->getDependentType(genericParams));
-
-#ifndef NDEBUG
-    // Check that we get consistent results from all of the anchors.
-    if (updatedAnchor) {
-      assert(anchorType->isEqual(archetypeAnchorCache.anchor) &&
-             "Inconsistent anchor computation");
-      continue;
-    }
-#endif
-
-    // Record the cache miss and update the cache.
-    ++NumArchetypeAnchorCacheMisses;
-    archetypeAnchorCache.anchor = anchorType;
-    archetypeAnchorCache.lastGeneration = builder.Impl->Generation;
-    updatedAnchor = true;
-
-#if NDEBUG
-    break;
-#endif
+    assert(anchorType->isEqual(archetypeAnchorCache.anchor) &&
+           "Inconsistent anchor computation");
   }
+#endif
 
-  assert(updatedAnchor && "Couldn't update anchor?");
   return substAnchor();
 }
 
@@ -3016,6 +3006,11 @@ void ArchetypeType::resolveNestedType(
     builder.resolveEquivalenceClass(
                                   memberInterfaceType,
                                   ArchetypeResolutionKind::CompleteWellFormed);
+  if (!equivClass) {
+    nested.second = ErrorType::get(interfaceType);
+    return;
+  }
+
   auto result = equivClass->getTypeInContext(builder, genericEnv);
   assert(!nested.second ||
          nested.second->isEqual(result) ||
@@ -3912,8 +3907,7 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
                                    TypeDecl *concreteDecl) {
   assert(concreteDecl);
 
-  auto *proto =
-      concreteDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+  auto *proto = concreteDecl->getDeclContext()->getSelfProtocolDecl();
 
   if (!concreteDecl->hasInterfaceType())
     builder.getLazyResolver()->resolveDeclSignature(concreteDecl);
@@ -4426,8 +4420,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
         // to that typealias.
         if (source->kind == RequirementSource::RequirementSignatureSelf) {
           auto inheritedOwningDecl =
-            inheritedType->getDeclContext()
-              ->getAsNominalTypeOrNominalTypeExtensionContext();
+              inheritedType->getDeclContext()->getSelfNominalTypeDecl();
           Diags.diagnose(assocTypeDecl,
                          diag::associated_type_override_typealias,
                          assocTypeDecl->getFullName(),
@@ -7486,6 +7479,17 @@ GenericSignature *GenericSignatureBuilder::computeGenericSignature(
   return sig;
 }
 
+/// Add all of the generic parameters from the given parameter list (and it's
+/// outer generic parameter lists) to the given generic signature builder.
+static void addAllGenericParams(GenericSignatureBuilder &builder,
+                                GenericParamList *genericParams) {
+  if (!genericParams) return;
+
+  addAllGenericParams(builder, genericParams->getOuterParameters());
+  for (auto gp : *genericParams)
+    builder.addGenericParameter(gp);
+}
+
 GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
                                                      ProtocolDecl *proto) {
   GenericSignatureBuilder builder(proto->getASTContext());
@@ -7496,12 +7500,12 @@ GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
       lazyResolver->resolveDeclSignature(proto);
   }
 
-  // Add the 'self' parameter.
-  auto selfType =
-    proto->getSelfInterfaceType()->castTo<GenericTypeParamType>();
-  builder.addGenericParameter(selfType);
+  // Add all of the generic parameters.
+  addAllGenericParams(builder, proto->getGenericParams());
 
   // Add the conformance of 'self' to the protocol.
+  auto selfType =
+    proto->getSelfInterfaceType()->castTo<GenericTypeParamType>();
   auto requirement =
     Requirement(RequirementKind::Conformance, selfType,
                 proto->getDeclaredInterfaceType());

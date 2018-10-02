@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -c -force-single-frontend-invocation -parse-as-library -emit-module -emit-module-path %t/PrintTestTypes.swiftmodule -o %t/PrintTestTypes.o %S/Inputs/PrintTestTypes.swift
 // RUN: %target-build-swift %s -Xlinker %t/PrintTestTypes.o -I %t -L %t -o %t/main
+// RUN: %target-codesign %t/main
 // RUN: %target-run %t/main
 // REQUIRES: executable_test
 

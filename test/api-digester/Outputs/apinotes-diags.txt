@@ -1,4 +1,8 @@
 
+/* Generic Signature Changes */
+APINotesTest(APINotesTest.h): Func SwiftTypeWithMethodLeft.minusPrint() has generic signature change from <Self where Self : SwiftTypeWithMethodLeft> to <Self where Self : SwiftTypeWithMethodRight>
+APINotesTest(APINotesTest.h): Func SwiftTypeWithMethodLeft.plusPrint() has generic signature change from <Self where Self : SwiftTypeWithMethodLeft> to <Self where Self : SwiftTypeWithMethodRight>
+
 /* RawRepresentable Changes */
 APINotesTest(APINotesTest.h): TypeAlias CatAttributeName(NSString) is now String representable
 

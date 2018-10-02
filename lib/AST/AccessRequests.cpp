@@ -36,8 +36,8 @@ namespace swift {
 //----------------------------------------------------------------------------//
 // AccessLevel computation
 //----------------------------------------------------------------------------//
-AccessLevel AccessLevelRequest::evaluate(Evaluator &evaluator,
-                                         ValueDecl *D) const {
+llvm::Expected<AccessLevel>
+AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
   assert(!D->hasAccess());
 
   // Check if the decl has an explicit access control attribute.
@@ -153,8 +153,9 @@ void AccessLevelRequest::cacheResult(AccessLevel value) const {
 // the cycle of computation associated with formal accesses, we give it its own
 // request.
 
-AccessLevel SetterAccessLevelRequest::evaluate(Evaluator &evaluator,
-                                               AbstractStorageDecl *ASD) const {
+llvm::Expected<AccessLevel>
+SetterAccessLevelRequest::evaluate(Evaluator &evaluator,
+                                   AbstractStorageDecl *ASD) const {
   assert(!ASD->Accessors.getInt().hasValue());
   if (auto *AA = ASD->getAttrs().getAttribute<SetterAccessAttr>())
     return AA->getAccess();
@@ -196,7 +197,7 @@ void SetterAccessLevelRequest::cacheResult(AccessLevel value) const {
 // DefaultAccessLevel computation
 //----------------------------------------------------------------------------//
 
-std::pair<AccessLevel, AccessLevel>
+llvm::Expected<std::pair<AccessLevel, AccessLevel>>
 DefaultAndMaxAccessLevelRequest::evaluate(Evaluator &evaluator,
                                           ExtensionDecl *ED) const {
   assert(!ED->hasDefaultAccessLevel());

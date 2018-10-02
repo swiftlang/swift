@@ -3,7 +3,5 @@ add_swift_library(swiftTestUtils SHARED
   # filename.
   SwiftTestUtils.swift
 
-  SWIFT_MODULE_DEPENDS Foundation
-  INSTALL_IN_COMPONENT swift-syntax
-  TARGET_SDKS OSX
+  INSTALL_IN_COMPONENT never_install
   IS_STDLIB)

@@ -506,7 +506,7 @@ SILGenModule::getOrCreateProfilerForConstructors(DeclContext *ctx,
   if (ctx->isExtensionContext())
     decl = cd;
   else
-    decl = ctx->getAsNominalTypeOrNominalTypeExtensionContext();
+    decl = ctx->getSelfNominalTypeDecl();
   assert(decl && "No decl available for profiling in this context");
 
   SILProfiler *&profiler = constructorProfilers[decl];
@@ -884,7 +884,7 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
 
   bool ForCoverageMapping = doesASTRequireProfiling(M, decl);
 
-  if (declCtx->getAsClassOrClassExtensionContext()) {
+  if (declCtx->getSelfClassDecl()) {
     // Class constructors have separate entry points for allocation and
     // initialization.
     emitOrDelayFunction(
@@ -895,9 +895,9 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
           postEmitFunction(constant, f);
         });
 
-    // If this constructor was imported, we don't need the initializing
-    // constructor to be emitted.
-    if (!decl->hasClangNode()) {
+    // Constructors may not have bodies if they've been imported, or if they've
+    // been parsed from a textual interface.
+    if (decl->hasBody()) {
       SILDeclRef initConstant(decl, SILDeclRef::Kind::Initializer);
       emitOrDelayFunction(
           *this, initConstant,
@@ -915,14 +915,16 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
     }
   } else {
     // Struct and enum constructors do everything in a single function.
-    emitOrDelayFunction(
-        *this, constant, [this, constant, decl, declCtx](SILFunction *f) {
-          preEmitFunction(constant, decl, f, decl);
-          PrettyStackTraceSILFunction X("silgen emitConstructor", f);
-          f->setProfiler(getOrCreateProfilerForConstructors(declCtx, decl));
-          SILGenFunction(*this, *f, decl).emitValueConstructor(decl);
-          postEmitFunction(constant, f);
-        });
+    if (decl->hasBody()) {
+      emitOrDelayFunction(
+          *this, constant, [this, constant, decl, declCtx](SILFunction *f) {
+            preEmitFunction(constant, decl, f, decl);
+            PrettyStackTraceSILFunction X("silgen emitConstructor", f);
+            f->setProfiler(getOrCreateProfilerForConstructors(declCtx, decl));
+            SILGenFunction(*this, *f, decl).emitValueConstructor(decl);
+            postEmitFunction(constant, f);
+          });
+    }
   }
 }
 
@@ -1060,7 +1062,7 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
 
   // Emit the destroying destructor.
   // Destructors are a necessary part of class metadata, so can't be delayed.
-  {
+  if (dd->hasBody()) {
     SILDeclRef destroyer(dd, SILDeclRef::Kind::Destroyer);
     SILFunction *f = getFunction(destroyer, ForDefinition);
     preEmitFunction(destroyer, dd, f, dd);
@@ -1148,8 +1150,8 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
       cast<FuncDecl>(getBuiltinValueDecl(C, C.getIdentifier("once")));
   auto blockParam = onceBuiltin->getParameters()->get(1);
   auto *type = blockParam->getType()->castTo<FunctionType>();
-  Type initType = FunctionType::get(TupleType::getEmpty(C),
-                                    TupleType::getEmpty(C), type->getExtInfo());
+  Type initType = FunctionType::get({}, TupleType::getEmpty(C),
+                                    type->getExtInfo());
   auto initSILType = getLoweredType(initType).castTo<SILFunctionType>();
 
   SILGenFunctionBuilder builder(*this);
@@ -1303,14 +1305,13 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
   if (vd->getImplInfo().isSimpleStored()) {
     // If the global variable has storage, it might also have synthesized
     // accessors. Emit them here, since they won't appear anywhere else.
-    if (auto getter = vd->getGetter())
-      emitFunction(getter);
-    if (auto setter = vd->getSetter())
-      emitFunction(setter);
-    if (auto materializeForSet = vd->getMaterializeForSetFunc())
-      emitFunction(materializeForSet);
+    vd->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
+      auto accessor = vd->getAccessor(kind);
+      if (accessor)
+        emitFunction(accessor);
+    });
   }
-  
+
   tryEmitPropertyDescriptor(vd);
 }
 
@@ -1628,7 +1629,8 @@ public:
                             sgm.Types.getEmptyTupleType(), {}, {error});
 
         // Signal an abnormal exit by returning 1.
-        SGF.Cleanups.emitCleanupsForReturn(CleanupLocation::get(moduleLoc));
+        SGF.Cleanups.emitCleanupsForReturn(CleanupLocation::get(moduleLoc),
+                                           IsForUnwind);
         SGF.B.createBranch(returnLoc, returnBB, emitTopLevelReturnValue(1));
       }
 

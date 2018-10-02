@@ -367,3 +367,48 @@ extension RawSyntax {
     return leadingTriviaLength + contentLength + trailingTriviaLength
   }
 }
+
+extension RawSyntax: ByteTreeObjectDecodable {
+  enum SyntaxType: UInt8, ByteTreeScalarDecodable {
+    case token = 0
+    case layout = 1
+
+    static func read(from pointer: UnsafeRawPointer, size: Int) ->
+      SyntaxType {
+      let rawValue = UInt8.read(from: pointer, size: size)
+      guard let type = SyntaxType(rawValue: rawValue) else {
+        fatalError("Unknown RawSyntax node type \(rawValue)")
+      }
+      return type
+    }
+  }
+
+  static func read(from reader: ByteTreeObjectReader, numFields: Int) ->
+    RawSyntax {
+    let type = reader.readField(SyntaxType.self, index: 0)
+    switch type {
+    case .token:
+      let presence = reader.readField(SourcePresence.self, index: 1)
+      let id = reader.readField(SyntaxNodeId.self, index: 2)
+      let kind = reader.readField(TokenKind.self, index: 3)
+      let leadingTrivia = reader.readField(Trivia.self, index: 4)
+      let trailingTrivia = reader.readField(Trivia.self, index: 5)
+      return RawSyntax(kind: kind, leadingTrivia: leadingTrivia,
+                       trailingTrivia: trailingTrivia,
+                       presence: presence, id: id)
+    case .layout:
+      let presence = reader.readField(SourcePresence.self, index: 1)
+      let id = reader.readField(SyntaxNodeId.self, index: 2)
+      let kind = reader.readField(SyntaxKind.self, index: 3)
+      let layout = reader.readField([RawSyntax?].self, index: 4)
+      return RawSyntax(kind: kind, layout: layout, presence: presence, id: id)
+    }
+  }
+}
+
+extension SyntaxNodeId: ByteTreeScalarDecodable {
+  static func read(from pointer: UnsafeRawPointer, size: Int) -> SyntaxNodeId {
+    let rawValue = UInt8.read(from: pointer, size: size)
+    return SyntaxNodeId(rawValue: UInt(rawValue))
+  }
+}

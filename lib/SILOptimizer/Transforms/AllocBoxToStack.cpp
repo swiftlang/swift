@@ -766,7 +766,7 @@ specializePartialApply(SILOptFunctionBuilder &FuncBuilder,
                                ClonedName);
     Cloner.populateCloned();
     ClonedFn = Cloner.getCloned();
-    pass.T->notifyAddFunction(ClonedFn, F);
+    pass.T->addFunctionToPassManagerWorklist(ClonedFn, F);
   }
 
   // Now create the new partial_apply using the cloned function.
@@ -843,7 +843,7 @@ static void rewritePartialApplies(AllocBoxToStackState &pass) {
   // Clone the referenced function of each partial_apply, removing the
   // operands that we will not need, and remove the existing
   // partial_apply.
-  SILOptFunctionBuilder FuncBuilder(*pass.T->getPassManager());
+  SILOptFunctionBuilder FuncBuilder(*pass.T);
   for (auto &It : IndexMap) {
     auto *PartialApply = It.first;
     auto &Indices = It.second;

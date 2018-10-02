@@ -30,12 +30,12 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILConstants.h"
-#include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/Support/CommandLine.h"
 #ifdef SWIFT_ENABLE_TENSORFLOW
@@ -643,6 +643,7 @@ static const char *markingStr[]{
 
 class TFFunctionPartition {
 public:
+  SILTransform &transform;
   SILFunction &hostFn;
   ModuleDecl &tensorFlowModule; // TensorFlow standard library.
   TFGraphLowering *const graphLowering;
@@ -751,12 +752,12 @@ public:
   SILFunction *acceleratorFn = nullptr;
 
 public:
-  TFFunctionPartition(SILFunction &Fn, SILPassManager *PM,
-                      ModuleDecl &tensorFlowModule,
+  TFFunctionPartition(SILTransform &transform, SILFunction &Fn,
+                      SILPassManager *PM, ModuleDecl &tensorFlowModule,
                       TFGraphLowering *graphLowering,
                       DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
                           &graphFunctions)
-      : hostFn(Fn), tensorFlowModule(tensorFlowModule),
+      : transform(transform), hostFn(Fn), tensorFlowModule(tensorFlowModule),
         graphLowering(graphLowering), graphFunctions(graphFunctions),
         // TODO: remote this call once partition pass is folded into
         // deabstraction.
@@ -769,8 +770,10 @@ public:
   ~TFFunctionPartition() {
     // Remove the partitioned function so it doesn't go through the normal
     // compiler flow.
-    if (acceleratorFn)
+    if (acceleratorFn) {
+      transform.getPassManager()->notifyWillDeleteFunction(acceleratorFn);
       acceleratorFn->getModule().eraseFunction(acceleratorFn);
+    }
   }
 
   /// Run the marking/analysis phase on this function. Return true on error.
@@ -4208,7 +4211,7 @@ bool TFFunctionPartition::partition(bool isTest) {
       SILCoroutineKind::None, ParameterConvention::Direct_Owned, params,
       /*interfaceYields*/ {}, results, /*interfaceErrorResult*/ None,
       hostFn.getModule().getASTContext());
-  SILFunctionBuilder FB(hostFn.getModule());
+  SILOptFunctionBuilder FB(transform);
   auto resultFn = FB.getOrCreateFunction(
       hostFn.getLocation(), hostFn.getName().str() + ".tf", SILLinkage::Private,
       newFnType,
@@ -4217,8 +4220,10 @@ bool TFFunctionPartition::partition(bool isTest) {
     // If we error out before assigning `resultFn` to the member field
     // `acceleratorFn`, we should make sure this synthensized function is
     // removed, to avoid it going through the normal compiler flow.
-    if (resultFn)
+    if (resultFn) {
+      transform.getPassManager()->notifyWillDeleteFunction(resultFn);
       resultFn->getModule().eraseFunction(resultFn);
+    }
   };
 
   PartitionCloner PC(*this, *resultFn, tensorProgram.theTensorComputation,
@@ -4274,6 +4279,7 @@ bool TFFunctionPartition::lowerGraph(bool isTest) {
 
     // Remove the host function so it doesn't go through the normal
     // compiler flow.
+    transform.getPassManager()->notifyWillDeleteFunction(&hostFn);
     hostFn.getModule().eraseFunction(&hostFn);
   } else {
     if (graphLowering->lowerTFGraph(hostFn.getName(), acceleratorFn,
@@ -4358,7 +4364,8 @@ class TFPartition : public SILModuleTransform {
 
 public:
   TFPartition(bool isTest)
-      : isTest(isTest), moduleGraphLowering(TFGraphLowering(graphFunctions)) {}
+      : isTest(isTest),
+        moduleGraphLowering(TFGraphLowering(*this, graphFunctions)) {}
 
   /// The entry point to the transformation.
   void run() override;
@@ -4524,11 +4531,11 @@ bool TFPartition::partitionFunction(
                           << " should be partitioned.\n");
   TFGraphLowering *graphLowering = &moduleGraphLowering;
   if (!TFModuleLevelGraph) {
-    testGraphLowerings.emplace_back(TFGraphLowering(graphFunctions));
+    testGraphLowerings.emplace_back(TFGraphLowering(*this, graphFunctions));
     graphLowering = &testGraphLowerings.back();
   }
   partitioner = llvm::make_unique<TFFunctionPartition>(
-      *hostFn, PM, *tfModule, graphLowering, graphFunctions);
+      *this, *hostFn, PM, *tfModule, graphLowering, graphFunctions);
 
   bool hasTensorOps = false;
   if (partitioner->markFunction(hasTensorOps))

@@ -31,6 +31,7 @@
 #include "swift/SIL/GraphOperationBuilder.h"
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILUndef.h"
 #include "llvm/ADT/iterator_range.h"
@@ -321,6 +322,58 @@ static SILValue createTFIntegerConst(GraphFunctionDeviceInfo &deviceInfo,
   return constNode->getResults()[0];
 }
 
+namespace {
+
+class BasicBlockCloner : public SILClonerWithScopes<BasicBlockCloner> {
+private:
+  /// The flag to track if  this cloner was used to clone any blocks.
+  bool cloned;
+
+public:
+  BasicBlockCloner(SILFunction &F)
+      : SILClonerWithScopes(F), cloned(false) {}
+
+  bool hasCloned() const { return cloned; }
+
+  /// Return a cloned block.
+  SILBasicBlock *cloneBlock(SILBasicBlock *bb) {
+    auto bbIt = BBMap.find(bb);
+    if (bbIt != BBMap.end())
+      return bbIt->second;
+
+    cloned = true;
+
+    SILFunction &F = getBuilder().getFunction();
+    SILBasicBlock *newBB = F.createBasicBlock();
+    getBuilder().setInsertionPoint(newBB);
+    BBMap[bb] = newBB;
+    // If the basic block has arguments, clone them as well.
+    for (auto *arg : bb->getArguments()) {
+      // Create a new argument and copy it into the ValueMap so future
+      // references use it.
+      ValueMap[arg] = newBB->createPHIArgument(
+          arg->getType(), arg->getOwnershipKind(), arg->getDecl());
+    }
+    // Clone all the instructions.
+    for (auto &inst : *bb) {
+      visit(&inst);
+    }
+    return newBB;
+  }
+
+  /// Handle references to basic blocks when cloning.
+  SILBasicBlock *remapBasicBlock(SILBasicBlock *bb) {
+    // If the block was not cloned by this cloner, directly reference it.
+    // Otherwise, use the cloned block.
+    auto bbIt = BBMap.find(bb);
+    if (bbIt != BBMap.end())
+      return bbIt->second;
+    return bb;
+  }
+};
+
+}  // namespace
+
 // A helper class to transform a loop to have a single exit from the header.
 class SingleExitLoopTransformer {
 public:
@@ -432,6 +485,8 @@ private:
   llvm::DenseMap<SILValue, SILValue> escapingValueSubstMap;
   /// Similar to escapingValueSubstMap, but arguments of exit blocks.
   llvm::DenseMap<SILValue, SILValue> exitArgSubstMap;
+  // Map from an arg of an exit block to the corresponding newly added header arg.
+  llvm::DenseMap<SILValue, SILValue> exitArgHeaderArgMap;
 };
 
 void SingleExitLoopTransformer::initialize() {
@@ -492,6 +547,8 @@ void SingleExitLoopTransformer::initialize() {
 }
 
 void SingleExitLoopTransformer::ensureSingleExitBlock() {
+  BasicBlockCloner cloner(*currentFn);
+
   // Identify the common post dominator
   SILPrintContext printContext(llvm::dbgs());
   SmallVector<SILBasicBlock*, 8> exitBlockList;
@@ -528,21 +585,31 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
         // appropriately and not deal with touching stale memory.
         auto succs = current->getSuccessors();
         auto *succ = succs[edgeIdx].getBB();
-        // Skip if (1) already processed, (2) reached common pd, or (3)
-        // block has in edges from outside the loop. In the last case, we will
-        // need to clone the blocks.
+        // Skip if (1) already processed or (2) reached common pd.
         if (blocksToBeMoved.count(succ) > 0 || succ == nearestCommonPD) {
           continue;
         }
-        if (!DI->properlyDominates(header, succ)) {
-          // Split this edge so that we don't mess up arguments passed in
-          // from other predecessors of succ.
-          if (succ->getNumArguments() > 0) {
-            splitEdge(current->getTerminator(), edgeIdx, DI, LI);
-          }
+
+        if (DI->properlyDominates(header, succ)) {
+          worklist.insert(succ);
           continue;
         }
-        worklist.insert(succ);
+        // If `succ` is not dominated by `header`, then `succ` is reachable from
+        // a node outside of this loop. We might have to clone `succ` in such
+        // cases.
+
+        // Before cloning make sure that header -> succ is *not* backedge of a
+        // parent loop. This can happen when we have labeled breaks in loops. We
+        // cannot clone the blocks in such cases. Simply continue. This is still
+        // OK for our purposes because we will find an equivalent value at the
+        // header for any value that escapes along this edge.
+        if (DI->properlyDominates(succ, header)) continue;
+
+        // Clone the block and rewire the edge.
+        SILBasicBlock *clonedSucc = cloner.cloneBlock(succ);
+        changeBranchTarget(current->getTerminator(), edgeIdx, clonedSucc,
+                           /*preserveArgs*/ true);
+        worklist.insert(clonedSucc);
       }
     }
   }
@@ -577,6 +644,12 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
       // top-level loop is already correct.
     }
     loop->addBasicBlockToLoop(outsideBlock, LI->getBase());
+  }
+  if (cloner.hasCloned()) {
+    // TODO(https://bugs.swift.org/browse/SR-8336): the transformations here are
+    // simple that we should be able to incrementally update the DI & PDI.
+    DI->recalculate(*currentFn);
+    PDI->recalculate(*currentFn);
   }
 }
 
@@ -699,30 +772,30 @@ SingleExitLoopTransformer::createNewHeader() {
   }
   header->dropAllArguments();
   // Add phi arguments in the new header corresponding to the escaping values.
-  auto addArgument =
-      [this, newHeader](SILValue escapingValue) {
-        SILValue newValue = newHeader->createPHIArgument(
-          escapingValue->getType(), escapingValue.getOwnershipKind());
-        // Replace uses *outside* of the loop with the new value.
-        auto UI = escapingValue->use_begin(), E = escapingValue->use_end();
-        while (UI != E) {
-          Operand *use = *UI;
-          // Increment iterator before we invalidate it
-          // when we invoke Operand::Set below.
-          ++UI;
-          if (loop->contains(use->getUser()->getParent())) {
-            continue;
-          }
-          use->set(newValue);
-        }
-      };
-
   for (const auto &kv : escapingValueSubstMap) {
-    addArgument(kv.first);
+    SILValue escapingValue = kv.first;
+    SILValue newValue = newHeader->createPHIArgument(
+      escapingValue->getType(), escapingValue.getOwnershipKind());
+    // Replace uses *outside* of the loop with the new value.
+    auto UI = escapingValue->use_begin(), E = escapingValue->use_end();
+    while (UI != E) {
+      Operand *use = *UI;
+      // Increment iterator before we invalidate it
+      // when we invoke Operand::Set below.
+      ++UI;
+      if (loop->contains(use->getUser()->getParent())) {
+        continue;
+      }
+      use->set(newValue);
+    }
   }
   if (TFNoUndefsInSESE) {
+    // Add arguments in the new header corresponding to exit block arguments.
     for (const auto &kv : exitArgSubstMap) {
-      addArgument(kv.first);
+      SILValue arg = kv.first;
+      SILValue newValue =
+        newHeader->createPHIArgument(arg->getType(), arg.getOwnershipKind());
+      exitArgHeaderArgMap[kv.first] = newValue;
     }
   }
   // An integer to identify the exit edge.
@@ -901,15 +974,6 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
 SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
     const llvm::DenseMap<SILBasicBlock *, intmax_t> &exitIndices,
     SILValue exitIndexArg) {
-  if (TFNoUndefsInSESE)  {
-    // Drop all arguments as we have moved them into the headers arguments.
-    for (SILBasicBlock *exitBlock : exitBlocks) {
-      exitBlock->dropAllArguments();
-    }
-  }
-  if (exitBlocks.size() == 1) {
-    return *exitBlocks.begin();
-  }
   auto createBlockOutsideLoop = [this]() {
     SILBasicBlock *newBlock = currentFn->createBasicBlock();
     SILLoop *parentLoop = loop->getParentLoop();
@@ -919,11 +983,9 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
     return newBlock;
   };
 
-  // Create a new exit block.
-  // FIXME: We can avoid creating an additional block and instead connect the
-  // header directly to the demuxBlock created in the loop below. Alternatively,
-  // we can also use contractUncondBranches in TFParititon.cpp to remove this
-  // block later.
+  // Create a new exit block. Strictly, we don't always need this block, but it
+  // makes it slightly easier to implement the demux blocks. contractUncondEdges
+  // will merge this block away if appropriate.
   SILBasicBlock *newExitBlock = createBlockOutsideLoop();
 
   SILBuilder builder(newExitBlock);
@@ -933,6 +995,17 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
   SILBasicBlock *demuxBlock = *curBlockIter++;
   SILLocation headerLocation =
       getUserSourceLocation(header->getTerminator()->getDebugLocation());
+
+  // Find the arguments at the header that were added for the exit arguments
+  // and pass that along to the original exit block.
+  auto remapExitArguments = [this](SILBasicBlock *exitingBlock,
+                                   SILBasicBlock *exitBlock) {
+    SmallVector<SILValue, 8> headerArgs;
+    for (SILValue arg : exitBlock->getArguments()) {
+      headerArgs.push_back(exitArgHeaderArgMap[arg]);
+    }
+    appendArguments(exitingBlock->getTerminator(), exitBlock, headerArgs);
+  };
 
   while (curBlockIter != exitBlocks.end()) {
     SILBasicBlock *newBlock = createBlockOutsideLoop();
@@ -959,10 +1032,18 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
         condTensorInst->getResults()[0], builder, headerLocation, *deviceInfo);
     builder.createCondBranch(headerLocation, condValue->getResults()[0],
                              trueBlock, demuxBlock);
+
+    if (TFNoUndefsInSESE) {
+      remapExitArguments(newBlock, trueBlock);
+      remapExitArguments(newBlock, demuxBlock);
+    }
     demuxBlock = newBlock;
   }
   builder.setInsertionPoint(newExitBlock);
   builder.createBranch(headerLocation, demuxBlock);
+  if (TFNoUndefsInSESE) {
+    remapExitArguments(newExitBlock, demuxBlock);
+  }
   return newExitBlock;
 }
 
@@ -1061,7 +1142,11 @@ void SESERegionBuilder::ensureSingleExitFromLoops() {
     changed |= loopChanged;
   }
   if (changed) {
-    splitAllCondBrCriticalEdgesWithNonTrivialArgs(*F, nullptr, &LI);
+    splitAllCondBrCriticalEdgesWithNonTrivialArgs(*F, &DI, &LI);
+    contractUncondBranches(F, &DI, &LI);
+    // TODO(https://bugs.swift.org/browse/SR-8336): the transformations here are
+    // simple that we should be able to incrementally update PDI.
+    PDI.recalculate(*F);
   }
 }
 

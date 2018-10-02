@@ -19,6 +19,7 @@
 // RUN: else \
 // RUN:   %target-build-swift %t/main.swift %S/Inputs/Mirror/MirrorOther.swift -o %t/Mirror; \
 // RUN: fi
+// RUN: %target-codesign %t/Mirror
 // RUN: %target-run %t/Mirror
 // REQUIRES: executable_test
 
@@ -1691,7 +1692,7 @@ mirrors.test("DictionaryIterator/Mirror") {
   dump(d.makeIterator(), to: &output)
 
   let expected =
-    "- Swift.DictionaryIterator<StdlibUnittest.MinimalHashableValue, StdlibUnittest.OpaqueValue<Swift.Int>>\n"
+    "- Swift.Dictionary<StdlibUnittest.MinimalHashableValue, StdlibUnittest.OpaqueValue<Swift.Int>>.Iterator\n"
 
   expectEqual(expected, output)
 }
@@ -1703,7 +1704,7 @@ mirrors.test("SetIterator/Mirror") {
   dump(s.makeIterator(), to: &output)
 
   let expected =
-    "- Swift.SetIterator<StdlibUnittest.MinimalHashableValue>\n"
+    "- Swift.Set<StdlibUnittest.MinimalHashableValue>.Iterator\n"
 
   expectEqual(expected, output)
 }

@@ -251,6 +251,8 @@ class RawSyntax final
       /// Number of children this "layout" node has.
       unsigned NumChildren : 32;
       /// Number of bytes this node takes up spelled out in the source code
+      /// A value of UINT32_MAX indicates that the text length has not been
+      /// computed yet.
       unsigned TextLength : 32;
     } Layout;
 
@@ -292,6 +294,18 @@ class RawSyntax final
   RawSyntax(tok TokKind, OwnedString Text, ArrayRef<TriviaPiece> LeadingTrivia,
             ArrayRef<TriviaPiece> TrailingTrivia, SourcePresence Presence,
             bool ManualMemory, llvm::Optional<SyntaxNodeId> NodeId);
+
+  /// Compute the node's text length by summing up the length of its childern
+  size_t computeTextLength() {
+    size_t TextLength = 0;
+    for (size_t I = 0, NumChildren = getNumChildren(); I < NumChildren; ++I) {
+      auto &ChildNode = getChild(I);
+      if (ChildNode && !ChildNode->isMissing()) {
+        TextLength += ChildNode->getTextLength();
+      }
+    }
+    return TextLength;
+  }
 
 public:
   ~RawSyntax();
@@ -390,11 +404,16 @@ public:
     return static_cast<tok>(Bits.Token.TokenKind);
   }
 
-  /// Return the text of the token.
-  StringRef getTokenText() const {
+  /// Return the text of the token as an \c OwnedString. Keeping a reference to
+  /// this string will keep it alive even if the syntax node gets freed.
+  OwnedString getOwnedTokenText() const {
     assert(isToken());
-    return getTrailingObjects<OwnedString>()->str();
+    return *getTrailingObjects<OwnedString>();
   }
+
+  /// Return the text of the token as a reference. The referenced buffer may
+  /// disappear when the syntax node gets freed.
+  StringRef getTokenText() const { return getOwnedTokenText().str(); }
 
   /// Return the leading trivia list of the token.
   ArrayRef<TriviaPiece> getLeadingTrivia() const {
@@ -420,7 +439,7 @@ public:
   /// trivia instead.
   RC<RawSyntax>
   withLeadingTrivia(ArrayRef<TriviaPiece> NewLeadingTrivia) const {
-    return make(getTokenKind(), getTokenText(), NewLeadingTrivia,
+    return make(getTokenKind(), getOwnedTokenText(), NewLeadingTrivia,
                 getTrailingTrivia(), getPresence());
   }
 
@@ -432,7 +451,7 @@ public:
   /// trivia instead.
   RC<RawSyntax>
   withTrailingTrivia(ArrayRef<TriviaPiece> NewTrailingTrivia) const {
-    return make(getTokenKind(), getTokenText(), getLeadingTrivia(),
+    return make(getTokenKind(), getOwnedTokenText(), getLeadingTrivia(),
                 NewTrailingTrivia, getPresence());
   }
 
@@ -476,6 +495,9 @@ public:
       accumulateAbsolutePosition(Pos);
       return Pos.getOffset();
     } else {
+      if (Bits.Layout.TextLength == UINT32_MAX) {
+        Bits.Layout.TextLength = computeTextLength();
+      }
       return Bits.Layout.TextLength;
     }
   }

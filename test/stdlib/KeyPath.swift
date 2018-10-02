@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -g %s -o %t/a.out
+// RUN: %target-build-swift -swift-version 5 -g %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
@@ -11,6 +12,8 @@ final class C<T> {
   var x: Int
   var y: LifetimeTracked?
   var z: T
+  let immutable: String
+  private(set) var secretlyMutable: String
 
   var computed: T {
     get {
@@ -25,6 +28,8 @@ final class C<T> {
     self.x = x
     self.y = y
     self.z = z
+    self.immutable = "\(x) \(y) \(z)"
+    self.secretlyMutable = immutable
   }
 }
 
@@ -32,10 +37,14 @@ struct Point: Equatable {
   var x: Double
   var y: Double
   var trackLifetime = LifetimeTracked(123)
+  let hypotenuse: Double
+  private(set) var secretlyMutableHypotenuse: Double
   
   init(x: Double, y: Double) {
     self.x = x
     self.y = y
+    hypotenuse = x*x + y*y
+    secretlyMutableHypotenuse = x*x + y*y
   }
   
   static func ==(a: Point, b: Point) -> Bool {
@@ -692,6 +701,13 @@ keyPath.test("offsets") {
   expectNil(NOPLayout.offset(of: \NonOffsetableProperties.z))
 }
 
+keyPath.test("let-ness") {
+  expectNil(\C<Int>.immutable as? ReferenceWritableKeyPath)
+  expectNotNil(\C<Int>.secretlyMutable as? ReferenceWritableKeyPath)
+  expectNil(\Point.hypotenuse as? WritableKeyPath)
+  expectNotNil(\Point.secretlyMutableHypotenuse as? WritableKeyPath)
+}
+
 // SR-6096
 
 protocol Protocol6096 {}
@@ -711,6 +727,7 @@ extension Int: Protocol6096 {}
 keyPath.test("optional chaining component that needs generic instantiation") {
   Value6096<Int>().doSomething()
 }
+
 
 runAllTests()
 

@@ -306,8 +306,8 @@ private:
       return;
 
     // match labels to properties
-    auto *TypeContext = MemberwiseInit->getDeclContext()
-                          ->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto *TypeContext =
+        MemberwiseInit->getDeclContext()->getSelfNominalTypeDecl();
     if (!TypeContext || !shouldIndex(TypeContext, false))
       return;
 
@@ -743,7 +743,7 @@ bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet 
 }
 
 static bool isDynamicVarAccessorOrFunc(ValueDecl *D, SymbolInfo symInfo) {
-  if (auto NTD = D->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext()) {
+  if (auto NTD = D->getDeclContext()->getSelfNominalTypeDecl()) {
     bool isClassOrProtocol = isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD);
     bool isInternalAccessor =
       symInfo.SubKind == SymbolSubKind::SwiftAccessorWillSet ||
@@ -1014,7 +1014,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(ExtensionDecl *ExtD, ValueDecl *Extend
 }
 
 static NominalTypeDecl *getNominalParent(ValueDecl *D) {
-  return D->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  return D->getDeclContext()->getSelfNominalTypeDecl();
 }
 
 bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
@@ -1368,7 +1368,7 @@ canDeclProvideDefaultImplementationFor(ValueDecl* VD,
     return {};
 
   // Check if VD is from a protocol extension.
-  auto P = VD->getDeclContext()->getAsProtocolExtensionContext();
+  auto P = VD->getDeclContext()->getExtendedProtocolDecl();
   if (!P)
     return {};
 

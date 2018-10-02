@@ -790,7 +790,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       const auto *VD = cast<ValueDecl>(D);
       const TypeDecl *declParent =
-          VD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+          VD->getDeclContext()->getSelfNominalTypeDecl();
       if (!declParent) {
         // If the declaration has been validated but not fully type-checked,
         // the attribute might be applied to something invalid.
@@ -1785,38 +1785,15 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
   auto &diags = ctx.Diags;
   auto tuple = dyn_cast<TupleExpr>(expr);
   if (!tuple) {
+    if (newNames[0].empty()) {
+      // We don't know what to do with this.
+      return false;
+    }
+
     llvm::SmallString<16> str;
     // If the diagnostic is local, flush it before returning.
     // This makes sure it's emitted before 'str' is destroyed.
     SWIFT_DEFER { diagOpt.reset(); };
-
-    if (newNames[0].empty()) {
-      // This is probably a conversion from a value of labeled tuple type to
-      // a scalar.
-      // FIXME: We want this issue to disappear completely when single-element
-      // labeled tuples go away.
-      if (auto tupleTy = expr->getType()->getRValueType()->getAs<TupleType>()) {
-        int scalarFieldIdx = tupleTy->getElementForScalarInit();
-        if (scalarFieldIdx >= 0) {
-          auto &field = tupleTy->getElement(scalarFieldIdx);
-          if (field.hasName()) {
-            str = ".";
-            str += field.getName().str();
-            if (!existingDiag) {
-              diagOpt.emplace(
-                          diags.diagnose(expr->getStartLoc(),
-                                         diag::extra_named_single_element_tuple,
-                                         field.getName().str()));
-            }
-            getDiag().fixItInsertAfter(expr->getEndLoc(), str);
-            return true;
-          }
-        }
-      }
-
-      // We don't know what to do with this.
-      return false;
-    }
 
     // This is a scalar-to-tuple conversion. Add the name. We "know"
     // that we're inside a ParenExpr, because ParenExprs are required
@@ -3200,8 +3177,7 @@ class ObjCSelectorWalker : public ASTWalker {
       lookupName = lookupName.getBaseName();
 
     // Look for members with the given name.
-    auto nominal =
-      method->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto nominal = method->getDeclContext()->getSelfNominalTypeDecl();
     auto result = TC.lookupMember(const_cast<DeclContext *>(DC),
                                   nominal->getDeclaredInterfaceType(),
                                   lookupName,
@@ -3271,7 +3247,7 @@ public:
 
       // Make sure the constructor is within Selector.
       auto ctorContextType = ctor->getDeclContext()
-          ->getAsNominalTypeOrNominalTypeExtensionContext()
+          ->getSelfNominalTypeDecl()
           ->getDeclaredType();
       if (!ctorContextType || !ctorContextType->isEqual(SelectorTy))
         return { true, expr };
@@ -3401,24 +3377,20 @@ public:
       }
 
       // If this method is within a protocol...
-      if (auto proto =
-            method->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+      if (auto proto = method->getDeclContext()->getSelfProtocolDecl()) {
         // If the best so far is not from a protocol, or is from a
         // protocol that inherits this protocol, we have a new best.
-        auto bestProto = bestMethod->getDeclContext()
-          ->getAsProtocolOrProtocolExtensionContext();
+        auto bestProto = bestMethod->getDeclContext()->getSelfProtocolDecl();
         if (!bestProto || bestProto->inheritsFrom(proto))
           bestMethod = method;
         continue;
       }
 
       // This method is from a class.
-      auto classDecl =
-        method->getDeclContext()->getAsClassOrClassExtensionContext();
+      auto classDecl = method->getDeclContext()->getSelfClassDecl();
 
       // If the best method was from a protocol, keep it.
-      auto bestClassDecl =
-        bestMethod->getDeclContext()->getAsClassOrClassExtensionContext();
+      auto bestClassDecl = bestMethod->getDeclContext()->getSelfClassDecl();
       if (!bestClassDecl) continue;
 
       // If the best method was from a subclass of the place where
@@ -3439,8 +3411,7 @@ public:
       SmallString<32> replacement;
       {
         llvm::raw_svector_ostream out(replacement);
-        auto nominal = bestMethod->getDeclContext()
-                         ->getAsNominalTypeOrNominalTypeExtensionContext();
+        auto nominal = bestMethod->getDeclContext()->getSelfNominalTypeDecl();
         out << "#selector(";
 
         DeclName name;

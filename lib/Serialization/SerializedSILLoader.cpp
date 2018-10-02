@@ -20,16 +20,16 @@
 
 using namespace swift;
 
-SerializedSILLoader::SerializedSILLoader(ASTContext &Ctx,
-                                         SILModule *SILMod,
-                                         Callback *callback) {
+SerializedSILLoader::SerializedSILLoader(
+    ASTContext &Ctx, SILModule *SILMod,
+    DeserializationNotificationHandlerSet *callbacks) {
 
   // Get a list of SerializedModules from ASTContext.
   // FIXME: Iterating over LoadedModules is not a good way to do this.
   for (auto &Entry : Ctx.LoadedModules) {
     for (auto File : Entry.second->getFiles()) {
       if (auto LoadedAST = dyn_cast<SerializedASTFile>(File)) {
-        auto Des = new SILDeserializer(&LoadedAST->File, *SILMod, callback);
+        auto Des = new SILDeserializer(&LoadedAST->File, *SILMod, callbacks);
 #ifndef NDEBUG
         SILMod->verify();
 #endif
@@ -181,5 +181,3 @@ void SerializedSILLoader::getAllProperties() {
     Des->getAllProperties();
 }
 
-// Anchor the SerializedSILLoader v-table.
-void SerializedSILLoader::Callback::_anchor() {}

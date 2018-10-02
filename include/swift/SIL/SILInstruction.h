@@ -31,6 +31,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
+#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILLocation.h"
@@ -259,6 +260,36 @@ public:
 
   friend bool operator!=(iterator lhs, iterator rhs) { return !(lhs == rhs); }
 };
+
+inline SILInstructionResultArray::iterator
+SILInstructionResultArray::begin() const {
+  return iterator(*this, 0);
+}
+
+inline SILInstructionResultArray::iterator
+SILInstructionResultArray::end() const {
+  return iterator(*this, size());
+}
+
+inline SILInstructionResultArray::reverse_iterator
+SILInstructionResultArray::rbegin() const {
+  return llvm::make_reverse_iterator(end());
+}
+
+inline SILInstructionResultArray::reverse_iterator
+SILInstructionResultArray::rend() const {
+  return llvm::make_reverse_iterator(begin());
+}
+
+inline SILInstructionResultArray::range
+SILInstructionResultArray::getValues() const {
+  return {begin(), end()};
+}
+
+inline SILInstructionResultArray::reverse_range
+SILInstructionResultArray::getReversedValues() const {
+  return {rbegin(), rend()};
+}
 
 /// This is the root class for all instructions that can be used as the
 /// contents of a Swift SILBasicBlock.
@@ -3933,9 +3964,12 @@ class ConvertFunctionInst final
   friend SILBuilder;
 
   ConvertFunctionInst(SILDebugLocation DebugLoc, SILValue Operand,
-                      ArrayRef<SILValue> TypeDependentOperands, SILType Ty)
+                      ArrayRef<SILValue> TypeDependentOperands, SILType Ty,
+                      bool WithoutActuallyEscaping)
       : UnaryInstructionWithTypeDependentOperandsBase(
             DebugLoc, Operand, TypeDependentOperands, Ty) {
+    SILInstruction::Bits.ConvertFunctionInst.WithoutActuallyEscaping =
+        WithoutActuallyEscaping;
     assert((Operand->getType().castTo<SILFunctionType>()->isNoEscape() ==
                 Ty.castTo<SILFunctionType>()->isNoEscape() ||
             Ty.castTo<SILFunctionType>()->getRepresentation() !=
@@ -3943,9 +3977,24 @@ class ConvertFunctionInst final
            "Change of escapeness is not ABI compatible");
   }
 
-  static ConvertFunctionInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+  static ConvertFunctionInst *create(SILDebugLocation DebugLoc,
+                                     SILValue Operand, SILType Ty,
+                                     SILFunction &F,
+                                     SILOpenedArchetypesState &OpenedArchetypes,
+                                     bool WithoutActuallyEscaping);
+
+public:
+  /// Returns `true` if this converts a non-escaping closure into an escaping
+  /// function type. `True` must be returned whenever the closure operand has an
+  /// unboxed capture (via @inout_aliasable) *and* the resulting function type
+  /// is escaping. (This only happens as a result of
+  /// withoutActuallyEscaping()). If `true` is returned, then the resulting
+  /// function type must be escaping, but the operand's function type may or may
+  /// not be @noescape. Note that a non-escaping closure may have unboxed
+  /// captured even though its SIL function type is "escaping".
+  bool withoutActuallyEscaping() const {
+    return SILInstruction::Bits.ConvertFunctionInst.WithoutActuallyEscaping;
+  }
 };
 
 /// ConvertEscapeToNoEscapeInst - Change the type of a escaping function value
@@ -5640,8 +5689,7 @@ class WitnessMethodInst final
 public:
   CanType getLookupType() const { return LookupType; }
   ProtocolDecl *getLookupProtocol() const {
-    return getMember().getDecl()->getDeclContext()
-             ->getAsProtocolOrProtocolExtensionContext();
+    return getMember().getDecl()->getDeclContext()->getSelfProtocolDecl();
   }
 
   ProtocolConformanceRef getConformance() const { return Conformance; }
@@ -8056,6 +8104,13 @@ inline DestructureTupleInst *DestructureTupleResult::getParent() {
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
+/// A graph operation attribute, used by GraphOperationInst.
+/// Attributes have a name and a constant value.
+struct GraphOperationAttribute {
+  Identifier name;
+  SymbolicValue value;
+};
+
 /// A result for the graph_op instruction. See documentation for
 /// graph_op for more information.
 class GraphOperationResult final : public MultipleValueInstructionResult {
@@ -8079,9 +8134,27 @@ public:
   }
 };
 
-/// SWIFT_ENABLE_TENSORFLOW
-/// A graph operation. This instruction will be extracted to a graph program
-/// via graph program extraction passes.
+/// A graph operation, which takes operands and attributes and returns results.
+///
+/// Operands have values that are possibly unknown at compile time. Operands
+/// are grouped into `GraphOperationInfo::StructuredArgument`s. See there for
+/// more documentation. This structure is mangled into `Name`.
+///
+/// Attributes have values that are known at compile time, and these values are
+/// stored in the GraphOperationInst.
+///
+/// Results can be represented in 3 different ways:
+/// 1. As a single output parameter with type that is a TensorFlow value or
+///    aggregate of TensorFlow values.
+/// 2. As a single result that is a TensorFlow value or aggregate of TensorFlow
+///    values.
+/// 3. As multiple results, where each result is a TensorFlow value (not an
+///    aggregate of TensorFlow values!).
+/// The later result representations are "better" than the earlier ones because
+/// code performing the operations has to do less work to deal with the results.
+/// Various compiler passes try to improve the result representations.
+/// Successful deabstraction currently guarantees that the result will be in
+/// form 3.
 class GraphOperationInst final
   : public InstructionBase<
                SILInstructionKind::GraphOperationInst,
@@ -8225,7 +8298,7 @@ namespace llvm {
 
 template <>
 struct ilist_traits<::swift::SILInstruction> :
-  public ilist_default_traits<::swift::SILInstruction> {
+  public ilist_node_traits<::swift::SILInstruction> {
   using SILInstruction = ::swift::SILInstruction;
 
 private:

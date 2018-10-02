@@ -382,7 +382,7 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
     // parameters.
     // FIXME: This is a current limitation, not inherent. We don't have
     // a concrete class to attach Objective-C category metadata to.
-    if (auto classDecl = ED->getAsClassOrClassExtensionContext()) {
+    if (auto classDecl = ED->getSelfClassDecl()) {
       if (auto generic = classDecl->getGenericAncestor()) {
         if (!generic->usesObjCGenericsModel()) {
           if (diagnose) {
@@ -815,8 +815,14 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   }
 
   // Figure out the type of the indices.
-  Type IndicesType = SD->getIndicesInterfaceType()->getWithoutImmediateLabel();
+  auto SubscriptType = SD->getInterfaceType()->getAs<AnyFunctionType>();
+  if (!SubscriptType)
+    return false;
 
+  if (SubscriptType->getParams().size() != 1)
+    return false;
+
+  Type IndicesType = SubscriptType->getParams()[0].getType();
   if (IndicesType->hasError())
     return false;
 
@@ -831,15 +837,6 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
 
   if (Result && checkObjCInExtensionContext(SD, Diagnose))
     return false;
-
-  // Make sure we know how to map the selector appropriately.
-  if (Result && SD->getObjCSubscriptKind() == ObjCSubscriptKind::None) {
-    SourceRange IndexRange = SD->getIndices()->getSourceRange();
-    SD->diagnose(diag::objc_invalid_subscript_key_type,
-                 getObjCDiagnosticAttrKind(Reason), IndicesType)
-      .highlight(IndexRange);
-    return false;
-  }
 
   if (!Diagnose || Result)
     return Result;
@@ -980,14 +977,13 @@ static bool isMemberOfObjCClassExtension(const ValueDecl *VD) {
   auto ext = dyn_cast<ExtensionDecl>(VD->getDeclContext());
   if (!ext) return false;
 
-  return ext->getAsClassOrClassExtensionContext() &&
-    ext->getAttrs().hasAttribute<ObjCAttr>();
+  return ext->getSelfClassDecl() && ext->getAttrs().hasAttribute<ObjCAttr>();
 }
 
 /// Whether this declaration is a member of a class with the `@objcMembers`
 /// attribute.
 static bool isMemberOfObjCMembersClass(const ValueDecl *VD) {
-  auto classDecl = VD->getDeclContext()->getAsClassOrClassExtensionContext();
+  auto classDecl = VD->getDeclContext()->getSelfClassDecl();
   if (!classDecl) return false;
 
   return classDecl->getAttrs().hasAttribute<ObjCMembersAttr>();
@@ -1116,7 +1112,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   if (VD->getOverriddenDecl() && VD->getOverriddenDecl()->isObjC())
     return ObjCReason(ObjCReason::OverridesObjC);
   // A witness to an @objc protocol requirement is implicitly @objc.
-  if (VD->getDeclContext()->getAsClassOrClassExtensionContext()) {
+  if (VD->getDeclContext()->getSelfClassDecl()) {
     auto requirements =
       findWitnessedObjCRequirements(VD, /*anySingleRequirement=*/true);
     if (!requirements.empty())
@@ -1168,8 +1164,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   // If this declaration is part of a class with implicitly @objc members,
   // make it implicitly @objc. However, if the declaration cannot be represented
   // as @objc, don't diagnose.
-  if (auto classDecl = VD->getDeclContext()
-          ->getAsClassOrClassExtensionContext()) {
+  if (auto classDecl = VD->getDeclContext()->getSelfClassDecl()) {
     // One cannot define @objc members of any foreign classes.
     if (classDecl->isForeign())
       return None;
@@ -1262,10 +1257,11 @@ static void markAsObjC(ValueDecl *D, ObjCReason reason,
                        Optional<ForeignErrorConvention> errorConvention);
 
 
-bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
+llvm::Expected<bool>
+IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   auto dc = VD->getDeclContext();
   Optional<ObjCReason> isObjC;
-  if (dc->getAsClassOrClassExtensionContext() && !isa<TypeDecl>(VD)) {
+  if (dc->getSelfClassDecl() && !isa<TypeDecl>(VD)) {
     // Members of classes can be @objc.
     isObjC = shouldMarkAsObjC(VD, isa<ConstructorDecl>(VD));
   }
@@ -1534,8 +1530,7 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
   }
 
   // Record the name of this Objective-C method in its class.
-  if (auto classDecl
-        = D->getDeclContext()->getAsClassOrClassExtensionContext()) {
+  if (auto classDecl = D->getDeclContext()->getSelfClassDecl()) {
     if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
       // Determine the foreign error convention.
       if (auto baseMethod = method->getOverriddenDecl()) {

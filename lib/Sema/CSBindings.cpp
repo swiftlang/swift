@@ -182,6 +182,7 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
   // check whether we can combine it with another
   // supertype binding by computing the 'join' of the types.
   if (binding.Kind == AllowedBindingKind::Supertypes &&
+      !binding.BindingType->hasUnresolvedType() &&
       !binding.BindingType->hasTypeVariable() &&
       !binding.BindingType->hasUnboundGenericType() &&
       !binding.DefaultedProtocol && !binding.isDefaultableBinding() &&
@@ -262,15 +263,12 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
   if (type->hasError())
     return None;
 
-  // Don't deduce autoclosure types or single-element, non-variadic
-  // tuples.
+  // Don't deduce autoclosure types.
   if (shouldBindToValueType(constraint)) {
     if (auto funcTy = type->getAs<FunctionType>()) {
       if (funcTy->isAutoClosure())
         type = funcTy->getResult();
     }
-
-    type = type->getWithoutImmediateLabel();
   }
 
   // If the source of the binding is 'OptionalObject' constraint

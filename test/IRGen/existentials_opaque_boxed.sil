@@ -446,7 +446,7 @@ bb0(%0 : $*Existential):
 // CHECK-LABEL: define linkonce_odr hidden %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWOb"(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
 // CHECK:  %2 = bitcast %T25existentials_opaque_boxed11ExistentialP* %1 to i8*
 // CHECK:  %3 = bitcast %T25existentials_opaque_boxed11ExistentialP* %0 to i8*
-// CHECK:  call void @llvm.memcpy.p0i8.p0i8.{{(i64|i32)}}(i8* %2, i8* %3, {{(i64 40|i32 20)}}, {{(i32 8|i32 4)}}, i1 false)
+// CHECK:  call void @llvm.memcpy.p0i8.p0i8.{{(i64|i32)}}(i8* align {{(8|4)}} %2, i8* align {{(8|4)}} %3, {{(i64 40|i32 20)}}, i1 false)
 // CHECK:  ret %T25existentials_opaque_boxed11ExistentialP* %1
 
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_initWithTake_existential_addr(%T25existentials_opaque_boxed11ExistentialP*

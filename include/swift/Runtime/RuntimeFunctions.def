@@ -196,29 +196,29 @@ FUNCTION(NativeNonAtomicStrongReleaseN, swift_nonatomic_release_n, C_CC,
          ARGS(RefCountedPtrTy, Int32Ty),
          ATTRS(NoUnwind))
 
-// void *swift_unknownRetain_n(void *ptr, int32_t n);
-FUNCTION(UnknownRetainN, swift_unknownRetain_n,
+// void *swift_unknownObjectRetain_n(void *ptr, int32_t n);
+FUNCTION(UnknownObjectRetainN, swift_unknownObjectRetain_n,
          C_CC,
          RETURNS(RefCountedPtrTy),
          ARGS(RefCountedPtrTy, Int32Ty),
          ATTRS(NoUnwind, FirstParamReturned))
 
-// void swift_unknownRelease_n(void *ptr, int32_t n);
-FUNCTION(UnknownReleaseN, swift_unknownRelease_n,
+// void swift_unknownObjectRelease_n(void *ptr, int32_t n);
+FUNCTION(UnknownObjectReleaseN, swift_unknownObjectRelease_n,
          C_CC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy, Int32Ty),
          ATTRS(NoUnwind))
 
-// void *swift_nonatomic_unknownRetain_n(void *ptr, int32_t n);
-FUNCTION(NonAtomicUnknownRetainN, swift_nonatomic_unknownRetain_n,
+// void *swift_nonatomic_unknownObjectRetain_n(void *ptr, int32_t n);
+FUNCTION(NonAtomicUnknownObjectRetainN, swift_nonatomic_unknownObjectRetain_n,
          C_CC,
          RETURNS(RefCountedPtrTy),
          ARGS(RefCountedPtrTy, Int32Ty),
          ATTRS(NoUnwind, FirstParamReturned))
 
-// void swift_nonatomic_unknownRelease_n(void *ptr, int32_t n);
-FUNCTION(NonAtomicUnknownReleaseN, swift_nonatomic_unknownRelease_n,
+// void swift_nonatomic_unknownObjectRelease_n(void *ptr, int32_t n);
+FUNCTION(NonAtomicUnknownObjectReleaseN, swift_nonatomic_unknownObjectRelease_n,
          C_CC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy, Int32Ty),
@@ -300,26 +300,26 @@ FUNCTION(NonAtomicNativeUnpin, swift_nonatomic_unpin, C_CC,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
-// void *swift_unknownRetain(void *ptr);
-FUNCTION(UnknownRetain, swift_unknownRetain, C_CC,
+// void *swift_unknownObjectRetain(void *ptr);
+FUNCTION(UnknownObjectRetain, swift_unknownObjectRetain, C_CC,
          RETURNS(UnknownRefCountedPtrTy),
          ARGS(UnknownRefCountedPtrTy),
          ATTRS(NoUnwind, FirstParamReturned))
 
-// void swift_unknownRelease(void *ptr);
-FUNCTION(UnknownRelease, swift_unknownRelease, C_CC,
+// void swift_unknownObjectRelease(void *ptr);
+FUNCTION(UnknownObjectRelease, swift_unknownObjectRelease, C_CC,
          RETURNS(VoidTy),
          ARGS(UnknownRefCountedPtrTy),
          ATTRS(NoUnwind))
 
-// void *swift_nonatomic_unknownRetain(void *ptr);
-FUNCTION(NonAtomicUnknownRetain, swift_nonatomic_unknownRetain, C_CC,
+// void *swift_nonatomic_unknownObjectRetain(void *ptr);
+FUNCTION(NonAtomicUnknownObjectRetain, swift_nonatomic_unknownObjectRetain, C_CC,
          RETURNS(UnknownRefCountedPtrTy),
          ARGS(UnknownRefCountedPtrTy),
          ATTRS(NoUnwind, FirstParamReturned))
 
-// void swift_nonatomic_unknownRelease(void *ptr);
-FUNCTION(NonAtomicUnknownRelease, swift_nonatomic_unknownRelease, C_CC,
+// void swift_nonatomic_unknownObjectRelease(void *ptr);
+FUNCTION(NonAtomicUnknownObjectRelease, swift_nonatomic_unknownObjectRelease, C_CC,
          RETURNS(VoidTy),
          ARGS(UnknownRefCountedPtrTy),
          ATTRS(NoUnwind))
@@ -409,7 +409,7 @@ FUNCTION(ErrorStrongRelease, swift_errorRelease, C_CC,
            ATTRS(NoUnwind, FirstParamReturned))
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Native, name, ) \
-  NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Unknown, unknown##Name, Unknown)
+  NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Unknown, unknownObject##Name, Unknown)
 #define LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name, Prefix, prefix) \
   /* void *swift_##prefix##name##Retain(void *ptr); */ \
   FUNCTION(Prefix##Name##Retain, swift_##prefix##name##Retain, C_CC, \
@@ -434,7 +434,7 @@ FUNCTION(ErrorStrongRelease, swift_errorRelease, C_CC,
            ARGS(RefCountedPtrTy), \
            ATTRS(NoUnwind))
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
-  NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Unknown, unknown##Name, Unknown) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Unknown, unknownObject##Name, Unknown) \
   LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name, Native, ) \
   LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name, NonAtomicNative, nonatomic_)
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
@@ -1341,6 +1341,11 @@ FUNCTION(TFE_OpAddInput, TFE_OpAddInput, C_CC,
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
+FUNCTION(TFE_OpSetDevice, TFE_OpSetDevice, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
 FUNCTION(TFE_OpSetAttrType, TFE_OpSetAttrType, C_CC,
          RETURNS(),
          ARGS(Int8PtrTy, Int8PtrTy, Int32Ty),
@@ -1362,6 +1367,11 @@ FUNCTION(TFC_CreateScalarFloatTensor, swift_tfc_CreateScalarFloatTensor, C_CC,
          ARGS(Int32Ty),
          ATTRS(NoUnwind))
 
+FUNCTION(TFC_CreateScalarIntTensor, swift_tfc_CreateScalarIntTensor, C_CC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int64Ty, Int32Ty, Int8PtrTy),
+         ATTRS(NoUnwind))
+
 FUNCTION(TFE_Execute, swift_tfc_TFE_Execute, C_CC,
          RETURNS(),
          ARGS(Int8PtrTy, Int8PtrPtrTy, Int32PtrTy, Int8PtrTy),
@@ -1373,15 +1383,15 @@ FUNCTION(TFC_GetGlobalEagerContext, _swift_tfc_GetGlobalEagerContext, C_CC,
          ATTRS(NoUnwind))
 
 // TODO: enable these decls once we have AnyTensorHandle.
-// FUNCTION(TFC_ExtractFloatCTensorHandle, _swift_tfc_ExtractFloatCTensorHandle, C_CC,
-//          RETURNS(Int8PtrTy),
-//          ARGS(Int8PtrTy),
-//          ATTRS(NoUnwind))
+FUNCTION(TFC_GetCTensorHandleFromSwift, _swift_tfc_GetCTensorHandleFromSwift, C_CC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
 
-// FUNCTION(TFC_CreateFloatTensorHandleFromCTensorHandle, _swift_tfc_CreateFloatTensorHandleFromCTensorHandle, C_CC,
-//          RETURNS(Int8PtrTy),
-//          ARGS(Int8PtrTy),
-//          ATTRS(NoUnwind))
+FUNCTION(TFC_CreateTensorHandleFromC, _swift_tfc_CreateTensorHandleFromC, C_CC,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind))
 
 FUNCTION(TFC_CheckOk, _swift_tfc_CheckOk, C_CC,
          RETURNS(),

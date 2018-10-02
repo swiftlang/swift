@@ -19,6 +19,7 @@
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/ImmutableSet.h"
@@ -460,7 +461,8 @@ tryDevirtualizeApplyHelper(FullApplySite InnerAI, SILBasicBlock::iterator I,
 ///
 /// \returns true if successful, false if failed due to circular inlining.
 static bool
-runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
+runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
+			 SILFunction *F, FullApplySite AI,
                          DenseFunctionSet &FullyInlinedSet,
                          ImmutableFunctionSet::Factory &SetFactory,
                          ImmutableFunctionSet CurrentInliningSet,
@@ -518,7 +520,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
         continue;
 
       // Then recursively process it first before trying to inline it.
-      if (!runOnFunctionRecursively(CalleeFunction, InnerAI,
+      if (!runOnFunctionRecursively(FuncBuilder, CalleeFunction, InnerAI,
                                     FullyInlinedSet, SetFactory,
                                     CurrentInliningSet, CHA,
                                     // SWIFT_ENABLE_TENSORFLOW
@@ -554,7 +556,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       }
 
       // SWIFT_ENABLE_TENSORFLOW
-      SILInliner Inliner(*F, *CalleeFunction, inlineKind, Subs,
+      SILInliner Inliner(FuncBuilder, *F, *CalleeFunction, inlineKind, Subs,
                          OpenedArchetypesTracker);
       if (!Inliner.canInlineFunction(InnerAI)) {
         // See comment above about casting when devirtualizing and how this
@@ -628,12 +630,12 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
 /// certain functions using the standard mandatory inlining algorithm.  This
 /// function implements support for it, inlining direct calls to callees that
 /// satisfy the given predicate.
-void swift::inlineForTFDeabstraction(SILFunction &fn,
+void swift::inlineForTFDeabstraction(SILOptFunctionBuilder &FB, SILFunction &fn,
                                  const ShouldMandatoryInlineFnPred &predicate) {
   DenseFunctionSet FullyInlinedSet;
   ImmutableFunctionSet::Factory SetFactory;
 
-  runOnFunctionRecursively(&fn,
+  runOnFunctionRecursively(FB, &fn,
                            FullApplySite(static_cast<ApplyInst*>(nullptr)),
                            FullyInlinedSet,
                            SetFactory, SetFactory.getEmptySet(),
@@ -657,6 +659,7 @@ class MandatoryInlining : public SILModuleTransform {
     DenseFunctionSet FullyInlinedSet;
     ImmutableFunctionSet::Factory SetFactory;
 
+    SILOptFunctionBuilder FuncBuilder(*this);
     for (auto &F : *M) {
       // Don't inline into thunks, even transparent callees.
       if (F.isThunk())
@@ -666,11 +669,11 @@ class MandatoryInlining : public SILModuleTransform {
       if (F.wasDeserializedCanonical())
         continue;
 
-      runOnFunctionRecursively(&F,
-                               FullApplySite(static_cast<ApplyInst*>(nullptr)),
+      // SWIFT_ENABLE_TENSORFLOW
+      runOnFunctionRecursively(FuncBuilder, &F,
+                               FullApplySite(),
                                FullyInlinedSet,
                                SetFactory, SetFactory.getEmptySet(), CHA,
-                               // SWIFT_ENABLE_TENSORFLOW
                                SILInliner::InlineKind::MandatoryInline,
          [&](FullApplySite site, SILFunction &callee) -> bool {
            if (callee.isTransparent() != IsTransparent)
@@ -716,10 +719,8 @@ class MandatoryInlining : public SILModuleTransform {
       if (F.getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
         continue;
 
-      notifyWillDeleteFunction(&F);
-
       // Okay, just erase the function from the module.
-      M->eraseFunction(&F);
+      FuncBuilder.eraseFunction(&F);
     }
   }
 

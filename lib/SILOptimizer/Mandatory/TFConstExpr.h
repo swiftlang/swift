@@ -38,8 +38,6 @@ class SILValue;
 class SymbolicValue;
 enum class UnknownReason;
 
-namespace tf {
-
 /// This class is the main entrypoint for evaluating constant expressions.  It
 /// also handles caching of previously computed constexpr results.
 class ConstExprEvaluator {
@@ -99,6 +97,5 @@ public:
                                 SmallPtrSet<SILInstruction*, 8> *arrayInsts);
 };
 
-} // end namespace tf
 } // end namespace swift
 #endif

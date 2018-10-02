@@ -24,6 +24,11 @@ CHANGELOG
 Swift 5.0
 ---------
 
+* [SR-2608][]
+
+  Default arguments are now printed in SourceKit-generated interfaces for Swift
+  modules, instead of just using a placeholder `default`.
+
 * Notable bug fix: unowned and unowned(unsafe) variables now support optional
   types.
 
@@ -7151,3 +7156,4 @@ Swift 1.0
 [SR-2131]: <https://bugs.swift.org/browse/SR-2131>
 [SR-2388]: <https://bugs.swift.org/browse/SR-2388>
 [SR-2394]: <https://bugs.swift.org/browse/SR-2394>
+[SR-2608]: <https://bugs.swift.org/browse/SR-2608>

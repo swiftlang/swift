@@ -375,7 +375,7 @@ public:
     // callback storage.)
     
     // This can happen if the witness is in a protocol extension...
-    if (Witness->getDeclContext()->getAsProtocolOrProtocolExtensionContext())
+    if (Witness->getDeclContext()->getSelfProtocolDecl())
       return true;
 
     // ...if the witness is in a constrained extension that adds protocol
@@ -446,7 +446,7 @@ public:
 
     // Metatypes and bases of non-mutating setters on value types
     //  are always rvalues.
-    if (!SubstSelfType->getRValueInstanceType()->mayHaveSuperclass()) {
+    if (!SubstSelfType->getMetatypeInstanceType()->mayHaveSuperclass()) {
       return LValue::forValue(self, SubstSelfType);
     }
 
@@ -631,7 +631,7 @@ void MaterializeForSetEmitter::emit(SILGenFunction &SGF) {
 
   // Form the result and return.
   auto result = SGF.B.createTuple(loc, resultTupleTy, { address, callback });
-  SGF.Cleanups.emitCleanupsForReturn(CleanupLocation::get(loc));
+  SGF.Cleanups.emitCleanupsForReturn(CleanupLocation::get(loc), NotForUnwind);
   SGF.B.createReturn(loc, result);
 }
 
@@ -908,6 +908,12 @@ MaterializeForSetEmitter::emitUsingGetterSetter(SILGenFunction &SGF,
   CanType indicesFormalType;
   if (isa<SubscriptDecl>(WitnessStorage)) {
     indicesFormalType = indices.getType();
+
+    // Unwrap one-element tuples, since we cannot lower them.
+    if (auto tupleType = dyn_cast<TupleType>(indicesFormalType))
+      if (tupleType->getNumElements() == 1)
+        indicesFormalType = tupleType.getElementType(0);
+
     indicesTL = &SGF.getTypeLowering(indicesFormalType);
     SILValue allocatedCallbackBuffer =
       SGF.B.createAllocValueBuffer(loc, indicesTL->getLoweredType(),

@@ -89,6 +89,7 @@
           "usr": "c:objc(pl)ObjcProt(im)someFunctionFromProt",
           "location": "",
           "moduleName": "Foo",
+          "genericSig": "<Self where Self : ObjcProt>",
           "declAttributes": [
             "ObjC"
           ],

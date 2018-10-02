@@ -103,7 +103,7 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
     // be beneficial to rerun some earlier passes on the current
     // function now that we've made these direct references visible.
     if (CalleeFn->isDefinition() && CalleeFn->shouldOptimize())
-      notifyAddFunction(CalleeFn, nullptr);
+      addFunctionToPassManagerWorklist(CalleeFn, nullptr);
   }
 
   return Changed;

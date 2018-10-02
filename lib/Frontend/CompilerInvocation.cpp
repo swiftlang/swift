@@ -65,16 +65,18 @@ void CompilerInvocation::setTargetTriple(StringRef Triple) {
 
 SourceFileKind CompilerInvocation::getSourceFileKind() const {
   switch (getInputKind()) {
-  case InputFileKind::IFK_Swift:
+  case InputFileKind::Swift:
     return SourceFileKind::Main;
-  case InputFileKind::IFK_Swift_Library:
+  case InputFileKind::SwiftLibrary:
     return SourceFileKind::Library;
-  case InputFileKind::IFK_Swift_REPL:
+  case InputFileKind::SwiftREPL:
     return SourceFileKind::REPL;
-  case InputFileKind::IFK_SIL:
+  case InputFileKind::SwiftModuleInterface:
+    return SourceFileKind::Interface;
+  case InputFileKind::SIL:
     return SourceFileKind::SIL;
-  case InputFileKind::IFK_None:
-  case InputFileKind::IFK_LLVM_IR:
+  case InputFileKind::None:
+  case InputFileKind::LLVM:
     llvm_unreachable("Trying to convert from unsupported InputFileKind");
   }
 
@@ -171,7 +173,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableTsanInoutInstrumentation |=
       Args.hasArg(OPT_disable_tsan_inout_instrumentation);
 
-  if (FrontendOpts.InputKind == InputFileKind::IFK_SIL)
+  if (FrontendOpts.InputKind == InputFileKind::SIL)
     Opts.DisableAvailabilityChecking = true;
   
   if (auto A = Args.getLastArg(OPT_enable_access_control,
@@ -351,6 +353,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 #else
   Opts.UseDarwinPreStableABIBit = true;
 #endif
+
+  Opts.DisableConstraintSolverPerformanceHacks |=
+      Args.hasArg(OPT_disable_constraint_solver_performance_hacks);
 
   // Must be processed after any other language options that could affect
   // platform conditions.
@@ -767,6 +772,36 @@ void CompilerInvocation::buildDebugFlags(std::string &Output,
   }
 }
 
+static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
+                            DiagnosticEngine &Diags,
+                            CompilerInvocation &Invocation) {
+  using namespace options;
+
+  Opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
+
+  if (const Arg *A = Args.getLastArg(OPT_module_link_name)) {
+    Opts.ModuleLinkName = A->getValue();
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_tbd_install_name)) {
+    Opts.InstallName = A->getValue();
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_tbd_compatibility_version)) {
+    if (auto vers = version::Version::parseVersionString(
+          A->getValue(), SourceLoc(), &Diags)) {
+      Opts.CompatibilityVersion = *vers;
+    }
+  }
+  if (const Arg *A = Args.getLastArg(OPT_tbd_current_version)) {
+    if (auto vers = version::Version::parseVersionString(
+          A->getValue(), SourceLoc(), &Diags)) {
+      Opts.CurrentVersion = *vers;
+    }
+  }
+  return false;
+}
+
 static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                            DiagnosticEngine &Diags,
                            const FrontendOptions &FrontendOpts,
@@ -1144,6 +1179,10 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
+  if (ParseTBDGenArgs(TBDGenOpts, ParsedArgs, Diags, *this)) {
+    return true;
+  }
+
   if (ParseDiagnosticArgs(DiagnosticOpts, ParsedArgs, Diags)) {
     return true;
   }
@@ -1204,13 +1243,13 @@ CompilerInvocation::setUpInputForSILTool(
                                ? moduleNameArg
                                : llvm::sys::path::stem(inputFilename);
     setModuleName(stem);
-    setInputKind(InputFileKind::IFK_Swift_Library);
+    setInputKind(InputFileKind::SwiftLibrary);
   } else {
     const StringRef name = (alwaysSetModuleToMain || moduleNameArg.empty())
                                ? "main"
                                : moduleNameArg;
     setModuleName(name);
-    setInputKind(InputFileKind::IFK_SIL);
+    setInputKind(InputFileKind::SIL);
   }
   return fileBufOrErr;
 }

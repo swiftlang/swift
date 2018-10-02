@@ -1,8 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -O  %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
-// RUN: %target-build-swift -O -wmo %s -o %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
+// RUN: %target-build-swift -O -wmo %s -o %t/a.out2
+// RUN: %target-codesign %t/a.out2
+// RUN: %target-run %t/a.out2 | %FileCheck %s -check-prefix=CHECK-OUTPUT
 // REQUIRES: executable_test
 
 // Check that in optimized builds the compiler generates correct code for

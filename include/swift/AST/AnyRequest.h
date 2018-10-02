@@ -20,6 +20,7 @@
 #include "swift/Basic/TypeID.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include <string>
 
 namespace llvm {
@@ -49,8 +50,14 @@ class DiagnosticEngine;
 ///       void noteCycleStep(DiagnosticEngine &diags) const;
 ///
 class AnyRequest {
+  friend llvm::DenseMapInfo<swift::AnyRequest>;
+
+  static hash_code hashForHolder(uint64_t typeID, hash_code requestHash) {
+    return hash_combine(hash_value(typeID), requestHash);
+  }
+
   /// Abstract base class used to hold the specific request kind.
-  class HolderBase {
+  class HolderBase : public llvm::RefCountedBase<HolderBase> {
   public:
     /// The type ID of the request being stored.
     const uint64_t typeID;
@@ -61,7 +68,7 @@ class AnyRequest {
   protected:
     /// Initialize base with type ID and hash code.
     HolderBase(uint64_t typeID, hash_code hash)
-      : typeID(typeID), hash(hash_combine(hash_value(typeID), hash)) { }
+      : typeID(typeID), hash(AnyRequest::hashForHolder(typeID, hash)) { }
 
   public:
     virtual ~HolderBase();
@@ -128,7 +135,7 @@ class AnyRequest {
   } storageKind = StorageKind::Normal;
 
   /// The data stored in this value.
-  std::shared_ptr<HolderBase> stored;
+  llvm::IntrusiveRefCntPtr<HolderBase> stored;
 
   AnyRequest(StorageKind storageKind) : storageKind(storageKind) {
     assert(storageKind != StorageKind::Normal);
@@ -159,17 +166,18 @@ public:
 
   /// Construct a new instance with the given value.
   template<typename T>
-  AnyRequest(T&& value) : storageKind(StorageKind::Normal) {
+  explicit AnyRequest(T&& value) : storageKind(StorageKind::Normal) {
     using ValueType =
-      typename std::remove_cv<typename std::remove_reference<T>::type>::type;
-    stored.reset(new Holder<ValueType>(std::forward<T>(value)));
+        typename std::remove_cv<typename std::remove_reference<T>::type>::type;
+    stored = llvm::IntrusiveRefCntPtr<HolderBase>(
+        new Holder<ValueType>(std::forward<T>(value)));
   }
 
   /// Cast to a specific (known) type.
   template<typename Request>
   const Request &castTo() const {
     assert(stored->typeID == TypeID<Request>::value && "wrong type in cast");
-    return static_cast<const Holder<Request> *>(stored.get())->value;
+    return static_cast<const Holder<Request> *>(stored.get())->request;
   }
 
   /// Try casting to a specific (known) type, returning \c nullptr on
@@ -179,7 +187,7 @@ public:
     if (stored->typeID != TypeID<Request>::value)
       return nullptr;
 
-    return &static_cast<const Holder<Request> *>(stored.get())->value;
+    return &static_cast<const Holder<Request> *>(stored.get())->request;
   }
 
   /// Diagnose a cycle detected for this request.
@@ -248,9 +256,24 @@ namespace llvm {
     static unsigned getHashValue(const swift::AnyRequest &request) {
       return hash_value(request);
     }
+    template <typename Request>
+    static unsigned getHashValue(const Request &request) {
+      return swift::AnyRequest::hashForHolder(swift::TypeID<Request>::value,
+                                              hash_value(request));
+    }
     static bool isEqual(const swift::AnyRequest &lhs,
                         const swift::AnyRequest &rhs) {
       return lhs == rhs;
+    }
+    template <typename Request>
+    static bool isEqual(const Request &lhs,
+                        const swift::AnyRequest &rhs) {
+      if (rhs == getEmptyKey() || rhs == getTombstoneKey())
+        return false;
+      const Request *rhsRequest = rhs.getAs<Request>();
+      if (!rhsRequest)
+        return false;
+      return lhs == *rhsRequest;
     }
   };
 
