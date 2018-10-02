@@ -20,8 +20,8 @@ module SwiftShims {
   export *
 }
 
-module SwiftShimsInline {
-  header "LibcShimsInline.h"
+module SwiftOverlayShims {
+  header "LibcOverlayShims.h"
   export *
 }
 

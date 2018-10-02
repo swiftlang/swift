@@ -1,4 +1,4 @@
-//===--- LibcShims.h - Static inline shims for POSIX functions. --*- C++ -*-===//
+//===--- LibcOverlayShims.h - Static inline shims for POSIX functions. --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,12 +11,14 @@
 //===----------------------------------------------------------------------===//
 //
 //  Provide small wrappers for POSIX functionality that can't be used
-//  directly from swift due to varargs or other issues.
+//  directly from Swift due to varargs or other issues.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_STDLIB_SHIMS_LIBCSHIMSINLINE_H
-#define SWIFT_STDLIB_SHIMS_LIBCSHIMSINLINE_H
+#ifndef SWIFT_STDLIB_SHIMS_LIBCOVERLAYSHIMS_H
+#define SWIFT_STDLIB_SHIMS_LIBCOVERLAYSHIMS_H
+
+#include "Visibility.h"
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
 #include <io.h>
@@ -24,6 +26,7 @@
 #include <Windows.h>
 typedef int mode_t;
 #else
+#include <semaphore.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -31,6 +34,10 @@ typedef int mode_t;
 
 #include <errno.h>
 #include <fcntl.h>
+
+#if __has_feature(nullability)
+#pragma clang assume_nonnull begin
+#endif
 
 // File control <fcntl.h>
 #if !defined(_WIN32) || defined(__CYGWIN__)
@@ -64,6 +71,19 @@ static inline int _swift_stdlib_getErrno() {
 static inline void _swift_stdlib_setErrno(int value) {
   errno = value;
 }
+
+// Semaphores <semaphore.h>
+#if !defined(_WIN32) || defined(__CYGWIN__)
+static inline sem_t *_stdlib_sem_open2(const char *name, int oflag) {
+  return sem_open(name, oflag);
+}
+
+static inline sem_t *_stdlib_sem_open4(const char *name, int oflag,
+                                       mode_t mode, unsigned int value) {
+  return sem_open(name, oflag, mode, value);
+}
+
+#endif // !(defined(_WIN32) && !defined(__CYGWIN__))
 
 // I/O control <ioctl.h>
 #if !defined(_WIN32) || defined(__CYGWIN__)
@@ -120,4 +140,8 @@ static inline int _swift_stdlib_close(int fd) {
 #endif
 }
 
-#endif // SWIFT_STDLIB_SHIMS_LIBCSHIMSINLINE_H
+#if __has_feature(nullability)
+#pragma clang assume_nonnull end
+#endif
+
+#endif // SWIFT_STDLIB_SHIMS_LIBCOVERLAYSHIMS_H

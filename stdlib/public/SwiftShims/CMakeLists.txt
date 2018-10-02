@@ -5,8 +5,8 @@ set(sources
   GlobalObjects.h
   HeapObject.h
   KeyPath.h
+  LibcOverlayShims.h
   LibcShims.h
-  LibcShimsInline.h
   Random.h
   RefCount.h
   RuntimeShims.h

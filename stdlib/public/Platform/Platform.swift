@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftShims
-import SwiftShimsInline
+import SwiftOverlayShims
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 //===----------------------------------------------------------------------===//
@@ -375,7 +375,6 @@ public func sem_open(
   _ oflag: Int32
 ) -> UnsafeMutablePointer<sem_t>? {
   return _stdlib_sem_open2(name, oflag)
-    .assumingMemoryBound(to: sem_t.self)
 }
 
 public func sem_open(
@@ -385,7 +384,6 @@ public func sem_open(
   _ value: CUnsignedInt
 ) -> UnsafeMutablePointer<sem_t>? {
   return _stdlib_sem_open4(name, oflag, mode, value)
-    .assumingMemoryBound(to: sem_t.self)
 }
 #endif
 

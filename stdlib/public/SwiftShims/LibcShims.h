@@ -64,44 +64,59 @@ typedef __swift_uint16_t __swift_mode_t;
 #endif
 
 
+// Input/output <stdio.h>
+SWIFT_RUNTIME_STDLIB_INTERNAL
+int _swift_stdlib_putchar_unlocked(int c);
+SWIFT_RUNTIME_STDLIB_INTERNAL
+__swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
+                                           __swift_size_t nitems);
+
 // General utilities <stdlib.h>
 // Memory management functions
-SWIFT_RUNTIME_STDLIB_SPI
-void _swift_stdlib_free(void *ptr);
-
-// Input/output <stdio.h>
-SWIFT_RUNTIME_STDLIB_SPI
-int _swift_stdlib_putchar_unlocked(int c);
-SWIFT_RUNTIME_STDLIB_SPI
-__swift_size_t _swift_stdlib_fwrite_stdout(const void *ptr, __swift_size_t size,
-                                     __swift_size_t nitems);
+static inline void _swift_stdlib_free(void *ptr) {
+  extern void free(void *);
+  free(ptr);
+}
 
 // String handling <string.h>
-SWIFT_READONLY SWIFT_RUNTIME_STDLIB_SPI
-__swift_size_t _swift_stdlib_strlen(const char *s);
-
-SWIFT_READONLY SWIFT_RUNTIME_STDLIB_SPI
-__swift_size_t _swift_stdlib_strlen_unsigned(const unsigned char *s);
+SWIFT_READONLY
+static inline __swift_size_t _swift_stdlib_strlen(const char *s) {
+  extern __swift_size_t strlen(const char *);
+  return strlen(s);
+}
 
 SWIFT_READONLY
-SWIFT_RUNTIME_STDLIB_SPI
-int _swift_stdlib_memcmp(const void *s1, const void *s2, __swift_size_t n);
+static inline __swift_size_t _swift_stdlib_strlen_unsigned(const unsigned char *s) {
+  return _swift_stdlib_strlen((const char *)s);
+}
 
-// Semaphores <semaphore.h>
-#if !defined(_WIN32) || defined(__CYGWIN__)
-// We can't use sem_t itself here, nor is there a platform-consistent
-// definition to copy for a __swift_sem_t type. Instead we use
-// void* in place of sem_t* and cast it back on the Swift side.
-SWIFT_RUNTIME_STDLIB_SPI
-void *_stdlib_sem_open2(const char *name, int oflag);
-SWIFT_RUNTIME_STDLIB_SPI
-void *_stdlib_sem_open4(const char *name, int oflag,
-                        __swift_mode_t mode, unsigned int value);
-#endif
+SWIFT_READONLY
+static inline int _swift_stdlib_memcmp(const void *s1, const void *s2,
+                                       __swift_size_t n) {
+  extern int memcmp(const void *, const void *, __swift_size_t);
+  return memcmp(s1, s2, n);
+}
 
 // Non-standard extensions
-SWIFT_READNONE SWIFT_RUNTIME_STDLIB_SPI
-__swift_size_t _swift_stdlib_malloc_size(const void *ptr);
+#if defined(__APPLE__)
+static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
+  extern __swift_size_t malloc_size(const void *);
+  return malloc_size(ptr);
+}
+#elif defined(__GNU_LIBRARY__) || defined(__CYGWIN__) || defined(__ANDROID__) \
+   || defined(__HAIKU__) || defined(__FreeBSD__)
+static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
+  extern __swift_size_t malloc_usable_size(void *ptr);
+  return malloc_usable_size((void *)ptrß);
+}
+#elif defined(_WIN32)
+static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
+  extern __swift_size_t _msize(void *ptr);
+  return _msize(const_cast<void *>(ptr));
+}
+#else
+#error No malloc_size analog known for this platform/libc.
+#endif
 
 // Math library functions
 static inline SWIFT_ALWAYS_INLINE
