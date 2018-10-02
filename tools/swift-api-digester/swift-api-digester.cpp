@@ -667,8 +667,8 @@ void swift::ide::api::SDKNodeDeclType::diagnose(SDKNode *Right) {
   auto &Diags = Ctx.getDiags();
 
   if (getDeclKind() != R->getDeclKind()) {
-    Diags.diagnose(SourceLoc(), diag::nominal_type_kind_changed,
-      getScreenInfo(), getDeclKindStr(R->getDeclKind()));
+    Diags.diagnose(SourceLoc(), diag::decl_kind_changed, getScreenInfo(),
+                   getDeclKindStr(R->getDeclKind()));
     return;
   }
 
@@ -795,6 +795,17 @@ void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
                        Desc);
       }
     }
+  }
+}
+
+void swift::ide::api::SDKNodeDeclOperator::diagnose(SDKNode *Right) {
+  SDKNodeDecl::diagnose(Right);
+  auto *RO = dyn_cast<SDKNodeDeclOperator>(Right);
+  if (!RO)
+    return;
+  if (getDeclKind() != RO->getDeclKind()) {
+    Ctx.getDiags().diagnose(SourceLoc(), diag::decl_kind_changed, getScreenInfo(),
+                            getDeclKindStr(RO->getDeclKind()));
   }
 }
 

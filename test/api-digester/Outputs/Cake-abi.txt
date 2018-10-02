@@ -20,6 +20,7 @@ cake1: Var RequiementChanges.removedVar has been removed
 
 /* Moved Decls */
 cake1: Class ClassToStruct has been changed to a Struct
+cake1: InfixOperator ..*.. has been changed to a PrefixOperator
 cake1: Protocol ProtocolToEnum has been changed to a Enum
 
 /* Renamed Decls */

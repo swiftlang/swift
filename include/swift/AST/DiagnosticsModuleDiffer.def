@@ -74,7 +74,7 @@ ERROR(super_class_removed,none,"%0 has removed its super class %1", (StringRef, 
 
 ERROR(super_class_changed,none,"%0 has changed its super class from %1 to %2", (StringRef, StringRef, StringRef))
 
-ERROR(nominal_type_kind_changed,none,"%0 has been changed to a %1", (StringRef, StringRef))
+ERROR(decl_kind_changed,none,"%0 has been changed to a %1", (StringRef, StringRef))
 
 ERROR(optional_req_changed,none,"%0 is %select{now|no longer}1 an optional requirement", (StringRef, bool))
 

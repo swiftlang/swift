@@ -141,3 +141,5 @@ public class EscapingFunctionType {
   public func removedEscaping(_ a: ()->()) {}
   public func addedEscaping(_ a: @escaping ()->()) {}
 }
+
+prefix operator ..*..
