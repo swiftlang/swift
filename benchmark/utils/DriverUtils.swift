@@ -464,7 +464,12 @@ final class TestRunner {
     }
 
     resetMeasurements()
-    test.setUpFunction?()
+    if let setUp = test.setUpFunction {
+      setUp()
+      stopMeasurement()
+      logVerbose("    SetUp \(lastSampleTime.microseconds)")
+      resetMeasurements()
+    }
 
     // Determine number of iterations for testFn to run for desired time.
     func iterationsPerSampleTime() -> (numIters: Int, oneIter: Int) {
