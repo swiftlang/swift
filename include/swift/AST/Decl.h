@@ -1462,7 +1462,7 @@ public:
 };
 
 // A private class for forcing exact field layout.
-class _GenericContext {
+class alignas(8) _GenericContext {
 // Not really public. See GenericContext.
 public:
   GenericParamList *GenericParams = nullptr;
@@ -1599,7 +1599,7 @@ public:
 
   ArrayRef<AccessPathElement> getFullAccessPath() const {
     return {getTrailingObjects<AccessPathElement>(),
-            Bits.ImportDecl.NumPathElements};
+            static_cast<size_t>(Bits.ImportDecl.NumPathElements)};
   }
 
   ArrayRef<AccessPathElement> getModulePath() const {
