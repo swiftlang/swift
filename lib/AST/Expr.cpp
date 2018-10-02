@@ -32,6 +32,11 @@
 #include "llvm/ADT/Twine.h"
 using namespace swift;
 
+#define EXPR(Id, _) \
+  static_assert(IsTriviallyDestructible<Id##Expr>::value, \
+                "Exprs are BumpPtrAllocated; the destructor is never called");
+#include "swift/AST/ExprNodes.def"
+
 StringRef swift::getFunctionRefKindStr(FunctionRefKind refKind) {
   switch (refKind) {
   case FunctionRefKind::Unapplied:

@@ -67,6 +67,12 @@ STATISTIC(NumLazyGenericEnvironments,
 STATISTIC(NumLazyGenericEnvironmentsLoaded,
           "# of lazily-deserialized generic environments loaded");
 
+#define DECL(Id, _) \
+  static_assert((DeclKind::Id == DeclKind::Module) ^ \
+                IsTriviallyDestructible<Id##Decl>::value, \
+                "Decls are BumpPtrAllocated; the destructor is never called");
+#include "swift/AST/DeclNodes.def"
+
 const clang::MacroInfo *ClangNode::getAsMacro() const {
   if (auto MM = getAsModuleMacro())
     return MM->getMacroInfo();

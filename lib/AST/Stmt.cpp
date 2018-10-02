@@ -24,6 +24,11 @@
 
 using namespace swift;
 
+#define STMT(Id, _) \
+  static_assert(IsTriviallyDestructible<Id##Stmt>::value, \
+                "Stmts are BumpPtrAllocated; the destructor is never called");
+#include "swift/AST/StmtNodes.def"
+
 //===----------------------------------------------------------------------===//
 // Stmt methods.
 //===----------------------------------------------------------------------===//
