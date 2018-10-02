@@ -1,4 +1,4 @@
-//===--- ApplySite.h ------------------------------------------------------===//
+//===--- ApplySite.h -------------------------------------*- mode: c++ -*--===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -457,6 +457,18 @@ public:
 
   OperandValueArrayRef getArgumentsWithoutIndirectResults() const {
     return getArguments().slice(getNumIndirectSILResults());
+  }
+
+  /// Returns true if \p op is the callee operand of this apply site
+  /// and not an argument operand.
+  bool isCalleeOperand(const Operand &op) const {
+    return op.getOperandNumber() < getOperandIndexOfFirstArgument();
+  }
+
+  /// Returns true if \p op is an operand that passes an indirect
+  /// result argument to the apply site.
+  bool isIndirectResultOperand(const Operand &op) const {
+    return getCalleeArgIndex(op) < getNumIndirectSILResults();
   }
 
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }
