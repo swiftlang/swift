@@ -76,13 +76,13 @@ syn keyword swiftFuncDefinition skipwhite skipempty nextgroup=swiftTypeName,swif
       \ func
 
 syn keyword swiftTypeDefinition skipwhite skipempty nextgroup=swiftTypeName
+      \ associatedtype
       \ class
       \ enum
       \ extension
       \ protocol
       \ struct
       \ typealias
-      \ associatedtype
 
 syn match swiftMultiwordTypeDefinition skipwhite skipempty nextgroup=swiftTypeName
       \ "indirect enum"
