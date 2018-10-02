@@ -69,7 +69,6 @@ cake1: Struct fixedLayoutStruct has removed conformance to P1
 
 /* Protocol Requirement Change */
 cake1: AssociatedType AssociatedTypePro.T1 has removed default type Int
-cake2: AssociatedType RequiementChanges.addedTypeWithDefault has been added as a protocol requirement
 cake2: AssociatedType RequiementChanges.addedTypeWithoutDefault has been added as a protocol requirement
 cake2: Func RequiementChanges.addedFunc() has been added as a protocol requirement
 cake2: Var RequiementChanges.addedVar has been added as a protocol requirement
