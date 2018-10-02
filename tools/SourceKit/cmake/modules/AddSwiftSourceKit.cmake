@@ -66,19 +66,10 @@ function(add_sourcekit_default_compiler_flags target)
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
     RESULT_VAR_NAME link_flags)
 
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-    # TODO(compnerd) this should really use target_compile_options but the use
-    # of keyword and non-keyword flags prevents this
+  # TODO(compnerd) this should really use target_compile_options but the use
+  # of keyword and non-keyword flags prevents this
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     list(APPEND c_compile_flags "-fblocks")
-    # TODO(compnerd) this should really use target_link_libraries but the use of
-    # explicit_llvm_config using target_link_libraries without keywords on
-    # executables causes conflicts here
-    list(APPEND link_flags "-L${SWIFT_PATH_TO_LIBDISPATCH_BUILD}")
-    list(APPEND link_flags "-lBlocksRuntime")
-    # NOTE(compnerd) since we do not use target_link_libraries, we do not get
-    # the implicit dependency tracking.  Add an explicit dependency until we can
-    # use target_link_libraries.
-    add_dependencies(${target} BlocksRuntime)
   endif()
 
   # Convert variables to space-separated strings.
