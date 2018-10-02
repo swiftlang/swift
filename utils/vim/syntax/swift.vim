@@ -120,10 +120,8 @@ syn match swiftImplicitVarName
 syn match swiftType contained skipwhite skipempty nextgroup=swiftTypeParameters
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
 " [Type:Type] (dictionary) or [Type] (array)
-syn region swiftType contained contains=swiftTypePair,swiftType
+syn region swiftType contained contains=swiftType
       \ matchgroup=Delimiter start=/\[/ end=/\]/
-syn match swiftTypePair contained skipwhite skipempty nextgroup=swiftTypeParameters,swiftTypeDeclaration
-      \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
 " (Type[, Type]) (tuple)
 " FIXME: we should be able to use skip="," and drop swiftParamDelim
 syn region swiftType contained contains=swiftType,swiftParamDelim
@@ -187,7 +185,6 @@ hi def link swiftMultiwordKeyword Statement
 hi def link swiftTypeDefinition Define
 hi def link swiftMultiwordTypeDefinition Define
 hi def link swiftType Type
-hi def link swiftTypePair Type
 hi def link swiftTypeName Function
 hi def link swiftConstraint Special
 hi def link swiftFuncDefinition Define
