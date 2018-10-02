@@ -54,8 +54,8 @@ cake1: EnumElement FrozenKind.Fixed in a non-resilient type changes position fro
 cake1: EnumElement FrozenKind.Rigid in a non-resilient type changes position from 2 to 1
 cake1: Var fixedLayoutStruct.a in a non-resilient type changes position from 1 to 0
 cake1: Var fixedLayoutStruct.b in a non-resilient type changes position from 0 to 1
-cake1: Var fixedLayoutStruct2.BecomeFixedBinaryOrder is now a property with fixed layout order
-cake1: Var fixedLayoutStruct2.NoLongerWithFixedBinaryOrder is no longer a property with fixed layout order
+cake1: Var fixedLayoutStruct2.BecomeFixedBinaryOrder is now a stored property
+cake1: Var fixedLayoutStruct2.NoLongerWithFixedBinaryOrder is no longer a stored property
 cake2: EnumElement FrozenKind.AddedCase is added to a non-resilient type
 cake2: Var fixedLayoutStruct.c is added to a non-resilient type
 cake2: Var fixedLayoutStruct.lazy_d.storage is added to a non-resilient type
@@ -69,7 +69,6 @@ cake1: Struct fixedLayoutStruct has removed conformance to P1
 
 /* Protocol Requirement Change */
 cake1: AssociatedType AssociatedTypePro.T1 has removed default type Int
-cake2: AssociatedType RequiementChanges.addedTypeWithDefault has been added as a protocol requirement
 cake2: AssociatedType RequiementChanges.addedTypeWithoutDefault has been added as a protocol requirement
 cake2: Func RequiementChanges.addedFunc() has been added as a protocol requirement
 cake2: Var RequiementChanges.addedVar has been added as a protocol requirement
