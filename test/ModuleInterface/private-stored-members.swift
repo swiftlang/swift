@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -emit-interface-path %t.swiftinterface -emit-module -o /dev/null %s
+// RUN: %target-swift-frontend -typecheck -emit-interface-path %t.swiftinterface %s
 // RUN: %FileCheck %s < %t.swiftinterface --check-prefix CHECK --check-prefix COMMON
 
-// RUN: %target-swift-frontend -emit-interface-path %t-resilient.swiftinterface -enable-resilience -emit-module -o /dev/null %s
+// RUN: %target-swift-frontend -typecheck -emit-interface-path %t-resilient.swiftinterface -enable-resilience %s
 // RUN: %FileCheck %s --check-prefix RESILIENT --check-prefix COMMON < %t-resilient.swiftinterface
 
 // RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule %t.swiftinterface -disable-objc-attr-requires-foundation-module
