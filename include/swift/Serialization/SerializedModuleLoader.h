@@ -20,10 +20,9 @@
 namespace swift {
 class ModuleFile;
 
-/// \brief Imports serialized Swift modules into an ASTContext.
-class SerializedModuleLoader : public ModuleLoader {
-private:
-  ASTContext &Ctx;
+/// Common functionality shared between \c SerializedModuleLoader and
+/// \c TextualInterfaceModuleLoader.
+class SerializedModuleLoaderBase : public ModuleLoader {
   llvm::StringMap<std::unique_ptr<llvm::MemoryBuffer>> MemoryBuffers;
   /// A { module, generation # } pair.
   using LoadedModulePair = std::pair<std::unique_ptr<ModuleFile>, unsigned>;
@@ -31,44 +30,29 @@ private:
 
   SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 2> OrphanedMemoryBuffers;
 
-  explicit SerializedModuleLoader(ASTContext &ctx, DependencyTracker *tracker);
+protected:
+  ASTContext &Ctx;
+  explicit SerializedModuleLoaderBase(ASTContext &ctx, DependencyTracker *tracker);
+
+  using AccessPathElem = std::pair<Identifier, SourceLoc>;
+  virtual bool findModule(AccessPathElem moduleID,
+                          std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
+                          std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+                          bool &isFramework);
+
+  virtual std::error_code
+  openModuleFiles(StringRef DirName, StringRef ModuleFilename,
+                  StringRef ModuleDocFilename,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+                  llvm::SmallVectorImpl<char> &Scratch);
 
 public:
-  /// \brief Create a new importer that can load serialized Swift modules
-  /// into the given ASTContext.
-  static std::unique_ptr<SerializedModuleLoader>
-  create(ASTContext &ctx, DependencyTracker *tracker = nullptr) {
-    return std::unique_ptr<SerializedModuleLoader>{
-      new SerializedModuleLoader(ctx, tracker)
-    };
-  }
-
-  ~SerializedModuleLoader();
-
-  SerializedModuleLoader(const SerializedModuleLoader &) = delete;
-  SerializedModuleLoader(SerializedModuleLoader &&) = delete;
-  SerializedModuleLoader &operator=(const SerializedModuleLoader &) = delete;
-  SerializedModuleLoader &operator=(SerializedModuleLoader &&) = delete;
-
-  /// \brief Check whether the module with a given name can be imported without
-  /// importing it.
-  ///
-  /// Note that even if this check succeeds, errors may still occur if the
-  /// module is loaded in full.
-  virtual bool canImportModule(std::pair<Identifier, SourceLoc> named) override;
-
-  /// \brief Import a module with the given module path.
-  ///
-  /// \param importLoc The location of the 'import' keyword.
-  ///
-  /// \param path A sequence of (identifier, location) pairs that denote
-  /// the dotted module name to load, e.g., AppKit.NSWindow.
-  ///
-  /// \returns the module referenced, if it could be loaded. Otherwise,
-  /// emits a diagnostic and returns a FailedImportModule object.
-  virtual ModuleDecl *
-  loadModule(SourceLoc importLoc,
-             ArrayRef<std::pair<Identifier, SourceLoc>> path) override;
+  virtual ~SerializedModuleLoaderBase();
+  SerializedModuleLoaderBase(const SerializedModuleLoaderBase &) = delete;
+  SerializedModuleLoaderBase(SerializedModuleLoaderBase &&) = delete;
+  SerializedModuleLoaderBase &operator=(const SerializedModuleLoaderBase &) = delete;
+  SerializedModuleLoaderBase &operator=(SerializedModuleLoaderBase &&) = delete;
 
   /// Attempt to load a serialized AST into the given module.
   ///
@@ -89,6 +73,27 @@ public:
     MemoryBuffers[AccessPath] = std::move(input);
   }
 
+    /// \brief Check whether the module with a given name can be imported without
+  /// importing it.
+  ///
+  /// Note that even if this check succeeds, errors may still occur if the
+  /// module is loaded in full.
+  virtual bool canImportModule(std::pair<Identifier, SourceLoc> named) override;
+
+  /// \brief Import a module with the given module path.
+  ///
+  /// \param importLoc The location of the 'import' keyword.
+  ///
+  /// \param path A sequence of (identifier, location) pairs that denote
+  /// the dotted module name to load, e.g., AppKit.NSWindow.
+  ///
+  /// \returns the module referenced, if it could be loaded. Otherwise,
+  /// emits a diagnostic and returns a FailedImportModule object.
+  virtual ModuleDecl *
+  loadModule(SourceLoc importLoc,
+             ArrayRef<std::pair<Identifier, SourceLoc>> path) override;
+
+
   virtual void loadExtensions(NominalTypeDecl *nominal,
                               unsigned previousGeneration) override;
 
@@ -102,9 +107,29 @@ public:
   virtual void verifyAllModules() override;
 };
 
+/// \brief Imports serialized Swift modules into an ASTContext.
+class SerializedModuleLoader : public SerializedModuleLoaderBase {
+
+  explicit SerializedModuleLoader(ASTContext &ctx, DependencyTracker *tracker)
+    : SerializedModuleLoaderBase(ctx, tracker)
+  {}
+
+public:
+  virtual ~SerializedModuleLoader();
+
+  /// \brief Create a new importer that can load serialized Swift modules
+  /// into the given ASTContext.
+  static std::unique_ptr<SerializedModuleLoader>
+  create(ASTContext &ctx, DependencyTracker *tracker = nullptr) {
+    return std::unique_ptr<SerializedModuleLoader>{
+      new SerializedModuleLoader(ctx, tracker)
+    };
+  }
+};
+
 /// A file-unit loaded from a serialized AST file.
 class SerializedASTFile final : public LoadedFile {
-  friend class SerializedModuleLoader;
+  friend class SerializedModuleLoaderBase;
   friend class SerializedSILLoader;
   friend class ModuleFile;
 
