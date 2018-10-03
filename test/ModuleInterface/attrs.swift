@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-interface-path %t.swiftinterface -enable-resilience -emit-module -o /dev/null %s
+// RUN: %target-swift-frontend -typecheck -emit-interface-path %t.swiftinterface -enable-resilience %s
 // RUN: %FileCheck %s < %t.swiftinterface
 
 // CHECK: @_transparent public func glass() -> Int { return 0 }{{$}}
