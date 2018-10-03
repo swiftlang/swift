@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-interface-path - -emit-module -o /dev/null %s -I %S/Inputs/imports-submodule-order/ | %FileCheck %s
-// RUN: %target-swift-frontend -emit-interface-path - -emit-module -o /dev/null %s -I %S/Inputs/imports-submodule-order/ -D XY | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -emit-interface-path - %s -I %S/Inputs/imports-submodule-order/ | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -emit-interface-path - %s -I %S/Inputs/imports-submodule-order/ -D XY | %FileCheck %s
 
 #if XY
 @_exported import X.Submodule

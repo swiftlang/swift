@@ -109,6 +109,15 @@ std::string CompilerInvocation::getTBDPathForWholeModule() const {
       .SupplementaryOutputs.TBDPath;
 }
 
+std::string
+CompilerInvocation::getModuleInterfaceOutputPathForWholeModule() const {
+  assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
+         "ModuleInterfaceOutputPath only makes sense when the whole module can "
+         "be seen");
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+      .SupplementaryOutputs.ModuleInterfaceOutputPath;
+}
+
 void CompilerInstance::createSILModule() {
   assert(MainModule && "main module not created yet");
   // Assume WMO if a -primary-file option was not provided.

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-interface-path - -emit-module -o /dev/null %s | %FileCheck %s
-// RUN: %target-swift-frontend -emit-interface-path - -emit-module -o /dev/null %s %S/Inputs/other.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-MULTI-FILE %s
+// RUN: %target-swift-frontend -typecheck -emit-interface-path - %s | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -emit-interface-path - %s %S/Inputs/other.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-MULTI-FILE %s
 
 // CHECK: public func verySimpleFunction(){{$}}
 public func verySimpleFunction() {}

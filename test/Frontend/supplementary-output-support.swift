@@ -26,7 +26,5 @@
 
 // RUN: not %target-swift-frontend -parse -emit-interface-path %t %s 2>&1 | %FileCheck -check-prefix=PARSE_NO_INTERFACE %s
 // PARSE_NO_INTERFACE: error: this mode does not support emitting textual interface files{{$}}
-// RUN: not %target-swift-frontend -typecheck -emit-interface-path %t %s 2>&1 | %FileCheck -check-prefix=TYPECHECK_NO_INTERFACE %s
-// TYPECHECK_NO_INTERFACE: error: this mode does not support emitting textual interface files{{$}}
 // RUN: not %target-swift-frontend -emit-silgen -emit-interface-path %t %s 2>&1 | %FileCheck -check-prefix=SILGEN_NO_INTERFACE %s
 // SILGEN_NO_INTERFACE: error: this mode does not support emitting textual interface files{{$}}
