@@ -1216,11 +1216,12 @@ SwiftDeclCollector::shouldIgnore(Decl *D, const Decl* Parent) {
       if (isa<TypeAliasDecl>(VD))
         return true;
     }
+  } else {
+    if (D->isPrivateStdlibDecl(false))
+      return true;
+    if (AvailableAttr::isUnavailable(D))
+      return true;
   }
-  if (D->isPrivateStdlibDecl(false))
-    return true;
-  if (AvailableAttr::isUnavailable(D))
-    return true;
   if (isa<ConstructorDecl>(D))
     return false;
   if (auto VD = dyn_cast<ValueDecl>(D)) {
