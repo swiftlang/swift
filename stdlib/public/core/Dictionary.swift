@@ -1534,10 +1534,10 @@ extension Dictionary {
         _variant = .init(native: _NativeDictionary(_variant.asCocoa))
       }
 #endif
+      let isUnique = _variant.isUniquelyReferenced()
       let native = _variant.asNative
       let a = native.validatedBucket(for: i)
       let b = native.validatedBucket(for: j)
-      let isUnique = _variant.isUniquelyReferenced()
       _variant.asNative.swapValuesAt(a, b, isUnique: isUnique)
     }
   }
