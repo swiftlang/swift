@@ -14,6 +14,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/Parse/Lexer.h"
 
 #include "llvm/ADT/SmallVector.h"
@@ -92,9 +93,15 @@ struct ExtractInactiveRanges : public ASTWalker {
       return false;
     }
 
-    // Ignore range from beginning of '#if' to the beginning of the elements
-    // of this clause.
-    addRange(start, Lexer::getLocForEndOfLine(sourceMgr, clause->Loc));
+    // Ignore range from beginning of '#if', '#elseif', or '#else' to the
+    // beginning of the elements of this clause.
+    auto elementsBegin = clause->Loc;
+    // If there's a condition (e.g. this isn't a '#else' block), then ignore
+    // everything up to the end of the condition.
+    if (auto cond = clause->Cond) {
+      elementsBegin = cond->getEndLoc();
+    }
+    addRange(start, Lexer::getLocForEndOfLine(sourceMgr, elementsBegin));
 
     // Ignore range from effective end of the elements of this clause to the
     // end of the '#endif'

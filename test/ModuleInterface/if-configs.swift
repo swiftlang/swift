@@ -69,6 +69,37 @@ public func hasClosureDefaultArgWithComplexPoundIf(_ x: () -> Void = {
 }) {
 }
 
+// CHECK: func hasClosureDefaultArgWithMultilinePoundIfCondition(_ x: () -> Void = {
+// CHECK-NOT: #if (
+// CHECK-NOT:   !false && true
+// CHECK-NOT: )
+// CHECK: print("should appear")
+// CHECK-NOT: #endif
+// CHECK-NOT: #if (
+// CHECK-NOT:   !true
+// CHECK-NOT: )
+// CHECK-NOT: print("should not appear")
+// CHECK-NOT: #else
+// CHECK: print("also should appear")
+// CHECK-NOT: #endif
+// CHECK-NEXT: })
+public func hasClosureDefaultArgWithMultilinePoundIfCondition(_ x: () -> Void = {
+  #if (
+    !false && true
+  )
+  print("should appear")
+  #endif
+
+  #if (
+    !true
+  )
+  print("should not appear")
+  #else
+  print("also should appear")
+  #endif
+}) {
+}
+
 // CHECK: func hasClosureDefaultArgWithSinglePoundIf(_ x: () -> Void = {
 // CHECK-NOT: #if true
 // CHECK: print("true")
@@ -84,7 +115,6 @@ public func hasClosureDefaultArgWithSinglePoundIf(_ x: () -> Void = {
   #endif
 }) {
 }
-
 
 // CHECK: func hasSimpleDefaultArgs(_ x: Int = 0, b: Int = 1)
 public func hasSimpleDefaultArgs(_ x: Int = 0, b: Int = 1) {
