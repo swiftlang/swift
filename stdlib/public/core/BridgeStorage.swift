@@ -61,11 +61,13 @@ struct _BridgeStorage<
     rawValue = Builtin.reinterpretCast(native)
   }
 
+#if !(arch(i386) || arch(arm))
   @inlinable
   @inline(__always)
   internal init(taggedPayload: UInt) {
     rawValue = _bridgeObject(taggingPayload: taggedPayload)
   }
+#endif
 
   @inlinable // FIXME(sil-serialize-all)
   public // @testable

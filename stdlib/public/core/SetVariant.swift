@@ -41,7 +41,11 @@ extension Set {
     @inlinable
     @inline(__always)
     init(dummy: ()) {
+#if arch(i386) || arch(arm)
+      self.init(native: _NativeSet())
+#else
       self.object = _BridgeStorage(taggedPayload: 0)
+#endif
     }
 
     @inlinable

@@ -51,7 +51,11 @@ extension Dictionary {
     @inlinable
     @inline(__always)
     init(dummy: Void) {
+#if arch(i386) || arch(arm)
+      self.init(native: _NativeDictionary())
+#else
       self.object = _BridgeStorage(taggedPayload: 0)
+#endif
     }
 
 #if _runtime(_ObjC)
