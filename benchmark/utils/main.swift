@@ -133,6 +133,7 @@ import SequenceAlgos
 import SetTests
 import SevenBoom
 import Sim2DArray
+import Sorting
 import SortIntPyramids
 import SortLargeExistentials
 import SortLettersInPlace
@@ -299,6 +300,7 @@ registerBenchmark(SequenceAlgos)
 registerBenchmark(SetTests)
 registerBenchmark(SevenBoom)
 registerBenchmark(Sim2DArray)
+registerBenchmark(Sorting)
 registerBenchmark(SortIntPyramids)
 registerBenchmark(SortLargeExistentials)
 registerBenchmark(SortLettersInPlace)
