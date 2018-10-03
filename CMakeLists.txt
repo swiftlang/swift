@@ -770,7 +770,7 @@ if(swift_build_android AND NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
   endif()
 
   if("${SWIFT_SDK_ANDROID_ARCHITECTURES}" STREQUAL "")
-    set(SWIFT_SDK_ANDROID_ARCHITECTURES armv7;aarch)
+    set(SWIFT_SDK_ANDROID_ARCHITECTURES armv7;aarch64)
   endif()
   configure_sdk_unix(ANDROID "Android" "android" "android" "${SWIFT_SDK_ANDROID_ARCHITECTURES}" "" "")
 endif()
