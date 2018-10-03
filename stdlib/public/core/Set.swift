@@ -163,19 +163,19 @@ public struct Set<Element: Hashable> {
   ///   storage buffer.
   public // FIXME(reserveCapacity): Should be inlinable
   init(minimumCapacity: Int) {
-    _variant = .native(_NativeSet(capacity: minimumCapacity))
+    _variant = _Variant(native: _NativeSet(capacity: minimumCapacity))
   }
 
   /// Private initializer.
   @inlinable
   internal init(_native: __owned _NativeSet<Element>) {
-    _variant = .native(_native)
+    _variant = _Variant(native: _native)
   }
 
 #if _runtime(_ObjC)
   @inlinable
   internal init(_cocoa: __owned _CocoaSet) {
-    _variant = .cocoa(_cocoa)
+    _variant = _Variant(cocoa: _cocoa)
   }
 
   /// Private initializer used for bridging.
@@ -421,45 +421,37 @@ extension Set: Equatable {
   ///   `false`.
   @inlinable
   public static func == (lhs: Set<Element>, rhs: Set<Element>) -> Bool {
-    switch (lhs._variant, rhs._variant) {
-    case (.native(let lhsNative), .native(let rhsNative)):
+    switch (lhs._variant.isNative, rhs._variant.isNative) {
+    case (true, true):
+      let lhs = lhs._variant.asNative
+      let rhs = rhs._variant.asNative
 
-      if lhsNative._storage === rhsNative._storage {
-        return true
-      }
+      if lhs._storage === rhs._storage { return true }
+      if lhs.count != rhs.count { return false }
 
-      if lhsNative.count != rhsNative.count {
-        return false
-      }
-
-      for member in lhsNative {
-        guard rhsNative.find(member).found else {
-          return false
-        }
+      for member in lhs {
+        guard rhs.find(member).found else { return false }
       }
       return true
+#if _runtime(_ObjC)
+    case (false, false):
+      return lhs._variant.asCocoa == rhs._variant.asCocoa
 
-  #if _runtime(_ObjC)
-    case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
-      return lhsCocoa == rhsCocoa
+    case (true, false):
+      let lhs = lhs._variant.asNative
+      let rhs = rhs._variant.asCocoa
 
-    case (.native(let lhsNative), .cocoa(let rhsCocoa)):
-      if lhsNative.count != rhsCocoa.count {
-        return false
-      }
+      if lhs.count != rhs.count { return false }
 
-      defer { _fixLifetime(lhsNative) }
-      for bucket in lhsNative.hashTable {
-        let key = lhsNative.uncheckedElement(at: bucket)
+      defer { _fixLifetime(lhs) }
+      for bucket in lhs.hashTable {
+        let key = lhs.uncheckedElement(at: bucket)
         let bridgedKey = _bridgeAnythingToObjectiveC(key)
-        if rhsCocoa.contains(bridgedKey) {
-          continue
-        }
-        return false
+        guard rhs.contains(bridgedKey) else { return false }
       }
       return true
 
-    case (.cocoa, .native):
+    case (false, true):
       return rhs == lhs
   #endif
     }

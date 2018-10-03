@@ -28,12 +28,22 @@ internal protocol _SetBuffer {
 
 extension Set {
   @usableFromInline
-  @_frozen
-  internal enum _Variant {
-    case native(_NativeSet<Element>)
-#if _runtime(_ObjC)
-    case cocoa(_CocoaSet)
-#endif
+  @_fixed_layout
+  internal struct _Variant {
+    @usableFromInline
+    internal var object: _BridgeStorage<_RawSetStorage, _NSSet>
+
+    @inlinable
+    @inline(__always)
+    init(native: __owned _NativeSet<Element>) {
+      self.object = _BridgeStorage(native: native._storage)
+    }
+
+    @inlinable
+    @inline(__always)
+    init(cocoa: __owned _CocoaSet) {
+      self.object = _BridgeStorage(objC: cocoa.object)
+    }
   }
 }
 
@@ -44,71 +54,34 @@ extension Set._Variant {
   internal var guaranteedNative: Bool {
     return _canBeClass(Element.self) == 0
   }
-
-  /// Allow the optimizer to consider the surrounding code unreachable if
-  /// Set<Element> is guaranteed to be native.
-  @usableFromInline
-  @_transparent
-  internal func cocoaPath() {
-    if guaranteedNative {
-      _conditionallyUnreachable()
-    }
-  }
 #endif
 
   @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {
-#if _runtime(_ObjC)
-    guard isNative else {
-      // Don't consider Cocoa buffer mutable, even if it is mutable and is
-      // uniquely referenced.
-      return false
-    }
-#endif
-    // Note that &self drills down through .native(_NativeSet) to the first
-    // property in _NativeSet, which is the reference to the storage.
-    return _isUnique_native(&self)
+    return object.isUniquelyReferencedNative()
   }
 
 #if _runtime(_ObjC)
   @usableFromInline @_transparent
   internal var isNative: Bool {
-    switch self {
-    case .native:
-      return true
-    case .cocoa:
-      cocoaPath()
-      return false
-    }
+    return guaranteedNative || object.isNative
   }
 #endif
 
   @usableFromInline @_transparent
   internal var asNative: _NativeSet<Element> {
     get {
-      switch self {
-      case .native(let nativeSet):
-        return nativeSet
-#if _runtime(_ObjC)
-      case .cocoa:
-        _sanityCheckFailure("internal error: not backed by native buffer")
-#endif
-      }
+      return _NativeSet<Element>(object.nativeInstance)
     }
     set {
-      self = .native(newValue)
+      self = .init(native: newValue)
     }
   }
 
 #if _runtime(_ObjC)
   @inlinable
   internal var asCocoa: _CocoaSet {
-    switch self {
-    case .native:
-      _sanityCheckFailure("internal error: not backed by NSSet")
-    case .cocoa(let cocoa):
-      return cocoa
-    }
+    return _CocoaSet(object.objCInstance)
   }
 #endif
 
@@ -119,7 +92,7 @@ extension Set._Variant {
     guard isNative else {
       let cocoa = asCocoa
       let capacity = Swift.max(cocoa.count, capacity)
-      self = .native(_NativeSet(cocoa, capacity: capacity))
+      self = .init(native: _NativeSet(cocoa, capacity: capacity))
       return
     }
 #endif
@@ -181,16 +154,14 @@ extension Set._Variant: _SetBuffer {
 
   @inlinable
   internal func formIndex(after index: inout Index) {
-    switch self {
-    case .native(let native):
-      index = native.index(after: index)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoa):
-      cocoaPath()
+    guard isNative else {
       let isUnique = index._isUniquelyReferenced()
-      cocoa.formIndex(after: &index._asCocoa, isUnique: isUnique)
-#endif
+      asCocoa.formIndex(after: &index._asCocoa, isUnique: isUnique)
+      return
     }
+#endif
+    index = asNative.index(after: index)
   }
 
   @inlinable
@@ -251,7 +222,7 @@ extension Set._Variant {
       // Make sure we have space for an extra element.
       var native = _NativeSet<Element>(asCocoa, capacity: asCocoa.count + 1)
       let old = native.update(with: value, isUnique: true)
-      self = .native(native)
+      self = .init(native: native)
       return old
     }
 #endif
@@ -273,7 +244,7 @@ extension Set._Variant {
       }
       var native = _NativeSet<Element>(cocoa, capacity: cocoa.count + 1)
       native.insertNew(element, isUnique: true)
-      self = .native(native)
+      self = .init(native: native)
       return (true, element)
     }
 #endif
@@ -334,7 +305,7 @@ extension Set._Variant {
     _precondition(found, "Bridging did not preserve equality")
     let old = native.uncheckedRemove(at: bucket, isUnique: true)
     _precondition(member == old, "Bridging did not preserve equality")
-    self = .native(native)
+    self = .init(native: native)
     return old
   }
 #endif
@@ -342,14 +313,14 @@ extension Set._Variant {
   @inlinable
   internal mutating func removeAll(keepingCapacity keepCapacity: Bool) {
     if !keepCapacity {
-      self = .native(_NativeSet<Element>())
+      self = .init(native: _NativeSet<Element>())
       return
     }
     guard count > 0 else { return }
 
 #if _runtime(_ObjC)
     guard isNative else {
-      self = .native(_NativeSet(capacity: asCocoa.count))
+      self = .init(native: _NativeSet(capacity: asCocoa.count))
       return
     }
 #endif

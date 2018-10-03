@@ -396,13 +396,13 @@ public struct Dictionary<Key: Hashable, Value> {
 
   @inlinable
   internal init(_native: __owned _NativeDictionary<Key, Value>) {
-    _variant = .native(_native)
+    _variant = _Variant(native: _native)
   }
 
 #if _runtime(_ObjC)
   @inlinable
   internal init(_cocoa: __owned _CocoaDictionary) {
-    _variant = .cocoa(_cocoa)
+    _variant = _Variant(cocoa: _cocoa)
   }
 
   /// Private initializer used for bridging.
@@ -444,7 +444,7 @@ public struct Dictionary<Key: Hashable, Value> {
   ///   reallocating its storage buffer.
   public // FIXME(reserveCapacity): Should be inlinable
   init(minimumCapacity: Int) {
-    _variant = .native(_NativeDictionary(capacity: minimumCapacity))
+    _variant = _Variant(native: _NativeDictionary(capacity: minimumCapacity))
   }
 
   /// Creates a new dictionary from the key-value pairs in the given sequence.
@@ -1317,7 +1317,7 @@ extension Dictionary {
     }
     _modify {
       var values = Values(_dictionary: self)
-      _variant = .native(_NativeDictionary())
+      _variant = _Variant(native: _NativeDictionary())
       yield &values
       self._variant = values._variant
     }
@@ -1404,10 +1404,22 @@ extension Dictionary {
     @inlinable
     public static func ==(lhs: Keys, rhs: Keys) -> Bool {
       // Equal if the two dictionaries share storage.
-      if case (.native(let ln), .native(let rn)) = (lhs._variant, rhs._variant),
-        ln._storage === rn._storage {
+      if
+        lhs._variant.isNative,
+        rhs._variant.isNative,
+        lhs._variant.asNative._storage === rhs._variant.asNative._storage
+      {
         return true
       }
+#if _runtime(_ObjC)
+      if
+        !lhs._variant.isNative,
+        !rhs._variant.isNative,
+        lhs._variant.asCocoa.object === rhs._variant.asCocoa.object
+      {
+        return true
+      }
+#endif
 
       // Not equal if the dictionaries are different sizes.
       if lhs.count != rhs.count {
@@ -1519,7 +1531,7 @@ extension Dictionary {
       guard i != j else { return }
 #if _runtime(_ObjC)
       if !_variant.isNative {
-        _variant = .native(_NativeDictionary<Key, Value>(_variant.asCocoa))
+        _variant = .init(native: _NativeDictionary(_variant.asCocoa))
       }
 #endif
       let native = _variant.asNative
@@ -1600,48 +1612,44 @@ extension Dictionary.Values {
 extension Dictionary: Equatable where Value: Equatable {
   @inlinable
   public static func == (lhs: [Key: Value], rhs: [Key: Value]) -> Bool {
-    switch (lhs._variant, rhs._variant) {
-    case (.native(let lhsNative), .native(let rhsNative)):
+    switch (lhs._variant.isNative, rhs._variant.isNative) {
+    case (true, true):
+      let lhs = lhs._variant.asNative
+      let rhs = rhs._variant.asNative
 
-      if lhsNative._storage === rhsNative._storage {
-        return true
-      }
-
-      if lhsNative.count != rhsNative.count {
-        return false
-      }
+      if lhs._storage === rhs._storage { return true }
+      if lhs.count != rhs.count { return false }
 
       for (k, v) in lhs {
-        let (bucket, found) = rhsNative.find(k)
-        guard found, rhsNative.uncheckedValue(at: bucket) == v else {
-          return false
-        }
+        let (bucket, found) = rhs.find(k)
+        guard found, rhs.uncheckedValue(at: bucket) == v else { return false }
       }
       return true
 
-  #if _runtime(_ObjC)
-    case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
-      return lhsCocoa == rhsCocoa
+#if _runtime(_ObjC)
+    case (false, false):
+      return lhs._variant.asCocoa == rhs._variant.asCocoa
 
-    case (.native(let lhsNative), .cocoa(let rhsCocoa)):
-      if lhsNative.count != rhsCocoa.count {
-        return false
-      }
+    case (true, false):
+      let lhs = lhs._variant.asNative
+      let rhs = rhs._variant.asCocoa
 
-      defer { _fixLifetime(lhsNative) }
-      for bucket in lhsNative.hashTable {
-        let key = lhsNative.uncheckedKey(at: bucket)
-        let value = lhsNative.uncheckedValue(at: bucket)
+      if lhs.count != rhs.count { return false }
+
+      defer { _fixLifetime(lhs) }
+      for bucket in lhs.hashTable {
+        let key = lhs.uncheckedKey(at: bucket)
+        let value = lhs.uncheckedValue(at: bucket)
         guard
-          let rhsValue = rhsCocoa.lookup(_bridgeAnythingToObjectiveC(key)),
-          value == _forceBridgeFromObjectiveC(rhsValue, Value.self)
+          let cocoaValue = rhs.lookup(_bridgeAnythingToObjectiveC(key)),
+          value == _forceBridgeFromObjectiveC(cocoaValue, Value.self)
         else {
           return false
         }
       }
       return true
 
-    case (.cocoa, .native):
+    case (false, true):
       return rhs == lhs
   #endif
     }
