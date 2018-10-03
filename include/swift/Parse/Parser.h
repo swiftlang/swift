@@ -730,7 +730,7 @@ public:
     }
 
     void outerConditionalCompletes(IfConfigDecl *ICD) {
-      ConditionalsMap.emplace_back(std::make_pair(PendingIndexNumber, ICD));
+      ConditionalsMap.emplace_back(PendingIndexNumber, ICD);
     }
 
     CollectionExpr *closeCollection(ASTContext &Context, CollectionExpr *expr) {
