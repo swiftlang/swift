@@ -32,12 +32,22 @@ internal protocol _DictionaryBuffer {
 
 extension Dictionary {
   @usableFromInline
-  @_frozen
-  internal enum _Variant {
-    case native(_NativeDictionary<Key, Value>)
-#if _runtime(_ObjC)
-    case cocoa(_CocoaDictionary)
-#endif
+  @_fixed_layout
+  internal struct _Variant {
+    @usableFromInline
+    internal var object: _BridgeStorage<_RawDictionaryStorage, _NSDictionary>
+
+    @inlinable
+    @inline(__always)
+    init(native: __owned _NativeDictionary<Key, Value>) {
+      self.object = _BridgeStorage(native: native._storage)
+    }
+
+    @inlinable
+    @inline(__always)
+    init(cocoa: __owned _CocoaDictionary) {
+      self.object = _BridgeStorage(objC: cocoa.object)
+    }
   }
 }
 
@@ -47,73 +57,34 @@ extension Dictionary._Variant {
   internal var guaranteedNative: Bool {
     return _canBeClass(Key.self) == 0 || _canBeClass(Value.self) == 0
   }
-
-  // Allow the optimizer to consider the surrounding code unreachable if Element
-  // is guaranteed to be native.
-  @usableFromInline @_transparent
-  internal func cocoaPath() {
-    if guaranteedNative {
-      _conditionallyUnreachable()
-    }
-  }
 #endif
 
   @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {
-#if _runtime(_ObjC)
-    guard isNative else {
-      // Don't consider Cocoa a buffer mutable, even if it is mutable and it is
-      // uniquely referenced.
-      return false
-    }
-#endif
-    // Note that &self drills down through .native(_NativeDictionary) to the
-    // first property in _NativeDictionary, which is the reference to the
-    // storage.
-    return _isUnique_native(&self)
+    return object.isUniquelyReferencedNative()
   }
 
 #if _runtime(_ObjC)
   @usableFromInline @_transparent
   internal var isNative: Bool {
-    switch self {
-    case .native:
-      return true
-    case .cocoa:
-      cocoaPath()
-      return false
-    }
+    return guaranteedNative || object.isNative
   }
 #endif
 
-  @inlinable
+  @usableFromInline @_transparent
   internal var asNative: _NativeDictionary<Key, Value> {
-    @inline(__always)
     get {
-      switch self {
-      case .native(let native):
-        return native
-#if _runtime(_ObjC)
-      case .cocoa:
-        _sanityCheckFailure("internal error: not backed by native buffer")
-#endif
-      }
+      return _NativeDictionary<Key, Value>(object.nativeInstance)
     }
-    @inline(__always)
     set {
-      self = .native(newValue)
+      self = .init(native: newValue)
     }
   }
 
 #if _runtime(_ObjC)
   @inlinable
   internal var asCocoa: _CocoaDictionary {
-    switch self {
-    case .native:
-      _sanityCheckFailure("internal error: not backed by NSDictionary")
-    case .cocoa(let cocoa):
-      return cocoa
-    }
+    return _CocoaDictionary(object.objCInstance)
   }
 #endif
 
@@ -124,7 +95,7 @@ extension Dictionary._Variant {
     guard isNative else {
       let cocoa = asCocoa
       let capacity = Swift.max(cocoa.count, capacity)
-      self = .native(_NativeDictionary(cocoa, capacity: capacity))
+      self = .init(native: _NativeDictionary(cocoa, capacity: capacity))
       return
     }
 #endif
@@ -188,16 +159,14 @@ extension Dictionary._Variant: _DictionaryBuffer {
 
   @inlinable
   internal func formIndex(after index: inout Index) {
-    switch self {
-    case .native(let native):
-      index = native.index(after: index)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoa):
-      cocoaPath()
+    guard isNative else {
       let isUnique = index._isUniquelyReferenced()
-      cocoa.formIndex(after: &index._asCocoa, isUnique: isUnique)
-#endif
+      asCocoa.formIndex(after: &index._asCocoa, isUnique: isUnique)
+      return
     }
+#endif
+    index = asNative.index(after: index)
   }
 
   @inlinable
@@ -307,7 +276,7 @@ extension Dictionary._Variant {
       var native = _NativeDictionary<Key, Value>(
         cocoa, capacity: cocoa.count + 1)
       let result = native.mutatingFind(key, isUnique: true)
-      self = .native(native)
+      self = .init(native: native)
       return result
     }
 #endif
@@ -320,9 +289,8 @@ extension Dictionary._Variant {
   internal mutating func ensureUniqueNative() -> _NativeDictionary<Key, Value> {
 #if _runtime(_ObjC)
     guard isNative else {
-      cocoaPath()
       let native = _NativeDictionary<Key, Value>(asCocoa)
-      self = .native(native)
+      self = .init(native: native)
       return native
     }
 #endif
@@ -346,7 +314,7 @@ extension Dictionary._Variant {
         cocoa,
         capacity: cocoa.count + 1)
       let result = native.updateValue(value, forKey: key, isUnique: true)
-      self = .native(native)
+      self = .init(native: native)
       return result
     }
 #endif
@@ -360,7 +328,7 @@ extension Dictionary._Variant {
     if !isNative {
       // Make sure we have space for an extra element.
       let cocoa = asCocoa
-      self = .native(_NativeDictionary<Key, Value>(
+      self = .init(native: _NativeDictionary<Key, Value>(
         cocoa,
         capacity: cocoa.count + 1))
     }
@@ -389,7 +357,7 @@ extension Dictionary._Variant {
       let (bucket, found) = native.find(key)
       _precondition(found, "Bridging did not preserve equality")
       let old = native.uncheckedRemove(at: bucket, isUnique: true).value
-      self = .native(native)
+      self = .init(native: native)
       return old
     }
 #endif
@@ -402,14 +370,14 @@ extension Dictionary._Variant {
   @inlinable
   internal mutating func removeAll(keepingCapacity keepCapacity: Bool) {
     if !keepCapacity {
-      self = .native(_NativeDictionary())
+      self = .init(native: _NativeDictionary())
       return
     }
     guard count > 0 else { return }
 
 #if _runtime(_ObjC)
     guard isNative else {
-      self = .native(_NativeDictionary(capacity: asCocoa.count))
+      self = .init(native: _NativeDictionary(capacity: asCocoa.count))
       return
     }
 #endif
@@ -459,7 +427,7 @@ extension Dictionary._Variant {
         keysAndValues,
         isUnique: true,
         uniquingKeysWith: combine)
-      self = .native(native)
+      self = .init(native: native)
       return
     }
 #endif
