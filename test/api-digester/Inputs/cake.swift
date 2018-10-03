@@ -88,3 +88,6 @@ public extension P1 {
 }
 
 infix operator ..*..
+
+@usableFromInline
+class UsableFromInlineClass {}
