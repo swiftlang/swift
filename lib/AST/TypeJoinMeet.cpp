@@ -396,8 +396,7 @@ CanType TypeJoin::visitProtocolCompositionType(CanType second) {
   assert(First != second);
 
   // FIXME: Handle other types here.
-  if (!First->is<ProtocolType>() &&
-      !First->is<ProtocolCompositionType>())
+  if (!First->isExistentialType())
     return TheAnyType;
 
   SmallVector<Type, 1> protocolType;
@@ -411,32 +410,6 @@ CanType TypeJoin::visitProtocolCompositionType(CanType second) {
   auto secondMembers = cast<ProtocolCompositionType>(second)->getMembers();
 
   return computeProtocolCompositionJoin(firstMembers, secondMembers);
-}
-
-// Return true if the first ProtocolDecl is a supertype of the second.
-static bool isSupertypeOf(ProtocolDecl *super, ProtocolDecl *sub) {
-  if (super == sub)
-    return true;
-
-  SmallVector<ProtocolDecl *, 4> worklist;
-  for (auto *decl : sub->getInheritedProtocols())
-    worklist.push_back(decl);
-
-  llvm::SmallPtrSet<ProtocolDecl *, 4> visited;
-  while (!worklist.empty()) {
-    auto *entry = worklist.pop_back_val();
-    if (visited.count(entry))
-      continue;
-    visited.insert(entry);
-
-    if (entry == super)
-      return true;
-
-    for (auto *decl : entry->getInheritedProtocols())
-      worklist.push_back(decl);
-  }
-
-  return false;
 }
 
 CanType TypeJoin::visitProtocolType(CanType second) {
@@ -459,11 +432,11 @@ CanType TypeJoin::visitProtocolType(CanType second) {
       secondDecl->getInheritedProtocols().empty())
     return TheAnyType;
 
-  if (isSupertypeOf(firstDecl, secondDecl))
-    return First;
-
-  if (isSupertypeOf(secondDecl, firstDecl))
+  if (firstDecl->inheritsFrom(secondDecl))
     return second;
+
+  if (secondDecl->inheritsFrom(firstDecl))
+    return First;
 
   // One isn't the supertype of the other, so instead, treat each as
   // if it's a protocol composition of its inherited members, and join
