@@ -526,6 +526,43 @@ extension _NativeDictionary {
   }
 }
 
+extension _NativeDictionary where Value: Equatable {
+  @inlinable
+  @inline(__always)
+  func isEqual(to other: _NativeDictionary) -> Bool {
+    if self._storage === other._storage { return true }
+    if self.count != other.count { return false }
+
+    for (key, value) in self {
+      let (bucket, found) = other.find(key)
+      guard found, other.uncheckedValue(at: bucket) == value else {
+        return false
+      }
+    }
+    return true
+  }
+
+#if _runtime(_ObjC)
+  @inlinable
+  func isEqual(to other: _CocoaDictionary) -> Bool {
+    if self.count != other.count { return false }
+
+    defer { _fixLifetime(self) }
+    for bucket in self.hashTable {
+      let key = self.uncheckedKey(at: bucket)
+      let value = self.uncheckedValue(at: bucket)
+      guard
+        let cocoaValue = other.lookup(_bridgeAnythingToObjectiveC(key)),
+        value == _forceBridgeFromObjectiveC(cocoaValue, Value.self)
+      else {
+        return false
+      }
+    }
+    return true
+  }
+#endif
+}
+
 extension _NativeDictionary: _HashTableDelegate {
   @inlinable
   @inline(__always)

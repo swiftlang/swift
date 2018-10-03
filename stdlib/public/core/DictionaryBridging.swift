@@ -434,13 +434,10 @@ internal struct _CocoaDictionary {
   }
 }
 
-extension _CocoaDictionary: Equatable {
+extension _CocoaDictionary {
   @usableFromInline
-  internal static func ==(
-    lhs: _CocoaDictionary,
-    rhs: _CocoaDictionary
-  ) -> Bool {
-    return _stdlib_NSObject_isEqual(lhs.object, rhs.object)
+  internal func isEqual(to other: _CocoaDictionary) -> Bool {
+    return _stdlib_NSObject_isEqual(self.object, other.object)
   }
 }
 

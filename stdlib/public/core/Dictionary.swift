@@ -1408,6 +1408,7 @@ extension Dictionary {
     @inlinable
     public static func ==(lhs: Keys, rhs: Keys) -> Bool {
       // Equal if the two dictionaries share storage.
+#if _runtime(_ObjC)
       if
         lhs._variant.isNative,
         rhs._variant.isNative,
@@ -1415,12 +1416,15 @@ extension Dictionary {
       {
         return true
       }
-#if _runtime(_ObjC)
       if
         !lhs._variant.isNative,
         !rhs._variant.isNative,
         lhs._variant.asCocoa.object === rhs._variant.asCocoa.object
       {
+        return true
+      }
+#else
+      if lhs._variant.asNative._storage === rhs._variant.asNative._storage {
         return true
       }
 #endif
@@ -1616,47 +1620,20 @@ extension Dictionary.Values {
 extension Dictionary: Equatable where Value: Equatable {
   @inlinable
   public static func == (lhs: [Key: Value], rhs: [Key: Value]) -> Bool {
+#if _runtime(_ObjC)
     switch (lhs._variant.isNative, rhs._variant.isNative) {
     case (true, true):
-      let lhs = lhs._variant.asNative
-      let rhs = rhs._variant.asNative
-
-      if lhs._storage === rhs._storage { return true }
-      if lhs.count != rhs.count { return false }
-
-      for (k, v) in lhs {
-        let (bucket, found) = rhs.find(k)
-        guard found, rhs.uncheckedValue(at: bucket) == v else { return false }
-      }
-      return true
-
-#if _runtime(_ObjC)
+      return lhs._variant.asNative.isEqual(to: rhs._variant.asNative)
     case (false, false):
-      return lhs._variant.asCocoa == rhs._variant.asCocoa
-
+      return lhs._variant.asCocoa.isEqual(to: rhs._variant.asCocoa)
     case (true, false):
-      let lhs = lhs._variant.asNative
-      let rhs = rhs._variant.asCocoa
-
-      if lhs.count != rhs.count { return false }
-
-      defer { _fixLifetime(lhs) }
-      for bucket in lhs.hashTable {
-        let key = lhs.uncheckedKey(at: bucket)
-        let value = lhs.uncheckedValue(at: bucket)
-        guard
-          let cocoaValue = rhs.lookup(_bridgeAnythingToObjectiveC(key)),
-          value == _forceBridgeFromObjectiveC(cocoaValue, Value.self)
-        else {
-          return false
-        }
-      }
-      return true
-
+      return lhs._variant.asNative.isEqual(to: rhs._variant.asCocoa)
     case (false, true):
-      return rhs == lhs
-  #endif
+      return rhs._variant.asNative.isEqual(to: lhs._variant.asCocoa)
     }
+#else
+    return lhs._variant.asNative.isEqual(to: rhs._variant.asNative)
+#endif
   }
 }
 

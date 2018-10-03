@@ -424,6 +424,35 @@ extension _NativeSet { // Insertions
   }
 }
 
+extension _NativeSet {
+  @inlinable
+  @inline(__always)
+  func isEqual(to other: _NativeSet) -> Bool {
+    if self._storage === other._storage { return true }
+    if self.count != other.count { return false }
+
+    for member in self {
+      guard other.find(member).found else { return false }
+    }
+    return true
+  }
+
+#if _runtime(_ObjC)
+  @inlinable
+  func isEqual(to other: _CocoaSet) -> Bool {
+    if self.count != other.count { return false }
+
+    defer { _fixLifetime(self) }
+    for bucket in self.hashTable {
+      let key = self.uncheckedElement(at: bucket)
+      let bridgedKey = _bridgeAnythingToObjectiveC(key)
+      guard other.contains(bridgedKey) else { return false }
+    }
+    return true
+  }
+#endif
+}
+
 extension _NativeSet: _HashTableDelegate {
   @inlinable
   @inline(__always)

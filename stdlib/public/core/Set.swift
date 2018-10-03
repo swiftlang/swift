@@ -421,40 +421,20 @@ extension Set: Equatable {
   ///   `false`.
   @inlinable
   public static func == (lhs: Set<Element>, rhs: Set<Element>) -> Bool {
+#if _runtime(_ObjC)
     switch (lhs._variant.isNative, rhs._variant.isNative) {
     case (true, true):
-      let lhs = lhs._variant.asNative
-      let rhs = rhs._variant.asNative
-
-      if lhs._storage === rhs._storage { return true }
-      if lhs.count != rhs.count { return false }
-
-      for member in lhs {
-        guard rhs.find(member).found else { return false }
-      }
-      return true
-#if _runtime(_ObjC)
+      return lhs._variant.asNative.isEqual(to: rhs._variant.asNative)
     case (false, false):
-      return lhs._variant.asCocoa == rhs._variant.asCocoa
-
+      return lhs._variant.asCocoa.isEqual(to: rhs._variant.asCocoa)
     case (true, false):
-      let lhs = lhs._variant.asNative
-      let rhs = rhs._variant.asCocoa
-
-      if lhs.count != rhs.count { return false }
-
-      defer { _fixLifetime(lhs) }
-      for bucket in lhs.hashTable {
-        let key = lhs.uncheckedElement(at: bucket)
-        let bridgedKey = _bridgeAnythingToObjectiveC(key)
-        guard rhs.contains(bridgedKey) else { return false }
-      }
-      return true
-
+      return lhs._variant.asNative.isEqual(to: rhs._variant.asCocoa)
     case (false, true):
-      return rhs == lhs
-  #endif
+      return rhs._variant.asNative.isEqual(to: lhs._variant.asCocoa)
     }
+#else
+    return lhs._variant.asNative.isEqual(to: rhs._variant.asNative)
+#endif
   }
 }
 
