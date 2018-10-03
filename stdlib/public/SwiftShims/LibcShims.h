@@ -81,22 +81,31 @@ static inline int _swift_stdlib_memcmp(const void *s1, const void *s2,
   return memcmp(s1, s2, n);
 }
 
+// Casting helper. This code needs to work when included from C or C++.
+// Casting away const with a C-style cast warns in C++. Use a const_cast
+// there.
+#ifdef __cplusplus
+#define CONST_CAST(type, value) const_cast<type>(value)
+#else
+#define CONST_CAST(type, value) (type)value
+#endif
+
 // Non-standard extensions
 #if defined(__APPLE__)
 static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
   extern __swift_size_t malloc_size(const void *);
   return malloc_size(ptr);
 }
-#elif defined(__GNU_LIBRARY__) || defined(__CYGWIN__) || defined(__ANDROID__) \
+#elif defined(__linux__) || defined(__CYGWIN__) || defined(__ANDROID__) \
    || defined(__HAIKU__) || defined(__FreeBSD__)
 static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
   extern __swift_size_t malloc_usable_size(void *ptr);
-  return malloc_usable_size((void *)ptr);
+  return malloc_usable_size(CONST_CAST(void *, ptr));
 }
 #elif defined(_WIN32)
 static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
   extern __swift_size_t _msize(void *ptr);
-  return _msize(const_cast<void *>(ptr));
+  return _msize(CONST_CAST(void *, ptr));
 }
 #else
 #error No malloc_size analog known for this platform/libc.

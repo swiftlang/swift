@@ -23,6 +23,7 @@
 #pragma comment(lib, "Bcrypt.lib")
 #else
 #include <errno.h>
+#include <fcntl.h>
 #include <unistd.h>
 #endif
 
@@ -36,6 +37,7 @@
 
 #include <stdlib.h>
 
+#include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Mutex.h"
 #include "../SwiftShims/Random.h"
 
@@ -91,12 +93,12 @@ void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
 
     if (actual_nbytes == -1) {
       static const int fd = 
-        WHILE_EINTR(_swift_stdlib_open("/dev/urandom", O_RDONLY | O_CLOEXEC, 0));
+        WHILE_EINTR(open("/dev/urandom", O_RDONLY | O_CLOEXEC, 0));
         
       if (fd != -1) {
         static StaticMutex mutex;
         mutex.withLock([&] {
-          actual_nbytes = WHILE_EINTR(_swift_stdlib_read(fd, buf, nbytes));
+          actual_nbytes = WHILE_EINTR(read(fd, buf, nbytes));
         });
       }
     }
