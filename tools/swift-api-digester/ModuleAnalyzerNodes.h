@@ -188,6 +188,7 @@ public:
   }
   bool isEqual(const SDKNode &Left, const SDKNode &Right);
   bool checkingABI() const { return Opts.ABI; }
+  AccessLevel getAccessLevel(const ValueDecl *VD) const;
   const CheckerOptions &getOpts() const { return Opts; }
   ArrayRef<ABIAttributeInfo> getABIAttributeInfo() const { return ABIAttrs; }
 

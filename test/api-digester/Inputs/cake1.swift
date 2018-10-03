@@ -55,8 +55,9 @@ public struct fixedLayoutStruct {
   public var a = 1
 }
 
+@usableFromInline
 @_fixed_layout
-public struct fixedLayoutStruct2 {
+struct fixedLayoutStruct2 {
   public private(set) var NoLongerWithFixedBinaryOrder = 1
   public var BecomeFixedBinaryOrder: Int { return 1 }
 }
