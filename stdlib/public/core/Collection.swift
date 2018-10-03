@@ -1267,6 +1267,7 @@ extension Collection {
   ///
   /// - Complexity: Hopefully less than O(`count`).
   @inlinable
+  @inline(__always)
   public // dispatching
   func _customIndexOfEquatableElement(_: Element) -> Index?? {
     return nil
@@ -1283,6 +1284,7 @@ extension Collection {
   ///
   /// - Complexity: Hopefully less than O(`count`).
   @inlinable
+  @inline(__always)
   public // dispatching
   func _customLastIndexOfEquatableElement(_ element: Element) -> Index?? {
     return nil
@@ -1802,6 +1804,7 @@ extension Collection where SubSequence == Self {
 
 extension Collection {
   @inlinable
+  @inline(__always)
   public func _preprocessingPass<R>(
     _ preprocess: () throws -> R
   ) rethrows -> R? {
