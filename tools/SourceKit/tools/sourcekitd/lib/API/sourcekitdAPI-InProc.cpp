@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "DictionaryKeys.h"
-#include "sourcekitd/sourcekitd.h"
 #include "sourcekitd/Internal.h"
 #include "sourcekitd/CodeCompletionResultsArray.h"
 #include "sourcekitd/DocStructureArray.h"
