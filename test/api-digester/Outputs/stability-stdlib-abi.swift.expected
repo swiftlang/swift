@@ -4,19 +4,13 @@
 /* RawRepresentable Changes */
 
 /* Removed Decls */
-Protocol ArrayProtocol has been removed
 
 /* Moved Decls */
 
 /* Renamed Decls */
-Var CVaListPointer.value has been renamed to Var CVaListPointer._value
 
 /* Type Changes */
-Var JoinedSequence.Iterator._state has declared type change from JoinedSequence<τ_0_0>.Iterator.JoinIteratorState to JoinedSequence<τ_0_0>.Iterator._JoinIteratorState
 
 /* Decl Attribute changes */
 
 /* Protocol Requirement Changes */
-Struct Array has removed conformance to ArrayProtocol
-Struct ArraySlice has removed conformance to ArrayProtocol
-Struct ContiguousArray has removed conformance to ArrayProtocol

@@ -770,6 +770,10 @@ bool SDKContext::isEqual(const SDKNode &Left, const SDKNode &Right) {
   return EqualCache[&Left][&Right];
 }
 
+AccessLevel SDKContext::getAccessLevel(const ValueDecl *VD) const {
+  return checkingABI() ? VD->getEffectiveAccess() : VD->getFormalAccess();
+}
+
 bool SDKNode::operator==(const SDKNode &Other) const {
   return Ctx.isEqual(*this, Other);
 }
@@ -1055,8 +1059,8 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
   IsStatic = VD->isStatic();
   IsOverriding = VD->getOverriddenDecl();
   IsProtocolReq = isa<ProtocolDecl>(VD->getDeclContext()) && VD->isProtocolRequirement();
-  IsOpen = VD->getFormalAccess() == AccessLevel::Open;
-  IsInternal = VD->getFormalAccess() < AccessLevel::Public;
+  IsOpen = Ctx.getAccessLevel(VD) == AccessLevel::Open;
+  IsInternal = Ctx.getAccessLevel(VD) < AccessLevel::Public;
   SelfIndex = getSelfIndex(VD);
   FixedBinaryOrder = getFixedBinaryOrder(VD);
   ReferenceOwnership = getReferenceOwnership(VD);
@@ -1212,17 +1216,18 @@ SwiftDeclCollector::shouldIgnore(Decl *D, const Decl* Parent) {
       if (isa<TypeAliasDecl>(VD))
         return true;
     }
+  } else {
+    if (D->isPrivateStdlibDecl(false))
+      return true;
+    if (AvailableAttr::isUnavailable(D))
+      return true;
   }
-  if (D->isPrivateStdlibDecl(false))
-    return true;
-  if (AvailableAttr::isUnavailable(D))
-    return true;
   if (isa<ConstructorDecl>(D))
     return false;
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     if (VD->getBaseName().empty())
       return true;
-    switch (VD->getFormalAccess()) {
+    switch (Ctx.getAccessLevel(VD)) {
     case AccessLevel::Internal:
     case AccessLevel::Private:
     case AccessLevel::FilePrivate:

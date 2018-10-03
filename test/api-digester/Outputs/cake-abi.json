@@ -231,8 +231,7 @@
           "declKind": "Func",
           "usr": "s:4cake2C1C4foo1yyFZ",
           "moduleName": "cake",
-          "static": true,
-          "isOpen": true
+          "static": true
         },
         {
           "kind": "Var",
@@ -1198,6 +1197,37 @@
       "moduleName": "cake",
       "declAttributes": [
         "Infix"
+      ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "UsableFromInlineClass",
+      "printedName": "UsableFromInlineClass",
+      "children": [
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init()",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "UsableFromInlineClass",
+              "printedName": "UsableFromInlineClass",
+              "usr": "s:4cake21UsableFromInlineClassC"
+            }
+          ],
+          "declKind": "Constructor",
+          "usr": "s:4cake21UsableFromInlineClassCACycfc",
+          "moduleName": "cake",
+          "implicit": true,
+          "isInternal": true
+        }
+      ],
+      "declKind": "Class",
+      "usr": "s:4cake21UsableFromInlineClassC",
+      "moduleName": "cake",
+      "declAttributes": [
+        "UsableFromInline"
       ]
     },
     {

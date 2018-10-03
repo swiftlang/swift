@@ -59,8 +59,9 @@ public struct fixedLayoutStruct {
   private lazy var lazy_d = 4
 }
 
+@usableFromInline
 @_fixed_layout
-public struct fixedLayoutStruct2 {
+struct fixedLayoutStruct2 {
   public var NoLongerWithFixedBinaryOrder: Int { return 1 }
   public var BecomeFixedBinaryOrder = 1
 }
