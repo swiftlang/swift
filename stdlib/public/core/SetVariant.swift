@@ -30,8 +30,13 @@ extension Set {
   @usableFromInline
   @_fixed_layout
   internal struct _Variant {
+#if _runtime(_ObjC)
     @usableFromInline
     internal var object: _BridgeStorage<_RawSetStorage, _NSSet>
+#else
+    @usableFromInline
+    internal var object: _BridgeStorage<_RawSetStorage, AnyObject>
+#endif
 
     @inlinable
     @inline(__always)
@@ -39,11 +44,13 @@ extension Set {
       self.object = _BridgeStorage(native: native._storage)
     }
 
+#if _runtime(_ObjC)
     @inlinable
     @inline(__always)
     init(cocoa: __owned _CocoaSet) {
       self.object = _BridgeStorage(objC: cocoa.object)
     }
+#endif
   }
 }
 
