@@ -1125,10 +1125,15 @@ ConstExprFunctionState::getSingleWriterAddressValue(SILValue addr) {
   if (!addrInst)
     return evaluator.getUnknown(addr, UnknownReason::Default);
 
-  // Keep track of the value found for the first constant store.
-  auto memoryAddress =
-      createMemoryObject(addr, SymbolicValue::getUninitMemory());
-  auto *memoryObject = memoryAddress.getAddressValueMemoryObject();
+  // Create a new object to keep track of the value that gets stored. However,
+  // do not point `addr` at this object right now, because we may fail to find a
+  // store. (For example, we can fail when the TupleElementAddrInst code below
+  // uses `getSingleWriterAddressValue` to test whether a TupleElementAddrInst
+  // is really a single writer address value).
+  auto *memoryObject = SymbolicValueMemoryObject::create(
+      simplifyType(addr->getType().getASTType()),
+      SymbolicValue::getUninitMemory(), evaluator.getAllocator());
+  auto memoryAddress = SymbolicValue::getAddress(memoryObject);
 
   // Okay, check out all of the users of this value looking for semantic stores
   // into the address.  If we find more than one, then this was a var or
@@ -1201,6 +1206,10 @@ ConstExprFunctionState::getSingleWriterAddressValue(SILValue addr) {
       // stack slot then we're done: we don't support multiple assignment.
       if (memoryObject->getValue().getKind() != SymbolicValue::UninitMemory)
         return evaluator.getUnknown(addr, UnknownReason::Default);
+
+      // Set `addr` to the address of the memory we want to initialize, so that
+      // the callee can find and initialize it.
+      setValue(addr, memoryAddress);
 
       // The callee needs to be a direct call to a constant expression.
       auto callResult = computeCallResult(apply);
