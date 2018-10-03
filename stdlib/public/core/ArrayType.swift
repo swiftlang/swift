@@ -54,22 +54,28 @@ extension _ArrayProtocol {
 
   @inlinable
   internal var _baseAddress: UnsafeMutablePointer<Element> {
-    return _buffer.firstElementAddress
+    @inline(__always)
+    get {
+      return _buffer.firstElementAddress
+    }
   }
   
   @inlinable
+  @inline(__always)
   @_semantics("array.get_count")
   internal func _getCount() -> Int {
     return _buffer.count
   }
 
   @inlinable
+  @inline(__always)
   @_semantics("array.get_capacity")
   internal func _getCapacity() -> Int {
     return _buffer.capacity
   }
   
   @inlinable
+  @inline(__always)
   @_semantics("array.make_mutable")
   internal mutating func _makeMutableAndUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
@@ -78,6 +84,7 @@ extension _ArrayProtocol {
   }
 
   @inlinable
+  @inline(__always)
   @_semantics("array.reserve_capacity_for_append")
   internal mutating func reserveCapacityForAppend(newElementsCount: Int) {
     let oldCount = self.count
@@ -93,6 +100,7 @@ extension _ArrayProtocol {
   }
 
   @inlinable
+  @inline(__always)
   @_semantics("array.mutate_unknown")
   internal mutating func _appendElementAssumeUniqueAndCapacity(
     _ oldCount: Int,
@@ -127,7 +135,27 @@ extension _ArrayProtocol {
     _buffer._arrayOutOfPlaceUpdate(&newBuffer, oldCount, 0)
   }
 
+  /// Construct a Array of `count` uninitialized elements.
   @inlinable
+  @inline(__always)
+  internal init(_uninitializedCount count: Int) {
+    _precondition(count >= 0, "Can't construct Array with count < 0")
+    // Note: Sinking this constructor into an else branch below causes an extra
+    // Retain/Release.
+    self = Self(_Buffer())
+    if count > 0 {
+      // Creating a buffer instead of calling reserveCapacity saves doing an
+      // unnecessary uniqueness check. We disable inlining here to curb code
+      // growth.
+      self = Self(Self._allocateBufferUninitialized(minimumCapacity: count))
+      _buffer.count = count
+    }
+    // Can't store count here because the buffer might be pointing to the
+    // shared empty array.
+  }
+
+  @inlinable
+  @inline(__always)
   @_semantics("array.make_mutable")
   internal mutating func _makeUniqueAndReserveCapacityIfNotUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
@@ -136,6 +164,7 @@ extension _ArrayProtocol {
   }
 
   @inlinable
+  @inline(__always)
   @_semantics("array.mutate_unknown")
   internal mutating func _reserveCapacityAssumingUniqueBuffer(oldCount: Int) {
     // This is a performance optimization. This code used to be in an ||
