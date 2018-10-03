@@ -442,6 +442,8 @@ class TestCodable : TestCodableSuper {
     lazy var indexSetValues: [Int : IndexSet] = [
         #line : IndexSet(),
         #line : IndexSet(integer: 42),
+    ]
+    lazy var indexSetMaxValues: [Int : IndexSet] = [
         #line : IndexSet(integersIn: 0 ..< Int.max)
     ]
 
@@ -449,10 +451,19 @@ class TestCodable : TestCodableSuper {
         for (testLine, indexSet) in indexSetValues {
             expectRoundTripEqualityThroughJSON(for: indexSet, lineNumber: testLine)
         }
+        if #available(macOS 10.10, iOS 8, *) {
+            // Mac OS X 10.9 and iOS 7 weren't able to round-trip Int.max in JSON.
+            for (testLine, indexSet) in indexSetMaxValues {
+                expectRoundTripEqualityThroughJSON(for: indexSet, lineNumber: testLine)
+            }
+        }
     }
 
     func test_IndexSet_Plist() {
         for (testLine, indexSet) in indexSetValues {
+            expectRoundTripEqualityThroughPlist(for: indexSet, lineNumber: testLine)
+        }
+        for (testLine, indexSet) in indexSetMaxValues {
             expectRoundTripEqualityThroughPlist(for: indexSet, lineNumber: testLine)
         }
     }
@@ -506,6 +517,9 @@ class TestCodable : TestCodableSuper {
     // MARK: - NSRange
     lazy var nsrangeValues: [Int : NSRange] = [
         #line : NSRange(),
+        #line : NSRange(location: 5, length: 20),
+    ]
+    lazy var nsrangeMaxValues: [Int : NSRange] = [
         #line : NSRange(location: 0, length: Int.max),
         #line : NSRange(location: NSNotFound, length: 0),
     ]
@@ -514,10 +528,19 @@ class TestCodable : TestCodableSuper {
         for (testLine, range) in nsrangeValues {
             expectRoundTripEqualityThroughJSON(for: range, lineNumber: testLine)
         }
+        if #available(macOS 10.10, iOS 8, *) {
+            // Mac OS X 10.9 and iOS 7 weren't able to round-trip Int.max in JSON.
+            for (testLine, range) in nsrangeMaxValues {
+                expectRoundTripEqualityThroughJSON(for: range, lineNumber: testLine)
+            }
+        }
     }
 
     func test_NSRange_Plist() {
         for (testLine, range) in nsrangeValues {
+            expectRoundTripEqualityThroughPlist(for: range, lineNumber: testLine)
+        }
+        for (testLine, range) in nsrangeMaxValues {
             expectRoundTripEqualityThroughPlist(for: range, lineNumber: testLine)
         }
     }
