@@ -4072,9 +4072,9 @@ public:
   void getPrecedenceGroupCompletions(SyntaxKind SK) {
     switch (SK) {
     case SyntaxKind::PrecedenceGroupAssociativity:
-      addKeyword("none");
-      addKeyword("left");
-      addKeyword("right");
+      addKeyword(getAssociativitySpelling(Associativity::None));
+      addKeyword(getAssociativitySpelling(Associativity::Left));
+      addKeyword(getAssociativitySpelling(Associativity::Right));
       break;
     case SyntaxKind::PrecedenceGroupAssignment:
       addKeyword(getTokenText(tok::kw_false), Type(), SemanticContextKind::None,
