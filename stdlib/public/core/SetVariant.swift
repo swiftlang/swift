@@ -76,6 +76,12 @@ extension Set._Variant {
     set {
       self = .init(native: newValue)
     }
+    _modify {
+      var native = _NativeSet<Element>(object.nativeInstance)
+      object = .init(taggedPayload: 0)
+      yield &native
+      object = .init(native: native._storage)
+    }
   }
 
 #if _runtime(_ObjC)

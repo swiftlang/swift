@@ -60,7 +60,13 @@ struct _BridgeStorage<
     _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
     rawValue = Builtin.reinterpretCast(native)
   }
-  
+
+  @inlinable
+  @inline(__always)
+  internal init(taggedPayload: UInt) {
+    rawValue = _bridgeObject(taggingPayload: taggedPayload)
+  }
+
   @inlinable // FIXME(sil-serialize-all)
   public // @testable
   var spareBits: Int {
