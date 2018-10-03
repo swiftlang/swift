@@ -1570,6 +1570,28 @@ Constraint *ConstraintSystem::selectApplyDisjunction() {
   return nullptr;
 }
 
+static bool isOperatorBindOverload(Constraint *bindOverload) {
+  if (bindOverload->getKind() != ConstraintKind::BindOverload)
+    return false;
+
+  auto choice = bindOverload->getOverloadChoice();
+  if (!choice.isDecl())
+    return false;
+
+  auto *funcDecl = dyn_cast<FuncDecl>(choice.getDecl());
+  return funcDecl && funcDecl->getOperatorDecl();
+}
+
+// Given a bind overload constraint for an operator, return the
+// protocol designated as the first place to look for overloads of the
+// operator.
+static ProtocolDecl *getOperatorDesignatedProtocol(Constraint *bindOverload) {
+  auto choice = bindOverload->getOverloadChoice();
+  auto *funcDecl = cast<FuncDecl>(choice.getDecl());
+  auto *operatorDecl = funcDecl->getOperatorDecl();
+  return operatorDecl->getDesignatedProtocol();
+}
+
 void ConstraintSystem::partitionDisjunction(
     ArrayRef<Constraint *> Choices, SmallVectorImpl<unsigned> &Ordering,
     SmallVectorImpl<unsigned> &PartitionBeginning) {
@@ -1582,7 +1604,118 @@ void ConstraintSystem::partitionDisjunction(
     PartitionBeginning.push_back(0);
   };
 
-  originalOrdering();
+  if (!getASTContext().isSwiftVersionAtLeast(5) ||
+      !TC.getLangOpts().SolverEnableOperatorDesignatedProtocols ||
+      !isOperatorBindOverload(Choices[0])) {
+    originalOrdering();
+    return;
+  }
+
+  SmallVector<unsigned, 4> disabled;
+  SmallVector<unsigned, 4> unavailable;
+  SmallVector<unsigned, 4> globalScope;
+  SmallVector<unsigned, 4> definedInType;
+  SmallVector<unsigned, 4> everythingElse;
+  SmallSet<Constraint *, 16> taken;
+
+  // Local function used to iterate over the untaken choices from the
+  // disjunction and use a higher-order function to determine if they
+  // should be part of a partition.
+  auto forEachChoice =
+      [&](ArrayRef<Constraint *>,
+          llvm::function_ref<bool(unsigned index, Constraint *)> fn) {
+        for (auto index : indices(Choices)) {
+          auto *constraint = Choices[index];
+          if (taken.count(constraint))
+            continue;
+
+          assert(constraint->getKind() == ConstraintKind::BindOverload);
+          assert(constraint->getOverloadChoice().isDecl());
+
+          if (fn(index, constraint))
+            taken.insert(constraint);
+        }
+      };
+
+  // First collect disabled constraints.
+  forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
+    if (!constraint->isDisabled())
+      return false;
+    disabled.push_back(index);
+    return true;
+  });
+
+  // Then unavailable constraints if we're skipping them.
+  if (!shouldAttemptFixes()) {
+    forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
+      auto *decl = constraint->getOverloadChoice().getDecl();
+      auto *funcDecl = cast<FuncDecl>(decl);
+
+      if (!funcDecl->getAttrs().isUnavailable(getASTContext()))
+        return false;
+
+      unavailable.push_back(index);
+      return true;
+    });
+  }
+
+  // Collect everything at the global scope.
+  forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
+    auto *decl = constraint->getOverloadChoice().getDecl();
+    auto *funcDecl = cast<FuncDecl>(decl);
+
+    // Skip anything defined within a type.
+    auto *parentDecl = funcDecl->getParent()->getAsDecl();
+    if (parentDecl)
+      return false;
+
+    globalScope.push_back(index);
+    return true;
+  });
+
+  // Now collect the overload choices that are defined within the type
+  // that was designated in the operator declaration.
+  auto *designatedProtocol = getOperatorDesignatedProtocol(Choices[0]);
+  forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
+    auto *decl = constraint->getOverloadChoice().getDecl();
+    auto *funcDecl = cast<FuncDecl>(decl);
+
+    auto *parentDecl = funcDecl->getParent()->getAsDecl();
+    assert(parentDecl);
+
+   if (auto *extensionDecl = dyn_cast<ExtensionDecl>(parentDecl))
+     parentDecl = extensionDecl->getExtendedNominal();
+
+    if (parentDecl != designatedProtocol)
+      return false;
+
+    definedInType.push_back(index);
+    return true;
+  });
+
+  // Gather the remaining options.
+  forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
+    everythingElse.push_back(index);
+    return true;
+  });
+
+  // Local function to create the next partition based on the options
+  // passed in.
+  auto appendPartition = [&](SmallVectorImpl<unsigned> &options) {
+    if (options.size()) {
+      PartitionBeginning.push_back(Ordering.size());
+      Ordering.insert(Ordering.end(), options.begin(), options.end());
+    }
+  };
+
+  // Now create the partitioning based on what was collected.
+  appendPartition(definedInType);
+  appendPartition(everythingElse);
+  appendPartition(globalScope);
+  appendPartition(unavailable);
+  appendPartition(disabled);
+
+  assert(Ordering.size() == Choices.size());
 }
 
 Constraint *ConstraintSystem::selectDisjunction() {
