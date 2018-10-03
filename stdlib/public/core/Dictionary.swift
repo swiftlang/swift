@@ -1541,11 +1541,13 @@ extension Dictionary.Keys {
     internal var _base: Dictionary<Key, Value>.Iterator
 
     @inlinable
+    @inline(__always)
     internal init(_ base: Dictionary<Key, Value>.Iterator) {
       self._base = base
     }
 
     @inlinable
+    @inline(__always)
     public mutating func next() -> Key? {
 #if _runtime(_ObjC)
       if case .cocoa(let cocoa) = _base._variant {
@@ -1559,6 +1561,7 @@ extension Dictionary.Keys {
   }
 
   @inlinable
+  @inline(__always)
   public func makeIterator() -> Iterator {
     return Iterator(_variant.makeIterator())
   }
@@ -1571,11 +1574,13 @@ extension Dictionary.Values {
     internal var _base: Dictionary<Key, Value>.Iterator
 
     @inlinable
+    @inline(__always)
     internal init(_ base: Dictionary<Key, Value>.Iterator) {
       self._base = base
     }
 
     @inlinable
+    @inline(__always)
     public mutating func next() -> Value? {
 #if _runtime(_ObjC)
       if case .cocoa(let cocoa) = _base._variant {
@@ -1589,6 +1594,7 @@ extension Dictionary.Values {
   }
 
   @inlinable
+  @inline(__always)
   public func makeIterator() -> Iterator {
     return Iterator(_variant.makeIterator())
   }
