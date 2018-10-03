@@ -19,27 +19,18 @@
 #include <io.h>
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#else
-#include <unistd.h>
 #endif
 
-#include <algorithm>
-#include <cmath>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/types.h>
+
 #include <type_traits>
 
-#include "llvm/Support/DataTypes.h"
-#include "swift/Basic/Lazy.h"
-#include "swift/Runtime/Config.h"
-#include "swift/Runtime/Debug.h"
 #include "../SwiftShims/LibcShims.h"
 
 using namespace swift;
 
-static_assert(std::is_same<ssize_t, swift::__swift_ssize_t>::value,
+static_assert(std::is_same<ssize_t, __swift_ssize_t>::value,
               "__swift_ssize_t must be defined as equivalent to ssize_t in LibcShims.h");
 #if !defined(_WIN32) || defined(__CYGWIN__)
 static_assert(std::is_same<mode_t, swift::__swift_mode_t>::value,

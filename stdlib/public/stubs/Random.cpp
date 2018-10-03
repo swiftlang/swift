@@ -22,6 +22,7 @@
 #include <Bcrypt.h>
 #pragma comment(lib, "Bcrypt.lib")
 #else
+#include <errno.h>
 #include <unistd.h>
 #endif
 
