@@ -49,7 +49,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
-#include "swift/Frontend/ParseableInterfaceGeneration.h"
+#include "swift/Frontend/ParseableInterfaceSupport.h"
 #include "swift/Immediate/Immediate.h"
 #include "swift/Index/IndexRecord.h"
 #include "swift/Option/Options.h"

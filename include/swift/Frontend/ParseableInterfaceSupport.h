@@ -1,4 +1,4 @@
-//===--- ParseableInterfaceGeneration.h - swiftinterface files --*- C++ -*-===//
+//===--- ParseableInterfaceSupport.h - swiftinterface files --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_FRONTEND_PARSEABLEINTERFACEGENERATION_H
-#define SWIFT_FRONTEND_PARSEABLEINTERFACEGENERATION_H
+#ifndef SWIFT_FRONTEND_PARSEABLEINTERFACESUPPORT_H
+#define SWIFT_FRONTEND_PARSEABLEINTERFACESUPPORT_H
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/Support/Regex.h"

@@ -1,4 +1,4 @@
-//===--- ParseableInterfaceGeneration.cpp - swiftinterface files ----------===//
+//===--- ParseableInterfaceSupport.cpp - swiftinterface files ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -14,7 +14,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
-#include "swift/Frontend/ParseableInterfaceGeneration.h"
+#include "swift/Frontend/ParseableInterfaceSupport.h"
 #include "clang/Basic/Module.h"
 #include "llvm/Support/Regex.h"
 
@@ -24,7 +24,7 @@ using namespace swift;
 #define SWIFT_MODULE_FLAGS_KEY "swift-module-flags"
 
 /// Diagnose any scoped imports in \p imports, i.e. those with a non-empty
-/// access path. These are not yet supported by parseable interfaces, since the
+/// access path. These are not yet supported by textual interfaces, since the
 /// information about the declaration kind is not preserved through the binary
 /// serialization that happens as an intermediate step in non-whole-module
 /// builds.
