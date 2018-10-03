@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// _swift_stdlib_random
+// swift_stdlib_random
 //
 // Should the implementation of this function add a new platform/change for a
 // platform, make sure to also update the documentation regarding platform
@@ -40,16 +40,16 @@
 
 #if defined(__APPLE__)
 
-SWIFT_RUNTIME_STDLIB_SPI
-void swift::_swift_stdlib_random(void *buf, __swift_size_t nbytes) {
+SWIFT_RUNTIME_STDLIB_API
+void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
   arc4random_buf(buf, nbytes);
 }
 
 #elif defined(_WIN32) && !defined(__CYGWIN__)
-#warning TODO: Test _swift_stdlib_random on Windows
+#warning TODO: Test swift_stdlib_random on Windows
 
-SWIFT_RUNTIME_STDLIB_SPI
-void swift::_swift_stdlib_random(void *buf, __swift_size_t nbytes) {
+SWIFT_RUNTIME_STDLIB_API
+void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
   NTSTATUS status = BCryptGenRandom(nullptr,
                                     static_cast<PUCHAR>(buf),
                                     static_cast<ULONG>(nbytes),
@@ -68,8 +68,8 @@ void swift::_swift_stdlib_random(void *buf, __swift_size_t nbytes) {
   result;                                                                      \
 })
 
-SWIFT_RUNTIME_STDLIB_SPI
-void swift::_swift_stdlib_random(void *buf, __swift_size_t nbytes) {
+SWIFT_RUNTIME_STDLIB_API
+void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
   while (nbytes > 0) {
     __swift_ssize_t actual_nbytes = -1;
 
