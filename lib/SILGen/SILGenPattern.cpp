@@ -1394,33 +1394,18 @@ void PatternMatchEmission::emitTupleDispatchWithOwnership(
   }
 
   auto firstPat = rows[0].Pattern;
-  auto sourceType = cast<TupleType>(firstPat->getType()->getCanonicalType());
   SILLocation loc = firstPat;
 
-  // Final consumption here will be either CopyOnSuccess or AlwaysTake. Since we
-  // do not have a take operation, we treat it as copy on success always.
-  //
-  // Once we get a take operation, we should consider allowing for the value to
-  // be taken at this point.
-  ManagedValue v = src.getFinalManagedValue().borrow(SGF, loc);
-  SmallVector<ConsumableManagedValue, 4> destructured;
+  // Final consumption here will be either BorrowAlways or TakeAlways.
+  ManagedValue v = src.getFinalManagedValue();
+
+  SmallVector<ConsumableManagedValue, 8> destructured;
+  SGF.B.emitDestructureValueOperation(
+      loc, v, [&](unsigned index, ManagedValue v) {
+        destructured.push_back({v, src.getFinalConsumption()});
+      });
 
   // Break down the values.
-  auto tupleSILTy = v.getType();
-  for (unsigned i = 0, e = sourceType->getNumElements(); i < e; ++i) {
-    SILType fieldTy = tupleSILTy.getTupleElementType(i);
-    auto &fieldTL = SGF.getTypeLowering(fieldTy);
-
-    // This is a borrowed value, so we need to use copy on success.
-    ManagedValue member = SGF.B.createTupleExtract(loc, v, i, fieldTy);
-    // *NOTE* We leave this as getManagedSubobject so that when we get a
-    // destructure operation, we can pass in src.getFinalConsumption() here and
-    // get the correct behavior of performing the take.
-    auto memberCMV = getManagedSubobject(SGF, member.getValue(), fieldTL,
-                                         CastConsumptionKind::CopyOnSuccess);
-    destructured.push_back(memberCMV);
-  }
-
   // Recurse.
   handleCase(destructured, specializedRows, outerFailure);
 }
