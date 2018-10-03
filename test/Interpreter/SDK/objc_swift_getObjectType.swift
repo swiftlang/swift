@@ -31,14 +31,14 @@ extension P {
 class O: NSObject, P { }
 var o = O()
 let obase: NSObject = o
-print(String(cString: object_getClassName(o)))
+print(NSStringFromClass(object_getClass(o)!))
 _ = (o as P).anyP
 _ = (obase as! P).anyP
-// CHECK: main.O
+// CHECK: {{^}}main.O{{$}}
 
 // ... and KVO's artificial subclass thereof
 o.addObserver(NSObject(), forKeyPath: "xxx", options: [.new], context: nil)
-print(String(cString: object_getClassName(o)))
+print(NSStringFromClass(object_getClass(o)!))
 _ = (o as P).anyP
 _ = (obase as! P).anyP
 // CHECK-NEXT: NSKVONotifying_main.O
@@ -47,14 +47,14 @@ _ = (obase as! P).anyP
 extension NSLock: P { }
 var l = NSLock()
 let lbase: NSObject = l
-print(String(cString: object_getClassName(l)))
+print(NSStringFromClass(object_getClass(l)!))
 _ = (l as P).anyP
 _ = (lbase as! P).anyP
 // CHECK-NEXT: NSLock
 
 // ... and KVO's artificial subclass thereof
 l.addObserver(NSObject(), forKeyPath: "xxx", options: [.new], context: nil)
-print(String(cString: object_getClassName(l)))
+print(NSStringFromClass(object_getClass(l)!))
 _ = (l as P).anyP
 _ = (lbase as! P).anyP
 // CHECK-NEXT: NSKVONotifying_NSLock
