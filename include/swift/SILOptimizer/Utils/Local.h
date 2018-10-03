@@ -246,8 +246,8 @@ public:
   /// In this case, if \p mode is AllowToModifyCFG, those critical edges are
   /// split, otherwise nothing is done and the returned \p Fr is not valid.
   ///
-  /// If \p deadEndBlocks is provided, all dead-end blocks are ignored. This
-  /// prevents unreachable-blocks to be included in the frontier.
+  /// If \p DEBlocks is provided, all dead-end blocks are ignored. This prevents
+  /// unreachable-blocks to be included in the frontier.
   bool computeFrontier(Frontier &Fr, Mode mode,
                        DeadEndBlocks *DEBlocks = nullptr);
 

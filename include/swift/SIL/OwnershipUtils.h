@@ -64,26 +64,26 @@ struct ErrorBehaviorKind {
 /// so types/etc do not leak.
 struct OwnershipChecker {
   /// The list of regular users from the last run of the checker.
-  SmallVector<SILInstruction *, 16> regularUsers;
+  SmallVector<SILInstruction *, 16> RegularUsers;
 
   /// The list of regular users from the last run of the checker.
-  SmallVector<SILInstruction *, 16> lifetimeEndingUsers;
+  SmallVector<SILInstruction *, 16> LifetimeEndingUsers;
 
   /// The live blocks for the SILValue we processed. This can be used to
   /// determine if a block is in the "live" region of our SILInstruction.
-  SmallPtrSet<SILBasicBlock *, 32> liveBlocks;
+  SmallPtrSet<SILBasicBlock *, 32> LiveBlocks;
 
   /// The list of implicit regular users from the last run of the checker.
   ///
   /// This is used to encode end of scope like instructions.
-  SmallVector<SILInstruction *, 4> endScopeRegularUsers;
+  SmallVector<SILInstruction *, 4> ImplicitRegularUsers;
 
   /// The module that we are in.
-  SILModule &mod;
+  SILModule &Mod;
 
   /// A cache of dead-end basic blocks that we use to determine if we can
   /// ignore "leaks".
-  DeadEndBlocks &deadEndBlocks;
+  DeadEndBlocks &DEBlocks;
 
   bool checkValue(SILValue Value);
 };
@@ -98,7 +98,7 @@ bool valueHasLinearLifetime(SILValue value,
                             ArrayRef<BranchPropagatedUser> consumingUses,
                             ArrayRef<BranchPropagatedUser> nonConsumingUses,
                             SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-                            DeadEndBlocks &deadEndBlocks,
+                            DeadEndBlocks &deBlocks,
                             ownership::ErrorBehaviorKind errorBehavior);
 
 } // namespace swift

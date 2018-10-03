@@ -101,9 +101,6 @@ class RefWithRef {
   init()
 }
 
-sil @produce_owned_optional : $@convention(thin) () -> @owned Optional<Builtin.NativeObject>
-sil @guaranteed_nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-
 ////////////////
 // Test Cases //
 ////////////////
@@ -444,61 +441,6 @@ bb1(%2 : @owned $Builtin.NativeObject):
   br bb3
 
 bb2:
-  br bb3
-
-bb3:
-  %9999 = tuple()
-  return %9999 : $()
-}
-
-// Make sure that we can propagate through an argument through an enum that is
-// switched upon and whose payload is then destroyed.
-sil @switch_enum_owned_payload_test2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : @owned $Builtin.NativeObject):
-  %1 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %0 : $Builtin.NativeObject
-  switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt.1: bb2
-
-bb1:
-  br bb3
-
-bb2(%2 : @owned $Builtin.NativeObject):
-  destroy_value %2 : $Builtin.NativeObject
-  br bb3
-
-bb3:
-  %9999 = tuple()
-  return %9999 : $()
-}
-
-sil @switch_enum_owned_payload_test3 : $@convention(thin) () -> () {
-bb0:
-  %1 = enum $Optional<Builtin.NativeObject>, #Optional.none!enumelt
-  switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt.1: bb2
-
-bb1:
-  br bb3
-
-bb2(%2 : @owned $Builtin.NativeObject):
-  destroy_value %2 : $Builtin.NativeObject
-  br bb3
-
-bb3:
-  %9999 = tuple()
-  return %9999 : $()
-}
-
-// Make sure that we can propagate through an argument through an enum that is
-// switched upon and whose payload is then destroyed.
-sil @switch_enum_owned_payload_test4 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : @owned $Builtin.NativeObject):
-  %1 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %0 : $Builtin.NativeObject
-  switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
-
-bb1:
-  br bb3
-
-bb2(%2 : @owned $Builtin.NativeObject):
-  destroy_value %2 : $Builtin.NativeObject
   br bb3
 
 bb3:
@@ -1087,28 +1029,3 @@ bb0(%0 : @trivial $@thick SubKlass.Type):
   %9999 = tuple()
   return %9999 : $()
 }
-
-sil @switch_enum_apply_test : $@convention(thin) () -> @owned Builtin.NativeObject {
-bb0:
-  %0 = function_ref @produce_owned_optional : $@convention(thin) () -> @owned Optional<Builtin.NativeObject>
-  %1 = apply %0() : $@convention(thin) () -> @owned Optional<Builtin.NativeObject>
-  switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
-
-bb1:
-  unreachable
-
-bb2(%2 : @owned $Builtin.NativeObject):
-  return %2 : $Builtin.NativeObject
-}
-
-// Make sure that we allow for @owned parameters to be passed as @guaranteed
-// parameters since we are performing an "instantaneous" borrow.
-sil @owned_passed_to_guaranteed_apply_parameter : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0k(%0 : @owned $Builtin.NativeObject):
-  %1 = function_ref @guaranteed_nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  destroy_value %0 : $Builtin.NativeObject
-  %9999 = tuple()
-  return %9999 : $()
-}
-
