@@ -13,20 +13,20 @@
 import SwiftShims
 
 extension _UnmanagedString where CodeUnit == UInt8 {
-  internal func hashASCII(into core: inout Hasher.Core) {
-    core.combine(bytes: rawBuffer)
+  internal func hashASCII(into hasher: inout Hasher) {
+    hasher.combine(bytes: rawBuffer)
   }
 }
 
 extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
-  internal func hashUTF16(into core: inout Hasher.Core) {
+  internal func hashUTF16(into hasher: inout Hasher) {
     for i in self.indices {
       let cu = self[i]
       let cuIsASCII = cu <= 0x7F
       let isSingleSegmentScalar = self.hasNormalizationBoundary(after: i)
 
       if cuIsASCII && isSingleSegmentScalar {
-        core.combine(UInt8(truncatingIfNeeded: cu))
+        hasher._combine(UInt8(truncatingIfNeeded: cu))
       } else {
         for encodedScalar in Unicode._ParsingIterator(
           codeUnits: _NormalizedCodeUnitIterator(self[i..<endIndex]),
@@ -36,7 +36,7 @@ extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
             encodedScalar, from: Unicode.UTF16.self
           ).unsafelyUnwrapped // never fails
           let (bytes, count) = transcoded._bytes
-          core.combine(bytes: bytes, count: count)
+          hasher._combine(bytes: bytes, count: count)
         }
         return
       }
@@ -46,8 +46,8 @@ extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
 
 extension _UnmanagedString where CodeUnit == UInt8 {
   internal func hash(into hasher: inout Hasher) {
-    self.hashASCII(into: &hasher._core)
-    hasher._core.combine(0xFF as UInt8) // terminator
+    self.hashASCII(into: &hasher)
+    hasher._combine(0xFF as UInt8) // terminator
   }
 
   internal func _rawHashValue(seed: Int) -> Int {
@@ -57,27 +57,27 @@ extension _UnmanagedString where CodeUnit == UInt8 {
 
 extension _UnmanagedString where CodeUnit == UInt16 {
   internal func hash(into hasher: inout Hasher) {
-    self.hashUTF16(into: &hasher._core)
-    hasher._core.combine(0xFF as UInt8) // terminator
+    self.hashUTF16(into: &hasher)
+    hasher._combine(0xFF as UInt8) // terminator
   }
 
   internal func _rawHashValue(seed: Int) -> Int {
-    var core = Hasher.Core(seed: seed)
-    self.hashUTF16(into: &core)
-    return Int(truncatingIfNeeded: core.finalize())
+    var hasher = Hasher(_seed: seed)
+    self.hashUTF16(into: &hasher)
+    return hasher._finalize()
   }
 }
 
 extension _UnmanagedOpaqueString {
   internal func hash(into hasher: inout Hasher) {
-    self.hashUTF16(into: &hasher._core)
-    hasher._core.combine(0xFF as UInt8) // terminator
+    self.hashUTF16(into: &hasher)
+    hasher._combine(0xFF as UInt8) // terminator
   }
 
   internal func _rawHashValue(seed: Int) -> Int {
-    var core = Hasher.Core(seed: seed)
-    self.hashUTF16(into: &core)
-    return Int(truncatingIfNeeded: core.finalize())
+    var hasher = Hasher(_seed: seed)
+    self.hashUTF16(into: &hasher)
+    return hasher._finalize()
   }
 }
 
