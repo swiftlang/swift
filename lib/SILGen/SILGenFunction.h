@@ -1593,20 +1593,6 @@ public:
       ProfileCounter TrueCount = ProfileCounter(),
       ProfileCounter FalseCount = ProfileCounter());
 
-  /// A form of checked cast branch that uses the old non-ownership preserving
-  /// semantics.
-  ///
-  /// The main difference is that this code does not pass the old argument as a
-  /// block argument in the failure case. This causes values to be double
-  /// consumed.
-  void
-  emitCheckedCastBranchOld(SILLocation loc, ConsumableManagedValue src,
-                           Type sourceType, CanType targetType, SGFContext ctx,
-                           llvm::function_ref<void(ManagedValue)> handleTrue,
-                           llvm::function_ref<void()> handleFalse,
-                           ProfileCounter TrueCount = ProfileCounter(),
-                           ProfileCounter FalseCount = ProfileCounter());
-
   /// Emit the control flow for an optional 'bind' operation, branching to the
   /// active failure destination if the optional value addressed by optionalAddr
   /// is nil, and leaving the insertion point on the success branch.
