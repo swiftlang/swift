@@ -17,12 +17,17 @@ import sourcekitd
 public class SourceKitdResponse: CustomStringConvertible {
 
   public struct Dictionary: CustomStringConvertible, CustomReflectable {
+    // The lifetime of this sourcekitd_variant_t is tied to the response it came
+    // from, so keep a reference to the response too.
     private let dict: sourcekitd_variant_t
+    private let context: SourceKitdResponse
 
-    public init(dict: sourcekitd_variant_t) {
+
+    public init(dict: sourcekitd_variant_t, context: SourceKitdResponse) {
       assert(sourcekitd_variant_get_type(dict).rawValue ==
         SOURCEKITD_VARIANT_TYPE_DICTIONARY.rawValue)
       self.dict = dict
+      self.context = context
     }
 
     public func getString(_ key: SourceKitdUID) -> String {
@@ -47,12 +52,12 @@ public class SourceKitdResponse: CustomStringConvertible {
 
     public func getArray(_ key: SourceKitdUID) -> Array {
       let value = sourcekitd_variant_dictionary_get_value(dict, key.uid)
-      return Array(arr: value)
+      return Array(arr: value, context: context)
     }
 
     public func getDictionary(_ key: SourceKitdUID) -> Dictionary {
       let value = sourcekitd_variant_dictionary_get_value(dict, key.uid)
-      return Dictionary(dict: value)
+      return Dictionary(dict: value, context: context)
     }
 
     public func getOptional(_ key: SourceKitdUID) -> Variant? {
@@ -61,7 +66,7 @@ public class SourceKitdResponse: CustomStringConvertible {
           SOURCEKITD_VARIANT_TYPE_NULL.rawValue {
         return nil
       }
-      return Variant(val: value)
+      return Variant(val: value, context: context)
     }
 
     public var description: String {
@@ -74,17 +79,21 @@ public class SourceKitdResponse: CustomStringConvertible {
   }
 
   public struct Array: CustomStringConvertible {
+    // The lifetime of this sourcekitd_variant_t is tied to the response it came
+    // from, so keep a reference to the response too.
     private let arr: sourcekitd_variant_t
+    private let context: SourceKitdResponse
 
     public var count: Int {
       let count = sourcekitd_variant_array_get_count(arr)
       return Int(count)
     }
 
-    public init(arr: sourcekitd_variant_t) {
+    public init(arr: sourcekitd_variant_t, context: SourceKitdResponse) {
       assert(sourcekitd_variant_get_type(arr).rawValue ==
           SOURCEKITD_VARIANT_TYPE_ARRAY.rawValue)
       self.arr = arr
+      self.context = context
     }
 
     public func getString(_ index: Int) -> String {
@@ -109,20 +118,21 @@ public class SourceKitdResponse: CustomStringConvertible {
 
     public func getArray(_ index: Int) -> Array {
       let value = sourcekitd_variant_array_get_value(arr, index)
-      return Array(arr: value)
+      return Array(arr: value, context: context)
     }
 
     public func getDictionary(_ index: Int) -> Dictionary {
       let value = sourcekitd_variant_array_get_value(arr, index)
-      return Dictionary(dict: value)
+      return Dictionary(dict: value, context: context)
     }
 
     public func enumerate(_ applier: (_ index: Int, _ value: Variant) -> Bool) {
       // The block passed to sourcekit_variant_array_apply() does not actually
       // escape, it's synchronous and not called after returning.
+      let context = self.context
       withoutActuallyEscaping(applier) { escapingApplier in
         _ = sourcekitd_variant_array_apply(arr) { (index, elem) -> Bool in
-          return escapingApplier(Int(index), Variant(val: elem))
+          return escapingApplier(Int(index), Variant(val: elem, context: context))
         }
       }
     }
@@ -134,10 +144,14 @@ public class SourceKitdResponse: CustomStringConvertible {
   }
 
   public struct Variant: CustomStringConvertible {
+    // The lifetime of this sourcekitd_variant_t is tied to the response it came
+    // from, so keep a reference to the response too.
     private let val: sourcekitd_variant_t
+    fileprivate let context: SourceKitdResponse
 
-    fileprivate init(val: sourcekitd_variant_t) {
+    fileprivate init(val: sourcekitd_variant_t, context: SourceKitdResponse) {
       self.val = val
+      self.context = context
     }
 
     public func getString() -> String {
@@ -167,11 +181,11 @@ public class SourceKitdResponse: CustomStringConvertible {
     }
 
     public func getArray() -> Array {
-      return Array(arr: val)
+      return Array(arr: val, context: context)
     }
 
     public func getDictionary() -> Dictionary {
-      return Dictionary(dict: val)
+      return Dictionary(dict: val, context: context)
     }
 
     public var description: String {
@@ -182,7 +196,7 @@ public class SourceKitdResponse: CustomStringConvertible {
   private let resp: sourcekitd_response_t
 
   public var value: Dictionary {
-    return Dictionary(dict: sourcekitd_response_get_value(resp))
+    return Dictionary(dict: sourcekitd_response_get_value(resp), context: self)
   }
 
   /// Copies the raw bytes of the JSON description of this documentation item.
