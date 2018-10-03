@@ -91,7 +91,7 @@ static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
    || defined(__HAIKU__) || defined(__FreeBSD__)
 static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
   extern __swift_size_t malloc_usable_size(void *ptr);
-  return malloc_usable_size((void *)ptrß);
+  return malloc_usable_size((void *)ptr);
 }
 #elif defined(_WIN32)
 static inline __swift_size_t _swift_stdlib_malloc_size(const void *ptr) {
