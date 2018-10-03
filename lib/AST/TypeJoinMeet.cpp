@@ -350,6 +350,14 @@ CanType TypeJoin::visitGenericFunctionType(CanType second) {
 //
 //   (A ^ B) v (C ^ D)
 // = (A v C) ^ (A v D) ^ (B v C) ^ (B v D)
+//
+// In general this law only applies to distributive lattices.
+//
+// In our case, this should be safe because our meet operation only
+// produces an existing nominal type when it is one of the operands of
+// the operation. So we can never arbitrarily climb down the lattice
+// in ways that would break distributivity.
+//
 CanType TypeJoin::computeProtocolCompositionJoin(ArrayRef<Type> firstMembers,
                                                  ArrayRef<Type> secondMembers) {
   SmallVector<Type, 8> result;
@@ -388,13 +396,13 @@ CanType TypeJoin::visitProtocolCompositionType(CanType second) {
   assert(First != second);
 
   // FIXME: Handle other types here.
-  if (First->getKind() != TypeKind::Protocol &&
-      First->getKind() != TypeKind::ProtocolComposition)
+  if (!First->is<ProtocolType>() &&
+      !First->is<ProtocolCompositionType>())
     return TheAnyType;
 
   SmallVector<Type, 1> protocolType;
   ArrayRef<Type> firstMembers;
-  if (First->getKind() == TypeKind::Protocol) {
+  if (First->is<ProtocolType>()) {
     protocolType.push_back(First);
     firstMembers = protocolType;
   } else {
@@ -434,8 +442,8 @@ static bool isSupertypeOf(ProtocolDecl *super, ProtocolDecl *sub) {
 CanType TypeJoin::visitProtocolType(CanType second) {
   assert(First != second);
 
-  assert(First->getKind() != TypeKind::ProtocolComposition &&
-         second->getKind() != TypeKind::ProtocolComposition);
+  assert(!First->is<ProtocolCompositionType>() &&
+         !second->is<ProtocolCompositionType>());
 
   // FIXME: Handle other types here.
   if (First->getKind() != second->getKind())

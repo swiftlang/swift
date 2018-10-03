@@ -75,9 +75,9 @@ expectEqualType(Builtin.type_join(FakeEquatable.self, FakeEquatable.self), FakeE
 expectEqualType(Builtin.type_join(FakeHashable.self, FakeEquatable.self), FakeEquatable.self)
 expectEqualType(Builtin.type_join(FakeEquatable.self, FakeHashable.self), FakeEquatable.self)
 expectEqualType(Builtin.type_join(FakeNumeric.self, FakeHashable.self), FakeEquatable.self)
-expectEqualType(Builtin.type_join((FakeHashable & Strideable).self, (FakeHashable & FakeNumeric).self),
+expectEqualType(Builtin.type_join((FakeHashable & FakeStrideable).self, (FakeHashable & FakeNumeric).self),
                                   FakeHashable.self)
-expectEqualType(Builtin.type_join((FakeNumeric & Strideable).self,
+expectEqualType(Builtin.type_join((FakeNumeric & FakeStrideable).self,
                                   (FakeHashable & FakeNumeric).self), FakeNumeric.self)
 expectEqualType(Builtin.type_join(FakeBinaryInteger.self, FakeFloatingPoint.self),
                                   (FakeHashable & FakeNumeric & FakeStrideable).self)
