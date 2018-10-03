@@ -343,10 +343,10 @@ extension Bool {
   /// Use this method to toggle a Boolean value from `true` to `false` or from
   /// `false` to `true`.
   ///
-  ///    var bools = [true, false]
+  ///     var bools = [true, false]
   ///
-  ///    bools[0].toggle()
-  ///    // bools == [false, false]
+  ///     bools[0].toggle()
+  ///     // bools == [false, false]
   @inlinable
   public mutating func toggle() {
     self = !self
