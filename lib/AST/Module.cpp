@@ -353,8 +353,8 @@ void SourceLookupCache::invalidate() {
 
 ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   : DeclContext(DeclContextKind::Module, nullptr),
-    TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), { }),
-    Flags() {
+    TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), { }) {
+
   ctx.addDestructorCleanup(*this);
   setImplicit();
   setInterfaceType(ModuleType::get(this));
