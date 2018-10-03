@@ -1383,16 +1383,19 @@ extension Dictionary {
     }
 
     @inlinable
+    @inline(__always)
     public func _customContainsEquatableElement(_ element: Element) -> Bool? {
       return _variant.contains(element)
     }
 
     @inlinable
+    @inline(__always)
     public func _customIndexOfEquatableElement(_ element: Element) -> Index?? {
       return Optional(_variant.index(forKey: element))
     }
 
     @inlinable
+    @inline(__always)
     public func _customLastIndexOfEquatableElement(_ element: Element) -> Index?? {
       // The first and last elements are the same because each element is unique.
       return _customIndexOfEquatableElement(element)
@@ -1541,11 +1544,13 @@ extension Dictionary.Keys {
     internal var _base: Dictionary<Key, Value>.Iterator
 
     @inlinable
+    @inline(__always)
     internal init(_ base: Dictionary<Key, Value>.Iterator) {
       self._base = base
     }
 
     @inlinable
+    @inline(__always)
     public mutating func next() -> Key? {
 #if _runtime(_ObjC)
       if case .cocoa(let cocoa) = _base._variant {
@@ -1559,6 +1564,7 @@ extension Dictionary.Keys {
   }
 
   @inlinable
+  @inline(__always)
   public func makeIterator() -> Iterator {
     return Iterator(_variant.makeIterator())
   }
@@ -1571,11 +1577,13 @@ extension Dictionary.Values {
     internal var _base: Dictionary<Key, Value>.Iterator
 
     @inlinable
+    @inline(__always)
     internal init(_ base: Dictionary<Key, Value>.Iterator) {
       self._base = base
     }
 
     @inlinable
+    @inline(__always)
     public mutating func next() -> Value? {
 #if _runtime(_ObjC)
       if case .cocoa(let cocoa) = _base._variant {
@@ -1589,6 +1597,7 @@ extension Dictionary.Values {
   }
 
   @inlinable
+  @inline(__always)
   public func makeIterator() -> Iterator {
     return Iterator(_variant.makeIterator())
   }

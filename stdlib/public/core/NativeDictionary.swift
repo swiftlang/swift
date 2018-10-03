@@ -656,6 +656,7 @@ extension _NativeDictionary: Sequence {
     internal var iterator: _HashTable.Iterator
 
     @inlinable
+    @inline(__always)
     init(_ base: __owned _NativeDictionary) {
       self.base = base
       self.iterator = base.hashTable.makeIterator()
@@ -673,18 +674,21 @@ extension _NativeDictionary.Iterator: IteratorProtocol {
   internal typealias Element = (key: Key, value: Value)
 
   @inlinable
+  @inline(__always)
   internal mutating func nextKey() -> Key? {
     guard let index = iterator.next() else { return nil }
     return base.uncheckedKey(at: index)
   }
 
   @inlinable
+  @inline(__always)
   internal mutating func nextValue() -> Value? {
     guard let index = iterator.next() else { return nil }
     return base.uncheckedValue(at: index)
   }
 
   @inlinable
+  @inline(__always)
   internal mutating func next() -> Element? {
     guard let index = iterator.next() else { return nil }
     let key = base.uncheckedKey(at: index)

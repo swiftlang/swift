@@ -266,6 +266,7 @@ extension Set: Sequence {
   }
 
   @inlinable
+  @inline(__always)
   public func _customContainsEquatableElement(_ member: Element) -> Bool? {
     return contains(member)
   }
@@ -361,6 +362,7 @@ extension Set: Collection {
   }
 
   @inlinable
+  @inline(__always)
   public func _customIndexOfEquatableElement(
      _ member: Element
     ) -> Index?? {
@@ -368,6 +370,7 @@ extension Set: Collection {
   }
 
   @inlinable
+  @inline(__always)
   public func _customLastIndexOfEquatableElement(
      _ member: Element
     ) -> Index?? {
