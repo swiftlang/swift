@@ -11,12 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-semantic-arc-opts"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/Basic/STLExtras.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -71,19 +71,20 @@ bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
   return true;
 }
 
-/// TODO: Add support for begin_borrow, load_borrow.
-static bool canHandleOperand(SILValue operand) {
-  if (auto *arg = dyn_cast<SILFunctionArgument>(operand)) {
-    return arg->getOwnershipKind() == ValueOwnershipKind::Guaranteed;
-  }
+static bool canHandleOperand(SILValue operand, SmallVectorImpl<SILValue> &out) {
+  if (!getUnderlyingBorrowIntroducers(operand, out))
+    return false;
 
-  return false;
+  /// TODO: Add support for begin_borrow, load_borrow.
+  return all_of(out, [](SILValue v) { return isa<SILFunctionArgument>(v); });
 }
 
 static bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
+  SmallVector<SILValue, 16> borrowIntroducers;
+
   // Whitelist the operands that we know how to support and make sure
   // our operand is actually guaranteed.
-  if (!canHandleOperand(cvi->getOperand()))
+  if (!canHandleOperand(cvi->getOperand(), borrowIntroducers))
     return false;
 
   // Then go over all of our uses. Find our destroying instructions
@@ -132,8 +133,8 @@ static bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
   //
   // TODO: When we support begin_borrow/load_borrow a linear linfetime
   // check will be needed here.
-  assert(isa<SILFunctionArgument>(cvi->getOperand()) &&
-         "This code must be updated for begin_borrow/load_borrow?!");
+  assert(all_of(borrowIntroducers,
+                [](SILValue v) { return isa<SILFunctionArgument>(v); }));
 
   // Otherwise, we know that our copy_value/destroy_values are all
   // completely within the guaranteed value scope.

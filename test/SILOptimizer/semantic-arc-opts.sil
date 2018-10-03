@@ -100,7 +100,7 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @struct_extract_guaranteed_use : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
+// CHECK-LABEL: sil @copy_struct_extract_guaranteed_use : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $NativeObjectPair):
 // CHECK-NOT: copy_value
 // CHECK-NOT: begin_borrow
@@ -108,8 +108,8 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
 // CHECK:   apply {{%.*}}([[FIELD]]) :
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-// CHECK: } // end sil function 'struct_extract_guaranteed_use'
-sil @struct_extract_guaranteed_use : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
+// CHECK: } // end sil function 'copy_struct_extract_guaranteed_use'
+sil @copy_struct_extract_guaranteed_use : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
 bb0(%0 : @guaranteed $NativeObjectPair):
   %1 = copy_value %0 : $NativeObjectPair
   %2 = begin_borrow %1 : $NativeObjectPair
