@@ -84,7 +84,8 @@ static bool isDecodableApply(ApplyInst *apply) {
   if (!fn) return false;
 
   auto name = fn->getName();
-  return name == "__tf_tensor_from_scalars" ||
+  return name == "__tf_tensor_from_scalar" ||
+         name == "__tf_tensor_from_scalars" ||
          name == "__tf_tensor_from_scalars_1d";
 }
 
@@ -1769,6 +1770,109 @@ static GraphOperationInst *tryToPromoteTensorFromScalars(
   return result;
 }
 
+/// This function transform the apply of the "__tf_tensor_from_scalar" function
+/// to a graph node (graph_op inst).
+///
+/// Similar to tryToPromoteTensorFromScalars(), the resulting graph node can be
+/// a "const", if its input scalar operand is a compile-time constant.
+/// Different from tryToPromoteTensorFromScalars(), we can also transform the
+/// apply into a "tfc.scalarToTensor" graph_op, which the partition pass then
+/// uses to do scalar promotion. See the comment above "func
+/// _TFTensorFromScalar<Scalar>" in Tensor.swift for more details.
+static GraphOperationInst *
+transformTensorFromScalar(ApplyInst *apply,
+                          const DenseMap<SILValue, SymbolicValue> &constants,
+                          GraphFunctionDeviceInfo &deviceInfo) {
+  assert(apply->getNumResults() == 1 &&
+         "tfc.scalarToTensor must have 1 result");
+  auto origResult = apply->getResults()[0];
+
+  assert(apply->getNumOperands() == 2);
+  auto scalarOperandAddr = apply->getOperand(1);
+  LLVM_DEBUG(llvm::dbgs() << "Converting __tf_tensor_from_scalar inst "
+                          << *apply
+                          << " with scalar operand : " << scalarOperandAddr
+                          << " of type " << scalarOperandAddr->getType()
+                          << " to a graph_op\n");
+  SILBuilder B(apply);
+  auto &ctx = B.getASTContext();
+
+  // First check to see if it's constant foldable.  If so, we can turn this into
+  // a Const node.
+  auto it = constants.find(scalarOperandAddr);
+  if (it != constants.end() && it->second.isConstant()) {
+    // Dig the element type out of the TensorHandle result type.
+    auto eltType =
+        getTensorHandleElementType(origResult->getType().getASTType());
+    // We use int32 as the element type of the zero-d shape array.
+    auto int32Ty =
+        ctx.getInt32Decl()->getDeclaredType()->getCanonicalType();
+    assert(it->second.getKind() == SymbolicValue::Address);
+
+    SmallVector<unsigned, 4> accessPath;
+    auto *scalarMemoryObject = it->second.getAddressValue(accessPath);
+    assert(accessPath.empty());
+    auto scalarValue = scalarMemoryObject->getValue();
+    assert(scalarValue.isConstant());
+    scalarValue = scalarValue.lookThroughSingleElementAggregates();
+    LLVM_DEBUG(llvm::dbgs()
+               << "  The scalar const value is: " << scalarValue << "\n");
+
+    auto constant = createConstTensor(
+        eltType, scalarValue,
+        SymbolicValue::getArray({}, int32Ty, ctx.getAllocator()),
+        origResult->getType(), getUserSourceLocation(apply), DeviceType::ALL,
+        B);
+    LLVM_DEBUG(llvm::dbgs()
+               << "  The resulting const node is: " << *constant << "\n");
+    origResult->replaceAllUsesWith(constant->getResult(0));
+    apply->eraseFromParent();
+    return constant;
+  }
+
+  // convert to tfc.scalarToTensor.
+  auto loc = getUserSourceLocation(apply);
+  // Create a load inst to convert a scalar type like Float* to Float.
+  auto hasOwnership = apply->getFunction()->hasQualifiedOwnership();
+  auto loadOwnership = hasOwnership ? LoadOwnershipQualifier::Trivial
+                                    : LoadOwnershipQualifier::Unqualified;
+  auto *loadScalar = B.createLoad(loc, scalarOperandAddr, loadOwnership);
+  auto scalarTy = loadScalar->getType();
+  assert(convertSwiftTypeToTF(scalarTy.getASTType()) > 0 &&
+         "Input value must be a scalar.");
+
+  // The marking and scalar promotion code in the TF partition pass does not
+  // work when we feed a stdlib type like $Float to tfc.scalarToTensor. So we
+  // get the underlying built-in type like $Builtin.FPIEEE32.
+  // TODO: Extend the partition code so that we can feed stdlib types directly.
+  SingleValueInstruction *loadScalarBuiltin = nullptr;
+  {
+    auto *decl = scalarTy.getStructOrBoundGenericStruct();
+    assert(decl);
+    for (auto *field : decl->getStoredProperties()) {
+        // Check the struct only has 1 field.
+      assert(!loadScalarBuiltin);
+      loadScalarBuiltin =
+          B.createStructExtract(loc, loadScalar, field);
+    }
+    assert(!loadScalarBuiltin);
+  }
+  GraphOperationBuilder opBuilder("tfc.scalarToTensor");
+  opBuilder.addArgument(loadScalarBuiltin);
+  // Place on the primary device.
+  deviceInfo.handleDevicePlacement("tfc.scalarToTensor", /*opDevice*/ "", ctx,
+                                   &opBuilder);
+
+  auto op = opBuilder.build(B, ctx, loc,
+                            /*resultSILTypes*/ {origResult->getType()});
+  LLVM_DEBUG(llvm::dbgs() << "  The resulting tfc.scalarToTensor op is: " << *op
+                          << "\n");
+  auto newResult = getSingleValueResult(op);
+  origResult->replaceAllUsesWith(newResult);
+  apply->eraseFromParent();
+  return op;
+}
+
 /// If all the operands to a call to __tf_tensor_from_scalars_1d are constants,
 /// we can promote this to a 'Const' node with an attached TF_Tensor attribute.
 /// This is a specialized form of __tf_tensor_from_scalars, because the later is
@@ -1896,6 +2000,10 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
       continue;
     }
 
+    // Do not perform the following graph_op optimization/promotion unless
+    // we are in graph mode.
+    if (llvm::TFDynamicCompilation) continue;
+
     // Take a look at the various well known function calls that we can promote
     // to tensor operations.  We can promote them if we are able to constant
     // fold all of the operands to these calls.  If so, we rewrite them in terms
@@ -1903,6 +2011,14 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
     if (auto apply = dyn_cast<ApplyInst>(inst)) {
       auto callee = apply->getCalleeFunction();
 
+      LLVM_DEBUG(llvm::dbgs() << "processing apply inst with func name "
+                              << callee->getName() << "\n");
+
+      if (callee && callee->getName() == "__tf_tensor_from_scalar") {
+          inst = transformTensorFromScalar(apply, constants, deviceInfo);
+          assert(inst);
+        continue;
+      }
       if (callee && callee->getName() == "__tf_tensor_from_scalars") {
         if (auto result =
                 tryToPromoteTensorFromScalars(apply, constants, deviceInfo))
@@ -2189,45 +2305,6 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
     // Collect and validate input arguments.
     if (std::get<1>(argumentNameAndLowering) ==
         GraphOperationInfo::ArgumentLowering::Input) {
-      // If this is tfc.scalarToTensor, then the input must be a valid scalar.
-      if (opInfo.getOperationName() == "tfc.scalarToTensor") {
-        assert(origInst->getNumResults() == 1 &&
-               "tfc.scalarToTensor must have 1 result");
-        auto origResult = origInst->getResult(0);
-
-        auto scalarType = argumentTy.getASTType();
-        if (convertSwiftTypeToTF(scalarType) == 0) {
-          diagnoseInvalid(origInstLoc,
-                          "scalarToTensor requires scalar value; unrecognized"
-                          " type '" + scalarType->getString() +
-                          "' is not allowed");
-          return;
-        }
-
-        // Check to see if it was constant foldable.  If so, we can turn this
-        // into a Const node to avoid a send.
-        auto it = constants.find(argumentValue);
-        if (it != constants.end() && it->second.isConstant()) {
-          // Dig the element type out of the TensorHandle result type.
-          auto eltType =
-              getTensorHandleElementType(origResult->getType().getASTType());
-          // We use int32 as the element type of the zero-d shape array.
-          auto int32Ty =
-            context.getInt32Decl()->getDeclaredType()->getCanonicalType();
-          auto constant =
-            createConstTensor(eltType, it->second,
-                              SymbolicValue::getArray({}, int32Ty, allocator),
-                              origResult->getType(),
-                              getUserSourceLocation(origInst), DeviceType::ALL, B);
-          origResult->replaceAllUsesWith(constant->getResult(0));
-          origInst->eraseFromParent();
-          return;
-        }
-
-        opBuilder.addArgument(argumentValue);
-        continue;
-      }
-
       // Remove the argument so decodeArrayElements doesn't see the use.
       origInst->setOperand(i, SILUndef::get(argumentTy, fn.getModule()));
 

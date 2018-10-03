@@ -105,9 +105,29 @@ func _TFTensorFromScalars<Scalar>(
   )
 }
 
-@inlinable @inline(__always)
-func _TFMakeScalarTensor<Scalar>(_ scalar: Scalar) -> TensorHandle<Scalar> {
-  return Scalar._makeScalarTensor(scalar)
+/// In graph mode, the deabstraction pass transforms this function call to
+/// either a "Const" graph_op (if `scalar` is a compile-time constant), or a
+/// "tfc.scalarToTensor" graph_op. In the latter case, the partition pass uses
+/// it to do scalar promotion, and transforms it away before entering graph
+/// lowering. e.g. For user code:
+///   let x_scalar = x_tensor.mean()
+///   let y_scalar = y_tensor.mean()
+///   let z_scalar = x_scalar + y_scalar
+///   let z_tensor = Tensor(z_scalar)
+///
+/// The scalar addition can be promoted into graph, through the
+/// "tfc.scalarToTensor" graph_op generated from Tensor(z_scalar). In this
+/// example, the _getScalarOrDie() call generated from mean() will be "cancelled
+/// out" with "tfc.scalarToTensor", such that we avoid generating scalar on the
+/// host, and then converting it back to a graph tensor.
+///
+/// In eager mode, this function is executed directly.
+@usableFromInline @inline(never)
+@_silgen_name("__tf_tensor_from_scalar")
+func _TFTensorFromScalar<Scalar>(
+  _ scalar: Scalar
+) -> TensorHandle<Scalar> {
+  return _TFTensorFromScalars([scalar], shape: [])
 }
 
 @usableFromInline @inline(never)
@@ -187,7 +207,7 @@ public extension Tensor {
   /// Creates a tensor from a scalar value.
   @inlinable @inline(__always)
   init(_ value: Scalar) {
-    self.init(handle: _TFMakeScalarTensor(value))
+    self.init(handle: Scalar._makeScalarTensor(value))
   }
 
   /// Creates a tensor from an array of tensors (which may themselves be
