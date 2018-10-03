@@ -217,6 +217,25 @@ public extension Error {
 internal let _errorDomainUserInfoProviderQueue = DispatchQueue(
   label: "SwiftFoundation._errorDomainUserInfoProviderQueue")
 
+/// Wraps up a Swift error instance so it can be stashed in the user-info
+/// dictionary of the NSError.
+internal class _SwiftOriginalErrorBox<T>: NSObject {
+  let originalError: T
+
+  init(originalError error: T) {
+    self.originalError = error
+  }
+
+  override var description: String {
+    return "<original Swift error instance>"
+  }
+
+  @objc(_swiftOriginalErrorInstance)
+  func _swiftOriginalErrorInstance() -> Any {
+    return originalError
+  }
+}
+
 /// Retrieve the default userInfo dictionary for a given error.
 public func _getErrorDefaultUserInfo<T: Error>(_ error: T)
   -> AnyObject? {
@@ -309,6 +328,12 @@ public func _getErrorDefaultUserInfo<T: Error>(_ error: T)
     result[NSLocalizedRecoveryOptionsErrorKey] =
       recoverableError.recoveryOptions
     result[NSRecoveryAttempterErrorKey] = _NSErrorRecoveryAttempter()
+  }
+
+  // For non-bridgeable errors, stash a copy of the error in the userInfo
+  // dictionary so we can bridge back to it.
+  if !(error is _ObjectiveCBridgeableError) {
+    result["_SwiftOriginalError"] = _SwiftOriginalErrorBox(originalError: error)
   }
 
   return result as AnyObject

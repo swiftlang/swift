@@ -555,6 +555,23 @@ ErrorBridgingTests.test("Customizing NSError via protocols") {
     nsError.userInfo[NSURLErrorKey as NSObject] as? URL)
 
   testCustomizedError(error: error, nsError: nsError)
+
+  // Clone the NSError.
+  let clonedNSError = NSError(domain: nsError.domain, code: nsError.code,
+    userInfo: nsError.userInfo)
+
+  // Cast the clone to the original.
+  let clonedError = clonedNSError as? MyCustomizedError
+  expectNotNil(clonedError)
+  expectEqual(12345, clonedError!.code)
+
+    // Cast the clone to Error and then localized error.
+  let clonedLocalizedTwoStep = clonedNSError as Error as? LocalizedError
+  expectNotNil(clonedLocalizedTwoStep)
+
+  // Cast the clone to a localized error.
+  let clonedLocalized = clonedNSError as? LocalizedError
+  expectNotNil(clonedLocalized)
 }
 
 ErrorBridgingTests.test("Customizing localization/recovery via protocols") {

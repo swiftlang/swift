@@ -732,8 +732,8 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
   };
 
   // A function to call if the dynamic type does not conform to the
-  // protocols.  Typically fails, but if the source type is AnyHashable,
-  // tries to unwrap that.
+  // protocols.  Typically fails, but if the source type is AnyHashable or an
+  // NSError instance, tries to unwrap that.
   auto fallbackForNonDirectConformance = [&] {
     // As a fallback, if the source type is AnyHashable, perform a cast
     // on its interior value.
@@ -744,6 +744,19 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
       maybeDeallocateSource(success);
       return success;
     }
+
+#if SWIFT_OBJC_INTEROP
+    // Try to cast an NSError to the given type.
+    if (tryDynamicCastNSErrorToValue(
+                             dest, srcDynamicValue, srcDynamicType,
+                             targetType,
+                             (dynamicFlags
+                                - DynamicCastFlags::TakeOnSuccess
+                                - DynamicCastFlags::DestroyOnFailure))) {
+      maybeDeallocateSource(true);
+      return true;
+    }
+#endif
 
     return _fail(src, srcType, targetType, flags, srcDynamicType);
   };

@@ -514,6 +514,28 @@ swift::tryDynamicCastNSErrorObjectToValue(HeapObject *object,
     }
   }
 
+  // If we stashed the original error in the user-info dictionary, cast through
+  // that.
+  if (id originalErrorWrapper =
+          [[srcInstance userInfo] objectForKey:@"_SwiftOriginalError"]) {
+    if ([originalErrorWrapper
+           respondsToSelector:@selector(_swiftOriginalErrorInstance)]) {
+      id originalError = [originalErrorWrapper _swiftOriginalErrorInstance];
+      DynamicCastFlags innerFlags =
+        flags - DynamicCastFlags::TakeOnSuccess
+              - DynamicCastFlags::DestroyOnFailure;
+      if (swift_dynamicCast(
+                           dest,
+                           reinterpret_cast<OpaqueValue *>(&originalError),
+                           _swift_getClass(originalError), destType,
+                           innerFlags)) {
+        if (flags & DynamicCastFlags::TakeOnSuccess)
+          objc_release(srcInstance);
+        return true;
+      }
+    }
+  }
+
   // If the destination is just an Error then we can bridge directly.
   auto *destTypeExistential = dyn_cast<ExistentialTypeMetadata>(destType);
   if (destTypeExistential &&
