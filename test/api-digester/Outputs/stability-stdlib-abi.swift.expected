@@ -23,9 +23,14 @@ Func _getEnumCaseName(_:) has been removed
 Func _opaqueSummary(_:) has been removed
 Func _stdlib_NSDictionary_allKeys(_:) has been removed
 Func _stdlib_NSSet_allObjects(_:) has been removed
+Protocol _HasherCore has been removed
 Protocol _HeapBufferHeader_ has been removed
+Struct _BufferingHasher has been removed
 Struct _ConcreteHashableBox has been removed
+Struct _HasherTailBuffer has been removed
 Struct _HeapBufferHeader has been removed
+Struct _SipHash13 has been removed
+Struct _SipHash24 has been removed
 Subscript ManagedBufferPointer.subscript(_:) has been removed
 Var ManagedBufferPointer.baseAddress has been removed
 Var ManagedBufferPointer.storage has been removed
@@ -46,12 +51,20 @@ Var __SwiftDeferredNSArray._heapBufferBridgedPtr has been removed
 /* Renamed Decls */
 
 /* Type Changes */
+Var Hasher._core has declared type change from _BufferingHasher<_SipHash13Core> to _SipHash13Core
 Struct _BridgeableMetatype is now without @_fixed_layout
 Func __ContiguousArrayStorageBase._getNonVerbatimBridgingBuffer() is added to a non-resilient type
+Var Hasher._core in a non-resilient type changes position from 0 to 1
+Var Hasher._tail is added to a non-resilient type
 Var _CocoaDictionary.Index._offset is added to a non-resilient type
 Var _CocoaDictionary.Index._storage in a non-resilient type changes position from 1 to 0
 Var _CocoaSet.Index._offset is added to a non-resilient type
 Var _CocoaSet.Index._storage in a non-resilient type changes position from 1 to 0
+Var _SipHashState.p0 is added to a non-resilient type
+Var _SipHashState.p1 is added to a non-resilient type
+Var _SipHashState.p2 is added to a non-resilient type
+Var _SipHashState.p3 is added to a non-resilient type
+Struct _SipHash13Core has removed conformance to _HasherCore
 
 /* Decl Attribute changes */
 
