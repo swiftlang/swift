@@ -4523,8 +4523,10 @@ bool TFPartition::partitionFunction(
   LLVM_DEBUG(llvm::dbgs() << "Processing SIL function " << hostFn->getName()
                           << " in TFPartition::partitionFunction().\n");
 
-  if (!tfc.shouldBePartitioned(hostFn, /*forceTFFunctions=*/true) ||
-      llvm::TFDynamicCompilation)
+  if (!tfc.shouldBePartitioned(hostFn, /*forceTFFunctions=*/true))
+    return false;
+  
+  if (llvm::TFDynamicCompilation && !isAcceleratorOnly(*hostFn))
     return false;
 
   LLVM_DEBUG(llvm::dbgs() << "  " << hostFn->getName()
