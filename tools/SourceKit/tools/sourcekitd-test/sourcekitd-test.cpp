@@ -47,9 +47,11 @@ using namespace sourcekitd_test;
 namespace {
 int STDOUT_FILENO = _fileno(stdout);
 const constexpr size_t MAXPATHLEN = MAX_PATH + 1;
-char *realpath(const char *path, const char *resolved_path) {
+char *realpath(const char *path, char *resolved_path) {
   DWORD dwLength = GetFullPathNameA(path, 0, nullptr, nullptr);
-  if (resolved_path = malloc(dwLength + 1))
+  if (dwLength == 0)
+    return nullptr;
+  if ((resolved_path = static_cast<char *>(malloc(dwLength + 1))))
     GetFullPathNameA(path, dwLength, resolved_path, nullptr);
   return resolved_path;
 }
