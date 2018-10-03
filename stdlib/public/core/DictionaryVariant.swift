@@ -48,6 +48,12 @@ extension Dictionary {
       self.object = _BridgeStorage(native: native._storage)
     }
 
+    @inlinable
+    @inline(__always)
+    init(dummy: Void) {
+      self.object = _BridgeStorage(taggedPayload: 0)
+    }
+
 #if _runtime(_ObjC)
     @inlinable
     @inline(__always)
@@ -88,7 +94,7 @@ extension Dictionary._Variant {
     }
     _modify {
       var native = _NativeDictionary<Key, Value>(object.nativeInstance)
-      object = .init(taggedPayload: 0)
+      self = .init(dummy: ())
       yield &native
       object = .init(native: native._storage)
     }
