@@ -101,20 +101,3 @@ public func scalarToHost() {
 public func inoutArgumentToAccelerator(t: inout Tensor<Float>) {
   t += 1  // expected-note {{value used here}}
 }
-
-// Opaque handles should not be sent or received.
-public func opaqueHandlesCannotBeSentOrReceived() {
-  // expected-error @+2 {{value cannot be used by non-TensorFlow API}}
-  let iterator: ResourceHandle =
-    #tfop("Iterator", shared_name: "foo", container: "bar")
-  _hostOp(iterator) // expected-note {{value used here}}
-  let _ = Tensor<Float>(1.0)
-}
-
-// SR-8498: Opaque handles should not be tensor program results.
-public func opaqueHandlesCannotBeResults() {
-  // expected-error @+2 {{value cannot be used by non-TensorFlow API}}
-  let iterator: ResourceHandle =
-    #tfop("Iterator", shared_name: "foo", container: "bar")
-  _hostOp(iterator) // expected-note {{value used here}}
-}

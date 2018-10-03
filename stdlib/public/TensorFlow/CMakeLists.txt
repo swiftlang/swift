@@ -40,7 +40,6 @@ set(SOURCES
   Dataset.swift
   DataTypes.swift
   Gradients.swift
-  OpaqueHandles.swift
   Ops.swift
   Parameterized.swift
   Random.swift
