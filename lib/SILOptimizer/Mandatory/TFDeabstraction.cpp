@@ -1855,7 +1855,7 @@ transformTensorFromScalar(ApplyInst *apply,
       loadScalarBuiltin =
           B.createStructExtract(loc, loadScalar, field);
     }
-    assert(!loadScalarBuiltin);
+    assert(loadScalarBuiltin);
   }
   GraphOperationBuilder opBuilder("tfc.scalarToTensor");
   opBuilder.addArgument(loadScalarBuiltin);
