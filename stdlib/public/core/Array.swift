@@ -331,18 +331,6 @@ extension Array {
   }
 
   @inlinable
-  @_semantics("array.get_count")
-  internal func _getCount() -> Int {
-    return _buffer.count
-  }
-
-  @inlinable
-  @_semantics("array.get_capacity")
-  internal func _getCapacity() -> Int {
-    return _buffer.capacity
-  }
-
-  @inlinable
   @_semantics("array.make_mutable")
   internal mutating func _makeMutableAndUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {

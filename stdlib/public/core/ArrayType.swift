@@ -24,37 +24,6 @@ where Indices == Range<Int> {
   /// element. Otherwise, `nil`.
   var _baseAddressIfContiguous: UnsafeMutablePointer<Element>? { get }
 
-  //===--- basic mutations ------------------------------------------------===//
-
-  /// Reserve enough space to store minimumCapacity elements.
-  ///
-  /// - Postcondition: `capacity >= minimumCapacity` and the array has
-  ///   mutable contiguous storage.
-  ///
-  /// - Complexity: O(`self.count`).
-  override mutating func reserveCapacity(_ minimumCapacity: Int)
-
-  /// Insert `newElement` at index `i`.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - Complexity: O(`self.count`).
-  ///
-  /// - Precondition: `startIndex <= i`, `i <= endIndex`.
-  override mutating func insert(_ newElement: __owned Element, at i: Int)
-
-  /// Remove and return the element at the given index.
-  ///
-  /// - returns: The removed element.
-  ///
-  /// - Complexity: Worst case O(*n*).
-  ///
-  /// - Precondition: `count > index`.
-  @discardableResult
-  override mutating func remove(at index: Int) -> Element
-
-  //===--- implementation detail  -----------------------------------------===//
-
   associatedtype _Buffer: _ArrayBufferProtocol where _Buffer.Element == Element
   init(_ buffer: _Buffer)
 
@@ -63,6 +32,18 @@ where Indices == Range<Int> {
 }
 
 extension _ArrayProtocol {
+  @inlinable @inline(__always)
+  @_semantics("array.get_count")
+  internal func _getCount() -> Int {
+    return _buffer.count
+  }
+
+  @inlinable @inline(__always)
+  @_semantics("array.get_capacity")
+  internal func _getCapacity() -> Int {
+    return _buffer.capacity
+  }
+
   // Since RangeReplaceableCollection now has a version of filter that is less
   // efficient, we should make the default implementation coming from Sequence
   // preferred.

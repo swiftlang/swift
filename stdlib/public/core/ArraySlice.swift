@@ -149,18 +149,6 @@ extension ArraySlice {
    return _buffer.arrayPropertyIsNativeTypeChecked
   }
 
-  @inlinable
-  @_semantics("array.get_count")
-  internal func _getCount() -> Int {
-    return _buffer.count
-  }
-
-  @inlinable
-  @_semantics("array.get_capacity")
-  internal func _getCapacity() -> Int {
-    return _buffer.capacity
-  }
-
   /// - Precondition: The array has a native buffer.
   @inlinable
   @_semantics("array.owner")
