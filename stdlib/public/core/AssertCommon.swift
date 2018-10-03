@@ -168,12 +168,21 @@ internal func _fatalErrorMessage(
   file: StaticString, line: UInt,
   flags: UInt32
 ) -> Never {
+  // This function breaks the infinite recursion detection pass by introducing
+  // an edge the pass doesn't look through.
+  func _withUTF8Buffer<R>(
+    _ string: StaticString,
+    _ body: (UnsafeBufferPointer<UInt8>) -> R
+  ) -> R {
+    return string.withUTF8Buffer(body)
+  }
+
 #if INTERNAL_CHECKS_ENABLED
-  prefix.withUTF8Buffer {
+  _withUTF8Buffer(prefix) {
     (prefix) in
-    message.withUTF8Buffer {
+    _withUTF8Buffer(message) {
       (message) in
-      file.withUTF8Buffer {
+      _withUTF8Buffer(file) {
         (file) in
         _swift_stdlib_reportFatalErrorInFile(
           prefix.baseAddress!, CInt(prefix.count),
@@ -184,9 +193,9 @@ internal func _fatalErrorMessage(
     }
   }
 #else
-  prefix.withUTF8Buffer {
+  _withUTF8Buffer(prefix) {
     (prefix) in
-    message.withUTF8Buffer {
+    _withUTF8Buffer(message) {
       (message) in
       _swift_stdlib_reportFatalError(
         prefix.baseAddress!, CInt(prefix.count),
