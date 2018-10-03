@@ -40,6 +40,12 @@ extension Set {
 
     @inlinable
     @inline(__always)
+    init(dummy: ()) {
+      self.object = _BridgeStorage(taggedPayload: 0)
+    }
+
+    @inlinable
+    @inline(__always)
     init(native: __owned _NativeSet<Element>) {
       self.object = _BridgeStorage(native: native._storage)
     }
@@ -78,14 +84,14 @@ extension Set._Variant {
   @usableFromInline @_transparent
   internal var asNative: _NativeSet<Element> {
     get {
-      return _NativeSet<Element>(object.nativeInstance)
+      return _NativeSet(object.nativeInstance)
     }
     set {
       self = .init(native: newValue)
     }
     _modify {
       var native = _NativeSet<Element>(object.nativeInstance)
-      object = .init(taggedPayload: 0)
+      self = .init(dummy: ())
       yield &native
       object = .init(native: native._storage)
     }
