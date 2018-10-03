@@ -1,4 +1,4 @@
-// RUN: %target-run-stdlib-swiftgyb
+// RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -7,12 +7,6 @@ let SipHashTests = TestSuite("SipHashTests")
 
 extension Hasher {
   typealias HashValue = Int
-}
-extension _SipHash13 {
-  typealias HashValue = UInt64
-}
-extension _SipHash24 {
-  typealias HashValue = UInt64
 }
 
 struct SipHashTest {
@@ -46,89 +40,6 @@ struct SipHashTest {
     self.output = output
   }
 }
-
-let sipHash24Tests: [SipHashTest] = [
-  // Test vectors from the reference C implementation, which was released
-  // to public domain by:
-  //
-  // * Jean-Philippe Aumasson <jeanphilippe.aumasson@gmail.com>
-  // * Daniel J. Bernstein <djb@cr.yp.to>
-  SipHashTest(referenceVectorIndex: 0, output: 0x726fdb47dd0e0e31),
-  SipHashTest(referenceVectorIndex: 1, output: 0x74f839c593dc67fd),
-  SipHashTest(referenceVectorIndex: 2, output: 0x0d6c8009d9a94f5a),
-  SipHashTest(referenceVectorIndex: 3, output: 0x85676696d7fb7e2d),
-  SipHashTest(referenceVectorIndex: 4, output: 0xcf2794e0277187b7),
-  SipHashTest(referenceVectorIndex: 5, output: 0x18765564cd99a68d),
-  SipHashTest(referenceVectorIndex: 6, output: 0xcbc9466e58fee3ce),
-  SipHashTest(referenceVectorIndex: 7, output: 0xab0200f58b01d137),
-  SipHashTest(referenceVectorIndex: 8, output: 0x93f5f5799a932462),
-  SipHashTest(referenceVectorIndex: 9, output: 0x9e0082df0ba9e4b0),
-  SipHashTest(referenceVectorIndex: 10, output: 0x7a5dbbc594ddb9f3),
-  SipHashTest(referenceVectorIndex: 11, output: 0xf4b32f46226bada7),
-  SipHashTest(referenceVectorIndex: 12, output: 0x751e8fbc860ee5fb),
-  SipHashTest(referenceVectorIndex: 13, output: 0x14ea5627c0843d90),
-  SipHashTest(referenceVectorIndex: 14, output: 0xf723ca908e7af2ee),
-  SipHashTest(referenceVectorIndex: 15, output: 0xa129ca6149be45e5),
-  SipHashTest(referenceVectorIndex: 16, output: 0x3f2acc7f57c29bdb),
-  SipHashTest(referenceVectorIndex: 17, output: 0x699ae9f52cbe4794),
-  SipHashTest(referenceVectorIndex: 18, output: 0x4bc1b3f0968dd39c),
-  SipHashTest(referenceVectorIndex: 19, output: 0xbb6dc91da77961bd),
-  SipHashTest(referenceVectorIndex: 20, output: 0xbed65cf21aa2ee98),
-  SipHashTest(referenceVectorIndex: 21, output: 0xd0f2cbb02e3b67c7),
-  SipHashTest(referenceVectorIndex: 22, output: 0x93536795e3a33e88),
-  SipHashTest(referenceVectorIndex: 23, output: 0xa80c038ccd5ccec8),
-  SipHashTest(referenceVectorIndex: 24, output: 0xb8ad50c6f649af94),
-  SipHashTest(referenceVectorIndex: 25, output: 0xbce192de8a85b8ea),
-  SipHashTest(referenceVectorIndex: 26, output: 0x17d835b85bbb15f3),
-  SipHashTest(referenceVectorIndex: 27, output: 0x2f2e6163076bcfad),
-  SipHashTest(referenceVectorIndex: 28, output: 0xde4daaaca71dc9a5),
-  SipHashTest(referenceVectorIndex: 29, output: 0xa6a2506687956571),
-  SipHashTest(referenceVectorIndex: 30, output: 0xad87a3535c49ef28),
-  SipHashTest(referenceVectorIndex: 31, output: 0x32d892fad841c342),
-  SipHashTest(referenceVectorIndex: 32, output: 0x7127512f72f27cce),
-  SipHashTest(referenceVectorIndex: 33, output: 0xa7f32346f95978e3),
-  SipHashTest(referenceVectorIndex: 34, output: 0x12e0b01abb051238),
-  SipHashTest(referenceVectorIndex: 35, output: 0x15e034d40fa197ae),
-  SipHashTest(referenceVectorIndex: 36, output: 0x314dffbe0815a3b4),
-  SipHashTest(referenceVectorIndex: 37, output: 0x027990f029623981),
-  SipHashTest(referenceVectorIndex: 38, output: 0xcadcd4e59ef40c4d),
-  SipHashTest(referenceVectorIndex: 39, output: 0x9abfd8766a33735c),
-  SipHashTest(referenceVectorIndex: 40, output: 0x0e3ea96b5304a7d0),
-  SipHashTest(referenceVectorIndex: 41, output: 0xad0c42d6fc585992),
-  SipHashTest(referenceVectorIndex: 42, output: 0x187306c89bc215a9),
-  SipHashTest(referenceVectorIndex: 43, output: 0xd4a60abcf3792b95),
-  SipHashTest(referenceVectorIndex: 44, output: 0xf935451de4f21df2),
-  SipHashTest(referenceVectorIndex: 45, output: 0xa9538f0419755787),
-  SipHashTest(referenceVectorIndex: 46, output: 0xdb9acddff56ca510),
-  SipHashTest(referenceVectorIndex: 47, output: 0xd06c98cd5c0975eb),
-  SipHashTest(referenceVectorIndex: 48, output: 0xe612a3cb9ecba951),
-  SipHashTest(referenceVectorIndex: 49, output: 0xc766e62cfcadaf96),
-  SipHashTest(referenceVectorIndex: 50, output: 0xee64435a9752fe72),
-  SipHashTest(referenceVectorIndex: 51, output: 0xa192d576b245165a),
-  SipHashTest(referenceVectorIndex: 52, output: 0x0a8787bf8ecb74b2),
-  SipHashTest(referenceVectorIndex: 53, output: 0x81b3e73d20b49b6f),
-  SipHashTest(referenceVectorIndex: 54, output: 0x7fa8220ba3b2ecea),
-  SipHashTest(referenceVectorIndex: 55, output: 0x245731c13ca42499),
-  SipHashTest(referenceVectorIndex: 56, output: 0xb78dbfaf3a8d83bd),
-  SipHashTest(referenceVectorIndex: 57, output: 0xea1ad565322a1a0b),
-  SipHashTest(referenceVectorIndex: 58, output: 0x60e61c23a3795013),
-  SipHashTest(referenceVectorIndex: 59, output: 0x6606d7e446282b93),
-  SipHashTest(referenceVectorIndex: 60, output: 0x6ca4ecb15c5f91e1),
-  SipHashTest(referenceVectorIndex: 61, output: 0x9f626da15c9625f3),
-  SipHashTest(referenceVectorIndex: 62, output: 0xe51b38608ef25f57),
-  SipHashTest(referenceVectorIndex: 63, output: 0x958a324ceb064572),
-  // End of reference test vectors.
-
-  SipHashTest(
-    input: [
-      0x72, 0xdc, 0xde, 0xd4, 0x6d, 0xb4, 0xc8, 0xa1,
-      0xcf, 0x22, 0xe2, 0x7f, 0xe3, 0xf6, 0xe5, 0x6d,
-      0x8b, 0x66, 0x0b, 0xaf, 0xba, 0x16, 0x25, 0xf3,
-      0x63, 0x8e, 0x69, 0x80, 0xf3, 0x7e, 0xd6, 0xe3,
-    ],
-    seed: (0xa3432fc680796c34, 0x1173946a79aeaae5),
-    output: 0x058b04535972ff2b),
-]
 
 let sipHash13Tests: [SipHashTest] = [
   SipHashTest(referenceVectorIndex: 0, output: 0xabac0158050fc4dc),
@@ -237,25 +148,19 @@ struct Loop<C: Collection>: Sequence, IteratorProtocol {
   }
 }
 
-% for (Self, tests) in [
-%   ('Hasher', 'sipHash13Tests'),
-%   ('_SipHash13', 'sipHash13Tests'),
-%   ('_SipHash24', 'sipHash24Tests')
-% ]:
-
-SipHashTests.test("${Self}/combine(UnsafeRawBufferPointer)")
-  .forEach(in: ${tests}) { test in
-  var hasher = ${Self}(_rawSeed: test.seed)
+SipHashTests.test("Hasher/combine(UnsafeRawBufferPointer)")
+  .forEach(in: sipHash13Tests) { test in
+  var hasher = Hasher(_rawSeed: test.seed)
   test.input.withUnsafeBytes { hasher.combine(bytes: $0) }
   let hash = hasher.finalize()
-  expectEqual(${Self}.HashValue(truncatingIfNeeded: test.output), hash)
+  expectEqual(Hasher.HashValue(truncatingIfNeeded: test.output), hash)
 }
 
-SipHashTests.test("${Self}/combine(UnsafeRawBufferPointer)/pattern")
-  .forEach(in: cartesianProduct(${tests}, incrementalPatterns)) { test_ in
+SipHashTests.test("Hasher/combine(UnsafeRawBufferPointer)/pattern")
+  .forEach(in: cartesianProduct(sipHash13Tests, incrementalPatterns)) { test_ in
   let (test, pattern) = test_
 
-  var hasher = ${Self}(_rawSeed: test.seed)
+  var hasher = Hasher(_rawSeed: test.seed)
   var chunkSizes = Loop(pattern).makeIterator()
   var startIndex = 0
   while startIndex != test.input.endIndex {
@@ -267,43 +172,52 @@ SipHashTests.test("${Self}/combine(UnsafeRawBufferPointer)/pattern")
     startIndex += chunkSize
   }
   let hash = hasher.finalize()
-  expectEqual(${Self}.HashValue(truncatingIfNeeded: test.output), hash)
+  expectEqual(Hasher.HashValue(truncatingIfNeeded: test.output), hash)
 }
 
-% for data_type in ['UInt', 'UInt64', 'UInt32', 'UInt16', 'UInt8']:
-SipHashTests.test("${Self}._combine(${data_type})")
-  .forEach(in: ${tests}) { test in
 
-  var hasher = ${Self}(_rawSeed: test.seed)
+func testIntegerType<I: FixedWidthInteger>(
+  _ type: I.Type,
+  combiner: @escaping (inout Hasher, I) -> Void) {
+  SipHashTests.test("Hasher._combine(\(type.self))")
+    .forEach(in: sipHash13Tests) { test in
 
-  // Load little-endian chunks and combine them into the hasher.
-  let bitWidth = ${data_type}.bitWidth
-  var i = 0
-  var count = 0
-  var chunk: ${data_type} = 0
-  while i < test.input.count {
-    chunk |= ${data_type}(test.input[i]) << (8 * count)
-    i += 1
-    count += 1
-    if 8 * count == bitWidth {
-      hasher._combine(chunk)
-      count = 0
-      chunk = 0
+    var hasher = Hasher(_rawSeed: test.seed)
+
+    // Load little-endian chunks and combine them into the hasher.
+    let bitWidth = I.bitWidth
+    var i = 0
+    var count = 0
+    var chunk: I = 0
+    while i < test.input.count {
+      chunk |= I(test.input[i]) << (8 * count)
+      i += 1
+      count += 1
+      if 8 * count == bitWidth {
+        combiner(&hasher, chunk)
+        count = 0
+        chunk = 0
+      }
     }
-  }
-  // Combine tail bytes.
-  if count > 0 {
-    hasher._combine(bytes: UInt64(truncatingIfNeeded: chunk), count: count)
-  }
+    // Combine tail bytes.
+    if count > 0 {
+      hasher._combine(bytes: UInt64(truncatingIfNeeded: chunk), count: count)
+    }
 
-  let hash = hasher.finalize()
-  expectEqual(${Self}.HashValue(truncatingIfNeeded: test.output), hash)
+    let hash = hasher.finalize()
+    expectEqual(Hasher.HashValue(truncatingIfNeeded: test.output), hash)
+  }
 }
-% end
 
-SipHashTests.test("${Self}/OperationsAfterFinalize") {
+testIntegerType(UInt.self) { $0._combine($1) }
+testIntegerType(UInt64.self) { $0._combine($1) }
+testIntegerType(UInt32.self) { $0._combine($1) }
+testIntegerType(UInt16.self) { $0._combine($1) }
+testIntegerType(UInt8.self) { $0._combine($1) }
+
+SipHashTests.test("Hasher/OperationsAfterFinalize") {
   // Verify that finalize is nonmutating.
-  var hasher1 = ${Self}(_rawSeed: (0, 0))
+  var hasher1 = Hasher(_rawSeed: (0, 0))
   hasher1._combine(1 as UInt8)
   _ = hasher1.finalize()
   // Hasher is now consumed. The operations below are illegal, but this isn't
@@ -314,13 +228,12 @@ SipHashTests.test("${Self}/OperationsAfterFinalize") {
   let hash1b = hasher1.finalize()
   expectEqual(hash1a, hash1b)
 
-  var hasher2 = ${Self}(_rawSeed: (0, 0))
+  var hasher2 = Hasher(_rawSeed: (0, 0))
   hasher2._combine(1 as UInt8)
   hasher2._combine(2 as UInt16)
   let hash2 = hasher2.finalize()
   expectEqual(hash1a, hash2)
 }
-% end
 
 runAllTests()
 
