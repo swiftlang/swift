@@ -442,6 +442,7 @@ extension _NativeSet: _HashTableDelegate {
 
 extension _NativeSet { // Deletion
   @inlinable
+  @_effects(releasenone)
   internal mutating func _delete(at bucket: Bucket) {
     hashTable.delete(at: bucket, with: self)
     _storage._count -= 1

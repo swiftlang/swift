@@ -540,6 +540,7 @@ extension _NativeDictionary: _HashTableDelegate {
 
 extension _NativeDictionary { // Deletion
   @inlinable
+  @_effects(releasenone)
   internal func _delete(at bucket: Bucket) {
     hashTable.delete(at: bucket, with: self)
     _storage._count -= 1
