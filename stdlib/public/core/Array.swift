@@ -1280,7 +1280,7 @@ extension Array: RangeReplaceableCollection {
   }
 
   @inlinable
-  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     if let n = _buffer.requestNativeBuffer() {
       return ContiguousArray(_buffer: n)
     }
@@ -1490,7 +1490,7 @@ extension Array {
   }
 
   @inlinable
-  public func _copyContents(
+  __consuming public func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
 

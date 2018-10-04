@@ -131,7 +131,7 @@ extension JoinedSequence: Sequence {
   }
 
   @inlinable // lazy-performance
-  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     var result = ContiguousArray<Element>()
     let separatorSize: Int = numericCast(_separator.count)
 
