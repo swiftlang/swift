@@ -94,37 +94,39 @@ static bool hasRecursiveCallInPath(SILBasicBlock &Block,
   return false;
 }
 
-static bool hasInfinitelyRecursiveApply(SILFunction &Fn,
-                                        SILFunction *TargetFn) {
+/// Perform a DFS through the target function to find any paths to an exit node
+/// that do not call into the target.
+static bool hasInfinitelyRecursiveApply(SILFunction *TargetFn) {
   SmallPtrSet<SILBasicBlock *, 16> Visited;
-  SmallVector<SILBasicBlock *, 16> WorkList;
-  // Keep track of whether we found at least one recursive path.
+  SmallVector<SILBasicBlock *, 16> WorkList = { TargetFn->getEntryBlock() };
+
+  // Keep track of if we've found any recursive blocks at all.
+  // We return true if we found any recursion and did not find any
+  // non-recursive, function-exiting blocks.
   bool foundRecursion = false;
-
   auto *TargetModule = TargetFn->getModule().getSwiftModule();
-  auto analyzeSuccessor = [&](SILBasicBlock *Succ) -> bool {
-    if (!Visited.insert(Succ).second)
-      return false;
 
-    // If the successor block contains a recursive call, end analysis there.
-    if (!hasRecursiveCallInPath(*Succ, TargetFn, TargetModule)) {
-      WorkList.push_back(Succ);
-      return false;
-    }
-    return true;
-  };
-
-  // Seed the work list with the entry block.
-  foundRecursion |= analyzeSuccessor(Fn.getEntryBlock());
-  
   while (!WorkList.empty()) {
     SILBasicBlock *CurBlock = WorkList.pop_back_val();
-    // Found a path to the exit node without a recursive call.
+    if (!Visited.insert(CurBlock).second)
+      continue;
+
+    // If we found a recursive call, keep track of it. We can't just `return
+    // true` here because that would mark every recursive function infinitely
+    // recursive.
+    if (hasRecursiveCallInPath(*CurBlock, TargetFn, TargetModule)) {
+      foundRecursion = true;
+      continue;
+    }
+
+    // If this block doesn't have a recursive call, and it exits the function,
+    // then we know the function is not infinitely recursive.
     if (CurBlock->getTerminator()->isFunctionExiting())
       return false;
 
-    for (SILBasicBlock *Succ : CurBlock->getSuccessorBlocks())
-      foundRecursion |= analyzeSuccessor(Succ);
+    // Otherwise, push the successors onto the stack.
+    WorkList.append(CurBlock->succblock_begin(),
+                    CurBlock->succblock_end());
   }
   return foundRecursion;
 }
@@ -149,7 +151,7 @@ namespace {
       if (!Fn->hasLocation() || Fn->getLocation().getSourceLoc().isInvalid())
         return;
 
-      if (hasInfinitelyRecursiveApply(*Fn, Fn)) {
+      if (hasInfinitelyRecursiveApply(Fn)) {
         diagnose(Fn->getModule().getASTContext(),
                  Fn->getLocation().getSourceLoc(),
                  diag::warn_infinite_recursive_function);
