@@ -1467,15 +1467,7 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   }
 
   // Convert the type.
-  TypeCacheEntry convertedEntry = convertType(exemplarTy);
-  auto convertedTI = convertedEntry.dyn_cast<const TypeInfo*>();
-
-  // If that gives us a forward declaration (which can happen with
-  // bound generic types), don't propagate that into the cache here,
-  // because we won't know how to clear it later.
-  if (!convertedTI) {
-    return convertedEntry;
-  }
+  auto *convertedTI = convertType(exemplarTy);
 
   // Cache the entry under the original type and the exemplar type, so that
   // we can avoid relowering equivalent types.
@@ -1600,7 +1592,7 @@ convertPrimitiveBuiltin(IRGenModule &IGM, CanType canTy) {
   }
 }
 
-TypeCacheEntry TypeConverter::convertType(CanType ty) {
+const TypeInfo *TypeConverter::convertType(CanType ty) {
   PrettyStackTraceType stackTrace(IGM.Context, "converting", ty);
 
   switch (ty->getKind()) {
@@ -1828,8 +1820,8 @@ static bool isIRTypeDependent(IRGenModule &IGM, NominalTypeDecl *decl) {
   }
 }
 
-TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
-                                                    NominalTypeDecl *decl) {
+const TypeInfo *TypeConverter::convertAnyNominalType(CanType type,
+                                                     NominalTypeDecl *decl) {
   // By "any", we don't mean existentials.
   assert(!isa<ProtocolDecl>(decl));
 
@@ -1871,7 +1863,7 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
   auto &Cache = Types.getCacheFor(/*isDependent*/ false, CompletelyFragile);
   auto entry = Cache.find(key);
   if (entry != Cache.end())
-    return entry->second;
+    return entry->second.get<const TypeInfo *>();
 
   switch (decl->getKind()) {
 #define NOMINAL_TYPE_DECL(ID, PARENT)

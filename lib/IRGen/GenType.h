@@ -102,8 +102,8 @@ private:
 
   void addForwardDecl(TypeBase *key, llvm::Type *type);
 
-  TypeCacheEntry convertType(CanType T);
-  TypeCacheEntry convertAnyNominalType(CanType T, NominalTypeDecl *D);
+  const TypeInfo *convertType(CanType T);
+  const TypeInfo *convertAnyNominalType(CanType T, NominalTypeDecl *D);
   const TypeInfo *convertTupleType(TupleType *T);
   const TypeInfo *convertClassType(CanType type, ClassDecl *D);
   const TypeInfo *convertEnumType(TypeBase *key, CanType type, EnumDecl *D);
