@@ -20,6 +20,7 @@
 #include "GenType.h"
 #include "IRGen.h"
 #include "IRGenModule.h"
+#include "LegacyLayoutFormat.h"
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -58,47 +59,7 @@ public:
   }
 };
 
-struct YAMLTypeInfoNode {
-  std::string Name;
-  uint64_t Size;
-  uint64_t Alignment;
-  uint64_t NumExtraInhabitants;
-
-  bool operator<(const YAMLTypeInfoNode &other) const {
-    return Name < other.Name;
-  }
-};
-
-struct YAMLModuleNode {
-  StringRef Name;
-  std::vector<YAMLTypeInfoNode> Decls;
-};
-
 } // end anonymous namespace
-
-namespace llvm {
-namespace yaml {
-
-template <> struct MappingTraits<YAMLTypeInfoNode> {
-  static void mapping(IO &io, YAMLTypeInfoNode &node) {
-    io.mapRequired("Name", node.Name);
-    io.mapRequired("Size", node.Size);
-    io.mapRequired("Alignment", node.Alignment);
-    io.mapRequired("ExtraInhabitants", node.NumExtraInhabitants);
-  }
-};
-
-template <> struct MappingTraits<YAMLModuleNode> {
-  static void mapping(IO &io, YAMLModuleNode &node) {
-    io.mapRequired("Name", node.Name);
-    io.mapOptional("Decls", node.Decls);
-  }
-};
-
-} // namespace yaml
-} // namespace llvm
-
-LLVM_YAML_IS_SEQUENCE_VECTOR(YAMLTypeInfoNode);
 
 static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
   Mangle::ASTMangler Mangler;
