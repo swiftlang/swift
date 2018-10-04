@@ -3107,7 +3107,7 @@ bool _swift_isOptional(OpaqueValue *src, const Metadata *type) {
   return swift_isOptionalType(type);
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 HeapObject *_swift_extractDynamicValue(OpaqueValue *value, const Metadata *self) {
   OpaqueValue *outValue;
   const Metadata *outType;
