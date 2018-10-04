@@ -850,46 +850,6 @@ extension Array: RangeReplaceableCollection {
     }
   }
 
-  @inline(never)
-  @usableFromInline
-  internal static func _allocateBufferUninitialized(
-    minimumCapacity: Int
-  ) -> _Buffer {
-    let newBuffer = _ContiguousArrayBuffer<Element>(
-      _uninitializedCount: 0, minimumCapacity: minimumCapacity)
-    return _Buffer(_buffer: newBuffer, shiftedToStartIndex: 0)
-  }
-
-  /// Construct a Array of `count` uninitialized elements.
-  @inlinable
-  internal init(_uninitializedCount count: Int) {
-    _precondition(count >= 0, "Can't construct Array with count < 0")
-    // Note: Sinking this constructor into an else branch below causes an extra
-    // Retain/Release.
-    _buffer = _Buffer()
-    if count > 0 {
-      // Creating a buffer instead of calling reserveCapacity saves doing an
-      // unnecessary uniqueness check. We disable inlining here to curb code
-      // growth.
-      _buffer = Array._allocateBufferUninitialized(minimumCapacity: count)
-      _buffer.count = count
-    }
-    // Can't store count here because the buffer might be pointing to the
-    // shared empty array.
-  }
-
-  /// Entry point for `Array` literal construction; builds and returns
-  /// a Array of `count` uninitialized elements.
-  @inlinable
-  @_semantics("array.uninitialized")
-  internal static func _allocateUninitialized(
-    _ count: Int
-  ) -> (Array, UnsafeMutablePointer<Element>) {
-    let result = Array(_uninitializedCount: count)
-    return (result, result._buffer.firstElementAddress)
-  }
-
-
   /// Returns an Array of `count` uninitialized elements using the
   /// given `storage`, and a pointer to uninitialized memory for the
   /// first element.

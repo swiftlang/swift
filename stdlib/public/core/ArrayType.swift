@@ -28,7 +28,7 @@ where Indices == Range<Int> {
   init(_ buffer: _Buffer)
 
   // For testing.
-  var _buffer: _Buffer { get }
+  var _buffer: _Buffer { get set }
 }
 
 extension _ArrayProtocol {
@@ -52,6 +52,45 @@ extension _ArrayProtocol {
     get {
       return _buffer.owner      
     }
+  }
+
+  @inline(never)
+  @usableFromInline
+  internal static func _allocateBufferUninitialized(
+    minimumCapacity: Int
+  ) -> _Buffer {
+    let newBuffer = _ContiguousArrayBuffer<Element>(
+      _uninitializedCount: 0, minimumCapacity: minimumCapacity)
+    return _Buffer(_buffer: newBuffer, shiftedToStartIndex: 0)
+  }
+
+  /// Construct an array of `count` uninitialized elements.
+  @inlinable
+  internal init(_uninitializedCount count: Int) {
+    _precondition(count >= 0, "Can't construct Array with count < 0")
+    // Note: Sinking this constructor into an else branch below causes an extra
+    // Retain/Release.
+    self.init(_Buffer())
+    if count > 0 {
+      // Creating a buffer instead of calling reserveCapacity saves doing an
+      // unnecessary uniqueness check. We disable inlining here to curb code
+      // growth.
+      _buffer = Self._allocateBufferUninitialized(minimumCapacity: count)
+      _buffer.count = count
+    }
+    // Can't store count here because the buffer might be pointing to the
+    // shared empty array.
+  }
+
+  /// Entry point for `Self` literal construction; builds and returns
+  /// a Self of `count` uninitialized elements.
+  @inlinable
+  @_semantics("array.uninitialized")
+  internal static func _allocateUninitialized(
+    _ count: Int
+  ) -> (Self, UnsafeMutablePointer<Element>) {
+    let result = Self(_uninitializedCount: count)
+    return (result, result._buffer.firstElementAddress)
   }
 
   // Since RangeReplaceableCollection now has a version of filter that is less

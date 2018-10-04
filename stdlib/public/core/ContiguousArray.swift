@@ -532,45 +532,6 @@ extension ContiguousArray: RangeReplaceableCollection {
     }
   }
 
-  @inline(never)
-  @usableFromInline
-  internal static func _allocateBufferUninitialized(
-    minimumCapacity: Int
-  ) -> _Buffer {
-    let newBuffer = _ContiguousArrayBuffer<Element>(
-      _uninitializedCount: 0, minimumCapacity: minimumCapacity)
-    return _Buffer(_buffer: newBuffer, shiftedToStartIndex: 0)
-  }
-
-  /// Construct a ContiguousArray of `count` uninitialized elements.
-  @inlinable
-  internal init(_uninitializedCount count: Int) {
-    _precondition(count >= 0, "Can't construct ContiguousArray with count < 0")
-    // Note: Sinking this constructor into an else branch below causes an extra
-    // Retain/Release.
-    _buffer = _Buffer()
-    if count > 0 {
-      // Creating a buffer instead of calling reserveCapacity saves doing an
-      // unnecessary uniqueness check. We disable inlining here to curb code
-      // growth.
-      _buffer = ContiguousArray._allocateBufferUninitialized(minimumCapacity: count)
-      _buffer.count = count
-    }
-    // Can't store count here because the buffer might be pointing to the
-    // shared empty array.
-  }
-
-  /// Entry point for `Array` literal construction; builds and returns
-  /// a ContiguousArray of `count` uninitialized elements.
-  @inlinable
-  @_semantics("array.uninitialized")
-  internal static func _allocateUninitialized(
-    _ count: Int
-  ) -> (ContiguousArray, UnsafeMutablePointer<Element>) {
-    let result = ContiguousArray(_uninitializedCount: count)
-    return (result, result._buffer.firstElementAddress)
-  }
-
   //===--- basic mutations ------------------------------------------------===//
 
   /// Reserves enough space to store the specified number of elements.
