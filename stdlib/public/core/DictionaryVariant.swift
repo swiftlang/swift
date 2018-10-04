@@ -78,26 +78,28 @@ extension Dictionary._Variant {
 
   @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {
-    return object.isUniquelyReferencedNative()
+    return object.isUniquelyReferenced_native_noSpareBits()
   }
 
 #if _runtime(_ObjC)
   @usableFromInline @_transparent
   internal var isNative: Bool {
-    return guaranteedNative || object.isNative
+    if guaranteedNative { return true }
+    return object.isNativeWithClearedSpareBits(0)
   }
 #endif
 
   @usableFromInline @_transparent
   internal var asNative: _NativeDictionary<Key, Value> {
     get {
-      return _NativeDictionary<Key, Value>(object.nativeInstance)
+      return _NativeDictionary<Key, Value>(object.nativeInstance_noSpareBits)
     }
     set {
       self = .init(native: newValue)
     }
     _modify {
-      var native = _NativeDictionary<Key, Value>(object.nativeInstance)
+      var native = _NativeDictionary<Key, Value>(
+        object.nativeInstance_noSpareBits)
       self = .init(dummy: ())
       yield &native
       object = .init(native: native._storage)
