@@ -112,6 +112,8 @@ public:
         numInstEvaluated(numInstEvaluated) {}
 
   void setValue(SILValue value, SymbolicValue symVal) {
+    LLVM_DEBUG(llvm::dbgs() << "For sil value " << value << ", setting it to: ";
+               symVal.dump());
     calculatedValues.insert({value, symVal});
   }
 
@@ -122,6 +124,10 @@ public:
     auto type = simplifyType(addr->getType().getASTType());
     auto *memObject = SymbolicValueMemoryObject::create(
         type, initialValue, evaluator.getAllocator());
+    LLVM_DEBUG(llvm::dbgs()
+                   << "For sil addr " << addr << ", creating memory obj: "
+                   << memObject << ", with init value " << initialValue
+                   << ", mem obj value: " << memObject->getValue(););
     auto result = SymbolicValue::getAddress(memObject);
     setValue(addr, result);
     return result;

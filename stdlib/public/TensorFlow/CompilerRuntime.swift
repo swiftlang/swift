@@ -264,6 +264,9 @@ public final class _ExecutionContext {
   init() {
     configureRuntimeFromEnvironment()
 
+    // Suppress TensorFlow logging, unless the user specified a log level.
+    setenv("TF_CPP_MIN_LOG_LEVEL", "3", /*override*/ 0)
+
     debugLog("Initializing global context.")
 
     // Initialize the TF runtime exactly once. Only affects local execution
