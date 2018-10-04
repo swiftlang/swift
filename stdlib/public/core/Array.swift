@@ -1490,7 +1490,7 @@ extension Array {
   }
 
   @inlinable
-  __consuming public func _copyContents(
+  public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
 
