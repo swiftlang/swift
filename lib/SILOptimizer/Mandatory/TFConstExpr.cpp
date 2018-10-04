@@ -16,6 +16,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Demangling/Demangle.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILConstants.h"
@@ -61,7 +62,7 @@ static WellKnownFunction classifyFunction(SILFunction *fn) {
     return WellKnownFunction::StringMakeUTF8;
 
   StringRef mangledName = fn->getName();
-  if (mangledName == "$SS2SycfC")
+  if (mangledName == "$sS2SycfC")
     return WellKnownFunction::StringInitEmpty;
 
   if (mangledName.contains("_assertionFailure"))

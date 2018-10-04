@@ -513,7 +513,7 @@ void DevicePartitionCloner::initBlock(SILBasicBlock *BB) {
 
     // Create the argument and copy it into the ValueMap so future references
     // use it.
-    ValueMap[arg] = newBB->createPHIArgument(remapType(arg->getType()),
+    ValueMap[arg] = newBB->createPhiArgument(remapType(arg->getType()),
                                              ValueOwnershipKind::Trivial,
                                              arg->getDecl());
   }

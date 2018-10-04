@@ -179,8 +179,7 @@ public:
   /// Determine if a ParameterAggregate requirement can be derived for a type.
   ///
   /// \returns True if the requirement can be derived.
-  static bool canDeriveParameterAggregate(TypeChecker &tc,
-                                          NominalTypeDecl *type);
+  static bool canDeriveParameterAggregate(NominalTypeDecl *type);
 
   /// Derive a ParameterAggregate requirement for a nominal type.
   ///

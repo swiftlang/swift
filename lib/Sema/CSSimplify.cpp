@@ -4673,7 +4673,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
                                                FunctionRefKind::DoubleApply,
                                                locator).second;
     auto methodType = memberType->castTo<AnyFunctionType>();
-    auto argType = methodType->getParams()[0].getType();
+    auto argType = methodType->getParams()[0].getPlainType();
 
     // Attempts to solve an argument conversion constraint from each dynamic
     // call parameter to the specified type. Returns true if the constraint can
@@ -4684,7 +4684,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
                     locator);
       // Constraint each dynamic call parameter to argument type.
       for (auto param : func1->getParams()) {
-        auto paramType = param.getType();
+        auto paramType = param.getPlainType();
         auto locatorBuilder =
           outerLocator.withPathElement(ConstraintLocator::ApplyArgument);
         if (matchTypes(paramType, argElementType,

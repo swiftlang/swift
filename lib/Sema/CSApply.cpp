@@ -2355,10 +2355,10 @@ namespace {
       SmallVector<Type, 8> diffParamTypes;
       if (expr->getParameters().empty()) {
         for (auto &gradParam : gradParams)
-          diffParamTypes.push_back(gradParam.getType());
+          diffParamTypes.push_back(gradParam.getPlainType());
       } else {
         for (auto &param : expr->getParameters())
-          diffParamTypes.push_back(gradParams[param.index].getType());
+          diffParamTypes.push_back(gradParams[param.index].getPlainType());
       }
       return expr;
     }

@@ -1320,7 +1320,7 @@ namespace {
       // original parameters' types.
       if (GE->getParameters().empty())
         for (auto &originalParam : originalParams)
-          diffParamTypes.push_back(originalParam.getType());
+          diffParamTypes.push_back(originalParam.getPlainType());
       // If parameters are specified, collect and type-check those parameters.
       else {
         int lastIndex = -1;
@@ -1342,7 +1342,7 @@ namespace {
           }
           // The parameter cannot be a reference object or a protocol
           // existential.
-          auto paramTy = originalParams[index].getType();
+          auto paramTy = originalParams[index].getPlainType();
           if (paramTy->isAnyClassReferenceType() ||
               paramTy->isExistentialType()) {
             TC.diagnose(param.loc, diag::gradient_expr_parameter_not_value_type,
@@ -1679,10 +1679,9 @@ namespace {
       // Now that we know what all of the arguments are supposed to be, add a
       // constraint to the constraint system.
       auto desiredArgTypes = TupleType::get(argTypes, tc.Context);
-      CS.addConstraint(ConstraintKind::ArgumentTupleConversion,
-                       CS.getType(tt), desiredArgTypes,
-                       CS.getConstraintLocator(expr,
-                                         ConstraintLocator::ApplyArgument));
+      CS.addConstraint(
+          ConstraintKind::Conversion, CS.getType(tt), desiredArgTypes,
+          CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
       return CS.createTypeVariable(locator, 0);
     }
 

@@ -713,10 +713,11 @@ getLoweredFunctionParameterIndex(unsigned paramIndex, AnyFunctionType *ty) {
   auto params = ty->getParams();
   assert(paramIndex < params.size() && "Parameter index out of bounds!");
   for (auto i : range(paramIndex))
-    startIndex += countNumFlattenedElementTypes(params[i].getType());
+    startIndex += countNumFlattenedElementTypes(params[i].getPlainType());
   // Compute the offset from the given parameter's first corresponding argument
   // index to the last corresponding argument index.
-  unsigned offset = countNumFlattenedElementTypes(params[paramIndex].getType());
+  unsigned offset = countNumFlattenedElementTypes(
+      params[paramIndex].getPlainType());
   return range(startIndex, startIndex + offset);
 }
 

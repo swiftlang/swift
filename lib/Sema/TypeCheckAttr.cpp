@@ -2476,11 +2476,48 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     attr->setInvalid();
   };
 
+  // Checks that the `candidate` function type equals the `required` function
+  // type, disregarding parameter labels.
+  //
+  // Precondition: `required` has no parameter labels.
+  std::function<bool(CanAnyFunctionType, CanType)> checkAdjointSignature;
+  checkAdjointSignature = [&](CanAnyFunctionType required,
+                              CanType candidate) -> bool {
+
+    // Check that candidate is actually a function.
+    CanAnyFunctionType candidateFnTy = dyn_cast<AnyFunctionType>(candidate);
+    if (!candidateFnTy)
+      return false;
+
+    // Check that generic signatures match.
+    if (candidateFnTy.getOptGenericSignature() !=
+        required.getOptGenericSignature())
+      return false;
+
+    // Check that parameter types match (disregards labels).
+    for (auto paramPair : llvm::zip(candidateFnTy.getParams(),
+                                    required.getParams()))
+      if (std::get<0>(paramPair).getParameterType() !=
+          std::get<1>(paramPair).getParameterType())
+        return false;
+
+    // If required result type is non-function, check that result types match
+    // exactly.
+    CanAnyFunctionType requiredResultFnTy =
+        dyn_cast<AnyFunctionType>(required.getResult());
+    if (!requiredResultFnTy)
+      return required.getResult() == candidateFnTy.getResult();
+
+    // Required result type is a function. Recurse.
+    return checkAdjointSignature(requiredResultFnTy,
+                                 candidateFnTy.getResult());
+  };
+
   auto isValidAdjoint = [&](FuncDecl *adjointCandidate) {
     TC.validateDeclForNameLookup(adjointCandidate);
-    auto adjointType = adjointCandidate->getInterfaceType()
-      ->getUnlabeledType(ctx);
-    return adjointType->isEqual(expectedAdjointFnTy);
+    return checkAdjointSignature(
+        cast<AnyFunctionType>(expectedAdjointFnTy->getCanonicalType()),
+        adjointCandidate->getInterfaceType()->getCanonicalType());
   };
 
   adjoint =

@@ -2,6 +2,8 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 //
+// FIXME: It's looking for a _modify coroutine on `allParameters`.
+//
 // TensorFlow aggregate parameter update tests.
 
 import TensorFlow

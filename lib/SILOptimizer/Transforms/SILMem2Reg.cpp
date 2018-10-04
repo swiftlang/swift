@@ -943,7 +943,7 @@ bool MemoryToRegisters::run() {
 /// SWIFT_ENABLE_TENSORFLOW
 /// Promote specific allocations.
 void MemoryToRegisters::promoteAllocs(ArrayRef<AllocStackInst*> allocs) {
-  splitAllCriticalEdges(F, true, DT, nullptr);
+  F.verifyCriticalEdges();
 
   // Compute dominator tree node levels for the function.
   DomTreeLevelMap DomTreeLevels;

@@ -71,7 +71,7 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
 
   // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::ParameterAggregate)
-    return canDeriveParameterAggregate(TC, Nominal);
+    return canDeriveParameterAggregate(Nominal);
 
   if (auto *enumDecl = dyn_cast<EnumDecl>(Nominal)) {
     switch (*knownProtocol) {
@@ -364,8 +364,6 @@ DerivedConformance::declareDerivedPropertySetter(TypeChecker &tc,
 
   auto &C = tc.Context;
   auto parentDC = property->getDeclContext();
-  auto selfDecl =
-    ParamDecl::createSelf(SourceLoc(), parentDC, isStatic, /*isInOut*/ true);
 
   auto propertyInterfaceType = property->getInterfaceType();
   auto propertyParam = new (C)
@@ -381,7 +379,7 @@ DerivedConformance::declareDerivedPropertySetter(TypeChecker &tc,
     AccessorKind::Set, AddressorKind::NotAddressor, property,
     /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,
     /*Throws*/ false, /*ThrowsLoc*/ SourceLoc(),
-    /*GenericParams*/ nullptr, selfDecl, params, TypeLoc(), parentDC);
+    /*GenericParams*/ nullptr, params, TypeLoc(), parentDC);
   setterDecl->setImplicit();
   setterDecl->setStatic(isStatic);
   setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);

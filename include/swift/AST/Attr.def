@@ -384,14 +384,14 @@ SIMPLE_DECL_ATTR(_nonoverride, NonOverride,
 
 // SWIFT_ENABLE_TENSORFLOW
 DECL_ATTR(differentiable, Differentiable,
-          OnFunc | LongAttribute, 79)
+          OnFunc | LongAttribute, 80)
 SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
                  OnAccessor | OnFunc | OnConstructor | OnSubscript,
-                 /* Not serialized */ 80)
+                 /* Not serialized */ 81)
 SIMPLE_DECL_ATTR(TensorFlowGraph, TensorFlowGraph,
-                 OnFunc, 81)
+                 OnFunc, 82)
 SIMPLE_DECL_ATTR(TFParameter, TFParameter,
-                 OnVar, 82)
+                 OnVar, 83)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

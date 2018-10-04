@@ -408,6 +408,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
+  auto &Ctx = F.getASTContext();
   for (auto *DA : F.getReverseDifferentiableAttrs()) {
     unsigned differentiableAttrAbbrCode =
         SILAbbrCodes[SILReverseDifferentiableAttrLayout::Code];

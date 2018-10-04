@@ -795,7 +795,7 @@ MULTIPLE_VALUE_INST(GraphOperationInst, graph_op,
 INST_RANGE(MultipleValueInstruction, BeginApplyInst, GraphOperationInst)
 
 NODE_RANGE(SILInstruction, AllocStackInst, GraphOperationInst)
-NODE_RANGE(SILNode, SILPHIArgument, GraphOperationInst)
+NODE_RANGE(SILNode, SILPhiArgument, GraphOperationInst)
 
 #undef SINGLE_VALUE_INST_RANGE
 #undef INST_RANGE

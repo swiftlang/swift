@@ -2162,7 +2162,6 @@ protected:
     case SILInstructionKind::IntegerLiteralInst:
     case SILInstructionKind::FloatLiteralInst:
     case SILInstructionKind::StringLiteralInst:
-    case SILInstructionKind::ConstStringLiteralInst:
     case SILInstructionKind::TupleInst:
     case SILInstructionKind::StructInst:
     case SILInstructionKind::TupleExtractInst:
