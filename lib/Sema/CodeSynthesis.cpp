@@ -2040,7 +2040,7 @@ void swift::maybeAddAccessorsToStorage(TypeChecker &TC,
         auto diag = TC.diagnose(var->getLoc(), diag::protocol_property_must_be_computed);
 
         if (braces.isValid())
-          diag.fixItReplace(braces, " { get <#set#> }");
+          diag.fixItReplace(braces, "{ get <#set#> }");
         else
           diag.fixItInsertAfter(var->getTypeLoc().getLoc(), " { get <#set#> }");
       }
