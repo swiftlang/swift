@@ -7,7 +7,7 @@ var f : Int
 #if os(macOS)
 #endif
 
-// CHECK: <#kw>#if</#kw> <kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> <#id>CONF</#id>
 #if CONF
   // CHECK: <kw>var</kw> x : <type>Int</type>
   var x : Int
@@ -18,14 +18,14 @@ var f : Int
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> <kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> <#id>CONF</#id>
 #if CONF
   // CHECK: <kw>var</kw> x2 : <type>Int</type>
   var x2 : Int
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
 #if !CONF
   // CHECK: <kw>var</kw> x3 : <type>Int</type>
   var x3 : Int
@@ -36,14 +36,14 @@ var f : Int
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
 #if !CONF
   // CHECK: <kw>var</kw> x4 : <type>Int</type>
   var x4 : Int
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> <kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> <#id>CONF</#id>
 #if CONF
   // CHECK: <kw>var</kw> y1 : <type>Int</type>
   var y1 : Int
@@ -58,7 +58,7 @@ var f : Int
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
 #if !CONF
   // CHECK: <kw>var</kw> y2 : <type>Int</type>
   var y2 : Int
@@ -73,11 +73,11 @@ var f : Int
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
 #if !CONF
   // CHECK: <kw>var</kw> y3 : <type>Int</type>
   var y3 : Int
-// CHECK: <#kw>#elseif</#kw> <kw>CONF</kw>
+// CHECK: <#kw>#elseif</#kw> <#id>CONF</#id>
 #elseif CONF
   // CHECK: <kw>var</kw> y3 : <type>String</type>
   var y3 : String
@@ -96,7 +96,7 @@ class C1 {
   // CHECK: <kw>var</kw> f : <type>Int</type>
   var f : Int
 
-// CHECK: <#kw>#if</#kw> <kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> <#id>CONF</#id>
 #if CONF
   // CHECK: <kw>var</kw> x : <type>Int</type>
   var x : Int
@@ -107,14 +107,14 @@ class C1 {
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> <kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> <#id>CONF</#id>
 #if CONF
   // CHECK: <kw>var</kw> x2 : <type>Int</type>
   var x2 : Int
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
 #if !CONF
   // CHECK: <kw>var</kw> x3 : <type>Int</type>
   var x3 : Int
@@ -125,14 +125,14 @@ class C1 {
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
 #if !CONF
   // CHECK: <kw>var</kw> x4 : <type>Int</type>
   var x4 : Int
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> <kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> <#id>CONF</#id>
 #if CONF
   // CHECK: <kw>var</kw> y1 : <type>Int</type>
   var y1 : Int
@@ -147,7 +147,7 @@ class C1 {
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
 #if !CONF
   // CHECK: <kw>var</kw> y2 : <type>Int</type>
   var y2 : Int
@@ -162,11 +162,11 @@ class C1 {
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
 #if !CONF
   // CHECK: <kw>var</kw> y3 : <type>Int</type>
   var y3 : Int
-// CHECK: <#kw>#elseif</#kw> <kw>CONF</kw>
+// CHECK: <#kw>#elseif</#kw> <#id>CONF</#id>
 #elseif CONF
   // CHECK: <kw>var</kw> y3 : <type>String</type>
   var y3 : String
@@ -186,7 +186,7 @@ func test1() {
   // CHECK: <kw>var</kw> f : <type>Int</type>
   var f : Int
 
-// CHECK: <#kw>#if</#kw> <kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> <#id>CONF</#id>
 #if CONF
   // CHECK: <kw>var</kw> x : <type>Int</type>
   var x : Int
@@ -197,14 +197,14 @@ func test1() {
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> <kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> <#id>CONF</#id>
 #if CONF
   // CHECK: <kw>var</kw> x2 : <type>Int</type>
   var x2 : Int
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
 #if !CONF
   // CHECK: <kw>var</kw> x3 : <type>Int</type>
   var x3 : Int
@@ -215,14 +215,14 @@ func test1() {
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
 #if !CONF
   // CHECK: <kw>var</kw> x4 : <type>Int</type>
   var x4 : Int
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> <kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> <#id>CONF</#id>
 #if CONF
   // CHECK: <kw>var</kw> y1 : <type>Int</type>
   var y1 : Int
@@ -237,7 +237,7 @@ func test1() {
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
 #if !CONF
   // CHECK: <kw>var</kw> y2 : <type>Int</type>
   var y2 : Int
@@ -252,11 +252,11 @@ func test1() {
 // CHECK: <#kw>#endif</#kw>
 #endif
 
-// CHECK: <#kw>#if</#kw> !<kw>CONF</kw>
+// CHECK: <#kw>#if</#kw> !<#id>CONF</#id>
 #if !CONF
   // CHECK: <kw>var</kw> y3 : <type>Int</type>
   var y3 : Int
-// CHECK: <#kw>#elseif</#kw> <kw>CONF</kw>
+// CHECK: <#kw>#elseif</#kw> <#id>CONF</#id>
 #elseif CONF
   // CHECK: <kw>var</kw> y3 : <type>String</type>
   var y3 : String

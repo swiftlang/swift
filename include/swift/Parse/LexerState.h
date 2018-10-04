@@ -35,6 +35,8 @@ public:
     assert(isValid());
     return LexerState(Loc.getAdvancedLoc(Offset));
   }
+  LexerState(const char *Ptr) :
+    Loc(SourceLoc(llvm::SMLoc::getFromPointer(Ptr))) {}
 
 private:
   explicit LexerState(SourceLoc Loc) : Loc(Loc) {}

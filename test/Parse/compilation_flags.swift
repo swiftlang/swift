@@ -2,7 +2,7 @@
 
 import Swift
 
-print("\(FOO) \(BAR)")
+print("\(#flagValue("FOO")) \(#flagValue("BAR"))")
 
 // CHECK: (float_literal_expr {{.*}} value=99.9))))
 // CHECK: (string_literal_expr {{.*}} value="a string" {{.*}}))))

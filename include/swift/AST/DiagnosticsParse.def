@@ -142,11 +142,6 @@ ERROR(lex_invalid_escape_delimiter,none,
       "too many '#' characters in delimited escape", ())
 ERROR(lex_invalid_closing_delimiter,none,
       "too many '#' characters in closing delimiter", ())
-ERROR(lex_invalid_compilation_flag,none,
-      "unable to parse token from compilation flag value '%0' for identifier '%1'",
-      (StringRef, StringRef))
-WARNING(lex_invalid_interpolation_in_flag,none,
-      "interolations are ignored inside compilation flag values", ())
 
 ERROR(lex_invalid_unicode_scalar,none,
       "invalid unicode scalar", ())
@@ -1250,6 +1245,22 @@ ERROR(expr_typeof_expected_rparen,PointsToFirstBadToken,
       "expected ')' to complete 'type(of: ...)' expression", ())
 ERROR(expr_dynamictype_deprecated,PointsToFirstBadToken,
       "'.dynamicType' is deprecated. Use 'type(of: ...)' instead", ())
+
+// #flagValue expressions.
+ERROR(keyvalue_missing_leftbrace,PointsToFirstBadToken,
+      "#flagValue must be followed by '('", ())
+ERROR(keyvalue_not_string_literal,PointsToFirstBadToken,
+      "#flagValue argument must be string literal", ())
+ERROR(keyvalue_file_open_failure,PointsToFirstBadToken,
+      "#flagValue unable to open included file '%0': '%1'", (StringRef, StringRef))
+ERROR(keyvalue_invalid_literal,PointsToFirstBadToken,
+      "#flagValue contents '%0' are invalid literal type", (StringRef))
+ERROR(keyvalue_expected,PointsToFirstBadToken,
+      "#flagValue expected '%0'", (StringRef))
+ERROR(keyvalue_no_value,PointsToFirstBadToken,
+      "#flagValue no value found for key '%0' and no default", (StringRef))
+WARNING(keyvalue_invalid_interpolation,none,
+      "#flagValue interpolations are ignored inside values", ())
 
 //------------------------------------------------------------------------------
 // MARK: Attribute-parsing diagnostics

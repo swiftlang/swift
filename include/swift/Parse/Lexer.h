@@ -415,7 +415,7 @@ public:
   StringRef getEncodedStringSegment(StringSegment Segment,
                                     SmallVectorImpl<char> &Buffer) const {
     return getEncodedStringSegmentImpl(
-        StringRef(static_cast<const char *>(Segment.Loc
+        StringRef(reinterpret_cast<const char *>(Segment.Loc
                   .getOpaquePointerValue()), Segment.Length),
         Buffer, Segment.IsFirstSegment, Segment.IsLastSegment,
         Segment.IndentToStrip, Segment.CustomDelimiterLen);
@@ -451,17 +451,18 @@ public:
   static void getStringLiteralSegments(
       const Token &Str,
       SmallVectorImpl<StringSegment> &Segments,
-      DiagnosticEngine *Diags, const LangOptions *LangOpts = nullptr,
-                  const SourceManager *SourceMgr = nullptr);
+      DiagnosticEngine *Diags);
 
   void getStringLiteralSegments(const Token &Str,
                                 SmallVectorImpl<StringSegment> &Segments) {
-    return getStringLiteralSegments(Str, Segments, Diags, &LangOpts, &SourceMgr);
+    return getStringLiteralSegments(Str, Segments, Diags);
   }
 
   static SourceLoc getSourceLoc(const char *Loc) {
     return SourceLoc(llvm::SMLoc::getFromPointer(Loc));
   }
+
+  static StringRef getStringLiteralContent(const Token &Str);
 
   /// Get the token that starts at the given location.
   Token getTokenAt(SourceLoc Loc);
@@ -529,9 +530,8 @@ private:
   void lexIdentifier();
   void lexDollarIdent();
   void lexOperatorIdentifier();
-  void lexNumber(const char *&CurPtr, const char *BufferEnd);
-  void lexHexNumber(const char *&CurPtr, const char *BufferEnd);
-  bool adjustKindForCompilationFlag(StringRef Identifier, tok &Kind);
+  void lexHexNumber();
+  void lexNumber();
   void lexTrivia(syntax::Trivia &T, bool IsForTrailingTrivia);
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 

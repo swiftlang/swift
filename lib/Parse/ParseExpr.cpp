@@ -1440,10 +1440,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   SyntaxParsingContext ExprContext(SyntaxContext, SyntaxContextKind::Expr);
   switch (Tok.getKind()) {
   case tok::integer_literal: {
-    StringRef Text = Tok.getText();
-    if (Tok.isCustomCompilationFlag())
-      Text = SourceMgr.bufferedCompilationFlag(Text, Context.LangOpts);
-    Text = copyAndStripUnderscores(Context, Text);
+    StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::integer_literal);
     ExprContext.setCreateSyntax(SyntaxKind::IntegerLiteralExpr);
     return makeParserResult(new (Context)
@@ -1451,10 +1448,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                                                    /*Implicit=*/false));
   }
   case tok::floating_literal: {
-    StringRef Text = Tok.getText();
-    if (Tok.isCustomCompilationFlag())
-      Text = SourceMgr.bufferedCompilationFlag(Text, Context.LangOpts);
-    Text = copyAndStripUnderscores(Context, Text);
+    StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
     SourceLoc Loc = consumeToken(tok::floating_literal);
     ExprContext.setCreateSyntax(SyntaxKind::FloatLiteralExpr);
     return makeParserResult(new (Context) FloatLiteralExpr(Text, Loc,
@@ -1584,6 +1578,9 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
 
   case tok::pound_keyPath:
     return parseExprKeyPathObjC();
+
+  case tok::pound_flagValue:
+    return parseExprFlagValue(ID, isExprBasic);
 
   case tok::l_brace:     // expr-closure
     return parseExprClosure();
@@ -1972,6 +1969,108 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
   return makeParserResult(Status, new (Context) InterpolatedStringLiteralExpr(
                                       Loc, Context.AllocateCopy(Exprs)));
+}
+
+ParserResult<Expr> Parser::parseExprFlagValue(Diag<> ID, bool isExprBasic) {
+  ParserResult<Expr> Result;
+  consumeToken();
+  if (!consumeIf(tok::l_paren)) {
+    diagnose(Tok, diag::keyvalue_missing_leftbrace);
+    return makeParserError();
+  }
+
+  auto Bail = [&] () {
+    skipUntilTokenOrEndOfLine(tok::r_brace);
+    return makeParserError();
+  };
+  if (!Tok.is(tok::string_literal)) {
+    diagnose(Tok, diag::keyvalue_not_string_literal);
+    return Bail();
+  }
+
+  StringRef FlagName = Lexer::getStringLiteralContent(Tok);
+  bool IsFileInclude = FlagName.size() && FlagName[0] == '@';
+  if (IsFileInclude)
+    FlagName = FlagName.drop_front();
+
+  const auto &Flags = Context.LangOpts.getCustomCompilationFlags();
+  if (Flags.find(FlagName) != Flags.end()) {
+    StringRef Value = Flags.at(FlagName);
+
+    if (Value.size() && Value[0] == '@') {
+      Value = Value.drop_front();
+      IsFileInclude = true;
+    }
+
+    if (IsFileInclude) {
+      const auto FileSystem = SourceMgr.getFileSystem();
+      using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
+      FileOrError inputFileOrErr = swift::vfs::getFileOrSTDIN(*FileSystem.get(),
+                                                              Value);
+      if (!inputFileOrErr) {
+        diagnose(Tok.getLoc(), diag::keyvalue_file_open_failure,
+                 Value, inputFileOrErr.getError().message());
+        return Bail();
+      }
+
+      unsigned BufferId = SourceMgr.addNewSourceBuffer(std::move(*inputFileOrErr));
+      StringRef Buffer = SourceMgr.getEntireTextForBuffer(BufferId);
+      SourceLoc Loc = SourceLoc(llvm::SMLoc::getFromPointer(Buffer.begin()));
+
+      auto Segment = Lexer::StringSegment::getLiteral(Loc, Buffer.size(),
+                                                      false, false, 0, 255);
+      Result = makeParserResult(createStringLiteralExprFromSegment(
+         Context, L, Segment, Loc));
+
+      consumeIf(tok::string_literal);
+    }
+    else {
+      unsigned BufferId = SourceMgr.addMemBufferCopy(Value, "-D"+FlagName.str());
+      StringRef Buffer = SourceMgr.getEntireTextForBuffer(BufferId);
+
+      {
+        // Temporarily swap out the parser's current lexer with our new one.
+        Lexer LocalLex(*L, LexerState(Buffer.begin()), LexerState(Buffer.end()));
+
+        llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
+        consumeIf(tok::string_literal);
+      }
+
+      if (!Tok.isAny(tok::identifier, tok::string_literal,
+                     tok::floating_literal, tok::integer_literal)) {
+        diagnose(Tok.getLoc(), diag::keyvalue_invalid_literal, Value);
+        consumeToken();
+        return Bail();
+      }
+
+      Tok.setCustomCompilationFlag();
+      Result = parseExprPrimary(ID, isExprBasic);
+    }
+  }
+  else
+    consumeIf(tok::string_literal);
+
+  if (consumeIf(tok::comma)) {
+    if (parseToken(tok::kw_default, diag::keyvalue_expected, "default:") ||
+        parseToken(tok::colon, diag::keyvalue_expected, ":"))
+      return Bail();
+
+    auto Default = parseExprImpl(ID, isExprBasic);
+
+    if (Result.isNull())
+      Result = Default;
+  }
+
+  if (Result.isNull()) {
+    diagnose(Tok.getLoc(), diag::keyvalue_no_value, FlagName);
+    Result = makeParserError();
+  }
+
+  if (parseToken(tok::r_paren, diag::keyvalue_expected, ")")) {
+    return Bail();
+  }
+
+  return Result;
 }
 
 void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {

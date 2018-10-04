@@ -3541,7 +3541,9 @@ public:
         llvm_unreachable("impossible parent node");
       }
       
-      if (!Ctx.SourceMgr.rangeContains(Enclosing, Current)) {
+      if (!Ctx.SourceMgr.rangeContains(Enclosing, Current) &&
+          Ctx.SourceMgr.findBufferContainingLoc(Current.Start) ==
+          Ctx.SourceMgr.findBufferContainingLoc(Enclosing.Start)) {
         Out << "child source range not contained within its parent: ";
         printEntity();
         Out << "\n  parent range: ";

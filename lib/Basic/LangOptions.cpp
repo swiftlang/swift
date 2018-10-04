@@ -141,8 +141,7 @@ checkPlatformCondition(PlatformConditionKind Kind, StringRef Value) const {
 }
 
 bool LangOptions::isCustomCompilationFlagSet(StringRef Name) const {
-  return CustomCompilationFlags.find(Name)
-      != CustomCompilationFlags.end() &&
+  return CustomCompilationFlags.find(Name) != CustomCompilationFlags.end() &&
       CustomCompilationFlags.at(Name) != "false";
 }
 

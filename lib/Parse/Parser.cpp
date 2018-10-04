@@ -418,6 +418,9 @@ public:
       TokEndLoc = SM.getLocForBufferStart(BufferID);
     }
     llvm::SmallVector<Token, 4> Scratch;
+    StringRef Bounds = SM.getEntireTextForBuffer(BufferID);
+    if (TokEndLoc.getOpaquePointerValue() >= Bounds.begin() &&
+        TokEndLoc.getOpaquePointerValue() <= Bounds.end())
     relexComment(CharSourceRange(SM, TokEndLoc,
                                  SM.getRangeForBuffer(BufferID).getEnd()),
                  Scratch);

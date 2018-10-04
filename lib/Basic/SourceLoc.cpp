@@ -12,7 +12,6 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Basic/LangOptions.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/raw_ostream.h"
@@ -157,19 +156,6 @@ Optional<unsigned> SourceManager::getIDForBufferIdentifier(
   if (It == BufIdentIDMap.end())
     return None;
   return It->second;
-}
-
-StringRef SourceManager::bufferedCompilationFlag(StringRef Name,
-                                                 const LangOptions &LangOpts) {
-  if (Name[0] == '#')
-    Name = Name.drop_front();
-  const auto &Custom = LangOpts.getCustomCompilationFlags();
-  if (Custom.find(Name) != Custom.end()) {
-    unsigned BufferId = addMemBufferCopy(Custom.at(Name));
-    return getEntireTextForBuffer(BufferId);
-  }
-  else
-    return Name;
 }
 
 StringRef SourceManager::getIdentifierForBuffer(unsigned bufferID) const {

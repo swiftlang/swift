@@ -235,7 +235,8 @@ Lexer::Lexer(const LangOptions &Options, const SourceManager &SourceMgr,
 }
 
 Lexer::Lexer(Lexer &Parent, State BeginState, State EndState)
-    : Lexer(PrincipalTag(), Parent.LangOpts, Parent.SourceMgr, Parent.BufferID,
+    : Lexer(PrincipalTag(), Parent.LangOpts, Parent.SourceMgr,
+            Parent.SourceMgr.findBufferContainingLoc(BeginState.Loc),
             Parent.Diags, Parent.InSILMode,
             Parent.IsHashbangAllowed
                 ? HashbangMode::Allowed
@@ -643,33 +644,6 @@ tok Lexer::kindOfIdentifier(StringRef Str, bool InSILMode) {
   return tok::identifier;
 }
 
-/// adjustKindForCompilationFlag - Detect and parse custom compilation flags.
-bool Lexer::adjustKindForCompilationFlag(StringRef Identifier, tok &Kind) {
-  const auto &Custom = LangOpts.getCustomCompilationFlags();
-  bool IsCustomCompilationFlag = Custom.find(Identifier) != Custom.end();
-  if (IsCustomCompilationFlag) {
-    std::string Value = Custom.at(Identifier);
-    const char *Start = Value.data(), *End = Value.data() + Value.size();
-
-    if (End - Start >= 2 && *Start == '"' && *(End - 1) == '"')
-      Kind = tok::string_literal;
-    else if (Value == "true")
-      Kind = tok::kw_true;
-    else if (Value == "false")
-      Kind = tok::kw_false;
-    else if (isDigit(*Start++)) {
-      lexNumber(Start, End);
-      if (Start == End)
-        Kind = NextToken.getKind();
-      else
-        diagnose(Identifier.data(), diag::lex_invalid_compilation_flag,
-                 StringRef(Value), Identifier);
-    }
-  }
-
-  return IsCustomCompilationFlag;
-}
-
 /// lexIdentifier - Match [a-zA-Z_][a-zA-Z_$0-9]*
 void Lexer::lexIdentifier() {
   const char *TokStart = CurPtr-1;
@@ -681,11 +655,8 @@ void Lexer::lexIdentifier() {
   // Lex [a-zA-Z_$0-9[[:XID_Continue:]]]*
   while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
 
-  StringRef Identifier(TokStart, CurPtr-TokStart);
-  tok Kind = kindOfIdentifier(Identifier, InSILMode);
-  bool IsCustomCompilationFlag = adjustKindForCompilationFlag(Identifier, Kind);
-  formToken(Kind, TokStart);
-  NextToken.setCustomCompilationFlag(IsCustomCompilationFlag);
+  tok Kind = kindOfIdentifier(StringRef(TokStart, CurPtr-TokStart), InSILMode);
+  return formToken(Kind, TokStart);
 }
 
 /// lexHash - Handle #], #! for shebangs, and the family of #identifiers.
@@ -707,24 +678,15 @@ void Lexer::lexHash() {
 #include "swift/Syntax/TokenKinds.def"
   .Default(tok::pound);
 
-  bool IsCustomCompilationFlag = false;
-  if (Kind == tok::pound) {
-    tmpPtr = CurPtr;
-    while (advanceIfValidContinuationOfIdentifier(tmpPtr, BufferEnd));
-    StringRef Identifier = StringRef(CurPtr, tmpPtr-CurPtr);
-    IsCustomCompilationFlag = adjustKindForCompilationFlag(Identifier, Kind);
-
-    // If we didn't find a match, then just return tok::pound.  This is highly
-    // dubious in terms of error recovery, but is useful for code completion
-    // and SIL parsing.
-    if (!IsCustomCompilationFlag)
-      return formToken(tok::pound, TokStart);
-  }
+  // If we didn't find a match, then just return tok::pound.  This is highly
+  // dubious in terms of error recovery, but is useful for code completion and
+  // SIL parsing.
+  if (Kind == tok::pound)
+    return formToken(tok::pound, TokStart);
 
   // If we found something specific, return it.
   CurPtr = tmpPtr;
-  formToken(Kind, TokStart);
-  NextToken.setCustomCompilationFlag(IsCustomCompilationFlag);
+  return formToken(Kind, TokStart);
 }
 
 
@@ -981,12 +943,11 @@ void Lexer::lexDollarIdent() {
 
 enum class ExpectedDigitKind : unsigned { Binary, Octal, Decimal, Hex };
 
-void Lexer::lexHexNumber(const char *&CurPtr, const char *BufferEnd) {
+void Lexer::lexHexNumber() {
   // We assume we're starting from the 'x' in a '0x...' floating-point literal.
   assert(*CurPtr == 'x' && "not a hex literal");
-  assert(*(CurPtr - 1) == '0' && "not a hex literal");
-  const char *TokStart = this->CurPtr-1;
-  bool IsFlag = CurPtr != this->CurPtr;
+  const char *TokStart = CurPtr-1;
+  assert(*TokStart == '0' && "not a hex literal");
 
   auto expected_digit = [&]() {
     while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
@@ -994,8 +955,8 @@ void Lexer::lexHexNumber(const char *&CurPtr, const char *BufferEnd) {
   };
 
   auto expected_hex_digit = [&](const char *loc) {
-    diagnose(IsFlag ? TokStart : loc, diag::lex_invalid_digit_in_int_literal,
-             StringRef(loc, 1), (unsigned)ExpectedDigitKind::Hex);
+    diagnose(loc, diag::lex_invalid_digit_in_int_literal, StringRef(loc, 1),
+             (unsigned)ExpectedDigitKind::Hex);
     return expected_digit();
   };
 
@@ -1038,8 +999,7 @@ void Lexer::lexHexNumber(const char *&CurPtr, const char *BufferEnd) {
         CurPtr = PtrOnDot;
         return formToken(tok::integer_literal, TokStart);
       }
-      diagnose(IsFlag ? TokStart : CurPtr,
-               diag::lex_expected_binary_exponent_in_hex_float_literal);
+      diagnose(CurPtr, diag::lex_expected_binary_exponent_in_hex_float_literal);
       return formToken(tok::unknown, TokStart);
     }
   }
@@ -1067,8 +1027,7 @@ void Lexer::lexHexNumber(const char *&CurPtr, const char *BufferEnd) {
     // non-identifier (empty exponent)
     auto tmp = CurPtr;
     if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd))
-      diagnose(IsFlag ? TokStart : tmp,
-               diag::lex_invalid_digit_in_fp_exponent, StringRef(tmp, 1),
+      diagnose(tmp, diag::lex_invalid_digit_in_fp_exponent, StringRef(tmp, 1),
                *tmp == '_');
     else
       diagnose(CurPtr, diag::lex_expected_digit_in_fp_exponent);
@@ -1081,8 +1040,7 @@ void Lexer::lexHexNumber(const char *&CurPtr, const char *BufferEnd) {
 
   auto tmp = CurPtr;
   if (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd)) {
-    diagnose(IsFlag ? TokStart : tmp,
-             diag::lex_invalid_digit_in_fp_exponent, StringRef(tmp, 1),
+    diagnose(tmp, diag::lex_invalid_digit_in_fp_exponent, StringRef(tmp, 1),
              false);
     return expected_digit();
   }
@@ -1100,10 +1058,9 @@ void Lexer::lexHexNumber(const char *&CurPtr, const char *BufferEnd) {
 ///   floating_literal ::= [0-9][0-9_]*[eE][+-]?[0-9][0-9_]*
 ///   floating_literal ::= 0x[0-9A-Fa-f][0-9A-Fa-f_]*
 ///                          (\.[0-9A-Fa-f][0-9A-Fa-f_]*)?[pP][+-]?[0-9][0-9_]*
-void Lexer::lexNumber(const char *&CurPtr, const char *BufferEnd) {
-  const char *TokStart = this->CurPtr-1, *RealTokStart = CurPtr-1;
-  assert((isDigit(*RealTokStart) || *RealTokStart == '.') && "Unexpected start");
-  bool IsFlag = CurPtr != this->CurPtr;
+void Lexer::lexNumber() {
+  const char *TokStart = CurPtr-1;
+  assert((isDigit(*TokStart) || *TokStart == '.') && "Unexpected start");
 
   auto expected_digit = [&]() {
     while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
@@ -1111,15 +1068,15 @@ void Lexer::lexNumber(const char *&CurPtr, const char *BufferEnd) {
   };
 
   auto expected_int_digit = [&](const char *loc, ExpectedDigitKind kind) {
-    diagnose(IsFlag ? TokStart : loc, diag::lex_invalid_digit_in_int_literal,
-             StringRef(loc, 1), (unsigned)kind);
+    diagnose(loc, diag::lex_invalid_digit_in_int_literal, StringRef(loc, 1),
+             (unsigned)kind);
     return expected_digit();
   };
 
-  if (*RealTokStart == '0' && *CurPtr == 'x')
-    return lexHexNumber(CurPtr, BufferEnd);
+  if (*TokStart == '0' && *CurPtr == 'x')
+    return lexHexNumber();
   
-  if (*RealTokStart == '0' && *CurPtr == 'o') {
+  if (*TokStart == '0' && *CurPtr == 'o') {
     // 0o[0-7][0-7_]*
     ++CurPtr;
     if (*CurPtr < '0' || *CurPtr > '7')
@@ -1135,7 +1092,7 @@ void Lexer::lexNumber(const char *&CurPtr, const char *BufferEnd) {
     return formToken(tok::integer_literal, TokStart);
   }
   
-  if (*RealTokStart && *CurPtr == 'b') {
+  if (*TokStart == '0' && *CurPtr == 'b') {
     // 0b[01][01_]*
     ++CurPtr;
     if (*CurPtr != '0' && *CurPtr != '1')
@@ -1590,7 +1547,7 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
 
 /// getStringLiteralContent:
 /// Extract content of string literal from inside quotes.
-static StringRef getStringLiteralContent(const Token &Str) {
+StringRef Lexer::getStringLiteralContent(const Token &Str) {
   StringRef Bytes = Str.getText();
 
   if (unsigned CustomDelimiterLen = Str.getCustomDelimiterLen())
@@ -1726,7 +1683,7 @@ static void diagnoseInvalidMultilineIndents(
 /// Diagnose contents of string literal that have inconsistent indentation.
 static void validateMultilineIndents(const Token &Str,
                                      DiagnosticEngine *Diags) {
-  StringRef Bytes = getStringLiteralContent(Str);
+  StringRef Bytes = Lexer::getStringLiteralContent(Str);
   StringRef Indent =
     getMultilineTrailingIndent(Bytes, Diags, Str.getCustomDelimiterLen());
   if (Indent.empty())
@@ -2265,14 +2222,10 @@ StringRef Lexer::getEncodedStringSegmentImpl(StringRef Bytes,
 void Lexer::getStringLiteralSegments(
               const Token &Str,
               SmallVectorImpl<StringSegment> &Segments,
-              DiagnosticEngine *Diags, const LangOptions *LangOpts,
-                                     const SourceManager *SourceMgr) {
+              DiagnosticEngine *Diags) {
   assert(Str.is(tok::string_literal));
   // Get the bytes behind the string literal, dropping any double quotes.
-  StringRef Bytes = Str.isCustomCompilationFlag() && LangOpts && SourceMgr ?
-    const_cast<SourceManager *>(SourceMgr)
-      ->bufferedCompilationFlag(Str.getText(), *LangOpts)
-          .drop_front().drop_back() : getStringLiteralContent(Str);
+  StringRef Bytes = getStringLiteralContent(Str);
 
   // Are substitutions required either for indent stripping or line ending
   // normalization?
@@ -2296,7 +2249,7 @@ void Lexer::getStringLiteralSegments(
 
     if (Str.isCustomCompilationFlag() && Diags) {
       Diags->diagnose(Lexer::getSourceLoc(BytesPtr-2),
-                      diag::lex_invalid_interpolation_in_flag);
+                      diag::keyvalue_invalid_interpolation);
       continue;
     }
 
@@ -2499,7 +2452,7 @@ void Lexer::lexImpl() {
 
   case '0': case '1': case '2': case '3': case '4':
   case '5': case '6': case '7': case '8': case '9':
-    return lexNumber(CurPtr, BufferEnd);
+    return lexNumber();
 
   case '"':
   case '\'':
