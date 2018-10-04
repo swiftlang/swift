@@ -311,6 +311,9 @@ code for the target that is not the build machine:
 * ``%target-os``: the target operating system (``macosx``, ``darwin``,
   ``linux``, ``freebsd``, ``windows-cygnus``, ``windows-gnu``).
 
+* ``%target-is-simulator``: ``true`` if the target is a simulator (iOS,
+  watchOS, tvOS), otherwise ``false``.
+
 * ``%target-object-format``: the platform's object format (``elf``, ``macho``,
   ``coff``).
 
