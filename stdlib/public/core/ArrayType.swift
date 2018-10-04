@@ -44,6 +44,16 @@ extension _ArrayProtocol {
     return _buffer.capacity
   }
 
+  /// An object that guarantees the lifetime of this array's elements.
+  @inlinable
+  public // @testable
+  var _owner: AnyObject? {
+    @inline(__always)
+    get {
+      return _buffer.owner      
+    }
+  }
+
   // Since RangeReplaceableCollection now has a version of filter that is less
   // efficient, we should make the default implementation coming from Sequence
   // preferred.

@@ -267,13 +267,6 @@ extension ArraySlice: _ArrayProtocol {
     return _getCapacity()
   }
 
-  /// An object that guarantees the lifetime of this array's elements.
-  @inlinable
-  public // @testable
-  var _owner: AnyObject? {
-    return _buffer.owner
-  }
-
   /// If the elements are stored contiguously, a pointer to the first
   /// element. Otherwise, `nil`.
   @inlinable
