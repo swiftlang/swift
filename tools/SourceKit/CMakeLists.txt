@@ -50,7 +50,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     execute_process(COMMAND sw_vers -productVersion
                     OUTPUT_VARIABLE SOURCEKIT_DEPLOYMENT_TARGET
                     OUTPUT_STRIP_TRAILING_WHITESPACE)
-    string(REGEX MATCH "[0-9]+\\.[0-9]+" SOURCEKIT_DEPLOYMENT_TARGET ${SOURCEKIT_DEPLOYMENT_TARGET})
+    string(REGEX MATCH "[0-9]+\\.[0-9]+" SOURCEKIT_DEPLOYMENT_TARGET "${SOURCEKIT_DEPLOYMENT_TARGET}")
   endif()
 
   # Sadly there are two OS naming conventions.
