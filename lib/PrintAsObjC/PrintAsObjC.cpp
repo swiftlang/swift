@@ -933,7 +933,7 @@ private:
     } else {
       TypeDecl *typeDecl = declContext->getSelfNominalTypeDecl();
       
-      if (!renamedDeclName.isSpecial()) {
+      if (!renamedParsedDeclName.ContextName.empty()) {
         auto contextIdentifier = D->getASTContext().getIdentifier(renamedParsedDeclName.ContextName);
         UnqualifiedLookup specificTypeLookup(contextIdentifier,
                                              declContext->getModuleScopeContext(),
