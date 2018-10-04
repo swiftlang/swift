@@ -1961,86 +1961,6 @@ IRGenModule::createNominalType(ProtocolCompositionType *type) {
   return llvm::StructType::create(getLLVMContext(), StringRef(typeName));
 }
 
-/// Compute the explosion schema for the given type.
-ExplosionSchema IRGenModule::getSchema(SILType type) {
-  ExplosionSchema schema;
-  getSchema(type, schema);
-  return schema;
-}
-
-/// Compute the explosion schema for the given type.
-void IRGenModule::getSchema(SILType type, ExplosionSchema &schema) {
-  // As an optimization, avoid actually building a TypeInfo for any
-  // obvious TupleTypes.  This assumes that a TupleType's explosion
-  // schema is always the concatenation of its component's schemas.
-  if (CanTupleType tuple = type.getAs<TupleType>()) {
-    for (auto index : indices(tuple.getElementTypes()))
-      getSchema(type.getTupleElementType(index), schema);
-    return;
-  }
-
-  // Okay, that didn't work;  just do the general thing.
-  getTypeInfo(type).getSchema(schema);
-}
-
-/// Compute the explosion schema for the given type.
-unsigned IRGenModule::getExplosionSize(SILType type) {
-  // As an optimization, avoid actually building a TypeInfo for any
-  // obvious TupleTypes.  This assumes that a TupleType's explosion
-  // schema is always the concatenation of its component's schemas.
-  if (auto tuple = type.getAs<TupleType>()) {
-    unsigned count = 0;
-    for (auto index : indices(tuple.getElementTypes()))
-      count += getExplosionSize(type.getTupleElementType(index));
-    return count;
-  }
-
-  // If the type isn't loadable, the explosion size is always 1.
-  auto *loadableTI = dyn_cast<LoadableTypeInfo>(&getTypeInfo(type));
-  if (!loadableTI) return 1;
-
-  // Okay, that didn't work;  just do the general thing.
-  return loadableTI->getExplosionSize();
-}
-
-/// Determine whether this type is a single value that is passed
-/// indirectly at the given level.
-llvm::PointerType *IRGenModule::isSingleIndirectValue(SILType type) {
-  if (auto archetype = type.getAs<ArchetypeType>()) {
-    if (!archetype->requiresClass())
-      return OpaquePtrTy;
-  }
-
-  ExplosionSchema schema;
-  getSchema(type, schema);
-  if (schema.size() == 1 && schema.begin()->isAggregate())
-    return schema.begin()->getAggregateType()->getPointerTo(0);
-  return nullptr;
-}
-
-/// Determine whether this type is known to be POD.
-bool IRGenModule::isPOD(SILType type, ResilienceExpansion expansion) {
-  if (type.is<ArchetypeType>()) return false;
-  if (type.is<ClassType>()) return false;
-  if (type.is<BoundGenericClassType>()) return false;
-  if (auto tuple = type.getAs<TupleType>()) {
-    for (auto index : indices(tuple.getElementTypes()))
-      if (!isPOD(type.getTupleElementType(index), expansion))
-        return false;
-    return true;
-  }
-  return getTypeInfo(type).isPOD(expansion);
-}
-
-/// Determine whether this type is known to be empty.
-bool IRGenModule::isKnownEmpty(SILType type, ResilienceExpansion expansion) {
-  if (auto tuple = type.getAs<TupleType>()) {
-    if (tuple->getNumElements() == 0)
-      return true;
-  }
-  return getTypeInfo(type).isKnownEmpty(expansion);
-}
-
 SpareBitVector IRGenModule::getSpareBitsForType(llvm::Type *scalarTy, Size size) {
   auto it = SpareBitsForTypes.find(scalarTy);
   if (it != SpareBitsForTypes.end())
@@ -2050,13 +1970,9 @@ SpareBitVector IRGenModule::getSpareBitsForType(llvm::Type *scalarTy, Size size)
          "using a size that's smaller than LLVM's alloc size?");
   
   {
-    // FIXME: Currently we only implement spare bits for single-element
-    // primitive integer types.
-    while (auto structTy = dyn_cast<llvm::StructType>(scalarTy)) {
-      if (structTy->getNumElements() != 1)
-        goto no_spare_bits;
-      scalarTy = structTy->getElementType(0);
-    }
+    // FIXME: Currently we only implement spare bits for primitive integer
+    // types.
+    assert(!isa<llvm::StructType>(scalarTy));
 
     auto *intTy = dyn_cast<llvm::IntegerType>(scalarTy);
     if (!intTy)

@@ -3402,8 +3402,8 @@ namespace {
             B.add(offset);
             return;
           }
-          assert(IGM.isKnownEmpty(Type.getFieldType(field, IGM.getSILModule()),
-                                  ResilienceExpansion::Maximal));
+          assert(IGM.getTypeInfo(Type.getFieldType(field, IGM.getSILModule()))
+                    .isKnownEmpty(ResilienceExpansion::Maximal));
           B.addInt32(0);
         }
 
