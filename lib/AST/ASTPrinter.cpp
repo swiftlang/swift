@@ -79,7 +79,7 @@ static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
   return !ND->isResilient() && ASD->hasStorage() && !ASD->isStatic();
 }
 
-PrintOptions PrintOptions::printTextualInterfaceFile() {
+PrintOptions PrintOptions::printParseableInterfaceFile() {
   PrintOptions result;
   result.PrintLongAttrsOnSeparateLines = true;
   result.TypeDefinitions = true;
@@ -100,7 +100,7 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
     printer << " " << AFD->getInlinableBodyText(scratch);
   };
 
-  class ShouldPrintForTextualInterface : public ShouldPrintChecker {
+  class ShouldPrintForParseableInterface : public ShouldPrintChecker {
     bool shouldPrint(const Decl *D, const PrintOptions &options) override {
       // Skip anything that isn't 'public' or '@usableFromInline'.
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
@@ -143,7 +143,7 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
     }
   };
   result.CurrentPrintabilityChecker =
-      std::make_shared<ShouldPrintForTextualInterface>();
+      std::make_shared<ShouldPrintForParseableInterface>();
 
   // FIXME: We don't really need 'public' on everything; we could just change
   // the default to 'public' and mark the 'internal' things.

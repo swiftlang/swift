@@ -24,7 +24,7 @@
 #include "ImportedModules.h"
 #include "ReferenceDependencies.h"
 #include "TBD.h"
-#include "TextualInterfaceGeneration.h"
+#include "ParseableInterfaceGeneration.h"
 
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTScope.h"
@@ -356,19 +356,20 @@ static bool printAsObjCIfNeeded(StringRef outputPath, ModuleDecl *M,
   });
 }
 
-/// Prints the stable textual interface for \p M to \p outputPath.
+/// Prints the stable parseable interface for \p M to \p outputPath.
 ///
 /// ...unless \p outputPath is empty, in which case it does nothing.
 ///
 /// \returns true if there were any errors
 ///
-/// \see swift::emitModuleInterface
-static bool printModuleInterfaceIfNeeded(StringRef outputPath, ModuleDecl *M) {
+/// \see swift::emitParseableInterface
+static bool printParseableInterfaceIfNeeded(StringRef outputPath,
+                                            ModuleDecl *M) {
   if (outputPath.empty())
     return false;
   return atomicallyWritingToTextFile(outputPath, M->getDiags(),
                                      [M](raw_ostream &out) -> bool {
-    return swift::emitModuleInterface(out, M);
+    return swift::emitParseableInterface(out, M);
   });
 }
 
@@ -888,9 +889,9 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
         Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
   }
 
-  if (opts.InputsAndOutputs.hasModuleInterfaceOutputPath()) {
-    hadAnyError |= printModuleInterfaceIfNeeded(
-        Invocation.getModuleInterfaceOutputPathForWholeModule(),
+  if (opts.InputsAndOutputs.hasParseableInterfaceOutputPath()) {
+    hadAnyError |= printParseableInterfaceIfNeeded(
+        Invocation.getParseableInterfaceOutputPathForWholeModule(),
         Instance.getMainModule());
   }
 
