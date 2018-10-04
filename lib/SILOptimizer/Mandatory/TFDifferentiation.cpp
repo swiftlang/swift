@@ -723,13 +723,13 @@ public:
   void setPrimal(SILFunction *fn) {
     assert(fn);
     primal = fn;
-    attr->setPrimalName(fn->getName());
+    attr->setPrimalName(fn->getName(), /*synthesized*/true);
   }
 
   void setAdjoint(SILFunction *fn) {
     assert(fn);
     adjoint = fn;
-    attr->setAdjointName(fn->getName());
+    attr->setAdjointName(fn->getName(), /*synthesized*/true);
   }
 
   DenseMap<ApplyInst *, DifferentiationTask *> &getAssociatedTasks() {

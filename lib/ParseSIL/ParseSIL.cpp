@@ -1126,13 +1126,23 @@ static bool parseReverseDifferentiableAttr(
       P.parseIdentifier(id, LastLoc, diag::expected_sil_function_name);
   };
 
-  // Parse optional 'primal'.
+  // Parse optional '(synthesized) primal'.
+  bool primalIsSynthesized = false;
+  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "synthesized") {
+    P.consumeToken();
+    primalIsSynthesized = true;
+  }
   Identifier PrimName;
   if (P.Tok.is(tok::identifier) && P.Tok.getText() == "primal") {
     P.consumeToken();
     if (parseFnName(PrimName)) return true;
   }
-  // Parse optional 'adjoint'.
+  // Parse optional '(synthesized) adjoint'.
+  bool adjointIsSynthesized;
+  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "synthesized") {
+    P.consumeToken();
+    adjointIsSynthesized = true;
+  }
   Identifier AdjName;
   if (P.Tok.is(tok::identifier) && P.Tok.getText() == "adjoint") {
     P.consumeToken();
@@ -1144,7 +1154,8 @@ static bool parseReverseDifferentiableAttr(
     return true;
   // Create an AdjointAttr and we are done.
   auto *Attr = SILReverseDifferentiableAttr::create(
-      SP.SILMod, {SourceIndex, ParamIndices}, PrimName.str(), AdjName.str());
+      SP.SILMod, {SourceIndex, ParamIndices}, PrimName.str(), AdjName.str(),
+      primalIsSynthesized, adjointIsSynthesized);
   DAs.push_back(Attr);
   return false;
 }

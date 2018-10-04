@@ -3147,8 +3147,14 @@ void SILReverseDifferentiableAttr::print(llvm::raw_ostream &OS) const {
   interleave(indices.parameters.set_bits(),
              [&](unsigned index) { OS << index; },
              [&] { OS << ", "; });
-  if (!PrimalName.empty()) OS << " primal @" << PrimalName;
-  if (!AdjointName.empty()) OS << " adjoint @" << AdjointName;
+  if (!PrimalName.empty()) {
+    if (PrimalIsSynthesized) OS << " synthesized";
+    OS << " primal @" << PrimalName;
+  }
+  if (!AdjointName.empty()) {
+    if (AdjointIsSynthesized) OS << " synthesized";
+    OS << " adjoint @" << AdjointName;
+  }
 }
 
 //===----------------------------------------------------------------------===//

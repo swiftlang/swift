@@ -830,7 +830,8 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
                                              diffAttr);
       SILReverseAutoDiffIndices indices(/*source*/ 0, paramIndices);
       silOriginalFn->addReverseDifferentiableAttr(
-          SILReverseDifferentiableAttr::create(M, indices, primName, adjName));
+          SILReverseDifferentiableAttr::create(M, indices, primName, adjName,
+                                               /*synthesized*/ false, false));
       break;
     }
     }
