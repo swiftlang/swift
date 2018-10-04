@@ -111,8 +111,8 @@ static void addYAMLTypeInfoNode(NominalTypeDecl *NTD,
   Result.push_back(createYAMLTypeInfoNode(NTD, IGM, fixedTI));
 }
 
-static YAMLModuleNode createYAMLModuleNode(ModuleDecl *Mod,
-                                           IRGenModule &IGM) {
+static Optional<YAMLModuleNode>
+createYAMLModuleNode(ModuleDecl *Mod, IRGenModule &IGM) {
   std::vector<NominalTypeDecl *> Decls;
   NominalTypeWalker Walker(Decls);
 
@@ -132,9 +132,12 @@ static YAMLModuleNode createYAMLModuleNode(ModuleDecl *Mod,
     }
   }
 
+  if (Nodes.empty())
+    return None;
+
   std::sort(Nodes.begin(), Nodes.end());
 
-  return {Mod->getName().str(), Nodes};
+  return YAMLModuleNode{Mod->getName().str(), Nodes};
 }
 
 void TypeLayoutDumper::write(ArrayRef<ModuleDecl *> AllModules,
@@ -144,7 +147,8 @@ void TypeLayoutDumper::write(ArrayRef<ModuleDecl *> AllModules,
   // Collect all nominal types, including nested types.
   for (auto *Mod : AllModules) {
     auto Node = createYAMLModuleNode(Mod, IGM);
-    yout << Node;
+    if (Node)
+      yout << *Node;
   }
 }
 
