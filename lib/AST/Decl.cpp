@@ -68,8 +68,7 @@ STATISTIC(NumLazyGenericEnvironmentsLoaded,
           "# of lazily-deserialized generic environments loaded");
 
 #define DECL(Id, _) \
-  static_assert((DeclKind::Id == DeclKind::Module) ^ \
-                IsTriviallyDestructible<Id##Decl>::value, \
+  static_assert(IsTriviallyDestructible<Id##Decl>::value, \
                 "Decls are BumpPtrAllocated; the destructor is never called");
 #include "swift/AST/DeclNodes.def"
 static_assert(IsTriviallyDestructible<ParameterList>::value,
@@ -112,12 +111,6 @@ const clang::Module *ClangNode::getClangModule() const {
 // Only allow allocation of Decls using the allocator in ASTContext.
 void *Decl::operator new(size_t Bytes, const ASTContext &C,
                          unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
-}
-
-// Only allow allocation of Modules using the allocator in ASTContext.
-void *ModuleDecl::operator new(size_t Bytes, const ASTContext &C,
-                           unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
 }
 

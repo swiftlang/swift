@@ -125,7 +125,10 @@ enum class ResilienceStrategy : unsigned {
 /// output binary and logical module (such as a single library or executable).
 ///
 /// \sa FileUnit
-class ModuleDecl : public DeclContext, public TypeDecl {
+class ModuleDecl final : public DeclContext, public TypeDecl,
+                         private llvm::TrailingObjects<ModuleDecl, FileUnit *> {
+  friend TrailingObjects;
+
 public:
   typedef ArrayRef<std::pair<Identifier, SourceLoc>> AccessPathTy;
   typedef std::pair<ModuleDecl::AccessPathTy, ModuleDecl*> ImportedModule;
@@ -196,7 +199,11 @@ private:
   // FIXME: Do we really need to bloat all modules with this?
   DebuggerClient *DebugClient = nullptr;
 
-  SmallVector<FileUnit *, 2> Files;
+  /// The number of files this Module currently contains.
+  unsigned NumFiles = 0;
+
+  /// The number of files this Module can hold.
+  unsigned MaxFiles;
 
   /// Tracks the file that will generate the module's entry point, either
   /// because it contains a class marked with \@UIApplicationMain
@@ -241,25 +248,26 @@ private:
   /// \see EntryPointInfoTy
   EntryPointInfoTy EntryPointInfo;
 
-  ModuleDecl(Identifier name, ASTContext &ctx);
+  ModuleDecl(Identifier name, ASTContext &ctx, size_t maxFiles);
 
 public:
-  static ModuleDecl *create(Identifier name, ASTContext &ctx) {
-    return new (ctx) ModuleDecl(name, ctx);
+  static ModuleDecl *create(Identifier name, ASTContext &ctx,
+                            size_t numFiles = 1) {
+    return new (ctx, numFiles) ModuleDecl(name, ctx, numFiles);
   }
 
   using Decl::getASTContext;
 
   ArrayRef<FileUnit *> getFiles() {
-    return Files;
+    return { getTrailingObjects<FileUnit *>(), NumFiles };
   }
   ArrayRef<const FileUnit *> getFiles() const {
-    return { Files.begin(), Files.size() };
+    return { getTrailingObjects<FileUnit *>(), NumFiles };
   }
 
   bool isClangModule() const;
   void addFile(FileUnit &newFile);
-  void removeFile(FileUnit &existingFile);
+  void removeLastFile(FileUnit &existingFile);
 
   /// Convenience accessor for clients that know what kind of file they're
   /// dealing with.
@@ -552,8 +560,7 @@ private:
 public:
   // Only allow allocation of Modules using the allocator in ASTContext
   // or by doing a placement new.
-  void *operator new(size_t Bytes, const ASTContext &C,
-                     unsigned Alignment = alignof(ModuleDecl));
+  void *operator new(size_t Bytes, const ASTContext &C, size_t MaxFiles);
 };
 
 static inline unsigned alignOfFileUnit();
@@ -1253,17 +1260,17 @@ public:
 
 inline SourceFile &
 ModuleDecl::getMainSourceFile(SourceFileKind expectedKind) const {
-  assert(!Files.empty() && "No files added yet");
-  assert(cast<SourceFile>(Files.front())->Kind == expectedKind);
-  return *cast<SourceFile>(Files.front());
+  assert(!getFiles().empty() && "No files added yet");
+  assert(cast<SourceFile>(getFiles().front())->Kind == expectedKind);
+  return *cast<SourceFile>(const_cast<ModuleDecl *>(this)->getFiles().front());
 }
 
 inline FileUnit &ModuleDecl::getMainFile(FileUnitKind expectedKind) const {
   assert(expectedKind != FileUnitKind::Source &&
          "must use specific source kind; see getMainSourceFile");
-  assert(!Files.empty() && "No files added yet");
-  assert(Files.front()->getKind() == expectedKind);
-  return *Files.front();
+  assert(!getFiles().empty() && "No files added yet");
+  assert(getFiles().front()->getKind() == expectedKind);
+  return *const_cast<ModuleDecl *>(this)->getFiles().front();
 }
 
 /// Wraps either a swift module or a clang one.

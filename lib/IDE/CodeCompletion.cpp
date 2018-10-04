@@ -1808,7 +1808,8 @@ public:
                                           Declaration,
                                           SemanticContextKind::OtherModule,
                                           ExpectedTypes);
-      auto MD = ModuleDecl::create(Ctx.getIdentifier(Pair.first), Ctx);
+      auto MD = ModuleDecl::create(Ctx.getIdentifier(Pair.first), Ctx,
+                                   /*MaxFiles*/0);
       Builder.setAssociatedDecl(MD);
       Builder.addTextChunk(MD->getNameStr());
       Builder.addTypeAnnotation("Module");
@@ -1866,7 +1867,8 @@ public:
     collectImportedModules(ImportedModules);
 
     for (auto ModuleName : ModuleNames) {
-      auto MD = ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx);
+      auto MD = ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx,
+                                   /*MaxFiles*/0);
       CodeCompletionResultBuilder Builder(
           Sink,
           CodeCompletionResult::ResultKind::Declaration,

@@ -351,11 +351,19 @@ void SourceLookupCache::invalidate() {
 // Module Implementation
 //===----------------------------------------------------------------------===//
 
-ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
-  : DeclContext(DeclContextKind::Module, nullptr),
-    TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), { }) {
+// Only allow allocation of Modules using the allocator in ASTContext.
+void *ModuleDecl::operator new(size_t Bytes, const ASTContext &C,
+                               size_t MaxFiles) {
+  return C.Allocate(totalSizeToAlloc<FileUnit *>(MaxFiles),
+                    alignof(ModuleDecl));
+}
 
-  ctx.addDestructorCleanup(*this);
+ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx, size_t maxFiles)
+  : DeclContext(DeclContextKind::Module, nullptr),
+    TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), { }),
+    MaxFiles(maxFiles) {
+  assert(MaxFiles == maxFiles && "you have more than 4 billion files? really?");
+
   setImplicit();
   setInterfaceType(ModuleType::get(this));
 
@@ -363,6 +371,9 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   setValidationToChecked();
 
   setAccess(AccessLevel::Public);
+
+  std::uninitialized_fill_n(getTrailingObjects<FileUnit *>(), maxFiles,
+                            nullptr);
 }
 
 bool ModuleDecl::isClangModule() const {
@@ -371,23 +382,22 @@ bool ModuleDecl::isClangModule() const {
 
 void ModuleDecl::addFile(FileUnit &newFile) {
   // Require Main and REPL files to be the first file added.
-  assert(Files.empty() ||
+  assert(NumFiles < MaxFiles && "ModuleDecl was created with too few files");
+  assert(getFiles().empty() ||
          !isa<SourceFile>(newFile) ||
          cast<SourceFile>(newFile).Kind == SourceFileKind::Library ||
          cast<SourceFile>(newFile).Kind == SourceFileKind::SIL);
-  Files.push_back(&newFile);
+  ++NumFiles;
+  assert(getFiles().back() == nullptr);
+  getTrailingObjects<FileUnit *>()[NumFiles-1] = &newFile;
 }
 
-void ModuleDecl::removeFile(FileUnit &existingFile) {
+void ModuleDecl::removeLastFile(FileUnit &existingFile) {
   // Do a reverse search; usually the file to be deleted will be at the end.
-  std::reverse_iterator<decltype(Files)::iterator> I(Files.end()),
-  E(Files.begin());
-  I = std::find(I, E, &existingFile);
-  assert(I != E);
-
-  // Adjust for the std::reverse_iterator offset.
-  ++I;
-  Files.erase(I.base());
+  assert(!getFiles().empty());
+  assert(getFiles().back() == &existingFile);
+  getTrailingObjects<FileUnit *>()[NumFiles-1] = nullptr;
+  --NumFiles;
 }
 
 #define FORWARD(name, args) \

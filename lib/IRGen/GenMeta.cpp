@@ -1718,7 +1718,7 @@ IRGenModule::getAddrOfObjCModuleContextDescriptor() {
   if (!ObjCModule)
     ObjCModule = ModuleDecl::create(
       Context.getIdentifier(MANGLING_MODULE_OBJC),
-      Context);
+      Context, /*MaxFiles*/0);
   return getAddrOfModuleContextDescriptor(ObjCModule);
 }
 
@@ -1727,7 +1727,7 @@ IRGenModule::getAddrOfClangImporterModuleContextDescriptor() {
   if (!ClangImporterModule)
     ClangImporterModule = ModuleDecl::create(
       Context.getIdentifier(MANGLING_MODULE_CLANG_IMPORTER),
-      Context);
+      Context, /*MaxFiles*/0);
   return getAddrOfModuleContextDescriptor(ClangImporterModule);
 }
 

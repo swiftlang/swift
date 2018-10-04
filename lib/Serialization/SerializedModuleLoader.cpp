@@ -315,7 +315,7 @@ FileUnit *SerializedModuleLoader::loadAST(
       return fileUnit;
     }
 
-    M.removeFile(*fileUnit);
+    M.removeLastFile(*fileUnit);
   }
 
   // From here on is the failure path.

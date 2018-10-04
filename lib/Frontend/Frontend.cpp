@@ -446,11 +446,20 @@ std::unique_ptr<SILModule> CompilerInstance::takeSILModule() {
 
 ModuleDecl *CompilerInstance::getMainModule() {
   if (!MainModule) {
+    // FIXME: Code completion doesn't always set its buffer as an input, but
+    // module-merging doesn't just use source buffers. For now, pick whichever
+    // is larger.
+    unsigned numFiles = std::max<size_t>(
+        Invocation.getFrontendOptions().InputsAndOutputs.inputCount(),
+        getInputBufferIDs().size());
+    if (numFiles == 0 && Invocation.getInputKind() == InputFileKind::SwiftREPL)
+      numFiles = 1;
+
     Identifier ID = Context->getIdentifier(Invocation.getModuleName());
-    MainModule = ModuleDecl::create(ID, *Context);
+    MainModule = ModuleDecl::create(ID, *Context, numFiles);
+
     if (Invocation.getFrontendOptions().EnableTesting)
       MainModule->setTestingEnabled();
-
     if (Invocation.getFrontendOptions().EnableResilience)
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
   }
