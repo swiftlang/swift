@@ -150,7 +150,7 @@ public class Concrete : Derived<Int> {
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s14generic_vtable7DerivedCMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
-// CHECK: call void @swift_initClassMetadata(%swift.type* [[METADATA]], %swift.type* {{%.*}}, [[INT]] 0, {{.*}})
+// CHECK: call void @swift_initClassMetadata(%swift.type* [[METADATA]], [[INT]] 0, {{.*}})
 
 // CHECK: ret %swift.metadata_response
 
@@ -159,20 +159,9 @@ public class Concrete : Derived<Int> {
 // CHECK: call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$s14generic_vtable8ConcreteCMn" to {{.*}}))
 // CHECK: ret
 
-//// Metadata response function for 'Concrete' sets the superclass.
+//// Metadata response function for 'Concrete' is fairly simple.
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s14generic_vtable8ConcreteCMr"(%swift.type*, i8*, i8**)
-// CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s14generic_vtable7DerivedCySiGMa"([[INT]] 257)
-// CHECK-NEXT: [[SUPERCLASS:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK-NEXT: [[STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
-// CHECK-NEXT: [[RESULT:%.*]] = icmp ule [[INT]] [[STATUS]], 1
-// CHECK-NEXT: br i1 [[RESULT]], label %dependency-satisfied, label %metadata-dependencies.cont
-
-// CHECK: dependency-satisfied:
-
 // -- ClassLayoutFlags is 256 / 0x100, HasStaticVTable
-// CHECK: call void @swift_initClassMetadata(%swift.type* %0, %swift.type* [[SUPERCLASS]], [[INT]] 256, {{.*}})
-// CHECK: br label %metadata-dependencies.cont
-
-// CHECK: metadata-dependencies.cont:
+// CHECK: call void @swift_initClassMetadata(%swift.type* %0, [[INT]] 256, {{.*}})
 // CHECK: ret %swift.metadata_response

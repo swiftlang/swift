@@ -2539,13 +2539,13 @@ static void initGenericObjCClass(ClassMetadata *self,
 
 void
 swift::swift_initClassMetadata(ClassMetadata *self,
-                               ClassMetadata *super,
                                ClassLayoutFlags layoutFlags,
                                size_t numFields,
                                const TypeLayout * const *fieldTypes,
                                size_t *fieldOffsets) {
   // If there is a mangled superclass name, demangle it to the superclass
   // type.
+  const ClassMetadata *super = nullptr;
   if (auto superclassNameBase = self->getDescription()->SuperclassType.get()) {
     StringRef superclassName =
       Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
@@ -2564,22 +2564,7 @@ swift::swift_initClassMetadata(ClassMetadata *self,
       superclass = objcWrapper->Class;
 #endif
 
-    if (superclass != super) {
-      auto superclassType = swift_getTypeName(superclass, true);
-      auto providedSuperclassType = swift_getTypeName(super, true);
-      fatalError(0,
-                 "demangled superclass %s (@%p) of %s differs from "
-                 "compiler-provided "
-                 "superclass %s (@%p) in swift_initClassMetadata\n",
-                 StringRef(superclassType.data, superclassType.length)
-                   .str().c_str(),
-                 superclass,
-                 self->getDescription()->Name.get(),
-                 StringRef(providedSuperclassType.data,
-                           providedSuperclassType.length)
-                   .str().c_str(),
-                 super);
-    }
+    super = cast<ClassMetadata>(superclass);
   }
 
   self->Superclass = super;
@@ -2627,13 +2612,14 @@ swift::swift_initClassMetadata(ClassMetadata *self,
 #if SWIFT_OBJC_INTEROP
 void
 swift::swift_updateClassMetadata(ClassMetadata *self,
-                                 ClassMetadata *super,
                                  ClassLayoutFlags layoutFlags,
                                  size_t numFields,
                                  const TypeLayout * const *fieldTypes,
                                  size_t *fieldOffsets) {
+#ifndef NDEBUG
   // If there is a mangled superclass name, demangle it to the superclass
   // type.
+  const ClassMetadata *super = nullptr;
   if (auto superclassNameBase = self->getDescription()->SuperclassType.get()) {
     StringRef superclassName =
       Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
@@ -2652,18 +2638,14 @@ swift::swift_updateClassMetadata(ClassMetadata *self,
       superclass = objcWrapper->Class;
 #endif
 
-    if (superclass != super) {
-      fatalError(0,
-                 "demangled superclass %p differs from compiler-provided "
-                 "superclass %p in swift_updateClassMetadata\n",
-                 superclass, super);
-    }
+    super = cast<ClassMetadata>(superclass);
   }
 
   if (!super)
     assert(self->Superclass == getRootSuperclass());
   else
     assert(self->Superclass == super);
+#endif
 
   // FIXME: Plumb this through
 #if 1

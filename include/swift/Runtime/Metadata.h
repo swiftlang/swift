@@ -629,7 +629,6 @@ swift_relocateClassMetadata(ClassDescriptor *descriptor,
 ///   class metadata pattern by swift_allocateGenericClassMetadata().
 SWIFT_RUNTIME_EXPORT
 void swift_initClassMetadata(ClassMetadata *self,
-                             ClassMetadata *super,
                              ClassLayoutFlags flags,
                              size_t numFields,
                              const TypeLayout * const *fieldTypes,
@@ -646,7 +645,6 @@ void swift_initClassMetadata(ClassMetadata *self,
 /// size is not known at compile time.
 SWIFT_RUNTIME_EXPORT
 void swift_updateClassMetadata(ClassMetadata *self,
-                               ClassMetadata *super,
                                ClassLayoutFlags flags,
                                size_t numFields,
                                const TypeLayout * const *fieldTypes,

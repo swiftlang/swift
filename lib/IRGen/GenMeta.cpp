@@ -1814,28 +1814,10 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
     if (!doesClassMetadataRequireRelocation(IGM, classDecl))
       flags |= ClassLayoutFlags::HasStaticVTable;
 
-    // Get the superclass metadata, if the class has one.
-    llvm::Value *superclassMetadata;
-    if (auto superclassType = classDecl->getSuperclass()) {
-      superclassType = classDecl->mapTypeIntoContext(superclassType);
-
-      auto request = DynamicMetadataRequest::getNonBlocking(
-                               MetadataState::NonTransitiveComplete, collector);
-
-      superclassMetadata =
-        emitClassHeapMetadataRef(IGF, superclassType->getCanonicalType(),
-                                 MetadataValueType::TypeMetadata,
-                                 request,
-                                 /*allowUninit*/ false);
-    } else {
-      superclassMetadata =
-        llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy);
-    }
-
     if (doesClassMetadataRequireInitialization(IGM, classDecl)) {
       // Call swift_initClassMetadata().
       IGF.Builder.CreateCall(IGM.getInitClassMetadataFn(),
-                             {metadata, superclassMetadata,
+                             {metadata,
                               IGM.getSize(Size(uintptr_t(flags))),
                               numFields, fields.getAddress(), fieldVector});
     } else {
@@ -1846,7 +1828,7 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
       // already references the superclass in this case, but we still want
       // to ensure the superclass metadata is initialized first.
       IGF.Builder.CreateCall(IGM.getUpdateClassMetadataFn(),
-                             {metadata, superclassMetadata,
+                             {metadata,
                               IGM.getSize(Size(uintptr_t(flags))),
                               numFields, fields.getAddress(), fieldVector});
     }
