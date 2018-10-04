@@ -92,6 +92,84 @@ extension _ArrayProtocol {
     let result = Self(_uninitializedCount: count)
     return (result, result._buffer.firstElementAddress)
   }
+  
+
+  /// Copy the contents of the current buffer to a new unique mutable buffer.
+  /// The count of the new buffer is set to `oldCount`, the capacity of the
+  /// new buffer is big enough to hold 'oldCount' + 1 elements.
+  @inline(never)
+  @inlinable // @specializable
+  internal mutating func _copyToNewBuffer(oldCount: Int) {
+    let newCount = oldCount + 1
+    var newBuffer = _buffer._forceCreateUniqueMutableBuffer(
+      countForNewBuffer: oldCount, minNewCapacity: newCount)
+    _buffer._arrayOutOfPlaceUpdate(&newBuffer, oldCount, 0)
+  }
+
+  @inlinable
+  @_semantics("array.make_mutable")
+  internal mutating func _makeUniqueAndReserveCapacityIfNotUnique() {
+    if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
+      _copyToNewBuffer(oldCount: _buffer.count)
+    }
+  }
+
+  @inlinable
+  @_semantics("array.mutate_unknown")
+  internal mutating func _reserveCapacityAssumingUniqueBuffer(oldCount: Int) {
+    // This is a performance optimization. This code used to be in an ||
+    // statement in the _sanityCheck below.
+    //
+    //   _sanityCheck(_buffer.capacity == 0 ||
+    //                _buffer.isMutableAndUniquelyReferenced())
+    //
+    // SR-6437
+    let capacity = _buffer.capacity == 0
+
+    // Due to make_mutable hoisting the situation can arise where we hoist
+    // _makeMutableAndUnique out of loop and use it to replace
+    // _makeUniqueAndReserveCapacityIfNotUnique that preceeds this call. If the
+    // array was empty _makeMutableAndUnique does not replace the empty array
+    // buffer by a unique buffer (it just replaces it by the empty array
+    // singleton).
+    // This specific case is okay because we will make the buffer unique in this
+    // function because we request a capacity > 0 and therefore _copyToNewBuffer
+    // will be called creating a new buffer.
+    _sanityCheck(capacity ||
+                 _buffer.isMutableAndUniquelyReferenced())
+
+    if _slowPath(oldCount + 1 > _buffer.capacity) {
+      _copyToNewBuffer(oldCount: oldCount)
+    }
+  }
+
+  @inlinable
+  @_semantics("array.mutate_unknown")
+  internal mutating func _appendElementAssumeUniqueAndCapacity(
+    _ oldCount: Int,
+    newElement: __owned Element
+  ) {
+    _sanityCheck(_buffer.isMutableAndUniquelyReferenced())
+    _sanityCheck(_buffer.capacity >= _buffer.count + 1)
+
+    _buffer.count = oldCount + 1
+    (_buffer.firstElementAddress + oldCount).initialize(to: newElement)
+  }
+
+  @inlinable
+  @_semantics("array.reserve_capacity_for_append")
+  internal mutating func reserveCapacityForAppend(newElementsCount: Int) {
+    let oldCount = self.count
+    let oldCapacity = self.capacity
+    let newCount = oldCount + newElementsCount
+
+    // Ensure uniqueness, mutability, and sufficient storage.  Note that
+    // for consistency, we need unique self even if newElements is empty.
+    self.reserveCapacity(
+      newCount > oldCapacity ?
+      Swift.max(newCount, _growArrayCapacity(oldCapacity))
+      : newCount)
+  }
 
   // Since RangeReplaceableCollection now has a version of filter that is less
   // efficient, we should make the default implementation coming from Sequence
