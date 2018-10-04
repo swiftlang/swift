@@ -161,18 +161,8 @@ public:
                                                SILValue dest);
 
 private:
-  struct SingleWriterAddressInitializationResult {
-    /// Whether we initialized the pointed-at memory.
-    bool initialized;
-
-    /// If there was a failure, an unknown with the failure reason.
-    llvm::Optional<SymbolicValue> failure;
-  };
-
-  SingleWriterAddressInitializationResult
-  initializeSingleWriterAddress(SILValue addr,
-                                SymbolicValueMemoryObject *memoryObject,
-                                ArrayRef<unsigned> accessPath);
+  llvm::Optional<SymbolicValue>
+  initializeAddressFromSingleWriter(SILValue addr);
 };
 } // end anonymous namespace
 
@@ -1019,30 +1009,31 @@ SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
 /// This is a helper function for `getSingleWriterAddressValue`. Callers should
 /// use `getSingleWriterAddressValue`.
 ///
-/// If `addr` has no writing uses, returns {false, None} and has no side
-/// effects.
+/// If `addr` has no writing uses, returns None.
 ///
 /// If the following conditions hold:
 ///   * `addr` points at uninitialized memory;
-///   * there are store(s) to `addr` that, taken together, set the memory
+///   * there are write(s) to `addr` that, taken together, set the memory
 ///     exactly once (e.g. a single "store" to `addr` OR multiple "store"s to
 ///     different "tuple_element_addr"s of `addr`); and
-///   * the stores' value(s) can be const-evaluated;
-/// Then: initializes the memory at `addr` and returns {true, None}.
+///   * the writes' value(s) can be const-evaluated;
+/// Then: initializes the memory at `addr` and returns None.
 ///
-/// Otherwise, sets the memory at `addr` to an unspecified value and returns
-/// {false, unknown}, where `unknown` is an unknown SymbolicValue.
+/// Otherwise, sets the memory at `addr` to an unknown SymbolicValue, and
+/// returns the unknown SymbolicValue.
 ///
-/// Precondition: `memoryObject, accessPath` must be the constant value for
-/// `addr`.
-ConstExprFunctionState::SingleWriterAddressInitializationResult
-ConstExprFunctionState::initializeSingleWriterAddress(
-    SILValue addr, SymbolicValueMemoryObject *memoryObject,
-    ArrayRef<unsigned> accessPath) {
-  LLVM_DEBUG(llvm::dbgs() << "ConstExpr: initializeSingleWriterAddress " << addr);
+/// Additional side effects: In all cases, this function might cache address
+/// values for `addr` and for addresses derived from `addr`.
+///
+/// Precondition: An address for `addr`, or an address that `addr` is derived
+/// from, must be cached in `computedValues`.
+llvm::Optional<SymbolicValue>
+ConstExprFunctionState::initializeAddressFromSingleWriter(SILValue addr) {
+  LLVM_DEBUG(llvm::dbgs() << "ConstExpr: initializeAddressFromSingleWriter "
+             << addr);
 
-  // Keeps track of whether we actually initialized the memory.
-  bool initialized = false;
+  SmallVector<unsigned, 4> accessPath;
+  auto *memoryObject = getConstantValue(addr).getAddressValue(accessPath);
 
   // If we detect instructions that initialize an aggregate piecewise, then we
   // set this flag, which tells us to verify that the entire aggregate has been
@@ -1060,6 +1051,15 @@ ConstExprFunctionState::initializeSingleWriterAddress(
     return memoryObject->getIndexedElement(accessPath);
   };
 
+  // Does all error-condition side-effects, and returns the appropriate error
+  // result.
+  // Precondition: `unknown` must be an unknown SymbolicValue.
+  auto error = [&](SymbolicValue unknown) -> SymbolicValue {
+    assert(unknown.getKind() == SymbolicValue::Unknown);
+    setMemoryValue(unknown);
+    return unknown;
+  };
+
   // Checks that the pointed-at aggregate is fully initialized.
   // Precondition: The pointed-at memory value is uninit memory or an
   // aggregate.
@@ -1073,9 +1073,8 @@ ConstExprFunctionState::initializeSingleWriterAddress(
   // Okay, check out all of the users of this value looking for semantic stores
   // into the address.  If we find more than one, then this was a var or
   // something else we can't handle.
-  // We must iterate over all uses, to make sure there is a single
-  // initializer. The only permitted early exit is when we known for sure that
-  // we have failed.
+  // We must iterate over all uses, to make sure there is a single initializer.
+  // The only permitted early exit is when we know for sure that we have failed.
   for (auto *use : addr->getUses()) {
     auto user = use->getUser();
 
@@ -1092,14 +1091,13 @@ ConstExprFunctionState::initializeSingleWriterAddress(
       if (use->getOperandNumber() == 1) {
         // Forbid multiple assignment.
         if (getMemoryValue().getKind() != SymbolicValue::UninitMemory)
-          return {false, evaluator.getUnknown(addr, UnknownReason::Default)};
+          return error(evaluator.getUnknown(addr, UnknownReason::Default));
 
         auto result = getConstantValue(si->getOperand(0));
         if (!result.isConstant())
-          return {false, evaluator.getUnknown(addr, UnknownReason::Default)};
+          return error(evaluator.getUnknown(addr, UnknownReason::Default));
 
         setMemoryValue(result);
-        initialized = true;
         continue;
       }
     }
@@ -1114,14 +1112,13 @@ ConstExprFunctionState::initializeSingleWriterAddress(
 
       // Forbid multiple assignment.
       if (getMemoryValue().getKind() != SymbolicValue::UninitMemory)
-        return {false, evaluator.getUnknown(addr, UnknownReason::Default)};
+        return error(evaluator.getUnknown(addr, UnknownReason::Default));
 
       auto result = getConstAddrAndLoadResult(cai->getOperand(0));
       if (!result.isConstant())
-        return {false, evaluator.getUnknown(addr, UnknownReason::Default)};
+        return error(evaluator.getUnknown(addr, UnknownReason::Default));
 
       setMemoryValue(result);
-      initialized = true;
       continue;
     }
 
@@ -1140,19 +1137,18 @@ ConstExprFunctionState::initializeSingleWriterAddress(
 
       // Forbid multiple assignment.
       if (getMemoryValue().getKind() != SymbolicValue::UninitMemory)
-        return {false, evaluator.getUnknown(addr, UnknownReason::Default)};
+        return error(evaluator.getUnknown(addr, UnknownReason::Default));
 
       // The callee needs to be a direct call to a constant expression.
       auto callResult = computeCallResult(apply);
 
       // If the call failed, we're done.
       if (callResult.hasValue())
-        return {false, callResult};
+        return error(*callResult);
 
       // computeCallResult will have figured out the result and cached it for
       // us.
       assert(getMemoryValue().isConstant());
-      initialized = true;
       continue;
     }
 
@@ -1163,7 +1159,7 @@ ConstExprFunctionState::initializeSingleWriterAddress(
         if (ili->getValue().getLimitedValue() != 0)
           continue;
       }
-      return {false, evaluator.getUnknown(addr, UnknownReason::Default)};
+      return error(evaluator.getUnknown(addr, UnknownReason::Default));
     }
 
     if (auto *teai = dyn_cast<TupleElementAddrInst>(user)) {
@@ -1177,30 +1173,23 @@ ConstExprFunctionState::initializeSingleWriterAddress(
       // The workflow is: when const-evaluating %178, we const-evaluate %191,
       // which in turn triggers const-evaluating %179, thereby enter this
       // function, where `addrInst` being %179. Among its users, %191 is not an
-      // initializer, so we skip it (`initializeSingleWriterAddress(teai)`
+      // initializer, so we skip it (`initializeAddressFromSingleWriter(teai)`
       // below will act as a no-op on it). %183 is a good initializer and can
       // be const-evaluated (by const-evaluating %114).
 
       // We can't forbid multiple assignment here by checking for uninit memory,
       // because previous TupleElementAddrInsts may have already partially
       // initialized the memory. However, the recursive call to
-      // `initializeSingleWriterAddress` below detects and forbids multiple
+      // `initializeAddressFromSingleWriter` below detects and forbids multiple
       // assignment, so we don't need to do it here.
 
-      SmallVector<unsigned, 4> teaiAccessPath(accessPath.begin(),
-                                              accessPath.end());
-      teaiAccessPath.push_back(teai->getFieldNo());
-        
-      auto initializationResult = initializeSingleWriterAddress(
-          teai, memoryObject, teaiAccessPath);
-        
-      if (initializationResult.failure)
-        return initializationResult;
+      if (auto failure = initializeAddressFromSingleWriter(teai))
+        return error(*failure);
 
-      if (initializationResult.initialized) {
-        initialized = true;
+      // If this instruction partially initialized the memory, then we must
+      // remember to check later that the memory has been fully initialized.
+      if (getMemoryValue().getKind() != SymbolicValue::UninitMemory)
         mustCheckAggregateInitialized = true;
-      }
 
 #ifndef NDEBUG
       // If all aggregate elements are const, we have successfully
@@ -1217,13 +1206,13 @@ ConstExprFunctionState::initializeSingleWriterAddress(
 
     // If this is some other user that we don't know about, then we should
     // treat it conservatively, because it could store into the address.
-    return {false, evaluator.getUnknown(addr, UnknownReason::Default)};
+    return error(evaluator.getUnknown(addr, UnknownReason::Default));
   }
 
   if (mustCheckAggregateInitialized && !checkAggregateInitialized())
-    return {false, evaluator.getUnknown(addr, UnknownReason::Default)};
+    return error(evaluator.getUnknown(addr, UnknownReason::Default));
 
-  return {initialized, None};
+  return None;
 }
 
 /// Find the initializer (single writer) of `addr` among it users,
@@ -1278,13 +1267,12 @@ ConstExprFunctionState::getSingleWriterAddressValue(SILValue addr) {
       createMemoryObject(addr, SymbolicValue::getUninitMemory());
   auto *memoryObject = memoryAddress.getAddressValueMemoryObject();
 
-  auto initializationResult = initializeSingleWriterAddress(addr, memoryObject,
-                                                            {});
-  if (initializationResult.failure) {
-    memoryObject->setValue(*initializationResult.failure);
-    return *initializationResult.failure;
+  if (auto failure = initializeAddressFromSingleWriter(addr)) {
+    assert(failure->getKind() == SymbolicValue::Unknown);
+    memoryObject->setValue(*failure);
+    return *failure;
   }
-  if (!initializationResult.initialized) {
+  if (!memoryObject->getValue().isConstant()) {
     auto unknown = evaluator.getUnknown(addr, UnknownReason::Default);
     memoryObject->setValue(unknown);
     return unknown;
@@ -1605,10 +1593,6 @@ void ConstExprEvaluator::computeConstantValues(
   unsigned numInstEvaluated = 0;
   ConstExprFunctionState state(*this, nullptr, {}, numInstEvaluated);
   for (auto v : values) {
-    LLVM_DEBUG(llvm::dbgs() << "ConstExpr: Trying to evaluate " << v
-               << "    In function:\n");
-    LLVM_DEBUG(v->getFunction()->dump());
-
     auto symVal = state.getConstantValue(v);
     results.push_back(symVal);
 

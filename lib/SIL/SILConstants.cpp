@@ -861,9 +861,10 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
   }
 }
 
-/// Helper function for `SymbolicValueMemoryObject::getIndexedElement` that
-/// does the same thing except with different arguments that make recursion
-/// possible.
+/// Returns the element of `aggregate` specified by the access path.
+///
+/// This is a helper for `SymbolicValueMemoryObject::getIndexedElement`. See
+/// there for more detailed documentation.
 static SymbolicValue getIndexedElement(SymbolicValue aggregate,
                                        ArrayRef<unsigned> accessPath,
                                        Type type) {
@@ -918,18 +919,18 @@ SymbolicValueMemoryObject::getIndexedElement(ArrayRef<unsigned> accessPath) {
   return ::getIndexedElement(value, accessPath, type);
 }
 
-/// Helper function for `SymbolicValueMemoryObject::setIndexedElement` that
-/// does the same thing except with different arguments that make recursion
-/// possible.
-static void setIndexedElement(SymbolicValue &aggregate,
-                              ArrayRef<unsigned> accessPath,
-                              SymbolicValue scalar, Type type,
-                              llvm::BumpPtrAllocator &allocator) {
+/// Returns `aggregate` with the element specified by the access path set to
+/// `scalar`.
+///
+/// This is a helper for `SymbolicValueMemoryObject::setIndexedElement`. See
+/// there for more detailed documentation.
+static SymbolicValue setIndexedElement(SymbolicValue aggregate,
+                                       ArrayRef<unsigned> accessPath,
+                                       SymbolicValue scalar, Type type,
+                                       llvm::BumpPtrAllocator &allocator) {
   // We're done if we've run out of access path.
-  if (accessPath.empty()) {
-    aggregate = scalar;
-    return;
-  }
+  if (accessPath.empty())
+    return scalar;
 
   // If we have an uninit memory, then scalarize it into an aggregate to
   // continue.  This happens when memory objects are initialized piecewise.
@@ -981,14 +982,17 @@ static void setIndexedElement(SymbolicValue &aggregate,
 
   // Update the indexed element of the aggregate.
   SmallVector<SymbolicValue, 4> newElts(oldElts.begin(), oldElts.end());
-  setIndexedElement(newElts[elementNo], accessPath.drop_front(), scalar,
-                    eltType, allocator);
+  newElts[elementNo] = setIndexedElement(newElts[elementNo],
+                                         accessPath.drop_front(), scalar,
+                                         eltType, allocator);
 
   if (aggregate.getKind() == SymbolicValue::Aggregate)
     aggregate = SymbolicValue::getAggregate(newElts, allocator);
   else
     aggregate = SymbolicValue::getArray(newElts, eltType->getCanonicalType(),
                                         allocator);
+
+  return aggregate;
 }
 
 /// Given that this memory object contains an aggregate value like
@@ -1000,5 +1004,5 @@ static void setIndexedElement(SymbolicValue &aggregate,
 void SymbolicValueMemoryObject::setIndexedElement(
     ArrayRef<unsigned> accessPath, SymbolicValue scalar,
     llvm::BumpPtrAllocator &allocator) {
-  ::setIndexedElement(value, accessPath, scalar, type, allocator);
+  value = ::setIndexedElement(value, accessPath, scalar, type, allocator);
 }
