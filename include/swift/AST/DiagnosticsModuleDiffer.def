@@ -84,6 +84,8 @@ ERROR(no_longer_open,none,"%0 is no longer open for subclassing", (StringRef))
 
 ERROR(func_type_escaping_changed,none,"%0 has %select{removed|added}2 @escaping in %1", (StringRef, StringRef, bool))
 
+ERROR(func_self_access_change,none,"%0 has self access kind changing from %1 to %2", (StringRef, StringRef, StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

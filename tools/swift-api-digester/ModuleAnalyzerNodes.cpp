@@ -116,10 +116,11 @@ SDKNodeDeclVar::SDKNodeDeclVar(SDKNodeInitInfo Info):
 
 SDKNodeDeclAbstractFunc::SDKNodeDeclAbstractFunc(SDKNodeInitInfo Info,
   SDKNodeKind Kind): SDKNodeDecl(Info, Kind), IsThrowing(Info.IsThrowing),
-                     IsMutating(Info.IsMutating), SelfIndex(Info.SelfIndex) {}
+                     SelfIndex(Info.SelfIndex) {}
 
 SDKNodeDeclFunction::SDKNodeDeclFunction(SDKNodeInitInfo Info):
-  SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclFunction) {}
+  SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclFunction),
+  FuncSelfKind(Info.FuncSelfKind) {}
 
 SDKNodeDeclConstructor::SDKNodeDeclConstructor(SDKNodeInitInfo Info):
   SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclConstructor) {}
@@ -673,19 +674,22 @@ bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         Left->hasSameChildren(*Right);
     }
 
-    case SDKNodeKind::DeclFunction:
+    case SDKNodeKind::DeclFunction: {
+      auto Left = L.getAs<SDKNodeDeclFunction>();
+      auto Right = R.getAs<SDKNodeDeclFunction>();
+      if (Left->getSelfAccessKind() != Right->getSelfAccessKind())
+        return false;
+      LLVM_FALLTHROUGH;
+    }
     case SDKNodeKind::DeclConstructor:
     case SDKNodeKind::DeclGetter:
     case SDKNodeKind::DeclSetter: {
       auto Left = L.getAs<SDKNodeDeclAbstractFunc>();
       auto Right = R.getAs<SDKNodeDeclAbstractFunc>();
-      if (Left->isMutating() ^ Right->isMutating())
-        return false;
       if (Left->isThrowing() ^ Right->isThrowing())
         return false;
       LLVM_FALLTHROUGH;
     }
-
     case SDKNodeKind::DeclVar: {
       if (Ctx.checkingABI()) {
         // If we're checking ABI, the definition order matters.
@@ -914,13 +918,6 @@ static bool isFuncThrowing(ValueDecl *VD) {
   return false;
 }
 
-static bool isFuncMutating(ValueDecl *VD) {
-  if (auto AF = dyn_cast<FuncDecl>(VD)) {
-    return AF->isMutating();
-  }
-  return false;
-}
-
 static Optional<uint8_t> getSelfIndex(ValueDecl *VD) {
   if (auto AF = dyn_cast<AbstractFunctionDecl>(VD)) {
     if (AF->isImportAsInstanceMember())
@@ -1055,7 +1052,6 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
   PrintedName = getPrintedName(Ctx, VD);
   Usr = calculateUsr(Ctx, VD);
   IsThrowing = isFuncThrowing(VD);
-  IsMutating = isFuncMutating(VD);
   IsStatic = VD->isStatic();
   IsOverriding = VD->getOverriddenDecl();
   IsProtocolReq = isa<ProtocolDecl>(VD->getDeclContext()) && VD->isProtocolRequirement();
@@ -1074,6 +1070,16 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
       }
     }
   }
+
+#define CASE(BASE, KIND, KEY) case BASE::KIND: KEY = #KIND; break;
+  if (auto *FD = dyn_cast<FuncDecl>(VD)) {
+    switch(FD->getSelfAccessKind()) {
+    CASE(SelfAccessKind, Mutating, FuncSelfKind)
+    CASE(SelfAccessKind, __Consuming, FuncSelfKind)
+    CASE(SelfAccessKind, NonMutating, FuncSelfKind)
+    }
+  }
+#undef CASE
 
   // Get all protocol names this type decl conforms to.
   if (auto *NTD = dyn_cast<NominalTypeDecl>(VD)) {
@@ -1176,6 +1182,7 @@ SwiftDeclCollector::createParameterNodes(ParameterList *PL) {
     Result.push_back(constructTypeNode(param->getInterfaceType(),
       param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>(),
       param->getDefaultArgumentKind() != DefaultArgumentKind::None));
+
   }
   return Result;
 }
@@ -1486,8 +1493,12 @@ void SDKNodeDecl::jsonize(json::Output &out) {
 void SDKNodeDeclAbstractFunc::jsonize(json::Output &out) {
   SDKNodeDecl::jsonize(out);
   output(out, KeyKind::KK_throwing, IsThrowing);
-  output(out, KeyKind::KK_mutating, IsMutating);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_selfIndex).data(), SelfIndex);
+}
+
+void SDKNodeDeclFunction::jsonize(json::Output &out) {
+  SDKNodeDeclAbstractFunc::jsonize(out);
+  output(out, KeyKind::KK_funcSelfKind, FuncSelfKind);
 }
 
 void SDKNodeDeclType::jsonize(json::Output &out) {

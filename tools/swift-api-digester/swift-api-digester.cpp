@@ -721,9 +721,17 @@ void swift::ide::api::SDKNodeDeclAbstractFunc::diagnose(SDKNode *Right) {
     Diags.diagnose(SourceLoc(), diag::decl_new_attr, getScreenInfo(),
                    Ctx.buffer("throwing"));
   }
-  if (!isMutating() && R->isMutating()) {
-    Diags.diagnose(SourceLoc(), diag::decl_new_attr, getScreenInfo(),
-                   Ctx.buffer("mutating"));
+}
+
+void swift::ide::api::SDKNodeDeclFunction::diagnose(SDKNode *Right) {
+  SDKNodeDeclAbstractFunc::diagnose(Right);
+  auto *R = dyn_cast<SDKNodeDeclFunction>(Right);
+  if (!R)
+    return;
+  auto &Diags = Ctx.getDiags();
+  if (getSelfAccessKind() != R->getSelfAccessKind()) {
+    Diags.diagnose(SourceLoc(), diag::func_self_access_change, getScreenInfo(),
+                   getSelfAccessKind(), R->getSelfAccessKind());
   }
 }
 
