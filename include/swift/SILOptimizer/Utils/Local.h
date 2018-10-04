@@ -600,13 +600,6 @@ SILType getExactDynamicType(SILValue S, SILModule &M,
 SILType getExactDynamicTypeOfUnderlyingObject(SILValue S, SILModule &M,
                                               ClassHierarchyAnalysis *CHA);
 
-/// Hoist the address projection rooted in \p Op to \p InsertBefore.
-/// Requires the projected value to dominate the insertion point.
-///
-/// Will look through single basic block predecessor arguments.
-void hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,
-                             DominanceInfo *DomTree);
-
 /// Utility class for cloning init values into the static initializer of a
 /// SILGlobalVariable.
 class StaticInitCloner : public SILCloner<StaticInitCloner> {
