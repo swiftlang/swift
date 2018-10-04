@@ -500,9 +500,8 @@ class C4 : P4 { // expected-error {{type 'C4' does not conform to protocol 'P4'}
 // <rdar://problem/25185722> Crash with invalid 'let' property in protocol
 protocol LetThereBeCrash {
   let x: Int
-  // expected-error@-1 {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
+  // expected-error@-1 {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}} {{13-13= { get \}}}
   // expected-note@-2 {{declared here}}
-  // {{13-13= { get \}}}
 }
 
 extension LetThereBeCrash {
