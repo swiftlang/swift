@@ -153,6 +153,20 @@ public:
   SymbolicValue loadAddrValue(SILValue addr, SymbolicValue addrVal);
   llvm::Optional<SymbolicValue> computeFSStore(SymbolicValue storedCst,
                                                SILValue dest);
+
+private:
+  struct SingleWriterAddressInitializationResult {
+    /// Whether we initialized the pointed-at memory.
+    bool initialized;
+
+    /// If there was a failure, an unknown with the failure reason.
+    llvm::Optional<SymbolicValue> failure;
+  };
+
+  SingleWriterAddressInitializationResult
+  initializeSingleWriterAddress(SILValue addr,
+                                SymbolicValueMemoryObject *memoryObject,
+                                ArrayRef<unsigned> accessPath);
 };
 } // end anonymous namespace
 
@@ -996,97 +1010,226 @@ SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
   return result;
 }
 
-/// Given an aggregate value like {{1, 2}, 3} and an access path like [0,1], and
-/// a scalar like 4, return the aggregate value with the indexed element
-/// replaced with its specified scalar, producing {{1, 4}, 3} in this case.
-/// If `writeOnlyOnce` is true, and the target aggregate element to update
-/// already has a constant value, fail on the update.
+/// This is a helper function for `getSingleWriterAddressValue`. Callers should
+/// use `getSingleWriterAddressValue`.
 ///
-/// This returns true on failure and false on success.
+/// If `addr` has no writing uses, returns {false, None} and has no side
+/// effects.
 ///
-static bool updateIndexedElement(SymbolicValue &aggregate,
-                                 ArrayRef<unsigned> indices,
-                                 SymbolicValue scalar, Type type,
-                                 bool writeOnlyOnce,
-                                 llvm::BumpPtrAllocator &allocator) {
-  // We're done if we've run out of indices.
-  if (indices.empty()) {
-    aggregate = scalar;
-    return false;
-  }
+/// If the following conditions hold:
+///   * `addr` points at uninitialized memory;
+///   * there are store(s) to `addr` that, taken together, set the memory
+///     exactly once (e.g. a single "store" to `addr` OR multiple "store"s to
+///     different "tuple_element_addr"s of `addr`);
+///   * the stores' value(s) can be const-evaluated; and
+/// Then: initializes the memory at `addr` and returns {true, None}.
+///
+/// Otherwise, sets the memory at `addr` to an unspecified value and returns
+/// {false, unknown}, where `unknown` is an unknown SymbolicValue.
+///
+/// Precondition: `memoryObject, accessPath` must be the constant value for
+/// `addr`.
+ConstExprFunctionState::SingleWriterAddressInitializationResult
+ConstExprFunctionState::initializeSingleWriterAddress(
+    SILValue addr, SymbolicValueMemoryObject *memoryObject,
+    ArrayRef<unsigned> accessPath) {
+  LLVM_DEBUG(llvm::dbgs() << "ConstExpr: initializeSingleWriterAddress " << addr);
 
-  // If we have an uninit memory, then scalarize it into an aggregate to
-  // continue.  This happens when memory objects are initialized piecewise.
-  if (aggregate.getKind() == SymbolicValue::UninitMemory) {
-    unsigned numMembers;
-    // We need to have either a struct or a tuple type.
-    if (auto *decl = type->getStructOrBoundGenericStruct()) {
-      numMembers = std::distance(decl->getStoredProperties().begin(),
-                                 decl->getStoredProperties().end());
-    } else if (auto tuple = type->getAs<TupleType>()) {
-      numMembers = tuple->getNumElements();
-    } else {
-      return true;
+  // Keeps track of whether we actually initialized the memory.
+  bool initialized = false;
+
+  // If we detect instructions that initialize an aggregate piecewise, then we
+  // set this flag, which tells us to verify that the entire aggregate has been
+  // initialized.
+  bool mustCheckAggregateInitialized = false;
+
+  // Sets the pointed-at memory to `value`.
+  auto setMemoryValue = [&](SymbolicValue value) {
+    memoryObject->setIndexedElement(accessPath, value,
+                                    evaluator.getAllocator());
+  };
+
+  // Gets the pointed-at memory value.
+  auto getMemoryValue = [&]() -> SymbolicValue {
+    return memoryObject->getIndexedElement(accessPath);
+  };
+
+  // Checks that the pointed-at aggregate is fully initialized.
+  // Precondition: The pointed-at memory value is uninit memory or an
+  // aggregate.
+  auto checkAggregateInitialized = [&]() -> bool {
+    auto memoryValue = getMemoryValue();
+    return memoryValue.getKind() != SymbolicValue::UninitMemory &&
+           llvm::all_of(memoryValue.getAggregateValue(),
+                        [](SymbolicValue v) { return v.isConstant(); });
+  };
+
+  // Okay, check out all of the users of this value looking for semantic stores
+  // into the address.  If we find more than one, then this was a var or
+  // something else we can't handle.
+  // We must iterate over all uses, to make sure there is a single
+  // initializer. The only permitted early exit is when we known for sure that
+  // we have failed.
+  for (auto *use : addr->getUses()) {
+    auto user = use->getUser();
+
+    // Ignore markers, loads, and other things that aren't stores to this stack
+    // value.
+    if (isa<LoadInst>(user) || isa<DeallocStackInst>(user) ||
+        isa<DestroyAddrInst>(user) || isa<DebugValueAddrInst>(user))
+      continue;
+
+    // TODO: BeginAccess/EndAccess.
+
+    // If this is a store *to* the memory, analyze the input value.
+    if (auto *si = dyn_cast<StoreInst>(user)) {
+      if (use->getOperandNumber() == 1) {
+        // Forbid multiple assignment.
+        if (getMemoryValue().getKind() != SymbolicValue::UninitMemory)
+          return {false, evaluator.getUnknown(addr, UnknownReason::Default)};
+
+        auto result = getConstantValue(si->getOperand(0));
+        if (!result.isConstant())
+          return {false, evaluator.getUnknown(addr, UnknownReason::Default)};
+
+        setMemoryValue(result);
+        initialized = true;
+        continue;
+      }
     }
 
-    SmallVector<SymbolicValue, 4> newElts(numMembers,
-                                          SymbolicValue::getUninitMemory());
-    aggregate = SymbolicValue::getAggregate(newElts, allocator);
-  }
+    if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
+      // If this is a copy_addr *from* the memory, then it is a load, ignore it.
+      if (use->getOperandNumber() == 0)
+        continue;
 
-  unsigned elementNo = indices.front();
+      // If this is a copy_addr *to* the memory, analyze the input value.
+      assert(use->getOperandNumber() == 1 && "copy_addr has two operands");
 
-  // If we have a non-aggregate then fail.
-  if (aggregate.getKind() != SymbolicValue::Aggregate &&
-      aggregate.getKind() != SymbolicValue::Array)
-    return true;
+      // Forbid multiple assignment.
+      if (getMemoryValue().getKind() != SymbolicValue::UninitMemory)
+        return {false, evaluator.getUnknown(addr, UnknownReason::Default)};
 
-  ArrayRef<SymbolicValue> oldElts;
-  Type eltType;
+      auto result = getConstAddrAndLoadResult(cai->getOperand(0));
+      if (!result.isConstant())
+        return {false, evaluator.getUnknown(addr, UnknownReason::Default)};
 
-  // We need to have an array, struct or a tuple type.
-  if (aggregate.getKind() == SymbolicValue::Array) {
-    CanType arrayEltTy;
-    oldElts = aggregate.getArrayValue(arrayEltTy);
-    eltType = arrayEltTy;
-  } else {
-    oldElts = aggregate.getAggregateValue();
-
-    if (auto *decl = type->getStructOrBoundGenericStruct()) {
-      auto it = decl->getStoredProperties().begin();
-      std::advance(it, elementNo);
-      eltType = (*it)->getType();
-    } else if (auto tuple = type->getAs<TupleType>()) {
-      assert(elementNo < tuple->getNumElements() && "invalid index");
-      eltType = tuple->getElement(elementNo).getType();
-    } else {
-      return true;
+      setMemoryValue(result);
+      initialized = true;
+      continue;
     }
+
+    // If this is an apply_inst passing the memory address as an indirect
+    // result operand, then we have a call that fills in this result.
+    //
+    if (auto *apply = dyn_cast<ApplyInst>(user)) {
+      auto conventions = apply->getSubstCalleeConv();
+
+      // If this is an out-parameter, it is like a store.  If not, this is an
+      // indirect read which is ok.
+      unsigned numIndirectResults = conventions.getNumIndirectSILResults();
+      unsigned opNum = use->getOperandNumber() - 1;
+      if (opNum >= numIndirectResults)
+        continue;
+
+      // Forbid multiple assignment.
+      if (getMemoryValue().getKind() != SymbolicValue::UninitMemory)
+        return {false, evaluator.getUnknown(addr, UnknownReason::Default)};
+
+      // The callee needs to be a direct call to a constant expression.
+      auto callResult = computeCallResult(apply);
+
+      // If the call failed, we're done.
+      if (callResult.hasValue())
+        return {false, callResult};
+
+      // computeCallResult will have figured out the result and cached it for
+      // us.
+      assert(getMemoryValue().isConstant());
+      initialized = true;
+      continue;
+    }
+
+    // If it is an index_addr, make sure it is a different address from base.
+    if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
+      assert(use->get() == iai->getBase());
+      if (auto *ili = dyn_cast<IntegerLiteralInst>(iai->getIndex())) {
+        if (ili->getValue().getLimitedValue() != 0)
+          continue;
+      }
+      return {false, evaluator.getUnknown(addr, UnknownReason::Default)};
+    }
+
+    if (auto *teai = dyn_cast<TupleElementAddrInst>(user)) {
+      // Try finding a writer among the users of `teai`. For example:
+      //   copy_addr %114 to [initialization] %183 : $*Int32
+      //   %179 = alloc_stack $(Int32, Int32, Int32, Int32)
+      //   %183 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
+      //   %191 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
+      //   copy_addr [take] %191 to [initialization] %178 : $*Int32
+      //
+      // The workflow is: when const-evaluating %178, we const-evaluate %191,
+      // which in turn triggers const-evaluating %179, thereby enter this
+      // function, where `addrInst` being %179. Among its users, %191 is not an
+      // initializer, so we skip it (`initializeSingleWriterAddress(teai)`
+      // below will act as a no-op on it). %183 is a good initializer and can
+      // be const-evaluated (by const-evaluating %114).
+
+      // We can't forbid multiple assignment here by checking for uninit memory,
+      // because previous TupleElementAddrInsts may have already partially
+      // initialized the memory. However, the recursive call to
+      // `initializeSingleWriterAddress` below detects and forbids multiple
+      // assignment, so we don't need to do it here.
+
+      // Set `teai`'s value to satisfy the `initializeSingleWriterAddress`
+      // precondition.
+      SmallVector<unsigned, 4> teaiAccessPath(accessPath.begin(),
+                                              accessPath.end());
+      teaiAccessPath.push_back(teai->getFieldNo());
+
+      auto initializationResult = initializeSingleWriterAddress(
+          teai, memoryObject, teaiAccessPath);
+      if (initializationResult.failure)
+        return initializationResult;
+
+      if (initializationResult.initialized) {
+        initialized = true;
+        mustCheckAggregateInitialized = true;
+      }
+
+#ifndef NDEBUG
+      // If all aggregate elements are const, we have successfully
+      // const-evaluated the entire tuple!
+      if (checkAggregateInitialized())
+        LLVM_DEBUG(llvm::dbgs() << "Const-evaluated the entire tuple: ";
+                   getMemoryValue().dump());
+#endif // NDEBUG
+      continue;
+    }
+
+    LLVM_DEBUG(llvm::dbgs()
+               << "Unknown SingleStore ConstExpr user: " << *user << "\n");
+
+    // If this is some other user that we don't know about, then we should
+    // treat it conservatively, because it could store into the address.
+    return {false, evaluator.getUnknown(addr, UnknownReason::Default)};
   }
 
-  if (writeOnlyOnce &&
-      oldElts[elementNo].getKind() != SymbolicValue::UninitMemory) {
-    // Cannot overwrite an existing constant.
-    return true;
-  }
+  if (mustCheckAggregateInitialized && !checkAggregateInitialized())
+    return {false, evaluator.getUnknown(addr, UnknownReason::Default)};
 
-  // Update the indexed element of the aggregate.
-  SmallVector<SymbolicValue, 4> newElts(oldElts.begin(), oldElts.end());
-  if (updateIndexedElement(newElts[elementNo], indices.drop_front(), scalar,
-                           eltType, writeOnlyOnce, allocator))
-    return true;
-
-  if (aggregate.getKind() == SymbolicValue::Aggregate)
-    aggregate = SymbolicValue::getAggregate(newElts, allocator);
-  else
-    aggregate = SymbolicValue::getArray(newElts, eltType->getCanonicalType(),
-                                        allocator);
-  return false;
+  return {initialized, None};
 }
 
 /// Find the initializer (single writer) of `addr` among it users,
-/// const-evaluate it and store the result into a memory object, and return the
-/// address of that memory object.
+/// const-evaluate it and store the result into a memory object.
+///
+/// Side effects: Creates a fully-initialized memory object (on success), or a
+/// memory object containing an unknown (on failure). Inserts the address of
+/// that memory object into `calculatedValues`, with key `addr`.
+///
+/// Returns the address of the memory object on success. Returns the unknown on
+/// failure.
 ///
 /// Some use cases are:
 /// 1. When analyzing the top-level code involved in a constant expression, we
@@ -1125,177 +1268,24 @@ ConstExprFunctionState::getSingleWriterAddressValue(SILValue addr) {
   if (!addrInst)
     return evaluator.getUnknown(addr, UnknownReason::Default);
 
-  // Keep track of the value found for the first constant store.
+  // Create a memory object to initialize, and point `addr` at it.
   auto memoryAddress =
       createMemoryObject(addr, SymbolicValue::getUninitMemory());
   auto *memoryObject = memoryAddress.getAddressValueMemoryObject();
 
-  // Okay, check out all of the users of this value looking for semantic stores
-  // into the address.  If we find more than one, then this was a var or
-  // something else we can't handle.
-  // We must iterate over all uses, to make sure there is a single
-  // initializer. The only permitted early exit is when we known for sure
-  // const-evaluation has failed.
-  for (auto *use : addr->getUses()) {
-    auto user = use->getUser();
-
-    // Ignore markers, loads, and other things that aren't stores to this stack
-    // value.
-    if (isa<LoadInst>(user) || isa<DeallocStackInst>(user) ||
-        isa<DestroyAddrInst>(user) || isa<DebugValueAddrInst>(user))
-      continue;
-
-    // TODO: BeginAccess/EndAccess.
-
-    // If this is a store *to* the memory, analyze the input value.
-    if (auto *si = dyn_cast<StoreInst>(user)) {
-      if (use->getOperandNumber() == 1) {
-
-        // If we have already found a value for this stack slot then we're done:
-        // we don't support multiple assignment.
-        if (memoryObject->getValue().getKind() != SymbolicValue::UninitMemory)
-          return evaluator.getUnknown(addr, UnknownReason::Default);
-
-        auto result = getConstantValue(si->getOperand(0));
-        if (!result.isConstant())
-          return evaluator.getUnknown(addr, UnknownReason::Default);
-        memoryObject->setValue(result);
-        continue;
-      }
-    }
-
-    if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
-      // If this is a copy_addr *from* the memory, then it is a load, ignore it.
-      if (use->getOperandNumber() == 0)
-        continue;
-
-      // If this is a copy_addr *to* the memory, analyze the input value.
-      assert(use->getOperandNumber() == 1 && "copy_addr has two operands");
-
-      // If we have already found a value for this stack slot then we're done:
-      // we don't support multiple assignment.
-      if (memoryObject->getValue().getKind() != SymbolicValue::UninitMemory)
-        return evaluator.getUnknown(addr, UnknownReason::Default);
-
-      auto result = getConstAddrAndLoadResult(cai->getOperand(0));
-      if (!result.isConstant())
-        return evaluator.getUnknown(addr, UnknownReason::Default);
-      memoryObject->setValue(result);
-      continue;
-    }
-
-    // If this is an apply_inst passing the memory address as an indirect
-    // result operand, then we have a call that fills in this result.
-    //
-    if (auto *apply = dyn_cast<ApplyInst>(user)) {
-      auto conventions = apply->getSubstCalleeConv();
-
-      // If this is an out-parameter, it is like a store.  If not, this is an
-      // indirect read which is ok.
-      unsigned numIndirectResults = conventions.getNumIndirectSILResults();
-      unsigned opNum = use->getOperandNumber() - 1;
-      if (opNum >= numIndirectResults)
-        continue;
-
-      // Otherwise this is a write.  If we have already found a value for this
-      // stack slot then we're done: we don't support multiple assignment.
-      if (memoryObject->getValue().getKind() != SymbolicValue::UninitMemory)
-        return evaluator.getUnknown(addr, UnknownReason::Default);
-
-      // The callee needs to be a direct call to a constant expression.
-      auto callResult = computeCallResult(apply);
-
-      // If the call failed, we're done.
-      if (callResult.hasValue()) {
-        assert(!callResult.getValue().isConstant());
-        memoryObject->setValue(callResult.getValue());
-        return memoryAddress;
-      }
-
-      // computeCallResult will have figured out the result and cached it for
-      // us.
-      assert(memoryObject->getValue().isConstant() &&
-             "Should have found a constant result value");
-      continue;
-    }
-
-    // If it is an index_addr, make sure it is a different address from base.
-    if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
-      assert(use->get() == iai->getBase());
-      if (auto *ili = dyn_cast<IntegerLiteralInst>(iai->getIndex())) {
-        if (ili->getValue().getLimitedValue() != 0)
-          continue;
-      }
-      return evaluator.getUnknown(addr, UnknownReason::Default);
-    }
-
-    if (auto *teai = dyn_cast<TupleElementAddrInst>(user)) {
-      // Try finding a writer among the users of `teai`. For example:
-      //   copy_addr %114 to [initialization] %183 : $*Int32
-      //   %179 = alloc_stack $(Int32, Int32, Int32, Int32)
-      //   %183 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
-      //   %191 = tuple_element_addr %179 : $*(Int32, Int32, Int32, Int32), 3
-      //   copy_addr [take] %191 to [initialization] %178 : $*Int32
-      //
-      // The workflow is: when const-evaluating %178, we const-evaluate %191,
-      // which in turn triggers const-evaluating %179, thereby enter this
-      // function, where `addrInst` being %179. Among its users, %191 is not an
-      // initializer, so we skip it (`getSingleWriterAddressValue(teai)` below
-      // will return non-const on it). %183 is a good initializer and can be
-      // const-evaluated (by const-evaluating %114).
-      auto *use = teai->getSingleUse();
-      if (!use)
-        continue;
-
-      auto tupleEltAddrValue = getSingleWriterAddressValue(teai);
-      if (!tupleEltAddrValue.isConstant())
-        continue;
-      // If the tuple elt is indeed a const, we write it into (the appropriate
-      // aggregate element slot of the) `memoryObject`, which is the const
-      // value for the entire tuple.
-      SmallVector<unsigned, 4> accessPath;
-      auto *tupleEltMemoryObject =
-          tupleEltAddrValue.getAddressValue(accessPath);
-      assert(accessPath.empty());
-      auto tupleEltValue = tupleEltMemoryObject->getValue();
-      assert(tupleEltValue.isConstant());
-
-      auto objectVal = memoryObject->getValue();
-      auto objectType = memoryObject->getType();
-      auto index = teai->getFieldNo();
-      bool failed = updateIndexedElement(
-          objectVal, /*accessPath*/ {index}, tupleEltValue, objectType,
-          /*writeOnlyOnce*/ true, evaluator.getAllocator());
-      if (failed)
-        return evaluator.getUnknown(addr, UnknownReason::Default);
-      memoryObject->setValue(objectVal);
-#ifndef NDEBUG
-      // If all aggregate elements are const, we have successfully
-      // const-evaluated the entire tuple!
-      if (llvm::all_of(objectVal.getAggregateValue(),
-                       [](SymbolicValue v) { return v.isConstant(); }))
-        LLVM_DEBUG(llvm::dbgs() << "Const-evaluated the entire tuple: ";
-                   objectVal.dump());
-#endif // NDEBUG
-      continue;
-    }
-
-    LLVM_DEBUG(llvm::dbgs()
-               << "Unknown SingleStore ConstExpr user: " << *user << "\n");
-
-    // If this is some other user that we don't know about, then we should
-    // treat it conservatively, because it could store into the address.
-    return evaluator.getUnknown(addr, UnknownReason::Default);
+  auto initializationResult = initializeSingleWriterAddress(addr, memoryObject,
+                                                            {});
+  if (initializationResult.failure) {
+    memoryObject->setValue(*initializationResult.failure);
+    return *initializationResult.failure;
+  }
+  if (!initializationResult.initialized) {
+    auto unknown = evaluator.getUnknown(addr, UnknownReason::Default);
+    memoryObject->setValue(unknown);
+    return unknown;
   }
 
-  // If we found a store of a constant, then return that value!
-  if (memoryObject->getValue().isConstant()) {
-    setValue(addr, memoryAddress);
-    return memoryAddress;
-  }
-
-  // Otherwise, return unknown.
-  return evaluator.getUnknown(addr, UnknownReason::Default);
+  return memoryAddress;
 }
 
 /// Given the operand to a load, resolve it to a constant if possible.
@@ -1349,23 +1339,8 @@ ConstExprFunctionState::computeFSStore(SymbolicValue storedCst, SILValue dest) {
 
   SmallVector<unsigned, 4> accessPath;
   auto *memoryObject = it->second.getAddressValue(accessPath);
-
-  // If this is a direct store to tracked memory object, just update it.
-  if (accessPath.empty()) {
-    memoryObject->setValue(storedCst);
-    return None;
-  }
-
-  // Otherwise, this is a store to a derived address, update the element of
-  // the base value.
-  auto objectVal = memoryObject->getValue();
-  auto objectType = memoryObject->getType();
-
-  if (updateIndexedElement(objectVal, accessPath, storedCst, objectType,
-                           /*writeOnlyOnce*/ false, evaluator.getAllocator()))
-    return evaluator.getUnknown(dest, UnknownReason::Default);
-
-  memoryObject->setValue(objectVal);
+  memoryObject->setIndexedElement(accessPath, storedCst,
+                                  evaluator.getAllocator());
   return None;
 }
 
@@ -1625,6 +1600,10 @@ void ConstExprEvaluator::computeConstantValues(
   unsigned numInstEvaluated = 0;
   ConstExprFunctionState state(*this, nullptr, {}, numInstEvaluated);
   for (auto v : values) {
+    LLVM_DEBUG(llvm::dbgs() << "ConstExpr: Trying to evaluate " << v
+               << "    In function:\n");
+    LLVM_DEBUG(v->getFunction()->dump());
+
     auto symVal = state.getConstantValue(v);
     results.push_back(symVal);
 

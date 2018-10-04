@@ -860,3 +860,145 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
     emittedFirstNote = true;
   }
 }
+
+/// Helper function for `SymbolicValueMemoryObject::getIndexedElement` that
+/// does the same thing except with different arguments that make recursion
+/// possible.
+static SymbolicValue getIndexedElement(SymbolicValue aggregate,
+                                       ArrayRef<unsigned> accessPath,
+                                       Type type) {
+  // We're done if we've run out of access path.
+  if (accessPath.empty())
+    return aggregate;
+
+  // Everything inside uninit memory is uninit memory.
+  if (aggregate.getKind() == SymbolicValue::UninitMemory)
+    return SymbolicValue::getUninitMemory();
+
+  assert((aggregate.getKind() == SymbolicValue::Aggregate ||
+          aggregate.getKind() == SymbolicValue::Array) &&
+         "the accessPath is invalid for this type");
+
+  unsigned elementNo = accessPath.front();
+
+  SymbolicValue elt;
+  Type eltType;
+
+  // We need to have an array, struct or a tuple type.
+  if (aggregate.getKind() == SymbolicValue::Array) {
+    CanType arrayEltTy;
+    elt = aggregate.getArrayValue(arrayEltTy)[elementNo];
+    eltType = arrayEltTy;
+  } else {
+    elt = aggregate.getAggregateValue()[elementNo];
+    if (auto *decl = type->getStructOrBoundGenericStruct()) {
+      auto it = decl->getStoredProperties().begin();
+      std::advance(it, elementNo);
+      eltType = (*it)->getType();
+    } else if (auto tuple = type->getAs<TupleType>()) {
+      assert(elementNo < tuple->getNumElements() && "invalid index");
+      eltType = tuple->getElement(elementNo).getType();
+    } else {
+      llvm_unreachable("the accessPath is invalid for this type");
+    }
+  }
+
+  return getIndexedElement(elt, accessPath.drop_front(), eltType);
+}
+
+/// Given that this memory object contains an aggregate value like
+/// {{1, 2}, 3}, and given an access path like [0,1], return the indexed
+/// element, e.g. "2" in this case.
+///
+/// Returns uninit memory if the access path points at or into uninit memory.
+///
+/// Precondition: The access path must be valid for this memory object's type.
+SymbolicValue
+SymbolicValueMemoryObject::getIndexedElement(ArrayRef<unsigned> accessPath) {
+  return ::getIndexedElement(value, accessPath, type);
+}
+
+/// Helper function for `SymbolicValueMemoryObject::setIndexedElement` that
+/// does the same thing except with different arguments that make recursion
+/// possible.
+static void setIndexedElement(SymbolicValue &aggregate,
+                              ArrayRef<unsigned> accessPath,
+                              SymbolicValue scalar, Type type,
+                              llvm::BumpPtrAllocator &allocator) {
+  // We're done if we've run out of access path.
+  if (accessPath.empty()) {
+    aggregate = scalar;
+    return;
+  }
+
+  // If we have an uninit memory, then scalarize it into an aggregate to
+  // continue.  This happens when memory objects are initialized piecewise.
+  if (aggregate.getKind() == SymbolicValue::UninitMemory) {
+    unsigned numMembers;
+    // We need to have either a struct or a tuple type.
+    if (auto *decl = type->getStructOrBoundGenericStruct()) {
+      numMembers = std::distance(decl->getStoredProperties().begin(),
+                                 decl->getStoredProperties().end());
+    } else if (auto tuple = type->getAs<TupleType>()) {
+      numMembers = tuple->getNumElements();
+    } else {
+      llvm_unreachable("the accessPath is invalid for this type");
+    }
+
+    SmallVector<SymbolicValue, 4> newElts(numMembers,
+                                          SymbolicValue::getUninitMemory());
+    aggregate = SymbolicValue::getAggregate(newElts, allocator);
+  }
+
+  assert((aggregate.getKind() == SymbolicValue::Aggregate ||
+          aggregate.getKind() == SymbolicValue::Array) &&
+         "the accessPath is invalid for this type");
+
+  unsigned elementNo = accessPath.front();
+
+  ArrayRef<SymbolicValue> oldElts;
+  Type eltType;
+
+  // We need to have an array, struct or a tuple type.
+  if (aggregate.getKind() == SymbolicValue::Array) {
+    CanType arrayEltTy;
+    oldElts = aggregate.getArrayValue(arrayEltTy);
+    eltType = arrayEltTy;
+  } else {
+    oldElts = aggregate.getAggregateValue();
+
+    if (auto *decl = type->getStructOrBoundGenericStruct()) {
+      auto it = decl->getStoredProperties().begin();
+      std::advance(it, elementNo);
+      eltType = (*it)->getType();
+    } else if (auto tuple = type->getAs<TupleType>()) {
+      assert(elementNo < tuple->getNumElements() && "invalid index");
+      eltType = tuple->getElement(elementNo).getType();
+    } else {
+      llvm_unreachable("the accessPath is invalid for this type");
+    }
+  }
+
+  // Update the indexed element of the aggregate.
+  SmallVector<SymbolicValue, 4> newElts(oldElts.begin(), oldElts.end());
+  setIndexedElement(newElts[elementNo], accessPath.drop_front(), scalar,
+                    eltType, allocator);
+
+  if (aggregate.getKind() == SymbolicValue::Aggregate)
+    aggregate = SymbolicValue::getAggregate(newElts, allocator);
+  else
+    aggregate = SymbolicValue::getArray(newElts, eltType->getCanonicalType(),
+                                        allocator);
+}
+
+/// Given that this memory object contains an aggregate value like
+/// {{1, 2}, 3}, given an access path like [0,1], and given a scalar like "4",
+/// set the indexed element to the specified scalar, producing {{1, 4}, 3} in
+/// this case.
+///
+/// Precondition: The access path must be valid for this memory object's type.
+void SymbolicValueMemoryObject::setIndexedElement(
+    ArrayRef<unsigned> accessPath, SymbolicValue scalar,
+    llvm::BumpPtrAllocator &allocator) {
+  ::setIndexedElement(value, accessPath, scalar, type, allocator);
+}
