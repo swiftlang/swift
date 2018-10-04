@@ -804,12 +804,12 @@ extension Any${Kind} {
   }
 
   @inlinable
-  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     return self._box.__copyToContiguousArray()
   }
 
   @inlinable
-  public func _copyContents(initializing buf: UnsafeMutableBufferPointer<Element>)
+  public __consuming func _copyContents(initializing buf: UnsafeMutableBufferPointer<Element>)
   -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
     let (it,idx) = _box.__copyContents(initializing: buf)
     return (AnyIterator(it),idx)
