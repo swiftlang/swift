@@ -454,7 +454,7 @@ protocol ShouldntCrash {
   let fullName: String { get }  // expected-error {{'let' declarations cannot be computed properties}} {{3-6=var}}
   
   // <rdar://problem/17200672> Let in protocol causes unclear errors and crashes
-  let fullName2: String  // expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}} {{24-24= { get \}}}
+  let fullName2: String  // expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}} {{3-6=var}} {{24-24= { get \}}}
 
   // <rdar://problem/16789886> Assert on protocol property requirement without a type
   var propertyWithoutType { get } // expected-error {{type annotation missing in pattern}}
