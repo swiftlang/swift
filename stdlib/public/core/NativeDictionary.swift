@@ -316,7 +316,13 @@ extension _NativeDictionary: _DictionaryBuffer {
 
   @inlinable
   internal func index(after index: Index) -> Index {
-    // Note that _asNative forces this not to work on Cocoa indices.
+#if _runtime(_ObjC)
+    guard _fastPath(index._isNative) else {
+      let _ = validatedBucket(for: index)
+      let i = index._asCocoa
+      return Index(_cocoa: i.dictionary.index(after: i))
+    }
+#endif
     let bucket = validatedBucket(for: index._asNative)
     let next = hashTable.occupiedBucket(after: bucket)
     return Index(_native: _HashTable.Index(bucket: next, age: age))

@@ -642,6 +642,14 @@ extension _CocoaDictionary.Index {
   }
 
   @usableFromInline
+  internal var dictionary: _CocoaDictionary {
+    @_effects(releasenone)
+    get {
+      return storage.base
+    }
+  }
+
+  @usableFromInline
   internal func copy() -> _CocoaDictionary.Index {
     let storage = self.storage
     return _CocoaDictionary.Index(Storage(
