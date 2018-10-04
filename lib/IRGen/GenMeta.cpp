@@ -918,6 +918,7 @@ namespace {
       asImpl().addReflectionFieldDescriptor();
       asImpl().addLayoutInfo();
       asImpl().addGenericSignature();
+      asImpl().maybeAddResilientSuperclass();
       asImpl().maybeAddMetadataInitialization();
     }
 
@@ -1263,7 +1264,9 @@ namespace {
       setCommonFlags(flags);
       return flags.getOpaqueValue();
     }
-    
+
+    void maybeAddResilientSuperclass() { }
+
     void addReflectionFieldDescriptor() {
       // Structs are reflectable unless we emit them with opaque reflection
       // metadata.
@@ -1334,6 +1337,8 @@ namespace {
       return flags.getOpaqueValue();
     }
 
+    void maybeAddResilientSuperclass() { }
+
     void addReflectionFieldDescriptor() {
       // Some enum layout strategies (viz. C compatible layout) aren't
       // supported by reflection.
@@ -1363,7 +1368,7 @@ namespace {
     // Non-null unless the type is foreign.
     ClassMetadataLayout *MetadataLayout = nullptr;
 
-    Optional<TypeEntityReference> SuperClassRef;
+    Optional<TypeEntityReference> ResilientSuperClassRef;
 
     SILVTable *VTable;
     bool Resilient;
@@ -1382,8 +1387,10 @@ namespace {
 
       MetadataLayout = &IGM.getClassMetadataLayout(Type);
 
-      if (auto superclassDecl = getType()->getSuperclassDecl())
-        SuperClassRef = IGM.getTypeEntityReference(superclassDecl);
+      if (auto superclassDecl = getType()->getSuperclassDecl()) {
+        if (MetadataLayout && MetadataLayout->hasResilientSuperclass())
+          ResilientSuperClassRef = IGM.getTypeEntityReference(superclassDecl);
+      }
 
       addVTableEntries(getType());
     }
@@ -1436,11 +1443,19 @@ namespace {
           flags.class_setHasResilientSuperclass(true);
       }
 
-      if (SuperClassRef) {
-        flags.class_setSuperclassReferenceKind(SuperClassRef->getKind());
+      if (ResilientSuperClassRef) {
+        flags.class_setResilientSuperclassReferenceKind(
+                                            ResilientSuperClassRef->getKind());
       }
       
       return flags.getOpaqueValue();
+    }
+
+    void maybeAddResilientSuperclass() {
+      // RelativeDirectPointer<const void, /*nullable*/ true> SuperClass;
+      if (ResilientSuperClassRef) {
+        B.addRelativeAddress(ResilientSuperClassRef->getValue());
+      }
     }
 
     void addReflectionFieldDescriptor() {
@@ -1575,13 +1590,6 @@ namespace {
     
     void addLayoutInfo() {
       auto properties = getType()->getStoredProperties();
-
-      // RelativeDirectPointer<const void, /*nullable*/ true> SuperClass;
-      if (SuperClassRef) {
-        B.addRelativeAddress(SuperClassRef->getValue());
-      } else {
-        B.addInt32(0);
-      }
 
       // union {
       //   uint32_t MetadataNegativeSizeInWords;

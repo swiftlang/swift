@@ -728,15 +728,18 @@ public:
   Optional<ClassMetadataBounds>
   readMetadataBoundsOfSuperclass(ContextDescriptorRef subclassRef) {
     auto subclass = cast<TargetClassDescriptor<Runtime>>(subclassRef);
+    if (!subclass->hasResilientSuperclass())
+      return ClassMetadataBounds::forSwiftRootClass();
 
     auto rawSuperclass =
-      resolveNullableRelativeField(subclassRef, subclass->Superclass);
+      resolveNullableRelativeField(subclassRef,
+                                   subclass->getResilientSuperclass());
     if (!rawSuperclass) {
       return ClassMetadataBounds::forSwiftRootClass();
     }
 
     return forTypeReference<ClassMetadataBounds>(
-      subclass->getSuperclassReferenceKind(), *rawSuperclass,
+      subclass->getResilientSuperclassReferenceKind(), *rawSuperclass,
       [&](ContextDescriptorRef superclass)
             -> Optional<ClassMetadataBounds> {
         if (!isa<TargetClassDescriptor<Runtime>>(superclass))
