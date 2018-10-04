@@ -816,10 +816,6 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
                                       parameterBindings))
     return cs.getTypeMatchFailure(locator);
 
-  // Check the argument types for each of the parameters.
-  ConstraintSystem::TypeMatchOptions subflags =
-    ConstraintSystem::TMF_GenerateConstraints;
-
   // If this application is part of an operator, then we allow an implicit
   // lvalue to be compatible with inout arguments.  This is used by
   // assignment operators.
@@ -848,9 +844,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
                                             getApplyArgToParam(argIdx,
                                                                paramIdx));
       auto argTy = argsWithLabels[argIdx].getOldType();
-      auto result = cs.matchTypes(argTy, paramTy, subKind, subflags, loc);
-      if (result.isFailure())
-        return result;
+      cs.addConstraint(subKind, argTy, paramTy, loc, /*isFavored=*/false);
     }
   }
 
