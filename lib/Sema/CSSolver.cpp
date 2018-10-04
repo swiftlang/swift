@@ -1683,8 +1683,8 @@ void ConstraintSystem::partitionDisjunction(
     auto *parentDecl = funcDecl->getParent()->getAsDecl();
     assert(parentDecl);
 
-   if (auto *extensionDecl = dyn_cast<ExtensionDecl>(parentDecl))
-     parentDecl = extensionDecl->getExtendedNominal();
+    if (auto *extensionDecl = dyn_cast<ExtensionDecl>(parentDecl))
+      parentDecl = extensionDecl->getExtendedNominal();
 
     if (parentDecl != designatedProtocol)
       return false;
