@@ -360,7 +360,7 @@ extension _NativeSet { // Insertions
       let bucket = hashTable.insertNew(hashValue: hashValue)
       uncheckedInitialize(at: bucket, to: element)
     }
-    _storage._count += 1
+    _storage._count &+= 1
   }
 
   /// Insert a new element into uniquely held storage.

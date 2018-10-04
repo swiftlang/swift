@@ -426,7 +426,7 @@ extension _NativeDictionary { // Insertions
       let bucket = hashTable.insertNew(hashValue: hashValue)
       uncheckedInitialize(at: bucket, toKey: key, value: value)
     }
-    _storage._count += 1
+    _storage._count &+= 1
   }
 
   /// Insert a new entry into uniquely held storage.
