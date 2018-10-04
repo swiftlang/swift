@@ -1676,22 +1676,22 @@ void ConstraintSystem::partitionDisjunction(
   // Now collect the overload choices that are defined within the type
   // that was designated in the operator declaration.
   auto *designatedProtocol = getOperatorDesignatedProtocol(Choices[0]);
-  forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
-    auto *decl = constraint->getOverloadChoice().getDecl();
-    auto *funcDecl = cast<FuncDecl>(decl);
+  if (designatedProtocol) {
+    forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
+        auto *decl = constraint->getOverloadChoice().getDecl();
+        auto *funcDecl = cast<FuncDecl>(decl);
 
-    auto *parentDecl = funcDecl->getParent()->getAsDecl();
-    assert(parentDecl);
+        auto *parentDecl = funcDecl->getParent()->getAsDecl();
+        if (auto *extensionDecl = dyn_cast<ExtensionDecl>(parentDecl))
+          parentDecl = extensionDecl->getExtendedNominal();
 
-    if (auto *extensionDecl = dyn_cast<ExtensionDecl>(parentDecl))
-      parentDecl = extensionDecl->getExtendedNominal();
+        if (parentDecl != designatedProtocol)
+          return false;
 
-    if (parentDecl != designatedProtocol)
-      return false;
-
-    definedInType.push_back(index);
-    return true;
-  });
+        definedInType.push_back(index);
+        return true;
+      });
+  }
 
   // Gather the remaining options.
   forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
