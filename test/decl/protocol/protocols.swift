@@ -16,6 +16,9 @@ protocol Test {
   var minor : Int { get }
   var subminor : Int  // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{21-21= { get <#set#> \}}}
   static var staticProperty: Int // expected-error{{property in protocol must have explicit { get } or { get set } specifier}} {{33-33= { get <#set#> \}}}
+
+  let bugfix // expected-error {{type annotation missing in pattern}} expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
+  var comment // expected-error {{type annotation missing in pattern}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
 }
 
 protocol Test2 {
