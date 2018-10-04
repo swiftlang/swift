@@ -3199,9 +3199,8 @@ public:
 
   public:
     ArgumentInfoCollector(ConstraintSystem &cs, FunctionType *fnTy) : CS(cs) {
-      walk(fnTy->getParams()[0].getPlainType());
-      if (fnTy->getParams().size() > 1)
-        walk(fnTy->getParams()[1].getPlainType());
+      for (auto &param : fnTy->getParams())
+        walk(param.getPlainType());
 
       minimizeLiteralProtocols();
     }
@@ -3221,7 +3220,7 @@ public:
                               "only for use within the debugger");
   };
 
-  bool haveTypeInformationForAllArguments(AnyFunctionType *fnType);
+  bool haveTypeInformationForAllArguments(FunctionType *fnType);
 
   // Partition the choices in the disjunction into groups that we will
   // iterate over in an order appropriate to attempt to stop before we

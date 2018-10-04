@@ -1553,14 +1553,14 @@ void ConstraintSystem::ArgumentInfoCollector::dump() const {
 // Check to see if we know something about the types of all arguments
 // in the given function type.
 bool ConstraintSystem::haveTypeInformationForAllArguments(
-    AnyFunctionType *fnType) {
+    FunctionType *fnType) {
   llvm::SetVector<Constraint *> literalConformsTo;
   return llvm::all_of(fnType->getParams(),
                       [&](AnyFunctionType::Param param) -> bool {
                         ArgumentInfoCollector argInfo(*this, param);
-                        return argInfo.getTypes().size() +
-                                   argInfo.getLiteralProtocols().size() >
-                               0;
+                        auto countFacts = argInfo.getTypes().size() +
+                                          argInfo.getLiteralProtocols().size();
+                        return countFacts > 0;
                       });
 }
 
@@ -1601,7 +1601,7 @@ Constraint *ConstraintSystem::selectApplyDisjunction() {
 
     auto *applicable = &constraint;
     if (haveTypeInformationForAllArguments(
-            applicable->getFirstType()->castTo<AnyFunctionType>())) {
+            applicable->getFirstType()->castTo<FunctionType>())) {
       auto *tyvar = applicable->getSecondType()->castTo<TypeVariableType>();
 
       // If we have created the disjunction for this apply, find it.
