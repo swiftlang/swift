@@ -197,9 +197,6 @@ def debug_time_function_bodies : Flag<["-"], "debug-time-function-bodies">,
 def debug_time_expression_type_checking : Flag<["-"], "debug-time-expression-type-checking">,
   HelpText<"Dumps the time it takes to type-check each expression">;
 
-def disable_constraint_solver_performance_hacks : Flag<["-"], "disable-constraint-solver-performance-hacks">,
-  HelpText<"Disable all the hacks in the constraint solver">;
-
 def debug_assert_immediately : Flag<["-"], "debug-assert-immediately">,
   DebugCrashOpt, HelpText<"Force an assertion failure immediately">;
 def debug_assert_after_parse : Flag<["-"], "debug-assert-after-parse">,
@@ -309,10 +306,6 @@ def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
   HelpText<"Enable experimental property behaviors">;
   
-def enable_operator_designated_protocols :
-  Flag<["-"], "enable-operator-designated-protocols">,
-  HelpText<"Enable operator designated protocols">;
-
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;
@@ -375,6 +368,17 @@ def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-
 def solver_disable_shrink :
   Flag<["-"], "solver-disable-shrink">,
   HelpText<"Disable the shrink phase of expression type checking">;
+
+def disable_constraint_solver_performance_hacks : Flag<["-"], "disable-constraint-solver-performance-hacks">,
+  HelpText<"Disable all the hacks in the constraint solver">;
+
+def enable_operator_designated_protocols :
+  Flag<["-"], "enable-operator-designated-protocols">,
+  HelpText<"Enable operator designated protocols">;
+
+def solver_enable_operator_designated_protocols :
+  Flag<["-"], "solver-enable-operator-designated-protocols">,
+  HelpText<"Enable operator designated protocols in constraint solver">;
 
 def switch_checking_invocation_threshold_EQ : Joined<["-"],
     "switch-checking-invocation-threshold=">;
