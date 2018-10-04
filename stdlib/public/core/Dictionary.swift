@@ -1863,6 +1863,19 @@ extension Dictionary.Index {
 #endif
 
   @usableFromInline @_transparent
+  internal var _isNative: Bool {
+    switch _variant {
+    case .native:
+      return true
+#if _runtime(_ObjC)
+    case .cocoa:
+      _cocoaPath()
+      return false
+#endif
+    }
+  }
+
+  @usableFromInline @_transparent
   internal var _asNative: _HashTable.Index {
     switch _variant {
     case .native(let nativeIndex):
