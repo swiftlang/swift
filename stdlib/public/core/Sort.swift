@@ -21,9 +21,6 @@ extension Sequence where Element: Comparable {
   /// You can sort any sequence of elements that conform to the `Comparable`
   /// protocol by calling this method. Elements are sorted in ascending order.
   ///
-  /// The sorting algorithm is not stable. A nonstable sort may change the
-  /// relative order of elements that compare equal.
-  ///
   /// Here's an example of sorting a list of students' names. Strings in Swift
   /// conform to the `Comparable` protocol, so the names are sorted in
   /// ascending order according to the less-than operator (`<`).
@@ -40,6 +37,9 @@ extension Sequence where Element: Comparable {
   ///     print(descendingStudents)
   ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
   ///
+  /// The sorting algorithm is stable. A stable sort preserves the relative
+  /// order of elements that compare equal.
+  ///
   /// - Returns: A sorted array of the sequence's elements.
   ///
   /// - Complexity: O(*n* log *n*), where *n* is the length of the sequence.
@@ -55,26 +55,9 @@ extension Sequence {
   ///
   /// When you want to sort a sequence of elements that don't conform to the
   /// `Comparable` protocol, pass a predicate to this method that returns
-  /// `true` when the first element passed should be ordered before the
-  /// second. The elements of the resulting array are ordered according to the
-  /// given predicate.
-  ///
-  /// The predicate must be a *strict weak ordering* over the elements. That
-  /// is, for any elements `a`, `b`, and `c`, the following conditions must
-  /// hold:
-  ///
-  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
-  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
-  ///   both `true`, then `areInIncreasingOrder(a, c)` is also `true`.
-  ///   (Transitive comparability)
-  /// - Two elements are *incomparable* if neither is ordered before the other
-  ///   according to the predicate. If `a` and `b` are incomparable, and `b`
-  ///   and `c` are incomparable, then `a` and `c` are also incomparable.
-  ///   (Transitive incomparability)
-  ///
-  /// The sorting algorithm is not stable. A nonstable sort may change the
-  /// relative order of elements for which `areInIncreasingOrder` does not
-  /// establish an order.
+  /// `true` when the first element should be ordered before the second. The
+  /// elements of the resulting array are ordered according to the given
+  /// predicate.
   ///
   /// In the following example, the predicate provides an ordering for an array
   /// of a custom `HTTPResponse` type. The predicate orders errors before
@@ -121,6 +104,23 @@ extension Sequence {
   ///     print(students.sorted(by: <))
   ///     // Prints "["Abena", "Akosua", "Kofi", "Kweku", "Peter"]"
   ///
+  /// The predicate must be a *strict weak ordering* over the elements. That
+  /// is, for any elements `a`, `b`, and `c`, the following conditions must
+  /// hold:
+  ///
+  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
+  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
+  ///   both `true`, then `areInIncreasingOrder(a, c)` is also `true`.
+  ///   (Transitive comparability)
+  /// - Two elements are *incomparable* if neither is ordered before the other
+  ///   according to the predicate. If `a` and `b` are incomparable, and `b`
+  ///   and `c` are incomparable, then `a` and `c` are also incomparable.
+  ///   (Transitive incomparability)
+  ///
+  /// The sorting algorithm is stable. A stable sort preserves the relative
+  /// order of elements for which `areInIncreasingOrder` does not establish an
+  /// order.
+  ///
   /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its
   ///   first argument should be ordered before its second argument;
   ///   otherwise, `false`.
@@ -146,9 +146,6 @@ where Self: RandomAccessCollection, Element: Comparable {
   /// `Comparable` protocol by calling this method. Elements are sorted in
   /// ascending order.
   ///
-  /// The sorting algorithm is not stable. A nonstable sort may change the
-  /// relative order of elements that compare equal.
-  ///
   /// Here's an example of sorting a list of students' names. Strings in Swift
   /// conform to the `Comparable` protocol, so the names are sorted in
   /// ascending order according to the less-than operator (`<`).
@@ -165,6 +162,9 @@ where Self: RandomAccessCollection, Element: Comparable {
   ///     print(students)
   ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
   ///
+  /// The sorting algorithm is stable. A stable sort preserves the relative
+  /// order of elements that compare equal.
+  ///
   /// - Complexity: O(*n* log *n*), where *n* is the length of the collection.
   @inlinable
   public mutating func sort() {
@@ -176,27 +176,9 @@ extension MutableCollection where Self: RandomAccessCollection {
   /// Sorts the collection in place, using the given predicate as the
   /// comparison between elements.
   ///
-  /// When you want to sort a collection of elements that doesn't conform to
+  /// When you want to sort a collection of elements that don't conform to
   /// the `Comparable` protocol, pass a closure to this method that returns
-  /// `true` when the first element passed should be ordered before the
-  /// second.
-  ///
-  /// The predicate must be a *strict weak ordering* over the elements. That
-  /// is, for any elements `a`, `b`, and `c`, the following conditions must
-  /// hold:
-  ///
-  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
-  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
-  ///   both `true`, then `areInIncreasingOrder(a, c)` is also `true`.
-  ///   (Transitive comparability)
-  /// - Two elements are *incomparable* if neither is ordered before the other
-  ///   according to the predicate. If `a` and `b` are incomparable, and `b`
-  ///   and `c` are incomparable, then `a` and `c` are also incomparable.
-  ///   (Transitive incomparability)
-  ///
-  /// The sorting algorithm is not stable. A nonstable sort may change the
-  /// relative order of elements for which `areInIncreasingOrder` does not
-  /// establish an order.
+  /// `true` when the first element should be ordered before the second.
   ///
   /// In the following example, the closure provides an ordering for an array
   /// of a custom enumeration that describes an HTTP response. The predicate
@@ -235,6 +217,23 @@ extension MutableCollection where Self: RandomAccessCollection {
   ///     students.sort(by: >)
   ///     print(students)
   ///     // Prints "["Peter", "Kweku", "Kofi", "Akosua", "Abena"]"
+  ///
+  /// `areInIncreasingOrder` must be a *strict weak ordering* over the
+  /// elements. That is, for any elements `a`, `b`, and `c`, the following
+  /// conditions must hold:
+  ///
+  /// - `areInIncreasingOrder(a, a)` is always `false`. (Irreflexivity)
+  /// - If `areInIncreasingOrder(a, b)` and `areInIncreasingOrder(b, c)` are
+  ///   both `true`, then `areInIncreasingOrder(a, c)` is also `true`.
+  ///   (Transitive comparability)
+  /// - Two elements are *incomparable* if neither is ordered before the other
+  ///   according to the predicate. If `a` and `b` are incomparable, and `b`
+  ///   and `c` are incomparable, then `a` and `c` are also incomparable.
+  ///   (Transitive incomparability)
+  ///
+  /// The sorting algorithm is stable. A stable sort preserves the relative
+  /// order of elements for which `areInIncreasingOrder` does not establish an
+  /// order.
   ///
   /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its
   ///   first argument should be ordered before its second argument;
