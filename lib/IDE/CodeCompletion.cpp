@@ -1296,7 +1296,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   CodeCompletionConsumer &Consumer;
   CodeCompletionExpr *CodeCompleteTokenExpr = nullptr;
   AssignExpr *AssignmentExpr;
-  CallExpr *FuncCallExpr;
   CompletionKind Kind = CompletionKind::None;
   Expr *ParsedExpr = nullptr;
   SourceLoc DotLoc;
@@ -1462,7 +1461,7 @@ public:
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
   void completeAssignmentRHS(AssignExpr *E) override;
-  void completeCallArg(CallExpr *E) override;
+  void completeCallArg(CodeCompletionExpr *E) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
                          Optional<unsigned> yieldIndex) override;
@@ -3952,22 +3951,6 @@ public:
     return !ExpectedTypes.empty() || !ExpectedNames.empty();
   }
 
-  bool getCallArgCompletions(DeclContext &DC, CallExpr *CallE, Expr *CCExpr) {
-    std::vector<Type> ExpectedTypes;
-    std::vector<StringRef> ExpectedNames;
-    if (!collectArgumentExpectation(DC, CallE, CCExpr, ExpectedTypes,
-                                    ExpectedNames))
-      return false;
-
-    addArgNameCompletionResults(ExpectedNames);
-    if (!ExpectedTypes.empty()) {
-      setExpectedTypes(ExpectedTypes);
-      getValueCompletionsInDeclContext(CCExpr->getStartLoc(), DefaultFilter);
-    }
-
-    return true;
-  }
-
   void getTypeContextEnumElementCompletions(SourceLoc Loc) {
     llvm::SaveAndRestore<LookupKind> ChangeLookupKind(
         Kind, LookupKind::EnumElement);
@@ -4654,14 +4637,10 @@ void CodeCompletionCallbacksImpl::completeAssignmentRHS(AssignExpr *E) {
   Kind = CompletionKind::AssignmentRHS;
 }
 
-void CodeCompletionCallbacksImpl::completeCallArg(CallExpr *E) {
-  if (Kind == CompletionKind::PostfixExprBeginning ||
-      Kind == CompletionKind::None) {
-    CurDeclContext = P.CurDeclContext;
-    Kind = CompletionKind::CallArg;
-    FuncCallExpr = E;
-    ParsedExpr = E;
-  }
+void CodeCompletionCallbacksImpl::completeCallArg(CodeCompletionExpr *E) {
+  CurDeclContext = P.CurDeclContext;
+  CodeCompleteTokenExpr = E;
+  Kind = CompletionKind::CallArg;
 }
 
 void CodeCompletionCallbacksImpl::completeReturnStmt(CodeCompletionExpr *E) {
@@ -5586,10 +5565,17 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
   case CompletionKind::CallArg : {
-    if (!CodeCompleteTokenExpr || !Lookup.getCallArgCompletions(*CurDeclContext,
-                                                                FuncCallExpr,
-                                                                CodeCompleteTokenExpr))
-      DoPostfixExprBeginning();
+    ::CodeCompletionTypeContextAnalyzer Analyzer(CurDeclContext,
+                                                 CodeCompleteTokenExpr);
+    SmallVector<Type, 2> PossibleTypes;
+    SmallVector<StringRef, 2> PossibleNames;
+    Analyzer.Analyze(PossibleTypes, PossibleNames);
+    if (!PossibleNames.empty()) {
+      Lookup.addArgNameCompletionResults(PossibleNames);
+      break;
+    }
+    Lookup.setExpectedTypes(PossibleTypes);
+    DoPostfixExprBeginning();
     break;
   }
 
