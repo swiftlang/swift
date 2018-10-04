@@ -43,8 +43,6 @@
 // CHECK-SAME:   @"$s16class_resilience14ResilientChildCMa"
 // --       field descriptor:
 // CHECK-SAME:   @"$s16class_resilience14ResilientChildCMF"
-// -- superclass:
-// CHECK-SAME:   @"got.$s15resilient_class22ResilientOutsideParentCMn"
 // -- metadata bounds:
 // CHECK-SAME:   @"$s16class_resilience14ResilientChildCMo"
 // --       metadata positive size in words (not used):
@@ -55,6 +53,8 @@
 // CHECK-SAME:   i32 1,
 // --       field offset vector offset:
 // CHECK-SAME:   i32 3,
+// -- superclass:
+// CHECK-SAME:   @"got.$s15resilient_class22ResilientOutsideParentCMn"
 // --       singleton metadata initialization cache:
 // CHECK-SAME:   @"$s16class_resilience14ResilientChildCMl"
 // --       resilient pattern:

@@ -1589,6 +1589,15 @@ namespace {
     }
     
     void addLayoutInfo() {
+
+      // TargetRelativeDirectPointer<Runtime, const char> SuperclassType;
+      if (auto superclassType = getType()->getSuperclass()) {
+        B.addRelativeAddress(IGM.getTypeRef(superclassType->getCanonicalType(),
+                                            MangledTypeRefRole::Metadata));
+      } else {
+        B.addInt32(0);
+      }
+
       auto properties = getType()->getStoredProperties();
 
       // union {

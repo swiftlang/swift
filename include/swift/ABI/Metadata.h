@@ -3683,6 +3683,10 @@ public:
       .class_getResilientSuperclassReferenceKind();
   }
 
+  /// The type of the superclass, expressed as a mangled type name that can
+  /// refer to the generic arguments of the subclass type.
+  TargetRelativeDirectPointer<Runtime, const char> SuperclassType;
+
   union {
     /// If this descriptor does not have a resilient superclass, this is the
     /// negative size of metadata objects of this class (in words).
