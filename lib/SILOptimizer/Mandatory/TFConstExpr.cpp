@@ -1181,14 +1181,13 @@ ConstExprFunctionState::initializeSingleWriterAddress(
       // `initializeSingleWriterAddress` below detects and forbids multiple
       // assignment, so we don't need to do it here.
 
-      // Set `teai`'s value to satisfy the `initializeSingleWriterAddress`
-      // precondition.
       SmallVector<unsigned, 4> teaiAccessPath(accessPath.begin(),
                                               accessPath.end());
       teaiAccessPath.push_back(teai->getFieldNo());
-
+        
       auto initializationResult = initializeSingleWriterAddress(
           teai, memoryObject, teaiAccessPath);
+        
       if (initializationResult.failure)
         return initializationResult;
 
