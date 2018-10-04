@@ -57,9 +57,6 @@ namespace irgen {
   class LoadableTypeInfo;
   class TypeInfo;
   
-/// Either a type or a forward-declaration.
-using TypeCacheEntry = llvm::PointerUnion<const TypeInfo *, llvm::Type *>;
-
 /// The helper class for generating types.
 class TypeConverter {
 public:
@@ -100,7 +97,7 @@ private:
   const FixedTypeInfo *createImmovable(llvm::Type *T,
                                        Size size, Alignment align);
 
-  void addForwardDecl(TypeBase *key, llvm::Type *type);
+  void addForwardDecl(TypeBase *key);
 
   const TypeInfo *convertType(CanType T);
   const TypeInfo *convertAnyNominalType(CanType T, NominalTypeDecl *D);
@@ -134,7 +131,7 @@ public:
     return CompletelyFragile;
   }
 
-  TypeCacheEntry getTypeEntry(CanType type);
+  const TypeInfo *getTypeEntry(CanType type);
   const TypeInfo &getCompleteTypeInfo(CanType type);
   const LoadableTypeInfo &getNativeObjectTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
@@ -184,14 +181,14 @@ private:
   CanType getExemplarType(CanType t);
   
   class Types_t {
-    llvm::DenseMap<TypeBase*, TypeCacheEntry> IndependentCache;
-    llvm::DenseMap<TypeBase*, TypeCacheEntry> DependentCache;
-    llvm::DenseMap<TypeBase*, TypeCacheEntry> FragileIndependentCache;
-    llvm::DenseMap<TypeBase*, TypeCacheEntry> FragileDependentCache;
+    llvm::DenseMap<TypeBase *, const TypeInfo *> IndependentCache;
+    llvm::DenseMap<TypeBase *, const TypeInfo *> DependentCache;
+    llvm::DenseMap<TypeBase *, const TypeInfo *> FragileIndependentCache;
+    llvm::DenseMap<TypeBase *, const TypeInfo *> FragileDependentCache;
 
   public:
-    llvm::DenseMap<TypeBase*, TypeCacheEntry> &getCacheFor(bool isDependent,
-                                                           bool completelyFragile);
+    llvm::DenseMap<TypeBase *, const TypeInfo *> &getCacheFor(bool isDependent,
+                                                              bool completelyFragile);
   };
   Types_t Types;
 };

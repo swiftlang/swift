@@ -55,7 +55,7 @@ Alignment IRGenModule::getCappedAlignment(Alignment align) {
   return std::min(align, Alignment(MaximumAlignment));
 }
 
-llvm::DenseMap<TypeBase*, TypeCacheEntry> &
+llvm::DenseMap<TypeBase *, const TypeInfo *> &
 TypeConverter::Types_t::getCacheFor(bool isDependent, bool completelyFragile) {
   if (completelyFragile) {
     return (isDependent
@@ -1128,12 +1128,13 @@ GenericEnvironment *IRGenModule::getGenericEnvironment() {
 
 /// Add a temporary forward declaration for a type.  This will live
 /// only until a proper mapping is added.
-void TypeConverter::addForwardDecl(TypeBase *key, llvm::Type *type) {
+void TypeConverter::addForwardDecl(TypeBase *key) {
   assert(key->isCanonical());
   assert(!key->hasTypeParameter());
   auto &Cache = Types.getCacheFor(/*isDependent*/ false, CompletelyFragile);
-  assert(!Cache.count(key) && "entry already exists for type!");
-  Cache.insert(std::make_pair(key, type));
+  auto result = Cache.insert(std::make_pair(key, nullptr));
+  assert(result.second && "entry already exists for type!");
+  (void) result;
 }
 
 const TypeInfo &IRGenModule::getWitnessTablePtrTypeInfo() {
@@ -1322,17 +1323,9 @@ llvm::Type *IRGenModule::getStorageType(SILType T) {
   return getStorageTypeForLowered(T.getASTType());
 }
 
-/// Get the storage type for the given type.  Note that, unlike
-/// fetching the type info and asking it for the storage type, this
-/// operation will succeed for forward-declarations.
+/// Get the storage type for the given type.
 llvm::Type *IRGenModule::getStorageTypeForLowered(CanType T) {
-  // TODO: we can avoid creating entries for some obvious cases here.
-  auto entry = Types.getTypeEntry(T);
-  if (auto ti = entry.dyn_cast<const TypeInfo*>()) {
-    return ti->getStorageType();
-  } else {
-    return entry.get<llvm::Type*>();
-  }
+  return Types.getTypeEntry(T)->getStorageType();
 }
 
 /// Get the type information for the given type, which may not have
@@ -1370,9 +1363,7 @@ const TypeInfo &IRGenModule::getTypeInfoForLowered(CanType T) {
 
 /// 
 const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
-  auto entry = getTypeEntry(T);
-  assert(entry.is<const TypeInfo*>() && "getting TypeInfo recursively!");
-  return *entry.get<const TypeInfo*>();
+  return *getTypeEntry(T);
 }
 
 ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
@@ -1428,7 +1419,7 @@ void TypeConverter::popCompletelyFragile() {
   CompletelyFragile = false;
 }
 
-TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
+const TypeInfo *TypeConverter::getTypeEntry(CanType canonicalTy) {
   // Cache this entry in the dependent or independent cache appropriate to it.
   auto &Cache = Types.getCacheFor(canonicalTy->hasTypeParameter(),
                                   CompletelyFragile);
@@ -1471,10 +1462,8 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
 
   // Cache the entry under the original type and the exemplar type, so that
   // we can avoid relowering equivalent types.
-  auto insertEntry = [&](TypeCacheEntry &entry) {
-    assert(entry == TypeCacheEntry() ||
-           (entry.is<llvm::Type*>() &&
-            entry.get<llvm::Type*>() == convertedTI->getStorageType()));
+  auto insertEntry = [&](const TypeInfo *&entry) {
+    assert(entry == nullptr);
     entry = convertedTI;
   };
   insertEntry(Cache[canonicalTy.getPointer()]);
@@ -1711,10 +1700,10 @@ TypeConverter::convert##Name##StorageType(Name##StorageType *refType) { \
 }
 #include "swift/AST/ReferenceStorage.def"
 
-static void overwriteForwardDecl(llvm::DenseMap<TypeBase*, TypeCacheEntry> &cache,
+static void overwriteForwardDecl(llvm::DenseMap<TypeBase *, const TypeInfo *> &cache,
                                  TypeBase *key, const TypeInfo *result) {
   assert(cache.count(key) && "no forward declaration?");
-  assert(cache[key].is<llvm::Type*>() && "overwriting real entry!");
+  assert(cache[key] == nullptr && "overwriting real entry!");
   cache[key] = result;
 }
 
@@ -1863,7 +1852,7 @@ const TypeInfo *TypeConverter::convertAnyNominalType(CanType type,
   auto &Cache = Types.getCacheFor(/*isDependent*/ false, CompletelyFragile);
   auto entry = Cache.find(key);
   if (entry != Cache.end())
-    return entry->second.get<const TypeInfo *>();
+    return entry->second;
 
   switch (decl->getKind()) {
 #define NOMINAL_TYPE_DECL(ID, PARENT)
