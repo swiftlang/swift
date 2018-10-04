@@ -141,6 +141,7 @@ KEY_STRING(SuperclassUsr, superclassUsr)
 KEY_STRING(EnumRawTypeName, enumRawTypeName)
 KEY_STRING(GenericSig, genericSig)
 KEY_STRING(FuncSelfKind, funcSelfKind)
+KEY_STRING(ParamValueOwnership, paramValueOwnership)
 
 KEY_STRING_ARR(SuperclassNames, superclassNames)
 KEY_STRING_ARR(ConformingProtocols, conformingProtocols)

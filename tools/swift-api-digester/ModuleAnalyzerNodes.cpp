@@ -42,8 +42,7 @@ struct swift::ide::api::SDKNodeInitInfo {
   SDKNodeInitInfo(SDKContext &Ctx, Decl *D);
   SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD);
   SDKNodeInitInfo(SDKContext &Ctx, OperatorDecl *D);
-  SDKNodeInitInfo(SDKContext &Ctx, Type Ty, bool IsImplicitlyUnwrappedOptional,
-                  bool hasDefaultArgument);
+  SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info = TypeInitInfo());
   SDKNode* createSDKNode(SDKNodeKind Kind);
 };
 
@@ -86,7 +85,8 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
 
 SDKNodeType::SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind):
   SDKNode(Info, Kind), TypeAttributes(Info.TypeAttrs),
-  HasDefaultArg(Info.HasDefaultArg) {}
+  HasDefaultArg(Info.HasDefaultArg),
+  ParamValueOwnership(Info.ParamValueOwnership) {}
 
 SDKNodeTypeNominal::SDKNodeTypeNominal(SDKNodeInitInfo Info):
   SDKNodeType(Info, SDKNodeKind::TypeNominal), USR(Info.Usr) {}
@@ -668,6 +668,8 @@ bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         return false;
       if (Left->hasDefaultArgument() != Right->hasDefaultArgument())
         return false;
+      if (Left->getParamValueOwnership() != Right->getParamValueOwnership())
+        return false;
       if (Left->getPrintedName() == Right->getPrintedName())
         return true;
       return Left->getName() == Right->getName() &&
@@ -1013,12 +1015,11 @@ static Optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) {
   return llvm::None;
 }
 
-SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty,
-                                 bool IsImplicitlyUnwrappedOptional = false,
-                                 bool hasDefaultArgument = false) :
-    Ctx(Ctx), Name(getTypeName(Ctx, Ty, IsImplicitlyUnwrappedOptional)),
-    PrintedName(getPrintedName(Ctx, Ty, IsImplicitlyUnwrappedOptional)),
-    HasDefaultArg(hasDefaultArgument) {
+SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info) :
+    Ctx(Ctx), Name(getTypeName(Ctx, Ty, Info.IsImplicitlyUnwrappedOptional)),
+    PrintedName(getPrintedName(Ctx, Ty, Info.IsImplicitlyUnwrappedOptional)),
+    ParamValueOwnership(Info.ValueOwnership),
+    HasDefaultArg(Info.hasDefaultArgument) {
   if (isFunctionTypeNoEscape(Ty))
     TypeAttrs.push_back(TypeAttrKind::TAK_noescape);
   // If this is a nominal type, get its Usr.
@@ -1123,14 +1124,11 @@ case SDKNodeKind::X:                                                           \
 // Recursively construct a node that represents a type, for instance,
 // representing the return value type of a function decl.
 SDKNode *swift::ide::api::
-SwiftDeclCollector::constructTypeNode(Type T,
-                                      bool IsImplicitlyUnwrappedOptional,
-                                      bool hasDefaultArgument) {
+SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
   if (Ctx.checkingABI()) {
     T = T->getCanonicalType();
   }
-  SDKNode* Root = SDKNodeInitInfo(Ctx, T, IsImplicitlyUnwrappedOptional,
-    hasDefaultArgument).createSDKNode(SDKNodeKind::TypeNominal);
+  SDKNode* Root = SDKNodeInitInfo(Ctx, T, Info).createSDKNode(SDKNodeKind::TypeNominal);
 
   if (auto NAT = dyn_cast<NameAliasType>(T.getPointer())) {
     SDKNode* Root = SDKNodeInitInfo(Ctx, T).createSDKNode(SDKNodeKind::TypeAlias);
@@ -1179,10 +1177,20 @@ std::vector<SDKNode*> swift::ide::api::
 SwiftDeclCollector::createParameterNodes(ParameterList *PL) {
   std::vector<SDKNode*> Result;
   for (auto param: *PL) {
-    Result.push_back(constructTypeNode(param->getInterfaceType(),
-      param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>(),
-      param->getDefaultArgumentKind() != DefaultArgumentKind::None));
-
+    TypeInitInfo Info;
+    Info.IsImplicitlyUnwrappedOptional = param->getAttrs().
+      hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    Info.hasDefaultArgument = param->getDefaultArgumentKind() !=
+      DefaultArgumentKind::None;
+    switch (param->getValueOwnership()) {
+#define CASE(KIND) case ValueOwnership::KIND: Info.ValueOwnership = #KIND; break;
+    CASE(Owned)
+    CASE(InOut)
+    CASE(Shared)
+    case ValueOwnership::Default: break;
+#undef CASE
+    }
+    Result.push_back(constructTypeNode(param->getInterfaceType(), Info));
   }
   return Result;
 }
@@ -1195,8 +1203,10 @@ SDKNode *swift::ide::api::
 SwiftDeclCollector::constructFunctionNode(FuncDecl* FD,
                                           SDKNodeKind Kind) {
   auto Func = SDKNodeInitInfo(Ctx, FD).createSDKNode(Kind);
-  Func->addChild(constructTypeNode(FD->getResultInterfaceType(),
-    FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()));
+  TypeInitInfo Info;
+  Info.IsImplicitlyUnwrappedOptional = FD->getAttrs().
+    hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  Func->addChild(constructTypeNode(FD->getResultInterfaceType(), Info));
   for (auto *Node : createParameterNodes(FD->getParameters()))
     Func->addChild(Node);
   return Func;
@@ -1295,8 +1305,10 @@ SwiftDeclCollector::constructExternalExtensionNode(NominalTypeDecl *NTD,
 SDKNode *swift::ide::api::
 SwiftDeclCollector::constructVarNode(ValueDecl *VD) {
   auto Var = SDKNodeInitInfo(Ctx, VD).createSDKNode(SDKNodeKind::DeclVar);
-  Var->addChild(constructTypeNode(VD->getInterfaceType(),
-    VD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()));
+  TypeInitInfo Info;
+  Info.IsImplicitlyUnwrappedOptional = VD->getAttrs().
+    hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  Var->addChild(constructTypeNode(VD->getInterfaceType(), Info));
   if (auto VAD = dyn_cast<AbstractStorageDecl>(VD)) {
     if (auto Getter = VAD->getGetter())
       Var->addChild(constructFunctionNode(Getter, SDKNodeKind::DeclGetter));
@@ -1513,6 +1525,7 @@ void SDKNodeType::jsonize(json::Output &out) {
   SDKNode::jsonize(out);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_typeAttributes).data(), TypeAttributes);
   output(out, KeyKind::KK_hasDefaultArg, HasDefaultArg);
+  output(out, KeyKind::KK_paramValueOwnership, ParamValueOwnership);
 }
 
 void SDKNodeTypeNominal::jsonize(json::Output &out) {

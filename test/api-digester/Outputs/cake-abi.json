@@ -563,6 +563,7 @@
               "kind": "TypeNominal",
               "name": "Hasher",
               "printedName": "Hasher",
+              "paramValueOwnership": "InOut",
               "usr": "s:s6HasherV"
             }
           ],
