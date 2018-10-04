@@ -1850,10 +1850,9 @@ transformTensorFromScalar(ApplyInst *apply,
     auto *decl = scalarTy.getStructOrBoundGenericStruct();
     assert(decl);
     for (auto *field : decl->getStoredProperties()) {
-        // Check the struct only has 1 field.
+      // Check the struct only has 1 field.
       assert(!loadScalarBuiltin);
-      loadScalarBuiltin =
-          B.createStructExtract(loc, loadScalar, field);
+      loadScalarBuiltin = B.createStructExtract(loc, loadScalar, field);
     }
     assert(loadScalarBuiltin);
   }

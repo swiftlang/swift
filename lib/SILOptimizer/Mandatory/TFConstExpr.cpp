@@ -1169,8 +1169,10 @@ ConstExprFunctionState::getSingleWriterAddressValue(SILValue addr) {
 
         // If we have already found a value for this stack slot then we're done:
         // we don't support multiple assignment.
-        if (memoryObject->getValue().getKind() != SymbolicValue::UninitMemory)
+        if (memoryObject->getValue().getKind() != SymbolicValue::UninitMemory) {
+          memoryObject->setValue(SymbolicValue::getUninitMemory());
           return evaluator.getUnknown(addr, UnknownReason::Default);
+        }
 
         auto result = getConstantValue(si->getOperand(0));
         if (!result.isConstant()) {

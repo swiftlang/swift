@@ -2014,7 +2014,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       auto tensorHandleValue =
           getLoweredSingletonExplosion(tensorHandleSilValue);
       auto *extractHandleFn = IGM.getTFC_GetCTensorHandleFromSwiftFn();
-      // Cast to a void*
+      // Cast to a void*, as required by TFC_GetCTensorHandleFromSwift().
       auto tensorHandleValueUntyped =
           Builder.CreateBitCast(tensorHandleValue, IGM.Int8PtrTy);
       auto cHandle = Builder.CreateCall(extractHandleFn, {tensorHandleValueUntyped});
