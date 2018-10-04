@@ -69,7 +69,13 @@ function(add_sourcekit_default_compiler_flags target)
   # TODO(compnerd) this should really use target_compile_options but the use
   # of keyword and non-keyword flags prevents this
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    list(APPEND c_compile_flags "-fblocks")
+    list(APPEND c_compile_flags -fblocks)
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    if(SWIFT_COMPILER_IS_MSVC_LIKE)
+      list(APPEND c_compile_flags -Xclang;-fblocks)
+    else()
+      list(APPEND c_compile_flags -fblocks)
+    endif()
   endif()
 
   # Convert variables to space-separated strings.

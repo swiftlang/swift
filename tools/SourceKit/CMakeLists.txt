@@ -35,7 +35,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT CMAKE_CROSSCOMPILING)
 endif()
 
 # If we were don't have XPC, just build inproc.
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT HAVE_XPC_H)
+if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" OR NOT HAVE_XPC_H)
   set(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY TRUE)
 endif()
 
@@ -95,12 +95,11 @@ include_directories(BEFORE
   ${SOURCEKIT_BINARY_DIR}/tools/SourceKit/include
 )
 
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-  set(SOURCEKIT_DEFAULT_TARGET_SDK "LINUX")
+if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  string(TOUPPER "${CMAKE_SYSTEM_NAME}" SOURCEKIT_DEFAULT_TARGET_SDK)
   set(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH TRUE)
 
   if(SWIFT_BUILD_SOURCEKIT)
-
     include(ExternalProject)
     ExternalProject_Add(libdispatch
                         SOURCE_DIR
