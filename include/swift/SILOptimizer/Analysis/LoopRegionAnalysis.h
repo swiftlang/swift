@@ -1080,8 +1080,10 @@ public:
     return S->getKind() == SILAnalysisKind::LoopRegion;
   }
 
-  virtual LoopRegionFunctionInfo *newFunctionAnalysis(SILFunction *F) override {
-    return new LoopRegionFunctionInfo(F, POA->get(F), SLA->get(F));
+  virtual std::unique_ptr<LoopRegionFunctionInfo>
+  newFunctionAnalysis(SILFunction *F) override {
+    return llvm::make_unique<LoopRegionFunctionInfo>(F, POA->get(F),
+                                                     SLA->get(F));
   }
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {

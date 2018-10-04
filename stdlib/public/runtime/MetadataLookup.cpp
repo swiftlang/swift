@@ -258,6 +258,50 @@ ParsedTypeIdentity::parse(const TypeContextDescriptor *type) {
   return result;
 }
 
+#if SWIFT_OBJC_INTEROP
+/// For a mangled node that refers to an Objective-C class or protocol,
+/// return the class or protocol name.
+static Optional<StringRef> getObjCClassOrProtocolName(
+                                           const Demangle::NodePointer &node) {
+  if (node->getKind() != Demangle::Node::Kind::Class &&
+      node->getKind() != Demangle::Node::Kind::Protocol)
+    return None;
+
+  if (node->getNumChildren() != 2)
+    return None;
+
+  // Check whether we have the __ObjC module.
+  auto moduleNode = node->getChild(0);
+  if (moduleNode->getKind() != Demangle::Node::Kind::Module ||
+      moduleNode->getText() != MANGLING_MODULE_OBJC)
+    return None;
+
+  // Check whether we have an identifier.
+  auto nameNode = node->getChild(1);
+  if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
+    return None;
+
+  return nameNode->getText();
+}
+
+/// Determine whether the two demangle trees both refer to the same
+/// Objective-C class or protocol referenced by name.
+static bool sameObjCTypeManglings(Demangle::NodePointer node1,
+                                  Demangle::NodePointer node2) {
+  // Entities need to be of the same kind.
+  if (node1->getKind() != node2->getKind())
+    return false;
+
+  auto name1 = getObjCClassOrProtocolName(node1);
+  if (!name1) return false;
+
+  auto name2 = getObjCClassOrProtocolName(node2);
+  if (!name2) return false;
+
+  return *name1 == *name2;
+}
+#endif
+
 bool
 swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
                                          Demangle::NodePointer node) {
@@ -315,10 +359,23 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         _findNominalTypeDescriptor(extendedContextNode, demangler);
       auto extendedDescriptorFromDemangled =
         _findNominalTypeDescriptor(extendedContextDemangled, demangler);
+
+      // Determine whether the contexts match.
+      bool contextsMatch =
+        extendedDescriptorFromNode && extendedDescriptorFromDemangled &&
+        equalContexts(extendedDescriptorFromNode,
+                      extendedDescriptorFromDemangled);
       
-      if (!extendedDescriptorFromNode || !extendedDescriptorFromDemangled ||
-          !equalContexts(extendedDescriptorFromNode,
-                         extendedDescriptorFromDemangled))
+#if SWIFT_OBJC_INTEROP
+      if (!contextsMatch &&
+          (!extendedDescriptorFromNode || !extendedDescriptorFromDemangled) &&
+          sameObjCTypeManglings(extendedContextNode,
+                                extendedContextDemangled)) {
+        contextsMatch = true;
+      }
+#endif
+
+      if (!contextsMatch)
         return false;
       
       // Check whether the generic signature of the extension matches the
@@ -470,7 +527,7 @@ _findNominalTypeDescriptor(Demangle::NodePointer node,
                          [&](const void *context) -> NodePointer {
                            return _buildDemanglingForContext(
                                (const ContextDescriptor *) context,
-                               {}, false, Dem);
+                               {}, Dem);
                          });
 
   // Look for an existing entry.
@@ -605,7 +662,7 @@ _findProtocolDescriptor(const Demangle::NodePointer &node,
                          [&](const void *context) -> NodePointer {
                            return _buildDemanglingForContext(
                                (const ContextDescriptor *) context,
-                               {}, false, Dem);
+                               {}, Dem);
                          });
 
   // Look for an existing entry.
@@ -679,64 +736,9 @@ public:
   const FieldDescriptor **end() const { return End; }
 };
 
-struct FieldCacheState {
-  ConcurrentMap<FieldDescriptorCacheEntry> FieldCache;
-
-  ConcurrentReadableArray<StaticFieldSection> StaticSections;
-  ConcurrentReadableArray<DynamicFieldSection> DynamicSections;
-
-  FieldCacheState() {
-    initializeTypeFieldLookup();
-  }
-};
-
-static Lazy<FieldCacheState> FieldCache;
 } // namespace
 
-void swift::swift_registerFieldDescriptors(const FieldDescriptor **records,
-                                           size_t size) {
-  auto &cache = FieldCache.get();
-  cache.DynamicSections.push_back({records, size});
-}
-
-void swift::addImageTypeFieldDescriptorBlockCallback(const void *recordsBegin,
-                                                     uintptr_t size) {
-  auto sectionBytes = reinterpret_cast<const char *>(recordsBegin);
-  auto recordsEnd = reinterpret_cast<const void *>(sectionBytes + size);
-
-  // Field cache should always be sufficiently initialized by this point.
-  auto &cache = FieldCache.unsafeGetAlreadyInitialized();
-  cache.StaticSections.push_back({recordsBegin, recordsEnd});
-}
-
 #pragma mark Metadata lookup via mangled name
-
-#if SWIFT_OBJC_INTEROP
-/// For a mangled node that refers to an Objective-C class or protocol,
-/// return the class or protocol name.
-static Optional<StringRef> getObjCClassOrProtocolName(
-                                           const Demangle::NodePointer &node) {
-  if (node->getKind() != Demangle::Node::Kind::Class &&
-      node->getKind() != Demangle::Node::Kind::Protocol)
-    return None;
-
-  if (node->getNumChildren() != 2)
-    return None;
-
-  // Check whether we have the __ObjC module.
-  auto moduleNode = node->getChild(0);
-  if (moduleNode->getKind() != Demangle::Node::Kind::Module ||
-      moduleNode->getText() != MANGLING_MODULE_OBJC)
-    return None;
-
-  // Check whether we have an identifier.
-  auto nameNode = node->getChild(1);
-  if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
-    return None;
-
-  return nameNode->getText();
-}
-#endif
 
 Optional<unsigned> swift::_depthIndexToFlatIndex(
                                               unsigned depth, unsigned index,
@@ -782,8 +784,9 @@ namespace {
 
 /// Find the offset of the protocol requirement for an associated type with
 /// the given name in the given protocol descriptor.
-Optional<unsigned> findAssociatedTypeByName(const ProtocolDescriptor *protocol,
-                                            StringRef name) {
+Optional<const ProtocolRequirement *> findAssociatedTypeByName(
+                                        const ProtocolDescriptor *protocol,
+                                        StringRef name) {
   // If we don't have associated type names, there's nothing to do.
   const char *associatedTypeNamesPtr = protocol->AssociatedTypeNames.get();
   if (!associatedTypeNamesPtr) return None;
@@ -818,12 +821,29 @@ Optional<unsigned> findAssociatedTypeByName(const ProtocolDescriptor *protocol,
       continue;
 
     if (currentAssocTypeIdx == matchingAssocTypeIdx)
-      return reqIdx + WitnessTableFirstRequirementOffset;
+      return requirements.begin() + reqIdx;
 
     ++currentAssocTypeIdx;
   }
 
   swift_runtime_unreachable("associated type names don't line up");
+}
+
+/// Retrieve the generic parameters introduced in this context.
+static ArrayRef<GenericParamDescriptor> getLocalGenericParams(
+    const ContextDescriptor *context) {
+  if (!context->isGeneric())
+    return { };
+
+  // Determine where to start looking at generic parameters.
+  unsigned startParamIndex;
+  if (auto parent = context->Parent.get())
+    startParamIndex = parent->getNumGenericParams();
+  else
+    startParamIndex = 0;
+
+  auto genericContext = context->getGenericContext();
+  return genericContext->getGenericParams().slice(startParamIndex);
 }
 
 /// Constructs metadata by decoding a mangled type name, for use with
@@ -939,120 +959,79 @@ public:
     // Figure out the various levels of generic parameters we have in
     // this type.
     std::vector<unsigned> genericParamCounts;
-    bool innermostIsGeneric;
+    (void)_gatherGenericParameterCounts(typeDecl, genericParamCounts);
+    unsigned numTotalGenericParams =
+        genericParamCounts.empty() ? 0 : genericParamCounts.back();
 
-    // If we have no parent given, try to form the whole type in one go.
-    if (!parent) {
-      innermostIsGeneric = !genericArgs.empty();
-      if (innermostIsGeneric) {
-        genericParamCounts.push_back(genericArgs.size());
-      }
-    // Otherwise, we'll need to steal the generic arguments from the parent
-    // type to build a nested type.
+    // Check whether we have the right number of generic arguments.
+    if (genericArgs.size() == getLocalGenericParams(typeDecl).size()) {
+      // Okay: genericArgs is the innermost set of generic arguments.
+    } else if (genericArgs.size() == numTotalGenericParams && !parent) {
+      // Okay: genericArgs is the complete set of generic arguments.
     } else {
-      innermostIsGeneric = _gatherGenericParameterCounts(typeDecl,
-                                                         genericParamCounts);
+      return BuiltType();
     }
-    bool isGeneric = !genericParamCounts.empty();
 
-    // Gather the generic arguments.
     std::vector<const void *> allGenericArgsVec;
-    ArrayRef<const void *> allGenericArgs;
 
-    // If the innermost type is generic, we need to gather arguments and
-    // check requirements.
-    if (innermostIsGeneric) {
-      // If no generic arguments were provided at this level, fail.
-      if (genericArgs.empty()) return BuiltType();
+    // If there are generic parameters at any level, check the generic
+    // requirements and fill in the generic arguments vector.
+    if (!genericParamCounts.empty()) {
+      // Compute the set of generic arguments "as written".
+      std::vector<const Metadata *> allGenericArgs;
 
-      unsigned startParamIndex;
-      if (genericParamCounts.size() > 1) {
-        // When there is more than one level of generic parameters, copy all of
-        // the key type parameters from the parent (but not any of the other
-        // requirements, e.g., witness tables are excluded).
-        auto parentGenericArgs = parent->getGenericArgs();
-        auto parentGenericParams =
-          typeDecl->Parent->getGenericContext()->getGenericParams();
-        unsigned parentArgIndex = 0;
-        for (const auto &parentGenericParam : parentGenericParams) {
-          if (parentGenericParam.hasKeyArgument())
-            allGenericArgsVec.push_back(parentGenericArgs[parentArgIndex++]);
+      // If we have a parent, gather it's generic arguments "as written".
+      if (parent) {
+        gatherWrittenGenericArgs(parent, parent->getTypeContextDescriptor(),
+                                 allGenericArgs);
+      }
+
+      // Add the generic arguments we were given.
+      allGenericArgs.insert(allGenericArgs.end(),
+                            genericArgs.begin(), genericArgs.end());
+
+      // Copy the generic arguments needed for metadata from the generic
+      // arguments "as written".
+      auto genericContext = typeDecl->getGenericContext();
+      {
+        auto genericParams = genericContext->getGenericParams();
+        for (unsigned i = 0, n = genericParams.size(); i != n; ++i) {
+          const auto &param = genericParams[i];
+          if (param.getKind() != GenericParamKind::Type)
+            return BuiltType();
+          if (param.hasExtraArgument())
+            return BuiltType();
+
+          if (param.hasKeyArgument())
+            allGenericArgsVec.push_back(allGenericArgs[i]);
         }
-
-        startParamIndex = parentGenericParams.size();
-      } else {
-        startParamIndex = 0;
       }
 
       // If we have the wrong number of generic arguments, fail.
-      auto genericContext = typeDecl->getGenericContext();
-      auto genericParams = genericContext->getGenericParams();
-      if (genericArgs.size() != genericParamCounts.back() - startParamIndex)
-        return BuiltType();
-
-      // Add generic arguments for the key parameters at this level.
-      unsigned genericArgIndex = 0;
-      for (const auto &genericParam : genericParams.slice(startParamIndex)) {
-        if (genericParam.hasKeyArgument())
-          allGenericArgsVec.push_back(genericArgs[genericArgIndex++]);
-      }
 
       // Check whether the generic requirements are satisfied, collecting
       // any extra arguments we need for the instantiation function.
+      SubstGenericParametersFromWrittenArgs substitutions(allGenericArgs,
+                                                          genericParamCounts);
       bool failed =
         _checkGenericRequirements(genericContext->getGenericRequirements(),
-                                  allGenericArgsVec,
-            [&](unsigned flatIndex) -> BuiltType {
-              // FIXME: Wrong for same-type-to-concrete
-              // constraints.
-              if (flatIndex < allGenericArgsVec.size())
-                return static_cast<BuiltType>(allGenericArgsVec[flatIndex]);
-
-              return BuiltType();
-            },
-            [&](unsigned depth, unsigned index) -> BuiltType {
-              auto flatIndex = _depthIndexToFlatIndex(depth, index,
-                                                      genericParamCounts);
-              // FIXME: Wrong for same-type-to-concrete
-              // constraints.
-              if (flatIndex && *flatIndex < allGenericArgsVec.size())
-                return static_cast<BuiltType>(allGenericArgsVec[*flatIndex]);
-
-              return BuiltType();
-            });
+                                  allGenericArgsVec, substitutions,
+                                  substitutions);
       if (failed)
         return BuiltType();
 
       // If we still have the wrong number of generic arguments, this is
       // some kind of metadata mismatch.
-      // FIXME: Fail silently? Complain loudly?
-      assert(typeDecl->getGenericContextHeader().getNumArguments() ==
-             allGenericArgsVec.size());
-
-      allGenericArgs = allGenericArgsVec;
-    } else {
-      // If generic arguments were provided at this level, fail.
-      if (!genericArgs.empty()) return BuiltType();
-
-      // If this is a generic context, get all of the arguments from our
-      // parent.
-      if (isGeneric) {
-        if (!parent) return BuiltType();
-
-        auto numGenericArgs =
-          typeDecl->getGenericContextHeader().getNumArguments();
-        auto parentGenericArgs =
-          reinterpret_cast<const void * const *>(parent->getGenericArgs());
-        allGenericArgs =
-          llvm::makeArrayRef(parentGenericArgs, numGenericArgs);
-      }
+      if (typeDecl->getGenericContextHeader().getNumArguments() !=
+            allGenericArgsVec.size())
+        return BuiltType();
     }
 
     // Call the access function.
     auto accessFunction = typeDecl->getAccessFunction();
     if (!accessFunction) return BuiltType();
 
-    return accessFunction(MetadataState::Complete, allGenericArgs).Value;
+    return accessFunction(MetadataState::Abstract, allGenericArgsVec).Value;
   }
 
   BuiltType createBuiltinType(StringRef mangledName) const {
@@ -1130,7 +1109,7 @@ public:
     auto flags = TupleTypeFlags().withNumElements(elements.size());
     if (!labels.empty())
       flags = flags.withNonConstantLabels(true);
-    return swift_getTupleTypeMetadata(MetadataState::Complete,
+    return swift_getTupleTypeMetadata(MetadataState::Abstract,
                                       flags, elements.data(),
                                       labels.empty() ? nullptr : labels.c_str(),
                                       /*proposedWitnesses=*/nullptr).Value;
@@ -1213,14 +1192,15 @@ swift::_getTypeByMangledName(StringRef typeName,
       if (!witnessTable) return nullptr;
 
       // Look for the named associated type within the protocol.
-      auto assocTypeReqIndex = findAssociatedTypeByName(protocol, assocType);
-      if (!assocTypeReqIndex) return nullptr;
+      auto assocTypeReq = findAssociatedTypeByName(protocol, assocType);
+      if (!assocTypeReq) return nullptr;
 
       // Call the associated type access function.
-      // TODO: can we just request abstract metadata?  If so, do we have
-      //   a responsibility to try to finish it later?
-      return ((AssociatedTypeAccessFunction * const *)witnessTable)[*assocTypeReqIndex]
-                (MetadataState::Complete, base, witnessTable).Value;
+      return swift_getAssociatedTypeWitness(
+                                     MetadataState::Abstract,
+                                     const_cast<WitnessTable *>(witnessTable),
+                                     base,
+                                     *assocTypeReq).Value;
     });
 
   auto type = Demangle::decodeMangledType(builder, node);
@@ -1233,7 +1213,7 @@ swift_getTypeByMangledNameImpl(const char *typeNameStart, size_t typeNameLength,
                            size_t *parametersPerLevel,
                            const Metadata * const *flatSubstitutions) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
-  return _getTypeByMangledName(typeName,
+  auto metadata = _getTypeByMangledName(typeName,
     [&](unsigned depth, unsigned index) -> const Metadata * {
       if (depth >= numberOfLevels)
         return nullptr;
@@ -1247,135 +1227,246 @@ swift_getTypeByMangledNameImpl(const char *typeNameStart, size_t typeNameLength,
 
       return flatSubstitutions[flatIndex];
     });
+
+  if (!metadata) return nullptr;
+
+  return swift_checkMetadataState(MetadataState::Complete, metadata).Value;
 }
 
-void swift::swift_getFieldAt(
-  const Metadata *base, unsigned index, 
-  void (*callback)(const char *name, const Metadata *type, void *ctx), void *callbackCtx) {
-    swift::_swift_getFieldAt(base, index, [&] (llvm::StringRef name, FieldType fieldInfo) { callback(name.data(), fieldInfo.getType(), callbackCtx); });
+unsigned SubstGenericParametersFromMetadata::
+buildDescriptorPath(const ContextDescriptor *context) const {
+  // Terminating condition: we don't have a context.
+  if (!context)
+    return 0;
+
+  // Add the parent's contributino to the descriptor path.
+  unsigned numKeyGenericParamsInParent =
+    buildDescriptorPath(context->Parent.get());
+
+  // If this context is non-generic, we're done.
+  if (!context->isGeneric())
+    return numKeyGenericParamsInParent;
+
+  // Count the number of key generic params at this level.
+  unsigned numKeyGenericParamsHere = 0;
+  bool hasNonKeyGenericParams = false;
+  for (const auto &genericParam : getLocalGenericParams(context)) {
+    if (genericParam.hasKeyArgument())
+      ++numKeyGenericParamsHere;
+    else
+      hasNonKeyGenericParams = true;
+  }
+
+  // Form the path element.
+  descriptorPath.push_back(PathElement{context, numKeyGenericParamsInParent,
+                                       numKeyGenericParamsHere,
+                                       hasNonKeyGenericParams});
+  return numKeyGenericParamsInParent + numKeyGenericParamsHere;
 }
 
-void swift::_swift_getFieldAt(
-    const Metadata *base, unsigned index,
-    std::function<void(llvm::StringRef name, FieldType fieldInfo)>
-        callback) {
-  auto *baseDesc = base->getTypeContextDescriptor();
-  if (!baseDesc)
+void SubstGenericParametersFromMetadata::setup() const {
+  if (!descriptorPath.empty() || !base)
     return;
 
-  auto getFieldAt = [&](const FieldDescriptor &descriptor) {
-    auto &field = descriptor.getFields()[index];
-    auto name = field.getFieldName(0);
+  buildDescriptorPath(base->getTypeContextDescriptor());
+}
 
-    // Enum cases don't always have types.
-    if (!field.hasMangledTypeName()) {
-      callback(name, FieldType().withIndirect(field.isIndirectCase()));
-      return;
+const Metadata *
+SubstGenericParametersFromMetadata::operator()(unsigned flatIndex) const {
+  // On first access, compute the descriptor path.
+  setup();
+
+  // Find the depth at which this parameter occurs.
+  unsigned depth = descriptorPath.size();
+  unsigned index = flatIndex;
+  for (const auto &pathElement : descriptorPath) {
+    // If the flat index is beyond the element at this position, we're done.
+    if (flatIndex >= pathElement.context->getNumGenericParams()) {
+      // Subtract off the number of parameters.
+      index -= pathElement.context->getNumGenericParams();
+      break;
     }
 
-    std::vector<const ContextDescriptor *> descriptorPath;
-    {
-      const auto *parent = reinterpret_cast<
-                              const ContextDescriptor *>(baseDesc);
-      while (parent) {
-        if (parent->isGeneric())
-          descriptorPath.push_back(parent);
+    --depth;
+  }
 
-        parent = parent->Parent.get();
+  // Perform the access based on depth/index.
+  return (*this)(depth, index);
+}
+
+const Metadata *
+SubstGenericParametersFromMetadata::operator()(
+                                        unsigned depth, unsigned index) const {
+  // On first access, compute the descriptor path.
+  setup();
+
+  // If the depth is too great, there is nothing to do.
+  if (depth >= descriptorPath.size())
+    return nullptr;
+
+  /// Retrieve the descriptor path element at this depth.
+  auto &pathElement = descriptorPath[depth];
+  auto currentContext = pathElement.context;
+
+  // Check whether the index is clearly out of bounds.
+  if (index >= currentContext->getNumGenericParams())
+    return nullptr;
+
+  // Compute the flat index.
+  unsigned flatIndex = pathElement.numKeyGenericParamsInParent;
+  if (pathElement.hasNonKeyGenericParams > 0) {
+    // We have non-key generic parameters at this level, so the index needs to
+    // be checked more carefully.
+    auto genericParams = getLocalGenericParams(currentContext);
+
+    // Make sure that the requested parameter itself has a key argument.
+    if (!genericParams[index].hasKeyArgument())
+      return nullptr;
+
+    // Increase the flat index for each parameter with a key argument, up to
+    // the given index.
+    for (const auto &genericParam : genericParams.slice(0, index)) {
+      if (genericParam.hasKeyArgument())
+        ++flatIndex;
+    }
+  } else {
+    flatIndex += index;
+  }
+
+  return base->getGenericArgs()[flatIndex];
+}
+
+const Metadata *SubstGenericParametersFromWrittenArgs::operator()(
+                                                    unsigned flatIndex) const {
+  if (flatIndex < allGenericArgs.size())
+    return allGenericArgs[flatIndex];
+
+  return nullptr;
+}
+
+const Metadata *SubstGenericParametersFromWrittenArgs::operator()(
+                                                        unsigned depth,
+                                                        unsigned index) const {
+  if (auto flatIndex =
+          _depthIndexToFlatIndex(depth, index, genericParamCounts)) {
+    if (*flatIndex < allGenericArgs.size())
+      return allGenericArgs[*flatIndex];
+  }
+
+  return nullptr;
+}
+
+void swift::gatherWrittenGenericArgs(
+                             const Metadata *metadata,
+                             const TypeContextDescriptor *description,
+                             std::vector<const Metadata *> &allGenericArgs) {
+  auto generics = description->getGenericContext();
+  if (!generics)
+    return;
+
+  bool missingWrittenArguments = false;
+  auto genericArgs = description->getGenericArguments(metadata);
+  for (auto param : generics->getGenericParams()) {
+    switch (param.getKind()) {
+    case GenericParamKind::Type:
+      // The type should have a key argument unless it's been same-typed to
+      // another type.
+      if (param.hasKeyArgument()) {
+        auto genericArg = *genericArgs++;
+        allGenericArgs.push_back(genericArg);
+      } else {
+        // Leave a gap for us to fill in by looking at same type info.
+        allGenericArgs.push_back(nullptr);
+        missingWrittenArguments = true;
       }
+
+      // We don't know about type parameters with extra arguments. Leave
+      // a hole for it.
+      if (param.hasExtraArgument()) {
+        allGenericArgs.push_back(nullptr);
+        ++genericArgs;
+      }
+      break;
+
+    default:
+      // We don't know about this kind of parameter. Create placeholders where
+      // needed.
+      if (param.hasKeyArgument()) {
+        allGenericArgs.push_back(nullptr);
+        ++genericArgs;
+      }
+
+      if (param.hasExtraArgument()) {
+        allGenericArgs.push_back(nullptr);
+        ++genericArgs;
+      }
+      break;
     }
+  }
 
-    auto typeName = field.getMangledTypeName(0);
-
-    auto typeInfo = _getTypeByMangledName(
-        typeName,
-        [&](unsigned depth, unsigned index) -> const Metadata * {
-          if (depth >= descriptorPath.size())
-            return nullptr;
-
-          unsigned currentDepth = 0;
-          unsigned flatIndex = index;
-          const ContextDescriptor *currentContext = descriptorPath.back();
-
-          for (const auto *context : llvm::reverse(descriptorPath)) {
-            if (currentDepth >= depth)
-              break;
-
-            flatIndex += context->getNumGenericParams();
-            currentContext = context;
-            ++currentDepth;
-          }
-
-          if (index >= currentContext->getNumGenericParams())
-            return nullptr;
-
-          return base->getGenericArgs()[flatIndex];
-        });
-
-    // If demangling the type failed, pretend it's an empty type instead with
-    // a log message.
-    if (typeInfo == nullptr) {
-      typeInfo = TypeInfo(&METADATA_SYM(EMPTY_TUPLE_MANGLING), {});
-      warning(0, "SWIFT RUNTIME BUG: unable to demangle type of field '%*s'. "
-                 "mangled type name is '%*s'\n",
-                 (int)name.size(), name.data(),
-                 (int)typeName.size(), typeName.data());
-    }
-
-    callback(name, FieldType()
-                       .withType(typeInfo)
-                       .withIndirect(field.isIndirectCase())
-                       .withWeak(typeInfo.isWeak()));
-
-  };
-
-  auto dem = getDemanglerForRuntimeTypeResolution();
-  auto &cache = FieldCache.get();
-  auto isRequestedDescriptor = [&](const FieldDescriptor &descriptor) {
-    assert(descriptor.hasMangledTypeName());
-    auto mangledName = descriptor.getMangledTypeName(0);
-
-    if (!_contextDescriptorMatchesMangling(baseDesc,
-                                           dem.demangleType(mangledName)))
-      return false;
-
-    cache.FieldCache.getOrInsert(base, &descriptor);
-    getFieldAt(descriptor);
-    return true;
-  };
-
-
-  // Fast path: If we already have field descriptor cached.
-  if (auto Value = cache.FieldCache.find(base)) {
-    getFieldAt(*Value->getDescription());
+  // If there is no follow-up work to do, we're done.
+  if (!missingWrittenArguments)
     return;
-  }
 
-  // Otherwise let's try to find it in one of the sections.
-  for (auto &section : cache.DynamicSections.snapshot()) {
-    for (const auto *descriptor : section) {
-      if (isRequestedDescriptor(*descriptor))
-        return;
+  // We have generic arguments that would be written, but have been
+  // canonicalized away. Use same-type requirements to reconstitute them.
+
+  // Retrieve the mapping information needed for depth/index -> flat index.
+  std::vector<unsigned> genericParamCounts;
+  (void)_gatherGenericParameterCounts(description, genericParamCounts);
+
+  // Walk through the generic requirements to evaluate same-type
+  // constraints that are needed to fill in missing generic arguments.
+  for (const auto &req : generics->getGenericRequirements()) {
+    // We only care about same-type constraints.
+    if (req.Flags.getKind() != GenericRequirementKind::SameType)
+      continue;
+
+    // Where the left-hand side is a generic parameter.
+    if (req.Param.begin() != req.Param.end())
+      continue;
+
+    // If we don't yet have an argument for this parameter, it's a
+    // same-type-to-concrete constraint.
+    unsigned lhsFlatIndex = req.Param.getRootParamIndex();
+    if (lhsFlatIndex >= allGenericArgs.size())
+      continue;
+
+    if (!allGenericArgs[lhsFlatIndex]) {
+      // Substitute into the right-hand side.
+      SubstGenericParametersFromWrittenArgs substitutions(allGenericArgs,
+                                                          genericParamCounts);
+      allGenericArgs[lhsFlatIndex] =
+          _getTypeByMangledName(req.getMangledTypeName(), substitutions);
+      continue;
     }
-  }
 
-  for (const auto &section : cache.StaticSections.snapshot()) {
-    for (auto &descriptor : section) {
-      if (isRequestedDescriptor(descriptor))
-        return;
-    }
-  }
+    // If we do have an argument for this parameter, it might be that
+    // the right-hand side is itself a generic parameter, which means
+    // we have a same-type constraint A == B where A is already filled in.
+    Demangler demangler;
+    NodePointer node = demangler.demangleType(req.getMangledTypeName());
+    if (!node)
+      continue;
 
-  // If we failed to find the field descriptor metadata for the type, fall
-  // back to returning an empty tuple as a standin.
-  auto typeName = swift_getTypeName(base, /*qualified*/ true);
-  warning(0, "SWIFT RUNTIME BUG: unable to find field metadata for type '%*s'\n",
-             (int)typeName.length, typeName.data);
-  callback("unknown",
-           FieldType()
-             .withType(TypeInfo(&METADATA_SYM(EMPTY_TUPLE_MANGLING), {}))
-             .withIndirect(false)
-             .withWeak(false));
+    // Find the flat index that the right-hand side refers to.
+    if (node->getKind() == Demangle::Node::Kind::Type)
+      node = node->getChild(0);
+    if (node->getKind() != Demangle::Node::Kind::DependentGenericParamType)
+      continue;
+
+    auto rhsFlatIndex =
+      _depthIndexToFlatIndex(node->getChild(0)->getIndex(),
+                             node->getChild(1)->getIndex(),
+                             genericParamCounts);
+    if (!rhsFlatIndex || *rhsFlatIndex >= allGenericArgs.size())
+      continue;
+
+    if (allGenericArgs[*rhsFlatIndex] || !allGenericArgs[lhsFlatIndex])
+      continue;
+
+    allGenericArgs[*rhsFlatIndex] = allGenericArgs[lhsFlatIndex];
+  }
 }
 
 #define OVERRIDE_METADATALOOKUP COMPATIBILITY_OVERRIDE

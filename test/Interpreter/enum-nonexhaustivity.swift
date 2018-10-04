@@ -1,10 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -Onone -o %t/main -import-objc-header %S/Inputs/enum-nonexhaustivity.h -Xfrontend -disable-objc-attr-requires-foundation-module
+// RUN: %target-codesign %t/main
 // RUN: %target-run %t/main
-// RUN: %target-build-swift %s -O -o %t/main -import-objc-header %S/Inputs/enum-nonexhaustivity.h -Xfrontend -disable-objc-attr-requires-foundation-module
-// RUN: %target-run %t/main
-// RUN: %target-build-swift %s -Ounchecked -o %t/main -import-objc-header %S/Inputs/enum-nonexhaustivity.h -Xfrontend -disable-objc-attr-requires-foundation-module
-// RUN: %target-run %t/main
+// RUN: %target-build-swift %s -O -o %t/main2 -import-objc-header %S/Inputs/enum-nonexhaustivity.h -Xfrontend -disable-objc-attr-requires-foundation-module
+// RUN: %target-codesign %t/main2
+// RUN: %target-run %t/main2
+// RUN: %target-build-swift %s -Ounchecked -o %t/main3 -import-objc-header %S/Inputs/enum-nonexhaustivity.h -Xfrontend -disable-objc-attr-requires-foundation-module
+// RUN: %target-codesign %t/main3
+// RUN: %target-run %t/main3
 // REQUIRES: executable_test
 
 import StdlibUnittest

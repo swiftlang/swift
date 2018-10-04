@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/existentials
+// RUN: %target-codesign %t/existentials
 // RUN: %target-run %target-swift-reflection-test %t/existentials | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 
@@ -267,7 +269,7 @@ reflect(any: he)
 // CHECK-64-NEXT:       (field name=error offset=0
 // CHECK-64-NEXT:         (reference kind=strong refcounting=unknown))))
 // CHECK-64-NEXT:   (field name=errorInComposition offset=8
-// CHECK-64-NEXT:     (opaque_existential size=48 alignment=8 stride=48 num_extra_inhabitants=0
+// CHECK-64-NEXT:     (opaque_existential size=48 alignment=8 stride=48 num_extra_inhabitants=2147483647
 // CHECK-64-NEXT:       (field name=metadata offset=24
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
 // CHECK-64-NEXT:       (field name=wtable offset=32
@@ -275,13 +277,13 @@ reflect(any: he)
 // CHECK-64-NEXT:       (field name=wtable offset=40
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))
 // CHECK-64-NEXT:   (field name=customError offset=56
-// CHECK-64-NEXT:     (opaque_existential size=40 alignment=8 stride=40 num_extra_inhabitants=0
+// CHECK-64-NEXT:     (opaque_existential size=40 alignment=8 stride=40 num_extra_inhabitants=2147483647
 // CHECK-64-NEXT:       (field name=metadata offset=24
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
 // CHECK-64-NEXT:       (field name=wtable offset=32
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))
 // CHECK-64-NEXT:   (field name=customErrorInComposition offset=96
-// CHECK-64-NEXT:     (opaque_existential size=48 alignment=8 stride=48 num_extra_inhabitants=0
+// CHECK-64-NEXT:     (opaque_existential size=48 alignment=8 stride=48 num_extra_inhabitants=2147483647
 // CHECK-64-NEXT:       (field name=metadata offset=24
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
 // CHECK-64-NEXT:       (field name=wtable offset=32
@@ -301,7 +303,7 @@ reflect(any: he)
 // CHECK-32-NEXT:       (field name=error offset=0
 // CHECK-32-NEXT:         (reference kind=strong refcounting=unknown))))
 // CHECK-32-NEXT:   (field name=errorInComposition offset=4
-// CHECK-32-NEXT:     (opaque_existential size=24 alignment=4 stride=24 num_extra_inhabitants=0
+// CHECK-32-NEXT:     (opaque_existential size=24 alignment=4 stride=24 num_extra_inhabitants=4096
 // CHECK-32-NEXT:       (field name=metadata offset=12
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096))
 // CHECK-32-NEXT:       (field name=wtable offset=16
@@ -309,13 +311,13 @@ reflect(any: he)
 // CHECK-32-NEXT:       (field name=wtable offset=20
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1))))
 // CHECK-32-NEXT:   (field name=customError offset=28
-// CHECK-32-NEXT:     (opaque_existential size=20 alignment=4 stride=20 num_extra_inhabitants=0
+// CHECK-32-NEXT:     (opaque_existential size=20 alignment=4 stride=20 num_extra_inhabitants=4096
 // CHECK-32-NEXT:       (field name=metadata offset=12
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096))
 // CHECK-32-NEXT:       (field name=wtable offset=16
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1))))
 // CHECK-32-NEXT:   (field name=customErrorInComposition offset=48
-// CHECK-32-NEXT:     (opaque_existential size=24 alignment=4 stride=24 num_extra_inhabitants=0
+// CHECK-32-NEXT:     (opaque_existential size=24 alignment=4 stride=24 num_extra_inhabitants=4096
 // CHECK-32-NEXT:       (field name=metadata offset=12
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096))
 // CHECK-32-NEXT:       (field name=wtable offset=16

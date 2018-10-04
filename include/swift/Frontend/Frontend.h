@@ -38,6 +38,7 @@
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
+#include "swift/TBDGen/TBDGen.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
@@ -70,6 +71,7 @@ class CompilerInvocation {
   MigratorOptions MigratorOpts;
   SILOptions SILOpts;
   IRGenOptions IRGenOpts;
+  TBDGenOptions TBDGenOpts;
   /// The \c SyntaxParsingCache to use when parsing the main file of this
   /// invocation
   SyntaxParsingCache *MainFileSyntaxParsingCache = nullptr;
@@ -197,6 +199,9 @@ public:
   FrontendOptions &getFrontendOptions() { return FrontendOpts; }
   const FrontendOptions &getFrontendOptions() const { return FrontendOpts; }
 
+  TBDGenOptions &getTBDGenOptions() { return TBDGenOpts; }
+  const TBDGenOptions &getTBDGenOptions() const { return TBDGenOpts; }
+
   ClangImporterOptions &getClangImporterOptions() { return ClangImporterOpts; }
   const ClangImporterOptions &getClangImporterOptions() const {
     return ClangImporterOpts;
@@ -293,7 +298,7 @@ public:
   std::string getPCHHash() const;
 
   SourceFile::ImplicitModuleImportKind getImplicitModuleImportKind() {
-    if (getInputKind() == InputFileKind::IFK_SIL) {
+    if (getInputKind() == InputFileKind::SIL) {
       return SourceFile::ImplicitModuleImportKind::None;
     }
     if (getParseStdlib()) {
@@ -310,7 +315,7 @@ public:
                        bool alwaysSetModuleToMain, bool bePrimary,
                        serialization::ExtendedValidationInfo &extendedInfo);
   bool hasSerializedAST() {
-    return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
+    return FrontendOpts.InputKind == InputFileKind::SwiftLibrary;
   }
 
   const PrimarySpecificPaths &
@@ -332,6 +337,11 @@ public:
   /// so return the TBDPath when in that mode and fail an assert
   /// if not in that mode.
   std::string getTBDPathForWholeModule() const;
+
+  /// ModuleInterfaceOutputPath only makes sense in whole module compilation
+  /// mode, so return the ModuleInterfaceOutputPath when in that mode and fail
+  /// an assert if not in that mode.
+  std::string getModuleInterfaceOutputPathForWholeModule() const;
 };
 
 /// A class which manages the state and execution of the compiler.
@@ -439,9 +449,7 @@ public:
     return TheSILModule.get();
   }
 
-  std::unique_ptr<SILModule> takeSILModule() {
-    return std::move(TheSILModule);
-  }
+  std::unique_ptr<SILModule> takeSILModule();
 
   bool hasSILModule() {
     return static_cast<bool>(TheSILModule);
@@ -507,10 +515,10 @@ private:
   void setUpDiagnosticOptions();
   bool setUpModuleLoaders();
   bool isInputSwift() {
-    return Invocation.getInputKind() == InputFileKind::IFK_Swift;
+    return Invocation.getInputKind() == InputFileKind::Swift;
   }
   bool isInSILMode() {
-    return Invocation.getInputKind() == InputFileKind::IFK_SIL;
+    return Invocation.getInputKind() == InputFileKind::SIL;
   }
 
   bool setUpInputs();
@@ -547,7 +555,8 @@ public:
 
   /// Parses the input file but does no type-checking or module imports.
   /// Note that this only supports parsing an invocation with a single file.
-  void performParseOnly(bool EvaluateConditionals = false);
+  void performParseOnly(bool EvaluateConditionals = false,
+                        bool ParseDelayedBodyOnEnd = false);
 
   /// Parses and performs name binding on all input files.
   ///

@@ -24,7 +24,6 @@ add_swift_library(swiftAST STATIC
   Decl.cpp
   DeclContext.cpp
   DeclNameLoc.cpp
-  DefaultArgumentKind.cpp
   DiagnosticConsumer.cpp
   DiagnosticEngine.cpp
   DiagnosticList.cpp
@@ -35,6 +34,7 @@ add_swift_library(swiftAST STATIC
   GenericSignature.cpp
   GenericSignatureBuilder.cpp
   Identifier.cpp
+  InlinableText.cpp
   LayoutConstraint.cpp
   LookupVisibleDecls.cpp
   Module.cpp

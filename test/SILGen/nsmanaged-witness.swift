@@ -58,8 +58,8 @@ extension Foo: NativeIntProperty {}
 
 // CHECK-NOT: hidden_external {{.*}}Foo{{.*}}intProperty
 
-// TODO: We can't emit a vtable entry for materializeForSet for ObjC types.
-// CHECK-NOT: class_method {{.*}}Foo{{.*}}intProperty{{.*}}materializeForSet
+// TODO: We can't emit a vtable entry for modify for ObjC types.
+// CHECK-NOT: class_method {{.*}}Foo{{.*}}intProperty{{.*}}modify
 
-// CHECK-LABEL: sil shared [serializable] @$SSo3FooC11intPropertys5Int32Vvm
+// CHECK-LABEL: sil shared [serializable] @$sSo3FooC11intPropertys5Int32VvM
 

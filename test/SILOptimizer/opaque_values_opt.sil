@@ -7,10 +7,10 @@ sil_stage canonical
 
 public typealias Int = Builtin.Int64
 
-// CHECK: sil shared [noinline] @$S20f010_genericIdentityBi64__Tg5 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+// CHECK: sil shared [noinline] @$s20f010_genericIdentityBi64__Tg5 : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 // CHECK: bb0(%0 : $Builtin.Int64):
 // CHECK:  return %0 : $Builtin.Int64
-// CHECK: } // end sil function '$S20f010_genericIdentityBi64__Tg5'
+// CHECK: } // end sil function '$s20f010_genericIdentityBi64__Tg5'
 sil hidden [noinline] @f010_genericIdentity : $@convention(thin) <T> (@in T) -> @out T {
 bb0(%0 : $T):
   return %0 : $T
@@ -51,7 +51,7 @@ bb0(%0 : $T):
 // ---
 // CHECK-LABEL: sil @f030_callMultiResult : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) {
 // CHECK: bb0(%0 : $Builtin.Int64):
-// CHECK:   %1 = function_ref @$S16f020_multiResultBi64__Tg5 : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64, @out Builtin.Int64, @out Builtin.Int64)
+// CHECK:   %1 = function_ref @$s16f020_multiResultBi64__Tg5 : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64, @out Builtin.Int64, @out Builtin.Int64)
 // CHECK:   %2 = apply %1(%0) : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64, @out Builtin.Int64, @out Builtin.Int64)
 // CHECK:   return %2 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64)
 // CHECK-LABEL: } // end sil function 'f030_callMultiResult'

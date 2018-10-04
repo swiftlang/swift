@@ -164,10 +164,10 @@ public:
   }
 };
 
-llvm::Constant *IRGenModule::getTypeRef(CanType type) {
+llvm::Constant *IRGenModule::getTypeRef(CanType type, MangledTypeRefRole role) {
   IRGenMangler Mangler;
   auto SymbolicName = Mangler.mangleTypeForReflection(*this, type);
-  return getAddrOfStringForTypeRef(SymbolicName);
+  return getAddrOfStringForTypeRef(SymbolicName, role);
 }
 
 class ReflectionMetadataBuilder {
@@ -210,7 +210,7 @@ protected:
   /// Add a 32-bit relative offset to a mangled typeref string
   /// in the typeref reflection section.
   void addTypeRef(CanType type) {
-    B.addRelativeAddress(IGM.getTypeRef(type));
+    B.addRelativeAddress(IGM.getTypeRef(type, MangledTypeRefRole::Reflection));
   }
 
   /// Add a 32-bit relative offset to a mangled nominal type string
@@ -220,31 +220,35 @@ protected:
       IRGenMangler mangler;
       SymbolicMangling mangledStr;
       mangledStr.String = mangler.mangleBareProtocol(proto);
-      auto mangledName = IGM.getAddrOfStringForTypeRef(mangledStr);
+      auto mangledName =
+        IGM.getAddrOfStringForTypeRef(mangledStr,
+                                      MangledTypeRefRole::Reflection);
       B.addRelativeAddress(mangledName);
     } else {
       CanType type = nominal->getDeclaredType()->getCanonicalType();
-      B.addRelativeAddress(IGM.getTypeRef(type));
+      B.addRelativeAddress(
+        IGM.getTypeRef(type, MangledTypeRefRole::Reflection));
     }
   }
 
-  llvm::GlobalVariable *emit(Optional<LinkEntity> entity,
-                             const char *section) {
+  // A function signature for a lambda wrapping an IRGenModule::getAddrOf*
+  // method.
+  using GetAddrOfEntityFn = llvm::Constant* (IRGenModule &, ConstantInit);
+
+  llvm::GlobalVariable *emit(
+                        Optional<llvm::function_ref<GetAddrOfEntityFn>> getAddr,
+                        const char *section) {
     layout();
 
     llvm::GlobalVariable *var;
 
     // Some reflection records have a mangled symbol name, for uniquing
     // imported type metadata.
-    if (entity) {
-      auto info = LinkInfo::get(IGM, *entity, ForDefinition);
-
+    if (getAddr) {
       auto init = B.finishAndCreateFuture();
 
-      var = createVariable(IGM, info, init.getType(), Alignment(4));
+      var = cast<llvm::GlobalVariable>((*getAddr)(IGM, init));
       var->setConstant(true);
-      init.installInGlobal(var);
-
     // Others, such as capture descriptors, do not have a name.
     } else {
       var = B.finishAndCreateGlobal("\x01l__swift5_reflection_descriptor",
@@ -259,6 +263,19 @@ protected:
     disableAddressSanitizer(IGM, var);
 
     return var;
+  }
+
+  // Helpers to guide the C++ type system into converting lambda arguments
+  // to Optional<function_ref>
+  llvm::GlobalVariable *emit(llvm::function_ref<GetAddrOfEntityFn> getAddr,
+                             const char *section) {
+    return emit(Optional<llvm::function_ref<GetAddrOfEntityFn>>(getAddr),
+                section);
+  }
+  llvm::GlobalVariable *emit(NoneType none,
+                             const char *section) {
+    return emit(Optional<llvm::function_ref<GetAddrOfEntityFn>>(),
+                section);
   }
 
   virtual void layout() = 0;
@@ -301,9 +318,12 @@ public:
       AssociatedTypes(AssociatedTypes) {}
 
   llvm::GlobalVariable *emit() {
-    auto entity = LinkEntity::forReflectionAssociatedTypeDescriptor(Conformance);
     auto section = IGM.getAssociatedTypeMetadataSectionName();
-    return ReflectionMetadataBuilder::emit(entity, section);
+    return ReflectionMetadataBuilder::emit(
+      [&](IRGenModule &IGM, ConstantInit init) -> llvm::Constant* {
+       return IGM.getAddrOfReflectionAssociatedTypeDescriptor(Conformance,init);
+      },
+      section);
   }
 };
 
@@ -341,7 +361,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
 
     if (auto CD = dyn_cast<ClassDecl>(NTD)) {
       auto type = CD->getDeclaredType()->getCanonicalType();
-      auto RC = getReferenceCountingForType(IGM, type);
+      auto RC = type->getReferenceCounting();
       if (RC == ReferenceCounting::ObjC)
         kind = FieldDescriptorKind::ObjCClass;
       else
@@ -460,10 +480,13 @@ public:
     : ReflectionMetadataBuilder(IGM), NTD(NTD) {}
 
   llvm::GlobalVariable *emit() {
-    auto entity = LinkEntity::forReflectionFieldDescriptor(
-        NTD->getDeclaredType()->getCanonicalType());
     auto section = IGM.getFieldTypeMetadataSectionName();
-    return ReflectionMetadataBuilder::emit(entity, section);
+    return ReflectionMetadataBuilder::emit(
+      [&](IRGenModule &IGM, ConstantInit definition) -> llvm::Constant* {
+        return IGM.getAddrOfReflectionFieldDescriptor(
+          NTD->getDeclaredType()->getCanonicalType(), definition);
+      },
+      section);
   }
 };
 
@@ -500,9 +523,12 @@ public:
   }
 
   llvm::GlobalVariable *emit() {
-    auto entity = LinkEntity::forReflectionBuiltinDescriptor(type);
     auto section = IGM.getBuiltinTypeMetadataSectionName();
-    return ReflectionMetadataBuilder::emit(entity, section);
+    return ReflectionMetadataBuilder::emit(
+      [&](IRGenModule &IGM, ConstantInit definition) -> llvm::Constant * {
+        return IGM.getAddrOfReflectionBuiltinDescriptor(type, definition);
+      },
+      section);
   }
 };
 
@@ -584,7 +610,8 @@ public:
       MetadataSourceEncoder Encoder(OS);
       Encoder.visit(Source);
 
-      auto EncodedSource = IGM.getAddrOfStringForTypeRef(OS.str());
+      auto EncodedSource =
+        IGM.getAddrOfStringForTypeRef(OS.str(), MangledTypeRefRole::Metadata);
       B.addRelativeAddress(EncodedSource);
     }
   }
@@ -897,7 +924,7 @@ void IRGenModule::emitBuiltinReflectionMetadata() {
     // extra inhabitants as these. But maybe it's best not to codify
     // that in the ABI anyway.
     CanType thinFunction = CanFunctionType::get(
-      AnyFunctionType::CanParamArrayRef(), Context.TheEmptyTupleType,
+      {}, Context.TheEmptyTupleType,
       AnyFunctionType::ExtInfo().withRepresentation(
           FunctionTypeRepresentation::Thin));
     BuiltinTypes.insert(thinFunction);

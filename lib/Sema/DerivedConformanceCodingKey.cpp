@@ -75,7 +75,7 @@ static void deriveRawValueInit(AbstractFunctionDecl *initDecl) {
   // rawValue param to init(rawValue:)
   auto *rawValueDecl = new (C) ParamDecl(
       VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_rawValue,
-      SourceLoc(), C.Id_rawValue, valueParam->getType(), parentDC);
+      SourceLoc(), C.Id_rawValue, parentDC);
   rawValueDecl->setInterfaceType(C.getIntDecl()->getDeclaredType());
   rawValueDecl->setImplicit();
   auto *paramList = ParameterList::createWithoutLoc(rawValueDecl);
@@ -117,7 +117,7 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
   // rawValue
   auto *rawDecl =
       new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                        paramName, SourceLoc(), paramName, paramType, parentDC);
+                        paramName, SourceLoc(), paramName, parentDC);
   rawDecl->setInterfaceType(paramType);
   rawDecl->setImplicit();
 
@@ -126,14 +126,12 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
   DeclName name(C, DeclBaseName::createConstructor(), paramList);
 
   // init(rawValue:) decl
-  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC,
-                                         /*static*/false, /*inout*/true);
   auto *initDecl =
     new (C) ConstructorDecl(name, SourceLoc(),
                             /*Failability=*/OTK_Optional,
                             /*FailabilityLoc=*/SourceLoc(),
                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                            selfDecl, paramList,
+                            paramList,
                             /*GenericParams=*/nullptr, parentDC);
 
   initDecl->setImplicit();
@@ -209,7 +207,7 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl) {
   auto *parentDC = strValDecl->getDeclContext();
   auto &C = parentDC->getASTContext();
 
-  auto *enumDecl = parentDC->getAsEnumOrEnumExtensionContext();
+  auto *enumDecl = parentDC->getSelfEnumDecl();
   Type enumType = parentDC->getDeclaredTypeInContext();
 
   BraceStmt *body = nullptr;
@@ -276,7 +274,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
   auto *parentDC = initDecl->getDeclContext();
   auto &C = parentDC->getASTContext();
 
-  auto *enumDecl = parentDC->getAsEnumOrEnumExtensionContext();
+  auto *enumDecl = parentDC->getSelfEnumDecl();
   Type enumType = parentDC->getDeclaredTypeInContext();
 
   auto elements = enumDecl->getAllElements();

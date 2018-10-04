@@ -36,7 +36,7 @@ namespace {
 /// Get PlatformConditionKind from platform condition name.
 static
 Optional<PlatformConditionKind> getPlatformConditionKind(StringRef Name) {
-  return llvm::StringSwitch<llvm::Optional<PlatformConditionKind>>(Name)
+  return llvm::StringSwitch<Optional<PlatformConditionKind>>(Name)
     .Case("os", PlatformConditionKind::OS)
     .Case("arch", PlatformConditionKind::Arch)
     .Case("_endian", PlatformConditionKind::Endianness)
@@ -53,6 +53,20 @@ static StringRef extractExprSource(SourceManager &SM, Expr *E) {
   return SM.extractText(Range);
 }
 
+static bool isValidPrefixUnaryOperator(Optional<StringRef> UnaryOperator) {
+  return UnaryOperator != None &&
+         (UnaryOperator.getValue() == ">=" || UnaryOperator.getValue() == "<");
+}
+
+static bool isValidVersion(const version::Version &Version,
+                           const version::Version &ExpectedVersion,
+                           StringRef UnaryOperator) {
+  if (UnaryOperator == ">=")
+    return Version >= ExpectedVersion;
+  if (UnaryOperator == "<")
+    return Version < ExpectedVersion;
+  llvm_unreachable("unsupported unary operator");
+}
 
 /// The condition validator.
 class ValidateIfConfigCondition :
@@ -63,7 +77,7 @@ class ValidateIfConfigCondition :
   bool HasError;
 
   /// Get the identifier string of the UnresolvedDeclRefExpr.
-  llvm::Optional<StringRef> getDeclRefStr(Expr *E, DeclRefKind Kind) {
+  Optional<StringRef> getDeclRefStr(Expr *E, DeclRefKind Kind) {
     auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(E);
     if (!UDRE ||
         !UDRE->hasName() ||
@@ -85,7 +99,7 @@ class ValidateIfConfigCondition :
   Expr *foldSequence(Expr *LHS, ArrayRef<Expr*> &S, bool isRecurse = false) {
     assert(!S.empty() && ((S.size() & 1) == 0));
 
-    auto getNextOperator = [&]() -> llvm::Optional<StringRef> {
+    auto getNextOperator = [&]() -> Optional<StringRef> {
       assert((S.size() & 1) == 0);
       while (!S.empty()) {
         auto Name = getDeclRefStr(S[0], DeclRefKind::BinaryOperator);
@@ -109,7 +123,7 @@ class ValidateIfConfigCondition :
       // If failed, it's not a sequence anymore.
       return LHS;
     Expr *Op = S[0];
-  
+
     // We will definitely be consuming at least one operator.
     // Pull out the prospective RHS and slice off the first two elements.
     Expr *RHS = validate(S[1]);
@@ -216,16 +230,16 @@ public:
       return E;
     }
 
-    // 'swift' '(' '>=' float-literal ( '.' integer-literal )* ')'
-    // 'compiler' '(' '>=' float-literal ( '.' integer-literal )* ')'
+    // 'swift' '(' ('>=' | '<') float-literal ( '.' integer-literal )* ')'
+    // 'compiler' '(' ('>=' | '<') float-literal ( '.' integer-literal )* ')'
     if (*KindName == "swift" || *KindName == "compiler") {
       auto PUE = dyn_cast<PrefixUnaryExpr>(Arg);
-      llvm::Optional<StringRef> PrefixName = PUE ?
-        getDeclRefStr(PUE->getFn(), DeclRefKind::PrefixOperator) : None;
-      if (!PrefixName || *PrefixName != ">=") {
-        D.diagnose(Arg->getLoc(),
-                   diag::unsupported_platform_condition_argument,
-                   "a unary comparison, such as '>=2.2'");
+      Optional<StringRef> PrefixName =
+          PUE ? getDeclRefStr(PUE->getFn(), DeclRefKind::PrefixOperator) : None;
+      if (!isValidPrefixUnaryOperator(PrefixName)) {
+        D.diagnose(
+            Arg->getLoc(), diag::unsupported_platform_condition_argument,
+            "a unary comparison '>=' or '<'; for example, '>=2.2' or '<2.2'");
         return nullptr;
       }
       auto versionString = extractExprSource(Ctx.SourceMgr, PUE->getArg());
@@ -382,13 +396,17 @@ public:
       return thisVersion >= Val;
     } else if ((KindName == "swift") || (KindName == "compiler")) {
       auto PUE = cast<PrefixUnaryExpr>(Arg);
+      auto PrefixName = getDeclRefStr(PUE->getFn());
       auto Str = extractExprSource(Ctx.SourceMgr, PUE->getArg());
       auto Val = version::Version::parseVersionString(
           Str, SourceLoc(), nullptr).getValue();
       if (KindName == "swift") {
-        return Ctx.LangOpts.EffectiveLanguageVersion >= Val;  
+        return isValidVersion(Ctx.LangOpts.EffectiveLanguageVersion, Val,
+                              PrefixName);
       } else if (KindName == "compiler") {
-        return version::Version::getCurrentLanguageVersion() >= Val;
+        auto currentLanguageVersion =
+            version::Version::getCurrentLanguageVersion();
+        return isValidVersion(currentLanguageVersion, Val, PrefixName);
       } else {
         llvm_unreachable("unsupported version conditional");
       }
@@ -585,6 +603,8 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
       ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
                                                       /*isBasic*/true,
                                                       /*isForDirective*/true);
+      if (Result.hasCodeCompletion())
+        return makeParserCodeCompletionStatus();
       if (Result.isNull())
         return makeParserError();
       Condition = Result.get();

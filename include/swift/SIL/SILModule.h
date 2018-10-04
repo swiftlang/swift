@@ -226,14 +226,8 @@ private:
   /// The stage of processing this module is at.
   SILStage Stage;
 
-  /// The callback used by the SILLoader.
-  std::unique_ptr<SerializationCallback> Callback;
-
-  // Callbacks registered by the SIL optimizer to run on each deserialized
-  // function body. This is intentionally a stateless type because the
-  // ModuleDecl and SILFunction should be sufficient context.
-  using SILFunctionBodyCallback = void (*)(ModuleDecl *, SILFunction *F);
-  SmallVector<SILFunctionBodyCallback, 0> DeserializationCallbacks;
+  /// The set of deserialization notification handlers.
+  DeserializationNotificationHandlerSet deserializationNotificationHandlers;
 
   /// The SILLoader used when linking functions into this module.
   ///
@@ -283,10 +277,19 @@ public:
   ~SILModule();
 
   /// Add a callback for each newly deserialized SIL function body.
-  void registerDeserializationCallback(SILFunctionBodyCallback callBack);
+  void registerDeserializationNotificationHandler(
+      std::unique_ptr<DeserializationNotificationHandler> &&handler);
 
-  /// Return set of registered deserialization callbacks.
-  ArrayRef<SILFunctionBodyCallback> getDeserializationCallbacks();
+  /// Return the set of registered deserialization callbacks.
+  DeserializationNotificationHandlerSet::range
+  getDeserializationHandlers() const {
+    return deserializationNotificationHandlers.getRange();
+  }
+
+  void removeDeserializationNotificationHandler(
+      DeserializationNotificationHandler *handler) {
+    deserializationNotificationHandlers.erase(handler);
+  }
 
   /// Add a delete notification handler \p Handler to the module context.
   void registerDeleteNotificationHandler(DeleteNotificationHandler* Handler);
@@ -340,11 +343,9 @@ public:
   /// should contain source files.
   ///
   /// If a source file is provided, SIL will only be emitted for decls in that
-  /// source file, starting from the specified element number.
+  /// source file.
   static std::unique_ptr<SILModule>
-  constructSIL(ModuleDecl *M, SILOptions &Options, FileUnit *sf = nullptr,
-               Optional<unsigned> startElem = None,
-               bool isWholeModule = false);
+  constructSIL(ModuleDecl *M, SILOptions &Options, FileUnit *sf = nullptr);
 
   /// \brief Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
@@ -377,8 +378,7 @@ public:
     return wholeModule;
   }
 
-  /// Returns true if it is the OnoneSupport module.
-  bool isOnoneSupportModule() const;
+  bool isStdlibModule() const;
 
   /// Returns true if it is the optimized OnoneSupport module.
   bool isOptimizedOnoneSupportModule() const;

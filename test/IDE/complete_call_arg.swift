@@ -1,26 +1,26 @@
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG1 | %FileCheck %s -check-prefix=EXPECT_OINT
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG2 | %FileCheck %s -check-prefix=ARG-NAME1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG1 | %FileCheck %s -check-prefix=EXPECT_OINT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG2 | %FileCheck %s -check-prefix=ARG-NAME1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG3 | %FileCheck %s -check-prefix=ARG-NAME2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG4 | %FileCheck %s -check-prefix=EXPECT_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG5 | %FileCheck %s -check-prefix=EXPECT_OSTRING
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG6 | %FileCheck %s -check-prefix=ARG-NAME2
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG7 | %FileCheck %s -check-prefix=ARG-NAME1
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG8 | %FileCheck %s -check-prefix=EXPECT_STRING
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG7 | %FileCheck %s -check-prefix=ARG-NAME1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARG8 | %FileCheck %s -check-prefix=EXPECT_STRING
 
 // RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD1 | %FileCheck %s -check-prefix=OVERLOAD1
 // RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD2 | %FileCheck %s -check-prefix=OVERLOAD2
 // RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD3 | %FileCheck %s -check-prefix=OVERLOAD3
 // RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD4 | %FileCheck %s -check-prefix=OVERLOAD4
 
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER1 | %FileCheck %s -check-prefix=MEMBER1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER1 | %FileCheck %s -check-prefix=MEMBER1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER2 | %FileCheck %s -check-prefix=MEMBER2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER3 | %FileCheck %s -check-prefix=MEMBER3
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER4 | %FileCheck %s -check-prefix=MEMBER4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER4 | %FileCheck %s -check-prefix=MEMBER4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER5 | %FileCheck %s -check-prefix=MEMBER2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER6 | %FileCheck %s -check-prefix=MEMBER4
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER7 | %FileCheck %s -check-prefix=MEMBER7
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER8 | %FileCheck %s -check-prefix=MEMBER8
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER9 | %FileCheck %s -check-prefix=MEMBER1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER7 | %FileCheck %s -check-prefix=MEMBER7
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER8 | %FileCheck %s -check-prefix=MEMBER8
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER9 | %FileCheck %s -check-prefix=MEMBER1
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG1 | %FileCheck %s -check-prefix=EXPECT_INT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG2 | %FileCheck %s -check-prefix=EXPECT_STRING
@@ -28,7 +28,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG4 | %FileCheck %s -check-prefix=MEMBER4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG5 | %FileCheck %s -check-prefix=MEMBER2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG6 | %FileCheck %s -check-prefix=FARG6
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG7 | %FileCheck %s -allow-deprecated-dag-overlap -check-prefix=EXPECT_OINT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FARG7 | %FileCheck %s -check-prefix=EXPECT_OINT
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_1 | %FileCheck %s -check-prefix=FIRST_ARG_NAME_PATTERN
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FIRST_ARG_NAME_2 | %FileCheck %s -check-prefix=FIRST_ARG_NAME_PATTERN
@@ -46,6 +46,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FORCED_IUO | %FileCheck %s -check-prefix=MEMBEROF_IUO
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_TO_GENERIC | %FileCheck %s -check-prefix=GENERIC_TO_GENERIC
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NESTED_CLOSURE | %FileCheck %s -check-prefix=NESTED_CLOSURE
 
 var i1 = 1
 var i2 = 2
@@ -125,8 +126,6 @@ class C1 {
 // ARG-NAME2-DAG: Keyword/ExprSpecific:               b: [#Argument name#]; name=b:
 
 // EXPECT_OINT: Begin completions
-// EXPECT_OINT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
-// EXPECT_OINT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f2()[#Void#]; name=f2()
 // EXPECT_OINT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f1()[#Void#]; name=f1()
 // EXPECT_OINT-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Invalid]: f2()[#Void#]; name=f2()
 // EXPECT_OINT-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Convertible]: i2[#Int#]; name=i2
@@ -388,7 +387,7 @@ func emptyOverload(foo foo: Int) {}
 emptyOverload(foo: #^EMPTY_OVERLOAD_1^#)
 struct EmptyOverload {
   init() {}
-  init(frame: Int) {}
+  init(foo: Int) {}
 }
 _ = EmptyOverload(foo: #^EMPTY_OVERLOAD_2^#)
 // FIXME: we should have a TypeRelation[Identical] here for Ints. For now just
@@ -417,4 +416,12 @@ class Bar {
   // MEMBEROF_IUO: Keyword[self]/CurrNominal: self[#Foo#]; name=self
   // MEMBEROF_IUO: Decl[InstanceVar]/CurrNominal: x[#Int#]; name=x
   // MEMBEROF_IUO: End completions
+}
+
+func curry<T1, T2, R>(_ f: @escaping (T1, T2) -> R) -> (T1) -> (T2) -> R {
+  return { t1 in { t2 in f(#^NESTED_CLOSURE^#, t2) } }
+  // NESTED_CLOSURE: Begin completions
+  // FIXME: Should be '/TypeRelation[Invalid]: t2[#T2#]'
+  // NESTED_CLOSURE: Decl[LocalVar]/Local:               t2; name=t2
+  // NESTED_CLOSURE: Decl[LocalVar]/Local:               t1[#T1#]; name=t1
 }

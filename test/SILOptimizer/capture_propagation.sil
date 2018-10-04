@@ -10,7 +10,7 @@ import Swift
 sil @capture_helper_2 : $@convention(thin) (Int32) -> ()
 
 // CHECK-LABEL: test_capture_propagation
-// CHECK: %[[FR:[0-9]+]] = function_ref @$SSiytIxyd_SiytIxid_TR22$S8capturep6helperySiFTf3npf_n : $@convention(thin) (@in Int32) -> ()
+// CHECK: %[[FR:[0-9]+]] = function_ref @$sSiytIxyd_SiytIxid_TR22$s8capturep6helperySiFTf3npf_n : $@convention(thin) (@in Int32) -> ()
 // CHECK: thin_to_thick_function %[[FR]] : $@convention(thin) (@in Int32) -> ()
 sil private @test_capture_propagation : $@convention(thin) () -> () {
 bb0:
@@ -19,10 +19,10 @@ bb0:
   %2 = struct $Int32 (%1 : $Builtin.Int32)           // user: %3
   store %2 to %0 : $*Int32                        // id: %3
   // function_ref capturep.helper (Swift.Int32) -> ()
-  %4 = function_ref @$S8capturep6helperySiF : $@convention(thin) (Int32) -> () // user: %5
+  %4 = function_ref @$s8capturep6helperySiF : $@convention(thin) (Int32) -> () // user: %5
   %5 = thin_to_thick_function %4 : $@convention(thin) (Int32) -> () to $@callee_owned (Int32) -> () // user: %7
   // function_ref reabstraction thunk helper from @callee_owned (@unowned Swift.Int32) -> (@unowned ()) to @callee_owned (@in Swift.Int32) -> (@unowned ())
-  %6 = function_ref @$SSiytIxyd_SiytIxid_TR : $@convention(thin) (@in Int32, @owned @callee_owned (Int32) -> ()) -> () // user: %7
+  %6 = function_ref @$sSiytIxyd_SiytIxid_TR : $@convention(thin) (@in Int32, @owned @callee_owned (Int32) -> ()) -> () // user: %7
   %7 = partial_apply %6(%5) : $@convention(thin) (@in Int32, @owned @callee_owned (Int32) -> ()) -> () // user: %9
   // function_ref specialization <Swift.Int32> of capturep.generic <A>(A, (A) -> ()) -> ()
   %8 = function_ref @_TTSgSi___TF8capturep7genericU__FTQ_FQ_T__T_ : $@convention(thin) (@in Int32, @owned @callee_owned (@in Int32) -> ()) -> () // user: %9
@@ -39,7 +39,7 @@ bb0:
 }
 
 // capturep.helper (Swift.Int32) -> ()
-sil @$S8capturep6helperySiF : $@convention(thin) (Int32) -> () {
+sil @$s8capturep6helperySiF : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
   %1 = tuple ()                                   // user: %2
   return %1 : $()                                 // id: %2
@@ -48,7 +48,7 @@ bb0(%0 : $Int32):
 sil @bad_thunk : $@convention(thin) (@in Int32, @owned @callee_owned (Int32) -> ()) -> ()
 
 // reabstraction thunk helper from @callee_owned (@unowned Swift.Int32) -> (@unowned ()) to @callee_owned (@in Swift.Int32) -> (@unowned ())
-sil shared [transparent] @$SSiytIxyd_SiytIxid_TR : $@convention(thin) (@in Int32, @owned @callee_owned (Int32) -> ()) -> () {
+sil shared [transparent] @$sSiytIxyd_SiytIxid_TR : $@convention(thin) (@in Int32, @owned @callee_owned (Int32) -> ()) -> () {
 bb0(%0 : $*Int32, %1 : $@callee_owned (Int32) -> ()):
   %2 = load %0 : $*Int32                            // user: %3
   %3 = apply %1(%2) : $@callee_owned (Int32) -> ()  // user: %4
@@ -69,7 +69,7 @@ bb0(%0 : $*Int32, %1 : $@callee_owned (@in Int32) -> ()):
 
 /*
 // reabstraction thunk helper from @callee_owned (@unowned Swift.Int32) -> (@unowned ()) to @callee_owned (@in Swift.Int32) -> (@unowned ())
-sil shared [transparent] @$SSiytIxyd_SiytIxid_TR : $@convention(thin) (@in Int32, @owned @callee_owned (Int32) -> ()) -> () {
+sil shared [transparent] @$sSiytIxyd_SiytIxid_TR : $@convention(thin) (@in Int32, @owned @callee_owned (Int32) -> ()) -> () {
 bb0(%0 : $*Int32, %1 : $@callee_owned (Int32) -> ()):
   %2 = load %0 : $*Int32                            // user: %3
   %3 = apply %1(%2) : $@callee_owned (Int32) -> ()  // user: %4
@@ -440,7 +440,7 @@ bb0(%0 : $*T, %1 : $*T, %2 : $@thin T.Type):
 }
 
 // CHECK-LABEL: sil @return_generic_nonthrowing_closure
-// CHECK: [[F:%[0-9]+]] = function_ref @$S39specialized_generic_nonthrowing_closures5Int32V_Tg5
+// CHECK: [[F:%[0-9]+]] = function_ref @$s39specialized_generic_nonthrowing_closures5Int32V_Tg5
 // CHECK: [[R:%[0-9]+]] = thin_to_thick_function [[F]]
 // CHECK: return [[R]]
 sil @return_generic_nonthrowing_closure : $@convention(thin) () -> @owned @callee_owned (@in Int32, @in Int32) -> Bool {

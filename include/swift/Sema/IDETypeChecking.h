@@ -52,12 +52,6 @@ namespace swift {
   void collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                         llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap);
 
-  /// \brief Given an unresolved member E and its parent P, this function tries
-  /// to infer the type of E.
-  /// \returns true on success, false on error.
-  bool typeCheckUnresolvedExpr(DeclContext &DC, Expr* E,
-                               Expr *P, SmallVectorImpl<Type> &PossibleTypes);
-
   enum InterestedMemberKind : uint8_t {
     Viable,
     Unviable,

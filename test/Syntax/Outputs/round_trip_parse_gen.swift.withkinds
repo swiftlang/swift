@@ -107,12 +107,12 @@ class C <MemberDeclBlock>{<MemberDeclListItem><FunctionDecl>
   private </DeclModifier>deinit <CodeBlock>{}</CodeBlock></DeinitializerDecl></MemberDeclListItem><MemberDeclListItem><SubscriptDecl><DeclModifier>
 
   internal </DeclModifier>subscript<ParameterClause>(<FunctionParameter>x: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause><AccessorBlock>{ <AccessorDecl>get <CodeBlock>{} </CodeBlock></AccessorDecl><AccessorDecl>set <CodeBlock>{} </CodeBlock></AccessorDecl>}</AccessorBlock></SubscriptDecl></MemberDeclListItem><MemberDeclListItem><SubscriptDecl>
-  subscript<ParameterClause>() </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause><AccessorBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</AccessorBlock></SubscriptDecl></MemberDeclListItem><MemberDeclListItem><VariableDecl>
+  subscript<ParameterClause>() </ParameterClause><ReturnClause>-> <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></ReturnClause><CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>1 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock></SubscriptDecl></MemberDeclListItem><MemberDeclListItem><VariableDecl>
 
-  var <PatternBinding><IdentifierPattern>x</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><AccessorBlock>{<FunctionCallExpr><IdentifierExpr>
+  var <PatternBinding><IdentifierPattern>x</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><CodeBlock>{<FunctionCallExpr><IdentifierExpr>
     address </IdentifierExpr><ClosureExpr>{ <FunctionCallExpr><IdentifierExpr>fatalError</IdentifierExpr>() </FunctionCallExpr>}</ClosureExpr></FunctionCallExpr><FunctionCallExpr><IdentifierExpr>
     unsafeMutableAddress </IdentifierExpr><ClosureExpr>{ <FunctionCallExpr><IdentifierExpr>fatalError</IdentifierExpr>() </FunctionCallExpr>}</ClosureExpr></FunctionCallExpr>
-  }</AccessorBlock></PatternBinding></VariableDecl></MemberDeclListItem>
+  }</CodeBlock></PatternBinding></VariableDecl></MemberDeclListItem>
 }</MemberDeclBlock></ClassDecl><ProtocolDecl>
 
 protocol PP <MemberDeclBlock>{<MemberDeclListItem><AssociatedtypeDecl>
@@ -290,9 +290,9 @@ class C <MemberDeclBlock>{<MemberDeclListItem><VariableDecl>
     @objc </Attribute>didSet <CodeBlock>{}</CodeBlock></AccessorDecl><AccessorDecl>
     willSet<AccessorParameter>(newValue)</AccessorParameter><CodeBlock>{ }</CodeBlock></AccessorDecl>
   }</AccessorBlock></PatternBinding></VariableDecl></MemberDeclListItem><MemberDeclListItem><VariableDecl>
-  var <PatternBinding><IdentifierPattern>a </IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><AccessorBlock>{<ReturnStmt>
+  var <PatternBinding><IdentifierPattern>a </IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><CodeBlock>{<ReturnStmt>
     return <IntegerLiteralExpr>3</IntegerLiteralExpr></ReturnStmt>
-  }</AccessorBlock></PatternBinding></VariableDecl></MemberDeclListItem>
+  }</CodeBlock></PatternBinding></VariableDecl></MemberDeclListItem>
 }</MemberDeclBlock></ClassDecl><ProtocolDecl>
 
 protocol P <MemberDeclBlock>{<MemberDeclListItem><VariableDecl>
@@ -302,7 +302,7 @@ protocol P <MemberDeclBlock>{<MemberDeclListItem><VariableDecl>
 
 private </DeclModifier><DeclModifier>final </DeclModifier>class D <MemberDeclBlock>{<MemberDeclListItem><VariableDecl><Attribute>
   @objc</Attribute><DeclModifier>
-  static </DeclModifier><DeclModifier>private </DeclModifier>var <PatternBinding><IdentifierPattern>a</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><InitializerClause>= <IntegerLiteralExpr>3 </IntegerLiteralExpr></InitializerClause><AccessorBlock>{ <ReturnStmt>return <IntegerLiteralExpr>3 </IntegerLiteralExpr></ReturnStmt>}</AccessorBlock>, </PatternBinding><PatternBinding><IdentifierPattern>b</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></TypeAnnotation>, </PatternBinding><PatternBinding><IdentifierPattern>c </IdentifierPattern><InitializerClause>= <IntegerLiteralExpr>4</IntegerLiteralExpr></InitializerClause>, </PatternBinding><PatternBinding><IdentifierPattern>d </IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><AccessorBlock>{ <AccessorDecl>get <CodeBlock>{} </CodeBlock></AccessorDecl><AccessorDecl>get <CodeBlock>{}</CodeBlock></AccessorDecl>}</AccessorBlock>, </PatternBinding><PatternBinding><TuplePattern>(<TuplePatternElement><IdentifierPattern>a</IdentifierPattern>, </TuplePatternElement><TuplePatternElement><IdentifierPattern>b</IdentifierPattern></TuplePatternElement>)</TuplePattern><TypeAnnotation>: <TupleType>(<TupleTypeElement><SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement><SimpleTypeIdentifier>Int</SimpleTypeIdentifier></TupleTypeElement>)</TupleType></TypeAnnotation></PatternBinding></VariableDecl></MemberDeclListItem><MemberDeclListItem><VariableDecl>
+  static </DeclModifier><DeclModifier>private </DeclModifier>var <PatternBinding><IdentifierPattern>a</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><InitializerClause>= <IntegerLiteralExpr>3 </IntegerLiteralExpr></InitializerClause><CodeBlock>{ <ReturnStmt>return <IntegerLiteralExpr>3 </IntegerLiteralExpr></ReturnStmt>}</CodeBlock>, </PatternBinding><PatternBinding><IdentifierPattern>b</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></TypeAnnotation>, </PatternBinding><PatternBinding><IdentifierPattern>c </IdentifierPattern><InitializerClause>= <IntegerLiteralExpr>4</IntegerLiteralExpr></InitializerClause>, </PatternBinding><PatternBinding><IdentifierPattern>d </IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><AccessorBlock>{ <AccessorDecl>get <CodeBlock>{} </CodeBlock></AccessorDecl><AccessorDecl>get <CodeBlock>{}</CodeBlock></AccessorDecl>}</AccessorBlock>, </PatternBinding><PatternBinding><TuplePattern>(<TuplePatternElement><IdentifierPattern>a</IdentifierPattern>, </TuplePatternElement><TuplePatternElement><IdentifierPattern>b</IdentifierPattern></TuplePatternElement>)</TuplePattern><TypeAnnotation>: <TupleType>(<TupleTypeElement><SimpleTypeIdentifier>Int</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement><SimpleTypeIdentifier>Int</SimpleTypeIdentifier></TupleTypeElement>)</TupleType></TypeAnnotation></PatternBinding></VariableDecl></MemberDeclListItem><MemberDeclListItem><VariableDecl>
   let <PatternBinding><TuplePattern>(<TuplePatternElement><IdentifierPattern>a</IdentifierPattern>, </TuplePatternElement><TuplePatternElement><IdentifierPattern>b</IdentifierPattern></TuplePatternElement>) </TuplePattern><InitializerClause>= <TupleExpr>(<TupleElement><IntegerLiteralExpr>1</IntegerLiteralExpr>,</TupleElement><TupleElement><IntegerLiteralExpr>2</IntegerLiteralExpr></TupleElement>)</TupleExpr></InitializerClause>, </PatternBinding><PatternBinding><WildcardPattern>_ </WildcardPattern><InitializerClause>= <IntegerLiteralExpr>4 </IntegerLiteralExpr></InitializerClause><AccessorBlock>{}</AccessorBlock></PatternBinding></VariableDecl></MemberDeclListItem><MemberDeclListItem><FunctionDecl>
 
   func patternTests<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<ForInStmt>
@@ -418,9 +418,9 @@ func statementTests<FunctionSignature><ParameterClause>() </ParameterClause></Fu
 // MARK: - ExtensionDecl
 
 extension <SimpleTypeIdentifier>ext </SimpleTypeIdentifier><MemberDeclBlock>{<MemberDeclListItem><VariableDecl>
-  var <PatternBinding><IdentifierPattern>s</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><AccessorBlock>{<ReturnStmt>
+  var <PatternBinding><IdentifierPattern>s</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Int </SimpleTypeIdentifier></TypeAnnotation><CodeBlock>{<ReturnStmt>
     return <IntegerLiteralExpr>42</IntegerLiteralExpr></ReturnStmt>
-  }</AccessorBlock></PatternBinding></VariableDecl></MemberDeclListItem>
+  }</CodeBlock></PatternBinding></VariableDecl></MemberDeclListItem>
 }</MemberDeclBlock></ExtensionDecl><ExtensionDecl><Attribute>
 
 @available(<AvailabilityArgument>*, </AvailabilityArgument><AvailabilityArgument>unavailable</AvailabilityArgument>)</Attribute><DeclModifier>

@@ -4,7 +4,7 @@
 class A {}
 class B : A {}
 
-// CHECK-LABEL: sil hidden @$S4main3fooyyAA1ACSgF : $@convention(thin) (@guaranteed Optional<A>) -> () {
+// CHECK-LABEL: sil hidden @$s4main3fooyyAA1ACSgF : $@convention(thin) (@guaranteed Optional<A>) -> () {
 // CHECK:    bb0([[ARG:%.*]] : @guaranteed $Optional<A>):
 // CHECK:      [[X:%.*]] = alloc_box ${ var Optional<B> }, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
@@ -51,7 +51,7 @@ func foo(_ y : A?) {
   var x = (y as? B)
 }
 
-// CHECK-LABEL: sil hidden @$S4main3baryyAA1ACSgSgSgSgF : $@convention(thin) (@guaranteed Optional<Optional<Optional<Optional<A>>>>) -> () {
+// CHECK-LABEL: sil hidden @$s4main3baryyAA1ACSgSgSgSgF : $@convention(thin) (@guaranteed Optional<Optional<Optional<Optional<A>>>>) -> () {
 // CHECK:    bb0([[ARG:%.*]] : @guaranteed $Optional<Optional<Optional<Optional<A>>>>):
 // CHECK:      [[X:%.*]] = alloc_box ${ var Optional<Optional<Optional<B>>> }, var, name "x"
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
@@ -142,7 +142,7 @@ func bar(_ y : A????) {
 }
 
 
-// CHECK-LABEL: sil hidden @$S4main3bazyyyXlSgF : $@convention(thin) (@guaranteed Optional<AnyObject>) -> () {
+// CHECK-LABEL: sil hidden @$s4main3bazyyyXlSgF : $@convention(thin) (@guaranteed Optional<AnyObject>) -> () {
 // CHECK:       bb0([[ARG:%.*]] : @guaranteed $Optional<AnyObject>):
 // CHECK:         [[X:%.*]] = alloc_box ${ var Optional<B> }, var, name "x"
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[X]]
@@ -155,7 +155,7 @@ func bar(_ y : A????) {
 // CHECK:         store [[CASTED_VALUE]] to [init] [[X_VALUE]]
 // CHECK:       [[NOT_B]]([[ORIGINAL_VALUE:%.*]] : @owned $AnyObject):
 // CHECK:         destroy_value [[ORIGINAL_VALUE]]
-// CHECK: } // end sil function '$S4main3bazyyyXlSgF'
+// CHECK: } // end sil function '$s4main3bazyyyXlSgF'
 func baz(_ y : AnyObject?) {
   var x = (y as? B)
 }
@@ -163,7 +163,7 @@ func baz(_ y : AnyObject?) {
 
 // <rdar://problem/17013042> T! <-> T? conversions should not produce a diamond
 
-// CHECK-LABEL: sil hidden @$S4main07opt_to_B8_trivialySiSgACF
+// CHECK-LABEL: sil hidden @$s4main07opt_to_B8_trivialySiSgACF
 // CHECK:       bb0(%0 : @trivial $Optional<Int>):
 // CHECK-NEXT:  debug_value %0 : $Optional<Int>, let, name "x"
 // CHECK-NEXT:  return %0 : $Optional<Int>
@@ -172,16 +172,16 @@ func opt_to_opt_trivial(_ x: Int?) -> Int! {
   return x
 }
 
-// CHECK-LABEL: sil hidden @$S4main07opt_to_B10_referenceyAA1CCSgAEF
+// CHECK-LABEL: sil hidden @$s4main07opt_to_B10_referenceyAA1CCSgAEF
 // CHECK:  bb0([[ARG:%.*]] : @guaranteed $Optional<C>):
 // CHECK:    debug_value [[ARG]] : $Optional<C>, let, name "x"
 // CHECK:    [[RESULT:%.*]] = copy_value [[ARG]]
 // CHECK-NOT:    destroy_value [[ARG]]
 // CHECK:    return [[RESULT]] : $Optional<C>
-// CHECK: } // end sil function '$S4main07opt_to_B10_referenceyAA1CCSgAEF'
+// CHECK: } // end sil function '$s4main07opt_to_B10_referenceyAA1CCSgAEF'
 func opt_to_opt_reference(_ x : C!) -> C? { return x }
 
-// CHECK-LABEL: sil hidden @$S4main07opt_to_B12_addressOnly{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s4main07opt_to_B12_addressOnly{{[_0-9a-zA-Z]*}}F
 // CHECK:       bb0(%0 : @trivial $*Optional<T>, %1 : @trivial $*Optional<T>):
 // CHECK-NEXT:  debug_value_addr %1 : $*Optional<T>, let, name "x"
 // CHECK-NEXT:  copy_addr %1 to [initialization] %0
@@ -193,7 +193,7 @@ class C {}
 public struct TestAddressOnlyStruct<T> {
   func f(_ a : T?) {}
   
-  // CHECK-LABEL: sil hidden @$S4main21TestAddressOnlyStructV8testCall{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden @$s4main21TestAddressOnlyStructV8testCall{{[_0-9a-zA-Z]*}}F
   // CHECK: bb0(%0 : @trivial $*Optional<T>, %1 : @trivial $TestAddressOnlyStruct<T>):
   // CHECK: apply {{.*}}<T>(%0, %1)
   func testCall(_ a : T!) {
@@ -201,7 +201,7 @@ public struct TestAddressOnlyStruct<T> {
   }
 }
 
-// CHECK-LABEL: sil hidden @$S4main35testContextualInitOfNonAddrOnlyTypeyySiSgF
+// CHECK-LABEL: sil hidden @$s4main35testContextualInitOfNonAddrOnlyTypeyySiSgF
 // CHECK: bb0(%0 : @trivial $Optional<Int>):
 // CHECK-NEXT: debug_value %0 : $Optional<Int>, let, name "a"
 // CHECK-NEXT: [[X:%.*]] = alloc_box ${ var Optional<Int> }, var, name "x"

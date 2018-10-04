@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -swift-version 4 %s -o %t/a.out -enforce-exclusivity=checked -Onone
 //
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
@@ -22,6 +23,11 @@ func readAndPerform<T>(_ _: UnsafePointer<T>, closure: () ->()) {
 
 /// Begin a modify access to the first parameter and call the closure inside it.
 func modifyAndPerform<T>(_ _: UnsafeMutablePointer<T>, closure: () ->()) {
+  closure()
+}
+
+/// Begin a modify access to the first parameter and call the escaping closure inside it.
+func modifyAndPerformEscaping<T>(_ _: UnsafeMutablePointer<T>, closure: () ->()) {
   closure()
 }
 
@@ -341,6 +347,37 @@ ExclusiveAccessTestSuite.test("KeyPathInoutKeyPathReadClassStoredProp")
     let y = c[keyPath: getF]
     _blackHole(y)
   }
+}
+
+// <rdar://problem/43076947> [Exclusivity] improve diagnostics for
+// withoutActuallyEscaping.
+ExclusiveAccessTestSuite.test("withoutActuallyEscapingConflict") {
+  var localVal = 0
+  let nestedModify = { localVal = 3 }
+  withoutActuallyEscaping(nestedModify) {
+    expectCrashLater()
+    modifyAndPerform(&localVal, closure: $0)
+  }
+}
+
+ExclusiveAccessTestSuite.test("directlyAppliedConflict") {
+  var localVal = 0
+  let nestedModify = { localVal = 3 }
+  expectCrashLater()
+  _ = {
+    modifyAndPerform(&localVal, closure: nestedModify)
+  }()
+}
+
+// <rdar://problem/43122715> [Exclusivity] failure to diagnose
+// escaping closures called within directly applied noescape closures.
+ExclusiveAccessTestSuite.test("directlyAppliedEscapingConflict") {
+  var localVal = 0
+  let nestedModify = { localVal = 3 }
+  expectCrashLater()
+  _ = {
+    modifyAndPerformEscaping(&localVal, closure: nestedModify)
+  }()
 }
 
 runAllTests()

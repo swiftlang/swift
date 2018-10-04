@@ -59,8 +59,7 @@ func _isStdlibInternalChecksEnabled() -> Bool {
 }
 
 @usableFromInline @_transparent
-internal
-func _fatalErrorFlags() -> UInt32 {
+internal func _fatalErrorFlags() -> UInt32 {
   // The current flags are:
   // (1 << 0): Report backtrace on fatal error
 #if os(iOS) || os(tvOS) || os(watchOS)
@@ -75,7 +74,7 @@ func _fatalErrorFlags() -> UInt32 {
 ///
 /// This function should not be inlined because it is cold and inlining just
 /// bloats code.
-@usableFromInline // FIXME(sil-serialize-all)
+@usableFromInline
 @inline(never)
 internal func _assertionFailure(
   _ prefix: StaticString, _ message: StaticString,
@@ -105,7 +104,7 @@ internal func _assertionFailure(
 ///
 /// This function should not be inlined because it is cold and inlining just
 /// bloats code.
-@usableFromInline // FIXME(sil-serialize-all)
+@usableFromInline
 @inline(never)
 internal func _assertionFailure(
   _ prefix: StaticString, _ message: String,
@@ -135,7 +134,7 @@ internal func _assertionFailure(
 ///
 /// This function should not be inlined because it is cold and inlining just
 /// bloats code.
-@usableFromInline // FIXME(sil-serialize-all)
+@usableFromInline
 @inline(never)
 internal func _assertionFailure(
   _ prefix: StaticString, _ message: String,
@@ -160,7 +159,7 @@ internal func _assertionFailure(
 ///
 /// This function should not be inlined because it is cold and it inlining just
 /// bloats code.
-@usableFromInline // FIXME(sil-serialize-all)
+@usableFromInline
 @inline(never)
 @_semantics("arc.programtermination_point")
 internal func _fatalErrorMessage(
@@ -168,12 +167,21 @@ internal func _fatalErrorMessage(
   file: StaticString, line: UInt,
   flags: UInt32
 ) -> Never {
+  // This function breaks the infinite recursion detection pass by introducing
+  // an edge the pass doesn't look through.
+  func _withUTF8Buffer<R>(
+    _ string: StaticString,
+    _ body: (UnsafeBufferPointer<UInt8>) -> R
+  ) -> R {
+    return string.withUTF8Buffer(body)
+  }
+
 #if INTERNAL_CHECKS_ENABLED
-  prefix.withUTF8Buffer {
+  _withUTF8Buffer(prefix) {
     (prefix) in
-    message.withUTF8Buffer {
+    _withUTF8Buffer(message) {
       (message) in
-      file.withUTF8Buffer {
+      _withUTF8Buffer(file) {
         (file) in
         _swift_stdlib_reportFatalErrorInFile(
           prefix.baseAddress!, CInt(prefix.count),
@@ -184,9 +192,9 @@ internal func _fatalErrorMessage(
     }
   }
 #else
-  prefix.withUTF8Buffer {
+  _withUTF8Buffer(prefix) {
     (prefix) in
-    message.withUTF8Buffer {
+    _withUTF8Buffer(message) {
       (message) in
       _swift_stdlib_reportFatalError(
         prefix.baseAddress!, CInt(prefix.count),
@@ -246,7 +254,6 @@ func _unimplementedInitializer(className: StaticString,
   Builtin.int_trap()
 }
 
-// FIXME(ABI)#21 (Type Checker): rename to something descriptive.
 @inlinable // FIXME(sil-serialize-all)
 public // COMPILER_INTRINSIC
 func _undefined<T>(

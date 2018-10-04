@@ -244,7 +244,7 @@ struct Subscript2 {
     get { return a }
   }
 
-  subscript (a: Int) -> Int { // expected-error{{invalid redeclaration of 'subscript'}}
+  subscript (a: Int) -> Int { // expected-error{{invalid redeclaration of 'subscript(_:)'}}
     get { return a }
   }
 
@@ -264,7 +264,7 @@ struct GenericSubscripts {
 }
 
 extension GenericSubscripts {
-  subscript<U>(x: U) -> Int { return 0 } // expected-error{{invalid redeclaration of 'subscript'}}
+  subscript<U>(x: U) -> Int { return 0 } // expected-error{{invalid redeclaration of 'subscript(_:)'}}
   subscript<T, U>(x: T) -> U { fatalError() }
   subscript<T>(x: T) -> T { fatalError() }
   subscript(x: Int) -> Int { return 0 }
@@ -275,7 +275,7 @@ struct GenericSubscripts2<T> {
 }
 
 extension GenericSubscripts2 {
-  subscript(x: T) -> Int { return 0 } // expected-error{{invalid redeclaration of 'subscript'}}
+  subscript(x: T) -> Int { return 0 } // expected-error{{invalid redeclaration of 'subscript(_:)'}}
   subscript<U>(x: U) -> Int { return 0 }
   subscript(x: T) -> T { fatalError() }
   subscript<U>(x: T) -> U { fatalError() }
@@ -288,7 +288,7 @@ struct GenericSubscripts3<T> {
 }
 
 extension GenericSubscripts3 {
-  subscript<U>(x: T) -> U { fatalError() } // expected-error{{invalid redeclaration of 'subscript'}}
+  subscript<U>(x: T) -> U { fatalError() } // expected-error{{invalid redeclaration of 'subscript(_:)'}}
   subscript<U, V>(x: U) -> V { fatalError() }
   subscript<U>(x: U) -> U { fatalError() }
   subscript(x: Int) -> Int { return 0 }

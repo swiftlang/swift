@@ -818,7 +818,7 @@ TEST(WitnessTableTest, getGenericWitnessTable) {
   // and an initializer, so we must instantiate.
   {
     tableStorage2.WitnessTableSizeInWords = 7;
-    tableStorage2.WitnessTablePrivateSizeInWords = 1 + 1;
+    tableStorage2.WitnessTablePrivateSizeInWords = (1 + 1) << 1;
     initializeRelativePointer(&tableStorage2.Protocol, &testProtocol.descriptor);
     initializeRelativePointer(&tableStorage2.Pattern, witnesses);
     initializeRelativePointer(&tableStorage2.Instantiator,

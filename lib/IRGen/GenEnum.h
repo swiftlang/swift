@@ -375,11 +375,13 @@ public:
 
   virtual llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                                Address src,
-                                               SILType T) const = 0;
+                                               SILType T,
+                                               bool isOutlined) const = 0;
   virtual void storeExtraInhabitant(IRGenFunction &IGF,
                                     llvm::Value *index,
                                     Address dest,
-                                    SILType T) const = 0;
+                                    SILType T,
+                                    bool isOutlined) const = 0;
   
   /// \group Delegated FixedTypeInfo operations
   

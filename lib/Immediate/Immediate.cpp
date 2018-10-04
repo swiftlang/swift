@@ -204,13 +204,8 @@ bool swift::immediate::linkLLVMModules(llvm::Module *Module,
   return !Failed;
 }
 
-bool swift::immediate::IRGenImportedModules(
-    CompilerInstance &CI, llvm::Module &Module,
-    llvm::SmallPtrSetImpl<swift::ModuleDecl *> &ImportedModules,
-    SmallVectorImpl<llvm::Function *> &InitFns, IRGenOptions &IRGenOpts,
-    const SILOptions &SILOpts) {
-  swift::ModuleDecl *M = CI.getMainModule();
-
+bool swift::immediate::autolinkImportedModules(ModuleDecl *M,
+                                               IRGenOptions &IRGenOpts) {
   // Perform autolinking.
   SmallVector<LinkLibrary, 4> AllLinkLibraries(IRGenOpts.LinkLibraries);
   auto addLinkLibrary = [&](LinkLibrary linkLib) {
@@ -219,63 +214,9 @@ bool swift::immediate::IRGenImportedModules(
 
   M->collectLinkLibraries(addLinkLibrary);
 
-  tryLoadLibraries(AllLinkLibraries, CI.getASTContext().SearchPathOpts,
-                   CI.getDiags());
-
-  ImportedModules.insert(M);
-  if (!CI.hasSourceImport())
-    return false;
-
-  // IRGen the modules this module depends on. This is only really necessary
-  // for imported source, but that's a very convenient thing to do in -i mode.
-  // FIXME: Crawling all loaded modules is a hack.
-  // FIXME: And re-doing SILGen, SIL-linking, SIL diagnostics, and IRGen is
-  // expensive, because it's not properly being limited to new things right now.
-  bool hadError = false;
-  for (auto &entry : CI.getASTContext().LoadedModules) {
-    swift::ModuleDecl *import = entry.second;
-    if (!ImportedModules.insert(import).second)
-      continue;
-
-    std::unique_ptr<SILModule> SILMod = performSILGeneration(import,
-                                                             CI.getSILOptions());
-    if (runSILDiagnosticPasses(*SILMod)) {
-      hadError = true;
-      break;
-    }
-    runSILLoweringPasses(*SILMod);
-
-    const auto PSPs = CI.getPrimarySpecificPathsForAtMostOnePrimary();
-    // FIXME: We shouldn't need to use the global context here, but
-    // something is persisting across calls to performIRGeneration.
-    auto SubModule = performIRGeneration(
-        IRGenOpts, import, std::move(SILMod), import->getName().str(), PSPs,
-        getGlobalLLVMContext(), ArrayRef<std::string>());
-
-    if (CI.getASTContext().hadError()) {
-      hadError = true;
-      break;
-    }
-
-    if (!linkLLVMModules(&Module, std::move(SubModule)
-                         // TODO: reactivate the linker mode if it is
-                         // supported in llvm again. Otherwise remove the
-                         // commented code completely.
-                         /*, llvm::Linker::DestroySource */)) {
-      hadError = true;
-      break;
-    }
-
-    // FIXME: This is an ugly hack; need to figure out how this should
-    // actually work.
-    SmallVector<char, 20> NameBuf;
-    StringRef InitFnName = (import->getName().str() + ".init").toStringRef(NameBuf);
-    llvm::Function *InitFn = Module.getFunction(InitFnName);
-    if (InitFn)
-      InitFns.push_back(InitFn);
-  }
-
-  return hadError;
+  tryLoadLibraries(AllLinkLibraries, M->getASTContext().SearchPathOpts,
+                   M->getASTContext().Diags);
+  return false;
 }
 
 int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
@@ -330,9 +271,7 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   (*emplaceProcessArgs)(argBuf.data(), CmdLine.size());
 
   SmallVector<llvm::Function*, 8> InitFns;
-  llvm::SmallPtrSet<swift::ModuleDecl *, 8> ImportedModules;
-  if (IRGenImportedModules(CI, *Module, ImportedModules, InitFns,
-                           IRGenOpts, SILOpts))
+  if (autolinkImportedModules(swiftModule, IRGenOpts))
     return -1;
 
   llvm::PassManagerBuilder PMBuilder;

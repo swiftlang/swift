@@ -32,7 +32,7 @@ void SILGenFunction::prepareEpilog(Type resultType, bool isThrowing,
     for (auto directResult : fnConv.getDirectSILResults()) {
       SILType resultType =
           F.mapTypeIntoContext(fnConv.getSILType(directResult));
-      epilogBB->createPHIArgument(resultType, ValueOwnershipKind::Owned);
+      epilogBB->createPhiArgument(resultType, ValueOwnershipKind::Owned);
     }
   }
 
@@ -50,7 +50,7 @@ void SILGenFunction::prepareEpilog(Type resultType, bool isThrowing,
 void SILGenFunction::prepareRethrowEpilog(CleanupLocation cleanupLoc) {
   auto exnType = SILType::getExceptionType(getASTContext());
   SILBasicBlock *rethrowBB = createBasicBlock(FunctionSection::Postmatter);
-  rethrowBB->createPHIArgument(exnType, ValueOwnershipKind::Owned);
+  rethrowBB->createPhiArgument(exnType, ValueOwnershipKind::Owned);
   ThrowDest = JumpDest(rethrowBB, getCleanupsDepth(), cleanupLoc);
 }
 
@@ -186,7 +186,7 @@ SILGenFunction::emitEpilogBB(SILLocation topLevel) {
          "emitting epilog in wrong scope");
 
   auto cleanupLoc = CleanupLocation::get(topLevel);
-  Cleanups.emitCleanupsForReturn(cleanupLoc);
+  Cleanups.emitCleanupsForReturn(cleanupLoc, NotForUnwind);
 
   // Build the return value.  We don't do this if there are no direct
   // results; this can happen for void functions, but also happens when
@@ -297,7 +297,7 @@ void SILGenFunction::emitRethrowEpilog(SILLocation topLevel) {
   if (!prepareExtraEpilog(*this, ThrowDest, throwLoc, &exn))
     return;
 
-  Cleanups.emitCleanupsForReturn(ThrowDest.getCleanupLocation());
+  Cleanups.emitCleanupsForReturn(ThrowDest.getCleanupLocation(), IsForUnwind);
 
   B.createThrow(throwLoc, exn);
 
@@ -309,7 +309,8 @@ void SILGenFunction::emitCoroutineUnwindEpilog(SILLocation topLevel) {
   if (!prepareExtraEpilog(*this, CoroutineUnwindDest, unwindLoc, nullptr))
     return;
 
-  Cleanups.emitCleanupsForReturn(CoroutineUnwindDest.getCleanupLocation());
+  Cleanups.emitCleanupsForReturn(CoroutineUnwindDest.getCleanupLocation(),
+                                 IsForUnwind);
 
   B.createUnwind(unwindLoc);
 

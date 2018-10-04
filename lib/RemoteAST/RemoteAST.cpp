@@ -178,7 +178,12 @@ public:
 
     // Build a SubstitutionMap.
     auto *genericSig = decl->getGenericSignature();
-    auto genericParams = genericSig->getSubstitutableParams();
+
+    SmallVector<GenericTypeParamType *, 4> genericParams;
+    genericSig->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
+      if (canonical)
+        genericParams.push_back(gp);
+    });
     if (genericParams.size() != args.size())
       return Type();
 
@@ -402,8 +407,10 @@ public:
     if (!base->isTypeParameter())
       return Type();
 
+    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
     for (auto member : protocol->lookupDirect(Ctx.getIdentifier(member),
-                                              /*ignoreNew=*/true)) {
+                                              flags)) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member))
         return DependentMemberType::get(base, assocType);
     }
@@ -449,8 +456,7 @@ public:
 
 private:
   bool validateNominalParent(NominalTypeDecl *decl, Type parent) {
-    auto parentDecl =
-      decl->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto parentDecl = decl->getDeclContext()->getSelfNominalTypeDecl();
 
     // If we don't have a parent type, fast-path.
     if (!parent) {
@@ -1167,10 +1173,10 @@ public:
 
   Result<std::pair<Type, RemoteAddress>>
   getDynamicTypeAndAddressClassExistential(RemoteAddress object) {
-    auto pointed = Reader.readPointedValue(object.getAddressData());
-    if (!pointed)
+    auto pointerval = Reader.readPointerValue(object.getAddressData());
+    if (!pointerval)
       return getFailure<std::pair<Type, RemoteAddress>>();
-    auto result = Reader.readMetadataFromInstance(*pointed);
+    auto result = Reader.readMetadataFromInstance(*pointerval);
     if (!result)
       return getFailure<std::pair<Type, RemoteAddress>>();
     auto typeResult = Reader.readTypeFromMetadata(result.getValue());
@@ -1182,11 +1188,11 @@ public:
 
   Result<std::pair<Type, RemoteAddress>>
   getDynamicTypeAndAddressErrorExistential(RemoteAddress object) {
-    auto pointed = Reader.readPointedValue(object.getAddressData());
-    if (!pointed)
+    auto pointerval = Reader.readPointerValue(object.getAddressData());
+    if (!pointerval)
       return getFailure<std::pair<Type, RemoteAddress>>();
     auto result =
-        Reader.readMetadataAndValueErrorExistential(RemoteAddress(*pointed));
+        Reader.readMetadataAndValueErrorExistential(RemoteAddress(*pointerval));
     if (!result)
       return getFailure<std::pair<Type, RemoteAddress>>();
     RemoteAddress metadataAddress = result->first;
@@ -1216,6 +1222,26 @@ public:
                                                std::move(valueAddress));
   }
 
+  Result<std::pair<Type, RemoteAddress>>
+  getDynamicTypeAndAddressExistentialMetatype(RemoteAddress object) {
+    // The value of the address is just the input address.
+    // The type is obtained through the following sequence of steps:
+    // 1) Loading a pointer from the input address
+    // 2) Reading it as metadata and resolving the type
+    // 3) Wrapping the resolved type in an existential metatype.
+    auto pointerval = Reader.readPointerValue(object.getAddressData());
+    if (!pointerval)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    auto typeResult = Reader.readTypeFromMetadata(*pointerval);
+    if (!typeResult)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    auto wrappedType = ExistentialMetatypeType::get(typeResult);
+    if (!wrappedType)
+      return getFailure<std::pair<Type, RemoteAddress>>();
+    return std::make_pair<Type, RemoteAddress>(std::move(wrappedType),
+                                               std::move(object));
+  }
+
   /// Resolve the dynamic type and the value address of an existential,
   /// given its address and its static type. For class and error existentials,
   /// this API takes a pointer to the instance reference rather than the
@@ -1227,9 +1253,9 @@ public:
     if (!staticType->isAnyExistentialType())
       return getFailure<std::pair<Type, RemoteAddress>>();
 
-    // TODO: implement support for ExistentialMetaTypes.
+    // Handle the case where this is an ExistentialMetatype.
     if (!staticType->isExistentialType())
-      return getFailure<std::pair<Type, RemoteAddress>>();
+      return getDynamicTypeAndAddressExistentialMetatype(object);
 
     // This should be an existential type at this point.
     auto layout = staticType->getExistentialLayout();

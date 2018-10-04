@@ -209,7 +209,8 @@ bool FulfillmentMap::searchWitnessTable(
 
   bool hadFulfillment = false;
 
-  auto &pi = IGM.getProtocolInfo(protocol);
+  auto &pi = IGM.getProtocolInfo(protocol,
+                                 ProtocolInfoKind::RequirementSignature);
 
   for (auto &entry : pi.getWitnessEntries()) {
     if (!entry.isBase()) continue;
@@ -329,6 +330,7 @@ static StringRef getStateName(MetadataState state) {
   case MetadataState::LayoutComplete: return "layout-complete";
   case MetadataState::Abstract: return "abstract";
   }
+  llvm_unreachable("unhandled state");
 }
 
 void FulfillmentMap::dump() const {

@@ -9,7 +9,7 @@ Mangling
 --------
 ::
 
-  mangled-name ::= '_S' global
+  mangled-name ::= '$S' global
 
 All Swift-mangled names begin with this prefix.
 
@@ -59,11 +59,12 @@ Globals
   global ::= nominal-type 'Ml'           // in-place type initialization cache
   global ::= nominal-type 'Mm'           // class metaclass
   global ::= nominal-type 'Mn'           // nominal type descriptor
+  global ::= nominal-type 'Mu'           // class method lookup function
   global ::= module 'MXM'                // module descriptor
   global ::= context 'MXE'               // extension descriptor
   global ::= context 'MXX'               // anonymous context descriptor
   global ::= context identifier 'MXY'    // anonymous context descriptor
-  global ::= type assoc_type_path 'MXA'  // generic parameter ref
+  global ::= type assoc-type-list 'MXA'  // generic parameter ref
   global ::= protocol 'Mp'               // protocol descriptor
 
   global ::= nominal-type 'Mo'           // class metadata immediate member base offset
@@ -89,15 +90,13 @@ Globals
   global ::= protocol-conformance 'WI'   // generic protocol witness table instantiation function
   global ::= type protocol-conformance 'WL'   // lazy protocol witness table cache variable
 
-  global ::= protocol-conformance identifier 'Wt' // associated type metadata accessor
-  global ::= protocol-conformance assoc_type_path nominal-type 'WT' // associated type witness table accessor
+  global ::= protocol-conformance identifier 'Wt' // associated type metadata accessor (HISTORICAL)
+  global ::= protocol-conformance assoc-type-list nominal-type 'WT' // associated type witness table accessor
   global ::= type protocol-conformance 'Wl' // lazy protocol witness table accessor
 
   global ::= type 'WV'                   // value witness table
   global ::= entity 'Wvd'                // field offset
   global ::= entity 'WC'                 // resilient enum tag index
-
-  assoc_type_path ::= identifier '_' identifier*
 
 A direct symbol resolves directly to the address of an object.  An
 indirect symbol resolves to the address of a pointer to the object.
@@ -115,6 +114,8 @@ field offsets are therefore required when accessing fields in generic
 types where the metadata itself has unknown layout.)
 
 ::
+  global ::= global 'Tj'                 // resilient method dispatch thunk
+  global ::= global 'Tq'                 // method descriptor
 
   global ::= global 'TO'                 // ObjC-as-swift thunk
   global ::= global 'To'                 // swift-as-ObjC thunk
@@ -134,6 +135,12 @@ types where the metadata itself has unknown layout.)
   global ::= entity generic-signature? type type* 'Tk' // key path setter
   global ::= type generic-signature 'TH' // key path equality
   global ::= type generic-signature 'Th' // key path hasher
+
+  global ::= protocol 'TL'               // protocol requirements base descriptor
+  global ::= assoc-type-name 'Tl'        // associated type descriptor
+  global ::= assoc-type-name 'TM'        // default associated type witness accessor (HISTORICAL)
+  global ::= type assoc-type-path protocol 'Tn' // associated conformance descriptor
+  global ::= type assoc-type-path protocol 'TN' // default associated conformance witness accessor
 
   REABSTRACT-THUNK-TYPE ::= 'R'          // reabstraction thunk helper function
   REABSTRACT-THUNK-TYPE ::= 'r'          // reabstraction thunk
@@ -215,7 +222,7 @@ Entities
   entity-spec ::= decl-name label-list? type 'v' ACCESSOR                           // variable
   entity-spec ::= decl-name type 'fp'                                               // generic type parameter
   entity-spec ::= decl-name type 'fo'                                               // enum element (currently not used)
-  entity-spec ::= identifier 'Qa'                                                   // associated type declaration
+  entity-spec ::= identifier 'Qa'                                                   // associated type declaration
 
   ACCESSOR ::= 'm'                           // materializeForSet
   ACCESSOR ::= 's'                           // setter
@@ -232,7 +239,7 @@ Entities
   ADDRESSOR-KIND ::= 'u'                     // unsafe addressor (no owner)
   ADDRESSOR-KIND ::= 'O'                     // owning addressor (non-native owner)
   ADDRESSOR-KIND ::= 'o'                     // owning addressor (native owner)
-  ADDRESSOR-KIND ::= 'p'                     // pinning addressor (native owner)
+  ADDRESSOR-KIND ::= 'p'                     // pinning addressor (native owner), not used anymore
 
   decl-name ::= identifier
   decl-name ::= identifier 'L' INDEX                  // locally-discriminated declaration
@@ -262,17 +269,17 @@ return value are bridged and the type of pattern outlined.
 
 ::
 
-  bridge-spec := bridged-kind bridged-param* bridged-return '_'
+  bridge-spec ::= bridged-kind bridged-param* bridged-return '_'
 
-  bridged-param := 'n' // not bridged parameter
-  bridged-param := 'b' // bridged parameter
+  bridged-param ::= 'n' // not bridged parameter
+  bridged-param ::= 'b' // bridged parameter
 
-  bridged-return := 'n' // not bridged return
-  bridged-return := 'b' // bridged return
+  bridged-return ::= 'n' // not bridged return
+  bridged-return ::= 'b' // bridged return
 
-  bridged-kind := 'm' // bridged method
-  bridged-kind := 'a' // bridged property (by address)
-  bridged-kind := 'p' // bridged property (by value)
+  bridged-kind ::= 'm' // bridged method
+  bridged-kind ::= 'a' // bridged property (by address)
+  bridged-kind ::= 'p' // bridged property (by value)
 
 Declaration Contexts
 ~~~~~~~~~~~~~~~~~~~~
@@ -332,7 +339,7 @@ Types
   any-generic-type ::= context decl-name 'a'     // typealias type (used in DWARF and USRs)
 
   any-generic-type ::= standard-substitutions
-  
+
   standard-substitutions ::= 'S' KNOWN-TYPE-KIND       // known nominal type substitution
   standard-substitutions ::= 'S' NATURAL KNOWN-TYPE-KIND    // repeated known type substitutions of the same kind
 
@@ -417,12 +424,12 @@ Types
   type ::= type 'Xp'                         // existential metatype without representation
   type ::= type 'Xm' METATYPE-REPR           // existential metatype with representation
   type ::= 'Xe'                              // error or unresolved type
- 
+
   bound-generic-type ::= type 'y' (type* '_')* type* retroactive-conformance* 'G'   // one type-list per nesting level of type
   bound-generic-type ::= substitution
 
   FUNCTION-KIND ::= 'f'                      // @thin function type
-  FUNCTION-KIND ::= 'U'                      // uncurried function type (currently not used) 
+  FUNCTION-KIND ::= 'U'                      // uncurried function type (currently not used)
   FUNCTION-KIND ::= 'K'                      // @auto_closure function type (noescape)
   FUNCTION-KIND ::= 'B'                      // objc block function type
   FUNCTION-KIND ::= 'C'                      // C function pointer type
@@ -431,10 +438,10 @@ Types
 
   function-signature ::= params-type params-type throws? // results and parameters
 
-  params-type := type 'z'? 'h'?              // tuple in case of multiple parameters or a single parameter with a single tuple type
+  params-type ::= type 'z'? 'h'?              // tuple in case of multiple parameters or a single parameter with a single tuple type
                                              // with optional inout convention, shared convention. parameters don't have labels,
                                              // they are mangled separately as part of the entity.
-  params-type := empty-list                  // shortcut for no parameters
+  params-type ::= empty-list                  // shortcut for no parameters
 
   throws ::= 'K'                             // 'throws' annotation on function types
 
@@ -474,7 +481,7 @@ Types
   associated-type ::= substitution
   associated-type ::= protocol 'QP'          // self type of protocol
   associated-type ::= archetype identifier 'Qa' // associated type
-  
+
   assoc-type-name ::= identifier                // associated type name without protocol
   assoc-type-name ::= identifier protocol 'P'   //
 
@@ -582,15 +589,15 @@ Property behaviors are implemented using private protocol conformances.
   GENERIC-PARAM-INDEX ::= INDEX              // depth = 0,   idx = N+1
   GENERIC-PARAM-INDEX ::= 'd' INDEX INDEX    // depth = M+1, idx = N
 
-  LAYOUT-CONSTRAINT ::= 'N'  // NativeRefCountedObject 
-  LAYOUT-CONSTRAINT ::= 'R'  // RefCountedObject 
-  LAYOUT-CONSTRAINT ::= 'T'  // Trivial 
+  LAYOUT-CONSTRAINT ::= 'N'  // NativeRefCountedObject
+  LAYOUT-CONSTRAINT ::= 'R'  // RefCountedObject
+  LAYOUT-CONSTRAINT ::= 'T'  // Trivial
   LAYOUT-CONSTRAINT ::= 'C'  // Class
-  LAYOUT-CONSTRAINT ::= 'D'  // NativeClass 
-  LAYOUT-CONSTRAINT ::= 'E' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of exact size 
-  LAYOUT-CONSTRAINT ::= 'e' LAYOUT-SIZE  // Trivial of exact size 
-  LAYOUT-CONSTRAINT ::= 'M' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of size at most N bits 
-  LAYOUT-CONSTRAINT ::= 'm' LAYOUT-SIZE  // Trivial of size at most N bits 
+  LAYOUT-CONSTRAINT ::= 'D'  // NativeClass
+  LAYOUT-CONSTRAINT ::= 'E' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of exact size
+  LAYOUT-CONSTRAINT ::= 'e' LAYOUT-SIZE  // Trivial of exact size
+  LAYOUT-CONSTRAINT ::= 'M' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of size at most N bits
+  LAYOUT-CONSTRAINT ::= 'm' LAYOUT-SIZE  // Trivial of size at most N bits
   LAYOUT-CONSTRAINT ::= 'U'  // Unknown layout
 
   LAYOUT-SIZE ::= INDEX // Size only

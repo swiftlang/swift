@@ -1,6 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/reflect_Double
-// RUN: %target-run %target-swift-reflection-test %t/reflect_Double 2>&1 | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-codesign %t/reflect_Double
+
+// RUN: %target-run %target-swift-reflection-test %t/reflect_Double | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 

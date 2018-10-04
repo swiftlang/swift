@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/Basic/SimpleDisplay.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/TypeID.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
@@ -54,15 +55,9 @@ enum class CacheKind {
 ///
 /// The \c Derived class needs to implement several operations. The most
 /// important one takes an evaluator and the input values, then computes the
-/// final result:
+/// final result, optionally bubbling up errors from recursive evaulations:
 /// \code
-///   Output evaluate(Evaluator &evaluator, Inputs...) const;
-/// \endcode
-///
-/// The \c Derived class will also need to implement an operation to break a
-/// cycle if one is found, i.e.,
-/// \code
-///   OutputType breakCycle() const;
+///   llvm::Expected<Output> evaluate(Evaluator &evaluator, Inputs...) const;
 /// \endcode
 ///
 /// Cycle diagnostics can be handled in one of two ways. Either the \c Derived
@@ -103,8 +98,8 @@ class SimpleRequest {
   }
 
   template<size_t ...Indices>
-  Output callDerived(Evaluator &evaluator,
-                     llvm::index_sequence<Indices...>) const {
+  llvm::Expected<Output>
+  callDerived(Evaluator &evaluator, llvm::index_sequence<Indices...>) const {
     static_assert(sizeof...(Indices) > 0, "Subclass must define evaluate()");
     return asDerived().evaluate(evaluator, std::get<Indices>(storage)...);
   }
@@ -131,8 +126,8 @@ public:
     : storage(inputs...) { }
 
   /// Request evaluation function that will be registered with the evaluator.
-  static OutputType evaluateRequest(const Derived &request,
-                                    Evaluator &evaluator) {
+  static llvm::Expected<OutputType>
+  evaluateRequest(const Derived &request, Evaluator &evaluator) {
     return request.callDerived(evaluator,
                                llvm::index_sequence_for<Inputs...>());
   }
@@ -166,8 +161,12 @@ public:
     out << TypeID<Derived>::getName();
     simple_display(out, request.storage);
   }
-};
 
+  friend FrontendStatsTracer
+  make_tracer(UnifiedStatsReporter *Reporter, const Derived &request) {
+    return make_tracer(Reporter, TypeID<Derived>::getName(), request.storage);
+  }
+};
 }
 
 #endif // SWIFT_BASIC_SIMPLEREQUEST_H

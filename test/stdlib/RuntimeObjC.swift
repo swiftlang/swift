@@ -2,6 +2,7 @@
 //
 // RUN: %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
 // RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control -module-name a -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o %s -o %t.out
+// RUN: %target-codesign %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
@@ -781,8 +782,8 @@ RuntimeClassNamesTestSuite.test("private class nested in same-type-constrained e
   let clas = unsafeBitCast(type(of: util), to: NSObject.self)
   // Name should look like _TtC1aP.*Inner
   let desc = clas.description
-  expectEqual(desc.prefix(7), "_TtC1aP")
-  expectEqual(desc.suffix(5), "Inner")
+  expectEqual("_TtGC1a", desc.prefix(7))
+  expectEqual("Data_", desc.suffix(5))
 }
 
 runAllTests()

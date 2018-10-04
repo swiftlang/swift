@@ -75,45 +75,52 @@ void CleanupManager::popAndEmitCleanup(CleanupHandle handle,
 
 void CleanupManager::emitCleanups(CleanupsDepth depth, CleanupLocation loc,
                                   ForUnwind_t forUnwind, bool popCleanups) {
-  auto begin = stack.stable_begin();
-  while (begin != depth) {
-    auto iter = stack.find(begin);
-
+  auto cur = stack.stable_begin();
+#ifndef NDEBUG
+  auto topOfStack = cur;
+#endif
+  while (cur != depth) {
+    // Copy the cleanup off the stack if it needs to be emitted.
+    // This is necessary both because we might need to pop the cleanup and
+    // because the cleanup might push other cleanups that will invalidate
+    // references onto the stack.
+    auto iter = stack.find(cur);
     Cleanup &stackCleanup = *iter;
+    Optional<CleanupBuffer> copiedCleanup;
+    if (stackCleanup.isActive() && SGF.B.hasValidInsertionPoint()) {
+      copiedCleanup.emplace(stackCleanup);
+    }
 
-    // Copy it off the cleanup stack in case the cleanup pushes a new cleanup
-    // and the backing storage is re-allocated.
-    CleanupBuffer buffer(stackCleanup);
-    Cleanup &cleanup = buffer.getCopy();
+    // Advance the iterator.
+    cur = stack.stabilize(++iter);
 
-    // Advance stable iterator.
-    begin = stack.stabilize(++iter);
-
-    // Pop now.
-    if (popCleanups)
+    // Pop now if that was requested.
+    if (popCleanups) {
       stack.pop();
 
-    if (cleanup.isActive() && SGF.B.hasValidInsertionPoint())
-      cleanup.emit(SGF, loc, forUnwind);
+#ifndef NDEBUG
+      topOfStack = stack.stable_begin();
+#endif
+    }
 
-    stack.checkIterator(begin);
+    // Emit the cleanup.
+    if (copiedCleanup) {
+      copiedCleanup->getCopy().emit(SGF, loc, forUnwind);
+#ifndef NDEBUG
+      if (hasAnyActiveCleanups(stack.stable_begin(), topOfStack)) {
+        copiedCleanup->getCopy().dump(SGF);
+        llvm_unreachable("cleanup left active cleanups on stack");
+      }
+#endif
+    }
+
+    stack.checkIterator(cur);
   }
 }
 
-/// Leave a scope, with all its cleanups.
+/// Leave a scope, emitting all the cleanups that are currently active.
 void CleanupManager::endScope(CleanupsDepth depth, CleanupLocation loc) {
-  stack.checkIterator(depth);
-
-  // FIXME: Thread a branch through the cleanups if there are any active
-  // cleanups and we have a valid insertion point.
-
-  if (!::hasAnyActiveCleanups(stack.begin(), stack.find(depth))) {
-    return;
-  }
-  
-  // Iteratively mark cleanups dead and pop them.
-  // Maybe we'd get better results if we marked them all dead in one shot?
-  emitCleanups(depth, loc, NotForUnwind);
+  emitCleanups(depth, loc, NotForUnwind, /*popCleanups*/ true);
 }
 
 bool CleanupManager::hasAnyActiveCleanups(CleanupsDepth from,
@@ -138,11 +145,12 @@ void CleanupManager::emitBranchAndCleanups(JumpDest dest, SILLocation branchLoc,
   builder.createBranch(branchLoc, dest.getBlock(), args);
 }
 
-void CleanupManager::emitCleanupsForReturn(CleanupLocation loc) {
+void CleanupManager::emitCleanupsForReturn(CleanupLocation loc,
+                                           ForUnwind_t forUnwind) {
   SILGenBuilder &builder = SGF.getBuilder();
   assert(builder.hasValidInsertionPoint() && "Emitting return in invalid spot");
   (void)builder;
-  emitCleanups(stack.stable_end(), loc, NotForUnwind, /*popCleanups=*/false);
+  emitCleanups(stack.stable_end(), loc, forUnwind, /*popCleanups=*/false);
 }
 
 /// Emit a new block that jumps to the specified location and runs necessary

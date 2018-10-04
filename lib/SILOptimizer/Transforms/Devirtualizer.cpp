@@ -69,14 +69,14 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
    }
   }
   for (auto Apply : Applies) {
-    auto NewInstPair = tryDevirtualizeApply(Apply, CHA, &ORE);
-    if (!NewInstPair.second)
+    auto NewInst = tryDevirtualizeApply(Apply, CHA, &ORE);
+    if (!NewInst)
       continue;
 
     Changed = true;
 
-    replaceDeadApply(Apply, NewInstPair.first);
-    NewApplies.push_back(NewInstPair.second);
+    deleteDevirtualizedApply(Apply);
+    NewApplies.push_back(NewInst);
   }
 
   // For each new apply, attempt to link in function bodies if we do
@@ -103,7 +103,7 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
     // be beneficial to rerun some earlier passes on the current
     // function now that we've made these direct references visible.
     if (CalleeFn->isDefinition() && CalleeFn->shouldOptimize())
-      notifyAddFunction(CalleeFn, nullptr);
+      addFunctionToPassManagerWorklist(CalleeFn, nullptr);
   }
 
   return Changed;

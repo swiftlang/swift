@@ -515,7 +515,8 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     llvm::Value *index = getArg(argv, "index");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
-    type.storeExtraInhabitant(IGF, index, dest, concreteType);
+    type.storeExtraInhabitant(IGF, index, dest, concreteType,
+                              /*outlined*/ true);
     IGF.Builder.CreateRetVoid();
     return;
   }
@@ -524,7 +525,8 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     Address src = getArgAs(IGF, argv, type, "src");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
-    llvm::Value *idx = type.getExtraInhabitantIndex(IGF, src, concreteType);
+    llvm::Value *idx = type.getExtraInhabitantIndex(IGF, src, concreteType,
+                                                    /*outlined*/ true);
     IGF.Builder.CreateRet(idx);
     return;
   }
@@ -983,18 +985,28 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type) {
   
   if (auto nom = type->getAnyNominal()) {
     // TODO: Generic metadata patterns relative-reference their VWT, which won't
-    // work if it's in a different module without supporting indirection through
-    // the GOT.
+    // work if the VWT is in a different module without supporting indirection
+    // through the GOT.
     if (nom->isGenericContext())
       return nullptr;
-    // TODO: Enums need additional value witnesses for their tag manipulation.
-    if (isa<EnumDecl>(nom))
-      return nullptr;
+    // TODO: Non-C enums have extra inhabitants and also need additional value
+    // witnesses for their tag manipulation (except when they're empty, in
+    // which case values never exist to witness).
+    if (auto enumDecl = dyn_cast<EnumDecl>(nom))
+      if (!enumDecl->isObjC() && !type->isUninhabited())
+        return nullptr;
   }
-  
+ 
+  auto &C = IGM.Context;
+
   type = getFormalTypeInContext(type);
   
   auto &ti = IGM.getTypeInfoForUnlowered(AbstractionPattern::getOpaque(), type);
+
+  // Empty types can use empty tuple witnesses.
+  if (ti.isKnownEmpty(ResilienceExpansion::Maximal))
+    return IGM.getAddrOfValueWitnessTable(TupleType::getEmpty(C));
+
   // We only have witnesses for fixed type info.
   auto *fixedTI = dyn_cast<FixedTypeInfo>(&ti);
   if (!fixedTI)
@@ -1003,7 +1015,6 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type) {
   CanType witnessSurrogate;
 
   // Handle common POD type layouts.
-  auto &C = type->getASTContext();
   ReferenceCounting refCounting;
   if (fixedTI->isPOD(ResilienceExpansion::Maximal)
       && fixedTI->getFixedExtraInhabitantCount(IGM) == 0) {

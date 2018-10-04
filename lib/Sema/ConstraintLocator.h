@@ -59,14 +59,10 @@ public:
     ApplyFunction,
     /// Matching an argument to a parameter.
     ApplyArgToParam,
-    /// \brief An archetype being opened.
+    /// \brief A generic parameter being opened.
     ///
-    /// Also contains the archetype itself.
-    Archetype,
-    /// An associated type reference.
-    ///
-    /// Contains the associated type itself.
-    AssociatedType,
+    /// Also contains the generic parameter type itself.
+    GenericParameter,
     /// \brief The argument type of a function.
     FunctionArgument,
     /// \brief The result type of a function.
@@ -89,10 +85,6 @@ public:
     MemberRefBase,
     /// \brief The lookup for a subscript member.
     SubscriptMember,
-    /// \brief The index of a subscript expression.
-    SubscriptIndex,
-    /// \brief The result of a subscript expression.
-    SubscriptResult,
     /// \brief The lookup for a constructor member.
     ConstructorMember,
     /// \brief An implicit @lvalue-to-inout conversion; only valid for operator
@@ -110,8 +102,6 @@ public:
     SequenceIteratorProtocol,
     /// \brief The element type of a generator.
     GeneratorElementType,
-    /// \brief The scalar type of a tuple type.
-    ScalarToTuple,
     /// \brief An argument passed in an autoclosure parameter
     /// position, which must match the autoclosure return type.
     AutoclosureResult,
@@ -143,17 +133,14 @@ public:
     switch (kind) {
     case ApplyArgument:
     case ApplyFunction:
-    case Archetype:
-    case AssociatedType:
+    case GenericParameter:
     case FunctionArgument:
     case FunctionResult:
     case OptionalPayload:
     case Member:
     case MemberRefBase:
     case UnresolvedMember:
-    case SubscriptIndex:
     case SubscriptMember:
-    case SubscriptResult:
     case ConstructorMember:
     case LValueConversion:
     case RValueAdjustment:
@@ -162,7 +149,6 @@ public:
     case InstanceType:
     case SequenceIteratorProtocol:
     case GeneratorElementType:
-    case ScalarToTuple:
     case AutoclosureResult:
     case Requirement:
     case Witness:
@@ -177,9 +163,9 @@ public:
     case TupleElement:
     case KeyPathComponent:
     case ConditionalRequirement:
-    case TypeParameterRequirement:
       return 1;
 
+    case TypeParameterRequirement:
     case ApplyArgToParam:
       return 2;
     }
@@ -217,13 +203,9 @@ public:
     case ParentType:
     case LValueConversion:
     case RValueAdjustment:
-    case ScalarToTuple:
-    case SubscriptIndex:
     case SubscriptMember:
-    case SubscriptResult:
     case OpenedGeneric:
-    case Archetype:
-    case AssociatedType:
+    case GenericParameter:
     case GenericArgument:
     case NamedTupleElement:
     case TupleElement:
@@ -251,7 +233,7 @@ public:
   class PathElement {
     /// \brief Describes the kind of data stored here.
     enum StoredKind : unsigned char {
-      StoredArchetype,
+      StoredGenericParameter,
       StoredRequirement,
       StoredWitness,
       StoredKindAndValue
@@ -309,13 +291,13 @@ public:
              "Path element requires value");
     }
 
-    PathElement(ArchetypeType *archetype)
-      : storage((reinterpret_cast<uintptr_t>(archetype) >> 2)),
-        storedKind(StoredArchetype)
+    PathElement(GenericTypeParamType *type)
+      : storage((reinterpret_cast<uintptr_t>(type) >> 2)),
+        storedKind(StoredGenericParameter)
     {
-      static_assert(alignof(ArchetypeType) >= 4,
+      static_assert(alignof(GenericTypeParamType) >= 4,
                     "archetypes insufficiently aligned");
-      assert(getArchetype() == archetype);
+      assert(getGenericParameter() == type);
     }
 
     PathElement(PathElementKind kind, ValueDecl *decl)
@@ -326,13 +308,6 @@ public:
              "Not a witness element");
       assert(((kind == Requirement && getRequirement() == decl) ||
               (kind == Witness && getWitness() == decl)));
-    }
-
-    PathElement(AssociatedTypeDecl *decl)
-      : storage((reinterpret_cast<uintptr_t>(decl) >> 2)),
-        storedKind(StoredRequirement)
-    {
-      assert(getAssociatedType() == decl);
     }
 
     /// \brief Retrieve a path element for a tuple element referred to by
@@ -347,7 +322,7 @@ public:
       return PathElement(NamedTupleElement, position);
     }
 
-    /// Retrieve a patch element for an argument/parameter comparison in a
+    /// Retrieve a path element for an argument/parameter comparison in a
     /// function application.
     static PathElement getApplyArgToParam(unsigned argIdx, unsigned paramIdx) {
       return PathElement(ApplyArgToParam, argIdx, paramIdx);
@@ -369,19 +344,20 @@ public:
       return PathElement(ConditionalRequirement, index);
     }
 
-    static PathElement getTypeRequirementComponent(unsigned index) {
-      return PathElement(TypeParameterRequirement, index);
+    static PathElement getTypeRequirementComponent(unsigned index,
+                                                   RequirementKind kind) {
+      return PathElement(TypeParameterRequirement, index,
+                         static_cast<unsigned>(kind));
     }
 
     /// \brief Retrieve the kind of path element.
     PathElementKind getKind() const {
       switch (static_cast<StoredKind>(storedKind)) {
-      case StoredArchetype:
-        return Archetype;
+      case StoredGenericParameter:
+        return GenericParameter;
 
       case StoredRequirement:
-        return isa<AssociatedTypeDecl>(getRequirement()) ? AssociatedType
-                                                         : Requirement;
+        return Requirement;
 
       case StoredWitness:
         return Witness;
@@ -424,10 +400,12 @@ public:
       return reinterpret_cast<ValueDecl *>(storage << 2);
     }
 
-    /// \brief Retrieve the actual archetype for an archetype path element.
-    ArchetypeType *getArchetype() const {
-      assert(getKind() == Archetype && "Not an archetype path element");
-      return reinterpret_cast<ArchetypeType *>(storage << 2);
+    /// \brief Retrieve the actual archetype for a generic parameter path
+    /// element.
+    GenericTypeParamType *getGenericParameter() const {
+      assert(getKind() == GenericParameter &&
+             "Not a generic parameter path element");
+      return reinterpret_cast<GenericTypeParamType *>(storage << 2);
     }
 
     /// Retrieve the declaration for a requirement path element.
@@ -435,12 +413,6 @@ public:
       assert((static_cast<StoredKind>(storedKind) == StoredRequirement) &&
              "Is not a requirement");
       return reinterpret_cast<ValueDecl *>(storage << 2);
-    }
-
-    /// Retrieve the declaration for an associated type path element.
-    AssociatedTypeDecl *getAssociatedType() const {
-      assert(getKind() == AssociatedType && "Is not an associated type");
-      return reinterpret_cast<AssociatedTypeDecl *>(storage << 2);
     }
 
     /// \brief Return the summary flags for this particular element.
@@ -598,6 +570,17 @@ public:
          prev = prev->previous.dyn_cast<ConstraintLocatorBuilder *>()) {
       if (auto locator = prev->previous.dyn_cast<ConstraintLocator *>())
         return locator;
+    }
+
+    return nullptr;
+  }
+
+  /// Get anchor expression associated with this locator builder.
+  Expr *getAnchor() const {
+    for (auto prev = this; prev;
+         prev = prev->previous.dyn_cast<ConstraintLocatorBuilder *>()) {
+      if (auto *locator = prev->previous.dyn_cast<ConstraintLocator *>())
+        return locator->getAnchor();
     }
 
     return nullptr;

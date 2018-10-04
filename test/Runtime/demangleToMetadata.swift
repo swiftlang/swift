@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -parse-stdlib %s -module-name main -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
@@ -366,7 +367,7 @@ DemangleToMetadataTests.test("Nested types in extensions") {
     _typeByMangledName("4main4SG11VA2A2P1RzlE016InnerTConformsToC0VA2A2P3Rd__rlE018InnermostUConformsfG0VyAA08ConformsfC0V_AA0jf5P2AndG0V_AA0jF3P4aVG")!)
 
   // Failure case: Dictionary's outer `Key: Hashable` constraint not sastified
-  // TODO: expectNil(_typeByMangledName("s10DictionaryV4mainE5InnerVyAC12ConformsToP1VSi_AC12ConformsToP1VG"))
+  expectNil(_typeByMangledName("s10DictionaryV4mainE5InnerVyAC12ConformsToP1VSi_AC12ConformsToP1VG"))
   // Failure case: Dictionary's inner `V: P1` constraint not satisfied
   expectNil(_typeByMangledName("s10DictionaryV4mainE5InnerVySSSi_AC12ConformsToP2VG"))
 
@@ -382,8 +383,6 @@ DemangleToMetadataTests.test("Nested types in extensions") {
 //
 // Nested types in same-type-constrained extensions
 //
-
-/* TODO
 
 struct SG12<T: P1, U: P2> {}
 
@@ -418,8 +417,6 @@ DemangleToMetadataTests.test("Nested types in same-type-constrained extensions")
   // T != ConformsToP1 in InnerTEqualsConformsToP1
   // V !: P3 in InnerTEqualsConformsToP1
 }
-
- */
 
 runAllTests()
 

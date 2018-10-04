@@ -330,11 +330,11 @@ ClassMetadataBounds getResilientMetadataBounds(
 int32_t getResilientImmediateMembersOffset(const ClassDescriptor *descriptor);
 
 /// \brief Fetch a uniqued metadata object for a nominal type which requires
-/// in-place metadata initialization.
+/// singleton metadata initialization.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse
-swift_getInPlaceMetadata(MetadataRequest request,
-                         const TypeContextDescriptor *description);
+swift_getSingletonMetadata(MetadataRequest request,
+                           const TypeContextDescriptor *description);
 
 /// \brief Fetch a uniqued metadata object for a generic nominal type.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
@@ -409,6 +409,20 @@ const WitnessTable *
 swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
                              const Metadata *type,
                              void **const *instantiationArgs);
+
+/// Retrieve an associated type witness from the given witness table.
+///
+/// \param wtable The witness table.
+/// \param conformingType Metadata for the conforming type.
+/// \param assocType Associated type descriptor.
+///
+/// \returns metadata for the associated type witness.
+SWIFT_RUNTIME_EXPORT
+MetadataResponse swift_getAssociatedTypeWitness(
+                                          MetadataRequest request,
+                                          WitnessTable *wtable,
+                                          const Metadata *conformingType,
+                                          const ProtocolRequirement *assocType);
 
 /// \brief Fetch a uniqued metadata for a function type.
 SWIFT_RUNTIME_EXPORT
@@ -574,24 +588,79 @@ void swift_initStructMetadata(StructMetadata *self,
                               const TypeLayout * const *fieldTypes,
                               uint32_t *fieldOffsets);
 
-/// Relocate the metadata for a class and copy fields from the given template.
-/// The final size of the metadata is calculated at runtime from the size of
-/// the superclass metadata together with the given number of immediate
-/// members.
+/// Allocate the metadata for a class and copy fields from the given pattern.
+/// The final size of the metadata is calculated at runtime from the metadata
+/// bounds in the class descriptor.
+///
+/// This function is only intended to be called from the relocation function
+/// of a resilient class pattern.
+///
+/// The metadata completion function must complete the metadata by calling
+/// swift_initClassMetadata().
 SWIFT_RUNTIME_EXPORT
 ClassMetadata *
-swift_relocateClassMetadata(ClassMetadata *self,
-                            size_t templateSize,
-                            size_t numImmediateMembers);
+swift_relocateClassMetadata(ClassDescriptor *descriptor,
+                            ResilientClassMetadataPattern *pattern);
 
-/// Initialize the field offset vector for a dependent-layout class, using the
-/// "Universal" layout strategy.
+/// Initialize various fields of the class metadata.
+///
+/// Namely:
+/// - The superclass field is set to \p super.
+/// - If the class metadata was allocated at runtime, copies the
+///   vtable entries from the superclass and installs the class's
+///   own vtable entries and overrides of superclass vtable entries.
+/// - Copies the field offsets and generic parameters and conformances
+///   from the superclass.
+/// - Initializes the field offsets using the runtime type layouts
+///   passed in \p fieldTypes.
+///
+/// This initialization pattern in the following cases:
+/// - The class has generic ancestry, or resiliently-sized fields.
+///   In this case the metadata was emitted statically but is incomplete,
+///   because, the superclass field, generic parameters and conformances,
+///   and field offset vector entries require runtime completion.
+///
+/// - The class is not generic, and has resilient ancestry.
+///   In this case the class metadata was allocated from a resilient
+///   class metadata pattern by swift_relocateClassMetadata().
+///
+/// - The class is generic.
+///   In this case the class metadata was allocated from a generic
+///   class metadata pattern by swift_allocateGenericClassMetadata().
 SWIFT_RUNTIME_EXPORT
 void swift_initClassMetadata(ClassMetadata *self,
+                             ClassMetadata *super,
                              ClassLayoutFlags flags,
                              size_t numFields,
                              const TypeLayout * const *fieldTypes,
                              size_t *fieldOffsets);
+
+#if SWIFT_OBJC_INTEROP
+/// Initialize various fields of the class metadata.
+///
+/// This is a special function only used to re-initialize metadata of
+/// classes that are visible to Objective-C and have resilient fields.
+///
+/// This means the class does not have generic or resilient ancestry,
+/// and is itself not generic. However, it might have fields whose
+/// size is not known at compile time.
+SWIFT_RUNTIME_EXPORT
+void swift_updateClassMetadata(ClassMetadata *self,
+                               ClassMetadata *super,
+                               ClassLayoutFlags flags,
+                               size_t numFields,
+                               const TypeLayout * const *fieldTypes,
+                               size_t *fieldOffsets);
+#endif
+
+/// Given class metadata, a class descriptor and a method descriptor, look up
+/// and load the vtable entry from the given metadata. The metadata must be of
+/// the same class or a subclass of the descriptor.
+SWIFT_RUNTIME_EXPORT
+void *
+swift_lookUpClassMethod(ClassMetadata *metadata,
+                        MethodDescriptor *method,
+                        ClassDescriptor *description);
 
 /// \brief Fetch a uniqued metadata for a metatype type.
 SWIFT_RUNTIME_EXPORT
@@ -740,22 +809,11 @@ SWIFT_RUNTIME_EXPORT
 void swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
                                        const TypeMetadataRecord *end);
 
-/// Register a block of type field records for dynamic lookup.
-SWIFT_RUNTIME_EXPORT
-void swift_registerFieldDescriptors(const reflection::FieldDescriptor **records,
-                                    size_t size);
-
 /// Return the superclass, if any.  The result is nullptr for root
 /// classes and class protocol types.
 SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_API
 const Metadata *_swift_class_getSuperclass(const Metadata *theClass);
-
-SWIFT_CC(swift)
-SWIFT_RUNTIME_STDLIB_API
-void swift_getFieldAt(
-  const Metadata *base, unsigned index, 
-  void (*callback)(const char *name, const Metadata *type, void *ctx), void *callbackCtx);
 
 #if !NDEBUG
 /// Verify that the given metadata pointer correctly roundtrips its
@@ -765,6 +823,10 @@ void verifyMangledNameRoundtrip(const Metadata *metadata);
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 const TypeContextDescriptor *swift_getTypeContextDescriptor(const Metadata *type);
+
+// Defined in KeyPath.swift in the standard library.
+SWIFT_RUNTIME_EXPORT
+const HeapObject *swift_getKeyPath(const void *pattern, const void *arguments);
 
 } // end namespace swift
 

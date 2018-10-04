@@ -58,6 +58,11 @@
 using namespace swift;
 using namespace irgen;
 
+llvm::cl::opt<bool> VerifyLineTable(
+    "verify-linetable", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Verify that the debug locations within one scope are contiguous."));
+
 namespace {
 using TrackingDIRefMap =
     llvm::DenseMap<const llvm::MDString *, llvm::TrackingMDNodeRef>;
@@ -105,6 +110,20 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   SmallVector<std::pair<SILLocation::DebugLoc, const SILDebugScope *>, 8>
       LocationStack;
 
+#ifndef NDEBUG
+  using UUSTuple = std::pair<std::pair<unsigned, unsigned>, StringRef>;
+  struct DebugLocKey : public UUSTuple {
+    DebugLocKey(SILLocation::DebugLoc DL)
+        : UUSTuple({{DL.Line, DL.Column}, DL.Filename}) {}
+    inline bool operator==(const SILLocation::DebugLoc &DL) const {
+      return first.first == DL.Line && first.second == DL.Column &&
+             second.equals(DL.Filename);
+    }
+  };
+  llvm::DenseSet<UUSTuple> PreviousLineEntries;
+  SILLocation::DebugLoc PreviousDebugLoc;
+#endif
+  
 public:
   IRGenDebugInfoImpl(const IRGenOptions &Opts, ClangImporter &CI,
                      IRGenModule &IGM, llvm::Module &M,
@@ -307,11 +326,15 @@ private:
     }
     return true;
   }
+
+  /// Assert that within one lexical block, each location is only visited once.
+  bool lineEntryIsSane(SILLocation::DebugLoc DL, const SILDebugScope *DS);
+
 #endif
 
   llvm::DIFile *getOrCreateFile(StringRef Filename) {
     if (Filename.empty())
-      return MainFile;
+      Filename = SILLocation::getCompilerGeneratedDebugLoc().Filename;
 
     // Look in the cache first.
     auto CachedFile = DIFileCache.find(Filename);
@@ -364,9 +387,6 @@ private:
           break;
         case AccessorKind::DidSet:
           Kind = ".didset";
-          break;
-        case AccessorKind::MaterializeForSet:
-          Kind = ".materialize";
           break;
         case AccessorKind::Address:
           Kind = ".addressor";
@@ -897,7 +917,7 @@ private:
     // throw it away before lowering.
     else if (isa<GenericFunctionType>(BaseTy)) {
       auto *fTy = cast<AnyFunctionType>(BaseTy);
-      auto *nongenericTy = FunctionType::get(fTy->getInput(), fTy->getResult(),
+      auto *nongenericTy = FunctionType::get(fTy->getParams(), fTy->getResult(),
                                              fTy->getExtInfo());
 
       FunTy = IGM.getLoweredType(nongenericTy).castTo<SILFunctionType>();
@@ -1420,7 +1440,7 @@ private:
     llvm::DIScope *Scope = nullptr;
     DeclContext *Context = DbgTy.getType()->getNominalOrBoundGenericNominal();
     if (Context) {
-      if (auto *D = Context->getAsNominalTypeOrNominalTypeExtensionContext())
+      if (auto *D = Context->getSelfNominalTypeDecl())
         if (auto *ClangDecl = D->getClangDecl()) {
           clang::ASTReader &Reader = *CI.getClangInstance().getModuleManager();
           auto Idx = ClangDecl->getOwningModuleID();
@@ -1567,6 +1587,25 @@ void IRGenDebugInfoImpl::finalize() {
   DBuilder.finalize();
 }
 
+#ifndef NDEBUG
+bool IRGenDebugInfoImpl::lineEntryIsSane(SILLocation::DebugLoc DL,
+                                         const SILDebugScope *DS) {
+  // All bets are off for optimized code.
+  if (!VerifyLineTable || Opts.shouldOptimize())
+    return true;
+  // We entered a new lexical block.
+  if (DS != LastScope)
+    PreviousLineEntries.clear();
+  if (DL.Line == 0 || DL == PreviousDebugLoc)
+    return true;
+  // Save the last non-zero line entry.
+  PreviousDebugLoc = DL;
+  auto ItNew = PreviousLineEntries.insert(DebugLocKey(DL));
+  // Return true iff DL was not yet in PreviousLineEntries.
+  return ItNew.second;
+}
+#endif
+
 void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
                                        const SILDebugScope *DS,
                                        SILLocation Loc) {
@@ -1615,9 +1654,8 @@ void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
   }
 
   // FIXME: Enable this assertion.
-  // assert(lineNumberIsSane(Builder, L.Line) &&
-  //       "-Onone, but line numbers are not monotonically increasing within
-  //       bb");
+  assert(lineEntryIsSane(L, DS) &&
+         "non-contiguous debug location in same scope at -Onone");
   LastDebugLoc = L;
   LastScope = DS;
 
@@ -2003,9 +2041,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
     return;
 
   // A dbg.declare is only meaningful if there is a single alloca for
-  // the variable that is live throughout the function. With SIL
-  // optimizations this is not guaranteed and a variable can end up in
-  // two allocas (for example, one function inlined twice).
+  // the variable that is live throughout the function.
   if (auto *Alloca = dyn_cast<llvm::AllocaInst>(Storage)) {
     auto *ParentBB = Alloca->getParent();
     auto InsertBefore = std::next(Alloca->getIterator());
@@ -2013,11 +2049,17 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
       DBuilder.insertDeclare(Alloca, Var, Expr, DL, &*InsertBefore);
     else
       DBuilder.insertDeclare(Alloca, Var, Expr, DL, ParentBB);
-    return;
+  } else if (isa<llvm::IntrinsicInst>(Storage) &&
+             cast<llvm::IntrinsicInst>(Storage)->getIntrinsicID() ==
+                 llvm::Intrinsic::coro_alloca_get) {
+    // FIXME: The live range of a coroutine alloca within the function may be
+    // limited, so using a dbg.addr instead of a dbg.declare would be more
+    // appropriate.
+    DBuilder.insertDeclare(Storage, Var, Expr, DL, BB);
+  } else {
+    // Insert a dbg.value at the current insertion point.
+    DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, BB);
   }
-
-  // Insert a dbg.value at the current insertion point.
-  DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, BB);
 }
 
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
@@ -2087,11 +2129,11 @@ SILLocation::DebugLoc IRGenDebugInfoImpl::decodeSourceLoc(SourceLoc SL) {
 
 } // anonymous namespace
 
-IRGenDebugInfo *IRGenDebugInfo::createIRGenDebugInfo(
+std::unique_ptr<IRGenDebugInfo> IRGenDebugInfo::createIRGenDebugInfo(
     const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
     llvm::Module &M, StringRef MainOutputFilenameForDebugInfo) {
-  return new IRGenDebugInfoImpl(Opts, CI, IGM, M,
-                                MainOutputFilenameForDebugInfo);
+  return llvm::make_unique<IRGenDebugInfoImpl>(Opts, CI, IGM, M,
+                                               MainOutputFilenameForDebugInfo);
 }
 
 

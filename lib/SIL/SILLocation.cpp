@@ -20,6 +20,9 @@
 
 using namespace swift;
 
+// 64-bit is 24 bytes, 32-bit is 20 bytes.
+static_assert(sizeof(SILLocation) == sizeof(void *) + 4*sizeof(unsigned),
+              "SILLocation must stay small");
 
 SourceLoc SILLocation::getSourceLoc() const {
   if (isSILFile())

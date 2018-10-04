@@ -148,7 +148,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
       // from ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
       if (isConditional) {
         SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-        CastSuccessBB->createPHIArgument(SILBridgedTy,
+        CastSuccessBB->createPhiArgument(SILBridgedTy,
                                          ValueOwnershipKind::Owned);
         Builder.createBranch(Loc, CastSuccessBB, SILValue(Load));
         Builder.setInsertionPoint(CastSuccessBB);
@@ -158,7 +158,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
       }
     } else if (isConditional) {
       SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-      CastSuccessBB->createPHIArgument(SILBridgedTy, ValueOwnershipKind::Owned);
+      CastSuccessBB->createPhiArgument(SILBridgedTy, ValueOwnershipKind::Owned);
       auto *CCBI = Builder.createCheckedCastBranch(Loc, false, Load,
                                       SILBridgedTy, CastSuccessBB, ConvFailBB);
       NewI = CCBI;
@@ -353,8 +353,8 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
   Members = NTD->lookupDirect(M.getASTContext().Id_bridgeToObjectiveC);
   if (Members.empty()) {
     if (NTD->getDeclContext()->lookupQualified(
-            NTD->getDeclaredType(), M.getASTContext().Id_bridgeToObjectiveC,
-            NLOptions::NL_ProtocolMembers, nullptr, FoundMembers)) {
+            NTD, M.getASTContext().Id_bridgeToObjectiveC,
+            NLOptions::NL_ProtocolMembers, FoundMembers)) {
       Members = FoundMembers;
       // Returned members are starting with the most specialized ones.
       // Thus, the first element is what we are looking for.
@@ -563,8 +563,8 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
       if (isConditional) {
         // In case of a conditional cast, we should handle it gracefully.
         auto CondBrSuccessBB =
-            NewAI->getFunction()->createBasicBlock(NewAI->getParent());
-        CondBrSuccessBB->createPHIArgument(DestTy, ValueOwnershipKind::Owned,
+            NewAI->getFunction()->createBasicBlockAfter(NewAI->getParent());
+        CondBrSuccessBB->createPhiArgument(DestTy, ValueOwnershipKind::Owned,
                                            nullptr);
         Builder.createCheckedCastBranch(Loc, /* isExact*/ false, NewAI, DestTy,
                                         CondBrSuccessBB, FailureBB);
@@ -1057,7 +1057,7 @@ SILInstruction *CastOptimizer::optimizeCheckedCastAddrBranchInst(
               Loc, false /*isExact*/, MI, Dest->getType().getObjectType(),
               SuccessBB, FailureBB, Inst->getTrueBBCount(),
               Inst->getFalseBBCount());
-          SuccessBB->createPHIArgument(Dest->getType().getObjectType(),
+          SuccessBB->createPhiArgument(Dest->getType().getObjectType(),
                                        ValueOwnershipKind::Owned);
           B.setInsertionPoint(SuccessBB->begin());
           // Store the result

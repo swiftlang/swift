@@ -158,7 +158,7 @@ namespace {
     //   F,F -> No
     //   F,T -> Yes
     //   T,F -> Partial
-    llvm::SmallBitVector Data;
+    SmallBitVector Data;
   public:
     AvailabilitySet(unsigned NumElts) {
       Data.resize(NumElts*2, true);
@@ -480,6 +480,7 @@ namespace {
 
     void handleStoreUse(unsigned UseID);
     void handleLoadUse(unsigned UseID);
+    void handleLoadForTypeOfSelfUse(const DIMemoryUse &Use);
     void handleInOutUse(const DIMemoryUse &Use);
     void handleEscapeUse(const DIMemoryUse &Use);
 
@@ -542,8 +543,21 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     // Keep track of all the uses that aren't loads or escapes.  These are
     // important uses that we'll visit, but we don't consider them definition
     // points for liveness computation purposes.
-    if (Use.Kind == DIUseKind::Load || Use.Kind == DIUseKind::Escape)
+    switch (Use.Kind) {
+    case DIUseKind::Load:
+    case DIUseKind::LoadForTypeOfSelf:
+    case DIUseKind::Escape:
       continue;
+    case DIUseKind::Assign:
+    case DIUseKind::IndirectIn:
+    case DIUseKind::InitOrAssign:
+    case DIUseKind::InOutArgument:
+    case DIUseKind::Initialization:
+    case DIUseKind::InOutSelfArgument:
+    case DIUseKind::PartialStore:
+    case DIUseKind::SelfInit:
+      break;
+    }
 
     NonLoadUses[Use.Inst] = ui;
 
@@ -780,7 +794,8 @@ void LifetimeChecker::doIt() {
     case DIUseKind::Load:
       handleLoadUse(i);
       break;
-    case DIUseKind::InOutUse:
+    case DIUseKind::InOutArgument:
+    case DIUseKind::InOutSelfArgument:
       handleInOutUse(Use);
       break;
     case DIUseKind::Escape:
@@ -789,6 +804,8 @@ void LifetimeChecker::doIt() {
     case DIUseKind::SelfInit:
       handleSelfInitUse(Use);
       break;
+    case DIUseKind::LoadForTypeOfSelf:
+      handleLoadForTypeOfSelfUse(Use);
     }
   }
 
@@ -818,53 +835,31 @@ void LifetimeChecker::doIt() {
 
 void LifetimeChecker::handleLoadUse(unsigned UseID) {
   DIMemoryUse &Use = Uses[UseID];
-  SILInstruction *LoadInst = Use.Inst;
 
   bool IsSuperInitComplete, FailedSelfUse;
   // If the value is not definitively initialized, emit an error.
   if (!isInitializedAtUse(Use, &IsSuperInitComplete, &FailedSelfUse))
     return handleLoadUseFailure(Use, IsSuperInitComplete, FailedSelfUse);
+}
 
-  // If this is an OpenExistentialAddrInst in preparation for applying
-  // a witness method, analyze its use to make sure, that no mutation of
-  // lvalue let constants occurs.
-  auto *OEAI = dyn_cast<OpenExistentialAddrInst>(LoadInst);
-  if (OEAI != nullptr && TheMemory.isElementLetProperty(Use.FirstElement)) {
-    for (auto OEAUse : OEAI->getUses()) {
-      auto *AI = dyn_cast<ApplyInst>(OEAUse->getUser());
-
-      if (AI == nullptr)
-        // User is not an ApplyInst
-        continue;
-
-      unsigned OperandNumber = OEAUse->getOperandNumber();
-      auto OptArgumentNumber =
-        AI->getArgumentIndexForOperandIndex(OperandNumber);
-      if (!OptArgumentNumber)
-        // Not used as a call argument
-        continue;
-
-      unsigned ArgumentNumber = *OptArgumentNumber;
-
-      CanSILFunctionType calleeType = AI->getSubstCalleeType();
-      SILParameterInfo parameterInfo = calleeType->getParameters()[ArgumentNumber];
-
-      if (!parameterInfo.isIndirectMutating() ||
-          parameterInfo.getType().isAnyClassReferenceType())
-        continue;
-
-      if (!shouldEmitError(LoadInst))
-        continue;
-
-      std::string PropertyName;
-      auto *VD = TheMemory.getPathStringToElement(Use.FirstElement, PropertyName);
-      diagnose(Module, LoadInst->getLoc(),
-               diag::mutating_protocol_witness_method_on_let_constant, PropertyName);
-
-      if (auto *Var = dyn_cast<VarDecl>(VD)) {
-        Var->emitLetToVarNoteIfSimple(nullptr);
-      }
+void LifetimeChecker::handleLoadForTypeOfSelfUse(const DIMemoryUse &Use) {
+  bool IsSuperInitComplete, FailedSelfUse;
+  // If the value is not definitively initialized, replace the
+  // value_metatype instruction with the metatype argument that was passed into
+  // the initializer.
+  if (!isInitializedAtUse(Use, &IsSuperInitComplete, &FailedSelfUse)) {
+    auto load = cast<SingleValueInstruction>(Use.Inst);
+    
+    ValueMetatypeInst *valueMetatype = nullptr;
+    for (auto use : load->getUses()) {
+      valueMetatype = dyn_cast<ValueMetatypeInst>(use->getUser());
+      if (valueMetatype)
+        break;
     }
+    assert(valueMetatype);
+    auto metatypeArgument = load->getFunction()->getSelfMetadataArgument();
+    replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument,
+                                     [](SILInstruction*) { });
   }
 }
 
@@ -1051,6 +1046,38 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
   updateInstructionForInitState(Use);
 }
 
+/// Check whether the instruction is an application.
+///
+/// Looks through certain projections to find the application.
+/// If this is done, updates isSelfParameter as appropriate; otherwise,
+/// assumes it was properly set by the caller based on which operand
+/// was accessed.
+static FullApplySite findApply(SILInstruction *I, bool &isSelfParameter) {
+  if (auto apply = FullApplySite::isa(I))
+    return apply;
+
+  // If this is an OpenExistentialAddrInst in preparation for applying
+  // a witness method, analyze its use to make sure, that no mutation of
+  // lvalue let constants occurs.
+  if (auto *open = dyn_cast<OpenExistentialAddrInst>(I)) {
+    for (auto use : open->getUses()) {
+      // Stop at the first use in an apply we find.  We assume that we
+      // won't find multiple interesting calls.
+      if (auto apply = FullApplySite::isa(use->getUser())) {
+        // The 'open' could also be a type dependency of the apply, so
+        // instead of checking whether 'use' is exactly the self argument,
+        // just check whether the self argument is the opened value.
+        isSelfParameter =
+          apply.hasSelfArgument() &&
+          apply.getSelfArgument() == open;
+        return apply;
+      }
+    }
+  }
+
+  return FullApplySite();
+}
+
 void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
   bool IsSuperInitDone, FailedSelfUse;
 
@@ -1080,15 +1107,16 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
       continue;
 
     std::string PropertyName;
-    (void)TheMemory.getPathStringToElement(i, PropertyName);
+    auto VD = TheMemory.getPathStringToElement(i, PropertyName);
     
     // Try to produce a specific error message about the inout use.  If this is
     // a call to a method or a mutating property access, indicate that.
     // Otherwise, we produce a generic error.
     FuncDecl *FD = nullptr;
     bool isAssignment = false;
+    bool isSelfParameter = (Use.Kind == DIUseKind::InOutSelfArgument);
 
-    auto Apply = FullApplySite::isa(Use.Inst);
+    auto Apply = findApply(Use.Inst, isSelfParameter);
     if (Apply) {
       // If this is a method application, produce a nice, specific, error.
       if (auto *WMI = dyn_cast<MethodInst>(Apply.getCallee()))
@@ -1101,7 +1129,7 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
           FD = SILLoc.getAsASTNode<FuncDecl>();
         }
       }
-      
+
       // If we failed to find the decl a clean and principled way, try hacks:
       // map back to the AST and look for some common patterns.
       if (!FD) {
@@ -1122,29 +1150,48 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
     // If we were able to find a method or function call, emit a diagnostic
     // about the method.  The magic numbers used by the diagnostic are:
     // 0 -> method, 1 -> property, 2 -> subscript, 3 -> operator.
-    unsigned Case = ~0;
-    DeclBaseName MethodName;
-    if (auto accessor = dyn_cast_or_null<AccessorDecl>(FD)) {
-      MethodName = accessor->getStorage()->getBaseName();
-      Case = isa<SubscriptDecl>(accessor->getStorage()) ? 2 : 1;
+    auto accessor = dyn_cast_or_null<AccessorDecl>(FD);
+    if (accessor && isSelfParameter) {
+      bool isMutator = [&] {
+        switch (accessor->getAccessorKind()) {
+        case AccessorKind::Get:
+        case AccessorKind::Read:
+        case AccessorKind::Address:
+          return false;
+        case AccessorKind::Set:
+        case AccessorKind::Modify:
+        case AccessorKind::MutableAddress:
+        case AccessorKind::DidSet:
+        case AccessorKind::WillSet:
+          return true;
+        }
+        llvm_unreachable("bad kind");
+      }();
+      diagnose(Module, Use.Inst->getLoc(),
+               isMutator
+                 ? diag::mutation_of_property_of_immutable_value
+                 : diag::using_mutating_accessor_on_immutable_value,
+               accessor->getStorage()->getBaseName(),
+               isa<SubscriptDecl>(accessor->getStorage()),
+               PropertyName);
     } else if (FD && FD->isOperator()) {
-      MethodName = FD->getName();
-      Case = 3;
-    } else if (FD && FD->isInstanceMember()) {
-      MethodName = FD->getName();
-      Case = 0;
-    }
-    
-    if (Case != ~0U) {
       diagnose(Module, Use.Inst->getLoc(),
                diag::mutating_method_called_on_immutable_value,
-               MethodName, Case, PropertyName);
+               FD->getName(), /*operator*/ 1, PropertyName);
+    } else if (FD && isSelfParameter) {
+      diagnose(Module, Use.Inst->getLoc(),
+               diag::mutating_method_called_on_immutable_value,
+               FD->getName(), /*method*/ 0, PropertyName);
     } else if (isAssignment) {
       diagnose(Module, Use.Inst->getLoc(),
                diag::assignment_to_immutable_value, PropertyName);
     } else {
       diagnose(Module, Use.Inst->getLoc(),
                diag::immutable_value_passed_inout, PropertyName);
+    }
+
+    if (auto *Var = dyn_cast<VarDecl>(VD)) {
+      Var->emitLetToVarNoteIfSimple(nullptr);
     }
     return;
   }
@@ -1470,8 +1517,9 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     // the generic error that we would emit before.
     //
     // That is the only case where we support pattern matching a release.
-    if (Release && AI &&
-        !AI->getSubstCalleeType()->getExtInfo().hasGuaranteedSelfParam())
+    if (Release && AI /*
+        && (!AI->getSubstCalleeType()->hasSelfParam()
+            || !AI->getSubstCalleeType()->getSelfParameter().isGuaranteed())*/)
       MI = nullptr;
 
     if (AI && MI) {
@@ -1920,12 +1968,13 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
     auto SILMetatypeTy = SILType::getPrimitiveObjectType(MetatypeTy);
     SILValue Metatype;
 
-    // In an inherited convenience initializer, we must use the dynamic
-    // type of the object since nothing is initialized yet.
-    if (TheMemory.isDelegatingInit())
-      Metatype = B.createValueMetatype(Loc, SILMetatypeTy, Pointer);
-    else
-      Metatype = B.createMetatype(Loc, SILMetatypeTy);
+    // A convenience initializer should never deal in partially allocated
+    // objects.
+    assert(!TheMemory.isDelegatingInit());
+
+    // In a designated initializer, we know the class of the thing
+    // we're cleaning up statically.
+    Metatype = B.createMetatype(Loc, SILMetatypeTy);
 
     // We've already destroyed any instance variables initialized by this
     // constructor, now destroy instance variables initialized by subclass
@@ -2663,7 +2712,7 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
 
   // Check locally to see if any elements are satisfied within the block, and
   // keep track of which ones are still needed in the NeededElements set.
-  llvm::SmallBitVector NeededElements(TheMemory.NumElements);
+  SmallBitVector NeededElements(TheMemory.NumElements);
   NeededElements.set(FirstElt, FirstElt+NumElts);
   
   // If there is a store in the current block, scan the block to see if the

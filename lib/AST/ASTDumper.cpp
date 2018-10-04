@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -256,8 +256,6 @@ StringRef swift::getReadWriteImplKindName(ReadWriteImplKind kind) {
     return "immutable";
   case ReadWriteImplKind::Stored:
     return "stored";
-  case ReadWriteImplKind::MaterializeForSet:
-    return "materialize_for_set";
   case ReadWriteImplKind::MutableAddress:
     return "mutable_addressor";
   case ReadWriteImplKind::MaterializeToTemporary:
@@ -282,17 +280,7 @@ static StringRef getImportKindString(ImportKind value) {
   
   llvm_unreachable("Unhandled ImportKind in switch.");
 }
-static StringRef getAccessLevelString(AccessLevel value) {
-  switch (value) {
-  case AccessLevel::Private: return "private";
-  case AccessLevel::FilePrivate: return "fileprivate";
-  case AccessLevel::Internal: return "internal";
-  case AccessLevel::Public: return "public";
-  case AccessLevel::Open: return "open";
-  }
 
-  llvm_unreachable("Unhandled AccessLevel in switch.");
-}
 static StringRef
 getForeignErrorConventionKindString(ForeignErrorConvention::Kind value) {
   switch (value) {
@@ -380,10 +368,6 @@ getStringLiteralExprEncodingString(StringLiteralExpr::Encoding value) {
   switch (value) {
     case StringLiteralExpr::UTF8: return "utf8";
     case StringLiteralExpr::UTF16: return "utf16";
-    case StringLiteralExpr::UTF8ConstString:
-      return "utf8_const_string";
-    case StringLiteralExpr::UTF16ConstString:
-      return "utf16_const_string";
     case StringLiteralExpr::OneUnicodeScalar: return "unicodeScalar";
   }
 
@@ -763,12 +747,21 @@ namespace {
 
       if (VD->hasAccess()) {
         PrintWithColorRAII(OS, AccessLevelColor) << " access="
-          << getAccessLevelString(VD->getFormalAccess());
+          << getAccessLevelSpelling(VD->getFormalAccess());
       }
 
-      if (auto Overridden = VD->getOverriddenDecl()) {
-        PrintWithColorRAII(OS, OverrideColor) << " override=";
-        Overridden->dumpRef(PrintWithColorRAII(OS, OverrideColor).getOS());
+      if (VD->overriddenDeclsComputed()) {
+        auto overridden = VD->getOverriddenDecls();
+        if (!overridden.empty()) {
+          PrintWithColorRAII(OS, OverrideColor) << " override=";
+          interleave(overridden,
+                     [&](ValueDecl *overridden) {
+                       overridden->dumpRef(
+                                PrintWithColorRAII(OS, OverrideColor).getOS());
+                     }, [&]() {
+                       OS << ", ";
+                     });
+        }
       }
 
       if (VD->isFinal())
@@ -872,8 +865,6 @@ namespace {
 
     void visitEnumElementDecl(EnumElementDecl *EED) {
       printCommon(EED, "enum_element_decl");
-      if (EED->getAttrs().hasAttribute<DowngradeExhaustivityCheckAttr>())
-        OS << "@_downgrade_exhaustivity_check";
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
@@ -1182,8 +1173,14 @@ namespace {
       printCommon(IOD, "infix_operator_decl ");
       OS << IOD->getName() << "\n";
       OS.indent(Indent+2);
-      OS << "precedence " << IOD->getPrecedenceGroupName();
-      if (!IOD->getPrecedenceGroup()) OS << " <null>";
+      if (!IOD->getFirstIdentifier().empty())
+        OS << "first identifier " << IOD->getFirstIdentifier();
+      else
+        OS << "first identifier <null>";
+      if (!IOD->getSecondIdentifier().empty())
+        OS << "second identifier " << IOD->getSecondIdentifier();
+      else
+        OS << "second identifier <null>";
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
@@ -2265,6 +2262,12 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitVarargExpansionExpr(VarargExpansionExpr *E) {
+    printCommon(E, "vararg_expansion_expr") << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitForceTryExpr(ForceTryExpr *E) {
     printCommon(E, "force_try_expr");
     OS << '\n';
@@ -2593,6 +2596,10 @@ public:
         OS << '\n';
         component.getIndexExpr()->print(OS, Indent + 4);
         OS.indent(Indent + 4);
+        break;
+      case KeyPathExpr::Component::Kind::Identity:
+        OS << "identity";
+        OS << '\n';
         break;
       }
       OS << "type=";
@@ -3397,7 +3404,7 @@ namespace {
         if (param.hasLabel())
           printField("name", param.getLabel().str());
         dumpParameterFlags(param.getParameterFlags());
-        printRec(param.getType());
+        printRec(param.getOldType());
         OS << ")";
       }
       Indent -= 2;

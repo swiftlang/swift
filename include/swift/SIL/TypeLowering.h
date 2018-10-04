@@ -473,6 +473,7 @@ public:
     case TypeExpansionKind::MostDerivedDescendents:
       return emitLoweredCopyValueMostDerivedDescendents(B, loc, value);
     }
+    llvm_unreachable("unhandled style");
   }
 
   /// Allocate a new TypeLowering using the TypeConverter's allocator.
@@ -507,20 +508,15 @@ struct SILConstantInfo {
 
   /// The SIL function type of the constant.
   CanSILFunctionType SILFnType;
-  
-  /// The generic environment used by the constant.
-  GenericEnvironment *GenericEnv;
 
   SILConstantInfo(CanAnyFunctionType formalType,
                   AbstractionPattern formalPattern,
                   CanAnyFunctionType loweredType,
-                  CanSILFunctionType silFnTy,
-                  GenericEnvironment *env)
+                  CanSILFunctionType silFnTy)
     : FormalType(formalType),
       FormalPattern(formalPattern),
       LoweredType(loweredType),
-      SILFnType(silFnTy),
-      GenericEnv(env) {}
+      SILFnType(silFnTy) {}
   
   SILType getSILType() const {
     return SILType::getPrimitiveObjectType(SILFnType);
@@ -529,8 +525,7 @@ struct SILConstantInfo {
   friend bool operator==(SILConstantInfo lhs, SILConstantInfo rhs) {
     return lhs.FormalType == rhs.FormalType &&
            lhs.LoweredType == rhs.LoweredType &&
-           lhs.SILFnType == rhs.SILFnType &&
-           lhs.GenericEnv == rhs.GenericEnv;
+           lhs.SILFnType == rhs.SILFnType;
   }
   friend bool operator!=(SILConstantInfo lhs, SILConstantInfo rhs) {
     return !(lhs == rhs);
@@ -669,9 +664,6 @@ class TypeConverter {
 
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
   
-  /// Get the generic environment for a constant.
-  GenericEnvironment *getConstantGenericEnvironment(SILDeclRef constant);
-  
   // Types converted during foreign bridging.
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
   Optional<CanType> BridgedType##Ty;
@@ -773,22 +765,15 @@ public:
     return ti.getLoweredType();
   }
 
-  AbstractionPattern getAbstractionPattern(AbstractStorageDecl *storage);
-  AbstractionPattern getAbstractionPattern(VarDecl *var);
-  AbstractionPattern getAbstractionPattern(SubscriptDecl *subscript);
-  AbstractionPattern getIndicesAbstractionPattern(SubscriptDecl *subscript);
+  AbstractionPattern getAbstractionPattern(AbstractStorageDecl *storage,
+                                           bool isNonObjC = false);
+  AbstractionPattern getAbstractionPattern(VarDecl *var,
+                                           bool isNonObjC = false);
+  AbstractionPattern getAbstractionPattern(SubscriptDecl *subscript,
+                                           bool isNonObjC = false);
   AbstractionPattern getAbstractionPattern(EnumElementDecl *element);
 
   SILType getLoweredTypeOfGlobal(VarDecl *var);
-
-  /// The return type of a materializeForSet contains a callback
-  /// whose type cannot be represented in the AST because it is
-  /// a polymorphic function value. This function returns the
-  /// unsubstituted lowered type of this callback.
-  CanSILFunctionType getMaterializeForSetCallbackType(
-      AbstractStorageDecl *storage, CanGenericSignature genericSig,
-      Type selfType, SILFunctionTypeRepresentation rep,
-      Optional<ProtocolConformanceRef> witnessMethodConformance);
 
   /// Return the SILFunctionType for a native function value of the
   /// given type.
@@ -798,6 +783,9 @@ public:
   /// Returns the formal type, lowered AST type, and SILFunctionType
   /// for a constant reference.
   const SILConstantInfo &getConstantInfo(SILDeclRef constant);
+  
+  /// Get the generic environment for a constant.
+  GenericEnvironment *getConstantGenericEnvironment(SILDeclRef constant);
   
   /// Returns the SIL type of a constant reference.
   SILType getConstantType(SILDeclRef constant) {
@@ -992,9 +980,15 @@ private:
                               bool canBridgeBool,
                               bool bridgedCollectionsAreOptional);
 
-  CanType getBridgedInputType(SILFunctionTypeRepresentation rep,
-                              AbstractionPattern pattern,
-                              CanType input);
+  AnyFunctionType::Param
+  getBridgedParam(SILFunctionTypeRepresentation rep,
+                  AbstractionPattern pattern,
+                  AnyFunctionType::Param param);
+
+  void getBridgedParams(SILFunctionTypeRepresentation rep,
+                        AbstractionPattern pattern,
+                        ArrayRef<AnyFunctionType::Param> params,
+                        SmallVectorImpl<AnyFunctionType::Param> &bridged);
 
   CanType getBridgedResultType(SILFunctionTypeRepresentation rep,
                                AbstractionPattern pattern,

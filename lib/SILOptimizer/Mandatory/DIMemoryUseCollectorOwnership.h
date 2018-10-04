@@ -116,8 +116,12 @@ public:
     return false;
   }
 
-  /// True if the memory object is the 'self' argument of a class initializer.
+  /// True if the memory object is the 'self' argument of a class designated
+  /// initializer.
   bool isClassInitSelf() const {
+    if (isDelegatingInit())
+      return false;
+      
     if (!MemoryInst->isVar()) {
       if (auto decl = getType()->getAnyNominal()) {
         if (isa<ClassDecl>(decl)) {
@@ -211,8 +215,11 @@ enum DIUseKind {
   /// The instruction is a store to a member of a larger struct value.
   PartialStore,
 
-  /// An indirect 'inout' parameter of an Apply instruction.
-  InOutUse,
+  /// An 'inout' argument of a function application.
+  InOutArgument,
+
+  /// An 'inout' self argument of a function application.
+  InOutSelfArgument,
 
   /// An indirect 'in' parameter of an Apply instruction.
   IndirectIn,
@@ -223,7 +230,11 @@ enum DIUseKind {
 
   /// This instruction is a call to 'self.init' in a delegating initializer,
   /// or a call to 'super.init' in a designated initializer of a derived class..
-  SelfInit
+  SelfInit,
+  
+  /// This instruction is a load that's only used to answer a `type(of: self)`
+  /// question.
+  LoadForTypeOfSelf,
 };
 
 /// This struct represents a single classified access to the memory object

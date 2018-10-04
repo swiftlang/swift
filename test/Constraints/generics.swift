@@ -248,12 +248,12 @@ struct S27515965 : P27515965 {
 
 struct V27515965 {
   init<T : P27515965>(_ tp: T) where T.R == Float {}
-  // expected-note@-1 {{candidate requires that the types 'Any' and 'Float' be equivalent (requirement specified as 'T.R' == 'Float' [with T = S27515965])}}
+  // expected-note@-1 {{where 'T.R' = 'Any'}}
 }
 
 func test(x: S27515965) -> V27515965 {
   return V27515965(x)
-  // expected-error@-1 {{cannot invoke initializer for type 'init(_:)' with an argument list of type '(S27515965)'}}
+  // expected-error@-1 {{initializer 'init(_:)' requires the types 'Any' and 'Float' be equivalent}}
 }
 
 protocol BaseProto {}
@@ -285,10 +285,10 @@ struct ProtosBound3<Foo: SubProto> where Foo: NSCopyish {} // expected-note {{'F
 struct AnyClassAndProtoBound<Foo> where Foo: AnyObject, Foo: SubProto {} // expected-note {{'Foo' declared as parameter to type 'AnyClassAndProtoBound'}}
 struct AnyClassAndProtoBound2<Foo> where Foo: SubProto, Foo: AnyObject {} // expected-note {{'Foo' declared as parameter to type 'AnyClassAndProtoBound2'}}
 
-struct ClassAndProtoBound<Foo> where Foo: X, Foo: SubProto {}
+struct ClassAndProtoBound<Foo> where Foo: X, Foo: SubProto {} // expected-note {{where 'Foo' = 'X'}}
 
-struct ClassAndProtosBound<Foo> where Foo: X, Foo: SubProto, Foo: NSCopyish {}
-struct ClassAndProtosBound2<Foo> where Foo: X, Foo: SubProto & NSCopyish {}
+struct ClassAndProtosBound<Foo> where Foo: X, Foo: SubProto, Foo: NSCopyish {} // expected-note 2 {{where 'Foo' = 'X'}}
+struct ClassAndProtosBound2<Foo> where Foo: X, Foo: SubProto & NSCopyish {} // expected-note 2 {{where 'Foo' = 'X'}}
 
 extension Pair {
   init(first: T) {}
@@ -331,14 +331,14 @@ func testFixIts() {
   _ = AnyClassAndProtoBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{28-28=<<#Foo: SubProto & AnyObject#>>}}
   _ = AnyClassAndProtoBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{29-29=<<#Foo: SubProto & AnyObject#>>}}
 
-  _ = ClassAndProtoBound() // expected-error {{'ClassAndProtoBound<X>' requires that 'X' conform to 'SubProto'}}
+  _ = ClassAndProtoBound() // expected-error {{referencing initializer 'init()' on 'ClassAndProtoBound' requires that 'X' conform to 'SubProto'}}
 
   _ = ClassAndProtosBound() 
-  // expected-error@-1 {{'ClassAndProtosBound<X>' requires that 'X' conform to 'SubProto'}}
-  // expected-error@-2 {{'ClassAndProtosBound<X>' requires that 'X' conform to 'NSCopyish'}}
+  // expected-error@-1 {{referencing initializer 'init()' on 'ClassAndProtosBound' requires that 'X' conform to 'NSCopyish'}}
+  // expected-error@-2 {{referencing initializer 'init()' on 'ClassAndProtosBound' requires that 'X' conform to 'SubProto'}}
   _ = ClassAndProtosBound2()
-  // expected-error@-1 {{'ClassAndProtosBound2<X>' requires that 'X' conform to 'SubProto'}}
-  // expected-error@-2 {{'ClassAndProtosBound2<X>' requires that 'X' conform to 'NSCopyish'}}
+  // expected-error@-1 {{referencing initializer 'init()' on 'ClassAndProtosBound2' requires that 'X' conform to 'NSCopyish'}}
+  // expected-error@-2 {{referencing initializer 'init()' on 'ClassAndProtosBound2' requires that 'X' conform to 'SubProto'}}
 
   _ = Pair() // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{11-11=<Any, Any>}}
   _ = Pair(first: S()) // expected-error {{generic parameter 'U' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{11-11=<S, Any>}}
@@ -604,20 +604,20 @@ func rdar40537858() {
     var id: Id
   }
 
-  struct List<T: Collection, E: Hashable> {
+  struct List<T: Collection, E: Hashable> { // expected-note {{where 'E' = 'S.Id'}}
     typealias Data = T.Element
     init(_: T, id: KeyPath<Data, E>) {}
   }
 
   var arr: [S] = []
-  _ = List(arr, id: \.id) // expected-error {{'List<[S], S.Id>' requires that 'S.Id' conform to 'Hashable'}}
+  _ = List(arr, id: \.id) // expected-error {{referencing initializer 'init(_:id:)' on 'List' requires that 'S.Id' conform to 'Hashable'}}
 
-  enum E<T: P> {
+  enum E<T: P> { // expected-note 2 {{where 'T' = 'S'}}
     case foo(T)
     case bar([T])
   }
 
   var s = S(id: S.Id())
-  let _: E = .foo(s)   // expected-error {{'E<S>' requires that 'S' conform to 'P'}}
-  let _: E = .bar([s]) // expected-error {{'E<S>' requires that 'S' conform to 'P'}}
+  let _: E = .foo(s)   // expected-error {{generic enum 'E' requires that 'S' conform to 'P'}}
+  let _: E = .bar([s]) // expected-error {{generic enum 'E' requires that 'S' conform to 'P'}}
 }

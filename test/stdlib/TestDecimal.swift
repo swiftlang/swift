@@ -1,4 +1,4 @@
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,6 +10,7 @@
 //
 // RUN: %target-clang %S/Inputs/FoundationBridge/FoundationBridge.m -c -o %t/FoundationBridgeObjC.o -g
 // RUN: %target-build-swift %s -I %S/Inputs/FoundationBridge/ -Xlinker %t/FoundationBridgeObjC.o -o %t/TestDecimal
+// RUN: %target-codesign %t/TestDecimal
 
 // RUN: %target-run %t/TestDecimal > %t.txt
 // REQUIRES: executable_test
@@ -118,6 +119,10 @@ class TestDecimal : TestDecimalSuper {
         expectFalse(zero.isInfinite)
         expectFalse(zero.isNaN)
         expectFalse(zero.isSignaling)
+
+        let d1 = Decimal(1234567890123456789 as UInt64)
+        expectEqual(d1._exponent, 0)
+        expectEqual(d1._length, 4)
     }
     func test_Constants() {
         expectEqual(8, NSDecimalMaxSize)

@@ -178,7 +178,7 @@ func _makeCocoaStringGuts(_ cocoaString: _CocoaString) -> _StringGuts {
     return _StringGuts(_large: ascii)
   } else if let utf16 = cocoaString as? _UTF16StringStorage {
     return _StringGuts(_large: utf16)
-  } else if let wrapped = cocoaString as? _NSContiguousString {
+  } else if let wrapped = cocoaString as? __NSContiguousString {
     return wrapped._guts
   } else if _isObjCTaggedPointer(cocoaString) {
     guard let small = _SmallUTF8String(_cocoaString: cocoaString) else {
@@ -217,15 +217,19 @@ extension String {
   }
 }
 
-// At runtime, this class is derived from `_SwiftNativeNSStringBase`,
+// At runtime, this class is derived from `__SwiftNativeNSStringBase`,
 // which is derived from `NSString`.
 //
 // The @_swift_native_objc_runtime_base attribute
 // This allows us to subclass an Objective-C class and use the fast Swift
 // memory allocator.
+//
+// NOTE: older runtimes called this _SwiftNativeNSString. The two must
+// coexist, so it was renamed. The old name must not be used in the new
+// runtime.
 @_fixed_layout // FIXME(sil-serialize-all)
-@objc @_swift_native_objc_runtime_base(_SwiftNativeNSStringBase)
-public class _SwiftNativeNSString {
+@objc @_swift_native_objc_runtime_base(__SwiftNativeNSStringBase)
+public class __SwiftNativeNSString {
   @usableFromInline // FIXME(sil-serialize-all)
   @objc
   internal init() {}
@@ -260,14 +264,18 @@ public protocol _NSStringCore : _NSCopying /* _NSFastEnumeration */ {
 }
 
 /// An `NSString` built around a slice of contiguous Swift `String` storage.
+///
+/// NOTE: older runtimes called this _NSContiguousString. The two must
+/// coexist, so it was renamed. The old name must not be used in the new
+/// runtime.
 @_fixed_layout // FIXME(sil-serialize-all)
-public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
+public final class __NSContiguousString : __SwiftNativeNSString, _NSStringCore {
   public let _guts: _StringGuts
 
   @inlinable // FIXME(sil-serialize-all)
   public init(_ _guts: _StringGuts) {
     _sanityCheck(!_guts._isOpaque,
-      "_NSContiguousString requires contiguous storage")
+      "__NSContiguousString requires contiguous storage")
     self._guts = _guts
     super.init()
   }
@@ -275,7 +283,7 @@ public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
   @inlinable // FIXME(sil-serialize-all)
   public init(_unmanaged guts: _StringGuts) {
     _sanityCheck(!guts._isOpaque,
-      "_NSContiguousString requires contiguous storage")
+      "__NSContiguousString requires contiguous storage")
     if guts.isASCII {
       self._guts = _StringGuts(_large: guts._unmanagedASCIIView)
     } else {
@@ -287,7 +295,7 @@ public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
   @inlinable // FIXME(sil-serialize-all)
   public init(_unmanaged guts: _StringGuts, range: Range<Int>) {
     _sanityCheck(!guts._isOpaque,
-      "_NSContiguousString requires contiguous storage")
+      "__NSContiguousString requires contiguous storage")
     if guts.isASCII {
       self._guts = _StringGuts(_large: guts._unmanagedASCIIView[range])
     } else {
@@ -299,7 +307,7 @@ public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
   @usableFromInline // FIXME(sil-serialize-all)
   @objc
   init(coder aDecoder: AnyObject) {
-    _sanityCheckFailure("init(coder:) not implemented for _NSContiguousString")
+    _sanityCheckFailure("init(coder:) not implemented for __NSContiguousString")
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -373,7 +381,7 @@ public final class _NSContiguousString : _SwiftNativeNSString, _NSStringCore {
   @inlinable // FIXME(sil-serialize-all)
   @_semantics("pair_no_escaping_closure")
   func _unsafeWithNotEscapedSelfPointerPair<Result>(
-    _ rhs: _NSContiguousString,
+    _ rhs: __NSContiguousString,
     _ body: (OpaquePointer, OpaquePointer) throws -> Result
   ) rethrows -> Result {
     let selfAsPointer = unsafeBitCast(self, to: OpaquePointer.self)
@@ -397,7 +405,7 @@ extension String {
     if let cocoa = _guts._underlyingCocoaString {
       return cocoa
     }
-    return _NSContiguousString(_guts)
+    return __NSContiguousString(_guts)
   }
 
   @inline(never) // Hide the CF dependency
@@ -417,7 +425,7 @@ public func _getDescription<T>(_ x: T) -> AnyObject {
 #else // !_runtime(_ObjC)
 
 @_fixed_layout // FIXME(sil-serialize-all)
-public class _SwiftNativeNSString {
+public class __SwiftNativeNSString {
   @usableFromInline // FIXME(sil-serialize-all)
   internal init() {}
   deinit {}

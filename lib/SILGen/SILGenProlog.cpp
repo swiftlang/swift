@@ -85,18 +85,19 @@ public:
   SILGenFunction &SGF;
   SILBasicBlock *parent;
   SILLocation loc;
-  bool functionArgs;
   ArrayRef<SILParameterInfo> &parameters;
 
-  EmitBBArguments(SILGenFunction &sgf, SILBasicBlock *parent,
-                  SILLocation l, bool functionArgs,
+  EmitBBArguments(SILGenFunction &sgf, SILBasicBlock *parent, SILLocation l,
                   ArrayRef<SILParameterInfo> &parameters)
-    : SGF(sgf), parent(parent), loc(l), functionArgs(functionArgs),
-      parameters(parameters) {}
+    : SGF(sgf), parent(parent), loc(l), parameters(parameters) {}
 
   ManagedValue visitType(CanType t) {
-    auto argType = SGF.getLoweredType(t->getInOutObjectType());
-    if (t->is<InOutType>())
+    return visitType(t, /*isInOut=*/false);
+  }
+
+  ManagedValue visitType(CanType t, bool isInOut) {
+    auto argType = SGF.getLoweredType(t);
+    if (isInOut)
       argType = SILType::getPrimitiveAddressType(argType.getASTType());
 
     // Pop the next parameter info.
@@ -112,6 +113,9 @@ public:
     ManagedValue mv = SGF.B.createInputFunctionArgument(
         argType, loc.getAsASTNode<ValueDecl>());
 
+    if (isInOut)
+      return mv;
+
     // If the value is a (possibly optional) ObjC block passed into the entry
     // point of the function, then copy it so we can treat the value reliably
     // as a heap object. Escape analysis can eliminate this copy if it's
@@ -119,9 +123,8 @@ public:
     CanType objectType = t;
     if (auto theObjTy = t.getOptionalObjectType())
       objectType = theObjTy;
-    if (functionArgs
-        && isa<FunctionType>(objectType)
-        && cast<FunctionType>(objectType)->getRepresentation()
+    if (isa<FunctionType>(objectType) &&
+        cast<FunctionType>(objectType)->getRepresentation()
               == FunctionType::Representation::Block) {
       SILValue blockCopy = SGF.B.createCopyBlock(loc, mv.getValue());
       mv = SGF.emitManagedRValueWithCleanup(blockCopy);
@@ -208,13 +211,18 @@ struct ArgumentInitHelper {
 
   unsigned getNumArgs() const { return ArgNo; }
 
-  ManagedValue makeArgument(Type ty, SILBasicBlock *parent, SILLocation l) {
+  ManagedValue makeArgument(Type ty, bool isInOut, SILBasicBlock *parent,
+                            SILLocation l) {
     assert(ty && "no type?!");
 
     // Create an RValue by emitting destructured arguments into a basic block.
     CanType canTy = ty->eraseDynamicSelfType()->getCanonicalType();
-    return EmitBBArguments(SGF, parent, l, /*functionArgs*/ true,
-                           parameters).visit(canTy);
+    EmitBBArguments argEmitter(SGF, parent, l, parameters);
+
+    // Note: inouts of tuples are not exploded, so we bypass visit().
+    if (isInOut)
+      return argEmitter.visitType(canTy, /*isInOut=*/true);
+    return argEmitter.visit(canTy);
   }
 
   /// Create a SILArgument and store its value into the given Initialization,
@@ -223,23 +231,9 @@ struct ArgumentInitHelper {
     SILLocation loc(vd);
     loc.markAsPrologue();
 
-    ManagedValue argrv = makeArgument(ty, parent, loc);
+    ManagedValue argrv = makeArgument(ty, vd->isInOut(), parent, loc);
 
-    // Create a shadow copy of inout parameters so they can be captured
-    // by closures. The InOutDeshadowing guaranteed optimization will
-    // eliminate the variable if it is not needed.
     if (vd->isInOut()) {
-      SILValue address = argrv.getUnmanagedValue();
-
-      // As a special case, don't introduce a local variable for
-      // Builtin.UnsafeValueBuffer, which is not copyable.
-      if (isa<BuiltinUnsafeValueBufferType>(ty->getCanonicalType())) {
-        // FIXME: mark a debug location?
-        SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(address);
-        SGF.B.createDebugValueAddr(loc, address,
-                                   SILDebugVariable(vd->isLet(), ArgNo));
-        return;
-      }
       assert(argrv.getType().isAddress() && "expected inout to be address");
     } else if (auto *metatypeTy = ty->getAs<MetatypeType>()) {
       // This is a hack to deal with the fact that Self.Type comes in as a
@@ -259,18 +253,22 @@ struct ArgumentInitHelper {
       // argument if we're responsible for it.
     }
     SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(argrv.getValue());
-    if (argrv.getType().isAddress())
-      SGF.B.createDebugValueAddr(loc, argrv.getValue(),
-                                 SILDebugVariable(vd->isLet(), ArgNo));
-    else
-      SGF.B.createDebugValue(loc, argrv.getValue(),
-                             SILDebugVariable(vd->isLet(), ArgNo));
+    SILValue value = argrv.getValue();
+    SILDebugVariable varinfo(vd->isLet(), ArgNo);
+    if (!argrv.getType().isAddress()) {
+      SGF.B.createDebugValue(loc, value, varinfo);
+    } else {
+      if (auto AllocStack = dyn_cast<AllocStackInst>(value))
+        AllocStack->setArgNo(ArgNo);
+      else
+        SGF.B.createDebugValueAddr(loc, value, varinfo);
+    }
   }
 
   void emitParam(ParamDecl *PD) {
     auto type = PD->getType();
-    if (PD->isInOut())
-      type = InOutType::get(type); // FIXME remove InOutType
+
+    assert(type->isMaterializable());
 
     ++ArgNo;
     if (PD->hasName()) {
@@ -282,26 +280,11 @@ struct ArgumentInitHelper {
   }
 
   void emitAnonymousParam(Type type, SILLocation paramLoc, ParamDecl *PD) {
-    // Allow non-materializable tuples to be bound to anonymous parameters.
-    //
-    // FIXME: Remove this once -swift-version 3 code generation goes away.
-    if (!type->isMaterializable()) {
-      if (auto tupleType = type->getAs<TupleType>()) {
-        for (auto eltType : tupleType->getElementTypes()) {
-          emitAnonymousParam(eltType, paramLoc, nullptr);
-        }
-        return;
-      }
-    }
-
     // A value bound to _ is unused and can be immediately released.
     Scope discardScope(SGF.Cleanups, CleanupLocation(PD));
 
     // Manage the parameter.
-    ManagedValue argrv = makeArgument(type, &*f.begin(), paramLoc);
-
-    // Don't do anything else if we don't have a parameter.
-    if (!PD) return;
+    auto argrv = makeArgument(type, PD->isInOut(), &*f.begin(), paramLoc);
 
     // Emit debug information for the argument.
     SILLocation loc(PD);
@@ -481,7 +464,7 @@ static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,
   auto var = new (ctx) ParamDecl(VarDecl::Specifier::InOut,
                                  SourceLoc(), SourceLoc(),
                                  ctx.getIdentifier("$return_value"), SourceLoc(),
-                                 ctx.getIdentifier("$return_value"), Type(),
+                                 ctx.getIdentifier("$return_value"),
                                  DC);
   var->setInterfaceType(resultType);
 

@@ -80,6 +80,12 @@ DRIVER_STATISTIC(ChildrenMaxRSS)
 /// EXIT_SUCCESS.
 FRONTEND_STATISTIC(Frontend, NumProcessFailures)
 
+/// Total instructions-executed count in each frontend process.
+FRONTEND_STATISTIC(Frontend, NumInstructionsExecuted)
+
+/// Maximum number of bytes allocated via malloc.
+FRONTEND_STATISTIC(Frontend, MaxMallocUsage)
+
 /// Number of source buffers visible in the source manager.
 FRONTEND_STATISTIC(AST, NumSourceBuffers)
 
@@ -140,6 +146,9 @@ FRONTEND_STATISTIC(AST, NumUsedConformances)
 
 /// Number of full function bodies parsed.
 FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
+
+/// Number of full braced decl list parsed.
+FRONTEND_STATISTIC(Parse, NumIterableDeclContextParsed)
 
 /// Number of conformances that were deserialized by this frontend job.
 FRONTEND_STATISTIC(Sema, NumConformancesDeserialized)

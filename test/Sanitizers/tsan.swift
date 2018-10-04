@@ -1,8 +1,13 @@
 // RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=thread -o %t_tsan-binary
+// RUN: %target-codesign %t_tsan-binary
 // RUN: not env %env-TSAN_OPTIONS="abort_on_error=0" %target-run %t_tsan-binary 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: tsan_runtime
 // UNSUPPORTED: OS=tvos
+
+// FIXME: This should be covered by "tsan_runtime"; older versions of Apple OSs
+// don't support TSan.
+// UNSUPPORTED: remote_run
 
 // https://bugs.swift.org/browse/SR-6622
 // XFAIL: linux

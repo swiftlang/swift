@@ -505,6 +505,9 @@ func testSingleQuoteStringLiterals() {
   _ = 'ab\nc' // expected-error{{single-quoted string literal found, use '"'}}{{7-14="ab\\nc"}}
 
   _ = "abc\('def')" // expected-error{{single-quoted string literal found, use '"'}}{{13-18="def"}}
+  _ = 'ab\("c")' // expected-error{{single-quoted string literal found, use '"'}}{{7-17="ab\\("c")"}}
+  _ = 'a\('b')c' // expected-error{{single-quoted string literal found, use '"'}}{{7-17="a\\('b')c"}}
+                 // expected-error@-1{{single-quoted string literal found, use '"'}}{{11-14="b"}}
 
   _ = "abc' // expected-error{{unterminated string literal}}
   _ = 'abc" // expected-error{{unterminated string literal}}
@@ -573,12 +576,12 @@ func conversionTest(_ a: inout Double, b: inout Int) {
   var pi_d1 = Double(pi_d)
   var pi_s1 = SpecialPi(pi_s) // expected-error {{argument passed to call that takes no arguments}}
 
-  var pi_f2 = Float(getPi()) // expected-error {{ambiguous use of 'init'}}
-  var pi_d2 = Double(getPi()) // expected-error {{ambiguous use of 'init'}}
+  var pi_f2 = Float(getPi()) // expected-error {{ambiguous use of 'init(_:)'}}
+  var pi_d2 = Double(getPi()) // expected-error {{ambiguous use of 'init(_:)'}}
   var pi_s2: SpecialPi = getPi() // no-warning
   
   var float = Float.self
-  var pi_f3 = float.init(getPi()) // expected-error {{ambiguous use of 'init'}}
+  var pi_f3 = float.init(getPi()) // expected-error {{ambiguous use of 'init(_:)'}}
   var pi_f4 = float.init(pi_f)
 
   var e = Empty(f)
@@ -614,7 +617,7 @@ func unaryOps(_ i8: inout Int8, i64: inout Int64) {
   i64 += 1
   i8 -= 1
 
-  Int64(5) += 1 // expected-error{{left side of mutating operator isn't mutable: function call returns immutable value}}
+  Int64(5) += 1 // expected-error{{left side of mutating operator has immutable type 'Int64'}}
   
   // <rdar://problem/17691565> attempt to modify a 'let' variable with ++ results in typecheck error not being able to apply ++ to Float
   let a = i8 // expected-note {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
@@ -736,8 +739,8 @@ func invalidDictionaryLiteral() {
 }
 
 
-[4].joined(separator: [1]) // expected-error {{'() -> FlattenCollection<[Int]>' requires that 'Int' conform to 'Collection'}}
-[4].joined(separator: [[[1]]]) // expected-error {{'() -> FlattenCollection<[Int]>' requires that 'Int' conform to 'Collection'}}
+[4].joined(separator: [1]) // expected-error {{referencing instance method 'joined()' on 'Collection' requires that 'Int' conform to 'Collection'}}
+[4].joined(separator: [[[1]]]) // expected-error {{referencing instance method 'joined()' on 'Collection' requires that 'Int' conform to 'Collection'}}
 
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons

@@ -50,11 +50,6 @@ void runAPIDiffMigratorPass(EditorAdapter &Editor,
                             SourceFile *SF,
                             const MigratorOptions &Opts);
 
-/// Run a pass to fix up new tuple interpretation in SE-0110.
-void runTupleSplatMigratorPass(EditorAdapter &Editor,
-                               SourceFile *SF,
-                               const MigratorOptions &Opts);
-
 } // end namespace migrator
 } // end namespace swift
 

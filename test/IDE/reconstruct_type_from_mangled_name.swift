@@ -1,4 +1,5 @@
 // RUN: %target-swift-ide-test -reconstruct-type -source-filename %s | %FileCheck %s -implicit-check-not="FAILURE"
+// XFAIL: *
 
 struct Mystruct1 {
 // CHECK: decl: struct Mystruct1
@@ -64,7 +65,7 @@ class Myclass2 {
 
     arr1.append(1)
 // FIXME: missing append()
-// CHECK: dref: FAILURE	for 'append' usr=s:Sa6appendyyxF
+// CHECK: dref: FAILURE	for 'append' usr=s:Sa6appendyyxnF
 // CHECK: type: (inout Array<Int>) -> (Int) -> ()
 
     var arr2 : [Mystruct1]
@@ -261,7 +262,7 @@ func hasLocalDecls() {
     // CHECK: FAILURE for 'localMethod'
     func localMethod() {}
 
-    // CHECK: FAILURE for 'subscript'
+    // CHECK: FAILURE for 'subscript(_:)'
     subscript(x: Int) { get {} set {} }
 
     // CHECK: decl: FAILURE for ''
@@ -291,11 +292,11 @@ fileprivate func privateFunction(_ d: VeryPrivateData) {}
 struct HasSubscript {
   // CHECK: decl: subscript(t: Int) -> Int { get set }
   subscript(_ t: Int) -> Int {
-    // CHECK: decl: get {}	for '' usr=s:14swift_ide_test12HasSubscriptVyS2icig
+    // CHECK: decl: get	for '' usr=s:14swift_ide_test12HasSubscriptVyS2icig
     get {
       return t
     }
-    // CHECK: decl: set {}	for '' usr=s:14swift_ide_test12HasSubscriptVyS2icis
+    // CHECK: decl: set	for '' usr=s:14swift_ide_test12HasSubscriptVyS2icis
     set {}
   }
 }
@@ -303,23 +304,21 @@ struct HasSubscript {
 // FIXME
 // CHECK: decl: FAILURE	for 'T' usr=s:14swift_ide_test19HasGenericSubscriptV1Txmfp
 struct HasGenericSubscript<T> {
-  // CHECK: subscript<U>(t: T) -> U { get set }	for 'subscript' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xclui
+  // CHECK: subscript<U>(t: T) -> U { get set }	for 'subscript(_:)' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xclui
   // FIXME
   // CHECK: decl: FAILURE	for 'U'
   // FIXME
   // CHECK: decl: FAILURE	for 't'
   subscript<U>(_ t: T) -> U {
 
-    // CHECK: decl: get {}	for '' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xcluig
+    // CHECK: decl: get for '' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xcluig
     // FIXME
     // CHECK: dref: FAILURE	for 't'
     get {
       return t as! U
     }
 
-    // FIXME
-    // CHECK: dref: FAILURE	for 'U'
-    // CHECK: decl: set {}	for '' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xcluis
+    // CHECK: decl: set	for '' usr=s:14swift_ide_test19HasGenericSubscriptVyqd__xcluis
     set {}
   }
 }

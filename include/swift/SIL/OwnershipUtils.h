@@ -63,22 +63,27 @@ struct ErrorBehaviorKind {
 /// use with SILPasses. It uses the actual checker as an internal PImpl detail
 /// so types/etc do not leak.
 struct OwnershipChecker {
-  /// The module that we are in.
-  SILModule &Mod;
-
-  /// A cache of dead-end basic blocks that we use to determine if we can
-  /// ignore "leaks".
-  DeadEndBlocks &DEBlocks;
+  /// The list of regular users from the last run of the checker.
+  SmallVector<SILInstruction *, 16> regularUsers;
 
   /// The list of regular users from the last run of the checker.
-  SmallVector<SILInstruction *, 16> RegularUsers;
-
-  /// The list of regular users from the last run of the checker.
-  SmallVector<SILInstruction *, 16> LifetimeEndingUsers;
+  SmallVector<SILInstruction *, 16> lifetimeEndingUsers;
 
   /// The live blocks for the SILValue we processed. This can be used to
   /// determine if a block is in the "live" region of our SILInstruction.
-  SmallPtrSet<SILBasicBlock *, 32> LiveBlocks;
+  SmallPtrSet<SILBasicBlock *, 32> liveBlocks;
+
+  /// The list of implicit regular users from the last run of the checker.
+  ///
+  /// This is used to encode end of scope like instructions.
+  SmallVector<SILInstruction *, 4> endScopeRegularUsers;
+
+  /// The module that we are in.
+  SILModule &mod;
+
+  /// A cache of dead-end basic blocks that we use to determine if we can
+  /// ignore "leaks".
+  DeadEndBlocks &deadEndBlocks;
 
   bool checkValue(SILValue Value);
 };
@@ -93,7 +98,7 @@ bool valueHasLinearLifetime(SILValue value,
                             ArrayRef<BranchPropagatedUser> consumingUses,
                             ArrayRef<BranchPropagatedUser> nonConsumingUses,
                             SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-                            DeadEndBlocks &deBlocks,
+                            DeadEndBlocks &deadEndBlocks,
                             ownership::ErrorBehaviorKind errorBehavior);
 
 } // namespace swift

@@ -116,9 +116,15 @@ std::unique_ptr<Job> ToolChain::constructJob(
 
   const char *responseFilePath = nullptr;
   const char *responseFileArg = nullptr;
-  if (invocationInfo.allowsResponseFiles &&
-      !llvm::sys::commandLineFitsWithinSystemLimits(
-          executablePath, invocationInfo.Arguments)) {
+
+  const bool forceResponseFiles =
+      C.getArgs().hasArg(options::OPT_driver_force_response_files);
+  assert((invocationInfo.allowsResponseFiles || !forceResponseFiles) &&
+         "Cannot force response file if platform does not allow it");
+
+  if (forceResponseFiles || (invocationInfo.allowsResponseFiles &&
+                             !llvm::sys::commandLineFitsWithinSystemLimits(
+                                 executablePath, invocationInfo.Arguments))) {
     responseFilePath = context.getTemporaryFilePath("arguments", "resp");
     responseFileArg = C.getArgs().MakeArgString(Twine("@") + responseFilePath);
   }
@@ -290,7 +296,7 @@ static void
 sortJobsToMatchCompilationInputs(ArrayRef<const Job *> unsortedJobs,
                                  SmallVectorImpl<const Job *> &sortedJobs,
                                  Compilation &C) {
-  llvm::StringMap<const Job *> jobsByInput;
+  llvm::DenseMap<StringRef, const Job *> jobsByInput;
   for (const Job *J : unsortedJobs) {
     const CompileJobAction *CJA = cast<CompileJobAction>(&J->getSource());
     const InputAction *IA = findSingleSwiftInput(CJA);

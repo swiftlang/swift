@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -typecheck -verify -dump-ast -enable-resilience %s 2>&1 | %FileCheck --check-prefix=RESILIENCE-ON %s
-// RUN: %target-swift-frontend -typecheck -verify -dump-ast -enable-resilience -enable-testing %s 2>&1 | %FileCheck --check-prefix=RESILIENCE-ON %s
-// RUN: not %target-swift-frontend -typecheck -dump-ast %s 2>&1 | %FileCheck --check-prefix=RESILIENCE-OFF %s
-// RUN: not %target-swift-frontend -typecheck -dump-ast %s -enable-testing 2>&1 | %FileCheck --check-prefix=RESILIENCE-OFF %s
+// RUN: %target-swift-frontend -typecheck -swift-version 4.2 -verify -dump-ast -enable-resilience %s 2>&1 | %FileCheck --check-prefix=RESILIENCE-ON %s
+// RUN: %target-swift-frontend -typecheck -swift-version 4.2 -verify -dump-ast -enable-resilience -enable-testing %s 2>&1 | %FileCheck --check-prefix=RESILIENCE-ON %s
+// RUN: not %target-swift-frontend -typecheck -swift-version 4.2 -dump-ast %s 2>&1 | %FileCheck --check-prefix=RESILIENCE-OFF %s
+// RUN: not %target-swift-frontend -typecheck -swift-version 4.2 -dump-ast %s -enable-testing 2>&1 | %FileCheck --check-prefix=RESILIENCE-OFF %s
 
 //
 // Public types with @_fixed_layout are always fixed layout
@@ -30,6 +30,10 @@ public struct Size {
   let w, h: Int
 }
 
+// RESILIENCE-ON: struct_decl{{.*}}"UsableFromInlineStruct" interface type='UsableFromInlineStruct.Type' access=internal non-resilient
+// RESILIENCE-OFF: struct_decl{{.*}}"UsableFromInlineStruct" interface type='UsableFromInlineStruct.Type' access=internal non-resilient
+@_fixed_layout @usableFromInline struct UsableFromInlineStruct {}
+
 // RESILIENCE-ON: enum_decl{{.*}}"TaxCredit" interface type='TaxCredit.Type' access=public resilient
 // RESILIENCE-OFF: enum_decl{{.*}}"TaxCredit" interface type='TaxCredit.Type' access=public non-resilient
 public enum TaxCredit {
@@ -52,7 +56,7 @@ struct Rectangle {
 // Diagnostics
 //
 
-@_fixed_layout struct InternalStruct {
+@_fixed_layout struct InternalStruct { // expected-note * {{declared here}}
 // expected-error@-1 {{'@_fixed_layout' attribute can only be applied to '@usableFromInline' or public declarations, but 'InternalStruct' is internal}}
 
   @_fixed_layout public struct NestedStruct {}
@@ -61,5 +65,43 @@ struct Rectangle {
 @_fixed_layout fileprivate struct FileprivateStruct {}
 // expected-error@-1 {{'@_fixed_layout' attribute can only be applied to '@usableFromInline' or public declarations, but 'FileprivateStruct' is fileprivate}}
 
-@_fixed_layout private struct PrivateStruct {}
+@_fixed_layout private struct PrivateStruct {} // expected-note * {{declared here}}
 // expected-error@-1 {{'@_fixed_layout' attribute can only be applied to '@usableFromInline' or public declarations, but 'PrivateStruct' is private}}
+
+
+@_fixed_layout public struct BadFields1 {
+  private var field: PrivateStruct // expected-error {{type referenced from a stored property in a @_fixed_layout struct must be '@usableFromInline' or public}}
+}
+
+@_fixed_layout public struct BadFields2 {
+  private var field: PrivateStruct? // expected-error {{type referenced from a stored property in a @_fixed_layout struct must be '@usableFromInline' or public}}
+}
+
+@_fixed_layout public struct BadFields3 {
+  internal var field: InternalStruct? // expected-error {{type referenced from a stored property in a @_fixed_layout struct must be '@usableFromInline' or public}}
+}
+
+@_fixed_layout @usableFromInline struct BadFields4 {
+  internal var field: InternalStruct? // expected-error {{type referenced from a stored property in a @_fixed_layout struct must be '@usableFromInline' or public}}
+}
+
+@_fixed_layout public struct BadFields5 {
+  private var field: PrivateStruct? { // expected-error {{type referenced from a stored property in a @_fixed_layout struct must be '@usableFromInline' or public}}
+    didSet {}
+  }
+}
+
+// expected-warning@+1 {{the result of a '@usableFromInline' function should be '@usableFromInline' or public}}
+@usableFromInline func notReallyUsableFromInline() -> InternalStruct? { return nil }
+@_fixed_layout public struct BadFields6 {
+  private var field = notReallyUsableFromInline() // expected-error {{type referenced from a stored property with inferred type 'InternalStruct?' in a @_fixed_layout struct must be '@usableFromInline' or public}}
+}
+
+@_fixed_layout public struct OKFields {
+  private var publicTy: Size
+  internal var ufiTy: UsableFromInlineStruct?
+
+  internal static var staticProp: InternalStruct?
+
+  private var computed: PrivateStruct? { return nil }
+}

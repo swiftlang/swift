@@ -4,11 +4,14 @@
 // RUN: %target-codesign %t/libresil.%target-dylib-extension
 
 // RUN: %target-build-swift %s -L %t -I %t -lresil -o %t/main -Xlinker -rpath -Xlinker %t
+// RUN: %target-codesign %t/main
 
 // RUN: %target-build-swift-dylib(%t/libresil.%target-dylib-extension) -Xfrontend -enable-resilience %S/Inputs/resilient_generic_struct_v2.swift -emit-module -emit-module-path %t/resil.swiftmodule -module-name resil
 // RUN: %target-codesign %t/libresil.%target-dylib-extension
 
 // RUN: %target-run %t/main %t/libresil.%target-dylib-extension
+
+// REQUIRES: executable_test
 
 import StdlibUnittest
 
@@ -29,11 +32,9 @@ var DynamicMetadataCycleTests =
 
 enum test0_Node {
     case link(ResilientGenericStruct<test0_Node>)
-    
-    static func test() -> [test0_Node] {
-        return []
-    }
 }
+
+
 DynamicMetadataCycleTests.test("cycle through enum")
   .crashOutputMatches("runtime error: unresolvable type metadata dependency cycle detected")
   .crashOutputMatches("  main.test0_Node")
@@ -41,7 +42,7 @@ DynamicMetadataCycleTests.test("cycle through enum")
   .crashOutputMatches("  depends on layout of main.test0_Node")
   .code {
     expectCrashLater()
-    _ = test0_Node.test()
+    _blackHole(test0_Node.self)
   }
 
 runAllTests()

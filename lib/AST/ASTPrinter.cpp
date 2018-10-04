@@ -64,34 +64,93 @@ void PrintOptions::clearSynthesizedExtension() {
   TransformContext.reset();
 }
 
+static bool isPublicOrUsableFromInline(const ValueDecl *VD) {
+  AccessScope scope =
+      VD->getFormalAccessScope(/*useDC*/nullptr,
+                               /*treatUsableFromInlineAsPublic*/true);
+  return scope.isPublic();
+}
+
+static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
+  auto *DC = ASD->getDeclContext()->getAsDecl();
+  if (!DC) return false;
+  auto *ND = dyn_cast<NominalTypeDecl>(DC);
+  if (!ND) return false;
+  return !ND->isResilient() && ASD->hasStorage() && !ASD->isStatic();
+}
+
 PrintOptions PrintOptions::printTextualInterfaceFile() {
   PrintOptions result;
   result.PrintLongAttrsOnSeparateLines = true;
   result.TypeDefinitions = true;
   result.PrintIfConfig = false;
   result.FullyQualifiedTypes = true;
+  result.AllowNullTypes = false;
   result.SkipImports = true;
+  result.OmitNameOfInaccessibleProperties = true;
+  result.FunctionDefinitions = true;
+  result.CollapseSingleGetterProperty = false;
 
-  class UsableFromInlineOnly : public ShouldPrintChecker {
-    bool shouldPrint(const Decl *D, PrintOptions &options) override {
+  result.FunctionBody = [](const ValueDecl *decl, ASTPrinter &printer) {
+    auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
+    if (!AFD || !AFD->hasInlinableBodyText()) return;
+    if (AFD->getResilienceExpansion() != ResilienceExpansion::Minimal)
+      return;
+    SmallString<128> scratch;
+    printer << " " << AFD->getInlinableBodyText(scratch);
+  };
+
+  class ShouldPrintForTextualInterface : public ShouldPrintChecker {
+    bool shouldPrint(const Decl *D, const PrintOptions &options) override {
+      // Skip anything that isn't 'public' or '@usableFromInline'.
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
-        AccessScope accessScope =
-            VD->getFormalAccessScope(/*useDC*/nullptr,
-                                     /*treatUsableFromInlineAsPublic*/true);
-        if (!accessScope.isPublic())
+        if (!isPublicOrUsableFromInline(VD)) {
+          // We do want to print private stored properties, without their
+          // original names present.
+          if (auto *ASD = dyn_cast<AbstractStorageDecl>(VD))
+            if (contributesToParentTypeStorage(ASD))
+              return true;
           return false;
+        }
       }
+
+      // Skip extensions that extend things we wouldn't print.
+      if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+        if (!shouldPrint(ED->getExtendedNominal(), options))
+          return false;
+        // FIXME: We also need to check the generic signature for constraints
+        // that we can't reference.
+      }
+
+      // Skip typealiases that just redeclare generic parameters.
+      if (auto *alias = dyn_cast<TypeAliasDecl>(D)) {
+        if (alias->isImplicit()) {
+          const Decl *parent =
+              D->getDeclContext()->getAsDecl();
+          if (auto *genericCtx = parent->getAsGenericContext()) {
+            bool matchesGenericParam =
+                llvm::any_of(genericCtx->getInnermostGenericParamTypes(),
+                             [alias](const GenericTypeParamType *param) {
+              return param->getName() == alias->getName();
+            });
+            if (matchesGenericParam)
+              return false;
+          }
+        }
+      }
+
       return ShouldPrintChecker::shouldPrint(D, options);
     }
   };
-  result.CurrentPrintabilityChecker = std::make_shared<UsableFromInlineOnly>();
+  result.CurrentPrintabilityChecker =
+      std::make_shared<ShouldPrintForTextualInterface>();
 
   // FIXME: We don't really need 'public' on everything; we could just change
   // the default to 'public' and mark the 'internal' things.
   result.PrintAccess = true;
 
-  // FIXME: We'll need the actual default parameter expression.
-  result.PrintDefaultParameterPlaceholder = false;
+  result.ExcludeAttrList = {DAK_ImplicitlyUnwrappedOptional, DAK_AccessControl,
+                            DAK_SetterAccess};
 
   return result;
 }
@@ -105,8 +164,10 @@ TypeTransformContext::TypeTransformContext(TypeOrExtensionDecl D)
     : BaseType(nullptr), Decl(D) {
   if (auto NTD = Decl.Decl.dyn_cast<NominalTypeDecl *>())
     BaseType = NTD->getDeclaredTypeInContext().getPointer();
-  else
-    BaseType = Decl.Decl.get<ExtensionDecl *>()->getExtendedType().getPointer();
+  else {
+    auto *ED = Decl.Decl.get<ExtensionDecl *>();
+    BaseType = ED->getDeclaredTypeInContext().getPointer();
+  }
 }
 
 TypeOrExtensionDecl TypeTransformContext::getDecl() const { return Decl; }
@@ -493,8 +554,13 @@ class PrintAST : public ASTVisitor<PrintAST> {
   }
 
   void printAccess(const ValueDecl *D) {
-    if (!Options.PrintAccess || !D->hasAccess() ||
-        D->getAttrs().hasAttribute<AccessControlAttr>())
+    assert(!llvm::is_contained(Options.ExcludeAttrList, DAK_AccessControl) ||
+           llvm::is_contained(Options.ExcludeAttrList, DAK_SetterAccess));
+
+    if (!Options.PrintAccess || isa<ProtocolDecl>(D->getDeclContext()))
+      return;
+    if (D->getAttrs().hasAttribute<AccessControlAttr>() &&
+        !llvm::is_contained(Options.ExcludeAttrList, DAK_AccessControl))
       return;
 
     printAccess(D->getFormalAccess());
@@ -605,6 +671,8 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
   void printAttributes(const Decl *D);
   void printTypedPattern(const TypedPattern *TP);
+  void printBraceStmt(const BraceStmt *stmt, bool newlineIfEmpty = true);
+  void printAccessorDecl(const AccessorDecl *decl);
 
 public:
   void printPattern(const Pattern *pattern);
@@ -613,9 +681,8 @@ public:
     PrintParams = 1,
     PrintRequirements = 2,
     InnermostOnly = 4,
-    SkipSelfRequirement = 8,
-    SwapSelfAndDependentMemberType = 16,
-    PrintInherited = 32,
+    SwapSelfAndDependentMemberType = 8,
+    PrintInherited = 16,
   };
 
   void printInheritedFromRequirementSignature(ProtocolDecl *proto,
@@ -639,7 +706,8 @@ private:
   bool shouldPrint(const Decl *D, bool Notify = false);
   bool shouldPrintPattern(const Pattern *P);
   void printPatternType(const Pattern *P);
-  void printAccessors(AbstractStorageDecl *ASD);
+  void printAccessors(const AbstractStorageDecl *ASD);
+  void printMutatingModifiersIfNeeded(const AccessorDecl *accessor);
   void printMembersOfDecl(Decl * NTD, bool needComma = false,
                           bool openBracket = true, bool closeBracket = true);
   void printMembers(ArrayRef<Decl *> members, bool needComma = false,
@@ -647,6 +715,7 @@ private:
   void printGenericDeclGenericParams(GenericContext *decl);
   void printGenericDeclGenericRequirements(GenericContext *decl);
   void printInherited(const Decl *decl);
+  void printBodyIfNecessary(const AbstractFunctionDecl *decl);
 
   void printEnumElement(EnumElementDecl *elt);
 
@@ -759,6 +828,16 @@ static StaticSpellingKind getCorrectStaticSpelling(const Decl *D) {
   }
 }
 
+static bool hasMutatingGetter(const AbstractStorageDecl *ASD) {
+  return ASD->getGetter() && ASD->isGetterMutating();
+}
+
+static bool hasNonMutatingSetter(const AbstractStorageDecl *ASD) {
+  if (!ASD->isSettable(nullptr)) return false;
+  auto setter = ASD->getSetter();
+  return setter && setter->isExplicitNonMutating();
+}
+
 void PrintAST::printAttributes(const Decl *D) {
   if (Options.SkipAttributes)
     return;
@@ -766,9 +845,19 @@ void PrintAST::printAttributes(const Decl *D) {
   // Don't print a redundant 'final' if we are printing a 'static' decl.
   unsigned originalExcludeAttrCount = Options.ExcludeAttrList.size();
   if (Options.PrintImplicitAttrs &&
-      D->getDeclContext()->getAsClassOrClassExtensionContext() &&
+      D->getDeclContext()->getSelfClassDecl() &&
       getCorrectStaticSpelling(D) == StaticSpellingKind::KeywordStatic) {
     Options.ExcludeAttrList.push_back(DAK_Final);
+  }
+
+  // Don't print any contextual decl modifiers.
+  // We will handle 'mutating' and 'nonmutating' separately.
+  if (Options.PrintImplicitAttrs && isa<AccessorDecl>(D)) {
+#define EXCLUDE_ATTR(Class) Options.ExcludeAttrList.push_back(DAK_##Class);
+#define CONTEXTUAL_DECL_ATTR(X, Class, Y, Z) EXCLUDE_ATTR(Class)
+#define CONTEXTUAL_SIMPLE_DECL_ATTR(X, Class, Y, Z) EXCLUDE_ATTR(Class)
+#define CONTEXTUAL_DECL_ATTR_ALIAS(X, Class) EXCLUDE_ATTR(Class)
+#include "swift/AST/Attr.def"
   }
 
   // If the declaration is implicitly @objc, print the attribute now.
@@ -782,6 +871,12 @@ void PrintAST::printAttributes(const Decl *D) {
   }
 
   D->getAttrs().print(Printer, Options, D);
+
+  // Explicitly print 'mutating' and 'nonmutating' before getters and setters
+  // for which that is true.
+  if (auto accessor = dyn_cast<AccessorDecl>(D)) {
+    printMutatingModifiersIfNeeded(accessor);
+  }
 
   Options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
@@ -800,7 +895,13 @@ void PrintAST::printPattern(const Pattern *pattern) {
 
   case PatternKind::Named: {
     auto named = cast<NamedPattern>(pattern);
-    recordDeclLoc(named->getDecl(), [&]{
+    auto decl = named->getDecl();
+    recordDeclLoc(decl, [&]{
+      if (Options.OmitNameOfInaccessibleProperties &&
+          contributesToParentTypeStorage(decl) &&
+          !isPublicOrUsableFromInline(decl))
+        Printer << "_";
+      else
         Printer.printName(named->getBoundName());
       });
     break;
@@ -1202,13 +1303,6 @@ void PrintAST::printSingleDepthOfGenericSignature(
       if (req.getKind() != RequirementKind::Layout)
         second = req.getSecondType();
 
-      if ((flags & SkipSelfRequirement) &&
-          req.getKind() == RequirementKind::Conformance) {
-        auto proto = cast<ProtocolDecl>(second->getAnyNominal());
-        if (first->isEqual(proto->getSelfInterfaceType()))
-          continue;
-      }
-
       if (!subMap.empty()) {
         if (Type subFirst = substParam(first))
           first = subFirst;
@@ -1303,7 +1397,8 @@ void PrintAST::printPatternType(const Pattern *P) {
   }
 }
 
-bool ShouldPrintChecker::shouldPrint(const Pattern *P, PrintOptions &Options) {
+bool ShouldPrintChecker::shouldPrint(const Pattern *P,
+                                     const PrintOptions &Options) {
   bool ShouldPrint = false;
   P->forEachVariable([&](const VarDecl *VD) {
     ShouldPrint |= shouldPrint(VD, Options);
@@ -1311,7 +1406,8 @@ bool ShouldPrintChecker::shouldPrint(const Pattern *P, PrintOptions &Options) {
   return ShouldPrint;
 }
 
-bool ShouldPrintChecker::shouldPrint(const Decl *D, PrintOptions &Options) {
+bool ShouldPrintChecker::shouldPrint(const Decl *D,
+                                     const PrintOptions &Options) {
   if (auto *ED= dyn_cast<ExtensionDecl>(D)) {
     if (Options.printExtensionContentAsMembers(ED))
       return false;
@@ -1346,10 +1442,16 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D, PrintOptions &Options) {
     return !EED->getSourceRange().isValid();
   }
 
+  if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
+    if (Options.OmitNameOfInaccessibleProperties &&
+        contributesToParentTypeStorage(ASD))
+      return true;
+  }
+
   // Skip declarations that are not accessible.
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
     if (Options.AccessFilter > AccessLevel::Private &&
-        VD->hasAccess() && VD->getFormalAccess() < Options.AccessFilter)
+        VD->getFormalAccess() < Options.AccessFilter)
       return false;
   }
 
@@ -1384,7 +1486,7 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D, PrintOptions &Options) {
         // If the Clang declaration is from a protocol but was mirrored into
         // class or extension thereof, treat it as an override.
         if (isa<clang::ObjCProtocolDecl>(clangDecl->getDeclContext()) &&
-            VD->getDeclContext()->getAsClassOrClassExtensionContext())
+            VD->getDeclContext()->getSelfClassDecl())
           return false;
 
         // Check whether Clang considers it an override.
@@ -1425,22 +1527,27 @@ bool PrintAST::shouldPrint(const Decl *D, bool Notify) {
   return Result;
 }
 
-static bool isAccessorAssumedNonMutating(AccessorDecl *accessor) {
-  switch (accessor->getAccessorKind()) {
-  case AccessorKind::Get:
-  case AccessorKind::Address:
-  case AccessorKind::Read:
-    return true;
-
-  case AccessorKind::Set:
-  case AccessorKind::WillSet:
-  case AccessorKind::DidSet:
-  case AccessorKind::MaterializeForSet:
-  case AccessorKind::MutableAddress:
-  case AccessorKind::Modify:
-    return false;
+void PrintAST::printBraceStmt(const BraceStmt *stmt, bool newlineIfEmpty) {
+  Printer << "{";
+  if (printASTNodes(stmt->getElements()) || newlineIfEmpty) {
+    Printer.printNewline();
+    indent();
   }
-  llvm_unreachable("bad addressor kind");
+  Printer << "}";
+}
+
+void PrintAST::printBodyIfNecessary(const AbstractFunctionDecl *decl) {
+  if (auto BodyFunc = Options.FunctionBody) {
+    BodyFunc(decl, Printer);
+    indent();
+    return;
+  }
+
+  if (!Options.FunctionDefinitions || !decl->getBody())
+    return;
+
+  Printer << " ";
+  printBraceStmt(decl->getBody(), /*newlineIfEmpty*/!isa<AccessorDecl>(decl));
 }
 
 static StringRef getAccessorLabel(AccessorDecl *accessor) {
@@ -1473,7 +1580,17 @@ static StringRef getAccessorLabel(AccessorDecl *accessor) {
   llvm_unreachable("bad accessor kind");
 }
 
-void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
+void PrintAST::printMutatingModifiersIfNeeded(const AccessorDecl *accessor) {
+  if (accessor->isAssumedNonMutating() && accessor->isMutating()) {
+    Printer.printKeyword("mutating");
+    Printer << " ";
+  } else if (accessor->isExplicitNonMutating()) {
+    Printer.printKeyword("nonmutating");
+    Printer << " ";
+  }
+}
+
+void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   if (isa<VarDecl>(ASD) && !Options.PrintPropertyAccessors)
     return;
 
@@ -1493,19 +1610,18 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     return;
   }
 
+  // AbstractAccessors is suppressed by FunctionDefinitions.
+  bool PrintAbstract =
+    Options.AbstractAccessors && !Options.FunctionDefinitions;
+
   // We sometimes want to print the accessors abstractly
   // instead of listing out how they're actually implemented.
   bool inProtocol = isa<ProtocolDecl>(ASD->getDeclContext());
-  if (!Options.FunctionBody &&
-      (inProtocol ||
-        (Options.AbstractAccessors && !Options.FunctionDefinitions))) {
-    bool mutatingGetter = ASD->getGetter() && ASD->isGetterMutating();
+  if ((inProtocol && !Options.PrintAccessorBodiesInProtocols) ||
+      PrintAbstract) {
     bool settable = ASD->isSettable(nullptr);
-    bool nonmutatingSetter = false;
-    if (settable && !ASD->isSetterMutating() && ASD->isInstanceMember() &&
-        !ASD->getDeclContext()->getDeclaredInterfaceType()
-            ->hasReferenceSemantics())
-      nonmutatingSetter = true;
+    bool mutatingGetter = hasMutatingGetter(ASD);
+    bool nonmutatingSetter = hasNonMutatingSetter(ASD);
 
     // We're about to print something like this:
     //   { mutating? get (nonmutating? set)? }
@@ -1534,13 +1650,25 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     return;
   }
 
+  // Should we print the 'modify' accessor?
+  auto shouldHideModifyAccessor = [&] {
+    if (impl.getReadWriteImpl() != ReadWriteImplKind::Modify)
+      return true;
+    // Always hide in a protocol.
+    return isa<ProtocolDecl>(ASD->getDeclContext());
+  };
+
+  auto isGetSetImpl = [&] {
+    return ((impl.getReadImpl() == ReadImplKind::Stored ||
+             impl.getReadImpl() == ReadImplKind::Get) &&
+            (impl.getWriteImpl() == WriteImplKind::Stored ||
+             impl.getWriteImpl() == WriteImplKind::Set) &&
+            (shouldHideModifyAccessor()));
+  };
+
   // Honor !Options.PrintGetSetOnRWProperties in the only remaining
   // case where we could end up printing { get set }.
-  if ((impl.getReadImpl() == ReadImplKind::Stored ||
-       impl.getReadImpl() == ReadImplKind::Get) &&
-      (impl.getWriteImpl() == WriteImplKind::Stored ||
-       impl.getWriteImpl() == WriteImplKind::Set) &&
-      (impl.getReadWriteImpl() == ReadWriteImplKind::MaterializeToTemporary) &&
+  if ((PrintAbstract || isGetSetImpl()) &&
       !Options.PrintGetSetOnRWProperties &&
       !Options.FunctionDefinitions &&
       !ASD->getGetter()->isMutating() &&
@@ -1549,45 +1677,50 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   }
 
   // Otherwise, print all the concrete defining accessors.
+  bool PrintAccessorBody = Options.FunctionDefinitions;
 
-  bool PrintAccessorBody = Options.FunctionDefinitions || Options.FunctionBody;
-
-  auto PrintAccessor = [&](AccessorDecl *Accessor) {
-    if (!Accessor)
-      return;
+  // Helper to print an accessor. Returns true if the
+  // accessor was present but skipped.
+  auto PrintAccessor = [&](AccessorDecl *Accessor) -> bool {
+    if (!Accessor || !shouldPrint(Accessor))
+      return true;
     if (!PrintAccessorBody) {
-      if (isAccessorAssumedNonMutating(Accessor)) {
-        if (Accessor->isMutating()) {
-          Printer << " ";
-          Printer.printKeyword("mutating");
-        }
-      } else {
-        if (Accessor->isExplicitNonMutating()) {
-          Printer << " ";
-          Printer.printKeyword("nonmutating");
-        }
-      }
       Printer << " ";
+      printMutatingModifiersIfNeeded(Accessor);
       Printer.printKeyword(getAccessorLabel(Accessor));
     } else {
-      Printer.printNewline();
-      IndentRAII IndentMore(*this);
+      {
+        IndentRAII IndentMore(*this);
+        indent();
+        visit(Accessor);
+      }
       indent();
-      visit(Accessor);
+      Printer.printNewline();
     }
+    return false;
   };
 
+  // Determine if we should print the getter without the 'get { ... }'
+  // block around it.
+  bool isOnlyGetter = impl.getReadImpl() == ReadImplKind::Get &&
+                      ASD->getGetter();
+  bool isGetterMutating = ASD->supportsMutation() || ASD->isGetterMutating();
+  if (isOnlyGetter && !isGetterMutating && PrintAccessorBody &&
+      Options.FunctionBody && Options.CollapseSingleGetterProperty) {
+    Options.FunctionBody(ASD->getGetter(), Printer);
+    indent();
+    return;
+  }
+
   Printer << " {";
-  if (impl.getReadImpl() == ReadImplKind::Get && ASD->getGetter() &&
-      !ASD->supportsMutation() &&
-      PrintAccessorBody && !Options.FunctionDefinitions) {
-    // Omit the 'get' keyword. Directly print getter
-    if (auto BodyFunc = Options.FunctionBody) {
-      Printer.printNewline();
-      IndentRAII IndentBody(*this);
-      indent();
-      Printer << BodyFunc(ASD->getGetter());
-    }    
+
+  if (PrintAccessorBody)
+    Printer.printNewline();
+
+  if (PrintAbstract) {
+    PrintAccessor(ASD->getGetter());
+    if (ASD->supportsMutation())
+      PrintAccessor(ASD->getSetter());
   } else {
     switch (impl.getReadImpl()) {
     case ReadImplKind::Stored:
@@ -1609,13 +1742,18 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
     case WriteImplKind::Stored:
       llvm_unreachable("simply-stored variable should have been filtered out");
     case WriteImplKind::StoredWithObservers:
-    case WriteImplKind::InheritedWithObservers:
-      PrintAccessor(ASD->getWillSetFunc());
-      PrintAccessor(ASD->getDidSetFunc());
+    case WriteImplKind::InheritedWithObservers: {
+      bool skippedWillSet = PrintAccessor(ASD->getWillSetFunc());
+      bool skippedDidSet = PrintAccessor(ASD->getDidSetFunc());
+      if (skippedDidSet && skippedWillSet) {
+        PrintAccessor(ASD->getGetter());
+        PrintAccessor(ASD->getSetter());
+      }
       break;
+    }
     case WriteImplKind::Set:
       PrintAccessor(ASD->getSetter());
-      if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify)
+      if (!shouldHideModifyAccessor())
         PrintAccessor(ASD->getModifyCoroutine());
       break;
     case WriteImplKind::MutableAddress:
@@ -1628,12 +1766,13 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
       break;
     }
   }
-  if (PrintAccessorBody) {
-    Printer.printNewline();
-    indent();
-  } else
+
+  if (!PrintAccessorBody)
     Printer << " ";
+
   Printer << "}";
+
+  indent();
 }
 
 void PrintAST::printMembersOfDecl(Decl *D, bool needComma,
@@ -1843,14 +1982,16 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
     });
     printInherited(decl);
 
-    if (decl->getGenericParams())
-      if (auto *genericSig = decl->getGenericSignature()) {
-        // For protocol extensions, don't print the 'Self : ...' requirement.
-        unsigned flags = PrintRequirements | InnermostOnly;
-        if (decl->getAsProtocolExtensionContext())
-          flags |= SkipSelfRequirement;
-        printGenericSignature(genericSig, flags);
-      }
+    if (auto *genericSig = decl->getGenericSignature()) {
+      auto *baseGenericSig = decl->getExtendedNominal()->getGenericSignature();
+      assert(baseGenericSig &&
+             "an extension can't be generic if the base type isn't");
+      printGenericSignature(genericSig, PrintRequirements | InnermostOnly,
+                            [baseGenericSig](const Requirement &req) -> bool {
+        // Only include constraints that are not satisfied by the base type.
+        return !baseGenericSig->isRequirementSatisfied(req);
+      });
+    }
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false,
@@ -1862,8 +2003,9 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
 void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
   if (Options.TransformContext &&
       Options.TransformContext->isPrintingSynthesizedExtension()) {
-    auto extendedType =
-        Options.TransformContext->getBaseType()->mapTypeOutOfContext();
+    auto extendedType = Options.TransformContext->getBaseType();
+    if (extendedType->hasArchetype())
+      extendedType = extendedType->mapTypeOutOfContext();
     printSynthesizedExtension(extendedType, decl);
   } else
     printExtension(decl);
@@ -2156,7 +2298,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
 }
 
 static bool isStructOrClassContext(DeclContext *dc) {
-  auto *nominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *nominal = dc->getSelfNominalTypeDecl();
   if (nominal == nullptr)
     return false;
   return isa<ClassDecl>(nominal) || isa<StructDecl>(nominal);
@@ -2303,7 +2445,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
   // through the paren types so that we don't print excessive @escapings.
   unsigned numParens = 0;
   if (!willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options)) {
-    auto type = TheTypeLoc.getType()->getInOutObjectType();
+    auto type = TheTypeLoc.getType();
 
     printParameterFlags(Printer, Options, paramFlags);
     while (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
@@ -2327,26 +2469,24 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     Printer << "...";
 
   if (param->isDefaultArgument()) {
-    auto defaultArgStr
-      = getDefaultArgumentSpelling(param->getDefaultArgumentKind());
-    if (defaultArgStr.empty()) {
-      if (Options.PrintDefaultParameterPlaceholder)
-        Printer << " = " << tok::kw_default;
-    } else {
-      Printer << " = ";
+    SmallString<128> scratch;
+    auto defaultArgStr = param->getDefaultValueStringRepresentation(scratch);
 
-      switch (param->getDefaultArgumentKind()) {
-      case DefaultArgumentKind::File:
-      case DefaultArgumentKind::Line:
-      case DefaultArgumentKind::Column:
-      case DefaultArgumentKind::Function:
-      case DefaultArgumentKind::DSOHandle:
-        Printer.printKeyword(defaultArgStr);
-        break;
-      default:
-        Printer << defaultArgStr;
-        break;
-      }
+    assert(!defaultArgStr.empty() && "empty default argument?");
+    Printer << " = ";
+
+    switch (param->getDefaultArgumentKind()) {
+    case DefaultArgumentKind::File:
+    case DefaultArgumentKind::Line:
+    case DefaultArgumentKind::Column:
+    case DefaultArgumentKind::Function:
+    case DefaultArgumentKind::DSOHandle:
+    case DefaultArgumentKind::NilLiteral:
+      Printer.printKeyword(defaultArgStr);
+      break;
+    default:
+      Printer << defaultArgStr;
+      break;
     }
   }
 }
@@ -2427,13 +2567,11 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   case AccessorKind::Read:
   case AccessorKind::Modify:
   case AccessorKind::DidSet:
-  case AccessorKind::MaterializeForSet:
   case AccessorKind::MutableAddress:
     recordDeclLoc(decl,
       [&]{
         Printer << getAccessorLabel(decl);
       });
-    Printer << " {";
     break;
   case AccessorKind::Set:
   case AccessorKind::WillSet:
@@ -2451,24 +2589,9 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
           }
         }
       });
-    Printer << " {";
   }
-  if (auto BodyFunc = Options.FunctionBody) {
-    {
-      IndentRAII IndentBody(*this);
-      indent();
-      Printer.printNewline();
-      Printer << BodyFunc(decl);
-    }
-    indent();
-    Printer.printNewline();
-  } else if (Options.FunctionDefinitions && decl->getBody()) {
-    if (printASTNodes(decl->getBody()->getElements())) {
-      Printer.printNewline();
-      indent();
-    }
-  }
-  Printer << "}";
+
+  printBodyIfNecessary(decl);
 }
 
 void PrintAST::visitFuncDecl(FuncDecl *decl) {
@@ -2540,22 +2663,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     printGenericDeclGenericRequirements(decl);
   }
 
-  if (auto BodyFunc = Options.FunctionBody) {
-    Printer << " {";
-    Printer.printNewline();
-    {
-      IndentRAII IndentBody(*this);
-      indent();
-      Printer << BodyFunc(decl);
-    }
-    indent();
-    Printer.printNewline();
-    Printer << "}";
-
-  } else if (Options.FunctionDefinitions && decl->getBody()) {
-    Printer << " ";
-    visit(decl->getBody());
-  }
+  printBodyIfNecessary(decl);
 }
 
 void PrintAST::printEnumElement(EnumElementDecl *elt) {
@@ -2679,10 +2787,25 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
   if ((decl->getInitKind() == CtorInitializerKind::Convenience ||
        decl->getInitKind() == CtorInitializerKind::ConvenienceFactory) &&
       !decl->getAttrs().hasAttribute<ConvenienceAttr>()) {
-    Printer.printKeyword("convenience");
-    Printer << " ";
+    // Protocol extension initializers are modeled as convenience initializers,
+    // but they're not written that way in source. Check if we're actually
+    // printing onto a class.
+    bool isClassContext;
+    if (CurrentType) {
+      isClassContext = CurrentType->getClassOrBoundGenericClass() != nullptr;
+    } else {
+      const DeclContext *dc = decl->getDeclContext();
+      isClassContext = dc->getSelfClassDecl() != nullptr;
+    }
+    if (isClassContext) {
+      Printer.printKeyword("convenience");
+      Printer << " ";
+    } else {
+      assert(decl->getDeclContext()->getExtendedProtocolDecl() &&
+             "unexpected convenience initializer");
+    }
   } else if (decl->getInitKind() == CtorInitializerKind::Factory) {
-      Printer << "/*not inherited*/ ";
+    Printer << "/*not inherited*/ ";
   }
 
   printContextIfNeeded(decl);
@@ -2709,21 +2832,7 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
 
   printGenericDeclGenericRequirements(decl);
 
-  if (auto BodyFunc = Options.FunctionBody) {
-    Printer << " {";
-    {
-      Printer.printNewline();
-      IndentRAII IndentBody(*this);
-      indent();
-      Printer << BodyFunc(decl);
-    }
-    indent();
-    Printer.printNewline();
-    Printer << "}";
-  } else if (Options.FunctionDefinitions && decl->getBody()) {
-    Printer << " ";
-    visit(decl->getBody());
-  }
+  printBodyIfNecessary(decl);
 }
 
 void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
@@ -2735,12 +2844,7 @@ void PrintAST::visitDestructorDecl(DestructorDecl *decl) {
       Printer << "deinit";
     });
 
-  if (!Options.FunctionDefinitions || !decl->getBody()) {
-    return;
-  }
-
-  Printer << " ";
-  visit(decl->getBody());
+  printBodyIfNecessary(decl);
 }
 
 void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
@@ -2750,9 +2854,10 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
-  if (!decl->getPrecedenceGroupName().empty()) {
-    Printer << " : " << decl->getPrecedenceGroupName();
-  }
+  if (!decl->getFirstIdentifier().empty())
+    Printer << " : " << decl->getFirstIdentifier();
+  if (!decl->getSecondIdentifier().empty())
+    Printer << ", " << decl->getSecondIdentifier();
 }
 
 void PrintAST::visitPrecedenceGroupDecl(PrecedenceGroupDecl *decl) {
@@ -2825,6 +2930,8 @@ void PrintAST::visitPrefixOperatorDecl(PrefixOperatorDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
+  if (!decl->getDesignatedProtocolName().empty())
+    Printer << " : " << decl->getDesignatedProtocolName();
 }
 
 void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
@@ -2834,6 +2941,8 @@ void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
+  if (!decl->getDesignatedProtocolName().empty())
+    Printer << " : " << decl->getDesignatedProtocolName();
 }
 
 void PrintAST::visitModuleDecl(ModuleDecl *decl) { }
@@ -2845,11 +2954,7 @@ void PrintAST::visitMissingMemberDecl(MissingMemberDecl *decl) {
 }
 
 void PrintAST::visitBraceStmt(BraceStmt *stmt) {
-  Printer << "{";
-  printASTNodes(stmt->getElements());
-  Printer.printNewline();
-  indent();
-  Printer << "}";
+  printBraceStmt(stmt);
 }
 
 void PrintAST::visitReturnStmt(ReturnStmt *stmt) {
@@ -3301,7 +3406,7 @@ public:
       if (i)
         Printer << ", ";
       const TupleTypeElt &TD = Fields[i];
-      Type EltType = TD.getType()->getInOutObjectType();
+      Type EltType = TD.getRawType();
 
       Printer.callPrintStructurePre(PrintStructureKind::TupleElement);
       SWIFT_DEFER {
@@ -3874,7 +3979,7 @@ public:
       Printer << "<anonymous>";
     else {
       if (T->getDecl() &&
-          T->getDecl()->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+          T->getDecl()->getDeclContext()->getSelfProtocolDecl()) {
         Printer.printTypeRef(T, T->getDecl(), Name);
         return;
       }
@@ -3916,10 +4021,15 @@ void Type::print(raw_ostream &OS, const PrintOptions &PO) const {
   print(Printer, PO);
 }
 void Type::print(ASTPrinter &Printer, const PrintOptions &PO) const {
-  if (isNull())
+  if (isNull()) {
+    if (!PO.AllowNullTypes) {
+      // Use report_fatal_error instead of assert to trap in release builds too.
+      llvm::report_fatal_error("Cannot pretty-print a null type");
+    }
     Printer << "<null>";
-  else
-    TypePrinter(Printer, PO).visit(*this);
+    return;
+  }
+  TypePrinter(Printer, PO).visit(*this);
 }
 
 void AnyFunctionType::printParams(raw_ostream &OS, const

@@ -54,19 +54,19 @@ func test_unavailable_accessors(_ obj: UnavailableAccessors,
   UnavailableAccessors.setterUnavailableClass = 0 // expected-error {{setter for 'setterUnavailableClass' is unavailable}}
   UnavailableAccessors.setterUnavailableClass += 1 // expected-error {{setter for 'setterUnavailableClass' is unavailable}}
 
-  _ = sub[0] // expected-error {{getter for 'subscript' is unavailable: bad subscript getter}}
-  sub[0] = "" // expected-error {{setter for 'subscript' is unavailable: bad subscript setter}}
-  sub[0] += "" // expected-error {{getter for 'subscript' is unavailable: bad subscript getter}} expected-error {{setter for 'subscript' is unavailable: bad subscript setter}}
+  _ = sub[0] // expected-error {{getter for 'subscript(_:)' is unavailable: bad subscript getter}}
+  sub[0] = "" // expected-error {{setter for 'subscript(_:)' is unavailable: bad subscript setter}}
+  sub[0] += "" // expected-error {{getter for 'subscript(_:)' is unavailable: bad subscript getter}} expected-error {{setter for 'subscript(_:)' is unavailable: bad subscript setter}}
 
-  _ = subGetter[0] // expected-error {{getter for 'subscript' is unavailable: bad subscript getter}}
+  _ = subGetter[0] // expected-error {{getter for 'subscript(_:)' is unavailable: bad subscript getter}}
   subGetter[0] = ""
-  subGetter[0] += "" // expected-error {{getter for 'subscript' is unavailable: bad subscript getter}}
+  subGetter[0] += "" // expected-error {{getter for 'subscript(_:)' is unavailable: bad subscript getter}}
 
   _ = subSetter[0]
-  subSetter[0] = "" // expected-error {{setter for 'subscript' is unavailable: bad subscript setter}}
-  subSetter[0] += "" // expected-error {{setter for 'subscript' is unavailable: bad subscript setter}}
+  subSetter[0] = "" // expected-error {{setter for 'subscript(_:)' is unavailable: bad subscript setter}}
+  subSetter[0] += "" // expected-error {{setter for 'subscript(_:)' is unavailable: bad subscript setter}}
 
-  _ = subReadOnly[0] // expected-error {{getter for 'subscript' is unavailable}}
+  _ = subReadOnly[0] // expected-error {{getter for 'subscript(_:)' is unavailable}}
 }
 
 func test_deprecated(_ s:UnsafeMutablePointer<CChar>, _ obj: AccessorDeprecations,
@@ -100,19 +100,19 @@ func test_deprecated(_ s:UnsafeMutablePointer<CChar>, _ obj: AccessorDeprecation
   AccessorDeprecations.setterDeprecatedClass = 0 // expected-warning {{setter for 'setterDeprecatedClass' is deprecated}}
   AccessorDeprecations.setterDeprecatedClass += 1 // expected-warning {{setter for 'setterDeprecatedClass' is deprecated}}
 
-  _ = sub[0] // expected-warning {{getter for 'subscript' is deprecated: bad subscript getter}}
-  sub[0] = "" // expected-warning {{setter for 'subscript' is deprecated: bad subscript setter}}
-  sub[0] += "" // expected-warning {{getter for 'subscript' is deprecated: bad subscript getter}} expected-warning {{setter for 'subscript' is deprecated: bad subscript setter}}
+  _ = sub[0] // expected-warning {{getter for 'subscript(_:)' is deprecated: bad subscript getter}}
+  sub[0] = "" // expected-warning {{setter for 'subscript(_:)' is deprecated: bad subscript setter}}
+  sub[0] += "" // expected-warning {{getter for 'subscript(_:)' is deprecated: bad subscript getter}} expected-warning {{setter for 'subscript(_:)' is deprecated: bad subscript setter}}
 
-  _ = subGetter[0] // expected-warning {{getter for 'subscript' is deprecated: bad subscript getter}}
+  _ = subGetter[0] // expected-warning {{getter for 'subscript(_:)' is deprecated: bad subscript getter}}
   subGetter[0] = ""
-  subGetter[0] += "" // expected-warning {{getter for 'subscript' is deprecated: bad subscript getter}}
+  subGetter[0] += "" // expected-warning {{getter for 'subscript(_:)' is deprecated: bad subscript getter}}
 
   _ = subSetter[0]
-  subSetter[0] = "" // expected-warning {{setter for 'subscript' is deprecated: bad subscript setter}}
-  subSetter[0] += "" // expected-warning {{setter for 'subscript' is deprecated: bad subscript setter}}
+  subSetter[0] = "" // expected-warning {{setter for 'subscript(_:)' is deprecated: bad subscript setter}}
+  subSetter[0] += "" // expected-warning {{setter for 'subscript(_:)' is deprecated: bad subscript setter}}
 
-  _ = subReadOnly[0] // expected-warning {{getter for 'subscript' is deprecated}}
+  _ = subReadOnly[0] // expected-warning {{getter for 'subscript(_:)' is deprecated}}
 }
 
 func test_NSInvocation(_ x: NSInvocation,         // expected-error {{'NSInvocation' is unavailable}}

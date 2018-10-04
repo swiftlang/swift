@@ -240,7 +240,7 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(convenience, Convenience,
   DeclModifier |
   NotSerialized, 43)
 CONTEXTUAL_SIMPLE_DECL_ATTR(override, Override,
-  OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor |
+  OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor | OnAssociatedType |
   DeclModifier |
   NotSerialized, 44)
 SIMPLE_DECL_ATTR(sil_stored, SILStored,
@@ -345,12 +345,7 @@ DECL_ATTR(_restatedObjCConformance, RestatedObjCConformance,
   OnProtocol |
   LongAttribute | RejectByParser |
   NotSerialized, 70)
-// HACK: Attribute needed to preserve source compatibility by downgrading errors
-// due to an SDK change in Dispatch
-SIMPLE_DECL_ATTR(_downgrade_exhaustivity_check, DowngradeExhaustivityCheck,
-  OnEnumElement |
-  LongAttribute | UserInaccessible,
-  71)
+// NOTE: 71 is unused
 SIMPLE_DECL_ATTR(_implicitly_unwrapped_optional, ImplicitlyUnwrappedOptional,
   OnFunc | OnAccessor | OnVar | OnParam | OnSubscript | OnConstructor |
   RejectByParser,
@@ -380,6 +375,10 @@ SIMPLE_DECL_ATTR(_hasInitialValue, HasInitialValue,
   OnVar |
   UserInaccessible,
   78)
+SIMPLE_DECL_ATTR(_nonoverride, NonOverride,
+  OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor | OnAssociatedType |
+  UserInaccessible | NotSerialized,
+  79)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

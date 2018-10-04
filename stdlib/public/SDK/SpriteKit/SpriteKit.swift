@@ -24,7 +24,11 @@ public typealias SKColor = UIColor
 // this class only exists to allow AnyObject lookup of _copyImageData
 // since that method only exists in a private header in SpriteKit, the lookup
 // mechanism by default fails to accept it as a valid AnyObject call
-@objc class _SpriteKitMethodProvider : NSObject {
+//
+// NOTE: older runtimes called this _SpriteKitMethodProvider. The two must
+// coexist, so it was renamed. The old name must not be used in the new
+// runtime.
+@objc class __SpriteKitMethodProvider : NSObject {
   override init() { preconditionFailure("don't touch me") }
   @objc func _copyImageData() -> NSData! { return nil }
 }

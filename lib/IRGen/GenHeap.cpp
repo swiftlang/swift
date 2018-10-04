@@ -97,13 +97,15 @@ namespace {
                                       ReferenceCounting::Nativeness); \
     } \
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src, \
-                                         SILType T) const override { \
+                                         SILType T, bool isOutlined) \
+    const override { \
       return IGF.getReferenceStorageExtraInhabitantIndex(src, \
                                                ReferenceOwnership::Name, \
                                                ReferenceCounting::Nativeness); \
     } \
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index, \
-                              Address dest, SILType T) const override { \
+                              Address dest, SILType T, bool isOutlined) \
+    const override { \
       return IGF.storeReferenceStorageExtraInhabitant(index, dest, \
                                                ReferenceOwnership::Name, \
                                                ReferenceCounting::Nativeness); \
@@ -166,13 +168,15 @@ namespace {
                                       ReferenceCounting::Nativeness); \
     } \
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src, \
-                                         SILType T) const override {     \
+                                         SILType T, bool isOutlined) \
+    const override {     \
       return IGF.getReferenceStorageExtraInhabitantIndex(src, \
                                                ReferenceOwnership::Name, \
                                                ReferenceCounting::Nativeness); \
     } \
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index, \
-                              Address dest, SILType T) const override { \
+                              Address dest, SILType T, bool isOutlined) \
+    const override { \
       return IGF.storeReferenceStorageExtraInhabitant(index, dest, \
                                                ReferenceOwnership::Name, \
                                                ReferenceCounting::Nativeness); \
@@ -217,12 +221,13 @@ namespace {
                                                     index + IsOptional, 0); \
     } \
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src, \
-                                         SILType T) \
+                                         SILType T, bool isOutlined) \
     const override { \
       return getHeapObjectExtraInhabitantIndex(IGF, src); \
     } \
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index, \
-                              Address dest, SILType T) const override { \
+                              Address dest, SILType T, bool isOutlined) \
+    const override { \
       return storeHeapObjectExtraInhabitant(IGF, index, dest); \
     } \
   };
@@ -233,7 +238,7 @@ namespace {
 /// corresponding to the given metadata kind.
 static llvm::ConstantInt *getMetadataKind(IRGenModule &IGM,
                                           MetadataKind kind) {
-  return llvm::ConstantInt::get(IGM.MetadataKindTy, uint8_t(kind));
+  return llvm::ConstantInt::get(IGM.MetadataKindTy, uint32_t(kind));
 }
 
 /// Perform the layout required for a heap object.
@@ -242,7 +247,7 @@ HeapLayout::HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
                        ArrayRef<const TypeInfo *> fieldTypeInfos,
                        llvm::StructType *typeToFill,
                        NecessaryBindings &&bindings)
-  : StructLayout(IGM, CanType(), LayoutKind::HeapObject, strategy,
+  : StructLayout(IGM, /*decl=*/nullptr, LayoutKind::HeapObject, strategy,
                  fieldTypeInfos, typeToFill),
     ElementTypes(fieldTypes.begin(), fieldTypes.end()),
     Bindings(std::move(bindings))
@@ -277,7 +282,7 @@ static llvm::Value *calcInitOffset(swift::irgen::IRGenFunction &IGF,
   auto prevType = layout.getElementTypes()[i - 1];
   // Start calculating offsets from the last fixed-offset field.
   Size lastFixedOffset = layout.getElement(i - 1).getByteOffset();
-  if (auto *fixedType = dyn_cast<FixedTypeInfo>(&prevElt.getTypeForLayout())) {
+  if (auto *fixedType = dyn_cast<FixedTypeInfo>(&prevElt.getType())) {
     // If the last fixed-offset field is also fixed-size, we can
     // statically compute the end of the fixed-offset fields.
     auto fixedEnd = lastFixedOffset + fixedType->getFixedSize();
@@ -287,7 +292,7 @@ static llvm::Value *calcInitOffset(swift::irgen::IRGenFunction &IGF,
     // offset.
     offset = llvm::ConstantInt::get(IGF.IGM.SizeTy, lastFixedOffset.getValue());
     offset = IGF.Builder.CreateAdd(
-        offset, prevElt.getTypeForLayout().getSize(IGF, prevType));
+        offset, prevElt.getType().getSize(IGF, prevType));
   }
   return offset;
 }
@@ -307,7 +312,7 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
       case ElementLayout::Kind::InitialNonFixedSize:
         // Factor the non-fixed-size field's alignment into the total alignment.
         totalAlign = IGF.Builder.CreateOr(totalAlign,
-                                    elt.getTypeForLayout().getAlignmentMask(IGF, eltTy));
+                                    elt.getType().getAlignmentMask(IGF, eltTy));
         LLVM_FALLTHROUGH;
       case ElementLayout::Kind::Empty:
       case ElementLayout::Kind::Fixed:
@@ -323,7 +328,7 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
         }
         
         // Round up to alignment to get the offset.
-        auto alignMask = elt.getTypeForLayout().getAlignmentMask(IGF, eltTy);
+        auto alignMask = elt.getType().getAlignmentMask(IGF, eltTy);
         auto notAlignMask = IGF.Builder.CreateNot(alignMask);
         offset = IGF.Builder.CreateAdd(offset, alignMask);
         offset = IGF.Builder.CreateAnd(offset, notAlignMask);
@@ -332,7 +337,7 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
         
         // Advance by the field's size to start the next field.
         offset = IGF.Builder.CreateAdd(offset,
-                                       elt.getTypeForLayout().getSize(IGF, eltTy));
+                                       elt.getType().getSize(IGF, eltTy));
         totalAlign = IGF.Builder.CreateOr(totalAlign, alignMask);
 
         break;
@@ -422,7 +427,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
     if (field.isPOD())
       continue;
 
-    field.getTypeForAccess().destroy(
+    field.getType().destroy(
         IGF, field.project(IGF, structAddr, offsets), fieldTy,
         true /*Called from metadata constructors: must be outlined*/);
   }
@@ -1245,9 +1250,10 @@ void IRGenFunction::emitUnknownStrongRetain(llvm::Value *value,
                                             Atomicity atomicity) {
   if (doesNotRequireRefCounting(value))
     return;
-  emitUnaryRefCountCall(*this, (atomicity == Atomicity::Atomic)
-                                   ? IGM.getUnknownRetainFn()
-                                   : IGM.getNonAtomicUnknownRetainFn(),
+  emitUnaryRefCountCall(*this,
+                        (atomicity == Atomicity::Atomic)
+                            ? IGM.getUnknownObjectRetainFn()
+                            : IGM.getNonAtomicUnknownObjectRetainFn(),
                         value);
 }
 
@@ -1255,9 +1261,10 @@ void IRGenFunction::emitUnknownStrongRelease(llvm::Value *value,
                                              Atomicity atomicity) {
   if (doesNotRequireRefCounting(value))
     return;
-  emitUnaryRefCountCall(*this, (atomicity == Atomicity::Atomic)
-                                   ? IGM.getUnknownReleaseFn()
-                                   : IGM.getNonAtomicUnknownReleaseFn(),
+  emitUnaryRefCountCall(*this,
+                        (atomicity == Atomicity::Atomic)
+                            ? IGM.getUnknownObjectReleaseFn()
+                            : IGM.getNonAtomicUnknownObjectReleaseFn(),
                         value);
 }
 
@@ -1287,30 +1294,6 @@ void IRGenFunction::emitErrorStrongRelease(llvm::Value *value) {
   emitUnaryRefCountCall(*this, IGM.getErrorStrongReleaseFn(), value);
 }
 
-llvm::Value *IRGenFunction::emitNativeTryPin(llvm::Value *value,
-                                             Atomicity atomicity) {
-  llvm::CallInst *call =
-      (atomicity == Atomicity::Atomic)
-          ? Builder.CreateCall(IGM.getNativeTryPinFn(), value)
-          : Builder.CreateCall(IGM.getNonAtomicNativeTryPinFn(), value);
-  call->setDoesNotThrow();
-
-  // Builtin.NativeObject? has representation i32/i64.
-  llvm::Value *handle = Builder.CreatePtrToInt(call, IGM.IntPtrTy);
-  return handle;
-}
-
-void IRGenFunction::emitNativeUnpin(llvm::Value *value, Atomicity atomicity) {
-  // Builtin.NativeObject? has representation i32/i64.
-  value = Builder.CreateIntToPtr(value, IGM.RefCountedPtrTy);
-
-  llvm::CallInst *call =
-      (atomicity == Atomicity::Atomic)
-          ? Builder.CreateCall(IGM.getNativeUnpinFn(), value)
-          : Builder.CreateCall(IGM.getNonAtomicNativeUnpinFn(), value);
-  call->setDoesNotThrow();
-}
-
 llvm::Value *IRGenFunction::emitLoadRefcountedPtr(Address addr,
                                                   ReferenceCounting style) {
   Address src =
@@ -1319,43 +1302,23 @@ llvm::Value *IRGenFunction::emitLoadRefcountedPtr(Address addr,
 }
 
 llvm::Value *IRGenFunction::
-emitIsUniqueCall(llvm::Value *value, SourceLoc loc, bool isNonNull,
-                 bool checkPinned) {
+emitIsUniqueCall(llvm::Value *value, SourceLoc loc, bool isNonNull) {
   llvm::Constant *fn;
   if (value->getType() == IGM.RefCountedPtrTy) {
-    if (checkPinned) {
-      if (isNonNull)
-        fn = IGM.getIsUniquelyReferencedOrPinned_nonNull_nativeFn();
-      else
-        fn = IGM.getIsUniquelyReferencedOrPinned_nativeFn();
-    }
-    else {
-      if (isNonNull)
-        fn = IGM.getIsUniquelyReferenced_nonNull_nativeFn();
-      else
-        fn = IGM.getIsUniquelyReferenced_nativeFn();
-    }
+    if (isNonNull)
+      fn = IGM.getIsUniquelyReferenced_nonNull_nativeFn();
+    else
+      fn = IGM.getIsUniquelyReferenced_nativeFn();
   } else if (value->getType() == IGM.UnknownRefCountedPtrTy) {
-    if (checkPinned) {
-      if (!isNonNull)
-        unimplemented(loc, "optional objc ref");
-
-      fn = IGM.getIsUniquelyReferencedOrPinnedNonObjC_nonNullFn();
-    }
-    else {
-      if (isNonNull)
-        fn = IGM.getIsUniquelyReferencedNonObjC_nonNullFn();
-      else
-        fn = IGM.getIsUniquelyReferencedNonObjCFn();
-    }
+    if (isNonNull)
+      fn = IGM.getIsUniquelyReferencedNonObjC_nonNullFn();
+    else
+      fn = IGM.getIsUniquelyReferencedNonObjCFn();
   } else if (value->getType() == IGM.BridgeObjectPtrTy) {
     if (!isNonNull)
       unimplemented(loc, "optional bridge ref");
 
-    if (checkPinned)
-      fn = IGM.getIsUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObjectFn();
-    else
-      fn = IGM.getIsUniquelyReferencedNonObjC_nonNull_bridgeObjectFn();
+    fn = IGM.getIsUniquelyReferencedNonObjC_nonNull_bridgeObjectFn();
   } else {
     llvm_unreachable("Unexpected LLVM type for a refcounted pointer.");
   }
@@ -1486,10 +1449,7 @@ public:
     // Allocate a new object using the layout.
     auto boxedInterfaceType = boxedType;
     if (env) {
-      boxedInterfaceType = SILType::getPrimitiveType(
-        boxedType.getASTType()->mapTypeOutOfContext()
-           ->getCanonicalType(),
-         boxedType.getCategory());
+      boxedInterfaceType = boxedType.mapTypeOutOfContext();
     }
 
     auto boxDescriptor = IGF.IGM.getAddrOfBoxDescriptor(
@@ -1916,6 +1876,7 @@ llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
     // ObjC classes.
     return emitDynamicTypeOfOpaqueHeapObject(IGF, object, repr);
   }
+  llvm_unreachable("unhandled ISA encoding");
 }
 
 static ClassDecl *getRootClass(ClassDecl *theClass) {

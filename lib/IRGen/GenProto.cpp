@@ -33,6 +33,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
@@ -237,9 +238,10 @@ irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
   if (!signature) return;
 
   // Get all of the type metadata.
-  for (auto gp : signature->getSubstitutableParams()) {
-    callback({CanType(gp), nullptr});
-  }
+  signature->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
+    if (canonical)
+      callback({CanType(gp), nullptr});
+  });
 
   // Get the protocol conformances.
   for (auto &reqt : signature->getRequirements()) {
@@ -562,13 +564,12 @@ void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
 
       auto selfTy = FnType->getSelfInstanceType();
       CanType argTy = getTypeInContext(selfTy);
-      if (auto archetype = dyn_cast<ArchetypeType>(argTy)) {
-        setProtocolWitnessTableName(IGF.IGM, selfTable, argTy, selfProto);
-        IGF.setUnscopedLocalTypeData(
-            archetype,
-            LocalTypeDataKind::forAbstractProtocolWitnessTable(selfProto),
-            selfTable);
-      }
+
+      setProtocolWitnessTableName(IGF.IGM, selfTable, argTy, selfProto);
+      IGF.setUnscopedLocalTypeData(
+          argTy,
+          LocalTypeDataKind::forProtocolWitnessTable(conformance),
+          selfTable);
 
       if (conformance.isConcrete()) {
         IGF.bindLocalTypeDataFromSelfWitnessTable(
@@ -749,8 +750,24 @@ namespace {
   /// A class which lays out a witness table in the abstract.
   class WitnessTableLayout : public SILWitnessVisitor<WitnessTableLayout> {
     SmallVector<WitnessTableEntry, 16> Entries;
+    bool requirementSignatureOnly;
 
   public:
+    explicit WitnessTableLayout(ProtocolInfoKind resultKind) {
+      switch (resultKind) {
+      case ProtocolInfoKind::RequirementSignature:
+        requirementSignatureOnly = true;
+        break;
+      case ProtocolInfoKind::Full:
+        requirementSignatureOnly = false;
+        break;
+      }
+    }
+
+    bool shouldVisitRequirementSignatureOnly() {
+      return requirementSignatureOnly;
+    }
+
     void addProtocolConformanceDescriptor() { }
 
     /// The next witness is an out-of-line base protocol.
@@ -896,9 +913,11 @@ namespace {
 
         // Otherwise, if there isn't a better path through this base,
         // don't accumulate anything in the path.
-        } else if (!findBetterPath(base, IGM.getProtocolInfo(base),
-                                   lengthToBase)) {
-          continue;
+        } else {
+          const ProtocolInfo &baseInfo =
+              IGM.getProtocolInfo(base, ProtocolInfoKind::RequirementSignature);
+          if (!findBetterPath(base, baseInfo, lengthToBase))
+            continue;
         }
 
         // Okay, we've found a better path, and ReversePath contains a
@@ -950,7 +969,13 @@ bool irgen::isDependentConformance(const NormalProtocolConformance *conformance)
     return true;
 
   // Check whether any of the inherited conformances are dependent.
-  for (auto inherited : conformance->getProtocol()->getInheritedProtocols()) {
+  auto proto = conformance->getProtocol();
+  for (const auto &req : proto->getRequirementSignature()) {
+    if (req.getKind() != RequirementKind::Conformance ||
+        !req.getFirstType()->isEqual(proto->getProtocolSelfType()))
+      continue;
+
+    auto inherited = req.getSecondType()->castTo<ProtocolType>()->getDecl();
     if (inherited->isObjC())
       continue;
 
@@ -979,19 +1004,6 @@ bool irgen::isDependentConformance(const NormalProtocolConformance *conformance)
   return SILWitnessTable::enumerateWitnessTableConditionalConformances(
       conformance, [](unsigned, CanType, ProtocolDecl *) { return true; });
 }
-
-/// Detail about how an object conforms to a protocol.
-class irgen::ConformanceInfo {
-  friend ProtocolInfo;
-public:
-  virtual ~ConformanceInfo() {}
-  virtual llvm::Value *getTable(IRGenFunction &IGF,
-                               llvm::Value **conformingMetadataCache) const = 0;
-  /// Try to get this table as a constant pointer.  This might just
-  /// not be supportable at all.
-  virtual llvm::Constant *tryGetConstantTable(IRGenModule &IGM,
-                                              CanType conformingType) const = 0;
-};
 
 static llvm::Value *
 emitConditionalConformancesBuffer(IRGenFunction &IGF,
@@ -1106,11 +1118,23 @@ getWitnessTableLazyAccessFunction(IRGenModule &IGM,
 static ProtocolConformance &mapConformanceIntoContext(IRGenModule &IGM,
                                                       const ProtocolConformance &conf,
                                                       DeclContext *dc) {
-  return *conf.subst(dc->mapTypeIntoContext(conf.getType()),
-                     [&](SubstitutableType *t) -> Type {
+  return *conf.subst([&](SubstitutableType *t) -> Type {
                        return dc->mapTypeIntoContext(t);
                      },
                      LookUpConformanceInModule(IGM.getSwiftModule()));
+}
+
+WitnessIndex ProtocolInfo::getAssociatedTypeIndex(
+                                    IRGenModule &IGM,
+                                    AssociatedType assocType) const {
+  assert(!IGM.isResilient(assocType.getSourceProtocol(),
+                          ResilienceExpansion::Maximal) &&
+         "Cannot ask for the associated type index of non-resilient protocol");
+  for (auto &witness : getWitnessEntries()) {
+    if (witness.matchesAssociatedType(assocType))
+      return getNonBaseWitnessIndex(&witness);
+  }
+  llvm_unreachable("didn't find entry for associated type");
 }
 
 namespace {
@@ -1196,7 +1220,7 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
     ArrayRef<SILWitnessTable::Entry> SILEntries;
     ArrayRef<SILWitnessTable::ConditionalConformance>
         SILConditionalConformances;
-    const ProtocolInfo &PI;
+
     Optional<FulfillmentMap> Fulfillments;
     SmallVector<std::pair<size_t, const ConformanceInfo *>, 4>
       SpecializedBaseConformances;
@@ -1206,8 +1230,10 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
     // Conditional conformances and metadata caches are stored at negative
     // offsets, with conditional conformances closest to 0.
     unsigned NextPrivateDataIndex = 0;
+    bool ResilientConformance;
     bool RequiresSpecialization = false;
-    bool ResilientConformance = false;
+
+    const ProtocolInfo &PI;
 
   public:
     WitnessTableBuilder(IRGenModule &IGM, ConstantArrayBuilder &table,
@@ -1223,12 +1249,14 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
                                                          Conformance.getDeclContext())),
           SILEntries(SILWT->getEntries()),
           SILConditionalConformances(SILWT->getConditionalConformances()),
-          PI(IGM.getProtocolInfo(SILWT->getConformance()->getProtocol())) {
+          ResilientConformance(isResilientConformance(&Conformance)),
+          PI(IGM.getProtocolInfo(SILWT->getConformance()->getProtocol(),
+                                 (ResilientConformance
+                                  ? ProtocolInfoKind::RequirementSignature
+                                  : ProtocolInfoKind::Full))) {
       // If the conformance is resilient, we require runtime instantiation.
-      if (isResilientConformance(&Conformance)) {
+      if (ResilientConformance)
         RequiresSpecialization = true;
-        ResilientConformance = true;
-      }
     }
 
     /// The top-level entry point.
@@ -1240,13 +1268,9 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
     /// Add reference to the protocol conformance descriptor that generated
     /// this table.
     void addProtocolConformanceDescriptor() {
-      if (Conformance.isBehaviorConformance()) {
-        Table.addNullPointer(IGM.Int8PtrTy);
-      } else {
-        auto descriptor =
-          IGM.getAddrOfProtocolConformanceDescriptor(&Conformance);
-        Table.addBitCast(descriptor, IGM.Int8PtrTy);
-      }
+      auto descriptor =
+        IGM.getAddrOfProtocolConformanceDescriptor(&Conformance);
+      Table.addBitCast(descriptor, IGM.Int8PtrTy);
     }
 
     /// A base protocol is witnessed by a pointer to the conformance
@@ -1268,13 +1292,10 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
 
       // TODO: Use the witness entry instead of falling through here.
 
-      // Look for a protocol type info.
-      const ProtocolInfo &basePI = IGM.getProtocolInfo(baseProto);
+      // Look for conformance info.
       auto *astConf = ConformanceInContext.getInheritedConformance(baseProto);
       assert(astConf->getType()->isEqual(ConcreteType));
-
-      const ConformanceInfo &conf =
-        basePI.getConformance(IGM, baseProto, astConf);
+      const ConformanceInfo &conf = IGM.getConformanceInfo(baseProto, astConf);
 
       // If we can emit the base witness table as a constant, do so.
       llvm::Constant *baseWitness = conf.tryGetConstantTable(IGM, ConcreteType);
@@ -1327,33 +1348,46 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
     }
 
     void addAssociatedType(AssociatedType requirement) {
+      auto &entry = SILEntries.front();
+      SILEntries = SILEntries.slice(1);
+
+      // Resilient conformances get a resilient witness table.
+      if (ResilientConformance)
+        return;
 
 #ifndef NDEBUG
-      auto &entry = SILEntries.front();
       assert(entry.getKind() == SILWitnessTable::AssociatedType
              && "sil witness table does not match protocol");
       assert(entry.getAssociatedTypeWitness().Requirement
-               == requirement.getAssociation()
+             == requirement.getAssociation()
              && "sil witness table does not match protocol");
-      auto piIndex = PI.getAssociatedTypeIndex(requirement);
+      auto piIndex = PI.getAssociatedTypeIndex(IGM, requirement);
       assert((size_t)piIndex.getValue() ==
-              Table.size() - WitnessTableFirstRequirementOffset &&
+             Table.size() - WitnessTableFirstRequirementOffset &&
              "offset doesn't match ProtocolInfo layout");
+#else
+      (void)entry;
 #endif
 
-      SILEntries = SILEntries.slice(1);
-
       auto associate =
-        ConformanceInContext.getTypeWitness(
-          requirement.getAssociation(), nullptr)->getCanonicalType();
-
-      llvm::Constant *metadataAccessFunction =
-        getAssociatedTypeMetadataAccessFunction(requirement, associate);
-      Table.addBitCast(metadataAccessFunction, IGM.Int8PtrTy);
+        Conformance.getTypeWitness(requirement.getAssociation(), nullptr)
+          ->getCanonicalType();
+      if (associate->hasTypeParameter())
+        RequiresSpecialization = true;
+      llvm::Constant *witness =
+          IGM.getAssociatedTypeWitness(associate, /*inProtocolContext=*/false);
+      Table.addBitCast(witness, IGM.Int8PtrTy);
     }
 
     void addAssociatedConformance(AssociatedConformance requirement) {
       // FIXME: Add static witness tables for type conformances.
+
+      auto &entry = SILEntries.front();
+      (void)entry;
+      SILEntries = SILEntries.slice(1);
+
+      if (ResilientConformance)
+        return;
 
       auto associate =
         ConformanceInContext.getAssociatedType(
@@ -1364,9 +1398,8 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
           requirement.getAssociation(),
           requirement.getAssociatedRequirement());
 
+
 #ifndef NDEBUG
-      auto &entry = SILEntries.front();
-      (void)entry;
       assert(entry.getKind() == SILWitnessTable::AssociatedTypeProtocol
              && "sil witness table does not match protocol");
       auto associatedWitness = entry.getAssociatedTypeProtocolWitness();
@@ -1380,8 +1413,6 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
               Table.size() - WitnessTableFirstRequirementOffset &&
              "offset doesn't match ProtocolInfo layout");
 #endif
-
-      SILEntries = SILEntries.slice(1);
 
       llvm::Constant *wtableAccessFunction =
         getAssociatedTypeWitnessTableAccessFunction(requirement,
@@ -1403,10 +1434,6 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
     }
 
     llvm::Constant *buildInstantiationFunction();
-
-    llvm::Constant *
-    getAssociatedTypeMetadataAccessFunction(AssociatedType requirement,
-                                            CanType associatedType);
 
     llvm::Constant *
     getAssociatedTypeWitnessTableAccessFunction(
@@ -1465,6 +1492,8 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
       }
       return *Fulfillments;
     }
+
+    llvm::Constant *emitResilientWitnessTable();
   };
 } // end anonymous namespace
 
@@ -1475,84 +1504,23 @@ void WitnessTableBuilder::build() {
   TableSize = Table.size();
 }
 
-/// Return the address of a function which will return the type metadata
-/// for an associated type.
-llvm::Constant *WitnessTableBuilder::
-getAssociatedTypeMetadataAccessFunction(AssociatedType requirement,
-                                        CanType associatedType) {
-  // If the associated type is non-dependent, we can use an ordinary
-  // metadata access function.  We'll just end up passing extra arguments.
-  if (!associatedType->hasArchetype()) {
-    return getOrCreateTypeMetadataAccessFunction(IGM, associatedType);
-  }
+llvm::Constant *IRGenModule::getAssociatedTypeWitness(CanType type,
+                                                      bool inProtocolContext) {
+  // FIXME: If we can directly reference constant type metadata, do so.
 
-  // Otherwise, emit an access function.
-  llvm::Function *accessor =
-    IGM.getAddrOfAssociatedTypeMetadataAccessFunction(&Conformance,
-                                                      requirement);
-  if (IGM.getOptions().optimizeForSize())
-    accessor->addFnAttr(llvm::Attribute::NoInline);
+  // Form a reference to the mangled name for this type.
+  assert(!type->hasArchetype() && "type cannot contain archetypes");
+  auto role = inProtocolContext
+    ? MangledTypeRefRole::DefaultAssociatedTypeWitness
+    : MangledTypeRefRole::Metadata;
+  auto typeRef = getTypeRef(type, role);
 
-  IRGenFunction IGF(IGM, accessor);
-  if (IGM.DebugInfo)
-    IGM.DebugInfo->emitArtificialFunction(IGF, accessor);
-
-  Explosion parameters = IGF.collectParameters();
-  auto request = DynamicMetadataRequest(parameters.claimNext());
-
-  llvm::Value *self = parameters.claimNext();
-  setTypeMetadataName(IGM, self, ConcreteType);
-
-  Address destTable(parameters.claimNext(), IGM.getPointerAlignment());
-  setProtocolWitnessTableName(IGM, destTable.getAddress(), ConcreteType,
-                              requirement.getSourceProtocol());
-  IGF.bindLocalTypeDataFromSelfWitnessTable(
-          &Conformance,
-          destTable.getAddress(),
-          [&](CanType type) {
-            return Conformance.getDeclContext()->mapTypeIntoContext(type)
-                     ->getCanonicalType();
-          });
-
-  // If the associated type is directly fulfillable from the type,
-  // we don't need a cache entry.
-  // TODO: maybe we should have a cache entry anyway if the fulfillment
-  // is expensive.
-  if (auto fulfillment =
-        getFulfillmentMap().getTypeMetadata(associatedType)) {
-    // We don't know that 'self' is any better than an abstract metadata here.
-    auto source = MetadataResponse::forBounded(self, MetadataState::Abstract);
-
-    MetadataResponse response =
-      fulfillment->Path.followFromTypeMetadata(IGF, ConcreteType, source,
-                                               request, /*cache*/ nullptr);
-    response.ensureDynamicState(IGF);
-    auto returnValue = response.combine(IGF);
-    IGF.Builder.CreateRet(returnValue);
-    return accessor;
-  }
-
-  // Bind local type data from the metadata argument.
-  IGF.bindLocalTypeDataFromTypeMetadata(ConcreteType, IsExact, self,
-                                        MetadataState::Abstract);
-
-  // For now, assume that an associated type is cheap enough to access
-  // that it doesn't need a new cache entry.
-  if (auto archetype = dyn_cast<ArchetypeType>(associatedType)) {
-    auto response = emitArchetypeTypeMetadataRef(IGF, archetype, request);
-    response.ensureDynamicState(IGF);
-    auto returnValue = response.combine(IGF);
-    IGF.Builder.CreateRet(returnValue);
-    return accessor;
-  }
-
-  // Otherwise, we need a cache entry.
-  emitReturnOfCheckedLoadFromCache(IGF, destTable, self,
-                                   [&]() -> MetadataResponse {
-    return IGF.emitTypeMetadataRef(associatedType, request);
-  });
-
-  return accessor;
+  // Set the low bit to indicate that this is a mangled name.
+  auto witness = llvm::ConstantExpr::getPtrToInt(typeRef, IntPtrTy);
+  unsigned bit = ProtocolRequirementFlags::AssociatedTypeMangledNameBit;
+  auto bitConstant = llvm::ConstantInt::get(IntPtrTy, bit);
+  witness = llvm::ConstantExpr::getAdd(witness, bitConstant);
+  return llvm::ConstantExpr::getIntToPtr(witness, Int8PtrTy);
 }
 
 /// Return a function which will return a particular witness table
@@ -1597,7 +1565,8 @@ llvm::Constant *WitnessTableBuilder::
 getAssociatedTypeWitnessTableAccessFunction(AssociatedConformance requirement,
                                             CanType associatedType,
                                 ProtocolConformanceRef associatedConformance) {
-  if (!associatedType->hasArchetype()) {
+  bool hasArchetype = associatedType->hasArchetype();
+  if (!hasArchetype && !ResilientConformance) {
     assert(associatedConformance.isConcrete() &&
            "no concrete conformance for non-dependent type");
     return getOrCreateWitnessTableAccessFunction(IGM,
@@ -1635,13 +1604,6 @@ getAssociatedTypeWitnessTableAccessFunction(AssociatedConformance requirement,
   Address destTable(parameters.claimNext(), IGM.getPointerAlignment());
   setProtocolWitnessTableName(IGM, destTable.getAddress(), ConcreteType,
                               Conformance.getProtocol());
-  IGF.bindLocalTypeDataFromSelfWitnessTable(
-          &Conformance,
-          destTable.getAddress(),
-          [&](CanType type) {
-            return Conformance.getDeclContext()->mapTypeIntoContext(type)
-                     ->getCanonicalType();
-          });
 
   ProtocolDecl *associatedProtocol = requirement.getAssociatedRequirement();
 
@@ -1649,10 +1611,8 @@ getAssociatedTypeWitnessTableAccessFunction(AssociatedConformance requirement,
   if (associatedConformance.isConcrete()) {
     assert(associatedType->isEqual(associatedConformance.getConcrete()->getType()));
 
-    const ProtocolInfo &protocolI = IGM.getProtocolInfo(associatedProtocol);
-    conformanceI =
-      &protocolI.getConformance(IGM, associatedProtocol,
-                                associatedConformance.getConcrete());
+    conformanceI = &IGM.getConformanceInfo(associatedProtocol,
+                                           associatedConformance.getConcrete());
 
     // If we can emit a constant table, do so.
     // In principle, any time we can do this, we should try to re-use this
@@ -1664,6 +1624,24 @@ getAssociatedTypeWitnessTableAccessFunction(AssociatedConformance requirement,
       return accessor;
     }
   }
+
+  // If there are no archetypes, return a reference to the table. There is
+  // no need for a cache.
+  if (!hasArchetype) {
+    auto wtable = MetadataResponse::forComplete(
+                    conformanceI->getTable(IGF, &associatedTypeMetadata))
+        .getMetadata();
+    IGF.Builder.CreateRet(wtable);
+    return accessor;
+  }
+
+  IGF.bindLocalTypeDataFromSelfWitnessTable(
+        &Conformance,
+        destTable.getAddress(),
+        [&](CanType type) {
+          return Conformance.getDeclContext()->mapTypeIntoContext(type)
+                   ->getCanonicalType();
+        });
 
   // If the witness table is directly fulfillable from the type,
   // we don't need a cache entry.
@@ -1820,11 +1798,12 @@ emitReturnOfCheckedLoadFromCache(IRGenFunction &IGF, Address destTable,
     resultState->addIncoming(completedState, cachingBB);
 }
 
-static llvm::Constant *emitResilientWitnessTable(IRGenModule &IGM,
-                                                 SILWitnessTable *wtable) {
+llvm::Constant *WitnessTableBuilder::emitResilientWitnessTable() {
   unsigned count = 0;
-  for (auto &entry : wtable->getEntries()) {
-    if (entry.getKind() != SILWitnessTable::Method)
+  for (auto &entry : SILWT->getEntries()) {
+    if (entry.getKind() != SILWitnessTable::Method &&
+        entry.getKind() != SILWitnessTable::AssociatedType &&
+        entry.getKind() != SILWitnessTable::AssociatedTypeProtocol)
       continue;
 
     count++;
@@ -1839,17 +1818,66 @@ static llvm::Constant *emitResilientWitnessTable(IRGenModule &IGM,
 
   table.addInt(IGM.Int32Ty, count);
 
-  for (auto &entry : wtable->getEntries()) {
+  for (auto &entry : SILWT->getEntries()) {
+    // Associated type witness access function.
+    if (entry.getKind() == SILWitnessTable::AssociatedType) {
+      // Associated type descriptor.
+      auto assocType = entry.getAssociatedTypeWitness().Requirement;
+      auto assocTypeDescriptor =
+        IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+          LinkEntity::forAssociatedTypeDescriptor(assocType),
+          Alignment(4), IGM.ProtocolRequirementStructTy);
+      table.addRelativeAddress(assocTypeDescriptor);
+
+      // Associated type metadata access function.
+      auto associate = Conformance.getTypeWitness(assocType, nullptr)
+          ->getCanonicalType();
+
+      llvm::Constant *witness =
+          IGM.getAssociatedTypeWitness(associate, /*inProtocolContext=*/false);
+      table.addRelativeAddress(witness);
+      continue;
+    }
+
+    // Associated conformance access function.
+    if (entry.getKind() == SILWitnessTable::AssociatedTypeProtocol) {
+      const auto &witness = entry.getAssociatedTypeProtocolWitness();
+
+      // Associated type descriptor.
+      AssociatedConformance requirement(SILWT->getConformance()->getProtocol(),
+                                        witness.Requirement,
+                                        witness.Protocol);
+      auto assocConformanceDescriptor =
+        IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+          LinkEntity::forAssociatedConformanceDescriptor(requirement),
+          Alignment(4), IGM.ProtocolRequirementStructTy);
+      table.addRelativeAddress(assocConformanceDescriptor);
+
+      auto associate =
+        ConformanceInContext.getAssociatedType(
+          witness.Requirement)->getCanonicalType();
+
+      ProtocolConformanceRef associatedConformance =
+        ConformanceInContext.getAssociatedConformance(witness.Requirement,
+                                                      witness.Protocol);
+
+      llvm::Constant *wtableAccessFunction =
+        getAssociatedTypeWitnessTableAccessFunction(requirement,
+                                                    associate,
+                                                    associatedConformance);
+      table.addRelativeAddress(wtableAccessFunction);
+      continue;
+    }
+
     if (entry.getKind() != SILWitnessTable::Method)
       continue;
 
     auto declRef = entry.getMethodWitness().Requirement;
-    auto entity = LinkEntity::forDispatchThunk(declRef);
-    auto *func = IGM.getAddrOfDispatchThunk(declRef,
-                                            NotForDefinition);
-    auto requirement = IGM.getFunctionGOTEquivalent(entity, func);
-
-    table.addIndirectRelativeAddress(requirement);
+    auto requirement =
+      IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+        LinkEntity::forMethodDescriptor(declRef),
+        Alignment(4), IGM.ProtocolRequirementStructTy);
+    table.addRelativeAddress(requirement);
 
     SILFunction *Func = entry.getMethodWitness().Witness;
     llvm::Constant *witness;
@@ -1865,7 +1893,7 @@ static llvm::Constant *emitResilientWitnessTable(IRGenModule &IGM,
 
   auto *result =
     cast<llvm::GlobalVariable>(
-      IGM.getAddrOfResilientWitnessTable(wtable->getConformance(),
+      IGM.getAddrOfResilientWitnessTable(SILWT->getConformance(),
                                          table.finishAndCreateFuture()));
   result->setConstant(true);
   IGM.setTrueConstGlobal(result);
@@ -1931,7 +1959,9 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   //    /// The amount of private storage to allocate before the address point,
   //    /// in words. This memory is zeroed out in the instantiated witness table
   //    /// template.
-  //    uint16_t WitnessTablePrivateSizeInWords;
+  //    /// The low bit is used to indicate whether this witness table is known
+  //    /// to require instantiation.
+  //    uint16_t WitnessTablePrivateSizeInWordsAndRequiresInstantiation;
   //
   //    /// The protocol.
   //    RelativeIndirectablePointer<ProtocolDescriptor> Protocol;
@@ -1973,7 +2003,7 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
 
   llvm::Constant *resilientWitnessTable = nullptr;
   if (ResilientConformance)
-    resilientWitnessTable = emitResilientWitnessTable(IGM, SILWT);
+    resilientWitnessTable = emitResilientWitnessTable();
 
   // Fill in the global.
   auto cacheTy = cast<llvm::StructType>(cache->getValueType());
@@ -1981,8 +2011,9 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   auto cacheData = cacheInitBuilder.beginStruct(cacheTy);
   // WitnessTableSizeInWords
   cacheData.addInt(IGM.Int16Ty, TableSize);
-  // WitnessTablePrivateSizeInWords
-  cacheData.addInt(IGM.Int16Ty, NextPrivateDataIndex);
+  // WitnessTablePrivateSizeInWordsAndRequiresInstantiation
+  cacheData.addInt(IGM.Int16Ty,
+                   (NextPrivateDataIndex << 1) | RequiresSpecialization);
   // RelativeIndirectablePointer<ProtocolDescriptor>
   cacheData.addRelativeAddress(descriptorRef);
   // RelativePointer<WitnessTable>
@@ -2029,6 +2060,8 @@ llvm::Constant *WitnessTableBuilder::buildInstantiationFunction() {
   Explosion params = IGF.collectParameters();
   Address wtable(params.claimNext(), PointerAlignment);
   llvm::Value *metadata = params.claimNext();
+  IGF.bindLocalTypeDataFromTypeMetadata(ConcreteType, IsExact, metadata,
+                                        MetadataState::Complete);
   llvm::Value *instantiationArgs = params.claimNext();
   Address conditionalTables(
       IGF.Builder.CreateBitCast(instantiationArgs,
@@ -2081,6 +2114,136 @@ llvm::Constant *WitnessTableBuilder::buildInstantiationFunction() {
   return fn;
 }
 
+namespace {
+  /// Builds a protocol conformance descriptor.
+  class ProtocolConformanceDescriptorBuilder {
+    IRGenModule &IGM;
+    ConstantStructBuilder &B;
+    const NormalProtocolConformance *Conformance;
+    ConformanceFlags Flags;
+
+  public:
+    ProtocolConformanceDescriptorBuilder(
+                                 IRGenModule &IGM,
+                                 ConstantStructBuilder &B,
+                                 const NormalProtocolConformance *conformance)
+    : IGM(IGM), B(B), Conformance(conformance) { }
+
+    void layout() {
+      addProtocol();
+      addConformingType();
+      addWitnessTable();
+      addFlags();
+      addContext();
+      addConditionalRequirements();
+
+      B.suggestType(IGM.ProtocolConformanceDescriptorTy);
+    }
+
+    void addProtocol() {
+      // Relative reference to the protocol descriptor.
+      auto protocol = Conformance->getProtocol();
+      auto descriptorRef = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+                    LinkEntity::forProtocolDescriptor(protocol),
+                    IGM.getPointerAlignment(), IGM.ProtocolDescriptorStructTy);
+      B.addRelativeAddress(descriptorRef);
+    }
+
+    void addConformingType() {
+      // Add a relative reference to the type, with the type reference
+      // kind stored in the flags.
+      auto ref =
+        IGM.getTypeEntityReference(Conformance->getType()->getAnyNominal());
+      B.addRelativeAddress(ref.getValue());
+      Flags = Flags.withTypeReferenceKind(ref.getKind());
+    }
+
+    void addWitnessTable() {
+      using ConformanceKind = ConformanceFlags::ConformanceKind;
+
+      // Figure out what kind of witness table we have.
+      llvm::Constant *witnessTableVar;
+
+      if (Conformance->getConditionalRequirements().empty()) {
+        if (!isDependentConformance(Conformance) &&
+            !Conformance->isSynthesizedNonUnique()) {
+          Flags = Flags.withConformanceKind(ConformanceKind::WitnessTable);
+          witnessTableVar = IGM.getAddrOfWitnessTable(Conformance);
+        } else {
+          Flags = Flags.withConformanceKind(
+                                        ConformanceKind::WitnessTableAccessor);
+          witnessTableVar = IGM.getAddrOfWitnessTableAccessFunction(
+              Conformance, ForDefinition);
+        }
+      } else {
+        Flags =
+          Flags.withConformanceKind(
+              ConformanceKind::ConditionalWitnessTableAccessor)
+            .withNumConditionalRequirements(
+              Conformance->getConditionalRequirements().size());
+
+        witnessTableVar = IGM.getAddrOfWitnessTableAccessFunction(
+          Conformance, ForDefinition);
+      }
+
+      // Relative reference to the witness table.
+      auto witnessTableRef =
+        ConstantReference(witnessTableVar, ConstantReference::Direct);
+      B.addRelativeAddress(witnessTableRef);
+    }
+
+    void addFlags() {
+      // Miscellaneous flags.
+      Flags = Flags.withIsRetroactive(Conformance->isRetroactive());
+      Flags =
+        Flags.withIsSynthesizedNonUnique(Conformance->isSynthesizedNonUnique());
+
+      // Add the flags.
+      B.addInt32(Flags.getIntValue());
+    }
+
+    void addContext() {
+      if (!Conformance->isRetroactive())
+        return;
+
+      auto moduleContext =
+        Conformance->getDeclContext()->getModuleScopeContext();
+      ConstantReference moduleContextRef =
+        IGM.getAddrOfParentContextDescriptor(moduleContext);
+      B.addRelativeAddress(moduleContextRef);
+    }
+
+    void addConditionalRequirements() {
+      if (Conformance->getConditionalRequirements().empty())
+        return;
+
+      auto nominal = Conformance->getType()->getAnyNominal();
+      irgen::addGenericRequirements(IGM, B,
+        nominal->getGenericSignatureOfContext(),
+        Conformance->getConditionalRequirements());
+    }
+  };
+}
+
+void IRGenModule::emitProtocolConformance(
+                                const NormalProtocolConformance *conformance) {
+  // Emit additional metadata to be used by reflection.
+  emitAssociatedTypeMetadataRecord(conformance);
+
+  // Form the protocol conformance descriptor.
+  ConstantInitBuilder initBuilder(*this);
+  auto init = initBuilder.beginStruct();
+  ProtocolConformanceDescriptorBuilder builder(*this, init, conformance);
+  builder.layout();
+
+  auto var =
+    cast<llvm::GlobalVariable>(
+          getAddrOfProtocolConformanceDescriptor(conformance,
+                                                 init.finishAndCreateFuture()));
+  var->setConstant(true);
+  setTrueConstGlobal(var);
+}
+
 void IRGenModule::ensureRelativeSymbolCollocation(SILWitnessTable &wt) {
   // Only resilient conformances use relative pointers for witness methods.
   if (wt.isDeclaration() || isAvailableExternally(wt.getLinkage()) ||
@@ -2097,90 +2260,131 @@ void IRGenModule::ensureRelativeSymbolCollocation(SILWitnessTable &wt) {
 }
 
 /// Do a memoized witness-table layout for a protocol.
-const ProtocolInfo &IRGenModule::getProtocolInfo(ProtocolDecl *protocol) {
-  return Types.getProtocolInfo(protocol);
+const ProtocolInfo &IRGenModule::getProtocolInfo(ProtocolDecl *protocol,
+                                                 ProtocolInfoKind kind) {
+  // If the protocol is resilient, we cannot know the full witness table layout.
+  assert(!isResilient(protocol, ResilienceExpansion::Maximal) ||
+         kind == ProtocolInfoKind::RequirementSignature);
+
+  return Types.getProtocolInfo(protocol, kind);
 }
 
 /// Do a memoized witness-table layout for a protocol.
-const ProtocolInfo &TypeConverter::getProtocolInfo(ProtocolDecl *protocol) {
+const ProtocolInfo &TypeConverter::getProtocolInfo(ProtocolDecl *protocol,
+                                                   ProtocolInfoKind kind) {
   // Check whether we've already translated this protocol.
   auto it = Protocols.find(protocol);
-  if (it != Protocols.end()) return *it->second;
+  if (it != Protocols.end() && it->getSecond()->getKind() >= kind)
+    return *it->getSecond();
 
   // If not, lay out the protocol's witness table, if it needs one.
-  WitnessTableLayout layout;
+  WitnessTableLayout layout(kind);
   if (Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
     layout.visitProtocolDecl(protocol);
 
   // Create a ProtocolInfo object from the layout.
-  ProtocolInfo *info = ProtocolInfo::create(layout.getEntries());
-  info->NextConverted = FirstProtocol;
-  FirstProtocol = info;
+  std::unique_ptr<ProtocolInfo> info = ProtocolInfo::create(layout.getEntries(),
+                                                            kind);
+
+  // Verify that we haven't generated an incompatible layout.
+  if (it != Protocols.end()) {
+    ArrayRef<WitnessTableEntry> originalEntries =
+        it->second->getWitnessEntries();
+    ArrayRef<WitnessTableEntry> newEntries = info->getWitnessEntries();
+    assert(newEntries.size() >= originalEntries.size());
+    assert(newEntries.take_front(originalEntries.size()) == originalEntries);
+    (void)originalEntries;
+    (void)newEntries;
+  }
 
   // Memoize.
-  Protocols.insert(std::make_pair(protocol, info));
+  std::unique_ptr<const ProtocolInfo> &cachedInfo = Protocols[protocol];
+  cachedInfo = std::move(info);
 
   // Done.
-  return *info;
+  return *cachedInfo;
 }
 
 /// Allocate a new ProtocolInfo.
-ProtocolInfo *ProtocolInfo::create(ArrayRef<WitnessTableEntry> table) {
+std::unique_ptr<ProtocolInfo>
+ProtocolInfo::create(ArrayRef<WitnessTableEntry> table, ProtocolInfoKind kind) {
   size_t bufferSize = totalSizeToAlloc<WitnessTableEntry>(table.size());
   void *buffer = ::operator new(bufferSize);
-  return new(buffer) ProtocolInfo(table);
+  return std::unique_ptr<ProtocolInfo>(new(buffer) ProtocolInfo(table, kind));
 }
 
-ProtocolInfo::~ProtocolInfo() {
-  for (auto &conf : Conformances) {
-    delete conf.second;
-  }
-}
+// Provide a unique home for the ConformanceInfo vtable.
+void ConformanceInfo::anchor() {}
 
 /// Find the conformance information for a protocol.
 const ConformanceInfo &
-ProtocolInfo::getConformance(IRGenModule &IGM, ProtocolDecl *protocol,
-                             const ProtocolConformance *conformance) const {
+IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
+                                const ProtocolConformance *conformance) {
   assert(conformance->getProtocol() == protocol &&
          "conformance is for wrong protocol");
 
   auto checkCache =
-      [&](const ProtocolConformance *conf) -> Optional<ConformanceInfo *> {
+      [this](const ProtocolConformance *conf) -> const ConformanceInfo * {
     // Check whether we've already cached this.
     auto it = Conformances.find(conf);
     if (it != Conformances.end())
-      return it->second;
+      return it->second.get();
 
-    return None;
+    return nullptr;
   };
 
   if (auto found = checkCache(conformance))
-    return **found;
+    return *found;
 
   //  Drill down to the root normal
   auto normalConformance = conformance->getRootNormalConformance();
 
-  ConformanceInfo *info;
+  const ConformanceInfo *info;
   // If the conformance is dependent in any way, we need to unique it.
   // TODO: maybe this should apply whenever it's out of the module?
   // TODO: actually enable this
+  // FIXME: Both implementations of ConformanceInfo are trivially-destructible,
+  // so in theory we could allocate them on a BumpPtrAllocator. But there's not
+  // a good one for us to use. (The ASTContext's outlives the IRGenModule in
+  // batch mode.)
   if (isDependentConformance(normalConformance) ||
       // Foreign types need to go through the accessor to unique the witness
       // table.
       normalConformance->isSynthesizedNonUnique()) {
     info = new AccessorConformanceInfo(conformance);
-    Conformances.insert({conformance, info});
+    Conformances.try_emplace(conformance, info);
   } else {
     // Otherwise, we can use a direct-referencing conformance, which can get
     // away with the non-specialized conformance.
     if (auto found = checkCache(normalConformance))
-      return **found;
+      return *found;
 
     info = new DirectConformanceInfo(normalConformance);
-    Conformances.insert({normalConformance, info});
+    Conformances.try_emplace(normalConformance, info);
   }
 
   return *info;
+}
+
+/// Whether the witness table will be constant.
+static bool isConstantWitnessTable(SILWitnessTable *wt) {
+  for (const auto &entry : wt->getEntries()) {
+    switch (entry.getKind()) {
+    case SILWitnessTable::Invalid:
+    case SILWitnessTable::AssociatedTypeProtocol:
+    case SILWitnessTable::BaseProtocol:
+    case SILWitnessTable::Method:
+      continue;
+
+    case SILWitnessTable::AssociatedType:
+      // Associated types are cached in the witness table.
+      // FIXME: If we start emitting constant references to type metadata here,
+      // we will need to ask the witness table builder for this information.
+      return false;
+    }
+  }
+
+  return true;
 }
 
 void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
@@ -2196,6 +2400,9 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     return;
 
   auto *conf = wt->getConformance();
+  PrettyStackTraceType stackTraceRAII(Context, "emitting witness table for",
+                                      conf->getType());
+  PrettyStackTraceDecl stackTraceRAII2("...conforming to", conf->getProtocol());
 
   // Build the witnesses.
   ConstantInitBuilder builder(*this);
@@ -2211,17 +2418,17 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     isDependent
       ? getAddrOfWitnessTablePattern(conf, initializer)
       : getAddrOfWitnessTable(conf, initializer));
-  global->setConstant(true);
+  global->setConstant(isDependent || isConstantWitnessTable(wt));
   global->setAlignment(getWitnessTableAlignment().getValue());
 
   // Always emit an accessor function.
   wtableBuilder.buildAccessFunction(global);
 
+  addProtocolConformance(conf);
+
   // Behavior conformances can't be reflected.
   if (conf->isBehaviorConformance())
     return;
-
-  addProtocolConformance(conf);
 
   // Trigger the lazy emission of the foreign type metadata.
   CanType conformingType = conf->getType()->getCanonicalType();
@@ -2370,8 +2577,7 @@ MetadataResponse MetadataPath::follow(IRGenFunction &IGF,
       auto skipRequest =
         (skipI == end ? finalRequest : MetadataState::Abstract);
       if (auto skipResponse =
-            IGF.tryGetConcreteLocalTypeData(skipKey.getCachingKey(),
-                                            skipRequest)) {
+            IGF.tryGetConcreteLocalTypeData(skipKey, skipRequest)) {
         // Advance the baseline information for the source to the current
         // point in the path, then continue the search.
         sourceKey = skipKey;
@@ -2409,10 +2615,30 @@ static llvm::Value *
 emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
                                   llvm::Value *parentMetadata,
                                   llvm::Value *wtable,
-                                  WitnessIndex index,
+                                  AssociatedConformance conformance,
                                   llvm::Value *associatedTypeMetadata) {
-  llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable,
-                                             index.forProtocolWitnessTable());
+  auto sourceProtocol = conformance.getSourceProtocol();
+  llvm::Value *witness;
+  if (IGF.IGM.isResilient(sourceProtocol, ResilienceExpansion::Maximal)) {
+    // For resilient protocols, use the associated conformance descriptor to
+    // determine the index.
+    auto assocConformanceDescriptor =
+      IGF.IGM.getAddrOfAssociatedConformanceDescriptor(conformance);
+
+    auto index =
+      computeResilientWitnessTableIndex(IGF, sourceProtocol,
+                                        assocConformanceDescriptor);
+
+    witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
+  } else {
+    // For non-resilient protocols, the index is a constant.
+    auto &pi = IGF.IGM.getProtocolInfo(sourceProtocol,
+                                       ProtocolInfoKind::RequirementSignature);
+
+    auto index = pi.getAssociatedConformanceIndex(conformance);
+    witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable,
+                                               index.forProtocolWitnessTable());
+  }
 
   // Cast the witness to the appropriate function type.
   auto sig = IGF.IGM.getAssociatedTypeWitnessTableAccessFunctionSignature();
@@ -2503,7 +2729,8 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
   case Component::Kind::OutOfLineBaseProtocol: {
     auto conformance = sourceKey.Kind.getProtocolConformance();
     auto protocol = conformance.getRequirement();
-    auto &pi = IGF.IGM.getProtocolInfo(protocol);
+    auto &pi = IGF.IGM.getProtocolInfo(protocol,
+                                       ProtocolInfoKind::RequirementSignature);
 
     auto &entry = pi.getWitnessEntries()[component.getPrimaryIndex()];
     assert(entry.isOutOfLineBase());
@@ -2539,7 +2766,8 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
     auto sourceType = sourceKey.Type;
     auto sourceConformance = sourceKey.Kind.getProtocolConformance();
     auto sourceProtocol = sourceConformance.getRequirement();
-    auto &pi = IGF.IGM.getProtocolInfo(sourceProtocol);
+    auto &pi = IGF.IGM.getProtocolInfo(sourceProtocol,
+                                       ProtocolInfoKind::RequirementSignature);
 
     auto &entry = pi.getWitnessEntries()[component.getPrimaryIndex()];
     assert(entry.isAssociatedConformance());
@@ -2570,14 +2798,17 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
 
     if (!source) return MetadataResponse();
 
-    WitnessIndex index(component.getPrimaryIndex(), /*prefix*/ false);
     auto sourceMetadata = IGF.emitTypeMetadataRef(sourceType);
     auto associatedMetadata = IGF.emitTypeMetadataRef(sourceKey.Type);
     auto sourceWTable = source.getMetadata();
 
+    AssociatedConformance associatedConformanceRef(sourceProtocol,
+                                                   association,
+                                                   associatedRequirement);
     auto associatedWTable = 
       emitAssociatedTypeWitnessTableRef(IGF, sourceMetadata, sourceWTable,
-                                        index, associatedMetadata);
+                                        associatedConformanceRef,
+                                        associatedMetadata);
 
     setProtocolWitnessTableName(IGF.IGM, associatedWTable, sourceKey.Type,
                                 associatedRequirement);
@@ -2760,7 +2991,7 @@ void NecessaryBindings::addTypeMetadata(CanType type) {
   }
   if (auto fn = dyn_cast<FunctionType>(type)) {
     for (const auto &elt : fn.getParams())
-      addTypeMetadata(elt.getType());
+      addTypeMetadata(elt.getOldType());
     addTypeMetadata(fn.getResult());
     return;
   }
@@ -2829,21 +3060,17 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   auto concreteConformance = conformance.getConcrete();
   assert(concreteConformance->getProtocol() == proto);
 
+  auto cacheKind =
+    LocalTypeDataKind::forConcreteProtocolWitnessTable(concreteConformance);
+
   // Check immediately for an existing cache entry.
-  auto wtable = IGF.tryGetLocalTypeData(
-    srcType,
-    LocalTypeDataKind::forConcreteProtocolWitnessTable(concreteConformance));
+  auto wtable = IGF.tryGetLocalTypeData(srcType, cacheKind);
   if (wtable) return wtable;
 
-  auto &protoI = IGF.IGM.getProtocolInfo(proto);
-  auto &conformanceI =
-    protoI.getConformance(IGF.IGM, proto, concreteConformance);
+  auto &conformanceI = IGF.IGM.getConformanceInfo(proto, concreteConformance);
   wtable = conformanceI.getTable(IGF, srcMetadataCache);
 
-  IGF.setScopedLocalTypeData(
-    srcType,
-    LocalTypeDataKind::forConcreteProtocolWitnessTable(concreteConformance),
-    wtable);
+  IGF.setScopedLocalTypeData(srcType, cacheKind, wtable);
   return wtable;
 }
 
@@ -3023,8 +3250,7 @@ NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
 }
 
 /// The information we need to record in generic type metadata
-/// is the information in the type's generic signature, minus the
-/// information recoverable from the type's parent type.  This is
+/// is the information in the type's generic signature.  This is
 /// simply the information that would be passed to a generic function
 /// that takes the (thick) parent metatype as an argument.
 GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
@@ -3263,7 +3489,7 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   assert(!IGF.IGM.isResilient(proto, ResilienceExpansion::Maximal));
 
   // Find the witness we're interested in.
-  auto &fnProtoInfo = IGF.IGM.getProtocolInfo(proto);
+  auto &fnProtoInfo = IGF.IGM.getProtocolInfo(proto, ProtocolInfoKind::Full);
   auto index = fnProtoInfo.getFunctionIndex(fn);
   llvm::Value *witnessFnPtr =
     emitInvariantLoadOfOpaqueWitness(IGF, wtable,
@@ -3289,21 +3515,35 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
   return emitWitnessMethodValue(IGF, wtable, member);
 }
 
-Signature IRGenModule::getAssociatedTypeMetadataAccessFunctionSignature() {
-  auto &fnType = AssociatedTypeMetadataAccessFunctionTy;
-  if (!fnType) {
-    fnType = llvm::FunctionType::get(TypeMetadataResponseTy,
-                                     { SizeTy,
-                                       TypeMetadataPtrTy,
-                                       WitnessTablePtrTy },
-                                     /*varargs*/ false);
-  }
+llvm::Value *irgen::computeResilientWitnessTableIndex(
+                                            IRGenFunction &IGF,
+                                            ProtocolDecl *proto,
+                                            llvm::Constant *reqtDescriptor) {
+  // The requirement base descriptor refers to the first requirement in the
+  // protocol descriptor, offset by the start of the witness table requirements.
+  auto requirementsBaseDescriptor =
+    IGF.IGM.getAddrOfProtocolRequirementsBaseDescriptor(proto);
 
-  auto attrs = llvm::AttributeList::get(getLLVMContext(),
-                                        llvm::AttributeList::FunctionIndex,
-                                        llvm::Attribute::NoUnwind);
+  // Subtract the two pointers to determine the offset to this particular
+  // requirement.
+  auto baseAddress = IGF.Builder.CreatePtrToInt(requirementsBaseDescriptor,
+                                                IGF.IGM.IntPtrTy);
+  auto reqtAddress = IGF.Builder.CreatePtrToInt(reqtDescriptor,
+                                                IGF.IGM.IntPtrTy);
+  auto offset = IGF.Builder.CreateSub(reqtAddress, baseAddress);
 
-  return Signature(fnType, attrs, SwiftCC);
+  // Determine how to adjust the byte offset we have to make it a witness
+  // table offset.
+  const auto &dataLayout = IGF.IGM.Module.getDataLayout();
+  auto protoReqSize =
+    dataLayout.getTypeAllocSizeInBits(IGF.IGM.ProtocolRequirementStructTy);
+  auto ptrSize = dataLayout.getTypeAllocSizeInBits(IGF.IGM.Int8PtrTy);
+  assert(protoReqSize >= ptrSize && "> 64-bit pointers?");
+  assert((protoReqSize % ptrSize == 0) && "Must be evenly divisible");
+  (void)ptrSize;
+  unsigned factor = protoReqSize / 8;
+  auto factorConstant = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, factor);
+  return IGF.Builder.CreateUDiv(offset, factorConstant);
 }
 
 MetadataResponse
@@ -3312,27 +3552,20 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                      llvm::Value *wtable,
                                      AssociatedType associatedType,
                                      DynamicMetadataRequest request) {
-  auto &pi = IGF.IGM.getProtocolInfo(associatedType.getSourceProtocol());
-  auto index = pi.getAssociatedTypeIndex(associatedType);
-  llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable,
-                                            index.forProtocolWitnessTable());
+  auto &IGM = IGF.IGM;
 
-  // Cast the witness to the appropriate function type.
-  auto sig = IGF.IGM.getAssociatedTypeMetadataAccessFunctionSignature();
-  auto witnessTy = sig.getType();
-  witness = IGF.Builder.CreateBitCast(witness, witnessTy->getPointerTo());
+  // Extract the associated type descriptor.
+  auto assocTypeDescriptor =
+    IGM.getAddrOfAssociatedTypeDescriptor(associatedType.getAssociation());
 
-  FunctionPointer witnessFnPtr(witness, sig);
-
-  // Call the accessor.
-  assert((!IGF.IGM.DebugInfo || IGF.Builder.getCurrentDebugLocation() ||
-          !IGF.CurFn->getSubprogram()) &&
-         "creating a function call without a debug location");
-  auto call = IGF.Builder.CreateCall(witnessFnPtr,
+  // Call swift_getAssociatedTypeWitness().
+  auto call = IGF.Builder.CreateCall(IGM.getGetAssociatedTypeWitnessFn(),
                                      { request.get(IGF),
+                                       wtable,
                                        parentMetadata,
-                                       wtable });
-
+                                       assocTypeDescriptor });
+  call->setDoesNotThrow();
+  call->setDoesNotAccessMemory();
   return MetadataResponse::handle(IGF, request, call);
 }
 

@@ -83,7 +83,8 @@ UncurriedCandidate::UncurriedCandidate(ValueDecl *decl, unsigned level)
   if (isa<AbstractStorageDecl>(decl)) {
     if (decl->getDeclContext()->isTypeContext()) {
       auto instanceTy = decl->getDeclContext()->getSelfTypeInContext();
-      entityType = FunctionType::get(instanceTy, entityType);
+      entityType = FunctionType::get({FunctionType::Param(instanceTy)},
+                                     entityType);
     }
   }
 }
@@ -189,7 +190,7 @@ void CalleeCandidateInfo::filterList(ClosenessPredicate predicate) {
       
       // Likewise, if the candidate is inaccessible from the scope it is being
       // accessed from, mark it as inaccessible or a general mismatch.
-      if (VD->hasAccess() && !VD->isAccessibleFrom(CS.DC)) {
+      if (!VD->isAccessibleFrom(CS.DC)) {
         // If this was an exact match, downgrade it to inaccessible, so that
         // accessible decls that are also an exact match will take precedence.
         // Otherwise consider it to be a general mismatch so we only list it in
@@ -320,7 +321,7 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
     return {CC_GeneralMismatch, {}};
 
   auto candArgs = candidate.getParameters();
-  llvm::SmallBitVector candDefaultMap =
+  SmallBitVector candDefaultMap =
     computeDefaultMap(candArgs, candidate.getDecl(), candidate.level);
   
   struct OurListener : public MatchCallArgumentListener {
@@ -399,11 +400,11 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
     // If parameter is marked as @autoclosure, we are
     // only interested in it's resulting type.
     if (param.isAutoClosure()) {
-      if (auto fnType = param.getType()->getAs<AnyFunctionType>())
+      if (auto fnType = param.getOldType()->getAs<AnyFunctionType>())
         return fnType->getResult();
     }
     
-    return param.getType();
+    return param.getOldType();
   };
   
   for (unsigned i = 0, e = paramBindings.size(); i != e; ++i) {
@@ -536,7 +537,7 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
   // Check to see if the first argument expects an inout argument, but is not
   // an lvalue.
   if (candArgs[0].isInOut() &&
-      !(actualArgs[0].getType()->hasLValueType() || actualArgs[0].isInOut())) {
+      !(actualArgs[0].getOldType()->hasLValueType() || actualArgs[0].isInOut())) {
     return { CC_NonLValueInOut, {}};
   }
   
@@ -636,9 +637,12 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     if (instanceType->mayHaveMembers()) {
       auto ctors = CS.TC.lookupConstructors(
                                             CS.DC, instanceType, NameLookupFlags::IgnoreAccessControl);
-      for (auto ctor : ctors)
+      for (auto ctor : ctors) {
+        if (!ctor.getValueDecl()->hasInterfaceType())
+          CS.getTypeChecker().validateDeclForNameLookup(ctor.getValueDecl());
         if (ctor.getValueDecl()->hasInterfaceType())
           candidates.push_back({ ctor.getValueDecl(), 1 });
+      }
     }
     
     declName = instanceType->getString();
@@ -675,7 +679,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
         if (baseType && C.level == 1 && C.getDecl()) {
           baseType = baseType
             ->getWithoutSpecifierType()
-            ->getRValueInstanceType();
+            ->getMetatypeInstanceType();
 
           if (baseType->isAnyObject())
             baseType = Type();
@@ -816,7 +820,7 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
     if (isa<InOutExpr>(argExpr))
       argType = LValueType::get(argType);
     
-    return filterListArgs(AnyFunctionType::Param({argType, Identifier(), {}}));
+    return filterListArgs(AnyFunctionType::Param(argType));
   }
   
   // If we have a tuple expression, form a tuple type.
@@ -868,7 +872,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
       if (substType)
         substType = substType
         ->getWithoutSpecifierType()
-        ->getRValueInstanceType();
+        ->getMetatypeInstanceType();
       
       // If this is a DeclViaUnwrappingOptional, then we're actually looking
       // through an optional to get the member, and baseType is an Optional or
@@ -1028,16 +1032,6 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
     auto substitution = pair.second;
     
     // FIXME: Add specific error for not subclass, if the archetype has a superclass?
-    
-    // Check for optional near miss.
-    if (auto argOptType = substitution->getOptionalObjectType()) {
-      if (isSubstitutableFor(argOptType, paramArchetype, CS.DC)) {
-        if (diagnoseUnwrap(CS.TC, CS.DC, badArgExpr, substitution)) {
-          foundFailure = true;
-          break;
-        }
-      }
-    }
     
     for (auto proto : paramArchetype->getConformsTo()) {
       if (!CS.TC.conformsToProtocol(substitution, proto, CS.DC,

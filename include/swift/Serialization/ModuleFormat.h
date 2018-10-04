@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 430; // Last change: ordered top-level decls
+const uint16_t VERSION_MINOR = 450; // Last change: don't serialize requirement environment
 
 using DeclIDField = BCFixed<31>;
 
@@ -114,6 +114,15 @@ using FileModTimeField = BCVBR<16>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
+enum class OpaqueReadOwnership : uint8_t {
+  Owned,
+  Borrowed,
+  OwnedOrBorrowed,
+};
+using OpaqueReadOwnershipField = BCFixed<2>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
 enum class ReadImplKind : uint8_t {
   Stored = 0,
   Get,
@@ -141,7 +150,6 @@ using WriteImplKindField = BCFixed<3>;
 enum class ReadWriteImplKind : uint8_t {
   Immutable = 0,
   Stored,
-  MaterializeForSet,
   MutableAddress,
   MaterializeToTemporary,
   Modify,
@@ -220,7 +228,6 @@ enum AccessorKind : uint8_t {
   Set,
   WillSet,
   DidSet,
-  MaterializeForSet,
   Address,
   MutableAddress,
   Read,
@@ -286,7 +293,7 @@ using MetatypeRepresentationField = BCFixed<2>;
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
 enum class AddressorKind : uint8_t {
-  NotAddressor, Unsafe, Owning, NativeOwning, NativePinning
+  NotAddressor, Unsafe, Owning, NativeOwning
 };
 using AddressorKindField = BCFixed<3>;
  
@@ -684,6 +691,7 @@ namespace decls_block {
     DeclIDField,      // typealias decl
     TypeIDField,      // parent type
     TypeIDField,      // underlying type
+    TypeIDField,      // substituted type
     SubstitutionMapIDField // substitution map
   >;
 
@@ -706,11 +714,7 @@ namespace decls_block {
 
   using ParenTypeLayout = BCRecordLayout<
     PAREN_TYPE,
-    TypeIDField,        // inner type
-    BCFixed<1>,         // vararg?
-    BCFixed<1>,         // autoclosure?
-    BCFixed<1>,         // escaping?
-    ValueOwnershipField // inout, shared or owned?
+    TypeIDField         // inner type
   >;
 
   using TupleTypeLayout = BCRecordLayout<
@@ -720,21 +724,28 @@ namespace decls_block {
   using TupleTypeEltLayout = BCRecordLayout<
     TUPLE_TYPE_ELT,
     IdentifierIDField,  // name
-    TypeIDField,        // type
-    BCFixed<1>,         // vararg?
-    BCFixed<1>,         // autoclosure?
-    BCFixed<1>,         // escaping?
-    ValueOwnershipField // inout, shared or owned?
+    TypeIDField         // type
   >;
 
   using FunctionTypeLayout = BCRecordLayout<
     FUNCTION_TYPE,
-    TypeIDField, // input
     TypeIDField, // output
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,  // auto-closure?
     BCFixed<1>,  // noescape?
     BCFixed<1>   // throws?
+
+    // trailed by parameters
+  >;
+
+  using FunctionParamLayout = BCRecordLayout<
+    FUNCTION_PARAM,
+    IdentifierIDField,  // name
+    TypeIDField,        // type
+    BCFixed<1>,         // vararg?
+    BCFixed<1>,         // autoclosure?
+    BCFixed<1>,         // escaping?
+    ValueOwnershipField // inout, shared or owned?
   >;
 
   using MetatypeTypeLayout = BCRecordLayout<
@@ -747,11 +758,6 @@ namespace decls_block {
     EXISTENTIAL_METATYPE_TYPE,
     TypeIDField,                       // instance type
     MetatypeRepresentationField        // representation
-  >;
-
-  using InOutTypeLayout = BCRecordLayout<
-    INOUT_TYPE,
-    TypeIDField // object type
   >;
 
   using ArchetypeTypeLayout = BCRecordLayout<
@@ -785,11 +791,12 @@ namespace decls_block {
 
   using GenericFunctionTypeLayout = BCRecordLayout<
     GENERIC_FUNCTION_TYPE,
-    TypeIDField,         // input
     TypeIDField,         // output
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,          // throws?
     GenericSignatureIDField // generic signture
+
+    // trailed by parameters
   >;
 
   using SILFunctionTypeLayout = BCRecordLayout<
@@ -871,7 +878,6 @@ namespace decls_block {
   using GenericTypeParamDeclLayout = BCRecordLayout<
     GENERIC_TYPE_PARAM_DECL,
     IdentifierIDField,  // name
-    DeclContextIDField, // context decl
     BCFixed<1>,         // implicit flag
     BCVBR<4>,           // depth
     BCVBR<4>            // index
@@ -966,7 +972,6 @@ namespace decls_block {
     BCFixed<1>,  // throws?
     CtorInitializerKindField,  // initializer kind
     GenericEnvironmentIDField, // generic environment
-    TypeIDField, // interface type
     DeclIDField, // overridden decl
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
@@ -975,8 +980,11 @@ namespace decls_block {
     BCVBR<5>,     // number of parameter name components
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
-    // Trailed by its generic parameters, if any, followed by the parameter
-    // patterns.
+    // This record is trailed by:
+    // - its generic parameters, if any
+    // - its parameter patterns,
+    // - the foreign error convention, if any
+    // - inlinable body text, if any
   >;
 
   using VarLayout = BCRecordLayout<
@@ -990,6 +998,7 @@ namespace decls_block {
     BCFixed<1>,   // HasNonPatternBindingInit?
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
+    OpaqueReadOwnershipField,   // opaque read ownership
     ReadImplKindField,   // read implementation
     WriteImplKindField,   // write implementation
     ReadWriteImplKindField,   // read-write implementation
@@ -1003,11 +1012,14 @@ namespace decls_block {
 
   using ParamLayout = BCRecordLayout<
     PARAM_DECL,
-    IdentifierIDField, // argument name
-    IdentifierIDField, // parameter name
-    DeclContextIDField,  // context decl
-    VarDeclSpecifierField,   // specifier
-    TypeIDField  // interface type
+    IdentifierIDField,     // argument name
+    IdentifierIDField,     // parameter name
+    DeclContextIDField,    // context decl
+    VarDeclSpecifierField, // specifier
+    TypeIDField,           // interface type
+    BCFixed<1>,            // isVariadic?
+    DefaultArgumentField,  // default argument kind
+    BCBlob                 // default argument text
   >;
 
   using FuncLayout = BCRecordLayout<
@@ -1022,7 +1034,7 @@ namespace decls_block {
     BCFixed<1>,   // has forced static dispatch?
     BCFixed<1>,   // throws?
     GenericEnvironmentIDField, // generic environment
-    TypeIDField,  // interface type
+    TypeIDField,  // result interface type
     DeclIDField,  // operator decl
     DeclIDField,  // overridden function
     BCVBR<5>,     // 0 for a simple name, otherwise the number of parameter name
@@ -1036,6 +1048,8 @@ namespace decls_block {
     // - its _silgen_name, if any
     // - its generic parameters, if any
     // - body parameter patterns
+    // - the foreign error convention, if any
+    // - inlinable body text, if any
   >;
 
   // TODO: remove the unnecessary FuncDecl components here
@@ -1051,7 +1065,7 @@ namespace decls_block {
     BCFixed<1>,   // has forced static dispatch?
     BCFixed<1>,   // throws?
     GenericEnvironmentIDField, // generic environment
-    TypeIDField,  // interface type
+    TypeIDField,  // result interface type
     DeclIDField,  // overridden function
     DeclIDField,  // AccessorStorageDecl
     AccessorKindField, // accessor kind
@@ -1065,6 +1079,8 @@ namespace decls_block {
     // - its _silgen_name, if any
     // - its generic parameters, if any
     // - body parameter patterns
+    // - the foreign error convention, if any
+    // - inlinable body text, if any
   >;
 
   using PatternBindingLayout = BCRecordLayout<
@@ -1081,8 +1097,9 @@ namespace decls_block {
   template <unsigned Code>
   using UnaryOperatorLayout = BCRecordLayout<
     Code, // ID field
-    IdentifierIDField, // name
-    DeclContextIDField // context decl
+    IdentifierIDField,  // name
+    DeclContextIDField, // context decl
+    DeclIDField         // protocol
   >;
 
   using PrefixOperatorLayout = UnaryOperatorLayout<PREFIX_OPERATOR_DECL>;
@@ -1092,7 +1109,8 @@ namespace decls_block {
     INFIX_OPERATOR_DECL,
     IdentifierIDField, // name
     DeclContextIDField,// context decl
-    DeclIDField        // precedence group
+    DeclIDField,       // precedence group
+    DeclIDField        // protocol
   >;
 
   using PrecedenceGroupLayout = BCRecordLayout<
@@ -1108,7 +1126,6 @@ namespace decls_block {
   using EnumElementLayout = BCRecordLayout<
     ENUM_ELEMENT_DECL,
     DeclContextIDField,// context decl
-    TypeIDField, // interface type
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // has payload?
     EnumElementRawValueKindField,  // raw value kind
@@ -1129,12 +1146,13 @@ namespace decls_block {
     BCFixed<1>,  // objc?
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
+    OpaqueReadOwnershipField,   // opaque read ownership
     ReadImplKindField,   // read implementation
     WriteImplKindField,   // write implementation
     ReadWriteImplKindField,   // read-write implementation
     AccessorCountField, // number of accessors
     GenericEnvironmentIDField, // generic environment
-    TypeIDField, // interface type
+    TypeIDField, // element interface type
     DeclIDField, // overridden decl
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
@@ -1165,22 +1183,19 @@ namespace decls_block {
     DeclContextIDField, // context decl
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
-    GenericEnvironmentIDField, // generic environment
-    TypeIDField  // interface type
-    // Trailed by a pattern for self.
+    GenericEnvironmentIDField // generic environment
+    // This record is trailed by its inlinable body text
+  >;
+
+  using InlinableBodyTextLayout = BCRecordLayout<
+    INLINABLE_BODY_TEXT,
+    BCBlob // body text
   >;
 
   using ParameterListLayout = BCRecordLayout<
     PARAMETERLIST,
-    BCVBR<5>    // numparams
+    BCArray<DeclIDField> // params
   >;
-  
-  using ParameterListEltLayout = BCRecordLayout<
-    PARAMETERLIST_ELT,
-    DeclIDField,           // ParamDecl
-    BCFixed<1>,            // isVariadic?
-    DefaultArgumentField   // default argument
-    >;
 
   using ParenPatternLayout = BCRecordLayout<
     PAREN_PATTERN,
@@ -1262,8 +1277,8 @@ namespace decls_block {
   using GenericRequirementLayout = BCRecordLayout<
     GENERIC_REQUIREMENT,
     GenericRequirementKindField, // requirement kind
-    TypeIDField,                 // types involved (two for conformance,
-    TypeIDField                  // same-type; one for value witness marker)
+    TypeIDField,                 // subject type
+    TypeIDField                  // constraint type
   >;
 
   using LayoutRequirementLayout = BCRecordLayout<

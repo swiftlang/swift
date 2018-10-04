@@ -199,6 +199,10 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addHighLevelLICM();
   // Simplify CFG after LICM that creates new exit blocks
   P.addSimplifyCFG();
+  // LICM might have added new merging potential by hoisting
+  // we don't want to restart the pipeline - ignore the
+  // potential of merging out of two loops
+  P.addAccessEnforcementOpts();
   // Start of loop unrolling passes.
   P.addArrayCountPropagation();
   // To simplify induction variable.
@@ -209,7 +213,6 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addSimplifyCFG();
   P.addArrayElementPropagation();
   // End of unrolling passes.
-  P.addRemovePins();
   P.addABCOpt();
   // Cleanup.
   P.addDCE();
@@ -242,6 +245,9 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
 
   // Promote stack allocations to values.
   P.addMem2Reg();
+
+  // Run the existential specializer Pass.
+  P.addExistentialSpecializer();
 
   // Cleanup, which is important if the inliner has restarted the pass pipeline.
   P.addPerformanceConstantPropagation();
@@ -327,7 +333,6 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   P.addRetainSinking();
   P.addReleaseHoisting();
   P.addARCSequenceOpts();
-  P.addRemovePins();
 }
 
 static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {
@@ -457,6 +462,10 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   P.addLICM();
   // Simplify CFG after LICM that creates new exit blocks
   P.addSimplifyCFG();
+  // LICM might have added new merging potential by hoisting
+  // we don't want to restart the pipeline - ignore the
+  // potential of merging out of two loops
+  P.addAccessEnforcementOpts();
 
   // Optimize overflow checks.
   P.addRedundantOverflowCheckRemoval();

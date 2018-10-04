@@ -187,12 +187,6 @@ protected:
     Length : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ConstStringLiteralInst, LiteralInst, 1+32,
-    TheEncoding : 1,
-    : NumPadBits,
-    Length : 32
-  );
-
   SWIFT_INLINE_BITFIELD(DeallocRefInst, DeallocationInst, 1,
     OnStack : 1
   );
@@ -219,9 +213,6 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(NonValueInstruction, SILInstruction);
   SWIFT_INLINE_BITFIELD(RefCountingInst, NonValueInstruction, 1,
-      atomicity : 1
-  );
-  SWIFT_INLINE_BITFIELD(StrongPinInst, SingleValueInstruction, 1,
       atomicity : 1
   );
 
@@ -315,7 +306,8 @@ protected:
     IsInvariant : 1
   );
 
-  UIWTDOB_BITFIELD_EMPTY(ConvertFunctionInst, ConversionInst);
+  UIWTDOB_BITFIELD(ConvertFunctionInst, ConversionInst, 1,
+                   WithoutActuallyEscaping : 1);
   UIWTDOB_BITFIELD_EMPTY(PointerToThinFunctionInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(UnconditionalCheckedCastInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(UpcastInst, ConversionInst);

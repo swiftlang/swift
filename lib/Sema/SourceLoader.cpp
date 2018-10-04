@@ -138,7 +138,7 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   importMod->addFile(*importFile);
 
   bool done;
-  PersistentParserState persistentState;
+  PersistentParserState persistentState(Ctx);
   SkipNonTransparentFunctions delayCallbacks;
   parseIntoSourceFile(*importFile, bufferID, &done, nullptr, &persistentState,
                       SkipBodies ? &delayCallbacks : nullptr);

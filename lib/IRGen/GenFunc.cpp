@@ -165,13 +165,14 @@ namespace {
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
-                                         SILType T)
+                                         SILType T, bool isOutlined)
     const override {
       return getFunctionPointerExtraInhabitantIndex(IGF, src);
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
-                              Address dest, SILType T) const override {
+                              Address dest, SILType T, bool isOutlined)
+    const override {
       return storeFunctionPointerExtraInhabitant(IGF, index, dest);
     }
   };
@@ -411,7 +412,8 @@ namespace {
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
-                                         SILType T) const override {
+                                         SILType T, bool isOutlined)
+    const override {
       src = projectFunction(IGF, src);
       return getFunctionPointerExtraInhabitantIndex(IGF, src);
     }
@@ -425,7 +427,8 @@ namespace {
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
-                              Address dest, SILType T) const override {
+                              Address dest, SILType T, bool isOutlined)
+    const override {
       dest = projectFunction(IGF, dest);
       return storeFunctionPointerExtraInhabitant(IGF, index, dest);
     }
@@ -570,7 +573,11 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
   case SILFunctionType::Representation::Thick: {
     SpareBitVector spareBits;
     spareBits.append(IGM.getFunctionPointerSpareBits());
-    spareBits.append(IGM.getHeapObjectSpareBits());
+    // Although the context pointer of a closure (at least, an escaping one)
+    // is a refcounted pointer, we'd like to reserve the right to pack small
+    // contexts into the pointer value, so let's not take any spare bits from
+    // it.
+    spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
     
     if (T->isNoEscape()) {
       // @noescape thick functions are trivial types.
@@ -703,6 +710,7 @@ static CanType getArgumentLoweringType(CanType type,
   case ParameterConvention::Indirect_InoutAliasable:
     return CanInOutType::get(type);
   }
+  llvm_unreachable("unhandled convention");
 }
 
 static bool isABIIgnoredParameterWithoutStorage(IRGenModule &IGM,
@@ -1084,7 +1092,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       auto &fieldTy = layout->getElementTypes()[nextCapturedField];
       auto fieldConvention = conventions[nextCapturedField];
       Address fieldAddr = fieldLayout.project(subIGF, data, offsets);
-      auto &fieldTI = fieldLayout.getTypeForAccess();
+      auto &fieldTI = fieldLayout.getType();
       auto fieldSchema = fieldTI.getSchema();
       
       Explosion param;
@@ -1559,9 +1567,9 @@ void irgen::emitFunctionPartialApplication(
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed: {
-        auto addr = fieldLayout.getTypeForAccess().getAddressForPointer(args.claimNext());
-        fieldLayout.getTypeForAccess().initializeWithTake(IGF, fieldAddr, addr, fieldTy,
-                                                          isOutlined);
+        auto addr = fieldLayout.getType().getAddressForPointer(args.claimNext());
+        fieldLayout.getType().initializeWithTake(IGF, fieldAddr, addr, fieldTy,
+                                                 isOutlined);
         break;
       }
       // Take direct value arguments and inout pointers by value.
@@ -1570,7 +1578,7 @@ void irgen::emitFunctionPartialApplication(
       case ParameterConvention::Direct_Guaranteed:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
-        cast<LoadableTypeInfo>(fieldLayout.getTypeForAccess())
+        cast<LoadableTypeInfo>(fieldLayout.getType())
             .initialize(IGF, args, fieldAddr, isOutlined);
         break;
       }

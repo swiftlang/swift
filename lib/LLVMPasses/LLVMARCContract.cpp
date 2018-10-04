@@ -28,9 +28,9 @@ STATISTIC(NumNoopDeleted,
 STATISTIC(NumRetainReleasesEliminatedByMergingIntoRetainReleaseN,
           "Number of retain/release eliminated by merging into "
           "retain_n/release_n");
-STATISTIC(NumUnknownRetainReleasesEliminatedByMergingIntoRetainReleaseN,
+STATISTIC(NumUnknownObjectRetainReleasesEliminatedByMergingIntoRetainReleaseN,
           "Number of retain/release eliminated by merging into "
-          "unknownRetain_n/unknownRelease_n");
+          "unknownObjectRetain_n/unknownObjectRelease_n");
 STATISTIC(NumBridgeRetainReleasesEliminatedByMergingIntoRetainReleaseN,
           "Number of bridge retain/release eliminated by merging into "
           "bridgeRetain_n/bridgeRelease_n");
@@ -41,8 +41,8 @@ namespace {
 struct LocalState {
   TinyPtrVector<CallInst *> RetainList;
   TinyPtrVector<CallInst *> ReleaseList;
-  TinyPtrVector<CallInst *> UnknownRetainList;
-  TinyPtrVector<CallInst *> UnknownReleaseList;
+  TinyPtrVector<CallInst *> UnknownObjectRetainList;
+  TinyPtrVector<CallInst *> UnknownObjectReleaseList;
   TinyPtrVector<CallInst *> BridgeRetainList;
   TinyPtrVector<CallInst *> BridgeReleaseList;
 };
@@ -147,57 +147,58 @@ performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
     }
     ReleaseList.clear();
 
-    auto &UnknownRetainList = P.second.UnknownRetainList;
-    if (UnknownRetainList.size() > 1) {
+    auto &UnknownObjectRetainList = P.second.UnknownObjectRetainList;
+    if (UnknownObjectRetainList.size() > 1) {
       // Create the retainN call right by the first retain.
-      B.setInsertPoint(UnknownRetainList[0]);
-      O = UnknownRetainList[0]->getArgOperand(0);
-      auto *RI = UnknownRetainList[0];
-      for (auto R : UnknownRetainList) {
+      B.setInsertPoint(UnknownObjectRetainList[0]);
+      O = UnknownObjectRetainList[0]->getArgOperand(0);
+      auto *RI = UnknownObjectRetainList[0];
+      for (auto R : UnknownObjectRetainList) {
         if (B.isAtomic(R)) {
           RI = R;
           break;
         }
       }
-      B.createUnknownRetainN(RC->getSwiftRCIdentityRoot(O),
-                             UnknownRetainList.size(), RI);
+      B.createUnknownObjectRetainN(RC->getSwiftRCIdentityRoot(O),
+                                   UnknownObjectRetainList.size(), RI);
 
       // Replace all uses of the retain instructions with our new retainN and
       // then delete them.
-      for (auto *Inst : UnknownRetainList) {
+      for (auto *Inst : UnknownObjectRetainList) {
         Inst->eraseFromParent();
-        NumUnknownRetainReleasesEliminatedByMergingIntoRetainReleaseN++;
+        NumUnknownObjectRetainReleasesEliminatedByMergingIntoRetainReleaseN++;
       }
 
-      NumUnknownRetainReleasesEliminatedByMergingIntoRetainReleaseN--;
+      NumUnknownObjectRetainReleasesEliminatedByMergingIntoRetainReleaseN--;
     }
-    UnknownRetainList.clear();
+    UnknownObjectRetainList.clear();
 
-    auto &UnknownReleaseList = P.second.UnknownReleaseList;
-    if (UnknownReleaseList.size() > 1) {
+    auto &UnknownObjectReleaseList = P.second.UnknownObjectReleaseList;
+    if (UnknownObjectReleaseList.size() > 1) {
       // Create the releaseN call right by the last release.
-      auto *OldCI = UnknownReleaseList[UnknownReleaseList.size() - 1];
+      auto *OldCI =
+          UnknownObjectReleaseList[UnknownObjectReleaseList.size() - 1];
       B.setInsertPoint(OldCI);
       O = OldCI->getArgOperand(0);
       auto *RI = OldCI;
-      for (auto R : UnknownReleaseList) {
+      for (auto R : UnknownObjectReleaseList) {
         if (B.isAtomic(R)) {
           RI = R;
           break;
         }
       }
-      B.createUnknownReleaseN(RC->getSwiftRCIdentityRoot(O),
-                              UnknownReleaseList.size(), RI);
+      B.createUnknownObjectReleaseN(RC->getSwiftRCIdentityRoot(O),
+                                    UnknownObjectReleaseList.size(), RI);
 
       // Remove all old release instructions.
-      for (auto *Inst : UnknownReleaseList) {
+      for (auto *Inst : UnknownObjectReleaseList) {
         Inst->eraseFromParent();
-        NumUnknownRetainReleasesEliminatedByMergingIntoRetainReleaseN++;
+        NumUnknownObjectRetainReleasesEliminatedByMergingIntoRetainReleaseN++;
       }
 
-      NumUnknownRetainReleasesEliminatedByMergingIntoRetainReleaseN--;
+      NumUnknownObjectRetainReleasesEliminatedByMergingIntoRetainReleaseN--;
     }
-    UnknownReleaseList.clear();
+    UnknownObjectReleaseList.clear();
 
     auto &BridgeRetainList = P.second.BridgeRetainList;
     if (BridgeRetainList.size() > 1) {
@@ -274,10 +275,10 @@ bool SwiftARCContractImpl::run() {
       // These instructions should not reach here based on the pass ordering.
       // i.e. LLVMARCOpt -> LLVMContractOpt.
       case RT_RetainN:
-      case RT_UnknownRetainN:
+      case RT_UnknownObjectRetainN:
       case RT_BridgeRetainN:
       case RT_ReleaseN:
-      case RT_UnknownReleaseN:
+      case RT_UnknownObjectReleaseN:
       case RT_BridgeReleaseN:
         llvm_unreachable("These are only created by LLVMARCContract !");
       // Delete all fix lifetime and end borrow instructions. After llvm-ir they
@@ -295,12 +296,12 @@ bool SwiftARCContractImpl::run() {
         LocalEntry.RetainList.push_back(CI);
         continue;
       }
-      case RT_UnknownRetain: {
+      case RT_UnknownObjectRetain: {
         auto *CI = cast<CallInst>(&Inst);
         auto *ArgVal = RC->getSwiftRCIdentityRoot(CI->getArgOperand(0));
 
         LocalState &LocalEntry = PtrToLocalStateMap[ArgVal];
-        LocalEntry.UnknownRetainList.push_back(CI);
+        LocalEntry.UnknownObjectRetainList.push_back(CI);
         continue;
       }
       case RT_Release: {
@@ -312,13 +313,13 @@ bool SwiftARCContractImpl::run() {
         LocalEntry.ReleaseList.push_back(CI);
         continue;
       }
-      case RT_UnknownRelease: {
+      case RT_UnknownObjectRelease: {
         // Stash any releases that we see.
         auto *CI = cast<CallInst>(&Inst);
         auto *ArgVal = RC->getSwiftRCIdentityRoot(CI->getArgOperand(0));
 
         LocalState &LocalEntry = PtrToLocalStateMap[ArgVal];
-        LocalEntry.UnknownReleaseList.push_back(CI);
+        LocalEntry.UnknownObjectReleaseList.push_back(CI);
         continue;
       }
       case RT_BridgeRetain: {

@@ -1,5 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/functions
+// RUN: %target-codesign %t/functions
+
 // RUN: %target-run %target-swift-reflection-test %t/functions | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // FIXME: Should not require objc_interop -- please put Objective-C-specific
@@ -47,14 +49,14 @@ func concrete(x: Int, y: Any) {
 // CHECK-32:      Type info:
 // CHECK-32-NEXT: (closure_context size=24 alignment=4 stride=24
 // CHECK-32-NEXT:   (field offset=8
-// CHECK-32-NEXT:     (opaque_existential size=16 alignment=4 stride=16 num_extra_inhabitants=0
+// CHECK-32-NEXT:     (opaque_existential size=16 alignment=4 stride=16 num_extra_inhabitants=4096
 // CHECK-32-NEXT:       (field name=metadata offset=12
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096)))))
 
 // CHECK-64:      Type info:
 // CHECK-64-NEXT: (closure_context size=48 alignment=8 stride=48
 // CHECK-64-NEXT:   (field offset=16
-// CHECK-64-NEXT:     (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=0
+// CHECK-64-NEXT:     (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=2147483647
 // CHECK-64-NEXT:       (field name=metadata offset=24
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647)))))
 }
@@ -232,7 +234,7 @@ class CapturingClass {
   // CHECK-64:      Type info:
   // CHECK-64:      (closure_context size=32 alignment=8 stride=32
   // CHECK-64-NEXT: (field offset=16
-  // CHECK-64-NEXT:   (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=0
+  // CHECK-64-NEXT:   (tuple size=16 alignment=8 stride=16 num_extra_inhabitants=2147483647
   // CHECK-64-NEXT:     (field offset=0
   // CHECK-64-NEXT:       (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
   // CHECK-64-NEXT:         (field name=_value offset=0
@@ -247,7 +249,7 @@ class CapturingClass {
   // CHECK-32:        Type info:
   // CHECK-32:        (closure_context size=16 alignment=4 stride=16
   // CHECK-32-NEXT:   (field offset=8
-  // CHECK-32-NEXT:     (tuple size=8 alignment=4 stride=8 num_extra_inhabitants=0
+  // CHECK-32-NEXT:     (tuple size=8 alignment=4 stride=8 num_extra_inhabitants=4096
   // CHECK-32-NEXT:       (field offset=0
   // CHECK-32-NEXT:         (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
   // CHECK-32-NEXT:           (field name=_value offset=0

@@ -751,33 +751,6 @@ uint64_t StringLiteralInst::getCodeUnitCount() {
   return SILInstruction::Bits.StringLiteralInst.Length;
 }
 
-ConstStringLiteralInst::ConstStringLiteralInst(SILDebugLocation Loc,
-                                               StringRef Text,
-                                               Encoding encoding, SILType Ty)
-    : InstructionBase(Loc, Ty) {
-  SILInstruction::Bits.ConstStringLiteralInst.TheEncoding = unsigned(encoding);
-  SILInstruction::Bits.ConstStringLiteralInst.Length = Text.size();
-  memcpy(getTrailingObjects<char>(), Text.data(), Text.size());
-}
-
-ConstStringLiteralInst *ConstStringLiteralInst::create(SILDebugLocation Loc,
-                                                       StringRef text,
-                                                       Encoding encoding,
-                                                       SILModule &M) {
-  void *buf =
-      allocateLiteralInstWithTextSize<ConstStringLiteralInst>(M, text.size());
-
-  auto Ty = SILType::getRawPointerType(M.getASTContext());
-  return ::new (buf) ConstStringLiteralInst(Loc, text, encoding, Ty);
-}
-
-uint64_t ConstStringLiteralInst::getCodeUnitCount() {
-  auto E = unsigned(Encoding::UTF16);
-  if (SILInstruction::Bits.ConstStringLiteralInst.TheEncoding == E)
-    return unicode::getUTF16Length(getValue());
-  return SILInstruction::Bits.ConstStringLiteralInst.Length;
-}
-
 StoreInst::StoreInst(
     SILDebugLocation Loc, SILValue Src, SILValue Dest,
     StoreOwnershipQualifier Qualifier = StoreOwnershipQualifier::Unqualified)
@@ -789,15 +762,6 @@ StoreBorrowInst::StoreBorrowInst(SILDebugLocation DebugLoc, SILValue Src,
                                  SILValue Dest)
     : InstructionBase(DebugLoc, Dest->getType()),
       Operands(this, Src, Dest) {}
-
-EndBorrowInst::EndBorrowInst(SILDebugLocation DebugLoc, SILValue Src,
-                             SILValue Dest)
-    : InstructionBase(DebugLoc),
-      Operands(this, Src, Dest) {}
-
-EndBorrowArgumentInst::EndBorrowArgumentInst(SILDebugLocation DebugLoc,
-                                             SILArgument *Arg)
-    : UnaryInstructionBase(DebugLoc, SILValue(Arg)) {}
 
 StringRef swift::getSILAccessKindName(SILAccessKind kind) {
   switch (kind) {
@@ -828,17 +792,6 @@ MarkFunctionEscapeInst::create(SILDebugLocation Loc,
   auto Size = totalSizeToAlloc<swift::Operand>(Elements.size());
   auto Buf = F.getModule().allocateInst(Size, alignof(MarkFunctionEscapeInst));
   return ::new(Buf) MarkFunctionEscapeInst(Loc, Elements);
-}
-
-static SILType getPinResultType(SILType operandType) {
-  return SILType::getPrimitiveObjectType(
-    OptionalType::get(operandType.getASTType())->getCanonicalType());
-}
-
-StrongPinInst::StrongPinInst(SILDebugLocation Loc, SILValue operand,
-                             Atomicity atomicity)
-    : UnaryInstructionBase(Loc, operand, getPinResultType(operand->getType())) {
-  setAtomicity(atomicity);
 }
 
 CopyAddrInst::CopyAddrInst(SILDebugLocation Loc, SILValue SrcLValue,
@@ -1106,6 +1059,15 @@ bool TermInst::isFunctionExiting() const {
   }
 
   llvm_unreachable("Unhandled TermKind in switch.");
+}
+
+TermInst::SuccessorBlockArgumentsListTy
+TermInst::getSuccessorBlockArguments() const {
+  function_ref<PhiArgumentArrayRef(const SILSuccessor &)> op;
+  op = [](const SILSuccessor &succ) -> PhiArgumentArrayRef {
+    return succ.getBB()->getPhiArguments();
+  };
+  return SuccessorBlockArgumentsListTy(getSuccessors(), op);
 }
 
 YieldInst *YieldInst::create(SILDebugLocation loc,
@@ -1971,10 +1933,9 @@ PointerToThinFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
                                                   TypeDependentOperands, Ty);
 }
 
-ConvertFunctionInst *
-ConvertFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
-                            SILType Ty, SILFunction &F,
-                            SILOpenedArchetypesState &OpenedArchetypes) {
+ConvertFunctionInst *ConvertFunctionInst::create(
+    SILDebugLocation DebugLoc, SILValue Operand, SILType Ty, SILFunction &F,
+    SILOpenedArchetypesState &OpenedArchetypes, bool WithoutActuallyEscaping) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
@@ -1982,8 +1943,8 @@ ConvertFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
   unsigned size =
     totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(ConvertFunctionInst));
-  auto *CFI = ::new (Buffer)
-      ConvertFunctionInst(DebugLoc, Operand, TypeDependentOperands, Ty);
+  auto *CFI = ::new (Buffer) ConvertFunctionInst(
+      DebugLoc, Operand, TypeDependentOperands, Ty, WithoutActuallyEscaping);
   // If we do not have lowered SIL, make sure that are not performing
   // ABI-incompatible conversions.
   //
@@ -2049,6 +2010,7 @@ bool KeyPathPatternComponent::isComputedSettablePropertyMutating() const {
        == ParameterConvention::Indirect_Inout;
   }
   }
+  llvm_unreachable("unhandled kind");
 }
 
 static void

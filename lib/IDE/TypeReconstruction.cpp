@@ -711,9 +711,7 @@ static void VisitNodeAddressor(
   // and they bear no connection to their original variable at the interface
   // level
   CanFunctionType swift_can_func_type =
-    CanFunctionType::get(AnyFunctionType::CanParamArrayRef(),
-                         ast->TheRawPointerType,
-                         AnyFunctionType::ExtInfo());
+    CanFunctionType::get({}, ast->TheRawPointerType);
   result._types.push_back(swift_can_func_type.getPointer());
 }
 
@@ -803,7 +801,7 @@ static void VisitNodeGenericTypealias(ASTContext *ast,
                                   ArrayRef<ProtocolConformanceRef>({}));
   Type parentType;
   if (auto nominal = genericTypeAlias->getDeclContext()
-                         ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+                         ->getSelfNominalTypeDecl()) {
     parentType = nominal->getDeclaredInterfaceType().subst(subMap);
   }
   NameAliasType *NAT = NameAliasType::get(
@@ -937,7 +935,7 @@ static void VisitNodeConstructor(
             // inits are typed as (Foo.Type) -> (args...) -> Foo, but don't
             // assert that in case we're dealing with broken code.
             if (identifier_func->getParams().size() == 1 &&
-                identifier_func->getParams()[0].getType()->is<AnyMetatypeType>() &&
+                identifier_func->getParams()[0].getOldType()->is<AnyMetatypeType>() &&
                 identifier_func->getResult()->is<AnyFunctionType>()) {
               identifier_func =
                   identifier_func->getResult()->getAs<AnyFunctionType>();
@@ -1229,7 +1227,8 @@ static bool CompareFunctionTypes(const AnyFunctionType *f,
     auto label1 = getLabel(fLabels, param1, i);
     auto label2 = getLabel(gLabels, param2, i);
 
-    if (label1.equals(label2) && param1.getType()->isEqual(param2.getType()))
+    if (label1.equals(label2) &&
+        param1.getOldType()->isEqual(param2.getOldType()))
       continue;
 
     in_matches = false;
@@ -1468,15 +1467,15 @@ static void CreateFunctionType(ASTContext *ast,
                                bool escaping,
                                bool throws,
                                VisitNodeResult &result) {
-  Type arg_clang_type;
-  Type return_clang_type;
+  Type arg_type;
+  Type return_type;
 
   switch (arg_type_result._types.size()) {
   case 0:
-    arg_clang_type = TupleType::getEmpty(*ast);
+    arg_type = TupleType::getEmpty(*ast);
     break;
   case 1:
-    arg_clang_type = arg_type_result._types.front().getPointer();
+    arg_type = arg_type_result._types.front().getPointer();
     break;
   default:
     result._error = "too many argument types for a function type";
@@ -1485,21 +1484,28 @@ static void CreateFunctionType(ASTContext *ast,
 
   switch (return_type_result._types.size()) {
   case 0:
-    return_clang_type = TupleType::getEmpty(*ast);
+    return_type = TupleType::getEmpty(*ast);
     break;
   case 1:
-    return_clang_type = return_type_result._types.front().getPointer();
+    return_type = return_type_result._types.front().getPointer();
     break;
   default:
     result._error = "too many return types for a function type";
     break;
   }
 
-  if (arg_clang_type && return_clang_type) {
-    result._types.push_back(
-        FunctionType::get(arg_clang_type, return_clang_type,
-                          FunctionType::ExtInfo().withNoEscape(!escaping)
-                          .withThrows(throws)));
+  if (arg_type && return_type) {
+    // FIXME: We need to either refactor this code to build function parameters
+    // directly, or better yet, scrap TypeReconstruction altogether in favor of
+    // TypeDecoder which already does the right thing.
+    SmallVector<AnyFunctionType::Param, 8> params;
+    AnyFunctionType::decomposeInput(arg_type, params);
+
+    auto ext_info =
+      FunctionType::ExtInfo()
+        .withNoEscape(!escaping)
+        .withThrows(throws);
+    result._types.push_back(FunctionType::get(params, return_type, ext_info));
   }
 }
 

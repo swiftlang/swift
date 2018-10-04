@@ -81,6 +81,7 @@ bool AccessMarkerElimination::shouldPreserveAccess(
   case SILAccessEnforcement::Dynamic:
     return Mod->getOptions().EnforceExclusivityDynamic;
   }
+  llvm_unreachable("unhandled enforcement");
 }
 
 // Check if the instruction is a marker that should be eliminated. If so, delete
@@ -181,8 +182,13 @@ struct AccessMarkerEliminationPass : SILModuleTransform {
 
       // Markers from all current SIL functions are stripped. Register a
       // callback to strip an subsequently loaded functions on-the-fly.
-      if (!EnableOptimizedAccessMarkers)
-        M.registerDeserializationCallback(prepareSILFunctionForOptimization);
+      if (!EnableOptimizedAccessMarkers) {
+        using NotificationHandlerTy =
+            FunctionBodyDeserializationNotificationHandler;
+        auto *n = new NotificationHandlerTy(prepareSILFunctionForOptimization);
+        std::unique_ptr<DeserializationNotificationHandler> ptr(n);
+        M.registerDeserializationNotificationHandler(std::move(ptr));
+      }
     }
   }
 };

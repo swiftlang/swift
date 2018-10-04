@@ -97,7 +97,7 @@ func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}
 f8(3, f4) // expected-error {{argument type 'Int' does not conform to expected type 'P2'}}
 typealias Tup = (Int, Double)
 func f9(_ x: Tup) -> Tup { return x }
-f8((1,2.0), f9) // expected-error {{'(Tup, @escaping (Tup) -> Tup) -> ()' (aka '((Int, Double), @escaping ((Int, Double)) -> (Int, Double)) -> ()') requires that '(_, _)' conform to 'P2'}}
+f8((1,2.0), f9) // expected-error {{argument type 'Tup' (aka '(Int, Double)') does not conform to expected type 'P2'}}
 
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals
 1.doesntExist(0)  // expected-error {{value of type 'Int' has no member 'doesntExist'}}
@@ -422,10 +422,11 @@ enum Color {
   static func frob(_ a : Int, b : inout Int) -> Color {}
   static var svar: Color { return .Red }
 }
-let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{'map' produces '[T]', not the expected contextual result type '(Int, Color)'}}
 
-// FIXME: rdar://41416346
-let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{'map' produces '[T]', not the expected contextual result type '[(Int, Color)]'}}
+// FIXME: This used to be better: "'map' produces '[T]', not the expected contextual result type '(Int, Color)'"
+let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{expression type '((Int) throws -> _) throws -> [_]' is ambiguous without more context}}
+
+let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{missing argument label 'description:' in call}}
 
 let _: [Color] = [1,2].map { _ in .Unknown("") }// expected-error {{missing argument label 'description:' in call}} {{44-44=description: }}
 
@@ -447,7 +448,7 @@ let _: Color = .overload(1)  // expected-error {{ambiguous reference to member '
 let _: Color = .frob(1.0, &i) // expected-error {{missing argument label 'b:' in call}}
 let _: Color = .frob(1.0, b: &i) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: Color = .frob(1, i)  // expected-error {{missing argument label 'b:' in call}}
-let _: Color = .frob(1, b: i)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
+let _: Color = .frob(1, b: i)  // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}} {{28-28=&}}
 let _: Color = .frob(1, &d) // expected-error {{missing argument label 'b:' in call}}
 let _: Color = .frob(1, b: &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 var someColor : Color = .red // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
@@ -657,7 +658,8 @@ example21890157.property = "confusing"  // expected-error {{value of optional ty
 
 struct UnaryOp {}
 
-_ = -UnaryOp() // expected-error {{argument type 'UnaryOp' does not conform to expected type 'SignedNumeric'}}
+_ = -UnaryOp() // expected-error {{unary operator '-' cannot be applied to an operand of type 'UnaryOp'}}
+// expected-note@-1 {{overloads for '-' exist with these partially matching parameter lists: (Float), (Double)}}
 
 
 // <rdar://problem/23433271> Swift compiler segfault in failure diagnosis
@@ -679,7 +681,7 @@ func r23641896() {
   var g = "Hello World"
   g.replaceSubrange(0...2, with: "ce")  // expected-error {{cannot convert value of type 'ClosedRange<Int>' to expected argument type 'Range<String.Index>'}}
 
-  _ = g[12]  // expected-error {{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
+  _ = g[12]  // expected-error {{'subscript(_:)' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
 
 }
 
@@ -718,14 +720,13 @@ func overloadSetResultType(_ a : Int, b : Int) -> Int {
 }
 
 postfix operator +++
-postfix func +++ <T>(_: inout T) -> T { fatalError() } // expected-note {{in call to operator '+++'}}
+postfix func +++ <T>(_: inout T) -> T { fatalError() }
 
 // <rdar://problem/21523291> compiler error message for mutating immutable field is incorrect
 func r21523291(_ bytes : UnsafeMutablePointer<UInt8>) {
-  let i = 42
+  let i = 42 // expected-note {{change 'let' to 'var' to make it mutable}}
 
-  // FIXME: rdar://41416382
-  _ = bytes[i+++]  // expected-error {{generic parameter 'T' could not be inferred}}
+  _ = bytes[i+++]  // expected-error {{cannot pass immutable value to mutating operator: 'i' is a 'let' constant}}
 }
 
 
@@ -952,7 +953,7 @@ func SR_6272_a() {
     case bar
   }
 
-  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'Float'}} {{35-35=Int(}} {{42-42=)}}
+  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'Float'}} {{35-35=Int(}} {{43-43=)}}
   // expected-note@+1 {{expected an argument list of type '(Int, Int)'}}
   let _: Int = Foo.bar.rawValue * Float(0)
 
@@ -1188,18 +1189,17 @@ func rdar17170728() {
 
 // https://bugs.swift.org/browse/SR-5934 - failure to emit diagnostic for bad
 // generic constraints
-func elephant<T, U>(_: T) where T : Collection, T.Element == U, T.Element : Hashable {}
+func elephant<T, U>(_: T) where T : Collection, T.Element == U, T.Element : Hashable {} // expected-note {{where 'U' = 'T'}}
 
 func platypus<T>(a: [T]) {
-    _ = elephant(a) // expected-error {{'([T]) -> ()' requires that 'T' conform to 'Hashable'}}
+    _ = elephant(a) // expected-error {{global function 'elephant' requires that 'T' conform to 'Hashable'}}
 }
 
 // Another case of the above.
 func badTypes() {
   let sequence:AnySequence<[Int]> = AnySequence() { AnyIterator() { [3] }}
   let array = [Int](sequence)
-  // expected-error@-1 {{type of expression is ambiguous without more context}}
-  // FIXME: terrible diagnostic
+  // expected-error@-1 {{initializer 'init(_:)' requires the types 'Int' and '[Int]' be equivalent}}
 }
 
 // rdar://34357545
@@ -1207,3 +1207,6 @@ func unresolvedTypeExistential() -> Bool {
   return (Int.self==_{})
   // expected-error@-1 {{ambiguous reference to member '=='}}
 }
+
+func rdar43525641(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
+rdar43525641(1, c: 2, 3) // Ok

@@ -16,7 +16,7 @@ bb0:
 // CHECK-32:  define hidden swiftcc void @test1([[WORD:i32]], [[WORD]])
 sil hidden @test1 : $@convention(thin) (@owned Optional<() -> ()>) -> () {
 bb0(%0 : $Optional<() -> ()>):
-  // CHECK: call void @"$SIey_SgWOy"
+  // CHECK: call void @"$sIey_SgWOy"
   retain_value %0 : $Optional<() -> ()>
 
   // CHECK: icmp eq i64 %0, 0

@@ -39,14 +39,14 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
-  AccessLevel evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+  llvm::Expected<AccessLevel> evaluate(Evaluator &evaluator,
+                                       ValueDecl *decl) const;
 
 public:
   // Cycle handling
-  AccessLevel breakCycle() const { return AccessLevel::Private; }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
@@ -68,14 +68,14 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
-  AccessLevel evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
+  llvm::Expected<AccessLevel>
+  evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
 
 public:
   // Cycle handling
-  AccessLevel breakCycle() const { return AccessLevel::Private; }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
@@ -95,17 +95,14 @@ public:
   using SimpleRequest::SimpleRequest;
   using DefaultAndMax = std::pair<AccessLevel, AccessLevel>;
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
-  DefaultAndMax
+  llvm::Expected<DefaultAndMax>
   evaluate(Evaluator &evaluator, ExtensionDecl *decl) const;
 
 public:
   // Cycle handling
-  DefaultAndMax
-  breakCycle() const { return std::make_pair(AccessLevel::Private,
-                                             AccessLevel::Private); }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 

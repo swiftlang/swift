@@ -17,8 +17,6 @@
 // RUN: %FileCheck %s -check-prefix=FILE2 < %t/both.txt
 
 
-// XFAIL: linux
-
 import ClangModuleB
 import ClangModuleC.Sub1
 import ClangModuleC.Sub2
@@ -51,7 +49,7 @@ func test() {
 // FILE1: DEPEND START
 // FILE1-NOT: ClangModuleA.h
 // FILE1-NOT: Unit |{{.*}}ClangModuleA
-// FILE1: Unit | system | Swift | {{.*}}Swift.swiftmodule | | {{[0-9]*$}}
+// FILE1: Unit | system | Swift | {{.*}}Swift.swiftmodule
 // FILE1-NOT: Unit |{{.*}}ClangModuleA
 // FILE1: Unit | user | ClangModuleB | {{.*}}ClangModuleB-{{[A-Z0-9]*}}.pcm | ClangModuleB-{{[A-Z0-9]*}}.pcm-
 // FILE1: Unit | user | ClangModuleC | {{.*}}ClangModuleC-{{[A-Z0-9]*}}.pcm | ClangModuleC-{{[A-Z0-9]*}}.pcm-
@@ -70,10 +68,11 @@ func test() {
 // FILE2-NOT: ClangModuleB.h
 // FILE2-NOT: Unit |{{.*}}ClangModuleB
 // FILE2-NOT: Record
-// FILE2: Unit | system | Swift | {{.*}}Swift.swiftmodule | | {{[0-9]*$}}
+// FILE2: Unit | system | Swift | {{.*}}Swift.swiftmodule
 // FILE2-NOT: Unit |{{.*}}ClangModuleB
 // FILE2-NOT: Record
 // FILE2: Unit | user | ClangModuleA | {{.*}}ClangModuleA-{{[A-Z0-9]*}}.pcm | ClangModuleA-{{[A-Z0-9]*}}.pcm-
+// FILE2: Record | user | {{.*}}s2.swift | s2.swift-
 // FILE2-NOT: Unit |{{.*}}ClangModuleB
 // FILE2-NOT: Record
 // FILE2: DEPEND END

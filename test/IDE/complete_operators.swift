@@ -226,7 +226,6 @@ func testInfix8(x: S3?) {
 }
 // The equality operators come from equatable.
 // S3_INFIX_OPTIONAL: Begin completions
-// S3_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  != {#S3?#}[#Bool#]
 // S3_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#S3?#}[#Bool#]
 // S3_INFIX_OPTIONAL: End completions
 

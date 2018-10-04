@@ -1079,7 +1079,7 @@ public:
   }
   ArrayRef<TypeRepr *> getGenericArguments() const {
     return {getTrailingObjects<TypeRepr*>(),
-            Bits.SILBoxTypeRepr.NumGenericArgs};
+            static_cast<size_t>(Bits.SILBoxTypeRepr.NumGenericArgs)};
   }
   
   GenericParamList *getGenericParams() const {

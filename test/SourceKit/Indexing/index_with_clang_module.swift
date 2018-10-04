@@ -18,6 +18,10 @@ func foo(a: FooClassDerived) {
 // CHECK-NEXT: key.filepath: "{{.*[/\\]}}Foo{{.*}}.pcm"
 // CHECK-NOT: key.hash:
 
+// CHECK:      key.kind: source.lang.swift.ref.module
+// CHECK-NEXT: key.name: "Foo"
+// CHECK-NEXT: key.usr: "c:@M@Foo"
+
 // CHECK:      key.kind: source.lang.swift.ref.class
 // CHECK-NEXT: key.name: "FooClassDerived"
 // CHECK-NEXT: key.usr: "c:objc(cs)FooClassDerived"

@@ -1347,27 +1347,33 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
     auto origEltType = origType.getTupleElementType(i);
     auto substEltType = substType.getElementType(i);
 
-    assert(!isa<LValueType>(substEltType) &&
-           "lvalue types cannot exist in function signatures");
-    assert(!isa<InOutType>(substEltType) &&
-           "inout cannot appear in tuple element type here");
-    
-    // If the original type was an archetype, use that archetype as
-    // the original type of the element --- the actual archetype
-    // doesn't matter, just the abstraction pattern.
+    auto &substElt = substType->getElement(i);
+
+    // Make sure we don't have something non-materializable.
+    auto Flags = substElt.getParameterFlags();
+    assert(Flags.getValueOwnership() == ValueOwnership::Default);
+    assert(!Flags.isVariadic());
+
     SILType silType = tc.getLoweredType(origEltType, substEltType);
     CanType loweredSubstEltType = silType.getASTType();
 
-    changed = (changed || substEltType != loweredSubstEltType);
+    changed = (changed || substEltType != loweredSubstEltType ||
+               !Flags.isNone());
 
-    auto &substElt = substType->getElement(i);
-    loweredElts.push_back(substElt.getWithType(loweredSubstEltType));
+    // Note: we drop @escaping and @autoclosure which can still appear on
+    // materializable tuple types.
+    //
+    // FIXME: Replace this with an assertion that the original tuple element
+    // did not have any flags.
+    loweredElts.emplace_back(loweredSubstEltType,
+                             substElt.getName(),
+                             ParameterTypeFlags());
   }
-  
+
   if (!changed) return substType;
 
-  // Because we're transforming an existing tuple, the weird corner
-  // case where TupleType::get does not return a TupleType can't happen.
+  // The cast should succeed, because if we end up with a one-element
+  // tuple type here, it must have a label.
   return cast<TupleType>(CanType(TupleType::get(loweredElts, tc.Context)));
 }
 
@@ -1603,7 +1609,7 @@ TypeConverter::getTypeLoweringForUncachedLoweredType(TypeKey key) {
 /// Get the type of a global variable accessor function, () -> RawPointer.
 static CanAnyFunctionType getGlobalAccessorType(CanType varType) {
   ASTContext &C = varType->getASTContext();
-  return CanFunctionType::get(TupleType::getEmpty(C), C.TheRawPointerType);
+  return CanFunctionType::get({}, C.TheRawPointerType);
 }
 
 /// Get the type of a default argument generator, () -> T.
@@ -1631,8 +1637,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   // Get the generic signature from the surrounding context.
   auto funcInfo = TC.getConstantInfo(SILDeclRef(VD));
   return CanAnyFunctionType::get(funcInfo.FormalType.getOptGenericSignature(),
-                                 TupleType::getEmpty(TC.Context),
-                                 canResultTy);
+                                 {}, canResultTy);
 }
 
 /// Get the type of a stored property initializer, () -> T.
@@ -1645,8 +1650,7 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
           ->getCanonicalType();
   auto sig = TC.getEffectiveGenericSignature(DC);
 
-  return CanAnyFunctionType::get(sig, TupleType::getEmpty(TC.Context),
-                                 resultTy);
+  return CanAnyFunctionType::get(sig, {}, resultTy);
 }
 
 /// Get the type of a destructor function.
@@ -1673,10 +1677,12 @@ static CanAnyFunctionType getDestructorInterfaceType(TypeConverter &TC,
   CanType resultTy = (isDeallocating
                       ? TupleType::getEmpty(C)
                       : C.TheNativeObjectType);
-  CanType methodTy = CanFunctionType::get(TupleType::getEmpty(C), resultTy);
+  CanType methodTy = CanFunctionType::get({}, resultTy);
 
   auto sig = TC.getEffectiveGenericSignature(dd);
-  return CanAnyFunctionType::get(sig, classType, methodTy, extInfo);
+  FunctionType::Param args[] = {FunctionType::Param(classType)};
+  return CanAnyFunctionType::get(sig, llvm::makeArrayRef(args),
+                                 methodTy, extInfo);
 }
 
 /// Retrieve the type of the ivar initializer or destroyer method for
@@ -1688,17 +1694,20 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(TypeConverter &TC,
   auto classType = cd->getDeclaredInterfaceType()
     ->getCanonicalType(cd->getGenericSignatureOfContext());
 
-  CanType emptyTupleTy = TupleType::getEmpty(TC.Context);
-  auto resultType = (isDestroyer ? emptyTupleTy : classType);
+  auto resultType = (isDestroyer
+                     ? TupleType::getEmpty(TC.Context)
+                     : classType);
   auto extInfo = AnyFunctionType::ExtInfo(FunctionType::Representation::Thin,
                                           /*throws*/ false);
   extInfo = extInfo
     .withSILRepresentation(isObjC? SILFunctionTypeRepresentation::ObjCMethod
                            : SILFunctionTypeRepresentation::Method);
 
-  resultType = CanFunctionType::get(emptyTupleTy, resultType, extInfo);
+  resultType = CanFunctionType::get({}, resultType, extInfo);
   auto sig = TC.getEffectiveGenericSignature(cd);
-  return CanAnyFunctionType::get(sig, classType, resultType, extInfo);
+  FunctionType::Param args[] = {FunctionType::Param(classType)};
+  return CanAnyFunctionType::get(sig, llvm::makeArrayRef(args),
+                                 resultType, extInfo);
 }
 
 GenericEnvironment *
@@ -1950,53 +1959,6 @@ TypeConverter::getProtocolDispatchStrategy(ProtocolDecl *P) {
   return ProtocolDispatchStrategy::Swift;
 }
 
-CanSILFunctionType TypeConverter::getMaterializeForSetCallbackType(
-    AbstractStorageDecl *storage, CanGenericSignature genericSig, Type selfType,
-    SILFunctionTypeRepresentation rep,
-    Optional<ProtocolConformanceRef> witnessMethodConformance) {
-  auto &ctx = M.getASTContext();
-
-  // Get lowered formal types for callback parameters.
-  auto selfMetatypeType = MetatypeType::get(selfType,
-                                            MetatypeRepresentation::Thick);
-
-  auto canSelfType = selfType->getCanonicalType(genericSig);
-  auto canSelfMetatypeType = selfMetatypeType->getCanonicalType(genericSig);
-  auto selfConvention = (storage->isSetterMutating()
-                         ? ParameterConvention::Indirect_Inout
-                         : ParameterConvention::Indirect_In_Guaranteed);
-
-  {
-    GenericContextScope scope(*this, genericSig);
-
-    // If 'self' is a metatype, make it @thin or @thick as needed, but not inside
-    // selfMetatypeType.
-    if (auto metatype = canSelfType->getAs<MetatypeType>()) {
-      if (!metatype->hasRepresentation())
-        canSelfType = getLoweredType(metatype).getASTType();
-    }
-  }
-
-  // Create the SILFunctionType for the callback.
-  SILParameterInfo params[] = {
-    { ctx.TheRawPointerType, ParameterConvention::Direct_Unowned },
-    { ctx.TheUnsafeValueBufferType, ParameterConvention::Indirect_Inout },
-    { canSelfType, selfConvention },
-    { canSelfMetatypeType, ParameterConvention::Direct_Unowned },
-  };
-  ArrayRef<SILResultInfo> results = {};
-
-  auto extInfo = SILFunctionType::ExtInfo().withRepresentation(rep);
-
-  if (genericSig && genericSig->areAllParamsConcrete())
-    genericSig = nullptr;
-
-  return SILFunctionType::get(genericSig, extInfo, SILCoroutineKind::None,
-                              /*callee*/ ParameterConvention::Direct_Unowned,
-                              params, {}, results, None, ctx,
-                              witnessMethodConformance);
-}
-
 /// If a capture references a local function, return a reference to that
 /// function.
 static Optional<AnyFunctionRef>
@@ -2029,7 +1991,7 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   
   // Recursively collect transitive captures from captured local functions.
   llvm::DenseSet<AnyFunctionRef> visitedFunctions;
-  llvm::SetVector<CapturedValue> captures;
+  llvm::MapVector<ValueDecl*,CapturedValue> captures;
 
   // If there is a capture of 'self' with dynamic 'Self' type, it goes last so
   // that IRGen can pass dynamic 'Self' metadata.
@@ -2112,8 +2074,6 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
           case ReadWriteImplKind::Modify:
             collectFunctionCaptures(capturedVar->getModifyCoroutine());
             break;
-          case ReadWriteImplKind::MaterializeForSet:
-            llvm_unreachable("local variable with materializeForSet?");
           }
         }
 
@@ -2130,30 +2090,43 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
 
           // We're capturing a 'self' value with dynamic 'Self' type;
           // handle it specially.
-          if (!selfCapture &&
-              captureType->getClassOrBoundGenericClass()) {
-            selfCapture = capture;
+          if (captureType->getClassOrBoundGenericClass()) {
+            if (selfCapture)
+              selfCapture = selfCapture->mergeFlags(capture);
+            else
+              selfCapture = capture;
             continue;
           }
         }
 
         // Fall through to capture the storage.
       }
-      
+
       // Collect non-function captures.
-      captures.insert(capture);
+      ValueDecl *value = capture.getDecl();
+      auto existing = captures.find(value);
+      if (existing != captures.end()) {
+        existing->second = existing->second.mergeFlags(capture);
+      } else {
+        captures.insert(std::pair<ValueDecl *, CapturedValue>(value, capture));
+      }
     }
   };
   collectFunctionCaptures(fn);
+
+  SmallVector<CapturedValue, 4> resultingCaptures;
+  for (auto capturePair : captures) {
+    resultingCaptures.push_back(capturePair.second);
+  }
 
   // If we captured the dynamic 'Self' type and we have a 'self' value also,
   // add it as the final capture. Otherwise, add a fake hidden capture for
   // the dynamic 'Self' metatype.
   if (selfCapture.hasValue()) {
-    captures.insert(*selfCapture);
+    resultingCaptures.push_back(*selfCapture);
   } else if (capturesDynamicSelf) {
     selfCapture = CapturedValue::getDynamicSelfMetadata();
-    captures.insert(*selfCapture);
+    resultingCaptures.push_back(*selfCapture);
   }
 
   // Cache the uniqued set of transitive captures.
@@ -2162,7 +2135,7 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   auto &cachedCaptures = inserted.first->second;
   cachedCaptures.setGenericParamCaptures(capturesGenericParams);
   cachedCaptures.setDynamicSelfType(capturesDynamicSelf);
-  cachedCaptures.setCaptures(Context.AllocateCopy(captures));
+  cachedCaptures.setCaptures(Context.AllocateCopy(resultingCaptures));
   
   return cachedCaptures;
 }

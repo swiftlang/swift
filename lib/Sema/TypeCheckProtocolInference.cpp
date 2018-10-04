@@ -179,17 +179,23 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
 
     // The extension where the conformance being checked is declared.
     auto conformanceExtension = checker.Conformance->
-      getDeclContext()->getAsDeclOrDeclExtensionContext();
+      getDeclContext()->getAsDecl();
     if (extension == conformanceExtension)
+      return true;
+
+    auto *extendedNominal = extension->getExtendedNominal();
+
+    // Invalid case.
+    if (extendedNominal == nullptr)
       return true;
 
     // Assume unconstrained concrete extensions we found witnesses in are
     // always viable.
-    if (!extension->getExtendedType()->isAnyExistentialType()) {
-      // TODO: When constrained extensions are a thing, we'll need an "is
-      // as specialized as" kind of check here.
+    if (!isa<ProtocolDecl>(extendedNominal))
       return !extension->isConstrainedExtension();
-    }
+
+    // Build a generic signature.
+    tc.validateExtension(extension);
 
     // The extension may not have a generic signature set up yet, as a
     // recursion breaker, in which case we can't yet confidently reject its
@@ -228,8 +234,8 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
   auto typeInContext =
     conformance->getDeclContext()->mapTypeIntoContext(conformance->getType());
 
-  for (auto witness : checker.lookupValueWitnesses(req,
-                                                   /*ignoringNames=*/nullptr)) {
+  for (auto witness :
+       checker.lookupValueWitnesses(req, /*ignoringNames=*/nullptr)) {
     LLVM_DEBUG(llvm::dbgs() << "Inferring associated types from decl:\n";
                witness->dump(llvm::dbgs()));
 
@@ -290,7 +296,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
           // on `Self`, then it may still be an interesting candidate if we find
           // an answer for that other type.
           auto witnessContext = witness->getDeclContext();
-          if (witnessContext->getAsProtocolExtensionContext()
+          if (witnessContext->getExtendedProtocolDecl()
               && witnessContext->getGenericSignatureOfContext()) {
             auto selfTy = witnessContext->getSelfInterfaceType();
             auto selfAssocTy = DependentMemberType::get(selfTy,
@@ -397,7 +403,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
 
     result.push_back(std::move(witnessResult));
 next_witness:;
-  }
+}
 
   return result;
 }
@@ -411,6 +417,8 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
   for (auto member : proto->getMembers()) {
     auto req = dyn_cast<ValueDecl>(member);
     if (!req)
+      continue;
+    if (!req->isProtocolRequirement())
       continue;
 
     // Infer type witnesses for associated types.
@@ -591,8 +599,7 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
       continue;
 
     // We only find these within a protocol extension.
-    auto defaultProto = typeDecl->getDeclContext()
-                          ->getAsProtocolOrProtocolExtensionContext();
+    auto defaultProto = typeDecl->getDeclContext()->getSelfProtocolDecl();
     if (!defaultProto)
       continue;
 
@@ -699,6 +706,13 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
       if (!inferredType->isMaterializable())
         return true;
 
+      // If the type contains a type parameter, there is nothing we can infer
+      // from it.
+      // FIXME: This is a weird state introduced by associated type inference
+      // that should not exist.
+      if (inferredType->hasTypeParameter())
+        return true;
+
       auto proto = Conformance->getProtocol();
       if (auto assocType = getReferencedAssocTypeOfProtocol(firstDepMember,
                                                             proto)) {
@@ -750,8 +764,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
   return inferred;
 }
 
-/// Find an associated type declarations that provides a default definition.
-static AssociatedTypeDecl *findDefaultedAssociatedType(
+AssociatedTypeDecl *AssociatedTypeInference::findDefaultedAssociatedType(
                                              TypeChecker &tc,
                                              AssociatedTypeDecl *assocType) {
   // If this associated type has a default, we're done.
@@ -767,11 +780,11 @@ static AssociatedTypeDecl *findDefaultedAssociatedType(
     if (!overriddenDefault) continue;
 
     Type overriddenType =
-      overriddenDefault->getDefaultDefinitionLoc().getType();
+      overriddenDefault->getDefaultDefinitionType();
     assert(overriddenType);
     if (!overriddenType) continue;
 
-    CanType key = overriddenType->mapTypeOutOfContext()->getCanonicalType();
+    CanType key = overriddenType->getCanonicalType();
     if (canonicalTypes.insert(key).second)
       results.push_back(overriddenDefault);
   }
@@ -843,20 +856,14 @@ Type AssociatedTypeInference::computeDefaultTypeWitness(
     }
   }
 
-  Type defaultType = defaultedAssocType->getDefaultDefinitionLoc().getType();
+  Type defaultType = defaultedAssocType->getDefaultDefinitionType();
 
   // FIXME: Circularity
   if (!defaultType)
     return Type();
 
-  // If the associated type came from a different protocol, map it into our
-  // protocol's context.
-  if (defaultedAssocType->getDeclContext() != proto) {
-    defaultType = defaultType->mapTypeOutOfContext();
-    defaultType = proto->mapTypeIntoContext(defaultType);
-    if (!defaultType) return Type();
-  }
-
+  // Map it into our protocol's context.
+  defaultType = proto->mapTypeIntoContext(defaultType);
   defaultType = defaultType.subst(
                           QueryTypeSubstitutionMap{substitutions},
                           LookUpConformanceInModule(dc->getParentModule()));
@@ -885,7 +892,7 @@ Type AssociatedTypeInference::computeDerivedTypeWitness(
 
   // Can we derive conformances for this protocol and adoptee?
   NominalTypeDecl *derivingTypeDecl = adoptee->getAnyNominal();
-  if (!DerivedConformance::derivesProtocolConformance(tc, dc, derivingTypeDecl,
+  if (!DerivedConformance::derivesProtocolConformance(dc, derivingTypeDecl,
                                                       proto))
     return Type();
 
@@ -1071,9 +1078,10 @@ AssociatedTypeInference::getSubstOptionsWithCurrentTypeWitnesses() {
         // Find an associated type with the same name in the given
         // protocol.
         AssociatedTypeDecl *foundAssocType = nullptr;
+        auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+        flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
         for (auto result : thisProto->lookupDirect(
-                                             assocType->getName(),
-                                             /*ignoreNewExtensions=*/true)) {
+                                             assocType->getName(), flags)) {
           foundAssocType = dyn_cast<AssociatedTypeDecl>(result);
           if (foundAssocType) break;
         }
@@ -1116,7 +1124,7 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
                              { Type(proto->getProtocolSelfType()) },
                              sanitizedRequirements,
                              QuerySubstitutionMap{substitutions},
-                             TypeChecker::LookUpConformance(tc, dc),
+                             TypeChecker::LookUpConformance(dc),
                              None, nullptr, options);
   switch (result) {
   case RequirementCheckResult::Failure:
@@ -1174,6 +1182,7 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
   case RequirementCheckResult::Failure:
     return true;
   }
+  llvm_unreachable("unhandled result");
 }
 
 void AssociatedTypeInference::findSolutions(
@@ -1342,11 +1351,11 @@ void AssociatedTypeInference::findSolutionsRec(
     // Record this value witness, popping it when we exit the current scope.
     valueWitnesses.push_back({inferredReq.first, witnessReq.Witness});
     if (!isa<TypeDecl>(inferredReq.first) &&
-        witnessReq.Witness->getDeclContext()->getAsProtocolExtensionContext())
+        witnessReq.Witness->getDeclContext()->getExtendedProtocolDecl())
       ++numValueWitnessesInProtocolExtensions;
     SWIFT_DEFER {
       if (!isa<TypeDecl>(inferredReq.first) &&
-          witnessReq.Witness->getDeclContext()->getAsProtocolExtensionContext())
+          witnessReq.Witness->getDeclContext()->getExtendedProtocolDecl())
         --numValueWitnessesInProtocolExtensions;
 
       valueWitnesses.pop_back();
@@ -1430,11 +1439,11 @@ compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
   // that came from a protocol extension.
   if (!decl1 || !decl2) {
     if (!decl1 &&
-        decl2 && decl2->getDeclContext()->getAsProtocolExtensionContext())
+        decl2 && decl2->getDeclContext()->getExtendedProtocolDecl())
       return Comparison::Worse;
 
     if (!decl2 &&
-        decl1 && decl1->getDeclContext()->getAsProtocolExtensionContext())
+        decl1 && decl1->getDeclContext()->getExtendedProtocolDecl())
       return Comparison::Better;
 
     return Comparison::Unordered;
@@ -1448,10 +1457,8 @@ compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
   if (dc1 == dc2)
     return TC.compareDeclarations(DC, decl1, decl2);
 
-  auto isProtocolExt1 =
-    (bool)dc1->getAsProtocolExtensionContext();
-  auto isProtocolExt2 =
-    (bool)dc2->getAsProtocolExtensionContext();
+  auto isProtocolExt1 = (bool)dc1->getExtendedProtocolDecl();
+  auto isProtocolExt2 = (bool)dc2->getExtendedProtocolDecl();
 
   // If one witness comes from a protocol extension, favor the one
   // from a concrete context.

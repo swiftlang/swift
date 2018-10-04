@@ -90,16 +90,16 @@ func testNotInherited2() {
   var n2 = NotInherited2(double: 2.72828) // expected-error{{'NotInherited2' cannot be constructed because it has no accessible initializers}}
 }
 
-// FIXME: <rdar://problem/16331406> Implement inheritance of variadic designated initializers
+// <rdar://problem/16331406> Implement inheritance of variadic designated initializers
 class SuperVariadic {
-  init(ints: Int...) { } // expected-note{{variadic superclass initializer defined here}}
-  init(_ : Double...) { } // expected-note{{variadic superclass initializer defined here}}
+  init(ints: Int...) { }
+  init(_ : Double...) { }
 
-  init(s: String, ints: Int...) { } // expected-note{{variadic superclass initializer defined here}}
-  init(s: String, _ : Double...) { } // expected-note{{variadic superclass initializer defined here}}
+  init(s: String, ints: Int...) { }
+  init(s: String, _ : Double...) { }
 }
 
-class SubVariadic : SuperVariadic { } // expected-warning 4{{synthesizing a variadic inherited initializer for subclass 'SubVariadic' is unsupported}}
+class SubVariadic : SuperVariadic { }
 
 // Don't crash with invalid nesting of class in generic function
 
@@ -110,3 +110,22 @@ func testClassInGenericFunc<T>(t: T) {
   _ = B(t: t)
 }
 
+
+// <https://bugs.swift.org/browse/SR-5056> Required convenience init inhibits inheritance
+
+class SR5056A {
+    required init(a: Int) {}
+}
+
+class SR5056B : SR5056A {
+    required convenience init(b: Int) {
+        self.init(a: b)
+    }
+}
+
+class SR5056C : SR5056B {}
+
+func useSR5056C() {
+  _ = SR5056C(a: 0)
+  _ = SR5056C(b: 0)
+}

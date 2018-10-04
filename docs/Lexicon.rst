@@ -26,7 +26,7 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
       struct Foo<T> {
         var value: T
         // Foo.value has abstraction pattern <T> T
-    
+      }
       struct Bar<T, U> {
         var value: (T) -> U
         // Bar.value has abstraction pattern <T, U> (T) -> U
@@ -103,6 +103,10 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     guarantee this. This was `discussed on Apple's Swift blog`__.
 
     __ https://developer.apple.com/swift/blog/?id=28
+
+  DNM
+    "Do not merge". Placed in PR titles where discussion or analysis is still
+    ongoing.
 
   dup
     From "duplicate". As a noun, refers to another filed issue that describes
@@ -401,6 +405,10 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     overridable method in the class. Unlike an Objective-C method table,
     vtable keys are just offsets, making lookup much simpler at the cost of
     dynamism and duplicated information about *non*-overridden methods.
+
+  WIP
+    "Work-in-progress". Placed in PR titles to indicate that the PR is not ready
+    for review or merging.
 
   witness
     The value or type that satisfies a protocol requirement.

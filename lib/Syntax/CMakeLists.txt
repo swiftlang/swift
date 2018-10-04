@@ -13,6 +13,6 @@ add_swift_library(swiftSyntax STATIC
   Trivia.cpp.gyb
   RawSyntax.cpp
   Syntax.cpp
-  SyntaxArena.cpp
   SyntaxData.cpp
+  SyntaxSerialization.cpp.gyb
   UnknownSyntax.cpp)

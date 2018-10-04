@@ -38,10 +38,7 @@ import StdlibUnittest
 /// The `DoubleWidth` type is not intended as a replacement for a variable-width
 /// integer type. Nesting `DoubleWidth` instances, in particular, may result in
 /// undesirable performance.
-public struct DoubleWidth<Base : FixedWidthInteger>
-  where Base.Magnitude : UnsignedInteger,
-  Base.Words : Collection, Base.Magnitude.Words : Collection {
-
+public struct DoubleWidth<Base : FixedWidthInteger> {
   public typealias High = Base
   public typealias Low = Base.Magnitude
 
@@ -240,72 +237,33 @@ extension DoubleWidth {
   }
 }
 
-extension DoubleWidth.Words {  
-  public struct Index {
-    internal enum _WordsIndexValue: Equatable {
-      case low(DoubleWidth.Low.Words.Index)
-      case high(DoubleWidth.High.Words.Index)
-    }
-
-    internal var _value: _WordsIndexValue
-
-    internal init(_ _value: _WordsIndexValue) { self._value = _value }
-  }
-}
-
-extension DoubleWidth.Words.Index: Equatable { }
-
-extension DoubleWidth.Words.Index: Comparable {
-  public static func <(lhs: DoubleWidth.Words.Index, rhs: DoubleWidth.Words.Index) -> Bool {
-    switch (lhs._value, rhs._value) {
-    case let (.low(l), .low(r)): return l < r
-    case (.low, .high): return true
-    case (.high, .low): return false
-    case let (.high(l), .high(r)): return l < r
-    }
-  }
-}
-
-extension DoubleWidth.Words: Collection {
+extension DoubleWidth.Words: RandomAccessCollection {
+  public typealias Index = Int
+  
   public var startIndex: Index {
-    return Index(.low(_low.startIndex))
+    return 0
   }
 
   public var endIndex: Index {
-    return Index(.high(_high.endIndex))
+    return count
   }
   
   public var count: Int {
     if Base.bitWidth < UInt.bitWidth { return 1 }
-    return Int(_low.count) + Int(_high.count)
-  }
-
-  public func index(after i: Index) -> Index {
-    switch i._value {
-    case let .low(li) where Base.bitWidth < UInt.bitWidth:
-      return Index(.high(_high.endIndex)) 
-    case let .low(li):
-      let next = _low.index(after: li)
-      if next == _low.endIndex { 
-        return Index(.high(_high.startIndex)) 
-      } else {
-        return Index(.low(next))        
-      }
-    case let .high(hi):
-      return Index(.high(_high.index(after: hi)))
-    }
+    return _low.count + _high.count
   }
 
   public subscript(_ i: Index) -> UInt {
     if Base.bitWidth < UInt.bitWidth {
-      precondition(i == Index(.low(_low.startIndex)), "Invalid index")
+      precondition(i == 0, "Invalid index")
       assert(2 * Base.bitWidth <= UInt.bitWidth)
       return _low.first! | (_high.first! &<< Base.bitWidth._lowWord) 
     }
-    switch i._value {
-    case let .low(li): return _low[li]
-    case let .high(hi): return _high[hi]
+    if i < _low.count {
+      return _low[i + _low.startIndex]
     }
+    
+    return _high[i - _low.count + _high.startIndex]
   }
 }
 
@@ -1002,6 +960,19 @@ dwTests.test("DivideMinByMinusOne") {
   }
   expectCrashLater()
   _ = f(Int1024.min)
+}
+
+dwTests.test("isMultiple") {
+  func isMultipleTest<T: FixedWidthInteger>(type: T.Type) {
+    expectTrue(T.min.isMultiple(of: 2))
+    expectFalse(T.max.isMultiple(of: 10))
+    // Test that these do not crash.
+    expectTrue((0 as T).isMultiple(of: 0))
+    expectFalse((1 as T).isMultiple(of: 0))
+    expectTrue(T.min.isMultiple(of: 0 &- 1))
+  }
+  isMultipleTest(type: Int128.self)
+  isMultipleTest(type: UInt128.self)
 }
 
 dwTests.test("MultiplyMinByMinusOne") {

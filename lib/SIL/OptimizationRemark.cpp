@@ -162,10 +162,9 @@ template <> struct MappingTraits<SourceLoc> {
     assert(io.outputting() && "input not yet implemented");
 
     SourceManager *SM = static_cast<SourceManager *>(io.getContext());
-    unsigned BufferID = SM->findBufferContainingLoc(Loc);
-    StringRef File = SM->getIdentifierForBuffer(BufferID);
+    StringRef File = SM->getDisplayNameForLoc(Loc);
     unsigned Line, Col;
-    std::tie(Line, Col) = SM->getLineAndColumn(Loc, BufferID);
+    std::tie(Line, Col) = SM->getLineAndColumn(Loc);
 
     io.mapRequired("File", File);
     io.mapRequired("Line", Line);

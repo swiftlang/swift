@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Callee.h"
+#include "ClassLayout.h"
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenClass.h"
@@ -728,6 +729,27 @@ emitWitnessTableGeneratorForKeyPath(IRGenModule &IGM,
     });
 }
 
+static unsigned getClassFieldIndex(ClassDecl *classDecl, VarDecl *property) {
+  SmallVector<ClassDecl *, 3> superclasses;
+  for (auto *superDecl = classDecl; superDecl != nullptr;
+       superDecl = classDecl->getSuperclassDecl()) {
+    superclasses.push_back(superDecl);
+  }
+
+  std::reverse(superclasses.begin(), superclasses.end());
+
+  unsigned index = 0;
+  for (auto *superDecl : superclasses) {
+    for (auto *other : superDecl->getStoredProperties()) {
+      if (other == property)
+        return index;
+      index++;
+    }
+  }
+
+  llvm_unreachable("Did not find stored property in class");
+}
+
 static void
 emitKeyPathComponent(IRGenModule &IGM,
                      ConstantStructBuilder &fields,
@@ -751,22 +773,23 @@ emitKeyPathComponent(IRGenModule &IGM,
   case KeyPathPatternComponent::Kind::StoredProperty: {
     auto property = cast<VarDecl>(component.getStoredPropertyDecl());
     
-    auto addFixedOffset = [&](bool isStruct, llvm::Constant *offset) {
+    auto addFixedOffset = [&](bool isStruct, bool isLet,
+                              llvm::Constant *offset) {
       if (auto offsetInt = dyn_cast_or_null<llvm::ConstantInt>(offset)) {
         auto offsetValue = offsetInt->getValue().getZExtValue();
         if (KeyPathComponentHeader::offsetCanBeInline(offsetValue)) {
           auto header = isStruct
             ? KeyPathComponentHeader
-                ::forStructComponentWithInlineOffset(offsetValue)
+                ::forStructComponentWithInlineOffset(isLet, offsetValue)
             : KeyPathComponentHeader
-                ::forClassComponentWithInlineOffset(offsetValue);
+                ::forClassComponentWithInlineOffset(isLet, offsetValue);
           fields.addInt32(header.getData());
           return;
         }
       }
       auto header = isStruct
-        ? KeyPathComponentHeader::forStructComponentWithOutOfLineOffset()
-        : KeyPathComponentHeader::forClassComponentWithOutOfLineOffset();
+        ? KeyPathComponentHeader::forStructComponentWithOutOfLineOffset(isLet)
+        : KeyPathComponentHeader::forClassComponentWithOutOfLineOffset(isLet);
       fields.addInt32(header.getData());
       fields.add(llvm::ConstantExpr::getTruncOrBitCast(offset, IGM.Int32Ty));
     };
@@ -779,7 +802,7 @@ emitKeyPathComponent(IRGenModule &IGM,
                                                             loweredBaseTy,
                                                             property)) {
         // We have a known constant fixed offset.
-        addFixedOffset(/*struct*/ true, offset);
+        addFixedOffset(/*struct*/ true, property->isLet(), offset);
         break;
       }
 
@@ -789,7 +812,7 @@ emitKeyPathComponent(IRGenModule &IGM,
       auto fieldOffset = metadataLayout.getStaticFieldOffset(property);
 
       auto header = KeyPathComponentHeader
-        ::forStructComponentWithUnresolvedFieldOffset();
+        ::forStructComponentWithUnresolvedFieldOffset(property->isLet());
       fields.addInt32(header.getData());
       fields.addInt32(fieldOffset.getValue());
       break;
@@ -807,14 +830,14 @@ emitKeyPathComponent(IRGenModule &IGM,
                                                                 loweredBaseTy,
                                                                 property);
         assert(offset && "no constant offset for ConstantDirect field?!");
-        addFixedOffset(/*struct*/ false, offset);
+        addFixedOffset(/*struct*/ false, property->isLet(), offset);
         break;
       }
       case FieldAccess::NonConstantDirect: {
         // A constant offset that's determined at class realization time.
         // We have to load the offset from a global ivar.
         auto header = KeyPathComponentHeader
-          ::forClassComponentWithUnresolvedIndirectOffset();
+          ::forClassComponentWithUnresolvedIndirectOffset(property->isLet());
         fields.addInt32(header.getData());
         fields.addAlignmentPadding(IGM.getPointerAlignment());
         auto offsetVar = IGM.getAddrOfFieldOffset(property, NotForDefinition);
@@ -824,8 +847,8 @@ emitKeyPathComponent(IRGenModule &IGM,
       case FieldAccess::ConstantIndirect: {
         // An offset that depends on the instance's generic parameterization,
         // but whose field offset is at a known vtable offset.
-        auto header =
-          KeyPathComponentHeader::forClassComponentWithUnresolvedFieldOffset();
+        auto header = KeyPathComponentHeader
+          ::forClassComponentWithUnresolvedFieldOffset(property->isLet());
         fields.addInt32(header.getData());
         auto fieldOffset =
           getClassFieldOffsetOffset(IGM,
@@ -917,49 +940,30 @@ emitKeyPathComponent(IRGenModule &IGM,
       } else {
         if (auto overridden = declRef.getOverriddenVTableEntry())
           declRef = overridden;
+        if (auto overridden = declRef.getOverriddenWitnessTableEntry())
+          declRef = overridden;
 
         auto dc = declRef.getDecl()->getDeclContext();
 
-        // If the method context is resilient, use the dispatch thunk as a
-        // stable identifier for the storage.
-        if (IGM.isResilient(cast<NominalTypeDecl>(dc),
+        // We can use a method descriptor if we have a class or resilient
+        // protocol.
+        if (isa<ClassDecl>(dc) ||
+            IGM.isResilient(cast<NominalTypeDecl>(dc),
                             ResilienceExpansion::Minimal)) {
           idKind = KeyPathComponentHeader::Pointer;
-          idValue = IGM.getAddrOfDispatchThunk(declRef, NotForDefinition);
+          idValue = IGM.getAddrOfMethodDescriptor(declRef, NotForDefinition);
           idResolved = true;
           break;
         }
       
         idKind = KeyPathComponentHeader::VTableOffset;
-        if (isa<ClassDecl>(dc) && !cast<ClassDecl>(dc)->isForeign()) {
-          auto declaringClass =
-            cast<ClassDecl>(declRef.getDecl()->getDeclContext());
-          auto &metadataLayout = IGM.getClassMetadataLayout(declaringClass);
-
-          // For a class method, we don't necessarily need the absolute offset,
-          // only an offset that's unique to this method. For a class with
-          // resilient ancestry, all of the superclass methods will be
-          // identified by their dispatch thunk (see above), so we can use
-          // relative offsets from the dynamic base offset to identify the local
-          // class's own methods.
-          auto methodInfo = metadataLayout.getMethodOffsetInfo(declRef);
-          Size offset;
-          if (methodInfo.isStatic())
-            offset = methodInfo.getStaticOffset();
-          else
-            offset = methodInfo.getRelativeOffset();
-
-          idValue = llvm::ConstantInt::get(IGM.SizeTy, offset.getValue());
-          idResolved = true;
-        } else if (auto methodProto = dyn_cast<ProtocolDecl>(dc)) {
-          auto &protoInfo = IGM.getProtocolInfo(methodProto);
-          auto index = protoInfo.getFunctionIndex(
-                               cast<AbstractFunctionDecl>(declRef.getDecl()));
-          idValue = llvm::ConstantInt::get(IGM.SizeTy, -index.getValue());
-          idResolved = true;
-        } else {
-          llvm_unreachable("neither a class nor protocol dynamic method?");
-        }
+        auto methodProto = cast<ProtocolDecl>(dc);
+        auto &protoInfo = IGM.getProtocolInfo(methodProto,
+                                              ProtocolInfoKind::Full);
+        auto index = protoInfo.getFunctionIndex(
+                             cast<AbstractFunctionDecl>(declRef.getDecl()));
+        idValue = llvm::ConstantInt::get(IGM.SizeTy, -index.getValue());
+        idResolved = true;
       }
       break;
     }
@@ -984,7 +988,7 @@ emitKeyPathComponent(IRGenModule &IGM,
         }
         assert(structIdx && "not a stored property of the struct?!");
         idValue = llvm::ConstantInt::get(IGM.SizeTy, structIdx.getValue());
-      } else if (baseTy->getClassOrBoundGenericClass()) {
+      } else if (auto *classDecl = baseTy->getClassOrBoundGenericClass()) {
         // TODO: This field index would require runtime resolution with Swift
         // native class resilience. We never directly access ObjC-imported
         // ivars so we can disregard ObjC ivar resilience for this computation
@@ -995,8 +999,7 @@ emitKeyPathComponent(IRGenModule &IGM,
         case FieldAccess::NonConstantDirect:
           idResolved = true;
           idValue = llvm::ConstantInt::get(IGM.SizeTy,
-            getClassFieldIndex(IGM,
-                         SILType::getPrimitiveAddressType(baseTy), property));
+                                       getClassFieldIndex(classDecl, property));
           break;
         }
         

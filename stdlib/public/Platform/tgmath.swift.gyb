@@ -326,7 +326,7 @@ public func remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) {
 %  if T == 'Float80':
 #if (arch(i386) || arch(x86_64)) && !os(Windows)
 %  end
-@available(*, deprecated: 4.2, message:
+@available(swift, deprecated: 4.2, message:
            "use ${T}(nan: ${T}.RawSignificand) instead.")
 @_transparent
 public func nan(_ tag: String) -> ${T} {

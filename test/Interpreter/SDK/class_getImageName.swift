@@ -3,6 +3,7 @@
 // RUN: %target-codesign %t/libGetImageNameHelper.dylib
 
 // RUN: %target-build-swift -g %s -I %t -o %t/main -L %t -lGetImageNameHelper
+// RUN: %target-codesign %t/main
 // RUN: %target-run %t/main %t/libGetImageNameHelper.dylib
 
 // REQUIRES: executable_test

@@ -19,6 +19,7 @@
 // RUN: else \
 // RUN:   %target-build-swift %t/main.swift %S/Inputs/Mirror/MirrorOther.swift -o %t/Mirror; \
 // RUN: fi
+// RUN: %target-codesign %t/Mirror
 // RUN: %target-run %t/Mirror
 // REQUIRES: executable_test
 
@@ -1691,7 +1692,7 @@ mirrors.test("DictionaryIterator/Mirror") {
   dump(d.makeIterator(), to: &output)
 
   let expected =
-    "- Swift.DictionaryIterator<StdlibUnittest.MinimalHashableValue, StdlibUnittest.OpaqueValue<Swift.Int>>\n"
+    "- Swift.Dictionary<StdlibUnittest.MinimalHashableValue, StdlibUnittest.OpaqueValue<Swift.Int>>.Iterator\n"
 
   expectEqual(expected, output)
 }
@@ -1703,7 +1704,7 @@ mirrors.test("SetIterator/Mirror") {
   dump(s.makeIterator(), to: &output)
 
   let expected =
-    "- Swift.SetIterator<StdlibUnittest.MinimalHashableValue>\n"
+    "- Swift.Set<StdlibUnittest.MinimalHashableValue>.Iterator\n"
 
   expectEqual(expected, output)
 }
@@ -1790,6 +1791,42 @@ mirrors.test("SymbolicReferenceInsideType") {
     "▿ Mirror.OtherStruct\n" +
     "  - a: Mirror.OtherOuter.Inner\n" +
     "  - b: Mirror.OtherOuterGeneric<Swift.Int>.Inner<Swift.String>\n"
+
+  expectEqual(expected, output)
+}
+
+protocol P1 { }
+protocol P2 { }
+protocol P3 { }
+
+struct ConformsToP1: P1 { }
+struct ConformsToP2: P2 { }
+struct ConformsToP3: P3 { }
+
+struct OuterTwoParams<T: P1, U: P2> {}
+
+struct ConformsToP1AndP2 : P1, P2 { }
+
+extension OuterTwoParams where U == T {
+  struct InnerEqualParams<V: P3> {
+    var x: T
+    var y: U
+    var z: V
+  }
+}
+
+mirrors.test("GenericNestedWithSameTypeConstraints") {
+  let value = OuterTwoParams.InnerEqualParams(x: ConformsToP1AndP2(),
+                                              y: ConformsToP1AndP2(),
+                                              z: ConformsToP3())
+  var output = ""
+  dump(value, to: &output)
+
+  let expected =
+    "▿ (extension in Mirror):Mirror.OuterTwoParams<Mirror.ConformsToP1AndP2, Mirror.ConformsToP1AndP2>.InnerEqualParams<Mirror.ConformsToP3>\n" +
+    "  - x: Mirror.ConformsToP1AndP2\n" +
+    "  - y: Mirror.ConformsToP1AndP2\n" +
+    "  - z: Mirror.ConformsToP3\n"
 
   expectEqual(expected, output)
 }

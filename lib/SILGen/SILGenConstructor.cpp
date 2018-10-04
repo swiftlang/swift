@@ -35,13 +35,13 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
   auto ctorFnType = ctor->getInterfaceType()->castTo<AnyFunctionType>();
   assert(ctorFnType->getParams().size() == 1 &&
          "more than one self parameter?");
-  Type metatype = ctorFnType->getParams()[0].getType();
+  Type metatype = ctorFnType->getParams()[0].getOldType();
   auto *DC = ctor->getInnermostDeclContext();
   auto &AC = SGF.getASTContext();
   auto VD =
       new (AC) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                          AC.getIdentifier("$metatype"), SourceLoc(),
-                         AC.getIdentifier("$metatype"), Type(), DC);
+                         AC.getIdentifier("$metatype"), DC);
   VD->setInterfaceType(metatype);
 
   SGF.AllocatorMetatype = SGF.F.begin()->createFunctionArgument(
@@ -68,7 +68,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
   auto VD = new (AC) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                                AC.getIdentifier("$implicit_value"),
                                SourceLoc(),
-                               AC.getIdentifier("$implicit_value"), Type(),
+                               AC.getIdentifier("$implicit_value"),
                                DC);
   VD->setInterfaceType(interfaceType);
   SILFunctionArgument *arg =
@@ -101,7 +101,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
                                  SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
-                                 AC.getIdentifier("$return_value"), Type(),
+                                 AC.getIdentifier("$return_value"),
                                  ctor);
     VD->setInterfaceType(selfIfaceTyCan);
     resultSlot = SGF.F.begin()->createFunctionArgument(selfTy, VD);
@@ -204,10 +204,6 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // Get the 'self' decl and type.
   VarDecl *selfDecl = ctor->getImplicitSelfDecl();
   auto &lowering = getTypeLowering(selfDecl->getType());
-  SILType selfTy = lowering.getLoweredType();
-  (void)selfTy;
-  assert(!selfTy.getClassOrBoundGenericClass()
-         && "can't emit a class ctor here");
 
   // Decide if we need to do extra work to warn on unsafe behavior in pre-Swift-5
   // modes.
@@ -219,8 +215,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   } else {
     auto *dc = ctor->getParent();
     if (isa<ExtensionDecl>(dc) &&
-        dc->getAsStructOrStructExtensionContext()->getParentModule() !=
-          dc->getParentModule()) {
+        dc->getSelfStructDecl()->getParentModule() != dc->getParentModule()) {
       MUIKind = MarkUninitializedInst::CrossModuleRootSelf;
     } else {
       MUIKind = MarkUninitializedInst::RootSelf;
@@ -258,7 +253,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     SILGenSavedInsertionPoint savedIP(*this, failureBB,
                                       FunctionSection::Postmatter);
     failureExitBB = createBasicBlock();
-    Cleanups.emitCleanupsForReturn(ctor);
+    Cleanups.emitCleanupsForReturn(ctor, IsForUnwind);
     // Return nil.
     if (F.getConventions().hasIndirectSILResults()) {
       // Inject 'nil' into the indirect return.
@@ -271,7 +266,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
       B.createReturn(ctor, emitEmptyTuple(ctor));
     } else {
       // Pass 'nil' as the return value to the exit BB.
-      failureExitArg = failureExitBB->createPHIArgument(
+      failureExitArg = failureExitBB->createPhiArgument(
           resultLowering.getLoweredType(), ValueOwnershipKind::Owned);
       SILValue nilResult =
           B.createEnum(ctor, SILValue(), getASTContext().getOptionalNoneDecl(),
@@ -288,7 +283,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   // If this is not a delegating constructor, emit member initializers.
   if (!isDelegating) {
     auto *typeDC = ctor->getDeclContext();
-    auto *nominal = typeDC->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto *nominal = typeDC->getSelfNominalTypeDecl();
     emitMemberInitializers(ctor, selfDecl, nominal);
   }
 
@@ -400,7 +395,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
                                  SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
-                                 AC.getIdentifier("$return_value"), Type(),
+                                 AC.getIdentifier("$return_value"),
                                  element->getDeclContext());
     VD->setInterfaceType(enumIfaceTy);
     auto resultSlot =
@@ -479,16 +474,16 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   // Use alloc_ref to allocate the object.
   // TODO: allow custom allocation?
   // FIXME: should have a cleanup in case of exception
-  auto selfClassDecl = ctor->getDeclContext()->getAsClassOrClassExtensionContext();
+  auto selfClassDecl = ctor->getDeclContext()->getSelfClassDecl();
 
   SILValue selfValue;
 
   // Allocate the 'self' value.
   bool useObjCAllocation = usesObjCAllocator(selfClassDecl);
 
-  if (ctor->isConvenienceInit() || ctor->hasClangNode()) {
-    // For a convenience initializer or an initializer synthesized
-    // for an Objective-C class, allocate using the metatype.
+  if (ctor->hasClangNode()) {
+    // For an allocator thunk synthesized for an Objective-C init method,
+    // allocate using the metatype.
     SILValue allocArg = selfMetaValue;
 
     // When using Objective-C allocation, convert the metatype
@@ -504,6 +499,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     selfValue = B.createAllocRefDynamic(Loc, allocArg, selfTy,
                                         useObjCAllocation, {}, {});
   } else {
+    assert(ctor->isDesignatedInit());
     // For a designated initializer, we know that the static type being
     // allocated is the type of the class that defines the designated
     // initializer.
@@ -567,7 +563,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   // this behavior, we could avoid runtime overhead here.
   VarDecl *selfDecl = ctor->getImplicitSelfDecl();
   auto *dc = ctor->getDeclContext();
-  auto selfClassDecl = dc->getAsClassOrClassExtensionContext();
+  auto selfClassDecl = dc->getSelfClassDecl();
   bool NeedsBoxForSelf = isDelegating ||
     (selfClassDecl->hasSuperclass() && !ctor->hasStubImplementation());
   bool usesObjCAllocator = Lowering::usesObjCAllocator(selfClassDecl);
@@ -655,10 +651,10 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
                                       FunctionSection::Postmatter);
 
     failureExitBB = createBasicBlock();
-    failureExitArg = failureExitBB->createPHIArgument(
+    failureExitArg = failureExitBB->createPhiArgument(
         resultLowering.getLoweredType(), ValueOwnershipKind::Owned);
 
-    Cleanups.emitCleanupsForReturn(ctor);
+    Cleanups.emitCleanupsForReturn(ctor, IsForUnwind);
     SILValue nilResult =
         B.createEnum(loc, SILValue(), getASTContext().getOptionalNoneDecl(),
                      resultLowering.getLoweredType());
@@ -795,7 +791,7 @@ static ManagedValue emitSelfForMemberInit(SILGenFunction &SGF, SILLocation loc,
       .getAsSingleValue(SGF, loc);
   else
     return SGF.emitAddressOfLocalVarDecl(loc, selfDecl, selfFormalType,
-                                         AccessKind::Write);
+                                         SGFAccessKind::Write);
 }
 
 static LValue emitLValueForMemberInit(SILGenFunction &SGF, SILLocation loc,
@@ -804,7 +800,7 @@ static LValue emitLValueForMemberInit(SILGenFunction &SGF, SILLocation loc,
   CanType selfFormalType = selfDecl->getType()->getCanonicalType();
   auto self = emitSelfForMemberInit(SGF, loc, selfDecl);
   return SGF.emitPropertyLValue(loc, self, selfFormalType, property,
-                                LValueOptions(), AccessKind::Write,
+                                LValueOptions(), SGFAccessKind::Write,
                                 AccessSemantics::DirectToStorage);
 }
 
@@ -1003,8 +999,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
       while (storageRef.isLastComponentTranslation())
         storageRef.dropLastTranslationComponent();
       
-      auto storageAddr = emitAddressOfLValue(var, std::move(storageRef),
-                                             AccessKind::ReadWrite);
+      auto storageAddr = emitAddressOfLValue(var, std::move(storageRef));
       
       // Get the setter.
       auto setterFn = getBehaviorSetterFn(*this, var);

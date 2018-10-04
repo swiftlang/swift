@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-interface-path %t.swiftinterface -emit-module -o /dev/null %s
+// RUN: %target-swift-frontend -typecheck -emit-interface-path %t.swiftinterface %s
 // RUN: %FileCheck %s < %t.swiftinterface
 // RUN: %FileCheck -check-prefix NEGATIVE %s < %t.swiftinterface
 
@@ -60,8 +60,7 @@ extension PublicProto {
   @usableFromInline internal func ufiMethod() {}
 } // CHECK: {{^[}]$}}
 
-// FIXME: We shouldn't print access on extensions in textual interface files.
-// CHECK: {{^}}public extension PublicProto {{[{]$}}
+// CHECK: {{^}}extension PublicProto {{[{]$}}
 public extension PublicProto {
   // CHECK: public func publicExtPublicMethod(){{$}}
   func publicExtPublicMethod() {}
@@ -97,3 +96,18 @@ extension UFIProto {
   // CHECK-NEXT: internal func ufiMethod(){{$}}
   @usableFromInline internal func ufiMethod() {}
 } // CHECK: {{^[}]$}}
+
+// CHECK: extension PublicStruct {{[{]$}}
+extension PublicStruct {
+  // CHECK: public private(set) static var secretlySettable: Int{{$}}
+  public private(set) static var secretlySettable: Int = 0
+} // CHECK: {{^[}]$}}
+
+extension InternalStruct_BAD: PublicProto {
+  internal static var dummy: Int { return 0 }
+}
+
+// CHECK: extension UFIStruct : PublicProto {{[{]$}}
+extension UFIStruct: PublicProto {
+  internal static var dummy: Int { return 0 }
+} // CHECK-NEXT: {{^[}]$}}

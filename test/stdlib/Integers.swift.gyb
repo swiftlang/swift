@@ -29,7 +29,7 @@ public func _log(_ message: @autoclosure () -> String) {
   // print(message())
 }
 
-extension FixedWidthInteger where Words : Collection {
+extension FixedWidthInteger {
   /// a hex representation of every bit in the number
   func hexBits(_ bitWidth: Int) -> String {
     let hexDigits: [Unicode.Scalar] = [
@@ -236,7 +236,7 @@ func expectEqual<T : FixedWidthInteger>(
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
-) where T.Words : Collection {
+) {
   if expected != actual {
     expectationFailure(
       "expected: \(String(reflecting: expected))"
@@ -560,7 +560,7 @@ tests.test("truncatingIfNeeded") {
 
 tests.test("Parsing/LosslessStringConvertible") {
   func _toArray<T: LosslessStringConvertible>(_ text: String) -> [T] {
-    return text.split(separator: " ").map { T(String($0)) }.flatMap { $0 }
+    return text.split(separator: " ").map { T(String($0)) }.compactMap { $0 }
   }
 
   expectEqualSequence([1, 2, 3], _toArray("1 2 3") as [Int])
@@ -727,6 +727,9 @@ tests.test("words") {
 
   expectEqualSequence([1], 1.words)
   expectEqualSequence([0], 0.words)
+
+  // Random access to words with Int indexing
+  expectEqual(1, 1.words[0])
 }
 
 tests.test("multipliedFullWidth/UInt8") {
@@ -796,6 +799,27 @@ tests.test("DivideMinByMinusOne") {
   }
   expectCrashLater()
   _ = f(Int.min)
+}
+
+tests.test("isMultiple") {
+  func isMultipleTest<T: FixedWidthInteger>(type: T.Type) {
+    expectTrue(T.min.isMultiple(of: 2))
+    expectFalse(T.max.isMultiple(of: 10))
+    // Test that these do not crash.
+    expectTrue((0 as T).isMultiple(of: 0))
+    expectFalse((1 as T).isMultiple(of: 0))
+    expectTrue(T.min.isMultiple(of: 0 &- 1))
+  }
+  isMultipleTest(type: Int.self)
+  isMultipleTest(type: Int8.self)
+  isMultipleTest(type: Int16.self)
+  isMultipleTest(type: Int32.self)
+  isMultipleTest(type: Int64.self)
+  isMultipleTest(type: UInt.self)
+  isMultipleTest(type: UInt8.self)
+  isMultipleTest(type: UInt16.self)
+  isMultipleTest(type: UInt32.self)
+  isMultipleTest(type: UInt64.self)
 }
 
 tests.test("MultiplyMinByMinusOne") {

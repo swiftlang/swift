@@ -104,7 +104,7 @@ _ = nullaryClosure(0)
 // parameter labels, and they are thus not in scope in the body of the function.
 // expected-error@+1{{unnamed parameters must be written}} {{27-27=_: }}
 func destructureArgument( (result: Int, error: Bool) ) -> Int {
-  return result
+  return result  // expected-error {{use of unresolved identifier 'result'}}
 }
 
 // The former is the same as this:
@@ -168,3 +168,14 @@ func testCurryFixits() {
 // Bogus diagnostic talking about a 'var' where there is none
 func invalidInOutParam(x: inout XYZ) {}
 // expected-error@-1{{use of undeclared type 'XYZ'}}
+
+// Parens around the 'inout'
+func parentheticalInout(_ x: ((inout Int))) {}
+
+var value = 0
+parentheticalInout(&value)
+
+func parentheticalInout2(_ fn: (((inout Int)), Int) -> ()) {
+  var value = 0
+  fn(&value, 0)
+}

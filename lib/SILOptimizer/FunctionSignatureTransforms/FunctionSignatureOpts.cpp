@@ -103,6 +103,10 @@ static bool canSpecializeFunction(SILFunction *F,
   if (F->getConventions().hasIndirectSILResults())
     return false;
 
+  // For now ignore coroutines.
+  if (F->getLoweredFunctionType()->isCoroutine())
+    return false;
+
   // Do not specialize the signature of always inline functions. We
   // will just inline them and specialize each one of the individual
   // functions that these sorts of functions are inlined into.
@@ -579,12 +583,12 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     SILFunction *Thunk = ThunkBody->getParent();
     SILBasicBlock *NormalBlock = Thunk->createBasicBlock();
     ReturnValue =
-        NormalBlock->createPHIArgument(ResultType, ValueOwnershipKind::Owned);
+        NormalBlock->createPhiArgument(ResultType, ValueOwnershipKind::Owned);
     SILBasicBlock *ErrorBlock = Thunk->createBasicBlock();
     SILType Error =
         SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getType());
     auto *ErrorArg =
-        ErrorBlock->createPHIArgument(Error, ValueOwnershipKind::Owned);
+        ErrorBlock->createPhiArgument(Error, ValueOwnershipKind::Owned);
     Builder.createTryApply(Loc, FRI, Subs, ThunkArgs, NormalBlock, ErrorBlock);
 
     Builder.setInsertionPoint(ErrorBlock);
@@ -752,8 +756,8 @@ public:
       return;
     }
 
-    CallerAnalysis *CA = PM->getAnalysis<CallerAnalysis>();
-    const CallerAnalysis::FunctionInfo &FuncInfo = CA->getCallerInfo(F);
+    const CallerAnalysis *CA = PM->getAnalysis<CallerAnalysis>();
+    const CallerAnalysis::FunctionInfo &FuncInfo = CA->getFunctionInfo(F);
 
     // Check the signature of F to make sure that it is a function that we
     // can specialize. These are conditions independent of the call graph.
@@ -794,7 +798,7 @@ public:
       ResultDescList.emplace_back(IR);
     }
 
-    SILOptFunctionBuilder FuncBuilder(*getPassManager());
+    SILOptFunctionBuilder FuncBuilder(*this);
     // Owned to guaranteed optimization.
     FunctionSignatureTransform FST(FuncBuilder, F, RCIA, EA, Mangler, AIM,
                                    ArgumentDescList, ResultDescList);
@@ -803,7 +807,7 @@ public:
     if (OptForPartialApply) {
       Changed = FST.removeDeadArgs(FuncInfo.getMinPartialAppliedArgs());
     } else {
-      Changed = FST.run(FuncInfo.hasCaller());
+      Changed = FST.run(FuncInfo.hasDirectCaller());
     }
 
     if (!Changed) {
@@ -818,7 +822,7 @@ public:
 
     // Make sure the PM knows about this function. This will also help us
     // with self-recursion.
-    notifyAddFunction(FST.getOptimizedFunction(), F);
+    addFunctionToPassManagerWorklist(FST.getOptimizedFunction(), F);
 
     if (!OptForPartialApply) {
       // We have to restart the pipeline for this thunk in order to run the

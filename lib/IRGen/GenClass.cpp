@@ -40,6 +40,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "Callee.h"
+#include "ClassLayout.h"
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenFunc.h"
@@ -60,51 +61,42 @@
 using namespace swift;
 using namespace irgen;
 
-/// What reference counting mechanism does a class-like type have?
-ReferenceCounting irgen::getReferenceCountingForType(IRGenModule &IGM,
-                                                     CanType type) {
-  return type->getReferenceCounting(ResilienceExpansion::Maximal);
-}
-
 namespace {
   /// Layout information for class types.
   class ClassTypeInfo : public HeapTypeInfo<ClassTypeInfo> {
     ClassDecl *TheClass;
-    mutable StructLayout *Layout;
-    mutable ClassLayout FieldLayout;
+
+    // The resilient layout of the class, without making any assumptions
+    // that violate resilience boundaries. This is used to allocate
+    // and deallocate instances of the class, and to access fields.
+    mutable Optional<ClassLayout> ResilientLayout;
+
+    // A completely fragile layout, used for metadata emission.
+    mutable Optional<ClassLayout> FragileLayout;
 
     /// Can we use swift reference-counting, or do we have to use
     /// objc_retain/release?
     const ReferenceCounting Refcount;
     
-    void generateLayout(IRGenModule &IGM, SILType classType) const;
+    ClassLayout generateLayout(IRGenModule &IGM, SILType classType,
+                               bool forBackwardDeployment) const;
 
   public:
     ClassTypeInfo(llvm::PointerType *irType, Size size,
                   SpareBitVector spareBits, Alignment align,
                   ClassDecl *theClass, ReferenceCounting refcount)
       : HeapTypeInfo(irType, size, std::move(spareBits), align),
-        TheClass(theClass), Layout(nullptr), Refcount(refcount) {}
+        TheClass(theClass), Refcount(refcount) {}
 
     ReferenceCounting getReferenceCounting() const {
       return Refcount;
     }
 
-    ~ClassTypeInfo() override {
-      delete Layout;
-    }
-
     ClassDecl *getClass() const { return TheClass; }
 
-    const StructLayout &getLayout(IRGenModule &IGM, SILType classType) const;
-    const ClassLayout &getClassLayout(IRGenModule &IGM, SILType type) const;
 
-    Alignment getHeapAlignment(IRGenModule &IGM, SILType type) const {
-      return getLayout(IGM, type).getAlignment();
-    }
-    ArrayRef<ElementLayout> getElements(IRGenModule &IGM, SILType type) const {
-      return getLayout(IGM, type).getElements();
-    }
+    const ClassLayout &getClassLayout(IRGenModule &IGM, SILType type,
+                                      bool forBackwardDeployment) const;
 
     StructLayout *createLayoutWithTailElems(IRGenModule &IGM,
                                             SILType classType,
@@ -140,43 +132,94 @@ namespace {
     SmallVector<VarDecl*, 8> AllStoredProperties;
     SmallVector<FieldAccess, 8> AllFieldAccesses;
 
-    unsigned NumInherited = 0;
+    // If we're building a layout with tail-allocated elements, we do
+    // things slightly differently; all fields from the superclass are
+    // added before the class fields, and the tail elements themselves
+    // come after. We don't make a ClassLayout in this case, only a
+    // StructLayout.
+    Optional<ArrayRef<SILType>> TailTypes;
 
-    // For now we always lay out resiliently-typed fields as if they
-    // were fragile.
+    // Normally, Swift only emits static metadata for a class if it has no
+    // generic ancestry and no fields with resilient value types, which
+    // require dynamic layout.
+    //
+    // However, for interop with Objective-C, where the runtime does not
+    // know how to invoke arbitrary code to initialize class metadata, we
+    // ignore resilience and emit a static layout and metadata for classes
+    // that would otherwise have static metadata, were it not for any
+    // resilient fields.
+    //
+    // This enables two things:
+    //
+    // - Objective-C can reference the class symbol by calling a static
+    //   method on it, for example +alloc, which requires the InstanceSize
+    //   to be known, except for possibly sliding ivars.
+    //
+    // - Objective-C message sends can call methods defined in categories
+    //   emitted by Swift, which again require the class metadata symbol
+    //   to have a static address.
+    //
+    // Note that we don't do this if the class is generic, has generic
+    // ancestry, or has a superclass that is itself resilient.
     bool CompletelyFragileLayout;
 
-    // Does the class metadata require dynamic initialization above and
-    // beyond what the runtime can automatically achieve?
+    // The below flags indicate various things about the metadata of the
+    // class that might require dynamic initialization or resilient
+    // access patterns:
+
+    // Does the class or any of its superclasses have stored properties that
+    // where dropped due to the Swift language version availability of
+    // their types?
+    bool ClassHasMissingMembers = false;
+
+    // Does the class or any of its fragile superclasses have stored
+    // properties of unknown size, which do *not* depend on generic
+    // parameters?
     //
-    // This is true if the class or any of its ancestors:
-    //   - is generic,
-    //   - is resilient,
-    //   - has a parent type which isn't emittable as a constant,
-    //   - or has a field with resilient layout.
-    bool ClassMetadataRequiresDynamicInitialization = false;
+    // This is different from the class itself being resilient or
+    // having resilient ancestry, because we still have a fixed layout
+    // for the class metadata in this case.
+    //
+    // In fact, for a class with resilient ancestry, this can still be
+    // false if all of the fields known to us are fixed size.
+    bool ClassHasResilientMembers = false;
 
-    // Does the class have a fixed size up until the current point?
-    // If not, we have to access stored properties either ivar offset globals,
-    // or through the field offset vector, based on whether the layout has
-    // dependent layout.
-    bool ClassHasFixedSize = true;
+    // Is this class or any of its superclasses generic?
+    bool ClassHasGenericAncestry = false;
 
-    // Does the class have identical layout under all generic substitutions?
-    // If not, we can have to access stored properties through the field
-    // offset vector in the instantiated type metadata.
-    bool ClassHasConcreteLayout = true;
-    
+    // Is this class itself generic via the Swift generic system, ie. not a
+    // lightweight Objective-C generic class?
+    bool ClassIsGeneric = false;
+
+    // Does the class layout depend on the size or alignment of its
+    // generic parameters?
+    //
+    // This can be the case if the class has generic resilient ancestry
+    // that depends on the class's generic parameters, of it it has
+    // fields of generic type that are not fixed size.
+    bool ClassHasGenericLayout = false;
+
+    // Is this class or any of its superclasses resilient from the viewpoint
+    // of the current module? This means that their metadata can change size
+    // and field offsets, generic arguments and virtual methods must be
+    // accessed relative to a metadata base global variable.
+    bool ClassHasResilientAncestry = false;
+
+    // Are any of this class's superclasses defined in Objective-C?
+    // This means that field offsets must be loaded from field offset globals
+    // or the field offset vector in the metadata, and the Objective-C runtime
+    // will slide offsets based on the actual superclass size, which is not
+    // known at compile time.
+    bool ClassHasObjCAncestry = false;
+
   public:
     ClassLayoutBuilder(IRGenModule &IGM, SILType classType,
-                       ReferenceCounting refcounting)
-      : StructLayoutBuilder(IGM)
-    {
-      // Perform fragile layout if Objective-C interop is enabled.
-      CompletelyFragileLayout =
-        (IGM.Context.LangOpts.EnableObjCInterop &&
-         !IGM.IRGen.Opts.EnableClassResilience);
-
+                       ReferenceCounting refcounting,
+                       bool completelyFragileLayout,
+                       Optional<ArrayRef<SILType>> tailTypes = None)
+      : StructLayoutBuilder(IGM),
+        TailTypes(tailTypes),
+        CompletelyFragileLayout(completelyFragileLayout) {
       // Start by adding a heap header.
       switch (refcounting) {
       case ReferenceCounting::Native:
@@ -198,21 +241,18 @@ namespace {
       // Next, add the fields for the given class.
       auto theClass = classType.getClassOrBoundGenericClass();
       assert(theClass);
-      addFieldsForClass(theClass, classType);
-      
-      // Add these fields to the builder.
-      addFields(Elements, LayoutStrategy::Universal);
-    }
 
-    /// Adds a layout of a tail-allocated element.
-    void addTailElement(const ElementLayout &Elt) {
-      Elements.push_back(Elt);
-      if (!addField(Elements.back(), LayoutStrategy::Universal)) {
-        // For empty tail allocated elements we still add 1 padding byte.
-        assert(cast<FixedTypeInfo>(Elt.getTypeForLayout()).getFixedStride() == Size(1) &&
-               "empty elements should have stride 1");
-        StructFields.push_back(llvm::ArrayType::get(IGM.Int8Ty, 1));
-        CurSize += Size(1);
+      if (theClass->isGenericContext() && !theClass->hasClangNode())
+        ClassIsGeneric = true;
+
+      addFieldsForClass(theClass, classType, /*superclass=*/false);
+
+      if (TailTypes) {
+        // Add the tail elements.
+        for (SILType TailTy : *TailTypes) {
+          const TypeInfo &tailTI = IGM.getTypeInfo(TailTy);
+          addTailElement(ElementLayout::getIncomplete(tailTI));
+        }
       }
     }
 
@@ -221,211 +261,237 @@ namespace {
       return Elements;
     }
 
-    ClassLayout getClassLayout() const {
-      ClassLayout fieldLayout;
+    /// Does the class metadata have a completely known, static layout that
+    /// does not require initialization at runtime beyond registeration of
+    /// the class with the Objective-C runtime?
+    bool isFixedSize() const {
+      return !(ClassHasMissingMembers ||
+               ClassHasResilientMembers ||
+               ClassHasGenericLayout ||
+               ClassHasResilientAncestry ||
+               ClassHasObjCAncestry);
+    }
+
+    bool doesMetadataRequireInitialization() const {
+      return (ClassHasMissingMembers ||
+              ClassHasResilientMembers ||
+              ClassHasResilientAncestry ||
+              ClassHasGenericAncestry);
+    }
+
+    bool doesMetadataRequireRelocation() const {
+      return (ClassHasResilientAncestry ||
+              ClassIsGeneric);
+    }
+
+    ClassLayout getClassLayout(llvm::Type *classTy) const {
+      assert(!TailTypes);
+
       auto allStoredProps = IGM.Context.AllocateCopy(AllStoredProperties);
-      auto inheritedStoredProps = allStoredProps.slice(0, NumInherited);
-      fieldLayout.AllStoredProperties = allStoredProps;
-      fieldLayout.InheritedStoredProperties = inheritedStoredProps;
-      fieldLayout.AllFieldAccesses = IGM.Context.AllocateCopy(AllFieldAccesses);
-      fieldLayout.MetadataRequiresDynamicInitialization =
-        ClassMetadataRequiresDynamicInitialization;
-      fieldLayout.HasFixedSize = ClassHasFixedSize;
-      return fieldLayout;
+      auto allFieldAccesses = IGM.Context.AllocateCopy(AllFieldAccesses);
+      auto allElements = IGM.Context.AllocateCopy(Elements);
+
+      return ClassLayout(*this,
+                         isFixedSize(),
+                         doesMetadataRequireInitialization(),
+                         doesMetadataRequireRelocation(),
+                         classTy,
+                         allStoredProps,
+                         allFieldAccesses,
+                         allElements);
     }
 
   private:
-    void addFieldsForClass(ClassDecl *theClass, SILType classType) {
-      if (theClass->isGenericContext())
-        ClassMetadataRequiresDynamicInitialization = true;
+    /// Adds a layout of a tail-allocated element.
+    void addTailElement(const ElementLayout &Elt) {
+      Elements.push_back(Elt);
+      if (!addField(Elements.back(), LayoutStrategy::Universal)) {
+        // For empty tail allocated elements we still add 1 padding byte.
+        assert(cast<FixedTypeInfo>(Elt.getType()).getFixedStride() == Size(1) &&
+               "empty elements should have stride 1");
+        StructFields.push_back(llvm::ArrayType::get(IGM.Int8Ty, 1));
+        CurSize += Size(1);
+      }
+    }
+
+    /// If 'superclass' is true, we're adding fields for one of our
+    /// superclasses, which means they become part of the struct
+    /// layout calculation, but are not actually added to any of
+    /// the vectors like AllStoredProperties, etc. Also, we don't need
+    /// to compute FieldAccesses for them.
+    void addFieldsForClass(ClassDecl *theClass, SILType classType,
+                           bool superclass) {
+      if (theClass->hasClangNode()) {
+        ClassHasObjCAncestry = true;
+        return;
+      }
 
       if (theClass->hasSuperclass()) {
         SILType superclassType = classType.getSuperclass();
-        auto superclass = superclassType.getClassOrBoundGenericClass();
-        assert(superclass);
+        auto superclassDecl = superclassType.getClassOrBoundGenericClass();
+        assert(superclassType && superclassDecl);
 
-        // If the superclass came from another module, we may have dropped
-        // stored properties due to the Swift language version availability of
-        // their types. In these cases we can't precisely lay out the ivars in
-        // the class object at compile time so we need to do runtime layout.
-        if (classHasIncompleteLayout(IGM, superclass)) {
-          ClassMetadataRequiresDynamicInitialization = true;
-          ClassHasFixedSize = false;
-        }
+        if (IGM.isResilient(superclassDecl, ResilienceExpansion::Maximal)) {
+          // If the class is resilient, don't walk over its fields; we have to
+          // calculate the layout at runtime.
+          ClassHasResilientAncestry = true;
 
-        if (superclass->hasClangNode()) {
-          // If the superclass was imported from Objective-C, its size is
-          // not known at compile time. However, since the field offset
-          // vector only stores offsets of stored properties defined in
-          // Swift, we don't have to worry about indirect indexing of
-          // the field offset vector.
-          ClassHasFixedSize = false;
-
-          // We can't use global offset variables if we are generic and layout
-          // dependent on a generic parameter because the objective-c layout might
-          // depend on the alignment of the generic stored property('t' in the
-          // example below).
-          //
-          // class Foo<T> : NSFoobar {
-          //   var x : AKlass = AKlass()
-          //   var y : AKlass = AKlass()
-          //   var t : T?
-          // }
-          if (classType.hasArchetype())
-            for (VarDecl *var : theClass->getStoredProperties()) {
-              SILType type = classType.getFieldType(var, IGM.getSILModule());
-              auto &eltType = IGM.getTypeInfo(type);
-              if (!eltType.isFixedSize()) {
-                if (type.hasArchetype())
-                  ClassHasConcreteLayout = false;
-              }
-            }
-        } else if (IGM.isResilient(superclass, ResilienceExpansion::Maximal)) {
-          ClassMetadataRequiresDynamicInitialization = true;
-          ClassHasFixedSize = false;
-
-          // Furthermore, if the superclass is a generic context, we have to
-          // assume that its layout depends on its generic parameters.
-          // But this only propagates down to subclasses whose superclass type
-          // depends on the subclass's generic context.
+          // Furthermore, if the superclass is generic, we have to assume
+          // that its layout depends on its generic parameters. But this only
+          // propagates down to subclasses whose superclass type depends on the
+          // subclass's generic context.
           if (superclassType.hasArchetype())
-            ClassHasConcreteLayout = false;
-
+            ClassHasGenericLayout = true;
         } else {
           // Otherwise, we have total knowledge of the class and its
           // fields, so walk them to compute the layout.
-          addFieldsForClass(superclass, superclassType);
-          // Count the fields we got from the superclass.
-          NumInherited = Elements.size();
+          addFieldsForClass(superclassDecl, superclassType, /*superclass=*/true);
         }
       }
 
-      // If this class was imported from another module, assume that we may
-      // not know its exact layout.
-      if (classHasIncompleteLayout(IGM, theClass)) {
-        ClassMetadataRequiresDynamicInitialization = true;
-        ClassHasFixedSize = false;
-      }
+      if (theClass->isGenericContext())
+        ClassHasGenericAncestry = true;
+
+      if (classHasIncompleteLayout(IGM, theClass))
+        ClassHasMissingMembers = true;
 
       if (IGM.isResilient(theClass, ResilienceExpansion::Maximal)) {
-        ClassMetadataRequiresDynamicInitialization = true;
-        ClassHasFixedSize = false;
-      }
-
-      // Access strategies should be set by the abstract class layout,
-      // not using the concrete type information we have.
-      const ClassLayout *abstractLayout = nullptr;
-
-      SILType selfType = getSelfType(theClass);
-      if (classType != selfType) {
-        auto &selfTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
-        abstractLayout = &selfTI.getClassLayout(IGM, selfType);
+        ClassHasResilientAncestry = true;
+        return;
       }
 
       // Collect fields from this class and add them to the layout as a chunk.
-      addDirectFieldsFromClass(theClass, classType, abstractLayout);
+      addDirectFieldsFromClass(theClass, classType, superclass);
     }
 
     void addDirectFieldsFromClass(ClassDecl *theClass,
                                   SILType classType,
-                                  const ClassLayout *abstractLayout) {
+                                  bool superclass) {
       for (VarDecl *var : theClass->getStoredProperties()) {
         SILType type = classType.getFieldType(var, IGM.getSILModule());
-        auto &eltTypeForAccess = IGM.getTypeInfo(type);
 
-        // For now, the Objective-C runtime cannot support dynamic layout of
-        // classes that contain resilient value types, so we just look through
-        // the resilience boundary and assume fragile layout for class ivars
-        // instead.
-        Optional<CompletelyFragileScope> generateStaticLayoutRAII;
-
-        if (CompletelyFragileLayout &&
-            !isa<FixedTypeInfo>(eltTypeForAccess)) {
-          generateStaticLayoutRAII.emplace(IGM);
+        // Lower the field type.
+        auto *eltType = &IGM.getTypeInfo(type);
+        if (CompletelyFragileLayout && !eltType->isFixedSize()) {
+          CompletelyFragileScope scope(IGM);
+          eltType = &IGM.getTypeInfo(type);
         }
 
-        auto &eltTypeForLayout = IGM.getTypeInfo(type);
-
-        if (!eltTypeForLayout.isFixedSize()) {
-          ClassMetadataRequiresDynamicInitialization = true;
-          ClassHasFixedSize = false;
-
+        if (!eltType->isFixedSize()) {
           if (type.hasArchetype())
-            ClassHasConcreteLayout = false;
+            ClassHasGenericLayout = true;
+          else
+            ClassHasResilientMembers = true;
         }
 
-        size_t fieldIndex = AllStoredProperties.size();
-        assert(!abstractLayout ||
-               abstractLayout->getFieldIndex(var) == fieldIndex);
+        auto element = ElementLayout::getIncomplete(*eltType);
+        addField(element, LayoutStrategy::Universal);
 
-        Elements.push_back(ElementLayout::getIncomplete(eltTypeForLayout,
-                                                        eltTypeForAccess));
-        AllStoredProperties.push_back(var);
-        AllFieldAccesses.push_back(getFieldAccess(abstractLayout, fieldIndex));
+        // The 'Elements' list only contains superclass fields when we're
+        // building a layout for tail allocation.
+        if (!superclass || TailTypes)
+          Elements.push_back(element);
+
+        if (!superclass) {
+          AllStoredProperties.push_back(var);
+          AllFieldAccesses.push_back(getFieldAccess());
+        }
+      }
+
+      if (!superclass) {
+        // If we're calculating the layout of a specialized generic class type,
+        // we cannot use field offset globals for dependently-typed fields,
+        // because they will not exist -- we only emit such globals for fields
+        // which are not dependent in all instantiations.
+        //
+        // So make sure to fall back to the fully unsubstituted 'abstract layout'
+        // for any fields whose offsets are not completely fixed.
+        auto *classTI = &IGM.getTypeInfo(classType).as<ClassTypeInfo>();
+
+        SILType selfType = getSelfType(theClass);
+        auto *selfTI = &IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+
+        // Only calculate an abstract layout if its different than the one
+        // being computed now.
+        if (classTI != selfTI) {
+          auto *abstractLayout = &selfTI->getClassLayout(IGM, selfType,
+                                                       CompletelyFragileLayout);
+
+          for (unsigned index : indices(AllFieldAccesses)) {
+            auto &access = AllFieldAccesses[index];
+            auto *var = AllStoredProperties[index];
+            if (access == FieldAccess::NonConstantDirect)
+              access = abstractLayout->getFieldAccessAndElement(var).first;
+          }
+        }
+
+        // If the class has Objective-C ancestry and we're doing runtime layout
+        // that depends on generic parameters, the Swift runtime will first
+        // layout the fields relative to the static instance start offset, and
+        // then ask the Objective-C runtime to slide them.
+        //
+        // However, this means that if some fields have a generic type, their
+        // alignment will change the instance start offset between generic
+        // instantiations, and we cannot use field offset global variables at
+        // all, even for fields that come before any generically-typed fields.
+        //
+        // For example, the alignment of 'x' and 'y' below might depend on 'T':
+        //
+        // class Foo<T> : NSFoobar {
+        //   var x : AKlass = AKlass()
+        //   var y : AKlass = AKlass()
+        //   var t : T?
+        // }
+        if (ClassHasGenericLayout && ClassHasObjCAncestry) {
+          for (auto &access : AllFieldAccesses) {
+            if (access == FieldAccess::NonConstantDirect)
+              access = FieldAccess::ConstantIndirect;
+          }
+        }
       }
     }
 
-    FieldAccess getFieldAccess(const ClassLayout *abstractLayout,
-                               size_t abstractFieldIndex) {
-      // The class has fixed size, so the field offset is known statically.
-      if (ClassHasFixedSize) {
+    FieldAccess getFieldAccess() {
+      // If the layout so far has a fixed size, the field offset is known
+      // statically.
+      if (isFixedSize())
         return FieldAccess::ConstantDirect;
-      }
 
-      // If the field offset can't be known at compile time, we need to
-      // load a field offset, either from a global or the metadata's field
-      // offset vector.
+      // If layout so far depends on generic parameters, we have to load the
+      // offset from the field offset vector in class metadata.
+      if (ClassHasGenericLayout)
+        return FieldAccess::ConstantIndirect;
 
-      // The global will exist only if the abstract type has concrete layout,
-      // so if we're not laying out the abstract type, use its access rule.
-      if (abstractLayout) {
-        return abstractLayout->AllFieldAccesses[abstractFieldIndex];
-      }
-
-      // If layout doesn't depend on any generic parameters, but it's
+      // If layout so far doesn't depend on any generic parameters, but it's
       // nonetheless not statically known (because either a superclass
       // or a member type was resilient), then we can rely on the existence
       // of a global field offset variable which will be initialized by
       // either the Objective-C or Swift runtime, depending on the
       // class's heritage.
-      if (ClassHasConcreteLayout) {
-        return FieldAccess::NonConstantDirect;
-      }
-
-      // If layout depends on generic parameters, we have to load the
-      // offset from the class metadata.
-      return FieldAccess::ConstantIndirect;
+      return FieldAccess::NonConstantDirect;
     }
   };
 } // end anonymous namespace
 
-void ClassTypeInfo::generateLayout(IRGenModule &IGM, SILType classType) const {
-  assert(!Layout && FieldLayout.AllStoredProperties.empty() &&
-         "already generated layout");
+ClassLayout ClassTypeInfo::generateLayout(IRGenModule &IGM, SILType classType,
+                                          bool completelyFragileLayout) const {
+  ClassLayoutBuilder builder(IGM, classType, Refcount, completelyFragileLayout);
 
-  // Add the heap header.
-  ClassLayoutBuilder builder(IGM, classType, Refcount);
+  auto *classTy =
+      cast<llvm::StructType>(getStorageType()->getPointerElementType());
 
-  // generateLayout can call itself recursively in order to compute a layout
-  // for the abstract type.  If classType shares an exemplar types with the
-  // abstract type, that will end up re-entrantly building the layout
-  // of the same ClassTypeInfo.  We don't have anything else to do in this
-  // case.
-  if (Layout) {
-    assert(this == &IGM.getTypeInfo(
-                     getSelfType(classType.getClassOrBoundGenericClass())));
-    return;
+  if (completelyFragileLayout) {
+    // Create a name for the new llvm type.
+    SmallString<32> typeName = classTy->getName();
+    typeName += "_fragile";
+
+    // Create the llvm type.
+    classTy = llvm::StructType::create(IGM.getLLVMContext(), typeName.str());
   }
-  
-  // Set the body of the class type.
-  auto classTy =
-    cast<llvm::StructType>(getStorageType()->getPointerElementType());
+
   builder.setAsBodyOfStruct(classTy);
-  
-  // Record the layout.
-  Layout = new StructLayout(builder, classType.getASTType(), classTy,
-                            builder.getElements());
-  FieldLayout = builder.getClassLayout();
+
+  return builder.getClassLayout(classTy);
 }
 
 StructLayout *
@@ -433,50 +499,48 @@ ClassTypeInfo::createLayoutWithTailElems(IRGenModule &IGM,
                                          SILType classType,
                                          ArrayRef<SILType> tailTypes) const {
   // Add the elements for the class properties.
-  ClassLayoutBuilder builder(IGM, classType, Refcount);
-
-  // Add the tail elements.
-  for (SILType TailTy : tailTypes) {
-    const TypeInfo &tailTI = IGM.getTypeInfo(TailTy);
-    builder.addTailElement(ElementLayout::getIncomplete(tailTI, tailTI));
-  }
+  ClassLayoutBuilder builder(IGM, classType, Refcount,
+                             /*CompletelyFragileLayout=*/false,
+                             tailTypes);
 
   // Create a name for the new llvm type.
   llvm::StructType *classTy =
     cast<llvm::StructType>(getStorageType()->getPointerElementType());
-  std::string typeName;
-  llvm::raw_string_ostream os(typeName);
+  SmallString<32> typeName;
+  llvm::raw_svector_ostream os(typeName);
   os << classTy->getName() << "_tailelems" << IGM.TailElemTypeID++;
 
   // Create the llvm type.
   llvm::StructType *ResultTy = llvm::StructType::create(IGM.getLLVMContext(),
-                                                        StringRef(os.str()));
+                                                        os.str());
   builder.setAsBodyOfStruct(ResultTy);
 
   // Create the StructLayout, which is transfered to the caller (the caller is
   // responsible for deleting it).
-  return new StructLayout(builder, classType.getASTType(), ResultTy,
-                          builder.getElements());
-}
-
-const StructLayout &
-ClassTypeInfo::getLayout(IRGenModule &IGM, SILType classType) const {
-  // Return the cached layout if available.
-  if (Layout)
-    return *Layout;
-
-  generateLayout(IGM, classType);
-  return *Layout;
+  return new StructLayout(builder, classType.getClassOrBoundGenericClass(),
+                          ResultTy, builder.getElements());
 }
 
 const ClassLayout &
-ClassTypeInfo::getClassLayout(IRGenModule &IGM, SILType classType) const {
+ClassTypeInfo::getClassLayout(IRGenModule &IGM, SILType classType,
+                              bool forBackwardDeployment) const {
+  // Perform fragile layout only if Objective-C interop is enabled.
+  //
+  // FIXME: EnableClassResilience staging flag will go away once we can do
+  // in-place re-initialization of class metadata.
+  bool completelyFragileLayout = (forBackwardDeployment &&
+                                  IGM.Context.LangOpts.EnableObjCInterop &&
+                                  !IGM.IRGen.Opts.EnableClassResilience);
+
   // Return the cached layout if available.
-  if (Layout)
-    return FieldLayout;
-  
-  generateLayout(IGM, classType);
-  return FieldLayout;
+  auto &Layout = completelyFragileLayout ? FragileLayout : ResilientLayout;
+  if (!Layout) {
+    auto NewLayout = generateLayout(IGM, classType, completelyFragileLayout);
+    assert(!Layout && "generateLayout() should not call itself recursively");
+    Layout = NewLayout;
+  }
+
+  return *Layout;
 }
 
 /// Cast the base to i8*, apply the given inbounds offset (in bytes,
@@ -527,12 +591,13 @@ irgen::tryEmitConstantClassFragilePhysicalMemberOffset(IRGenModule &IGM,
 
   auto &baseClassTI = IGM.getTypeInfo(baseType).as<ClassTypeInfo>();
 
-  auto &classLayout = baseClassTI.getClassLayout(IGM, baseType);
-  unsigned fieldIndex = classLayout.getFieldIndex(field);
+  auto &classLayout = baseClassTI.getClassLayout(IGM, baseType,
+                                               /*forBackwardDeployment=*/false);
 
-  switch (classLayout.AllFieldAccesses[fieldIndex]) {
+  auto fieldInfo = classLayout.getFieldAccessAndElement(field);
+  switch (fieldInfo.first) {
   case FieldAccess::ConstantDirect: {
-    auto &element = baseClassTI.getElements(IGM, baseType)[fieldIndex];
+    auto element = fieldInfo.second;
     return llvm::ConstantInt::get(IGM.SizeTy,
                                   element.getByteOffset().getValue());
   }
@@ -540,21 +605,31 @@ irgen::tryEmitConstantClassFragilePhysicalMemberOffset(IRGenModule &IGM,
   case FieldAccess::ConstantIndirect:
     return nullptr;
   }
-}
-
-unsigned
-irgen::getClassFieldIndex(IRGenModule &IGM, SILType baseType, VarDecl *field) {
-  auto &baseClassTI = IGM.getTypeInfo(baseType).as<ClassTypeInfo>();
-  auto &classLayout = baseClassTI.getClassLayout(IGM, baseType);
-  return classLayout.getFieldIndex(field);
+  llvm_unreachable("unhandled access");
 }
 
 FieldAccess
 irgen::getClassFieldAccess(IRGenModule &IGM, SILType baseType, VarDecl *field) {
   auto &baseClassTI = IGM.getTypeInfo(baseType).as<ClassTypeInfo>();
-  auto &classLayout = baseClassTI.getClassLayout(IGM, baseType);
-  unsigned fieldIndex = classLayout.getFieldIndex(field);
-  return classLayout.AllFieldAccesses[fieldIndex];
+  auto &classLayout = baseClassTI.getClassLayout(IGM, baseType,
+                                               /*forBackwardDeployment=*/false);
+  return classLayout.getFieldAccessAndElement(field).first;
+}
+
+Size
+irgen::getClassFieldOffset(IRGenModule &IGM, SILType baseType, VarDecl *field) {
+  auto &baseClassTI = IGM.getTypeInfo(baseType).as<ClassTypeInfo>();
+
+  // FIXME: For now we just assume fragile layout here, because this is used as
+  // part of emitting class metadata.
+  auto &classLayout = baseClassTI.getClassLayout(IGM, baseType,
+                                                /*forBackwardDeployment=*/true);
+
+  auto fieldInfo = classLayout.getFieldAccessAndElement(field);
+  auto element = fieldInfo.second;
+  assert(element.getKind() == ElementLayout::Kind::Fixed ||
+         element.getKind() == ElementLayout::Kind::Empty);
+  return element.getByteOffset();
 }
 
 StructLayout *
@@ -578,13 +653,15 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
   auto &baseClassTI = IGF.getTypeInfo(baseType).as<ClassTypeInfo>();
   ClassDecl *baseClass = baseClassTI.getClass();
 
-  auto &classLayout = baseClassTI.getClassLayout(IGF.IGM, baseType);
-  unsigned fieldIndex = classLayout.getFieldIndex(field);
+  auto &classLayout = baseClassTI.getClassLayout(IGF.IGM, baseType,
+                                               /*forBackwardDeployment=*/false);
 
-  switch (classLayout.AllFieldAccesses[fieldIndex]) {
+  auto fieldInfo = classLayout.getFieldAccessAndElement(field);
+
+  switch (fieldInfo.first) {
   case FieldAccess::ConstantDirect: {
-    Address baseAddr(base, baseClassTI.getHeapAlignment(IGF.IGM, baseType));
-    auto &element = baseClassTI.getElements(IGF.IGM, baseType)[fieldIndex];
+    Address baseAddr(base, classLayout.getAlignment());
+    auto element = fieldInfo.second;
     Address memberAddr = element.project(IGF, baseAddr, None);
     // We may need to bitcast the address if the field is of a generic type.
     if (memberAddr.getType()->getElementType() != fieldTI.getStorageType())
@@ -595,8 +672,6 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
     
   case FieldAccess::NonConstantDirect: {
     Address offsetA = IGF.IGM.getAddrOfFieldOffset(field, NotForDefinition);
-    auto offsetVar = cast<llvm::GlobalVariable>(offsetA.getAddress());
-    offsetVar->setConstant(false);
     auto offset = IGF.Builder.CreateLoad(offsetA, "offset");
     return emitAddressAtOffset(IGF, baseType, base, offset, field);
   }
@@ -616,12 +691,13 @@ irgen::getPhysicalClassMemberAccessStrategy(IRGenModule &IGM,
   auto &baseClassTI = IGM.getTypeInfo(baseType).as<ClassTypeInfo>();
   ClassDecl *baseClass = baseType.getClassOrBoundGenericClass();
 
-  auto &classLayout = baseClassTI.getClassLayout(IGM, baseType);
-  unsigned fieldIndex = classLayout.getFieldIndex(field);
+  auto &classLayout = baseClassTI.getClassLayout(IGM, baseType,
+                                               /*forBackwardDeployment=*/false);
+  auto fieldInfo = classLayout.getFieldAccessAndElement(field);
 
-  switch (classLayout.AllFieldAccesses[fieldIndex]) {
+  switch (fieldInfo.first) {
   case FieldAccess::ConstantDirect: {
-    auto &element = baseClassTI.getElements(IGM, baseType)[fieldIndex];
+    auto element = fieldInfo.second;
     return MemberAccessStrategy::getDirectFixed(element.getByteOffset());
   }
 
@@ -647,7 +723,8 @@ Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
   const ClassTypeInfo &classTI = IGF.getTypeInfo(ClassType).as<ClassTypeInfo>();
 
   llvm::Value *Offset = nullptr;
-  auto &layout = classTI.getLayout(IGF.IGM, ClassType);
+  auto &layout = classTI.getClassLayout(IGF.IGM, ClassType,
+                                        /*forBackwardDeployment=*/false);
   Alignment HeapObjAlign = IGF.IGM.TargetInfo.HeapObjectAlignment;
   Alignment Align;
 
@@ -687,18 +764,18 @@ Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
 ///
 /// Returns the alloca if successful, or nullptr otherwise.
 static llvm::Value *stackPromote(IRGenFunction &IGF,
-                      const StructLayout &ClassLayout,
+                      const ClassLayout &FieldLayout,
                       int &StackAllocSize,
                       ArrayRef<std::pair<SILType, llvm::Value *>> TailArrays) {
   if (StackAllocSize < 0)
     return nullptr;
-  if (!ClassLayout.isFixedLayout())
+  if (!FieldLayout.isFixedLayout())
     return nullptr;
 
   // Calculate the total size needed.
   // The first part is the size of the class itself.
-  Alignment ClassAlign = ClassLayout.getAlignment();
-  Size TotalSize = ClassLayout.getSize();
+  Alignment ClassAlign = FieldLayout.getAlignment();
+  Size TotalSize = FieldLayout.getSize();
 
   // Add size for tail-allocated arrays.
   for (const auto &TailArray : TailArrays) {
@@ -728,9 +805,9 @@ static llvm::Value *stackPromote(IRGenFunction &IGF,
     return nullptr;
   StackAllocSize = TotalSize.getValue();
 
-  if (TotalSize == ClassLayout.getSize()) {
+  if (TotalSize == FieldLayout.getSize()) {
     // No tail-allocated arrays: we can use the llvm class type for alloca.
-    llvm::Type *ClassTy = ClassLayout.getType();
+    llvm::Type *ClassTy = FieldLayout.getType();
     Address Alloca = IGF.createAlloca(ClassTy, ClassAlign, "reference.raw");
     return Alloca.getAddress();
   }
@@ -791,15 +868,13 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
     emitClassHeapMetadataRef(IGF, classType, MetadataValueType::TypeMetadata,
                              MetadataState::Complete);
 
-  const StructLayout &structLayout = classTI.getLayout(IGF.IGM, selfType);
-  const ClassLayout &classLayout = classTI.getClassLayout(IGF.IGM, selfType);
+  auto &classLayout = classTI.getClassLayout(IGF.IGM, selfType,
+                                             /*forBackwardDeployment=*/false);
 
   llvm::Value *size, *alignMask;
-  if (classLayout.HasFixedSize) {
-    assert(structLayout.isFixedLayout());
-
-    size = structLayout.emitSize(IGF.IGM);
-    alignMask = structLayout.emitAlignMask(IGF.IGM);
+  if (classLayout.isFixedSize()) {
+    size = IGF.IGM.getSize(classLayout.getSize());
+    alignMask = IGF.IGM.getSize(classLayout.getAlignMask());
   } else {
     std::tie(size, alignMask)
       = emitClassResilientInstanceSizeAndAlignMask(IGF,
@@ -807,9 +882,9 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
                                      metadata);
   }
 
-  llvm::Type *destType = structLayout.getType()->getPointerTo();
+  llvm::Type *destType = classLayout.getType()->getPointerTo();
   llvm::Value *val = nullptr;
-  if (llvm::Value *Promoted = stackPromote(IGF, structLayout, StackAllocSize,
+  if (llvm::Value *Promoted = stackPromote(IGF, classLayout, StackAllocSize,
                                            TailArrays)) {
     val = IGF.Builder.CreateBitCast(Promoted, IGF.IGM.RefCountedPtrTy);
     val = IGF.emitInitStackObjectCall(metadata, val, "reference.new");
@@ -845,7 +920,8 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
   llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, alignMask,
                                              "reference.new");
   auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
-  auto &layout = classTI.getLayout(IGF.IGM, selfType);
+  auto &layout = classTI.getClassLayout(IGF.IGM, selfType,
+                                        /*forBackwardDeployment=*/false);
   llvm::Type *destType = layout.getType()->getPointerTo();
   return IGF.Builder.CreateBitCast(val, destType);
 }
@@ -860,12 +936,13 @@ static void getInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                         llvm::Value *&alignMask) {
   // Try to determine the size of the object we're deallocating.
   auto &info = IGF.IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
-  auto &layout = info.getLayout(IGF.IGM, selfType);
+  auto &layout = info.getClassLayout(IGF.IGM, selfType,
+                                     /*forBackwardDeployment=*/false);
 
   // If it's fixed, emit the constant size and alignment mask.
   if (layout.isFixedLayout()) {
-    size = layout.emitSize(IGF.IGM);
-    alignMask = layout.emitAlignMask(IGF.IGM);
+    size = IGF.IGM.getSize(layout.getSize());
+    alignMask = IGF.IGM.getSize(layout.getAlignMask());
     return;
   }
 
@@ -919,32 +996,6 @@ void irgen::emitPartialClassDeallocation(IRGenFunction &IGF,
                                      size, alignMask);
 }
 
-llvm::Constant *irgen::tryEmitClassConstantFragileInstanceSize(
-                                                        IRGenModule &IGM,
-                                                        ClassDecl *Class) {
-  auto selfType = getSelfType(Class);
-  auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
-
-  auto &layout = classTI.getLayout(IGM, selfType);
-  if (layout.isFixedLayout())
-    return layout.emitSize(IGM);
-  
-  return nullptr;
-}
-
-llvm::Constant *irgen::tryEmitClassConstantFragileInstanceAlignMask(
-                                                             IRGenModule &IGM,
-                                                             ClassDecl *Class) {
-  auto selfType = getSelfType(Class);
-  auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
-  
-  auto &layout = classTI.getLayout(IGM, selfType);
-  if (layout.isFixedLayout())
-    return layout.emitAlignMask(IGM);
-  
-  return nullptr;
-}
-
 /// emitClassDecl - Emit all the declarations associated with this class type.
 void IRGenModule::emitClassDecl(ClassDecl *D) {
   PrettyStackTraceDecl prettyStackTrace("emitting class metadata for", D);
@@ -952,45 +1003,22 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   SILType selfType = getSelfType(D);
   auto &classTI = getTypeInfo(selfType).as<ClassTypeInfo>();
 
+  // FIXME: For now, always use the fragile layout when emitting metadata.
+  auto &fragileLayout =
+    classTI.getClassLayout(*this, selfType, /*forBackwardDeployment=*/true);
+
+  // ... but still compute the resilient layout for better test coverage.
+  auto &resilientLayout =
+    classTI.getClassLayout(*this, selfType, /*forBackwardDeployment=*/false);
+  (void) resilientLayout;
+
   // Emit the class metadata.
-  emitClassMetadata(*this, D,
-                    classTI.getLayout(*this, selfType),
-                    classTI.getClassLayout(*this, selfType));
+  emitClassMetadata(*this, D, fragileLayout);
 
   IRGen.addClassForEagerInitialization(D);
 
   emitNestedTypeDecls(D->getMembers());
   emitFieldMetadataRecord(D);
-
-  // If the class is resilient, emit dispatch thunks.
-  if (isResilient(D, ResilienceExpansion::Minimal)) {
-    struct ThunkEmitter : public SILVTableVisitor<ThunkEmitter> {
-      IRGenModule &IGM;
-      ClassDecl *D;
-
-      ThunkEmitter(IRGenModule &IGM, ClassDecl *D)
-        : IGM(IGM), D(D) {
-        addVTableEntries(D);
-      }
-
-      void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
-
-      void addMethod(SILDeclRef member) {
-        auto *func = cast<AbstractFunctionDecl>(member.getDecl());
-        if (func->getDeclContext() == D &&
-            func->getEffectiveAccess() >= AccessLevel::Public) {
-          IGM.emitDispatchThunk(member);
-        }
-      }
-
-      void addPlaceholder(MissingMemberDecl *m) {
-        assert(m->getNumberOfVTableEntries() == 0
-               && "Should not be emitting class with missing members");
-      }
-    };
-
-    ThunkEmitter emitter(*this, D);
-  }
 }
 
 namespace {
@@ -1008,7 +1036,6 @@ namespace {
     IRGenModule &IGM;
     PointerUnion<ClassDecl *, ProtocolDecl *> TheEntity;
     ExtensionDecl *TheExtension;
-    const StructLayout *Layout;
     const ClassLayout *FieldLayout;
     
     ClassDecl *getClass() const {
@@ -1086,9 +1113,6 @@ namespace {
     SmallVector<VarDecl*, 8> ClassProperties;
     
     llvm::Constant *Name = nullptr;
-    /// Index of the first non-inherited field in the layout.
-    unsigned FirstFieldIndex;
-    unsigned NextFieldIndex;
 
     SmallVectorImpl<MethodDescriptor> &getMethodList(ValueDecl *decl) {
       if (decl->getAttrs().hasAttribute<OptionalAttr>()) {
@@ -1108,15 +1132,10 @@ namespace {
 
   public:
     ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass,
-                     const StructLayout &layout,
                      const ClassLayout &fieldLayout)
         : IGM(IGM), TheEntity(theClass), TheExtension(nullptr),
-          Layout(&layout),
           FieldLayout(&fieldLayout)
     {
-      FirstFieldIndex = fieldLayout.InheritedStoredProperties.size();
-      NextFieldIndex = FirstFieldIndex;
-
       visitConformances(theClass);
       visitMembers(theClass);
 
@@ -1129,11 +1148,8 @@ namespace {
     ClassDataBuilder(IRGenModule &IGM, ClassDecl *theClass,
                      ExtensionDecl *theExtension)
       : IGM(IGM), TheEntity(theClass), TheExtension(theExtension),
-        Layout(nullptr), FieldLayout(nullptr)
+        FieldLayout(nullptr)
     {
-      FirstFieldIndex = -1;
-      NextFieldIndex = -1;
-
       buildCategoryName(CategoryName);
 
       visitConformances(theExtension);
@@ -1207,7 +1223,7 @@ namespace {
     }
 
     void buildMetaclassStub() {
-      assert(Layout && "can't build a metaclass from a category");
+      assert(FieldLayout && "can't build a metaclass from a category");
       // The isa is the metaclass pointer for the root class.
       auto rootClass = getRootClassForMetaclass(IGM, TheEntity.get<ClassDecl *>());
       auto rootPtr = getMetaclassRefOrNull(rootClass);
@@ -1352,7 +1368,7 @@ namespace {
     }
 
     void emitRODataFields(ConstantStructBuilder &b, ForMetaClass_t forMeta) {
-      assert(Layout && "can't emit rodata for a category");
+      assert(FieldLayout && "can't emit rodata for a category");
 
       // struct _class_ro_t {
       //   uint32_t flags;
@@ -1373,19 +1389,8 @@ namespace {
         // historical nonsense
         instanceStart = instanceSize;
       } else {
-        instanceSize = Layout->getSize();
-        if (Layout->getElements().empty()
-            || Layout->getElements().size() == FirstFieldIndex) {
-          instanceStart = instanceSize;
-        } else if (Layout->getElement(FirstFieldIndex).getKind()
-                     == ElementLayout::Kind::Fixed ||
-                   Layout->getElement(FirstFieldIndex).getKind()
-                     == ElementLayout::Kind::Empty) {
-          // FIXME: assumes layout is always sequential!
-          instanceStart = Layout->getElement(FirstFieldIndex).getByteOffset();
-        } else {
-          instanceStart = Size(0);
-        }
+        instanceSize = FieldLayout->getSize();
+        instanceStart = FieldLayout->getInstanceStart();
       }
       b.addInt32(instanceStart.getValue());
       b.addInt32(instanceSize.getValue());
@@ -1722,7 +1727,7 @@ namespace {
     /// affect flags.
     void visitStoredVar(VarDecl *var) {
       // FIXME: how to handle ivar extensions in categories?
-      if (!Layout)
+      if (!FieldLayout)
         return;
 
       Ivars.push_back(var);
@@ -1739,24 +1744,17 @@ namespace {
     ///   uint32_t size;
     /// };
     void buildIvar(ConstantArrayBuilder &ivars, VarDecl *ivar) {
+      assert(FieldLayout && "can't build ivar for category");
+
       auto fields = ivars.beginStruct();
 
       // For now, we never try to emit specialized versions of the
       // metadata statically, so compute the field layout using the
       // originally-declared type.
-      SILType fieldType =
-          IGM.getLoweredType(IGM.getSILTypes().getAbstractionPattern(ivar),
-                             ivar->getDeclContext()
-                                 ->mapTypeIntoContext(ivar->getInterfaceType())
-                                 ->getCanonicalType());
-
-      assert(Layout && "can't build ivar for category");
-      // FIXME: this is not always the right thing to do!
-      //auto &elt = Layout->getElement(NextFieldIndex++);
-      auto &ivarTI = IGM.getTypeInfo(fieldType);
+      auto pair = FieldLayout->getFieldAccessAndElement(ivar);
 
       llvm::Constant *offsetPtr;
-      switch (FieldLayout->AllFieldAccesses[NextFieldIndex++]) {
+      switch (pair.first) {
       case FieldAccess::ConstantDirect:
       case FieldAccess::NonConstantDirect: {
         // If the field offset is fixed relative to the start of the superclass,
@@ -1784,11 +1782,10 @@ namespace {
 
       Size size;
       Alignment alignment;
-      if (auto fixedTI = dyn_cast<FixedTypeInfo>(&ivarTI)) {
+      if (auto fixedTI = dyn_cast<FixedTypeInfo>(&pair.second.getType())) {
         size = fixedTI->getFixedSize();
         alignment = fixedTI->getFixedAlignment();
       } else {
-        // FIXME: set something up to fill these in at runtime!
         size = Size(0);
         alignment = Alignment(1);
       }
@@ -1855,7 +1852,7 @@ namespace {
     void buildPropertyAttributes(VarDecl *prop, SmallVectorImpl<char> &out) {
       llvm::raw_svector_ostream outs(out);
 
-      auto propTy = prop->getInterfaceType()->getReferenceStorageReferent();
+      auto propTy = prop->getValueInterfaceType();
 
       // Emit the type encoding for the property.
       outs << 'T';
@@ -2082,11 +2079,14 @@ namespace {
 llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
                                             ClassDecl *cls) {
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
+  PrettyStackTraceDecl stackTraceRAII("emitting ObjC metadata for", cls);
   SILType selfType = getSelfType(cls);
   auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
-  auto &layout = classTI.getLayout(IGM, selfType);
-  auto &fieldLayout = classTI.getClassLayout(IGM, selfType);
-  ClassDataBuilder builder(IGM, cls, layout, fieldLayout);
+
+  // FIXME: For now, always use the fragile layout when emitting metadata.
+  auto &fieldLayout = classTI.getClassLayout(IGM, selfType,
+                                             /*forBackwardDeployment=*/true);
+  ClassDataBuilder builder(IGM, cls, fieldLayout);
 
   // First, build the metaclass object.
   builder.buildMetaclassStub();
@@ -2100,13 +2100,16 @@ irgen::emitClassPrivateDataFields(IRGenModule &IGM,
                                   ConstantStructBuilder &init,
                                   ClassDecl *cls) {
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
+  PrettyStackTraceDecl stackTraceRAII("emitting ObjC metadata for", cls);
 
   SILType selfType = getSelfType(cls);
   auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
-  auto &layout = classTI.getLayout(IGM, selfType);
-  auto &fieldLayout = classTI.getClassLayout(IGM, selfType);
 
-  ClassDataBuilder builder(IGM, cls, layout, fieldLayout);
+  // FIXME: For now, always use the fragile layout when emitting metadata.
+  auto &fieldLayout = classTI.getClassLayout(IGM, selfType,
+                                             /*forBackwardDeployment=*/true);
+
+  ClassDataBuilder builder(IGM, cls, fieldLayout);
 
   Size startOfClassRO = init.getNextOffsetFromGlobal();
   assert(startOfClassRO.isMultipleOf(IGM.getPointerSize()));
@@ -2131,11 +2134,11 @@ irgen::emitClassPrivateDataFields(IRGenModule &IGM,
 llvm::Constant *irgen::emitCategoryData(IRGenModule &IGM,
                                         ExtensionDecl *ext) {
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
-  ClassDecl *cls = ext->getAsClassOrClassExtensionContext();
+  ClassDecl *cls = ext->getSelfClassDecl();
   assert(cls && "generating category metadata for a non-class extension");
   
+  PrettyStackTraceDecl stackTraceRAII("emitting ObjC metadata for", ext);
   ClassDataBuilder builder(IGM, cls, ext);
-  
   return builder.emitCategory();
 }
   
@@ -2143,6 +2146,7 @@ llvm::Constant *irgen::emitCategoryData(IRGenModule &IGM,
 llvm::Constant *irgen::emitObjCProtocolData(IRGenModule &IGM,
                                             ProtocolDecl *proto) {
   assert(proto->isObjC() && "not an objc protocol");
+  PrettyStackTraceDecl stackTraceRAII("emitting ObjC metadata for", proto);
   ClassDataBuilder builder(IGM, proto);
   return builder.emitProtocol();
 }
@@ -2151,7 +2155,7 @@ const TypeInfo *
 TypeConverter::convertClassType(CanType type, ClassDecl *D) {
   llvm::StructType *ST = IGM.createNominalType(type);
   llvm::PointerType *irType = ST->getPointerTo();
-  ReferenceCounting refcount = ::getReferenceCountingForType(IGM, type);
+  ReferenceCounting refcount = type->getReferenceCounting();
   
   SpareBitVector spareBits;
   
@@ -2235,17 +2239,40 @@ ClassDecl *irgen::getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *C) {
                                      IGM.Context.Id_SwiftObject);
 }
 
-bool irgen::doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
-                                                          ClassDecl *theClass) {
-  // Classes imported from Objective-C never requires dynamic initialization.
-  if (theClass->hasClangNode())
-    return false;
-
+bool irgen::doesClassMetadataRequireRelocation(IRGenModule &IGM,
+                                               ClassDecl *theClass) {
   SILType selfType = getSelfType(theClass);
   auto &selfTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
 
-  auto &layout = selfTI.getClassLayout(IGM, selfType);
-  return layout.MetadataRequiresDynamicInitialization;
+  // A completely fragile layout does not change whether the metadata
+  // requires *relocation*, since that only depends on resilient class
+  // ancestry, or the class itself being generic.
+  auto &layout = selfTI.getClassLayout(IGM, selfType,
+                                       /*forBackwardDeployment=*/false);
+  return layout.doesMetadataRequireRelocation();
+}
+
+bool irgen::doesClassMetadataRequireInitialization(IRGenModule &IGM,
+                                                   ClassDecl *theClass) {
+  SILType selfType = getSelfType(theClass);
+  auto &selfTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+
+  // If we have a fragile layout used for backward deployment, we must use
+  // idempotent initialization; swift_initClassMetadata() does not work with
+  // statically registered classes.
+  auto &layout = selfTI.getClassLayout(IGM, selfType,
+                                       /*forBackwardDeployment=*/true);
+  return layout.doesMetadataRequireInitialization();
+}
+
+bool irgen::doesClassMetadataRequireUpdate(IRGenModule &IGM,
+                                           ClassDecl *theClass) {
+  SILType selfType = getSelfType(theClass);
+  auto &selfTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+
+  auto &layout = selfTI.getClassLayout(IGM, selfType,
+                                       /*forBackwardDeployment=*/false);
+  return layout.doesMetadataRequireInitialization();
 }
 
 bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, CanType type) {
@@ -2328,49 +2355,27 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                                               SILDeclRef method,
                                               CanSILFunctionType methodType,
                                               bool useSuperVTable) {
-  AbstractFunctionDecl *methodDecl
-    = cast<AbstractFunctionDecl>(method.getDecl());
-
-  // Find the vtable entry for this method.
-  SILDeclRef overridden = method.getOverriddenVTableEntry();
-
   // Find the metadata.
   llvm::Value *metadata;
   if (useSuperVTable) {
-    auto instanceTy = baseType;
-    if (auto metaTy = dyn_cast<MetatypeType>(baseType.getASTType()))
-      instanceTy = SILType::getPrimitiveObjectType(metaTy.getInstanceType());
-
-    if (IGF.IGM.isResilient(instanceTy.getClassOrBoundGenericClass(),
-                            ResilienceExpansion::Maximal)) {
-      // The derived type that is making the super call is resilient,
-      // for example we may be in an extension of a class outside of our
-      // resilience domain. So, we need to load the superclass metadata
-      // dynamically.
-
-      metadata = emitClassHeapMetadataRef(IGF, instanceTy.getASTType(),
-                                          MetadataValueType::TypeMetadata,
-                                          MetadataState::Complete);
-      auto superField = emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
-      metadata = IGF.Builder.CreateLoad(superField);
-    } else {
-      // Otherwise, we can directly load the statically known superclass's
-      // metadata.
-      auto superTy = instanceTy.getSuperclass();
-      metadata = emitClassHeapMetadataRef(IGF, superTy.getASTType(),
-                                          MetadataValueType::TypeMetadata,
-                                          MetadataState::Complete);
-    }
+    // For a non-resilient 'super' call, emit a reference to the superclass
+    // of the static type of the 'self' value.
+    auto instanceTy = baseType.getASTType()->getMetatypeInstanceType();
+    auto superTy = instanceTy->getSuperclass();
+    metadata = emitClassHeapMetadataRef(IGF,
+                                        superTy->getCanonicalType(),
+                                        MetadataValueType::TypeMetadata,
+                                        MetadataState::Complete);
   } else {
-    if ((isa<FuncDecl>(methodDecl) && cast<FuncDecl>(methodDecl)->isStatic()) ||
-        (isa<ConstructorDecl>(methodDecl) &&
-         method.kind == SILDeclRef::Kind::Allocator)) {
+    if (baseType.is<MetatypeType>()) {
+      // For a static method call, the 'self' value is already a class metadata.
       metadata = base;
     } else {
+      // Otherwise, load the class metadata from the 'self' value's isa pointer.
       metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType,
                                                   /*suppress cast*/ true);
     }
   }
 
-  return emitVirtualMethodValue(IGF, metadata, overridden, methodType);
+  return emitVirtualMethodValue(IGF, metadata, method, methodType);
 }

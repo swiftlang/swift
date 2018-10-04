@@ -100,7 +100,8 @@ enum class SourceFileKind {
   Library,  ///< A normal .swift file.
   Main,     ///< A .swift file that can have top-level code.
   REPL,     ///< A virtual file that holds the user's input in the REPL.
-  SIL       ///< Came from a .sil file.
+  SIL,      ///< Came from a .sil file.
+  Interface ///< Came from a .swiftinterface file, representing another module.
 };
 
 /// Discriminator for resilience strategy.
@@ -148,6 +149,45 @@ public:
                                                    rhs.first.begin());
       return lhs.first.size() < rhs.first.size();
     }
+  };
+
+  /// Produces the components of a given module's full name in reverse order.
+  ///
+  /// For a Swift module, this will only ever have one component, but an
+  /// imported Clang module might actually be a submodule.
+  class ReverseFullNameIterator {
+  public:
+    // Make this look like a valid STL iterator.
+    using difference_type = int;
+    using value_type = StringRef;
+    using pointer = StringRef *;
+    using reference = StringRef;
+    using iterator_category = std::forward_iterator_tag;
+
+  private:
+    PointerUnion<const ModuleDecl *, const /* clang::Module */ void *> current;
+  public:
+    ReverseFullNameIterator() = default;
+    explicit ReverseFullNameIterator(const ModuleDecl *M);
+    explicit ReverseFullNameIterator(const clang::Module *clangModule) {
+      current = clangModule;
+    }
+
+    StringRef operator*() const;
+    ReverseFullNameIterator &operator++();
+
+    friend bool operator==(ReverseFullNameIterator left,
+                           ReverseFullNameIterator right) {
+      return left.current == right.current;
+    }
+    friend bool operator!=(ReverseFullNameIterator left,
+                           ReverseFullNameIterator right) {
+      return !(left == right);
+    }
+
+    /// This is a convenience function that writes the entire name, in forward
+    /// order, to \p out.
+    void printForward(raw_ostream &out) const;
   };
 
 private:
@@ -224,6 +264,7 @@ public:
     return { Files.begin(), Files.size() };
   }
 
+  bool isClangModule() const;
   void addFile(FileUnit &newFile);
   void removeFile(FileUnit &existingFile);
 
@@ -372,6 +413,12 @@ public:
   void
   getImportedModulesForLookup(SmallVectorImpl<ImportedModule> &imports) const;
 
+  /// Uniques the items in \p imports, ignoring the source locations of the
+  /// access paths.
+  ///
+  /// The order of items in \p imports is \e not preserved.
+  static void removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports);
+
   /// Finds all top-level decls of this module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
@@ -459,6 +506,9 @@ public:
   /// \returns true if this module is the "builtin" module.
   bool isBuiltinModule() const;
 
+  /// \returns true if this module is the "SwiftOnoneSupport" module;
+  bool isOnoneSupportModule() const;
+
   /// \returns true if this module is a system module; note that the StdLib is
   /// considered a system module.
   bool isSystemModule() const;
@@ -480,10 +530,19 @@ public:
   /// Returns the associated clang module if one exists.
   const clang::Module *findUnderlyingClangModule() const;
 
+  /// Returns a generator with the components of this module's full,
+  /// hierarchical name.
+  ///
+  /// For a Swift module, this will only ever have one component, but an
+  /// imported Clang module might actually be a submodule.
+  ReverseFullNameIterator getReverseFullModuleName() const {
+    return ReverseFullNameIterator(this);
+  }
+
   SourceRange getSourceRange() const { return SourceRange(); }
 
   static bool classof(const DeclContext *DC) {
-    if (auto D = DC->getAsDeclOrDeclExtensionContext())
+    if (auto D = DC->getAsDecl())
       return classof(D);
     return false;
   }
@@ -815,7 +874,8 @@ private:
 
   /// A hash of all interface-contributing tokens that have been lexed for
   /// this source file so far.
-  llvm::MD5 InterfaceHash;
+  /// We only collect interface hash for primary input files.
+  llvm::Optional<llvm::MD5> InterfaceHash;
 
   /// \brief The ID for the memory buffer containing this file's source.
   ///
@@ -831,8 +891,6 @@ private:
 
   friend ASTContext;
   friend Impl;
-
-  ~SourceFile();
 public:
   /// The list of top-level declarations in the source file.
   std::vector<Decl*> Decls;
@@ -1021,6 +1079,7 @@ public:
       return true;
       
     case SourceFileKind::Library:
+    case SourceFileKind::Interface:
     case SourceFileKind::SIL:
       return false;
     }
@@ -1058,20 +1117,26 @@ public:
   /// Set the root refinement context for the file.
   void setTypeRefinementContext(TypeRefinementContext *TRC);
 
-  void recordInterfaceToken(StringRef token) {
-    assert(!token.empty());
-    InterfaceHash.update(token);
-    // Add null byte to separate tokens.
-    uint8_t a[1] = {0};
-    InterfaceHash.update(a);
+  void enableInterfaceHash() {
+    assert(!hasInterfaceHash());
+    InterfaceHash.emplace();
   }
 
-  const llvm::MD5 &getInterfaceHashState() { return InterfaceHash; }
-  void setInterfaceHashState(const llvm::MD5 &state) { InterfaceHash = state; }
+  bool hasInterfaceHash() const {
+    return InterfaceHash.hasValue();
+  }
+
+  void recordInterfaceToken(StringRef token) {
+    assert(!token.empty());
+    InterfaceHash->update(token);
+    // Add null byte to separate tokens.
+    uint8_t a[1] = {0};
+    InterfaceHash->update(a);
+  }
 
   void getInterfaceHash(llvm::SmallString<32> &str) {
     llvm::MD5::MD5Result result;
-    InterfaceHash.final(result);
+    InterfaceHash->final(result);
     llvm::MD5::stringifyResult(result, str);
   }
 
@@ -1098,7 +1163,7 @@ private:
   /// If not None, the underlying vector should contain tokens of this source file.
   Optional<std::vector<Token>> AllCorrectedTokens;
 
-  SourceFileSyntaxInfo &SyntaxInfo;
+  std::unique_ptr<SourceFileSyntaxInfo> SyntaxInfo;
 };
 
 
@@ -1224,12 +1289,18 @@ public:
   bool isSystemModule() const;
   bool isBuiltinModule() const;
   const ModuleDecl *getAsSwiftModule() const;
+  const clang::Module *getAsClangModule() const;
+
+  void *getOpaqueValue() const {
+    assert(!Mod.isNull());
+    return Mod.getOpaqueValue();
+  }
 
   explicit operator bool() const { return !Mod.isNull(); }
 };
 
 inline bool DeclContext::isModuleContext() const {
-  if (auto D = getAsDeclOrDeclExtensionContext())
+  if (auto D = getAsDecl())
     return ModuleDecl::classof(D);
   return false;
 }

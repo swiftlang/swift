@@ -33,8 +33,8 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
   for (auto elt : path) {
     id.AddInteger(elt.getKind());
     switch (elt.getKind()) {
-    case Archetype:
-      id.AddPointer(elt.getArchetype()->getCanonicalType().getPointer());
+    case GenericParameter:
+      id.AddPointer(elt.getGenericParameter());
       break;
 
     case Requirement:
@@ -45,10 +45,6 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
       id.AddPointer(elt.getWitness());
       break;
 
-    case AssociatedType:
-      id.AddPointer(elt.getAssociatedType());
-      break;
-
     case ApplyArgument:
     case ApplyFunction:
     case FunctionArgument:
@@ -57,9 +53,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case Member:
     case MemberRefBase:
     case UnresolvedMember:
-    case SubscriptIndex:
     case SubscriptMember:
-    case SubscriptResult:
     case ConstructorMember:
     case LValueConversion:
     case RValueAdjustment:
@@ -68,7 +62,6 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case InstanceType:
     case SequenceIteratorProtocol:
     case GeneratorElementType:
-    case ScalarToTuple:
     case AutoclosureResult:
     case GenericArgument:
     case NamedTupleElement:
@@ -116,13 +109,8 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
   for (auto elt : getPath()) {
     out << " -> ";
     switch (elt.getKind()) {
-    case Archetype:
-      out << "archetype '" << elt.getArchetype()->getString() << "'";
-      break;
-
-    case AssociatedType:
-      out << "associated type '"
-          << elt.getAssociatedType()->getNameStr() << "'";
+    case GenericParameter:
+      out << "generic parameter '" << elt.getGenericParameter()->getString() << "'";
       break;
 
     case ApplyArgument:
@@ -202,24 +190,12 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "rvalue adjustment";
       break;
 
-    case ScalarToTuple:
-      out << "scalar to tuple";
-      break;
-
     case SequenceIteratorProtocol:
       out << "sequence iterator type";
       break;
 
-    case SubscriptIndex:
-      out << "subscript index";
-      break;
-
     case SubscriptMember:
       out << "subscript member";
-      break;
-
-    case SubscriptResult:
-      out << "subscript result";
       break;
 
     case TupleElement:
@@ -248,9 +224,26 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "conditional requirement #" << llvm::utostr(elt.getValue());
       break;
 
-    case TypeParameterRequirement:
-      out << "type parameter requirement #" << llvm::utostr(elt.getValue());
+    case TypeParameterRequirement: {
+      out << "type parameter requirement #" << llvm::utostr(elt.getValue())
+          << " (";
+      switch (static_cast<RequirementKind>(elt.getValue2())) {
+      case RequirementKind::Conformance:
+        out << "conformance";
+        break;
+      case RequirementKind::Superclass:
+        out << "superclass";
+        break;
+      case RequirementKind::SameType:
+        out << "same-type";
+        break;
+      case RequirementKind::Layout:
+        out << "layout";
+        break;
+      }
+      out << ")";
       break;
+    }
 
     case ImplicitlyUnwrappedDisjunctionChoice:
       out << "implicitly unwrapped disjunction choice";

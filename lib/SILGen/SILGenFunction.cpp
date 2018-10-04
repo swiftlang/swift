@@ -35,7 +35,8 @@ SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
                                DeclContext *DC)
     : SGM(SGM), F(F), silConv(SGM.M), FunctionDC(DC),
       StartOfPostmatter(F.end()), B(*this), OpenedArchetypesTracker(&F),
-      CurrentSILLoc(F.getLocation()), Cleanups(*this) {
+      CurrentSILLoc(F.getLocation()), Cleanups(*this),
+      StatsTracer(SGM.M.getASTContext().Stats, "SILGen-function", &F) {
   assert(DC && "creating SGF without a DeclContext?");
   B.setInsertionPoint(createBasicBlock());
   B.setCurrentDebugScope(F.getDebugScope());
@@ -552,7 +553,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     if (r->getType() != rType)
       r = B.createStruct(mainClass, rType, r);
 
-    Cleanups.emitCleanupsForReturn(mainClass);
+    Cleanups.emitCleanupsForReturn(mainClass, NotForUnwind);
     B.createReturn(mainClass, r);
     return;
   }
@@ -653,8 +654,10 @@ void SILGenFunction::emitProfilerIncrement(ASTNode N) {
   auto &C = B.getASTContext();
   const auto &RegionCounterMap = SP->getRegionCounterMap();
   auto CounterIt = RegionCounterMap.find(N);
-  assert(CounterIt != RegionCounterMap.end() &&
-         "cannot increment non-existent counter");
+
+  // TODO: Assert that this cannot happen (rdar://42792053).
+  if (CounterIt == RegionCounterMap.end())
+    return;
 
   auto Int32Ty = getLoweredType(BuiltinIntegerType::get(32, C));
   auto Int64Ty = getLoweredType(BuiltinIntegerType::get(64, C));

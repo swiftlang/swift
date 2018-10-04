@@ -388,6 +388,16 @@ bool LetPropertiesOpt::isConstantLetProperty(VarDecl *Property) {
   return true;
 }
 
+static bool isProjectionOfProperty(SILValue addr, VarDecl *Property) {
+  if (auto *REA = dyn_cast<RefElementAddrInst>(addr)) {
+    return REA->getField() == Property;
+  }
+  if (auto *SEA = dyn_cast<StructElementAddrInst>(addr)) {
+    return SEA->getField() == Property;
+  }
+  return false;
+}
+
 // Analyze the init value being stored by the instruction into a property.
 bool
 LetPropertiesOpt::analyzeInitValue(SILInstruction *I, VarDecl *Property) {
@@ -398,13 +408,17 @@ LetPropertiesOpt::analyzeInitValue(SILInstruction *I, VarDecl *Property) {
   } else if (auto SI = dyn_cast<StoreInst>(I)) {
     auto Dest = stripAddressAccess(SI->getDest());
 
-    assert(((isa<RefElementAddrInst>(Dest) &&
-             cast<RefElementAddrInst>(Dest)->getField() == Property) ||
-            (isa<StructElementAddrInst>(Dest) &&
-             cast<StructElementAddrInst>(Dest)->getField() == Property)) &&
-           "Store instruction should store into a proper let property");
+    assert(isProjectionOfProperty(stripAddressAccess(SI->getDest()), Property)
+           && "Store instruction should store into a proper let property");
     (void) Dest;
     value = SI->getSrc();
+  }
+
+  // Check if it's just a copy from another instance of the struct.
+  if (auto *LI = dyn_cast<LoadInst>(value)) {
+    SILValue addr = LI->getOperand();
+    if (isProjectionOfProperty(addr, Property))
+      return true;
   }
 
   // Bail if a value of a property is not a statically known constant init.

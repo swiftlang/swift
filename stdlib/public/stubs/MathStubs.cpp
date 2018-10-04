@@ -64,7 +64,7 @@ extern "C" {
     (defined(__linux__) && defined(__aarch64__)) || \
     (defined(__linux__) && defined(__powerpc64__)) || \
     (defined(__linux__) && defined(__s390x__)) || \
-    (defined(__ANDROID__) && defined(__arm64__))
+    (defined(__ANDROID__) && defined(__aarch64__))
 
 SWIFT_RUNTIME_STDLIB_API
 ti_int
@@ -112,7 +112,7 @@ __muloti4(ti_int a, ti_int b, int* overflow)
 // lowered to instructions as though MSVC had generated.  There does not seem to
 // be a MSVC provided multiply with overflow detection that I can see, but this
 // avoids an unnecessary dependency on compiler-rt for a single function.
-#if (defined(__linux__) && defined(__arm__)) || defined(_WIN32)
+#if (defined(__linux__) && (defined(__arm__) || defined(__i386__))) || defined(_WIN32)
 
 // Similar to above, but with mulodi4.  Perhaps this is
 // something that shouldn't be done, and is a bandaid over

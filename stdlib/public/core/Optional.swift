@@ -328,8 +328,8 @@ extension Optional : Equatable where Wrapped : Equatable {
   ///     }
   ///     // Prints "The two groups start the same."
   ///
-  /// You can also use this operator to compare a non-optional value to an
-  /// optional that wraps the same type. The non-optional value is wrapped as an
+  /// You can also use this operator to compare a nonoptional value to an
+  /// optional that wraps the same type. The nonoptional value is wrapped as an
   /// optional before the comparison is made. In the following example, the
   /// `numberToMatch` constant is wrapped as an optional before comparing to the
   /// optional `numberFromString`:
@@ -365,44 +365,6 @@ extension Optional : Equatable where Wrapped : Equatable {
     default:
       return false
     }
-  }
-  
-  /// Returns a Boolean value indicating whether two optional instances are not
-  /// equal.
-  ///
-  /// Use this not-equal-to operator (`!=`) to compare any two optional instances
-  /// of a type that conforms to the `Equatable` protocol. The comparison
-  /// returns `true` if only one of the arguments is `nil` or if the two
-  /// arguments wrap values that are not equal. The comparison returns `false`
-  /// if both arguments are `nil` or if the two arguments wrap values that are
-  /// equal.
-  ///
-  ///     let group1 = [2, 4, 6, 8, 10]
-  ///     let group2 = [1, 3, 5, 7, 9]
-  ///     if group1.first != group2.first {
-  ///         print("The two groups start differently.")
-  ///     }
-  ///     // Prints "The two groups start differently."
-  ///
-  /// You can also use this operator to compare a non-optional value to an
-  /// optional that wraps the same type. The non-optional value is wrapped as an
-  /// optional before the comparison is made. In this example, the
-  /// `numberToMatch` constant is wrapped as an optional before comparing to the
-  /// optional `numberFromString`:
-  ///
-  ///     let numberToFind: Int = 23
-  ///     let numberFromString: Int? = Int("not-a-number")      // nil
-  ///     if numberToFind != numberFromString {
-  ///         print("No match.")
-  ///     }
-  ///     // Prints "No match."
-  ///
-  /// - Parameters:
-  ///   - lhs: An optional value to compare.
-  ///   - rhs: Another optional value to compare.
-  @inlinable
-  public static func !=(lhs: Wrapped?, rhs: Wrapped?) -> Bool {
-    return !(lhs == rhs)
   }
 }
 
@@ -681,7 +643,7 @@ public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T)
 ///
 /// If `userPrefs[greetingKey]` has a value, that value is assigned to
 /// `greeting`. If not, any value in `defaults[greetingKey]` will succeed, and
-/// if not that, `greeting` will be set to the non-optional default value,
+/// if not that, `greeting` will be set to the nonoptional default value,
 /// `"Greetings!"`.
 ///
 /// - Parameters:

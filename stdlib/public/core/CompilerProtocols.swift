@@ -148,7 +148,7 @@ public protocol RawRepresentable {
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func == <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
   where T.RawValue : Equatable {
   return lhs.rawValue == rhs.rawValue
@@ -159,7 +159,7 @@ public func == <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func != <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
   where T.RawValue : Equatable {
   return lhs.rawValue != rhs.rawValue
@@ -172,7 +172,7 @@ public func != <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func != <T : Equatable>(lhs: T, rhs: T) -> Bool
   where T : RawRepresentable, T.RawValue : Equatable {
   return lhs.rawValue != rhs.rawValue
@@ -471,18 +471,6 @@ public protocol _ExpressibleByBuiltinUTF16StringLiteral
     utf16CodeUnitCount: Builtin.Word)
 }
 
-public protocol _ExpressibleByBuiltinConstStringLiteral
-  : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
-
-  init(_builtinConstStringLiteral constantString: Builtin.RawPointer)
-}
-
-public protocol _ExpressibleByBuiltinConstUTF16StringLiteral
-  : _ExpressibleByBuiltinConstStringLiteral {
-
-  init(_builtinConstUTF16StringLiteral constantUTF16String: Builtin.RawPointer)
-}
-
 /// A type that can be initialized with a string literal.
 ///
 /// The `String` and `StaticString` types conform to the
@@ -660,10 +648,10 @@ public protocol ExpressibleByArrayLiteral {
 ///     print(frequencies.count)
 ///     // Prints "0"
 ///
-/// - Note: A dictionary literal is *not* the same as an instance of
-///   `Dictionary` or the similarly named `DictionaryLiteral` type. You can't
-///   initialize a type that conforms to `ExpressibleByDictionaryLiteral` simply
-///   by assigning an instance of one of these types.
+/// - Note:
+///   A dictionary literal is *not* the same as an instance of `Dictionary`.
+///   You can't initialize a type that conforms to `ExpressibleByDictionaryLiteral`
+///   simply by assigning an instance of `Dictionary`, `KeyValuePairs`, or similar.
 ///
 /// Conforming to the ExpressibleByDictionaryLiteral Protocol
 /// =========================================================

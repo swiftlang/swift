@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -o %t/a.out && %target-run %t/a.out
+// RUN: %target-build-swift %s -o %t/a.out && %target-codesign %t/a.out && %target-run %t/a.out
 
 // REQUIRES: executable_test
 
@@ -18,7 +18,7 @@ Tests.test("DefaultReturnType") {
 Tests.test("ExplicitTypeContext") {
   expectEqualSequence(["hello", "world"],
     ["hello", "world"].flatMap { $0 } as [String])
-  expectEqualSequence("helloworld".characters,
+  expectEqualSequence("helloworld",
     ["hello", "world"].flatMap { $0 } as [Character])
 }
 

@@ -456,7 +456,7 @@ static VarDecl *createKeyedContainer(ASTContext &C, DeclContext *DC,
   // let container : Keyed*Container<KeyType>
   auto *containerDecl = new (C) VarDecl(/*IsStatic=*/false, spec,
                                         /*IsCaptureList=*/false, SourceLoc(),
-                                        C.Id_container, containerType, DC);
+                                        C.Id_container, DC);
   containerDecl->setImplicit();
   containerDecl->setInterfaceType(containerType);
   return containerDecl;
@@ -481,7 +481,7 @@ static CallExpr *createContainerKeyedByCall(ASTContext &C, DeclContext *DC,
   // (keyedBy:)
   auto *keyedByDecl = new (C)
       ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                C.Id_keyedBy, SourceLoc(), C.Id_keyedBy, returnType, DC);
+                C.Id_keyedBy, SourceLoc(), C.Id_keyedBy, DC);
   keyedByDecl->setImplicit();
   keyedByDecl->setInterfaceType(returnType);
 
@@ -531,8 +531,7 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
   // }
 
   // The enclosing type decl.
-  auto *targetDecl = encodeDecl->getDeclContext()
-                         ->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *targetDecl = encodeDecl->getDeclContext()->getSelfNominalTypeDecl();
 
   auto *funcDC = cast<DeclContext>(encodeDecl);
   auto &C = funcDC->getASTContext();
@@ -707,11 +706,10 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   auto encoderType = C.getEncoderDecl()->getDeclaredInterfaceType();
   auto returnType = TupleType::getEmpty(C);
 
-  // Params: (self [implicit], Encoder)
-  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), conformanceDC);
+  // Params: (Encoder)
   auto *encoderParam = new (C)
       ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_to,
-                SourceLoc(), C.Id_encoder, encoderType, conformanceDC);
+                SourceLoc(), C.Id_encoder, conformanceDC);
   encoderParam->setInterfaceType(encoderType);
 
   ParameterList *params = ParameterList::createWithoutLoc(encoderParam);
@@ -720,7 +718,7 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
   DeclName name(C, C.Id_encode, params);
   auto *encodeDecl = FuncDecl::create(
       C, SourceLoc(), StaticSpellingKind::None, SourceLoc(), name, SourceLoc(),
-      /*Throws=*/true, SourceLoc(), nullptr, selfDecl, params,
+      /*Throws=*/true, SourceLoc(), nullptr, params,
       TypeLoc::withoutLoc(returnType), conformanceDC);
   encodeDecl->setImplicit();
   encodeDecl->setSynthesized();
@@ -771,8 +769,7 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
 
   // The enclosing type decl.
   auto conformanceDC = initDecl->getDeclContext();
-  auto *targetDecl =
-      conformanceDC->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto *targetDecl = conformanceDC->getSelfNominalTypeDecl();
 
   auto *funcDC = cast<DeclContext>(initDecl);
   auto &C = funcDC->getASTContext();
@@ -1008,16 +1005,11 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   //                         output: Self
   // Compute from the inside out:
 
-  // Params: (self [implicit], Decoder)
-  // self should be inout if the type is a value type; not inout otherwise.
-  auto *selfDecl = ParamDecl::createSelf(SourceLoc(), conformanceDC,
-                                         /*isStatic=*/false,
-                                         /*isInOut=*/!classDecl);
-
+  // Params: (Decoder)
   auto decoderType = C.getDecoderDecl()->getDeclaredInterfaceType();
   auto *decoderParamDecl = new (C) ParamDecl(
       VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_from,
-      SourceLoc(), C.Id_decoder, decoderType, conformanceDC);
+      SourceLoc(), C.Id_decoder, conformanceDC);
   decoderParamDecl->setImplicit();
   decoderParamDecl->setInterfaceType(decoderType);
 
@@ -1028,7 +1020,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
 
   auto *initDecl =
       new (C) ConstructorDecl(name, SourceLoc(), OTK_None, SourceLoc(),
-                              /*Throws=*/true, SourceLoc(), selfDecl, paramList,
+                              /*Throws=*/true, SourceLoc(), paramList,
                               /*GenericParams=*/nullptr, conformanceDC);
   initDecl->setImplicit();
   initDecl->setSynthesized();

@@ -156,7 +156,6 @@ static bool isRLEInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::CondFailInst:
   case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueInst:
-  case SILInstructionKind::IsUniqueOrPinnedInst:
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::CopyUnownedValueInst:
     return true;
@@ -206,27 +205,27 @@ private:
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If the bit is set, then the location currently has an
   /// downward visible value at the beginning of the basic block.
-  llvm::SmallBitVector ForwardSetIn;
+  SmallBitVector ForwardSetIn;
 
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If the bit is set, then the location currently has an
   /// downward visible value at the end of the basic block.
-  llvm::SmallBitVector ForwardSetOut;
+  SmallBitVector ForwardSetOut;
 
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If we ignore all unknown write, what's the maximum set
   /// of available locations at the current position in the basic block.
-  llvm::SmallBitVector ForwardSetMax;
+  SmallBitVector ForwardSetMax;
 
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If the bit is set, then the basic block generates a
   /// value for the location.
-  llvm::SmallBitVector BBGenSet;
+  SmallBitVector BBGenSet;
 
   /// A bit vector for which the ith bit represents the ith LSLocation in
   /// LocationVault. If the bit is set, then the basic block kills the
   /// value for the location.
-  llvm::SmallBitVector BBKillSet;
+  SmallBitVector BBKillSet;
 
   /// This is map between LSLocations and their available values at the
   /// beginning of this basic block.
@@ -274,9 +273,9 @@ private:
                     SILValue Val, RLEKind Kind);
 
   /// BitVector manipulation functions.
-  void startTrackingLocation(llvm::SmallBitVector &BV, unsigned B);
-  void stopTrackingLocation(llvm::SmallBitVector &BV, unsigned B);
-  bool isTrackingLocation(llvm::SmallBitVector &BV, unsigned B);
+  void startTrackingLocation(SmallBitVector &BV, unsigned B);
+  void stopTrackingLocation(SmallBitVector &BV, unsigned B);
+  bool isTrackingLocation(SmallBitVector &BV, unsigned B);
   void startTrackingValue(ValueTableMap &VM, unsigned L, unsigned V);
   void stopTrackingValue(ValueTableMap &VM, unsigned B);
 
@@ -416,8 +415,6 @@ public:
 //===----------------------------------------------------------------------===//
 
 namespace {
-
-using BBValueMap = llvm::DenseMap<SILBasicBlock *, SILValue>;
 
 /// This class stores global state that we use when computing redundant load and
 /// their replacement in each basic block.
@@ -570,15 +567,15 @@ void BlockState::stopTrackingValue(ValueTableMap &VM, unsigned B) {
   VM.erase(B);
 }
  
-bool BlockState::isTrackingLocation(llvm::SmallBitVector &BV, unsigned B) {
+bool BlockState::isTrackingLocation(SmallBitVector &BV, unsigned B) {
   return BV.test(B);
 }
  
-void BlockState::startTrackingLocation(llvm::SmallBitVector &BV, unsigned B) {
+void BlockState::startTrackingLocation(SmallBitVector &BV, unsigned B) {
   BV.set(B);
 }
  
-void BlockState::stopTrackingLocation(llvm::SmallBitVector &BV, unsigned B) {
+void BlockState::stopTrackingLocation(SmallBitVector &BV, unsigned B) {
   BV.reset(B);
 }
 
@@ -1249,7 +1246,7 @@ BlockState::ValueState BlockState::getValueStateAtEndOfBlock(RLEContext &Ctx,
 
 SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
                                                      LSLocation &L) {
-  BBValueMap Values;
+  llvm::SmallVector<std::pair<SILBasicBlock *, SILValue>, 8> Values;
   llvm::DenseSet<SILBasicBlock *> HandledBBs;
   llvm::SmallVector<SILBasicBlock *, 8> WorkList;
 
@@ -1278,7 +1275,7 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
     // locations, collect and reduce them into a single value in the current
     // basic block.
     if (Forwarder.isConcreteValues(*this, L)) {
-      Values[CurBB] = Forwarder.reduceValuesAtEndOfBlock(*this, L);
+      Values.push_back({CurBB, Forwarder.reduceValuesAtEndOfBlock(*this, L)});
       continue;
     }
 
@@ -1302,7 +1299,7 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
 
     // Reduce the available values into a single SILValue we can use to forward
     SILInstruction *IPt = CurBB->getTerminator();
-    Values[CurBB] = LSValue::reduce(L, &BB->getModule(), LSValues, IPt);
+    Values.push_back({CurBB, LSValue::reduce(L, &BB->getModule(), LSValues, IPt)});
   }
 
   // Finally, collect all the values for the SILArgument, materialize it using
@@ -1318,7 +1315,7 @@ SILValue RLEContext::computePredecessorLocationValue(SILBasicBlock *BB,
 bool RLEContext::collectLocationValues(SILBasicBlock *BB, LSLocation &L,
                                        LSLocationValueMap &Values,
                                        ValueTableMap &VM) {
-  LSLocationSet CSLocs;
+  LSLocationList CSLocs;
   LSLocationList Locs;
   LSLocation::expand(L, &BB->getModule(), Locs, TE);
 
@@ -1329,7 +1326,7 @@ bool RLEContext::collectLocationValues(SILBasicBlock *BB, LSLocation &L,
     Values[X] = getValue(VM[getLocationBit(X)]);
     if (!Values[X].isCoveringValue())
       continue;
-    CSLocs.insert(X);
+    CSLocs.push_back(X);
   }
 
   // For locations which we do not have concrete values for in this basic
@@ -1564,7 +1561,7 @@ bool RLEContext::run() {
   processBasicBlocksForRLE(Optimistic);
 
   // Finally, perform the redundant load replacements.
-  llvm::DenseSet<SILInstruction *> InstsToDelete;
+  llvm::SmallVector<SILInstruction *, 16> InstsToDelete;
   bool SILChanged = false;
   for (auto &B : *Fn) {
     auto &State = BBToLocState[&B];
@@ -1588,7 +1585,7 @@ bool RLEContext::run() {
                               << "With " << Iter->second);
       SILChanged = true;
       Iter->first->replaceAllUsesWith(Iter->second);
-      InstsToDelete.insert(Iter->first);
+      InstsToDelete.push_back(Iter->first);
       ++NumForwardedLoads;
     }
   }

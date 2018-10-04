@@ -8,12 +8,11 @@ set(SourceKitSupport_sources
   UIDRegistry.cpp
 )
 
-set(SOURCEKIT_SUPPORT_DEPEND swiftBasic swiftSyntax clangBasic clangRewrite)
-if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
-  list(APPEND SOURCEKIT_SUPPORT_DEPEND dispatch BlocksRuntime)
-endif()
-
 add_sourcekit_library(SourceKitSupport
   ${SourceKitSupport_sources}
-  LINK_LIBS ${SOURCEKIT_SUPPORT_DEPEND}
+  LINK_LIBS swiftBasic swiftSyntax clangBasic clangRewrite
 )
+if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
+  target_link_libraries(SourceKitSupport INTERFACE dispatch BlocksRuntime)
+endif()
+

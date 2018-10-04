@@ -51,7 +51,8 @@ public:
   enum Kind {
     Getter,
     Setter,
-    MaterializeForSet,
+    ReadCoroutine,
+    ModifyCoroutine,
     LazyGetter,
     LazySetter,
   };
@@ -65,7 +66,8 @@ private:
     switch (kind) {
     case Kind::Getter:
     case Kind::Setter:
-    case Kind::MaterializeForSet:
+    case Kind::ReadCoroutine:
+    case Kind::ModifyCoroutine:
       return Members::indexOf<void>();
     case Kind::LazyGetter:
     case Kind::LazySetter:
@@ -100,8 +102,6 @@ void makeFinal(ASTContext &ctx, ValueDecl *D);
 bool checkOverrides(ValueDecl *decl);
 
 // These are implemented in CodeSynthesis.cpp.
-void maybeAddMaterializeForSet(AbstractStorageDecl *storage,
-                               TypeChecker &TC);
 void maybeAddAccessorsToStorage(TypeChecker &TC, AbstractStorageDecl *storage);
 
 void triggerAccessorSynthesis(TypeChecker &TC, AbstractStorageDecl *storage);

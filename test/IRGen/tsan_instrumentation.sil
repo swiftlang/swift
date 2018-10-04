@@ -9,21 +9,21 @@ var g: Int
 
 public func inoutAccess()
 
-sil_global hidden @$S20tsan_instrumentation1gSiv : $Int
+sil_global hidden @$s20tsan_instrumentation1gSiv : $Int
 
-// CHECK: @"$S20tsan_instrumentation1gSiv" = hidden global [[GLOBAL:%.*]] zeroinitializer, align {{.*}}
+// CHECK: @"$s20tsan_instrumentation1gSiv" = hidden global [[GLOBAL:%.*]] zeroinitializer, align {{.*}}
 
 // The inout access builtin is currently turned into a call to the __tsan_write1
 // compiler-rt instrumentation. Eventually we will add a specific
 // instrumentation callback for tsan inout accesses to compiler-rt.
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S20tsan_instrumentation11inoutAccessyyF"()
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s20tsan_instrumentation11inoutAccessyyF"()
 // foo() -> ()
-sil @$S20tsan_instrumentation11inoutAccessyyF : $@convention(thin) () -> () {
+sil @$s20tsan_instrumentation11inoutAccessyyF : $@convention(thin) () -> () {
 bb0:
-  %0 = global_addr @$S20tsan_instrumentation1gSiv : $*Int
+  %0 = global_addr @$s20tsan_instrumentation1gSiv : $*Int
   %1 = builtin "tsanInoutAccess"(%0 : $*Int) : $()
-// CHECK:  call void @__tsan_external_write(i8* bitcast ([[GLOBAL]]* @"$S20tsan_instrumentation1gSiv" to i8*), i8* null, i8* inttoptr ({{(i32|i64)}} 1 to i8*))
+// CHECK:  call void @__tsan_external_write(i8* bitcast ([[GLOBAL]]* @"$s20tsan_instrumentation1gSiv" to i8*), i8* null, i8* inttoptr ({{(i32|i64)}} 1 to i8*))
 
   %2 = tuple ()
   return %2 : $()

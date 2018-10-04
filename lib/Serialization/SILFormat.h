@@ -164,7 +164,6 @@ namespace sil_block {
     SIL_WITNESS_ASSOC_ENTRY,
     SIL_WITNESS_CONDITIONAL_CONFORMANCE,
     SIL_DEFAULT_WITNESS_TABLE,
-    SIL_DEFAULT_WITNESS_TABLE_ENTRY,
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY,
     SIL_INST_WITNESS_METHOD,
     SIL_SPECIALIZE_ATTR,
@@ -263,12 +262,6 @@ namespace sil_block {
     // Default witness table entries will be serialized after.
   >;
 
-  using DefaultWitnessTableEntryLayout = BCRecordLayout<
-    SIL_DEFAULT_WITNESS_TABLE_ENTRY,
-    DeclIDField,  // SILFunction name
-    BCArray<ValueIDField> // SILDeclRef
-  >;
-
   using DefaultWitnessTableNoEntryLayout = BCRecordLayout<
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY
   >;
@@ -288,6 +281,7 @@ namespace sil_block {
                      BCFixed<1>,  // transparent
                      BCFixed<2>,  // serialized
                      BCFixed<2>,  // thunks: signature optimized/reabstraction
+                     BCFixed<1>,  // without_actually_escaping
                      BCFixed<1>,  // global_init
                      BCFixed<2>,  // inlineStrategy
                      BCFixed<2>,  // optimizationMode

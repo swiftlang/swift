@@ -65,8 +65,8 @@ static bool isAnyObjectOrAny(Type type) {
 
 /// Returns true if \p name matches a keyword in any Clang language mode.
 static bool isClangKeyword(Identifier name) {
-  static const llvm::StringSet<> keywords = []{
-    llvm::StringSet<> set;
+  static const llvm::DenseSet<StringRef> keywords = []{
+    llvm::DenseSet<StringRef> set;
     // FIXME: clang::IdentifierInfo /nearly/ has the API we need to do this
     // in a more principled way, but not quite.
 #define KEYWORD(SPELLING, FLAGS) \
@@ -193,7 +193,7 @@ public:
     assert(members.begin() != members.end());
 
     const DeclContext *origDC = (*members.begin())->getDeclContext();
-    auto *baseClass = origDC->getAsClassOrClassExtensionContext();
+    auto *baseClass = origDC->getSelfClassDecl();
 
     os << "@interface " << getNameForObjC(baseClass);
     maybePrintObjCGenericParameters(baseClass);
@@ -365,7 +365,7 @@ private:
     if (isEmptyExtensionDecl(ED))
       return;
 
-    auto baseClass = ED->getAsClassOrClassExtensionContext();
+    auto baseClass = ED->getSelfClassDecl();
 
     if (printAvailability(ED, PrintLeadingSpace::No))
       os << "\n";
@@ -656,9 +656,9 @@ private:
         // inherits from NSObject.
         if (selectorIsInit(selector) && !ctor->getOverriddenDecl()) {
           auto container = ctor->getDeclContext();
-          auto *classDecl = container->getAsClassOrClassExtensionContext();
+          auto *classDecl = container->getSelfClassDecl();
           if (!classDecl) {
-            assert(container->getAsProtocolOrProtocolExtensionContext());
+            assert(container->getSelfProtocolDecl());
           } else {
             while (classDecl->hasSuperclass()) {
               classDecl = classDecl->getSuperclassDecl();
@@ -932,9 +932,9 @@ private:
       renamedDecl = lookup.getSingleTypeResult();
     } else {
       SmallVector<ValueDecl *, 4> lookupResults;
-      declContext->lookupQualified(declContext->getSelfTypeInContext(),
-                                   renamedDeclName, NL_QualifiedDefault, NULL,
-                                   lookupResults);
+      declContext->lookupQualified(
+        declContext->getSelfNominalTypeDecl(),
+        renamedDeclName, NL_QualifiedDefault, lookupResults);
       for (auto candidate : lookupResults) {
         if (!shouldInclude(candidate))
           continue;
@@ -988,8 +988,7 @@ private:
     else
       os << "method";
     os << " '";
-    auto nominal =
-      VD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+    auto nominal = VD->getDeclContext()->getSelfNominalTypeDecl();
     printEncodedString(nominal->getName().str(), /*includeQuotes=*/false);
     os << ".";
     SmallString<32> scratch;
@@ -1028,17 +1027,40 @@ private:
     return true;
   }
 
+  /// Returns whether \p ty is the C type \c CFTypeRef, or some typealias
+  /// thereof.
   bool isCFTypeRef(Type ty) {
-    if (ID_CFTypeRef.empty())
-      ID_CFTypeRef = M.getASTContext().getIdentifier("CFTypeRef");
-
     const TypeAliasDecl *TAD = nullptr;
     while (auto aliasTy = dyn_cast<NameAliasType>(ty.getPointer())) {
       TAD = aliasTy->getDecl();
       ty = aliasTy->getSinglyDesugaredType();
     }
 
-    return TAD && TAD->getName() == ID_CFTypeRef && TAD->hasClangNode();
+    if (!TAD || !TAD->hasClangNode())
+      return false;
+
+    if (ID_CFTypeRef.empty())
+      ID_CFTypeRef = M.getASTContext().getIdentifier("CFTypeRef");
+    return TAD->getName() == ID_CFTypeRef;
+  }
+
+  /// Returns true if \p ty can be used with Objective-C reference-counting
+  /// annotations like \c strong and \c weak.
+  bool isObjCReferenceCountableObjectType(Type ty) {
+    if (auto classDecl = ty->getClassOrBoundGenericClass()) {
+      switch (classDecl->getForeignClassKind()) {
+      case ClassDecl::ForeignKind::Normal:
+      case ClassDecl::ForeignKind::RuntimeOnly:
+        return true;
+      case ClassDecl::ForeignKind::CFType:
+        return false;
+      }
+    }
+
+    if (ty->isObjCExistentialType() && !isCFTypeRef(ty))
+      return true;
+
+    return false;
   }
 
   void visitVarDecl(VarDecl *VD) {
@@ -1066,22 +1088,27 @@ private:
       os << ", readonly";
 
     // Print the ownership semantics, if relevant.
-    // We treat "unowned" as "assign" (even though it's more like
-    // "safe_unretained") because we want people to think twice about
-    // allowing that object to disappear.
     Type ty = VD->getInterfaceType();
-    if (auto weakTy = ty->getAs<WeakStorageType>()) {
-      auto innerTy = weakTy->getReferentType()->getOptionalObjectType();
-      auto innerClass = innerTy->getClassOrBoundGenericClass();
-      if ((innerClass &&
-           innerClass->getForeignClassKind()!=ClassDecl::ForeignKind::CFType) ||
-          (innerTy->isObjCExistentialType() && !isCFTypeRef(innerTy))) {
-        os << ", weak";
+    if (auto referenceStorageTy = ty->getAs<ReferenceStorageType>()) {
+      switch (referenceStorageTy->getOwnership()) {
+      case ReferenceOwnership::Strong:
+        llvm_unreachable("not represented with a ReferenceStorageType");
+      case ReferenceOwnership::Weak: {
+        auto innerTy =
+            referenceStorageTy->getReferentType()->getOptionalObjectType();
+        if (isObjCReferenceCountableObjectType(innerTy))
+          os << ", weak";
+        break;
       }
-    } else if (ty->is<UnownedStorageType>()) {
-      os << ", assign";
-    } else if (ty->is<UnmanagedStorageType>()) {
-      os << ", unsafe_unretained";
+      case ReferenceOwnership::Unowned:
+      case ReferenceOwnership::Unmanaged:
+        // We treat "unowned" as "unsafe_unretained" (even though it's more
+        // like "safe_unretained") because we want people to think twice about
+        // allowing that object to disappear. "unowned(unsafe)" (and
+        // Swift.Unmanaged, handled below) really are "unsafe_unretained".
+        os << ", unsafe_unretained";
+        break;
+      }
     } else {
       Type copyTy = ty;
       bool isOptional = false;
@@ -1118,10 +1145,7 @@ private:
         case FunctionTypeRepresentation::CFunctionPointer:
           break;
         }
-      } else if ((nominal && isa<ClassDecl>(nominal) &&
-                  cast<ClassDecl>(nominal)->getForeignClassKind() !=
-                    ClassDecl::ForeignKind::CFType) ||
-                 (copyTy->isObjCExistentialType() && !isCFTypeRef(copyTy))) {
+      } else if (isObjCReferenceCountableObjectType(copyTy)) {
         os << ", strong";
       }
     }
@@ -1524,12 +1548,8 @@ private:
 
   bool printImportedAlias(const TypeAliasDecl *alias,
                           Optional<OptionalTypeKind> optionalKind) {
-    if (!alias->hasClangNode()) {
-      if (!alias->isObjC()) return false;
-
-      os << alias->getName();
-      return true;
-    }
+    if (!alias->hasClangNode())
+      return false;
 
     if (auto *clangTypeDecl =
           dyn_cast<clang::TypeDecl>(alias->getClangDecl())) {
@@ -1561,7 +1581,7 @@ private:
     if (printImportedAlias(alias, optionalKind))
       return;
 
-    visitPart(alias->getUnderlyingTypeLoc().getType(), optionalKind);
+    visitPart(aliasTy->getSinglyDesugaredType(), optionalKind);
   }
 
   void maybePrintTagKeyword(const TypeDecl *NTD) {
@@ -1839,8 +1859,7 @@ private:
     assert(decl && "can't print canonicalized GenericTypeParamType");
 
     if (auto *extension = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
-      const ClassDecl *extendedClass =
-          extension->getAsClassOrClassExtensionContext();
+      const ClassDecl *extendedClass = extension->getSelfClassDecl();
       assert(extendedClass->isGeneric());
       assert(extension->getGenericParams()->size() ==
              extendedClass->getGenericParams()->size() &&
@@ -1890,7 +1909,7 @@ private:
     if (!FT->getParams().empty()) {
       interleave(FT->getParams(),
                  [this](const AnyFunctionType::Param &param) {
-                   print(param.getType(), OTK_None, param.getLabel(),
+                   print(param.getOldType(), OTK_None, param.getLabel(),
                          IsFunctionParam);
                  },
                  [this] { os << ", "; });
@@ -1995,7 +2014,10 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
   }
 
   void visitNameAliasType(NameAliasType *aliasTy) {
-    Callback(*this, aliasTy->getDecl());
+    if (aliasTy->getDecl()->hasClangNode())
+      Callback(*this, aliasTy->getDecl());
+    else
+      visit(aliasTy->getSinglyDesugaredType());
   }
 
   void visitParenType(ParenType *parenTy) {
@@ -2039,7 +2061,7 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
 
   void visitAnyFunctionType(AnyFunctionType *fnTy) {
     for (auto &param : fnTy->getParams())
-      visit(param.getType());
+      visit(param.getOldType());
     visit(fnTy->getResult());
   }
 
@@ -2314,9 +2336,8 @@ public:
         } else if (auto PD = dyn_cast<ProtocolDecl>(TD)) {
           forwardDeclare(PD);
         } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
-          (void)addImport(TD);
-          // Just in case, make sure the underlying type is visible too.
-          finder.visit(TAD->getUnderlyingTypeLoc().getType());
+          if (TAD->hasClangNode())
+            (void)addImport(TD);
         } else if (addImport(TD)) {
           return;
         } else if (auto ED = dyn_cast<EnumDecl>(TD)) {
@@ -2406,7 +2427,7 @@ public:
   bool writeExtension(const ExtensionDecl *ED) {
     bool allRequirementsSatisfied = true;
 
-    const ClassDecl *CD = ED->getAsClassOrClassExtensionContext();
+    const ClassDecl *CD = ED->getSelfClassDecl();
     allRequirementsSatisfied &= require(CD);
     for (auto proto : ED->getLocalProtocols())
       if (printer.shouldInclude(proto))
@@ -2658,15 +2679,6 @@ public:
     return import == importer->getImportedHeaderModule();
   }
 
-  static void getClangSubmoduleReversePath(SmallVectorImpl<StringRef> &path,
-                                           const clang::Module *module) {
-    // FIXME: This should be an API on clang::Module.
-    do {
-      path.push_back(module->Name);
-      module = module->Parent;
-    } while (module);
-  }
-
   static int compareImportModulesByName(const ImportModuleTy *left,
                                         const ImportModuleTy *right) {
     auto *leftSwiftModule = left->dyn_cast<ModuleDecl *>();
@@ -2696,10 +2708,10 @@ public:
     assert(rightClangModule->isSubModule() &&
            "top-level modules should use a normal swift::ModuleDecl");
 
-    SmallVector<StringRef, 8> leftReversePath;
-    SmallVector<StringRef, 8> rightReversePath;
-    getClangSubmoduleReversePath(leftReversePath, leftClangModule);
-    getClangSubmoduleReversePath(rightReversePath, rightClangModule);
+    SmallVector<StringRef, 8> leftReversePath(
+        ModuleDecl::ReverseFullNameIterator(leftClangModule), {});
+    SmallVector<StringRef, 8> rightReversePath(
+        ModuleDecl::ReverseFullNameIterator(rightClangModule), {});
 
     assert(leftReversePath != rightReversePath &&
            "distinct Clang modules should not have the same full name");
@@ -2738,11 +2750,7 @@ public:
         assert(clangModule->isSubModule() &&
                "top-level modules should use a normal swift::ModuleDecl");
         out << "@import ";
-        SmallVector<StringRef, 8> submoduleNames;
-        getClangSubmoduleReversePath(submoduleNames, clangModule);
-        interleave(submoduleNames.rbegin(), submoduleNames.rend(),
-                   [&out](StringRef next) { out << next; },
-                   [&out] { out << "."; });
+        ModuleDecl::ReverseFullNameIterator(clangModule).printForward(out);
         out << ";\n";
       }
     }
@@ -2768,7 +2776,7 @@ public:
         return !printer.shouldInclude(VD);
 
       if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-        auto baseClass = ED->getAsClassOrClassExtensionContext();
+        auto baseClass = ED->getSelfClassDecl();
         return !baseClass || !printer.shouldInclude(baseClass) ||
                baseClass->isForeign();
       }
@@ -2792,7 +2800,7 @@ public:
           return VD->getBaseName().userFacingName();
 
         if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-          auto baseClass = ED->getAsClassOrClassExtensionContext();
+          auto baseClass = ED->getSelfClassDecl();
           return baseClass->getName().str();
         }
         llvm_unreachable("unknown top-level ObjC decl");

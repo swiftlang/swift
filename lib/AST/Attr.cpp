@@ -28,11 +28,32 @@
 #include "llvm/ADT/StringSwitch.h"
 using namespace swift;
 
+#define DECL_ATTR(_, Id, ...) \
+  static_assert(IsTriviallyDestructible<Id##Attr>::value, \
+                "Attrs are BumpPtrAllocated; the destructor is never called");
+#include "swift/AST/Attr.def"
+static_assert(IsTriviallyDestructible<DeclAttributes>::value,
+              "DeclAttributes are BumpPtrAllocated; the d'tor is never called");
+static_assert(IsTriviallyDestructible<TypeAttributes>::value,
+              "TypeAttributes are BumpPtrAllocated; the d'tor is never called");
+
 
 // Only allow allocation of attributes using the allocator in ASTContext.
 void *AttributeBase::operator new(size_t Bytes, ASTContext &C,
                                   unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
+}
+
+StringRef swift::getAccessLevelSpelling(AccessLevel value) {
+  switch (value) {
+  case AccessLevel::Private: return "private";
+  case AccessLevel::FilePrivate: return "fileprivate";
+  case AccessLevel::Internal: return "internal";
+  case AccessLevel::Public: return "public";
+  case AccessLevel::Open: return "open";
+  }
+
+  llvm_unreachable("Unhandled AccessLevel in switch.");
 }
 
 /// Given a name like "autoclosure", return the type attribute ID that
@@ -191,6 +212,7 @@ void DeclAttributes::dump(const Decl *D) const {
 /// attribute (e.g., as @available(iOS 8.0, *). The presentation requires an
 /// introduction version and does not support deprecation, obsoletion, or
 /// messages.
+LLVM_READONLY
 static bool isShortAvailable(const DeclAttribute *DA) {
   auto *AvailAttr = dyn_cast<AvailableAttr>(DA);
   if (!AvailAttr)
@@ -211,9 +233,15 @@ static bool isShortAvailable(const DeclAttribute *DA) {
   if (!AvailAttr->Rename.empty())
     return false;
 
-  if (AvailAttr->PlatformAgnostic != PlatformAgnosticAvailabilityKind::None &&
-      !AvailAttr->isLanguageVersionSpecific())
+  switch (AvailAttr->PlatformAgnostic) {
+  case PlatformAgnosticAvailabilityKind::Deprecated:
+  case PlatformAgnosticAvailabilityKind::Unavailable:
+  case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
     return false;
+  case PlatformAgnosticAvailabilityKind::None:
+  case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
+    return true;
+  }
 
   return true;
 }
@@ -231,7 +259,7 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
   assert(!Attrs.empty());
 
   Printer << "@available(";
-  auto FirstAvail = dyn_cast<AvailableAttr>(Attrs[0]);
+  auto FirstAvail = cast<AvailableAttr>(Attrs.front());
   if (Attrs.size() == 1 &&
       FirstAvail->isLanguageVersionSpecific()) {
     assert(FirstAvail->Introduced.hasValue());
@@ -261,6 +289,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
 
   // Process attributes in passes.
   AttributeVector shortAvailableAttributes;
+  const DeclAttribute *swiftVersionAvailableAttribute = nullptr;
   AttributeVector longAttributes;
   AttributeVector attributes;
   AttributeVector modifiers;
@@ -274,6 +303,16 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     if (Options.excludeAttrKind(DA->getKind()))
       continue;
 
+    // Be careful not to coalesce `@available(swift 5)` with other short
+    // `available' attributes.
+    if (auto *availableAttr = dyn_cast<AvailableAttr>(DA)) {
+      if (availableAttr->isLanguageVersionSpecific() &&
+          isShortAvailable(availableAttr)) {
+        swiftVersionAvailableAttribute = availableAttr;
+        continue;
+      }
+    }
+
     AttributeVector &which = DA->isDeclModifier() ? modifiers :
                              isShortAvailable(DA) ? shortAvailableAttributes :
                              DA->isLongAttribute() ? longAttributes :
@@ -281,9 +320,10 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
     which.push_back(DA);
   }
 
-  if (!shortAvailableAttributes.empty()) {
+  if (swiftVersionAvailableAttribute)
+    printShortFormAvailable(swiftVersionAvailableAttribute, Printer, Options);
+  if (!shortAvailableAttributes.empty())
     printShortFormAvailable(shortAvailableAttributes, Printer, Options);
-  }
 
   for (auto DA : longAttributes)
     DA->print(Printer, Options, D);
@@ -598,31 +638,21 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_Effects:
     switch (cast<EffectsAttr>(this)->getKind()) {
       case EffectsKind::ReadNone:
-        return "effects(readnone)";
+        return "_effects(readnone)";
       case EffectsKind::ReadOnly:
-        return "effects(readonly)";
+        return "_effects(readonly)";
       case EffectsKind::ReleaseNone:
-        return "effects(releasenone)";
+        return "_effects(releasenone)";
       case EffectsKind::ReadWrite:
-        return "effects(readwrite)";
+        return "_effects(readwrite)";
       case EffectsKind::Unspecified:
-        return "effects(unspecified)";
+        return "_effects(unspecified)";
     }
   case DAK_AccessControl:
-  case DAK_SetterAccess:
-    switch (cast<AbstractAccessControlAttr>(this)->getAccess()) {
-    case AccessLevel::Private:
-      return "private";
-    case AccessLevel::FilePrivate:
-      return "fileprivate";
-    case AccessLevel::Internal:
-      return "internal";
-    case AccessLevel::Public:
-      return "public";
-    case AccessLevel::Open:
-      return "open";
-    }
-    llvm_unreachable("bad access level");
+  case DAK_SetterAccess: {
+    AccessLevel access = cast<AbstractAccessControlAttr>(this)->getAccess();
+    return getAccessLevelSpelling(access);
+  }
 
   case DAK_ReferenceOwnership:
     return keywordOf(cast<ReferenceOwnershipAttr>(this)->get());
