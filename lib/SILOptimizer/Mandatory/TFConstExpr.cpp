@@ -1020,8 +1020,8 @@ SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
 ///   * `addr` points at uninitialized memory;
 ///   * there are store(s) to `addr` that, taken together, set the memory
 ///     exactly once (e.g. a single "store" to `addr` OR multiple "store"s to
-///     different "tuple_element_addr"s of `addr`);
-///   * the stores' value(s) can be const-evaluated; and
+///     different "tuple_element_addr"s of `addr`); and
+///   * the stores' value(s) can be const-evaluated;
 /// Then: initializes the memory at `addr` and returns {true, None}.
 ///
 /// Otherwise, sets the memory at `addr` to an unspecified value and returns
