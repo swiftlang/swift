@@ -3166,6 +3166,63 @@ public:
     return false;
   }
 
+  // Utility class that can collect information about the type of an
+  // argument in an apply.
+  //
+  // For example, when given a type variable type that represents the
+  // argument of a function call, it will walk the constraint graph
+  // finding any concrete types that are reachable through various
+  // subtype constraints and will also collect all the literal types
+  // conformed to by the types it finds on the walk.
+  //
+  // This makes it possible to get an idea of the kinds of literals
+  // and types of arguments that are used in the subexpression rooted
+  // in this argument, which we can then use to make better choices
+  // for how we partition the operators in a disjunction (in order to
+  // avoid visiting all the options).
+  class ArgumentInfoCollector {
+    ConstraintSystem &CS;
+    llvm::SetVector<Type> Types;
+    llvm::SetVector<ProtocolDecl *> LiteralProtocols;
+
+    void addType(Type ty) {
+      assert(!ty->is<TypeVariableType>());
+      Types.insert(ty);
+    }
+
+    void addLiteralProtocol(ProtocolDecl *proto) {
+      LiteralProtocols.insert(proto);
+    }
+
+    void walk(Type argType);
+    void minimizeLiteralProtocols();
+
+  public:
+    ArgumentInfoCollector(ConstraintSystem &cs, FunctionType *fnTy) : CS(cs) {
+      walk(fnTy->getParams()[0].getPlainType());
+      if (fnTy->getParams().size() > 1)
+        walk(fnTy->getParams()[1].getPlainType());
+
+      minimizeLiteralProtocols();
+    }
+
+    ArgumentInfoCollector(ConstraintSystem &cs, AnyFunctionType::Param param)
+        : CS(cs) {
+      walk(param.getPlainType());
+      minimizeLiteralProtocols();
+    }
+
+    const llvm::SetVector<Type> &getTypes() const { return Types; }
+    const llvm::SetVector<ProtocolDecl *> &getLiteralProtocols() const {
+      return LiteralProtocols;
+    }
+
+    LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                              "only for use within the debugger");
+  };
+
+  bool haveTypeInformationForAllArguments(AnyFunctionType *fnType);
+
   // Partition the choices in the disjunction into groups that we will
   // iterate over in an order appropriate to attempt to stop before we
   // have to visit all of the options.

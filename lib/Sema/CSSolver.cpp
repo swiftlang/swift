@@ -1361,27 +1361,34 @@ static Constraint *selectBestBindingDisjunction(
   return firstBindDisjunction;
 }
 
-// For a given type, determine if it's either a concrete type, the
-// result of converting from a concrete type, or a type variable known
-// to conform to other types (or the result of converting from such a
-// type variable).
-static bool havePotentialTypesOrLiteralConformances(Type ty,
-                                                    ConstraintSystem &cs) {
+// For a given type, collect any concrete types or literal
+// conformances we can reach by walking the constraint graph starting
+// from this point.
+//
+// For example, if the type is a type variable, we'll walk back
+// through the constraints mentioning this type variable and find what
+// types are converted to this type along with what literals are
+// conformed-to by this type.
+void ConstraintSystem::ArgumentInfoCollector::walk(Type argType) {
   llvm::SmallSet<TypeVariableType *, 4> visited;
   llvm::SmallVector<Type, 4> worklist;
-  worklist.push_back(ty);
+  worklist.push_back(argType);
 
   while (!worklist.empty()) {
     auto itemTy = worklist.pop_back_val()->getRValueType();
 
-    if (!itemTy->is<TypeVariableType>())
-      return true;
+    if (!itemTy->is<TypeVariableType>()) {
+      addType(itemTy);
+      continue;
+    }
 
     auto tyvar = itemTy->castTo<TypeVariableType>();
-    if (cs.getFixedType(tyvar))
-      return true;
+    if (auto fixedTy = CS.getFixedType(tyvar)) {
+      addType(fixedTy);
+      continue;
+    }
 
-    auto *rep = cs.getRepresentative(tyvar);
+    auto *rep = CS.getRepresentative(tyvar);
 
     // FIXME: This can happen when we have two type variables that are
     // subtypes of each other. We would ideally merge those type
@@ -1391,22 +1398,15 @@ static bool havePotentialTypesOrLiteralConformances(Type ty,
 
     visited.insert(rep);
 
-    // Gather all the constraints involving this type variable, and
-    // then attempt to trace back through each constraint to see if we
-    // can reach a concrete type or a literal.
-
     llvm::SetVector<Constraint *> constraints;
-    cs.getConstraintGraph().gatherConstraints(
+    CS.getConstraintGraph().gatherConstraints(
         rep, constraints, ConstraintGraph::GatheringKind::EquivalenceClass);
 
     for (auto *constraint : constraints) {
       switch (constraint->getKind()) {
       case ConstraintKind::LiteralConformsTo:
-        return true;
-
-      case ConstraintKind::Defaultable:
-        assert(!constraint->getSecondType()->is<TypeVariableType>());
-        return true;
+        addLiteralProtocol(constraint->getProtocol());
+        break;
 
       case ConstraintKind::Bind:
       case ConstraintKind::Equal: {
@@ -1414,15 +1414,15 @@ static bool havePotentialTypesOrLiteralConformances(Type ty,
         auto secondTy = constraint->getSecondType();
         if (firstTy->is<TypeVariableType>()) {
           auto otherRep =
-            cs.getRepresentative(firstTy->castTo<TypeVariableType>());
+              CS.getRepresentative(firstTy->castTo<TypeVariableType>());
           if (otherRep->isEqual(rep))
             worklist.push_back(secondTy);
         }
         if (secondTy->is<TypeVariableType>()) {
           auto otherRep =
-              cs.getRepresentative(secondTy->castTo<TypeVariableType>());
+              CS.getRepresentative(secondTy->castTo<TypeVariableType>());
           if (otherRep->isEqual(rep))
-            worklist.push_back(constraint->getFirstType());
+            worklist.push_back(firstTy);
         }
         break;
       }
@@ -1436,7 +1436,7 @@ static bool havePotentialTypesOrLiteralConformances(Type ty,
         auto secondTy = constraint->getSecondType();
         if (secondTy->is<TypeVariableType>()) {
           auto otherRep =
-              cs.getRepresentative(secondTy->castTo<TypeVariableType>());
+              CS.getRepresentative(secondTy->castTo<TypeVariableType>());
           if (otherRep->isEqual(rep))
             worklist.push_back(constraint->getFirstType());
         }
@@ -1448,7 +1448,7 @@ static bool havePotentialTypesOrLiteralConformances(Type ty,
         auto firstTy = constraint->getFirstType();
         if (firstTy->is<TypeVariableType>()) {
           auto otherRep =
-              cs.getRepresentative(firstTy->castTo<TypeVariableType>());
+              CS.getRepresentative(firstTy->castTo<TypeVariableType>());
           if (otherRep->isEqual(rep))
             worklist.push_back(constraint->getSecondType());
         }
@@ -1460,7 +1460,7 @@ static bool havePotentialTypesOrLiteralConformances(Type ty,
         auto secondTy = constraint->getSecondType();
         if (secondTy->is<TypeVariableType>()) {
           auto otherRep =
-              cs.getRepresentative(secondTy->castTo<TypeVariableType>());
+              CS.getRepresentative(secondTy->castTo<TypeVariableType>());
           if (otherRep->isEqual(rep)) {
             // See if we can actually determine what the underlying
             // type is.
@@ -1469,8 +1469,7 @@ static bool havePotentialTypesOrLiteralConformances(Type ty,
             if (!firstTy->is<TypeVariableType>()) {
               fixedTy = firstTy;
             } else {
-              fixedTy =
-                cs.getFixedType(firstTy->castTo<TypeVariableType>());
+              fixedTy = CS.getFixedType(firstTy->castTo<TypeVariableType>());
             }
             if (fixedTy && fixedTy->getOptionalObjectType())
               worklist.push_back(fixedTy->getOptionalObjectType());
@@ -1484,7 +1483,7 @@ static bool havePotentialTypesOrLiteralConformances(Type ty,
         auto firstTy = constraint->getFirstType();
         if (firstTy->is<TypeVariableType>()) {
           auto otherRep =
-              cs.getRepresentative(firstTy->castTo<TypeVariableType>());
+              CS.getRepresentative(firstTy->castTo<TypeVariableType>());
           if (otherRep->isEqual(rep))
             worklist.push_back(constraint->getThirdType());
         }
@@ -1503,21 +1502,66 @@ static bool havePotentialTypesOrLiteralConformances(Type ty,
       case ConstraintKind::FunctionResult:
       case ConstraintKind::SelfObjectOfProtocol:
       case ConstraintKind::ConformsTo:
+      case ConstraintKind::Defaultable:
         break;
       }
     }
   }
+}
 
-  return false;
+void ConstraintSystem::ArgumentInfoCollector::minimizeLiteralProtocols() {
+  if (LiteralProtocols.size() <= 1)
+    return;
+
+  llvm::SmallVector<Type, 2> defaultTypes;
+  for (auto *protocol : LiteralProtocols)
+    defaultTypes.push_back(CS.TC.getDefaultType(protocol, CS.DC));
+
+  auto result = 0;
+  for (unsigned long i = 1; i < LiteralProtocols.size(); ++i) {
+    auto first =
+        CS.TC.conformsToProtocol(defaultTypes[i], LiteralProtocols[result],
+                                 CS.DC, ConformanceCheckFlags::InExpression);
+    auto second =
+        CS.TC.conformsToProtocol(defaultTypes[result], LiteralProtocols[i],
+                                 CS.DC, ConformanceCheckFlags::InExpression);
+    if ((first && second) || (!first && !second))
+      return;
+
+    if (first)
+      result = i;
+  }
+
+  auto *protocol = LiteralProtocols[result];
+  LiteralProtocols.clear();
+  LiteralProtocols.insert(protocol);
+}
+
+void ConstraintSystem::ArgumentInfoCollector::dump() const {
+  auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+  log << "types:\n";
+  for (auto type : Types)
+    type->print(log);
+  log << "\n";
+
+  log << "literal protocols:\n";
+  for (auto *proto : LiteralProtocols)
+    proto->print(log);
+  log << "\n";
 }
 
 // Check to see if we know something about the types of all arguments
 // in the given function type.
-static bool haveTypeInformationForAllArguments(AnyFunctionType *fnType,
-                                               ConstraintSystem &cs) {
-  return llvm::all_of(fnType->getParams(), [&](AnyFunctionType::Param param) {
-    return havePotentialTypesOrLiteralConformances(param.getPlainType(), cs);
-  });
+bool ConstraintSystem::haveTypeInformationForAllArguments(
+    AnyFunctionType *fnType) {
+  llvm::SetVector<Constraint *> literalConformsTo;
+  return llvm::all_of(fnType->getParams(),
+                      [&](AnyFunctionType::Param param) -> bool {
+                        ArgumentInfoCollector argInfo(*this, param);
+                        return argInfo.getTypes().size() +
+                                   argInfo.getLiteralProtocols().size() >
+                               0;
+                      });
 }
 
 // Given a type variable representing the RHS of an ApplicableFunction
@@ -1557,7 +1601,7 @@ Constraint *ConstraintSystem::selectApplyDisjunction() {
 
     auto *applicable = &constraint;
     if (haveTypeInformationForAllArguments(
-            applicable->getFirstType()->castTo<AnyFunctionType>(), *this)) {
+            applicable->getFirstType()->castTo<AnyFunctionType>())) {
       auto *tyvar = applicable->getSecondType()->castTo<TypeVariableType>();
 
       // If we have created the disjunction for this apply, find it.
