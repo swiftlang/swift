@@ -4686,9 +4686,9 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
   auto result = _getTypeByMangledName(mangledName,
                                       [](unsigned, unsigned){ return nullptr; });
   if (metadata != result)
-    swift::warning(RuntimeErrorFlagNone,
-                   "Metadata mangled name failed to roundtrip: %p -> %s -> %p\n",
-                   metadata, mangledName.c_str(), (const Metadata *)result);
+    swift::fatalError(RuntimeErrorFlagNone,
+                      "Metadata mangled name failed to roundtrip: %p -> %s -> %p\n",
+                      metadata, mangledName.c_str(), (const Metadata *)result);
 }
 #endif
 
