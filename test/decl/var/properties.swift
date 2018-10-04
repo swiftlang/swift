@@ -850,7 +850,7 @@ struct WillSetDidSetDisambiguate3 {
 }
 
 protocol ProtocolGetSet1 {
-  var a: Int // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} //{{13-13= { get <#set#> \}}}
+  var a: Int // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{13-13= { get <#set#> \}}}
 }
 protocol ProtocolGetSet2 {
   var a: Int {} // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-16={ get <#set#> \}}}
