@@ -340,13 +340,17 @@ internal func _isValidAddress(_ address: UInt) -> Bool {
 // TODO(<rdar://problem/34837023>): Get rid of superfluous UInt constructor
 // calls
 @inlinable
-internal var _objCTaggedPointerBits: UInt {
+internal var _bridgeObjectTaggedPointerBits: UInt {
   @inline(__always) get { return UInt(_swift_BridgeObject_TaggedPointerBits) }
+}
+@inlinable
+internal var _objCTaggedPointerBits: UInt {
+  @inline(__always) get { return UInt(_swift_abi_ObjCReservedBitsMask) }
 }
 @inlinable
 internal var _objectPointerSpareBits: UInt {
     @inline(__always) get {
-      return UInt(_swift_abi_SwiftSpareBitsMask) & ~_objCTaggedPointerBits
+      return UInt(_swift_abi_SwiftSpareBitsMask) & ~_bridgeObjectTaggedPointerBits
     }
 }
 @inlinable
@@ -400,12 +404,12 @@ internal func _isObjCTaggedPointer(_ x: UInt) -> Bool {
 
 @inlinable @inline(__always) public // FIXME
 func _isTaggedObject(_ x: Builtin.BridgeObject) -> Bool {
-  return _bitPattern(x) & _objCTaggedPointerBits != 0
+  return _bitPattern(x) & _bridgeObjectTaggedPointerBits != 0
 }
 @inlinable @inline(__always) public // FIXME
 func _isNativePointer(_ x: Builtin.BridgeObject) -> Bool {
   return (
-    _bitPattern(x) & (_objCTaggedPointerBits | _objectPointerIsObjCBit)
+    _bitPattern(x) & (_bridgeObjectTaggedPointerBits | _objectPointerIsObjCBit)
   ) == 0
 }
 @inlinable @inline(__always) public // FIXME
@@ -418,7 +422,7 @@ func _isNonTaggedObjCPointer(_ x: Builtin.BridgeObject) -> Bool {
 func _getNonTagBits(_ x: Builtin.BridgeObject) -> UInt {
   // Zero out the tag bits, and leave them all at the top.
   _sanityCheck(_isTaggedObject(x), "not tagged!")
-  return (_bitPattern(x) & ~_objCTaggedPointerBits)
+  return (_bitPattern(x) & ~_bridgeObjectTaggedPointerBits)
     >> _objectPointerLowSpareBitShift
 }
 
@@ -446,7 +450,7 @@ public func _bridgeObject(
 @inline(__always)
 @inlinable
 public func _bridgeObject(fromTagged x: UInt) -> Builtin.BridgeObject {
-  _sanityCheck(x & _objCTaggedPointerBits != 0)
+  _sanityCheck(x & _bridgeObjectTaggedPointerBits != 0)
   let object: Builtin.BridgeObject = Builtin.valueToBridgeObject(x)
   _sanityCheck(_isTaggedObject(object))
   return object
@@ -458,9 +462,9 @@ public func _bridgeObject(taggingPayload x: UInt) -> Builtin.BridgeObject {
   let shifted = x &<< _objectPointerLowSpareBitShift
   _sanityCheck(x == (shifted &>> _objectPointerLowSpareBitShift),
     "out-of-range: limited bit range requires some zero top bits")
-  _sanityCheck(shifted & _objCTaggedPointerBits == 0,
+  _sanityCheck(shifted & _bridgeObjectTaggedPointerBits == 0,
     "out-of-range: post-shift use of tag bits")
-  return _bridgeObject(fromTagged: shifted | _objCTaggedPointerBits)
+  return _bridgeObject(fromTagged: shifted | _bridgeObjectTaggedPointerBits)
 }
 
 // BridgeObject -> Values
@@ -485,7 +489,7 @@ public func _bridgeObject(
 public func _bridgeObject(toTagged x: Builtin.BridgeObject) -> UInt {
   _sanityCheck(_isTaggedObject(x))
   let bits = _bitPattern(x)
-  _sanityCheck(bits & _objCTaggedPointerBits != 0)
+  _sanityCheck(bits & _bridgeObjectTaggedPointerBits != 0)
   return bits
 }
 @inline(__always)

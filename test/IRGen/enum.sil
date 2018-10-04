@@ -1,6 +1,6 @@
 // #if directives don't work with SIL keywords, therefore please put ObjC tests
 // in `enum_objc.sil`.
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -enable-objc-interop  | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-objc --check-prefix=CHECK-objc-%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -enable-objc-interop  | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-objc --check-prefix=CHECK-objc-%target-ptrsize --check-prefix=CHECK-objc-%target-ptrsize-simulator-%target-is-simulator
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -disable-objc-interop | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-native --check-prefix=CHECK-native-%target-ptrsize
 
 // REQUIRES: CPU=i386 || CPU=x86_64
@@ -1134,8 +1134,10 @@ enum SinglePayloadClass {
 // CHECK-64: entry:
 // CHECK-64:   switch i64 %0, label {{%.*}} [
 // CHECK-64:     i64 0, label {{%.*}}
-// CHECK-objc-64:   i64 2, label {{%.*}}
-// CHECK-objc-64:   i64 4, label {{%.*}}
+// CHECK-objc-64-simulator-false:   i64 2, label {{%.*}}
+// CHECK-objc-64-simulator-false:   i64 4, label {{%.*}}
+// CHECK-objc-64-simulator-true:   i64 1, label {{%.*}}
+// CHECK-objc-64-simulator-true:   i64 2, label {{%.*}}
 // CHECK-native-64: i64 1, label {{%.*}}
 // CHECK-native-64: i64 2, label {{%.*}}
 // CHECK-64:   ]
@@ -1179,8 +1181,10 @@ enum SinglePayloadClassProtocol {
 // CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_class_protocol_switch(i64, i64) {{.*}} {
 // CHECK-64:   switch i64 %0, label {{%.*}} [
 // CHECK-64:     i64 0, label {{%.*}}
-// CHECK-objc-64:     i64 2, label {{%.*}}
-// CHECK-objc-64:     i64 4, label {{%.*}}
+// CHECK-objc-64-simulator-false:     i64 2, label {{%.*}}
+// CHECK-objc-64-simulator-false:     i64 4, label {{%.*}}
+// CHECK-objc-64-simulator-true:     i64 1, label {{%.*}}
+// CHECK-objc-64-simulator-true:     i64 2, label {{%.*}}
 // CHECK-native-64:   i64 1, label {{%.*}}
 // CHECK-native-64:   i64 2, label {{%.*}}
 // CHECK-64:   ]
@@ -2457,7 +2461,8 @@ entry(%0 : $DynamicSingleton<NoPayloads>):
 // Check that payloads get properly masked in nested single-payload enums.
 // rdar://problem/18841262
 // CHECK-64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @optional_optional_class_protocol(i64, i64)
-// CHECK-objc-64:       icmp eq i64 %0, 2
+// CHECK-objc-64-simulator-false:       icmp eq i64 %0, 2
+// CHECK-objc-64-simulator-true:       icmp eq i64 %0, 1
 // CHECK-native-64:     icmp eq i64 %0, 1
 // CHECK-32-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @optional_optional_class_protocol(i32, i32)
 // CHECK-32:         icmp eq i32 %0, 1

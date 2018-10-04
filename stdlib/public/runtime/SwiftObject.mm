@@ -489,10 +489,11 @@ _objcClassUsesNativeSwiftReferenceCounting(const Metadata *theClass) {
 #endif
 }
 
-// The non-pointer bits, excluding the ObjC tag bits.
+// The non-pointer bits, excluding the tag bits.
 static auto const unTaggedNonNativeBridgeObjectBits
   = heap_object_abi::SwiftSpareBitsMask
-  & ~heap_object_abi::ObjCReservedBitsMask;
+  & ~heap_object_abi::ObjCReservedBitsMask
+  & ~heap_object_abi::BridgeObjectTagBitsMask;
 
 #if SWIFT_OBJC_INTEROP
 
@@ -579,7 +580,7 @@ static bool isNonNative_unTagged_bridgeObject(void *object) {
   static_assert((heap_object_abi::SwiftSpareBitsMask & objectPointerIsObjCBit) ==
                 objectPointerIsObjCBit,
                 "isObjC bit not within spare bits");
-  return (uintptr_t(object) & objectPointerIsObjCBit) != 0;
+  return (uintptr_t(object) & objectPointerIsObjCBit) != 0 && (uintptr_t(object) & heap_object_abi::BridgeObjectTagBitsMask) == 0;
 }
 #endif
 
