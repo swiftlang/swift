@@ -1,6 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+
 // RUN: %target-swift-frontend  -I %t -emit-ir -enable-resilience %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+
+// RUN: %target-swift-frontend  -I %t -emit-ir -enable-resilience %s -read-type-info-path=%S/Inputs/legacy_type_info/a.yaml | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+
 // RUN: %target-swift-frontend  -I %t -emit-ir -enable-resilience -O %s
 
 // We only use fragile class layouts when Objective-C interop is enabled.
@@ -78,6 +82,20 @@ sil_vtable ClassWithResilientEnum {}
 // Field offsets are statically known:
 // CHECK-LABEL: @"$s31completely_fragile_class_layout22ClassWithResilientEnumC5firstAA0hfG7PayloadOvpWvd" = hidden constant i64 16, align 8
 // CHECK-LABEL: @"$s31completely_fragile_class_layout22ClassWithResilientEnumC6seconds4Int8VvpWvd" = hidden constant i64 25, align 8
+
+
+// Make sure extra inhabitants work when reading a legacy layout -- the
+// Optional<ResilientRef> should be 8 bytes in size, not 9
+public class ClassWithResilientRef {
+  var first: ResilientRef?
+  var second: Int
+}
+
+sil_vtable ClassWithResilientRef {}
+
+// Field offsets are statically known:
+// CHECK-LABEL: @"$s31completely_fragile_class_layout21ClassWithResilientRefC5first16resilient_struct0gH0VSgvpWvd" = hidden constant i64 16, align 8
+// CHECK-LABEL: @"$s31completely_fragile_class_layout21ClassWithResilientRefC6secondSivpWvd" = hidden constant i64 24, align 8
 
 
 // When allocating a class with resiliently-sized fields, we must still load

@@ -100,5 +100,6 @@ template <> struct MappingTraits<swift::irgen::YAMLModuleNode> {
 } // namespace llvm
 
 LLVM_YAML_IS_SEQUENCE_VECTOR(swift::irgen::YAMLTypeInfoNode);
+LLVM_YAML_IS_DOCUMENT_LIST_VECTOR(swift::irgen::YAMLModuleNode);
 
 #endif // SWIFT_IRGEN_LEGACY_LAYOUT_FORMAT_H

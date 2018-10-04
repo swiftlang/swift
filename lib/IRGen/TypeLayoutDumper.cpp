@@ -163,7 +163,7 @@ bool swift::performDumpTypeInfo(IRGenOptions &Opts,
   IRGenModule IGM(IRGen, IRGen.createTargetMachine(), LLVMContext);
 
   // We want to bypass resilience.
-  CompletelyFragileScope scope(IGM);
+  LoweringModeScope scope(IGM, TypeConverter::Mode::CompletelyFragile);
 
   auto *Mod = SILMod.getSwiftModule();
   SmallVector<Decl *, 16> AllDecls;

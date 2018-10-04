@@ -1788,7 +1788,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     // FIXME: Once lldb can make use of remote mirrors to calculate layouts
     // at runtime, this should be removed.
     {
-      CompletelyFragileScope Scope(*this);
+      LoweringModeScope Scope(*this, TypeConverter::Mode::CompletelyFragile);
 
       SILType loweredTy = var->getLoweredType();
       auto &nonResilientTI = cast<FixedTypeInfo>(getTypeInfo(loweredTy));
@@ -3602,7 +3602,7 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
 ///   of stored properties
 bool IRGenModule::isResilient(NominalTypeDecl *D, ResilienceExpansion expansion) {
   if (expansion == ResilienceExpansion::Maximal &&
-      Types.isCompletelyFragile()) {
+      Types.getLoweringMode() == TypeConverter::Mode::CompletelyFragile) {
     return false;
   }
   return D->isResilient(getSwiftModule(), expansion);
@@ -3621,7 +3621,7 @@ IRGenModule::getResilienceExpansionForAccess(NominalTypeDecl *decl) {
 // layout. Calling isResilient() with this scope will always return false.
 ResilienceExpansion
 IRGenModule::getResilienceExpansionForLayout(NominalTypeDecl *decl) {
-  if (Types.isCompletelyFragile())
+  if (Types.getLoweringMode() == TypeConverter::Mode::CompletelyFragile)
     return ResilienceExpansion::Minimal;
 
   if (isResilient(decl, ResilienceExpansion::Minimal))

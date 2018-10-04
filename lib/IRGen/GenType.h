@@ -22,8 +22,10 @@
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/ilist_node.h"
+#include "llvm/ADT/StringMap.h"
 #include "IRGenModule.h"
 #include "IRGenFunction.h"
+#include "LegacyLayoutFormat.h"
 
 namespace swift {
   class GenericSignatureBuilder;
@@ -60,9 +62,31 @@ namespace irgen {
 /// The helper class for generating types.
 class TypeConverter {
 public:
+  enum class Mode : unsigned {
+    /// Normal type lowering mode where resilient types are opaque.
+    Normal,
+
+    /// Used for computing backward deployment class layouts, where we emit a
+    /// static class metadata layout using known sizes and alignments of any
+    /// resiliently-typed fields from a previous Swift version. On newer Swift
+    /// versions we use a runtime mechanism to re-initialize the class metadata
+    /// in-place with the current known layout.
+    Legacy,
+
+    /// A temporary hack for lldb where all resilient types are transparent and
+    /// treated like fixed-size (but still lowered in a way that matches the
+    /// runtime layout produced for resilient types, which is important for some
+    /// types like enums where enabling resilience changes the layout).
+    CompletelyFragile
+
+    /// When adding or removing fields, remember to update NumLoweringModes below.
+  };
+
+  static unsigned const NumLoweringModes = 3;
+
   IRGenModule &IGM;
 private:
-  bool CompletelyFragile = false;
+  Mode LoweringMode = Mode::Normal;
 
   llvm::DenseMap<ProtocolDecl*, std::unique_ptr<const ProtocolInfo>> Protocols;
   const TypeInfo *FirstType;
@@ -88,6 +112,9 @@ private:
     PODBoxTI;
   const LoadableTypeInfo *SwiftRetainablePointerBoxTI = nullptr,
                          *UnknownObjectRetainablePointerBoxTI = nullptr;
+
+  llvm::StringMap<YAMLTypeInfoNode> LegacyTypeInfos;
+  llvm::DenseMap<NominalTypeDecl *, std::string> DeclMangledNames;
 
   const LoadableTypeInfo *createPrimitive(llvm::Type *T,
                                           Size size, Alignment align);
@@ -127,8 +154,8 @@ public:
   TypeConverter(IRGenModule &IGM);
   ~TypeConverter();
 
-  bool isCompletelyFragile() const {
-    return CompletelyFragile;
+  Mode getLoweringMode() const {
+    return LoweringMode;
   }
 
   const TypeInfo *getTypeEntry(CanType type);
@@ -160,18 +187,24 @@ public:
   /// Exit a generic context.
   void popGenericContext(CanGenericSignature signature);
 
-  /// Enter a scope where all types are lowered bypassing resilience.
-  void pushCompletelyFragile();
-
-  /// Exit a completely fragile scope.
-  void popCompletelyFragile();
-
   /// Retrieve the generic environment for the current generic context.
   ///
   /// Fails if there is no generic context.
   GenericEnvironment *getGenericEnvironment();
 
 private:
+  friend class LoweringModeScope;
+
+  void setLoweringMode(Mode mode) {
+    LoweringMode = mode;
+  }
+
+  /// Read a YAML legacy type layout dump. Returns false on success, true on
+  /// error.
+  bool readLegacyTypeInfo(StringRef path);
+
+  Optional<YAMLTypeInfoNode> getLegacyTypeInfo(NominalTypeDecl *decl) const;
+
   // Debugging aids.
 #ifndef NDEBUG
   bool isExemplarArchetype(ArchetypeType *arch) const;
@@ -181,14 +214,12 @@ private:
   CanType getExemplarType(CanType t);
   
   class Types_t {
-    llvm::DenseMap<TypeBase *, const TypeInfo *> IndependentCache;
-    llvm::DenseMap<TypeBase *, const TypeInfo *> DependentCache;
-    llvm::DenseMap<TypeBase *, const TypeInfo *> FragileIndependentCache;
-    llvm::DenseMap<TypeBase *, const TypeInfo *> FragileDependentCache;
+    llvm::DenseMap<TypeBase *, const TypeInfo *> IndependentCache[NumLoweringModes];
+    llvm::DenseMap<TypeBase *, const TypeInfo *> DependentCache[NumLoweringModes];
 
   public:
     llvm::DenseMap<TypeBase *, const TypeInfo *> &getCacheFor(bool isDependent,
-                                                              bool completelyFragile);
+                                                              Mode mode);
   };
   Types_t Types;
 };
@@ -215,22 +246,21 @@ public:
 };
 
 /// An RAII interface for forcing types to be lowered bypassing resilience.
-class CompletelyFragileScope {
-  bool State;
+class LoweringModeScope {
+  TypeConverter::Mode OldLoweringMode;
   TypeConverter &TC;
 public:
-  explicit CompletelyFragileScope(TypeConverter &TC) : TC(TC) {
-    State = TC.isCompletelyFragile();
-    if (!State)
-      TC.pushCompletelyFragile();
+  LoweringModeScope(TypeConverter &TC, TypeConverter::Mode LoweringMode)
+      : TC(TC) {
+    OldLoweringMode = TC.getLoweringMode();
+    TC.setLoweringMode(LoweringMode);
   }
 
-  CompletelyFragileScope(IRGenModule &IGM)
-    : CompletelyFragileScope(IGM.Types) {}
+  LoweringModeScope(IRGenModule &IGM, TypeConverter::Mode LoweringMode)
+      : LoweringModeScope(IGM.Types, LoweringMode) {}
 
-  ~CompletelyFragileScope() {
-    if (!State)
-      TC.popCompletelyFragile();
+  ~LoweringModeScope() {
+    TC.setLoweringMode(OldLoweringMode);
   }
 };
 

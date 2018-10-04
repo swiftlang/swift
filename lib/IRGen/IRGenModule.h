@@ -792,7 +792,7 @@ private:
                  std::unique_ptr<const ConformanceInfo>> Conformances;
 
   friend class GenericContextScope;
-  friend class CompletelyFragileScope;
+  friend class LoweringModeScope;
   
 //--- Globals ---------------------------------------------------------------
 public:

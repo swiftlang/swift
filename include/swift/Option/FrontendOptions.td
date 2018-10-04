@@ -497,6 +497,9 @@ def enable_class_resilience : Flag<["-"], "enable-class-resilience">,
 def enable_resilience_bypass : Flag<["-"], "enable-resilience-bypass">,
    HelpText<"Completely bypass resilience when accessing types in resilient frameworks">;
 
+def read_type_info_path_EQ : Joined<["-"], "read-type-info-path=">,
+  HelpText<"Read legacy type layout from the given path">;
+
 def group_info_path : Separate<["-"], "group-info-path">,
   HelpText<"The path to collect the group information of the compiled module">;
 
