@@ -163,8 +163,8 @@ internal struct _HasherTailBuffer {
 // rdar://problem/38549901
 @usableFromInline @_fixed_layout
 internal struct _BufferingHasher<RawCore: _HasherCore> {
-  private var _buffer: _HasherTailBuffer
   private var _core: RawCore
+  private var _buffer: _HasherTailBuffer
 
   @inline(__always)
   internal init(core: RawCore) {
