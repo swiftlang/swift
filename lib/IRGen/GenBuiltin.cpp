@@ -393,7 +393,13 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     llvm::Value *v = IGF.Builder.CreateFSub(lhs, rhs);
     return out.add(v);
   }
-  
+  if (Builtin.ID == BuiltinValueKind::AssumeTrue) {
+    llvm::Value *v = args.claimNext();
+    if (v->getType() == IGF.IGM.Int1Ty) {
+      IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::assume, v);
+    }
+    return;
+  }
   if (Builtin.ID == BuiltinValueKind::AssumeNonNegative) {
     llvm::Value *v = args.claimNext();
     // Set a value range on the load instruction, which must be the argument of

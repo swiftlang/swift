@@ -652,6 +652,12 @@ func isUnique(_ ref: inout Builtin.BridgeObject) -> Bool {
   return Builtin.isUnique(&ref)
 }
 
+// CHECK-LABEL: define hidden{{.*}} @"$s8builtins10assumeTrueyyBi1_F"
+// CHECK: call void @llvm.assume(i1 %0)
+// CHECK: ret
+func assumeTrue(_ x: Builtin.Int1) {
+  Builtin.assume_Int1(x)
+}
 // BridgeObject nonNull
 // CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins15isUnique_nativeyBi1_BbzF"(%swift.bridge** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:

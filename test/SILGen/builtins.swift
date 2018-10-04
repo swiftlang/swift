@@ -812,4 +812,10 @@ func once(control: Builtin.RawPointer) {
 func valueToBridgeObject(_ x: UInt) -> Builtin.BridgeObject {
   return Builtin.valueToBridgeObject(x)
 }
- 
+
+// CHECK-LABEL: sil hidden @$s8builtins10assumeTrueyyBi1_F
+// CHECK: builtin "assume_Int1"({{.*}} : $Builtin.Int1)
+// CHECK: return
+func assumeTrue(_ x: Builtin.Int1) {
+  Builtin.assume_Int1(x)
+}

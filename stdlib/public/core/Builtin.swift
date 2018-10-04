@@ -290,6 +290,11 @@ public func _onFastPath() {
   Builtin.onFastPath()
 }
 
+@_transparent
+public func _assume(_ condition: Bool) {
+  _ = Builtin.assume_Int1(condition._value)
+}
+
 //===--- Runtime shim wrappers --------------------------------------------===//
 
 /// Returns `true` iff the class indicated by `theClass` uses native
