@@ -2023,11 +2023,21 @@ void swift::maybeAddAccessorsToStorage(TypeChecker &TC,
   } else if (isa<ProtocolDecl>(dc)) {
     if (storage->hasStorage()) {
       auto var = cast<VarDecl>(storage);
-      if (var->isLet())
+
+      if (var->isLet()) {
         TC.diagnose(var->getLoc(),
-                    diag::protocol_property_must_be_computed_var);
-      else
-        TC.diagnose(var->getLoc(), diag::protocol_property_must_be_computed);
+                   diag::protocol_property_must_be_computed_var)
+          .fixItReplace(var->getParentPatternBinding()->getLoc(), "var")
+          .fixItInsertAfter(var->getTypeLoc().getLoc(), " { get }");
+      } else {
+        auto diag = TC.diagnose(var->getLoc(), diag::protocol_property_must_be_computed);
+        auto braces = var->getBracesRange();
+
+        if (braces.isValid())
+          diag.fixItReplace(braces, "{ get <#set#> }");
+        else
+          diag.fixItInsertAfter(var->getTypeLoc().getLoc(), " { get <#set#> }");
+      }
     }
 
     setProtocolStorageImpl(TC, storage);
