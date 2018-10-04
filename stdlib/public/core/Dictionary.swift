@@ -1565,7 +1565,7 @@ extension Dictionary.Keys {
 
   @inlinable
   @inline(__always)
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_variant.makeIterator())
   }
 }
@@ -1598,7 +1598,7 @@ extension Dictionary.Values {
 
   @inlinable
   @inline(__always)
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_variant.makeIterator())
   }
 }
