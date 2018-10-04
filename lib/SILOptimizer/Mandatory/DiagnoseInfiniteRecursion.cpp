@@ -96,37 +96,37 @@ static bool hasRecursiveCallInPath(SILBasicBlock &Block,
 
 /// Perform a DFS through the target function to find any paths to an exit node
 /// that do not call into the target.
-static bool hasInfinitelyRecursiveApply(SILFunction *TargetFn) {
-  SmallPtrSet<SILBasicBlock *, 16> Visited;
-  SmallVector<SILBasicBlock *, 16> WorkList = { TargetFn->getEntryBlock() };
+static bool hasInfinitelyRecursiveApply(SILFunction *targetFn) {
+  SmallPtrSet<SILBasicBlock *, 32> visited = { targetFn->getEntryBlock() };
+  SmallVector<SILBasicBlock *, 32> workList = { targetFn->getEntryBlock() };
 
   // Keep track of if we've found any recursive blocks at all.
   // We return true if we found any recursion and did not find any
   // non-recursive, function-exiting blocks.
   bool foundRecursion = false;
-  auto *TargetModule = TargetFn->getModule().getSwiftModule();
+  auto *targetModule = targetFn->getModule().getSwiftModule();
 
-  while (!WorkList.empty()) {
-    SILBasicBlock *CurBlock = WorkList.pop_back_val();
-    if (!Visited.insert(CurBlock).second)
-      continue;
+  while (!workList.empty()) {
+    SILBasicBlock *curBlock = workList.pop_back_val();
 
-    // If we found a recursive call, keep track of it. We can't just `return
-    // true` here because that would mark every recursive function infinitely
-    // recursive.
-    if (hasRecursiveCallInPath(*CurBlock, TargetFn, TargetModule)) {
+    // We're looking for functions that are recursive on _all_ paths. If this
+    // block is recursive, mark that we found recursion and check the next
+    // block in the work list.
+    if (hasRecursiveCallInPath(*curBlock, targetFn, targetModule)) {
       foundRecursion = true;
       continue;
     }
 
     // If this block doesn't have a recursive call, and it exits the function,
     // then we know the function is not infinitely recursive.
-    if (CurBlock->getTerminator()->isFunctionExiting())
+    if (curBlock->getTerminator()->isFunctionExiting())
       return false;
 
-    // Otherwise, push the successors onto the stack.
-    WorkList.append(CurBlock->succblock_begin(),
-                    CurBlock->succblock_end());
+    // Otherwise, push the successors onto the stack if we haven't visited them.
+    for (auto *succ : curBlock->getSuccessorBlocks()) {
+      if (visited.insert(succ).second)
+        workList.push_back(succ);
+    }
   }
   return foundRecursion;
 }
