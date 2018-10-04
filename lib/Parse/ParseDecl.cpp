@@ -6226,7 +6226,7 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
     if (!Status.isError()) {
       if (Flags.contains(PD_InProtocol)) {
         diagnose(Tok, diag::expected_lbrace_subscript_protocol)
-            .fixItInsertAfter(ElementTy.get()->getEndLoc(), " { get set }");
+            .fixItInsertAfter(ElementTy.get()->getEndLoc(), " { get <#set#> }");
       } else {
         diagnose(Tok, diag::expected_lbrace_subscript);
       }
