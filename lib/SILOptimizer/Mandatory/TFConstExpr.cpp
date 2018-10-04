@@ -1026,8 +1026,8 @@ SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
 ///   * `addr` points at uninitialized memory;
 ///   * there are store(s) to `addr` that, taken together, set the memory
 ///     exactly once (e.g. a single "store" to `addr` OR multiple "store"s to
-///     different "tuple_element_addr"s of `addr`);
-///   * the stores' value(s) can be const-evaluated; and
+///     different "tuple_element_addr"s of `addr`); and
+///   * the stores' value(s) can be const-evaluated;
 /// Then: initializes the memory at `addr` and returns {true, None}.
 ///
 /// Otherwise, sets the memory at `addr` to an unspecified value and returns
@@ -1187,14 +1187,13 @@ ConstExprFunctionState::initializeSingleWriterAddress(
       // `initializeSingleWriterAddress` below detects and forbids multiple
       // assignment, so we don't need to do it here.
 
-      // Set `teai`'s value to satisfy the `initializeSingleWriterAddress`
-      // precondition.
       SmallVector<unsigned, 4> teaiAccessPath(accessPath.begin(),
                                               accessPath.end());
       teaiAccessPath.push_back(teai->getFieldNo());
-
+        
       auto initializationResult = initializeSingleWriterAddress(
           teai, memoryObject, teaiAccessPath);
+        
       if (initializationResult.failure)
         return initializationResult;
 
