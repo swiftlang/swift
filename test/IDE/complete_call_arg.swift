@@ -9,8 +9,8 @@
 
 // RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD1 | %FileCheck %s -check-prefix=OVERLOAD1
 // RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD2 | %FileCheck %s -check-prefix=OVERLOAD2
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD3 | %FileCheck %s -check-prefix=OVERLOAD3
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD4 | %FileCheck %s -check-prefix=OVERLOAD4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD3 | %FileCheck %s -check-prefix=OVERLOAD3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOAD4 | %FileCheck %s -check-prefix=OVERLOAD4
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER1 | %FileCheck %s -check-prefix=MEMBER1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER2 | %FileCheck %s -check-prefix=MEMBER2
@@ -424,4 +424,14 @@ func curry<T1, T2, R>(_ f: @escaping (T1, T2) -> R) -> (T1) -> (T2) -> R {
   // FIXME: Should be '/TypeRelation[Invalid]: t2[#T2#]'
   // NESTED_CLOSURE: Decl[LocalVar]/Local:               t2; name=t2
   // NESTED_CLOSURE: Decl[LocalVar]/Local:               t1[#T1#]; name=t1
+}
+
+func trailingClosureLocal(x: Int, fn: (Int) -> Void) {
+  trailingClosureLocal(x: 1) { localArg in
+    var localVar = 1
+    if #^TRAILING_CLOSURE_LOCAL^#
+  }
+  // TRAILING_CLOSURE_LOCAL: Begin completions
+  // TRAILING_CLOSURE_LOCAL: Decl[LocalVar]/Local: localArg[#Int#]; name=localArg
+  // TRAILING_CLOSURE_LOCAL: Decl[LocalVar]/Local: localVar[#Int#]; name=localVar
 }
