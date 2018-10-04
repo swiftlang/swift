@@ -1658,7 +1658,8 @@ void ConstraintSystem::partitionDisjunction(
   SmallVector<unsigned, 4> disabled;
   SmallVector<unsigned, 4> unavailable;
   SmallVector<unsigned, 4> globalScope;
-  SmallVector<unsigned, 4> definedInType;
+  SmallVector<unsigned, 4> definedInDesignatedType;
+  SmallVector<unsigned, 4> definedInExtensionOfDesignatedType;
   SmallVector<unsigned, 4> everythingElse;
   SmallSet<Constraint *, 16> taken;
 
@@ -1726,14 +1727,19 @@ void ConstraintSystem::partitionDisjunction(
         auto *funcDecl = cast<FuncDecl>(decl);
 
         auto *parentDecl = funcDecl->getParent()->getAsDecl();
-        if (auto *extensionDecl = dyn_cast<ExtensionDecl>(parentDecl))
-          parentDecl = extensionDecl->getExtendedNominal();
+        if (parentDecl == designatedProtocol) {
+          definedInDesignatedType.push_back(index);
+          return true;
+        }
 
-        if (parentDecl != designatedProtocol)
-          return false;
+        if (auto *extensionDecl = dyn_cast<ExtensionDecl>(parentDecl)) {
+          if (static_cast<Decl *>(extensionDecl) == designatedProtocol) {
+            definedInExtensionOfDesignatedType.push_back(index);
+            return true;
+          }
+        }
 
-        definedInType.push_back(index);
-        return true;
+        return false;
       });
   }
 
@@ -1753,7 +1759,8 @@ void ConstraintSystem::partitionDisjunction(
   };
 
   // Now create the partitioning based on what was collected.
-  appendPartition(definedInType);
+  appendPartition(definedInDesignatedType);
+  appendPartition(definedInExtensionOfDesignatedType);
   appendPartition(everythingElse);
   appendPartition(globalScope);
   appendPartition(unavailable);
