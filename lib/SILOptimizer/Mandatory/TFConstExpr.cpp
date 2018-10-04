@@ -112,6 +112,8 @@ public:
         numInstEvaluated(numInstEvaluated) {}
 
   void setValue(SILValue value, SymbolicValue symVal) {
+    LLVM_DEBUG(llvm::dbgs() << "For sil value " << value << ", setting it to: ";
+               symVal.dump());
     calculatedValues.insert({value, symVal});
   }
 
@@ -122,6 +124,10 @@ public:
     auto type = simplifyType(addr->getType().getASTType());
     auto *memObject = SymbolicValueMemoryObject::create(
         type, initialValue, evaluator.getAllocator());
+    LLVM_DEBUG(llvm::dbgs()
+                   << "For sil addr " << addr << ", creating memory obj: "
+                   << memObject << ", with init value " << initialValue
+                   << ", mem obj value: " << memObject->getValue(););
     auto result = SymbolicValue::getAddress(memObject);
     setValue(addr, result);
     return result;
@@ -1113,6 +1119,11 @@ static bool updateIndexedElement(SymbolicValue &aggregate,
 ///  pointer_to_address, if the address is to be written to, caller should call
 ///  this method (e.g. a[3] = 17). If the address is to be read (e.g. let v =
 ///  a[3]), call getConstAddrAndLoadResult().
+///
+/// Invariant: When this function returns, if it fails the const-evaluate, the
+/// memory object associated with `addr` is set to uninit memory or Unknown.
+// TODO: consider always setting it to Unknown, which would be a better error
+// code.
 SymbolicValue
 ConstExprFunctionState::getSingleWriterAddressValue(SILValue addr) {
   // Check to see if we already have an answer.
@@ -1125,7 +1136,12 @@ ConstExprFunctionState::getSingleWriterAddressValue(SILValue addr) {
   if (!addrInst)
     return evaluator.getUnknown(addr, UnknownReason::Default);
 
-  // Keep track of the value found for the first constant store.
+  // Keep track of the value found for the first constant store.  Tentatively
+  // point/link `addr` to the memory object, whose content will be set when we
+  // find a qualified writer (some writer such as ApplyInst depends on the
+  // existence of such a memory object). But when we find a violation
+  // (e.g. unsupported inst types or multiple writers, set the memory object
+  // content back to uninit memory.)
   auto memoryAddress =
       createMemoryObject(addr, SymbolicValue::getUninitMemory());
   auto *memoryObject = memoryAddress.getAddressValueMemoryObject();
@@ -1153,12 +1169,16 @@ ConstExprFunctionState::getSingleWriterAddressValue(SILValue addr) {
 
         // If we have already found a value for this stack slot then we're done:
         // we don't support multiple assignment.
-        if (memoryObject->getValue().getKind() != SymbolicValue::UninitMemory)
+        if (memoryObject->getValue().getKind() != SymbolicValue::UninitMemory) {
+          memoryObject->setValue(SymbolicValue::getUninitMemory());
           return evaluator.getUnknown(addr, UnknownReason::Default);
+        }
 
         auto result = getConstantValue(si->getOperand(0));
-        if (!result.isConstant())
+        if (!result.isConstant()) {
+          memoryObject->setValue(SymbolicValue::getUninitMemory());
           return evaluator.getUnknown(addr, UnknownReason::Default);
+        }
         memoryObject->setValue(result);
         continue;
       }
@@ -1174,12 +1194,16 @@ ConstExprFunctionState::getSingleWriterAddressValue(SILValue addr) {
 
       // If we have already found a value for this stack slot then we're done:
       // we don't support multiple assignment.
-      if (memoryObject->getValue().getKind() != SymbolicValue::UninitMemory)
+      if (memoryObject->getValue().getKind() != SymbolicValue::UninitMemory) {
+        memoryObject->setValue(SymbolicValue::getUninitMemory());
         return evaluator.getUnknown(addr, UnknownReason::Default);
+      }
 
       auto result = getConstAddrAndLoadResult(cai->getOperand(0));
-      if (!result.isConstant())
+      if (!result.isConstant()) {
+        memoryObject->setValue(SymbolicValue::getUninitMemory());
         return evaluator.getUnknown(addr, UnknownReason::Default);
+      }
       memoryObject->setValue(result);
       continue;
     }
@@ -1199,8 +1223,10 @@ ConstExprFunctionState::getSingleWriterAddressValue(SILValue addr) {
 
       // Otherwise this is a write.  If we have already found a value for this
       // stack slot then we're done: we don't support multiple assignment.
-      if (memoryObject->getValue().getKind() != SymbolicValue::UninitMemory)
+      if (memoryObject->getValue().getKind() != SymbolicValue::UninitMemory) {
+        memoryObject->setValue(SymbolicValue::getUninitMemory());
         return evaluator.getUnknown(addr, UnknownReason::Default);
+      }
 
       // The callee needs to be a direct call to a constant expression.
       auto callResult = computeCallResult(apply);
@@ -1208,6 +1234,8 @@ ConstExprFunctionState::getSingleWriterAddressValue(SILValue addr) {
       // If the call failed, we're done.
       if (callResult.hasValue()) {
         assert(!callResult.getValue().isConstant());
+        LLVM_DEBUG(llvm::dbgs() << "  The failed call result returned "
+                                << callResult.getValue() << "\n");
         memoryObject->setValue(callResult.getValue());
         return memoryAddress;
       }
@@ -1226,6 +1254,7 @@ ConstExprFunctionState::getSingleWriterAddressValue(SILValue addr) {
         if (ili->getValue().getLimitedValue() != 0)
           continue;
       }
+      memoryObject->setValue(SymbolicValue::getUninitMemory());
       return evaluator.getUnknown(addr, UnknownReason::Default);
     }
 
@@ -1266,8 +1295,10 @@ ConstExprFunctionState::getSingleWriterAddressValue(SILValue addr) {
       bool failed = updateIndexedElement(
           objectVal, /*accessPath*/ {index}, tupleEltValue, objectType,
           /*writeOnlyOnce*/ true, evaluator.getAllocator());
-      if (failed)
+      if (failed) {
+        memoryObject->setValue(SymbolicValue::getUninitMemory());
         return evaluator.getUnknown(addr, UnknownReason::Default);
+      }
       memoryObject->setValue(objectVal);
 #ifndef NDEBUG
       // If all aggregate elements are const, we have successfully
@@ -1285,6 +1316,7 @@ ConstExprFunctionState::getSingleWriterAddressValue(SILValue addr) {
 
     // If this is some other user that we don't know about, then we should
     // treat it conservatively, because it could store into the address.
+    memoryObject->setValue(SymbolicValue::getUninitMemory());
     return evaluator.getUnknown(addr, UnknownReason::Default);
   }
 
