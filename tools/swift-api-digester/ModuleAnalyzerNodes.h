@@ -368,7 +368,7 @@ public:
   bool hasDefaultArgument() const { return HasDefaultArg; }
   bool isTopLevelType() const { return !isa<SDKNodeType>(getParent()); }
   StringRef getTypeRoleDescription() const;
-  StringRef getParamValueOwnership() const { return ParamValueOwnership; }
+  StringRef getParamValueOwnership() const;
   static bool classof(const SDKNode *N);
   virtual void jsonize(json::Output &Out) override;
   virtual void diagnose(SDKNode *Right) override;

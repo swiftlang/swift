@@ -871,6 +871,13 @@ void swift::ide::api::SDKNodeType::diagnose(SDKNode *Right) {
     Diags.diagnose(SourceLoc(), diag::default_arg_removed,
                    LParent->getScreenInfo(), Descriptor);
   }
+  if (getParamValueOwnership() != RT->getParamValueOwnership()) {
+    Diags.diagnose(SourceLoc(), diag::param_ownership_change,
+                   getParent()->getAs<SDKNodeDecl>()->getScreenInfo(),
+                   getTypeRoleDescription(),
+                   getParamValueOwnership(),
+                   RT->getParamValueOwnership());
+  }
 }
 
 void swift::ide::api::SDKNodeTypeFunc::diagnose(SDKNode *Right) {
