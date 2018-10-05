@@ -121,9 +121,15 @@ ArrayRef<const char *> Driver::getArgsWithoutProgramNameAndDriverMode(
 
 static void validateBridgingHeaderArgs(DiagnosticEngine &diags,
                                        const ArgList &args) {
-  if (args.hasArgNoClaim(options::OPT_import_underlying_module) &&
-      args.hasArgNoClaim(options::OPT_import_objc_header)) {
+  if (!args.hasArgNoClaim(options::OPT_import_objc_header))
+    return;
+
+  if (args.hasArgNoClaim(options::OPT_import_underlying_module))
     diags.diagnose({}, diag::error_framework_bridging_header);
+
+  if (args.hasArgNoClaim(options::OPT_emit_parseable_module_interface,
+                         options::OPT_emit_parseable_module_interface_path)) {
+    diags.diagnose({}, diag::error_bridging_header_parseable_interface);
   }
 }
 
