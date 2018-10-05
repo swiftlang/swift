@@ -1547,56 +1547,6 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
   llvm_unreachable("Unhandled access level in switch.");
 }
 
-void swift::hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,
-                                    DominanceInfo *DomTree) {
-  SILValue V = Op.get();
-  SILInstruction *Prev = nullptr;
-  auto *InsertPt = InsertBefore;
-  while (true) {
-    SILValue Incoming = stripSinglePredecessorArgs(V);
-    
-    // Forward the incoming arg from a single predecessor.
-    if (V != Incoming) {
-      if (V == Op.get()) {
-        // If we are the operand itself set the operand to the incoming
-        // argument.
-        Op.set(Incoming);
-        V = Incoming;
-      } else {
-        // Otherwise, set the previous projections operand to the incoming
-        // argument.
-        assert(Prev && "Must have seen a projection");
-        Prev->setOperand(0, Incoming);
-        V = Incoming;
-      }
-    }
-    
-    switch (V->getKind()) {
-      case ValueKind::StructElementAddrInst:
-      case ValueKind::TupleElementAddrInst:
-      case ValueKind::RefElementAddrInst:
-      case ValueKind::RefTailAddrInst:
-      case ValueKind::UncheckedTakeEnumDataAddrInst: {
-        auto *Inst = cast<SingleValueInstruction>(V);
-        // We are done once the current projection dominates the insert point.
-        if (DomTree->dominates(Inst->getParent(), InsertBefore->getParent()))
-          return;
-        
-        // Move the current projection and memorize it for the next iteration.
-        Prev = Inst;
-        Inst->moveBefore(InsertPt);
-        InsertPt = Inst;
-        V = Inst->getOperand(0);
-        continue;
-      }
-      default:
-        assert(DomTree->dominates(V->getParentBlock(), InsertBefore->getParent()) &&
-               "The projected value must dominate the insertion point");
-        return;
-    }
-  }
-}
-
 void StaticInitCloner::add(SILInstruction *InitVal) {
   // Don't schedule an instruction twice for cloning.
   if (NumOpsToClone.count(InitVal) != 0)
