@@ -47,7 +47,7 @@ public extension Int {
 @_fixed_layout
 public struct fixedLayoutStruct {
   public var a = 1
-  private var b = 2
+  private var b = 2 { didSet {} willSet(value) {} }
   var c = 3
   @available(*, unavailable)
   public let unavailableProperty = 1
