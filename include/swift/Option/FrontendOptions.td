@@ -150,8 +150,8 @@ def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
 class DebugCrashOpt : Group<debug_crash_Group>;
 
 
-// Flags that are saved into textual interfaces
-let Flags = [FrontendOption, NoDriverOption, HelpHidden, TextualInterfaceOption] in {
+// Flags that are saved into parseable interfaces
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ParseableInterfaceOption] in {
 
 def enable_objc_interop :
   Flag<["-"], "enable-objc-interop">,

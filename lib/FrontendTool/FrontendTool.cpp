@@ -364,7 +364,7 @@ static bool printAsObjCIfNeeded(StringRef outputPath, ModuleDecl *M,
 ///
 /// \see swift::emitParseableInterface
 static bool printParseableInterfaceIfNeeded(StringRef outputPath,
-                                            TextualInterfaceOptions const &Opts,
+                                            ParseableInterfaceOptions const &Opts,
                                             ModuleDecl *M) {
   if (outputPath.empty())
     return false;
@@ -893,7 +893,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   if (opts.InputsAndOutputs.hasParseableInterfaceOutputPath()) {
     hadAnyError |= printParseableInterfaceIfNeeded(
         Invocation.getParseableInterfaceOutputPathForWholeModule(),
-        Invocation.getTextualInterfaceOptions(),
+        Invocation.getParseableInterfaceOptions(),
         Instance.getMainModule());
   }
 

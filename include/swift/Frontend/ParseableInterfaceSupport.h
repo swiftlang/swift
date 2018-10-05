@@ -22,11 +22,11 @@ namespace swift {
 class ModuleDecl;
 
 /// Options for controlling the generation of the .swiftinterface output.
-struct TextualInterfaceOptions {
+struct ParseableInterfaceOptions {
   /// Copy of all the command-line flags passed at .swiftinterface
   /// generation time, re-applied to CompilerInvocation when reading
   /// back .swiftinterface and reconstructing .swiftmodule.
-  std::string TextualInterfaceFlags;
+  std::string ParseableInterfaceFlags;
 };
 
 llvm::Regex getSwiftInterfaceToolsVersionRegex();
@@ -46,7 +46,7 @@ llvm::Regex getSwiftInterfaceModuleFlagsRegex();
 ///
 /// \sa swift::serialize
 bool emitParseableInterface(raw_ostream &out,
-                            TextualInterfaceOptions const &Opts,
+                            ParseableInterfaceOptions const &Opts,
                             ModuleDecl *M);
 
 
@@ -54,8 +54,8 @@ bool emitParseableInterface(raw_ostream &out,
 /// CompilerInstance to convert .swiftinterface files to .swiftmodule
 /// files on the fly, caching the resulting .swiftmodules in the module cache
 /// directory, and loading the serialized .swiftmodules from there.
-class TextualInterfaceModuleLoader : public SerializedModuleLoaderBase {
-  explicit TextualInterfaceModuleLoader(ASTContext &ctx, StringRef cacheDir,
+class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
+  explicit ParseableInterfaceModuleLoader(ASTContext &ctx, StringRef cacheDir,
                                         DependencyTracker *tracker)
     : SerializedModuleLoaderBase(ctx, tracker),
       CacheDir(cacheDir)
@@ -76,11 +76,11 @@ class TextualInterfaceModuleLoader : public SerializedModuleLoaderBase {
                   llvm::SmallVectorImpl<char> &Scratch) override;
 
 public:
-  static std::unique_ptr<TextualInterfaceModuleLoader>
+  static std::unique_ptr<ParseableInterfaceModuleLoader>
   create(ASTContext &ctx, StringRef cacheDir,
          DependencyTracker *tracker = nullptr) {
-    return std::unique_ptr<TextualInterfaceModuleLoader>(
-        new TextualInterfaceModuleLoader(ctx, cacheDir, tracker));
+    return std::unique_ptr<ParseableInterfaceModuleLoader>(
+        new ParseableInterfaceModuleLoader(ctx, cacheDir, tracker));
   }
 };
 

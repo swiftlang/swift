@@ -47,9 +47,9 @@ def DoesNotAffectIncrementalBuild : OptionFlag;
 // current working directory.
 def ArgumentIsPath : OptionFlag;
 
-// The option should be written into a .swiftinterface textual interface file,
+// The option should be written into a .swiftinterface parseable interface file,
 // and read/parsed from there when reconstituting a .swiftmodule from it.
-def TextualInterfaceOption : OptionFlag;
+def ParseableInterfaceOption : OptionFlag;
 
 /////////
 // Options
@@ -164,7 +164,7 @@ def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
 def sdk : Separate<["-"], "sdk">, Flags<[FrontendOption, ArgumentIsPath]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
 
-def swift_version : Separate<["-"], "swift-version">, Flags<[FrontendOption, TextualInterfaceOption]>,
+def swift_version : Separate<["-"], "swift-version">, Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Interpret input according to a specific Swift language version number">,
   MetaVarName<"<vers>">;
 
@@ -274,7 +274,7 @@ def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Specifies the Clang module cache path">;
 
-def module_name : Separate<["-"], "module-name">, Flags<[FrontendOption, TextualInterfaceOption]>,
+def module_name : Separate<["-"], "module-name">, Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Name of the module to build">;
 def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
@@ -611,7 +611,7 @@ def parse_sil : Flag<["-"], "parse-sil">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Parse the input file as SIL code, not Swift source">;
 def parse_stdlib : Flag<["-"], "parse-stdlib">,
-  Flags<[FrontendOption, HelpHidden, TextualInterfaceOption]>,
+  Flags<[FrontendOption, HelpHidden, ParseableInterfaceOption]>,
   HelpText<"Parse the input file(s) as the Swift standard library">;
 
 def modes_Group : OptionGroup<"<mode options>">, HelpText<"MODES">;
@@ -749,12 +749,12 @@ def resource_dir : Separate<["-"], "resource-dir">,
   HelpText<"The directory that holds the compiler resource files">;
 
 def target : Separate<["-"], "target">,
-  Flags<[FrontendOption, ModuleWrapOption, TextualInterfaceOption]>,
+  Flags<[FrontendOption, ModuleWrapOption, ParseableInterfaceOption]>,
   HelpText<"Generate code for the given target">;
 def target_legacy_spelling : Joined<["--"], "target=">,
   Flags<[FrontendOption]>, Alias<target>;
 
-def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption, TextualInterfaceOption]>,
+def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Generate code for a particular CPU variant">;
 
 def profile_generate : Flag<["-"], "profile-generate">,

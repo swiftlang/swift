@@ -51,12 +51,12 @@ extractSwiftInterfaceVersionAndArgs(DiagnosticEngine &Diags,
   SmallVector<StringRef, 1> VersMatches, FlagMatches;
   if (!VersRe.match(SB, &VersMatches)) {
     Diags.diagnose(SourceLoc(),
-                   diag::error_extracting_version_from_textual_interface);
+                   diag::error_extracting_version_from_parseable_interface);
     return true;
   }
   if (!FlagRe.match(SB, &FlagMatches)) {
     Diags.diagnose(SourceLoc(),
-                   diag::error_extracting_flags_from_textual_interface);
+                   diag::error_extracting_flags_from_parseable_interface);
     return true;
   }
   assert(VersMatches.size() == 2);
@@ -67,7 +67,7 @@ extractSwiftInterfaceVersionAndArgs(DiagnosticEngine &Diags,
 }
 
 void
-TextualInterfaceModuleLoader::configureSubInvocationAndOutputPath(
+ParseableInterfaceModuleLoader::configureSubInvocationAndOutputPath(
     CompilerInvocation &SubInvocation,
     StringRef InPath,
     llvm::SmallString<128> &OutPath) {
@@ -179,7 +179,7 @@ static bool buildSwiftModuleFromSwiftInterface(
 /// Load a .swiftmodule associated with a .swiftinterface either from a
 /// cache or by converting it in a subordinate \c CompilerInstance, caching
 /// the results.
-std::error_code TextualInterfaceModuleLoader::openModuleFiles(
+std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
     StringRef DirName, StringRef ModuleFilename, StringRef ModuleDocFilename,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
@@ -223,7 +223,7 @@ std::error_code TextualInterfaceModuleLoader::openModuleFiles(
 }
 
 /// Diagnose any scoped imports in \p imports, i.e. those with a non-empty
-/// access path. These are not yet supported by textual interfaces, since the
+/// access path. These are not yet supported by parseable interfaces, since the
 /// information about the declaration kind is not preserved through the binary
 /// serialization that happens as an intermediate step in non-whole-module
 /// builds.
@@ -242,13 +242,13 @@ static void diagnoseScopedImports(DiagnosticEngine &diags,
 /// Prints to \p out a comment containing a tool-versions identifier as well
 /// as any relevant command-line flags in \p Opts used to construct \p M.
 static void printToolVersionAndFlagsComment(raw_ostream &out,
-                                            TextualInterfaceOptions const &Opts,
+                                            ParseableInterfaceOptions const &Opts,
                                             ModuleDecl *M) {
   auto &Ctx = M->getASTContext();
   out << "// " SWIFT_TOOLS_VERSION_KEY ": "
       << Ctx.LangOpts.EffectiveLanguageVersion << "\n";
   out << "// " SWIFT_MODULE_FLAGS_KEY ": "
-      << Opts.TextualInterfaceFlags << "\n";
+      << Opts.ParseableInterfaceFlags << "\n";
 }
 
 llvm::Regex swift::getSwiftInterfaceToolsVersionRegex() {
@@ -305,7 +305,7 @@ static void printImports(raw_ostream &out, ModuleDecl *M) {
 }
 
 bool swift::emitParseableInterface(raw_ostream &out,
-                                   TextualInterfaceOptions const &Opts,
+                                   ParseableInterfaceOptions const &Opts,
                                    ModuleDecl *M) {
   assert(M);
 

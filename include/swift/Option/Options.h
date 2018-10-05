@@ -35,7 +35,7 @@ namespace options {
     ModuleWrapOption = (1 << 10),
     SwiftFormatOption = (1 << 11),
     ArgumentIsPath = (1 << 12),
-    TextualInterfaceOption = (1 << 13),
+    ParseableInterfaceOption = (1 << 13),
   };
 
   enum ID {

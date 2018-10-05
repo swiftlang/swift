@@ -21,7 +21,7 @@ namespace swift {
 class ModuleFile;
 
 /// Common functionality shared between \c SerializedModuleLoader and
-/// \c TextualInterfaceModuleLoader.
+/// \c ParseableInterfaceModuleLoader.
 class SerializedModuleLoaderBase : public ModuleLoader {
   llvm::StringMap<std::unique_ptr<llvm::MemoryBuffer>> MemoryBuffers;
   /// A { module, generation # } pair.

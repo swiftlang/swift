@@ -130,18 +130,18 @@ generateOptimizationRemarkRegex(DiagnosticEngine &Diags, ArgList &Args,
   return Pattern;
 }
 
-/// \brief Save a copy of any flags marked as TextualInterfaceOption, if running
+/// \brief Save a copy of any flags marked as ParseableInterfaceOption, if running
 /// in a mode that is going to emit a .swiftinterface file.
-static void SaveTextualInterfaceArgs(TextualInterfaceOptions &Opts,
+static void SaveParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
                                      ArgList &Args, DiagnosticEngine &Diags) {
   if (!Args.hasArg(options::OPT_emit_interface_path))
     return;
   ArgStringList RenderedArgs;
   for (auto A : Args) {
-    if (A->getOption().hasFlag(options::TextualInterfaceOption))
+    if (A->getOption().hasFlag(options::ParseableInterfaceOption))
       A->render(Args, RenderedArgs);
   }
-  llvm::raw_string_ostream OS(Opts.TextualInterfaceFlags);
+  llvm::raw_string_ostream OS(Opts.ParseableInterfaceFlags);
   interleave(RenderedArgs,
              [&](const char *Argument) { OS << Argument; },
              [&] { OS << " "; });
@@ -1182,7 +1182,7 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  SaveTextualInterfaceArgs(TextualInterfaceOpts, ParsedArgs, Diags);
+  SaveParseableInterfaceArgs(ParseableInterfaceOpts, ParsedArgs, Diags);
 
   if (ParseFrontendArgs(FrontendOpts, ParsedArgs, Diags,
                         ConfigurationFileBuffers)) {

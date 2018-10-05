@@ -310,7 +310,7 @@ bool CompilerInstance::setUpModuleLoaders() {
     }
     // Capture the specified-or-defaulted -module-cache-path that winds up in
     // the clang importer, for reuse as the .swiftmodule cache path when
-    // building the TextualInterfaceModuleLoader below.
+    // building the ParseableInterfaceModuleLoader below.
     //
     // The returned-from-clang module cache path includes a suffix directory
     // that is specific to the clang version and invocation; we want the
@@ -325,10 +325,10 @@ bool CompilerInstance::setUpModuleLoaders() {
     Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
   }
   {
-    auto TIML = TextualInterfaceModuleLoader::create(*Context,
-                                                     ModuleCachePath,
-                                                     getDependencyTracker());
-    Context->addModuleLoader(std::move(TIML));
+    auto PIML = ParseableInterfaceModuleLoader::create(*Context,
+                                                       ModuleCachePath,
+                                                       getDependencyTracker());
+    Context->addModuleLoader(std::move(PIML));
   }
   return false;
 }

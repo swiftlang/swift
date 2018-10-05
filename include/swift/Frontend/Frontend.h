@@ -73,7 +73,7 @@ class CompilerInvocation {
   SILOptions SILOpts;
   IRGenOptions IRGenOpts;
   TBDGenOptions TBDGenOpts;
-  TextualInterfaceOptions TextualInterfaceOpts;
+  ParseableInterfaceOptions ParseableInterfaceOpts;
   /// The \c SyntaxParsingCache to use when parsing the main file of this
   /// invocation
   SyntaxParsingCache *MainFileSyntaxParsingCache = nullptr;
@@ -205,8 +205,8 @@ public:
   TBDGenOptions &getTBDGenOptions() { return TBDGenOpts; }
   const TBDGenOptions &getTBDGenOptions() const { return TBDGenOpts; }
 
-  TextualInterfaceOptions &getTextualInterfaceOptions() { return TextualInterfaceOpts; }
-  const TextualInterfaceOptions &getTextualInterfaceOptions() const { return TextualInterfaceOpts; }
+  ParseableInterfaceOptions &getParseableInterfaceOptions() { return ParseableInterfaceOpts; }
+  const ParseableInterfaceOptions &getParseableInterfaceOptions() const { return ParseableInterfaceOpts; }
 
   ClangImporterOptions &getClangImporterOptions() { return ClangImporterOpts; }
   const ClangImporterOptions &getClangImporterOptions() const {
