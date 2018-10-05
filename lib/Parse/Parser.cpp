@@ -418,9 +418,6 @@ public:
       TokEndLoc = SM.getLocForBufferStart(BufferID);
     }
     llvm::SmallVector<Token, 4> Scratch;
-    StringRef Bounds = SM.getEntireTextForBuffer(BufferID);
-    if (TokEndLoc.getOpaquePointerValue() >= Bounds.begin() &&
-        TokEndLoc.getOpaquePointerValue() <= Bounds.end())
     relexComment(CharSourceRange(SM, TokEndLoc,
                                  SM.getRangeForBuffer(BufferID).getEnd()),
                  Scratch);
@@ -521,7 +518,13 @@ const Token &Parser::peekToken() {
 }
 
 SourceLoc Parser::consumeTokenWithoutFeedingReceiver() {
-  SourceLoc Loc = Tok.getLoc();
+  // The following is to keep SourceKit happy when using a token from a
+  // custom compilation flag value. These are sub-lexed using a separate
+  // source buffer from the remainder of the source causing much firing
+  // of assertions. Using PreviousLoc, the Expr node is created with
+  // a Text value in the flag value's lexing buffer while having an
+  // apparently legitimate "Loc" pointing to the main source buffer.
+  SourceLoc Loc = Tok.isCustomCompilationFlag() ? PreviousLoc : Tok.getLoc();
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
 
   if (IsParsingInterfaceTokens && !Tok.getText().empty()) {

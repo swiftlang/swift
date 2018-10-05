@@ -48,7 +48,7 @@ class Token {
   /// Length of custom delimiter of "raw" string literals
   unsigned CustomDelimiterLen : 8;
 
-  /// Value is name of custom compilation flag
+  /// Value from custom compilation flag
   unsigned CustomCompilationFlag : 1;
 
   // Padding bits == 32 - 12;

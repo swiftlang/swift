@@ -68,6 +68,11 @@ static bool isValidVersion(const version::Version &Version,
   llvm_unreachable("unsupported unary operator");
 }
 
+static bool isComparisonOp(StringRef Op) {
+  return Op == "==" || Op == "!=" ||
+    Op == ">" || Op == ">=" || Op == "<=" || Op == "<";
+}
+
 /// The condition validator.
 class ValidateIfConfigCondition :
   public ExprVisitor<ValidateIfConfigCondition, Expr*> {
@@ -103,7 +108,8 @@ class ValidateIfConfigCondition :
       assert((S.size() & 1) == 0);
       while (!S.empty()) {
         auto Name = getDeclRefStr(S[0], DeclRefKind::BinaryOperator);
-        if (Name.hasValue() && (*Name == "||" || *Name == "&&"))
+        if (Name.hasValue() &&
+            (*Name == "||" || *Name == "&&" || isComparisonOp(*Name)))
           return Name;
 
         auto DiagID = isa<UnresolvedDeclRefExpr>(S[0])
@@ -115,6 +121,12 @@ class ValidateIfConfigCondition :
         S = S.slice(2);
       }
       return None;
+    };
+
+    auto lowerPrecedence = [&] (StringRef OpName, StringRef NextOpName) {
+      return (OpName == "||" &&
+              (NextOpName == "&&" || isComparisonOp(NextOpName))) ||
+              (OpName == "&&" && isComparisonOp(NextOpName));
     };
 
     // Extract out the first operator name.
@@ -133,9 +145,20 @@ class ValidateIfConfigCondition :
       // Pull out the next binary operator.
       auto NextOpName = getNextOperator();
       bool IsEnd = !NextOpName.hasValue();
-      if (!IsEnd && *OpName == "||" && *NextOpName == "&&") {
+      if (!IsEnd && lowerPrecedence(*OpName, *NextOpName)) {
         RHS = foldSequence(RHS, S, /*isRecurse*/true);
         continue;
+      }
+
+      if (!IsEnd && isComparisonOp(*OpName) && isComparisonOp(*NextOpName)) {
+        D.diagnose(RHS->getLoc(),
+                   diag::unsupported_conditional_compilation_chained_comparison);
+        HasError |= true;
+      }
+
+      if (*OpName == "||" || *OpName == "&&") {
+        diagnoseLiteral(LHS);
+        diagnoseLiteral(RHS);
       }
 
       // Apply the operator with left-associativity by folding the first two
@@ -149,7 +172,7 @@ class ValidateIfConfigCondition :
       // If we don't have the next operator, we're done.
       if (IsEnd)
         break;
-      if (isRecurse && *OpName == "&&" && *NextOpName == "||")
+      if (isRecurse && lowerPrecedence(*NextOpName, *OpName))
         break;
 
       OpName = NextOpName;
@@ -172,8 +195,26 @@ public:
     return E;
   }
 
+  void diagnoseLiteral(Expr *E) {
+    if (auto P = dyn_cast<ParenExpr>(E))
+      E = P->getSubExpr();
+    if (isa<StringLiteralExpr>(E) || isa<FloatLiteralExpr>(E)) {
+      D.diagnose(E->getLoc(),
+                 diag::unsupported_conditional_compilation_literal);
+      HasError |= true;
+    }
+  }
+
   // 'true' or 'false' constant.
   Expr *visitBooleanLiteralExpr(BooleanLiteralExpr *E) {
+    return E;
+  }
+
+  // Literals for comparison operators.
+  Expr *visitStringLiteralExpr(StringLiteralExpr *E) {
+    return E;
+  }
+  Expr *visitFloatLiteralExpr(FloatLiteralExpr *E) {
     return E;
   }
 
@@ -304,6 +345,7 @@ public:
   // Grouped condition. e.g. '(FLAG)'
   Expr *visitParenExpr(ParenExpr *E) {
     E->setSubExpr(validate(E->getSubExpr()));
+    diagnoseLiteral(E->getSubExpr());
     return E;
   }
 
@@ -316,6 +358,7 @@ public:
       return nullptr;
     }
     E->setArg(validate(E->getArg()));
+    diagnoseLiteral(E->getArg());
     return E;
   }
 
@@ -353,6 +396,7 @@ static bool validateIfConfigCondition(Expr *&condition,
                                       DiagnosticEngine &D) {
   ValidateIfConfigCondition Validator(Context, D);
   condition = Validator.validate(condition);
+  Validator.diagnoseLiteral(condition);
   return Validator.hasError();
 }
 
@@ -366,6 +410,35 @@ class EvaluateIfConfigCondition :
   /// \c UnresolvedDeclRefExpr.
   StringRef getDeclRefStr(Expr *E) {
     return cast<UnresolvedDeclRefExpr>(E)->getName().getBaseIdentifier().str();
+  }
+
+  std::string asString(Expr *E) {
+    if (auto Literal = dyn_cast<StringLiteralExpr>(E))
+      return Literal->getValue();
+    else if (auto Literal = dyn_cast<FloatLiteralExpr>(E))
+      return (Literal->isNegative()? "-" : "") + Literal->getDigitsText().str();
+    else if (auto Literal = dyn_cast<IntegerLiteralExpr>(E))
+      return (Literal->isNegative()? "-" : "") + Literal->getDigitsText().str();
+    else if (isa<UnresolvedDeclRefExpr>(E)) {
+      StringRef FlagName = getDeclRefStr(E);
+      const auto &Flags = Ctx.LangOpts.getCustomCompilationFlags();
+      if (Flags.find(FlagName) != Flags.end()) {
+        StringRef Value = Flags.at(FlagName);
+        if (Value.size() >= 2 && Value[0] == '"' && Value.end()[-1] == '"')
+          Value = Value.drop_front().drop_back();
+        return Value;
+      }
+      return "";
+    }
+    return visit(E) ? "true" : "false";
+  }
+
+  bool isNumber(Expr *E) {
+    return isa<NumberLiteralExpr>(E);
+  }
+
+  double asDouble(Expr *E) {
+    return strtod(asString(E).c_str(), nullptr);
   }
 
 public:
@@ -433,10 +506,24 @@ public:
     auto Args = E->getArg()->getElements();
     if (OpName == "||") return visit(Args[0]) || visit(Args[1]);
     if (OpName == "&&") return visit(Args[0]) && visit(Args[1]);
+    if (OpName == "==") return isNumber(Args[0]) || isNumber(Args[1]) ?
+                                asDouble(Args[0]) == asDouble(Args[1]) :
+                                asString(Args[0]) == asString(Args[1]);
+    if (OpName == "!=") return isNumber(Args[0]) || isNumber(Args[1]) ?
+                                asDouble(Args[0]) != asDouble(Args[1]) :
+                                asString(Args[0]) != asString(Args[1]);
+    if (OpName == ">=") return asDouble(Args[0]) >= asDouble(Args[1]);
+    if (OpName == "<=") return asDouble(Args[0]) <= asDouble(Args[1]);
+    if (OpName == ">") return asDouble(Args[0]) > asDouble(Args[1]);
+    if (OpName == "<") return asDouble(Args[0]) < asDouble(Args[1]);
     llvm_unreachable("unsupported binary operator");
   }
 
-  bool visitExpr(Expr *E) { llvm_unreachable("Unvalidated condition?"); }
+  bool visitExpr(Expr *E) {
+    llvm::raw_fd_ostream out(2, false);
+    E->dump(out);
+    llvm_unreachable("Unvalidated condition?");
+  }
 };
 
 /// Evaluate the condition.
@@ -463,6 +550,7 @@ public:
     auto Args = E->getArg()->getElements();
     if (OpName == "||") return visit(Args[0]) && visit(Args[1]);
     if (OpName == "&&") return visit(Args[0]) || visit(Args[1]);
+    if (isComparisonOp(OpName)) return false;
     llvm_unreachable("unsupported binary operator");
   }
 

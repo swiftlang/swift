@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -D FOO -D BAZ -swift-version 4
 
-#if FOO == BAZ // expected-error{{expected '&&' or '||' expression}}
+#if FOO == BAZ // comparisons now permitted
 var x = 0
 #endif
 

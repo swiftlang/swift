@@ -3404,7 +3404,9 @@ public:
         // Condition if present
         Expr *Cond = Clause.Cond;
         if (Cond) {
-          if (!Ctx.SourceMgr.isBeforeInBuffer(Location, Cond->getStartLoc())) {
+          if (!Ctx.SourceMgr.isBeforeInBuffer(Location, Cond->getStartLoc()) &&
+              Ctx.SourceMgr.findBufferContainingLoc(Cond->getStartLoc()) ==
+              Ctx.SourceMgr.findBufferContainingLoc(Location)) {
             Out << "invalid IfConfigDecl clause condition start location\n";
             ICD->print(Out);
             abort();

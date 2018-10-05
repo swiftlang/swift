@@ -1971,20 +1971,24 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
                                       Loc, Context.AllocateCopy(Exprs)));
 }
 
+///   expr-literal:
+///     #flagValue("FLAG_NAME"[, default: expr])
+///   Result is an expr containg either a literal taken from the flag's value
+///   or an optional expression that will be used if the flag is not present.
 ParserResult<Expr> Parser::parseExprFlagValue(Diag<> ID, bool isExprBasic) {
-  ParserResult<Expr> Result;
-  consumeToken();
-  if (!consumeIf(tok::l_paren)) {
-    diagnose(Tok, diag::keyvalue_missing_leftbrace);
+  consumeToken(tok::pound_flagValue);
+  if (parseToken(tok::l_paren, diag::flagvalue_missing_left_paren, "("))
     return makeParserError();
-  }
 
+  ParserResult<Expr> Result;
   auto Bail = [&] () {
-    skipUntilTokenOrEndOfLine(tok::r_brace);
-    return makeParserError();
+    if (skipUntilTokenOrEndOfLine(tok::r_paren))
+      consumeIf(tok::r_paren);
+    Result.setIsParseError();
+    return Result;
   };
-  if (!Tok.is(tok::string_literal)) {
-    diagnose(Tok, diag::keyvalue_not_string_literal);
+  if (Tok.isNot(tok::string_literal)) {
+    diagnose(Tok, diag::flagvalue_not_string_literal);
     return Bail();
   }
 
@@ -2003,56 +2007,77 @@ ParserResult<Expr> Parser::parseExprFlagValue(Diag<> ID, bool isExprBasic) {
     }
 
     if (IsFileInclude) {
+      // Flag name or value starts with @. Read as string from file.
       const auto FileSystem = SourceMgr.getFileSystem();
       using FileOrError = llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>;
       FileOrError inputFileOrErr = swift::vfs::getFileOrSTDIN(*FileSystem.get(),
                                                               Value);
       if (!inputFileOrErr) {
-        diagnose(Tok.getLoc(), diag::keyvalue_file_open_failure,
+        diagnose(Tok, diag::flagvalue_file_open_failure,
                  Value, inputFileOrErr.getError().message());
         return Bail();
       }
 
+      // Register file contents as source buffer.
       unsigned BufferId = SourceMgr.addNewSourceBuffer(std::move(*inputFileOrErr));
       StringRef Buffer = SourceMgr.getEntireTextForBuffer(BufferId);
       SourceLoc Loc = SourceLoc(llvm::SMLoc::getFromPointer(Buffer.begin()));
 
+      // Create StringLiteralExpr with single, straight though segement.
       auto Segment = Lexer::StringSegment::getLiteral(Loc, Buffer.size(),
-                                                      false, false, 0, 255);
+                                                      false, false, 0, ~0u);
       Result = makeParserResult(createStringLiteralExprFromSegment(
-         Context, L, Segment, Loc));
+                                Context, L, Segment, Tok.getLoc()));
 
-      consumeIf(tok::string_literal);
+      consumeToken(tok::string_literal);
     }
-    else {
-      unsigned BufferId = SourceMgr.addMemBufferCopy(Value, "-D"+FlagName.str());
-      StringRef Buffer = SourceMgr.getEntireTextForBuffer(BufferId);
-
+    else if (!Value.empty()) {
       {
+        // Sub-parse flag value looking for appropriate literal token.
+        unsigned BufferId = SourceMgr.addMemBufferCopy(Value,
+                                                       "Option: -D"+FlagName.str());
+        StringRef Buffer = SourceMgr.getEntireTextForBuffer(BufferId);
+
         // Temporarily swap out the parser's current lexer with our new one.
         Lexer LocalLex(*L, LexerState(Buffer.begin()), LexerState(Buffer.end()));
 
         llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
-        consumeIf(tok::string_literal);
+
+        // Now the sub-lexer is set up, the next token is lexed at this point.
+        consumeToken(tok::string_literal);
       }
 
-      if (!Tok.isAny(tok::identifier, tok::string_literal,
-                     tok::floating_literal, tok::integer_literal)) {
-        diagnose(Tok.getLoc(), diag::keyvalue_invalid_literal, Value);
+      // Don't feed to syntax token recorder.
+      ConsumeTokenReceiver DisabledRec;
+      llvm::SaveAndRestore<ConsumeTokenReceiver *> R(TokReceiver, &DisabledRec);
+
+      // Prevents interpolations in strings in flag values.
+      // Also, arranges for the "Loc" of the resulting Expr to
+      // be that of the FlagName argument in the main buffer.
+      Tok.setCustomCompilationFlag(true);
+
+      if (Tok.isNot(tok::kw_true, tok::kw_false, tok::string_literal,
+                    tok::floating_literal, tok::integer_literal, tok::kw_nil)) {
+        diagnose(Tok, diag::flagvalue_invalid_literal, Value);
         consumeToken();
         return Bail();
       }
 
-      Tok.setCustomCompilationFlag();
+      // Literal token consumed to create Expr *
       Result = parseExprPrimary(ID, isExprBasic);
+    }
+    else {
+      diagnose(Tok, diag::flagvalue_flag_empty, FlagName);
+      return Bail();
     }
   }
   else
-    consumeIf(tok::string_literal);
+    consumeToken(tok::string_literal);
 
   if (consumeIf(tok::comma)) {
-    if (parseToken(tok::kw_default, diag::keyvalue_expected, "default:") ||
-        parseToken(tok::colon, diag::keyvalue_expected, ":"))
+    // Parse out default if provided and use if necessary.
+    if (parseToken(tok::kw_default, diag::flagvalue_expected, "default:") ||
+        parseToken(tok::colon, diag::flagvalue_expected, ":"))
       return Bail();
 
     auto Default = parseExprImpl(ID, isExprBasic);
@@ -2062,13 +2087,12 @@ ParserResult<Expr> Parser::parseExprFlagValue(Diag<> ID, bool isExprBasic) {
   }
 
   if (Result.isNull()) {
-    diagnose(Tok.getLoc(), diag::keyvalue_no_value, FlagName);
-    Result = makeParserError();
-  }
-
-  if (parseToken(tok::r_paren, diag::keyvalue_expected, ")")) {
+    diagnose(Tok, diag::flagvalue_no_value, FlagName);
     return Bail();
   }
+
+  if (parseToken(tok::r_paren, diag::flagvalue_expected, ")"))
+    return Bail();
 
   return Result;
 }

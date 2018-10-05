@@ -340,7 +340,8 @@ void Lexer::formStringLiteralToken(const char *TokStart,
 }
 
 Lexer::State Lexer::getStateForBeginningOfTokenLoc(SourceLoc Loc) const {
-  const char *Ptr = getBufferPtrForSourceLoc(Loc);
+//  const char *Ptr = getBufferPtrForSourceLoc(Loc);
+  const char *Ptr = reinterpret_cast<const char *>(Loc.getOpaquePointerValue());
   // Skip whitespace backwards until we hit a newline.  This is needed to
   // correctly lex the token if it is at the beginning of the line.
   while (Ptr >= ContentStart + 1) {
@@ -2124,6 +2125,10 @@ StringRef Lexer::getEncodedStringSegmentImpl(StringRef Bytes,
                                              unsigned IndentToStrip,
                                              unsigned CustomDelimiterLen) {
 
+  // Special case for file contents included using a custom compilation flag.
+  if (CustomDelimiterLen == ~0u)
+    return Bytes;
+
   TempString.clear();
   // Note that it is always safe to read one over the end of "Bytes" because we
   // know that there is a terminating " character (or null byte for an
@@ -2247,9 +2252,10 @@ void Lexer::getStringLiteralSegments(
         *BytesPtr++ != '(')
       continue;
 
-    if (Str.isCustomCompilationFlag() && Diags) {
-      Diags->diagnose(Lexer::getSourceLoc(BytesPtr-2),
-                      diag::keyvalue_invalid_interpolation);
+    if (Str.isCustomCompilationFlag()) {
+      if (Diags)
+        Diags->diagnose(Lexer::getSourceLoc(BytesPtr-2),
+                        diag::flagvalue_invalid_interpolation);
       continue;
     }
 

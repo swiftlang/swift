@@ -1247,19 +1247,21 @@ ERROR(expr_dynamictype_deprecated,PointsToFirstBadToken,
       "'.dynamicType' is deprecated. Use 'type(of: ...)' instead", ())
 
 // #flagValue expressions.
-ERROR(keyvalue_missing_leftbrace,PointsToFirstBadToken,
-      "#flagValue must be followed by '('", ())
-ERROR(keyvalue_not_string_literal,PointsToFirstBadToken,
+ERROR(flagvalue_missing_left_paren,PointsToFirstBadToken,
+      "#flagValue must be followed by '%0'", (StringRef))
+ERROR(flagvalue_not_string_literal,PointsToFirstBadToken,
       "#flagValue argument must be string literal", ())
-ERROR(keyvalue_file_open_failure,PointsToFirstBadToken,
+ERROR(flagvalue_file_open_failure,PointsToFirstBadToken,
       "#flagValue unable to open included file '%0': '%1'", (StringRef, StringRef))
-ERROR(keyvalue_invalid_literal,PointsToFirstBadToken,
+ERROR(flagvalue_invalid_literal,PointsToFirstBadToken,
       "#flagValue contents '%0' are invalid literal type", (StringRef))
-ERROR(keyvalue_expected,PointsToFirstBadToken,
+ERROR(flagvalue_flag_empty,PointsToFirstBadToken,
+      "#flagValue empty string for '%0'", (StringRef))
+ERROR(flagvalue_expected,PointsToFirstBadToken,
       "#flagValue expected '%0'", (StringRef))
-ERROR(keyvalue_no_value,PointsToFirstBadToken,
+ERROR(flagvalue_no_value,PointsToFirstBadToken,
       "#flagValue no value found for key '%0' and no default", (StringRef))
-WARNING(keyvalue_invalid_interpolation,none,
+WARNING(flagvalue_invalid_interpolation,none,
       "#flagValue interpolations are ignored inside values", ())
 
 //------------------------------------------------------------------------------
@@ -1507,9 +1509,11 @@ ERROR(where_inside_brackets,none,
 // MARK: Conditional compilation parsing diagnostics
 //------------------------------------------------------------------------------
 ERROR(unsupported_conditional_compilation_binary_expression,none,
-      "expected '&&' or '||' expression", ())
+      "expected '&&', '||' or comparison expression", ())
 ERROR(unsupported_conditional_compilation_unary_expression,none,
       "expected unary '!' expression", ())
+ERROR(unsupported_conditional_compilation_chained_comparison,none,
+      "comparison operators can not be chained", ())
 ERROR(unsupported_platform_condition_expression,none,
       "unexpected platform condition "
       "(expected 'os', 'arch', or 'swift')",
@@ -1525,6 +1529,8 @@ ERROR(unsupported_platform_condition_argument,none,
       (StringRef))
 ERROR(unsupported_conditional_compilation_expression_type,none,
       "invalid conditional compilation expression", ())
+ERROR(unsupported_conditional_compilation_literal,none,
+      "invalid context for literal in conditional", ())
 ERROR(unsupported_conditional_compilation_integer,none,
       "'%0' is not a valid conditional compilation expression, use '%1'",
       (StringRef, StringRef))
