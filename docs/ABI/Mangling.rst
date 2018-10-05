@@ -9,7 +9,7 @@ Mangling
 --------
 ::
 
-  mangled-name ::= '$S' global
+  mangled-name ::= '$s' global
 
 All Swift-mangled names begin with this prefix.
 
@@ -114,6 +114,7 @@ field offsets are therefore required when accessing fields in generic
 types where the metadata itself has unknown layout.)
 
 ::
+
   global ::= global 'Tj'                 // resilient method dispatch thunk
   global ::= global 'Tq'                 // method descriptor
 
