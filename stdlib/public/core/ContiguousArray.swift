@@ -51,14 +51,6 @@ public struct ContiguousArray<Element>: _DestructorSafeContainer {
 
 //===--- private helpers---------------------------------------------------===//
 extension ContiguousArray {
-  @inlinable
-  @_semantics("array.make_mutable")
-  internal mutating func _makeMutableAndUnique() {
-    if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
-      _buffer = _Buffer(copying: _buffer)
-    }
-  }
-
   /// Check that the given `index` is valid for subscripting, i.e.
   /// `0 ≤ index < count`.
   @inlinable

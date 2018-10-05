@@ -44,6 +44,14 @@ extension _ArrayProtocol {
     return _buffer.capacity
   }
 
+  @inlinable
+  @_semantics("array.make_mutable")
+  internal mutating func _makeMutableAndUnique() {
+    if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
+      _buffer = _Buffer(copying: _buffer)
+    }
+  }
+
   /// An object that guarantees the lifetime of this array's elements.
   @inlinable
   public // @testable
