@@ -757,28 +757,42 @@ bool Parser::parseEndIfDirective(SourceLoc &Loc) {
   return false;
 }
 
-static Parser::StructureMarkerKind getStructureMarkerKindForToken(const Token &tok)
-{
+static Parser::StructureMarkerKind
+getStructureMarkerKindForToken(const Token &tok) {
   switch (tok.getKind()) {
-    case tok::l_brace:
-      return Parser::StructureMarkerKind::OpenBrace;
-        
-    case tok::l_paren:
-      return Parser::StructureMarkerKind::OpenBrace;
-        
-    case tok::l_square:
-      return Parser::StructureMarkerKind::OpenSquare;
-        
-    default:
-      llvm_unreachable("Not a matched token");
+  case tok::l_brace:
+    return Parser::StructureMarkerKind::OpenBrace;
+  case tok::l_paren:
+    return Parser::StructureMarkerKind::OpenBrace;
+  case tok::l_square:
+    return Parser::StructureMarkerKind::OpenSquare;
+  default:
+    llvm_unreachable("Not a matched token");
   }
 }
 
+Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser,
+                                                 const Token &tok)
+    : StructureMarkerRAII(parser, tok.getLoc(),
+                          getStructureMarkerKindForToken(tok)) {}
 
-Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser, const Token &tok):
-  StructureMarkerRAII(parser, tok.getLoc(), getStructureMarkerKindForToken(tok)) { }
-
-
+bool Parser::StructureMarkerRAII::pushStructureMarker(
+                                      Parser &parser, SourceLoc loc,    
+                                      StructureMarkerKind kind) {
+  
+  if (parser.StructureMarkers.size() < MaxDepth) {
+    parser.StructureMarkers.push_back({loc, kind, None});
+    return true;
+  } else {
+    parser.diagnose(loc, diag::structure_overflow, MaxDepth);
+    // We need to cut off parsing or we will stack-overflow.
+    // But `cutOffParsing` changes the current token to eof, and we may be in
+    // a place where `consumeToken()` will be expecting e.g. '[',
+    // since we need that to get to the callsite, so this can cause an assert.
+    parser.cutOffParsing();
+    return false;
+  }
+}
 //===----------------------------------------------------------------------===//
 // Primitive Parsing
 //===----------------------------------------------------------------------===//

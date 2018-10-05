@@ -311,33 +311,20 @@ public:
     /// Max nesting level
     // TODO: customizable.
     enum { MaxDepth = 256 };
-      
-  StructureMarkerRAII(Parser *parser)
-      : P(parser) {  }
-    
-  // Have the parser start the new Structure or fail if already too deep.
-  bool pushStructureMarker(Parser &parser, SourceLoc loc, StructureMarkerKind kind) {
-    if (parser.StructureMarkers.size() < MaxDepth) {
-      parser.StructureMarkers.push_back({loc, kind, None});
-      return true;
-    }
-    else {
-      parser.diagnose(loc, diag::structure_overflow, MaxDepth);
-      // We need to cut off parsing or we will stack-overflow.
-      // But `cutOffParsing` changes the current token to eof,
-      // and we may be in a place where `consumeToken()` will be expecting e.g. '[',
-      // since we need that to get to the callsite, so this can cause an assert.
-      parser.cutOffParsing();
-      return false;
-    }
-  }
+
+    StructureMarkerRAII(Parser *parser) : P(parser) {}
+
+    /// Have the parser start the new Structure or fail if already too deep.
+    bool pushStructureMarker(Parser &parser, SourceLoc loc,
+                             StructureMarkerKind kind);
 
   public:
-    StructureMarkerRAII(Parser &parser, SourceLoc loc, StructureMarkerKind kind):
-      StructureMarkerRAII( pushStructureMarker(parser, loc, kind)? &parser : nullptr ) {}
-    
+    StructureMarkerRAII(Parser &parser, SourceLoc loc, StructureMarkerKind kind)
+        : StructureMarkerRAII(
+              pushStructureMarker(parser, loc, kind) ? &parser : nullptr) {}
+
     StructureMarkerRAII(Parser &parser, const Token &tok);
-    
+
     /// Did we fail to push the new structure?
     bool isFailed() {
       return P == nullptr;
