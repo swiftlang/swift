@@ -1,5 +1,6 @@
 silopt_register_sources(
   ARCCodeMotion.cpp
+  AccessEnforcementDom.cpp
   AccessEnforcementOpts.cpp
   AccessEnforcementWMO.cpp
   AllocBoxToStack.cpp

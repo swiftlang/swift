@@ -1656,7 +1656,15 @@ func _projectKeyPathReadOnly<Root, Value>(
   return keyPath._projectReadOnly(from: root)
 }
 
-@inlinable
+// The compiler can't tell which calls might begin an access.
+// That means it can't eliminate dominated checks even when it can prove
+// that the dominated scope has no internal nested conflicts.
+// We use the @_keyPathEntryPoint annotation:
+// This doesn't solve the deinit ending a scope problem,
+// but it solves the much more important half of the problem:
+// identifying the beginning of an access scope -
+// would allow dominance based optimization:
+@_keyPathEntryPoint
 public // COMPILER_INTRINSIC
 func _projectKeyPathWritable<Root, Value>(
   root: UnsafeMutablePointer<Root>,
@@ -1665,7 +1673,7 @@ func _projectKeyPathWritable<Root, Value>(
   return keyPath._projectMutableAddress(from: root)
 }
 
-@inlinable
+@_keyPathEntryPoint
 public // COMPILER_INTRINSIC
 func _projectKeyPathReferenceWritable<Root, Value>(
   root: Root,

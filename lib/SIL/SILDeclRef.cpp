@@ -530,6 +530,8 @@ IsSerialized_t SILDeclRef::isSerialized() const {
 bool SILDeclRef::isNoinline() const {
   if (!hasDecl())
     return false;
+  if (getDecl()->getAttrs().hasAttribute<KeyPathEntryPointAttr>())
+    return true;
   if (auto InlineA = getDecl()->getAttrs().getAttribute<InlineAttr>())
     if (InlineA->getKind() == InlineKind::Never)
       return true;

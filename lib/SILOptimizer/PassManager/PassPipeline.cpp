@@ -496,6 +496,10 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
   // Optimize access markers for improved IRGen after all other optimizations.
   P.addAccessEnforcementOpts();
   P.addAccessEnforcementWMO();
+  P.addAccessEnforcementDom();
+  // addAccessEnforcementDom might provide potential for LICM:
+  // A loop might have only one dynamic access now, i.e. hoistable
+  P.addLICM();
 
   // Only has an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();
