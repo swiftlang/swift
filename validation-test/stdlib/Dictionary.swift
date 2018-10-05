@@ -4801,10 +4801,11 @@ DictionaryTestSuite.test("Values.MutationDoesNotInvalidateIndices") {
 
   // You should also be able to advance Cocoa indices.
   let j = d.index(after: i)
+  expectLT(i, j)
 
   // Unfortunately, Cocoa and Native indices aren't comparable, so the
   // Collection conformance is not quite perfect.
-  expectCrash(withMessage: "Comparing indexes from different dictionaries") {
+  expectCrash() {
     print(i == i2)
   }
 }
