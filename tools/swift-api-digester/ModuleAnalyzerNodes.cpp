@@ -989,11 +989,12 @@ static StringRef printGenericSignature(SDKContext &Ctx, Decl *D) {
 }
 
 static Optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) {
-  auto D = VD->getDeclContext()->getAsDecl();
-  if (!D)
+  auto *NTD = dyn_cast_or_null<NominalTypeDecl>(VD->getDeclContext()->getAsDecl());
+
+  if (!NTD || isa<ProtocolDecl>(NTD))
     return None;
 
-  if (auto *ED = dyn_cast<EnumDecl>(D)) {
+  if (auto *ED = dyn_cast<EnumDecl>(NTD)) {
     auto Check = [](Decl *M) {
       return isa<EnumElementDecl>(M);
     };
@@ -1003,20 +1004,19 @@ static Optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) {
       assert(End != Members.end());
       return std::count_if(Members.begin(), End, Check);
     }
+    return None;
   }
-  if (auto *SD = dyn_cast<StructDecl>(D)) {
-    auto Check = [](Decl *M) {
-      if (auto *STD = dyn_cast<AbstractStorageDecl>(M)) {
-        return STD->hasStorage() && !STD->isStatic();
-      }
-      return false;
-    };
-    if (!SD->isResilient() && Check(VD)) {
-      auto Members = SD->getMembers();
-      auto End = std::find(Members.begin(), Members.end(), VD);
-      assert(End != Members.end());
-      return std::count_if(Members.begin(), End, Check);
+  auto Check = [](Decl *M) {
+    if (auto *STD = dyn_cast<AbstractStorageDecl>(M)) {
+      return STD->hasStorage() && !STD->isStatic();
     }
+    return false;
+  };
+  if (!NTD->isResilient() && Check(VD)) {
+    auto Members = NTD->getMembers();
+    auto End = std::find(Members.begin(), Members.end(), VD);
+    assert(End != Members.end());
+    return std::count_if(Members.begin(), End, Check);
   }
   return llvm::None;
 }

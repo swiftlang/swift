@@ -363,6 +363,7 @@
             "ReferenceOwnership"
           ],
           "ownership": 1,
+          "fixedbinaryorder": 0,
           "hasStorage": true
         },
         {
@@ -429,6 +430,7 @@
             "ReferenceOwnership"
           ],
           "ownership": 2,
+          "fixedbinaryorder": 1,
           "hasStorage": true
         },
         {
