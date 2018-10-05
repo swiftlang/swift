@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
-// RUN: %target-typecheck-verify-swift -enable-testing -swift-version 5
+// RUN: %target-typecheck-verify-swift -swift-version 5 -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-typecheck-verify-swift -swift-version 5 -disable-objc-attr-requires-foundation-module -enable-objc-interop -enable-testing
 
 @usableFromInline private func privateVersioned() {}
 // expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal declarations, but 'privateVersioned()' is private}}
@@ -66,6 +66,12 @@ public func usesEqEnum() -> Bool {
 
   _ = RawEnum.foo.rawValue
   _ = RawEnum(rawValue: 0)
+}
+
+public class DynamicMembers {
+  @usableFromInline @objc dynamic init() {}
+  @usableFromInline @objc dynamic func foo() {}
+  @usableFromInline @objc dynamic var bar: Int = 0
 }
 
 internal struct InternalStruct {}

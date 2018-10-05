@@ -1844,16 +1844,6 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
     return;
   }
 
-  // Symbols of dynamically-dispatched declarations are never referenced
-  // directly, so marking them as @usableFromInline does not make sense.
-  if (VD->isDynamic()) {
-    if (attr->isImplicit())
-      attr->setInvalid();
-    else
-      diagnoseAndRemoveAttr(attr, diag::usable_from_inline_dynamic_not_supported);
-    return;
-  }
-
   // On internal declarations, @inlinable implies @usableFromInline.
   if (VD->getAttrs().hasAttribute<InlinableAttr>()) {
     if (TC.Context.isSwiftVersionAtLeast(4,2))
