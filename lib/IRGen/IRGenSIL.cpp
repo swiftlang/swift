@@ -2080,6 +2080,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       case SymbolicValue::EnumWithPayload:
       case SymbolicValue::Address:
       case SymbolicValue::Aggregate: // Tuples and structs
+      case SymbolicValue::Metatype:
         assert(0 && "These attribute kinds cannot happen here");
       case SymbolicValue::Function:
         assert(0 && "TODO: implement function typed attr");
@@ -2192,18 +2193,6 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         }
         break;
       }
-      case SymbolicValue::Metatype:
-        // Set up dtype attr as in:
-        //   TFE_OpSetAttrType(op, "dtype", TF_FLOAT);
-        auto *setAttrTypeFn = IGM.getTFE_OpSetAttrTypeFn();
-        auto dtypeValAddr = createStringValAddr(IGM, attrName.c_str());
-        dtypeAttr = convertSwiftTypeToTF(attr.value.getMetatypeValue());
-        LLVM_DEBUG(llvm::dbgs() << " Setting type-typed attr " << attrName
-                                << " with dtype value " << dtypeAttr << ".\n");
-        Builder.CreateCall(
-            setAttrTypeFn,
-            {op, dtypeValAddr, llvm::ConstantInt::get(IGM.Int32Ty, dtypeAttr)});
-        break;
       }
       // Done with normal attributes.
       break;
@@ -2312,6 +2301,27 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
       auto *deleteTensorFn = IGM.getTF_DeleteTensorFn();
       Builder.CreateCall(deleteTensorFn, {tensor});
+      break;
+    }
+    case GraphOperationInfo::ArgumentLowering::TFDataTypeAttribute: {
+      switch (attr.value.getKind()) {
+      case SymbolicValue::Integer: {
+        // Set up dtype attr as in:
+        //   TFE_OpSetAttrType(op, "dtype", TF_FLOAT);
+        auto *setAttrTypeFn = IGM.getTFE_OpSetAttrTypeFn();
+        auto attrNameValAddr = createStringValAddr(IGM, attrName.c_str());
+        dtypeAttr = getTFDataType(attr.value);
+        auto dtypeAttrConst = llvm::ConstantInt::get(IGM.Int32Ty, dtypeAttr);
+        Builder.CreateCall(setAttrTypeFn,
+                           {op, attrNameValAddr, dtypeAttrConst});
+        break;
+      }
+      case SymbolicValue::Array:
+        llvm_unreachable("TODO: Implement array of TF_DataType");
+      default:
+        llvm_unreachable(
+            "only integers and arrays are possible for TF_DataType attrs");
+      }
       break;
     }
     case GraphOperationInfo::ArgumentLowering::ShapeAttribute:

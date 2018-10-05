@@ -28,6 +28,7 @@
 
 namespace swift {
 class GraphOperationInst;
+class SymbolicValue;
 
 namespace tf {
 /// Holds information about a TensorFlow operation as represented in SIL
@@ -44,9 +45,8 @@ public:
     Input,
 
     /// This should be lowered to an attribute, in the most direct way. e.g.
-    /// integers should be lowered to integer attributes, metatypes should be
-    /// lowered to type attributes, TensorShapes should be lowered to shape
-    /// attributes, etc.
+    /// integers should be lowered to integer attributes, TensorShapes should
+    /// be lowered to shape attributes, etc.
     ///
     /// Written as named argument without "$" suffix.
     NormalAttribute,
@@ -69,10 +69,17 @@ public:
     UnknownShapeListAttribute,
 
     /// A metatype of a TensorFlow value type or aggregate of TensorFlow value
-    /// types that should be lowered into a list of type attributes.
+    /// types. Deabstraction lowers this to TFDataTypeAttribute.
     ///
     /// Written as named argument with "$typeList" suffix.
     TypeListAttribute,
+
+    /// An integer, or an aggregate containing a single integer, representing a
+    /// TF_DataType attribute. Or a list of such elements, representing a
+    /// TF_DataType list attribute.
+    ///
+    /// Written as named argument with "$dtype" suffix.
+    TFDataTypeAttribute,
 
     /// An argument specifying the address where an indirect output should be
     /// stored. This occurs when the graph_op exists in a context where its
@@ -246,6 +253,13 @@ bool isShapeArrayPseudoAttr(StringRef attrName, SymbolicValue attrValue);
 /// that case.
 int decodeShapeAttr(const ASTContext &ctx, SymbolicValue attr,
                     SmallVectorImpl<int64_t> &result);
+
+/// Return the TF_DataType represented by `value`.
+unsigned getTFDataType(SymbolicValue value);
+
+/// Return a SymbolicValue that represents the TF_DataType for the given swift
+/// type.
+SymbolicValue convertSwiftTypeToTFSymbolicValue(Type type);
 
 } // end namespace tf
 } // end namespace swift

@@ -172,7 +172,7 @@ public func _scalarTensorWithShape<Scalar>(
   _ x: Tensor<Scalar>
 ) -> Tensor<Scalar> {
   let ret: TensorHandle<Scalar> =
-    #tfop("Identity", x, T: Scalar.self, __shapes: [TensorShape()])
+    #tfop("Identity", x, T$dtype: Scalar.cDataType, __shapes: [TensorShape()])
   return Tensor<Scalar>(handle: ret)
 }
 
@@ -182,6 +182,6 @@ public func _addScalarTensorsWithShape<Scalar>(
   _ y: Tensor<Scalar>
 ) -> Tensor<Scalar> {
   let ret: TensorHandle<Scalar> =
-    #tfop("Add", x, y, T: Scalar.self, __shapes: [TensorShape()])
+    #tfop("Add", x, y, T$dtype: Scalar.cDataType, __shapes: [TensorShape()])
   return Tensor<Scalar>(handle: ret)
 }

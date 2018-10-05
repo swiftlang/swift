@@ -23,9 +23,11 @@ import CTensorFlow
 
 @_fixed_layout
 public struct _TensorDataType {
+  @usableFromInline
   internal var cDataType: TF_DataType
 
-  fileprivate init(_ cDataType: TF_DataType) {
+  @inlinable
+  internal init(_ cDataType: TF_DataType) {
     self.cDataType = cDataType
   }
 }
@@ -37,6 +39,7 @@ public struct _TensorDataType {
 public protocol AccelerableByTensorFlow {
   /// The underlying TensorFlow data type.
   /// - Note: This is not intended for general use.
+  @inlinable
   static var _tensorFlowDataType: _TensorDataType { get }
 
   // Hooks used by the TFPartition pass for primitive operations on tensors.
@@ -85,13 +88,14 @@ private func _TFGetScalarImpl<Scalar>(
 }
 
 internal extension AccelerableByTensorFlow {
-  @usableFromInline
+  @inlinable
   static var cDataType: TF_DataType {
     return _tensorFlowDataType.cDataType
   }
 }
 
 extension Bool : AccelerableByTensorFlow {
+  @inlinable
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_BOOL)
   }
@@ -115,6 +119,7 @@ extension Bool : AccelerableByTensorFlow {
 }
 
 extension Int8 : AccelerableByTensorFlow {
+  @inlinable
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_INT8)
   }
@@ -138,6 +143,7 @@ extension Int8 : AccelerableByTensorFlow {
 }
 
 extension UInt8 : AccelerableByTensorFlow {
+  @inlinable
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_UINT8)
   }
@@ -161,6 +167,7 @@ extension UInt8 : AccelerableByTensorFlow {
 }
 
 extension Int16 : AccelerableByTensorFlow {
+  @inlinable
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_INT16)
   }
@@ -184,6 +191,7 @@ extension Int16 : AccelerableByTensorFlow {
 }
 
 extension UInt16 : AccelerableByTensorFlow {
+  @inlinable
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_UINT16)
   }
@@ -208,6 +216,7 @@ extension UInt16 : AccelerableByTensorFlow {
 }
 
 extension Int32 : AccelerableByTensorFlow {
+  @inlinable
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_INT32)
   }
@@ -231,6 +240,7 @@ extension Int32 : AccelerableByTensorFlow {
 }
 
 extension UInt32 : AccelerableByTensorFlow {
+  @inlinable
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_UINT32)
   }
@@ -255,6 +265,7 @@ extension UInt32 : AccelerableByTensorFlow {
 }
 
 extension Int64 : AccelerableByTensorFlow {
+  @inlinable
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_INT64)
   }
@@ -278,6 +289,7 @@ extension Int64 : AccelerableByTensorFlow {
 }
 
 extension UInt64 : AccelerableByTensorFlow {
+  @inlinable
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_UINT64)
   }
@@ -308,6 +320,7 @@ public struct BFloat16 {
 }
 
 extension BFloat16 : AccelerableByTensorFlow {
+  @inlinable
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_BFLOAT16)
   }
@@ -336,6 +349,7 @@ extension BFloat16 : AccelerableByTensorFlow {
 }
 
 extension Float : AccelerableByTensorFlow {
+  @inlinable
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_FLOAT)
   }
@@ -359,6 +373,7 @@ extension Float : AccelerableByTensorFlow {
 }
 
 extension Double : AccelerableByTensorFlow {
+  @inlinable
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_DOUBLE)
   }
@@ -383,6 +398,7 @@ extension Double : AccelerableByTensorFlow {
 }
 
 extension String : AccelerableByTensorFlow {
+  @inlinable
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_STRING)
   }

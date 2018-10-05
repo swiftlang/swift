@@ -110,6 +110,8 @@ GraphOperationInfo::getArgumentLoweringSuffix(ArgumentLowering lowering) {
     return "$unknownShapeList";
   case ArgumentLowering::TypeListAttribute:
     return "$typeList";
+  case ArgumentLowering::TFDataTypeAttribute:
+    return "$dtype";
   case ArgumentLowering::Out:
     return "$out";
   }
@@ -136,6 +138,7 @@ GraphOperationInfo::decodeArgumentName(StringRef Name) {
           .Case("shape", ArgumentLowering::ShapeAttribute)
           .Case("unknownShapeList", ArgumentLowering::UnknownShapeListAttribute)
           .Case("typeList", ArgumentLowering::TypeListAttribute)
+          .Case("dtype", ArgumentLowering::TFDataTypeAttribute)
           .Case("out", ArgumentLowering::Out)
           .Default(None);
     assert(loweringOpt && "invalid attribute modifier");
@@ -192,4 +195,17 @@ int tf::decodeShapeAttr(const ASTContext &ctx, SymbolicValue attr,
     result.push_back(elt.getIntegerValue().sextOrTrunc(64).getLimitedValue());
   }
   return arrayValue.size();
+}
+
+/// Return the TF_DataType represented by `value`.
+unsigned tf::getTFDataType(SymbolicValue value) {
+  value = value.lookThroughSingleElementAggregates();
+  assert(value.getKind() == SymbolicValue::Integer);
+  return value.getIntegerValue().sextOrTrunc(32).getLimitedValue();
+}
+
+/// Return a SymbolicValue that represents the TF_DataType for the given swift
+/// type.
+SymbolicValue tf::convertSwiftTypeToTFSymbolicValue(Type type) {
+  return SymbolicValue::getInteger(convertSwiftTypeToTF(type), 32);
 }
