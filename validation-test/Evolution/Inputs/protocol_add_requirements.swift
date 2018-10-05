@@ -175,3 +175,43 @@ public func doSomething<T : AddSubscriptProtocol>(_ t: inout T, k1: T.Key, k2: T
   t[k1] = t[k2]
 #endif
 }
+
+public protocol SimpleProtocol {
+  static func getString() -> String
+}
+
+public struct Wrapper<T>: SimpleProtocol {
+  public static func getString() -> String {
+    return "I am a wrapper for \(T.self)"
+  }
+}
+
+public protocol AddAssocTypesProtocol {
+#if AFTER
+  associatedtype AssocType = Self
+  associatedtype AssocType2: SimpleProtocol = Wrapper<AssocType>
+#endif
+}
+
+public func doSomethingWithAssocTypes<T: AddAssocTypesProtocol>(_ value: T)
+    -> String {
+#if AFTER
+  return String(describing: T.AssocType2.self)
+#else
+  return "there are no associated types yet"
+#endif
+}
+
+public func doSomethingWithAssocConformances<T: AddAssocTypesProtocol>(_ value: T)
+    -> String {
+#if AFTER
+  let at2: Any.Type = T.AssocType2.self
+  if let simpleType = at2 as? SimpleProtocol.Type {
+    return simpleType.getString()
+  }
+  
+  return "missing associated conformance"
+#else
+  return "there are no associated conformances yet"
+#endif
+}

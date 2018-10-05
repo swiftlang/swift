@@ -13,10 +13,10 @@ var x: Int
 let reversedArray: ReversedCollection<[Int]>
 
 // x
-sil_global hidden @$S3tmp1xSivp : $Int
+sil_global hidden @$s3tmp1xSivp : $Int
 
 // reversedArray
-sil_global hidden [let] @$S3tmp13reversedArrays18ReversedCollectionVySaySiGGvp : $ReversedCollection<Array<Int>>
+sil_global hidden [let] @$s3tmp13reversedArrays18ReversedCollectionVySaySiGGvp : $ReversedCollection<Array<Int>>
 
 // _swiftEmptyArrayStorage
 sil_global @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
@@ -24,7 +24,7 @@ sil_global @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
 
 // CHECK-LABEL: sil hidden @multi_end_licm : $@convention(thin) () -> () {
 // CHECK: bb2:
-// CHECK: [[GLOBALVAR:%.*]] = global_addr @$S3tmp1xSivp : $*Int
+// CHECK: [[GLOBALVAR:%.*]] = global_addr @$s3tmp1xSivp : $*Int
 // CHECK: [[BEGINA:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]] : $*Int
 // CHECK-NEXT: br [[LOOPH:bb[0-9]+]]({{.*}} : $Builtin.Int64)
 // CHECK: [[LOOPH]]({{.*}} : $Builtin.Int64)
@@ -51,14 +51,14 @@ sil_global @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
 // CHECK-NEXT: return
 sil hidden @multi_end_licm : $@convention(thin) () -> () {
 bb0:
-  %0 = global_addr @$S3tmp13reversedArrays18ReversedCollectionVySaySiGGvp : $*ReversedCollection<Array<Int>>
+  %0 = global_addr @$s3tmp13reversedArrays18ReversedCollectionVySaySiGGvp : $*ReversedCollection<Array<Int>>
   %1 = struct_element_addr %0 : $*ReversedCollection<Array<Int>>, #ReversedCollection._base
   %2 = struct_element_addr %1 : $*Array<Int>, #Array._buffer
   %3 = struct_element_addr %2 : $*_ArrayBuffer<Int>, #_ArrayBuffer._storage
-  %4 = struct_element_addr %3 : $*_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
+  %4 = struct_element_addr %3 : $*_BridgeStorage<__ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
   %5 = load %4 : $*Builtin.BridgeObject
-  %6 = unchecked_ref_cast %5 : $Builtin.BridgeObject to $_ContiguousArrayStorageBase
-  %7 = ref_element_addr %6 : $_ContiguousArrayStorageBase, #_ContiguousArrayStorageBase.countAndCapacity
+  %6 = unchecked_ref_cast %5 : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
+  %7 = ref_element_addr %6 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
   %8 = struct_element_addr %7 : $*_ArrayBody, #_ArrayBody._storage
   %9 = struct_element_addr %8 : $*_SwiftArrayBodyStorage, #_SwiftArrayBodyStorage.count
   %10 = struct_element_addr %9 : $*Int, #Int._value
@@ -74,10 +74,10 @@ bb1:
   br bbRet
 
 bb2:
-  %19 = global_addr @$S3tmp1xSivp : $*Int
+  %19 = global_addr @$s3tmp1xSivp : $*Int
   %20 = integer_literal $Builtin.Int64, 1
   %21 = integer_literal $Builtin.Int1, -1
-  %23 = ref_tail_addr %6 : $_ContiguousArrayStorageBase, $Int
+  %23 = ref_tail_addr %6 : $__ContiguousArrayStorageBase, $Int
   br bb4(%12 : $Builtin.Int64)
 
 bb4(%27 : $Builtin.Int64):
@@ -136,14 +136,14 @@ bbRet:
 // CHECK: return
 sil hidden @multi_end_licm_loop_exit : $@convention(thin) () -> () {
 bb0:
-  %0 = global_addr @$S3tmp13reversedArrays18ReversedCollectionVySaySiGGvp : $*ReversedCollection<Array<Int>>
+  %0 = global_addr @$s3tmp13reversedArrays18ReversedCollectionVySaySiGGvp : $*ReversedCollection<Array<Int>>
   %1 = struct_element_addr %0 : $*ReversedCollection<Array<Int>>, #ReversedCollection._base
   %2 = struct_element_addr %1 : $*Array<Int>, #Array._buffer
   %3 = struct_element_addr %2 : $*_ArrayBuffer<Int>, #_ArrayBuffer._storage
-  %4 = struct_element_addr %3 : $*_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
+  %4 = struct_element_addr %3 : $*_BridgeStorage<__ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
   %5 = load %4 : $*Builtin.BridgeObject
-  %6 = unchecked_ref_cast %5 : $Builtin.BridgeObject to $_ContiguousArrayStorageBase
-  %7 = ref_element_addr %6 : $_ContiguousArrayStorageBase, #_ContiguousArrayStorageBase.countAndCapacity
+  %6 = unchecked_ref_cast %5 : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
+  %7 = ref_element_addr %6 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
   %8 = struct_element_addr %7 : $*_ArrayBody, #_ArrayBody._storage
   %9 = struct_element_addr %8 : $*_SwiftArrayBodyStorage, #_SwiftArrayBodyStorage.count
   %10 = struct_element_addr %9 : $*Int, #Int._value
@@ -159,10 +159,10 @@ bb1:
   br bbRet
 
 bb2:
-  %19 = global_addr @$S3tmp1xSivp : $*Int
+  %19 = global_addr @$s3tmp1xSivp : $*Int
   %20 = integer_literal $Builtin.Int64, 1
   %21 = integer_literal $Builtin.Int1, -1
-  %23 = ref_tail_addr %6 : $_ContiguousArrayStorageBase, $Int
+  %23 = ref_tail_addr %6 : $__ContiguousArrayStorageBase, $Int
   br bb4(%12 : $Builtin.Int64)
 
 bb4(%27 : $Builtin.Int64):

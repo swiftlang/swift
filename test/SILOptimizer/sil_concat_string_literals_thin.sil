@@ -16,9 +16,9 @@ sil @_TF12StringConcat58testStringConcat_UnicodeScalarLiteral_UnicodeScalarLiter
 bb0:
   %0 = alloc_stack $String, var, name "s"              // users: %15, %16
   // function_ref static String.+ infix(String, String) -> String
-  %1 = function_ref @$SSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
+  %1 = function_ref @$sSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
   // function_ref String.init(_builtinStringLiteral : Builtin.RawPointer, utf8CodeUnitCount : Builtin.Word, isASCII : Builtin.Int1) -> String
-  %2 = function_ref @$SSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %2 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %3 = metatype $@thin String.Type                // user: %7
   %4 = string_literal utf8 "1"                    // user: %7
   %5 = integer_literal $Builtin.Word, 1           // user: %7
@@ -44,16 +44,16 @@ sil @_TF12StringConcat68testStringConcat_UnicodeScalarLiteral_ExtendedGraphemeCl
 bb0:
   %0 = alloc_stack $String, var, name "s"              // users: %15, %16
   // function_ref static String.+ infix(String, String) -> String
-  %1 = function_ref @$SSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
+  %1 = function_ref @$sSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
   // function_ref String.init(_builtinStringLiteral : Builtin.RawPointer, utf8CodeUnitCount : Builtin.Word, isASCII : Builtin.Int1) -> String
-  %2 = function_ref @$SSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %2 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %3 = metatype $@thin String.Type                // user: %7
   %4 = string_literal utf8 "1"                    // user: %7
   %5 = integer_literal $Builtin.Word, 1           // user: %7
   %6 = integer_literal $Builtin.Int1, -1          // user: %7
   %7 = apply %2(%4, %5, %6, %3) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
   // function_ref String.init(_builtinUTF16StringLiteral : Builtin.RawPointer, utf16CodeUnitCount : Builtin.Word) -> String
-  %8 = function_ref @$SSS26_builtinUTF16StringLiteral18utf16CodeUnitCountSSBp_BwtcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
+  %8 = function_ref @$sSS26_builtinUTF16StringLiteral18utf16CodeUnitCountSSBp_BwtcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
   %9 = metatype $@thin String.Type                // user: %13
   %10 = string_literal utf16 "á"                // user: %13
   %11 = integer_literal $Builtin.Word, 2          // user: %13
@@ -66,15 +66,15 @@ bb0:
 }
 
 // static String.+ infix(String, String) -> String
-sil [readonly] [_semantics "string.concat"] @$SSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
+sil [readonly] [_semantics "string.concat"] @$sSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
 
 
 // String.init(_builtinStringLiteral : Builtin.RawPointer, utf8CodeUnitCount : Builtin.Word, isASCII : Builtin.Int1) -> String
-sil [serialized] [readonly] [_semantics "string.makeUTF8"] @$SSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+sil [serialized] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
 
 
 // String.init(_builtinUTF16StringLiteral : Builtin.RawPointer, utf16CodeUnitCount : Builtin.Word) -> String
-sil [serialized] [readonly] [_semantics "string.makeUTF16"] @$SSS26_builtinUTF16StringLiteral18utf16CodeUnitCountSSBp_BwtcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
+sil [serialized] [readonly] [_semantics "string.makeUTF16"] @$sSS26_builtinUTF16StringLiteral18utf16CodeUnitCountSSBp_BwtcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
 
 //CHECK-LABEL: sil @_TF12StringConcat51testStringConcat_UnicodeScalarLiteral_StringLiteralFT_SS : $@convention(thin) () -> @owned String
 //CHECK-NOT: string_literal utf8 "1"
@@ -85,9 +85,9 @@ sil @_TF12StringConcat51testStringConcat_UnicodeScalarLiteral_StringLiteralFT_SS
 bb0:
   %0 = alloc_stack $String, var, name "s"              // users: %15, %16
   // function_ref static String.+ infix(String, String) -> String
-  %1 = function_ref @$SSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
+  %1 = function_ref @$sSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
   // function_ref String.init(_builtinStringLiteral : Builtin.RawPointer, utf8CodeUnitCount : Builtin.Word, isASCII : Builtin.Int1) -> String
-  %2 = function_ref @$SSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %2 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %3 = metatype $@thin String.Type                // user: %7
   %4 = string_literal utf8 "1"                    // user: %7
   %5 = integer_literal $Builtin.Word, 1           // user: %7
@@ -113,16 +113,16 @@ sil @_TF12StringConcat68testStringConcat_ExtendedGraphemeClusterLiteral_UnicodeS
 bb0:
   %0 = alloc_stack $String, var, name "s"              // users: %15, %16
   // function_ref static String.+ infix(String, String) -> String
-  %1 = function_ref @$SSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
+  %1 = function_ref @$sSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
   // function_ref String.init(_builtinUTF16StringLiteral : Builtin.RawPointer, utf16CodeUnitCount : Builtin.Word) -> String
-  %2 = function_ref @$SSS26_builtinUTF16StringLiteral18utf16CodeUnitCountSSBp_BwtcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
+  %2 = function_ref @$sSS26_builtinUTF16StringLiteral18utf16CodeUnitCountSSBp_BwtcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
   %3 = metatype $@thin String.Type                // user: %7
   %4 = string_literal utf16 "á"                 // user: %7
   %5 = integer_literal $Builtin.Word, 2           // user: %7
   %6 = integer_literal $Builtin.Int1, 0
   %7 = apply %2(%4, %5, %3) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %14
   // function_ref String.init(_builtinStringLiteral : Builtin.RawPointer, utf8CodeUnitCount : Builtin.Word, isASCII : Builtin.Int1) -> String
-  %8 = function_ref @$SSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %8 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %9 = metatype $@thin String.Type                // user: %13
   %10 = string_literal utf8 "z"                   // user: %13
   %11 = integer_literal $Builtin.Word, 1          // user: %13
@@ -143,9 +143,9 @@ sil @_TF12StringConcat78testStringConcat_ExtendedGraphemeClusterLiteral_Extended
 bb0:
   %0 = alloc_stack $String, var, name "s"              // users: %15, %16
   // function_ref static String.+ infix(String, String) -> String
-  %1 = function_ref @$SSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
+  %1 = function_ref @$sSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
   // function_ref String.init(_builtinUTF16StringLiteral : Builtin.RawPointer, utf16CodeUnitCount : Builtin.Word) -> String
-  %2 = function_ref @$SSS26_builtinUTF16StringLiteral18utf16CodeUnitCountSSBp_BwtcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
+  %2 = function_ref @$sSS26_builtinUTF16StringLiteral18utf16CodeUnitCountSSBp_BwtcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
   %3 = metatype $@thin String.Type                // user: %7
   %4 = string_literal utf16 "á"                 // user: %7
   %5 = integer_literal $Builtin.Word, 2           // user: %7
@@ -171,16 +171,16 @@ sil @_TF12StringConcat61testStringConcat_ExtendedGraphemeClusterLiteral_StringLi
 bb0:
   %0 = alloc_stack $String, var, name "s"              // users: %15, %16
   // function_ref static String.+ infix(String, String) -> String
-  %1 = function_ref @$SSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
+  %1 = function_ref @$sSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
   // function_ref String.init(_builtinUTF16StringLiteral : Builtin.RawPointer, utf16CodeUnitCount : Builtin.Word) -> String
-  %2 = function_ref @$SSS26_builtinUTF16StringLiteral18utf16CodeUnitCountSSBp_BwtcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
+  %2 = function_ref @$sSS26_builtinUTF16StringLiteral18utf16CodeUnitCountSSBp_BwtcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
   %3 = metatype $@thin String.Type                // user: %7
   %4 = string_literal utf16 "á"                 // user: %7
   %5 = integer_literal $Builtin.Word, 2           // user: %7
   %6 = integer_literal $Builtin.Int1, 0
   %7 = apply %2(%4, %5, %3) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String // user: %14
   // function_ref String.init(_builtinStringLiteral : Builtin.RawPointer, utf8CodeUnitCount : Builtin.Word, isASCII : Builtin.Int1) -> String
-  %8 = function_ref @$SSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %8 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %9 = metatype $@thin String.Type                // user: %13
   %10 = string_literal utf8 "xyz"                 // user: %13
   %11 = integer_literal $Builtin.Word, 3          // user: %13
@@ -201,9 +201,9 @@ sil @_TF12StringConcat51testStringConcat_StringLiteral_UnicodeScalarLiteralFT_SS
 bb0:
   %0 = alloc_stack $String, var, name "s"              // users: %15, %16
   // function_ref static String.+ infix(String, String) -> String
-  %1 = function_ref @$SSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
+  %1 = function_ref @$sSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
   // function_ref String.init(_builtinStringLiteral : Builtin.RawPointer, utf8CodeUnitCount : Builtin.Word, isASCII : Builtin.Int1) -> String
-  %2 = function_ref @$SSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %2 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %3 = metatype $@thin String.Type                // user: %7
   %4 = string_literal utf8 "xyz"                  // user: %7
   %5 = integer_literal $Builtin.Word, 3           // user: %7
@@ -229,16 +229,16 @@ sil @_TF12StringConcat61testStringConcat_StringLiteral_ExtendedGraphemeClusterLi
 bb0:
   %0 = alloc_stack $String, var, name "s"              // users: %15, %16
   // function_ref static String.+ infix(String, String) -> String
-  %1 = function_ref @$SSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
+  %1 = function_ref @$sSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
   // function_ref String.init(_builtinStringLiteral : Builtin.RawPointer, utf8CodeUnitCount : Builtin.Word, isASCII : Builtin.Int1) -> String
-  %2 = function_ref @$SSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %2 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %3 = metatype $@thin String.Type                // user: %7
   %4 = string_literal utf8 "xyz"                  // user: %7
   %5 = integer_literal $Builtin.Word, 3           // user: %7
   %6 = integer_literal $Builtin.Int1, -1          // user: %7
   %7 = apply %2(%4, %5, %6, %3) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
   // function_ref String.init(_builtinUTF16StringLiteral : Builtin.RawPointer, utf16CodeUnitCount : Builtin.Word) -> String
-  %8 = function_ref @$SSS26_builtinUTF16StringLiteral18utf16CodeUnitCountSSBp_BwtcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
+  %8 = function_ref @$sSS26_builtinUTF16StringLiteral18utf16CodeUnitCountSSBp_BwtcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
   %9 = metatype $@thin String.Type                // user: %13
   %10 = string_literal utf16 "á"                // user: %13
   %11 = integer_literal $Builtin.Word, 2          // user: %13
@@ -259,9 +259,9 @@ sil @_TF12StringConcat44testStringConcat_StringLiteral_StringLiteralFT_SS : $@co
 bb0:
   %0 = alloc_stack $String, var, name "s"              // users: %15, %16
   // function_ref static String.+ infix(String, String) -> String
-  %1 = function_ref @$SSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
+  %1 = function_ref @$sSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
   // function_ref String.init(_builtinStringLiteral : Builtin.RawPointer, utf8CodeUnitCount : Builtin.Word, isASCII : Builtin.Int1) -> String
-  %2 = function_ref @$SSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %2 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %3 = metatype $@thin String.Type                // user: %7
   %4 = string_literal utf8 "xyz"                  // user: %7
   %5 = integer_literal $Builtin.Word, 3           // user: %7
@@ -289,9 +289,9 @@ sil @_TF12StringConcat72testStringConcat_StringLiteral_StringLiteral_StringLiter
 bb0:
   %0 = alloc_stack $String, var, name "s"              // users: %31, %32
   // function_ref static String.+ infix(String, String) -> String
-  %1 = function_ref @$SSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
+  %1 = function_ref @$sSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
   // function_ref String.init(_builtinStringLiteral : Builtin.RawPointer, utf8CodeUnitCount : Builtin.Word, isASCII : Builtin.Int1) -> String
-  %2 = function_ref @$SSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %2 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %5 = metatype $@thin String.Type                // user: %9
   %6 = string_literal utf8 "ab"                   // user: %9
   %7 = integer_literal $Builtin.Word, 2           // user: %9
@@ -330,16 +330,16 @@ sil @_TF12StringConcat82testStringConcat_StringLiteral_UnicodeScalarLiteral_Exte
 bb0:
   %0 = alloc_stack $String, var, name "s"              // users: %23, %24
   // function_ref static String.+ infix(String, String) -> String
-  %1 = function_ref @$SSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
+  %1 = function_ref @$sSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
   // function_ref String.init(_builtinStringLiteral : Builtin.RawPointer, utf8CodeUnitCount : Builtin.Word, isASCII : Builtin.Int1) -> String
-  %3 = function_ref @$SSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %3 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %4 = metatype $@thin String.Type                // user: %8
   %5 = string_literal utf8 "ab"                   // user: %8
   %6 = integer_literal $Builtin.Word, 2           // user: %8
   %7 = integer_literal $Builtin.Int1, -1          // user: %8
   %8 = apply %3(%5, %6, %7, %4) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %15
   // function_ref String.init(_builtinUTF16StringLiteral : Builtin.RawPointer, utf16CodeUnitCount : Builtin.Word) -> String
-  %9 = function_ref @$SSS26_builtinUTF16StringLiteral18utf16CodeUnitCountSSBp_BwtcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
+  %9 = function_ref @$sSS26_builtinUTF16StringLiteral18utf16CodeUnitCountSSBp_BwtcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
   %10 = metatype $@thin String.Type               // user: %14
   %11 = string_literal utf8 "c"                   // user: %14
   %12 = integer_literal $Builtin.Word, 1          // user: %14
@@ -368,9 +368,9 @@ sil @_TF12StringConcat109testStringConcat_ExtendedGraphemeClusterLiteral_Extende
 bb0:
   %0 = alloc_stack $String, var, name "s"              // users: %23, %24
   // function_ref static String.+ infix(String, String) -> String
-  %1 = function_ref @$SSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
+  %1 = function_ref @$sSS1poiyS2S_SStFZ : $@convention(thin) (@owned String, @owned String, @thin String.Type) -> @owned String
   // function_ref String.init(_builtinUTF16StringLiteral : Builtin.RawPointer, utf16CodeUnitCount : Builtin.Word) -> String
-  %2 = function_ref @$SSS26_builtinUTF16StringLiteral18utf16CodeUnitCountSSBp_BwtcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
+  %2 = function_ref @$sSS26_builtinUTF16StringLiteral18utf16CodeUnitCountSSBp_BwtcfC : $@convention(thin) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
   %4 = metatype $@thin String.Type                // user: %8
   %5 = string_literal utf16 "aaaá"              // user: %8
   %6 = integer_literal $Builtin.Word, 5           // user: %8

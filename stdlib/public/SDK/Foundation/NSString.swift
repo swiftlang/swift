@@ -54,7 +54,7 @@ extension NSString : _HasCustomAnyHashableRepresentation {
 }
 
 extension NSString {
-  public convenience init(format: NSString, _ args: CVarArg...) {
+  public convenience init(format: __shared NSString, _ args: CVarArg...) {
     // We can't use withVaList because 'self' cannot be captured by a closure
     // before it has been initialized.
     let va_args = getVaList(args)
@@ -62,7 +62,7 @@ extension NSString {
   }
 
   public convenience init(
-    format: NSString, locale: Locale?, _ args: CVarArg...
+    format: __shared NSString, locale: Locale?, _ args: CVarArg...
   ) {
     // We can't use withVaList because 'self' cannot be captured by a closure
     // before it has been initialized.
@@ -102,7 +102,7 @@ extension NSString {
   ///   characters from `aString`. The returned object may be different
   ///   from the original receiver.
   @nonobjc
-  public convenience init(string aString: NSString) {
+  public convenience init(string aString: __shared NSString) {
     self.init(string: aString as String)
   }
 }

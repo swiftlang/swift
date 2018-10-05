@@ -753,7 +753,7 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
   //   %57 = load %56 : $*Builtin.BridgeObject from Array<Int>
   //   %58 = unchecked_ref_cast %57 : $Builtin.BridgeObject to
   //   $_ContiguousArray
-  //   %59 = unchecked_ref_cast %58 : $_ContiguousArrayStorageBase to
+  //   %59 = unchecked_ref_cast %58 : $__ContiguousArrayStorageBase to
   //   $Builtin.NativeObject
   //   %60 = struct_extract %53 : $UnsafeMutablePointer<Int>,
   //   #UnsafeMutablePointer
@@ -797,20 +797,6 @@ bool COWArrayOpt::checkSafeElementValueUses(UserOperList &ElementValueUsers) {
       return false;
   }
   return true;
-}
-static bool isArrayEltStore(StoreInst *SI) {
-  SILValue Dest = stripAddressProjections(SI->getDest());
-  if (auto *MD = dyn_cast<MarkDependenceInst>(Dest))
-    Dest = MD->getValue();
-
-  if (auto *PtrToAddr =
-          dyn_cast<PointerToAddressInst>(stripAddressProjections(Dest)))
-    if (auto *SEI = dyn_cast<StructExtractInst>(PtrToAddr->getOperand())) {
-      ArraySemanticsCall Call(SEI->getOperand());
-      if (Call && Call.getKind() == ArrayCallKind::kGetElementAddress)
-        return true;
-    }
-  return false;
 }
 
 /// Check whether the array semantic operation could change an array value to
@@ -1278,7 +1264,7 @@ bool COWArrayOpt::hoistInLoopWithOnlyNonArrayValueMutatingOperations() {
       // A store is only safe if it is to an array element and the element type
       // is trivial.
       if (auto *SI = dyn_cast<StoreInst>(Inst)) {
-        if (!isArrayEltStore(SI) ||
+        if (!isAddressOfArrayElement(SI->getDest()) ||
             !SI->getSrc()->getType().isTrivial(Module)) {
           LLVM_DEBUG(llvm::dbgs()
                      <<"     (NO) non trivial store could store an array value "
@@ -1420,7 +1406,7 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
 
       // Stores to array elements.
       if (auto *SI = dyn_cast<StoreInst>(Inst)) {
-        if (isArrayEltStore(SI))
+        if (isAddressOfArrayElement(SI->getDest()))
           continue;
         LLVM_DEBUG(llvm::dbgs() << "     (NO) unknown store " << *SI);
         return ReturnWithCleanup(false);
@@ -1993,7 +1979,7 @@ public:
 
     // Clone the arguments.
     for (auto &Arg : StartBB->getArguments()) {
-      SILValue MappedArg = ClonedStartBB->createPHIArgument(
+      SILValue MappedArg = ClonedStartBB->createPhiArgument(
           getOpType(Arg->getType()), ValueOwnershipKind::Owned);
       ValueMap.insert(std::make_pair(Arg, MappedArg));
     }
@@ -2376,9 +2362,8 @@ class SwiftArrayOptPass : public SILFunctionTransform {
       for (auto &HoistableLoopNest : HoistableLoopNests)
         ArrayPropertiesSpecializer(DT, LA, HoistableLoopNest).run();
 
-      // We might have cloned there might be critical edges that need splitting.
-      splitAllCriticalEdges(*getFunction(), true /* only cond_br terminators*/,
-                            DT, nullptr);
+      // Verify that no illegal critical edges were created.
+      getFunction()->verifyCriticalEdges();
 
       LLVM_DEBUG(getFunction()->viewCFG());
 

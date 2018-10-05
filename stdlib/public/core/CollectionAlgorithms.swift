@@ -72,13 +72,6 @@ extension Collection where Element : Equatable {
     }
     return nil
   }
-  
-  /// Returns the first index where the specified value appears in the
-  /// collection.
-  @inlinable
-  public func index(of _element: Element) -> Index? {
-    return firstIndex(of: _element)
-  }
 }
 
 extension Collection {
@@ -116,15 +109,6 @@ extension Collection {
       self.formIndex(after: &i)
     }
     return nil
-  }
-  
-  /// Returns the first index in which an element of the collection satisfies
-  /// the given predicate.
-  @inlinable
-  public func index(
-    where _predicate: (Element) throws -> Bool
-  ) rethrows -> Index? {
-    return try firstIndex(where: _predicate)
   }
 }
 
@@ -386,10 +370,10 @@ extension Sequence {
   /// Returns the elements of the sequence, shuffled using the given generator
   /// as a source for randomness.
   ///
-  /// You use this method to randomize the elements of a sequence when you
-  /// are using a custom random number generator. For example, you can shuffle
-  /// the numbers between `0` and `9` by calling the `shuffled(using:)` method
-  /// on that range:
+  /// You use this method to randomize the elements of a sequence when you are
+  /// using a custom random number generator. For example, you can shuffle the
+  /// numbers between `0` and `9` by calling the `shuffled(using:)` method on
+  /// that range:
   ///
   ///     let numbers = 0...9
   ///     let shuffledNumbers = numbers.shuffled(using: &myGenerator)
@@ -400,6 +384,11 @@ extension Sequence {
   /// - Returns: An array of this sequence's elements in a shuffled order.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
+  /// - Note: The algorithm used to shuffle a sequence may change in a future
+  ///   version of Swift. If you're passing a generator that results in the
+  ///   same shuffled order each time you run your program, that sequence may
+  ///   change when your program is compiled using a different version of
+  ///   Swift.
   @inlinable
   public func shuffled<T: RandomNumberGenerator>(
     using generator: inout T
@@ -418,8 +407,8 @@ extension Sequence {
   ///     let shuffledNumbers = numbers.shuffled()
   ///     // shuffledNumbers == [1, 7, 6, 2, 8, 9, 4, 3, 5, 0]
   ///
-  /// This method is equivalent to calling the version that takes a generator, 
-  /// passing in the system's default random generator.
+  /// This method is equivalent to calling `shuffled(using:)`, passing in the
+  /// system's default random generator.
   ///
   /// - Returns: A shuffled array of this sequence's elements.
   ///
@@ -447,6 +436,11 @@ extension MutableCollection where Self : RandomAccessCollection {
   ///   the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
+  /// - Note: The algorithm used to shuffle a collection may change in a future
+  ///   version of Swift. If you're passing a generator that results in the
+  ///   same shuffled order each time you run your program, that sequence may
+  ///   change when your program is compiled using a different version of
+  ///   Swift.
   @inlinable
   public mutating func shuffle<T: RandomNumberGenerator>(
     using generator: inout T
@@ -468,15 +462,14 @@ extension MutableCollection where Self : RandomAccessCollection {
   
   /// Shuffles the collection in place.
   ///
-  /// Use the `shuffle()` method to randomly reorder the elements of an
-  /// array.
+  /// Use the `shuffle()` method to randomly reorder the elements of an array.
   ///
   ///     var names = ["Alejandro", "Camila", "Diego", "Luciana", "Luis", "Sofía"]
   ///     names.shuffle(using: myGenerator)
   ///     // names == ["Luis", "Camila", "Luciana", "Sofía", "Alejandro", "Diego"]
   ///
-  /// This method is equivalent to calling the version that takes a generator, 
-  /// passing in the system's default random generator.
+  /// This method is equivalent to calling `shuffle(using:)`, passing in the
+  /// system's default random generator.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable

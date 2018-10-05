@@ -23,9 +23,7 @@ func useIdentity(_ x: Int, y: Float, i32: Int32) {
   // Deduction where the result type and input type can get different results
   var xx : X, yy : Y
   xx = identity(yy) // expected-error{{cannot assign value of type 'Y' to type 'X'}}
-
-  // FIXME: rdar://41416647
-  xx = identity2(yy) // expected-error{{type of expression is ambiguous without more context}}
+  xx = identity2(yy) // expected-error{{cannot convert value of type 'Y' to expected argument type 'X'}}
 }
 
 // FIXME: Crummy diagnostic!
@@ -80,7 +78,7 @@ func passFunction(_ f: (Int) -> Float, x: Int, y: Float) {
    acceptFunction(f, y, y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
 }
 
-func returnTuple<T, U>(_: T) -> (T, U) { } // expected-note 2{{in call to function 'returnTuple'}}
+func returnTuple<T, U>(_: T) -> (T, U) { } // expected-note {{in call to function 'returnTuple'}}
 
 func testReturnTuple(_ x: Int, y: Float) {
   returnTuple(x) // expected-error{{generic parameter 'U' could not be inferred}}
@@ -89,7 +87,7 @@ func testReturnTuple(_ x: Int, y: Float) {
   var _ : (Float, Float) = returnTuple(y)
 
   // <rdar://problem/22333090> QoI: Propagate contextual information in a call to operands
-  var _ : (Int, Float) = returnTuple(y) // expected-error{{generic parameter 'U' could not be inferred}}
+  var _ : (Int, Float) = returnTuple(y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
 }
 
 
@@ -218,12 +216,12 @@ func callRangeOfIsBefore(_ ia: [Int], da: [Double]) {
 }
 
 func testEqualIterElementTypes<A: IteratorProtocol, B: IteratorProtocol>(_ a: A, _ b: B) where A.Element == B.Element {}
-// expected-note@-1 {{candidate requires that the types 'Int' and 'Double' be equivalent (requirement specified as 'A.Element' == 'B.Element' [with A = IndexingIterator<[Int]>, B = IndexingIterator<[Double]>])}}
+// expected-note@-1 {{where 'A.Element' = 'Int', 'B.Element' = 'Double'}}
 func compareIterators() {
   var a: [Int] = []
   var b: [Double] = []
   testEqualIterElementTypes(a.makeIterator(), b.makeIterator())
-  // expected-error@-1 {{cannot invoke 'testEqualIterElementTypes(_:_:)' with an argument list of type '(IndexingIterator<[Int]>, IndexingIterator<[Double]>)'}}
+  // expected-error@-1 {{global function 'testEqualIterElementTypes' requires the types 'Int' and 'Double' be equivalent}}
 }
 
 protocol P_GI {

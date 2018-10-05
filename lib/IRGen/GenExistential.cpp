@@ -109,6 +109,11 @@ namespace {
     Address projectMetadataRef(IRGenFunction &IGF, Address addr) {
       return IGF.Builder.CreateStructGEP(addr, 1, getFixedBufferSize(IGF.IGM));
     }
+    
+    /// Give the offset of the metadata field of an existential object.
+    Size getMetadataRefOffset(IRGenModule &IGM) {
+      return getFixedBufferSize(IGM);
+    }
 
     /// Given the address of an existential object, load its metadata
     /// object.
@@ -150,8 +155,9 @@ namespace {
     create(ArrayRef<const ProtocolDecl *> protocols, As &&...args)
     {
       void *buffer = operator new(
-          ExistentialTypeInfoBase::template totalSizeToAlloc<
-            const ProtocolDecl *>(protocols.size()));
+          llvm::TrailingObjects<Derived, const ProtocolDecl *>::
+              template totalSizeToAlloc<const ProtocolDecl *>(
+                  protocols.size()));
       return new (buffer) Derived(protocols, std::forward<As>(args)...);
     }
 
@@ -554,20 +560,21 @@ namespace {
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
-                                         SILType T)
+                                         SILType T, bool isOutlined)
     const override {
       // NB: We assume that the witness table slots are zero if an extra
       // inhabitant is stored in the container.
       src = projectValue(IGF, src);
       return asDerived().getValueTypeInfoForExtraInhabitants(IGF.IGM)
-                        .getExtraInhabitantIndex(IGF, src, SILType());
+                      .getExtraInhabitantIndex(IGF, src, SILType(), isOutlined);
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
-                              Address dest, SILType T) const override {
+                              Address dest, SILType T, bool isOutlined)
+    const override {
       Address valueDest = projectValue(IGF, dest);
       asDerived().getValueTypeInfoForExtraInhabitants(IGF.IGM)
-                 .storeExtraInhabitant(IGF, index, valueDest, SILType());
+            .storeExtraInhabitant(IGF, index, valueDest, SILType(), isOutlined);
     }
 
     APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
@@ -615,23 +622,25 @@ namespace {
       } \
     } \
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src, \
-                                         SILType T) const override { \
+                                         SILType T, bool isOutlined) \
+    const override { \
       Address valueSrc = projectValue(IGF, src); \
       if (shouldStoreExtraInhabitantsInRef(IGF.IGM)) { \
         return IGF.getReferenceStorageExtraInhabitantIndex(valueSrc, \
                                        ReferenceOwnership::Name, Refcounting); \
       } else { \
-        return Super::getExtraInhabitantIndex(IGF, src, T); \
+        return Super::getExtraInhabitantIndex(IGF, src, T, isOutlined); \
       } \
     } \
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index, \
-                              Address dest, SILType T) const override { \
+                              Address dest, SILType T, bool isOutlined) \
+    const override { \
       Address valueDest = projectValue(IGF, dest); \
       if (shouldStoreExtraInhabitantsInRef(IGF.IGM)) { \
         return IGF.storeReferenceStorageExtraInhabitant(index, valueDest, \
                                        ReferenceOwnership::Name, Refcounting); \
       } else { \
-        return Super::storeExtraInhabitant(IGF, index, dest, T); \
+        return Super::storeExtraInhabitant(IGF, index, dest, T, isOutlined); \
       } \
     } \
     APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override { \
@@ -807,12 +816,12 @@ class OpaqueExistentialTypeInfo final :
              IndirectTypeInfo<OpaqueExistentialTypeInfo, FixedTypeInfo>>;
   friend super;
 
-  // FIXME: We could get spare bits out of the metadata and/or witness
-  // pointers.
   OpaqueExistentialTypeInfo(ArrayRef<const ProtocolDecl *> protocols,
-                            llvm::Type *ty, Size size, Alignment align)
+                            llvm::Type *ty, Size size,
+                            SpareBitVector &&spareBits,
+                            Alignment align)
     : super(protocols, ty, size,
-            SpareBitVector::getConstant(size.getValueInBits(), false), align,
+            std::move(spareBits), align,
             IsNotPOD, IsBitwiseTakable, IsFixedSize) {}
 
 public:
@@ -898,6 +907,37 @@ public:
     call->setCallingConv(IGF.IGM.DefaultCC);
     call->setDoesNotThrow();
     return;
+  }
+               
+  // Opaque existentials have extra inhabitants and spare bits in their type
+  // metadata pointer, matching those of a standalone thick metatype (which
+  // in turn match those of a heap object).
+  unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+    return getHeapObjectExtraInhabitantCount(IGM);
+  }
+  APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                     unsigned bits,
+                                     unsigned index) const override {
+    auto offset = getLayout().getMetadataRefOffset(IGM).getValueInBits();
+    return getHeapObjectFixedExtraInhabitantValue(IGM, bits, index, offset);
+  }
+  APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
+    auto mask = APInt::getAllOnesValue(IGM.getPointerSize().getValueInBits());
+    mask = mask.zext(getFixedSize().getValueInBits());
+    mask = mask.shl(getLayout().getMetadataRefOffset(IGM).getValueInBits());
+    return mask;
+  }
+  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
+                                       Address src, SILType T,
+                                       bool isOutlined) const override {
+    auto type = getLayout().projectMetadataRef(IGF, src);
+    return getHeapObjectExtraInhabitantIndex(IGF, type);
+  }
+  void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
+                            Address dest, SILType T, bool isOutlined)
+  const override {
+    auto type = getLayout().projectMetadataRef(IGF, dest);
+    return storeHeapObjectExtraInhabitant(IGF, index, type);
   }
 };
 
@@ -1404,7 +1444,27 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
   OpaqueExistentialLayout opaque(protosWithWitnessTables.size());
   Alignment align = opaque.getAlignment(IGM);
   Size size = opaque.getSize(IGM);
+  // There are spare bits in the metadata pointer and witness table pointers
+  // consistent with a native object reference.
+  SpareBitVector spareBits;
+  spareBits.appendClearBits(size.getValueInBits());
+  /* TODO: There are spare bits we could theoretically use in the type metadata
+     and witness table pointers, but opaque existentials are currently address-
+     only, and we can't soundly take advantage of spare bits for in-memory
+     representations.
+   
+  auto metadataOffset = opaque.getMetadataRefOffset(IGM);
+  spareBits.appendClearBits(metadataOffset.getValueInBits());
+  auto typeSpareBits = IGM.getHeapObjectSpareBits();
+  spareBits.append(typeSpareBits);
+  auto witnessSpareBits =
+    IGM.getWitnessTablePtrSpareBits();
+  for (unsigned i = 0, e = protosWithWitnessTables.size(); i < e; ++i)
+    spareBits.append(witnessSpareBits);
+  assert(spareBits.size() == size.getValueInBits());
+   */
   return OpaqueExistentialTypeInfo::create(protosWithWitnessTables, type, size,
+                                           std::move(spareBits),
                                            align);
 }
 

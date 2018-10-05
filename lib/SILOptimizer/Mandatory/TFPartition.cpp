@@ -1483,7 +1483,7 @@ bool TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
   // handled eagerly.
   if (hasUncondBr) {
     SmallVector<SILValue, 4> incomingValues;
-    arg->getIncomingValues(incomingValues);
+    arg->getIncomingPhiValues(incomingValues);
     for (auto v : incomingValues)
       if (markValue(v, user))
         return true;
@@ -2341,7 +2341,7 @@ void PartitionCloner::initBlock(SILBasicBlock *BB) {
 
     // Create the argument and copy it into the ValueMap so future references
     // use it.
-    ValueMap[arg] = newBB->createPHIArgument(
+    ValueMap[arg] = newBB->createPhiArgument(
         remapType(arg->getType()), ValueOwnershipKind::Trivial, arg->getDecl());
   }
 

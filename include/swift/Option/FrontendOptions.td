@@ -309,6 +309,10 @@ def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
   HelpText<"Enable experimental property behaviors">;
   
+def enable_operator_designated_protocols :
+  Flag<["-"], "enable-operator-designated-protocols">,
+  HelpText<"Enable operator designated protocols">;
+
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;
@@ -419,6 +423,9 @@ def sil_inline_caller_benefit_reduction_factor : Separate<["-"], "sil-inline-cal
 def sil_unroll_threshold : Separate<["-"], "sil-unroll-threshold">,
   MetaVarName<"<250>">,
   HelpText<"Controls the aggressiveness of loop unrolling">;
+
+def sil_existential_specializer : Flag<["-"], "sil-existential-specializer">,
+  HelpText<"Enable SIL existential specializer optimization">;
 
 def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
   HelpText<"Merge SIL from all partial swiftmodules into the final module">;

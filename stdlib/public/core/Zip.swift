@@ -41,7 +41,7 @@
 ///   - sequence2: The second sequence or collection to zip.
 /// - Returns: A sequence of tuple pairs, where the elements of each pair are
 ///   corresponding elements of `sequence1` and `sequence2`.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // generic-performance
 public func zip<Sequence1, Sequence2>(
   _ sequence1: Sequence1, _ sequence2: Sequence2
 ) -> Zip2Sequence<Sequence1, Sequence2> {
@@ -67,16 +67,16 @@ public func zip<Sequence1, Sequence2>(
 ///     // Prints "two: 2
 ///     // Prints "three: 3"
 ///     // Prints "four: 4"
-@_fixed_layout // FIXME(sil-serialize-all)
+@_fixed_layout // generic-performance
 public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence> {
-  @usableFromInline // FIXME(sil-serialize-all)
+  @usableFromInline // generic-performance
   internal let _sequence1: Sequence1
-  @usableFromInline // FIXME(sil-serialize-all)
+  @usableFromInline // generic-performance
   internal let _sequence2: Sequence2
 
   /// Creates an instance that makes pairs of elements from `sequence1` and
   /// `sequence2`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public // @testable
   init(_sequence1 sequence1: Sequence1, _sequence2 sequence2: Sequence2) {
     (_sequence1, _sequence2) = (sequence1, sequence2)
@@ -85,17 +85,17 @@ public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence> {
 
 extension Zip2Sequence {
   /// An iterator for `Zip2Sequence`.
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_fixed_layout // generic-performance
   public struct Iterator {
-    @usableFromInline // FIXME(sil-serialize-all)
+    @usableFromInline // generic-performance
     internal var _baseStream1: Sequence1.Iterator
-    @usableFromInline // FIXME(sil-serialize-all)
+    @usableFromInline // generic-performance
     internal var _baseStream2: Sequence2.Iterator
-    @usableFromInline // FIXME(sil-serialize-all)
+    @usableFromInline // generic-performance
     internal var _reachedEnd: Bool = false
 
     /// Creates an instance around a pair of underlying iterators.
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable // generic-performance
     internal init(
     _ iterator1: Sequence1.Iterator, 
     _ iterator2: Sequence2.Iterator
@@ -113,7 +113,7 @@ extension Zip2Sequence.Iterator: IteratorProtocol {
   /// exists.
   ///
   /// Once `nil` has been returned, all subsequent calls return `nil`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // generic-performance
   public mutating func next() -> Element? {
     // The next() function needs to track if it has reached the end.  If we
     // didn't, and the first sequence is longer than the second, then when we
@@ -139,8 +139,8 @@ extension Zip2Sequence: Sequence {
   public typealias Element = (Sequence1.Element, Sequence2.Element)
 
   /// Returns an iterator over the elements of this sequence.
-  @inlinable // FIXME(sil-serialize-all)
-  public func makeIterator() -> Iterator {
+  @inlinable // generic-performance
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(
       _sequence1.makeIterator(),
       _sequence2.makeIterator())

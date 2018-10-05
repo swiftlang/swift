@@ -84,6 +84,27 @@ void TBDGenVisitor::addDispatchThunk(SILDeclRef declRef) {
   addSymbol(entity);
 }
 
+void TBDGenVisitor::addMethodDescriptor(SILDeclRef declRef) {
+  auto entity = LinkEntity::forMethodDescriptor(declRef);
+  addSymbol(entity);
+}
+
+void TBDGenVisitor::addProtocolRequirementsBaseDescriptor(ProtocolDecl *proto) {
+  auto entity = LinkEntity::forProtocolRequirementsBaseDescriptor(proto);
+  addSymbol(entity);
+}
+
+void TBDGenVisitor::addAssociatedTypeDescriptor(AssociatedTypeDecl *assocType) {
+  auto entity = LinkEntity::forAssociatedTypeDescriptor(assocType);
+  addSymbol(entity);
+}
+
+void TBDGenVisitor::addAssociatedConformanceDescriptor(
+                                           AssociatedConformance conformance) {
+  auto entity = LinkEntity::forAssociatedConformanceDescriptor(conformance);
+  addSymbol(entity);
+}
+
 void TBDGenVisitor::addConformances(DeclContext *DC) {
   for (auto conformance : DC->getLocalConformances()) {
     auto protocol = conformance->getProtocol();
@@ -208,9 +229,7 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
       addSymbol(mangler.mangleEntity(VD, false));
     }
 
-    // Top-level variables (*not* statics) in the main file don't get accessors,
-    // despite otherwise looking like globals.
-    if (!FileHasEntryPoint || VD->isStatic())
+    if (VD->isLazilyInitializedGlobal())
       addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
   }
 
@@ -291,28 +310,35 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   }
 
   // Types with resilient superclasses have some extra symbols.
-  if (!hasResilientAncestor)
-    return;
-
-  addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
-
-  // And classes that are themselves resilient (not just a superclass) have even
-  // more.
-  if (!CD->isResilient())
-    return;
+  if (hasResilientAncestor)
+    addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
 
   // Emit dispatch thunks for every new vtable entry.
   struct VTableVisitor : public SILVTableVisitor<VTableVisitor> {
     TBDGenVisitor &TBD;
     ClassDecl *CD;
+    bool FirstTime = true;
 
   public:
     VTableVisitor(TBDGenVisitor &TBD, ClassDecl *CD)
         : TBD(TBD), CD(CD) {}
 
     void addMethod(SILDeclRef method) {
-      if (method.getDecl()->getDeclContext() == CD)
+      assert(method.getDecl()->getDeclContext() == CD);
+
+      if (CD->isResilient()) {
+        if (FirstTime) {
+          FirstTime = false;
+
+          // If the class is itself resilient and has at least one vtable entry,
+          // it has a method lookup function.
+          TBD.addSymbol(LinkEntity::forMethodLookupFunction(CD));
+        }
+
         TBD.addDispatchThunk(method);
+      }
+
+      TBD.addMethodDescriptor(method);
     }
 
     void addMethodOverride(SILDeclRef baseRef, SILDeclRef derivedRef) {}
@@ -359,18 +385,66 @@ void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
     visit(member);
 }
 
+/// Determine whether the protocol descriptor for the given protocol will
+/// contain any protocol requirements.
+static bool protocolDescriptorHasRequirements(ProtocolDecl *proto) {
+  if (!proto->getRequirementSignature().empty())
+    return true;
+
+  for (auto *member : proto->getMembers()) {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+      if (SILDeclRef::requiresNewWitnessTableEntry(func))
+        return true;
+    }
+
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+      if (assocType->getOverriddenDecls().empty()) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
   if (!PD->isObjC()) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
 
-    if (PD->isResilient()) {
-      for (auto *member : PD->getMembers()) {
-        if (auto *funcDecl = dyn_cast<FuncDecl>(member)) {
-          addDispatchThunk(SILDeclRef(funcDecl));
+    // If there are any requirements, emit a requirements base descriptor.
+    if (protocolDescriptorHasRequirements(PD))
+      addProtocolRequirementsBaseDescriptor(PD);
+
+    for (const auto &req : PD->getRequirementSignature()) {
+      if (req.getKind() != RequirementKind::Conformance)
+        continue;
+
+      // Skip inherited requirements.
+      if (req.getFirstType()->isEqual(PD->getProtocolSelfType()))
+        continue;
+
+      AssociatedConformance conformance(
+        PD,
+        req.getFirstType()->getCanonicalType(),
+        req.getSecondType()->castTo<ProtocolType>()->getDecl());
+      addAssociatedConformanceDescriptor(conformance);
+    }
+
+    for (auto *member : PD->getMembers()) {
+      if (PD->isResilient()) {
+        if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(member)) {
+          if (SILDeclRef::requiresNewWitnessTableEntry(funcDecl)) {
+            addDispatchThunk(SILDeclRef(funcDecl));
+            addMethodDescriptor(SILDeclRef(funcDecl));
+          }
         }
-        if (auto *ctorDecl = dyn_cast<ConstructorDecl>(member)) {
-          addDispatchThunk(SILDeclRef(ctorDecl, SILDeclRef::Kind::Allocator));
-        }
+      }
+
+      // Always produce associated type descriptors, because they can
+      // be referenced by generic signatures.
+      if (auto *assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        if (assocType->getOverriddenDecls().empty())
+          addAssociatedTypeDescriptor(assocType);
       }
     }
   }
@@ -423,6 +497,10 @@ convertToPacked(const version::Version &version) {
   return tapi::internal::PackedVersion(major, minor, subminor);
 }
 
+static bool isApplicationExtensionSafe(const LangOptions &LangOpts) {
+  return LangOpts.EnableAppExtensionRestrictions;
+}
+
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
                                            StringSet *symbols,
                                            llvm::raw_ostream *os,
@@ -433,6 +511,8 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
 
   tapi::internal::InterfaceFile file;
   file.setFileType(tapi::internal::FileType::TBD_V3);
+  file.setApplicationExtensionSafe(
+    isApplicationExtensionSafe(M->getASTContext().LangOpts));
   file.setInstallName(opts.InstallName);
   file.setCurrentVersion(convertToPacked(opts.CurrentVersion));
   file.setCompatibilityVersion(convertToPacked(opts.CompatibilityVersion));
@@ -453,7 +533,7 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
     SmallVector<Decl *, 16> decls;
     file->getTopLevelDecls(decls);
 
-    visitor.setFileHasEntryPoint(file->hasEntryPoint());
+    visitor.addMainIfNecessary(file);
 
     for (auto d : decls)
       visitor.visit(d);

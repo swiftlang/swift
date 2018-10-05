@@ -81,6 +81,18 @@ func test_loops() {
   #assert(loops2(a: 20000) > 42)
 }
 
+func test_tupleElementAddrInitialization() {
+  func identity<T>(_ t: T) -> T {
+    return t
+  }
+
+  // SIL initializes a buffer of type (Int, Int), stores "1" and "2" to the
+  // tuple_element_addr's, and then passes the address of the buffer to
+  // `identity`. Therefore, this test tests that we can evaluate top-level
+  // buffers initialized via tuple_element_addr's.
+  #assert(identity((1, 2)) == (1, 2))
+}
+
 //===----------------------------------------------------------------------===//
 // Reduced testcase propagating substitutions around.
 //===----------------------------------------------------------------------===//

@@ -6,7 +6,7 @@
 import Foundation
 
 // Make sure that we keep the escaping closures alive accross the ultimate call.
-// CHECK-LABEL: sil @$S1A19bridgeNoescapeBlock5optFn0D3Fn2yySSSgcSg_AFtF
+// CHECK-LABEL: sil @$s1A19bridgeNoescapeBlock5optFn0D3Fn2yySSSgcSg_AFtF
 // CHECK: bb0
 // CHECK:  retain_value %0
 // CHECK:  retain_value %0
@@ -37,7 +37,7 @@ public func returnOptionalEscape() -> (() ->())?
 
 // Make sure that we keep the escaping closure alive accross the ultimate call.
 
-// CHECK-LABEL: sil @$S1A19bridgeNoescapeBlockyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil @$s1A19bridgeNoescapeBlockyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:  [[V0:%.*]] = function_ref @_returnOptionalEscape
 // CHECK:  [[V1:%.*]] = apply [[V0]]
@@ -51,7 +51,7 @@ public func returnOptionalEscape() -> (() ->())?
 // CHECK:  apply [[F]]({{.*}})
 // CHECK:  release_value [[V1]] : $Optional<@callee_guaranteed () -> ()>
 
-// NOPEEPHOLE-LABEL: sil @$S1A19bridgeNoescapeBlockyyF : $@convention(thin) () -> () {
+// NOPEEPHOLE-LABEL: sil @$s1A19bridgeNoescapeBlockyyF : $@convention(thin) () -> () {
 // NOPEEPHOLE: bb0:
 // NOPEEPHOLE:  alloc_stack $Optional<@callee_guaranteed () -> ()>
 // NOPEEPHOLE:  [[SLOT:%.*]] = alloc_stack $Optional<@callee_guaranteed () -> ()>

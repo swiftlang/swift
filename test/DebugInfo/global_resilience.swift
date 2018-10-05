@@ -16,9 +16,9 @@ let small = Size(w: 1, h: 2)
 // Needs out-of-line allocation
 let large = Rectangle(p: Point(x: 1, y: 2), s: Size(w: 3, h: 4), color: 5)
 
-// CHECK: @"$S17global_resilience5small16resilient_struct4SizeVvp" =
+// CHECK: @"$s17global_resilience5small16resilient_struct4SizeVvp" =
 // CHECK-SAME: !dbg ![[SMALL:[0-9]+]]
-// CHECK: @"$S17global_resilience5large16resilient_struct9RectangleVvp" =
+// CHECK: @"$s17global_resilience5large16resilient_struct9RectangleVvp" =
 // CHECK-SAME: !dbg ![[LARGE:[0-9]+]]
 
 // CHECK: ![[SMALL]] = !DIGlobalVariableExpression(

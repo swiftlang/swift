@@ -176,6 +176,10 @@ namespace swift {
     CycleDiagnosticKind EvaluatorCycleDiagnostics =
         CycleDiagnosticKind::NoDiagnose;
 
+    /// \brief The path to which we should emit GraphViz output for the complete
+    /// request-evaluator graph.
+    std::string RequestEvaluatorGraphVizPath;
+
     /// \brief The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
     unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
@@ -198,6 +202,9 @@ namespace swift {
 
     /// \brief Enable experimental property behavior feature.
     bool EnableExperimentalPropertyBehaviors = false;
+
+    /// \brief Enable experimental operator protocol designator feature.
+    bool EnableOperatorDesignatedProtocols = false;
 
     /// \brief Staging flag for treating inout parameters as Thread Sanitizer
     /// accesses.
@@ -243,6 +250,9 @@ namespace swift {
     /// of Swift do not.
     Swift3ObjCInferenceWarnings WarnSwift3ObjCInference =
       Swift3ObjCInferenceWarnings::None;
+
+    /// Diagnose implicit 'override'.
+    bool WarnImplicitOverrides = false;
 
     /// Diagnose uses of NSCoding with classes that have unstable mangled names.
     bool EnableNSKeyedArchiverDiagnostics = true;

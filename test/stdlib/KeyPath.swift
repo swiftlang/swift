@@ -684,6 +684,10 @@ struct NonOffsetableProperties {
   var z: Int { return 0 }
 }
 
+func getIdentityKeyPathOfType<T>(_: T.Type) -> KeyPath<T, T> {
+  return \.self
+}
+
 keyPath.test("offsets") {
   let SLayout = MemoryLayout<S<Int>>.self
   expectNotNil(SLayout.offset(of: \S<Int>.x))
@@ -699,6 +703,42 @@ keyPath.test("offsets") {
   expectNil(NOPLayout.offset(of: \NonOffsetableProperties.x))
   expectNil(NOPLayout.offset(of: \NonOffsetableProperties.y))
   expectNil(NOPLayout.offset(of: \NonOffsetableProperties.z))
+
+  expectEqual(SLayout.offset(of: \.self), 0)
+  expectEqual(SLayout.offset(of: getIdentityKeyPathOfType(S<Int>.self)), 0)
+}
+
+keyPath.test("identity key path") {
+  var x = LifetimeTracked(1738)
+
+  let id = \LifetimeTracked.self
+  expectTrue(x === x[keyPath: id])
+
+  let newX = LifetimeTracked(679)
+  x[keyPath: id] = newX
+  expectTrue(x === newX)
+
+  let id2 = getIdentityKeyPathOfType(LifetimeTracked.self)
+  expectEqual(id, id2)
+  expectEqual(id.hashValue, id2.hashValue)
+  expectNotNil(id2 as? WritableKeyPath)
+
+  let id3 = id.appending(path: id2)
+  expectEqual(id, id3)
+  expectEqual(id.hashValue, id3.hashValue)
+  expectNotNil(id3 as? WritableKeyPath)
+
+  let valueKey = \LifetimeTracked.value
+  let valueKey2 = id.appending(path: valueKey)
+  let valueKey3 = (valueKey as KeyPath).appending(path: \Int.self)
+
+  expectEqual(valueKey, valueKey2)
+  expectEqual(valueKey.hashValue, valueKey2.hashValue)
+  expectEqual(valueKey, valueKey3)
+  expectEqual(valueKey.hashValue, valueKey3.hashValue)
+
+  expectEqual(x[keyPath: valueKey2], 679)
+  expectEqual(x[keyPath: valueKey3], 679)
 }
 
 keyPath.test("let-ness") {

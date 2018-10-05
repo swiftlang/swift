@@ -124,7 +124,7 @@ struct ValueOwnershipKind {
                 "ownership value?!");
 
   ValueOwnershipKind(innerty NewValue) : Value(NewValue) {}
-  ValueOwnershipKind(unsigned NewValue) : Value(innerty(NewValue)) {}
+  explicit ValueOwnershipKind(unsigned NewValue) : Value(innerty(NewValue)) {}
   ValueOwnershipKind(SILModule &M, SILType Type,
                      SILArgumentConvention Convention);
 
@@ -134,6 +134,10 @@ struct ValueOwnershipKind {
   explicit ValueOwnershipKind(StringRef Value);
 
   operator innerty() const { return Value; }
+
+  bool operator==(const swift::ValueOwnershipKind::innerty& b) {
+    return Value == b;
+  }
 
   Optional<ValueOwnershipKind> merge(ValueOwnershipKind RHS) const;
 

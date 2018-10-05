@@ -143,7 +143,7 @@ static SILInstruction *tryToGetArgumentInst(SILArgument *arg,
     return nullptr;
 
   SmallVector<SILValue, 4> inputs;
-  arg->getIncomingValues(inputs);
+  arg->getIncomingPhiValues(inputs);
   for (auto input : inputs) {
     if (auto *arg = dyn_cast<SILArgument>(input)) {
       if (auto inst = tryToGetArgumentInst(arg, visited))

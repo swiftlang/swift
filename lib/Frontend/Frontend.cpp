@@ -128,6 +128,7 @@ void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
 void CompilerInstance::recordPrimarySourceFile(SourceFile *SF) {
   assert(MainModule && "main module not created yet");
   PrimarySourceFiles.push_back(SF);
+  SF->enableInterfaceHash();
   SF->createReferencedNameTracker();
   if (SF->getBufferID().hasValue())
     recordPrimaryInputBuffer(SF->getBufferID().getValue());
@@ -298,6 +299,7 @@ static bool shouldTreatSingleInputAsMain(InputFileKind inputKind) {
   case InputFileKind::None:
     return false;
   }
+  llvm_unreachable("unhandled input kind");
 }
 
 bool CompilerInstance::setUpInputs() {
@@ -429,6 +431,10 @@ CompilerInstance::openModuleDoc(const InputFile &input) {
   return None;
 }
 
+std::unique_ptr<SILModule> CompilerInstance::takeSILModule() {
+  return std::move(TheSILModule);
+}
+
 ModuleDecl *CompilerInstance::getMainModule() {
   if (!MainModule) {
     Identifier ID = Context->getIdentifier(Invocation.getModuleName());
@@ -511,7 +517,9 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
   }
 
   FrontendStatsTracer tracer(Context->Stats, "perform-sema");
-  Context->LoadedModules[MainModule->getName()] = getMainModule();
+
+  ModuleDecl *mainModule = getMainModule();
+  Context->LoadedModules[mainModule->getName()] = mainModule;
 
   if (Invocation.getInputKind() == InputFileKind::SIL) {
     assert(!InputSourceCodeBufferIDs.empty());
@@ -666,7 +674,7 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   std::unique_ptr<DelayedParsingCallbacks> SecondaryDelayedCB{
       computeDelayedParsingCallback(false)};
 
-  PersistentParserState PersistentState;
+  PersistentParserState PersistentState(getASTContext());
 
   bool hadLoadError = parsePartialModulesAndLibraryFiles(
       implicitImports, PersistentState,
@@ -924,7 +932,8 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
   return inputFile;
 }
 
-void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
+void CompilerInstance::performParseOnly(bool EvaluateConditionals,
+                                        bool ParseDelayedBodyOnEnd) {
   const InputFileKind Kind = Invocation.getInputKind();
   ModuleDecl *const MainModule = getMainModule();
   Context->LoadedModules[MainModule->getName()] = MainModule;
@@ -945,7 +954,11 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
                                   MainBufferID);
   }
 
-  PersistentParserState PersistentState;
+  PersistentParserState PersistentState(getASTContext());
+  SWIFT_DEFER {
+    if (ParseDelayedBodyOnEnd)
+      PersistentState.parseAllDelayedDeclLists();
+  };
   PersistentState.PerformConditionEvaluation = EvaluateConditionals;
   // Parse all the library files.
   for (auto BufferID : InputSourceCodeBufferIDs) {

@@ -730,8 +730,8 @@ std::string TFGraphFunctionLowering::getUniqueName(SILDebugLocation loc,
     auto sourceLoc = loc.getLocation().getSourceLoc();
     if (sourceLoc.isValid()) {
       auto lineCol = SM.getLineAndColumn(sourceLoc);
-      auto bufferID = SM.getBufferIdentifierForLoc(sourceLoc);
-      name += "/" + bufferID.str() + "." + llvm::utostr(lineCol.first);
+      auto bufferID = SM.findBufferContainingLoc(sourceLoc);
+      name += "/" + llvm::utostr(bufferID) + "." + llvm::utostr(lineCol.first);
       name += "." + llvm::utostr(lineCol.second);
     }
   }
@@ -1053,7 +1053,11 @@ static void decodeShapeArray(const ASTContext &ctx,
   auto dimPtr = dims.data();
   for (unsigned shapeIdx = 0; shapeIdx != numShapes; ++shapeIdx) {
     dimPtrs.push_back(dimPtr);
-    dimPtr += numDims[shapeIdx];
+
+    // Make sure to handle the "unknown rank" case (numDims[shapeIdx] == -1) by
+    // without incrementing the pointer.
+    if (numDims[shapeIdx] >= 0)
+      dimPtr += numDims[shapeIdx];
   }
 }
 

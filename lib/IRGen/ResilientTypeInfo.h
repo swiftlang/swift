@@ -139,13 +139,15 @@ public:
   }
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                        Address src,
-                                       SILType T) const override {
+                                       SILType T,
+                                       bool isOutlined) const override {
     return emitGetExtraInhabitantIndexCall(IGF, T, src);
   }
   void storeExtraInhabitant(IRGenFunction &IGF,
                             llvm::Value *index,
                             Address dest,
-                            SILType T) const override {
+                            SILType T,
+                            bool isOutlined) const override {
     emitStoreExtraInhabitantCall(IGF, T, index, dest);
   }
 

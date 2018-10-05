@@ -108,6 +108,7 @@ public:
       case RecordedAccessKind::NoescapeClosureCapture:
         return ClosureAccessKind;
     };
+    llvm_unreachable("unhandled kind");
   }
 
   SILLocation getAccessLoc() const {
@@ -117,6 +118,7 @@ public:
       case RecordedAccessKind::NoescapeClosureCapture:
         return ClosureAccessLoc;
     };
+    llvm_unreachable("unhandled kind");
   }
 
   const IndexTrieNode *getSubPath() const {
@@ -1000,12 +1002,12 @@ static void checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
 
   // Look through Phis.
   case SILInstructionKind::BranchInst: {
-    const SILPHIArgument *arg = cast<BranchInst>(user)->getArgForOperand(oper);
+    const SILPhiArgument *arg = cast<BranchInst>(user)->getArgForOperand(oper);
     followUses(arg);
     return;
   }
   case SILInstructionKind::CondBranchInst: {
-    const SILPHIArgument *arg =
+    const SILPhiArgument *arg =
         cast<CondBranchInst>(user)->getArgForOperand(oper);
     if (arg) // If the use isn't the branch condition, follow it.
       followUses(arg);

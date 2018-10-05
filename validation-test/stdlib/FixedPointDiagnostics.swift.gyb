@@ -95,7 +95,8 @@ func testMixedSignArithmetic() {
     x += Stride(1) // expected-error {{'+=' is unavailable: Please use explicit type conversions or Strideable methods for mixed-type arithmetics.}}
     x -= Stride(1) // expected-error {{'-=' is unavailable: Please use explicit type conversions or Strideable methods for mixed-type arithmetics.}}
 
-    _ = (x - x) as Stride // expected-error {{ambiguous reference to member '-'}}
+    // Terrible over-specific error, but at least disabled
+    _ = (x - x) as Stride // expected-error {{'(@lvalue ${T}, @lvalue ${T}) -> ${T}' is not convertible to '(${T}, ${T}) -> ${T}'}}
 
     //===------------------------------------------------------------------===//
     // The following errors are different because they're not being

@@ -429,6 +429,24 @@ struct SymbolicValueMemoryObject {
   static SymbolicValueMemoryObject *create(Type type, SymbolicValue value,
                                            llvm::BumpPtrAllocator &allocator);
 
+  /// Given that this memory object contains an aggregate value like
+  /// {{1, 2}, 3}, and given an access path like [0,1], return the indexed
+  /// element, e.g. "2" in this case.
+  ///
+  /// Returns uninit memory if the access path points at or into uninit memory.
+  ///
+  /// Precondition: The access path must be valid for this memory object's type.
+  SymbolicValue getIndexedElement(ArrayRef<unsigned> accessPath);
+
+  /// Given that this memory object contains an aggregate value like
+  /// {{1, 2}, 3}, given an access path like [0,1], and given a scalar like "4",
+  /// set the indexed element to the specified scalar, producing {{1, 4}, 3} in
+  /// this case.
+  ///
+  /// Precondition: The access path must be valid for this memory object's type.
+  void setIndexedElement(ArrayRef<unsigned> accessPath, SymbolicValue scalar,
+                         llvm::BumpPtrAllocator &allocator);
+
 private:
   const Type type;
   SymbolicValue value;

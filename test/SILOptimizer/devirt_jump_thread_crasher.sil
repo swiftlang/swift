@@ -29,8 +29,8 @@ enum MyOptional<T> {
 sil @method1 : $@convention(method) <τ_0_0> (@owned @callee_owned (S) -> @out τ_0_0, @guaranteed Derived1) -> @out MyOptional<τ_0_0>
 sil @method2 : $@convention(method) <τ_0_0> (@owned @callee_owned (S) -> @out τ_0_0, @guaranteed Base) -> @out MyOptional<τ_0_0>
 
-// CHECK: sil [serialized] @_TFCs27_ContiguousArrayStorageBase25withUnsafeBufferOfObjectsfS_U__FFGVs19UnsafeBufferPointerPs9AnyObject__Q_Q_
-sil [serialized] @_TFCs27_ContiguousArrayStorageBase25withUnsafeBufferOfObjectsfS_U__FFGVs19UnsafeBufferPointerPs9AnyObject__Q_Q_ : $@convention(method) <R> (@owned @callee_owned (S) -> @out R, @guaranteed Base) -> @out R {
+// CHECK: sil [serialized] @_TFCs28__ContiguousArrayStorageBase25withUnsafeBufferOfObjectsfS_U__FFGVs19UnsafeBufferPointerPs9AnyObject__Q_Q_
+sil [serialized] @_TFCs28__ContiguousArrayStorageBase25withUnsafeBufferOfObjectsfS_U__FFGVs19UnsafeBufferPointerPs9AnyObject__Q_Q_ : $@convention(method) <R> (@owned @callee_owned (S) -> @out R, @guaranteed Base) -> @out R {
 bb0(%0 : $*R, %1 : $@callee_owned (S) -> @out R, %2 : $Base):
   %3 = alloc_stack $MyOptional<R>                   // users: %9, %12, %13, %15, %20, %26, %33, %42, %50, %54
   checked_cast_br [exact] %2 : $Base to $Derived1, bb1, bb2 // id: %4

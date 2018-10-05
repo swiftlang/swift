@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 433; // Last change: add graph_op serialization
+const uint16_t VERSION_MINOR = 451; // Last change: add graph_op serialization
 
 using DeclIDField = BCFixed<31>;
 
@@ -114,6 +114,15 @@ using FileModTimeField = BCVBR<16>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
+enum class OpaqueReadOwnership : uint8_t {
+  Owned,
+  Borrowed,
+  OwnedOrBorrowed,
+};
+using OpaqueReadOwnershipField = BCFixed<2>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
 enum class ReadImplKind : uint8_t {
   Stored = 0,
   Get,
@@ -141,7 +150,6 @@ using WriteImplKindField = BCFixed<3>;
 enum class ReadWriteImplKind : uint8_t {
   Immutable = 0,
   Stored,
-  MaterializeForSet,
   MutableAddress,
   MaterializeToTemporary,
   Modify,
@@ -224,7 +232,6 @@ enum AccessorKind : uint8_t {
   Set,
   WillSet,
   DidSet,
-  MaterializeForSet,
   Address,
   MutableAddress,
   Read,
@@ -290,7 +297,7 @@ using MetatypeRepresentationField = BCFixed<2>;
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
 enum class AddressorKind : uint8_t {
-  NotAddressor, Unsafe, Owning, NativeOwning, NativePinning
+  NotAddressor, Unsafe, Owning, NativeOwning
 };
 using AddressorKindField = BCFixed<3>;
  
@@ -688,6 +695,7 @@ namespace decls_block {
     DeclIDField,      // typealias decl
     TypeIDField,      // parent type
     TypeIDField,      // underlying type
+    TypeIDField,      // substituted type
     SubstitutionMapIDField // substitution map
   >;
 
@@ -976,8 +984,11 @@ namespace decls_block {
     BCVBR<5>,     // number of parameter name components
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
-    // Trailed by its generic parameters, if any, followed by the parameter
-    // patterns.
+    // This record is trailed by:
+    // - its generic parameters, if any
+    // - its parameter patterns,
+    // - the foreign error convention, if any
+    // - inlinable body text, if any
   >;
 
   using VarLayout = BCRecordLayout<
@@ -991,6 +1002,7 @@ namespace decls_block {
     BCFixed<1>,   // HasNonPatternBindingInit?
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
+    OpaqueReadOwnershipField,   // opaque read ownership
     ReadImplKindField,   // read implementation
     WriteImplKindField,   // write implementation
     ReadWriteImplKindField,   // read-write implementation
@@ -1040,6 +1052,8 @@ namespace decls_block {
     // - its _silgen_name, if any
     // - its generic parameters, if any
     // - body parameter patterns
+    // - the foreign error convention, if any
+    // - inlinable body text, if any
   >;
 
   // TODO: remove the unnecessary FuncDecl components here
@@ -1069,6 +1083,8 @@ namespace decls_block {
     // - its _silgen_name, if any
     // - its generic parameters, if any
     // - body parameter patterns
+    // - the foreign error convention, if any
+    // - inlinable body text, if any
   >;
 
   using PatternBindingLayout = BCRecordLayout<
@@ -1085,8 +1101,9 @@ namespace decls_block {
   template <unsigned Code>
   using UnaryOperatorLayout = BCRecordLayout<
     Code, // ID field
-    IdentifierIDField, // name
-    DeclContextIDField // context decl
+    IdentifierIDField,  // name
+    DeclContextIDField, // context decl
+    DeclIDField         // protocol
   >;
 
   using PrefixOperatorLayout = UnaryOperatorLayout<PREFIX_OPERATOR_DECL>;
@@ -1096,7 +1113,8 @@ namespace decls_block {
     INFIX_OPERATOR_DECL,
     IdentifierIDField, // name
     DeclContextIDField,// context decl
-    DeclIDField        // precedence group
+    DeclIDField,       // precedence group
+    DeclIDField        // protocol
   >;
 
   using PrecedenceGroupLayout = BCRecordLayout<
@@ -1132,6 +1150,7 @@ namespace decls_block {
     BCFixed<1>,  // objc?
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
+    OpaqueReadOwnershipField,   // opaque read ownership
     ReadImplKindField,   // read implementation
     WriteImplKindField,   // write implementation
     ReadWriteImplKindField,   // read-write implementation
@@ -1169,6 +1188,12 @@ namespace decls_block {
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
     GenericEnvironmentIDField // generic environment
+    // This record is trailed by its inlinable body text
+  >;
+
+  using InlinableBodyTextLayout = BCRecordLayout<
+    INLINABLE_BODY_TEXT,
+    BCBlob // body text
   >;
 
   using ParameterListLayout = BCRecordLayout<

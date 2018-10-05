@@ -11,8 +11,8 @@
 // multi_module_resilience.
 // rdar://39763787
 
-// CHECK-LABEL: define {{(dllexport |protected )?}}swiftcc void @"$S4main7copyFoo3fooAA0C0VAE_tF"
-// CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S4main3FooVMa"([[INT]] 0)
+// CHECK-LABEL: define {{(dllexport |protected )?}}swiftcc void @"$s4main7copyFoo3fooAA0C0VAE_tF"
+// CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s4main3FooVMa"([[INT]] 0)
 // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: [[VWT:%.*]] = load i8**,
 //   Allocate 'copy'.

@@ -317,6 +317,7 @@ function(_compile_swift_files
     set(sibopt_file "${module_base}.O.sib")
     set(sibgen_file "${module_base}.sibgen")
     set(module_doc_file "${module_base}.swiftdoc")
+    set(interface_file "${module_base}.swiftinterface")
 
     list(APPEND command_create_dirs
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${module_dir}")
@@ -332,12 +333,9 @@ function(_compile_swift_files
     endif()
   endif()
 
-  # If we want to build a single overlay, don't install the swiftmodule and swiftdoc files.
-  if(NOT BUILD_STANDALONE)
-    swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
-        FILES "${module_file}" "${module_doc_file}"
-        DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
-  endif()
+  swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
+    FILES "${module_file}" "${module_doc_file}" "${interface_file}"
+    DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
   set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")
@@ -353,16 +351,14 @@ function(_compile_swift_files
   set(apinote_files)
 
   foreach(apinote_module ${SWIFTFILE_API_NOTES})
-    set(apinote_file "${module_dir}/${apinote_module}.apinotesc")
+    set(apinote_file "${module_dir}/${apinote_module}.apinotes")
     set(apinote_input_file
       "${SWIFT_API_NOTES_PATH}/${apinote_module}.apinotes")
 
     list(APPEND command_create_apinotes
       COMMAND
-      "${swift_compiler_tool}" "-apinotes" "-yaml-to-binary"
-      "-o" "${apinote_file}"
-      "-target" "${SWIFT_SDK_${SWIFTFILE_SDK}_ARCH_${SWIFTFILE_ARCHITECTURE}_TRIPLE}"
-      "${apinote_input_file}")
+      "${CMAKE_COMMAND}" "-E" "copy_if_different"
+      "${apinote_input_file}" "${apinote_file}")
     list(APPEND depends_create_apinotes "${apinote_input_file}")
 
     list(APPEND apinote_files "${apinote_file}")
@@ -395,7 +391,7 @@ function(_compile_swift_files
 
   set(standard_outputs ${SWIFTFILE_OUTPUT})
   set(apinotes_outputs ${apinote_files})
-  set(module_outputs "${module_file}" "${module_doc_file}")
+  set(module_outputs "${module_file}" "${module_doc_file}" "${interface_file}")
   set(sib_outputs "${sib_file}")
   set(sibopt_outputs "${sibopt_file}")
   set(sibgen_outputs "${sibgen_file}")
@@ -446,10 +442,9 @@ function(_compile_swift_files
         COMMAND ""
         OUTPUT ${apinotes_outputs}
         DEPENDS
-          ${swift_compiler_tool_dep}
           ${depends_create_apinotes}
           ${obj_dirs_dependency_target}
-        COMMENT "Generating API notes ${first_output}")
+        COMMENT "Copying API notes for ${first_output}")
   endif()
 
   # Then we can compile both the object files and the swiftmodule files
@@ -483,13 +478,14 @@ function(_compile_swift_files
   #
   # 1. *.swiftmodule
   # 2. *.swiftdoc
-  # 3. *.Onone.sib
-  # 4. *.O.sib
-  # 5. *.sibgen
+  # 3. *.swiftinterface
+  # 4. *.Onone.sib
+  # 5. *.O.sib
+  # 6. *.sibgen
   #
-  # Only 1,2 are built by default. 3,4,5 are utility targets for use by engineers
-  # and thus even though the targets are generated, the targets are not built by
-  # default.
+  # Only 1,2,3 are built by default. 4,5,6 are utility targets for use by
+  # engineers and thus even though the targets are generated, the targets are
+  # not built by default.
   #
   # We only build these when we are not producing a main file. We could do this
   # with sib/sibgen, but it is useful for looking at the stdlib.
@@ -501,9 +497,11 @@ function(_compile_swift_files
         COMMAND
           "${CMAKE_COMMAND}" "-E" "remove" "-f" "${module_doc_file}"
         COMMAND
+          "${CMAKE_COMMAND}" "-E" "remove" "-f" "${interface_file}"
+        COMMAND
           "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
-          "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}" ${swift_flags}
-          "@${file_path}"
+          "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}"
+          "-experimental-emit-interface" ${swift_flags} "@${file_path}"
         ${command_touch_module_outputs}
         OUTPUT ${module_outputs}
         DEPENDS

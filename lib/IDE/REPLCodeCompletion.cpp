@@ -193,7 +193,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
                  CodeCompletionCallbacksFactory *CompletionCallbacksFactory) {
   // Temporarily disable printing the diagnostics.
   ASTContext &Ctx = SF.getASTContext();
-  auto DiagnosticConsumers = Ctx.Diags.takeConsumers();
+  DiagnosticTransaction DelayedDiags(Ctx.Diags);
 
   std::string AugmentedCode = EnteredCode.str();
   AugmentedCode += '\0';
@@ -206,30 +206,23 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   // Parse, typecheck and temporarily insert the incomplete code into the AST.
   const unsigned OriginalDeclCount = SF.Decls.size();
 
-  unsigned CurElem = OriginalDeclCount;
-  PersistentParserState PersistentState;
+  PersistentParserState PersistentState(Ctx);
   std::unique_ptr<DelayedParsingCallbacks> DelayedCB(
       new CodeCompleteDelayedCallbacks(Ctx.SourceMgr.getCodeCompletionLoc()));
   bool Done;
   do {
     parseIntoSourceFile(SF, *BufferID, &Done, nullptr, &PersistentState,
                         DelayedCB.get());
-    performTypeChecking(SF, PersistentState.getTopLevelContext(), None, 
-                        CurElem);
-    CurElem = SF.Decls.size();
   } while (!Done);
+  performTypeChecking(SF, PersistentState.getTopLevelContext(), None,
+                      OriginalDeclCount);
 
   performDelayedParsing(&SF, PersistentState, CompletionCallbacksFactory);
 
   // Now we are done with code completion.  Remove the declarations we
   // temporarily inserted.
   SF.Decls.resize(OriginalDeclCount);
-
-  // Add the diagnostic consumers back.
-  for (auto DC : DiagnosticConsumers)
-    Ctx.Diags.addConsumer(*DC);
-
-  Ctx.Diags.resetHadAnyError();
+  DelayedDiags.abort();
 }
 
 void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {

@@ -161,6 +161,7 @@ public:
 };
 
 bool operator>=(const Version &lhs, const Version &rhs);
+bool operator<(const Version &lhs, const Version &rhs);
 bool operator==(const Version &lhs, const Version &rhs);
 inline bool operator!=(const Version &lhs, const Version &rhs) {
   return !(lhs == rhs);

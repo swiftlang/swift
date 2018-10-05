@@ -31,10 +31,10 @@ using namespace importer;
 
 /// Get a bit vector indicating which arguments are non-null for a
 /// given function or method.
-llvm::SmallBitVector
+SmallBitVector
 importer::getNonNullArgs(const clang::Decl *decl,
                          ArrayRef<const clang::ParmVarDecl *> params) {
-  llvm::SmallBitVector result;
+  SmallBitVector result;
   if (!decl)
     return result;
 

@@ -617,7 +617,7 @@ static void updateBasicBlockArgTypes(SILBasicBlock *BB,
                                      ArchetypeType *OldOpenedArchetype,
                                      ArchetypeType *NewOpenedArchetype) {
   // Check types of all BB arguments.
-  for (auto *Arg : BB->getPHIArguments()) {
+  for (auto *Arg : BB->getPhiArguments()) {
     if (!Arg->getType().hasOpenedExistential())
       continue;
     // Type of this BB argument uses an opened existential.
@@ -645,7 +645,7 @@ static void updateBasicBlockArgTypes(SILBasicBlock *BB,
     // Then replace all uses by an undef.
     Arg->replaceAllUsesWith(SILUndef::get(Arg->getType(), BB->getModule()));
     // Replace the type of the BB argument.
-    auto *NewArg = BB->replacePHIArgument(Arg->getIndex(), NewArgType,
+    auto *NewArg = BB->replacePhiArgument(Arg->getIndex(), NewArgType,
                                           Arg->getOwnershipKind(),
                                           Arg->getDecl());
     // Restore all uses to refer to the BB argument with updated type.

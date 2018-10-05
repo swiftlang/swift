@@ -122,7 +122,7 @@ public func precondition(
 ///     where `assertionFailure(_:file:line:)` is called.
 ///   - line: The line number to print along with `message`. The default is the
 ///     line number where `assertionFailure(_:file:line:)` is called.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable
 @inline(__always)
 public func assertionFailure(
   _ message: @autoclosure () -> String = String(),

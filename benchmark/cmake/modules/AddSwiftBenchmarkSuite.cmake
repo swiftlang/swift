@@ -41,16 +41,20 @@ macro(configure_build)
   endif()
 
   set(PAGE_ALIGNMENT_OPTION "-Xllvm" "-align-module-to-page-size")
-  execute_process(
-      COMMAND "touch" "empty.swift"
-      RESULT_VARIABLE result
-      ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
-  execute_process(
-      COMMAND "${SWIFT_EXEC}" ${PAGE_ALIGNMENT_OPTION} "empty.swift"
-      RESULT_VARIABLE result
-      ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if(NOT "${result}" MATCHES "0")
-    set(PAGE_ALIGNMENT_OPTION "")
+  if(EXISTS "${SWIFT_EXEC}")
+    # If we are using a pre-built compiler, check if it supports the
+    # -align-module-to-page-size option.
+    execute_process(
+        COMMAND "touch" "empty.swift"
+        RESULT_VARIABLE result
+        ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(
+        COMMAND "${SWIFT_EXEC}" ${PAGE_ALIGNMENT_OPTION} "empty.swift"
+        RESULT_VARIABLE result
+        ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(NOT "${result}" MATCHES "0")
+      set(PAGE_ALIGNMENT_OPTION "")
+    endif()
   endif()
 
   # We always infer the SWIFT_LIBRARY_PATH from SWIFT_EXEC unless
@@ -311,6 +315,7 @@ function (swift_benchmark_compile_archopts)
   if (is_darwin)
     list(APPEND common_options
       "-I" "${srcdir}/utils/ObjectiveCTests"
+      "-I" "${srcdir}/utils/LibProc"
       "-F" "${sdk}/../../../Developer/Library/Frameworks"
       "-sdk" "${sdk}"
       "-no-link-objc-runtime")
@@ -340,6 +345,7 @@ function (swift_benchmark_compile_archopts)
     list(APPEND common_options_driver
       "-sdk" "${sdk}"
       "-F" "${sdk}/../../../Developer/Library/Frameworks"
+      "-I" "${srcdir}/utils/LibProc"
       "-no-link-objc-runtime")
   endif()
   set(bench_library_objects)

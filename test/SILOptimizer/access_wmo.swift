@@ -11,29 +11,29 @@
 // ===---------------------------------------------------------------------===//
 
 // readGlobal():
-// PRIMARY-LABEL: sil @$S10access_wmo10readGlobalSiyF : $@convention(thin) () -> Int {
+// PRIMARY-LABEL: sil @$s10access_wmo10readGlobalSiyF : $@convention(thin) () -> Int {
 // function_ref internalGlobal.unsafeMutableAddressor
-// PRIMARY: [[F1:%.*]] = function_ref @$S10access_wmo14internalGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
+// PRIMARY: [[F1:%.*]] = function_ref @$s10access_wmo14internalGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
 // PRIMARY: [[G1:%.*]] = apply [[F1]]() : $@convention(thin) () -> Builtin.RawPointer
 // PRIMARY: [[P1:%.*]] = pointer_to_address [[G1]] : $Builtin.RawPointer to [strict] $*Int
 // PRIMARY: [[A1:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[P1]] : $*Int
 // PRIMARY: end_access [[A1]] : $*Int
 // function_ref publicGlobal.unsafeMutableAddressor
-// PRIMARY: [[F2:%.*]] = function_ref @$S10access_wmo12publicGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
+// PRIMARY: [[F2:%.*]] = function_ref @$s10access_wmo12publicGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
 // PRIMARY: [[G2:%.*]] = apply [[F2]]() : $@convention(thin) () -> Builtin.RawPointer
 // PRIMARY: [[P2:%.*]] = pointer_to_address [[G2]] : $Builtin.RawPointer to [strict] $*Int
 // PRIMARY: [[A2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[P2]] : $*Int
 // PRIMARY: end_access [[A2]] : $*Int
-// PRIMARY-LABEL: } // end sil function '$S10access_wmo10readGlobalSiyF'
+// PRIMARY-LABEL: } // end sil function '$s10access_wmo10readGlobalSiyF'
 //
-// WMO-LABEL: sil @$S10access_wmo10readGlobalSiyF : $@convention(thin) () -> Int {
-// WMO: [[G1:%.*]] = global_addr @$S10access_wmo14internalGlobalSivp : $*Int
+// WMO-LABEL: sil @$s10access_wmo10readGlobalSiyF : $@convention(thin) () -> Int {
+// WMO: [[G1:%.*]] = global_addr @$s10access_wmo14internalGlobalSivp : $*Int
 // WMO: [[A1:%.*]] = begin_access [read] [static] [no_nested_conflict] [[G1]] : $*Int
 // WMO: end_access [[A1]] : $*Int
-// WMO: [[G2:%.*]] = global_addr @$S10access_wmo12publicGlobalSivp : $*Int
+// WMO: [[G2:%.*]] = global_addr @$s10access_wmo12publicGlobalSivp : $*Int
 // WMO: [[A2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[G2]] : $*Int
 // WMO: end_access [[A2]] : $*Int
-// WMO-LABEL: } // end sil function '$S10access_wmo10readGlobalSiyF'
+// WMO-LABEL: } // end sil function '$s10access_wmo10readGlobalSiyF'
 public func readGlobal() -> Int {
   return internalGlobal + publicGlobal
 }
@@ -48,43 +48,43 @@ func inlinedSetInt(_ i: inout Int, _ v: Int) {
 }
 
 // testAccessGlobal(v:)
-// PRIMARY-LABEL: sil @$S10access_wmo16testAccessGlobal1vySi_tF : $@convention(thin) (Int) -> () {
+// PRIMARY-LABEL: sil @$s10access_wmo16testAccessGlobal1vySi_tF : $@convention(thin) (Int) -> () {
 // PRIMARY: bb0(%0 : $Int):
 //
 // function_ref internalGlobal.unsafeMutableAddressor
-// PRIMARY: [[F1:%.*]] = function_ref @$S10access_wmo14internalGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
+// PRIMARY: [[F1:%.*]] = function_ref @$s10access_wmo14internalGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
 // PRIMARY: [[G1:%.*]] = apply [[F1]]() : $@convention(thin) () -> Builtin.RawPointer
 // PRIMARY: [[P1:%.*]] = pointer_to_address [[G1]] : $Builtin.RawPointer to [strict] $*Int
 // PRIMARY: [[A1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[P1]] : $*Int
 // function_ref setInt(_:_:)
-// PRIMARY: [[F2:%.*]] = function_ref @$S10access_wmo6setIntyySiz_SitF : $@convention(thin) (@inout Int, Int) -> ()
+// PRIMARY: [[F2:%.*]] = function_ref @$s10access_wmo6setIntyySiz_SitF : $@convention(thin) (@inout Int, Int) -> ()
 // PRIMARY: apply [[F2]]([[A1]], %0) : $@convention(thin) (@inout Int, Int) -> ()
 // PRIMARY: end_access [[A1]] : $*Int
 //
 // function_ref publicGlobal.unsafeMutableAddressor
-// PRIMARY: [[F3:%.*]] = function_ref @$S10access_wmo12publicGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
+// PRIMARY: [[F3:%.*]] = function_ref @$s10access_wmo12publicGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
 // PRIMARY: [[G2:%.*]] = apply [[F3]]() : $@convention(thin) () -> Builtin.RawPointer
 // PRIMARY: [[P2:%.*]] = pointer_to_address [[G2]] : $Builtin.RawPointer to [strict] $*Int
 // PRIMARY: [[A2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[P2]] : $*Int
 // PRIMARY: apply [[F2]]([[A2]], %0) : $@convention(thin) (@inout Int, Int) -> ()
 // PRIMARY: end_access [[A2]] : $*Int
-// PRIMARY-LABEL: } // end sil function '$S10access_wmo16testAccessGlobal1vySi_tF'
+// PRIMARY-LABEL: } // end sil function '$s10access_wmo16testAccessGlobal1vySi_tF'
 //
-// WMO-LABEL: sil @$S10access_wmo16testAccessGlobal1vySi_tF : $@convention(thin) (Int) -> () {
+// WMO-LABEL: sil @$s10access_wmo16testAccessGlobal1vySi_tF : $@convention(thin) (Int) -> () {
 // WMO: bb0(%0 : $Int):
-// WMO: [[G1:%.*]] = global_addr @$S10access_wmo14internalGlobalSivp : $*Int
+// WMO: [[G1:%.*]] = global_addr @$s10access_wmo14internalGlobalSivp : $*Int
 // WMO: [[A1:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[G1]] : $*Int
 // function_ref setInt(_:_:)
-// WMO: [[F:%.*]] = function_ref @$S10access_wmo6setIntyySiz_SitF : $@convention(thin) (@inout Int, Int) -> ()
+// WMO: [[F:%.*]] = function_ref @$s10access_wmo6setIntyySiz_SitF : $@convention(thin) (@inout Int, Int) -> ()
 // WMO: apply [[F]]([[A1]], %0) : $@convention(thin) (@inout Int, Int) -> ()
 // WMO: end_access [[A1]] : $*Int
 //
-// WMO: [[G2:%.*]] = global_addr @$S10access_wmo12publicGlobalSivp : $*Int
+// WMO: [[G2:%.*]] = global_addr @$s10access_wmo12publicGlobalSivp : $*Int
 // WMO: [[A2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[G2]] : $*Int
 // function_ref setInt(_:_:)
 // WMO: apply [[F]]([[A2]], %0) : $@convention(thin) (@inout Int, Int) -> ()
 // WMO: end_access [[A2]] : $*Int
-// WMO-LABEL: } // end sil function '$S10access_wmo16testAccessGlobal1vySi_tF'
+// WMO-LABEL: } // end sil function '$s10access_wmo16testAccessGlobal1vySi_tF'
 public func testAccessGlobal(v: Int) {
   setInt(&internalGlobal, v)
   setInt(&publicGlobal, v)
@@ -151,7 +151,7 @@ public func testAccessProp(c: C, v: Int) {
   setInt(&c.publicProp, v)
 }
 
-// PRIMARY-LABEL: sil @$S10access_wmo8readProp1cSiAA1CC_tF : $@convention(thin) (@guaranteed C) -> Int {
+// PRIMARY-LABEL: sil @$s10access_wmo8readProp1cSiAA1CC_tF : $@convention(thin) (@guaranteed C) -> Int {
 // PRIMARY-NOT: begin_{{.*}}access
 // PRIMARY: [[E1:%.*]] = ref_element_addr %0 : $C, #C.finalProp
 // PRIMARY: [[A1:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[E1]] : $*Int
@@ -161,9 +161,9 @@ public func testAccessProp(c: C, v: Int) {
 // PRIMARY: [[A2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[E2]] : $*Int
 // PRIMARY: end_access [[A2]] : $*Int
 // PRIMARY-NOT: begin_{{.*}}access
-// PRIMARY-LABEL:  } // end sil function '$S10access_wmo8readProp1cSiAA1CC_tF'
+// PRIMARY-LABEL:  } // end sil function '$s10access_wmo8readProp1cSiAA1CC_tF'
 //
-// WMO-LABEL: sil @$S10access_wmo8readProp1cSiAA1CC_tF : $@convention(thin) (@guaranteed C) -> Int {
+// WMO-LABEL: sil @$s10access_wmo8readProp1cSiAA1CC_tF : $@convention(thin) (@guaranteed C) -> Int {
 // WMO: [[E1:%.*]] = ref_element_addr %0 : $C, #C.setterProp
 // WMO: [[A1:%.*]] = begin_access [read] [static] [no_nested_conflict] [[E1]] : $*Int
 // WMO: end_access [[A1]] : $*Int
@@ -173,11 +173,11 @@ public func testAccessProp(c: C, v: Int) {
 // WMO: end_access [[A2]] : $*Int
 //
 // WMO: [[E3:%.*]] = ref_element_addr %0 : $C, #C.inlinedProp
-// WMO: [[A3:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[E3]] : $*Int
+// WMO: [[A3:%.*]] = begin_access [read] [static] [no_nested_conflict] [[E3]] : $*Int
 // WMO: end_access [[A3]] : $*Int
 //
 // WMO: [[E4:%.*]] = ref_element_addr %0 : $C, #C.internalProp
-// WMO: [[A4:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[E4]] : $*Int
+// WMO: [[A4:%.*]] = begin_access [read] [static] [no_nested_conflict] [[E4]] : $*Int
 // WMO: end_access [[A4]] : $*Int
 //
 // WMO: [[E5:%.*]] = ref_element_addr %0 : $C, #C.keyPathProp
@@ -191,20 +191,20 @@ public func testAccessProp(c: C, v: Int) {
 // WMO: [[E7:%.*]] = ref_element_addr %0 : $C, #C.publicProp
 // WMO: [[A7:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[E7]] : $*Int
 // WMO: end_access [[A7]] : $*Int
-// WMO-LABEL: } // end sil function '$S10access_wmo8readProp1cSiAA1CC_tF'
+// WMO-LABEL: } // end sil function '$s10access_wmo8readProp1cSiAA1CC_tF'
 
-// PRIMARY-LABEL: sil @$S10access_wmo14testAccessProp1c1vyAA1CC_SitF : $@convention(thin) (@guaranteed C, Int) -> () {
+// PRIMARY-LABEL: sil @$s10access_wmo14testAccessProp1c1vyAA1CC_SitF : $@convention(thin) (@guaranteed C, Int) -> () {
 // PRIMARY-NOT: begin_{{.*}}access
 // PRIMARY: [[E1:%.*]] = ref_element_addr %0 : $C, #C.finalProp
 // PRIMARY: [[A1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[E1]] : $*Int
 // function_ref setInt(_:_:)
-// PRIMARY: [[F1:%.*]] = function_ref @$S10access_wmo6setIntyySiz_SitF : $@convention(thin) (@inout Int, Int) -> ()
+// PRIMARY: [[F1:%.*]] = function_ref @$s10access_wmo6setIntyySiz_SitF : $@convention(thin) (@inout Int, Int) -> ()
 // PRIMARY: apply [[F1]]([[A1]], %1) : $@convention(thin) (@inout Int, Int) -> ()
 // PRIMARY: end_access [[A1]] : $*Int
 // PRIMARY-NOT: begin_{{.*}}access
-// PRIMARY-LABEL: } // end sil function '$S10access_wmo14testAccessProp1c1vyAA1CC_SitF'
+// PRIMARY-LABEL: } // end sil function '$s10access_wmo14testAccessProp1c1vyAA1CC_SitF'
 
-// WMO-LABEL: sil @$S10access_wmo14testAccessProp1c1vyAA1CC_SitF : $@convention(thin) (@guaranteed C, Int) -> () {
+// WMO-LABEL: sil @$s10access_wmo14testAccessProp1c1vyAA1CC_SitF : $@convention(thin) (@guaranteed C, Int) -> () {
 // WMO: [[E1:%.*]] = ref_element_addr %0 : $C, #C.setterProp
 // WMO: [[A1:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[E1]] : $*Int
 // WMO: end_access [[A1]] : $*Int
@@ -212,31 +212,29 @@ public func testAccessProp(c: C, v: Int) {
 // WMO: [[E2:%.*]] = ref_element_addr %0 : $C, #C.finalProp
 // WMO: [[A2:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[E2]] : $*Int
 // function_ref setInt(_:_:)
-// WMO: [[F1:%.*]] = function_ref @$S10access_wmo6setIntyySiz_SitF : $@convention(thin) (@inout Int, Int) -> ()
+// WMO: [[F1:%.*]] = function_ref @$s10access_wmo6setIntyySiz_SitF : $@convention(thin) (@inout Int, Int) -> ()
 // WMO: apply [[F1]]([[A2]], %1) : $@convention(thin) (@inout Int, Int) -> ()
 // WMO: end_access [[A2]] : $*Int
 //
 // WMO: [[E3:%.*]] = ref_element_addr %0 : $C, #C.inlinedProp
-// WMO: begin_unpaired_access [modify] [dynamic] [[E3]] : $*Int, %{{.*}} : $*Builtin.UnsafeValueBuffer
-// WMO: end_unpaired_access [dynamic] %{{.*}} : $*Builtin.UnsafeValueBuffer
+// WMO: [[A3:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[E3]] : $*Int
+// WMO: end_access [[A3]] : $*Int
 //
 // WMO: [[E4:%.*]] = ref_element_addr %0 : $C, #C.internalProp
-// WMO: begin_unpaired_access [modify] [dynamic] [[E4]] : $*Int, %{{.*}} : $*Builtin.UnsafeValueBuffer
-// WMO: [[D4:%.*]] = mark_dependence [[E4]] : $*Int on %0 : $C
-// WMO: apply [[F1]]([[D4]], %1) : $@convention(thin) (@inout Int, Int) -> ()
-// WMO: end_unpaired_access [dynamic] %{{.*}} : $*Builtin.UnsafeValueBuffer
+// WMO: [[A4:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[E4]] : $*Int
+// WMO: apply [[F1]]([[A4]], %1) : $@convention(thin) (@inout Int, Int) -> ()
+// WMO: end_access [[A4]]
 //
-// WMO: [[KP:%.*]] = keypath $ReferenceWritableKeyPath<C, Int>, (root $C; settable_property $Int,  id #C.keyPathProp!getter.1 : (C) -> () -> Int, getter @$S10access_wmo1CC11keyPathPropSivpACTK : $@convention(thin) (@in_guaranteed C) -> @out Int, setter @$S10access_wmo1CC11keyPathPropSivpACTk : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ())
+// WMO: [[KP:%.*]] = keypath $ReferenceWritableKeyPath<C, Int>, (root $C; settable_property $Int,  id #C.keyPathProp!getter.1 : (C) -> () -> Int, getter @$s10access_wmo1CC11keyPathPropSivpACTK : $@convention(thin) (@in_guaranteed C) -> @out Int, setter @$s10access_wmo1CC11keyPathPropSivpACTk : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ())
 // function_ref setKeyPath(_:_:_:)
-// WMO: [[F2:%.*]] = function_ref @$S10access_wmo10setKeyPathyyAA1CC_s017ReferenceWritabledE0CyADSiGSitF : $@convention(thin) (@guaranteed C, @guaranteed ReferenceWritableKeyPath<C, Int>, Int) -> ()
+// WMO: [[F2:%.*]] = function_ref @$s10access_wmo10setKeyPathyyAA1CC_s017ReferenceWritabledE0CyADSiGSitF : $@convention(thin) (@guaranteed C, @guaranteed ReferenceWritableKeyPath<C, Int>, Int) -> ()
 // WMO: apply [[F2]](%0, [[KP]], %1) : $@convention(thin) (@guaranteed C, @guaranteed ReferenceWritableKeyPath<C, Int>, Int) -> ()
 //
 // WMO: [[FKP:%.*]] = keypath $ReferenceWritableKeyPath<C, Int>, (root $C; stored_property #C.finalKeyPathProp : $Int)
 // WMO: apply [[F2]](%0, [[FKP]], %1) : $@convention(thin) (@guaranteed C, @guaranteed ReferenceWritableKeyPath<C, Int>, Int) -> ()
 //
 // WMO: [[E4:%.*]] = ref_element_addr %0 : $C, #C.publicProp
-// WMO: begin_unpaired_access [modify] [dynamic] [[E4]] : $*Int, %{{.*}} : $*Builtin.UnsafeValueBuffer
-// WMO: [[D4:%.*]] = mark_dependence [[E4]] : $*Int on %0 : $C
-// WMO: apply [[F1]]([[D4]], %1) : $@convention(thin) (@inout Int, Int) -> ()
-// WMO: end_unpaired_access [dynamic] %{{.*}} : $*Builtin.UnsafeValueBuffer
-// WMO-LABEL: } // end sil function '$S10access_wmo14testAccessProp1c1vyAA1CC_SitF'
+// WMO: [[A4:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[E4]] : $*Int
+// WMO: apply [[F1]]([[A4]], %1) : $@convention(thin) (@inout Int, Int) -> ()
+// WMO: end_access [[A4]]
+// WMO-LABEL: } // end sil function '$s10access_wmo14testAccessProp1c1vyAA1CC_SitF'

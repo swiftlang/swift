@@ -18,6 +18,7 @@
 #include "ImporterImpl.h"
 #include "ClangDiagnosticConsumer.h"
 #include "swift/Strings.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -46,6 +47,16 @@ using namespace importer;
 static bool isImportedCFPointer(clang::QualType clangType, Type type) {
   return (clangType->isPointerType() &&
           (type->is<ClassType>() || type->isClassExistentialType()));
+}
+
+bool ClangImporter::Implementation::isOverAligned(const clang::TypeDecl *decl) {
+  auto type = getClangASTContext().getTypeDeclType(decl);
+  return isOverAligned(type);
+}
+
+bool ClangImporter::Implementation::isOverAligned(clang::QualType type) {
+  auto align = getClangASTContext().getTypeAlignInChars(type);
+  return align > clang::CharUnits::fromQuantity(MaximumAlignment);
 }
 
 namespace {
@@ -377,9 +388,10 @@ namespace {
             pointeeQualType, ImportTypeKind::Pointee, AllowNSUIntegerAsInt,
             Bridgeability::None);
 
-      // If the pointed-to type is unrepresentable in Swift, import as
+      // If the pointed-to type is unrepresentable in Swift, or its C
+      // alignment is greater than the maximum Swift alignment, import as
       // OpaquePointer.
-      if (!pointeeType) {
+      if (!pointeeType || Impl.isOverAligned(pointeeQualType)) {
         auto opaquePointer = Impl.SwiftContext.getOpaquePointerDecl();
         if (!opaquePointer)
           return Type();
@@ -785,8 +797,9 @@ namespace {
         if (attr->getProtocolKind() ==
             KnownProtocolKind::BridgedStoredNSError) {
           auto &ctx = nominal->getASTContext();
-          auto lookup = nominal->lookupDirect(ctx.Id_Code,
-                                              /*ignoreNewExtensions=*/true);
+          auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+          flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+          auto lookup = nominal->lookupDirect(ctx.Id_Code, flags);
           for (auto found : lookup) {
             if (auto codeDecl = dyn_cast<TypeDecl>(found))
               return codeDecl;
@@ -1639,7 +1652,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   // Import the parameters.
   SmallVector<ParamDecl *, 4> parameters;
   unsigned index = 0;
-  llvm::SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
+  SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
 
   for (auto param : params) {
     auto paramTy = param->getType();
@@ -1997,7 +2010,7 @@ ImportedType ClangImporter::Implementation::importMethodType(
 
   CanType errorParamType;
 
-  llvm::SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
+  SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
 
   // Import the parameters.
   SmallVector<ParamDecl*, 4> swiftParams;

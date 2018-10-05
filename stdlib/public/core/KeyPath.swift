@@ -57,6 +57,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
     ObjectIdentifier(type(of: self)).hash(into: &hasher)
     return withBuffer {
       var buffer = $0
+      if buffer.data.isEmpty { return }
       while true {
         let (component, type) = buffer.next()
         hasher.combine(component.value)
@@ -88,6 +89,11 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
           return false
         }
         
+        // Identity is equal to identity
+        if aBuffer.data.isEmpty {
+          return bBuffer.data.isEmpty
+        }
+
         while true {
           let (aComponent, aType) = aBuffer.next()
           let (bComponent, bType) = bBuffer.next()
@@ -153,6 +159,11 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   internal var _storedInlineOffset: Int? {
     return withBuffer {
       var buffer = $0
+
+      // The identity key path is effectively a stored keypath of type Self
+      // at offset zero
+      if buffer.data.isEmpty { return 0 }
+
       var offset = 0
       while true {
         let (rawComponent, optNextType) = buffer.next()
@@ -220,6 +231,9 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
     var curBase: Any = root
     return withBuffer {
       var buffer = $0
+      if buffer.data.isEmpty {
+        return unsafeBitCast(root, to: Value.self)
+      }
       while true {
         let (rawComponent, optNextType) = buffer.next()
         let valueType = optNextType ?? Value.self
@@ -279,6 +293,13 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
       _sanityCheck(!buffer.hasReferencePrefix,
                    "WritableKeyPath should not have a reference prefix")
       
+      if buffer.data.isEmpty {
+        return (
+          UnsafeMutablePointer<Value>(
+            mutating: p.assumingMemoryBound(to: Value.self)),
+          nil)
+      }
+
       while true {
         let (rawComponent, optNextType) = buffer.next()
         let nextType = optNextType ?? Value.self
@@ -306,7 +327,6 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
               owner: keepAlive)
     }
   }
-
 }
 
 /// A key path that supports reading from and writing to the resulting value
@@ -1941,6 +1961,16 @@ internal func _appendingKeyPaths<
     var rootBuffer = $0
     return leaf.withBuffer {
       var leafBuffer = $0
+
+      // If either operand is the identity key path, then we should return
+      // the other operand back untouched.
+      if leafBuffer.data.isEmpty {
+        return unsafeDowncast(root, to: Result.self)
+      }
+      if rootBuffer.data.isEmpty {
+        return unsafeDowncast(leaf, to: Result.self)
+      }
+
       // Reserve room for the appended KVC string, if both key paths are
       // KVC-compatible.
       let appendedKVCLength: Int, rootKVCLength: Int, leafKVCLength: Int
@@ -2275,7 +2305,8 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
   var buffer = KeyPathBuffer(base: bufferPtr)
   var size = buffer.data.count + MemoryLayout<Int>.size
 
-  while true {
+  if !buffer.data.isEmpty {
+   while true {
     let header = buffer.pop(RawKeyPathComponent.Header.self)
 
     // Ensure that we pop an amount of data consistent with what
@@ -2552,6 +2583,7 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
     // Pop the type accessor reference.
     _ = buffer.popRaw(size: MemoryLayout<Int>.size,
                       alignment: Int.self)
+   }
   }
 
   _sanityCheck(buffer.data.isEmpty, "didn't read entire pattern")
@@ -2628,7 +2660,8 @@ internal func _instantiateKeyPathBuffer(
   var base: Any.Type = rootType
   // Some pattern forms are pessimistically larger than what we need in the
   // instantiated key path. Keep track of this.
-  while true {
+  if !patternBuffer.data.isEmpty {
+   while true {
     let componentAddr = destData.baseAddress.unsafelyUnwrapped
     let header = patternBuffer.pop(RawKeyPathComponent.Header.self)
 
@@ -2996,6 +3029,7 @@ internal func _instantiateKeyPathBuffer(
     base = unsafeBitCast(componentTyAccessor(arguments), to: Any.Type.self)
     pushDest(base)
     previousComponentAddr = componentAddr
+   }
   }
 
   // We should have traversed both buffers.

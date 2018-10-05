@@ -14,6 +14,7 @@
 
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/Demangling/Demangle.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
@@ -85,6 +86,21 @@ llvm::cl::list<std::string>
     SILDisablePass("sil-disable-pass",
                      llvm::cl::desc("Disable passes "
                                     "which contain a string from this list"));
+
+llvm::cl::list<std::string> SILVerifyBeforePass(
+    "sil-verify-before-pass",
+    llvm::cl::desc("Verify the module/analyses before we run "
+                   "a pass from this list"));
+
+llvm::cl::list<std::string> SILVerifyAroundPass(
+    "sil-verify-around-pass",
+    llvm::cl::desc("Verify the module/analyses before/after we run "
+                   "a pass from this list"));
+
+llvm::cl::list<std::string>
+    SILVerifyAfterPass("sil-verify-after-pass",
+                       llvm::cl::desc("Verify the module/analyses after we run "
+                                      "a pass from this list"));
 
 llvm::cl::opt<bool> SILVerifyWithoutInvalidation(
     "sil-verify-without-invalidation", llvm::cl::init(false),
@@ -365,6 +381,20 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
 
   CurrentPassHasInvalidated = false;
 
+  auto MatchFun = [&](const std::string &Str) -> bool {
+    return SFT->getTag().find(Str) != StringRef::npos ||
+           SFT->getID().find(Str) != StringRef::npos;
+  };
+  if ((SILVerifyBeforePass.end() != std::find_if(SILVerifyBeforePass.begin(),
+                                                 SILVerifyBeforePass.end(),
+                                                 MatchFun)) ||
+      (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
+                                                 SILVerifyAroundPass.end(),
+                                                 MatchFun))) {
+    F->verify();
+    verifyAnalyses();
+  }
+
   if (SILPrintPassName)
     dumpPassInfo("Run", TransIdx, F);
 
@@ -404,6 +434,16 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
       (CurrentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
     F->verify();
     verifyAnalyses(F);
+  } else {
+    if ((SILVerifyAfterPass.end() != std::find_if(SILVerifyAfterPass.begin(),
+                                                  SILVerifyAfterPass.end(),
+                                                  MatchFun)) ||
+        (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
+                                                   SILVerifyAroundPass.end(),
+                                                   MatchFun))) {
+      F->verify();
+      verifyAnalyses();
+    }
   }
 
   ++NumPassesRun;
@@ -497,6 +537,20 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
     printModule(Mod, Options.EmitVerboseSIL);
   }
 
+  auto MatchFun = [&](const std::string &Str) -> bool {
+    return SMT->getTag().find(Str) != StringRef::npos ||
+           SMT->getID().find(Str) != StringRef::npos;
+  };
+  if ((SILVerifyBeforePass.end() != std::find_if(SILVerifyBeforePass.begin(),
+                                                 SILVerifyBeforePass.end(),
+                                                 MatchFun)) ||
+      (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
+                                                 SILVerifyAroundPass.end(),
+                                                 MatchFun))) {
+    Mod->verify();
+    verifyAnalyses();
+  }
+
   llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
   Mod->registerDeleteNotificationHandler(SMT);
@@ -522,6 +576,16 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
       (CurrentPassHasInvalidated || !SILVerifyWithoutInvalidation)) {
     Mod->verify();
     verifyAnalyses();
+  } else {
+    if ((SILVerifyAfterPass.end() != std::find_if(SILVerifyAfterPass.begin(),
+                                                  SILVerifyAfterPass.end(),
+                                                  MatchFun)) ||
+        (SILVerifyAroundPass.end() != std::find_if(SILVerifyAroundPass.begin(),
+                                                   SILVerifyAroundPass.end(),
+                                                   MatchFun))) {
+      Mod->verify();
+      verifyAnalyses();
+    }
   }
 }
 

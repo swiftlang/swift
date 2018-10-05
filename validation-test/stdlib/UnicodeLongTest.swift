@@ -18,7 +18,7 @@ UTF8Decoder.test("Internal/_decodeOne") {
       i += 1
     }
     let (codePoint, _) = UTF8._decodeOne(data)
-    expectOptionalEqual(scalar.value, codePoint, "data=\(asHex(data))")
+    expectEqual(scalar.value, codePoint, "data=\(asHex(data))")
   }
 
   for i in 0..<0xd800 { ensureValid(UnicodeScalar(i)!) }

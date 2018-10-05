@@ -21,7 +21,6 @@
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
-#include "swift/Frontend/Frontend.h"
 #include "swift/Option/Options.h"
 #include "clang/Basic/Version.h"
 #include "clang/Driver/Util.h"
@@ -86,7 +85,10 @@ ToolChain::InvocationInfo toolchains::GenericUnix::constructInvocation(
     const AutolinkExtractJobAction &job, const JobContext &context) const {
   assert(context.Output.getPrimaryOutputType() == file_types::TY_AutolinkFile);
 
-  ArgStringList Arguments;
+  InvocationInfo II{"swift-autolink-extract"};
+  ArgStringList &Arguments = II.Arguments;
+  II.allowsResponseFiles = true;
+
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                          file_types::TY_Object);
   addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
@@ -95,7 +97,7 @@ ToolChain::InvocationInfo toolchains::GenericUnix::constructInvocation(
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
-  return {"swift-autolink-extract", Arguments};
+  return II;
 }
 
 std::string toolchains::GenericUnix::getDefaultLinker() const {

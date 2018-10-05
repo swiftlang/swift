@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name generic_casts -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-runtime %s
+// RUN: %target-swift-emit-silgen -swift-version 5 -module-name generic_casts -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-runtime %s
 
 protocol ClassBound : class {}
 protocol NotClassBound {}
@@ -8,7 +8,7 @@ class C : ClassBound, NotClassBound {}
 struct S : NotClassBound {}
 struct Unloadable : NotClassBound { var x : NotClassBound }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts020opaque_archetype_to_c1_D0{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts020opaque_archetype_to_c1_D0{{[_0-9a-zA-Z]*}}F
 func opaque_archetype_to_opaque_archetype
 <T:NotClassBound, U>(_ t:T) -> U {
   return t as! U
@@ -16,7 +16,7 @@ func opaque_archetype_to_opaque_archetype
   // CHECK:   unconditional_checked_cast_addr T in {{%.*}} : $*T to U in [[RET]] : $*U
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts020opaque_archetype_is_c1_D0{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts020opaque_archetype_is_c1_D0{{[_0-9a-zA-Z]*}}F
 func opaque_archetype_is_opaque_archetype
 <T:NotClassBound, U>(_ t:T, u:U.Type) -> Bool {
   return t is U
@@ -31,13 +31,13 @@ func opaque_archetype_is_opaque_archetype
   // CHECK: [[CONT]]([[I1:%.*]] : @trivial $Builtin.Int1):
   // -- apply the _getBool library fn
   // CHECK-NEXT:  function_ref Swift._getBool
-  // CHECK-NEXT:  [[GETBOOL:%.*]] = function_ref @$Ss8_getBoolySbBi1_F :
+  // CHECK-NEXT:  [[GETBOOL:%.*]] = function_ref @$ss8_getBoolySbBi1_F :
   // CHECK-NEXT:  [[RES:%.*]] = apply [[GETBOOL]]([[I1]])
   // -- we don't consume the checked value
   // CHECK:   return [[RES]] : $Bool
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts026opaque_archetype_to_class_D0{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts026opaque_archetype_to_class_D0{{[_0-9a-zA-Z]*}}F
 func opaque_archetype_to_class_archetype
 <T:NotClassBound, U:ClassBound> (_ t:T) -> U {
   return t as! U
@@ -46,7 +46,7 @@ func opaque_archetype_to_class_archetype
   // CHECK: return [[DOWNCAST]] : $U
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts026opaque_archetype_is_class_D0{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts026opaque_archetype_is_class_D0{{[_0-9a-zA-Z]*}}F
 func opaque_archetype_is_class_archetype
 <T:NotClassBound, U:ClassBound> (_ t:T, u:U.Type) -> Bool {
   return t is U
@@ -54,7 +54,7 @@ func opaque_archetype_is_class_archetype
   // CHECK: checked_cast_addr_br take_always T in [[VAL:%.*]] : {{.*}} to U
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts019class_archetype_to_c1_D0{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts019class_archetype_to_c1_D0{{[_0-9a-zA-Z]*}}F
 func class_archetype_to_class_archetype
 <T:ClassBound, U:ClassBound>(_ t:T) -> U {
   return t as! U
@@ -64,7 +64,7 @@ func class_archetype_to_class_archetype
   // CHECK: return [[DOWNCAST]] : $U
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts019class_archetype_is_c1_D0{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts019class_archetype_is_c1_D0{{[_0-9a-zA-Z]*}}F
 func class_archetype_is_class_archetype
 <T:ClassBound, U:ClassBound>(_ t:T, u:U.Type) -> Bool {
   return t is U
@@ -72,7 +72,7 @@ func class_archetype_is_class_archetype
   // CHECK: checked_cast_addr_br {{.*}} T in {{%.*}} : $*T to U in {{%.*}} : $*U
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts38opaque_archetype_to_addr_only_concrete{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts38opaque_archetype_to_addr_only_concrete{{[_0-9a-zA-Z]*}}F
 func opaque_archetype_to_addr_only_concrete
 <T:NotClassBound> (_ t:T) -> Unloadable {
   return t as! Unloadable
@@ -80,14 +80,14 @@ func opaque_archetype_to_addr_only_concrete
   // CHECK:   unconditional_checked_cast_addr T in {{%.*}} : $*T to Unloadable in [[RET]] : $*Unloadable
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts38opaque_archetype_is_addr_only_concrete{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts38opaque_archetype_is_addr_only_concrete{{[_0-9a-zA-Z]*}}F
 func opaque_archetype_is_addr_only_concrete
 <T:NotClassBound> (_ t:T) -> Bool {
   return t is Unloadable
   // CHECK: checked_cast_addr_br take_always T in [[VAL:%.*]] : {{.*}} to Unloadable in
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts37opaque_archetype_to_loadable_concrete{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts37opaque_archetype_to_loadable_concrete{{[_0-9a-zA-Z]*}}F
 func opaque_archetype_to_loadable_concrete
 <T:NotClassBound>(_ t:T) -> S {
   return t as! S
@@ -96,14 +96,14 @@ func opaque_archetype_to_loadable_concrete
   // CHECK: return [[DOWNCAST]] : $S
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts37opaque_archetype_is_loadable_concrete{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts37opaque_archetype_is_loadable_concrete{{[_0-9a-zA-Z]*}}F
 func opaque_archetype_is_loadable_concrete
 <T:NotClassBound>(_ t:T) -> Bool {
   return t is S
   // CHECK: checked_cast_addr_br take_always T in {{%.*}} : $*T to S in
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts019class_archetype_to_C0{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts019class_archetype_to_C0{{[_0-9a-zA-Z]*}}F
 func class_archetype_to_class
 <T:ClassBound>(_ t:T) -> C {
   return t as! C
@@ -111,14 +111,14 @@ func class_archetype_to_class
   // CHECK: return [[DOWNCAST]] : $C
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts019class_archetype_is_C0{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts019class_archetype_is_C0{{[_0-9a-zA-Z]*}}F
 func class_archetype_is_class
 <T:ClassBound>(_ t:T) -> Bool {
   return t is C
   // CHECK: checked_cast_br {{%.*}} to $C
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts022opaque_existential_to_C10_archetype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts022opaque_existential_to_C10_archetype{{[_0-9a-zA-Z]*}}F
 func opaque_existential_to_opaque_archetype
 <T:NotClassBound>(_ p:NotClassBound) -> T {
   return p as! T
@@ -131,14 +131,14 @@ func opaque_existential_to_opaque_archetype
   // CHECK-NEXT: return [[T0]]
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts022opaque_existential_is_C10_archetype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts022opaque_existential_is_C10_archetype{{[_0-9a-zA-Z]*}}F
 func opaque_existential_is_opaque_archetype
 <T:NotClassBound>(_ p:NotClassBound, _: T) -> Bool {
   return p is T
   // CHECK:   checked_cast_addr_br take_always NotClassBound in [[CONTAINER:%.*]] : {{.*}} to T in
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts37opaque_existential_to_class_archetype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts37opaque_existential_to_class_archetype{{[_0-9a-zA-Z]*}}F
 func opaque_existential_to_class_archetype
 <T:ClassBound>(_ p:NotClassBound) -> T {
   return p as! T
@@ -147,14 +147,14 @@ func opaque_existential_to_class_archetype
   // CHECK: return [[DOWNCAST]] : $T
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts37opaque_existential_is_class_archetype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts37opaque_existential_is_class_archetype{{[_0-9a-zA-Z]*}}F
 func opaque_existential_is_class_archetype
 <T:ClassBound>(_ p:NotClassBound, _: T) -> Bool {
   return p is T
   // CHECK: checked_cast_addr_br take_always NotClassBound in {{%.*}} : $*NotClassBound to T in
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts021class_existential_to_C10_archetype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts021class_existential_to_C10_archetype{{[_0-9a-zA-Z]*}}F
 func class_existential_to_class_archetype
 <T:ClassBound>(_ p:ClassBound) -> T {
   return p as! T
@@ -163,27 +163,27 @@ func class_existential_to_class_archetype
   // CHECK: return [[DOWNCAST]] : $T
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts021class_existential_is_C10_archetype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts021class_existential_is_C10_archetype{{[_0-9a-zA-Z]*}}F
 func class_existential_is_class_archetype
 <T:ClassBound>(_ p:ClassBound, _: T) -> Bool {
   return p is T
   // CHECK: checked_cast_addr_br {{.*}} ClassBound in {{%.*}} : $*ClassBound to T in {{%.*}} : $*T
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts40opaque_existential_to_addr_only_concrete{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts40opaque_existential_to_addr_only_concrete{{[_0-9a-zA-Z]*}}F
 func opaque_existential_to_addr_only_concrete(_ p: NotClassBound) -> Unloadable {
   return p as! Unloadable
   // CHECK: bb0([[RET:%.*]] : @trivial $*Unloadable, {{%.*}}: @trivial $*NotClassBound):
   // CHECK:   unconditional_checked_cast_addr NotClassBound in {{%.*}} : $*NotClassBound to Unloadable in [[RET]] : $*Unloadable
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts40opaque_existential_is_addr_only_concrete{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts40opaque_existential_is_addr_only_concrete{{[_0-9a-zA-Z]*}}F
 func opaque_existential_is_addr_only_concrete(_ p: NotClassBound) -> Bool {
   return p is Unloadable
   // CHECK:   checked_cast_addr_br take_always NotClassBound in {{%.*}} : $*NotClassBound to Unloadable in
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts39opaque_existential_to_loadable_concrete{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts39opaque_existential_to_loadable_concrete{{[_0-9a-zA-Z]*}}F
 func opaque_existential_to_loadable_concrete(_ p: NotClassBound) -> S {
   return p as! S
   // CHECK:   unconditional_checked_cast_addr NotClassBound in {{%.*}} : $*NotClassBound to S in [[DOWNCAST_ADDR:%.*]] : $*S
@@ -191,26 +191,26 @@ func opaque_existential_to_loadable_concrete(_ p: NotClassBound) -> S {
   // CHECK: return [[DOWNCAST]] : $S
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts39opaque_existential_is_loadable_concrete{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts39opaque_existential_is_loadable_concrete{{[_0-9a-zA-Z]*}}F
 func opaque_existential_is_loadable_concrete(_ p: NotClassBound) -> Bool {
   return p is S
   // CHECK: checked_cast_addr_br take_always NotClassBound in {{%.*}} : $*NotClassBound to S in
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts021class_existential_to_C0{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts021class_existential_to_C0{{[_0-9a-zA-Z]*}}F
 func class_existential_to_class(_ p: ClassBound) -> C {
   return p as! C
   // CHECK: [[DOWNCAST:%.*]] = unconditional_checked_cast {{%.*}} to $C
   // CHECK: return [[DOWNCAST]] : $C
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts021class_existential_is_C0{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts021class_existential_is_C0{{[_0-9a-zA-Z]*}}F
 func class_existential_is_class(_ p: ClassBound) -> Bool {
   return p is C
   // CHECK: checked_cast_br {{%.*}} to $C
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts27optional_anyobject_to_classyAA1CCSgyXlSgF
+// CHECK-LABEL: sil hidden @$s13generic_casts27optional_anyobject_to_classyAA1CCSgyXlSgF
 func optional_anyobject_to_class(_ p: AnyObject?) -> C? {
   return p as? C
   // CHECK: checked_cast_br {{%.*}} : $AnyObject to $C
@@ -219,20 +219,20 @@ func optional_anyobject_to_class(_ p: AnyObject?) -> C? {
 // The below tests are to ensure we don't dig into an optional operand when
 // casting to a non-class archetype, as it could dynamically be an optional type.
 
-// CHECK-LABEL: sil hidden @$S13generic_casts32optional_any_to_opaque_archetype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts32optional_any_to_opaque_archetype{{[_0-9a-zA-Z]*}}F
 func optional_any_to_opaque_archetype<T>(_ x: Any?) -> T {
   return x as! T
   // CHECK: bb0([[RET:%.*]] : @trivial $*T, {{%.*}} : @trivial $*Optional<Any>):
   // CHECK: unconditional_checked_cast_addr Optional<Any> in {{%.*}} : $*Optional<Any> to T in [[RET]] : $*T
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts46optional_any_conditionally_to_opaque_archetype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts46optional_any_conditionally_to_opaque_archetype{{[_0-9a-zA-Z]*}}F
 func optional_any_conditionally_to_opaque_archetype<T>(_ x: Any?) -> T? {
   return x as? T
   // CHECK: checked_cast_addr_br take_always Optional<Any> in {{%.*}} : $*Optional<Any> to T in {{%.*}} : $*T
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts32optional_any_is_opaque_archetype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts32optional_any_is_opaque_archetype{{[_0-9a-zA-Z]*}}F
 func optional_any_is_opaque_archetype<T>(_ x: Any?, _: T) -> Bool {
   return x is T
   // CHECK: checked_cast_addr_br take_always Optional<Any> in {{%.*}} : $*Optional<Any> to T in {{%.*}} : $*T
@@ -241,19 +241,19 @@ func optional_any_is_opaque_archetype<T>(_ x: Any?, _: T) -> Bool {
 // But we can dig into at most one layer of the operand if it's
 // an optional archetype...
 
-// CHECK-LABEL: sil hidden @$S13generic_casts016optional_any_to_C17_opaque_archetype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts016optional_any_to_C17_opaque_archetype{{[_0-9a-zA-Z]*}}F
 func optional_any_to_optional_opaque_archetype<T>(_ x: Any?) -> T? {
   return x as! T?
   // CHECK: unconditional_checked_cast_addr Any in {{%.*}} : $*Any to T in {{%.*}} : $*T
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts030optional_any_conditionally_to_C17_opaque_archetype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts030optional_any_conditionally_to_C17_opaque_archetype{{[_0-9a-zA-Z]*}}F
 func optional_any_conditionally_to_optional_opaque_archetype<T>(_ x: Any?) -> T?? {
   return x as? T?
   // CHECK: checked_cast_addr_br take_always Any in {{%.*}} : $*Any to T in {{%.*}} : $*T
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts016optional_any_is_C17_opaque_archetype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts016optional_any_is_C17_opaque_archetype{{[_0-9a-zA-Z]*}}F
 func optional_any_is_optional_opaque_archetype<T>(_ x: Any?, _: T) -> Bool {
   return x is T?
   //   Because the levels of optional are the same, 'is' doesn't transform into an 'as?',
@@ -264,19 +264,19 @@ func optional_any_is_optional_opaque_archetype<T>(_ x: Any?, _: T) -> Bool {
 // And we can dig into the operand when casting to a class archetype, as it
 // cannot dynamically be optional...
 
-// CHECK-LABEL: sil hidden @$S13generic_casts31optional_any_to_class_archetype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts31optional_any_to_class_archetype{{[_0-9a-zA-Z]*}}F
 func optional_any_to_class_archetype<T : AnyObject>(_ x: Any?) -> T {
   return x as! T
   // CHECK: unconditional_checked_cast_addr Any in {{%.*}} : $*Any to T in {{%.*}} : $*T
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts45optional_any_conditionally_to_class_archetype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts45optional_any_conditionally_to_class_archetype{{[_0-9a-zA-Z]*}}F
 func optional_any_conditionally_to_class_archetype<T : AnyObject>(_ x: Any?) -> T? {
   return x as? T
   // CHECK: checked_cast_addr_br take_always Any in {{%.*}} : $*Any to T in {{%.*}} : $*T
 }
 
-// CHECK-LABEL: sil hidden @$S13generic_casts31optional_any_is_class_archetype{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13generic_casts31optional_any_is_class_archetype{{[_0-9a-zA-Z]*}}F
 func optional_any_is_class_archetype<T : AnyObject>(_ x: Any?, _: T) -> Bool {
   return x is T
   // CHECK: checked_cast_addr_br take_always Any in {{%.*}} : $*Any to T in {{%.*}} : $*T

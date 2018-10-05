@@ -908,7 +908,7 @@ StringTests.test("stringGutsReserve")
   .skip(.nativeRuntime("Foundation dependency"))
   .code {
 #if _runtime(_ObjC)
-  guard #available(iOS 11.0, *) else { return }
+  guard #available(macOS 10.13, iOS 11.0, tvOS 11.0, *) else { return }
   for k in 0...7 {
     var base: String
     var startedNative: Bool
@@ -1060,17 +1060,17 @@ StringTests.test("toInt") {
   expectNil(Int(""))
   expectNil(Int("+"))
   expectNil(Int("-"))
-  expectOptionalEqual(20, Int("+20"))
-  expectOptionalEqual(0, Int("0"))
-  expectOptionalEqual(-20, Int("-20"))
+  expectEqual(20, Int("+20"))
+  expectEqual(0, Int("0"))
+  expectEqual(-20, Int("-20"))
   expectNil(Int("-cc20"))
   expectNil(Int("  -20"))
   expectNil(Int("  \t 20ddd"))
 
-  expectOptionalEqual(Int.min, Int("\(Int.min)"))
-  expectOptionalEqual(Int.min + 1, Int("\(Int.min + 1)"))
-  expectOptionalEqual(Int.max, Int("\(Int.max)"))
-  expectOptionalEqual(Int.max - 1, Int("\(Int.max - 1)"))
+  expectEqual(Int.min, Int("\(Int.min)"))
+  expectEqual(Int.min + 1, Int("\(Int.min + 1)"))
+  expectEqual(Int.max, Int("\(Int.max)"))
+  expectEqual(Int.max - 1, Int("\(Int.max - 1)"))
 
   expectNil(Int("\(Int.min)0"))
   expectNil(Int("\(Int.max)0"))
@@ -1098,8 +1098,8 @@ StringTests.test("toInt") {
   // Test values lower than min.
   do {
     let base = UInt(Int.max)
-    expectOptionalEqual(Int.min + 1, Int("-\(base)"))
-    expectOptionalEqual(Int.min, Int("-\(base + 1)"))
+    expectEqual(Int.min + 1, Int("-\(base)"))
+    expectEqual(Int.min, Int("-\(base + 1)"))
     for i in 2..<20 {
       expectNil(Int("-\(base + UInt(i))"))
     }
@@ -1109,14 +1109,14 @@ StringTests.test("toInt") {
   do {
     let base = UInt(Int.max)
     for i in UInt(0)..<20 {
-      expectOptionalEqual(-Int(base - i) , Int("-\(base - i)"))
+      expectEqual(-Int(base - i) , Int("-\(base - i)"))
     }
   }
 
   // Test values greater than max.
   do {
     let base = UInt(Int.max)
-    expectOptionalEqual(Int.max, Int("\(base)"))
+    expectEqual(Int.max, Int("\(base)"))
     for i in 1..<20 {
       expectNil(Int("\(base + UInt(i))"))
     }
@@ -1126,7 +1126,7 @@ StringTests.test("toInt") {
   do {
     let base = Int.max
     for i in 0..<20 {
-      expectOptionalEqual(base - i, Int("\(base - i)"))
+      expectEqual(base - i, Int("\(base - i)"))
     }
   }
 }

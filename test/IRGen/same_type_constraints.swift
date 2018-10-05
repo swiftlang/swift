@@ -3,7 +3,7 @@
 
 // Ensure that same-type constraints between generic arguments get reflected
 // correctly in the type context descriptor.
-// CHECK-LABEL: @"$S21same_type_constraints4SG11VA2A2P2Rzq_RszrlE13InnerTEqualsUVMn" = 
+// CHECK-LABEL: @"$s21same_type_constraints4SG11VA2A2P2Rzq_RszrlE13InnerTEqualsUVMn" = 
 //                  T       U(==T) V        padding
 // CHECK-SAME:    , i8 -128, i8 0, i8 -128, i8 0,
 
@@ -23,13 +23,13 @@ public extension P where Foo == DefaultFoo<Self> {
 }
 
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S21same_type_constraints1PPA2A10DefaultFooVyxG0E0RtzrlE3fooAFyF"
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s21same_type_constraints1PPA2A10DefaultFooVyxG0E0RtzrlE3fooAFyF"
 
 // <rdar://26873036> IRGen crash with derived class declaring same-type constraint on constrained associatedtype.
 public class C1<T: Equatable> { }
 public class C2<T: Equatable, U: P>: C1<T> where T == U.Foo {}
 
-// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S21same_type_constraints2C1CfD"
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s21same_type_constraints2C1CfD"
 
 public protocol MyHashable {}
 public protocol DataType : MyHashable {}
@@ -67,7 +67,7 @@ where Self : CodingType,
   print(Self.ValueType.self)
 }
 
-// OSIZE: define internal swiftcc i8** @"$S21same_type_constraints12GenericKlazzCyxq_GAA1EAA4Data_AA0F4TypePWT"(%swift.type* %"GenericKlazz<T, R>.Data", %swift.type* nocapture readonly %"GenericKlazz<T, R>", i8** nocapture readnone %"GenericKlazz<T, R>.E") [[ATTRS:#[0-9]+]] {
+// OSIZE: define internal swiftcc i8** @"$s21same_type_constraints12GenericKlazzCyxq_GAA1EAA4Data_AA0F4TypePWT"(%swift.type* %"GenericKlazz<T, R>.Data", %swift.type* nocapture readonly %"GenericKlazz<T, R>", i8** nocapture readnone %"GenericKlazz<T, R>.E") [[ATTRS:#[0-9]+]] {
 // OSIZE: [[ATTRS]] = {{{.*}}noinline
 
 // Check that same-typing two generic parameters together lowers correctly.

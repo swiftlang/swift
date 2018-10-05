@@ -18,8 +18,8 @@ func main_func<T>(In In : T) {
   x.ping(x: In)
 }
 
-//CHECK: sil hidden @$S21specialize_apply_conf11interestingyyF
-//CHECK-DAG: [[F:%[0-9]+]] = function_ref @$S21specialize_apply_conf9main_func2Inyx_tlFSi_Tg5{{.*}}{{.*}}scope
+//CHECK: sil hidden @$s21specialize_apply_conf11interestingyyF
+//CHECK-DAG: [[F:%[0-9]+]] = function_ref @$s21specialize_apply_conf9main_func2Inyx_tlFSi_Tg5{{.*}}{{.*}}scope
 //CHECK-DAG: [[A:%[0-9]+]] = struct $Int
 //CHECK-DAG: apply [[F]]([[A]])
 //CHECK: return

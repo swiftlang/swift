@@ -123,7 +123,7 @@ bool StackPromotion::tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
       UsePoints.push_back(I);
     } else {
       // Also block arguments can be use points.
-      SILBasicBlock *UseBB = cast<SILPHIArgument>(UsePoint)->getParent();
+      SILBasicBlock *UseBB = cast<SILPhiArgument>(UsePoint)->getParent();
       // For simplicity we just add the first instruction of the block as use
       // point.
       UsePoints.push_back(&UseBB->front());

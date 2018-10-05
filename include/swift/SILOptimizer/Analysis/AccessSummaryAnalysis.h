@@ -173,22 +173,18 @@ private:
 
   /// A trie of integer indices that gives pointer identity to a path of
   /// projections. This is shared between all functions in the module.
-  IndexTrieNode *SubPathTrie;
+  std::unique_ptr<IndexTrieNode> SubPathTrie;
 
 public:
   AccessSummaryAnalysis() : BottomUpIPAnalysis(SILAnalysisKind::AccessSummary) {
-    SubPathTrie = new IndexTrieNode();
-  }
-
-  ~AccessSummaryAnalysis() {
-    delete SubPathTrie;
+    SubPathTrie.reset(new IndexTrieNode());
   }
 
   /// Returns a summary of the accesses performed by the given function.
   const FunctionSummary &getOrCreateSummary(SILFunction *Fn);
 
   IndexTrieNode *getSubPathTrieRoot() {
-    return SubPathTrie;
+    return SubPathTrie.get();
   }
 
   /// Returns an IndexTrieNode that represents the single subpath accessed from

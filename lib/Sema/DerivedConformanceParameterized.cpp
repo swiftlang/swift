@@ -305,12 +305,16 @@ deriveParameterized_allParameters(DerivedConformance &derived) {
   auto *setterDecl =
       derived.declareDerivedPropertySetter(derived.TC, allParamsDecl, returnTy);
   setterDecl->setBodySynthesizer(&derivedBody_allParametersSetter);
+
   allParamsDecl->setAccessors(StorageImplInfo::getMutableComputed(),
                               SourceLoc(), {getterDecl, setterDecl},
                               SourceLoc());
 
   derived.addMembersToConformanceContext(
       {getterDecl, setterDecl, allParamsDecl, pbDecl});
+
+  addExpectedOpaqueAccessorsToStorage(TC, allParamsDecl);
+  triggerAccessorSynthesis(TC, allParamsDecl);
 
   return allParamsDecl;
 }
@@ -368,7 +372,7 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
 
   // Add conformance to the ParameterAggregate protocol, if possible.
   // The ParameterAggregate protocol requirements will be derived.
-  if (DerivedConformance::canDeriveParameterAggregate(TC, parametersDecl)) {
+  if (DerivedConformance::canDeriveParameterAggregate(parametersDecl)) {
     TypeLoc inherited[1] = {paramAggType};
     parametersDecl->setInherited(C.AllocateCopy(inherited));
   }

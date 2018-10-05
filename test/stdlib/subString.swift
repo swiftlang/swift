@@ -102,14 +102,14 @@ SubstringTests.test("Filter") {
 
 SubstringTests.test("CharacterView") {
   let s = "abcdefg"
-  var t = s.characters.dropFirst(2)
+  var t = s.dropFirst(2)
   var u = t.dropFirst(2)
   
-  checkMatch(s.characters, t, t.startIndex)
-  checkMatch(s.characters, t, t.index(after: t.startIndex))
-  checkMatch(s.characters, t, t.index(before: t.endIndex))
+  checkMatch(s, t, t.startIndex)
+  checkMatch(s, t, t.index(after: t.startIndex))
+  checkMatch(s, t, t.index(before: t.endIndex))
   
-  checkMatch(s.characters, t, u.startIndex)
+  checkMatch(s, t, u.startIndex)
   checkMatch(t, u, u.startIndex)
   checkMatch(t, u, u.index(after: u.startIndex))
   checkMatch(t, u, u.index(before: u.endIndex))

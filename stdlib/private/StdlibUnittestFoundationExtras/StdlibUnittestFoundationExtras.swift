@@ -18,7 +18,7 @@ internal var _temporaryLocaleCurrentLocale: NSLocale?
 
 extension NSLocale {
   @objc
-  public class func _swiftUnittest_currentLocale() -> NSLocale {
+  public class func __swiftUnittest_currentLocale() -> NSLocale {
     return _temporaryLocaleCurrentLocale!
   }
 }
@@ -34,9 +34,9 @@ public func withOverriddenLocaleCurrentLocale<Result>(
   }
 
   guard let newMethod = class_getClassMethod(
-    NSLocale.self, #selector(NSLocale._swiftUnittest_currentLocale)) as Optional
+    NSLocale.self, #selector(NSLocale.__swiftUnittest_currentLocale)) as Optional
   else {
-    preconditionFailure("Could not find +[Locale _swiftUnittest_currentLocale]")
+    preconditionFailure("Could not find +[Locale __swiftUnittest_currentLocale]")
   }
 
   precondition(_temporaryLocaleCurrentLocale == nil,

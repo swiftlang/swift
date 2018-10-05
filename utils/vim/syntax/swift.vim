@@ -127,7 +127,7 @@ syn match swiftTypePair contained skipwhite nextgroup=swiftTypeParameters,swiftT
 " (Type[, Type]) (tuple)
 " FIXME: we should be able to use skip="," and drop swiftParamDelim
 syn region swiftType contained contains=swiftType,swiftParamDelim
-      \ matchgroup=Delimiter start="[^@](" end=")" matchgroup=NONE skip=","
+      \ matchgroup=Delimiter start="[^@]\?(" end=")" matchgroup=NONE skip=","
 syn match swiftParamDelim contained
       \ /,/
 " <Generic Clause> (generics)
@@ -140,6 +140,8 @@ syn match swiftTypeDeclaration skipwhite nextgroup=swiftType,swiftInOutKeyword
       \ /:/
 syn match swiftTypeDeclaration skipwhite nextgroup=swiftType
       \ /->/
+
+syn region swiftParenthesisRegion matchgroup=NONE start=/(/ end=/)/ contains=TOP
 
 syn region swiftString start=/"/ skip=/\\\\\|\\"/ end=/"/ contains=swiftInterpolationRegion
 syn region swiftInterpolationRegion matchgroup=swiftInterpolation start=/\\(/ end=/)/ contained contains=TOP
@@ -156,8 +158,13 @@ syn match swiftOperator "\.\.[<.]" skipwhite nextgroup=swiftTypeParameters
 
 syn match swiftChar /'\([^'\\]\|\\\(["'tnr0\\]\|x[0-9a-fA-F]\{2}\|u[0-9a-fA-F]\{4}\|U[0-9a-fA-F]\{8}\)\)'/
 
+syn match swiftTupleIndexNumber contains=swiftDecimal
+      \ /\.[0-9]\+/
+syn match swiftDecimal contained
+      \ /[0-9]\+/
+
 syn match swiftPreproc /#\(\<file\>\|\<line\>\|\<function\>\)/
-syn match swiftPreproc /^\s*#\(\<if\>\|\<else\>\|\<elseif\>\|\<endif\>\<error\>\|\<warning\>\|\)/
+syn match swiftPreproc /^\s*#\(\<if\>\|\<else\>\|\<elseif\>\|\<endif\>\|\<error\>\|\<warning\>\)/
 syn region swiftPreprocFalse start="^\s*#\<if\>\s\+\<false\>" end="^\s*#\(\<else\>\|\<elseif\>\|\<endif\>\)"
 
 syn match swiftAttribute /@\<\w\+\>/ skipwhite nextgroup=swiftType

@@ -98,6 +98,8 @@ static bool isOwnershipForwardingValueKind(SILNodeKind K) {
   case SILNodeKind::SelectEnumInst:
   case SILNodeKind::SwitchEnumInst:
   case SILNodeKind::CheckedCastBranchInst:
+  case SILNodeKind::BranchInst:
+  case SILNodeKind::CondBranchInst:
   case SILNodeKind::DestructureStructInst:
   case SILNodeKind::DestructureTupleInst:
   // SWIFT_ENABLE_TENSORFLOW
@@ -309,7 +311,6 @@ NO_OPERAND_INST(ObjCProtocol)
 NO_OPERAND_INST(RetainValue)
 NO_OPERAND_INST(RetainValueAddr)
 NO_OPERAND_INST(StringLiteral)
-NO_OPERAND_INST(ConstStringLiteral)
 NO_OPERAND_INST(StrongRetain)
 NO_OPERAND_INST(Unreachable)
 NO_OPERAND_INST(Unwind)
@@ -344,7 +345,6 @@ CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DestroyValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, ReleaseValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, ReleaseValueAddr)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, StrongRelease)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, StrongUnpin)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, InitExistentialRef)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndLifetime)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, AbortApply)
@@ -370,7 +370,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, InitExistentialAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, InitExistentialMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, InjectEnumAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, IsUnique)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, IsUniqueOrPinned)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, Load)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, LoadBorrow)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, MarkFunctionEscape)
@@ -495,7 +494,6 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, OpenExistentialBox)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefTailAddr)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefToRawPointer)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, SetDeallocating)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, StrongPin)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, ProjectExistentialBox)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, UnmanagedRetainValue)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, UnmanagedReleaseValue)
@@ -615,21 +613,6 @@ OwnershipCompatibilityUseChecker::visitDeallocPartialRefInst(
 
   return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
           UseLifetimeConstraint::MustBeLive};
-}
-
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitEndBorrowArgumentInst(
-    EndBorrowArgumentInst *I) {
-  // If we are currently checking an end_borrow_argument as a subobject, then we
-  // treat this as just a use.
-  if (isCheckingSubObject())
-    return {true, UseLifetimeConstraint::MustBeLive};
-
-  // Otherwise, we must be checking an actual argument. Make sure it is guaranteed!
-  auto lifetimeConstraint = hasExactOwnership(ValueOwnershipKind::Guaranteed)
-                                ? UseLifetimeConstraint::MustBeInvalidated
-                                : UseLifetimeConstraint::MustBeLive;
-  return {true, lifetimeConstraint};
 }
 
 OwnershipUseCheckerResult
@@ -817,11 +800,18 @@ OwnershipCompatibilityUseChecker::visitReturnInst(ReturnInst *RI) {
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitEndBorrowInst(EndBorrowInst *I) {
-  // We do not consider the original value to be a verified use. But the value
-  // does need to be alive.
-  if (getOperandIndex() == EndBorrowInst::OriginalValue)
+  // If we are checking a subobject, make sure that we are from a guaranteed
+  // basic block argument.
+  if (isCheckingSubObject()) {
+    auto *phiArg = cast<SILPhiArgument>(Op.get());
+    (void)phiArg;
+    assert(phiArg->getOwnershipKind() == ValueOwnershipKind::Guaranteed &&
+           "Expected an end_borrow paired with an argument.");
     return {true, UseLifetimeConstraint::MustBeLive};
-  // The borrowed value is a verified use though of the begin_borrow.
+  }
+
+  /// An end_borrow is modeled as invalidating the guaranteed value preventing
+  /// any further uses of the value.
   return {compatibleWithOwnership(ValueOwnershipKind::Guaranteed),
           UseLifetimeConstraint::MustBeInvalidated};
 }
@@ -979,6 +969,7 @@ visitFullApply(FullApplySite apply) {
   case ParameterConvention::Indirect_InoutAliasable:
     llvm_unreachable("Unexpected non-trivial parameter convention.");
   }
+  llvm_unreachable("unhandled convension");
 }
 
 OwnershipUseCheckerResult
@@ -1034,6 +1025,7 @@ OwnershipCompatibilityUseChecker::visitYieldInst(YieldInst *I) {
   case ParameterConvention::Indirect_InoutAliasable:
     llvm_unreachable("Unexpected non-trivial parameter convention.");
   }
+  llvm_unreachable("unhandled convension");
 }
 
 OwnershipUseCheckerResult
@@ -1241,6 +1233,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, IntToFPWithOverflow)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, IntToPtr)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, IsOptionalType)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, IsPOD)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, IsBitwiseTakable)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, IsSameMetatype)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, LShr)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Mul)
@@ -1301,56 +1294,14 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, PoundAssert)
 
 // Builtins that should be lowered to SIL instructions so we should never see
 // them.
-#define BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(ID)                 \
+#define BUILTIN_SIL_OPERATION(ID, NAME, CATEGORY)                              \
   OwnershipUseCheckerResult                                                    \
       OwnershipCompatibilityBuiltinUseChecker::visit##ID(BuiltinInst *BI,      \
                                                          StringRef Attr) {     \
     llvm_unreachable("Builtin should have been lowered to SIL instruction?!"); \
   }
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Retain)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Release)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Autorelease)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(TryPin)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Unpin)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Load)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(LoadRaw)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(LoadInvariant)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Take)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Destroy)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Assign)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Init)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(CastToNativeObject)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(UnsafeCastToNativeObject)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(CastFromNativeObject)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(CastToBridgeObject)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(
-    CastReferenceFromBridgeObject)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(
-    CastBitPatternFromBridgeObject)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(ClassifyBridgeObject)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(ValueToBridgeObject)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(BridgeToRawPointer)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(BridgeFromRawPointer)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(CastReference)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(ReinterpretCast)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(AddressOf)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(AddressOfBorrow)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(GepRaw)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Gep)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(GetTailAddr)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(PerformInstantaneousReadAccess)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(BeginUnpairedModifyAccess)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(EndUnpairedAccess)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(CondFail)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(FixLifetime)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(IsUnique)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(IsUniqueOrPinned)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(IsUnique_native)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(IsUniqueOrPinned_native)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(BindMemory)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(AllocWithTailElems)
-BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(ProjectTailElems)
-#undef BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS
+#define BUILTIN(X, Y, Z)
+#include "swift/AST/Builtins.def"
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitBuiltinInst(BuiltinInst *BI) {
@@ -1392,14 +1343,22 @@ class SILValueOwnershipChecker {
 
   /// The list of lifetime ending users that we found. Only valid if check is
   /// successful.
-  llvm::SmallVector<BranchPropagatedUser, 16> LifetimeEndingUsers;
+  SmallVector<BranchPropagatedUser, 16> LifetimeEndingUsers;
 
   /// The list of non lifetime ending users that we found. Only valid if check
   /// is successful.
-  llvm::SmallVector<BranchPropagatedUser, 16> RegularUsers;
+  SmallVector<BranchPropagatedUser, 16> RegularUsers;
+
+  /// The list of implicit non lifetime ending users that we found. This
+  /// consists of instructions like end_borrow that end a scoped lifetime. We
+  /// must treat those as regular uses and ensure that our value is not
+  /// destroyed while that sub-scope is valid.
+  ///
+  /// TODO: Rename to SubBorrowScopeUsers?
+  SmallVector<BranchPropagatedUser, 4> ImplicitRegularUsers;
 
   /// The set of blocks that we have visited.
-  llvm::SmallPtrSetImpl<SILBasicBlock *> &VisitedBlocks;
+  SmallPtrSetImpl<SILBasicBlock *> &VisitedBlocks;
 
 public:
   SILValueOwnershipChecker(
@@ -1424,7 +1383,10 @@ public:
     if (!Result.getValue())
       return false;
 
-    Result = valueHasLinearLifetime(Value, LifetimeEndingUsers, RegularUsers,
+    SmallVector<BranchPropagatedUser, 32> allRegularUsers;
+    copy(RegularUsers, std::back_inserter(allRegularUsers));
+    copy(ImplicitRegularUsers, std::back_inserter(allRegularUsers));
+    Result = valueHasLinearLifetime(Value, LifetimeEndingUsers, allRegularUsers,
                                     VisitedBlocks, DEBlocks, ErrorBehavior);
 
     return Result.getValue();
@@ -1463,9 +1425,9 @@ public:
 
 private:
   bool checkUses();
-  void gatherUsers(
-      llvm::SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers,
-      llvm::SmallVectorImpl<BranchPropagatedUser> &NonLifetimeEndingUsers);
+  void gatherUsers(SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers,
+                   SmallVectorImpl<BranchPropagatedUser> &RegularUsers,
+                   SmallVectorImpl<BranchPropagatedUser> &ImplicitRegularUsers);
 
   bool checkValueWithoutLifetimeEndingUses();
 
@@ -1500,8 +1462,9 @@ private:
 } // end anonymous namespace
 
 void SILValueOwnershipChecker::gatherUsers(
-    llvm::SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers,
-    llvm::SmallVectorImpl<BranchPropagatedUser> &NonLifetimeEndingUsers) {
+    SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers,
+    SmallVectorImpl<BranchPropagatedUser> &NonLifetimeEndingUsers,
+    SmallVectorImpl<BranchPropagatedUser> &ImplicitRegularUsers) {
 
   // See if Value is guaranteed. If we are guaranteed and not forwarding, then
   // we need to look through subobject uses for more uses. Otherwise, if we are
@@ -1509,26 +1472,26 @@ void SILValueOwnershipChecker::gatherUsers(
   // users since we verify against our base.
   auto OwnershipKind = Value.getOwnershipKind();
   bool IsGuaranteed = OwnershipKind == ValueOwnershipKind::Guaranteed;
+  bool IsOwned = OwnershipKind == ValueOwnershipKind::Owned;
 
   if (IsGuaranteed && isGuaranteedForwardingValue(Value))
     return;
 
   // Then gather up our initial list of users.
-  llvm::SmallVector<Operand *, 8> Users;
+  SmallVector<Operand *, 8> Users;
   std::copy(Value->use_begin(), Value->use_end(), std::back_inserter(Users));
 
-  auto addCondBranchToList =
-      [](llvm::SmallVectorImpl<BranchPropagatedUser> &List, CondBranchInst *CBI,
-         unsigned OperandIndex) {
-        if (CBI->isConditionOperandIndex(OperandIndex)) {
-          List.emplace_back(CBI);
-          return;
-        }
+  auto addCondBranchToList = [](SmallVectorImpl<BranchPropagatedUser> &List,
+                                CondBranchInst *CBI, unsigned OperandIndex) {
+    if (CBI->isConditionOperandIndex(OperandIndex)) {
+      List.emplace_back(CBI);
+      return;
+    }
 
-        bool isTrueOperand = CBI->isTrueOperandIndex(OperandIndex);
-        List.emplace_back(CBI, isTrueOperand ? CondBranchInst::TrueIdx
-                                             : CondBranchInst::FalseIdx);
-      };
+    bool isTrueOperand = CBI->isTrueOperandIndex(OperandIndex);
+    List.emplace_back(CBI, isTrueOperand ? CondBranchInst::TrueIdx
+                                         : CondBranchInst::FalseIdx);
+  };
 
   while (!Users.empty()) {
     Operand *Op = Users.pop_back_val();
@@ -1557,12 +1520,36 @@ void SILValueOwnershipChecker::gatherUsers(
       }
     }
 
-    // If our base value is not guaranteed or our intermediate value is not an
-    // ownership forwarding inst, continue. We do not want to visit any
-    // subobjects recursively.
-    if (!IsGuaranteed || !isGuaranteedForwardingInst(User)) {
+    // If our base value is not guaranteed, we do not to try to visit
+    // subobjects.
+    if (!IsGuaranteed) {
+      // But if we are owned, check if we have any end_borrows. We
+      // need to treat these as sub-scope users. We can rely on the
+      // end_borrow to prevent recursion.
+      if (IsOwned) {
+        // Do a check if any of our users are begin_borrows. If we find such a
+        // use, then we want to include the end_borrow associated with the
+        // begin_borrow in our NonLifetimeEndingUser lists.
+        //
+        // For correctness reasons we use indices to make sure that we can
+        // append to NonLifetimeEndingUsers without needing to deal with
+        // iterator invalidation.
+        SmallVector<SILInstruction *, 4> endBorrowInsts;
+        for (unsigned i : indices(NonLifetimeEndingUsers)) {
+          if (auto *bbi = dyn_cast<BeginBorrowInst>(
+                  NonLifetimeEndingUsers[i].getInst())) {
+            copy(bbi->getEndBorrows(),
+                 std::back_inserter(ImplicitRegularUsers));
+          }
+        }
+      }
       continue;
     }
+
+    // If we are guaranteed, but are not a guaranteed forwarding inst,
+    // just continue. This user is just treated as a normal use.
+    if (!isGuaranteedForwardingInst(User))
+      continue;
 
     // At this point, we know that we must have a forwarded subobject. Since the
     // base type is guaranteed, we know that the subobject is either guaranteed
@@ -1594,10 +1581,9 @@ void SILValueOwnershipChecker::gatherUsers(
       continue;
     }
 
-    // Otherwise if we have a terminator, add any as uses any
-    // end_borrow_argument to ensure that the subscope is completely enclsed
-    // within the super scope. all of the arguments to the work list. We require
-    // all of our arguments to be either trivial or guaranteed.
+    // Otherwise if we have a terminator, add any as uses any end_borrow to
+    // ensure that the subscope is completely enclsed within the super scope. We
+    // require all of our arguments to be either trivial or guaranteed.
     for (auto &Succ : TI->getSuccessors()) {
       auto *BB = Succ.getBB();
 
@@ -1610,7 +1596,7 @@ void SILValueOwnershipChecker::gatherUsers(
       //
       // TODO: We could ignore this error and emit a more specific error on the
       // actual terminator.
-      for (auto *BBArg : BB->getArguments()) {
+      for (auto *BBArg : BB->getPhiArguments()) {
         // *NOTE* We do not emit an error here since we want to allow for more
         // specific errors to be found during use_verification.
         //
@@ -1627,8 +1613,16 @@ void SILValueOwnershipChecker::gatherUsers(
         if (BBArgOwnershipKind == ValueOwnershipKind::Trivial)
           continue;
 
-        // Otherwise, 
-        std::copy(BBArg->use_begin(), BBArg->use_end(), std::back_inserter(Users));
+        // Otherwise add all end_borrow users for this BBArg to the
+        // implicit regular user list. We know that BBArg must be
+        // completely joint post-dominated by these users, so we use
+        // them to ensure that all of BBArg's uses are completely
+        // enclosed within the end_borrow of this argument.
+        for (auto *op : BBArg->getUses()) {
+          if (auto *ebi = dyn_cast<EndBorrowInst>(op->getUser())) {
+            ImplicitRegularUsers.push_back(ebi);
+          }
+        }
       }
     }
   }
@@ -1776,7 +1770,7 @@ bool SILValueOwnershipChecker::checkUses() {
   // 1. Verify that none of the uses are in the same block. This would be an
   // overconsume so in this case we assert.
   // 2. Verify that the uses are compatible with our ownership convention.
-  gatherUsers(LifetimeEndingUsers, RegularUsers);
+  gatherUsers(LifetimeEndingUsers, RegularUsers, ImplicitRegularUsers);
 
   // We can only have no lifetime ending uses if we have:
   //

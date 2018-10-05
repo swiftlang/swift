@@ -32,22 +32,23 @@ using namespace swift;
 // Return the "parameter type" corresponding to a ValueDecl.
 // If the decl conforms to ParameterAggregate, return the `Parameter` associated
 // type. Otherwise, directly return the decl's type.
-static Type getParameterType(TypeChecker &TC, ValueDecl *decl) {
+static Type getParameterType(ValueDecl *decl) {
+  auto &ctx = decl->getASTContext();
   auto *paramAggProto =
-      TC.Context.getProtocol(KnownProtocolKind::ParameterAggregate);
-  auto conf = TC.conformsToProtocol(decl->getInterfaceType(), paramAggProto,
-                                    decl->getDeclContext(),
-                                    ConformanceCheckFlags::InExpression);
+      ctx.getProtocol(KnownProtocolKind::ParameterAggregate);
+  auto conf = TypeChecker::conformsToProtocol(
+      decl->getInterfaceType(), paramAggProto, decl->getDeclContext(),
+      ConformanceCheckFlags::InExpression);
   if (!conf)
     return decl->getInterfaceType();
   Type parameterType = ProtocolConformanceRef::getTypeWitnessByName(
-      decl->getInterfaceType(), *conf, TC.Context.Id_Parameter, &TC);
+      decl->getInterfaceType(), *conf, ctx.Id_Parameter,
+      ctx.getLazyResolver());
   assert(parameterType && "'Parameter' associated type not found");
   return parameterType;
 }
 
-static Type deriveParameterAggregate_Parameter(TypeChecker &TC,
-                                               NominalTypeDecl *nominal) {
+static Type deriveParameterAggregate_Parameter(NominalTypeDecl *nominal) {
   if (nominal->getMembers().empty())
     return Type();
   // If all stored properties have the same type, return that type.
@@ -57,7 +58,7 @@ static Type deriveParameterAggregate_Parameter(TypeChecker &TC,
     auto varDecl = dyn_cast<VarDecl>(member);
     if (!varDecl || varDecl->isStatic() || !varDecl->hasStorage())
       continue;
-    auto parameterType = getParameterType(TC, varDecl);
+    auto parameterType = getParameterType(varDecl);
     if (!sameMemberType) {
       sameMemberType = parameterType;
       continue;
@@ -68,9 +69,9 @@ static Type deriveParameterAggregate_Parameter(TypeChecker &TC,
   return sameMemberType;
 }
 
-bool DerivedConformance::canDeriveParameterAggregate(TypeChecker &TC,
-                                                     NominalTypeDecl *nominal) {
-  return bool(deriveParameterAggregate_Parameter(TC, nominal));
+bool
+DerivedConformance::canDeriveParameterAggregate(NominalTypeDecl *nominal) {
+  return bool(deriveParameterAggregate_Parameter(nominal));
 }
 
 // Add @_fixed_layout attribute to type conforming to `ParameterAggregate`, if
@@ -194,8 +195,6 @@ static ValueDecl *deriveParameterAggregate_update(DerivedConformance &derived) {
   auto parentDC = derived.getConformanceContext();
   auto &C = derived.TC.Context;
 
-  auto selfDecl = ParamDecl::createSelf(SourceLoc(), nominal,
-                                        /*isStatic*/ false, /*isInOut*/ true);
   auto parametersType = nominal->getDeclaredTypeInContext();
   auto parametersInterfaceType = nominal->getDeclaredInterfaceType();
 
@@ -229,7 +228,7 @@ static ValueDecl *deriveParameterAggregate_update(DerivedConformance &derived) {
   DeclName updateDeclName(C, C.getIdentifier("update"), params);
   auto updateDecl = FuncDecl::create(
       C, SourceLoc(), StaticSpellingKind::None, SourceLoc(), updateDeclName,
-      SourceLoc(), /*Throws*/ false, SourceLoc(), nullptr, selfDecl, params,
+      SourceLoc(), /*Throws*/ false, SourceLoc(), nullptr, params,
       TypeLoc::withoutLoc(TupleType::getEmpty(C)), nominal);
   updateDecl->setImplicit();
   updateDecl->setSelfAccessKind(SelfAccessKind::Mutating);
@@ -262,7 +261,7 @@ Type DerivedConformance::deriveParameterAggregate(
     AssociatedTypeDecl *requirement) {
   if (requirement->getBaseName() == TC.Context.Id_Parameter) {
     addFixedLayoutAttrIfNeeded(TC, Nominal);
-    return deriveParameterAggregate_Parameter(TC, Nominal);
+    return deriveParameterAggregate_Parameter(Nominal);
   }
   TC.diagnose(requirement->getLoc(),
               diag::broken_parameter_aggregate_requirement);

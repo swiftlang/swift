@@ -334,6 +334,13 @@ struct SILDeclRef {
   /// entry.
   bool requiresNewVTableEntry() const;
 
+  /// True if the decl ref references a method which introduces a new witness
+  /// table entry.
+  bool requiresNewWitnessTableEntry() const;
+
+  /// True if the decl is a method which introduces a new witness table entry.
+  static bool requiresNewWitnessTableEntry(AbstractFunctionDecl *func);
+
   /// Return a SILDeclRef to the declaration overridden by this one, or
   /// a null SILDeclRef if there is no override.
   SILDeclRef getOverridden() const;
@@ -347,6 +354,15 @@ struct SILDeclRef {
   /// If the method does not override anything or no override is vtable
   /// dispatched, will return the least derived method.
   SILDeclRef getOverriddenVTableEntry() const;
+
+  /// Return the original protocol requirement that introduced the witness table
+  /// entry overridden by this method.
+  SILDeclRef getOverriddenWitnessTableEntry() const;
+
+  /// Return the original protocol requirement that introduced the witness table
+  /// entry overridden by this method.
+  static AbstractFunctionDecl *getOverriddenWitnessTableEntry(
+                                                    AbstractFunctionDecl *func);
 
   /// True if the referenced entity is some kind of thunk.
   bool isThunk() const;

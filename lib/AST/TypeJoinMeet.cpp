@@ -172,7 +172,7 @@ CanType TypeJoin::visitStructType(CanType second) {
   assert(First != second);
 
   // Deal with inout cases in visitInOutType.
-  if (auto inoutTy = First->getAs<InOutType>())
+  if (First->is<InOutType>())
     return TypeJoin(second).visit(First);
 
   // FIXME: When possible we should return a protocol or protocol
@@ -233,7 +233,7 @@ CanType TypeJoin::visitBoundGenericStructType(CanType second) {
   assert(First != second);
 
   // Deal with inout cases in visitInOutType.
-  if (auto inoutTy = First->getAs<InOutType>())
+  if (First->is<InOutType>())
     return TypeJoin(second).visit(First);
 
   return Unimplemented;

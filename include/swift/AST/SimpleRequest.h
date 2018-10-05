@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/Basic/SimpleDisplay.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/TypeID.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
@@ -160,8 +161,12 @@ public:
     out << TypeID<Derived>::getName();
     simple_display(out, request.storage);
   }
-};
 
+  friend FrontendStatsTracer
+  make_tracer(UnifiedStatsReporter *Reporter, const Derived &request) {
+    return make_tracer(Reporter, TypeID<Derived>::getName(), request.storage);
+  }
+};
 }
 
 #endif // SWIFT_BASIC_SIMPLEREQUEST_H
