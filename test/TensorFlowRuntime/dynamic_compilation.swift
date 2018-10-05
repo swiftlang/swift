@@ -20,6 +20,16 @@ DynamicCompilationTests.testCPUOrGPU("Const") {
   expectNearlyEqualWithScalarTensor(1.0, Tensor<Float>(handle: x))
 }
 
+DynamicCompilationTests.testCPUOrGPU("ScalarNonConst") {
+  _RuntimeConfig.printsDebugLog = true
+  func scalarInitializer_CreateHostTensor(_ x: Float) {
+    let y = Tensor<Float>(x)
+    _hostOp(y)
+    expectNearlyEqualWithScalarTensor(x, y)
+  }
+  scalarInitializer_CreateHostTensor(1.2)
+}
+
 DynamicCompilationTests.testCPUOrGPU("AddFloat") {
   _RuntimeConfig.printsDebugLog = true
   let x = Tensor<Float>(1.0)

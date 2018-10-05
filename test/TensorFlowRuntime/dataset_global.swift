@@ -25,13 +25,6 @@ let scalars = Tensor<Float>([0, 1, 2])
 let dataset = Dataset(elements: scalars)
 var iterator = dataset.makeIterator()
 
-// This stmt makes sure the store inst into the global var `dataset` does not
-// make dataset a return tensor.
-//
-// It can be removed when we convert return tensors to TF->Swift tensor
-// transfers.
-_ = Tensor<Float>(0.0)
-
 DatasetGlobalTests.testCPUOrGPU("DatasetAsGlobalVar") {
   // This stmt makes sure the load inst from the global var `dataset` does not
   // make dataset an input arg tensor.
