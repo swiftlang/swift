@@ -269,6 +269,19 @@ void FrontendInputsAndOutputs::addPrimaryInputFile(StringRef file,
   addInput(InputFile(file, true, buffer));
 }
 
+void FrontendInputsAndOutputs::overrideBufferForInput(
+    StringRef file, llvm::MemoryBuffer *buffer) {
+  // FIXME: If we knew this was only interesting for primary inputs, we could
+  // use the PrimaryInputsByName map instead of a linear scan. But at the time
+  // this was added, the CompilerInvocation used for code completion does not
+  // guarantee that.
+  auto indexIter = llvm::find_if(AllInputs, [file](const InputFile &input) {
+    return input.file() == file;
+  });
+  assert(indexIter != AllInputs.end() && "input file not found");
+  indexIter->overrideBuffer(buffer);
+}
+
 // Outputs
 
 unsigned FrontendInputsAndOutputs::countOfInputsProducingMainOutputs() const {

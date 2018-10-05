@@ -283,16 +283,14 @@ bool CompilerInstance::setUpModuleLoaders() {
 }
 
 Optional<unsigned> CompilerInstance::setUpCodeCompletionBuffer() {
-  Optional<unsigned> codeCompletionBufferID;
+  if (!Invocation.isCodeCompletion())
+    return None;
+
   auto codeCompletePoint = Invocation.getCodeCompletionPoint();
-  if (codeCompletePoint.first) {
-    auto memBuf = codeCompletePoint.first;
-    // CompilerInvocation doesn't own the buffers, copy to a new buffer.
-    codeCompletionBufferID = SourceMgr.addMemBufferCopy(memBuf);
-    InputSourceCodeBufferIDs.push_back(*codeCompletionBufferID);
-    SourceMgr.setCodeCompletionPoint(*codeCompletionBufferID,
-                                     codeCompletePoint.second);
-  }
+  Optional<unsigned> codeCompletionBufferID =
+      SourceMgr.getIDForBufferIdentifier(codeCompletePoint.first);
+  SourceMgr.setCodeCompletionPoint(codeCompletionBufferID.getValue(),
+                                   codeCompletePoint.second);
   return codeCompletionBufferID;
 }
 
@@ -312,16 +310,14 @@ static bool shouldTreatSingleInputAsMain(InputFileKind inputKind) {
 }
 
 bool CompilerInstance::setUpInputs() {
-  // Adds to InputSourceCodeBufferIDs, so may need to happen before the
-  // per-input setup.
-  const Optional<unsigned> codeCompletionBufferID = setUpCodeCompletionBuffer();
-
   for (const InputFile &input :
        Invocation.getFrontendOptions().InputsAndOutputs.getAllInputs())
     if (setUpForInput(input))
       return true;
 
   // Set the primary file to the code-completion point if one exists.
+  // Note that this must happen after the regular inputs have been set up.
+  const Optional<unsigned> codeCompletionBufferID = setUpCodeCompletionBuffer();
   if (codeCompletionBufferID.hasValue() &&
       !isPrimaryInput(*codeCompletionBufferID)) {
     assert(PrimaryBufferIDs.empty() && "re-setting PrimaryBufferID");
@@ -446,12 +442,8 @@ std::unique_ptr<SILModule> CompilerInstance::takeSILModule() {
 
 ModuleDecl *CompilerInstance::getMainModule() {
   if (!MainModule) {
-    // FIXME: Code completion doesn't always set its buffer as an input, but
-    // module-merging doesn't just use source buffers. For now, pick whichever
-    // is larger.
-    unsigned numFiles = std::max<size_t>(
-        Invocation.getFrontendOptions().InputsAndOutputs.inputCount(),
-        getInputBufferIDs().size());
+    unsigned numFiles =
+        Invocation.getFrontendOptions().InputsAndOutputs.inputCount();
     if (numFiles == 0 && Invocation.getInputKind() == InputFileKind::SwiftREPL)
       numFiles = 1;
 

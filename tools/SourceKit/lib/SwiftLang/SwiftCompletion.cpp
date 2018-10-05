@@ -152,7 +152,9 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
   if (Failed) {
     return false;
   }
-  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
+
+  auto &InputsAndOutputs = Invocation.getFrontendOptions().InputsAndOutputs;
+  if (!InputsAndOutputs.hasInputs()) {
     Error = "no input filenames specified";
     return false;
   }
@@ -167,7 +169,10 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
   *NewPos = '\0';
   std::copy(Position, InputFile->getBufferEnd(), NewPos+1);
 
-  Invocation.setCodeCompletionPoint(NewBuffer.get(), CodeCompletionOffset);
+  InputsAndOutputs.overrideBufferForInput(InputFile->getBufferIdentifier(),
+                                          NewBuffer.get());
+  Invocation.setCodeCompletionPoint(InputFile->getBufferIdentifier(),
+                                    CodeCompletionOffset);
 
   auto swiftCache = Lang.getCodeCompletionCache(); // Pin the cache.
   ide::CodeCompletionContext CompletionContext(swiftCache->getCache());

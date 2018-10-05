@@ -709,9 +709,9 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
                << " at offset " << CodeCompletionOffset << "\n";
 
   CompilerInvocation Invocation(InitInvok);
-
-  Invocation.setCodeCompletionPoint(CleanFile.get(), CodeCompletionOffset);
-
+  Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
+      SourceFilename, CleanFile.get());
+  Invocation.setCodeCompletionPoint(SourceFilename, CodeCompletionOffset);
 
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {

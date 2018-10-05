@@ -169,6 +169,8 @@ public:
   void addPrimaryInputFile(StringRef file,
                            llvm::MemoryBuffer *buffer = nullptr);
 
+  void overrideBufferForInput(StringRef file, llvm::MemoryBuffer *buffer);
+
   // Outputs
 
 private:

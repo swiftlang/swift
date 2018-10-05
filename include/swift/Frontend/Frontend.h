@@ -76,10 +76,12 @@ class CompilerInvocation {
   /// invocation
   SyntaxParsingCache *MainFileSyntaxParsingCache = nullptr;
 
-  llvm::MemoryBuffer *CodeCompletionBuffer = nullptr;
+  /// \see CodeCompletionOffset
+  std::string CodeCompletionBufferName;
 
-  /// \brief Code completion offset in bytes from the beginning of the main
-  /// source file.  Valid only if \c isCodeCompletion() == true.
+  /// Code completion offset in bytes from the beginning of the buffer
+  /// identified by #CodeCompletionBufferName. Valid only if
+  /// `isCodeCompletion() == true`.
   unsigned CodeCompletionOffset = ~0U;
 
   CodeCompletionCallbacksFactory *CodeCompletionFactory = nullptr;
@@ -266,17 +268,17 @@ public:
     return FrontendOpts.InputsAndOutputs.getSingleOutputFilename();
   }
 
-  void setCodeCompletionPoint(llvm::MemoryBuffer *Buf, unsigned Offset) {
-    assert(Buf);
-    CodeCompletionBuffer = Buf;
+  void setCodeCompletionPoint(StringRef BufferName, unsigned Offset) {
+    assert(!BufferName.empty());
+    CodeCompletionBufferName = BufferName;
     CodeCompletionOffset = Offset;
     // We don't need typo-correction for code-completion.
     // FIXME: This isn't really true, but is a performance issue.
     LangOpts.TypoCorrectionLimit = 0;
   }
 
-  std::pair<llvm::MemoryBuffer *, unsigned> getCodeCompletionPoint() const {
-    return std::make_pair(CodeCompletionBuffer, CodeCompletionOffset);
+  std::pair<std::string, unsigned> getCodeCompletionPoint() const {
+    return std::make_pair(CodeCompletionBufferName, CodeCompletionOffset);
   }
 
   /// \returns true if we are doing code completion.

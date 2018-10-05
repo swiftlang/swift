@@ -66,6 +66,10 @@ public:
     return Filename;
   }
 
+  void overrideBuffer(llvm::MemoryBuffer *newBuffer) {
+    Buffer = newBuffer;
+  }
+
   /// Return Swift-standard file name from a buffer name set by
   /// llvm::MemoryBuffer::getFileOrSTDIN, which uses "<stdin>" instead of "-".
   static StringRef convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
