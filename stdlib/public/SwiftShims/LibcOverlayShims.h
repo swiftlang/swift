@@ -99,7 +99,7 @@ static inline int _swift_stdlib_ioctlPtr(int fd, unsigned long int request, void
 #if defined(_WIN32) && !defined(__CYGWIN__)
 // Windows
 static inline int _swift_stdlib_open(const char *path, int oflag, mode_t mode) {
-  return _open(path, oflag, static_cast<int>(mode));
+  return _open(path, oflag, (int)mode);
 }
 
 #else
@@ -114,7 +114,7 @@ int static inline _swift_stdlib_openat(int fd, const char *path, int oflag,
 }
 #endif
 
-static inline ssize_t
+static inline __swift_ssize_t
 _swift_stdlib_read(int fd, void *buf, size_t nbyte) {
 #if defined(_WIN32)
   return _read(fd, buf, nbyte);
@@ -123,7 +123,7 @@ _swift_stdlib_read(int fd, void *buf, size_t nbyte) {
 #endif
 }
 
-static inline ssize_t
+static inline __swift_ssize_t
 _swift_stdlib_write(int fd, const void *buf, size_t nbyte) {
 #if defined(_WIN32)
   return _write(fd, buf, nbyte);
