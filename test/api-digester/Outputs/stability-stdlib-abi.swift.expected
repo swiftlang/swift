@@ -4,6 +4,10 @@
 /* RawRepresentable Changes */
 
 /* Removed Decls */
+Protocol _ArrayProtocol has been removed
+Struct Array has removed conformance to _ArrayProtocol
+Struct ArraySlice has removed conformance to _ArrayProtocol
+Struct ContiguousArray has removed conformance to _ArrayProtocol
 
 /* Moved Decls */
 
@@ -55,10 +59,6 @@ Var _ArrayBufferProtocol.firstElementAddressIfContiguous has been added as a pro
 Var _ArrayBufferProtocol.identity has been added as a protocol requirement
 Var _ArrayBufferProtocol.owner has been added as a protocol requirement
 Var _ArrayBufferProtocol.subscriptBaseAddress has been added as a protocol requirement
-Var _ArrayProtocol._baseAddressIfContiguous has been added as a protocol requirement
-Var _ArrayProtocol._buffer has been added as a protocol requirement
-Var _ArrayProtocol._owner has been added as a protocol requirement
-Var _ArrayProtocol.capacity has been added as a protocol requirement
 Var _HeapBufferHeader_.value has been added as a protocol requirement
 Var _StringVariant.isASCII has been added as a protocol requirement
 Var _SwiftStringView._encodedOffsetRange has been added as a protocol requirement

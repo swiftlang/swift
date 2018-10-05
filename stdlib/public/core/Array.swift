@@ -405,7 +405,7 @@ extension Array {
   }
 }
 
-extension Array: _ArrayProtocol {
+extension Array {
   /// The total number of elements that the array can contain without
   /// allocating new storage.
   ///

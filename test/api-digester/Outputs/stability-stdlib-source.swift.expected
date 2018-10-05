@@ -4,6 +4,9 @@
 /* RawRepresentable Changes */
 
 /* Removed Decls */
+Struct Array has removed conformance to _ArrayProtocol
+Struct ArraySlice has removed conformance to _ArrayProtocol
+Struct ContiguousArray has removed conformance to _ArrayProtocol
 
 /* Moved Decls */
 

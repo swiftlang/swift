@@ -94,7 +94,7 @@ extension ContiguousArray {
   }
 }
 
-extension ContiguousArray: _ArrayProtocol {
+extension ContiguousArray {
   /// The total number of elements that the array can contain without
   /// allocating new storage.
   ///

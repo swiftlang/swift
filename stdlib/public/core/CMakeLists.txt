@@ -26,7 +26,6 @@ set(SWIFTLIB_ESSENTIAL
   Array.swift
   ArrayShared.swift
   ArraySlice.swift
-  ArrayType.swift
   ASCII.swift
   Assert.swift
   AssertCommon.swift

@@ -248,7 +248,7 @@ extension ArraySlice {
   }
 }
 
-extension ArraySlice: _ArrayProtocol {
+extension ArraySlice {
   /// The total number of elements that the array can contain without
   /// allocating new storage.
   ///

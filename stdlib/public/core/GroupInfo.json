@@ -102,7 +102,6 @@
         "ArrayBuffer.swift",
         "ArrayBufferProtocol.swift",
         "ArrayCast.swift",
-        "ArrayType.swift",
         "ArrayShared.swift",
         "ArraySlice.swift",
         "CocoaArray.swift",
