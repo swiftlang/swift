@@ -3867,6 +3867,7 @@ class CompletionOverrideLookup : public swift::VisibleDeclConsumer {
   bool hasAccessModifier = false;
   bool hasOverride = false;
   bool hasOverridabilityModifier = false;
+  bool hasStaticOrClass = false;
 
 public:
   CompletionOverrideLookup(CodeCompletionResultSink &Sink, ASTContext &Ctx,
@@ -3891,6 +3892,8 @@ public:
     hasOverride = isKeywordSpecified("override");
     hasOverridabilityModifier = isKeywordSpecified("final") ||
                                 isKeywordSpecified("open");
+    hasStaticOrClass = isKeywordSpecified(getTokenText(tok::kw_class)) ||
+                       isKeywordSpecified(getTokenText(tok::kw_static));
   }
 
   bool isKeywordSpecified(StringRef Word) {
@@ -3942,6 +3945,7 @@ public:
       Options.ExclusiveAttrList.push_back(TAK_escaping);
       Options.PrintOverrideKeyword = false;
       Options.PrintPropertyAccessors = false;
+      Options.PrintStaticKeyword = !hasStaticOrClass;
       VD->print(Printer, Options);
       NameOffset = Printer.NameOffset.getValue();
     }
@@ -3951,7 +3955,7 @@ public:
 
     // FIXME: if we're missing 'override', but have the decl introducer we
     // should delete it and re-add both in the correct order.
-    if (!hasDeclIntroducer && missingOverride(Reason))
+    if (!hasDeclIntroducer && !hasStaticOrClass && missingOverride(Reason))
       Builder.addOverrideKeyword();
 
     if (!hasDeclIntroducer)
@@ -4048,7 +4052,9 @@ public:
     if (D->shouldHideFromEditor())
       return;
 
-    if (D->getAttrs().hasAttribute<FinalAttr>())
+    if (D->getAttrs().hasAttribute<FinalAttr>() ||
+        // A 'class' member with an initial value cannot be overriden either.
+        (D->isStatic() && D->getAttrs().hasAttribute<HasInitialValueAttr>()))
       return;
 
     if (!D->hasInterfaceType())
@@ -4057,6 +4063,15 @@ public:
     bool hasIntroducer = hasFuncIntroducer ||
                          hasVarIntroducer ||
                          hasTypealiasIntroducer;
+
+    if (hasStaticOrClass && !D->isStatic())
+      return;
+
+    // As per the current convention, only instance members are
+    // suggested if an introducer is not accompanied by a 'static' or
+    // 'class' modifier.
+    if (hasIntroducer && !hasStaticOrClass && D->isStatic())
+      return;
 
     if (auto *FD = dyn_cast<FuncDecl>(D)) {
       // We cannot override operators as members.
@@ -4081,7 +4096,8 @@ public:
     if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
       if (!isa<ProtocolDecl>(CD->getDeclContext()))
         return;
-      if (hasIntroducer || hasOverride || hasOverridabilityModifier)
+      if (hasIntroducer || hasOverride || hasOverridabilityModifier ||
+          hasStaticOrClass)
         return;
       if (CD->isRequired() || CD->isDesignatedInit())
         addConstructor(CD, Reason);
@@ -4091,7 +4107,7 @@ public:
 
   void addDesignatedInitializers(NominalTypeDecl *NTD) {
     if (hasFuncIntroducer || hasVarIntroducer || hasTypealiasIntroducer ||
-        hasOverridabilityModifier)
+        hasOverridabilityModifier || hasStaticOrClass)
       return;
 
     const auto *CD = dyn_cast<ClassDecl>(NTD);
@@ -4114,7 +4130,7 @@ public:
   void addAssociatedTypes(NominalTypeDecl *NTD) {
     if (!hasTypealiasIntroducer &&
         (hasFuncIntroducer || hasVarIntroducer || hasInitializerModifier ||
-         hasOverride || hasOverridabilityModifier))
+         hasOverride || hasOverridabilityModifier || hasStaticOrClass))
       return;
 
     for (auto Conformance : NTD->getAllConformances()) {
@@ -4145,9 +4161,11 @@ public:
     Type CurrTy = CurrDeclContext->getSelfTypeInContext();
     auto *NTD = CurrDeclContext->getSelfNominalTypeDecl();
     if (CurrTy && !CurrTy->is<ErrorType>()) {
-      lookupVisibleMemberDecls(*this, CurrTy, CurrDeclContext,
+      // Look for overridable static members too.
+      Type Meta = MetatypeType::get(CurrTy);
+      lookupVisibleMemberDecls(*this, Meta, CurrDeclContext,
                                TypeResolver,
-                               /*includeInstanceMembers=*/false);
+                               /*includeInstanceMembers=*/true);
       addDesignatedInitializers(NTD);
       addAssociatedTypes(NTD);
     }

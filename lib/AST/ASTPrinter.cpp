@@ -2403,7 +2403,7 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
   printAttributes(decl);
   printAccess(decl);
   if (!Options.SkipIntroducerKeywords) {
-    if (decl->isStatic())
+    if (decl->isStatic() && Options.PrintStaticKeyword)
       printStaticKeyword(decl->getCorrectStaticSpelling());
     if (decl->getKind() == DeclKind::Var
         || Options.PrintParameterSpecifiers) {
@@ -2679,7 +2679,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     printSourceRange(Range, Ctx);
   } else {
     if (!Options.SkipIntroducerKeywords) {
-      if (decl->isStatic())
+      if (decl->isStatic() && Options.PrintStaticKeyword)
         printStaticKeyword(decl->getCorrectStaticSpelling());
       if (decl->isMutating() && !decl->getAttrs().hasAttribute<MutatingAttr>()) {
         Printer.printKeyword("mutating", Options, " ");

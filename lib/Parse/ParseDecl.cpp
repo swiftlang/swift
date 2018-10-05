@@ -2944,6 +2944,11 @@ Parser::parseDecl(ParseDeclOptions Flags,
         // Other tokens are already accounted for.
         break;
       }
+      if (StaticSpelling == StaticSpellingKind::KeywordStatic) {
+        Keywords.push_back(getTokenText(tok::kw_static));
+      } else if (StaticSpelling == StaticSpellingKind::KeywordClass) {
+        Keywords.push_back(getTokenText(tok::kw_class));
+      }
       for (auto attr : Attributes) {
         Keywords.push_back(attr->getAttrName());
       }

@@ -130,6 +130,16 @@
 // RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER12 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER9
 // RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER13 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER13
 // RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER14 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER9
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER15 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER15
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER16 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER15
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER17 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER15
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER18 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER15
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER19 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER13
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER20 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER13
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER21 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER21
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER22 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER21
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER23 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER23
+// RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=MODIFIER24 -code-completion-keywords=false | %FileCheck %s -check-prefix=MODIFIER23
 
 // RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=PROTOINIT_NORM -code-completion-keywords=false | %FileCheck %s -check-prefix=PROTOINIT_NORM
 // RUN: %target-swift-ide-test -enable-objc-interop -code-completion -source-filename %s -code-completion-token=PROTOINIT_FINAL -code-completion-keywords=false | %FileCheck %s -check-prefix=PROTOINIT_FINAL
@@ -563,13 +573,26 @@ class Escaping : EscapingBase {
 // ESCAPING_1: Decl[InstanceMethod]/Super:         method(_ x: @escaping (@escaping () -> ()) -> (() -> ())) -> ((@escaping () -> ()) -> ()) {|};
 
 class OverrideBase {
+  static let staticLet = 0
+  static var staticVar = 0
+  static var staticGetOnlyVar: Int { return 0 }
+
+  class let classLet = 0
+  class var classVar = 0
+  class var classGetOnlyVar: Int { return 0 }
+
+  static func staticMethod() {}
+  class func classMethod() {}
+
+  let letDecl = 0
+  var varDecl: Int = 0
+
   init(x: Int) {}
   convenience init(y: Int) { self.init(x: y) }
   required init(a: Int) {}
   required convenience init(b: Int) {}
   func defaultMethod() {}
   final func finalMethod() {}
-  var varDecl: Int = 0
   open func openMethod() {}
 }
 protocol OverrideP {
@@ -631,9 +654,49 @@ class Override14 : OverrideBase, OverrideP {
   override let #^MODIFIER14^#
   // Same as MODIFIER9.
 }
+class Override15 : OverrideBase, OverrideP {
+  required static var #^MODIFIER15^#
+}
+class Override16 : OverrideBase, OverrideP {
+  override class var #^MODIFIER16^#
+  // Same as MODIFIER15
+}
+class Override17 : OverrideBase, OverrideP {
+  // Note: This *does* emit variables. See MODIFIER14
+  override static let #^MODIFIER17^#
+  // Same as MODIFIER15
+}
+class Override18 : OverrideBase, OverrideP {
+  class var #^MODIFIER18^#
+  // Same as MODIFIER15
+}
+class Override19 : OverrideBase, OverrideP {
+  // No completions.
+  class let #^MODIFIER19^#
+}
+class Override20 : OverrideBase, OverrideP {
+  // No completions.
+  static let #^MODIFIER20^#
+}
+class Override21 : OverrideBase, OverrideP {
+  override class func #^MODIFIER21^#
+}
+class Override22 : OverrideBase, OverrideP {
+  class func #^MODIFIER22^#
+  // Same as MODIFIER21
+}
+class Override23 : OverrideBase, OverrideP {
+  static #^MODIFIER23^#
+}
+class Override24 : OverrideBase, OverrideP {
+  override static #^MODIFIER24^#
+  // Same as MODIFIER23
+}
 
-// MODIFIER1: Begin completions, 7 items
+// MODIFIER1: Begin completions, 9 items
 // MODIFIER1-DAG: Decl[Constructor]/Super:            required init(p: Int) {|}; name=required init(p: Int)
+// MODIFIER1-DAG: Decl[StaticMethod]/Super:           override class func classMethod() {|}; name=classMethod()
+// MODIFIER1-DAG: Decl[StaticVar]/Super:              override class var classGetOnlyVar: Int; name=classGetOnlyVar: Int
 // MODIFIER1-DAG: Decl[InstanceMethod]/Super:         override func defaultMethod() {|}; name=defaultMethod()
 // MODIFIER1-DAG: Decl[InstanceMethod]/Super:         override func openMethod() {|}; name=openMethod()
 // MODIFIER1-DAG: Decl[InstanceVar]/Super:            override var varDecl: Int; name=varDecl: Int
@@ -642,7 +705,9 @@ class Override14 : OverrideBase, OverrideP {
 // MODIFIER1-DAG: Decl[AssociatedType]/Super:         typealias Assoc = {#(Type)#}; name=Assoc = Type
 // MODIFIER1: End completions
 
-// MODIFIER2: Begin completions, 3 items
+// MODIFIER2: Begin completions, 5 items
+// MODIFIER2-DAG: Decl[StaticVar]/Super:              override class var classGetOnlyVar: Int; name=classGetOnlyVar: Int
+// MODIFIER2-DAG: Decl[StaticMethod]/Super:           override class func classMethod() {|}; name=classMethod()
 // MODIFIER2-DAG: Decl[InstanceMethod]/Super:         override func defaultMethod() {|}; name=defaultMethod()
 // MODIFIER2-DAG: Decl[InstanceMethod]/Super:         override func openMethod() {|}; name=openMethod()
 // MODIFIER2-DAG: Decl[InstanceVar]/Super:            override var varDecl: Int; name=varDecl: Int
@@ -664,7 +729,9 @@ class Override14 : OverrideBase, OverrideP {
 // MODIFIER6-DAG: Decl[AssociatedType]/Super:         Assoc = {#(Type)#}; name=Assoc = Type
 // MODIFIER6: End completions
 
-// MODIFIER7: Begin completions, 5 items
+// MODIFIER7: Begin completions, 7 items
+// MODIFIER7-DAG: Decl[StaticVar]/Super:              class var classGetOnlyVar: Int; name=classGetOnlyVar: Int
+// MODIFIER7-DAG: Decl[StaticMethod]/Super:           class func classMethod() {|}; name=classMethod()
 // MODIFIER7-DAG: Decl[InstanceMethod]/Super:         func defaultMethod() {|}; name=defaultMethod()
 // MODIFIER7-DAG: Decl[InstanceVar]/Super:            var varDecl: Int; name=varDecl: Int
 // MODIFIER7-DAG: Decl[InstanceMethod]/Super:         func openMethod() {|}; name=openMethod()
@@ -682,6 +749,19 @@ class Override14 : OverrideBase, OverrideP {
 // MODIFIER9: End completions
 
 // MODIFIER13-NOT: Begin completions
+
+// MODIFIER15: Begin completions, 1 items
+// MODIFIER15-DAG: Decl[StaticVar]/Super:             classGetOnlyVar: Int; name=classGetOnlyVar: Int
+// MODIFIER15: End completions
+
+// MODIFIER21: Begin completions, 1 items
+// MODIFIER21: Decl[StaticMethod]/Super:           classMethod() {|}; name=classMethod()
+// MODIFIER21: End completions
+
+// MODIFIER23: Begin completions, 2 items
+// MODIFIER23-DAG: Decl[StaticMethod]/Super:           func classMethod() {|}; name=classMethod()
+// MODIFIER23-DAG: Decl[StaticVar]/Super:              var classGetOnlyVar: Int; name=classGetOnlyVar: Int
+// MODIFIER23: End completions
 
 protocol RequiredP {
   init(p: Int)
