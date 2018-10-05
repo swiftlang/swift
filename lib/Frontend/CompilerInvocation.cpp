@@ -59,7 +59,11 @@ void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
 }
 
 void CompilerInvocation::setTargetTriple(StringRef Triple) {
-  LangOpts.setTarget(llvm::Triple(Triple));
+  setTargetTriple(llvm::Triple(Triple));
+}
+
+void CompilerInvocation::setTargetTriple(const llvm::Triple &Triple) {
+  LangOpts.setTarget(Triple);
   updateRuntimeLibraryPath(SearchPathOpts, LangOpts.Target);
 }
 

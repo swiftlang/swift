@@ -132,6 +132,7 @@ public:
                               StringRef SDKPath,
                               StringRef ResourceDir);
 
+  void setTargetTriple(const llvm::Triple &Triple);
   void setTargetTriple(StringRef Triple);
 
   StringRef getTargetTriple() const {
