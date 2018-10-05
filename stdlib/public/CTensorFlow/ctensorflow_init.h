@@ -20,15 +20,22 @@ extern void InitTensorFlowRuntime(unsigned char enable_debug_logging,
 // - MARK: Runtime functions to be called via IRGen.
 //===----------------------------------------------------------------------===//
 
-// Caller owns the returned tensor.
-// TODO: Generalize to create tensors from other shapes and dtypes.
-void *swift_tfc_CreateScalarFloatTensor(int32_t val);
-
 struct TF_Status;
-//`val` will be cast to the C data type based on `dtype`, which is then used to
-// create the scalar tensor. e.g. For dtype = TF_INT8, int8_t will be used.
-void *swift_tfc_CreateScalarIntTensor(int64_t val, int32_t dtype,
-                                      TF_Status *status);
+
+// Given the tensor shape specified by `num_dims` and `dims`, create an int
+// tensor with element values taken from `vals`, where the # elements must be
+// equal to the product of the dimension sizes. Each element in `vals` is
+// converted to the C data type based on `dtype`. e.g. For dtype = TF_INT8,
+// int8_t will be used.
+//
+// Caller owns the returned tensor.
+void *swift_tfc_CreateIntTensor(int32_t num_dims, int64_t *dims, int64_t *vals,
+                                int32_t dtype, TF_Status *status);
+
+// Similar to the above API, but creates a float tensor, and no conversion is
+// involved on the elements of `vals`.
+void *swift_tfc_CreateFloatTensor(int32_t num_dims, int64_t *dims, float *vals,
+                                  TF_Status *status);
 
 void swift_tfc_TFE_Execute(void *op, void **retvals, int32_t *num_retvals,
                            void *status);

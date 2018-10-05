@@ -1351,6 +1351,40 @@ FUNCTION(TFE_OpSetAttrType, TFE_OpSetAttrType, C_CC,
          ARGS(Int8PtrTy, Int8PtrTy, Int32Ty),
          ATTRS(NoUnwind))
 
+FUNCTION(TFE_OpSetAttrInt, TFE_OpSetAttrInt, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, Int64Ty),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFE_OpSetAttrFloat, TFE_OpSetAttrFloat, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, FloatTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFE_OpSetAttrBool, TFE_OpSetAttrBool, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, Int1Ty),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFE_OpSetAttrString, TFE_OpSetAttrString, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, SizeTy),
+         ATTRS(NoUnwind))
+
+// The C API definition is the following. Note in particular the last param has
+// type int, not int32_t. If there is a type size mismatch between int and int32
+// in any swift platform, we'll need to do the type conversion. See
+// swift_tfc_TFE_Execute() for example.
+//
+// void TFE_OpSetAttrIntList(TFE_Op* op,
+//                           const char* attr_name,
+//                           const int64_t* values,
+//                           int num_values);
+FUNCTION(TFE_OpSetAttrIntList, TFE_OpSetAttrIntList, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
 FUNCTION(TFE_OpSetAttrTensor, TFE_OpSetAttrTensor, C_CC,
          RETURNS(),
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
@@ -1362,14 +1396,14 @@ FUNCTION(TF_DeleteTensor, TF_DeleteTensor, C_CC,
          ATTRS(NoUnwind))
 
 // Functions with definitions in runtime library.
-FUNCTION(TFC_CreateScalarFloatTensor, swift_tfc_CreateScalarFloatTensor, C_CC,
+FUNCTION(TFC_CreateIntTensor, swift_tfc_CreateIntTensor, C_CC,
          RETURNS(Int8PtrTy),
-         ARGS(Int32Ty),
+         ARGS(Int32Ty, Int8PtrTy, Int8PtrTy, Int32Ty, Int8PtrTy),
          ATTRS(NoUnwind))
 
-FUNCTION(TFC_CreateScalarIntTensor, swift_tfc_CreateScalarIntTensor, C_CC,
+FUNCTION(TFC_CreateFloatTensor, swift_tfc_CreateFloatTensor, C_CC,
          RETURNS(Int8PtrTy),
-         ARGS(Int64Ty, Int32Ty, Int8PtrTy),
+         ARGS(Int32Ty, Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
 FUNCTION(TFE_Execute, swift_tfc_TFE_Execute, C_CC,

@@ -439,11 +439,3 @@ bool TensorFunctionClassifier::containsTensorFlowValue(
 
   return false;
 }
-
-bool tf::isShapeArrayPseudoAttr(StringRef attrName, SymbolicValue attrValue) {
-  if (attrName != SHAPE_ARRAY_ATTR)
-    return false;
-  CanType eltType;
-  (void)attrValue.getArrayValue(eltType);
-  return eltType->getString() == "TensorShape";
-}

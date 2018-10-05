@@ -1,3 +1,4 @@
+// RUN: %target-run-simple-swift
 // TODO: Revert to %target-run-simple-swift once we fold dynamic compilation into -Onone.
 // RUN: %target-run-dynamic-compilation-swift
 // REQUIRES: executable_test
@@ -55,6 +56,16 @@ DynamicCompilationTests.testCPUOrGPU("AddInt32") {
   let z = x + y
   _hostOp(z)
   expectEqualWithScalarTensor(3, z)
+}
+
+DynamicCompilationTests.testCPUOrGPU("2Adds") {
+  _RuntimeConfig.printsDebugLog = true
+  let x = Tensor<Float>(1.0)
+  let y = Tensor<Float>(2.0)
+  let z = x + y
+  let w = z + z
+  _hostOp(w)
+  expectNearlyEqualWithScalarTensor(6.0, w)
 }
 
 runAllTests()

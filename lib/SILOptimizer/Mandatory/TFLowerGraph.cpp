@@ -1031,35 +1031,6 @@ static unsigned getTFDataTypeFromTensorGenericType(Type type) {
   return convertSwiftTypeToTF(genTy->getGenericArgs()[0]);
 }
 
-/// This helper function decodes a shape attribute of type TensorShape or
-/// Optional<TensorShape>. It stores the dimensions to `result`, and returns
-/// the rank. Note that "nil as Optional<TensorShape>" represents "unknown
-/// rank", and that we return -1 in that case.
-static int decodeShapeAttr(const ASTContext &ctx,
-                           SymbolicValue attr,
-                           SmallVectorImpl<int64_t> &result) {
-  // Handle "nil as Optional<TensorShape>" unknown rank case.
-  if (attr.getKind() == SymbolicValue::Kind::Enum &&
-      attr.getEnumValue() == ctx.getOptionalNoneDecl()) {
-    return -1;
-  }
-
-  // Extract value from Optional<TensorShape>.
-  if (attr.getKind() == SymbolicValue::Kind::EnumWithPayload) {
-    attr = attr.getEnumPayloadValue();
-  }
-
-  attr = attr.lookThroughSingleElementAggregates();
-
-  CanType eltType;
-  auto arrayValue = attr.getArrayValue(eltType);
-  for (auto elt : arrayValue) {
-    elt = elt.lookThroughSingleElementAggregates();
-    result.push_back(elt.getIntegerValue().sextOrTrunc(64).getLimitedValue());
-  }
-  return arrayValue.size();
-}
-
 /// Decode the shape array in `attrValue` into `dims`, `numDims` and `dimPtrs`.
 static void decodeShapeArray(const ASTContext &ctx,
                              SymbolicValue attrValue,
