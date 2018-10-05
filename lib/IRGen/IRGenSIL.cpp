@@ -2139,7 +2139,6 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
           auto valsUntyped =
               Builder.CreateBitCast(vals.getAddress(), IGM.Int8PtrTy);
 
-          // TF_SetAttrIntList(op, name.c_str(), values.data(), values.size());
           auto setAttrFn = IGM.getTFE_OpSetAttrIntListFn();
           auto attrNameAddr = createStringValAddr(IGM, attrName.c_str());
           Builder.CreateCall(setAttrFn,
