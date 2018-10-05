@@ -6099,8 +6099,8 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
   else
     storageType = IGM.createNominalType(type);
 
-  // Create a forward declaration for that type.
-  addForwardDecl(key, storageType);
+  // Create a forward declaration.
+  addForwardDecl(key);
   
   SILType loweredTy = SILType::getPrimitiveAddressType(type);
 
