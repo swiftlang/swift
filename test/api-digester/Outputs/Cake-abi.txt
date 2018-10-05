@@ -36,6 +36,8 @@ cake1: Func C7.foo(_:_:) has removed default argument from parameter 1
 cake1: Func EscapingFunctionType.addedEscaping(_:) has added @escaping in parameter 0
 cake1: Func EscapingFunctionType.removedEscaping(_:) has removed @escaping in parameter 0
 cake1: Func Somestruct2.foo1(_:) has parameter 0 type change from C3 to C1
+cake1: Func ownershipChange(_:_:) has parameter 0 changing from InOut to Default
+cake1: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned
 
 /* Decl Attribute changes */
 cake1: Class C5 is now without @objc

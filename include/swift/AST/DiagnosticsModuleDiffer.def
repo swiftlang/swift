@@ -86,6 +86,8 @@ ERROR(func_type_escaping_changed,none,"%0 has %select{removed|added}2 @escaping 
 
 ERROR(func_self_access_change,none,"%0 has self access kind changing from %1 to %2", (StringRef, StringRef, StringRef))
 
+ERROR(param_ownership_change,none,"%0 has %1 changing from %2 to %3", (StringRef, StringRef, StringRef, StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

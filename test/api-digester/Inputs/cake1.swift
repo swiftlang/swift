@@ -134,3 +134,5 @@ public class EscapingFunctionType {
 }
 
 infix operator ..*..
+
+public func ownershipChange(_ a: inout Int, _ b: __shared Int) {}

@@ -144,3 +144,5 @@ public class EscapingFunctionType {
 }
 
 prefix operator ..*..
+
+public func ownershipChange(_ a: Int, _ b: __owned Int) {}
