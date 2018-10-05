@@ -300,9 +300,15 @@ def emit_module_path_EQ : Joined<["-"], "emit-module-path=">,
          ArgumentIsPath]>,
   Alias<emit_module_path>;
 
-def experimental_emit_interface : Flag<["-"], "experimental-emit-interface">,
-  Flags<[NoInteractiveOption, HelpHidden]>,
-  HelpText<"Test out the parseable interfaces feature">;
+def emit_parseable_module_interface :
+  Flag<["-"], "emit-parseable-module-interface">,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Output parseable interface file">;
+def emit_parseable_module_interface_path :
+  Separate<["-"], "emit-parseable-module-interface-path">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         ArgumentIsPath]>,
+  MetaVarName<"<path>">, HelpText<"Output parseable interface file to <path>">;
 
 def emit_objc_header : Flag<["-"], "emit-objc-header">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule -emit-interface-path %t/Test.swiftinterface -module-name Test %s
+// RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule -emit-parseable-module-interface-path %t/Test.swiftinterface -module-name Test %s
 // RUN: %FileCheck %s < %t/Test.swiftinterface
-// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -disable-objc-attr-requires-foundation-module -emit-interface-path - -module-name Test | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -disable-objc-attr-requires-foundation-module -emit-parseable-module-interface-path - -module-name Test | %FileCheck %s
 
 // CHECK: public struct Foo : Hashable {
 public struct Foo: Hashable {

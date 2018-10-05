@@ -295,7 +295,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_loaded_module_trace_path);
   auto TBD = getSupplementaryFilenamesFromArguments(options::OPT_emit_tbd_path);
   auto parseableInterfaceOutput = getSupplementaryFilenamesFromArguments(
-      options::OPT_emit_interface_path);
+      options::OPT_emit_parseable_module_interface_path);
 
   if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||

@@ -2,7 +2,7 @@
 
 // Check that importing this module creates the right types
 
-// RUN: %target-swift-frontend -emit-interface-path %t/private-stored-members.swiftinterface -module-name PrivateStoredMembers -emit-module -o %t/PrivateStoredMembers.swiftmodule %S/private-stored-members.swift
+// RUN: %target-swift-frontend -emit-parseable-module-interface-path %t/private-stored-members.swiftinterface -module-name PrivateStoredMembers -emit-module -o %t/PrivateStoredMembers.swiftmodule %S/private-stored-members.swift
 // RUN: %target-swift-frontend -emit-ir %s -I %t 2>&1 -DSHOULD_IMPORT | %FileCheck %s --check-prefix CHECK-EXEC --check-prefix CHECK
 
 // Check that the types are also correct when importing a module created from an interface

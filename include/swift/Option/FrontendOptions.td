@@ -63,9 +63,10 @@ def emit_fixits_path
   : Separate<["-"], "emit-fixits-path">, MetaVarName<"<path>">,
     HelpText<"Output compiler fixits as source edits to <path>">;
 
+// For transition purposes.
 def emit_interface_path
-  : Separate<["-"], "emit-interface-path">, MetaVarName<"<path>">,
-    HelpText<"Output parseable interface file to <path>">;
+  : Separate<["-"], "emit-interface-path">,
+    Alias<emit_parseable_module_interface_path>;
 
 def tbd_install_name
   : Separate<["-"], "tbd-install_name">, MetaVarName<"<path>">,
