@@ -1873,3 +1873,9 @@ BigIntBitTests.test("words") {
 }
 
 runAllTests()
+
+BigIntTests.test("isMultiple") {
+  // Test that these do not crash.
+  expectTrue((0 as _BigInt<UInt>).isMultiple(of: 0))
+  expectFalse((1 as _BigInt<UInt>).isMultiple(of: 0))
+}

@@ -119,6 +119,16 @@ static bool optimizeGuaranteedArgument(SILArgument *Arg,
             Worklist.push_back(BBIUseCopyValue);
           }
         }
+
+        // First go through and eliminate all end borrows.
+        SmallVector<EndBorrowInst *, 4> endBorrows;
+        copy(BBI->getEndBorrows(), std::back_inserter(endBorrows));
+        while (!endBorrows.empty()) {
+          endBorrows.pop_back_val()->eraseFromParent();
+          ++NumEliminatedInsts;
+        }
+
+        // Then eliminate BBI itself.
         BBI->replaceAllUsesWith(BBI->getOperand());
         BBI->eraseFromParent();
         ++NumEliminatedInsts;
@@ -150,7 +160,7 @@ struct SemanticARCOpts : SILFunctionTransform {
     SILFunction *F = getFunction();
 
     DeadEndBlocks DEBlocks(F);
-    OwnershipChecker Checker{F->getModule(), DEBlocks, {}, {}, {}};
+    OwnershipChecker Checker{{}, {}, {}, {}, F->getModule(), DEBlocks};
 
     // First as a special case, handle guaranteed SIL function arguments.
     //

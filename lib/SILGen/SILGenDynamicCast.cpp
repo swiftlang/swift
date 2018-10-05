@@ -172,7 +172,7 @@ namespace {
                                           abstraction, origTargetTL, ctx);
         } else {
           ManagedValue argument =
-              SGF.B.createOwnedPHIArgument(origTargetTL.getLoweredType());
+              SGF.B.createOwnedPhiArgument(origTargetTL.getLoweredType());
           result = finishFromResultScalar(hasAbstraction, argument, consumption,
                                           abstraction, origTargetTL, ctx);
         }
@@ -207,7 +207,7 @@ namespace {
         if (shouldDestroyOnFailure(consumption)) {
           {
             FullExpr argScope(SGF.Cleanups, CleanupLocation::get(Loc));
-            SGF.B.createOwnedPHIArgument(operandValue.getType());
+            SGF.B.createOwnedPhiArgument(operandValue.getType());
           }
           handleFalse(None);
           assert(!SGF.B.hasValidInsertionPoint() &&
@@ -215,7 +215,7 @@ namespace {
           return;
         }
 
-        handleFalse(SGF.B.createOwnedPHIArgument(operandValue.getType()));
+        handleFalse(SGF.B.createOwnedPhiArgument(operandValue.getType()));
         assert(!SGF.B.hasValidInsertionPoint() && "handler did not end block");
       }
     }
@@ -328,34 +328,6 @@ namespace {
 
     bool isOperandIndirect() const { return Strategy == CastStrategy::Address; }
 
-    ManagedValue emitOperand(Expr *operand) {
-      AbstractionPattern mostGeneral =
-          SGF.SGM.Types.getMostGeneralAbstraction();
-      auto &origSourceTL = SGF.getTypeLowering(mostGeneral, SourceType);
-
-      SGFContext ctx;
-
-      std::unique_ptr<TemporaryInitialization> temporary;
-      if (isOperandIndirect() && SGF.silConv.useLoweredAddresses()) {
-        temporary = SGF.emitTemporary(Loc, origSourceTL);
-        ctx = SGFContext(temporary.get());
-      }
-
-      auto result =
-          SGF.emitRValueAsOrig(operand, mostGeneral, origSourceTL, ctx);
-
-      if (isOperandIndirect() && SGF.silConv.useLoweredAddresses()) {
-        // Force the result into the temporary if it's not already there.
-        if (!result.isInContext()) {
-          result.forwardInto(SGF, Loc, temporary->getAddress());
-          temporary->finishInitialization(SGF);
-        }
-        return temporary->getManagedAddress();
-      }
-
-      return result;
-    }
-
     RValue emitUnconditionalCast(ManagedValue operand, SGFContext ctx) {
       // The cast functions don't know how to work with anything but
       // the most general possible abstraction level.
@@ -445,7 +417,7 @@ namespace {
           result = finishFromResultBuffer(hasAbstraction, resultBuffer,
                                           abstraction, origTargetTL, ctx);
         } else {
-          SILValue argument = trueBB->createPHIArgument(
+          SILValue argument = trueBB->createPhiArgument(
               origTargetTL.getLoweredType(), ValueOwnershipKind::Owned);
           result = finishFromResultScalar(hasAbstraction, argument, consumption,
                                           abstraction, origTargetTL, ctx);
@@ -541,17 +513,6 @@ namespace {
     }
   };
 } // end anonymous namespace
-
-void SILGenFunction::emitCheckedCastBranchOld(
-    SILLocation loc, Expr *source, Type targetType, SGFContext ctx,
-    llvm::function_ref<void(ManagedValue)> handleTrue,
-    llvm::function_ref<void()> handleFalse, ProfileCounter TrueCount,
-    ProfileCounter FalseCount) {
-  CheckedCastEmitterOld emitter(*this, loc, source->getType(), targetType);
-  ManagedValue operand = emitter.emitOperand(source);
-  emitter.emitConditional(operand, CastConsumptionKind::TakeAlways, ctx,
-                          handleTrue, handleFalse, TrueCount, FalseCount);
-}
 
 void SILGenFunction::emitCheckedCastBranchOld(
     SILLocation loc, ConsumableManagedValue src, Type sourceType,
@@ -768,7 +729,7 @@ RValue Lowering::emitConditionalCheckedCast(
   if (resultObjectTemp) {
     result = SGF.manageBufferForExprResult(resultBuffer, resultTL, C);
   } else {
-    auto argument = contBlock->createPHIArgument(resultTL.getLoweredType(),
+    auto argument = contBlock->createPhiArgument(resultTL.getLoweredType(),
                                                  ValueOwnershipKind::Owned);
     result = SGF.emitManagedRValueWithCleanup(argument, resultTL);
   }
@@ -821,7 +782,7 @@ SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
       });
 
   auto contBB = scope.exit();
-  auto isa = contBB->createPHIArgument(i1Ty, ValueOwnershipKind::Trivial);
+  auto isa = contBB->createPhiArgument(i1Ty, ValueOwnershipKind::Trivial);
   return isa;
 }
 

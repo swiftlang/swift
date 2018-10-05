@@ -17,6 +17,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/Basic/Unicode.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -480,12 +481,6 @@ namespace {
       auto LHS_ = cast<StringLiteralInst>(LHS);
       return LHS_->getEncoding() == RHS->getEncoding()
         && LHS_->getValue().equals(RHS->getValue());
-    }
-
-    bool visitConstStringLiteralInst(const ConstStringLiteralInst *RHS) {
-      auto LHS_ = cast<ConstStringLiteralInst>(LHS);
-      return LHS_->getEncoding() == RHS->getEncoding() &&
-             LHS_->getValue().equals(RHS->getValue());
     }
 
     bool visitStructInst(const StructInst *RHS) {
@@ -1069,7 +1064,6 @@ bool SILInstruction::mayReleaseOrReadRefCount() const {
   switch (getKind()) {
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::IsEscapingClosureInst:
-  case SILInstructionKind::IsUniqueOrPinnedInst:
     return true;
   default:
     return mayRelease();
@@ -1173,6 +1167,13 @@ bool SILInstruction::isTriviallyDuplicatable() const {
   // instructions must directly operate on the BeginAccess.
   if (isa<BeginAccessInst>(this))
     return false;
+
+  // begin_apply creates a token that has to be directly used by the
+  // corresponding end_apply and abort_apply.
+  if (isa<BeginApplyInst>(this))
+    return false;
+
+  // If you add more cases here, you should also update SILLoop:canDuplicate.
 
   return true;
 }

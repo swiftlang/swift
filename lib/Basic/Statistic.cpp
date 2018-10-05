@@ -27,8 +27,12 @@
 #include "llvm/Support/raw_ostream.h"
 #include <chrono>
 #include <limits>
-#include <unistd.h>
 
+#if LLVM_ON_UNIX
+#if HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#endif
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
@@ -38,10 +42,19 @@
 #ifdef HAVE_PROC_PID_RUSAGE
 #include <libproc.h>
 #endif
+#ifdef HAVE_MALLOC_MALLOC_H
+#include <malloc/malloc.h>
+#endif
 
 namespace swift {
 using namespace llvm;
 using namespace llvm::sys;
+
+bool environmentVariableRequestedMaximumDeterminism() {
+  if (const char *S = ::getenv("SWIFTC_MAXIMUM_DETERMINISM"))
+    return (S[0] != '\0');
+  return false;
+}
 
 static int64_t
 getChildrenMaxResidentSetSize() {
@@ -344,6 +357,7 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
     TraceFilename(Directory),
     ProfileDirname(Directory),
     StartedTime(llvm::TimeRecord::getCurrentTime()),
+    MainThreadID(std::this_thread::get_id()),
     Timer(make_unique<NamedRegionTimer>(AuxName,
                                         "Building Target",
                                         ProgramName, "Running Program")),
@@ -384,6 +398,7 @@ UnifiedStatsReporter::getFrontendCounters()
 
 void
 UnifiedStatsReporter::noteCurrentProcessExitStatus(int status) {
+  assert(MainThreadID == std::this_thread::get_id());
   assert(!currentProcessExitStatusSet);
   currentProcessExitStatusSet = true;
   currentProcessExitStatus = status;
@@ -440,6 +455,7 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
   }
   // Print timers.
   TimerGroup::printAllJSONValues(OS, delim);
+  TimerGroup::clearAll();
   OS << "\n}\n";
   OS.flush();
 }
@@ -495,6 +511,21 @@ void updateProcessWideFrontendCounters(
     C.NumInstructionsExecuted = ru.ri_instructions;
   }
 #endif
+
+#if defined(HAVE_MALLOC_ZONE_STATISTICS) && defined(HAVE_MALLOC_MALLOC_H)
+  // On Darwin we have a lifetime max that's maintained by malloc we can
+  // just directly query, even if we only make one query on shutdown.
+  malloc_statistics_t Stats;
+  malloc_zone_statistics(malloc_default_zone(), &Stats);
+  C.MaxMallocUsage = (int64_t)Stats.max_size_in_use;
+#else
+  // If we don't have a malloc-tracked max-usage counter, we have to rely
+  // on taking the max over current-usage samples while running and hoping
+  // we get called often enough. This will happen when profiling/tracing,
+  // but not while doing single-query-on-shutdown collection.
+  C.MaxMallocUsage = std::max(C.MaxMallocUsage,
+                              (int64_t)llvm::sys::Process::GetMallocUsage());
+#endif
 }
 
 static inline void
@@ -517,6 +548,7 @@ UnifiedStatsReporter::saveAnyFrontendStatsEvents(
     FrontendStatsTracer const& T,
     bool IsEntry)
 {
+  assert(MainThreadID == std::this_thread::get_id());
   // First make a note in the recursion-safe timers; these
   // are active anytime UnifiedStatsReporter is active.
   if (IsEntry) {
@@ -597,6 +629,7 @@ UnifiedStatsReporter::TraceFormatter::~TraceFormatter() {}
 
 UnifiedStatsReporter::~UnifiedStatsReporter()
 {
+  assert(MainThreadID == std::this_thread::get_id());
   // If nobody's marked this process as successful yet,
   // mark it as failing.
   if (currentProcessExitStatus != EXIT_SUCCESS) {
@@ -609,7 +642,8 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
     }
   }
 
-  updateProcessWideFrontendCounters(getFrontendCounters());
+  if (FrontendCounters)
+    updateProcessWideFrontendCounters(getFrontendCounters());
 
   // NB: Timer needs to be Optional<> because it needs to be destructed early;
   // LLVM will complain about double-stopping a timer if you tear down a
@@ -660,10 +694,15 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_STATS)
   publishAlwaysOnStatsToLLVM();
   PrintStatisticsJSON(ostream);
+  TimerGroup::clearAll();
 #else
   printAlwaysOnStatsAndTimers(ostream);
 #endif
+  flushTracesAndProfiles();
+}
 
+void
+UnifiedStatsReporter::flushTracesAndProfiles() {
   if (FrontendStatsEvents && SourceMgr) {
     std::error_code EC;
     raw_fd_ostream tstream(TraceFilename, EC, fs::F_Append | fs::F_Text);
@@ -725,6 +764,10 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
 #undef FRONTEND_STATISTIC
     }
   }
+  LastTracedFrontendCounters.reset();
+  FrontendStatsEvents.reset();
+  EventProfilers.reset();
+  EntityProfilers.reset();
 }
 
 } // namespace swift

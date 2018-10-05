@@ -302,7 +302,7 @@ bb0(%0 : $*Int64):
 sil @trivial_witness_method_caller : $@convention(thin) () -> () {
   %0 = alloc_box ${ var Int64 }, var, name "x"
   %1 = project_box %0 : ${ var Int64 }, 0
-  %2 = function_ref @$Ss5Int64V22_builtinIntegerLiteralABBi2048__tcfC : $@convention(method) (Builtin.Int2048, @thin Int64.Type) -> Int64 // user: %5
+  %2 = function_ref @$ss5Int64V22_builtinIntegerLiteralABBi2048__tcfC : $@convention(method) (Builtin.Int2048, @thin Int64.Type) -> Int64 // user: %5
   %3 = metatype $@thin Int64.Type
   %4 = integer_literal $Builtin.Int2048, 0
   %5 = apply %2(%4, %3) : $@convention(method) (Builtin.Int2048, @thin Int64.Type) -> Int64
@@ -314,7 +314,7 @@ sil @trivial_witness_method_caller : $@convention(thin) () -> () {
 }
 
 // Int64.init(_builtinIntegerLiteral:)
-sil [transparent] [serialized] @$Ss5Int64V22_builtinIntegerLiteralABBi2048__tcfC : $@convention(method) (Builtin.Int2048, @thin Int64.Type) -> Int64
+sil [transparent] [serialized] @$ss5Int64V22_builtinIntegerLiteralABBi2048__tcfC : $@convention(method) (Builtin.Int2048, @thin Int64.Type) -> Int64
 
 
 // We can inline function_refs with c calling convention.

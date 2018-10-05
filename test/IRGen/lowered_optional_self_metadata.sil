@@ -15,8 +15,8 @@ public protocol Protocol {
 
 sil @optional_method : $@convention(method) <T> (@in_guaranteed Optional<T>) -> ()
 
-sil @call_optional_method_with_lowered_function : $@convention(thin) (@in_guaranteed Optional<@callee_guaranteed (@in_guaranteed ()) -> @out ()>) -> () {
-entry(%x : $*Optional<@callee_guaranteed (@in_guaranteed ()) -> @out ()>):
+sil @call_optional_method_with_lowered_function : $@convention(thin) (@in_guaranteed Optional<@callee_guaranteed () -> @out ()>) -> () {
+entry(%x : $*Optional<@callee_guaranteed () -> @out ()>):
   %f = function_ref @optional_method : $@convention(method) <T> (@in_guaranteed Optional<T>) -> ()
   apply %f<() -> ()>(%x) : $@convention(method) <T> (@in_guaranteed Optional<T>) -> ()
   %p = partial_apply [callee_guaranteed] %f<() -> ()>() : $@convention(method) <T> (@in_guaranteed Optional<T>) -> ()

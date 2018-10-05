@@ -25,7 +25,7 @@ class Bar: NSObject {
   @objc var foo: Foo { fatalError() }
 }
 
-// CHECK-LABEL: sil hidden @$S13keypaths_objc0B8KeypathsyyF
+// CHECK-LABEL: sil hidden @$s13keypaths_objc0B8KeypathsyyF
 func objcKeypaths() {
   // CHECK: keypath $WritableKeyPath<NonObjC, Int>, (root
   _ = \NonObjC.x
@@ -47,7 +47,7 @@ func objcKeypaths() {
   _ = \Foo.differentName
 }
 
-// CHECK-LABEL: sil hidden @$S13keypaths_objc0B18KeypathIdentifiersyyF
+// CHECK-LABEL: sil hidden @$s13keypaths_objc0B18KeypathIdentifiersyyF
 func objcKeypathIdentifiers() {
   // CHECK: keypath $KeyPath<ObjCFoo, String>, (objc "objcProp"; {{.*}} id #ObjCFoo.objcProp!getter.1.foreign
   _ = \ObjCFoo.objcProp

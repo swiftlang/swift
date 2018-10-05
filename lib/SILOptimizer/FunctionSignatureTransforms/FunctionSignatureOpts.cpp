@@ -105,6 +105,10 @@ static bool canSpecializeFunction(SILFunction *F,
   if (F->getConventions().hasIndirectSILResults())
     return false;
 
+  // For now ignore coroutines.
+  if (F->getLoweredFunctionType()->isCoroutine())
+    return false;
+
   // Do not specialize the signature of always inline functions. We
   // will just inline them and specialize each one of the individual
   // functions that these sorts of functions are inlined into.
@@ -581,12 +585,12 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     SILFunction *Thunk = ThunkBody->getParent();
     SILBasicBlock *NormalBlock = Thunk->createBasicBlock();
     ReturnValue =
-        NormalBlock->createPHIArgument(ResultType, ValueOwnershipKind::Owned);
+        NormalBlock->createPhiArgument(ResultType, ValueOwnershipKind::Owned);
     SILBasicBlock *ErrorBlock = Thunk->createBasicBlock();
     SILType Error =
         SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getType());
     auto *ErrorArg =
-        ErrorBlock->createPHIArgument(Error, ValueOwnershipKind::Owned);
+        ErrorBlock->createPhiArgument(Error, ValueOwnershipKind::Owned);
     Builder.createTryApply(Loc, FRI, Subs, ThunkArgs, NormalBlock, ErrorBlock);
 
     Builder.setInsertionPoint(ErrorBlock);
@@ -754,8 +758,8 @@ public:
       return;
     }
 
-    CallerAnalysis *CA = PM->getAnalysis<CallerAnalysis>();
-    const CallerAnalysis::FunctionInfo &FuncInfo = CA->getCallerInfo(F);
+    const CallerAnalysis *CA = PM->getAnalysis<CallerAnalysis>();
+    const CallerAnalysis::FunctionInfo &FuncInfo = CA->getFunctionInfo(F);
 
     // Check the signature of F to make sure that it is a function that we
     // can specialize. These are conditions independent of the call graph.
@@ -805,7 +809,7 @@ public:
     if (OptForPartialApply) {
       Changed = FST.removeDeadArgs(FuncInfo.getMinPartialAppliedArgs());
     } else {
-      Changed = FST.run(FuncInfo.hasCaller());
+      Changed = FST.run(FuncInfo.hasDirectCaller());
     }
 
     if (!Changed) {

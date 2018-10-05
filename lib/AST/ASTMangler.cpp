@@ -71,8 +71,6 @@ static StringRef getCodeForAccessorKind(AccessorKind kind,
       return "lO";
     case AddressorKind::NativeOwning:
       return "lo";
-    case AddressorKind::NativePinning:
-      return "lp";
     }
     llvm_unreachable("bad addressor kind");
   case AccessorKind::MutableAddress:
@@ -85,12 +83,8 @@ static StringRef getCodeForAccessorKind(AccessorKind kind,
       return "aO";
     case AddressorKind::NativeOwning:
       return "ao";
-    case AddressorKind::NativePinning:
-      return "aP";
     }
     llvm_unreachable("bad addressor kind");
-  case AccessorKind::MaterializeForSet:
-    return "m";
   }
   llvm_unreachable("bad accessor kind");
 }
@@ -418,8 +412,7 @@ std::string ASTMangler::mangleDeclType(const ValueDecl *decl) {
 
 #ifdef USE_NEW_MANGLING_FOR_OBJC_RUNTIME_NAMES
 static bool isPrivate(const NominalTypeDecl *Nominal) {
-  return Nominal->hasAccess() &&
-         Nominal->getFormalAccess() <= AccessLevel::FilePrivate;
+  return Nominal->getFormalAccess() <= AccessLevel::FilePrivate;
 }
 #endif
 
@@ -541,7 +534,6 @@ void ASTMangler::appendSymbolKind(SymbolKind SKind) {
   switch (SKind) {
     case SymbolKind::Default: return;
     case SymbolKind::DynamicThunk: return appendOperator("TD");
-    case SymbolKind::SwiftDispatchThunk: return appendOperator("Tj");
     case SymbolKind::SwiftAsObjCThunk: return appendOperator("To");
     case SymbolKind::ObjCAsSwiftThunk: return appendOperator("TO");
     case SymbolKind::DirectMethodReferenceThunk: return appendOperator("Td");

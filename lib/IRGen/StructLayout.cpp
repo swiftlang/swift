@@ -120,8 +120,14 @@ void irgen::applyLayoutAttributes(IRGenModule &IGM,
     else if (value < MinimumAlign.getValue())
       Diags.diagnose(alignment->getLocation(),
                    diag::alignment_less_than_natural, MinimumAlign.getValue());
-    else
-      MinimumAlign = Alignment(value);
+    else {
+      auto requestedAlignment = Alignment(value);
+      MinimumAlign = IGM.getCappedAlignment(requestedAlignment);
+      if (requestedAlignment > MinimumAlign)
+        Diags.diagnose(alignment->getLocation(),
+                       diag::alignment_more_than_maximum,
+                       MinimumAlign.getValue());
+    }
   }
 }
 

@@ -134,7 +134,6 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
 
   /// Creates an instance that stores the given value.
   @_transparent
-  @compilerEvaluable
   public init(_ some: Wrapped) { self = .some(some) }
 
   /// Evaluates the given closure when this `Optional` instance is not `nil`,
@@ -159,7 +158,6 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
   @inlinable
-  @compilerEvaluable
   public func map<U>(
     _ transform: (Wrapped) throws -> U
   ) rethrows -> U? {
@@ -191,7 +189,6 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
   @inlinable
-  @compilerEvaluable
   public func flatMap<U>(
     _ transform: (Wrapped) throws -> U?
   ) rethrows -> U? {
@@ -213,7 +210,6 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   /// In this example, the assignment to the `i` variable calls this
   /// initializer behind the scenes.
   @_transparent
-  @compilerEvaluable
   public init(nilLiteral: ()) {
     self = .none
   }
@@ -360,7 +356,6 @@ extension Optional : Equatable where Wrapped : Equatable {
   ///   - lhs: An optional value to compare.
   ///   - rhs: Another optional value to compare.
   @inlinable
-  @compilerEvaluable
   public static func ==(lhs: Wrapped?, rhs: Wrapped?) -> Bool {
     switch (lhs, rhs) {
     case let (l?, r?):
@@ -370,45 +365,6 @@ extension Optional : Equatable where Wrapped : Equatable {
     default:
       return false
     }
-  }
-  
-  /// Returns a Boolean value indicating whether two optional instances are not
-  /// equal.
-  ///
-  /// Use this not-equal-to operator (`!=`) to compare any two optional instances
-  /// of a type that conforms to the `Equatable` protocol. The comparison
-  /// returns `true` if only one of the arguments is `nil` or if the two
-  /// arguments wrap values that are not equal. The comparison returns `false`
-  /// if both arguments are `nil` or if the two arguments wrap values that are
-  /// equal.
-  ///
-  ///     let group1 = [2, 4, 6, 8, 10]
-  ///     let group2 = [1, 3, 5, 7, 9]
-  ///     if group1.first != group2.first {
-  ///         print("The two groups start differently.")
-  ///     }
-  ///     // Prints "The two groups start differently."
-  ///
-  /// You can also use this operator to compare a nonoptional value to an
-  /// optional that wraps the same type. The nonoptional value is wrapped as an
-  /// optional before the comparison is made. In this example, the
-  /// `numberToMatch` constant is wrapped as an optional before comparing to the
-  /// optional `numberFromString`:
-  ///
-  ///     let numberToFind: Int = 23
-  ///     let numberFromString: Int? = Int("not-a-number")      // nil
-  ///     if numberToFind != numberFromString {
-  ///         print("No match.")
-  ///     }
-  ///     // Prints "No match."
-  ///
-  /// - Parameters:
-  ///   - lhs: An optional value to compare.
-  ///   - rhs: Another optional value to compare.
-  @inlinable
-  @compilerEvaluable
-  public static func !=(lhs: Wrapped?, rhs: Wrapped?) -> Bool {
-    return !(lhs == rhs)
   }
 }
 
@@ -436,7 +392,6 @@ extension Optional: Hashable where Wrapped: Hashable {
 public struct _OptionalNilComparisonType : ExpressibleByNilLiteral {
   /// Create an instance initialized with `nil`.
   @_transparent
-  @compilerEvaluable
   public init(nilLiteral: ()) {
   }
 }
@@ -473,7 +428,6 @@ extension Optional {
   ///   - lhs: A `nil` literal.
   ///   - rhs: A value to match against `nil`.
   @_transparent
-  @compilerEvaluable
   public static func ~=(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
     switch rhs {
     case .some:
@@ -508,7 +462,6 @@ extension Optional {
   ///   - lhs: A value to compare to `nil`.
   ///   - rhs: A `nil` literal.
   @_transparent
-  @compilerEvaluable
   public static func ==(lhs: Wrapped?, rhs: _OptionalNilComparisonType) -> Bool {
     switch lhs {
     case .some:
@@ -540,7 +493,6 @@ extension Optional {
   ///   - lhs: A value to compare to `nil`.
   ///   - rhs: A `nil` literal.
   @_transparent
-  @compilerEvaluable
   public static func !=(lhs: Wrapped?, rhs: _OptionalNilComparisonType) -> Bool {
     switch lhs {
     case .some:
@@ -572,7 +524,6 @@ extension Optional {
   ///   - lhs: A `nil` literal.
   ///   - rhs: A value to compare to `nil`.
   @_transparent
-  @compilerEvaluable
   public static func ==(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
     switch rhs {
     case .some:
@@ -604,7 +555,6 @@ extension Optional {
   ///   - lhs: A `nil` literal.
   ///   - rhs: A value to compare to `nil`.
   @_transparent
-  @compilerEvaluable
   public static func !=(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
     switch rhs {
     case .some:
@@ -648,7 +598,6 @@ extension Optional {
 ///   - defaultValue: A value to use as a default. `defaultValue` is the same
 ///     type as the `Wrapped` type of `optional`.
 @_transparent
-@compilerEvaluable
 public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T)
     rethrows -> T {
   switch optional {
@@ -702,7 +651,6 @@ public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T)
 ///   - defaultValue: A value to use as a default. `defaultValue` and
 ///     `optional` have the same type.
 @_transparent
-@compilerEvaluable
 public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T?)
     rethrows -> T? {
   switch optional {

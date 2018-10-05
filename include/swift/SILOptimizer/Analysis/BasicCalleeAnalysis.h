@@ -16,6 +16,7 @@
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"

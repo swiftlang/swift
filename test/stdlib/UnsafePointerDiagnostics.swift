@@ -22,21 +22,21 @@ func unsafePointerConversionAvailability(
   let oups: UnsafePointer<String>? = ups
 
   _ = UnsafeMutableRawPointer(mrp)
-  _ = UnsafeMutableRawPointer(rp)   // expected-error {{'init' has been renamed to 'init(mutating:)'}}
+  _ = UnsafeMutableRawPointer(rp)   // expected-error {{'init(_:)' has been renamed to 'init(mutating:)'}}
   _ = UnsafeMutableRawPointer(umpv)
-  _ = UnsafeMutableRawPointer(upv)  // expected-error {{'init' has been renamed to 'init(mutating:)'}}
+  _ = UnsafeMutableRawPointer(upv)  // expected-error {{'init(_:)' has been renamed to 'init(mutating:)'}}
   _ = UnsafeMutableRawPointer(umpi)
-  _ = UnsafeMutableRawPointer(upi)  // expected-error {{'init' has been renamed to 'init(mutating:)'}}
+  _ = UnsafeMutableRawPointer(upi)  // expected-error {{'init(_:)' has been renamed to 'init(mutating:)'}}
   _ = UnsafeMutableRawPointer(umps)
-  _ = UnsafeMutableRawPointer(ups)  // expected-error {{'init' has been renamed to 'init(mutating:)'}}
+  _ = UnsafeMutableRawPointer(ups)  // expected-error {{'init(_:)' has been renamed to 'init(mutating:)'}}
   _ = UnsafeMutableRawPointer(omrp)
-  _ = UnsafeMutableRawPointer(orp)   // expected-error {{'init' has been renamed to 'init(mutating:)'}}
+  _ = UnsafeMutableRawPointer(orp)   // expected-error {{'init(_:)' has been renamed to 'init(mutating:)'}}
   _ = UnsafeMutableRawPointer(oumpv)
-  _ = UnsafeMutableRawPointer(oupv)  // expected-error {{'init' has been renamed to 'init(mutating:)'}}
+  _ = UnsafeMutableRawPointer(oupv)  // expected-error {{'init(_:)' has been renamed to 'init(mutating:)'}}
   _ = UnsafeMutableRawPointer(oumpi)
-  _ = UnsafeMutableRawPointer(oupi)  // expected-error {{'init' has been renamed to 'init(mutating:)'}}
+  _ = UnsafeMutableRawPointer(oupi)  // expected-error {{'init(_:)' has been renamed to 'init(mutating:)'}}
   _ = UnsafeMutableRawPointer(oumps)
-  _ = UnsafeMutableRawPointer(oups)  // expected-error {{'init' has been renamed to 'init(mutating:)'}}
+  _ = UnsafeMutableRawPointer(oups)  // expected-error {{'init(_:)' has been renamed to 'init(mutating:)'}}
 
   // These all correctly pass with no error.
   _ = UnsafeRawPointer(mrp)

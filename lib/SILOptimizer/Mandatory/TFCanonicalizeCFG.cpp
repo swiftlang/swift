@@ -351,7 +351,7 @@ public:
     for (auto *arg : bb->getArguments()) {
       // Create a new argument and copy it into the ValueMap so future
       // references use it.
-      ValueMap[arg] = newBB->createPHIArgument(
+      ValueMap[arg] = newBB->createPhiArgument(
           arg->getType(), arg->getOwnershipKind(), arg->getDecl());
     }
     // Clone all the instructions.
@@ -496,7 +496,7 @@ void SingleExitLoopTransformer::initialize() {
   for (auto &bb : *currentFn) {
     for (auto arg : bb.getArguments()) {
       SmallVector<SILValue, 8> incomingValues;
-      arg->getIncomingValues(incomingValues);
+      arg->getIncomingPhiValues(incomingValues);
       for (SILValue incomingValue : incomingValues) {
         equivalentValues.unionSets(arg, incomingValue);
       }
@@ -774,7 +774,7 @@ SingleExitLoopTransformer::createNewHeader() {
   // Add phi arguments in the new header corresponding to the escaping values.
   for (const auto &kv : escapingValueSubstMap) {
     SILValue escapingValue = kv.first;
-    SILValue newValue = newHeader->createPHIArgument(
+    SILValue newValue = newHeader->createPhiArgument(
       escapingValue->getType(), escapingValue.getOwnershipKind());
     // Replace uses *outside* of the loop with the new value.
     auto UI = escapingValue->use_begin(), E = escapingValue->use_end();
@@ -794,17 +794,17 @@ SingleExitLoopTransformer::createNewHeader() {
     for (const auto &kv : exitArgSubstMap) {
       SILValue arg = kv.first;
       SILValue newValue =
-        newHeader->createPHIArgument(arg->getType(), arg.getOwnershipKind());
+        newHeader->createPhiArgument(arg->getType(), arg.getOwnershipKind());
       exitArgHeaderArgMap[kv.first] = newValue;
     }
   }
   // An integer to identify the exit edge.
-  SILValue exitIndexArg = newHeader->createPHIArgument(
+  SILValue exitIndexArg = newHeader->createPhiArgument(
       convertElementTypeToTensorValueType(
           SILType::getBuiltinIntegerType(32, context)),
       ValueOwnershipKind::Owned);
   // A boolean corresponding to the stayInLoop flag.
-  newHeader->createPHIArgument(convertElementTypeToTensorValueType(
+  newHeader->createPhiArgument(convertElementTypeToTensorValueType(
                                    SILType::getBuiltinIntegerType(1, context)),
                                ValueOwnershipKind::Trivial);
   return std::make_pair(newHeader, exitIndexArg);

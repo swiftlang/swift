@@ -17,16 +17,20 @@ import SwiftShims
 /// initialized.  See stdlib/runtime/GlobalObjects.cpp for details.
 /// Because it's statically referenced, it requires non-lazy realization
 /// by the Objective-C runtime.
+///
+/// NOTE: older runtimes called this _EmptyArrayStorage. The two must
+/// coexist, so it was renamed. The old name must not be used in the new
+/// runtime.
 @_fixed_layout
 @usableFromInline
 @_objc_non_lazy_realization
-internal final class _EmptyArrayStorage
-  : _ContiguousArrayStorageBase {
+internal final class __EmptyArrayStorage
+  : __ContiguousArrayStorageBase {
 
   @inlinable
   @nonobjc
   internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("creating instance of _EmptyArrayStorage")
+    _sanityCheckFailure("creating instance of __EmptyArrayStorage")
   }
   
 #if _runtime(_ObjC)
@@ -65,7 +69,7 @@ internal final class _EmptyArrayStorage
 /// The empty array prototype.  We use the same object for all empty
 /// `[Native]Array<Element>`s.
 @inlinable
-internal var _emptyArrayStorage : _EmptyArrayStorage {
+internal var _emptyArrayStorage : __EmptyArrayStorage {
   return Builtin.bridgeFromRawPointer(
     Builtin.addressof(&_swiftEmptyArrayStorage))
 }
@@ -75,7 +79,7 @@ internal var _emptyArrayStorage : _EmptyArrayStorage {
 @usableFromInline
 internal final class _ContiguousArrayStorage<
   Element
-> : _ContiguousArrayStorageBase {
+> : __ContiguousArrayStorageBase {
 
   @inlinable // FIXME(sil-serialize-all)
   deinit {
@@ -223,7 +227,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   }
 
   @inlinable
-  internal init(_ storage: _ContiguousArrayStorageBase) {
+  internal init(_ storage: __ContiguousArrayStorageBase) {
     _storage = storage
   }
 
@@ -312,11 +316,6 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   @inlinable
   internal mutating func isMutableAndUniquelyReferenced() -> Bool {
     return isUniquelyReferenced()
-  }
-
-  @inlinable
-  internal mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
-    return isUniquelyReferencedOrPinned()
   }
 
   /// If this buffer is backed by a `_ContiguousArrayBuffer`
@@ -435,14 +434,6 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     return _isUnique(&_storage)
   }
 
-  /// Returns `true` iff this buffer's storage is either
-  /// uniquely-referenced or pinned.  NOTE: this does not mean
-  /// the buffer is mutable; see the comment on isUniquelyReferenced.
-  @inlinable
-  internal mutating func isUniquelyReferencedOrPinned() -> Bool {
-    return _isUniqueOrPinned(&_storage)
-  }
-
 #if _runtime(_ObjC)
   /// Convert to an NSArray.
   ///
@@ -457,7 +448,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     if _isBridgedVerbatimToObjectiveC(Element.self) {
       return _storage
     }
-    return _SwiftDeferredNSArray(_nativeStorage: _storage)
+    return __SwiftDeferredNSArray(_nativeStorage: _storage)
   }
 #endif
 
@@ -515,7 +506,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   }
 
   @usableFromInline
-  internal var _storage: _ContiguousArrayStorageBase
+  internal var _storage: __ContiguousArrayStorageBase
 }
 
 /// Append the elements of `rhs` to `lhs`.

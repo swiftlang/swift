@@ -7,46 +7,46 @@ sil_stage raw
 import Builtin
 import Swift
 
-// CHECK-LABEL: sil @_TF4test3fooFT1fGSqFT_T___T_ : $@convention(thin) (@guaranteed Optional<@callee_guaranteed (@in_guaranteed ()) -> @out ()>) -> ()
-sil @_TF4test3fooFT1fGSqFT_T___T_ : $@convention(thin) (@guaranteed Optional<@callee_guaranteed (@in_guaranteed ()) -> @out ()>) -> () {
-bb0(%0 : @guaranteed $Optional<@callee_guaranteed (@in_guaranteed ()) -> @out ()>):
-  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<@callee_guaranteed (@in_guaranteed ()) -> @out ()>>  // var f    // users: %2, %6, %32
-  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Optional<@callee_guaranteed (@in_guaranteed ()) -> @out ()>>, 0
-  store %0 to [init] %1a : $*Optional<@callee_guaranteed (@in_guaranteed ()) -> @out ()>         // id: %2
+// CHECK-LABEL: sil @_TF4test3fooFT1fGSqFT_T___T_ : $@convention(thin) (@guaranteed Optional<@callee_guaranteed () -> @out ()>) -> ()
+sil @_TF4test3fooFT1fGSqFT_T___T_ : $@convention(thin) (@guaranteed Optional<@callee_guaranteed () -> @out ()>) -> () {
+bb0(%0 : @guaranteed $Optional<@callee_guaranteed () -> @out ()>):
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<@callee_guaranteed () -> @out ()>>  // var f    // users: %2, %6, %32
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Optional<@callee_guaranteed () -> @out ()>>, 0
+  store %0 to [init] %1a : $*Optional<@callee_guaranteed () -> @out ()>         // id: %2
   %3 = alloc_stack $Optional<()>                  // users: %22, %28, %30, %31
   %4 = alloc_stack $()                            // users: %12, %22, %25
-  %5 = alloc_stack $Optional<@callee_guaranteed (@in_guaranteed ()) -> @out ()>            // users: %6, %8, %10, %11, %16, %24
-  copy_addr %1a to [initialization] %5 : $*Optional<@callee_guaranteed (@in_guaranteed ()) -> @out ()> // id: %6
+  %5 = alloc_stack $Optional<@callee_guaranteed () -> @out ()>            // users: %6, %8, %10, %11, %16, %24
+  copy_addr %1a to [initialization] %5 : $*Optional<@callee_guaranteed () -> @out ()> // id: %6
   %7 = function_ref @_TFs22_doesOptionalHaveValueU__FT1vRGSqQ___Bi1_ : $@convention(thin) <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1 // user: %8
   %8 = apply %7<() -> ()>(%5) : $@convention(thin) <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1 // user: %9
   br bb2                                          // id: %13
 
 bb2:                                              // Preds: bb0
   %14 = function_ref @_TFs17_getOptionalValueU__FT1vGSqQ___Q_ : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>) -> @out τ_0_0 // user: %16
-  %15 = alloc_stack $@callee_guaranteed (@in_guaranteed ()) -> @out () // users: %16, %17, %23
+  %15 = alloc_stack $@callee_guaranteed () -> @out () // users: %16, %17, %23
   // CHECK: apply %{{[0-9]+}}<() -> ()>(%{{[0-9]+}}, %{{[0-9]+}}) : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>) -> @out τ_0_0
   %16 = apply %14<() -> ()>(%15, %5) : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>) -> @out τ_0_0
-  %17 = load [take] %15 : $*@callee_guaranteed (@in_guaranteed ()) -> @out () // user: %19
-  %18 = function_ref @_TTRXFo_iT__iT__XFo__dT__ : $@convention(thin) (@guaranteed @callee_guaranteed (@in_guaranteed ()) -> @out ()) -> () // user: %19
-  %19 = partial_apply [callee_guaranteed] %18(%17) : $@convention(thin) (@guaranteed @callee_guaranteed (@in_guaranteed ()) -> @out ()) -> () // user: %20
+  %17 = load [take] %15 : $*@callee_guaranteed () -> @out () // user: %19
+  %18 = function_ref @_TTRXFo_iT__iT__XFo__dT__ : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out ()) -> () // user: %19
+  %19 = partial_apply [callee_guaranteed] %18(%17) : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out ()) -> () // user: %20
   %20 = apply %19() : $@callee_guaranteed () -> ()
   %21 = function_ref @_TFs24_injectValueIntoOptionalU__FT1vQ__GSqQ__ : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0> // user: %22
   // CHECK: apply %{{[0-9]+}}<()>(%{{[0-9]+}}, %{{[0-9]+}}) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
   %22 = apply %21<()>(%3, %4) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
-  dealloc_stack %15 : $*@callee_guaranteed (@in_guaranteed ()) -> @out () // id: %23
-  dealloc_stack %5 : $*Optional<@callee_guaranteed (@in_guaranteed ()) -> @out ()> // id: %24
+  dealloc_stack %15 : $*@callee_guaranteed () -> @out () // id: %23
+  dealloc_stack %5 : $*Optional<@callee_guaranteed () -> @out ()> // id: %24
   dealloc_stack %4 : $*()        // id: %25
   br bb4                                          // id: %26
 
 bb4:                                              // Preds: bb2 bb3
   %30 = load [trivial] %3 : $*Optional<()>
   dealloc_stack %3 : $*Optional<()> // id: %31
-  destroy_value %1 : $<τ_0_0> { var τ_0_0 } <Optional<@callee_guaranteed (@in_guaranteed ()) -> @out ()>>
+  destroy_value %1 : $<τ_0_0> { var τ_0_0 } <Optional<@callee_guaranteed () -> @out ()>>
   %33 = tuple ()                                  // user: %34
   return %33 : $()                                // id: %34
 }
 
 sil [transparent] @_TFs22_doesOptionalHaveValueU__FT1vRGSqQ___Bi1_ : $@convention(thin) <τ_0_0> (@inout Optional<τ_0_0>) -> Builtin.Int1
 sil [transparent] @_TFs17_getOptionalValueU__FT1vGSqQ___Q_ : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>) -> @out τ_0_0
-sil [transparent] @_TTRXFo_iT__iT__XFo__dT__ : $@convention(thin) (@guaranteed @callee_guaranteed (@in_guaranteed ()) -> @out ()) -> ()
+sil [transparent] @_TTRXFo_iT__iT__XFo__dT__ : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out ()) -> ()
 sil [transparent] @_TFs24_injectValueIntoOptionalU__FT1vQ__GSqQ__ : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>

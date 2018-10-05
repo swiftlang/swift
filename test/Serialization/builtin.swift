@@ -11,4 +11,4 @@ var a : TheBuiltinInt64
 
 // Check that it really is Builtin.Int64.
 var wrapped = Int64(a) // okay
-var badWrapped = Int32(a) // expected-error{{initializer 'init' requires that 'TheBuiltinInt64' conform to 'BinaryInteger'}}
+var badWrapped = Int32(a) // expected-error{{initializer 'init(_:)' requires that 'TheBuiltinInt64' conform to 'BinaryInteger'}}

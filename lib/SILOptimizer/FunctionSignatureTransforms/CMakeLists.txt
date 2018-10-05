@@ -3,4 +3,6 @@ silopt_register_sources(
   DeadArgumentTransform.cpp
   ArgumentExplosionTransform.cpp
   OwnedToGuaranteedTransform.cpp
+  ExistentialSpecializer.cpp
+  ExistentialTransform.cpp
 )

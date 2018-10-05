@@ -10,13 +10,12 @@
 // STRIP_REFLECTION_NAMES-NOT: section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
 // STRIP_REFLECTION_NAMES-NOT: section "{{[^"]*swift5_builtin|.sw5bltn\$B}}
 
-// STRIP_REFLECTION_NAMES-DAG: @"$S19reflection_metadata10MyProtocol_pMF" = internal constant {{.*}}swift5_fieldmd
+// STRIP_REFLECTION_NAMES-DAG: @"$s19reflection_metadata10MyProtocol_pMF" = internal constant {{.*}}swift5_fieldmd
 
 // STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_reflect|.sw5rfst\$B}}
 // STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
 // STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_assocty|.sw5asty\$B}}
 // STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_capture|.sw5cptr\$B}}
-// STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_typeref|.sw5tyrf\$B}}
 // STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
 // STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_builtin|.sw5bltn\$B}}
 
@@ -39,14 +38,14 @@
 
 // CHECK-DAG: @"\01l__swift5_reflection_descriptor" = private constant { {{.*}} } { i32 1, i32 1, i32 2, {{.*}} }
 
-// CHECK-DAG: @"$S19reflection_metadata10MyProtocol_pMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
-// CHECK-DAG: @"$S19reflection_metadata7MyClassCMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
-// CHECK-DAG: @"$S19reflection_metadata11ConformanceVAA10MyProtocolAAMA" = internal constant {{.*}} section "{{[^"]*swift5_assocty|.sw5asty\$B}}
-// CHECK-DAG: @"$S19reflection_metadata8MyStructVMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
-// CHECK-DAG: @"$S19reflection_metadata6MyEnumOMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
-// CHECK-DAG: @"$S19reflection_metadata14MyGenericClassCMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
-// CHECK-DAG: @"$S19reflection_metadata15MyGenericStructVMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
-// CHECK-DAG: @"$S19reflection_metadata13MyGenericEnumOMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
+// CHECK-DAG: @"$s19reflection_metadata10MyProtocol_pMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
+// CHECK-DAG: @"$s19reflection_metadata7MyClassCMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
+// CHECK-DAG: @"$s19reflection_metadata11ConformanceVAA10MyProtocolAAMA" = internal constant {{.*}} section "{{[^"]*swift5_assocty|.sw5asty\$B}}
+// CHECK-DAG: @"$s19reflection_metadata8MyStructVMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
+// CHECK-DAG: @"$s19reflection_metadata6MyEnumOMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
+// CHECK-DAG: @"$s19reflection_metadata14MyGenericClassCMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
+// CHECK-DAG: @"$s19reflection_metadata15MyGenericStructVMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
+// CHECK-DAG: @"$s19reflection_metadata13MyGenericEnumOMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
 
 public protocol MyProtocol {
   associatedtype Inner

@@ -109,7 +109,7 @@ bb0:
 // CHECK-LABEL: define {{.*}} @testOtherGlobal
 sil @testOtherGlobal : $@convention(thin) () -> () {
 bb0:
-  // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct4SizeVMa"([[INT]] 0)
+  // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 0)
   // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
   // CHECK: call %swift.opaque* @__swift_allocate_value_buffer(%swift.type* [[METADATA]], %swift.opaque* bitcast ([{{.*}} x i8]* @otherGlobal to %swift.opaque*))
     alloc_global @otherGlobal
@@ -142,7 +142,7 @@ bb0:
 // CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 8
 // CHECK:   [[SIZEWITNESS:%.*]] = load i8*, i8** [[SIZE_ADDR]]
 // CHECK:   [[SIZE:%.*]] = ptrtoint i8* [[SIZEWITNESS]]
-// CHECK:   [[ALIGN:%.*]] = and {{.*}} [[FLAGS]], 65535
+// CHECK:   [[ALIGN:%.*]] = and {{.*}} [[FLAGS]], 255
 // CHECK:   [[PTR:%.*]] = call noalias i8* @swift_slowAlloc({{.*}} [[SIZE]], {{.*}} [[ALIGN]])
 // CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* %1 to i8**
 // CHECK:   store i8* [[PTR]], i8** [[ADDR]]

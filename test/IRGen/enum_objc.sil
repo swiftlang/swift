@@ -11,7 +11,7 @@ import Swift
 
 @objc class OC {}
 sil_vtable OC {}
-sil hidden @$S9enum_objc2OCCACycfcTo : $@convention(thin) (OC) -> OC {
+sil hidden @$s9enum_objc2OCCACycfcTo : $@convention(thin) (OC) -> OC {
 entry(%x : $OC):
   return %x : $OC
 }
@@ -125,4 +125,4 @@ x:
 }
 
 // Weak existentials allow extra inhabitants if not @objc, therefore StructWithWeakVar must emit:
-// CHECK: define linkonce_odr hidden void @"$S9enum_objc17StructWithWeakVarVwxs"
+// CHECK: define linkonce_odr hidden void @"$s9enum_objc17StructWithWeakVarVwxs"

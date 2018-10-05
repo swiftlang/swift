@@ -20,6 +20,8 @@
 
 using namespace swift;
 
+static_assert(sizeof(SILLocation) == 3*sizeof(void *),
+              "SILLocation must stay small");
 
 SourceLoc SILLocation::getSourceLoc() const {
   if (isSILFile())

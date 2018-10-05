@@ -7,13 +7,13 @@
 
 import def_objc
 
-// SIL: sil hidden @$S4objc9testProto3objy04def_A09ObjCProto_p_tF : $@convention(thin) (@guaranteed ObjCProto) -> () {
+// SIL: sil hidden @$s4objc9testProto3objy04def_A09ObjCProto_p_tF : $@convention(thin) (@guaranteed ObjCProto) -> () {
 func testProto(obj obj: ObjCProto) {
   // SIL: = objc_method {{%.*}} : $@opened({{.*}}) ObjCProto, #ObjCProto.doSomething!1.foreign
   obj.doSomething()
 }
 
-// SIL: sil hidden @$S4objc9testClass3objy04def_A09ObjCClassC_tF : $@convention(thin) (@guaranteed ObjCClass) -> () {
+// SIL: sil hidden @$s4objc9testClass3objy04def_A09ObjCClassC_tF : $@convention(thin) (@guaranteed ObjCClass) -> () {
 func testClass(obj obj: ObjCClass) {
   // SIL: = objc_method %{{.+}} : $ObjCClass, #ObjCClass.implicitlyObjC!1.foreign
   obj.implicitlyObjC()
@@ -22,7 +22,7 @@ func testClass(obj obj: ObjCClass) {
   ObjCClass.classMethod()
 }
 
-// SIL: sil hidden @$S4objc15testNativeClass3objy04def_A012NonObjCClassC_tF : $@convention(thin) (@guaranteed NonObjCClass) -> () {
+// SIL: sil hidden @$s4objc15testNativeClass3objy04def_A012NonObjCClassC_tF : $@convention(thin) (@guaranteed NonObjCClass) -> () {
 func testNativeClass(obj obj: NonObjCClass) {
   // SIL: = objc_method %{{.+}} : $NonObjCClass, #NonObjCClass.doSomething!1.foreign
   // SIL: = objc_method %{{.+}} : $NonObjCClass, #NonObjCClass.objcMethod!1.foreign

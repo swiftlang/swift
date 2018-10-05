@@ -50,7 +50,7 @@ struct CustomHashValue: Hashable {
 
   var hashValue: Int { return 0 }
 
-  static func ==(x: CustomHashValue, y: CustomHashValue) -> Bool { return true } // expected-note 3 {{non-matching type}}
+  static func ==(x: CustomHashValue, y: CustomHashValue) -> Bool { return true }
 }
 
 func customHashValue() {
@@ -72,7 +72,7 @@ struct CustomHashInto: Hashable {
     hasher.combine(y)
   }
 
-  static func ==(x: CustomHashInto, y: CustomHashInto) -> Bool { return true } // expected-note 3 {{non-matching type}}
+  static func ==(x: CustomHashInto, y: CustomHashInto) -> Bool { return true }
 }
 
 func customHashInto() {
@@ -172,9 +172,9 @@ public struct StructConformsAndImplementsInExtension {
   let v: Int
 }
 extension StructConformsAndImplementsInExtension : Equatable {
-  public static func ==(lhs: StructConformsAndImplementsInExtension, rhs: StructConformsAndImplementsInExtension) -> Bool {  // expected-note 3 {{non-matching type}}
+  public static func ==(lhs: StructConformsAndImplementsInExtension, rhs: StructConformsAndImplementsInExtension) -> Bool {
     return true
-  }  
+  }
 }
 
 // No explicit conformance and it cannot be derived.
@@ -189,7 +189,7 @@ struct NoStoredProperties: Hashable {}
 // Verify that conformance (albeit manually implemented) can still be added to
 // a type in a different file.
 extension OtherFileNonconforming: Hashable {
-  static func ==(lhs: OtherFileNonconforming, rhs: OtherFileNonconforming) -> Bool { // expected-note 3 {{non-matching type}}
+  static func ==(lhs: OtherFileNonconforming, rhs: OtherFileNonconforming) -> Bool {
     return true
   }
   var hashValue: Int { return 0 }

@@ -23,9 +23,9 @@ class Anesthesiologist<T: Cat> : Veterinarian<T> { }
 
 func breed<T : Panda>(_ t: T) { }
 
-// CHECK-LABEL: define hidden swiftcc void @"$S40sil_witness_tables_inherited_conformance4feed{{[_0-9a-zA-Z]*}}F"(%T40sil_witness_tables_inherited_conformance3CatC*, %swift.type* %T)
+// CHECK-LABEL: define hidden swiftcc void @"$s40sil_witness_tables_inherited_conformance4feed{{[_0-9a-zA-Z]*}}F"(%T40sil_witness_tables_inherited_conformance3CatC*, %swift.type* %T)
 func feed<T : Cat>(_ t: T) {
-  // CHECK: call swiftcc void @"$S40sil_witness_tables_inherited_conformance5breed{{[_0-9a-zA-Z]*}}F"{{.*}} @"$S40sil_witness_tables_inherited_conformance3CatCAA5PandaAAWP"
+  // CHECK: call swiftcc void @"$s40sil_witness_tables_inherited_conformance5breed{{[_0-9a-zA-Z]*}}F"{{.*}} @"$s40sil_witness_tables_inherited_conformance3CatCAA5PandaAAWP"
   breed(t)
 }
 
@@ -33,9 +33,9 @@ func obtain<T : Panda>(_ t: T.Type) {
   t.init()
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$S40sil_witness_tables_inherited_conformance6wangle{{[_0-9a-zA-Z]*}}F"(%swift.type*, %swift.type* %T)
+// CHECK-LABEL: define hidden swiftcc void @"$s40sil_witness_tables_inherited_conformance6wangle{{[_0-9a-zA-Z]*}}F"(%swift.type*, %swift.type* %T)
 func wangle<T : Cat>(_ t: T.Type) {
-  // CHECK: call swiftcc void @"$S40sil_witness_tables_inherited_conformance6obtain{{[_0-9a-zA-Z]*}}F"{{.*}} @"$S40sil_witness_tables_inherited_conformance3CatCAA5PandaAAWP"
+  // CHECK: call swiftcc void @"$s40sil_witness_tables_inherited_conformance6obtain{{[_0-9a-zA-Z]*}}F"{{.*}} @"$s40sil_witness_tables_inherited_conformance3CatCAA5PandaAAWP"
   obtain(t)
 }
 

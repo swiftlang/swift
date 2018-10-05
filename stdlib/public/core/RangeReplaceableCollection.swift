@@ -63,8 +63,8 @@
 /// provide your own custom implementation.
 public protocol RangeReplaceableCollection : Collection
   where SubSequence : RangeReplaceableCollection {
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype SubSequence
+  // FIXME: Associated type inference requires this.
+  override associatedtype SubSequence
 
   //===--- Fundamental Requirements ---------------------------------------===//
 
@@ -109,7 +109,7 @@ public protocol RangeReplaceableCollection : Collection
   ///   equivalent to `append(contentsOf:)`.
   mutating func replaceSubrange<C>(
     _ subrange: Range<Index>,
-    with newElements: C
+    with newElements: __owned C
   ) where C : Collection, C.Element == Element
 
   /// Prepares the collection to store the specified number of elements, when
@@ -343,7 +343,16 @@ public protocol RangeReplaceableCollection : Collection
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   mutating func removeAll(keepingCapacity keepCapacity: Bool /*= false*/)
 
-  /// Removes from the collection all elements that satisfy the given predicate.
+  /// Removes all the elements that satisfy the given predicate.
+  ///
+  /// Use this method to remove every element in a collection that meets
+  /// particular criteria. The order of the remaining elements is preserved.
+  /// This example removes all the odd values from an
+  /// array of numbers:
+  ///
+  ///     var numbers = [5, 6, 7, 8, 9, 10, 11]
+  ///     numbers.removeAll(where: { $0 % 2 != 0 })
+  ///     // numbers == [6, 8, 10]
   ///
   /// - Parameter shouldBeRemoved: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
@@ -353,11 +362,9 @@ public protocol RangeReplaceableCollection : Collection
   mutating func removeAll(
     where shouldBeRemoved: (Element) throws -> Bool) rethrows
 
-  // FIXME(ABI): Associated type inference requires this.
-  subscript(bounds: Index) -> Element { get }
-
-  // FIXME(ABI): Associated type inference requires this.
-  subscript(bounds: Range<Index>) -> SubSequence { get }
+  // FIXME: Associated type inference requires these.
+  override subscript(bounds: Index) -> Element { get }
+  override subscript(bounds: Range<Index>) -> SubSequence { get }
 }
 
 //===----------------------------------------------------------------------===//
@@ -416,7 +423,7 @@ extension RangeReplaceableCollection {
   /// - Complexity: O(1) on average, over many calls to `append(_:)` on the
   ///   same collection.
   @inlinable
-  public mutating func append(_ newElement: Element) {
+  public mutating func append(_ newElement: __owned Element) {
     insert(newElement, at: endIndex)
   }
 
@@ -438,7 +445,7 @@ extension RangeReplaceableCollection {
   ///
   /// - Complexity: O(*m*), where *m* is the length of `newElements`.
   @inlinable
-  public mutating func append<S : Sequence>(contentsOf newElements: S)
+  public mutating func append<S : Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
 
     let approximateCapacity = self.count +
@@ -474,7 +481,7 @@ extension RangeReplaceableCollection {
   ///   `i == endIndex`, this method is equivalent to `append(_:)`.
   @inlinable
   public mutating func insert(
-    _ newElement: Element, at i: Index
+    _ newElement: __owned Element, at i: Index
   ) {
     replaceSubrange(i..<i, with: CollectionOfOne(newElement))
   }
@@ -506,7 +513,7 @@ extension RangeReplaceableCollection {
   ///   is equivalent to `append(contentsOf:)`.
   @inlinable
   public mutating func insert<C : Collection>(
-    contentsOf newElements: C, at i: Index
+    contentsOf newElements: __owned C, at i: Index
   ) where C.Element == Element {
     replaceSubrange(i..<i, with: newElements)
   }
@@ -737,7 +744,7 @@ extension RangeReplaceableCollection {
   @inlinable
   public mutating func replaceSubrange<C: Collection, R: RangeExpression>(
     _ subrange: R,
-    with newElements: C
+    with newElements: __owned C
   ) where C.Element == Element, R.Bound == Index {
     self.replaceSubrange(subrange.relative(to: self), with: newElements)
   }
@@ -1072,7 +1079,7 @@ extension RangeReplaceableCollection {
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   @available(swift, introduced: 4.0)
-  public func filter(
+  public __consuming func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> Self {
     return try Self(self.lazy.filter(isIncluded))
@@ -1083,11 +1090,12 @@ extension RangeReplaceableCollection where Self: MutableCollection {
   /// Removes all the elements that satisfy the given predicate.
   ///
   /// Use this method to remove every element in a collection that meets
-  /// particular criteria. This example removes all the odd values from an
+  /// particular criteria. The order of the remaining elements is preserved.
+  /// This example removes all the odd values from an
   /// array of numbers:
   ///
   ///     var numbers = [5, 6, 7, 8, 9, 10, 11]
-  ///     numbers.removeAll(where: { $0 % 2 == 1 })
+  ///     numbers.removeAll(where: { $0 % 2 != 0 })
   ///     // numbers == [6, 8, 10]
   ///
   /// - Parameter shouldBeRemoved: A closure that takes an element of the
@@ -1108,7 +1116,8 @@ extension RangeReplaceableCollection {
   /// Removes all the elements that satisfy the given predicate.
   ///
   /// Use this method to remove every element in a collection that meets
-  /// particular criteria. This example removes all the vowels from a string:
+  /// particular criteria. The order of the remaining elements is preserved.
+  /// This example removes all the vowels from a string:
   ///
   ///     var phrase = "The rain in Spain stays mainly in the plain."
   ///

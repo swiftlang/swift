@@ -1,10 +1,12 @@
-// RUN: %target-sil-opt -access-enforcement-opts -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -access-enforcement-opts -I %S/Inputs/abi -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
 
 sil_stage canonical
 
 import Builtin
 import Swift
 import SwiftShims
+import c_layout
+
 
 struct X {
   @sil_stored var i: Int64 { get set }
@@ -46,28 +48,17 @@ bb0(%0 : $@thin X.Type):
 // }
 // Preserve begin/end scope for nested conflicts,
 // after inlining (read|modify)AndPerform.
+// need to split it into 3 SIL functions else merging would kick in and we would be testing something else
 //
-// CHECK-LABEL: sil hidden @testNestedAccess : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden @testNestedAccess1 : $@convention(thin) () -> () {
 // CHECK: [[F1:%.*]] = function_ref @testNestedAccessClosure1 : $@convention(thin) () -> ()
 // CHECK: [[C1:%.*]] = convert_function [[F1]] : $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
 // CHECK: [[TF1:%.*]] = thin_to_thick_function [[C1]] : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed ()
 // CHECK: [[A1:%.*]] = begin_access [read] [dynamic] %0 : $*X
 // CHECK: apply [[TF1]]() : $@noescape @callee_guaranteed () -> ()
 // CHECK: end_access [[A1]] : $*X
-// CHECK: [[F2:%.*]] = function_ref @testNestedAccessClosure2 : $@convention(thin) () -> ()
-// CHECK: [[C2:%.*]] = convert_function [[F2]] : $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
-// CHECK: [[TF2:%.*]] = thin_to_thick_function [[C2]] : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed () -> ()
-// CHECK: [[A2:%.*]] = begin_access [modify] [dynamic] %0 : $*X
-// CHECK: apply [[TF2]]() : $@noescape @callee_guaranteed () -> ()
-// CHECK: end_access [[A2]] : $*X
-// CHECK: [[F3:%.*]] = function_ref @testNestedAccessClosure3 : $@convention(thin) () -> ()
-// CHECK: [[C3:%.*]] = convert_function [[F3]] : $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
-// CHECK: [[TF3:%.*]] = thin_to_thick_function [[C3]] : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed () -> ()
-// CHECK: [[A3:%.*]] = begin_access [modify] [dynamic] %0 : $*X
-// CHECK: apply [[TF3]]() : $@noescape @callee_guaranteed () -> ()
-// CHECK: end_access [[A3]] : $*X
-// CHECK-LABEL: } // end sil function 'testNestedAccess'
-sil hidden @testNestedAccess : $@convention(thin) () -> () {
+// CHECK-LABEL: } // end sil function 'testNestedAccess1'
+sil hidden @testNestedAccess1 : $@convention(thin) () -> () {
 bb0:
   %2 = global_addr @globalX: $*X
   %3 = function_ref @testNestedAccessClosure1 : $@convention(thin) () -> ()
@@ -76,14 +67,40 @@ bb0:
   %6 = begin_access [read] [dynamic] %2 : $*X
   %9 = apply %5() : $@noescape @callee_guaranteed () -> ()
   end_access %6 : $*X
-
+  %36 = tuple ()
+  return %36 : $()
+}
+// CHECK-LABEL: sil hidden @testNestedAccess2 : $@convention(thin) () -> () {
+// CHECK: [[F2:%.*]] = function_ref @testNestedAccessClosure2 : $@convention(thin) () -> ()
+// CHECK: [[C2:%.*]] = convert_function [[F2]] : $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
+// CHECK: [[TF2:%.*]] = thin_to_thick_function [[C2]] : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[A2:%.*]] = begin_access [modify] [dynamic] %0 : $*X
+// CHECK: apply [[TF2]]() : $@noescape @callee_guaranteed () -> ()
+// CHECK: end_access [[A2]] : $*X
+// CHECK-LABEL: } // end sil function 'testNestedAccess2'
+sil hidden @testNestedAccess2 : $@convention(thin) () -> () {
+bb0:
+  %2 = global_addr @globalX: $*X
   %15 = function_ref @testNestedAccessClosure2 : $@convention(thin) () -> ()
   %16 = convert_function %15 : $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
   %17 = thin_to_thick_function %16 : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed () -> ()
   %18 = begin_access [modify] [dynamic] %2 : $*X
   %21 = apply %17() : $@noescape @callee_guaranteed () -> ()
   end_access %18 : $*X
-
+  %36 = tuple ()
+  return %36 : $()
+}
+// CHECK-LABEL: sil hidden @testNestedAccess3 : $@convention(thin) () -> () {
+// CHECK: [[F3:%.*]] = function_ref @testNestedAccessClosure3 : $@convention(thin) () -> ()
+// CHECK: [[C3:%.*]] = convert_function [[F3]] : $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
+// CHECK: [[TF3:%.*]] = thin_to_thick_function [[C3]] : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK: [[A3:%.*]] = begin_access [modify] [dynamic] %0 : $*X
+// CHECK: apply [[TF3]]() : $@noescape @callee_guaranteed () -> ()
+// CHECK: end_access [[A3]] : $*X
+// CHECK-LABEL: } // end sil function 'testNestedAccess3'
+sil hidden @testNestedAccess3 : $@convention(thin) () -> () {
+bb0:
+  %2 = global_addr @globalX: $*X
   %27 = function_ref @testNestedAccessClosure3 : $@convention(thin) () -> ()
   %28 = convert_function %27 : $@convention(thin) () -> () to $@convention(thin) @noescape () -> ()
   %29 = thin_to_thick_function %28 : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed () -> ()
@@ -489,7 +506,7 @@ bb0(%0 : ${ var Int64 }):
 // }
 // Preserve the scope of the outer inout access. Runtime trap expected.
 //
-// CHECK-LABEL: sil @$S17enforce_with_opts24testInoutWriteEscapeReadyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil @$s17enforce_with_opts24testInoutWriteEscapeReadyyF : $@convention(thin) () -> () {
 // CHECK: [[BOX:%.*]] = alloc_box ${ var Int64 }, var, name "x"
 // CHECK: [[BOXADR:%.*]] = project_box [[BOX]] : ${ var Int64 }, 0
 // CHECK: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[BOXADR]] : $*Int64
@@ -497,8 +514,8 @@ bb0(%0 : ${ var Int64 }):
 // CHECK-NOT: begin_access
 // CHECK: end_access [[BEGIN]]
 // CHECK-NOT: begin_access
-// CHECK-LABEL: } // end sil function '$S17enforce_with_opts24testInoutWriteEscapeReadyyF'
-sil @$S17enforce_with_opts24testInoutWriteEscapeReadyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: } // end sil function '$s17enforce_with_opts24testInoutWriteEscapeReadyyF'
+sil @$s17enforce_with_opts24testInoutWriteEscapeReadyyF : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_box ${ var Int64 }, var, name "x"
   %1 = project_box %0 : ${ var Int64 }, 0
@@ -506,7 +523,7 @@ bb0:
   %3 = struct $Int64 (%2 : $Builtin.Int64)
   store %3 to %1 : $*Int64
   // function_ref closure #1 in testInoutWriteEscapeRead()
-  %5 = function_ref @$S17enforce_with_opts24testInoutWriteEscapeReadyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %5 = function_ref @$s17enforce_with_opts24testInoutWriteEscapeReadyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> ()
   strong_retain %0 : ${ var Int64 }
   %7 = partial_apply [callee_guaranteed] %5(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> ()
   debug_value %7 : $@callee_guaranteed () -> (), let, name "c"
@@ -534,11 +551,11 @@ bb0:
 }
 
 // closure #1 in testInoutWriteEscapeRead()
-// CHECK-LABEL: sil private @$S17enforce_with_opts24testInoutWriteEscapeReadyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+// CHECK-LABEL: sil private @$s17enforce_with_opts24testInoutWriteEscapeReadyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
 // CHECK: [[BOXADR:%.*]] = project_box %0 : ${ var Int64 }, 0
 // CHECK: begin_access [read] [dynamic] [no_nested_conflict] %1
-// CHECK-LABEL: } // end sil function '$S17enforce_with_opts24testInoutWriteEscapeReadyyFyycfU_'
-sil private @$S17enforce_with_opts24testInoutWriteEscapeReadyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+// CHECK-LABEL: } // end sil function '$s17enforce_with_opts24testInoutWriteEscapeReadyyFyycfU_'
+sil private @$s17enforce_with_opts24testInoutWriteEscapeReadyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
 // %0
 bb0(%0 : ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
@@ -562,7 +579,7 @@ bb0(%0 : ${ var Int64 }):
 // }
 // Preserve the scope of the outer inout access. Runtime trap expected.
 //
-// CHECK-LABEL: sil @$S17enforce_with_opts020testInoutWriteEscapeF0yyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil @$s17enforce_with_opts020testInoutWriteEscapeF0yyF : $@convention(thin) () -> () {
 // CHECK: [[BOX:%.*]] = alloc_box ${ var Int64 }, var, name "x"
 // CHECK: [[BOXADR:%.*]] = project_box [[BOX]] : ${ var Int64 }, 0
 // CHECK: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[BOXADR]] : $*Int64
@@ -570,8 +587,8 @@ bb0(%0 : ${ var Int64 }):
 // CHECK-NOT: begin_access
 // CHECK: end_access [[BEGIN]]
 // CHECK-NOT: begin_access
-// CHECK-LABEL: } // end sil function '$S17enforce_with_opts020testInoutWriteEscapeF0yyF'
-sil @$S17enforce_with_opts020testInoutWriteEscapeF0yyF : $@convention(thin) () -> () {
+// CHECK-LABEL: } // end sil function '$s17enforce_with_opts020testInoutWriteEscapeF0yyF'
+sil @$s17enforce_with_opts020testInoutWriteEscapeF0yyF : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_box ${ var Int64 }, var, name "x"
   %1 = project_box %0 : ${ var Int64 }, 0
@@ -579,7 +596,7 @@ bb0:
   %3 = struct $Int64 (%2 : $Builtin.Int64)
   store %3 to %1 : $*Int64
   // function_ref closure #1 in testInoutWriteEscapeWrite()
-  %5 = function_ref @$S17enforce_with_opts020testInoutWriteEscapeF0yyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %5 = function_ref @$s17enforce_with_opts020testInoutWriteEscapeF0yyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> ()
   strong_retain %0 : ${ var Int64 }
   %7 = partial_apply [callee_guaranteed] %5(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> ()
   debug_value %7 : $@callee_guaranteed () -> (), let, name "c"
@@ -606,11 +623,11 @@ bb0:
   return %30 : $()
 }
 
-// CHECK-LABEL: sil private @$S17enforce_with_opts020testInoutWriteEscapeF0yyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+// CHECK-LABEL: sil private @$s17enforce_with_opts020testInoutWriteEscapeF0yyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
 // CHECK: [[BOXADR:%.*]] = project_box %0 : ${ var Int64 }, 0
 // CHECK: begin_access [modify] [dynamic] [no_nested_conflict] [[BOXADR]] : $*Int64
-// CHECK-LABEL: } // end sil function '$S17enforce_with_opts020testInoutWriteEscapeF0yyFyycfU_'
-sil private @$S17enforce_with_opts020testInoutWriteEscapeF0yyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+// CHECK-LABEL: } // end sil function '$s17enforce_with_opts020testInoutWriteEscapeF0yyFyycfU_'
+sil private @$s17enforce_with_opts020testInoutWriteEscapeF0yyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
 // %0
 bb0(%0 : ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
@@ -632,7 +649,7 @@ bb0(%0 : ${ var Int64 }):
 // }
 // The outer inout access is not folded because we the optimizer can't resolve
 // the call to the inner closure from the outer closure.
-sil @$S23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyF : $@convention(thin) () -> () {
+sil @$s23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyF : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_box ${ var Int64 }, var, name "x"
   %1 = project_box %0 : ${ var Int64 }, 0
@@ -640,12 +657,12 @@ bb0:
   %3 = struct $Int64 (%2 : $Builtin.Int64)
   store %3 to %1 : $*Int64
   // function_ref closure #1 in testInoutReadNoescapeRead()
-  %5 = function_ref @$S23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %5 = function_ref @$s23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> ()
   strong_retain %0 : ${ var Int64 }
   %7 = partial_apply [callee_guaranteed] %5(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> ()
   debug_value %7 : $@callee_guaranteed () -> (), let, name "c"
   // function_ref closure #2 in testInoutReadNoescapeRead()
-  %9 = function_ref @$S23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> ()
+  %9 = function_ref @$s23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> ()
   strong_retain %7 : $@callee_guaranteed () -> ()
   %11 = partial_apply [callee_guaranteed] %9(%1, %7) : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> ()
   strong_retain %11 : $@callee_guaranteed () -> ()
@@ -661,11 +678,11 @@ bb0:
 }
 
 // closure #1 in testInoutReadNoescapeRead()
-// CHECK-LABEL: sil private @$S23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+// CHECK-LABEL: sil private @$s23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
 // CHECK: [[BOXADR:%.*]] = project_box %0 : ${ var Int64 }, 0
 // CHECK: begin_access [read] [dynamic] [no_nested_conflict] [[BOXADR]] : $*Int64
-// CHECK-LABEL: } // end sil function '$S23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyycfU_'
-sil private @$S23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+// CHECK-LABEL: } // end sil function '$s23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyycfU_'
+sil private @$s23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
 // %0
 bb0(%0 : ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
@@ -682,10 +699,10 @@ bb0(%0 : ${ var Int64 }):
 }
 
 // closure #2 in testInoutReadNoescapeRead()
-// CHECK-LABEL: sil private @$S23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
+// CHECK-LABEL: sil private @$s23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
 // CHECK: begin_access [read] [dynamic] %0 : $*Int64
-// CHECK-LABEL: } // end sil function '$S23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyyXEfU0_'
-sil private @$S23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
+// CHECK-LABEL: } // end sil function '$s23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyyXEfU0_'
+sil private @$s23enforce_with_opts_nob2s021testInoutReadNoescapeG0yyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
 // %0
 // %1
 bb0(%0 : $*Int64, %1 : $@callee_guaranteed () -> ()):
@@ -709,7 +726,7 @@ bb0(%0 : $*Int64, %1 : $@callee_guaranteed () -> ()):
 // }
 // The outer inout access scope (closure #2) must be preserved.
 // Expected to trap at runtime.
-sil @$S23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyF : $@convention(thin) () -> () {
+sil @$s23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyF : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_box ${ var Int64 }, var, name "x"
   %1 = project_box %0 : ${ var Int64 }, 0
@@ -717,12 +734,12 @@ bb0:
   %3 = struct $Int64 (%2 : $Builtin.Int64)
   store %3 to %1 : $*Int64
   // function_ref closure #1 in testInoutReadNoescapeWrite()
-  %5 = function_ref @$S23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %5 = function_ref @$s23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> ()
   strong_retain %0 : ${ var Int64 }
   %7 = partial_apply [callee_guaranteed] %5(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> ()
   debug_value %7 : $@callee_guaranteed () -> (), let, name "c"
   // function_ref closure #2 in testInoutReadNoescapeWrite()
-  %9 = function_ref @$S23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> ()
+  %9 = function_ref @$s23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> ()
   strong_retain %7 : $@callee_guaranteed () -> ()
   %11 = partial_apply [callee_guaranteed] %9(%1, %7) : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> ()
   strong_retain %11 : $@callee_guaranteed () -> ()
@@ -738,10 +755,10 @@ bb0:
 }
 
 // closure #1 in testInoutReadNoescapeWrite()
-// CHECK-LABEL: sil private @$S23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+// CHECK-LABEL: sil private @$s23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
 // CHECK: begin_access [modify] [dynamic] [no_nested_conflict] %1 : $*Int64
-// CHECK-LABEL: } // end sil function '$S23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyycfU_'
-sil private @$S23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+// CHECK-LABEL: } // end sil function '$s23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyycfU_'
+sil private @$s23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
 // %0
 bb0(%0 : ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
@@ -756,10 +773,10 @@ bb0(%0 : ${ var Int64 }):
 }
 
 // closure #2 in testInoutReadNoescapeWrite()
-// CHECK-LABEL: sil private @$S23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
+// CHECK-LABEL: sil private @$s23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
 // CHECK: begin_access [read] [dynamic] %0 : $*Int64
-// CHECK-LABEL: } // end sil function '$S23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyyXEfU0_'
-sil private @$S23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
+// CHECK-LABEL: } // end sil function '$s23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyyXEfU0_'
+sil private @$s23enforce_with_opts_nob2s26testInoutReadNoescapeWriteyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
 bb0(%0 : $*Int64, %1 : $@callee_guaranteed () -> ()):
   debug_value_addr %0 : $*Int64, var, name "x", argno 1
   debug_value %1 : $@callee_guaranteed () -> (), let, name "c", argno 2
@@ -781,7 +798,7 @@ bb0(%0 : $*Int64, %1 : $@callee_guaranteed () -> ()):
 // }
 // The outer inout access scope (closure #2) must be preserved.
 // Expected to trap at runtime.
-sil @$S23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyF : $@convention(thin) () -> () {
+sil @$s23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyF : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_box ${ var Int64 }, var, name "x"
   %1 = project_box %0 : ${ var Int64 }, 0
@@ -789,12 +806,12 @@ bb0:
   %3 = struct $Int64 (%2 : $Builtin.Int64)
   store %3 to %1 : $*Int64
   // function_ref closure #1 in testInoutWriteNoescapeReadClosure()
-  %5 = function_ref @$S23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %5 = function_ref @$s23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> ()
   strong_retain %0 : ${ var Int64 }
   %7 = partial_apply [callee_guaranteed] %5(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> ()
   debug_value %7 : $@callee_guaranteed () -> (), let, name "c"
   // function_ref closure #2 in testInoutWriteNoescapeReadClosure()
-  %9 = function_ref @$S23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> ()
+  %9 = function_ref @$s23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> ()
   strong_retain %7 : $@callee_guaranteed () -> ()
   %11 = partial_apply [callee_guaranteed] %9(%1, %7) : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> ()
   strong_retain %11 : $@callee_guaranteed () -> ()
@@ -810,10 +827,10 @@ bb0:
 }
 
 // closure #1 in testInoutWriteNoescapeReadClosure()
-// CHECK-LABEL: sil private @$S23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+// CHECK-LABEL: sil private @$s23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
 // CHECK: begin_access [read] [dynamic] [no_nested_conflict] %1 : $*Int64
-// CHECK-LABEL: } // end sil function '$S23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyFyycfU_'
-sil private @$S23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+// CHECK-LABEL: } // end sil function '$s23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyFyycfU_'
+sil private @$s23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
 // %0
 bb0(%0 : ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
@@ -830,10 +847,10 @@ bb0(%0 : ${ var Int64 }):
 }
 
 // closure #2 in testInoutWriteNoescapeReadClosure()
-// CHECK-LABEL: sil private @$S23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
+// CHECK-LABEL: sil private @$s23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
 // CHECK: begin_access [modify] [dynamic] %0 : $*Int64
-// CHECK-LABEL: } // end sil function '$S23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyFyyXEfU0_'
-sil private @$S23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
+// CHECK-LABEL: } // end sil function '$s23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyFyyXEfU0_'
+sil private @$s23enforce_with_opts_nob2s33testInoutWriteNoescapeReadClosureyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
 // %0
 // %1
 bb0(%0 : $*Int64, %1 : $@callee_guaranteed () -> ()):
@@ -855,7 +872,7 @@ bb0(%0 : $*Int64, %1 : $@callee_guaranteed () -> ()):
 //   let c = { x = 7 }
 //   doOne { modifyAndPerform(&x, closure: c) }
 // }
-sil @$S23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyF : $@convention(thin) () -> () {
+sil @$s23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyF : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_box ${ var Int64 }, var, name "x"
   %1 = project_box %0 : ${ var Int64 }, 0
@@ -863,12 +880,12 @@ bb0:
   %3 = struct $Int64 (%2 : $Builtin.Int64)
   store %3 to %1 : $*Int64
   // function_ref closure #1 in testInoutWriteNoescapeWriteClosure()
-  %5 = function_ref @$S23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> ()
+  %5 = function_ref @$s23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> ()
   strong_retain %0 : ${ var Int64 }
   %7 = partial_apply [callee_guaranteed] %5(%0) : $@convention(thin) (@guaranteed { var Int64 }) -> ()
   debug_value %7 : $@callee_guaranteed () -> (), let, name "c"
   // function_ref closure #2 in testInoutWriteNoescapeWriteClosure()
-  %9 = function_ref @$S23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> ()
+  %9 = function_ref @$s23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> ()
   strong_retain %7 : $@callee_guaranteed () -> ()
   %11 = partial_apply [callee_guaranteed] %9(%1, %7) : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> ()
   strong_retain %11 : $@callee_guaranteed () -> ()
@@ -884,10 +901,10 @@ bb0:
 }
 
 // closure #1 in testInoutWriteNoescapeWriteClosure()
-// CHECK-LABEL: sil private @$S23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+// CHECK-LABEL: sil private @$s23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
 // CHECK: begin_access [modify] [dynamic] [no_nested_conflict] %1 : $*Int64
-// CHECK-LABEL: } // end sil function '$S23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyycfU_'
-sil private @$S23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
+// CHECK-LABEL: } // end sil function '$s23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyycfU_'
+sil private @$s23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyycfU_ : $@convention(thin) (@guaranteed { var Int64 }) -> () {
 // %0
 bb0(%0 : ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
@@ -902,10 +919,10 @@ bb0(%0 : ${ var Int64 }):
 }
 
 // closure #2 in testInoutWriteNoescapeWriteClosure()
-// CHECK-LABEL: sil private @$S23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
+// CHECK-LABEL: sil private @$s23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
 // CHECK: begin_access [modify] [dynamic] %0 : $*Int64
-// CHECK-LABEL: } // end sil function '$S23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyyXEfU0_'
-sil private @$S23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
+// CHECK-LABEL: } // end sil function '$s23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyyXEfU0_'
+sil private @$s23enforce_with_opts_nob2s022testInoutWriteNoescapeG7ClosureyyFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int64, @guaranteed @callee_guaranteed () -> ()) -> () {
 bb0(%0 : $*Int64, %1 : $@callee_guaranteed () -> ()):
   debug_value_addr %0 : $*Int64, var, name "x", argno 1
   debug_value %1 : $@callee_guaranteed () -> (), let, name "c", argno 2
@@ -940,6 +957,38 @@ bb0:
   %4 = begin_access [read] [dynamic] %0 : $*X
   %5 = load %4 : $*X
   end_access %4 : $*X
+  %7 = begin_access [read] [dynamic] %0 : $*X
+  %8 = load %7 : $*X
+  end_access %7 : $*X
+  %10 = tuple ()
+  return %10 : $()
+}
+
+
+// public func testOldToNewMapReadMayRelease() {
+// Checks merging 2 out of 3 scopes resulting in a larger read scope
+// Due to a MayRelease instruction before the 3rd scope
+//
+// CHECK-LABEL: sil @testOldToNewMapReadMayRelease : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-LABEL: } // end sil function 'testOldToNewMapReadMayRelease'
+sil @testOldToNewMapReadMayRelease : $@convention(thin) () -> () {
+bb0:
+  %alloc = alloc_box ${ var Int32 }, var, name "y"
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [read] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  %4 = begin_access [read] [dynamic] %0 : $*X
+  %5 = load %4 : $*X
+  end_access %4 : $*X
+  strong_release %alloc : ${ var Int32 }
   %7 = begin_access [read] [dynamic] %0 : $*X
   %8 = load %7 : $*X
   end_access %7 : $*X
@@ -1266,6 +1315,48 @@ bb5:
   return %16 : $()
 }
 
+class RefElemClass {
+  var x : BitfieldOne
+  var y : Int32
+  init()
+}
+
+// Checks that we don't crash when unable to create projection paths
+// we can't merge anything here because of that
+// CHECK-LABEL: sil @ref_elem_c : $@convention(thin) (RefElemClass) -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NEXT: [[REFX:%.*]] = ref_element_addr %0 : $RefElemClass, #RefElemClass.x
+// CHECK-NEXT: [[REFY:%.*]] = ref_element_addr %0 : $RefElemClass, #RefElemClass.y
+// CHECK-NEXT: [[BEGINX:%.*]] = begin_access [modify] [dynamic] [[REFX]] : $*BitfieldOne
+// CHECK: end_access [[BEGINX]] : $*BitfieldOne
+// CHECK: [[BEGINY:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[REFY]] : $*Int32
+// CHECK: [[BEGINX2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[REFX]] : $*BitfieldOne
+// CHECK-NEXT: end_access [[BEGINX2]] : $*BitfieldOne
+// CHECK-NEXT: end_access [[BEGINY]] : $*Int32
+// CHECK-LABEL: } // end sil function 'ref_elem_c'
+
+sil @ref_elem_c : $@convention(thin) (RefElemClass) -> () {
+bb0(%0 : $RefElemClass):
+  %b0 = global_addr @globalX: $*X
+  %1 = begin_access [read] [dynamic] %b0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  %x = ref_element_addr %0 : $RefElemClass, #RefElemClass.x
+  %y = ref_element_addr %0 : $RefElemClass, #RefElemClass.y
+  %b1 = begin_access [modify] [dynamic] %x : $*BitfieldOne
+  %u0 = function_ref @globalAddressor : $@convention(thin) () -> Builtin.RawPointer
+  %u1 = apply %u0() : $@convention(thin) () -> Builtin.RawPointer
+  end_access %b1 : $*BitfieldOne
+  %b2 = begin_access [modify] [dynamic] %y : $*Int32
+  %b3 = begin_access [modify] [dynamic] %x : $*BitfieldOne
+  end_access %b3 : $*BitfieldOne
+  end_access %b2 : $*Int32
+  %10 = tuple ()
+  return %10 : $()
+}
 
 // public func testStronglyConnectedComponent() {
 // During the merge optimization,
@@ -1345,3 +1436,55 @@ bb6:
   %19 = tuple ()
   return %19 : $()
 }
+
+// public func testMergeWithFirstConflict() {
+// Check that we can merge scopes even if the first one of them has conflicts within it
+//
+// CHECK-LABEL: sil @testMergeWithFirstConflict : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*X
+// CHECK: apply
+// CHECK-NEXT: load
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NOT: begin_access
+// CHECK-LABEL: } // end sil function 'testMergeWithFirstConflict'
+sil @testMergeWithFirstConflict : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %4 = begin_access [read] [dynamic] %0 : $*X
+  %u0 = function_ref @globalAddressor : $@convention(thin) () -> Builtin.RawPointer
+  %u1 = apply %u0() : $@convention(thin) () -> Builtin.RawPointer
+  end_access %4 : $*X
+  %1 = begin_access [read] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// public func testMergeWithSecondConflict() {
+// Check that we can merge scopes even if the 2nd one of them has conflicts within it
+//
+// CHECK-LABEL: sil @testMergeWithSecondConflict : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*X
+// CHECK: load
+// CHECK: apply
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NOT: begin_access
+// CHECK-LABEL: } // end sil function 'testMergeWithSecondConflict'
+sil @testMergeWithSecondConflict : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [read] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  %4 = begin_access [read] [dynamic] %0 : $*X
+  %u0 = function_ref @globalAddressor : $@convention(thin) () -> Builtin.RawPointer
+  %u1 = apply %u0() : $@convention(thin) () -> Builtin.RawPointer
+  end_access %4 : $*X
+  %10 = tuple ()
+  return %10 : $()
+}
+
+

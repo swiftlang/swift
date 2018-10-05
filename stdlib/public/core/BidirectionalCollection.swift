@@ -37,17 +37,11 @@
 ///   `c.index(after: c.index(before: i)) == i`.
 public protocol BidirectionalCollection: Collection
 where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype Element
-
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype Index
-
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype SubSequence
-
-  // FIXME(ABI): Associated type inference requires this.
-  associatedtype Indices
+  // FIXME: Only needed for associated type inference.
+  override associatedtype Element
+  override associatedtype Index
+  override associatedtype SubSequence
+  override associatedtype Indices
 
   /// Returns the position immediately before the given index.
   ///
@@ -71,13 +65,13 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
-  func index(after i: Index) -> Index
+  override func index(after i: Index) -> Index
 
   /// Replaces the given index with its successor.
   ///
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
-  func formIndex(after i: inout Index)
+  override func formIndex(after i: inout Index)
 
   /// Returns an index that is the specified distance from the given index.
   ///
@@ -106,7 +100,7 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the absolute
   ///   value of `distance`.
-  func index(_ i: Index, offsetBy distance: Int) -> Index
+  @_nonoverride func index(_ i: Index, offsetBy distance: Int) -> Index
 
   /// Returns an index that is the specified distance from the given index,
   /// unless that distance is beyond a given limiting index.
@@ -150,7 +144,7 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the absolute
   ///   value of `distance`.
-  func index(
+  @_nonoverride func index(
     _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index?
 
@@ -170,7 +164,7 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the
   ///   resulting distance.
-  func distance(from start: Index, to end: Index) -> Int
+  @_nonoverride func distance(from start: Index, to end: Index) -> Int
 
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
@@ -189,7 +183,7 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   ///         i = c.index(after: i)
   ///     }
   ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
-  var indices: Indices { get }
+  override var indices: Indices { get }
   
   // TODO: swift-3-indexing-model: tests.
   /// The last element of the collection.
@@ -228,16 +222,12 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   ///   the range must be valid indices of the collection.
   ///
   /// - Complexity: O(1)
-  subscript(bounds: Range<Index>) -> SubSequence { get }
+  override subscript(bounds: Range<Index>) -> SubSequence { get }
 
-  // FIXME(ABI): Associated type inference requires this.
-  subscript(position: Index) -> Element { get }
-
-  // FIXME(ABI): Associated type inference requires this.
-  var startIndex: Index { get }
-
-  // FIXME(ABI): Associated type inference requires this.
-  var endIndex: Index { get }
+  // FIXME: Only needed for associated type inference.
+  override subscript(position: Index) -> Element { get }
+  override var startIndex: Index { get }
+  override var endIndex: Index { get }
 }
 
 /// Default implementation for bidirectional collections.
@@ -392,7 +382,7 @@ extension BidirectionalCollection {
   ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
   ///   elements to drop.
   @inlinable // protocol-only
-  public func dropLast(_ k: Int) -> SubSequence {
+  public __consuming func dropLast(_ k: Int) -> SubSequence {
     _precondition(
       k >= 0, "Can't drop a negative number of elements from a collection")
     let end = index(
@@ -423,7 +413,7 @@ extension BidirectionalCollection {
   ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is equal to
   ///   `maxLength`.
   @inlinable // protocol-only
-  public func suffix(_ maxLength: Int) -> SubSequence {
+  public __consuming func suffix(_ maxLength: Int) -> SubSequence {
     _precondition(
       maxLength >= 0,
       "Can't take a suffix of negative length from a collection")

@@ -18,9 +18,9 @@
 #include "swift/Subsystems.h"
 #include "TypeChecker.h"
 #include "TypeCheckObjC.h"
+#include "TypeCheckType.h"
 #include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
-#include "GenericTypeResolver.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
@@ -194,17 +194,17 @@ DeclName TypeChecker::getObjectLiteralConstructorName(ObjectLiteralExpr *expr) {
 /// unambiguous name.
 Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
                                                 ConstructorDecl *ctor) {
-  Type argType = ctor->getArgumentInterfaceType();
-  auto argTuple = argType->getAs<TupleType>();
-  if (!argTuple) return argType;
+  auto params = ctor->getMethodInterfaceType()
+                    ->castTo<FunctionType>()->getParams();
+  SmallVector<AnyFunctionType::Param, 8> newParams;
+  newParams.append(params.begin(), params.end());
 
   auto replace = [&](StringRef replacement) -> Type {
-    SmallVector<TupleTypeElt, 4> elements;
-    elements.append(argTuple->getElements().begin(),
-                    argTuple->getElements().end());
-    elements[0] = TupleTypeElt(elements[0].getType(),
-                               Context.getIdentifier(replacement));
-    return TupleType::get(elements, Context);
+    newParams[0] = AnyFunctionType::Param(newParams[0].getPlainType(),
+                                          Context.getIdentifier(replacement),
+                                          newParams[0].getParameterFlags());
+    return AnyFunctionType::composeInput(Context, newParams,
+                                         /*canonicalVararg=*/false);
   };
 
   switch (expr->getLiteralKind()) {
@@ -351,79 +351,6 @@ static void bindExtensionToNominal(ExtensionDecl *ext,
   nominal->addExtension(ext);
 }
 
-static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
-  if (ED->getExtendedType())
-    return;
-
-  // If we didn't parse a type, fill in an error type and bail out.
-  if (!ED->getExtendedTypeLoc().getTypeRepr()) {
-    ED->setInvalid();
-    ED->getExtendedTypeLoc().setInvalidType(TC.Context);
-    return;
-  }
-
-  auto dc = ED->getDeclContext();
-
-  // Validate the representation.
-  // FIXME: Perform some kind of "shallow" validation here?
-  TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
-  options |= TypeResolutionFlags::AllowUnboundGenerics;
-  if (TC.validateType(ED->getExtendedTypeLoc(), dc, options)) {
-    ED->setInvalid();
-    ED->getExtendedTypeLoc().setInvalidType(TC.Context);
-    return;
-  }
-
-  // Dig out the extended type.
-  auto extendedType = ED->getExtendedType();
-
-  // Hack to allow extending a generic typealias.
-  if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
-    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
-      auto extendedNominal = aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
-      if (extendedNominal) {
-        extendedType = extendedNominal->getDeclaredType();
-        if (!isPassThroughTypealias(aliasDecl))
-          ED->getExtendedTypeLoc().setType(extendedType);
-      }
-    }
-  }
-
-  // Handle easy cases.
-
-  // Cannot extend a metatype.
-  if (extendedType->is<AnyMetatypeType>()) {
-    TC.diagnose(ED->getLoc(), diag::extension_metatype, extendedType)
-      .highlight(ED->getExtendedTypeLoc().getSourceRange());
-    ED->setInvalid();
-    ED->getExtendedTypeLoc().setInvalidType(TC.Context);
-    return;
-  }
-
-  // Cannot extend a bound generic type.
-  if (extendedType->isSpecialized()) {
-    TC.diagnose(ED->getLoc(), diag::extension_specialization,
-                extendedType->getAnyNominal()->getName())
-      .highlight(ED->getExtendedTypeLoc().getSourceRange());
-    ED->setInvalid();
-    ED->getExtendedTypeLoc().setInvalidType(TC.Context);
-    return;
-  }
-
-  // Dig out the nominal type being extended.
-  NominalTypeDecl *extendedNominal = extendedType->getAnyNominal();
-  if (!extendedNominal) {
-    TC.diagnose(ED->getLoc(), diag::non_nominal_extension, extendedType)
-      .highlight(ED->getExtendedTypeLoc().getSourceRange());
-    ED->setInvalid();
-    ED->getExtendedTypeLoc().setInvalidType(TC.Context);
-    return;
-  }
-  assert(extendedNominal && "Should have the nominal type being extended");
-
-  bindExtensionToNominal(ED, extendedNominal);
-}
-
 static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
@@ -471,14 +398,8 @@ static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
     }
   } while(changed);
 
-  // Phase 3 - anything that remains on the worklist cannot be resolved, which
-  // means its invalid. Diagnose.
-  for (auto *ext : worklist)
-    bindExtensionDecl(ext, TC);
-}
-
-void TypeChecker::bindExtension(ExtensionDecl *ext) {
-  ::bindExtensionDecl(ext, *this);
+  // Any remaining extensions are invalid. They will be diagnosed later by
+  // typeCheckDecl().
 }
 
 static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) {
@@ -842,15 +763,13 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   if (isSILType)
     options |= TypeResolutionFlags::SILType;
 
-  GenericTypeToArchetypeResolver contextResolver(GenericEnv);
-
+  auto resolution = TypeResolution::forContextual(DC, GenericEnv);
   if (ProduceDiagnostics) {
-    return TypeChecker(Ctx).validateType(T, DC, options, &contextResolver);
+    return TypeChecker(Ctx).validateType(T, resolution, options);
   } else {
     // Set up a diagnostics engine that swallows diagnostics.
     DiagnosticEngine Diags(Ctx.SourceMgr);
-    return TypeChecker(Ctx, Diags).validateType(T, DC, options,
-                                                &contextResolver);
+    return TypeChecker(Ctx, Diags).validateType(T, resolution, options);
   }
 }
 
@@ -1001,24 +920,6 @@ OwnedResolver swift::createLazyResolver(ASTContext &Ctx) {
   auto diags = new DiagnosticEngine(Ctx.SourceMgr);
   return OwnedResolver(new TypeChecker(Ctx, *diags),
                        &deleteTypeCheckerAndDiags);
-}
-
-void TypeChecker::diagnoseAmbiguousMemberType(Type baseTy,
-                                              SourceRange baseRange,
-                                              Identifier name,
-                                              SourceLoc nameLoc,
-                                              LookupTypeResult &lookup) {
-  if (auto moduleTy = baseTy->getAs<ModuleType>()) {
-    diagnose(nameLoc, diag::ambiguous_module_type, name,
-             moduleTy->getModule()->getName())
-      .highlight(baseRange);
-  } else {
-    diagnose(nameLoc, diag::ambiguous_member_type, name, baseTy)
-      .highlight(baseRange);
-  }
-  for (const auto &member : lookup) {
-    diagnose(member.Member, diag::found_candidate_type, member.MemberType);
-  }
 }
 
 // checkForForbiddenPrefix is for testing purposes.

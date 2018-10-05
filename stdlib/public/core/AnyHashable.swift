@@ -34,7 +34,7 @@ public protocol _HasCustomAnyHashableRepresentation {
   ///         // Correct:
   ///         return AnyHashable(customRepresentation as Base)
   ///       }
-  func _toCustomAnyHashable() -> AnyHashable?
+  __consuming func _toCustomAnyHashable() -> AnyHashable?
 }
 
 @usableFromInline // FIXME(sil-serialize-all)
@@ -49,7 +49,7 @@ internal protocol _AnyHashableBox {
   func _isEqual(to box: _AnyHashableBox) -> Bool?
   var _hashValue: Int { get }
   func _hash(into hasher: inout Hasher)
-  func _rawHashValue(_seed: (UInt64, UInt64)) -> Int
+  func _rawHashValue(_seed: Int) -> Int
 
   var _base: Any { get }
   func _unbox<T: Hashable>() -> T?
@@ -97,7 +97,7 @@ internal struct _ConcreteHashableBox<Base : Hashable> : _AnyHashableBox {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  func _rawHashValue(_seed: (UInt64, UInt64)) -> Int {
+  func _rawHashValue(_seed: Int) -> Int {
     return _baseHashable._rawHashValue(seed: _seed)
   }
 
@@ -269,7 +269,7 @@ extension AnyHashable : Hashable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+  public func _rawHashValue(seed: Int) -> Int {
     return _box._canonicalBox._rawHashValue(_seed: seed)
   }
 }

@@ -172,7 +172,7 @@ void SILBuilder::emitBlock(SILBasicBlock *BB, SILLocation BranchLoc) {
 SILBasicBlock *SILBuilder::splitBlockForFallthrough() {
   // If we are concatenating, just create and return a new block.
   if (insertingAtEndOfBlock()) {
-    return getFunction().createBasicBlock(BB);
+    return getFunction().createBasicBlockAfter(BB);
   }
 
   // Otherwise we need to split the current block at the insertion point.

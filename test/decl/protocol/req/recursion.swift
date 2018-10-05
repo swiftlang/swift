@@ -25,12 +25,13 @@ protocol CircularAssocTypeDefault {
   associatedtype Z3 = Z2
   // expected-note@-1{{protocol requires nested type 'Z3'; do you want to add it?}}
 
-  associatedtype Z4 = Self.Z4 // expected-error{{associated type 'Z4' is not a member type of 'Self'}}
-  // expected-note@-1{{protocol requires nested type 'Z4'; do you want to add it?}}
+  associatedtype Z4 = Self.Z4 // expected-error{{associated type 'Z4' references itself}}
+  // expected-note@-1{{type declared here}}
+  // expected-note@-2{{protocol requires nested type 'Z4'; do you want to add it?}}
 
   associatedtype Z5 = Self.Z6
   // expected-note@-1{{protocol requires nested type 'Z5'; do you want to add it?}}
-  associatedtype Z6 = Self.Z5 // expected-error{{associated type 'Z5' is not a member type of 'Self'}}
+  associatedtype Z6 = Self.Z5
   // expected-note@-1{{protocol requires nested type 'Z6'; do you want to add it?}}
 }
 
@@ -47,7 +48,7 @@ public struct S<A: P> where A.T == S<A> {
 // expected-error@-2 {{generic struct 'S' references itself}}
   func f(a: A.T) {
     g(a: id(t: a))
-    // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+    // expected-error@-1 {{cannot convert value of type 'A.T' to expected argument type 'S<_>'}}
     _ = A.T.self
   }
 

@@ -15,15 +15,15 @@ import CoreGraphics
 
 extension Int8 : _ObjectiveCBridgeable {
     @available(swift, deprecated: 4, renamed: "init(truncating:)")
-    public init(_ number: NSNumber) {
+    public init(_ number: __shared NSNumber) {
         self = number.int8Value
     }
 
-    public init(truncating number: NSNumber) {
+    public init(truncating number: __shared NSNumber) {
         self = number.int8Value
     }
 
-    public init?(exactly number: NSNumber) {
+    public init?(exactly number: __shared NSNumber) {
         let value = number.int8Value
         guard NSNumber(value: value) == number else { return nil }
         self = value
@@ -56,15 +56,15 @@ extension Int8 : _ObjectiveCBridgeable {
 
 extension UInt8 : _ObjectiveCBridgeable {
     @available(swift, deprecated: 4, renamed: "init(truncating:)")
-    public init(_ number: NSNumber) {
+    public init(_ number: __shared NSNumber) {
         self = number.uint8Value
     }
 
-    public init(truncating number: NSNumber) {
+    public init(truncating number: __shared NSNumber) {
         self = number.uint8Value
     }
 
-    public init?(exactly number: NSNumber) {
+    public init?(exactly number: __shared NSNumber) {
         let value = number.uint8Value
         guard NSNumber(value: value) == number else { return nil }
         self = value
@@ -97,15 +97,15 @@ extension UInt8 : _ObjectiveCBridgeable {
 
 extension Int16 : _ObjectiveCBridgeable {
     @available(swift, deprecated: 4, renamed: "init(truncating:)")
-    public init(_ number: NSNumber) {
+    public init(_ number: __shared NSNumber) {
         self = number.int16Value
     }
 
-    public init(truncating number: NSNumber) {
+    public init(truncating number: __shared NSNumber) {
         self = number.int16Value
     }
 
-    public init?(exactly number: NSNumber) {
+    public init?(exactly number: __shared NSNumber) {
         let value = number.int16Value
         guard NSNumber(value: value) == number else { return nil }
         self = value
@@ -138,15 +138,15 @@ extension Int16 : _ObjectiveCBridgeable {
 
 extension UInt16 : _ObjectiveCBridgeable {
     @available(swift, deprecated: 4, renamed: "init(truncating:)")
-    public init(_ number: NSNumber) {
+    public init(_ number: __shared NSNumber) {
         self = number.uint16Value
     }
 
-    public init(truncating number: NSNumber) {
+    public init(truncating number: __shared NSNumber) {
         self = number.uint16Value
     }
 
-    public init?(exactly number: NSNumber) {
+    public init?(exactly number: __shared NSNumber) {
         let value = number.uint16Value
         guard NSNumber(value: value) == number else { return nil }
         self = value
@@ -179,15 +179,15 @@ extension UInt16 : _ObjectiveCBridgeable {
 
 extension Int32 : _ObjectiveCBridgeable {
     @available(swift, deprecated: 4, renamed: "init(truncating:)")
-    public init(_ number: NSNumber) {
+    public init(_ number: __shared NSNumber) {
         self = number.int32Value
     }
 
-    public init(truncating number: NSNumber) {
+    public init(truncating number: __shared NSNumber) {
         self = number.int32Value
     }
 
-    public init?(exactly number: NSNumber) {
+    public init?(exactly number: __shared NSNumber) {
         let value = number.int32Value
         guard NSNumber(value: value) == number else { return nil }
         self = value
@@ -220,15 +220,15 @@ extension Int32 : _ObjectiveCBridgeable {
 
 extension UInt32 : _ObjectiveCBridgeable {
     @available(swift, deprecated: 4, renamed: "init(truncating:)")
-    public init(_ number: NSNumber) {
+    public init(_ number: __shared NSNumber) {
         self = number.uint32Value
     }
 
-    public init(truncating number: NSNumber) {
+    public init(truncating number: __shared NSNumber) {
         self = number.uint32Value
     }
 
-    public init?(exactly number: NSNumber) {
+    public init?(exactly number: __shared NSNumber) {
         let value = number.uint32Value
         guard NSNumber(value: value) == number else { return nil }
         self = value
@@ -261,15 +261,15 @@ extension UInt32 : _ObjectiveCBridgeable {
 
 extension Int64 : _ObjectiveCBridgeable {
     @available(swift, deprecated: 4, renamed: "init(truncating:)")
-    public init(_ number: NSNumber) {
+    public init(_ number: __shared NSNumber) {
         self = number.int64Value
     }
 
-    public init(truncating number: NSNumber) {
+    public init(truncating number: __shared NSNumber) {
         self = number.int64Value
     }
 
-    public init?(exactly number: NSNumber) {
+    public init?(exactly number: __shared NSNumber) {
         let value = number.int64Value
         guard NSNumber(value: value) == number else { return nil }
         self = value
@@ -302,15 +302,15 @@ extension Int64 : _ObjectiveCBridgeable {
 
 extension UInt64 : _ObjectiveCBridgeable {
     @available(swift, deprecated: 4, renamed: "init(truncating:)")
-    public init(_ number: NSNumber) {
+    public init(_ number: __shared NSNumber) {
         self = number.uint64Value
     }
 
-    public init(truncating number: NSNumber) {
+    public init(truncating number: __shared NSNumber) {
         self = number.uint64Value
     }
 
-    public init?(exactly number: NSNumber) {
+    public init?(exactly number: __shared NSNumber) {
         let value = number.uint64Value
         guard NSNumber(value: value) == number else { return nil }
         self = value
@@ -343,15 +343,15 @@ extension UInt64 : _ObjectiveCBridgeable {
 
 extension Int : _ObjectiveCBridgeable {
     @available(swift, deprecated: 4, renamed: "init(truncating:)")
-    public init(_ number: NSNumber) {
+    public init(_ number: __shared NSNumber) {
         self = number.intValue
     }
 
-    public init(truncating number: NSNumber) {
+    public init(truncating number: __shared NSNumber) {
         self = number.intValue
     }
 
-    public init?(exactly number: NSNumber) {
+    public init?(exactly number: __shared NSNumber) {
         let value = number.intValue
         guard NSNumber(value: value) == number else { return nil }
         self = value
@@ -384,15 +384,15 @@ extension Int : _ObjectiveCBridgeable {
 
 extension UInt : _ObjectiveCBridgeable {
     @available(swift, deprecated: 4, renamed: "init(truncating:)")
-    public init(_ number: NSNumber) {
+    public init(_ number: __shared NSNumber) {
         self = number.uintValue
     }
 
-    public init(truncating number: NSNumber) {
+    public init(truncating number: __shared NSNumber) {
         self = number.uintValue
     }
 
-    public init?(exactly number: NSNumber) {
+    public init?(exactly number: __shared NSNumber) {
         let value = number.uintValue
         guard NSNumber(value: value) == number else { return nil }
         self = value
@@ -425,15 +425,15 @@ extension UInt : _ObjectiveCBridgeable {
 
 extension Float : _ObjectiveCBridgeable {
     @available(swift, deprecated: 4, renamed: "init(truncating:)")
-    public init(_ number: NSNumber) {
+    public init(_ number: __shared NSNumber) {
         self = number.floatValue
     }
 
-    public init(truncating number: NSNumber) {
+    public init(truncating number: __shared NSNumber) {
         self = number.floatValue
     }
 
-    public init?(exactly number: NSNumber) {
+    public init?(exactly number: __shared NSNumber) {
         let type = number.objCType.pointee
         if type == 0x49 || type == 0x4c || type == 0x51 {
             guard let result = Float(exactly: number.uint64Value) else { return nil }
@@ -477,15 +477,15 @@ extension Float : _ObjectiveCBridgeable {
 
 extension Double : _ObjectiveCBridgeable {
     @available(swift, deprecated: 4, renamed: "init(truncating:)")
-    public init(_ number: NSNumber) {
+    public init(_ number: __shared NSNumber) {
         self = number.doubleValue
     }
 
-    public init(truncating number: NSNumber) {
+    public init(truncating number: __shared NSNumber) {
         self = number.doubleValue
     }
 
-    public init?(exactly number: NSNumber) {
+    public init?(exactly number: __shared NSNumber) {
         let type = number.objCType.pointee
         if type == 0x51 {
             guard let result = Double(exactly: number.uint64Value) else { return nil }
@@ -531,15 +531,15 @@ extension Double : _ObjectiveCBridgeable {
 
 extension Bool : _ObjectiveCBridgeable {
     @available(swift, deprecated: 4, renamed: "init(truncating:)")
-    public init(_ number: NSNumber) {
+    public init(_ number: __shared NSNumber) {
         self = number.boolValue
     }
 
-    public init(truncating number: NSNumber) {
+    public init(truncating number: __shared NSNumber) {
         self = number.boolValue
     }
 
-    public init?(exactly number: NSNumber) {
+    public init?(exactly number: __shared NSNumber) {
         if number === kCFBooleanTrue as NSNumber || NSNumber(value: 1) == number {
             self = true
         } else if number === kCFBooleanFalse as NSNumber || NSNumber(value: 0) == number {
@@ -582,15 +582,15 @@ extension Bool : _ObjectiveCBridgeable {
 
 extension CGFloat : _ObjectiveCBridgeable {
     @available(swift, deprecated: 4, renamed: "init(truncating:)")
-    public init(_ number: NSNumber) {
+    public init(_ number: __shared NSNumber) {
         self.init(CGFloat.NativeType(truncating: number))
     }
 
-    public init(truncating number: NSNumber) {
+    public init(truncating number: __shared NSNumber) {
         self.init(CGFloat.NativeType(truncating: number))
     }
 
-    public init?(exactly number: NSNumber) {
+    public init?(exactly number: __shared NSNumber) {
         var nativeValue: CGFloat.NativeType? = 0
         guard CGFloat.NativeType._conditionallyBridgeFromObjectiveC(number, result: &nativeValue) else { return nil }
         self.init(nativeValue!)

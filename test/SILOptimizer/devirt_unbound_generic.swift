@@ -55,12 +55,12 @@ public func testDevirt<T>(_ c: CC<T>) -> T? {
 
 // Check that the instance method Derived<T>.foo can be devirtualized, because Derived.foo is an internal function,
 // Derived has no subclasses and it is a WMO compilation.
-// CHECK-LABEL: sil shared [noinline] @$S22devirt_unbound_generic5test2yyAA7DerivedCyxGlFTf4d_n
+// CHECK-LABEL: sil shared [noinline] @$s22devirt_unbound_generic5test2yyAA7DerivedCyxGlFTf4d_n
 // CHECK-NOT: class_method
 // CHECK-NOT: witness_method
 // CHECK-NOT: apply
 // CHECK: return
-// CHECK: end sil function '$S22devirt_unbound_generic5test2yyAA7DerivedCyxGlFTf4d_n'
+// CHECK: end sil function '$s22devirt_unbound_generic5test2yyAA7DerivedCyxGlFTf4d_n'
 @inline(never)
 func test2<T>(_ d: Derived<T>) {
    d.foo()
@@ -72,12 +72,12 @@ public func doTest2<T>(_ t:T) {
 
 // Check that the class method Derived<T>.boo can be devirtualized, because Derived.boo is an internal function,
 // Derived has no subclasses and it is a WMO compilation.
-// CHECK: sil shared [noinline] @$S22devirt_unbound_generic5test3yyAA7DerivedCyxGlFTf4d_n
+// CHECK: sil shared [noinline] @$s22devirt_unbound_generic5test3yyAA7DerivedCyxGlFTf4d_n
 // CHECK-NOT: class_method
 // CHECK-NOT: witness_method
 // CHECK-NOT: apply
 // CHECK: return
-// CHECK: end sil function '$S22devirt_unbound_generic5test3yyAA7DerivedCyxGlFTf4d_n'
+// CHECK: end sil function '$s22devirt_unbound_generic5test3yyAA7DerivedCyxGlFTf4d_n'
 @inline(never)
 func test3<T>(_ d: Derived<T>) {
    type(of: d).boo()

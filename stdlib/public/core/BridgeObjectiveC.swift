@@ -341,11 +341,6 @@ public func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 
 // -- Pointer argument bridging
 
-@usableFromInline @_transparent
-internal var _nilNativeObject: AnyObject? {
-  return nil
-}
-
 /// A mutable pointer-to-ObjC-pointer argument.
 ///
 /// This type has implicit conversions to allow passing any of the following
@@ -601,7 +596,7 @@ protocol _NSSwiftValue: class {
 }
 
 @usableFromInline
-internal class _SwiftValue {
+internal class __SwiftValue {
   @usableFromInline
   let value: Any
   
@@ -611,7 +606,7 @@ internal class _SwiftValue {
   }
   
   @usableFromInline
-  static let null = _SwiftValue(Optional<Any>.none as Any)
+  static let null = __SwiftValue(Optional<Any>.none as Any)
 }
 
 // Internal stdlib SPI
@@ -628,7 +623,7 @@ public func swift_unboxFromSwiftValueWithType<T>(
     }
   }
     
-  if let box = source as? _SwiftValue {
+  if let box = source as? __SwiftValue {
     if let value = box.value as? T {
       result.initialize(to: value)
       return true
@@ -649,7 +644,7 @@ public func _swiftValueConformsTo<T>(_ type: T.Type) -> Bool {
   if let foundationType = _foundationSwiftValueType {
     return foundationType is T.Type
   } else {
-    return _SwiftValue.self is T.Type
+    return __SwiftValue.self is T.Type
   }
 }
 
@@ -670,14 +665,14 @@ extension Optional: _Unwrappable {
   }
 }
 
-private let _foundationSwiftValueType = _typeByName("Foundation._SwiftValue") as? _NSSwiftValue.Type
+private let _foundationSwiftValueType = _typeByName("Foundation.__SwiftValue") as? _NSSwiftValue.Type
 
 @usableFromInline
 internal var _nullPlaceholder: AnyObject {
   if let foundationType = _foundationSwiftValueType {
     return foundationType.null
   } else {
-    return _SwiftValue.null
+    return __SwiftValue.null
   }
 }
 
@@ -686,7 +681,7 @@ func _makeSwiftValue(_ value: Any) -> AnyObject {
   if let foundationType = _foundationSwiftValueType {
     return foundationType.init(value)
   } else {
-    return _SwiftValue(value)
+    return __SwiftValue(value)
   }
 }
 

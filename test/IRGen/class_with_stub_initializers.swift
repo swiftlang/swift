@@ -6,12 +6,12 @@
 
 import Foundation
 
-// CHECK:       @"$S28class_with_stub_initializers3FooCN" =
+// CHECK:       @"$s28class_with_stub_initializers3FooCN" =
 // -- The init() stub should get no vtable entry
-// CHECK-NOT:     %T28class_with_stub_initializers3FooC* (%T28class_with_stub_initializers3FooC*)*
-// CHECK:         %T28class_with_stub_initializers3FooC* (i64, %T28class_with_stub_initializers3FooC*)*
+// CHECK-NOT:     %T28class_with_stub_initializers3FooC* (%swift.type*)*
+// CHECK:         %T28class_with_stub_initializers3FooC* (i64, %swift.type*)*
 // -- The init() stub should get no vtable entry
-// CHECK-NOT:     %T28class_with_stub_initializers3FooC* (%T28class_with_stub_initializers3FooC*)*
+// CHECK-NOT:     %T28class_with_stub_initializers3FooC* (%swift.type*)*
 // CHECK:       {{^(@|define)}}
 class Foo: NSObject {
   init(x: Int64) { super.init() }

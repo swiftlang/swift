@@ -498,7 +498,7 @@ static auto const unTaggedNonNativeBridgeObjectBits
 
 #if defined(__x86_64__)
 static uintptr_t const objectPointerIsObjCBit = 0x4000000000000000ULL;
-#elif defined(__arm64__)
+#elif defined(__arm64__) || defined(__arch64__) || defined(_M_ARM64)
 static uintptr_t const objectPointerIsObjCBit = 0x4000000000000000ULL;
 #else
 static uintptr_t const objectPointerIsObjCBit = 0x00000002U;
@@ -1356,52 +1356,6 @@ bool swift::swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
 #endif
 }
 
-/// Return true if the given bits of a Builtin.BridgeObject refer to a
-/// native swift object whose strong reference count is 1.
-bool swift::swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject(
-  uintptr_t bits
-) {
-  auto bridgeObject = (void*)bits;
-
-  if (isObjCTaggedPointer(bridgeObject))
-    return false;
-
-  const auto object = toPlainObject_unTagged_bridgeObject(bridgeObject);
-
-  // Note: we could just return false if all spare bits are set,
-  // but in that case the cost of a deeper check for a unique native
-  // object is going to be a negligible cost for a possible big win.
-#if SWIFT_OBJC_INTEROP
-  if (isNonNative_unTagged_bridgeObject(bridgeObject))
-    return swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(object);
-#endif
-  return swift_isUniquelyReferencedOrPinned_nonNull_native(
-                                                   (const HeapObject *)object);
-}
-
-
-/// Given a non-nil object reference, return true if the object is a
-/// native swift object and either its strong reference count is 1 or
-/// its pinned flag is set.
-bool swift::swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(
-                                                          const void *object) {
-  assert(object != nullptr);
-  return
-#if SWIFT_OBJC_INTEROP
-    usesNativeSwiftReferenceCounting_nonNull(object) &&
-#endif
-    swift_isUniquelyReferencedOrPinned_nonNull_native(
-                                                    (const HeapObject*)object);
-}
-
-// Given a non-@objc object reference, return true iff the
-// object is non-nil and either has a strong reference count of 1
-// or is pinned.
-bool swift::swift_isUniquelyReferencedOrPinned_native(const HeapObject *object){
-  return object != nullptr &&
-         swift_isUniquelyReferencedOrPinned_nonNull_native(object);
-}
-
 // Given a non-@objc object reference, return true iff the
 // object is non-nil and has a strong reference count greather than 1
 bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
@@ -1445,16 +1399,6 @@ bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
     free(log);
   }
   return isEscaping;
-}
-
-/// Given a non-nil native swift object reference, return true if
-/// either the object has a strong reference count of 1 or its
-/// pinned flag is set.
-bool swift::swift_isUniquelyReferencedOrPinned_nonNull_native(
-    const HeapObject *object) {
-  assert(object != nullptr);
-  assert(!object->refCounts.isDeiniting());
-  return object->refCounts.isUniquelyReferencedOrPinned();
 }
 
 struct ClassExtents {

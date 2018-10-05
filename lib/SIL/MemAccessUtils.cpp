@@ -104,8 +104,7 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
     // actually refer the same address) because these will be dynamically
     // checked.
     auto *REA = cast<RefElementAddrInst>(base);
-    SILValue Object = stripBorrow(REA->getOperand());
-    objProj = ObjectProjection(Object, Projection(REA));
+    objProj = ObjectProjection(REA);
   }
   }
 }
@@ -136,6 +135,7 @@ const ValueDecl *AccessedStorage::getDecl(SILFunction *F) const {
   case Unidentified:
     return nullptr;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 const char *AccessedStorage::getKindName(AccessedStorage::Kind k) {
@@ -157,6 +157,7 @@ const char *AccessedStorage::getKindName(AccessedStorage::Kind k) {
   case Class:
     return "Class";
   }
+  llvm_unreachable("unhandled kind");
 }
 
 void AccessedStorage::print(raw_ostream &os) const {
@@ -209,7 +210,7 @@ static bool isUnsafePointerExtraction(StructExtractInst *SEI) {
 // projected from a switch_enum. This is a valid pattern at any SIL stage
 // resulting in a block-type phi. In later SIL stages, the optimizer may form
 // address-type phis, causing this assert if called on those cases.
-static void checkSwitchEnumBlockArg(SILPHIArgument *arg) {
+static void checkSwitchEnumBlockArg(SILPhiArgument *arg) {
   assert(!arg->getType().isAddress());
   SILBasicBlock *Pred = arg->getParent()->getSinglePredecessorBlock();
   if (!Pred || !isa<SwitchEnumInst>(Pred->getTerminator())) {
@@ -288,11 +289,11 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
 
     // A block argument may be a box value projected out of
     // switch_enum. Address-type block arguments are not allowed.
-    case ValueKind::SILPHIArgument:
+    case ValueKind::SILPhiArgument:
       if (address->getType().isAddress())
         return AccessedStorage();
 
-      checkSwitchEnumBlockArg(cast<SILPHIArgument>(address));
+      checkSwitchEnumBlockArg(cast<SILPhiArgument>(address));
       return AccessedStorage(address, AccessedStorage::Unidentified);
 
     // Load a box from an indirect payload of an opaque enum.
@@ -470,8 +471,8 @@ bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
     if (isAddressForLocalInitOnly(storage.getValue()))
       return false;
 
-    if (isa<SILPHIArgument>(storage.getValue())) {
-      checkSwitchEnumBlockArg(cast<SILPHIArgument>(storage.getValue()));
+    if (isa<SILPhiArgument>(storage.getValue())) {
+      checkSwitchEnumBlockArg(cast<SILPhiArgument>(storage.getValue()));
       return false;
     }
     // Pointer-to-address exclusivity cannot be enforced. `baseAddress` may be
@@ -527,6 +528,10 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     default:
       builtin->dump();
       llvm_unreachable("unexpected bulitin memory access.");
+
+      // WillThrow exists for the debugger, does nothing.
+    case BuiltinValueKind::WillThrow:
+      return;
 
       // Buitins that affect memory but can't be formal accesses.
     case BuiltinValueKind::UnexpectedError:
@@ -696,7 +701,6 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::DestroyValueInst:
   case SILInstructionKind::EndAccessInst:
   case SILInstructionKind::EndApplyInst:
-  case SILInstructionKind::EndBorrowArgumentInst:
   case SILInstructionKind::EndBorrowInst:
   case SILInstructionKind::EndUnpairedAccessInst:
   case SILInstructionKind::EndLifetimeInst:
@@ -705,14 +709,12 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::InitExistentialValueInst:
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::IsEscapingClosureInst:
-  case SILInstructionKind::IsUniqueOrPinnedInst:
   case SILInstructionKind::KeyPathInst:
   case SILInstructionKind::OpenExistentialBoxInst:
   case SILInstructionKind::OpenExistentialBoxValueInst:
   case SILInstructionKind::OpenExistentialValueInst:
   case SILInstructionKind::PartialApplyInst:
   case SILInstructionKind::ProjectValueBufferInst:
-  case SILInstructionKind::StrongPinInst:
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::UnwindInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:

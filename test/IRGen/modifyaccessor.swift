@@ -11,6 +11,6 @@ extension Dictionary {
   }
 }
 
-// CHECK-LABEL: define {{.*}}SSD14modifyaccessorE9alternateq_Sgx_tciM
+// CHECK-LABEL: define {{.*}}sSD14modifyaccessorE9alternateq_Sgx_tciM
 // CHECK: [[COROALLOCA:%.*]] = call token @llvm.coro.alloca.alloc
 // CHECK: call void @llvm.coro.alloca.free(token [[COROALLOCA]])

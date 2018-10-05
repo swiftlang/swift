@@ -414,8 +414,8 @@ SILCloner<ImplClass>::visitSILBasicBlock(SILBasicBlock* BB) {
       auto *MappedBB = F.createBasicBlock();
       BBMap.insert(std::make_pair(Succ.getBB(), MappedBB));
       // Create new arguments for each of the original block's arguments.
-      for (auto *Arg : Succ.getBB()->getPHIArguments()) {
-        SILValue MappedArg = MappedBB->createPHIArgument(
+      for (auto *Arg : Succ.getBB()->getPhiArguments()) {
+        SILValue MappedArg = MappedBB->createPhiArgument(
             getOpType(Arg->getType()), Arg->getOwnershipKind());
 
         ValueMap.insert(std::make_pair(Arg, MappedArg));
@@ -730,16 +730,6 @@ SILCloner<ImplClass>::visitStringLiteralInst(StringLiteralInst *Inst) {
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitConstStringLiteralInst(
-    ConstStringLiteralInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-                getBuilder().createConstStringLiteral(
-                    getOpLocation(Inst->getLoc()), Inst->getValue(),
-                    Inst->getEncoding()));
-}
-
-template <typename ImplClass>
 void SILCloner<ImplClass>::visitLoadInst(LoadInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst, getBuilder().createLoad(getOpLocation(Inst->getLoc()),
@@ -784,19 +774,9 @@ void SILCloner<ImplClass>::visitStoreBorrowInst(StoreBorrowInst *Inst) {
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitEndBorrowInst(EndBorrowInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(
-      Inst, getBuilder().createEndBorrow(getOpLocation(Inst->getLoc()),
-                                         getOpValue(Inst->getBorrowedValue()),
-                                         getOpValue(Inst->getOriginalValue())));
-}
-
-template <typename ImplClass>
-void SILCloner<ImplClass>::visitEndBorrowArgumentInst(
-    EndBorrowArgumentInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(
-      Inst, getBuilder().createEndBorrowArgument(
-                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
+  doPostProcess(Inst, getBuilder().createEndBorrow(
+                          getOpLocation(Inst->getLoc()),
+                          getOpValue(Inst->getOperand()), SILValue()));
 }
 
 template <typename ImplClass>
@@ -1968,26 +1948,6 @@ void SILCloner<ImplClass>::visitMarkDependenceInst(MarkDependenceInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitStrongPinInst(StrongPinInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createStrongPin(getOpLocation(Inst->getLoc()),
-                                 getOpValue(Inst->getOperand()),
-                                 Inst->getAtomicity()));
-}
-
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitStrongUnpinInst(StrongUnpinInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createStrongUnpin(getOpLocation(Inst->getLoc()),
-                                   getOpValue(Inst->getOperand()),
-                                   Inst->getAtomicity()));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::visitStrongReleaseInst(StrongReleaseInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
@@ -2002,15 +1962,6 @@ void SILCloner<ImplClass>::visitIsUniqueInst(IsUniqueInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createIsUnique(getOpLocation(Inst->getLoc()),
                                 getOpValue(Inst->getOperand())));
-}
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::
-visitIsUniqueOrPinnedInst(IsUniqueOrPinnedInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createIsUniqueOrPinned(getOpLocation(Inst->getLoc()),
-                                        getOpValue(Inst->getOperand())));
 }
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitIsEscapingClosureInst(

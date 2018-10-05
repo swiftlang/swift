@@ -28,7 +28,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
   store_borrow %2 to %1 : $*Builtin.NativeObject
   %3 = function_ref @in_guaranteed_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
   apply %3(%1) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
-  end_borrow %2 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
   dealloc_stack %1 : $*Builtin.NativeObject
   br bb1
 

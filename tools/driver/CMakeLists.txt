@@ -41,11 +41,11 @@ if(NOT SWIFT_BUILT_STANDALONE)
 endif()
 
 swift_install_in_component(compiler
-    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc"
+    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc${CMAKE_EXECUTABLE_SUFFIX}"
     DESTINATION "bin")
 swift_install_in_component(autolink-driver
-    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-autolink-extract"
+    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-autolink-extract${CMAKE_EXECUTABLE_SUFFIX}"
     DESTINATION "bin")
 swift_install_in_component(editor-integration
-    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-format"
+    FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-format${CMAKE_EXECUTABLE_SUFFIX}"
     DESTINATION "bin")

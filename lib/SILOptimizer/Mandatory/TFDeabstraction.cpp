@@ -1307,7 +1307,7 @@ void TFDeabstraction::prepareStackAllocForPromotion(AllocStackInst *alloc) {
 /// Explode it into its deabstracted elements, rebuilding it and the branch
 /// instructions that feed it.  This returns a value of the original type that
 /// can be used for further analysis.
-static SILValue explodeSILTupleArgument(SILPHIArgument *arg) {
+static SILValue explodeSILTupleArgument(SILPhiArgument *arg) {
   SmallVector<SILValue, 4> newArgs;
 
   auto *argBB = arg->getParent();
@@ -1317,7 +1317,7 @@ static SILValue explodeSILTupleArgument(SILPHIArgument *arg) {
   auto tuple = arg->getType();
   unsigned numElements = tuple.castTo<TupleType>()->getNumElements();
   for (unsigned i = 0; i != numElements; ++i) {
-    auto newArg = argBB->createPHIArgument(tuple.getTupleElementType(i),
+    auto newArg = argBB->createPhiArgument(tuple.getTupleElementType(i),
                                            arg->getOwnershipKind());
     newArgs.push_back(newArg);
   }
@@ -1362,7 +1362,7 @@ static SILValue explodeSILTupleArgument(SILPHIArgument *arg) {
 /// scalarize. Explode it into its deabstracted elements, rebuilding it and the
 /// branch instructions that feed it.  This returns a value of the original type
 /// that can be used for further analysis.
-static SILValue explodeSILStructArgument(SILPHIArgument *arg) {
+static SILValue explodeSILStructArgument(SILPhiArgument *arg) {
   SmallVector<VarDecl*, 4> elementDecls;
   SmallVector<SILValue, 4> newArgs;
 
@@ -1378,7 +1378,7 @@ static SILValue explodeSILStructArgument(SILPHIArgument *arg) {
     elementDecls.push_back(fieldDecl);
     auto fieldTy = structType.getFieldType(fieldDecl, M);
 
-    auto newArg = argBB->createPHIArgument(fieldTy, arg->getOwnershipKind());
+    auto newArg = argBB->createPhiArgument(fieldTy, arg->getOwnershipKind());
     newArgs.push_back(newArg);
   }
 
@@ -1530,7 +1530,7 @@ struct ArrayElementDecoder {
 /// cause a send.
 ///
 static SILValue
-propagateSSAOperand(SILValue v, SmallPtrSet<SILPHIArgument *, 8> &checkedPhis) {
+propagateSSAOperand(SILValue v, SmallPtrSet<SILPhiArgument *, 8> &checkedPhis) {
   // This is the series of struct/tuple extract indices that the value is
   // currently being projected through.  Consider an access like this:
   //     B = struct { #1, #2 }
@@ -1549,7 +1549,7 @@ propagateSSAOperand(SILValue v, SmallPtrSet<SILPHIArgument *, 8> &checkedPhis) {
     if (accessPath.empty())
       lastRootValue = v;
 
-    if (auto *arg = dyn_cast<SILPHIArgument>(v)) {
+    if (auto *arg = dyn_cast<SILPhiArgument>(v)) {
       // Don't reprocess a PHI argument if we've already seen it.
       if (!checkedPhis.insert(arg).second)
         break;
@@ -1678,7 +1678,7 @@ propagateSSAOperand(SILValue v, SmallPtrSet<SILPHIArgument *, 8> &checkedPhis) {
 void TFDeabstraction::propagateSSAValues() {
   llvm::PrettyStackTraceFormat X("TFDeabstraction::propagateSSAValues");
 
-  SmallPtrSet<SILPHIArgument*, 8> checkedPhis;
+  SmallPtrSet<SILPhiArgument*, 8> checkedPhis;
   for (auto *op : tensorOps) {
     for (auto &operand : op->getAllOperands()) {
       // Get the propagated value.

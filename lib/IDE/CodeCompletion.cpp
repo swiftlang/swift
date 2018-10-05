@@ -973,6 +973,7 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
         !IsImplicitlyCurriedInstanceMethod)
       funcType = funcType->getResult()->getAs<AnyFunctionType>();
     if (funcType) {
+      funcType = funcType->removeArgumentLabels(1)->castTo<AnyFunctionType>();
       auto relation = calculateTypeRelation(funcType, ExpectedType, DC);
       if (UseFuncResultType)
         relation =
@@ -1303,16 +1304,16 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   DeclContext *CurDeclContext = nullptr;
   DeclAttrKind AttrKind;
   int AttrParamIndex;
-  bool IsInSil;
+  bool IsInSil = false;
   bool HasSpace = false;
   bool ShouldCompleteCallPatternAfterParen = true;
   bool PreferFunctionReferencesToCalls = false;
   Optional<DeclKind> AttTargetDK;
+  Optional<StmtKind> ParentStmtKind;
 
   SmallVector<StringRef, 3> ParsedKeywords;
 
   std::vector<std::pair<std::string, bool>> SubModuleNameVisibilityPairs;
-  StmtKind ParentStmtKind;
 
   void addSuperKeyword(CodeCompletionResultSink &Sink) {
     auto *DC = CurDeclContext->getInnermostTypeContext();
@@ -1390,8 +1391,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
 
     // Figure out the kind of type-check we'll be performing.
     auto CheckKind = CompletionTypeCheckKind::Normal;
-    if (Kind == CompletionKind::KeyPathExpr ||
-        Kind == CompletionKind::KeyPathExprDot)
+    if (Kind == CompletionKind::KeyPathExprObjC)
       CheckKind = CompletionTypeCheckKind::KeyPath;
 
     // If we've already successfully type-checked the expression for some
@@ -1444,7 +1444,7 @@ public:
   void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) override;
   void completeExprSuper(SuperRefExpr *SRE) override;
   void completeExprSuperDot(SuperRefExpr *SRE) override;
-  void completeExprKeyPath(KeyPathExpr *KPE, bool HasDot) override;
+  void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) override;
 
   void completeTypeSimpleBeginning() override;
   void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) override;
@@ -1466,13 +1466,17 @@ public:
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
                          Optional<unsigned> yieldIndex) override;
-  void completeAfterPound(CodeCompletionExpr *E, StmtKind ParentKind) override;
+  void completeAfterPoundExpr(CodeCompletionExpr *E,
+                              Optional<StmtKind> ParentKind) override;
+  void completeAfterPoundDirective() override;
+  void completePlatformCondition() override;
   void completeGenericParams(TypeLoc TL) override;
   void completeAfterIfStmt(bool hasElse) override;
-  void addKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody);
 
   void doneParsing() override;
 
+private:
+  void addKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody);
   void deliverCompletionResults();
 };
 } // end anonymous namespace
@@ -1557,14 +1561,14 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
 /// that is of type () -> ().
 static bool hasTrivialTrailingClosure(const FuncDecl *FD,
                                       AnyFunctionType *funcType) {
-  llvm::SmallBitVector defaultMap =
+  SmallBitVector defaultMap =
     computeDefaultMap(funcType->getParams(), FD,
                       /*level*/ FD->isInstanceMember() ? 1 : 0);
   
   if (defaultMap.size() - defaultMap.count() == 1) {
     auto param = funcType->getParams().back();
     if (!param.isAutoClosure()) {
-      if (auto Fn = param.getType()->getAs<AnyFunctionType>()) {
+      if (auto Fn = param.getOldType()->getAs<AnyFunctionType>()) {
         return Fn->getParams().empty() && Fn->getResult()->isVoid();
       }
     }
@@ -1598,7 +1602,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   Type ExprType;
 
   /// Whether the expr is of statically inferred metatype.
-  bool IsStaticMetatype;
+  bool IsStaticMetatype = false;
 
   /// User-provided base type for LookupKind::Type completions.
   Type BaseType;
@@ -1619,6 +1623,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   bool IsSelfRefExpr = false;
   bool IsKeyPathExpr = false;
   bool IsSwiftKeyPathExpr = false;
+  bool IsAfterSwiftKeyPathRoot = false;
   bool IsDynamicLookup = false;
   bool PreferFunctionReferencesToCalls = false;
   bool HaveLeadingSpace = false;
@@ -1777,8 +1782,9 @@ public:
     IsKeyPathExpr = true;
   }
 
-  void setIsSwiftKeyPathExpr() {
+  void setIsSwiftKeyPathExpr(bool onRoot) {
     IsSwiftKeyPathExpr = true;
+    IsAfterSwiftKeyPathRoot = onRoot;
   }
 
   void setIsDynamicLookup() {
@@ -2099,7 +2105,7 @@ public:
 
   void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason) {
     if (!VD->hasName() ||
-        (VD->hasAccess() && !VD->isAccessibleFrom(CurrDeclContext)) ||
+        !VD->isAccessibleFrom(CurrDeclContext) ||
         shouldHideDeclFromCompletionResults(VD))
       return;
 
@@ -2278,7 +2284,7 @@ public:
       Builder.addAnnotatedThrows();
   }
 
-  void addPoundAvailable(StmtKind ParentKind) {
+  void addPoundAvailable(Optional<StmtKind> ParentKind) {
     if (ParentKind != StmtKind::If && ParentKind != StmtKind::Guard)
       return;
     CodeCompletionResultBuilder Builder(Sink, CodeCompletionResult::ResultKind::Keyword,
@@ -2295,11 +2301,15 @@ public:
     // #selector is only available when the Objective-C runtime is.
     if (!Ctx.LangOpts.EnableObjCInterop) return;
 
+    // After #, this is a very likely result. When just in a String context,
+    // it's not.
+    auto semanticContext = needPound ? SemanticContextKind::None
+    : SemanticContextKind::ExpressionSpecific;
+
     CodeCompletionResultBuilder Builder(
                                   Sink,
                                   CodeCompletionResult::ResultKind::Keyword,
-                                  SemanticContextKind::ExpressionSpecific,
-                                  ExpectedTypes);
+                                  semanticContext, ExpectedTypes);
     if (needPound)
       Builder.addTextChunk("#selector");
     else
@@ -2608,7 +2618,7 @@ public:
 
   void addConstructorCallsForType(Type type, Identifier name,
                                   DeclVisibilityKind Reason) {
-    if (!Ctx.LangOpts.CodeCompleteInitsInPostfixExpr)
+    if (!Ctx.LangOpts.CodeCompleteInitsInPostfixExpr && !IsUnresolvedMember)
       return;
 
     assert(CurrDeclContext);
@@ -2625,14 +2635,16 @@ public:
     }
   }
 
-  bool shouldAddSubscriptCall() {
-    if (IsSwiftKeyPathExpr)
-      return true;
-    return !HaveDot;
-  }
-
   void addSubscriptCall(const SubscriptDecl *SD, DeclVisibilityKind Reason) {
-    assert(shouldAddSubscriptCall() && "cannot add a subscript after a dot");
+    // Don't add subscript call to meta types.
+    if (!ExprType || ExprType->is<AnyMetatypeType>())
+      return;
+
+    // Subscript after '.' is valid only after type part of Swift keypath
+    // expression. (e.g. '\TyName.SubTy.[0])
+    if (HaveDot && !IsAfterSwiftKeyPathRoot)
+      return;
+
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
@@ -2640,6 +2652,16 @@ public:
         getSemanticContext(SD, Reason), ExpectedTypes);
     Builder.setAssociatedDecl(SD);
     setClangDeclKeywords(SD, Pairs, Builder);
+
+    // '\TyName#^TOKEN^#' requires leading dot.
+    if (!HaveDot && IsAfterSwiftKeyPathRoot)
+      Builder.addLeadingDot();
+
+    if (NeedOptionalUnwrap) {
+      Builder.setNumBytesToErase(NumBytesToEraseForOptionalUnwrap);
+      Builder.addQuestionMark();
+    }
+
     Builder.addLeftBracket();
     addParameters(Builder, SD->getIndices());
     Builder.addRightBracket();
@@ -2656,6 +2678,8 @@ public:
 
   void addNominalTypeRef(const NominalTypeDecl *NTD,
                          DeclVisibilityKind Reason) {
+    if (IsUnresolvedMember)
+      return;
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
@@ -2669,6 +2693,8 @@ public:
   }
 
   void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason) {
+    if (IsUnresolvedMember)
+      return;
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
@@ -2730,7 +2756,7 @@ public:
                          DeclVisibilityKind Reason,
                          bool HasTypeContext) {
     if (!EED->hasName() ||
-        (EED->hasAccess() && !EED->isAccessibleFrom(CurrDeclContext)) ||
+        !EED->isAccessibleFrom(CurrDeclContext) ||
         shouldHideDeclFromCompletionResults(EED))
       return;
 
@@ -2887,7 +2913,7 @@ public:
           // initializer completions if we do not have a left parenthesis and either
           // the initializer is required, the base type's instance type is not a class,
           // or this is a 'self' or 'super' reference.
-          if (IsStaticMetatype || Ty->is<ArchetypeType>())
+          if (IsStaticMetatype || IsUnresolvedMember || Ty->is<ArchetypeType>())
             addConstructorCall(CD, Reason, None, Result, /*isOnType*/true);
           else if ((IsSelfRefExpr || IsSuperRefExpr || !Ty->is<ClassType>() ||
                     CD->isRequired()) && !HaveLParen)
@@ -2973,12 +2999,9 @@ public:
       }
 
       // Swift key path allows .[0]
-      if (shouldAddSubscriptCall()) {
-        if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
-          if (ExprType && !ExprType->is<AnyMetatypeType>())
-            addSubscriptCall(SD, Reason);
-          return;
-        }
+      if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
+        addSubscriptCall(SD, Reason);
+        return;
       }
       return;
 
@@ -3734,34 +3757,88 @@ public:
     }
   }
 
+  void getUnresolvedMemberCompletions(Type T) {
+    if (!T->getNominalOrBoundGenericNominal())
+      return;
+
+    // We can only say .foo where foo is a static member of the contextual
+    // type and has the same type (or if the member is a function, then the
+    // same result type) as the contextual type.
+    FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD,
+                                             DeclVisibilityKind reason) {
+      if (!VD->hasInterfaceType()) {
+        TypeResolver->resolveDeclSignature(VD);
+        if (!VD->hasInterfaceType())
+          return false;
+      }
+
+      // Enum element decls can always be referenced by implicit member
+      // expression.
+      if (isa<EnumElementDecl>(VD))
+        return true;
+
+      // Only non-failable constructors are implicitly referenceable.
+      if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
+        switch (CD->getFailability()) {
+          case OTK_None:
+          case OTK_ImplicitlyUnwrappedOptional:
+            return true;
+          case OTK_Optional:
+            return false;
+        }
+      }
+
+      // Otherwise, check the result type matches the contextual type.
+      auto declTy = getTypeOfMember(VD, T);
+      if (declTy->hasError())
+        return false;
+
+      DeclContext *DC = const_cast<DeclContext *>(CurrDeclContext);
+
+      // Member types can also be implicitly referenceable as long as it's
+      // convertible to the contextual type.
+      if (auto CD = dyn_cast<TypeDecl>(VD)) {
+        declTy = declTy->getMetatypeInstanceType();
+        return swift::isConvertibleTo(declTy, T, *DC);
+      }
+
+      // Only static member can be referenced.
+      if (!VD->isStatic())
+        return false;
+
+      if (isa<FuncDecl>(VD)) {
+        // Strip '(Self.Type) ->' and parameters.
+        declTy = declTy->castTo<AnyFunctionType>()->getResult();
+        declTy = declTy->castTo<AnyFunctionType>()->getResult();
+      } else if (auto FT = declTy->getAs<AnyFunctionType>()) {
+        // The compiler accepts 'static var factory: () -> T' for implicit
+        // member expression.
+        // FIXME: This emits just 'factory'. We should emit 'factory()' instead.
+        declTy = FT->getResult();
+      }
+      return swift::isConvertibleTo(declTy, T, *DC);
+    });
+
+    auto baseType = MetatypeType::get(T);
+    llvm::SaveAndRestore<LookupKind> SaveLook(Kind, LookupKind::ValueExpr);
+    llvm::SaveAndRestore<Type> SaveType(ExprType, baseType);
+    llvm::SaveAndRestore<bool> SaveUnresolved(IsUnresolvedMember, true);
+    lookupVisibleMemberDecls(consumer, baseType, CurrDeclContext,
+                             TypeResolver.get(),
+                             /*includeInstanceMembers=*/false);
+  }
+
   void getUnresolvedMemberCompletions(ArrayRef<Type> Types) {
     NeedLeadingDot = !HaveDot;
     for (auto T : Types) {
-      if (T && T->getNominalOrBoundGenericNominal()) {
-        // We can only say .foo where foo is a static member of the contextual
-        // type and has the same type (or if the member is a function, then the
-        // same result type) as the contextual type.
-        FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD, DeclVisibilityKind reason) {
-          if (!VD->hasInterfaceType()) {
-            TypeResolver->resolveDeclSignature(VD);
-            if (!VD->hasInterfaceType())
-              return false;
-          }
-
-          auto declTy = VD->getInterfaceType();
-          while (auto FT = declTy->getAs<AnyFunctionType>())
-            declTy = FT->getResult();
-          return declTy->isEqual(T);
-        });
-
-        auto baseType = MetatypeType::get(T);
-        llvm::SaveAndRestore<LookupKind> SaveLook(Kind, LookupKind::ValueExpr);
-        llvm::SaveAndRestore<Type> SaveType(ExprType, baseType);
-        llvm::SaveAndRestore<bool> SaveUnresolved(IsUnresolvedMember, true);
-        lookupVisibleMemberDecls(consumer, baseType, CurrDeclContext,
-                                 TypeResolver.get(),
-                                 /*includeInstanceMembers=*/false);
+      if (!T)
+        continue;
+      if (auto objT = T->getOptionalObjectType()) {
+        // If this is optional type, perform completion for the object type.
+        // i.e. 'let _: Enum??? = .enumMember' is legal.
+        getUnresolvedMemberCompletions(objT->lookThroughAllOptionalTypes());
       }
+      getUnresolvedMemberCompletions(T);
     }
   }
 
@@ -3867,8 +3944,8 @@ public:
           if (seenNames.insert(Param.getLabel()).second)
             ExpectedNames.push_back(Param.getLabel().str());
         } else {
-          if (seenTypes.insert(Param.getType().getPointer()).second)
-            ExpectedTypes.push_back(Param.getType());
+          if (seenTypes.insert(Param.getOldType().getPointer()).second)
+            ExpectedTypes.push_back(Param.getOldType());
         }
       }
     }
@@ -4107,7 +4184,6 @@ public:
       PrintOptions Options;
       if (auto transformType = CurrDeclContext->getDeclaredTypeInContext())
         Options.setBaseType(transformType);
-      Options.PrintDefaultParameterPlaceholder = false;
       Options.PrintImplicitAttrs = false;
       Options.ExclusiveAttrList.push_back(TAK_escaping);
       Options.PrintOverrideKeyword = false;
@@ -4204,7 +4280,6 @@ public:
       PrintOptions Options;
       Options.PrintImplicitAttrs = false;
       Options.SkipAttributes = true;
-      Options.PrintDefaultParameterPlaceholder = false;
       CD->print(OS, Options);
     }
     Builder.addTextChunk(DeclStr);
@@ -4352,8 +4427,6 @@ void CodeCompletionCallbacksImpl::completeDotExpr(Expr *E, SourceLoc DotLoc) {
     return;
 
   Kind = CompletionKind::DotExpr;
-  if (E->getKind() == ExprKind::KeyPath)
-    Kind = CompletionKind::SwiftKeyPath;
   if (ParseExprSelectorContext != ObjCSelectorContext::None) {
     PreferFunctionReferencesToCalls = true;
     CompleteExprSelectorContext = ParseExprSelectorContext;
@@ -4474,9 +4547,11 @@ void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
 }
 
 void CodeCompletionCallbacksImpl::completeExprKeyPath(KeyPathExpr *KPE,
-                                                      bool HasDot) {
-  Kind = HasDot ? CompletionKind::KeyPathExprDot : CompletionKind::KeyPathExpr;
+                                                      SourceLoc DotLoc) {
+  Kind = (!KPE || KPE->isObjC()) ? CompletionKind::KeyPathExprObjC
+                                 : CompletionKind::KeyPathExprSwift;
   ParsedExpr = KPE;
+  this->DotLoc = DotLoc;
   CurDeclContext = P.CurDeclContext;
 }
 
@@ -4604,12 +4679,22 @@ void CodeCompletionCallbacksImpl::completeYieldStmt(CodeCompletionExpr *E,
   Kind = CompletionKind::YieldStmtExpr;
 }
 
-void CodeCompletionCallbacksImpl::completeAfterPound(CodeCompletionExpr *E,
-                                                     StmtKind ParentKind) {
+void CodeCompletionCallbacksImpl::completeAfterPoundExpr(
+    CodeCompletionExpr *E, Optional<StmtKind> ParentKind) {
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = E;
-  Kind = CompletionKind::AfterPound;
+  Kind = CompletionKind::AfterPoundExpr;
   ParentStmtKind = ParentKind;
+}
+
+void CodeCompletionCallbacksImpl::completeAfterPoundDirective() {
+  CurDeclContext = P.CurDeclContext;
+  Kind = CompletionKind::AfterPoundDirective;
+}
+
+void CodeCompletionCallbacksImpl::completePlatformCondition() {
+  CurDeclContext = P.CurDeclContext;
+  Kind = CompletionKind::PlatformConditon;
 }
 
 void CodeCompletionCallbacksImpl::completeAfterIfStmt(bool hasElse) {
@@ -4735,11 +4820,12 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::Import:
   case CompletionKind::UnresolvedMember:
   case CompletionKind::CallArg:
-  case CompletionKind::AfterPound:
+  case CompletionKind::AfterPoundExpr:
+  case CompletionKind::AfterPoundDirective:
+  case CompletionKind::PlatformConditon:
   case CompletionKind::GenericParams:
-  case CompletionKind::KeyPathExpr:
-  case CompletionKind::KeyPathExprDot:
-  case CompletionKind::SwiftKeyPath:
+  case CompletionKind::KeyPathExprObjC:
+  case CompletionKind::KeyPathExprSwift:
     break;
 
   case CompletionKind::StmtOrExpr:
@@ -4802,6 +4888,121 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::AfterIfStmtElse:
     addKeyword(Sink, "if", CodeCompletionKeywordKind::kw_if);
     break;
+  }
+}
+
+static void addPoundDirectives(CodeCompletionResultSink &Sink) {
+  auto addWithName =
+      [&](StringRef name, CodeCompletionKeywordKind K,
+          llvm::function_ref<void(CodeCompletionResultBuilder &)> consumer =
+              nullptr) {
+        CodeCompletionResultBuilder Builder(Sink, CodeCompletionResult::Keyword,
+                                            SemanticContextKind::None, {});
+        Builder.addTextChunk(name);
+        Builder.setKeywordKind(K);
+        if (consumer)
+          consumer(Builder);
+      };
+
+  addWithName("sourceLocation", CodeCompletionKeywordKind::pound_sourceLocation,
+              [&] (CodeCompletionResultBuilder &Builder) {
+    Builder.addLeftParen();
+    Builder.addTextChunk("file");
+    Builder.addCallParameterColon();
+    Builder.addSimpleTypedParameter("String");
+    Builder.addComma();
+    Builder.addTextChunk("line");
+    Builder.addCallParameterColon();
+    Builder.addSimpleTypedParameter("Int");
+    Builder.addRightParen();
+  });
+  addWithName("warning", CodeCompletionKeywordKind::pound_warning,
+              [&] (CodeCompletionResultBuilder &Builder) {
+    Builder.addLeftParen();
+    Builder.addTextChunk("\"");
+    Builder.addSimpleNamedParameter("message");
+    Builder.addTextChunk("\"");
+    Builder.addRightParen();
+  });
+  addWithName("error", CodeCompletionKeywordKind::pound_error,
+              [&] (CodeCompletionResultBuilder &Builder) {
+    Builder.addLeftParen();
+    Builder.addTextChunk("\"");
+    Builder.addSimpleNamedParameter("message");
+    Builder.addTextChunk("\"");
+    Builder.addRightParen();
+  });
+
+  addWithName("if ", CodeCompletionKeywordKind::pound_if,
+              [&] (CodeCompletionResultBuilder &Builder) {
+    Builder.addSimpleNamedParameter("condition");
+  });
+
+  // FIXME: These directives are only valid in conditional completion block.
+  addWithName("elseif ", CodeCompletionKeywordKind::pound_elseif,
+              [&] (CodeCompletionResultBuilder &Builder) {
+    Builder.addSimpleNamedParameter("condition");
+  });
+  addWithName("else", CodeCompletionKeywordKind::pound_else);
+  addWithName("endif", CodeCompletionKeywordKind::pound_endif);
+}
+
+/// Add platform conditions used in '#if' and '#elseif' directives.
+static void addPlatformConditions(CodeCompletionResultSink &Sink) {
+  auto addWithName =
+      [&](StringRef Name,
+          llvm::function_ref<void(CodeCompletionResultBuilder & Builder)>
+              consumer) {
+        CodeCompletionResultBuilder Builder(
+            Sink, CodeCompletionResult::ResultKind::Pattern,
+            SemanticContextKind::ExpressionSpecific, {});
+        Builder.addTextChunk(Name);
+        Builder.addLeftParen();
+        consumer(Builder);
+        Builder.addRightParen();
+      };
+  addWithName("os", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addSimpleNamedParameter("name");
+  });
+  addWithName("arch", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addSimpleNamedParameter("name");
+  });
+  addWithName("canImport", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addSimpleNamedParameter("module");
+  });
+  addWithName("targetEnvironment", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addTextChunk("simulator");
+  });
+  addWithName("swift", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addTextChunk(">=");
+    Builder.addSimpleNamedParameter("version");
+  });
+  addWithName("swift", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addTextChunk("<");
+    Builder.addSimpleNamedParameter("version");
+  });
+  addWithName("compiler", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addTextChunk(">=");
+    Builder.addSimpleNamedParameter("version");
+  });
+  addWithName("compiler", [](CodeCompletionResultBuilder &Builder) {
+    Builder.addTextChunk("<");
+    Builder.addSimpleNamedParameter("version");
+  });
+
+  addKeyword(Sink, "true", CodeCompletionKeywordKind::kw_true, "Bool");
+  addKeyword(Sink, "false", CodeCompletionKeywordKind::kw_false, "Bool");
+}
+
+/// Add flags specified by '-D' to completion results.
+static void addConditionalCompilationFlags(ASTContext &Ctx,
+                                           CodeCompletionResultSink &Sink) {
+  for (auto Flag : Ctx.LangOpts.getCustomConditionalCompilationFlags()) {
+    // TODO: Should we filter out some flags?
+    CodeCompletionResultBuilder Builder(
+        Sink, CodeCompletionResult::ResultKind::Keyword,
+        SemanticContextKind::ExpressionSpecific, {});
+    Builder.addTextChunk(Flag);
   }
 }
 
@@ -5135,8 +5336,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
     if (!ExprType && Kind != CompletionKind::PostfixExprParen &&
         Kind != CompletionKind::CallArg &&
-        Kind != CompletionKind::KeyPathExpr &&
-        Kind != CompletionKind::KeyPathExprDot)
+        Kind != CompletionKind::KeyPathExprObjC)
       return;
   }
 
@@ -5190,17 +5390,32 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
-  case CompletionKind::SwiftKeyPath: {
-    Lookup.setHaveDot(DotLoc);
-    Lookup.setIsSwiftKeyPathExpr();
-    if (auto BGT = (*ExprType)->getAs<BoundGenericType>()) {
-      auto AllArgs = BGT->getGenericArgs();
-      if (AllArgs.size() == 2) {
-        // The second generic type argument of KeyPath<Root, Value> should be
-        // the value we pull code completion results from.
-        Lookup.getValueExprCompletions(AllArgs[1]);
-      }
+  case CompletionKind::KeyPathExprSwift: {
+    auto KPE = dyn_cast<KeyPathExpr>(ParsedExpr);
+    auto BGT = (*ExprType)->getAs<BoundGenericType>();
+    if (!KPE || !BGT || BGT->getGenericArgs().size() != 2)
+      break;
+    assert(!KPE->isObjC());
+
+    if (DotLoc.isValid())
+      Lookup.setHaveDot(DotLoc);
+
+    bool OnRoot = !KPE->getComponents().front().isValid();
+    Lookup.setIsSwiftKeyPathExpr(OnRoot);
+
+    auto ParsedType = BGT->getGenericArgs()[1];
+    auto Components = KPE->getComponents();
+    if (Components.back().getKind() ==
+        KeyPathExpr::Component::Kind::OptionalWrap) {
+      // KeyPath expr with '?' (e.g. '\Ty.[0].prop?.another').
+      // Althogh expected type is optional, we should unwrap it because it's
+      // unwrapped.
+      ParsedType = ParsedType->getOptionalObjectType();
     }
+
+    // The second generic type argument of KeyPath<Root, Value> should be
+    // the value we pull code completion results from.
+    Lookup.getValueExprCompletions(ParsedType);
     break;
   }
 
@@ -5276,11 +5491,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
-  case CompletionKind::KeyPathExprDot:
-    Lookup.setHaveDot(SourceLoc());
-    LLVM_FALLTHROUGH;
-
-  case CompletionKind::KeyPathExpr: {
+  case CompletionKind::KeyPathExprObjC: {
+    if (DotLoc.isValid())
+      Lookup.setHaveDot(DotLoc);
     Lookup.setIsKeyPathExpr();
     Lookup.includeInstanceMembers();
 
@@ -5399,10 +5612,24 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
 
-  case CompletionKind::AfterPound: {
+  case CompletionKind::AfterPoundExpr: {
     Lookup.addPoundAvailable(ParentStmtKind);
     Lookup.addPoundSelector(/*needPound=*/false);
     Lookup.addPoundKeyPath(/*needPound=*/false);
+    break;
+  }
+
+  case CompletionKind::AfterPoundDirective: {
+    addPoundDirectives(CompletionContext.getResultSink());
+    // FIXME: Add pound expressions (e.g. '#selector()') if it's at statements
+    // position.
+    break;
+  }
+
+  case CompletionKind::PlatformConditon: {
+    addPlatformConditions(CompletionContext.getResultSink());
+    addConditionalCompilationFlags(CurDeclContext->getASTContext(),
+                                   CompletionContext.getResultSink());
     break;
   }
 

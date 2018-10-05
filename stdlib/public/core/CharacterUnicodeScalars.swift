@@ -49,7 +49,7 @@ extension Character.UnicodeScalarView.Iterator : IteratorProtocol {
 
 extension Character.UnicodeScalarView : Sequence {
   @inlinable // FIXME(sil-serialize-all)
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_base: IndexingIterator(_elements: self))
   }
 }

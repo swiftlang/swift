@@ -315,13 +315,11 @@ public:
 
   /// Substitute the conforming type and produce a ProtocolConformance that
   /// applies to the substituted type.
-  ProtocolConformance *subst(Type substType,
-                             SubstitutionMap subMap) const;
+  ProtocolConformance *subst(SubstitutionMap subMap) const;
 
   /// Substitute the conforming type and produce a ProtocolConformance that
   /// applies to the substituted type.
-  ProtocolConformance *subst(Type substType,
-                             TypeSubstitutionFn subs,
+  ProtocolConformance *subst(TypeSubstitutionFn subs,
                              LookupConformanceFn conformances) const;
 
   void dump() const;
@@ -417,7 +415,6 @@ class NormalProtocolConformance : public ProtocolConformance,
   {
     assert(!conformingType->hasArchetype() &&
            "ProtocolConformances should store interface types");
-    differenceAndStoreConditionalRequirements();
   }
 
   NormalProtocolConformance(Type conformingType,
@@ -430,7 +427,6 @@ class NormalProtocolConformance : public ProtocolConformance,
   {
     assert(!conformingType->hasArchetype() &&
            "ProtocolConformances should store interface types");
-    differenceAndStoreConditionalRequirements();
   }
 
   void resolveLazyInfo() const;

@@ -10,24 +10,24 @@ import Builtin
 // CHECK: begin_borrow [[ARG2]]
 // CHECK: [[MEM:%.*]] = alloc_stack $Builtin.NativeObject
 // CHECK: store_borrow [[ARG2]] to [[MEM]] : $*Builtin.NativeObject
-// CHECK: end_borrow [[ARG1]] from [[ARG2]] : $*Builtin.NativeObject, $Builtin.NativeObject
-// CHECK: end_borrow [[ARG2]] from [[ARG1]] : $Builtin.NativeObject, $*Builtin.NativeObject
-// CHECK: end_borrow [[ARG1]] from [[ARG1]] : $*Builtin.NativeObject, $*Builtin.NativeObject
-// CHECK: end_borrow [[ARG2]] from [[ARG2]] : $Builtin.NativeObject, $Builtin.NativeObject
+// CHECK: end_borrow [[ARG1]] : $*Builtin.NativeObject
+// CHECK: end_borrow [[ARG2]] : $Builtin.NativeObject
+// CHECK: end_borrow [[ARG1]] : $*Builtin.NativeObject
+// CHECK: end_borrow [[ARG2]] : $Builtin.NativeObject
 sil @borrow_test : $@convention(thin) (@in Builtin.NativeObject, Builtin.NativeObject) -> () {
 bb0(%0 : @trivial $*Builtin.NativeObject, %1 : @unowned $Builtin.NativeObject):
   %2 = begin_borrow %1 : $Builtin.NativeObject
-  end_borrow %2 from %1 : $Builtin.NativeObject, $Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
 
   %3 = alloc_stack $Builtin.NativeObject
   store_borrow %1 to %3 : $*Builtin.NativeObject
-  end_borrow %3 from %1 : $*Builtin.NativeObject, $Builtin.NativeObject
+  end_borrow %3 : $*Builtin.NativeObject
   dealloc_stack %3 : $*Builtin.NativeObject
 
-  end_borrow %0 from %1 : $*Builtin.NativeObject, $Builtin.NativeObject
-  end_borrow %1 from %0 : $Builtin.NativeObject, $*Builtin.NativeObject
-  end_borrow %0 from %0 : $*Builtin.NativeObject, $*Builtin.NativeObject
-  end_borrow %1 from %1 : $Builtin.NativeObject, $Builtin.NativeObject
+  end_borrow %0 : $*Builtin.NativeObject
+  end_borrow %1 : $Builtin.NativeObject
+  end_borrow %0 : $*Builtin.NativeObject
+  end_borrow %1 : $Builtin.NativeObject
   %4 = tuple()
   return %4 : $()
 }
