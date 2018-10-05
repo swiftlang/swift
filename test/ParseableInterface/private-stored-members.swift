@@ -1,16 +1,16 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck -emit-interface-path %t.swiftinterface %s
+// RUN: %target-swift-frontend -typecheck -emit-parseable-module-interface-path %t.swiftinterface %s
 // RUN: %FileCheck %s < %t.swiftinterface --check-prefix CHECK --check-prefix COMMON
 
-// RUN: %target-swift-frontend -typecheck -emit-interface-path %t-resilient.swiftinterface -enable-resilience %s
+// RUN: %target-swift-frontend -typecheck -emit-parseable-module-interface-path %t-resilient.swiftinterface -enable-resilience %s
 // RUN: %FileCheck %s --check-prefix RESILIENT --check-prefix COMMON < %t-resilient.swiftinterface
 
 // RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule %t.swiftinterface -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -module-name Test -emit-interface-path - | %FileCheck %s --check-prefix CHECK --check-prefix COMMON
+// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -module-name Test -emit-parseable-module-interface-path - | %FileCheck %s --check-prefix CHECK --check-prefix COMMON
 
 // RUN: %target-swift-frontend -emit-module -o %t/TestResilient.swiftmodule -enable-resilience %t.swiftinterface -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/TestResilient.swiftmodule -module-name TestResilient -enable-resilience -emit-interface-path - | %FileCheck %s --check-prefix RESILIENT --check-prefix COMMON
+// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/TestResilient.swiftmodule -module-name TestResilient -enable-resilience -emit-parseable-module-interface-path - | %FileCheck %s --check-prefix RESILIENT --check-prefix COMMON
 
 
 // COMMON: struct MyStruct {{{$}}

@@ -1494,7 +1494,8 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     OI.ShouldTreatModuleAsTopLevelOutput = false;
   } else if (Args.hasArg(options::OPT_emit_objc_header,
                          options::OPT_emit_objc_header_path,
-                         options::OPT_experimental_emit_interface) &&
+                         options::OPT_emit_parseable_module_interface,
+                         options::OPT_emit_parseable_module_interface_path) &&
              OI.CompilerMode != OutputInfo::Mode::SingleCompile) {
     // An option has been passed which requires whole-module knowledge, but we
     // don't have that. Generate a module, but treat it as an intermediate
@@ -2473,7 +2474,8 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     chooseSwiftModuleDocOutputPath(C, OutputMap, workingDirectory,
                                    Output.get());
 
-  if (C.getArgs().hasArg(options::OPT_experimental_emit_interface))
+  if (C.getArgs().hasArg(options::OPT_emit_parseable_module_interface,
+                         options::OPT_emit_parseable_module_interface_path))
     chooseParseableInterfacePath(C, JA, workingDirectory, Buf, Output.get());
 
   if (C.getArgs().hasArg(options::OPT_update_code) && isa<CompileJobAction>(JA))
@@ -2773,9 +2775,9 @@ void Driver::chooseRemappingOutputPath(Compilation &C,
 }
 
 void Driver::chooseParseableInterfacePath(Compilation &C, const JobAction *JA,
-                                        StringRef workingDirectory,
-                                        llvm::SmallString<128> &buffer,
-                                        CommandOutput *output) const {
+                                          StringRef workingDirectory,
+                                          llvm::SmallString<128> &buffer,
+                                          CommandOutput *output) const {
   switch (C.getOutputInfo().CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::BatchModeCompile:
@@ -2792,9 +2794,10 @@ void Driver::chooseParseableInterfacePath(Compilation &C, const JobAction *JA,
   }
 
   StringRef outputPath = *getOutputFilenameFromPathArgOrAsTopLevel(
-        C.getOutputInfo(), C.getArgs(), llvm::opt::OptSpecifier(),
-        file_types::TY_SwiftModuleInterfaceFile,
-        /*TreatAsTopLevelOutput*/true, workingDirectory, buffer);
+      C.getOutputInfo(), C.getArgs(),
+      options::OPT_emit_parseable_module_interface_path,
+      file_types::TY_SwiftModuleInterfaceFile,
+      /*TreatAsTopLevelOutput*/true, workingDirectory, buffer);
   output->setAdditionalOutputForType(file_types::TY_SwiftModuleInterfaceFile,
                                      outputPath);
 }

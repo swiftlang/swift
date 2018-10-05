@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -emit-interface-path %t.swiftinterface %s
+// RUN: %target-swift-frontend -typecheck -emit-parseable-module-interface-path %t.swiftinterface %s
 // RUN: %FileCheck %s < %t.swiftinterface
 // RUN: %FileCheck -check-prefix NEGATIVE %s < %t.swiftinterface
 

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o /dev/null -disable-objc-attr-requires-foundation-module -enable-objc-interop -emit-interface-path %t/dynamic_accessors.swiftinterface %s
+// RUN: %target-swift-frontend -emit-module -o /dev/null -disable-objc-attr-requires-foundation-module -enable-objc-interop -emit-parseable-module-interface-path %t/dynamic_accessors.swiftinterface %s
 // RUN: %target-swift-emit-silgen -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-silgen -disable-objc-attr-requires-foundation-module -enable-objc-interop %t/dynamic_accessors.swiftinterface | %FileCheck %s
 
