@@ -1023,6 +1023,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.EnableResilienceBypass = true;
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_read_type_info_path_EQ)) {
+    Opts.ReadTypeInfoPath = A->getValue();
+  }
+
   for (const auto &Lib : Args.getAllArgValues(options::OPT_autolink_library))
     Opts.LinkLibraries.push_back(LinkLibrary(Lib, LibraryKind::Library));
 

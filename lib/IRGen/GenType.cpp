@@ -29,6 +29,7 @@
 #include "clang/CodeGen/SwiftCallingConv.h"
 
 #include "EnumPayload.h"
+#include "LegacyLayoutFormat.h"
 #include "LoadableTypeInfo.h"
 #include "GenMeta.h"
 #include "GenProto.h"
@@ -56,16 +57,10 @@ Alignment IRGenModule::getCappedAlignment(Alignment align) {
 }
 
 llvm::DenseMap<TypeBase *, const TypeInfo *> &
-TypeConverter::Types_t::getCacheFor(bool isDependent, bool completelyFragile) {
-  if (completelyFragile) {
-    return (isDependent
-            ? FragileDependentCache
-            : FragileIndependentCache);
-  }
-
+TypeConverter::Types_t::getCacheFor(bool isDependent, TypeConverter::Mode mode) {
   return (isDependent
-          ? DependentCache
-          : IndependentCache);
+          ? DependentCache[unsigned(mode)]
+          : IndependentCache[unsigned(mode)]);
 }
 
 void TypeInfo::assign(IRGenFunction &IGF, Address dest, Address src,
@@ -1071,6 +1066,54 @@ TypeConverter::createImmovable(llvm::Type *type, Size size, Alignment align) {
 
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
 
+bool TypeConverter::readLegacyTypeInfo(StringRef path) {
+  auto fileOrErr = llvm::MemoryBuffer::getFile(path);
+  if (!fileOrErr)
+    return true;
+
+  auto file = std::move(fileOrErr.get());
+
+  llvm::yaml::Input yin(file->getBuffer());
+
+  // Read the document list.
+  std::vector<YAMLModuleNode> modules;
+  yin >> modules;
+
+  if (yin.error())
+    return true;
+
+  for (auto &module : modules) {
+    for (auto &decl : module.Decls) {
+      auto result = LegacyTypeInfos.insert(std::make_pair(
+                                             decl.Name,
+                                             decl));
+      assert(result.second);
+      (void) result;
+    }
+  }
+
+  return false;
+}
+
+static std::string mangleTypeAsContext(const NominalTypeDecl *decl) {
+  Mangle::ASTMangler Mangler;
+  return Mangler.mangleTypeAsContextUSR(decl);
+}
+
+Optional<YAMLTypeInfoNode>
+TypeConverter::getLegacyTypeInfo(NominalTypeDecl *decl) const {
+  auto &mangledName = const_cast<TypeConverter *>(this)->DeclMangledNames[decl];
+  if (mangledName.empty())
+    mangledName = mangleTypeAsContext(decl);
+  assert(!mangledName.empty());
+
+  auto found = LegacyTypeInfos.find(mangledName);
+  if (found == LegacyTypeInfos.end())
+    return None;
+
+  return found->second;
+}
+
 TypeConverter::TypeConverter(IRGenModule &IGM)
   : IGM(IGM),
     FirstType(invalidTypeInfo()) {
@@ -1080,7 +1123,15 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   // sync with the binary module. Once LLDB can calculate type layouts at
   // runtime (using remote mirrors or some other mechanism), we can remove this.
   if (IGM.IRGen.Opts.EnableResilienceBypass)
-    CompletelyFragile = true;
+    LoweringMode = Mode::CompletelyFragile;
+
+  StringRef path = IGM.IRGen.Opts.ReadTypeInfoPath;
+  if (!path.empty()) {
+    bool error = readLegacyTypeInfo(path);
+    if (error) {
+      llvm::report_fatal_error("Cannot read '" + path + "'");
+    }
+  }
 }
 
 TypeConverter::~TypeConverter() {
@@ -1102,8 +1153,9 @@ void TypeConverter::pushGenericContext(CanGenericSignature signature) {
 
   // Clear the dependent type info cache since we have a new active signature
   // now.
-  Types.getCacheFor(/*isDependent*/ true, /*isFragile*/ false).clear();
-  Types.getCacheFor(/*isDependent*/ true, /*isFragile*/ true).clear();
+  Types.getCacheFor(/*isDependent*/ true, Mode::Normal).clear();
+  Types.getCacheFor(/*isDependent*/ true, Mode::Legacy).clear();
+  Types.getCacheFor(/*isDependent*/ true, Mode::CompletelyFragile).clear();
 }
 
 void TypeConverter::popGenericContext(CanGenericSignature signature) {
@@ -1113,8 +1165,9 @@ void TypeConverter::popGenericContext(CanGenericSignature signature) {
   // Pop the SIL TypeConverter's generic context too.
   IGM.getSILTypes().popGenericContext(signature);
   
-  Types.getCacheFor(/*isDependent*/ true, /*isFragile*/ false).clear();
-  Types.getCacheFor(/*isDependent*/ true, /*isFragile*/ true).clear();
+  Types.getCacheFor(/*isDependent*/ true, Mode::Normal).clear();
+  Types.getCacheFor(/*isDependent*/ true, Mode::Legacy).clear();
+  Types.getCacheFor(/*isDependent*/ true, Mode::CompletelyFragile).clear();
 }
 
 GenericEnvironment *TypeConverter::getGenericEnvironment() {
@@ -1131,7 +1184,7 @@ GenericEnvironment *IRGenModule::getGenericEnvironment() {
 void TypeConverter::addForwardDecl(TypeBase *key) {
   assert(key->isCanonical());
   assert(!key->hasTypeParameter());
-  auto &Cache = Types.getCacheFor(/*isDependent*/ false, CompletelyFragile);
+  auto &Cache = Types.getCacheFor(/*isDependent*/ false, LoweringMode);
   auto result = Cache.insert(std::make_pair(key, nullptr));
   assert(result.second && "entry already exists for type!");
   (void) result;
@@ -1409,20 +1462,10 @@ CanType TypeConverter::getExemplarType(CanType contextTy) {
   }
 }
 
-void TypeConverter::pushCompletelyFragile() {
-  assert(!CompletelyFragile);
-  CompletelyFragile = true;
-}
-
-void TypeConverter::popCompletelyFragile() {
-  assert(CompletelyFragile);
-  CompletelyFragile = false;
-}
-
 const TypeInfo *TypeConverter::getTypeEntry(CanType canonicalTy) {
   // Cache this entry in the dependent or independent cache appropriate to it.
   auto &Cache = Types.getCacheFor(canonicalTy->hasTypeParameter(),
-                                  CompletelyFragile);
+                                  LoweringMode);
 
   {
     auto it = Cache.find(canonicalTy.getPointer());
@@ -1447,7 +1490,7 @@ const TypeInfo *TypeConverter::getTypeEntry(CanType canonicalTy) {
   
   // See whether we lowered a type equivalent to this one.
   if (exemplarTy != canonicalTy) {
-    auto &Cache = Types.getCacheFor(/*isDependent*/ false, CompletelyFragile);
+    auto &Cache = Types.getCacheFor(/*isDependent*/ false, LoweringMode);
     auto it = Cache.find(exemplarTy.getPointer());
     if (it != Cache.end()) {
       // Record the object under the original type.
@@ -1469,7 +1512,7 @@ const TypeInfo *TypeConverter::getTypeEntry(CanType canonicalTy) {
   insertEntry(Cache[canonicalTy.getPointer()]);
   if (canonicalTy != exemplarTy) {
     auto &IndependentCache = Types.getCacheFor(/*isDependent*/ false,
-                                               CompletelyFragile);
+                                               LoweringMode);
     insertEntry(IndependentCache[exemplarTy.getPointer()]);
   }
   
@@ -1809,10 +1852,93 @@ static bool isIRTypeDependent(IRGenModule &IGM, NominalTypeDecl *decl) {
   }
 }
 
+namespace {
+
+class LegacyTypeInfo : public FixedTypeInfo {
+  unsigned NumExtraInhabitants;
+
+public:
+  LegacyTypeInfo(llvm::Type *type, const SpareBitVector &spareBits,
+                 const YAMLTypeInfoNode &node)
+    : FixedTypeInfo(type,
+                    Size(node.Size),
+                    spareBits,
+                    Alignment(node.Alignment),
+                    IsNotPOD, /* irrelevant */
+                    IsNotBitwiseTakable, /* irrelevant */
+                    IsFixedSize /* irrelevant */),
+      NumExtraInhabitants(node.NumExtraInhabitants) {}
+
+  virtual unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+    return NumExtraInhabitants;
+  }
+
+  virtual APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
+    llvm_unreachable("TypeConverter::Mode::Legacy is not for real values");
+  }
+
+  virtual APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                             unsigned bits,
+                                             unsigned index) const override {
+    llvm_unreachable("TypeConverter::Mode::Legacy is not for real values");
+  }
+
+  virtual void getSchema(ExplosionSchema &schema) const override {
+    llvm_unreachable("TypeConverter::Mode::Legacy is not for real values");
+  }
+
+  virtual void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                              SILType T, bool isOutlined) const override {
+    llvm_unreachable("TypeConverter::Mode::Legacy is not for real values");
+  }
+
+  virtual void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
+                              SILType T, bool isOutlined) const override {
+    llvm_unreachable("TypeConverter::Mode::Legacy is not for real values");
+  }
+
+  virtual void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
+                                  Address srcAddr, SILType T,
+                                  bool isOutlined) const override {
+    llvm_unreachable("TypeConverter::Mode::Legacy is not for real values");
+  }
+
+  virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                                    Address src, SILType T,
+                                    bool isOutlined) const override {
+    llvm_unreachable("TypeConverter::Mode::Legacy is not for real values");
+  }
+
+  virtual void destroy(IRGenFunction &IGF, Address address, SILType T,
+                       bool isOutlined) const override {
+    llvm_unreachable("TypeConverter::Mode::Legacy is not for real values");
+  }
+};
+
+} // namespace
+
 const TypeInfo *TypeConverter::convertAnyNominalType(CanType type,
                                                      NominalTypeDecl *decl) {
   // By "any", we don't mean existentials.
   assert(!isa<ProtocolDecl>(decl));
+
+  // If we're producing a legacy type layout, and we have a serialized
+  // record for this type, produce it now.
+  if (LoweringMode == Mode::Legacy) {
+    auto node = getLegacyTypeInfo(decl);
+
+    if (node) {
+      Size size(node->Size);
+
+      auto ty = IGM.createNominalType(type);
+      ty->setBody(llvm::ArrayType::get(IGM.Int8Ty, size.getValue()));
+
+      SpareBitVector spareBits;
+      spareBits.appendClearBits(size.getValueInBits());
+
+      return new LegacyTypeInfo(ty, spareBits, *node);
+    }
+  }
 
   // We need to give generic specializations distinct TypeInfo objects
   // if their IR-gen might be different, e.g. if they use different IR
@@ -1849,7 +1975,7 @@ const TypeInfo *TypeConverter::convertAnyNominalType(CanType type,
   assert(decl->getDeclaredType()->isCanonical());
   assert(decl->getDeclaredType()->hasUnboundGenericType());
   TypeBase *key = decl->getDeclaredType().getPointer();
-  auto &Cache = Types.getCacheFor(/*isDependent*/ false, CompletelyFragile);
+  auto &Cache = Types.getCacheFor(/*isDependent*/ false, LoweringMode);
   auto entry = Cache.find(key);
   if (entry != Cache.end())
     return entry->second;
