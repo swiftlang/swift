@@ -25,6 +25,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Module.h"
@@ -3340,12 +3341,58 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
                                           const DefaultArgumentStorage &info,
                                           SmallVectorImpl<ManagedValue> &args,
                                           size_t &argIndex) {
-  auto value = SGF.emitApplyOfDefaultArgGenerator(info.loc,
-                                                  info.defaultArgsOwner,
-                                                  info.destIndex,
-                                                  info.resultType,
-                                                  info.origResultType);
-  
+  RValue value;  
+  bool isStoredPropertyDefaultArg = false;
+
+  // Check if this is a synthesized memberwise constructor for stored property
+  // default values
+  if (auto ctor = dyn_cast<ConstructorDecl>(info.defaultArgsOwner.getDecl())) {
+    if (ctor->isMemberwiseInitializer() && ctor->isImplicit()) {
+      auto param = ctor->getParameters()->get(info.destIndex);
+      
+      if (auto var = param->getStoredProperty()) {
+        // This is a stored property default arg. Do not emit a call to the
+        // default arg generator, but rather the variable initializer expression
+        isStoredPropertyDefaultArg = true;
+
+        auto pbd = var->getParentPatternBinding();
+        auto entry = pbd->getPatternEntryForVarDecl(var);
+
+        SubstitutionMap subs;
+        auto *genericEnv = ctor->getGenericEnvironmentOfContext();
+        auto typeGenericSig = 
+          var->getDeclContext()->getGenericSignatureOfContext();
+
+        if (genericEnv && typeGenericSig) {
+          subs = SubstitutionMap::get(
+            typeGenericSig,
+            [&](SubstitutableType *type) {
+              if (auto gp = type->getAs<GenericTypeParamType>()) {
+                return genericEnv->mapTypeIntoContext(gp);
+              }
+
+              return Type(type);
+            },
+            MakeAbstractConformanceForGenericType());
+        }
+
+        value = SGF.emitApplyOfStoredPropertyInitializer(info.loc,
+                                                         entry, subs,
+                                                         info.resultType,
+                                                         info.origResultType,
+                                                         SGFContext());
+      }
+    }
+  }                      
+
+  if (!isStoredPropertyDefaultArg) {
+    value = SGF.emitApplyOfDefaultArgGenerator(info.loc,
+                                               info.defaultArgsOwner,
+                                               info.destIndex,
+                                               info.resultType,
+                                               info.origResultType);
+  }
+
   SmallVector<ManagedValue, 4> loweredArgs;
   SmallVector<DelayedArgument, 4> delayedArgs;
   Optional<ForeignErrorConvention> errorConvention = None;

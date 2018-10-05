@@ -75,7 +75,8 @@ struct ImplicitConstructors2 {
 
 func testImplicitConstructors2() {
   ImplicitConstructors2#^IMPLICIT_CONSTRUCTORS_2^#
-// IMPLICIT_CONSTRUCTORS_2: Begin completions, 4 items
+// IMPLICIT_CONSTRUCTORS_2: Begin completions, 5 items
+// IMPLICIT_CONSTRUCTORS_2-DAG: Decl[Constructor]/CurrNominal: ()[#ImplicitConstructors2#]{{; name=.+$}}
 // IMPLICIT_CONSTRUCTORS_2-DAG: Decl[Constructor]/CurrNominal: ({#instanceVar: Int#})[#ImplicitConstructors2#]{{; name=.+$}}
 // IMPLICIT_CONSTRUCTORS_2-DAG: Decl[Constructor]/CurrNominal: ()[#ImplicitConstructors2#]{{; name=.+$}}
 // IMPLICIT_CONSTRUCTORS_2-DAG: Keyword[self]/CurrNominal:     .self[#ImplicitConstructors2.Type#]; name=self

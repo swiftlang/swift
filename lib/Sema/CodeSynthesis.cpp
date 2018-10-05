@@ -1655,12 +1655,13 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
                                                   ImplicitConstructorKind ICK) {
   assert(!decl->hasClangNode());
 
-  ASTContext &context = tc.Context;
+  ASTContext &C = tc.Context;
   SourceLoc Loc = decl->getLoc();
   auto accessLevel = AccessLevel::Internal;
 
   // Determine the parameter type of the implicit constructor.
   SmallVector<ParamDecl*, 8> params;
+  SmallVector<DefaultArgumentInitializer *, 8> defaultInits;
   if (ICK == ImplicitConstructorKind::Memberwise) {
     assert(isa<StructDecl>(decl) && "Only struct have memberwise constructor");
 
@@ -1693,28 +1694,64 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       // If var is a lazy property, its value is provided for the underlying
       // storage.  We thus take an optional of the properties type.  We only
       // need to do this because the implicit constructor is added before all
-      // the properties are type checked.  Perhaps init() synth should be moved
+      // the properties are type checked. Perhaps init() synth should be moved
       // later.
       if (var->getAttrs().hasAttribute<LazyAttr>())
         varInterfaceType = OptionalType::get(varInterfaceType);
 
       // Create the parameter.
-      auto *arg = new (context)
+      auto *arg = new (C)
           ParamDecl(VarDecl::Specifier::Default, SourceLoc(), Loc,
                     var->getName(), Loc, var->getName(), decl);
       arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();
       
+      // If this is a var that has a default value, lets assign a default value
+      // to the parameter with the same expression.
+      if (!var->isLet()) {
+        if (auto init = var->getParentInitializer()) {
+          // Give this some bogus context right now, we'll fix it after making
+          // the constructor.
+          auto *initDC = new (C) DefaultArgumentInitializer(
+            arg->getDeclContext(), params.size());
+            
+          defaultInits.push_back(initDC);
+          
+          // Set the default value to the variable. When we emit this in silgen
+          // we're going to call the variable's initializer expression.
+          arg->setStoredProperty(var);
+          arg->setDefaultArgumentKind(DefaultArgumentKind::StoredProperty);
+        }
+      }
+      
+      // Now that we have default values for this synthesized constructor,
+      // if the property is an optional and does not have an initializer,
+      // and is not a let property because it can never be reassigned,
+      // assign nil as the default value.
+      if (var->getType()->getOptionalObjectType() &&
+          var->getParentPatternBinding()->isDefaultInitializable() &&
+          !var->isLet() &&
+          !var->getParentInitializer()) {
+        auto *initDC = new (C) DefaultArgumentInitializer(
+          arg->getDeclContext(), params.size());
+
+        defaultInits.push_back(initDC);
+        
+        auto nil = new (C) NilLiteralExpr(SourceLoc(), /*implicit*/ true);
+        arg->setDefaultValue(nil);
+        arg->setDefaultArgumentKind(DefaultArgumentKind::NilLiteral);
+      }
+      
       params.push_back(arg);
     }
   }
 
-  auto paramList = ParameterList::create(context, params);
+  auto paramList = ParameterList::create(C, params);
   
   // Create the constructor.
-  DeclName name(context, DeclBaseName::createConstructor(), paramList);
+  DeclName name(C, DeclBaseName::createConstructor(), paramList);
   auto *ctor =
-    new (context) ConstructorDecl(name, Loc,
+    new (C) ConstructorDecl(name, Loc,
                                   OTK_None, /*FailabilityLoc=*/SourceLoc(),
                                   /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                                   paramList, /*GenericParams=*/nullptr, decl);
@@ -1722,6 +1759,11 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   // Mark implicit.
   ctor->setImplicit();
   ctor->setAccess(accessLevel);
+
+  // Fix default argument init contexts now that we have a constructor
+  for (auto initDC : defaultInits) {
+    initDC->changeFunction(ctor, paramList);
+  }
 
   if (ICK == ImplicitConstructorKind::Memberwise)
     ctor->setIsMemberwiseInitializer();
@@ -1731,7 +1773,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   // 'override' attribute.
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
     if (classDecl->getSuperclass())
-      ctor->getAttrs().add(new (tc.Context) OverrideAttr(/*IsImplicit=*/true));
+      ctor->getAttrs().add(new (C) OverrideAttr(/*IsImplicit=*/true));
   }
 
   return ctor;

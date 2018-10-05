@@ -305,6 +305,7 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
     case DefaultArgumentKind::EmptyArray: return "[]";
     case DefaultArgumentKind::EmptyDictionary: return "[:]";
     case DefaultArgumentKind::Normal: return "normal";
+    case DefaultArgumentKind::StoredProperty: return "stored property";
   }
 
   llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
