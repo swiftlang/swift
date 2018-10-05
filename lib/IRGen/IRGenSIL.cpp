@@ -2110,9 +2110,9 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         // counterpart in TFLowerGraph.cpp.
 
         // SHAPE_ARRAY_ATTR is a pseudo-attribute used by the compiler's
-        // partitioning and graph lowering passes to propagate shape info for
-        // XLA compilation (e.g. feed shape info to infeed / outfeed ops), and
-        // will not be lowered into this graph op itself.
+        // partitioning and graph lowering passes (in graph mode) to propagate
+        // shape info for XLA compilation (e.g. feed shape info to infeed /
+        // outfeed ops), and is not relevant to eager execution.
         if (isShapeArrayPseudoAttr(attrName, attr.value))
           break;
 
