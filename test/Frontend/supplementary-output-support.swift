@@ -25,6 +25,6 @@
 // RESOLVE_IMPORTS_NO_OBJC_HEADER: error: this mode does not support emitting Objective-C headers{{$}}
 
 // RUN: not %target-swift-frontend -parse -emit-interface-path %t %s 2>&1 | %FileCheck -check-prefix=PARSE_NO_INTERFACE %s
-// PARSE_NO_INTERFACE: error: this mode does not support emitting textual interface files{{$}}
+// PARSE_NO_INTERFACE: error: this mode does not support emitting parseable interface files{{$}}
 // RUN: not %target-swift-frontend -emit-silgen -emit-interface-path %t %s 2>&1 | %FileCheck -check-prefix=SILGEN_NO_INTERFACE %s
-// SILGEN_NO_INTERFACE: error: this mode does not support emitting textual interface files{{$}}
+// SILGEN_NO_INTERFACE: error: this mode does not support emitting parseable interface files{{$}}

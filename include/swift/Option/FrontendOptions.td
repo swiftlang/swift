@@ -65,7 +65,7 @@ def emit_fixits_path
 
 def emit_interface_path
   : Separate<["-"], "emit-interface-path">, MetaVarName<"<path>">,
-    HelpText<"Output textual interface file to <path>">;
+    HelpText<"Output parseable interface file to <path>">;
 
 def tbd_install_name
   : Separate<["-"], "tbd-install_name">, MetaVarName<"<path>">,

@@ -2474,7 +2474,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                                    Output.get());
 
   if (C.getArgs().hasArg(options::OPT_experimental_emit_interface))
-    chooseTextualInterfacePath(C, JA, workingDirectory, Buf, Output.get());
+    chooseParseableInterfacePath(C, JA, workingDirectory, Buf, Output.get());
 
   if (C.getArgs().hasArg(options::OPT_update_code) && isa<CompileJobAction>(JA))
     chooseRemappingOutputPath(C, OutputMap, Output.get());
@@ -2772,7 +2772,7 @@ void Driver::chooseRemappingOutputPath(Compilation &C,
   }
 }
 
-void Driver::chooseTextualInterfacePath(Compilation &C, const JobAction *JA,
+void Driver::chooseParseableInterfacePath(Compilation &C, const JobAction *JA,
                                         StringRef workingDirectory,
                                         llvm::SmallString<128> &buffer,
                                         CommandOutput *output) const {

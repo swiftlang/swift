@@ -435,10 +435,10 @@ bool FrontendInputsAndOutputs::hasModuleDocOutputPath() const {
         return outs.ModuleDocOutputPath;
       });
 }
-bool FrontendInputsAndOutputs::hasModuleInterfaceOutputPath() const {
+bool FrontendInputsAndOutputs::hasParseableInterfaceOutputPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {
-        return outs.ModuleInterfaceOutputPath;
+        return outs.ParseableInterfaceOutputPath;
       });
 }
 bool FrontendInputsAndOutputs::hasTBDPath() const {
