@@ -340,7 +340,7 @@ internal func _merge<Element>(
   high: UnsafeMutablePointer<Element>,
   buffer: UnsafeMutablePointer<Element>,
   by areInIncreasingOrder: (Element, Element) throws -> Bool
-) rethrows {
+) rethrows -> Bool {
   let lowCount = mid - low
   let highCount = high - mid
   
@@ -434,6 +434,8 @@ internal func _merge<Element>(
       }
     }
   }
+
+  return true
 }
 
 /// Calculates an optimal minimum run length for sorting a collection.
@@ -512,13 +514,13 @@ extension UnsafeMutableBufferPointer {
     at i: Int,
     buffer: UnsafeMutablePointer<Element>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
-  ) rethrows {
+  ) rethrows -> Bool {
     _sanityCheck(runs[i - 1].upperBound == runs[i].lowerBound)
     let low = runs[i - 1].lowerBound
     let middle = runs[i].lowerBound
     let high = runs[i].upperBound
     
-    try _merge(
+    let result = try _merge(
       low: baseAddress! + low,
       mid: baseAddress! + middle,
       high: baseAddress! + high,
@@ -527,6 +529,7 @@ extension UnsafeMutableBufferPointer {
     
     runs[i - 1] = low..<high
     runs.remove(at: i)
+    return result
   }
   
   /// Merges upper elements of `runs` until the required invariants are
@@ -541,7 +544,7 @@ extension UnsafeMutableBufferPointer {
     _ runs: inout [Range<Index>],
     buffer: UnsafeMutablePointer<Element>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
-  ) rethrows {
+  ) rethrows -> Bool {
     // The invariants for the `runs` array are:
     // (a) - for all i in 2..<runs.count:
     //         - runs[i - 2].count > runs[i - 1].count + runs[i].count
@@ -562,6 +565,8 @@ extension UnsafeMutableBufferPointer {
     // If W > X + Y, X > Y + Z, and Y > Z, then the invariants are satisfied
     // for the entirety of `runs`.
     
+    var result = true
+
     // The invariant is always in place for a single element.
     while runs.count > 1 {
       var lastIndex = runs.count - 1
@@ -593,9 +598,11 @@ extension UnsafeMutableBufferPointer {
       }
       
       // Merge the runs at `i` and `i - 1`.
-      try _mergeRuns(
+      result = try result && _mergeRuns(
         &runs, at: lastIndex, buffer: buffer, by: areInIncreasingOrder)
     }
+
+    return result
   }
   
   /// Merges elements of `runs` until only one run remains.
@@ -609,11 +616,13 @@ extension UnsafeMutableBufferPointer {
     _ runs: inout [Range<Index>],
     buffer: UnsafeMutablePointer<Element>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
-  ) rethrows {
+  ) rethrows -> Bool {
+    var result = true
     while runs.count > 1 {
-      try _mergeRuns(
+      result = try result && _mergeRuns(
         &runs, at: runs.count - 1, buffer: buffer, by: areInIncreasingOrder)
     }
+    return result
   }
   
   /// Sorts the elements of this buffer according to `areInIncreasingOrder`,
@@ -631,7 +640,9 @@ extension UnsafeMutableBufferPointer {
         within: startIndex..<endIndex, by: areInIncreasingOrder)
       return
     }
-    
+
+    var result = true
+
     // Use array's allocating initializer to create a temporary buffer---this
     // keeps the buffer allocation going through the same tail-allocated path
     // as other allocating methods.
@@ -663,15 +674,17 @@ extension UnsafeMutableBufferPointer {
         // Append this run and merge down as needed to maintain the `runs`
         // invariants.
         runs.append(start..<end)
-        try _mergeTopRuns(
+        result = try result && _mergeTopRuns(
           &runs, buffer: buffer.baseAddress!, by: areInIncreasingOrder)
         start = end
       }
       
-      try _finalizeRuns(
+      result = try result && _finalizeRuns(
         &runs, buffer: buffer.baseAddress!, by: areInIncreasingOrder)
       assert(runs.count == 1, "Didn't complete final merge")
     }
+
+    if !result { fatalError() }
   }
 }
 
