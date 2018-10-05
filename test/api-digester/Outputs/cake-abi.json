@@ -803,7 +803,9 @@
             "HasInitialValue"
           ],
           "fixedbinaryorder": 1,
-          "hasStorage": true
+          "hasStorage": true,
+          "hasDidset": true,
+          "hasWillset": true
         },
         {
           "kind": "Var",

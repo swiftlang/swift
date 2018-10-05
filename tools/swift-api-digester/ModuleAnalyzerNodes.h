@@ -497,6 +497,8 @@ class SDKNodeDeclVar : public SDKNodeDecl {
   Optional<uint8_t> FixedBinaryOrder;
   bool IsLet;
   bool HasStorage;
+  bool HasDidSet;
+  bool HasWillSet;
 public:
   SDKNodeDeclVar(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
@@ -509,6 +511,8 @@ public:
   void jsonize(json::Output &Out) override;
   void diagnose(SDKNode *Right) override;
   bool hasStorage() const { return HasStorage; }
+  bool hasDidSet() const { return HasDidSet; }
+  bool hasWillSet() const { return HasWillSet; }
 };
 
 class SDKNodeDeclAbstractFunc : public SDKNodeDecl {
@@ -532,6 +536,8 @@ public:
 class SDKNodeDeclSubscript: public SDKNodeDeclAbstractFunc {
   bool HasSetter;
   bool HasStorage;
+  bool HasDidSet;
+  bool HasWillSet;
 public:
   SDKNodeDeclSubscript(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
@@ -539,6 +545,8 @@ public:
   bool hasStorage() const { return HasStorage; }
   void jsonize(json::Output &Out) override;
   void diagnose(SDKNode *Right) override;
+  bool hasDidSet() const { return HasDidSet; }
+  bool hasWillSet() const { return HasWillSet; }
 };
 
 class SDKNodeDeclFunction: public SDKNodeDeclAbstractFunc {
