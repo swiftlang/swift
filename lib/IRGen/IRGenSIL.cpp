@@ -4234,8 +4234,8 @@ static SILAccessEnforcement getEffectiveEnforcement(IRGenFunction &IGF,
   // of cases where this triggers, because of the restrictions on abstracting
   // over addresses and the fact that we use static enforcement on inouts.
   if (enforcement == SILAccessEnforcement::Dynamic &&
-      IGF.IGM.isKnownEmpty(access->getSource()->getType(),
-                           ResilienceExpansion::Maximal)) {
+      IGF.IGM.getTypeInfo(access->getSource()->getType())
+             .isKnownEmpty(ResilienceExpansion::Maximal)) {
     enforcement = SILAccessEnforcement::Unsafe;
   }
 
