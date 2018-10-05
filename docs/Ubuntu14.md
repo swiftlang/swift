@@ -3,9 +3,11 @@
 ## Upgrade Clang
 You'll need to upgrade your clang compiler for C++14 support and create a symlink. The minimum required version of clang may change, and may not be available on Ubuntu 14.04 in the future.
 ```bash
-sudo apt-get install clang-3.6
-sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-3.6 100
-sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.6 100
+sudo apt-get install clang-3.9
+sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-3.9 100
+sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-3.9 100
+sudo update-alternatives --set clang /usr/bin/clang-3.9
+sudo update-alternatives --set clang++ /usr/bin/clang++-3.9
 ```
 
 ## Upgrade CMake
