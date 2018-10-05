@@ -513,9 +513,8 @@ extension UnsafeMutableBufferPointer {
     buffer: UnsafeMutablePointer<Element>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows {
-    precondition(i > 0)
+    _sanityCheck(runs[i - 1].upperBound == runs[i].lowerBound)
     let low = runs[i - 1].lowerBound
-    precondition(runs[i - 1].upperBound == runs[i].lowerBound)
     let middle = runs[i].lowerBound
     let high = runs[i].upperBound
     
