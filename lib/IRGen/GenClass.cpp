@@ -373,7 +373,12 @@ namespace {
         // Lower the field type.
         auto *eltType = &IGM.getTypeInfo(type);
         if (CompletelyFragileLayout && !eltType->isFixedSize()) {
-          CompletelyFragileScope scope(IGM);
+          // For staging purposes, only do the new thing if the path flag
+          // is provided.
+          auto mode = (IGM.IRGen.Opts.ReadTypeInfoPath.empty()
+                       ? TypeConverter::Mode::CompletelyFragile
+                       : TypeConverter::Mode::Legacy);
+          LoweringModeScope scope(IGM, mode);
           eltType = &IGM.getTypeInfo(type);
         }
 

@@ -411,6 +411,29 @@ class Sub : Base {
   }
 }
 
+// rdar://problem/45046969
+struct Bar<T> { }
+
+protocol FooProtocol {
+  subscript<T>(index: Bar<T>) -> T { get set }
+}
+
+// Make sure we get the right generic signatures for the synthesized
+// getter/setter.
+
+// CHECK: sil hidden [transparent] @$s10addressors3FooVyqd__AA3BarVyqd__Gcluig : $@convention(method) <Base><T> (Bar<T>, Foo<Base>)
+// CHECK: sil hidden [transparent] @$s10addressors3FooVyqd__AA3BarVyqd__Gcluis : $@convention(method) <Base><T> (@in T, Bar<T>, @inout Foo<Base>) -> ()
+struct Foo<Base>: FooProtocol {
+  subscript<T>(index: Bar<T>) -> T {
+    unsafeAddress {
+      return UnsafePointer<T>(bitPattern: 0)!
+    }
+    unsafeMutableAddress {
+      return UnsafeMutablePointer<T>(bitPattern: 0)!
+    }
+  }
+}
+
 // Make sure addressors don't get vtable entries.
 // CHECK-LABEL: sil_vtable Base {
 // CHECK-NEXT: #Base.data!getter.1: (Base) -> () -> UnsafeMutablePointer<Int32> : @$s10addressors4BaseC4dataSpys5Int32VGvg
