@@ -1067,35 +1067,6 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
   return false;
 }
 
-static SerializationOptions
-computeSerializationOptions(const CompilerInvocation &Invocation,
-                            const SupplementaryOutputPaths &outs,
-                            bool moduleIsPublic) {
-  const FrontendOptions &opts = Invocation.getFrontendOptions();
-
-  SerializationOptions serializationOpts;
-  serializationOpts.OutputPath = outs.ModuleOutputPath.c_str();
-  serializationOpts.DocOutputPath = outs.ModuleDocOutputPath.c_str();
-  serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
-  if (opts.SerializeBridgingHeader && !outs.ModuleOutputPath.empty())
-    serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
-  serializationOpts.ModuleLinkName = opts.ModuleLinkName;
-  serializationOpts.ExtraClangOptions =
-      Invocation.getClangImporterOptions().ExtraArgs;
-  serializationOpts.EnableNestedTypeLookupTable =
-      opts.EnableSerializationNestedTypeLookupTable;
-  if (!Invocation.getIRGenOptions().ForceLoadSymbolName.empty())
-    serializationOpts.AutolinkForceLoad = true;
-
-  // Options contain information about the developer's computer,
-  // so only serialize them if the module isn't going to be shipped to
-  // the public.
-  serializationOpts.SerializeOptionsForDebugging =
-      !moduleIsPublic || opts.AlwaysSerializeDebuggingOptions;
-
-  return serializationOpts;
-}
-
 /// Perform SIL optimization passes if optimizations haven't been disabled.
 /// These may change across compiler versions.
 static void performSILOptimizations(CompilerInvocation &Invocation,
@@ -1318,7 +1289,7 @@ static bool performCompileStepsPostSILGen(
       return;
 
     SerializationOptions serializationOpts =
-        computeSerializationOptions(Invocation, outs, moduleIsPublic);
+        Invocation.computeSerializationOptions(outs, moduleIsPublic);
     serialize(MSF, serializationOpts, SM.get());
   };
 

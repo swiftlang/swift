@@ -26,6 +26,7 @@
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
@@ -116,6 +117,33 @@ CompilerInvocation::getParseableInterfaceOutputPathForWholeModule() const {
          "can be seen");
   return getPrimarySpecificPathsForAtMostOnePrimary()
       .SupplementaryOutputs.ParseableInterfaceOutputPath;
+}
+
+SerializationOptions
+CompilerInvocation::computeSerializationOptions(const SupplementaryOutputPaths &outs,
+                                                bool moduleIsPublic) {
+  const FrontendOptions &opts = getFrontendOptions();
+
+  SerializationOptions serializationOpts;
+  serializationOpts.OutputPath = outs.ModuleOutputPath.c_str();
+  serializationOpts.DocOutputPath = outs.ModuleDocOutputPath.c_str();
+  serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
+  if (opts.SerializeBridgingHeader && !outs.ModuleOutputPath.empty())
+    serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
+  serializationOpts.ModuleLinkName = opts.ModuleLinkName;
+  serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
+  serializationOpts.EnableNestedTypeLookupTable =
+      opts.EnableSerializationNestedTypeLookupTable;
+  if (!getIRGenOptions().ForceLoadSymbolName.empty())
+    serializationOpts.AutolinkForceLoad = true;
+
+  // Options contain information about the developer's computer,
+  // so only serialize them if the module isn't going to be shipped to
+  // the public.
+  serializationOpts.SerializeOptionsForDebugging =
+      !moduleIsPublic || opts.AlwaysSerializeDebuggingOptions;
+
+  return serializationOpts;
 }
 
 void CompilerInstance::createSILModule() {
