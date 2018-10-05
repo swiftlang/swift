@@ -699,7 +699,6 @@ func _makeSwiftValue(_ value: Any) -> AnyObject {
 ///   the boxed value, but is otherwise opaque.
 ///
 /// COMPILER_INTRINSIC
-@inlinable // FIXME(sil-serialize-all)
 public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   var done = false
   var result: AnyObject!

@@ -1977,8 +1977,8 @@ internal func _appendingKeyPaths<
 
       if let rootPtr = root._kvcKeyPathStringPtr,
          let leafPtr = leaf._kvcKeyPathStringPtr {
-        rootKVCLength = Int(_stdlib_strlen(rootPtr))
-        leafKVCLength = Int(_stdlib_strlen(leafPtr))
+        rootKVCLength = Int(_swift_stdlib_strlen(rootPtr))
+        leafKVCLength = Int(_swift_stdlib_strlen(leafPtr))
         // root + "." + leaf
         appendedKVCLength = rootKVCLength + 1 + leafKVCLength
       } else {

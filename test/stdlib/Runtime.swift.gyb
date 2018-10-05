@@ -39,7 +39,7 @@ func _stdlib_demangleName(_ mangledName: String) -> String {
 
     if let demangledNamePtr = demangledNamePtr {
       let demangledName = String(cString: demangledNamePtr)
-      _stdlib_free(demangledNamePtr)
+      _swift_stdlib_free(demangledNamePtr)
       return demangledName
     }
     return mangledName
