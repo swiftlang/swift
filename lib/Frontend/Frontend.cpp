@@ -324,6 +324,12 @@ bool CompilerInstance::setUpModuleLoaders() {
     }
     Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
   }
+  {
+    auto TIML = TextualInterfaceModuleLoader::create(*Context,
+                                                     ModuleCachePath,
+                                                     getDependencyTracker());
+    Context->addModuleLoader(std::move(TIML));
+  }
   return false;
 }
 
