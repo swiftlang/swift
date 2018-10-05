@@ -3618,11 +3618,23 @@ using StoredClassMetadataBounds =
   TargetStoredClassMetadataBounds<InProcess>;
 
 template <typename Runtime>
+struct TargetResilientSuperclass {
+  /// The superclass of this class.  This pointer can be interpreted
+  /// using the superclass reference kind stored in the type context
+  /// descriptor flags.  It is null if the class has no formal superclass.
+  ///
+  /// Note that SwiftObject, the implicit superclass of all Swift root
+  /// classes when building with ObjC compatibility, does not appear here.
+  TargetRelativeDirectPointer<Runtime, const void, /*nullable*/true> Superclass;
+};
+
+template <typename Runtime>
 class TargetClassDescriptor final
     : public TargetTypeContextDescriptor<Runtime>,
       public TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
                               TargetTypeGenericContextDescriptorHeader,
                               /*additional trailing objects:*/
+                              TargetResilientSuperclass<Runtime>,
                               TargetForeignMetadataInitialization<Runtime>,
                               TargetSingletonMetadataInitialization<Runtime>,
                               TargetVTableDescriptorHeader<Runtime>,
@@ -3633,6 +3645,7 @@ private:
   using TrailingGenericContextObjects =
     TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
                                   TargetTypeGenericContextDescriptorHeader,
+                                  TargetResilientSuperclass<Runtime>,
                                   TargetForeignMetadataInitialization<Runtime>,
                                   TargetSingletonMetadataInitialization<Runtime>,
                                   TargetVTableDescriptorHeader<Runtime>,
@@ -3649,6 +3662,7 @@ public:
   using VTableDescriptorHeader = TargetVTableDescriptorHeader<Runtime>;
   using OverrideTableHeader = TargetOverrideTableHeader<Runtime>;
   using MethodOverrideDescriptor = TargetMethodOverrideDescriptor<Runtime>;
+  using ResilientSuperclass = TargetResilientSuperclass<Runtime>;
   using ForeignMetadataInitialization =
     TargetForeignMetadataInitialization<Runtime>;
   using SingletonMetadataInitialization =
@@ -3664,22 +3678,14 @@ public:
   using TrailingGenericContextObjects::getGenericParams;
   using TargetTypeContextDescriptor<Runtime>::getTypeContextDescriptorFlags;
 
-  /// The superclass of this class.  This pointer can be interpreted
-  /// using the superclass reference kind stored in the type context
-  /// descriptor flags.  It is null if the class has no formal superclass.
-  ///
-  /// Note that SwiftObject, the implicit superclass of all Swift root
-  /// classes when building with ObjC compatibility, does not appear here.
-  TargetRelativeDirectPointer<Runtime, const void, /*nullable*/true> Superclass;
-
-  /// Does this class have a formal superclass?
-  bool hasSuperclass() const {
-    return !Superclass.isNull();
+  TypeReferenceKind getResilientSuperclassReferenceKind() const {
+    return getTypeContextDescriptorFlags()
+      .class_getResilientSuperclassReferenceKind();
   }
 
-  TypeReferenceKind getSuperclassReferenceKind() const {
-    return getTypeContextDescriptorFlags().class_getSuperclassReferenceKind();
-  }
+  /// The type of the superclass, expressed as a mangled type name that can
+  /// refer to the generic arguments of the subclass type.
+  TargetRelativeDirectPointer<Runtime, const char> SuperclassType;
 
   union {
     /// If this descriptor does not have a resilient superclass, this is the
@@ -3740,6 +3746,10 @@ private:
   
   using TrailingGenericContextObjects::numTrailingObjects;
 
+  size_t numTrailingObjects(OverloadToken<ResilientSuperclass>) const {
+    return this->hasResilientSuperclass() ? 1 : 0;
+  }
+
   size_t numTrailingObjects(OverloadToken<ForeignMetadataInitialization>) const{
     return this->hasForeignMetadataInitialization() ? 1 : 0;
   }
@@ -3771,6 +3781,12 @@ private:
   }
 
 public:
+  const TargetRelativeDirectPointer<Runtime, const void, /*nullable*/true> &
+  getResilientSuperclass() const {
+    assert(this->hasResilientSuperclass());
+    return this->template getTrailingObjects<ResilientSuperclass>()->Superclass;
+  }
+
   const ForeignMetadataInitialization &getForeignMetadataInitialization() const{
     assert(this->hasForeignMetadataInitialization());
     return *this->template getTrailingObjects<ForeignMetadataInitialization>();
