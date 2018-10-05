@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil-parse-stdlib -O -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -O -emit-ir %s | %FileCheck %s
 sil_stage canonical
 
 import Swift
@@ -11,16 +11,16 @@ import Builtin
 // CHECK:   ret i64 [[RES]]
 // CHECK: }
 
-sil @test_assume : $@convention(thin) (Int) -> Int {
-bb0(%0 : $Int):
+sil @test_assume : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
  %2 = integer_literal $Builtin.Int64, 0
- %3 = struct_extract %0 : $Int, #Int._value
+ %3 = struct_extract %0 : $Int64, #Int64._value
  %4 = builtin "cmp_slt_Int64"(%3 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
  %5 = integer_literal $Builtin.Int1, -1
  %6 = builtin "xor_Int1"(%4 : $Builtin.Int1, %5 : $Builtin.Int1) : $Builtin.Int1
  %7 = builtin "assume_Int1"(%6 : $Builtin.Int1) : $Builtin.Int1
  %8 = integer_literal $Builtin.Int64, 64
  %9 = builtin "sdiv_Int64"(%3 : $Builtin.Int64, %8 : $Builtin.Int64) : $Builtin.Int64
- %10 = struct $Int (%9 : $Builtin.Int64)
- return %10 : $Int
+ %10 = struct $Int64 (%9 : $Builtin.Int64)
+ return %10 : $Int64
 }
