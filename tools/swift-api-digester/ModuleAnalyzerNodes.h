@@ -350,6 +350,9 @@ class SDKNodeType: public SDKNode {
   std::vector<TypeAttrKind> TypeAttributes;
   bool HasDefaultArg;
 
+  // Empty() implies "Default"
+  StringRef ParamValueOwnership;
+
 protected:
   SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind);
   ~SDKNodeType() = default;
@@ -365,6 +368,7 @@ public:
   bool hasDefaultArgument() const { return HasDefaultArg; }
   bool isTopLevelType() const { return !isa<SDKNodeType>(getParent()); }
   StringRef getTypeRoleDescription() const;
+  StringRef getParamValueOwnership() const { return ParamValueOwnership; }
   static bool classof(const SDKNode *N);
   virtual void jsonize(json::Output &Out) override;
   virtual void diagnose(SDKNode *Right) override;
@@ -509,7 +513,6 @@ public:
 
 class SDKNodeDeclAbstractFunc : public SDKNodeDecl {
   bool IsThrowing;
-  bool IsMutating;
   Optional<uint8_t> SelfIndex;
 
 protected:
@@ -517,7 +520,6 @@ protected:
   virtual ~SDKNodeDeclAbstractFunc() = default;
 public:
   bool isThrowing() const { return IsThrowing; }
-  bool isMutating() const { return IsMutating; }
   uint8_t getSelfIndex() const { return SelfIndex.getValue(); }
   Optional<uint8_t> getSelfIndexOptional() const { return SelfIndex; }
   bool hasSelfIndex() const { return SelfIndex.hasValue(); }
@@ -540,10 +542,14 @@ public:
 };
 
 class SDKNodeDeclFunction: public SDKNodeDeclAbstractFunc {
+  StringRef FuncSelfKind;
 public:
   SDKNodeDeclFunction(SDKNodeInitInfo Info);
   SDKNode *getReturnType() { return *getChildBegin(); }
+  StringRef getSelfAccessKind() const { return FuncSelfKind; }
   static bool classof(const SDKNode *N);
+  void jsonize(json::Output &Out) override;
+  void diagnose(SDKNode *Right) override;
 };
 
 class SDKNodeDeclConstructor: public SDKNodeDeclAbstractFunc {
@@ -562,6 +568,15 @@ class SDKNodeDeclSetter: public SDKNodeDeclAbstractFunc {
 public:
   SDKNodeDeclSetter(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
+};
+
+// The additional information we need for a type node in the digest.
+// We use type node to represent entities more than types, e.g. parameters, so
+// this struct is necessary to pass down to create a type node.
+struct TypeInitInfo {
+  bool IsImplicitlyUnwrappedOptional = false;
+  bool hasDefaultArgument = false;
+  StringRef ValueOwnership;
 };
 
 class SwiftDeclCollector: public VisibleDeclConsumer {
@@ -605,8 +620,7 @@ public:
   SDKNode *constructFunctionNode(FuncDecl* FD, SDKNodeKind Kind);
   SDKNode *constructOperatorDeclNode(OperatorDecl *OD);
   std::vector<SDKNode*> createParameterNodes(ParameterList *PL);
-  SDKNode *constructTypeNode(Type T, bool IsImplicitlyUnwrappedOptional = false,
-    bool hasDefaultArgument = false);
+  SDKNode *constructTypeNode(Type T, TypeInitInfo Info = TypeInitInfo());
   void processValueDecl(ValueDecl *VD);
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override;
   void processDecl(Decl *D);

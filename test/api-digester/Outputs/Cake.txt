@@ -34,7 +34,7 @@ cake1: Func C7.foo(_:_:) has removed default argument from parameter 1
 
 /* Decl Attribute changes */
 cake1: Func C1.foo1() is now not static
-cake1: Func S1.foo1() is now mutating
+cake1: Func S1.foo1() has self access kind changing from NonMutating to Mutating
 cake1: Func S1.foo3() is now static
 cake1: Var C1.CIIns1 changes from weak to strong
 cake1: Var C1.CIIns2 changes from strong to weak

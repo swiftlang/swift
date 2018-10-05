@@ -36,7 +36,8 @@
           "usr": "s:4cake2P1PAAE1poiyAaB_pAaB_p_AaB_ptFZ",
           "moduleName": "cake",
           "genericSig": "<τ_0_0 where τ_0_0 : P1>",
-          "static": true
+          "static": true,
+          "funcSelfKind": "NonMutating"
         }
       ],
       "declKind": "Protocol",
@@ -70,7 +71,8 @@
           "declKind": "Func",
           "usr": "s:4cake2S1V4foo1yyFZ",
           "moduleName": "cake",
-          "static": true
+          "static": true,
+          "funcSelfKind": "NonMutating"
         },
         {
           "kind": "Function",
@@ -86,7 +88,7 @@
           "declKind": "Func",
           "usr": "s:4cake2S1V4foo2yyF",
           "moduleName": "cake",
-          "mutating": true
+          "funcSelfKind": "Mutating"
         },
         {
           "kind": "Function",
@@ -101,7 +103,8 @@
           ],
           "declKind": "Func",
           "usr": "s:4cake2S1V4foo6yyF",
-          "moduleName": "cake"
+          "moduleName": "cake",
+          "funcSelfKind": "NonMutating"
         },
         {
           "kind": "Constructor",
@@ -188,7 +191,8 @@
           "declKind": "Func",
           "usr": "s:4cake2C0CA2A2S1VRszAERs_AERs0_rlE17conditionalFooExtyyF",
           "moduleName": "cake",
-          "genericSig": "<τ_0_0, τ_0_1, τ_0_2 where τ_0_0 == S1, τ_0_1 == S1, τ_0_2 == S1>"
+          "genericSig": "<τ_0_0, τ_0_1, τ_0_2 where τ_0_0 == S1, τ_0_1 == S1, τ_0_2 == S1>",
+          "funcSelfKind": "NonMutating"
         },
         {
           "kind": "Function",
@@ -204,7 +208,8 @@
           "declKind": "Func",
           "usr": "s:4cake2C0C19unconditionalFooExtyyF",
           "moduleName": "cake",
-          "genericSig": "<τ_0_0, τ_0_1, τ_0_2>"
+          "genericSig": "<τ_0_0, τ_0_1, τ_0_2>",
+          "funcSelfKind": "NonMutating"
         }
       ],
       "declKind": "Class",
@@ -231,7 +236,8 @@
           "declKind": "Func",
           "usr": "s:4cake2C1C4foo1yyFZ",
           "moduleName": "cake",
-          "static": true
+          "static": true,
+          "funcSelfKind": "NonMutating"
         },
         {
           "kind": "Var",
@@ -435,7 +441,8 @@
       ],
       "declKind": "Func",
       "usr": "s:4cake4foo1_1bySi_AA2S1VtF",
-      "moduleName": "cake"
+      "moduleName": "cake",
+      "funcSelfKind": "NonMutating"
     },
     {
       "kind": "Function",
@@ -463,7 +470,8 @@
       ],
       "declKind": "Func",
       "usr": "s:4cake4foo2_1bySi_AA2S1VtF",
-      "moduleName": "cake"
+      "moduleName": "cake",
+      "funcSelfKind": "NonMutating"
     },
     {
       "kind": "TypeDecl",
@@ -555,13 +563,15 @@
               "kind": "TypeNominal",
               "name": "Hasher",
               "printedName": "Hasher",
+              "paramValueOwnership": "InOut",
               "usr": "s:s6HasherV"
             }
           ],
           "declKind": "Func",
           "usr": "s:4cake6NumberO4hash4intoys6HasherVz_tF",
           "moduleName": "cake",
-          "implicit": true
+          "implicit": true,
+          "funcSelfKind": "NonMutating"
         },
         {
           "kind": "Constructor",
@@ -678,7 +688,8 @@
       ],
       "declKind": "Func",
       "usr": "s:4cake4foo3yySDySiSSGF",
-      "moduleName": "cake"
+      "moduleName": "cake",
+      "funcSelfKind": "NonMutating"
     },
     {
       "kind": "TypeDecl",
@@ -739,8 +750,7 @@
               "implicit": true,
               "declAttributes": [
                 "Transparent"
-              ],
-              "mutating": true
+              ]
             }
           ],
           "declKind": "Var",
@@ -988,7 +998,8 @@
           "declKind": "Func",
           "usr": "s:4cake21ProWithAssociatedTypePAAE10NonReqFuncyyF",
           "moduleName": "cake",
-          "genericSig": "<τ_0_0 where τ_0_0 : ProWithAssociatedType>"
+          "genericSig": "<τ_0_0 where τ_0_0 : ProWithAssociatedType>",
+          "funcSelfKind": "NonMutating"
         },
         {
           "kind": "Var",
@@ -1116,7 +1127,8 @@
           "usr": "s:4cake6PSuperP3fooyyF",
           "moduleName": "cake",
           "genericSig": "<τ_0_0 where τ_0_0 : PSuper>",
-          "protocolReq": true
+          "protocolReq": true,
+          "funcSelfKind": "NonMutating"
         }
       ],
       "declKind": "Protocol",
@@ -1157,7 +1169,8 @@
           "overriding": true,
           "declAttributes": [
             "Override"
-          ]
+          ],
+          "funcSelfKind": "NonMutating"
         }
       ],
       "declKind": "Protocol",
@@ -1248,7 +1261,8 @@
           ],
           "declKind": "Func",
           "usr": "s:Si4cakeE3fooyyF",
-          "moduleName": "cake"
+          "moduleName": "cake",
+          "funcSelfKind": "NonMutating"
         },
         {
           "kind": "Function",
@@ -1263,7 +1277,8 @@
           ],
           "declKind": "Func",
           "usr": "s:Si4cakeE3baryyF",
-          "moduleName": "cake"
+          "moduleName": "cake",
+          "funcSelfKind": "NonMutating"
         }
       ],
       "declKind": "Struct",
