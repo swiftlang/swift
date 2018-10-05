@@ -192,6 +192,10 @@ public:
 /// TODO: Consider moving these helper functions and consts to a separate header
 /// file.
 
+/// Return true if the specified type is TensorHandle<T>, ResourceHandle, or
+/// VariantHandle.
+bool isTensorFlowValue(SILType ty);
+
 /// Determine whether the specified type is one of our well-known types, and
 /// if so, which one it is.
 TFValueKind classifyTensorFlowValue(SILType ty);
@@ -209,6 +213,7 @@ enum class DeviceType {
   ALL,
 };
 
+// TODO: Prefix the consts below with "TF_".
 static const char DEFAULT_CPU_DEVICE[] =
     "/job:localhost/replica:0/task:0/device:CPU:0";
 static const char DEFAULT_GPU_DEVICE[] =
@@ -231,12 +236,12 @@ static const char DEVICE_ATTR[] = "__device";
 // other TF ops (e.g. a "Const" op).
 static const char SHAPE_ARRAY_ATTR[] = "__shapes";
 
-/// Returns true if `attrName` is SHAPE_ARRAY_ATTR, `attrValue` is an array of
+/// Return true if `attrName` is SHAPE_ARRAY_ATTR, `attrValue` is an array of
 /// TensorShape-typed elements.
 bool isShapeArrayPseudoAttr(StringRef attrName, SymbolicValue attrValue);
 
-/// Decodes a shape attribute of type TensorShape or Optional<TensorShape>. It
-/// stores the dimensions to `result`, and returns the rank. Note that "nil as
+/// Decode a shape attribute of type TensorShape or Optional<TensorShape>. It
+/// stores the dimensions to `result`, and return the rank. Note that "nil as
 /// Optional<TensorShape>" represents "unknown rank", and that we return -1 in
 /// that case.
 int decodeShapeAttr(const ASTContext &ctx, SymbolicValue attr,

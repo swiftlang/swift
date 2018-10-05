@@ -72,7 +72,7 @@ void *swift_tfc_CreateIntTensor(int32_t num_dims, int64_t *dims, int64_t *vals,
 
   // Compute the total memory size of the tensor value.
   // totalElements can be 0 if shape is [] (i.e., num_dims = 1, dims[0] = 0).
-  unsigned long long totalElements = 1;
+  size_t totalElements = 1;
   for (int32_t i = 0; i < num_dims; ++i)
     totalElements *= dims[i];
 
@@ -88,7 +88,7 @@ void *swift_tfc_CreateIntTensor(int32_t num_dims, int64_t *dims, int64_t *vals,
   // Set up its contents, element-wise.
   // FIXME: This will need a byte swap for big endian hosts.
   auto *ptr = (char *)TF_TensorData(tensor);
-  for (unsigned long long i = 0; i < totalElements; ++i) {
+  for (size_t i = 0; i < totalElements; ++i) {
     if (setValue(dtype, vals[i], ptr)) {
       TF_MakeInternalErrorStatus(status, "Unsupported data type");
       return nullptr;
@@ -101,7 +101,7 @@ void *swift_tfc_CreateIntTensor(int32_t num_dims, int64_t *dims, int64_t *vals,
 void *swift_tfc_CreateFloatTensor(int32_t num_dims, int64_t *dims, float *vals,
                                   TF_Status *status) {
   // Compute the total memory size of the tensor value.
-  unsigned long long totalElements = 1;
+  size_t totalElements = 1;
   for (int32_t i = 0; i < num_dims; ++i)
     totalElements *= dims[i];
 
@@ -121,7 +121,7 @@ void *swift_tfc_CreateFloatTensor(int32_t num_dims, int64_t *dims, float *vals,
   // Set up its contents, element-wise.
   // FIXME: This will need a byte swap for big endian hosts.
   auto *ptr = (char *)TF_TensorData(tensor);
-  for (unsigned long long i = 0; i < totalElements; ++i) {
+  for (size_t i = 0; i < totalElements; ++i) {
     *reinterpret_cast<float *>(ptr) = vals[i];
     ptr += dtypeSize;
   }

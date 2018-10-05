@@ -54,10 +54,6 @@ bool isTensorHandle(SILType ty);
 /// as VariantHandle and ResourceHandle.
 bool isOpaqueHandle(SILType ty);
 
-/// Return true if the specified type is TensorHandle<T>, ResourceHandle, or
-/// VariantHandle.
-bool isTensorFlowValue(SILType ty);
-
 /// `ty` must be a valid TensorFlow element type "T", like Builtin.Int32. Turn
 /// it into a TensorHandle<T> type.
 SILType convertElementTypeToTensorValueType(Type ty, const ASTContext &ctx);

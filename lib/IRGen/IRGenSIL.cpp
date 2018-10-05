@@ -931,23 +931,24 @@ public:
     }
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
   void checkOk(llvm::Value *status) {
     auto *checkOkFn = IGM.getTFC_CheckOkFn();
     Builder.CreateCall(checkOkFn, {status});
   }
 
   /// Create an int64 or float array based on `elements` and `isFloat`. On
-  /// return, `*numElts` is set to an int32-typed array size value.  `*array` is
-  /// set to an alloca inst representing the array, where the inst name is set
-  /// to arrayName.
+  /// return, `*numEltsOut` is set to an int32-typed array size value.
+  /// `*arrayOut` is set to an alloca inst representing the array, where the
+  /// inst name is set to arrayName.
   ///
   /// For each value in `elements`, the function runs `convertElt` on it to
-  /// produce a value, to store into the memory buffer allocated at `*array`.
+  /// produce a value, to store into the memory buffer allocated at `*arrayOut`.
   template <typename SrcT>
   void createArrayAndSize(ArrayRef<SrcT> elements, bool isFloat,
                           const char *arrayName,
                           std::function<llvm::Value *(SrcT elt)> convertElt,
-                          Address *array, llvm::Value **numElts);
+                          Address &arrayOut, llvm::Value *&numEltsOut);
 
   //===--------------------------------------------------------------------===//
   // SIL instruction lowering
@@ -1939,17 +1940,16 @@ static llvm::Value *createStringValAddr(IRGenModule &IGM, StringRef strVal) {
 template <typename SrcT>
 void IRGenSILFunction::createArrayAndSize(
     ArrayRef<SrcT> elements, bool isFloat, const char *arrayName,
-    std::function<llvm::Value *(SrcT elt)> convertElt, Address *array,
-    llvm::Value **numElts) {
-  *numElts = llvm::ConstantInt::get(IGM.Int32Ty, elements.size());
-  *array = isFloat ? createAlloca(IGM.FloatTy, *numElts,
-                                  IGM.getPointerAlignment(), "tensorEltVals")
-                   : createAlloca(IGM.Int64Ty, *numElts,
-                                  IGM.getPointerAlignment(), "tensorEltVals");
-  for (unsigned idx = 0; idx < elements.size(); ++idx) {
+    std::function<llvm::Value *(SrcT elt)> convertElt, Address &arrayOut,
+    llvm::Value *&numEltsOut) {
+  numEltsOut = llvm::ConstantInt::get(IGM.Int32Ty, elements.size());
+  auto *eltTy = isFloat ? IGM.FloatTy : (llvm::Type *)IGM.Int64Ty;
+  arrayOut = createAlloca(eltTy, numEltsOut, IGM.getPointerAlignment(),
+                           "tensorEltVals");
+  for (auto idx : indices(elements)) {
     auto elt = elements[idx];
     auto idxVal = llvm::ConstantInt::get(IGM.Int32Ty, idx);
-    auto eltAddr = Builder.CreateInBoundsGEP(array->getAddress(), idxVal);
+    auto eltAddr = Builder.CreateInBoundsGEP(arrayOut.getAddress(), idxVal);
     llvm::Value *eltVal = convertElt(elt);
     Builder.CreateStore(eltVal, eltAddr, IGM.getPointerAlignment());
   }
@@ -2022,11 +2022,10 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       Builder.CreateCall(TFENewOpFn, {eagerContext, opNameValAddr, status});
   checkOk(status);
 
-  auto addTensorhandleAsOpInput = [=](SILValue tensorHandle) {
+  auto addTensorhandleAsOpInput = [&](SILValue tensorHandle) {
     LLVM_DEBUG(llvm::dbgs()
                << " Adding input of type " << tensorHandle->getType() << ".\n");
-    auto valueKind = classifyTensorFlowValue(tensorHandle->getType());
-    assert(valueKind != TFValueKind::Nope &&
+    assert(tf::isTensorFlowValue(tensorHandle->getType()) &&
            "all op inputs should be TensorFlow values");
 
     auto tensorHandleValue = getLoweredSingletonExplosion(tensorHandle);
@@ -2130,12 +2129,12 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
           Address vals;
           createArrayAndSize<SymbolicValue>(
               elements, /*isFloat*/ false, "intListAttr",
-              [=](SymbolicValue elt) {
+              [&](SymbolicValue elt) {
                 return llvm::ConstantInt::get(
                     IGM.Int64Ty,
                     /*elt*/ elt.getIntegerValue().getLimitedValue());
               },
-              &vals, &numElts);
+              vals, numElts);
           auto valsUntyped =
               Builder.CreateBitCast(vals.getAddress(), IGM.Int8PtrTy);
 
@@ -2248,7 +2247,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       // Tensor can support two cases: an array case (possibly empty), and a
       // scalar case.
       SmallVector<SymbolicValue, 4> elements;
-      bool isFloat;
+      bool isFloat = false;
       SmallVector<int64_t, 4> shape;
       // The scalar case is very simple, the shape of a scalar is 0d, and the
       // data type comes from an attr that should already be processed.
@@ -2271,7 +2270,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
                    << "The elt dtype of tensor-typed attr is " << eltType
                    << ", with tfDtype = " << tfDtype << ".\n");
         // 1 means TF_FLOAT.
-        isFloat = (tfDtype == 1);
+        isFloat = tfDtype == 1;
 
         // Decode the shape attribute which must come next.
         auto shapeAttr = i->getAttribute(nextAttributeNumber++).value;
@@ -2287,7 +2286,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       Address tensorEltVals;
       createArrayAndSize<SymbolicValue>(
           elements, isFloat, "tensorEltVals",
-          [=](SymbolicValue elt) {
+          [&](SymbolicValue elt) {
             return isFloat ? llvm::ConstantFP::get(
                                  IGM.FloatTy,
                                  (double)elt.getFloatValue().convertToFloat())
@@ -2296,15 +2295,15 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
                                                         .sextOrTrunc(64)
                                                         .getLimitedValue());
           },
-          &tensorEltVals, &numElts);
+          tensorEltVals, numElts);
 
       // Create the LLVM values representing shape.
       llvm::Value *numDims = nullptr;
       Address dimVals;
       createArrayAndSize<int64_t>(
           shape, /*isFloat*/ false, "dimVals",
-          [=](int64_t elt) { return llvm::ConstantInt::get(IGM.Int64Ty, elt); },
-          &dimVals, &numDims);
+          [&](int64_t elt) { return llvm::ConstantInt::get(IGM.Int64Ty, elt); },
+          dimVals, numDims);
 
       auto dimValsUntyped =
           Builder.CreateBitCast(dimVals.getAddress(), IGM.Int8PtrTy);
