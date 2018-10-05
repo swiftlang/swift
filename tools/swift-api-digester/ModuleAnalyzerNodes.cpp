@@ -112,7 +112,8 @@ SDKNodeDeclTypeAlias::SDKNodeDeclTypeAlias(SDKNodeInitInfo Info):
 SDKNodeDeclVar::SDKNodeDeclVar(SDKNodeInitInfo Info): 
   SDKNodeDecl(Info, SDKNodeKind::DeclVar),
   FixedBinaryOrder(Info.FixedBinaryOrder), IsLet(Info.IsLet),
-  HasStorage(Info.HasStorage) {}
+  HasStorage(Info.HasStorage), HasDidSet(Info.HasDidset),
+  HasWillSet(Info.HasWillset) {}
 
 SDKNodeDeclAbstractFunc::SDKNodeDeclAbstractFunc(SDKNodeInitInfo Info,
   SDKNodeKind Kind): SDKNodeDecl(Info, Kind), IsThrowing(Info.IsThrowing),
@@ -136,7 +137,8 @@ SDKNodeDeclAssociatedType::SDKNodeDeclAssociatedType(SDKNodeInitInfo Info):
 
 SDKNodeDeclSubscript::SDKNodeDeclSubscript(SDKNodeInitInfo Info):
   SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclSubscript),
-  HasSetter(Info.HasSetter), HasStorage(Info.HasStorage) {}
+  HasSetter(Info.HasSetter), HasStorage(Info.HasStorage),
+  HasDidSet(Info.HasDidset), HasWillSet(Info.HasWillset) {}
 
 StringRef SDKNodeDecl::getHeaderName() const {
   if (Location.empty())
@@ -1111,6 +1113,8 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
 
   if (auto *VAR = dyn_cast<AbstractStorageDecl>(VD)) {
     HasStorage = VAR->hasStorage();
+    HasDidset = VAR->getDidSetFunc();
+    HasWillset = VAR->getWillSetFunc();
   }
 }
 
@@ -1541,6 +1545,8 @@ void SDKNodeDeclSubscript::jsonize(json::Output &out) {
   SDKNodeDeclAbstractFunc::jsonize(out);
   output(out, KeyKind::KK_hasSetter, HasSetter);
   output(out, KeyKind::KK_hasStorage, HasStorage);
+  output(out, KeyKind::KK_hasDidset, HasDidSet);
+  output(out, KeyKind::KK_hasWillset, HasWillSet);
 }
 
 void SDKNodeDeclVar::jsonize(json::Output &out) {
@@ -1548,6 +1554,8 @@ void SDKNodeDeclVar::jsonize(json::Output &out) {
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_fixedbinaryorder).data(), FixedBinaryOrder);
   output(out, KeyKind::KK_isLet, IsLet);
   output(out, KeyKind::KK_hasStorage, HasStorage);
+  output(out, KeyKind::KK_hasDidset, HasDidSet);
+  output(out, KeyKind::KK_hasWillset, HasWillSet);
 }
 
 namespace swift {
