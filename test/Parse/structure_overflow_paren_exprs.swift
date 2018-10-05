@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -typecheck %s 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -parse %s 2>&1 | %FileCheck %s
 
 // From SR-4866 <https://bugs.swift.org/browse/SR-4866>
 
