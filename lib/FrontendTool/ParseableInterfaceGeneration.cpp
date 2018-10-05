@@ -1,4 +1,4 @@
-//===--- TextualInterfaceGeneration.cpp - swiftinterface files ------------===//
+//===--- ParseableInterfaceGeneration.cpp - swiftinterface files ----------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TextualInterfaceGeneration.h"
+#include "ParseableInterfaceGeneration.h"
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
@@ -21,7 +21,7 @@
 using namespace swift;
 
 /// Diagnose any scoped imports in \p imports, i.e. those with a non-empty
-/// access path. These are not yet supported by textual interfaces, since the
+/// access path. These are not yet supported by parseable interfaces, since the
 /// information about the declaration kind is not preserved through the binary
 /// serialization that happens as an intermediate step in non-whole-module
 /// builds.
@@ -33,7 +33,7 @@ static void diagnoseScopedImports(DiagnosticEngine &diags,
     if (importPair.first.empty())
       continue;
     diags.diagnose(importPair.first.front().second,
-                   diag::textual_interface_scoped_import_unsupported);
+                   diag::parseable_interface_scoped_import_unsupported);
   }
 }
 
@@ -80,12 +80,12 @@ static void printImports(raw_ostream &out, ModuleDecl *M) {
   }
 }
 
-bool swift::emitModuleInterface(raw_ostream &out, ModuleDecl *M) {
+bool swift::emitParseableInterface(raw_ostream &out, ModuleDecl *M) {
   assert(M);
 
   printImports(out, M);
 
-  const PrintOptions printOptions = PrintOptions::printTextualInterfaceFile();
+  const PrintOptions printOptions = PrintOptions::printParseableInterfaceFile();
   SmallVector<Decl *, 16> topLevelDecls;
   M->getTopLevelDecls(topLevelDecls);
   for (const Decl *D : topLevelDecls) {

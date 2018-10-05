@@ -302,7 +302,7 @@ def emit_module_path_EQ : Joined<["-"], "emit-module-path=">,
 
 def experimental_emit_interface : Flag<["-"], "experimental-emit-interface">,
   Flags<[NoInteractiveOption, HelpHidden]>,
-  HelpText<"Test out the textual interfaces feature">;
+  HelpText<"Test out the parseable interfaces feature">;
 
 def emit_objc_header : Flag<["-"], "emit-objc-header">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,

@@ -110,12 +110,12 @@ std::string CompilerInvocation::getTBDPathForWholeModule() const {
 }
 
 std::string
-CompilerInvocation::getModuleInterfaceOutputPathForWholeModule() const {
+CompilerInvocation::getParseableInterfaceOutputPathForWholeModule() const {
   assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
-         "ModuleInterfaceOutputPath only makes sense when the whole module can "
-         "be seen");
+         "ParseableInterfaceOutputPath only makes sense when the whole module "
+         "can be seen");
   return getPrimarySpecificPathsForAtMostOnePrimary()
-      .SupplementaryOutputs.ModuleInterfaceOutputPath;
+      .SupplementaryOutputs.ParseableInterfaceOutputPath;
 }
 
 void CompilerInstance::createSILModule() {

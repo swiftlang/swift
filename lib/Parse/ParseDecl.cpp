@@ -4273,7 +4273,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
   assert(Tok.is(tok::l_brace));
 
   // Properties in protocols use a very limited syntax.
-  // SIL mode and textual interfaces use the same syntax.
+  // SIL mode and parseable interfaces use the same syntax.
   // Otherwise, we have a normal var or subscript declaration and we need
   // parse the full complement of specifiers, along with their bodies.
   bool parsingLimitedSyntax = Flags.contains(PD_InProtocol) ||
@@ -4396,7 +4396,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
 
     // It's okay not to have a body if there's an external asm name.
     if (!Tok.is(tok::l_brace)) {
-      // Accessors don't need bodies in textual interfaces
+      // Accessors don't need bodies in parseable interfaces
       if (SF.Kind == SourceFileKind::Interface)
         continue;
       // _silgen_name'd accessors don't need bodies.
@@ -6404,7 +6404,7 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     switch (SF.Kind) {
     case SourceFileKind::Interface:
     case SourceFileKind::SIL:
-      // It's okay to have no body for SIL code or textual interfaces.
+      // It's okay to have no body for SIL code or parseable interfaces.
       break;
     case SourceFileKind::Library:
     case SourceFileKind::Main:
