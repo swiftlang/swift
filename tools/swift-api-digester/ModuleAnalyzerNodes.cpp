@@ -312,6 +312,10 @@ bool SDKNodeType::hasTypeAttribute(TypeAttrKind DAKind) const {
     TypeAttributes.end();
 }
 
+StringRef SDKNodeType::getParamValueOwnership() const {
+  return ParamValueOwnership.empty() ? "Default" : ParamValueOwnership;
+}
+
 StringRef SDKNodeType::getTypeRoleDescription() const {
   assert(isTopLevelType());
   auto P = cast<SDKNodeDecl>(getParent());
