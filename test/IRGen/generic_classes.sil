@@ -345,7 +345,7 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal swiftcc %swift.metadata_response @"$s15generic_classes11RootGenericCMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
 // -- initialize the dependent field offsets
-// CHECK:   call void @swift_initClassMetadata(%swift.type* [[METADATA]], %swift.type* null, i64 0, i64 3, i8*** {{%.*}}, i64* {{%.*}})
+// CHECK:   call void @swift_initClassMetadata(%swift.type* [[METADATA]], i64 0, i64 3, i8*** {{%.*}}, i64* {{%.*}})
 // CHECK: }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$s15generic_classes22RootGenericFixedLayoutCMi"(%swift.type_descriptor*, i8**, i8*) {{.*}} {
@@ -353,7 +353,7 @@ entry(%c : $RootGeneric<Int32>):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal swiftcc %swift.metadata_response @"$s15generic_classes22RootGenericFixedLayoutCMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
-// CHECK:   call void @swift_initClassMetadata(%swift.type* [[METADATA]], %swift.type* null, i64 0, i64 3, i8*** {{%.*}}, i64* {{%.*}})
+// CHECK:   call void @swift_initClassMetadata(%swift.type* [[METADATA]], i64 0, i64 3, i8*** {{%.*}}, i64* {{%.*}})
 // CHECK: }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$s15generic_classes015GenericInheritsC0CMi"(%swift.type_descriptor*, i8**, i8*) {{.*}} {
@@ -385,15 +385,9 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 0
 // CHECK:   store i8** [[T0]], i8*** [[T1]], align 8
 
-// CHECK:   [[T0:%.*]] = call{{( tail)?}} swiftcc %swift.metadata_response @"$s15generic_classes11RootGenericCMa"(i64 257, %swift.type* %A)
-// CHECK:   [[SUPER:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK:   [[SUPER_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
-// CHECK:   [[SUPER_OK:%.*]] = icmp ule i64 [[SUPER_STATUS]], 1
-// CHECK:   br i1 [[SUPER_OK]],
-
-// CHECK:   call void @swift_initClassMetadata(%swift.type* [[METADATA]], %swift.type* [[SUPER]], i64 0, i64 1, i8*** [[FIELDS_ADDR]], i64* [[OFFSETS]])
-// CHECK:   [[DEP:%.*]] = phi %swift.type* [ [[B_CHECKED]], {{.*}} ], [ [[SUPER]], {{.*}} ], [ null, {{.*}} ]
-// CHECK:   [[DEP_REQ:%.*]] = phi i64 [ 63, {{.*}} ], [ 1, {{.*}}], [ 0, {{.*}} ]
+// CHECK:   call void @swift_initClassMetadata(%swift.type* [[METADATA]], i64 0, i64 1, i8*** [[FIELDS_ADDR]], i64* [[OFFSETS]])
+// CHECK:   [[DEP:%.*]] = phi %swift.type* [ [[B_CHECKED]], {{.*}} ], [ null, {{.*}} ]
+// CHECK:   [[DEP_REQ:%.*]] = phi i64 [ 63, {{.*}} ], [ 0, {{.*}} ]
 // CHECK:   [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[DEP]], 0
 // CHECK:   [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], i64 [[DEP_REQ]], 1
 // CHECK:   ret %swift.metadata_response [[T1]]

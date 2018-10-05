@@ -139,9 +139,9 @@ static ClassMetadataBounds computeMetadataBoundsFromSuperclass(
 
   // Compute the bounds for the superclass, extending it to the minimum
   // bounds of a Swift class.
-  if (const void *superRef = description->Superclass.get()) {
+  if (const void *superRef = description->getResilientSuperclass()) {
     bounds = computeMetadataBoundsForSuperclass(superRef,
-                                     description->getSuperclassReferenceKind());
+                           description->getResilientSuperclassReferenceKind());
   } else {
     bounds = ClassMetadataBounds::forSwiftRootClass();
   }
@@ -2539,11 +2539,34 @@ static void initGenericObjCClass(ClassMetadata *self,
 
 void
 swift::swift_initClassMetadata(ClassMetadata *self,
-                               ClassMetadata *super,
                                ClassLayoutFlags layoutFlags,
                                size_t numFields,
                                const TypeLayout * const *fieldTypes,
                                size_t *fieldOffsets) {
+  // If there is a mangled superclass name, demangle it to the superclass
+  // type.
+  const ClassMetadata *super = nullptr;
+  if (auto superclassNameBase = self->getDescription()->SuperclassType.get()) {
+    StringRef superclassName =
+      Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
+    SubstGenericParametersFromMetadata substitutions(self);
+    const Metadata *superclass =
+      _getTypeByMangledName(superclassName, substitutions);
+    if (!superclass) {
+      fatalError(0,
+                 "failed to demangle superclass of %s from mangled name '%s'\n",
+                 self->getDescription()->Name.get(),
+                 superclassName.str().c_str());
+    }
+
+#if SWIFT_OBJC_INTEROP
+    if (auto objcWrapper = dyn_cast<ObjCClassWrapperMetadata>(superclass))
+      superclass = objcWrapper->Class;
+#endif
+
+    super = cast<ClassMetadata>(superclass);
+  }
+
   self->Superclass = super;
 
 #if SWIFT_OBJC_INTEROP
@@ -2589,15 +2612,40 @@ swift::swift_initClassMetadata(ClassMetadata *self,
 #if SWIFT_OBJC_INTEROP
 void
 swift::swift_updateClassMetadata(ClassMetadata *self,
-                                 ClassMetadata *super,
                                  ClassLayoutFlags layoutFlags,
                                  size_t numFields,
                                  const TypeLayout * const *fieldTypes,
                                  size_t *fieldOffsets) {
+#ifndef NDEBUG
+  // If there is a mangled superclass name, demangle it to the superclass
+  // type.
+  const ClassMetadata *super = nullptr;
+  if (auto superclassNameBase = self->getDescription()->SuperclassType.get()) {
+    StringRef superclassName =
+      Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
+    SubstGenericParametersFromMetadata substitutions(self);
+    const Metadata *superclass =
+      _getTypeByMangledName(superclassName, substitutions);
+    if (!superclass) {
+      fatalError(0,
+                 "failed to demangle superclass of %s from mangled name '%s'\n",
+                 self->getDescription()->Name.get(),
+                 superclassName.str().c_str());
+    }
+
+#if SWIFT_OBJC_INTEROP
+    if (auto objcWrapper = dyn_cast<ObjCClassWrapperMetadata>(superclass))
+      superclass = objcWrapper->Class;
+#endif
+
+    super = cast<ClassMetadata>(superclass);
+  }
+
   if (!super)
     assert(self->Superclass == getRootSuperclass());
   else
     assert(self->Superclass == super);
+#endif
 
   // FIXME: Plumb this through
 #if 1
