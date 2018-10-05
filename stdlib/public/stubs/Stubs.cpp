@@ -280,7 +280,7 @@ uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
 ///
 /// \returns Size of character data returned in \c LinePtr, or -1
 /// if an error occurred, or EOF was reached.
-swift::__swift_ssize_t
+__swift_ssize_t
 swift::swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
 #if defined(_WIN32)
   if (LinePtr == nullptr)

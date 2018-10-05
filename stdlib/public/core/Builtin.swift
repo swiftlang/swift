@@ -299,7 +299,7 @@ public func _onFastPath() {
 // the type of argument to be AnyClass. This is currently not possible
 // when using RuntimeShims.h
 @usableFromInline
-@_silgen_name("_objcClassUsesNativeSwiftReferenceCounting")
+@_silgen_name("_swift_objcClassUsesNativeSwiftReferenceCounting")
 internal func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool
 #else
 @inlinable
@@ -310,12 +310,12 @@ internal func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool {
 #endif
 
 @usableFromInline
-@_silgen_name("_getSwiftClassInstanceExtents")
+@_silgen_name("_swift_getSwiftClassInstanceExtents")
 internal func getSwiftClassInstanceExtents(_ theClass: AnyClass)
   -> (negative: UInt, positive: UInt)
 
 @usableFromInline
-@_silgen_name("_getObjCClassInstanceExtents")
+@_silgen_name("_swift_getObjCClassInstanceExtents")
 internal func getObjCClassInstanceExtents(_ theClass: AnyClass)
   -> (negative: UInt, positive: UInt)
 
