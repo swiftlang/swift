@@ -21,7 +21,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <Bcrypt.h>
-#pragma comment(lib, "Bcrypt.lib")
+#pragma comment(lib, "bcrypt.lib")
 #else
 #include <errno.h>
 #include <fcntl.h>
