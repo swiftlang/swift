@@ -373,7 +373,7 @@ Semantic Tags
 ARC takes advantage of certain semantic tags. This section documents these
 semantics and their meanings.
 
-arc.programtermination_point
+programtermination_point
 ----------------------------
 
 If this semantic tag is applied to a function, then we know that:
@@ -396,7 +396,7 @@ scope's lifetime may never end. This means that:
 
 1. While we can not ignore all such unreachable terminated blocks for ARC
 purposes for instance, if we sink a retain past a br into a non
-arc.programtermination_point block, we must sink the retain into the block.
+programtermination_point block, we must sink the retain into the block.
 
 2. If we are able to infer that an object's lifetime scope would never end due
 to the unreachable/no-return function, then we do not need to end the lifetime
