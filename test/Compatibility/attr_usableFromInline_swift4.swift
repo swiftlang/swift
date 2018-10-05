@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
-// RUN: %target-typecheck-verify-swift -enable-testing -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 4 -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-typecheck-verify-swift -enable-testing -swift-version 4 -disable-objc-attr-requires-foundation-module -enable-objc-interop
 
 @usableFromInline private func privateVersioned() {}
 // expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal declarations, but 'privateVersioned()' is private}}
@@ -121,3 +121,9 @@ enum BadEnum {
 
 @usableFromInline
 class BadClass : InternalClass {}
+
+public class DynamicMembers {
+  @usableFromInline @objc dynamic init() {}
+  @usableFromInline @objc dynamic func foo() {}
+  @usableFromInline @objc dynamic var bar: Int = 0
+}

@@ -2358,9 +2358,11 @@ bool ValueDecl::isUsableFromInline() const {
     if (EED->getParentEnum()->getAttrs().hasAttribute<UsableFromInlineAttr>())
       return true;
 
-  if (auto *ATD = dyn_cast<AssociatedTypeDecl>(this))
-    if (ATD->getProtocol()->getAttrs().hasAttribute<UsableFromInlineAttr>())
+  if (auto *containingProto = dyn_cast<ProtocolDecl>(getDeclContext())) {
+    if (isProtocolRequirement() &&
+        containingProto->getAttrs().hasAttribute<UsableFromInlineAttr>())
       return true;
+  }
 
   if (auto *DD = dyn_cast<DestructorDecl>(this))
     if (auto *CD = dyn_cast<ClassDecl>(DD->getDeclContext()))
