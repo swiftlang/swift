@@ -4,7 +4,6 @@
 /* RawRepresentable Changes */
 
 /* Removed Decls */
-Protocol ArrayProtocol has been removed
 
 /* Moved Decls */
 
@@ -15,6 +14,3 @@ Protocol ArrayProtocol has been removed
 /* Decl Attribute changes */
 
 /* Protocol Requirement Changes */
-Struct Array has removed conformance to ArrayProtocol
-Struct ArraySlice has removed conformance to ArrayProtocol
-Struct ContiguousArray has removed conformance to ArrayProtocol
