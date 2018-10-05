@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t/empty.swiftmodule %S/../Inputs/empty.swift
-// RUN: %target-swift-frontend -typecheck -emit-interface-path - %s %S/Inputs/imports-other.swift -I %S/Inputs/imports-clang-modules/ -I %t -verify | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -emit-parseable-module-interface-path - %s %S/Inputs/imports-other.swift -I %S/Inputs/imports-clang-modules/ -I %t -verify | %FileCheck %s
 
 
 @_exported import empty

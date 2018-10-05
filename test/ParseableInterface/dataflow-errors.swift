@@ -1,7 +1,7 @@
 // RUN: rm -f %t
-// RUN: not %target-swift-frontend -emit-interface-path %t -emit-module -o /dev/null %s
+// RUN: not %target-swift-frontend -emit-parseable-module-interface-path %t -emit-module -o /dev/null %s
 // RUN: test ! -f %t
-// RUN: %target-swift-frontend -emit-interface-path %t -typecheck %s
+// RUN: %target-swift-frontend -emit-parseable-module-interface-path %t -typecheck %s
 // RUN: test -f %t
 
 public struct BadInit {

@@ -84,6 +84,9 @@ ERROR(error_unknown_target,none,
 
 ERROR(error_framework_bridging_header,none,
       "using bridging headers with framework targets is unsupported", ())
+ERROR(error_bridging_header_parseable_interface,none,
+      "using bridging headers with parseable module interfaces is unsupported",
+      ())
 
 ERROR(error_i_mode,none,
       "the flag '-i' is no longer required and has been removed; "
