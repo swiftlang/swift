@@ -2,11 +2,11 @@
 
 // LLVM uses the assume intrinsic to strength reduce the division.
 
-// CHECK-LABEL: define swiftcc i64 @"$s1A10testAssumeyS2iF"(i64)
-// CHECK:   [[COND:%.*]] = icmp sgt i64 %0, -1
+// CHECK-LABEL: define{{.*}} swiftcc i{{(64|32)}} @"$s1A10testAssumeyS2iF"(i{{(64|32)}})
+// CHECK:   [[COND:%.*]] = icmp sgt i{{(64|32)}} %0, -1
 // CHECK:   tail call void @llvm.assume(i1 [[COND]])
-// CHECK:   [[RES:%.*]] = lshr i64 %0, 6
-// CHECK:   ret i64 [[RES]]
+// CHECK:   [[RES:%.*]] = lshr i{{(64|32)}} %0, 6
+// CHECK:   ret i{{(64|32)}} [[RES]]
 
 public func testAssume(_ i: Int) -> Int {
   let cond = i >= 0

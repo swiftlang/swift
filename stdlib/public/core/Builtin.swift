@@ -290,8 +290,10 @@ public func _onFastPath() {
   Builtin.onFastPath()
 }
 
-@_transparent
-public func _assume(_ condition: Bool) {
+// Optimizier hint that the condition is true. The condition is unchecked.
+// The builtin acts as an opaque instruction with side-effects.
+@usableFromInline @_transparent
+func _uncheckedUnsafeAssume(_ condition: Bool) {
   _ = Builtin.assume_Int1(condition._value)
 }
 
