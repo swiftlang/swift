@@ -388,7 +388,9 @@ Running AngryPhonebook for 3 samples.
 Running Array2D for 3 samples.
     SetUp 14444
     Sample 0,369900
+    Yielding after ~369918 μs
     Sample 1,381039
+    Yielding after ~381039 μs
     Sample 2,371043
 3,Array2D,3,369900,381039,373994,6127,371043
 
@@ -404,6 +406,7 @@ Totals,2"""
         self.assertEquals(r.num_samples, r.samples.num_samples)
         self.assertEquals(results[0].samples.all_samples,
                           [(0, 78, 11812), (1, 90, 13898), (2, 90, 11467)])
+        self.assertEquals(r.yields, None)
 
         r = results[1]
         self.assertEquals(
@@ -414,6 +417,10 @@ Totals,2"""
         self.assertEquals(r.num_samples, r.samples.num_samples)
         self.assertEquals(results[1].samples.all_samples,
                           [(0, 1, 369900), (1, 1, 381039), (2, 1, 371043)])
+        yielded = r.yields[0]
+        self.assertEquals(yielded.before_sample, 1)
+        self.assertEquals(yielded.after, 369918)
+        self.assertEquals(r.yields, [(1, 369918), (2, 381039)])
 
     def test_parse_environment_verbose(self):
         """Parse stats about environment in verbose mode."""

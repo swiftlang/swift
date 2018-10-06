@@ -51,6 +51,14 @@ class Sample(namedtuple('Sample', 'i num_iters runtime')):
         return 's({0.i!r}, {0.num_iters!r}, {0.runtime!r})'.format(self)
 
 
+class Yield(namedtuple('Yield', 'before_sample after')):
+    u"""Meta-measurement of when the Benchmark_X voluntarily yielded process.
+
+    `before_sample`: index of measurement taken just after returning from yield
+    `after`: time elapsed since the previous yield in microseconds (μs)
+    """
+
+
 class PerformanceTestSamples(object):
     """Collection of runtime samples from the benchmark execution.
 
@@ -236,6 +244,7 @@ class PerformanceTestResult(object):
         self.max_rss = (                # Maximum Resident Set Size (B)
             int(csv_row[8]) if len(csv_row) > 8 else None)
         self.samples = None
+        self.yields = None
         self.setup = None
 
     def __repr__(self):
@@ -319,7 +328,7 @@ class LogParser(object):
 
     def _reset(self):
         """Reset parser to the default state for reading a new result."""
-        self.samples, self.num_iters = [], 1
+        self.samples, self.yields, self.num_iters = [], [], 1
         self.setup, self.max_rss, self.mem_pages = None, None, None
         self.voluntary_cs, self.involuntary_cs = None, None
 
@@ -343,6 +352,7 @@ class LogParser(object):
             r.samples = PerformanceTestSamples(r.name, self.samples)
             r.samples.exclude_outliers()
         self.results.append(r)
+        r.yields = self.yields or None
         self._reset()
 
     def _store_memory_stats(self, max_rss, mem_pages):
@@ -365,6 +375,11 @@ class LogParser(object):
 
         re.compile(r'\s+SetUp (\d+)'):
         (lambda self, setup: setattr(self, 'setup', int(setup))),
+
+        re.compile(r'\s+Yielding after ~(\d+) μs'):
+        (lambda self, since_last_yield:
+            self.yields.append(
+                Yield(len(self.samples), int(since_last_yield)))),
 
         # Environmental statistics: memory usage and context switches
         re.compile(r'\s+MAX_RSS \d+ - \d+ = (\d+) \((\d+) pages\)'):
