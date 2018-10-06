@@ -1733,7 +1733,8 @@ void ConstraintSystem::partitionDisjunction(
         }
 
         if (auto *extensionDecl = dyn_cast<ExtensionDecl>(parentDecl)) {
-          if (static_cast<Decl *>(extensionDecl) == designatedProtocol) {
+          parentDecl = extensionDecl->getExtendedNominal();
+          if (parentDecl == designatedProtocol) {
             definedInExtensionOfDesignatedType.push_back(index);
             return true;
           }
