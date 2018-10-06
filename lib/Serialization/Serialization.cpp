@@ -2438,9 +2438,19 @@ void Serializer::writePatternBindingInitializer(PatternBindingDecl *binding,
                                                 unsigned bindingIndex) {
   using namespace decls_block;
   auto abbrCode = DeclTypeAbbrCodes[PatternBindingInitializerLayout::Code];
+
+  StringRef initStr;
+  SmallString<128> scratch;
+  auto &entry = binding->getPatternList()[bindingIndex];
+  auto varDecl = entry.getAnchoringVarDecl();
+  if (entry.hasInitStringRepresentation() &&
+      varDecl->isInitExposedToClients()) {
+    initStr = entry.getInitStringRepresentation(scratch);
+  }
+
   PatternBindingInitializerLayout::emitRecord(Out, ScratchRecord,
                                               abbrCode, addDeclRef(binding),
-                                              bindingIndex);
+                                              bindingIndex, initStr);
 }
 
 void
