@@ -38,7 +38,7 @@ struct SourceEdit {
   /// Check if the characters replaced by this edit fall into the given range
   /// or are directly adjacent to it
   bool intersectsOrTouchesRange(size_t RangeStart, size_t RangeEnd) {
-    return !(End <= RangeStart || Start >= RangeEnd);
+    return End >= RangeStart && Start <= RangeEnd;
   }
 };
 

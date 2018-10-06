@@ -1996,7 +1996,7 @@ static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
     exit(1);
   }
   Ptr = LineStart;
-  for (; Ptr < End; ++Ptr) {
+  for (; Ptr <= End; ++Ptr) {
     --Col;
     if (Col == 0)
       return Ptr - InputBuf->getBufferStart();

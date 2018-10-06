@@ -85,7 +85,7 @@ llvm::Optional<Syntax> SyntaxParsingCache::lookUp(size_t NewPosition,
   size_t OldPosition = NewPosition;
   for (auto I = Edits.rbegin(), E = Edits.rend(); I != E; ++I) {
     auto Edit = *I;
-    if (Edit.End <= OldPosition) {
+    if (Edit.End < OldPosition) {
       OldPosition =
           OldPosition - Edit.ReplacementLength + Edit.originalLength();
     }
