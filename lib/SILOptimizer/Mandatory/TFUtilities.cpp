@@ -126,12 +126,6 @@ bool tf::isOpaqueHandle(SILType ty) {
   return isOpaqueHandle(ty.getASTType());
 }
 
-/// Return true if the specified type is TensorHandle<T>, ResourceHandle, or
-/// VariantHandle.
-bool tf::isTensorFlowValue(SILType ty) {
-  return (bool)isTensorFlowValue(ty.getASTType());
-}
-
 /// `ty` must be a valid TensorFlow element type "T", like Builtin.Int32. Turn
 /// it into a TensorHandle<T> type.
 SILType tf::convertElementTypeToTensorValueType(Type ty,
@@ -438,12 +432,4 @@ bool TensorFunctionClassifier::containsTensorFlowValue(
       return true;
 
   return false;
-}
-
-bool tf::isShapeArrayPseudoAttr(StringRef attrName, SymbolicValue attrValue) {
-  if (attrName != SHAPE_ARRAY_ATTR)
-    return false;
-  CanType eltType;
-  (void)attrValue.getArrayValue(eltType);
-  return eltType->getString() == "TensorShape";
 }

@@ -430,9 +430,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     break;
     
   case SILStage::Lowered:
-    if (!declarationOnly) // SWIFT_ENABLE_TENSORFLOW
-      llvm_unreachable("cannot deserialize into a module that has entered "
-                       "Lowered stage");
+    llvm_unreachable("cannot deserialize into a module that has entered "
+                     "Lowered stage");
   }
   
   if (FID == 0)

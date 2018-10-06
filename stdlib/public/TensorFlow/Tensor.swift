@@ -160,6 +160,7 @@ public extension Tensor {
     let ret: TensorHandle<Scalar> = #tfop(
       "Identity",
       tensor,
+      T: Scalar.self,
       __shapes: [shape],
       __device: "/job:localhost/replica:0/task:0/device:CPU:0")
     return Tensor(handle: ret)
@@ -180,7 +181,8 @@ public extension Tensor {
     // If the `self` tensor resides on TPU, the shape is specified on that
     // device first, before outfeeding the tensor to CPU, a required step for
     // sending the tensor to the host.
-    let tensor: TensorHandle<Scalar> = #tfop("Identity", self, __shapes: [shape])
+    let tensor: TensorHandle<Scalar> =
+      #tfop("Identity", self, T: Scalar.self, __shapes: [shape])
     return Tensor(handle: tensor).toHost()
   }
 
@@ -447,7 +449,10 @@ extension TensorElementLiteral : ExpressibleByArrayLiteral {
   public typealias ArrayLiteralElement = TensorElementLiteral<Scalar>
   @inlinable @inline(__always)
   public init(arrayLiteral elements: TensorElementLiteral<Scalar>...) {
-    let handle: TensorHandle<Scalar> = #tfop("Pack", elements)
+    // Attr T (non-optional in the op definition) need not be specified when we
+    // run the op as part of a graph function, but need to be specified when we
+    // run it via eager C API.
+    let handle: TensorHandle<Scalar> = #tfop("Pack", elements, T: Scalar.self)
     tensor = Tensor(handle: handle)
   }
 }
@@ -463,7 +468,7 @@ extension Tensor : ExpressibleByArrayLiteral {
   internal init(
     tensorElementLiterals elements: [TensorElementLiteral<Scalar>]
   ) {
-    self.init(handle: #tfop("Pack", elements))
+    self.init(handle: #tfop("Pack", elements, T: Scalar.self))
   }
 
   /// Creates a tensor initialized with the given elements.

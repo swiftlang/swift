@@ -150,8 +150,46 @@ GraphOperationInfo::StructuredArgument::getArgumentNameAndLowering() const {
   return decodeArgumentName(Name);
 }
 
+/// Return true if the specified type is TensorHandle<T>, ResourceHandle, or
+/// VariantHandle.
+bool tf::isTensorFlowValue(SILType ty) {
+  return (bool)isTensorFlowValue(ty.getASTType());
+}
+
 /// Determine whether the specified type is one of our well-known types, and
 /// if so, which one it is.
 TFValueKind tf::classifyTensorFlowValue(SILType ty) {
   return classifyTensorFlowValue(ty.getASTType());
+}
+
+bool tf::isShapeArrayPseudoAttr(StringRef attrName, SymbolicValue attrValue) {
+  if (attrName != SHAPE_ARRAY_ATTR)
+    return false;
+  CanType eltType;
+  (void)attrValue.getArrayValue(eltType);
+  return eltType->getString() == "TensorShape";
+}
+
+int tf::decodeShapeAttr(const ASTContext &ctx, SymbolicValue attr,
+                        SmallVectorImpl<int64_t> &result) {
+  // Handle "nil as Optional<TensorShape>" unknown rank case.
+  if (attr.getKind() == SymbolicValue::Kind::Enum &&
+      attr.getEnumValue() == ctx.getOptionalNoneDecl()) {
+    return -1;
+  }
+
+  // Extract value from Optional<TensorShape>.
+  if (attr.getKind() == SymbolicValue::Kind::EnumWithPayload) {
+    attr = attr.getEnumPayloadValue();
+  }
+
+  attr = attr.lookThroughSingleElementAggregates();
+
+  CanType eltType;
+  auto arrayValue = attr.getArrayValue(eltType);
+  for (auto elt : arrayValue) {
+    elt = elt.lookThroughSingleElementAggregates();
+    result.push_back(elt.getIntegerValue().sextOrTrunc(64).getLimitedValue());
+  }
+  return arrayValue.size();
 }
