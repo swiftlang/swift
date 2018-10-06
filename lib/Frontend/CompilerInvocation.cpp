@@ -161,11 +161,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalPropertyBehaviors |=
     Args.hasArg(OPT_enable_experimental_property_behaviors);
 
-  Opts.EnableOperatorDesignatedProtocols |=
-      Args.hasArg(OPT_enable_operator_designated_protocols);
+  Opts.EnableOperatorDesignatedTypes |=
+      Args.hasArg(OPT_enable_operator_designated_types);
 
-  Opts.SolverEnableOperatorDesignatedProtocols |=
-      Args.hasArg(OPT_solver_enable_operator_designated_protocols);
+  Opts.SolverEnableOperatorDesignatedTypes |=
+      Args.hasArg(OPT_solver_enable_operator_designated_types);
 
   if (auto A = Args.getLastArg(OPT_enable_deserialization_recovery,
                                OPT_disable_deserialization_recovery)) {

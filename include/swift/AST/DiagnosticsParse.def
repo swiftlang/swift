@@ -432,7 +432,7 @@ ERROR(operator_decl_no_fixity,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
 
 ERROR(operator_decl_trailing_comma,none,
-      "expected designated protocol in operator declaration", ())
+      "expected designated type in operator declaration", ())
 
 // PrecedenceGroup
 ERROR(precedencegroup_not_infix,none,

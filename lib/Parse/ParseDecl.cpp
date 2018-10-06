@@ -6503,11 +6503,12 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
   if (Tok.is(tok::colon)) {
     SyntaxParsingContext GroupCtxt(SyntaxContext, SyntaxKind::InfixOperatorGroup);
     colonLoc = consumeToken();
-    if (Tok.is(tok::identifier)) {
-      firstIdentifierName = Context.getIdentifier(Tok.getText());
-      firstIdentifierNameLoc = consumeToken(tok::identifier);
 
-      if (Context.LangOpts.EnableOperatorDesignatedProtocols) {
+    if (Context.LangOpts.EnableOperatorDesignatedTypes) {
+      if (Tok.is(tok::identifier)) {
+        firstIdentifierName = Context.getIdentifier(Tok.getText());
+        firstIdentifierNameLoc = consumeToken(tok::identifier);
+
         if (consumeIf(tok::comma)) {
           if (isPrefix || isPostfix)
             diagnose(colonLoc, diag::precedencegroup_not_infix)
@@ -6521,7 +6522,12 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
             diagnose(otherTokLoc, diag::operator_decl_trailing_comma);
           }
         }
-      } else if (isPrefix || isPostfix) {
+      }
+    } else if (Tok.is(tok::identifier)) {
+      firstIdentifierName = Context.getIdentifier(Tok.getText());
+      firstIdentifierNameLoc = consumeToken(tok::identifier);
+
+      if (isPrefix || isPostfix) {
         diagnose(colonLoc, diag::precedencegroup_not_infix)
             .fixItRemove({colonLoc, firstIdentifierNameLoc});
       }

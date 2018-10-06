@@ -2878,7 +2878,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(op->getDeclContext());
     auto nameID = addDeclBaseNameRef(op->getName());
     auto groupID = addDeclRef(op->getPrecedenceGroup());
-    auto protoID = addDeclRef(op->getDesignatedProtocol());
+    auto protoID = addDeclRef(op->getDesignatedNominalType());
 
     unsigned abbrCode = DeclTypeAbbrCodes[InfixOperatorLayout::Code];
     InfixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode, nameID,
@@ -2891,7 +2891,7 @@ void Serializer::writeDecl(const Decl *D) {
     verifyAttrSerializable(op);
 
     auto contextID = addDeclContextRef(op->getDeclContext());
-    auto protoID = addDeclRef(op->getDesignatedProtocol());
+    auto protoID = addDeclRef(op->getDesignatedNominalType());
 
     unsigned abbrCode = DeclTypeAbbrCodes[PrefixOperatorLayout::Code];
     PrefixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -2905,7 +2905,7 @@ void Serializer::writeDecl(const Decl *D) {
     verifyAttrSerializable(op);
 
     auto contextID = addDeclContextRef(op->getDeclContext());
-    auto protoID = addDeclRef(op->getDesignatedProtocol());
+    auto protoID = addDeclRef(op->getDesignatedNominalType());
 
     unsigned abbrCode = DeclTypeAbbrCodes[PostfixOperatorLayout::Code];
     PostfixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
