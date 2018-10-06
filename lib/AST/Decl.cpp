@@ -3651,7 +3651,7 @@ ProtocolDecl::getInheritedProtocols() const {
 llvm::TinyPtrVector<AssociatedTypeDecl *>
 ProtocolDecl::getAssociatedTypeMembers() const {
   llvm::TinyPtrVector<AssociatedTypeDecl *> result;
-  if (!isObjC()) {
+  if (!hasClangNode()) {
     for (auto member : getMembers()) {
       if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
         result.push_back(ATD);
