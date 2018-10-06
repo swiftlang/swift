@@ -1382,6 +1382,15 @@ ERROR(convention_attribute_witness_method_expected_colon,none,
 ERROR(convention_attribute_witness_method_expected_protocol,none,
       "expected protocol name in 'witness_method' 'convention' attribute", ())
 
+// SWIFT_ENABLE_TENSORFLOW
+// autodiff
+ERROR(autodiff_attribute_expected_mode,none,
+      "expected differentiation mode in 'convention' attribute", ())
+ERROR(autodiff_attribute_expected_rparen,none,
+      "expected ')' after convention name for 'autodiff' attribute", ())
+ERROR(autodiff_attribute_order_expected_unsigned_integer,none,
+      "expected an unsigned integer as the differentiation order", ())
+
 // objc
 ERROR(attr_objc_missing_colon,none,
       "missing ':' after selector piece in @objc attribute", ())

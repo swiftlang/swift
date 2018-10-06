@@ -1911,7 +1911,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   static const TypeAttrKind FunctionAttrs[] = {
     TAK_convention, TAK_noreturn, TAK_pseudogeneric,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure,
-    TAK_escaping, TAK_yield_once, TAK_yield_many
+    // SWIFT_ENABLE_TENSORFLOW
+    TAK_escaping, TAK_autodiff, TAK_yield_once, TAK_yield_many
   };
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
@@ -2067,11 +2068,33 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           .fixItRemove(attrRange)
           .fixItReplace(resultRange, "Never");
     }
+    
+    // SWIFT_ENABLE_TENSORFLOW
+    // @nodiff is only valid on parameters.
+    if (!isParam && attrs.has(TAK_nodiff)) {
+      TC.diagnose(attrs.getLoc(TAK_nodiff),
+                  isVariadicFunctionParam
+                      ? diag::attr_not_on_variadic_parameters
+                      : diag::attr_not_on_variadic_parameters, "@nodiff");
+      attrs.clearAttribute(TAK_autoclosure);
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // @nodiff is only valid on parameters.
+    if (!isParam && attrs.has(TAK_nodiff)) {
+      TC.diagnose(attrs.getLoc(TAK_nodiff),
+                  isVariadicFunctionParam
+                      ? diag::attr_not_on_variadic_parameters
+                      : diag::attr_not_on_variadic_parameters, "@nodiff");
+      attrs.clearAttribute(TAK_autoclosure);
+    }
 
     // Resolve the function type directly with these attributes.
     FunctionType::ExtInfo extInfo(rep,
                                   attrs.has(TAK_autoclosure),
                                   attrs.has(TAK_noescape),
+                                  // SWIFT_ENABLE_TENSORFLOW
+                                  attrs.has(TAK_autodiff),
                                   fnRepr->throws());
 
     ty = resolveASTFunctionType(fnRepr, options, extInfo);

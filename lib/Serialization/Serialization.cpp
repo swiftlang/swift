@@ -3886,7 +3886,9 @@ void Serializer::writeType(Type ty) {
              getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
              fnTy->isAutoClosure(),
              fnTy->isNoEscape(),
-             fnTy->throws());
+             // SWIFT_ENABLE_TENSORFLOW
+             fnTy->throws(),
+             fnTy->isAutoDiff());
     } else {
       assert(!fnTy->isAutoClosure());
       assert(!fnTy->isNoEscape());
@@ -3977,9 +3979,10 @@ void Serializer::writeType(Type ty) {
         Out, ScratchRecord, abbrCode,
         stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
-        fnTy->hasErrorResult(), fnTy->getParameters().size(),
-        fnTy->getNumYields(), fnTy->getNumResults(),
-        addGenericSignatureRef(sig), variableData);
+        // SWIFT_ENABLE_TENSORFLOW
+        fnTy->isAutoDiff(), fnTy->hasErrorResult(),
+        fnTy->getParameters().size(), fnTy->getNumYields(),
+        fnTy->getNumResults(), addGenericSignatureRef(sig), variableData);
 
     if (auto conformance = fnTy->getWitnessMethodConformanceOrNone())
       writeConformance(*conformance, DeclTypeAbbrCodes);

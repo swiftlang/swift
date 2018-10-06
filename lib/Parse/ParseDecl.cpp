@@ -2031,6 +2031,9 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   SourceRange autoclosureEscapingParenRange;
   StringRef conventionName;
   StringRef witnessMethodProtocol;
+  // SWIFT_ENABLE_TENSORFLOW
+  StringRef differentiationMode;
+  int differentiationOrder = -1;
 
   // Handle @autoclosure(escaping)
   if (attr == TAK_autoclosure) {
@@ -2097,7 +2100,46 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
                        diag::convention_attribute_expected_rparen,
                        LPLoc);
   }
-
+  // Handle @autodiff(...).
+  else if (attr == TAK_autodiff) {
+    SourceLoc lPLoc;
+    auto parseOrder = [&]() -> bool {
+      consumeToken(); // 'order'
+      unsigned order = 0;
+      SourceLoc orderLoc;
+      if (justChecking && Tok.isNot(tok::integer_literal))
+        return true;
+      if (parseUnsignedInteger(order, orderLoc,
+              diag::autodiff_attribute_order_expected_unsigned_integer))
+        return true;
+      differentiationOrder = (int)order;
+      return false;
+    };
+    // If not followed by '('.
+    if (consumeIf(tok::l_paren, lPLoc)) {
+      if (Tok.isNot(tok::identifier)) {
+        if (!justChecking)
+          diagnose(Tok, diag::autodiff_attribute_expected_mode);
+        return true;
+      }
+      // Either there's just "order: <order>", or "<mode>, order: <order>".
+      if (Tok.getText() == "order" && peekToken().is(tok::colon) &&
+          !parseOrder())
+        return true;
+      else {
+        differentiationMode = Tok.getText();
+        if (consumeIf(tok::comma) &&
+            Tok.getText() == "order" && peekToken().is(tok::colon) &&
+            !parseOrder())
+          return true;
+      }
+      if (justChecking && Tok.isNot(tok::r_paren))
+        return true;
+      SourceLoc rPLoc;
+      parseMatchingToken(tok::r_paren, rPLoc,
+                         diag::autodiff_attribute_expected_rparen, lPLoc);
+    }
+  }
 
   // In just-checking mode, we only need to consume the tokens, and we don't
   // want to do any other analysis.
@@ -2155,6 +2197,10 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       diagnose(Loc, diag::attr_escaping_conflicts_noescape);
       return false;
     }
+    break;
+  // SWIFT_ENABLE_TENSORFLOW
+  case TAK_autodiff:
+    Attributes.setAttr(TAK_autodiff, Loc);
     break;
   case TAK_out:
   case TAK_in:

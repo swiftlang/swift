@@ -4421,7 +4421,9 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   case decls_block::GENERIC_FUNCTION_TYPE: {
     TypeID resultID;
     uint8_t rawRepresentation;
-    bool autoClosure = false, noescape = false, throws;
+    // SWIFT_ENABLE_TENSORFLOW
+    bool autoClosure = false, noescape = false, throws = false,
+         autodiff = false;
     GenericSignature *genericSig = nullptr;
 
     if (recordID == decls_block::FUNCTION_TYPE) {
@@ -4429,7 +4431,9 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
                                                   rawRepresentation,
                                                   autoClosure,
                                                   noescape,
-                                                  throws);
+                                                  // SWIFT_ENABLE_TENSORFLOW
+                                                  throws,
+                                                  autodiff);
     } else {
       GenericSignatureID rawGenericSig;
       decls_block::GenericFunctionTypeLayout::readRecord(scratch,
@@ -4447,7 +4451,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     }
     
     auto info = FunctionType::ExtInfo(*representation, autoClosure, noescape,
-                                      throws);
+                                      // SWIFT_ENABLE_TENSORFLOW
+                                      throws, autodiff);
 
     auto resultTy = getTypeChecked(resultID);
     if (!resultTy)
@@ -4777,6 +4782,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     uint8_t rawRepresentation;
     bool pseudogeneric = false;
     bool noescape;
+    // SWIFT_ENABLE_TENSORFLOW
+    bool autodiff;
     bool hasErrorResult;
     unsigned numParams;
     unsigned numYields;
@@ -4790,6 +4797,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
                                              rawRepresentation,
                                              pseudogeneric,
                                              noescape,
+                                             // SWIFT_ENABLE_TENSORFLOW
+                                             autodiff,
                                              hasErrorResult,
                                              numParams,
                                              numYields,
