@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,10 +15,10 @@
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
-#if USE_STDLIBUNITTEST
+// Note: This introsort was the standard library's sort algorithm until Swift 5.
+
 import Swift
 import StdlibUnittest
-#endif
 
 extension MutableCollection {
   /// Sorts the elements at `elements[a]`, `elements[b]`, and `elements[c]`.

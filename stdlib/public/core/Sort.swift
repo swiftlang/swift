@@ -283,7 +283,6 @@ extension MutableCollection where Self: BidirectionalCollection {
           break
         }
         
-        // Swap the elements at `i` and `j`.
         swapAt(i, j)
         i = j
       } while i != range.lowerBound
@@ -435,6 +434,7 @@ internal func _merge<Element>(
     }
   }
 
+  // FIXME: Remove this, it works around rdar://problem/45044610
   return true
 }
 
@@ -458,47 +458,46 @@ internal func _minimumMergeRunLength(_ c: Int) -> Int {
   if c < 1 << bitsToUse {
     return c
   }
-  let offset = (MemoryLayout<Int>.size * 8 - bitsToUse) - c.leadingZeroBitCount
+  let offset = (Int.bitWidth - bitsToUse) - c.leadingZeroBitCount
   let mask = (1 << offset) - 1
   return c >> offset + (c & mask == 0 ? 0 : 1)
 }
 
 /// Returns the end of the next in-order run along with a Boolean value
-/// indicating whether the elements in `start..<end` are in increasing order.
+/// indicating whether the elements in `start..<end` are in descending order.
+///
+/// - Precondition: `start < elements.endIndex`
 @inlinable
 internal func _findNextRun<C: RandomAccessCollection>(
   in elements: C,
   from start: C.Index,
   by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
-) rethrows -> (end: C.Index, ascending: Bool) {
-  var next = start
-  if next < elements.endIndex {
-    var current = next
-    elements.formIndex(after: &next)
-    if try next < elements.endIndex &&
-      areInIncreasingOrder(elements[next], elements[current])
-    {
-      // The elements of this run are in descending order. Equal elements
-      // cannot be included in the run, since the run will be reversed, which
-      // would break stability.
-      repeat {
-        current = next
-        elements.formIndex(after: &next)
-      } while try next < elements.endIndex &&
-        areInIncreasingOrder(elements[next], elements[current])
-      
-      return(next, false)
-    } else if next < elements.endIndex {
-      // The elements in this run are in ascending order. Equal elements can
-      // be included in the run.
-      repeat {
-        current = next
-        elements.formIndex(after: &next)
-      } while try next < elements.endIndex &&
-        !areInIncreasingOrder(elements[next], elements[current])
-    }
+) rethrows -> (end: C.Index, descending: Bool) {
+  _sanityCheck(start < elements.endIndex)
+
+  var previous = start
+  var current = elements.index(after: start)
+  guard current < elements.endIndex else {
+    // This is a one-element run, so treating it as ascending saves a
+    // meaningless call to `reverse()`.
+    return (current, false)
   }
-  return (next, true)
+
+  // Check whether the run beginning at `start` is ascending or descending.
+  // An ascending run can include consecutive equal elements, but because a
+  // descending run will be reversed, it must be strictly descending.
+  let isDescending =
+    try areInIncreasingOrder(elements[current], elements[previous])
+  
+  // Advance `current` until there's a break in the ascending / descending
+  // pattern.
+  repeat {
+    previous = current
+    elements.formIndex(after: &current)
+  } while try current < elements.endIndex &&
+    isDescending == areInIncreasingOrder(elements[current], elements[previous])
+    
+  return(current, isDescending)
 }
 
 extension UnsafeMutableBufferPointer {
@@ -529,6 +528,8 @@ extension UnsafeMutableBufferPointer {
     
     runs[i - 1] = low..<high
     runs.remove(at: i)
+
+    // FIXME: Remove this, it works around rdar://problem/45044610
     return result
   }
   
@@ -565,12 +566,15 @@ extension UnsafeMutableBufferPointer {
     // If W > X + Y, X > Y + Z, and Y > Z, then the invariants are satisfied
     // for the entirety of `runs`.
     
+    // FIXME: Remove this, it works around rdar://problem/45044610
     var result = true
 
     // The invariant is always in place for a single element.
     while runs.count > 1 {
       var lastIndex = runs.count - 1
       
+      // Check for the three invariant-breaking conditions, and break out of
+      // the while loop if none are met.
       if lastIndex >= 3 &&
         (runs[lastIndex - 3].count <=
           runs[lastIndex - 2].count + runs[lastIndex - 1].count)
@@ -590,8 +594,8 @@ extension UnsafeMutableBufferPointer {
           lastIndex -= 1
         }
       } else if runs[lastIndex - 1].count <= runs[lastIndex].count {
-        // Last two runs do not follow Y > Z.
-        // Merge Y and Z.
+        // Last two runs do not follow Y > Z, so merge Y and Z.
+        // This block is intentionally blank--the merge happens below.
       } else {
         // All invariants satisfied!
         break
@@ -617,6 +621,7 @@ extension UnsafeMutableBufferPointer {
     buffer: UnsafeMutablePointer<Element>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows -> Bool {
+    // FIXME: Remove this, it works around rdar://problem/45044610
     var result = true
     while runs.count > 1 {
       result = try result && _mergeRuns(
@@ -641,6 +646,7 @@ extension UnsafeMutableBufferPointer {
       return
     }
 
+    // FIXME: Remove this, it works around rdar://problem/45044610
     var result = true
 
     // Use array's allocating initializer to create a temporary buffer---this
@@ -656,9 +662,9 @@ extension UnsafeMutableBufferPointer {
       var start = startIndex
       while start < endIndex {
         // Find the next consecutive run, reversing it if necessary.
-        var (end, ascending) =
+        var (end, descending) =
           try _findNextRun(in: self, from: start, by: areInIncreasingOrder)
-        if !ascending {
+        if descending {
           _reverse(within: start..<end)
         }
         
@@ -684,7 +690,8 @@ extension UnsafeMutableBufferPointer {
       assert(runs.count == 1, "Didn't complete final merge")
     }
 
-    if !result { fatalError() }
+    // FIXME: Remove this, it works around rdar://problem/45044610
+    precondition(result)
   }
 }
 
