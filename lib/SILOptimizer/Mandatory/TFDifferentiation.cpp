@@ -1011,15 +1011,24 @@ public:
   }
 
   /// Finds a differentiation task on a function such that the task produces
-  /// adjoints for the least number of parameters that is a superset of
-  /// the parameter indices in `indices`.
+  /// adjoints for the specified indices or, if such a task is not present,
+  /// for the task with the least number of parameters that is a superset of
+  /// the parameter indices in `indices`, and which corresponds to a
+  /// non-synthesized adjoint function.
   DifferentiationTask *
   lookupMinimalDifferentiationTask(SILFunction *original,
                                    const SILReverseAutoDiffIndices &indices) {
     const llvm::SmallBitVector *supersetParamIndices;
     const auto &indexSet = indices.parameters;
     for (auto *rda : original->getReverseDifferentiableAttrs())
-      if (!indexSet.test(indexSet & rda->getIndices().parameters))
+      auto rdaIndexSet = rda->getIndices().parameters;
+      // If all indices in indexSet are in rdaIndexSet, and it has fewer
+      // indices than our current candidate and a non-synthesized adjoint,
+      // rda is our new candidate.
+      if (!indexSet.test(rdaIndexSet) && // all indexSet indices in rdaIndexSet
+          (supersetParamIndices.empty() || // fewer parameters than before
+           rdaIndexSet.count() < supersetParamIndices.count()) &&
+          (indexSet == rdaIndexSet || !rda->adjointIsSynthesized()))
         supersetParamIndices = &rda->getIndices().parameters;
     auto existing = enqueuedTaskIndices.find(
         {original, {indices.source, *supersetParamIndices}});
