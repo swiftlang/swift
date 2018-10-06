@@ -493,8 +493,6 @@ bool DisjunctionStep::shouldStopAt(const DisjunctionChoice &choice) const {
 bool DisjunctionStep::shortCircuitDisjunctionAt(
     Constraint *currentChoice, Constraint *lastSuccessfulChoice) const {
   auto &ctx = CS.getASTContext();
-  if (ctx.LangOpts.DisableConstraintSolverPerformanceHacks)
-    return false;
 
   // If the successfully applied constraint is favored, we'll consider that to
   // be the "best".
@@ -514,6 +512,9 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
   // Anything without a fix is better than anything with a fix.
   if (currentChoice->getFix() && !lastSuccessfulChoice->getFix())
     return true;
+
+  if (ctx.LangOpts.DisableConstraintSolverPerformanceHacks)
+    return false;
 
   if (auto restriction = currentChoice->getRestriction()) {
     // Non-optional conversions are better than optional-to-optional
