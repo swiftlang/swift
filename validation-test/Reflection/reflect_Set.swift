@@ -39,7 +39,7 @@ reflect(object: obj)
 // CHECK-32: Type info:
 // CHECK-32: (class_instance size=12 alignment=4 stride=12 num_extra_inhabitants=0
 // CHECK-32:   (field name=t offset=8
-// CHECK-32:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
+// CHECK-32:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=1
 // (unstable implementation details omitted)
 
 doneReflecting()
