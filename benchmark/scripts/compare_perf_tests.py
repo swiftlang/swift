@@ -69,7 +69,7 @@ class PerformanceTestSamples(object):
             self.add(sample)
 
     def __str__(self):
-        """Text summary of benchmark statisctics."""
+        """Text summary of benchmark statistics."""
         return (
             '{0.name!s} n={0.count!r} '
             'Min={0.min!r} Q1={0.q1!r} M={0.median!r} Q3={0.q3!r} '
@@ -253,6 +253,7 @@ class PerformanceTestResult(object):
         The use case here is comparing test results parsed from concatenated
         log files from multiple runs of benchmark driver.
         """
+        # Statistics
         if self.samples and r.samples:
             map(self.samples.add, r.samples.samples)
             sams = self.samples
@@ -266,8 +267,13 @@ class PerformanceTestResult(object):
                 (self.mean * self.num_samples) + (r.mean * r.num_samples)
             ) / float(self.num_samples + r.num_samples)
             self.num_samples += r.num_samples
-            self.max_rss = min(self.max_rss, r.max_rss)
             self.median, self.sd = 0, 0
+
+        # Metadata
+        def minimum(a, b):  # work around None being less than everything
+            return (min(filter(lambda x: x is not None, [a, b])) if any([a, b])
+                    else None)
+        self.max_rss = minimum(self.max_rss, r.max_rss)
 
 
 class ResultComparison(object):
@@ -326,11 +332,10 @@ class LogParser(object):
         if len(columns) < 8:
             columns = result.split()
         r = PerformanceTestResult(columns)
-        if self.max_rss:
-            r.max_rss = self.max_rss
-            r.mem_pages = self.mem_pages
-            r.voluntary_cs = self.voluntary_cs
-            r.involuntary_cs = self.involuntary_cs
+        r.max_rss = r.max_rss or self.max_rss
+        r.mem_pages = self.mem_pages
+        r.voluntary_cs = self.voluntary_cs
+        r.involuntary_cs = self.involuntary_cs
         if self.samples:
             r.samples = PerformanceTestSamples(r.name, self.samples)
             r.samples.exclude_outliers()

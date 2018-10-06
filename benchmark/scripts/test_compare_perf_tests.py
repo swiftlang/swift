@@ -214,10 +214,11 @@ class TestPerformanceTestResult(unittest.TestCase):
         )
 
     def test_merge(self):
-        tests = """1,AngryPhonebook,1,12045,12045,12045,0,12045,10510336
+        tests = """
+1,AngryPhonebook,1,12045,12045,12045,0,12045
 1,AngryPhonebook,1,12325,12325,12325,0,12325,10510336
 1,AngryPhonebook,1,11616,11616,11616,0,11616,10502144
-1,AngryPhonebook,1,12270,12270,12270,0,12270,10498048""".split('\n')
+1,AngryPhonebook,1,12270,12270,12270,0,12270,10498048""".split('\n')[1:]
         results = map(PerformanceTestResult,
                       [line.split(',') for line in tests])
 
@@ -227,7 +228,7 @@ class TestPerformanceTestResult(unittest.TestCase):
 
         r = results[0]
         self.assertEquals(as_tuple(r),
-                          (1, 12045, 12045, 12045, 0, 12045, 10510336))
+                          (1, 12045, 12045, 12045, 0, 12045, None))
         r.merge(results[1])
         self.assertEquals(as_tuple(r),  # drops SD and median
                           (2, 12045, 12325, 12185, 0, 0, 10510336))
