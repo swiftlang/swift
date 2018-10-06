@@ -263,9 +263,7 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
         continue;
 
       diagnose(decl,
-               Context.isSwiftVersion3()
-                 ? diag::requirement_restricts_self_swift3
-                 : diag::requirement_restricts_self,
+               diag::requirement_restricts_self,
                decl->getDescriptiveKind(), decl->getFullName(),
                req.getFirstType().getString(),
                static_cast<unsigned>(req.getKind()),
