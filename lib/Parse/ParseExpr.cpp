@@ -1444,6 +1444,13 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   switch (Tok.getKind()) {
   case tok::integer_literal: {
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
+    if (Text[0] == '\'') {
+      const char *CurPtr = Tok.getText().begin() + 1;
+      uint32_t CodePoint = L->lexCharacterLiteral(CurPtr);
+      std::string Integer = std::to_string(CodePoint);
+      char *IntegerBuff = (char *)Context.Allocate(Integer.size() + 1, 1 );
+      Text = StringRef(strcpy(IntegerBuff, Integer.c_str()), Integer.size());
+    }
     SourceLoc Loc = consumeToken(tok::integer_literal);
     ExprContext.setCreateSyntax(SyntaxKind::IntegerLiteralExpr);
     return makeParserResult(new (Context)

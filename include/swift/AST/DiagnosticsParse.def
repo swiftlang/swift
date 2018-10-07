@@ -115,6 +115,12 @@ ERROR(lex_unprintable_ascii_character,none,
       "unprintable ASCII character found in source file", ())
 ERROR(lex_invalid_utf8,none,
       "invalid UTF-8 found in source file", ())
+ERROR(lex_character_empty,none,
+       "empty character literal", ())
+ERROR(lex_character_invalid_escape,none,
+       "invalid escape in character literal", ())
+ERROR(lex_character_not_codepoint,none,
+       "character not expressible as a single codepoint", ())
 ERROR(lex_single_quote_string,none,
       "single-quoted string literal found, use '\"'", ())
 ERROR(lex_invalid_curly_quote,none,

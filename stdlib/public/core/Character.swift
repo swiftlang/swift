@@ -497,3 +497,9 @@ extension Character: Hashable {
     hasher.combine(String(self))
   }
 }
+
+extension Character : ExpressibleByIntegerLiteral {
+  public init(integerLiteral value: Int) {
+    self.init(Unicode.Scalar(_value: UInt32(value)))
+  }
+}

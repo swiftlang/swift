@@ -480,6 +480,8 @@ public:
     void operator=(const SILBodyRAII&) = delete;
   };
 
+  uint32_t lexCharacterLiteral(const char *&CurPtr);
+
 private:
   /// Nul character meaning kind.
   enum class NulCharacterKind {

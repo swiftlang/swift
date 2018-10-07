@@ -2489,13 +2489,52 @@ void Lexer::lexImpl() {
     return lexNumber();
 
   case '"':
-  case '\'':
     return lexStringLiteral();
       
+  case '\'': {
+    const char *TokStart = CurPtr-1;
+    uint32_t CodePoint = lexCharacterLiteral(CurPtr);
+    return formToken(CodePoint == ~0U ? tok::unknown :
+                     tok::integer_literal, TokStart);
+  }
+
   case '`':
     return lexEscapedIdentifier();
   }
 }
+
+uint32_t Lexer::lexCharacterLiteral(const char *&CurPtr) {
+  uint32_t CodePoint = ~0;
+  if (*CurPtr == '\'')
+    diagnose(CurPtr, diag::lex_character_empty);
+  else if (*CurPtr == '\\') {
+    switch (*++CurPtr) {
+      case 't': CodePoint = '\t'; break;
+      case 'r': CodePoint = '\r'; break;
+      case 'n': CodePoint = '\n'; break;
+      case '\\': CodePoint = '\\'; break;
+      case '\'': ++CurPtr; CodePoint = '\''; break;
+      default:
+        diagnose(CurPtr, diag::lex_character_invalid_escape);
+    }
+  }
+  else {
+    CodePoint = swift::validateUTF8CharacterAndAdvance(CurPtr, BufferEnd);
+
+    if (CodePoint == ~0U)
+      diagnose(CurPtr, diag::lex_invalid_utf8);
+  }
+
+  if (CodePoint != ~0U && *CurPtr != '\'') {
+    diagnose(CurPtr, diag::lex_character_not_codepoint);
+    CodePoint = ~0U;
+  }
+
+  while (*CurPtr && *CurPtr != '\n' && *CurPtr++ != '\'');
+  return CodePoint;
+}
+
+
 
 Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   // Don't try to do anything with an invalid location.
