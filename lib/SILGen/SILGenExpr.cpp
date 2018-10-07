@@ -3071,7 +3071,9 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   auto signature = SILFunctionType::get(genericSig,
     SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                              /*pseudogeneric*/ false,
-                             /*noescape*/ false),
+                             // SWIFT_ENABLE_TENSORFLOW
+                             /*noescape*/ false,
+                             FunctionType::Differentiability::None),
     SILCoroutineKind::None,
     ParameterConvention::Direct_Unowned,
     params, {}, result, None, SGM.getASTContext());
@@ -3207,7 +3209,9 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   auto signature = SILFunctionType::get(genericSig,
     SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                              /*pseudogeneric*/ false,
-                             /*noescape*/ false),
+                             // SWIFT_ENABLE_TENSORFLOW
+                             /*noescape*/ false,
+                             FunctionType::Differentiability::None),
     SILCoroutineKind::None,
     ParameterConvention::Direct_Unowned,
     params, {}, {}, None, SGM.getASTContext());
@@ -3374,7 +3378,9 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     auto signature = SILFunctionType::get(genericSig,
       SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                                /*pseudogeneric*/ false,
-                               /*noescape*/ false),
+                               // SWIFT_ENABLE_TENSORFLOW
+                               /*noescape*/ false,
+                               FunctionType::Differentiability::None),
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, /*yields*/ {}, results, None, C);
@@ -3539,7 +3545,9 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     auto signature = SILFunctionType::get(genericSig,
       SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                                /*pseudogeneric*/ false,
-                               /*noescape*/ false),
+                               // SWIFT_ENABLE_TENSORFLOW
+                               /*noescape*/ false,
+                               FunctionType::Differentiability::None),
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, /*yields*/ {}, results, None, C);

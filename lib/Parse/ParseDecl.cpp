@@ -2101,43 +2101,41 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
                        LPLoc);
   }
   // Handle @autodiff(...).
+  // autodiff-attr = '@autodiff'
   else if (attr == TAK_autodiff) {
-    SourceLoc lPLoc;
-    auto parseOrder = [&]() -> bool {
-      consumeToken(); // 'order'
-      unsigned order = 0;
-      SourceLoc orderLoc;
-      if (justChecking && Tok.isNot(tok::integer_literal))
-        return true;
-      if (parseUnsignedInteger(order, orderLoc,
-              diag::autodiff_attribute_order_expected_unsigned_integer))
-        return true;
-      differentiationOrder = (int)order;
-      return false;
-    };
-    // If not followed by '('.
-    if (consumeIf(tok::l_paren, lPLoc)) {
-      if (Tok.isNot(tok::identifier)) {
-        if (!justChecking)
-          diagnose(Tok, diag::autodiff_attribute_expected_mode);
-        return true;
-      }
-      // Either there's just "order: <order>", or "<mode>, order: <order>".
-      if (Tok.getText() == "order" && peekToken().is(tok::colon) &&
-          !parseOrder())
-        return true;
-      else {
-        differentiationMode = Tok.getText();
-        if (consumeIf(tok::comma) &&
-            Tok.getText() == "order" && peekToken().is(tok::colon) &&
-            !parseOrder())
+    // Look ahead for detailed differentiability. This is necessary because we
+    // should be able to parse `@autodiff(reverse) -> T` as a function type
+    // where `reverse` is a type name.
+    //   diff-order ::= 'order' ':' integer-literal
+    //   diff-mode ::= identifier
+    //   detailed-differentiability ::=
+    //       '(' (diff-order | diff-mode ',' diff-order) ')'
+    if (Tok.is(tok::l_paren) && peekToken().is(tok::identifier)) {
+      Parser::BacktrackingScope backtrack(*this);
+      consumeToken(tok::l_paren);
+      // Attempts to parse an unsigned integer. Returns true on success.
+      auto tryParseOrder = [&]() -> bool {
+        Parser::BacktrackingScope innerBacktrack(*this);
+        if (Tok.getText() != "order")
+          return false;
+        consumeToken(tok::identifier); // 'order'
+        if (consumeIf(tok::colon) &&
+            Tok.is(tok::integer_literal) &&
+            !Tok.getText().getAsInteger(0, differentiationOrder)) {
+          consumeToken(tok::integer_literal);
+          innerBacktrack.cancelBacktrack();
           return true;
+        }
+        return false;
+      };
+      if (!tryParseOrder()) {
+        differentiationMode = Tok.getText();
+        consumeToken(tok::identifier);
+        if (consumeIf(tok::comma))
+          tryParseOrder();
       }
-      if (justChecking && Tok.isNot(tok::r_paren))
-        return true;
-      SourceLoc rPLoc;
-      parseMatchingToken(tok::r_paren, rPLoc,
-                         diag::autodiff_attribute_expected_rparen, lPLoc);
+      if (consumeIf(tok::r_paren) && Tok.isNot(tok::arrow))
+        backtrack.cancelBacktrack();
     }
   }
 
@@ -2197,10 +2195,6 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       diagnose(Loc, diag::attr_escaping_conflicts_noescape);
       return false;
     }
-    break;
-  // SWIFT_ENABLE_TENSORFLOW
-  case TAK_autodiff:
-    Attributes.setAttr(TAK_autodiff, Loc);
     break;
   case TAK_out:
   case TAK_in:
@@ -2276,6 +2270,13 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   case TAK_convention:
     Attributes.convention = conventionName;
     Attributes.conventionWitnessMethodProtocol = witnessMethodProtocol;
+    break;
+  // SWIFT_ENABLE_TENSORFLOW
+  // @autodiff(...) attribute.
+  case TAK_autodiff:
+    Attributes.differentiabilityAndOrder = {
+      differentiationMode, differentiationOrder
+    };
     break;
   }
 

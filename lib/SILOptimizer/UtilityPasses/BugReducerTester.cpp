@@ -85,7 +85,9 @@ class BugReducerTester : public SILFunctionTransform {
     auto FuncType = SILFunctionType::get(
         nullptr, SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                                           false /*isPseudoGeneric*/,
-                                          false /*noescape*/),
+                                          // SWIFT_ENABLE_TENSORFLOW
+                                          false /*noescape*/,
+                                         FunctionType::Differentiability::None),
         SILCoroutineKind::None, ParameterConvention::Direct_Unowned,
         ArrayRef<SILParameterInfo>(), ArrayRef<SILYieldInfo>(),
         ResultInfoArray, None, getFunction()->getModule().getASTContext());

@@ -2633,17 +2633,17 @@ getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
 /// The differentiability of a function type.
 enum class FunctionTypeDifferentiability : uint8_t {
   /// Non-differentiable.
-  None = 0b000,
+  None = 0,
   /// Forward-mode differentiable.
-  Forward = 0b001,
+  Forward,
   /// Reverse-mode differentiable.
-  Reverse = 0b010,
+  Reverse,
   /// Both forward-mode and reverse-mode differentiable.
-  Bidirectional = 0b011,
+  Bidirectional,
   /// Linear map.
-  Linear = 0b100,
+  Linear,
   /// Constant function, whose derivatives are always zero.
-  Constant = 0b101,
+  Constant,
 };
 
 /// AnyFunctionType - A function type has zero or more input parameters and a
@@ -2812,8 +2812,8 @@ public:
     // and NumMaskBits must be updated, and they must match.
     //
     //   SWIFT_ENABLE_TENSORFLOW
-    //   |representation|isAutoClosure|noEscape|throws|autodiff|
-    //   |    0 .. 3    |      4      |    5   |   6  |  7..9  |
+    //   |representation|isAutoClosure|noEscape|throws|differentiability|
+    //   |    0 .. 3    |      4      |    5   |   6  |      7 .. 9     |
     //
     enum : unsigned {
       RepresentationMask     = 0xF << 0,
@@ -3019,6 +3019,12 @@ public:
   /// \brief Get the representation of the function type.
   Representation getRepresentation() const {
     return getExtInfo().getRepresentation();
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// \brief Get the differentiability of the function type.
+  Differentiability getDifferentiability() const {
+    return getExtInfo().getDifferentiability();
   }
   
   /// \brief True if this type allows an implicit conversion from a function
@@ -3633,6 +3639,8 @@ class SILFunctionType final : public TypeBase, public llvm::FoldingSetNode,
 public:
   using Language = SILFunctionLanguage;
   using Representation = SILFunctionTypeRepresentation;
+  // SWIFT_ENABLE_TENSORFLOW
+  using Differentiability = FunctionTypeDifferentiability;
 
   /// \brief A class which abstracts out some details necessary for
   /// making a call.
@@ -3641,15 +3649,15 @@ public:
     // and NumMaskBits must be updated, and they must match.
 
     // SWIFT_ENABLE_TENSORFLOW
-    //   |representation|pseudogeneric| noescape | autodiff |
-    //   |    0 .. 3    |      4      |     5    |  6 .. 8  |
+    //   |representation|pseudogeneric| noescape | differentiability |
+    //   |    0 .. 3    |      4      |     5    |      6 .. 8       |
     //
     enum : unsigned {
       RepresentationMask = 0xF << 0,
       PseudogenericMask  = 1 << 4,
       NoEscapeMask       = 1 << 5,
       // SWIFT_ENABLE_TENSORFLOW
-      DifferentiabilityMask       = 0b111 << 6,
+      DifferentiabilityMask = 0b111 << 6,
       NumMaskBits        = 9
     };
 
@@ -3664,10 +3672,14 @@ public:
     ExtInfo() : Bits(0) { }
 
     // Constructor for polymorphic type.
-    ExtInfo(Representation rep, bool isPseudogeneric, bool isNoEscape) {
+    // SWIFT_ENABLE_TENSORFLOW
+    ExtInfo(Representation rep, bool isPseudogeneric, bool isNoEscape,
+            Differentiability diff) {
       Bits = ((unsigned) rep) |
              (isPseudogeneric ? PseudogenericMask : 0) |
-             (isNoEscape ? NoEscapeMask : 0);
+             // SWIFT_ENABLE_TENSORFLOW
+             (isNoEscape ? NoEscapeMask : 0) |
+             ((unsigned) diff);
     }
 
     /// Is this function pseudo-generic?  A pseudo-generic function
@@ -3679,6 +3691,10 @@ public:
     
     // SWIFT_ENABLE_TENSORFLOW
     bool isDifferentiable() const { return Bits & DifferentiabilityMask; }
+
+    Differentiability getDifferentiability() const {
+      return Differentiability(Bits & DifferentiabilityMask);
+    }
 
     /// What is the abstract representation of this function value?
     Representation getRepresentation() const {
@@ -4068,6 +4084,12 @@ public:
   /// \brief Get the representation of the function type.
   Representation getRepresentation() const {
     return getExtInfo().getRepresentation();
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// \brief Get the differentiability of the function type.
+  Differentiability getDifferentiability() const {
+    return getExtInfo().getDifferentiability();
   }
 
   bool isPseudogeneric() const {
