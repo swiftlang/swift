@@ -665,7 +665,7 @@ if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
   # Should we build the standard library for the host?
   is_sdk_requested(LINUX swift_build_linux)
   if(swift_build_linux)
-    configure_sdk_unix(LINUX "Linux" "linux" "${SWIFT_HOST_VARIANT}" "${SWIFT_HOST_VARIANT_ARCH}" "${SWIFT_HOST_TRIPLE}")
+    configure_sdk_unix(LINUX "Linux" "linux" "${SWIFT_HOST_VARIANT_ARCH}" "${SWIFT_HOST_TRIPLE}")
     set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
     set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
   endif()
@@ -680,7 +680,7 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "FREEBSD")
   # cross-compilation.
   string(REPLACE "[-].*" "" FREEBSD_SYSTEM_VERSION ${CMAKE_SYSTEM_VERSION})
   message(STATUS "FreeBSD Version: ${FREEBSD_SYSTEM_VERSION}")
-  configure_sdk_unix(FREEBSD "FreeBSD" "freebsd" "freebsd" "x86_64" "x86_64-unknown-freebsd${FREEBSD_SYSTEM_VERSION}")
+  configure_sdk_unix(FREEBSD "FreeBSD" "freebsd" "x86_64" "x86_64-unknown-freebsd${FREEBSD_SYSTEM_VERSION}")
   set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
 
@@ -690,7 +690,7 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
   set(SWIFT_HOST_VARIANT "cygwin" CACHE STRING
       "Deployment OS for Swift host tools (the compiler) [cygwin].")
 
-  configure_sdk_unix(CYGWIN "Cygwin" "cygwin" "cygwin" "x86_64" "x86_64-unknown-windows-cygnus")
+  configure_sdk_unix(CYGWIN "Cygwin" "cygwin" "x86_64" "x86_64-unknown-windows-cygnus")
   set(SWIFT_PRIMARY_VARIANT_SDK_default "${SWIFT_HOST_VARIANT_SDK}")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
 
@@ -709,7 +709,7 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "HAIKU")
   set(SWIFT_HOST_VARIANT "haiku" CACHE STRING
       "Deployment OS for Swift host tools (the compiler) [haiku].")
 
-  configure_sdk_unix(HAIKU "Haiku" "haiku" "haiku" "x86_64" "x86_64-unknown-haiku")
+  configure_sdk_unix(HAIKU "Haiku" "haiku" "x86_64" "x86_64-unknown-haiku")
   set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
 
@@ -771,7 +771,7 @@ if(swift_build_android AND NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
   if("${SWIFT_SDK_ANDROID_ARCHITECTURES}" STREQUAL "")
     set(SWIFT_SDK_ANDROID_ARCHITECTURES armv7;aarch64)
   endif()
-  configure_sdk_unix(ANDROID "Android" "android" "android" "${SWIFT_SDK_ANDROID_ARCHITECTURES}" "")
+  configure_sdk_unix(ANDROID "Android" "android" "${SWIFT_SDK_ANDROID_ARCHITECTURES}" "")
 endif()
 
 # Should we cross-compile the standard library for Windows?

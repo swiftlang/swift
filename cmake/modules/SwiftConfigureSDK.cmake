@@ -160,7 +160,7 @@ macro(configure_sdk_darwin
   _report_sdk("${prefix}")
 endmacro()
 
-macro(configure_sdk_unix prefix name lib_subdir triple_name architectures triple)
+macro(configure_sdk_unix prefix name platform architectures triple)
   # Note: this has to be implemented as a macro because it sets global
   # variables.
 
@@ -168,9 +168,9 @@ macro(configure_sdk_unix prefix name lib_subdir triple_name architectures triple
   set(SWIFT_SDK_${prefix}_VERSION "don't use")
   set(SWIFT_SDK_${prefix}_BUILD_NUMBER "don't use")
   set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "")
-  set(SWIFT_SDK_${prefix}_LIB_SUBDIR "${lib_subdir}")
+  set(SWIFT_SDK_${prefix}_LIB_SUBDIR "${platform}")
   set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "")
-  set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${triple_name}")
+  set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${platform}")
   set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
   if("${prefix}" STREQUAL "CYGWIN")
     set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "COFF")
