@@ -518,13 +518,8 @@ const Token &Parser::peekToken() {
 }
 
 SourceLoc Parser::consumeTokenWithoutFeedingReceiver() {
-  // The following is to keep SourceKit happy when using a token from a
-  // custom compilation flag value. These are sub-lexed using a separate
-  // source buffer from the remainder of the source causing much firing
-  // of assertions. Using PreviousLoc, the Expr node is created with
-  // a Text value in the flag value's lexing buffer while having an
-  // apparently legitimate "Loc" pointing to the main source buffer.
-  SourceLoc Loc = Tok.isCustomCompilationFlag() ? PreviousLoc : Tok.getLoc();
+  // See Parser::parseExprFlagValue(). Avoids assertion failures in SourceKit.
+  SourceLoc Loc = Tok.isSubParsedFlagValue() ? PreviousLoc : Tok.getLoc();
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
 
   if (IsParsingInterfaceTokens && !Tok.getText().empty()) {

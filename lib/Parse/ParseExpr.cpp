@@ -1981,15 +1981,18 @@ ParserResult<Expr> Parser::parseExprFlagValue(Diag<> ID, bool isExprBasic) {
     return makeParserError();
 
   ParserResult<Expr> Result;
-  auto Bail = [&] () {
+  SourceLoc StringLoc = Tok.getLoc();
+  auto NilExprAndSkipToRightParen = [&] () {
     if (skipUntilTokenOrEndOfLine(tok::r_paren))
       consumeIf(tok::r_paren);
+    auto Nil = new (Context) NilLiteralExpr(StringLoc, /*Implicit=*/true);
+    Result = makeParserResult(Nil);
     Result.setIsParseError();
     return Result;
   };
   if (Tok.isNot(tok::string_literal)) {
     diagnose(Tok, diag::flagvalue_not_string_literal);
-    return Bail();
+    return NilExprAndSkipToRightParen();;
   }
 
   StringRef FlagName = Lexer::getStringLiteralContent(Tok);
@@ -1997,7 +2000,7 @@ ParserResult<Expr> Parser::parseExprFlagValue(Diag<> ID, bool isExprBasic) {
   if (IsFileInclude)
     FlagName = FlagName.drop_front();
 
-  const auto &Flags = Context.LangOpts.getCustomCompilationFlags();
+  const auto &Flags = Context.LangOpts.getCustomConditionalCompilationFlags();
   if (Flags.find(FlagName) != Flags.end()) {
     StringRef Value = Flags.at(FlagName);
 
@@ -2015,7 +2018,7 @@ ParserResult<Expr> Parser::parseExprFlagValue(Diag<> ID, bool isExprBasic) {
       if (!inputFileOrErr) {
         diagnose(Tok, diag::flagvalue_file_open_failure,
                  Value, inputFileOrErr.getError().message());
-        return Bail();
+        return NilExprAndSkipToRightParen();;
       }
 
       // Register file contents as source buffer.
@@ -2027,7 +2030,7 @@ ParserResult<Expr> Parser::parseExprFlagValue(Diag<> ID, bool isExprBasic) {
       auto Segment = Lexer::StringSegment::getLiteral(Loc, Buffer.size(),
                                                       false, false, 0, ~0u);
       Result = makeParserResult(createStringLiteralExprFromSegment(
-                                Context, L, Segment, Tok.getLoc()));
+                                Context, L, Segment, StringLoc));
 
       consumeToken(tok::string_literal);
     }
@@ -2035,7 +2038,7 @@ ParserResult<Expr> Parser::parseExprFlagValue(Diag<> ID, bool isExprBasic) {
       {
         // Sub-parse flag value looking for appropriate literal token.
         unsigned BufferId = SourceMgr.addMemBufferCopy(Value,
-                                                       "Option: -D"+FlagName.str());
+                                                "Option: -D"+FlagName.str());
         StringRef Buffer = SourceMgr.getEntireTextForBuffer(BufferId);
 
         // Temporarily swap out the parser's current lexer with our new one.
@@ -2054,21 +2057,21 @@ ParserResult<Expr> Parser::parseExprFlagValue(Diag<> ID, bool isExprBasic) {
       // Prevents interpolations in strings in flag values.
       // Also, arranges for the "Loc" of the resulting Expr to
       // be that of the FlagName argument in the main buffer.
-      Tok.setCustomCompilationFlag(true);
+      Tok.setSubParsedFlagValue(true);
 
       if (Tok.isNot(tok::kw_true, tok::kw_false, tok::string_literal,
                     tok::floating_literal, tok::integer_literal, tok::kw_nil)) {
         diagnose(Tok, diag::flagvalue_invalid_literal, Value);
         consumeToken();
-        return Bail();
+        return NilExprAndSkipToRightParen();;
       }
 
       // Literal token consumed to create Expr *
       Result = parseExprPrimary(ID, isExprBasic);
     }
     else {
-      diagnose(Tok, diag::flagvalue_flag_empty, FlagName);
-      return Bail();
+      diagnose(StringLoc, diag::flagvalue_flag_empty, FlagName);
+      return NilExprAndSkipToRightParen();;
     }
   }
   else
@@ -2078,7 +2081,7 @@ ParserResult<Expr> Parser::parseExprFlagValue(Diag<> ID, bool isExprBasic) {
     // Parse out default if provided and use if necessary.
     if (parseToken(tok::kw_default, diag::flagvalue_expected, "default:") ||
         parseToken(tok::colon, diag::flagvalue_expected, ":"))
-      return Bail();
+      return NilExprAndSkipToRightParen();;
 
     auto Default = parseExprImpl(ID, isExprBasic);
 
@@ -2087,12 +2090,12 @@ ParserResult<Expr> Parser::parseExprFlagValue(Diag<> ID, bool isExprBasic) {
   }
 
   if (Result.isNull()) {
-    diagnose(Tok, diag::flagvalue_no_value, FlagName);
-    return Bail();
+    diagnose(StringLoc, diag::flagvalue_no_value, FlagName);
+    return NilExprAndSkipToRightParen();;
   }
 
   if (parseToken(tok::r_paren, diag::flagvalue_expected, ")"))
-    return Bail();
+    return NilExprAndSkipToRightParen();;
 
   return Result;
 }

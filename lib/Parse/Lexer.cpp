@@ -2252,7 +2252,7 @@ void Lexer::getStringLiteralSegments(
         *BytesPtr++ != '(')
       continue;
 
-    if (Str.isCustomCompilationFlag()) {
+    if (Str.isSubParsedFlagValue()) {
       if (Diags)
         Diags->diagnose(Lexer::getSourceLoc(BytesPtr-2),
                         diag::flagvalue_invalid_interpolation);

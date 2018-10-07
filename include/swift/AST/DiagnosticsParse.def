@@ -1529,6 +1529,8 @@ ERROR(unsupported_platform_condition_argument,none,
       (StringRef))
 ERROR(unsupported_conditional_compilation_expression_type,none,
       "invalid conditional compilation expression", ())
+WARNING(undefined_conditional_compilation_comparison,none,
+      "flag '%0' referred to in comparison but has no value", (StringRef))
 ERROR(unsupported_conditional_compilation_literal,none,
       "invalid context for literal in conditional", ())
 ERROR(unsupported_conditional_compilation_integer,none,

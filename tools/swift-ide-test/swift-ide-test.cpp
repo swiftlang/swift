@@ -3121,7 +3121,7 @@ int main(int argc, char *argv[]) {
       options::DebugConstraintSolver;
 
   for (auto ConfigName : options::BuildConfigs)
-    InitInvok.getLangOptions().addCustomCompilationFlag(ConfigName);
+    InitInvok.getLangOptions().addCustomConditionalCompilationFlag(ConfigName);
 
   // Process the clang arguments last and allow them to override previously
   // set options.

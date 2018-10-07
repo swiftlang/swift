@@ -48,8 +48,8 @@ class Token {
   /// Length of custom delimiter of "raw" string literals
   unsigned CustomDelimiterLen : 8;
 
-  /// Value from custom compilation flag
-  unsigned CustomCompilationFlag : 1;
+  /// Value from custom compilation flag (see #flagValue)
+  unsigned SubParsedFlagValue : 1;
 
   // Padding bits == 32 - 12;
 
@@ -69,7 +69,7 @@ public:
   Token(tok Kind, StringRef Text, unsigned CommentLength = 0)
           : Kind(Kind), AtStartOfLine(false), EscapedIdentifier(false),
             MultilineString(false), CustomDelimiterLen(0),
-            CustomCompilationFlag(0), CommentLength(CommentLength), Text(Text) {}
+            SubParsedFlagValue(0), CommentLength(CommentLength), Text(Text) {}
 
   Token() : Token(tok::NUM_TOKENS, {}, 0) {}
 
@@ -297,12 +297,12 @@ public:
            "custom string delimiter length > 255");
   }
 
-  void setCustomCompilationFlag(bool CustomCompilationFlag = true) {
-    this->CustomCompilationFlag = CustomCompilationFlag;
+  void setSubParsedFlagValue(bool SubParsedFlagValue = true) {
+    this->SubParsedFlagValue = SubParsedFlagValue;
   }
 
-  bool isCustomCompilationFlag() const {
-    return CustomCompilationFlag != 0;
+  bool isSubParsedFlagValue() const {
+    return SubParsedFlagValue != 0;
   }
 };
   

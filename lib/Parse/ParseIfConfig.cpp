@@ -152,7 +152,7 @@ class ValidateIfConfigCondition :
 
       if (!IsEnd && isComparisonOp(*OpName) && isComparisonOp(*NextOpName)) {
         D.diagnose(RHS->getLoc(),
-                   diag::unsupported_conditional_compilation_chained_comparison);
+               diag::unsupported_conditional_compilation_chained_comparison);
         HasError |= true;
       }
 
@@ -405,6 +405,7 @@ static bool validateIfConfigCondition(Expr *&condition,
 class EvaluateIfConfigCondition :
   public ExprVisitor<EvaluateIfConfigCondition, bool> {
   ASTContext &Ctx;
+  DiagnosticEngine &D;
 
   /// Get the identifier string from an \c Expr assuming it's an
   /// \c UnresolvedDeclRefExpr.
@@ -415,19 +416,19 @@ class EvaluateIfConfigCondition :
   std::string asString(Expr *E) {
     if (auto Literal = dyn_cast<StringLiteralExpr>(E))
       return Literal->getValue();
-    else if (auto Literal = dyn_cast<FloatLiteralExpr>(E))
-      return (Literal->isNegative()? "-" : "") + Literal->getDigitsText().str();
-    else if (auto Literal = dyn_cast<IntegerLiteralExpr>(E))
+    else if (auto Literal = dyn_cast<NumberLiteralExpr>(E))
       return (Literal->isNegative()? "-" : "") + Literal->getDigitsText().str();
     else if (isa<UnresolvedDeclRefExpr>(E)) {
       StringRef FlagName = getDeclRefStr(E);
-      const auto &Flags = Ctx.LangOpts.getCustomCompilationFlags();
+      const auto &Flags = Ctx.LangOpts.getCustomConditionalCompilationFlags();
       if (Flags.find(FlagName) != Flags.end()) {
         StringRef Value = Flags.at(FlagName);
         if (Value.size() >= 2 && Value[0] == '"' && Value.end()[-1] == '"')
           Value = Value.drop_front().drop_back();
         return Value;
       }
+      D.diagnose(E->getLoc(),
+                 diag::undefined_conditional_compilation_comparison, FlagName);
       return "";
     }
     return visit(E) ? "true" : "false";
@@ -442,7 +443,8 @@ class EvaluateIfConfigCondition :
   }
 
 public:
-  EvaluateIfConfigCondition(ASTContext &Ctx) : Ctx(Ctx) {}
+  EvaluateIfConfigCondition(ASTContext &Ctx, DiagnosticEngine &D)
+    : Ctx(Ctx), D(D) {}
 
   bool visitBooleanLiteralExpr(BooleanLiteralExpr *E) {
     return E->getValue();
@@ -454,7 +456,7 @@ public:
 
   bool visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
     auto Name = getDeclRefStr(E);
-    return Ctx.LangOpts.isCustomCompilationFlagSet(Name);
+    return Ctx.LangOpts.isCustomConditionalCompilationFlagSet(Name);
   }
 
   bool visitCallExpr(CallExpr *E) {
@@ -528,8 +530,9 @@ public:
 
 /// Evaluate the condition.
 /// \c true if success, \c false if failed.
-static bool evaluateIfConfigCondition(Expr *Condition, ASTContext &Context) {
-  return EvaluateIfConfigCondition(Context).visit(Condition);
+static bool evaluateIfConfigCondition(Expr *Condition, ASTContext &Context,
+                                      DiagnosticEngine &D) {
+  return EvaluateIfConfigCondition(Context, D).visit(Condition);
 }
 
 /// Version condition checker.
@@ -703,7 +706,7 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
       } else if (!foundActive && State->PerformConditionEvaluation) {
         // Evaluate the condition only if we haven't found any active one and
         // we're not in parse-only mode.
-        isActive = evaluateIfConfigCondition(Condition, Context);
+        isActive = evaluateIfConfigCondition(Condition, Context, Diags);
         isVersionCondition = isVersionIfConfigCondition(Condition);
       }
     }

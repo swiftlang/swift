@@ -140,9 +140,10 @@ checkPlatformCondition(PlatformConditionKind Kind, StringRef Value) const {
   return false;
 }
 
-bool LangOptions::isCustomCompilationFlagSet(StringRef Name) const {
-  return CustomCompilationFlags.find(Name) != CustomCompilationFlags.end() &&
-      CustomCompilationFlags.at(Name) != "false";
+bool LangOptions::isCustomConditionalCompilationFlagSet(StringRef Name) const {
+  return CustomConditionalCompilationFlags.find(Name) !=
+      CustomConditionalCompilationFlags.end() &&
+      CustomConditionalCompilationFlags.at(Name) != "false";
 }
 
 std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
