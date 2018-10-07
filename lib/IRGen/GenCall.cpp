@@ -3105,7 +3105,6 @@ Explosion NativeConventionSchema::mapFromNative(IRGenModule &IGM,
   // Store the expanded type elements.
   auto coercionAddr = Builder.CreateElementBitCast(temporary, coercionTy);
   unsigned expandedMapIdx = 0;
-  SmallVector<llvm::Value *, 8> expandedElts(expandedTys.size(), nullptr);
 
   auto eltsArray = native.claimAll();
   SmallVector<llvm::Value *, 8> nativeElts(eltsArray.begin(), eltsArray.end());
