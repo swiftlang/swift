@@ -160,7 +160,7 @@ macro(configure_sdk_darwin
   _report_sdk("${prefix}")
 endmacro()
 
-macro(configure_sdk_unix prefix name platform architectures triple)
+macro(configure_sdk_unix prefix name platform architectures)
   # Note: this has to be implemented as a macro because it sets global
   # variables.
 
@@ -211,7 +211,41 @@ macro(configure_sdk_unix prefix name platform architectures triple)
       if(NOT SWIFT_SDK_${prefix}_ARCH_${arch}_PATH)
         set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "/")
       endif()
-      set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE "${triple}")
+
+      if("${prefix}" STREQUAL "LINUX")
+        if(arch MATCHES "(armv6|armv7)")
+          set(SWIFT_SDK_LINUX_ARCH_${arch}_TRIPLE "${arch}-unknown-linux-gnueabihf")
+        elseif(arch MATCHES "(aarch64|i686|powerpc64|powerpc64le|s390x|x86_64)")
+          set(SWIFT_SDK_LINUX_ARCH_${arch}_TRIPLE "${arch}-unknown-linux-gnu")
+        else()
+          message(FATAL_ERROR "unknown arch for ${prefix}: ${arch}")
+        endif()
+      elseif("${prefix}" STREQUAL "FREEBSD")
+        if(arch STREQUAL x86_64)
+          message(FATAL_ERROR "unsupported arch for FreeBSD: ${arch}")
+        endif()
+
+        if(CMAKE_HOST_SYSTEM_NAME NOT STREQUAL FreeBSD)
+          message(WARNING "CMAKE_SYSTEM_VERSION will not match target")
+        endif()
+
+        string(REPLACE "[-].*" "" freebsd_system_version ${CMAKE_SYSTEM_VERSION})
+        message(STATUS "FreeBSD Version: ${freebsd_system_version}")
+
+        set(SWIFT_SDK_FREEBSD_ARCH_x86_64_TRIPLE "x86_64-unknown-freebsd${freebsd_system_version}")
+      elseif("${prefix}" STREQUAL "CYGWIN")
+        if(NOT arch STREQUAL x86_64)
+          message(FATAL_ERROR "unsupported arch for cygwin: ${arch}")
+        endif()
+        set(SWIFT_SDK_CYGWIN_ARCH_x86_64_TRIPLE "x86_64-unknown-windows-cygnus")
+      elseif("${prefix}" STREQUAL "HAIKU")
+        if(NOT arch STREQUAL x86_64)
+          message(FATAL_ERROR "unsupported arch for Haiku: ${arch}")
+        endif()
+        set(SWIFT_SDK_HAIKU_ARCH_x86_64_TRIPLE "x86_64-unknown-haiku")
+      else()
+        message(FATAL_ERROR "unknown Unix OS: ${prefix}")
+      endif()
     endif()
   endforeach()
 
