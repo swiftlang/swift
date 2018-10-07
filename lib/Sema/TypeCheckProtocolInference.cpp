@@ -723,6 +723,17 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
       return true;
     }
 
+    // Allow match of dynamic Self to the conforming type, if it's
+    // a non-class or final class.
+    bool mismatch(DynamicSelfType *firstType, TypeBase *secondType,
+                  Type sugaredFirstType) {
+      if (secondType->isEqual(Conformance->getType())) {
+        auto classDecl = Conformance->getType()->getClassOrBoundGenericClass();
+        return !classDecl || classDecl->isFinal();
+      }
+      return false;
+    }
+
     /// FIXME: Recheck the type of Self against the second type?
     bool mismatch(GenericTypeParamType *selfParamType,
                   TypeBase *secondType, Type sugaredFirstType) {
