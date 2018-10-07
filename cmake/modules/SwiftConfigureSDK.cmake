@@ -160,8 +160,7 @@ macro(configure_sdk_darwin
   _report_sdk("${prefix}")
 endmacro()
 
-macro(configure_sdk_unix
-    prefix name lib_subdir triple_name architectures triple sdkpath)
+macro(configure_sdk_unix prefix name lib_subdir triple_name architectures triple)
   # Note: this has to be implemented as a macro because it sets global
   # variables.
 
@@ -209,7 +208,9 @@ macro(configure_sdk_unix
       set(SWIFT_SDK_ANDROID_ARCH_${arch}_LINKER
           "${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_PREBUILT_PATH}/bin/${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE}-${SWIFT_ANDROID_LINKER_NAME}")
     else()
-      set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "${sdkpath}")
+      if(NOT SWIFT_SDK_${prefix}_ARCH_${arch}_PATH)
+        set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "/")
+      endif()
       set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE "${triple}")
     endif()
   endforeach()
