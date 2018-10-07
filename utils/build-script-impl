@@ -2658,47 +2658,62 @@ for host in "${ALL_HOSTS[@]}"; do
                 ICU_TMPLIBDIR="${SWIFT_BUILD_PATH}/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
                 if [[ "${RECONFIGURE}" || ! -f "${LIBICU_BUILD_DIR}"/config.status ]]; then
                     echo "Reconfiguring libicu"
-                    if [[ "$LIBICU_BUILD_TYPE" == "Release" ]] ; then
-                        icu_build_variant_arg="--enable-release"
-                    elif [[ "$LIBICU_BUILD_TYPE" == "RelWithDebInfo" ]]; then
-                        icu_build_variant_arg="--enable-release"
+                    if [[ "$LIBICU_BUILD_TYPE" != "Release" ]] ; then
+                        libicu_enable_debug="--enable-debug"
                     else
-                        icu_build_variant_arg="--enable-debug"
+                        libicu_enable_debug=""
                     fi
                     call mkdir -p "${LIBICU_BUILD_DIR}"
+
+                    if [ $(true_false "${BUILD_SWIFT_STATIC_STDLIB}") == "TRUE" ]; then
+                          libicu_enable_static="--enable-static"
+                    else
+                          libicu_enable_static=""
+                    fi
+
                     with_pushd "${LIBICU_BUILD_DIR}" \
-                        call "${LIBICU_SOURCE_DIR}"/source/configure \
+                        call env CXXFLAGS=-fPIC "${LIBICU_SOURCE_DIR}"/icu4c/source/runConfigureICU Linux \
                         ${icu_build_variant_arg} --prefix=${ICU_TMPINSTALL} \
+                        ${libicu_enable_debug} \
+                        --enable-renaming --with-library-suffix=swift \
                         --libdir=${ICU_TMPLIBDIR} \
                         --enable-shared --enable-static \
                         --enable-strict --disable-icuio \
                         --disable-plugins --disable-dyload --disable-extras \
-                        --disable-samples --with-data-packaging=auto
+                        --disable-samples --disable-layoutex --with-data-packaging=auto
                 else
                     echo "Skipping reconfiguration of libicu"
                 fi
                 with_pushd "${LIBICU_BUILD_DIR}" \
-                    call make install
+                    call make -j ${BUILD_JOBS} install
                 ICU_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
                 ICU_LIBDIR_STATIC="$(build_directory ${host} swift)/lib/swift_static/${SWIFT_HOST_VARIANT}"
                 ICU_LIBDIR_STATIC_ARCH="$(build_directory ${host} swift)/lib/swift_static/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
-                mkdir -p "${ICU_LIBDIR_STATIC_ARCH}"
-                # Copy the static libs into the swift_static directory
-                for l in uc i18n data
-                do
-                    lib="${ICU_LIBDIR}/libicu${l}.a"
-                    cp "${lib}" "${ICU_LIBDIR_STATIC}"
-                    cp "${lib}" "${ICU_LIBDIR_STATIC_ARCH}"
-                done
+                # Add in the ICU renaming config into uconfig.h
+                sed -e "/^#define __UCONFIG_H__/ r ${LIBICU_BUILD_DIR}/uconfig.h.prepend" -i ${ICU_TMPINSTALL}/include/unicode/uconfig.h
+
+                if [ $(true_false "${BUILD_SWIFT_STATIC_STDLIB}") == "TRUE" ]; then
+                    # Copy the static libs into the swift_static directory
+                    mkdir -p "${ICU_LIBDIR_STATIC_ARCH}"
+                    for l in uc i18n data
+                    do
+                        lib="${ICU_LIBDIR}/libicu${l}swift.a"
+                        cp "${lib}" "${ICU_LIBDIR_STATIC}"
+                        cp "${lib}" "${ICU_LIBDIR_STATIC_ARCH}"
+                    done
+                fi
 
                 # Set the PKG_CONFIG_PATH so that core-foundation can find the libraries and
                 # header files
-                export PKG_CONFIG_PATH="${ICU_TMPLIBDIR}/pkgconfig:${PKG_CONFIG_PATH}"
+                export PKG_CONFIG_PATH="${LIBICU_BUILD_DIR}/config:${PKG_CONFIG_PATH}"
+                export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}":"${LIBICU_BUILD_DIR}/lib"
                 swift_cmake_options=(
                     "${swift_cmake_options[@]}"
                     -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_UC_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
                     -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_I18N_INCLUDE:STRING="${ICU_TMPINSTALL}/include"
                     -DSWIFT_${SWIFT_HOST_VARIANT_SDK}_${SWIFT_HOST_VARIANT_ARCH}_ICU_STATICLIB:BOOL=TRUE
+                    -DICU_UC_LIBDIR:PATH="${LIBICU_BUILD_DIR}/lib"
+                    -DICU_I18N_LIBDIR:PATH="${LIBICU_BUILD_DIR}/lib"
                 )
                 # libicu builds itself and doesn't use cmake
                 continue
@@ -3169,7 +3184,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 LIBICU_BUILD_DIR=$(build_directory ${host} ${product})
                 echo "--- Running tests for ${product} ---"
                 with_pushd "${LIBICU_BUILD_DIR}/test" \
-                    call make
+                    call make -j ${BUILD_JOBS}
                 echo "--- Finished tests for ${product} ---"
                 continue
                 ;;
@@ -3411,21 +3426,34 @@ for host in "${ALL_HOSTS[@]}"; do
                     exit 1
                 fi
                 echo "--- Installing ${product} ---"
-                LIBICU_BUILD_DIR=$(build_directory ${host} ${product})
+                ICU_BUILD_DIR=$(build_directory ${host} ${product})
+                ICU_INSTALL_DIR="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"
                 ICU_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
-                LIBICU_DEST_DIR="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})lib/swift/${SWIFT_HOST_VARIANT}"
-                LIBICU_DEST_DIR_STATIC="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})lib/swift_static/${SWIFT_HOST_VARIANT}"
+                LIBICU_DEST_DIR="${ICU_INSTALL_DIR}lib/swift/${SWIFT_HOST_VARIANT}"
                 mkdir -p ${LIBICU_DEST_DIR}
-                mkdir -p ${LIBICU_DEST_DIR_STATIC}
+
                 for l in uc i18n data
                 do
-                    lib=${ICU_LIBDIR}/libicu${l}
+                    lib=${ICU_LIBDIR}/libicu${l}swift
                     echo "${lib} => ${LIBICU_DEST_DIR}"
                     cp -d ${lib}.so ${lib}.so.* ${LIBICU_DEST_DIR}
-                    cp -d ${lib}.so ${lib}.so.* ${LIBICU_DEST_DIR}
-                    cp -d ${lib}.a ${LIBICU_DEST_DIR_STATIC}
-                    cp -d ${lib}.a ${LIBICU_DEST_DIR_STATIC}
                 done
+
+                if [ $(true_false "${BUILD_SWIFT_STATIC_STDLIB}") == "TRUE" ]; then
+                    LIBICU_DEST_DIR_STATIC="${ICU_INSTALL_DIR}lib/swift_static/${SWIFT_HOST_VARIANT}"
+                    mkdir -p ${LIBICU_DEST_DIR_STATIC}
+                    for l in uc i18n data
+                    do
+                        lib=${ICU_LIBDIR}/libicu${l}swift
+                        echo "${lib} => ${LIBICU_DEST_DIR_STATIC}"
+                        cp -d ${lib}.a ${LIBICU_DEST_DIR_STATIC}
+                    done
+                fi
+
+                ICU_TMP_INSTALL_DIR="${ICU_BUILD_DIR}/tmp_install"
+                mkdir -p  "${ICU_INSTALL_DIR}include"
+                cp -a "${ICU_TMP_INSTALL_DIR}/include/unicode" "${ICU_INSTALL_DIR}include"
+
                 continue
                 ;;
             playgroundsupport)

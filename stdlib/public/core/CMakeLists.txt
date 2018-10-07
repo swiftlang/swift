@@ -231,7 +231,7 @@ else()
     list(APPEND swift_core_private_link_libraries
       ICU_UC ICU_I18N)
   else()
-    list(APPEND swift_core_private_link_libraries -licui18n -licuuc -licudata)
+    list(APPEND swift_core_private_link_libraries -licui18nswift -licuucswift -licudataswift)
   endif()
 endif()
 
