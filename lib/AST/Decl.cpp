@@ -3651,13 +3651,22 @@ ProtocolDecl::getInheritedProtocols() const {
 llvm::TinyPtrVector<AssociatedTypeDecl *>
 ProtocolDecl::getAssociatedTypeMembers() const {
   llvm::TinyPtrVector<AssociatedTypeDecl *> result;
-  if (!hasClangNode()) {
-    for (auto member : getMembers()) {
-      if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
-        result.push_back(ATD);
-      }
+
+  // Clang-imported protocols never have associated types.
+  if (hasClangNode())
+    return result;
+
+  // Deserialized @objc protocols never have associated types.
+  if (!getParentSourceFile() && isObjC())
+    return result;
+
+  // Find the associated type declarations.
+  for (auto member : getMembers()) {
+    if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
+      result.push_back(ATD);
     }
   }
+
   return result;
 }
 
