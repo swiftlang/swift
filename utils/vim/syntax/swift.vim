@@ -12,7 +12,6 @@ syn keyword swiftKeyword
       \ break
       \ catch
       \ continue
-      \ default
       \ defer
       \ do
       \ else
@@ -144,6 +143,8 @@ syn match swiftKeyword
       \ /\<case\>/
 syn region swiftCaseLabelRegion
       \ matchgroup=swiftKeyword start=/\<case\>/ matchgroup=Delimiter end=/:/ oneline contains=TOP
+syn region swiftDefaultLabelRegion
+      \ matchgroup=swiftKeyword start=/\<default\>/ matchgroup=Delimiter end=/:/
 
 syn region swiftParenthesisRegion matchgroup=NONE start=/(/ end=/)/ contains=TOP
 
