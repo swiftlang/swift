@@ -236,3 +236,16 @@ func autoclosure1<T>(_: [T], _: X) { }
 func test_autoclosure1(ia: [Int]) {
   autoclosure1(ia, X()) // okay: resolves to the second function
 }
+
+// SR-8791
+struct Bar {
+    func strs() -> [String] {
+        return ["foo", "bar"]
+    }
+}
+struct Foo {
+    func anArray() -> [Any]? {
+        let bars = [Bar(), Bar()]
+        return bars.flatMap { $0.strs() } // Okay: resolves to correct flatMap, not deprecated
+    }
+}
