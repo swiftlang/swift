@@ -90,4 +90,7 @@ public extension P1 {
 infix operator ..*..
 
 @usableFromInline
-class UsableFromInlineClass {}
+@_fixed_layout
+class UsableFromInlineClass {
+  private var Prop = 1
+}
