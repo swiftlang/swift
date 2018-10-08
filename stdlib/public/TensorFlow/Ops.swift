@@ -374,28 +374,28 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// Returns a Boolean value indicating whether the value of the first argument
   /// is lexicographically less than that of the second argument.
   @inlinable @inline(__always)
-  public static func < (lhs: Tensor, rhs: Scalar) -> Bool {
+  static func < (lhs: Tensor, rhs: Scalar) -> Bool {
     return lhs.elementsLess(rhs).all()
   }
 
   /// Returns a Boolean value indicating whether the value of the first argument
   /// is lexicographically less than or equal to that of the second argument.
   @inlinable @inline(__always)
-  public static func <= (lhs: Tensor, rhs: Scalar) -> Bool {
+  static func <= (lhs: Tensor, rhs: Scalar) -> Bool {
     return lhs.elementsLessOrEqual(rhs).all()
   }
 
   /// Returns a Boolean value indicating whether the value of the first argument
   /// is lexicographically greater than that of the second argument.
   @inlinable @inline(__always)
-  public static func > (lhs: Tensor, rhs: Scalar) -> Bool {
+  static func > (lhs: Tensor, rhs: Scalar) -> Bool {
     return lhs.elementsGreater(rhs).all()
   }
 
   /// Returns a Boolean value indicating whether the value of the first argument
   /// is lexicographically greater than or equal to that of the second argument.
   @inlinable @inline(__always)
-  public static func >= (lhs: Tensor, rhs: Scalar) -> Bool {
+  static func >= (lhs: Tensor, rhs: Scalar) -> Bool {
     return lhs.elementsGreaterOrEqual(rhs).all()
   }
 }
@@ -790,28 +790,28 @@ public extension Tensor where Scalar == Bool {
   ///   must be either have the same shape as `left` or be a 1-D `Tensor` such
   ///   that `self.scalarCount == left[0]`.
   @inlinable @inline(__always)
-  public func selecting<T>(_ left: Tensor<T>, _ right: Tensor<T>) -> Tensor<T> {
+  func selecting<T>(_ left: Tensor<T>, _ right: Tensor<T>) -> Tensor<T> {
     return Raw.select(condition: self, t: left, e: right)
   }
 
   // FIXME: "Select" is non-broadcasting: `left` and `right` are required to
   // have the same shapes. An explicit broadcast must be added.
   @inlinable @inline(__always)
-  public func selecting<T>(_ left: T, _ right: Tensor<T>) -> Tensor<T> {
+  func selecting<T>(_ left: T, _ right: Tensor<T>) -> Tensor<T> {
     return selecting(Tensor<T>(left), right)
   }
 
   // FIXME: "Select" is non-broadcasting: `left` and `right` are required to
   // have the same shapes. An explicit broadcast must be added.
   @inlinable @inline(__always)
-  public func selecting<T>(_ left: Tensor<T>, _ right: T) -> Tensor<T> {
+  func selecting<T>(_ left: Tensor<T>, _ right: T) -> Tensor<T> {
     return selecting(left, Tensor<T>(right))
   }
 
   // FIXME: "Select" is non-broadcasting: `left` and `right` are required to
   // have the same shapes. An explicit broadcast must be added.
   @inlinable @inline(__always)
-  public func selecting<T>(_ left: T, _ right: T) -> Tensor<T> {
+  func selecting<T>(_ left: T, _ right: T) -> Tensor<T> {
     return selecting(Tensor<T>(left), Tensor<T>(right))
   }
 }

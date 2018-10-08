@@ -69,7 +69,7 @@ public extension Dataset {
 public extension Dataset {
   /// Creates a dataset from a batch of elements as a tensor.
   @inlinable @inline(__always)
-  public init(elements: Element) {
+  init(elements: Element) {
     // A dataset creation op only runs on TF CPU.
     self.init(
       _handle: #tfop(
