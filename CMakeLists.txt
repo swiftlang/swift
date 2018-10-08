@@ -637,71 +637,9 @@ endif()
 # We could easily do that - we have all of that information in build-script-impl.
 # Darwin targets cheat and use `xcrun`.
 
-if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
-
-  set(SWIFT_HOST_VARIANT "linux" CACHE STRING
-      "Deployment OS for Swift host tools (the compiler) [linux].")
-
-  # Should we build the standard library for the host?
-  is_sdk_requested(LINUX swift_build_linux)
-  if(swift_build_linux)
-    configure_sdk_unix("Linux" "${SWIFT_HOST_VARIANT_ARCH}")
-    set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
-    set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
-  endif()
-
-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "FREEBSD")
-
-  set(SWIFT_HOST_VARIANT "freebsd" CACHE STRING
-      "Deployment OS for Swift host tools (the compiler) [freebsd].")
-
-  configure_sdk_unix("FreeBSD" "${SWIFT_HOST_VARIANT_ARCH}")
-  set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
-  set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
-
-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
-
-  set(SWIFT_HOST_VARIANT "cygwin" CACHE STRING
-      "Deployment OS for Swift host tools (the compiler) [cygwin].")
-
-  configure_sdk_unix("Cygwin" "${SWIFT_HOST_VARIANT_ARCH}")
-  set(SWIFT_PRIMARY_VARIANT_SDK_default "${SWIFT_HOST_VARIANT_SDK}")
-  set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
-
-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
-
-  set(SWIFT_HOST_VARIANT "windows" CACHE STRING
-      "Deployment OS for Swift host tools (the compiler) [windows].")
-
-  configure_sdk_windows("Windows" "msvc" "${SWIFT_HOST_VARIANT_ARCH}")
-  set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
-  set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
-
-elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "HAIKU")
-
-  set(SWIFT_HOST_VARIANT "haiku" CACHE STRING
-      "Deployment OS for Swift host tools (the compiler) [haiku].")
-
-  configure_sdk_unix("Haiku" "${SWIFT_HOST_VARIANT_ARCH}")
-  set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
-  set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
-
-elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
-
+if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
   set(SWIFT_HOST_VARIANT "macosx" CACHE STRING
       "Deployment OS for Swift host tools (the compiler) [macosx, iphoneos].")
-
-  # Display Xcode toolchain version.
-  # The SDK configuration below prints each SDK version.
-  execute_process(
-    COMMAND "xcodebuild" "-version"
-    OUTPUT_VARIABLE xcode_version
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-  string(REPLACE "\n" ", " xcode_version "${xcode_version}")
-  message(STATUS "${xcode_version}")
-  message(STATUS "")
-
-  include(DarwinSDKs)
 
   # FIXME: guess target variant based on the host.
   # if(SWIFT_HOST_VARIANT MATCHES "^macosx")
@@ -718,7 +656,13 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" MATCHES "(OSX|IOS*|TVOS*|WATCHOS*)")
   # Primary variant is always OSX; even on iOS hosts.
   set(SWIFT_PRIMARY_VARIANT_SDK_default "OSX")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "x86_64")
+else()
+  string(TOLOWER SWIFT_HOST_VARIANT_default ${SWIFT_HOST_VARIANT_SDK})
+  set(SWIFT_HOST_VARIANT ${SWIFT_HOST_VARIANT_default} CACHE STRING
+      "Deployment OS for Swift host tools (the compiler) [${SWIFT_HOST_VARIANT_default}].")
 
+  set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
+  set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
 endif()
 
 if("${SWIFT_PRIMARY_VARIANT_SDK}" STREQUAL "")
@@ -728,18 +672,8 @@ if("${SWIFT_PRIMARY_VARIANT_ARCH}" STREQUAL "")
   set(SWIFT_PRIMARY_VARIANT_ARCH "${SWIFT_PRIMARY_VARIANT_ARCH_default}")
 endif()
 
-# Should we cross-compile the standard library for Android?
-is_sdk_requested(ANDROID swift_build_android)
-if(swift_build_android AND NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
-  if (NOT ("${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Darwin" OR "${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Linux"))
-    message(FATAL_ERROR "A Darwin or Linux host is required to build the Swift runtime for Android")
-  endif()
-
-  if("${SWIFT_SDK_ANDROID_ARCHITECTURES}" STREQUAL "")
-    set(SWIFT_SDK_ANDROID_ARCHITECTURES armv7;aarch64)
-  endif()
-  configure_sdk_unix("Android" "${SWIFT_SDK_ANDROID_ARCHITECTURES}")
-endif()
+include(DarwinSDKs)
+include(UnixSDKs)
 
 # Should we cross-compile the standard library for Windows?
 is_sdk_requested(WINDOWS swift_build_windows)
@@ -815,37 +749,6 @@ endif()
 #
 # Find required dependencies.
 #
-
-function(swift_icu_variables_set sdk arch result)
-  string(TOUPPER "${sdk}" sdk)
-
-  set(icu_var_ICU_UC_INCLUDE ${SWIFT_${sdk}_${arch}_ICU_UC_INCLUDE})
-  set(icu_var_ICU_UC ${SWIFT_${sdk}_${arch}_ICU_UC})
-  set(icu_var_ICU_I18N_INCLUDE ${SWIFT_${sdk}_${arch}_ICU_I18N_INCLUDE})
-  set(icu_var_ICU_I18N ${SWIFT_${sdk}_${arch}_ICU_I18N})
-
-  if(icu_var_ICU_UC_INCLUDE AND icu_var_ICU_UC AND
-     icu_var_ICU_I18N_INCLUDE AND icu_var_ICU_I18N)
-    set(${result} TRUE PARENT_SCOPE)
-  else()
-    set(${result} FALSE PARENT_SCOPE)
-  endif()
-endfunction()
-
-# ICU is provided through CoreFoundation on Darwin.  On other hosts, if the ICU
-# unicode and i18n include and library paths are not defined, perform a standard
-# package lookup.  Otherwise, rely on the paths specified by the user.  These
-# need to be defined when cross-compiling.
-if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
-    swift_icu_variables_set("${SWIFT_PRIMARY_VARIANT_SDK}"
-                            "${SWIFT_PRIMARY_VARIANT_ARCH}"
-                            ICU_CONFIGURED)
-    if("${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "" AND NOT ${ICU_CONFIGURED})
-      find_package(ICU REQUIRED COMPONENTS uc i18n)
-    endif()
-  endif()
-endif()
 
 find_package(PythonInterp REQUIRED)
 

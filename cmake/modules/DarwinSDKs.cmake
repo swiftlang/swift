@@ -16,6 +16,15 @@ set(SUPPORTED_WATCHOS_ARCHS "armv7k")
 set(SUPPORTED_WATCHOS_SIMULATOR_ARCHS "i386")
 set(SUPPORTED_OSX_ARCHS "x86_64")
 
+# Display Xcode toolchain version.
+# The SDK configuration below prints each SDK version.
+execute_process(COMMAND "xcodebuild" "-version"
+                OUTPUT_VARIABLE xcode_version
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
+string(REPLACE "\n" ", " xcode_version "${xcode_version}")
+message(STATUS "${xcode_version}")
+message(STATUS "")
+
 is_sdk_requested(OSX swift_build_osx)
 if(swift_build_osx)
   configure_sdk_darwin(
