@@ -47,7 +47,8 @@ function(get_test_dependencies SDK result_var_name)
   if(NOT SWIFT_BUILT_STANDALONE)
     list(APPEND deps_binaries FileCheck arcmt-test c-arcmt-test c-index-test
          clang llc llvm-cov llvm-dwarfdump llvm-link llvm-as llvm-dis
-         llvm-bcanalyzer llvm-nm llvm-readobj llvm-profdata count not)
+         llvm-bcanalyzer llvm-nm llvm-readobj llvm-profdata count not
+         llvm-strings)
   endif()
   if(SWIFT_BUILD_SOURCEKIT)
     list(APPEND deps_binaries sourcekitd-test complete-test)
