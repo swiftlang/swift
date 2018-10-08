@@ -273,10 +273,10 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
       return _position![i]
     }
 %if Mutable:
-    nonmutating set {
+    nonmutating _modify {
       _debugPrecondition(i >= 0)
       _debugPrecondition(i < endIndex)
-      _position![i] = newValue
+      yield &_position![i]
     }
 %end
   }
