@@ -136,3 +136,12 @@ public class EscapingFunctionType {
 infix operator ..*..
 
 public func ownershipChange(_ a: inout Int, _ b: __shared Int) {}
+
+@usableFromInline
+@_fixed_layout
+class _NoResilientClass {
+  @usableFromInline
+  final func NoLongerFinalFunc() {}
+  private func FuncPositionChange0() {}
+  private func FuncPositionChange1() {}
+}

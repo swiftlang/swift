@@ -281,6 +281,7 @@
           "moduleName": "cake",
           "static": true,
           "isOpen": true,
+          "fixedbinaryorder": 0,
           "funcSelfKind": "NonMutating"
         },
         {
@@ -362,8 +363,8 @@
             "HasInitialValue",
             "ReferenceOwnership"
           ],
-          "ownership": 1,
           "fixedbinaryorder": 0,
+          "ownership": 1,
           "hasStorage": true
         },
         {
@@ -429,8 +430,8 @@
             "HasInitialValue",
             "ReferenceOwnership"
           ],
-          "ownership": 2,
           "fixedbinaryorder": 1,
+          "ownership": 2,
           "hasStorage": true
         },
         {

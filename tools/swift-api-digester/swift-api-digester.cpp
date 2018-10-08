@@ -733,6 +733,12 @@ void swift::ide::api::SDKNodeDeclFunction::diagnose(SDKNode *Right) {
     Diags.diagnose(SourceLoc(), diag::func_self_access_change, getScreenInfo(),
                    getSelfAccessKind(), R->getSelfAccessKind());
   }
+  if (Ctx.checkingABI()) {
+    if (hasFixedBinaryOrder() != R->hasFixedBinaryOrder()) {
+      Ctx.getDiags().diagnose(SourceLoc(), diag::func_has_fixed_order_change,
+                              getScreenInfo(), hasFixedBinaryOrder());
+    }
+  }
 }
 
 void swift::ide::api::SDKNodeDeclSubscript::diagnose(SDKNode *Right) {
@@ -803,6 +809,13 @@ void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
                        Desc);
       }
     }
+    if (hasFixedBinaryOrder() && RD->hasFixedBinaryOrder() &&
+        getFixedBinaryOrder() != RD->getFixedBinaryOrder()) {
+      Ctx.getDiags().diagnose(SourceLoc(), diag::decl_reorder,
+                              getScreenInfo(),
+                              getFixedBinaryOrder(),
+                              RD->getFixedBinaryOrder());
+    }
   }
 }
 
@@ -828,15 +841,8 @@ void swift::ide::api::SDKNodeDeclVar::diagnose(SDKNode *Right) {
   }
   if (Ctx.checkingABI()) {
     if (hasFixedBinaryOrder() != RV->hasFixedBinaryOrder()) {
-      Ctx.getDiags().diagnose(SourceLoc(), diag::decl_has_fixed_order_change,
+      Ctx.getDiags().diagnose(SourceLoc(), diag::var_has_fixed_order_change,
                               getScreenInfo(), hasFixedBinaryOrder());
-    }
-    if (hasFixedBinaryOrder() && RV->hasFixedBinaryOrder() &&
-        getFixedBinaryOrder() != RV->getFixedBinaryOrder()) {
-      Ctx.getDiags().diagnose(SourceLoc(), diag::decl_reorder,
-                              getScreenInfo(),
-                              getFixedBinaryOrder(),
-                              RV->getFixedBinaryOrder());
     }
     if (isLet() != RV->isLet()) {
       Ctx.getDiags().diagnose(SourceLoc(), diag::var_let_changed,
@@ -959,10 +965,11 @@ public:
       assert(!Left);
       Right->annotate(NodeAnnotation::Added);
       if (Ctx.checkingABI()) {
-        if (auto *VAD = dyn_cast<SDKNodeDeclVar>(Right)) {
-          if (VAD->hasFixedBinaryOrder()) {
+        // Any order-important decl added to a non-resilient type breaks ABI.
+        if (auto *D = dyn_cast<SDKNodeDecl>(Right)) {
+          if (D->hasFixedBinaryOrder()) {
             Ctx.getDiags().diagnose(SourceLoc(), diag::decl_added,
-                                    VAD->getScreenInfo());
+                                    D->getScreenInfo());
           }
         }
       }

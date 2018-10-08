@@ -81,7 +81,7 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
         IsOpen(Info.IsOpen),
         IsInternal(Info.IsInternal),
         ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
-        GenericSig(Info.GenericSig) {}
+        GenericSig(Info.GenericSig), FixedBinaryOrder(Info.FixedBinaryOrder) {}
 
 SDKNodeType::SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind):
   SDKNode(Info, Kind), TypeAttributes(Info.TypeAttrs),
@@ -110,8 +110,7 @@ SDKNodeDeclTypeAlias::SDKNodeDeclTypeAlias(SDKNodeInitInfo Info):
   SDKNodeDecl(Info, SDKNodeKind::DeclTypeAlias) {}
 
 SDKNodeDeclVar::SDKNodeDeclVar(SDKNodeInitInfo Info): 
-  SDKNodeDecl(Info, SDKNodeKind::DeclVar),
-  FixedBinaryOrder(Info.FixedBinaryOrder), IsLet(Info.IsLet),
+  SDKNodeDecl(Info, SDKNodeKind::DeclVar), IsLet(Info.IsLet),
   HasStorage(Info.HasStorage), HasDidSet(Info.HasDidset),
   HasWillSet(Info.HasWillset) {}
 
@@ -705,12 +704,6 @@ bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         // them equal because we need to check definition orders.
         if (auto *LV = dyn_cast<SDKNodeDeclVar>(&L)) {
           if (auto *RV = dyn_cast<SDKNodeDeclVar>(&R)) {
-            if (LV->hasFixedBinaryOrder() != RV->hasFixedBinaryOrder())
-              return false;
-            if (LV->hasFixedBinaryOrder()) {
-              if (LV->getFixedBinaryOrder() != RV->getFixedBinaryOrder())
-                return false;
-            }
             if (LV->isLet() != RV->isLet())
               return false;
             if (LV->hasStorage() != RV->hasStorage())
@@ -764,6 +757,12 @@ bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         return false;
       if (Left->isInternal() != Right->isInternal())
         return false;
+      if (Left->hasFixedBinaryOrder() != Right->hasFixedBinaryOrder())
+        return false;
+      if (Left->hasFixedBinaryOrder()) {
+        if (Left->getFixedBinaryOrder() != Right->getFixedBinaryOrder())
+          return false;
+      }
       LLVM_FALLTHROUGH;
     }
     case SDKNodeKind::Root: {
@@ -988,37 +987,58 @@ static StringRef printGenericSignature(SDKContext &Ctx, Decl *D) {
   return StringRef();
 }
 
+static Optional<uint8_t> getSimilarMemberCount(NominalTypeDecl *NTD,
+                                               ValueDecl *VD,
+                                        llvm::function_ref<bool(Decl*)> Check) {
+  if (!Check(VD))
+    return None;
+  auto Members = NTD->getMembers();
+  auto End = std::find(Members.begin(), Members.end(), VD);
+  assert(End != Members.end());
+  return std::count_if(Members.begin(), End, Check);
+}
+
 static Optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) {
-  auto *NTD = dyn_cast_or_null<NominalTypeDecl>(VD->getDeclContext()->getAsDecl());
+  auto *NTD = dyn_cast_or_null<NominalTypeDecl>(VD->getDeclContext()->
+    getAsDecl());
 
-  if (!NTD || isa<ProtocolDecl>(NTD))
+  if (!NTD || isa<ProtocolDecl>(NTD) || NTD->isResilient())
     return None;
 
-  if (auto *ED = dyn_cast<EnumDecl>(NTD)) {
-    auto Check = [](Decl *M) {
-      return isa<EnumElementDecl>(M);
-    };
-    if (!ED->isResilient() && Check(VD)) {
-      auto Members = ED->getMembers();
-      auto End = std::find(Members.begin(), Members.end(), VD);
-      assert(End != Members.end());
-      return std::count_if(Members.begin(), End, Check);
-    }
-    return None;
-  }
-  auto Check = [](Decl *M) {
+  // The relative order of stored properties matters for non-resilient type.
+  auto isStored = [](Decl *M) {
     if (auto *STD = dyn_cast<AbstractStorageDecl>(M)) {
       return STD->hasStorage() && !STD->isStatic();
     }
     return false;
   };
-  if (!NTD->isResilient() && Check(VD)) {
-    auto Members = NTD->getMembers();
-    auto End = std::find(Members.begin(), Members.end(), VD);
-    assert(End != Members.end());
-    return std::count_if(Members.begin(), End, Check);
+  // The relative order of non-final instance functions matters for non-resilient
+  // class.
+  auto isNonfinalFunc = [](Decl *M) {
+    if (auto *FD = dyn_cast<FuncDecl>(M)) {
+      return !isa<AccessorDecl>(FD) && !FD->isFinal();
+    }
+    return false;
+  };
+  switch (NTD->getKind()) {
+  case DeclKind::Enum: {
+    return getSimilarMemberCount(NTD, VD, [](Decl *M) {
+      return isa<EnumElementDecl>(M);
+    });
   }
-  return llvm::None;
+  case DeclKind::Struct: {
+    return getSimilarMemberCount(NTD, VD, isStored);
+  }
+  case DeclKind::Class: {
+    if (auto count = getSimilarMemberCount(NTD, VD, isStored)) {
+      return count;
+    } else {
+      return getSimilarMemberCount(NTD, VD, isNonfinalFunc);
+    }
+  }
+  default:
+    llvm_unreachable("bad nominal type kind.");
+  }
 }
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info) :
@@ -1503,6 +1523,7 @@ void SDKNodeDecl::jsonize(json::Output &out) {
   output(out, KeyKind::KK_isOpen, IsOpen);
   output(out, KeyKind::KK_isInternal, IsInternal);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_declAttributes).data(), DeclAttributes);
+  out.mapOptional(getKeyContent(Ctx, KeyKind::KK_fixedbinaryorder).data(), FixedBinaryOrder);
   // Strong reference is implied, no need for serialization.
   if (getReferenceOwnership() != ReferenceOwnership::Strong) {
     uint8_t Raw = uint8_t(getReferenceOwnership());
@@ -1551,7 +1572,6 @@ void SDKNodeDeclSubscript::jsonize(json::Output &out) {
 
 void SDKNodeDeclVar::jsonize(json::Output &out) {
   SDKNodeDecl::jsonize(out);
-  out.mapOptional(getKeyContent(Ctx, KeyKind::KK_fixedbinaryorder).data(), FixedBinaryOrder);
   output(out, KeyKind::KK_isLet, IsLet);
   output(out, KeyKind::KK_hasStorage, HasStorage);
   output(out, KeyKind::KK_hasDidset, HasDidSet);

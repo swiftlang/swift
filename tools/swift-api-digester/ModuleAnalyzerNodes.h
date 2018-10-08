@@ -297,6 +297,7 @@ class SDKNodeDecl: public SDKNode {
   bool IsInternal;
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
+  Optional<uint8_t> FixedBinaryOrder;
 
 protected:
   SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind);
@@ -328,6 +329,8 @@ public:
   bool isInternal() const { return IsInternal; }
   StringRef getGenericSignature() const { return GenericSig; }
   StringRef getScreenInfo() const;
+  bool hasFixedBinaryOrder() const { return FixedBinaryOrder.hasValue(); }
+  uint8_t getFixedBinaryOrder() const { return *FixedBinaryOrder; }
   virtual void jsonize(json::Output &Out) override;
   virtual void diagnose(SDKNode *Right) override;
 };
@@ -494,7 +497,6 @@ public:
 };
 
 class SDKNodeDeclVar : public SDKNodeDecl {
-  Optional<uint8_t> FixedBinaryOrder;
   bool IsLet;
   bool HasStorage;
   bool HasDidSet;
@@ -502,8 +504,6 @@ class SDKNodeDeclVar : public SDKNodeDecl {
 public:
   SDKNodeDeclVar(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
-  bool hasFixedBinaryOrder() const { return FixedBinaryOrder.hasValue(); }
-  uint8_t getFixedBinaryOrder() const { return *FixedBinaryOrder; }
   SDKNodeDeclGetter *getGetter() const;
   SDKNodeDeclSetter *getSetter() const;
   SDKNodeType *getType() const;
