@@ -28,20 +28,12 @@ typedef size_t __swift_size_t;
 typedef __SIZE_TYPE__ __swift_size_t;
 #endif
 
-// This declaration is not universally correct.  We verify its correctness for
-// the current platform in the runtime code.
-#if defined(__linux__) && (defined(__arm__) || defined(__i386__))
-typedef           int __swift_ssize_t;
-#elif defined(_WIN32)
-#if defined(_M_ARM) || defined(_M_IX86)
-typedef           int __swift_ssize_t;
-#elif defined(_M_X64) || defined(_M_ARM64)
-typedef long long int __swift_ssize_t;
-#else
-#error unsupported machine type
-#endif
-#else
-typedef      long int __swift_ssize_t;
-#endif
+// This selects the signed equivalent of the unsigned type chosen for size_t.
+typedef __typeof__(_Generic((__swift_size_t)0,                                 \
+                            unsigned long long int : (long long int)0,         \
+                            unsigned long int : (long int)0,                   \
+                            unsigned int : (int)0,                             \
+                            unsigned short : (short)0,                         \
+                            unsigned char : (signed char)0)) __swift_ssize_t;
 
 #endif // SWIFT_STDLIB_SHIMS_SWIFT_STDDEF_H
