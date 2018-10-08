@@ -10,7 +10,6 @@ endif
 syn keyword swiftKeyword
       \ associatedtype
       \ break
-      \ case
       \ catch
       \ continue
       \ default
@@ -140,6 +139,11 @@ syn match swiftTypeDeclaration skipwhite skipempty nextgroup=swiftType,swiftInOu
       \ /:/
 syn match swiftTypeDeclaration skipwhite skipempty nextgroup=swiftType
       \ /->/
+
+syn match swiftKeyword
+      \ /\<case\>/
+syn region swiftCaseLabelRegion
+      \ matchgroup=swiftKeyword start=/\<case\>/ matchgroup=Delimiter end=/:/ oneline contains=TOP
 
 syn region swiftParenthesisRegion matchgroup=NONE start=/(/ end=/)/ contains=TOP
 
