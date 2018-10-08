@@ -693,6 +693,8 @@ public:
   /// The instructions that are to be run on the accelerator.
   DenseMap<SILInstruction *, Marking> markedInstructions;
 
+  DynAttrValueNameMap dynAttrInsts;
+
   /// BB Arguments that are marked as being moved, deleted, copied, or used as
   /// arguments.
   ///
@@ -1994,6 +1996,107 @@ static const char *markingEnumToStr(Marking m) {
   return markingStr[static_cast<int>(m)];
 }
 
+// If `inst` has some dynamic attr, return a rewritten one without any, and
+// delete `inst`.
+
+// TODO: As a fast path, can we remember/materialize in `inst` whether it has
+// any dynamic attrs, and if none we just return `inst` immediately?
+//
+// TODO: should `dynAttrInsts` just store sil values? this would then cover bb
+// args.
+static GraphOperationInst *
+maybeRewriteForDynAttr(GraphOperationInst *inst,
+                       DynAttrValueNameMap &dynAttrInsts) {
+  // An example dynamic attr is %9 below:
+  //   %9 = struct_extract %7 : $Bool, #Bool._value    // user: %12
+  //   ...
+  //   %12 = graph_op "matmul"(%10 : $TensorHandle<Float>,
+  //                           %11 : $TensorHandle<Float>,
+  //                           transpose_a %9 : $Builtin.Int1)
+  //
+  // If %9 can be hoisted above tensor start point, we can compile this program
+  // in GPE/graph mode. In that case, we rewrite %12 to use a placeholder (of
+  // string type) attribute in the constructed graph function, with a
+  // synthesized name such as "$MyBoolAttr".
+
+  GraphOperationInfo opInfo(inst);
+
+  // Scan through and rewrite dynamic attributes if any.
+  SILBuilder B(inst);
+  auto &ctx = B.getASTContext();
+
+  bool hasDynAttr = false;
+  GraphOperationBuilder opBuilder(opInfo.getOperationName());
+  // Pass attributes through.
+  for (auto &attr : inst->getAttributes())
+    opBuilder.addAttribute(attr);
+  // Pass input through.
+  for (auto &argument : opInfo.getStructuredArguments()) {
+    if (argument.getKind() == GraphOperationInfo::SAK_List) {
+      opBuilder.addListArgument(argument.getArgumentList(),
+                                argument.getArgumentNameWithSuffix());
+      continue;
+    }
+
+    assert(argument.getKind() == GraphOperationInfo::SAK_Single &&
+           "should have already handled all other argument kinds");
+    auto argumentValue = argument.getSingleArgument();
+    const auto &nameAndLowering = argument.getArgumentNameAndLowering();
+    // same as nameAndLowering.second?
+    auto argumentLowering = std::get<1>(nameAndLowering);
+    if (argumentLowering == GraphOperationInfo::ArgumentLowering::Input) {
+      // TODO: confirm this assert is equivalent to the if cond above.
+      assert(argument.getArgumentNameWithSuffix().empty());
+      opBuilder.addArgument(argumentValue,
+                            argument.getArgumentNameWithSuffix());
+      continue;
+    }
+
+    // convert this dynamic attr into a static one based on placeholder attr.
+    assert(argumentLowering != GraphOperationInfo::ArgumentLowering::Out);
+    auto dynAttrName = ctx.getIdentifier(std::get<0>(nameAndLowering));
+    // TODO: generate a unique name for each unique SIL value `argument` as a
+    // dyn attr.
+    const std::string dynAttrTypeStr = "MyBoolAttr2";
+    auto dynAttrType = SymbolicValue::getString(
+        std::string("$") + dynAttrTypeStr, ctx.getAllocator());
+    opBuilder.addAttribute({dynAttrName, dynAttrType});
+
+    // TODO: if argument has been used in some other graph_op as a dyn attr, we
+    // could reuse the map entry.
+    assert(!dynAttrInsts.count(argumentValue));
+    dynAttrInsts[argumentValue] = dynAttrTypeStr;
+    LLVM_DEBUG(llvm::dbgs()
+               << "For inst " << *inst << ", replaced the dyn attr "
+               << argumentValue << " with a placeholder attr " << dynAttrType
+               << "\n");
+
+    hasDynAttr = true;
+  }
+
+  if (!hasDynAttr)
+    return inst;
+
+  // Now that we've rebuilt the argument list, create a new graph_op and
+  // replace the old one.
+  GraphOperationInst *newInst;
+  SmallVector<SILType, 4> origResultTypes(inst->getResultTypes());
+  newInst = opBuilder.build(B, ctx, inst->getLoc(), origResultTypes);
+  newInst->setDebugLocation(inst->getDebugLocation());
+
+  // Replace the old with the new and delete the old instruction.
+  inst->replaceAllUsesPairwiseWith(newInst);
+
+  // Do not recusively delete the operand insts, in particular not the one
+  // producing the dynamic attr, since it has to be kept alive to be later used
+  // in the host program when launching the tensor program (tensor computation).
+  inst->eraseFromParent();
+
+  LLVM_DEBUG(llvm::dbgs() << "The new inst after dyn attr rewrite is "
+                          << *newInst << "\n");
+  return newInst;
+}
+
 /// Scan the function looking for blocks with tensor operations in them.  As
 /// we find them, mark them as "to-be-partitioned", which marks (transitive)
 /// data and control dependencies.
@@ -2032,16 +2135,18 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
   SmallVector<SILInstruction *, 32> tensorOps;
   bool invalidOpFound = false;
   for (auto *BB : llvm::depth_first(&hostFn)) {
-    for (auto bbi = BB->begin(), e = BB->end(); bbi != e; ++bbi) {
-      auto *inst = &*bbi;
+    for (auto bbi = BB->begin(), e = BB->end(); bbi != e;) {
+      auto *inst = &*(bbi++);
 
       // Graph operations are tensor ops.
       auto *graphOp = dyn_cast<GraphOperationInst>(inst);
       if (!graphOp)
         continue;
       logInput();
-      tensorOps.push_back(inst);
-      tensorOpsSet.insert(inst);
+
+      graphOp = maybeRewriteForDynAttr(graphOp, dynAttrInsts);
+      tensorOps.push_back(graphOp);
+      tensorOpsSet.insert(graphOp);
 
       auto opDevice = getDeviceType(GraphOperationInfo(graphOp));
       deviceInfo.markDeviceUsed(opDevice);
@@ -2087,6 +2192,21 @@ bool TFFunctionPartition::markFunction(bool &hasTensorOps) {
   for (auto inst : tensorOps)
     if (markInstruction(*inst, Marking::Move))
       return true;
+
+  // For all dynamic attrs, hoist them above TSP, or otherwise fail the program.
+  for (const auto &dynAttrInfo : dynAttrInsts) {
+    auto inst = dynAttrInfo.first->getDefiningInstruction();
+    // Even if the dynamic attr comes from a BB arg (say %14 in the example
+    // below), there should be a struct extract inst between it and the graph_op
+    // that uses the attr, as in:
+    //  %16 = struct_extract %14 : $Bool, #Bool._value
+    assert(inst);
+    if (!hoistValueAboveStartPoint(inst, tensorStartPoint, DI)) {
+      diagnose(hostFn.getASTContext(), inst->getLoc().getSourceLoc(),
+               diag::tf_unsupported_dynamic_attr);
+      return true;
+    }
+  }
 
   // Optimize the host code (and avoid copies back to the host in some cases) by
   // changing scalar operations marked as "Copy" into "Move" when all of their
@@ -3724,6 +3844,10 @@ void TFFunctionPartition::insertTensorComputationStartEndTerminate(
   //   _ entryFunctionBaseName: UnsafePointer<Int8>,
   //   _ tensorArgumentAddress: UnsafePointer<CTensorHandle>,
   //   _ tensorArgumentCount: Int,
+  //   _ dynAttrCount: Int,
+  //   // TODO: generalize data type, and also make this is array
+  //   _ dynAttrName: UnsafePointer<Int8>,
+  //   _ dynAttrValue: Int,
   //   _ helperFunctionCount: Int,
   //   _ resultCount: Int
   // ) -> TensorComputation {
@@ -3885,6 +4009,42 @@ void TFFunctionPartition::insertTensorComputationStartEndTerminate(
 
   auto numTensorArguments = createIntValue(tensorFnArguments.size(), B, loc);
 
+  // TODO: generalize to N attrs.
+  assert(dynAttrInsts.size() <= 1);
+  auto numdynAttrCounts = createIntValue(dynAttrInsts.size(), B, loc);
+  SILValue dynAttrNamePtr, dynAttrValue;
+  if (dynAttrInsts.empty()) {
+    // Use some dummy values.
+    dynAttrNamePtr = B.createStruct(
+        loc, int8PointerSILType,
+        {B.createStringLiteral(loc, StringRef(),
+                               StringLiteralInst::Encoding::UTF8)});
+    dynAttrValue = createIntValue(-1, B, loc);
+  }
+  for (const auto &dynAttrInfo : dynAttrInsts) {
+    // StringRef dynAttrNameStrRef = "MyBoolAttr";
+    StringRef dynAttrNameStrRef = dynAttrInfo.second;
+    auto dynAttrNameStr = B.createStringLiteral(
+        loc, dynAttrNameStrRef, StringLiteralInst::Encoding::UTF8);
+    dynAttrNamePtr = B.createStruct(loc, int8PointerSILType, {dynAttrNameStr});
+
+    auto intFromBoolFn = hostFn.getModule().findFunction(
+        "_swift_tfc_IntFromBool", SILLinkage::PublicExternal);
+    assert(intFromBoolFn);
+    auto intFromBoolFnRef = B.createFunctionRef(loc, intFromBoolFn);
+
+    // Convert a builtin type like $Builtin.Int1 to an stdlib type like $Bool.
+    //
+    // TODO: consider doing this before we add this entry to `dynAttrInsts`, so
+    // that we can store an inst there instead of a SILValue, and need not worry
+    // about the map key being a BB arg instead of an inst.
+    auto dynAttrInput =
+        wrapInStruct(dynAttrInfo.first, ctx.getBoolDecl(), B, loc);
+    dynAttrValue = B.createApply(loc, intFromBoolFnRef, /*no substitutions*/ {},
+                                 {/*castedDynAttrVal*/ dynAttrInput},
+                                 /*isNonThrowing*/ false);
+  }
+
   // TODO: When the runtime matures, we shouldn't have to pass in the # results.
   auto numTensorResults = createIntValue(resultValues.size(), B, loc);
 
@@ -3896,6 +4056,9 @@ void TFFunctionPartition::insertTensorComputationStartEndTerminate(
       entryFunctionBaseName, // entryFunctionBaseName: UnsafePointer<Int8>
       firstPtr,           // tensorArgumentAddress: UnsafePointer<CTensorHandle>
       numTensorArguments, // tensorArgumentCount: Int
+      numdynAttrCounts,   // dynAttrCount: Int
+      dynAttrNamePtr,     // dynAttrNamePtr: UnsafePointer<Int8>
+      dynAttrValue,       // dynAttrValue: Int
       helperFunctionCount, // helperFunctionCount,: Int
       numTensorResults     // resultCount: Int
   };
@@ -4273,6 +4436,8 @@ bool TFFunctionPartition::lowerGraph(bool isTest) {
     assert(deviceInfo.numUsedDeviceTypes == 1 &&
            "An accelerator-only SIL function must be lowered to a single TF "
            "device.");
+    assert(dynAttrInsts.empty() &&
+           "An accelerator-only SIL function cannot have dynamic attributes.");
     if (graphLowering->lowerTFFunction(hostFn.getName(), acceleratorFn,
                                        deviceInfo))
       return true;
@@ -4282,8 +4447,8 @@ bool TFFunctionPartition::lowerGraph(bool isTest) {
     transform.getPassManager()->notifyWillDeleteFunction(&hostFn);
     hostFn.getModule().eraseFunction(&hostFn);
   } else {
-    if (graphLowering->lowerTFGraph(hostFn.getName(), acceleratorFn,
-                                    deviceInfo))
+    if (graphLowering->lowerTFGraph(hostFn.getName(), acceleratorFn, deviceInfo,
+                                    dynAttrInsts))
       return true;
   }
 

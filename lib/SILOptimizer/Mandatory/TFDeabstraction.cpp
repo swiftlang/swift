@@ -2383,25 +2383,15 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
     // compilation.
     auto it = constants.find(argumentValue);
     if (it == constants.end() || !it->second.isConstant()) {
-      if (llvm::TFDynamicCompilation) {
-        // Since we're doing dynamic compilation, we can simply pass this
-        // unknown attribute as a named argument to the graph_op, and IRGen will
-        // deal with it.
-        opBuilder.addArgument(argumentValue, argument.getArgumentNameWithSuffix());
-        continue;
-      } else {
-        // TODO: improve the diagnostic to talk about the parameter label in
-        // the user code, not the internal op attribute.  The bookkeeping for
-        // this isn't obvious though.
-        diagnoseInvalidAttr("requires a constant argument");
-
-        // If we have more specific information about what went wrong, emit
-        // notes.
-        if (it != constants.end() &&
-            it->second.getKind() == SymbolicValue::Unknown)
-          it->second.emitUnknownDiagnosticNotes(origInstLoc);
-        return;
-      }
+      // Simply pass this unknown attribute as a named argument to the graph_op:
+      //
+      // In dynamic compilation, IRGen will deal with it.
+      // In graph mode, the partition pass will try hoisting it above tensor
+      // start point. If that works, the value will be passed into runtime when
+      // instantiation the graph function.
+      opBuilder.addArgument(argumentValue,
+                            argument.getArgumentNameWithSuffix());
+      continue;
     }
 
     // Get the constant, ignoring struct wrappers.

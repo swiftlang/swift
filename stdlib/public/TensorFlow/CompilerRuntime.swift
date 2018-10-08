@@ -527,6 +527,10 @@ private class TFEState {
   var ops: [CTFEOp] = []
   init(_ programByteAddress: UnsafeRawPointer,
        programByteCount: Int,
+       dynAttrCount: Int, // must be 0 or 1 for now.
+       // TODO: generalize data type, and also make this is array
+       dynAttrName: UnsafePointer<Int8>,
+       dynAttrValue: Int,
        helperFunctionCount: Int,
        entryFunctionBaseNameAddress: UnsafePointer<Int8>) {
     let context = _ExecutionContext.global
@@ -537,12 +541,14 @@ private class TFEState {
     let entryFunctionBaseName = String(cString: entryFunctionBaseNameAddress)
     debugLog("Looking up op(s) from func base name \(entryFunctionBaseName).")
     for i in 0...helperFunctionCount {
+      let isPrimary = i == 0
       // Also look up in the TensorFlow program a function name (op type) based
       // on the op name. e.g. given op name "tfc_func_S4mainyycfU_.tf", return
       // op type "S4mainyycfU_.tf_CPU.device_partition". TFE ops are created by
-      // the op types.
+      // the op types. Other than type info (function name), these top-level
+      // nodes are not used in eager based runtime.
       var opName = "tfc_func_" + entryFunctionBaseName;
-      if i > 0 {
+      if !isPrimary {
         opName += "_helper_\(i-1)"
       }
       let funcNode = TF_GraphOperationByName(graph, opName)
@@ -566,6 +572,16 @@ private class TFEState {
         debugLog("Placing the op on device \(context.gpuDeviceName!).")
       }
       checkOk(status)
+
+      if isPrimary {
+        // TODO: generalize to support more # attrs.
+        internalConsistencyCheck(dynAttrCount >= 0 && dynAttrCount <= 1)
+        if dynAttrCount == 1 {
+          let attrName = String(cString: dynAttrName)
+          debugLog("Setting dynamic attr \(attrName) to \(dynAttrValue).")
+          TFE_OpSetAttrBool(op, attrName, dynAttrValue > 0 ? 1 : 0);
+        }
+      }
       ops.append(op!)
     }
   }
@@ -819,6 +835,11 @@ public final class _TensorComputation {
        entryFunctionBaseNameAddress: UnsafePointer<Int8>,
        tensorArgumentAddress: UnsafePointer<CTensorHandle>,
        tensorArgumentCount: Int,
+       // Must be 0 or 1 for now.
+       // TODO: generalize data type, and also support a true array
+       dynAttrCount: Int,
+       dynAttrName: UnsafePointer<Int8>,
+       dynAttrValue: Int,
        helperFunctionCount: Int,
        resultCount: Int) {
     configureRuntimeFromEnvironment()
@@ -849,10 +870,18 @@ public final class _TensorComputation {
       self.stateTFE = TFEState(
         programByteAddress,
         programByteCount: programByteCount,
+        dynAttrCount: dynAttrCount,
+        dynAttrName: dynAttrName,
+        dynAttrValue: dynAttrValue,
         helperFunctionCount: helperFunctionCount,
         entryFunctionBaseNameAddress: entryFunctionBaseNameAddress)
       debugLog("Done initializing TFE-specific state.")
     } else {
+      // We should remove this session-based code path soon if possible.
+      internalConsistencyCheck(
+        dynAttrCount == 0,
+        "No support for dynamic attrs in session-based (non-eager) API."
+      )
       self.stateTF = TFState(programByteAddress,
         programByteCount: programByteCount)
       debugLog("Done initializing TF-specific state.")
@@ -1061,13 +1090,18 @@ public func _TFCStartTensorComputation(
   _ entryFunctionBaseNameAddress: UnsafePointer<Int8>,
   _ tensorArgumentAddress: UnsafePointer<CTensorHandle>,
   _ tensorArgumentCount: Int,
+  _ dynAttrCount: Int, // must be 0 or 1 for now.
+  // TODO: generalize data type, and also make this is array
+  _ dynAttrName: UnsafePointer<Int8>,
+  _ dynAttrValue: Int,
   _ helperFunctionCount: Int,
   _ resultCount: Int
 ) -> _TensorComputation {
 
   debugLog("""
     _TFCStartTensorComputation() is called with \(programByteCount) \
-    program bytes, \(tensorArgumentCount) input tensors \
+    program bytes, \(tensorArgumentCount) input tensors, \
+    \(dynAttrCount) dynamic attrs,
     \(String(cString:entryFunctionBaseNameAddress)) as the func base name, \
     \(helperFunctionCount) helper functions, and \(resultCount) output tensors.
     """)
@@ -1079,6 +1113,9 @@ public func _TFCStartTensorComputation(
                             entryFunctionBaseNameAddress: entryFunctionBaseNameAddress,
                             tensorArgumentAddress: tensorArgumentAddress,
                             tensorArgumentCount: tensorArgumentCount,
+                            dynAttrCount: dynAttrCount,
+                            dynAttrName: dynAttrName,
+                            dynAttrValue: dynAttrValue,
                             helperFunctionCount: helperFunctionCount,
                             resultCount: resultCount)
 }
@@ -1197,4 +1234,13 @@ public func _TFCCreateTensorHandleFromC(
 @_cdecl("_swift_tfc_CheckOk")
 func _TFCCheckOk(_ s: CTFStatus) {
   checkOk(s)
+}
+
+//===----------------------------------------------------------------------===//
+// - MARK: Dynamic attributes entrypoints
+//===----------------------------------------------------------------------===//
+@inlinable
+@_silgen_name("_swift_tfc_IntFromBool")
+public func _TFCIntFromBool(_ b: Bool) -> Int {
+  return b ? 1 : 0;
 }

@@ -322,11 +322,25 @@ public:
   /// top level graph function, in which case we ignore `funcHasSideEffects`, as
   /// the top level function gets called in a `TF_SessionRun()` call.
   ///
+  /// For each dynamatic attribute in `dynAttrInsts`, add a function-level
+  /// attribute based on their name and type info.
+  ///
   /// This emits an error and returns true on error.
   bool buildGraphFunction(const GraphFunctionBody &graphBody, StringRef name,
+                          const DynAttrValueNameMap &dynAttrInsts,
                           bool &funcHasSideEffects,
                           SmallVectorImpl<TF_DataType> *inputTypes,
                           SmallVectorImpl<TF_DataType> *outputTypes);
+
+  // TODO: Remove this sugar function.
+  bool buildGraphFunctionNoDynAttrs(const GraphFunctionBody &graphBody,
+                                    StringRef name, bool &funcHasSideEffects,
+                                    SmallVectorImpl<TF_DataType> *inputTypes,
+                                    SmallVectorImpl<TF_DataType> *outputTypes) {
+    DynAttrValueNameMap dynAttrInsts;
+    return buildGraphFunction(graphBody, name, dynAttrInsts, funcHasSideEffects,
+                              inputTypes, outputTypes);
+  }
 
   /// Builds TF graph nodes for the top level TF function call, where
   /// `funcOpType` is the TF graph function name, and `funcNodeBaseName` is the
@@ -361,7 +375,8 @@ public:
   ///
   /// This emits an error and returns true on error.
   bool buildGraphNodesForTopLevelFunctionCall(
-      StringRef funcOpType, bool isPrimaryFn, ArrayRef<TF_DataType> inputTypes,
+      StringRef funcOpType, bool isPrimaryFn,
+      const DynAttrValueNameMap &dynAttrInsts, ArrayRef<TF_DataType> inputTypes,
       ArrayRef<TF_DataType> outputTypes, TF_Operation *&metadataNodeForTPU);
 
 private: // Helpers to create TensorFlow graph nodes.
@@ -2382,13 +2397,17 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
   auto loopBodyFnName = getUniqueName(loc, "whilebody");
   SmallVector<TF_DataType, 4> inputTypes, outputTypes;
   bool bodyHasSideEffects = false;
-  if (buildGraphFunction(loopBodyFn, loopBodyFnName, bodyHasSideEffects,
-                         &inputTypes, &outputTypes))
+  // TODO: support dyn attrs in loop body, if true/else body, etc. This requires
+  // we track dynAttrInsts at a finer-grained level.
+  if (buildGraphFunctionNoDynAttrs(loopBodyFn, loopBodyFnName,
+                                   bodyHasSideEffects, &inputTypes,
+                                   &outputTypes))
     return GLStatus::Error;
   auto condFnName = getUniqueName(loc, "whilecond");
   bool condHasSideEffects = false;
-  if (buildGraphFunction(condFn, condFnName, condHasSideEffects,
-                         /*inputTypes*/ nullptr, /*outputTypes*/ nullptr))
+  if (buildGraphFunctionNoDynAttrs(condFn, condFnName, condHasSideEffects,
+                                   /*inputTypes*/ nullptr,
+                                   /*outputTypes*/ nullptr))
     return GLStatus::Error;
   // This is needed for correctness, since we lower the header code again right
   // after creating the While op towards the end of this function.
@@ -2582,13 +2601,14 @@ TFGraphFunctionLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   auto trueFnName = getUniqueName(loc, "true");
   bool trueFnHasSideEffects = false;
   SmallVector<TF_DataType, 4> inputTypes, outputTypes;
-  if (buildGraphFunction(trueCodeFn, trueFnName, trueFnHasSideEffects,
-                         &inputTypes, &outputTypes))
+  if (buildGraphFunctionNoDynAttrs(trueCodeFn, trueFnName, trueFnHasSideEffects,
+                                   &inputTypes, &outputTypes))
     return GLStatus::Error;
   bool falseFnHasSideEffects = false;
   auto falseFnName = getUniqueName(loc, "false");
-  if (buildGraphFunction(falseCodeFn, falseFnName, falseFnHasSideEffects,
-                         /*inputTypes*/ nullptr, /*outputTypes*/ nullptr))
+  if (buildGraphFunctionNoDynAttrs(
+          falseCodeFn, falseFnName, falseFnHasSideEffects,
+          /*inputTypes*/ nullptr, /*outputTypes*/ nullptr))
     return GLStatus::Error;
 
   auto &graphFn = getCurrentGraphFunction();
@@ -2772,7 +2792,8 @@ bool TFGraphFunctionLowering::addTopLevelTPUConfigLogic(
 }
 
 bool TFGraphFunctionLowering::buildGraphNodesForTopLevelFunctionCall(
-    StringRef funcOpType, bool isPrimaryFn, ArrayRef<TF_DataType> inputTypes,
+    StringRef funcOpType, bool isPrimaryFn,
+    const DynAttrValueNameMap &dynAttrInsts, ArrayRef<TF_DataType> inputTypes,
     ArrayRef<TF_DataType> outputTypes, TF_Operation *&metadataNodeForTPU) {
   if (isPrimaryFn && thisDeviceType == DeviceType::TPU && !metadataNodeForTPU) {
     if (addTopLevelTPUConfigLogic(&metadataNodeForTPU)) {
@@ -2814,6 +2835,27 @@ bool TFGraphFunctionLowering::buildGraphNodesForTopLevelFunctionCall(
     markNodeAsTPUReplicated(funcDesc);
   } else {
     TF_SetDevice(funcDesc, thisDeviceTypeStr.c_str());
+  }
+
+  // Set dynamic attr values so that this graph node can be constructed. Note
+  // however these values will never be used at runtime -- dynamic attrs are
+  // only supposed when we used the eager based runtime, in which case we only
+  // look up this node for its type info (function name).
+  //
+  // TODO: once we retire the non-eager based runtime, we can consider passing
+  // function names into the compiler runtime entrypoint
+  // "_swift_tfc_StartTensorComputation" directly instead of a top-level node
+  // name tfc_func_<funcNodeBaseName>. This way we don't have to create that
+  // node.
+  if (isPrimaryFn) {
+    for (const auto &dynAttrInfo : dynAttrInsts) {
+      const auto &dynAttrName = dynAttrInfo.second;
+      LLVM_DEBUG(llvm::dbgs()
+                 << "For function with base name " << funcNodeBaseName
+                 << ", adding dyn attr " << dynAttrName << "\n");
+      // TODO: handle other attr types.
+      TF_SetAttrBool(funcDesc, dynAttrName.c_str(), 0);
+    }
   }
 
   // Handle inputs.
@@ -2922,7 +2964,8 @@ bool TFGraphFunctionLowering::buildGraphNodesForTopLevelFunctionCall(
 
 bool TFGraphFunctionLowering::buildGraphFunction(
     const GraphFunctionBody &graphBody, StringRef funcName,
-    bool &funcHasSideEffects, SmallVectorImpl<TF_DataType> *inputTypes,
+    const DynAttrValueNameMap &dynAttrInsts, bool &funcHasSideEffects,
+    SmallVectorImpl<TF_DataType> *inputTypes,
     SmallVectorImpl<TF_DataType> *outputTypes) {
   // Inform our callers whether this function contains side effects or not.
   funcHasSideEffects = graphBody.funcHasSideEffects;
@@ -2950,17 +2993,31 @@ bool TFGraphFunctionLowering::buildGraphFunction(
   }
 
   LLVM_DEBUG(llvm::dbgs() << "Creating graph function " << funcName << "\n");
+  // TODO: Support an array of dyn attrs, and attr types other than bool.
+  assert(dynAttrInsts.size() <= 1);
+  const char *attrNames = nullptr;
+  const char *attrTypes = "bool";
+  for (const auto &dynAttrInfo : dynAttrInsts) {
+    const auto &attrName = dynAttrInfo.second;
+    LLVM_DEBUG(llvm::dbgs() << "Setting placeholder attr " << attrName
+                            << " to type " << attrTypes << "\n");
+    attrNames = attrName.c_str();
+  }
+
   auto resultFn =
-      TF_GraphToFunction(graphBody.getGraph(), funcName.str().c_str(),
-                         /*append_hash_to_fn_name*/ false,
-                         /*num_opers*/ -1,
-                         /*opers*/ nullptr,
-                         /*numinputs*/ ins.size(),
-                         /*inputs*/ ins.data(),
-                         /*noutputs*/ outs.size(),
-                         /*outputs*/ outs.data(),
-                         /*outputnames*/ nullptr,
-                         /*functionoptions*/ nullptr, "", status);
+      TF_GraphToFunctionWithAttrs(graphBody.getGraph(), funcName.str().c_str(),
+                                  /*append_hash_to_fn_name*/ false,
+                                  /*num_opers*/ -1,
+                                  /*opers*/ nullptr,
+                                  /*numinputs*/ ins.size(),
+                                  /*inputs*/ ins.data(),
+                                  /*noutputs*/ outs.size(),
+                                  /*outputs*/ outs.data(),
+                                  /*outputnames*/ nullptr,
+                                  /*nattrs*/ dynAttrInsts.size(),
+                                  /*attr_names*/ &attrNames,
+                                  /*attr_types*/ &attrTypes,
+                                  /*functionoptions*/ nullptr, "", status);
   // Diagnose any error that occurred if it happened building the graph.
   if (checkStatus(SILFn.getLocation()))
     return true;
@@ -3055,7 +3112,8 @@ StringRef getTFCompatibleFuncName(SILFunction *fn) {
 bool TFGraphLowering::lowerTFGraphOrFunction(
     StringRef hostFnName, SILFunction *fn,
     const std::string &graphFnNameForCaller, bool isAcceleratorOnly,
-    const GraphFunctionDeviceInfo &deviceInfo) {
+    const GraphFunctionDeviceInfo &deviceInfo,
+    const DynAttrValueNameMap &dynAttrInsts) {
 #ifndef SWIFT_ENABLE_TENSORFLOW
   // This should never be called if TensorFlow support isn't enabled, but just
   // in case, emit an error message so a misconfiguration is diagnosable.
@@ -3134,12 +3192,14 @@ bool TFGraphLowering::lowerTFGraphOrFunction(
     assert(!graphFunctions.count(graphFnName));
 
     bool funcHasSideEffects = false;
+    DynAttrValueNameMap dummyDynAttrInsts;
     SmallVector<TF_DataType, 4> inputTypes, outputTypes;
     // Ignore `funcHasSideEffects` when the call returns, since this top level
     // graph function gets called directly in a TF_SessionRun() call.
-    if (graphFuncGen.buildGraphFunction(graphFnBody, graphFnName,
-                                        funcHasSideEffects, &inputTypes,
-                                        &outputTypes))
+    if (graphFuncGen.buildGraphFunction(
+            graphFnBody, graphFnName,
+            isPrimaryFn ? dynAttrInsts : dummyDynAttrInsts, funcHasSideEffects,
+            &inputTypes, &outputTypes))
       return true;
 
     if (!isPrimaryFn) {
@@ -3151,7 +3211,7 @@ bool TFGraphLowering::lowerTFGraphOrFunction(
     // for host-side invocation.
     if (!isAcceleratorOnly &&
         graphFuncGen.buildGraphNodesForTopLevelFunctionCall(
-            graphFnName, isPrimaryFn, inputTypes, outputTypes,
+            graphFnName, isPrimaryFn, dynAttrInsts, inputTypes, outputTypes,
             metadataNodeForTPU))
       return true;
   }
@@ -3183,15 +3243,19 @@ bool TFGraphLowering::lowerTFFunction(
   std::string graphFnName = getGraphFuncNameForFuncAttr(hostFnName);
   LLVM_DEBUG(llvm::dbgs() << "Lowering accelerator-only host fn " << hostFnName
                           << " to graph function " << graphFnName << "\n");
+  DynAttrValueNameMap dummyDynAttrInsts;
   return lowerTFGraphOrFunction(hostFnName, fn, graphFnName,
-                                /*isAcceleratorOnly*/ true, deviceInfo);
+                                /*isAcceleratorOnly*/ true, deviceInfo,
+                                dummyDynAttrInsts);
 }
 
 bool TFGraphLowering::lowerTFGraph(StringRef hostFnName, SILFunction *fn,
-                                   const GraphFunctionDeviceInfo &deviceInfo) {
+                                   const GraphFunctionDeviceInfo &deviceInfo,
+                                   const DynAttrValueNameMap &dynAttrInsts) {
   std::string entryFnBaseName = getTFCompatibleFuncName(fn);
   return lowerTFGraphOrFunction(hostFnName, fn, entryFnBaseName,
-                                /*isAcceleratorOnly*/ false, deviceInfo);
+                                /*isAcceleratorOnly*/ false, deviceInfo,
+                                dynAttrInsts);
 }
 
 //===----------------------------------------------------------------------===//
@@ -3212,7 +3276,9 @@ struct TFLowerGraphTestPass : public SILFunctionTransform {
     llvm::DenseMap<StringRef, std::unique_ptr<LoweredGraphFunction>>
         graphFunctions;
     TFGraphLowering graphLowering(*this, graphFunctions);
-    if (graphLowering.lowerTFGraph(fn->getName(), fn, deviceInfo)) {
+    DynAttrValueNameMap dummyDynAttrInsts;
+    if (graphLowering.lowerTFGraph(fn->getName(), fn, deviceInfo,
+                                   dummyDynAttrInsts)) {
       llvm::errs() << "Failed to generate TFGraph for " << fn->getName()
                    << "\n";
       return;

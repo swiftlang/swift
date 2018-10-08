@@ -36,6 +36,10 @@ extern cl::opt<bool> TFDynamicCompilation;
 namespace swift {
 namespace tf {
 
+/// Maps a SIL value to a placeholder attribute name in the graph function.
+// e.g. map %9 to "MyBoolAttr".
+using DynAttrValueNameMap = llvm::DenseMap<SILValue, std::string>;
+
 // TODO: reformat the code below to remove indentation.
 
 /// If the -tf-dump-intermediates flag has been passed, return a pointer to
@@ -236,8 +240,12 @@ public:
   /// single SessionRun() call. Those N-1 helper functions take no input or
   /// output tensors, and are executed for their side-effects of
   /// sending/receiving tensors with the function of `entryFnBaseName`.
+  ///
+  /// For each dynamatic attribute in `dynAttrInsts`, add a function-level
+  /// attribute based on their name and type info.
   bool lowerTFGraph(StringRef hostFnName, SILFunction *fn,
-                    const GraphFunctionDeviceInfo &deviceInfo);
+                    const GraphFunctionDeviceInfo &deviceInfo,
+                    const DynAttrValueNameMap &dynAttrInsts);
 
   /// Serialize `graph` into a binary protobuf into `bytes`.
   /// Return true on error, with an error diagnostic already emitted at
@@ -261,7 +269,8 @@ private:
   bool lowerTFGraphOrFunction(StringRef hostFnName, SILFunction *fn,
                               const std::string &graphFnNameForCaller,
                               bool isAcceleratorOnly,
-                              const GraphFunctionDeviceInfo &deviceInfo);
+                              const GraphFunctionDeviceInfo &deviceInfo,
+                              const DynAttrValueNameMap &dynAttrInsts);
 };
 
 } // end namespace tf
