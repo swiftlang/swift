@@ -745,7 +745,6 @@ tests.test("LazyCollection/Passthrough") {
   CollectionLog._customIndexOfEquatableElement.expectIncrement(baseType) {
     _ = s._customIndexOfEquatableElement(OpaqueValue(0))
   }
-  CollectionLog.first.expectIncrement(baseType) { _ = s.first }
 }
 
 //===--- Map --------------------------------------------------------------===//
@@ -842,9 +841,6 @@ tests.test("LazyMapCollection/Passthrough") {
   }
   CollectionLog.isEmpty.expectIncrement(type(of: base)) {
     _ = mapped.isEmpty
-  }
-  CollectionLog.first.expectIncrement(type(of: base)) {
-    _ = mapped.first
   }
   CollectionLog.underestimatedCount.expectIncrement(type(of: base)) {
     _ = mapped.underestimatedCount

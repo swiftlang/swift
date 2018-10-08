@@ -196,11 +196,7 @@ CollectionTypeTests.test("filter/Collection/${Implementation}Implementation/${di
 //===----------------------------------------------------------------------===//
 var MinimalCollectionWithCustomMap_timesMapWasCalled: Int = 0
 
-% for Implementation in [ 'Default', 'Custom' ]:
-
-struct MinimalCollectionWith${Implementation}Map<Element>
-  : Collection {
-
+struct MinimalCollectionWithDefaultMap<Element>: Collection {
   init(_ data: [Element], underestimatedCount: UnderestimatedCountBehavior) {
     self._data = MinimalCollection(
       elements: data, underestimatedCount: underestimatedCount)
@@ -227,43 +223,10 @@ struct MinimalCollectionWith${Implementation}Map<Element>
   }
 
   var _data: MinimalCollection<Element>
-
-
-%   if Implementation == 'Custom':
-
-  static var timesMapWasCalled: Int {
-    get {
-      return MinimalCollectionWithCustomMap_timesMapWasCalled
-    }
-    set {
-      MinimalCollectionWithCustomMap_timesMapWasCalled = newValue
-    }
-  }
-
-  func map<T>(
-    _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    MinimalCollectionWithCustomMap.timesMapWasCalled += 1
-    return try _data.map(transform)
-  }
-
-%   end
-
 }
-
-% end
 
 func callStaticCollectionMap<T>(
   _ collection: MinimalCollectionWithDefaultMap<OpaqueValue<Int>>,
-  transform: (OpaqueValue<Int>) -> T
-) -> [T] {
-  var result = collection.map(transform)
-  expectType([T].self, &result)
-  return result
-}
-
-func callStaticCollectionMap<T>(
-  _ collection: MinimalCollectionWithCustomMap<OpaqueValue<Int>>,
   transform: (OpaqueValue<Int>) -> T
 ) -> [T] {
   var result = collection.map(transform)
@@ -280,9 +243,7 @@ func callGenericCollectionMap<C : Collection, T>(
   return result
 }
 
-% for Implementation in [ 'Default', 'Custom' ]:
-
-%   for dispatch in [ 'Static', 'Generic' ]:
+% for dispatch in [ 'Static', 'Generic' ]:
 
 CollectionTypeTests.test(
   "map/Collection/${Implementation}Implementation/${dispatch}"
@@ -293,19 +254,12 @@ CollectionTypeTests.test(
       UnderestimatedCountBehavior.half,
       UnderestimatedCountBehavior.value(0)
     ] {
-      let s = MinimalCollectionWith${Implementation}Map<
-        OpaqueValue<Int>
-      >(
+      let s = MinimalCollectionWithDefaultMap<OpaqueValue<Int>>(
         test.sequence.map(OpaqueValue.init),
         underestimatedCount: underestimatedCountBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
-%     if Implementation == 'Custom':
-      MinimalCollectionWithCustomMap<
-        OpaqueValue<Int>
-      >.timesMapWasCalled = 0
-%     end
       var result = call${dispatch}CollectionMap(s) {
         (element: OpaqueValue<Int>) -> OpaqueValue<Int32> in
         _blackHole(closureLifetimeTracker)
@@ -314,12 +268,6 @@ CollectionTypeTests.test(
       }
       expectType([OpaqueValue<Int32>].self, &result)
       expectEqual(test.expected, result.map { $0.value })
-%     if Implementation == 'Custom':
-      expectEqual(
-        1, MinimalCollectionWithCustomMap<
-          OpaqueValue<Int>
-        >.timesMapWasCalled)
-%     end
       expectEqual(test.sequence, s.map { $0.value },
         "collection should not be consumed")
       expectEqual(test.sequence.count, timesClosureWasCalled,
@@ -328,8 +276,6 @@ CollectionTypeTests.test(
     }
   }
 }
-
-%   end
 
 % end
 
@@ -603,15 +549,6 @@ CollectionTypeTests.test("isEmpty/dispatch") {
   expectCustomizable(tester, tester.log.isEmpty)
 }
 
-//===----------------------------------------------------------------------===//
-// first
-//===----------------------------------------------------------------------===//
-
-CollectionTypeTests.test("first/dispatch") {
-  let tester = CollectionLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.first
-  expectCustomizable(tester, tester.log.first)
-}
 
 //===----------------------------------------------------------------------===//
 // count

@@ -60,11 +60,6 @@ sequenceWrapperTests.test("Dispatch/underestimatedCount") {
     dispatchLog.underestimatedCount)
 }
 
-sequenceWrapperTests.test("Dispatch/map") {
-  expectWrapperDispatch(
-    direct.map { $0 }, indirect.map { $0 }, dispatchLog.map)
-}
-
 sequenceWrapperTests.test("Dispatch/filter") {
   expectWrapperDispatch(
     direct.filter { _ in true },

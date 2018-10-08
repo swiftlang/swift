@@ -4,6 +4,20 @@
 /* RawRepresentable Changes */
 
 /* Removed Decls */
+Func Sequence.forEach(_:) has been removed
+Func Sequence.map(_:) has been removed
+Var AnyBidirectionalCollection.first has been removed
+Var AnyBidirectionalCollection.last has been removed
+Var AnyCollection.first has been removed
+Var AnyRandomAccessCollection.first has been removed
+Var AnyRandomAccessCollection.last has been removed
+Var BidirectionalCollection.last has been removed
+Var Dictionary.first has been removed
+Var LazyCollection.first has been removed
+Var LazyCollection.last has been removed
+Var LazyMapCollection.first has been removed
+Var LazyMapCollection.last has been removed
+Var Set.first has been removed
 
 /* Moved Decls */
 

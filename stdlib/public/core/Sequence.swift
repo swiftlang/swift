@@ -348,29 +348,6 @@ public protocol Sequence {
   ///   In this case, see the documentation of `Collection.underestimatedCount`.
   var underestimatedCount: Int { get }
 
-  /// Returns an array containing the results of mapping the given closure
-  /// over the sequence's elements.
-  ///
-  /// In this example, `map` is used first to convert the names in the array
-  /// to lowercase strings and then to count their characters.
-  ///
-  ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
-  ///     let lowercaseNames = cast.map { $0.lowercased() }
-  ///     // 'lowercaseNames' == ["vivien", "marlon", "kim", "karl"]
-  ///     let letterCounts = cast.map { $0.count }
-  ///     // 'letterCounts' == [6, 6, 3, 4]
-  ///
-  /// - Parameter transform: A mapping closure. `transform` accepts an
-  ///   element of this sequence as its parameter and returns a transformed
-  ///   value of the same or of a different type.
-  /// - Returns: An array containing the transformed elements of this
-  ///   sequence.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  func map<T>(
-    _ transform: (Element) throws -> T
-  ) rethrows -> [T]
-
   /// Returns an array containing, in order, the elements of the sequence
   /// that satisfy the given predicate.
   ///
@@ -391,37 +368,6 @@ public protocol Sequence {
   __consuming func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Element]
-
-  /// Calls the given closure on each element in the sequence in the same order
-  /// as a `for`-`in` loop.
-  ///
-  /// The two loops in the following example produce the same output:
-  ///
-  ///     let numberWords = ["one", "two", "three"]
-  ///     for word in numberWords {
-  ///         print(word)
-  ///     }
-  ///     // Prints "one"
-  ///     // Prints "two"
-  ///     // Prints "three"
-  ///
-  ///     numberWords.forEach { word in
-  ///         print(word)
-  ///     }
-  ///     // Same as above
-  ///
-  /// Using the `forEach` method is distinct from a `for`-`in` loop in two
-  /// important ways:
-  ///
-  /// 1. You cannot use a `break` or `continue` statement to exit the current
-  ///    call of the `body` closure or skip subsequent calls.
-  /// 2. Using the `return` statement in the `body` closure will exit only from
-  ///    the current call to `body`, not from any outer scope, and won't skip
-  ///    subsequent calls.
-  ///
-  /// - Parameter body: A closure that takes an element of the sequence as a
-  ///   parameter.
-  func forEach(_ body: (Element) throws -> Void) rethrows
 
   // Note: The complexity of Sequence.dropFirst(_:) requirement
   // is documented as O(n) because Collection.dropFirst(_:) is
