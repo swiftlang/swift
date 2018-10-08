@@ -29,10 +29,11 @@ struct _SetBuilder<Element: Hashable> {
   }
 
   @inlinable
+  @inline(__always)
   public mutating func add(member: Element) {
     _precondition(_target.count < _requestedCount,
       "Can't add more members than promised")
-    _target.insertNew(member, isUnique: true)
+    _target._unsafeInsertNew(member)
   }
 
   @inlinable
