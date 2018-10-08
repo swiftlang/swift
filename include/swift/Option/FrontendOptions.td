@@ -373,13 +373,13 @@ def solver_disable_shrink :
 def disable_constraint_solver_performance_hacks : Flag<["-"], "disable-constraint-solver-performance-hacks">,
   HelpText<"Disable all the hacks in the constraint solver">;
 
-def enable_operator_designated_protocols :
-  Flag<["-"], "enable-operator-designated-protocols">,
-  HelpText<"Enable operator designated protocols">;
+def enable_operator_designated_types :
+  Flag<["-"], "enable-operator-designated-types">,
+  HelpText<"Enable operator designated types">;
 
-def solver_enable_operator_designated_protocols :
-  Flag<["-"], "solver-enable-operator-designated-protocols">,
-  HelpText<"Enable operator designated protocols in constraint solver">;
+def solver_enable_operator_designated_types :
+  Flag<["-"], "solver-enable-operator-designated-types">,
+  HelpText<"Enable operator designated types in constraint solver">;
 
 def switch_checking_invocation_threshold_EQ : Joined<["-"],
     "switch-checking-invocation-threshold=">;
