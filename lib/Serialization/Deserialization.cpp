@@ -3448,15 +3448,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     decls_block::InfixOperatorLayout::readRecord(scratch, nameID, contextID,
                                                  precedenceGroupID, nominalID);
 
-    PrecedenceGroupDecl *precedenceGroup = nullptr;
-    Identifier precedenceGroupName;
-    if (precedenceGroupID) {
-      precedenceGroup =
-        dyn_cast_or_null<PrecedenceGroupDecl>(getDecl(precedenceGroupID));
-      if (precedenceGroup) {
-        precedenceGroupName = precedenceGroup->getName();
-      }
-    }
+    Expected<Decl *> precedenceGroup = getDeclChecked(precedenceGroupID);
+    if (!precedenceGroup)
+      return precedenceGroup.takeError();
 
     auto DC = getDeclContext(contextID);
 
@@ -3466,9 +3460,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     auto result = createDecl<InfixOperatorDecl>(
         DC, SourceLoc(), getIdentifier(nameID), SourceLoc(), SourceLoc(),
-        precedenceGroupName, SourceLoc(),
+        cast_or_null<PrecedenceGroupDecl>(precedenceGroup.get()),
         cast_or_null<NominalTypeDecl>(nominal.get()));
-    result->setPrecedenceGroup(precedenceGroup);
 
     declOrOffset = result;
     break;
