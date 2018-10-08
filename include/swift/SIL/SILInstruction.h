@@ -6645,9 +6645,6 @@ public:
   /// Returns true if this terminator exits the function.
   bool isFunctionExiting() const;
 
-  /// Returns true if this terminator terminates the program.
-  bool isProgramTerminating() const;
-
   TermKind getTermKind() const { return TermKind(getKind()); }
 };
 
