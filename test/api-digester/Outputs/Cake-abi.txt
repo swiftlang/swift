@@ -44,8 +44,11 @@ cake1: Class C5 is now without @objc
 cake1: Enum IceKind is now without @_frozen
 cake1: Func C1.foo1() is now not static
 cake1: Func C5.dy_foo() is now with dynamic
+cake1: Func FinalFuncContainer.NewFinalFunc() is now with final
+cake1: Func FinalFuncContainer.NoLongerFinalFunc() is now without final
 cake1: Func S1.foo1() has self access kind changing from NonMutating to Mutating
 cake1: Func S1.foo3() is now static
+cake1: Func _NoResilientClass.NoLongerFinalFunc() is now without final
 cake1: Struct C6 is now with @_fixed_layout
 cake1: Var C1.CIIns1 changes from weak to strong
 cake1: Var C1.CIIns2 changes from strong to weak
@@ -55,11 +58,14 @@ cake1: Var GlobalVarChangedToLet changes from var to let
 /* Fixed-layout Type changes */
 cake1: EnumElement FrozenKind.Fixed in a non-resilient type changes position from 1 to 2
 cake1: EnumElement FrozenKind.Rigid in a non-resilient type changes position from 2 to 1
+cake1: Func _NoResilientClass.FuncPositionChange0() in a non-resilient type changes position from 0 to 2
+cake1: Func _NoResilientClass.NoLongerFinalFunc() is now a non-final instance function
 cake1: Var fixedLayoutStruct.a in a non-resilient type changes position from 1 to 0
 cake1: Var fixedLayoutStruct.b in a non-resilient type changes position from 0 to 1
 cake1: Var fixedLayoutStruct2.BecomeFixedBinaryOrder is now a stored property
 cake1: Var fixedLayoutStruct2.NoLongerWithFixedBinaryOrder is no longer a stored property
 cake2: EnumElement FrozenKind.AddedCase is added to a non-resilient type
+cake2: Func _NoResilientClass.FuncPositionChange2() is added to a non-resilient type
 cake2: Var fixedLayoutStruct.c is added to a non-resilient type
 cake2: Var fixedLayoutStruct.lazy_d.storage is added to a non-resilient type
 

@@ -146,3 +146,18 @@ public class EscapingFunctionType {
 prefix operator ..*..
 
 public func ownershipChange(_ a: Int, _ b: __owned Int) {}
+
+@usableFromInline
+@_fixed_layout
+class _NoResilientClass {
+  @usableFromInline
+  func NoLongerFinalFunc() {}
+  private func FuncPositionChange1() {}
+  private func FuncPositionChange0() {}
+  private func FuncPositionChange2() {}
+}
+
+public class FinalFuncContainer {
+  public final func NewFinalFunc() {}
+  public func NoLongerFinalFunc() {}
+}

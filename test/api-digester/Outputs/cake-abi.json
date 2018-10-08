@@ -237,6 +237,7 @@
           "usr": "s:4cake2C1C4foo1yyFZ",
           "moduleName": "cake",
           "static": true,
+          "fixedbinaryorder": 0,
           "funcSelfKind": "NonMutating"
         },
         {
@@ -318,6 +319,7 @@
             "HasInitialValue",
             "ReferenceOwnership"
           ],
+          "fixedbinaryorder": 0,
           "ownership": 1,
           "hasStorage": true
         },
@@ -384,6 +386,7 @@
             "HasInitialValue",
             "ReferenceOwnership"
           ],
+          "fixedbinaryorder": 1,
           "ownership": 2,
           "hasStorage": true
         },
@@ -1220,6 +1223,49 @@
       "printedName": "UsableFromInlineClass",
       "children": [
         {
+          "kind": "Var",
+          "name": "Prop",
+          "printedName": "Prop",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Int",
+              "usr": "s:Si"
+            },
+            {
+              "kind": "Getter",
+              "name": "_",
+              "printedName": "_()",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ],
+              "declKind": "Accessor",
+              "usr": "s:4cake21UsableFromInlineClassC4Prop33_3D8926C30F7417F2EF9A277D0C73FBDBLLSivg",
+              "moduleName": "cake",
+              "implicit": true,
+              "isInternal": true,
+              "declAttributes": [
+                "Transparent"
+              ]
+            }
+          ],
+          "declKind": "Var",
+          "usr": "s:4cake21UsableFromInlineClassC4Prop33_3D8926C30F7417F2EF9A277D0C73FBDBLLSivp",
+          "moduleName": "cake",
+          "isInternal": true,
+          "declAttributes": [
+            "HasInitialValue"
+          ],
+          "fixedbinaryorder": 0,
+          "hasStorage": true
+        },
+        {
           "kind": "Constructor",
           "name": "init",
           "printedName": "init()",
@@ -1242,6 +1288,7 @@
       "usr": "s:4cake21UsableFromInlineClassC",
       "moduleName": "cake",
       "declAttributes": [
+        "FixedLayout",
         "UsableFromInline"
       ]
     },
