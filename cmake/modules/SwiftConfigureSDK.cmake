@@ -168,12 +168,7 @@ macro(configure_sdk_unix name architectures)
   string(TOLOWER ${name} platform)
 
   set(SWIFT_SDK_${prefix}_NAME "${name}")
-  set(SWIFT_SDK_${prefix}_VERSION "don't use")
-  set(SWIFT_SDK_${prefix}_BUILD_NUMBER "don't use")
-  set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "")
   set(SWIFT_SDK_${prefix}_LIB_SUBDIR "${platform}")
-  set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "")
-  set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${platform}")
   set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
   if("${prefix}" STREQUAL "CYGWIN")
     set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "COFF")
@@ -258,7 +253,7 @@ macro(configure_sdk_unix name architectures)
   _report_sdk("${prefix}")
 endmacro()
 
-macro(configure_sdk_windows name environment architectures)
+macro(configure_sdk_windows sdk_name environment architectures)
   # Note: this has to be implemented as a macro because it sets global
   # variables.
 
@@ -266,12 +261,7 @@ macro(configure_sdk_windows name environment architectures)
   string(TOLOWER ${name} platform)
 
   set(SWIFT_SDK_${prefix}_NAME "${sdk_name}")
-  set(SWIFT_SDK_${prefix}_VERSION "NOTFOUND")
-  set(SWIFT_SDK_${prefix}_BUILD_NUMBER "NOTFOUND")
-  set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "")
   set(SWIFT_SDK_${prefix}_LIB_SUBDIR "windows")
-  set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "NOTFOUND")
-  set(SWIFT_SDK_${prefix}_TRIPLE_NAME "Win32")
   set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
   set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "COFF")
 
