@@ -2032,7 +2032,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   StringRef conventionName;
   StringRef witnessMethodProtocol;
   // SWIFT_ENABLE_TENSORFLOW
-  StringRef differentiationMode;
+  StringRef differentiabilityName;
   int differentiationOrder = -1;
 
   // Handle @autoclosure(escaping)
@@ -2129,7 +2129,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
         return false;
       };
       if (!tryParseOrder()) {
-        differentiationMode = Tok.getText();
+        differentiabilityName = Tok.getText();
         consumeToken(tok::identifier);
         if (consumeIf(tok::comma))
           tryParseOrder();
@@ -2139,7 +2139,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       // If parsing failed, clean up the states.
       if (backtrack.willBacktrack()) {
         differentiationOrder = -1;
-        differentiationMode = StringRef();
+        differentiabilityName = StringRef();
       }
     }
   }
@@ -2280,7 +2280,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   // @autodiff(...) attribute.
   case TAK_autodiff:
     Attributes.differentiabilityAndOrder = {
-      differentiationMode, differentiationOrder
+      differentiabilityName, differentiationOrder
     };
     break;
   }
