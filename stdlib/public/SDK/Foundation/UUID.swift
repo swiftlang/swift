@@ -93,8 +93,7 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
     // MARK: - Bridging Support
     
     fileprivate var reference: NSUUID {
-        var bytes = uuid
-        return withUnsafePointer(to: &bytes) {
+        return withUnsafePointer(to: uuid) {
             $0.withMemoryRebound(to: UInt8.self, capacity: 16) {
                 return NSUUID(uuidBytes: $0)
             }
