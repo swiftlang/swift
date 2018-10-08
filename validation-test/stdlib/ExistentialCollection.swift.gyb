@@ -151,18 +151,6 @@ tests.test("${TestedType}: dispatch to wrapped, SequenceLog") {
     _ = s.underestimatedCount
   }
 
-  Log.map.expectIncrement(Base.self) {
-    _ = s.map { $0 }
-  }
-
-  Log.filter.expectIncrement(Base.self) {
-    _ = s.filter { (_) in true }
-  }
-
-  Log.forEach.expectIncrement(Base.self) {
-    _ = s.forEach { (_) in }
-  }
-
   Log.dropFirst.expectIncrement(Base.self) {
     _ = s.dropFirst(0)
   }
@@ -331,23 +319,6 @@ tests.test("${TestedType}: dispatch to wrapped, CollectionLog") {
     _blackHole(x)
   }
 %   end
-
-  Log.first.expectIncrement(Base.self) {
-    Log.startIndex.expectUnchanged(Base.self) {
-      Log.makeIterator.expectUnchanged(Base.self) {
-        _ = c.first
-      }
-    }
-  }
-
-%   if Traversal in ['Bidirectional', 'RandomAccess']:
-  BidirectionalCollectionLog.last.expectIncrement(Base.self) {
-    Log.endIndex.expectUnchanged(Base.self) {
-      _ = c.last
-    }
-  }
-%   end
-
 }
 %   end
 % end
