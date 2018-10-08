@@ -1165,6 +1165,7 @@ static bool shouldTake(ConsumableManagedValue value, bool isIrrefutable) {
   case CastConsumptionKind::TakeAlways: return true;
   case CastConsumptionKind::TakeOnSuccess: return isIrrefutable;
   case CastConsumptionKind::CopyOnSuccess: return false;
+  case CastConsumptionKind::BorrowAlways: return false;
   }
   llvm_unreachable("bad consumption kind");
 }
@@ -1349,14 +1350,17 @@ static ConsumableManagedValue
 getManagedSubobject(SILGenFunction &SGF, SILValue value,
                     const TypeLowering &valueTL,
                     CastConsumptionKind consumption) {
-  if (consumption == CastConsumptionKind::CopyOnSuccess) {
+  switch (consumption) {
+  case CastConsumptionKind::BorrowAlways:
+  case CastConsumptionKind::CopyOnSuccess:
     return {ManagedValue::forUnmanaged(value), consumption};
+  case CastConsumptionKind::TakeAlways:
+  case CastConsumptionKind::TakeOnSuccess:
+    assert((!SGF.F.getModule().getOptions().EnableSILOwnership ||
+            consumption != CastConsumptionKind::TakeOnSuccess) &&
+           "TakeOnSuccess should never be used when sil ownership is enabled");
+    return {SGF.emitManagedRValueWithCleanup(value, valueTL), consumption};
   }
-
-  assert((!SGF.F.getModule().getOptions().EnableSILOwnership ||
-          consumption != CastConsumptionKind::TakeOnSuccess) &&
-         "TakeOnSuccess should never be used when sil ownership is enabled");
-  return {SGF.emitManagedRValueWithCleanup(value, valueTL), consumption};
 }
 
 static ConsumableManagedValue
@@ -1873,6 +1877,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
     switch (src.getFinalConsumption()) {
     case CastConsumptionKind::TakeAlways:
     case CastConsumptionKind::CopyOnSuccess:
+    case CastConsumptionKind::BorrowAlways:
       // No change to src necessary.
       break;
 
@@ -1977,7 +1982,13 @@ void PatternMatchEmission::emitEnumElementDispatch(
           eltValue = SGF.B.createUncheckedTakeEnumDataAddr(loc, srcValue,
                                                            elt, eltTy);
           break;
-
+        case CastConsumptionKind::BorrowAlways:
+          // If we reach this point, we know that we have a loadable
+          // element type from an enum with mixed address
+          // only/loadable cases. Since we had an address only type,
+          // we assume that we will not have BorrowAlways since
+          // address only types do not support BorrowAlways.
+          llvm_unreachable("not allowed");
         case CastConsumptionKind::CopyOnSuccess: {
           auto copy = SGF.emitTemporaryAllocation(loc, srcValue->getType());
           SGF.B.createCopyAddr(loc, srcValue, copy,
