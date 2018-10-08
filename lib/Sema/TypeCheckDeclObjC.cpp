@@ -1539,8 +1539,11 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
   }
 
   if (!isa<TypeDecl>(D) && !isa<AccessorDecl>(D) && !isa<EnumElementDecl>(D)) {
-    useObjectiveCBridgeableConformances(D->getInnermostDeclContext(),
-                                        D->getInterfaceType());
+    if (ctx.getLazyResolver()) {
+      // Only record conformances when we have a lazy resolver.
+      useObjectiveCBridgeableConformances(D->getInnermostDeclContext(),
+                                          D->getInterfaceType());
+    }
   }
 
   if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
