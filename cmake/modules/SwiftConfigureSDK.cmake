@@ -160,9 +160,12 @@ macro(configure_sdk_darwin
   _report_sdk("${prefix}")
 endmacro()
 
-macro(configure_sdk_unix prefix name platform architectures)
+macro(configure_sdk_unix name architectures)
   # Note: this has to be implemented as a macro because it sets global
   # variables.
+
+  string(TOUPPER ${name} prefix)
+  string(TOLOWER ${name} platform)
 
   set(SWIFT_SDK_${prefix}_NAME "${name}")
   set(SWIFT_SDK_${prefix}_VERSION "don't use")
@@ -255,9 +258,12 @@ macro(configure_sdk_unix prefix name platform architectures)
   _report_sdk("${prefix}")
 endmacro()
 
-macro(configure_sdk_windows prefix sdk_name environment architectures)
+macro(configure_sdk_windows name environment architectures)
   # Note: this has to be implemented as a macro because it sets global
   # variables.
+
+  string(TOUPPER ${name} prefix)
+  string(TOLOWER ${name} platform)
 
   set(SWIFT_SDK_${prefix}_NAME "${sdk_name}")
   set(SWIFT_SDK_${prefix}_VERSION "NOTFOUND")
