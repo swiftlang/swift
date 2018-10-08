@@ -290,7 +290,7 @@ public func _onFastPath() {
   Builtin.onFastPath()
 }
 
-// Optimizier hint that the condition is true. The condition is unchecked.
+// Optimizer hint that the condition is true. The condition is unchecked.
 // The builtin acts as an opaque instruction with side-effects.
 @usableFromInline @_transparent
 func _uncheckedUnsafeAssume(_ condition: Bool) {
