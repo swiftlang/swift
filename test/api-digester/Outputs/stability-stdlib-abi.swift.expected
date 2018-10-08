@@ -12,12 +12,40 @@ Struct _PrefixSequence has generic signature change from <τ_0_0 where τ_0_0 : 
 /* Removed Decls */
 Constructor _DropFirstSequence.init(_iterator:limit:dropped:) has been removed
 Constructor _PrefixSequence.init(_iterator:maxLength:taken:) has been removed
+Func Collection.prefix(through:) has been removed
+Func Collection.prefix(upTo:) has been removed
+Func Collection.suffix(from:) has been removed
+Func Sequence.filter(_:) has been removed
+Func Sequence.forEach(_:) has been removed
+Func Sequence.map(_:) has been removed
 Func _DropFirstSequence.next() has been removed
 Func _PrefixSequence.next() has been removed
+Func _SequenceWrapper.filter(_:) has been removed
+Func _SequenceWrapper.forEach(_:) has been removed
+Func _SequenceWrapper.map(_:) has been removed
+Var AnyBidirectionalCollection.first has been removed
+Var AnyBidirectionalCollection.last has been removed
+Var AnyCollection.first has been removed
+Var AnyRandomAccessCollection.first has been removed
+Var AnyRandomAccessCollection.last has been removed
+Var BidirectionalCollection.last has been removed
+Var Dictionary.first has been removed
+Var LazyCollection.first has been removed
+Var LazyCollection.last has been removed
+Var LazyMapCollection.first has been removed
+Var LazyMapCollection.last has been removed
+Var Set.first has been removed
+Var _AnyBidirectionalCollectionBox._last has been removed
+Var _AnyCollectionBox._first has been removed
+Var _BidirectionalCollectionBox._first has been removed
+Var _BidirectionalCollectionBox._last has been removed
+Var _CollectionBox._first has been removed
 Var _DropFirstSequence._dropped has been removed
 Var _DropFirstSequence._iterator has been removed
 Var _PrefixSequence._iterator has been removed
 Var _PrefixSequence._taken has been removed
+Var _RandomAccessCollectionBox._first has been removed
+Var _RandomAccessCollectionBox._last has been removed
 
 /* Moved Decls */
 Struct _DropFirstSequence has been renamed to Struct DropFirstSequence
