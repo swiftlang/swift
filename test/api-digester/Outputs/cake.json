@@ -1218,7 +1218,6 @@
       "conformingProtocols": [
         "Comparable",
         "SignedInteger",
-        "_ExpressibleByBuiltinIntegerLiteral",
         "BinaryInteger",
         "LosslessStringConvertible",
         "SignedNumeric",
@@ -1232,9 +1231,7 @@
         "Decodable",
         "Hashable",
         "Equatable",
-        "_HasCustomAnyHashableRepresentation",
         "CustomReflectable",
-        "_CustomPlaygroundQuickLookable",
         "MirrorPath",
         "CVarArg"
       ]

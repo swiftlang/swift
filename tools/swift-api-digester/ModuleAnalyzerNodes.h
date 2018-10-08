@@ -190,6 +190,7 @@ public:
   bool checkingABI() const { return Opts.ABI; }
   AccessLevel getAccessLevel(const ValueDecl *VD) const;
   const CheckerOptions &getOpts() const { return Opts; }
+  bool shouldIgnore(Decl *D, const Decl* Parent = nullptr) const;
   ArrayRef<BreakingAttributeInfo> getBreakingAttributeInfo() const { return BreakingAttrs; }
 
   template<class YAMLNodeTy, typename ...ArgTypes>
@@ -615,7 +616,6 @@ public:
 
   void printTopLevelNames();
 
-  bool shouldIgnore(Decl *D, const Decl* Parent);
   void addMembersToRoot(SDKNode *Root, IterableDeclContext *Context);
   SDKNode *constructSubscriptDeclNode(SubscriptDecl *SD);
   SDKNode *constructAssociatedTypeNode(AssociatedTypeDecl *ATD);

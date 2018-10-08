@@ -1116,7 +1116,9 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
   // Get all protocol names this type decl conforms to.
   if (auto *NTD = dyn_cast<NominalTypeDecl>(VD)) {
     for (auto *P: NTD->getAllProtocols()) {
-      ConformingProtocols.push_back(P->getName().str());
+      if (!Ctx.shouldIgnore(P)) {
+        ConformingProtocols.push_back(P->getName().str());
+      }
     }
   }
 
@@ -1255,8 +1257,8 @@ SwiftDeclCollector::constructInitNode(ConstructorDecl *CD) {
 }
 
 bool swift::ide::api::
-SwiftDeclCollector::shouldIgnore(Decl *D, const Decl* Parent) {
-  if (Ctx.checkingABI()) {
+SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
+  if (checkingABI()) {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       // Private vars with fixed binary orders can have ABI-impact, so we should
       // whitelist them if we're checking ABI.
@@ -1277,7 +1279,7 @@ SwiftDeclCollector::shouldIgnore(Decl *D, const Decl* Parent) {
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     if (VD->getBaseName().empty())
       return true;
-    switch (Ctx.getAccessLevel(VD)) {
+    switch (getAccessLevel(VD)) {
     case AccessLevel::Internal:
     case AccessLevel::Private:
     case AccessLevel::FilePrivate:
@@ -1382,7 +1384,7 @@ SwiftDeclCollector::constructSubscriptDeclNode(SubscriptDecl *SD) {
 void swift::ide::api::
 SwiftDeclCollector::addMembersToRoot(SDKNode *Root, IterableDeclContext *Context) {
   for (auto *Member : Context->getMembers()) {
-    if (shouldIgnore(Member, Context->getDecl()))
+    if (Ctx.shouldIgnore(Member, Context->getDecl()))
       continue;
     if (auto Func = dyn_cast<FuncDecl>(Member)) {
       Root->addChild(constructFunctionNode(Func, SDKNodeKind::DeclFunction));
@@ -1421,7 +1423,7 @@ void SwiftDeclCollector::lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
     llvm::SmallVector<Decl*, 512> Decls;
     M->getDisplayDecls(Decls);
     for (auto D : Decls) {
-      if (shouldIgnore(D, nullptr))
+      if (Ctx.shouldIgnore(D))
         continue;
       if (KnownDecls.count(D))
         continue;
