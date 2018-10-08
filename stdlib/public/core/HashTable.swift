@@ -94,7 +94,6 @@ extension _HashTable {
     for object: AnyObject,
     scale: Int8
   ) -> Int {
-#if false // FIXME: Enable per-instance seeding
     // We generate a new hash seed whenever a new hash table is allocated and
     // whenever an existing table is resized, so that we avoid certain copy
     // operations becoming quadratic.  (For background details, see
@@ -115,10 +114,6 @@ extension _HashTable {
     // guarantee that no two tables with the same seed can coexist at the same
     // time (apart from copy-on-write derivatives of the same table).
     return unsafeBitCast(object, to: Int.self)
-#else
-    // Use per-capacity seeding for now.
-    return Int(scale)
-#endif
   }
 }
 
@@ -392,7 +387,7 @@ extension _HashTable {
     }
     var wrap = false
     while true {
-      word += 1
+      word &+= 1
       if word == wordCount {
         _precondition(!wrap, "Hash table has no holes")
         wrap = true

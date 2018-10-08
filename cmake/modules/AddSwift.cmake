@@ -273,6 +273,13 @@ function(_add_variant_c_compile_flags)
     # RTTI as well.  This requires a newer SDK though and we do not have
     # guarantees on the SDK version currently.
     list(APPEND result "-D_HAS_STATIC_RTTI=0")
+
+    # NOTE(compnerd) workaround LLVM invoking `add_definitions(-D_DEBUG)` which
+    # causes failures for the runtime library when cross-compiling due to
+    # undefined symbols from the standard library.
+    if(NOT CMAKE_BUILD_TYPE STREQUAL Debug)
+      list(APPEND result "-U_DEBUG")
+    endif()
   endif()
 
   if(CFLAGS_ENABLE_ASSERTIONS)

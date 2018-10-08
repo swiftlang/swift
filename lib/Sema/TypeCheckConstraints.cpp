@@ -2483,7 +2483,7 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   // Add the attribute that preserves the "has an initializer" value across
   // module generation, as required for TBDGen.
   PBD->getPattern(patternNumber)->forEachVariable([&](VarDecl *VD) {
-    if (VD->hasStorage())
+    if (VD->hasStorage() && !VD->getAttrs().hasAttribute<HasInitialValueAttr>())
       VD->getAttrs().add(new (ctx) HasInitialValueAttr(/*IsImplicit=*/true));
   });
 
