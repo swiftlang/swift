@@ -1629,11 +1629,12 @@ static bool isOperatorBindOverload(Constraint *bindOverload) {
 // Given a bind overload constraint for an operator, return the
 // protocol designated as the first place to look for overloads of the
 // operator.
-static ProtocolDecl *getOperatorDesignatedProtocol(Constraint *bindOverload) {
+static NominalTypeDecl *
+getOperatorDesignatedNominalType(Constraint *bindOverload) {
   auto choice = bindOverload->getOverloadChoice();
   auto *funcDecl = cast<FuncDecl>(choice.getDecl());
   auto *operatorDecl = funcDecl->getOperatorDecl();
-  return operatorDecl->getDesignatedProtocol();
+  return operatorDecl->getDesignatedNominalType();
 }
 
 void ConstraintSystem::partitionDisjunction(
@@ -1649,7 +1650,7 @@ void ConstraintSystem::partitionDisjunction(
   };
 
   if (!getASTContext().isSwiftVersionAtLeast(5) ||
-      !TC.getLangOpts().SolverEnableOperatorDesignatedProtocols ||
+      !TC.getLangOpts().SolverEnableOperatorDesignatedTypes ||
       !isOperatorBindOverload(Choices[0])) {
     originalOrdering();
     return;
@@ -1720,21 +1721,21 @@ void ConstraintSystem::partitionDisjunction(
 
   // Now collect the overload choices that are defined within the type
   // that was designated in the operator declaration.
-  auto *designatedProtocol = getOperatorDesignatedProtocol(Choices[0]);
-  if (designatedProtocol) {
+  auto *designatedNominal = getOperatorDesignatedNominalType(Choices[0]);
+  if (designatedNominal) {
     forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
         auto *decl = constraint->getOverloadChoice().getDecl();
         auto *funcDecl = cast<FuncDecl>(decl);
 
         auto *parentDecl = funcDecl->getParent()->getAsDecl();
-        if (parentDecl == designatedProtocol) {
+        if (parentDecl == designatedNominal) {
           definedInDesignatedType.push_back(index);
           return true;
         }
 
         if (auto *extensionDecl = dyn_cast<ExtensionDecl>(parentDecl)) {
           parentDecl = extensionDecl->getExtendedNominal();
-          if (parentDecl == designatedProtocol) {
+          if (parentDecl == designatedNominal) {
             definedInExtensionOfDesignatedType.push_back(index);
             return true;
           }
