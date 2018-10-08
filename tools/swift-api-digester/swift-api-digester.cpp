@@ -1936,6 +1936,8 @@ class RenameDetectorForMemberDiff : public MatchedNodeListener {
 public:
   RenameDetectorForMemberDiff(): LeftDetector(true), RightDetector(false) {}
   void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) override {
+    if (!Left || !Right)
+      return;
     detectRename(Left, Right);
     LeftDetector.detect(Left, Right);
     RightDetector.detect(Right, Left);

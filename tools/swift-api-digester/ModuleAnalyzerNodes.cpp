@@ -1003,7 +1003,10 @@ static Optional<uint8_t> getSimilarMemberCount(NominalTypeDecl *NTD,
   return std::count_if(Members.begin(), End, Check);
 }
 
-static Optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) {
+Optional<uint8_t> SDKContext::getFixedBinaryOrder(ValueDecl *VD) const {
+  // We don't need fixed binary order when checking API stability.
+  if (!checkingABI())
+    return None;
   auto *NTD = dyn_cast_or_null<NominalTypeDecl>(VD->getDeclContext()->
     getAsDecl());
 
@@ -1090,7 +1093,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
   IsOpen = Ctx.getAccessLevel(VD) == AccessLevel::Open;
   IsInternal = Ctx.getAccessLevel(VD) < AccessLevel::Public;
   SelfIndex = getSelfIndex(VD);
-  FixedBinaryOrder = getFixedBinaryOrder(VD);
+  FixedBinaryOrder = Ctx.getFixedBinaryOrder(VD);
   ReferenceOwnership = getReferenceOwnership(VD);
 
   // Calculate usr for its super class.

@@ -281,7 +281,6 @@
           "moduleName": "cake",
           "static": true,
           "isOpen": true,
-          "fixedbinaryorder": 0,
           "funcSelfKind": "NonMutating"
         },
         {
@@ -363,7 +362,6 @@
             "HasInitialValue",
             "ReferenceOwnership"
           ],
-          "fixedbinaryorder": 0,
           "ownership": 1,
           "hasStorage": true
         },
@@ -430,7 +428,6 @@
             "HasInitialValue",
             "ReferenceOwnership"
           ],
-          "fixedbinaryorder": 1,
           "ownership": 2,
           "hasStorage": true
         },
@@ -566,8 +563,7 @@
           ],
           "declKind": "EnumElement",
           "usr": "s:4cake6NumberO3oneyA2CmF",
-          "moduleName": "cake",
-          "fixedbinaryorder": 0
+          "moduleName": "cake"
         },
         {
           "kind": "TypeAlias",
@@ -830,7 +826,6 @@
           "declAttributes": [
             "HasInitialValue"
           ],
-          "fixedbinaryorder": 0,
           "hasStorage": true
         },
         {

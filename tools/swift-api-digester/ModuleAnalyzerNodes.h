@@ -192,7 +192,7 @@ public:
   const CheckerOptions &getOpts() const { return Opts; }
   bool shouldIgnore(Decl *D, const Decl* Parent = nullptr) const;
   ArrayRef<BreakingAttributeInfo> getBreakingAttributeInfo() const { return BreakingAttrs; }
-
+  Optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) const;
   template<class YAMLNodeTy, typename ...ArgTypes>
   void diagnose(YAMLNodeTy node, Diag<ArgTypes...> ID,
                 typename detail::PassArgument<ArgTypes>::type... args) {

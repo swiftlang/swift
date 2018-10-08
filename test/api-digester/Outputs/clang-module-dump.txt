@@ -33,7 +33,6 @@
           "declAttributes": [
             "ObjC"
           ],
-          "fixedbinaryorder": 0,
           "funcSelfKind": "NonMutating"
         },
         {
