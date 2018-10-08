@@ -2866,7 +2866,7 @@ public:
     }
     // SWIFT_ENABLE_TENSORFLOW
     Differentiability getDifferentiability() const {
-      unsigned rawDiffability = Bits & DifferentiabilityMask;
+      unsigned rawDiffability = (Bits & DifferentiabilityMask) >> 7;
       return Differentiability(rawDiffability);
     }
 
@@ -3693,7 +3693,7 @@ public:
     bool isDifferentiable() const { return Bits & DifferentiabilityMask; }
 
     Differentiability getDifferentiability() const {
-      return Differentiability(Bits & DifferentiabilityMask);
+      return Differentiability((Bits & DifferentiabilityMask) >> 6);
     }
 
     /// What is the abstract representation of this function value?
