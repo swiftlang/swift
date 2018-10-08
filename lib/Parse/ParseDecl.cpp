@@ -2136,6 +2136,11 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       }
       if (consumeIf(tok::r_paren) && Tok.isNot(tok::arrow))
         backtrack.cancelBacktrack();
+      // If parsing failed, clean up the states.
+      if (backtrack.willBacktrack()) {
+        differentiationOrder = -1;
+        differentiationMode = StringRef();
+      }
     }
   }
 

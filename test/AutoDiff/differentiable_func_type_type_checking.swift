@@ -3,11 +3,7 @@
 // expected-error @+1 {{invalid differentiability 'blah' in '@autodiff' attribute; expected 'forward', 'reverse', 'linear', 'constant', or 'bidirectional'}}
 let _: @autodiff(blah) (Float) -> Float
 
-// FIXME: The type checker thinks "Float" is the differentiability name. This
-// means something's wrong in the parser.
-//
-// let _: @autodiff (Float) -> Float
-
+let _: @autodiff (Float) -> Float
 let _: @autodiff(bidirectional) (Float) -> Float
 let _: @autodiff(forward) (Float) -> Float
 let _: @autodiff(reverse) (Float) -> Float
