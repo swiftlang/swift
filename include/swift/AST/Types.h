@@ -2836,6 +2836,8 @@ public:
     // Constructor with all defaults.
     ExtInfo() : Bits(0) {
       assert(getRepresentation() == Representation::Swift);
+      // SWIFT_ENABLE_TENSORFLOW
+      assert(getDifferentiability() == Differentiability::None);
     }
 
     // Constructor for polymorphic type.
@@ -2859,6 +2861,7 @@ public:
     bool isAutoClosure() const { return Bits & AutoClosureMask; }
     bool isNoEscape() const { return Bits & NoEscapeMask; }
     bool throws() const { return Bits & ThrowsMask; }
+    // SWIFT_ENABLE_TENSORFLOW
     bool isDifferentiable() const { return Bits & DifferentiabilityMask; }
     Representation getRepresentation() const {
       unsigned rawRep = Bits & RepresentationMask;
