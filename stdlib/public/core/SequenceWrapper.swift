@@ -22,7 +22,7 @@ protocol _SequenceWrapper : Sequence {
   associatedtype Base : Sequence where Base.Element == Element
   associatedtype Iterator = Base.Iterator
   associatedtype SubSequence = Base.SubSequence
-  
+
   var _base: Base { get }
 }
 
@@ -45,7 +45,7 @@ extension _SequenceWrapper where Iterator == Base.Iterator {
   public __consuming func makeIterator() -> Iterator {
     return self._base.makeIterator()
   }
-  
+
   @inlinable // generic-performance
   @discardableResult
   public __consuming func _copyContents(
@@ -56,25 +56,6 @@ extension _SequenceWrapper where Iterator == Base.Iterator {
 }
 
 extension _SequenceWrapper {
-  @inlinable // generic-performance
-  public func map<T>(
-    _ transform: (Element) throws -> T
-) rethrows -> [T] {
-    return try _base.map(transform)
-  }
-  
-  @inlinable // generic-performance
-  public __consuming func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
-    return try _base.filter(isIncluded)
-  }
-
-  @inlinable // generic-performance
-  public func forEach(_ body: (Element) throws -> Void) rethrows {
-    return try _base.forEach(body)
-  }
-  
   @inlinable // generic-performance
   public func _customContainsEquatableElement(
     _ element: Element
