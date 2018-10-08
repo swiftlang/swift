@@ -2098,11 +2098,11 @@ void TypeChecker::validateDecl(OperatorDecl *OD) {
 
   // Pre- or post-fix operator?
   if (!IOD) {
-    auto *protocol = OD->getDesignatedNominalType();
-    auto protocolId = OD->getDesignatedNominalTypeName();
-    if (!protocol && !protocolId.empty() && enableOperatorDesignatedTypes) {
-      auto protocolIdLoc = OD->getDesignatedNominalTypeNameLoc();
-      checkDesignatedTypes(OD, protocolId, protocolIdLoc, *this, Context);
+    auto *nominal = OD->getDesignatedNominalType();
+    auto nominalId = OD->getDesignatedNominalTypeName();
+    if (!nominal && !nominalId.empty() && enableOperatorDesignatedTypes) {
+      auto nominalIdLoc = OD->getDesignatedNominalTypeNameLoc();
+      checkDesignatedTypes(OD, nominalId, nominalIdLoc, *this, Context);
     }
     return;
   }
@@ -2120,15 +2120,15 @@ void TypeChecker::validateDecl(OperatorDecl *OD) {
     }
 
     auto secondId = IOD->getSecondIdentifier();
-    auto *protocol = IOD->getDesignatedNominalType();
-    if (!protocol && enableOperatorDesignatedTypes) {
+    auto *nominal = IOD->getDesignatedNominalType();
+    if (!nominal && enableOperatorDesignatedTypes) {
       auto secondIdLoc = IOD->getSecondIdentifierLoc();
       assert(secondId.empty() || !firstId.empty());
 
-      auto protocolId = group ? secondId : firstId;
-      auto protocolIdLoc = group ? secondIdLoc : firstIdLoc;
-      if (!protocolId.empty())
-        checkDesignatedTypes(IOD, protocolId, protocolIdLoc, *this, Context);
+      auto nominalId = group ? secondId : firstId;
+      auto nominalIdLoc = group ? secondIdLoc : firstIdLoc;
+      if (!nominalId.empty())
+        checkDesignatedTypes(IOD, nominalId, nominalIdLoc, *this, Context);
     }
 
     if (!group && !IOD->isInvalid()) {
