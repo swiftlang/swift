@@ -110,14 +110,11 @@ func equalsUnordered(_ lhs: Set<Int>, _ rhs: Set<Int>) -> Bool {
 }
 
 func isNativeSet<T : Hashable>(_ s: Set<T>) -> Bool {
-  switch s._variant {
-  case .native:
-    return true
 #if _runtime(_ObjC)
-  case .cocoa:
-    return false
+  return s._variant.isNative
+#else
+  return true
 #endif
-  }
 }
 
 #if _runtime(_ObjC)

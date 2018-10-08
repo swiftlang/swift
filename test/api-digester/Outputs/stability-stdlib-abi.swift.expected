@@ -4,12 +4,32 @@
 /* RawRepresentable Changes */
 
 /* Removed Decls */
+EnumElement Dictionary._Variant.cocoa has been removed
+EnumElement Set._Variant.cocoa has been removed
+Func Dictionary._Variant.cocoaPath() has been removed
+Func Set._Variant.cocoaPath() has been removed
+Func _CocoaDictionary.==(_:_:) has been removed
+Func _CocoaSet.==(_:_:) has been removed
 
 /* Moved Decls */
+Enum Dictionary._Variant has been changed to a Struct
+Enum Set._Variant has been changed to a Struct
 
 /* Renamed Decls */
+EnumElement Dictionary._Variant.native has been renamed to Var Dictionary._Variant.isNative
+EnumElement Set._Variant.native has been renamed to Var Set._Variant.isNative
 
 /* Type Changes */
+Enum Dictionary._Variant is now with @_fixed_layout
+Enum Dictionary._Variant is now without @_frozen
+Enum Set._Variant is now with @_fixed_layout
+Enum Set._Variant is now without @_frozen
+EnumElement Dictionary._Variant.native is no longer a stored property
+EnumElement Set._Variant.native is no longer a stored property
+Var Dictionary._Variant.object is added to a non-resilient type
+Var Set._Variant.object is added to a non-resilient type
+Struct _CocoaDictionary has removed conformance to Equatable
+Struct _CocoaSet has removed conformance to Equatable
 
 /* Decl Attribute changes */
 
