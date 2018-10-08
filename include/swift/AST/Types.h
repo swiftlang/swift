@@ -2821,7 +2821,8 @@ public:
       NoEscapeMask           = 1 << 5,
       ThrowsMask             = 1 << 6,
       // SWIFT_ENABLE_TENSORFLOW
-      DifferentiabilityMask  = 0b111 << 7,
+      DifferentiabilityOffset = 7,
+      DifferentiabilityMask  = 0b111 << DifferentiabilityOffset,
       NumMaskBits            = 10
     };
 
@@ -2851,7 +2852,8 @@ public:
       Bits |= (IsAutoClosure ? AutoClosureMask : 0);
       Bits |= (IsNoEscape ? NoEscapeMask : 0);
       // SWIFT_ENABLE_TENSORFLOW
-      Bits |= ((unsigned)Diff << 7 & DifferentiabilityMask);
+      Bits |=
+          (((unsigned)Diff << DifferentiabilityOffset) & DifferentiabilityMask);
     }
 
     bool isAutoClosure() const { return Bits & AutoClosureMask; }
@@ -2866,8 +2868,8 @@ public:
     }
     // SWIFT_ENABLE_TENSORFLOW
     Differentiability getDifferentiability() const {
-      unsigned rawDiffability = (Bits & DifferentiabilityMask) >> 7;
-      return Differentiability(rawDiffability);
+      return Differentiability(
+          (Bits & DifferentiabilityMask) >> DifferentiabilityOffset);
     }
 
     bool hasSelfParam() const {
@@ -2936,6 +2938,12 @@ public:
         return ExtInfo(Bits | ThrowsMask);
       else
         return ExtInfo(Bits & ~ThrowsMask);
+    }
+    // SWIFT_ENABLE_TENSORFLOW
+    LLVM_NODISCARD
+    ExtInfo withDifferentiability(Differentiability diff) const {
+      return ExtInfo((Bits & ~DifferentiabilityMask) |
+                     (unsigned)diff << DifferentiabilityOffset);
     }
 
     unsigned getFuncAttrKey() const {
@@ -3657,7 +3665,8 @@ public:
       PseudogenericMask  = 1 << 4,
       NoEscapeMask       = 1 << 5,
       // SWIFT_ENABLE_TENSORFLOW
-      DifferentiabilityMask = 0b111 << 6,
+      DifferentiabilityOffset = 6,
+      DifferentiabilityMask = 0b111 << DifferentiabilityOffset,
       NumMaskBits        = 9
     };
 
@@ -3679,7 +3688,7 @@ public:
              (isPseudogeneric ? PseudogenericMask : 0) |
              // SWIFT_ENABLE_TENSORFLOW
              (isNoEscape ? NoEscapeMask : 0) |
-             ((unsigned) diff);
+             ((unsigned)diff << DifferentiabilityOffset);
     }
 
     /// Is this function pseudo-generic?  A pseudo-generic function
@@ -3693,7 +3702,8 @@ public:
     bool isDifferentiable() const { return Bits & DifferentiabilityMask; }
 
     Differentiability getDifferentiability() const {
-      return Differentiability((Bits & DifferentiabilityMask) >> 6);
+      return Differentiability(
+          (Bits & DifferentiabilityMask) >> DifferentiabilityOffset);
     }
 
     /// What is the abstract representation of this function value?
@@ -3760,6 +3770,11 @@ public:
         return ExtInfo(Bits | NoEscapeMask);
       else
         return ExtInfo(Bits & ~NoEscapeMask);
+    }
+    // SWIFT_ENABLE_TENSORFLOW
+    ExtInfo withDifferentiability(Differentiability diff) const {
+      return ExtInfo((Bits & ~DifferentiabilityMask) |
+                     (unsigned)diff << DifferentiabilityOffset);
     }
 
     unsigned getFuncAttrKey() const {
