@@ -798,17 +798,18 @@ void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
     }
   }
 
-  if (Ctx.checkingABI()) {
-    // Check if some attributes with ABI-impact have been added/removed.
-    for (auto &Info: Ctx.getABIAttributeInfo()) {
-      if (hasDeclAttribute(Info.Kind) != RD->hasDeclAttribute(Info.Kind)) {
-        auto Desc = hasDeclAttribute(Info.Kind) ?
-        Ctx.buffer((llvm::Twine("without ") + Info.Content).str()):
-        Ctx.buffer((llvm::Twine("with ") + Info.Content).str());
-        Diags.diagnose(SourceLoc(), diag::decl_new_attr, getScreenInfo(),
-                       Desc);
-      }
+  // Check if some attributes with ABI/API-impact have been added/removed.
+  for (auto &Info: Ctx.getBreakingAttributeInfo()) {
+    if (hasDeclAttribute(Info.Kind) != RD->hasDeclAttribute(Info.Kind)) {
+      auto Desc = hasDeclAttribute(Info.Kind) ?
+      Ctx.buffer((llvm::Twine("without ") + Info.Content).str()):
+      Ctx.buffer((llvm::Twine("with ") + Info.Content).str());
+      Diags.diagnose(SourceLoc(), diag::decl_new_attr, getScreenInfo(),
+                     Desc);
     }
+  }
+
+  if (Ctx.checkingABI()) {
     if (hasFixedBinaryOrder() && RD->hasFixedBinaryOrder() &&
         getFixedBinaryOrder() != RD->getFixedBinaryOrder()) {
       Ctx.getDiags().diagnose(SourceLoc(), diag::decl_reorder,

@@ -36,6 +36,8 @@ cake1: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned
 
 /* Decl Attribute changes */
 cake1: Func C1.foo1() is now not static
+cake1: Func FinalFuncContainer.NewFinalFunc() is now with final
+cake1: Func FinalFuncContainer.NoLongerFinalFunc() is now without final
 cake1: Func S1.foo1() has self access kind changing from NonMutating to Mutating
 cake1: Func S1.foo3() is now static
 cake1: Var C1.CIIns1 changes from weak to strong

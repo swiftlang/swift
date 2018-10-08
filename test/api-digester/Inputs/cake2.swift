@@ -156,3 +156,8 @@ class _NoResilientClass {
   private func FuncPositionChange0() {}
   private func FuncPositionChange2() {}
 }
+
+public class FinalFuncContainer {
+  public final func NewFinalFunc() {}
+  public func NoLongerFinalFunc() {}
+}

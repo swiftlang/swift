@@ -47,12 +47,17 @@ struct swift::ide::api::SDKNodeInitInfo {
 };
 
 SDKContext::SDKContext(CheckerOptions Opts): Diags(SourceMgr), Opts(Opts) {
-#define ADD(NAME) ABIAttrs.push_back({DeclAttrKind::DAK_##NAME, \
+#define ADD(NAME) BreakingAttrs.push_back({DeclAttrKind::DAK_##NAME, \
       getAttrName(DeclAttrKind::DAK_##NAME)});
-  ADD(ObjC)
-  ADD(FixedLayout)
-  ADD(Frozen)
-  ADD(Dynamic)
+  // Add attributes that both break ABI and API.
+  ADD(Final)
+  if (checkingABI()) {
+    // Add ABI-breaking-specific attributes.
+    ADD(ObjC)
+    ADD(FixedLayout)
+    ADD(Frozen)
+    ADD(Dynamic)
+  }
 #undef ADD
 }
 

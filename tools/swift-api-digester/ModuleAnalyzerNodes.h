@@ -129,9 +129,9 @@ public:
   }
 };
 
-// Describing some attributes with ABI impact. The addition or removal of these
-// attributes is considerred ABI-breaking.
-struct ABIAttributeInfo {
+// Describing some attributes with ABI/API impact. The addition or removal of these
+// attributes is considerred breakage.
+struct BreakingAttributeInfo {
   const DeclAttrKind Kind;
   const StringRef Content;
 };
@@ -156,7 +156,7 @@ class SDKContext {
   TypeMemberDiffVector TypeMemberDiffs;
 
   CheckerOptions Opts;
-  std::vector<ABIAttributeInfo> ABIAttrs;
+  std::vector<BreakingAttributeInfo> BreakingAttrs;
   /// This is to cache the equal comparison results between nodes.
   llvm::DenseMap<const SDKNode*, llvm::DenseMap<const SDKNode*, bool>> EqualCache;
 
@@ -190,7 +190,7 @@ public:
   bool checkingABI() const { return Opts.ABI; }
   AccessLevel getAccessLevel(const ValueDecl *VD) const;
   const CheckerOptions &getOpts() const { return Opts; }
-  ArrayRef<ABIAttributeInfo> getABIAttributeInfo() const { return ABIAttrs; }
+  ArrayRef<BreakingAttributeInfo> getBreakingAttributeInfo() const { return BreakingAttrs; }
 
   template<class YAMLNodeTy, typename ...ArgTypes>
   void diagnose(YAMLNodeTy node, Diag<ArgTypes...> ID,
