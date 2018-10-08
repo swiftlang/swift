@@ -22,12 +22,10 @@
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
-#include "swift/Strings.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Debug.h"
@@ -111,14 +109,6 @@ static bool hasInfinitelyRecursiveApply(SILFunction *targetFn) {
   while (!workList.empty()) {
     SILBasicBlock *curBlock = workList.pop_back_val();
 
-    // If the block is "program terminating", meaning it traps without relevant
-    // side effects, then skip it.
-    // Note that this check happens _before_ the recursion check. This is
-    // deliberate, as we want to ignore recursive calls inside a program
-    // termination point.
-    if (curBlock->isProgramTerminationPoint())
-      continue;
-
     // We're looking for functions that are recursive on _all_ paths. If this
     // block is recursive, mark that we found recursion and check the next
     // block in the work list.
@@ -129,8 +119,7 @@ static bool hasInfinitelyRecursiveApply(SILFunction *targetFn) {
 
     // If this block doesn't have a recursive call, and it exits the function,
     // then we know the function is not infinitely recursive.
-    TermInst *terminator = curBlock->getTerminator();
-    if (terminator->isFunctionExiting() || terminator->isProgramTerminating())
+    if (curBlock->getTerminator()->isFunctionExiting())
       return false;
 
     // Otherwise, push the successors onto the stack if we haven't visited them.

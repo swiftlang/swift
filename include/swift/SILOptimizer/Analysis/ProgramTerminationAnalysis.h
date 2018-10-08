@@ -39,7 +39,7 @@ class ProgramTerminationFunctionInfo {
 public:
   ProgramTerminationFunctionInfo(const SILFunction *F) {
     for (const auto &BB : *F) {
-      if (!BB.isProgramTerminationPoint())
+      if (!isARCInertTrapBB(&BB))
         continue;
       ProgramTerminatingBlocks.insert(&BB);
     }

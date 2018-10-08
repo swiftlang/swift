@@ -1074,7 +1074,7 @@ static void eliminateRetainsPrecedingProgramTerminationPoints(SILFunction *f) {
     if (auto apply = FullApplySite::isa(&*iter)) {
       SILFunction *callee = apply.getCalleeFunction();
       if (!callee ||
-          !callee->hasSemanticsAttr(SEMANTICS_PROGRAMTERMINATION_POINT)) {
+          !callee->hasSemanticsAttr(SEMANTICS_ARC_PROGRAMTERMINATION_POINT)) {
         continue;
       }
     } else {
