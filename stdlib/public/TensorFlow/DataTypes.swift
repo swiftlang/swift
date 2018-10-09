@@ -21,10 +21,11 @@
 
 import CTensorFlow
 
-/// Wraps a TF_DataType.
-///
-/// This allows user code to handle TF_DataTypes without importing CTensorFlow,
-/// which would import a bunch of distracting declarations from the TF C API.
+/// A TensorFlow dynamic type value. Can be created from types that conform to
+/// `AccelerableByTensorFlow`.
+// This simply wraps TF_DataTypes, which allows user code to handle TF_DataTypes
+// without importing CTensorFlow, which would import a bunch of distracting
+// declarations from the TF C API.
 @_fixed_layout
 public struct TensorDataType {
   @usableFromInline
