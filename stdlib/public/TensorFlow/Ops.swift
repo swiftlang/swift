@@ -136,6 +136,7 @@ extension Tensor : VectorNumeric where Scalar : Numeric {
 
 extension Tensor : Differentiable where Scalar : FloatingPoint {
   public typealias TangentVector = Tensor
+  public typealias CotangentVector = Tensor
 }
 
 public extension Tensor where Scalar : Numeric {
