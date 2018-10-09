@@ -24,3 +24,22 @@ let _: @autodiff(const, order: 7) (Float) -> Float
 let _: @autodiff(order: 0) (Float) -> Float
 // expected-error @+1 {{differentiation order cannot be zero; it should be at least first-order}}
 let _: @autodiff(forward, order: 0) (Float) -> Float
+
+//
+// Type differentiability
+//
+
+// struct NonDiffType {}
+// TODO:
+// xpected-error {{argument is not differentiable, but the function type is marked '@autodiff'}}
+// let _: @autodiff (NonDiffType) -> Float
+
+//
+// Argument selection (@nondiff)
+//
+
+// expected-error @+1 {{'nondiff' cannot be applied to arguments of a non-differentiable function}}
+let _: (@nondiff Float, Float) -> Float
+
+let _: @autodiff (Float, @nondiff Float) -> Float // okay
+

@@ -3791,7 +3791,9 @@ void AnyFunctionType::decomposeInput(
   default:
     result.emplace_back(type->getInOutObjectType(), Identifier(),
                         ParameterTypeFlags::fromParameterType(
-                          type, false, ValueOwnership::Default));
+                          // SWIFT_ENABLE_TENSORFLOW
+                          type, false, ValueOwnership::Default,
+                          /*differentiable*/ false));
     return;
   }
 }
@@ -5159,6 +5161,12 @@ LayoutConstraint LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind
 }
 
 // SWIFT_ENABLE_TENSORFLOW
+bool ASTContext::isDifferentiable(CanType type, ModuleDecl *module) {
+  auto *diffableProto = getProtocol(KnownProtocolKind::Differentiable);
+  auto maybeDiffableConf = module->lookupConformance(type, diffableProto);
+  return maybeDiffableConf.hasValue();
+}
+
 Optional<TangentSpace> ASTContext::getTangentSpace(CanType type,
                                                    ModuleDecl *module) {
   auto lookup = getImpl().TangentSpaces.find(type);

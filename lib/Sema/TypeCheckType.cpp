@@ -1641,6 +1641,8 @@ namespace {
     resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
                                  TypeResolutionOptions options,
                                  bool requiresMappingOut,
+                                 // SWIFT_ENABLE_TENSORFLOW
+                                 bool isDifferentiable,
                                  SmallVectorImpl<AnyFunctionType::Param> &ps);
 
     Type resolveSILFunctionType(FunctionTypeRepr *repr,
@@ -2072,6 +2074,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       }
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
     auto diffability = resolveDifferentiability();
 
     // Resolve the function type directly with these attributes.
@@ -2134,8 +2137,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
     // SWIFT_ENABLE_TENSORFLOW
     // @nodiff is only valid on parameters.
-    if (!isParam && attrs.has(TAK_nodiff)) {
-      diagnose(attrs.getLoc(TAK_nodiff),
+    if (!isParam && attrs.has(TAK_nondiff)) {
+      diagnose(attrs.getLoc(TAK_nondiff),
                isVariadicFunctionParam
                    ? diag::attr_not_on_variadic_parameters
                    : diag::attr_not_on_variadic_parameters, "@nodiff");
@@ -2276,7 +2279,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
 bool TypeResolver::resolveASTFunctionTypeParams(
     TupleTypeRepr *inputRepr, TypeResolutionOptions options,
-    bool requiresMappingOut,
+    // SWIFT_ENABLE_TENSORFLOW
+    bool requiresMappingOut, bool isDifferentiable,
     SmallVectorImpl<AnyFunctionType::Param> &elements) {
   elements.reserve(inputRepr->getNumElements());
 
@@ -2336,8 +2340,23 @@ bool TypeResolver::resolveASTFunctionTypeParams(
       ownership = ValueOwnership::Default;
       break;
     }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    bool nondiff = false;
+    if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(eltTypeRepr)) {
+      if (attrTypeRepr->getAttrs().has(TAK_nondiff)) {
+        if (!isDifferentiable)
+          diagnose(eltTypeRepr->getLoc(),
+                   diag::nondiff_attr_invalid_on_nondifferentiable_function)
+              .highlight(eltTypeRepr->getSourceRange());
+        else
+          nondiff = true;
+      }
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
     ParameterTypeFlags paramFlags =
-        ParameterTypeFlags::fromParameterType(ty, variadic, ownership);
+        ParameterTypeFlags::fromParameterType(ty, variadic, ownership, nondiff);
     elements.emplace_back(ty, Identifier(), paramFlags);
   }
 
@@ -2352,7 +2371,9 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
 
   SmallVector<AnyFunctionType::Param, 8> params;
   if (resolveASTFunctionTypeParams(repr->getArgsTypeRepr(), options,
-                         repr->getGenericEnvironment() != nullptr, params)) {
+                                   // SWIFT_ENABLE_TENSORFLOW
+                                   repr->getGenericEnvironment() != nullptr,
+                                   extInfo.isDifferentiable(), params)) {
     return Type();
   }
 

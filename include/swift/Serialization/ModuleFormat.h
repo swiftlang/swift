@@ -758,12 +758,14 @@ namespace decls_block {
 
   using FunctionParamLayout = BCRecordLayout<
     FUNCTION_PARAM,
-    IdentifierIDField,  // name
-    TypeIDField,        // type
-    BCFixed<1>,         // vararg?
-    BCFixed<1>,         // autoclosure?
-    BCFixed<1>,         // escaping?
-    ValueOwnershipField // inout, shared or owned?
+    // SWIFT_ENABLE_TENSORFLOW
+    IdentifierIDField,   // name
+    TypeIDField,         // type
+    BCFixed<1>,          // vararg?
+    BCFixed<1>,          // autoclosure?
+    BCFixed<1>,          // escaping?
+    ValueOwnershipField, // inout, shared or owned?
+    BCFixed<1>           // nondifferentiable?
   >;
 
   using MetatypeTypeLayout = BCRecordLayout<
