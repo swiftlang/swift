@@ -221,23 +221,25 @@ class TestPerformanceTestResult(unittest.TestCase):
 1,AngryPhonebook,1,12270,12270,12270,0,12270,10498048""".split('\n')[1:]
         results = map(PerformanceTestResult,
                       [line.split(',') for line in tests])
+        results[2].setup = 9
+        results[3].setup = 7
 
         def as_tuple(r):
             return (r.num_samples, r.min, r.max, round(r.mean, 2),
-                    r.sd, r.median, r.max_rss)
+                    r.sd, r.median, r.max_rss, r.setup)
 
         r = results[0]
         self.assertEquals(as_tuple(r),
-                          (1, 12045, 12045, 12045, 0, 12045, None))
+                          (1, 12045, 12045, 12045, 0, 12045, None, None))
         r.merge(results[1])
-        self.assertEquals(as_tuple(r),  # drops SD and median
-                          (2, 12045, 12325, 12185, None, None, 10510336))
+        self.assertEquals(as_tuple(r),  # drops SD and median, +max_rss
+                          (2, 12045, 12325, 12185, None, None, 10510336, None))
         r.merge(results[2])
-        self.assertEquals(as_tuple(r),  # picks smaller of the MAX_RSS
-                          (3, 11616, 12325, 11995.33, None, None, 10502144))
+        self.assertEquals(as_tuple(r),  # picks smaller of the MAX_RSS, +setup
+                          (3, 11616, 12325, 11995.33, None, None, 10502144, 9))
         r.merge(results[3])
-        self.assertEquals(as_tuple(r),
-                          (4, 11616, 12325, 12064, None, None, 10498048))
+        self.assertEquals(as_tuple(r),  # picks smaller of the setup values
+                          (4, 11616, 12325, 12064, None, None, 10498048, 7))
 
 
 class TestResultComparison(unittest.TestCase):
@@ -384,6 +386,7 @@ Running AngryPhonebook for 3 samples.
     Sample 2,11467
 1,AngryPhonebook,3,11467,13898,12392,1315,11812
 Running Array2D for 3 samples.
+    SetUp 14444
     Sample 0,369900
     Sample 1,381039
     Sample 2,371043
@@ -407,6 +410,7 @@ Totals,2"""
             (r.name, r.min, r.max, int(r.mean), int(r.sd), r.median),
             ('Array2D', 369900, 381039, 373994, 6127, 371043)
         )
+        self.assertEquals(r.setup, 14444)
         self.assertEquals(r.num_samples, r.samples.num_samples)
         self.assertEquals(results[1].samples.all_samples,
                           [(0, 1, 369900), (1, 1, 381039), (2, 1, 371043)])

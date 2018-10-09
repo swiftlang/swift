@@ -236,6 +236,7 @@ class PerformanceTestResult(object):
         self.max_rss = (                # Maximum Resident Set Size (B)
             int(csv_row[8]) if len(csv_row) > 8 else None)
         self.samples = None
+        self.setup = None
 
     def __repr__(self):
         """Short summary for debugging purposes."""
@@ -274,6 +275,7 @@ class PerformanceTestResult(object):
             return (min(filter(lambda x: x is not None, [a, b])) if any([a, b])
                     else None)
         self.max_rss = minimum(self.max_rss, r.max_rss)
+        self.setup = minimum(self.setup, r.setup)
 
 
 class ResultComparison(object):
@@ -318,7 +320,7 @@ class LogParser(object):
     def _reset(self):
         """Reset parser to the default state for reading a new result."""
         self.samples, self.num_iters = [], 1
-        self.max_rss, self.mem_pages = None, None
+        self.setup, self.max_rss, self.mem_pages = None, None, None
         self.voluntary_cs, self.involuntary_cs = None, None
 
     # Parse lines like this
@@ -332,6 +334,7 @@ class LogParser(object):
         if len(columns) < 8:
             columns = result.split()
         r = PerformanceTestResult(columns)
+        r.setup = self.setup
         r.max_rss = r.max_rss or self.max_rss
         r.mem_pages = self.mem_pages
         r.voluntary_cs = self.voluntary_cs
@@ -359,6 +362,9 @@ class LogParser(object):
         (lambda self, i, runtime:
          self.samples.append(
              Sample(int(i), int(self.num_iters), int(runtime)))),
+
+        re.compile(r'\s+SetUp (\d+)'):
+        (lambda self, setup: setattr(self, 'setup', int(setup))),
 
         # Environmental statistics: memory usage and context switches
         re.compile(r'\s+MAX_RSS \d+ - \d+ = (\d+) \((\d+) pages\)'):
