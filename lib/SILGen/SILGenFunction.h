@@ -1369,6 +1369,8 @@ public:
                           Initialization *dest);
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue &&src,
                                    TSanKind tsanKind = TSanKind::None);
+  ManagedValue emitBorrowedLValue(SILLocation loc, LValue &&src,
+                                  TSanKind tsanKind = TSanKind::None);
   LValue emitOpenExistentialLValue(SILLocation loc,
                                    LValue &&existentialLV,
                                    CanArchetypeType openedArchetype,
