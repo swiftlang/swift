@@ -182,53 +182,14 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
   if (!typeAccessScope.hasValue())
     return;
 
-  auto shouldComplainAboutAccessScope =
-      [contextAccessScope](AccessScope scope) -> bool {
-    if (scope.isPublic())
-      return false;
-    if (scope.hasEqualDeclContextWith(contextAccessScope))
-      return false;
-    if (contextAccessScope.isChildOf(scope))
-      return false;
-    return true;
-  };
-
-  if (!shouldComplainAboutAccessScope(typeAccessScope.getValue()))
+  if (typeAccessScope->isPublic())
+    return;
+  if (typeAccessScope->hasEqualDeclContextWith(contextAccessScope))
+    return;
+  if (contextAccessScope.isChildOf(*typeAccessScope))
     return;
 
   auto downgradeToWarning = DowngradeToWarning::No;
-  if (!checkUsableFromInline) {
-    // Swift 3.0 wasn't nearly as strict as checking types because it didn't
-    // look at the TypeRepr at all except to highlight a particular part of the
-    // type in diagnostics, and looked through typealiases in other cases.
-    // Approximate this behavior by running our non-TypeRepr-based check again
-    // and downgrading to a warning when the checks disagree.
-    if (TC.getLangOpts().isSwiftVersion3()) {
-      auto typeOnlyAccessScope =
-        TypeAccessScopeChecker::getAccessScope(
-            type, useDC,
-            /*treatUsableFromInlineAsPublic*/false,
-            /*canonicalizeParents*/true);
-      if (typeOnlyAccessScope.hasValue()) {
-        // If Swift 4 would have complained about a private type, but Swift 4
-        // would only diagnose an internal type, complain about the Swift 3
-        // offense first to avoid confusing users.
-        if (shouldComplainAboutAccessScope(typeOnlyAccessScope.getValue()))
-          typeAccessScope = typeOnlyAccessScope;
-        else
-          downgradeToWarning = DowngradeToWarning::Yes;
-      }
-    }
-
-    // Swift 3.0.0 mistakenly didn't diagnose any issues when the context
-    // access scope represented a private or fileprivate level.
-    if (!contextAccessScope.isPublic() &&
-        !isa<ModuleDecl>(contextAccessScope.getDeclContext()) &&
-        TC.getLangOpts().isSwiftVersion3()) {
-      downgradeToWarning = DowngradeToWarning::Yes;
-    }
-  }
-
   const TypeRepr *complainRepr =
         TypeAccessScopeDiagnoser::findTypeWithScope(
             typeRepr,

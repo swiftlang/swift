@@ -360,19 +360,6 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
     allowCrossfileExtensions = ED && ED->hasOnlyCasesWithoutAssociatedValues();
   }
 
-  if (TC.Context.isSwiftVersion3()) {
-    // In Swift 3, a 'private' property can't be accessed in any extensions, so
-    // we can't synthesize anything that uses them. Thus, we stick to the old
-    // rule for synthesis, which is never in an extension except for the
-    // Equatable/Hashable cases mentioned above.
-    if (!allowCrossfileExtensions && Nominal != ConformanceDecl) {
-      TC.diagnose(ConformanceDecl->getLoc(),
-                  diag::swift3_cannot_synthesize_in_extension,
-                  getProtocolType());
-      return true;
-    }
-  }
-
   if (!allowCrossfileExtensions &&
       Nominal->getModuleScopeContext() !=
           getConformanceContext()->getModuleScopeContext()) {
