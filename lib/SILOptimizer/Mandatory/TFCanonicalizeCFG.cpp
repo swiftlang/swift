@@ -559,49 +559,6 @@ void SingleExitLoopTransformer::initialize() {
       exitArgSubstMap = getPreheaderSubstMap(exitArgs);
     }
   }
-  escapingValueSubstMap = computeEscapingValuesSubstMap();
-  if (TFNoUndefsInSESE) {
-    // Collect escaping/exit values that are undef.
-    SmallPtrSet<SILValue, 8> undefValues;
-    for (const auto &kv : escapingValueSubstMap) {
-      if (isa<SILUndef>(kv.second)) {
-        undefValues.insert(kv.first);
-      }
-    }
-    for (const auto &kv : exitArgSubstMap) {
-      if (isa<SILUndef>(kv.second)) {
-        undefValues.insert(kv.first);
-      }
-    }
-    if (!undefValues.empty()) {
-      unrollLoopBody();
-      DI->recalculate(*currentFn);
-      PDI->recalculate(*currentFn);
-      // Update the equivalence classes induced by argument passing.
-      for (auto &bb : *currentFn) {
-        for (auto arg : bb.getArguments()) {
-          SmallVector<SILValue, 8> incomingValues;
-          arg->getIncomingValues(incomingValues);
-          for (SILValue incomingValue : incomingValues) {
-            equivalentValues.unionSets(arg, incomingValue);
-          }
-        }
-      }
-      auto undefMap = getPreheaderSubstMap(undefValues);
-      for (auto &kv : escapingValueSubstMap) {
-        if (isa<SILUndef>(kv.second)) {
-          kv.second = undefMap[kv.first];
-          assert(!isa<SILUndef>(kv.second));
-        }
-      }
-      for (auto &kv : exitArgSubstMap) {
-        if (isa<SILUndef>(kv.second)) {
-          kv.second = undefMap[kv.first];
-          assert(!isa<SILUndef>(kv.second));
-        }
-      }
-    }
-  }
 
   // All the exiting edges need to be rewired.
   loop->getExitEdges(edgesToFix);
@@ -618,6 +575,8 @@ void SingleExitLoopTransformer::initialize() {
       edge.first = splitBlock;
     }
   }
+
+  escapingValueSubstMap = computeEscapingValuesSubstMap();
 }
 
 void SingleExitLoopTransformer::ensureSingleExitBlock() {
@@ -938,11 +897,6 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
 
   llvm::DenseMap<SILBasicBlock *, intmax_t> exitIndices;
 
-//   unsigned oldHeaderNumArgs =
-//       newHeader->getNumArguments() -
-//       (escapingValueSubstMap.size() + exitArgSubstMap.size() +
-//        /* exitIndex, stayInLoop*/ 2);
-
   // Identify the exit from the header (if any) and assign '0' as its index.
   SILBasicBlock *headerExit = nullptr;
   for (SILBasicBlock *succ : header->getSuccessorBlocks()) {
@@ -1180,17 +1134,13 @@ bool SingleExitLoopTransformer::transform() {
   // Update the loop header to newHeader.
   loop->moveToHeader(newHeader);
 
-  // if (TFNoUndefsInSESE) {
-  //   // If we still have undefs at preheader, simply clone the loop body once
-  //   // before the actual loop.
-  //   if (hasUndefsAtPreheader) {
-  //     llvm::dbgs() << "Unrolling loop body ";
-  //     currentFn->dump();
-  //     unrollLoopBody();
-  //     llvm::dbgs() << "After unrolling loop body ";
-  //     currentFn->dump();
-  //   }
-  // }
+  if (TFNoUndefsInSESE) {
+    // If we still have undefs at preheader, simply clone the loop body once
+    // before the actual loop.
+    if (hasUndefsAtPreheader) {
+      unrollLoopBody();
+    }
+  }
 
   return true;
 }
@@ -1243,14 +1193,14 @@ void SingleExitLoopTransformer::unrollLoopBody() {
   BasicBlockCloner cloner(*currentFn);
   // Setup cloner so that newHeader's argument's are replaced with values in
   // preheader.
-  // SILBasicBlock *newHeader = loop->getHeader();
-  // auto preheaderTermInst = dyn_cast<BranchInst>(preheader->getTerminator());
-  // assert(preheaderTermInst && "Preheader of a loop has a non-branch terminator");
-  // for (unsigned i = 0; i < oldHeaderNumArgs; ++i) {
-  //   auto preHeaderArg = preheaderTermInst->getArg(i);
-  //   auto newHeaderArg = newHeader->getArgument(i);
-  //   cloner.updateValueMap(newHeaderArg, preHeaderArg);
-  // }
+  SILBasicBlock *newHeader = loop->getHeader();
+  auto preheaderTermInst = dyn_cast<BranchInst>(preheader->getTerminator());
+  assert(preheaderTermInst && "Preheader of a loop has a non-branch terminator");
+  for (unsigned argIndex = 0; argIndex < oldHeaderNumArgs; ++argIndex) {
+    auto preHeaderArg = preheaderTermInst->getArg(argIndex);
+    auto newHeaderArg = newHeader->getArgument(argIndex);
+    cloner.updateValueMap(newHeaderArg, preHeaderArg);
+  }
   // Clone everything except the new header. We should traverse the
   // blocks in depth first order to ensure values are cloned before they are used.
   SmallPtrSet<SILBasicBlock *, 32> worklist;
@@ -1264,44 +1214,100 @@ void SingleExitLoopTransformer::unrollLoopBody() {
     for (SILBasicBlock *succ : current->getSuccessorBlocks()) {
       // Skip if succ is not a part of the loop, is already cloned, or
       // is the new preheader.
-      llvm::dbgs() << "Processing "
-                   << SILPrintContext(llvm::dbgs()).getID(succ) << " ";
-
-      if (!loop->contains(succ) || cloner.remapBasicBlock(succ) != succ) {
-        // || succ == newHeader) {
-        llvm::dbgs() << "Skipping " << (!loop->contains(succ)) << ","
-                     << (cloner.remapBasicBlock(succ) != succ) << ","
-                     // << (succ == newHeader)
-                     << "\n";
+      if (!loop->contains(succ) || cloner.remapBasicBlock(succ) != succ ||
+          succ == newHeader) {
         continue;
       }
-      llvm::dbgs() << "OK\n";
       worklist.insert(succ);
     }
   }
   for (SILBasicBlock *bb : initializedBlocks) {
     cloner.cloneBlock(bb);
   }
-  // Get the clone for the header.
+
+  // Get the clone for the original and new header.
   SILBasicBlock *clonedHeader = cloner.remapBasicBlock(header);
-  replaceBranchTarget(preheader->getTerminator(), header, clonedHeader,
-                      /*preserveArgs*/ true);
+  replaceBranchTarget(preheader->getTerminator(), newHeader, clonedHeader,
+                      /*preserveArgs*/ false);
+
+  // Along a path in the loop body where an escaping value or an exit argument
+  // is not defined, the SESE loop canonicalization would have propagated the
+  // corresponding loop carried state that was added to the new header. However,
+  // these are not remapped when the loop body is unrolled (as we won't know
+  // what value to use in the unrolled body as it is undefined along that path).
+  // This following code patches these arguments by picking a value that
+  // dominates `pred` and is equivalent to the corresponding argument in the
+  // cloned block. e.g.,
   //
-  SILBasicBlock *clonedLatch = cloner.remapBasicBlock(latch);
-  replaceBranchTarget(clonedLatch->getTerminator(), clonedHeader, header,
-                      /*preserveArgs*/ true);
-
-  SILBasicBlock *splitBlock = splitIfCriticalEdge(clonedLatch, header, /*DT*/ nullptr, LI);
-  preheader = (splitBlock == nullptr) ? clonedLatch : splitBlock;
-
-  //   // Get the clone for the original and new header.
-  //   SILBasicBlock *clonedHeader = cloner.remapBasicBlock(header);
-  //   // Connect cloned latch to the new header.
-  //   SILBasicBlock *newLatch = loop->getLoopLatch();
-  //   assert(newLatch && "We should have a single loop latch at this point.");
-  //   SILBasicBlock *clonedNewLatch = cloner.remapBasicBlock(newLatch);
-  //   replaceBranchTarget(clonedNewLatch->getTerminator(), header, newHeader,
-  //                       /*preserveArgs*/ true);
+  //   do {
+  //     if (...) break;
+  //     i += 1
+  //   } while(...)
+  //   return i
+  //
+  // --CFG--
+  //   preheader: i0 = 0; br header(i0)
+  //
+  //   header(i0): cond ??, break, body
+  //
+  //   break: br exit(i0)
+  //
+  //   body: i1 = i0 + 1; cond ??, header(i1), exit(i1)
+  //
+  //   exit(i2): return i2
+  //
+  // --Canonicalized CFG (not everything is shown)--
+  //   preheader: i0 = 0; br newHeader(i0, undef)
+  //
+  //   newHeader(i0, i3): cond stayInLoop, header, exit(i3)
+  //
+  //   header: cond ??, break, body
+  //
+  //   break: br newLatch(i0, i3)
+  //
+  //   body: i1 = i0 + 1; cond ??, newHeader(i1, i1), newLatch(i1, i1)
+  //
+  //   newLatch(i4, i5): br newHeader(i4, i5)
+  //
+  //   exit(i2): return i2
+  //
+  // In the unrolled body of the loop, break will be cloned as follows:
+  // (prime refers to the cloned version):
+  //    break': br newLatch'(i0', i3)
+  //
+  // Note that i3 is not cloned, which is patched here as follows:
+  //    break': br newLatch'(i0', ii')
+  // `i1` is equivalent to `i3` as they both flow into the argument `i5` of
+  // `newLatch`.
+  SILBasicBlock *newLatch = loop->getLoopLatch();
+  SILBasicBlock *clonedNewLatch = cloner.remapBasicBlock(newLatch);
+  for (SILBasicBlock *pred : newLatch->getPredecessorBlocks()) {
+    auto predTermInst = dyn_cast<BranchInst>(pred->getTerminator());
+    assert(predTermInst && "Preheader of a loop has a non-branch terminator");
+    for (unsigned argIndex = 0; argIndex < predTermInst->getNumArgs(); ++argIndex) {
+      auto arg = predTermInst->getArg(argIndex);
+      // Skip if this is not a uncloned argument as illustrated above.
+      if (!isa<SILArgument>(arg) ||
+          cast<SILArgument>(arg)->getParent() != newHeader) {
+        continue;
+      }
+      // Iterate over the incoming values of the corresponding argument in the
+      // latch block and pick one that is suitable to be used here.
+      auto destBBArg = newLatch->getArgument(argIndex);
+      SmallVector<SILValue, 8> incomingValues;
+      destBBArg->getIncomingValues(incomingValues);
+      for (auto value : incomingValues) {
+        if (value != arg && DI->properlyDominates(value, predTermInst)) {
+          // A suitable value is found. Update the edge value in the unrolled
+          // loop with the corresponding cloned value.
+          SILBasicBlock *clonedPred = cloner.remapBasicBlock(pred);
+          changeEdgeValue(clonedPred->getTerminator(), clonedNewLatch, argIndex,
+                          cloner.remapValue(value));
+          break;
+        }
+      }
+    }
+  }
 
 }
 
