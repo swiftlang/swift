@@ -140,13 +140,19 @@ STMT_NODES = [
     Node('YieldStmt', kind='Stmt',
          children=[
              Child('YieldKeyword', kind='YieldToken'),
-             Child('LeftParen', kind='LeftParenToken',
-                   is_optional=True),
-             Child('Expression', kind='Expr'),  # FIXME: allow list
-             Child('RightParen', kind='RightParenToken',
-                   is_optional=True),
-             Child('Semicolon', kind='SemicolonToken',
-                   is_optional=True),
+             Child('Yields', kind='Syntax',
+                   node_choices=[
+                       Child('YieldList', kind='YieldList'),
+                       Child('SimpleYield', kind='Expr'),
+                   ]),
+         ]),
+
+    Node('YieldList', kind='Syntax',
+         children=[
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('ElementList', kind='ExprList'),
+             Child('TrailingComma', kind='CommaToken', is_optional=True),
+             Child('RightParen', kind='RightParenToken'),
          ]),
 
     # fallthrough-stmt -> 'fallthrough' ';'?

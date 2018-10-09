@@ -828,6 +828,8 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
         .fixItRemoveChars(tryLoc, yieldLoc);
     }
 
+    SyntaxParsingContext YieldsCtxt(SyntaxContext, SyntaxKind::YieldList);
+
     SmallVector<Identifier, 4> yieldLabels;
     SmallVector<SourceLoc, 4> yieldLabelLocs;
     Expr *trailingClosure = nullptr;
@@ -839,7 +841,7 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
                            yields, yieldLabels, yieldLabelLocs,
                            rpLoc,
                            trailingClosure,
-                           SyntaxKind::YieldStmt);
+                           SyntaxKind::ExprList);
     assert(trailingClosure == nullptr);
     assert(yieldLabels.empty());
     assert(yieldLabelLocs.empty());
