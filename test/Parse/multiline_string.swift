@@ -221,9 +221,14 @@ _ = "hello\("""
 _ = """
     welcome
     \(
+      /*
+        ')' or '"""' in comment.
+        """
+      */
       "to\("""
            Swift
            """)"
+      // ) or """ in comment.
     )
     !
     """
