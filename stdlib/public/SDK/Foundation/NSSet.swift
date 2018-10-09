@@ -111,6 +111,7 @@ extension Set : _ObjectiveCBridgeable {
     return result != nil
   }
 
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(_ s: NSSet?) -> Set {
     // `nil` has historically been used as a stand-in for an empty
     // set; map it to an empty set.
