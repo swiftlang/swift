@@ -116,9 +116,6 @@ def driver_batch_count : Separate<["-"], "driver-batch-count">,
 def driver_batch_size_limit : Separate<["-"], "driver-batch-size-limit">,
   InternalDebugOpt,
   HelpText<"Use the given number as the upper limit on dynamic batch-mode partition size">;
-def driver_force_one_batch_repartition : Flag<["-"], "driver-force-one-batch-repartition">,
-  InternalDebugOpt,
-  HelpText<"Force one batch repartitioning for testing">;
 
 def driver_force_response_files : Flag<["-"], "driver-force-response-files">,
   InternalDebugOpt,

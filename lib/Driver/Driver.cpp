@@ -915,8 +915,6 @@ Driver::buildCompilation(const ToolChain &TC,
     const Optional<unsigned> DriverBatchCount = getDriverBatchCount(*ArgList, Diags);
     const Optional<unsigned> DriverBatchSizeLimit =
       getDriverBatchSizeLimit(*ArgList, Diags);
-    const bool DriverForceOneBatchRepartition =
-    ArgList->hasArg(options::OPT_driver_force_one_batch_repartition);
     const bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
     const bool ShowDriverTimeCompilation =
         ArgList->hasArg(options::OPT_driver_time_compilation);
@@ -939,7 +937,6 @@ Driver::buildCompilation(const ToolChain &TC,
         DriverBatchSeed,
         DriverBatchCount,
         DriverBatchSizeLimit,
-        DriverForceOneBatchRepartition,
         SaveTemps,
         ShowDriverTimeCompilation,
         std::move(StatsReporter));
