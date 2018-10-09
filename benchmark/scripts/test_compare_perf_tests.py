@@ -231,13 +231,13 @@ class TestPerformanceTestResult(unittest.TestCase):
                           (1, 12045, 12045, 12045, 0, 12045, None))
         r.merge(results[1])
         self.assertEquals(as_tuple(r),  # drops SD and median
-                          (2, 12045, 12325, 12185, 0, 0, 10510336))
+                          (2, 12045, 12325, 12185, None, None, 10510336))
         r.merge(results[2])
         self.assertEquals(as_tuple(r),  # picks smaller of the MAX_RSS
-                          (3, 11616, 12325, 11995.33, 0, 0, 10502144))
+                          (3, 11616, 12325, 11995.33, None, None, 10502144))
         r.merge(results[3])
         self.assertEquals(as_tuple(r),
-                          (4, 11616, 12325, 12064, 0, 0, 10498048))
+                          (4, 11616, 12325, 12064, None, None, 10498048))
 
 
 class TestResultComparison(unittest.TestCase):

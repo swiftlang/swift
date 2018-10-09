@@ -267,7 +267,7 @@ class PerformanceTestResult(object):
                 (self.mean * self.num_samples) + (r.mean * r.num_samples)
             ) / float(self.num_samples + r.num_samples)
             self.num_samples += r.num_samples
-            self.median, self.sd = 0, 0
+            self.median, self.sd = None, None
 
         # Metadata
         def minimum(a, b):  # work around None being less than everything
