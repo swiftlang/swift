@@ -174,6 +174,12 @@ protected:
     return asImpl().remapASTType(ty);
   }
 
+  void remapOpenedType(CanArchetypeType archetypeTy) {
+    auto existentialTy = archetypeTy->getOpenedExistentialType()->getCanonicalType();
+    auto replacementTy = ArchetypeType::getOpened(getOpASTType(existentialTy));
+    registerOpenedExistentialRemapping(archetypeTy, replacementTy);
+  }
+
   ProtocolConformanceRef getOpConformance(Type ty,
                                           ProtocolConformanceRef conformance) {
     // If we have open existentials to substitute, do so now.
@@ -1644,10 +1650,7 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitOpenExistentialAddrInst(OpenExistentialAddrInst *Inst) {
   // Create a new archetype for this opened existential type.
-  auto archetypeTy = Inst->getType().castTo<ArchetypeType>();
-  registerOpenedExistentialRemapping(
-      archetypeTy,
-      ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType()));
+  remapOpenedType(Inst->getType().castTo<ArchetypeType>());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
@@ -1661,10 +1664,7 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::visitOpenExistentialValueInst(
     OpenExistentialValueInst *Inst) {
   // Create a new archetype for this opened existential type.
-  auto archetypeTy = Inst->getType().castTo<ArchetypeType>();
-  registerOpenedExistentialRemapping(
-      archetypeTy,
-      ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType()));
+  remapOpenedType(Inst->getType().castTo<ArchetypeType>());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst, getBuilder().createOpenExistentialValue(
@@ -1684,10 +1684,7 @@ visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *Inst) {
     exType = exMetatype.getInstanceType();
     openedType = cast<MetatypeType>(openedType).getInstanceType();
   }
-  auto archetypeTy = cast<ArchetypeType>(openedType);
-  registerOpenedExistentialRemapping(
-      archetypeTy,
-      ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType()));
+  remapOpenedType(cast<ArchetypeType>(openedType));
 
   if (!Inst->getOperand()->getType().canUseExistentialRepresentation(
           Inst->getModule(), ExistentialRepresentation::Class)) {
@@ -1711,10 +1708,7 @@ void
 SILCloner<ImplClass>::
 visitOpenExistentialRefInst(OpenExistentialRefInst *Inst) {
   // Create a new archetype for this opened existential type.
-  auto archetypeTy = Inst->getType().castTo<ArchetypeType>();
-  registerOpenedExistentialRemapping(
-      archetypeTy,
-      ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType()));
+  remapOpenedType(Inst->getType().castTo<ArchetypeType>());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
@@ -1728,10 +1722,7 @@ void
 SILCloner<ImplClass>::
 visitOpenExistentialBoxInst(OpenExistentialBoxInst *Inst) {
   // Create a new archetype for this opened existential type.
-  auto archetypeTy = Inst->getType().castTo<ArchetypeType>();
-  registerOpenedExistentialRemapping(
-      archetypeTy,
-      ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType()));
+  remapOpenedType(Inst->getType().castTo<ArchetypeType>());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
@@ -1745,10 +1736,7 @@ void
 SILCloner<ImplClass>::
 visitOpenExistentialBoxValueInst(OpenExistentialBoxValueInst *Inst) {
   // Create a new archetype for this opened existential type.
-  auto archetypeTy = Inst->getType().castTo<ArchetypeType>();
-  registerOpenedExistentialRemapping(
-      archetypeTy,
-      ArchetypeType::getOpened(archetypeTy->getOpenedExistentialType()));
+  remapOpenedType(Inst->getType().castTo<ArchetypeType>());
 
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
