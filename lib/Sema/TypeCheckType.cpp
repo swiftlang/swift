@@ -2443,6 +2443,7 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
     break;
   }
   
+  // SWIFT_ENABLE_TENSORFLOW
   // If the function is marked as `@autodiff`, the result must be a
   // differentiable type.
   if (extInfo.isDifferentiable() &&
