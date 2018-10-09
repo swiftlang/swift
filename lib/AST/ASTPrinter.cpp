@@ -2873,8 +2873,8 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
-  if (!decl->getFirstIdentifier().empty())
-    Printer << " : " << decl->getFirstIdentifier();
+  if (auto *group = decl->getPrecedenceGroup())
+    Printer << " : " << group->getName();
   if (!decl->getSecondIdentifier().empty())
     Printer << ", " << decl->getSecondIdentifier();
 }
