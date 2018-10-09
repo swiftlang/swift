@@ -2666,18 +2666,6 @@ ParserResult<Expr> Parser::parseExprClosure() {
   Scope S(this, ScopeKind::ClosureParams);
   ParseFunctionBody cc(*this, closure);
   
-  // duplicated from parseAbstractFunctionBody
-  // Just as we exclude function bodies from the interface hash,
-  // let's also exclude closure bodies.
-  if (Context.LangOpts.EnableExperimentalDependencies) {
-    if (IsParsingInterfaceTokens) {
-      // Record the curly braces but nothing inside.
-      SF.recordInterfaceToken("{");
-      SF.recordInterfaceToken("}");
-    }
-    llvm::SaveAndRestore<bool> TParsingInterfaceTokens(IsParsingInterfaceTokens, false);
-  }
-
   // Handle parameters.
   if (params) {
     // Add the parameters into scope.
