@@ -3797,7 +3797,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
       // If the first parameter explicitly accepts the type, this method 
       // presumably doesn't want us to warn about optional use.
       auto firstParamType =
-        curriedType->getParams().front().getType()->getRValueType();
+        curriedType->getParams().front().getPlainType()->getRValueType();
       if (kind == UnintendedInterpolationKind::Optional) {
         if (firstParamType->getOptionalObjectType())
           return false;
