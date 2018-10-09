@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 451; // Last change: add graph_op serialization
+const uint16_t VERSION_MINOR = 452; // Last change: @autodiff type attribute
 
 using DeclIDField = BCFixed<31>;
 
@@ -204,6 +204,19 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   Closure,
 };
 using SILFunctionTypeRepresentationField = BCFixed<4>;
+
+// SWIFT_ENABLE_TENSORFLOW
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum class FunctionTypeDifferentiability : uint8_t {
+  None = 0,
+  Forward,
+  Reverse,
+  Bidirectional,
+  Linear,
+  Constant,
+};
+using FunctionTypeDifferentiabilityField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -737,8 +750,9 @@ namespace decls_block {
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,  // auto-closure?
     BCFixed<1>,  // noescape?
-    BCFixed<1>   // throws?
-
+    // SWIFT_ENABLE_TENSORFLOW
+    BCFixed<1>,  // throws?
+    FunctionTypeDifferentiabilityField // differentiability
     // trailed by parameters
   >;
 
@@ -798,7 +812,9 @@ namespace decls_block {
     TypeIDField,         // output
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,          // throws?
-    GenericSignatureIDField // generic signture
+    // SWIFT_ENABLE_TENSORFLOW
+    GenericSignatureIDField, // generic signture
+    BCFixed<3>           // differentiability
 
     // trailed by parameters
   >;
@@ -810,6 +826,8 @@ namespace decls_block {
     SILFunctionTypeRepresentationField, // representation
     BCFixed<1>,            // pseudogeneric?
     BCFixed<1>,            // noescape?
+    // SWIFT_ENABLE_TENSORFLOW
+    FunctionTypeDifferentiabilityField, // differentiability
     BCFixed<1>,            // error result?
     BCFixed<30>,           // number of parameters
     BCFixed<30>,           // number of yields

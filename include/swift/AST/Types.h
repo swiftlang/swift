@@ -17,6 +17,8 @@
 #ifndef SWIFT_TYPES_H
 #define SWIFT_TYPES_H
 
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/Identifier.h"
@@ -278,8 +280,9 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 7 };
-  enum { NumSILExtInfoBits = 6 };
+  // SWIFT_ENABLE_TENSORFLOW
+  enum { NumAFTExtInfoBits = 10 };
+  enum { NumSILExtInfoBits = 9 };
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
@@ -2626,6 +2629,23 @@ getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+/// The differentiability of a function type.
+enum class FunctionTypeDifferentiability : uint8_t {
+  /// Non-differentiable.
+  None = 0,
+  /// Forward-mode differentiable.
+  Forward,
+  /// Reverse-mode differentiable.
+  Reverse,
+  /// Both forward-mode and reverse-mode differentiable.
+  Bidirectional,
+  /// Linear map.
+  Linear,
+  /// Constant function, whose derivatives are always zero.
+  Constant,
+};
+
 /// AnyFunctionType - A function type has zero or more input parameters and a
 /// single result. The result type may be a tuple. For example:
 ///   "(int) -> int" or "(a : int, b : int) -> (int, int)".
@@ -2639,6 +2659,8 @@ class AnyFunctionType : public TypeBase {
   
 public:
   using Representation = FunctionTypeRepresentation;
+  // SWIFT_ENABLE_TENSORFLOW
+  using Differentiability = FunctionTypeDifferentiability;
 
   class Param {
   public:
@@ -2789,15 +2811,19 @@ public:
     // If bits are added or removed, then TypeBase::AnyFunctionTypeBits
     // and NumMaskBits must be updated, and they must match.
     //
-    //   |representation|isAutoClosure|noEscape|throws|
-    //   |    0 .. 3    |      4      |    5   |   6  |
+    //   SWIFT_ENABLE_TENSORFLOW
+    //   |representation|isAutoClosure|noEscape|throws|differentiability|
+    //   |    0 .. 3    |      4      |    5   |   6  |      7 .. 9     |
     //
     enum : unsigned {
       RepresentationMask     = 0xF << 0,
       AutoClosureMask        = 1 << 4,
       NoEscapeMask           = 1 << 5,
       ThrowsMask             = 1 << 6,
-      NumMaskBits            = 7
+      // SWIFT_ENABLE_TENSORFLOW
+      DifferentiabilityOffset = 7,
+      DifferentiabilityMask  = 0b111 << DifferentiabilityOffset,
+      NumMaskBits            = 10
     };
 
     unsigned Bits; // Naturally sized for speed.
@@ -2810,6 +2836,8 @@ public:
     // Constructor with all defaults.
     ExtInfo() : Bits(0) {
       assert(getRepresentation() == Representation::Swift);
+      // SWIFT_ENABLE_TENSORFLOW
+      assert(getDifferentiability() == Differentiability::None);
     }
 
     // Constructor for polymorphic type.
@@ -2820,20 +2848,31 @@ public:
     // Constructor with no defaults.
     ExtInfo(Representation Rep,
             bool IsAutoClosure, bool IsNoEscape,
-            bool Throws)
+            // SWIFT_ENABLE_TENSORFLOW
+            bool Throws, Differentiability Diff)
       : ExtInfo(Rep, Throws) {
       Bits |= (IsAutoClosure ? AutoClosureMask : 0);
       Bits |= (IsNoEscape ? NoEscapeMask : 0);
+      // SWIFT_ENABLE_TENSORFLOW
+      Bits |=
+          (((unsigned)Diff << DifferentiabilityOffset) & DifferentiabilityMask);
     }
 
     bool isAutoClosure() const { return Bits & AutoClosureMask; }
     bool isNoEscape() const { return Bits & NoEscapeMask; }
     bool throws() const { return Bits & ThrowsMask; }
+    // SWIFT_ENABLE_TENSORFLOW
+    bool isDifferentiable() const { return Bits & DifferentiabilityMask; }
     Representation getRepresentation() const {
       unsigned rawRep = Bits & RepresentationMask;
       assert(rawRep <= unsigned(Representation::Last)
              && "unexpected SIL representation");
       return Representation(rawRep);
+    }
+    // SWIFT_ENABLE_TENSORFLOW
+    Differentiability getDifferentiability() const {
+      return Differentiability(
+          (Bits & DifferentiabilityMask) >> DifferentiabilityOffset);
     }
 
     bool hasSelfParam() const {
@@ -2902,6 +2941,12 @@ public:
         return ExtInfo(Bits | ThrowsMask);
       else
         return ExtInfo(Bits & ~ThrowsMask);
+    }
+    // SWIFT_ENABLE_TENSORFLOW
+    LLVM_NODISCARD
+    ExtInfo withDifferentiability(Differentiability diff) const {
+      return ExtInfo((Bits & ~DifferentiabilityMask) |
+                     (unsigned)diff << DifferentiabilityOffset);
     }
 
     unsigned getFuncAttrKey() const {
@@ -2986,6 +3031,12 @@ public:
   Representation getRepresentation() const {
     return getExtInfo().getRepresentation();
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// \brief Get the differentiability of the function type.
+  Differentiability getDifferentiability() const {
+    return getExtInfo().getDifferentiability();
+  }
   
   /// \brief True if this type allows an implicit conversion from a function
   /// argument expression of type T to a function of type () -> T.
@@ -3001,6 +3052,11 @@ public:
 
   bool throws() const {
     return getExtInfo().throws();
+  }
+  
+  // SWIFT_ENABLE_TENSORFLOW
+  bool isDifferentiable() const {
+    return getExtInfo().isDifferentiable();
   }
 
   /// Returns a new function type exactly like this one but with the ExtInfo
@@ -3594,6 +3650,8 @@ class SILFunctionType final : public TypeBase, public llvm::FoldingSetNode,
 public:
   using Language = SILFunctionLanguage;
   using Representation = SILFunctionTypeRepresentation;
+  // SWIFT_ENABLE_TENSORFLOW
+  using Differentiability = FunctionTypeDifferentiability;
 
   /// \brief A class which abstracts out some details necessary for
   /// making a call.
@@ -3601,14 +3659,18 @@ public:
     // If bits are added or removed, then TypeBase::SILFunctionTypeBits
     // and NumMaskBits must be updated, and they must match.
 
-    //   |representation|pseudogeneric| noescape |
-    //   |    0 .. 3    |      4      |     5    |
+    // SWIFT_ENABLE_TENSORFLOW
+    //   |representation|pseudogeneric| noescape | differentiability |
+    //   |    0 .. 3    |      4      |     5    |      6 .. 8       |
     //
     enum : unsigned {
       RepresentationMask = 0xF << 0,
       PseudogenericMask  = 1 << 4,
       NoEscapeMask       = 1 << 5,
-      NumMaskBits        = 6
+      // SWIFT_ENABLE_TENSORFLOW
+      DifferentiabilityOffset = 6,
+      DifferentiabilityMask = 0b111 << DifferentiabilityOffset,
+      NumMaskBits        = 9
     };
 
     unsigned Bits; // Naturally sized for speed.
@@ -3622,10 +3684,14 @@ public:
     ExtInfo() : Bits(0) { }
 
     // Constructor for polymorphic type.
-    ExtInfo(Representation rep, bool isPseudogeneric, bool isNoEscape) {
+    // SWIFT_ENABLE_TENSORFLOW
+    ExtInfo(Representation rep, bool isPseudogeneric, bool isNoEscape,
+            Differentiability diff) {
       Bits = ((unsigned) rep) |
              (isPseudogeneric ? PseudogenericMask : 0) |
-             (isNoEscape ? NoEscapeMask : 0);
+             // SWIFT_ENABLE_TENSORFLOW
+             (isNoEscape ? NoEscapeMask : 0) |
+             ((unsigned)diff << DifferentiabilityOffset);
     }
 
     /// Is this function pseudo-generic?  A pseudo-generic function
@@ -3634,6 +3700,14 @@ public:
 
     // Is this function guaranteed to be no-escape by the type system?
     bool isNoEscape() const { return Bits & NoEscapeMask; }
+    
+    // SWIFT_ENABLE_TENSORFLOW
+    bool isDifferentiable() const { return Bits & DifferentiabilityMask; }
+
+    Differentiability getDifferentiability() const {
+      return Differentiability(
+          (Bits & DifferentiabilityMask) >> DifferentiabilityOffset);
+    }
 
     /// What is the abstract representation of this function value?
     Representation getRepresentation() const {
@@ -3699,6 +3773,11 @@ public:
         return ExtInfo(Bits | NoEscapeMask);
       else
         return ExtInfo(Bits & ~NoEscapeMask);
+    }
+    // SWIFT_ENABLE_TENSORFLOW
+    ExtInfo withDifferentiability(Differentiability diff) const {
+      return ExtInfo((Bits & ~DifferentiabilityMask) |
+                     (unsigned)diff << DifferentiabilityOffset);
     }
 
     unsigned getFuncAttrKey() const {
@@ -4025,6 +4104,12 @@ public:
     return getExtInfo().getRepresentation();
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// \brief Get the differentiability of the function type.
+  Differentiability getDifferentiability() const {
+    return getExtInfo().getDifferentiability();
+  }
+
   bool isPseudogeneric() const {
     return getExtInfo().isPseudogeneric();
   }
@@ -4037,6 +4122,11 @@ public:
   bool isTrivialNoEscape() const {
     return isNoEscape() &&
            getRepresentation() == SILFunctionTypeRepresentation::Thick;
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  bool isDifferentiable() const {
+    return getExtInfo().isDifferentiable();
   }
 
   bool isNoReturnFunction() const; // Defined in SILType.cpp

@@ -2031,6 +2031,9 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   SourceRange autoclosureEscapingParenRange;
   StringRef conventionName;
   StringRef witnessMethodProtocol;
+  // SWIFT_ENABLE_TENSORFLOW
+  StringRef differentiabilityName;
+  int differentiationOrder = -1;
 
   // Handle @autoclosure(escaping)
   if (attr == TAK_autoclosure) {
@@ -2097,7 +2100,49 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
                        diag::convention_attribute_expected_rparen,
                        LPLoc);
   }
-
+  // Handle @autodiff(...).
+  // autodiff-attr = '@autodiff'
+  else if (attr == TAK_autodiff) {
+    // Look ahead for detailed differentiability. This is necessary because we
+    // should be able to parse `@autodiff(reverse) -> T` as a function type
+    // where `reverse` is a type name.
+    //   diff-order ::= 'order' ':' integer-literal
+    //   diff-mode ::= identifier
+    //   detailed-differentiability ::=
+    //       '(' (diff-order | diff-mode ',' diff-order) ')'
+    if (Tok.is(tok::l_paren) && peekToken().is(tok::identifier)) {
+      Parser::BacktrackingScope backtrack(*this);
+      consumeToken(tok::l_paren);
+      // Attempts to parse an unsigned integer. Returns true on success.
+      auto tryParseOrder = [&]() -> bool {
+        Parser::BacktrackingScope innerBacktrack(*this);
+        if (Tok.getText() != "order")
+          return false;
+        consumeToken(tok::identifier); // 'order'
+        if (consumeIf(tok::colon) &&
+            Tok.is(tok::integer_literal) &&
+            !Tok.getText().getAsInteger(0, differentiationOrder)) {
+          consumeToken(tok::integer_literal);
+          innerBacktrack.cancelBacktrack();
+          return true;
+        }
+        return false;
+      };
+      if (!tryParseOrder()) {
+        differentiabilityName = Tok.getText();
+        consumeToken(tok::identifier);
+        if (consumeIf(tok::comma))
+          tryParseOrder();
+      }
+      if (consumeIf(tok::r_paren) && Tok.isNot(tok::arrow))
+        backtrack.cancelBacktrack();
+      // If parsing failed, clean up the states.
+      if (backtrack.willBacktrack()) {
+        differentiationOrder = -1;
+        differentiabilityName = StringRef();
+      }
+    }
+  }
 
   // In just-checking mode, we only need to consume the tokens, and we don't
   // want to do any other analysis.
@@ -2230,6 +2275,13 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   case TAK_convention:
     Attributes.convention = conventionName;
     Attributes.conventionWitnessMethodProtocol = witnessMethodProtocol;
+    break;
+  // SWIFT_ENABLE_TENSORFLOW
+  // @autodiff(...) attribute.
+  case TAK_autodiff:
+    Attributes.differentiabilityAndOrder = {
+      differentiabilityName, differentiationOrder
+    };
     break;
   }
 

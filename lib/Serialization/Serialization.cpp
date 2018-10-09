@@ -3607,6 +3607,22 @@ static uint8_t getRawStableSILFunctionTypeRepresentation(
   llvm_unreachable("bad calling convention");
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+/// Translate from the AST function type differentiability enum to the
+/// Serialization enum values, which are guaranteed to be stable.
+static uint8_t getRawStableFunctionTypeDifferentiability(
+                           swift::FunctionType::Differentiability diffability) {
+  switch (diffability) {
+  SIMPLE_CASE(FunctionTypeDifferentiability, None)
+  SIMPLE_CASE(FunctionTypeDifferentiability, Forward)
+  SIMPLE_CASE(FunctionTypeDifferentiability, Reverse)
+  SIMPLE_CASE(FunctionTypeDifferentiability, Bidirectional)
+  SIMPLE_CASE(FunctionTypeDifferentiability, Linear)
+  SIMPLE_CASE(FunctionTypeDifferentiability, Constant)
+  }
+  llvm_unreachable("bad differentiability");
+}
+
 /// Translate from the AST coroutine-kind enum to the Serialization enum
 /// values, which are guaranteed to be stable.
 static uint8_t getRawStableSILCoroutineKind(
@@ -3886,7 +3902,10 @@ void Serializer::writeType(Type ty) {
              getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
              fnTy->isAutoClosure(),
              fnTy->isNoEscape(),
-             fnTy->throws());
+             // SWIFT_ENABLE_TENSORFLOW
+             fnTy->throws(),
+             getRawStableFunctionTypeDifferentiability(
+                 fnTy->getDifferentiability()));
     } else {
       assert(!fnTy->isAutoClosure());
       assert(!fnTy->isNoEscape());
@@ -3897,7 +3916,9 @@ void Serializer::writeType(Type ty) {
               addTypeRef(fnTy->getResult()),
               getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
               fnTy->throws(),
-              addGenericSignatureRef(genericSig));
+              // SWIFT_ENABLE_TENSORFLOW
+              addGenericSignatureRef(genericSig),
+       getRawStableFunctionTypeDifferentiability(fnTy->getDifferentiability()));
     }
 
     unsigned abbrCode = DeclTypeAbbrCodes[FunctionParamLayout::Code];
@@ -3972,14 +3993,19 @@ void Serializer::writeType(Type ty) {
     auto stableCalleeConvention =
       getRawStableParameterConvention(fnTy->getCalleeConvention());
 
+    // SWIFT_ENABLE_TENSORFLOW
+    auto stableDifferentiability =
+      getRawStableFunctionTypeDifferentiability(fnTy->getDifferentiability());
+
     unsigned abbrCode = DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(
         Out, ScratchRecord, abbrCode,
         stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
-        fnTy->hasErrorResult(), fnTy->getParameters().size(),
-        fnTy->getNumYields(), fnTy->getNumResults(),
-        addGenericSignatureRef(sig), variableData);
+        // SWIFT_ENABLE_TENSORFLOW
+        stableDifferentiability, fnTy->hasErrorResult(),
+        fnTy->getParameters().size(), fnTy->getNumYields(),
+        fnTy->getNumResults(), addGenericSignatureRef(sig), variableData);
 
     if (auto conformance = fnTy->getWitnessMethodConformanceOrNone())
       writeConformance(*conformance, DeclTypeAbbrCodes);

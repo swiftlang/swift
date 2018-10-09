@@ -3679,6 +3679,15 @@ ERROR(unsupported_convention,none,
 ERROR(unreferenced_generic_parameter,none,
       "generic parameter '%0' is not used in function signature", (StringRef))
 
+// SWIFT_ENABLE_TENSORFLOW
+// Function differentiability
+ERROR(autodiff_attr_invalid_differentiability,none,
+      "invalid differentiability '%0' in '@autodiff' attribute; expected 'forward', 'reverse', 'linear', 'constant', or 'bidirectional'", (StringRef))
+ERROR(autodiff_attr_order_cannot_be_zero,none,
+      "differentiation order cannot be zero; it should be at least first-order", ())
+ERROR(autodiff_attr_order_cannot_be_specified_in_mode,none,
+      "differentiation order cannot be specified in '%0' mode", (StringRef))
+
 // SIL
 ERROR(opened_non_protocol,none,
       "@opened cannot be applied to non-protocol type %0", (Type))
