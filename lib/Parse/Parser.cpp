@@ -763,7 +763,7 @@ getStructureMarkerKindForToken(const Token &tok) {
   case tok::l_brace:
     return Parser::StructureMarkerKind::OpenBrace;
   case tok::l_paren:
-    return Parser::StructureMarkerKind::OpenBrace;
+    return Parser::StructureMarkerKind::OpenParen;
   case tok::l_square:
     return Parser::StructureMarkerKind::OpenSquare;
   default:
