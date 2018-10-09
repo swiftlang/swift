@@ -639,7 +639,6 @@ endif()
 
 if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
 
-  set(CMAKE_EXECUTABLE_FORMAT "ELF")
   set(SWIFT_HOST_VARIANT "linux" CACHE STRING
       "Deployment OS for Swift host tools (the compiler) [linux].")
 
@@ -653,7 +652,6 @@ if("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
 
 elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "FREEBSD")
 
-  set(CMAKE_EXECUTABLE_FORMAT "ELF")
   set(SWIFT_HOST_VARIANT "freebsd" CACHE STRING
       "Deployment OS for Swift host tools (the compiler) [freebsd].")
 
@@ -663,7 +661,6 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "FREEBSD")
 
 elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "CYGWIN")
 
-  # set(CMAKE_EXECUTABLE_FORMAT "ELF")
   set(SWIFT_HOST_VARIANT "cygwin" CACHE STRING
       "Deployment OS for Swift host tools (the compiler) [cygwin].")
 
@@ -682,7 +679,6 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WINDOWS")
 
 elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "HAIKU")
 
-  set(CMAKE_EXECUTABLE_FORMAT "ELF")
   set(SWIFT_HOST_VARIANT "haiku" CACHE STRING
       "Deployment OS for Swift host tools (the compiler) [haiku].")
 
