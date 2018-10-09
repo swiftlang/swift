@@ -171,6 +171,12 @@ public:
     return SILFunctionConventions(getSubstCalleeType(), getModule());
   }
 
+  /// Returns true if the callee function is annotated with
+  /// @_semantics("programtermination_point")
+  bool isCalleeKnownProgramTerminationPoint() const {
+    FOREACH_IMPL_RETURN(isCalleeKnownProgramTerminationPoint());
+  }
+
   /// Check if this is a call of a never-returning function.
   bool isCalleeNoReturn() const { FOREACH_IMPL_RETURN(isCalleeNoReturn()); }
 

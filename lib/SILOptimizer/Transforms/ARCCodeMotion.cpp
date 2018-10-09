@@ -1072,9 +1072,7 @@ static void eliminateRetainsPrecedingProgramTerminationPoints(SILFunction *f) {
     // such a case, we can ignore it. All other functions though imply we must
     // bail. If we don't have a function here, check for side
     if (auto apply = FullApplySite::isa(&*iter)) {
-      SILFunction *callee = apply.getCalleeFunction();
-      if (!callee ||
-          !callee->hasSemanticsAttr(SEMANTICS_ARC_PROGRAMTERMINATION_POINT)) {
+      if (!apply.isCalleeKnownProgramTerminationPoint()) {
         continue;
       }
     } else {

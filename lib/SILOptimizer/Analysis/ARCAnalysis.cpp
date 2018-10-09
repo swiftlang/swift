@@ -1092,11 +1092,8 @@ bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
 //===----------------------------------------------------------------------===//
 
 static bool ignorableApplyInstInUnreachableBlock(const ApplyInst *AI) {
-  const auto *Fn = AI->getReferencedFunction();
-  if (!Fn)
-    return false;
-
-  return Fn->hasSemanticsAttr("arc.programtermination_point");
+  auto applySite = FullApplySite(const_cast<ApplyInst *>(AI));
+  return applySite.isCalleeKnownProgramTerminationPoint();
 }
 
 static bool ignorableBuiltinInstInUnreachableBlock(const BuiltinInst *BI) {

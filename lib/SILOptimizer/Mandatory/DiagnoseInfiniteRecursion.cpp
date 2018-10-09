@@ -94,6 +94,24 @@ static bool hasRecursiveCallInPath(SILBasicBlock &Block,
   return false;
 }
 
+/// Returns true if the block has a call to a function marked with
+/// @_semantics("programtermination_point").
+static bool isKnownProgramTerminationPoint(const SILBasicBlock *bb) {
+  // Skip checking anything if this block doesn't end in a program terminator.
+  if (!bb->getTerminator()->isProgramTerminating())
+    return false;
+
+  // Check each instruction for a call to something that's a known
+  // programtermination_point
+  for (auto it = bb->rbegin(); it != bb->rend(); ++it) {
+    auto applySite = FullApplySite::isa(const_cast<SILInstruction *>(&*it));
+    if (!applySite) continue;
+    if (applySite.isCalleeKnownProgramTerminationPoint())
+      return true;
+  }
+  return false;
+}
+
 /// Perform a DFS through the target function to find any paths to an exit node
 /// that do not call into the target.
 static bool hasInfinitelyRecursiveApply(SILFunction *targetFn) {
@@ -109,6 +127,13 @@ static bool hasInfinitelyRecursiveApply(SILFunction *targetFn) {
   while (!workList.empty()) {
     SILBasicBlock *curBlock = workList.pop_back_val();
 
+    // Before checking for infinite recursion, see if we're calling something
+    // that's @_semantics("programtermination_point"). We explicitly don't
+    // want this call to disqualify the warning for infinite recursion,
+    // because they're reserved for exceptional circumstances.
+    if (isKnownProgramTerminationPoint(curBlock))
+      continue;
+
     // We're looking for functions that are recursive on _all_ paths. If this
     // block is recursive, mark that we found recursion and check the next
     // block in the work list.
@@ -119,7 +144,8 @@ static bool hasInfinitelyRecursiveApply(SILFunction *targetFn) {
 
     // If this block doesn't have a recursive call, and it exits the function,
     // then we know the function is not infinitely recursive.
-    if (curBlock->getTerminator()->isFunctionExiting())
+    auto term = curBlock->getTerminator();
+    if (term->isFunctionExiting() || term->isProgramTerminating())
       return false;
 
     // Otherwise, push the successors onto the stack if we haven't visited them.
