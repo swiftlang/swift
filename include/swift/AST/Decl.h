@@ -3233,10 +3233,7 @@ public:
                                                      ToStoredProperty>;
 
   /// Return a collection of the stored member variables of this type.
-  StoredPropertyRange getStoredProperties(bool skipInaccessible = false) const {
-    return StoredPropertyRange(getMembers(),
-                               ToStoredProperty(skipInaccessible));
-  }
+  StoredPropertyRange getStoredProperties(bool skipInaccessible = false) const;
 
 private:
   /// Predicate used to filter StoredPropertyRange.
