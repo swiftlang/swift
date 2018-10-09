@@ -6453,12 +6453,11 @@ public:
 
   InfixOperatorDecl(DeclContext *DC, SourceLoc operatorLoc, Identifier name,
                     SourceLoc nameLoc, SourceLoc colonLoc,
-                    Identifier firstIdentifier, SourceLoc firstIdentifierLoc,
+                    PrecedenceGroupDecl *precedenceGroup,
                     NominalTypeDecl *designatedNominalType)
       : OperatorDecl(DeclKind::InfixOperator, DC, operatorLoc, name, nameLoc,
                      designatedNominalType),
-        ColonLoc(colonLoc), FirstIdentifierLoc(firstIdentifierLoc),
-        FirstIdentifier(firstIdentifier) {}
+        ColonLoc(colonLoc), PrecedenceGroup(precedenceGroup) {}
 
   SourceLoc getEndLoc() const {
     if (!SecondIdentifier.empty())
