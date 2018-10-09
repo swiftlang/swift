@@ -258,7 +258,7 @@ macro(configure_sdk_unix name architectures)
   _report_sdk("${prefix}")
 endmacro()
 
-macro(configure_sdk_windows sdk_name environment architectures)
+macro(configure_sdk_windows name environment architectures)
   # Note: this has to be implemented as a macro because it sets global
   # variables.
 
