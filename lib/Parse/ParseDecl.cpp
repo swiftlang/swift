@@ -6496,27 +6496,26 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
   // parse them both as identifiers here and sort it out in type
   // checking.
   SourceLoc colonLoc;
-  Identifier firstIdentifierName;
-  SourceLoc firstIdentifierNameLoc;
-  Identifier secondIdentifierName;
-  SourceLoc secondIdentifierNameLoc;
+  SmallVector<Identifier, 4> identifiers;
+  SmallVector<SourceLoc, 4> identifierLocs;
   if (Tok.is(tok::colon)) {
-    SyntaxParsingContext GroupCtxt(SyntaxContext, SyntaxKind::InfixOperatorGroup);
+    SyntaxParsingContext GroupCtxt(SyntaxContext,
+                                   SyntaxKind::InfixOperatorGroup);
     colonLoc = consumeToken();
 
     if (Context.LangOpts.EnableOperatorDesignatedTypes) {
       if (Tok.is(tok::identifier)) {
-        firstIdentifierName = Context.getIdentifier(Tok.getText());
-        firstIdentifierNameLoc = consumeToken(tok::identifier);
+        identifiers.push_back(Context.getIdentifier(Tok.getText()));
+        identifierLocs.push_back(consumeToken(tok::identifier));
 
         if (consumeIf(tok::comma)) {
           if (isPrefix || isPostfix)
             diagnose(colonLoc, diag::precedencegroup_not_infix)
-                .fixItRemove({colonLoc, firstIdentifierNameLoc});
+                .fixItRemove({colonLoc, identifierLocs.back()});
 
           if (Tok.is(tok::identifier)) {
-            secondIdentifierName = Context.getIdentifier(Tok.getText());
-            secondIdentifierNameLoc = consumeToken(tok::identifier);
+            identifiers.push_back(Context.getIdentifier(Tok.getText()));
+            identifierLocs.push_back(consumeToken(tok::identifier));
           } else {
             auto otherTokLoc = consumeToken();
             diagnose(otherTokLoc, diag::operator_decl_trailing_comma);
@@ -6524,12 +6523,12 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
         }
       }
     } else if (Tok.is(tok::identifier)) {
-      firstIdentifierName = Context.getIdentifier(Tok.getText());
-      firstIdentifierNameLoc = consumeToken(tok::identifier);
+      identifiers.push_back(Context.getIdentifier(Tok.getText()));
+      identifierLocs.push_back(consumeToken(tok::identifier));
 
       if (isPrefix || isPostfix) {
         diagnose(colonLoc, diag::precedencegroup_not_infix)
-            .fixItRemove({colonLoc, firstIdentifierNameLoc});
+            .fixItRemove({colonLoc, identifierLocs.back()});
       }
     }
   }
@@ -6542,7 +6541,8 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
     } else {
       auto Diag = diagnose(lBraceLoc, diag::deprecated_operator_body);
       if (Tok.is(tok::r_brace)) {
-        SourceLoc lastGoodLoc = firstIdentifierNameLoc;
+        SourceLoc lastGoodLoc =
+            !identifierLocs.empty() ? identifierLocs.back() : SourceLoc();
         if (lastGoodLoc.isInvalid())
           lastGoodLoc = NameLoc;
         SourceLoc lastGoodLocEnd = Lexer::getLocForEndOfToken(SourceMgr,
@@ -6560,16 +6560,18 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
   if (Attributes.hasAttribute<PrefixAttr>())
     res = new (Context)
         PrefixOperatorDecl(CurDeclContext, OperatorLoc, Name, NameLoc,
-                           firstIdentifierName, firstIdentifierNameLoc);
+                           Context.AllocateCopy(identifiers),
+                           Context.AllocateCopy(identifierLocs));
   else if (Attributes.hasAttribute<PostfixAttr>())
     res = new (Context)
         PostfixOperatorDecl(CurDeclContext, OperatorLoc, Name, NameLoc,
-                            firstIdentifierName, firstIdentifierNameLoc);
+                            Context.AllocateCopy(identifiers),
+                            Context.AllocateCopy(identifierLocs));
   else
     res = new (Context)
         InfixOperatorDecl(CurDeclContext, OperatorLoc, Name, NameLoc, colonLoc,
-                          firstIdentifierName, firstIdentifierNameLoc,
-                          secondIdentifierName, secondIdentifierNameLoc);
+                          Context.AllocateCopy(identifiers),
+                          Context.AllocateCopy(identifierLocs));
 
   diagnoseOperatorFixityAttributes(*this, Attributes, res);
   
