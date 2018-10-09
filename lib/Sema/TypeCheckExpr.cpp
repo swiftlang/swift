@@ -581,6 +581,14 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
     type = &ExtendedGraphemeClusterType;
     name = "ExtendedGraphemeClusterType";
   }
+  // ExpressibleByCodepointLiteral -> CodepointLiteralType
+  else if (protocol ==
+           getProtocol(
+               SourceLoc(),
+               KnownProtocolKind::ExpressibleByCodepointLiteral)) {
+    type = &CodepointLiteralType;
+    name = "CodepointLiteralType";
+  }
   // ExpressibleByStringLiteral -> StringLiteralType
   // ExpressibleByStringInterpolation -> StringLiteralType
   else if (protocol == getProtocol(

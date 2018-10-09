@@ -1443,19 +1443,23 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   SyntaxParsingContext ExprContext(SyntaxContext, SyntaxContextKind::Expr);
   switch (Tok.getKind()) {
   case tok::integer_literal: {
-    StringRef Text = copyAndStripUnderscores(Context, Tok.getText());
-    if (Text[0] == '\'') {
-      const char *CurPtr = Tok.getText().begin() + 1;
-      uint32_t CodePoint = L->lexCharacterLiteral(CurPtr);
-      std::string Integer = std::to_string(CodePoint);
-      char *IntegerBuff = (char *)Context.Allocate(Integer.size() + 1, 1 );
+    StringRef Text = Tok.getText();;
+    bool IsCodepointLiteral = Text[0] == '\'';
+    if (IsCodepointLiteral) {
+      const char *CurPtr = Text.begin() + 1;
+      uint32_t Codepoint = L->lexCodepointLiteral(CurPtr, nullptr);
+      std::string Integer = std::to_string(Codepoint);
+      char *IntegerBuff = (char *)Context.Allocate(Integer.size() + 1, 1);
       Text = StringRef(strcpy(IntegerBuff, Integer.c_str()), Integer.size());
     }
+    else
+      Text = copyAndStripUnderscores(Context, Text);
     SourceLoc Loc = consumeToken(tok::integer_literal);
     ExprContext.setCreateSyntax(SyntaxKind::IntegerLiteralExpr);
     return makeParserResult(new (Context)
                                 IntegerLiteralExpr(Text, Loc,
-                                                   /*Implicit=*/false));
+                                                   /*Implicit=*/false,
+                                                   IsCodepointLiteral));
   }
   case tok::floating_literal: {
     StringRef Text = copyAndStripUnderscores(Context, Tok.getText());

@@ -811,6 +811,10 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
       // Try to print user-visible types if they are available.
       if (!UserDstTy.isNull()) {
         auto diagID = diag::integer_literal_overflow;
+        if (auto TE = dyn_cast<TupleExpr>(CE->getArg()))
+          if (auto LE = dyn_cast<IntegerLiteralExpr>(TE->getElements()[0]))
+            if (LE->isCodepoint())
+              diagID = diag::codepoint_literal_overflow;
 
         // If this is a negative literal in an unsigned type, use a specific
         // diagnostic.

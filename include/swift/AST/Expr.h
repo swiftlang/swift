@@ -165,6 +165,10 @@ protected:
     IsNegative : 1
   );
 
+  SWIFT_INLINE_BITFIELD(IntegerLiteralExpr, NumberLiteralExpr, 1,
+    IsCodepoint : 1
+  );
+
   SWIFT_INLINE_BITFIELD(StringLiteralExpr, LiteralExpr, 3+1+1,
     Encoding : 3,
     IsSingleUnicodeScalar : 1,
@@ -788,10 +792,18 @@ public:
 /// a BuiltinIntegerType.
 class IntegerLiteralExpr : public NumberLiteralExpr {
 public:
-  IntegerLiteralExpr(StringRef Val, SourceLoc DigitsLoc, bool Implicit = false)
+
+  IntegerLiteralExpr(StringRef Val, SourceLoc DigitsLoc, bool Implicit = false,
+                     bool IsCodepoint = false)
       : NumberLiteralExpr(ExprKind::IntegerLiteral,
                           Val, DigitsLoc, Implicit)
-  {}
+  {
+    Bits.IntegerLiteralExpr.IsCodepoint = IsCodepoint;
+  }
+
+  bool isCodepoint() const {
+    return Bits.IntegerLiteralExpr.IsCodepoint;
+  }
 
   /// Returns a new integer literal expression with the given value.
   /// \p C The AST context.

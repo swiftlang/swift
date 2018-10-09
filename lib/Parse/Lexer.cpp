@@ -20,6 +20,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Unicode.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -1785,51 +1786,6 @@ static void validateMultilineIndents(const Token &Str,
                                   commonIndentation);
 }
 
-/// Emit diagnostics for single-quote string and suggest replacement
-/// with double-quoted equivalent.
-static void diagnoseSingleQuoteStringLiteral(const char *TokStart,
-                                             const char *TokEnd,
-                                             DiagnosticEngine *D) {
-  assert(*TokStart == '\'' && TokEnd[-1] == '\'');
-  if (!D)
-    return;
-
-  SmallString<32> replacement;
-  replacement.push_back('"');
-  const char *Ptr = TokStart + 1;
-  const char *OutputPtr = Ptr;
-
-  while (*Ptr++ != '\'' && Ptr < TokEnd) {
-    if (Ptr[-1] == '\\') {
-      if (*Ptr == '\'') {
-        replacement.append(OutputPtr, Ptr - 1);
-        OutputPtr = Ptr + 1;
-        // Un-escape single quotes.
-        replacement.push_back('\'');
-      } else if (*Ptr == '(') {
-        // Preserve the contents of interpolation.
-        Ptr = skipToEndOfInterpolatedExpression(Ptr + 1, replacement.end(),
-                                                /*IsMultiline=*/false);
-        assert(*Ptr == ')');
-      }
-      // Skip over escaped characters.
-      ++Ptr;
-    } else if (Ptr[-1] == '"') {
-      replacement.append(OutputPtr, Ptr - 1);
-      OutputPtr = Ptr;
-      // Escape double quotes.
-      replacement.append("\\\"");
-    }
-  }
-  assert(Ptr == TokEnd && Ptr[-1] == '\'');
-  replacement.append(OutputPtr, Ptr - 1);
-  replacement.push_back('"');
-
-  D->diagnose(Lexer::getSourceLoc(TokStart), diag::lex_single_quote_string)
-      .fixItReplaceChars(Lexer::getSourceLoc(TokStart),
-                         Lexer::getSourceLoc(TokEnd), replacement);
-}
-
 /// lexStringLiteral:
 ///   string_literal ::= ["]([^"\\\n\r]|character_escape)*["]
 ///   string_literal ::= ["]["]["].*["]["]["] - approximately
@@ -1888,12 +1844,6 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
 
     // Remember we had already-diagnosed invalid characters.
     wasErroneous |= CharValue == ~1U;
-  }
-
-  if (QuoteChar == '\'') {
-    assert(!IsMultilineString && CustomDelimiterLen == 0 &&
-           "Single quoted string cannot have custom delimitor, nor multiline");
-    diagnoseSingleQuoteStringLiteral(TokStart, CurPtr, Diags);
   }
 
   if (wasErroneous)
@@ -2493,9 +2443,14 @@ void Lexer::lexImpl() {
       
   case '\'': {
     const char *TokStart = CurPtr-1;
-    uint32_t CodePoint = lexCharacterLiteral(CurPtr);
-    return formToken(CodePoint == ~0U ? tok::unknown :
-                     tok::integer_literal, TokStart);
+    if (lexCodepointLiteral(CurPtr, TokStart) != ~0U)
+      return formToken(tok::integer_literal, TokStart);
+    CurPtr = TokStart + 1;
+    lexStringLiteral();
+    StringRef Text = NextToken.getText().drop_front().drop_back();
+    if (!swift::unicode::isSingleExtendedGraphemeCluster(Text))
+      diagnose(TokStart, diag::lex_character_not_cluster);
+    return;
   }
 
   case '`':
@@ -2503,10 +2458,12 @@ void Lexer::lexImpl() {
   }
 }
 
-uint32_t Lexer::lexCharacterLiteral(const char *&CurPtr) {
+uint32_t Lexer::lexCodepointLiteral(const char *&CurPtr, const char *TokStart) {
   uint32_t CodePoint = ~0;
-  if (*CurPtr == '\'')
-    diagnose(CurPtr, diag::lex_character_empty);
+  if (*CurPtr == '\'') {
+    if (TokStart)
+      diagnose(CurPtr, diag::lex_character_empty);
+  }
   else if (*CurPtr == '\\') {
     switch (*++CurPtr) {
       case 't': CodePoint = '\t'; break;
@@ -2514,19 +2471,25 @@ uint32_t Lexer::lexCharacterLiteral(const char *&CurPtr) {
       case 'n': CodePoint = '\n'; break;
       case '\\': CodePoint = '\\'; break;
       case '\'': ++CurPtr; CodePoint = '\''; break;
+      case 'u':
+        ++CurPtr;
+        CodePoint = lexUnicodeEscape(CurPtr, Diags ? this : nullptr);
+        break;
       default:
-        diagnose(CurPtr, diag::lex_character_invalid_escape);
+        if (TokStart)
+          diagnose(CurPtr, diag::lex_character_invalid_escape);
     }
   }
   else {
     CodePoint = swift::validateUTF8CharacterAndAdvance(CurPtr, BufferEnd);
 
-    if (CodePoint == ~0U)
-      diagnose(CurPtr, diag::lex_invalid_utf8);
+    if (CodePoint == ~0U && TokStart)
+      diagnose(TokStart, diag::lex_invalid_utf8);
   }
 
   if (CodePoint != ~0U && *CurPtr != '\'') {
-    diagnose(CurPtr, diag::lex_character_not_codepoint);
+//    if (TokStart)
+//      diagnose(TokStart, diag::lex_character_not_codepoint);
     CodePoint = ~0U;
   }
 

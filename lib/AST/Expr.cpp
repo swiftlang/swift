@@ -757,7 +757,8 @@ static LiteralExpr *
 shallowCloneImpl(const IntegerLiteralExpr *E, ASTContext &Ctx,
                  llvm::function_ref<Type(const Expr *)> getType) {
   auto res = new (Ctx) IntegerLiteralExpr(E->getDigitsText(),
-                                          E->getSourceRange().End);
+                                          E->getSourceRange().End,
+                                          false, E->isCodepoint());
   if (E->isNegative())
     res->setNegative(E->getSourceRange().Start);
   return res;

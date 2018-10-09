@@ -271,6 +271,9 @@ ERROR(negative_integer_literal_overflow_unsigned,none,
 ERROR(integer_literal_overflow,none,
       "integer literal '%1' overflows when stored into %0",
       (Type, StringRef))
+ERROR(codepoint_literal_overflow,none,
+      "codepoint literal '%1' overflows when stored into %0",
+      (Type, StringRef))
 ERROR(integer_literal_overflow_builtin_types,none,
       "integer literal '%2' overflows when stored into "
       "%select{unsigned|signed}0 %1", (bool, Type, StringRef))

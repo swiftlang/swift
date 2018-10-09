@@ -975,7 +975,7 @@ private:
     MemberLookups;
 
   /// Cached sets of "alternative" literal types.
-  static const unsigned NumAlternativeLiteralTypes = 13;
+  static const unsigned NumAlternativeLiteralTypes = 14;
   Optional<ArrayRef<Type>> AlternativeLiteralTypes[NumAlternativeLiteralTypes];
 
   /// \brief Folding set containing all of the locators used in this

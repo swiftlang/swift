@@ -44,12 +44,6 @@ extension Unicode {
   }
 }
 
-extension Unicode.Scalar : ExpressibleByIntegerLiteral {
-  public init(integerLiteral value: Int) {
-    self.init(_value: UInt32(value))
-  }
-}
-
 extension Unicode.Scalar :
     _ExpressibleByBuiltinUnicodeScalarLiteral,
     ExpressibleByUnicodeScalarLiteral {
@@ -504,4 +498,8 @@ extension Unicode.Scalar {
   }
 }
 
-
+extension Unicode.Scalar : ExpressibleByCodepointLiteral {
+  public init(codepointLiteral value: IntegerLiteralType) {
+    self.init(_value: UInt32(value))
+  }
+}

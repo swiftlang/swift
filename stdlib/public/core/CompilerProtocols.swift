@@ -279,6 +279,25 @@ public protocol ExpressibleByIntegerLiteral {
   init(integerLiteral value: IntegerLiteralType)
 }
 
+public protocol ExpressibleByCodepointLiteral {
+  /// A type that represents a single quoted codepoint literal.
+  ///
+  associatedtype IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral
+
+  /// Creates an instance initialized to the specified codepoint value.
+  ///
+  /// Do not call this initializer directly. Instead, initialize a variable or
+  /// constant using an integer literal. For example:
+  ///
+  ///     let x = 'A'
+  ///
+  /// In this example, the assignment to the `x` constant calls this codepoint
+  /// literal initializer behind the scenes.
+  ///
+  /// - Parameter value: The value to create.
+  init(codepointLiteral value: IntegerLiteralType)
+}
+
 public protocol _ExpressibleByBuiltinFloatLiteral {
   init(_builtinFloatLiteral value: _MaxBuiltinFloatType)
 }
