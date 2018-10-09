@@ -287,6 +287,9 @@ namespace swift {
 
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
     bool VerifySyntaxTree = false;
+    
+    /// Try better but risky dependency propagation.
+    bool EnableExperimentalDependencies = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

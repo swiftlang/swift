@@ -117,7 +117,8 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          Optional<unsigned> BatchSizeLimit,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
-                         std::unique_ptr<UnifiedStatsReporter> StatsReporter)
+                         std::unique_ptr<UnifiedStatsReporter> StatsReporter,
+                         bool EnableExperimentalDependencies)
   : Diags(Diags), TheToolChain(TC),
     TheOutputInfo(OI),
     Level(Level),
@@ -138,7 +139,8 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     SaveTemps(SaveTemps),
     ShowDriverTimeCompilation(ShowDriverTimeCompilation),
     Stats(std::move(StatsReporter)),
-    FilelistThreshold(FilelistThreshold) {
+    FilelistThreshold(FilelistThreshold),
+    EnableExperimentalDependencies(EnableExperimentalDependencies) {
 };
 
 static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,

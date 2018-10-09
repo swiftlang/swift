@@ -16,6 +16,7 @@
 
 #include "swift/Parse/Parser.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/EditorPlaceholder.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/SyntaxParsingContext.h"
@@ -2664,6 +2665,18 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // The arguments to the func are defined in their own scope.
   Scope S(this, ScopeKind::ClosureParams);
   ParseFunctionBody cc(*this, closure);
+  
+  // duplicated from parseAbstractFunctionBody
+  // Just as we exclude function bodies from the interface hash,
+  // let's also exclude closure bodies.
+  if (Context.LangOpts.EnableExperimentalDependencies) {
+    if (IsParsingInterfaceTokens) {
+      // Record the curly braces but nothing inside.
+      SF.recordInterfaceToken("{");
+      SF.recordInterfaceToken("}");
+    }
+    llvm::SaveAndRestore<bool> TParsingInterfaceTokens(IsParsingInterfaceTokens, false);
+  }
 
   // Handle parameters.
   if (params) {
