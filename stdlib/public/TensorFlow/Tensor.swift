@@ -160,7 +160,7 @@ public extension Tensor {
     let ret: TensorHandle<Scalar> = #tfop(
       "Identity",
       tensor,
-      T: Scalar.self,
+      T$dtype: Scalar.tensorFlowDataType,
       __shapes: [shape],
       __device: "/job:localhost/replica:0/task:0/device:CPU:0")
     return Tensor(handle: ret)
@@ -182,7 +182,8 @@ public extension Tensor {
     // device first, before outfeeding the tensor to CPU, a required step for
     // sending the tensor to the host.
     let tensor: TensorHandle<Scalar> =
-      #tfop("Identity", self, T: Scalar.self, __shapes: [shape])
+      #tfop("Identity", self, T$dtype: Scalar.tensorFlowDataType,
+            __shapes: [shape])
     return Tensor(handle: tensor).toHost()
   }
 
@@ -452,7 +453,8 @@ extension TensorElementLiteral : ExpressibleByArrayLiteral {
     // Attr T (non-optional in the op definition) need not be specified when we
     // run the op as part of a graph function, but need to be specified when we
     // run it via eager C API.
-    let handle: TensorHandle<Scalar> = #tfop("Pack", elements, T: Scalar.self)
+    let handle: TensorHandle<Scalar> = #tfop("Pack", elements,
+                                             T$dtype: Scalar.tensorFlowDataType)
     tensor = Tensor(handle: handle)
   }
 }
@@ -468,7 +470,8 @@ extension Tensor : ExpressibleByArrayLiteral {
   internal init(
     tensorElementLiterals elements: [TensorElementLiteral<Scalar>]
   ) {
-    self.init(handle: #tfop("Pack", elements, T: Scalar.self))
+    self.init(handle: #tfop("Pack", elements,
+                            T$dtype: Scalar.tensorFlowDataType))
   }
 
   /// Creates a tensor initialized with the given elements.

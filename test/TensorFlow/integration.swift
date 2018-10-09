@@ -18,8 +18,8 @@ public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testTensor{{.*}}
 // CHECK:  sil private @{{.*}}testTensor{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Float>):
-// CHECK-NEXT:   [[A:%.*]] = graph_op "Add"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) {T: $Float, __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
-// CHECK-NEXT:   {{.*}} = graph_op "Sub"([[A]] : $TensorHandle<Float>, [[A]] : $TensorHandle<Float>) {T: $Float, __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
+// CHECK-NEXT:   [[A:%.*]] = graph_op "Add"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) {T$dtype: i32 1, __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
+// CHECK-NEXT:   {{.*}} = graph_op "Sub"([[A]] : $TensorHandle<Float>, [[A]] : $TensorHandle<Float>) {T$dtype: i32 1, __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
 // CHECK:        graph_op "tfc.SendToHost
 // CHECK:        [[RESULT:%.*]] = graph_op "Add"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>
 // CHECK-NEXT:   return [[RESULT]] : $TensorHandle<Float>
@@ -53,7 +53,7 @@ public func testScalar(f: Float) {
 // CHECK: sil private @{{.*}}testScalar{{.*}} : $@callee_owned (TensorHandle<Builtin.FPIEEE32>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : @unowned $TensorHandle<Builtin.FPIEEE32>):
 // CHECK-NEXT:   %1 = unchecked_ref_cast %0 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
-// CHECK:        [[CONST:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"} : $TensorHandle<Float>
+// CHECK:        [[CONST:%.*]] = graph_op "Const"() {dtype$dtype: i32 1, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"} : $TensorHandle<Float>
 // CHECK:        [[ADD1:%.*]] = graph_op "Add"(%1 : $TensorHandle<Float>, [[CONST]] : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
 // CHECK:        [[ADD2:%.*]] = graph_op "Add"([[ADD1]] : $TensorHandle<Float>, [[ADD1:%.*]] : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
 // CHECK-NEXT:   return [[ADD2]] : $TensorHandle<Float>
@@ -92,7 +92,7 @@ public func testExitBranch1(i: Int) {
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExitBranch1{{.*}}
 // CHECK: sil private @{{.*}}testExitBranch1{{.*}} : $@callee_owned () -> TensorHandle<Float> {
 // CHECK: bb0:
-// CHECK-NEXT:   [[CONST:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"} : $TensorHandle<Float>
+// CHECK-NEXT:   [[CONST:%.*]] = graph_op "Const"() {dtype$dtype: i32 1, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"} : $TensorHandle<Float>
 // CHECK:        [[RET:%.*]] = graph_op "Add"([[CONST]] : $TensorHandle<Float>, [[CONST]] : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
 // CHECK-NEXT:   return [[RET]] : $TensorHandle<Float>
 // CHECK-NEXT: }
@@ -252,7 +252,7 @@ public func test_while1(maxCount: Int, arg1: Tensor<Float>, arg2: Tensor<Float>)
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_while1{{.*}}
 // CHECK: sil private @{{.*}}test_while1{{.*}}
 // CHECK: bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Float>, %2 : @unowned $TensorHandle<Builtin.Int1>, %3 : @unowned $TensorHandle<Builtin.Int64>):
-// CHECK-NEXT: graph_op "Const"() {dtype: $Builtin.Int64, value$tensor: i64 0
+// CHECK-NEXT: graph_op "Const"() {dtype$dtype: i32 9, value$tensor: i64 0
 // CHECK:      graph_op "Add"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>
 // CHECK-NEXT: graph_op "tf_tensor_to_i1"(
 // CHECK-NEXT: cond_br {{.*}}, bb2, bb1
@@ -294,7 +294,7 @@ public func scalar_manipulation(a : Float) -> Tensor<Float> {
 // CHECK: sil private @{{.*}}scalar_manipulation{{.*}} : $@callee_owned (TensorHandle<Builtin.FPIEEE32>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : @unowned $TensorHandle<Builtin.FPIEEE32>):
 // CHECK-NEXT:  %1 = unchecked_ref_cast %0 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
-// CHECK-NEXT:  [[CONST:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"} : $TensorHandle<Float>
+// CHECK-NEXT:  [[CONST:%.*]] = graph_op "Const"() {dtype$dtype: i32 1, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"} : $TensorHandle<Float>
 // CHECK:       graph_op "Add"(%1 : $TensorHandle<Float>, [[CONST]] : $TensorHandle<Float>) {{.*}} : $TensorHandle<Float>
 // CHECK:       graph_op "tfc.SendToHost
 // CHECK-NEXT:  graph_op "Const"()
@@ -378,7 +378,8 @@ public func testResourceAndVariants() {
   //     .Attr("output_shapes: list(shape) >= 1")
   let dataset: VariantHandle =
     // expected-error @+1 {{op named 'TensorDataSet' is not registered in TensorFlow}}
-    #tfop("TensorDataSet", values, Toutput_types: [Float.self],
+    #tfop("TensorDataSet", values,
+          Toutput_types$dtype: [Float.tensorFlowDataType],
           output_shapes: [TensorShape(1)])
 
   // REGISTER_OP("Iterator")
@@ -390,7 +391,7 @@ public func testResourceAndVariants() {
   //     .SetShapeFn(shape_inference::ScalarShape);
   let iterator: ResourceHandle =
     #tfop("Iterator", shared_name: "foo", container: "bar",
-          output_types: [Float.self], output_shapes: [TensorShape(1)])
+          output_types$dtype: [Float.tensorFlowDataType], output_shapes: [TensorShape(1)])
 
   // REGISTER_OP("MakeIterator")
   //     .Input("dataset: variant")
@@ -400,7 +401,7 @@ public func testResourceAndVariants() {
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testResourceAndVariantsyyF
-// CHECK:  [[VALUES:%.*]] = graph_op "Const"() {dtype: $Float, value$tensor: [$Float: (f32 0x3F800000 /* 1 */), (f32 0x40000000 /* 2 */),
+// CHECK:  [[VALUES:%.*]] = graph_op "Const"() {dtype$dtype: i32 1, value$tensor: [$Float: (f32 0x3F800000 /* 1 */), (f32 0x40000000 /* 2 */),
 // CHECK:  [[DATASET:%.*]] = graph_op "TensorDataSet"([[VALUES]] : $TensorHandle<Float>
 // CHECK:  [[ITERATOR:%.*]] = graph_op "Iterator"()
 // CHECK:  graph_op "MakeIterator"([[DATASET]] : $VariantHandle, [[ITERATOR]] : $ResourceHandle) {{.*}}
@@ -409,25 +410,24 @@ public func testResourceAndVariants() {
 
 public func testStringHandle() {
   let str: TensorHandle<String> = #tfop(
-    "Const", dtype: String.self, value$tensor: "foo"
+    "Const", dtype$dtype: String.tensorFlowDataType, value$tensor: "foo"
   )
   let _: TensorHandle<String> = #tfop(
     "Substr", str, Tensor<Int32>(0), Tensor<Int32>(1)
   )
   let _: TensorHandle<String> = #tfop(
-    "Const", dtype:
-    String.self,
+    "Const", dtype$dtype: String.tensorFlowDataType,
     value$tensor: ["foo", "bar"],
     shape$shape: TensorShape(2)
   )
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testStringHandle
-// CHECK: [[STR:%.*]] = graph_op "Const"() {dtype: $String, value$tensor: "foo", __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<String>
-// CHECK: [[POS:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: i32 0, __device: "ALL_DEVICES"} : $TensorHandle<Int32>
-// CHECK: [[LEN:%.*]] = graph_op "Const"() {dtype: $Int32, value$tensor: i32 1, __device: "ALL_DEVICES"} : $TensorHandle<Int32>
+// CHECK: [[STR:%.*]] = graph_op "Const"() {dtype$dtype: i32 7, value$tensor: "foo", __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<String>
+// CHECK: [[POS:%.*]] = graph_op "Const"() {dtype$dtype: i32 3, value$tensor: i32 0, __device: "ALL_DEVICES"} : $TensorHandle<Int32>
+// CHECK: [[LEN:%.*]] = graph_op "Const"() {dtype$dtype: i32 3, value$tensor: i32 1, __device: "ALL_DEVICES"} : $TensorHandle<Int32>
 // CHECK: graph_op "Substr"([[STR]] : $TensorHandle<String>, [[POS]] : $TensorHandle<Int32>, [[LEN]] : $TensorHandle<Int32>) {__device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<String>
-// CHECK: graph_op "Const"() {dtype: $String, value$tensor: [$String: "foo", "bar"], shape$shape: [$Int32: (i32 2)], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<String>
+// CHECK: graph_op "Const"() {dtype$dtype: i32 7, value$tensor: [$String: "foo", "bar"], shape$shape: [$Int32: (i32 2)], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<String>
 
 
 // b/76117368
@@ -518,21 +518,21 @@ public func test77437755(_ hiddenSize: Float) {
 public func graphFuncReturningOpaqueHandles() -> (ResourceHandle, ResourceHandle) {
   let iterator : ResourceHandle =
     #tfop("Iterator", shared_name: "foo", container: "bar",
-    output_shapes: [TensorShape()], output_types: [Float.self])
+    output_shapes: [TensorShape()], output_types$dtype: [Float.tensorFlowDataType])
   let iterator2 : ResourceHandle =
     #tfop("Iterator", shared_name: "foo", container: "bar",
-    output_shapes: [TensorShape()], output_types: [Float.self])
+    output_shapes: [TensorShape()], output_types$dtype: [Float.tensorFlowDataType])
   return (iterator, iterator2)
 }
 // CHECK-LABEL --- TFPartition Accelerator Result: {{.*}}graphFuncReturningOpaqueHandles{{.*}}
 // CHECK: bb0:
-// CHECK:  [[A:%.*]] = graph_op "Iterator"() {shared_name: "foo", container: "bar", output_shapes: [$TensorShape: ([$Int32: ])], output_types: [$Float.Type: $Float], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $ResourceHandle 
-// CHECK:  [[B:%.*]] = graph_op "Iterator"() {shared_name: "foo", container: "bar", output_shapes: [$TensorShape: ([$Int32: ])], output_types: [$Float.Type: $Float], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $ResourceHandle 
+// CHECK:  [[A:%.*]] = graph_op "Iterator"() {shared_name: "foo", container: "bar", output_shapes: [$TensorShape: ([$Int32: ])], output_types$dtype: [$TensorDataType: (((i32 1)))], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $ResourceHandle 
+// CHECK:  [[B:%.*]] = graph_op "Iterator"() {shared_name: "foo", container: "bar", output_shapes: [$TensorShape: ([$Int32: ])], output_types$dtype: [$TensorDataType: (((i32 1)))], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $ResourceHandle 
 // CHECK:  [[C:%.*]] = tuple ([[A]] : $ResourceHandle, [[B]] : $ResourceHandle)
 // CHECK:  return [[C]] : $(ResourceHandle, ResourceHandle)   
 
 // Allow Any.Type as a type list member for empty type lists.
 public func testSR8570() {
-  () = #tfop("FooOp", Targuments: [] as [Any.Type]) // expected-error {{op named 'FooOp' is not registered in TensorFlow}}
+  () = #tfop("FooOp", Targuments$dtype: [] as [UInt32]) // expected-error {{op named 'FooOp' is not registered in TensorFlow}}
 }
 

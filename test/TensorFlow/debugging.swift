@@ -21,14 +21,14 @@ public func noCopyForOpaqueHandles() {
   let values = Tensor<Float>([1.0])
   let dataset: VariantHandle =
     #tfop("TensorSliceDataset", [values],
-          Toutput_types: [Float.self], output_shapes: [TensorShape()])
+          Toutput_types$dtype: [Float.tensorFlowDataType], output_shapes: [TensorShape()])
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}basicDebugValues
 // CHECK: @{{.*}}basicDebugValues{{.*}}.tf
 // CHECK: [[ONE:%.*]] = graph_op "Const"
 // CHECK: [[ADD_RESULT:%.*]] = graph_op "Add"
-// CHECK: graph_op "Square"([[ADD_RESULT]] : $TensorHandle<Float>) {T: $Float, __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
+// CHECK: graph_op "Square"([[ADD_RESULT]] : $TensorHandle<Float>) {T$dtype: i32 1, __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
 
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}debugValuesInLoop

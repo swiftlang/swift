@@ -77,7 +77,7 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
     // Initialize tensor and copy data.
     // TF_AllocateTensor() never returns nil.
     let cTensor = TF_AllocateTensor(
-      Scalar.cDataType,
+      Scalar.tensorFlowDataType.cDataType,
       shape.map(Int64.init),
       Int32(shape.count),
       byteCount
@@ -114,7 +114,8 @@ extension TensorHandle : TensorSendableReceivable {
     if _RuntimeConfig.usesTFEagerAPI {
       let context = _ExecutionContext.global
       let cTensorHandle = TFE_DequeueNamedTensorFromCtx(
-        context.eagerContext, Int32(tensorID), Scalar.cDataType, status)
+        context.eagerContext, Int32(tensorID),
+        Scalar.tensorFlowDataType.cDataType, status)
       checkOk(status)
       tensorHandle = TensorHandle<Scalar>(owning: cTensorHandle!)
     } else {
@@ -163,7 +164,8 @@ extension TensorHandle : TensorSendableReceivable {
   @inlinable
   static func scalar(_ scalar: Scalar) -> TensorHandle<Scalar> {
     debugLog("Creating a tensor from scalar \(scalar).")
-    let cTensorHandle = _TFCCreateCTensorHandle(scalar, Scalar.cDataType)
+    let cTensorHandle = _TFCCreateCTensorHandle(
+        scalar, Scalar.tensorFlowDataType.cDataType)
     return TensorHandle<Scalar>(owning: cTensorHandle)
   }
 }

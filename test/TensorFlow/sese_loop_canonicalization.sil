@@ -34,8 +34,8 @@ public func loopTest(breakCount:Int32) -> Int32 {
 //-- Preheader sets up the undefs, exit index, and stayInLoop flag.
 // CHECK: [[PHDR]](%0 : $Builtin.Int32):
 // CHECK: [[CONST_ONE:%.*]] =  integer_literal $Builtin.Int32, 1
-// CHECK: [[PHDR_EXIT:%.*]] = graph_op "Const"() {dtype: $Builtin.Int32, value$tensor: i32 0, __device: "ALL_DEVICES"}
-// CHECK: [[PHDR_FLAG:%.*]] = graph_op "Const"() {dtype: $Builtin.Int1, value$tensor: i1 -1, __device: "ALL_DEVICES"}
+// CHECK: [[PHDR_EXIT:%.*]] = graph_op "Const"() {dtype$dtype: i32 3, value$tensor: i32 0, __device: "ALL_DEVICES"}
+// CHECK: [[PHDR_FLAG:%.*]] = graph_op "Const"() {dtype$dtype: i32 10, value$tensor: i1 -1, __device: "ALL_DEVICES"}
 // CHECK: br [[HDR]]([[A:%.*]] : $Builtin.Int32, [[A]] : $Builtin.Int32, [[A]] : $Builtin.Int32, [[PHDR_EXIT]] : $TensorHandle<Builtin.Int32>, [[PHDR_FLAG]] : $TensorHandle<Builtin.Int1>)
 
 // Original header
@@ -45,8 +45,8 @@ public func loopTest(breakCount:Int32) -> Int32 {
 
 //- Sets up index to 1 and flag to false on the exit branch of the original header to latch.
 // CHECK: [[ORIG_EXIT]]:
-// CHECK:   [[LOCAL_EXIT_INDEX:%.*]] = graph_op "Const"() {dtype: $Builtin.Int32, value$tensor: i32 1, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int32>
-// CHECK:   [[LOCAL_STAY_FLAG:%.*]] = graph_op "Const"() {dtype: $Builtin.Int1, value$tensor: i1 0, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int1>
+// CHECK:   [[LOCAL_EXIT_INDEX:%.*]] = graph_op "Const"() {dtype$dtype: i32 3, value$tensor: i32 1, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int32>
+// CHECK:   [[LOCAL_STAY_FLAG:%.*]] = graph_op "Const"() {dtype$dtype: i32 10, value$tensor: i1 0, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int1>
 // CHECK:  br [[LATCH]]([[SUM_AT_HDR:%.*]] : $Builtin.Int32, [[COUNT_AT_HDR:%.*]] : $Builtin.Int32, [[SUM_AT_HDR]] : $Builtin.Int32, [[LOCAL_EXIT_INDEX]] : $TensorHandle<Builtin.Int32>, [[LOCAL_STAY_FLAG]] : $TensorHandle<Builtin.Int1>)
 
 // CHECK: [[BRK_COND]]:
@@ -56,14 +56,14 @@ public func loopTest(breakCount:Int32) -> Int32 {
 
 //- Sets up index to 0 and flag to true on the false branch of the if with break to latch.
 // CHECK: [[BRK_FALSE]]:
-// CHECK: [[LOCAL_EXIT_INDEX:%.*]] = graph_op "Const"() {dtype: $Builtin.Int32, value$tensor: i32 0, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int32>
-// CHECK: [[LOCAL_STAY_FLAG:%.*]] = graph_op "Const"() {dtype: $Builtin.Int1, value$tensor: i1 -1, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int1>
+// CHECK: [[LOCAL_EXIT_INDEX:%.*]] = graph_op "Const"() {dtype$dtype: i32 3, value$tensor: i32 0, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int32>
+// CHECK: [[LOCAL_STAY_FLAG:%.*]] = graph_op "Const"() {dtype$dtype: i32 10, value$tensor: i1 -1, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int1>
 // CHECK:  br [[LATCH]]([[SUM_ESCAPING]] : $Builtin.Int32, [[COUNT_ESCAPING]] : $Builtin.Int32, [[SUM_ESCAPING_AT_HDR:%.*]] : $Builtin.Int32, [[LOCAL_EXIT_INDEX]] : $TensorHandle<Builtin.Int32>, [[LOCAL_STAY_FLAG]] : $TensorHandle<Builtin.Int1>)
 
 //- Sets up index to 1 and flag to false on the true branch of the if with break to latch.
 // CHECK: [[BRK_TRUE]]:
-// CHECK:  [[LOCAL_EXIT_INDEX:%.*]] = graph_op "Const"() {dtype: $Builtin.Int32, value$tensor: i32 1, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int32>
-// CHECK:  [[LOCAL_STAY_FLAG:%.*]] = graph_op "Const"() {dtype: $Builtin.Int1, value$tensor: i1 0, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int1>
+// CHECK:  [[LOCAL_EXIT_INDEX:%.*]] = graph_op "Const"() {dtype$dtype: i32 3, value$tensor: i32 1, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int32>
+// CHECK:  [[LOCAL_STAY_FLAG:%.*]] = graph_op "Const"() {dtype$dtype: i32 10, value$tensor: i1 0, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int1>
 // CHECK: br [[LATCH]]([[SUM_AT_HDR]] : $Builtin.Int32, [[COUNT_AT_HDR]] : $Builtin.Int32, [[SUM_ESCAPING]] : $Builtin.Int32, [[LOCAL_EXIT_INDEX]] : $TensorHandle<Builtin.Int32>, [[LOCAL_STAY_FLAG]] : $TensorHandle<Builtin.Int1>)
 
 //-- New Header simply checks flag

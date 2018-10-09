@@ -2199,18 +2199,19 @@ static bool unpackTensorAggregates(
   return recurse(unwrapAggregateInstructions(rootAggregate, unwrapCache));
 }
 
-/// Given a type, recursively collect all innermost element types if it's an
-/// aggregate of TensorHandle's or dtypes.
+/// Given a type that is an aggregate of TF types, recursively collect all
+/// innermost TF types as SymbolicValue integers representing TF_DataTypes.
 static bool collectInnermostTensorFlowDTypes(
     CanType type, SmallVectorImpl<SymbolicValue> &result) {
+
   if (isTensorFlowDType(type)) {
-    result.push_back(SymbolicValue::getMetatype(type));
+    result.push_back(convertSwiftTypeToConstantTFDataType(type));
     return true;
   }
   if (tf::isTensorHandle(type)) {
     auto eltType = getTensorHandleElementType(type)->getCanonicalType();
     assert(tf::isTensorFlowDType(eltType));
-    result.push_back(SymbolicValue::getMetatype(eltType));
+    result.push_back(convertSwiftTypeToConstantTFDataType(eltType));
     return true;
   }
   if (auto tupleTy = type->getAs<TupleType>())
@@ -2443,12 +2444,26 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
         diagnoseInvalidAttr("cannot be an enum, struct, or tuple");
         return true;
 
+      case SymbolicValue::Metatype:
+        diagnoseInvalidAttr("cannot be a metatype");
+        return true;
+
       case SymbolicValue::Integer:
       case SymbolicValue::Float:
-      case SymbolicValue::Metatype:
       case SymbolicValue::String:
       case SymbolicValue::Function:
+        break;
+
       case SymbolicValue::Array:
+        // Best effort check for common problems.
+        CanType eltTy;
+        for (auto elt : constValue.getArrayValue(eltTy)) {
+          elt = elt.lookThroughSingleElementAggregates();
+          if (elt.getKind() == SymbolicValue::Metatype) {
+            diagnoseInvalidAttr("cannot be an array of metatypes");
+            return true;
+          }
+        }
         break;
       }
       return false;
@@ -2509,15 +2524,14 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
                                             dtypes))
         return diagnoseInvalidAttr("requires a TensorFlow value or an "
                                    "aggregate of TensorFlow values");
-      // Drop '$typeList' from the attribute name.
+      // Change "$typeList" to "$dtype".
       currentAttr.name = context.getIdentifier(
-          std::get<0>(argumentNameAndLowering));
-      // Replace the single metatype with a list of metatypes each
-      // representing a dtype.
-      auto *dtypeProto =
-          context.getProtocol(KnownProtocolKind::AccelerableByTensorFlow);
+          (std::get<0>(argumentNameAndLowering) + "$dtype").str());
+      // Replace the single metatype with a list of UInt32s each representing a
+      // TF_DataType.
       currentAttr.value = SymbolicValue::getArray(
-          dtypes, dtypeProto->getInterfaceType()->getCanonicalType(),
+          dtypes,
+          context.getUInt32Decl()->getDeclaredType()->getCanonicalType(),
           context.getAllocator());
       break;
     }
@@ -2550,7 +2564,7 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
                                                   context.getAllocator());
       break;
     }
-    case GraphOperationInfo::ArgumentLowering::TensorAttribute:
+    case GraphOperationInfo::ArgumentLowering::TensorAttribute: {
       if (constValue.getKind() == SymbolicValue::Integer ||
           constValue.getKind() == SymbolicValue::Float   ||
           constValue.getKind() == SymbolicValue::String)
@@ -2627,6 +2641,27 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
                                    " floating point, string, or array thereof");
       }
       break;
+    }
+    case GraphOperationInfo::ArgumentLowering::TFDataTypeAttribute: {
+      // Integers are ok.
+      if (constValue.getKind() == SymbolicValue::Integer)
+        break;
+
+      // Arrays of integers are ok.
+      if (constValue.getKind() == SymbolicValue::Array) {
+        CanType eltTy;
+        for (auto elt : constValue.getArrayValue(eltTy)) {
+          elt = elt.lookThroughSingleElementAggregates();
+          if (elt.getKind() != SymbolicValue::Integer)
+            return diagnoseInvalidAttr("requires an integer or array of "
+                                       "integers");
+        }
+        break;
+      }
+
+      // Everything else is bad.
+      return diagnoseInvalidAttr("requires an integer or array of integers");
+    }
     }
   }
 

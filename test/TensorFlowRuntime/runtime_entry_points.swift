@@ -11,7 +11,7 @@ var RuntimeEntryPointTests = TestSuite("RuntimeEntryPoint")
 
 RuntimeEntryPointTests.testCPUOrGPU("RoundTrip_CTensorHandle_AnyTensorHandle") {
   let zero: TensorHandle<Float> =
-    #tfop("Const", dtype: Float.self, value$tensor: 0.0)
+    #tfop("Const", dtype$dtype: Float.tensorFlowDataType, value$tensor: 0.0)
   var cHandle = _TFCGetCTensorHandleFromSwift(zero as _AnyTensorHandle)
   let status = TF_NewStatus()
   // We must do a copy, i.e. a retain on the tensor handle, to make sure it won't

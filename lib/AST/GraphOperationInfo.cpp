@@ -110,6 +110,8 @@ GraphOperationInfo::getArgumentLoweringSuffix(ArgumentLowering lowering) {
     return "$unknownShapeList";
   case ArgumentLowering::TypeListAttribute:
     return "$typeList";
+  case ArgumentLowering::TFDataTypeAttribute:
+    return "$dtype";
   case ArgumentLowering::Out:
     return "$out";
   }
@@ -136,6 +138,7 @@ GraphOperationInfo::decodeArgumentName(StringRef Name) {
           .Case("shape", ArgumentLowering::ShapeAttribute)
           .Case("unknownShapeList", ArgumentLowering::UnknownShapeListAttribute)
           .Case("typeList", ArgumentLowering::TypeListAttribute)
+          .Case("dtype", ArgumentLowering::TFDataTypeAttribute)
           .Case("out", ArgumentLowering::Out)
           .Default(None);
     assert(loweringOpt && "invalid attribute modifier");
@@ -192,4 +195,23 @@ int tf::decodeShapeAttr(const ASTContext &ctx, SymbolicValue attr,
     result.push_back(elt.getIntegerValue().sextOrTrunc(64).getLimitedValue());
   }
   return arrayValue.size();
+}
+
+/// Return the TF_DataType value represented by `value`. `value` must be a
+/// valid tensorflow type ID.
+unsigned tf::getTFDataType(SymbolicValue value) {
+  value = value.lookThroughSingleElementAggregates();
+  assert(value.getKind() == SymbolicValue::Integer);
+  assert(value.getIntegerValue().isIntN(32));
+  unsigned tfType = value.getIntegerValue().getLimitedValue();
+  assert(tfType > 0 && "0 is invalid TF_DataType");
+  return tfType;
+}
+
+/// Return a constant integer representing the TF_DataType value for the given
+/// Swift type. `type` must be a valid TensorFlow type.
+SymbolicValue tf::convertSwiftTypeToConstantTFDataType(Type type) {
+  unsigned tfType = convertSwiftTypeToTF(type);
+  assert(tfType != 0);
+  return SymbolicValue::getInteger(tfType, 32);
 }
