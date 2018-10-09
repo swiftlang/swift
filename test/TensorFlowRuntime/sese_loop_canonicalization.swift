@@ -89,6 +89,30 @@ ControlFlowTests.testAllBackends("sumOfProductsWithBound") {
   // Effectively no bound as natSum(3) * natSum(3) is 36.
   expectNearlyEqualWithScalarTensor(36, sumOfProductsWithBound(3, 3, 100))
 }
+
+
+func doWhileLoopWithBreak(_ breakIndex:Int32) -> Tensor<Int32> {
+  var i: Int32 = 1
+  var sum = Tensor<Int32>(0)
+  let maxCount: Int32 = 100
+	repeat {
+    sum += i
+    if (i == breakIndex) {
+      break
+    }
+    i += 1
+  } while i <= maxCount
+  return sum
+}
+
+ControlFlowTests.testAllBackends("doWhileLoopWithBreak") {
+  expectEqualWithScalarTensor(3, natSumWithBreak(2))
+  expectEqualWithScalarTensor(55, natSumWithBreak(10))
+  expectEqualWithScalarTensor(5050, natSumWithBreak(-300))
+  expectEqualWithScalarTensor(5050, natSumWithBreak(100))
+  expectEqualWithScalarTensor(5050, natSumWithBreak(200))
+}
+
 #endif // CUDA
 
 runAllTests()
