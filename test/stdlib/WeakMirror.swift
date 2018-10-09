@@ -99,6 +99,24 @@ mirrors.test("struct/StructHasNativeWeakReference") {
   print(extractedChild)
 }
 
+// SR-8878: Using Mirror to access a weak reference results in object
+// being retained indefinitely
+mirrors.test("class/NativeSwiftClassHasNativeWeakReferenceNoLeak") {
+  weak var verifier: AnyObject?
+  do {
+    let parent = NativeSwiftClassHasWeak(x: 1010)
+    let child = NativeSwiftClass(x: 2020)
+    verifier = child
+    parent.weakProperty = child
+    let mirror = Mirror(reflecting: parent)
+    let children = Array(mirror.children)
+    let extractedChild = children[0].1 as! NativeSwiftClass
+    expectNotNil(extractedChild)
+    expectNotNil(verifier)
+  }
+  expectNil(verifier)
+}
+
 #if _runtime(_ObjC)
 
 import Foundation
