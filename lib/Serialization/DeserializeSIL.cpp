@@ -628,13 +628,11 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     uint64_t primalNameId;
     uint64_t adjointNameId;
-    bool primalIsSynthesized;
     bool adjointIsSynthesized;
     uint64_t source;
     ArrayRef<uint64_t> parameters;
     SILReverseDifferentiableAttrLayout::readRecord(scratch, primalNameId,
                                                    adjointNameId,
-                                                   primalIsSynthesized,
                                                    adjointIsSynthesized,
                                                    source, parameters);
 
@@ -647,7 +645,6 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     auto *attr = SILReverseDifferentiableAttr::create(SILMod, indices,
                                                       primalName, adjointName,
-                                                      primalIsSynthesized,
                                                       adjointIsSynthesized);
     fn->addReverseDifferentiableAttr(attr);
   }

@@ -108,7 +108,7 @@ static void createEntryArguments(SILFunction *f) {
 /// Looks up a function in the current module. If it exists, returns it.
 /// Otherwise, attempt to link it from imported modules. Returns null if such
 /// function name does not exist.
-static SILFunction *lookupOrLinkFunction(StringRef name, SILModule &module) {
+static SILFunction *lookUpOrLinkFunction(StringRef name, SILModule &module) {
   assert(!name.empty());
   if (auto *localFn = module.lookUpFunction(name))
     return localFn;
@@ -237,9 +237,9 @@ static FuncDecl *findAssociativeOperatorDeclInProtocol(DeclName operatorName,
   assert(operatorName.isOperator());
   // Find the operator requirement in the `VectorNumeric` protocol
   // declaration and cache it.
-  auto plusLookup = protocol->lookupDirect(operatorName);
+  auto plusLookUp = protocol->lookupDirect(operatorName);
   // Find the `+` with type siguature `(Self, Self) -> Self`.
-  for (auto *decl : plusLookup) {
+  for (auto *decl : plusLookUp) {
     auto *fd = dyn_cast<FuncDecl>(decl);
     if (!fd || !fd->isBinaryOperator() || !fd->isStatic())
       continue;
@@ -602,7 +602,7 @@ public:
 
   /// Finds the primal value decl in the primal value struct for an `apply` in
   /// the original function.
-  VarDecl *lookupNestedStaticPrimalValueDecl(ApplyInst *inst) {
+  VarDecl *lookUpNestedStaticPrimalValueDecl(ApplyInst *inst) {
     auto lookup = nestedStaticPrimalValueMap.find(inst);
     return lookup == nestedStaticPrimalValueMap.end() ? nullptr
                                                       : lookup->getSecond();
@@ -692,9 +692,9 @@ protected:
                                DifferentiationInvoker invoker)
       : original(original), attr(attr), invoker(invoker) {
     if (attr->hasPrimal())
-      primal = lookupOrLinkFunction(attr->getPrimalName(), module);
+      primal = lookUpOrLinkFunction(attr->getPrimalName(), module);
     if (attr->hasAdjoint())
-      adjoint = lookupOrLinkFunction(attr->getAdjointName(), module);
+      adjoint = lookUpOrLinkFunction(attr->getAdjointName(), module);
   }
 
 public:
@@ -723,13 +723,13 @@ public:
   void setPrimal(SILFunction *fn) {
     assert(fn);
     primal = fn;
-    attr->setPrimalName(fn->getName(), /*synthesized*/true);
+    attr->setPrimalName(fn->getName());
   }
 
   void setAdjoint(SILFunction *fn) {
     assert(fn);
     adjoint = fn;
-    attr->setAdjointName(fn->getName(), /*synthesized*/true);
+    attr->setAdjointName(fn->getName(), /*synthesized*/ true);
   }
 
   DenseMap<ApplyInst *, DifferentiationTask *> &getAssociatedTasks() {
@@ -826,7 +826,7 @@ enum class PrimalValueKind {
   TapeCheckpoint
 };
 
-using GradientLookupKey = std::pair<SILFunction *, SILReverseAutoDiffConfig>;
+using GradientLookUpKey = std::pair<SILFunction *, SILReverseAutoDiffConfig>;
 
 //===----------------------------------------------------------------------===//
 // ADContext - Per-module contextual information for the Differentiation pass.
@@ -850,9 +850,9 @@ private:
   ///
   /// NOTE: The parameter index array is hashed by reference, which is expected
   /// to point to [reverse_differentiable wrt ...]'s trailing index storage.
-  DenseMap<GradientLookupKey, SILFunction *> gradientMap;
+  DenseMap<GradientLookUpKey, SILFunction *> gradientMap;
   /// Canonical gradients to be filled.
-  SmallVector<std::pair<GradientLookupKey, SILFunction *>, 32>
+  SmallVector<std::pair<GradientLookUpKey, SILFunction *>, 32>
       canonicalGradients;
 
   /// Queue of differentiation tasks.
@@ -895,7 +895,7 @@ public:
     return differentiationTasks;
   }
 
-  ArrayRef<std::pair<GradientLookupKey, SILFunction *>>
+  ArrayRef<std::pair<GradientLookUpKey, SILFunction *>>
   getCanonicalGradients() const {
     return canonicalGradients;
   }
@@ -948,20 +948,19 @@ public:
   /// parameters as the function.
   StructDecl *createPrimalValueStruct(const DifferentiationTask *task);
 
-  void insertGradient(const GradientLookupKey &key, SILFunction *gradient,
-                      bool canonical) {
+  void insertGradient(const GradientLookUpKey &key, SILFunction *gradient) {
     gradientMap.insert({key, gradient});
-    if (canonical)
+    if (key.second.isMaster())
       canonicalGradients.push_back({key, gradient});
   }
 
-  SILFunction *lookupGradient(const GradientLookupKey &key) const {
+  SILFunction *lookUpGradient(const GradientLookUpKey &key) const {
     auto lookup = gradientMap.find(key);
     return lookup == gradientMap.end() ? nullptr : lookup->getSecond();
   }
 
-  SILFunction *lookupCanonicalGradient(const DifferentiationTask *task) const {
-    return lookupGradient({task->original, task->getMasterConfig()});
+  SILFunction *lookUpCanonicalGradient(const DifferentiationTask *task) const {
+    return lookUpGradient({task->original, task->getMasterConfig()});
   }
 
   /// Finds the `[reverse_differentiable]` attribute on the specified original
@@ -971,7 +970,7 @@ public:
   /// TODO: Currently we are doing a O(n) lookup. This could be improved by
   /// hashing on SILFunction's side or maintaining a dictionary in ADContext.
   /// In any case, this is not performance-critical.
-  SILReverseDifferentiableAttr *lookupReverseDifferentiableAttr(
+  SILReverseDifferentiableAttr *lookUpReverseDifferentiableAttr(
       SILFunction *original, const SILReverseAutoDiffIndices &indices) const {
     for (auto *attr : original->getReverseDifferentiableAttrs())
       if (attr->getIndices() == indices)
@@ -981,7 +980,7 @@ public:
 
   SILReverseDifferentiableAttr *createReverseDifferentiableAttr(
       SILFunction *original, const SILReverseAutoDiffIndices &indices) const {
-    assert(!lookupReverseDifferentiableAttr(original, indices));
+    assert(!lookUpReverseDifferentiableAttr(original, indices));
     auto *attr =
         SILReverseDifferentiableAttr::create(getModule(), indices,
                                              /*primalName*/ StringRef(),
@@ -994,7 +993,7 @@ public:
   /// original function corresponding to the specified parameter indices.
   SILReverseDifferentiableAttr *getOrCreateReverseDifferentiableAttr(
       SILFunction *original, const SILReverseAutoDiffIndices &indices) {
-    if (auto *attr = lookupReverseDifferentiableAttr(original, indices))
+    if (auto *attr = lookUpReverseDifferentiableAttr(original, indices))
       return attr;
     return createReverseDifferentiableAttr(original, indices);
   }
@@ -1002,7 +1001,7 @@ public:
   /// Finds a differentiation task on a function such that the task produces
   /// adjoints for the specified indices.
   DifferentiationTask *
-  lookupDifferentiationTask(SILFunction *original,
+  lookUpDifferentiationTask(SILFunction *original,
                             const SILReverseAutoDiffIndices &indices) {
     auto existing = enqueuedTaskIndices.find({original, indices});
     if (existing == enqueuedTaskIndices.end())
@@ -1016,22 +1015,23 @@ public:
   /// the parameter indices in `indices`, and which corresponds to a
   /// non-synthesized adjoint function.
   DifferentiationTask *
-  lookupMinimalDifferentiationTask(SILFunction *original,
+  lookUpMinimalDifferentiationTask(SILFunction *original,
                                    const SILReverseAutoDiffIndices &indices) {
-    const llvm::SmallBitVector *supersetParamIndices;
+    auto supersetParamIndices = llvm::SmallBitVector();
     const auto &indexSet = indices.parameters;
-    for (auto *rda : original->getReverseDifferentiableAttrs())
-      auto rdaIndexSet = rda->getIndices().parameters;
+    for (auto *rda : original->getReverseDifferentiableAttrs()) {
+      const auto &rdaIndexSet = rda->getIndices().parameters;
       // If all indices in indexSet are in rdaIndexSet, and it has fewer
       // indices than our current candidate and a non-synthesized adjoint,
       // rda is our new candidate.
       if (!indexSet.test(rdaIndexSet) && // all indexSet indices in rdaIndexSet
           (supersetParamIndices.empty() || // fewer parameters than before
            rdaIndexSet.count() < supersetParamIndices.count()) &&
-          (indexSet == rdaIndexSet || !rda->adjointIsSynthesized()))
-        supersetParamIndices = &rda->getIndices().parameters;
+          (indexSet == rdaIndexSet || !rda->isAdjointSynthesized()))
+        supersetParamIndices = rda->getIndices().parameters;
+    }
     auto existing = enqueuedTaskIndices.find(
-        {original, {indices.source, *supersetParamIndices}});
+        {original, {indices.source, supersetParamIndices}});
     if (existing == enqueuedTaskIndices.end())
       return nullptr;
     return differentiationTasks[existing->getSecond()].get();
@@ -1048,7 +1048,7 @@ public:
                               const SILReverseAutoDiffIndices &indices,
                               DifferentiationInvoker invoker) {
     // Make sure this pair of original and indices is unique.
-    assert(!lookupDifferentiationTask(original, indices));
+    assert(!lookUpDifferentiationTask(original, indices));
     // Make sure this function either has a body or has a
     // `[reverse_differentiable]` attribute that is a superset of all the
     if (original->isExternalDeclaration()) {
@@ -1068,10 +1068,10 @@ public:
   }
 
   DifferentiationTask *
-  lookupOrRegisterDifferentiationTask(SILFunction *original,
+  lookUpOrRegisterDifferentiationTask(SILFunction *original,
                                       const SILReverseAutoDiffIndices &indices,
                                       DifferentiationInvoker invoker) {
-    if (auto *existingTask = lookupMinimalDifferentiationTask(original, indices))
+    if (auto *existingTask = lookUpMinimalDifferentiationTask(original, indices))
       return existingTask;
     return registerDifferentiationTask(original, indices, invoker);
   }
@@ -1603,13 +1603,13 @@ static void convertIntToIndirectExpressible(intmax_t scalar,
   // Step 1. Initialize a value of type `<target type>.IntegerLiteralType` from
   // the given value.
   DeclName intLitTypeName(astCtx.Id_IntegerLiteralType);
-  SmallVector<ValueDecl *, 1> intLitTypeLookupResults;
+  SmallVector<ValueDecl *, 1> intLitTypeLookUpResults;
   targetTypeDecl->lookupQualified(targetTy, intLitTypeName, NL_OnlyTypes,
                                   /*typeResolver*/ nullptr,
-                                  intLitTypeLookupResults);
-  assert(intLitTypeLookupResults.size() == 1);
+                                  intLitTypeLookUpResults);
+  assert(intLitTypeLookUpResults.size() == 1);
   auto intLitTypeAliasDecl =
-      cast<TypeAliasDecl>(intLitTypeLookupResults[0]);
+      cast<TypeAliasDecl>(intLitTypeLookUpResults[0]);
   // Now we have the IntegerLiteralType type.
   auto intLitTy = intLitTypeAliasDecl
       ->getUnderlyingTypeLoc().getType()->getCanonicalType();
@@ -1678,7 +1678,7 @@ static void convertIntToIndirectExpressible(intmax_t scalar,
   auto *parentModule = targetTypeDecl->getModuleContext();
   auto eilConf = *parentModule->lookupConformance(targetTy, eilProto);
   ProtocolConformanceRef eilConfRef(eilConf);
-  // context.lookupOrLinkWitnessTable(eilConfRef);
+  // context.lookUpOrLinkWitnessTable(eilConfRef);
   // %6 = witness_method ...
   auto initILFn = builder.createWitnessMethod(loc, targetTy, eilConfRef,
                                               initILDeclRef, initILType);
@@ -1742,9 +1742,9 @@ static void createScalarValueIndirect(intmax_t scalar, CanType type,
     auto &module = context.getModule();
     // Create a scalar value from the specified integer literal.
     DeclName scalarDeclName(astCtx.getIdentifier("ScalarElement"));
-    auto currencyDeclLookupResult =
+    auto currencyDeclLookUpResult =
         targetTypeDecl->lookupDirect(scalarDeclName);
-    auto *scalarElemAlias = cast<TypeAliasDecl>(currencyDeclLookupResult[0]);
+    auto *scalarElemAlias = cast<TypeAliasDecl>(currencyDeclLookUpResult[0]);
     auto scalarTy =
         scalarElemAlias->getDeclaredInterfaceType()->getCanonicalType();
     auto currencySubMap =
@@ -1952,7 +1952,7 @@ public:
 
 protected:
   /// Lazily create a task to synthesize the primal function.
-  SILFunction *lookupPrimalOrScheduleSynthesis(DifferentiationTask *task);
+  SILFunction *lookUpPrimalOrScheduleSynthesis(DifferentiationTask *task);
 
 private:
   /// Creates an empty primal function, updating the primal info in the task.
@@ -2415,7 +2415,7 @@ public:
     }
     auto calleeOriginType = calleeOriginFnRef->getFunctionType();
     // Find or register a differentiation task for this function.
-    auto *newTask = context.lookupOrRegisterDifferentiationTask(
+    auto *newTask = context.lookUpOrRegisterDifferentiationTask(
         calleeOriginFnRef->getReferencedFunction(), indices,
         /*invoker*/ {ai, synthesis.task});
     // Associate the new differentiation task with this `apply` instruction, so
@@ -2425,7 +2425,7 @@ public:
     // then we need to schedule a synthesis item for the primal.
     auto *primalFn = newTask->getPrimal();
     if (!primalFn)
-      primalFn = primalGen.lookupPrimalOrScheduleSynthesis(newTask);
+      primalFn = primalGen.lookUpPrimalOrScheduleSynthesis(newTask);
     // Now that we have the primal, get ready to call it.
     // But before calling it, we need to convert the primal function like how
     // the original function is converted.
@@ -2618,7 +2618,7 @@ PrimalGen::createEmptyPrimal(DifferentiationTask *task) {
 }
 
 SILFunction *
-PrimalGen::lookupPrimalOrScheduleSynthesis(DifferentiationTask *task) {
+PrimalGen::lookUpPrimalOrScheduleSynthesis(DifferentiationTask *task) {
   // If the original function already has a primal, skip this task.
   if (auto *existingPrimal = task->getPrimal())
     return existingPrimal;
@@ -2636,7 +2636,7 @@ PrimalGen::lookupPrimalOrScheduleSynthesis(DifferentiationTask *task) {
 bool PrimalGen::run() {
   // Push everything to the list of primal synthesis items.
   for (auto &task : context.getDifferentiationTasks())
-    lookupPrimalOrScheduleSynthesis(task.get());
+    lookUpPrimalOrScheduleSynthesis(task.get());
   // Process each item until empty.
   while (!worklist.empty()) {
     auto synthesis = worklist.back();
@@ -2684,7 +2684,7 @@ private:
   /// Look up the adjoint function corresponding to this task. If it does not
   /// exist, create an empty adjoint and schedule a synthesis item to be
   /// processed later in AdjointGen.
-  SILFunction *lookupAdjointOrScheduleSynthesis(DifferentiationTask *task);
+  SILFunction *lookUpAdjointOrScheduleSynthesis(DifferentiationTask *task);
 };
 } // end anonymous namespace
 
@@ -2766,7 +2766,7 @@ SILFunction *AdjointGen::createEmptyAdjoint(DifferentiationTask *task) {
 }
 
 SILFunction *
-AdjointGen::lookupAdjointOrScheduleSynthesis(DifferentiationTask *task) {
+AdjointGen::lookUpAdjointOrScheduleSynthesis(DifferentiationTask *task) {
   // If the original function already has an adjoint, skip this task.
   if (auto *existingAdjoint = task->getAdjoint())
     return existingAdjoint;
@@ -2782,7 +2782,7 @@ AdjointGen::lookupAdjointOrScheduleSynthesis(DifferentiationTask *task) {
 bool AdjointGen::run() {
   // Push everything to the worklist.
   for (auto &task : context.getDifferentiationTasks())
-    lookupAdjointOrScheduleSynthesis(task.get());
+    lookUpAdjointOrScheduleSynthesis(task.get());
   // Iterate over the worklist, look up existing adjoint. If an adjoint exists
   // for the task, do nothing. Otherwise, create a function and process it.
   while (!worklist.empty()) {
@@ -3325,7 +3325,7 @@ public:
     else {
       if (nested) {
         auto *applyInst = cast<ApplyInst>(value);
-        field = pi.lookupNestedStaticPrimalValueDecl(applyInst);
+        field = pi.lookUpNestedStaticPrimalValueDecl(applyInst);
       } else {
         field = pi.lookupDirectStaticPrimalValueDecl(value);
       }
@@ -3368,16 +3368,16 @@ public:
   void visitApplyInst(ApplyInst *ai) {
     // Replace a call to the function with a call to its adjoint.
     auto &assocTasks = getDifferentiationTask()->getAssociatedTasks();
-    auto assocTaskLookup = assocTasks.find(ai);
+    auto assocTaskLookUp = assocTasks.find(ai);
     // If no task was found, then this task doesn't need to be differentiated.
-    if (assocTaskLookup == assocTasks.end()) {
+    if (assocTaskLookUp == assocTasks.end()) {
       // Must not be active.
       assert(
           !activityInfo.isActive(ai, getDifferentiationTask()->getIndices()));
       return;
     }
     // When we have a differentiation task, just get the adjoint and call it.
-    auto *otherTask = assocTaskLookup->getSecond();
+    auto *otherTask = assocTaskLookUp->getSecond();
     auto origTy = otherTask->getOriginal()->getLoweredFunctionType();
     SILFunctionConventions origConvs(origTy, getModule());
     auto *adjoint = otherTask->getAdjoint();
@@ -4101,7 +4101,7 @@ static ReverseAutoDiffExpr *findDifferentialOperator(GradientInst *inst) {
 // Retrieve or create an empty gradient function based on a `gradient`
 // instruction and replace all users of the `gradient` instruction with the
 // gradient function. Returns the gradient function.
-static SILFunction *lookupOrSynthesizeGradient(ADContext &context,
+static SILFunction *lookUpOrSynthesizeGradient(ADContext &context,
                                                GradientInst *gradInst,
                                                SILFunction *original) {
   auto &module = original->getModule();
@@ -4136,20 +4136,19 @@ static SILFunction *lookupOrSynthesizeGradient(ADContext &context,
   auto masterConfig = config.getWithCanonicalOptions();
   // If the canonical gradient already exists, we'll simply use it. No
   // differentiation is needed.
-  if (auto *existingGrad = context.lookupGradient({original, masterConfig}))
+  if (auto *existingGrad = context.lookUpGradient({original, masterConfig}))
     canonicalGrad = existingGrad;
   // Otherwise, create a canonical gradient and enqueue a differentiation task.
   else {
     // Create a canonical gradient.
     canonicalGrad = createGradFunction(masterConfig);
-    context.insertGradient({original, masterConfig}, canonicalGrad,
-                           /*canonical*/true);
+    context.insertGradient({original, masterConfig}, canonicalGrad);
     // Enqueue a new differentiation task in the global context.
     if (auto *diffOp = findDifferentialOperator(gradInst))
-      context.lookupOrRegisterDifferentiationTask(
+      context.lookUpOrRegisterDifferentiationTask(
           original, config.indices, diffOp);
     else
-      context.lookupOrRegisterDifferentiationTask(
+      context.lookUpOrRegisterDifferentiationTask(
           original, config.indices, gradInst);
   }
 
@@ -4159,7 +4158,7 @@ static SILFunction *lookupOrSynthesizeGradient(ADContext &context,
   SILFunction *gradFn = nullptr;
   if (config.isMaster())
     gradFn = canonicalGrad;
-  else if (auto *existingGradFn = context.lookupGradient({original, config}))
+  else if (auto *existingGradFn = context.lookUpGradient({original, config}))
     gradFn = existingGradFn;
   else {
     gradFn = createGradFunction(config);
@@ -4238,7 +4237,7 @@ static SILFunction *lookupOrSynthesizeGradient(ADContext &context,
     }
 
     // Cache the newly created gradient wrapper (non-canonical).
-    context.insertGradient({original, config}, gradFn, /*canonical*/false);
+    context.insertGradient({original, config}, gradFn);
   }
 
   return gradFn;
@@ -4382,7 +4381,7 @@ bool Differentiation::processGradientInst(GradientInst *gi,
   // If it traces back to a `function_ref`, differentiate that.
   if (auto *originalFRI = findReferenceToVisibleFunction(operand)) {
     auto *original = originalFRI->getReferencedFunction();
-    gradFn = lookupOrSynthesizeGradient(context, gi, original);
+    gradFn = lookUpOrSynthesizeGradient(context, gi, original);
 
     // Replace the `gradient` instruction with the reference to the specified
     // function.
@@ -4470,7 +4469,7 @@ void Differentiation::run() {
   }
 
   // A global differentiation context.
-  ADContext context(module, *PM);
+  ADContext context(*this);
 
   // For every `[reverse_differentiable]` attribute, create a differentiation
   // task. If the attribute has a primal and adjoint, this task will not
@@ -4521,12 +4520,8 @@ void Differentiation::run() {
     auto *original = canonicalGrad.first.first;
     auto config = canonicalGrad.first.second;
     auto *canGradFn = canonicalGrad.second;
-    auto *task = context.lookupMinimalDifferentiationTask(
-      original, config.indices);
-    // // If the invoker is not a differential operator, there's no need to
-    // // synthesize any canonical gradient for it.
-    // if (!task->getInvoker().isAnyDifferentialOperator())
-    //   continue;
+    auto *task = context.lookUpMinimalDifferentiationTask(
+        original, config.indices);
     fillCanonicalGradient(*canGradFn, task, config, context);
   }
 

@@ -61,10 +61,8 @@ SILReverseDifferentiableAttr::
 SILReverseDifferentiableAttr(const SILReverseAutoDiffIndices &indices,
                              StringRef primalName,
                              StringRef adjointName,
-                             bool primalIsSynthesized,
                              bool adjointIsSynthesized)
   : indices(indices), PrimalName(primalName), AdjointName(adjointName),
-    PrimalIsSynthesized(primalIsSynthesized),
     AdjointIsSynthesized(adjointIsSynthesized) {}
 
 SILReverseDifferentiableAttr *
@@ -72,13 +70,12 @@ SILReverseDifferentiableAttr::create(SILModule &M,
                                      const SILReverseAutoDiffIndices &indices,
                                      StringRef primalName,
                                      StringRef adjointName,
-                                     bool primalIsSynthesized,
                                      bool adjointIsSynthesized) {
   void *mem = M.allocate(sizeof(SILReverseDifferentiableAttr),
                          alignof(SILReverseDifferentiableAttr));
   return ::new (mem)
       SILReverseDifferentiableAttr(indices, primalName, adjointName,
-                                   primalIsSynthesized, adjointIsSynthesized);
+                                   adjointIsSynthesized);
 }
 
 SILFunction *SILFunction::create(

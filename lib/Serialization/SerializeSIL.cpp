@@ -420,8 +420,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
         Out, ScratchRecord, differentiableAttrAbbrCode,
         S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getPrimalName())),
         S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getAdjointName())),
-        DA->isPrimalSynthesized(), DA->isAdjointSynthesized(),
-        indices.source, parameters);
+        DA->isAdjointSynthesized(), indices.source, parameters);
   }
 
   // Assign a unique ID to each basic block of the SILFunction.

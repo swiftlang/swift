@@ -119,30 +119,31 @@ private:
   SILReverseAutoDiffIndices indices;
   /// The primal and adjoint function names.
   StringRef PrimalName, AdjointName;
-  /// Whether the primal and adjoint are synthesized.
-  bool PrimalIsSynthesized, AdjointIsSynthesized;
+  /// Whether the adjoint is synthesized.
+  bool AdjointIsSynthesized;
 
   SILReverseDifferentiableAttr(const SILReverseAutoDiffIndices &indices,
                                StringRef primalName,
                                StringRef adjointName,
-                               bool primalIsSynthesized,
                                bool adjointIsSynthesized);
 
 public:
   static SILReverseDifferentiableAttr *create(
       SILModule &M, const SILReverseAutoDiffIndices &indices,
       StringRef primalName = StringRef(), StringRef adjointName = StringRef(),
-      bool primalIsSynthesized = false, bool adjointIsSynthesized = false);
+      bool adjointIsSynthesized = false);
 
   bool hasPrimal() const { return !PrimalName.empty(); }
-  bool isPrimalSynthesized() const { return PrimalIsSynthesized; }
   StringRef getPrimalName() const { assert(hasPrimal()); return PrimalName; }
-  void setPrimalName(StringRef name, bool synthesized) { PrimalName = name; }
+  void setPrimalName(StringRef name) { PrimalName = name; }
 
   bool hasAdjoint() const { return !AdjointName.empty(); }
   bool isAdjointSynthesized() const { return AdjointIsSynthesized; }
   StringRef getAdjointName() const { assert(hasAdjoint()); return AdjointName; }
-  void setAdjointName(StringRef name, bool synthesized) { AdjointName = name; }
+  void setAdjointName(StringRef name, bool synthesized) {
+    AdjointName = name;
+    AdjointIsSynthesized = synthesized;
+  }
 
   const SILReverseAutoDiffIndices &getIndices() const { return indices; }
 

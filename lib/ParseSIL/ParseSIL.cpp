@@ -1126,27 +1126,23 @@ static bool parseReverseDifferentiableAttr(
       P.parseIdentifier(id, LastLoc, diag::expected_sil_function_name);
   };
 
-  // Parse optional '(synthesized) primal'.
-  bool primalIsSynthesized = false;
-  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "synthesized") {
-    P.consumeToken();
-    primalIsSynthesized = true;
-  }
+  // Parse optional 'primal'.
   Identifier PrimName;
   if (P.Tok.is(tok::identifier) && P.Tok.getText() == "primal") {
     P.consumeToken();
     if (parseFnName(PrimName)) return true;
   }
-  // Parse optional '(synthesized) adjoint'.
-  bool adjointIsSynthesized;
-  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "synthesized") {
-    P.consumeToken();
-    adjointIsSynthesized = true;
-  }
+  // Parse optional 'adjoint'.
   Identifier AdjName;
   if (P.Tok.is(tok::identifier) && P.Tok.getText() == "adjoint") {
     P.consumeToken();
     if (parseFnName(AdjName)) return true;
+  }
+  // Parse optional 'synthesized'.
+  bool adjointIsSynthesized = false;
+  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "synthesized") {
+    P.consumeToken();
+    adjointIsSynthesized = true;
   }
   // Parse ']'.
   if (P.parseToken(tok::r_square,
@@ -1155,7 +1151,7 @@ static bool parseReverseDifferentiableAttr(
   // Create an AdjointAttr and we are done.
   auto *Attr = SILReverseDifferentiableAttr::create(
       SP.SILMod, {SourceIndex, ParamIndices}, PrimName.str(), AdjName.str(),
-      primalIsSynthesized, adjointIsSynthesized);
+      adjointIsSynthesized);
   DAs.push_back(Attr);
   return false;
 }
