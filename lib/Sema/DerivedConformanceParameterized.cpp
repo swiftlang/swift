@@ -332,8 +332,8 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
   auto nominal = derived.Nominal;
   auto &C = nominal->getASTContext();
 
-  auto *paramAggProto = C.getProtocol(KnownProtocolKind::ParameterGroup);
-  auto paramAggType = TypeLoc::withoutLoc(paramAggProto->getDeclaredType());
+  auto *paramGroupProto = C.getProtocol(KnownProtocolKind::ParameterGroup);
+  auto paramGroupType = TypeLoc::withoutLoc(paramGroupProto->getDeclaredType());
   auto *parametersDecl =
       new (C) StructDecl(SourceLoc(), C.Id_Parameters, SourceLoc(),
                          /*Inherited*/ {}, /*GenericParams*/ {}, parentDC);
@@ -373,7 +373,7 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
   // Add conformance to the ParameterGroup protocol, if possible.
   // The ParameterGroup protocol requirements will be derived.
   if (DerivedConformance::canDeriveParameterGroup(parametersDecl)) {
-    TypeLoc inherited[1] = {paramAggType};
+    TypeLoc inherited[1] = {paramGroupType};
     parametersDecl->setInherited(C.AllocateCopy(inherited));
   }
 
