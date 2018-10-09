@@ -1634,7 +1634,8 @@ getOperatorDesignatedNominalType(Constraint *bindOverload) {
   auto choice = bindOverload->getOverloadChoice();
   auto *funcDecl = cast<FuncDecl>(choice.getDecl());
   auto *operatorDecl = funcDecl->getOperatorDecl();
-  return operatorDecl->getDesignatedNominalType();
+  auto designatedTypes = operatorDecl->getDesignatedNominalTypes();
+  return !designatedTypes.empty() ? designatedTypes[0] : nullptr;
 }
 
 void ConstraintSystem::partitionDisjunction(

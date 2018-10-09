@@ -2875,8 +2875,9 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
     });
   if (auto *group = decl->getPrecedenceGroup())
     Printer << " : " << group->getName();
-  if (!decl->getSecondIdentifier().empty())
-    Printer << ", " << decl->getSecondIdentifier();
+  auto designatedNominalTypes = decl->getDesignatedNominalTypes();
+  for (auto typeDecl : designatedNominalTypes)
+    Printer << ", " << typeDecl->getName();
 }
 
 void PrintAST::visitPrecedenceGroupDecl(PrecedenceGroupDecl *decl) {

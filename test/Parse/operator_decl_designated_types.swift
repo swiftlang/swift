@@ -28,7 +28,6 @@ postfix operator ^^*
 
 infix operator **>> : UndeclaredPrecedence
 // expected-error@-1 {{unknown precedence group 'UndeclaredPrecedence'}}
-// expected-error@-2 {{use of undeclared type 'UndeclaredPrecedence'}}
 
 infix operator **+> : MediumPrecedence, UndeclaredProtocol
 // expected-error@-1 {{use of undeclared type 'UndeclaredProtocol'}}
@@ -60,3 +59,15 @@ infix operator  <*<<< : MediumPrecedence, &
 
 infix operator **^^ : MediumPrecedence // expected-note {{previous operator declaration here}}
 infix operator **^^ : InfixMagicOperatorProtocol // expected-error {{operator redeclared}}
+
+infix operator ^%*%^ : MediumPrecedence, Struct, Class
+infix operator ^%*%% : Struct, Class
+prefix operator %^*^^ : Struct, Class
+postfix operator ^^*^% : Struct, Class
+prefix operator %%*^^ : LowPrecedence, Class
+// expected-error@-1{{use of undeclared type 'LowPrecedence'}}
+postfix operator ^^*%% : MediumPrecedence, Class
+// expected-error@-1{{use of undeclared type 'MediumPrecedence'}}
+
+// expected-error@+1 {{trailing comma in operator declaration}}
+infix operator <*<>*> : AdditionPrecedence,

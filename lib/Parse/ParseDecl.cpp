@@ -6508,17 +6508,19 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
         identifiers.push_back(Context.getIdentifier(Tok.getText()));
         identifierLocs.push_back(consumeToken(tok::identifier));
 
-        if (consumeIf(tok::comma)) {
-          if (isPrefix || isPostfix)
-            diagnose(colonLoc, diag::precedencegroup_not_infix)
-                .fixItRemove({colonLoc, identifierLocs.back()});
+        while (Tok.is(tok::comma)) {
+          auto comma = consumeToken();
 
           if (Tok.is(tok::identifier)) {
             identifiers.push_back(Context.getIdentifier(Tok.getText()));
             identifierLocs.push_back(consumeToken(tok::identifier));
           } else {
-            auto otherTokLoc = consumeToken();
-            diagnose(otherTokLoc, diag::operator_decl_trailing_comma);
+            if (Tok.isNot(tok::eof)) {
+              auto otherTokLoc = consumeToken();
+              diagnose(otherTokLoc, diag::operator_decl_expected_type);
+            } else {
+              diagnose(comma, diag::operator_decl_trailing_comma);
+            }
           }
         }
       }
