@@ -890,6 +890,9 @@ public:
 
   /// Reads inlinable body text from \c DeclTypeCursor, if present.
   Optional<StringRef> maybeReadInlinableBodyText();
+
+  /// Reads pattern initializer text from \c DeclTypeCursor, if present.
+  Optional<StringRef> maybeReadPatternInitializerText();
 };
 
 template <typename T, typename RawData>

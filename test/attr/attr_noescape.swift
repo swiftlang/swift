@@ -32,6 +32,7 @@ func takesNoEscapeClosure(_ fn : () -> Int) {
   // expected-note@-5{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
   // expected-note@-6{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
   // expected-note@-7{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
+  // expected-note@-8{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
   takesNoEscapeClosure { 4 }  // ok
 
   _ = fn()  // ok
@@ -56,7 +57,7 @@ func takesNoEscapeClosure(_ fn : () -> Int) {
   takesGenericClosure(4) { fn() }  // ok.
 
   _ = [fn] // expected-error {{converting non-escaping value to 'Element' may allow it to escape}}
-  _ = [doesEscape(fn)] // expected-error {{'(() -> Int) -> ()' is not convertible to '(@escaping () -> Int) -> ()'}}
+  _ = [doesEscape(fn)] // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
   _ = [1 : fn] // expected-error {{converting non-escaping value to 'Value' may allow it to escape}}
   _ = [1 : doesEscape(fn)] // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
   _ = "\(doesEscape(fn))" // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}

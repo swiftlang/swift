@@ -163,19 +163,19 @@ public struct Set<Element: Hashable> {
   ///   storage buffer.
   public // FIXME(reserveCapacity): Should be inlinable
   init(minimumCapacity: Int) {
-    _variant = .native(_NativeSet(capacity: minimumCapacity))
+    _variant = _Variant(native: _NativeSet(capacity: minimumCapacity))
   }
 
   /// Private initializer.
   @inlinable
   internal init(_native: __owned _NativeSet<Element>) {
-    _variant = .native(_native)
+    _variant = _Variant(native: _native)
   }
 
 #if _runtime(_ObjC)
   @inlinable
   internal init(_cocoa: __owned _CocoaSet) {
-    _variant = .cocoa(_cocoa)
+    _variant = _Variant(cocoa: _cocoa)
   }
 
   /// Private initializer used for bridging.
@@ -266,6 +266,7 @@ extension Set: Sequence {
   }
 
   @inlinable
+  @inline(__always)
   public func _customContainsEquatableElement(_ member: Element) -> Bool? {
     return contains(member)
   }
@@ -361,6 +362,7 @@ extension Set: Collection {
   }
 
   @inlinable
+  @inline(__always)
   public func _customIndexOfEquatableElement(
      _ member: Element
     ) -> Index?? {
@@ -368,6 +370,7 @@ extension Set: Collection {
   }
 
   @inlinable
+  @inline(__always)
   public func _customLastIndexOfEquatableElement(
      _ member: Element
     ) -> Index?? {
@@ -418,48 +421,20 @@ extension Set: Equatable {
   ///   `false`.
   @inlinable
   public static func == (lhs: Set<Element>, rhs: Set<Element>) -> Bool {
-    switch (lhs._variant, rhs._variant) {
-    case (.native(let lhsNative), .native(let rhsNative)):
-
-      if lhsNative._storage === rhsNative._storage {
-        return true
-      }
-
-      if lhsNative.count != rhsNative.count {
-        return false
-      }
-
-      for member in lhsNative {
-        guard rhsNative.find(member).found else {
-          return false
-        }
-      }
-      return true
-
-  #if _runtime(_ObjC)
-    case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
-      return lhsCocoa == rhsCocoa
-
-    case (.native(let lhsNative), .cocoa(let rhsCocoa)):
-      if lhsNative.count != rhsCocoa.count {
-        return false
-      }
-
-      defer { _fixLifetime(lhsNative) }
-      for bucket in lhsNative.hashTable {
-        let key = lhsNative.uncheckedElement(at: bucket)
-        let bridgedKey = _bridgeAnythingToObjectiveC(key)
-        if rhsCocoa.contains(bridgedKey) {
-          continue
-        }
-        return false
-      }
-      return true
-
-    case (.cocoa, .native):
-      return rhs == lhs
-  #endif
+#if _runtime(_ObjC)
+    switch (lhs._variant.isNative, rhs._variant.isNative) {
+    case (true, true):
+      return lhs._variant.asNative.isEqual(to: rhs._variant.asNative)
+    case (false, false):
+      return lhs._variant.asCocoa.isEqual(to: rhs._variant.asCocoa)
+    case (true, false):
+      return lhs._variant.asNative.isEqual(to: rhs._variant.asCocoa)
+    case (false, true):
+      return rhs._variant.asNative.isEqual(to: lhs._variant.asCocoa)
     }
+#else
+    return lhs._variant.asNative.isEqual(to: rhs._variant.asNative)
+#endif
   }
 }
 
@@ -1358,6 +1333,19 @@ extension Set.Index {
   }
 #endif
 
+#if _runtime(_ObjC)
+  @usableFromInline @_transparent
+  internal var _isNative: Bool {
+    switch _variant {
+    case .native:
+      return true
+    case .cocoa:
+      _cocoaPath()
+      return false
+    }
+  }
+#endif
+
   @usableFromInline @_transparent
   internal var _asNative: _HashTable.Index {
     switch _variant {
@@ -1446,19 +1434,17 @@ extension Set.Index: Hashable {
   ///   of this instance.
   public // FIXME(cocoa-index): Make inlinable
   func hash(into hasher: inout Hasher) {
-  #if _runtime(_ObjC)
-    switch _variant {
-    case .native(let nativeIndex):
-      hasher.combine(0 as UInt8)
-      hasher.combine(nativeIndex.bucket.offset)
-    case .cocoa(let cocoaIndex):
-      _cocoaPath()
+#if _runtime(_ObjC)
+    guard _isNative else {
       hasher.combine(1 as UInt8)
-      hasher.combine(cocoaIndex.storage.currentKeyIndex)
+      hasher.combine(_asCocoa.storage.currentKeyIndex)
+      return
     }
-  #else
+    hasher.combine(0 as UInt8)
     hasher.combine(_asNative.bucket.offset)
-  #endif
+#else
+    hasher.combine(_asNative.bucket.offset)
+#endif
   }
 }
 
@@ -1523,6 +1509,19 @@ extension Set.Iterator {
   }
 #endif
 
+#if _runtime(_ObjC)
+  @usableFromInline @_transparent
+  internal var _isNative: Bool {
+    switch _variant {
+    case .native:
+      return true
+    case .cocoa:
+      _cocoaPath()
+      return false
+    }
+  }
+#endif
+
   @usableFromInline @_transparent
   internal var _asNative: _NativeSet<Element>.Iterator {
     get {
@@ -1539,6 +1538,20 @@ extension Set.Iterator {
       self._variant = .native(newValue)
     }
   }
+
+#if _runtime(_ObjC)
+  @usableFromInline @_transparent
+  internal var _asCocoa: _CocoaSet.Iterator {
+    get {
+      switch _variant {
+      case .native:
+        _sanityCheckFailure("internal error: does not contain a Cocoa index")
+      case .cocoa(let cocoa):
+        return cocoa
+      }
+    }
+  }
+#endif
 }
 
 extension Set.Iterator: IteratorProtocol {
@@ -1550,19 +1563,12 @@ extension Set.Iterator: IteratorProtocol {
   @inline(__always)
   public mutating func next() -> Element? {
 #if _runtime(_ObjC)
-    switch _variant {
-    case .native:
-      return _asNative.next()
-    case .cocoa(let cocoaIterator):
-      _cocoaPath()
-      if let cocoaElement = cocoaIterator.next() {
-        return _forceBridgeFromObjectiveC(cocoaElement, Element.self)
-      }
-      return nil
+    guard _isNative else {
+      guard let cocoaElement = _asCocoa.next() else { return nil }
+      return _forceBridgeFromObjectiveC(cocoaElement, Element.self)
     }
-#else
-    return _asNative.next()
 #endif
+    return _asNative.next()
   }
 }
 

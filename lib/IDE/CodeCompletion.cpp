@@ -973,6 +973,7 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
         !IsImplicitlyCurriedInstanceMethod)
       funcType = funcType->getResult()->getAs<AnyFunctionType>();
     if (funcType) {
+      funcType = funcType->removeArgumentLabels(1)->castTo<AnyFunctionType>();
       auto relation = calculateTypeRelation(funcType, ExpectedType, DC);
       if (UseFuncResultType)
         relation =
@@ -1295,7 +1296,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   CodeCompletionConsumer &Consumer;
   CodeCompletionExpr *CodeCompleteTokenExpr = nullptr;
   AssignExpr *AssignmentExpr;
-  CallExpr *FuncCallExpr;
   CompletionKind Kind = CompletionKind::None;
   Expr *ParsedExpr = nullptr;
   SourceLoc DotLoc;
@@ -1468,7 +1468,7 @@ public:
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
   void completeAssignmentRHS(AssignExpr *E) override;
-  void completeCallArg(CallExpr *E) override;
+  void completeCallArg(CodeCompletionExpr *E) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
                          Optional<unsigned> yieldIndex) override;
@@ -2630,7 +2630,7 @@ public:
 
   void addConstructorCallsForType(Type type, Identifier name,
                                   DeclVisibilityKind Reason) {
-    if (!Ctx.LangOpts.CodeCompleteInitsInPostfixExpr)
+    if (!Ctx.LangOpts.CodeCompleteInitsInPostfixExpr && !IsUnresolvedMember)
       return;
 
     assert(CurrDeclContext);
@@ -2690,6 +2690,8 @@ public:
 
   void addNominalTypeRef(const NominalTypeDecl *NTD,
                          DeclVisibilityKind Reason) {
+    if (IsUnresolvedMember)
+      return;
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
@@ -2703,6 +2705,8 @@ public:
   }
 
   void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason) {
+    if (IsUnresolvedMember)
+      return;
     CommandWordsPairs Pairs;
     CodeCompletionResultBuilder Builder(
         Sink,
@@ -2932,7 +2936,7 @@ public:
           // initializer completions if we do not have a left parenthesis and either
           // the initializer is required, the base type's instance type is not a class,
           // or this is a 'self' or 'super' reference.
-          if (IsStaticMetatype || Ty->is<ArchetypeType>())
+          if (IsStaticMetatype || IsUnresolvedMember || Ty->is<ArchetypeType>())
             addConstructorCall(CD, Reason, None, Result, /*isOnType*/true);
           else if ((IsSelfRefExpr || IsSuperRefExpr || !Ty->is<ClassType>() ||
                     CD->isRequired()) && !HaveLParen)
@@ -3783,17 +3787,59 @@ public:
     // We can only say .foo where foo is a static member of the contextual
     // type and has the same type (or if the member is a function, then the
     // same result type) as the contextual type.
-    FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD, DeclVisibilityKind reason) {
+    FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD,
+                                             DeclVisibilityKind reason) {
       if (!VD->hasInterfaceType()) {
         TypeResolver->resolveDeclSignature(VD);
         if (!VD->hasInterfaceType())
           return false;
       }
 
-      auto declTy = VD->getInterfaceType();
-      while (auto FT = declTy->getAs<AnyFunctionType>())
+      // Enum element decls can always be referenced by implicit member
+      // expression.
+      if (isa<EnumElementDecl>(VD))
+        return true;
+
+      // Only non-failable constructors are implicitly referenceable.
+      if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
+        switch (CD->getFailability()) {
+          case OTK_None:
+          case OTK_ImplicitlyUnwrappedOptional:
+            return true;
+          case OTK_Optional:
+            return false;
+        }
+      }
+
+      // Otherwise, check the result type matches the contextual type.
+      auto declTy = getTypeOfMember(VD, T);
+      if (declTy->hasError())
+        return false;
+
+      DeclContext *DC = const_cast<DeclContext *>(CurrDeclContext);
+
+      // Member types can also be implicitly referenceable as long as it's
+      // convertible to the contextual type.
+      if (auto CD = dyn_cast<TypeDecl>(VD)) {
+        declTy = declTy->getMetatypeInstanceType();
+        return swift::isConvertibleTo(declTy, T, *DC);
+      }
+
+      // Only static member can be referenced.
+      if (!VD->isStatic())
+        return false;
+
+      if (isa<FuncDecl>(VD)) {
+        // Strip '(Self.Type) ->' and parameters.
+        declTy = declTy->castTo<AnyFunctionType>()->getResult();
+        declTy = declTy->castTo<AnyFunctionType>()->getResult();
+      } else if (auto FT = declTy->getAs<AnyFunctionType>()) {
+        // The compiler accepts 'static var factory: () -> T' for implicit
+        // member expression.
+        // FIXME: This emits just 'factory'. We should emit 'factory()' instead.
         declTy = FT->getResult();
-      return declTy->isEqual(T);
+      }
+      return swift::isConvertibleTo(declTy, T, *DC);
     });
 
     auto baseType = MetatypeType::get(T);
@@ -3808,14 +3854,14 @@ public:
   void getUnresolvedMemberCompletions(ArrayRef<Type> Types) {
     NeedLeadingDot = !HaveDot;
     for (auto T : Types) {
-      if (T) {
-        // FIXME: we should also include .some/.none from optional itself but
-        // getUnresolvedMemberCompletions doesn't ever return them since the
-        // interface type in the FilteredDeclConsumer will not match the bound
-        // generic type expected.
-        T = T->lookThroughAllOptionalTypes();
-        getUnresolvedMemberCompletions(T);
+      if (!T)
+        continue;
+      if (auto objT = T->getOptionalObjectType()) {
+        // If this is optional type, perform completion for the object type.
+        // i.e. 'let _: Enum??? = .enumMember' is legal.
+        getUnresolvedMemberCompletions(objT->lookThroughAllOptionalTypes());
       }
+      getUnresolvedMemberCompletions(T);
     }
   }
 
@@ -3927,22 +3973,6 @@ public:
       }
     }
     return !ExpectedTypes.empty() || !ExpectedNames.empty();
-  }
-
-  bool getCallArgCompletions(DeclContext &DC, CallExpr *CallE, Expr *CCExpr) {
-    std::vector<Type> ExpectedTypes;
-    std::vector<StringRef> ExpectedNames;
-    if (!collectArgumentExpectation(DC, CallE, CCExpr, ExpectedTypes,
-                                    ExpectedNames))
-      return false;
-
-    addArgNameCompletionResults(ExpectedNames);
-    if (!ExpectedTypes.empty()) {
-      setExpectedTypes(ExpectedTypes);
-      getValueCompletionsInDeclContext(CCExpr->getStartLoc(), DefaultFilter);
-    }
-
-    return true;
   }
 
   void getTypeContextEnumElementCompletions(SourceLoc Loc) {
@@ -4702,14 +4732,10 @@ void CodeCompletionCallbacksImpl::completeAssignmentRHS(AssignExpr *E) {
   Kind = CompletionKind::AssignmentRHS;
 }
 
-void CodeCompletionCallbacksImpl::completeCallArg(CallExpr *E) {
-  if (Kind == CompletionKind::PostfixExprBeginning ||
-      Kind == CompletionKind::None) {
-    CurDeclContext = P.CurDeclContext;
-    Kind = CompletionKind::CallArg;
-    FuncCallExpr = E;
-    ParsedExpr = E;
-  }
+void CodeCompletionCallbacksImpl::completeCallArg(CodeCompletionExpr *E) {
+  CurDeclContext = P.CurDeclContext;
+  CodeCompleteTokenExpr = E;
+  Kind = CompletionKind::CallArg;
 }
 
 void CodeCompletionCallbacksImpl::completeReturnStmt(CodeCompletionExpr *E) {
@@ -5637,10 +5663,17 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     break;
   }
   case CompletionKind::CallArg : {
-    if (!CodeCompleteTokenExpr || !Lookup.getCallArgCompletions(*CurDeclContext,
-                                                                FuncCallExpr,
-                                                                CodeCompleteTokenExpr))
-      DoPostfixExprBeginning();
+    ::CodeCompletionTypeContextAnalyzer Analyzer(CurDeclContext,
+                                                 CodeCompleteTokenExpr);
+    SmallVector<Type, 2> PossibleTypes;
+    SmallVector<StringRef, 2> PossibleNames;
+    Analyzer.Analyze(PossibleTypes, PossibleNames);
+    if (!PossibleNames.empty()) {
+      Lookup.addArgNameCompletionResults(PossibleNames);
+      break;
+    }
+    Lookup.setExpectedTypes(PossibleTypes);
+    DoPostfixExprBeginning();
     break;
   }
 

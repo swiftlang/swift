@@ -433,6 +433,9 @@ function set_build_options_for_host() {
                 linux-x86_64)
                     SWIFT_HOST_VARIANT_ARCH="x86_64"
                     ;;
+                linux-i686)
+                    SWIFT_HOST_VARIANT_ARCH="i686"
+                    ;;
                 linux-armv6)
                     SWIFT_HOST_VARIANT_ARCH="armv6"
                     SWIFT_HOST_TRIPLE="armv6-unknown-linux-gnueabihf"

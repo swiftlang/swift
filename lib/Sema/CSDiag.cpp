@@ -551,6 +551,14 @@ private:
   /// a subscript and offer a fixit if the inputs are compatible.
   bool diagnoseSubscriptMisuse(ApplyExpr *callExpr);
 
+  /// Try to diagnose common errors involving implicitly non-escaping parameters
+  /// of function type, giving more specific and simpler diagnostics, attaching
+  /// notes on the parameter, and offering fixits to insert @escaping. Returns
+  /// true if it detects and issues an error, false if it does nothing.
+  bool diagnoseNonEscapingParameterToEscaping(Expr *expr, Type srcType,
+                                              Type dstType,
+                                              ContextualTypePurpose dstPurpose);
+
   bool visitExpr(Expr *E);
   bool visitIdentityExpr(IdentityExpr *E);
   bool visitTryExpr(TryExpr *E);
@@ -1441,12 +1449,14 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
         return true;
       }
 
-      if (srcFT->isNoEscape() && !destFT->isNoEscape()) {
-        diagnose(expr->getLoc(), diag::noescape_functiontype_mismatch,
-                 fromType, toType)
-        .highlight(expr->getSourceRange());
+      auto destPurpose = CTP_Unused;
+      if (constraint->getKind() == ConstraintKind::ArgumentConversion ||
+          constraint->getKind() == ConstraintKind::OperatorArgumentConversion)
+        destPurpose = CTP_CallArgument;
+
+      if (diagnoseNonEscapingParameterToEscaping(anchor, fromType, toType,
+                                                 destPurpose))
         return true;
-      }
     }
 
   // If this is a callee that mismatches an expected return type, we can emit a
@@ -2344,9 +2354,8 @@ static bool addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem &CS,
 /// of function type, giving more specific and simpler diagnostics, attaching
 /// notes on the parameter, and offering fixits to insert @escaping. Returns
 /// true if it detects and issues an error, false if it does nothing.
-static bool tryDiagnoseNonEscapingParameterToEscaping(
-    Expr *expr, Type srcType, Type dstType, ContextualTypePurpose dstPurpose,
-    ConstraintSystem &CS) {
+bool FailureDiagnosis::diagnoseNonEscapingParameterToEscaping(
+    Expr *expr, Type srcType, Type dstType, ContextualTypePurpose dstPurpose) {
   assert(expr);
   // Need to be referencing a parameter of function type
   auto declRef = dyn_cast<DeclRefExpr>(expr);
@@ -2684,8 +2693,8 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   }
 
   // Try for better/more specific diagnostics for non-escaping to @escaping
-  if (tryDiagnoseNonEscapingParameterToEscaping(expr, exprType, contextualType,
-                                                CTP, CS))
+  if (diagnoseNonEscapingParameterToEscaping(expr, exprType, contextualType,
+                                             CTP))
     return true;
 
   // Don't attempt fixits if we have an unsolved type variable, since
@@ -5482,21 +5491,52 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     }
   }
 
+  auto isFailingConstraintRelevant = [&]() -> bool {
+    auto *constraint = CS.failedConstraint;
+    if (!constraint)
+      return false;
+
+    auto *locator = constraint->getLocator();
+    return locator && locator->getAnchor() == callExpr;
+  };
+
   // If there is a failing constraint associated with current constraint
   // system which points to the argument/parameter mismatch, let's use
   // that information while re-typechecking argument expression, this
   // makes it a lot easier to determine contextual mismatch.
-  if (CS.failedConstraint && !hasTrailingClosure) {
+  if (isFailingConstraintRelevant() && !hasTrailingClosure) {
     auto *constraint = CS.failedConstraint;
     if (constraint->getKind() == ConstraintKind::ApplicableFunction) {
-      if (auto *locator = constraint->getLocator()) {
-        if (locator->getAnchor() == callExpr) {
-          auto calleeType = CS.simplifyType(constraint->getSecondType());
-          if (auto *fnType = calleeType->getAs<FunctionType>())
-            argType = AnyFunctionType::composeInput(fnType->getASTContext(),
-                                                    fnType->getParams(),
+      auto calleeType = CS.simplifyType(constraint->getSecondType());
+      if (auto *fnType = calleeType->getAs<FunctionType>())
+        argType = AnyFunctionType::composeInput(fnType->getASTContext(),
+                                                fnType->getParams(),
+                                                /*canonicalVararg=*/false);
+    } else if (constraint->getKind() == ConstraintKind::ArgumentConversion ||
+               constraint->getKind() ==
+                   ConstraintKind::OperatorArgumentConversion) {
+      using PathEltKind = ConstraintLocator::PathElementKind;
+      // Dig up type variable which represents the overload choice that fit
+      // this call expression after simplifying `ApplicableFunction` constraint.
+      for (auto *typeVar : CS.getTypeVariables()) {
+        auto *locator = typeVar->getImpl().getLocator();
+        auto path = locator->getPath();
+
+        // Check whether this type variable in anchored at current
+        // expression and path ends with `apply function`, which means
+        // that it's related to `ApplicableFunction` constraint.
+        if (locator->getAnchor() != callExpr || path.empty() ||
+            path.back().getKind() != PathEltKind::ApplyFunction)
+          continue;
+
+        if (auto type = typeVar->getImpl().getFixedType(nullptr)) {
+          fnType = type;
+          if (auto *FT = fnType->getAs<AnyFunctionType>())
+            argType = AnyFunctionType::composeInput(FT->getASTContext(),
+                                                    FT->getParams(),
                                                     /*canonicalVararg=*/false);
         }
+        break;
       }
     }
   }

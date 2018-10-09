@@ -21,13 +21,25 @@
 #include "llvm/Support/FileSystem.h"
 #include <fstream>
 #include <regex>
+#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
 #include <unistd.h>
 #include <sys/param.h>
+#elif defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
+#endif
 
 // FIXME: Platform compatibility.
 #include <dispatch/dispatch.h>
 
 using namespace llvm;
+
+#if defined(_WIN32)
+namespace {
+int STDOUT_FILENO = _fileno(stdout);
+}
+#endif
 
 namespace {
 struct TestOptions {

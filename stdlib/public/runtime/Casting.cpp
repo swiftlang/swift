@@ -2502,19 +2502,12 @@ static inline bool swift_isClassOrObjCExistentialTypeImpl(const Metadata *T) {
 namespace {
 
 // protocol _ObjectiveCBridgeable {
-struct _ObjectiveCBridgeableWitnessTable {
-  /// The protocol conformance descriptor.
-  const void *protocolConformanceDescriptor;
-
+struct _ObjectiveCBridgeableWitnessTable : WitnessTable {
   static_assert(WitnessTableFirstRequirementOffset == 1,
                 "Witness table layout changed");
 
   // associatedtype _ObjectiveCType : class
-  SWIFT_CC(swift)
-  MetadataResponse (*ObjectiveCType)(
-                     MetadataRequest request,
-                     const Metadata *parentMetadata,
-                     const _ObjectiveCBridgeableWitnessTable *witnessTable);
+  void *_ObjectiveCType;
 
   // func _bridgeToObjectiveC() -> _ObjectiveCType
   SWIFT_CC(swift)
@@ -2544,6 +2537,23 @@ struct _ObjectiveCBridgeableWitnessTable {
 };
 // }
 
+/// Retrieve the bridged Objective-C type for the given type that
+/// conforms to \c _ObjectiveCBridgeable.
+MetadataResponse _getBridgedObjectiveCType(
+                             MetadataRequest request,
+                             const Metadata *conformingType,
+                             const _ObjectiveCBridgeableWitnessTable *wtable) {
+  // FIXME: Can we directly reference the descriptor somehow?
+  const ProtocolConformanceDescriptor *conformance = wtable->Description;
+  const ProtocolDescriptor *protocol = conformance->getProtocol();
+  auto assocTypeRequirement = protocol->getRequirements().begin();
+  assert(assocTypeRequirement->Flags.getKind() ==
+         ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction);
+  auto mutableWTable = (WitnessTable *)wtable;
+  return swift_getAssociatedTypeWitness(request, mutableWTable, conformingType,
+                                        assocTypeRequirement);
+}
+  
 } // unnamed namespace
 
 extern "C" const ProtocolDescriptor PROTOCOL_DESCR_SYM(s21_ObjectiveCBridgeable);
@@ -2634,8 +2644,8 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
                DynamicCastFlags flags) {
   // Determine the class type to which the target value type is bridged.
   auto targetBridgedClass =
-    targetBridgeWitness->ObjectiveCType(MetadataState::Complete, targetType,
-                                        targetBridgeWitness).Value;
+      _getBridgedObjectiveCType(MetadataState::Complete, targetType,
+                                targetBridgeWitness).Value;
 
   // Dynamic cast the source object to the class type to which the target value
   // type is bridged. If we succeed, we can bridge from there; if we fail,
@@ -2888,8 +2898,8 @@ const Metadata *_getBridgedNonVerbatimObjectiveCType(
   // Check if the type conforms to _BridgedToObjectiveC, in which case
   // we'll extract its associated type.
   if (const auto *bridgeWitness = findBridgeWitness(T)) {
-    return bridgeWitness->ObjectiveCType(MetadataState::Complete, T,
-                                         bridgeWitness).Value;
+    return _getBridgedObjectiveCType(MetadataState::Complete, T,
+                                     bridgeWitness).Value;
   }
   
   return nullptr;
@@ -2980,8 +2990,8 @@ _bridgeNonVerbatimFromObjectiveC(
     // Check if sourceValue has the _ObjectiveCType type required by the
     // protocol.
     const Metadata *objectiveCType =
-        bridgeWitness->ObjectiveCType(MetadataState::Complete, nativeType,
-                                      bridgeWitness).Value;
+        _getBridgedObjectiveCType(MetadataState::Complete, nativeType,
+                                  bridgeWitness).Value;
       
     auto sourceValueAsObjectiveCType =
         const_cast<void*>(swift_dynamicCastUnknownClass(sourceValue,
@@ -3031,8 +3041,8 @@ _bridgeNonVerbatimFromObjectiveCConditional(
   // Dig out the Objective-C class type through which the native type
   // is bridged.
   const Metadata *objectiveCType =
-    bridgeWitness->ObjectiveCType(MetadataState::Complete, nativeType,
-                                  bridgeWitness).Value;
+    _getBridgedObjectiveCType(MetadataState::Complete, nativeType,
+                              bridgeWitness).Value;
         
   // Check whether we can downcast the source value to the Objective-C
   // type.
@@ -3097,7 +3107,7 @@ bool _swift_isOptional(OpaqueValue *src, const Metadata *type) {
   return swift_isOptionalType(type);
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 HeapObject *_swift_extractDynamicValue(OpaqueValue *value, const Metadata *self) {
   OpaqueValue *outValue;
   const Metadata *outType;

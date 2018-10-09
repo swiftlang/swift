@@ -12,7 +12,6 @@
 
 #define DEBUG_TYPE "sil-ownership-verifier"
 
-#include "UseOwnershipRequirement.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
@@ -137,66 +136,51 @@ static bool isOwnershipForwardingInst(SILInstruction *I) {
 }
 
 //===----------------------------------------------------------------------===//
-//                      OwnershipCompatibilityUseChecker
+//                      OperandOwnershipKindClassifier
 //===----------------------------------------------------------------------===//
 
 namespace {
 
-struct OwnershipUseCheckerResult {
-  bool HasCompatibleOwnership;
-  bool ShouldCheckForDataflowViolations;
-
-  OwnershipUseCheckerResult(bool HasCompatibleOwnership,
-                            UseLifetimeConstraint OwnershipRequirement)
-      : HasCompatibleOwnership(HasCompatibleOwnership),
-        ShouldCheckForDataflowViolations(bool(OwnershipRequirement)) {}
-};
-
-class OwnershipCompatibilityUseChecker
-    : public SILInstructionVisitor<OwnershipCompatibilityUseChecker,
-                                   OwnershipUseCheckerResult> {
+class OperandOwnershipKindClassifier
+    : public SILInstructionVisitor<OperandOwnershipKindClassifier,
+                                   OperandOwnershipKindMap> {
 public:
+  using Map = OperandOwnershipKindMap;
+
 private:
-  LLVM_ATTRIBUTE_UNUSED
-  SILModule &Mod;
+  LLVM_ATTRIBUTE_UNUSED SILModule &mod;
 
-  const Operand &Op;
-  SILValue BaseValue;
-  ErrorBehaviorKind ErrorBehavior;
+  const Operand &op;
+  ErrorBehaviorKind errorBehavior;
+  bool checkingSubObject;
 
 public:
-  /// Create a new OwnershipCompatibilityUseChecker.
+  /// Create a new OperandOwnershipKindClassifier.
   ///
   /// In most cases, one should only pass in \p Op and \p BaseValue will be set
   /// to Op.get(). In cases where one is trying to verify subobjects, Op.get()
   /// should be the subobject and Value should be the parent object. An example
   /// of where one would want to do this is in the case of value projections
   /// like struct_extract.
-  OwnershipCompatibilityUseChecker(SILModule &M, const Operand &Op,
-                                   SILValue BaseValue,
-                                   ErrorBehaviorKind ErrorBehavior)
-      : Mod(M), Op(Op), BaseValue(BaseValue), ErrorBehavior(ErrorBehavior) {
-    assert((BaseValue == Op.get() ||
-            BaseValue.getOwnershipKind() == ValueOwnershipKind::Guaranteed) &&
-           "Guaranteed values are the only values allowed to have subobject");
-    // We only support subobjects on objects.
-    assert((BaseValue->getType().isObject() || !isCheckingSubObject()) &&
-           "Checking a subobject, but do not have an object base value?!");
-  }
+  OperandOwnershipKindClassifier(SILModule &mod, const Operand &op,
+                                 ErrorBehaviorKind errorBehavior,
+                                 bool checkingSubObject)
+      : mod(mod), op(op), errorBehavior(errorBehavior),
+        checkingSubObject(checkingSubObject) {}
 
-  bool isCheckingSubObject() const { return Op.get() != BaseValue; }
+  bool isCheckingSubObject() const { return checkingSubObject; }
 
-  SILValue getValue() const { return Op.get(); }
+  SILValue getValue() const { return op.get(); }
 
   ValueOwnershipKind getOwnershipKind() const {
-    assert(getValue().getOwnershipKind() == Op.get().getOwnershipKind() &&
+    assert(getValue().getOwnershipKind() == op.get().getOwnershipKind() &&
            "Expected ownership kind of parent value and operand");
     return getValue().getOwnershipKind();
   }
 
-  unsigned getOperandIndex() const { return Op.getOperandNumber(); }
+  unsigned getOperandIndex() const { return op.getOperandNumber(); }
 
-  SILType getType() const { return Op.get()->getType(); }
+  SILType getType() const { return op.get()->getType(); }
 
   bool compatibleWithOwnership(ValueOwnershipKind Kind) const {
     return getOwnershipKind().isCompatibleWith(Kind);
@@ -213,73 +197,26 @@ public:
       getOwnershipKind() == ValueOwnershipKind::Any;
   }
 
-  /// Depending on our initialization, either return false or call Func and
-  /// throw an error.
-  bool handleError(llvm::function_ref<void()> &&MessagePrinterFunc) const {
-    if (ErrorBehavior.shouldPrintMessage()) {
-      MessagePrinterFunc();
-    }
-
-    if (ErrorBehavior.shouldReturnFalse()) {
-      return false;
-    }
-
-    assert(ErrorBehavior.shouldAssert() && "At this point, we should assert");
-    llvm_unreachable("triggering standard assertion failure routine");
-  }
-
-  OwnershipUseCheckerResult visitForwardingInst(SILInstruction *I,
-                                                ArrayRef<Operand> Ops);
-  OwnershipUseCheckerResult visitForwardingInst(SILInstruction *I) {
+  OperandOwnershipKindMap visitForwardingInst(SILInstruction *I,
+                                              ArrayRef<Operand> Ops);
+  OperandOwnershipKindMap visitForwardingInst(SILInstruction *I) {
     return visitForwardingInst(I, I->getAllOperands());
   }
 
-  /// Visit a terminator instance that performs a transform like
-  /// operation. E.x.: switch_enum, checked_cast_br. This does not include br or
-  /// cond_br.
-  OwnershipUseCheckerResult visitTransformingTerminatorInst(TermInst *TI);
-
-  OwnershipUseCheckerResult
-  visitEnumArgument(EnumDecl *E, ValueOwnershipKind RequiredConvention);
-  OwnershipUseCheckerResult
+  OperandOwnershipKindMap
+  visitEnumArgument(ValueOwnershipKind RequiredConvention);
+  OperandOwnershipKindMap
   visitApplyParameter(ValueOwnershipKind RequiredConvention,
                       UseLifetimeConstraint Requirement);
-  OwnershipUseCheckerResult
-  visitFullApply(FullApplySite apply);
+  OperandOwnershipKindMap visitFullApply(FullApplySite apply);
 
-  /// Check if \p User as compatible ownership with the SILValue that we are
-  /// checking.
-  ///
-  /// \returns true if the user is a use that must be checked for dataflow
-  /// violations.
-  bool check(SILInstruction *User) {
-    auto Result = visit(User);
-    if (!Result.HasCompatibleOwnership) {
-      return handleError([&]() {
-        llvm::errs() << "Function: '" << User->getFunction()->getName() << "'\n"
-                     << "Have operand with incompatible ownership?!\n"
-                     << "Value: " << *getValue() << "BaseValue: " << *BaseValue
-                     << "User: " << *User << "Conv: " << getOwnershipKind()
-                     << "\n\n";
-      });
-    }
-
-    assert((!Result.ShouldCheckForDataflowViolations ||
-            !isAddressOrTrivialType()) &&
-           "Address or trivial types should never be checked for dataflow "
-           "violations");
-
-    return Result.ShouldCheckForDataflowViolations;
-  }
-
-  OwnershipUseCheckerResult visitCallee(CanSILFunctionType SubstCalleeType);
-  OwnershipUseCheckerResult
+  OperandOwnershipKindMap visitCallee(CanSILFunctionType SubstCalleeType);
+  OperandOwnershipKindMap
   checkTerminatorArgumentMatchesDestBB(SILBasicBlock *DestBB, unsigned OpIndex);
 
 // Create declarations for all instructions, so we get a warning at compile
 // time if any instructions do not have an implementation.
-#define INST(Id, Parent) \
-  OwnershipUseCheckerResult visit##Id(Id *);
+#define INST(Id, Parent) OperandOwnershipKindMap visit##Id(Id *);
 #include "swift/SIL/SILNodes.def"
 };
 
@@ -288,9 +225,9 @@ public:
 /// Implementation for instructions without operands. These should never be
 /// visited.
 #define NO_OPERAND_INST(INST)                                                  \
-  OwnershipUseCheckerResult                                                    \
-      OwnershipCompatibilityUseChecker::visit##INST##Inst(INST##Inst *I) {     \
-    assert(I->getNumOperands() == 0 &&                                         \
+  OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
+      INST##Inst *i) {                                                         \
+    assert(i->getNumOperands() == 0 &&                                         \
            "Expected instruction without operands?!");                         \
     llvm_unreachable("Instruction without operand can not be compatible with " \
                      "any def's OwnershipValueKind");                          \
@@ -320,16 +257,12 @@ NO_OPERAND_INST(Unwind)
 
 /// Instructions whose arguments are always compatible with one convention.
 #define CONSTANT_OWNERSHIP_INST(OWNERSHIP, USE_LIFETIME_CONSTRAINT, INST)      \
-  OwnershipUseCheckerResult                                                    \
-      OwnershipCompatibilityUseChecker::visit##INST##Inst(INST##Inst *I) {     \
-    assert(I->getNumOperands() && "Expected to have non-zero operands");       \
-    if (ValueOwnershipKind::OWNERSHIP == ValueOwnershipKind::Trivial) {        \
-      assert(isAddressOrTrivialType() &&                                       \
-             "Trivial ownership requires a trivial type or an address");       \
-    }                                                                          \
-                                                                               \
-    return {compatibleWithOwnership(ValueOwnershipKind::OWNERSHIP),            \
-            UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT};                   \
+  OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
+      INST##Inst *i) {                                                         \
+    assert(i->getNumOperands() && "Expected to have non-zero operands");       \
+    return Map::compatibilityMap(                                              \
+        ValueOwnershipKind::OWNERSHIP,                                         \
+        UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
   }
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, IsEscapingClosure)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, RefElementAddr)
@@ -413,19 +346,13 @@ CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, DeallocValueBuffer)
 /// Instructions whose arguments are always compatible with one convention.
 #define CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(OWNERSHIP, USE_LIFETIME_CONSTRAINT, \
                                            INST)                               \
-  OwnershipUseCheckerResult                                                    \
-      OwnershipCompatibilityUseChecker::visit##INST##Inst(INST##Inst *I) {     \
-    assert(I->getNumOperands() && "Expected to have non-zero operands");       \
-    if (ValueOwnershipKind::OWNERSHIP == ValueOwnershipKind::Trivial) {        \
-      assert(isAddressOrTrivialType() &&                                       \
-             "Trivial ownership requires a trivial type or an address");       \
-    }                                                                          \
-                                                                               \
-    if (compatibleWithOwnership(ValueOwnershipKind::Trivial)) {                \
-      return {true, UseLifetimeConstraint::MustBeLive};                        \
-    }                                                                          \
-    return {compatibleWithOwnership(ValueOwnershipKind::OWNERSHIP),            \
-            UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT};                   \
+  OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
+      INST##Inst *i) {                                                         \
+    assert(i->getNumOperands() && "Expected to have non-zero operands");       \
+    return Map::compatibilityMap(                                              \
+        {{ValueOwnershipKind::Trivial, UseLifetimeConstraint::MustBeLive},     \
+         {ValueOwnershipKind::OWNERSHIP,                                       \
+          UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT}});                   \
   }
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, MustBeInvalidated,
                                    CheckedCastValueBranch)
@@ -438,9 +365,9 @@ CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, MustBeInvalidated,
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
 
 #define ACCEPTS_ANY_OWNERSHIP_INST(INST)                                       \
-  OwnershipUseCheckerResult                                                    \
-      OwnershipCompatibilityUseChecker::visit##INST##Inst(INST##Inst *I) {     \
-    return {true, UseLifetimeConstraint::MustBeLive};                          \
+  OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
+      INST##Inst *I) {                                                         \
+    return Map::allLive();                                                     \
   }
 ACCEPTS_ANY_OWNERSHIP_INST(BeginBorrow)
 ACCEPTS_ANY_OWNERSHIP_INST(CopyValue)
@@ -460,15 +387,14 @@ ACCEPTS_ANY_OWNERSHIP_INST(ValueToBridgeObject)
 // Trivial if trivial typed, otherwise must accept owned?
 #define ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(USE_LIFETIME_CONSTRAINT,  \
                                                      INST)                     \
-  OwnershipUseCheckerResult                                                    \
-      OwnershipCompatibilityUseChecker::visit##INST##Inst(INST##Inst *I) {     \
+  OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
+      INST##Inst *I) {                                                         \
     assert(I->getNumOperands() && "Expected to have non-zero operands");       \
     if (getType().is<AnyMetatypeType>()) {                                     \
-      return {true, UseLifetimeConstraint::MustBeLive};                        \
+      return Map::compatibilityMap(ValueOwnershipKind::Trivial,                \
+                                   UseLifetimeConstraint::MustBeLive);         \
     }                                                                          \
-    bool compatible = hasExactOwnership(ValueOwnershipKind::Any) ||            \
-                      !compatibleWithOwnership(ValueOwnershipKind::Trivial);   \
-    return {compatible, UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT};       \
+    return Map::compatibleWithAllExcept(ValueOwnershipKind::Trivial);          \
   }
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, ClassMethod)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, ObjCMethod)
@@ -478,12 +404,10 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, SuperMethod)
 
 // Trivial if trivial typed, otherwise must accept owned?
 #define ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(USE_LIFETIME_CONSTRAINT, INST)        \
-  OwnershipUseCheckerResult                                                    \
-      OwnershipCompatibilityUseChecker::visit##INST##Inst(INST##Inst *I) {     \
+  OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
+      INST##Inst *I) {                                                         \
     assert(I->getNumOperands() && "Expected to have non-zero operands");       \
-    bool compatible = hasExactOwnership(ValueOwnershipKind::Any) ||            \
-                      !compatibleWithOwnership(ValueOwnershipKind::Trivial);   \
-    return {compatible, UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT};       \
+    return Map::compatibleWithAllExcept(ValueOwnershipKind::Trivial);          \
   }
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, BridgeObjectToWord)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, ClassifyBridgeObject)
@@ -506,53 +430,47 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, ConvertEscapeToNoEscape)
 #include "swift/AST/ReferenceStorage.def"
 #undef ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitForwardingInst(SILInstruction *I, ArrayRef<Operand> Ops) {
-  assert(I->getNumOperands() && "Expected to have non-zero operands");
-  assert(isOwnershipForwardingInst(I) &&
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
+                                                    ArrayRef<Operand> ops) {
+  assert(i->getNumOperands() && "Expected to have non-zero operands");
+  assert(isOwnershipForwardingInst(i) &&
          "Expected to have an ownership forwarding inst");
 
-  // Find the first index where we have a trivial value.
-  auto Iter = find_if(Ops, [&I](const Operand &Op) -> bool {
-    if (I->isTypeDependentOperand(Op))
+  // Find the first index where we have a non-trivial value.
+  auto iter = find_if(ops, [&i](const Operand &op) -> bool {
+    if (i->isTypeDependentOperand(op))
       return false;
-    return Op.get().getOwnershipKind() != ValueOwnershipKind::Trivial;
+    return op.get().getOwnershipKind() != ValueOwnershipKind::Trivial;
   });
 
-  // All trivial.
-  if (Iter == Ops.end()) {
-    return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
-            UseLifetimeConstraint::MustBeLive};
+  // If we do not find a non-trivial value, then we know for sure that we have a
+  // trivial value.
+  if (iter == ops.end()) {
+    return Map::compatibilityMap(ValueOwnershipKind::Trivial,
+                                 UseLifetimeConstraint::MustBeLive);
   }
 
-  unsigned Index = std::distance(Ops.begin(), Iter);
-  ValueOwnershipKind Base = Ops[Index].get().getOwnershipKind();
+  // Ok, we have at least a single non-trivial value. Grab the type of the
+  // operand and see if it is trivial or non-trivial. If the type of the operand
+  // is trivial, then return that we accept trivial here. Otherwise, return the
+  // base ownership kind.
+  if (getType().isTrivial(mod))
+    return Map::compatibilityMap(ValueOwnershipKind::Trivial,
+                                 UseLifetimeConstraint::MustBeLive);
 
-  for (const Operand &Op : Ops.slice(Index + 1)) {
-    if (I->isTypeDependentOperand(Op))
-      continue;
-    auto OpKind = Op.get().getOwnershipKind();
-    if (OpKind.merge(ValueOwnershipKind::Trivial))
-      continue;
-
-    auto MergedValue = Base.merge(OpKind.Value);
-    if (!MergedValue.hasValue()) {
-      return {false, UseLifetimeConstraint::MustBeInvalidated};
-    }
-    Base = MergedValue.getValue();
-  }
-
-  // We only need to treat a forwarded instruction as a lifetime ending use of
-  // it is owned.
-  auto lifetimeConstraint = hasExactOwnership(ValueOwnershipKind::Owned)
-                                ? UseLifetimeConstraint::MustBeInvalidated
-                                : UseLifetimeConstraint::MustBeLive;
-  return {true, lifetimeConstraint};
+  // Otherwise, return the value ownership kind and forwarding lifetime
+  // constraint of the first non-trivial operand. This will ensure that all
+  // non-trivial operands have the same ownership kind.
+  unsigned index = std::distance(ops.begin(), iter);
+  ValueOwnershipKind kind = ops[index].get().getOwnershipKind();
+  auto lifetimeConstraint = kind.getForwardingLifetimeConstraint();
+  return Map::compatibilityMap(kind, lifetimeConstraint);
 }
 
 #define FORWARD_ANY_OWNERSHIP_INST(INST)                                       \
-  OwnershipUseCheckerResult                                                    \
-      OwnershipCompatibilityUseChecker::visit##INST##Inst(INST##Inst *I) {     \
+  OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
+      INST##Inst *I) {                                                         \
     return visitForwardingInst(I);                                             \
   }
 FORWARD_ANY_OWNERSHIP_INST(Tuple)
@@ -575,189 +493,246 @@ FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
 // An instruction that forwards a constant ownership or trivial ownership.
 #define FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(                            \
     OWNERSHIP, USE_LIFETIME_CONSTRAINT, INST)                                  \
-  OwnershipUseCheckerResult                                                    \
-      OwnershipCompatibilityUseChecker::visit##INST##Inst(INST##Inst *I) {     \
+  OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
+      INST##Inst *I) {                                                         \
     assert(I->getNumOperands() && "Expected to have non-zero operands");       \
     assert(isGuaranteedForwardingInst(I) &&                                    \
            "Expected an ownership forwarding inst");                           \
-    if (ValueOwnershipKind::OWNERSHIP != ValueOwnershipKind::Trivial &&        \
-        hasExactOwnership(ValueOwnershipKind::Trivial)) {                      \
-      assert(isAddressOrTrivialType() &&                                       \
-             "Trivial ownership requires a trivial type or an address");       \
-      return {true, UseLifetimeConstraint::MustBeLive};                        \
-    }                                                                          \
-    if (ValueOwnershipKind::OWNERSHIP == ValueOwnershipKind::Trivial) {        \
-      assert(isAddressOrTrivialType() &&                                       \
-             "Trivial ownership requires a trivial type or an address");       \
-    }                                                                          \
-                                                                               \
-    return {compatibleWithOwnership(ValueOwnershipKind::OWNERSHIP),            \
-            UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT};                   \
+    OperandOwnershipKindMap map;                                               \
+    map.add(ValueOwnershipKind::Trivial, UseLifetimeConstraint::MustBeLive);   \
+    map.addCompatibilityConstraint(                                            \
+        ValueOwnershipKind::OWNERSHIP,                                         \
+        UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
+    return map;                                                                \
   }
 FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, MustBeLive, TupleExtract)
 FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, MustBeLive,
                                            StructExtract)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitDeallocPartialRefInst(
-    DeallocPartialRefInst *I) {
-  if (getValue() == I->getInstance()) {
-    return {compatibleWithOwnership(ValueOwnershipKind::Owned),
-            UseLifetimeConstraint::MustBeInvalidated};
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitDeallocPartialRefInst(
+    DeallocPartialRefInst *i) {
+  if (getValue() == i->getInstance()) {
+    return Map::compatibilityMap(ValueOwnershipKind::Owned,
+                                 UseLifetimeConstraint::MustBeInvalidated);
   }
 
-  return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
-          UseLifetimeConstraint::MustBeLive};
+  return Map::compatibilityMap(ValueOwnershipKind::Trivial,
+                               UseLifetimeConstraint::MustBeLive);
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitSelectEnumInst(SelectEnumInst *I) {
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitSelectEnumInst(SelectEnumInst *I) {
   if (getValue() == I->getEnumOperand()) {
-    return {true, UseLifetimeConstraint::MustBeLive};
+    return Map::allLive();
   }
 
   return visitForwardingInst(I, I->getAllOperands().drop_front());
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitAllocRefInst(AllocRefInst *I) {
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitAllocRefInst(AllocRefInst *I) {
   assert(I->getNumOperands() != 0
          && "If we reach this point, we must have a tail operand");
-  return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
-          UseLifetimeConstraint::MustBeLive};
+  return Map::compatibilityMap(ValueOwnershipKind::Trivial,
+                               UseLifetimeConstraint::MustBeLive);
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitAllocRefDynamicInst(
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitAllocRefDynamicInst(
     AllocRefDynamicInst *I) {
   assert(I->getNumOperands() != 0 &&
          "If we reach this point, we must have a tail operand");
-  return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
-          UseLifetimeConstraint::MustBeLive};
+  return Map::compatibilityMap(ValueOwnershipKind::Trivial,
+                               UseLifetimeConstraint::MustBeLive);
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::checkTerminatorArgumentMatchesDestBB(
-    SILBasicBlock *DestBB, unsigned OpIndex) {
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::checkTerminatorArgumentMatchesDestBB(
+    SILBasicBlock *destBB, unsigned opIndex) {
   // Grab the ownership kind of the destination block.
-  ValueOwnershipKind DestBlockArgOwnershipKind =
-      DestBB->getArgument(OpIndex)->getOwnershipKind();
+  ValueOwnershipKind destBlockArgOwnershipKind =
+      destBB->getArgument(opIndex)->getOwnershipKind();
 
   // Then if we do not have an enum, make sure that the conventions match.
-  EnumDecl *E = getType().getEnumOrBoundGenericEnum();
-  if (!E) {
-    bool matches = compatibleWithOwnership(DestBlockArgOwnershipKind);
-    auto lifetimeConstraint = hasExactOwnership(ValueOwnershipKind::Owned)
-                                  ? UseLifetimeConstraint::MustBeInvalidated
-                                  : UseLifetimeConstraint::MustBeLive;
-    return {matches, lifetimeConstraint};
+  if (!getType().getEnumOrBoundGenericEnum()) {
+    auto lifetimeConstraint =
+        destBlockArgOwnershipKind.getForwardingLifetimeConstraint();
+    return Map::compatibilityMap(destBlockArgOwnershipKind, lifetimeConstraint);
   }
 
-  return visitEnumArgument(E, DestBlockArgOwnershipKind);
+  // Otherwise, we need to properly handle the sum type nature of enum
+  // arguments.
+  return visitEnumArgument(destBlockArgOwnershipKind);
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitBranchInst(BranchInst *BI) {
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitBranchInst(BranchInst *BI) {
   return checkTerminatorArgumentMatchesDestBB(BI->getDestBB(),
                                               getOperandIndex());
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitCondBranchInst(CondBranchInst *CBI) {
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitCondBranchInst(CondBranchInst *cbi) {
   // If our conditional branch is the condition, it is trivial. Check that the
   // ownership kind is trivial.
-  if (CBI->isConditionOperandIndex(getOperandIndex()))
-    return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
-            UseLifetimeConstraint::MustBeLive};
+  if (cbi->isConditionOperandIndex(getOperandIndex()))
+    return Map::compatibilityMap(ValueOwnershipKind::Trivial,
+                                 UseLifetimeConstraint::MustBeLive);
 
-  // Otherwise, make sure that our operand matches the
-  if (CBI->isTrueOperandIndex(getOperandIndex())) {
-    unsigned TrueOffset = 1;
-    return checkTerminatorArgumentMatchesDestBB(CBI->getTrueBB(),
-                                                getOperandIndex() - TrueOffset);
+  // Otherwise, make sure that our operand matches the ownership of the relevant
+  // argument.
+  //
+  // TODO: Use more updated APIs here to get the operands/etc.
+  if (cbi->isTrueOperandIndex(getOperandIndex())) {
+    unsigned trueOffset = 1;
+    return checkTerminatorArgumentMatchesDestBB(cbi->getTrueBB(),
+                                                getOperandIndex() - trueOffset);
   }
 
-  assert(CBI->isFalseOperandIndex(getOperandIndex()) &&
+  assert(cbi->isFalseOperandIndex(getOperandIndex()) &&
          "If an operand is not the condition index or a true operand index, it "
          "must be a false operand index");
-  unsigned FalseOffset = 1 + CBI->getTrueOperands().size();
-  return checkTerminatorArgumentMatchesDestBB(CBI->getFalseBB(),
-                                              getOperandIndex() - FalseOffset);
+  unsigned falseOffset = 1 + cbi->getTrueOperands().size();
+  return checkTerminatorArgumentMatchesDestBB(cbi->getFalseBB(),
+                                              getOperandIndex() - falseOffset);
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitSwitchEnumInst(SwitchEnumInst *SEI) {
-  return visitTransformingTerminatorInst(SEI);
-}
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitSwitchEnumInst(SwitchEnumInst *sei) {
+  auto opTy = sei->getOperand()->getType();
+  auto &mod = sei->getModule();
+  // If our passed in type is trivial, we shouldn't have any non-trivial
+  // successors. Just bail early returning trivial.
+  if (opTy.isTrivial(mod))
+    return Map::compatibilityMap(ValueOwnershipKind::Trivial,
+                                 UseLifetimeConstraint::MustBeLive);
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitCheckedCastBranchInst(
-    CheckedCastBranchInst *SEI) {
-  return visitTransformingTerminatorInst(SEI);
-}
+  // Otherwise, go through the cases of the enum. If we have any cases with
+  // trivial payload or no payload cases, add trivial as a base ownership kind
+  // we can accept.
+  OperandOwnershipKindMap map;
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitTransformingTerminatorInst(
-    TermInst *TI) {
-  // If our operand was trivial, return early.
-  if (compatibleWithOwnership(ValueOwnershipKind::Trivial))
-    return {true, UseLifetimeConstraint::MustBeLive};
+  bool foundNonTrivialCase = false;
 
-  // Then we need to go through all of our destinations and make sure that if
-  // they have a payload, the payload's convention matches our
-  // convention.
-  //
-  // *NOTE* we assume that all of our types line up and are checked by the
-  // normal verifier.
-  for (auto *Succ : TI->getParent()->getSuccessorBlocks()) {
-    // This must be a no-payload case... continue.
-    if (Succ->args_size() == 0)
+  auto *enumDecl = opTy.getEnumOrBoundGenericEnum();
+  assert(enumDecl);
+  for (auto *eltDecl : enumDecl->getAllElements()) {
+    // If we have a no-payload case add that we support trivial and continue.
+    if (!eltDecl->hasAssociatedValues()) {
+      map.addCompatibilityConstraint(ValueOwnershipKind::Trivial,
+                                     UseLifetimeConstraint::MustBeLive);
       continue;
+    }
 
-    // If we have a trivial value or a value with ownership kind that matches
-    // the switch_enum, then continue.
-    auto OwnershipKind = Succ->getArgument(0)->getOwnershipKind();
-    if (OwnershipKind == ValueOwnershipKind::Trivial ||
-        compatibleWithOwnership(OwnershipKind))
+    // If we have a completely trivial payload case, then add that we support
+    // trivial and continue.
+    if (opTy.getEnumElementType(eltDecl, mod).isTrivial(mod)) {
+      map.addCompatibilityConstraint(ValueOwnershipKind::Trivial,
+                                     UseLifetimeConstraint::MustBeLive);
       continue;
+    }
 
-    // Otherwise, emit an error.
-    handleError([&]() {
-      llvm::errs()
-          << "Function: '" << Succ->getParent()->getName() << "'\n"
-          << "Error! Argument ownership kind does not match terminator!\n"
-          << "Terminator: " << *TI << "Argument: " << *Succ->getArgument(0)
-          << "Expected convention: " << getOwnershipKind() << ".\n"
-          << "Actual convention:   " << OwnershipKind << '\n'
-          << '\n';
-    });
+    // Otherwise, we have a non-trivial case. Set foundNonTrivialCase to
+    // true. We will need to check the arguments of the switch_enum's successors
+    // for the ownership kind that we can accept.
+    foundNonTrivialCase = true;
   }
 
-  // Finally, if everything lines up, emit that we match and are a lifetime
-  // ending point if we are owned.
-  auto lifetimeConstraint = hasExactOwnership(ValueOwnershipKind::Owned)
-                                ? UseLifetimeConstraint::MustBeInvalidated
-                                : UseLifetimeConstraint::MustBeLive;
-  return {true, lifetimeConstraint};
+  // If we didn't find a non-trivial case, return the map we have constructed so
+  // far.
+  if (!foundNonTrivialCase)
+    return map;
+
+  // Otherwise, we want to find the ownership constraint of our successor
+  // arguments.
+  Optional<ValueOwnershipKind> nonTrivialKind;
+  for (auto argArray : sei->getSuccessorBlockArguments()) {
+    if (argArray.empty())
+      continue;
+    SILValue arg = argArray[getOperandIndex()];
+    if (arg->getType().isTrivial(mod))
+      continue;
+
+    // If we haven't found a non-trivial kind yet, stash the kind we find.
+    if (!nonTrivialKind) {
+      nonTrivialKind = arg.getOwnershipKind();
+      continue;
+    }
+
+    // Otherwise if we /do/ have a non trivial kind and the argument's ownership
+    // kind is compatible, merge in case the first value we saw had Any
+    // ownership.
+    auto newKind = nonTrivialKind->merge(arg.getOwnershipKind());
+    if (newKind) {
+      nonTrivialKind = newKind;
+      continue;
+    }
+
+    // Otherwise, we have inconsistent ownership in between our successors. To
+    // be sure that we error, return an empty map.
+    return Map();
+  }
+
+  // We should never have an enum with a non-trivial case where we do not have
+  // at least one successor with a proper ownership qualifier since we either
+  // switch over the entire enum implying we visit that case, or we go through
+  // the default which will have our enum type as its type and thus some form of
+  // non-trivial ownership. So it is correct to use the optional here without
+  // checking.
+  auto lifetimeConstraint = nonTrivialKind->getForwardingLifetimeConstraint();
+  map.addCompatibilityConstraint(*nonTrivialKind, lifetimeConstraint);
+
+  return map;
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitReturnInst(ReturnInst *RI) {
-  SILModule &M = RI->getModule();
-  bool IsTrivial = RI->getOperand()->getType().isTrivial(M);
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitCheckedCastBranchInst(
+    CheckedCastBranchInst *ccbi) {
+  Optional<OperandOwnershipKindMap> map;
+  for (auto argArray : ccbi->getSuccessorBlockArguments()) {
+    assert(!argArray.empty());
+
+    auto argOwnershipKind = argArray[getOperandIndex()]->getOwnershipKind();
+    // If we do not have a map yet, initialize it and continue.
+    if (!map) {
+      auto lifetimeConstraint =
+          argOwnershipKind.getForwardingLifetimeConstraint();
+      map = Map::compatibilityMap(argOwnershipKind, lifetimeConstraint);
+      continue;
+    }
+
+    // Otherwise, make sure that we can accept the rest of our
+    // arguments. If not, we return an empty ownership kind to make
+    // sure that we flag everything as an error.
+    if (map->canAcceptKind(argOwnershipKind)) {
+      continue;
+    }
+
+    return OperandOwnershipKindMap();
+  }
+
+  return map.getValue();
+}
+
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitReturnInst(ReturnInst *RI) {
+  bool IsTrivial = RI->getOperand()->getType().isTrivial(mod);
   SILFunctionConventions fnConv = RI->getFunction()->getConventions();
   auto Results = fnConv.getDirectSILResults();
+  // FIXME: Shouldn't we return an empty OperandOwnershipKindMap here if we do
+  // not have any results?
   if (Results.empty() || IsTrivial) {
-    return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
-            UseLifetimeConstraint::MustBeLive};
+    return Map::compatibilityMap(ValueOwnershipKind::Trivial,
+                                 UseLifetimeConstraint::MustBeLive);
   }
 
   CanGenericSignature Sig = fnConv.funcTy->getGenericSignature();
 
   // Find the first index where we have a trivial value.
-  auto Iter = find_if(Results, [&M, &Sig](const SILResultInfo &Info) -> bool {
-    return Info.getOwnershipKind(M, Sig) != ValueOwnershipKind::Trivial;
+  auto Iter = find_if(Results, [this, &Sig](const SILResultInfo &Info) -> bool {
+    return Info.getOwnershipKind(mod, Sig) != ValueOwnershipKind::Trivial;
   });
 
   // If we have all trivial, then we must be trivial. Why wasn't our original
@@ -766,115 +741,111 @@ OwnershipCompatibilityUseChecker::visitReturnInst(ReturnInst *RI) {
   if (Iter == Results.end())
     llvm_unreachable("Should have already checked a trivial type?!");
 
-  ValueOwnershipKind Base = Iter->getOwnershipKind(M, Sig);
+  ValueOwnershipKind Base = Iter->getOwnershipKind(mod, Sig);
 
   for (const SILResultInfo &ResultInfo :
        SILFunctionConventions::DirectSILResultRange(std::next(Iter),
                                                     Results.end())) {
-    auto RKind = ResultInfo.getOwnershipKind(M, Sig);
+    auto RKind = ResultInfo.getOwnershipKind(mod, Sig);
     // Ignore trivial types.
     if (RKind.merge(ValueOwnershipKind::Trivial))
       continue;
 
     auto MergedValue = Base.merge(RKind);
     // If we fail to merge all types in, bail. We can not come up with a proper
-    // result type.
-    if (!MergedValue.hasValue()) {
-      return {false, UseLifetimeConstraint::MustBeLive};
-    }
+    // result type. We assert here since this is a hard error in the normal
+    // SILVerifier since the return type of the function would not match its
+    // terminator.
+    assert(MergedValue.hasValue() &&
+           "Failed to merge all types in on a return?!");
     // In case Base is Any.
     Base = MergedValue.getValue();
   }
 
-  if (auto *E = getType().getEnumOrBoundGenericEnum()) {
-    return visitEnumArgument(E, Base);
+  if (getType().getEnumOrBoundGenericEnum()) {
+    return visitEnumArgument(Base);
   }
 
-  return {compatibleWithOwnership(Base),
-          UseLifetimeConstraint::MustBeInvalidated};
+  return Map::compatibilityMap(Base, UseLifetimeConstraint::MustBeInvalidated);
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitEndBorrowInst(EndBorrowInst *I) {
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitEndBorrowInst(EndBorrowInst *I) {
   // If we are checking a subobject, make sure that we are from a guaranteed
   // basic block argument.
   if (isCheckingSubObject()) {
-    auto *phiArg = cast<SILPhiArgument>(Op.get());
+    auto *phiArg = cast<SILPhiArgument>(op.get());
     (void)phiArg;
-    assert(phiArg->getOwnershipKind() == ValueOwnershipKind::Guaranteed &&
-           "Expected an end_borrow paired with an argument.");
-    return {true, UseLifetimeConstraint::MustBeLive};
+    return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,
+                                 UseLifetimeConstraint::MustBeLive);
   }
 
   /// An end_borrow is modeled as invalidating the guaranteed value preventing
   /// any further uses of the value.
-  return {compatibleWithOwnership(ValueOwnershipKind::Guaranteed),
-          UseLifetimeConstraint::MustBeInvalidated};
+  return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,
+                               UseLifetimeConstraint::MustBeInvalidated);
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitThrowInst(ThrowInst *I) {
-  return {compatibleWithOwnership(ValueOwnershipKind::Owned),
-          UseLifetimeConstraint::MustBeInvalidated};
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitThrowInst(ThrowInst *I) {
+  return Map::compatibilityMap(ValueOwnershipKind::Owned,
+                               UseLifetimeConstraint::MustBeInvalidated);
 }
 
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-OwnershipUseCheckerResult \
-OwnershipCompatibilityUseChecker::visitStore##Name##Inst(Store##Name##Inst *I){\
-  /* A store instruction implies that the value to be stored to be live, */ \
-  /* but it does not touch the strong reference count of the value. */ \
-  if (getValue() == I->getSrc()) \
-    return {true, UseLifetimeConstraint::MustBeLive}; \
-  return {compatibleWithOwnership(ValueOwnershipKind::Trivial), \
-          UseLifetimeConstraint::MustBeLive}; \
-}
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
+  OperandOwnershipKindMap                                                      \
+      OperandOwnershipKindClassifier::visitStore##Name##Inst(                  \
+          Store##Name##Inst *I) {                                              \
+    /* A store instruction implies that the value to be stored to be live, */  \
+    /* but it does not touch the strong reference count of the value. We */    \
+    /* also just care about liveness for the dest. So just match everything */ \
+    /* as must be live. */                                                     \
+    return Map::allLive();                                                     \
+  }
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
 #include "swift/AST/ReferenceStorage.def"
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitStoreBorrowInst(StoreBorrowInst *I) {
-  if (getValue() == I->getSrc())
-    return {compatibleWithOwnership(ValueOwnershipKind::Guaranteed),
-            UseLifetimeConstraint::MustBeLive};
-  return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
-          UseLifetimeConstraint::MustBeLive};
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitStoreBorrowInst(StoreBorrowInst *I) {
+  if (getValue() == I->getSrc()) {
+    return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,
+                                 UseLifetimeConstraint::MustBeLive);
+  }
+  return Map::compatibilityMap(ValueOwnershipKind::Trivial,
+                               UseLifetimeConstraint::MustBeLive);
 }
 
 // FIXME: Why not use SILArgumentConvention here?
-OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitCallee(
-    CanSILFunctionType SubstCalleeType) {
-  ParameterConvention Conv = SubstCalleeType->getCalleeConvention();
-  switch (Conv) {
+OperandOwnershipKindMap OperandOwnershipKindClassifier::visitCallee(
+    CanSILFunctionType substCalleeType) {
+  ParameterConvention conv = substCalleeType->getCalleeConvention();
+  switch (conv) {
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Constant:
-    assert(!SILModuleConventions(Mod).isSILIndirect(
-        SILParameterInfo(SubstCalleeType, Conv)));
-    return {compatibleWithOwnership(ValueOwnershipKind::Owned),
-            UseLifetimeConstraint::MustBeInvalidated};
+    assert(!SILModuleConventions(mod).isSILIndirect(
+        SILParameterInfo(substCalleeType, conv)));
+    return Map::compatibilityMap(ValueOwnershipKind::Owned,
+                                 UseLifetimeConstraint::MustBeInvalidated);
   case ParameterConvention::Indirect_In_Guaranteed:
-    assert(!SILModuleConventions(Mod).isSILIndirect(
-        SILParameterInfo(SubstCalleeType, Conv)));
-    return {compatibleWithOwnership(ValueOwnershipKind::Owned),
-            UseLifetimeConstraint::MustBeLive};
+    assert(!SILModuleConventions(mod).isSILIndirect(
+        SILParameterInfo(substCalleeType, conv)));
+    return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,
+                                 UseLifetimeConstraint::MustBeLive);
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
     llvm_unreachable("Illegal convention for callee");
   case ParameterConvention::Direct_Unowned:
-    if (isAddressOrTrivialType())
-      return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
-              UseLifetimeConstraint::MustBeLive};
-    // We accept unowned, owned, and guaranteed in unowned positions.
-    return {true, UseLifetimeConstraint::MustBeLive};
+    return Map::allLive();
   case ParameterConvention::Direct_Owned:
-    return {compatibleWithOwnership(ValueOwnershipKind::Owned),
-            UseLifetimeConstraint::MustBeInvalidated};
+    return Map::compatibilityMap(ValueOwnershipKind::Owned,
+                                 UseLifetimeConstraint::MustBeInvalidated);
   case ParameterConvention::Direct_Guaranteed:
-    if (SubstCalleeType->isNoEscape())
-      return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
-        UseLifetimeConstraint::MustBeLive};
-    return {compatibleWithOwnership(ValueOwnershipKind::Guaranteed),
-            UseLifetimeConstraint::MustBeLive};
+    if (substCalleeType->isNoEscape())
+      return Map::compatibilityMap(ValueOwnershipKind::Trivial,
+                                   UseLifetimeConstraint::MustBeLive);
+    return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,
+                                 UseLifetimeConstraint::MustBeLive);
   }
 
   llvm_unreachable("Unhandled ParameterConvention in switch.");
@@ -889,117 +860,159 @@ OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitCallee(
 //
 // %val = enum $Optional<SomeClass>, #Optional.none // trivial ownership
 // apply %f(%val) : (@owned Optional<SomeClass>)    // owned argument
-OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitEnumArgument(
-    EnumDecl *E, ValueOwnershipKind RequiredKind) {
-  // If this value is already categorized as a trivial ownership kind, it is
-  // safe to pass to any argument convention.
-  if (compatibleWithOwnership(ValueOwnershipKind::Trivial)) {
-    return {true, UseLifetimeConstraint::MustBeLive};
-  }
+OperandOwnershipKindMap OperandOwnershipKindClassifier::visitEnumArgument(
+    ValueOwnershipKind requiredKind) {
+  // If this value is already categorized as a trivial ownership kind,
+  // it is safe to pass to any argument convention. This is ok since
+  // we know that the enum type must match up as checked by the
+  // ownership verifier.
+  OperandOwnershipKindMap map;
+  map.addCompatibilityConstraint(ValueOwnershipKind::Trivial,
+                                 UseLifetimeConstraint::MustBeLive);
 
   // The operand has a non-trivial ownership kind. It must match the argument
   // convention.
-  auto ownership = getOwnershipKind();
-  UseLifetimeConstraint lifetimeConstraint;
-  if (ownership == ValueOwnershipKind::Owned) {
-    if (RequiredKind != ValueOwnershipKind::Owned) {
-      lifetimeConstraint = UseLifetimeConstraint::MustBeLive;
-    } else {
-      lifetimeConstraint = UseLifetimeConstraint::MustBeInvalidated;
-    }
+  if (requiredKind != ValueOwnershipKind::Owned) {
+    map.addCompatibilityConstraint(ValueOwnershipKind::Owned,
+                                   UseLifetimeConstraint::MustBeLive);
   } else {
-    lifetimeConstraint = UseLifetimeConstraint::MustBeLive;
+    map.addCompatibilityConstraint(ValueOwnershipKind::Owned,
+                                   UseLifetimeConstraint::MustBeInvalidated);
   }
-  return {ownership.isCompatibleWith(RequiredKind), lifetimeConstraint};
+  map.addCompatibilityConstraint(ValueOwnershipKind::Guaranteed,
+                                 UseLifetimeConstraint::MustBeLive);
+  map.addCompatibilityConstraint(ValueOwnershipKind::Unowned,
+                                 UseLifetimeConstraint::MustBeLive);
+  return map;
 }
 
 // We allow for trivial cases of enums with non-trivial cases to be passed in
 // non-trivial argument positions. This fits with modeling of a
 // SILFunctionArgument as a phi in a global program graph.
-OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::visitApplyParameter(
+OperandOwnershipKindMap OperandOwnershipKindClassifier::visitApplyParameter(
     ValueOwnershipKind Kind, UseLifetimeConstraint Requirement) {
+
   // Check if we have an enum. If not, then we just check against the passed in
   // convention.
-  EnumDecl *E = getType().getEnumOrBoundGenericEnum();
-  if (!E) {
-    return {compatibleWithOwnership(Kind), Requirement};
+  if (!getType().getEnumOrBoundGenericEnum()) {
+    // We allow for owned to be passed to apply parameters.
+    if (Kind != ValueOwnershipKind::Owned) {
+      return Map::compatibilityMap(
+          {{Kind, Requirement},
+           {ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeLive}});
+    }
+    return Map::compatibilityMap(Kind, Requirement);
   }
-  return visitEnumArgument(E, Kind);
+
+  // Otherwise consider that we may have a payload with a trivial case
+  // that has other non-trivial cases.
+  return visitEnumArgument(Kind);
 }
 
 // Handle Apply and TryApply.
-OwnershipUseCheckerResult OwnershipCompatibilityUseChecker::
-visitFullApply(FullApplySite apply) {
-  // If we are visiting the callee, handle it specially.
-  if (getOperandIndex() == 0)
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitFullApply(FullApplySite apply) {
+  // If we are visiting the callee operand, handle it specially.
+  if (apply.isCalleeOperand(op)) {
     return visitCallee(apply.getSubstCalleeType());
+  }
 
   // Indirect return arguments are address types.
-  if (isAddressOrTrivialType())
-    return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
-            UseLifetimeConstraint::MustBeLive};
+  if (apply.isIndirectResultOperand(op)) {
+    return Map::compatibilityMap(ValueOwnershipKind::Trivial,
+                                 UseLifetimeConstraint::MustBeLive);
+  }
 
-  unsigned argIndex = apply.getCalleeArgIndex(Op);
-  SILParameterInfo paramInfo =
-    apply.getSubstCalleeConv().getParamInfoForSILArg(argIndex);
+  unsigned argIndex = apply.getCalleeArgIndex(op);
+  auto conv = apply.getSubstCalleeConv();
+  SILParameterInfo paramInfo = conv.getParamInfoForSILArg(argIndex);
 
   switch (paramInfo.getConvention()) {
-  case ParameterConvention::Indirect_In:
   case ParameterConvention::Direct_Owned:
     return visitApplyParameter(ValueOwnershipKind::Owned,
                                UseLifetimeConstraint::MustBeInvalidated);
-  case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Direct_Unowned:
-    // We accept unowned, owned, and guaranteed in unowned positions.
-    return {true, UseLifetimeConstraint::MustBeLive};
-  case ParameterConvention::Indirect_In_Guaranteed:
+    return Map::allLive();
+
+  case ParameterConvention::Indirect_In: {
+    // This expects an @trivial if we have lowered addresses and @
+    if (conv.useLoweredAddresses()) {
+      return visitApplyParameter(ValueOwnershipKind::Trivial,
+                                 UseLifetimeConstraint::MustBeLive);
+    }
+    // TODO: Once trivial is subsumed in any, this goes away.
+    auto map = visitApplyParameter(ValueOwnershipKind::Owned,
+                                   UseLifetimeConstraint::MustBeInvalidated);
+    map.addCompatibilityConstraint(ValueOwnershipKind::Trivial,
+                                   UseLifetimeConstraint::MustBeLive);
+    return map;
+  }
+
+  case ParameterConvention::Indirect_In_Guaranteed: {
+    // This expects an @trivial if we have lowered addresses and @
+    if (conv.useLoweredAddresses()) {
+      return visitApplyParameter(ValueOwnershipKind::Trivial,
+                                 UseLifetimeConstraint::MustBeLive);
+    }
+    // TODO: Once trivial is subsumed in any, this goes away.
+    auto map = visitApplyParameter(ValueOwnershipKind::Guaranteed,
+                                   UseLifetimeConstraint::MustBeLive);
+    map.addCompatibilityConstraint(ValueOwnershipKind::Trivial,
+                                   UseLifetimeConstraint::MustBeLive);
+    return map;
+  }
+
+  // The following conventions should take address types and thus be
+  // trivial.
+  case ParameterConvention::Indirect_In_Constant:
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
+    return visitApplyParameter(ValueOwnershipKind::Trivial,
+                               UseLifetimeConstraint::MustBeLive);
+
   case ParameterConvention::Direct_Guaranteed:
     // A +1 value may be passed to a guaranteed argument. From the caller's
     // point of view, this is just like a normal non-consuming use.
     // Direct_Guaranteed only accepts non-trivial types, but trivial types are
     // already handled above.
-    return visitApplyParameter(ValueOwnershipKind::Any,
+    return visitApplyParameter(ValueOwnershipKind::Guaranteed,
                                UseLifetimeConstraint::MustBeLive);
-  // The following conventions should take address types.
-  case ParameterConvention::Indirect_Inout:
-  case ParameterConvention::Indirect_InoutAliasable:
-    llvm_unreachable("Unexpected non-trivial parameter convention.");
   }
   llvm_unreachable("unhandled convension");
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitBeginApplyInst(BeginApplyInst *I) {
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitBeginApplyInst(BeginApplyInst *I) {
   return visitFullApply(I);
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitApplyInst(ApplyInst *I) {
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitApplyInst(ApplyInst *I) {
   return visitFullApply(I);
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitTryApplyInst(TryApplyInst *I) {
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitTryApplyInst(TryApplyInst *I) {
   return visitFullApply(I);
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitPartialApplyInst(PartialApplyInst *I) {
-  // All non-trivial types should be captured.
-  if (isAddressOrTrivialType()) {
-    return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
-            UseLifetimeConstraint::MustBeLive};
-  }
-  return {compatibleWithOwnership(ValueOwnershipKind::Owned),
-          UseLifetimeConstraint::MustBeInvalidated};
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitPartialApplyInst(PartialApplyInst *I) {
+  return Map::compatibilityMap(
+      {{ValueOwnershipKind::Trivial, UseLifetimeConstraint::MustBeLive},
+       // All non-trivial types should be captured.
+       {ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeInvalidated}});
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitYieldInst(YieldInst *I) {
+// TODO: FIX THIS
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitYieldInst(YieldInst *I) {
   // Indirect return arguments are address types.
+  //
+  // TODO: Change this to check if this operand is an indirect result
   if (isAddressOrTrivialType())
-    return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
-            UseLifetimeConstraint::MustBeLive};
+    return Map::compatibilityMap(ValueOwnershipKind::Trivial,
+                                 UseLifetimeConstraint::MustBeLive);
 
   auto fnType = I->getFunction()->getLoweredFunctionType();
   auto yieldInfo = fnType->getYields()[getOperandIndex()];
@@ -1011,7 +1024,7 @@ OwnershipCompatibilityUseChecker::visitYieldInst(YieldInst *I) {
   case ParameterConvention::Indirect_In_Constant:
   case ParameterConvention::Direct_Unowned:
     // We accept unowned, owned, and guaranteed in unowned positions.
-    return {true, UseLifetimeConstraint::MustBeLive};
+    return Map::allLive();
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Direct_Guaranteed:
     return visitApplyParameter(ValueOwnershipKind::Guaranteed,
@@ -1024,50 +1037,45 @@ OwnershipCompatibilityUseChecker::visitYieldInst(YieldInst *I) {
   llvm_unreachable("unhandled convension");
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitAssignInst(AssignInst *I) {
-  if (getValue() == I->getSrc()) {
-    if (isAddressOrTrivialType()) {
-      return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
-              UseLifetimeConstraint::MustBeLive};
-    }
-    return {compatibleWithOwnership(ValueOwnershipKind::Owned),
-            UseLifetimeConstraint::MustBeInvalidated};
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitAssignInst(AssignInst *I) {
+  if (getValue() != I->getSrc()) {
+    return Map::compatibilityMap(ValueOwnershipKind::Trivial,
+                                 UseLifetimeConstraint::MustBeLive);
   }
 
-  return {true, UseLifetimeConstraint::MustBeLive};
+  return Map::compatibilityMap({
+      {ValueOwnershipKind::Trivial, UseLifetimeConstraint::MustBeLive},
+      {ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeInvalidated},
+  });
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitStoreInst(StoreInst *I) {
-  if (getValue() == I->getSrc()) {
-    if (isAddressOrTrivialType()) {
-      return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
-              UseLifetimeConstraint::MustBeLive};
-    }
-    return {compatibleWithOwnership(ValueOwnershipKind::Owned),
-            UseLifetimeConstraint::MustBeInvalidated};
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitStoreInst(StoreInst *I) {
+  if (getValue() != I->getSrc()) {
+    return Map::compatibilityMap(ValueOwnershipKind::Trivial,
+                                 UseLifetimeConstraint::MustBeLive);
   }
-  return {true, UseLifetimeConstraint::MustBeLive};
+
+  return Map::compatibilityMap({
+      {ValueOwnershipKind::Trivial, UseLifetimeConstraint::MustBeLive},
+      {ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeInvalidated},
+  });
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitCopyBlockWithoutEscapingInst(
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitCopyBlockWithoutEscapingInst(
     CopyBlockWithoutEscapingInst *I) {
   // Consumes the closure parameter.
   if (getValue() == I->getClosure()) {
-    return {compatibleWithOwnership(ValueOwnershipKind::Owned),
-            UseLifetimeConstraint::MustBeInvalidated};
+    return Map::compatibilityMap(ValueOwnershipKind::Owned,
+                                 UseLifetimeConstraint::MustBeInvalidated);
   }
-  bool compatible = hasExactOwnership(ValueOwnershipKind::Any) ||
-                    !compatibleWithOwnership(ValueOwnershipKind::Trivial);
 
-  return { compatible, UseLifetimeConstraint::MustBeLive };
+  return Map::compatibleWithAllExcept(ValueOwnershipKind::Trivial);
 }
 
-
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitMarkDependenceInst(
+OperandOwnershipKindMap OperandOwnershipKindClassifier::visitMarkDependenceInst(
     MarkDependenceInst *MDI) {
 
   // Forward ownership if the mark_dependence instruction marks a dependence
@@ -1076,24 +1084,22 @@ OwnershipCompatibilityUseChecker::visitMarkDependenceInst(
     if (auto ResFnTy = MDI->getType().getAs<SILFunctionType>())
       if (auto BaseFnTy = MDI->getBase()->getType().getAs<SILFunctionType>())
         if (!ResFnTy->isNoEscape() && BaseFnTy->isNoEscape())
-          return {compatibleWithOwnership(ValueOwnershipKind::Owned),
-                  UseLifetimeConstraint::MustBeInvalidated};
+          return Map::compatibilityMap(
+              ValueOwnershipKind::Owned,
+              UseLifetimeConstraint::MustBeInvalidated);
 
   // We always treat mark dependence as a use that keeps a value alive. We will
   // be introducing a begin_dependence/end_dependence version of this later.
-  return {true, UseLifetimeConstraint::MustBeLive};
+  return Map::allLive();
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitKeyPathInst(KeyPathInst *I) {
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitKeyPathInst(KeyPathInst *I) {
   // KeyPath moves the value in memory out of address operands, but the
   // ownership checker doesn't reason about that yet.
-  if (isAddressOrTrivialType()) {
-    return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
-            UseLifetimeConstraint::MustBeLive};
-  }
-  return {compatibleWithOwnership(ValueOwnershipKind::Owned),
-          UseLifetimeConstraint::MustBeInvalidated};
+  return Map::compatibilityMap(
+      {{ValueOwnershipKind::Trivial, UseLifetimeConstraint::MustBeLive},
+       {ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeInvalidated}});
 }
 
 //===----------------------------------------------------------------------===//
@@ -1102,50 +1108,26 @@ OwnershipCompatibilityUseChecker::visitKeyPathInst(KeyPathInst *I) {
 
 namespace {
 
-class OwnershipCompatibilityBuiltinUseChecker
-    : public SILBuiltinVisitor<OwnershipCompatibilityBuiltinUseChecker,
-                               OwnershipUseCheckerResult> {
+struct OperandOwnershipKindBuiltinClassifier
+    : SILBuiltinVisitor<OperandOwnershipKindBuiltinClassifier,
+                        OperandOwnershipKindMap> {
+  using Map = OperandOwnershipKindMap;
 
-  const OwnershipCompatibilityUseChecker &ParentChecker;
-
-public:
-  OwnershipCompatibilityBuiltinUseChecker(
-      OwnershipCompatibilityUseChecker &ParentChecker)
-      : ParentChecker(ParentChecker) {}
-
-  SILValue getValue() const { return ParentChecker.getValue(); }
-
-  ValueOwnershipKind getOwnershipKind() const {
-    return ParentChecker.getOwnershipKind();
-  }
-
-  unsigned getOperandIndex() const { return ParentChecker.getOperandIndex(); }
-
-  SILType getType() const { return ParentChecker.getType(); }
-
-  bool compatibleWithOwnership(ValueOwnershipKind Kind) const {
-    return ParentChecker.compatibleWithOwnership(Kind);
-  }
-
-  bool isAddressOrTrivialType() const {
-    return ParentChecker.isAddressOrTrivialType();
-  }
-
-  OwnershipUseCheckerResult visitLLVMIntrinsic(BuiltinInst *BI,
-                                               llvm::Intrinsic::ID ID) {
+  OperandOwnershipKindMap visitLLVMIntrinsic(BuiltinInst *BI,
+                                             llvm::Intrinsic::ID ID) {
     // LLVM intrinsics do not traffic in ownership, so if we have a result, it
     // must be trivial.
-    return {true, UseLifetimeConstraint::MustBeLive};
+    return {ValueOwnershipKind::Trivial, UseLifetimeConstraint::MustBeLive};
   }
 
     // BUILTIN_TYPE_CHECKER_OPERATION does not live past the type checker.
 #define BUILTIN_TYPE_CHECKER_OPERATION(ID, NAME)
 
 #define BUILTIN(ID, NAME, ATTRS)                                               \
-  OwnershipUseCheckerResult visit##ID(BuiltinInst *BI, StringRef Attr);
+  OperandOwnershipKindMap visit##ID(BuiltinInst *BI, StringRef Attr);
 #include "swift/AST/Builtins.def"
 
-  OwnershipUseCheckerResult check(BuiltinInst *BI) { return visit(BI); }
+  OperandOwnershipKindMap check(BuiltinInst *BI) { return visit(BI); }
 };
 
 } // end anonymous namespace
@@ -1154,11 +1136,11 @@ public:
 // @guaranteed parameters. This means that we can only have a lifetime ending
 // use with our builtins if it is owned.
 #define CONSTANT_OWNERSHIP_BUILTIN(OWNERSHIP, USE_LIFETIME_CONSTRAINT, ID)     \
-  OwnershipUseCheckerResult                                                    \
-      OwnershipCompatibilityBuiltinUseChecker::visit##ID(BuiltinInst *BI,      \
-                                                         StringRef Attr) {     \
-    return {compatibleWithOwnership(ValueOwnershipKind::OWNERSHIP),            \
-            UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT};                   \
+  OperandOwnershipKindMap OperandOwnershipKindBuiltinClassifier::visit##ID(    \
+      BuiltinInst *BI, StringRef Attr) {                                       \
+    return Map::compatibilityMap(                                              \
+        ValueOwnershipKind::OWNERSHIP,                                         \
+        UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
   }
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeLive, ErrorInMain)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeLive, UnexpectedError)
@@ -1282,17 +1264,16 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Swift3ImplicitObjCEntrypoint)
 // Builtins that should be lowered to SIL instructions so we should never see
 // them.
 #define BUILTIN_SIL_OPERATION(ID, NAME, CATEGORY)                              \
-  OwnershipUseCheckerResult                                                    \
-      OwnershipCompatibilityBuiltinUseChecker::visit##ID(BuiltinInst *BI,      \
-                                                         StringRef Attr) {     \
+  OperandOwnershipKindMap OperandOwnershipKindBuiltinClassifier::visit##ID(    \
+      BuiltinInst *BI, StringRef Attr) {                                       \
     llvm_unreachable("Builtin should have been lowered to SIL instruction?!"); \
   }
 #define BUILTIN(X, Y, Z)
 #include "swift/AST/Builtins.def"
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitBuiltinInst(BuiltinInst *BI) {
-  return OwnershipCompatibilityBuiltinUseChecker(*this).check(BI);
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitBuiltinInst(BuiltinInst *BI) {
+  return OperandOwnershipKindBuiltinClassifier().check(BI);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1305,28 +1286,28 @@ namespace {
 // refactored into a large state object that is used by functions.
 class SILValueOwnershipChecker {
   /// The result of performing the check.
-  llvm::Optional<bool> Result;
+  llvm::Optional<bool> result;
 
   /// The module that we are in.
-  SILModule &Mod;
+  SILModule &mod;
 
   /// A cache of dead-end basic blocks that we use to determine if we can
   /// ignore "leaks".
-  DeadEndBlocks &DEBlocks;
+  DeadEndBlocks &deadEndBlocks;
 
   /// The value whose ownership we will check.
-  SILValue Value;
+  SILValue value;
 
   /// The action that the checker should perform on detecting an error.
-  ErrorBehaviorKind ErrorBehavior;
+  ErrorBehaviorKind errorBehavior;
 
   /// The list of lifetime ending users that we found. Only valid if check is
   /// successful.
-  SmallVector<BranchPropagatedUser, 16> LifetimeEndingUsers;
+  SmallVector<BranchPropagatedUser, 16> lifetimeEndingUsers;
 
   /// The list of non lifetime ending users that we found. Only valid if check
   /// is successful.
-  SmallVector<BranchPropagatedUser, 16> RegularUsers;
+  SmallVector<BranchPropagatedUser, 16> regularUsers;
 
   /// The list of implicit non lifetime ending users that we found. This
   /// consists of instructions like end_borrow that end a scoped lifetime. We
@@ -1334,19 +1315,19 @@ class SILValueOwnershipChecker {
   /// destroyed while that sub-scope is valid.
   ///
   /// TODO: Rename to SubBorrowScopeUsers?
-  SmallVector<BranchPropagatedUser, 4> ImplicitRegularUsers;
+  SmallVector<BranchPropagatedUser, 4> implicitRegularUsers;
 
   /// The set of blocks that we have visited.
-  SmallPtrSetImpl<SILBasicBlock *> &VisitedBlocks;
+  SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks;
 
 public:
   SILValueOwnershipChecker(
-      SILModule &M, DeadEndBlocks &DEBlocks, SILValue V,
-      ErrorBehaviorKind ErrorBehavior,
-      llvm::SmallPtrSetImpl<SILBasicBlock *> &VisitedBlocks)
-      : Result(), Mod(M), DEBlocks(DEBlocks), Value(V),
-        ErrorBehavior(ErrorBehavior), VisitedBlocks(VisitedBlocks) {
-    assert(Value && "Can not initialize a checker with an empty SILValue");
+      SILModule &mod, DeadEndBlocks &deadEndBlocks, SILValue value,
+      ErrorBehaviorKind errorBehavior,
+      llvm::SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks)
+      : result(), mod(mod), deadEndBlocks(deadEndBlocks), value(value),
+        errorBehavior(errorBehavior), visitedBlocks(visitedBlocks) {
+    assert(value && "Can not initialize a checker with an empty SILValue");
   }
 
   ~SILValueOwnershipChecker() = default;
@@ -1354,21 +1335,22 @@ public:
   SILValueOwnershipChecker(SILValueOwnershipChecker &&) = delete;
 
   bool check() {
-    if (Result.hasValue())
-      return Result.getValue();
+    if (result.hasValue())
+      return result.getValue();
 
-    LLVM_DEBUG(llvm::dbgs() << "Verifying ownership of: " << *Value);
-    Result = checkUses();
-    if (!Result.getValue())
+    LLVM_DEBUG(llvm::dbgs() << "Verifying ownership of: " << *value);
+    result = checkUses();
+    if (!result.getValue())
       return false;
 
     SmallVector<BranchPropagatedUser, 32> allRegularUsers;
-    copy(RegularUsers, std::back_inserter(allRegularUsers));
-    copy(ImplicitRegularUsers, std::back_inserter(allRegularUsers));
-    Result = valueHasLinearLifetime(Value, LifetimeEndingUsers, allRegularUsers,
-                                    VisitedBlocks, DEBlocks, ErrorBehavior);
+    copy(regularUsers, std::back_inserter(allRegularUsers));
+    copy(implicitRegularUsers, std::back_inserter(allRegularUsers));
+    result =
+        valueHasLinearLifetime(value, lifetimeEndingUsers, allRegularUsers,
+                               visitedBlocks, deadEndBlocks, errorBehavior);
 
-    return Result.getValue();
+    return result.getValue();
   }
 
   using user_array_transform =
@@ -1378,134 +1360,175 @@ public:
   /// A function that returns a range of lifetime ending users found for the
   /// given value.
   user_array getLifetimeEndingUsers() const {
-    assert(Result.hasValue() && "Can not call until check() is called");
-    assert(Result.getValue() && "Can not call if check() returned false");
+    assert(result.hasValue() && "Can not call until check() is called");
+    assert(result.getValue() && "Can not call if check() returned false");
 
-    user_array_transform Transform(
-        [](BranchPropagatedUser User) -> SILInstruction * {
-          return User.getInst();
+    user_array_transform transform(
+        [](BranchPropagatedUser user) -> SILInstruction * {
+          return user.getInst();
         });
-    return user_array(ArrayRef<BranchPropagatedUser>(LifetimeEndingUsers),
-                      Transform);
+    return user_array(ArrayRef<BranchPropagatedUser>(lifetimeEndingUsers),
+                      transform);
   }
 
   /// A function that returns a range of regular (i.e. "non lifetime ending")
   /// users found for the given value.
   user_array getRegularUsers() const {
-    assert(Result.hasValue() && "Can not call until check() is called");
-    assert(Result.getValue() && "Can not call if check() returned false");
+    assert(result.hasValue() && "Can not call until check() is called");
+    assert(result.getValue() && "Can not call if check() returned false");
 
-    user_array_transform Transform(
-        [](BranchPropagatedUser User) -> SILInstruction * {
-          return User.getInst();
+    user_array_transform transform(
+        [](BranchPropagatedUser user) -> SILInstruction * {
+          return user.getInst();
         });
-    return user_array(ArrayRef<BranchPropagatedUser>(RegularUsers), Transform);
+    return user_array(ArrayRef<BranchPropagatedUser>(regularUsers), transform);
   }
 
 private:
   bool checkUses();
-  void gatherUsers(SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers,
-                   SmallVectorImpl<BranchPropagatedUser> &RegularUsers,
-                   SmallVectorImpl<BranchPropagatedUser> &ImplicitRegularUsers);
+  bool gatherUsers(SmallVectorImpl<BranchPropagatedUser> &lifetimeEndingUsers,
+                   SmallVectorImpl<BranchPropagatedUser> &regularUsers,
+                   SmallVectorImpl<BranchPropagatedUser> &implicitRegularUsers);
 
   bool checkValueWithoutLifetimeEndingUses();
 
-  bool checkFunctionArgWithoutLifetimeEndingUses(SILFunctionArgument *Arg);
-  bool checkYieldWithoutLifetimeEndingUses(BeginApplyResult *Yield);
+  bool checkFunctionArgWithoutLifetimeEndingUses(SILFunctionArgument *arg);
+  bool checkYieldWithoutLifetimeEndingUses(BeginApplyResult *yield);
 
   bool isGuaranteedFunctionArgWithLifetimeEndingUses(
-      SILFunctionArgument *Arg,
-      const llvm::SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers)
-      const;
+      SILFunctionArgument *arg,
+      const SmallVectorImpl<BranchPropagatedUser> &lifetimeEndingUsers) const;
   bool isSubobjectProjectionWithLifetimeEndingUses(
-      SILValue Value,
-      const llvm::SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers)
-      const;
+      SILValue value,
+      const SmallVectorImpl<BranchPropagatedUser> &lifetimeEndingUsers) const;
 
   /// Depending on our initialization, either return false or call Func and
   /// throw an error.
-  bool handleError(llvm::function_ref<void()> &&MessagePrinterFunc) const {
-    if (ErrorBehavior.shouldPrintMessage()) {
-      MessagePrinterFunc();
+  bool handleError(function_ref<void()> &&messagePrinterFunc) const {
+    if (errorBehavior.shouldPrintMessage()) {
+      messagePrinterFunc();
     }
 
-    if (ErrorBehavior.shouldReturnFalse()) {
+    if (errorBehavior.shouldReturnFalse()) {
       return false;
     }
 
-    assert(ErrorBehavior.shouldAssert() && "At this point, we should assert");
+    assert(errorBehavior.shouldAssert() && "At this point, we should assert");
     llvm_unreachable("triggering standard assertion failure routine");
   }
 };
 
 } // end anonymous namespace
 
-void SILValueOwnershipChecker::gatherUsers(
-    SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers,
-    SmallVectorImpl<BranchPropagatedUser> &NonLifetimeEndingUsers,
-    SmallVectorImpl<BranchPropagatedUser> &ImplicitRegularUsers) {
+bool SILValueOwnershipChecker::gatherUsers(
+    SmallVectorImpl<BranchPropagatedUser> &lifetimeEndingUsers,
+    SmallVectorImpl<BranchPropagatedUser> &nonLifetimeEndingUsers,
+    SmallVectorImpl<BranchPropagatedUser> &implicitRegularUsers) {
 
   // See if Value is guaranteed. If we are guaranteed and not forwarding, then
   // we need to look through subobject uses for more uses. Otherwise, if we are
   // forwarding, we do not create any lifetime ending users/non lifetime ending
   // users since we verify against our base.
-  auto OwnershipKind = Value.getOwnershipKind();
-  bool IsGuaranteed = OwnershipKind == ValueOwnershipKind::Guaranteed;
-  bool IsOwned = OwnershipKind == ValueOwnershipKind::Owned;
+  auto ownershipKind = value.getOwnershipKind();
+  bool isGuaranteed = ownershipKind == ValueOwnershipKind::Guaranteed;
+  bool isOwned = ownershipKind == ValueOwnershipKind::Owned;
 
-  if (IsGuaranteed && isGuaranteedForwardingValue(Value))
-    return;
+  if (isGuaranteed && isGuaranteedForwardingValue(value))
+    return true;
 
   // Then gather up our initial list of users.
-  SmallVector<Operand *, 8> Users;
-  std::copy(Value->use_begin(), Value->use_end(), std::back_inserter(Users));
+  SmallVector<Operand *, 8> users;
+  std::copy(value->use_begin(), value->use_end(), std::back_inserter(users));
 
-  auto addCondBranchToList = [](SmallVectorImpl<BranchPropagatedUser> &List,
-                                CondBranchInst *CBI, unsigned OperandIndex) {
-    if (CBI->isConditionOperandIndex(OperandIndex)) {
-      List.emplace_back(CBI);
+  auto addCondBranchToList = [](SmallVectorImpl<BranchPropagatedUser> &list,
+                                CondBranchInst *cbi, unsigned operandIndex) {
+    if (cbi->isConditionOperandIndex(operandIndex)) {
+      list.emplace_back(cbi);
       return;
     }
 
-    bool isTrueOperand = CBI->isTrueOperandIndex(OperandIndex);
-    List.emplace_back(CBI, isTrueOperand ? CondBranchInst::TrueIdx
+    bool isTrueOperand = cbi->isTrueOperandIndex(operandIndex);
+    list.emplace_back(cbi, isTrueOperand ? CondBranchInst::TrueIdx
                                          : CondBranchInst::FalseIdx);
   };
 
-  while (!Users.empty()) {
-    Operand *Op = Users.pop_back_val();
-    SILInstruction *User = Op->getUser();
+  bool foundError = false;
+  while (!users.empty()) {
+    Operand *op = users.pop_back_val();
+    SILInstruction *user = op->getUser();
 
     // If this op is a type dependent operand, skip it. It is not interesting
     // from an ownership perspective.
-    if (User->isTypeDependentOperand(*Op))
+    if (user->isTypeDependentOperand(*op))
       continue;
 
-    if (OwnershipCompatibilityUseChecker(Mod, *Op, Value, ErrorBehavior)
-            .check(User)) {
-      LLVM_DEBUG(llvm::dbgs() << "        Lifetime Ending User: " << *User);
-      if (auto *CBI = dyn_cast<CondBranchInst>(User)) {
-        addCondBranchToList(LifetimeEndingUsers, CBI, Op->getOperandNumber());
+    bool isGuaranteedSubValue = false;
+    if (isGuaranteed && isGuaranteedForwardingInst(op->getUser())) {
+      isGuaranteedSubValue = true;
+    }
+
+    auto opOwnershipKindMap = op->getOwnershipKindMap(isGuaranteedSubValue);
+    // If our ownership kind doesn't match, track that we found an error, emit
+    // an error message optionally and then continue.
+    if (!opOwnershipKindMap.canAcceptKind(ownershipKind)) {
+      foundError = true;
+
+      // If we did not support /any/ ownership kind, it means that we found a
+      // conflicting answer so the kind map that was returned is the empty
+      // map. Put out a more specific error here.
+      if (!opOwnershipKindMap.data.any()) {
+        handleError([&]() {
+          llvm::errs() << "Function: '" << user->getFunction()->getName()
+                       << "'\n"
+                       << "Ill-formed SIL! Unable to compute ownership kind "
+                          "map for user?!\n"
+                       << "For terminator users, check that successors have "
+                          "compatible ownership kinds.\n"
+                       << "Value: " << op->get() << "User: " << *user
+                       << "Operand Number: " << op->getOperandNumber() << '\n'
+                       << "Conv: " << ownershipKind << "\n\n";
+        });
+        continue;
+      }
+
+      handleError([&]() {
+        llvm::errs() << "Function: '" << user->getFunction()->getName() << "'\n"
+                     << "Have operand with incompatible ownership?!\n"
+                     << "Value: " << op->get() << "User: " << *user
+                     << "Operand Number: " << op->getOperandNumber() << '\n'
+                     << "Conv: " << ownershipKind << '\n'
+                     << "OwnershipMap:\n"
+                     << opOwnershipKindMap << '\n';
+      });
+      continue;
+    }
+
+    auto lifetimeConstraint =
+        opOwnershipKindMap.getLifetimeConstraint(ownershipKind);
+    if (lifetimeConstraint == UseLifetimeConstraint::MustBeInvalidated) {
+      LLVM_DEBUG(llvm::dbgs() << "        Lifetime Ending User: " << *user);
+      if (auto *cbi = dyn_cast<CondBranchInst>(user)) {
+        addCondBranchToList(lifetimeEndingUsers, cbi, op->getOperandNumber());
       } else {
-        LifetimeEndingUsers.emplace_back(User);
+        lifetimeEndingUsers.emplace_back(user);
       }
     } else {
-      LLVM_DEBUG(llvm::dbgs() << "        Regular User: " << *User);
-      if (auto *CBI = dyn_cast<CondBranchInst>(User)) {
-        addCondBranchToList(NonLifetimeEndingUsers, CBI,
-                            Op->getOperandNumber());
+      LLVM_DEBUG(llvm::dbgs() << "        Regular User: " << *user);
+      if (auto *cbi = dyn_cast<CondBranchInst>(user)) {
+        addCondBranchToList(nonLifetimeEndingUsers, cbi,
+                            op->getOperandNumber());
       } else {
-        NonLifetimeEndingUsers.emplace_back(User);
+        nonLifetimeEndingUsers.emplace_back(user);
       }
     }
 
     // If our base value is not guaranteed, we do not to try to visit
     // subobjects.
-    if (!IsGuaranteed) {
+    if (!isGuaranteed) {
       // But if we are owned, check if we have any end_borrows. We
       // need to treat these as sub-scope users. We can rely on the
       // end_borrow to prevent recursion.
-      if (IsOwned) {
+      if (isOwned) {
         // Do a check if any of our users are begin_borrows. If we find such a
         // use, then we want to include the end_borrow associated with the
         // begin_borrow in our NonLifetimeEndingUser lists.
@@ -1514,11 +1537,11 @@ void SILValueOwnershipChecker::gatherUsers(
         // append to NonLifetimeEndingUsers without needing to deal with
         // iterator invalidation.
         SmallVector<SILInstruction *, 4> endBorrowInsts;
-        for (unsigned i : indices(NonLifetimeEndingUsers)) {
+        for (unsigned i : indices(nonLifetimeEndingUsers)) {
           if (auto *bbi = dyn_cast<BeginBorrowInst>(
-                  NonLifetimeEndingUsers[i].getInst())) {
+                  nonLifetimeEndingUsers[i].getInst())) {
             copy(bbi->getEndBorrows(),
-                 std::back_inserter(ImplicitRegularUsers));
+                 std::back_inserter(implicitRegularUsers));
           }
         }
       }
@@ -1527,7 +1550,7 @@ void SILValueOwnershipChecker::gatherUsers(
 
     // If we are guaranteed, but are not a guaranteed forwarding inst,
     // just continue. This user is just treated as a normal use.
-    if (!isGuaranteedForwardingInst(User))
+    if (!isGuaranteedForwardingInst(user))
       continue;
 
     // At this point, we know that we must have a forwarded subobject. Since the
@@ -1535,8 +1558,8 @@ void SILValueOwnershipChecker::gatherUsers(
     // or trivial. We now split into two cases, if the user is a terminator or
     // not. If we do not have a terminator, then just add the uses of all of
     // User's results to the worklist.
-    if (User->getResults().size()) {
-      for (SILValue result : User->getResults()) {
+    if (user->getResults().size()) {
+      for (SILValue result : user->getResults()) {
         if (result.getOwnershipKind() == ValueOwnershipKind::Trivial) {
           continue;
         }
@@ -1547,27 +1570,27 @@ void SILValueOwnershipChecker::gatherUsers(
         assert(result.getOwnershipKind() == ValueOwnershipKind::Guaranteed &&
                "Our value is guaranteed and this is a forwarding instruction. "
                "Should have guaranteed ownership as well.");
-        copy(result->getUses(), std::back_inserter(Users));
+        copy(result->getUses(), std::back_inserter(users));
       }
 
       continue;
     }
 
-    assert(User->getResults().empty());
+    assert(user->getResults().empty());
 
-    auto *TI = dyn_cast<TermInst>(User);
-    if (!TI) {
+    auto *ti = dyn_cast<TermInst>(user);
+    if (!ti) {
       continue;
     }
 
     // Otherwise if we have a terminator, add any as uses any end_borrow to
     // ensure that the subscope is completely enclsed within the super scope. We
     // require all of our arguments to be either trivial or guaranteed.
-    for (auto &Succ : TI->getSuccessors()) {
-      auto *BB = Succ.getBB();
+    for (auto &succ : ti->getSuccessors()) {
+      auto *succBlock = succ.getBB();
 
       // If we do not have any arguments, then continue.
-      if (BB->args_empty())
+      if (succBlock->args_empty())
         continue;
 
       // Otherwise, make sure that all arguments are trivial or guaranteed. If
@@ -1575,21 +1598,21 @@ void SILValueOwnershipChecker::gatherUsers(
       //
       // TODO: We could ignore this error and emit a more specific error on the
       // actual terminator.
-      for (auto *BBArg : BB->getPhiArguments()) {
+      for (auto *succArg : succBlock->getPhiArguments()) {
         // *NOTE* We do not emit an error here since we want to allow for more
         // specific errors to be found during use_verification.
         //
         // TODO: Add a flag that associates the terminator instruction with
         // needing to be verified. If it isn't verified appropriately, assert
         // when the verifier is destroyed.
-        auto BBArgOwnershipKind = BBArg->getOwnershipKind();
-        if (!BBArgOwnershipKind.isTrivialOrCompatibleWith(OwnershipKind)) {
+        auto succArgOwnershipKind = succArg->getOwnershipKind();
+        if (!succArgOwnershipKind.isTrivialOrCompatibleWith(ownershipKind)) {
           // This is where the error would go.
           continue;
         }
 
         // If we have a trivial value, just continue.
-        if (BBArgOwnershipKind == ValueOwnershipKind::Trivial)
+        if (succArgOwnershipKind == ValueOwnershipKind::Trivial)
           continue;
 
         // Otherwise add all end_borrow users for this BBArg to the
@@ -1597,19 +1620,25 @@ void SILValueOwnershipChecker::gatherUsers(
         // completely joint post-dominated by these users, so we use
         // them to ensure that all of BBArg's uses are completely
         // enclosed within the end_borrow of this argument.
-        for (auto *op : BBArg->getUses()) {
+        for (auto *op : succArg->getUses()) {
           if (auto *ebi = dyn_cast<EndBorrowInst>(op->getUser())) {
-            ImplicitRegularUsers.push_back(ebi);
+            implicitRegularUsers.push_back(ebi);
           }
         }
       }
     }
   }
+
+  // Return true if we did not have an error and false if we did find an error.
+  //
+  // The reason why we use this extra variable is to make sure that when we are
+  // testing, we print out all mismatching pairs rather than just the first.
+  return !foundError;
 }
 
 bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
-    SILFunctionArgument *Arg) {
-  switch (Arg->getOwnershipKind()) {
+    SILFunctionArgument *arg) {
+  switch (arg->getOwnershipKind()) {
   case ValueOwnershipKind::Guaranteed:
   case ValueOwnershipKind::Unowned:
   case ValueOwnershipKind::Trivial:
@@ -1621,19 +1650,19 @@ bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
     break;
   }
 
-  if (DEBlocks.isDeadEnd(Arg->getParent()))
+  if (deadEndBlocks.isDeadEnd(arg->getParent()))
     return true;
 
   return !handleError([&] {
-    llvm::errs() << "Function: '" << Arg->getFunction()->getName() << "'\n"
+    llvm::errs() << "Function: '" << arg->getFunction()->getName() << "'\n"
                  << "    Owned function parameter without life ending uses!\n"
-                 << "Value: " << *Arg << '\n';
+                 << "Value: " << *arg << '\n';
   });
 }
 
 bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
-    BeginApplyResult *Yield) {
-  switch (Yield->getOwnershipKind()) {
+    BeginApplyResult *yield) {
+  switch (yield->getOwnershipKind()) {
   case ValueOwnershipKind::Guaranteed:
   case ValueOwnershipKind::Unowned:
   case ValueOwnershipKind::Trivial:
@@ -1644,25 +1673,25 @@ bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
     break;
   }
 
-  if (DEBlocks.isDeadEnd(Yield->getParent()->getParent()))
+  if (deadEndBlocks.isDeadEnd(yield->getParent()->getParent()))
     return true;
 
   return !handleError([&] {
-    llvm::errs() << "Function: '" << Yield->getFunction()->getName() << "'\n"
+    llvm::errs() << "Function: '" << yield->getFunction()->getName() << "'\n"
                  << "    Owned yield without life ending uses!\n"
-                 << "Value: " << *Yield << '\n';
+                 << "Value: " << *yield << '\n';
   });
 }
 bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
   LLVM_DEBUG(llvm::dbgs() << "    No lifetime ending users?! Bailing early.\n");
-  if (auto *Arg = dyn_cast<SILFunctionArgument>(Value)) {
-    if (checkFunctionArgWithoutLifetimeEndingUses(Arg)) {
+  if (auto *arg = dyn_cast<SILFunctionArgument>(value)) {
+    if (checkFunctionArgWithoutLifetimeEndingUses(arg)) {
       return true;
     }
   }
 
-  if (auto *Yield = dyn_cast<BeginApplyResult>(Value)) {
-    if (checkYieldWithoutLifetimeEndingUses(Yield)) {
+  if (auto *yield = dyn_cast<BeginApplyResult>(value)) {
+    if (checkYieldWithoutLifetimeEndingUses(yield)) {
       return true;
     }
   }
@@ -1670,29 +1699,29 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
   // Check if we are a guaranteed subobject. In such a case, we should never
   // have lifetime ending uses, since our lifetime is guaranteed by our
   // operand, so there is nothing further to do. So just return true.
-  if (isGuaranteedForwardingValue(Value) &&
-      Value.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
+  if (isGuaranteedForwardingValue(value) &&
+      value.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
     return true;
 
   // If we have an unowned value, then again there is nothing left to do.
-  if (Value.getOwnershipKind() == ValueOwnershipKind::Unowned)
+  if (value.getOwnershipKind() == ValueOwnershipKind::Unowned)
     return true;
 
-  if (auto *ParentBlock = Value->getParentBlock()) {
-    if (DEBlocks.isDeadEnd(ParentBlock)) {
+  if (auto *parentBlock = value->getParentBlock()) {
+    if (deadEndBlocks.isDeadEnd(parentBlock)) {
       LLVM_DEBUG(llvm::dbgs() << "    Ignoring transitively unreachable value "
                               << "without users!\n"
                               << "    Function: '"
-                              << Value->getFunction()->getName() << "'\n"
-                              << "    Value: " << *Value << '\n');
+                              << value->getFunction()->getName() << "'\n"
+                              << "    Value: " << *value << '\n');
       return true;
     }
   }
 
-  if (!isValueAddressOrTrivial(Value, Mod)) {
+  if (!isValueAddressOrTrivial(value, mod)) {
     return !handleError([&] {
-      llvm::errs() << "Function: '" << Value->getFunction()->getName() << "'\n";
-      if (Value.getOwnershipKind() == ValueOwnershipKind::Owned) {
+      llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n";
+      if (value.getOwnershipKind() == ValueOwnershipKind::Owned) {
         llvm::errs() << "Error! Found a leaked owned value that was never "
                         "consumed.\n";
       } else {
@@ -1700,7 +1729,7 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
                         "guaranteed function args must have at least one "
                         "lifetime ending use?!\n";
       }
-      llvm::errs() << "Value: " << *Value << '\n';
+      llvm::errs() << "Value: " << *value << '\n';
     });
   }
 
@@ -1708,34 +1737,34 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
 }
 
 bool SILValueOwnershipChecker::isGuaranteedFunctionArgWithLifetimeEndingUses(
-    SILFunctionArgument *Arg,
-    const llvm::SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers)
+    SILFunctionArgument *arg,
+    const llvm::SmallVectorImpl<BranchPropagatedUser> &lifetimeEndingUsers)
     const {
-  if (Arg->getOwnershipKind() != ValueOwnershipKind::Guaranteed)
+  if (arg->getOwnershipKind() != ValueOwnershipKind::Guaranteed)
     return true;
 
   return handleError([&] {
-    llvm::errs() << "    Function: '" << Arg->getFunction()->getName() << "'\n"
+    llvm::errs() << "    Function: '" << arg->getFunction()->getName() << "'\n"
                  << "    Guaranteed function parameter with life ending uses!\n"
-                 << "    Value: " << *Arg;
-    for (const auto &U : LifetimeEndingUsers) {
-      llvm::errs() << "    Lifetime Ending User: " << *U;
+                 << "    Value: " << *arg;
+    for (const auto &user : lifetimeEndingUsers) {
+      llvm::errs() << "    Lifetime Ending User: " << *user;
     }
     llvm::errs() << '\n';
   });
 }
 
 bool SILValueOwnershipChecker::isSubobjectProjectionWithLifetimeEndingUses(
-    SILValue Value,
-    const llvm::SmallVectorImpl<BranchPropagatedUser> &LifetimeEndingUsers)
+    SILValue value,
+    const llvm::SmallVectorImpl<BranchPropagatedUser> &lifetimeEndingUsers)
     const {
   return handleError([&] {
-    llvm::errs() << "    Function: '" << Value->getFunction()->getName()
+    llvm::errs() << "    Function: '" << value->getFunction()->getName()
                  << "'\n"
                  << "    Subobject projection with life ending uses!\n"
-                 << "    Value: " << *Value;
-    for (const auto &U : LifetimeEndingUsers) {
-      llvm::errs() << "    Lifetime Ending User: " << *U;
+                 << "    Value: " << *value;
+    for (const auto &user : lifetimeEndingUsers) {
+      llvm::errs() << "    Lifetime Ending User: " << *user;
     }
     llvm::errs() << '\n';
   });
@@ -1749,7 +1778,15 @@ bool SILValueOwnershipChecker::checkUses() {
   // 1. Verify that none of the uses are in the same block. This would be an
   // overconsume so in this case we assert.
   // 2. Verify that the uses are compatible with our ownership convention.
-  gatherUsers(LifetimeEndingUsers, RegularUsers, ImplicitRegularUsers);
+  if (!gatherUsers(lifetimeEndingUsers, regularUsers, implicitRegularUsers)) {
+    // Silently return false if this fails.
+    //
+    // If the user pass in a ErrorBehaviorKind that will assert, we
+    // will have asserted in gatherUsers(). If we get here the user
+    // asked us to optionally print out a message and indicate that
+    // the verification failed.
+    return false;
+  }
 
   // We can only have no lifetime ending uses if we have:
   //
@@ -1764,7 +1801,7 @@ bool SILValueOwnershipChecker::checkUses() {
   // more. Specifically, we should have /no/ lifetime ending uses of a
   // guaranteed function argument, since a guaranteed function argument should
   // outlive the current function always.
-  if (LifetimeEndingUsers.empty() && checkValueWithoutLifetimeEndingUses()) {
+  if (lifetimeEndingUsers.empty() && checkValueWithoutLifetimeEndingUses()) {
     return false;
   }
 
@@ -1773,9 +1810,9 @@ bool SILValueOwnershipChecker::checkUses() {
 
   // See if we have a guaranteed function address. Guaranteed function addresses
   // should never have any lifetime ending uses.
-  if (auto *Arg = dyn_cast<SILFunctionArgument>(Value)) {
-    if (!isGuaranteedFunctionArgWithLifetimeEndingUses(Arg,
-                                                       LifetimeEndingUsers)) {
+  if (auto *arg = dyn_cast<SILFunctionArgument>(value)) {
+    if (!isGuaranteedFunctionArgWithLifetimeEndingUses(arg,
+                                                       lifetimeEndingUsers)) {
       return false;
     }
   }
@@ -1783,10 +1820,10 @@ bool SILValueOwnershipChecker::checkUses() {
   // Check if we are an instruction that forwards forwards guaranteed
   // ownership. In such a case, we are a subobject projection. We should not
   // have any lifetime ending uses.
-  if (isGuaranteedForwardingValue(Value) &&
-      Value.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
-    if (!isSubobjectProjectionWithLifetimeEndingUses(Value,
-                                                     LifetimeEndingUsers)) {
+  if (isGuaranteedForwardingValue(value) &&
+      value.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
+    if (!isSubobjectProjectionWithLifetimeEndingUses(value,
+                                                     lifetimeEndingUsers)) {
       return false;
     }
   }
@@ -1797,6 +1834,14 @@ bool SILValueOwnershipChecker::checkUses() {
 //===----------------------------------------------------------------------===//
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
+
+OperandOwnershipKindMap
+Operand::getOwnershipKindMap(bool isForwardingSubValue) const {
+  OperandOwnershipKindClassifier classifier(getUser()->getModule(), *this,
+                                            ErrorBehaviorKind::ReturnFalse,
+                                            isForwardingSubValue);
+  return classifier.visit(const_cast<SILInstruction *>(getUser()));
+}
 
 void SILInstruction::verifyOperandOwnership() const {
 #ifndef NDEBUG
@@ -1827,26 +1872,47 @@ void SILInstruction::verifyOperandOwnership() const {
   if (isa<TermInst>(this))
     return;
 
-  ErrorBehaviorKind ErrorBehavior;
+  ErrorBehaviorKind errorBehavior;
   if (IsSILOwnershipVerifierTestingEnabled) {
-    ErrorBehavior = ErrorBehaviorKind::PrintMessageAndReturnFalse;
+    errorBehavior = ErrorBehaviorKind::PrintMessageAndReturnFalse;
   } else {
-    ErrorBehavior = ErrorBehaviorKind::PrintMessageAndAssert;
+    errorBehavior = ErrorBehaviorKind::PrintMessageAndAssert;
   }
-  auto *Self = const_cast<SILInstruction *>(this);
-  for (const Operand &Op : getAllOperands()) {
-    if (isTypeDependentOperand(Op))
+  for (const Operand &op : getAllOperands()) {
+    // Skip type dependence operands.
+    if (isTypeDependentOperand(op))
       continue;
+    SILValue opValue = op.get();
+
     // Skip any SILUndef that we see.
-    if (isa<SILUndef>(Op.get()))
+    if (isa<SILUndef>(opValue))
       continue;
-    OwnershipCompatibilityUseChecker(getModule(), Op, Op.get(), ErrorBehavior)
-        .check(Self);
+    auto operandOwnershipKindMap = op.getOwnershipKindMap();
+    auto valueOwnershipKind = opValue.getOwnershipKind();
+    if (operandOwnershipKindMap.canAcceptKind(valueOwnershipKind))
+      continue;
+
+    if (errorBehavior.shouldPrintMessage()) {
+      llvm::errs() << "Found an operand with a value that is not compatible "
+                      "with the operand's operand ownership kind map.\n";
+      llvm::errs() << "Value: " << opValue;
+      llvm::errs() << "Value Ownership Kind: " << valueOwnershipKind << "\n";
+      llvm::errs() << "Instruction: " << *this;
+      llvm::errs() << "Operand Ownership Kind Map: " << operandOwnershipKindMap;
+    }
+
+    if (errorBehavior.shouldReturnFalse())
+      continue;
+
+    assert(errorBehavior.shouldAssert() &&
+           "At this point, we are expected to assert");
+    llvm_unreachable("triggering standard assertion failure routine");
   }
 #endif
 }
 
-void SILValue::verifyOwnership(SILModule &Mod, DeadEndBlocks *DEBlocks) const {
+void SILValue::verifyOwnership(SILModule &mod,
+                               DeadEndBlocks *deadEndBlocks) const {
 #ifndef NDEBUG
   if (DisableOwnershipVerification)
     return;
@@ -1858,62 +1924,65 @@ void SILValue::verifyOwnership(SILModule &Mod, DeadEndBlocks *DEBlocks) const {
 
   // Since we do not have SILUndef, we now know that getFunction() should return
   // a real function. Assert in case this assumption is no longer true.
-  SILFunction *F = (*this)->getFunction();
-  assert(F && "Instructions and arguments should have a function");
+  SILFunction *f = (*this)->getFunction();
+  assert(f && "Instructions and arguments should have a function");
 
   // If the given function has unqualified ownership or we have been asked by
   // the user not to verify this function, there is nothing to verify.
-  if (!F->hasQualifiedOwnership() || !F->shouldVerifyOwnership())
+  if (!f->hasQualifiedOwnership() || !f->shouldVerifyOwnership())
     return;
 
-  ErrorBehaviorKind ErrorBehavior;
+  ErrorBehaviorKind errorBehavior;
   if (IsSILOwnershipVerifierTestingEnabled) {
-    ErrorBehavior = ErrorBehaviorKind::PrintMessageAndReturnFalse;
+    errorBehavior = ErrorBehaviorKind::PrintMessageAndReturnFalse;
   } else {
-    ErrorBehavior = ErrorBehaviorKind::PrintMessageAndAssert;
+    errorBehavior = ErrorBehaviorKind::PrintMessageAndAssert;
   }
-  llvm::SmallPtrSet<SILBasicBlock *, 32> LiveBlocks;
-  if (DEBlocks) {
-    SILValueOwnershipChecker(Mod, *DEBlocks, *this, ErrorBehavior, LiveBlocks)
+
+  llvm::SmallPtrSet<SILBasicBlock *, 32> liveBlocks;
+  if (deadEndBlocks) {
+    SILValueOwnershipChecker(mod, *deadEndBlocks, *this, errorBehavior,
+                             liveBlocks)
         .check();
   } else {
-    DeadEndBlocks DEBlocks((*this)->getFunction());
-    SILValueOwnershipChecker(Mod, DEBlocks, *this, ErrorBehavior, LiveBlocks)
+    DeadEndBlocks deadEndBlocks(f);
+    SILValueOwnershipChecker(mod, deadEndBlocks, *this, errorBehavior,
+                             liveBlocks)
         .check();
   }
 #endif
 }
 
-bool OwnershipChecker::checkValue(SILValue Value) {
-  RegularUsers.clear();
-  LifetimeEndingUsers.clear();
-  LiveBlocks.clear();
+bool OwnershipChecker::checkValue(SILValue value) {
+  regularUsers.clear();
+  lifetimeEndingUsers.clear();
+  liveBlocks.clear();
 
   // If we are SILUndef, just bail. SILUndef can pair with anything. Any uses of
   // the SILUndef will make sure that the matching checks out.
-  if (isa<SILUndef>(Value))
+  if (isa<SILUndef>(value))
     return false;
 
   // Since we do not have SILUndef, we now know that getFunction() should return
   // a real function. Assert in case this assumption is no longer true.
-  SILFunction *F = Value->getFunction();
-  assert(F && "Instructions and arguments should have a function");
+  SILFunction *f = value->getFunction();
+  assert(f && "Instructions and arguments should have a function");
 
   // If the given function has unqualified ownership, there is nothing further
   // to verify.
-  if (!F->hasQualifiedOwnership())
+  if (!f->hasQualifiedOwnership())
     return false;
 
-  ErrorBehaviorKind ErrorBehavior(ErrorBehaviorKind::ReturnFalse);
-  SILValueOwnershipChecker Checker(Mod, DEBlocks, Value, ErrorBehavior,
-                                   LiveBlocks);
-  if (!Checker.check()) {
+  ErrorBehaviorKind errorBehavior(ErrorBehaviorKind::ReturnFalse);
+  SILValueOwnershipChecker checker(mod, deadEndBlocks, value, errorBehavior,
+                                   liveBlocks);
+  if (!checker.check()) {
     return false;
   }
 
   // TODO: Make this more efficient.
-  copy(Checker.getRegularUsers(), std::back_inserter(RegularUsers));
-  copy(Checker.getLifetimeEndingUsers(),
-       std::back_inserter(LifetimeEndingUsers));
+  copy(checker.getRegularUsers(), std::back_inserter(regularUsers));
+  copy(checker.getLifetimeEndingUsers(),
+       std::back_inserter(lifetimeEndingUsers));
   return true;
 }

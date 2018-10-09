@@ -203,7 +203,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
          realMinimumCapacity._builtinWordValue, Element.self)
 
       let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(_storage))
-      let endAddr = storageAddr + _stdlib_malloc_size(storageAddr)
+      let endAddr = storageAddr + _swift_stdlib_malloc_size(storageAddr)
       let realCapacity = endAddr.assumingMemoryBound(to: Element.self) - firstElementAddress
 
       _initStorageHeader(
@@ -393,7 +393,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// just-initialized memory.
   @inlinable
   @discardableResult
-  internal func _copyContents(
+  internal __consuming func _copyContents(
     subRange bounds: Range<Int>,
     initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
@@ -441,7 +441,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   ///
   /// - Complexity: O(1).
   @inlinable
-  internal func _asCocoaArray() -> _NSArrayCore {
+  internal __consuming func _asCocoaArray() -> _NSArrayCore {
     if count == 0 {
       return _emptyArrayStorage
     }
@@ -512,7 +512,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 /// Append the elements of `rhs` to `lhs`.
 @inlinable
 internal func += <Element, C : Collection>(
-  lhs: inout _ContiguousArrayBuffer<Element>, rhs: C
+  lhs: inout _ContiguousArrayBuffer<Element>, rhs: __owned C
 ) where C.Element == Element {
 
   let oldCount = lhs.count
@@ -566,7 +566,7 @@ extension _ContiguousArrayBuffer : RandomAccessCollection {
 
 extension Sequence {
   @inlinable
-  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     return _copySequenceToContiguousArray(self)
   }
 }
@@ -599,14 +599,14 @@ internal func _copySequenceToContiguousArray<
 
 extension Collection {
   @inlinable
-  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     return _copyCollectionToContiguousArray(self)
   }
 }
 
 extension _ContiguousArrayBuffer {
   @inlinable
-  internal func _copyToContiguousArray() -> ContiguousArray<Element> {
+  internal __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     return ContiguousArray(_buffer: self)
   }
 }

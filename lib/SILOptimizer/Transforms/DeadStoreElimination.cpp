@@ -251,7 +251,7 @@ public:
   SmallBitVector BBDeallocateLocation;
 
   /// The dead stores in the current basic block.
-  llvm::DenseSet<SILInstruction *> DeadStores;
+  llvm::SmallVector<SILInstruction *, 2> DeadStores;
 
   /// Keeps track of what stores to generate after the data flow stabilizes.
   /// these stores come from partial dead stores.
@@ -946,7 +946,7 @@ void DSEContext::processWrite(SILInstruction *I, SILValue Val, SILValue Mem,
   // instruction is dead.
   if (Dead) {
     LLVM_DEBUG(llvm::dbgs() << "Instruction Dead: " << *I << "\n");
-    S->DeadStores.insert(I);
+    S->DeadStores.push_back(I);
     ++NumDeadStores;
     return;
   }
@@ -954,14 +954,14 @@ void DSEContext::processWrite(SILInstruction *I, SILValue Val, SILValue Mem,
   // Partial dead store - stores to some locations are dead, but not all. This
   // is a partially dead store. Also at this point we know what locations are
   // dead.
-  llvm::DenseSet<LSLocation> Alives;
+  LSLocationList Alives;
   if (V.any()) {
     // Take out locations that are dead.
     for (unsigned i = 0; i < V.size(); ++i) {
       if (V.test(i))
         continue;
       // This location is alive.
-      Alives.insert(Locs[i]);
+      Alives.push_back(Locs[i]);
     }
 
     // Try to create as few aggregated stores as possible out of the locations.
@@ -994,7 +994,7 @@ void DSEContext::processWrite(SILInstruction *I, SILValue Val, SILValue Mem,
 
     // Lastly, mark the old store as dead.
     LLVM_DEBUG(llvm::dbgs() << "Instruction Partially Dead: " << *I << "\n");
-    S->DeadStores.insert(I);
+    S->DeadStores.push_back(I);
     ++NumPartialDeadStores;
   }
 }

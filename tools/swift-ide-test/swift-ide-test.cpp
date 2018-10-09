@@ -3093,8 +3093,7 @@ int main(int argc, char *argv[]) {
   InitInvok.getLangOptions().InferImportAsMember |=
     options::InferImportAsMember;
   InitInvok.getLangOptions().EnableSwift3ObjCInference =
-    options::EnableSwift3ObjCInference ||
-    InitInvok.getLangOptions().isSwiftVersion3();
+    options::EnableSwift3ObjCInference;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
   InitInvok.getClangImporterOptions().InferImportAsMember |=

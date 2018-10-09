@@ -302,4 +302,25 @@ FunctionConversionTestSuite.test("CollectionUpCastsWithHashableInFuncParameters"
   expectEqual(rdar35702810_set_hashable(type: B.self, fn_set), 42)
 }
 
+func takesTwo(_ fn: ((AnyObject, AnyObject)) -> (),
+              _ a: AnyObject,
+              _ b: AnyObject) {
+  fn((a, b))
+}
+
+func takesTwoGeneric<T>(_ fn: (T) -> (), _ a: T) {
+  fn(a)
+}
+
+FunctionConversionTestSuite.test("SE0110") {
+  func callback1(_: AnyObject, _: AnyObject) {}
+  func callback2(_: __owned AnyObject, _: __owned AnyObject) {}
+
+  takesTwo(callback1, LifetimeTracked(0), LifetimeTracked(0))
+  takesTwo(callback2, LifetimeTracked(0), LifetimeTracked(0))
+
+  takesTwoGeneric(callback1, (LifetimeTracked(0), LifetimeTracked(0)))
+  takesTwoGeneric(callback2, (LifetimeTracked(0), LifetimeTracked(0)))
+}
+
 runAllTests()

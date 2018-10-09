@@ -1788,7 +1788,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     // FIXME: Once lldb can make use of remote mirrors to calculate layouts
     // at runtime, this should be removed.
     {
-      CompletelyFragileScope Scope(*this);
+      LoweringModeScope Scope(*this, TypeConverter::Mode::CompletelyFragile);
 
       SILType loweredTy = var->getLoweredType();
       auto &nonResilientTI = cast<FixedTypeInfo>(getTypeInfo(loweredTy));
@@ -3602,7 +3602,7 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
 ///   of stored properties
 bool IRGenModule::isResilient(NominalTypeDecl *D, ResilienceExpansion expansion) {
   if (expansion == ResilienceExpansion::Maximal &&
-      Types.isCompletelyFragile()) {
+      Types.getLoweringMode() == TypeConverter::Mode::CompletelyFragile) {
     return false;
   }
   return D->isResilient(getSwiftModule(), expansion);
@@ -3621,7 +3621,7 @@ IRGenModule::getResilienceExpansionForAccess(NominalTypeDecl *decl) {
 // layout. Calling isResilient() with this scope will always return false.
 ResilienceExpansion
 IRGenModule::getResilienceExpansionForLayout(NominalTypeDecl *decl) {
-  if (Types.isCompletelyFragile())
+  if (Types.getLoweringMode() == TypeConverter::Mode::CompletelyFragile)
     return ResilienceExpansion::Minimal;
 
   if (isResilient(decl, ResilienceExpansion::Minimal))
@@ -3685,7 +3685,7 @@ llvm::StructType *IRGenModule::getGenericWitnessTableCacheTy() {
     {
       // WitnessTableSizeInWords
       Int16Ty,
-      // WitnessTablePrivateSizeInWords
+      // WitnessTablePrivateSizeInWords + RequiresInstantiation bit
       Int16Ty,
       // Protocol
       RelativeAddressTy,
@@ -3805,27 +3805,6 @@ IRGenModule::getAddrOfWitnessTablePattern(const NormalProtocolConformance *conf,
 }
 
 llvm::Function *
-IRGenModule::getAddrOfAssociatedTypeMetadataAccessFunction(
-                                  const NormalProtocolConformance *conformance,
-                                  AssociatedType association) {
-  auto forDefinition = ForDefinition;
-
-  LinkEntity entity =
-    LinkEntity::forAssociatedTypeMetadataAccessFunction(conformance,
-                                                        association);
-  llvm::Function *&entry = GlobalFuncs[entity];
-  if (entry) {
-    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
-    return entry;
-  }
-
-  auto signature = getAssociatedTypeMetadataAccessFunctionSignature();
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, signature);
-  return entry;
-}
-
-llvm::Function *
 IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
                                   const NormalProtocolConformance *conformance,
                                   const AssociatedConformance &association) {
@@ -3841,25 +3820,6 @@ IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
   }
 
   auto signature = getAssociatedTypeWitnessTableAccessFunctionSignature();
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, signature);
-  return entry;
-}
-
-llvm::Function *
-IRGenModule::getAddrOfDefaultAssociatedTypeMetadataAccessFunction(
-                                  AssociatedType association) {
-  auto forDefinition = ForDefinition;
-
-  LinkEntity entity =
-    LinkEntity::forDefaultAssociatedTypeMetadataAccessFunction(association);
-  llvm::Function *&entry = GlobalFuncs[entity];
-  if (entry) {
-    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
-    return entry;
-  }
-
-  auto signature = getAssociatedTypeMetadataAccessFunctionSignature();
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
   return entry;

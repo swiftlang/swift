@@ -63,9 +63,10 @@ def emit_fixits_path
   : Separate<["-"], "emit-fixits-path">, MetaVarName<"<path>">,
     HelpText<"Output compiler fixits as source edits to <path>">;
 
+// For transition purposes.
 def emit_interface_path
-  : Separate<["-"], "emit-interface-path">, MetaVarName<"<path>">,
-    HelpText<"Output textual interface file to <path>">;
+  : Separate<["-"], "emit-interface-path">,
+    Alias<emit_parseable_module_interface_path>;
 
 def tbd_install_name
   : Separate<["-"], "tbd-install_name">, MetaVarName<"<path>">,
@@ -197,9 +198,6 @@ def debug_time_function_bodies : Flag<["-"], "debug-time-function-bodies">,
 def debug_time_expression_type_checking : Flag<["-"], "debug-time-expression-type-checking">,
   HelpText<"Dumps the time it takes to type-check each expression">;
 
-def disable_constraint_solver_performance_hacks : Flag<["-"], "disable-constraint-solver-performance-hacks">,
-  HelpText<"Disable all the hacks in the constraint solver">;
-
 def debug_assert_immediately : Flag<["-"], "debug-assert-immediately">,
   DebugCrashOpt, HelpText<"Force an assertion failure immediately">;
 def debug_assert_after_parse : Flag<["-"], "debug-assert-after-parse">,
@@ -309,10 +307,6 @@ def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
   HelpText<"Enable experimental property behaviors">;
   
-def enable_operator_designated_protocols :
-  Flag<["-"], "enable-operator-designated-protocols">,
-  HelpText<"Enable operator designated protocols">;
-
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;
@@ -375,6 +369,17 @@ def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-
 def solver_disable_shrink :
   Flag<["-"], "solver-disable-shrink">,
   HelpText<"Disable the shrink phase of expression type checking">;
+
+def disable_constraint_solver_performance_hacks : Flag<["-"], "disable-constraint-solver-performance-hacks">,
+  HelpText<"Disable all the hacks in the constraint solver">;
+
+def enable_operator_designated_types :
+  Flag<["-"], "enable-operator-designated-types">,
+  HelpText<"Enable operator designated types">;
+
+def solver_enable_operator_designated_types :
+  Flag<["-"], "solver-enable-operator-designated-types">,
+  HelpText<"Enable operator designated types in constraint solver">;
 
 def switch_checking_invocation_threshold_EQ : Joined<["-"],
     "switch-checking-invocation-threshold=">;
@@ -492,6 +497,9 @@ def enable_class_resilience : Flag<["-"], "enable-class-resilience">,
 
 def enable_resilience_bypass : Flag<["-"], "enable-resilience-bypass">,
    HelpText<"Completely bypass resilience when accessing types in resilient frameworks">;
+
+def read_type_info_path_EQ : Joined<["-"], "read-type-info-path=">,
+  HelpText<"Read legacy type layout from the given path">;
 
 def group_info_path : Separate<["-"], "group-info-path">,
   HelpText<"The path to collect the group information of the compiled module">;

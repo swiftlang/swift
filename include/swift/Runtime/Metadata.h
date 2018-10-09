@@ -410,6 +410,20 @@ swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
                              const Metadata *type,
                              void **const *instantiationArgs);
 
+/// Retrieve an associated type witness from the given witness table.
+///
+/// \param wtable The witness table.
+/// \param conformingType Metadata for the conforming type.
+/// \param assocType Associated type descriptor.
+///
+/// \returns metadata for the associated type witness.
+SWIFT_RUNTIME_EXPORT
+MetadataResponse swift_getAssociatedTypeWitness(
+                                          MetadataRequest request,
+                                          WitnessTable *wtable,
+                                          const Metadata *conformingType,
+                                          const ProtocolRequirement *assocType);
+
 /// \brief Fetch a uniqued metadata for a function type.
 SWIFT_RUNTIME_EXPORT
 const FunctionTypeMetadata *
@@ -615,7 +629,6 @@ swift_relocateClassMetadata(ClassDescriptor *descriptor,
 ///   class metadata pattern by swift_allocateGenericClassMetadata().
 SWIFT_RUNTIME_EXPORT
 void swift_initClassMetadata(ClassMetadata *self,
-                             ClassMetadata *super,
                              ClassLayoutFlags flags,
                              size_t numFields,
                              const TypeLayout * const *fieldTypes,
@@ -632,7 +645,6 @@ void swift_initClassMetadata(ClassMetadata *self,
 /// size is not known at compile time.
 SWIFT_RUNTIME_EXPORT
 void swift_updateClassMetadata(ClassMetadata *self,
-                               ClassMetadata *super,
                                ClassLayoutFlags flags,
                                size_t numFields,
                                const TypeLayout * const *fieldTypes,
@@ -798,7 +810,7 @@ void swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
 /// Return the superclass, if any.  The result is nullptr for root
 /// classes and class protocol types.
 SWIFT_CC(swift)
-SWIFT_RUNTIME_STDLIB_API
+SWIFT_RUNTIME_STDLIB_INTERNAL
 const Metadata *_swift_class_getSuperclass(const Metadata *theClass);
 
 #if !NDEBUG

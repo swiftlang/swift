@@ -60,7 +60,15 @@ struct _BridgeStorage<
     _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
     rawValue = Builtin.reinterpretCast(native)
   }
-  
+
+#if !(arch(i386) || arch(arm))
+  @inlinable
+  @inline(__always)
+  internal init(taggedPayload: UInt) {
+    rawValue = _bridgeObject(taggingPayload: taggedPayload)
+  }
+#endif
+
   @inlinable // FIXME(sil-serialize-all)
   public // @testable
   var spareBits: Int {
@@ -93,7 +101,8 @@ struct _BridgeStorage<
   public // @testable
   func isNativeWithClearedSpareBits(_ bits: Int) -> Bool {
     return (_bitPattern(rawValue) &
-            (_objCTaggedPointerBits | _objectPointerIsObjCBit |
+            (_bridgeObjectTaggedPointerBits | _objCTaggedPointerBits |
+             _objectPointerIsObjCBit |
              (UInt(bits)) << _objectPointerLowSpareBitShift)) == 0
   }
 

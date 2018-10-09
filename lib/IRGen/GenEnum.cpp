@@ -6099,8 +6099,8 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
   else
     storageType = IGM.createNominalType(type);
 
-  // Create a forward declaration for that type.
-  addForwardDecl(key, storageType);
+  // Create a forward declaration.
+  addForwardDecl(key);
   
   SILType loweredTy = SILType::getPrimitiveAddressType(type);
 
@@ -6114,6 +6114,13 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
   // Assert that the layout query functions for fixed-layout enums work, for
   // LLDB's sake.
 #ifndef NDEBUG
+
+  // ... but not if we're building a legacy layout, in which case we only know
+  // the extra inhabitant *count* and not the actual extra inhabitant values, so
+  // we simply crash if we go do this.
+  if (LoweringMode == Mode::Legacy)
+    return ti;
+
   auto displayBitMask = [&](const SpareBitVector &v) {
     for (unsigned i = v.size(); i-- > 0;) {
       llvm::dbgs() << (v[i] ? '1' : '0');

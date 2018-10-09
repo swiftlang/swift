@@ -3573,12 +3573,10 @@ namespace {
 
       auto &tc = cs.getTypeChecker();
 
-      // Since this is literal initialization, we don't
-      // really need to keep wrapping coercion around.
+      // If this is a literal that got converted into constructor call
+      // lets put proper source information in place.
       if (expr->isLiteralInit()) {
         auto *literalInit = expr->getSubExpr();
-        // If literal got converted into constructor call
-        // lets put proper source information in place.
         if (auto *call = dyn_cast<CallExpr>(literalInit)) {
           call->getFn()->forEachChildExpr([&](Expr *subExpr) -> Expr * {
             auto *TE = dyn_cast<TypeExpr>(subExpr);
@@ -3600,7 +3598,10 @@ namespace {
         }
 
         literalInit->setImplicit(false);
-        return literalInit;
+
+        // Keep the coercion around, because it contains the source range
+        // for the original constructor call.
+        return expr;
       }
 
       // Turn the subexpression into an rvalue.
@@ -5753,6 +5754,17 @@ Expr *ExprRewriter::coerceCallArguments(
   // If we came from a scalar, create a scalar-to-tuple conversion.
   TupleShuffleExpr::TypeImpact typeImpact;
   if (argTuple == nullptr) {
+    // Deal with a difference in only scalar ownership.
+    if (auto paramParenTy = dyn_cast<ParenType>(paramType.getPointer())) {
+      assert(paramParenTy->getUnderlyingType()
+              ->isEqual(cs.getType(arg)));
+      auto argParen = new (tc.Context) ParenExpr(arg->getStartLoc(),
+                                                 arg, arg->getEndLoc(), false,
+                                                 paramParenTy);
+      argParen->setImplicit();
+      return cs.cacheType(argParen);
+    }
+
     typeImpact = TupleShuffleExpr::ScalarToTuple;
     assert(isa<TupleType>(paramType.getPointer()));
   } else if (isa<TupleType>(paramType.getPointer())) {

@@ -172,7 +172,7 @@ extension String {
         return selfSmall.withUnmanagedASCII { selfASCII in
           return prefixSmall.withUnmanagedASCII { prefixASCII in
             if prefixASCII.count > selfASCII.count { return false }
-            return (0 as CInt) == _stdlib_memcmp(
+            return (0 as CInt) == _swift_stdlib_memcmp(
                 selfASCII.rawStart,
                 prefixASCII.rawStart,
                 prefixASCII.count)
@@ -190,7 +190,7 @@ extension String {
           // Prefix is longer than self.
           result = false
         } else {
-          result = (0 as CInt) == _stdlib_memcmp(
+          result = (0 as CInt) == _swift_stdlib_memcmp(
             selfASCII.rawStart,
             prefixASCII.rawStart,
             prefixASCII.count)
@@ -219,7 +219,7 @@ extension String {
         return selfSmall.withUnmanagedASCII { selfASCII in
           return suffixSmall.withUnmanagedASCII { suffixASCII in
             if suffixASCII.count > selfASCII.count { return false }
-            return (0 as CInt) == _stdlib_memcmp(
+            return (0 as CInt) == _swift_stdlib_memcmp(
                 selfASCII.rawStart + (selfASCII.count - suffixASCII.count),
                 suffixASCII.rawStart,
                 suffixASCII.count)
@@ -237,7 +237,7 @@ extension String {
           // Suffix is longer than self.
           result = false
         } else {
-          result = (0 as CInt) == _stdlib_memcmp(
+          result = (0 as CInt) == _swift_stdlib_memcmp(
             selfASCII.rawStart + (selfASCII.count - suffixASCII.count),
             suffixASCII.rawStart,
             suffixASCII.count)

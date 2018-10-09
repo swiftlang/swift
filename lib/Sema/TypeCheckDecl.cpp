@@ -383,18 +383,6 @@ static void checkInheritanceClause(
         if (!inheritedTy)
           continue;
       }
-
-      // Swift 3 compatibility -- a class inheriting from AnyObject is a no-op.
-      if (ctx.LangOpts.isSwiftVersion3() && isa<ClassDecl>(decl) &&
-          inheritedTy->isAnyObject()) {
-        auto classDecl = cast<ClassDecl>(decl);
-        auto removeRange = getRemovalRange(i);
-        diags.diagnose(inherited.getSourceRange().Start,
-                       diag::class_inherits_anyobject,
-                       classDecl->getDeclaredInterfaceType())
-          .fixItRemoveChars(removeRange.Start, removeRange.End);
-        continue;
-      }
     }
     
     // If this is an enum inheritance clause, check for a raw type.
@@ -2061,9 +2049,9 @@ PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
   return group;
 }
 
-static void checkDesignatedProtocol(OperatorDecl *OD, Identifier name,
-                                    SourceLoc loc, TypeChecker &tc,
-                                    ASTContext &ctx) {
+static void checkDesignatedTypes(OperatorDecl *OD, Identifier name,
+                                 SourceLoc loc, TypeChecker &tc,
+                                 ASTContext &ctx) {
   auto *dc = OD->getDeclContext();
   auto *TyR = new (ctx) SimpleIdentTypeRepr(loc, name);
   TypeLoc typeLoc = TypeLoc(TyR);
@@ -2074,17 +2062,11 @@ static void checkDesignatedProtocol(OperatorDecl *OD, Identifier name,
   }
 
   if (!typeLoc.isError()) {
-    auto *decl = typeLoc.getType()->getNominalOrBoundGenericNominal();
-    if (!decl || !isa<ProtocolDecl>(decl)) {
-      tc.diagnose(typeLoc.getLoc(),
-                  diag::operators_designated_protocol_not_a_protocol,
-                  typeLoc.getType());
-      OD->setInvalid();
-    } else {
-      OD->setDesignatedProtocol(cast<ProtocolDecl>(decl));
-      // FIXME: verify this operator has a declaration within this
-      //        protocol with the same arity and fixity
-    }
+    auto *decl = typeLoc.getType()->getAnyNominal();
+    assert(decl);
+    OD->setDesignatedNominalType(decl);
+    // FIXME: verify this operator has a declaration within this
+    //        protocol with the same arity and fixity
   }
 }
 
@@ -2099,17 +2081,16 @@ void TypeChecker::validateDecl(OperatorDecl *OD) {
 
   auto IOD = dyn_cast<InfixOperatorDecl>(OD);
 
-  auto enableOperatorDesignatedProtocols =
-      getLangOpts().EnableOperatorDesignatedProtocols;
+  auto enableOperatorDesignatedTypes =
+      getLangOpts().EnableOperatorDesignatedTypes;
 
   // Pre- or post-fix operator?
   if (!IOD) {
-    auto *protocol = OD->getDesignatedProtocol();
-    auto protocolId = OD->getDesignatedProtocolName();
-    if (!protocol && !protocolId.empty() &&
-        enableOperatorDesignatedProtocols) {
-      auto protocolIdLoc = OD->getDesignatedProtocolNameLoc();
-      checkDesignatedProtocol(OD, protocolId, protocolIdLoc, *this, Context);
+    auto *nominal = OD->getDesignatedNominalType();
+    auto nominalId = OD->getDesignatedNominalTypeName();
+    if (!nominal && !nominalId.empty() && enableOperatorDesignatedTypes) {
+      auto nominalIdLoc = OD->getDesignatedNominalTypeNameLoc();
+      checkDesignatedTypes(OD, nominalId, nominalIdLoc, *this, Context);
     }
     return;
   }
@@ -2127,20 +2108,20 @@ void TypeChecker::validateDecl(OperatorDecl *OD) {
     }
 
     auto secondId = IOD->getSecondIdentifier();
-    auto *protocol = IOD->getDesignatedProtocol();
-    if (!protocol && enableOperatorDesignatedProtocols) {
+    auto *nominal = IOD->getDesignatedNominalType();
+    if (!nominal && enableOperatorDesignatedTypes) {
       auto secondIdLoc = IOD->getSecondIdentifierLoc();
       assert(secondId.empty() || !firstId.empty());
 
-      auto protocolId = group ? secondId : firstId;
-      auto protocolIdLoc = group ? secondIdLoc : firstIdLoc;
-      if (!protocolId.empty())
-        checkDesignatedProtocol(IOD, protocolId, protocolIdLoc, *this, Context);
+      auto nominalId = group ? secondId : firstId;
+      auto nominalIdLoc = group ? secondIdLoc : firstIdLoc;
+      if (!nominalId.empty())
+        checkDesignatedTypes(IOD, nominalId, nominalIdLoc, *this, Context);
     }
 
     if (!group && !IOD->isInvalid()) {
       if (!firstId.empty() &&
-          (!secondId.empty() || !IOD->getDesignatedProtocol())) {
+          (!secondId.empty() || !IOD->getDesignatedNominalType())) {
         diagnose(firstIdLoc, diag::unknown_precedence_group, firstId);
         IOD->setInvalid();
       }
@@ -2583,7 +2564,7 @@ public:
         // Static/class declarations require an initializer unless in a
         // protocol.
         if (var->isStatic() && !isa<ProtocolDecl>(varDC)) {
-          // ...but don't enforce this for SIL or textual interface files.
+          // ...but don't enforce this for SIL or parseable interface files.
           switch (varDC->getParentSourceFile()->Kind) {
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
@@ -3123,7 +3104,7 @@ public:
         return false;
     }
 
-    // Declarations in SIL and textual interface files don't require
+    // Declarations in SIL and parseable interface files don't require
     // definitions.
     if (auto sourceFile = decl->getDeclContext()->getParentSourceFile()) {
       switch (sourceFile->Kind) {
@@ -5181,7 +5162,7 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
 
 void TypeChecker::maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   if (auto *SF = classDecl->getParentSourceFile()) {
-    // Allow classes without initializers in SIL and textual interface files.
+    // Allow classes without initializers in SIL and parseable interface files.
     switch (SF->Kind) {
     case SourceFileKind::SIL:
     case SourceFileKind::Interface:
@@ -5316,7 +5297,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   if (decl->isInvalid())
     return;
 
-  // Don't add implicit constructors in textual interfaces.
+  // Don't add implicit constructors in parseable interfaces.
   if (auto *SF = decl->getParentSourceFile()) {
     if (SF->Kind == SourceFileKind::Interface) {
       decl->setAddedImplicitInitializers();

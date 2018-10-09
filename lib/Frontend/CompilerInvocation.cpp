@@ -161,8 +161,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalPropertyBehaviors |=
     Args.hasArg(OPT_enable_experimental_property_behaviors);
 
-  Opts.EnableOperatorDesignatedProtocols |=
-      Args.hasArg(OPT_enable_operator_designated_protocols);
+  Opts.EnableOperatorDesignatedTypes |=
+      Args.hasArg(OPT_enable_operator_designated_types);
+
+  Opts.SolverEnableOperatorDesignatedTypes |=
+      Args.hasArg(OPT_solver_enable_operator_designated_types);
 
   if (auto A = Args.getLastArg(OPT_enable_deserialization_recovery,
                                OPT_disable_deserialization_recovery)) {
@@ -1018,6 +1021,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_enable_resilience_bypass)) {
     Opts.EnableResilienceBypass = true;
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_read_type_info_path_EQ)) {
+    Opts.ReadTypeInfoPath = A->getValue();
   }
 
   for (const auto &Lib : Args.getAllArgValues(options::OPT_autolink_library))

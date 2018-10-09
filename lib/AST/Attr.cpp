@@ -28,6 +28,15 @@
 #include "llvm/ADT/StringSwitch.h"
 using namespace swift;
 
+#define DECL_ATTR(_, Id, ...) \
+  static_assert(IsTriviallyDestructible<Id##Attr>::value, \
+                "Attrs are BumpPtrAllocated; the destructor is never called");
+#include "swift/AST/Attr.def"
+static_assert(IsTriviallyDestructible<DeclAttributes>::value,
+              "DeclAttributes are BumpPtrAllocated; the d'tor is never called");
+static_assert(IsTriviallyDestructible<TypeAttributes>::value,
+              "TypeAttributes are BumpPtrAllocated; the d'tor is never called");
+
 
 // Only allow allocation of attributes using the allocator in ASTContext.
 void *AttributeBase::operator new(size_t Bytes, ASTContext &C,

@@ -313,10 +313,10 @@ extension _CocoaSet {
   }
 }
 
-extension _CocoaSet: Equatable {
+extension _CocoaSet {
   @usableFromInline
-  internal static func ==(lhs: _CocoaSet, rhs: _CocoaSet) -> Bool {
-    return _stdlib_NSObject_isEqual(lhs.object, rhs.object)
+  internal func isEqual(to other: _CocoaSet) -> Bool {
+    return _stdlib_NSObject_isEqual(self.object, other.object)
   }
 }
 
@@ -619,12 +619,10 @@ extension _CocoaSet.Iterator: IteratorProtocol {
 extension Set {
   @inlinable
   public __consuming func _bridgeToObjectiveCImpl() -> _NSSetCore {
-    switch _variant {
-    case .native(let nativeSet):
-      return nativeSet.bridged()
-    case .cocoa(let cocoaSet):
-      return cocoaSet.object
+    guard _variant.isNative else {
+      return _variant.asCocoa.object
     }
+    return _variant.asNative.bridged()
   }
 
   /// Returns the native Dictionary hidden inside this NSDictionary;

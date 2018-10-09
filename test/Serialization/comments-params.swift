@@ -3,7 +3,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -module-name comments -emit-module -emit-module-path %t/comments.swiftmodule -emit-module-doc -emit-module-doc-path %t/comments.swiftdoc -group-info-path %S/Inputs/comments-params.json %s
-// RUN: strings %t/comments.swiftdoc > %t.txt
+// RUN: %llvm-strings %t/comments.swiftdoc > %t.txt
 // RUN: %FileCheck %s < %t.txt
 // RUN: %FileCheck -check-prefix NEGATIVE %s < %t.txt
 

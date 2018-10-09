@@ -784,8 +784,9 @@ namespace {
 
 /// Find the offset of the protocol requirement for an associated type with
 /// the given name in the given protocol descriptor.
-Optional<unsigned> findAssociatedTypeByName(const ProtocolDescriptor *protocol,
-                                            StringRef name) {
+Optional<const ProtocolRequirement *> findAssociatedTypeByName(
+                                        const ProtocolDescriptor *protocol,
+                                        StringRef name) {
   // If we don't have associated type names, there's nothing to do.
   const char *associatedTypeNamesPtr = protocol->AssociatedTypeNames.get();
   if (!associatedTypeNamesPtr) return None;
@@ -820,7 +821,7 @@ Optional<unsigned> findAssociatedTypeByName(const ProtocolDescriptor *protocol,
       continue;
 
     if (currentAssocTypeIdx == matchingAssocTypeIdx)
-      return reqIdx + WitnessTableFirstRequirementOffset;
+      return requirements.begin() + reqIdx;
 
     ++currentAssocTypeIdx;
   }
@@ -1191,12 +1192,15 @@ swift::_getTypeByMangledName(StringRef typeName,
       if (!witnessTable) return nullptr;
 
       // Look for the named associated type within the protocol.
-      auto assocTypeReqIndex = findAssociatedTypeByName(protocol, assocType);
-      if (!assocTypeReqIndex) return nullptr;
+      auto assocTypeReq = findAssociatedTypeByName(protocol, assocType);
+      if (!assocTypeReq) return nullptr;
 
       // Call the associated type access function.
-      return ((AssociatedTypeAccessFunction * const *)witnessTable)[*assocTypeReqIndex]
-                (MetadataState::Abstract, base, witnessTable).Value;
+      return swift_getAssociatedTypeWitness(
+                                     MetadataState::Abstract,
+                                     const_cast<WitnessTable *>(witnessTable),
+                                     base,
+                                     *assocTypeReq).Value;
     });
 
   auto type = Demangle::decodeMangledType(builder, node);

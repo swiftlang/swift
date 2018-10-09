@@ -660,6 +660,10 @@ void SILModule::setOptRecordStream(
   OptRecordRawStream = std::move(RawStream);
 }
 
+bool SILModule::isStdlibModule() const {
+  return TheSwiftModule->isStdlibModule();
+}
+
 SILProperty *SILProperty::create(SILModule &M,
                                  bool Serialized,
                                  AbstractStorageDecl *Decl,

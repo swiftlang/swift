@@ -8,10 +8,6 @@ else()
   set(SOURCEKITD_TEST_LINK_LIBS sourcekitd)
 endif()
 
-if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
-  set(SOURCEKITD_TEST_LINK_LIBS ${SOURCEKITD_TEST_LINK_LIBS} dispatch)
-endif()
-
 add_sourcekit_executable(sourcekitd-test
   sourcekitd-test.cpp
   TestOptions.cpp
@@ -19,6 +15,9 @@ add_sourcekit_executable(sourcekitd-test
     clangRewrite clangLex clangBasic
   LLVM_COMPONENT_DEPENDS core support option coverage lto
 )
+if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
+  target_link_libraries(sourcekitd-test PRIVATE dispatch BlocksRuntime)
+endif()
 
 add_dependencies(sourcekitd-test sourcekitdTestOptionsTableGen)
 

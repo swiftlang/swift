@@ -3642,23 +3642,6 @@ public:
       llvm_unreachable("Unhandled Representation in switch.");
     }
 
-    bool hasGuaranteedSelfParam() const {
-      switch (getRepresentation()) {
-      case Representation::Thick:
-      case Representation::Block:
-      case Representation::Thin:
-      case Representation::CFunctionPointer:
-      case Representation::ObjCMethod:
-      case Representation::Closure:
-        return false;
-      case Representation::Method:
-      case Representation::WitnessMethod:
-        return true;
-      }
-
-      llvm_unreachable("Unhandled Representation in switch.");
-    }
-
     /// True if the function representation carries context.
     bool hasContext() const {
       switch (getRepresentation()) {
@@ -4650,7 +4633,7 @@ public:
   /// type shall conform.
   ArrayRef<ProtocolDecl *> getConformsTo() const {
     return { getTrailingObjects<ProtocolDecl *>(),
-             Bits.ArchetypeType.NumProtocols };
+             static_cast<size_t>(Bits.ArchetypeType.NumProtocols) };
   }
   
   /// requiresClass - True if the type can only be substituted with class types.

@@ -24,6 +24,9 @@ typedef NSString *NSErrorDomain;
 @end
 
 @interface NSDictionary<KeyType, ValueType> : NSObject
+
++ (void) classMethod;
+
 @end
 
 @interface NSSet<ObjectType> : NSObject

@@ -164,6 +164,20 @@ buildIndexForwardingParamList(AbstractStorageDecl *storage,
   return ParameterList::create(context, elements);
 }
 
+/// Create the generic parameters needed for the given accessor, if any.
+static GenericParamList *createAccessorGenericParams(
+                                              AbstractStorageDecl *storage) {
+  // Accessors of generic subscripts get a copy of the subscript's
+  // generic parameter list, because they're not nested inside the
+  // subscript.
+  if (auto *subscript = dyn_cast<SubscriptDecl>(storage)) {
+    if (auto genericParams = subscript->getGenericParams())
+      return genericParams->clone(subscript->getDeclContext());
+  }
+
+  return nullptr;
+}
+
 static AccessorDecl *createGetterPrototype(TypeChecker &TC,
                                            AbstractStorageDecl *storage) {
   assert(!storage->getGetter());
@@ -193,6 +207,8 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
     }
   }
 
+  GenericParamList *genericParams = createAccessorGenericParams(storage);
+
   // Add an index-forwarding clause.
   auto *getterParams = buildIndexForwardingParamList(storage, {});
 
@@ -209,7 +225,7 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
       AccessorKind::Get, AddressorKind::NotAddressor, storage,
       staticLoc, StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr,
+      genericParams,
       getterParams,
       TypeLoc::withoutLoc(storageInterfaceType),
       storage->getDeclContext());
@@ -255,7 +271,9 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
 
   bool isStatic = storage->isStatic();
   bool isMutating = storage->isSetterMutating();
-  
+
+  GenericParamList *genericParams = createAccessorGenericParams(storage);
+
   // Add a "(value : T, indices...)" argument list.
   auto storageInterfaceType = storage->getValueInterfaceType();
   auto valueDecl = buildArgument(storage->getLoc(), storage->getDeclContext(),
@@ -269,7 +287,7 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
       AccessorKind::Set, AddressorKind::NotAddressor, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*GenericParams=*/nullptr, params,
+      genericParams, params,
       TypeLoc::withoutLoc(setterRetTy),
       storage->getDeclContext());
   setter->setImplicit();
@@ -379,15 +397,7 @@ createCoroutineAccessorPrototype(TypeChecker &TC,
   // Coroutine accessors always return ().
   Type retTy = TupleType::getEmpty(ctx);
 
-  // Accessors of generic subscripts get a copy of the subscript's
-  // generic parameter list, because they're not nested inside the
-  // subscript.
-  GenericParamList *genericParams = nullptr;
-  if (auto *subscript = dyn_cast<SubscriptDecl>(storage)) {
-    genericParams = subscript->getGenericParams();
-    if (genericParams)
-      genericParams = genericParams->clone(dc);
-  }
+  GenericParamList *genericParams = createAccessorGenericParams(storage);
 
   auto *accessor = AccessorDecl::create(
       ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(),
@@ -2023,11 +2033,21 @@ void swift::maybeAddAccessorsToStorage(TypeChecker &TC,
   } else if (isa<ProtocolDecl>(dc)) {
     if (storage->hasStorage()) {
       auto var = cast<VarDecl>(storage);
-      if (var->isLet())
+
+      if (var->isLet()) {
         TC.diagnose(var->getLoc(),
-                    diag::protocol_property_must_be_computed_var);
-      else
-        TC.diagnose(var->getLoc(), diag::protocol_property_must_be_computed);
+                   diag::protocol_property_must_be_computed_var)
+          .fixItReplace(var->getParentPatternBinding()->getLoc(), "var")
+          .fixItInsertAfter(var->getTypeLoc().getLoc(), " { get }");
+      } else {
+        auto diag = TC.diagnose(var->getLoc(), diag::protocol_property_must_be_computed);
+        auto braces = var->getBracesRange();
+
+        if (braces.isValid())
+          diag.fixItReplace(braces, "{ get <#set#> }");
+        else
+          diag.fixItInsertAfter(var->getTypeLoc().getLoc(), " { get <#set#> }");
+      }
     }
 
     setProtocolStorageImpl(TC, storage);

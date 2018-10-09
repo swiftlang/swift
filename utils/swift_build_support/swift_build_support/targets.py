@@ -113,6 +113,7 @@ class StdlibDeploymentTarget(object):
 
     Linux = Platform("linux", archs=[
         "x86_64",
+        "i686",
         "armv6",
         "armv7",
         "aarch64",
@@ -160,6 +161,8 @@ class StdlibDeploymentTarget(object):
         if system == 'Linux':
             if machine == 'x86_64':
                 return StdlibDeploymentTarget.Linux.x86_64
+            elif machine == 'i686':
+                return StdlibDeploymentTarget.Linux.i686
             elif machine.startswith('armv7'):
                 # linux-armv7* is canonicalized to 'linux-armv7'
                 return StdlibDeploymentTarget.Linux.armv7

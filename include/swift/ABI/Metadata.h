@@ -1700,11 +1700,6 @@ using TargetWitnessTablePointer =
 
 using WitnessTablePointer = TargetWitnessTablePointer<InProcess>;
 
-using AssociatedTypeAccessFunction =
-  SWIFT_CC(swift) MetadataResponse(MetadataRequest request,
-                                  const Metadata *self,
-                                  const WitnessTable *selfConformance);
-
 using AssociatedWitnessTableAccessFunction =
   SWIFT_CC(swift) WitnessTable *(const Metadata *associatedType,
                                  const Metadata *self,
@@ -2013,7 +2008,10 @@ struct TargetGenericWitnessTable {
   /// The amount of private storage to allocate before the address point,
   /// in words. This memory is zeroed out in the instantiated witness table
   /// template.
-  uint16_t WitnessTablePrivateSizeInWords;
+  ///
+  /// The low bit is used to indicate whether this witness table is known
+  /// to require instantiation.
+  uint16_t WitnessTablePrivateSizeInWordsAndRequiresInstantiation;
 
   /// The protocol descriptor. Only used for resilient conformances.
   RelativeIndirectablePointer<ProtocolDescriptor,
@@ -2037,6 +2035,15 @@ struct TargetGenericWitnessTable {
   /// Private data for the instantiator.  Out-of-line so that the rest
   /// of this structure can be constant.
   RelativeDirectPointer<PrivateDataType> PrivateData;
+
+  uint16_t getWitnessTablePrivateSizeInWords() const {
+    return WitnessTablePrivateSizeInWordsAndRequiresInstantiation >> 1;
+  }
+
+  /// Whether the witness table is known to require instantiation.
+  uint16_t requiresInstantiation() const {
+    return WitnessTablePrivateSizeInWordsAndRequiresInstantiation & 0x01;
+  }
 };
 using GenericWitnessTable = TargetGenericWitnessTable<InProcess>;
 
@@ -2238,8 +2245,7 @@ struct TargetProtocolConformanceDescriptor final
 public:
   using WitnessTableAccessorFn
     = const TargetWitnessTable<Runtime> *(const TargetMetadata<Runtime>*,
-                                          const TargetWitnessTable<Runtime> **,
-                                          size_t);
+                                          const TargetWitnessTable<Runtime> **);
 
   using GenericRequirementDescriptor =
     TargetGenericRequirementDescriptor<Runtime>;
@@ -3612,11 +3618,23 @@ using StoredClassMetadataBounds =
   TargetStoredClassMetadataBounds<InProcess>;
 
 template <typename Runtime>
+struct TargetResilientSuperclass {
+  /// The superclass of this class.  This pointer can be interpreted
+  /// using the superclass reference kind stored in the type context
+  /// descriptor flags.  It is null if the class has no formal superclass.
+  ///
+  /// Note that SwiftObject, the implicit superclass of all Swift root
+  /// classes when building with ObjC compatibility, does not appear here.
+  TargetRelativeDirectPointer<Runtime, const void, /*nullable*/true> Superclass;
+};
+
+template <typename Runtime>
 class TargetClassDescriptor final
     : public TargetTypeContextDescriptor<Runtime>,
       public TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
                               TargetTypeGenericContextDescriptorHeader,
                               /*additional trailing objects:*/
+                              TargetResilientSuperclass<Runtime>,
                               TargetForeignMetadataInitialization<Runtime>,
                               TargetSingletonMetadataInitialization<Runtime>,
                               TargetVTableDescriptorHeader<Runtime>,
@@ -3627,6 +3645,7 @@ private:
   using TrailingGenericContextObjects =
     TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
                                   TargetTypeGenericContextDescriptorHeader,
+                                  TargetResilientSuperclass<Runtime>,
                                   TargetForeignMetadataInitialization<Runtime>,
                                   TargetSingletonMetadataInitialization<Runtime>,
                                   TargetVTableDescriptorHeader<Runtime>,
@@ -3643,6 +3662,7 @@ public:
   using VTableDescriptorHeader = TargetVTableDescriptorHeader<Runtime>;
   using OverrideTableHeader = TargetOverrideTableHeader<Runtime>;
   using MethodOverrideDescriptor = TargetMethodOverrideDescriptor<Runtime>;
+  using ResilientSuperclass = TargetResilientSuperclass<Runtime>;
   using ForeignMetadataInitialization =
     TargetForeignMetadataInitialization<Runtime>;
   using SingletonMetadataInitialization =
@@ -3658,22 +3678,14 @@ public:
   using TrailingGenericContextObjects::getGenericParams;
   using TargetTypeContextDescriptor<Runtime>::getTypeContextDescriptorFlags;
 
-  /// The superclass of this class.  This pointer can be interpreted
-  /// using the superclass reference kind stored in the type context
-  /// descriptor flags.  It is null if the class has no formal superclass.
-  ///
-  /// Note that SwiftObject, the implicit superclass of all Swift root
-  /// classes when building with ObjC compatibility, does not appear here.
-  TargetRelativeDirectPointer<Runtime, const void, /*nullable*/true> Superclass;
-
-  /// Does this class have a formal superclass?
-  bool hasSuperclass() const {
-    return !Superclass.isNull();
+  TypeReferenceKind getResilientSuperclassReferenceKind() const {
+    return getTypeContextDescriptorFlags()
+      .class_getResilientSuperclassReferenceKind();
   }
 
-  TypeReferenceKind getSuperclassReferenceKind() const {
-    return getTypeContextDescriptorFlags().class_getSuperclassReferenceKind();
-  }
+  /// The type of the superclass, expressed as a mangled type name that can
+  /// refer to the generic arguments of the subclass type.
+  TargetRelativeDirectPointer<Runtime, const char> SuperclassType;
 
   union {
     /// If this descriptor does not have a resilient superclass, this is the
@@ -3734,6 +3746,10 @@ private:
   
   using TrailingGenericContextObjects::numTrailingObjects;
 
+  size_t numTrailingObjects(OverloadToken<ResilientSuperclass>) const {
+    return this->hasResilientSuperclass() ? 1 : 0;
+  }
+
   size_t numTrailingObjects(OverloadToken<ForeignMetadataInitialization>) const{
     return this->hasForeignMetadataInitialization() ? 1 : 0;
   }
@@ -3765,6 +3781,12 @@ private:
   }
 
 public:
+  const TargetRelativeDirectPointer<Runtime, const void, /*nullable*/true> &
+  getResilientSuperclass() const {
+    assert(this->hasResilientSuperclass());
+    return this->template getTrailingObjects<ResilientSuperclass>()->Superclass;
+  }
+
   const ForeignMetadataInitialization &getForeignMetadataInitialization() const{
     assert(this->hasForeignMetadataInitialization());
     return *this->template getTrailingObjects<ForeignMetadataInitialization>();

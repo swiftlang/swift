@@ -164,14 +164,14 @@ public struct SystemRandomNumberGenerator : RandomNumberGenerator {
   @inlinable
   public mutating func next() -> UInt64 {
     var random: UInt64 = 0
-    _stdlib_random(&random, MemoryLayout<UInt64>.size)
+    swift_stdlib_random(&random, MemoryLayout<UInt64>.size)
     return random
   }
 
   @inlinable
   public mutating func _fill(bytes buffer: UnsafeMutableRawBufferPointer) {
     if !buffer.isEmpty {
-      _stdlib_random(buffer.baseAddress!, buffer.count)
+      swift_stdlib_random(buffer.baseAddress!, buffer.count)
     }
   }
 }

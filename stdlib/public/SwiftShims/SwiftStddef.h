@@ -28,4 +28,12 @@ typedef size_t __swift_size_t;
 typedef __SIZE_TYPE__ __swift_size_t;
 #endif
 
+// This selects the signed equivalent of the unsigned type chosen for size_t.
+typedef __typeof__(_Generic((__swift_size_t)0,                                 \
+                            unsigned long long int : (long long int)0,         \
+                            unsigned long int : (long int)0,                   \
+                            unsigned int : (int)0,                             \
+                            unsigned short : (short)0,                         \
+                            unsigned char : (signed char)0)) __swift_ssize_t;
+
 #endif // SWIFT_STDLIB_SHIMS_SWIFT_STDDEF_H

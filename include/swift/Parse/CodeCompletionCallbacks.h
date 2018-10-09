@@ -200,7 +200,7 @@ public:
 
   virtual void completeAssignmentRHS(AssignExpr *E) = 0;
 
-  virtual void completeCallArg(CallExpr *E) = 0;
+  virtual void completeCallArg(CodeCompletionExpr *E) = 0;
 
   virtual void completeReturnStmt(CodeCompletionExpr *E) = 0;
 

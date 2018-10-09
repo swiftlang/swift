@@ -337,6 +337,11 @@ public:
   /// so return the TBDPath when in that mode and fail an assert
   /// if not in that mode.
   std::string getTBDPathForWholeModule() const;
+
+  /// ParseableInterfaceOutputPath only makes sense in whole module compilation
+  /// mode, so return the ParseableInterfaceOutputPath when in that mode and
+  /// fail an assert if not in that mode.
+  std::string getParseableInterfaceOutputPathForWholeModule() const;
 };
 
 /// A class which manages the state and execution of the compiler.

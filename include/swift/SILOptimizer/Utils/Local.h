@@ -246,8 +246,8 @@ public:
   /// In this case, if \p mode is AllowToModifyCFG, those critical edges are
   /// split, otherwise nothing is done and the returned \p Fr is not valid.
   ///
-  /// If \p DEBlocks is provided, all dead-end blocks are ignored. This prevents
-  /// unreachable-blocks to be included in the frontier.
+  /// If \p deadEndBlocks is provided, all dead-end blocks are ignored. This
+  /// prevents unreachable-blocks to be included in the frontier.
   bool computeFrontier(Frontier &Fr, Mode mode,
                        DeadEndBlocks *DEBlocks = nullptr);
 
@@ -599,13 +599,6 @@ SILType getExactDynamicType(SILValue S, SILModule &M,
 /// if the exact type could not be determined.
 SILType getExactDynamicTypeOfUnderlyingObject(SILValue S, SILModule &M,
                                               ClassHierarchyAnalysis *CHA);
-
-/// Hoist the address projection rooted in \p Op to \p InsertBefore.
-/// Requires the projected value to dominate the insertion point.
-///
-/// Will look through single basic block predecessor arguments.
-void hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,
-                             DominanceInfo *DomTree);
 
 /// Utility class for cloning init values into the static initializer of a
 /// SILGlobalVariable.

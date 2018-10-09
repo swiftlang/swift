@@ -4273,7 +4273,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
   assert(Tok.is(tok::l_brace));
 
   // Properties in protocols use a very limited syntax.
-  // SIL mode and textual interfaces use the same syntax.
+  // SIL mode and parseable interfaces use the same syntax.
   // Otherwise, we have a normal var or subscript declaration and we need
   // parse the full complement of specifiers, along with their bodies.
   bool parsingLimitedSyntax = Flags.contains(PD_InProtocol) ||
@@ -4396,7 +4396,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
 
     // It's okay not to have a body if there's an external asm name.
     if (!Tok.is(tok::l_brace)) {
-      // Accessors don't need bodies in textual interfaces
+      // Accessors don't need bodies in parseable interfaces
       if (SF.Kind == SourceFileKind::Interface)
         continue;
       // _silgen_name'd accessors don't need bodies.
@@ -6226,7 +6226,7 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
     if (!Status.isError()) {
       if (Flags.contains(PD_InProtocol)) {
         diagnose(Tok, diag::expected_lbrace_subscript_protocol)
-            .fixItInsertAfter(ElementTy.get()->getEndLoc(), " { get set }");
+            .fixItInsertAfter(ElementTy.get()->getEndLoc(), " { get <#set#> }");
       } else {
         diagnose(Tok, diag::expected_lbrace_subscript);
       }
@@ -6404,7 +6404,7 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     switch (SF.Kind) {
     case SourceFileKind::Interface:
     case SourceFileKind::SIL:
-      // It's okay to have no body for SIL code or textual interfaces.
+      // It's okay to have no body for SIL code or parseable interfaces.
       break;
     case SourceFileKind::Library:
     case SourceFileKind::Main:
@@ -6513,11 +6513,12 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
 
       return makeParserCodeCompletionResult<OperatorDecl>();
     }
-    if (Tok.is(tok::identifier)) {
-      firstIdentifierName = Context.getIdentifier(Tok.getText());
-      firstIdentifierNameLoc = consumeToken(tok::identifier);
 
-      if (Context.LangOpts.EnableOperatorDesignatedProtocols) {
+    if (Context.LangOpts.EnableOperatorDesignatedTypes) {
+      if (Tok.is(tok::identifier)) {
+        firstIdentifierName = Context.getIdentifier(Tok.getText());
+        firstIdentifierNameLoc = consumeToken(tok::identifier);
+
         if (consumeIf(tok::comma)) {
           if (isPrefix || isPostfix)
             diagnose(colonLoc, diag::precedencegroup_not_infix)
@@ -6531,7 +6532,12 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
             diagnose(otherTokLoc, diag::operator_decl_trailing_comma);
           }
         }
-      } else if (isPrefix || isPostfix) {
+      }
+    } else if (Tok.is(tok::identifier)) {
+      firstIdentifierName = Context.getIdentifier(Tok.getText());
+      firstIdentifierNameLoc = consumeToken(tok::identifier);
+
+      if (isPrefix || isPostfix) {
         diagnose(colonLoc, diag::precedencegroup_not_infix)
             .fixItRemove({colonLoc, firstIdentifierNameLoc});
       }

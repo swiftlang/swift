@@ -111,20 +111,23 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
                               TreatUsableFromInlineAsPublic).isPublic())
     return false;
 
-  // Enum cases are handled as part of their containing enum.
-  if (isa<EnumElementDecl>(D))
+  // Dynamic declarations were mistakenly not checked in Swift 4.2.
+  // Do enforce the restriction even in pre-Swift-5 modes if the module we're
+  // building is resilient, though.
+  if (D->isDynamic() && !Context.isSwiftVersionAtLeast(5) &&
+      DC->getParentModule()->getResilienceStrategy() !=
+        ResilienceStrategy::Resilient) {
     return false;
+  }
 
-  // Protocol requirements are not versioned because there's no
-  // global entry point.
-  if (isa<ProtocolDecl>(D->getDeclContext()) &&
-      D->isProtocolRequirement())
-    return false;
-
-  // Dynamic declarations are not versioned because there's no
-  // global entry point.
-  if (D->isDynamic())
-    return false;
+  // Property initializers that are not exposed to clients are OK.
+  if (auto pattern = dyn_cast<PatternBindingInitializer>(DC)) {
+    auto bindingIndex = pattern->getBindingIndex();
+    auto &patternEntry = pattern->getBinding()->getPatternList()[bindingIndex];
+    auto varDecl = patternEntry.getAnchoringVarDecl();
+    if (!varDecl->isInitExposedToClients())
+      return false;
+  }
 
   DowngradeToWarning downgradeToWarning = DowngradeToWarning::No;
 

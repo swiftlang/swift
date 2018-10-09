@@ -545,12 +545,12 @@ internal struct _Stdout : TextOutputStream {
     if _fastPath(string._guts.isASCII) {
       defer { _fixLifetime(string) }
       let ascii = string._guts._unmanagedASCIIView
-      _stdlib_fwrite_stdout(ascii.start, ascii.count, 1)
+      _swift_stdlib_fwrite_stdout(ascii.start, ascii.count, 1)
       return
     }
 
     for c in string.utf8 {
-      _stdlib_putchar_unlocked(Int32(c))
+      _swift_stdlib_putchar_unlocked(Int32(c))
     }
   }
 }

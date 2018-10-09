@@ -4,15 +4,14 @@ else()
   set(SOURCEKITD_TEST_LINK_LIBS sourcekitd)
 endif()
 
-if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
-  set(SOURCEKITD_TEST_LINK_LIBS ${SOURCEKITD_TEST_LINK_LIBS} dispatch)
-endif()
-
 add_sourcekit_executable(complete-test
   complete-test.cpp
   LINK_LIBS ${SOURCEKITD_TEST_LINK_LIBS}
   LLVM_COMPONENT_DEPENDS support option coverage lto
 )
+if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
+  target_link_libraries(complete-test PRIVATE dispatch BlocksRuntime)
+endif()
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set_target_properties(complete-test

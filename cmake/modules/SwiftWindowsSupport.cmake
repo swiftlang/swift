@@ -47,14 +47,24 @@ function(swift_windows_lib_for_arch arch var)
   swift_windows_arch_spelling(${arch} ARCH)
 
   set(paths)
-  if(${ARCH} STREQUAL x86)
-    list(APPEND paths "$ENV{VCToolsInstallDir}/Lib")
+
+  # NOTE(compnerd) provide compatibility with VS2015 which had the libraries in
+  # a directory called "Lib" rather than VS2017 which normalizes the layout and
+  # places them in a directory named "lib".
+  if(IS_DIRECTORY "$ENV{VCToolsInstallDir}/Lib")
+    if(${ARCH} STREQUAL x86)
+      list(APPEND paths "$ENV{VCToolsInstallDir}/Lib/")
+    else()
+      list(APPEND paths "$ENV{VCToolsInstallDir}/Lib/${ARCH}")
+    endif()
   else()
-    list(APPEND paths "$ENV{VCToolsInstallDir}/Lib/${ARCH}")
+    list(APPEND paths "$ENV{VCToolsInstallDir}/lib/${ARCH}")
   endif()
+
   list(APPEND paths
           "$ENV{UniversalCRTSdkDir}/Lib/$ENV{UCRTVersion}/ucrt/${ARCH}"
           "$ENV{UniversalCRTSdkDir}/Lib/$ENV{UCRTVersion}/um/${ARCH}")
+
   set(${var} ${paths} PARENT_SCOPE)
 endfunction()
 

@@ -580,6 +580,19 @@ public:
   bool isInstance() const { return Value & IsInstanceMask; }
 
   int_type getIntValue() const { return Value; }
+
+  enum : uintptr_t {
+    /// Bit used to indicate that an associated type witness is a pointer to
+    /// a mangled name (vs. a pointer to metadata).
+    AssociatedTypeMangledNameBit = 0x01,
+  };
+
+  enum : uint8_t {
+    /// Prefix byte used to identify an associated type whose mangled name
+    /// is relative to the protocol's context rather than the conforming
+    /// type's context.
+    AssociatedTypeInProtocolContextByte = 0xFF
+  };
 };
 
 /// Flags that go in a TargetConformanceDescriptor structure.
@@ -1240,12 +1253,12 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
 
     // Type-specific flags:
 
-    /// The kind of reference that this class makes to its superclass
+    /// The kind of reference that this class makes to its resilient superclass
     /// descriptor.  A TypeReferenceKind.
     ///
     /// Only meaningful for class descriptors.
-    Class_SuperclassReferenceKind = 9,
-    Class_SuperclassReferenceKind_width = 3,
+    Class_ResilientSuperclassReferenceKind = 9,
+    Class_ResilientSuperclassReferenceKind_width = 3,
 
     /// Whether the immediate class members in this metadata are allocated
     /// at negative offsets.  For now, we don't use this.
@@ -1318,11 +1331,11 @@ public:
                                 class_areImmediateMembersNegative,
                                 class_setAreImmediateMembersNegative)
 
-  FLAGSET_DEFINE_FIELD_ACCESSORS(Class_SuperclassReferenceKind,
-                                 Class_SuperclassReferenceKind_width,
+  FLAGSET_DEFINE_FIELD_ACCESSORS(Class_ResilientSuperclassReferenceKind,
+                                 Class_ResilientSuperclassReferenceKind_width,
                                  TypeReferenceKind,
-                                 class_getSuperclassReferenceKind,
-                                 class_setSuperclassReferenceKind)
+                                 class_getResilientSuperclassReferenceKind,
+                                 class_setResilientSuperclassReferenceKind)
 };
 
 /// Flags for protocol context descriptors. These values are used as the

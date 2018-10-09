@@ -24,7 +24,7 @@
 #include "ImportedModules.h"
 #include "ReferenceDependencies.h"
 #include "TBD.h"
-#include "TextualInterfaceGeneration.h"
+#include "ParseableInterfaceGeneration.h"
 
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTScope.h"
@@ -356,19 +356,20 @@ static bool printAsObjCIfNeeded(StringRef outputPath, ModuleDecl *M,
   });
 }
 
-/// Prints the stable textual interface for \p M to \p outputPath.
+/// Prints the stable parseable interface for \p M to \p outputPath.
 ///
 /// ...unless \p outputPath is empty, in which case it does nothing.
 ///
 /// \returns true if there were any errors
 ///
-/// \see swift::emitModuleInterface
-static bool printModuleInterfaceIfNeeded(StringRef outputPath, ModuleDecl *M) {
+/// \see swift::emitParseableInterface
+static bool printParseableInterfaceIfNeeded(StringRef outputPath,
+                                            ModuleDecl *M) {
   if (outputPath.empty())
     return false;
   return atomicallyWritingToTextFile(outputPath, M->getDiags(),
                                      [M](raw_ostream &out) -> bool {
-    return swift::emitModuleInterface(out, M);
+    return swift::emitParseableInterface(out, M);
   });
 }
 
@@ -867,6 +868,40 @@ emitIndexData(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   return hadEmitIndexDataError;
 }
 
+/// Emits all "one-per-module" supplementary outputs that don't depend on
+/// anything past type-checking.
+///
+/// These are extracted out so that they can be invoked early when using
+/// `-typecheck`, but skipped for any mode that runs SIL diagnostics if there's
+/// an error found there (to get those diagnostics back to the user faster).
+static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
+    CompilerInstance &Instance, CompilerInvocation &Invocation,
+    bool moduleIsPublic) {
+  const FrontendOptions &opts = Invocation.getFrontendOptions();
+
+  // Record whether we failed to emit any of these outputs, but keep going; one
+  // failure does not mean skipping the rest.
+  bool hadAnyError = false;
+
+  if (opts.InputsAndOutputs.hasObjCHeaderOutputPath()) {
+    hadAnyError |= printAsObjCIfNeeded(
+        Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
+        Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
+  }
+
+  if (opts.InputsAndOutputs.hasParseableInterfaceOutputPath()) {
+    hadAnyError |= printParseableInterfaceIfNeeded(
+        Invocation.getParseableInterfaceOutputPathForWholeModule(),
+        Instance.getMainModule());
+  }
+
+  {
+    hadAnyError |= writeTBDIfNeeded(Invocation, Instance);
+  }
+
+  return hadAnyError;
+}
+
 static bool performCompileStepsPostSILGen(
     CompilerInstance &Instance, CompilerInvocation &Invocation,
     std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
@@ -965,9 +1000,6 @@ static bool performCompile(CompilerInstance &Instance,
     return true;
   }
 
-  if (writeTBDIfNeeded(Invocation, Instance))
-    return true;
-
   // FIXME: This is still a lousy approximation of whether the module file will
   // be externally consumed.
   bool moduleIsPublic =
@@ -977,17 +1009,14 @@ static bool performCompile(CompilerInstance &Instance,
 
   // We've just been told to perform a typecheck, so we can return now.
   if (Action == FrontendOptions::ActionType::Typecheck) {
-    const bool hadPrintAsObjCError =
-        Invocation.getFrontendOptions()
-            .InputsAndOutputs.hasObjCHeaderOutputPath() &&
-        printAsObjCIfNeeded(
-            Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
-            Instance.getMainModule(), opts.ImplicitObjCHeaderPath,
-            moduleIsPublic);
-
-    const bool hadEmitIndexDataError = emitIndexData(Invocation, Instance);
-
-    return hadPrintAsObjCError || hadEmitIndexDataError || Context.hadError();
+    if (emitIndexData(Invocation, Instance))
+      return true;
+    if (emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance,
+                                                            Invocation,
+                                                            moduleIsPublic)) {
+      return true;
+    }
+    return false;
   }
 
   assert(FrontendOptions::doesActionGenerateSIL(Action) &&
@@ -1272,6 +1301,9 @@ static bool performCompileStepsPostSILGen(
     SM->verify();
   }
 
+  emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance, Invocation,
+                                                      moduleIsPublic);
+
   // This is the action to be used to serialize SILModule.
   // It may be invoked multiple times, but it will perform
   // serialization only once. The serialization may either happen
@@ -1308,14 +1340,6 @@ static bool performCompileStepsPostSILGen(
   performSILInstCountIfNeeded(&*SM);
 
   setPrivateDiscriminatorIfNeeded(IRGenOpts, MSF);
-
-  (void)printAsObjCIfNeeded(PSPs.SupplementaryOutputs.ObjCHeaderOutputPath,
-                            Instance.getMainModule(),
-                            opts.ImplicitObjCHeaderPath, moduleIsPublic);
-
-  (void)printModuleInterfaceIfNeeded(
-      PSPs.SupplementaryOutputs.ModuleInterfaceOutputPath,
-      Instance.getMainModule());
 
   if (Action == FrontendOptions::ActionType::EmitSIB)
     return serializeSIB(SM.get(), PSPs, Instance.getASTContext(), MSF);

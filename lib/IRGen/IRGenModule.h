@@ -436,6 +436,17 @@ public:
   llvm::Constant *getValue() const { return Value; }
 };
 
+/// Describes the role of a mangled type reference string.
+enum class MangledTypeRefRole {
+  /// The mangled type reference is used for normal metadata.
+  Metadata,
+  /// The mangled type reference is used for reflection metadata.
+  Reflection,
+  /// The mangled type reference is used for a default associated type
+  /// witness.
+  DefaultAssociatedTypeWitness,
+};
+
 /// IRGenModule - Primary class for emitting IR for global declarations.
 /// 
 class IRGenModule {
@@ -591,7 +602,6 @@ public:
   llvm::CallingConv::ID DefaultCC;     /// default calling convention
   llvm::CallingConv::ID SwiftCC;       /// swift calling convention
 
-  Signature getAssociatedTypeMetadataAccessFunctionSignature();
   Signature getAssociatedTypeWitnessTableAccessFunctionSignature();
   llvm::StructType *getGenericWitnessTableCacheTy();
 
@@ -697,7 +707,6 @@ private:
   llvm::Type *FixedBufferTy;          /// [N x i8], where N == 3 * sizeof(void*)
 
   llvm::Type *ValueWitnessTys[MaxNumValueWitnesses];
-  llvm::FunctionType *AssociatedTypeMetadataAccessFunctionTy = nullptr;
   llvm::FunctionType *AssociatedTypeWitnessTableAccessFunctionTy = nullptr;
   llvm::StructType *GenericWitnessTableCacheTy = nullptr;
   
@@ -739,12 +748,6 @@ public:
   llvm::PointerType *getStoragePointerType(SILType T);
   llvm::StructType *createNominalType(CanType type);
   llvm::StructType *createNominalType(ProtocolCompositionType *T);
-  void getSchema(SILType T, ExplosionSchema &schema);
-  ExplosionSchema getSchema(SILType T);
-  unsigned getExplosionSize(SILType T);
-  llvm::PointerType *isSingleIndirectValue(SILType T);
-  bool isKnownEmpty(SILType type, ResilienceExpansion expansion);
-  bool isPOD(SILType type, ResilienceExpansion expansion);
   clang::CanQual<clang::Type> getClangType(CanType type);
   clang::CanQual<clang::Type> getClangType(SILType type);
   clang::CanQual<clang::Type> getClangType(SILParameterInfo param);
@@ -789,7 +792,7 @@ private:
                  std::unique_ptr<const ConformanceInfo>> Conformances;
 
   friend class GenericContextScope;
-  friend class CompletelyFragileScope;
+  friend class LoweringModeScope;
   
 //--- Globals ---------------------------------------------------------------
 public:
@@ -993,9 +996,11 @@ public:
   /// reflection metadata.
   llvm::SetVector<const StructDecl *> ImportedStructs;
 
-  llvm::Constant *getTypeRef(CanType type);
-  llvm::Constant *getAddrOfStringForTypeRef(StringRef mangling);
-  llvm::Constant *getAddrOfStringForTypeRef(const SymbolicMangling &mangling);
+  llvm::Constant *getTypeRef(CanType type, MangledTypeRefRole role);
+  llvm::Constant *getAddrOfStringForTypeRef(StringRef mangling,
+                                            MangledTypeRefRole role);
+  llvm::Constant *getAddrOfStringForTypeRef(const SymbolicMangling &mangling,
+                                            MangledTypeRefRole role);
   llvm::Constant *getAddrOfFieldName(StringRef Name);
   llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
                                              CanSILFunctionType origCalleeType,
@@ -1003,6 +1008,10 @@ public:
                                              SubstitutionMap subs,
                                              const HeapLayout &layout);
   llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
+
+  /// Produce an associated type witness that refers to the given type.
+  llvm::Constant *getAssociatedTypeWitness(CanType type,
+                                           bool inProtocolContext);
 
   void emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance);
   void emitFieldMetadataRecord(const NominalTypeDecl *Decl);
@@ -1283,14 +1292,9 @@ public:
   llvm::Function *
   getAddrOfGenericWitnessTableInstantiationFunction(
                                     const NormalProtocolConformance *C);
-  llvm::Function *getAddrOfAssociatedTypeMetadataAccessFunction(
-                                           const NormalProtocolConformance *C,
-                                           AssociatedType association);
   llvm::Function *getAddrOfAssociatedTypeWitnessTableAccessFunction(
                                      const NormalProtocolConformance *C,
                                      const AssociatedConformance &association);
-  llvm::Function *getAddrOfDefaultAssociatedTypeMetadataAccessFunction(
-                                           AssociatedType association);
   llvm::Function *getAddrOfDefaultAssociatedConformanceAccessor(
                                            AssociatedConformance requirement);
 

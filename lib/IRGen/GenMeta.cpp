@@ -457,7 +457,8 @@ namespace {
     
     void addExtendedContext() {
       auto string = IGM.getTypeRef(
-          E->getSelfInterfaceType()->getCanonicalType());
+          E->getSelfInterfaceType()->getCanonicalType(),
+          MangledTypeRefRole::Metadata);
       B.addRelativeAddress(string);
     }
     
@@ -602,7 +603,6 @@ namespace {
       auto var = cast<llvm::GlobalVariable>(addr);
 
       var->setConstant(true);
-      disableAddressSanitizer(IGM, var);
       IGM.setTrueConstGlobal(var);
     }
 
@@ -765,49 +765,14 @@ namespace {
             entry.getAssociatedTypeWitness().Requirement != assocType)
           continue;
 
-        auto witness = entry.getAssociatedTypeWitness().Witness;
-        return getDefaultAssociatedTypeMetadataAccessFunction(
-                 AssociatedType(assocType), witness);
+        auto witness =
+          entry.getAssociatedTypeWitness().Witness->mapTypeOutOfContext()
+            ->getCanonicalType();
+        return IGM.getAssociatedTypeWitness(witness,
+                                            /*inProtocolContext=*/true);
       }
 
       return nullptr;
-    }
-
-    /// Create an associated type metadata access function for the default
-    /// associated type witness.
-    llvm::Constant *getDefaultAssociatedTypeMetadataAccessFunction(
-                      AssociatedType requirement, CanType witness) {
-      auto accessor =
-        IGM.getAddrOfDefaultAssociatedTypeMetadataAccessFunction(requirement);
-
-      IRGenFunction IGF(IGM, accessor);
-      if (IGM.DebugInfo)
-        IGM.DebugInfo->emitArtificialFunction(IGF, accessor);
-
-      Explosion parameters = IGF.collectParameters();
-      auto request = DynamicMetadataRequest(parameters.claimNext());
-
-      llvm::Value *self = parameters.claimNext();
-      llvm::Value *wtable = parameters.claimNext();
-
-      CanType selfInContext =
-          Proto->mapTypeIntoContext(Proto->getProtocolSelfType())
-            ->getCanonicalType();
-
-      // Bind local Self type data from the metadata argument.
-      IGF.bindLocalTypeDataFromTypeMetadata(selfInContext, IsExact, self,
-                                            MetadataState::Abstract);
-      IGF.setUnscopedLocalTypeData(
-          selfInContext,
-          LocalTypeDataKind::forAbstractProtocolWitnessTable(Proto),
-          wtable);
-
-      // Emit a reference to the type metadata.
-      auto response = IGF.emitTypeMetadataRef(witness, request);
-      response.ensureDynamicState(IGF);
-      auto returnValue = response.combine(IGF);
-      IGF.Builder.CreateRet(returnValue);
-      return accessor;
     }
 
     llvm::Constant *findDefaultAssociatedConformanceWitness(
@@ -953,6 +918,7 @@ namespace {
       asImpl().addReflectionFieldDescriptor();
       asImpl().addLayoutInfo();
       asImpl().addGenericSignature();
+      asImpl().maybeAddResilientSuperclass();
       asImpl().maybeAddMetadataInitialization();
     }
 
@@ -1298,7 +1264,9 @@ namespace {
       setCommonFlags(flags);
       return flags.getOpaqueValue();
     }
-    
+
+    void maybeAddResilientSuperclass() { }
+
     void addReflectionFieldDescriptor() {
       // Structs are reflectable unless we emit them with opaque reflection
       // metadata.
@@ -1369,6 +1337,8 @@ namespace {
       return flags.getOpaqueValue();
     }
 
+    void maybeAddResilientSuperclass() { }
+
     void addReflectionFieldDescriptor() {
       // Some enum layout strategies (viz. C compatible layout) aren't
       // supported by reflection.
@@ -1398,7 +1368,7 @@ namespace {
     // Non-null unless the type is foreign.
     ClassMetadataLayout *MetadataLayout = nullptr;
 
-    Optional<TypeEntityReference> SuperClassRef;
+    Optional<TypeEntityReference> ResilientSuperClassRef;
 
     SILVTable *VTable;
     bool Resilient;
@@ -1417,8 +1387,10 @@ namespace {
 
       MetadataLayout = &IGM.getClassMetadataLayout(Type);
 
-      if (auto superclassDecl = getType()->getSuperclassDecl())
-        SuperClassRef = IGM.getTypeEntityReference(superclassDecl);
+      if (auto superclassDecl = getType()->getSuperclassDecl()) {
+        if (MetadataLayout && MetadataLayout->hasResilientSuperclass())
+          ResilientSuperClassRef = IGM.getTypeEntityReference(superclassDecl);
+      }
 
       addVTableEntries(getType());
     }
@@ -1471,11 +1443,19 @@ namespace {
           flags.class_setHasResilientSuperclass(true);
       }
 
-      if (SuperClassRef) {
-        flags.class_setSuperclassReferenceKind(SuperClassRef->getKind());
+      if (ResilientSuperClassRef) {
+        flags.class_setResilientSuperclassReferenceKind(
+                                            ResilientSuperClassRef->getKind());
       }
       
       return flags.getOpaqueValue();
+    }
+
+    void maybeAddResilientSuperclass() {
+      // RelativeDirectPointer<const void, /*nullable*/ true> SuperClass;
+      if (ResilientSuperClassRef) {
+        B.addRelativeAddress(ResilientSuperClassRef->getValue());
+      }
     }
 
     void addReflectionFieldDescriptor() {
@@ -1609,14 +1589,16 @@ namespace {
     }
     
     void addLayoutInfo() {
-      auto properties = getType()->getStoredProperties();
 
-      // RelativeDirectPointer<const void, /*nullable*/ true> SuperClass;
-      if (SuperClassRef) {
-        B.addRelativeAddress(SuperClassRef->getValue());
+      // TargetRelativeDirectPointer<Runtime, const char> SuperclassType;
+      if (auto superclassType = getType()->getSuperclass()) {
+        B.addRelativeAddress(IGM.getTypeRef(superclassType->getCanonicalType(),
+                                            MangledTypeRefRole::Metadata));
       } else {
         B.addInt32(0);
       }
+
+      auto properties = getType()->getStoredProperties();
 
       // union {
       //   uint32_t MetadataNegativeSizeInWords;
@@ -1832,28 +1814,10 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
     if (!doesClassMetadataRequireRelocation(IGM, classDecl))
       flags |= ClassLayoutFlags::HasStaticVTable;
 
-    // Get the superclass metadata, if the class has one.
-    llvm::Value *superclassMetadata;
-    if (auto superclassType = classDecl->getSuperclass()) {
-      superclassType = classDecl->mapTypeIntoContext(superclassType);
-
-      auto request = DynamicMetadataRequest::getNonBlocking(
-                               MetadataState::NonTransitiveComplete, collector);
-
-      superclassMetadata =
-        emitClassHeapMetadataRef(IGF, superclassType->getCanonicalType(),
-                                 MetadataValueType::TypeMetadata,
-                                 request,
-                                 /*allowUninit*/ false);
-    } else {
-      superclassMetadata =
-        llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy);
-    }
-
     if (doesClassMetadataRequireInitialization(IGM, classDecl)) {
       // Call swift_initClassMetadata().
       IGF.Builder.CreateCall(IGM.getInitClassMetadataFn(),
-                             {metadata, superclassMetadata,
+                             {metadata,
                               IGM.getSize(Size(uintptr_t(flags))),
                               numFields, fields.getAddress(), fieldVector});
     } else {
@@ -1864,7 +1828,7 @@ static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
       // already references the superclass in this case, but we still want
       // to ensure the superclass metadata is initialized first.
       IGF.Builder.CreateCall(IGM.getUpdateClassMetadataFn(),
-                             {metadata, superclassMetadata,
+                             {metadata,
                               IGM.getSize(Size(uintptr_t(flags))),
                               numFields, fields.getAddress(), fieldVector});
     }
@@ -3437,8 +3401,8 @@ namespace {
             B.add(offset);
             return;
           }
-          assert(IGM.isKnownEmpty(Type.getFieldType(field, IGM.getSILModule()),
-                                  ResilienceExpansion::Maximal));
+          assert(IGM.getTypeInfo(Type.getFieldType(field, IGM.getSILModule()))
+                    .isKnownEmpty(ResilienceExpansion::Maximal));
           B.addInt32(0);
         }
 
@@ -4237,7 +4201,8 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
 
       auto flags = GenericRequirementFlags(abiKind, false, false);
       auto typeName =
-        IGM.getTypeRef(requirement.getSecondType()->getCanonicalType());
+        IGM.getTypeRef(requirement.getSecondType()->getCanonicalType(),
+                       MangledTypeRefRole::Metadata);
 
       addGenericRequirement(IGM, B, metadata, sig, flags,
                             requirement.getFirstType(),

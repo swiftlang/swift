@@ -30,7 +30,9 @@ struct _DictionaryBuilder<Key: Hashable, Value> {
 
   @inlinable
   public mutating func add(key newKey: Key, value: Value) {
-    _target.insertNew(key: newKey, value: value)
+    _precondition(_target.count < _requestedCount,
+      "Can't add more members than promised")
+    _target._unsafeInsertNew(key: newKey, value: value)
   }
 
   @inlinable

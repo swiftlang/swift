@@ -759,6 +759,11 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   if (!VD->hasInterfaceType()) {
     VD->getASTContext().getLazyResolver()->resolveDeclSignature(
                                               const_cast<VarDecl *>(VD));
+    if (!VD->hasInterfaceType()) {
+      VD->diagnose(diag::recursive_type_reference, VD->getDescriptiveKind(),
+                   VD->getName());
+      return false;
+    }
   }
 
   Type T = VD->getDeclContext()->mapTypeIntoContext(VD->getInterfaceType());
@@ -1534,8 +1539,11 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
   }
 
   if (!isa<TypeDecl>(D) && !isa<AccessorDecl>(D) && !isa<EnumElementDecl>(D)) {
-    useObjectiveCBridgeableConformances(D->getInnermostDeclContext(),
-                                        D->getInterfaceType());
+    if (ctx.getLazyResolver()) {
+      // Only record conformances when we have a lazy resolver.
+      useObjectiveCBridgeableConformances(D->getInnermostDeclContext(),
+                                          D->getInterfaceType());
+    }
   }
 
   if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
@@ -1576,13 +1584,8 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
           // Swift 3 and earlier allowed you to override `initialize`, but
           // Swift's semantics do not guarantee that it will be called at
           // the point you expect. It is disallowed in Swift 4 and later.
-          if (sel.getSelectorPieces().front() == ctx.Id_initialize) {
-            if (ctx.LangOpts.isSwiftVersion3())
-              return
-                diag::objc_class_method_not_permitted_swift3_compat_warning;
-            else
-              return diag::objc_class_method_not_permitted;
-          }
+          if (sel.getSelectorPieces().front() == ctx.Id_initialize)
+            return diag::objc_class_method_not_permitted;
           return None;
         case 1:
           if (sel.getSelectorPieces().front() == ctx.Id_allocWithZone)

@@ -14,9 +14,8 @@
 /// `_ArrayBufferProtocol`.  This buffer does not provide value semantics.
 @usableFromInline
 internal protocol _ArrayBufferProtocol
-  : MutableCollection, RandomAccessCollection {
-
-  associatedtype Indices = Range<Int>
+  : MutableCollection, RandomAccessCollection 
+where Indices == Range<Int> {
 
   /// Create an empty buffer.
   init()
@@ -34,9 +33,6 @@ internal protocol _ArrayBufferProtocol
     subRange bounds: Range<Int>,
     initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element>
-
-  /// Get or set the index'th element.
-  subscript(index: Int) -> Element { get nonmutating set }
 
   /// If this buffer is backed by a uniquely-referenced mutable
   /// `_ContiguousArrayBuffer` that can be grown in-place to allow the `self`
@@ -121,9 +117,6 @@ internal protocol _ArrayBufferProtocol
   /// buffers address the same elements when they have the same
   /// identity and count.
   var identity: UnsafeRawPointer { get }
-
-  var startIndex: Int { get }
-  var endIndex: Int { get }
 }
 
 extension _ArrayBufferProtocol where Indices == Range<Int>{
