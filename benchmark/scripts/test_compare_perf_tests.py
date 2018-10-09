@@ -204,6 +204,37 @@ class TestPerformanceTestResult(unittest.TestCase):
         r = PerformanceTestResult(log_line.split(','))
         self.assertEquals(r.max_rss, 10510336)
 
+    def test_init_quantiles(self):
+        # #,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs)
+        log = '1,Ackermann,3,54383,54512,54601'
+        r = PerformanceTestResult(log.split(','), quantiles=True)
+        self.assertEquals(r.test_num, '1')
+        self.assertEquals(r.name, 'Ackermann')
+        self.assertEquals((r.num_samples, r.min, r.median, r.max),
+                          (3, 54383, 54512, 54601))
+        self.assertAlmostEquals(r.mean, 54498.67, places=2)
+        self.assertAlmostEquals(r.sd, 109.61, places=2)
+        self.assertEquals(r.samples.count, 3)
+        self.assertEquals(r.samples.num_samples, 3)
+        self.assertEquals([s.runtime for s in r.samples.all_samples],
+                          [54383, 54512, 54601])
+
+        # #,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs),MAX_RSS(B)
+        log = '1,Ackermann,3,54529,54760,55807,266240'
+        r = PerformanceTestResult(log.split(','), quantiles=True, memory=True)
+        self.assertEquals((r.samples.count, r.max_rss), (3, 266240))
+        # #,TEST,SAMPLES,MIN(μs),Q1(μs),Q2(μs),Q3(μs),MAX(μs)
+        log = '1,Ackermann,5,54570,54593,54644,57212,63304'
+        r = PerformanceTestResult(log.split(','), quantiles=True, memory=False)
+        self.assertEquals((r.num_samples, r.min, r.median, r.max),
+                          (5, 54570, 54644, 63304))
+        self.assertEquals((r.samples.q1, r.samples.q3), (54593, 57212))
+        self.assertEquals(r.samples.count, 5)
+        # #,TEST,SAMPLES,MIN(μs),Q1(μs),Q2(μs),Q3(μs),MAX(μs),MAX_RSS(B)
+        log = '1,Ackermann,5,54686,54731,54774,55030,63466,270336'
+        r = PerformanceTestResult(log.split(','), quantiles=True, memory=True)
+        self.assertEquals((r.samples.count, r.max_rss), (5, 270336))
+
     def test_repr(self):
         log_line = '1,AngryPhonebook,20,10664,12933,11035,576,10884'
         r = PerformanceTestResult(log_line.split(','))
@@ -339,7 +370,7 @@ class OldAndNewLog(unittest.TestCase):
 
 class TestLogParser(unittest.TestCase):
     def test_parse_results_csv(self):
-        """Ignores header row, empty lines and Totals row."""
+        """Ignores uknown lines, extracts data from supported formats."""
         log = """#,TEST,SAMPLES,MIN(us),MAX(us),MEAN(us),SD(us),MEDIAN(us)
 34,BitCount,20,3,4,4,0,4
 
@@ -371,6 +402,20 @@ Total performance tests executed: 1
         r = results[0]
         self.assertEquals(r.name, 'Array2D')
         self.assertEquals(r.max_rss, 20915200)
+
+    def test_parse_quantiles(self):
+        """Gathers samples from reported quantiles. Handles optional memory."""
+        r = LogParser.results_from_string(
+            """#,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs)
+1,Ackermann,3,54383,54512,54601""")['Ackermann']
+        self.assertEquals([s.runtime for s in r.samples.all_samples],
+                          [54383, 54512, 54601])
+        r = LogParser.results_from_string(
+            """#,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs),MAX_RSS(B)
+1,Ackermann,3,54529,54760,55807,266240""")['Ackermann']
+        self.assertEquals([s.runtime for s in r.samples.all_samples],
+                          [54529, 54760, 55807])
+        self.assertEquals(r.max_rss, 266240)
 
     def test_parse_results_verbose(self):
         """Parse multiple performance test results with 2 sample formats:
