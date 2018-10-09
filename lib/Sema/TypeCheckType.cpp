@@ -2135,16 +2135,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           .fixItReplace(resultRange, "Never");
     }
 
-    // SWIFT_ENABLE_TENSORFLOW
-    // @nondiff is only valid on parameters.
-    if (!isParam && attrs.has(TAK_nondiff)) {
-      diagnose(attrs.getLoc(TAK_nondiff),
-               isVariadicFunctionParam
-                   ? diag::attr_not_on_variadic_parameters
-                   : diag::attr_not_on_variadic_parameters, "@nondiff");
-      attrs.clearAttribute(TAK_nondiff);
-    }
-
     auto diffability = resolveDifferentiability();
 
     // Resolve the function type directly with these attributes.
@@ -2226,7 +2216,18 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       attrs.clearAttribute(i);
     attrs.convention = None;
   }
-
+  
+  // SWIFT_ENABLE_TENSORFLOW
+  // @nondiff is only valid on parameters.
+  if (attrs.has(TAK_nondiff)) {
+    if (!isParam)
+        diagnose(attrs.getLoc(TAK_nondiff),
+                 isVariadicFunctionParam
+                     ? diag::attr_not_on_variadic_parameters
+                     : diag::attr_not_on_variadic_parameters, "@nondiff");
+    attrs.clearAttribute(TAK_nondiff);
+  }
+  
   // In SIL, handle @opened (n), which creates an existential archetype.
   if (attrs.has(TAK_opened)) {
     if (!ty->isExistentialType()) {
@@ -2353,6 +2354,16 @@ bool TypeResolver::resolveASTFunctionTypeParams(
           nondiff = true;
       }
     }
+    // If the outer function is differentiable, arguments that are not marked as
+    // `@nondiff` must be differentiable
+    if (isDifferentiable && !nondiff &&
+        !Context.isDifferentiable(ty->getCanonicalType(),
+                                  DC->getParentModule())) {
+      diagnose(eltTypeRepr->getLoc(),
+               diag::autodiff_attr_argument_not_differentiable)
+          .highlight(eltTypeRepr->getSourceRange())
+          .fixItInsert(eltTypeRepr->getLoc(), "@nondiff ");
+    }
 
     // SWIFT_ENABLE_TENSORFLOW
     ParameterTypeFlags paramFlags =
@@ -2432,6 +2443,15 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
     break;
   }
   
+  // If the function is marked as `@autodiff`, the result must be a
+  // differentiable type.
+  if (extInfo.isDifferentiable() &&
+      !Context.isDifferentiable(outputTy->getCanonicalType(),
+                                DC->getParentModule()))
+    diagnose(repr->getResultTypeRepr()->getLoc(),
+             diag::autodiff_attr_result_not_differentiable)
+        .highlight(repr->getResultTypeRepr()->getSourceRange());
+
   return fnTy;
 }
 

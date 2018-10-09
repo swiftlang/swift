@@ -3793,7 +3793,7 @@ void AnyFunctionType::decomposeInput(
                         ParameterTypeFlags::fromParameterType(
                           // SWIFT_ENABLE_TENSORFLOW
                           type, false, ValueOwnership::Default,
-                          /*differentiable*/ false));
+                          /*nonDifferentiable*/ false));
     return;
   }
 }
@@ -5162,9 +5162,7 @@ LayoutConstraint LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind
 
 // SWIFT_ENABLE_TENSORFLOW
 bool ASTContext::isDifferentiable(CanType type, ModuleDecl *module) {
-  auto *diffableProto = getProtocol(KnownProtocolKind::Differentiable);
-  auto maybeDiffableConf = module->lookupConformance(type, diffableProto);
-  return maybeDiffableConf.hasValue();
+  return getTangentSpace(type, module).hasValue();
 }
 
 Optional<TangentSpace> ASTContext::getTangentSpace(CanType type,

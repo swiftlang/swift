@@ -29,10 +29,9 @@ let _: @autodiff(forward, order: 0) (Float) -> Float
 // Type differentiability
 //
 
-// struct NonDiffType {}
-// TODO:
-// xpected-error {{argument is not differentiable, but the function type is marked '@autodiff'}}
-// let _: @autodiff (NonDiffType) -> Float
+struct NonDiffType { var x: Int }
+// expected-error @+1 {{argument is not differentiable, but the enclosing function type is marked '@autodiff'; did you want to add '@nondiff' to this argument?}}
+let _: @autodiff (NonDiffType) -> Float
 
 //
 // Argument selection (@nondiff)
