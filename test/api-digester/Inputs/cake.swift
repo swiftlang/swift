@@ -1,3 +1,5 @@
+@_exported import cake
+
 public protocol P1 {}
 public protocol P2 {}
 
