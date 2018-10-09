@@ -229,7 +229,7 @@ class PerformanceTestResult(object):
     `--quantile`parameter. In both cases, the last column, MAX_RSS is optional.
     """
 
-    def __init__(self, csv_row, quantiles=False, memory=False):
+    def __init__(self, csv_row, quantiles=False, memory=False, delta=False):
         """Initialize from a row of multiple columns with benchmark summary.
 
         The row is an iterable, such as a row provided by the CSV parser.
@@ -239,10 +239,14 @@ class PerformanceTestResult(object):
         self.num_samples = int(csv_row[2])  # Number of measurements taken
 
         if quantiles:  # Variable number of columns representing quantiles
+            runtimes = csv_row[3:-1] if memory else csv_row[3:]
+            if delta:
+                runtimes = map(lambda x: int(x) if x else 0, runtimes)
+                runtimes = reduce(lambda l, x: l.append(l[-1] + x) or
+                                  l if l else [x], runtimes, None)
             self.samples = PerformanceTestSamples(
                 self.name,
-                [Sample(None, None, int(runtime))
-                 for runtime in (csv_row[3:-1] if memory else csv_row[3:])])
+                [Sample(None, None, int(runtime)) for runtime in runtimes])
             sams = self.samples
             self.min, self.max, self.median, self.mean, self.sd = \
                 sams.min, sams.max, sams.median, sams.mean, sams.sd
@@ -337,7 +341,7 @@ class LogParser(object):
     def __init__(self):
         """Create instance of `LogParser`."""
         self.results = []
-        self.quantiles, self.memory = False, False
+        self.quantiles, self.delta, self.memory = False, False, False
         self._reset()
 
     def _reset(self):
@@ -350,13 +354,14 @@ class LogParser(object):
     # #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs)
     results_re = re.compile(
         r'( *\d+[, \t]+[\w.]+[, \t]+' +  # #,TEST
-        r'[, \t]+'.join([r'\d+'] * 4) +  # at least 4...
-        r'(?:[, \t]+\d+)*)')             # ...or more numeric columns
+        r'[, \t]+'.join([r'\d+'] * 2) +  # at least 2...
+        r'(?:[, \t]+\d*)*)')             # ...or more numeric columns
 
     def _append_result(self, result):
         columns = result.split(',') if ',' in result else result.split()
         r = PerformanceTestResult(
-            columns, quantiles=self.quantiles, memory=self.memory)
+            columns, quantiles=self.quantiles, memory=self.memory,
+            delta=self.delta)
         r.setup = self.setup
         r.max_rss = r.max_rss or self.max_rss
         r.mem_pages = self.mem_pages
@@ -376,6 +381,7 @@ class LogParser(object):
     def _configure_format(self, header):
         self.quantiles = 'MEAN' not in header
         self.memory = 'MAX_RSS' in header
+        self.delta = '𝚫' in header
 
     # Regular expression and action to take when it matches the parsed line
     state_actions = {

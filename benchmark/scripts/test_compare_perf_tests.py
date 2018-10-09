@@ -235,6 +235,17 @@ class TestPerformanceTestResult(unittest.TestCase):
         r = PerformanceTestResult(log.split(','), quantiles=True, memory=True)
         self.assertEquals((r.samples.count, r.max_rss), (5, 270336))
 
+    def test_init_delta_quantiles(self):
+        # #,TEST,SAMPLES,MIN(μs),𝚫MEDIAN,𝚫MAX
+        # 2-quantile from 2 samples in repeated min, when delta encoded,
+        # the difference is 0, which is ommited -- only separator remains
+        log = '202,DropWhileArray,2,265,,22'
+        r = PerformanceTestResult(log.split(','), quantiles=True, delta=True)
+        self.assertEquals((r.num_samples, r.min, r.median, r.max),
+                          (2, 265, 265, 287))
+        self.assertEquals(r.samples.count, 3)        # --quantile=2 gives a
+        self.assertEquals(r.samples.num_samples, 3)  # 3 sample estimate
+
     def test_repr(self):
         log_line = '1,AngryPhonebook,20,10664,12933,11035,576,10884'
         r = PerformanceTestResult(log_line.split(','))
@@ -416,6 +427,25 @@ Total performance tests executed: 1
         self.assertEquals([s.runtime for s in r.samples.all_samples],
                           [54529, 54760, 55807])
         self.assertEquals(r.max_rss, 266240)
+
+    def test_parse_delta_quantiles(self):
+        r = LogParser.results_from_string(  # 2-quantile aka. median
+            '#,TEST,SAMPLES,MIN(μs),𝚫MEDIAN,𝚫MAX\n0,B,1,101,,')['B']
+        self.assertEquals(
+            (r.num_samples, r.min, r.median, r.max, r.samples.count),
+            (1, 101, 101, 101, 1))
+        r = LogParser.results_from_string(
+            '#,TEST,SAMPLES,MIN(μs),𝚫MEDIAN,𝚫MAX\n0,B,2,101,,1')['B']
+        self.assertEquals(
+            (r.num_samples, r.min, r.median, r.max, r.samples.count),
+            (2, 101, 101, 102, 2))
+        r = LogParser.results_from_string(  # 20-quantiles aka. ventiles
+            '#,TEST,SAMPLES,MIN(μs),𝚫V1,𝚫V2,𝚫V3,𝚫V4,𝚫V5,𝚫V6,𝚫V7,𝚫V8,' +
+            '𝚫V9,𝚫VA,𝚫VB,𝚫VC,𝚫VD,𝚫VE,𝚫VF,𝚫VG,𝚫VH,𝚫VI,𝚫VJ,𝚫MAX\n' +
+            '202,DropWhileArray,200,214,,,,,,,,,,,,1,,,,,,2,16,464'
+        )['DropWhileArray']
+        self.assertEquals((r.num_samples, r.min, r.max, r.samples.count),
+                          (200, 214, 697, 21))
 
     def test_parse_results_verbose(self):
         """Parse multiple performance test results with 2 sample formats:
