@@ -24,6 +24,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Defer.h"
+#include "swift/SIL/GraphFunctionDeviceInfo.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -1031,36 +1032,6 @@ static unsigned getTFDataTypeFromTensorGenericType(Type type) {
   return convertSwiftTypeToTF(genTy->getGenericArgs()[0]);
 }
 
-/// Decode the shape array in `attrValue` into `dims`, `numDims` and `dimPtrs`.
-static void decodeShapeArray(const ASTContext &ctx,
-                             SymbolicValue attrValue,
-                             SmallVectorImpl<int64_t> &dims,
-                             SmallVectorImpl<int> &numDims,
-                             SmallVectorImpl<int64_t *> &dimPtrs) {
-  CanType eltType;
-  auto shapeArray = attrValue.getArrayValue(eltType);
-  assert(eltType->getString() == "TensorShape" ||
-         eltType->getString() == "Optional<TensorShape>");
-  auto numShapes = shapeArray.size();
-  for (unsigned shapeIdx = 0; shapeIdx != numShapes; ++shapeIdx) {
-    auto shape = shapeArray[shapeIdx];
-    numDims.push_back(decodeShapeAttr(ctx, shape, dims));
-  }
-
-  // Now that we've build the array of dimensions, convert it to the array
-  // of pointers that TensorFlow needs.  This is safe now that the vector
-  // has finished its resizing.
-  auto dimPtr = dims.data();
-  for (unsigned shapeIdx = 0; shapeIdx != numShapes; ++shapeIdx) {
-    dimPtrs.push_back(dimPtr);
-
-    // Make sure to handle the "unknown rank" case (numDims[shapeIdx] == -1) by
-    // without incrementing the pointer.
-    if (numDims[shapeIdx] >= 0)
-      dimPtr += numDims[shapeIdx];
-  }
-}
-
 /// Decode the shape array attribute at attr `attrIdx` in the graph_op
 /// instruction, into `dims`, `numDims` and `dimPtrs`.
 static void decodeShapeArrayAtAttr(const ASTContext &ctx,
@@ -1640,12 +1611,6 @@ GLStatus TFGraphFunctionLowering::visitTFDataset(Inst *inst) {
     }
   }
   return GLStatus::Success;
-}
-
-static std::string getGraphFuncNameForFuncAttr(StringRef fnName) {
-  if (fnName.startswith("$"))
-    fnName = fnName.substr(1);
-  return std::string(fnName) + ".tf_only";
 }
 
 void TFGraphFunctionLowering::handleFunctionAttribute(

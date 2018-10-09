@@ -2001,7 +2001,7 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
 
     // Do not perform the following graph_op optimization/promotion unless
     // we are in graph mode.
-    if (llvm::TFDynamicCompilation) continue;
+    if (llvm::TFDynamicCompilation && !isAcceleratorOnly(fn)) continue;
 
     // Take a look at the various well known function calls that we can promote
     // to tensor operations.  We can promote them if we are able to constant
@@ -2384,7 +2384,7 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
     // compilation.
     auto it = constants.find(argumentValue);
     if (it == constants.end() || !it->second.isConstant()) {
-      if (llvm::TFDynamicCompilation) {
+      if (llvm::TFDynamicCompilation && !isAcceleratorOnly(fn)) {
         // Since we're doing dynamic compilation, we can simply pass this
         // unknown attribute as a named argument to the graph_op, and IRGen will
         // deal with it.
@@ -2798,8 +2798,6 @@ void TFDeabstraction::doIt() {
   cleanupDeadInstructions();
 
   logCurrentState("Result", /*detailed*/false);
-
-  fn.TFDeabstracted = true;
 }
 
 
@@ -2854,6 +2852,7 @@ void TFDeabstractionPass::run() {
                                    fn.getName().str().c_str());
 
     TFDeabstraction(*this, fn, tfc, constantEvaluator, PM).doIt();
+    fn.TFDeabstracted = true;
     partitionedFunctions.insert(&fn);
 
     // TODO(clattner): This should eventually be the driver that kicks off

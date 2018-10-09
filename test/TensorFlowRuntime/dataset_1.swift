@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift
+// RUN: %target-run-dynamic-compilation-swift
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 //
@@ -25,6 +26,9 @@ import StdlibUnittest
 
 var DatasetTests = TestSuite("Dataset")
 
+// TODO: This test uses function attributes, which dynamic compilation does not
+// support yet.
+#if !TF_DYNAMIC_COMPILATION
 // Creates a dataset, which produces one float scalar value in each get next
 // call.
 @TensorFlowGraph
@@ -97,6 +101,7 @@ public func model() {
 DatasetTests.testAllBackends("Basic") {
   model()
 }
+#endif // !TF_DYNAMIC_COMPILATION
 
 DatasetTests.testAllBackends("MultiValue") {
   enableCPU()

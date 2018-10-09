@@ -136,6 +136,15 @@ GraphOperationInst *createTensorToInt1Inst(SILValue value, SILBuilder &builder,
                                            SILLocation location,
                                            GraphFunctionDeviceInfo &deviceInfo);
 
+/// Return true when this function must be entirely lowered to a TF graph
+/// function, with no host-side logic remaining (i.e., no sends/recvs, and no
+/// start/stop tensor computation on the host side). In other words, this
+/// function uses the tensorflow calling convention.
+///
+/// The only way to call/use such a function is from a TF graph node (e.g. by
+/// referencing the function in a function-typed op attribute).
+bool isAcceleratorOnly(const SILFunction &hostFn);
+
 /// This struct provides a an efficient implementation of a predicate that
 /// determines whether a type is or contains a TensorHandle that will be
 /// exposed after deabstraction.  This is a class instead of a simple

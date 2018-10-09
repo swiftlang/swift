@@ -1189,6 +1189,8 @@ public func _TFCCreateTensorHandleFromC(
   case TF_FLOAT: return TensorHandle<Float>(owning: cHandle)
   case TF_DOUBLE: return TensorHandle<Double>(owning: cHandle)
   case TF_BOOL: return TensorHandle<Bool>(owning: cHandle)
+  case TF_RESOURCE: return ResourceHandle(owning: cHandle)
+  case TF_VARIANT: return VariantHandle(owning: cHandle)
   default: fatalError("Unsupported dtype \(dtype)")
   }
 }

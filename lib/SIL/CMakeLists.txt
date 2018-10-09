@@ -5,6 +5,7 @@ add_swift_library(swiftSIL STATIC
   DebugUtils.cpp
   Dominance.cpp
   DynamicCasts.cpp
+  GraphFunctionDeviceInfo.cpp
   InstructionUtils.cpp
   MemAccessUtils.cpp
   Linker.cpp
