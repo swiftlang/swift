@@ -101,4 +101,7 @@ class C8902 : P8902 { // expected-error {{type 'C8902' does not conform to proto
 final class C8902b : P8902 {
     func f(_ x: Bool) -> C8902b { fatalError() }
 }
+class C8902c : P8902 {
+    func f(_ x: Bool) -> Self { fatalError() }
+}
 

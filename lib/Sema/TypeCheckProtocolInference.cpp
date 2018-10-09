@@ -727,6 +727,8 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitness(ValueDecl *req,
     // a non-class or final class.
     bool mismatch(DynamicSelfType *firstType, TypeBase *secondType,
                   Type sugaredFirstType) {
+      if (secondType->is<DynamicSelfType>())
+        return true;
       if (secondType->isEqual(Conformance->getType())) {
         auto classDecl = Conformance->getType()->getClassOrBoundGenericClass();
         return !classDecl || classDecl->isFinal();
