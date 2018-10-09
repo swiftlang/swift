@@ -2995,6 +2995,17 @@ void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
   LastExtension = extension;
 }
 
+auto NominalTypeDecl::getStoredProperties(bool skipInaccessible) const
+    -> StoredPropertyRange {
+  // Clang-imported classes never have stored properties.
+  if (hasClangNode() && isa<ClassDecl>(this))
+    return StoredPropertyRange(DeclRange(nullptr, nullptr),
+                               ToStoredProperty(skipInaccessible));
+
+  return StoredPropertyRange(getMembers(),
+                             ToStoredProperty(skipInaccessible));
+}
+
 bool NominalTypeDecl::isOptionalDecl() const {
   return this == getASTContext().getOptionalDecl();
 }
