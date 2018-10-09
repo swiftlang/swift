@@ -933,6 +933,9 @@ private:
     } else {
       TypeDecl *typeDecl = declContext->getSelfNominalTypeDecl();
       
+      TypeMatchOptions matchMode = TypeMatchFlags::AllowOverride;
+      matchMode |= TypeMatchFlags::AllowTopLevelOptionalMismatch;
+      
       if (!renamedParsedDeclName.ContextName.empty()) {
         auto contextIdentifier = D->getASTContext().getIdentifier(renamedParsedDeclName.ContextName);
         UnqualifiedLookup specificTypeLookup(contextIdentifier,
@@ -941,7 +944,23 @@ private:
                                              SourceLoc(),
                                              UnqualifiedLookup::Flags::TypeLookup);
         if (specificTypeLookup.getSingleTypeResult()) {
+          fprintf(stderr, "Declared type : %s\n", typeDecl->getDeclaredInterfaceType()->getStringAsComponent().data());
+          fprintf(stderr, "Looked up type : %s\n", specificTypeLookup.getSingleTypeResult()->getDeclaredInterfaceType()->getStringAsComponent().data());
+          fprintf(stderr, "Result %d\n", specificTypeLookup.getSingleTypeResult()->getDeclaredInterfaceType()->matches(typeDecl->getDeclaredInterfaceType(), matchMode));
+          fprintf(stderr, "Result %d\n", typeDecl->getDeclaredInterfaceType()->matches(specificTypeLookup.getSingleTypeResult()->getDeclaredInterfaceType(), matchMode));
+        }
+        if (!specificTypeLookup.getSingleTypeResult()) {
+          renamedDecl = nullptr;
+          goto printing_rename_attribute;
+        }
+        
+        if (typeDecl->getDeclaredInterfaceType()->matches(specificTypeLookup.getSingleTypeResult()->getDeclaredInterfaceType(), matchMode)) {
+          // If the Context Name contain the name of the subclass then we would find the renamed in the superclass instead
           typeDecl = specificTypeLookup.getSingleTypeResult();
+        } else if (!specificTypeLookup.getSingleTypeResult()->getDeclaredInterfaceType()->matches(typeDecl->getDeclaredInterfaceType(), matchMode)) {
+          // Failed and print the raw renamed attributed when there is no relationship between those 2 types
+          renamedDecl = nullptr;
+          goto printing_rename_attribute;
         }
       }
       
@@ -991,6 +1010,7 @@ private:
       }
     }
     
+  printing_rename_attribute:
     if (renamedDecl) {
       SmallString<128> scratch;
       auto renamedObjCRuntimeName = renamedDecl->getObjCRuntimeName()
