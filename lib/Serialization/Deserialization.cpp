@@ -4461,7 +4461,9 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
                                                          resultID,
                                                          rawRepresentation,
                                                          throws,
-                                                         rawGenericSig);
+                                                         // SWIFT_ENABLE_TENSORFLOW
+                                                         rawGenericSig,
+                                                         rawDifferentiability);
       genericSig = getGenericSignature(rawGenericSig);
     }
 

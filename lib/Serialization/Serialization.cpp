@@ -3916,7 +3916,9 @@ void Serializer::writeType(Type ty) {
               addTypeRef(fnTy->getResult()),
               getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
               fnTy->throws(),
-              addGenericSignatureRef(genericSig));
+              // SWIFT_ENABLE_TENSORFLOW
+              addGenericSignatureRef(genericSig),
+       getRawStableFunctionTypeDifferentiability(fnTy->getDifferentiability()));
     }
 
     unsigned abbrCode = DeclTypeAbbrCodes[FunctionParamLayout::Code];
