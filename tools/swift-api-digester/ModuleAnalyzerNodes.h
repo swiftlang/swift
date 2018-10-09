@@ -142,6 +142,7 @@ struct CheckerOptions {
   bool Verbose;
   bool AbortOnModuleLoadFailure;
   bool PrintModule;
+  bool SwiftOnly;
   StringRef LocationFilter;
 };
 

@@ -1261,6 +1261,10 @@ SwiftDeclCollector::constructInitNode(ConstructorDecl *CD) {
 
 bool swift::ide::api::
 SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
+  // Exclude all clang nodes if we're comparing Swift decls specifically.
+  if (Opts.SwiftOnly && isFromClang(D)) {
+    return true;
+  }
   if (checkingABI()) {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       // Private vars with fixed binary orders can have ABI-impact, so we should

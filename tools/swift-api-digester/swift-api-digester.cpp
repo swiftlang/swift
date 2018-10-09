@@ -100,6 +100,11 @@ static llvm::cl::opt<bool>
 Abi("abi", llvm::cl::desc("Dumping ABI interface"),  llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+SwiftOnly("swift-only",
+          llvm::cl::desc("Only include APIs defined from Swift source"),
+          llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 PrintModule("print-module", llvm::cl::desc("Print module names in diagnostics"));
 
 static llvm::cl::opt<ActionType>
@@ -2288,6 +2293,7 @@ static CheckerOptions getCheckOpts() {
   Opts.AbortOnModuleLoadFailure = options::AbortOnModuleLoadFailure;
   Opts.LocationFilter = options::LocationFilter;
   Opts.PrintModule = options::PrintModule;
+  Opts.SwiftOnly = options::SwiftOnly;
   return Opts;
 }
 
