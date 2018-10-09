@@ -227,6 +227,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'FunctionType': 222,
     'AttributedType': 223,
     'YieldStmt': 224,
+    'YieldList': 225,
 }
 
 
