@@ -120,6 +120,15 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
     return false;
   }
 
+  // Property initializers that are not exposed to clients are OK.
+  if (auto pattern = dyn_cast<PatternBindingInitializer>(DC)) {
+    auto bindingIndex = pattern->getBindingIndex();
+    auto &patternEntry = pattern->getBinding()->getPatternList()[bindingIndex];
+    auto varDecl = patternEntry.getAnchoringVarDecl();
+    if (!varDecl->isInitExposedToClients())
+      return false;
+  }
+
   DowngradeToWarning downgradeToWarning = DowngradeToWarning::No;
 
   // Swift 4.2 did not perform any checks for type aliases.
