@@ -2375,16 +2375,23 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   LLVM_DEBUG(llvm::dbgs() << "The returned tensor handle is " << *cTensorHandle
                           << ".\n");
 
-  // Wrap `cTensorHandle` into a TensorHandle<T> object.
+  // Wrap `cTensorHandle` into a _AnyTensorHandle object, and get an untyped
+  // pointer to the _AnyTensorHandle.
   auto *createHandleFn = IGM.getTFC_CreateTensorHandleFromCFn();
-  auto tensorHandle = Builder.CreateCall(createHandleFn, {cTensorHandle});
+  llvm::Value *tensorHandle = Builder.CreateCall(createHandleFn,
+                                                 {cTensorHandle});
+
+  // Cast to a pointer of the expected result type (for example,
+  // TensorHandle<Float>).
+  SILValue result = i->getResults()[0];
+  tensorHandle = Builder.CreateBitCast(
+      tensorHandle, IGM.getStorageType(result->getType()));
 
   LLVM_DEBUG(
       llvm::dbgs() << "Done with IRGen for graph_op; setting explosion.\n");
   Explosion e;
   e.add(tensorHandle);
 
-  SILValue result = i->getResults()[0];
   setLoweredExplosion(result, e);
 }
 
