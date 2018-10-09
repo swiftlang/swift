@@ -39,7 +39,7 @@ public func createMockDataSet() -> VariantHandle {
   //   .Attr("output_shapes: list(shape) >= 1")
   let dataset : VariantHandle = #tfop("TensorSliceDataset",
                                       [values],
-                                      Toutput_types$dtype: [Float._tensorFlowDataType],
+                                      Toutput_types$dtype: [Float.tensorFlowDataType],
                                       output_shapes: [nil as TensorShape?])
   return dataset
 }
@@ -52,7 +52,7 @@ func getNextScalarFloatTensor(_ iterator: ResourceHandle) -> Tensor<Float> {
   //   .Attr("output_shapes: list(shape) >= 1")
   let ret: TensorHandle<Float> = #tfop("IteratorGetNext",
                                        iterator,
-                                       output_types$dtype: [Float._tensorFlowDataType],
+                                       output_types$dtype: [Float.tensorFlowDataType],
                                        output_shapes: [nil as TensorShape?])
   return Tensor(handle: ret)
 }
@@ -68,7 +68,7 @@ public func model() {
   let iterator: ResourceHandle = #tfop(
     "OneShotIterator",
     dataset_factory : createMockDataSet,
-    output_types$dtype: [Float._tensorFlowDataType],
+    output_types$dtype: [Float.tensorFlowDataType],
     output_shapes: [nil as TensorShape?]
   )
 
@@ -90,7 +90,7 @@ public func model() {
 
   // let _: TensorHandle<Float> = #tfop("IteratorGetNext",
   //                                    iterator,
-  //                                    output_types$dtype: [Float._tensorFlowDataType],
+  //                                    output_types$dtype: [Float.tensorFlowDataType],
   //                                    output_shapes: [nil as TensorShape?])
 }
 
@@ -102,7 +102,7 @@ DatasetTests.testAllBackends("MultiValue") {
   enableCPU()
   let elements1: Tensor<Int32> = [0, 1, 2]
   let elements2: Tensor<Int32> = [10, 11, 12]
-  let outputTypes = [Int32._tensorFlowDataType, Int32._tensorFlowDataType]
+  let outputTypes = [Int32.tensorFlowDataType, Int32.tensorFlowDataType]
   let outputShapes: [TensorShape?] = [nil, nil]
   let dataset: VariantHandle = #tfop(
     "TensorSliceDataset", [elements1, elements2],

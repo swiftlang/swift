@@ -1968,21 +1968,21 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
                        "deabstraction");
     case GraphOperationInfo::ArgumentLowering::TFDataTypeAttribute:
       switch (attrValue.getKind()) {
-        case SymbolicValue::Integer:
-          dtypeAttr = getTFDataType(attrValue);
-          TF_SetAttrType(op, name.c_str(), (TF_DataType)dtypeAttr);
-          break;
-        case SymbolicValue::Array: {
-          CanType eltTy;
-          SmallVector<TF_DataType, 4> types;
-          for (auto elt : attrValue.getArrayValue(eltTy))
-            types.push_back((TF_DataType)getTFDataType(elt));
-          TF_SetAttrTypeList(op, name.c_str(), types.data(), types.size());
-          break;
-        }
-        default:
-          llvm_unreachable(
-              "only integers and arrays are possible for TF_DataType attrs");
+      case SymbolicValue::Integer:
+        dtypeAttr = getTFDataType(attrValue);
+        TF_SetAttrType(op, name.c_str(), (TF_DataType)dtypeAttr);
+        break;
+      case SymbolicValue::Array: {
+        CanType eltTy;
+        SmallVector<TF_DataType, 4> types;
+        for (auto elt : attrValue.getArrayValue(eltTy))
+          types.push_back((TF_DataType)getTFDataType(elt));
+        TF_SetAttrTypeList(op, name.c_str(), types.data(), types.size());
+        break;
+      }
+      default:
+        llvm_unreachable(
+            "only integers and arrays are possible for TF_DataType attrs");
       }
     }
   }

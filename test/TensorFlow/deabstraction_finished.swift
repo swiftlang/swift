@@ -96,7 +96,7 @@ CHECK-LABEL: --- INPUT FUNCTION {{.*}}stringAttributes
 public func tensorShape() -> Tensor<Float> {
   let shape : TensorShape = [1, 2]
 
-  return Tensor(handle: #tfop("Const", dtype$dtype: Float._tensorFlowDataType, value$tensor: [17.0 as Float, 18.0], shape$shape: shape))
+  return Tensor(handle: #tfop("Const", dtype$dtype: Float.tensorFlowDataType, value$tensor: [17.0 as Float, 18.0], shape$shape: shape))
 }
 
 // b/75407624
@@ -149,12 +149,12 @@ public func testShapeList() {
   let t = Tensor<Int32>([0])
   let handle: VariantHandle = #tfop(
     "TensorSliceDataset", [t],
-    Toutput_types$dtype: [Int32._tensorFlowDataType],
+    Toutput_types$dtype: [Int32.tensorFlowDataType],
     output_shapes: [TensorShape()]
   )
   let dataset = SimpleDataset(handle: handle, elementShape: TensorShape())
   _ = #tfop("AnonymousIterator",
-            output_types$dtype: [Int32._tensorFlowDataType],
+            output_types$dtype: [Int32.tensorFlowDataType],
             output_shapes: [dataset.elementShape]) as ResourceHandle
 }
 
@@ -165,7 +165,7 @@ struct SimpleIterator {
 
   mutating func next() -> Tensor<Float> {
     return #tfop("IteratorGetNext", handle,
-                 output_types$dtype: [Int32._tensorFlowDataType],
+                 output_types$dtype: [Int32.tensorFlowDataType],
                  output_shapes: [elementShape])
   }
 }
@@ -174,12 +174,12 @@ public func testShapeList2() {
   let t = Tensor<Int32>([0])
   let handle: VariantHandle = #tfop(
     "TensorSliceDataset", [t],
-    Toutput_types$dtype: [Int32._tensorFlowDataType],
+    Toutput_types$dtype: [Int32.tensorFlowDataType],
     output_shapes: [TensorShape()]
   )
   let dataset = SimpleDataset(handle: handle, elementShape: TensorShape())
   let resource = #tfop("AnonymousIterator",
-                       output_types$dtype: [Int32._tensorFlowDataType],
+                       output_types$dtype: [Int32.tensorFlowDataType],
                        output_shapes: [dataset.elementShape]) as ResourceHandle
 
   var it = SimpleIterator(handle: resource, elementShape: dataset.elementShape)
@@ -187,7 +187,7 @@ public func testShapeList2() {
 }
 
 // CHECK-LABEL: ---- INPUT FUNCTION {{.*}}testShapeList
-// CHECK: graph_op "AnonymousIterator"() {output_types$dtype: [$_TensorDataType: (((i32 3)))], output_shapes: [$TensorShape: ([$Int32: ])]
+// CHECK: graph_op "AnonymousIterator"() {output_types$dtype: [$TensorDataType: (((i32 3)))], output_shapes: [$TensorShape: ([$Int32: ])]
 
 @TensorFlowGraph
 func isZero(_ x: Tensor<Float>) -> Tensor<Bool> {
@@ -198,12 +198,12 @@ public func noescapeFuncAsAttr(_ f: @convention(tensorflow) (Tensor<Float>) -> T
   let t = Tensor<Int32>([0])
   let dataset: VariantHandle = #tfop(
     "TensorSliceDataset", [t],
-    Toutput_types$dtype: [Int32._tensorFlowDataType],
+    Toutput_types$dtype: [Int32.tensorFlowDataType],
     output_shapes: [TensorShape()]
   )
   let _: VariantHandle = #tfop(
     "FilterDataset", dataset, [Tensor<Int32>(0)], predicate: isZero,
-    Targuments$dtype: [Int32._tensorFlowDataType], output_types$dtype: [Float._tensorFlowDataType], output_shapes: [TensorShape()]
+    Targuments$dtype: [Int32.tensorFlowDataType], output_types$dtype: [Float.tensorFlowDataType], output_shapes: [TensorShape()]
   )
 }
 // Ensure that private functions are partitioned and lowered
@@ -284,12 +284,12 @@ public func testExtractUnknownShapeList() {
   struct Foo { let a, b: Tensor<Float> }
   let elements = Foo(a: Tensor([1]), b: Tensor([2]))
   let _: VariantHandle = #tfop("TensorSliceDataset", [elements.a, elements.b],
-                               Toutput_types$dtype: [Float._tensorFlowDataType, Float._tensorFlowDataType],
+                               Toutput_types$dtype: [Float.tensorFlowDataType, Float.tensorFlowDataType],
                                output_shapes$unknownShapeList: Foo.self)
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExtractUnknownShapeList{{.*}}
-// CHECK: graph_op "TensorSliceDataset"([{{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>]) {Toutput_types$dtype: [$_TensorDataType: (((i32 1))), (((i32 1)))], output_shapes: [$Optional<TensorShape>: #Optional.none!enumelt, #Optional.none!enumelt], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $VariantHandle
+// CHECK: graph_op "TensorSliceDataset"([{{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>]) {Toutput_types$dtype: [$TensorDataType: (((i32 1))), (((i32 1)))], output_shapes: [$Optional<TensorShape>: #Optional.none!enumelt, #Optional.none!enumelt], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $VariantHandle
 
 // Tests that private functions operating on Tensors are partitioned
 // if they are only referred in code.  In this case, addOne should be

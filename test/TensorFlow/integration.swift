@@ -379,7 +379,7 @@ public func testResourceAndVariants() {
   let dataset: VariantHandle =
     // expected-error @+1 {{op named 'TensorDataSet' is not registered in TensorFlow}}
     #tfop("TensorDataSet", values,
-          Toutput_types$dtype: [Float._tensorFlowDataType],
+          Toutput_types$dtype: [Float.tensorFlowDataType],
           output_shapes: [TensorShape(1)])
 
   // REGISTER_OP("Iterator")
@@ -391,7 +391,7 @@ public func testResourceAndVariants() {
   //     .SetShapeFn(shape_inference::ScalarShape);
   let iterator: ResourceHandle =
     #tfop("Iterator", shared_name: "foo", container: "bar",
-          output_types$dtype: [Float._tensorFlowDataType], output_shapes: [TensorShape(1)])
+          output_types$dtype: [Float.tensorFlowDataType], output_shapes: [TensorShape(1)])
 
   // REGISTER_OP("MakeIterator")
   //     .Input("dataset: variant")
@@ -410,13 +410,13 @@ public func testResourceAndVariants() {
 
 public func testStringHandle() {
   let str: TensorHandle<String> = #tfop(
-    "Const", dtype$dtype: String._tensorFlowDataType, value$tensor: "foo"
+    "Const", dtype$dtype: String.tensorFlowDataType, value$tensor: "foo"
   )
   let _: TensorHandle<String> = #tfop(
     "Substr", str, Tensor<Int32>(0), Tensor<Int32>(1)
   )
   let _: TensorHandle<String> = #tfop(
-    "Const", dtype$dtype: String._tensorFlowDataType,
+    "Const", dtype$dtype: String.tensorFlowDataType,
     value$tensor: ["foo", "bar"],
     shape$shape: TensorShape(2)
   )
@@ -518,16 +518,16 @@ public func test77437755(_ hiddenSize: Float) {
 public func graphFuncReturningOpaqueHandles() -> (ResourceHandle, ResourceHandle) {
   let iterator : ResourceHandle =
     #tfop("Iterator", shared_name: "foo", container: "bar",
-    output_shapes: [TensorShape()], output_types$dtype: [Float._tensorFlowDataType])
+    output_shapes: [TensorShape()], output_types$dtype: [Float.tensorFlowDataType])
   let iterator2 : ResourceHandle =
     #tfop("Iterator", shared_name: "foo", container: "bar",
-    output_shapes: [TensorShape()], output_types$dtype: [Float._tensorFlowDataType])
+    output_shapes: [TensorShape()], output_types$dtype: [Float.tensorFlowDataType])
   return (iterator, iterator2)
 }
 // CHECK-LABEL --- TFPartition Accelerator Result: {{.*}}graphFuncReturningOpaqueHandles{{.*}}
 // CHECK: bb0:
-// CHECK:  [[A:%.*]] = graph_op "Iterator"() {shared_name: "foo", container: "bar", output_shapes: [$TensorShape: ([$Int32: ])], output_types$dtype: [$_TensorDataType: (((i32 1)))], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $ResourceHandle 
-// CHECK:  [[B:%.*]] = graph_op "Iterator"() {shared_name: "foo", container: "bar", output_shapes: [$TensorShape: ([$Int32: ])], output_types$dtype: [$_TensorDataType: (((i32 1)))], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $ResourceHandle 
+// CHECK:  [[A:%.*]] = graph_op "Iterator"() {shared_name: "foo", container: "bar", output_shapes: [$TensorShape: ([$Int32: ])], output_types$dtype: [$TensorDataType: (((i32 1)))], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $ResourceHandle 
+// CHECK:  [[B:%.*]] = graph_op "Iterator"() {shared_name: "foo", container: "bar", output_shapes: [$TensorShape: ([$Int32: ])], output_types$dtype: [$TensorDataType: (((i32 1)))], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $ResourceHandle 
 // CHECK:  [[C:%.*]] = tuple ([[A]] : $ResourceHandle, [[B]] : $ResourceHandle)
 // CHECK:  return [[C]] : $(ResourceHandle, ResourceHandle)   
 

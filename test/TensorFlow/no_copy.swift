@@ -58,19 +58,20 @@ public func testConvolution(x: Tensor<Float>, filter: Tensor<Float>) -> Tensor<F
 
 // Testcase for an op that uses the $tensor and $shape modifiers.
 public func testConstantArray() -> TensorHandle<Float> {
-  return #tfop("Const", dtype$dtype: 1, value$tensor: [1.0, 2.0], shape$shape: [2])
+  return #tfop("Const", dtype$dtype: Float.tensorFlowDataType,
+               value$tensor: [1.0, 2.0], shape$shape: [2])
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConstantArray
 // CHECK: sil private @{{.*}}testConstantArray{{.*}} : $@callee_owned () -> TensorHandle<Float> {
 // CHECK: bb0:
-// CHECK:  %0 = graph_op "Const"() {dtype$dtype: i64 1, value$tensor: [$Double: (f64 0x3FF0000000000000 /* 1 */), (f64 0x4000000000000000 /* 2 */)], shape$shape: [$Int: (i64 2)], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
+// CHECK:  %0 = graph_op "Const"() {dtype$dtype: i32 1, value$tensor: [$Double: (f64 0x3FF0000000000000 /* 1 */), (f64 0x4000000000000000 /* 2 */)], shape$shape: [$Int: (i64 2)], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
 // CHECK-NEXT:  return %0 : $TensorHandle<Float>
 
 // Testcase for an op that uses the $shape modifier.
 public func tensorShapeModifier() {
   let _ : TensorHandle<Float> = #tfop("ImmutableConst",
-                                      dtype$dtype: 1,
+                                      dtype$dtype: Float.tensorFlowDataType,
                                       shape$shape: [2, 2],
                                       memory_region_name: "abc")
 }

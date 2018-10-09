@@ -110,7 +110,7 @@ public extension Dataset where Element == Tensor<Float> {
     return Dataset(
       _handle: #tfop(
         "MapDataset", _handle, [Tensor<Int32>(0)], f: transform,
-        Targuments$dtype: [Int32.cDataType],
+        Targuments$dtype: [Int32.tensorFlowDataType],
         output_types$typeList: Element.self,
         output_shapes$unknownShapeList: Element.self
       )
@@ -129,7 +129,7 @@ public extension Dataset where Element == Tensor<Float> {
     return Dataset(
       _handle: #tfop(
         "FilterDataset", _handle, [Tensor<Int32>(0)],
-        predicate: isIncluded, Targuments$dtype: [Int32.cDataType],
+        predicate: isIncluded, Targuments$dtype: [Int32.tensorFlowDataType],
         output_types$typeList: Element.self,
         output_shapes$unknownShapeList: Element.self
       )

@@ -2450,7 +2450,7 @@ static void createConstTensorAttrsOnAccel(
   // Literals take attributes specifying the dtype and value.
   opBuilder->addAttribute(
       {ctx.getIdentifier("dtype$dtype"),
-       convertSwiftTypeToTFSymbolicValue(valTy.getASTType())});
+       convertSwiftTypeToConstantTFDataType(valTy.getASTType())});
   opBuilder->addAttribute({ctx.getIdentifier("value$tensor"), constVal});
 }
 
@@ -2554,7 +2554,7 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     // Conversions get an attribute specifying the result dtype, named "DstT".
     opBuilder.addAttribute(
         {ctx.getIdentifier("DstT$dtype"),
-         convertSwiftTypeToTFSymbolicValue(inst->getType().getASTType())});
+         convertSwiftTypeToConstantTFDataType(inst->getType().getASTType())});
     break;
   }
   }

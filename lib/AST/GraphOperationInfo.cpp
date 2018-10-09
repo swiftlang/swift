@@ -197,15 +197,21 @@ int tf::decodeShapeAttr(const ASTContext &ctx, SymbolicValue attr,
   return arrayValue.size();
 }
 
-/// Return the TF_DataType represented by `value`.
+/// Return the TF_DataType value represented by `value`. `value` must be a
+/// valid tensorflow type ID.
 unsigned tf::getTFDataType(SymbolicValue value) {
   value = value.lookThroughSingleElementAggregates();
   assert(value.getKind() == SymbolicValue::Integer);
-  return value.getIntegerValue().sextOrTrunc(32).getLimitedValue();
+  assert(value.getIntegerValue().isIntN(32));
+  unsigned tfType = value.getIntegerValue().getLimitedValue();
+  assert(tfType > 0 && "0 is invalid TF_DataType");
+  return tfType;
 }
 
-/// Return a SymbolicValue that represents the TF_DataType for the given swift
-/// type.
-SymbolicValue tf::convertSwiftTypeToTFSymbolicValue(Type type) {
-  return SymbolicValue::getInteger(convertSwiftTypeToTF(type), 32);
+/// Return a constant integer representing the TF_DataType value for the given
+/// Swift type. `type` must be a valid TensorFlow type.
+SymbolicValue tf::convertSwiftTypeToConstantTFDataType(Type type) {
+  unsigned tfType = convertSwiftTypeToTF(type);
+  assert(tfType != 0);
+  return SymbolicValue::getInteger(tfType, 32);
 }

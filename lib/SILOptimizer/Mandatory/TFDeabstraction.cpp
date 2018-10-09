@@ -2205,13 +2205,13 @@ static bool collectInnermostTensorFlowDTypes(
     CanType type, SmallVectorImpl<SymbolicValue> &result) {
 
   if (isTensorFlowDType(type)) {
-    result.push_back(convertSwiftTypeToTFSymbolicValue(type));
+    result.push_back(convertSwiftTypeToConstantTFDataType(type));
     return true;
   }
   if (tf::isTensorHandle(type)) {
     auto eltType = getTensorHandleElementType(type)->getCanonicalType();
     assert(tf::isTensorFlowDType(eltType));
-    result.push_back(convertSwiftTypeToTFSymbolicValue(eltType));
+    result.push_back(convertSwiftTypeToConstantTFDataType(eltType));
     return true;
   }
   if (auto tupleTy = type->getAs<TupleType>())

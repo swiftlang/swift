@@ -54,13 +54,13 @@ public func invalidAttrTensor(a: Tensor<Float>) {
 
 public func noTensorShape() -> Tensor<Float> {
   // expected-error @+1 {{attribute 'value' must be followed by a shape attribute}}
-  return Tensor(handle: #tfop("Const", dtype$dtype: Float._tensorFlowDataType, value$tensor: [17.0 as Float, 18.0]))
+  return Tensor(handle: #tfop("Const", dtype$dtype: Float.tensorFlowDataType, value$tensor: [17.0 as Float, 18.0]))
 }
 
 public func badTensorShape() -> Tensor<Float> {
   let badShape : TensorShape = [1]
   // expected-error @+1 {{attribute 'value' does not match the shape attribute in the number of scalar elements}}
-  return Tensor(handle: #tfop("Const", dtype$dtype: Float._tensorFlowDataType, value$tensor: [17.0 as Float, 18.0], shape$shape: badShape))
+  return Tensor(handle: #tfop("Const", dtype$dtype: Float.tensorFlowDataType, value$tensor: [17.0 as Float, 18.0], shape$shape: badShape))
 }
 
 public func metatypeAttrs() {

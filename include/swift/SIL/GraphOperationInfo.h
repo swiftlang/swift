@@ -66,17 +66,21 @@ public:
     /// types that should be lowered into a list of unknown shape attributes.
     ///
     /// Written as named argument with "$unknownShapeList" suffix.
+    ///
+    /// TODO(SR-8830): Remove this when we have a TensorAggregate protocol.
     UnknownShapeListAttribute,
 
     /// A metatype of a TensorFlow value type or aggregate of TensorFlow value
     /// types. Deabstraction lowers this to TFDataTypeAttribute.
     ///
     /// Written as named argument with "$typeList" suffix.
+    ///
+    /// TODO(SR-8830): Remove this when we have a TensorAggregate protocol.
     TypeListAttribute,
 
-    /// An integer, or an aggregate containing a single integer, representing a
-    /// TF_DataType attribute. Or a list of such elements, representing a
-    /// TF_DataType list attribute.
+    /// A TensorDataType (which is two nested structs wrapping a UInt32), a
+    /// UInt32 representing a TensorDataType, or a list of such elements.
+    /// Should be lowered to a type attribute or type list attribute.
     ///
     /// Written as named argument with "$dtype" suffix.
     TFDataTypeAttribute,
@@ -254,12 +258,14 @@ bool isShapeArrayPseudoAttr(StringRef attrName, SymbolicValue attrValue);
 int decodeShapeAttr(const ASTContext &ctx, SymbolicValue attr,
                     SmallVectorImpl<int64_t> &result);
 
-/// Return the TF_DataType represented by `value`.
+/// Return the TF_DataType represented by `value`. `value` must be a 32-bit
+/// unsigned integer value, or a single element aggregate of a 32-bit unsigned
+/// integer value.
 unsigned getTFDataType(SymbolicValue value);
 
-/// Return a SymbolicValue that represents the TF_DataType for the given swift
-/// type.
-SymbolicValue convertSwiftTypeToTFSymbolicValue(Type type);
+/// Return a constant integer representing the TensorDataType for the given
+/// Swift type. `type` must be a valid TensorFlow type.
+SymbolicValue convertSwiftTypeToConstantTFDataType(Type type);
 
 } // end namespace tf
 } // end namespace swift

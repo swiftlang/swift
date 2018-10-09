@@ -21,7 +21,7 @@ public func noCopyForOpaqueHandles() {
   let values = Tensor<Float>([1.0])
   let dataset: VariantHandle =
     #tfop("TensorSliceDataset", [values],
-          Toutput_types$dtype: [Float._tensorFlowDataType], output_shapes: [TensorShape()])
+          Toutput_types$dtype: [Float.tensorFlowDataType], output_shapes: [TensorShape()])
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}basicDebugValues
