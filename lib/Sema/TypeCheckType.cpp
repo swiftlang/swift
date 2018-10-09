@@ -2136,13 +2136,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     }
 
     // SWIFT_ENABLE_TENSORFLOW
-    // @nodiff is only valid on parameters.
+    // @nondiff is only valid on parameters.
     if (!isParam && attrs.has(TAK_nondiff)) {
       diagnose(attrs.getLoc(TAK_nondiff),
                isVariadicFunctionParam
                    ? diag::attr_not_on_variadic_parameters
-                   : diag::attr_not_on_variadic_parameters, "@nodiff");
-      attrs.clearAttribute(TAK_autoclosure);
+                   : diag::attr_not_on_variadic_parameters, "@nondiff");
+      attrs.clearAttribute(TAK_nondiff);
     }
 
     auto diffability = resolveDifferentiability();
