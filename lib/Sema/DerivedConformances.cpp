@@ -70,8 +70,8 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     return !Nominal->getAllTFParameters().empty();
 
   // SWIFT_ENABLE_TENSORFLOW
-  if (*knownProtocol == KnownProtocolKind::ParameterAggregate)
-    return canDeriveParameterAggregate(Nominal);
+  if (*knownProtocol == KnownProtocolKind::ParameterGroup)
+    return canDeriveParameterGroup(Nominal);
 
   if (auto *enumDecl = dyn_cast<EnumDecl>(Nominal)) {
     switch (*knownProtocol) {
@@ -231,14 +231,14 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     }
 
     // SWIFT_ENABLE_TENSORFLOW
-    // ParameterAggregate.update(withGradients:_:)
+    // ParameterGroup.update(withGradients:_:)
     if (name.isCompoundName() &&
         name.getBaseName() == ctx.getIdentifier("update")) {
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 2 &&
           argumentNames[0] == ctx.getIdentifier("withGradients") &&
           argumentNames[1].empty()) {
-        return getRequirement(KnownProtocolKind::ParameterAggregate);
+        return getRequirement(KnownProtocolKind::ParameterGroup);
       }
     }
 
@@ -282,9 +282,9 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       return getRequirement(KnownProtocolKind::Parameterized);
 
     // SWIFT_ENABLE_TENSORFLOW
-    // ParameterAggregate.Parameter
+    // ParameterGroup.Parameter
     if (name.isSimpleName(ctx.Id_Parameter))
-      return getRequirement(KnownProtocolKind::ParameterAggregate);
+      return getRequirement(KnownProtocolKind::ParameterGroup);
 
     return nullptr;
   }

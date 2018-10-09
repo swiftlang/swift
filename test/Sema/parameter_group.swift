@@ -4,7 +4,7 @@
 
 import TensorFlow
 
-struct Parameters : ParameterAggregate {
+struct Parameters : ParameterGroup {
   var w: Float
   var b: Float
 }
@@ -13,7 +13,7 @@ params.update(withGradients: params, -=)
 params.update(withGradients: params) { p, g in p -= g }
 params.update(withGradients: params) { $0 -= 0.1 * $1 }
 
-struct TensorParameters : ParameterAggregate {
+struct TensorParameters : ParameterGroup {
   var w: Tensor<Float>
   var b: Tensor<Float>
 
@@ -29,8 +29,8 @@ tensorParams.update(withGradients: tensorParams, -=)
 tensorParams.update(withGradients: tensorParams) { p, g in p -= g }
 tensorParams.update(withGradients: tensorParams) { $0 -= 0.1 * $1 }
 
-// Test types with ParameterAggregate members.
-struct NestedParameters : ParameterAggregate {
+// Test types with ParameterGroup members.
+struct NestedParameters : ParameterGroup {
   var params1: Parameters
   var params2: Parameters
   var float: Float
@@ -40,7 +40,7 @@ nested.update(withGradients: nested, -=)
 nested.update(withGradients: nested) { p, g in p -= g }
 nested.update(withGradients: nested) { $0 -= 0.1 * $1 }
 
-struct VeryNestedParameters : ParameterAggregate {
+struct VeryNestedParameters : ParameterGroup {
   var nested: NestedParameters
   var params: Parameters
   var float: Float
@@ -53,15 +53,15 @@ veryNested.update(withGradients: veryNested) { $0 -= 0.1 * $1 }
 // Test type in generic context.
 struct A<T> {
   struct B<U, V> {
-    struct GenericContextParams : ParameterAggregate {
+    struct GenericContextParams : ParameterGroup {
       var params: Parameters
       var float: Float
     }
   }
 }
 
-// Test manual conformances to ParameterAggregate.
-struct HeterogeneousParameters : ParameterAggregate {
+// Test manual conformances to ParameterGroup.
+struct HeterogeneousParameters : ParameterGroup {
   var float: Float
   var double: Double
 

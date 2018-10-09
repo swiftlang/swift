@@ -176,20 +176,20 @@ public:
   /// \returns the derived member, which will also be added to the type.
   Type deriveParameterized(AssociatedTypeDecl *assocType);
 
-  /// Determine if a ParameterAggregate requirement can be derived for a type.
+  /// Determine if a ParameterGroup requirement can be derived for a type.
   ///
   /// \returns True if the requirement can be derived.
-  static bool canDeriveParameterAggregate(NominalTypeDecl *type);
+  static bool canDeriveParameterGroup(NominalTypeDecl *type);
 
-  /// Derive a ParameterAggregate requirement for a nominal type.
+  /// Derive a ParameterGroup requirement for a nominal type.
   ///
   /// \returns the derived member, which will also be added to the type.
-  ValueDecl *deriveParameterAggregate(ValueDecl *requirement);
+  ValueDecl *deriveParameterGroup(ValueDecl *requirement);
 
-  /// Derive a ParameterAggregate type witness for a nominal type.
+  /// Derive a ParameterGroup type witness for a nominal type.
   ///
   /// \returns the derived member, which will also be added to the type.
-  Type deriveParameterAggregate(AssociatedTypeDecl *assocType);
+  Type deriveParameterGroup(AssociatedTypeDecl *assocType);
 
   /// Declare a read-only property.
   std::pair<VarDecl *, PatternBindingDecl *>

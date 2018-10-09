@@ -948,7 +948,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
     break;
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::AccelerableByTensorFlow:
-  case KnownProtocolKind::ParameterAggregate:
+  case KnownProtocolKind::ParameterGroup:
   case KnownProtocolKind::Parameterized:
   case KnownProtocolKind::TensorSendableReceivable:
   case KnownProtocolKind::TensorProtocol:

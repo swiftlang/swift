@@ -10,16 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the Parameterized and ParameterAggregate protocols.
+// This file defines the Parameterized and ParameterGroup protocols.
 //
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
-// ParameterAggregate
+// ParameterGroup
 //===----------------------------------------------------------------------===//
 
 /// A type representing an aggregate of parameters.
-public protocol ParameterAggregate {
+public protocol ParameterGroup {
   /// The parameter type.
   associatedtype Parameter
 
@@ -44,7 +44,7 @@ public protocol ParameterAggregate {
 /// marked properties, and a computed instance `allParameters`.
 ///
 /// If all parameters have the same type, the compiler also synthesizes a
-/// conformance of `Parameters` to `ParameterAggregate`.
+/// conformance of `Parameters` to `ParameterGroup`.
 ///
 public protocol Parameterized {
   /// The type representing all parameters, synthesized from stored properties
@@ -55,7 +55,7 @@ public protocol Parameterized {
   var allParameters: Parameters { get set }
 }
 
-public extension Parameterized where Parameters : ParameterAggregate {
+public extension Parameterized where Parameters : ParameterGroup {
   /// Update parameters with their gradient values, using an updater function.
   @inlinable
   mutating func updateParameters(
