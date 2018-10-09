@@ -24,6 +24,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/Strings.h"
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
