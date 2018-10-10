@@ -11,6 +11,89 @@
 //===----------------------------------------------------------------------===//
 
 import StdlibUnittest
+import Foundation
+
+extension String {
+  func parseUTF8CodeUnits() -> [UInt8] {
+    var utf8 = [UInt8]()
+    let units = self.split(separator: " ")
+    let scalars = units.compactMap { string -> Unicode.Scalar? in
+      let i = Int(string, radix: 16)!
+      return Unicode.Scalar(i)
+
+    }
+
+    for scalar in scalars {
+      utf8 += String(scalar).utf8
+    }
+    return utf8
+  }
+  
+  func parseUTF16CodeUnits() -> [UInt16] {
+    var utf16 = [UInt16]()
+    let units = self.split(separator: " ")
+    let scalars = units.compactMap { string -> Unicode.Scalar? in
+      let i = Int(string, radix: 16)!
+      return Unicode.Scalar(i)
+    }
+    
+    for scalar in scalars {
+      utf16 += scalar.utf16
+    }
+    return utf16
+  }
+}
+
+public struct NormalizationTest {
+  public var sourceUTF16: [UInt16]
+  public var source: [UInt8]
+  public var NFC: [UInt8]
+  public var NFD: [UInt8]
+  public var NFKC: [UInt8]
+  public var NFKD: [UInt8]
+
+  init(source: String, NFC: String, NFD: String, NFKC: String, NFKD: String) {
+    self.sourceUTF16 = source.parseUTF16CodeUnits()
+    self.source = source.parseUTF8CodeUnits()
+    self.NFC = NFC.parseUTF8CodeUnits()
+    self.NFD = NFD.parseUTF8CodeUnits()
+    self.NFKC = NFKC.parseUTF8CodeUnits()
+    self.NFKD = NFKD.parseUTF8CodeUnits()
+  }
+}
+
+public let normalizationTests: [NormalizationTest] = {
+  var tests = [NormalizationTest]()
+
+  let fileURL = URL(fileURLWithPath: CommandLine.arguments[2])
+
+  //Bridged String grapheme breaking is sloooooow.
+  let fileContents = try! String(contentsOf: fileURL) + ""
+
+  for line in fileContents.split(separator: "\n") {
+    guard line.hasPrefix("#") == false else {
+      continue
+    }
+
+    let content = line.split(separator: "#").first!
+  
+    guard !content.isEmpty else {
+      continue
+    }
+    guard !content.hasPrefix("@") else {
+      continue
+    }
+
+    let columns = content.split(separator: ";").filter { $0 != " " }.map(String.init)
+    let test = NormalizationTest(source: columns[0],
+                        NFC: columns[1], NFD: columns[2],
+                        NFKC: columns[3], NFKD: columns[4])
+
+    tests.append(test)
+  }
+  
+  return tests
+}()
 
 public struct UTFTest {
   public struct Flags : OptionSet {

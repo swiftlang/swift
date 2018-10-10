@@ -36,7 +36,7 @@ internal enum _StringComparisonResult: Int {
 extension _SlicedStringGuts {
   @inline(__always)
   @_effects(readonly)
-  internal func withNFCCodeUnits<R>(
+  internal func withNFCCodeUnitsIterator<R>(
     _ f: (_NormalizedUTF8CodeUnitIterator) throws -> R
   ) rethrows -> R {
     if self.isNFCFastUTF8 {
@@ -97,10 +97,10 @@ extension _SlicedStringGuts {
   internal func _slowCompare(
     with other: _SlicedStringGuts
   ) -> _StringComparisonResult {
-    return self.withNFCCodeUnits {
+    return self.withNFCCodeUnitsIterator {
       var selfIter = $0
-      return other.withNFCCodeUnits {
-        var otherIter = $0
+      return other.withNFCCodeUnitsIterator {
+        let otherIter = $0
         return selfIter.compare(with: otherIter)
       }
     }

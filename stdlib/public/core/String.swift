@@ -1246,3 +1246,14 @@ extension String : LosslessStringConvertible {
     self = content
   }
 }
+
+extension String {
+  public // @testable
+  func _withNFCCodeUnits(_ f: (UInt8) throws -> Void) rethrows {
+    try _slicedGuts.withNFCCodeUnitsIterator { 
+      for cu in $0 {
+        try f(cu)
+      }
+    }
+  }
+}
