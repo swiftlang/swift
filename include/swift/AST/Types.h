@@ -1666,8 +1666,9 @@ class ParameterTypeFlags {
     InOut       = 1 << 3,
     Shared      = 1 << 4,
     Owned       = 1 << 5,
-
-    NumBits = 6
+    // SWIFT_ENABLE_TENSORFLOW
+    NonDifferentiable = 1 << 6,
+    NumBits = 7
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits < 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
@@ -1681,16 +1682,21 @@ public:
   }
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool escaping,
-                     ValueOwnership ownership)
+                     // SWIFT_ENABLE_TENSORFLOW
+                     ValueOwnership ownership, bool nonDifferentiable)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (escaping ? Escaping : 0) |
               (ownership == ValueOwnership::InOut ? InOut : 0) |
               (ownership == ValueOwnership::Shared ? Shared : 0) |
-              (ownership == ValueOwnership::Owned ? Owned : 0)) {}
+              // SWIFT_ENABLE_TENSORFLOW
+              (ownership == ValueOwnership::Owned ? Owned : 0) |
+              (nonDifferentiable ? NonDifferentiable : 0)) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
-  fromParameterType(Type paramTy, bool isVariadic, ValueOwnership ownership);
+  // SWIFT_ENABLE_TENSORFLOW
+  fromParameterType(Type paramTy, bool isVariadic, ValueOwnership ownership,
+                    bool isNonDifferentiable);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -1699,6 +1705,8 @@ public:
   bool isInOut() const { return value.contains(InOut); }
   bool isShared() const { return value.contains(Shared); }
   bool isOwned() const { return value.contains(Owned); }
+  // SWIFT_ENABLE_TENSORFLOW
+  bool isNonDifferentiable() const { return value.contains(NonDifferentiable); }
 
   ValueOwnership getValueOwnership() const {
     if (isInOut())
@@ -1734,6 +1742,13 @@ public:
   ParameterTypeFlags withOwned(bool isOwned) const {
     return ParameterTypeFlags(isOwned ? value | ParameterTypeFlags::Owned
                                       : value - ParameterTypeFlags::Owned);
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  ParameterTypeFlags withNonDifferentiable(bool nonDifferentiable) const {
+    return ParameterTypeFlags(nonDifferentiable
+                              ? value | ParameterTypeFlags::NonDifferentiable
+                              : value - ParameterTypeFlags::NonDifferentiable);
   }
 
   bool operator ==(const ParameterTypeFlags &other) const {
@@ -1805,7 +1820,9 @@ public:
     return ParameterTypeFlags(/*variadic*/ false,
                               /*autoclosure*/ false,
                               /*escaping*/ false,
-                              getValueOwnership());
+                              // SWIFT_ENABLE_TENSORFLOW
+                              getValueOwnership(),
+                              /*nondifferentiable*/ false);
   }
 
   bool operator ==(const YieldTypeFlags &other) const {
@@ -5381,7 +5398,9 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 /// Create one from what's present in the parameter decl and type
 inline ParameterTypeFlags
 ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
-                                      ValueOwnership ownership) {
+                                      // SWIFT_ENABLE_TENSORFLOW
+                                      ValueOwnership ownership,
+                                      bool isNonDifferentiable) {
   bool autoclosure = paramTy->is<AnyFunctionType>() &&
                      paramTy->castTo<AnyFunctionType>()->isAutoClosure();
   bool escaping = paramTy->is<AnyFunctionType>() &&
@@ -5395,7 +5414,8 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
            ownership == ValueOwnership::InOut);
     ownership = ValueOwnership::InOut;
   }
-  return {isVariadic, autoclosure, escaping, ownership};
+  // SWIFT_ENABLE_TENSORFLOW
+  return {isVariadic, autoclosure, escaping, ownership, isNonDifferentiable};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

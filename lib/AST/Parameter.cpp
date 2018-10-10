@@ -106,8 +106,10 @@ void ParameterList::getParams(
       type = ParamDecl::getVarargBaseTy(type);
 
     auto label = P->getArgumentName();
-    auto flags = ParameterTypeFlags::fromParameterType(type, P->isVariadic(),
-                                                       P->getValueOwnership());
+    // SWIFT_ENABLE_TENSORFLOW
+    auto flags = ParameterTypeFlags::fromParameterType(
+        type, P->isVariadic(), P->getValueOwnership(),
+        /*nondifferentiable*/ false);
     params.emplace_back(type, label, flags);
   }
 }

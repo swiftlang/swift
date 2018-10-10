@@ -54,7 +54,7 @@ TYPE_ATTR(noescape)
 TYPE_ATTR(escaping)
 // SWIFT_ENABLE_TENSORFLOW
 TYPE_ATTR(autodiff)
-TYPE_ATTR(nodiff)
+TYPE_ATTR(nondiff)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)

@@ -781,6 +781,8 @@ class TargetFunctionTypeFlags {
     ThrowsMask        = 0x01000000U,
     ParamFlagsMask    = 0x02000000U,
     EscapingMask      = 0x04000000U,
+    // SWIFT_ENABLE_TENSORFLOW
+    DifferentiabilityMask = 0x38000000U,
   };
   int_type Data;
   

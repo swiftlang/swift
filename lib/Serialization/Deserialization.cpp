@@ -4503,11 +4503,14 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
       IdentifierID labelID;
       TypeID typeID;
-      bool isVariadic, isAutoClosure, isEscaping;
+      // SWIFT_ENABLE_TENSORFLOW
+      bool isVariadic, isAutoClosure, isEscaping, isNonDifferentiable;
       unsigned rawOwnership;
       decls_block::FunctionParamLayout::readRecord(scratch, labelID, typeID,
                                                    isVariadic, isAutoClosure,
-                                                   isEscaping, rawOwnership);
+                                                   // SWIFT_ENABLE_TENSORFLOW
+                                                   isEscaping, rawOwnership,
+                                                   isNonDifferentiable);
 
       auto ownership =
           getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
@@ -4523,7 +4526,9 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       params.emplace_back(paramTy.get(),
                           getIdentifier(labelID),
                           ParameterTypeFlags(isVariadic, isAutoClosure,
-                                             isEscaping, *ownership));
+                                             // SWIFT_ENABLE_TENSORFLOW
+                                             isEscaping, *ownership,
+                                             isNonDifferentiable));
     }
 
     if (recordID == decls_block::FUNCTION_TYPE) {

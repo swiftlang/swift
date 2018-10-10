@@ -3929,7 +3929,9 @@ void Serializer::writeType(Type ty) {
       FunctionParamLayout::emitRecord(
           Out, ScratchRecord, abbrCode, addDeclBaseNameRef(param.getLabel()),
           addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
-          paramFlags.isAutoClosure(), paramFlags.isEscaping(), rawOwnership);
+          // SWIFT_ENABLE_TENSORFLOW
+          paramFlags.isAutoClosure(), paramFlags.isEscaping(), rawOwnership,
+          paramFlags.isNonDifferentiable());
     }
 
     break;

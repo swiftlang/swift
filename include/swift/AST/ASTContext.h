@@ -928,6 +928,9 @@ public:
   }
 
   // SWIFT_ENABLE_TENSORFLOW
+  /// Determine whether the given type is differentiable.
+  bool isDifferentiable(CanType type, ModuleDecl *module);
+
   /// Compute the tangent space of this manifold, if the given type represents a
   /// differentiable manifold.
   Optional<TangentSpace> getTangentSpace(CanType type, ModuleDecl *module);
