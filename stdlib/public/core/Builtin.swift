@@ -290,6 +290,13 @@ public func _onFastPath() {
   Builtin.onFastPath()
 }
 
+// Optimizer hint that the condition is true. The condition is unchecked.
+// The builtin acts as an opaque instruction with side-effects.
+@usableFromInline @_transparent
+func _uncheckedUnsafeAssume(_ condition: Bool) {
+  _ = Builtin.assume_Int1(condition._value)
+}
+
 //===--- Runtime shim wrappers --------------------------------------------===//
 
 /// Returns `true` iff the class indicated by `theClass` uses native
