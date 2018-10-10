@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-stdlib -enable-sil-ownership -Xllvm -sil-print-debuginfo -verify -primary-file %s %S/Inputs/errors_other.swift | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-stdlib -enable-sil-ownership -Xllvm -sil-print-debuginfo -verify -swift-version 5 -primary-file %s %S/Inputs/errors_other.swift | %FileCheck %s
 
 import Swift
 
@@ -774,7 +774,7 @@ func testOptionalTryThatNeverThrows() {
 // CHECK-NEXT: bb0:
 // CHECK-NEXT: [[BOX:%.+]] = alloc_box ${ var Optional<Cat> }
 // CHECK-NEXT: [[PB:%.*]] = project_box [[BOX]]
-// CHECK: [[FN:%.+]] = function_ref @$S6errors10make_a_catAA3CatCyKF
+// CHECK: [[FN:%.+]] = function_ref @$s6errors10make_a_catAA3CatCyKF
 // CHECK-NEXT: try_apply [[FN]]() : $@convention(thin) () -> (@owned Cat, @error Error), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]],
 // CHECK: [[SUCCESS]]([[VALUE:%.+]] : @owned $Cat)
 // CHECK-NEXT: [[CAT_ENUM:%.+]] = enum $Optional<Cat>, #Optional.some!enumelt.1
