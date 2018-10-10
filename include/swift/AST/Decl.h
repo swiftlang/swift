@@ -6412,14 +6412,6 @@ public:
     return IdentifierLocs;
   }
 
-  Identifier getDesignatedNominalTypeName() const {
-    return !Identifiers.empty() ? Identifiers[0] : Identifier();
-  }
-
-  SourceLoc getDesignatedNominalTypeNameLoc() const {
-    return !IdentifierLocs.empty() ? IdentifierLocs[0] : SourceLoc();
-  }
-
   ArrayRef<NominalTypeDecl *> getDesignatedNominalTypes() const {
     return DesignatedNominalTypes;
   }
