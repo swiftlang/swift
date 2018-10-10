@@ -32,11 +32,13 @@ list(APPEND CMAKE_MODULE_PATH
   ${LLVM_CMAKE_MODULES_PATH}
 )
 
-message(STATUS "FINDING LIPO")
-  execute_process(
-  COMMAND "xcrun" "-find" "lipo"
-  OUTPUT_VARIABLE LIPO
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
+set(SWIFT_DARWIN_XCRUN_TOOLCHAIN "XcodeDefault" CACHE STRING
+    "The name of the toolchain to pass to 'xcrun'")
+
+include(SwiftToolchainUtils)
+if(NOT SWIFT_LIPO)
+  find_toolchain_tool(SWIFT_LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
+endif()
 
 include(AddLLVM)
 include(SwiftUtils)
