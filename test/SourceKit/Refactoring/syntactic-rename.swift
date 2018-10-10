@@ -150,7 +150,7 @@ _ = Memberwise2.init(m: 2, n: Memberwise1(x: 34))
 // RUN: diff -u %S/find-rename-ranges/rename-memberwise.expected %t.ranges/rename-memberwise.expected
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/rename-layer.in.json %s >> %t.ranges/rename-layer.expected
 // RUN: diff -u %S/find-rename-ranges/rename-layer.expected %t.ranges/rename-layer.expected
-// RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/rename-P.in.json %s -- -swift-version 3 >> %t.ranges/rename-P.expected
+// RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/rename-P.in.json %s -- -swift-version 4 >> %t.ranges/rename-P.expected
 // RUN: diff -u %S/find-rename-ranges/rename-P.expected %t.ranges/rename-P.expected
-// RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/keywordbase.in.json %s -- -swift-version 3 >> %t.ranges/keywordbase.expected
+// RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/keywordbase.in.json %s -- -swift-version 4 >> %t.ranges/keywordbase.expected
 // RUN: diff -u %S/find-rename-ranges/keywordbase.expected %t.ranges/keywordbase.expected
