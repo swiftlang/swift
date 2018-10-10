@@ -253,7 +253,7 @@ DerivedConformance::deriveParameterGroup(ValueDecl *requirement) {
     return deriveParameterGroup_update(*this);
   }
   TC.diagnose(requirement->getLoc(),
-              diag::broken_parameter_aggregate_requirement);
+              diag::broken_parameter_group_requirement);
   return nullptr;
 }
 
@@ -264,6 +264,6 @@ Type DerivedConformance::deriveParameterGroup(
     return deriveParameterGroup_Parameter(Nominal);
   }
   TC.diagnose(requirement->getLoc(),
-              diag::broken_parameter_aggregate_requirement);
+              diag::broken_parameter_group_requirement);
   return nullptr;
 }
