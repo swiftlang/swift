@@ -12,8 +12,9 @@ sil_stage canonical
 
 import Builtin
 
-sil @in_guaranteed_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
 protocol Error {}
+
+sil @in_guaranteed_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
 sil @error_func : $@convention(thin) () -> (Builtin.Int32, @error Error)
 sil @allocate_object : $@convention(thin) () -> (@owned Builtin.NativeObject)
 
