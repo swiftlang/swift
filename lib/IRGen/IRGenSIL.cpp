@@ -1939,9 +1939,12 @@ void IRGenSILFunction::createArrayAndSize(
 void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   tf::GraphOperationInfo opInfo(i);
 
-  if (!llvm::TFDynamicCompilation) {
-    // graph_ops do make it here when building the TensorFlow module itself.
-    // For those cases, we abort here with an error message.
+  if (!CurSILFn->TFDeabstracted) {
+    // graph_ops do make it here when building functions that don't get
+    // deabstracted (e.g. TensorFlow stdlib functions).
+    // IRGen is currently not powerful enough to handle graph_ops in functions
+    // that don't get deabstractd. For these cases, we abort here with an error
+    // message.
     const std::string errMessage = "!!! Compiler bug -- graph_op " +
                               opInfo.getOperationName().str() +
                               " cannot be lowered to LLVM IR !!!\n";
