@@ -1113,6 +1113,7 @@ extension Calendar : _ObjectiveCBridgeable {
         return true
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSCalendar?) -> Calendar {
         var result: Calendar?
         _forceBridgeFromObjectiveC(source!, result: &result)

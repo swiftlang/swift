@@ -487,6 +487,7 @@ extension Decimal : _ObjectiveCBridgeable {
         return true
     }
 
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSDecimalNumber?) -> Decimal {
         guard let src = source else { return Decimal(_exponent: 0, _length: 0, _isNegative: 0, _isCompact: 0, _reserved: 0, _mantissa: (0, 0, 0, 0, 0, 0, 0, 0)) }
         return src.decimalValue
