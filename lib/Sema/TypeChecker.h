@@ -726,8 +726,7 @@ private:
   Expr* constructCallToSuperInit(ConstructorDecl *ctor, ClassDecl *ClDecl);
 
 public:
-  TypeChecker(ASTContext &Ctx) : TypeChecker(Ctx, Ctx.Diags) { }
-  TypeChecker(ASTContext &Ctx, DiagnosticEngine &Diags);
+  TypeChecker(ASTContext &Ctx);
   TypeChecker(const TypeChecker&) = delete;
   TypeChecker& operator=(const TypeChecker&) = delete;
   ~TypeChecker();
