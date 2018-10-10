@@ -15,7 +15,7 @@ public func createMockDataSet() -> VariantHandle {
   //   .Attr("output_shapes: list(shape) >= 1")
   let dataset : VariantHandle = #tfop("TensorSliceDataset",
                                       [values],
-                                      Toutput_types: [Float.self],
+                                      Toutput_types$dtype: [Float.tensorFlowDataType],
                                       output_shapes: [TensorShape()])
   return dataset
 }
@@ -35,7 +35,7 @@ public func model() {
     "OneShotIterator",
     container: "some_container",
     dataset_factory : /*datasetCreator*/createMockDataSet,
-    output_types: [Float.self],
+    output_types$dtype: [Float.tensorFlowDataType],
     output_shapes: [TensorShape()],
     shared_name: "some_name"
   )
@@ -47,7 +47,7 @@ public func model() {
   //   .Attr("output_shapes: list(shape) >= 1")
   let one: TensorHandle<Float> = #tfop("IteratorGetNext",
                                        iterator,
-                                       output_types: [Float.self],
+                                       output_types$dtype: [Float.tensorFlowDataType],
                                        output_shapes: [TensorShape()])
   _hostOp(one)
 }

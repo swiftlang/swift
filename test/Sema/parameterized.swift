@@ -77,7 +77,7 @@ struct MixedParameterized : Parameterized {
 var mixed = MixedParameterized(int: 1, float: 3.14, string: "foo")
 _ = mixed.allParameters
 
-extension MixedParameterized.Parameters : ParameterAggregate {
+extension MixedParameterized.Parameters : ParameterGroup {
   typealias Parameter = Float
   mutating func update(
     withGradients gradients: MixedParameterized.Parameters,
@@ -92,7 +92,7 @@ mixed.updateParameters(withGradients: mixed.allParameters, -=)
 struct ModelWithReorderedParameters : Parameterized {
   @TFParameter var layer: DenseLayer
   @TFParameter var float: Float
-  struct Parameters : ParameterAggregate {
+  struct Parameters : ParameterGroup {
     var float: Float
     var layer: DenseLayer.Parameters
   }

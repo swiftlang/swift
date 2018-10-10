@@ -227,7 +227,7 @@ public func test1RecvScalarCPU() {
 // CHECK:      graph_op "Add"([[X2]] : $TensorHandle<Builtin.FPIEEE32>, {{.*}} : $TensorHandle<Builtin.FPIEEE32>
 // z + z
 // CHECK:      graph_op "Add"
-// CHECK:      graph_op "Add"({{.*}}) {T: $Float, __device
+// CHECK:      graph_op "Add"({{.*}}) {T$dtype: i32 1, __device
 
 // On host, we receive x, extract its scalar value, and then make a scalar
 // tensor to send back to device.
@@ -326,7 +326,7 @@ public func test1RecvTensorCPU() {
 
 public func test1RecvTensorTPU() {
   TensorFlow.enableTPU()
-  let a_tpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "TPU_SYSTEM")
+  let a_tpu_h: TensorHandle<Float> = #tfop("Const", dtype$dtype: 1, value$tensor: 1.0, __device: "TPU_SYSTEM")
   let a_tpu = Tensor<Float>(handle: a_tpu_h)
   // Tensor transfer for the param of atariSim(): TPU->CPU, and then CPU->host.
   let a_host = a_tpu.toHost(shape: [])
@@ -339,7 +339,7 @@ public func test1RecvTensorTPU() {
 public func test1RecvTensorTPU_ToHostNoShape_Error() {
   TensorFlow.enableTPU()
   // expected-error @+1 {{TPU outfeed dequeue supports dequeuing a single tensor -- did you specify shape?}}
-  let a_tpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "TPU_SYSTEM")
+  let a_tpu_h: TensorHandle<Float> = #tfop("Const", dtype$dtype: 1, value$tensor: 1.0, __device: "TPU_SYSTEM")
   let a_tpu = Tensor<Float>(handle: a_tpu_h)
   // Tensor transfer for the param of atariSim(): TPU->CPU, and then CPU->host.
   let a_host = a_tpu.toHost()
@@ -351,7 +351,7 @@ public func test1RecvTensorTPU_ToHostNoShape_Error() {
 
 public func test1RecvTensorTPU_ToAcceleratorNoShape_Error() {
   TensorFlow.enableTPU()
-  let a_tpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "TPU_SYSTEM")
+  let a_tpu_h: TensorHandle<Float> = #tfop("Const", dtype$dtype: 1, value$tensor: 1.0, __device: "TPU_SYSTEM")
   let a_tpu = Tensor<Float>(handle: a_tpu_h)
   // Tensor transfer for the param of atariSim(): TPU->CPU, and then CPU->host.
   let a_host = a_tpu.toHost(shape: [])
@@ -366,7 +366,7 @@ public func test1RecvTensorTPU_ToAcceleratorNoShape_Error() {
 // Specifying shapes for CPU<->GPU sends/recvs should not hurt.
 public func test1RecvTensorGPU_WithShapes() {
   TensorFlow.enableGPU()
-  let a_gpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "/job:localhost/replica:0/task:0/device:CPU:0")
+  let a_gpu_h: TensorHandle<Float> = #tfop("Const", dtype$dtype: 1, value$tensor: 1.0, __device: "/job:localhost/replica:0/task:0/device:CPU:0")
   let a_gpu = Tensor<Float>(handle: a_gpu_h)
   // One send.
   // Tensor transfer for the param of atariSim(): GPU->CPU, and then CPU->host.
@@ -395,10 +395,10 @@ public func testRecvsInALoop() {
 
 let globalIterator: ResourceHandle =
   #tfop("Iterator", shared_name: "foo", container: "bar",
-        output_types: [Float.self], output_shapes: [TensorShape()])
+        output_types$dtype: [1], output_shapes: [TensorShape()])
 let globalNextIterator: ResourceHandle =
   #tfop("IteratorGetNextAsOptional", globalIterator,
-        output_types: [Float.self], output_shapes: [TensorShape()])
+        output_types$dtype: [1], output_shapes: [TensorShape()])
 
 public func resourceHandlesCanBeSentOrReceived() {
   // The following constant is a workaround to extend the deabstraction scope so
@@ -408,11 +408,11 @@ public func resourceHandlesCanBeSentOrReceived() {
   // expected-warning @+2 {{value implicitly copied to the accelerator}}
   let _: VariantHandle =
     #tfop("IteratorGetNextAsOptional", globalIterator,
-    output_types: [Float.self], output_shapes: [TensorShape()])
+    output_types$dtype: [1], output_shapes: [TensorShape()])
   // expected-warning @+2 {{value implicitly copied to the host}}
   let localIterator: ResourceHandle =
     #tfop("Iterator", shared_name: "foo", container: "bar",
-          output_types: [Float.self], output_shapes: [TensorShape()])
+          output_types$dtype: [1], output_shapes: [TensorShape()])
   _hostOp(localIterator) // expected-note {{value used here}}
   // The following constant is a workaround to extend the deabstraction scope so
   // that a resource handle is sent back to the host instead of being an output.
@@ -422,7 +422,7 @@ public func resourceHandlesCanBeSentOrReceived() {
 public func resourceHandlesCanBeResults() {
   let iterator: ResourceHandle =
     #tfop("Iterator", shared_name: "foo", container: "bar",
-  	      output_types: [Float.self], output_shapes: [TensorShape()])
+  	      output_types$dtype: [1], output_shapes: [TensorShape()])
   _hostOp(iterator)
 }
 
@@ -435,7 +435,7 @@ public func variantHandlesCanBeSentOrReceived() {
   // expected-warning @+2 {{value implicitly copied to the accelerator}}
   let localNextIterator: VariantHandle =
     #tfop("IteratorGetNextAsOptional", globalNextIterator,
-    output_types: [Float.self], output_shapes: [TensorShape()])
+    output_types$dtype: [1], output_shapes: [TensorShape()])
   // expected-warning @-2 {{value implicitly copied to the host}}
   _hostOp(localNextIterator) // expected-note {{value used here}}
   // The following constant is a workaround to extend the deabstraction scope so
@@ -446,9 +446,9 @@ public func variantHandlesCanBeSentOrReceived() {
 public func variantHandlesCanBeResults() {
   let iterator: ResourceHandle =
     #tfop("Iterator", shared_name: "foo", container: "bar",
-  	      output_types: [Float.self], output_shapes: [TensorShape()])
+  	      output_types$dtype: [1], output_shapes: [TensorShape()])
   let nextIterator: VariantHandle =
     #tfop("IteratorGetNextAsOptional", iterator,
-    output_types: [Float.self], output_shapes: [TensorShape()])
+    output_types$dtype: [1], output_shapes: [TensorShape()])
   _hostOp(nextIterator)
 }

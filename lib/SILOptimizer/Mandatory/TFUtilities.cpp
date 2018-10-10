@@ -278,8 +278,8 @@ tf::createConstTensor(Type elementType, SymbolicValue scalars,
 
   // Add a dtype attribute for the array element.
   opBuilder.addAttribute(
-      {context.getIdentifier("dtype"),
-       SymbolicValue::getMetatype(elementType->getCanonicalType())});
+      {context.getIdentifier("dtype$dtype"),
+       convertSwiftTypeToConstantTFDataType(elementType)});
 
   // Add an attribute for the value$tensor attribute.
   auto tensorSuffix = GraphOperationInfo::getArgumentLoweringSuffix(

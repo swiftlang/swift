@@ -39,7 +39,7 @@ public func testEmptyScalarsArray() {
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testEmptyScalarsArray
  CHECK: sil private @{{.*}}testEmptyScalarsArray{{.*}} : $@callee_owned () -> () {
  CHECK: bb0:
- CHECK: graph_op "Const"() {dtype: $Int32, value$tensor: [$Int32: ], shape$shape: [$Int32: (i32 0), (i32 20), (i32 30)],
+ CHECK: graph_op "Const"() {dtype$dtype: i32 3, value$tensor: [$Int32: ], shape$shape: [$Int32: (i32 0), (i32 20), (i32 30)],
  CHECK: graph_op "Add"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>
  */
 
@@ -52,25 +52,26 @@ public func testConvolution(x: Tensor<Float>, filter: Tensor<Float>) -> Tensor<F
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConvolution
 // CHECK: sil private @{{.*}}testConvolution{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : @unowned $TensorHandle<Float>, %1 : @unowned $TensorHandle<Float>):
-// CHECK: [[A:%.*]] = graph_op "Conv2D"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {T: $Float, strides: [$Int32: (i32 1), (i32 2), (i32 3), (i32 4)], use_cudnn_on_gpu: i1 -1, padding: "SAME", data_format: "NHWC", dilations: [$Int32: (i32 1), (i32 1), (i32 1), (i32 1)], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
+// CHECK: [[A:%.*]] = graph_op "Conv2D"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>) {T$dtype: i32 1, strides: [$Int32: (i32 1), (i32 2), (i32 3), (i32 4)], use_cudnn_on_gpu: i1 -1, padding: "SAME", data_format: "NHWC", dilations: [$Int32: (i32 1), (i32 1), (i32 1), (i32 1)], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
 // CHECK-NEXT:  return [[A]] : $TensorHandle<Float>
 // CHECK-NEXT:}
 
 // Testcase for an op that uses the $tensor and $shape modifiers.
 public func testConstantArray() -> TensorHandle<Float> {
-  return #tfop("Const", dtype: Float.self, value$tensor: [1.0, 2.0], shape$shape: [2])
+  return #tfop("Const", dtype$dtype: Float.tensorFlowDataType,
+               value$tensor: [1.0, 2.0], shape$shape: [2])
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConstantArray
 // CHECK: sil private @{{.*}}testConstantArray{{.*}} : $@callee_owned () -> TensorHandle<Float> {
 // CHECK: bb0:
-// CHECK:  %0 = graph_op "Const"() {dtype: $Float, value$tensor: [$Double: (f64 0x3FF0000000000000 /* 1 */), (f64 0x4000000000000000 /* 2 */)], shape$shape: [$Int: (i64 2)], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
+// CHECK:  %0 = graph_op "Const"() {dtype$dtype: i32 1, value$tensor: [$Double: (f64 0x3FF0000000000000 /* 1 */), (f64 0x4000000000000000 /* 2 */)], shape$shape: [$Int: (i64 2)], __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>
 // CHECK-NEXT:  return %0 : $TensorHandle<Float>
 
 // Testcase for an op that uses the $shape modifier.
 public func tensorShapeModifier() {
   let _ : TensorHandle<Float> = #tfop("ImmutableConst",
-                                      dtype: Float.self,
+                                      dtype$dtype: Float.tensorFlowDataType,
                                       shape$shape: [2, 2],
                                       memory_region_name: "abc")
 }
@@ -258,7 +259,7 @@ func createStringTensorConst(_ str: String) -> TensorHandle<String> {
   // Const tfops with String cannot be placed on GPU/TPU. 
   // TODO: Find a better API to write string consts.
   return #tfop("Const",
-               dtype: String.self,
+               dtype$dtype: 7,
                value$tensor: str,
                __device: "/job:localhost/replica:0/task:0/device:CPU:0")
 }

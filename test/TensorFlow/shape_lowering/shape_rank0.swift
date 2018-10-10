@@ -11,7 +11,7 @@ import TensorFlow
 
 public func test() {
   let _: TensorHandle<Float> = #tfop("Placeholder",
-                                     dtype: Float.self,
+                                     dtype$dtype: Float.tensorFlowDataType,
                                      shape: TensorShape([]))
 }
 

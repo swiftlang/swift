@@ -794,7 +794,7 @@ class TargetFunctionTypeFlags {
     EscapingMask      = 0x04000000U,
     // SWIFT_ENABLE_TENSORFLOW
     DifferentiabilityShift = 27U,
-    DifferentiabilityMask  = 0x38000000U,
+    DifferentiabilityMask  = 0x38000000U
   };
   int_type Data;
   

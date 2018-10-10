@@ -8,7 +8,7 @@ import TensorFlow
 
 public func test() {
   let _: ResourceHandle = #tfop("AnonymousIterator",
-                                output_types: [Float.self],
+                                output_types$dtype: [Float.tensorFlowDataType],
                                 output_shapes: [TensorShape([])])
 }
 

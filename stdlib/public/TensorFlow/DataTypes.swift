@@ -21,11 +21,18 @@
 
 import CTensorFlow
 
+/// A TensorFlow dynamic type value. Can be created from types that conform to
+/// `AccelerableByTensorFlow`.
+// This simply wraps TF_DataTypes, which allows user code to handle TF_DataTypes
+// without importing CTensorFlow, which would import a bunch of distracting
+// declarations from the TF C API.
 @_fixed_layout
-public struct _TensorDataType {
+public struct TensorDataType {
+  @usableFromInline
   internal var cDataType: TF_DataType
 
-  fileprivate init(_ cDataType: TF_DataType) {
+  @inlinable
+  internal init(_ cDataType: TF_DataType) {
     self.cDataType = cDataType
   }
 }
@@ -36,8 +43,8 @@ public struct _TensorDataType {
 /// associated type of `Tensor`, `Tensor1D`, `Tensor2D`, etc.
 public protocol AccelerableByTensorFlow {
   /// The underlying TensorFlow data type.
-  /// - Note: This is not intended for general use.
-  static var _tensorFlowDataType: _TensorDataType { get }
+  @inlinable
+  static var tensorFlowDataType: TensorDataType { get }
 
   // Hooks used by the TFPartition pass for primitive operations on tensors.
   // These should not be called directly or implemented.
@@ -84,16 +91,10 @@ private func _TFGetScalarImpl<Scalar>(
   return handle.makeHostCopy().scalar
 }
 
-internal extension AccelerableByTensorFlow {
-  @usableFromInline
-  static var cDataType: TF_DataType {
-    return _tensorFlowDataType.cDataType
-  }
-}
-
 extension Bool : AccelerableByTensorFlow {
-  public static var _tensorFlowDataType: _TensorDataType {
-    return _TensorDataType(TF_BOOL)
+  @inlinable
+  public static var tensorFlowDataType: TensorDataType {
+    return TensorDataType(TF_BOOL)
   }
   @_silgen_name("__tf_get_scalar_or_die_Bool") @inline(never)
   public static func _getScalarOrDie(_ handle: TensorHandle<Bool>) -> Bool {
@@ -115,8 +116,9 @@ extension Bool : AccelerableByTensorFlow {
 }
 
 extension Int8 : AccelerableByTensorFlow {
-  public static var _tensorFlowDataType: _TensorDataType {
-    return _TensorDataType(TF_INT8)
+  @inlinable
+  public static var tensorFlowDataType: TensorDataType {
+    return TensorDataType(TF_INT8)
   }
   @_silgen_name("__tf_get_scalar_or_die_Int8") @inline(never)
   public static func _getScalarOrDie(_ handle: TensorHandle<Int8>) -> Int8 {
@@ -138,8 +140,9 @@ extension Int8 : AccelerableByTensorFlow {
 }
 
 extension UInt8 : AccelerableByTensorFlow {
-  public static var _tensorFlowDataType: _TensorDataType {
-    return _TensorDataType(TF_UINT8)
+  @inlinable
+  public static var tensorFlowDataType: TensorDataType {
+    return TensorDataType(TF_UINT8)
   }
   @_silgen_name("__tf_get_scalar_or_die_UInt8") @inline(never)
   public static func _getScalarOrDie(_ handle: TensorHandle<UInt8>) -> UInt8 {
@@ -161,8 +164,9 @@ extension UInt8 : AccelerableByTensorFlow {
 }
 
 extension Int16 : AccelerableByTensorFlow {
-  public static var _tensorFlowDataType: _TensorDataType {
-    return _TensorDataType(TF_INT16)
+  @inlinable
+  public static var tensorFlowDataType: TensorDataType {
+    return TensorDataType(TF_INT16)
   }
   @_silgen_name("__tf_get_scalar_or_die_Int16") @inline(never)
   public static func _getScalarOrDie(_ handle: TensorHandle<Int16>) -> Int16 {
@@ -184,8 +188,9 @@ extension Int16 : AccelerableByTensorFlow {
 }
 
 extension UInt16 : AccelerableByTensorFlow {
-  public static var _tensorFlowDataType: _TensorDataType {
-    return _TensorDataType(TF_UINT16)
+  @inlinable
+  public static var tensorFlowDataType: TensorDataType {
+    return TensorDataType(TF_UINT16)
   }
   @_silgen_name("__tf_get_scalar_or_die_UInt16") @inline(never)
   public static func _getScalarOrDie(_ handle: TensorHandle<UInt16>) -> UInt16 {
@@ -208,8 +213,9 @@ extension UInt16 : AccelerableByTensorFlow {
 }
 
 extension Int32 : AccelerableByTensorFlow {
-  public static var _tensorFlowDataType: _TensorDataType {
-    return _TensorDataType(TF_INT32)
+  @inlinable
+  public static var tensorFlowDataType: TensorDataType {
+    return TensorDataType(TF_INT32)
   }
   @_silgen_name("__tf_get_scalar_or_die_Int32") @inline(never)
   public static func _getScalarOrDie(_ handle: TensorHandle<Int32>) -> Int32 {
@@ -231,8 +237,9 @@ extension Int32 : AccelerableByTensorFlow {
 }
 
 extension UInt32 : AccelerableByTensorFlow {
-  public static var _tensorFlowDataType: _TensorDataType {
-    return _TensorDataType(TF_UINT32)
+  @inlinable
+  public static var tensorFlowDataType: TensorDataType {
+    return TensorDataType(TF_UINT32)
   }
   @_silgen_name("__tf_get_scalar_or_die_UInt32") @inline(never)
   public static func _getScalarOrDie(_ handle: TensorHandle<UInt32>) -> UInt32 {
@@ -255,8 +262,9 @@ extension UInt32 : AccelerableByTensorFlow {
 }
 
 extension Int64 : AccelerableByTensorFlow {
-  public static var _tensorFlowDataType: _TensorDataType {
-    return _TensorDataType(TF_INT64)
+  @inlinable
+  public static var tensorFlowDataType: TensorDataType {
+    return TensorDataType(TF_INT64)
   }
   @_silgen_name("__tf_get_scalar_or_die_Int64") @inline(never)
   public static func _getScalarOrDie(_ handle: TensorHandle<Int64>) -> Int64 {
@@ -278,8 +286,9 @@ extension Int64 : AccelerableByTensorFlow {
 }
 
 extension UInt64 : AccelerableByTensorFlow {
-  public static var _tensorFlowDataType: _TensorDataType {
-    return _TensorDataType(TF_UINT64)
+  @inlinable
+  public static var tensorFlowDataType: TensorDataType {
+    return TensorDataType(TF_UINT64)
   }
   @_silgen_name("__tf_get_scalar_or_die_UInt64") @inline(never)
   public static func _getScalarOrDie(_ handle: TensorHandle<UInt64>) -> UInt64 {
@@ -308,8 +317,9 @@ public struct BFloat16 {
 }
 
 extension BFloat16 : AccelerableByTensorFlow {
-  public static var _tensorFlowDataType: _TensorDataType {
-    return _TensorDataType(TF_BFLOAT16)
+  @inlinable
+  public static var tensorFlowDataType: TensorDataType {
+    return TensorDataType(TF_BFLOAT16)
   }
   @_silgen_name("__tf_get_scalar_or_die_BFloat16") @inline(never)
   public static func _getScalarOrDie
@@ -336,8 +346,9 @@ extension BFloat16 : AccelerableByTensorFlow {
 }
 
 extension Float : AccelerableByTensorFlow {
-  public static var _tensorFlowDataType: _TensorDataType {
-    return _TensorDataType(TF_FLOAT)
+  @inlinable
+  public static var tensorFlowDataType: TensorDataType {
+    return TensorDataType(TF_FLOAT)
   }
   @_silgen_name("__tf_get_scalar_or_die_Float") @inline(never)
   public static func _getScalarOrDie(_ handle: TensorHandle<Float>) -> Float {
@@ -359,8 +370,9 @@ extension Float : AccelerableByTensorFlow {
 }
 
 extension Double : AccelerableByTensorFlow {
-  public static var _tensorFlowDataType: _TensorDataType {
-    return _TensorDataType(TF_DOUBLE)
+  @inlinable
+  public static var tensorFlowDataType: TensorDataType {
+    return TensorDataType(TF_DOUBLE)
   }
   @_silgen_name("__tf_get_scalar_or_die_Double") @inline(never)
   public static func _getScalarOrDie(_ handle: TensorHandle<Double>) -> Double {
@@ -383,8 +395,9 @@ extension Double : AccelerableByTensorFlow {
 }
 
 extension String : AccelerableByTensorFlow {
-  public static var _tensorFlowDataType: _TensorDataType {
-    return _TensorDataType(TF_STRING)
+  @inlinable
+  public static var tensorFlowDataType: TensorDataType {
+    return TensorDataType(TF_STRING)
   }
   @_silgen_name("__tf_get_scalar_or_die_String") @inline(never)
   public static func _getScalarOrDie(_ handle: TensorHandle<String>) -> String {

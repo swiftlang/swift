@@ -1778,6 +1778,8 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       case SymbolicValue::EnumWithPayload:
       case SymbolicValue::Address:
       case SymbolicValue::Aggregate: // Tuples and structs
+      case SymbolicValue::Metatype:
+        llvm::dbgs() << name << " " << attrValue << "\n";
         assert(0 && "These attribute kinds cannot happen here");
       case SymbolicValue::Integer: {
         auto value = attrValue.getIntegerValue();
@@ -1797,11 +1799,6 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         TF_SetAttrFloat(op, name.c_str(), value.convertToFloat());
         break;
       }
-      case SymbolicValue::Metatype:
-        dtypeAttr = convertSwiftTypeToTF(attrValue.getMetatypeValue());
-        assert(dtypeAttr && "expected a valid tensorflow type");
-        TF_SetAttrType(op, name.c_str(), (TF_DataType)dtypeAttr);
-        break;
       case SymbolicValue::String: {
         auto value = attrValue.getStringValue();
         if (name != DEVICE_ATTR) {
@@ -1852,18 +1849,6 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         elements.reserve(rawElements.size());
         for (auto elt : rawElements)
           elements.push_back(elt.lookThroughSingleElementAggregates());
-
-        if (elementType->is<AnyMetatypeType>()) {
-          SmallVector<TF_DataType, 4> types;
-          for (auto elt : elements) {
-            auto dtype = convertSwiftTypeToTF(elt.getMetatypeValue());
-            assert(dtype && "expected a valid tensorflow type");
-            types.push_back((TF_DataType)dtype);
-          }
-
-          TF_SetAttrTypeList(op, name.c_str(), types.data(), types.size());
-          break;
-        }
 
         if (elementTypeString == "String") {
           SmallVector<const void *, 4> pointers;
@@ -1981,6 +1966,24 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     case GraphOperationInfo::ArgumentLowering::TypeListAttribute:
       llvm_unreachable("TypeListAttribute should have been eliminated by "
                        "deabstraction");
+    case GraphOperationInfo::ArgumentLowering::TFDataTypeAttribute:
+      switch (attrValue.getKind()) {
+      case SymbolicValue::Integer:
+        dtypeAttr = getTFDataType(attrValue);
+        TF_SetAttrType(op, name.c_str(), (TF_DataType)dtypeAttr);
+        break;
+      case SymbolicValue::Array: {
+        CanType eltTy;
+        SmallVector<TF_DataType, 4> types;
+        for (auto elt : attrValue.getArrayValue(eltTy))
+          types.push_back((TF_DataType)getTFDataType(elt));
+        TF_SetAttrTypeList(op, name.c_str(), types.data(), types.size());
+        break;
+      }
+      default:
+        llvm_unreachable(
+            "only integers and arrays are possible for TF_DataType attrs");
+      }
     }
   }
 

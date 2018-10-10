@@ -305,8 +305,8 @@ static SILValue createTFIntegerConst(GraphFunctionDeviceInfo &deviceInfo,
   // Literals take attributes specifying the dtype, value, and device.
   GraphOperationBuilder opBuilder("Const");
   opBuilder.addAttribute(
-      {context.getIdentifier("dtype"),
-       SymbolicValue::getMetatype(intType.getASTType())});
+      {context.getIdentifier("dtype$dtype"),
+       convertSwiftTypeToConstantTFDataType(intType.getASTType())});
   opBuilder.addAttribute(
       {context.getIdentifier("value$tensor"),
        SymbolicValue::getInteger(APInt(bitwidth, value),

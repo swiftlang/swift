@@ -129,7 +129,7 @@ public func packResultsToAggregate_basic() {
 }
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}packResultsToAggregate_basic{{.*}}
 // CHECK:  ([[A0:%.*]], [[A1:%.*]], [[A2:%.*]], [[A3:%.*]], [[A4:%.*]]) = graph_op "SomeOp"() {__device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Float>, $TensorHandle<Float>, $TensorHandle<Int32>, $TensorHandle<Bool>, $TensorHandle<Double>
-// CHECK: graph_op "Add"({{.*}} : $TensorHandle<Int32>, [[A2]] : $TensorHandle<Int32>) {T: $Int32, __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Int32>
+// CHECK: graph_op "Add"({{.*}} : $TensorHandle<Int32>, [[A2]] : $TensorHandle<Int32>) {T$dtype: i32 3, __device: "/job:localhost/replica:0/task:0/device:CPU:0"} : $TensorHandle<Int32>
 // CHECK:  [[PACKED:%.*]] = tuple ([[A0]] : $TensorHandle<Float>, [[A1]] : $TensorHandle<Float>, [[A2]] : $TensorHandle<Int32>, [[A3]] : $TensorHandle<Bool>, [[A4]] : $TensorHandle<Double>)
 // CHECK:  return [[PACKED]] : $(TensorHandle<Float>, TensorHandle<Float>, TensorHandle<Int32>, TensorHandle<Bool>, TensorHandle<Double>)
 

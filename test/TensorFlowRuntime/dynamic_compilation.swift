@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift
+// RUN: %target-run-dynamic-compilation-swift
 // TODO: Revert to %target-run-simple-swift once we fold dynamic compilation into -Onone.
 // RUN: %target-run-dynamic-compilation-swift
 // REQUIRES: executable_test
@@ -16,7 +17,7 @@ var DynamicCompilationTests = TestSuite("DynamicCompilation")
 
 DynamicCompilationTests.testCPUOrGPU("Const") {
   _RuntimeConfig.printsDebugLog = true
-  let x: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: Float(1.0))
+  let x: TensorHandle<Float> = #tfop("Const", dtype$dtype: Float.tensorFlowDataType, value$tensor: Float(1.0))
   _hostOp(x)
   expectNearlyEqualWithScalarTensor(1.0, Tensor<Float>(handle: x))
 }

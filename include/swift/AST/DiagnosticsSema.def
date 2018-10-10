@@ -2447,8 +2447,8 @@ ERROR(broken_encodable_requirement,none,
 ERROR(broken_decodable_requirement,none,
       "Decodable protocol is broken: unexpected requirement", ())
 // SWIFT_ENABLE_TENSORFLOW
-ERROR(broken_parameter_aggregate_requirement,none,
-      "ParameterAggregate protocol is broken: unexpected requirement", ())
+ERROR(broken_parameter_group_requirement,none,
+      "ParameterGroup protocol is broken: unexpected requirement", ())
 ERROR(broken_parameterized_requirement,none,
       "Parameterized protocol is broken: unexpected requirement", ())
 ERROR(parameterized_no_parameters_struct,none,

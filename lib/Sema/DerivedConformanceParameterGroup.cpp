@@ -1,4 +1,4 @@
-//===--- DerivedConformanceParameterAggregate.cpp -------------------------===//
+//===--- DerivedConformanceParameterGroup.cpp -----------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements explicit derivation of the ParameterAggregate protocol
+// This file implements explicit derivation of the ParameterGroup protocol
 // for a nominal type.
 //
 //===----------------------------------------------------------------------===//
@@ -30,12 +30,12 @@
 using namespace swift;
 
 // Return the "parameter type" corresponding to a ValueDecl.
-// If the decl conforms to ParameterAggregate, return the `Parameter` associated
+// If the decl conforms to ParameterGroup, return the `Parameter` associated
 // type. Otherwise, directly return the decl's type.
 static Type getParameterType(ValueDecl *decl) {
   auto &ctx = decl->getASTContext();
   auto *paramAggProto =
-      ctx.getProtocol(KnownProtocolKind::ParameterAggregate);
+      ctx.getProtocol(KnownProtocolKind::ParameterGroup);
   auto conf = TypeChecker::conformsToProtocol(
       decl->getInterfaceType(), paramAggProto, decl->getDeclContext(),
       ConformanceCheckFlags::InExpression);
@@ -48,7 +48,7 @@ static Type getParameterType(ValueDecl *decl) {
   return parameterType;
 }
 
-static Type deriveParameterAggregate_Parameter(NominalTypeDecl *nominal) {
+static Type deriveParameterGroup_Parameter(NominalTypeDecl *nominal) {
   if (nominal->getMembers().empty())
     return Type();
   // If all stored properties have the same type, return that type.
@@ -70,11 +70,11 @@ static Type deriveParameterAggregate_Parameter(NominalTypeDecl *nominal) {
 }
 
 bool
-DerivedConformance::canDeriveParameterAggregate(NominalTypeDecl *nominal) {
-  return bool(deriveParameterAggregate_Parameter(nominal));
+DerivedConformance::canDeriveParameterGroup(NominalTypeDecl *nominal) {
+  return bool(deriveParameterGroup_Parameter(nominal));
 }
 
-// Add @_fixed_layout attribute to type conforming to `ParameterAggregate`, if
+// Add @_fixed_layout attribute to type conforming to `ParameterGroup`, if
 // necessary.
 void addFixedLayoutAttrIfNeeded(TypeChecker &TC, NominalTypeDecl *nominal) {
   // If nominal already has @_fixed_layout, return.
@@ -108,7 +108,7 @@ static TypeAliasDecl *getParameterTypeAliasDecl(NominalTypeDecl *nominal) {
 }
 
 static void
-deriveBodyParameterAggregate_update(AbstractFunctionDecl *updateDecl) {
+deriveBodyParameterGroup_update(AbstractFunctionDecl *updateDecl) {
   auto *nominal = updateDecl->getDeclContext()->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
 
@@ -132,13 +132,13 @@ deriveBodyParameterAggregate_update(AbstractFunctionDecl *updateDecl) {
       if (varDecl->getName() == target->getName())
         return varDecl;
     }
-    assert(false && "Could not find matching 'ParameterAggregate' member");
+    assert(false && "Could not find matching 'ParameterGroup' member");
     return nullptr;
   };
 
-  auto *paramAggProto = C.getProtocol(KnownProtocolKind::ParameterAggregate);
+  auto *paramAggProto = C.getProtocol(KnownProtocolKind::ParameterGroup);
   auto lookup = paramAggProto->lookupDirect(C.getIdentifier("update"));
-  assert(lookup.size() == 1 && "Broken 'ParameterAggregate' protocol");
+  assert(lookup.size() == 1 && "Broken 'ParameterGroup' protocol");
   auto updateRequirement = lookup[0];
 
   // Return an "update call" expression for a member `x`.
@@ -152,7 +152,7 @@ deriveBodyParameterAggregate_update(AbstractFunctionDecl *updateDecl) {
         gradientsDRE, SourceLoc(), getMatchingMember(member), DeclNameLoc(),
         /*Implicit*/ true);
 
-    // If member does not conform to ParameterAggregate, apply updater to member
+    // If member does not conform to ParameterGroup, apply updater to member
     // directly: `updater(&x, gradients.x)`.
     if (!confRef) {
       auto *inoutExpr = new (C) InOutExpr(SourceLoc(), memberExpr,
@@ -161,7 +161,7 @@ deriveBodyParameterAggregate_update(AbstractFunctionDecl *updateDecl) {
                                       {inoutExpr, gradientsMemberExpr}, {});
     }
 
-    // Otherwise, if member does conform to ParameterAggregate, call the
+    // Otherwise, if member does conform to ParameterGroup, call the
     // member's `update` method:
     // `x.update(withGradients: gradients.x, updater)`.
     auto conf = confRef->getConcrete();
@@ -190,7 +190,7 @@ deriveBodyParameterAggregate_update(AbstractFunctionDecl *updateDecl) {
 }
 
 // Synthesize the `update(withGradients:_:)` function declaration.
-static ValueDecl *deriveParameterAggregate_update(DerivedConformance &derived) {
+static ValueDecl *deriveParameterGroup_update(DerivedConformance &derived) {
   auto nominal = derived.Nominal;
   auto parentDC = derived.getConformanceContext();
   auto &C = derived.TC.Context;
@@ -232,7 +232,7 @@ static ValueDecl *deriveParameterAggregate_update(DerivedConformance &derived) {
       TypeLoc::withoutLoc(TupleType::getEmpty(C)), nominal);
   updateDecl->setImplicit();
   updateDecl->setSelfAccessKind(SelfAccessKind::Mutating);
-  updateDecl->setBodySynthesizer(deriveBodyParameterAggregate_update);
+  updateDecl->setBodySynthesizer(deriveBodyParameterGroup_update);
 
   if (auto env = parentDC->getGenericEnvironmentOfContext())
     updateDecl->setGenericEnvironment(env);
@@ -247,23 +247,23 @@ static ValueDecl *deriveParameterAggregate_update(DerivedConformance &derived) {
 }
 
 ValueDecl *
-DerivedConformance::deriveParameterAggregate(ValueDecl *requirement) {
+DerivedConformance::deriveParameterGroup(ValueDecl *requirement) {
   if (requirement->getBaseName() == TC.Context.getIdentifier("update")) {
     addFixedLayoutAttrIfNeeded(TC, Nominal);
-    return deriveParameterAggregate_update(*this);
+    return deriveParameterGroup_update(*this);
   }
   TC.diagnose(requirement->getLoc(),
-              diag::broken_parameter_aggregate_requirement);
+              diag::broken_parameter_group_requirement);
   return nullptr;
 }
 
-Type DerivedConformance::deriveParameterAggregate(
+Type DerivedConformance::deriveParameterGroup(
     AssociatedTypeDecl *requirement) {
   if (requirement->getBaseName() == TC.Context.Id_Parameter) {
     addFixedLayoutAttrIfNeeded(TC, Nominal);
-    return deriveParameterAggregate_Parameter(Nominal);
+    return deriveParameterGroup_Parameter(Nominal);
   }
   TC.diagnose(requirement->getLoc(),
-              diag::broken_parameter_aggregate_requirement);
+              diag::broken_parameter_group_requirement);
   return nullptr;
 }

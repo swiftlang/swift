@@ -8,8 +8,8 @@ public func testArrayValues() -> Tensor<Float> {
 
 /*
 CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testArrayValues
-CHECK: %0 = graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"} : $TensorHandle<Float>
-CHECK: %1 = graph_op "Const"() {dtype: $Float, value$tensor: f32 0x40000000 /* 2 */
+CHECK: %0 = graph_op "Const"() {dtype$dtype: i32 1, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"} : $TensorHandle<Float>
+CHECK: %1 = graph_op "Const"() {dtype$dtype: i32 1, value$tensor: f32 0x40000000 /* 2 */
 CHECK-LABEL: ----
 */
 

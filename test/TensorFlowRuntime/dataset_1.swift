@@ -39,7 +39,7 @@ public func createMockDataSet() -> VariantHandle {
   //   .Attr("output_shapes: list(shape) >= 1")
   let dataset : VariantHandle = #tfop("TensorSliceDataset",
                                       [values],
-                                      Toutput_types: [Float.self],
+                                      Toutput_types$dtype: [Float.tensorFlowDataType],
                                       output_shapes: [nil as TensorShape?])
   return dataset
 }
@@ -52,7 +52,7 @@ func getNextScalarFloatTensor(_ iterator: ResourceHandle) -> Tensor<Float> {
   //   .Attr("output_shapes: list(shape) >= 1")
   let ret: TensorHandle<Float> = #tfop("IteratorGetNext",
                                        iterator,
-                                       output_types: [Float.self],
+                                       output_types$dtype: [Float.tensorFlowDataType],
                                        output_shapes: [nil as TensorShape?])
   return Tensor(handle: ret)
 }
@@ -68,7 +68,7 @@ public func model() {
   let iterator: ResourceHandle = #tfop(
     "OneShotIterator",
     dataset_factory : createMockDataSet,
-    output_types: [Float.self],
+    output_types$dtype: [Float.tensorFlowDataType],
     output_shapes: [nil as TensorShape?]
   )
 
@@ -90,7 +90,7 @@ public func model() {
 
   // let _: TensorHandle<Float> = #tfop("IteratorGetNext",
   //                                    iterator,
-  //                                    output_types: [Float.self],
+  //                                    output_types$dtype: [Float.tensorFlowDataType],
   //                                    output_shapes: [nil as TensorShape?])
 }
 
@@ -102,33 +102,33 @@ DatasetTests.testAllBackends("MultiValue") {
   enableCPU()
   let elements1: Tensor<Int32> = [0, 1, 2]
   let elements2: Tensor<Int32> = [10, 11, 12]
-  let outputTypes = [Int32.self, Int32.self]
+  let outputTypes = [Int32.tensorFlowDataType, Int32.tensorFlowDataType]
   let outputShapes: [TensorShape?] = [nil, nil]
   let dataset: VariantHandle = #tfop(
     "TensorSliceDataset", [elements1, elements2],
-    Toutput_types: outputTypes,
+    Toutput_types$dtype: outputTypes,
     output_shapes: outputShapes
   )
   let iterator: ResourceHandle = #tfop(
     "IteratorV2", shared_name: "blah", container: "earth",
-    output_types: outputTypes, output_shapes: outputShapes
+    output_types$dtype: outputTypes, output_shapes: outputShapes
   )
   #tfop("MakeIterator", dataset, iterator) as Void
   var next: (TensorHandle<Int32>, TensorHandle<Int32>) = #tfop(
     "IteratorGetNext", iterator,
-    output_types: outputTypes, output_shapes: outputShapes
+    output_types$dtype: outputTypes, output_shapes: outputShapes
   )
   expectEqual(0, Tensor(handle: next.0).scalarized())
   expectEqual(10, Tensor(handle: next.1).scalarized())
   next = #tfop(
     "IteratorGetNext", iterator,
-    output_types: outputTypes, output_shapes: outputShapes
+    output_types$dtype: outputTypes, output_shapes: outputShapes
   )
   expectEqual(1, Tensor(handle: next.0).scalarized())
   expectEqual(11, Tensor(handle: next.1).scalarized())
   next = #tfop(
     "IteratorGetNext", iterator,
-    output_types: outputTypes, output_shapes: outputShapes
+    output_types$dtype: outputTypes, output_shapes: outputShapes
   )
   expectEqual(2, Tensor(handle: next.0).scalarized())
   expectEqual(12, Tensor(handle: next.1).scalarized())

@@ -5188,8 +5188,8 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
     return derived.deriveParameterized(Requirement);
 
   // SWIFT_ENABLE_TENSORFLOW
-  case KnownProtocolKind::ParameterAggregate:
-    return derived.deriveParameterAggregate(Requirement);
+  case KnownProtocolKind::ParameterGroup:
+    return derived.deriveParameterGroup(Requirement);
 
   default:
     return nullptr;
@@ -5217,8 +5217,8 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::Parameterized:
     return derived.deriveParameterized(AssocType);
-  case KnownProtocolKind::ParameterAggregate:
-    return derived.deriveParameterAggregate(AssocType);
+  case KnownProtocolKind::ParameterGroup:
+    return derived.deriveParameterGroup(AssocType);
   default:
     return nullptr;
   }
