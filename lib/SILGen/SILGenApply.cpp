@@ -2459,6 +2459,20 @@ static Expr *findStorageReferenceExprForBorrow(Expr *e) {
   return nullptr;
 }
 
+Expr *ArgumentSource::findStorageReferenceExprForBorrow() && {
+  if (!isExpr()) return nullptr;
+
+  auto argExpr = asKnownExpr();
+  auto lvExpr = ::findStorageReferenceExprForBorrow(argExpr);
+
+  // Claim the value of this argument if we found a storage reference.
+  if (lvExpr) {
+    (void) std::move(*this).asKnownExpr();
+  }
+
+  return lvExpr;
+}
+
 namespace {
 
 /// A destination for an argument other than just "onto to the end
@@ -2894,13 +2908,8 @@ private:
     assert(paramsSlice.size() == 1);
 
     // Try to find an expression we can emit as an l-value.
-    if (!arg.isExpr()) return false;
-    auto argExpr = arg.peekExpr();
-    auto lvExpr = findStorageReferenceExprForBorrow(argExpr);
+    auto lvExpr = std::move(arg).findStorageReferenceExprForBorrow();
     if (!lvExpr) return false;
-
-    // Claim the argument.
-    (void) std::move(arg).asKnownExpr();
 
     emitBorrowed(lvExpr, loweredSubstArgType, loweredSubstParamType,
                  origParamType, paramsSlice);
