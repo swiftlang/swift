@@ -578,7 +578,8 @@ NormalProtocolConformance::populateSignatureConformances() {
 
       // Allocate the buffer of conformance requirements.
       auto &ctx = self->getProtocol()->getASTContext();
-      buffer = ctx.AllocateUninitialized<ProtocolConformanceRef>(numConformanceRequirements);
+      buffer = ctx.AllocateUninitialized<ProtocolConformanceRef>(
+          numConformanceRequirements);
 
       // Skip over any non-conformance requirements in the requirement
       // signature.
@@ -600,11 +601,20 @@ NormalProtocolConformance::populateSignatureConformances() {
       other.owning = false;
     }
 
+    ~Writer() {
+      if (!owning)
+        return;
+      while (!requirementSignature.empty())
+        (*this)(ProtocolConformanceRef::forInvalid());
+    }
+
     void operator()(ProtocolConformanceRef conformance){
       // Make sure we have the right conformance.
       assert(!requirementSignature.empty() && "Too many conformances?");
-      assert(conformance.getRequirement() ==
-               requirementSignature.front().getSecondType()->castTo<ProtocolType>()->getDecl());
+      assert(conformance.isInvalid() ||
+             conformance.getRequirement() ==
+                 requirementSignature.front().getSecondType()
+                     ->castTo<ProtocolType>()->getDecl());
       assert((!conformance.isConcrete() ||
               !conformance.getConcrete()->getType()->hasArchetype()) &&
              "signature conformances must use interface types");
