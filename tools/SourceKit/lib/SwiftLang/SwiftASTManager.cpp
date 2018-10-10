@@ -175,7 +175,6 @@ namespace SourceKit {
     SmallVector<ImmutableTextSnapshotRef, 4> Snapshots;
     EditorDiagConsumer CollectDiagConsumer;
     CompilerInstance CompInst;
-    OwnedResolver TypeResolver{ nullptr, nullptr };
     WorkQueue Queue{ WorkQueue::Dequeuing::Serial, "sourcekit.swift.ConsumeAST" };
 
     Implementation(uint64_t Generation, std::shared_ptr<SwiftStatistics> Stats)
@@ -925,11 +924,6 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
       runSILDiagnosticPasses(*SILMod);
     }
   }
-
-  // We mirror the compiler and don't set the TypeResolver during SIL
-  // processing. This is to avoid unnecessary typechecking that can occur if the
-  // TypeResolver is set before.
-  ASTRef->Impl.TypeResolver = createLazyResolver(CompIns.getASTContext());
 
   return ASTRef;
 }

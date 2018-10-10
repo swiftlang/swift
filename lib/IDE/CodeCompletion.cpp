@@ -1580,7 +1580,7 @@ static bool hasTrivialTrailingClosure(const FuncDecl *FD,
 class CompletionLookup final : public swift::VisibleDeclConsumer {
   CodeCompletionResultSink &Sink;
   ASTContext &Ctx;
-  OwnedResolver TypeResolver;
+  LazyResolver *TypeResolver = nullptr;
   const DeclContext *CurrDeclContext;
   ClangImporter *Importer;
   CodeCompletionContext *CompletionContext;
@@ -1723,11 +1723,12 @@ public:
                    ASTContext &Ctx,
                    const DeclContext *CurrDeclContext,
                    CodeCompletionContext *CompletionContext = nullptr)
-      : Sink(Sink), Ctx(Ctx),
-        TypeResolver(createLazyResolver(Ctx)), CurrDeclContext(CurrDeclContext),
+      : Sink(Sink), Ctx(Ctx), CurrDeclContext(CurrDeclContext),
         Importer(static_cast<ClangImporter *>(CurrDeclContext->getASTContext().
           getClangModuleLoader())),
         CompletionContext(CompletionContext) {
+    (void)createTypeChecker(Ctx);
+    TypeResolver = Ctx.getLazyResolver();
 
     // Determine if we are doing code completion inside a static method.
     if (CurrDeclContext) {
@@ -1735,10 +1736,6 @@ public:
       if (auto *FD = dyn_cast_or_null<FuncDecl>(CurrentMethod))
         InsideStaticMethod = FD->isStatic();
     }
-  }
-
-  void discardTypeResolver() {
-    TypeResolver.reset();
   }
 
   void setHaveDot(SourceLoc DotLoc) {
@@ -2095,7 +2092,7 @@ public:
         if (Conformance && Conformance->isConcrete()) {
           return Conformance->getConcrete()
               ->getTypeWitness(const_cast<AssociatedTypeDecl *>(ATD),
-                               TypeResolver.get());
+                               nullptr);
         }
       }
     }
@@ -2624,7 +2621,7 @@ public:
     SmallVector<ValueDecl *, 16> initializers;
     if (CurrDeclContext->lookupQualified(type, DeclBaseName::createConstructor(),
                                          NL_QualifiedDefault,
-                                         TypeResolver.get(), initializers)) {
+                                         TypeResolver, initializers)) {
       for (auto *init : initializers) {
         if (shouldHideDeclFromCompletionResults(init))
           continue;
@@ -3121,7 +3118,7 @@ public:
     if (isIUO) {
       if (Type Unwrapped = ExprType->getOptionalObjectType()) {
         lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
-                                 TypeResolver.get(), IncludeInstanceMembers);
+                                 TypeResolver, IncludeInstanceMembers);
         return true;
       }
       assert(IsUnwrappedOptional && "IUOs should be optional if not bound/forced");
@@ -3141,7 +3138,7 @@ public:
           CodeCompletionResult::MaxNumBytesToErase) {
         if (!tryTupleExprCompletions(Unwrapped)) {
           lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
-                                   TypeResolver.get(),
+                                   TypeResolver,
                                    IncludeInstanceMembers);
         }
       }
@@ -3181,7 +3178,7 @@ public:
     tryUnwrappedCompletions(ExprType, isIUO);
 
     lookupVisibleMemberDecls(*this, ExprType, CurrDeclContext,
-                             TypeResolver.get(), IncludeInstanceMembers);
+                             TypeResolver, IncludeInstanceMembers);
   }
 
   template <typename T>
@@ -3690,7 +3687,7 @@ public:
     Kind = LookupKind::ValueInDeclContext;
     NeedLeadingDot = false;
     FilteredDeclConsumer Consumer(*this, Filter);
-    lookupVisibleDecls(Consumer, CurrDeclContext, TypeResolver.get(),
+    lookupVisibleDecls(Consumer, CurrDeclContext, TypeResolver,
                        /*IncludeTopLevel=*/IncludeTopLevel, Loc);
     if (RequestCache)
       RequestedCachedResults = RequestedResultsTy::toplevelResults();
@@ -3823,7 +3820,7 @@ public:
     llvm::SaveAndRestore<Type> SaveType(ExprType, baseType);
     llvm::SaveAndRestore<bool> SaveUnresolved(IsUnresolvedMember, true);
     lookupVisibleMemberDecls(consumer, baseType, CurrDeclContext,
-                             TypeResolver.get(),
+                             TypeResolver,
                              /*includeInstanceMembers=*/false);
   }
 
@@ -3989,7 +3986,7 @@ public:
     NeedLeadingDot = !HaveDot;
     Type MetaBase = MetatypeType::get(BaseType);
     lookupVisibleMemberDecls(*this, MetaBase,
-                             CurrDeclContext, TypeResolver.get(),
+                             CurrDeclContext, TypeResolver,
                              IncludeInstanceMembers);
     addKeyword("Type", MetaBase);
   }
@@ -4053,7 +4050,7 @@ public:
 
   void getTypeCompletionsInDeclContext(SourceLoc Loc) {
     Kind = LookupKind::TypeInDeclContext;
-    lookupVisibleDecls(*this, CurrDeclContext, TypeResolver.get(),
+    lookupVisibleDecls(*this, CurrDeclContext, TypeResolver,
                        /*IncludeTopLevel=*/false, Loc);
 
     RequestedCachedResults =
@@ -4088,8 +4085,8 @@ public:
 
 class CompletionOverrideLookup : public swift::VisibleDeclConsumer {
   CodeCompletionResultSink &Sink;
-  OwnedResolver TypeResolver;
   const DeclContext *CurrDeclContext;
+  LazyResolver *TypeResolver;
   SmallVectorImpl<StringRef> &ParsedKeywords;
 
   bool hasFuncIntroducer = false;
@@ -4104,8 +4101,11 @@ public:
   CompletionOverrideLookup(CodeCompletionResultSink &Sink, ASTContext &Ctx,
                            const DeclContext *CurrDeclContext,
                            SmallVectorImpl<StringRef> &ParsedKeywords)
-      : Sink(Sink), TypeResolver(createLazyResolver(Ctx)),
+      : Sink(Sink),
         CurrDeclContext(CurrDeclContext), ParsedKeywords(ParsedKeywords) {
+    (void)createTypeChecker(Ctx);
+    TypeResolver = Ctx.getLazyResolver();
+
     hasFuncIntroducer = isKeywordSpecified("func");
     hasVarIntroducer = isKeywordSpecified("var") ||
                        isKeywordSpecified("let");
@@ -4377,7 +4377,7 @@ public:
     Type CurrTy = CurrDeclContext->getDeclaredTypeInContext();
     if (CurrTy && !CurrTy->is<ErrorType>()) {
       lookupVisibleMemberDecls(*this, CurrTy, CurrDeclContext,
-                               TypeResolver.get(),
+                               TypeResolver,
                                /*includeInstanceMembers=*/false);
       addDesignatedInitializers(CurrTy);
       addAssociatedTypes(CurrTy);
@@ -5521,7 +5521,6 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::NominalMemberBeginning: {
-    Lookup.discardTypeResolver();
     CompletionOverrideLookup OverrideLookup(CompletionContext.getResultSink(),
                                             P.Context, CurDeclContext,
                                             ParsedKeywords);
@@ -5683,15 +5682,12 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     };
 
     if (Request.TheModule) {
-      Lookup.discardTypeResolver();
-
       // FIXME: actually check imports.
       const_cast<ModuleDecl*>(Request.TheModule)
           ->forAllVisibleModules({}, handleImport);
     } else {
       // Add results from current module.
       Lookup.getToplevelCompletions(Request.OnlyTypes);
-      Lookup.discardTypeResolver();
 
       // Add results for all imported modules.
       SmallVector<ModuleDecl::ImportedModule, 4> Imports;
