@@ -2888,6 +2888,10 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
   trailingClosure = nullptr;
 
   StructureMarkerRAII ParsingExprList(*this, Tok);
+  
+  if (ParsingExprList.isFailed()) {
+    return makeParserError();
+  }
 
   leftLoc = consumeToken(leftTok);
   ParserStatus status = parseList(rightTok, leftLoc, rightLoc,

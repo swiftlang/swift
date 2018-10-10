@@ -306,30 +306,34 @@ public:
 
   /// An RAII object that notes when we have seen a structure marker.
   class StructureMarkerRAII {
-    Parser &P;
+    Parser *const P;
 
     /// Max nesting level
     // TODO: customizable.
     enum { MaxDepth = 256 };
 
-    void diagnoseOverflow();
+    StructureMarkerRAII(Parser *parser) : P(parser) {}
+
+    /// Have the parser start the new Structure or fail if already too deep.
+    bool pushStructureMarker(Parser &parser, SourceLoc loc,
+                             StructureMarkerKind kind);
 
   public:
-    StructureMarkerRAII(Parser &parser, SourceLoc loc,
-                               StructureMarkerKind kind)
-      : P(parser) {
-      P.StructureMarkers.push_back({loc, kind, None});
-
-      if (P.StructureMarkers.size() >= MaxDepth) {
-        diagnoseOverflow();
-        P.cutOffParsing();
-      }
-    }
+    StructureMarkerRAII(Parser &parser, SourceLoc loc, StructureMarkerKind kind)
+        : StructureMarkerRAII(
+              pushStructureMarker(parser, loc, kind) ? &parser : nullptr) {}
 
     StructureMarkerRAII(Parser &parser, const Token &tok);
 
+    /// Did we fail to push the new structure?
+    bool isFailed() {
+      return P == nullptr;
+    }
+
     ~StructureMarkerRAII() {
-      P.StructureMarkers.pop_back();
+      if (P != nullptr) {
+        P->StructureMarkers.pop_back();
+      }
     }
   };
   friend class StructureMarkerRAII;
