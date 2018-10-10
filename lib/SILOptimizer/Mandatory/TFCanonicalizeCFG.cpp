@@ -1295,7 +1295,7 @@ void SingleExitLoopTransformer::unrollLoopBody() {
       // latch block and pick one that is suitable to be used here.
       auto destBBArg = newLatch->getArgument(argIndex);
       SmallVector<SILValue, 8> incomingValues;
-      destBBArg->getIncomingValues(incomingValues);
+      destBBArg->getIncomingPhiValues(incomingValues);
       for (auto value : incomingValues) {
         if (value != arg && DI->properlyDominates(value, predTermInst)) {
           // A suitable value is found. Update the edge value in the unrolled
