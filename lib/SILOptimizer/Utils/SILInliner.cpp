@@ -12,10 +12,11 @@
 
 #define DEBUG_TYPE "sil-inliner"
 
-#include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/TypeSubstCloner.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;

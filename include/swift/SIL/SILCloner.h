@@ -539,8 +539,8 @@ void SILCloner<ImplClass>::cloneReachableBlocks(
   clonePhiArgs(startBB);
 
   // Premap exit blocks to terminate so that visitBlocksDepthFirst terminates
-  // after discovering the cloned region. Mappint an exit block to itself
-  // provide the correct destination block during visitTerminator.
+  // after discovering the cloned region. Mapping an exit block to itself
+  // provides the correct destination block during visitTerminator.
   for (auto *exitBB : exitBlocks)
     BBMap[exitBB] = exitBB;
 

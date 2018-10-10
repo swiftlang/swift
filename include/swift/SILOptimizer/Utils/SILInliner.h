@@ -18,12 +18,16 @@
 #ifndef SWIFT_SIL_SILINLINER_H
 #define SWIFT_SIL_SILINLINER_H
 
+#include "swift/AST/SubstitutionMap.h"
+#include "swift/SIL/ApplySite.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILOpenedArchetypesTracker.h"
 #include "llvm/ADT/DenseMap.h"
-#include "swift/SIL/TypeSubstCloner.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include <functional>
 
 namespace swift {
+
+class SILOptFunctionBuilder;
 
 // For now Free is 0 and Expensive is 1. This can be changed in the future by
 // adding more categories.
