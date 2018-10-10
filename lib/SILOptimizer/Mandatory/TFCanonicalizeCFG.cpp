@@ -335,7 +335,7 @@ public:
 
   bool hasCloned() const { return cloned; }
 
-  /// Create a block and clone everything except the instructions.
+  /// Create a block and clone the arguments alone.
   SILBasicBlock *initBlock(SILBasicBlock *bb) {
     auto bbIt = BBMap.find(bb);
     if (bbIt != BBMap.end())
@@ -358,7 +358,7 @@ public:
   }
 
   // Clone all the instructions and return the cloned block.
-  SILBasicBlock *cloneBlock(SILBasicBlock * bb) {
+  SILBasicBlock *cloneBlock(SILBasicBlock *bb) {
     auto bbIt = BBMap.find(bb);
     assert (bbIt != BBMap.end() && "Block is not initialied before cloning.");
     SILBasicBlock *newBB = bbIt->second;
@@ -369,7 +369,7 @@ public:
     return newBB;
   }
 
-  SILBasicBlock *initAndCloneBlock(SILBasicBlock * bb) {
+  SILBasicBlock *initAndCloneBlock(SILBasicBlock *bb) {
     initBlock(bb);
     return cloneBlock(bb);
   }
@@ -391,9 +391,12 @@ public:
     return Value;
   }
 
+  // Update ValueMap so that occurrences of `oldValue` are replaced with
+  // `newValue` when cloning.
   void updateValueMap(SILValue oldValue, SILValue newValue)  {
     auto emplaceResult = ValueMap.try_emplace(oldValue, newValue);
-    assert(emplaceResult.second && "Remapping value multiple times during SESE cloning.");
+    assert(emplaceResult.second && "Updating the same key in ValueMap multiple "
+                                   "times during SESE cloning.");
   }
 };
 
@@ -447,8 +450,7 @@ private:
   /// we will get a single exit block.
   void ensureSingleExitBlock();
 
-  ///  Unroll the body of the loop once.
-  void unrollLoopBody();
+  void unrollLoopBodyOnce();
 
   /// Compute escaping values and what values to use as arguments at preheader.
   llvm::DenseMap<SILValue, SILValue> computeEscapingValuesSubstMap() const;
@@ -1138,7 +1140,7 @@ bool SingleExitLoopTransformer::transform() {
     // If we still have undefs at preheader, simply clone the loop body once
     // before the actual loop.
     if (hasUndefsAtPreheader) {
-      unrollLoopBody();
+      unrollLoopBodyOnce();
     }
   }
 
@@ -1189,9 +1191,9 @@ void SESERegionBuilder::ensureSingleExitFromLoops() {
   }
 }
 
-void SingleExitLoopTransformer::unrollLoopBody() {
+void SingleExitLoopTransformer::unrollLoopBodyOnce() {
   BasicBlockCloner cloner(*currentFn);
-  // Setup cloner so that newHeader's argument's are replaced with values in
+  // Setup cloner so that newHeader's arguments are replaced with values in
   // preheader.
   SILBasicBlock *newHeader = loop->getHeader();
   auto preheaderTermInst = dyn_cast<BranchInst>(preheader->getTerminator());
@@ -1276,7 +1278,7 @@ void SingleExitLoopTransformer::unrollLoopBody() {
   //    break': br newLatch'(i0', i3)
   //
   // Note that i3 is not cloned, which is patched here as follows:
-  //    break': br newLatch'(i0', ii')
+  //    break': br newLatch'(i0', i1')
   // `i1` is equivalent to `i3` as they both flow into the argument `i5` of
   // `newLatch`.
   SILBasicBlock *newLatch = loop->getLoopLatch();

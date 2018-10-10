@@ -95,9 +95,9 @@ func doWhileLoopWithBreak(_ breakIndex:Int32) -> Tensor<Int32> {
   var i: Int32 = 1
   var sum = Tensor<Int32>(0)
   let maxCount: Int32 = 100
-	repeat {
+  repeat {
     sum += i
-    if (i == breakIndex) {
+    if i == breakIndex {
       break
     }
     i += 1
