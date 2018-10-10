@@ -1047,9 +1047,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   return false;
 }
 
-static std::string getScriptFileName(StringRef name, bool isSwiftVersion3) {
-  StringRef langVer = isSwiftVersion3 ? "3" : "4";
-  return (Twine(name) + langVer + ".json").str();
+static std::string getScriptFileName(StringRef name) {
+  return (Twine(name) + "4" + ".json").str();
 }
 
 static bool ParseMigratorArgs(MigratorOptions &Opts,
@@ -1082,7 +1081,6 @@ static bool ParseMigratorArgs(MigratorOptions &Opts,
     Opts.APIDigesterDataStorePaths.push_back(DataPath->getValue());
   } else {
     auto &Triple = LangOpts.Target;
-    bool isSwiftVersion3 = LangOpts.isSwiftVersion3();
 
     llvm::SmallString<128> basePath;
     if (auto DataDir = Args.getLastArg(OPT_api_diff_data_dir)) {
@@ -1096,23 +1094,18 @@ static bool ParseMigratorArgs(MigratorOptions &Opts,
     llvm::SmallString<128> dataPath(basePath);
 
     if (Triple.isMacOSX())
-      llvm::sys::path::append(dataPath,
-                              getScriptFileName("macos", isSwiftVersion3));
+      llvm::sys::path::append(dataPath, getScriptFileName("macos"));
     else if (Triple.isiOS())
-      llvm::sys::path::append(dataPath,
-                              getScriptFileName("ios", isSwiftVersion3));
+      llvm::sys::path::append(dataPath, getScriptFileName("ios"));
     else if (Triple.isTvOS())
-      llvm::sys::path::append(dataPath,
-                              getScriptFileName("tvos", isSwiftVersion3));
+      llvm::sys::path::append(dataPath, getScriptFileName("tvos"));
     else if (Triple.isWatchOS())
-      llvm::sys::path::append(dataPath,
-                              getScriptFileName("watchos", isSwiftVersion3));
+      llvm::sys::path::append(dataPath, getScriptFileName("watchos"));
     else
       Supported = false;
     if (Supported) {
       llvm::SmallString<128> authoredDataPath(basePath);
-      llvm::sys::path::append(authoredDataPath,
-                              getScriptFileName("overlay", isSwiftVersion3));
+      llvm::sys::path::append(authoredDataPath, getScriptFileName("overlay"));
       // Add authored list first to take higher priority.
       Opts.APIDigesterDataStorePaths.push_back(authoredDataPath.str());
       Opts.APIDigesterDataStorePaths.push_back(dataPath.str());
