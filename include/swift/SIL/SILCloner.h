@@ -138,10 +138,16 @@ public:
            && "cloned instruction dropped debug scope");
   }
 
-  /// Visitor callback that maps an original value to an existing value. Called
-  /// whenever the visitor that clones an instruction skips doPostProcess().
+  /// Visitor callback that maps an original value to an existing value. If the
+  /// original instruction can be folded away in the cloned code, then the
+  /// instruction visitor should call this instead of cloning the instruction
+  /// and calling doPostProcess(). foldValue() and doPostProcess() are the only
+  /// two ways for a visitor to remap an original value that may be used within
+  /// the cloned region.
   void foldValue(SILValue origValue, SILValue mappedValue) {
-    ValueMap.insert({origValue, mappedValue});
+    auto iterAndInserted = ValueMap.insert({origValue, mappedValue});
+    (void)iterAndInserted;
+    assert(iterAndInserted.second && "Original value already mapped.");
   }
 
   /// Mark a block containing an unreachable instruction for use in the `fixUp`
@@ -316,7 +322,7 @@ protected:
   // terminator.
   void visitInstructionsInBlock(SILBasicBlock *BB);
 
-  // Visit a block's terminator. This is called with each block in DFS predorder
+  // Visit a block's terminator. This is called with each block in DFS preorder
   // after visiting and mapping all basic blocks and after visiting all
   // non-terminator instructions in the block.
   void visitTerminator(SILBasicBlock *BB) {
@@ -623,17 +629,13 @@ void SILCloner<ImplClass>::visitBlocksDepthFirst(
         continue;
 
       // Map the successor to a new BB.
-      auto *MappedBB = newF.createBasicBlock();
+      auto *MappedBB = insertBeforeBB
+        ? newF.createBasicBlockBefore(insertBeforeBB)
+        : newF.createBasicBlock();
+
       BBMap.insert(std::make_pair(Succ.getBB(), MappedBB));
 
       clonePhiArgs(Succ);
-
-      // Also, move the new mapped BB to the right position in the caller
-      if (insertBeforeBB) {
-        newF.getBlocks().splice(SILFunction::iterator(insertBeforeBB),
-                                newF.getBlocks(),
-                                SILFunction::iterator(MappedBB));
-      }
 
       dfsWorklist.push_back(Succ);
     }

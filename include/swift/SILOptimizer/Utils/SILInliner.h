@@ -83,7 +83,7 @@ public:
   ///
   /// *NOTE*: This attempts to perform inlining unconditionally and thus asserts
   /// if inlining will fail. All users /must/ check that a function is allowed
-  /// to be inlined using SILInliner::canInlineApplyAite before calling this
+  /// to be inlined using SILInliner::canInlineApplySite before calling this
   /// function.
   SILBasicBlock::iterator inlineFunction(SILFunction *calleeFunction,
                                          FullApplySite apply,

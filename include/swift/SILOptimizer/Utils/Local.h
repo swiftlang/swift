@@ -377,7 +377,7 @@ public:
           DestPHIArg->getType(), DestPHIArg->getOwnershipKind());
       // Since we don't call any CFG cloning entry point, we can call
       // `foldValue` immediately as if cloning has already started. This simply
-      // avoids handling AvailVals during `remap` or defining a custome
+      // avoids handling AvailVals during `remap` or defining a custom
       // visitSILPhiArgument().
       foldValue(DestPHIArg, BlockArg);
       AvailVals.push_back(std::make_pair(DestPHIArg, BlockArg));
@@ -427,7 +427,7 @@ class BasicBlockCloner : public BaseThreadingCloner {
       for (unsigned i = 0, e = FromBB->args_size(); i != e; ++i) {
         // Since we don't call any CFG cloning entry point, we can call
         // `foldValue` immediately as if cloning has already started. This
-        // simply avoids handling AvailVals during `remap` or defining a custome
+        // simply avoids handling AvailVals during `remap` or defining a custom
         // visitSILPhiArgument().
         foldValue(FromBB->getArgument(i), DestBB->getArgument(i));
         AvailVals.push_back(
