@@ -2798,6 +2798,8 @@ void TFDeabstraction::doIt() {
   cleanupDeadInstructions();
 
   logCurrentState("Result", /*detailed*/false);
+
+  fn.TFDeabstracted = true;
 }
 
 
