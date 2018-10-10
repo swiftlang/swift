@@ -279,29 +279,38 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         self.subprocess_mock.assert_called_with(
             ('/benchmarks/Benchmark_O', 'b', '--memory'))
 
+    def test_report_quantiles(self):
+        """Use delta compression for quantile reports."""
+        self.driver.run('b', quantile=4)
+        self.subprocess_mock.assert_called_with(
+            ('/benchmarks/Benchmark_O', 'b', '--quantile=4', '--delta'))
+
     def test_run_benchmark_independent_samples(self):
+        """Extract up to 20 measurements from an independent run."""
         self.driver.args.independent_samples = 3
         r = self.driver.run_independent_samples('b1')
         self.assertEquals(self.subprocess_mock.calls.count(
-            ('/benchmarks/Benchmark_O', 'b1', '--memory')), 3)
+            ('/benchmarks/Benchmark_O', 'b1', '--num-iters=1', '--memory',
+             '--quantile=20', '--delta')), 3)
         self.assertEquals(r.num_samples, 3)  # results are merged
 
     def test_run_and_log(self):
         def mock_run(test):
             self.assertEquals(test, 'b1')
             return PerformanceTestResult(
-                '3,b1,1,123,123,123,0,123,888'.split(','))
+                '3,b1,5,101,1,1,1,1,888'.split(','),
+                quantiles=True, delta=True, memory=True)
         driver = BenchmarkDriver(tests=['b1'], args=Stub(output_dir=None))
         driver.run_independent_samples = mock_run  # patching
 
         with captured_output() as (out, _):
             log = driver.run_and_log()
 
-        csv_log = '3,b1,1,123,123,123,0,123,888\n'
+        csv_log = '3,b1,5,101,102,103,104,105,888\n'
         self.assertEquals(log, None)
         self.assertEquals(
             out.getvalue(),
-            '#,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),' +
+            '#,TEST,SAMPLES,MIN(μs),Q1(μs),MEDIAN(μs),Q3(μs),MAX(μs),' +
             'MAX_RSS(B)\n' +
             csv_log +
             '\n' +
@@ -313,10 +322,10 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         self.assertEquals(log, csv_log)
         self.assertEquals(
             out.getvalue(),
-            '  # TEST                      SAMPLES MIN(μs) MAX(μs)' +
-            ' MEAN(μs) SD(μs) MEDIAN(μs) MAX_RSS(B)\n' +
-            '  3 b1                              1     123     123' +
-            '      123      0        123        888\n' +
+            '  # TEST                      SAMPLES MIN(μs) Q1(μs)' +
+            ' MEDIAN(μs) Q3(μs) MAX(μs) MAX_RSS(B)\n' +
+            '  3 b1                              5     101    102' +
+            '        103    104     105        888\n' +
             '\n' +
             'Total performance tests executed: 1\n')
 
