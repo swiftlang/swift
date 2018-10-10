@@ -96,15 +96,16 @@ class Test_parse_args(unittest.TestCase):
              "(choose from 'O', 'Onone', 'Osize')"],
             err.getvalue())
 
-    def test_iterations(self):
-        self.assertEquals(parse_args(['run']).iterations, 1)
-        self.assertEquals(parse_args(['run', '-i', '3']).iterations, 3)
+    def test_independent_samples(self):
+        self.assertEquals(parse_args(['run']).independent_samples, 1)
+        self.assertEquals(parse_args(['run', '-i', '3']).independent_samples,
+                          3)
         with captured_output() as (out, err):
             self.assertRaises(SystemExit,
                               parse_args, ['run', '-i', '-3'])
         self.assert_contains(
-            ['error:',
-             "argument -i/--iterations: invalid positive_int value: '-3'"],
+            ['error:', "argument -i/--independent-samples: " +
+             "invalid positive_int value: '-3'"],
             err.getvalue())
 
     def test_output_dir(self):
@@ -279,7 +280,7 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
             ('/benchmarks/Benchmark_O', 'b', '--memory'))
 
     def test_run_benchmark_independent_samples(self):
-        self.driver.args.iterations = 3
+        self.driver.args.independent_samples = 3
         r = self.driver.run_independent_samples('b1')
         self.assertEquals(self.subprocess_mock.calls.count(
             ('/benchmarks/Benchmark_O', 'b1', '--memory')), 3)

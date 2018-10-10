@@ -167,7 +167,7 @@ class BenchmarkDriver(object):
 
         return reduce(merge_results,
                       [self.run(test, measure_memory=True)
-                       for _ in range(self.args.iterations)])
+                       for _ in range(self.args.independent_samples)])
 
     def log_results(self, output, log_file=None):
         """Log output to `log_file`.
@@ -603,7 +603,7 @@ def parse_args(args):
         help='Run benchmarks and output results to stdout',
         parents=[shared_benchmarks_parser])
     run_parser.add_argument(
-        '-i', '--iterations',
+        '-i', '--independent-samples',
         help='number of times to run each test (default: 1)',
         type=positive_int, default=1)
     run_parser.add_argument(
