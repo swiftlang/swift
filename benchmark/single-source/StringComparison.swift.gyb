@@ -30,32 +30,50 @@ extension String {
   }
 }
 
-% Names = ["ascii", "latin1", "fastPrenormal", "slowerPrenormal", "nonBMPSlowestPrenormal", "emoji", "abnormal", "zalgo", "longSharedPrefix"]
+% AllWorkloads = ["ascii", "latin1", "fastPrenormal", "slowerPrenormal", "nonBMPSlowestPrenormal", "emoji", "abnormal", "zalgo", "longSharedPrefix"]
+% ComparisonWorkloads = AllWorkloads
+% HashingWorkloads = ["ascii", "latin1", "fastPrenormal", "slowerPrenormal", "nonBMPSlowestPrenormal", "emoji", "abnormal", "zalgo"]
+% NormalizedIteratorWorkloads = ["ascii", "latin1", "fastPrenormal", "slowerPrenormal", "nonBMPSlowestPrenormal", "emoji", "abnormal", "zalgo"]
 
 public let StringComparison = [
-% for Name in Names:
+% for Name in ComparisonWorkloads:
   BenchmarkInfo(
     name: "StringComparison_${Name}",
     runFunction: run_StringComparison_${Name},
     tags: [.validation, .api, .String],
-    setUpFunction: { blackHole(Workload_${Name}) }),
-% end # Names
+    setUpFunction: { blackHole(Workload_${Name}) }
+  ),
+% end # ComparisonWorkloads
 ]
 
 public let StringHashing = [
-% for Name in Names:
+% for Name in HashingWorkloads:
   BenchmarkInfo(
     name: "StringHashing_${Name}",
     runFunction: run_StringHashing_${Name},
     tags: [.validation, .api, .String],
-    setUpFunction: { blackHole(Workload_${Name}) }),
-% end # Names
+    setUpFunction: { blackHole(Workload_${Name}) }
+  ),
+% end # HashingWorkloads
 ]
 
-% for Name in Names:
+public let NormalizedIterator = [
+% for Name in NormalizedIteratorWorkloads:
+  BenchmarkInfo(
+    name: "NormalizedIterator_${Name}",
+    runFunction: run_NormalizedIterator_${Name},
+    tags: [.validation, .String],
+    setUpFunction: { blackHole(Workload_${Name}) }
+  ),
+% end # NormalizedIteratorWorkloads
+]
 
+% for Name in AllWorkloads:
 var Workload_${Name}: Workload! = Workload.${Name}
 
+% end # AllWorkloads
+
+%for Name in ComparisonWorkloads:
 @inline(never)
 public func run_StringComparison_${Name}(_ N: Int) {
   let workload: Workload = Workload_${Name}
@@ -70,6 +88,9 @@ public func run_StringComparison_${Name}(_ N: Int) {
   }
 }
 
+% end # ComparisonWorkloads
+
+%for Name in HashingWorkloads:
 @inline(never)
 public func run_StringHashing_${Name}(_ N: Int) {
   let workload: Workload = Workload.${Name}
@@ -81,8 +102,25 @@ public func run_StringHashing_${Name}(_ N: Int) {
     }
   }
 }
-  
-% end # Names
+
+% end # HashingWorkloads
+
+%for Name in NormalizedIteratorWorkloads:
+@inline(never)
+public func run_NormalizedIterator_${Name}(_ N: Int) {
+  let workload: Workload = Workload.${Name}
+  let tripCount = workload.tripCount
+  let payload = workload.payload
+  for _ in 1...tripCount*N {
+    for str in payload {
+      str._withNFCCodeUnits { cu in
+        blackHole(cu)
+      }
+    }
+  }
+}
+
+% end # NormalizedIteratorWorkloads
 
 struct Workload {
   static let N = 100
