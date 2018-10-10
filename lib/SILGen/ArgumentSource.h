@@ -196,9 +196,7 @@ public:
     return Storage.get<LValueStorage>(StoredKind).Loc;
   }
 
-  Expr *peekExpr() & {
-    return Storage.get<Expr*>(StoredKind);
-  }
+  Expr *findStorageReferenceExprForBorrow() &&;
 
   /// Given that this source is an expression, extract and clear
   /// that expression.
