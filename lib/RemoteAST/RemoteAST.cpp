@@ -341,6 +341,29 @@ public:
       representation = FunctionTypeRepresentation::CFunctionPointer;
       break;
     }
+    
+    // SWIFT_ENABLE_TENSORFLOW
+    FunctionTypeDifferentiability diffability;
+    switch (flags.getDifferentiability()) {
+    case FunctionMetadataDifferentiability::None:
+      diffability = FunctionTypeDifferentiability::None;
+      break;
+    case FunctionMetadataDifferentiability::Forward:
+      diffability = FunctionTypeDifferentiability::Forward;
+      break;
+    case FunctionMetadataDifferentiability::Reverse:
+      diffability = FunctionTypeDifferentiability::Reverse;
+      break;
+    case FunctionMetadataDifferentiability::Bidirectional:
+      diffability = FunctionTypeDifferentiability::Bidirectional;
+      break;
+    case FunctionMetadataDifferentiability::Linear:
+      diffability = FunctionTypeDifferentiability::Linear;
+      break;
+    case FunctionMetadataDifferentiability::Constant:
+      diffability = FunctionTypeDifferentiability::Constant;
+      break;
+    }
 
     auto einfo = AnyFunctionType::ExtInfo(representation,
                                           /*throws*/ flags.throws());
@@ -348,6 +371,9 @@ public:
       einfo = einfo.withNoEscape(false);
     else
       einfo = einfo.withNoEscape(true);
+    
+    // SWIFT_ENABLE_TENSORFLOW
+    einfo = einfo.withDifferentiability(diffability);
 
     // The result type must be materializable.
     if (!output->isMaterializable()) return Type();
@@ -367,7 +393,9 @@ public:
                                 .withInOut(ownership == ValueOwnership::InOut)
                                 .withShared(ownership == ValueOwnership::Shared)
                                 .withOwned(ownership == ValueOwnership::Owned)
-                                .withVariadic(flags.isVariadic());
+                                // SWIFT_ENABLE_TENSORFLOW
+                                .withVariadic(flags.isVariadic())
+                            .withNonDifferentiable(flags.isNonDifferentiable());
 
       funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
     }

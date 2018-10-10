@@ -952,13 +952,38 @@ namespace {
         metadataConvention = FunctionMetadataConvention::CFunctionPointer;
         break;
       }
+      
+      // SWIFT_ENABLE_TENSORFLOW
+      FunctionMetadataDifferentiability metadataDiffability;
+      switch (type->getDifferentiability()) {
+      case FunctionTypeDifferentiability::None:
+        metadataDiffability = FunctionMetadataDifferentiability::None;
+        break;
+      case FunctionTypeDifferentiability::Forward:
+        metadataDiffability = FunctionMetadataDifferentiability::Forward;
+        break;
+      case FunctionTypeDifferentiability::Reverse:
+        metadataDiffability = FunctionMetadataDifferentiability::Reverse;
+        break;
+      case FunctionTypeDifferentiability::Bidirectional:
+        metadataDiffability = FunctionMetadataDifferentiability::Bidirectional;
+        break;
+      case FunctionTypeDifferentiability::Linear:
+        metadataDiffability = FunctionMetadataDifferentiability::Linear;
+        break;
+      case FunctionTypeDifferentiability::Constant:
+        metadataDiffability = FunctionMetadataDifferentiability::Constant;
+        break;
+      }
 
       auto flagsVal = FunctionTypeFlags()
                           .withNumParameters(numParams)
                           .withConvention(metadataConvention)
                           .withThrows(type->throws())
                           .withParameterFlags(hasFlags)
-                          .withEscaping(isEscaping);
+                          // SWIFT_ENABLE_TENSORFLOW
+                          .withEscaping(isEscaping)
+                          .withDifferentiability(metadataDiffability);
 
       auto flags = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                                           flagsVal.getIntValue());
