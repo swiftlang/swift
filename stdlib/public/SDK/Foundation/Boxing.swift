@@ -62,9 +62,3 @@ extension _MutableBoxing {
         return whatToDo(_handle._pointer)
     }
 }
-
-internal enum _MutableUnmanagedWrapper<ImmutableType : NSObject, MutableType : NSObject>
-  where MutableType : NSMutableCopying{
-    case Immutable(Unmanaged<ImmutableType>)
-    case Mutable(Unmanaged<MutableType>)
-}
