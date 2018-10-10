@@ -73,6 +73,7 @@ extension AnyHashable : _ObjectiveCBridgeable {
     return result != nil
   }
 
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSObject?
   ) -> AnyHashable {

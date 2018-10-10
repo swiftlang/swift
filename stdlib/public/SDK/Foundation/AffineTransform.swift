@@ -317,6 +317,7 @@ extension AffineTransform : _ObjectiveCBridgeable {
         return true // Can't fail
     }
 
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ x: NSAffineTransform?) -> AffineTransform {
         guard let src = x else { return AffineTransform.identity }
         return AffineTransform(reference: src)

@@ -125,6 +125,7 @@ extension Dictionary : _ObjectiveCBridgeable {
     return result != nil
   }
 
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(
     _ d: NSDictionary?
   ) -> Dictionary {
