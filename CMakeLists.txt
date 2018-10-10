@@ -448,13 +448,9 @@ include(SwiftList)
 swift_configure_components()
 
 # lipo is used to create universal binaries.
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-  include(SwiftDarwin)
-  if(SWIFT_LIPO)
-    set(LIPO ${SWIFT_LIPO})
-  else()
-    find_toolchain_tool(LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
-  endif()
+include(SwiftToolchainUtils)
+if(NOT SWIFT_LIPO)
+  find_toolchain_tool(SWIFT_LIPO "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" lipo)
 endif()
 
 if("${SWIFT_NATIVE_LLVM_TOOLS_PATH}" STREQUAL "")

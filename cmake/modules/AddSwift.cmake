@@ -548,7 +548,7 @@ function(_add_swift_lipo_target)
     endif()
     # Use lipo to create the final binary.
     add_custom_command_target(unused_var
-        COMMAND "${LIPO}" "-create" "-output" "${LIPO_OUTPUT}" ${source_binaries}
+        COMMAND "${SWIFT_LIPO}" "-create" "-output" "${LIPO_OUTPUT}" ${source_binaries}
         ${codesign_command}
         CUSTOM_TARGET_NAME "${LIPO_TARGET}"
         OUTPUT "${LIPO_OUTPUT}"
