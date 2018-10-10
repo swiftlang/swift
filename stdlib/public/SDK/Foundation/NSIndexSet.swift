@@ -12,7 +12,7 @@
 
 @_exported import Foundation // Clang module
 
-// FIXME: move inside NSIndexSet when the compiler supports this.
+// TODO: Evaluate deprecating with a message in favor of IndexSet.
 public struct NSIndexSetIterator : IteratorProtocol {
   public typealias Element = Int
 

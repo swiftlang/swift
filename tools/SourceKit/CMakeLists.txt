@@ -158,6 +158,13 @@ if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
                             INTERFACE_INCLUDE_DIRECTORIES
                               ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}/src/BlocksRuntime)
 
+    swift_install_in_component(sourcekit-inproc
+                               FILES
+                                 $<TARGET_FILE:dispatch>
+                                 $<TARGET_FILE:BlocksRuntime>
+                               DESTINATION
+                                 lib${LLVM_LIBDIR_SUFFIX})
+
     # FIXME(compnerd) this should be taken care of by the
     # INTERFACE_INCLUDE_DIRECTORIES above
     include_directories(AFTER

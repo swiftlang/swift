@@ -13,6 +13,8 @@
 @_exported import Foundation // Clang module
 import _SwiftCoreFoundationOverlayShims
 
+// The methods in this extension exist to match the protocol requirements of FloatinPoint, even if we can't conform directly.
+// If it becomes clear that conformance is truly impossible, we can deprecate some of the methods (e.g. isEqual(to:)) in favor of operators.
 extension Decimal {
     public typealias RoundingMode = NSDecimalNumber.RoundingMode
     public typealias CalculationError = NSDecimalNumber.CalculationError
