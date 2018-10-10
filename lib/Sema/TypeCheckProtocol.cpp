@@ -545,6 +545,13 @@ swift::matchWitness(
     // Result types must match.
     // FIXME: Could allow (trivial?) subtyping here.
     if (!ignoreReturnType) {
+      if (reqResultType->is<DynamicSelfType>()) {
+        auto classDecl = witness->getDeclContext()->getSelfClassDecl();
+        if (!classDecl || classDecl->isFinal() || witnessResultType->is<DynamicSelfType>())
+          reqResultType = reqResultType->eraseDynamicSelfType();
+        witnessResultType = witnessResultType->eraseDynamicSelfType();
+      }
+
       auto reqTypeIsIUO =
           req->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
       auto witnessTypeIsIUO =
