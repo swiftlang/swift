@@ -955,6 +955,8 @@ void Lexer::lexDollarIdent() {
     // independent of language mode.
     return formToken(tok::identifier, tokStart);
   } else {
+    if (LangOpts.EnableDollarIdentifiers && !LangOpts.Playground)
+      return formToken(tok::identifier, tokStart);
     return formToken(tok::dollarident, tokStart);
   }
 }
