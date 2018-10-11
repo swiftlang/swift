@@ -1,4 +1,4 @@
-//===--- ParseableInterfaceSupport.h - swiftinterface files --*- C++ -*-===//
+//===--- ParseableInterfaceSupport.h - swiftinterface files -----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -56,7 +56,7 @@ bool emitParseableInterface(raw_ostream &out,
 /// directory, and loading the serialized .swiftmodules from there.
 class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
   explicit ParseableInterfaceModuleLoader(ASTContext &ctx, StringRef cacheDir,
-                                        DependencyTracker *tracker)
+                                          DependencyTracker *tracker)
     : SerializedModuleLoaderBase(ctx, tracker),
       CacheDir(cacheDir)
   {}

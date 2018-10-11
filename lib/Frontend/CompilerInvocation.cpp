@@ -130,10 +130,36 @@ generateOptimizationRemarkRegex(DiagnosticEngine &Diags, ArgList &Args,
   return Pattern;
 }
 
-/// \brief Save a copy of any flags marked as ParseableInterfaceOption, if running
+// Lifted from the clang driver.
+static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
+  const bool Escape = std::strpbrk(Arg, "\"\\$ ");
+
+  if (!TempDir.empty() && StringRef(Arg).startswith(TempDir)) {
+    // Don't write temporary file names in the debug info. This would prevent
+    // incremental llvm compilation because we would generate different IR on
+    // every compiler invocation.
+    Arg = "<temporary-file>";
+  }
+
+  if (!Escape) {
+    OS << Arg;
+    return;
+  }
+
+  // Quote and escape. This isn't really complete, but good enough.
+  OS << '"';
+  while (const char c = *Arg++) {
+    if (c == '"' || c == '\\' || c == '$')
+      OS << '\\';
+    OS << c;
+  }
+  OS << '"';
+}
+
+/// Save a copy of any flags marked as ParseableInterfaceOption, if running
 /// in a mode that is going to emit a .swiftinterface file.
 static void SaveParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
-                                     ArgList &Args, DiagnosticEngine &Diags) {
+                                       ArgList &Args, DiagnosticEngine &Diags) {
   if (!Args.hasArg(options::OPT_emit_interface_path))
     return;
   ArgStringList RenderedArgs;
@@ -631,6 +657,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
       return true;
     }
+  }
+  if (Args.hasArg(OPT_sil_existential_specializer)) {
+    Opts.ExistentialSpecializer = true;
   }
   if (const Arg *A = Args.getLastArg(OPT_num_threads)) {
     if (StringRef(A->getValue()).getAsInteger(10, Opts.NumThreads)) {
