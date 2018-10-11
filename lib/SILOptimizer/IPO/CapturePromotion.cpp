@@ -643,7 +643,7 @@ void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *LI) {
     // We assume that the value is already guaranteed.
     assert(Val.getOwnershipKind().isTrivialOr(ValueOwnershipKind::Guaranteed) &&
            "Expected argument value to be guaranteed");
-    foldValue(LI, Val);
+    recordFoldedValue(LI, Val);
     return;
   }
 
@@ -668,7 +668,7 @@ void ClosureCloner::visitLoadInst(LoadInst *LI) {
         && LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
       Val = getBuilder().createCopyValue(LI->getLoc(), Val);
     }
-    foldValue(LI, Val);
+    recordFoldedValue(LI, Val);
     return;
   }
 
@@ -694,7 +694,7 @@ void ClosureCloner::visitLoadInst(LoadInst *LI) {
         && LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
       Val = getBuilder().createCopyValue(LI->getLoc(), Val);
     }
-    foldValue(LI, Val);
+    recordFoldedValue(LI, Val);
     return;
   }
   SILCloner<ClosureCloner>::visitLoadInst(LI);

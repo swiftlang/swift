@@ -726,7 +726,7 @@ void PromotedParamCloner::visitProjectBoxInst(ProjectBoxInst *Inst) {
   // Its uses will be replaced by the promoted address.
   if (OrigPromotedParameters.count(Inst->getOperand())) {
     auto *origArg = cast<SILFunctionArgument>(Inst->getOperand());
-    foldValue(Inst, NewPromotedArgs[origArg->getIndex()]);
+    recordFoldedValue(Inst, NewPromotedArgs[origArg->getIndex()]);
     return;
   }
 
