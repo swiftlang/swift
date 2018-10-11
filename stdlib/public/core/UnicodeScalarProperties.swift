@@ -1066,6 +1066,26 @@ extension Unicode {
   }
 }
 
+// Internal helpers
+extension Unicode.GeneralCategory {
+  internal var _isSymbol: Bool {
+    switch self {
+      case .mathSymbol, .currencySymbol, .modifierSymbol, .otherSymbol:
+        return true
+      default: return false
+    }
+  }
+  internal var _isPunctuation: Bool {
+    switch self {
+      case .connectorPunctuation, .dashPunctuation, .openPunctuation,
+           .closePunctuation, .initialPunctuation, .finalPunctuation,
+           .otherPunctuation:
+        return true
+      default: return false
+    }
+  }
+}
+
 extension Unicode.Scalar.Properties {
 
   /// The general category (most usual classification) of the scalar.
