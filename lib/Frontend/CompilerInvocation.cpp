@@ -169,7 +169,7 @@ static void SaveParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
   }
   llvm::raw_string_ostream OS(Opts.ParseableInterfaceFlags);
   interleave(RenderedArgs,
-             [&](const char *Argument) { OS << Argument; },
+             [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
              [&] { OS << " "; });
 }
 
@@ -573,32 +573,6 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
          "conflicting arguments; should have been caught by driver");
 
   return false;
-}
-
-// Lifted from the clang driver.
-static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
-  const bool Escape = std::strpbrk(Arg, "\"\\$ ");
-
-  if (StringRef(Arg).startswith(TempDir)) {
-    // Don't write temporary file names in the debug info. This would prevent
-    // incremental llvm compilation because we would generate different IR on
-    // every compiler invocation.
-    Arg = "<temporary-file>";
-  }
-
-  if (!Escape) {
-    OS << Arg;
-    return;
-  }
-
-  // Quote and escape. This isn't really complete, but good enough.
-  OS << '"';
-  while (const char c = *Arg++) {
-    if (c == '"' || c == '\\' || c == '$')
-      OS << '\\';
-    OS << c;
-  }
-  OS << '"';
 }
 
 /// Parse -enforce-exclusivity=... options
