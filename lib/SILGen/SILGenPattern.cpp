@@ -465,10 +465,10 @@ private:
   void emitSpecializedDispatch(ClauseMatrix &matrix, ArgArray args,
                                unsigned &lastRow, unsigned column,
                                const FailureHandler &failure);
-  void emitTupleDispatchWithOwnership(ArrayRef<RowToSpecialize> rows,
-                                      ConsumableManagedValue src,
-                                      const SpecializationHandler &handleSpec,
-                                      const FailureHandler &failure);
+  void emitTupleObjectDispatch(ArrayRef<RowToSpecialize> rows,
+                               ConsumableManagedValue src,
+                               const SpecializationHandler &handleSpec,
+                               const FailureHandler &failure);
   void emitTupleDispatch(ArrayRef<RowToSpecialize> rows,
                          ConsumableManagedValue src,
                          const SpecializationHandler &handleSpec,
@@ -1371,7 +1371,7 @@ emitReabstractedSubobject(SILGenFunction &SGF, SILLocation loc,
            SGF.emitOrigToSubstValue(loc, mv, abstraction, substFormalType));
 }
 
-void PatternMatchEmission::emitTupleDispatchWithOwnership(
+void PatternMatchEmission::emitTupleObjectDispatch(
     ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     const SpecializationHandler &handleCase,
     const FailureHandler &outerFailure) {
@@ -1399,8 +1399,7 @@ void PatternMatchEmission::emitTupleDispatchWithOwnership(
         destructured.push_back({v, src.getFinalConsumption()});
       });
 
-  // Break down the values.
-  // Recurse.
+  // Since we did all of our work at +0, we just send down the outer failure.
   handleCase(destructured, specializedRows, outerFailure);
 }
 
@@ -1411,12 +1410,44 @@ void PatternMatchEmission::
 emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
                   const SpecializationHandler &handleCase,
                   const FailureHandler &outerFailure) {
-  if (SGF.getOptions().EnableSILOwnership && src.getType().isObject()) {
-    return emitTupleDispatchWithOwnership(rows, src, handleCase, outerFailure);
-  }
   auto firstPat = rows[0].Pattern;
-  auto sourceType = cast<TupleType>(firstPat->getType()->getCanonicalType());
   SILLocation loc = firstPat;
+
+  // If our source is an address that is loadable, perform a load_borrow.
+  if (src.getType().isAddress() && src.getType().isLoadable(SGF.getModule())) {
+    src = {SGF.B.createLoadBorrow(loc, src.getFinalManagedValue()),
+           CastConsumptionKind::BorrowAlways};
+  }
+
+  // Then if we have an object...
+  if (src.getType().isObject()) {
+    // Make sure that if we ahve a copy_on_success, non-trivial value that we do
+    // not have a value with @owned ownership.
+    assert((!src.getType().isTrivial(SGF.getModule()) ||
+            src.getFinalConsumption() != CastConsumptionKind::CopyOnSuccess ||
+            src.getOwnershipKind() != ValueOwnershipKind::Owned) &&
+           "@owned value without cleanup + copy_on_success");
+
+    // If we have are asked to perform TakeOnSuccess, borrow the value instead.
+    //
+    // The reason why do this for TakeOnSuccess is that we want to not have to
+    // deal with unforwarding of aggregate tuples in failing cases since that
+    // causes ownership invariants to be violated since we already forwarded the
+    // aggregate to create cleanups on its elements.
+    //
+    // In contrast, we do still want to allow for TakeAlways variants to not
+    // need to borrow, so we do not borrow if we take always.
+    if (!src.getType().isTrivial(SGF.getModule()) &&
+        src.getFinalConsumption() == CastConsumptionKind::TakeOnSuccess) {
+      src = {src.getFinalManagedValue().borrow(SGF, loc),
+             CastConsumptionKind::BorrowAlways};
+    }
+
+    // Then perform a forward or reborrow destructure on the object.
+    return emitTupleObjectDispatch(rows, src, handleCase, outerFailure);
+  }
+
+  auto sourceType = cast<TupleType>(firstPat->getType()->getCanonicalType());
 
   SILValue v = src.getFinalManagedValue().forward(SGF);
   SmallVector<ConsumableManagedValue, 4> destructured;
