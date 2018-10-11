@@ -414,6 +414,7 @@ swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
 ///
 /// \param wtable The witness table.
 /// \param conformingType Metadata for the conforming type.
+/// \param reqBase "Base" requirement used to compute the witness index
 /// \param assocType Associated type descriptor.
 ///
 /// \returns metadata for the associated type witness.
@@ -422,6 +423,7 @@ MetadataResponse swift_getAssociatedTypeWitness(
                                           MetadataRequest request,
                                           WitnessTable *wtable,
                                           const Metadata *conformingType,
+                                          const ProtocolRequirement *reqBase,
                                           const ProtocolRequirement *assocType);
 
 /// \brief Fetch a uniqued metadata for a function type.

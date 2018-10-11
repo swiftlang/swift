@@ -3554,6 +3554,11 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                      DynamicMetadataRequest request) {
   auto &IGM = IGF.IGM;
 
+  // Extract the requirements base descriptor.
+  auto reqBaseDescriptor =
+    IGM.getAddrOfProtocolRequirementsBaseDescriptor(
+                                          associatedType.getSourceProtocol());
+
   // Extract the associated type descriptor.
   auto assocTypeDescriptor =
     IGM.getAddrOfAssociatedTypeDescriptor(associatedType.getAssociation());
@@ -3563,6 +3568,7 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                      { request.get(IGF),
                                        wtable,
                                        parentMetadata,
+                                       reqBaseDescriptor,
                                        assocTypeDescriptor });
   call->setDoesNotThrow();
   call->setDoesNotAccessMemory();

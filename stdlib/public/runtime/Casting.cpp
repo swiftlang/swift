@@ -2550,8 +2550,10 @@ MetadataResponse _getBridgedObjectiveCType(
   assert(assocTypeRequirement->Flags.getKind() ==
          ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction);
   auto mutableWTable = (WitnessTable *)wtable;
-  return swift_getAssociatedTypeWitness(request, mutableWTable, conformingType,
-                                        assocTypeRequirement);
+  return swift_getAssociatedTypeWitness(
+                                      request, mutableWTable, conformingType,
+                                      protocol->getRequirementBaseDescriptor(),
+                                      assocTypeRequirement);
 }
   
 } // unnamed namespace

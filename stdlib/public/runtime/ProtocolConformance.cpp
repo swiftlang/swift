@@ -671,7 +671,10 @@ static const Metadata *resolveGenericParamRef(
     current = swift_getAssociatedTypeWitness(
                                     MetadataState::Abstract,
                                     const_cast<WitnessTable *>(witnessTable),
-                                    current, assocTypeReq).Value;
+                                    current,
+                                    assocTypeRef.Protocol
+                                      ->getRequirementBaseDescriptor(),
+                                    assocTypeReq).Value;
     if (!current) return nullptr;
   }
 
