@@ -64,7 +64,7 @@ extension _UnsafeBitset {
   @inline(__always)
   internal static func join(word: Int, bit: Int) -> Int {
     _sanityCheck(bit >= 0 && bit < Word.capacity)
-    return word &* Word.capacity + bit
+    return word &* Word.capacity &+ bit
   }
 }
 
@@ -72,7 +72,7 @@ extension _UnsafeBitset {
   @inlinable
   @inline(__always)
   internal static func wordCount(forCapacity capacity: Int) -> Int {
-    return word(for: capacity + Word.capacity - 1)
+    return word(for: capacity &+ Word.capacity &- 1)
   }
 
   @inlinable

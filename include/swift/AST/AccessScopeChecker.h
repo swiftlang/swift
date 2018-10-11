@@ -55,19 +55,15 @@ public:
 };
 
 class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
-  bool CanonicalizeParentTypes;
-
   TypeAccessScopeChecker(const DeclContext *useDC,
-                         bool treatUsableFromInlineAsPublic,
-                         bool canonicalizeParentTypes);
+                         bool treatUsableFromInlineAsPublic);
 
   Action walkToTypePre(Type T);
 
 public:
   static Optional<AccessScope>
   getAccessScope(Type T, const DeclContext *useDC,
-                 bool treatUsableFromInlineAsPublic = false,
-                 bool canonicalizeParentTypes = false);
+                 bool treatUsableFromInlineAsPublic = false);
 };
 
 }

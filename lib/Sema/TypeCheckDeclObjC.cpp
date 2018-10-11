@@ -1584,13 +1584,8 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
           // Swift 3 and earlier allowed you to override `initialize`, but
           // Swift's semantics do not guarantee that it will be called at
           // the point you expect. It is disallowed in Swift 4 and later.
-          if (sel.getSelectorPieces().front() == ctx.Id_initialize) {
-            if (ctx.LangOpts.isSwiftVersion3())
-              return
-                diag::objc_class_method_not_permitted_swift3_compat_warning;
-            else
-              return diag::objc_class_method_not_permitted;
-          }
+          if (sel.getSelectorPieces().front() == ctx.Id_initialize)
+            return diag::objc_class_method_not_permitted;
           return None;
         case 1:
           if (sel.getSelectorPieces().front() == ctx.Id_allocWithZone)

@@ -844,8 +844,12 @@ OperandOwnershipKindMap OperandOwnershipKindClassifier::visitCallee(
     if (substCalleeType->isNoEscape())
       return Map::compatibilityMap(ValueOwnershipKind::Trivial,
                                    UseLifetimeConstraint::MustBeLive);
-    return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,
-                                 UseLifetimeConstraint::MustBeLive);
+    // We want to accept guaranteed/owned in this position since we
+    // treat the use of an owned parameter as an instantaneously
+    // borrowed value for the duration of the call.
+    return Map::compatibilityMap(
+        {{ValueOwnershipKind::Guaranteed, UseLifetimeConstraint::MustBeLive},
+         {ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeLive}});
   }
 
   llvm_unreachable("Unhandled ParameterConvention in switch.");
@@ -1157,6 +1161,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AssignCopyArrayFrontToBack)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AssignCopyArrayBackToFront)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AssignTakeArray)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AssumeNonNegative)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AssumeTrue)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AtomicLoad)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AtomicRMW)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AtomicStore)

@@ -6380,24 +6380,24 @@ class OperatorDecl : public Decl {
   
   Identifier name;
 
-  Identifier DesignatedProtocolName;
-  SourceLoc DesignatedProtocolNameLoc;
-  ProtocolDecl *DesignatedProtocol = nullptr;
+  Identifier DesignatedNominalTypeName;
+  SourceLoc DesignatedNominalTypeNameLoc;
+  NominalTypeDecl *DesignatedNominalType = nullptr;
 
 public:
   OperatorDecl(DeclKind kind, DeclContext *DC, SourceLoc OperatorLoc,
                Identifier Name, SourceLoc NameLoc,
-               Identifier DesignatedProtocolName = Identifier(),
-               SourceLoc DesignatedProtocolNameLoc = SourceLoc())
+               Identifier DesignatedNominalTypeName = Identifier(),
+               SourceLoc DesignatedNominalTypeNameLoc = SourceLoc())
       : Decl(kind, DC), OperatorLoc(OperatorLoc), NameLoc(NameLoc), name(Name),
-        DesignatedProtocolName(DesignatedProtocolName),
-        DesignatedProtocolNameLoc(DesignatedProtocolNameLoc) {}
+        DesignatedNominalTypeName(DesignatedNominalTypeName),
+        DesignatedNominalTypeNameLoc(DesignatedNominalTypeNameLoc) {}
 
   OperatorDecl(DeclKind kind, DeclContext *DC, SourceLoc OperatorLoc,
                Identifier Name, SourceLoc NameLoc,
-               ProtocolDecl *DesignatedProtocol)
+               NominalTypeDecl *DesignatedNominalType)
       : Decl(kind, DC), OperatorLoc(OperatorLoc), NameLoc(NameLoc), name(Name),
-        DesignatedProtocol(DesignatedProtocol) {}
+        DesignatedNominalType(DesignatedNominalType) {}
 
   SourceLoc getLoc() const { return NameLoc; }
 
@@ -6405,18 +6405,20 @@ public:
   SourceLoc getNameLoc() const { return NameLoc; }
   Identifier getName() const { return name; }
 
-  Identifier getDesignatedProtocolName() const {
-    return DesignatedProtocolName;
+  Identifier getDesignatedNominalTypeName() const {
+    return DesignatedNominalTypeName;
   }
 
-  SourceLoc getDesignatedProtocolNameLoc() const {
-    return DesignatedProtocolNameLoc;
+  SourceLoc getDesignatedNominalTypeNameLoc() const {
+    return DesignatedNominalTypeNameLoc;
   }
 
-  ProtocolDecl *getDesignatedProtocol() const { return DesignatedProtocol; }
+  NominalTypeDecl *getDesignatedNominalType() const {
+    return DesignatedNominalType;
+  }
 
-  void setDesignatedProtocol(ProtocolDecl *protocol) {
-    DesignatedProtocol = protocol;
+  void setDesignatedNominalType(NominalTypeDecl *nominal) {
+    DesignatedNominalType = nominal;
   }
 
   static bool classof(const Decl *D) {
@@ -6451,12 +6453,11 @@ public:
 
   InfixOperatorDecl(DeclContext *DC, SourceLoc operatorLoc, Identifier name,
                     SourceLoc nameLoc, SourceLoc colonLoc,
-                    Identifier firstIdentifier, SourceLoc firstIdentifierLoc,
-                    ProtocolDecl *designatedProtocol)
+                    PrecedenceGroupDecl *precedenceGroup,
+                    NominalTypeDecl *designatedNominalType)
       : OperatorDecl(DeclKind::InfixOperator, DC, operatorLoc, name, nameLoc,
-                     designatedProtocol),
-        ColonLoc(colonLoc), FirstIdentifierLoc(firstIdentifierLoc),
-        FirstIdentifier(firstIdentifier) {}
+                     designatedNominalType),
+        ColonLoc(colonLoc), PrecedenceGroup(precedenceGroup) {}
 
   SourceLoc getEndLoc() const {
     if (!SecondIdentifier.empty())
@@ -6501,15 +6502,15 @@ class PrefixOperatorDecl : public OperatorDecl {
 public:
   PrefixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
                      SourceLoc NameLoc,
-                     Identifier DesignatedProtocolName = Identifier(),
-                     SourceLoc DesignatedProtocolNameLoc = SourceLoc())
+                     Identifier DesignatedNominalTypeName = Identifier(),
+                     SourceLoc DesignatedNominalTypeNameLoc = SourceLoc())
       : OperatorDecl(DeclKind::PrefixOperator, DC, OperatorLoc, Name, NameLoc,
-                     DesignatedProtocolName, DesignatedProtocolNameLoc) {}
+                     DesignatedNominalTypeName, DesignatedNominalTypeNameLoc) {}
 
   PrefixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
-                     SourceLoc NameLoc, ProtocolDecl *DesignatedProtocol)
+                     SourceLoc NameLoc, NominalTypeDecl *DesignatedNominalType)
       : OperatorDecl(DeclKind::PrefixOperator, DC, OperatorLoc, Name, NameLoc,
-                     DesignatedProtocol) {}
+                     DesignatedNominalType) {}
 
   SourceRange getSourceRange() const {
     return { getOperatorLoc(), getNameLoc() };
@@ -6535,15 +6536,15 @@ class PostfixOperatorDecl : public OperatorDecl {
 public:
   PostfixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
                       SourceLoc NameLoc,
-                      Identifier DesignatedProtocolName = Identifier(),
-                      SourceLoc DesignatedProtocolNameLoc = SourceLoc())
+                      Identifier DesignatedNominalTypeName = Identifier(),
+                      SourceLoc DesignatedNominalTypeNameLoc = SourceLoc())
       : OperatorDecl(DeclKind::PostfixOperator, DC, OperatorLoc, Name, NameLoc,
-                     DesignatedProtocolName, DesignatedProtocolNameLoc) {}
+                     DesignatedNominalTypeName, DesignatedNominalTypeNameLoc) {}
 
   PostfixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
-                      SourceLoc NameLoc, ProtocolDecl *DesignatedProtocol)
+                      SourceLoc NameLoc, NominalTypeDecl *DesignatedNominalType)
       : OperatorDecl(DeclKind::PostfixOperator, DC, OperatorLoc, Name, NameLoc,
-                     DesignatedProtocol) {}
+                     DesignatedNominalType) {}
 
   SourceRange getSourceRange() const {
     return { getOperatorLoc(), getNameLoc() };

@@ -948,7 +948,7 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
   if (!Ty->hasTypeParameter() && !ExpectedTy->hasTypeParameter()) {
     if (Ty->isEqual(ExpectedTy))
       return CodeCompletionResult::ExpectedTypeRelation::Identical;
-    if (isConvertibleTo(Ty, ExpectedTy, *DC))
+    if (!ExpectedTy->isAny() && isConvertibleTo(Ty, ExpectedTy, *DC))
       return CodeCompletionResult::ExpectedTypeRelation::Convertible;
   }
   if (auto FT = Ty->getAs<AnyFunctionType>()) {
@@ -3889,6 +3889,9 @@ public:
 
   static bool getPositionInArgs(DeclContext &DC, Expr *Args, Expr *CCExpr,
                                 unsigned &Position, bool &HasName) {
+    if (auto TSE = dyn_cast<TupleShuffleExpr>(Args))
+      Args = TSE->getSubExpr();
+
     if (isa<ParenExpr>(Args)) {
       HasName = false;
       Position = 0;
@@ -3911,6 +3914,38 @@ public:
     return false;
   }
 
+  /// Translate argument index in \p Args to parameter index.
+  /// Does nothing unless \p Args is \c TupleShuffleExpr.
+  static bool translateArgIndexToParamIndex(Expr *Args,
+                                            unsigned &Position, bool &HasName) {
+    auto TSE = dyn_cast<TupleShuffleExpr>(Args);
+    if (!TSE)
+      return true;
+
+    auto mapping = TSE->getElementMapping();
+    for (unsigned destIdx = 0, e = mapping.size(); destIdx != e; ++destIdx) {
+      auto srcIdx = mapping[destIdx];
+      if (srcIdx == (signed)Position) {
+        Position = destIdx;
+        return true;
+      }
+      if (srcIdx == TupleShuffleExpr::Variadic &&
+          llvm::is_contained(TSE->getVariadicArgs(), Position)) {
+        // The arg is a part of variadic args.
+        Position = destIdx;
+        HasName = false;
+        if (auto Args = dyn_cast<TupleExpr>(TSE->getSubExpr())) {
+          // Check if the first variadiac argument has the label.
+          auto firstVarArgIdx = TSE->getVariadicArgs().front();
+          HasName = Args->getElementNameLoc(firstVarArgIdx).isValid();
+        }
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   static bool
   collectArgumentExpectation(DeclContext &DC, ApplyExpr *CallE, Expr *CCExpr,
                              std::vector<Type> &ExpectedTypes,
@@ -3924,6 +3959,8 @@ public:
     unsigned Position;
     bool HasName;
     if (!getPositionInArgs(DC, CallE->getArg(), CCExpr, Position, HasName))
+      return false;
+    if (!translateArgIndexToParamIndex(CallE->getArg(), Position, HasName))
       return false;
 
     // Collect possible types (or labels) at the position.
@@ -4989,7 +5026,7 @@ namespace  {
   class ExprParentFinder : public ASTWalker {
     friend class CodeCompletionTypeContextAnalyzer;
     Expr *ChildExpr;
-    llvm::function_ref<bool(ParentTy)> Predicate;
+    llvm::function_ref<bool(ParentTy, ParentTy)> Predicate;
 
     bool arePositionsSame(Expr *E1, Expr *E2) {
       return E1->getSourceRange().Start == E2->getSourceRange().Start &&
@@ -5001,10 +5038,14 @@ namespace  {
     ParentTy ParentClosest;
     ParentTy ParentFarthest;
     ExprParentFinder(Expr* ChildExpr,
-                     llvm::function_ref<bool(ParentTy)> Predicate) :
+                     llvm::function_ref<bool(ParentTy, ParentTy)> Predicate) :
                      ChildExpr(ChildExpr), Predicate(Predicate) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (E != ChildExpr && Predicate(E, Parent)) {
+        Ancestors.push_back(E);
+        return { true, E };
+      }
       if (E == ChildExpr || arePositionsSame(E, ChildExpr)) {
         if (!Ancestors.empty()) {
           ParentClosest = Ancestors.back();
@@ -5012,49 +5053,47 @@ namespace  {
         }
         return {false, nullptr};
       }
-      if (Predicate(E))
-        Ancestors.push_back(E);
       return { true, E };
     }
 
     Expr *walkToExprPost(Expr *E) override {
-      if (Predicate(E))
+      if (Predicate(E, Parent))
         Ancestors.pop_back();
       return E;
     }
 
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      if (Predicate(S))
+      if (Predicate(S, Parent))
         Ancestors.push_back(S);
       return { true, S };
     }
 
     Stmt *walkToStmtPost(Stmt *S) override {
-      if (Predicate(S))
+      if (Predicate(S, Parent))
         Ancestors.pop_back();
       return S;
     }
 
     bool walkToDeclPre(Decl *D) override {
-      if (Predicate(D))
+      if (Predicate(D, Parent))
         Ancestors.push_back(D);
       return true;
     }
 
     bool walkToDeclPost(Decl *D) override {
-      if (Predicate(D))
+      if (Predicate(D, Parent))
         Ancestors.pop_back();
       return true;
     }
 
     std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
-      if (Predicate(P))
+      if (Predicate(P, Parent))
         Ancestors.push_back(P);
       return { true, P };
     }
 
     Pattern *walkToPatternPost(Pattern *P) override {
-      if (Predicate(P))
+      if (Predicate(P, Parent))
         Ancestors.pop_back();
       return P;
     }
@@ -5074,7 +5113,7 @@ public:
   CodeCompletionTypeContextAnalyzer(DeclContext *DC, Expr *ParsedExpr) : DC(DC),
     ParsedExpr(ParsedExpr), SM(DC->getASTContext().SourceMgr),
     Context(DC->getASTContext()),
-    Finder(ParsedExpr,  [](ASTWalker::ParentTy Node) {
+    Finder(ParsedExpr,  [](ASTWalker::ParentTy Node, ASTWalker::ParentTy Parent) {
       if (auto E = Node.getAsExpr()) {
         switch(E->getKind()) {
         case ExprKind::Call:
@@ -5082,6 +5121,12 @@ public:
         case ExprKind::PrefixUnary:
         case ExprKind::Assign:
           return true;
+        case ExprKind::Tuple: {
+          auto ParentE = Parent.getAsExpr();
+          return !ParentE || (!isa<CallExpr>(ParentE) &&
+                              !isa<BinaryExpr>(ParentE)&&
+                              !isa<TupleShuffleExpr>(ParentE));
+        }
         default:
           return false;
         }
@@ -5147,6 +5192,16 @@ public:
             if (auto *decl = DRE->getDecl())
               Callback(decl->getInterfaceType());
           }
+        }
+        break;
+      }
+      case ExprKind::Tuple: {
+        if (!Parent->getType() || !Parent->getType()->is<TupleType>())
+          return;
+        unsigned Position = 0;
+        bool HasName;
+        if (CompletionLookup::getPositionInArgs(*DC, Parent, ParsedExpr, Position, HasName)) {
+          Callback(Parent->getType()->castTo<TupleType>()->getElementType(Position));
         }
         break;
       }

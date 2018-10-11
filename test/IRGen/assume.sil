@@ -1,0 +1,26 @@
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -O -emit-ir %s | %FileCheck %s
+sil_stage canonical
+
+import Swift
+import Builtin
+
+// CHECK-LABEL: define{{.*}} swiftcc i64 @test_assume(i64)
+// CHECK:   [[COND:%.*]] = icmp sgt i64 %0, -1
+// CHECK:   tail call void @llvm.assume(i1 [[COND]])
+// CHECK:   [[RES:%.*]] = lshr i64 %0, 6
+// CHECK:   ret i64 [[RES]]
+// CHECK: }
+
+sil @test_assume : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+ %2 = integer_literal $Builtin.Int64, 0
+ %3 = struct_extract %0 : $Int64, #Int64._value
+ %4 = builtin "cmp_slt_Int64"(%3 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int1
+ %5 = integer_literal $Builtin.Int1, -1
+ %6 = builtin "xor_Int1"(%4 : $Builtin.Int1, %5 : $Builtin.Int1) : $Builtin.Int1
+ %7 = builtin "assume_Int1"(%6 : $Builtin.Int1) : $Builtin.Int1
+ %8 = integer_literal $Builtin.Int64, 64
+ %9 = builtin "sdiv_Int64"(%3 : $Builtin.Int64, %8 : $Builtin.Int64) : $Builtin.Int64
+ %10 = struct $Int64 (%9 : $Builtin.Int64)
+ return %10 : $Int64
+}

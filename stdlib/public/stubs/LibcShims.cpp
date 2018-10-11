@@ -30,8 +30,6 @@
 
 using namespace swift;
 
-static_assert(std::is_same<ssize_t, __swift_ssize_t>::value,
-              "__swift_ssize_t must be defined as equivalent to ssize_t in LibcShims.h");
 #if !defined(_WIN32) || defined(__CYGWIN__)
 static_assert(std::is_same<mode_t, swift::__swift_mode_t>::value,
               "__swift_mode_t must be defined as equivalent to mode_t in LibcShims.h");

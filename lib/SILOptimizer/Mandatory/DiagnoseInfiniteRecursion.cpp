@@ -22,12 +22,10 @@
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
-#include "swift/Strings.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Debug.h"
@@ -96,6 +94,24 @@ static bool hasRecursiveCallInPath(SILBasicBlock &Block,
   return false;
 }
 
+/// Returns true if the block has a call to a function marked with
+/// @_semantics("programtermination_point").
+static bool isKnownProgramTerminationPoint(const SILBasicBlock *bb) {
+  // Skip checking anything if this block doesn't end in a program terminator.
+  if (!bb->getTerminator()->isProgramTerminating())
+    return false;
+
+  // Check each instruction for a call to something that's a known
+  // programtermination_point
+  for (auto it = bb->rbegin(); it != bb->rend(); ++it) {
+    auto applySite = FullApplySite::isa(const_cast<SILInstruction *>(&*it));
+    if (!applySite) continue;
+    if (applySite.isCalleeKnownProgramTerminationPoint())
+      return true;
+  }
+  return false;
+}
+
 /// Perform a DFS through the target function to find any paths to an exit node
 /// that do not call into the target.
 static bool hasInfinitelyRecursiveApply(SILFunction *targetFn) {
@@ -111,12 +127,11 @@ static bool hasInfinitelyRecursiveApply(SILFunction *targetFn) {
   while (!workList.empty()) {
     SILBasicBlock *curBlock = workList.pop_back_val();
 
-    // If the block is "program terminating", meaning it traps without relevant
-    // side effects, then skip it.
-    // Note that this check happens _before_ the recursion check. This is
-    // deliberate, as we want to ignore recursive calls inside a program
-    // termination point.
-    if (curBlock->isProgramTerminationPoint())
+    // Before checking for infinite recursion, see if we're calling something
+    // that's @_semantics("programtermination_point"). We explicitly don't
+    // want this call to disqualify the warning for infinite recursion,
+    // because they're reserved for exceptional circumstances.
+    if (isKnownProgramTerminationPoint(curBlock))
       continue;
 
     // We're looking for functions that are recursive on _all_ paths. If this
@@ -129,8 +144,8 @@ static bool hasInfinitelyRecursiveApply(SILFunction *targetFn) {
 
     // If this block doesn't have a recursive call, and it exits the function,
     // then we know the function is not infinitely recursive.
-    TermInst *terminator = curBlock->getTerminator();
-    if (terminator->isFunctionExiting() || terminator->isProgramTerminating())
+    auto term = curBlock->getTerminator();
+    if (term->isFunctionExiting() || term->isProgramTerminating())
       return false;
 
     // Otherwise, push the successors onto the stack if we haven't visited them.

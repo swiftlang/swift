@@ -13,7 +13,10 @@
 @_exported import Foundation // Clang module
 import ObjectiveC
 
+// This exists to allow for dynamic dispatch on KVO methods added to NSObject.
+// Extending NSObject with these methods would disallow overrides.
 public protocol _KeyValueCodingAndObserving {}
+extension NSObject : _KeyValueCodingAndObserving {}
 
 public struct NSKeyValueObservedChange<Value> {
     public typealias Kind = NSKeyValueChange
@@ -230,5 +233,3 @@ extension _KeyValueCodingAndObserving {
         (self as! NSObject).didChangeValue(forKey: _bridgeKeyPathToString(keyPath), withSetMutation: mutation, using: set)
     }
 }
-
-extension NSObject : _KeyValueCodingAndObserving {}

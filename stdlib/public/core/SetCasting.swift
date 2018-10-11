@@ -48,12 +48,10 @@ public func _setDownCast<BaseValue, DerivedValue>(_ source: Set<BaseValue>)
 #if _runtime(_ObjC)
   if _isClassOrObjCExistential(BaseValue.self)
   && _isClassOrObjCExistential(DerivedValue.self) {
-    switch source._variant {
-    case .native(let nativeSet):
-      return Set(_immutableCocoaSet: nativeSet.bridged())
-    case .cocoa(let cocoaSet):
-      return Set(_immutableCocoaSet: cocoaSet.object)
+    guard source._variant.isNative else {
+      return Set(_immutableCocoaSet: source._variant.asCocoa.object)
     }
+    return Set(_immutableCocoaSet: source._variant.asNative.bridged())
   }
 #endif
   return _setDownCastConditional(source)!

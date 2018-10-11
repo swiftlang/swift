@@ -129,9 +129,9 @@ public:
   }
 };
 
-// Describing some attributes with ABI impact. The addition or removal of these
-// attributes is considerred ABI-breaking.
-struct ABIAttributeInfo {
+// Describing some attributes with ABI/API impact. The addition or removal of these
+// attributes is considerred breakage.
+struct BreakingAttributeInfo {
   const DeclAttrKind Kind;
   const StringRef Content;
 };
@@ -142,6 +142,7 @@ struct CheckerOptions {
   bool Verbose;
   bool AbortOnModuleLoadFailure;
   bool PrintModule;
+  bool SwiftOnly;
   StringRef LocationFilter;
 };
 
@@ -156,7 +157,7 @@ class SDKContext {
   TypeMemberDiffVector TypeMemberDiffs;
 
   CheckerOptions Opts;
-  std::vector<ABIAttributeInfo> ABIAttrs;
+  std::vector<BreakingAttributeInfo> BreakingAttrs;
   /// This is to cache the equal comparison results between nodes.
   llvm::DenseMap<const SDKNode*, llvm::DenseMap<const SDKNode*, bool>> EqualCache;
 
@@ -190,8 +191,9 @@ public:
   bool checkingABI() const { return Opts.ABI; }
   AccessLevel getAccessLevel(const ValueDecl *VD) const;
   const CheckerOptions &getOpts() const { return Opts; }
-  ArrayRef<ABIAttributeInfo> getABIAttributeInfo() const { return ABIAttrs; }
-
+  bool shouldIgnore(Decl *D, const Decl* Parent = nullptr) const;
+  ArrayRef<BreakingAttributeInfo> getBreakingAttributeInfo() const { return BreakingAttrs; }
+  Optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) const;
   template<class YAMLNodeTy, typename ...ArgTypes>
   void diagnose(YAMLNodeTy node, Diag<ArgTypes...> ID,
                 typename detail::PassArgument<ArgTypes>::type... args) {
@@ -297,6 +299,7 @@ class SDKNodeDecl: public SDKNode {
   bool IsInternal;
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
+  Optional<uint8_t> FixedBinaryOrder;
 
 protected:
   SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind);
@@ -328,6 +331,8 @@ public:
   bool isInternal() const { return IsInternal; }
   StringRef getGenericSignature() const { return GenericSig; }
   StringRef getScreenInfo() const;
+  bool hasFixedBinaryOrder() const { return FixedBinaryOrder.hasValue(); }
+  uint8_t getFixedBinaryOrder() const { return *FixedBinaryOrder; }
   virtual void jsonize(json::Output &Out) override;
   virtual void diagnose(SDKNode *Right) override;
 };
@@ -494,7 +499,6 @@ public:
 };
 
 class SDKNodeDeclVar : public SDKNodeDecl {
-  Optional<uint8_t> FixedBinaryOrder;
   bool IsLet;
   bool HasStorage;
   bool HasDidSet;
@@ -502,8 +506,6 @@ class SDKNodeDeclVar : public SDKNodeDecl {
 public:
   SDKNodeDeclVar(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
-  bool hasFixedBinaryOrder() const { return FixedBinaryOrder.hasValue(); }
-  uint8_t getFixedBinaryOrder() const { return *FixedBinaryOrder; }
   SDKNodeDeclGetter *getGetter() const;
   SDKNodeDeclSetter *getSetter() const;
   SDKNodeType *getType() const;
@@ -615,7 +617,6 @@ public:
 
   void printTopLevelNames();
 
-  bool shouldIgnore(Decl *D, const Decl* Parent);
   void addMembersToRoot(SDKNode *Root, IterableDeclContext *Context);
   SDKNode *constructSubscriptDeclNode(SubscriptDecl *SD);
   SDKNode *constructAssociatedTypeNode(AssociatedTypeDecl *ATD);

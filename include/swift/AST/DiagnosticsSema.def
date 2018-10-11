@@ -706,10 +706,6 @@ ERROR(unspaced_unary_operator,none,
       "unary operators must not be juxtaposed; parenthesize inner expression",
       ())
 
-ERROR(operators_designated_protocol_not_a_protocol,none,
-      "type %0 unexpected; expected a protocol type",
-      (Type))
-
 ERROR(use_unresolved_identifier,none,
       "use of unresolved %select{identifier|operator}1 %0", (DeclName, bool))
 ERROR(use_unresolved_identifier_corrected,none,
@@ -1374,10 +1370,6 @@ ERROR(nscoding_unstable_mangled_name,none,
       "%select{private|fileprivate|nested|local}0 class %1 has an "
       "unstable name when archiving via 'NSCoding'",
       (unsigned, Type))
-WARNING(nscoding_unstable_mangled_name_warn,none,
-        "%select{private|fileprivate|nested|local}0 class %1 has an "
-        "unstable name when archiving via 'NSCoding'",
-        (unsigned, Type))
 NOTE(unstable_mangled_name_add_objc_new,none,
      "for new classes, use '@objc' to specify a unique, prefixed Objective-C "
      "runtime name", ())
@@ -1630,10 +1622,6 @@ ERROR(requirement_restricts_self,none,
       "%0 requirement %1 cannot add constraint '%2%select{:|:| ==|:}3 %4' on "
       "'Self'",
       (DescriptiveDeclKind, DeclName, StringRef, unsigned, StringRef))
-WARNING(requirement_restricts_self_swift3,none,
-        "adding constraint '%2%select{:|:| ==|:}3 %4' on 'Self' via %0 "
-        "requirement %1 is deprecated in Swift 3",
-        (DescriptiveDeclKind, DeclName, StringRef, unsigned, StringRef))
 ERROR(witness_argument_name_mismatch,none,
       "%select{method|initializer}0 %1 has different argument labels from those "
       "required by protocol %2 (%3)", (bool, DeclName, Type, DeclName))
@@ -2154,9 +2142,6 @@ ERROR(override_dynamic_self_mismatch,none,
 ERROR(override_class_declaration_in_extension,none,
       "cannot override a non-dynamic class declaration from an extension",
       ())
-WARNING(override_class_declaration_in_extension_warning,none,
-      "cannot override a non-dynamic class declaration from an extension",
-      ())
 ERROR(override_throws,none,
       "cannot override non-throwing %select{method|initializer}0 with "
       "throwing %select{method|initializer}0", (bool))
@@ -2254,8 +2239,6 @@ ERROR(inheritance_from_cf_class,none,
 ERROR(inheritance_from_objc_runtime_visible_class,none,
       "cannot inherit from class %0 because it is only visible via the "
       "Objective-C runtime", (Identifier))
-WARNING(class_inherits_anyobject,none,
-        "conformance of class %0 to 'AnyObject' is redundant", (Type))
 
 // Enums
 ERROR(enum_case_access,none,
@@ -2347,9 +2330,6 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
      "construct %0 from unwrapped %1 value", (Type, Type))
 
 // Derived conformances
-ERROR(swift3_cannot_synthesize_in_extension,none,
-      "implementation of %0 cannot be automatically synthesized in an extension "
-      "in Swift 3", (Type))
 ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,
       "implementation of %0 for non-final class cannot be automatically "
       "synthesized in extension because initializer requirement %1 can only be "
@@ -2493,9 +2473,6 @@ ERROR(override_static,none,
 
 ERROR(member_cannot_be_final,none,
       "only classes and class members may be marked with 'final'",
-      ())
-WARNING(protocol_extension_cannot_be_final,none,
-      "functions in a protocol extension do not need to be marked with 'final'",
       ())
 
 ERROR(final_not_allowed_here,none,
@@ -3307,10 +3284,6 @@ ERROR(isa_collection_downcast_pattern_value_unimplemented,none,
       "collection downcast in cast pattern is not implemented; use an explicit "
       "downcast to %0 instead", (Type))
 
-WARNING(swift3_ignore_specialized_enum_element_call,none,
-        "cannot specialize enum case; ignoring generic argument, "
-        "which will be rejected in future version of Swift", ())
-
 //------------------------------------------------------------------------------
 // MARK: Error-handling diagnostics
 //------------------------------------------------------------------------------
@@ -3812,11 +3785,6 @@ ERROR(objc_override_other,none,
 ERROR(objc_class_method_not_permitted,none,
       OBJC_DIAG_SELECT " defines Objective-C class method %2, which is "
       "not permitted by Swift", (unsigned, DeclName, ObjCSelector))
-
-WARNING(objc_class_method_not_permitted_swift3_compat_warning,none,
-      OBJC_DIAG_SELECT " defines Objective-C class method %2, which is "
-      "not guaranteed to be invoked by Swift and will be disallowed in future "
-      "versions", (unsigned, DeclName, ObjCSelector))
 
 ERROR(objc_witness_selector_mismatch,none,
       "Objective-C method %2 provided by " OBJC_DIAG_SELECT

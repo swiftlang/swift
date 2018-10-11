@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift-swift3
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
@@ -60,7 +60,7 @@ DemangleToMetadataTests.test("Imported swift_wrapper types") {
 }
 
 DemangleToMetadataTests.test("Imported enum types") {
-  expectEqual(NSURLSessionTask.State.self,
+  expectEqual(URLSessionTask.State.self,
     _typeByMangledName("So21NSURLSessionTaskStateV")!)
 }
 

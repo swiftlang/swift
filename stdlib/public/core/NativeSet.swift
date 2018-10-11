@@ -241,12 +241,10 @@ extension _NativeSet {
   @inlinable
   @inline(__always)
   func validatedBucket(for index: Set<Element>.Index) -> Bucket {
-    switch index._variant {
-    case .native(let native):
-      return validatedBucket(for: native)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoa):
+    guard index._isNative else {
       index._cocoaPath()
+      let cocoa = index._asCocoa
       // Accept Cocoa indices as long as they contain an element that exists in
       // this set, and the address of their Cocoa object generates the same age.
       if cocoa.age == self.age {
@@ -258,8 +256,9 @@ extension _NativeSet {
       }
       _preconditionFailure(
         "Attempting to access Set elements using an invalid index")
-#endif
     }
+#endif
+    return validatedBucket(for: index._asNative)
   }
 }
 
@@ -361,7 +360,7 @@ extension _NativeSet { // Insertions
       let bucket = hashTable.insertNew(hashValue: hashValue)
       uncheckedInitialize(at: bucket, to: element)
     }
-    _storage._count += 1
+    _storage._count &+= 1
   }
 
   /// Insert a new element into uniquely held storage.
@@ -423,6 +422,35 @@ extension _NativeSet { // Insertions
     _unsafeInsertNew(element, at: bucket)
     return nil
   }
+}
+
+extension _NativeSet {
+  @inlinable
+  @inline(__always)
+  func isEqual(to other: _NativeSet) -> Bool {
+    if self._storage === other._storage { return true }
+    if self.count != other.count { return false }
+
+    for member in self {
+      guard other.find(member).found else { return false }
+    }
+    return true
+  }
+
+#if _runtime(_ObjC)
+  @inlinable
+  func isEqual(to other: _CocoaSet) -> Bool {
+    if self.count != other.count { return false }
+
+    defer { _fixLifetime(self) }
+    for bucket in self.hashTable {
+      let key = self.uncheckedElement(at: bucket)
+      let bridgedKey = _bridgeAnythingToObjectiveC(key)
+      guard other.contains(bridgedKey) else { return false }
+    }
+    return true
+  }
+#endif
 }
 
 extension _NativeSet: _HashTableDelegate {

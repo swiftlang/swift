@@ -58,7 +58,9 @@ ERROR(decl_reorder,none,"%0 in a non-resilient type changes position from %1 to 
 
 ERROR(decl_added,none,"%0 is added to a non-resilient type", (StringRef))
 
-ERROR(decl_has_fixed_order_change,none,"%0 is %select{now|no longer}1 a stored property", (StringRef, bool))
+ERROR(var_has_fixed_order_change,none,"%0 is %select{now|no longer}1 a stored property", (StringRef, bool))
+
+ERROR(func_has_fixed_order_change,none,"%0 is %select{now|no longer}1 a non-final instance function", (StringRef, bool))
 
 ERROR(default_arg_removed,none,"%0 has removed default argument from %1", (StringRef, StringRef))
 

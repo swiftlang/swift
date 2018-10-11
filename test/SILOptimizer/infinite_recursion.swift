@@ -102,6 +102,16 @@ func o() -> MyNever {
   blackHole() // no warning; blackHole() will terminate the program
 }
 
+func mayHaveSideEffects() {}
+
+func p() { // expected-warning {{all paths through this function will call itself}}
+  if Bool.random() {
+    mayHaveSideEffects() // presence of side-effects doesn't alter the check for the programtermination_point apply
+    fatalError()
+  }
+  p()
+}
+
 class S {
   convenience init(a: Int) { // expected-warning {{all paths through this function will call itself}}
     self.init(a: a)

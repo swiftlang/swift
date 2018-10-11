@@ -3399,19 +3399,19 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
   case decls_block::PREFIX_OPERATOR_DECL: {
     IdentifierID nameID;
     DeclContextID contextID;
-    DeclID protoID;
+    DeclID nominalID;
 
     decls_block::PrefixOperatorLayout::readRecord(scratch, nameID, contextID,
-                                                  protoID);
+                                                  nominalID);
     auto DC = getDeclContext(contextID);
 
-    Expected<Decl *> protocol = getDeclChecked(protoID);
-    if (!protocol)
-      return protocol.takeError();
+    Expected<Decl *> nominal = getDeclChecked(nominalID);
+    if (!nominal)
+      return nominal.takeError();
 
     auto result = createDecl<PrefixOperatorDecl>(
         DC, SourceLoc(), getIdentifier(nameID), SourceLoc(),
-        cast_or_null<ProtocolDecl>(protocol.get()));
+        cast_or_null<NominalTypeDecl>(nominal.get()));
 
     declOrOffset = result;
     break;
@@ -3420,20 +3420,20 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
   case decls_block::POSTFIX_OPERATOR_DECL: {
     IdentifierID nameID;
     DeclContextID contextID;
-    DeclID protoID;
+    DeclID nominalID;
 
     decls_block::PostfixOperatorLayout::readRecord(scratch, nameID, contextID,
-                                                   protoID);
+                                                   nominalID);
 
     auto DC = getDeclContext(contextID);
 
-    Expected<Decl *> protocol = getDeclChecked(protoID);
-    if (!protocol)
-      return protocol.takeError();
+    Expected<Decl *> nominal = getDeclChecked(nominalID);
+    if (!nominal)
+      return nominal.takeError();
 
     auto result = createDecl<PostfixOperatorDecl>(
         DC, SourceLoc(), getIdentifier(nameID), SourceLoc(),
-        cast_or_null<ProtocolDecl>(protocol.get()));
+        cast_or_null<NominalTypeDecl>(nominal.get()));
 
     declOrOffset = result;
     break;
@@ -3443,32 +3443,25 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     IdentifierID nameID;
     DeclContextID contextID;
     DeclID precedenceGroupID;
-    DeclID protoID;
+    DeclID nominalID;
 
     decls_block::InfixOperatorLayout::readRecord(scratch, nameID, contextID,
-                                                 precedenceGroupID, protoID);
+                                                 precedenceGroupID, nominalID);
 
-    PrecedenceGroupDecl *precedenceGroup = nullptr;
-    Identifier precedenceGroupName;
-    if (precedenceGroupID) {
-      precedenceGroup =
-        dyn_cast_or_null<PrecedenceGroupDecl>(getDecl(precedenceGroupID));
-      if (precedenceGroup) {
-        precedenceGroupName = precedenceGroup->getName();
-      }
-    }
+    Expected<Decl *> precedenceGroup = getDeclChecked(precedenceGroupID);
+    if (!precedenceGroup)
+      return precedenceGroup.takeError();
 
     auto DC = getDeclContext(contextID);
 
-    Expected<Decl *> protocol = getDeclChecked(protoID);
-    if (!protocol)
-      return protocol.takeError();
+    Expected<Decl *> nominal = getDeclChecked(nominalID);
+    if (!nominal)
+      return nominal.takeError();
 
     auto result = createDecl<InfixOperatorDecl>(
         DC, SourceLoc(), getIdentifier(nameID), SourceLoc(), SourceLoc(),
-        precedenceGroupName, SourceLoc(),
-        cast_or_null<ProtocolDecl>(protocol.get()));
-    result->setPrecedenceGroup(precedenceGroup);
+        cast_or_null<PrecedenceGroupDecl>(precedenceGroup.get()),
+        cast_or_null<NominalTypeDecl>(nominal.get()));
 
     declOrOffset = result;
     break;

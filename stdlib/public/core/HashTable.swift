@@ -387,7 +387,7 @@ extension _HashTable {
     }
     var wrap = false
     while true {
-      word += 1
+      word &+= 1
       if word == wordCount {
         _precondition(!wrap, "Hash table has no holes")
         wrap = true

@@ -424,6 +424,9 @@ public:
 /// FinalRelease.
 bool getFinalReleasesForValue(SILValue Value, ReleaseTracker &Tracker);
 
+/// Match a call to a trap BB with no ARC relevant side effects.
+bool isARCInertTrapBB(const SILBasicBlock *BB);
+
 /// Get the two result values of the builtin "unsafeGuaranteed" instruction.
 ///
 /// Gets the (GuaranteedValue, Token) tuple from a call to "unsafeGuaranteed"

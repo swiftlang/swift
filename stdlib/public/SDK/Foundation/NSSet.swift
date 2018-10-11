@@ -17,7 +17,7 @@ extension Set {
   ///
   /// The provided `NSSet` will be copied to ensure that the copy can
   /// not be mutated by other code.
-  public init(_cocoaSet: __shared _NSSet) {
+  fileprivate init(_cocoaSet: __shared _NSSet) {
     assert(_isBridgedVerbatimToObjectiveC(Element.self),
       "Set can be backed by NSSet _variantStorage only when the member type can be bridged verbatim to Objective-C")
     // FIXME: We would like to call CFSetCreateCopy() to avoid doing an
@@ -111,6 +111,7 @@ extension Set : _ObjectiveCBridgeable {
     return result != nil
   }
 
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(_ s: NSSet?) -> Set {
     // `nil` has historically been used as a stand-in for an empty
     // set; map it to an empty set.

@@ -1302,14 +1302,9 @@ VarDecl *PatternBindingDecl::getSingleVar() const {
 bool VarDecl::isInitExposedToClients() const {
   auto parent = dyn_cast<NominalTypeDecl>(getDeclContext());
   if (!parent) return false;
-  if (!hasInitialValue())
-    return false;
-  if (isStatic())
-    return false;
-  if (!parent->getAttrs().hasAttribute<FixedLayoutAttr>())
-    return false;
-  auto *module = parent->getModuleContext();
-  return module->getResilienceStrategy() == ResilienceStrategy::Resilient;
+  if (!hasInitialValue()) return false;
+  if (isStatic()) return false;
+  return parent->getAttrs().hasAttribute<FixedLayoutAttr>();
 }
 
 /// Check whether the given type representation will be

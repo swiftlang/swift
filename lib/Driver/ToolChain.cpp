@@ -344,6 +344,18 @@ ToolChain::constructBatchJob(ArrayRef<const Job *> unsortedJobs,
   JobContext context{C, inputJobs.getArrayRef(), inputActions.getArrayRef(),
                      *output, OI};
   auto invocationInfo = constructInvocation(*batchCJA, context);
+  // Batch mode can produce quite long command lines; in almost every case these
+  // will trigger use of supplementary output file maps, but in some rare corner
+  // cases (very few files, very long paths) they might not. However, in those
+  // cases we _should_ degrade to using response files to pass arguments to the
+  // frontend, which is done automatically by code elsewhere.
+  //
+  // The `allowsResponseFiles` flag on the `invocationInfo` we have here exists
+  // only to model external tools that don't know about response files, such as
+  // platform linkers; when talking to the frontend (which we control!) it
+  // should always be true. But double check with an assert here in case someone
+  // failed to set it in `constructInvocation`.
+  assert(invocationInfo.allowsResponseFiles);
   return llvm::make_unique<BatchJob>(
       *batchCJA, inputJobs.takeVector(), std::move(output), executablePath,
       std::move(invocationInfo.Arguments),

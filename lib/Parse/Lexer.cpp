@@ -382,41 +382,48 @@ static void diagnoseEmbeddedNul(DiagnosticEngine *Diags, const char *Ptr) {
       .fixItRemoveChars(NulLoc, NulEndLoc);
 }
 
-void Lexer::skipToEndOfLine(bool EatNewline) {
+/// Advance \p CurPtr to the end of line or the end of file. Returns \c true
+/// if it stopped at the end of line, \c false if it stopped at the end of file.
+static bool advanceToEndOfLine(const char *&CurPtr, const char *BufferEnd,
+                               const char *CodeCompletionPtr = nullptr,
+                               DiagnosticEngine *Diags = nullptr) {
   while (1) {
     switch (*CurPtr++) {
     case '\n':
     case '\r':
-      if (EatNewline) {
-        NextToken.setAtStartOfLine(true);
-      } else {
-        --CurPtr;
-      }
-      return;  // If we found the end of the line, return.
+      --CurPtr;
+      return true; // If we found the end of the line, return.
     default:
       // If this is a "high" UTF-8 character, validate it.
-      if ((signed char)(CurPtr[-1]) < 0) {
+      if (Diags && (signed char)(CurPtr[-1]) < 0) {
         --CurPtr;
         const char *CharStart = CurPtr;
         if (validateUTF8CharacterAndAdvance(CurPtr, BufferEnd) == ~0U)
-          diagnose(CharStart, diag::lex_invalid_utf8);
+          Diags->diagnose(Lexer::getSourceLoc(CharStart),
+                          diag::lex_invalid_utf8);
       }
       break;   // Otherwise, eat other characters.
     case 0:
-      switch (getNulCharacterKind(CurPtr - 1)) {
-      case NulCharacterKind::Embedded:
-        // If this is a random nul character in the middle of a buffer, skip it
-        // as whitespace.
-        diagnoseEmbeddedNul(Diags, CurPtr-1);
-        LLVM_FALLTHROUGH;
-      case NulCharacterKind::CodeCompletion:
+      if (CurPtr - 1 != BufferEnd) {
+        if (Diags && CurPtr - 1 != CodeCompletionPtr) {
+          // If this is a random nul character in the middle of a buffer, skip
+          // it as whitespace.
+          diagnoseEmbeddedNul(Diags, CurPtr - 1);
+        }
         continue;
-      case NulCharacterKind::BufferEnd:
-        // Otherwise, the last line of the file does not have a newline.
-        --CurPtr;
-        return;
       }
+      // Otherwise, the last line of the file does not have a newline.
+      --CurPtr;
+      return false;
     }
+  }
+}
+
+void Lexer::skipToEndOfLine(bool EatNewline) {
+  bool isEOL = advanceToEndOfLine(CurPtr, BufferEnd, CodeCompletionPtr, Diags);
+  if (EatNewline && isEOL) {
+    ++CurPtr;
+    NextToken.setAtStartOfLine(true);
   }
 }
 
@@ -431,18 +438,20 @@ void Lexer::skipHashbang(bool EatNewline) {
   skipToEndOfLine(EatNewline);
 }
 
-/// skipSlashStarComment - /**/ comments are skipped (treated as whitespace).
-/// Note that (unlike in C) block comments can be nested.
-void Lexer::skipSlashStarComment() {
+static bool skipToEndOfSlashStarComment(const char *&CurPtr,
+                                        const char *BufferEnd,
+                                        const char *CodeCompletionPtr = nullptr,
+                                        DiagnosticEngine *Diags = nullptr) {
   const char *StartPtr = CurPtr-1;
   assert(CurPtr[-1] == '/' && CurPtr[0] == '*' && "Not a /* comment");
   // Make sure to advance over the * so that we don't incorrectly handle /*/ as
   // the beginning and end of the comment.
   ++CurPtr;
-  
+
   // /**/ comments can be nested, keep track of how deep we've gone.
   unsigned Depth = 1;
-  
+  bool isMultiline = false;
+
   while (1) {
     switch (*CurPtr++) {
     case '*':
@@ -450,7 +459,7 @@ void Lexer::skipSlashStarComment() {
       if (*CurPtr == '/') {
         ++CurPtr;
         if (--Depth == 0)
-          return;
+          return isMultiline;
       }
       break;
     case '/':
@@ -463,46 +472,56 @@ void Lexer::skipSlashStarComment() {
 
     case '\n':
     case '\r':
-      NextToken.setAtStartOfLine(true);
+      isMultiline = true;
       break;
 
     default:
       // If this is a "high" UTF-8 character, validate it.
-      if ((signed char)(CurPtr[-1]) < 0) {
+      if (Diags && (signed char)(CurPtr[-1]) < 0) {
         --CurPtr;
         const char *CharStart = CurPtr;
         if (validateUTF8CharacterAndAdvance(CurPtr, BufferEnd) == ~0U)
-          diagnose(CharStart, diag::lex_invalid_utf8);
+          Diags->diagnose(Lexer::getSourceLoc(CharStart),
+                          diag::lex_invalid_utf8);
       }
 
       break;   // Otherwise, eat other characters.
     case 0:
-      switch (getNulCharacterKind(CurPtr - 1)) {
-      case NulCharacterKind::Embedded:
-        // If this is a random nul character in the middle of a buffer, skip it
-        // as whitespace.
-        diagnoseEmbeddedNul(Diags, CurPtr - 1);
-        LLVM_FALLTHROUGH;
-      case NulCharacterKind::CodeCompletion:
+      if (CurPtr - 1 != BufferEnd) {
+        if (Diags && CurPtr - 1 != CodeCompletionPtr) {
+          // If this is a random nul character in the middle of a buffer, skip
+          // it as whitespace.
+          diagnoseEmbeddedNul(Diags, CurPtr - 1);
+        }
         continue;
-      case NulCharacterKind::BufferEnd: {
-        // Otherwise, we have an unterminated /* comment.
-        --CurPtr;
+      }
+      // Otherwise, we have an unterminated /* comment.
+      --CurPtr;
 
+      if (Diags) {
         // Count how many levels deep we are.
         llvm::SmallString<8> Terminator("*/");
         while (--Depth != 0)
           Terminator += "*/";
-
         const char *EOL = (CurPtr[-1] == '\n') ? (CurPtr - 1) : CurPtr;
-        diagnose(EOL, diag::lex_unterminated_block_comment)
-            .fixItInsert(getSourceLoc(EOL), Terminator);
-        diagnose(StartPtr, diag::lex_comment_start);
-        return;
+        Diags
+            ->diagnose(Lexer::getSourceLoc(EOL),
+                       diag::lex_unterminated_block_comment)
+            .fixItInsert(Lexer::getSourceLoc(EOL), Terminator);
+        Diags->diagnose(Lexer::getSourceLoc(StartPtr), diag::lex_comment_start);
       }
-      }
+      return isMultiline;
     }
   }
+}
+
+/// skipSlashStarComment - /**/ comments are skipped (treated as whitespace).
+/// Note that (unlike in C) block comments can be nested.
+void Lexer::skipSlashStarComment() {
+  bool isMultiline =
+      skipToEndOfSlashStarComment(CurPtr, BufferEnd, CodeCompletionPtr, Diags);
+  if (isMultiline)
+    NextToken.setAtStartOfLine(true);
 }
 
 static bool isValidIdentifierContinuationCodePoint(uint32_t c) {
@@ -936,6 +955,8 @@ void Lexer::lexDollarIdent() {
     // independent of language mode.
     return formToken(tok::identifier, tokStart);
   } else {
+    if (LangOpts.EnableDollarIdentifiers && !LangOpts.Playground)
+      return formToken(tok::identifier, tokStart);
     return formToken(tok::dollarident, tokStart);
   }
 }
@@ -1537,6 +1558,29 @@ static const char *skipToEndOfInterpolatedExpression(const char *CurPtr,
         assert(inStringLiteral());
         continue;
       }
+    case '/':
+      if (inStringLiteral())
+        continue;
+
+      if (*CurPtr == '*') {
+        auto CommentStart = CurPtr - 1;
+        bool isMultilineComment = skipToEndOfSlashStarComment(CurPtr, EndPtr);
+        if (isMultilineComment && !AllowNewline.back()) {
+          // Multiline comment is prohibited in string literal.
+          // Return the start of the comment.
+          return CommentStart;
+        }
+      } else if (*CurPtr == '/') {
+        if (!AllowNewline.back()) {
+          // '//' comment is impossible in single line string literal.
+          // Return the start of the comment.
+          return CurPtr - 1;
+        }
+        // Advance to the end of the comment.
+        if (/*isEOL=*/advanceToEndOfLine(CurPtr, EndPtr))
+          ++CurPtr;
+      }
+      continue;
     default:
       // Normal token character.
       continue;
@@ -1823,11 +1867,10 @@ void Lexer::lexStringLiteral(unsigned CustomDelimiterLen) {
         diagnose(CurPtr, diag::lex_unterminated_string);
         wasErroneous = true;
         continue;
+      } else {
+        diagnose(TokStart, diag::lex_unterminated_string);
+        return formToken(tok::unknown, TokStart);
       }
-
-      // Being diagnosed below.
-      assert((*CurPtr == '\r' || *CurPtr == '\n' || CurPtr == BufferEnd) &&
-             "Returned at unexpected position");
     }
 
     // String literals cannot have \n or \r in them (unless multiline).

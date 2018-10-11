@@ -828,6 +828,8 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
         .fixItRemoveChars(tryLoc, yieldLoc);
     }
 
+    SyntaxParsingContext YieldsCtxt(SyntaxContext, SyntaxKind::YieldList);
+
     SmallVector<Identifier, 4> yieldLabels;
     SmallVector<SourceLoc, 4> yieldLabelLocs;
     Expr *trailingClosure = nullptr;
@@ -839,7 +841,7 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
                            yields, yieldLabels, yieldLabelLocs,
                            rpLoc,
                            trailingClosure,
-                           SyntaxKind::YieldStmt);
+                           SyntaxKind::ExprList);
     assert(trailingClosure == nullptr);
     assert(yieldLabels.empty());
     assert(yieldLabelLocs.empty());
@@ -1248,6 +1250,11 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
   }
 
   StructureMarkerRAII ParsingAvailabilitySpecList(*this, Tok);
+
+  if (ParsingAvailabilitySpecList.isFailed()) {
+    return makeParserError();
+  }
+    
   SourceLoc LParenLoc = consumeToken(tok::l_paren);
 
   SmallVector<AvailabilitySpec *, 5> Specs;

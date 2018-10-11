@@ -171,11 +171,11 @@ internal func _fatalErrorMessage(
   flags: UInt32
 ) -> Never {
 #if INTERNAL_CHECKS_ENABLED
-  prefix.withUTF8Buffer {
+  prefix.withUTF8Buffer() {
     (prefix) in
-    message.withUTF8Buffer {
+    message.withUTF8Buffer() {
       (message) in
-      file.withUTF8Buffer {
+      file.withUTF8Buffer() {
         (file) in
         _swift_stdlib_reportFatalErrorInFile(
           prefix.baseAddress!, CInt(prefix.count),
@@ -186,9 +186,9 @@ internal func _fatalErrorMessage(
     }
   }
 #else
-  prefix.withUTF8Buffer {
+  prefix.withUTF8Buffer() {
     (prefix) in
-    message.withUTF8Buffer {
+    message.withUTF8Buffer() {
       (message) in
       _swift_stdlib_reportFatalError(
         prefix.baseAddress!, CInt(prefix.count),
@@ -265,7 +265,6 @@ func _undefined<T>(
 /// in release builds anyway (old apps that are run on new OSs).
 @inline(never)
 @usableFromInline // COMPILER_INTRINSIC
-@_semantics("programtermination_point")
 internal func _diagnoseUnexpectedEnumCaseValue<SwitchedValue, RawValue>(
   type: SwitchedValue.Type,
   rawValue: RawValue
@@ -283,7 +282,6 @@ internal func _diagnoseUnexpectedEnumCaseValue<SwitchedValue, RawValue>(
 /// in release builds anyway (old apps that are run on new OSs).
 @inline(never)
 @usableFromInline // COMPILER_INTRINSIC
-@_semantics("programtermination_point")
 internal func _diagnoseUnexpectedEnumCase<SwitchedValue>(
   type: SwitchedValue.Type
 ) -> Never {

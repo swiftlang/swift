@@ -193,12 +193,12 @@ namespace swift {
     /// Disable constraint system performance hacks.
     bool DisableConstraintSolverPerformanceHacks = false;
 
-    /// \brief Enable experimental operator protocol designator feature.
-    bool EnableOperatorDesignatedProtocols = false;
+    /// \brief Enable experimental operator designated types feature.
+    bool EnableOperatorDesignatedTypes = false;
 
     /// \brief Enable constraint solver support for experimental
     ///        operator protocol designator feature.
-    bool SolverEnableOperatorDesignatedProtocols = false;
+    bool SolverEnableOperatorDesignatedTypes = false;
 
     /// The maximum depth to which to test decl circularity.
     unsigned MaxCircularityDepth = 500;

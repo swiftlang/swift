@@ -1072,11 +1072,11 @@ bool TermInst::isProgramTerminating() const {
   case TermKind::CheckedCastBranchInst:
   case TermKind::CheckedCastValueBranchInst:
   case TermKind::CheckedCastAddrBranchInst:
-  case TermKind::TryApplyInst:
-  case TermKind::YieldInst:
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
   case TermKind::UnwindInst:
+  case TermKind::TryApplyInst:
+  case TermKind::YieldInst:
     return false;
   case TermKind::UnreachableInst:
     return true;

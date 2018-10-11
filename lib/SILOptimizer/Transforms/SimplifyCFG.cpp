@@ -3515,7 +3515,7 @@ bool SimplifyCFG::simplifyProgramTerminationBlock(SILBasicBlock *BB) {
   // use the analysis is because the CFG is likely to be invalidated right
   // after this pass, o we do not really get the benefit of reusing the
   // computation for the next iteration of the pass.
-  if (!BB->isProgramTerminationPoint())
+  if (!isARCInertTrapBB(BB))
     return false;
 
   // This is going to be the last basic block this program is going to execute

@@ -229,16 +229,3 @@ extension NSKeyedUnarchiver {
     }
   }
 }
-
-
-@available(*, deprecated, renamed:"NSCoding", message: "Please use NSCoding")
-typealias Coding = NSCoding
-
-@available(*, deprecated, renamed:"NSCoder", message: "Please use NSCoder")
-typealias Coder = NSCoder
-
-@available(*, deprecated, renamed:"NSKeyedUnarchiver", message: "Please use NSKeyedUnarchiver")
-typealias KeyedUnarchiver = NSKeyedUnarchiver
-
-@available(*, deprecated, renamed:"NSKeyedArchiver", message: "Please use NSKeyedArchiver")
-typealias KeyedArchiver = NSKeyedArchiver

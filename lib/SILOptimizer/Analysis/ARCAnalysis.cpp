@@ -1088,6 +1088,75 @@ bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
 }
 
 //===----------------------------------------------------------------------===//
+//                            Leaking BB Analysis
+//===----------------------------------------------------------------------===//
+
+static bool ignorableApplyInstInUnreachableBlock(const ApplyInst *AI) {
+  auto applySite = FullApplySite(const_cast<ApplyInst *>(AI));
+  return applySite.isCalleeKnownProgramTerminationPoint();
+}
+
+static bool ignorableBuiltinInstInUnreachableBlock(const BuiltinInst *BI) {
+  const BuiltinInfo &BInfo = BI->getBuiltinInfo();
+  if (BInfo.ID == BuiltinValueKind::CondUnreachable)
+    return true;
+
+  const IntrinsicInfo &IInfo = BI->getIntrinsicInfo();
+  if (IInfo.ID == llvm::Intrinsic::trap)
+    return true;
+
+  return false;
+}
+
+/// Match a call to a trap BB with no ARC relevant side effects.
+bool swift::isARCInertTrapBB(const SILBasicBlock *BB) {
+  // Do a quick check at the beginning to make sure that our terminator is
+  // actually an unreachable. This ensures that in many cases this function will
+  // exit early and quickly.
+  auto II = BB->rbegin();
+  if (!isa<UnreachableInst>(*II))
+    return false;
+
+  auto IE = BB->rend();
+  while (II != IE) {
+    // Ignore any instructions without side effects.
+    if (!II->mayHaveSideEffects()) {
+      ++II;
+      continue;
+    }
+
+    // Ignore cond fail.
+    if (isa<CondFailInst>(*II)) {
+      ++II;
+      continue;
+    }
+
+    // Check for apply insts that we can ignore.
+    if (auto *AI = dyn_cast<ApplyInst>(&*II)) {
+      if (ignorableApplyInstInUnreachableBlock(AI)) {
+        ++II;
+        continue;
+      }
+    }
+
+    // Check for builtins that we can ignore.
+    if (auto *BI = dyn_cast<BuiltinInst>(&*II)) {
+      if (ignorableBuiltinInstInUnreachableBlock(BI)) {
+        ++II;
+        continue;
+      }
+    }
+
+    // If we can't ignore the instruction, return false.
+    return false;
+  }
+
+  // Otherwise, we have an unreachable and every instruction is inert from an
+  // ARC perspective in an unreachable BB.
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
 //             Analysis of builtin "unsafeGuaranteed" instructions
 //===----------------------------------------------------------------------===//
 std::pair<SingleValueInstruction *, SingleValueInstruction *>

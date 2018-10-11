@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-operator-designated-protocols
+// RUN: %target-typecheck-verify-swift -enable-operator-designated-types
 
 precedencegroup LowPrecedence {
   associativity: right
@@ -47,23 +47,16 @@ postfix operator +*+> : UndeclaredProtocol
 struct Struct {}
 class Class {}
 infix operator *>*> : Struct
-// expected-error@-1 {{type 'Struct' unexpected; expected a protocol type}}
-
 infix operator >**> : Class
-// expected-error@-1 {{type 'Class' unexpected; expected a protocol type}}
 
 prefix operator **>> : Struct
-// expected-error@-1 {{type 'Struct' unexpected; expected a protocol type}}
 prefix operator *>*> : Class
-// expected-error@-1 {{type 'Class' unexpected; expected a protocol type}}
 
 postfix operator >*>* : Struct
-// expected-error@-1 {{type 'Struct' unexpected; expected a protocol type}}
 postfix operator >>** : Class
-// expected-error@-1 {{type 'Class' unexpected; expected a protocol type}}
 
 infix operator  <*<<< : MediumPrecedence, &
-// expected-error@-1 {{expected designated protocol in operator declaration}}
+// expected-error@-1 {{expected designated type in operator declaration}}
 
 infix operator **^^ : MediumPrecedence // expected-note {{previous operator declaration here}}
 infix operator **^^ : InfixMagicOperatorProtocol // expected-error {{operator redeclared}}

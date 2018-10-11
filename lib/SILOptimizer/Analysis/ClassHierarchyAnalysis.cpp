@@ -20,19 +20,47 @@
 using namespace swift;
 
 void ClassHierarchyAnalysis::init() {
+  auto module = M->getSwiftModule();
+
   // For each class declaration in our V-table list:
   for (auto &VT : M->getVTableList()) {
     ClassDecl *C = VT.getClass();
-    // Ignore classes that are at the top of the class hierarchy:
-    if (!C->hasSuperclass())
-      continue;
 
-    // Add the superclass to the list of inherited classes.
-    ClassDecl *Super = C->getSuperclassDecl();
-    auto &K = DirectSubclassesCache[Super];
-    assert(std::find(K.begin(), K.end(), C) == K.end() &&
-           "Class vector must be unique");
-    K.push_back(C);
+    while (true) {
+      // Ignore classes that are at the top of the class hierarchy:
+      if (!C->hasSuperclass())
+        break;
+
+      ClassDecl *super = C->getSuperclassDecl();
+      auto superModule = super->getModuleContext();
+
+      // Don't bother collecting subclasses for classes from a different module.
+      // TODO: cross-module WMO
+      if (superModule != module)
+        break;
+
+      // Find the superclass's list of direct subclasses.  If it's non-empty,
+      // we've previously walked up to the class, so there's no reason to keep
+      // walking from this point.
+      auto &list = DirectSubclassesCache[super];
+      bool shouldVisitSuper = list.empty();
+
+      // Check whether C is already in the list, which can happen
+      // if we had a v-table that was a subclass of C.
+      // We expect a linear scan to be cheap enough for this.
+      if (std::find(list.begin(), list.end(), C) != list.end())
+        break;
+
+      list.push_back(C);
+
+      // Keep walking if this is the first time we reached this superclass.
+      // We have to do this because the SILModule might not have v-tables for
+      // every class in the module.
+      if (!shouldVisitSuper)
+        break;
+
+      C = super;
+    }
   }
 }
 

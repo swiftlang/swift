@@ -373,9 +373,6 @@ public:
   /// Returns true if this block only contains a branch instruction.
   bool isTrampoline() const;
 
-  /// Returns true if this block traps without any side effects.
-  bool isProgramTerminationPoint() const;
-
   /// Returns true if it is legal to hoist instructions into this block.
   ///
   /// Used by llvm::LoopInfo.

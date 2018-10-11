@@ -563,8 +563,7 @@
           ],
           "declKind": "EnumElement",
           "usr": "s:4cake6NumberO3oneyA2CmF",
-          "moduleName": "cake",
-          "fixedbinaryorder": 0
+          "moduleName": "cake"
         },
         {
           "kind": "TypeAlias",
@@ -827,7 +826,6 @@
           "declAttributes": [
             "HasInitialValue"
           ],
-          "fixedbinaryorder": 0,
           "hasStorage": true
         },
         {
@@ -1215,7 +1213,6 @@
       "conformingProtocols": [
         "Comparable",
         "SignedInteger",
-        "_ExpressibleByBuiltinIntegerLiteral",
         "BinaryInteger",
         "LosslessStringConvertible",
         "SignedNumeric",
@@ -1229,9 +1226,7 @@
         "Decodable",
         "Hashable",
         "Equatable",
-        "_HasCustomAnyHashableRepresentation",
         "CustomReflectable",
-        "_CustomPlaygroundQuickLookable",
         "MirrorPath",
         "CVarArg"
       ]

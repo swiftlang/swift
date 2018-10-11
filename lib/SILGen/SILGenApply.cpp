@@ -1704,12 +1704,7 @@ static bool hasUnownedInnerPointerResult(CanSILFunctionType fnType) {
 /// Count the number of SILParameterInfos that are needed in order to
 /// pass the given argument.
 static unsigned getFlattenedValueCount(AbstractionPattern origType,
-                                       CanType substType,
-                                       ImportAsMemberStatus foreignSelf) {
-  // C functions imported as static methods don't consume any real arguments.
-  if (foreignSelf.isStatic())
-    return 0;
-
+                                       CanType substType) {
   // The count is always 1 unless the substituted type is a tuple.
   auto substTuple = dyn_cast<TupleType>(substType);
   if (!substTuple)
@@ -1723,10 +1718,21 @@ static unsigned getFlattenedValueCount(AbstractionPattern origType,
   unsigned count = 0;
   for (auto i : indices(substTuple.getElementTypes())) {
     count += getFlattenedValueCount(origType.getTupleElementType(i),
-                                    substTuple.getElementType(i),
-                                    ImportAsMemberStatus());
+                                    substTuple.getElementType(i));
   }
   return count;
+}
+
+/// Count the number of SILParameterInfos that are needed in order to
+/// pass the given argument.
+static unsigned getFlattenedValueCount(AbstractionPattern origType,
+                                       CanType substType,
+                                       ImportAsMemberStatus foreignSelf) {
+  // C functions imported as static methods don't consume any real arguments.
+  if (foreignSelf.isStatic())
+    return 0;
+
+  return getFlattenedValueCount(origType, substType);
 }
 
 static void claimNextParamClause(CanAnyFunctionType &type) {
@@ -1943,6 +1949,9 @@ public:
     
     LastRVKind = FunctionConversion,
     
+    /// This is an immutable borrow from an l-value.
+    BorrowedLValue,
+
     /// A default argument that needs to be evaluated.
     DefaultArgument,
   };
@@ -1983,14 +1992,33 @@ private:
         functionRepresentation(functionRepresentation)
     {}
   };
+  struct BorrowedLValueStorage {
+    LValue LV;
+    SILLocation Loc;
+    AbstractionPattern OrigParamType;
+    ClaimedParamsRef ParamsToEmit;
+  };
 
   using ValueMembers =
     ExternalUnionMembers<RValueStorage, LValueStorage,
-                         DefaultArgumentStorage>;
+                         DefaultArgumentStorage,
+                         BorrowedLValueStorage>;
   static ValueMembers::Index getValueMemberIndexForKind(KindTy kind) {
-    return (kind <= LastLVKind ? ValueMembers::indexOf<LValueStorage>() :
-            kind <= LastRVKind ? ValueMembers::indexOf<RValueStorage>()
-                               : ValueMembers::indexOf<DefaultArgumentStorage>());
+    switch (kind) {
+    case InOut:
+    case LValueToPointer:
+    case LValueArrayToPointer:
+      return ValueMembers::indexOf<LValueStorage>();
+    case RValueArrayToPointer:
+    case RValueStringToPointer:
+    case FunctionConversion:
+      return ValueMembers::indexOf<RValueStorage>();
+    case DefaultArgument:
+      return ValueMembers::indexOf<DefaultArgumentStorage>();
+    case BorrowedLValue:
+      return ValueMembers::indexOf<BorrowedLValueStorage>();
+    }
+    llvm_unreachable("bad kind");
   }
 
   /// Storage for either the l-value or the r-value.
@@ -2060,6 +2088,14 @@ public:
     Value.emplace<RValueStorage>(Kind, rv);
     Extra.emplace<ArrayAccessInfo>(Kind, arrayInfo);
   }
+
+  DelayedArgument(LValue &&lv, SILLocation loc,
+                  AbstractionPattern origResultType,
+                  ClaimedParamsRef params)
+    : Kind(BorrowedLValue) {
+    Value.emplaceAggregate<BorrowedLValueStorage>(Kind, std::move(lv), loc,
+                                                  origResultType, params);
+  }
   
   DelayedArgument(SILLocation loc,
                   ConcreteDeclRef defaultArgsOwner,
@@ -2101,23 +2137,26 @@ public:
     return LV().Loc;
   }
 
-  void emit(SILGenFunction &SGF,
-            SmallVectorImpl<ManagedValue> &args,
-            int &argIndex) {
+  void emit(SILGenFunction &SGF, SmallVectorImpl<ManagedValue> &args,
+            size_t &argIndex) {
     switch (Kind) {
     case InOut:
-      args[argIndex] = emitInOut(SGF);
+      args[argIndex++] = emitInOut(SGF);
       return;
     case LValueToPointer:
     case LValueArrayToPointer:
     case RValueArrayToPointer:
     case RValueStringToPointer:
     case FunctionConversion:
-      args[argIndex] = finishOriginalArgument(SGF);
+      args[argIndex++] = finishOriginalArgument(SGF);
       return;
     case DefaultArgument:
       emitDefaultArgument(SGF, Value.get<DefaultArgumentStorage>(Kind),
                           args, argIndex);
+      return;
+    case BorrowedLValue:
+      emitBorrowedLValue(SGF, Value.get<BorrowedLValueStorage>(Kind),
+                         args, argIndex);
       return;
     }
     llvm_unreachable("bad kind");
@@ -2158,7 +2197,12 @@ private:
   void emitDefaultArgument(SILGenFunction &SGF,
                            const DefaultArgumentStorage &info,
                            SmallVectorImpl<ManagedValue> &args,
-                           int &argIndex);
+                           size_t &argIndex);
+
+  void emitBorrowedLValue(SILGenFunction &SGF,
+                          BorrowedLValueStorage &info,
+                          SmallVectorImpl<ManagedValue> &args,
+                          size_t &argIndex);
 
   // (value, owner)
   std::pair<ManagedValue, ManagedValue>
@@ -2200,6 +2244,7 @@ private:
 
     switch (Kind) {
     case InOut:
+    case BorrowedLValue:
     case DefaultArgument:
       llvm_unreachable("no original expr to finish in these cases");
 
@@ -2318,10 +2363,13 @@ static void emitDelayedArguments(SILGenFunction &SGF,
   // Note that this also begins the formal accesses in evaluation order.
   for (auto &siteArgs : args) {
     // NB: siteArgs.size() may change during iteration
-    for (int i = 0; i < (int)siteArgs.size(); ++i) {
+    for (size_t i = 0; i < siteArgs.size(); ) {
       auto &siteArg = siteArgs[i];
       
-      if (siteArg) continue;
+      if (siteArg) {
+        ++i;
+        continue;
+      }
 
       assert(delayedNext != delayedArgs.end());
       auto &delayedArg = *delayedNext;
@@ -2361,6 +2409,68 @@ done:
         .highlight(j->second.getSourceRange());
     }
   }
+}
+
+static Expr *findStorageReferenceExprForBorrow(Expr *e) {
+  e = e->getSemanticsProvidingExpr();
+
+  // These are basically defined as the cases implemented by SILGenLValue.
+
+  // Direct storage references.
+  if (auto dre = dyn_cast<DeclRefExpr>(e)) {
+    if (isa<VarDecl>(dre->getDecl()))
+      return dre;
+  } else if (auto mre = dyn_cast<MemberRefExpr>(e)) {
+    if (isa<VarDecl>(mre->getDecl().getDecl()))
+      return mre;
+  } else if (isa<SubscriptExpr>(e)) {
+    return e;
+  } else if (isa<OpaqueValueExpr>(e)) {
+    return e;
+  } else if (isa<KeyPathApplicationExpr>(e)) {
+    return e;
+
+  // Transitive storage references.  Look through these to see if the
+  // sub-expression is a storage reference, but don't return the
+  // sub-expression.
+  } else if (auto tue = dyn_cast<TupleElementExpr>(e)) {
+    if (findStorageReferenceExprForBorrow(tue->getBase()))
+      return tue;
+  } else if (auto fve = dyn_cast<ForceValueExpr>(e)) {
+    if (findStorageReferenceExprForBorrow(fve->getSubExpr()))
+      return fve;
+  } else if (auto boe = dyn_cast<BindOptionalExpr>(e)) {
+    if (findStorageReferenceExprForBorrow(boe->getSubExpr()))
+      return boe;
+  } else if (auto oe = dyn_cast<OpenExistentialExpr>(e)) {
+    if (findStorageReferenceExprForBorrow(oe->getExistentialValue()) &&
+        findStorageReferenceExprForBorrow(oe->getSubExpr()))
+      return oe;
+  } else if (auto bie = dyn_cast<DotSyntaxBaseIgnoredExpr>(e)) {
+    if (findStorageReferenceExprForBorrow(bie->getRHS()))
+      return bie;
+  } else if (auto te = dyn_cast<AnyTryExpr>(e)) {
+    if (findStorageReferenceExprForBorrow(te->getSubExpr()))
+      return te;
+  } else if (auto ioe = dyn_cast<InOutExpr>(e)) {
+    return ioe;
+  }
+
+  return nullptr;
+}
+
+Expr *ArgumentSource::findStorageReferenceExprForBorrow() && {
+  if (!isExpr()) return nullptr;
+
+  auto argExpr = asKnownExpr();
+  auto lvExpr = ::findStorageReferenceExprForBorrow(argExpr);
+
+  // Claim the value of this argument if we found a storage reference.
+  if (lvExpr) {
+    (void) std::move(*this).asKnownExpr();
+  }
+
+  return lvExpr;
 }
 
 namespace {
@@ -2460,6 +2570,7 @@ class ArgEmitter {
 
   SILGenFunction &SGF;
   SILFunctionTypeRepresentation Rep;
+  bool IsYield;
   Optional<ForeignErrorConvention> ForeignError;
   ImportAsMemberStatus ForeignSelf;
   ClaimedParamsRef ParamInfos;
@@ -2472,13 +2583,13 @@ class ArgEmitter {
   Optional<ArgSpecialDestArray> SpecialDests;
 public:
   ArgEmitter(SILGenFunction &SGF, SILFunctionTypeRepresentation Rep,
-             ClaimedParamsRef paramInfos,
+             bool isYield, ClaimedParamsRef paramInfos,
              SmallVectorImpl<ManagedValue> &args,
              SmallVectorImpl<DelayedArgument> &delayedArgs,
              const Optional<ForeignErrorConvention> &foreignError,
              ImportAsMemberStatus foreignSelf,
              Optional<ArgSpecialDestArray> specialDests = None)
-    : SGF(SGF), Rep(Rep), ForeignError(foreignError),
+    : SGF(SGF), Rep(Rep), IsYield(isYield), ForeignError(foreignError),
       ForeignSelf(foreignSelf),
       ParamInfos(paramInfos),
       Args(args), DelayedArguments(delayedArgs), SpecialDests(specialDests) {
@@ -2579,7 +2690,8 @@ private:
 
     // The substituted parameter type.  Might be different from the
     // substituted argument type by abstraction and/or bridging.
-    SILParameterInfo param = claimNextParameter();
+    auto paramSlice = claimNextParameters(1);
+    SILParameterInfo param = paramSlice.front();
     ArgSpecialDest *specialDest = claimNextSpecialDest();
 
     assert(arg.hasLValueType() == param.isIndirectInOut());
@@ -2606,6 +2718,14 @@ private:
       return;
     }
 
+    // If this is a yield, and the yield is borrowed, emit a borrowed r-value.
+    if (IsYield && param.isGuaranteed()) {
+      assert(!specialDest);
+      if (tryEmitBorrowed(std::move(arg), loweredSubstArgType,
+                          loweredSubstParamType, origParamType, paramSlice))
+        return;
+    }
+
     // If the original type is passed indirectly, copy to memory if
     // it's not already there.  (Note that this potentially includes
     // conventions which pass indirectly without transferring
@@ -2618,22 +2738,23 @@ private:
                        *specialDest);
       Args.push_back(ManagedValue::forInContext());
       return;
-    } else if (SGF.silConv.isSILIndirect(param)) {
+    }
+
+     if (SGF.silConv.isSILIndirect(param)) {
       emitIndirect(std::move(arg), loweredSubstArgType, origParamType, param);
       return;
     }
 
     // Okay, if the original parameter is passed directly, then we
     // just need to handle abstraction differences and bridging.
-    assert(!specialDest);
     emitDirect(std::move(arg), loweredSubstArgType, origParamType, param);
   }
 
-  SILParameterInfo claimNextParameter() {
-    assert(!ParamInfos.empty());
-    auto param = ParamInfos.front();
-    ParamInfos = ParamInfos.slice(1);
-    return param;
+  ClaimedParamsRef claimNextParameters(unsigned count) {
+    assert(count <= ParamInfos.size());
+    auto slice = ParamInfos.slice(0, count);
+    ParamInfos = ParamInfos.slice(count);
+    return slice;
   }
 
   /// Claim the next destination, returning a null pointer if there
@@ -2690,6 +2811,13 @@ private:
              origParamType.getTupleElementType(i));
       }
       return;
+    }
+
+    if (IsYield) {
+      if (auto lvExpr = findStorageReferenceExprForBorrow(e)) {
+        emitExpandedBorrowed(lvExpr, origParamType);
+        return;
+      }
     }
 
     // Fall back to the r-value case.
@@ -2771,6 +2899,59 @@ private:
     DelayedArguments.emplace_back(DelayedArgument::InOut, std::move(lv), loc);
     Args.push_back(ManagedValue());
     return;
+  }
+
+  bool tryEmitBorrowed(ArgumentSource &&arg, SILType loweredSubstArgType,
+                       SILType loweredSubstParamType,
+                       AbstractionPattern origParamType,
+                       ClaimedParamsRef paramsSlice) {
+    assert(paramsSlice.size() == 1);
+
+    // Try to find an expression we can emit as an l-value.
+    auto lvExpr = std::move(arg).findStorageReferenceExprForBorrow();
+    if (!lvExpr) return false;
+
+    emitBorrowed(lvExpr, loweredSubstArgType, loweredSubstParamType,
+                 origParamType, paramsSlice);
+    return true;
+  }
+
+  void emitBorrowed(Expr *arg, SILType loweredSubstArgType,
+                    SILType loweredSubstParamType,
+                    AbstractionPattern origParamType,
+                    ClaimedParamsRef claimedParams) {
+    auto emissionKind = SGFAccessKind::BorrowedObjectRead;
+    for (auto param : claimedParams) {
+      assert(!param.isConsumed());
+      if (param.isIndirectInGuaranteed()) {
+        emissionKind = SGFAccessKind::BorrowedAddressRead;
+        break;
+      }
+    }
+
+    LValue argLV = SGF.emitLValue(arg, emissionKind);
+
+    if (loweredSubstParamType.hasAbstractionDifference(Rep,
+                                                       loweredSubstArgType)) {
+      argLV.addSubstToOrigComponent(origParamType, loweredSubstParamType);
+    }
+
+    DelayedArguments.emplace_back(std::move(argLV), arg, origParamType,
+                                  claimedParams);
+    Args.push_back(ManagedValue());
+  }
+
+  void emitExpandedBorrowed(Expr *arg, AbstractionPattern origParamType) {
+    CanType substArgType = arg->getType()->getCanonicalType();
+    auto count = getFlattenedValueCount(origParamType, substArgType);
+    auto claimedParams = claimNextParameters(count);
+
+    SILType loweredSubstArgType = SGF.getLoweredType(substArgType);
+    SILType loweredSubstParamType =
+      SGF.getLoweredType(origParamType, substArgType);
+
+    return emitBorrowed(arg, loweredSubstArgType, loweredSubstParamType,
+                        origParamType, claimedParams);
   }
 
   void emitDirect(ArgumentSource &&arg, SILType loweredSubstArgType,
@@ -2994,7 +3175,7 @@ private:
         ForeignError->getErrorParameterIndex() != Args.size())
       return;
 
-    SILParameterInfo param = claimNextParameter();
+    SILParameterInfo param = claimNextParameters(1).front();
     ArgSpecialDest *specialDest = claimNextSpecialDest();
 
     assert(param.getConvention() == ParameterConvention::Direct_Unowned);
@@ -3033,7 +3214,7 @@ private:
 void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
                                           const DefaultArgumentStorage &info,
                                           SmallVectorImpl<ManagedValue> &args,
-                                          int &argIndex) {
+                                          size_t &argIndex) {
   auto value = SGF.emitApplyOfDefaultArgGenerator(info.loc,
                                                   info.defaultArgsOwner,
                                                   info.destIndex,
@@ -3043,7 +3224,7 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
   SmallVector<ManagedValue, 4> loweredArgs;
   SmallVector<DelayedArgument, 4> delayedArgs;
   Optional<ForeignErrorConvention> errorConvention = None;
-  auto emitter = ArgEmitter(SGF, info.functionRepresentation,
+  auto emitter = ArgEmitter(SGF, info.functionRepresentation, /*yield*/ false,
                             info.paramsToEmit,
                             loweredArgs, delayedArgs,
                             errorConvention, ImportAsMemberStatus());
@@ -3055,13 +3236,80 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
   
   // Splice the emitted default argument into the argument list.
   if (loweredArgs.size() == 1) {
-    args[argIndex] = loweredArgs.front();
+    args[argIndex++] = loweredArgs.front();
   } else {
     args.erase(args.begin() + argIndex);
     args.insert(args.begin() + argIndex,
                 loweredArgs.begin(), loweredArgs.end());
-    argIndex += loweredArgs.size() - 1;
+    argIndex += loweredArgs.size();
   }
+}
+
+static void emitBorrowedLValueRecursive(SILGenFunction &SGF,
+                                        SILLocation loc,
+                                        ManagedValue value,
+                                        AbstractionPattern origParamType,
+                                        ClaimedParamsRef &params,
+                                        MutableArrayRef<ManagedValue> args,
+                                        size_t &argIndex) {
+  // Recurse into tuples.
+  if (origParamType.isTuple()) {
+    size_t count = origParamType.getNumTupleElements();
+    for (size_t i = 0; i != count; ++i) {
+      // Drill down to the element, either by address or by scalar extraction.
+      ManagedValue eltValue;
+      if (value.getType().isAddress()) {
+        eltValue = SGF.B.createTupleElementAddr(loc, value, i);
+      } else {
+        eltValue = SGF.B.createTupleExtract(loc, value, i);
+      }
+
+      // Recurse.
+      auto origEltType = origParamType.getTupleElementType(i);
+      emitBorrowedLValueRecursive(SGF, loc, eltValue, origEltType,
+                                  params, args, argIndex);
+    }
+
+    return;
+  }
+
+  // Claim the next parameter.
+  auto param = params.front();
+  params = params.slice(1);
+
+  // Load if necessary.
+  assert(!param.isConsumed() && "emitting borrow into consumed parameter?");
+  if (!param.isIndirectInGuaranteed() && value.getType().isAddress()) {
+    value = SGF.B.createFormalAccessLoadBorrow(loc, value);
+  }
+
+  assert(param.getType() == value.getType().getASTType());
+  args[argIndex++] = value;
+}
+
+void DelayedArgument::emitBorrowedLValue(SILGenFunction &SGF,
+                                         BorrowedLValueStorage &info,
+                                         SmallVectorImpl<ManagedValue> &args,
+                                         size_t &argIndex) {
+  // Begin the access.
+  auto value = SGF.emitBorrowedLValue(info.Loc, std::move(info.LV));
+  ClaimedParamsRef params = info.ParamsToEmit;
+
+  // We inserted exactly one space in the argument array, so fix that up
+  // to have the right number of spaces.
+  if (params.size() == 0) {
+    args.erase(args.begin() + argIndex);
+    return;
+  } else if (params.size() > 1) {
+    args.insert(args.begin() + argIndex + 1, params.size() - 1, ManagedValue());
+  }
+
+  // Recursively expand.
+  emitBorrowedLValueRecursive(SGF, info.Loc, value, info.OrigParamType,
+                              params, args, argIndex);
+
+  // That should drain all the parameters.
+  assert(params.empty());
 }
 
 struct ElementExtent {
@@ -3385,11 +3633,11 @@ void TupleShuffleArgEmitter::emitDefaultArgsAndFinalize(ArgEmitter &parent) {
       
       auto numParams = getFlattenedValueCount(origType, eltType,
                                               ImportAsMemberStatus());
+
       parent.DelayedArguments.emplace_back(outer, defaultArgsOwner,
                                          outerIndex, eltType, origType,
-                                         parent.ParamInfos.slice(0, numParams),
+                                         parent.claimNextParameters(numParams),
                                          parent.Rep);
-      parent.ParamInfos = parent.ParamInfos.slice(numParams);
       parent.Args.push_back(ManagedValue());
       continue;
     }
@@ -3459,8 +3707,8 @@ void TupleShuffleArgEmitter::emit(ArgEmitter &parent) {
 
   // Emit the inner expression.
   if (!innerParams.empty()) {
-    ArgEmitter(parent.SGF, parent.Rep, ClaimedParamsRef(innerParams), innerArgs,
-               innerDelayedArgs,
+    ArgEmitter(parent.SGF, parent.Rep, parent.IsYield,
+               ClaimedParamsRef(innerParams), innerArgs, innerDelayedArgs,
                /*foreign error*/ None, /*foreign self*/ ImportAsMemberStatus(),
                (innerSpecialDests ? ArgSpecialDestArray(*innerSpecialDests)
                                   : Optional<ArgSpecialDestArray>()))
@@ -3724,7 +3972,8 @@ public:
     auto params = lowering.claimParams(origFormalType, getParams(),
                                        foreignError, foreignSelf);
 
-    ArgEmitter emitter(SGF, lowering.Rep, params, args, delayedArgs,
+    ArgEmitter emitter(SGF, lowering.Rep, /*yield*/ false,
+                       params, args, delayedArgs,
                        foreignError, foreignSelf);
     emitter.emitPreparedArgs(std::move(Args), origFormalType);
   }
@@ -4799,7 +5048,7 @@ void SILGenFunction::emitYield(SILLocation loc,
     });
   }
 
-  ArgEmitter emitter(*this, fnType->getRepresentation(),
+  ArgEmitter emitter(*this, fnType->getRepresentation(), /*yield*/ true,
                      ClaimedParamsRef(substYieldTys),
                      yieldArgs, delayedArgs,
                      /*foreign error*/None,
@@ -5585,7 +5834,7 @@ SILGenFunction::prepareSubscriptIndices(SubscriptDecl *subscript,
   SmallVector<ManagedValue, 4> argValues;
   SmallVector<DelayedArgument, 2> delayedArgs;
 
-  ArgEmitter emitter(*this, SILFunctionTypeRepresentation::Thin,
+  ArgEmitter emitter(*this, SILFunctionTypeRepresentation::Thin, /*yield*/false,
                      ClaimedParamsRef(substParamTys),
                      argValues, delayedArgs,
                      /*foreign error*/None,

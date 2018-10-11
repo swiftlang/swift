@@ -1113,3 +1113,15 @@ bb0k(%0 : @owned $Builtin.NativeObject):
   return %9999 : $()
 }
 
+sil @owned_partial_apply_used_as_callee_guaranteed : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @allocate_object : $@convention(thin) () -> @owned Builtin.NativeObject
+  %1 = partial_apply %0() : $@convention(thin) () -> @owned Builtin.NativeObject
+  %2 = convert_function %1 : $@callee_owned () -> @owned Builtin.NativeObject to $@callee_guaranteed () -> @owned Builtin.NativeObject
+  %3 = apply %2() : $@callee_guaranteed () -> @owned Builtin.NativeObject
+  destroy_value %3 : $Builtin.NativeObject
+  destroy_value %2 : $@callee_guaranteed () -> @owned Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
