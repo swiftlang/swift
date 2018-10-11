@@ -96,13 +96,14 @@ void ExistentialSpecializerCloner::cloneAndPopulateFunction() {
   llvm::SmallDenseMap<int, AllocStackInst *> ArgToAllocStackMap;
   bool MissingDestroyUse = false;
 
-  BBMap.insert(std::make_pair(OrigEntryBB, ClonedEntryBB));
   NewFBuilder.setInsertionPoint(ClonedEntryBB);
+
+  llvm::SmallVector<SILValue, 4> entryArgs;
+  entryArgs.reserve(OrigEntryBB->getArguments().size());
 
   /// Determine the location for the new init_existential_ref.
   auto InsertLoc = OrigF->begin()->begin()->getLoc();
   for (auto &ArgDesc : ArgumentDescList) {
-    SILArgument *OrigArg = OrigEntryBB->getArgument(ArgDesc.Index);
     auto iter = ArgToGenericTypeMap.find(ArgDesc.Index);
     SILArgument *NewArg = nullptr;
     /// For all Generic Arguments.
@@ -155,8 +156,7 @@ void ExistentialSpecializerCloner::cloneAndPopulateFunction() {
         } else {
           MissingDestroyUse = true;
         }
-        ValueMap.insert(std::make_pair(OrigArg, SILValue(ASI)));
-        assert(ValueMap.find(OrigArg) != ValueMap.end());
+        entryArgs.push_back(ASI);
         break;
       }
       case ExistentialRepresentation::Class: {
@@ -165,8 +165,7 @@ void ExistentialSpecializerCloner::cloneAndPopulateFunction() {
         auto *InitRef = NewFBuilder.createInitExistentialRef(
             InsertLoc, ArgDesc.Arg->getType(), NewArg->getType().getASTType(),
             NewArg, Conformances);
-        ValueMap.insert(std::make_pair(OrigArg, SILValue(InitRef)));
-        assert(ValueMap.find(OrigArg) != ValueMap.end());
+        entryArgs.push_back(InitRef);
         break;
       }
       default: {
@@ -182,20 +181,13 @@ void ExistentialSpecializerCloner::cloneAndPopulateFunction() {
       NewArg = ClonedEntryBB->createFunctionArgument(MappedTy, ArgDesc.Decl);
       NewArg->setOwnershipKind(ValueOwnershipKind(
           M, MappedTy, ArgDesc.Arg->getArgumentConvention()));
-      ValueMap.insert(std::make_pair(OrigArg, SILValue(NewArg)));
-      assert(ValueMap.find(OrigArg) != ValueMap.end());
+      entryArgs.push_back(NewArg);
     }
   }
 
-  // Recursively visit original BBs in depth-first preorder, starting with the
-  // entry block, cloning all instructions other than terminators.
-  visitSILBasicBlock(OrigEntryBB);
-
-  // Now iterate over the BBs and fix up the terminators.
-  for (auto BI = BBMap.begin(), BE = BBMap.end(); BI != BE; ++BI) {
-    NewFBuilder.setInsertionPoint(BI->second);
-    visit(BI->first->getTerminator());
-  }
+  // Visit original BBs in depth-first preorder, starting with the
+  // entry block, cloning all instructions and terminators.
+  cloneFunctionBody(&Original, ClonedEntryBB, entryArgs);
 
   /// If there is an argument with no DestroyUse, insert DeallocStack
   /// before return Instruction.

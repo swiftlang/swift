@@ -175,6 +175,13 @@ namespace {
 void swift::
 recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
                                            bool Force, CallbackTy Callback) {
+  SILBasicBlock::iterator instIter;
+  recursivelyDeleteTriviallyDeadInstructions(IA, instIter, Force, Callback);
+}
+
+void swift::recursivelyDeleteTriviallyDeadInstructions(
+    ArrayRef<SILInstruction *> IA, SILBasicBlock::iterator &InstIter,
+    bool Force, CallbackTy Callback) {
   // Delete these instruction and others that become dead after it's deleted.
   llvm::SmallPtrSet<SILInstruction *, 8> DeadInsts;
   for (auto I : IA) {
@@ -217,8 +224,7 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
 
     for (auto I : DeadInsts) {
       // This will remove this instruction and all its uses.
-      
-      eraseFromParentWithDebugInsts(I);
+      eraseFromParentWithDebugInsts(I, InstIter);
     }
 
     NextInsts.swap(DeadInsts);
@@ -232,12 +238,13 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
 /// \param I The instruction to be deleted.
 /// \param Force If Force is set, don't check if the top level instruction is
 ///        considered dead - delete it regardless.
-void swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
-                                                       bool Force,
-                                                       CallbackTy Callback) {
-
+SILBasicBlock::iterator
+swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I, bool Force,
+                                                  CallbackTy Callback) {
+  SILBasicBlock::iterator nextI = std::next(I->getIterator());
   ArrayRef<SILInstruction *> AI = ArrayRef<SILInstruction *>(I);
-  recursivelyDeleteTriviallyDeadInstructions(AI, Force, Callback);
+  recursivelyDeleteTriviallyDeadInstructions(AI, nextI, Force, Callback);
+  return nextI;
 }
 
 void swift::eraseUsesOfInstruction(SILInstruction *Inst,
@@ -1329,6 +1336,7 @@ void ValueLifetimeAnalysis::dump() const {
   llvm::errs() << '\n';
 }
 
+// FIXME: Remove this. SILCloner should not create critical edges.
 bool EdgeThreadingCloner::splitCriticalEdges(DominanceInfo *DT,
                                              SILLoopInfo *LI) {
   bool changed = false;
@@ -1586,9 +1594,7 @@ StaticInitCloner::clone(SingleValueInstruction *InitVal) {
       }
     }
   }
-  assert(ValueMap.count(InitVal) != 0 &&
-         "Could not schedule all instructions for cloning");
-  return cast<SingleValueInstruction>(ValueMap[InitVal]);
+  return cast<SingleValueInstruction>(remapValue(InitVal));
 }
 
 Optional<FindLocalApplySitesResult>

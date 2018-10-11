@@ -12,6 +12,7 @@
 
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/AST/Module.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 
 //===----------------------------------------------------------------------===//
 //                               ConstantTracker
@@ -667,7 +668,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   }
 
   // Not all apply sites can be inlined, even if they're direct.
-  if (!SILInliner::canInline(AI))
+  if (!SILInliner::canInlineApplySite(AI))
     return nullptr;
 
   ModuleDecl *SwiftModule = Callee->getModule().getSwiftModule();

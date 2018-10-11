@@ -457,14 +457,17 @@ ClosureCloner::populateCloned() {
   SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
   getBuilder().setInsertionPoint(ClonedEntryBB);
 
+  SmallVector<SILValue, 4> entryArgs;
+  entryArgs.reserve(OrigEntryBB->getArguments().size());
+
   unsigned ArgNo = 0;
   auto I = OrigEntryBB->args_begin(), E = OrigEntryBB->args_end();
   for (; I != E; ++ArgNo, ++I) {
     if (!PromotableIndices.count(ArgNo)) {
-      // Otherwise, create a new argument which copies the original argument
+      // Simply create a new argument which copies the original argument
       SILValue MappedValue = ClonedEntryBB->createFunctionArgument(
           (*I)->getType(), (*I)->getDecl());
-      ValueMap.insert(std::make_pair(*I, MappedValue));
+      entryArgs.push_back(MappedValue);
       continue;
     }
 
@@ -484,6 +487,8 @@ ClosureCloner::populateCloned() {
       SILLocation Loc(const_cast<ValueDecl *>((*I)->getDecl()));
       MappedValue = getBuilder().createBeginBorrow(Loc, MappedValue);
     }
+    entryArgs.push_back(MappedValue);
+
     BoxArgumentMap.insert(std::make_pair(*I, MappedValue));
 
     // Track the projections of the box.
@@ -493,17 +498,9 @@ ClosureCloner::populateCloned() {
       }
     }
   }
-
-  BBMap.insert(std::make_pair(OrigEntryBB, ClonedEntryBB));
-  // Recursively visit original BBs in depth-first preorder, starting with the
-  // entry block, cloning all instructions other than terminators.
-  visitSILBasicBlock(OrigEntryBB);
-
-  // Now iterate over the BBs and fix up the terminators.
-  for (auto BI = BBMap.begin(), BE = BBMap.end(); BI != BE; ++BI) {
-    getBuilder().setInsertionPoint(BI->second);
-    visit(BI->first->getTerminator());
-  }
+  // Visit original BBs in depth-first preorder, starting with the
+  // entry block, cloning all instructions and terminators.
+  cloneFunctionBody(Orig, ClonedEntryBB, entryArgs);
 }
 
 /// If this operand originates from a mapped ProjectBox, return the mapped
@@ -646,7 +643,7 @@ void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *LI) {
     // We assume that the value is already guaranteed.
     assert(Val.getOwnershipKind().isTrivialOr(ValueOwnershipKind::Guaranteed) &&
            "Expected argument value to be guaranteed");
-    ValueMap.insert(std::make_pair(LI, Val));
+    recordFoldedValue(LI, Val);
     return;
   }
 
@@ -671,7 +668,7 @@ void ClosureCloner::visitLoadInst(LoadInst *LI) {
         && LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
       Val = getBuilder().createCopyValue(LI->getLoc(), Val);
     }
-    ValueMap.insert(std::make_pair(LI, Val));
+    recordFoldedValue(LI, Val);
     return;
   }
 
@@ -697,7 +694,7 @@ void ClosureCloner::visitLoadInst(LoadInst *LI) {
         && LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
       Val = getBuilder().createCopyValue(LI->getLoc(), Val);
     }
-    ValueMap.insert(std::make_pair(LI, Val));
+    recordFoldedValue(LI, Val);
     return;
   }
   SILCloner<ClosureCloner>::visitLoadInst(LI);
