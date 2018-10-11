@@ -1325,7 +1325,6 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
 
   SILLoop *parentLoop = loop->getParentLoop();
   for (SILBasicBlock *bb : initializedBlocks) {
-    cloner.cloneBlock(bb);
     SILBasicBlock *clonedBlock = cloner.cloneBlock(bb);
     if (parentLoop) {
       parentLoop->addBasicBlockToLoop(clonedBlock, LI->getBase());
@@ -1356,6 +1355,7 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
       auto destBBArg = newLatch->getArgument(argIndex);
       SmallVector<SILValue, 8> incomingValues;
       destBBArg->getIncomingPhiValues(incomingValues);
+      bool patched = false;
       for (auto value : incomingValues) {
         if (value != arg && DI->properlyDominates(value, predTermInst)) {
           // A suitable value is found. Update the edge value in the unrolled
@@ -1363,9 +1363,11 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
           SILBasicBlock *clonedPred = cloner.remapBasicBlock(pred);
           changeEdgeValue(clonedPred->getTerminator(), clonedNewLatch, argIndex,
                           cloner.remapValue(value));
+          patched = true;
           break;
         }
       }
+      assert(patched && "Unable to patch the arguments in unrolled loop body.");
     }
   }
 }
