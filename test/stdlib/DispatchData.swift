@@ -2,10 +2,12 @@
 // RUN: %target-build-swift -swift-version 4 %s -o %t/a.out-4 && %target-codesign %t/a.out-4 && %target-run %t/a.out-4
 // RUN: %target-build-swift -swift-version 4.2 %s -o %t/a.out-4.2 && %target-codesign %t/a.out-4.2 && %target-run %t/a.out-4.2
 // REQUIRES: executable_test
-// REQUIRES: objc_interop
+// REQUIRES: dispatch
 
 import Dispatch
+#if os(macOS) || os(iOS)
 import Foundation
+#endif
 import StdlibUnittest
 
 defer { runAllTests() }
@@ -23,7 +25,13 @@ DispatchAPI.test("dispatch_data_t deallocator") {
 	let q = DispatchQueue(label: "dealloc queue")
 	var t = 0
 
-	autoreleasepool {
+#if os(macOS) || os(iOS)
+	let runWithPool: (()->())->() = { autoreleasepool { $0() } }
+#else
+	let runWithPool: (()->())->() = { $0() }
+#endif
+
+	runWithPool {
 		let size = 1024
 		let p = UnsafeMutablePointer<UInt8>.allocate(capacity: size)
 		let _ = DispatchData(bytesNoCopy: UnsafeBufferPointer(start: p, count: size), deallocator: .custom(q, {

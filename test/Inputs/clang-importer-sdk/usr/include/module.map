@@ -26,11 +26,6 @@ module CoreMIDI {
   export *
 }
 
-module Dispatch {
-  header "dispatch.h"
-  export *
-}
-
 module MachO {
   header "dyld.h"
   export *

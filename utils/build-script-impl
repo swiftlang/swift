@@ -2618,20 +2618,33 @@ for host in "${ALL_HOSTS[@]}"; do
                   echo "Cleaning the libdispatch build directory"
                   call rm -rf "${LIBDISPATCH_BUILD_DIR}"
 
-                  cmake_options=(
-                    ${cmake_options[@]}
-                    -DCMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
-                    -DCMAKE_C_COMPILER:PATH="${LLVM_BIN}/clang"
-                    -DCMAKE_CXX_COMPILER:PATH="${LLVM_BIN}/clang++"
-                    -DCMAKE_SWIFT_COMPILER:PATH="${SWIFTC_BIN}"
-                    -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
-                    -DCMAKE_INSTALL_LIBDIR:PATH="lib"
+                  call mkdir -p "${LIBDISPATCH_BUILD_DIR}"
+                  with_pushd "${LIBDISPATCH_BUILD_DIR}" \
+                      call cmake \
+                        ${LIBDISPATCH_SOURCE_DIR} \
+                        ${cmake_options[@]} \
+                        -DCMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}" \
+                        -DCMAKE_C_COMPILER:PATH="${LLVM_BIN}/clang" \
+                        -DCMAKE_CXX_COMPILER:PATH="${LLVM_BIN}/clang++"\
+                        -DCMAKE_SWIFT_COMPILER:PATH="${SWIFTC_BIN}" \
+                        -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})" \
+                        -DCMAKE_INSTALL_LIBDIR:PATH="lib" \
+                        -DENABLE_SWIFT=YES \
+                        -DSWIFT_RUNTIME_LIBDIR:PATH="${SWIFT_BUILD_PATH}/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}" \
+                        -DENABLE_TESTING=YES
+                  with_pushd "${LIBDISPATCH_BUILD_DIR}" \
+                      call ${NINJA_BIN}
+                  with_pushd "${LIBDISPATCH_BUILD_DIR}" \
+                      cp src/libdispatch.so ${SWIFT_BUILD_PATH}/lib/swift/${SWIFT_HOST_VARIANT}/
+                  with_pushd "${LIBDISPATCH_BUILD_DIR}" \
+                      cp src/swift/Dispatch.{swiftdoc,swiftmodule} ${SWIFT_BUILD_PATH}/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}/
+                  rm -f ${SWIFT_BUILD_PATH}/lib/swift/os
+                  ln -s ${LIBDISPATCH_SOURCE_DIR}/os ${SWIFT_BUILD_PATH}/lib/swift/os
+                  rm -f ${SWIFT_BUILD_PATH}/lib/swift/dispatch
+                  ln -s ${LIBDISPATCH_SOURCE_DIR}/dispatch ${SWIFT_BUILD_PATH}/lib/swift/dispatch
 
-                    -DENABLE_SWIFT=YES
-                    -DSWIFT_RUNTIME_LIBDIR:PATH="${SWIFT_BUILD_PATH}/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
-
-                    -DENABLE_TESTING=YES
-                  )
+                  # libdispatch builds itself
+                  continue
                 ;;
                 esac
 
