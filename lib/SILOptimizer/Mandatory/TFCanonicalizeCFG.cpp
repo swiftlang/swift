@@ -1192,6 +1192,99 @@ void SESERegionBuilder::ensureSingleExitFromLoops() {
 }
 
 void SingleExitLoopTransformer::unrollLoopBodyOnce() {
+  // Consider the following example:
+  //
+  //   do {
+  //     i += 1
+  //     if (...) break;
+  //     i += 1
+  //   } while(...)
+  //   return i
+  //
+  // The SIL CFG is shown below:
+  //
+  //   preheader:
+  //     i0 = 0
+  //     br header(i0)
+  //
+  //   header(i1):
+  //     i2 = i1 + 1
+  //     cond ??, break, body
+  //
+  //   break:
+  //     br exit(i2)
+  //
+  //   body:
+  //     i3 = i2 + 1
+  //     cond ??, header(i3), exit(i3)
+  //
+  //   exit(i4):
+  //     return i4
+  //
+  // Note that the dataflow between iterations of the loop is captured by
+  // argument `i1` of the header. If we need to exit from the header of the
+  // loop, we will need to "freeze" the state at the current exit points and
+  // propagate it to the new header. The canonicalization pass does that by
+  // adding an argument to the header and passing it from the exit points. See
+  // argument `i5` of the header. We also have a `stayInLoop` argument to
+  // determine when we should exit the loop.
+  //
+  // The propagation of the frozen state is done as follows:
+  //   - The original branches to `exit` are replaced with branches to
+  //     `newLatch`, where `stayInLoop` is set to false.
+  //   - For the original argument `i1` at the header, we simply pass back that
+  //     value. This is OK because we exit the loop before accessing it.
+  //   - For the additional argument `i5` at the header, we pass the current
+  //     state at the exit.
+  //
+  // The canonicalized CFG is shown below:
+  //
+  //   preheader:
+  //     i0 = 0
+  //     br newHeader(i0, undef, true)
+  //
+  //   newHeader(i1, i4, stayInLoop):
+  //     cond stayInLoop, header, exit(i4)
+  //
+  //   header:
+  //     i2 = i1 + 1
+  //     cond ??, break, body
+  //
+  //   break:
+  //     br newLatch(i1, i2, false)
+  //
+  //   body:
+  //     i3 = i2 + 1
+  //     cond ??, newLatch(i3, i4, true), newLatch(i1, i3, false)
+  //
+  //   newLatch(i5, i6, stayInLoop1):
+  //     br newHeader(i5, i6, stayInLoop1)
+  //
+  //   exit(i7):
+  //     return i7
+  //
+  // We have an undef for `i5` from the preheader because we do not know the
+  // value before the loop gets executed. However, note that on all paths from
+  // `header` to `newLatch`, the second argument is always defined. Therefore,
+  // we can eliminate the `undef` by simply unrolling the loop body from
+  // `header` to `newLatch` once. We do not need to  clone `newHeader`.
+  //
+  // Given that we do not clone `newHeader`, references to the arguments `i1`
+  // and `i5` of `newHeader` will not be cloned as well. For example, in the
+  // unrolled body of the loop, `break` will be cloned as follows (prime refers
+  // to the clones):
+  //    break':
+  //      br newLatch'(i1, i2', false)
+  //
+  // Note that `i1` still refers to the original argument of `newHeader`.
+  // `newHeader` occurs after the unrolled loop body (in CFG) and hence, won't
+  // dominate `break'` in the unrolled loop body. We fix this by
+  // picking a value that is equivalent to the corresponding argument and
+  // dominates `break'`. (Note that it is enough to search for equivalent values
+  // among the immediate predecessors of the `newLatch'` block.)
+  //
+  // (1) Unroll the loop body once.
+  //
   BasicBlockCloner cloner(*currentFn);
   // Setup cloner so that newHeader's arguments are replaced with values in
   // preheader.
@@ -1199,9 +1292,9 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
   auto preheaderTermInst = dyn_cast<BranchInst>(preheader->getTerminator());
   assert(preheaderTermInst && "Preheader of a loop has a non-branch terminator");
   for (unsigned argIndex = 0; argIndex < oldHeaderNumArgs; ++argIndex) {
-    auto preHeaderArg = preheaderTermInst->getArg(argIndex);
+    auto preheaderArg = preheaderTermInst->getArg(argIndex);
     auto newHeaderArg = newHeader->getArgument(argIndex);
-    cloner.updateValueMap(newHeaderArg, preHeaderArg);
+    cloner.updateValueMap(newHeaderArg, preheaderArg);
   }
   // Clone everything except the new header. We should traverse the
   // blocks in depth first order to ensure values are cloned before they are used.
@@ -1232,55 +1325,8 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
   replaceBranchTarget(preheader->getTerminator(), newHeader, clonedHeader,
                       /*preserveArgs*/ false);
 
-  // Along a path in the loop body where an escaping value or an exit argument
-  // is not defined, the SESE loop canonicalization would have propagated the
-  // corresponding loop carried state that was added to the new header. However,
-  // these are not remapped when the loop body is unrolled (as we won't know
-  // what value to use in the unrolled body as it is undefined along that path).
-  // This following code patches these arguments by picking a value that
-  // dominates `pred` and is equivalent to the corresponding argument in the
-  // cloned block. e.g.,
+  // (2) Patch values that still refer to the arguments of `newHeader`.
   //
-  //   do {
-  //     if (...) break;
-  //     i += 1
-  //   } while(...)
-  //   return i
-  //
-  // --CFG--
-  //   preheader: i0 = 0; br header(i0)
-  //
-  //   header(i0): cond ??, break, body
-  //
-  //   break: br exit(i0)
-  //
-  //   body: i1 = i0 + 1; cond ??, header(i1), exit(i1)
-  //
-  //   exit(i2): return i2
-  //
-  // --Canonicalized CFG (not everything is shown)--
-  //   preheader: i0 = 0; br newHeader(i0, undef)
-  //
-  //   newHeader(i0, i3): cond stayInLoop, header, exit(i3)
-  //
-  //   header: cond ??, break, body
-  //
-  //   break: br newLatch(i0, i3)
-  //
-  //   body: i1 = i0 + 1; cond ??, newHeader(i1, i1), newLatch(i1, i1)
-  //
-  //   newLatch(i4, i5): br newHeader(i4, i5)
-  //
-  //   exit(i2): return i2
-  //
-  // In the unrolled body of the loop, break will be cloned as follows:
-  // (prime refers to the cloned version):
-  //    break': br newLatch'(i0', i3)
-  //
-  // Note that i3 is not cloned, which is patched here as follows:
-  //    break': br newLatch'(i0', i1')
-  // `i1` is equivalent to `i3` as they both flow into the argument `i5` of
-  // `newLatch`.
   SILBasicBlock *newLatch = loop->getLoopLatch();
   SILBasicBlock *clonedNewLatch = cloner.remapBasicBlock(newLatch);
   for (SILBasicBlock *pred : newLatch->getPredecessorBlocks()) {
@@ -1288,7 +1334,7 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
     assert(predTermInst && "Preheader of a loop has a non-branch terminator");
     for (unsigned argIndex = 0; argIndex < predTermInst->getNumArgs(); ++argIndex) {
       auto arg = predTermInst->getArg(argIndex);
-      // Skip if this is not a uncloned argument as illustrated above.
+      // Skip if this is not an argument of the `newHeader`.
       if (!isa<SILArgument>(arg) ||
           cast<SILArgument>(arg)->getParent() != newHeader) {
         continue;
