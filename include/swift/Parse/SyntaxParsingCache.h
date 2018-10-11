@@ -18,7 +18,9 @@
 #include "llvm/Support/raw_ostream.h"
 #include <unordered_set>
 
-namespace {
+namespace swift {
+
+using namespace swift::syntax;
 
 /// A single edit to the original source file in which a continuous range of
 /// characters have been replaced by a new string
@@ -41,12 +43,6 @@ struct SourceEdit {
     return End >= RangeStart && Start <= RangeEnd;
   }
 };
-
-} // anonymous namespace
-
-namespace swift {
-
-using namespace swift::syntax;
 
 struct SyntaxReuseRegion {
   AbsolutePosition Start;
@@ -88,6 +84,13 @@ public:
   /// \p SyntaxTree that have been reused as part of the incremental parse.
   std::vector<SyntaxReuseRegion>
   getReusedRegions(const SourceFileSyntax &SyntaxTree) const;
+
+  /// Translates a post-edit position to a pre-edit position by undoing the
+  /// specified edits.
+  /// Should not be invoked externally. Only public for testing purposes.
+  static size_t
+  translateToPreEditPosition(size_t PostEditPosition,
+                             llvm::SmallVector<SourceEdit, 4> Edits);
 
 private:
   llvm::Optional<Syntax> lookUpFrom(const Syntax &Node, size_t NodeStart,
