@@ -315,7 +315,7 @@ namespace sil_block {
     SIL_REVERSE_DIFFERENTIABLE_ATTR,
     IdentifierIDField,  // Primal name.
     IdentifierIDField,  // Adjoint name.
-    BCFixed<1>,         // Adjoint is synthesized.
+    BCFixed<1>,         // Adjoint is primitive.
     BCFixed<32>,        // Indices' source.
     BCArray<BCFixed<1>> // Indices' parameters bitvector.
   >;

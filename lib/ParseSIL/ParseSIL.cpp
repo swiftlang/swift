@@ -1138,11 +1138,11 @@ static bool parseReverseDifferentiableAttr(
     P.consumeToken();
     if (parseFnName(AdjName)) return true;
   }
-  // Parse optional 'synthesized'.
-  bool adjointIsSynthesized = false;
-  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "synthesized") {
+  // Parse optional 'primitive'.
+  bool adjointIsPrimitive = false;
+  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "primitive") {
     P.consumeToken();
-    adjointIsSynthesized = true;
+    adjointIsPrimitive = true;
   }
   // Parse ']'.
   if (P.parseToken(tok::r_square,
@@ -1151,7 +1151,7 @@ static bool parseReverseDifferentiableAttr(
   // Create an AdjointAttr and we are done.
   auto *Attr = SILReverseDifferentiableAttr::create(
       SP.SILMod, {SourceIndex, ParamIndices}, PrimName.str(), AdjName.str(),
-      adjointIsSynthesized);
+      adjointIsPrimitive);
   DAs.push_back(Attr);
   return false;
 }

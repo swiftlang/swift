@@ -3153,7 +3153,7 @@ void SILReverseDifferentiableAttr::print(llvm::raw_ostream &OS) const {
   if (!AdjointName.empty()) {
     OS << " adjoint @" << AdjointName;
   }
-  if (AdjointIsSynthesized) OS << " synthesized";
+  if (AdjointIsPrimitive) OS << " primitive";
 }
 
 //===----------------------------------------------------------------------===//

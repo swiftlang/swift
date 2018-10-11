@@ -811,6 +811,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
       // Either only adjoint is specified, or both primal and adjoint are
       // spcified.
       StringRef primName, adjName;
+      bool hasPrimitiveAdjoint = false;
       if (auto *primFn = diffAttr->getPrimalFunction())
         primName = getFunction(SILDeclRef(primFn), ForDefinition)->getName();
       if (auto *adjointFn = diffAttr->getAdjointFunction()) {
@@ -819,6 +820,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
         if (primName.empty())
           primName = silOriginalFn->getName();
         adjName = getFunction(SILDeclRef(adjointFn), ForDefinition)->getName();
+        hasPrimitiveAdjoint = true;
       }
       else {
         assert(primName.empty() &&
@@ -830,8 +832,9 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
                                              diffAttr);
       SILReverseAutoDiffIndices indices(/*source*/ 0, paramIndices);
       silOriginalFn->addReverseDifferentiableAttr(
-          SILReverseDifferentiableAttr::create(M, indices, primName, adjName,
-                                               /*synthesized*/ false));
+          SILReverseDifferentiableAttr::create(
+            M, indices, primName, adjName,
+            /*primitive*/ hasPrimitiveAdjoint));
       break;
     }
     }
