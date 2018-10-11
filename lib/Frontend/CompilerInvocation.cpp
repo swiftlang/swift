@@ -309,8 +309,16 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.DebugForbidTypecheckPrefix = A->getValue();
   }
 
-  if (Args.getLastArg(OPT_debug_cycles)) {
-    Opts.EvaluatorCycleDiagnostics = CycleDiagnosticKind::DebugDiagnose;
+  if (const Arg *A = Args.getLastArg(OPT_debug_cycles, OPT_suppress_cycles,
+                                     OPT_diagnose_cycles)) {
+    if (A->getOption().matches(OPT_debug_cycles)) {
+      Opts.EvaluatorCycleDiagnostics = CycleDiagnosticKind::DebugDiagnose;
+    } else if (A->getOption().matches(OPT_diagnose_cycles)) {
+      Opts.EvaluatorCycleDiagnostics = CycleDiagnosticKind::FullDiagnose;
+    } else {
+      assert(A->getOption().matches(OPT_suppress_cycles));
+      Opts.EvaluatorCycleDiagnostics = CycleDiagnosticKind::NoDiagnose;
+    }
   }
 
   if (const Arg *A = Args.getLastArg(OPT_output_request_graphviz)) {

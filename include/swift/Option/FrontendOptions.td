@@ -204,6 +204,10 @@ def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-pref
 
 def debug_cycles : Flag<["-"], "debug-cycles">,
   HelpText<"Print out debug dumps when cycles are detected in evaluation">;
+def suppress_cycles : Flag<["-"], "suppress-cycles">,
+  HelpText<"Suppress diagnostics for cycles detected in evaluation">;
+def diagnose_cycles : Flag<["-"], "diagnose-cycles">,
+  HelpText<"Diagnose diagnostics for cycles detected in evaluation">;
 def output_request_graphviz : Separate<["-"], "output-request-graphviz">,
   HelpText<"Emit GraphViz output visualizing the request graph">;
 
