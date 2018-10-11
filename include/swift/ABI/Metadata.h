@@ -2943,6 +2943,12 @@ public:
             NumRequirements};
   }
 
+  /// Retrieve the requirement base descriptor address.
+  ConstTargetPointer<Runtime, TargetProtocolRequirement<Runtime>>
+  getRequirementBaseDescriptor() const {
+    return getRequirements().data() - WitnessTableFirstRequirementOffset;
+  }
+
 #ifndef NDEBUG
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
                             "only for use in the debugger");
