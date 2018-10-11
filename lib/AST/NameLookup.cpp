@@ -601,6 +601,26 @@ SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
   return result;
 }
 
+static void
+populateLookupDeclsFromContext(DeclContext *dc,
+                               SmallVectorImpl<TypeDecl *> &lookupDecls) {
+  auto nominal = dc->getSelfNominalTypeDecl();
+  if (!nominal)
+    return;
+
+  lookupDecls.push_back(nominal);
+
+  // For a protocol extension, check whether there are additional "Self"
+  // constraints that can affect name lookup.
+  if (dc->getExtendedProtocolDecl()) {
+    auto ext = cast<ExtensionDecl>(dc);
+    auto bounds = evaluateOrDefault(dc->getASTContext().evaluator,
+                                    SelfBoundsFromWhereClauseRequest{ext}, {});
+    for (auto bound : bounds)
+      lookupDecls.push_back(bound);
+  }
+}
+
 TinyPtrVector<TypeDecl *>
 TypeDeclsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
                                           ExtensionDecl *ext) const {
@@ -812,18 +832,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
         // Dig out the type we're looking into.
         SmallVector<TypeDecl *, 2> lookupDecls;
-        lookupDecls.push_back(nominal);
-
-        // For a protocol extension, check whether there are additional
-        // "Self" constraints that can affect name lookup.
-        if (isa<ProtocolDecl>(nominal)) {
-          if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-            auto bounds = evaluateOrDefault(Ctx.evaluator,
-              SelfBoundsFromWhereClauseRequest{ext}, {});
-            for (auto bound : bounds)
-              lookupDecls.push_back(bound);
-          }
-        }
+        populateLookupDeclsFromContext(dc, lookupDecls);
 
         NLOptions options = baseNLOptions;
         // Perform lookup into the type.
@@ -888,29 +897,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         DeclContext *MetaBaseDC = nullptr;
         GenericParamList *GenericParams = nullptr;
 
-        // Dig out the type we're looking into.
         SmallVector<TypeDecl *, 2> lookupDecls;
-
-        // Local function to populate the set of lookup declarations from
-        // the given DeclContext.
-        auto populateLookupDeclsFromContext = [&](DeclContext *dc) {
-          auto nominal = dc->getSelfNominalTypeDecl();
-          if (!nominal)
-            return;
-
-          lookupDecls.push_back(nominal);
-
-          // For a protocol extension, check whether there are additional
-          // "Self" constraints that can affect name lookup.
-          if (isa<ProtocolDecl>(nominal)) {
-            if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-              auto bounds = evaluateOrDefault(Ctx.evaluator,
-                SelfBoundsFromWhereClauseRequest{ext}, {});
-              for (auto bound : bounds)
-                lookupDecls.push_back(bound);
-            }
-          }
-        };
 
         if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC)) {
           auto *PBD = PBI->getBinding();
@@ -926,7 +913,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
             DC = DC->getParent();
 
-            populateLookupDeclsFromContext(DC);
+            populateLookupDeclsFromContext(DC, lookupDecls);
             MetaBaseDC = DC;
             BaseDC = PBI;
           }
@@ -935,7 +922,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           else if (PBD->getDeclContext()->isTypeContext()) {
             DC = DC->getParent();
 
-            populateLookupDeclsFromContext(DC);
+            populateLookupDeclsFromContext(DC, lookupDecls);
             MetaBaseDC = DC;
             BaseDC = MetaBaseDC;
 
@@ -973,7 +960,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             isCascadingUse = AFD->isCascadingContextForLookup(false);
 
           if (AFD->getDeclContext()->isTypeContext()) {
-            populateLookupDeclsFromContext(AFD->getDeclContext());
+            populateLookupDeclsFromContext(AFD->getDeclContext(),
+                                           lookupDecls);
             BaseDC = AFD;
             MetaBaseDC = AFD->getDeclContext();
             DC = DC->getParent();
@@ -1014,7 +1002,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             isCascadingUse = ACE->isCascadingContextForLookup(false);
         } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
           if (shouldLookupMembers(ED, Loc))
-            populateLookupDeclsFromContext(ED);
+            populateLookupDeclsFromContext(ED, lookupDecls);
 
           BaseDC = ED;
           MetaBaseDC = ED;
@@ -1022,7 +1010,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             isCascadingUse = ED->isCascadingContextForLookup(false);
         } else if (auto *ND = dyn_cast<NominalTypeDecl>(DC)) {
           if (shouldLookupMembers(ND, Loc))
-            populateLookupDeclsFromContext(ND);
+            populateLookupDeclsFromContext(ND, lookupDecls);
           BaseDC = DC;
           MetaBaseDC = DC;
           if (!isCascadingUse.hasValue())
