@@ -246,10 +246,10 @@ struct ByteBasedSourceRange {
 
   bool empty() { return Start == End; }
 
-  SourceRange toSourceRange(SourceManager &SourceMgr, unsigned BufferID) {
+  CharSourceRange toCharSourceRange(SourceManager &SourceMgr, unsigned BufferID) {
     auto StartLoc = SourceMgr.getLocForOffset(BufferID, Start);
     auto EndLoc = SourceMgr.getLocForOffset(BufferID, End);
-    return SourceRange(StartLoc, EndLoc);
+    return CharSourceRange(SourceMgr, StartLoc, EndLoc);
   }
 };
 
@@ -538,12 +538,11 @@ bool verifyReusedRegions(ByteBasedSourceRangeSet ExpectedReparseRegions,
   bool NoUnexpectedParse = true;
 
   for (auto ReparseRegion : UnexpectedReparseRegions.Ranges) {
-    auto ReparseRange = ReparseRegion.toSourceRange(SourceMgr, BufferID);
+    auto ReparseRange = ReparseRegion.toCharSourceRange(SourceMgr, BufferID);
 
     // To improve the ergonomics when writing tests we do not want to complain
     // about reparsed whitespaces.
-    auto RangeStr =
-        CharSourceRange(SourceMgr, ReparseRange.Start, ReparseRange.End).str();
+    auto RangeStr = ReparseRange.str();
     llvm::Regex WhitespaceOnlyRegex("^[ \t\r\n]*$");
     if (WhitespaceOnlyRegex.match(RangeStr)) {
       continue;
