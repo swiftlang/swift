@@ -213,14 +213,14 @@ TFValueKind classifyTensorFlowValue(SILType ty);
 
 // We assume the following special attr names do not occur in the regular
 // attributes of any TF ops.
-static const char DEVICE_ATTR[] = "__device";
+static const char TF_DEVICE_ATTR[] = "__device";
 // This pseudo-attribute is propagated from a tfop inst to TensorTransfer, and
 // then to D2D send/recv insts. When lowering to TF graph, the pseudo-attribute
 // is used when creating TPU infeed/outfeed ops, and is dropped when creating
 // other TF ops (e.g. a "Const" op).
-static const char SHAPE_ARRAY_ATTR[] = "__shapes";
+static const char TF_SHAPE_ARRAY_ATTR[] = "__shapes";
 
-/// Return true if `attrName` is SHAPE_ARRAY_ATTR, `attrValue` is an array of
+/// Return true if `attrName` is TF_SHAPE_ARRAY_ATTR, `attrValue` is an array of
 /// TensorShape-typed elements.
 bool isShapeArrayPseudoAttr(StringRef attrName, SymbolicValue attrValue);
 

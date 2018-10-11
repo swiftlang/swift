@@ -2135,7 +2135,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         // The code has some overlapping but is sufficiently different from the
         // counterpart in TFLowerGraph.cpp.
 
-        // SHAPE_ARRAY_ATTR is a pseudo-attribute used by the compiler's
+        // TF_SHAPE_ARRAY_ATTR is a pseudo-attribute used by the compiler's
         // partitioning and graph lowering passes (in graph mode) to propagate
         // shape info for XLA compilation (e.g. feed shape info to infeed /
         // outfeed ops), and is not relevant to eager execution.
@@ -2444,7 +2444,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   opDevice = deviceInfo->handleDevicePlacement(opInfo.getOperationName(),
                                                opDevice);
   assert(!opDevice.empty());
-  if (opDevice != ALL_DEVICES) {
+  if (opDevice != TF_ALL_DEVICES) {
     auto *setDeviceFn = IGM.getTFE_OpSetDeviceFn();
     auto device = createStringValAddr(IGM, opDevice);
     Builder.CreateCall(setDeviceFn, {op, device, status});

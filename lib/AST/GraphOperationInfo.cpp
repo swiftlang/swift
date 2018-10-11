@@ -166,7 +166,7 @@ TFValueKind tf::classifyTensorFlowValue(SILType ty) {
 }
 
 bool tf::isShapeArrayPseudoAttr(StringRef attrName, SymbolicValue attrValue) {
-  if (attrName != SHAPE_ARRAY_ATTR)
+  if (attrName != TF_SHAPE_ARRAY_ATTR)
     return false;
   CanType eltType;
   (void)attrValue.getArrayValue(eltType);

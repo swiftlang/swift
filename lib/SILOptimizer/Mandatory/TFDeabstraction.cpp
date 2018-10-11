@@ -2269,7 +2269,7 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
 
   // Pass attributes through.
   for (auto &attr : origInst->getAttributes()) {
-    if (attr.name.str() == DEVICE_ATTR) {
+    if (attr.name.str() == TF_DEVICE_ATTR) {
       opDevice = attr.value.getStringValue();
     }
     opBuilder.addAttribute(attr);
@@ -2417,12 +2417,12 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
     // FIXME: Do we detect and reject duplicate attribute names already?
 
     // If it's a device attribute, get the device value.
-    if (std::get<0>(argumentNameAndLowering) == DEVICE_ATTR) {
+    if (std::get<0>(argumentNameAndLowering) == TF_DEVICE_ATTR) {
       if (constValue.getKind() != SymbolicValue::String)
         return diagnoseInvalidAttr("must be a string");
       opDevice = constValue.getStringValue();
       // User code should not specify this pseudo device.
-      if (opDevice == ALL_DEVICES)
+      if (opDevice == TF_ALL_DEVICES)
         return diagnoseInvalidAttr("may not use this device name");
     }
 

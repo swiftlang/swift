@@ -2446,7 +2446,7 @@ static void createConstTensorAttrsOnAccel(
 static void
 addScalarShapeArrayAttr(ASTContext &ctx, GraphOperationBuilder *opBuilder) {
   // For TPU graph, set a scalar shape array, with attr name "__shapes".
-  auto attrName = std::string(SHAPE_ARRAY_ATTR);
+  auto attrName = std::string(TF_SHAPE_ARRAY_ATTR);
   // A shape is an array of ints -- empty array means it's a scalar (0d) shape.
   auto scalarShape = SymbolicValue::getArray(
       {}, ctx.getInt32Decl()->getDeclaredType()->getCanonicalType(),

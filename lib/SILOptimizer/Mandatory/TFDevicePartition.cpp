@@ -39,7 +39,7 @@ using namespace tf;
 // Return the device attribute associated with `inst`, which is required to
 // exist.
 StringRef swift::tf::getDeviceString(const GraphOperationInfo &graphOpInfo) {
-  auto attr = graphOpInfo.getInst()->getAttributeNamed(DEVICE_ATTR);
+  auto attr = graphOpInfo.getInst()->getAttributeNamed(TF_DEVICE_ATTR);
   assert(attr.hasValue() && "Tensor op instruction has no device string");
   return attr.getValue().getStringValue();
 }
@@ -256,7 +256,7 @@ void DevicePartitionCloner::addD2DSend(GraphOperationInfo &graphOpInfo,
       {ctx.getIdentifier("destDevice"),
        SymbolicValue::getString(getDeviceString(destDevice), allocator)});
   newInstBuilder.addAttribute(
-      {ctx.getIdentifier(DEVICE_ATTR),
+      {ctx.getIdentifier(TF_DEVICE_ATTR),
        SymbolicValue::getString(getDeviceString(thisDeviceType), allocator)});
 
   auto valueToSend = remapValue(inst->getOperand(0));
@@ -290,7 +290,7 @@ void DevicePartitionCloner::addD2DRecv(GraphOperationInfo &graphOpInfo,
       {ctx.getIdentifier("srcDevice"),
        SymbolicValue::getString(getDeviceString(srcDevice), allocator)});
   newInstBuilder.addAttribute(
-      {ctx.getIdentifier(DEVICE_ATTR),
+      {ctx.getIdentifier(TF_DEVICE_ATTR),
        SymbolicValue::getString(getDeviceString(thisDeviceType), allocator)});
 
   auto valueTy = inst->getResults()[0]->getType();
@@ -438,7 +438,7 @@ class DevicePartitionerImpl
   /// instructions.  For example, we create an int interal on ALL devices, use
   /// it to create a Const tfop on ALL devices, and in turn use that const as
   /// the upper bound for loop iteration, where the loop runs on all devices.
-  SmallPtrSet<SILInstruction *, 8> instByDevice[NUM_DEVICE_TYPES];
+  SmallPtrSet<SILInstruction *, 8> instByDevice[TF_NUM_DEVICE_TYPES];
 
   /// When a SIL value v on some device D1 is to be consumed by an instruction
   /// on another device D2, prepare() below inserts a TensorTransfer instruction
@@ -468,7 +468,7 @@ public:
       : parentTransform(parentTransform), srcFn(srcFn), deviceInfo(deviceInfo),
         nextTensorTransferId(nextTensorTransferId) {
     static_assert(
-        NUM_DEVICE_TYPES <= 8,
+        TF_NUM_DEVICE_TYPES <= 8,
         "3 bits are allocated in KeyByInstDestDevice to encode device types");
     markFunctionAndInsertTensorTransfers();
   }
@@ -675,7 +675,7 @@ public:
       SILBuilder B(&srcFn.front().front());
       auto &ctx = B.getModule().getASTContext();
       identityOpBuilder.addAttribute({
-          ctx.getIdentifier(DEVICE_ATTR),
+          ctx.getIdentifier(TF_DEVICE_ATTR),
           SymbolicValue::getString(
               getDeviceString(deviceInfo.primaryDeviceType),
               ctx.getAllocator())});
