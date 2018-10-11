@@ -6062,6 +6062,15 @@ SourceRange DestructorDecl::getSourceRange() const {
   return { getDestructorLoc(), getBody()->getEndLoc() };
 }
 
+StringRef swift::getAssociativitySpelling(Associativity value) {
+  switch (value) {
+  case Associativity::None: return "none";
+  case Associativity::Left: return "left";
+  case Associativity::Right: return "right";
+  }
+  llvm_unreachable("Unhandled Associativity in switch.");
+}
+
 PrecedenceGroupDecl *
 PrecedenceGroupDecl::create(DeclContext *dc,
                             SourceLoc precedenceGroupLoc,

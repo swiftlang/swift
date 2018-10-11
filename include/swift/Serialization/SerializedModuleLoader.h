@@ -176,6 +176,9 @@ public:
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 
   virtual void
+  getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results) const override;
+
+  virtual void
   getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &results) const override;
 
   virtual void getDisplayDecls(SmallVectorImpl<Decl*> &results) const override;
