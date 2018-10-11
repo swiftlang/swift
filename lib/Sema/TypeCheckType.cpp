@@ -924,7 +924,7 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, SourceLoc loc,
         : callback(callback) {}
 
         bool walkToTypeReprPre(TypeRepr *TR) {
-          if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(TR)) {
+          if (auto CITR = dyn_cast_or_null<ComponentIdentTypeRepr>(TR)) {
             if (auto associatedTypeDecl = dyn_cast_or_null<AssociatedTypeDecl>(CITR->getBoundDecl())) {
               callback(associatedTypeDecl);
             }
@@ -933,13 +933,14 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, SourceLoc loc,
         }
       };
 
-      auto repr = aliasDecl->getUnderlyingTypeLoc().getTypeRepr();
-      AssociatedTypeReprWalker walker([&](AssociatedTypeDecl *associatedTypeDecl) {
-        maybeDiagnoseBadConformanceRef(fromDC,
-                                       foundDC->getDeclaredInterfaceType(),
-                                       loc, associatedTypeDecl);
-      });
-      repr->walk(walker);
+      if (auto repr = aliasDecl->getUnderlyingTypeLoc().getTypeRepr()) {
+        AssociatedTypeReprWalker walker([&](AssociatedTypeDecl *associatedTypeDecl) {
+          maybeDiagnoseBadConformanceRef(fromDC,
+                                         foundDC->getDeclaredInterfaceType(),
+                                         loc, associatedTypeDecl);
+        });
+        repr->walk(walker);
+      }
     }
   }
 
