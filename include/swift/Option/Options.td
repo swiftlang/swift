@@ -310,6 +310,11 @@ def emit_parseable_module_interface_path :
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
          ArgumentIsPath]>,
   MetaVarName<"<path>">, HelpText<"Output parseable interface file to <path>">;
+def enable_parseable_module_interface :
+  Flag<["-"], "enable-parseable-module-interface">,
+  Flags<[FrontendOption, HelpHidden, NoInteractiveOption,
+         DoesNotAffectIncrementalBuild]>,
+  HelpText<"Accept parseable .swiftinterface form of modules">;
 
 def emit_objc_header : Flag<["-"], "emit-objc-header">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,

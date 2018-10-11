@@ -191,6 +191,7 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_import_underlying_module);
   inputArgs.AddLastArg(arguments, options::OPT_module_cache_path);
   inputArgs.AddLastArg(arguments, options::OPT_module_link_name);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_parseable_module_interface);
   inputArgs.AddLastArg(arguments, options::OPT_nostdimport);
   inputArgs.AddLastArg(arguments, options::OPT_parse_stdlib);
   inputArgs.AddLastArg(arguments, options::OPT_resource_dir);

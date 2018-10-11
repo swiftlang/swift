@@ -201,6 +201,9 @@ public:
   /// (if asked to emit SIL).
   bool EmitVerboseSIL = false;
 
+  /// If set, find and import parseable modules from .swiftinterface files.
+  bool EnableParseableModuleInterface = false;
+
   /// If set, this module is part of a mixed Objective-C/Swift framework, and
   /// the Objective-C half should implicitly be visible to the Swift sources.
   bool ImportUnderlyingModule = false;

@@ -324,7 +324,7 @@ bool CompilerInstance::setUpModuleLoaders() {
     }
     Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
   }
-  {
+  if (Invocation.getFrontendOptions().EnableParseableModuleInterface) {
     auto PIML = ParseableInterfaceModuleLoader::create(*Context,
                                                        ModuleCachePath,
                                                        getDependencyTracker());
