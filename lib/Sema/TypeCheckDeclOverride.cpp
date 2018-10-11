@@ -549,7 +549,7 @@ namespace {
 
     /// The set of declarations in which we'll look for overridden
     /// methods.
-    DirectlyReferencedTypeDecls superContexts;
+    SmallVector<NominalTypeDecl *, 2> superContexts;
 
     /// Cached member lookup results.
     SmallVector<ValueDecl *, 4> members;
