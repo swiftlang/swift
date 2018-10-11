@@ -1197,7 +1197,7 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
   //   do {
   //     i += 1
   //     if (...) break;
-  //     i += 1
+  //     i += 2
   //   } while(...)
   //   return i
   //
@@ -1215,7 +1215,7 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
   //     br exit(i2)
   //
   //   body:
-  //     i3 = i2 + 1
+  //     i3 = i2 + 2
   //     cond ??, header(i3), exit(i3)
   //
   //   exit(i4):
@@ -1223,21 +1223,23 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
   //
   // Note that the dataflow between iterations of the loop is captured by
   // argument `i1` of the header. If we need to exit from the header of the
-  // loop, we will need to "freeze" the state at the current exit points and
-  // propagate it to the new header. The canonicalization pass does that by
-  // adding an argument to the header and passing it from the exit points. See
-  // argument `i5` of the header. We also have a `stayInLoop` argument to
-  // determine when we should exit the loop.
+  // loop, we will need to "freeze" the state at the exit points of the loop
+  // (`break` and `body` in the example).  The canonicalization pass does that
+  // by creating a new header, which has arguments corresponding to the frozen
+  // states, in addition to the arguments (such as `i1`) of the original
+  // `header` block.
+  //
+  // The canonicalized CFG is shown below. Argument `i4` of `newHeader` is one
+  // of the additional arguments added by the canonicalization pass. `newHeader`
+  // also has a `stayInLoop` argument to determine when we should exit the loop.
   //
   // The propagation of the frozen state is done as follows:
   //   - The original branches to `exit` are replaced with branches to
   //     `newLatch`, where `stayInLoop` is set to false.
   //   - For the original argument `i1` at the header, we simply pass back that
   //     value. This is OK because we exit the loop before accessing it.
-  //   - For the additional argument `i5` at the header, we pass the current
+  //   - For the additional argument `i4` at the header, we pass the current
   //     state at the exit.
-  //
-  // The canonicalized CFG is shown below:
   //
   //   preheader:
   //     i0 = 0
@@ -1254,7 +1256,7 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
   //     br newLatch(i1, i2, false)
   //
   //   body:
-  //     i3 = i2 + 1
+  //     i3 = i2 + 2
   //     cond ??, newLatch(i3, i4, true), newLatch(i1, i3, false)
   //
   //   newLatch(i5, i6, stayInLoop1):
@@ -1267,12 +1269,12 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
   // value before the loop gets executed. However, note that on all paths from
   // `header` to `newLatch`, the second argument is always defined. Therefore,
   // we can eliminate the `undef` by simply unrolling the loop body from
-  // `header` to `newLatch` once. We do not need to  clone `newHeader`.
+  // `header` to `newLatch` once. We do not need to clone `newHeader`.
   //
   // Given that we do not clone `newHeader`, references to the arguments `i1`
-  // and `i5` of `newHeader` will not be cloned as well. For example, in the
-  // unrolled body of the loop, `break` will be cloned as follows (prime refers
-  // to the clones):
+  // and `i4` of `newHeader` will not be cloned. For example, in the unrolled
+  // body of the loop, `break` will be cloned as follows (prime refers to the
+  // clones):
   //    break':
   //      br newLatch'(i1, i2', false)
   //
@@ -1283,7 +1285,11 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
   // dominates `break'`. (Note that it is enough to search for equivalent values
   // among the immediate predecessors of the `newLatch'` block.)
   //
-  // (1) Unroll the loop body once.
+  // In summary, there are two steps for eliminating undefs:
+  //    (1) Unroll the loop body once (excluding `newHeader`)
+  //    (2) Patch values that still refer to the arguments of `newHeader`.
+
+  // Step 1. Unroll the loop body once (excluding `newHeader`)
   //
   BasicBlockCloner cloner(*currentFn);
   // Setup cloner so that newHeader's arguments are replaced with values in
@@ -1326,12 +1332,12 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
     }
   }
 
-  // Get the clone for the original and new header.
-  SILBasicBlock *clonedHeader = cloner.remapBasicBlock(header);
-  replaceBranchTarget(preheader->getTerminator(), newHeader, clonedHeader,
+  // Get the clone for old header.
+  SILBasicBlock *clonedOldHeader = cloner.remapBasicBlock(header);
+  replaceBranchTarget(preheader->getTerminator(), newHeader, clonedOldHeader,
                       /*preserveArgs*/ false);
 
-  // (2) Patch values that still refer to the arguments of `newHeader`.
+  // Step 2. Patch values that still refer to the arguments of `newHeader`.
   //
   SILBasicBlock *newLatch = loop->getLoopLatch();
   SILBasicBlock *clonedNewLatch = cloner.remapBasicBlock(newLatch);
@@ -1362,7 +1368,6 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
       }
     }
   }
-
 }
 
 /// Process the specified loop, collapsing it into a SESE region node.  This
