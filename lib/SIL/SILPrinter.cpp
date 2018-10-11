@@ -398,6 +398,7 @@ static StringRef getCastConsumptionKindName(CastConsumptionKind kind) {
   case CastConsumptionKind::TakeAlways: return "take_always";
   case CastConsumptionKind::TakeOnSuccess: return "take_on_success";
   case CastConsumptionKind::CopyOnSuccess: return "copy_on_success";
+  case CastConsumptionKind::BorrowAlways: return "borrow_always";
   }
   llvm_unreachable("bad cast consumption kind");
 }
