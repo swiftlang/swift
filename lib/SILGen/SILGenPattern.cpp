@@ -900,18 +900,9 @@ public:
 
   static bool requiresUnforwarding(SILGenFunction &SGF,
                                    ConsumableManagedValue operand) {
-    if (SGF.F.getModule().getOptions().EnableSILOwnership &&
-        operand.getType().isObject()) {
-      assert(operand.getFinalConsumption() !=
-                 CastConsumptionKind::TakeOnSuccess &&
-             "When compiling with sil ownership take on success is disabled");
-      // No unforwarding is needed, we always borrow/copy.
-      return false;
-    }
-
-    return (operand.hasCleanup() &&
-            operand.getFinalConsumption()
-              == CastConsumptionKind::TakeOnSuccess);
+    return operand.hasCleanup() &&
+           operand.getFinalConsumption()
+             == CastConsumptionKind::TakeOnSuccess;
   }
 
   /// Given that an aggregate was divided into a set of borrowed
