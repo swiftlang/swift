@@ -1302,6 +1302,12 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   TypeLoc ParsedTypeLoc;
   DeclContext *CurDeclContext = nullptr;
   DeclAttrKind AttrKind;
+
+  /// In situations when \c SyntaxKind hints or determines
+  /// completions, i.e. a precedence group attribute, this
+  /// can be set and used to control the code completion scenario.
+  SyntaxKind SyntxKind;
+
   int AttrParamIndex;
   bool IsInSil = false;
   bool HasSpace = false;
@@ -1453,6 +1459,7 @@ public:
   void completeCaseStmtDotPrefix() override;
   void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
+  void completeInPrecedenceGroup(SyntaxKind SK) override;
   void completeNominalMemberBeginning(
       SmallVectorImpl<StringRef> &Keywords) override;
 
@@ -1697,26 +1704,32 @@ public:
   struct RequestedResultsTy {
     const ModuleDecl *TheModule;
     bool OnlyTypes;
+    bool OnlyPrecedenceGroups;
     bool NeedLeadingDot;
 
     static RequestedResultsTy fromModule(const ModuleDecl *TheModule) {
-      return { TheModule, false, false };
+      return { TheModule, false, false, false };
     }
 
     RequestedResultsTy onlyTypes() const {
-      return { TheModule, true, NeedLeadingDot };
+      return { TheModule, true, false, NeedLeadingDot };
+    }
+
+    RequestedResultsTy onlyPrecedenceGroups() const {
+      assert(!OnlyTypes && "onlyTypes() already includes precedence groups");
+      return { TheModule, false, true, false };
     }
 
     RequestedResultsTy needLeadingDot(bool NeedDot) const {
-      return { TheModule, OnlyTypes, NeedDot };
+      return { TheModule, OnlyTypes, OnlyPrecedenceGroups, NeedDot };
     }
 
     static RequestedResultsTy toplevelResults() {
-      return { nullptr, false, false };
+      return { nullptr, false, false, false };
     }
   };
 
-  Optional<RequestedResultsTy> RequestedCachedResults;
+  std::vector<RequestedResultsTy> RequestedCachedResults;
 
 public:
   CompletionLookup(CodeCompletionResultSink &Sink,
@@ -2748,6 +2761,17 @@ public:
       addTypeAnnotation(Builder, T);
   }
 
+  void addPrecedenceGroupRef(PrecedenceGroupDecl *PGD) {
+    auto semanticContext =
+      getSemanticContext(PGD, DeclVisibilityKind::VisibleAtTopLevel);
+    CodeCompletionResultBuilder builder(
+      Sink, CodeCompletionResult::ResultKind::Declaration,
+      semanticContext, {});
+
+    builder.addTextChunk(PGD->getName().str());
+    builder.setAssociatedDecl(PGD);
+  };
+
   void addEnumElementRef(const EnumElementDecl *EED,
                          DeclVisibilityKind Reason,
                          bool HasTypeContext) {
@@ -2785,7 +2809,7 @@ public:
       addTypeAnnotation(Builder, EnumType);
   }
 
-  void addKeyword(StringRef Name, Type TypeAnnotation,
+  void addKeyword(StringRef Name, Type TypeAnnotation = Type(),
                   SemanticContextKind SK = SemanticContextKind::None,
                   CodeCompletionKeywordKind KeyKind
                     = CodeCompletionKeywordKind::None) {
@@ -2795,7 +2819,7 @@ public:
     addLeadingDot(Builder);
     Builder.addTextChunk(Name);
     Builder.setKeywordKind(KeyKind);
-    if (!TypeAnnotation.isNull())
+    if (TypeAnnotation)
       addTypeAnnotation(Builder, TypeAnnotation);
   }
 
@@ -3097,8 +3121,8 @@ public:
       ModuleDecl *M = MT->getModule();
       if (CurrDeclContext->getParentModule() != M) {
         // Only use the cache if it is not the current module.
-        RequestedCachedResults = RequestedResultsTy::fromModule(M)
-        .needLeadingDot(needDot());
+        RequestedCachedResults.push_back(
+          RequestedResultsTy::fromModule(M).needLeadingDot(needDot()));
         return true;
       }
     }
@@ -3690,7 +3714,7 @@ public:
     lookupVisibleDecls(Consumer, CurrDeclContext, TypeResolver,
                        /*IncludeTopLevel=*/IncludeTopLevel, Loc);
     if (RequestCache)
-      RequestedCachedResults = RequestedResultsTy::toplevelResults();
+      RequestedCachedResults.push_back(RequestedResultsTy::toplevelResults());
 
     // Manually add any expected nominal types from imported modules so that
     // they get their expected type relation. Don't include protocols, since
@@ -4079,6 +4103,63 @@ public:
     }
   }
 
+  void collectPrecedenceGroups() {
+    assert(CurrDeclContext);
+
+    auto M = CurrDeclContext->getParentModule();
+
+    if (M) {
+      for (auto FU: M->getFiles()) {
+        // We are looking through the current module,
+        // inspect only source files.
+        if (FU->getKind() != FileUnitKind::Source)
+          continue;
+
+        llvm::SmallVector<PrecedenceGroupDecl*, 4> results;
+        cast<SourceFile>(FU)->getPrecedenceGroups(results);
+
+        for (auto PG: results)
+            addPrecedenceGroupRef(PG);
+      }
+    }
+    CurrDeclContext->getParentSourceFile()
+      ->forAllVisibleModules([&](ModuleDecl::ImportedModule Import) {
+      auto Module = Import.second;
+      if (Module == M)
+        return;
+
+      RequestedCachedResults.push_back(
+        RequestedResultsTy::fromModule(Module).onlyPrecedenceGroups());
+    });
+  }
+
+  void getPrecedenceGroupCompletions(SyntaxKind SK) {
+    switch (SK) {
+    case SyntaxKind::PrecedenceGroupAssociativity:
+      addKeyword(getAssociativitySpelling(Associativity::None));
+      addKeyword(getAssociativitySpelling(Associativity::Left));
+      addKeyword(getAssociativitySpelling(Associativity::Right));
+      break;
+    case SyntaxKind::PrecedenceGroupAssignment:
+      addKeyword(getTokenText(tok::kw_false), Type(), SemanticContextKind::None,
+                 CodeCompletionKeywordKind::kw_false);
+      addKeyword(getTokenText(tok::kw_true), Type(), SemanticContextKind::None,
+                 CodeCompletionKeywordKind::kw_true);
+      break;
+    case SyntaxKind::PrecedenceGroupAttributeList:
+      addKeyword("associativity");
+      addKeyword("higherThan");
+      addKeyword("lowerThan");
+      addKeyword("assignment");
+      break;
+    case SyntaxKind::PrecedenceGroupRelation:
+      collectPrecedenceGroups();
+      break;
+    default:
+        llvm_unreachable("not a precedencegroup SyntaxKind");
+    }
+  }
+
   void getPoundAvailablePlatformCompletions() {
 
     // The platform names should be identical to those in @available.
@@ -4090,8 +4171,8 @@ public:
     lookupVisibleDecls(*this, CurrDeclContext, TypeResolver,
                        /*IncludeTopLevel=*/false, Loc);
 
-    RequestedCachedResults =
-        RequestedResultsTy::toplevelResults().onlyTypes();
+    RequestedCachedResults.push_back(
+      RequestedResultsTy::toplevelResults().onlyTypes());
   }
 
   void getToplevelCompletions(bool OnlyTypes) {
@@ -4117,6 +4198,12 @@ public:
     AccessFilteringDeclConsumer FilteringConsumer(CurrDeclContext, *this);
     TheModule->lookupVisibleDecls(LookupAccessPath, FilteringConsumer,
                                   NLKind::UnqualifiedLookup);
+
+    llvm::SmallVector<PrecedenceGroupDecl*, 16> precedenceGroups;
+    TheModule->getPrecedenceGroups(precedenceGroups);
+
+    for (auto PGD: precedenceGroups)
+      addPrecedenceGroupRef(PGD);
   }
 };
 
@@ -4606,6 +4693,14 @@ void CodeCompletionCallbacksImpl::completeDeclAttrKeyword(Decl *D,
   CurDeclContext = P.CurDeclContext;
 }
 
+void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(SyntaxKind SK) {
+  assert(P.Tok.is(tok::code_complete));
+
+  SyntxKind = SK;
+  Kind = CompletionKind::PrecedenceGroup;
+  CurDeclContext = P.CurDeclContext;
+}
+
 void CodeCompletionCallbacksImpl::completeTypeIdentifierWithDot(
     IdentTypeRepr *ITR) {
   if (!ITR) {
@@ -4842,6 +4937,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::GenericParams:
   case CompletionKind::KeyPathExprObjC:
   case CompletionKind::KeyPathExprSwift:
+  case CompletionKind::PrecedenceGroup:
     break;
 
   case CompletionKind::StmtOrExpr:
@@ -5408,7 +5504,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.setIsDynamicLookup();
 
     if (!ExprType.getValue()->getAs<ModuleType>())
-      Lookup.addKeyword("self", (*ExprType)->getRValueType(),
+      Lookup.addKeyword(getTokenText(tok::kw_self),
+                        (*ExprType)->getRValueType(),
                         SemanticContextKind::CurrentNominal,
                         CodeCompletionKeywordKind::kw_self);
 
@@ -5477,7 +5574,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.getOperatorCompletions(ParsedExpr, leadingSequenceExprs);
 
     if (!ExprType.getValue()->getAs<ModuleType>())
-      Lookup.addKeyword("self", (*ExprType)->getRValueType(),
+      Lookup.addKeyword(getTokenText(tok::kw_self),
+                        (*ExprType)->getRValueType(),
                         SemanticContextKind::CurrentNominal,
                         CodeCompletionKeywordKind::kw_self);
     break;
@@ -5686,15 +5784,16 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::AfterIfStmtElse:
     // Handled earlier by keyword completions.
     break;
+  case CompletionKind::PrecedenceGroup:
+    Lookup.getPrecedenceGroupCompletions(SyntxKind);
+    break;
   }
 
-  if (Lookup.RequestedCachedResults) {
+  for (auto &Request: Lookup.RequestedCachedResults) {
     // Use the current SourceFile as the DeclContext so that we can use it to
     // perform qualified lookup, and to get the correct visibility for
     // @testable imports.
     const SourceFile &SF = P.SF;
-
-    auto &Request = Lookup.RequestedCachedResults.getValue();
 
     llvm::DenseSet<CodeCompletionCache::Key> ImportsSeen;
     auto handleImport = [&](ModuleDecl::ImportedModule Import) {
@@ -5730,9 +5829,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         std::pair<PairType, bool> Result = ImportsSeen.insert(K);
         if (!Result.second)
           return; // already handled.
-
-        RequestedModules.push_back(
-            {std::move(K), TheModule, Request.OnlyTypes});
+        RequestedModules.push_back({std::move(K), TheModule,
+          Request.OnlyTypes, Request.OnlyPrecedenceGroups});
       }
     };
 
@@ -5755,7 +5853,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         TheModule->forAllVisibleModules(AccessPath, handleImport);
       }
     }
-    Lookup.RequestedCachedResults.reset();
+    Lookup.RequestedCachedResults.clear();
   }
 
   CompletionContext.HasExpectedTypeRelation = Lookup.hasExpectedTypes();
@@ -5841,7 +5939,8 @@ void swift::ide::lookupCodeCompletionResultsFromModule(
 
 void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
                                            CodeCompletionResultSink &sourceSink,
-                                           bool onlyTypes) {
+                                           bool onlyTypes,
+                                           bool onlyPrecedenceGroups) {
 
   // We will be adding foreign results (from another sink) into TargetSink.
   // TargetSink should have an owning pointer to the allocator that keeps the
@@ -5884,6 +5983,13 @@ void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
 
       llvm_unreachable("Unhandled CodeCompletionDeclKind in switch.");
     });
+  } else if (onlyPrecedenceGroups) {
+    std::copy_if(sourceSink.Results.begin(), sourceSink.Results.end(),
+                 std::back_inserter(targetSink.Results),
+                 [](CodeCompletionResult *R) -> bool {
+      return R->getAssociatedDeclKind() ==
+               CodeCompletionDeclKind::PrecedenceGroup;
+    });
   } else {
     targetSink.Results.insert(targetSink.Results.end(),
                               sourceSink.Results.begin(),
@@ -5909,7 +6015,8 @@ void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
       context.Cache.set(R.Key, *V);
     }
     assert(V.hasValue());
-    copyCodeCompletionResults(context.getResultSink(), (*V)->Sink, R.OnlyTypes);
+    copyCodeCompletionResults(context.getResultSink(), (*V)->Sink,
+                              R.OnlyTypes, R.OnlyPrecedenceGroups);
   }
 
   handleResults(context.takeResults());
