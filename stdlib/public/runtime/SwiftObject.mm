@@ -580,9 +580,15 @@ static bool isNonNative_unTagged_bridgeObject(void *object) {
   static_assert((heap_object_abi::SwiftSpareBitsMask & objectPointerIsObjCBit) ==
                 objectPointerIsObjCBit,
                 "isObjC bit not within spare bits");
-  return (uintptr_t(object) & objectPointerIsObjCBit) != 0 && (uintptr_t(object) & heap_object_abi::BridgeObjectTagBitsMask) == 0;
+  return (uintptr_t(object) & objectPointerIsObjCBit) != 0
+      && (uintptr_t(object) & heap_object_abi::BridgeObjectTagBitsMask) == 0;
 }
 #endif
+
+/// Return true iff the given BridgeObject is a tagged value.
+static bool isBridgeObjectTaggedPointer(void *object) {
+	return (uintptr_t(object) & heap_object_abi::BridgeObjectTagBitsMask) != 0;
+}
 
 // Mask out the spare bits in a bridgeObject, returning the object it
 // encodes.
@@ -594,7 +600,7 @@ static void* toPlainObject_unTagged_bridgeObject(void *object) {
 
 void *swift::swift_bridgeObjectRetain(void *object) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isObjCTaggedPointer(object) || isBridgeObjectTaggedPointer(object))
     return object;
 #endif
 
@@ -616,7 +622,7 @@ void *swift::swift_bridgeObjectRetain(void *object) {
 SWIFT_RUNTIME_EXPORT
 void *swift::swift_nonatomic_bridgeObjectRetain(void *object) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isObjCTaggedPointer(object) || isBridgeObjectTaggedPointer(object))
     return object;
 #endif
 
@@ -638,7 +644,7 @@ void *swift::swift_nonatomic_bridgeObjectRetain(void *object) {
 SWIFT_RUNTIME_EXPORT
 void swift::swift_bridgeObjectRelease(void *object) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isObjCTaggedPointer(object) || isBridgeObjectTaggedPointer(object))
     return;
 #endif
 
@@ -655,7 +661,7 @@ void swift::swift_bridgeObjectRelease(void *object) {
 
 void swift::swift_nonatomic_bridgeObjectRelease(void *object) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isObjCTaggedPointer(object) || isBridgeObjectTaggedPointer(object))
     return;
 #endif
 
@@ -672,7 +678,7 @@ void swift::swift_nonatomic_bridgeObjectRelease(void *object) {
 
 void *swift::swift_bridgeObjectRetain_n(void *object, int n) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isObjCTaggedPointer(object) || isBridgeObjectTaggedPointer(object))
     return object;
 #endif
 
@@ -695,7 +701,7 @@ void *swift::swift_bridgeObjectRetain_n(void *object, int n) {
 
 void swift::swift_bridgeObjectRelease_n(void *object, int n) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isObjCTaggedPointer(object) || isBridgeObjectTaggedPointer(object))
     return;
 #endif
 
@@ -713,7 +719,7 @@ void swift::swift_bridgeObjectRelease_n(void *object, int n) {
 
 void *swift::swift_nonatomic_bridgeObjectRetain_n(void *object, int n) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isObjCTaggedPointer(object) || isBridgeObjectTaggedPointer(object))
     return object;
 #endif
 
@@ -736,7 +742,7 @@ void *swift::swift_nonatomic_bridgeObjectRetain_n(void *object, int n) {
 
 void swift::swift_nonatomic_bridgeObjectRelease_n(void *object, int n) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isObjCTaggedPointer(object) || isBridgeObjectTaggedPointer(object))
     return;
 #endif
 
