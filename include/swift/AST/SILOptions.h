@@ -47,6 +47,10 @@ public:
   /// above but the interactions between all the flags are tricky.
   bool MergePartialModules = false;
 
+  /// Controls whether to optimize non-inlinable functions and whether to cut
+  /// off the pass pipelines after we've serialized the SIL.
+  bool IsEmittingModuleOnly = false;
+
   /// Remove all runtime assertions during optimizations.
   bool RemoveRuntimeAsserts = false;
 

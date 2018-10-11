@@ -630,6 +630,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_sil_merge_partial_modules))
     Opts.MergePartialModules = true;
 
+  if (FEOpts.RequestedAction == FrontendOptions::ActionType::EmitModuleOnly)
+    Opts.IsEmittingModuleOnly = true;
+
   // Parse the optimization level.
   // Default to Onone settings if no option is passed.
   Opts.OptMode = OptimizationMode::NoOptimization;

@@ -187,6 +187,10 @@ OptimizationMode SILFunction::getEffectiveOptimizationMode() const {
 }
 
 bool SILFunction::shouldOptimize() const {
+  // If we're just emitting a module, don't optimize non-serialized functions,
+  // otherwise the work is wasted.
+  if (getModule().getOptions().IsEmittingModuleOnly && !isSerialized())
+    return false;
   return getEffectiveOptimizationMode() != OptimizationMode::NoOptimization;
 }
 
