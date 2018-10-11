@@ -50,22 +50,23 @@
 
 using namespace swift;
 
+TypeChecker &TypeChecker::createForContext(ASTContext &ctx) {
+  (void)ctx.createLazyResolverIfMissing<TypeChecker>();
+  return *static_cast<TypeChecker *>(ctx.getLazyResolver());
+}
+
 TypeChecker::TypeChecker(ASTContext &Ctx)
   : Context(Ctx), Diags(Ctx.Diags)
 {
   auto clangImporter =
     static_cast<ClangImporter *>(Context.getClangModuleLoader());
   clangImporter->setTypeResolver(*this);
-
-  Context.setLazyResolver(this);
 }
 
 TypeChecker::~TypeChecker() {
   auto clangImporter =
     static_cast<ClangImporter *>(Context.getClangModuleLoader());
   clangImporter->clearTypeResolver();
-
-  Context.setLazyResolver(nullptr);
 }
 
 ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
@@ -220,10 +221,11 @@ ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
   if (StdlibModule)
     return StdlibModule;
 
-  if (!StdlibModule)
-    StdlibModule = Context.getStdlibModule();
-  if (!StdlibModule)
-    StdlibModule = dc->getParentModule();
+  StdlibModule = Context.getStdlibModule();
+
+  if (!StdlibModule) {
+    return dc->getParentModule();
+  }
 
   assert(StdlibModule && "no main module found");
   Context.recordKnownProtocols(StdlibModule);
@@ -545,6 +547,8 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   for (AnyFunctionRef closure : TC.ClosuresWithUncomputedCaptures) {
     TC.computeCaptures(closure);
   }
+  TC.ClosuresWithUncomputedCaptures.clear();
+
   for (AbstractFunctionDecl *FD : reversed(TC.definedFunctions)) {
     TC.computeCaptures(FD);
   }
@@ -555,13 +559,14 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   for (AbstractFunctionDecl *FD : TC.definedFunctions) {
     TC.checkFunctionErrorHandling(FD);
   }
+
+  TC.definedFunctions.clear();
 }
 
 void swift::typeCheckExternalDefinitions(SourceFile &SF) {
   assert(SF.ASTStage == SourceFile::TypeChecked);
   auto &Ctx = SF.getASTContext();
-  TypeChecker TC(Ctx);
-  typeCheckFunctionsAndExternalDecls(SF, TC);
+  typeCheckFunctionsAndExternalDecls(SF, createTypeChecker(Ctx));
 }
 
 void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
@@ -577,57 +582,42 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   auto &Ctx = SF.getASTContext();
 
   // Make sure we have a type checker.
-  //
-  // FIXME: We should never have a type checker here, but currently we do when
-  // we're using immediate together with -enable-source-import.
-  //
-  // This possibility should be eliminated, since it results in duplicated
-  // work.
-  Optional<TypeChecker> MyTC;
-  if (!Ctx.getLazyResolver())
-    MyTC.emplace(Ctx);
+  TypeChecker &TC = createTypeChecker(Ctx);
 
   // Make sure that name binding has been completed before doing any type
   // checking.
   performNameBinding(SF, StartElem);
 
   {
-    // NOTE: The type checker is scoped to be torn down before AST
-    // verification.
     SharedTimer timer("Type checking / Semantic analysis");
 
-    if (MyTC) {
-      MyTC->setWarnLongFunctionBodies(WarnLongFunctionBodies);
-      MyTC->setWarnLongExpressionTypeChecking(WarnLongExpressionTypeChecking);
-      if (ExpressionTimeoutThreshold != 0)
-        MyTC->setExpressionTimeoutThreshold(ExpressionTimeoutThreshold);
+    TC.setWarnLongFunctionBodies(WarnLongFunctionBodies);
+    TC.setWarnLongExpressionTypeChecking(WarnLongExpressionTypeChecking);
+    if (ExpressionTimeoutThreshold != 0)
+      TC.setExpressionTimeoutThreshold(ExpressionTimeoutThreshold);
 
-      if (SwitchCheckingInvocationThreshold != 0)
-        MyTC->setSwitchCheckingInvocationThreshold(
-            SwitchCheckingInvocationThreshold);
+    if (SwitchCheckingInvocationThreshold != 0)
+      TC.setSwitchCheckingInvocationThreshold(
+          SwitchCheckingInvocationThreshold);
 
-      if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
-        MyTC->enableDebugTimeFunctionBodies();
+    if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
+      TC.enableDebugTimeFunctionBodies();
 
-      if (Options.contains(TypeCheckingFlags::DebugTimeExpressions))
-        MyTC->enableDebugTimeExpressions();
+    if (Options.contains(TypeCheckingFlags::DebugTimeExpressions))
+      TC.enableDebugTimeExpressions();
 
-      if (Options.contains(TypeCheckingFlags::ForImmediateMode))
-        MyTC->setInImmediateMode(true);
-      
-      // Lookup the swift module.  This ensures that we record all known
-      // protocols in the AST.
-      (void) MyTC->getStdlibModule(&SF);
+    if (Options.contains(TypeCheckingFlags::ForImmediateMode))
+      TC.setInImmediateMode(true);
 
-      if (!Ctx.LangOpts.DisableAvailabilityChecking) {
-        // Build the type refinement hierarchy for the primary
-        // file before type checking.
-        MyTC->buildTypeRefinementContextHierarchy(SF, StartElem);
-      }
+    // Lookup the swift module.  This ensures that we record all known
+    // protocols in the AST.
+    (void) TC.getStdlibModule(&SF);
+
+    if (!Ctx.LangOpts.DisableAvailabilityChecking) {
+      // Build the type refinement hierarchy for the primary
+      // file before type checking.
+      TC.buildTypeRefinementContextHierarchy(SF, StartElem);
     }
-
-    TypeChecker &TC =
-      MyTC ? *MyTC : *static_cast<TypeChecker *>(Ctx.getLazyResolver());
 
     // Resolve extensions. This has to occur first during type checking,
     // because the extensions need to be wired into the AST for name lookup
@@ -667,8 +657,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   if (!(Options & TypeCheckingFlags::DelayWholeModuleChecking)) {
     performWholeModuleTypeChecking(SF);
   }
-
-  MyTC.reset();
 
   // Verify that we've checked types correctly.
   SF.ASTStage = SourceFile::TypeChecked;
@@ -754,21 +742,22 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   Optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
-  return TypeChecker(Ctx).validateType(T, resolution, options);
+  TypeChecker &TC = createTypeChecker(Ctx);
+  return TC.validateType(T, resolution, options);
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
 GenericEnvironment *
 swift::handleSILGenericParams(ASTContext &Ctx, GenericParamList *genericParams,
                               DeclContext *DC) {
-  return TypeChecker(Ctx).handleSILGenericParams(genericParams, DC);
+  return createTypeChecker(Ctx).handleSILGenericParams(genericParams, DC);
 }
 
 void swift::typeCheckCompletionDecl(Decl *D) {
   auto &Ctx = D->getASTContext();
 
   DiagnosticSuppression suppression(Ctx.Diags);
-  TypeChecker TC(Ctx);
+  TypeChecker &TC = createTypeChecker(Ctx);
 
   if (auto ext = dyn_cast<ExtensionDecl>(D))
     TC.validateExtension(ext);
@@ -825,47 +814,29 @@ Optional<Type> swift::getTypeOfCompletionContextExpr(
                         Expr *&parsedExpr,
                         ConcreteDeclRef &referencedDecl) {
   DiagnosticSuppression suppression(Ctx.Diags);
+  TypeChecker &TC = createTypeChecker(Ctx);
 
-  if (Ctx.getLazyResolver()) {
-    TypeChecker *TC = static_cast<TypeChecker *>(Ctx.getLazyResolver());
-    return ::getTypeOfCompletionContextExpr(*TC, DC, kind, parsedExpr,
-                                            referencedDecl);
-  } else {
-    TypeChecker TC(Ctx);
-    // Try to solve for the actual type of the expression.
-    return ::getTypeOfCompletionContextExpr(TC, DC, kind, parsedExpr,
-                                            referencedDecl);
-  }
+  // Try to solve for the actual type of the expression.
+  return ::getTypeOfCompletionContextExpr(TC, DC, kind, parsedExpr,
+                                          referencedDecl);
 }
 
 bool swift::typeCheckCompletionSequence(DeclContext *DC, Expr *&parsedExpr) {
   auto &ctx = DC->getASTContext();
   DiagnosticSuppression suppression(ctx.Diags);
-  if (ctx.getLazyResolver()) {
-    TypeChecker *TC = static_cast<TypeChecker *>(ctx.getLazyResolver());
-    return TC->typeCheckCompletionSequence(parsedExpr, DC);
-  } else {
-    TypeChecker TC(ctx);
-    return TC.typeCheckCompletionSequence(parsedExpr, DC);
-  }
+  TypeChecker &TC = createTypeChecker(ctx);
+  return TC.typeCheckCompletionSequence(parsedExpr, DC);
 }
 
 bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   auto &ctx = DC->getASTContext();
   DiagnosticSuppression suppression(ctx.Diags);
-  if (ctx.getLazyResolver()) {
-    TypeChecker *TC = static_cast<TypeChecker *>(ctx.getLazyResolver());
-    auto resultTy = TC->typeCheckExpression(parsedExpr, DC, TypeLoc(),
-                                      ContextualTypePurpose::CTP_Unused,
-                                      TypeCheckExprFlags::SuppressDiagnostics);
-    return !resultTy;
-  } else {
-    TypeChecker TC(ctx);
-    auto resultTy = TC.typeCheckExpression(parsedExpr, DC, TypeLoc(),
-                                      ContextualTypePurpose::CTP_Unused,
-                                      TypeCheckExprFlags::SuppressDiagnostics);
-    return !resultTy;
-  }
+  TypeChecker &TC = createTypeChecker(ctx);
+
+  auto resultTy = TC.typeCheckExpression(parsedExpr, DC, TypeLoc(),
+                                    ContextualTypePurpose::CTP_Unused,
+                                    TypeCheckExprFlags::SuppressDiagnostics);
+  return !resultTy;
 }
 
 bool swift::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
@@ -873,24 +844,20 @@ bool swift::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
   auto &Ctx = AFD->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
 
-  TypeChecker TC(Ctx);
+  TypeChecker &TC = createTypeChecker(Ctx);
   return !TC.typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
 }
 
 bool swift::typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
   auto &Ctx = static_cast<Decl *>(TLCD)->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
-  TypeChecker TC(Ctx);
+  TypeChecker &TC = createTypeChecker(Ctx);
   TC.typeCheckTopLevelCodeDecl(TLCD);
   return true;
 }
 
-static void deleteTypeChecker(LazyResolver *resolver) {
-  delete resolver;
-}
-
-OwnedResolver swift::createLazyResolver(ASTContext &Ctx) {
-  return OwnedResolver(new TypeChecker(Ctx), &deleteTypeChecker);
+TypeChecker &swift::createTypeChecker(ASTContext &Ctx) {
+  return TypeChecker::createForContext(Ctx);
 }
 
 // checkForForbiddenPrefix is for testing purposes.

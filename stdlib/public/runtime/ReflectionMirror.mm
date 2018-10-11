@@ -172,6 +172,7 @@ static bool loadSpecialReferenceStorage(OpaqueValue *fieldData,
                               reinterpret_cast<OpaqueValue *>(temporaryValue));
 
   type->deallocateBufferIn(&temporaryBuffer);
+  swift_unknownObjectRelease(strongValue);
   
   return true;
 }

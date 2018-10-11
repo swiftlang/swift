@@ -30,6 +30,7 @@ namespace swift {
   class ExtensionDecl;
   class ProtocolDecl;
   class Type;
+  class TypeChecker;
   class DeclContext;
   class ConcreteDeclRef;
   class ValueDecl;
@@ -123,11 +124,11 @@ namespace swift {
   /// \returns true on success, false on error.
   bool typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-  /// A unique_ptr for LazyResolver that can perform additional cleanup.
-  using OwnedResolver = std::unique_ptr<LazyResolver, void(*)(LazyResolver*)>;
-
-  /// Creates a lazy type resolver for use in lookups.
-  OwnedResolver createLazyResolver(ASTContext &Ctx);
+  /// Creates a type checker instance on the given AST context, if it
+  /// doesn't already have one.
+  ///
+  /// \returns a reference to the type checker instance.
+  TypeChecker &createTypeChecker(ASTContext &Ctx);
 
   struct ExtensionInfo {
     // The extension with the declarations to apply.

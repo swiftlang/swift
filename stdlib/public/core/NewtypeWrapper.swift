@@ -133,6 +133,7 @@ extension _SwiftNewtypeWrapper where Self.RawValue : _ObjectiveCBridgeable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: Self.RawValue._ObjectiveCType?
   ) -> Self {
@@ -165,6 +166,7 @@ extension _SwiftNewtypeWrapper where Self.RawValue: AnyObject {
   }
 
   @inlinable // FIXME(sil-serialize-all)
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: Self.RawValue?
   ) -> Self {

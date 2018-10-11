@@ -400,12 +400,35 @@ public:
   /// Set a new stats reporter.
   void setStatsReporter(UnifiedStatsReporter *stats);
 
+  /// Creates a new lazy resolver by passing the ASTContext and the other
+  /// given arguments to a newly-allocated instance of \c ResolverType.
+  ///
+  /// \returns true if a new lazy resolver was created, false if there was
+  /// already a lazy resolver registered.
+  template<typename ResolverType, typename ... Args>
+  bool createLazyResolverIfMissing(Args && ...args) {
+    if (getLazyResolver())
+      return false;
+
+    setLazyResolver(new ResolverType(*this, std::forward<Args>(args)...));
+    return true;
+  }
+
+  /// Remove the lazy resolver, if there is one.
+  ///
+  /// FIXME: We probably don't ever want to do this.
+  void removeLazyResolver() {
+    setLazyResolver(nullptr);
+  }
+
   /// Retrieve the lazy resolver for this context.
   LazyResolver *getLazyResolver() const;
 
+private:
   /// Set the lazy resolver for this context.
   void setLazyResolver(LazyResolver *resolver);
 
+public:
   /// Add a lazy parser for resolving members later.
   void addLazyParser(LazyMemberParser *parser);
 

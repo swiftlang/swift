@@ -428,6 +428,8 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
 ASTContext::Implementation::Implementation()
     : IdentifierTable(Allocator), TheSyntaxArena(new SyntaxArena()) {}
 ASTContext::Implementation::~Implementation() {
+  delete Resolver;
+
   for (auto &cleanup : Cleanups)
     cleanup();
 }
@@ -579,13 +581,10 @@ LazyResolver *ASTContext::getLazyResolver() const {
 
 /// Set the lazy resolver for this context.
 void ASTContext::setLazyResolver(LazyResolver *resolver) {
-  if (resolver) {
-    assert(getImpl().Resolver == nullptr && "already have a resolver");
-    getImpl().Resolver = resolver;
-  } else {
-    assert(getImpl().Resolver != nullptr && "no resolver to remove");
-    getImpl().Resolver = resolver;
-  }
+  if (auto existing = getImpl().Resolver)
+    delete existing;
+
+  getImpl().Resolver = resolver;
 }
 
 void ASTContext::addLazyParser(LazyMemberParser *lazyParser) {

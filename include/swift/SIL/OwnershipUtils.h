@@ -14,6 +14,7 @@
 #define SWIFT_SIL_OWNERSHIPUTILS_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -100,6 +101,22 @@ bool valueHasLinearLifetime(SILValue value,
                             SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
                             DeadEndBlocks &deadEndBlocks,
                             ownership::ErrorBehaviorKind errorBehavior);
+
+/// Returns true if v is an address or trivial.
+bool isValueAddressOrTrivial(SILValue v, SILModule &m);
+
+/// These operations forward both owned and guaranteed ownership.
+bool isOwnershipForwardingValueKind(SILNodeKind kind);
+
+/// These operations forward guaranteed ownership, but don't necessarily forward
+/// owned values.
+bool isGuaranteedForwardingValueKind(SILNodeKind kind);
+
+bool isGuaranteedForwardingValue(SILValue value);
+
+bool isGuaranteedForwardingInst(SILInstruction *i);
+
+bool isOwnershipForwardingInst(SILInstruction *i);
 
 } // namespace swift
 
