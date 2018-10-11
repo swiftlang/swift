@@ -910,10 +910,37 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, SourceLoc loc,
     return ErrorType::get(ctx);
   }
 
-  if (type->hasError() && isa<AssociatedTypeDecl>(typeDecl)) {
-    maybeDiagnoseBadConformanceRef(fromDC,
-                                   foundDC->getDeclaredInterfaceType(),
-                                   loc, cast<AssociatedTypeDecl>(typeDecl));
+  if (type->hasError()) {
+    if (auto associatedTypeDecl = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
+      maybeDiagnoseBadConformanceRef(fromDC,
+                                     foundDC->getDeclaredInterfaceType(),
+                                     loc, associatedTypeDecl);
+    }
+    if (auto aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      struct AssociatedTypeReprWalker : ASTWalker {
+        llvm::function_ref<void (AssociatedTypeDecl *)> callback;
+
+        AssociatedTypeReprWalker(llvm::function_ref<void (AssociatedTypeDecl *)> callback)
+        : callback(callback) {}
+
+        bool walkToTypeReprPre(TypeRepr *TR) {
+          if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(TR)) {
+            if (auto associatedTypeDecl = dyn_cast_or_null<AssociatedTypeDecl>(CITR->getBoundDecl())) {
+              callback(associatedTypeDecl);
+            }
+          }
+          return true;
+        }
+      };
+
+      auto repr = aliasDecl->getUnderlyingTypeLoc().getTypeRepr();
+      AssociatedTypeReprWalker walker([&](AssociatedTypeDecl *associatedTypeDecl) {
+        maybeDiagnoseBadConformanceRef(fromDC,
+                                       foundDC->getDeclaredInterfaceType(),
+                                       loc, associatedTypeDecl);
+      });
+      repr->walk(walker);
+    }
   }
 
   if (generic) {
