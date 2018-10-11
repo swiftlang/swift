@@ -7402,7 +7402,10 @@ class CheckedCastAddrBranchInst
       : InstructionBase(DebugLoc), ConsumptionKind(consumptionKind),
         Operands{this, src, dest}, DestBBs{{this, successBB, Target1Count},
                                            {this, failureBB, Target2Count}},
-        SourceType(srcType), TargetType(targetType) {}
+        SourceType(srcType), TargetType(targetType) {
+    assert(ConsumptionKind != CastConsumptionKind::BorrowAlways &&
+           "BorrowAlways is not supported on addresses");
+  }
 
 public:
   enum {
