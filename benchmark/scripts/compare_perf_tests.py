@@ -256,6 +256,7 @@ class PerformanceTestResult(object):
             self.samples = PerformanceTestSamples(
                 self.name,
                 [Sample(None, None, int(runtime)) for runtime in runtimes])
+            self.samples.exclude_outliers(top_only=True)
             sams = self.samples
             self.min, self.max, self.median, self.mean, self.sd = \
                 sams.min, sams.max, sams.median, sams.mean, sams.sd

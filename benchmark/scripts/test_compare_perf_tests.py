@@ -224,16 +224,18 @@ class TestPerformanceTestResult(unittest.TestCase):
         r = PerformanceTestResult(log.split(','), quantiles=True, memory=True)
         self.assertEquals((r.samples.count, r.max_rss), (3, 266240))
         # #,TEST,SAMPLES,MIN(μs),Q1(μs),Q2(μs),Q3(μs),MAX(μs)
-        log = '1,Ackermann,5,54570,54593,54644,57212,63304'
+        log = '1,Ackermann,5,54570,54593,54644,57212,58304'
         r = PerformanceTestResult(log.split(','), quantiles=True, memory=False)
         self.assertEquals((r.num_samples, r.min, r.median, r.max),
-                          (5, 54570, 54644, 63304))
+                          (5, 54570, 54644, 58304))
         self.assertEquals((r.samples.q1, r.samples.q3), (54593, 57212))
         self.assertEquals(r.samples.count, 5)
         # #,TEST,SAMPLES,MIN(μs),Q1(μs),Q2(μs),Q3(μs),MAX(μs),MAX_RSS(B)
         log = '1,Ackermann,5,54686,54731,54774,55030,63466,270336'
         r = PerformanceTestResult(log.split(','), quantiles=True, memory=True)
-        self.assertEquals((r.samples.count, r.max_rss), (5, 270336))
+        self.assertEquals(r.samples.num_samples, 5)
+        self.assertEquals(r.samples.count, 4)  # outlier was excluded
+        self.assertEquals(r.max_rss, 270336)
 
     def test_init_delta_quantiles(self):
         # #,TEST,SAMPLES,MIN(μs),𝚫MEDIAN,𝚫MAX
@@ -504,8 +506,10 @@ Total performance tests executed: 1
             '𝚫V9,𝚫VA,𝚫VB,𝚫VC,𝚫VD,𝚫VE,𝚫VF,𝚫VG,𝚫VH,𝚫VI,𝚫VJ,𝚫MAX\n' +
             '202,DropWhileArray,200,214,,,,,,,,,,,,1,,,,,,2,16,464'
         )['DropWhileArray']
-        self.assertEquals((r.num_samples, r.min, r.max, r.samples.count),
-                          (200, 214, 697, 21))
+        self.assertEquals(
+            (r.num_samples, r.min, r.max, r.samples.count),
+             # last 3 ventiles were outliers and were excluded from the sample
+            (200, 214, 215, 18))
 
     def test_parse_results_verbose(self):
         """Parse multiple performance test results with 2 sample formats:
