@@ -35,6 +35,22 @@
                             {
                               "kind": "Newline",
                               "value": 1
+                            },
+                            {
+                              "kind": "LineComment",
+                              "value": "\/\/ ATTENTION: This file is testing the EOF token. "
+                            },
+                            {
+                              "kind": "Newline",
+                              "value": 1
+                            },
+                            {
+                              "kind": "LineComment",
+                              "value": "\/\/ DO NOT PUT ANYTHING AFTER THE CHANGE, NOT EVEN A NEWLINE"
+                            },
+                            {
+                              "kind": "Newline",
+                              "value": 1
                             }
                           ],
                           "trailingTrivia": [
