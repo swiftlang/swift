@@ -106,12 +106,39 @@ func doWhileLoopWithBreak(_ breakIndex:Int32) -> Tensor<Int32> {
 }
 
 ControlFlowTests.testAllBackends("doWhileLoopWithBreak") {
-  expectEqualWithScalarTensor(3, natSumWithBreak(2))
-  expectEqualWithScalarTensor(55, natSumWithBreak(10))
-  expectEqualWithScalarTensor(5050, natSumWithBreak(-300))
-  expectEqualWithScalarTensor(5050, natSumWithBreak(100))
-  expectEqualWithScalarTensor(5050, natSumWithBreak(200))
+  expectEqualWithScalarTensor(3, doWhileLoopWithBreak(2))
+  expectEqualWithScalarTensor(55, doWhileLoopWithBreak(10))
+  expectEqualWithScalarTensor(5050, doWhileLoopWithBreak(-300))
+  expectEqualWithScalarTensor(5050, doWhileLoopWithBreak(100))
+  expectEqualWithScalarTensor(5050, doWhileLoopWithBreak(200))
 }
+
+func nestedDoWhileLoopWithBreak(
+	_ breakIndex:Int32, _ repetitions: Int32) -> Tensor<Int32> {
+	var sum = Tensor<Int32>(0)
+	for j in 1...repetitions {
+		var i: Int32 = 1
+		let maxCount: Int32 = 100
+		repeat {
+			sum += i
+			if i == breakIndex {
+				break
+			}
+			i += 1
+		} while i <= maxCount
+	}
+	return sum
+}
+
+ControlFlowTests.testAllBackends("nestedDoWhileLoopWithBreak") {
+  expectEqualWithScalarTensor(3, nestedDoWhileLoopWithBreak(2, 1))
+  expectEqualWithScalarTensor(165, nestedDoWhileLoopWithBreak(10, 3))
+  expectEqualWithScalarTensor(5050, nestedDoWhileLoopWithBreak(-300, 1))
+  expectEqualWithScalarTensor(10100, nestedDoWhileLoopWithBreak(100, 2))
+  expectEqualWithScalarTensor(5050, nestedDoWhileLoopWithBreak(200, 1))
+}
+
+
 
 #endif // CUDA
 

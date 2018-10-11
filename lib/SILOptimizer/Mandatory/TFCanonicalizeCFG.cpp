@@ -1316,8 +1316,14 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
       worklist.insert(succ);
     }
   }
+
+  SILLoop *parentLoop = loop->getParentLoop();
   for (SILBasicBlock *bb : initializedBlocks) {
     cloner.cloneBlock(bb);
+    SILBasicBlock *clonedBlock = cloner.cloneBlock(bb);
+    if (parentLoop) {
+      parentLoop->addBasicBlockToLoop(clonedBlock, LI->getBase());
+    }
   }
 
   // Get the clone for the original and new header.
