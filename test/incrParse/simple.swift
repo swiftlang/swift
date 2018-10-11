@@ -22,7 +22,7 @@ func foo() {
 }
 
 _ = <<REPLACE<6|||7>>>
-_ = </reparse REPLACE><<REPLACE_BY_LONGER<6|||"Hello World">>>
+_ = <<REPLACE_BY_LONGER<6|||"Hello World">>></reparse REPLACE>
 _ = <<REPLACE_BY_SHORTER<"Hello again"|||"a">>>
 <<INSERT<|||foo()>>>
 <<REMOVE<print("abc")|||>>>
