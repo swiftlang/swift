@@ -6500,7 +6500,7 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
   SmallVector<SourceLoc, 4> identifierLocs;
   if (Tok.is(tok::colon)) {
     SyntaxParsingContext GroupCtxt(SyntaxContext,
-                                   SyntaxKind::InfixOperatorGroup);
+                                   SyntaxKind::OperatorPrecedenceAndTypes);
     colonLoc = consumeToken();
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletion && !isPrefix && !isPostfix) {
@@ -6514,6 +6514,9 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
 
     if (Context.LangOpts.EnableOperatorDesignatedTypes) {
       if (Tok.is(tok::identifier)) {
+        SyntaxParsingContext GroupCtxt(SyntaxContext,
+                                       SyntaxKind::IdentifierList);
+
         identifiers.push_back(Context.getIdentifier(Tok.getText()));
         identifierLocs.push_back(consumeToken(tok::identifier));
 
@@ -6534,6 +6537,9 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
         }
       }
     } else if (Tok.is(tok::identifier)) {
+      SyntaxParsingContext GroupCtxt(SyntaxContext,
+                                     SyntaxKind::IdentifierList);
+
       identifiers.push_back(Context.getIdentifier(Tok.getText()));
       identifierLocs.push_back(consumeToken(tok::identifier));
 
