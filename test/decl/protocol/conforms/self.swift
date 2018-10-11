@@ -104,4 +104,11 @@ final class C8902b : P8902 {
 class C8902c : P8902 {
     func f(_ x: Bool) -> Self { fatalError() }
 }
+protocol P8902complex {
+  associatedtype A
+  func f() -> (A, Self?)
+}
+final class C8902complex : P8902complex {
+  func f() -> (Bool, C8902complex?) { fatalError() }
+}
 
