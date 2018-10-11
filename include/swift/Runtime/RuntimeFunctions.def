@@ -649,12 +649,14 @@ FUNCTION(GetGenericWitnessTable, swift_getGenericWitnessTable, C_CC,
 //                                            MetadataRequest request,
 //                                            WitnessTable *wtable,
 //                                            const Metadata *conformingType,
+//                                            ProtocolRequirement *reqBase,
 //                                            ProtocolRequirement *assocType);
 FUNCTION(GetAssociatedTypeWitness, swift_getAssociatedTypeWitness, C_CC,
          RETURNS(TypeMetadataResponseTy),
          ARGS(SizeTy,
               WitnessTablePtrTy,
               TypeMetadataPtrTy,
+              ProtocolRequirementStructTy->getPointerTo(),
               ProtocolRequirementStructTy->getPointerTo()),
          ATTRS(NoUnwind, ReadNone))
 

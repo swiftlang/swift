@@ -3998,21 +3998,24 @@ MetadataResponse
 swift::swift_getAssociatedTypeWitness(MetadataRequest request,
                                       WitnessTable *wtable,
                                       const Metadata *conformingType,
+                                      const ProtocolRequirement *reqBase,
                                       const ProtocolRequirement *assocType) {
-  const ProtocolConformanceDescriptor *conformance = wtable->Description;
-  const ProtocolDescriptor *protocol = conformance->getProtocol();
 
-  auto requirements = protocol->getRequirements();
-  assert(assocType >= requirements.begin() &&
-         assocType < requirements.end());
-  const auto &req = *assocType;
-  (void)req;
-  assert(req.Flags.getKind() ==
+#ifndef NDEBUG
+  {
+    const ProtocolConformanceDescriptor *conformance = wtable->Description;
+    const ProtocolDescriptor *protocol = conformance->getProtocol();
+    auto requirements = protocol->getRequirements();
+    assert(assocType >= requirements.begin() &&
+           assocType < requirements.end());
+    assert(reqBase == requirements.data() - WitnessTableFirstRequirementOffset);
+    assert(assocType->Flags.getKind() ==
            ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction);
+  }
+#endif
 
   // If the low bit of the witness is clear, it's already a metadata pointer.
-  unsigned witnessIndex = (assocType - requirements.begin()) +
-    WitnessTableFirstRequirementOffset;
+  unsigned witnessIndex = assocType - reqBase;
   auto witness = ((const void* const *)wtable)[witnessIndex];
   if (LLVM_LIKELY((uintptr_t(witness) &
          ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
@@ -4033,6 +4036,10 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
     inProtocolContext = true;
     ++mangledNameBase;
   }
+
+  // Dig out the protocol.
+  const ProtocolConformanceDescriptor *conformance = wtable->Description;
+  const ProtocolDescriptor *protocol = conformance->getProtocol();
 
   // Extract the mangled name itself.
   StringRef mangledName =

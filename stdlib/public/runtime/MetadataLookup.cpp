@@ -1200,6 +1200,7 @@ swift::_getTypeByMangledName(StringRef typeName,
                                      MetadataState::Abstract,
                                      const_cast<WitnessTable *>(witnessTable),
                                      base,
+                                     protocol->getRequirementBaseDescriptor(),
                                      *assocTypeReq).Value;
     });
 
