@@ -725,8 +725,16 @@ private:
   /// \returns NULL if the constructed expression does not typecheck.
   Expr* constructCallToSuperInit(ConstructorDecl *ctor, ClassDecl *ClDecl);
 
-public:
   TypeChecker(ASTContext &Ctx);
+  friend class ASTContext;
+
+public:
+  /// Create a new type checker instance for the given ASTContext, if it
+  /// doesn't already have one.
+  ///
+  /// \returns a reference to the type vchecker.
+  static TypeChecker &createForContext(ASTContext &ctx);
+
   TypeChecker(const TypeChecker&) = delete;
   TypeChecker& operator=(const TypeChecker&) = delete;
   ~TypeChecker();

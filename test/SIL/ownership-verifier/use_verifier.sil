@@ -13,8 +13,6 @@ import Builtin
 // Declarations //
 //////////////////
 
-sil @allocate_object : $@convention(thin) () -> @owned Builtin.NativeObject
-
 typealias AnyObject = Builtin.AnyObject
 
 public protocol Error {}
@@ -35,8 +33,6 @@ case nopayload
 case trivial_payload(Builtin.Int32)
 case nontrivial_payload(Builtin.NativeObject)
 }
-
-sil @three_differing_payload_enum_user : $@convention(thin) (@owned ThreeDifferingPayloadEnum, @guaranteed ThreeDifferingPayloadEnum, ThreeDifferingPayloadEnum) -> ()
 
 struct TrivialStruct {
   var f1: Builtin.Int32
@@ -67,8 +63,6 @@ protocol SwiftKlassP : class {
   func foo()
 }
 
-sil @nontrivial_unowned_user : $@convention(thin) (Builtin.NativeObject) -> ()
-
 struct Val {
 }
 class Ref {
@@ -78,14 +72,9 @@ struct Aleph {
   var b:Val
 }
 
-sil @borrow_tuple_user : $@convention(thin) (@guaranteed (Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)) -> ()
-sil @unowned_tuple_user : $@convention(thin) ((Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)) -> ()
-
 struct Int {
   var value: Builtin.Int64
 }
-
-sil @no_arg_or_output_function : $@convention(thin) () -> ()
 
 class RefWithInt {
   var value: Builtin.Int32
@@ -100,6 +89,18 @@ class RefWithRef {
 
   init()
 }
+
+sil @no_arg_or_output_function : $@convention(thin) () -> ()
+
+
+sil @allocate_object : $@convention(thin) () -> @owned Builtin.NativeObject
+
+sil @three_differing_payload_enum_user : $@convention(thin) (@owned ThreeDifferingPayloadEnum, @guaranteed ThreeDifferingPayloadEnum, ThreeDifferingPayloadEnum) -> ()
+
+sil @nontrivial_unowned_user : $@convention(thin) (Builtin.NativeObject) -> ()
+
+sil @borrow_tuple_user : $@convention(thin) (@guaranteed (Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)) -> ()
+sil @unowned_tuple_user : $@convention(thin) ((Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)) -> ()
 
 sil @produce_owned_optional : $@convention(thin) () -> @owned Optional<Builtin.NativeObject>
 sil @guaranteed_nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()

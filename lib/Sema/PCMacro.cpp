@@ -322,7 +322,7 @@ public:
 
         if (NB != B) {
           FD->setBody(NB);
-          TypeChecker(Context).checkFunctionErrorHandling(FD);
+          TypeChecker::createForContext(Context).checkFunctionErrorHandling(FD);
         }
       }
     } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -668,7 +668,7 @@ void swift::performPCMacro(SourceFile &SF, TopLevelContext &TLC) {
             BraceStmt *NewBody = I.transformBraceStmt(Body, true);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
-              TypeChecker TC(ctx);
+              TypeChecker &TC = TypeChecker::createForContext(ctx);
               TC.checkTopLevelErrorHandling(TLCD);
               TC.contextualizeTopLevelCode(TLC,
                                            SmallVector<Decl *, 1>(1, TLCD));
