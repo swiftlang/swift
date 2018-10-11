@@ -1484,7 +1484,7 @@ static bool diagnoseAvailability(IdentTypeRepr *IdType,
       if (ctx.LangOpts.isSwiftVersion3() && comp != componentRange.back())
         continue;
 
-      // FIXME: Need to eliminate the type checker argument.
+      assert(ctx.getLazyResolver() && "Must have a type checker!");
       TypeChecker &tc = static_cast<TypeChecker &>(*ctx.getLazyResolver());
       if (diagnoseDeclAvailability(typeDecl, tc, DC, comp->getIdLoc(),
                                    AllowPotentiallyUnavailableProtocol,
