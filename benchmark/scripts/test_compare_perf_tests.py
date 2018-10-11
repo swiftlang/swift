@@ -243,8 +243,68 @@ class TestPerformanceTestResult(unittest.TestCase):
         r = PerformanceTestResult(log.split(','), quantiles=True, delta=True)
         self.assertEquals((r.num_samples, r.min, r.median, r.max),
                           (2, 265, 265, 287))
-        self.assertEquals(r.samples.count, 3)        # --quantile=2 gives a
-        self.assertEquals(r.samples.num_samples, 3)  # 3 sample estimate
+        self.assertEquals(r.samples.count, 2)
+        self.assertEquals(r.samples.num_samples, 2)
+
+    def test_init_oversampled_quantiles(self):
+        """When num_samples is < quantile + 1, some of the measurements are
+        repeated in the report summary. Samples should contain only true
+        values, discarding the repetated artifacts from quantile estimation.
+
+        The test string is slightly massaged output of the following R script:
+        subsample <- function(x, q) {
+          quantile(1:x, probs=((0:(q-1))/(q-1)), type=1)}
+        tbl <- function(s) t(sapply(1:s, function(x) {
+          qs <- subsample(x, s); c(qs[1], diff(qs)) }))
+        sapply(c(3, 5, 11, 21), tbl)
+        """
+        def validatePTR(deq):  # construct from delta encoded quantiles string
+            deq = deq.split(',')
+            num_samples = deq.count('1')
+            r = PerformanceTestResult(['0', 'B', str(num_samples)] + deq,
+                                      quantiles=True, delta=True)
+            self.assertEquals(r.samples.num_samples, num_samples)
+            self.assertEquals([s.runtime for s in r.samples.all_samples],
+                              range(1, num_samples + 1))
+
+        delta_encoded_quantiles = """
+1,,
+1,,1
+1,,,,
+1,,,1,
+1,,1,1,
+1,,1,1,1
+1,,,,,,,,,,
+1,,,,,,1,,,,
+1,,,,1,,,1,,,
+1,,,1,,,1,,1,,
+1,,,1,,1,,1,,1,
+1,,1,,1,,1,1,,1,
+1,,1,1,,1,1,,1,1,
+1,,1,1,1,,1,1,1,1,
+1,,1,1,1,1,1,1,1,1,
+1,,1,1,1,1,1,1,1,1,1
+1,,,,,,,,,,,,,,,,,,,,
+1,,,,,,,,,,,1,,,,,,,,,
+1,,,,,,,1,,,,,,,1,,,,,,
+1,,,,,,1,,,,,1,,,,,1,,,,
+1,,,,,1,,,,1,,,,1,,,,1,,,
+1,,,,1,,,1,,,,1,,,1,,,1,,,
+1,,,1,,,1,,,1,,,1,,,1,,,1,,
+1,,,1,,,1,,1,,,1,,1,,,1,,1,,
+1,,,1,,1,,1,,1,,,1,,1,,1,,1,,
+1,,,1,,1,,1,,1,,1,,1,,1,,1,,1,
+1,,1,,1,,1,,1,,1,1,,1,,1,,1,,1,
+1,,1,,1,,1,1,,1,,1,1,,1,,1,1,,1,
+1,,1,,1,1,,1,1,,1,1,,1,1,,1,1,,1,
+1,,1,1,,1,1,,1,1,,1,1,1,,1,1,,1,1,
+1,,1,1,,1,1,1,,1,1,1,,1,1,1,,1,1,1,
+1,,1,1,1,,1,1,1,1,,1,1,1,1,,1,1,1,1,
+1,,1,1,1,1,1,,1,1,1,1,1,1,,1,1,1,1,1,
+1,,1,1,1,1,1,1,1,1,,1,1,1,1,1,1,1,1,1,
+1,,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1"""
+        map(validatePTR, delta_encoded_quantiles.split('\n')[1:])
 
     def test_repr(self):
         log_line = '1,AngryPhonebook,20,10664,12933,11035,576,10884'

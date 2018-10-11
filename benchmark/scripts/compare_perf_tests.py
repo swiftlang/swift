@@ -241,9 +241,18 @@ class PerformanceTestResult(object):
         if quantiles:  # Variable number of columns representing quantiles
             runtimes = csv_row[3:-1] if memory else csv_row[3:]
             if delta:
-                runtimes = map(lambda x: int(x) if x else 0, runtimes)
-                runtimes = reduce(lambda l, x: l.append(l[-1] + x) or
-                                  l if l else [x], runtimes, None)
+                runtimes = [int(x) if x else 0 for x in runtimes]
+                runtimes = reduce(lambda l, x: l.append(l[-1] + x) or  # runnin
+                                  l if l else [x], runtimes, None)     # total
+            num_values = len(runtimes)
+            if self.num_samples < num_values: # remove repeated samples
+                quantile = num_values - 1
+                qs = [float(i) / float(quantile) for i in range(0, num_values)]
+                indices = [max(0, int(ceil(self.num_samples * float(q))) - 1)
+                           for q in qs]
+                runtimes = [runtimes[indices.index(i)]
+                            for i in range(0, self.num_samples)]
+
             self.samples = PerformanceTestSamples(
                 self.name,
                 [Sample(None, None, int(runtime)) for runtime in runtimes])
