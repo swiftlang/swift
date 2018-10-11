@@ -849,7 +849,7 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
                         TheSILModule ? &SILContext : nullptr, &PersistentState,
                         DelayedParseCB);
 
-    if (mainIsPrimary) {
+    if (mainIsPrimary && (Done || CurTUElem < MainFile.Decls.size())) {
       switch (LimitStage) {
       case SourceFile::Parsing:
       case SourceFile::Parsed:

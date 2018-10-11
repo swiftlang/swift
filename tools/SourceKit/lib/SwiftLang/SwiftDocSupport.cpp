@@ -960,8 +960,7 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
     return true;
 
   ASTContext &Ctx = CI.getASTContext();
-  // Setup a typechecker for protocol conformance resolving.
-  OwnedResolver TypeResolver = createLazyResolver(Ctx);
+  (void)createTypeChecker(Ctx);
 
   SourceTextInfo IFaceInfo;
   if (getModuleInterfaceInfo(Ctx, ModuleName, IFaceInfo))
@@ -1089,7 +1088,7 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
   CI.performSema();
 
   // Setup a typechecker for protocol conformance resolving.
-  OwnedResolver TypeResolver = createLazyResolver(Ctx);
+  (void)createTypeChecker(Ctx);
 
   SourceTextInfo SourceInfo;
   if (getSourceTextInfo(CI, SourceInfo))
@@ -1447,7 +1446,8 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
 
   ASTContext &Ctx = CI.getASTContext();
   // Setup a typechecker for protocol conformance resolving.
-  OwnedResolver TypeResolver = createLazyResolver(Ctx);
+  (void)createTypeChecker(Ctx);
+
   // Load standard library so that Clang importer can use it.
   auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);
   if (!Stdlib) {

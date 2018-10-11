@@ -3664,13 +3664,7 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
       BaseTy->hasUnboundGenericType())
     return true;
 
-  std::unique_ptr<TypeChecker> CreatedTC;
-  // If the current ast context has no type checker, create one for it.
-  auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
-  if (!TC) {
-    CreatedTC.reset(new TypeChecker(DC.getASTContext()));
-    TC = CreatedTC.get();
-  }
+  TypeChecker *TC = &createTypeChecker(DC.getASTContext());
 
   ConstraintSystemOptions Options;
   ConstraintSystem CS(*TC, &DC, Options);
@@ -3696,14 +3690,9 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
 static bool canSatisfy(Type type1, Type type2, bool openArchetypes,
                        ConstraintKind kind, DeclContext *dc) {
   std::unique_ptr<TypeChecker> CreatedTC;
-  // If the current ASTContext has no type checker, create one for it.
-  auto *TC = static_cast<TypeChecker*>(dc->getASTContext().getLazyResolver());
-  if (!TC) {
-    CreatedTC.reset(new TypeChecker(dc->getASTContext()));
-    TC = CreatedTC.get();
-  }
-  return TC->typesSatisfyConstraint(type1, type2, openArchetypes, kind, dc,
-                                    /*unwrappedIUO=*/nullptr);
+  auto &TC = TypeChecker::createForContext(dc->getASTContext());
+  return TC.typesSatisfyConstraint(type1, type2, openArchetypes, kind, dc,
+                                   /*unwrappedIUO=*/nullptr);
 }
 
 bool swift::canPossiblyEqual(Type T1, Type T2, DeclContext &DC) {
@@ -3765,12 +3754,8 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
   ResolvedMemberResult Result;
   std::unique_ptr<TypeChecker> CreatedTC;
   // If the current ast context has no type checker, create one for it.
-  auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
-  if (!TC) {
-    CreatedTC.reset(new TypeChecker(DC.getASTContext()));
-    TC = CreatedTC.get();
-  }
-  ConstraintSystem CS(*TC, &DC, None);
+  auto &TC = TypeChecker::createForContext(DC.getASTContext());
+  ConstraintSystem CS(TC, &DC, None);
 
   // Look up all members of BaseTy with the given Name.
   MemberLookupResult LookupResult = CS.performMemberLookup(
