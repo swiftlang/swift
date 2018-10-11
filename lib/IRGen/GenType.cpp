@@ -423,6 +423,19 @@ static llvm::Value *computeExtraTagBytes(IRGenFunction &IGF, IRBuilder &Builder,
   return phi;
 }
 
+static Address alignAddress(IRGenFunction &IGF,
+		            Address originAddress,
+			    llvm::Value *shift){
+  auto &Builder = IGF.Builder;
+  auto &IGM = IGF.IGM;
+  auto *alignedAddress = Builder.CreateBitCast(originAddress, IGM.Int8PtrTy).getAddress();
+#if defined(__linux__) && defined(__BIG_ENDIAN__)
+  alignedAddress = Builder.CreateConstGEP1_32(alignedAddress, 4);
+  alignedAddress = Builder.CreateGEP(alignedAddress, Builder.CreateNeg(shift));
+#endif
+  return Address(alignedAddress, Alignment(0));
+}
+
 llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
                                                     llvm::Value *numEmptyCases,
                                                     Address enumAddr,
@@ -473,9 +486,10 @@ llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
       Builder.CreateConstInBoundsGEP1_32(IGM.Int8Ty, valueAddr,
                                          fixedSize.getValue());
 
-  // TODO: big endian.
+  Address alignedExtraTagBitsSlot = alignAddress(IGF, extraTagBitsSlot, numExtraTagBytes);
+  numExtraTagBytes = IGF.Builder.CreateZExt(numExtraTagBytes, IGM.SizeTy);
   Builder.CreateMemCpy(
-      Builder.CreateBitCast(extraTagBitsSlot, IGM.Int8PtrTy).getAddress(), 1,
+      Builder.CreateBitCast(alignedExtraTagBitsSlot, IGM.Int8PtrTy).getAddress(), 1,
       extraTagBitsAddr, 1, numExtraTagBytes);
   auto extraTagBits = Builder.CreateLoad(extraTagBitsSlot);
 
@@ -496,9 +510,9 @@ llvm::Value *FixedTypeInfo::getEnumTagSinglePayload(IRGenFunction &IGF,
       Builder.CreateShl(Builder.CreateSub(extraTagBits, one),
                         Builder.CreateMul(eight, truncSize)));
 
-  // TODO: big endian.
+  Address alignedCaseIndex = alignAddress(IGF, caseIndexFromValueSlot, llvm::ConstantInt::getSigned(IGM.Int32Ty, std::min(Size(4U).getValue(), fixedSize.getValue())));
   Builder.CreateMemCpy(
-      Builder.CreateBitCast(caseIndexFromValueSlot, IGM.Int8PtrTy),
+      alignedCaseIndex,
       Address(valueAddr, Alignment(1)),
       std::min(Size(4U), fixedSize));
   auto caseIndexFromValue = Builder.CreateLoad(caseIndexFromValueSlot);
@@ -712,16 +726,18 @@ void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,
   Builder.CreateStore(payloadIndex, payloadIndexAddr);
   Address extraTagIndexAddr = IGF.createAlloca(int32Ty, Alignment(4));
   Builder.CreateStore(extraTagIndex, extraTagIndexAddr);
-  // TODO: big endian
+
+  Address alignedPayloadIndexAddr = alignAddress(IGF, payloadIndexAddr, llvm::ConstantInt::getSigned(IGM.Int32Ty, std::min(Size(4U).getValue(), fixedSize.getValue())));
   Builder.CreateMemCpy(
       valueAddr,
-      Builder.CreateBitCast(payloadIndexAddr, IGM.Int8PtrTy),
+      alignedPayloadIndexAddr,
       std::min(Size(4U), fixedSize));
   Address extraZeroAddr = Builder.CreateConstByteArrayGEP(valueAddr, Size(4));
   if (fixedSize > Size(4))
     Builder.CreateMemSet(
         extraZeroAddr, llvm::ConstantInt::get(IGM.Int8Ty, 0),
         Builder.CreateSub(size, llvm::ConstantInt::get(size->getType(), 4)));
+  extraTagIndexAddr = alignAddress(IGF, extraTagIndexAddr, numExtraTagBytes);
   emitMemCpy(IGF, extraTagBitsAddr, extraTagIndexAddr, numExtraTagBytes);
   Builder.CreateBr(returnBB);
 
