@@ -248,8 +248,7 @@ struct ByteBasedSourceRange {
 
   SourceRange toSourceRange(SourceManager &SourceMgr, unsigned BufferID) {
     auto StartLoc = SourceMgr.getLocForOffset(BufferID, Start);
-    // SourceRange includes the last offset, we don't. So subtract 1
-    auto EndLoc = SourceMgr.getLocForOffset(BufferID, End - 1);
+    auto EndLoc = SourceMgr.getLocForOffset(BufferID, End);
     return SourceRange(StartLoc, EndLoc);
   }
 };
