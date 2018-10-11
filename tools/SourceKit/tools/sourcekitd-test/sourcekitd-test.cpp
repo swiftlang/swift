@@ -554,6 +554,10 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     break;
   }
 
+  case SourceKitRequest::CrashWithExit:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCrashWithExit);
+    break;
+
   case SourceKitRequest::CursorInfo:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCursorInfo);
     if (Opts.CollectActionables) {
@@ -1001,6 +1005,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
     case SourceKitRequest::CodeCompleteUpdate:
     case SourceKitRequest::CodeCompleteCacheOnDisk:
     case SourceKitRequest::CodeCompleteSetPopularAPI:
+    case SourceKitRequest::CrashWithExit:
       sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
       break;
 

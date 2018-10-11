@@ -398,6 +398,10 @@ static void updateSemanticEditorDelay() {
   // Clear any previous setting.
   SemanticEditorDelaySecondsNum = 0;
 
+  // Leave the delay at 0 if it is explicitly disabled
+  if(::getenv("SOURCEKIT_DISABLE_SEMA_EDITOR_DELAY"))
+    return;
+
   static TimePoint gPrevCrashTime;
 
   TimePoint PrevTime = gPrevCrashTime;

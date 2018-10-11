@@ -114,6 +114,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("complete.update", SourceKitRequest::CodeCompleteUpdate)
         .Case("complete.cache.ondisk", SourceKitRequest::CodeCompleteCacheOnDisk)
         .Case("complete.setpopularapi", SourceKitRequest::CodeCompleteSetPopularAPI)
+        .Case("crash", SourceKitRequest::CrashWithExit)
         .Case("cursor", SourceKitRequest::CursorInfo)
         .Case("related-idents", SourceKitRequest::RelatedIdents)
         .Case("syntax-map", SourceKitRequest::SyntaxMap)
@@ -155,7 +156,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         llvm::errs() << "error: invalid request '" << InputArg->getValue()
             << "'\nexpected one of "
             << "version/demangle/mangle/index/complete/complete.open/complete.cursor/"
-               "complete.update/complete.cache.ondisk/complete.cache.setpopularapi/"
+               "complete.update/complete.cache.ondisk/complete.cache.setpopularapi/crash/"
                "cursor/related-idents/syntax-map/structure/format/expand-placeholder/"
                "doc-info/sema/interface-gen/interface-gen-openfind-usr/find-interface/"
                "open/close/edit/print-annotations/print-diags/extract-comment/module-groups/"
