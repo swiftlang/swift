@@ -348,7 +348,7 @@
 ///
 /// Note that in this example, `imagePaths` is subscripted using a dictionary
 /// index. Unlike the key-based subscript, the index-based subscript returns
-/// the corresponding key-value pair as a nonoptional tuple.
+/// the corresponding key-value pair as a non-optional tuple.
 ///
 ///     print(imagePaths[glyphIndex!])
 ///     // Prints "("star", "/glyphs/star.png")"
@@ -967,7 +967,7 @@ extension Dictionary {
   /// Returns a new dictionary containing only the key-value pairs that have
   /// non-`nil` values as the result from the transform by the given closure.
   ///
-  /// Use this method to receive a dictionary of nonoptional values when your
+  /// Use this method to receive a dictionary of non-optional values when your
   /// transformation can produce an optional value.
   ///
   /// In this example, note the difference in the result of using `mapValues`
