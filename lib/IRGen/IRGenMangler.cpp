@@ -101,7 +101,10 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
       // TODO: We ought to be able to use indirect symbolic references even
       // when the referent may be in another file, once the on-disk
       // ObjectMemoryReader can handle them.
-      if (!IGM.CurSourceFile || IGM.CurSourceFile != type->getParentSourceFile())
+      // Private entities are known to be accessible.
+      if (type->getEffectiveAccess() >= AccessLevel::Internal &&
+          (!IGM.CurSourceFile ||
+           IGM.CurSourceFile != type->getParentSourceFile()))
         return false;
       
       // @objc protocols don't have descriptors.
@@ -114,6 +117,7 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
       llvm_unreachable("symbolic referent not handled");
     }
   };
+
   SymbolicReferences.clear();
   
   body();
