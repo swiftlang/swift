@@ -60,9 +60,15 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
     TFE_DeleteTensorHandle(_cTensorHandle)
     debugLog("Returning from deinit of TensorHandle.")
   }
-  
+}
+
+// TODO: We should add a "Scalar : TensorBuffersArePlainScalars" (better
+// protocol name TBD) constraint to this extension, because these initializers
+// only work for Tensors whose underlying buffers are filled with plain
+// scalars.  In particular, this will exclude String scalars.
+extension TensorHandle {
   /// Create a `TensorHandle` with a closure that initializes the underlying
-  /// buffer.
+  /// buffer.  The Scalar must not be a String.
   ///
   /// - Note: `scalarsInitializer` must initialize all scalars in the underlying
   /// buffer.
@@ -71,6 +77,8 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
     shape: [Int32],
     scalarsInitializer: (UnsafeMutablePointer<Scalar>) -> Void
   ) {
+    precondition(Scalar.self != String.self,
+                 "Cannot use scalarsInitializer with String.")
     let contiguousSize = shape.lazy.map(Int.init).reduce(1, *)
     let byteCount = contiguousSize * MemoryLayout<Scalar>.stride
     // Initialize tensor and copy data.
@@ -87,6 +95,94 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
 
     self.init(copyingFromCTensor: cTensor)
     TF_DeleteTensor(cTensor)
+  }
+
+  /// Create a `TensorHandle` with the specified `scalars` and `shape`.  The
+  /// Scalar must not be a String.
+  @usableFromInline
+  convenience init(_ scalars: [Scalar], shape: [Int32]) {
+    precondition(Scalar.self != String.self,
+                 "Cannot use scalarsInitializer with String.")
+    let contiguousSize = shape.map(Int.init).reduce(1, *)
+    precondition(scalars.count == contiguousSize,
+                 "The number of scalars does not match the shape.")
+    self.init(
+      shape: shape,
+      scalarsInitializer: { addr in
+        scalars.withUnsafeBufferPointer { ptr in
+          addr.assign(from: ptr.baseAddress!, count: contiguousSize)
+        }
+      }
+    )
+  }
+}
+
+extension TensorHandle where Scalar == String {
+  /// Create a `TensorHandle<String>` with the specified `strings` and `shape`.
+  @usableFromInline
+  convenience init(strings: [String], shape: [Int32]) {
+    let contiguousSize = shape.map(Int.init).reduce(1, *)
+    precondition(strings.count == contiguousSize,
+                 "The number of strings does not match the shape.")
+
+    let cStrings = strings.map({ $0.utf8CString })
+
+    let tfEncodedSizes = cStrings.map({ cString -> Int in
+      // The cStrings are null-terminated. TF_StringEncodedSize wants the
+      // string's byte count not including null-terminator.
+      return TF_StringEncodedSize(cString.count - 1)
+    })
+
+    // Format information copied from tensorflow/c/c_api.h:
+    // The format for TF_STRING tensors is:
+    //   start_offset: array[uint64]
+    //   data:         byte[...]
+    //
+    //   The string length (as a varint), followed by the contents of the string
+    //   is encoded at data[start_offset[i]]].
+
+    // The size of the "start_offset" region.
+    let startOffsetsByteCount = strings.count * MemoryLayout<UInt64>.stride
+
+    // The size of the "data" region.
+    let dataByteCount =
+        tfEncodedSizes.reduce(0, +) * MemoryLayout<UInt8>.stride
+
+    // Allocate the tensor.
+    let cTensor = TF_AllocateTensor(
+      Scalar.tensorFlowDataType.cDataType,
+      shape.map(Int64.init),
+      Int32(shape.count),
+      startOffsetsByteCount + dataByteCount
+    )!
+    assert(TF_TensorByteSize(cTensor) == startOffsetsByteCount + dataByteCount)
+    let tensorAddr = TF_TensorData(cTensor)
+
+    // Initialize the "start_offset" region.
+    var startOffset: UInt64 = 0
+    var startOffsetAddr =
+        tensorAddr?.bindMemory(to: UInt64.self, capacity: strings.count)
+    for tfEncodedSize in tfEncodedSizes {
+      startOffsetAddr!.initialize(to: startOffset)
+      startOffsetAddr = startOffsetAddr?.advanced(by: 1)
+      startOffset = startOffset + UInt64(tfEncodedSize)
+    }
+
+    // Initialize the "data" region.
+    var dataAddr = tensorAddr?.advanced(by: startOffsetsByteCount).bindMemory(to: Int8.self, capacity: dataByteCount)
+    let status = TF_NewStatus()
+    for (cString, tfEncodedSize) in zip(cStrings, tfEncodedSizes) {
+      let _ = cString.withUnsafeBufferPointer { buffer in
+        TF_StringEncode(buffer.baseAddress, buffer.count - 1, dataAddr, tfEncodedSize, status)
+      }
+      checkOk(status)
+      dataAddr = dataAddr?.advanced(by: tfEncodedSize)
+    }
+    TF_DeleteStatus(status)
+
+    self.init(copyingFromCTensor: cTensor)
+    TF_DeleteTensor(cTensor)
+    return
   }
 }
 

@@ -91,17 +91,9 @@ func _TFGetScalar<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar? {
 func _TFTensorFromScalars<Scalar>(
   _ scalars: [Scalar], shape: [Int32]
 ) -> TensorHandle<Scalar> {
-  let contiguousSize = shape.map(Int.init).reduce(1, *)
-  precondition(scalars.count == contiguousSize,
-               "The number of scalars does not match the shape.")
-  return TensorHandle(
-    shape: shape,
-    scalarsInitializer: { addr in
-      scalars.withUnsafeBufferPointer { ptr in
-        addr.assign(from: ptr.baseAddress!, count: contiguousSize)
-      }
-    }
-  )
+  // We need to do a dynamic dispatch through the Scalar protocol because we
+  // initialize tensors differently depending on the Scalar type.
+  return Scalar._makeTensor(scalars, shape: shape)
 }
 
 /// In graph mode, the deabstraction pass transforms this function call to
