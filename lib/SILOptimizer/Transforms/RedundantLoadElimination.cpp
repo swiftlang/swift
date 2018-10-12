@@ -481,6 +481,9 @@ private:
   /// walked, i.e. when the we generate the genset and killset.
   llvm::DenseSet<SILBasicBlock *> BBWithLoads;
 
+  /// If set, RLE ignores loads from that array type.
+  NominalTypeDecl *ArrayType;
+
 #ifndef NDEBUG
   SILPrintContext printCtx;
 #endif
@@ -488,7 +491,7 @@ private:
 public:
   RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
              TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO,
-             EpilogueARCFunctionInfo *EAFI);
+             EpilogueARCFunctionInfo *EAFI, bool disableArrayLoads);
 
   RLEContext(const RLEContext &) = delete;
   RLEContext(RLEContext &&) = default;
@@ -555,6 +558,17 @@ public:
   /// Transitively collect all the values that make up this location and
   /// create a SILArgument out of them.
   SILValue computePredecessorLocationValue(SILBasicBlock *BB, LSLocation &L);
+
+  /// Returns the LoadInst if \p Inst is a load inst we want to handle.
+  LoadInst *isLoadInstToHandle(SILInstruction *Inst) {
+    if (auto *LI = dyn_cast<LoadInst>(Inst)) {
+      if (!ArrayType ||
+          LI->getType().getNominalOrBoundGenericNominal() != ArrayType) {
+        return LI;
+      }
+    }
+    return nullptr;
+  }
 };
 
 } // end anonymous namespace
@@ -1054,7 +1068,7 @@ void BlockState::processInstructionWithKind(RLEContext &Ctx,
 
   // This is a LoadInst. Let's see if we can find a previous loaded, stored
   // value to use instead of this load.
-  if (auto *LI = dyn_cast<LoadInst>(Inst)) {
+  if (auto *LI = Ctx.isLoadInstToHandle(Inst)) {
     processLoadInst(Ctx, LI, Kind);
     return;
   }
@@ -1174,8 +1188,10 @@ void BlockState::dump(RLEContext &Ctx) {
 
 RLEContext::RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
                        TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO,
-                       EpilogueARCFunctionInfo *EAFI)
-    : Fn(F), PM(PM), AA(AA), TE(TE), PO(PO), EAFI(EAFI)
+                       EpilogueARCFunctionInfo *EAFI, bool disableArrayLoads)
+    : Fn(F), PM(PM), AA(AA), TE(TE), PO(PO), EAFI(EAFI),
+      ArrayType(disableArrayLoads ?
+                F->getModule().getASTContext().getArrayDecl() : nullptr)
 #ifndef NDEBUG
       ,
       printCtx(llvm::dbgs(), /*Verbose=*/false, /*Sorted=*/true)
@@ -1612,6 +1628,14 @@ namespace {
 
 class RedundantLoadElimination : public SILFunctionTransform {
 
+private:
+  bool disableArrayLoads;
+
+public:
+
+  RedundantLoadElimination(bool disableArrayLoads)
+    : disableArrayLoads(disableArrayLoads) { }
+
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
@@ -1623,7 +1647,7 @@ class RedundantLoadElimination : public SILFunctionTransform {
     auto *PO = PM->getAnalysis<PostOrderAnalysis>()->get(F);
     auto *EAFI = PM->getAnalysis<EpilogueARCAnalysis>()->get(F);
 
-    RLEContext RLE(F, PM, AA, TE, PO, EAFI);
+    RLEContext RLE(F, PM, AA, TE, PO, EAFI, disableArrayLoads);
     if (RLE.run()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
@@ -1632,6 +1656,10 @@ class RedundantLoadElimination : public SILFunctionTransform {
 
 } // end anonymous namespace
 
+SILTransform *swift::createEarlyRedundantLoadElimination() {
+  return new RedundantLoadElimination(/*disableArrayLoads=*/true);
+}
+
 SILTransform *swift::createRedundantLoadElimination() {
-  return new RedundantLoadElimination();
+  return new RedundantLoadElimination(/*disableArrayLoads=*/false);
 }
