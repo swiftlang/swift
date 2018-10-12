@@ -17,6 +17,7 @@ add_swift_library(swiftFrontend STATIC
     swiftMigrator
     swiftOption
     swiftParseSIL
+    swiftSILGen
     swiftSILOptimizer
     swiftSema
     swiftSerialization)

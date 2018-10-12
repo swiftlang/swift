@@ -155,14 +155,16 @@ static bool buildSwiftModuleFromSwiftInterface(
       return;
     }
 
+    SILOptions &SILOpts = SubInvocation.getSILOptions();
     auto Mod = SubInstance.getMainModule();
-    auto SILMod = SubInstance.takeSILModule();
+    auto SILMod = performSILGeneration(Mod, SILOpts);
     if (SILMod) {
       LLVM_DEBUG(llvm::dbgs() << "Running SIL diagnostic passes\n");
       if (runSILDiagnosticPasses(*SILMod)) {
         SubError = true;
         return;
       }
+      SILMod->verify();
     }
 
     LLVM_DEBUG(llvm::dbgs() << "Serializing " << OutPath << "\n");
@@ -170,7 +172,10 @@ static bool buildSwiftModuleFromSwiftInterface(
     std::string OutPathStr = OutPath;
     serializationOpts.OutputPath = OutPathStr.c_str();
     serializationOpts.SerializeAllSIL = true;
-    serialize(Mod, serializationOpts, SILMod.get());
+    SILMod->setSerializeSILAction([&]() {
+        serialize(Mod, serializationOpts, SILMod.get());
+      });
+    SILMod->serialize();
     SubError = Diags.hadAnyError();
   });
   return !RunSuccess || SubError;
