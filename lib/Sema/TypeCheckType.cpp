@@ -914,7 +914,8 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, SourceLoc loc,
     return ErrorType::get(ctx);
   }
 
-  if (type->hasError() && (isa<AssociatedTypeDecl>(typeDecl) || isa<TypeAliasDecl>(typeDecl))) {
+  if (type->hasError() && foundDC &&
+      (isa<AssociatedTypeDecl>(typeDecl) || isa<TypeAliasDecl>(typeDecl))) {
     maybeDiagnoseBadConformanceRef(fromDC,
                                    foundDC->getDeclaredInterfaceType(),
                                    loc, typeDecl);
