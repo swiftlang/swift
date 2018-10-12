@@ -174,7 +174,7 @@ bool FrontendInputsAndOutputs::shouldTreatAsModuleInterface() const {
 
   StringRef InputExt = llvm::sys::path::extension(getFilenameOfFirstInput());
   file_types::ID InputType = file_types::lookupTypeForExtension(InputExt);
-  return InputType == file_types::TY_SwiftModuleInterfaceFile;
+  return InputType == file_types::TY_SwiftParseableInterfaceFile;
 }
 
 bool FrontendInputsAndOutputs::shouldTreatAsSIL() const {

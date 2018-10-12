@@ -1779,7 +1779,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_TBD:
       case file_types::TY_ModuleTrace:
       case file_types::TY_OptRecord:
-      case file_types::TY_SwiftModuleInterfaceFile:
+      case file_types::TY_SwiftParseableInterfaceFile:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
@@ -2799,9 +2799,9 @@ void Driver::chooseParseableInterfacePath(Compilation &C, const JobAction *JA,
   StringRef outputPath = *getOutputFilenameFromPathArgOrAsTopLevel(
       C.getOutputInfo(), C.getArgs(),
       options::OPT_emit_parseable_module_interface_path,
-      file_types::TY_SwiftModuleInterfaceFile,
+      file_types::TY_SwiftParseableInterfaceFile,
       /*TreatAsTopLevelOutput*/true, workingDirectory, buffer);
-  output->setAdditionalOutputForType(file_types::TY_SwiftModuleInterfaceFile,
+  output->setAdditionalOutputForType(file_types::TY_SwiftParseableInterfaceFile,
                                      outputPath);
 }
 

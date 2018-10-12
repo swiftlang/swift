@@ -31,6 +31,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/Frontend/ParseableInterfaceSupport.h"
 #include "swift/Migrator/MigratorOptions.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
@@ -72,6 +73,7 @@ class CompilerInvocation {
   SILOptions SILOpts;
   IRGenOptions IRGenOpts;
   TBDGenOptions TBDGenOpts;
+  ParseableInterfaceOptions ParseableInterfaceOpts;
   /// The \c SyntaxParsingCache to use when parsing the main file of this
   /// invocation
   SyntaxParsingCache *MainFileSyntaxParsingCache = nullptr;
@@ -130,6 +132,7 @@ public:
                               StringRef SDKPath,
                               StringRef ResourceDir);
 
+  void setTargetTriple(const llvm::Triple &Triple);
   void setTargetTriple(StringRef Triple);
 
   StringRef getTargetTriple() const {
@@ -201,6 +204,9 @@ public:
 
   TBDGenOptions &getTBDGenOptions() { return TBDGenOpts; }
   const TBDGenOptions &getTBDGenOptions() const { return TBDGenOpts; }
+
+  ParseableInterfaceOptions &getParseableInterfaceOptions() { return ParseableInterfaceOpts; }
+  const ParseableInterfaceOptions &getParseableInterfaceOptions() const { return ParseableInterfaceOpts; }
 
   ClangImporterOptions &getClangImporterOptions() { return ClangImporterOpts; }
   const ClangImporterOptions &getClangImporterOptions() const {
@@ -342,6 +348,10 @@ public:
   /// mode, so return the ParseableInterfaceOutputPath when in that mode and
   /// fail an assert if not in that mode.
   std::string getParseableInterfaceOutputPathForWholeModule() const;
+
+  SerializationOptions
+  computeSerializationOptions(const SupplementaryOutputPaths &outs,
+                              bool moduleIsPublic);
 };
 
 /// A class which manages the state and execution of the compiler.

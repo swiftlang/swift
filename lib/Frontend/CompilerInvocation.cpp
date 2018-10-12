@@ -59,7 +59,11 @@ void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
 }
 
 void CompilerInvocation::setTargetTriple(StringRef Triple) {
-  LangOpts.setTarget(llvm::Triple(Triple));
+  setTargetTriple(llvm::Triple(Triple));
+}
+
+void CompilerInvocation::setTargetTriple(const llvm::Triple &Triple) {
+  LangOpts.setTarget(Triple);
   updateRuntimeLibraryPath(SearchPathOpts, LangOpts.Target);
 }
 
@@ -124,6 +128,50 @@ generateOptimizationRemarkRegex(DiagnosticEngine &Diags, ArgList &Args,
     Pattern.reset();
   }
   return Pattern;
+}
+
+// Lifted from the clang driver.
+static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
+  const bool Escape = std::strpbrk(Arg, "\"\\$ ");
+
+  if (!TempDir.empty() && StringRef(Arg).startswith(TempDir)) {
+    // Don't write temporary file names in the debug info. This would prevent
+    // incremental llvm compilation because we would generate different IR on
+    // every compiler invocation.
+    Arg = "<temporary-file>";
+  }
+
+  if (!Escape) {
+    OS << Arg;
+    return;
+  }
+
+  // Quote and escape. This isn't really complete, but good enough.
+  OS << '"';
+  while (const char c = *Arg++) {
+    if (c == '"' || c == '\\' || c == '$')
+      OS << '\\';
+    OS << c;
+  }
+  OS << '"';
+}
+
+/// Save a copy of any flags marked as ParseableInterfaceOption, if running
+/// in a mode that is going to emit a .swiftinterface file.
+static void SaveParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
+                                       ArgList &Args, DiagnosticEngine &Diags) {
+  if (!Args.hasArg(options::OPT_emit_interface_path) &&
+      !Args.hasArg(options::OPT_emit_parseable_module_interface_path))
+    return;
+  ArgStringList RenderedArgs;
+  for (auto A : Args) {
+    if (A->getOption().hasFlag(options::ParseableInterfaceOption))
+      A->render(Args, RenderedArgs);
+  }
+  llvm::raw_string_ostream OS(Opts.ParseableInterfaceFlags);
+  interleave(RenderedArgs,
+             [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
+             [&] { OS << " "; });
 }
 
 static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
@@ -526,32 +574,6 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
          "conflicting arguments; should have been caught by driver");
 
   return false;
-}
-
-// Lifted from the clang driver.
-static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
-  const bool Escape = std::strpbrk(Arg, "\"\\$ ");
-
-  if (StringRef(Arg).startswith(TempDir)) {
-    // Don't write temporary file names in the debug info. This would prevent
-    // incremental llvm compilation because we would generate different IR on
-    // every compiler invocation.
-    Arg = "<temporary-file>";
-  }
-
-  if (!Escape) {
-    OS << Arg;
-    return;
-  }
-
-  // Quote and escape. This isn't really complete, but good enough.
-  OS << '"';
-  while (const char c = *Arg++) {
-    if (c == '"' || c == '\\' || c == '$')
-      OS << '\\';
-    OS << c;
-  }
-  OS << '"';
 }
 
 /// Parse -enforce-exclusivity=... options
@@ -1163,6 +1185,8 @@ bool CompilerInvocation::parseArgs(
     }
     return true;
   }
+
+  SaveParseableInterfaceArgs(ParseableInterfaceOpts, ParsedArgs, Diags);
 
   if (ParseFrontendArgs(FrontendOpts, ParsedArgs, Diags,
                         ConfigurationFileBuffers)) {

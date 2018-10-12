@@ -1,3 +1,6 @@
+// swift-tools-version: 4.0
+// swift-module-flags: 
+
 // Make sure parse-only works...
 // RUN: %target-swift-frontend -parse %s
 
