@@ -2852,7 +2852,7 @@ void TFDeabstractionPass::run() {
                                    fn.getName().str().c_str());
 
     TFDeabstraction(*this, fn, tfc, constantEvaluator, PM).doIt();
-    fn.TFDeabstracted = true;
+    fn.processedByDeabstraction = true;
     partitionedFunctions.insert(&fn);
 
     // TODO(clattner): This should eventually be the driver that kicks off

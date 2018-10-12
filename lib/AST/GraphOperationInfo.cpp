@@ -245,10 +245,11 @@ SymbolicValue tf::convertSwiftTypeToConstantTFDataType(Type type) {
   return SymbolicValue::getInteger(tfType, 32);
 }
 
-/// Return the graph function name for a function that is being used as a
-/// function attribute.
-std::string tf::getGraphFuncNameForFuncAttr(StringRef fnName) {
-  if (fnName.startswith("$"))
-    fnName = fnName.substr(1);
-  return std::string(fnName) + ".tf_only";
+/// Return the graph function name for a SIL function that is being used as a
+/// function attribute. This transformation may modify the name to make it
+/// conform to graph function name rules.
+std::string tf::getGraphFuncNameForFuncAttr(StringRef silFnName) {
+  if (silFnName.startswith("$"))
+    silFnName = silFnName.substr(1);
+  return std::string(silFnName) + ".tf_only";
 }

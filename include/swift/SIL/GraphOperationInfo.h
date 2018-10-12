@@ -246,9 +246,10 @@ unsigned getTFDataType(SymbolicValue value);
 /// Swift type. `type` must be a valid TensorFlow type.
 SymbolicValue convertSwiftTypeToConstantTFDataType(Type type);
 
-/// Return the graph function name for a function that is being used as a
-/// function attribute.
-std::string getGraphFuncNameForFuncAttr(StringRef fnName);
+/// Return the graph function name for a SIL function that is being used as a
+/// function attribute. This transformation may modify the name to make it
+/// conform to graph function name rules.
+std::string getGraphFuncNameForFuncAttr(StringRef silFnName);
 
 } // end namespace tf
 } // end namespace swift

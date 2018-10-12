@@ -408,6 +408,7 @@ public:
   SmallVector<std::pair<llvm::Instruction *, DominancePoint>, 8> ValueDomPoints;
   unsigned NumAnonVars = 0;
 
+  // SWIFT_ENABLE_TENSORFLOW
   /// If we run across a graph_op, we compute the function's
   /// GraphFunctionDeviceInfo and store it here.
   llvm::Optional<GraphFunctionDeviceInfo> deviceInfo;
@@ -1955,7 +1956,7 @@ static const char *inputListNumberAttr(StringRef opName) {
 void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   tf::GraphOperationInfo opInfo(i);
 
-  if (!CurSILFn->TFDeabstracted) {
+  if (!CurSILFn->processedByDeabstraction) {
     // graph_ops do make it here when building functions that don't get
     // deabstracted (e.g. TensorFlow stdlib functions).
     // IRGen is currently not powerful enough to handle graph_ops in functions
@@ -2070,8 +2071,8 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       for (auto tensorHandle : structuredArgument.getArgumentList()) {
         addTensorhandleAsOpInput(tensorHandle);
       }
-      // Set special attr to represent the list length. This is not done in
-      // graph lowering.
+      // Set special attr to represent the list length, if needed. This is not
+      // needed in graph lowering.
       if (auto numberAttr = inputListNumberAttr(opInfo.getOperationName())) {
         auto setAttrFn = IGM.getTFE_OpSetAttrIntFn();
         auto listLenAddr = createStringValAddr(IGM, numberAttr);
