@@ -37,7 +37,7 @@ using namespace swift;
 
 static bool
 extractSwiftInterfaceVersionAndArgs(DiagnosticEngine &Diags,
-                                    clang::vfs::FileSystem &FS,
+                                    llvm::vfs::FileSystem &FS,
                                     StringRef SwiftInterfacePathIn,
                                     swift::version::Version &Vers,
                                     llvm::StringSaver &SubArgSaver,
@@ -160,7 +160,7 @@ static bool writeSwiftInterfaceDeps(DiagnosticEngine &Diags,
 // Check that the output .swiftmodule file is at least as new as all the
 // dependencies it read when it was built last time.
 static bool
-swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
+swiftModuleIsUpToDate(llvm::vfs::FileSystem &FS,
                       StringRef InPath, StringRef OutPath, StringRef DepPath) {
 
   if (!FS.exists(OutPath) || !FS.exists(DepPath))
@@ -201,7 +201,7 @@ swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
 }
 
 static bool buildSwiftModuleFromSwiftInterface(
-    clang::vfs::FileSystem &FS, DiagnosticEngine &Diags,
+    llvm::vfs::FileSystem &FS, DiagnosticEngine &Diags,
     CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath,
     StringRef DepPath) {
   bool SubError = false;
