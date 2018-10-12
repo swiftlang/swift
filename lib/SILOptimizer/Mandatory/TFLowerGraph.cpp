@@ -1011,7 +1011,7 @@ bool TFGraphFunctionLowering::createDatasetIteratorNodesWithInfeedEnqueue() {
       infeedInputs.push_back({getnextOp, i});
     }
     TF_AddInputList(desc, infeedInputs.data(), infeedInputs.size());
-    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
+    TF_SetDevice(desc, TF_DEFAULT_CPU_DEVICE);
     TF_SetAttrInt(desc, "device_ordinal", 0);
     datasetCreationContext->setInfeedTypeAndShapeList(desc);
     /*TF_Operation* enqueue =*/TF_FinishOperation(desc, status);
@@ -1073,7 +1073,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpSendToHostInst(
     inputType = getTensorFlowDataType(operand->getType(), inst->getLoc());
   }
 
-  assert(getDeviceString(graphOpInfo) == DEFAULT_CPU_DEVICE &&
+  assert(getDeviceString(graphOpInfo) == TF_DEFAULT_CPU_DEVICE &&
          "SendToHost must run on CPU device");
   int tensorId = inst->getAttributeNamed("tensorId")
                      .getValue()
@@ -1086,7 +1086,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpSendToHostInst(
     auto opName = "fifo_queue_" + llvm::itostr(tensorId);
     auto *desc =
         TF_NewOperation(graphFn.getGraph(), "FIFOQueueV2", opName.c_str());
-    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
+    TF_SetDevice(desc, TF_DEFAULT_CPU_DEVICE);
     TF_SetAttrInt(desc, "capacity", NAMED_TENSOR_QUEUE_CAPACITY);
     TF_SetAttrTypeList(desc, "component_types", &inputType, 1);
     TF_SetAttrString(desc, "shared_name", opName.data(), opName.size());
@@ -1102,7 +1102,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpSendToHostInst(
         TF_NewOperation(graphFn.getGraph(), "QueueEnqueueV2", opName.c_str());
     TF_AddInput(desc, {queueOp, 0});
     TF_AddInputList(desc, &inputOp, 1);
-    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
+    TF_SetDevice(desc, TF_DEFAULT_CPU_DEVICE);
     TF_SetAttrTypeList(desc, "Tcomponents", &inputType, 1);
 
     graphFn.finishOp(desc, /*opHasSideEffects*/ true,
@@ -1125,7 +1125,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpSendToHostInst(
   {
     auto opName = "fifo_queue_" + llvm::itostr(tensorId);
     auto *desc = TF_NewOperation(resultGraph, "FIFOQueueV2", opName.c_str());
-    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
+    TF_SetDevice(desc, TF_DEFAULT_CPU_DEVICE);
     TF_SetAttrInt(desc, "capacity", NAMED_TENSOR_QUEUE_CAPACITY);
     TF_SetAttrTypeList(desc, "component_types", &inputType, 1);
     // FIXME: Revisit whether to populate "shared_name".
@@ -1139,7 +1139,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpSendToHostInst(
     auto opName = "fifo_queue_dequeue_" + llvm::itostr(tensorId);
     auto *desc = TF_NewOperation(resultGraph, "QueueDequeueV2", opName.c_str());
     TF_AddInput(desc, {globalQueueOp, 0});
-    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
+    TF_SetDevice(desc, TF_DEFAULT_CPU_DEVICE);
     TF_SetAttrTypeList(desc, "component_types", &inputType, 1);
     TF_FinishOperation(desc, status);
     if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
@@ -1170,7 +1170,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpRecvFromHostInst(
   assert(inst->getNumOperands() == 0);
   assert(inst->getNumAttributes() >= 2);
 
-  assert(getDeviceString(graphOpInfo) == DEFAULT_CPU_DEVICE &&
+  assert(getDeviceString(graphOpInfo) == TF_DEFAULT_CPU_DEVICE &&
          "SendToHost must run on CPU device");
   int tensorId = inst->getAttributeNamed("tensorId")
                      .getValue()
@@ -1187,7 +1187,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpRecvFromHostInst(
     auto opName = "fifo_queue_" + llvm::itostr(tensorId);
     auto *desc =
         TF_NewOperation(graphFn.getGraph(), "FIFOQueueV2", opName.c_str());
-    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
+    TF_SetDevice(desc, TF_DEFAULT_CPU_DEVICE);
     TF_SetAttrInt(desc, "capacity", NAMED_TENSOR_QUEUE_CAPACITY);
     TF_SetAttrTypeList(desc, "component_types", &outputType, 1);
     TF_SetAttrString(desc, "shared_name", opName.data(), opName.size());
@@ -1202,7 +1202,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpRecvFromHostInst(
     auto *desc =
         TF_NewOperation(graphFn.getGraph(), "QueueDequeueV2", opName.c_str());
     TF_AddInput(desc, {queueOp, 0});
-    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
+    TF_SetDevice(desc, TF_DEFAULT_CPU_DEVICE);
     TF_SetAttrTypeList(desc, "component_types", &outputType, 1);
 
     auto dequeueOp = graphFn.finishOp(desc, /*opHasSideEffects*/ true,
@@ -1226,7 +1226,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpRecvFromHostInst(
   {
     auto opName = "fifo_queue_" + llvm::itostr(tensorId);
     auto *desc = TF_NewOperation(resultGraph, "FIFOQueueV2", opName.c_str());
-    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
+    TF_SetDevice(desc, TF_DEFAULT_CPU_DEVICE);
     TF_SetAttrInt(desc, "capacity", NAMED_TENSOR_QUEUE_CAPACITY);
     TF_SetAttrTypeList(desc, "component_types", &outputType, 1);
     // FIXME: Revisit whether to populate "shared_name".
@@ -1253,7 +1253,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpRecvFromHostInst(
     TF_AddInput(desc, {globalQueueOp, 0});
     TF_Output inputTensor{inputTensorPlaceholder, 0};
     TF_AddInputList(desc, &inputTensor, 1);
-    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
+    TF_SetDevice(desc, TF_DEFAULT_CPU_DEVICE);
     TF_SetAttrTypeList(desc, "Tcomponents", &outputType, 1);
     TF_FinishOperation(desc, status);
     if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
@@ -1377,7 +1377,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorRecvInst(
   if (inst->getNumAttributes() == 4) {
     // 3 is the attr idx for the optional shape array attr.
     decodeShapeArrayAtAttr(SILFn.getASTContext(), graphOpInfo,
-                           SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims, numDims,
+                           TF_SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims, numDims,
                            dimPtrs);
   }
   if (thisDeviceType == DeviceType::TPU) {
@@ -1505,7 +1505,7 @@ GLStatus TFGraphFunctionLowering::visitGraphOpD2DTensorSendInst(
   if (inst->getNumAttributes() == 4)
     // 3 is the attr idx for the optional shape array attr.
     decodeShapeArrayAtAttr(SILFn.getASTContext(), graphOpInfo,
-                           SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims, numDims,
+                           TF_SHAPE_ARRAY_ATTR, /*attrIdx*/ 3, dims, numDims,
                            dimPtrs);
   if (thisDeviceType == DeviceType::TPU) {
     return addTPUEnqueueOp(inst, /* isInfeed */ false, transferId, dims,
@@ -1766,13 +1766,13 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       }
       case SymbolicValue::String: {
         auto value = attrValue.getStringValue();
-        if (name != DEVICE_ATTR) {
+        if (name != TF_DEVICE_ATTR) {
           TF_SetAttrString(op, name.c_str(), value.data(), value.size());
         } else {
-          if (value == ALL_DEVICES)
+          if (value == TF_ALL_DEVICES)
             value = thisDeviceTypeStr;
 
-          if (value.str() != DEFAULT_TPU_DEVICE) {
+          if (value.str() != TF_DEFAULT_TPU_DEVICE) {
             TF_SetDevice(op, value.str().c_str());
           } else {
             // TPU device placement is not done via TF_SetDevice().
@@ -1788,7 +1788,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
         break;
       }
       case SymbolicValue::Array: {
-        // SHAPE_ARRAY_ATTR is a pseudo-attribute used by the compiler's
+        // TF_SHAPE_ARRAY_ATTR is a pseudo-attribute used by the compiler's
         // partitioning and graph lowering passes to propagate shape info for
         // XLA compilation (e.g. feed shape info to infeed / outfeed ops), and
         // will not be lowered into this graph op itself.
@@ -2717,7 +2717,7 @@ bool TFGraphFunctionLowering::addTopLevelTPUConfigLogic(
   {
     auto *desc = TF_NewOperation(resultGraph, "ConfigureDistributedTPU",
                                  "ConfigureDistributedTPU");
-    TF_SetDevice(desc, DEFAULT_TPU_DEVICE);
+    TF_SetDevice(desc, TF_DEFAULT_TPU_DEVICE);
     TF_SetAttrBool(desc, "is_global_init", true);
     TF_FinishOperation(desc, status);
     if (checkStatus(SILFn.getLocation()))
@@ -2727,7 +2727,7 @@ bool TFGraphFunctionLowering::addTopLevelTPUConfigLogic(
   {
     auto *desc = TF_NewOperation(resultGraph, "TPUCompilationResult",
                                  "TPUCompilationResult");
-    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
+    TF_SetDevice(desc, TF_DEFAULT_CPU_DEVICE);
     TF_SetAttrString(desc, "_tpu_compilation_status", TPU_CLUSTER_ATTR_VALUE,
                      strlen(TPU_CLUSTER_ATTR_VALUE));
     TF_AddControlInput(desc, *metadataNode);

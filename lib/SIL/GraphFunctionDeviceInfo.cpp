@@ -147,7 +147,7 @@ void GraphFunctionDeviceInfo::handleDevicePlacement(
   //   __device: "/device:CPU:0"}
   // TODO: Use integer device ID's instead of strings?
   opBuilder->addAttribute(
-      {ctx.getIdentifier(DEVICE_ATTR),
+      {ctx.getIdentifier(TF_DEVICE_ATTR),
        SymbolicValue::getString(deviceString, ctx.getAllocator())});
 }
 

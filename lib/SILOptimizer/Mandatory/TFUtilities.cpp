@@ -298,7 +298,7 @@ tf::createConstTensor(Type elementType, SymbolicValue scalars,
 
   // All graph_op's get a device.
   opBuilder.addAttribute(
-      {context.getIdentifier(DEVICE_ATTR),
+      {context.getIdentifier(TF_DEVICE_ATTR),
        SymbolicValue::getString(getDeviceString(targetDevice), allocator)});
 
   // Finally build a new graphop instruction with the simplified operands.
