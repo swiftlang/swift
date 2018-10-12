@@ -103,11 +103,27 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Optional<FrontendInputsAndOutputs> inputsAndOutputs =
       ArgsToFrontendInputsConverter(Diags, Args).convert(buffers);
+
+  // None here means error, not just "no inputs". Propagage unconditionally.
   if (!inputsAndOutputs)
     return true;
-  Opts.InputsAndOutputs = std::move(inputsAndOutputs).getValue();
 
-  Opts.RequestedAction = determineRequestedAction(Args);
+  // InputsAndOutputs can only get set up once; if it was set already when we
+  // entered this function, we should not set it again (and should assert this
+  // is not being done). Further, the computeMainAndSupplementaryOutputFilenames
+  // call below needs to only happen when there was a new InputsAndOutputs,
+  // since it clobbers the existing one rather than adding to it.
+  bool HaveNewInputsAndOutputs = false;
+  if (Opts.InputsAndOutputs.hasInputs()) {
+    assert(!inputsAndOutputs->hasInputs());
+  } else {
+    HaveNewInputsAndOutputs = true;
+    Opts.InputsAndOutputs = std::move(inputsAndOutputs).getValue();
+  }
+
+  if (Opts.RequestedAction == FrontendOptions::ActionType::NoneAction) {
+    Opts.RequestedAction = determineRequestedAction(Args);
+  }
 
   if (Opts.RequestedAction == FrontendOptions::ActionType::Immediate &&
       Opts.InputsAndOutputs.hasPrimaryInputs()) {
@@ -121,7 +137,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (computeModuleName())
     return true;
 
-  if (computeMainAndSupplementaryOutputFilenames())
+  if (HaveNewInputsAndOutputs &&
+      computeMainAndSupplementaryOutputFilenames())
     return true;
 
   if (checkUnusedSupplementaryOutputPaths())
