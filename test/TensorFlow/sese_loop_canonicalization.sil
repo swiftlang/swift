@@ -231,6 +231,11 @@ public func nestedLoopWithBreak(breakCount:Int32) -> Int32 {
 
 // CHECK-LABEL: --- XLA CFG Canonicalize: $doWhileLoop
 // CHECK: [sequence
+// CHECK:   {condition Header: {{bb[0-9]+}}
+// CHECK:     {condition Header: {{bb[0-9]+}}
+// CHECK:       block {{bb[0-9]+}}
+// CHECK:       block {{bb[0-9]+}}}
+// CHECK:     block {{bb[0-9]+}}}
 // CHECK:   <while Preheader: [[PHDR:bb[0-9]+]], Header: [[HDR:bb[0-9]+]], exit: [[EXIT:bb[0-9]+]]
 // CHECK:     [sequence
 // CHECK:       {condition Header: {{bb[0-9]+}}
@@ -243,8 +248,8 @@ public func nestedLoopWithBreak(breakCount:Int32) -> Int32 {
 
 // Make sure undef is still left in this case for now.
 // CHECK: sil @$doWhileLoop : {{.*}} (Builtin.Int32) -> Builtin.Int32 {
-// CHECK: [[PHDR]]({{.*}} : $Builtin.Int32):
-// CHECK: br [[HDR]]({{.*}} : $Builtin.Int32, undef : $Builtin.Int32, {{.*}} : $TensorHandle<Builtin.Int32>, {{.*}} : $TensorHandle<Builtin.Int1>)
+// CHECK: [[PHDR]]({{.*}} : $TensorHandle<Builtin.Int1>):
+// CHECK: br [[HDR]]({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $TensorHandle<Builtin.Int32>, {{.*}} : $TensorHandle<Builtin.Int1>)
 
 sil @$doWhileLoop : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32):
@@ -299,19 +304,19 @@ bb3 (%9 : $Builtin.Int32):
 //
 // CHECK-LABEL: --- XLA CFG Canonicalize: $loopThatRequiresNodeCloning
 // CHECK: [sequence
-// CHECK:   {condition Header: bb0
-// CHECK:     block bb1
+// CHECK:   {condition Header: {{bb[0-9]+}}
+// CHECK:     block {{bb[0-9]+}}
 // CHECK:     [sequence
-// CHECK:       <while Preheader: bb2, Header: bb9, exit: bb11
+// CHECK:       <while Preheader: {{bb[0-9]+}}, Header: {{bb[0-9]+}}, exit: {{bb[0-9]+}}
 // CHECK:         [sequence
-// CHECK:           {condition Header: bb3
-// CHECK:             block bb4
-// CHECK:             {condition Header: bb5
-// CHECK:               block bb7
-// CHECK:               block bb6}}
-// CHECK:           block bb10]>
-// CHECK:       block bb11]}
-// CHECK:   block bb8]
+// CHECK:           {condition Header: {{bb[0-9]+}}
+// CHECK:             block {{bb[0-9]+}}
+// CHECK:             {condition Header: {{bb[0-9]+}}
+// CHECK:               block {{bb[0-9]+}}
+// CHECK:               block {{bb[0-9]+}}}}
+// CHECK:           block {{bb[0-9]+}}]>
+// CHECK:       block {{bb[0-9]+}}]}
+// CHECK:   block {{bb[0-9]+}}]
 // CHECK: --- XLA CFG Canonicalize end
 sil @$loopThatRequiresNodeCloning : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):

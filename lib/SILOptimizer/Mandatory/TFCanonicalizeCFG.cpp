@@ -335,8 +335,8 @@ public:
 
   bool hasCloned() const { return cloned; }
 
-  /// Return a cloned block.
-  SILBasicBlock *cloneBlock(SILBasicBlock *bb) {
+  /// Create a block and clone the arguments alone.
+  SILBasicBlock *initBlock(SILBasicBlock *bb) {
     auto bbIt = BBMap.find(bb);
     if (bbIt != BBMap.end())
       return bbIt->second;
@@ -354,11 +354,24 @@ public:
       ValueMap[arg] = newBB->createPhiArgument(
           arg->getType(), arg->getOwnershipKind(), arg->getDecl());
     }
-    // Clone all the instructions.
+    return newBB;
+  }
+
+  // Clone all the instructions and return the cloned block.
+  SILBasicBlock *cloneBlock(SILBasicBlock *bb) {
+    auto bbIt = BBMap.find(bb);
+    assert (bbIt != BBMap.end() && "Block is not initialied before cloning.");
+    SILBasicBlock *newBB = bbIt->second;
+    getBuilder().setInsertionPoint(newBB);
     for (auto &inst : *bb) {
       visit(&inst);
     }
     return newBB;
+  }
+
+  SILBasicBlock *initAndCloneBlock(SILBasicBlock *bb) {
+    initBlock(bb);
+    return cloneBlock(bb);
   }
 
   /// Handle references to basic blocks when cloning.
@@ -369,6 +382,21 @@ public:
     if (bbIt != BBMap.end())
       return bbIt->second;
     return bb;
+  }
+
+  SILValue remapValue(SILValue Value) {
+    auto VI = ValueMap.find(Value);
+    if (VI != ValueMap.end())
+      return VI->second;
+    return Value;
+  }
+
+  // Update ValueMap so that occurrences of `oldValue` are replaced with
+  // `newValue` when cloning.
+  void updateValueMap(SILValue oldValue, SILValue newValue)  {
+    auto emplaceResult = ValueMap.try_emplace(oldValue, newValue);
+    assert(emplaceResult.second && "Updating the same key in ValueMap multiple "
+                                   "times during SESE cloning.");
   }
 };
 
@@ -382,7 +410,8 @@ public:
                             PostDominanceInfo *PDI)
       : deviceInfo(deviceInfo), DI(DI), PDI(PDI), LI(LI), loop(loop),
         header(loop->getHeader()), preheader(loop->getLoopPreheader()),
-        latch(loop->getLoopLatch()), currentFn(header->getParent()) {
+        latch(loop->getLoopLatch()), currentFn(header->getParent()),
+        oldHeaderNumArgs(header->getNumArguments()), hasUndefsAtPreheader(false) {
     assert(preheader && "Canonicalization should have given us one preheader");
     assert(latch && "Canonicalization should have given us one latch block");
     initialize();
@@ -420,6 +449,8 @@ private:
   /// exit block right now. Once all the required components are implemented,
   /// we will get a single exit block.
   void ensureSingleExitBlock();
+
+  void unrollLoopBodyOnce();
 
   /// Compute escaping values and what values to use as arguments at preheader.
   llvm::DenseMap<SILValue, SILValue> computeEscapingValuesSubstMap() const;
@@ -471,6 +502,10 @@ private:
   SILBasicBlock *preheader;
   SILBasicBlock *latch;
   SILFunction *currentFn;
+  unsigned oldHeaderNumArgs;
+  /// Flag to track if we have undefs at preheader corresponding to escaping
+  /// values and exit args.
+  bool hasUndefsAtPreheader;
   /// Equivalence classes induced by argument passing.
   llvm::EquivalenceClasses<SILValue> equivalentValues;
   /// exit blocks of the loop.
@@ -606,7 +641,7 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
         if (DI->properlyDominates(succ, header)) continue;
 
         // Clone the block and rewire the edge.
-        SILBasicBlock *clonedSucc = cloner.cloneBlock(succ);
+        SILBasicBlock *clonedSucc = cloner.initAndCloneBlock(succ);
         changeBranchTarget(current->getTerminator(), edgeIdx, clonedSucc,
                            /*preserveArgs*/ true);
         worklist.insert(clonedSucc);
@@ -839,10 +874,12 @@ void SingleExitLoopTransformer::patchPreheader(SILBasicBlock *newHeader) {
   // Simply pass in an undef. This will never be accessed at runtime.
   SmallVector<SILValue, 8> newArgs;
   for (const auto &kv : escapingValueSubstMap) {
+    hasUndefsAtPreheader |= isa<SILUndef>(kv.second);
     newArgs.push_back(kv.second);
   }
   if (TFNoUndefsInSESE) {
     for (const auto &kv : exitArgSubstMap) {
+      hasUndefsAtPreheader |= isa<SILUndef>(kv.second);
       newArgs.push_back(kv.second);
     }
   }
@@ -861,11 +898,6 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
                                       SILBasicBlock *latchBlock) {
 
   llvm::DenseMap<SILBasicBlock *, intmax_t> exitIndices;
-
-  unsigned oldHeaderNumArgs =
-      newHeader->getNumArguments() -
-      (escapingValueSubstMap.size() + exitArgSubstMap.size() +
-       /* exitIndex, stayInLoop*/ 2);
 
   // Identify the exit from the header (if any) and assign '0' as its index.
   SILBasicBlock *headerExit = nullptr;
@@ -1103,6 +1135,15 @@ bool SingleExitLoopTransformer::transform() {
 
   // Update the loop header to newHeader.
   loop->moveToHeader(newHeader);
+
+  if (TFNoUndefsInSESE) {
+    // If we still have undefs at preheader, simply clone the loop body once
+    // before the actual loop.
+    if (hasUndefsAtPreheader) {
+      unrollLoopBodyOnce();
+    }
+  }
+
   return true;
 }
 
@@ -1147,6 +1188,199 @@ void SESERegionBuilder::ensureSingleExitFromLoops() {
     // TODO(https://bugs.swift.org/browse/SR-8336): the transformations here are
     // simple that we should be able to incrementally update PDI.
     PDI.recalculate(*F);
+  }
+}
+
+void SingleExitLoopTransformer::unrollLoopBodyOnce() {
+  // Consider the following example:
+  //
+  //   do {
+  //     i += 1
+  //     if (...) break;
+  //     i += 2
+  //   } while(...)
+  //   return i
+  //
+  // The SIL CFG is shown below:
+  //
+  //   preheader:
+  //     i0 = 0
+  //     br header(i0)
+  //
+  //   header(i1):
+  //     i2 = i1 + 1
+  //     cond ??, break, body
+  //
+  //   break:
+  //     br exit(i2)
+  //
+  //   body:
+  //     i3 = i2 + 2
+  //     cond ??, header(i3), exit(i3)
+  //
+  //   exit(i4):
+  //     return i4
+  //
+  // Note that the dataflow between iterations of the loop is captured by
+  // argument `i1` of the header. If we need to exit from the header of the
+  // loop, we will need to "freeze" the state at the exit points of the loop
+  // (`break` and `body` in the example).  The canonicalization pass does that
+  // by creating a new header, which has arguments corresponding to the frozen
+  // states, in addition to the arguments (such as `i1`) of the original
+  // `header` block.
+  //
+  // The canonicalized CFG is shown below. Argument `i4` of `newHeader` is one
+  // of the additional arguments added by the canonicalization pass. `newHeader`
+  // also has a `stayInLoop` argument to determine when we should exit the loop.
+  //
+  // The propagation of the frozen state is done as follows:
+  //   - The original branches to `exit` are replaced with branches to
+  //     `newLatch`, where `stayInLoop` is set to false.
+  //   - For the original argument `i1` at the header, we simply pass back that
+  //     value. This is OK because we exit the loop before accessing it.
+  //   - For the additional argument `i4` at the header, we pass the current
+  //     state at the exit.
+  //
+  //   preheader:
+  //     i0 = 0
+  //     br newHeader(i0, undef, true)
+  //
+  //   newHeader(i1, i4, stayInLoop):
+  //     cond stayInLoop, header, exit(i4)
+  //
+  //   header:
+  //     i2 = i1 + 1
+  //     cond ??, break, body
+  //
+  //   break:
+  //     br newLatch(i1, i2, false)
+  //
+  //   body:
+  //     i3 = i2 + 2
+  //     cond ??, newLatch(i3, i4, true), newLatch(i1, i3, false)
+  //
+  //   newLatch(i5, i6, stayInLoop1):
+  //     br newHeader(i5, i6, stayInLoop1)
+  //
+  //   exit(i7):
+  //     return i7
+  //
+  // We have an undef for `i5` from the preheader because we do not know the
+  // value before the loop gets executed. However, note that on all paths from
+  // `header` to `newLatch`, the second argument is always defined. Therefore,
+  // we can eliminate the `undef` by simply unrolling the loop body from
+  // `header` to `newLatch` once. We do not need to clone `newHeader`.
+  //
+  // Given that we do not clone `newHeader`, references to the arguments `i1`
+  // and `i4` of `newHeader` will not be cloned. For example, in the unrolled
+  // body of the loop, `break` will be cloned as follows (prime refers to the
+  // clones):
+  //    break':
+  //      br newLatch'(i1, i2', false)
+  //
+  // Note that `i1` still refers to the original argument of `newHeader`.
+  // `newHeader` occurs after the unrolled loop body (in CFG) and hence, won't
+  // dominate `break'` in the unrolled loop body. We fix this by
+  // picking a value that is equivalent to the corresponding argument and
+  // dominates `break'`. (Note that it is enough to search for equivalent values
+  // among the immediate predecessors of the `newLatch'` block.)
+  //
+  // In summary, there are two steps for eliminating undefs:
+  //    (1) Unroll the loop body once (excluding `newHeader`)
+  //    (2) Patch values that still refer to the arguments of `newHeader`.
+
+  // Step 1. Unroll the loop body once (excluding `newHeader`)
+  //
+  BasicBlockCloner cloner(*currentFn);
+  // Setup cloner so that newHeader's arguments are replaced with values in
+  // preheader.
+  SILBasicBlock *newHeader = loop->getHeader();
+  auto preheaderTermInst = dyn_cast<BranchInst>(preheader->getTerminator());
+  assert(preheaderTermInst && "Preheader of a loop has a non-branch terminator");
+  for (unsigned argIndex = 0; argIndex < oldHeaderNumArgs; ++argIndex) {
+    auto preheaderArg = preheaderTermInst->getArg(argIndex);
+    auto newHeaderArg = newHeader->getArgument(argIndex);
+    cloner.updateValueMap(newHeaderArg, preheaderArg);
+  }
+  // Clone everything except the new header. We should traverse the
+  // blocks in depth first order to ensure values are cloned before they are used.
+  SmallPtrSet<SILBasicBlock *, 32> worklist;
+  SmallVector<SILBasicBlock *, 32> initializedBlocks;
+  worklist.insert(header);
+  while (!worklist.empty()) {
+    SILBasicBlock *current = *worklist.begin();
+    worklist.erase(current);
+    cloner.initBlock(current);
+    initializedBlocks.push_back(current);
+    for (SILBasicBlock *succ : current->getSuccessorBlocks()) {
+      // Skip if succ is not a part of the loop, is already cloned, or
+      // is the new preheader.
+      if (!loop->contains(succ) || cloner.remapBasicBlock(succ) != succ ||
+          succ == newHeader) {
+        continue;
+      }
+      worklist.insert(succ);
+    }
+  }
+
+  SILLoop *parentLoop = loop->getParentLoop();
+  for (SILBasicBlock *bb : initializedBlocks) {
+    SILBasicBlock *clonedBlock = cloner.cloneBlock(bb);
+    if (parentLoop) {
+      parentLoop->addBasicBlockToLoop(clonedBlock, LI->getBase());
+    }
+  }
+
+  // Get the clone for old header.
+  SILBasicBlock *clonedOldHeader = cloner.remapBasicBlock(header);
+  replaceBranchTarget(preheader->getTerminator(), newHeader, clonedOldHeader,
+                      /*preserveArgs*/ false);
+
+  // Step 2. Patch values that still refer to the arguments of `newHeader`.
+  //
+  SILBasicBlock *newLatch = loop->getLoopLatch();
+  SILBasicBlock *clonedNewLatch = cloner.remapBasicBlock(newLatch);
+  // Note that we iterate over the predecessors of the `newLatch` and not
+  // `clonedNewLatch`. This is important for a couple of reasons:
+  //  (1) DI and PDI information is not valid for the cloned nodes. Therefore, we
+  //      can only check for dominance using the original nodes of the loop body.
+  //  (2) changeEdgeValue invalidates pred_iterator. Given that the unrolled
+  //      loop body is a clone of the loop, it is convenient to iterate over the
+  //      predecessors of the latch block in the loop and access the corresponding
+  //      cloned predecessor whenever needed.
+  for (SILBasicBlock *pred : newLatch->getPredecessorBlocks()) {
+    auto predTermInst = dyn_cast<BranchInst>(pred->getTerminator());
+    assert(predTermInst && "Preheader of a loop has a non-branch terminator");
+    for (unsigned argIndex = 0; argIndex < predTermInst->getNumArgs(); ++argIndex) {
+      // Check if the argument of *cloned* predecessor needs patching.
+      SILBasicBlock *clonedPred = cloner.remapBasicBlock(pred);
+      auto clonedPredTermInst = dyn_cast<BranchInst>(clonedPred->getTerminator());
+      assert(clonedPredTermInst &&
+             "Preheader of a loop has a non-branch terminator");
+      auto arg = clonedPredTermInst->getArg(argIndex);
+      // Skip if this is not an argument of the `newHeader`.
+      if (!isa<SILArgument>(arg) ||
+          cast<SILArgument>(arg)->getParent() != newHeader) {
+        continue;
+      }
+      // Iterate over the incoming values of the corresponding argument in the
+      // latch block and pick one that is suitable to be used here.
+      auto destBBArg = newLatch->getArgument(argIndex);
+      SmallVector<SILValue, 8> incomingValues;
+      destBBArg->getIncomingPhiValues(incomingValues);
+      bool patched = false;
+      for (auto value : incomingValues) {
+        if (value != arg && DI->properlyDominates(value, predTermInst)) {
+          // A suitable value is found. Update the edge value in the unrolled
+          // loop with the corresponding cloned value.
+          changeEdgeValue(clonedPred->getTerminator(), clonedNewLatch, argIndex,
+                          cloner.remapValue(value));
+          patched = true;
+          break;
+        }
+      }
+      assert(patched && "Unable to patch the arguments in unrolled loop body.");
+    }
   }
 }
 
