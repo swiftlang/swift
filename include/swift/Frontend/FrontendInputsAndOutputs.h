@@ -173,7 +173,7 @@ public:
 
 private:
   friend class ArgsToFrontendOptionsConverter;
-
+  friend class ParseableInterfaceModuleLoader;
   void setMainAndSupplementaryOutputs(
       ArrayRef<std::string> outputFiles,
       ArrayRef<SupplementaryOutputPaths> supplementaryOutputs);

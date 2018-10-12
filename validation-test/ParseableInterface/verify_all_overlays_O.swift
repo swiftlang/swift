@@ -4,7 +4,7 @@
 
 // REQUIRES: nonexecutable_test
 
-// The following textual interfaces (in alphabetical order) are known not to
+// The following parseable interfaces (in alphabetical order) are known not to
 // work with these settings.
 
 // Needs to be built as Swift 4.2.

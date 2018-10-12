@@ -494,7 +494,7 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
       {file_types::TY_SerializedDiagnostics, paths.SerializedDiagnosticsPath},
       {file_types::TY_ModuleTrace, paths.LoadedModuleTracePath},
       {file_types::TY_TBD, paths.TBDPath},
-      {file_types::TY_SwiftModuleInterfaceFile,
+      {file_types::TY_SwiftParseableInterfaceFile,
        paths.ParseableInterfaceOutputPath}
   };
   for (const std::pair<file_types::ID, std::string &> &typeAndString :

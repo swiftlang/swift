@@ -106,26 +106,8 @@ def verify_syntax_tree : Flag<["-"], "verify-syntax-tree">,
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
 
-def enable_objc_interop :
-  Flag<["-"], "enable-objc-interop">,
-  HelpText<"Enable Objective-C interop code generation and config directives">;
-
-def disable_objc_interop :
-  Flag<["-"], "disable-objc-interop">,
-  HelpText<"Disable Objective-C interop code generation and config directives">;
-
 def enable_swiftcall : Flag<["-"], "enable-swiftcall">,
   HelpText<"Enable the use of LLVM swiftcall support">;
-
-def enable_objc_attr_requires_foundation_module :
-  Flag<["-"], "enable-objc-attr-requires-foundation-module">,
-  HelpText<"Enable requiring uses of @objc to require importing the "
-           "Foundation module">;
-
-def disable_objc_attr_requires_foundation_module :
-  Flag<["-"], "disable-objc-attr-requires-foundation-module">,
-  HelpText<"Disable requiring uses of @objc to require importing the "
-           "Foundation module">;
 
 def enable_testable_attr_requires_testable_module :
   Flag<["-"], "enable-testable-attr-requires-testable-module">,
@@ -166,6 +148,40 @@ def disable_serialization_nested_type_lookup_table :
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
 class DebugCrashOpt : Group<debug_crash_Group>;
+
+
+// Flags that are saved into parseable interfaces
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ParseableInterfaceOption] in {
+
+def enable_objc_interop :
+  Flag<["-"], "enable-objc-interop">,
+  HelpText<"Enable Objective-C interop code generation and config directives">;
+
+def disable_objc_interop :
+  Flag<["-"], "disable-objc-interop">,
+  HelpText<"Disable Objective-C interop code generation and config directives">;
+
+def enable_objc_attr_requires_foundation_module :
+  Flag<["-"], "enable-objc-attr-requires-foundation-module">,
+  HelpText<"Enable requiring uses of @objc to require importing the "
+           "Foundation module">;
+
+def disable_objc_attr_requires_foundation_module :
+  Flag<["-"], "disable-objc-attr-requires-foundation-module">,
+  HelpText<"Disable requiring uses of @objc to require importing the "
+           "Foundation module">;
+
+def enable_resilience : Flag<["-"], "enable-resilience">,
+   HelpText<"Compile the module to export resilient interfaces for all "
+            "public declarations by default">;
+
+def enable_class_resilience : Flag<["-"], "enable-class-resilience">,
+   HelpText<"Enable resilient layout for classes containing resilient value types">;
+
+def read_type_info_path_EQ : Joined<["-"], "read-type-info-path=">,
+  HelpText<"Read legacy type layout from the given path">;
+}
+
 
 // HIDDEN FLAGS
 let Flags = [FrontendOption, NoDriverOption, HelpHidden] in {
@@ -485,21 +501,11 @@ def dump_interface_hash : Flag<["-"], "dump-interface-hash">,
    HelpText<"Parse input file(s) and dump interface token hash(es)">,
    ModeOpt;
 
-def dump_api_path : Separate<["-"], "dump-api-path">,
-  HelpText<"The path to output swift interface files for the compiled source files">;
-
-def enable_resilience : Flag<["-"], "enable-resilience">,
-   HelpText<"Compile the module to export resilient interfaces for all "
-            "public declarations by default">;
-
-def enable_class_resilience : Flag<["-"], "enable-class-resilience">,
-   HelpText<"Enable resilient layout for classes containing resilient value types">;
-
 def enable_resilience_bypass : Flag<["-"], "enable-resilience-bypass">,
    HelpText<"Completely bypass resilience when accessing types in resilient frameworks">;
 
-def read_type_info_path_EQ : Joined<["-"], "read-type-info-path=">,
-  HelpText<"Read legacy type layout from the given path">;
+def dump_api_path : Separate<["-"], "dump-api-path">,
+  HelpText<"The path to output swift interface files for the compiled source files">;
 
 def group_info_path : Separate<["-"], "group-info-path">,
   HelpText<"The path to collect the group information of the compiled module">;

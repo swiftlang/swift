@@ -26,6 +26,7 @@
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
@@ -35,6 +36,9 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "clang/Frontend/CompilerInstance.h"
+#include "clang/Lex/Preprocessor.h"
+#include "clang/Lex/HeaderSearch.h"
 
 using namespace swift;
 
@@ -116,6 +120,33 @@ CompilerInvocation::getParseableInterfaceOutputPathForWholeModule() const {
          "can be seen");
   return getPrimarySpecificPathsForAtMostOnePrimary()
       .SupplementaryOutputs.ParseableInterfaceOutputPath;
+}
+
+SerializationOptions
+CompilerInvocation::computeSerializationOptions(const SupplementaryOutputPaths &outs,
+                                                bool moduleIsPublic) {
+  const FrontendOptions &opts = getFrontendOptions();
+
+  SerializationOptions serializationOpts;
+  serializationOpts.OutputPath = outs.ModuleOutputPath.c_str();
+  serializationOpts.DocOutputPath = outs.ModuleDocOutputPath.c_str();
+  serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
+  if (opts.SerializeBridgingHeader && !outs.ModuleOutputPath.empty())
+    serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
+  serializationOpts.ModuleLinkName = opts.ModuleLinkName;
+  serializationOpts.ExtraClangOptions = getClangImporterOptions().ExtraArgs;
+  serializationOpts.EnableNestedTypeLookupTable =
+      opts.EnableSerializationNestedTypeLookupTable;
+  if (!getIRGenOptions().ForceLoadSymbolName.empty())
+    serializationOpts.AutolinkForceLoad = true;
+
+  // Options contain information about the developer's computer,
+  // so only serialize them if the module isn't going to be shipped to
+  // the public.
+  serializationOpts.SerializeOptionsForDebugging =
+      !moduleIsPublic || opts.AlwaysSerializeDebuggingOptions;
+
+  return serializationOpts;
 }
 
 void CompilerInstance::createSILModule() {
@@ -265,6 +296,7 @@ bool CompilerInstance::setUpModuleLoaders() {
     this->SML = SML.get();
     Context->addModuleLoader(std::move(SML));
   }
+  std::string ModuleCachePath;
   {
     // Wire up the Clang importer. If the user has specified an SDK, use it.
     // Otherwise, we just keep it around as our interface to Clang's ABI
@@ -276,8 +308,27 @@ bool CompilerInstance::setUpModuleLoaders() {
       Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
       return true;
     }
-
+    // Capture the specified-or-defaulted -module-cache-path that winds up in
+    // the clang importer, for reuse as the .swiftmodule cache path when
+    // building the ParseableInterfaceModuleLoader below.
+    //
+    // The returned-from-clang module cache path includes a suffix directory
+    // that is specific to the clang version and invocation; we want the
+    // directory above that.
+    auto const &Clang = clangImporter->getClangInstance();
+    if (Clang.hasPreprocessor()) {
+      std::string SpecificModuleCachePath = Clang.getPreprocessor()
+                                                .getHeaderSearchInfo()
+                                                .getModuleCachePath();
+      ModuleCachePath = llvm::sys::path::parent_path(SpecificModuleCachePath);
+    }
     Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
+  }
+  if (Invocation.getFrontendOptions().EnableParseableModuleInterface) {
+    auto PIML = ParseableInterfaceModuleLoader::create(*Context,
+                                                       ModuleCachePath,
+                                                       getDependencyTracker());
+    Context->addModuleLoader(std::move(PIML));
   }
   return false;
 }
