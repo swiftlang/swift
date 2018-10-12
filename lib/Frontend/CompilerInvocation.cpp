@@ -160,7 +160,8 @@ static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
 /// in a mode that is going to emit a .swiftinterface file.
 static void SaveParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
                                        ArgList &Args, DiagnosticEngine &Diags) {
-  if (!Args.hasArg(options::OPT_emit_interface_path))
+  if (!Args.hasArg(options::OPT_emit_interface_path) &&
+      !Args.hasArg(options::OPT_emit_parseable_module_interface_path))
     return;
   ArgStringList RenderedArgs;
   for (auto A : Args) {
