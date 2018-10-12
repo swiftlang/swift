@@ -60,6 +60,7 @@ func test_switch_two_trivial_unions(x: Foo, y: Foo) {
   // CHECK:   unreachable
   }
 }
+// CHECK: } // end sil function '$s6switch05test_A19_two_trivial_unions1x1yyAA3FooO_AFtF'
 
 // CHECK-LABEL: sil hidden @$s6switch05test_A22_two_nontrivial_unions1x1yyAA13NonTrivialFooO_AFtF : $@convention(thin) (@guaranteed NonTrivialFoo, @guaranteed NonTrivialFoo) -> () {
 func test_switch_two_nontrivial_unions(x: NonTrivialFoo, y: NonTrivialFoo) {
@@ -98,3 +99,4 @@ func test_switch_two_nontrivial_unions(x: NonTrivialFoo, y: NonTrivialFoo) {
   // CHECK:   unreachable
   }
 }
+// CHECK: } // end sil function '$s6switch05test_A22_two_nontrivial_unions1x1yyAA13NonTrivialFooO_AFtF'
