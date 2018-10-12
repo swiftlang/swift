@@ -192,7 +192,7 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
   // First check to see if the .swiftinterface exists at all. Bail if not.
   InPath = DirName;
   llvm::sys::path::append(InPath, ModuleFilename);
-  auto Ext = file_types::getExtension(file_types::TY_SwiftModuleInterfaceFile);
+  auto Ext = file_types::getExtension(file_types::TY_SwiftParseableInterfaceFile);
   llvm::sys::path::replace_extension(InPath, Ext);
   if (!FS.exists(InPath))
     return std::make_error_code(std::errc::no_such_file_or_directory);
