@@ -32,10 +32,13 @@ extension String {
 
 % AllWorkloads = ["ascii", "latin1", "fastPrenormal", "slowerPrenormal", "nonBMPSlowestPrenormal", "emoji", "abnormal", "zalgo", "longSharedPrefix"]
 % ComparisonWorkloads = AllWorkloads
-% HashingWorkloads = ["ascii", "latin1", "fastPrenormal", "slowerPrenormal", "nonBMPSlowestPrenormal", "emoji", "abnormal", "zalgo"]
-% NormalizedIteratorWorkloads = ["ascii", "latin1", "fastPrenormal", "slowerPrenormal", "nonBMPSlowestPrenormal", "emoji", "abnormal", "zalgo"]
+% HashingWorkloads = ["ascii", "latin1", "fastPrenormal", "slowerPrenormal", "nonBMPSlowestPrenormal", "emoji", "abnormal", "zalgo", "longSharedPrefix"]
+// TODO(UTF8 merge): Disable longSharedPrefix hashing benchmark, which is enabled here for 1-to-1 comparison vs master
 
-public let StringComparison = [
+% NormalizedIteratorWorkloads = []
+// TODO(UTF8 merge): Enable NormalizedIteratorWorkloads for ["ascii", "latin1", "fastPrenormal", "slowerPrenormal", "nonBMPSlowestPrenormal", "emoji", "abnormal", "zalgo"]
+
+public let StringComparison: [BenchmarkInfo] = [
 % for Name in ComparisonWorkloads:
   BenchmarkInfo(
     name: "StringComparison_${Name}",
@@ -46,7 +49,7 @@ public let StringComparison = [
 % end # ComparisonWorkloads
 ]
 
-public let StringHashing = [
+public let StringHashing: [BenchmarkInfo] = [
 % for Name in HashingWorkloads:
   BenchmarkInfo(
     name: "StringHashing_${Name}",
@@ -57,7 +60,7 @@ public let StringHashing = [
 % end # HashingWorkloads
 ]
 
-public let NormalizedIterator = [
+public let NormalizedIterator: [BenchmarkInfo] = [
 % for Name in NormalizedIteratorWorkloads:
   BenchmarkInfo(
     name: "NormalizedIterator_${Name}",

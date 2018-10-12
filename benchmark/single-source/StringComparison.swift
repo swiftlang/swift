@@ -29,8 +29,11 @@ extension String {
   }
 }
 
+// TODO(UTF8 merge): Disable longSharedPrefix hashing benchmark, which is enabled here for 1-to-1 comparison vs master
 
-public let StringComparison = [
+// TODO(UTF8 merge): Enable NormalizedIteratorWorkloads for ["ascii", "latin1", "fastPrenormal", "slowerPrenormal", "nonBMPSlowestPrenormal", "emoji", "abnormal", "zalgo"]
+
+public let StringComparison: [BenchmarkInfo] = [
   BenchmarkInfo(
     name: "StringComparison_ascii",
     runFunction: run_StringComparison_ascii,
@@ -87,7 +90,7 @@ public let StringComparison = [
   ),
 ]
 
-public let StringHashing = [
+public let StringHashing: [BenchmarkInfo] = [
   BenchmarkInfo(
     name: "StringHashing_ascii",
     runFunction: run_StringHashing_ascii,
@@ -136,57 +139,15 @@ public let StringHashing = [
     tags: [.validation, .api, .String],
     setUpFunction: { blackHole(Workload_zalgo) }
   ),
+  BenchmarkInfo(
+    name: "StringHashing_longSharedPrefix",
+    runFunction: run_StringHashing_longSharedPrefix,
+    tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(Workload_longSharedPrefix) }
+  ),
 ]
 
-public let NormalizedIterator = [
-  BenchmarkInfo(
-    name: "NormalizedIterator_ascii",
-    runFunction: run_NormalizedIterator_ascii,
-    tags: [.validation, .String],
-    setUpFunction: { blackHole(Workload_ascii) }
-  ),
-  BenchmarkInfo(
-    name: "NormalizedIterator_latin1",
-    runFunction: run_NormalizedIterator_latin1,
-    tags: [.validation, .String],
-    setUpFunction: { blackHole(Workload_latin1) }
-  ),
-  BenchmarkInfo(
-    name: "NormalizedIterator_fastPrenormal",
-    runFunction: run_NormalizedIterator_fastPrenormal,
-    tags: [.validation, .String],
-    setUpFunction: { blackHole(Workload_fastPrenormal) }
-  ),
-  BenchmarkInfo(
-    name: "NormalizedIterator_slowerPrenormal",
-    runFunction: run_NormalizedIterator_slowerPrenormal,
-    tags: [.validation, .String],
-    setUpFunction: { blackHole(Workload_slowerPrenormal) }
-  ),
-  BenchmarkInfo(
-    name: "NormalizedIterator_nonBMPSlowestPrenormal",
-    runFunction: run_NormalizedIterator_nonBMPSlowestPrenormal,
-    tags: [.validation, .String],
-    setUpFunction: { blackHole(Workload_nonBMPSlowestPrenormal) }
-  ),
-  BenchmarkInfo(
-    name: "NormalizedIterator_emoji",
-    runFunction: run_NormalizedIterator_emoji,
-    tags: [.validation, .String],
-    setUpFunction: { blackHole(Workload_emoji) }
-  ),
-  BenchmarkInfo(
-    name: "NormalizedIterator_abnormal",
-    runFunction: run_NormalizedIterator_abnormal,
-    tags: [.validation, .String],
-    setUpFunction: { blackHole(Workload_abnormal) }
-  ),
-  BenchmarkInfo(
-    name: "NormalizedIterator_zalgo",
-    runFunction: run_NormalizedIterator_zalgo,
-    tags: [.validation, .String],
-    setUpFunction: { blackHole(Workload_zalgo) }
-  ),
+public let NormalizedIterator: [BenchmarkInfo] = [
 ]
 
 var Workload_ascii: Workload! = Workload.ascii
@@ -431,118 +392,18 @@ public func run_StringHashing_zalgo(_ N: Int) {
   }
 }
 
-
 @inline(never)
-public func run_NormalizedIterator_ascii(_ N: Int) {
-  let workload: Workload = Workload.ascii
+public func run_StringHashing_longSharedPrefix(_ N: Int) {
+  let workload: Workload = Workload.longSharedPrefix
   let tripCount = workload.tripCount
   let payload = workload.payload
   for _ in 1...tripCount*N {
     for str in payload {
-      str._withNFCCodeUnits { cu in
-        blackHole(cu)
-      }
+      blackHole(str.hashValue)
     }
   }
 }
 
-@inline(never)
-public func run_NormalizedIterator_latin1(_ N: Int) {
-  let workload: Workload = Workload.latin1
-  let tripCount = workload.tripCount
-  let payload = workload.payload
-  for _ in 1...tripCount*N {
-    for str in payload {
-      str._withNFCCodeUnits { cu in
-        blackHole(cu)
-      }
-    }
-  }
-}
-
-@inline(never)
-public func run_NormalizedIterator_fastPrenormal(_ N: Int) {
-  let workload: Workload = Workload.fastPrenormal
-  let tripCount = workload.tripCount
-  let payload = workload.payload
-  for _ in 1...tripCount*N {
-    for str in payload {
-      str._withNFCCodeUnits { cu in
-        blackHole(cu)
-      }
-    }
-  }
-}
-
-@inline(never)
-public func run_NormalizedIterator_slowerPrenormal(_ N: Int) {
-  let workload: Workload = Workload.slowerPrenormal
-  let tripCount = workload.tripCount
-  let payload = workload.payload
-  for _ in 1...tripCount*N {
-    for str in payload {
-      str._withNFCCodeUnits { cu in
-        blackHole(cu)
-      }
-    }
-  }
-}
-
-@inline(never)
-public func run_NormalizedIterator_nonBMPSlowestPrenormal(_ N: Int) {
-  let workload: Workload = Workload.nonBMPSlowestPrenormal
-  let tripCount = workload.tripCount
-  let payload = workload.payload
-  for _ in 1...tripCount*N {
-    for str in payload {
-      str._withNFCCodeUnits { cu in
-        blackHole(cu)
-      }
-    }
-  }
-}
-
-@inline(never)
-public func run_NormalizedIterator_emoji(_ N: Int) {
-  let workload: Workload = Workload.emoji
-  let tripCount = workload.tripCount
-  let payload = workload.payload
-  for _ in 1...tripCount*N {
-    for str in payload {
-      str._withNFCCodeUnits { cu in
-        blackHole(cu)
-      }
-    }
-  }
-}
-
-@inline(never)
-public func run_NormalizedIterator_abnormal(_ N: Int) {
-  let workload: Workload = Workload.abnormal
-  let tripCount = workload.tripCount
-  let payload = workload.payload
-  for _ in 1...tripCount*N {
-    for str in payload {
-      str._withNFCCodeUnits { cu in
-        blackHole(cu)
-      }
-    }
-  }
-}
-
-@inline(never)
-public func run_NormalizedIterator_zalgo(_ N: Int) {
-  let workload: Workload = Workload.zalgo
-  let tripCount = workload.tripCount
-  let payload = workload.payload
-  for _ in 1...tripCount*N {
-    for str in payload {
-      str._withNFCCodeUnits { cu in
-        blackHole(cu)
-      }
-    }
-  }
-}
 
 
 struct Workload {
