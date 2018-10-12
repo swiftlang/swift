@@ -34,7 +34,7 @@ using namespace swift;
 
 static bool
 extractSwiftInterfaceVersionAndArgs(DiagnosticEngine &Diags,
-                                    clang::vfs::FileSystem &FS,
+                                    llvm::vfs::FileSystem &FS,
                                     StringRef SwiftInterfacePathIn,
                                     swift::version::Version &Vers,
                                     llvm::StringSaver &SubArgSaver,
@@ -106,7 +106,7 @@ ParseableInterfaceModuleLoader::configureSubInvocationAndOutputPath(
 
 // FIXME: this needs to be a more extensive up-to-date check.
 static bool
-swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
+swiftModuleIsUpToDate(llvm::vfs::FileSystem &FS,
                       StringRef InPath, StringRef OutPath) {
   if (FS.exists(OutPath)) {
     auto InStatus = FS.status(InPath);
@@ -120,7 +120,7 @@ swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
 }
 
 static bool buildSwiftModuleFromSwiftInterface(
-    clang::vfs::FileSystem &FS, DiagnosticEngine &Diags,
+    llvm::vfs::FileSystem &FS, DiagnosticEngine &Diags,
     CompilerInvocation &SubInvocation, StringRef InPath, StringRef OutPath) {
   bool SubError = false;
   bool RunSuccess = llvm::CrashRecoveryContext().RunSafelyOnThread([&] {

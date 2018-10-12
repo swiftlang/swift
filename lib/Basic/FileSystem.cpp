@@ -20,6 +20,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Signals.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 using namespace swift;
 
@@ -223,7 +224,7 @@ std::error_code swift::moveFileIfDifferent(const llvm::Twine &source,
 }
 
 llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-swift::vfs::getFileOrSTDIN(clang::vfs::FileSystem &FS,
+swift::vfs::getFileOrSTDIN(llvm::vfs::FileSystem &FS,
                            const llvm::Twine &Filename,
                            int64_t FileSize,
                            bool RequiresNullTerminator,
