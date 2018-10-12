@@ -556,10 +556,11 @@ extension ArraySlice: RandomAccessCollection, MutableCollection {
         index, wasNativeTypeChecked: wasNativeTypeChecked,
         matchingSubscriptCheck: token)
     }
-    mutableAddressWithNativeOwner {
+    _modify {
       _makeMutableAndUnique() // makes the array native, too
       _checkSubscript_native(index)
-      return (_getElementAddress(index), _getOwner_native())
+      let address = _buffer.subscriptBaseAddress + index
+      yield &address.pointee
     }
   }
 
