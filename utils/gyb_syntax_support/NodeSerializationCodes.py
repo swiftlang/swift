@@ -129,7 +129,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'AccessorBlock': 124,
     'PatternBinding': 125,
     'EnumCaseElement': 126,
-    'InfixOperatorGroup': 127,
+    'OperatorPrecedenceAndTypes': 127,
     'PrecedenceGroupRelation': 128,
     'PrecedenceGroupNameElement': 129,
     'PrecedenceGroupAssignment': 130,
@@ -228,6 +228,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'AttributedType': 223,
     'YieldStmt': 224,
     'YieldList': 225,
+    'IdentifierList': 226,
 }
 
 

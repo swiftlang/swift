@@ -1,3 +1,4 @@
+
 //===--- DiagnosticsParse.def - Diagnostics Text ----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
@@ -431,8 +432,10 @@ ERROR(deprecated_operator_body_use_group,PointsToFirstBadToken,
 ERROR(operator_decl_no_fixity,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
 
-ERROR(operator_decl_trailing_comma,none,
+ERROR(operator_decl_expected_type,none,
       "expected designated type in operator declaration", ())
+ERROR(operator_decl_trailing_comma,none,
+      "trailing comma in operator declaration", ())
 
 // PrecedenceGroup
 ERROR(precedencegroup_not_infix,none,

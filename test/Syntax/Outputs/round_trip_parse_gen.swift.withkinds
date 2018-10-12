@@ -492,7 +492,7 @@ precedencegroup BazPrecedence {<PrecedenceGroupAssociativity>
   lowerThan: <PrecedenceGroupNameElement>DefaultPrecedence</PrecedenceGroupNameElement></PrecedenceGroupRelation>
 }</PrecedenceGroupDecl><OperatorDecl><DeclModifier>
 
-infix </DeclModifier>operator<++><InfixOperatorGroup>:FooPrecedence</InfixOperatorGroup></OperatorDecl><OperatorDecl><DeclModifier>
+infix </DeclModifier>operator<++><OperatorPrecedenceAndTypes>:FooPrecedence</OperatorPrecedenceAndTypes></OperatorDecl><OperatorDecl><DeclModifier>
 prefix </DeclModifier>operator..<<</OperatorDecl><OperatorDecl><DeclModifier>
 postfix </DeclModifier>operator <-</OperatorDecl><FunctionDecl>
 
