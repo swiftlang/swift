@@ -465,10 +465,10 @@ private:
   void emitSpecializedDispatch(ClauseMatrix &matrix, ArgArray args,
                                unsigned &lastRow, unsigned column,
                                const FailureHandler &failure);
-  void emitTupleDispatchWithOwnership(ArrayRef<RowToSpecialize> rows,
-                                      ConsumableManagedValue src,
-                                      const SpecializationHandler &handleSpec,
-                                      const FailureHandler &failure);
+  void emitTupleObjectDispatch(ArrayRef<RowToSpecialize> rows,
+                               ConsumableManagedValue src,
+                               const SpecializationHandler &handleSpec,
+                               const FailureHandler &failure);
   void emitTupleDispatch(ArrayRef<RowToSpecialize> rows,
                          ConsumableManagedValue src,
                          const SpecializationHandler &handleSpec,
@@ -738,15 +738,19 @@ forwardIntoSubtree(SILGenFunction &SGF, SILLocation loc,
   ManagedValue outerMV = outerCMV.getFinalManagedValue();
   if (!outerMV.hasCleanup()) return outerCMV;
 
-  assert(outerCMV.getFinalConsumption() != CastConsumptionKind::CopyOnSuccess
-         && "copy-on-success value with cleanup?");
+  auto consumptionKind = outerCMV.getFinalConsumption();
+  (void)consumptionKind;
+  assert((consumptionKind == CastConsumptionKind::TakeAlways ||
+          consumptionKind == CastConsumptionKind::TakeOnSuccess) &&
+         "non-+1 consumption with a cleanup?");
   scope.pushCleanupState(outerMV.getCleanup(),
                          CleanupState::PersistentlyActive);
 
-  // If SILOwnership is enabled, we always forward down values as borrows that
-  // are copied on success.
-  if (SGF.F.getModule().getOptions().EnableSILOwnership) {
-    return {outerMV.borrow(SGF, loc), CastConsumptionKind::CopyOnSuccess};
+  // If SILOwnership is enabled and we have an object, borrow instead of take on
+  // success.
+  if (SGF.F.getModule().getOptions().EnableSILOwnership &&
+      outerMV.getType().isObject()) {
+    return {outerMV.borrow(SGF, loc), CastConsumptionKind::BorrowAlways};
   }
 
   // Success means that we won't end up in the other branch,
@@ -766,9 +770,6 @@ static void forwardIntoIrrefutableSubtree(SILGenFunction &SGF,
 
   assert(outerCMV.getFinalConsumption() != CastConsumptionKind::CopyOnSuccess
          && "copy-on-success value with cleanup?");
-  assert((!SGF.F.getModule().getOptions().EnableSILOwnership ||
-          outerCMV.getFinalConsumption() == CastConsumptionKind::TakeAlways) &&
-         "When semantic sil is enabled, we should never see TakeOnSuccess");
   scope.pushCleanupState(outerMV.getCleanup(),
                          CleanupState::PersistentlyActive);
 
@@ -899,17 +900,9 @@ public:
 
   static bool requiresUnforwarding(SILGenFunction &SGF,
                                    ConsumableManagedValue operand) {
-    if (SGF.F.getModule().getOptions().EnableSILOwnership) {
-      assert(operand.getFinalConsumption() !=
-                 CastConsumptionKind::TakeOnSuccess &&
-             "When compiling with sil ownership take on success is disabled");
-      // No unforwarding is needed, we always borrow/copy.
-      return false;
-    }
-
-    return (operand.hasCleanup() &&
-            operand.getFinalConsumption()
-              == CastConsumptionKind::TakeOnSuccess);
+    return operand.hasCleanup() &&
+           operand.getFinalConsumption()
+             == CastConsumptionKind::TakeOnSuccess;
   }
 
   /// Given that an aggregate was divided into a set of borrowed
@@ -1356,9 +1349,6 @@ getManagedSubobject(SILGenFunction &SGF, SILValue value,
     return {ManagedValue::forUnmanaged(value), consumption};
   case CastConsumptionKind::TakeAlways:
   case CastConsumptionKind::TakeOnSuccess:
-    assert((!SGF.F.getModule().getOptions().EnableSILOwnership ||
-            consumption != CastConsumptionKind::TakeOnSuccess) &&
-           "TakeOnSuccess should never be used when sil ownership is enabled");
     return {SGF.emitManagedRValueWithCleanup(value, valueTL), consumption};
   }
 }
@@ -1381,7 +1371,7 @@ emitReabstractedSubobject(SILGenFunction &SGF, SILLocation loc,
            SGF.emitOrigToSubstValue(loc, mv, abstraction, substFormalType));
 }
 
-void PatternMatchEmission::emitTupleDispatchWithOwnership(
+void PatternMatchEmission::emitTupleObjectDispatch(
     ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     const SpecializationHandler &handleCase,
     const FailureHandler &outerFailure) {
@@ -1409,8 +1399,7 @@ void PatternMatchEmission::emitTupleDispatchWithOwnership(
         destructured.push_back({v, src.getFinalConsumption()});
       });
 
-  // Break down the values.
-  // Recurse.
+  // Since we did all of our work at +0, we just send down the outer failure.
   handleCase(destructured, specializedRows, outerFailure);
 }
 
@@ -1421,12 +1410,44 @@ void PatternMatchEmission::
 emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
                   const SpecializationHandler &handleCase,
                   const FailureHandler &outerFailure) {
-  if (SGF.getOptions().EnableSILOwnership && src.getType().isObject()) {
-    return emitTupleDispatchWithOwnership(rows, src, handleCase, outerFailure);
-  }
   auto firstPat = rows[0].Pattern;
-  auto sourceType = cast<TupleType>(firstPat->getType()->getCanonicalType());
   SILLocation loc = firstPat;
+
+  // If our source is an address that is loadable, perform a load_borrow.
+  if (src.getType().isAddress() && src.getType().isLoadable(SGF.getModule())) {
+    src = {SGF.B.createLoadBorrow(loc, src.getFinalManagedValue()),
+           CastConsumptionKind::BorrowAlways};
+  }
+
+  // Then if we have an object...
+  if (src.getType().isObject()) {
+    // Make sure that if we ahve a copy_on_success, non-trivial value that we do
+    // not have a value with @owned ownership.
+    assert((!src.getType().isTrivial(SGF.getModule()) ||
+            src.getFinalConsumption() != CastConsumptionKind::CopyOnSuccess ||
+            src.getOwnershipKind() != ValueOwnershipKind::Owned) &&
+           "@owned value without cleanup + copy_on_success");
+
+    // If we have are asked to perform TakeOnSuccess, borrow the value instead.
+    //
+    // The reason why do this for TakeOnSuccess is that we want to not have to
+    // deal with unforwarding of aggregate tuples in failing cases since that
+    // causes ownership invariants to be violated since we already forwarded the
+    // aggregate to create cleanups on its elements.
+    //
+    // In contrast, we do still want to allow for TakeAlways variants to not
+    // need to borrow, so we do not borrow if we take always.
+    if (!src.getType().isTrivial(SGF.getModule()) &&
+        src.getFinalConsumption() == CastConsumptionKind::TakeOnSuccess) {
+      src = {src.getFinalManagedValue().borrow(SGF, loc),
+             CastConsumptionKind::BorrowAlways};
+    }
+
+    // Then perform a forward or reborrow destructure on the object.
+    return emitTupleObjectDispatch(rows, src, handleCase, outerFailure);
+  }
+
+  auto sourceType = cast<TupleType>(firstPat->getType()->getCanonicalType());
 
   SILValue v = src.getFinalManagedValue().forward(SGF);
   SmallVector<ConsumableManagedValue, 4> destructured;
@@ -1882,8 +1903,6 @@ void PatternMatchEmission::emitEnumElementDispatch(
       break;
 
     case CastConsumptionKind::TakeOnSuccess:
-      assert(!SGF.F.getModule().getOptions().EnableSILOwnership &&
-             "TakeOnSuccess is not supported when compiling with ownership");
       // If any of the specialization cases is refutable, we must copy.
       if (!blocks.hasAnyRefutableCase())
         break;
@@ -1966,8 +1985,6 @@ void PatternMatchEmission::emitEnumElementDispatch(
       auto eltConsumption = src.getFinalConsumption();
       if (caseInfo.Irrefutable &&
           eltConsumption == CastConsumptionKind::TakeOnSuccess) {
-        assert(!SGF.F.getModule().getOptions().EnableSILOwnership &&
-               "TakeOnSuccess is not supported when compiling with ownership");
         eltConsumption = CastConsumptionKind::TakeAlways;
       }
 
@@ -2760,8 +2777,9 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
   // Set up an initial clause matrix.
   ClauseMatrix clauseMatrix(clauseRows);
   ConsumableManagedValue subject;
-  if (F.getModule().getOptions().EnableSILOwnership) {
-    subject = {exn.borrow(*this, S), CastConsumptionKind::CopyOnSuccess};
+  if (F.getModule().getOptions().EnableSILOwnership &&
+      exn.getType().isObject()) {
+    subject = {exn.borrow(*this, S), CastConsumptionKind::BorrowAlways};
   } else {
     subject = {exn, CastConsumptionKind::TakeOnSuccess};
   }

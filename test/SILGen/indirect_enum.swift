@@ -176,8 +176,7 @@ func switchTreeA<T>(_ x: TreeA<T>) {
   // CHECK:     [[BRANCH_CASE]]([[NODE_BOX:%.*]] : @owned $<τ_0_0> { var (left: TreeA<τ_0_0>, right: TreeA<τ_0_0>) } <T>):
   // CHECK:       [[TUPLE_ADDR:%.*]] = project_box [[NODE_BOX]]
   // CHECK:       [[TUPLE:%.*]] = load_borrow [[TUPLE_ADDR]]
-  // CHECK:       [[LEFT:%.*]] = tuple_extract [[TUPLE]] {{.*}}, 0
-  // CHECK:       [[RIGHT:%.*]] = tuple_extract [[TUPLE]] {{.*}}, 1
+  // CHECK:       ([[LEFT:%.*]], [[RIGHT:%.*]]) = destructure_tuple [[TUPLE]]
   // CHECK:       switch_enum [[LEFT]] : $TreeA<T>,
   // CHECK:          case #TreeA.Leaf!enumelt.1: [[LEAF_CASE_LEFT:bb[0-9]+]],
   // CHECK:          default [[FAIL_LEFT:bb[0-9]+]]

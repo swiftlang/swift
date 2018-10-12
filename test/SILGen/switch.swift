@@ -705,8 +705,7 @@ func test_union_1(u: MaybePair) {
 
   // CHECK: [[IS_BOTH]]([[TUP:%.*]] : @owned $(Int, String)):
   case .Both:
-  // CHECK:   tuple_extract [[TUP]] : $(Int, String), 0
-  // CHECK:   [[TUP_STR:%.*]] = tuple_extract [[TUP]] : $(Int, String), 1
+  // CHECK:   ({{%.*}}, [[TUP_STR:%.*]]) = destructure_tuple [[TUP]]
   // CHECK:   destroy_value [[TUP_STR]] : $String
   // CHECK:   function_ref @$s6switch1dyyF
   // CHECK:   br [[CONT]]
@@ -915,9 +914,7 @@ enum Foo { case A, B }
 // CHECK-LABEL: sil hidden @$s6switch05test_A11_two_unions1x1yyAA3FooO_AFtF
 func test_switch_two_unions(x: Foo, y: Foo) {
   // CHECK:   [[T0:%.*]] = tuple (%0 : $Foo, %1 : $Foo)
-  // CHECK:   [[X:%.*]] = tuple_extract [[T0]] : $(Foo, Foo), 0
-  // CHECK:   [[Y:%.*]] = tuple_extract [[T0]] : $(Foo, Foo), 1
-
+  // CHECK:   ([[X:%.*]], [[Y:%.*]]) = destructure_tuple [[T0]]
   // CHECK:   switch_enum [[Y]] : $Foo, case #Foo.A!enumelt: [[IS_CASE1:bb[0-9]+]], default [[IS_NOT_CASE1:bb[0-9]+]]
 
   switch (x, y) {
@@ -980,8 +977,7 @@ func rdar14835992<T, U>(t: Rdar14835992, tt: T, uu: U) {
 enum ABC { case A, B, C }
 
 // CHECK-LABEL: sil hidden @$s6switch18testTupleWildcardsyyAA3ABCO_ADtF
-// CHECK:         [[X:%.*]] = tuple_extract {{%.*}} : $(ABC, ABC), 0
-// CHECK:         [[Y:%.*]] = tuple_extract {{%.*}} : $(ABC, ABC), 1
+// CHECK:         ([[X:%.*]], [[Y:%.*]]) = destructure_tuple {{%.*}} : $(ABC, ABC)
 // CHECK:         switch_enum [[X]] : $ABC, case #ABC.A!enumelt: [[X_A:bb[0-9]+]], default [[X_NOT_A:bb[0-9]+]]
 // CHECK:       [[X_A]]:
 // CHECK:         function_ref @$s6switch1ayyF
@@ -1022,7 +1018,7 @@ func testLabeledScalarPayload(_ lsp: LabeledScalarPayload) -> Any {
   // CHECK: switch_enum {{%.*}}, case #LabeledScalarPayload.Payload!enumelt.1: bb1
   switch lsp {
   // CHECK: bb1([[TUPLE:%.*]] : @trivial $(name: Int)):
-  // CHECK:   [[X:%.*]] = tuple_extract [[TUPLE]]
+  // CHECK:   [[X:%.*]] = destructure_tuple [[TUPLE]]
   // CHECK:   [[ANY_X_ADDR:%.*]] = init_existential_addr {{%.*}}, $Int
   // CHECK:   store [[X]] to [trivial] [[ANY_X_ADDR]]
   case let .Payload(x):
