@@ -917,6 +917,9 @@ public:
   bool isObjCClassRef() const {
     return getKind() == Kind::ObjCClassRef;
   }
+  bool isSILFunction() const {
+    return getKind() == Kind::SILFunction;
+  }
 
   /// Determine whether this entity will be weak-imported.
   bool isWeakImported(ModuleDecl *module) const;
