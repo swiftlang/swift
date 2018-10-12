@@ -31,8 +31,11 @@ func foo() {}
 // SEMA_2: 5 {{.*}} source.statistic.num-requests
 // SEMA_2: 0 {{.*}} source.statistic.num-semantic-requests
 // SEMA_2: 2 {{.*}} source.statistic.num-ast-builds
-// SEMA_2: 1 {{.*}} source.statistic.num-asts-in-memory
-// FIXME_SEMA_2: 0 {{.*}} source.statistic.num-ast-cache-hits
+// NOTE: we cannot match num-asts-in-memory, or num-ast-cache-hits reliably when
+// doing edits. The first ASTConsumer can still be running when the edit happens
+// in which case we may trigger an extra processLatestSnapshotAsync() which will
+// hit the cache, and/or keep the first AST in memory long enough to be reported
+// here.
 // SEMA_2: 0 {{.*}} source.statistic.num-ast-snaphost-uses
 
 // RUN: %sourcekitd-test -req=sema %s -- %s == -req=cursor -pos=1:6 %s -- %s == -req=stats | %FileCheck %s -check-prefix=SEMA_3
