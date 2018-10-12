@@ -18,7 +18,14 @@
 // RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS < %t.enum.txt
 // RUN: %FileCheck %s -check-prefix=QUX_ENUM_TYPE_CONTEXT < %t.enum.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_6 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=WITH_GLOBAL_RESULTS < %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=QUX_ENUM_TYPE_CONTEXT < %t.enum.txt
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_WITH_DOT_1 > %t.enum.txt
+// RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT_ELEMENTS < %t.enum.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_WITH_DOT_2 > %t.enum.txt
 // RUN: %FileCheck %s -check-prefix=FOO_ENUM_DOT_ELEMENTS < %t.enum.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_SW_WITH_QUAL_1 > %t.enum.txt
@@ -313,10 +320,20 @@ func testSwitch5(e: QuxEnum) {
   }
 }
 
+// Test for top level code
+switch QuxEnum.Qux1 {
+case #^ENUM_SW_6^#
+}
+
 func testSwitchWithDot1(e: FooEnum) {
   switch e {
   case .#^ENUM_SW_WITH_DOT_1^#
   }
+}
+
+// Test for top level code
+switch FooEnum.Foo2 {
+case .#^ENUM_SW_WITH_DOT_2^#
 }
 
 func testSwitchWithQualification1(e: FooEnum) {
