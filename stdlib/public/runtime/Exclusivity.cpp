@@ -87,6 +87,7 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
   constexpr unsigned framesToSkip = 1;
   printCurrentBacktrace(framesToSkip);
 
+  // Should be inlined away in release builds.
   bool keepGoing = isWarningOnly(newFlags);
 
   RuntimeErrorDetails::Thread secondaryThread = {

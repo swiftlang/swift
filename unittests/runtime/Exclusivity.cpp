@@ -16,6 +16,7 @@
 
 using namespace swift;
 
+#ifndef NDEBUG
 TEST(TestExclusivity, testNullPC) {
   ValueBuffer scratch, scratch2;
   long var;
@@ -28,7 +29,9 @@ TEST(TestExclusivity, testNullPC) {
   swift_endAccess(&scratch2);
   swift_endAccess(&scratch);
 }
+#endif
 
+#ifndef NDEBUG
 TEST(TestExclusivity, testPCOne) {
   ValueBuffer scratch, scratch2;
   long var;
@@ -41,7 +44,9 @@ TEST(TestExclusivity, testPCOne) {
   swift_endAccess(&scratch2);
   swift_endAccess(&scratch);
 }
+#endif
 
+#ifndef NDEBUG
 TEST(TestExclusivity, testBogusPC) {
   ValueBuffer scratch, scratch2;
   long var;
@@ -54,6 +59,7 @@ TEST(TestExclusivity, testBogusPC) {
   swift_endAccess(&scratch2);
   swift_endAccess(&scratch);
 }
+#endif
 
 // rdar://32866493
 TEST(TestExclusivity, testNonNested) {
