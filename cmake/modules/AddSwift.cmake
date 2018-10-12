@@ -1834,8 +1834,13 @@ function(add_swift_target_library name)
 
       foreach(lib ${SWIFTLIB_PRIVATE_LINK_LIBRARIES})
         if("${lib}" STREQUAL "ICU_UC")
-          list(APPEND swiftlib_private_link_libraries_targets
-               "${SWIFT_${sdk}_${arch}_ICU_UC}")
+          if("${sdk}" STREQUAL "ANDROID" OR "${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "")
+            list(APPEND swiftlib_private_link_libraries_targets
+                 "${SWIFT_${sdk}_${arch}_ICU_UC}")
+          else()
+            list(APPEND swiftlib_private_link_libraries_targets -licuucswift -licudataswift)
+          endif()
+
           # temporary fix for atomic needing to be
           # after object files for libswiftCore.so
           if("${sdk}" STREQUAL "ANDROID")
@@ -1848,8 +1853,12 @@ function(add_swift_target_library name)
                  "${SWIFTLIB_DIR}/clang/lib/freebsd/libclang_rt.builtins-${arch}.a")
           endif()
         elseif("${lib}" STREQUAL "ICU_I18N")
-          list(APPEND swiftlib_private_link_libraries_targets
-               "${SWIFT_${sdk}_${arch}_ICU_I18N}")
+          if("${sdk}" STREQUAL "ANDROID" OR "${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "")
+            list(APPEND swiftlib_private_link_libraries_targets
+                 "${SWIFT_${sdk}_${arch}_ICU_I18N}")
+          else()
+            list(APPEND swiftlib_private_link_libraries_targets -licui18nswift)
+          endif()
         elseif(TARGET "${lib}${VARIANT_SUFFIX}")
           list(APPEND swiftlib_private_link_libraries_targets
               "${lib}${VARIANT_SUFFIX}")
