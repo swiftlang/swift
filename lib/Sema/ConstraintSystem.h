@@ -1213,6 +1213,7 @@ private:
     /// \param constraint The newly generated constraint.
     void addGeneratedConstraint(Constraint *constraint) {
       generatedConstraints.push_back(constraint);
+      CS.invalidateBindings(constraint->getTypeVariables());
     }
 
     /// \brief Erase given constraint from the list of generated constraints
@@ -2940,6 +2941,12 @@ private:
     }
   };
 
+  /// Maps type variables to their bindings. Bindings are invalidated
+  /// and have to be re-computed if new constraints are introduced or
+  /// in relation to a particular set of type variables or type variables
+  /// are assigned fixed types or merged together.
+  llvm::DenseMap<TypeVariableType *, PotentialBindings> Bindings;
+
   Optional<Type> checkTypeOfBinding(TypeVariableType *typeVar, Type type,
                                     bool *isNilLiteral = nullptr);
   Optional<PotentialBindings> determineBestBindings();
@@ -3227,6 +3234,28 @@ public:
   void partitionDisjunction(ArrayRef<Constraint *> Choices,
                             SmallVectorImpl<unsigned> &Ordering,
                             SmallVectorImpl<unsigned> &PartitionBeginning);
+
+  void invalidateBindings(ArrayRef<TypeVariableType *> typeVars) {
+    llvm::SmallPtrSet<TypeVariableType *, 8> visitedVars;
+    for (auto *typeVar : typeVars) {
+      if (typeVar != typeVar->getImpl().getRepresentative(nullptr) ||
+          visitedVars.count(typeVar) > 0)
+        continue;
+
+      // If there was no binding, there is no need to disturb
+      // other type variables.
+      Bindings.erase(typeVar);
+      visitedVars.insert(typeVar);
+
+      for (auto *eqClassVar : CG[typeVar].getEquivalenceClass()) {
+        for (auto *adjacentVar : CG[eqClassVar].getAdjacencies()) {
+          auto *var = getRepresentative(adjacentVar);
+          if (visitedVars.insert(var).second)
+            Bindings.erase(var);
+        }
+      }
+    }
+  }
 
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() LLVM_ATTRIBUTE_USED,

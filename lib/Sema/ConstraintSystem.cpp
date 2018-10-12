@@ -232,6 +232,10 @@ void ConstraintSystem::addTypeVariableConstraintsToWorkList(
                              constraint);
     constraint->setActive(true);
   }
+
+  // Invalidate pre-computed bindings associated
+  // with this type variable (if any).
+  invalidateBindings(typeVar);
 }
 
 /// Retrieve a dynamic result signature for the given declaration.

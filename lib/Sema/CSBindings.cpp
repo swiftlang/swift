@@ -25,22 +25,26 @@ Optional<ConstraintSystem::PotentialBindings>
 ConstraintSystem::determineBestBindings() {
   // Look for potential type variable bindings.
   Optional<PotentialBindings> bestBindings;
-  llvm::SmallDenseMap<TypeVariableType *, PotentialBindings> cache;
-
   // First, let's collect all of the possible bindings.
   for (auto *typeVar : getTypeVariables()) {
     if (typeVar->getImpl().hasRepresentativeOrFixed())
       continue;
 
+    if (Bindings.count(typeVar) > 0)
+      continue;
+
     if (auto bindings = getPotentialBindings(typeVar))
-      cache.insert({typeVar, std::move(bindings)});
+      Bindings.insert({typeVar, std::move(bindings)});
   }
 
   // Now let's see if we could infer something for related type
   // variables based on other bindings.
   for (auto *typeVar : getTypeVariables()) {
-    auto cachedBindings = cache.find(typeVar);
-    if (cachedBindings == cache.end())
+    if (typeVar->getImpl().hasRepresentativeOrFixed())
+      continue;
+
+    auto cachedBindings = Bindings.find(typeVar);
+    if (cachedBindings == Bindings.end())
       continue;
 
     auto &bindings = cachedBindings->getSecond();
@@ -62,8 +66,8 @@ ConstraintSystem::determineBestBindings() {
       if (!tv)
         continue;
 
-      auto relatedBindings = cache.find(tv);
-      if (relatedBindings == cache.end())
+      auto relatedBindings = Bindings.find(tv);
+      if (relatedBindings == Bindings.end())
         continue;
 
       for (auto &binding : relatedBindings->getSecond().Bindings) {

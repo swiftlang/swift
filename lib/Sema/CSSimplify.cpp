@@ -1561,7 +1561,6 @@ ConstraintSystem::matchTypesBindTypeVar(
   }
 
   assignFixedType(typeVar, type);
-
   return getTypeMatchSuccess();
 }
 
