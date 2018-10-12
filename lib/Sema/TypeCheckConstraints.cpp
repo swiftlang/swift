@@ -101,7 +101,8 @@ void *operator new(size_t bytes, ConstraintSystem& cs,
 bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
                                       ArrayRef<TupleTypeElt> toTuple,
                                       SmallVectorImpl<int> &sources,
-                                      SmallVectorImpl<unsigned> &variadicArgs) {
+                                      SmallVectorImpl<unsigned> &variadicArgs,
+                                      bool rejectReorderingShuffles) {
   const int unassigned = -3;
   
   SmallVector<bool, 4> consumed(fromTuple.size(), false);
@@ -121,8 +122,14 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
     int matched = -1;
     {
       int index = 0;
-      for (auto field : fromTuple) {
+      for (auto fieldIdx : indices(fromTuple)) {
+        const auto &field = fromTuple[fieldIdx];
         if (field.getName() == toElt.getName() && !consumed[index]) {
+          // Complain if we're not allowed to create a shuffle that reorders
+          // field indices.
+          if (rejectReorderingShuffles && fieldIdx != i) {
+            return true;
+          }
           matched = index;
           break;
         }

@@ -1509,7 +1509,8 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       // If the shuffle conversion is invalid (e.g. incorrect element labels),
       // then we have a type error.
       if (computeTupleShuffle(TEType->castTo<TupleType>()->getElements(),
-                              toTT->getElements(), sources, variadicArgs)) {
+                              toTT->getElements(), sources, variadicArgs,
+                              CS.getASTContext().isSwiftVersionAtLeast(5))) {
         diagnose(anchor->getLoc(), diag::tuple_types_not_convertible,
                  fromTT, toTT)
         .highlight(anchor->getSourceRange());
@@ -7611,7 +7612,8 @@ bool FailureDiagnosis::visitTupleExpr(TupleExpr *TE) {
   // it specifically here, but the general logic does a fine job so we let it
   // do it.
   if (computeTupleShuffle(TEType->castTo<TupleType>()->getElements(),
-                          contextualTT->getElements(), sources, variadicArgs))
+                          contextualTT->getElements(), sources, variadicArgs,
+                          CS.getASTContext().isSwiftVersionAtLeast(5)))
     return visitExpr(TE);
 
   // If we got a correct shuffle, we can perform the analysis of all of

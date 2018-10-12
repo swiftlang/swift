@@ -999,7 +999,8 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   // Compute the element shuffles for conversions.
   SmallVector<int, 16> sources;
   SmallVector<unsigned, 4> variadicArguments;
-  if (computeTupleShuffle(tuple1, tuple2, sources, variadicArguments))
+  if (computeTupleShuffle(tuple1, tuple2, sources, variadicArguments,
+                          getASTContext().isSwiftVersionAtLeast(5)))
     return getTypeMatchFailure(locator);
 
   // Check each of the elements.

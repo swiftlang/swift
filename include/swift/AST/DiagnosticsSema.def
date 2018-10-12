@@ -4223,8 +4223,6 @@ WARNING(override_nsobject_hashvalue,none,
 // MARK: Tuple Shuffle Diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(reordering_tuple_shuffle_deprecated,none,
-      "expression shuffles the elements of this tuple", ())
 WARNING(warn_reordering_tuple_shuffle_deprecated,none,
         "expression shuffles the elements of this tuple; "
         "this behavior is deprecated in Swift 4", ())

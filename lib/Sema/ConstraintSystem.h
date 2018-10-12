@@ -3317,17 +3317,25 @@ public:
 /// \c where \c consumed[i] is \c TupleShuffleExpr::Variadic). The values
 /// are indices into the source tuple.
 ///
+/// \param rejectReorderingShuffles Tuple shuffles that reorder element indices
+/// are no longer semantically valid in non-legacy Swift modes. However,
+/// computing such shuffles may be valuable for legacy and diagnostic purposes.
+/// Pass \c false if reordering tuple shuffles should be constructed, else any
+/// attempt to form one will report that no tuple conversion is possible.
+///
 /// \returns true if no tuple conversion is possible, false otherwise.
 bool computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
                          ArrayRef<TupleTypeElt> toTuple,
                          SmallVectorImpl<int> &sources,
-                         SmallVectorImpl<unsigned> &variadicArgs);
+                         SmallVectorImpl<unsigned> &variadicArgs,
+                         bool rejectReorderingShuffles);
 static inline bool computeTupleShuffle(TupleType *fromTuple,
                                        TupleType *toTuple,
                                        SmallVectorImpl<int> &sources,
-                                       SmallVectorImpl<unsigned> &variadicArgs){
+                                       SmallVectorImpl<unsigned> &variadicArgs,
+                                       bool rejectReorderingShuffles){
   return computeTupleShuffle(fromTuple->getElements(), toTuple->getElements(),
-                             sources, variadicArgs);
+                             sources, variadicArgs, rejectReorderingShuffles);
 }
 
 /// Describes the arguments to which a parameter binds.

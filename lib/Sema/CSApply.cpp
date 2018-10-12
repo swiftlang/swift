@@ -5177,19 +5177,13 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     return expr;
   }
 
+  // SE-NNNN deprecates the element-reordering variety of shuffle in legacy
+  // swift modes.  In non-legacy mode we decline to even form the shuffle.
   if (anythingReordered) {
-    if (cs.getASTContext().isSwiftVersionAtLeast(5)) {
-      // Reject the shuffle in Swift 5.
-      //
-      // FIXME: Do not fail the solution set in CSApply.  Fail it much earlier
-      // in the solver when we are allowed to remove the compatibility warning.
-      cs.TC.diagnose(expr->getLoc(),
-                     diag::reordering_tuple_shuffle_deprecated);
-      return nullptr;
-    } else {
-      cs.TC.diagnose(expr->getLoc(),
-                     diag::warn_reordering_tuple_shuffle_deprecated);
-    }
+    assert(!cs.getASTContext().isSwiftVersionAtLeast(5)
+           && "Allowed an element-reordering tuple shuffle to slip by!");
+    cs.TC.diagnose(expr->getLoc(),
+                   diag::warn_reordering_tuple_shuffle_deprecated);
   }
 
   // Create the tuple shuffle.
@@ -5339,7 +5333,8 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
       SmallVector<int, 4> sources;
       SmallVector<unsigned, 4> variadicArgs;
       bool failed = computeTupleShuffle(tupleType, toTuple,
-                                        sources, variadicArgs);
+                                        sources, variadicArgs,
+                                        ctx.isSwiftVersionAtLeast(5));
       assert(!failed && "Couldn't convert tuple to tuple?");
       (void)failed;
 
@@ -6575,7 +6570,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     if (auto fromTuple = fromType->getAs<TupleType>()) {
       SmallVector<int, 4> sources;
       SmallVector<unsigned, 4> variadicArgs;
-      if (!computeTupleShuffle(fromTuple, toTuple, sources, variadicArgs)) {
+      if (!computeTupleShuffle(fromTuple, toTuple, sources, variadicArgs,
+                               cs.getASTContext().isSwiftVersionAtLeast(5))) {
         return coerceTupleToTuple(expr, fromTuple, toTuple,
                                   locator, sources, variadicArgs);
       }
