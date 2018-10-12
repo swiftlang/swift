@@ -197,6 +197,35 @@ int tf::decodeShapeAttr(const ASTContext &ctx, SymbolicValue attr,
   return arrayValue.size();
 }
 
+/// Decode the shape array in `attrValue` into `dims`, `numDims` and `dimPtrs`.
+void tf::decodeShapeArray(const ASTContext &ctx, SymbolicValue attrValue,
+                          SmallVectorImpl<int64_t> &dims,
+                          SmallVectorImpl<int> &numDims,
+                          SmallVectorImpl<int64_t *> &dimPtrs) {
+  CanType eltType;
+  auto shapeArray = attrValue.getArrayValue(eltType);
+  assert(eltType->getString() == "TensorShape" ||
+         eltType->getString() == "Optional<TensorShape>");
+  auto numShapes = shapeArray.size();
+  for (unsigned shapeIdx = 0; shapeIdx != numShapes; ++shapeIdx) {
+    auto shape = shapeArray[shapeIdx];
+    numDims.push_back(decodeShapeAttr(ctx, shape, dims));
+  }
+
+  // Now that we've build the array of dimensions, convert it to the array
+  // of pointers that TensorFlow needs.  This is safe now that the vector
+  // has finished its resizing.
+  auto dimPtr = dims.data();
+  for (unsigned shapeIdx = 0; shapeIdx != numShapes; ++shapeIdx) {
+    dimPtrs.push_back(dimPtr);
+
+    // Make sure to handle the "unknown rank" case (numDims[shapeIdx] == -1) by
+    // without incrementing the pointer.
+    if (numDims[shapeIdx] >= 0)
+      dimPtr += numDims[shapeIdx];
+  }
+}
+
 /// Return the TF_DataType value represented by `value`. `value` must be a
 /// valid tensorflow type ID.
 unsigned tf::getTFDataType(SymbolicValue value) {
@@ -214,4 +243,13 @@ SymbolicValue tf::convertSwiftTypeToConstantTFDataType(Type type) {
   unsigned tfType = convertSwiftTypeToTF(type);
   assert(tfType != 0);
   return SymbolicValue::getInteger(tfType, 32);
+}
+
+/// Return the graph function name for a SIL function that is being used as a
+/// function attribute. This transformation may modify the name to make it
+/// conform to graph function name rules.
+std::string tf::getGraphFuncNameForFuncAttr(StringRef silFnName) {
+  if (silFnName.startswith("$"))
+    silFnName = silFnName.substr(1);
+  return std::string(silFnName) + ".tf_only";
 }

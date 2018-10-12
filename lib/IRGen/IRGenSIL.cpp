@@ -38,6 +38,7 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
 // SWIFT_ENABLE_TENSORFLOW
+#include "swift/SIL/GraphFunctionDeviceInfo.h"
 #include "swift/SIL/GraphOperationInfo.h"
 #include "swift/SIL/PrettyStackTrace.h"
 // SWIFT_ENABLE_TENSORFLOW
@@ -406,6 +407,11 @@ public:
   /// Holds the DominancePoint of values that are storage for a source variable.
   SmallVector<std::pair<llvm::Instruction *, DominancePoint>, 8> ValueDomPoints;
   unsigned NumAnonVars = 0;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// If we run across a graph_op, we compute the function's
+  /// GraphFunctionDeviceInfo and store it here.
+  llvm::Optional<GraphFunctionDeviceInfo> deviceInfo;
 
   /// Accumulative amount of allocated bytes on the stack. Used to limit the
   /// size for stack promoted objects.
@@ -913,18 +919,15 @@ public:
     Builder.CreateCall(checkOkFn, {status});
   }
 
-  /// Create an int64 or float array based on `elements` and `isFloat`. On
-  /// return, `*numEltsOut` is set to an int32-typed array size value.
-  /// `*arrayOut` is set to an alloca inst representing the array, where the
-  /// inst name is set to arrayName.
+  /// Creates instructions that allocate and initialize an array. Sets
+  /// `arrayOut` to the alloca inst, and returns a value containing the size of
+  /// the array. The alloca inst name is set to `arrayName`.
   ///
-  /// For each value in `elements`, the function runs `convertElt` on it to
-  /// produce a value, to store into the memory buffer allocated at `*arrayOut`.
-  template <typename SrcT>
-  void createArrayAndSize(ArrayRef<SrcT> elements, bool isFloat,
-                          const char *arrayName,
-                          std::function<llvm::Value *(SrcT elt)> convertElt,
-                          Address &arrayOut, llvm::Value *&numEltsOut);
+  /// For each value in `elements`, runs `convertElt` on it to produce a value,
+  /// to store into the memory buffer allocated at `arrayOut`.
+  template <typename SrcT> llvm::Value *createArrayAndSize(
+      ArrayRef<SrcT> elements, llvm::Type *eltTy, const char *arrayName,
+      std::function<llvm::Value *(SrcT elt)> convertElt, Address &arrayOut);
 
   //===--------------------------------------------------------------------===//
   // SIL instruction lowering
@@ -1917,14 +1920,12 @@ static llvm::Value *createStringValAddr(IRGenModule &IGM, StringRef strVal) {
 }
 
 template <typename SrcT>
-void IRGenSILFunction::createArrayAndSize(
-    ArrayRef<SrcT> elements, bool isFloat, const char *arrayName,
-    std::function<llvm::Value *(SrcT elt)> convertElt, Address &arrayOut,
-    llvm::Value *&numEltsOut) {
-  numEltsOut = llvm::ConstantInt::get(IGM.Int32Ty, elements.size());
-  auto *eltTy = isFloat ? IGM.FloatTy : (llvm::Type *)IGM.Int64Ty;
-  arrayOut = createAlloca(eltTy, numEltsOut, IGM.getPointerAlignment(),
-                           "tensorEltVals");
+llvm::Value *IRGenSILFunction::createArrayAndSize(
+    ArrayRef<SrcT> elements, llvm::Type *eltTy, const char *arrayName,
+    std::function<llvm::Value *(SrcT elt)> convertElt, Address &arrayOut) {
+  llvm::Value *numElts = llvm::ConstantInt::get(IGM.Int32Ty, elements.size());
+  arrayOut = createAlloca(eltTy, numElts, IGM.getPointerAlignment(),
+                          arrayName);
   for (auto idx : indices(elements)) {
     auto elt = elements[idx];
     auto idxVal = llvm::ConstantInt::get(IGM.Int32Ty, idx);
@@ -1932,6 +1933,22 @@ void IRGenSILFunction::createArrayAndSize(
     llvm::Value *eltVal = convertElt(elt);
     Builder.CreateStore(eltVal, eltAddr, IGM.getPointerAlignment());
   }
+  return numElts;
+}
+
+/// The name of the number attr that describes the length of the input list to
+/// the op. Returns nullptr if no number attr is required.
+/// FIXME: This is incomplete. We should derive this from op metadata. We can
+/// get it from the "number_attr" field of the input's "input_arg". The raw op
+/// generator is probably the right place to put this.
+static const char *inputListNumberAttr(StringRef opName) {
+  if (opName == "Pack")
+    return "N";
+  if (opName == "Concat" || opName == "ConcatV2" || opName == "ConcatOffset")
+    return "N";
+  if (opName == "ZipDataset")
+    return "N";
+  return nullptr;
 }
 
 // The code structure resembles
@@ -1939,7 +1956,7 @@ void IRGenSILFunction::createArrayAndSize(
 void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   tf::GraphOperationInfo opInfo(i);
 
-  if (!CurSILFn->TFDeabstracted) {
+  if (!CurSILFn->processedByDeabstraction) {
     // graph_ops do make it here when building functions that don't get
     // deabstracted (e.g. TensorFlow stdlib functions).
     // IRGen is currently not powerful enough to handle graph_ops in functions
@@ -1959,6 +1976,17 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     setLoweredExplosion(result, e);
     return;
   }
+
+  // If the deviceInfo is not computed yet, compute it here.
+  if (!deviceInfo)
+    deviceInfo = Optional<GraphFunctionDeviceInfo>(
+        GraphFunctionDeviceInfo::getForFunction(*CurSILFn,
+                                                /*removeConfigInst*/false));
+
+  // These ops configure the `deviceInfo`. They do not do anything
+  // at runtime, so do not lower them.
+  if (GraphFunctionDeviceInfo::isConfigOp(opInfo))
+    return;
 
   LLVM_DEBUG(llvm::dbgs() << "IRGen for graph_op: "
                           << opInfo.getOperationName() << "\n");
@@ -2043,26 +2071,27 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       for (auto tensorHandle : structuredArgument.getArgumentList()) {
         addTensorhandleAsOpInput(tensorHandle);
       }
-      // Set special attr N to represent the list length. This is not done in
-      // graph lowering.
-      // TODO: this works with Pack. Not sure about other list typed attrs.
-      auto setAttrFn = IGM.getTFE_OpSetAttrIntFn();
-      auto listLenAddr = createStringValAddr(IGM, "N");
-      auto listLenVal = llvm::ConstantInt::get(
-          IGM.Int64Ty, structuredArgument.getArgumentList().size());
-      Builder.CreateCall(setAttrFn, {op, listLenAddr, listLenVal});
+      // Set special attr to represent the list length, if needed. This is not
+      // needed in graph lowering.
+      if (auto numberAttr = inputListNumberAttr(opInfo.getOperationName())) {
+        auto setAttrFn = IGM.getTFE_OpSetAttrIntFn();
+        auto listLenAddr = createStringValAddr(IGM, numberAttr);
+        auto listLenVal = llvm::ConstantInt::get(
+            IGM.Int64Ty, structuredArgument.getArgumentList().size());
+        Builder.CreateCall(setAttrFn, {op, listLenAddr, listLenVal});
+      }
     }
     }
   }
 
   // Handle attributes.
   unsigned dtypeAttr = 0;
+  std::string opDevice;
   for (unsigned nextAttributeNumber = 0, e = i->getNumAttributes();
        nextAttributeNumber != e;) {
     auto attr = i->getAttribute(nextAttributeNumber++);
     auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
     std::string attrName = attrInfo.first.str();
-
     switch (attrInfo.second) {
     case GraphOperationInfo::ArgumentLowering::Input:
       assert(0 && "Input classes cannot exist for attributes");
@@ -2085,8 +2114,23 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       case SymbolicValue::Aggregate: // Tuples and structs
       case SymbolicValue::Metatype:
         assert(0 && "These attribute kinds cannot happen here");
-      case SymbolicValue::Function:
-        assert(0 && "TODO: implement function typed attr");
+      case SymbolicValue::Function: {
+        assert(0 && "TODO: Create the function in the graph at runtime.");
+
+        // Set up the function attr as in:
+        //   TFE_OpSetAttrFunctionName(op, "function", funcName, length);
+        auto silFuncName = attr.value.getFunctionValue()->getName();
+        auto graphFuncName = getGraphFuncNameForFuncAttr(silFuncName);
+        auto setAttrFn = IGM.getTFE_OpSetAttrFunctionNameFn();
+        auto attrNameAddr = createStringValAddr(IGM, attrName.c_str());
+        auto graphFuncNameAddr = createStringValAddr(IGM, graphFuncName);
+        auto graphFuncNameSize = llvm::ConstantInt::get(IGM.SizeTy,
+                                                        graphFuncName.size());
+        Builder.CreateCall(
+            setAttrFn,
+            {op, attrNameAddr, graphFuncNameAddr, graphFuncNameSize});
+        break;
+      }
       case SymbolicValue::Array: {
         // The code has some overlapping but is sufficiently different from the
         // counterpart in TFLowerGraph.cpp.
@@ -2108,16 +2152,15 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
           elements.push_back(elt.lookThroughSingleElementAggregates());
 
         if (StringRef(elementTypeString).startswith("Int")) {
-          llvm::Value *numElts = nullptr;
           Address vals;
-          createArrayAndSize<SymbolicValue>(
-              elements, /*isFloat*/ false, "intListAttr",
+          llvm::Value *numElts = createArrayAndSize<SymbolicValue>(
+              elements, IGM.Int64Ty, "intListAttr",
               [&](SymbolicValue elt) {
                 return llvm::ConstantInt::get(
                     IGM.Int64Ty,
                     /*elt*/ elt.getIntegerValue().getLimitedValue());
               },
-              vals, numElts);
+              vals);
           auto valsUntyped =
               Builder.CreateBitCast(vals.getAddress(), IGM.Int8PtrTy);
 
@@ -2134,10 +2177,64 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         }
         if (elementTypeString == "TensorShape" ||
             elementTypeString == "Optional<TensorShape>") {
-          assert(0 && "TODO: implement shape list typed attr");
-        }
-        if (elementType->is<AnyMetatypeType>()) {
-          assert(0 && "TODO: implement type list typed attr");
+          // Set up shape list attr as in:
+          //   TFE_OpSetAttrShapeList(op, "dtype", dims, numDims, numValues,
+          //                          status);
+
+          SmallVector<int64_t, 8> dims;
+          SmallVector<int, 4> numDims;
+          SmallVector<int64_t *, 4> dimPtrs;
+          decodeShapeArray(CurSILFn->getASTContext(), attr.value, dims,
+                           numDims, dimPtrs);
+
+          SmallVector<ArrayRef<int64_t>, 4> dimArrays;
+          for (auto ptrAndCount : zip(dimPtrs, numDims)) {
+            int64_t *ptr = std::get<0>(ptrAndCount);
+            int count = std::get<1>(ptrAndCount);
+            if (count == -1) {
+              dimArrays.push_back({nullptr, (size_t)0});
+              continue;
+            }
+            assert(count >= 0);
+            dimArrays.push_back({ptr, (size_t)count});
+          }
+
+          Address dimsBufferBuffer;
+          createArrayAndSize<ArrayRef<int64_t>>(
+              dimArrays, IGM.Int8PtrTy, "shapeListAttrDimsList",
+              [&](ArrayRef<int64_t> dimArray) -> llvm::Value* {
+                Address dimsBuffer;
+                createArrayAndSize<int64_t>(
+                    dimArray, IGM.Int64Ty, "shapeListAttrDims",
+                    [&](int64_t elt) {
+                      return llvm::ConstantInt::get(IGM.Int64Ty, elt);
+                    },
+                    dimsBuffer);
+                return Builder.CreateBitCast(dimsBuffer.getAddress(),
+                                             IGM.Int8PtrTy);
+              },
+              dimsBufferBuffer);
+          auto *dimsBufferBufferUntyped = Builder.CreateBitCast(
+              dimsBufferBuffer.getAddress(), IGM.Int8PtrPtrTy);
+
+          Address numDimsBuffer;
+          llvm::Value *numValues = createArrayAndSize<int>(
+              numDims, IGM.Int32Ty, "shapeListAttrNumDims",
+              [&](int elt) {
+                return llvm::ConstantInt::get(IGM.Int32Ty, elt);
+              },
+              numDimsBuffer);
+          auto numDimsBufferUntyped = Builder.CreateBitCast(
+              numDimsBuffer.getAddress(), IGM.Int8PtrTy);
+
+          auto *setAttrShapeListFn = IGM.getTFE_OpSetAttrShapeListFn();
+          auto attrNameValAddr = createStringValAddr(IGM, attrName.c_str());
+          Builder.CreateCall(
+              setAttrShapeListFn,
+              {op, attrNameValAddr, dimsBufferBufferUntyped,
+               numDimsBufferUntyped, numValues, status});
+          checkOk(status);
+          break;
         }
         assert(0 && "unknown array attribute");
       }
@@ -2186,13 +2283,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
           Builder.CreateCall(setAttrFn,
                              {op, attrNameAddr, attrValAddr, attrLength});
         } else {
-          // In this case, just let eager pick a default device.
-          if (attrValue == ALL_DEVICES)
-            break;
-          auto *setDeviceFn = IGM.getTFE_OpSetDeviceFn();
-          auto device = createStringValAddr(IGM, attrValue);
-          Builder.CreateCall(setDeviceFn, {op, device, status});
-          checkOk(status);
+          opDevice = attrValue;
         }
         break;
       }
@@ -2253,10 +2344,9 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
       // Create llvm values for elements and shape, and then call
       // swift_tfc_CreateIntTensor() or swift_tfc_CreateFloatTensor().
-      llvm::Value *numElts = nullptr;
       Address tensorEltVals;
       createArrayAndSize<SymbolicValue>(
-          elements, isFloat, "tensorEltVals",
+          elements, isFloat ? IGM.FloatTy : IGM.Int64Ty, "tensorEltVals",
           [&](SymbolicValue elt) {
             return isFloat ? llvm::ConstantFP::get(
                                  IGM.FloatTy,
@@ -2266,15 +2356,14 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
                                                         .sextOrTrunc(64)
                                                         .getLimitedValue());
           },
-          tensorEltVals, numElts);
+          tensorEltVals);
 
       // Create the LLVM values representing shape.
-      llvm::Value *numDims = nullptr;
       Address dimVals;
-      createArrayAndSize<int64_t>(
-          shape, /*isFloat*/ false, "dimVals",
+      llvm::Value *numDims = createArrayAndSize<int64_t>(
+          shape, IGM.Int64Ty, "dimVals",
           [&](int64_t elt) { return llvm::ConstantInt::get(IGM.Int64Ty, elt); },
-          dimVals, numDims);
+          dimVals);
 
       auto dimValsUntyped =
           Builder.CreateBitCast(dimVals.getAddress(), IGM.Int8PtrTy);
@@ -2319,8 +2408,27 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
                            {op, attrNameValAddr, dtypeAttrConst});
         break;
       }
-      case SymbolicValue::Array:
-        llvm_unreachable("TODO: Implement array of TF_DataType");
+      case SymbolicValue::Array: {
+        // Set up dtype list attr as in:
+        //   TFE_OpSetAttrTypeList(op, "dtype", types, numTypes);
+
+        CanType eltTy;
+        Address typeList;
+        llvm::Value *numTypes = createArrayAndSize<SymbolicValue>(
+            attr.value.getArrayValue(eltTy), IGM.Int32Ty, "typeListAttr",
+            [&](SymbolicValue elt) {
+              return llvm::ConstantInt::get(IGM.Int32Ty, getTFDataType(elt));
+            },
+            typeList);
+        auto typeListUntyped = Builder.CreateBitCast(typeList.getAddress(),
+                                                     IGM.Int8PtrTy);
+
+        auto *setAttrTypeListFn = IGM.getTFE_OpSetAttrTypeListFn();
+        auto attrNameValAddr = createStringValAddr(IGM, attrName.c_str());
+        Builder.CreateCall(setAttrTypeListFn,
+                           {op, attrNameValAddr, typeListUntyped, numTypes});
+        break;
+      }
       default:
         llvm_unreachable(
             "only integers and arrays are possible for TF_DataType attrs");
@@ -2330,6 +2438,17 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     case GraphOperationInfo::ArgumentLowering::ShapeAttribute:
       assert(0 && "TODO: implement shape attr");
     }
+  }
+
+  // Set the device.
+  opDevice = deviceInfo->handleDevicePlacement(opInfo.getOperationName(),
+                                               opDevice);
+  assert(!opDevice.empty());
+  if (opDevice != ALL_DEVICES) {
+    auto *setDeviceFn = IGM.getTFE_OpSetDeviceFn();
+    auto device = createStringValAddr(IGM, opDevice);
+    Builder.CreateCall(setDeviceFn, {op, device, status});
+    checkOk(status);
   }
 
   // Now we execute the TFE op as in:
@@ -2373,29 +2492,29 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   auto *deleteStatusFn = IGM.getTF_DeleteStatusFn();
   Builder.CreateCall(deleteStatusFn, {status});
 
-  auto cTensorHandle =
-      Builder.CreateLoad(returnValues.getAddress(), IGM.getPointerAlignment());
-  LLVM_DEBUG(llvm::dbgs() << "The returned tensor handle is " << *cTensorHandle
-                          << ".\n");
+  for (unsigned resultIdx = 0; resultIdx < i->getNumResults(); ++resultIdx) {
+    auto resultIdxVal = llvm::ConstantInt::get(IGM.Int32Ty, resultIdx);
+    auto resultAddr = Builder.CreateInBoundsGEP(returnValues.getAddress(),
+                                                resultIdxVal);
+    auto cTensorHandle = Builder.CreateLoad(resultAddr,
+                                            IGM.getPointerAlignment());
 
-  // Wrap `cTensorHandle` into a _AnyTensorHandle object, and get an untyped
-  // pointer to the _AnyTensorHandle.
-  auto *createHandleFn = IGM.getTFC_CreateTensorHandleFromCFn();
-  llvm::Value *tensorHandle = Builder.CreateCall(createHandleFn,
-                                                 {cTensorHandle});
+    // Wrap `cTensorHandle` into a _AnyTensorHandle object, and get an untyped
+    // pointer to the _AnyTensorHandle.
+    auto *createHandleFn = IGM.getTFC_CreateTensorHandleFromCFn();
+    llvm::Value *tensorHandle = Builder.CreateCall(createHandleFn,
+                                                   {cTensorHandle});
 
-  // Cast to a pointer of the expected result type (for example,
-  // TensorHandle<Float>).
-  SILValue result = i->getResults()[0];
-  tensorHandle = Builder.CreateBitCast(
-      tensorHandle, IGM.getStorageType(result->getType()));
+    // Cast to a pointer of the expected result type (for example,
+    // TensorHandle<Float>).
+    SILValue result = i->getResults()[resultIdx];
+    tensorHandle = Builder.CreateBitCast(
+        tensorHandle, IGM.getStorageType(result->getType()));
 
-  LLVM_DEBUG(
-      llvm::dbgs() << "Done with IRGen for graph_op; setting explosion.\n");
-  Explosion e;
-  e.add(tensorHandle);
-
-  setLoweredExplosion(result, e);
+    Explosion e;
+    e.add(tensorHandle);
+    setLoweredExplosion(result, e);
+  }
 }
 
 void IRGenSILFunction::visitFunctionRefInst(FunctionRefInst *i) {

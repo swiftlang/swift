@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
+#include "swift/SIL/GraphFunctionDeviceInfo.h"
 #include "swift/SIL/GraphOperationBuilder.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILConstants.h"
@@ -322,6 +323,18 @@ tf::createTensorToInt1Inst(SILValue value, SILBuilder &builder,
   return condValue;
 }
 
+/// Return true when this function must be entirely lowered to a TF graph
+/// function, with no host-side logic remaining (i.e., no sends/recvs, and no
+/// start/stop tensor computation on the host side). In other words, this
+/// function uses the tensorflow calling convention.
+///
+/// The only way to call/use such a function is from a TF graph node (e.g. by
+/// referencing the function in a function-typed op attribute).
+bool tf::isAcceleratorOnly(const SILFunction &hostFn) {
+  return hostFn.getRepresentation() ==
+         SILFunctionType::Representation::TensorFlow; // @convention(tensorflow)
+}
+
 //===----------------------------------------------------------------------===//
 // TensorFunctionClassifier Implementation
 //===----------------------------------------------------------------------===//
@@ -361,8 +374,7 @@ bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn,
 
   // Graph functions always get partitioned because they can be used as
   // attributes.
-  if (fn->getLoweredFunctionType()->getRepresentation() ==
-      SILFunctionType::Representation::TensorFlow)
+  if (isAcceleratorOnly(*fn))
     return true;
 
   // If the function is marked public, but it isn't marked inlinable, then it is

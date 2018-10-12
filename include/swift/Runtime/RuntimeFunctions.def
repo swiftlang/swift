@@ -1327,6 +1327,11 @@ FUNCTION(TFE_OpSetAttrType, TFE_OpSetAttrType, C_CC,
          ARGS(Int8PtrTy, Int8PtrTy, Int32Ty),
          ATTRS(NoUnwind))
 
+FUNCTION(TFE_OpSetAttrFunctionName, TFE_OpSetAttrFunctionName, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, SizeTy),
+         ATTRS(NoUnwind))
+
 FUNCTION(TFE_OpSetAttrInt, TFE_OpSetAttrInt, C_CC,
          RETURNS(),
          ARGS(Int8PtrTy, Int8PtrTy, Int64Ty),
@@ -1359,6 +1364,21 @@ FUNCTION(TFE_OpSetAttrString, TFE_OpSetAttrString, C_CC,
 FUNCTION(TFE_OpSetAttrIntList, TFE_OpSetAttrIntList, C_CC,
          RETURNS(),
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// Similar situation with the final int param as described above on
+// TFE_OpSetAttrIntList.
+FUNCTION(TFE_OpSetAttrTypeList, TFE_OpSetAttrTypeList, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// Similar situation with the final int param as described above on
+// TFE_OpSetAttrIntList.
+FUNCTION(TFE_OpSetAttrShapeList, TFE_OpSetAttrShapeList, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrPtrTy, Int8PtrTy, Int32Ty,
+	      Int8PtrTy),
          ATTRS(NoUnwind))
 
 FUNCTION(TFE_OpSetAttrTensor, TFE_OpSetAttrTensor, C_CC,

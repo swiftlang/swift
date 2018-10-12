@@ -26,6 +26,7 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/GraphFunctionDeviceInfo.h"
 #include "swift/SIL/GraphOperationBuilder.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILCloner.h"
@@ -314,18 +315,6 @@ classifyPromotedScalarOp(SILInstruction *inst) {
   case BuiltinValueKind::SExtOrBitCast:
     return conversion();
   }
-}
-
-/// Return true when this function must be entirely lowered to a TF graph
-/// function, with no host-side logic remaining (i.e., no sends/recvs, and no
-/// start/stop tensor computation on the host side). In other words, this
-/// function uses the tensorflow calling convention.
-///
-/// The only way to call/use such a function is from a TF graph node (e.g. by
-/// referencing the function in a function-typed op attribute).
-static bool isAcceleratorOnly(const SILFunction &hostFn) {
-  return hostFn.getRepresentation() ==
-         SILFunctionType::Representation::TensorFlow; // @convention(tensorflow)
 }
 
 //===----------------------------------------------------------------------===//

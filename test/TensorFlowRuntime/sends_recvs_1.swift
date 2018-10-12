@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift
+// RUN: %target-run-dynamic-compilation-swift
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
 //
@@ -109,8 +110,11 @@ SendsRecvsTests.testAllBackends("testSendsInALoopWithNoResultTensor",
 // If we ever need it in other test cases, can move this helper function to
 // Utilities.swift in TensorFlow stdlib.
 @inline(__always)
-func _scalarTensorWithShapeOnCPU<T>(_ x: Tensor<T>) -> Tensor<T> {
-  let ret: TensorHandle<T> = #tfop("Identity", x, __shapes: [TensorShape()], __device: "/job:localhost/replica:0/task:0/device:CPU:0")
+func _scalarTensorWithShapeOnCPU<T: AccelerableByTensorFlow>(_ x: Tensor<T>)
+    -> Tensor<T> {
+  let ret: TensorHandle<T> = #tfop(
+    "Identity", x, T$dtype:T.tensorFlowDataType, __shapes: [TensorShape()],
+    __device: "/job:localhost/replica:0/task:0/device:CPU:0")
   return Tensor<T>(handle: ret)
 }
 

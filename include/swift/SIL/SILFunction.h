@@ -346,13 +346,13 @@ private:
 
 public:
   // SWIFT_ENABLE_TENSORFLOW
-  /// Whether TFDeabstraction deabstracted this function.
+  /// Whether TFDeabstraction processed this function.
   ///
   /// This is a temporary flag that IRGen uses to determine if the graph_ops in
   /// this function are safe to lower. Once IRGen is powerful enough to lower
   /// every graph_op that it receives, we should remove this flag.
   /// TODO: Remove this flag.
-  bool TFDeabstracted = false;
+  bool processedByDeabstraction = false;
 
   ~SILFunction();
 
