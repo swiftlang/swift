@@ -320,7 +320,9 @@ extension LazyFilterCollection : LazyCollectionProtocol {
   /// `position != endIndex`.
   @inlinable // lazy-performance
   public subscript(position: Index) -> Element {
-    return _base[position]
+    _read {
+      yield _base[position]      
+    }
   }
 
   @inlinable // lazy-performance

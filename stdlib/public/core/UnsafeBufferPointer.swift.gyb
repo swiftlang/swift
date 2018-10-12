@@ -267,10 +267,10 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
   ///   range `0..<count`.
   @inlinable // unsafe-performance
   public subscript(i: Int) -> Element {
-    get {
+    _read {
       _debugPrecondition(i >= 0)
       _debugPrecondition(i < endIndex)
-      return _position![i]
+      yield _position![i]
     }
 %if Mutable:
     nonmutating _modify {

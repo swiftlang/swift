@@ -536,7 +536,9 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
 
   @inlinable
   internal override subscript(position: _AnyIndexBox) -> Element {
-    return _base[_unbox(position)]
+    _read {
+      yield _base[_unbox(position)]      
+    }
   }
 
   @inlinable
@@ -1022,7 +1024,9 @@ extension ${Self}: ${SelfProtocol} {
   ///   `position != endIndex`.
   @inlinable
   public subscript(position: Index) -> Element {
-    return _box[position._box]
+    _read {
+      yield _box[position._box]      
+    }
   }
 
   @inlinable

@@ -244,6 +244,7 @@ extension FlattenCollection.Index : Hashable
 }
 
 extension FlattenCollection : Sequence {
+  public typealias Element = Base.Element.Element
   public typealias Iterator = FlattenSequence<Base>.Iterator
   public typealias SubSequence = Slice<FlattenCollection>
 
@@ -461,8 +462,10 @@ extension FlattenCollection : Collection {
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   @inlinable // lazy-performance
-  public subscript(position: Index) -> Base.Element.Element {
-    return _base[position._outer][position._inner!]
+  public subscript(position: Index) -> Element {
+    _read {
+      yield _base[position._outer][position._inner!]
+    }
   }
 
   @inlinable // lazy-performance

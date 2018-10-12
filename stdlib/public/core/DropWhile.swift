@@ -224,7 +224,9 @@ extension LazyDropWhileCollection: Collection {
 
   @inlinable // lazy-performance
   public subscript(position: Index) -> Element {
-    return _base[position.base]
+    _read {
+      yield _base[position.base]
+    }
   }
 }
 
