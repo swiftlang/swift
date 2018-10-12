@@ -514,24 +514,38 @@ public:
 
 // A helper class to transform a loop to have a single exit from the header.
 class SingleExitLoopTransformer {
-public:
-  SingleExitLoopTransformer(GraphFunctionDeviceInfo *deviceInfo,
-                            SILLoopInfo *LI, DominanceInfo *DI, SILLoop *loop,
-                            PostDominanceInfo *PDI)
-      : deviceInfo(deviceInfo), DI(DI), PDI(PDI), LI(LI), loop(loop),
-        header(loop->getHeader()), preheader(loop->getLoopPreheader()),
-        latch(loop->getLoopLatch()), currentFn(header->getParent()),
-        oldHeaderNumArgs(header->getNumArguments()), hasUndefsAtPreheader(false) {
-    assert(preheader && "Canonicalization should have given us one preheader");
-    assert(latch && "Canonicalization should have given us one latch block");
-    initialize();
+  public:
+    static bool doIt(GraphFunctionDeviceInfo *deviceInfo, SILLoopInfo *LI,
+                     DominanceInfo *DI, SILLoop *loop, PostDominanceInfo *PDI) {
+      SingleExitLoopTransformer transformer(deviceInfo, LI, DI, loop, PDI);
+      bool loopChanged = transformer.transform();
+      if (loopChanged) {
+        // Recalculate dominator information as it is stale now.
+        DI->recalculate(*transformer.currentFn);
+        PDI->recalculate(*transformer.currentFn);
+      }
+      return loopChanged;
+    }
+
+  private:
+    SingleExitLoopTransformer(GraphFunctionDeviceInfo *deviceInfo,
+                              SILLoopInfo *LI, DominanceInfo *DI, SILLoop *loop,
+                              PostDominanceInfo *PDI)
+        : deviceInfo(deviceInfo), DI(DI), PDI(PDI), LI(LI), loop(loop),
+          header(loop->getHeader()), preheader(loop->getLoopPreheader()),
+          latch(loop->getLoopLatch()), currentFn(header->getParent()),
+          oldHeaderNumArgs(header->getNumArguments()),
+          hasUndefsAtPreheader(false) {
+      assert(preheader &&
+             "Canonicalization should have given us one preheader");
+      assert(latch && "Canonicalization should have given us one latch block");
+      initialize();
   }
 
   /// Transforms the loop to ensure it has a single exit from the header.
   /// Returns true if the CFG was changed.
   bool transform();
 
-private:
   // Helper functions
 
   void initialize();
@@ -1283,13 +1297,8 @@ void SESERegionBuilder::ensureSingleExitFromLoops() {
       }
       continue;
     }
-    SingleExitLoopTransformer transformer(&deviceInfo, &LI, &DI, loop, &PDI);
-    bool loopChanged = transformer.transform();
-    if (loopChanged) {
-      // Recalculate dominator information as it is stale now.
-      DI.recalculate(*F);
-      PDI.recalculate(*F);
-    }
+    bool loopChanged =
+        SingleExitLoopTransformer::doIt(&deviceInfo, &LI, &DI, loop, &PDI);
     changed |= loopChanged;
   }
   if (changed) {
