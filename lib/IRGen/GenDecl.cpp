@@ -3650,14 +3650,6 @@ getAddrOfGenericWitnessTableCache(const NormalProtocolConformance *conf,
                                expectedTy, DebugTypeInfo());
 }
 
-llvm::Constant *IRGenModule::
-getAddrOfResilientWitnessTable(const NormalProtocolConformance *conf,
-                               ConstantInit definition) {
-  auto entity = LinkEntity::forResilientProtocolWitnessTable(conf);
-  return getAddrOfLLVMVariable(entity, getPointerAlignment(), definition,
-                               definition.getType(), DebugTypeInfo());
-}
-
 llvm::Function *
 IRGenModule::getAddrOfGenericWitnessTableInstantiationFunction(
                                       const NormalProtocolConformance *conf) {
