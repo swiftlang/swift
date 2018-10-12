@@ -292,8 +292,8 @@ public func ${bfunc}(_ lhs: ${T}, _ rhs: ${T}) -> ${T} {
 %  if T == 'Float80':
 #if (arch(i386) || arch(x86_64)) && !os(Windows)
 %  else:
-//  lgamma not avaialable on Windows, apparently?
-#if !os(Windows) && !os(Android)
+//  lgamma not available on Windows, apparently?
+#if !os(Windows)
 %  end
 @_transparent
 public func lgamma(_ x: ${T}) -> (${T}, Int) {

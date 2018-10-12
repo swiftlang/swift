@@ -535,7 +535,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     // using Glibc or a libc that respects that flag. This will cause some
     // source breakage however (specifically with strerror_r()) on Linux
     // without a workaround.
-    if (triple.isOSFuchsia()) {
+    if (triple.isOSFuchsia() || triple.isAndroid()) {
       // Many of the modern libc features are hidden behind feature macros like
       // _GNU_SOURCE or _XOPEN_SOURCE.
       invocationArgStrs.insert(invocationArgStrs.end(), {
