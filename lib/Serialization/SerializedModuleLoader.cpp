@@ -50,7 +50,7 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
           (!ModuleBuffer && !ModuleDocBuffer)) &&
          "Module and Module Doc buffer must both be initialized or NULL");
 
-  clang::vfs::FileSystem &FS = *Ctx.SourceMgr.getFileSystem();
+  llvm::vfs::FileSystem &FS = *Ctx.SourceMgr.getFileSystem();
 
   // Try to open the module file first.  If we fail, don't even look for the
   // module documentation file.
