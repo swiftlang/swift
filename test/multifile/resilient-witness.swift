@@ -39,7 +39,7 @@ public func inlineThis(_ char: Character) {
 
 // The witness table and witness definition need to be in the same file.
 
-// CHECK: @"$s4test7ContextC8SomeEnumOSQAAWr" = {{.*}}sub {{.*}} @"$s4test7ContextC8SomeEnumOSQAASQ2eeoiySbx_xtFZTW" {{.*}} @"$s4test7ContextC8SomeEnumOSQAAWr"
+// CHECK: @"$s4test7ContextC8SomeEnumOSQAAMc" = {{.*}}sub {{.*}} @"$s4test7ContextC8SomeEnumOSQAASQ2eeoiySbx_xtFZTW" {{.*}} @"$s4test7ContextC8SomeEnumOSQAAMc"
 
 
 // CHECK: define{{.*}}@"$s4test7ContextC8SomeEnumOSQAASQ2eeoiySbx_xtFZTW"({{.*}}){{.*}} {

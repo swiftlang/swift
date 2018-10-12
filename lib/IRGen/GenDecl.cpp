@@ -2451,20 +2451,20 @@ llvm::Constant *IRGenModule::emitSwiftProtocols() {
 }
 
 void IRGenModule::addProtocolConformance(
-                                const NormalProtocolConformance *conformance) {
+                                ConformanceDescription record) {
   // Add this protocol conformance.
-  ProtocolConformances.push_back(conformance);
+  ProtocolConformances.push_back(std::move(record));
 }
 
 /// Emit the protocol conformance list and return it.
 llvm::Constant *IRGenModule::emitProtocolConformances() {
   // Emit the conformances.
   bool anyReflectedConformances = false;
-  for (auto *conformance : ProtocolConformances) {
+  for (const auto &record : ProtocolConformances) {
     // Emit the protocol conformance now.
-    emitProtocolConformance(conformance);
+    emitProtocolConformance(record);
 
-    if (conformance->isBehaviorConformance())
+    if (record.conformance->isBehaviorConformance())
       continue;
 
     anyReflectedConformances = true;
@@ -2477,7 +2477,9 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
   ConstantInitBuilder builder(*this);
   auto descriptorArray = builder.beginArray(RelativeAddressTy);
 
-  for (auto *conformance : ProtocolConformances) {
+  for (const auto &record : ProtocolConformances) {
+    auto conformance = record.conformance;
+
     // Behavior conformances cannot be reflected.
     if (conformance->isBehaviorConformance())
       continue;
@@ -3687,11 +3689,7 @@ llvm::StructType *IRGenModule::getGenericWitnessTableCacheTy() {
       Int16Ty,
       // WitnessTablePrivateSizeInWords + RequiresInstantiation bit
       Int16Ty,
-      // Protocol
-      RelativeAddressTy,
       // Pattern
-      RelativeAddressTy,
-      // ResilientWitnesses
       RelativeAddressTy,
       // Instantiator
       RelativeAddressTy,

@@ -42,7 +42,7 @@ import resilient_protocol
 // ----------------------------------------------------------------------------
 // Resilient witness tables
 // ----------------------------------------------------------------------------
-// CHECK-USAGE-LABEL: $s31protocol_resilience_descriptors34ConformsToProtocolWithRequirementsVyxG010resilient_A00fgH0AAWr" = internal
+// CHECK-USAGE-LABEL: $s31protocol_resilience_descriptors34ConformsToProtocolWithRequirementsVyxG010resilient_A00fgH0AAMc" = constant
 // CHECK-USAGE-SAME: {{got.|__imp_}}$s1T18resilient_protocol24ProtocolWithRequirementsPTl
 // CHECK-USAGE-SAME: @"symbolic x"
 public struct ConformsToProtocolWithRequirements<Element>
@@ -56,7 +56,7 @@ public protocol P { }
 public struct ConditionallyConforms<Element> { }
 public struct Y { }
 
-// CHECK-USAGE: @"$s31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAAWr" = internal
+// CHECK-USAGE: @"$s31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAAMc" = constant
 // CHECK-USAGE-SAME: $s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2AC_AA014OtherResilientC0Tn
 // CHECK-USAGE-SAME: $s31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAA2T2AdEP_AD014OtherResilientI0PWT
 public struct ConformsWithAssocRequirements : ProtocolWithAssocTypeDefaults {

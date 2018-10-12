@@ -627,6 +627,8 @@ private:
 
     NumConditionalRequirementsMask = 0xFF << 8,
     NumConditionalRequirementsShift = 8,
+
+    HasResilientWitnessesMask = 0x01 << 16,
   };
 
   int_type Value;
@@ -658,6 +660,12 @@ public:
   ConformanceFlags withNumConditionalRequirements(unsigned n) const {
     return ConformanceFlags((Value & ~NumConditionalRequirementsMask)
                             | (n << NumConditionalRequirementsShift));
+  }
+
+  ConformanceFlags withHasResilientWitnesses(bool hasResilientWitnesses) const {
+    return ConformanceFlags((Value & ~HasResilientWitnessesMask)
+                            | (hasResilientWitnesses? HasResilientWitnessesMask
+                                                    : 0));
   }
 
   /// Retrieve the conformance kind.
@@ -694,6 +702,11 @@ public:
   unsigned getNumConditionalRequirements() const {
     return (Value & NumConditionalRequirementsMask)
               >> NumConditionalRequirementsShift;
+  }
+
+  /// Whether this conformance has any resilient witnesses.
+  bool hasResilientWitnesses() const {
+    return Value & HasResilientWitnessesMask;
   }
 
   int_type getIntValue() const { return Value; }

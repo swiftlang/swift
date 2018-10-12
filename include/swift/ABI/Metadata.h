@@ -2013,16 +2013,8 @@ struct TargetGenericWitnessTable {
   /// to require instantiation.
   uint16_t WitnessTablePrivateSizeInWordsAndRequiresInstantiation;
 
-  /// The protocol descriptor. Only used for resilient conformances.
-  RelativeIndirectablePointer<ProtocolDescriptor,
-                              /*nullable*/ true> Protocol;
-
   /// The pattern.
   RelativeDirectPointer<const TargetWitnessTable<Runtime>> Pattern;
-
-  /// The resilient witness table, if any.
-  RelativeDirectPointer<const TargetResilientWitnessTable<Runtime>,
-                        /*nullable*/ true> ResilientWitnesses;
 
   /// The instantiation function, which is called after the template is copied.
   RelativeDirectPointer<void(TargetWitnessTable<Runtime> *instantiatedTable,
@@ -2043,6 +2035,18 @@ struct TargetGenericWitnessTable {
   /// Whether the witness table is known to require instantiation.
   uint16_t requiresInstantiation() const {
     return WitnessTablePrivateSizeInWordsAndRequiresInstantiation & 0x01;
+  }
+
+  /// Retrieve the protocol conformance descriptor.
+  ConstTargetPointer<Runtime, TargetProtocolConformanceDescriptor<Runtime>>
+  getConformance() const {
+    return Pattern->Description;
+  }
+
+  /// Retrieve the protocol.
+  ConstTargetPointer<Runtime, TargetProtocolDescriptor<Runtime>>
+  getProtocol() const {
+    return Pattern->Description->getProtocol();
   }
 };
 using GenericWitnessTable = TargetGenericWitnessTable<InProcess>;
@@ -2222,6 +2226,14 @@ struct TargetTypeReference {
 };
 using TypeReference = TargetTypeReference<InProcess>;
 
+/// Header containing information about the resilient witnesses in a
+/// protocol conformance descriptor.
+template <typename Runtime>
+struct TargetResilientWitnessesHeader {
+  uint32_t NumWitnesses;
+};
+using ResilientWitnessesHeader = TargetResilientWitnessesHeader<InProcess>;
+
 /// The structure of a protocol conformance.
 ///
 /// This contains enough static information to recover the witness table for a
@@ -2231,12 +2243,16 @@ struct TargetProtocolConformanceDescriptor final
   : public swift::ABI::TrailingObjects<
              TargetProtocolConformanceDescriptor<Runtime>,
              RelativeContextPointer<Runtime>,
-             TargetGenericRequirementDescriptor<Runtime>> {
+             TargetGenericRequirementDescriptor<Runtime>,
+             TargetResilientWitnessesHeader<Runtime>,
+             TargetResilientWitness<Runtime>> {
 
   using TrailingObjects = swift::ABI::TrailingObjects<
                              TargetProtocolConformanceDescriptor<Runtime>,
                              RelativeContextPointer<Runtime>,
-                             TargetGenericRequirementDescriptor<Runtime>>;
+                             TargetGenericRequirementDescriptor<Runtime>,
+                             TargetResilientWitnessesHeader<Runtime>,
+                             TargetResilientWitness<Runtime>>;
   friend TrailingObjects;
 
   template<typename T>
@@ -2249,6 +2265,9 @@ public:
 
   using GenericRequirementDescriptor =
     TargetGenericRequirementDescriptor<Runtime>;
+
+  using ResilientWitnessesHeader = TargetResilientWitnessesHeader<Runtime>;
+  using ResilientWitness = TargetResilientWitness<Runtime>;
 
 private:
   /// The protocol being conformed to.
@@ -2271,7 +2290,8 @@ private:
   ConformanceFlags Flags;
 
 public:
-  const ProtocolDescriptor *getProtocol() const {
+  ConstTargetPointer<Runtime, TargetProtocolDescriptor<Runtime>>
+  getProtocol() const {
     return Protocol;
   }
 
@@ -2345,6 +2365,16 @@ public:
   const swift::TargetWitnessTable<Runtime> *
   getWitnessTable(const TargetMetadata<Runtime> *type) const;
 
+  /// Retrieve the resilient witnesses.
+  ArrayRef<ResilientWitness> getResilientWitnesses() const{
+    if (!Flags.hasResilientWitnesses())
+      return { };
+
+    return ArrayRef<ResilientWitness>(
+             this->template getTrailingObjects<ResilientWitness>(),
+             numTrailingObjects(OverloadToken<ResilientWitness>()));
+  }
+
 #if !defined(NDEBUG) && SWIFT_OBJC_INTEROP
   void dump() const;
 #endif
@@ -2367,6 +2397,17 @@ private:
 
   size_t numTrailingObjects(OverloadToken<GenericRequirementDescriptor>) const {
     return Flags.getNumConditionalRequirements();
+  }
+
+  size_t numTrailingObjects(OverloadToken<ResilientWitnessesHeader>) const {
+    return Flags.hasResilientWitnesses() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<ResilientWitness>) const {
+    return Flags.hasResilientWitnesses()
+      ? this->template getTrailingObjects<ResilientWitnessesHeader>()
+          ->NumWitnesses
+      : 0;
   }
 };
 using ProtocolConformanceDescriptor
