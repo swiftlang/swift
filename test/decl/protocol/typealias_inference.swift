@@ -12,7 +12,7 @@ protocol BaseProtocol {
 struct Base<Value>: BaseProtocol {
   private let closure: Closure
 
-  init(closure: Closure) { //expected-error {{reference to invalid associated type 'Value' of type 'Base<Value>'}}
+  init(closure: Closure) { //expected-error {{reference to invalid type alias 'Closure' of type 'Base<Value>'}}
     self.closure = closure
   }
 }

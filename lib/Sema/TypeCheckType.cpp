@@ -841,11 +841,15 @@ static void diagnoseUnboundGenericType(Type ty, SourceLoc loc) {
 static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
                                            Type parentTy,
                                            SourceLoc loc,
-                                           AssociatedTypeDecl *assocType) {
+                                           TypeDecl *typeDecl) {
+  auto protocol = dyn_cast<ProtocolDecl>(typeDecl->getDeclContext());
+  if (!protocol)
+    return;
+
   // If we weren't given a conformance, go look it up.
   ProtocolConformance *conformance = nullptr;
   if (auto conformanceRef = TypeChecker::conformsToProtocol(
-          parentTy, assocType->getProtocol(), dc,
+          parentTy, protocol, dc,
           (ConformanceCheckFlags::InExpression |
            ConformanceCheckFlags::SuppressDependencyTracking |
            ConformanceCheckFlags::AllowUnavailableConditionalRequirements))) {
@@ -864,7 +868,7 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
           ? diag::unsupported_recursion_in_associated_type_reference
           : diag::broken_associated_type_witness;
 
-  ctx.Diags.diagnose(loc, diagCode, assocType->getFullName(), parentTy);
+  ctx.Diags.diagnose(loc, diagCode, isa<TypeAliasDecl>(typeDecl), typeDecl->getFullName(), parentTy);
 }
 
 /// \brief Returns a valid type or ErrorType in case of an error.
@@ -910,38 +914,10 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, SourceLoc loc,
     return ErrorType::get(ctx);
   }
 
-  if (type->hasError()) {
-    if (auto associatedTypeDecl = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
-      maybeDiagnoseBadConformanceRef(fromDC,
-                                     foundDC->getDeclaredInterfaceType(),
-                                     loc, associatedTypeDecl);
-    }
-    if (auto aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-      struct AssociatedTypeReprWalker : ASTWalker {
-        llvm::function_ref<void (AssociatedTypeDecl *)> callback;
-
-        AssociatedTypeReprWalker(llvm::function_ref<void (AssociatedTypeDecl *)> callback)
-        : callback(callback) {}
-
-        bool walkToTypeReprPre(TypeRepr *TR) {
-          if (auto CITR = dyn_cast_or_null<ComponentIdentTypeRepr>(TR)) {
-            if (auto associatedTypeDecl = dyn_cast_or_null<AssociatedTypeDecl>(CITR->getBoundDecl())) {
-              callback(associatedTypeDecl);
-            }
-          }
-          return true;
-        }
-      };
-
-      if (auto repr = aliasDecl->getUnderlyingTypeLoc().getTypeRepr()) {
-        AssociatedTypeReprWalker walker([&](AssociatedTypeDecl *associatedTypeDecl) {
-          maybeDiagnoseBadConformanceRef(fromDC,
-                                         foundDC->getDeclaredInterfaceType(),
-                                         loc, associatedTypeDecl);
-        });
-        repr->walk(walker);
-      }
-    }
+  if (type->hasError() && (isa<AssociatedTypeDecl>(typeDecl) || isa<TypeAliasDecl>(typeDecl))) {
+    maybeDiagnoseBadConformanceRef(fromDC,
+                                   foundDC->getDeclaredInterfaceType(),
+                                   loc, typeDecl);
   }
 
   if (generic) {
