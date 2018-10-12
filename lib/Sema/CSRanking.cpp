@@ -44,6 +44,10 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
       log << "use of an unavailable declaration";
       break;
 
+    case SK_Deprecated:
+      log << "use of a deprecated declaration";
+      break;
+
     case SK_Fix:
       log << "attempting to fix the source";
       break;

@@ -1766,6 +1766,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     if (choice.getDecl()->getAttrs().isUnavailable(getASTContext())) {
       increaseScore(SK_Unavailable);
     }
+    if (choice.getDecl()->getAttrs().getDeprecated(getASTContext())) {
+      increaseScore(SK_Deprecated);
+    }
 
     if (kind == OverloadChoiceKind::DynamicMemberLookup) {
       // DynamicMemberLookup results are always a (dynamicMember:T1)->T2
