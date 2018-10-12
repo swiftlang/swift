@@ -79,17 +79,21 @@ llvm::Optional<Syntax> SyntaxParsingCache::lookUpFrom(const Syntax &Node,
   return llvm::None;
 }
 
-llvm::Optional<Syntax> SyntaxParsingCache::lookUp(size_t NewPosition,
-                                                  SyntaxKind Kind) {
-  // Undo the edits in reverse order
-  size_t OldPosition = NewPosition;
-  for (auto I = Edits.rbegin(), E = Edits.rend(); I != E; ++I) {
+size_t SyntaxParsingCache::translateToPreEditPosition(
+    size_t PostEditPosition, llvm::SmallVector<SourceEdit, 4> Edits) {
+  size_t Position = PostEditPosition;
+  for (auto I = Edits.begin(), E = Edits.end(); I != E; ++I) {
     auto Edit = *I;
-    if (Edit.End <= OldPosition) {
-      OldPosition =
-          OldPosition - Edit.ReplacementLength + Edit.originalLength();
+    if (Edit.End + Edit.ReplacementLength - Edit.originalLength() <= Position) {
+      Position = Position - Edit.ReplacementLength + Edit.originalLength();
     }
   }
+  return Position;
+}
+
+llvm::Optional<Syntax> SyntaxParsingCache::lookUp(size_t NewPosition,
+                                                  SyntaxKind Kind) {
+  size_t OldPosition = translateToPreEditPosition(NewPosition, Edits);
 
   auto Node = lookUpFrom(OldSyntaxTree, /*NodeStart=*/0, OldPosition, Kind);
   if (Node.hasValue()) {
