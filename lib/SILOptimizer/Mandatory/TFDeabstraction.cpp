@@ -2384,7 +2384,8 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
     // compilation.
     auto it = constants.find(argumentValue);
     if (it == constants.end() || !it->second.isConstant()) {
-      if (llvm::TFDynamicCompilation && !isAcceleratorOnly(fn)) {
+      if (llvm::TFDynamicCompilation && !isAcceleratorOnly(fn)
+          && !argument.mustBeLoweredToConstant()) {
         // Since we're doing dynamic compilation, we can simply pass this
         // unknown attribute as a named argument to the graph_op, and IRGen will
         // deal with it.

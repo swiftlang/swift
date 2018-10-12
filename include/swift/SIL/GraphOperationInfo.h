@@ -55,6 +55,16 @@ public:
     /// to an attribute.
     ///
     /// Written as named argument with "$tensor" suffix.
+    ///
+    /// Because of how lowering is implemented,
+    /// - TensorAttributes must come after a $dtype attr specifying the dtype
+    ///   for the Tensor
+    /// - TensorAttributes with array values must have a $shape attr immediately
+    ///   after them, and
+    /// - TensorAttributes must not be dynamic (because ordering between
+    ///   constant and dynamic attrs is not preserved, which would make the
+    ///   previous two conditions impossible to fulfill for dynamic
+    ///   TensorAttributes).
     TensorAttribute,
 
     /// An array of integers that should be lowered to a shape attribute.
@@ -146,6 +156,13 @@ public:
 
     /// Returns this argument's name, without suffix, and the ArgumentLowering.
     std::pair<StringRef, ArgumentLowering> getArgumentNameAndLowering() const;
+
+    /// Whether this argument must be lowered to a constant, even for IRGen'd
+    /// graph_ops.
+    bool mustBeLoweredToConstant() const {
+      return std::get<1>(getArgumentNameAndLowering()) ==
+          ArgumentLowering::TensorAttribute;
+    }
   };
 
 private:
