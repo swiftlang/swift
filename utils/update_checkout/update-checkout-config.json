@@ -33,7 +33,9 @@
         "ninja": {
             "remote": { "id": "ninja-build/ninja" } },
         "icu": {
-            "remote": { "id": "unicode-org/icu" } }
+            "remote": { "id": "unicode-org/icu" },
+            "platforms": [ "Linux" ]
+        }
     },
     "default-branch-scheme": "master",
     "branch-schemes": {
