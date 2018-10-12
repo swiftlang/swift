@@ -182,13 +182,18 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
+struct SelfBounds {
+  llvm::TinyPtrVector<NominalTypeDecl *> decls;
+  bool anyObject = false;
+};
+
 /// Request the nominal types that occur as the right-hand side of "Self: Foo"
 /// constraints in the "where" clause of a protocol extension.
 class SelfBoundsFromWhereClauseRequest :
     public SimpleRequest<SelfBoundsFromWhereClauseRequest,
                          CacheKind::Uncached,
-                         llvm::TinyPtrVector<NominalTypeDecl *>,
-                         ExtensionDecl *> {
+                         SelfBounds,
+                         llvm::PointerUnion<TypeDecl *, ExtensionDecl *>> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -196,12 +201,12 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::TinyPtrVector<NominalTypeDecl *> evaluate(Evaluator &evaluator,
-                                                  ExtensionDecl *ext) const;
+  SelfBounds evaluate(Evaluator &evaluator,
+                      llvm::PointerUnion<TypeDecl *, ExtensionDecl *>) const;
 
 public:
   // Cycle handling
-  llvm::TinyPtrVector<NominalTypeDecl *> breakCycle() const { return { }; }
+  SelfBounds breakCycle() const { return { }; }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 };

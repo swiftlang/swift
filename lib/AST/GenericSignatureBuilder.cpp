@@ -7251,19 +7251,18 @@ void GenericSignatureBuilder::enumerateRequirements(
     // Enumerate conformance requirements.
     SmallVector<ProtocolDecl *, 4> protocols;
     DenseMap<ProtocolDecl *, const RequirementSource *> protocolSources;
-    if (equivClass) {
-      for (const auto &conforms : equivClass->conformsTo) {
-        protocols.push_back(conforms.first);
-        assert(protocolSources.count(conforms.first) == 0 && 
-               "redundant protocol requirement?");
 
-        protocolSources.insert(
-          {conforms.first,
-           *getBestConstraintSource<ProtocolDecl *>(conforms.second,
-             [&](ProtocolDecl *proto) {
-               return proto == conforms.first;
-             })});
-      }
+    for (const auto &conforms : equivClass->conformsTo) {
+      protocols.push_back(conforms.first);
+      assert(protocolSources.count(conforms.first) == 0 &&
+             "redundant protocol requirement?");
+
+      protocolSources.insert(
+        {conforms.first,
+         *getBestConstraintSource<ProtocolDecl *>(conforms.second,
+           [&](ProtocolDecl *proto) {
+             return proto == conforms.first;
+           })});
     }
 
     // Sort the protocols in canonical order.
