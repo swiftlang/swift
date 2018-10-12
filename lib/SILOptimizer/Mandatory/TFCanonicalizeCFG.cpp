@@ -1340,11 +1340,24 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
   //
   SILBasicBlock *newLatch = loop->getLoopLatch();
   SILBasicBlock *clonedNewLatch = cloner.remapBasicBlock(newLatch);
+  // Note that we iterate over the predecessors of the `newLatch` and not
+  // `clonedNewLatch`. This is important for a couple of reasons:
+  //  (1) DI and PDI information is not valid for the cloned nodes. Therefore, we
+  //      can only check for dominance using the original nodes of the loop body.
+  //  (2) changeEdgeValue invalidates pred_iterator. Given that the unrolled
+  //      loop body is a clone of the loop, it is convenient to iterate over the
+  //      predecessors of the latch block in the loop and access the corresponding
+  //      cloned predecessor whenever needed.
   for (SILBasicBlock *pred : newLatch->getPredecessorBlocks()) {
     auto predTermInst = dyn_cast<BranchInst>(pred->getTerminator());
     assert(predTermInst && "Preheader of a loop has a non-branch terminator");
     for (unsigned argIndex = 0; argIndex < predTermInst->getNumArgs(); ++argIndex) {
-      auto arg = predTermInst->getArg(argIndex);
+      // Check if the argument of *cloned* predecessor needs patching.
+      SILBasicBlock *clonedPred = cloner.remapBasicBlock(pred);
+      auto clonedPredTermInst = dyn_cast<BranchInst>(clonedPred->getTerminator());
+      assert(clonedPredTermInst &&
+             "Preheader of a loop has a non-branch terminator");
+      auto arg = clonedPredTermInst->getArg(argIndex);
       // Skip if this is not an argument of the `newHeader`.
       if (!isa<SILArgument>(arg) ||
           cast<SILArgument>(arg)->getParent() != newHeader) {
@@ -1360,7 +1373,6 @@ void SingleExitLoopTransformer::unrollLoopBodyOnce() {
         if (value != arg && DI->properlyDominates(value, predTermInst)) {
           // A suitable value is found. Update the edge value in the unrolled
           // loop with the corresponding cloned value.
-          SILBasicBlock *clonedPred = cloner.remapBasicBlock(pred);
           changeEdgeValue(clonedPred->getTerminator(), clonedNewLatch, argIndex,
                           cloner.remapValue(value));
           patched = true;
