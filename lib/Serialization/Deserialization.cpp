@@ -3399,19 +3399,23 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
   case decls_block::PREFIX_OPERATOR_DECL: {
     IdentifierID nameID;
     DeclContextID contextID;
-    DeclID nominalID;
+    ArrayRef<uint64_t> designatedNominalTypeDeclIDs;
 
     decls_block::PrefixOperatorLayout::readRecord(scratch, nameID, contextID,
-                                                  nominalID);
+                                                  designatedNominalTypeDeclIDs);
     auto DC = getDeclContext(contextID);
 
-    Expected<Decl *> nominal = getDeclChecked(nominalID);
-    if (!nominal)
-      return nominal.takeError();
+    SmallVector<NominalTypeDecl *, 1> designatedNominalTypes;
+    for (auto id : designatedNominalTypeDeclIDs) {
+      Expected<Decl *> nominal = getDeclChecked(id);
+      if (!nominal)
+        return nominal.takeError();
+      designatedNominalTypes.push_back(cast<NominalTypeDecl>(nominal.get()));
+    }
 
     auto result = createDecl<PrefixOperatorDecl>(
         DC, SourceLoc(), getIdentifier(nameID), SourceLoc(),
-        cast_or_null<NominalTypeDecl>(nominal.get()));
+        ctx.AllocateCopy(designatedNominalTypes));
 
     declOrOffset = result;
     break;
@@ -3420,20 +3424,24 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
   case decls_block::POSTFIX_OPERATOR_DECL: {
     IdentifierID nameID;
     DeclContextID contextID;
-    DeclID nominalID;
+    ArrayRef<uint64_t> designatedNominalTypeDeclIDs;
 
-    decls_block::PostfixOperatorLayout::readRecord(scratch, nameID, contextID,
-                                                   nominalID);
+    decls_block::PostfixOperatorLayout::readRecord(
+        scratch, nameID, contextID, designatedNominalTypeDeclIDs);
 
     auto DC = getDeclContext(contextID);
 
-    Expected<Decl *> nominal = getDeclChecked(nominalID);
-    if (!nominal)
-      return nominal.takeError();
+    SmallVector<NominalTypeDecl *, 1> designatedNominalTypes;
+    for (auto id : designatedNominalTypeDeclIDs) {
+      Expected<Decl *> nominal = getDeclChecked(id);
+      if (!nominal)
+        return nominal.takeError();
+      designatedNominalTypes.push_back(cast<NominalTypeDecl>(nominal.get()));
+    }
 
     auto result = createDecl<PostfixOperatorDecl>(
         DC, SourceLoc(), getIdentifier(nameID), SourceLoc(),
-        cast_or_null<NominalTypeDecl>(nominal.get()));
+        ctx.AllocateCopy(designatedNominalTypes));
 
     declOrOffset = result;
     break;
@@ -3443,10 +3451,11 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
     IdentifierID nameID;
     DeclContextID contextID;
     DeclID precedenceGroupID;
-    DeclID nominalID;
+    ArrayRef<uint64_t> designatedNominalTypeDeclIDs;
 
     decls_block::InfixOperatorLayout::readRecord(scratch, nameID, contextID,
-                                                 precedenceGroupID, nominalID);
+                                                 precedenceGroupID,
+                                                 designatedNominalTypeDeclIDs);
 
     Expected<Decl *> precedenceGroup = getDeclChecked(precedenceGroupID);
     if (!precedenceGroup)
@@ -3454,14 +3463,18 @@ ModuleFile::getDeclCheckedImpl(DeclID DID) {
 
     auto DC = getDeclContext(contextID);
 
-    Expected<Decl *> nominal = getDeclChecked(nominalID);
-    if (!nominal)
-      return nominal.takeError();
+    SmallVector<NominalTypeDecl *, 1> designatedNominalTypes;
+    for (auto id : designatedNominalTypeDeclIDs) {
+      Expected<Decl *> nominal = getDeclChecked(id);
+      if (!nominal)
+        return nominal.takeError();
+      designatedNominalTypes.push_back(cast<NominalTypeDecl>(nominal.get()));
+    }
 
     auto result = createDecl<InfixOperatorDecl>(
         DC, SourceLoc(), getIdentifier(nameID), SourceLoc(), SourceLoc(),
         cast_or_null<PrecedenceGroupDecl>(precedenceGroup.get()),
-        cast_or_null<NominalTypeDecl>(nominal.get()));
+        ctx.AllocateCopy(designatedNominalTypes));
 
     declOrOffset = result;
     break;

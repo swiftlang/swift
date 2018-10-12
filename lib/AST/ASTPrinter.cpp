@@ -2875,8 +2875,15 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
     });
   if (auto *group = decl->getPrecedenceGroup())
     Printer << " : " << group->getName();
-  if (!decl->getSecondIdentifier().empty())
-    Printer << ", " << decl->getSecondIdentifier();
+  auto designatedNominalTypes = decl->getDesignatedNominalTypes();
+  auto first = true;
+  for (auto typeDecl : designatedNominalTypes) {
+    if (first && !decl->getPrecedenceGroup())
+      Printer << " : " << typeDecl->getName();
+    else
+      Printer << ", " << typeDecl->getName();
+    first = false;
+  }
 }
 
 void PrintAST::visitPrecedenceGroupDecl(PrecedenceGroupDecl *decl) {
@@ -2949,8 +2956,15 @@ void PrintAST::visitPrefixOperatorDecl(PrefixOperatorDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
-  if (!decl->getDesignatedNominalTypeName().empty())
-    Printer << " : " << decl->getDesignatedNominalTypeName();
+  auto designatedNominalTypes = decl->getDesignatedNominalTypes();
+  auto first = true;
+  for (auto typeDecl : designatedNominalTypes) {
+    if (first)
+      Printer << " : " << typeDecl->getName();
+    else
+      Printer << ", " << typeDecl->getName();
+    first = false;
+  }
 }
 
 void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
@@ -2960,8 +2974,15 @@ void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
-  if (!decl->getDesignatedNominalTypeName().empty())
-    Printer << " : " << decl->getDesignatedNominalTypeName();
+  auto designatedNominalTypes = decl->getDesignatedNominalTypes();
+  auto first = true;
+  for (auto typeDecl : designatedNominalTypes) {
+    if (first)
+      Printer << " : " << typeDecl->getName();
+    else
+      Printer << ", " << typeDecl->getName();
+    first = false;
+  }
 }
 
 void PrintAST::visitModuleDecl(ModuleDecl *decl) { }

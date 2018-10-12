@@ -6380,24 +6380,23 @@ class OperatorDecl : public Decl {
   
   Identifier name;
 
-  Identifier DesignatedNominalTypeName;
-  SourceLoc DesignatedNominalTypeNameLoc;
-  NominalTypeDecl *DesignatedNominalType = nullptr;
+  ArrayRef<Identifier> Identifiers;
+  ArrayRef<SourceLoc> IdentifierLocs;
+  ArrayRef<NominalTypeDecl *> DesignatedNominalTypes;
 
 public:
   OperatorDecl(DeclKind kind, DeclContext *DC, SourceLoc OperatorLoc,
                Identifier Name, SourceLoc NameLoc,
-               Identifier DesignatedNominalTypeName = Identifier(),
-               SourceLoc DesignatedNominalTypeNameLoc = SourceLoc())
+               ArrayRef<Identifier> Identifiers,
+               ArrayRef<SourceLoc> IdentifierLocs)
       : Decl(kind, DC), OperatorLoc(OperatorLoc), NameLoc(NameLoc), name(Name),
-        DesignatedNominalTypeName(DesignatedNominalTypeName),
-        DesignatedNominalTypeNameLoc(DesignatedNominalTypeNameLoc) {}
+        Identifiers(Identifiers), IdentifierLocs(IdentifierLocs) {}
 
   OperatorDecl(DeclKind kind, DeclContext *DC, SourceLoc OperatorLoc,
                Identifier Name, SourceLoc NameLoc,
-               NominalTypeDecl *DesignatedNominalType)
+               ArrayRef<NominalTypeDecl *> DesignatedNominalTypes)
       : Decl(kind, DC), OperatorLoc(OperatorLoc), NameLoc(NameLoc), name(Name),
-        DesignatedNominalType(DesignatedNominalType) {}
+        DesignatedNominalTypes(DesignatedNominalTypes) {}
 
   SourceLoc getLoc() const { return NameLoc; }
 
@@ -6405,20 +6404,20 @@ public:
   SourceLoc getNameLoc() const { return NameLoc; }
   Identifier getName() const { return name; }
 
-  Identifier getDesignatedNominalTypeName() const {
-    return DesignatedNominalTypeName;
+  ArrayRef<Identifier> getIdentifiers() const {
+    return Identifiers;
   }
 
-  SourceLoc getDesignatedNominalTypeNameLoc() const {
-    return DesignatedNominalTypeNameLoc;
+  ArrayRef<SourceLoc> getIdentifierLocs() const {
+    return IdentifierLocs;
   }
 
-  NominalTypeDecl *getDesignatedNominalType() const {
-    return DesignatedNominalType;
+  ArrayRef<NominalTypeDecl *> getDesignatedNominalTypes() const {
+    return DesignatedNominalTypes;
   }
 
-  void setDesignatedNominalType(NominalTypeDecl *nominal) {
-    DesignatedNominalType = nominal;
+  void setDesignatedNominalTypes(ArrayRef<NominalTypeDecl *> nominalTypes) {
+    DesignatedNominalTypes = nominalTypes;
   }
 
   static bool classof(const Decl *D) {
@@ -6436,46 +6435,39 @@ public:
 /// infix operator /+/ : AdditionPrecedence, Numeric
 /// \endcode
 class InfixOperatorDecl : public OperatorDecl {
-  SourceLoc ColonLoc, FirstIdentifierLoc, SecondIdentifierLoc;
-  Identifier FirstIdentifier, SecondIdentifier;
+  SourceLoc ColonLoc;
   PrecedenceGroupDecl *PrecedenceGroup = nullptr;
 
 public:
   InfixOperatorDecl(DeclContext *DC, SourceLoc operatorLoc, Identifier name,
                     SourceLoc nameLoc, SourceLoc colonLoc,
-                    Identifier firstIdentifier, SourceLoc firstIdentifierLoc,
-                    Identifier secondIdentifier = Identifier(),
-                    SourceLoc secondIdentifierLoc = SourceLoc())
-      : OperatorDecl(DeclKind::InfixOperator, DC, operatorLoc, name, nameLoc),
-        ColonLoc(colonLoc), FirstIdentifierLoc(firstIdentifierLoc),
-        SecondIdentifierLoc(secondIdentifierLoc),
-        FirstIdentifier(firstIdentifier), SecondIdentifier(secondIdentifier) {}
+                    ArrayRef<Identifier> identifiers,
+                    ArrayRef<SourceLoc> identifierLocs)
+      : OperatorDecl(DeclKind::InfixOperator, DC, operatorLoc, name, nameLoc,
+                     identifiers, identifierLocs),
+        ColonLoc(colonLoc) {}
 
   InfixOperatorDecl(DeclContext *DC, SourceLoc operatorLoc, Identifier name,
                     SourceLoc nameLoc, SourceLoc colonLoc,
                     PrecedenceGroupDecl *precedenceGroup,
-                    NominalTypeDecl *designatedNominalType)
+                    ArrayRef<NominalTypeDecl *> designatedNominalTypes)
       : OperatorDecl(DeclKind::InfixOperator, DC, operatorLoc, name, nameLoc,
-                     designatedNominalType),
+                     designatedNominalTypes),
         ColonLoc(colonLoc), PrecedenceGroup(precedenceGroup) {}
 
   SourceLoc getEndLoc() const {
-    if (!SecondIdentifier.empty())
-      return SecondIdentifierLoc;
-    if (!FirstIdentifier.empty())
-      return FirstIdentifierLoc;
-    return getNameLoc();
+    auto identifierLocs = getIdentifierLocs();
+    if (identifierLocs.empty())
+      return getNameLoc();
+
+    return identifierLocs.back();
   }
+
   SourceRange getSourceRange() const {
     return { getOperatorLoc(), getEndLoc() };
   }
 
   SourceLoc getColonLoc() const { return ColonLoc; }
-  SourceLoc getFirstIdentifierLoc() const { return FirstIdentifierLoc; }
-  SourceLoc getSecondIdentifierLoc() const { return SecondIdentifierLoc; }
-
-  Identifier getFirstIdentifier() const { return FirstIdentifier; }
-  Identifier getSecondIdentifier() const { return SecondIdentifier; }
 
   PrecedenceGroupDecl *getPrecedenceGroup() const { return PrecedenceGroup; }
   void setPrecedenceGroup(PrecedenceGroupDecl *PGD) {
@@ -6502,15 +6494,16 @@ class PrefixOperatorDecl : public OperatorDecl {
 public:
   PrefixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
                      SourceLoc NameLoc,
-                     Identifier DesignatedNominalTypeName = Identifier(),
-                     SourceLoc DesignatedNominalTypeNameLoc = SourceLoc())
+                     ArrayRef<Identifier> Identifiers,
+                     ArrayRef<SourceLoc> IdentifierLocs)
       : OperatorDecl(DeclKind::PrefixOperator, DC, OperatorLoc, Name, NameLoc,
-                     DesignatedNominalTypeName, DesignatedNominalTypeNameLoc) {}
+                     Identifiers, IdentifierLocs) {}
 
   PrefixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
-                     SourceLoc NameLoc, NominalTypeDecl *DesignatedNominalType)
+                     SourceLoc NameLoc,
+                     ArrayRef<NominalTypeDecl *> designatedNominalTypes)
       : OperatorDecl(DeclKind::PrefixOperator, DC, OperatorLoc, Name, NameLoc,
-                     DesignatedNominalType) {}
+                     designatedNominalTypes) {}
 
   SourceRange getSourceRange() const {
     return { getOperatorLoc(), getNameLoc() };
@@ -6536,15 +6529,16 @@ class PostfixOperatorDecl : public OperatorDecl {
 public:
   PostfixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
                       SourceLoc NameLoc,
-                      Identifier DesignatedNominalTypeName = Identifier(),
-                      SourceLoc DesignatedNominalTypeNameLoc = SourceLoc())
+                      ArrayRef<Identifier> Identifiers,
+                      ArrayRef<SourceLoc> IdentifierLocs)
       : OperatorDecl(DeclKind::PostfixOperator, DC, OperatorLoc, Name, NameLoc,
-                     DesignatedNominalTypeName, DesignatedNominalTypeNameLoc) {}
+                     Identifiers, IdentifierLocs) {}
 
   PostfixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
-                      SourceLoc NameLoc, NominalTypeDecl *DesignatedNominalType)
+                      SourceLoc NameLoc,
+                      ArrayRef<NominalTypeDecl *> designatedNominalTypes)
       : OperatorDecl(DeclKind::PostfixOperator, DC, OperatorLoc, Name, NameLoc,
-                     DesignatedNominalType) {}
+                     designatedNominalTypes) {}
 
   SourceRange getSourceRange() const {
     return { getOperatorLoc(), getNameLoc() };
