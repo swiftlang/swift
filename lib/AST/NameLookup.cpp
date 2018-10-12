@@ -556,18 +556,26 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
                           SmallVectorImpl<ModuleDecl *> &modulesFound,
                           bool &anyObject);
 
-TinyPtrVector<NominalTypeDecl *>
-SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
-                                           ExtensionDecl *ext) const {
-  auto proto = ext->getExtendedProtocolDecl();
-  assert(proto && "Not a protocol extension?");
+SelfBounds
+SelfBoundsFromWhereClauseRequest::evaluate(
+    Evaluator &evaluator,
+    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) const {
+  auto *typeDecl = decl.dyn_cast<TypeDecl *>();
+  auto *protoDecl = dyn_cast_or_null<ProtocolDecl>(typeDecl);
+  auto *extDecl = decl.dyn_cast<ExtensionDecl *>();
 
-  ASTContext &ctx = proto->getASTContext();
-  TinyPtrVector<NominalTypeDecl *> result;
-  if (!ext->getGenericParams())
+  DeclContext *dc = protoDecl ? (DeclContext *)protoDecl : (DeclContext *)extDecl;
+  auto requirements = protoDecl ? protoDecl->getTrailingWhereClause()
+                                : extDecl->getTrailingWhereClause();
+
+  ASTContext &ctx = dc->getASTContext();
+
+  SelfBounds result;
+
+  if (requirements == nullptr)
     return result;
 
-  for (const auto &req : ext->getGenericParams()->getTrailingRequirements()) {
+  for (const auto &req : requirements->getRequirements()) {
     // We only care about type constraints.
     if (req.getKind() != RequirementReprKind::TypeConstraint)
       continue;
@@ -578,7 +586,7 @@ SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
       if (auto identTypeRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr))
         isSelfLHS = (identTypeRepr->getIdentifier() == ctx.Id_Self);
     } else if (Type type = req.getSubject()) {
-      isSelfLHS = type->isEqual(proto->getSelfInterfaceType());
+      isSelfLHS = type->isEqual(dc->getSelfInterfaceType());
     }
     if (!isSelfLHS)
       continue;
@@ -586,19 +594,31 @@ SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
     // Resolve the right-hand side.
     DirectlyReferencedTypeDecls rhsDecls;
     if (auto typeRepr = req.getConstraintRepr()) {
-      rhsDecls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
+      rhsDecls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, dc);
     } else if (Type type = req.getConstraint()) {
       rhsDecls = directReferencesForType(type);
     }
 
     SmallVector<ModuleDecl *, 2> modulesFound;
-    bool anyObject = false;
     auto rhsNominals = resolveTypeDeclsToNominal(evaluator, ctx, rhsDecls,
-                                                 modulesFound, anyObject);
-    result.insert(result.end(), rhsNominals.begin(), rhsNominals.end());
+                                                 modulesFound,
+                                                 result.anyObject);
+    result.decls.insert(result.decls.end(),
+                        rhsNominals.begin(),
+                        rhsNominals.end());
   }
 
   return result;
+}
+
+SelfBounds swift::getSelfBoundsFromWhereClause(
+    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) {
+  auto *typeDecl = decl.dyn_cast<TypeDecl *>();
+  auto *extDecl = decl.dyn_cast<ExtensionDecl *>();
+  auto &ctx = typeDecl ? typeDecl->getASTContext()
+                       : extDecl->getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           SelfBoundsFromWhereClauseRequest{decl}, {});
 }
 
 static void
@@ -614,9 +634,8 @@ populateLookupDeclsFromContext(DeclContext *dc,
   // constraints that can affect name lookup.
   if (dc->getExtendedProtocolDecl()) {
     auto ext = cast<ExtensionDecl>(dc);
-    auto bounds = evaluateOrDefault(dc->getASTContext().evaluator,
-                                    SelfBoundsFromWhereClauseRequest{ext}, {});
-    for (auto bound : bounds)
+    auto bounds = getSelfBoundsFromWhereClause(ext);
+    for (auto bound : bounds.decls)
       lookupDecls.push_back(bound);
   }
 }
