@@ -16,7 +16,7 @@ class Generic<T> : Concrete {
 
 protocol BaseProto {}
 
-protocol ProtoRefinesClass : Generic<Int>, BaseProto {
+protocol ProtoRefinesClass where Self : Generic<Int>, Self : BaseProto {
   func requirementUsesClassTypes(_: ConcreteAlias, _: GenericAlias)
   // expected-note@-1 {{protocol requires function 'requirementUsesClassTypes' with type '(Generic<Int>.ConcreteAlias, Generic<Int>.GenericAlias) -> ()' (aka '(String, (Int, Int)) -> ()'); do you want to add a stub?}}
 }
@@ -130,7 +130,7 @@ class GoodConformingClass : Generic<Int>, ProtoRefinesClass {
   }
 }
 
-protocol ProtoRefinesProtoWithClass : ProtoRefinesClass {}
+protocol ProtoRefinesProtoWithClass where Self : ProtoRefinesClass {}
 
 extension ProtoRefinesProtoWithClass {
   func anotherExtensionMethodUsesClassTypes(_ x: ConcreteAlias, _ y: GenericAlias) {
@@ -204,7 +204,7 @@ class ClassWithInits<T> {
   required init(requiredInit: ()) {}
 }
 
-protocol ProtocolWithClassInits : ClassWithInits<Int> {}
+protocol ProtocolWithClassInits where Self : ClassWithInits<Int> {}
 
 func useProtocolWithClassInits1() {
   _ = ProtocolWithClassInits(notRequiredInit: ())
@@ -276,10 +276,10 @@ extension HasMutableProperty {
 
 // Some pathological examples -- just make sure they don't crash.
 
-protocol RecursiveSelf : Generic<Self> {}
+protocol RecursiveSelf where Self : Generic<Self> {}
 // expected-error@-1 {{superclass constraint 'Self' : 'Generic<Self>' is recursive}}
 
-protocol RecursiveAssociatedType : Generic<Self.X> {
+protocol RecursiveAssociatedType where Self : Generic<Self.X> {
   // expected-error@-1 {{superclass constraint 'Self' : 'Generic<Self.X>' is recursive}}
   associatedtype X
 }
@@ -290,7 +290,7 @@ protocol BaseProtocol {
 
 class BaseClass : BaseProtocol {}
 
-protocol RefinedProtocol : BaseClass {
+protocol RefinedProtocol where Self : BaseClass {
   func takesT(_: T)
 }
 
@@ -301,12 +301,12 @@ class RefinedClass : BaseClass, RefinedProtocol {
 }
 
 class LoopClass : LoopProto {}
-protocol LoopProto : LoopClass {}
+protocol LoopProto where Self : LoopClass {}
 
 class FirstClass {}
-protocol FirstProtocol : FirstClass {}
+protocol FirstProtocol where Self : FirstClass {}
 class SecondClass : FirstClass {}
-protocol SecondProtocol : SecondClass, FirstProtocol {}
+protocol SecondProtocol where Self : SecondClass, Self : FirstProtocol {}
 
 class FirstConformer : FirstClass, SecondProtocol {}
 // expected-error@-1 {{'SecondProtocol' requires that 'FirstConformer' inherit from 'SecondClass'}}
@@ -315,17 +315,19 @@ class FirstConformer : FirstClass, SecondProtocol {}
 class SecondConformer : SecondClass, SecondProtocol {}
 
 // Duplicate superclass
-// FIXME: Duplicate diagnostics
-protocol DuplicateSuper : Concrete, Concrete {}
+// FIXME: Should be an error here too
+protocol DuplicateSuper1 : Concrete where Self : Concrete {}
 // expected-note@-1 {{superclass constraint 'Self' : 'Concrete' written here}}
 // expected-warning@-2 {{redundant superclass constraint 'Self' : 'Concrete'}}
-// expected-error@-3 {{duplicate inheritance from 'Concrete'}}
+protocol DuplicateSuper2 where Self : Concrete, Self : Concrete {}
+// expected-note@-1 {{superclass constraint 'Self' : 'Concrete' written here}}
+// expected-warning@-2 {{redundant superclass constraint 'Self' : 'Concrete'}}
 
-// Ambigous name lookup situation
-protocol Amb : Concrete {}
+// Ambiguous name lookup situation
+protocol Amb where Self : Concrete {}
 // expected-note@-1 {{'Amb' previously declared here}}
 // expected-note@-2 {{found this candidate}}
-protocol Amb : Concrete {}
+protocol Amb where Self : Concrete {}
 // expected-error@-1 {{invalid redeclaration of 'Amb'}}
 // expected-note@-2 {{found this candidate}}
 

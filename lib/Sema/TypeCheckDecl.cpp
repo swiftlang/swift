@@ -3044,7 +3044,6 @@ public:
     checkAccessControl(TC, PD);
 
     checkInheritanceClause(PD);
-    checkProtocolSelfRequirements(PD, PD);
 
     TC.checkDeclCircularity(PD);
     if (PD->isResilient())

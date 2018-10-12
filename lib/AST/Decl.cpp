@@ -3642,7 +3642,7 @@ ProtocolDecl::getInheritedProtocols() const {
   SmallPtrSet<const ProtocolDecl *, 4> known;
   known.insert(this);
   bool anyObject = false;
-  for (const auto &found :
+  for (const auto found :
            getDirectlyInheritedNominalTypeDecls(
              const_cast<ProtocolDecl *>(this), anyObject)) {
     if (auto proto = dyn_cast<ProtocolDecl>(found.second)) {
@@ -3758,12 +3758,14 @@ bool ProtocolDecl::requiresClassSlow() {
     getDirectlyInheritedNominalTypeDecls(this, anyObject);
 
   // Quick check: do we inherit AnyObject?
-  if (anyObject)
-    return Bits.ProtocolDecl.RequiresClass = true;
+  if (anyObject) {
+    Bits.ProtocolDecl.RequiresClass = true;
+    return true;
+  }
 
   // Look through all of the inherited nominals for a superclass or a
   // class-bound protocol.
-  for (const auto &found : allInheritedNominals) {
+  for (const auto found : allInheritedNominals) {
     // Superclass bound.
     if (isa<ClassDecl>(found.second))
       return Bits.ProtocolDecl.RequiresClass = true;

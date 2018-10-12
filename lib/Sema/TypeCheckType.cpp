@@ -3083,9 +3083,12 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
   Type sugaredBaseTy = baseTy;
 
   // For type members of a base class, make sure we use the right
-  // derived class as the parent type.
-  if (auto *ownerClass = member->getDeclContext()->getSelfClassDecl()) {
-    baseTy = baseTy->getSuperclassForDecl(ownerClass, useArchetypes);
+  // derived class as the parent type. If the base type is an error
+  // type, we have an invalid extension, so do nothing.
+  if (!baseTy->is<ErrorType>()) {
+    if (auto *ownerClass = member->getDeclContext()->getSelfClassDecl()) {
+      baseTy = baseTy->getSuperclassForDecl(ownerClass, useArchetypes);
+    }
   }
 
   if (baseTy->is<ModuleType>()) {
