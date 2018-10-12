@@ -1,5 +1,3 @@
-// REQUIRES: rdar39260564
-
 // RUN: %sourcekitd-test -req=track-compiles == -req=sema %s -- %s | %FileCheck %s -check-prefix=NODIAGS
 // NODIAGS: key.notification: source.notification.compile-did-finish
 // NODIAGS-NEXT: key.diagnostics: [
@@ -75,9 +73,9 @@
 // INVALID_ARG_CLANG-NEXT: key.diagnostics: [
 // INVALID_ARG_CLANG-NEXT:   {
 // INVALID_ARG_CLANG-NEXT:     key.filepath: "<unknown>"
-// INVALID_ARG_CLANG-NEXT:     key.severity: source.diagnostic.severity.warning,
+// INVALID_ARG_CLANG-NEXT:     key.severity: source.diagnostic.severity.error,
 // INVALID_ARG_CLANG-NEXT:     key.offset: 0
-// INVALID_ARG_CLANG-NEXT:     key.description: "argument unused
+// INVALID_ARG_CLANG-NEXT:     key.description: "unknown argument
 
 // Ignore the spurious -wmo + -enable-batch-mode warning.
 // RUN: %sourcekitd-test -req=track-compiles == -req=sema %s -- %s -enable-batch-mode | %FileCheck %s -check-prefix=NODIAGS
