@@ -62,13 +62,6 @@ function(_report_sdk prefix)
     endif()
   endif()
   message(STATUS "  Object Format: ${SWIFT_SDK_${prefix}_OBJECT_FORMAT}")
-  foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
-    if(SWIFT_SDK_${prefix}_ARCH_${arch}_LINKER)
-      message(STATUS "  Linker (${arch}): ${SWIFT_SDK_${prefix}_ARCH_${arch}_LINKER}")
-    else()
-      message(STATUS "  Linker (${arch}): ${CMAKE_LINKER}")
-    endif()
-  endforeach()
 
   foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
     message(STATUS
@@ -205,11 +198,6 @@ macro(configure_sdk_unix name architectures)
       endif()
       set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_PREBUILT_PATH
           "${SWIFT_ANDROID_NDK_PATH}/toolchains/${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE}-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/${_swift_android_prebuilt_build}")
-
-      # Resolve the correct linker based on the file name of CMAKE_LINKER (being 'ld' or 'ld.gold' the options)
-      get_filename_component(SWIFT_ANDROID_LINKER_NAME "${CMAKE_LINKER}" NAME)
-      set(SWIFT_SDK_ANDROID_ARCH_${arch}_LINKER
-          "${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_PREBUILT_PATH}/bin/${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE}-${SWIFT_ANDROID_LINKER_NAME}")
     else()
       if(NOT SWIFT_SDK_${prefix}_ARCH_${arch}_PATH)
         set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "/")

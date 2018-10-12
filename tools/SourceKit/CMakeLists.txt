@@ -107,9 +107,9 @@ if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
                         CMAKE_ARGS
                           -DCMAKE_AR=${CMAKE_AR}
                           -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-                          -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                          -DCMAKE_C_COMPILER=${PATH_TO_CLANG_BUILD}/bin/clang
                           -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
-                          -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                          -DCMAKE_CXX_COMPILER=${PATH_TO_CLANG_BUILD}/bin/clang++
                           -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
                           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
                           -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
