@@ -98,8 +98,10 @@ ParseableInterfaceModuleLoader::configureSubInvocationAndOutputPath(
   auto &FEOpts = SubInvocation.getFrontendOptions();
   FEOpts.RequestedAction = FrontendOptions::ActionType::EmitModuleOnly;
   FEOpts.InputsAndOutputs.addPrimaryInputFile(InPath);
-  FEOpts.InputsAndOutputs.setMainAndSupplementaryOutputs(
-    {OutPath.str()}, {SupplementaryOutputPaths()});
+  SupplementaryOutputPaths SOPs;
+  SOPs.ModuleOutputPath = OutPath.str();
+  StringRef MainOut = "/dev/null";
+  FEOpts.InputsAndOutputs.setMainAndSupplementaryOutputs({MainOut}, {SOPs});
 }
 
 // FIXME: this needs to be a more extensive up-to-date check.
