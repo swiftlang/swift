@@ -206,15 +206,15 @@ class BenchmarkDriver(object):
         def console_log(values):
             print(format(values))
 
-        console_log(['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'Q1(μs)',  # header
-                     'MEDIAN(μs)', 'Q3(μs)', 'MAX(μs)', 'MAX_RSS(B)'])
-
         def result_values(r):
             return map(str, [r.test_num, r.name, r.num_samples, r.min,
                              r.samples.q1, r.median, r.samples.q3, r.max,
                              r.max_rss])
 
-        results = []
+        header = ['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'Q1(μs)', 'MEDIAN(μs)',
+                  'Q3(μs)', 'MAX(μs)', 'MAX_RSS(B)']
+        console_log(header)
+        results = [header]
         for test in self.tests:
             result = result_values(self.run_independent_samples(test))
             console_log(result)

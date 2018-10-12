@@ -306,12 +306,13 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         with captured_output() as (out, _):
             log = driver.run_and_log()
 
+        header = '#,TEST,SAMPLES,MIN(μs),Q1(μs),MEDIAN(μs),Q3(μs),MAX(μs),' +\
+            'MAX_RSS(B)\n'
         csv_log = '3,b1,5,101,102,103,104,105,888\n'
         self.assertEquals(log, None)
         self.assertEquals(
             out.getvalue(),
-            '#,TEST,SAMPLES,MIN(μs),Q1(μs),MEDIAN(μs),Q3(μs),MAX(μs),' +
-            'MAX_RSS(B)\n' +
+            header +
             csv_log +
             '\n' +
             'Total performance tests executed: 1\n')
@@ -319,7 +320,7 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         with captured_output() as (out, _):
             log = driver.run_and_log(csv_console=False)
 
-        self.assertEquals(log, csv_log)
+        self.assertEquals(log, header + csv_log)
         self.assertEquals(
             out.getvalue(),
             '  # TEST                      SAMPLES MIN(μs) Q1(μs)' +
