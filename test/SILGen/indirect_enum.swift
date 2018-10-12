@@ -152,8 +152,7 @@ func switchTreeA<T>(_ x: TreeA<T>) {
   // --           x +2
   // CHECK:       [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:       [[BORROWED_ARG_COPY:%.*]] = begin_borrow [[ARG_COPY]]
-  // CHECK:       [[ARG_COPY_2:%.*]] = copy_value [[BORROWED_ARG_COPY]]
-  // CHECK:       switch_enum [[ARG_COPY_2]] : $TreeA<T>,
+  // CHECK:       switch_enum [[BORROWED_ARG_COPY]] : $TreeA<T>,
   // CHECK:          case #TreeA.Nil!enumelt: [[NIL_CASE:bb1]],
   // CHECK:          case #TreeA.Leaf!enumelt.1: [[LEAF_CASE:bb2]],
   // CHECK:          case #TreeA.Branch!enumelt.1: [[BRANCH_CASE:bb3]],
@@ -163,48 +162,42 @@ func switchTreeA<T>(_ x: TreeA<T>) {
   // CHECK:       br [[OUTER_CONT:bb[0-9]+]]
   case .Nil:
     a()
-  // CHECK:     [[LEAF_CASE]]([[LEAF_BOX:%.*]] : @owned $<τ_0_0> { var τ_0_0 } <T>):
+  // CHECK:     [[LEAF_CASE]]([[LEAF_BOX:%.*]] : @guaranteed $<τ_0_0> { var τ_0_0 } <T>):
   // CHECK:       [[VALUE:%.*]] = project_box [[LEAF_BOX]]
   // CHECK:       copy_addr [[VALUE]] to [initialization] [[X:%.*]] : $*T
   // CHECK:       function_ref @$s13indirect_enum1b{{[_0-9a-zA-Z]*}}F
   // CHECK:       destroy_addr [[X]]
   // CHECK:       dealloc_stack [[X]]
   // --           x +1
-  // CHECK:       destroy_value [[LEAF_BOX]]
   // CHECK:       br [[OUTER_CONT]]
   case .Leaf(let x):
     b(x)
 
-  // CHECK:     [[BRANCH_CASE]]([[NODE_BOX:%.*]] : @owned $<τ_0_0> { var (left: TreeA<τ_0_0>, right: TreeA<τ_0_0>) } <T>):
+  // CHECK:     [[BRANCH_CASE]]([[NODE_BOX:%.*]] : @guaranteed $<τ_0_0> { var (left: TreeA<τ_0_0>, right: TreeA<τ_0_0>) } <T>):
   // CHECK:       [[TUPLE_ADDR:%.*]] = project_box [[NODE_BOX]]
   // CHECK:       [[TUPLE:%.*]] = load_borrow [[TUPLE_ADDR]]
   // CHECK:       ([[LEFT:%.*]], [[RIGHT:%.*]]) = destructure_tuple [[TUPLE]]
-  // CHECK:       [[LEFT_COPY:%.*]] = copy_value [[LEFT]]
-  // CHECK:       switch_enum [[LEFT_COPY]] : $TreeA<T>,
+  // CHECK:       switch_enum [[LEFT]] : $TreeA<T>,
   // CHECK:          case #TreeA.Leaf!enumelt.1: [[LEAF_CASE_LEFT:bb[0-9]+]],
   // CHECK:          default [[FAIL_LEFT:bb[0-9]+]]
 
-  // CHECK:     [[LEAF_CASE_LEFT]]([[LEFT_LEAF_BOX:%.*]] : @owned $<τ_0_0> { var τ_0_0 } <T>):
+  // CHECK:     [[LEAF_CASE_LEFT]]([[LEFT_LEAF_BOX:%.*]] : @guaranteed $<τ_0_0> { var τ_0_0 } <T>):
   // CHECK:       [[LEFT_LEAF_VALUE:%.*]] = project_box [[LEFT_LEAF_BOX]]
-  // CHECK:       [[RIGHT_COPY:%.*]] = copy_value [[RIGHT]]
-  // CHECK:       switch_enum [[RIGHT_COPY]] : $TreeA<T>,
+  // CHECK:       switch_enum [[RIGHT]] : $TreeA<T>,
   // CHECK:          case #TreeA.Leaf!enumelt.1: [[LEAF_CASE_RIGHT:bb[0-9]+]],
   // CHECK:          default [[FAIL_RIGHT:bb[0-9]+]]
 
-  // CHECK:     [[LEAF_CASE_RIGHT]]([[RIGHT_LEAF_BOX:%.*]] : @owned $<τ_0_0> { var τ_0_0 } <T>):
+  // CHECK:     [[LEAF_CASE_RIGHT]]([[RIGHT_LEAF_BOX:%.*]] : @guaranteed $<τ_0_0> { var τ_0_0 } <T>):
   // CHECK:       [[RIGHT_LEAF_VALUE:%.*]] = project_box [[RIGHT_LEAF_BOX]]
   // CHECK:       copy_addr [[LEFT_LEAF_VALUE]]
   // CHECK:       copy_addr [[RIGHT_LEAF_VALUE]]
   // --           x +1
-  // CHECK:       destroy_value [[NODE_BOX]]
   // CHECK:       br [[OUTER_CONT]]
 
-  // CHECK:     [[FAIL_RIGHT]]([[DEFAULT_VAL:%.*]] :
-  // CHECK:       destroy_value [[DEFAULT_VAL]]
+  // CHECK:     [[FAIL_RIGHT]]([[DEFAULT_VAL:%.*]] : @guaranteed
   // CHECK:       br [[DEFAULT:bb[0-9]+]]
 
-  // CHECK:     [[FAIL_LEFT]]([[DEFAULT_VAL:%.*]] :
-  // CHECK:       destroy_value [[DEFAULT_VAL]]
+  // CHECK:     [[FAIL_LEFT]]([[DEFAULT_VAL:%.*]] : @guaranteed
   // CHECK:       br [[DEFAULT]]
 
   case .Branch(.Leaf(let x), .Leaf(let y)):
