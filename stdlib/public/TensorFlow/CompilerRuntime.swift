@@ -111,7 +111,7 @@ public enum _RuntimeConfig {
 
   /// When true, uses the TF eager C API, and TF interpreter backend.
   /// Otherwise uses the TF C API, with execution mode set below.
-  static public var usesTFEagerAPI = false
+  static public var usesTFEagerAPI = true
 
   /// Only defined when usesTFEagerAPI == false.
   ///
