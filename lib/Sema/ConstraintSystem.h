@@ -441,6 +441,8 @@ enum ScoreKind {
   SK_Fix,
   /// A reference to an @unavailable declaration.
   SK_Unavailable,
+  /// A reference to a deprecated declaration.
+  SK_Deprecated,
   /// An implicit force of an implicitly unwrapped optional value.
   SK_ForceUnchecked,
   /// A user-defined conversion.
@@ -449,10 +451,10 @@ enum ScoreKind {
   SK_FunctionConversion,
   /// A literal expression bound to a non-default literal type.
   SK_NonDefaultLiteral,
-  /// An implicit upcast conversion between collection types.
-  SK_CollectionUpcastConversion,
   /// A value-to-optional conversion.
   SK_ValueToOptional,
+  /// An implicit upcast conversion between collection types.
+  SK_CollectionUpcastConversion,
   /// A conversion to an empty existential type ('Any' or '{}').
   SK_EmptyExistentialConversion,
   /// A key path application subscript.
