@@ -1138,13 +1138,20 @@ static bool parseReverseDifferentiableAttr(
     P.consumeToken();
     if (parseFnName(AdjName)) return true;
   }
+  // Parse optional 'primitive'.
+  bool adjointIsPrimitive = false;
+  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "primitive") {
+    P.consumeToken();
+    adjointIsPrimitive = true;
+  }
   // Parse ']'.
   if (P.parseToken(tok::r_square,
                    diag::sil_attr_differentiable_expected_rsquare))
     return true;
   // Create an AdjointAttr and we are done.
   auto *Attr = SILReverseDifferentiableAttr::create(
-      SP.SILMod, {SourceIndex, ParamIndices}, PrimName.str(), AdjName.str());
+      SP.SILMod, {SourceIndex, ParamIndices}, PrimName.str(), AdjName.str(),
+      adjointIsPrimitive);
   DAs.push_back(Attr);
   return false;
 }

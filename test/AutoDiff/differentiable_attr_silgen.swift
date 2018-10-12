@@ -10,7 +10,7 @@ public func foo(_ x: Float, _ y: Float) -> Float {
   return 1
 }
 
-// CHECK-LABEL: sil [reverse_differentiable source 0 wrt 0, 1 primal @foo adjoint @dfoo] @foo
+// CHECK-LABEL: sil [reverse_differentiable source 0 wrt 0, 1 primal @foo adjoint @dfoo primitive] @foo
 
 @_silgen_name("dfoo")
 public func dfoo(_ x: Float, _ y: Float, partial: Float, seed: Float) -> (Float, Float) {
@@ -29,7 +29,7 @@ public func foo_indir_ret<T>(_ x: Float, _ y: T) -> T {
   return y
 }
 
-// CHECK-LABEL: sil [reverse_differentiable source 0 wrt 0, 1 primal @foo_indir_ret adjoint @dfoo_indir_ret] @foo_indir_ret : $@convention(thin) <T> (Float, @in_guaranteed T) -> @out T {
+// CHECK-LABEL: sil [reverse_differentiable source 0 wrt 0, 1 primal @foo_indir_ret adjoint @dfoo_indir_ret primitive] @foo_indir_ret : $@convention(thin) <T> (Float, @in_guaranteed T) -> @out T {
 // CHECK: bb0(%0 : @trivial $*T, %1 : @trivial $Float, %2 : @trivial $*T):
 
 @_silgen_name("dfoo_indir_ret")
@@ -50,7 +50,7 @@ public func foo_tuple(_ x: ((Float, (Float, Float)), Float, ((Float))), _ y: Flo
   return 1
 }
 
-// CHECK-LABEL: sil [reverse_differentiable source 0 wrt 0, 1, 2, 3, 4, 5 primal @foo_tuple adjoint @dfoo_tuple] @foo_tuple : $@convention(thin) (Float, Float, Float, Float, Float, Float) -> Float
+// CHECK-LABEL: sil [reverse_differentiable source 0 wrt 0, 1, 2, 3, 4, 5 primal @foo_tuple adjoint @dfoo_tuple primitive] @foo_tuple : $@convention(thin) (Float, Float, Float, Float, Float, Float) -> Float
 
 @_silgen_name("dfoo_tuple")
 public func dfoo_tuple(_ x: ((Float, (Float, Float)), Float, ((Float))), _ y: Float, partial: Float, seed: Float) -> (((Float, (Float, Float)), Float, ((Float))), Float) {

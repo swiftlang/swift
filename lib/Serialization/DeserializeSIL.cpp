@@ -628,11 +628,13 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     uint64_t primalNameId;
     uint64_t adjointNameId;
+    bool adjointIsPrimitive;
     uint64_t source;
     ArrayRef<uint64_t> parameters;
     SILReverseDifferentiableAttrLayout::readRecord(scratch, primalNameId,
-                                                   adjointNameId, source,
-                                                   parameters);
+                                                   adjointNameId,
+                                                   adjointIsPrimitive,
+                                                   source, parameters);
 
     StringRef primalName = MF->getIdentifier(primalNameId).str();
     StringRef adjointName = MF->getIdentifier(adjointNameId).str();
@@ -642,7 +644,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     SILReverseAutoDiffIndices indices(source, parametersBitVector);
 
     auto *attr = SILReverseDifferentiableAttr::create(SILMod, indices,
-                                                      primalName, adjointName);
+                                                      primalName, adjointName,
+                                                      adjointIsPrimitive);
     fn->addReverseDifferentiableAttr(attr);
   }
 

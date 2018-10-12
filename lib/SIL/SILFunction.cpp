@@ -60,18 +60,22 @@ void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
 SILReverseDifferentiableAttr::
 SILReverseDifferentiableAttr(const SILReverseAutoDiffIndices &indices,
                              StringRef primalName,
-                             StringRef adjointName)
-  : indices(indices), PrimalName(primalName), AdjointName(adjointName) {}
+                             StringRef adjointName,
+                             bool adjointIsPrimitive)
+  : indices(indices), PrimalName(primalName), AdjointName(adjointName),
+    AdjointIsPrimitive(adjointIsPrimitive) {}
 
 SILReverseDifferentiableAttr *
 SILReverseDifferentiableAttr::create(SILModule &M,
                                      const SILReverseAutoDiffIndices &indices,
                                      StringRef primalName,
-                                     StringRef adjointName) {
+                                     StringRef adjointName,
+                                     bool adjointIsPrimitive) {
   void *mem = M.allocate(sizeof(SILReverseDifferentiableAttr),
                          alignof(SILReverseDifferentiableAttr));
   return ::new (mem)
-      SILReverseDifferentiableAttr(indices, primalName, adjointName);
+      SILReverseDifferentiableAttr(indices, primalName, adjointName,
+                                   adjointIsPrimitive);
 }
 
 SILFunction *SILFunction::create(

@@ -119,23 +119,31 @@ private:
   SILReverseAutoDiffIndices indices;
   /// The primal and adjoint function names.
   StringRef PrimalName, AdjointName;
-  
+  /// Whether the adjoint is primitive.
+  bool AdjointIsPrimitive;
+
   SILReverseDifferentiableAttr(const SILReverseAutoDiffIndices &indices,
                                StringRef primalName,
-                               StringRef adjointName);
+                               StringRef adjointName,
+                               bool adjointIsPrimitive);
 
 public:
   static SILReverseDifferentiableAttr *create(
       SILModule &M, const SILReverseAutoDiffIndices &indices,
-      StringRef primalName = StringRef(), StringRef adjointName = StringRef());
-  
+      StringRef primalName = StringRef(), StringRef adjointName = StringRef(),
+      bool adjointIsPrimitive = false);
+
   bool hasPrimal() const { return !PrimalName.empty(); }
   StringRef getPrimalName() const { assert(hasPrimal()); return PrimalName; }
   void setPrimalName(StringRef name) { PrimalName = name; }
 
   bool hasAdjoint() const { return !AdjointName.empty(); }
+  bool isAdjointPrimitive() const { return AdjointIsPrimitive; }
   StringRef getAdjointName() const { assert(hasAdjoint()); return AdjointName; }
-  void setAdjointName(StringRef name) { AdjointName = name; }
+  void setAdjointName(StringRef name, bool primitive) {
+    AdjointName = name;
+    AdjointIsPrimitive = primitive;
+  }
 
   const SILReverseAutoDiffIndices &getIndices() const { return indices; }
 
