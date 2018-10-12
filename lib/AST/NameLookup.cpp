@@ -2542,6 +2542,8 @@ DirectlyReferencedTypeDecls UnderlyingTypeDeclsReferencedRequest::evaluate(
 llvm::Expected<ClassDecl *>
 SuperclassDeclRequest::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *subject) const {
+  auto &Ctx = subject->getASTContext();
+
   for (unsigned i : indices(subject->getInherited())) {
     // Find the inherited declarations referenced at this position.
     auto inheritedTypes = evaluateOrDefault(evaluator,
@@ -2551,7 +2553,7 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
     SmallVector<ModuleDecl *, 2> modulesFound;
     bool anyObject = false;
     auto inheritedNominalTypes
-      = resolveTypeDeclsToNominal(evaluator, subject->getASTContext(),
+      = resolveTypeDeclsToNominal(evaluator, Ctx,
                                   inheritedTypes, modulesFound, anyObject);
 
     // Look for a class declaration.
@@ -2560,6 +2562,16 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
         return classDecl;
     }
   }
+
+  // Protocols also support '... where Self : Superclass'.
+  auto *proto = dyn_cast<ProtocolDecl>(subject);
+  if (proto == nullptr)
+    return nullptr;
+
+  auto selfBounds = getSelfBoundsFromWhereClause(proto);
+  for (auto inheritedNominal : selfBounds.decls)
+    if (auto classDecl = dyn_cast<ClassDecl>(inheritedNominal))
+      return classDecl;
 
   return nullptr;
 }
@@ -2640,6 +2652,19 @@ swift::getDirectlyInheritedNominalTypeDecls(
   for (unsigned i : range(numInherited)) {
     getDirectlyInheritedNominalTypeDecls(decl, i, result, anyObject);
   }
+
+  auto *protoDecl = dyn_cast_or_null<ProtocolDecl>(typeDecl);
+  if (protoDecl == nullptr)
+    return result;
+
+  // FIXME: Refactor SelfBoundsFromWhereClauseRequest to dig out
+  // the source location.
+  SourceLoc loc = SourceLoc();
+  auto selfBounds = getSelfBoundsFromWhereClause(decl);
+  anyObject |= selfBounds.anyObject;
+
+  for (auto inheritedNominal : selfBounds.decls)
+    result.emplace_back(loc, inheritedNominal);
 
   return result;
 }

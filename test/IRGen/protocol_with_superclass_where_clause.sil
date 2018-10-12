@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -module-name protocol_with_superclass | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime -DINT=i%target-ptrsize
 
 sil_stage canonical
 
@@ -11,11 +11,11 @@ class Concrete {}
 
 class SubConcrete : Concrete {}
 
-protocol SuperProto : AnyObject {}
+protocol SuperProto where Self : AnyObject {}
 
-protocol ProtoRefinesClass : SuperProto, Concrete {}
+protocol ProtoRefinesClass where Self : SuperProto, Self : Concrete {}
 
-protocol SubProto : ProtoRefinesClass {}
+protocol SubProto where Self : ProtoRefinesClass {}
 
 protocol OtherProto {}
 
