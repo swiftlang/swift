@@ -54,15 +54,86 @@ static Demangler getDemanglerForRuntimeTypeResolution() {
   // Resolve symbolic references to type contexts into the absolute address of
   // the type context descriptor, so that if we see a symbolic reference in the
   // mangled name we can immediately find the associated metadata.
-  dem.setSymbolicReferenceResolver([&](int32_t offset,
-                                       const void *base) -> NodePointer {
-    auto absolute_addr = (uintptr_t)detail::applyRelativeOffset(base, offset);
-    auto reference = dem.createNode(Node::Kind::SymbolicReference, absolute_addr);
-    auto type = dem.createNode(Node::Kind::Type);
-    type->addChild(reference, dem);
-    return type;
-  });
+  dem.setSymbolicReferenceResolver(ResolveAsSymbolicReference(dem));
   return dem;
+}
+
+NodePointer
+ResolveAsSymbolicReference::operator()(SymbolicReferenceKind kind,
+                                       Directness isIndirect,
+                                       int32_t offset,
+                                       const void *base) {
+  // Resolve the absolute pointer to the entity being referenced.
+  auto ptr = detail::applyRelativeOffset(base, offset);
+  if (isIndirect == Directness::Indirect) {
+    ptr = *(const uintptr_t *)ptr;
+  }
+
+  // Figure out this symbolic reference's grammatical role.
+  Node::Kind nodeKind;
+  bool isType;
+  switch (kind) {
+  case Demangle::SymbolicReferenceKind::Context: {
+    auto descriptor = (const ContextDescriptor *)ptr;
+    switch (descriptor->getKind()) {
+    case ContextDescriptorKind::Protocol:
+      nodeKind = Node::Kind::ProtocolSymbolicReference;
+      isType = false;
+      break;
+      
+    default:
+      if (auto typeContext = dyn_cast<TypeContextDescriptor>(descriptor)) {
+        nodeKind = Node::Kind::TypeSymbolicReference;
+        isType = true;
+        break;
+      }
+      
+      // References to other kinds of context aren't yet implemented.
+      return nullptr;
+    }
+    break;
+  }
+  }
+  
+  auto node = Dem.createNode(nodeKind, ptr);
+  if (isType) {
+    auto typeNode = Dem.createNode(Node::Kind::Type);
+    typeNode->addChild(node, Dem);
+    node = typeNode;
+  }
+  return node;
+}
+
+static NodePointer
+_buildDemanglingForSymbolicReference(SymbolicReferenceKind kind,
+                                     const void *resolvedReference,
+                                     Demangler &Dem) {
+  switch (kind) {
+  case SymbolicReferenceKind::Context:
+    return _buildDemanglingForContext(
+      (const ContextDescriptor *)resolvedReference, {}, Dem);
+  }
+  
+  swift_runtime_unreachable("invalid symbolic reference kind");
+}
+  
+NodePointer
+ResolveToDemanglingForContext::operator()(SymbolicReferenceKind kind,
+                                          Directness isIndirect,
+                                          int32_t offset,
+                                          const void *base) {
+  auto ptr = detail::applyRelativeOffset(base, offset);
+  if (isIndirect == Directness::Indirect) {
+    ptr = *(const uintptr_t *)ptr;
+  }
+  
+  return _buildDemanglingForSymbolicReference(kind, (const void *)ptr, Dem);
+}
+
+NodePointer
+ExpandResolvedSymbolicReferences::operator()(SymbolicReferenceKind kind,
+                                             const void *ptr) {
+  return _buildDemanglingForSymbolicReference(kind, (const void *)ptr, Dem);
 }
 
 #pragma mark Nominal type descriptor cache
@@ -310,10 +381,13 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
       node = node->getChild(0);
     
     // We can directly match symbolic references to the current context.
-    if (node && node->getKind() == Demangle::Node::Kind::SymbolicReference) {
-      if (equalContexts(context, reinterpret_cast<const ContextDescriptor *>(
-                                     node->getIndex()))) {
-        return true;
+    if (node) {
+      if (node->getKind() == Demangle::Node::Kind::TypeSymbolicReference
+         || node->getKind() == Demangle::Node::Kind::ProtocolSymbolicReference){
+        if (equalContexts(context,
+               reinterpret_cast<const ContextDescriptor *>(node->getIndex()))) {
+          return true;
+        }
       }
     }
 
@@ -518,17 +592,12 @@ _findNominalTypeDescriptor(Demangle::NodePointer node,
   NodePointer symbolicNode = node;
   if (symbolicNode->getKind() == Node::Kind::Type)
     symbolicNode = symbolicNode->getChild(0);
-  if (symbolicNode->getKind() == Node::Kind::SymbolicReference)
+  if (symbolicNode->getKind() == Node::Kind::TypeSymbolicReference)
     return cast<TypeContextDescriptor>(
       (const ContextDescriptor *)symbolicNode->getIndex());
 
   auto mangledName =
-    Demangle::mangleNode(node,
-                         [&](const void *context) -> NodePointer {
-                           return _buildDemanglingForContext(
-                               (const ContextDescriptor *) context,
-                               {}, Dem);
-                         });
+    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem));
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.
@@ -653,17 +722,12 @@ _findProtocolDescriptor(const Demangle::NodePointer &node,
   NodePointer symbolicNode = node;
   if (symbolicNode->getKind() == Node::Kind::Type)
     symbolicNode = symbolicNode->getChild(0);
-  if (symbolicNode->getKind() == Node::Kind::SymbolicReference)
+  if (symbolicNode->getKind() == Node::Kind::ProtocolSymbolicReference)
     return cast<ProtocolDescriptor>(
       (const ContextDescriptor *)symbolicNode->getIndex());
 
   mangledName =
-    Demangle::mangleNode(node,
-                         [&](const void *context) -> NodePointer {
-                           return _buildDemanglingForContext(
-                               (const ContextDescriptor *) context,
-                               {}, Dem);
-                         });
+    Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem));
 
   // Look for an existing entry.
   // Find the bucket for the metadata entry.
@@ -1155,13 +1219,23 @@ swift::_getTypeByMangledName(StringRef typeName,
 
   // Check whether this is the convenience syntax "ModuleName.ClassName".
   auto getDotPosForConvenienceSyntax = [&]() -> size_t {
-    size_t dotPos = typeName.find('.');
-    if (dotPos == llvm::StringRef::npos)
-      return llvm::StringRef::npos;
-    if (typeName.find('.', dotPos + 1) != llvm::StringRef::npos)
-      return llvm::StringRef::npos;
-    if (typeName.find('\1') != llvm::StringRef::npos)
-      return llvm::StringRef::npos;
+    size_t dotPos = llvm::StringRef::npos;
+    for (unsigned i = 0; i < typeName.size(); ++i) {
+      // Should only contain one dot.
+      if (typeName[i] == '.') {
+        if (dotPos == llvm::StringRef::npos) {
+          dotPos = i;
+          continue;
+        } else {
+          return llvm::StringRef::npos;
+        }
+      }
+      
+      // Should not contain symbolic references.
+      if ((unsigned char)typeName[i] <= '\x1F') {
+        return llvm::StringRef::npos;
+      }
+    }
     return dotPos;
   };
 
