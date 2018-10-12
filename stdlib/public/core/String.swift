@@ -1249,6 +1249,11 @@ extension String : LosslessStringConvertible {
 
 extension String {
   public // @testable
+  var _nfcCodeUnits: [UInt8] {
+    return _slicedGuts.withNFCCodeUnitsIterator { Array($0) }
+  }
+  
+  public // @testable
   func _withNFCCodeUnits(_ f: (UInt8) throws -> Void) rethrows {
     try _gutsSlice.withNFCCodeUnitsIterator_2 {
       for cu in $0 {

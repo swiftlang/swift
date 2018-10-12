@@ -18,16 +18,12 @@ import StdlibUnittest
 import StdlibUnicodeUnittest
 
 private func expectEqualIterators(expected: [UInt8], others: [[UInt8]]) {
-  expected.withUnsafeBufferPointer { expectedBuffer in
-    for other in others {
-      other.withUnsafeBufferPointer { otherBuffer in
-        let expectedIterator = 
-          _NormalizedUTF8CodeUnitIterator(expectedBuffer, range: 0..<expectedBuffer.count)
-        let otherIterator = 
-          _NormalizedUTF8CodeUnitIterator(otherBuffer, range: 0..<otherBuffer.count)
-        expectEqual(Array(expectedIterator), Array(otherIterator))
-      }
-    }
+  let expectedString = String(decoding: expected, as: UTF8.self)
+  let expectedCodeUnits = expectedString._nfcCodeUnits
+  
+  for other in others {
+    let otherString = String(decoding: other, as: UTF8.self)
+    expectEqual(expectedCodeUnits, otherString._nfcCodeUnits)
   }
 }
 
