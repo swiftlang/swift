@@ -19,9 +19,6 @@ var DatasetGlobalTests = TestSuite("DatasetGlobal")
 // Fatal error: No unary variant device copy function found for direction: 1 and Variant type_name: tensorflow::DatasetVariantWrapper
 #if !CUDA
 
-// Global code must turn on eager mode explicitly (until when we change the
-// default mode to eager).
-_RuntimeConfig.usesTFEagerAPI = true
 let scalars = Tensor<Float>([0, 1, 2])
 let dataset = Dataset(elements: scalars)
 var iterator = dataset.makeIterator()
