@@ -255,9 +255,6 @@ class LinkEntity {
     /// The secondary pointer is a ProtocolConformance*.
     GenericProtocolWitnessTableInstantiationFunction,
 
-    /// A list of key/value pairs that resiliently specify a witness table.
-    ResilientProtocolWitnessTable,
-
     /// A function which returns the witness table for a protocol-constrained
     /// associated type of a protocol.  The secondary pointer is a
     /// ProtocolConformance*.  The index of the associated conformance
@@ -745,13 +742,6 @@ public:
   forGenericProtocolWitnessTableCache(const ProtocolConformance *C) {
     LinkEntity entity;
     entity.setForProtocolConformance(Kind::GenericProtocolWitnessTableCache, C);
-    return entity;
-  }
-
-  static LinkEntity
-  forResilientProtocolWitnessTable(const ProtocolConformance *C) {
-    LinkEntity entity;
-    entity.setForProtocolConformance(Kind::ResilientProtocolWitnessTable, C);
     return entity;
   }
 

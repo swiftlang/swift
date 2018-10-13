@@ -11,7 +11,7 @@ import gizmo
 // CHECK: @"$sSo16NSRuncingOptionsVMn" = linkonce_odr hidden constant
 // CHECK: @"$sSo16NSRuncingOptionsVN" = linkonce_odr hidden constant
 //   CHECK-SAME: @"$sBi{{[0-9]+}}_WV"
-// CHECK: @"$sSo16NSRuncingOptionsVSQSCMc" = linkonce_odr hidden constant %swift.protocol_conformance_descriptor { {{.*}}@"$sSo16NSRuncingOptionsVSQSCWa
+// CHECK: @"$sSo16NSRuncingOptionsVSQSCMc" = linkonce_odr hidden constant{{.*}}@"$sSo16NSRuncingOptionsVSQSCWa
 // CHECK-NOT: @"$sSo28NeverActuallyMentionedByNameVSQSCWp" = linkonce_odr hidden constant
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} i32 @main

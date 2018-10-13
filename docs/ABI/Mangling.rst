@@ -86,7 +86,7 @@ Globals
 
   global ::= protocol-conformance 'WG'   // generic protocol witness table
   global ::= protocol-conformance 'Wp'   // protocol witness table pattern
-  global ::= protocol-conformance 'Wr'   // resilient witness table
+  global ::= protocol-conformance 'Wr'   // resilient witness table (HISTORICAL)
   global ::= protocol-conformance 'WI'   // generic protocol witness table instantiation function
   global ::= type protocol-conformance 'WL'   // lazy protocol witness table cache variable
 

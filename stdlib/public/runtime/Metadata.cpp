@@ -3793,7 +3793,7 @@ public:
   }
 
   static size_t getWitnessTableSize(GenericWitnessTable *genericTable) {
-    auto protocol = genericTable->Protocol.get();
+    auto protocol = genericTable->getProtocol();
     size_t numPrivateWords = genericTable->getWitnessTablePrivateSizeInWords();
     size_t numRequirementWords =
       WitnessTableFirstRequirementOffset + protocol->NumRequirements;
@@ -3832,14 +3832,15 @@ static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
   }
 
   // If we have resilient witnesses, we require instantiation.
-  if (!genericTable->ResilientWitnesses.isNull()) {
+  auto conformance = genericTable->getConformance();
+  if (!conformance->getResilientWitnesses().empty()) {
     return false;
   }
 
   // If we don't have the exact number of witnesses expected, we require
   // instantiation.
   if (genericTable->WitnessTableSizeInWords !=
-          (genericTable->Protocol->NumRequirements +
+          (conformance->getProtocol()->NumRequirements +
            WitnessTableFirstRequirementOffset)) {
     return false;
   }
@@ -3858,12 +3859,11 @@ static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
 /// witnesses stored in the generic witness table structure itself.
 static void initializeResilientWitnessTable(GenericWitnessTable *genericTable,
                                             void **table) {
-  auto protocol = genericTable->Protocol.get();
+  auto conformance = genericTable->getConformance();
+  auto protocol = conformance->getProtocol();
 
   auto requirements = protocol->getRequirements();
-  llvm::ArrayRef<TargetResilientWitness<InProcess>> witnesses;
-  if (auto resilientWitnesses = genericTable->ResilientWitnesses.get())
-    witnesses = resilientWitnesses->getWitnesses();
+  auto witnesses = conformance->getResilientWitnesses();
 
   // Loop over the provided witnesses, filling in appropriate entry.
   for (const auto &witness : witnesses) {
@@ -3913,7 +3913,7 @@ WitnessTableCacheEntry::allocate(GenericWitnessTable *genericTable,
   // The number of witnesses provided by the table pattern.
   size_t numPatternWitnesses = genericTable->WitnessTableSizeInWords;
 
-  auto protocol = genericTable->Protocol.get();
+  auto protocol = genericTable->getProtocol();
 
   // The total number of requirements.
   size_t numRequirements =
