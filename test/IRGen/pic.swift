@@ -51,3 +51,12 @@ public func use_global() -> Int {
 // arm64:        str [[REG2]], [sp]
 // arm64:        bl _swift_endAccess
 // arm64:        ldr x0, [sp]
+
+// aarch64-LABEL: $s4main10use_globalSiyF:
+// aarch64:        adrp [[REG1:x[0-9]+]], ($s4main6globalSivp@PAGE)
+// aarch64:        add [[REG1]], [[REG1]], :lo12:($s4main6globalSivp)
+// aarch64:        bl swift_beginAccess
+// aarch64:        ldr [[REG2:x[0-9]+]], {{\[}}[[REG1]]{{\]}}
+// aarch64:        str [[REG2]], [sp]
+// aarch64:        bl swift_endAccess
+// aarch64:        ldr x0, [sp]
