@@ -1454,16 +1454,9 @@ SourceLoc RequirementSource::getLoc() const {
   if (auto typeRepr = getTypeRepr())
     return typeRepr->getStartLoc();
 
-  if (auto requirementRepr = getRequirementRepr()) {
-    switch (requirementRepr->getKind()) {
-    case RequirementReprKind::LayoutConstraint:
-    case RequirementReprKind::TypeConstraint:
-      return requirementRepr->getColonLoc();
+  if (auto requirementRepr = getRequirementRepr())
+    return requirementRepr->getSeparatorLoc();
 
-    case RequirementReprKind::SameType:
-      return requirementRepr->getEqualLoc();
-    }
-  }
   if (parent)
     return parent->getLoc();
 
@@ -1681,22 +1674,24 @@ const RequirementSource *FloatingRequirementSource::getSource(
 }
 
 SourceLoc FloatingRequirementSource::getLoc() const {
+  // For an explicit abstract protocol source, we can get a more accurate source
+  // location from the written protocol requirement.
+  if (kind == Kind::AbstractProtocol && isExplicit()) {
+    auto written = protocolReq.written;
+    if (auto typeRepr = written.dyn_cast<const TypeRepr *>())
+      return typeRepr->getLoc();
+    if (auto requirementRepr = written.dyn_cast<const RequirementRepr *>())
+      return requirementRepr->getSeparatorLoc();
+  }
+
   if (auto source = storage.dyn_cast<const RequirementSource *>())
     return source->getLoc();
 
   if (auto typeRepr = storage.dyn_cast<const TypeRepr *>())
     return typeRepr->getLoc();
 
-  if (auto requirementRepr = storage.dyn_cast<const RequirementRepr *>()) {
-    switch (requirementRepr->getKind()) {
-    case RequirementReprKind::LayoutConstraint:
-    case RequirementReprKind::TypeConstraint:
-      return requirementRepr->getColonLoc();
-
-    case RequirementReprKind::SameType:
-      return requirementRepr->getEqualLoc();
-    }
-  }
+  if (auto requirementRepr = storage.dyn_cast<const RequirementRepr *>())
+    return requirementRepr->getSeparatorLoc();
 
   return SourceLoc();
 }
@@ -4586,7 +4581,7 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirement(
       Impl->HadAnyError = true;
 
       Diags.diagnose(source.getLoc(), diag::requires_not_suitable_archetype,
-                     TypeLoc::withoutLoc(concreteType));
+                     concreteType);
       return ConstraintResult::Concrete;
     }
 
@@ -4719,8 +4714,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
 
       Impl->HadAnyError = true;
       Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
-                     TypeLoc::withoutLoc(subjectType),
-                     TypeLoc::withoutLoc(constraintType));
+                     subjectType, constraintType);
     }
 
     return ConstraintResult::Conflicting;
@@ -4768,7 +4762,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
       if (source.getLoc().isValid()) {
         Impl->HadAnyError = true;
         Diags.diagnose(source.getLoc(), diag::requires_not_suitable_archetype,
-                       TypeLoc::withoutLoc(subjectType));
+                       subjectType);
       }
 
       return ConstraintResult::Concrete;
@@ -5356,7 +5350,7 @@ GenericSignatureBuilder::addRequirement(const Requirement &req,
         !req.getSecondType()->hasTypeParameter() &&
         !req.getFirstType()->hasError() &&
         !req.getSecondType()->hasError()) {
-      Diags.diagnose(reqRepr->getEqualLoc(),
+      Diags.diagnose(reqRepr->getSeparatorLoc(),
                      diag::requires_no_same_type_archetype,
                      req.getFirstType(), req.getSecondType())
         .highlight(reqRepr->getFirstTypeLoc().getSourceRange())

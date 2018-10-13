@@ -1151,14 +1151,6 @@ public:
     return SecondLayout;
   }
 
-  /// \brief Retrieve the location of the ':' in an explicitly-written
-  /// conformance requirement.
-  SourceLoc getColonLoc() const {
-    assert(getKind() == RequirementReprKind::TypeConstraint ||
-           getKind() == RequirementReprKind::LayoutConstraint);
-    return SeparatorLoc;
-  }
-
   /// \brief Retrieve the first type of a same-type requirement.
   Type getFirstType() const {
     assert(getKind() == RequirementReprKind::SameType);
@@ -1201,10 +1193,9 @@ public:
     return SecondType;
   }
 
-  /// \brief Retrieve the location of the '==' in an explicitly-written
-  /// same-type requirement.
-  SourceLoc getEqualLoc() const {
-    assert(getKind() == RequirementReprKind::SameType);
+  /// \brief Retrieve the location of the ':' or '==' in an explicitly-written
+  /// conformance or same-type requirement respectively.
+  SourceLoc getSeparatorLoc() const {
     return SeparatorLoc;
   }
 
