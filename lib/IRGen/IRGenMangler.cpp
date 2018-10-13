@@ -87,29 +87,19 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
   llvm::SaveAndRestore<std::function<bool (const DeclContext *)>>
     SymbolicReferencesForLocalTypes(CanSymbolicReference);
   
-  if ((!IGM.CurSourceFile || !isa<ClangModuleUnit>(IGM.CurSourceFile))
+  if (IGM.CurSourceFile
+      && !isa<ClangModuleUnit>(IGM.CurSourceFile)
       && !IGM.getOptions().IntegratedREPL) {
     CanSymbolicReference = [&](const DeclContext *dc) -> bool {
-      // Can only symbolically reference nominal type declarations.
-      auto nominal = dyn_cast<NominalTypeDecl>(dc);
-      if (!nominal || isa<ProtocolDecl>(dc))
-        return false;
-
       // Symbolically reference types that are defined in the same file unit
       // as we're referencing from.
-      if (IGM.CurSourceFile &&
-          dc->getModuleScopeContext() == IGM.CurSourceFile)
-        return true;
-
-      // fileprivate and private entities are always in the same file unit
-      // that they're referenced from.
-      if (nominal->getEffectiveAccess() < AccessLevel::Internal)
-        return true;
-
-      // FIXME: We could eventually improve this to reference any type that ends
+      //
+      // We could eventually improve this to reference any type that ends
       // up with its nominal type descriptor in the same linked binary as us,
       // but IRGen doesn't know that with much certainty currently.
-      return false;
+      return dc->getModuleScopeContext() == IGM.CurSourceFile
+        && isa<NominalTypeDecl>(dc)
+        && !isa<ProtocolDecl>(dc);
     };
   }
   
