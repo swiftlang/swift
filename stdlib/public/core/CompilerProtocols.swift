@@ -773,8 +773,10 @@ extension ExpressibleByStringInterpolation
   ///
   ///     let price = 2
   ///     let number = 3
-  ///     let message = "If one cookie costs \(price) dollars, " +
-  ///                   "\(number) cookies cost \(price * number) dollars."
+  ///     let message = """
+  ///                   If one cookie costs \(price) dollars, \
+  ///                   \(number) cookies cost \(price * number) dollars.
+  ///                   """
   ///     print(message)
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   public init(stringInterpolation: DefaultStringInterpolation) {
