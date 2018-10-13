@@ -876,7 +876,11 @@ public protocol StringInterpolationProtocol {
   ///             that appear next in the string literal.
   mutating func appendLiteral(_ literal: StringLiteralType)
 
-  // Informal requirement: mutating func appendInterpolation(...)
+  // Informal requirement: Any desired appendInterpolation overloads, e.g.:
+  // 
+  //   mutating func appendInterpolation<T>(_: T)
+  //   mutating func appendInterpolation(_: Int, radix: Int)
+  //   mutating func appendInterpolation<T: Encodable>(json: T) throws
 }
 
 /// A type that can be initialized using a color literal (e.g.
