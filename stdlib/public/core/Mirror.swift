@@ -547,7 +547,7 @@ extension String {
   ///
   ///     print(String(describing: p))
   ///     // Prints "(21, 30)"
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init<Subject: CustomStringConvertible>(describing instance: Subject) {
     self = instance.description
   }
@@ -591,7 +591,7 @@ extension String {
   ///
   ///     print(String(describing: p))
   ///     // Prints "(21, 30)"
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init<Subject: TextOutputStreamable>(describing instance: Subject) {
     self.init()
     instance.write(to: &self)
@@ -636,7 +636,7 @@ extension String {
   ///
   ///     print(String(describing: p))
   ///     // Prints "(21, 30)"
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init<Subject>(describing instance: Subject)
     where Subject: CustomStringConvertible & TextOutputStreamable
   {

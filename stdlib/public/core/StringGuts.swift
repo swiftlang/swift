@@ -919,7 +919,7 @@ extension _StringGuts {
     reserveCapacitySlow(capacity)
   }
 
-  @usableFromInline // @testable
+  @usableFromInline
   mutating func reserveCapacitySlow(_ capacity: Int) {
     if _fastPath(_isUniqueNative()) {
       if _fastPath(_object.nativeRawStorage.capacity >= capacity) {
@@ -1001,7 +1001,7 @@ extension _StringGuts {
     _appendSlow(other)
   }
 
-  @usableFromInline // @testable
+  @usableFromInline
   internal
   mutating func _appendSlow(_ other: _StringGuts) {
     if _slowPath(other._isOpaque) {

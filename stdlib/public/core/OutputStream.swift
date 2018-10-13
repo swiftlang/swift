@@ -80,7 +80,7 @@ extension TextOutputStream {
   public mutating func _lock() {}
   public mutating func _unlock() {}
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
     write(String._fromASCII(buffer))
   }
