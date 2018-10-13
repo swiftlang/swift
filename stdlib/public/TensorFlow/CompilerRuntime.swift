@@ -111,8 +111,8 @@ public enum _RuntimeConfig {
 
   /// When true, uses the TF eager C API, and TF interpreter backend.
   /// Otherwise uses the TF C API, with execution mode set below.
-  /// NOTE: when this is false, sends/receives for variant and resources tensors
-  /// are not supported and have undefined behavior.
+  // NOTE: when this is false, sends/receives for variant and resources tensors
+  // are not supported and have undefined behavior.
   static public var usesTFEagerAPI = true
 
   /// Only defined when usesTFEagerAPI == false.
