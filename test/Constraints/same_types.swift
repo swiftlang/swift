@@ -240,6 +240,7 @@ func structuralSameType3<T, U, V, W>(_: T, _: U, _: V, _: W)
   where X1<T, U> == X1<V, W> { }
 // expected-error@-1{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}
 // expected-error@-2{{same-type requirement makes generic parameters 'U' and 'W' equivalent}}
+// expected-warning@-3{{neither type in same-type constraint ('X1<T, U>' or 'X1<V, W>') refers to a generic parameter or associated type}}
 
 protocol P2 {
   associatedtype Assoc1
@@ -285,6 +286,7 @@ func test9<T: P6, U: P6>(_ t: T, u: U)
 func testMetatypeSameType<T, U>(_ t: T, _ u: U)
   where T.Type == U.Type { }
 // expected-error@-1{{same-type requirement makes generic parameters 'T' and 'U' equivalent}}
+// expected-warning@-2{{neither type in same-type constraint ('T.Type' or 'U.Type') refers to a generic parameter or associated type}}
 
 func testSameTypeCommutativity1<U, T>(_ t: T, _ u: U)
   where T.Type == U { } // Equivalent to U == T.Type
