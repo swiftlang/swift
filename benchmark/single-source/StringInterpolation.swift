@@ -25,13 +25,13 @@ public let StringInterpolationManySmallSegments = BenchmarkInfo(
   runFunction: run_StringInterpolationManySmallSegments,
   tags: [.validation, .api, .String])
 public let CustomStringInterpolation = BenchmarkInfo(
-	name: "CustomStringInterpolation",
-	runFunction: run_CustomStringInterpolation,
-	tags: [.validation, .api, .String])
+  name: "CustomStringInterpolation",
+  runFunction: run_CustomStringInterpolation,
+  tags: [.validation, .api, .String])
 public let CustomStringNoInterpolation = BenchmarkInfo(
-	name: "CustomStringNoInterpolation",
-	runFunction: run_CustomStringNoInterpolation,
-	tags: [.validation, .api, .String])
+  name: "CustomStringNoInterpolation",
+  runFunction: run_CustomStringNoInterpolation,
+  tags: [.validation, .api, .String])
 
 class RefTypePrintable : CustomStringConvertible {
   var description: String {
@@ -40,11 +40,11 @@ class RefTypePrintable : CustomStringConvertible {
 }
 
 struct CustomString: ExpressibleByStringInterpolation {
-	var value: String
-	
-	init(stringLiteral: String) {
-		self.value = stringLiteral
-	}
+  var value: String
+
+  init(stringLiteral: String) {
+    self.value = stringLiteral
+  }
 }
 
 @inline(never)

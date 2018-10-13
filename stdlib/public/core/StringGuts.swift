@@ -985,7 +985,7 @@ extension _StringGuts {
   mutating func append<S: StringProtocol>(_ other: S) {
     self.append(other._wholeString._guts, range: other._encodedOffsetRange)
   }
-  
+
   @inlinable // @testable
   internal
   mutating func append(_ other: _StringGuts) {

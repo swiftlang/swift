@@ -105,7 +105,9 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
   ///     print(message)
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @inlinable
-  public mutating func appendInterpolation<T: TextOutputStreamable & CustomStringConvertible>(_ value: T) {
+  public mutating func appendInterpolation<T>(_ value: T)
+    where T: TextOutputStreamable, T: CustomStringConvertible
+  {
     value.write(to: &_storage)
   }
   
@@ -125,7 +127,9 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
   ///     print(message)
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @inlinable
-  public mutating func appendInterpolation<T: TextOutputStreamable>(_ value: T) {
+  public mutating func appendInterpolation<T>(_ value: T)
+    where T: TextOutputStreamable
+  {
     value.write(to: &_storage)
   }
   
@@ -147,7 +151,9 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
   ///     print(message)
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @inlinable
-  public mutating func appendInterpolation<T: CustomStringConvertible>(_ value: T) {
+  public mutating func appendInterpolation<T>(_ value: T)
+    where T: CustomStringConvertible
+  {
     _storage += value.description
   }
   
@@ -188,8 +194,8 @@ extension DefaultStringInterpolation: CustomStringConvertible {
   }
 }
 
-// While not strictly necessary, declaring these is faster than using the default
-// implementation.
+// While not strictly necessary, declaring these is faster than using the
+// default implementation.
 extension String {
   /// Creates a new instance from an interpolated string literal.
   /// 
