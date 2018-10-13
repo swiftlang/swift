@@ -1911,11 +1911,11 @@ ERROR(protocol_composition_one_class,none,
 
 ERROR(requires_conformance_nonprotocol,none,
       "type %0 constrained to non-protocol, non-class type %1",
-      (TypeLoc, TypeLoc))
+      (Type, Type))
 ERROR(requires_not_suitable_archetype,none,
       "type %0 in conformance requirement does not refer to a "
       "generic parameter or associated type",
-      (TypeLoc))
+      (Type))
 WARNING(requires_no_same_type_archetype,none,
         "neither type in same-type constraint (%0 or %1) refers to a "
         "generic parameter or associated type",
