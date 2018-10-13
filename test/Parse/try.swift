@@ -196,3 +196,4 @@ _ = "a\()b" // expected-error {{interpolation can throw but is not marked with '
               // expected-note@-1 {{did you mean to use 'try'?}} {{5-5=try }}
               // expected-note@-2 {{did you mean to handle error as optional value?}} {{5-5=try? }}
               // expected-note@-3 {{did you mean to disable error propagation?}} {{5-5=try! }}
+_ = try "\() \(1)"
