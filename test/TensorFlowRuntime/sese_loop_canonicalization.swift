@@ -91,6 +91,9 @@ ControlFlowTests.testAllBackends("sumOfProductsWithBound") {
   expectNearlyEqualWithScalarTensor(36, sumOfProductsWithBound(3, 3, 100))
 }
 
+// Disable this test in macos for now
+// https://bugs.swift.org/browse/SR-8986
+#if !os(macOS)
 
 func doWhileLoopWithBreak(_ breakIndex:Int32) -> Tensor<Int32> {
   var i: Int32 = 1
@@ -113,6 +116,8 @@ ControlFlowTests.testAllBackends("doWhileLoopWithBreak") {
   expectEqualWithScalarTensor(5050, doWhileLoopWithBreak(100))
   expectEqualWithScalarTensor(5050, doWhileLoopWithBreak(200))
 }
+
+#endif // !os(macOS)
 
 func nestedDoWhileLoopWithBreak(
 	_ breakIndex:Int32, _ repetitions: Int32) -> Tensor<Int32> {
