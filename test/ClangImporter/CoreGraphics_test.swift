@@ -100,9 +100,9 @@ public func testRenames(transform: CGAffineTransform, context: CGContext,
   let _ = point.applying(transform)
   var rect = rect.applying(transform)
   let _ = size.applying(transform)
-// CHECK:   %{{.*}} = call { double, double } @CGPointApplyAffineTransform(double %{{.*}}, double %{{.*}}, %struct.CGAffineTransform* {{.*}})
+// CHECK:   %{{.*}} = {{(tail )?}}call { double, double } @CGPointApplyAffineTransform(double %{{.*}}, double %{{.*}}, %struct.CGAffineTransform* {{.*}})
 // CHECK:   call void @CGRectApplyAffineTransform(%struct.CGRect* {{.*}}, %struct.CGRect* {{.*}}, %struct.CGAffineTransform* {{.*}})
-// CHECK:   %{{.*}} = call { double, double } @CGSizeApplyAffineTransform(double %{{.*}}, double %{{.*}}, %struct.CGAffineTransform* {{.*}})
+// CHECK:   %{{.*}} = {{(tail )?}}call { double, double } @CGSizeApplyAffineTransform(double %{{.*}}, double %{{.*}}, %struct.CGAffineTransform* {{.*}})
 
   context.concatenate(transform)
   context.rotate(by: CGFloat.pi)
