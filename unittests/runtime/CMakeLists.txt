@@ -36,7 +36,6 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     Array.cpp
     CompatibilityOverride.cpp
     Concurrent.cpp
-    Exclusivity.cpp
     Metadata.cpp
     Mutex.cpp
     Enum.cpp

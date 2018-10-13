@@ -1,75 +1,59 @@
-//===--- Exclusivity.cpp --------------------------------------------------===//
-//
-// This source file is part of the Swift.org open source project
-//
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
-// Licensed under Apache License v2.0 with Runtime Library Exception
-//
-// See https://swift.org/LICENSE.txt for license information
-// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-//
-//===----------------------------------------------------------------------===//
-
 #include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/Metadata.h"
-#include "gtest/gtest.h"
 
 using namespace swift;
 
-#ifndef NDEBUG
-TEST(TestExclusivity, testNullPC) {
+SWIFT_CC(swift) SWIFT_RUNTIME_LIBRARY_VISIBILITY extern "C"
+void testExclusivityNullPC() {
   ValueBuffer scratch, scratch2;
   long var;
   swift_beginAccess(&var, &scratch,
-                    ExclusivityFlags::WarningOnly | ExclusivityFlags::Read,
+                    ExclusivityFlags::Read | ExclusivityFlags::Tracking,
                     /*pc=*/0);
-  swift_beginAccess(&var, &scratch2,
-                    ExclusivityFlags::WarningOnly | ExclusivityFlags::Modify,
+  swift_beginAccess(&var, &scratch2, ExclusivityFlags::Modify,
                     /*pc=*/0);
   swift_endAccess(&scratch2);
   swift_endAccess(&scratch);
 }
-#endif
 
-#ifndef NDEBUG
-TEST(TestExclusivity, testPCOne) {
+SWIFT_CC(swift) SWIFT_RUNTIME_LIBRARY_VISIBILITY extern "C"
+void testExclusivityPCOne() {
   ValueBuffer scratch, scratch2;
   long var;
   swift_beginAccess(&var, &scratch,
-                    ExclusivityFlags::WarningOnly | ExclusivityFlags::Read,
+                    ExclusivityFlags::Read | ExclusivityFlags::Tracking,
                     /*pc=*/(void *)1);
-  swift_beginAccess(&var, &scratch2,
-                    ExclusivityFlags::WarningOnly | ExclusivityFlags::Modify,
+  swift_beginAccess(&var, &scratch2, ExclusivityFlags::Modify,
                     /*pc=*/(void *)1);
   swift_endAccess(&scratch2);
   swift_endAccess(&scratch);
 }
-#endif
 
-#ifndef NDEBUG
-TEST(TestExclusivity, testBogusPC) {
+SWIFT_CC(swift) SWIFT_RUNTIME_LIBRARY_VISIBILITY extern "C"
+void testExclusivityBogusPC() {
   ValueBuffer scratch, scratch2;
   long var;
   swift_beginAccess(&var, &scratch,
-                    ExclusivityFlags::WarningOnly | ExclusivityFlags::Read,
+                    ExclusivityFlags::Read | ExclusivityFlags::Tracking,
                     /*pc=*/(void *)0xdeadbeefdeadbeefULL);
-  swift_beginAccess(&var, &scratch2,
-                    ExclusivityFlags::WarningOnly | ExclusivityFlags::Modify,
+  swift_beginAccess(&var, &scratch2, ExclusivityFlags::Modify,
                     /*pc=*/(void *)0xdeadbeefdeadbeefULL);
   swift_endAccess(&scratch2);
   swift_endAccess(&scratch);
 }
-#endif
+
 
 // rdar://32866493
-TEST(TestExclusivity, testNonNested) {
+SWIFT_CC(swift) SWIFT_RUNTIME_LIBRARY_VISIBILITY extern "C"
+void testExclusivityNonNested() {
   const int N = 5;
   ValueBuffer scratches[N];
   long vars[N];
 
   auto begin = [&](unsigned i) {
     assert(i < N);
-    swift_beginAccess(&vars[i], &scratches[i], ExclusivityFlags::Modify, 0);
+    swift_beginAccess(&vars[i], &scratches[i],
+                      ExclusivityFlags::Modify | ExclusivityFlags::Tracking, 0);
   };
   auto end = [&](unsigned i) {
     assert(i < N);
