@@ -447,6 +447,24 @@ enum class MangledTypeRefRole {
   DefaultAssociatedTypeWitness,
 };
 
+/// The description of a protocol conformance, including its witness table
+/// and any additional information needed to produce the protocol conformance
+/// descriptor.
+struct ConformanceDescription {
+  /// The conformance itself.
+  const NormalProtocolConformance *conformance;
+
+  /// The witness table.
+  SILWitnessTable *wtable;
+
+  /// The resilient witnesses, if any.
+  SmallVector<llvm::Constant *, 4> resilientWitnesses;
+
+  ConformanceDescription(const NormalProtocolConformance *conformance,
+                         SILWitnessTable *wtable)
+    : conformance(conformance), wtable(wtable) { }
+};
+
 /// IRGenModule - Primary class for emitting IR for global declarations.
 /// 
 class IRGenModule {
@@ -819,7 +837,7 @@ public:
   void addCompilerUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
   void addFieldTypes(ArrayRef<CanType> fieldTypes);
-  void addProtocolConformance(const NormalProtocolConformance *conformance);
+  void addProtocolConformance(ConformanceDescription conformance);
 
   llvm::Constant *emitSwiftProtocols();
   llvm::Constant *emitProtocolConformances();
@@ -916,8 +934,8 @@ private:
   SmallVector<llvm::WeakTrackingVH, 4> ObjCCategories;
   /// List of non-ObjC protocols described by this module.
   SmallVector<ProtocolDecl *, 4> SwiftProtocols;
-  /// List of protocol conformances to generate records for.
-  SmallVector<const NormalProtocolConformance *, 4> ProtocolConformances;
+  /// List of protocol conformances to generate descriptors for.
+  SmallVector<ConformanceDescription, 4> ProtocolConformances;
   /// List of nominal types to generate type metadata records for.
   SmallVector<NominalTypeDecl *, 4> RuntimeResolvableTypes;
   /// List of ExtensionDecls corresponding to the generated
@@ -1130,7 +1148,7 @@ public:
   void emitSILProperty(SILProperty *prop);
   void emitSILStaticInitializers();
   llvm::Constant *emitFixedTypeLayout(CanType t, const FixedTypeInfo &ti);
-  void emitProtocolConformance(const NormalProtocolConformance *conformance);
+  void emitProtocolConformance(const ConformanceDescription &record);
   void emitNestedTypeDecls(DeclRange members);
   void emitClangDecl(const clang::Decl *decl);
   void finalizeClangCodeGen();
@@ -1286,9 +1304,6 @@ public:
   llvm::Constant *
   getAddrOfGenericWitnessTableCache(const NormalProtocolConformance *C,
                                     ForDefinition_t forDefinition);
-  llvm::Constant *
-  getAddrOfResilientWitnessTable(const NormalProtocolConformance *C,
-                                 ConstantInit definition);
   llvm::Function *
   getAddrOfGenericWitnessTableInstantiationFunction(
                                     const NormalProtocolConformance *C);

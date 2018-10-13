@@ -24,14 +24,8 @@ import resilient_protocol
 // -- size of private area + 'needs instantiation' bit
 // CHECK-SAME:   i16 1,
 
-// -- the protocol descriptor
-// CHECK-SAME:   @"{{got.|__imp_}}$s18resilient_protocol22OtherResilientProtocolMp"
-
 // -- the template
 // CHECK-SAME:   @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWp"
-
-// -- resilient witnesses
-// CHECK-SAME:   i32 0,
 
 // -- instantiator function
 // CHECK-SAME:   i32 0
@@ -126,24 +120,29 @@ protocol InternalProtocol {
 // -- size of private area + 'needs instantiation' bit
 // CHECK-SAME:   i16 1,
 
-// -- the protocol descriptor
-// CHECK-SAME:   @"{{got.|__imp_}}$s18resilient_protocol24ProtocolWithRequirementsMp"
-
 // -- the template
 // CHECK-SAME:   @"$s19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWp"
-
-// -- resilient witnesses
-// CHECK-SAME:   @"$s19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWr"
 
 // -- instantiator function
 // CHECK-SAME:   i32 0
 
 // CHECK-SAME: }
 
+// Witness table for conformance with resilient associated type
 
-// CHECK: @"$s19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWr"
+// CHECK: @"$s19protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWP" = {{(protected )?}}hidden global [3 x i8*] [
+// CHECK-SAME:   i8* bitcast (i8** ()* @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWa" to i8*)
+// CHECK-SAME:   @"symbolic 19protocol_resilience23ResilientConformingTypeV"
+// CHECK-SAME: ]
 
-// CHECK-SAME: internal constant {
+// ConformsWithRequirements protocol conformance descriptor
+
+// CHECK: "$s19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAMc" = hidden constant {
+
+// -- flags
+// CHECK-SAME: i32 65537,
+
+// CHECK-SAME: i32 3,
 
 // -- type metadata for associated type
 // CHECK-SAME: @"{{got.|__imp_}}$s1T18resilient_protocol24ProtocolWithRequirementsPTl"
@@ -157,14 +156,6 @@ protocol InternalProtocol {
 
 // CHECK-SAME: }
 
-
-// Witness table for conformance with resilient associated type
-
-// CHECK: @"$s19protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWP" = {{(protected )?}}hidden global [3 x i8*] [
-// CHECK-SAME:   i8* bitcast (i8** ()* @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWa" to i8*)
-// CHECK-SAME:   @"symbolic 19protocol_resilience23ResilientConformingTypeV"
-// CHECK-SAME: ]
-
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
 sil @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
@@ -175,7 +166,6 @@ bb0(%0 : $*Self):
   %result = tuple ()
   return %result : $()
 }
-
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defaultD(%swift.opaque* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
