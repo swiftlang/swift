@@ -517,20 +517,33 @@ Type TypeChecker::resolveTypeInContext(
     selfType = resolution.mapTypeIntoContext(
       foundDC->getSelfInterfaceType());
 
-    if (selfType->is<GenericTypeParamType>() &&
-        typeDecl->getDeclContext()->getSelfClassDecl()) {
-      // We found a member of a class from a protocol or protocol
-      // extension.
-      //
-      // Get the superclass of the 'Self' type parameter.
-      auto *sig = foundDC->getGenericSignatureOfContext();
-      if (!sig)
-        return ErrorType::get(ctx);
-      auto superclassType = sig->getSuperclassBound(selfType);
-      if (!superclassType)
-        return ErrorType::get(ctx);
+    if (selfType->is<GenericTypeParamType>()) {
+      // In structural mode, we have to be very conservative in
+      // TypeResolution::areSameType(). So to avoid incorrectly diagnosing
+      // ambiguity, map associated types and protocol typealiases to unresolved
+      // member types.
+      if (resolution.getStage() == TypeResolutionStage::Structural) {
+        if (isa<AssociatedTypeDecl>(typeDecl) ||
+            (isa<TypeAliasDecl>(typeDecl) &&
+             !cast<TypeAliasDecl>(typeDecl)->isGeneric())) {
+          return DependentMemberType::get(selfType, typeDecl->getName());
+        }
+      }
 
-      selfType = superclassType;
+      if (typeDecl->getDeclContext()->getSelfClassDecl()) {
+        // We found a member of a class from a protocol or protocol
+        // extension.
+        //
+        // Get the superclass of the 'Self' type parameter.
+        auto *sig = foundDC->getGenericSignatureOfContext();
+        if (!sig)
+          return ErrorType::get(ctx);
+        auto superclassType = sig->getSuperclassBound(selfType);
+        if (!superclassType)
+          return ErrorType::get(ctx);
+
+        selfType = superclassType;
+      }
     }
   }
   
