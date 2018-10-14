@@ -738,6 +738,8 @@ public:
   /// The block should be empty and have no predecessors.
   void eraseBasicBlock(SILBasicBlock *block);
 
+  void mergeCleanupBlocks();
+
   //===--------------------------------------------------------------------===//
   // Memory management
   //===--------------------------------------------------------------------===//
