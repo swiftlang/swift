@@ -2045,6 +2045,9 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     SolverState state(expr, *this, FreeTypeVariableBinding::Disallow);
     state.recordFixes = true;
 
+    if (failedConstraint && simplifyConstraint(*failedConstraint) == SolutionKind::Solved)
+      failedConstraint = nullptr;
+
     // Solve the system.
     solve(viable);
 
