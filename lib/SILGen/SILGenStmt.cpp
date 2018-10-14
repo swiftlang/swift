@@ -20,6 +20,7 @@
 #include "SwitchEnumBuilder.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/ProfileCounter.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -95,6 +96,76 @@ void SILGenFunction::eraseBasicBlock(SILBasicBlock *block) {
     StartOfPostmatter = next_or_end(blockIt, F.end());
   }
   block->eraseFromParent();
+}
+
+// Merge blocks during a single traversal of the block list. Only unconditional
+// branch edges are visited. Consequently, this takes only as much time as a
+// linked list traversal and requires no additional storage.
+//
+// For each block, check if it can be merged with its successor. Place the
+// merged block at the successor position in the block list.
+//
+// Typically, the successor occurs later in the list. This is most efficient
+// because merging moves instructions from the successor to the
+// predecessor. This way, instructions will only be moved once. Furthermore, the
+// merged block will be visited again to determine if it can be merged with it's
+// successor, and so on, so no edges are skipped.
+//
+// In rare cases, the predessor is merged with its earlier successor, which has
+// already been visited. If the successor can also be merged, then it has
+// already happened, and there is no need to revisit the merged block.
+void SILGenFunction::mergeCleanupBlocks() {
+  for (auto bbPos = F.begin(), bbEnd = F.end(), nextPos = bbPos; bbPos != bbEnd;
+       bbPos = nextPos) {
+    // A forward iterator refering to the next unprocessed block in the block
+    // list. If blocks are merged and moved, then this will be updated.
+    nextPos = std::next(bbPos);
+
+    // Consider the current block as the predecessor.
+    auto *predBB = &*bbPos;
+    auto *BI = dyn_cast<BranchInst>(predBB->getTerminator());
+    if (!BI)
+      continue;
+
+    // predBB has an unconditional branch to succBB. If succBB has no other
+    // predecessors, then merge the blocks.
+    auto *succBB = BI->getDestBB();
+    if (!succBB->getSinglePredecessorBlock())
+      continue;
+
+    // Before merging, establish iterators that won't be invalidated by erasing
+    // succBB. Use a reverse iterator to remember the position before a block.
+    //
+    // Remember the block before the current successor as a position for placing
+    // the merged block.
+    auto beforeSucc = std::next(SILFunction::reverse_iterator(succBB));
+
+    // Remember the position before the current predecessor to avoid skipping
+    // blocks or revisiting blocks unnecessarilly.
+    auto beforePred = std::next(SILFunction::reverse_iterator(predBB));
+    // Since succBB will be erased, move before it.
+    if (beforePred == SILFunction::reverse_iterator(succBB))
+      ++beforePred;
+
+    // Merge `predBB` with `succBB`. This erases `succBB`.
+    mergeBasicBlockWithSingleSuccessor(predBB, succBB);
+
+    // If predBB is first in the list, then it must be the entry block which
+    // cannot be moved.
+    if (beforePred != F.rend()) {
+      // Move the merged block into the successor position. (If the blocks are
+      // not already adjacent, then the first is typically the trampoline.)
+      assert(beforeSucc != F.rend()
+             && "entry block cannot have a predecessor.");
+      predBB->moveAfter(&*beforeSucc);
+    }
+    // If after moving predBB there are no more blocks to process, then break.
+    if (beforePred == F.rbegin())
+      break;
+
+    // Update the loop iterator to the next unprocessed block.
+    nextPos = SILFunction::iterator(&*std::prev(beforePred));
+  }
 }
 
 //===----------------------------------------------------------------------===//

@@ -11,10 +11,30 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILFunction.h"
 
 using namespace swift;
+
+/// Merge the basic block with its successor if possible.
+void swift::mergeBasicBlockWithSingleSuccessor(SILBasicBlock *BB,
+                                               SILBasicBlock *succBB) {
+  auto *BI = cast<BranchInst>(BB->getTerminator());
+  assert(succBB->getSinglePredecessorBlock());
+
+  // If there are any BB arguments in the destination, replace them with the
+  // branch operands, since they must dominate the dest block.
+  for (unsigned i = 0, e = BI->getArgs().size(); i != e; ++i)
+    succBB->getArgument(i)->replaceAllUsesWith(BI->getArg(i));
+
+  BI->eraseFromParent();
+
+  // Move the instruction from the successor block to the current block.
+  BB->spliceAtEnd(succBB);
+
+  succBB->eraseFromParent();
+}
 
 //===----------------------------------------------------------------------===//
 //                              DeadEndBlocks
