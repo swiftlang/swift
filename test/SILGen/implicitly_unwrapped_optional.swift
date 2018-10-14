@@ -13,24 +13,24 @@ func foo(f f: (() -> ())!) {
 // CHECK:   store [[T0_COPY]] to [init] [[PF]]
 // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PF]] : $*Optional<@callee_guaranteed () -> ()>
 // CHECK:   [[HASVALUE:%.*]] = select_enum_addr [[READ]]
-// CHECK:   cond_br [[HASVALUE]], bb2, bb1
+// CHECK:   cond_br [[HASVALUE]], bb1, bb3
 //
 //   If it does, project and load the value out of the implicitly unwrapped
 //   optional...
-// CHECK:    bb2:
+// CHECK:    bb1:
 // CHECK-NEXT: [[FN0_ADDR:%.*]] = unchecked_take_enum_data_addr [[READ]]
 // CHECK-NEXT: [[FN0:%.*]] = load [copy] [[FN0_ADDR]]
 //   .... then call it
 // CHECK:   [[B:%.*]] = begin_borrow [[FN0]]
 // CHECK:   apply [[B]]() : $@callee_guaranteed () -> ()
 // CHECK:   end_borrow [[B]]
-// CHECK:   br bb3
-// CHECK: bb3(
+// CHECK:   br bb2
+// CHECK: bb2(
 // CHECK:   destroy_value [[F]]
 // CHECK:   return
-// CHECK: bb4:
+// CHECK: bb3:
 // CHECK:   enum $Optional<()>, #Optional.none!enumelt
-// CHECK:   br bb3
+// CHECK:   br bb2
 //   The rest of this is tested in optional.swift
 // } // end sil function '{{.*}}foo{{.*}}'
 

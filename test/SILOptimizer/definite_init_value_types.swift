@@ -33,10 +33,8 @@ enum ValueEnum {
   // CHECK-NEXT:   [[INIT_STATE:%.*]] = integer_literal $Builtin.Int1, 0
   // CHECK-NEXT:   store [[INIT_STATE]] to [[STATE]]
   // CHECK:        [[BOOL:%.*]] = struct_extract %0 : $Bool, #Bool._value
-  // CHECK-NEXT:   cond_br [[BOOL]], bb2, bb1
+  // CHECK-NEXT:   cond_br [[BOOL]], bb1, bb2
   // CHECK:      bb1:
-  // CHECK-NEXT:   br bb3
-  // CHECK:      bb2:
   // CHECK-NEXT:   [[METATYPE:%.*]] = metatype $@thin ValueEnum.Type
   // CHECK-NEXT:   [[NEW_SELF:%.*]] = enum $ValueEnum, #ValueEnum.b!enumelt
   // CHECK-NEXT:   [[SELF_ACCESS:%.*]] = begin_access [modify] [static] [[SELF_BOX]]
@@ -44,6 +42,8 @@ enum ValueEnum {
   // CHECK-NEXT:   store [[NEW_STATE]] to [[STATE]]
   // CHECK-NEXT:   store [[NEW_SELF]] to [[SELF_ACCESS]]
   // CHECK-NEXT:   end_access [[SELF_ACCESS]]
+  // CHECK-NEXT:   br bb3
+  // CHECK:      bb2:
   // CHECK-NEXT:   br bb3
   // CHECK:      bb3:
   // CHECK-NEXT:   [[METATYPE:%.*]] = metatype $@thin ValueEnum.Type

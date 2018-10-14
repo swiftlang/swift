@@ -26,17 +26,12 @@ public func testOptionalArray() {
   // CHECK: bb0:
   // CHECK:   switch_enum {{.*}}, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 
-  // CHECK: [[NONE_BB]]:
-  // CHECK-NEXT: [[NO_POINTER:%.+]] = enum $Optional<UnsafeRawPointer>, #Optional.none!enumelt
-  // CHECK-NEXT: [[NO_OWNER:%.+]] = enum $Optional<AnyObject>, #Optional.none!enumelt
-  // CHECK-NEXT: br [[CALL_BRANCH:bb[0-9]+]]([[NO_POINTER]] : $Optional<UnsafeRawPointer>, [[NO_OWNER]] : $Optional<AnyObject>)
-
   // CHECK: [[SOME_BB]](
   // CHECK: [[OWNER:%.+]] = enum $Optional<AnyObject>, #Optional.some!enumelt.1,
   // CHECK-NEXT: [[POINTER:%.+]] = struct $UnsafeRawPointer (
   // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on [[OWNER]] : $Optional<AnyObject>
   // CHECK-NEXT: [[OPT_POINTER:%.+]] = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt.1, [[DEP_POINTER]]
-  // CHECK-NEXT: br [[CALL_BRANCH]]([[OPT_POINTER]] : $Optional<UnsafeRawPointer>, [[OWNER]] : $Optional<AnyObject>)
+  // CHECK-NEXT: br [[CALL_BRANCH:bb[0-9]+]]([[OPT_POINTER]] : $Optional<UnsafeRawPointer>, [[OWNER]] : $Optional<AnyObject>)
 
   // CHECK: [[CALL_BRANCH]]([[OPT_POINTER:%.+]] : $Optional<UnsafeRawPointer>, [[OWNER:%.+]] : $Optional<AnyObject>):
   // CHECK-NOT: release
@@ -48,5 +43,10 @@ public func testOptionalArray() {
   // CHECK: release_value {{%.+}} : $Optional<Array<Int>>
   // CHECK-NEXT: [[EMPTY:%.+]] = tuple ()
   // CHECK-NEXT: return [[EMPTY]]
+
+  // CHECK: [[NONE_BB]]:
+  // CHECK-NEXT: [[NO_POINTER:%.+]] = enum $Optional<UnsafeRawPointer>, #Optional.none!enumelt
+  // CHECK-NEXT: [[NO_OWNER:%.+]] = enum $Optional<AnyObject>, #Optional.none!enumelt
+  // CHECK-NEXT: br [[CALL_BRANCH]]([[NO_POINTER]] : $Optional<UnsafeRawPointer>, [[NO_OWNER]] : $Optional<AnyObject>)
 
 } // CHECK: end sil function '$s18pointer_conversion17testOptionalArrayyyF'

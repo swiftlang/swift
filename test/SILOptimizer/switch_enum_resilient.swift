@@ -210,7 +210,7 @@ public enum Coin : Int {
 
 // CHECK-NOINLINE-LABEL: sil{{.*}} @$s21switch_enum_resilient19testImperativeHeadsyyAA4CoinOF
 public func testImperativeHeads(_ coin: Coin) {
-  // CHECK-NOINLINE: switch_enum{{_addr %.+ : [$][*]Coin| %0 : [$]Coin}}, case #Coin.heads!enumelt: bb2, case #Coin.tails!enumelt: bb1 //
+  // CHECK-NOINLINE: switch_enum{{_addr %.+ : [$][*]Coin| %0 : [$]Coin}}, case #Coin.heads!enumelt: bb1, case #Coin.tails!enumelt: bb2 //
   if case .heads = coin {
     action0()
   } else {
@@ -220,7 +220,7 @@ public func testImperativeHeads(_ coin: Coin) {
 
 // CHECK-NOINLINE-LABEL: sil{{.*}} @$s21switch_enum_resilient19testImperativeTailsyyAA4CoinOF
 public func testImperativeTails(_ coin: Coin) {
-  // CHECK-NOINLINE: switch_enum{{_addr %.+ : [$][*]Coin| %0 : [$]Coin}}, case #Coin.tails!enumelt: bb2, case #Coin.heads!enumelt: bb1 //
+  // CHECK-NOINLINE: switch_enum{{_addr %.+ : [$][*]Coin| %0 : [$]Coin}}, case #Coin.tails!enumelt: bb1, case #Coin.heads!enumelt: bb2 //
   if case .tails = coin {
     action0()
   } else {
@@ -233,7 +233,7 @@ public func testFunctionalHeads(_ coin: Coin) -> Int {
   // CHECK-FRAGILE-NOINLINE: [[FIVE:%.+]] = integer_literal ${{.+}}, 5000
   // CHECK-FRAGILE-NOINLINE: [[NINE:%.+]] = integer_literal ${{.+}}, 9001
   // CHECK-FRAGILE-NOINLINE: = select_enum %0 : $Coin, case #Coin.heads!enumelt: [[FIVE]], case #Coin.tails!enumelt: [[NINE]] :
-  // CHECK-RESILIENT-NOINLINE: switch_enum_addr {{%.+}} : $*Coin, case #Coin.heads!enumelt: bb2, case #Coin.tails!enumelt: bb1
+  // CHECK-RESILIENT-NOINLINE: switch_enum_addr {{%.+}} : $*Coin, case #Coin.heads!enumelt: bb1, case #Coin.tails!enumelt: bb2
   if case .heads = coin {
     return 5000
   } else {
@@ -246,7 +246,7 @@ public func testFunctionalTails(_ coin: Coin) -> Int {
   // CHECK-FRAGILE-NOINLINE: [[FIVE:%.+]] = integer_literal ${{.+}}, 5000
   // CHECK-FRAGILE-NOINLINE: [[NINE:%.+]] = integer_literal ${{.+}}, 9001
   // CHECK-FRAGILE-NOINLINE: = select_enum %0 : $Coin, case #Coin.tails!enumelt: [[FIVE]], case #Coin.heads!enumelt: [[NINE]] :
-  // CHECK-RESILIENT-NOINLINE: switch_enum_addr {{%.+}} : $*Coin, case #Coin.tails!enumelt: bb2, case #Coin.heads!enumelt: bb1
+  // CHECK-RESILIENT-NOINLINE: switch_enum_addr {{%.+}} : $*Coin, case #Coin.tails!enumelt: bb1, case #Coin.heads!enumelt: bb2
   if case .tails = coin {
     return 5000
   } else {
@@ -306,7 +306,7 @@ public func testFunctionalTails(_ coin: Coin) -> Int {
   // CHECK-FRAGILE: [[FIVE:%.+]] = integer_literal ${{.+}}, 5000
   // CHECK-FRAGILE: [[NINE:%.+]] = integer_literal ${{.+}}, 9001
   // CHECK-FRAGILE: = select_enum %0 : $Coin, case #Coin.heads!enumelt: [[FIVE]], case #Coin.tails!enumelt: [[NINE]] :
-  // CHECK-RESILIENT-NOINLINE: switch_enum_addr {{%.+}} : $*Coin, case #Coin.heads!enumelt: bb2, case #Coin.tails!enumelt: bb1 //
+  // CHECK-RESILIENT-NOINLINE: switch_enum_addr {{%.+}} : $*Coin, case #Coin.heads!enumelt: bb{{[0-9]+}}, case #Coin.tails!enumelt: bb{{[0-9]+}} //
   // CHECK-RESILIENT-INLINE: switch_enum_addr {{%.+}} : $*Coin, case #Coin.heads!enumelt: bb2, default bb1
   if case .heads = coin {
     return 5000
@@ -320,7 +320,7 @@ public func testFunctionalTails(_ coin: Coin) -> Int {
   // CHECK-FRAGILE: [[FIVE:%.+]] = integer_literal ${{.+}}, 5000
   // CHECK-FRAGILE: [[NINE:%.+]] = integer_literal ${{.+}}, 9001
   // CHECK-FRAGILE: = select_enum %0 : $Coin, case #Coin.tails!enumelt: [[FIVE]], case #Coin.heads!enumelt: [[NINE]] :
-  // CHECK-RESILIENT-NOINLINE: switch_enum_addr {{%.+}} : $*Coin, case #Coin.tails!enumelt: bb2, case #Coin.heads!enumelt: bb1 //
+  // CHECK-RESILIENT-NOINLINE: switch_enum_addr {{%.+}} : $*Coin, case #Coin.tails!enumelt: bb{{[0-9]+}}, case #Coin.heads!enumelt: bb{{[0-9]+}} //
   // CHECK-RESILIENT-INLINE: switch_enum_addr {{%.+}} : $*Coin, case #Coin.tails!enumelt: bb2, default bb1
   if case .tails = coin {
     return 5000
@@ -332,8 +332,8 @@ public func testFunctionalTails(_ coin: Coin) -> Int {
 
 // CHECK-ALL-LABEL: sil{{.*}} @$s21switch_enum_resilient21inlineImperativeHeadsyyAA4CoinOF
 @inlinable public func inlineImperativeHeads(_ coin: Coin) {
-  // CHECK-FRAGILE: switch_enum %0 : $Coin, case #Coin.heads!enumelt: bb2, case #Coin.tails!enumelt: bb1 //
-  // CHECK-RESILIENT-NOINLINE: switch_enum_addr {{%.+}} : $*Coin, case #Coin.heads!enumelt: bb2, case #Coin.tails!enumelt: bb1 //
+  // CHECK-FRAGILE: switch_enum %0 : $Coin, case #Coin.heads!enumelt: bb{{[0-9]+}}, case #Coin.tails!enumelt: bb{{[0-9]+}} //
+  // CHECK-RESILIENT-NOINLINE: switch_enum_addr {{%.+}} : $*Coin, case #Coin.heads!enumelt: bb{{[0-9]+}}, case #Coin.tails!enumelt: bb{{[0-9]+}} //
   // CHECK-RESILIENT-INLINE: switch_enum_addr {{%.+}} : $*Coin, case #Coin.heads!enumelt: bb2, default bb1
   if case .heads = coin {
     action0()
@@ -344,8 +344,8 @@ public func testFunctionalTails(_ coin: Coin) -> Int {
 
 // CHECK-ALL-LABEL: sil{{.*}} @$s21switch_enum_resilient21inlineImperativeTailsyyAA4CoinOF
 @inlinable public func inlineImperativeTails(_ coin: Coin) {
-  // CHECK-FRAGILE: switch_enum %0 : $Coin, case #Coin.tails!enumelt: bb2, case #Coin.heads!enumelt: bb1 //
-  // CHECK-RESILIENT-NOINLINE: switch_enum_addr {{%.+}} : $*Coin, case #Coin.tails!enumelt: bb2, case #Coin.heads!enumelt: bb1 //
+  // CHECK-FRAGILE: switch_enum %0 : $Coin, case #Coin.tails!enumelt: bb{{[0-9]+}}, case #Coin.heads!enumelt: bb{{[0-9]+}} //
+  // CHECK-RESILIENT-NOINLINE: switch_enum_addr {{%.+}} : $*Coin, case #Coin.tails!enumelt: bb{{[0-9]+}}, case #Coin.heads!enumelt: bb{{[0-9]+}} //
   // CHECK-RESILIENT-INLINE: switch_enum_addr {{%.+}} : $*Coin, case #Coin.tails!enumelt: bb2, default bb1
   if case .tails = coin {
     action0()
