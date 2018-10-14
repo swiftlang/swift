@@ -145,6 +145,31 @@ extension StringProtocol {
       return _StringGutsSlice(String(self)._guts)
     }
   }
+
+  @inlinable
+  internal var _offsetRange: Range<Int> {
+    @inline(__always) get {
+      let start = startIndex
+      let end = endIndex
+      _sanityCheck(start.transcodedOffset == 0 && end.transcodedOffset == 0)
+      return Range(uncheckedBounds: (start.encodedOffset, end.encodedOffset))
+    }
+  }
+
+  @inlinable
+  internal var _wholeGuts: _StringGuts {
+    @_specialize(where Self == String)
+    @_specialize(where Self == Substring)
+    @inline(__always) get {
+      if let str = self as? String {
+        return str._guts
+      }
+      if let subStr = self as? Substring {
+        return subStr._wholeGuts
+      }
+      return String(self)._guts
+    }
+  }
 }
 
 

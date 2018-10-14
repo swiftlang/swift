@@ -292,6 +292,7 @@ extension _SmallString {
   }
 }
 
+#if _runtime(_ObjC)
 // Cocoa interop
 extension _SmallString {
   // Resiliently create from a tagged cocoa string
@@ -309,6 +310,7 @@ extension _SmallString {
     self._invariantCheck()
   }
 }
+#endif
 
 extension UInt {
   // Fetches the `i`th byte, from least-significant to most-significant

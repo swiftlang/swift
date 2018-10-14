@@ -19,7 +19,7 @@ extension String {
   ///
   /// - Complexity: O(*n*), where *n* is the length of `substring`.
   @inlinable
-  public init(_ substring: Substring) {
+  public init(_ substring: __shared Substring) {
     self = substring.withUnsafeBytes {
       return String._uncheckedFromUTF8($0._asUInt8)
     }
@@ -308,9 +308,9 @@ extension Substring: StringProtocol {
   }
 }
 
-//extension Substring : CustomReflectable {
-//  public var customMirror: Mirror { return String(self).customMirror }
-//}
+extension Substring : CustomReflectable {
+ public var customMirror: Mirror { return String(self).customMirror }
+}
 
 //extension Substring : CustomPlaygroundQuickLookable {
 //  @available(*, deprecated, message: "Substring.customPlaygroundQuickLook will be removed in a future Swift version")
