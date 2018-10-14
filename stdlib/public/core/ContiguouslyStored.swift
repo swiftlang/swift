@@ -54,36 +54,44 @@ extension UnsafeMutableBufferPointer: _HasContiguousBytes {
 }
 extension String: _HasContiguousBytes {
   @inlinable
-  var _providesContiguousBytesNoCopy: Bool {
+  internal var _providesContiguousBytesNoCopy: Bool {
     @inline(__always) get { return self._guts.isFastUTF8 }
   }
 
   @inlinable @inline(__always)
-  func withUnsafeBytes<R>(
-    _ body: (UnsafeRawBufferPointer) throws -> R
+  internal func _withUTF8<R>(
+    _ body: (UnsafeBufferPointer<UInt8>) throws -> R
   ) rethrows -> R {
     if _fastPath(self._guts.isFastUTF8) {
       return try self._guts.withFastUTF8 {
-        try body(UnsafeRawBufferPointer($0))
+        try body($0)
       }
     }
 
-    return try ContiguousArray(self.utf8).withUnsafeBytes { try body($0) }
+    return try ContiguousArray(self.utf8).withUnsafeBufferPointer {
+      try body($0)
+    }
+  }
+
+  @inlinable @inline(__always)
+  internal func withUnsafeBytes<R>(
+    _ body: (UnsafeRawBufferPointer) throws -> R
+  ) rethrows -> R {
+    return try self._withUTF8 { return try body(UnsafeRawBufferPointer($0)) }
   }
 }
 extension Substring: _HasContiguousBytes {
   @inlinable
-  var _providesContiguousBytesNoCopy: Bool {
+  internal var _providesContiguousBytesNoCopy: Bool {
     @inline(__always) get { return self._wholeGuts.isFastUTF8 }
   }
 
   @inlinable @inline(__always)
-  func withUnsafeBytes<R>(
+  internal func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
-    let sliced = self._gutsSlice
-    if _fastPath(sliced.isFastUTF8) {
-      return try sliced.withFastUTF8 {
+    if _wholeGuts.isFastUTF8 {
+      return try _wholeGuts.withFastUTF8(range: self._offsetRange) {
         return try body(UnsafeRawBufferPointer($0))
       }
     }

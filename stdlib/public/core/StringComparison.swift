@@ -12,20 +12,116 @@
 
 import SwiftShims
 
-@_frozen
-@usableFromInline
-internal enum _StringComparisonResult: Int {
-  case less = -1
-  case equal = 0
-  case greater = 1
 
-  @inlinable
-  internal var flipped: _StringComparisonResult {
-    @inline(__always) get {
-      return _StringComparisonResult(
-        rawValue: -self.rawValue)._unsafelyUnwrappedUnchecked
+@inlinable @inline(__always) // Fold away opt range and top-level fast-paths
+@_effects(readonly)
+internal func _stringCompare(
+  _ lhs: _StringGuts, _ lhsRange: Range<Int>?,
+  _ rhs: _StringGuts, _ rhsRange: Range<Int>?,
+  expecting: _StringComparisonResult
+) -> Bool {
+  _sanityCheck(expecting == .equal || expecting == .less)
+  if lhs.rawBits == rhs.rawBits && lhsRange == rhsRange {
+    return expecting == .equal
+  }
+  if _fastPath(lhs.isFastUTF8 && rhs.isFastUTF8) {
+    let isNFC = lhs.isNFC && rhs.isNFC
+    return lhs.withFastUTF8(range: lhsRange) { utf8Left in
+      return rhs.withFastUTF8(range: rhsRange) { utf8Right in
+        if isNFC {
+          let cmp = _binaryCompare(utf8Left, utf8Right)
+          if expecting == .equal {
+            return cmp == 0
+          }
+          _sanityCheck(expecting == .less)
+          return cmp < 0
+        }
+
+        return _stringCompare(utf8Left, utf8Right, expecting: expecting)
+      }
     }
   }
+  return _stringCompareSlow(lhs, lhsRange, rhs, rhsRange, expecting: expecting)
+}
+
+@usableFromInline
+@_effects(readonly)
+internal func _stringCompareSlow(
+  _ lhs: _StringGuts, _ lhsRange: Range<Int>?,
+  _ rhs: _StringGuts, _ rhsRange: Range<Int>?,
+  expecting: _StringComparisonResult
+) -> Bool {
+  return _StringGutsSlice(lhs, lhsRange ?? 0..<lhs.count).compare(
+    with: _StringGutsSlice(rhs, rhsRange ?? 0..<rhs.count),
+    expecting: expecting)
+}
+
+@usableFromInline
+@_effects(readonly)
+internal func _stringCompare(
+  _ left: UnsafeBufferPointer<UInt8>,
+  _ right: UnsafeBufferPointer<UInt8>,
+  expecting: _StringComparisonResult
+) -> Bool {
+  _sanityCheck(expecting == .equal || expecting == .less)
+
+  if _binaryCompare(left, right) == 0 {
+    return expecting == .equal
+  }
+
+  // Do a binary scan finding the point of divergence. From there, see if we can
+  // determine our answer right away, otherwise back up to the beginning of the
+  // current normalization segment and fall back to the slow path.
+  var idx = 0
+  let end = Swift.min(left.count, right.count)
+  let leftPtr = left.baseAddress._unsafelyUnwrappedUnchecked
+  let rightPtr = right.baseAddress._unsafelyUnwrappedUnchecked
+  while idx < end {
+    guard leftPtr[idx] == rightPtr[idx] else { break }
+    idx &+= 1
+  }
+  _sanityCheck(idx != left.count || idx != right.count,
+    "should of been cought by prior binary compare")
+  if idx == end {
+    // We finished one of our inputs.
+    //
+    // TODO: This gives us a consistent and good ordering, but technically it
+    // could differ from our stated ordering if combination with a prior scalar
+    // did not produce a greater-value scalar. Consider checking normality.
+    return expecting == _lexicographicalCompare(left.count, right.count)
+  }
+
+  // Back up to nearest scalar boundary and check if normal and end of segment.
+  // If so, we have our answer.
+  while _isContinuation(left[idx]) && idx > 0 { idx &-= 1 }
+
+  // TODO: Refactor this into a function, handle these boundary condition as
+  // early returns...
+  if !_isContinuation(right[idx]) {
+    let (leftScalar, leftLen) = _decodeScalar(left, startingAt: idx)
+    let (rightScalar, rightLen) = _decodeScalar(right, startingAt: idx)
+    _sanityCheck(leftScalar != rightScalar)
+
+    let nfcQC = leftScalar._isNFCQCYes && rightScalar._isNFCQCYes
+    let isSegmentEnd = left.hasNormalizationBoundary(before: idx + leftLen)
+                    && right.hasNormalizationBoundary(before: idx + rightLen)
+    if _fastPath(nfcQC && isSegmentEnd) {
+      return expecting == _lexicographicalCompare(leftScalar, rightScalar)
+    }
+  }
+
+  // TODO: Back up to start of segment, and slow-path resume from there
+
+  return _StringGutsSlice(_StringGuts(left, isASCII: false)).compare(with:
+    _StringGutsSlice(_StringGuts(right, isASCII: false)), expecting: expecting)
+}
+
+@_frozen
+@usableFromInline
+internal enum _StringComparisonResult {
+  case less
+  case equal
+  case greater
 
   @inlinable @inline(__always)
   internal init(signedNotation int: Int) {
@@ -71,7 +167,7 @@ internal func _binaryCompare<UInt8>(
   _ lhs: UnsafeBufferPointer<UInt8>, _ rhs: UnsafeBufferPointer<UInt8>
 ) -> Int {
   var cmp = Int(truncatingIfNeeded:
-    _stdlib_memcmp(
+    _swift_stdlib_memcmp(
       lhs.baseAddress._unsafelyUnwrappedUnchecked,
       rhs.baseAddress._unsafelyUnwrappedUnchecked,
       Swift.min(lhs.count, rhs.count)))
@@ -124,48 +220,24 @@ extension _StringGutsSlice {
     return self.withNFCCodeUnitsIterator_2 {
       var selfIter = $0
       return other.withNFCCodeUnitsIterator_2 {
-        var otherIter = $0
+        let otherIter = $0
         return selfIter.compare(with: otherIter)
       }
     }
   }
 }
 
-internal func _lexicographicalCompare(
-  _ lhs: UInt8, _ rhs: UInt8
+@inline(__always)
+internal func _lexicographicalCompare<I: FixedWidthInteger>(
+  _ lhs: I, _ rhs: I
 ) -> _StringComparisonResult {
   return lhs < rhs ? .less : (lhs > rhs ? .greater : .equal)
 }
-
+@inline(__always)
 internal func _lexicographicalCompare(
-  _ lhs: UInt16, _ rhs: UInt16
+  _ lhs: Unicode.Scalar, _ rhs: Unicode.Scalar
 ) -> _StringComparisonResult {
-  return lhs < rhs ? .less : (lhs > rhs ? .greater : .equal)
+  return _lexicographicalCompare(lhs.value, rhs.value)
 }
 
-internal func _lexicographicalCompare(
-  _ lhs: Int, _ rhs: Int
-) -> _StringComparisonResult {
-  // TODO: inspect code quality
-  return lhs < rhs ? .less : (lhs > rhs ? .greater : .equal)
-}
-
-@_effects(readonly)
-internal func _lexicographicalCompare(
-  _ lhs: Array<UInt8>, _ rhs: Array<UInt8>
-) -> _StringComparisonResult {
-  // Check for a difference in overlapping contents
-  let count = Swift.min(lhs.count, rhs.count)
-  for idx in 0..<count {
-    let lhsValue = lhs[idx]
-    let rhsValue = rhs[idx]
-    guard lhsValue == rhsValue else {
-      return lhsValue < rhsValue ? .less : .greater
-    }
-  }
-
-  // Otherwise, the longer string is greater
-  if lhs.count == rhs.count { return .equal }
-  return lhs.count < rhs.count ? .less : .greater
-}
 

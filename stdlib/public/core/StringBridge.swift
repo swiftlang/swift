@@ -205,15 +205,15 @@ extension String {
   }
 }
 
-// At runtime, this class is derived from `_SwiftNativeNSStringBase`,
+// At runtime, this class is derived from `__SwiftNativeNSStringBase`,
 // which is derived from `NSString`.
 //
 // The @_swift_native_objc_runtime_base attribute
 // This allows us to subclass an Objective-C class and use the fast Swift
 // memory allocator.
 @_fixed_layout // FIXME(sil-serialize-all)
-@objc @_swift_native_objc_runtime_base(_SwiftNativeNSStringBase)
-public class _SwiftNativeNSString {
+@objc @_swift_native_objc_runtime_base(__SwiftNativeNSStringBase)
+public class __SwiftNativeNSString {
   @usableFromInline // FIXME(sil-serialize-all)
   @objc
   internal init() {}
@@ -260,7 +260,7 @@ public func _getDescription<T>(_ x: T) -> AnyObject {
 #else // !_runtime(_ObjC)
 
 @_fixed_layout // FIXME(sil-serialize-all)
-public class _SwiftNativeNSString {
+public class __SwiftNativeNSString {
   @usableFromInline // FIXME(sil-serialize-all)
   internal init() {}
   deinit {}

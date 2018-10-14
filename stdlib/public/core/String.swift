@@ -13,13 +13,6 @@
 import SwiftShims
 
 @inlinable @_transparent
-internal func unimplemented_utf8(
-  _ message: String = "",
-  file: StaticString = #file, line: UInt = #line
-) -> Never {
-  fatalError("Unimplemented for UTF-8 support", file: file, line: line)
-}
-@inlinable @_transparent
 internal func unimplemented_utf8_32bit(
   _ message: String = "",
   file: StaticString = #file, line: UInt = #line
@@ -717,7 +710,6 @@ extension String {
   #else
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
-    _guts._invariantCheck()
   }
   #endif // INTERNAL_CHECKS_ENABLED
 
@@ -910,23 +902,6 @@ extension String {
   @inlinable // Forward inlinability to append
   public static func += (lhs: inout String, rhs: String) {
     lhs.append(rhs)
-  }
-}
-
-extension String {
-  /// Constructs a `String` in `resultStorage` containing the given UTF-8.
-  ///
-  /// Low-level construction interface used by introspection
-  /// implementation in the runtime library.
-  @inlinable @inline(__always)
-  @_silgen_name("swift_stringFromUTF8InRawMemory")
-  public // COMPILER_INTRINSIC
-  static func _fromUTF8InRawMemory(
-    _ resultStorage: UnsafeMutablePointer<String>,
-    start: UnsafeMutablePointer<UTF8.CodeUnit>,
-    utf8CodeUnitCount: Int
-    ) {
-    unimplemented_utf8()
   }
 }
 
@@ -1202,28 +1177,6 @@ extension String: CustomStringConvertible {
   public var description: String { return self }
 }
 
-extension String {
-  /// Calls the given closure with a pointer to the contents of the string,
-  /// represented as a null-terminated sequence of UTF-8 code units.
-  ///
-  /// The pointer passed as an argument to `body` is valid only during the
-  /// execution of `withCString(_:)`. Do not store or return the pointer for
-  /// later use.
-  ///
-  /// - Parameter body: A closure with a pointer parameter that points to a
-  ///   null-terminated sequence of UTF-8 code units. If `body` has a return
-  ///   value, that value is also used as the return value for the
-  ///   `withCString(_:)` method. The pointer argument is valid only for the
-  ///   duration of the method's execution.
-  /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable // fast-path: already C-string compatible
-  public func withCString<Result>(
-    _ body: (UnsafePointer<Int8>) throws -> Result
-  ) rethrows -> Result {
-    return try _guts.withCString(body)
-  }
-}
-
 // TODO(UTF8): Move this decl back to StringIndex.swift
 extension String {
   /// A position of a character or code unit in a string.
@@ -1240,17 +1193,10 @@ extension String {
   }
 }
 
-extension String : LosslessStringConvertible {
-  @inlinable // FIXME(sil-serialize-all)
-  public init(_ content: String) {
-    self = content
-  }
-}
-
 extension String {
   public // @testable
   var _nfcCodeUnits: [UInt8] {
-    return _slicedGuts.withNFCCodeUnitsIterator { Array($0) }
+    return _gutsSlice.withNFCCodeUnitsIterator_2 { Array($0) }
   }
   
   public // @testable
