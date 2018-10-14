@@ -841,11 +841,15 @@ static void diagnoseUnboundGenericType(Type ty, SourceLoc loc) {
 static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
                                            Type parentTy,
                                            SourceLoc loc,
-                                           AssociatedTypeDecl *assocType) {
+                                           TypeDecl *typeDecl) {
+  auto protocol = dyn_cast<ProtocolDecl>(typeDecl->getDeclContext());
+  if (!protocol)
+    return;
+
   // If we weren't given a conformance, go look it up.
   ProtocolConformance *conformance = nullptr;
   if (auto conformanceRef = TypeChecker::conformsToProtocol(
-          parentTy, assocType->getProtocol(), dc,
+          parentTy, protocol, dc,
           (ConformanceCheckFlags::InExpression |
            ConformanceCheckFlags::SuppressDependencyTracking |
            ConformanceCheckFlags::AllowUnavailableConditionalRequirements))) {
@@ -864,7 +868,7 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
           ? diag::unsupported_recursion_in_associated_type_reference
           : diag::broken_associated_type_witness;
 
-  ctx.Diags.diagnose(loc, diagCode, assocType->getFullName(), parentTy);
+  ctx.Diags.diagnose(loc, diagCode, isa<TypeAliasDecl>(typeDecl), typeDecl->getFullName(), parentTy);
 }
 
 /// \brief Returns a valid type or ErrorType in case of an error.
@@ -910,10 +914,11 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, SourceLoc loc,
     return ErrorType::get(ctx);
   }
 
-  if (type->hasError() && isa<AssociatedTypeDecl>(typeDecl)) {
+  if (type->hasError() && foundDC &&
+      (isa<AssociatedTypeDecl>(typeDecl) || isa<TypeAliasDecl>(typeDecl))) {
     maybeDiagnoseBadConformanceRef(fromDC,
                                    foundDC->getDeclaredInterfaceType(),
-                                   loc, cast<AssociatedTypeDecl>(typeDecl));
+                                   loc, typeDecl);
   }
 
   if (generic) {
