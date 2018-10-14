@@ -151,7 +151,9 @@ extension String {
   public var utf8: UTF8View {
     @inline(__always) get { return UTF8View(self._guts) }
     set {
-      unimplemented_utf8()
+      // TODO(UTF8 testing): test suite doesn't currenlty exercise this code at
+      // all, test it.
+      self = String(utf8._guts)
     }
   }
 
@@ -200,25 +202,6 @@ extension String {
 }
 
 // TODO(UTF8): design specialized iterator, rather than default indexing one
-//extension String.UTF8View {
-//  @_fixed_layout // FIXME(sil-serialize-all)
-//  public struct Iterator {
-//    // TODO(UTF8):
-//  }
-//
-//  public func makeIterator() -> Iterator {
-//    unimplemented_utf8()
-//  }
-//}
-//
-//extension String.UTF8View.Iterator : IteratorProtocol {
-//  public typealias Element = String.UTF8View.Element
-//
-//  @inlinable @inline(__always)
-//  public mutating func next() -> Unicode.UTF8.CodeUnit? {
-//    unimplemented_utf8()
-//  }
-//}
 
 extension String.UTF8View {
   @inlinable

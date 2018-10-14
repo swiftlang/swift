@@ -14,46 +14,52 @@ import SwiftShims
 
 extension StringProtocol {
   @inlinable
-  @_specialize(where Self == String, R == String)
-  @_specialize(where Self == String, R == Substring)
-  @_specialize(where Self == Substring, R == String)
-  @_specialize(where Self == Substring, R == Substring)
+  @_specialize(where Self == String, RHS == String)
+  @_specialize(where Self == String, RHS == Substring)
+  @_specialize(where Self == Substring, RHS == String)
+  @_specialize(where Self == Substring, RHS == Substring)
   @_effects(readonly)
-  public static func == <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-    return lhs._gutsSlice.compare(with: rhs._gutsSlice, expecting: .equal)
+  public static func == <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
+    return _stringCompare(
+      lhs._wholeGuts, lhs._offsetRange,
+      rhs._wholeGuts, rhs._offsetRange,
+      expecting: .equal)
   }
 
   @inlinable @inline(__always) // forward to other operator
   @_effects(readonly)
-  public static func != <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
+  public static func != <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
     return !(lhs == rhs)
   }
 
   @inlinable
-  @_specialize(where Self == String, R == String)
-  @_specialize(where Self == String, R == Substring)
-  @_specialize(where Self == Substring, R == String)
-  @_specialize(where Self == Substring, R == Substring)
+  @_specialize(where Self == String, RHS == String)
+  @_specialize(where Self == String, RHS == Substring)
+  @_specialize(where Self == Substring, RHS == String)
+  @_specialize(where Self == Substring, RHS == Substring)
   @_effects(readonly)
-  public static func < <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-    return lhs._gutsSlice.compare(with: rhs._gutsSlice, expecting: .less)
+  public static func < <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
+    return _stringCompare(
+      lhs._wholeGuts, lhs._offsetRange,
+      rhs._wholeGuts, rhs._offsetRange,
+      expecting: .less)
   }
 
   @inlinable @inline(__always) // forward to other operator
   @_effects(readonly)
-  public static func > <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
+  public static func > <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
     return rhs < lhs
   }
 
   @inlinable @inline(__always) // forward to other operator
   @_effects(readonly)
-  public static func <= <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
+  public static func <= <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
     return !(rhs < lhs)
   }
 
   @inlinable @inline(__always) // forward to other operator
   @_effects(readonly)
-  public static func >= <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
+  public static func >= <RHS: StringProtocol>(lhs: Self, rhs: RHS) -> Bool {
     return !(lhs < rhs)
   }
 }
@@ -62,17 +68,7 @@ extension String : Equatable {
   @inlinable @inline(__always) // For the bitwise comparision
   @_effects(readonly)
   public static func == (lhs: String, rhs: String) -> Bool {
-    if lhs._guts.rawBits == rhs._guts.rawBits { return true }
-    if _fastPath(lhs._guts.isNFCFastUTF8 && rhs._guts.isNFCFastUTF8) {
-      Builtin.onFastPath() // aggressively inline / optimize
-      return lhs._guts.withFastUTF8 { nfcSelf in
-        return rhs._guts.withFastUTF8 { nfcOther in
-          return _binaryCompare(nfcSelf, nfcOther) == 0
-        }
-      }
-    }
-
-    return lhs._gutsSlice.compare(with: rhs._gutsSlice, expecting: .equal)
+    return _stringCompare(lhs._guts, nil, rhs._guts, nil, expecting: .equal)
   }
 }
 
@@ -80,17 +76,7 @@ extension String : Comparable {
   @inlinable @inline(__always) // For the bitwise comparision
   @_effects(readonly)
   public static func < (lhs: String, rhs: String) -> Bool {
-    if lhs._guts.rawBits == rhs._guts.rawBits { return false }
-    if _fastPath(lhs._guts.isNFCFastUTF8 && rhs._guts.isNFCFastUTF8) {
-      Builtin.onFastPath() // aggressively inline / optimize
-      return lhs._guts.withFastUTF8 { nfcSelf in
-        return rhs._guts.withFastUTF8 { nfcOther in
-          return _binaryCompare(nfcSelf, nfcOther) < 0
-        }
-      }
-    }
-
-    return lhs._gutsSlice.compare(with: rhs._gutsSlice, expecting: .less)
+    return _stringCompare(lhs._guts, nil, rhs._guts, nil, expecting: .less)
   }
 }
 

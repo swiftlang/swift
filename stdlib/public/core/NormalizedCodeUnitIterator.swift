@@ -143,18 +143,18 @@ extension UnsafeBufferPointer where Element == UInt8 {
 internal struct _NormalizedUTF8CodeUnitIterator: IteratorProtocol {
   internal typealias CodeUnit = UInt8
 
-  var utf16Iterator: _NormalizedCodeUnitIterator
+  var utf16Iterator: _NormalizedUTF16CodeUnitIterator
   var utf8Buffer = _FixedArray4<CodeUnit>(allZeros:())
   var bufferIndex = 0
   var bufferCount = 0
 
   internal init(foreign guts: _StringGuts, range: Range<String.Index>) {
     _sanityCheck(guts.isForeign)
-    utf16Iterator = _NormalizedCodeUnitIterator(guts, range)
+    utf16Iterator = _NormalizedUTF16CodeUnitIterator(guts, range)
   }
 
   internal init(_ buffer: UnsafeBufferPointer<UInt8>, range: Range<Int>) {
-    utf16Iterator = _NormalizedCodeUnitIterator(buffer, range)
+    utf16Iterator = _NormalizedUTF16CodeUnitIterator(buffer, range)
   }
 
   internal mutating func next() -> UInt8? {
@@ -225,7 +225,7 @@ internal struct _NormalizedUTF8CodeUnitIterator: IteratorProtocol {
 extension _NormalizedUTF8CodeUnitIterator: Sequence { }
 
 internal
-struct _NormalizedCodeUnitIterator: IteratorProtocol {
+struct _NormalizedUTF16CodeUnitIterator: IteratorProtocol {
   internal typealias CodeUnit = UInt16
   var segmentBuffer = _FixedArray16<CodeUnit>(allZeros:())
   var overflowBuffer: [CodeUnit]? = nil
@@ -243,33 +243,6 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
 
   init(_ buffer: UnsafeBufferPointer<UInt8>, _ range: Range<Int>) {
     source = _UTF8BufferSource(buffer, range)
-  }
-
-  mutating func compare(
-    with other: _NormalizedCodeUnitIterator
-  ) -> _StringComparisonResult {
-    var mutableOther = other
-    for cu in IteratorSequence(self) {
-      if let otherCU = mutableOther.next() {
-        let result = _lexicographicalCompare(cu, otherCU)
-        if result == .equal {
-          continue
-        } else {
-          return result
-        }
-      } else {
-        //other returned nil, we are greater
-        return .greater
-      }
-    }
-
-    //we ran out of code units, either we are equal, or only we ran out and
-    //other is greater
-    if let _ = mutableOther.next() {
-      return .less
-    } else {
-      return .equal
-    }
   }
 
   struct _UTF8BufferSource: _SegmentSource {

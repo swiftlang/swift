@@ -54,7 +54,7 @@ extension _StringGutsSlice {
       }
     } else {
       self.withNFCCodeUnitsIterator_2 {
-        var selfIter = $0
+        let selfIter = $0
         for cu in selfIter { hasher.combine(cu) }
       }
     }

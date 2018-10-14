@@ -338,11 +338,11 @@ extension String {
 extension Sequence where Element == String {
   @available(*, unavailable, message: "Operator '+' cannot be used to append a String to a sequence of strings")
   public static func + (lhs: Self, rhs: String) -> Never {
-    unimplemented_utf8()
+    fatalError()
   }
 
   @available(*, unavailable, message: "Operator '+' cannot be used to append a String to a sequence of strings")
   public static func + (lhs: String, rhs: Self) -> Never {
-    unimplemented_utf8()
+    fatalError()
   }
 }
