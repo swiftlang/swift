@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILArgument.h"
@@ -740,16 +741,6 @@ bool swift::mergeBasicBlockWithSuccessor(SILBasicBlock *BB, DominanceInfo *DT,
   if (BB == SuccBB || !SuccBB->getSinglePredecessorBlock())
     return false;
 
-  // If there are any BB arguments in the destination, replace them with the
-  // branch operands, since they must dominate the dest block.
-  for (unsigned i = 0, e = Branch->getArgs().size(); i != e; ++i)
-    SuccBB->getArgument(i)->replaceAllUsesWith(Branch->getArg(i));
-
-  Branch->eraseFromParent();
-
-  // Move the instruction from the successor block to the current block.
-  BB->spliceAtEnd(SuccBB);
-
   if (DT)
     if (auto *SuccBBNode = DT->getNode(SuccBB)) {
       // Change the immediate dominator for children of the successor to be the
@@ -766,7 +757,7 @@ bool swift::mergeBasicBlockWithSuccessor(SILBasicBlock *BB, DominanceInfo *DT,
   if (LI)
     LI->removeBlock(SuccBB);
 
-  SuccBB->eraseFromParent();
+  mergeBasicBlockWithSingleSuccessor(BB, SuccBB);
 
   return true;
 }
