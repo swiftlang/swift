@@ -561,10 +561,10 @@ func testNoReturn3(_ b : Bool) -> Any {
 
   switch b {
   default:
-    PerpetualMotion().start()
+    PerpetualMotion().start() // expected-note {{a call to a never-returning function}}
   }
 
-  return a
+  return a // expected-warning {{will never be executed}}
 }
 
 func testNoReturn4(_ b : Bool) -> Any {
@@ -572,10 +572,10 @@ func testNoReturn4(_ b : Bool) -> Any {
 
   switch b {
   default:
-    PerpetualMotion.stop()
+    PerpetualMotion.stop() // expected-note {{a call to a never-returning function}}
   }
 
-  return a
+  return a // expected-warning {{will never be executed}}
 }
 
 

@@ -96,7 +96,7 @@ import Foundation
   // CHECK-LABEL: sil hidden @$s20objc_blocks_bridging3FooC19optCFunctionPointer{{[_0-9a-zA-Z]*}}F
   // CHECK:         switch_enum %0
   //
-  // CHECK: bb2([[FP_BUF:%.*]] : @trivial $@convention(c) (NSString) -> @autoreleased NSString):
+  // CHECK: bb1([[FP_BUF:%.*]] : @trivial $@convention(c) (NSString) -> @autoreleased NSString):
   @objc dynamic func optCFunctionPointer(_ fp: (@convention(c) (String) -> String)?, x: String) -> String? {
     return fp?(x)
   }

@@ -9,9 +9,6 @@ func testCall(_ f: (() -> ())?) {
 // CHECK:      [[T0_COPY:%.*]] = copy_value [[T0]]
 // CHECK-NEXT: switch_enum [[T0_COPY]] : $Optional<@callee_guaranteed () -> ()>, case #Optional.some!enumelt.1: [[SOME:bb[0-9]+]], case #Optional.none!enumelt: [[NONE:bb[0-9]+]]
 //
-// CHECK: [[NONE]]:
-// CHECK:   br [[NOTHING_BLOCK_EXIT:bb[0-9]+]]
-
 //   If it does, project and load the value out of the implicitly unwrapped
 //   optional...
 
@@ -23,7 +20,7 @@ func testCall(_ f: (() -> ())?) {
 // CHECK:      br [[EXIT:bb[0-9]+]](
 
 //   (first nothing block)
-// CHECK:    [[NOTHING_BLOCK_EXIT]]:
+// CHECK:    [[NONE]]:
 // CHECK-NEXT: enum $Optional<()>, #Optional.none!enumelt
 // CHECK-NEXT: br [[EXIT]]
 // CHECK: } // end sil function '$s8optional8testCallyyyycSgF'
@@ -44,9 +41,9 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
 // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [unknown] [[PBF]]
 //   Check whether 'f' holds a value.
 // CHECK: [[HASVALUE:%.*]] = select_enum_addr [[READ]]
-// CHECK-NEXT: cond_br [[HASVALUE]], bb2, bb1
+// CHECK-NEXT: cond_br [[HASVALUE]], bb1, bb3
 //   If so, pull out the value...
-// CHECK:    bb2:
+// CHECK:    bb1:
 // CHECK-NEXT: [[T1:%.*]] = unchecked_take_enum_data_addr [[READ]]
 // CHECK-NEXT: [[T0:%.*]] = load [copy] [[T1]]
 // CHECK-NEXT: end_access [[READ]]
@@ -56,9 +53,9 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
 //   ...and coerce to T?
 // CHECK: inject_enum_addr [[PBX]] {{.*}}some
 // CHECK:     destroy_value [[T0]]
-// CHECK-NEXT: br bb3
+// CHECK-NEXT: br bb2
 //   Continuation block.
-// CHECK:    bb3
+// CHECK:    bb2
 // CHECK-NEXT: destroy_value [[X]]
 // CHECK-NEXT: destroy_value [[F]]
 // CHECK-NOT: destroy_value %0
@@ -66,9 +63,10 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
 // CHECK-NEXT: return [[T0]] : $()
 
 //   Nothing block.
-// CHECK:    bb4:
+// CHECK:    bb3:
+// CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: inject_enum_addr [[PBX]] {{.*}}none
-// CHECK-NEXT: br bb3
+// CHECK-NEXT: br bb2
 
 
 // <rdar://problem/15180622>
