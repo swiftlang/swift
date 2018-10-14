@@ -422,8 +422,9 @@ final internal class _VaListBuilder {
     var encoded = arg._cVarArgEncoding
 
 #if arch(x86_64)
-    if arg is _CVarArgPassedAsDouble
-      && sseRegistersUsed < _countSSERegisters {
+    let isDouble = arg is _CVarArgPassedAsDouble
+
+    if isDouble && sseRegistersUsed < _countSSERegisters {
       var startIndex = _countGPRegisters
            + (sseRegistersUsed * _sseRegisterWords)
       for w in encoded {
@@ -433,7 +434,7 @@ final internal class _VaListBuilder {
       sseRegistersUsed += 1
     }
     else if encoded.count == 1
-      && !(arg is _CVarArgPassedAsDouble)
+      && !isDouble
       && gpRegistersUsed < _countGPRegisters {
       storage[gpRegistersUsed] = encoded[0]
       gpRegistersUsed += 1
