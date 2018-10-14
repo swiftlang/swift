@@ -689,10 +689,11 @@ ERROR(use_nonmatching_operator,none,
       "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
       (DeclName, unsigned))
 ERROR(unsupported_recursion_in_associated_type_reference,none,
-      "unsupported recursion for reference to associated type %0 of type %1",
-      (DeclName, Type))
+      "unsupported recursion for reference to %select{associated type|type alias}0 %1 of type %2",
+      (bool, DeclName, Type))
 ERROR(broken_associated_type_witness,none,
-      "reference to invalid associated type %0 of type %1", (DeclName, Type))
+      "reference to invalid %select{associated type|type alias}0 %1 of type %2",
+      (bool, DeclName, Type))
 
 ERROR(unspaced_binary_operator_fixit,none,
       "missing whitespace between %0 and %1 operators",
