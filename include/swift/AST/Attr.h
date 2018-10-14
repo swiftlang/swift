@@ -135,7 +135,7 @@ public:
   static const char *getAttrName(TypeAttrKind kind);
 };
 
-class AttributeBase {
+class alignas(1 << AttrAlignInBits) AttributeBase {
 public:
   /// The location of the '@'.
   const SourceLoc AtLoc;
