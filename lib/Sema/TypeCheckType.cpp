@@ -215,46 +215,69 @@ Type TypeResolution::resolveDependentMemberType(
   auto lazyResolver = ctx.getLazyResolver();
   if (lazyResolver)
     lazyResolver->resolveDeclSignature(concrete);
-
-  if (auto typeAlias = dyn_cast<TypeAliasDecl>(concrete)) {
-    if (auto protocol = dyn_cast<ProtocolDecl>(typeAlias->getDeclContext())) {
-      // We need to make sure the generic environment of a surrounding protocol
-      // propagates to the typealias, since the former may not have existed when
-      // the typealiases type was first computed.
-      // FIXME: See the comment in the ProtocolDecl case of validateDecl().
-      if (lazyResolver)
-        lazyResolver->resolveProtocolEnvironment(protocol);
-    }
-  }
   if (!concrete->hasInterfaceType())
     return ErrorType::get(ctx);
-  if (baseTy->isTypeParameter()) {
-    if (auto proto = concrete->getDeclContext()->getSelfProtocolDecl()) {
-      // Fast path: if there are no type parameters in the concrete type, just
-      // return it.
-      if (!concrete->getDeclaredInterfaceType()->hasTypeParameter())
-        return concrete->getDeclaredInterfaceType();
 
-      if (lazyResolver)
-        lazyResolver->resolveProtocolEnvironment(proto);
-
-      auto subMap = SubstitutionMap::getProtocolSubstitutions(
-                      proto, baseTy, ProtocolConformanceRef(proto));
-      return concrete->getDeclaredInterfaceType().subst(subMap);
-    }
-
-    Type baseType = baseEquivClass->concreteType ? baseEquivClass->concreteType
-                                                 : baseEquivClass->superclass;
-
-    if (baseType) {
-      return baseType->getTypeOfMember(DC->getParentModule(), concrete,
-                                       concrete->getDeclaredInterfaceType());
-    }
-
-    llvm_unreachable("shouldn't have a concrete decl here");
+  if (concrete->getDeclContext()->getSelfClassDecl()) {
+    // We found a member of a class from a protocol or protocol
+    // extension.
+    //
+    // Get the superclass of the 'Self' type parameter.
+    baseTy = (baseEquivClass->concreteType
+              ? baseEquivClass->concreteType
+              : baseEquivClass->superclass);
+    assert(baseTy);
   }
 
   return TypeChecker::substMemberTypeWithBase(DC->getParentModule(), concrete,
+                                              baseTy);
+}
+
+Type TypeResolution::resolveSelfAssociatedType(Type baseTy,
+                                               DeclContext *DC,
+                                               Identifier name) const {
+  switch (stage) {
+  case TypeResolutionStage::Structural:
+    return DependentMemberType::get(baseTy, name);
+
+  case TypeResolutionStage::Contextual:
+    llvm_unreachable("Dependent type after archetype substitution");
+
+  case TypeResolutionStage::Interface:
+    // Handled below.
+    break;
+  }
+
+  assert(stage == TypeResolutionStage::Interface);
+  auto builder = getGenericSignatureBuilder();
+  auto baseEquivClass =
+    builder->resolveEquivalenceClass(
+                                baseTy,
+                                ArchetypeResolutionKind::CompleteWellFormed);
+  if (!baseEquivClass)
+    return ErrorType::get(baseTy);
+
+  // Look for a nested type with the given name.
+  auto nestedType = baseEquivClass->lookupNestedType(*builder, name);
+  assert(nestedType);
+
+  // If the nested type has been resolved to an associated type, use it.
+  if (auto assocType = dyn_cast<AssociatedTypeDecl>(nestedType)) {
+    return DependentMemberType::get(baseTy, assocType);
+  }
+
+  if (nestedType->getDeclContext()->getSelfClassDecl()) {
+    // We found a member of a class from a protocol or protocol
+    // extension.
+    //
+    // Get the superclass of the 'Self' type parameter.
+    baseTy = (baseEquivClass->concreteType
+              ? baseEquivClass->concreteType
+              : baseEquivClass->superclass);
+    assert(baseTy);
+  }
+
+  return TypeChecker::substMemberTypeWithBase(DC->getParentModule(), nestedType,
                                               baseTy);
 }
 
@@ -279,6 +302,12 @@ bool TypeResolution::areSameType(Type type1, Type type2) const {
 
   // If we have a generic signature, canonicalize using it.
   if (auto genericSig = getGenericSignature()) {
+    // If both are type parameters, we can use a cheaper check
+    // that avoids transforming the type and computing anchors.
+    if (type1->isTypeParameter() &&
+        type2->isTypeParameter()) {
+      return genericSig->areSameTypeParameterInContext(type1, type2);
+    }
     return genericSig->getCanonicalTypeInContext(type1)
       == genericSig->getCanonicalTypeInContext(type2);
   }
@@ -542,20 +571,41 @@ Type TypeChecker::resolveTypeInContext(
     selfType = resolution.mapTypeIntoContext(
       foundDC->getSelfInterfaceType());
 
-    if (selfType->is<GenericTypeParamType>() &&
-        typeDecl->getDeclContext()->getSelfClassDecl()) {
-      // We found a member of a class from a protocol or protocol
-      // extension.
-      //
-      // Get the superclass of the 'Self' type parameter.
-      auto *sig = foundDC->getGenericSignatureOfContext();
-      if (!sig)
-        return ErrorType::get(ctx);
-      auto superclassType = sig->getSuperclassBound(selfType);
-      if (!superclassType)
-        return ErrorType::get(ctx);
+    if (selfType->is<GenericTypeParamType>()) {
+      if (typeDecl->getDeclContext()->getSelfProtocolDecl()) {
+        if (isa<AssociatedTypeDecl>(typeDecl) ||
+            (isa<TypeAliasDecl>(typeDecl) &&
+             !cast<TypeAliasDecl>(typeDecl)->isGeneric())) {
+          // FIXME: We should use this lookup method for the Interface
+          // stage too, but right now that causes problems with
+          // Sequence.SubSequence vs Collection.SubSequence; the former
+          // is more canonical, but if we return that instead of the
+          // latter, we infer the wrong associated type in some cases,
+          // because we use the Sequence.SubSequence default instead of
+          // the Collection.SubSequence default, even when the conforming
+          // type wants to conform to Collection.
+          if (resolution.getStage() == TypeResolutionStage::Structural) {
+            return resolution.resolveSelfAssociatedType(
+              selfType, foundDC, typeDecl->getName());
+          }
+        }
+      }
 
-      selfType = superclassType;
+      // FIXME: Remove this once the above FIXME is addressed.
+      if (typeDecl->getDeclContext()->getSelfClassDecl()) {
+        // We found a member of a class from a protocol or protocol
+        // extension.
+        //
+        // Get the superclass of the 'Self' type parameter.
+        auto *sig = foundDC->getGenericSignatureOfContext();
+        if (!sig)
+          return ErrorType::get(ctx);
+        auto superclassType = sig->getSuperclassBound(selfType);
+        if (!superclassType)
+          return ErrorType::get(ctx);
+
+        selfType = superclassType;
+      }
     }
   }
   
