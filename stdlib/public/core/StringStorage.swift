@@ -45,7 +45,7 @@ extension _AbstractStringStorage {
 
     let range = Range(
       uncheckedBounds: (aRange.location, aRange.location+aRange.length))
-    let slice = asString.utf16[asString._utf16OffsetToIndex(range)]
+    let slice = asString.utf16[asString._utf16OffsetsToRange(range)]
     let outputBufPtr = UnsafeMutableBufferPointer(
       start: buffer, count: range.count)
 

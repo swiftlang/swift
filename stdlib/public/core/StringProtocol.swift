@@ -19,16 +19,21 @@ public protocol StringProtocol
   TextOutputStream, TextOutputStreamable,
   LosslessStringConvertible, ExpressibleByStringLiteral,
   Hashable, Comparable
-  where Iterator.Element == Character, SubSequence : StringProtocol {
-
+  where Iterator.Element == Character,
+        Index == String.Index,
+        SubSequence : StringProtocol
+{
   associatedtype UTF8View : /*Bidirectional*/Collection
-  where UTF8View.Element == UInt8 // Unicode.UTF8.CodeUnit
+  where UTF8View.Element == UInt8, // Unicode.UTF8.CodeUnit
+        UTF8View.Index == Index
 
   associatedtype UTF16View : BidirectionalCollection
-  where UTF16View.Element == UInt16 // Unicode.UTF16.CodeUnit
+  where UTF16View.Element == UInt16, // Unicode.UTF16.CodeUnit
+        UTF16View.Index == Index
 
   associatedtype UnicodeScalarView : BidirectionalCollection
-  where UnicodeScalarView.Element == Unicode.Scalar
+  where UnicodeScalarView.Element == Unicode.Scalar,
+        UnicodeScalarView.Index == Index
 
   var utf8: UTF8View { get }
   var utf16: UTF16View { get }
