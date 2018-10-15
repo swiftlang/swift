@@ -515,7 +515,6 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   case ArrayCallKind::kGetCount:
   case ArrayCallKind::kGetCapacity:
   case ArrayCallKind::kGetElement:
-  case ArrayCallKind::kGetArrayOwner:
   case ArrayCallKind::kGetElementAddress:
     return true;
   case ArrayCallKind::kMakeMutable:
