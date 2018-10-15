@@ -351,6 +351,11 @@ public:
                                   SourceRange baseRange,
                                   ComponentIdentTypeRepr *ref) const;
 
+  /// Resolve an unqualified reference to an associated type or type alias
+  /// in a protocol.
+  Type resolveSelfAssociatedType(Type baseTy, DeclContext *DC,
+                                 Identifier name) const;
+
   /// Determine whether the given two types are equivalent within this
   /// type resolution context.
   bool areSameType(Type type1, Type type2) const;
