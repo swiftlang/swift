@@ -82,7 +82,11 @@ extension ${Self} : CustomStringConvertible {
   @inlinable
   public var description: String {
     if isFinite {
-      return _float${bits}ToString(self, debug: false)
+      var (buffer, length) = _float${bits}ToString(self, debug: false)
+      return buffer.withBytes { (bufferPtr) in
+        String._fromASCII(
+          UnsafeBufferPointer(start: bufferPtr, count: length))
+      }
     } else if isNaN {
       return "nan"
     } else if sign == .minus {
@@ -97,11 +101,26 @@ extension ${Self} : CustomDebugStringConvertible {
   /// A textual representation of the value, suitable for debugging.
   public var debugDescription: String {
     if isFinite || isNaN {
-      return _float${bits}ToString(self, debug: true)
+      var (buffer, length) = _float${bits}ToString(self, debug: true)
+      return buffer.withBytes { (bufferPtr) in
+        String._fromASCII(
+          UnsafeBufferPointer(start: bufferPtr, count: length))
+      }
     } else if sign == .minus {
       return "-inf"
     } else {
       return "inf"
+    }
+  }
+}
+
+extension ${Self} : TextOutputStreamable {
+  @inlinable
+  public func write<Target>(to target: inout Target) where Target : TextOutputStream {
+    var (buffer, length) = _float${bits}ToString(self, debug: true)
+    buffer.withBytes { (bufferPtr) in
+      let bufPtr = UnsafeBufferPointer(start: bufferPtr, count: length)
+      target._writeASCII(bufPtr)
     }
   }
 }
