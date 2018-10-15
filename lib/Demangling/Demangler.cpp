@@ -1290,6 +1290,8 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
   }
 
   // Generic arguments for the outermost type come first.
+  if (Nominal->getNumChildren() == 0)
+    return nullptr;
   NodePointer Context = Nominal->getFirstChild();
 
   bool consumesGenericArgs = true;

@@ -333,3 +333,5 @@ $S1T19protocol_resilience17ResilientProtocolPTl ---> associated type descriptor 
 $S18resilient_protocol21ResilientBaseProtocolTL ---> protocol requirements base descriptor for resilient_protocol.ResilientBaseProtocol
 $S1t1PP10AssocType2_AA1QTn ---> associated conformance descriptor for t.P.AssocType2: t.Q
 $S1t1PP10AssocType2_AA1QTN ---> default associated conformance accessor for t.P.AssocType2: t.Q
+$sSD5IndexVy__GD ---> $sSD5IndexVy__GD
+
