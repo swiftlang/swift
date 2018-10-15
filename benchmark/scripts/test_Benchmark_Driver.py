@@ -421,9 +421,9 @@ class TestLoggingReportFormatter(unittest.TestCase):
         self.assertEquals(f.format(lr), 'INFO Hi!')
 
 
-def _PTR(min=700, mem_pages=1000):
+def _PTR(min=700, mem_pages=1000, setup=None):
     """Create PerformanceTestResult Stub."""
-    return Stub(min=min, mem_pages=mem_pages)
+    return Stub(min=min, mem_pages=mem_pages, setup=setup)
 
 
 def _run(test, num_samples=None, num_iters=None, verbose=None,
@@ -620,6 +620,29 @@ class TestBenchmarkDoctor(unittest.TestCase):
         self.assert_contains(
             ["Move initialization of benchmark data to the `setUpFunction` "
              "registered in `BenchmarkInfo`."], self.logs['info'])
+
+    def test_benchmark_setup_takes_reasonable_time(self):
+        """Setup < 200 ms (20% extra on top of the typical 1 s measurement)"""
+        with captured_output() as (out, _):
+            doctor = BenchmarkDoctor(self.args, BenchmarkDriverMock([]))
+            doctor.analyze({
+                'name': 'NormalSetup',
+                'NormalSetup O i1a': _PTR(setup=199999),
+                'NormalSetup O i2a': _PTR(setup=200001)})
+            doctor.analyze({
+                'name': 'LongSetup',
+                'LongSetup O i1a': _PTR(setup=200001),
+                'LongSetup O i2a': _PTR(setup=200002)})
+        output = out.getvalue()
+
+        self.assertIn('runtime: ', output)
+        self.assertNotIn('NormalSetup', output)
+        self.assert_contains(
+            ["'LongSetup' setup took at least 200001 μs."],
+            self.logs['error'])
+        self.assert_contains(
+            ["The `setUpFunction` should take no more than 200 ms."],
+            self.logs['info'])
 
     def test_benchmark_has_constant_memory_use(self):
         """Benchmark's memory footprint must not vary with num-iters."""

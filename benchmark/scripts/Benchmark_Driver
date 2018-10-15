@@ -296,6 +296,7 @@ class BenchmarkDoctor(object):
             self._name_matches_capital_words_convention,
             self._name_is_at_most_40_chars_long,
             self._no_setup_overhead,
+            self._reasonable_setup_time,
             self._optimized_runtime_in_range,
             self._constant_memory_use
         ]
@@ -382,6 +383,17 @@ class BenchmarkDoctor(object):
             BenchmarkDoctor.log_runtime.info(
                 'Move initialization of benchmark data to the `setUpFunction` '
                 'registered in `BenchmarkInfo`.')
+
+    @staticmethod
+    def _reasonable_setup_time(measurements):
+        setup = min([result.setup
+                     for result in BenchmarkDoctor._select(measurements)])
+        if 200000 < setup:  # 200 ms
+            BenchmarkDoctor.log_runtime.error(
+                "'%s' setup took at least %d μs.",
+                measurements['name'], setup)
+            BenchmarkDoctor.log_runtime.info(
+                'The `setUpFunction` should take no more than 200 ms.')
 
     @staticmethod
     def _constant_memory_use(measurements):
