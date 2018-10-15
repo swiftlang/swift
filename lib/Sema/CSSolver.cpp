@@ -1629,13 +1629,12 @@ static bool isOperatorBindOverload(Constraint *bindOverload) {
 // Given a bind overload constraint for an operator, return the
 // protocol designated as the first place to look for overloads of the
 // operator.
-static NominalTypeDecl *
-getOperatorDesignatedNominalType(Constraint *bindOverload) {
+static ArrayRef<NominalTypeDecl *>
+getOperatorDesignatedNominalTypes(Constraint *bindOverload) {
   auto choice = bindOverload->getOverloadChoice();
   auto *funcDecl = cast<FuncDecl>(choice.getDecl());
   auto *operatorDecl = funcDecl->getOperatorDecl();
-  auto designatedTypes = operatorDecl->getDesignatedNominalTypes();
-  return !designatedTypes.empty() ? designatedTypes[0] : nullptr;
+  return operatorDecl->getDesignatedNominalTypes();
 }
 
 void ConstraintSystem::partitionDisjunction(
@@ -1660,8 +1659,8 @@ void ConstraintSystem::partitionDisjunction(
   SmallVector<unsigned, 4> disabled;
   SmallVector<unsigned, 4> unavailable;
   SmallVector<unsigned, 4> globalScope;
-  SmallVector<unsigned, 4> definedInDesignatedType;
-  SmallVector<unsigned, 4> definedInExtensionOfDesignatedType;
+  SmallVector<SmallVector<unsigned, 4>, 4> definedInDesignatedType;
+  SmallVector<SmallVector<unsigned, 4>, 4> definedInExtensionOfDesignatedType;
   SmallVector<unsigned, 4> everythingElse;
   SmallSet<Constraint *, 16> taken;
 
@@ -1722,28 +1721,43 @@ void ConstraintSystem::partitionDisjunction(
 
   // Now collect the overload choices that are defined within the type
   // that was designated in the operator declaration.
-  auto *designatedNominal = getOperatorDesignatedNominalType(Choices[0]);
-  if (designatedNominal) {
-    forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
-        auto *decl = constraint->getOverloadChoice().getDecl();
-        auto *funcDecl = cast<FuncDecl>(decl);
+  auto designatedNominalTypes = getOperatorDesignatedNominalTypes(Choices[0]);
+  if (!designatedNominalTypes.empty()) {
+    forEachChoice(
+        Choices, [&](unsigned constraintIndex, Constraint *constraint) -> bool {
+          auto *decl = constraint->getOverloadChoice().getDecl();
+          auto *funcDecl = cast<FuncDecl>(decl);
 
-        auto *parentDecl = funcDecl->getParent()->getAsDecl();
-        if (parentDecl == designatedNominal) {
-          definedInDesignatedType.push_back(index);
-          return true;
-        }
+          auto *parentDecl = funcDecl->getParent()->getAsDecl();
+          for (auto designatedTypeIndex : indices(designatedNominalTypes)) {
+            auto *designatedNominal =
+                designatedNominalTypes[designatedTypeIndex];
+            if (parentDecl == designatedNominal) {
+              if (designatedTypeIndex >= definedInDesignatedType.size())
+                definedInDesignatedType.resize(designatedTypeIndex + 1);
+              auto &constraints = definedInDesignatedType[designatedTypeIndex];
+              constraints.push_back(constraintIndex);
+              return true;
+            }
 
-        if (auto *extensionDecl = dyn_cast<ExtensionDecl>(parentDecl)) {
-          parentDecl = extensionDecl->getExtendedNominal();
-          if (parentDecl == designatedNominal) {
-            definedInExtensionOfDesignatedType.push_back(index);
-            return true;
+            if (auto *extensionDecl = dyn_cast<ExtensionDecl>(parentDecl)) {
+              parentDecl = extensionDecl->getExtendedNominal();
+              if (parentDecl == designatedNominal) {
+                if (designatedTypeIndex >=
+                    definedInExtensionOfDesignatedType.size())
+                  definedInExtensionOfDesignatedType.resize(
+                      designatedTypeIndex + 1);
+
+                auto &constraints =
+                    definedInExtensionOfDesignatedType[designatedTypeIndex];
+                constraints.push_back(constraintIndex);
+                return true;
+              }
+            }
           }
-        }
 
-        return false;
-      });
+          return false;
+        });
   }
 
   // Gather the remaining options.
@@ -1762,8 +1776,19 @@ void ConstraintSystem::partitionDisjunction(
   };
 
   // Now create the partitioning based on what was collected.
-  appendPartition(definedInDesignatedType);
-  appendPartition(definedInExtensionOfDesignatedType);
+
+  // First we'll add partitions for each of the overloads we found in
+  // types that were designated as part of the operator declaration.
+  for (auto designatedTypeIndex : indices(designatedNominalTypes)) {
+    if (designatedTypeIndex < definedInDesignatedType.size()) {
+      auto &primary = definedInDesignatedType[designatedTypeIndex];
+      appendPartition(primary);
+    }
+    if (designatedTypeIndex < definedInExtensionOfDesignatedType.size()) {
+      auto &secondary = definedInExtensionOfDesignatedType[designatedTypeIndex];
+      appendPartition(secondary);
+    }
+  }
   appendPartition(everythingElse);
   appendPartition(globalScope);
   appendPartition(unavailable);
