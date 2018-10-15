@@ -230,24 +230,16 @@ bool Parser::isTerminatorForBraceItemListKind(BraceItemListKind Kind,
 
 void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
                                  TopLevelCodeDecl *TLCD) {
+  SourceLoc EndLoc = PreviousLoc;
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
-  // Consume tokens up to code completion token.
-  while (Tok.isNot(tok::code_complete, tok::eof)) {
-    consumeToken();
-  }
-  // Consume the code completion token, if there is one.
-  consumeIf(tok::code_complete);
-  // Also perform the same recovery as the main parser to capture tokens from
-  // this decl that are past the code completion token.
-  skipUntilDeclStmtRBrace(tok::l_brace);
-  SourceLoc EndLoc = Tok.getLoc();
-  State->delayTopLevel(TLCD, { BeginLoc, EndLoc },
+  State->delayTopLevel(TLCD, {BeginLoc, EndLoc},
                        BeginParserPosition.PreviousLoc);
 
   // Skip the rest of the file to prevent the parser from constructing the AST
   // for it.  Forward references are not allowed at the top level.
-  skipUntil(tok::eof);
+  while (!Tok.is(tok::eof))
+    consumeToken();
 }
 
 ///   brace-item:
@@ -1035,10 +1027,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
                                 GuardedPatternContext parsingContext,
                                 bool isFirstPattern) {
   ParserResult<Pattern> patternResult;
-  auto setErrorResult = [&] () {
-    patternResult = makeParserErrorResult(new (P.Context)
-      AnyPattern(SourceLoc()));
-  };
+
   bool isExprBasic = [&]() -> bool {
     switch (parsingContext) {
     // 'case' is terminated with a colon and so allows a trailing closure.
@@ -1053,7 +1042,6 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
 
   // Do some special-case code completion for the start of the pattern.
   if (P.Tok.is(tok::code_complete)) {
-    setErrorResult();
     if (P.CodeCompletion) {
       switch (parsingContext) {
       case GuardedPatternContext::Case:
@@ -1063,26 +1051,22 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
         P.CodeCompletion->completePostfixExprBeginning(nullptr);
         break;
       }
-      P.consumeToken();
-    } else {
-      result.ThePattern = patternResult.get();
-      status.setHasCodeCompletion();
-      return;
     }
+    auto loc = P.consumeToken(tok::code_complete);
+    result.ThePattern = new (P.Context) AnyPattern(loc);
+    status.setHasCodeCompletion();
+    return;
   }
   if (parsingContext == GuardedPatternContext::Case &&
       P.Tok.isAny(tok::period_prefix, tok::period) &&
       P.peekToken().is(tok::code_complete)) {
-    setErrorResult();
-    if (P.CodeCompletion) {
-      P.consumeToken();
+    P.consumeToken();
+    if (P.CodeCompletion)
       P.CodeCompletion->completeCaseStmtDotPrefix();
-      P.consumeToken();
-    } else {
-      result.ThePattern = patternResult.get();
-      status.setHasCodeCompletion();
-      return;
-    }
+    auto loc = P.consumeToken(tok::code_complete);
+    result.ThePattern = new (P.Context) AnyPattern(loc);
+    status.setHasCodeCompletion();
+    return;
   }
 
   // If this is a 'catch' clause and we have "catch {" or "catch where...",
