@@ -2094,55 +2094,24 @@ namespace {
       Diag<> brokenBuiltinProtocolDiag;
 
       if (isStringLiteral) {
-        // If the string contains only ASCII, force a UTF8 representation
-        bool forceASCII = stringLiteral != nullptr;
-        if (forceASCII) {
-          for (auto c: stringLiteral->getValue()) {
-            if (c & (1 << 7)) {
-              forceASCII = false;
-              break;
-            }
-          }
-        }
-        
         literalType = tc.Context.Id_StringLiteralType;
 
         literalFuncName = DeclName(tc.Context, DeclBaseName::createConstructor(),
                                    { tc.Context.Id_stringLiteral });
 
-        // If the string contains non-ASCII and the type can handle
-        // UTF-16 string literals, prefer them.
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
-            KnownProtocolKind::ExpressibleByBuiltinUTF16StringLiteral);
+            KnownProtocolKind::ExpressibleByBuiltinStringLiteral);
+        builtinLiteralFuncName
+          = DeclName(tc.Context, DeclBaseName::createConstructor(),
+                     { tc.Context.Id_builtinStringLiteral,
+                       tc.Context.getIdentifier("utf8CodeUnitCount"),
+                       tc.Context.getIdentifier("isASCII") });
+        if (stringLiteral)
+          stringLiteral->setEncoding(StringLiteralExpr::UTF8);
+        else
+          magicLiteral->setStringEncoding(StringLiteralExpr::UTF8);
 
-        if (!forceASCII && (tc.conformsToProtocol(
-                                      type, builtinProtocol, cs.DC,
-                                      ConformanceCheckFlags::InExpression))) {
-          builtinLiteralFuncName =
-              DeclName(tc.Context, DeclBaseName::createConstructor(),
-                       {tc.Context.Id_builtinUTF16StringLiteral,
-                        tc.Context.getIdentifier("utf16CodeUnitCount")});
-
-          if (stringLiteral)
-            stringLiteral->setEncoding(StringLiteralExpr::UTF16);
-          else
-            magicLiteral->setStringEncoding(StringLiteralExpr::UTF16);
-        } else {
-          // Otherwise, fall back to UTF-8.
-          builtinProtocol = tc.getProtocol(
-              expr->getLoc(),
-              KnownProtocolKind::ExpressibleByBuiltinStringLiteral);
-          builtinLiteralFuncName 
-            = DeclName(tc.Context, DeclBaseName::createConstructor(),
-                       { tc.Context.Id_builtinStringLiteral,
-                         tc.Context.getIdentifier("utf8CodeUnitCount"),
-                         tc.Context.getIdentifier("isASCII") });
-          if (stringLiteral)
-            stringLiteral->setEncoding(StringLiteralExpr::UTF8);
-          else
-            magicLiteral->setStringEncoding(StringLiteralExpr::UTF8);
-        }
         brokenProtocolDiag = diag::string_literal_broken_proto;
         brokenBuiltinProtocolDiag = diag::builtin_string_literal_broken_proto;
       } else if (isGraphemeClusterLiteral) {
@@ -2163,26 +2132,6 @@ namespace {
             diag::extended_grapheme_cluster_literal_broken_proto;
         brokenBuiltinProtocolDiag =
             diag::builtin_extended_grapheme_cluster_literal_broken_proto;
-
-        auto *builtinUTF16ExtendedGraphemeClusterProtocol = tc.getProtocol(
-            expr->getLoc(),
-            KnownProtocolKind::ExpressibleByBuiltinUTF16ExtendedGraphemeClusterLiteral);
-        if (tc.conformsToProtocol(type,
-                                  builtinUTF16ExtendedGraphemeClusterProtocol,
-                                  cs.DC, ConformanceCheckFlags::InExpression)) {
-          builtinLiteralFuncName
-            = DeclName(tc.Context, DeclBaseName::createConstructor(),
-                       { tc.Context.Id_builtinExtendedGraphemeClusterLiteral,
-                         tc.Context.getIdentifier("utf16CodeUnitCount") });
-
-          builtinProtocol = builtinUTF16ExtendedGraphemeClusterProtocol;
-          brokenBuiltinProtocolDiag =
-            diag::builtin_utf16_extended_grapheme_cluster_literal_broken_proto;
-          if (stringLiteral)
-            stringLiteral->setEncoding(StringLiteralExpr::UTF16);
-          else
-            magicLiteral->setStringEncoding(StringLiteralExpr::UTF16);
-        }
       } else {
         // Otherwise, we should have just one Unicode scalar.
         literalType = tc.Context.Id_UnicodeScalarLiteralType;
