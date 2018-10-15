@@ -106,7 +106,6 @@ class Parser {
   void operator=(const Parser&) = delete;
 
   bool IsInputIncomplete = false;
-  SourceLoc DelayedDeclEnd;
   std::vector<Token> SplitTokens;
 
 public:
