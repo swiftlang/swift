@@ -12,8 +12,8 @@ public func takesInout(_ i: inout Int) {
 // Helper taking a basic, no-escape closure.
 func takeClosure(_: ()->Int) {}
 
-// Helper taking a basic, no-escape closure.
-func takeClosureAndInout(_: inout Int, _: ()->Int) {}
+// Helper taking an escaping closure.
+func takeClosureAndInout(_: inout Int, _: @escaping ()->Int) {}
 
 // Helper taking an escaping closure.
 func takeEscapingClosure(_: @escaping ()->Int) {}
@@ -56,13 +56,13 @@ public func captureStackWithInoutInProgress() -> Int {
   return x
 }
 // CHECK-LABEL: Access Enforcement Selection in $s28access_enforcement_selection31captureStackWithInoutInProgressSiyF
-// Static access for `&x`.
-// CHECK-DAG: Static Access: %{{.*}} = begin_access [modify] [static] %{{.*}} : $*Int
-// Static access for `return x`.
-// CHECK-DAG: Static Access: %{{.*}} = begin_access [read] [static] %{{.*}} : $*Int
+// Access for `return x`.
+// CHECK-DAG: Dynamic Access: %{{.*}} = begin_access [read] [dynamic] %{{.*}} : $*Int
+// Access for `&x`.
+// CHECK-DAG: Dynamic Access: %{{.*}} = begin_access [modify] [dynamic] %{{.*}} : $*Int
 //
-// CHECK-LABEL: Access Enforcement Selection in $s28access_enforcement_selection31captureStackWithInoutInProgressSiyFSiyXEfU_
-// CHECK: Static Access: %{{.*}} = begin_access [read] [static] %{{.*}} : $*Int
+// CHECK-LABEL: Access Enforcement Selection in $s28access_enforcement_selection31captureStackWithInoutInProgressSiyF
+// CHECK: Dynamic Access: %{{.*}} = begin_access [read] [dynamic] %{{.*}} : $*Int
 
 // Generate an alloc_box that escapes into a closure.
 // FIXME: `x` is eventually promoted to an alloc_stack even though it has dynamic enforcement.

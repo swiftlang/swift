@@ -50,15 +50,6 @@ LLVM_ATTRIBUTE_ALWAYS_INLINE
 static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
                                       ExclusivityFlags newFlags, void *newPC,
                                       void *pointer) {
-  static std::atomic<long> reportedConflicts{0};
-  constexpr long maxReportedConflicts = 100;
-  // Don't report more that 100 conflicts. Hopefully, this will improve
-  // performance in case there are conflicts inside a tight loop.
-  if (reportedConflicts.fetch_add(1, std::memory_order_relaxed) >=
-      maxReportedConflicts) {
-    return;
-  }
-
   constexpr unsigned maxMessageLength = 100;
   constexpr unsigned maxAccessDescriptionLength = 50;
   char message[maxMessageLength];
@@ -87,8 +78,6 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
   constexpr unsigned framesToSkip = 1;
   printCurrentBacktrace(framesToSkip);
 
-  bool keepGoing = isWarningOnly(newFlags);
-
   RuntimeErrorDetails::Thread secondaryThread = {
     .description = oldAccess,
     .numFrames = 1,
@@ -103,17 +92,7 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
     .numExtraThreads = 1,
     .threads = &secondaryThread
   };
-  uintptr_t flags = RuntimeErrorFlagNone;
-  if (!keepGoing)
-    flags = RuntimeErrorFlagFatal;
-  _swift_reportToDebugger(flags, message, &details);
-
-  if (keepGoing) {
-    return;
-  }
-
-  // 0 means no backtrace will be printed.
-  fatalError(0, "Fatal access conflict detected.\n");
+  _swift_reportToDebugger(RuntimeErrorFlagFatal, message, &details);
 }
 
 namespace {
@@ -200,8 +179,8 @@ public:
       reportExclusivityConflict(cur->getAccessAction(), cur->PC,
                                 flags, pc, pointer);
 
-      // If we're only warning, don't report multiple conflicts.
-      break;
+      // 0 means no backtrace will be printed.
+      fatalError(0, "Fatal access conflict detected.\n");
     }
     if (!isTracking(flags))
       return false;
