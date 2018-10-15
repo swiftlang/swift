@@ -889,23 +889,33 @@ void EnumElementPatternInitialization::emitEnumMatch(
 
         // If the payload is indirect, project it out of the box.
         if (eltDecl->isIndirect() || eltDecl->getParentEnum()->isIndirect()) {
-          SILValue boxedValue = SGF.B.createProjectBox(loc, mv.getValue(), 0);
-          auto &boxedTL = SGF.getTypeLowering(boxedValue->getType());
-          // SEMANTIC ARC TODO: Revisit this when the verifier is enabled.
-          if (boxedTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
-            UnenforcedAccess access;
-            SILValue accessAddress =
-              access.beginAccess(SGF, loc, boxedValue, SILAccessKind::Read);
-            boxedValue = boxedTL.emitLoad(SGF.B, loc, accessAddress,
-                                          LoadOwnershipQualifier::Take);
-            access.endAccess(SGF);
-          }
+          ManagedValue boxedValue = SGF.B.createProjectBox(loc, mv, 0);
+          auto &boxedTL = SGF.getTypeLowering(boxedValue.getType());
+
           // We must treat the boxed value as +0 since it may be shared. Copy it
           // if nontrivial.
           //
-          // TODO: Should be able to hand it off at +0 in some cases.
-          mv = ManagedValue::forUnmanaged(boxedValue);
-          mv = mv.copyUnmanaged(SGF, loc);
+          // NOTE: The APIs that we are usinng here will ensure that if we have
+          // a trivial value, the load_borrow will become a load [trivial] and
+          // the copies will be "automagically" elided.
+          if (boxedTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
+            UnenforcedAccess access;
+            SILValue accessAddress = access.beginAccess(
+                SGF, loc, boxedValue.getValue(), SILAccessKind::Read);
+            auto mvAccessAddress = ManagedValue::forUnmanaged(accessAddress);
+            {
+              Scope loadScope(SGF, loc);
+              ManagedValue borrowedVal =
+                  SGF.B.createLoadBorrow(loc, mvAccessAddress);
+              mv = loadScope.popPreservingValue(
+                  borrowedVal.copyUnmanaged(SGF, loc));
+            }
+            access.endAccess(SGF);
+          } else {
+            // If we do not have a loadable value, just do a copy of the
+            // boxedValue.
+            mv = boxedValue.copyUnmanaged(SGF, loc);
+          }
         }
 
         // Reabstract to the substituted type, if needed.
