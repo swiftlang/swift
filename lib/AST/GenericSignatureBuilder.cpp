@@ -5157,8 +5157,18 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementBetweenConcrete(
     }
   } matcher(*this, source, type1, type2, diagnoseMismatch);
 
-  return matcher.match(type1, type2) ? ConstraintResult::Resolved
-                                     : ConstraintResult::Conflicting;
+  if (matcher.match(type1, type2)) {
+    // Warn if neither side of the requirement contains a type parameter.
+    if (source.isTopLevel() && source.getLoc().isValid()) {
+      Diags.diagnose(source.getLoc(),
+                     diag::requires_no_same_type_archetype,
+                     type1, type2);
+    }
+
+    return ConstraintResult::Resolved;
+  }
+
+  return ConstraintResult::Conflicting;
 }
 
 ConstraintResult GenericSignatureBuilder::addSameTypeRequirement(
@@ -5343,19 +5353,6 @@ GenericSignatureBuilder::addRequirement(const Requirement &req,
 
   case RequirementKind::SameType: {
     auto secondType = subst(req.getSecondType());
-
-    // Warn if neither side of the requirement contains a type parameter.
-    if (reqRepr &&
-        !req.getFirstType()->hasTypeParameter() &&
-        !req.getSecondType()->hasTypeParameter() &&
-        !req.getFirstType()->hasError() &&
-        !req.getSecondType()->hasError()) {
-      Diags.diagnose(reqRepr->getSeparatorLoc(),
-                     diag::requires_no_same_type_archetype,
-                     req.getFirstType(), req.getSecondType())
-        .highlight(reqRepr->getFirstTypeLoc().getSourceRange())
-        .highlight(reqRepr->getSecondTypeLoc().getSourceRange());
-    }
 
     if (inferForModule) {
       inferRequirements(*inferForModule, firstType,
