@@ -146,8 +146,7 @@ static void emitOrDeleteBlock(SILGenFunction &SGF, JumpDest &dest,
     SGF.B.emitBlock(BB, BranchLoc);
 }
 
-Condition SILGenFunction::emitCondition(Expr *E, bool hasFalseCode,
-                                        bool invertValue,
+Condition SILGenFunction::emitCondition(Expr *E, bool invertValue,
                                         ArrayRef<SILType> contArgs,
                                         ProfileCounter NumTrueTaken,
                                         ProfileCounter NumFalseTaken) {
@@ -162,12 +161,12 @@ Condition SILGenFunction::emitCondition(Expr *E, bool hasFalseCode,
   }
   assert(V->getType().castTo<BuiltinIntegerType>()->isFixedWidth(1));
 
-  return emitCondition(V, E, hasFalseCode, invertValue, contArgs, NumTrueTaken,
+  return emitCondition(V, E, invertValue, contArgs, NumTrueTaken,
                        NumFalseTaken);
 }
 
 Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
-                                        bool hasFalseCode, bool invertValue,
+                                        bool invertValue,
                                         ArrayRef<SILType> contArgs,
                                         ProfileCounter NumTrueTaken,
                                         ProfileCounter NumFalseTaken) {
@@ -179,23 +178,14 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
   for (SILType argTy : contArgs) {
     ContBB->createPhiArgument(argTy, ValueOwnershipKind::Owned);
   }
-  
-  SILBasicBlock *FalseBB, *FalseDestBB;
-  if (hasFalseCode) {
-    FalseBB = FalseDestBB = createBasicBlock();
-  } else {
-    FalseBB = nullptr;
-    FalseDestBB = ContBB;
-  }
 
+  SILBasicBlock *FalseBB = createBasicBlock();
   SILBasicBlock *TrueBB = createBasicBlock();
 
   if (invertValue)
-    B.createCondBranch(Loc, V, FalseDestBB, TrueBB, NumFalseTaken,
-                       NumTrueTaken);
+    B.createCondBranch(Loc, V, FalseBB, TrueBB, NumFalseTaken, NumTrueTaken);
   else
-    B.createCondBranch(Loc, V, TrueBB, FalseDestBB, NumTrueTaken,
-                       NumFalseTaken);
+    B.createCondBranch(Loc, V, TrueBB, FalseBB, NumTrueTaken, NumFalseTaken);
 
   return Condition(TrueBB, FalseBB, ContBB, Loc);
 }
@@ -773,7 +763,7 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
     // to the continuation block.
     auto NumTrueTaken = SGF.loadProfilerCount(S->getBody());
     auto NumFalseTaken = SGF.loadProfilerCount(S);
-    Condition Cond = SGF.emitCondition(S->getCond(), /*hasFalseCode*/ false,
+    Condition Cond = SGF.emitCondition(S->getCond(),
                                        /*invertValue*/ false, /*contArgs*/ {},
                                        NumTrueTaken, NumFalseTaken);
 
@@ -880,8 +870,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
           // condition.
           // If it fails, loop around as if 'continue' happened.
           if (auto *Where = S->getWhere()) {
-            auto cond =
-                SGF.emitCondition(Where, /*hasFalse*/ false, /*invert*/ true);
+            auto cond = SGF.emitCondition(Where, /*invert*/ true);
             // If self is null, branch to the epilog.
             cond.enterTrue(SGF);
             SGF.Cleanups.emitBranchAndCleanups(loopDest, Where, {});
