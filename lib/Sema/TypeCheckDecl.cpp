@@ -2057,7 +2057,7 @@ static NominalTypeDecl *resolveSingleNominalTypeDecl(
 
   TypeResolutionOptions options = TypeResolverContext::TypeAliasDecl;
   options |= flags;
-  if (tc.validateType(typeLoc, TypeResolution::forContextual(DC), options))
+  if (tc.validateType(typeLoc, TypeResolution::forInterface(DC), options))
     return nullptr;
 
   return typeLoc.getType()->getAnyNominal();
@@ -3469,7 +3469,7 @@ static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
   }
 
   if (tc.validateType(typeAlias->getUnderlyingTypeLoc(),
-                      TypeResolution::forContextual(typeAlias), options)) {
+                      TypeResolution::forInterface(typeAlias), options)) {
     typeAlias->setInvalid();
     typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
   }
