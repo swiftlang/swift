@@ -389,14 +389,6 @@ public protocol ExpressibleByUnicodeScalarLiteral {
   init(unicodeScalarLiteral value: UnicodeScalarLiteralType)
 }
 
-public protocol _ExpressibleByBuiltinUTF16ExtendedGraphemeClusterLiteral
-  : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
-
-  init(
-    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    utf16CodeUnitCount: Builtin.Word)
-}
-
 public protocol _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
   : _ExpressibleByBuiltinUnicodeScalarLiteral {
 
@@ -461,14 +453,6 @@ public protocol _ExpressibleByBuiltinStringLiteral
     _builtinStringLiteral start: Builtin.RawPointer,
     utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1)
-}
-
-public protocol _ExpressibleByBuiltinUTF16StringLiteral
-  : _ExpressibleByBuiltinStringLiteral {
-
-  init(
-    _builtinUTF16StringLiteral start: Builtin.RawPointer,
-    utf16CodeUnitCount: Builtin.Word)
 }
 
 /// A type that can be initialized with a string literal.

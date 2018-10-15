@@ -29,36 +29,7 @@ struct SillyString : _ExpressibleByBuiltinStringLiteral, ExpressibleByStringLite
   init(stringLiteral value: SillyString) { }
 }
 
-struct SillyUTF16String : _ExpressibleByBuiltinUTF16StringLiteral, ExpressibleByStringLiteral {
-  init(_builtinUnicodeScalarLiteral value: Builtin.Int32) { }
-
-  init(unicodeScalarLiteral value: SillyString) { }
-
-  init(
-    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    utf8CodeUnitCount: Builtin.Word,
-    isASCII: Builtin.Int1
-  ) { 
-  }
-
-  init(extendedGraphemeClusterLiteral value: SillyString) { }
-
-  init(
-    _builtinStringLiteral start: Builtin.RawPointer,
-    utf8CodeUnitCount: Builtin.Word,
-    isASCII: Builtin.Int1
-  ) { }
-
-  init(
-    _builtinUTF16StringLiteral start: Builtin.RawPointer,
-    utf16CodeUnitCount: Builtin.Word
-  ) { 
-  }
-
-  init(stringLiteral value: SillyUTF16String) { }
-}
-
-struct SillyConstUTF16String : ExpressibleByStringLiteral {
+struct SillyConstString : ExpressibleByStringLiteral {
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32) { }
 
   init(unicodeScalarLiteral value: SillyString) { }
@@ -72,7 +43,7 @@ struct SillyConstUTF16String : ExpressibleByStringLiteral {
 
   init(extendedGraphemeClusterLiteral value: SillyString) { }
 
-  init(stringLiteral value: SillyUTF16String) { }
+  init(stringLiteral value: SillyString) { }
 }
 
 func literals() {

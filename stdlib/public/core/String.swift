@@ -597,23 +597,6 @@ extension String: _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
   }
 }
 
-extension String: _ExpressibleByBuiltinUTF16StringLiteral {
-  @inlinable @inline(__always)
-  @_effects(readonly) @_semantics("string.makeUTF16")
-  public init(
-    _builtinUTF16StringLiteral start: Builtin.RawPointer,
-    utf16CodeUnitCount: Builtin.Word
-  ) {
-//    fatalError("TODO: Have compiler emit as UTF-8 instead")
-
-    // TODO(UTF8 merge) Remove this conformance entirely...
-    let bufPtr = UnsafeBufferPointer(
-      start: UnsafeRawPointer(start).assumingMemoryBound(to: UInt16.self),
-      count: Int(utf16CodeUnitCount))
-    self = String._uncheckedFromUTF16(bufPtr)
-  }
-}
-
 extension String: _ExpressibleByBuiltinStringLiteral {
   @inlinable @inline(__always)
   @_effects(readonly) @_semantics("string.makeUTF8")

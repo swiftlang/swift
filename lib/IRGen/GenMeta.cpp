@@ -4040,12 +4040,10 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::ExpressibleByImageLiteral:
   case KnownProtocolKind::ExpressibleByFileReferenceLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinBooleanLiteral:
-  case KnownProtocolKind::ExpressibleByBuiltinUTF16ExtendedGraphemeClusterLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinExtendedGraphemeClusterLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinFloatLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinStringLiteral:
-  case KnownProtocolKind::ExpressibleByBuiltinUTF16StringLiteral:
   case KnownProtocolKind::ExpressibleByBuiltinUnicodeScalarLiteral:
   case KnownProtocolKind::OptionSet:
   case KnownProtocolKind::BridgedNSError:
