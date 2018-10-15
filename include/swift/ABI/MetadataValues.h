@@ -1010,8 +1010,6 @@ enum class ExclusivityFlags : uintptr_t {
   // Read or Modify).
   ActionMask       = 0x1,
 
-  // Downgrade exclusivity failures to a warning.
-  WarningOnly      = 0x10,
   // The runtime should track this access to check against subsequent accesses.
   Tracking         = 0x20
 };
@@ -1026,9 +1024,6 @@ static inline ExclusivityFlags &operator|=(ExclusivityFlags &lhs,
 static inline ExclusivityFlags getAccessAction(ExclusivityFlags flags) {
   return ExclusivityFlags(uintptr_t(flags)
                         & uintptr_t(ExclusivityFlags::ActionMask));
-}
-static inline bool isWarningOnly(ExclusivityFlags flags) {
-  return uintptr_t(flags) & uintptr_t(ExclusivityFlags::WarningOnly);
 }
 static inline bool isTracking(ExclusivityFlags flags) {
   return uintptr_t(flags) & uintptr_t(ExclusivityFlags::Tracking);
