@@ -130,7 +130,7 @@ def driver_always_rebuild_dependents :
   HelpText<"Always rebuild dependents of files that have been modified">;
 
 def enable_experimental_dependencies :
-Flag<["-"], "enable-experimental-dependencies">, Flags<[HelpHidden]>,
+Flag<["-"], "enable-experimental-dependencies">, Flags<[FrontendOption, HelpHidden]>,
 HelpText<"When interface changes, be more selective">;
 
 def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
