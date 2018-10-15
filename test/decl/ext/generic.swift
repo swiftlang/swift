@@ -97,7 +97,7 @@ extension GenericOverloads where T : P1, U : P2 {
   subscript (i: Int) -> Int { return i }
 }
 
-extension Array where Element : Hashable {
+extension Array where Element : Hashable { // expected-note {{where 'Element' = 'T'}}
   var worseHashEver: Int {
     var result = 0
     for elt in self {
@@ -108,7 +108,7 @@ extension Array where Element : Hashable {
 }
 
 func notHashableArray<T>(_ x: [T]) {
-  x.worseHashEver // expected-error{{type 'T' does not conform to protocol 'Hashable'}}
+  x.worseHashEver // expected-error{{property 'worseHashEver' requires that 'T' conform to 'Hashable'}}
 }
 
 func hashableArray<T : Hashable>(_ x: [T]) {
@@ -132,7 +132,7 @@ func genericClassEquatable<T : Equatable>(_ gc: GenericClass<T>, x: T, y: T) {
 }
 
 func genericClassNotEquatable<T>(_ gc: GenericClass<T>, x: T, y: T) {
-  gc.foo(x, y: y) // expected-error{{type 'T' does not conform to protocol 'Equatable'}}
+  gc.foo(x, y: y) // expected-error{{argument type 'T' does not conform to expected type 'Equatable'}}
 }
 
 

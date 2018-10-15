@@ -21,7 +21,7 @@ class Conditional<T> {
   }
 }
 
-extension Conditional: Codable where T: Codable {
+extension Conditional: Codable where T: Codable { // expected-note 2 {{where 'T' = 'Nonconforming'}}
     // expected-error@-1 2 {{implementation of 'Decodable' for non-final class cannot be automatically synthesized in extension because initializer requirement 'init(from:)' can only be be satisfied by a 'required' initializer in the class definition}}
 }
 
@@ -32,7 +32,8 @@ let _ = Conditional<Int>.encode(to:)
 // but only for Codable parameters.
 struct Nonconforming {}
 let _ = Conditional<Nonconforming>.init(from:) // expected-error {{type 'Conditional<Nonconforming>' has no member 'init(from:)'}}
-let _ = Conditional<Nonconforming>.encode(to:) // expected-error {{type 'Nonconforming' does not conform to protocol 'Decodable'}}
+let _ = Conditional<Nonconforming>.encode(to:) // expected-error {{referencing instance method 'encode(to:)' on 'Conditional' requires that 'Nonconforming' conform to 'Decodable'}}
+// expected-error@-1 {{referencing instance method 'encode(to:)' on 'Conditional' requires that 'Nonconforming' conform to 'Encodable'}}
 
 // The synthesized CodingKeys type should not be accessible from outside the
 // struct.

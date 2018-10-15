@@ -208,8 +208,8 @@ struct S4d : P4 {
   func reqP4a() -> Bool { return false }
 }
 
-extension P4 where Self.AssocP4 == Int {
-  func extP4Int() { } // expected-note {{candidate requires that the types 'Bool' and 'Int' be equivalent (requirement specified as 'Self.AssocP4' == 'Int')}}
+extension P4 where Self.AssocP4 == Int { // expected-note {{where 'Self.AssocP4' = 'Bool'}}
+  func extP4Int() { }
 }
 
 extension P4 where Self.AssocP4 == Bool {
@@ -229,7 +229,7 @@ func testP4(_ s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {
   s4c.extP4Int() // okay
   var b1 = s4d.extP4a() // okay, "Bool" version
   b1 = true // checks type above
-  s4d.extP4Int() // expected-error{{value of type 'S4d' has no member 'extP4Int'}}
+  s4d.extP4Int() // expected-error{{referencing instance method 'extP4Int()' on 'P4' requires the types 'Bool' and 'Int' be equivalent}}
   _ = b1
 }
 
