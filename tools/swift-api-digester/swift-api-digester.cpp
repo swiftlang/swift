@@ -2304,9 +2304,6 @@ int main(int argc, char *argv[]) {
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SDK Digester\n");
   CompilerInvocation InitInvok;
 
-  ClangImporterOptions &ImporterOpts = InitInvok.getClangImporterOptions();
-  ImporterOpts.DetailedPreprocessingRecord = true;
-
   llvm::StringSet<> Modules;
   std::vector<std::string> PrintApis;
   llvm::StringSet<> IgnoredUsrs;

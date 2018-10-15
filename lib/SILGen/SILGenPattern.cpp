@@ -1447,25 +1447,24 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     return emitTupleObjectDispatch(rows, src, handleCase, outerFailure);
   }
 
-  auto sourceType = cast<TupleType>(firstPat->getType()->getCanonicalType());
-
+  // At this point we know that we must have an address only type, since we
+  // would have loaded it earlier.
   SILValue v = src.getFinalManagedValue().forward(SGF);
+  assert(v->getType().isAddressOnly(SGF.getModule()) &&
+         "Loadable values were handled earlier");
+
   SmallVector<ConsumableManagedValue, 4> destructured;
 
   // Break down the values.
   auto tupleSILTy = v->getType();
-  for (unsigned i = 0, e = sourceType->getNumElements(); i < e; ++i) {
+  for (unsigned i : range(tupleSILTy.castTo<TupleType>()->getNumElements())) {
     SILType fieldTy = tupleSILTy.getTupleElementType(i);
     auto &fieldTL = SGF.getTypeLowering(fieldTy);
 
-    SILValue member;
-    if (tupleSILTy.isAddress()) {
-      member = SGF.B.createTupleElementAddr(loc, v, i, fieldTy);
-      if (!fieldTL.isAddressOnly())
-        member =
-            fieldTL.emitLoad(SGF.B, loc, member, LoadOwnershipQualifier::Take);
-    } else {
-      member = SGF.B.createTupleExtract(loc, v, i, fieldTy);
+    SILValue member = SGF.B.createTupleElementAddr(loc, v, i, fieldTy);
+    if (!fieldTL.isAddressOnly()) {
+      member =
+          fieldTL.emitLoad(SGF.B, loc, member, LoadOwnershipQualifier::Take);
     }
     auto memberCMV = getManagedSubobject(SGF, member, fieldTL,
                                          src.getFinalConsumption());
