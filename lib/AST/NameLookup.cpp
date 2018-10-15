@@ -999,8 +999,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
           // Look in the generic parameters after checking our local declaration.
           GenericParams = AFD->getGenericParams();
-        } else if (auto *SD = dyn_cast<SubscriptDecl>(DC)) {
-          GenericParams = SD->getGenericParams();
         } else if (auto *ACE = dyn_cast<AbstractClosureExpr>(DC)) {
           // Look for local variables; normally, the parser resolves these
           // for us, but it can't do the right thing inside local types.
@@ -1042,18 +1040,44 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           continue;
         } else {
           assert(isa<TopLevelCodeDecl>(DC) || isa<Initializer>(DC) ||
-                 isa<TypeAliasDecl>(DC));
+                 isa<TypeAliasDecl>(DC) || isa<SubscriptDecl>(DC));
           if (!isCascadingUse.hasValue())
             isCascadingUse = DC->isCascadingContextForLookup(false);
         }
 
-        // Check the generic parameters for something with the given name.
+        // If we're inside a function context, we've already moved to
+        // the parent DC, so we have to check the function's generic
+        // parameters first.
         if (GenericParams) {
           namelookup::FindLocalVal localVal(SM, Loc, Consumer);
           localVal.checkGenericParams(GenericParams);
 
           if (shouldReturnBasedOnResults())
             return;
+        }
+
+        // Check the generic parameters of our context.
+        GenericParamList *dcGenericParams = nullptr;
+        if (auto nominal = dyn_cast<NominalTypeDecl>(DC))
+          dcGenericParams = nominal->getGenericParams();
+        else if (auto ext = dyn_cast<ExtensionDecl>(DC))
+          dcGenericParams = ext->getGenericParams();
+        else if (auto subscript = dyn_cast<SubscriptDecl>(DC))
+          dcGenericParams = subscript->getGenericParams();
+
+        while (dcGenericParams) {
+          namelookup::FindLocalVal localVal(SM, Loc, Consumer);
+          localVal.checkGenericParams(dcGenericParams);
+
+          if (shouldReturnBasedOnResults())
+            return;
+
+          // Extensions of nested types have multiple levels of
+          // generic parameters, so we have to visit them explicitly.
+          if (!isa<ExtensionDecl>(DC))
+            break;
+
+          dcGenericParams = dcGenericParams->getOuterParameters();
         }
 
         if (BaseDC && !lookupDecls.empty()) {
@@ -1071,12 +1095,9 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             // Classify this declaration.
             FoundAny = true;
 
-            // Types are local or metatype members.
+            // Types are formally members of the metatype.
             if (auto TD = dyn_cast<TypeDecl>(Result)) {
-              if (isa<GenericTypeParamDecl>(TD))
-                Results.push_back(LookupResultEntry(Result));
-              else
-                Results.push_back(LookupResultEntry(MetaBaseDC, Result));
+              Results.push_back(LookupResultEntry(MetaBaseDC, Result));
               continue;
             }
 
@@ -1106,29 +1127,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                 return;
             }
           }
-        }
-
-        // Check the generic parameters if our context is a generic type or
-        // extension thereof.
-        GenericParamList *dcGenericParams = nullptr;
-        if (auto nominal = dyn_cast<NominalTypeDecl>(DC))
-          dcGenericParams = nominal->getGenericParams();
-        else if (auto ext = dyn_cast<ExtensionDecl>(DC))
-          dcGenericParams = ext->getGenericParams();
-        else if (auto subscript = dyn_cast<SubscriptDecl>(DC))
-          dcGenericParams = subscript->getGenericParams();
-
-        while (dcGenericParams) {
-          namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-          localVal.checkGenericParams(dcGenericParams);
-
-          if (shouldReturnBasedOnResults())
-            return;
-
-          if (!isa<ExtensionDecl>(DC))
-            break;
-
-          dcGenericParams = dcGenericParams->getOuterParameters();
         }
 
         DC = DC->getParentForLookup();
