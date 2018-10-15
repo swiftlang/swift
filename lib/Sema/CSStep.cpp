@@ -117,7 +117,7 @@ void SplitterStep::computeFollowupSteps(
         CS, i, /*single=*/false, &Components[i], PartialSolutions[i]));
   }
 
-  if (numComponents > 1 && isDebugMode()) {
+  if (isDebugMode()) {
     auto &log = getDebugLogger();
     // Verify that the constraint graph is valid.
     CG.verify();
