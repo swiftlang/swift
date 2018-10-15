@@ -341,3 +341,17 @@ extension _StringGuts {
   }
 }
 
+// Index
+extension _StringGuts {
+  @usableFromInline
+  internal typealias Index = String.Index
+
+  @inlinable
+  internal var startIndex: String.Index {
+    @inline(__always) get { return Index(encodedOffset: 0) }
+  }
+  @inlinable
+  internal var endIndex: String.Index {
+    @inline(__always) get { return Index(encodedOffset: self.count) }
+  }
+}

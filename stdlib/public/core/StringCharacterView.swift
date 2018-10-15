@@ -37,7 +37,7 @@ extension String: BidirectionalCollection {
   /// In an empty string, `startIndex` is equal to `endIndex`.
   @inlinable
   public var startIndex: Index {
-    @inline(__always) get { return Index(encodedOffset: 0) }
+    @inline(__always) get { return _guts.startIndex }
   }
 
   /// A string's "past the end" position---that is, the position one greater
@@ -46,7 +46,7 @@ extension String: BidirectionalCollection {
   /// In an empty string, `endIndex` is equal to `startIndex`.
   @inlinable
   public var endIndex: Index {
-    @inline(__always) get { return Index(encodedOffset: _guts.count) }
+    @inline(__always) get { return _guts.endIndex }
   }
 
   /// The number of characters in a string.
@@ -188,7 +188,7 @@ extension String: BidirectionalCollection {
       // FIXME(UTF8): bounds checking
 
       // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-
+      let i = _guts.scalarAlign(i)
       let distance = _characterStride(startingAt: i)
 
       // TODO(UTF8): Probably worth making into `extractRange` on StringGuts.
@@ -227,6 +227,13 @@ extension String {
   @_effects(releasenone)
   internal func _foreignSubscript(position: Index, distance: Int) -> Character {
     _sanityCheck(_guts.isForeign)
+
+    // Both a fast-path for single-code-unit graphemes and validation:
+    //   ICU treats isolated surrogates as isolated graphemes
+    if distance == 1 {
+      return Character(
+        String(_guts.foreignErrorCorrectedScalar(startingAt: position)))
+    }
 
     let start = position.encodedOffset
     let end = start + distance
