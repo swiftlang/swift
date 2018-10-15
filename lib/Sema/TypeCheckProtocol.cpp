@@ -1971,11 +1971,12 @@ static void
 diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
               ValueDecl *req, const RequirementMatch &match) {
 
-  // If we are matching a constructor and the name doesn't match,
+  // If the name doesn't match and that's not the only problem,
   // it is likely this witness wasn't intended to be a match at all, so omit
   // diagnosis.
-  if (req->getKind() == DeclKind::Constructor && match.Kind != MatchKind::RenamedMatch
-      && !match.Witness->getAttrs().hasAttribute<ImplementsAttr>() &&
+  if (match.Kind != MatchKind::RenamedMatch &&
+      !match.Witness->getAttrs().hasAttribute<ImplementsAttr>() &&
+      match.Witness->getFullName() &&
       req->getFullName() != match.Witness->getFullName())
     return;
 
