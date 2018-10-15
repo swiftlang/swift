@@ -103,12 +103,36 @@ extension _StringGuts {
     @inline(__always) get { return _object.isASCII }
   }
 
-  @inlinable
-  internal var capacity: Int? {
-    // TODO: Should small strings return their capacity too?
-    guard _object.hasNativeStorage else { return nil }
-    return _object.nativeStorage.capacity
+  internal var nativeCapacity: Int? {
+      guard hasNativeStorage else { return nil }
+      return _object.nativeStorage.capacity
   }
+
+  internal var nativeUnusedCapacity: Int? {
+      guard hasNativeStorage else { return nil }
+      return _object.nativeStorage.unusedCapacity
+  }
+
+  // If natively stored and uniquely referenced, return the storage's total
+  // capacity. Otherwise, nil.
+  internal var uniqueNativeCapacity: Int? {
+    @inline(__always) mutating get {
+      guard isUniqueNative else { return nil }
+      return _object.nativeStorage.capacity
+    }
+  }
+
+  // If natively stored and uniquely referenced, return the storage's spare
+  // capacity. Otherwise, nil.
+  internal var uniqueNativeUnusedCapacity: Int? {
+    @inline(__always) mutating get {
+      guard isUniqueNative else { return nil }
+      return _object.nativeStorage.unusedCapacity
+    }
+  }
+
+  @inlinable
+  internal var hasNativeStorage: Bool { return _object.hasNativeStorage }
 }
 
 //
@@ -173,13 +197,34 @@ extension _StringGuts {
 
 // Append
 extension _StringGuts {
+  @usableFromInline // @testable
+  internal var isUniqueNative: Bool {
+    @inline(__always) mutating get {
+      // Note: mutating so that self is `inout`.
+      guard hasNativeStorage else { return false }
+      defer { _fixLifetime(self) }
+      var bits: UInt = _object.largeAddressBits
+      return _isUnique_native(&bits)
+    }
+  }
+
   internal mutating func reserveCapacity(_ n: Int) {
     // Check if there's nothing to do
     if n <= _SmallString.capacity { return }
-    if let currentCap = self.capacity, currentCap >= n { return }
+    if let currentCap = self.uniqueNativeCapacity, currentCap >= n { return }
 
     // Grow
-    if isFastUTF8 {
+    self.grow(n)
+  }
+
+  // Grow to accomodate at least `n` code units
+  internal mutating func grow(_ n: Int) {
+    defer { self._invariantCheck() }
+
+    _sanityCheck(
+      self.uniqueNativeCapacity == nil || self.uniqueNativeCapacity! < n)
+
+    if _fastPath(isFastUTF8) {
       let storage = self.withFastUTF8 {
         _StringStorage.create(initializingFrom: $0, capacity: n)
       }
@@ -189,68 +234,84 @@ extension _StringGuts {
       return
     }
 
-    unimplemented_utf8()
-  }
-
-  internal mutating func append(_ other: _StringGuts) {
-    // Try to form a small string if possible
-    if let smol = _SmallString(base: self, appending: other) {
-      self = _StringGuts(smol)
-      return
-    }
-
-    if other.isFastUTF8 {
-      other.withFastUTF8 { self.append($0) }
-      return
-    }
-    _foreignAppend(other)
-  }
-
-  internal mutating func append(_ bufPtr: UnsafeBufferPointer<UInt8>) {
-    if _object.hasNativeStorage {
-      if _object.nativeStorage.unusedCapacity >= bufPtr.count {
-        // TODO(UTF8 perf): Uniqueness check and skip the reallocation
-      }
-    }
-
-    if _slowPath(_object.isForeign) {
-      _foreignAppend(bufPtr)
-      return
-    }
-
-    // Grow into an appropriately sized storage
-    //
-    // TODO(UTF8): How do we want to grow? Take current capacity into account?
-    let storage = self.withFastUTF8 {
-      _StringStorage.create(initializingFrom: $0, andAppending: bufPtr)
-    }
-
-    // TODO(UTF8): Track known ascii
-    self = _StringGuts(storage)
-    return
+    _foreignGrow(n)
   }
 
   @inline(never) // slow-path
-  internal mutating func _foreignAppend(_ bufPtr: UnsafeBufferPointer<UInt8>) {
-    _sanityCheck(!isFastUTF8)
-
+  internal mutating func _foreignGrow(_ n: Int) {
     // TODO(UTF8 perf): skip the intermediary arrays
     let selfUTF8 = Array(String(self).utf8)
     selfUTF8.withUnsafeBufferPointer {
       self = _StringGuts(_StringStorage.create(
-        initializingFrom: $0, andAppending: bufPtr))
+        initializingFrom: $0, capacity: n))
     }
   }
 
-  @inline(never) // slow-path
-  internal mutating func _foreignAppend(_ other: _StringGuts) {
-    _sanityCheck(!other.isFastUTF8)
+  internal mutating func append(_ other: _StringGuts) {
+    defer { self._invariantCheck() }
 
-    // TODO(UTF8 perf): skip the intermediary arrays
-    let otherUTF8 = Array(String(other).utf8)
-    otherUTF8.withUnsafeBufferPointer {
-      self.append($0)
+    // Try to form a small string if possible
+    if !hasNativeStorage {
+      if let smol = _SmallString(base: self, appending: other) {
+        self = _StringGuts(smol)
+        return
+      }
     }
+
+    // See if we can accomodate without growing or copying. If we have
+    // sufficient capacity, we do not need to grow, and we can skip the copy if
+    // unique. Otherwise, growth is required.
+    let otherUTF8Count = other.utf8Count
+    let sufficientCapacity: Bool
+    if let unused = self.nativeUnusedCapacity, unused >= otherUTF8Count {
+      sufficientCapacity = true
+    } else {
+      sufficientCapacity = false
+    }
+    if !self.isUniqueNative || !sufficientCapacity {
+      let totalCount = self.utf8Count + otherUTF8Count
+
+      // Non-unique storage: just make a copy of the appropriate size, otherwise
+      // grow like an array.
+      let growthTarget: Int
+      if sufficientCapacity {
+        growthTarget = totalCount
+      } else {
+        growthTarget = Swift.max(
+          totalCount, _growArrayCapacity(nativeCapacity ?? 0))
+      }
+      self.grow(growthTarget)
+    }
+
+    _sanityCheck(self.uniqueNativeUnusedCapacity != nil,
+      "growth should produce uniqueness")
+
+    if other.isFastUTF8 {
+      other.withFastUTF8 { self.appendInPlace($0) }
+      return
+    }
+    _foreignAppendInPlace(other)
+  }
+
+  internal mutating func appendInPlace(_ other: UnsafeBufferPointer<UInt8>) {
+    self._object.nativeStorage.appendInPlace(other)
+
+    // We re-initialize from the modified storage to pick up new count, flags,
+    // etc.
+    self = _StringGuts(self._object.nativeStorage)
+  }
+
+  @inline(never) // slow-path
+  internal mutating func _foreignAppendInPlace(_ other: _StringGuts) {
+    _sanityCheck(!other.isFastUTF8)
+    _sanityCheck(self.uniqueNativeUnusedCapacity != nil)
+
+    var iter = String(other).utf8.makeIterator()
+    self._object.nativeStorage.appendInPlace(&iter)
+
+    // We re-initialize from the modified storage to pick up new count, flags,
+    // etc.
+    self = _StringGuts(self._object.nativeStorage)
   }
 }
 

@@ -60,6 +60,7 @@ extension _AbstractStringStorage {
   @objc(_fastCStringContents)
   final func _fastCStringContents() -> UnsafePointer<CChar>? {
     if let native = self as? _StringStorage {
+      // FIXME(UTF8): Need to check for interior nul
       return native.start._asCChar
     }
 
@@ -83,9 +84,11 @@ extension _AbstractStringStorage {
 @_fixed_layout
 @usableFromInline
 final internal class _StringStorage: _AbstractStringStorage {
+  // The capacity of our allocation. Note that this includes the nul-terminator,
+  // which is not available for overridding.
   @nonobjc
   @usableFromInline
-  internal var capacity: Int
+  internal var _realCapacity: Int
 
   @nonobjc
   @usableFromInline
@@ -116,12 +119,12 @@ extension _StringStorage {
     _sanityCheck(capacity >= count)
 
     // Reserve enough capacity for a trailing nul character
-    let capacity = 1 + Swift.max(capacity, _SmallUTF8String.capacity)
-    _sanityCheck(capacity > count)
+    let desiredCapacity = 1 + Swift.max(capacity, _SmallUTF8String.capacity)
+    _sanityCheck(desiredCapacity > count)
 
     let storage = Builtin.allocWithTailElems_1(
       _StringStorage.self,
-      capacity._builtinWordValue, UInt8.self)
+      desiredCapacity._builtinWordValue, UInt8.self)
 
     let storageAddr = UnsafeRawPointer(
       Builtin.bridgeToRawPointer(storage))
@@ -129,10 +132,10 @@ extension _StringStorage {
       storageAddr + _stdlib_malloc_size(storageAddr)
     ).assumingMemoryBound(to: UInt8.self)
 
-    storage.capacity = endAddr - storage.start
+    storage._realCapacity = endAddr - storage.start
     storage._count = count
     _sanityCheck(storage.capacity >= capacity)
-    storage.unusedStorage[0] = 0 // nul-terminated
+    storage.terminator.pointee = 0 // nul-terminated
     storage._invariantCheck()
 
     return storage
@@ -147,6 +150,7 @@ extension _StringStorage {
       capacity: capacity, count: bufPtr.count)
     let addr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
     storage.mutableStart.initialize(from: addr, count: bufPtr.count)
+    storage._invariantCheck()
     return storage
   }
 
@@ -156,24 +160,6 @@ extension _StringStorage {
   ) -> _StringStorage {
     return _StringStorage.create(
       initializingFrom: bufPtr, capacity: bufPtr.count)
-  }
-
-  @nonobjc
-  internal static func create(
-    initializingFrom bufPtr: UnsafeBufferPointer<UInt8>,
-    andAppending secondBufPtr: UnsafeBufferPointer<UInt8>
-  ) -> _StringStorage {
-    let size = bufPtr.count + secondBufPtr.count
-    let storage = _StringStorage.create(
-      capacity: size, count: size)
-
-    let addr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
-    storage.mutableStart.initialize(from: addr, count: bufPtr.count)
-
-    let secondAddr = secondBufPtr.baseAddress._unsafelyUnwrappedUnchecked
-    (storage.mutableStart + bufPtr.count).initialize(
-      from: secondAddr, count: secondBufPtr.count)
-    return storage
   }
 }
 
@@ -206,6 +192,13 @@ extension _StringStorage {
     @inline(__always) get { return UnsafePointer(mutableEnd) }
   }
 
+  // Point to the nul-terminator
+  @nonobjc
+  @inlinable
+  internal final var terminator: UnsafeMutablePointer<UInt8> {
+    @inline(__always) get { return mutableEnd }
+  }
+
   @nonobjc
   @inlinable
   internal var codeUnits: UnsafeBufferPointer<UInt8> {
@@ -214,19 +207,27 @@ extension _StringStorage {
     }
   }
 
-  @inlinable
+  // The total capacity available for code units. Note that this excludes the
+  // required nul-terminator
+  @nonobjc
+  internal var capacity: Int { return _realCapacity &- 1 }
+
+  // The unused capacity available for appending. Note that this excludes the
+  // required nul-terminator
   @nonobjc
   internal var unusedStorage: UnsafeMutableBufferPointer<UInt8> {
     @inline(__always) get {
       return UnsafeMutableBufferPointer(
-        start: mutableEnd, count: unusedCapacity)
+        start: mutableEnd, count: capacity)
     }
   }
 
+  // The capacity available for appending. Note that this excludes the required
+  // nul-terminator
   @nonobjc
   @inlinable
   internal var unusedCapacity: Int {
-    @inline(__always) get { return capacity &- count }
+    @inline(__always) get { return _realCapacity &- _count &- 1 }
   }
 
   @nonobjc
@@ -235,10 +236,49 @@ extension _StringStorage {
     #if INTERNAL_CHECKS_ENABLED
     let rawSelf = UnsafeRawPointer(Builtin.bridgeToRawPointer(self))
     let rawStart = UnsafeRawPointer(start)
+    _sanityCheck(unusedCapacity >= 0)
     _sanityCheck(rawSelf + Int(_StringObject.nativeBias) == rawStart)
-    _sanityCheck(self.capacity > self.count, "no room for nul-terminator")
-    _sanityCheck(self.unusedStorage[0] == 0, "not nul terminated")
+    _sanityCheck(self._realCapacity > self._count, "no room for nul-terminator")
+    _sanityCheck(self.terminator.pointee == 0, "not nul terminated")
     #endif
+  }
+}
+
+// Appending
+extension _StringStorage {
+  @nonobjc
+  internal func appendInPlace(_ other: UnsafeBufferPointer<UInt8>) {
+    _sanityCheck(self.capacity >= other.count)
+    let oldTerminator = self.terminator
+
+    let srcAddr = other.baseAddress._unsafelyUnwrappedUnchecked
+    let srcCount = other.count
+    self.mutableEnd.initialize(from: srcAddr, count: srcCount)
+    self._count += srcCount
+
+    _sanityCheck(oldTerminator + other.count == self.terminator)
+    self.terminator.pointee = 0
+
+    _invariantCheck()
+  }
+
+  @nonobjc
+  internal func appendInPlace<Iter: IteratorProtocol>(
+    _ other: inout Iter
+  ) where Iter.Element == UInt8 {
+    let oldTerminator = self.terminator
+    var srcCount = 0
+    while let cu = other.next() {
+      _sanityCheck(self.unusedCapacity >= 1)
+      unusedStorage[srcCount] = cu
+      srcCount += 1
+    }
+    self._count += srcCount
+
+    _sanityCheck(oldTerminator + srcCount == self.terminator)
+    self.terminator.pointee = 0
+
+    _invariantCheck()
   }
 }
 
