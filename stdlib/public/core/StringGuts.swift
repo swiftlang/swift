@@ -60,10 +60,6 @@ extension _StringGuts {
 
   @inlinable @inline(__always)
   internal init(_ bufPtr: UnsafeBufferPointer<UInt8>, isKnownASCII: Bool) {
-//    if let smol = _SmallString(bufPtr) {
-//      self.init(smol)
-//      return
-//    }
     self.init(_StringObject(immortal: bufPtr, isASCII: isKnownASCII))
   }
 

@@ -126,7 +126,7 @@ extension _SmallString {
     #if INTERNAL_CHECKS_ENABLED
     print("""
       smallUTF8: count: \(self.count), codeUnits: \(
-        self.map { String($0, radix: 16) }.dropLast()
+        self.map { String($0, radix: 16) }.dropLast().joined()
       )
       """)
     #endif // INTERNAL_CHECKS_ENABLED
@@ -190,7 +190,7 @@ extension _SmallString {
 
   // Overwrite stored code units, including uninitialized. `f` should return the
   // new count.
-  @inline(__always)
+  @inlinable @inline(__always)
   internal mutating func withMutableCapacity(
     _ f: (UnsafeMutableBufferPointer<UInt8>) throws -> Int
   ) rethrows {
@@ -208,7 +208,7 @@ extension _SmallString {
   }
 
   // Write to excess capacity. `f` should return the new count.
-  @inline(__always)
+  @inlinable @inline(__always)
   internal mutating func withMutableExcessCapacity(
     _ f: (UnsafeMutableBufferPointer<UInt8>) throws -> Int
   ) rethrows {
@@ -226,7 +226,8 @@ extension _SmallString {
 // Creation
 extension _SmallString {
   // Direct from UTF-8
-  init?(_ input: UnsafeBufferPointer<UInt8>) {
+  @inlinable @inline(__always)
+  internal init?(_ input: UnsafeBufferPointer<UInt8>) {
     guard input.count <= _SmallString.capacity else { return nil }
 
     // TODO(UTF8 perf): Directly in register
@@ -242,7 +243,7 @@ extension _SmallString {
 
 
   // Appending
-  init?(base: _StringGuts, appending other: _StringGuts) {
+  internal init?(base: _StringGuts, appending other: _StringGuts) {
     guard (base.utf8Count + other.utf8Count) <= _SmallString.capacity else {
       return nil
     }

@@ -140,5 +140,15 @@ extension String {
     let str = contents.withUnsafeBufferPointer { String._uncheckedFromUTF8($0) }
     return (str, repaired)
   }
+
+  public // @testable
+  static func _fromInvalidUTF16(
+    _ utf16: UnsafeBufferPointer<UInt16>
+  ) -> String {
+    // TODO(UTF8 test): How much does ahead-of-time fix defeat the purpose of
+    // validation-test/stdlib/StringViews.swift ?
+
+    return String._fromCodeUnits(utf16, encoding: UTF16.self, repair: true)!.0
+  }
 }
 
