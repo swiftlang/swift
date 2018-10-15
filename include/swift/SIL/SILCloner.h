@@ -614,6 +614,10 @@ void SILCloner<ImplClass>::visitBlocksDepthFirst(
   assert(preorderBlocks.empty());
 
   // First clone the CFG region.
+  //
+  // FIXME: Add reverse iteration to SILSuccessor, then convert this to an RPOT
+  // traversal. We would prefer to keep CFG regions in RPO order, and this would
+  // be more scalable for functions with many large switches.
   SmallVector<SILBasicBlock *, 8> dfsWorklist(1, startBB);
   while (!dfsWorklist.empty()) {
     auto *BB = dfsWorklist.pop_back_val();
