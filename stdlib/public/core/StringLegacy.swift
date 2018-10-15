@@ -30,8 +30,7 @@ extension String {
   public init(repeating repeatedValue: String, count: Int) {
     precondition(count >= 0, "Negative count not allowed")
     guard count > 1 else {
-      // TODO(UTF8 merge): use string literal
-      self = count == 0 ? String() : repeatedValue
+      self = count == 0 ? "" : repeatedValue
       return
     }
 
