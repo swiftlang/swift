@@ -38,3 +38,21 @@ extension P1 where Self : P2 {
 protocol P3 {
   associatedtype T
 }
+
+// FIXME: This extension's generic signature is still minimized differently from
+// the next one. We need to decide if 'T == Int' is a redundant requirement or
+// not.
+extension P2 where Self : P3, T == Int {
+  func takeT1(_: T) {}
+  func takeT2(_: Self.T) {}
+}
+
+extension P2 where Self : P3 {
+  func takeT1(_: T) {}
+  func takeT2(_: Self.T) {}
+}
+
+protocol P4 : P2, P3 {
+  func takeT1(_: T)
+  func takeT2(_: Self.T)
+}

@@ -254,6 +254,12 @@ bool TypeResolution::areSameType(Type type1, Type type2) const {
 
   // If we have a generic signature, canonicalize using it.
   if (auto genericSig = getGenericSignature()) {
+    // If both are type parameters, we can use a cheaper check
+    // that avoids transforming the type and computing anchors.
+    if (type1->isTypeParameter() &&
+        type2->isTypeParameter()) {
+      return genericSig->areSameTypeParameterInContext(type1, type2);
+    }
     return genericSig->getCanonicalTypeInContext(type1)
       == genericSig->getCanonicalTypeInContext(type2);
   }
