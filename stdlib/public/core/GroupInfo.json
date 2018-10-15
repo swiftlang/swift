@@ -39,6 +39,7 @@
     "Substring.swift",
     "Unicode.swift",
     "UnicodeEncoding.swift",
+    "UnicodeHelpers.swift",
     "UnicodeParser.swift",
     "UnicodeScalar.swift",
     "UnicodeScalarProperties.swift",

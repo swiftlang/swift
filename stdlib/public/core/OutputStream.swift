@@ -536,7 +536,7 @@ extension String : TextOutputStream {
   }
 
   public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
-    self._guts.append(_StringGuts(buffer, isKnownASCII: true))
+    self._guts.append(_StringGuts(buffer, isASCII: true))
   }
 }
 

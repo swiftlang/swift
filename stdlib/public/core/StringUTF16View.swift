@@ -10,42 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// TODO(UTF8 merge): Find a common place for these helpers
-extension _StringGuts {
-  @_effects(releasenone)
-  // TODO(UTF8): Should probably take a String.Index, assert no transcoding
-  internal func foreignUTF16CodeUnit(at i: Int) -> UInt16 {
-    // Currently, foreign means NSString
-    return _cocoaStringSubscript(_object.cocoaObject, i)
-  }
-}
-
-internal let _leadingSurrogateBias: UInt16 = 0xd800
-internal let _trailingSurrogateBias: UInt16 = 0xdc00
-internal let _surrogateMask: UInt16 = 0xfc00
-
-@inline(__always)
-internal func _isTrailingSurrogate(_ cu: UInt16) -> Bool {
-  return cu & _surrogateMask == _trailingSurrogateBias
-}
-@inline(__always)
-internal func _isLeadingSurrogate(_ cu: UInt16) -> Bool {
-  return cu & _surrogateMask == _leadingSurrogateBias
-}
-
-internal func _numTranscodedUTF8CodeUnits(_ x: UInt16) -> Int {
-  _sanityCheck(!_isTrailingSurrogate(x))
-
-  if _slowPath(_isLeadingSurrogate(x)) { return 4 }
-
-  switch x {
-    case 0..<0x80: return 1
-    case 0x80..<0x0800: return 2
-    case _: return 3
-  }
-}
-
-
 // FIXME(ABI)#71 : The UTF-16 string view should have a custom iterator type to
 // allow performance optimizations of linear traversals.
 
@@ -162,7 +126,7 @@ extension String.UTF16View: BidirectionalCollection {
   /// nonempty; identical to `endIndex` otherwise.
   @inlinable // FIXME(sil-serialize-all)
   public var startIndex: Index {
-    @inline(__always) get { return Index(encodedOffset: 0) }
+    @inline(__always) get { return _guts.startIndex }
   }
 
   /// The "past the end" position---that is, the position one greater than
@@ -171,7 +135,7 @@ extension String.UTF16View: BidirectionalCollection {
   /// In an empty UTF-16 view, `endIndex` is equal to `startIndex`.
   @inlinable // FIXME(sil-serialize-all)
   public var endIndex: Index {
-    @inline(__always) get { return Index(encodedOffset: _guts.count) }
+    @inline(__always) get { return _guts.endIndex }
   }
 
   @inlinable @inline(__always)
@@ -204,11 +168,14 @@ extension String.UTF16View: BidirectionalCollection {
 
     let len = _guts.fastUTF8ScalarLength(endingAt: i.encodedOffset)
     if len == 4 {
+      // 2 UTF-16 code units comprise this scalar; advance to the beginning and
+      // start mid-scalar transcoding
       return Index(
         encodedOffset: i.encodedOffset &- len,
         transcodedOffset: 1)
     }
 
+    // Single UTF-16 code unit
     _sanityCheck((1...3) ~= len)
     return Index(encodedOffset: i.encodedOffset &- len)
   }
@@ -260,11 +227,12 @@ extension String.UTF16View: BidirectionalCollection {
   @inlinable
   public subscript(i: Index) -> UTF16.CodeUnit {
     @inline(__always) get {
-      _precondition(i.encodedOffset >= 0 && i < endIndex)
+      String(_guts)._boundsCheck(i)
       // TODO(UTF8): known-ASCII fast path
 
       if _fastPath(_guts.isFastUTF8) {
-        let scalar = _guts.fastUTF8Scalar(startingAt: i.encodedOffset)
+        let scalar = _guts.fastUTF8Scalar(
+          startingAt: _guts.scalarAlign(i).encodedOffset)
         if scalar.value <= 0xFFFF {
           return UInt16(truncatingIfNeeded: scalar.value)
         }
@@ -348,12 +316,16 @@ extension String.UTF16View.Index {
   ///   - sourcePosition: A position in at least one of the views of the string
   ///     shared by `target`.
   ///   - target: The `UTF16View` in which to find the new position.
-  @inlinable // FIXME(sil-serialize-all)
   public init?(
-    _ sourcePosition: String.Index, within target: String.UTF16View
+    _ idx: String.Index, within target: String.UTF16View
   ) {
-    guard sourcePosition.transcodedOffset == 0 else { return nil }
-    self.init(encodedOffset: sourcePosition.encodedOffset)
+    if _slowPath(target._guts.isForeign) {
+      guard idx._foreignIsWithin(target) else { return nil }
+    } else {
+      guard target._guts.isOnUnicodeScalarBoundary(idx) else { return nil }
+    }
+
+    self = idx
   }
 
   /// Returns the position in the given view of Unicode scalars that
@@ -428,9 +400,7 @@ extension String.UTF16View {
   @_effects(releasenone)
   internal func _foreignSubscript(position i: Index) -> UTF16.CodeUnit {
     _sanityCheck(_guts.isForeign)
-
-    // Currently, foreign means NSString
-    return _guts.foreignUTF16CodeUnit(at: i.encodedOffset)
+    return _guts.foreignErrorCorrectedUTF16CodeUnit(at: i)
   }
 
   @usableFromInline @inline(never)
@@ -461,9 +431,18 @@ extension String.UTF16View {
   @_effects(releasenone)
   internal func _foreignIndex(_ i: Index, offsetBy n: Int) -> Index {
     _sanityCheck(_guts.isForeign)
-
-    // Currently, foreign means NSString
     return Index(encodedOffset: i.encodedOffset + n)
   }
-
 }
+
+extension String.Index {
+  @usableFromInline @inline(never) // opaque slow-path
+  @_effects(releasenone)
+  internal func _foreignIsWithin(_ target: String.UTF16View) -> Bool {
+    _sanityCheck(target._guts.isForeign)
+
+    // If we're transcoding, we're a UTF-8 view index, not UTF-16.
+    return self.transcodedOffset == 0
+  }
+}
+

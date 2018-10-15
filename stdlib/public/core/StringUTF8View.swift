@@ -205,7 +205,7 @@ extension String.UTF8View: BidirectionalCollection {
   /// If the UTF-8 view is empty, `startIndex` is equal to `endIndex`.
   @inlinable
   public var startIndex: Index {
-    @inline(__always) get { return Index(encodedOffset: 0) }
+    @inline(__always) get { return _guts.startIndex }
   }
 
   /// The "past the end" position---that is, the position one
@@ -214,7 +214,7 @@ extension String.UTF8View: BidirectionalCollection {
   /// In an empty UTF-8 view, `endIndex` is equal to `startIndex`.
   @inlinable
   public var endIndex: Index {
-    @inline(__always) get { return Index(encodedOffset: _guts.count) }
+    @inline(__always) get { return _guts.endIndex }
   }
 
   /// Returns the next consecutive position after `i`.
@@ -512,43 +512,40 @@ extension String.UTF8View {
   internal func _foreignIndex(after i: Index) -> Index {
     _sanityCheck(_guts.isForeign)
 
-    let cu = _guts.foreignUTF16CodeUnit(at: i.encodedOffset)
-    let len = _numTranscodedUTF8CodeUnits(cu)
+    let scalar = _guts.foreignErrorCorrectedScalar(
+      startingAt: i.strippingTranscoding)
+    let utf8Len = _numUTF8CodeUnits(scalar)
+    let utf16Len = _numUTF16CodeUnits(scalar)
 
-    if len == 1 {
+    if utf8Len == 1 {
       _sanityCheck(i.transcodedOffset == 0)
       return Index(encodedOffset: i.encodedOffset + 1)
     }
 
     // Check if we're still transcoding sub-scalar
-    if i.transcodedOffset < len - 1 {
-        return Index(transcodedAfter: i)
+    if i.transcodedOffset < utf8Len - 1 {
+      return Index(transcodedAfter: i)
     }
 
     // Skip to the next scalar
-    let scalarLen = len == 4 ? 2 : 1
-    return Index(encodedOffset: i.encodedOffset + scalarLen)
+    return Index(encodedOffset: i.encodedOffset + utf16Len)
   }
 
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _foreignIndex(before i: Index) -> Index {
     _sanityCheck(_guts.isForeign)
-
     if i.transcodedOffset != 0 {
       _sanityCheck((1...3) ~= i.transcodedOffset)
       return Index(transcodedBefore: i)
     }
-    var offset = i.encodedOffset &- 1
-    var cu = _guts.foreignUTF16CodeUnit(at: offset)
-    if _isTrailingSurrogate(cu) {
-      offset = offset &- 1
-      _sanityCheck(offset >= 0)
-      cu = _guts.foreignUTF16CodeUnit(at: offset)
-    }
-    let len = _numTranscodedUTF8CodeUnits(cu)
 
-    return Index(encodedOffset: offset, transcodedOffset: len &- 1)
+    let scalar = _guts.foreignErrorCorrectedScalar(endingAt: i)
+    let utf8Len = _numUTF8CodeUnits(scalar)
+    let utf16Len = _numUTF16CodeUnits(scalar)
+    return Index(
+      encodedOffset: i.encodedOffset &- utf16Len,
+      transcodedOffset: utf8Len &- 1)
   }
 
   @usableFromInline @inline(never)
@@ -556,13 +553,11 @@ extension String.UTF8View {
   internal func _foreignSubscript(position i: Index) -> UTF8.CodeUnit {
     _sanityCheck(_guts.isForeign)
 
-    // Currently, foreign means NSString
-
-    // TODO(UTF8 perf): Could probably work just off a single code unit
-    let scalar = _guts.foreignScalar(startingAt: i.encodedOffset)
+    let scalar = _guts.foreignErrorCorrectedScalar(
+      startingAt: _guts.scalarAlign(i))
     let encoded = Unicode.UTF8.encode(scalar)._unsafelyUnwrappedUnchecked
-
     _sanityCheck(i.transcodedOffset < 1+encoded.count)
+
     return encoded[
       encoded.index(encoded.startIndex, offsetBy: i.transcodedOffset)]
   }
@@ -596,5 +591,20 @@ extension String.UTF8View {
     _sanityCheck(_guts.isForeign)
     return __distance(from: startIndex, to: endIndex)
   }
+}
 
+extension String.Index {
+  @usableFromInline @inline(never) // opaque slow-path
+  @_effects(releasenone)
+  internal func _foreignIsWithin(_ target: String.UTF8View) -> Bool {
+    _sanityCheck(target._guts.isForeign)
+    // Currently, foreign means UTF-16.
+
+    // If we're transcoding, we're already a UTF8 view index.
+    if self.encodedOffset != 0 { return true }
+
+    // Otherwise, we must be scalar-aligned, i.e. not pointing at a trailing
+    // surrogate.
+    return target._guts.isOnUnicodeScalarBoundary(self)
+  }
 }
