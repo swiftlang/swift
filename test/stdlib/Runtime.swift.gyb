@@ -558,6 +558,14 @@ Runtime.test("SwiftError layout constants for LLDB") {
   let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)
 #elseif os(Linux)
   let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)
+#elseif os(Android)
+  #if arch(arm)
+    let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0xffffffff)
+  #elseif arch(arm64)
+    let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)
+  #else
+    _UnimplementedError()
+  #endif
 #else
   _UnimplementedError()
 #endif
@@ -574,7 +582,7 @@ Runtime.test("SwiftError layout constants for LLDB") {
   expectEqual(40, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
   expectEqual(72, sizeof_SwiftError.load(as: UInt.self))
 #endif
-#elseif os(Linux)
+#elseif os(Linux) || os(Android)
   expectEqual(16, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
   expectEqual(32, sizeof_SwiftError.load(as: UInt.self))
 #else
