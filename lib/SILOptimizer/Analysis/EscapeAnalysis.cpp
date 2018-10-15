@@ -1239,12 +1239,6 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
           return;
         }
         break;
-      case ArrayCallKind::kGetArrayOwner:
-        if (CGNode *BufferNode = ConGraph->getNode(ASC.getSelf(), this)) {
-          ConGraph->defer(ConGraph->getNode(ASC.getCallResult(), this),
-                          BufferNode);
-        }
-        return;
       case ArrayCallKind::kGetElement:
         if (CGNode *AddrNode = ConGraph->getNode(ASC.getSelf(), this)) {
           CGNode *DestNode = nullptr;
