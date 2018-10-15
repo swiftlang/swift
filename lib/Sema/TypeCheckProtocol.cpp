@@ -1961,7 +1961,16 @@ static void addOptionalityFixIts(
 /// \brief Diagnose a requirement match, describing what went wrong (or not).
 static void
 diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
-              ValueDecl *req, const RequirementMatch &match){
+              ValueDecl *req, const RequirementMatch &match) {
+
+  // If we are matching a constructor and the name doesn't match,
+  // it is likely this witness wasn't intended to be a match at all, so omit
+  // diagnosis.
+  if (req->getKind() == DeclKind::Constructor && match.Kind != MatchKind::RenamedMatch
+      && !match.Witness->getAttrs().hasAttribute<ImplementsAttr>() &&
+      req->getFullName() != match.Witness->getFullName())
+    return;
+
   // Form a string describing the associated type deductions.
   // FIXME: Determine which associated types matter, and only print those.
   llvm::SmallString<128> withAssocTypes;
