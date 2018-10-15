@@ -233,6 +233,54 @@ Type TypeResolution::resolveDependentMemberType(
                                               baseTy);
 }
 
+Type TypeResolution::resolveSelfAssociatedType(Type baseTy,
+                                               DeclContext *DC,
+                                               Identifier name) const {
+  switch (stage) {
+  case TypeResolutionStage::Structural:
+    return DependentMemberType::get(baseTy, name);
+
+  case TypeResolutionStage::Contextual:
+    llvm_unreachable("Dependent type after archetype substitution");
+
+  case TypeResolutionStage::Interface:
+    // Handled below.
+    break;
+  }
+
+  assert(stage == TypeResolutionStage::Interface);
+  auto builder = getGenericSignatureBuilder();
+  auto baseEquivClass =
+    builder->resolveEquivalenceClass(
+                                baseTy,
+                                ArchetypeResolutionKind::CompleteWellFormed);
+  if (!baseEquivClass)
+    return ErrorType::get(baseTy);
+
+  // Look for a nested type with the given name.
+  auto nestedType = baseEquivClass->lookupNestedType(*builder, name);
+  assert(nestedType);
+
+  // If the nested type has been resolved to an associated type, use it.
+  if (auto assocType = dyn_cast<AssociatedTypeDecl>(nestedType)) {
+    return DependentMemberType::get(baseTy, assocType);
+  }
+
+  if (nestedType->getDeclContext()->getSelfClassDecl()) {
+    // We found a member of a class from a protocol or protocol
+    // extension.
+    //
+    // Get the superclass of the 'Self' type parameter.
+    baseTy = (baseEquivClass->concreteType
+              ? baseEquivClass->concreteType
+              : baseEquivClass->superclass);
+    assert(baseTy);
+  }
+
+  return TypeChecker::substMemberTypeWithBase(DC->getParentModule(), nestedType,
+                                              baseTy);
+}
+
 bool TypeResolution::areSameType(Type type1, Type type2) const {
   if (type1->isEqual(type2))
     return true;
@@ -524,18 +572,26 @@ Type TypeChecker::resolveTypeInContext(
       foundDC->getSelfInterfaceType());
 
     if (selfType->is<GenericTypeParamType>()) {
-      // In structural mode, we have to be very conservative in
-      // TypeResolution::areSameType(). So to avoid incorrectly diagnosing
-      // ambiguity, map associated types and protocol typealiases to unresolved
-      // member types.
-      if (resolution.getStage() == TypeResolutionStage::Structural) {
+      if (typeDecl->getDeclContext()->getSelfProtocolDecl()) {
         if (isa<AssociatedTypeDecl>(typeDecl) ||
             (isa<TypeAliasDecl>(typeDecl) &&
              !cast<TypeAliasDecl>(typeDecl)->isGeneric())) {
-          return DependentMemberType::get(selfType, typeDecl->getName());
+          // FIXME: We should use this lookup method for the Interface
+          // stage too, but right now that causes problems with
+          // Sequence.SubSequence vs Collection.SubSequence; the former
+          // is more canonical, but if we return that instead of the
+          // latter, we infer the wrong associated type in some cases,
+          // because we use the Sequence.SubSequence default instead of
+          // the Collection.SubSequence default, even when the conforming
+          // type wants to conform to Collection.
+          if (resolution.getStage() == TypeResolutionStage::Structural) {
+            return resolution.resolveSelfAssociatedType(
+              selfType, foundDC, typeDecl->getName());
+          }
         }
       }
 
+      // FIXME: Remove this once the above FIXME is addressed.
       if (typeDecl->getDeclContext()->getSelfClassDecl()) {
         // We found a member of a class from a protocol or protocol
         // extension.
