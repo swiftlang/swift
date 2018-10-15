@@ -161,31 +161,6 @@ extension ArraySlice {
     return _buffer.capacity
   }
 
-  /// - Precondition: The array has a native buffer.
-  @inlinable
-  @_semantics("array.owner")
-  internal func _getOwnerWithSemanticLabel_native() -> Builtin.NativeObject {
-    return Builtin.unsafeCastToNativeObject(_buffer.nativeOwner)
-  }
-
-  /// - Precondition: The array has a native buffer.
-  @inlinable
-  @inline(__always)
-  internal func _getOwner_native() -> Builtin.NativeObject {
-#if _runtime(_ObjC)
-    if _isClassOrObjCExistential(Element.self) {
-      // We are hiding the access to '_buffer.owner' behind
-      // _getOwner() to help the compiler hoist uniqueness checks in
-      // the case of class or Objective-C existential typed array
-      // elements.
-      return _getOwnerWithSemanticLabel_native()
-    }
-#endif
-    // In the value typed case the extra call to
-    // _getOwnerWithSemanticLabel_native hinders optimization.
-    return Builtin.unsafeCastToNativeObject(_buffer.owner)
-  }
-
   @inlinable
   @_semantics("array.make_mutable")
   internal mutating func _makeMutableAndUnique() {
