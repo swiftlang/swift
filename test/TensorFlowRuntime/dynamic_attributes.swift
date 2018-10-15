@@ -24,14 +24,7 @@ func loadAttribute<T: PythonConvertible>(_ key: String) -> T {
 
 extension TensorDataType : PythonConvertible {
   public var pythonObject: PythonObject {
-    switch self {
-    case Double.tensorFlowDataType:
-      return "Double".pythonObject
-    case Int32.tensorFlowDataType:
-      return "Int32".pythonObject
-    default:
-      fatalError("unimplmented")
-    }
+    fatalError("unimplemented")
   }
 
   public init?(_ pythonObject: PythonObject) {

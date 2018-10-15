@@ -27,7 +27,7 @@ import CTensorFlow
 // without importing CTensorFlow, which would import a bunch of distracting
 // declarations from the TF C API.
 @_fixed_layout
-public struct TensorDataType : Equatable {
+public struct TensorDataType {
   @usableFromInline
   internal var cDataType: TF_DataType
 

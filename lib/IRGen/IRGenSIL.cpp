@@ -1954,6 +1954,7 @@ static const char *inputListNumberAttr(StringRef opName) {
 // The code structure resembles
 // TFGraphFunctionLowering::visitGraphOperationInst().
 void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
+  auto &astCtx = CurSILFn->getASTContext();
   tf::GraphOperationInfo opInfo(i);
 
   if (!CurSILFn->processedByDeabstraction) {
@@ -2071,8 +2072,9 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       assert(0 && "TypeListAttribute should have been eliminated by "
                   "deabstraction");
     case GraphOperationInfo::ArgumentLowering::TensorAttribute:
-      // See GraphOperationInfo.h for more information on why TensorAttribute
-      // cannot be dynamic.
+      // See the comment on the declaration of the enum case
+      // `GraphOperationInfo::ArgumentLowering::TensorAttribute` for more
+      // information on why this cannot be dynamic.
       assert(0 && "TensorAttributes cannot be dynamic");
     case GraphOperationInfo::ArgumentLowering::Input: {
       assert(argumentName.empty() && "inputs cannot have names");
@@ -2107,8 +2109,8 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       switch (structuredArgument.getKind()) {
       case GraphOperationInfo::SAK_Single: {
         auto silValue = structuredArgument.getSingleArgument();
-        StringRef typeString = silValue->getType().getASTType().getString();
-        if (typeString == "Builtin.Int32") {
+        auto silType = silValue->getType();
+        if (silType == SILType::getBuiltinIntegerType(32, astCtx)) {
           // Deabstraction extracts the Builtin.Int32 that's inside the
           // TensorDataType.
           auto dtypeAttrValue = getLoweredSingletonExplosion(silValue);
@@ -2116,9 +2118,8 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
           auto attrNameValAddr = createStringValAddr(IGM, argumentName.c_str());
           Builder.CreateCall(setAttrTypeFn,
                              {op, attrNameValAddr, dtypeAttrValue});
-        } else if (typeString == "Array<TensorDataType>") {
-          assert(0 && "TODO: Implement dynamic type list attribute");
         } else {
+          // TODO: Implement dynamic type list attribute
           assert(0 && "unknown TFDataTypeAttribute argument type");
         }
         break;
