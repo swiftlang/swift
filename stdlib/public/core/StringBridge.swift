@@ -283,45 +283,40 @@ public protocol _NSStringCore: class {}
 
 #endif
 
-extension String {
-  // Resiliently provide a (barely) amortized random access UTF-16 interface
-  //
-  // @opaque
-  internal func _utf16OffsetToIndex(_ offset: Int) -> Index {
-    // TODO(UTF8): Track known ASCII
+// Special-case Index <-> Offset converters for bridging and use in accelerating
+// the UTF16View in general.
+extension StringProtocol {
+  @_specialize(where Self == String)
+  @_specialize(where Self == Substring)
+  public // SPI(Foundation)
+  func _toUTF16Offset(_ idx: Index) -> Int {
+    return self.utf16.distance(from: self.utf16.startIndex, to: idx)
+  }
 
-    // TODO(UTF8): Leave breadcrumbs, and more efficient impl
-
+  @_specialize(where Self == String)
+  @_specialize(where Self == Substring)
+  public // SPI(Foundation)
+  func _toUTF16Index(_ offset: Int) -> Index {
     return self.utf16.index(self.utf16.startIndex, offsetBy: offset)
   }
 
-  // Resiliently provide a (barely) amortized random access UTF-16 interface
-  //
-  // @opaque
-  internal func _utf16OffsetToIndex(_ range: Range<Int>) -> Range<Index> {
-    // TODO(UTF8): Can be more efficient for a range
-    return self._utf16OffsetToIndex(range.lowerBound)
-       ..< self._utf16OffsetToIndex(range.upperBound)
+  @_specialize(where Self == String)
+  @_specialize(where Self == Substring)
+  public // SPI(Foundation)
+  func _toUTF16Offsets(_ indices: Range<Index>) -> Range<Int> {
+    let lowerbound = _toUTF16Offset(indices.lowerBound)
+    let length = self.utf16.distance(
+      from: indices.lowerBound, to: indices.upperBound)
+    return Range(
+      uncheckedBounds: (lower: lowerbound, upper: lowerbound + length))
   }
 
-  // Resiliently provide a (barely) amortized random access UTF-16 interface
-  //
-  // @opaque
-  internal func _utf16Length() -> Int {
-    // TODO(UTF8): Track known ASCII
-
-    // TODO(UTF8): Leave breadcrumbs, and more efficient impl. Perhaps even
-    // store it.
-
-    return self.utf16.count
+  @_specialize(where Self == String)
+  @_specialize(where Self == Substring)
+  public // SPI(Foundation)
+  func _toUTF16Indices(_ range: Range<Int>) -> Range<Index> {
+    let lowerbound = _toUTF16Index(range.lowerBound)
+    let upperbound = _toUTF16Index(range.lowerBound + range.count)
+    return Range(uncheckedBounds: (lower: lowerbound, upper: upperbound))
   }
-
-  // Resiliently provide a (barely) amortized `characterAtIndex`
-  //
-  // @opaque
-  internal func _utf16CodeUnitAtOffset(_ offset: Int) -> UInt16 {
-    return self.utf16[self._utf16OffsetToIndex(offset)]
-  }
-
 }
-
