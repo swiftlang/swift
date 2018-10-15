@@ -718,6 +718,8 @@ public:
     return *Context.get<ASTContext *>();
   }
 
+  bool getEnableExperimentalDependencies() const;
+
   const DeclAttributes &getAttrs() const {
     return Attrs;
   }

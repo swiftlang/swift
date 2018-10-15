@@ -524,6 +524,8 @@ public:
   LLVM_READONLY
   ASTContext &getASTContext() const;
 
+  bool getEnableExternalDependencies() const;
+
   /// Retrieve the set of protocols whose conformances will be
   /// associated with this declaration context.
   ///

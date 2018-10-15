@@ -22,6 +22,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/ExperimentalDependencies.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/ReferenceDependencyKeys.h"
@@ -72,6 +73,13 @@ private:
   void emitProvides() const;
   void emitDepends() const;
   void emitInterfaceHash() const;
+
+  /// In order to experiment with finer-grained dependencies, a second interface
+  /// hash is needed. This hash will be invarient to changes that can be
+  /// captured by other experimental additions. By emitting it in addition, we
+  /// should obtain backwards compatibility.
+  void emitExperimentalInterfaceHash() const;
+  void emitNormalInterfaceHash() const;
 };
 
 /// Emits the declarations provided by a source file.
@@ -246,6 +254,18 @@ void ReferenceDependenciesEmitter::emitDepends() const {
 }
 
 void ReferenceDependenciesEmitter::emitInterfaceHash() const {
+  if (SF->getEnableExternalDependencies())
+    emitExperimentalInterfaceHash();
+  emitNormalInterfaceHash();
+}
+void ReferenceDependenciesEmitter::emitExperimentalInterfaceHash() const {
+  // FIXME: just the same hash for now
+  llvm::SmallString<32> interfaceHash;
+  SF->getInterfaceHash(interfaceHash);
+  out << reference_dependency_keys::interfaceHash << ": \"" << interfaceHash
+      << "\"\n";
+}
+void ReferenceDependenciesEmitter::emitNormalInterfaceHash() const {
   llvm::SmallString<32> interfaceHash;
   SF->getInterfaceHash(interfaceHash);
   out << reference_dependency_keys::interfaceHash << ": \"" << interfaceHash
