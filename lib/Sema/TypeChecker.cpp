@@ -589,7 +589,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   performNameBinding(SF, StartElem);
 
   {
-    SharedTimer timer("Type checking / Semantic analysis");
+    SharedTimer timer("Type checking and Semantic analysis");
 
     TC.setWarnLongFunctionBodies(WarnLongFunctionBodies);
     TC.setWarnLongExpressionTypeChecking(WarnLongExpressionTypeChecking);
