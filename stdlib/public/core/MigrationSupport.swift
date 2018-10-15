@@ -125,8 +125,6 @@ public typealias _BuiltinExtendedGraphemeClusterLiteralConvertible = _Expressibl
 public typealias ExtendedGraphemeClusterLiteralConvertible = ExpressibleByExtendedGraphemeClusterLiteral
 @available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByBuiltinStringLiteral")
 public typealias _BuiltinStringLiteralConvertible = _ExpressibleByBuiltinStringLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByBuiltinUTF16StringLiteral")
-public typealias _BuiltinUTF16StringLiteralConvertible = _ExpressibleByBuiltinUTF16StringLiteral
 @available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByStringLiteral")
 public typealias StringLiteralConvertible = ExpressibleByStringLiteral
 @available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByArrayLiteral")

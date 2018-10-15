@@ -105,8 +105,8 @@ extension Character {
   }
 }
 
-extension Character
-: _ExpressibleByBuiltinUTF16ExtendedGraphemeClusterLiteral,
+extension Character :
+  _ExpressibleByBuiltinExtendedGraphemeClusterLiteral,
   ExpressibleByExtendedGraphemeClusterLiteral
 {
   /// Creates a character containing the given Unicode scalar value.
@@ -136,19 +136,6 @@ extension Character
       _builtinExtendedGraphemeClusterLiteral: start,
       utf8CodeUnitCount: utf8CodeUnitCount,
       isASCII: isASCII))
-  }
-
-  // Inlining ensures that the whole constructor can be folded away to a single
-  // integer constant in case of small character literals.
-  @inlinable @inline(__always)
-  @_effects(readonly)
-  public init(
-    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    utf16CodeUnitCount: Builtin.Word
-  ) {
-    self.init(unchecked: String(
-      _builtinUTF16StringLiteral: start,
-      utf16CodeUnitCount: utf16CodeUnitCount))
   }
 
   /// Creates a character with the specified value.
