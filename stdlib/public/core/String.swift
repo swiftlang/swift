@@ -684,7 +684,6 @@ extension String {
   ///     // Prints "Hello, friend"
   ///
   /// - Parameter other: Another string.
-  @inlinable
   public mutating func append(_ other: String) {
     if self.isEmpty && !_guts.hasNativeStorage {
       self = other

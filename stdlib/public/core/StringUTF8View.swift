@@ -231,7 +231,7 @@ extension String.UTF8View: BidirectionalCollection {
 
   @inlinable @inline(__always)
   public func index(before i: Index) -> Index {
-    precondition(i.encodedOffset > 0)
+    precondition(!i.isZeroPosition)
     if _fastPath(_guts.isFastUTF8) {
       return Index(encodedOffset: i.encodedOffset &- 1)
     }
@@ -295,7 +295,7 @@ extension String.UTF8View: BidirectionalCollection {
   @inlinable
   public subscript(i: Index) -> UTF8.CodeUnit {
     @inline(__always) get {
-      _precondition(i.encodedOffset >= 0 && i < endIndex)
+      String(_guts)._boundsCheck(i)
       if _fastPath(_guts.isFastUTF8) {
         return _guts.withFastUTF8 { utf8 in utf8[i.encodedOffset] }
       }
@@ -445,9 +445,17 @@ extension String.UTF8View.Index {
   /// - Parameters:
   ///   - sourcePosition: A position in a `String` or one of its views.
   ///   - target: The `UTF8View` in which to find the new position.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init?(_ idx: String.Index, within target: String.UTF8View) {
-    unimplemented_utf8()
+    if _slowPath(target._guts.isForeign) {
+      guard idx._foreignIsWithin(target) else { return nil }
+    } else {
+      // All indices, except sub-scalar UTF-16 indices pointing at trailing
+      // surrogates, are valid.
+      guard idx.transcodedOffset == 0 else { return nil }
+    }
+
+    self = idx
   }
 }
 

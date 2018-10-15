@@ -44,7 +44,7 @@ internal func _compareStringsCanonicalEquivalent(
   return _compareStringsSlow(lhs, rhs) == .equal
 }
 
-@usableFromInline // @opaque
+@usableFromInline @inline(never)// @opaque slowish-path
 @_effects(readonly)
 internal func _compareStringsCanonicalLess(
   _ lhs: String, _ rhs: String
