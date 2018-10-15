@@ -185,7 +185,7 @@ extension String: BidirectionalCollection {
   @inlinable
   public subscript(i: Index) -> Character {
     @inline(__always) get {
-      // FIXME(UTF8): bounds checking
+      _boundsCheck(i)
 
       // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
       let i = _guts.scalarAlign(i)
@@ -211,6 +211,7 @@ extension String: BidirectionalCollection {
     if let d = i.characterStride { return d }
 
     // TODO: Known-single-scalar-grapheme fast path
+    _boundsCheck(i)
     return _guts._opaqueCharacterStride(startingAt: i.encodedOffset)
   }
 

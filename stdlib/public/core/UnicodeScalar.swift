@@ -485,6 +485,7 @@ extension Unicode.Scalar {
   }
 
   // Access the scalar as encoded in UTF-8
+  @inlinable
   internal func withUTF8CodeUnits<Result>(
     _ body: (UnsafeBufferPointer<UInt8>) throws -> Result
   ) rethrows -> Result {
@@ -497,5 +498,4 @@ extension Unicode.Scalar {
     }
   }
 }
-
 

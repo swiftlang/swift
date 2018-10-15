@@ -19,6 +19,7 @@ extension Unicode.Scalar {
 
   /// A value that provides access to properties of a Unicode scalar that are
   /// defined by the Unicode standard.
+
   public struct Properties {
     @usableFromInline
     internal var _scalar: Unicode.Scalar

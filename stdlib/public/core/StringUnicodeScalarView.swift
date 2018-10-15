@@ -68,7 +68,6 @@ extension _StringGuts {
     }
   }
 
-  // TODO(UTF8): Should probably take a String.Index, assert no transcoding
   @usableFromInline @inline(__always)
   internal func fastUTF8Scalar(startingAt i: Int) -> Unicode.Scalar {
     _sanityCheck(isFastUTF8)
