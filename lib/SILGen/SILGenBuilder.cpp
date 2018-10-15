@@ -971,3 +971,9 @@ void SILGenBuilder::emitDestructureValueOperation(
         return func(index, cloner.clone(subValue));
       });
 }
+
+ManagedValue SILGenBuilder::createProjectBox(SILLocation loc, ManagedValue mv,
+                                             unsigned index) {
+  auto *pbi = SILBuilder::createProjectBox(loc, mv.getValue(), index);
+  return ManagedValue::forUnmanaged(pbi);
+}

@@ -417,6 +417,10 @@ public:
   void emitDestructureValueOperation(
       SILLocation loc, ManagedValue value,
       function_ref<void(unsigned, ManagedValue)> func);
+
+  using SILBuilder::createProjectBox;
+  ManagedValue createProjectBox(SILLocation loc, ManagedValue mv,
+                                unsigned index);
 };
 
 } // namespace Lowering
