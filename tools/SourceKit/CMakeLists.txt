@@ -100,6 +100,17 @@ if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   set(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH TRUE)
 
   if(SWIFT_BUILD_SOURCEKIT)
+    if(CMAKE_C_COMPILER_ID STREQUAL clang AND
+       CMAKE_C_COMPILER_VERSION VERSION_GREATER 3.8)
+     set(SWIFT_SOURCEKIT_C_COMPILER ${CMAKE_C_COMPILER})
+     set(SWIFT_SOURCEKIT_CXX_COMPILER ${CMAKE_CXX_COMPILER})
+   elseif(${CMAKE_SYSTEM_NAME} STREQUAL ${CMAKE_HOST_SYSTEM_NAME})
+     set(SWIFT_SOURCEKIT_C_COMPILER ${PATH_TO_CLANG_BUILD}/bin/clang)
+     set(SWIFT_SOURCEKIT_CXX_COMPILER ${PATH_TO_CLANG_BUILD}/bin/clang++)
+   else()
+     message(SEND_ERROR "libdispatch requires a newer clang compiler (${CMAKE_C_COMPILER_VERSION} < 3.9)")
+   endif()
+
     include(ExternalProject)
     ExternalProject_Add(libdispatch
                         SOURCE_DIR
@@ -107,9 +118,9 @@ if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
                         CMAKE_ARGS
                           -DCMAKE_AR=${CMAKE_AR}
                           -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-                          -DCMAKE_C_COMPILER=${PATH_TO_CLANG_BUILD}/bin/clang
+                          -DCMAKE_C_COMPILER=${SWIFT_SOURCEKIT_C_COMPILER}
                           -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
-                          -DCMAKE_CXX_COMPILER=${PATH_TO_CLANG_BUILD}/bin/clang++
+                          -DCMAKE_CXX_COMPILER=${SWIFT_SOURCEKIT_CXX_COMPILER}
                           -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
                           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
                           -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
