@@ -155,7 +155,7 @@ extension String.UTF16View: BidirectionalCollection {
 
   @inlinable @inline(__always)
   public func index(before i: Index) -> Index {
-    precondition(i.encodedOffset > 0)
+    precondition(!i.isZeroPosition)
 
     if _slowPath(_guts.isForeign) { return _foreignIndex(before: i) }
 
@@ -382,8 +382,6 @@ extension String.UTF16View {
   @_effects(releasenone)
   internal func _foreignIndex(after i: Index) -> Index {
     _sanityCheck(_guts.isForeign)
-
-    // Currently, foreign means NSString
     return Index(encodedOffset: i.encodedOffset + 1)
   }
 
@@ -391,8 +389,6 @@ extension String.UTF16View {
   @_effects(releasenone)
   internal func _foreignIndex(before i: Index) -> Index {
     _sanityCheck(_guts.isForeign)
-
-    // Currently, foreign means NSString
     return Index(encodedOffset: i.encodedOffset - 1)
   }
 
@@ -407,8 +403,6 @@ extension String.UTF16View {
   @_effects(releasenone)
   internal func _foreignDistance(from start: Index, to end: Index) -> Int {
     _sanityCheck(_guts.isForeign)
-
-    // Currently, foreign means NSString
     return end.encodedOffset - start.encodedOffset
   }
 
@@ -418,8 +412,6 @@ extension String.UTF16View {
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
     _sanityCheck(_guts.isForeign)
-
-    // Currently, foreign means NSString
     let l = limit.encodedOffset - i.encodedOffset
     if n > 0 ? l >= 0 && l < n : l <= 0 && n < l {
       return nil

@@ -32,6 +32,7 @@ extension String : _ExpressibleByStringInterpolation {
     for str in strings {
       self += str
     }
+    _invariantCheck()
   }
 
   /// Creates a string containing the given expression's textual
