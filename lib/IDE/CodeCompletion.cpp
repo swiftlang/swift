@@ -390,13 +390,12 @@ public:
 };
 } // end anonymous namespace
 
-static Stmt *findNearestStmt(const AbstractFunctionDecl *AFD, SourceLoc Loc,
+static Stmt *findNearestStmt(const DeclContext *DC, SourceLoc Loc,
                              StmtKind Kind) {
-  auto &SM = AFD->getASTContext().SourceMgr;
-  assert(SM.rangeContainsTokenLoc(AFD->getSourceRange(), Loc));
+  auto &SM = DC->getASTContext().SourceMgr;
   StmtFinder Finder(SM, Loc, Kind);
   // FIXME(thread-safety): the walker is mutating the AST.
-  const_cast<AbstractFunctionDecl *>(AFD)->walk(Finder);
+  const_cast<DeclContext *>(DC)->walkContext(Finder);
   return Finder.getFoundStmt();
 }
 /// Prepare the given expression for type-checking again, prinicipally by
@@ -4014,20 +4013,8 @@ public:
         Kind, LookupKind::EnumElement);
     NeedLeadingDot = !HaveDot;
 
-    const DeclContext *FunctionDC = CurrDeclContext;
-    const AbstractFunctionDecl *CurrentFunction = nullptr;
-    while (FunctionDC->isLocalContext()) {
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(FunctionDC)) {
-        CurrentFunction = AFD;
-        break;
-      }
-      FunctionDC = FunctionDC->getParent();
-    }
-    if (!CurrentFunction)
-      return;
-
     auto *Switch = cast_or_null<SwitchStmt>(
-        findNearestStmt(CurrentFunction, Loc, StmtKind::Switch));
+        findNearestStmt(CurrDeclContext, Loc, StmtKind::Switch));
     if (!Switch)
       return;
     auto Ty = Switch->getSubjectExpr()->getType();
