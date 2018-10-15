@@ -328,7 +328,7 @@ $SSiSHsWP ---> protocol witness table for Swift.Int : Swift.Hashable in Swift
 $S7TestMod5OuterV3Fooayx_SiGD ---> TestMod.Outer<A>.Foo<Swift.Int>
 $Ss17_VariantSetBufferO05CocoaC0ayx_GD ---> Swift._VariantSetBuffer<A>.CocoaBuffer
 $S2t21QP22ProtocolTypeAliasThingayAA4BlahV5SomeQa_GSgD ---> t2.Blah.SomeQ as t2.Q.ProtocolTypeAliasThing?
-A.h<A>(A) -> ()inlined generic function <(A, A1)> of 
+$s1A1gyyxlFx_qd__t_Ti5 ---> inlined generic function <(A, A1)> of A.g<A>(A) -> ()
 $S1T19protocol_resilience17ResilientProtocolPTl --> associated type descriptor for T
 $S18resilient_protocol21ResilientBaseProtocolTL --> protocol requirements base descriptor for resilient_protocol.ResilientBaseProtocol
 $S1t1PP10AssocType2_AA1QTn --> associated conformance descriptor for t.P.AssocType2: t.Q
