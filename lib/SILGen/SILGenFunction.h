@@ -679,12 +679,10 @@ public:
   //===--------------------------------------------------------------------===//
   // Control flow
   //===--------------------------------------------------------------------===//
-  
+
   /// emitCondition - Emit a boolean expression as a control-flow condition.
   ///
   /// \param E - The expression to be evaluated as a condition.
-  /// \param hasFalseCode - true if the false branch doesn't just lead
-  ///        to the fallthrough.
   /// \param invertValue - true if this routine should invert the value before
   ///        testing true/false.
   /// \param contArgs - the types of the arguments to the continuation BB.
@@ -693,14 +691,15 @@ public:
   /// \param NumTrueTaken - The number of times the condition evaluates to true.
   /// \param NumFalseTaken - The number of times the condition evaluates to
   /// false.
-  Condition emitCondition(Expr *E, bool hasFalseCode = true,
-                          bool invertValue = false,
+  ///
+  /// If `contArgs` is nonempty, then both Condition::exitTrue() and
+  /// Condition::exitFalse() must be called.
+  Condition emitCondition(Expr *E, bool invertValue = false,
                           ArrayRef<SILType> contArgs = {},
                           ProfileCounter NumTrueTaken = ProfileCounter(),
                           ProfileCounter NumFalseTaken = ProfileCounter());
 
-  Condition emitCondition(SILValue V, SILLocation Loc, bool hasFalseCode = true,
-                          bool invertValue = false,
+  Condition emitCondition(SILValue V, SILLocation Loc, bool invertValue = false,
                           ArrayRef<SILType> contArgs = {},
                           ProfileCounter NumTrueTaken = ProfileCounter(),
                           ProfileCounter NumFalseTaken = ProfileCounter());
@@ -726,6 +725,9 @@ public:
   /// Create a new basic block at the end of the given function
   /// section.
   SILBasicBlock *createBasicBlock(FunctionSection section);
+
+  SILBasicBlock *createBasicBlockAndBranch(SILLocation loc,
+                                           SILBasicBlock *destBB);
 
   /// Erase a basic block that was speculatively created and turned
   /// out to be unneeded.
