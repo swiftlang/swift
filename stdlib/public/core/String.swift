@@ -556,12 +556,14 @@ extension String {
     // TODO(UTF8 perf): Transcode from guts directly
     let codeUnits = Array(self.utf8)
     var arg = Array<TargetEncoding.CodeUnit>()
+    arg.reserveCapacity(1 &+ self._guts.count / 4)
     let repaired = transcode(
       codeUnits.makeIterator(),
       from: UTF8.self,
       to: targetEncoding,
       stoppingOnError: false,
       into: { arg.append($0) })
+    arg.append(TargetEncoding.CodeUnit(0))
     _sanityCheck(!repaired)
     return try body(arg)
   }
@@ -576,11 +578,7 @@ extension String: _ExpressibleByBuiltinUnicodeScalarLiteral {
 
   @inlinable @inline(__always)
   public init(_ scalar: Unicode.Scalar) {
-    // FIXME(UTF8 perf): These should always fit in small representation
-    // For now, hack hack hack and go slow
-    self = Array(scalar.utf16).withUnsafeBufferPointer {
-      String._uncheckedFromUTF16($0)
-    }
+    self = scalar.withUTF8CodeUnits { String._uncheckedFromUTF8($0) }
   }
 }
 
@@ -605,9 +603,10 @@ extension String: _ExpressibleByBuiltinUTF16StringLiteral {
   public init(
     _builtinUTF16StringLiteral start: Builtin.RawPointer,
     utf16CodeUnitCount: Builtin.Word
-    ) {
-    // TODO(UTF8): have compiler emit as UTF-8 instead
+  ) {
+//    fatalError("TODO: Have compiler emit as UTF-8 instead")
 
+    // TODO(UTF8 merge) Remove this conformance entirely...
     let bufPtr = UnsafeBufferPointer(
       start: UnsafeRawPointer(start).assumingMemoryBound(to: UInt16.self),
       count: Int(utf16CodeUnitCount))
@@ -626,6 +625,10 @@ extension String: _ExpressibleByBuiltinStringLiteral {
     let bufPtr = UnsafeBufferPointer(
       start: UnsafeRawPointer(start).assumingMemoryBound(to: UInt8.self),
       count: Int(utf8CodeUnitCount))
+    if let smol = _SmallString(bufPtr) {
+      self = String(_StringGuts(smol))
+      return
+    }
     self.init(_StringGuts(bufPtr, isKnownASCII: Bool(isASCII)))
   }
 }
@@ -683,7 +686,7 @@ extension String {
   /// - Parameter other: Another string.
   @inlinable
   public mutating func append(_ other: String) {
-    if self.isEmpty {
+    if self.isEmpty && !_guts.hasNativeStorage {
       self = other
       return
     }

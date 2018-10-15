@@ -25,6 +25,7 @@ internal func _measureCharacterStride(
     _sanityCheck(offset > i, "zero-sized grapheme?")
     return Int(truncatingIfNeeded: offset) &- i
   }
+  _sanityCheck(utf8.count > i)
   return utf8.count &- i
 }
 
@@ -80,6 +81,8 @@ extension _StringGuts {
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func isOnGraphemeClusterBoundary(_ i: String.Index) -> Bool {
+    guard i.transcodedOffset == 0 else { return false }
+
     let offset = i.encodedOffset
     if offset == 0 || offset == self.count { return true }
 
