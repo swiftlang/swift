@@ -88,11 +88,13 @@ ProtocolDecl *DeclContext::getExtendedProtocolDecl() const {
 GenericTypeParamType *DeclContext::getProtocolSelfType() const {
   assert(getSelfProtocolDecl() && "not a protocol");
 
+  GenericParamList *genericParams;
   if (auto proto = dyn_cast<ProtocolDecl>(this)) {
-    const_cast<ProtocolDecl *>(proto)->createGenericParamsIfMissing();
+    genericParams = proto->getGenericParams();
+  } else {
+    genericParams = cast<ExtensionDecl>(this)->getGenericParams();
   }
 
-  auto *genericParams = getGenericParamsOfContext();
   if (genericParams == nullptr)
     return nullptr;
 
