@@ -1,4 +1,4 @@
-// RUN: %scale-test --begin 10 --end 15 --step 1 --select incrementScopeCounter %s
+// RUN: %scale-test --begin 10 --end 15 --step 1 --select numLeafScopes %s
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 

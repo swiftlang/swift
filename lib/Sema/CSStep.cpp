@@ -76,6 +76,12 @@ StepResult SplitterStep::resume(bool prevFailed) {
   for (auto &component : Components)
     workList.splice(workList.end(), component);
 
+  // We want to compute the number of leaf scopes as if the system had
+  // not been split, so allow each additional component after the
+  // first to have a free leaf scope that doesn't count against the
+  // total for the system.
+  CS.decrementLeafScopes(Components.size() - 1);
+
   // If we came back to this step and previous (one of the components)
   // failed, it means that we can't solve this step either.
   if (prevFailed)

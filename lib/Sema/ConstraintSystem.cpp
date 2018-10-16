@@ -90,6 +90,19 @@ void ConstraintSystem::incrementScopeCounter() {
     TC.Context.Stats->getFrontendCounters().NumConstraintScopes++;
 }
 
+void ConstraintSystem::numLeafScopes(unsigned value) {
+  // NOTE: We rely on 2's complement addition here.
+  SWIFT_FUNC_STAT_INCREMENT(value);
+}
+
+void ConstraintSystem::incrementLeafScopes(unsigned increment) {
+  numLeafScopes(increment);
+}
+
+void ConstraintSystem::decrementLeafScopes(unsigned decrement) {
+  numLeafScopes(-decrement);
+}
+
 bool ConstraintSystem::hasFreeTypeVariables() {
   // Look for any free type variables.
   for (auto tv : TypeVariables) {
