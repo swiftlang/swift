@@ -1181,7 +1181,7 @@ SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
 
   if (auto NAT = dyn_cast<NameAliasType>(T.getPointer())) {
     SDKNode* Root = SDKNodeInitInfo(Ctx, T, Info).createSDKNode(SDKNodeKind::TypeAlias);
-    Root->addChild(constructTypeNode(NAT->getCanonicalType()));
+    Root->addChild(constructTypeNode(NAT->getSinglyDesugaredType()));
     return Root;
   }
 
