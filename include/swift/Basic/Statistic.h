@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -26,6 +26,13 @@
     static llvm::Statistic FStat =                                      \
       {DEBUG_TYPE, __func__, __func__, {0}, {false}};                   \
     ++FStat;                                                            \
+  } while (0)
+
+#define SWIFT_FUNC_STAT_INCREMENT(x)                                    \
+  do {                                                                  \
+    static llvm::Statistic FStat =                                      \
+      {DEBUG_TYPE, __func__, __func__, {0}, {false}};                   \
+    FStat += (x);                                                       \
   } while (0)
 
 // Helper class designed to consolidate reporting of LLVM statistics and timers

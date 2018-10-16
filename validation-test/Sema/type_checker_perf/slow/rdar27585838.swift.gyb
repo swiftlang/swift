@@ -1,4 +1,4 @@
-// RUN: %scale-test --begin 1 --end 5 --step 1 --select incrementScopeCounter %s --polynomial-threshold=1.7
+// RUN: %scale-test --begin 1 --end 5 --step 1 --select numLeafScopes %s --polynomial-threshold=1.7
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 
