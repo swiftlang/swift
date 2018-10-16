@@ -542,8 +542,7 @@ function(_add_swift_lipo_target)
     list(APPEND source_binaries $<TARGET_FILE:${source_target}>)
   endforeach()
 
-  is_darwin_based_sdk("${LIPO_SDK}" IS_DARWIN)
-  if(IS_DARWIN)
+  if(${LIPO_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
     if(LIPO_CODESIGN)
       set(codesign_command COMMAND "codesign" "-f" "-s" "-" "${LIPO_OUTPUT}")
     endif()
@@ -751,8 +750,7 @@ function(_add_swift_library_single target name)
   endif()
 
   if (SWIFT_COMPILER_VERSION)
-    is_darwin_based_sdk("${SWIFTLIB_SINGLE_SDK}" IS_DARWIN)
-    if(IS_DARWIN)
+    if(${SWIFTLIB_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
       list(APPEND SWIFTLIB_SINGLE_LINK_FLAGS "-Xlinker" "-current_version" "-Xlinker" "${SWIFT_COMPILER_VERSION}" "-Xlinker" "-compatibility_version" "-Xlinker" "1")
     endif()
   endif()
@@ -1014,8 +1012,7 @@ function(_add_swift_library_single target name)
     endforeach()
   endif()
 
-  is_darwin_based_sdk("${SWIFTLIB_SINGLE_SDK}" IS_DARWIN)
-  if(IS_DARWIN)
+  if(${SWIFTLIB_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
     set(install_name_dir "@rpath")
 
     if(SWIFTLIB_SINGLE_IS_STDLIB)
@@ -2084,8 +2081,7 @@ function(_add_swift_executable_single name)
     list(APPEND link_flags "-Wl,-no_pie")
   endif()
 
-  is_darwin_based_sdk("${SWIFTEXE_SINGLE_SDK}" IS_DARWIN)
-  if(IS_DARWIN)
+  if(${SWIFTEXE_SINGLE_SDK} IN_LIST SWIFT_APPLE_PLATFORMS)
     list(APPEND link_flags
         "-Xlinker" "-rpath"
         "-Xlinker" "@executable_path/../lib/swift/${SWIFT_SDK_${SWIFTEXE_SINGLE_SDK}_LIB_SUBDIR}")
@@ -2227,8 +2223,7 @@ function(add_swift_target_executable name)
           ${SWIFTEXE_TARGET_DONT_STRIP_NON_MAIN_SYMBOLS_FLAG}
           ${SWIFTEXE_DISABLE_ASLR_FLAG})
 
-      is_darwin_based_sdk("${sdk}" IS_DARWIN)
-      if(IS_DARWIN)
+      if(${sdk} IN_LIST SWIFT_APPLE_PLATFORMS)
         add_custom_command_target(unused_var2
          COMMAND "codesign" "-f" "-s" "-" "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${VARIANT_NAME}"
          CUSTOM_TARGET_NAME "${VARIANT_NAME}_signed"
