@@ -4771,8 +4771,12 @@ Type DeclContext::getSelfTypeInContext() const {
   assert(isTypeContext());
 
   // For a protocol or extension thereof, the type is 'Self'.
-  if (getSelfProtocolDecl())
-    return mapTypeIntoContext(getProtocolSelfType());
+  if (getSelfProtocolDecl()) {
+    auto selfType = getProtocolSelfType();
+    if (!selfType)
+      return ErrorType::get(getASTContext());
+    return mapTypeIntoContext(selfType);
+  }
   return getDeclaredTypeInContext();
 }
 
@@ -4781,8 +4785,12 @@ Type DeclContext::getSelfInterfaceType() const {
   assert(isTypeContext());
 
   // For a protocol or extension thereof, the type is 'Self'.
-  if (getSelfProtocolDecl())
-    return getProtocolSelfType();
+  if (getSelfProtocolDecl()) {
+    auto selfType = getProtocolSelfType();
+    if (!selfType)
+      return ErrorType::get(getASTContext());
+    return selfType;
+  }
   return getDeclaredInterfaceType();
 }
 
