@@ -1764,6 +1764,11 @@ extension BinaryInteger {
   public static func != (lhs: Self, rhs: Self) -> Bool {
     return !(lhs == rhs)
   }
+  
+  @_transparent
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    return lhs == rhs
+  }
 
   @_transparent
   public static func <= (lhs: Self, rhs: Self) -> Bool {
