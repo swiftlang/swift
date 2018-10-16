@@ -455,8 +455,7 @@ private: // Helpers to create TensorFlow graph nodes.
   bool addTopLevelTPUConfigLogic(TF_Operation **metadataNode);
 
 public: // Lowering functionality.
-  std::string getUniqueName(SILDebugLocation loc, const SILFunction *fn,
-                            const char *baseName);
+  std::string getUniqueName(SILDebugLocation loc, const char *baseName);
 
   TF_DataType getTensorFlowDataType(SILType type, SILLocation loc);
 
@@ -672,7 +671,6 @@ static std::string escapeDeclName(DeclName name) {
 /// Produce a "stack trace" for the specified location, producing it in a form
 /// that we can use as a unique op name.
 std::string TFGraphFunctionLowering::getUniqueName(SILDebugLocation loc,
-                                                   const SILFunction *fn,
                                                    const char *baseName) {
   std::string name = baseName;
 
@@ -745,7 +743,7 @@ std::string TFGraphFunctionLowering::getUniqueName(SILDebugLocation loc,
 
   // Append module name to ensure the name is unique across all modules.
   // (Duplicate names happen across execution units in the lldb repl).
-  auto module = fn->getModule().getAssociatedContext()->getParentModule();
+  auto module = SILFn.getModule().getAssociatedContext()->getParentModule();
   name += ':';
   name += *module->getReverseFullModuleName();
 
@@ -1664,8 +1662,7 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
 
   // The name label we put on the op is summarized from the "stack trace" of
   // the operation's source location.
-  auto opLocString = getUniqueName(inst->getDebugLocation(),
-                                   inst->getFunction(), "op");
+  auto opLocString = getUniqueName(inst->getDebugLocation(), "op");
 
   auto *op = TF_NewOperation(graphFn.getGraph(), opName.str().c_str(),
                              opLocString.c_str());
@@ -2138,9 +2135,8 @@ static TF_Output getCondition(CondBranchInst *condBr,
 // Given a boolean value, create a 'not' operation to invert it, returning the
 // inverted result.
 static TF_Output createNotOp(TF_Output input, SILDebugLocation loc,
-                             const SILFunction *fn,
                              TFGraphFunctionLowering &lowering) {
-  auto opLocString = lowering.getUniqueName(loc, fn, "not");
+  auto opLocString = lowering.getUniqueName(loc, "not");
   auto &graphFn = lowering.getCurrentGraphFunction();
   auto *op =
       TF_NewOperation(graphFn.getGraph(), "LogicalNot", opLocString.c_str());
@@ -2157,9 +2153,8 @@ static TF_Output createNotOp(TF_Output input, SILDebugLocation loc,
 
 /// Given a boolean value, create a 'cast' operation to convert it to int32.
 static TF_Output castBoolToInt32(TF_Output input, SILDebugLocation loc,
-                                 const SILFunction *fn,
                                  TFGraphFunctionLowering &lowering) {
-  auto opLocString = lowering.getUniqueName(loc, fn, "cast");
+  auto opLocString = lowering.getUniqueName(loc, "cast");
   auto &graphFn = lowering.getCurrentGraphFunction();
   auto *op = TF_NewOperation(graphFn.getGraph(), "Cast", opLocString.c_str());
   TF_AddInput(op, input);
@@ -2323,8 +2318,7 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
     // condition.
     // TODO: add a unit test to cover this case.
     if (headerBr->getTrueBB() == r->getExit()) {
-      condValue = createNotOp(condValue, headerBr->getDebugLocation(),
-                              headerBr->getFunction(), *this);
+      condValue = createNotOp(condValue, headerBr->getDebugLocation(), *this);
       if (!condValue.oper) {
         S = GLStatus::Error;
         return;
@@ -2337,8 +2331,7 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
       // FIXME: this added cast may not work for XlaWhile. Revisit whether/how
       // to support loops in XLA GPU.
       condValue =
-          castBoolToInt32(condValue, headerBr->getDebugLocation(),
-                          headerBr->getFunction(), *this);
+          castBoolToInt32(condValue, headerBr->getDebugLocation(), *this);
       if (!condValue.oper) {
         S = GLStatus::Error;
         return;
@@ -2360,14 +2353,13 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
 
   // Create TF_Function's for our condition and body.
   auto loc = headerBr->getDebugLocation();
-  const auto *fn = headerBr->getFunction();
-  auto loopBodyFnName = getUniqueName(loc, fn, "whilebody");
+  auto loopBodyFnName = getUniqueName(loc, "whilebody");
   SmallVector<TF_DataType, 4> inputTypes, outputTypes;
   bool bodyHasSideEffects = false;
   if (buildGraphFunction(loopBodyFn, loopBodyFnName, bodyHasSideEffects,
                          &inputTypes, &outputTypes))
     return GLStatus::Error;
-  auto condFnName = getUniqueName(loc, fn, "whilecond");
+  auto condFnName = getUniqueName(loc, "whilecond");
   bool condHasSideEffects = false;
   if (buildGraphFunction(condFn, condFnName, condHasSideEffects,
                          /*inputTypes*/ nullptr, /*outputTypes*/ nullptr))
@@ -2387,7 +2379,7 @@ GLStatus TFGraphFunctionLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
   //   .Attr("T: list(type) >= 0")
   //   .Attr("cond: func")
   //   .Attr("body: func")
-  auto opLocString = getUniqueName(loc, fn, "op");
+  auto opLocString = getUniqueName(loc, "op");
   auto *op = TF_NewOperation(graphFn.getGraph(),
                              bodyHasSideEffects ? "While" : "StatelessWhile",
                              opLocString.c_str());
@@ -2430,7 +2422,6 @@ TFGraphFunctionLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   // invocation.
   auto condBr = cast<CondBranchInst>(r->getBranchBB()->getTerminator());
   auto loc = condBr->getDebugLocation();
-  const auto *fn = condBr->getFunction();
 
   auto condValue = getCondition(condBr, *this);
   if (!condValue.oper)
@@ -2562,14 +2553,14 @@ TFGraphFunctionLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   }
 
   // Create the graph functions for the true/false code.
-  auto trueFnName = getUniqueName(loc, fn, "true");
+  auto trueFnName = getUniqueName(loc, "true");
   bool trueFnHasSideEffects = false;
   SmallVector<TF_DataType, 4> inputTypes, outputTypes;
   if (buildGraphFunction(trueCodeFn, trueFnName, trueFnHasSideEffects,
                          &inputTypes, &outputTypes))
     return GLStatus::Error;
   bool falseFnHasSideEffects = false;
-  auto falseFnName = getUniqueName(loc, fn, "false");
+  auto falseFnName = getUniqueName(loc, "false");
   if (buildGraphFunction(falseCodeFn, falseFnName, falseFnHasSideEffects,
                          /*inputTypes*/ nullptr, /*outputTypes*/ nullptr))
     return GLStatus::Error;
@@ -2587,7 +2578,7 @@ TFGraphFunctionLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   //   .Attr("else_branch: func")
   //   .Attr("Tin: list(type) >= 0")
   //   .Attr("Tout: list(type) >= 0")
-  auto opLocString = getUniqueName(loc, fn, "op");
+  auto opLocString = getUniqueName(loc, "op");
   bool useSideEffectingIf = trueFnHasSideEffects || falseFnHasSideEffects;
   auto *op = TF_NewOperation(graphFn.getGraph(),
                              useSideEffectingIf ? "If" : "StatelessIf",
