@@ -788,7 +788,7 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
     }
   }
 
-  llvm_unreachable("Unhanlded SDKNodeKind in switch.");
+  llvm_unreachable("Unhandled SDKNodeKind in switch.");
 }
 
 bool SDKContext::isEqual(const SDKNode &Left, const SDKNode &Right) {
