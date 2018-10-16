@@ -49,14 +49,14 @@ public func test1SendWithParam(x: Float) {
 // The _Send node should be hooked up as a control dependency on the return
  // node, so that Sends gets run before the function returns.
 // CHECK:        function {
-// CHECK:          name: "{{.*}}test1SendWithParam{{.*}}.tf_CPU.device_partition"
-// CHECK:        function {
 // CHECK:          name: "{{.*}}test1SendWithParam{{.*}}.tf_GPU.device_partition"
 // CHECK:          node_def {
 // CHECK:            name: "RunControlDependency"
 // CHECK:            op: "Identity"
 // CHECK-NEXT:       input: "op/test1SendWithParam.x_
 // CHECK-NEXT:       input: "^tf_send_0"
+// CHECK:        function {
+// CHECK:          name: "{{.*}}test1SendWithParam{{.*}}.tf_CPU.device_partition"
 
 public func test2Sends() {
   var a = Tensor<Float>(1.0)
