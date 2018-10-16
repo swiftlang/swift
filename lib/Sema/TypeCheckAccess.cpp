@@ -17,6 +17,7 @@
 #include "TypeChecker.h"
 #include "TypeCheckAccess.h"
 #include "swift/AST/AccessScopeChecker.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Pattern.h"
@@ -28,6 +29,60 @@ using namespace swift;
 #define DEBUG_TYPE "TypeCheckAccess"
 
 namespace {
+
+/// A uniquely-typed boolean to reduce the chances of accidentally inverting
+/// a check.
+///
+/// \see checkTypeAccess
+enum class DowngradeToWarning: bool {
+  No,
+  Yes
+};
+
+/// \see checkTypeAccess
+using CheckTypeAccessCallback =
+    void(AccessScope, const TypeRepr *, DowngradeToWarning);
+
+class AccessControlCheckerBase {
+protected:
+  TypeChecker &TC;
+  bool checkUsableFromInline;
+
+  void checkTypeAccessImpl(
+      Type type, TypeRepr *typeRepr, AccessScope contextAccessScope,
+      const DeclContext *useDC,
+      llvm::function_ref<CheckTypeAccessCallback> diagnose);
+
+  void checkTypeAccess(
+      Type type, TypeRepr *typeRepr, const ValueDecl *context,
+      llvm::function_ref<CheckTypeAccessCallback> diagnose);
+
+  void checkTypeAccess(
+      const TypeLoc &TL, const ValueDecl *context,
+      llvm::function_ref<CheckTypeAccessCallback> diagnose) {
+    return checkTypeAccess(TL.getType(), TL.getTypeRepr(), context, diagnose);
+  }
+
+  void checkRequirementAccess(
+      WhereClauseOwner source,
+      AccessScope accessScope,
+      const DeclContext *useDC,
+      llvm::function_ref<CheckTypeAccessCallback> diagnose);
+
+  AccessControlCheckerBase(TypeChecker &TC, bool checkUsableFromInline)
+    : TC(TC), checkUsableFromInline(checkUsableFromInline) {}
+
+public:
+  void checkGenericParamAccess(
+    const GenericParamList *params,
+    const Decl *owner,
+    AccessScope accessScope,
+    AccessLevel contextAccess);
+
+  void checkGenericParamAccess(
+    const GenericParamList *params,
+    const ValueDecl *owner);
+};
 
 class TypeAccessScopeDiagnoser : private ASTWalker {
   AccessScope accessScope;
@@ -127,53 +182,14 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
   if (!typeAccessScope.hasValue())
     return;
 
-  auto shouldComplainAboutAccessScope =
-      [contextAccessScope](AccessScope scope) -> bool {
-    if (scope.isPublic())
-      return false;
-    if (scope.hasEqualDeclContextWith(contextAccessScope))
-      return false;
-    if (contextAccessScope.isChildOf(scope))
-      return false;
-    return true;
-  };
-
-  if (!shouldComplainAboutAccessScope(typeAccessScope.getValue()))
+  if (typeAccessScope->isPublic())
+    return;
+  if (typeAccessScope->hasEqualDeclContextWith(contextAccessScope))
+    return;
+  if (contextAccessScope.isChildOf(*typeAccessScope))
     return;
 
   auto downgradeToWarning = DowngradeToWarning::No;
-  if (!checkUsableFromInline) {
-    // Swift 3.0 wasn't nearly as strict as checking types because it didn't
-    // look at the TypeRepr at all except to highlight a particular part of the
-    // type in diagnostics, and looked through typealiases in other cases.
-    // Approximate this behavior by running our non-TypeRepr-based check again
-    // and downgrading to a warning when the checks disagree.
-    if (TC.getLangOpts().isSwiftVersion3()) {
-      auto typeOnlyAccessScope =
-        TypeAccessScopeChecker::getAccessScope(
-            type, useDC,
-            /*treatUsableFromInlineAsPublic*/false,
-            /*canonicalizeParents*/true);
-      if (typeOnlyAccessScope.hasValue()) {
-        // If Swift 4 would have complained about a private type, but Swift 4
-        // would only diagnose an internal type, complain about the Swift 3
-        // offense first to avoid confusing users.
-        if (shouldComplainAboutAccessScope(typeOnlyAccessScope.getValue()))
-          typeAccessScope = typeOnlyAccessScope;
-        else
-          downgradeToWarning = DowngradeToWarning::Yes;
-      }
-    }
-
-    // Swift 3.0.0 mistakenly didn't diagnose any issues when the context
-    // access scope represented a private or fileprivate level.
-    if (!contextAccessScope.isPublic() &&
-        !isa<ModuleDecl>(contextAccessScope.getDeclContext()) &&
-        TC.getLangOpts().isSwiftVersion3()) {
-      downgradeToWarning = DowngradeToWarning::Yes;
-    }
-  }
-
   const TypeRepr *complainRepr =
         TypeAccessScopeDiagnoser::findTypeWithScope(
             typeRepr,
@@ -256,15 +272,6 @@ void AccessControlCheckerBase::checkGenericParamAccess(
     AccessLevel contextAccess) {
   if (!params)
     return;
-
-  if (checkUsableFromInline) {
-    if (auto *VD = dyn_cast<ValueDecl>(owner)) {
-      if (VD->getFormalAccess() != AccessLevel::Internal)
-        return;
-      if (!VD->isUsableFromInline())
-        return;
-    }
-  }
 
   // This must stay in sync with diag::generic_param_access.
   enum class ACEK {
@@ -350,132 +357,139 @@ void AccessControlCheckerBase::checkGenericParamAccess(
                           owner->getFormalAccess());
 }
 
-/// Checks the given declaration's signature does not reference any other
-/// declarations that are less visible than the declaration itself.
-///
-/// \p D must be a ValueDecl or a Decl that can appear in a type context.
-void AccessControlChecker::check(Decl *D) {
-  if (D->isInvalid() || D->isImplicit())
-    return;
+namespace {
+class AccessControlChecker : public AccessControlCheckerBase,
+                             public DeclVisitor<AccessControlChecker> {
+public:
+  explicit AccessControlChecker(TypeChecker &TC)
+    : AccessControlCheckerBase(TC, /*checkUsableFromInline=*/false) {}
 
-  switch (D->getKind()) {
-  case DeclKind::Import:
-  case DeclKind::Extension:
-  case DeclKind::TopLevelCode:
-  case DeclKind::InfixOperator:
-  case DeclKind::PrefixOperator:
-  case DeclKind::PostfixOperator:
-  case DeclKind::PrecedenceGroup:
-  case DeclKind::Module:
-    llvm_unreachable("cannot appear in a type context");
+  void visit(Decl *D) {
+    if (D->isInvalid() || D->isImplicit())
+      return;
 
-  case DeclKind::Param:
-  case DeclKind::GenericTypeParam:
-  case DeclKind::MissingMember:
-    llvm_unreachable("does not have access control");
+    DeclVisitor<AccessControlChecker>::visit(D);
+  }
 
-  case DeclKind::IfConfig:
-  case DeclKind::PoundDiagnostic:
-    // Does not have access control.
-  case DeclKind::EnumCase:
-    // Handled at the EnumElement level.
-  case DeclKind::Var:
-    // Handled at the PatternBindingDecl level.
-  case DeclKind::Destructor:
-    // Always correct.
-    return;
+  // Force all kinds to be handled at a lower level.
+  void visitDecl(Decl *D) = delete;
+  void visitValueDecl(ValueDecl *D) = delete;
 
-  case DeclKind::PatternBinding: {
-    auto PBD = cast<PatternBindingDecl>(D);
+#define UNREACHABLE(KIND, REASON) \
+  void visit##KIND##Decl(KIND##Decl *D) { \
+    llvm_unreachable(REASON); \
+  }
+  UNREACHABLE(Import, "cannot appear in a type context")
+  UNREACHABLE(Extension, "cannot appear in a type context")
+  UNREACHABLE(TopLevelCode, "cannot appear in a type context")
+  UNREACHABLE(Operator, "cannot appear in a type context")
+  UNREACHABLE(PrecedenceGroup, "cannot appear in a type context")
+  UNREACHABLE(Module, "cannot appear in a type context")
+
+  UNREACHABLE(Param, "does not have access control")
+  UNREACHABLE(GenericTypeParam, "does not have access control")
+  UNREACHABLE(MissingMember, "does not have access control")
+#undef UNREACHABLE
+
+#define UNINTERESTING(KIND) \
+  void visit##KIND##Decl(KIND##Decl *D) {}
+
+  UNINTERESTING(IfConfig) // Does not have access control.
+  UNINTERESTING(PoundDiagnostic) // Does not have access control.
+  UNINTERESTING(EnumCase) // Handled at the EnumElement level.
+  UNINTERESTING(Var) // Handled at the PatternBinding level.
+  UNINTERESTING(Destructor) // Always correct.
+  UNINTERESTING(Accessor) // Handled by the Var or Subscript.
+
+  /// \see visitPatternBindingDecl
+  void checkNamedPattern(const NamedPattern *NP, bool isTypeContext,
+                         const llvm::DenseSet<const VarDecl *> &seenVars) {
+    const VarDecl *theVar = NP->getDecl();
+    if (seenVars.count(theVar) || theVar->isInvalid())
+      return;
+
+    checkTypeAccess(theVar->getInterfaceType(), nullptr, theVar,
+                    [&](AccessScope typeAccessScope,
+                        const TypeRepr *complainRepr,
+                        DowngradeToWarning downgradeToWarning) {
+      auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
+      bool isExplicit = theVar->getAttrs().hasAttribute<AccessControlAttr>() ||
+                        isa<ProtocolDecl>(theVar->getDeclContext());
+      auto theVarAccess =
+          isExplicit ? theVar->getFormalAccess()
+                     : typeAccessScope.requiredAccessForDiagnostics();
+      auto diagID = diag::pattern_type_access_inferred;
+      if (downgradeToWarning == DowngradeToWarning::Yes)
+        diagID = diag::pattern_type_access_inferred_warn;
+      auto diag = TC.diagnose(NP->getLoc(), diagID,
+                              theVar->isLet(),
+                              isTypeContext,
+                              isExplicit,
+                              theVarAccess,
+                              isa<FileUnit>(theVar->getDeclContext()),
+                              typeAccess,
+                              theVar->getInterfaceType());
+    });
+  }
+
+  void checkTypedPattern(const TypedPattern *TP, bool isTypeContext,
+                         llvm::DenseSet<const VarDecl *> &seenVars) {
+    const VarDecl *anyVar = nullptr;
+    TP->forEachVariable([&](VarDecl *V) {
+      seenVars.insert(V);
+      anyVar = V;
+    });
+    if (!anyVar)
+      return;
+
+    checkTypeAccess(TP->getTypeLoc(), anyVar,
+                    [&](AccessScope typeAccessScope,
+                        const TypeRepr *complainRepr,
+                        DowngradeToWarning downgradeToWarning) {
+      auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
+      bool isExplicit = anyVar->getAttrs().hasAttribute<AccessControlAttr>() ||
+                        isa<ProtocolDecl>(anyVar->getDeclContext());
+      auto diagID = diag::pattern_type_access;
+      if (downgradeToWarning == DowngradeToWarning::Yes)
+        diagID = diag::pattern_type_access_warn;
+      auto anyVarAccess =
+          isExplicit ? anyVar->getFormalAccess()
+                     : typeAccessScope.requiredAccessForDiagnostics();
+      auto diag = TC.diagnose(TP->getLoc(), diagID,
+                              anyVar->isLet(),
+                              isTypeContext,
+                              isExplicit,
+                              anyVarAccess,
+                              isa<FileUnit>(anyVar->getDeclContext()),
+                              typeAccess);
+      highlightOffendingType(TC, diag, complainRepr);
+    });
+  }
+
+  void visitPatternBindingDecl(PatternBindingDecl *PBD) {
     bool isTypeContext = PBD->getDeclContext()->isTypeContext();
 
     llvm::DenseSet<const VarDecl *> seenVars;
-    for (auto entry : PBD->getPatternList())
-    entry.getPattern()->forEachNode([&](const Pattern *P) {
-      if (auto *NP = dyn_cast<NamedPattern>(P)) {
-        // Only check individual variables if we didn't check an enclosing
-        // TypedPattern.
-        const VarDecl *theVar = NP->getDecl();
-        if (seenVars.count(theVar) || theVar->isInvalid())
+    for (auto entry : PBD->getPatternList()) {
+      entry.getPattern()->forEachNode([&](const Pattern *P) {
+        if (auto *NP = dyn_cast<NamedPattern>(P)) {
+          // Only check individual variables if we didn't check an enclosing
+          // TypedPattern.
+          checkNamedPattern(NP, isTypeContext, seenVars);
           return;
+        }
 
-        checkTypeAccess(theVar->getType(), nullptr,
-                        theVar,
-                        [&](AccessScope typeAccessScope,
-                            const TypeRepr *complainRepr,
-                            DowngradeToWarning downgradeToWarning) {
-          auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
-          bool isExplicit =
-            theVar->getAttrs().hasAttribute<AccessControlAttr>() ||
-            isa<ProtocolDecl>(theVar->getDeclContext());
-          auto theVarAccess = isExplicit
-            ? theVar->getFormalAccess()
-            : typeAccessScope.requiredAccessForDiagnostics();
-          auto diagID = diag::pattern_type_access_inferred;
-          if (downgradeToWarning == DowngradeToWarning::Yes)
-            diagID = diag::pattern_type_access_inferred_warn;
-          auto diag = TC.diagnose(P->getLoc(), diagID,
-                                  theVar->isLet(),
-                                  isTypeContext,
-                                  isExplicit,
-                                  theVarAccess,
-                                  isa<FileUnit>(theVar->getDeclContext()),
-                                  typeAccess,
-                                  theVar->getType());
-        });
-        return;
-      }
-
-      auto *TP = dyn_cast<TypedPattern>(P);
-      if (!TP)
-        return;
-
-      // FIXME: We need an access level to check against, so we pull one out of
-      // some random VarDecl in the pattern. They're all going to be the same,
-      // but still, ick.
-      const VarDecl *anyVar = nullptr;
-      TP->forEachVariable([&](VarDecl *V) {
-        seenVars.insert(V);
-        anyVar = V;
+        auto *TP = dyn_cast<TypedPattern>(P);
+        if (!TP)
+          return;
+        checkTypedPattern(TP, isTypeContext, seenVars);
       });
-      if (!anyVar)
-        return;
-
-      checkTypeAccess(TP->getTypeLoc().getType(),
-                      TP->getTypeLoc().getTypeRepr(),
-                      anyVar,
-                      [&](AccessScope typeAccessScope,
-                          const TypeRepr *complainRepr,
-                          DowngradeToWarning downgradeToWarning) {
-        auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
-        bool isExplicit =
-          anyVar->getAttrs().hasAttribute<AccessControlAttr>() ||
-          isa<ProtocolDecl>(anyVar->getDeclContext());
-        auto diagID = diag::pattern_type_access;
-        if (downgradeToWarning == DowngradeToWarning::Yes)
-          diagID = diag::pattern_type_access_warn;
-        auto anyVarAccess = isExplicit
-          ? anyVar->getFormalAccess()
-          : typeAccessScope.requiredAccessForDiagnostics();
-        auto diag = TC.diagnose(P->getLoc(), diagID,
-                                anyVar->isLet(),
-                                isTypeContext,
-                                isExplicit,
-                                anyVarAccess,
-                                isa<FileUnit>(anyVar->getDeclContext()),
-                                typeAccess);
-        highlightOffendingType(TC, diag, complainRepr);
-      });
-    });
-    return;
+      seenVars.clear();
+    }
   }
 
-  case DeclKind::TypeAlias: {
-    auto TAD = cast<TypeAliasDecl>(D);
-
-    checkTypeAccess(TAD->getUnderlyingTypeLoc().getType(),
-                    TAD->getUnderlyingTypeLoc().getTypeRepr(),
-                    TAD,
+  void visitTypeAliasDecl(TypeAliasDecl *TAD) {
+    checkTypeAccess(TAD->getUnderlyingTypeLoc(), TAD,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning) {
@@ -494,13 +508,9 @@ void AccessControlChecker::check(Decl *D) {
                               typeAccess, isa<FileUnit>(TAD->getDeclContext()));
       highlightOffendingType(TC, diag, complainRepr);
     });
-
-    return;
   }
 
-  case DeclKind::AssociatedType: {
-    auto assocType = cast<AssociatedTypeDecl>(D);
-
+  void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
     // This must stay in sync with diag::associated_type_access.
     enum {
       ACEK_DefaultDefinition = 0,
@@ -527,9 +537,7 @@ void AccessControlChecker::check(Decl *D) {
         }
       });
     });
-    checkTypeAccess(assocType->getDefaultDefinitionLoc().getType(),
-                    assocType->getDefaultDefinitionLoc().getTypeRepr(),
-                    assocType,
+    checkTypeAccess(assocType->getDefaultDefinitionLoc(), assocType,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *thisComplainRepr,
                         DowngradeToWarning downgradeDiag) {
@@ -574,12 +582,9 @@ void AccessControlChecker::check(Decl *D) {
                               minAccess, accessControlErrorKind);
       highlightOffendingType(TC, diag, complainRepr);
     }
-    return;
   }
 
-  case DeclKind::Enum: {
-    auto ED = cast<EnumDecl>(D);
-
+  void visitEnumDecl(EnumDecl *ED) {
     checkGenericParamAccess(ED->getGenericParams(), ED);
 
     if (ED->hasRawType()) {
@@ -611,19 +616,13 @@ void AccessControlChecker::check(Decl *D) {
         highlightOffendingType(TC, diag, complainRepr);
       });
     }
-
-    return;
   }
 
-  case DeclKind::Struct: {
-    auto SD = cast<StructDecl>(D);
+  void visitStructDecl(StructDecl *SD) {
     checkGenericParamAccess(SD->getGenericParams(), SD);
-    return;
   }
 
-  case DeclKind::Class: {
-    auto CD = cast<ClassDecl>(D);
-
+  void visitClassDecl(ClassDecl *CD) {
     checkGenericParamAccess(CD->getGenericParams(), CD);
 
     if (const NominalTypeDecl *superclassDecl = CD->getSuperclassDecl()) {
@@ -675,13 +674,9 @@ void AccessControlChecker::check(Decl *D) {
         highlightOffendingType(TC, diag, complainRepr);
       });
     }
-
-    return;
   }
 
-  case DeclKind::Protocol: {
-    auto proto = cast<ProtocolDecl>(D);
-
+  void visitProtocolDecl(ProtocolDecl *proto) {
     // This must stay in sync with diag::protocol_access.
     enum {
       PCEK_Refine = 0,
@@ -755,12 +750,9 @@ void AccessControlChecker::check(Decl *D) {
                               isa<FileUnit>(proto->getDeclContext()));
       highlightOffendingType(TC, diag, complainRepr);
     }
-    return;
   }
 
-  case DeclKind::Subscript: {
-    auto SD = cast<SubscriptDecl>(D);
-
+  void visitSubscriptDecl(SubscriptDecl *SD) {
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
@@ -813,15 +805,9 @@ void AccessControlChecker::check(Decl *D) {
                               problemIsElement);
       highlightOffendingType(TC, diag, complainRepr);
     }
-    return;
   }
 
-  case DeclKind::Accessor:
-    return;
-
-  case DeclKind::Func:
-  case DeclKind::Constructor: {
-    auto fn = cast<AbstractFunctionDecl>(D);
+  void visitAbstractFunctionDecl(AbstractFunctionDecl *fn) {
     bool isTypeContext = fn->getDeclContext()->isTypeContext();
 
     checkGenericParamAccess(fn->getGenericParams(), fn);
@@ -892,12 +878,9 @@ void AccessControlChecker::check(Decl *D) {
                               problemIsResult);
       highlightOffendingType(TC, diag, complainRepr);
     }
-    return;
   }
 
-  case DeclKind::EnumElement: {
-    auto EED = cast<EnumElementDecl>(D);
-
+  void visitEnumElementDecl(EnumElementDecl *EED) {
     if (!EED->hasAssociatedValues())
       return;
     for (auto &P : *EED->getParameterList()) {
@@ -914,130 +897,177 @@ void AccessControlChecker::check(Decl *D) {
         highlightOffendingType(TC, diag, complainRepr);
       });
     }
-
-    return;
   }
-  }
-}
+};
 
-/// Checks the given declaration's signature does not reference any other
-/// declarations that are not @usableFromInline or public.
-///
-/// \p D must be a ValueDecl or a Decl that can appear in a type context.
-void UsableFromInlineChecker::check(Decl *D) {
-  if (!TC.Context.isSwiftVersionAtLeast(4, 2))
-    return;
+class UsableFromInlineChecker : public AccessControlCheckerBase,
+                                public DeclVisitor<UsableFromInlineChecker> {
+public:
+  explicit UsableFromInlineChecker(TypeChecker &TC)
+    : AccessControlCheckerBase(TC, /*checkUsableFromInline=*/true) {}
 
-  if (D->isInvalid() || D->isImplicit())
-    return;
-
-  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+  static bool shouldSkipChecking(const ValueDecl *VD) {
     if (VD->getFormalAccess() != AccessLevel::Internal)
+      return true;
+    return !VD->isUsableFromInline();
+  };
+
+  void visit(Decl *D) {
+    if (!TC.Context.isSwiftVersionAtLeast(4, 2))
       return;
-    if (!VD->isUsableFromInline())
+
+    if (D->isInvalid() || D->isImplicit())
       return;
+
+    if (auto *VD = dyn_cast<ValueDecl>(D))
+      if (shouldSkipChecking(VD))
+        return;
+
+    DeclVisitor<UsableFromInlineChecker>::visit(D);
   }
 
-  switch (D->getKind()) {
-  case DeclKind::Import:
-  case DeclKind::Extension:
-  case DeclKind::TopLevelCode:
-  case DeclKind::InfixOperator:
-  case DeclKind::PrefixOperator:
-  case DeclKind::PostfixOperator:
-  case DeclKind::PrecedenceGroup:
-  case DeclKind::Module:
-    llvm_unreachable("cannot appear in a type context");
+  // Force all kinds to be handled at a lower level.
+  void visitDecl(Decl *D) = delete;
+  void visitValueDecl(ValueDecl *D) = delete;
 
-  case DeclKind::Param:
-  case DeclKind::GenericTypeParam:
-  case DeclKind::MissingMember:
-    llvm_unreachable("does not have access control");
+#define UNREACHABLE(KIND, REASON) \
+  void visit##KIND##Decl(KIND##Decl *D) { \
+    llvm_unreachable(REASON); \
+  }
+  UNREACHABLE(Import, "cannot appear in a type context")
+  UNREACHABLE(Extension, "cannot appear in a type context")
+  UNREACHABLE(TopLevelCode, "cannot appear in a type context")
+  UNREACHABLE(Operator, "cannot appear in a type context")
+  UNREACHABLE(PrecedenceGroup, "cannot appear in a type context")
+  UNREACHABLE(Module, "cannot appear in a type context")
 
-  case DeclKind::IfConfig:
-  case DeclKind::PoundDiagnostic:
-    // Does not have access control.
-  case DeclKind::EnumCase:
-    // Handled at the EnumElement level.
-  case DeclKind::Var:
-    // Handled at the PatternBindingDecl level.
-  case DeclKind::Destructor:
-    // Always correct.
-    return;
+  UNREACHABLE(Param, "does not have access control")
+  UNREACHABLE(GenericTypeParam, "does not have access control")
+  UNREACHABLE(MissingMember, "does not have access control")
+#undef UNREACHABLE
 
-  case DeclKind::PatternBinding: {
-    auto PBD = cast<PatternBindingDecl>(D);
+#define UNINTERESTING(KIND) \
+  void visit##KIND##Decl(KIND##Decl *D) {}
+
+  UNINTERESTING(IfConfig) // Does not have access control.
+  UNINTERESTING(PoundDiagnostic) // Does not have access control.
+  UNINTERESTING(EnumCase) // Handled at the EnumElement level.
+  UNINTERESTING(Var) // Handled at the PatternBinding level.
+  UNINTERESTING(Destructor) // Always correct.
+  UNINTERESTING(Accessor) // Handled by the Var or Subscript.
+
+  /// If \p PBD declared stored instance properties in a fixed-contents struct,
+  /// return said struct.
+  static const StructDecl *
+  getFixedLayoutStructContext(const PatternBindingDecl *PBD) {
+    auto *parentStruct = dyn_cast<StructDecl>(PBD->getDeclContext());
+    if (!parentStruct)
+      return nullptr;
+    if (!parentStruct->getAttrs().hasAttribute<FixedLayoutAttr>() ||
+        PBD->isStatic() || !PBD->hasStorage()) {
+      return nullptr;
+    }
+    // We don't check for "in resilient modules" because there's no reason to
+    // write '@_fixedLayout' on a struct in a non-resilient module.
+    return parentStruct;
+  }
+
+  /// \see visitPatternBindingDecl
+  void checkNamedPattern(const NamedPattern *NP,
+                         const ValueDecl *fixedLayoutStructContext,
+                         bool isTypeContext,
+                         const llvm::DenseSet<const VarDecl *> &seenVars) {
+    const VarDecl *theVar = NP->getDecl();
+    if (!fixedLayoutStructContext && shouldSkipChecking(theVar))
+      return;
+    // Only check individual variables if we didn't check an enclosing
+    // TypedPattern.
+    if (seenVars.count(theVar) || theVar->isInvalid())
+      return;
+
+    checkTypeAccess(theVar->getInterfaceType(), nullptr,
+                    fixedLayoutStructContext ? fixedLayoutStructContext
+                                             : theVar,
+                    [&](AccessScope typeAccessScope,
+                        const TypeRepr *complainRepr,
+                        DowngradeToWarning downgradeToWarning) {
+      auto diagID = diag::pattern_type_not_usable_from_inline_inferred;
+      if (fixedLayoutStructContext) {
+        diagID =
+            diag::pattern_type_not_usable_from_inline_inferred_fixed_layout;
+      } else if (!TC.Context.isSwiftVersionAtLeast(5)) {
+        diagID = diag::pattern_type_not_usable_from_inline_inferred_warn;
+      }
+      TC.diagnose(NP->getLoc(), diagID, theVar->isLet(), isTypeContext,
+                  theVar->getInterfaceType());
+    });
+  }
+
+  /// \see visitPatternBindingDecl
+  void checkTypedPattern(const TypedPattern *TP,
+                         const ValueDecl *fixedLayoutStructContext,
+                         bool isTypeContext,
+                         llvm::DenseSet<const VarDecl *> &seenVars) {
+    // FIXME: We need an access level to check against, so we pull one out
+    // of some random VarDecl in the pattern. They're all going to be the
+    // same, but still, ick.
+    const VarDecl *anyVar = nullptr;
+    TP->forEachVariable([&](VarDecl *V) {
+      seenVars.insert(V);
+      anyVar = V;
+    });
+    if (!anyVar)
+      return;
+    if (!fixedLayoutStructContext && shouldSkipChecking(anyVar))
+      return;
+
+    checkTypeAccess(TP->getTypeLoc(),
+                    fixedLayoutStructContext ? fixedLayoutStructContext
+                                             : anyVar,
+                    [&](AccessScope typeAccessScope,
+                        const TypeRepr *complainRepr,
+                        DowngradeToWarning downgradeToWarning) {
+      auto diagID = diag::pattern_type_not_usable_from_inline;
+      if (fixedLayoutStructContext)
+        diagID = diag::pattern_type_not_usable_from_inline_fixed_layout;
+      else if (!TC.Context.isSwiftVersionAtLeast(5))
+        diagID = diag::pattern_type_not_usable_from_inline_warn;
+      auto diag = TC.diagnose(TP->getLoc(), diagID, anyVar->isLet(),
+                              isTypeContext);
+      highlightOffendingType(TC, diag, complainRepr);
+    });
+  }
+
+  void visitPatternBindingDecl(PatternBindingDecl *PBD) {
     bool isTypeContext = PBD->getDeclContext()->isTypeContext();
 
+    // Stored instance properties in public/@usableFromInline fixed-contents
+    // structs in resilient modules must always use public/@usableFromInline
+    // types. In these cases, check the access against the struct instead of the
+    // VarDecl, and customize the diagnostics.
+    const ValueDecl *fixedLayoutStructContext =
+        getFixedLayoutStructContext(PBD);
+
     llvm::DenseSet<const VarDecl *> seenVars;
-    for (auto entry : PBD->getPatternList())
-    entry.getPattern()->forEachNode([&](const Pattern *P) {
-      if (auto *NP = dyn_cast<NamedPattern>(P)) {
-        // Only check individual variables if we didn't check an enclosing
-        // TypedPattern.
-        const VarDecl *theVar = NP->getDecl();
-        if (theVar->getFormalAccess() != AccessLevel::Internal)
+    for (auto entry : PBD->getPatternList()) {
+      entry.getPattern()->forEachNode([&](const Pattern *P) {
+        if (auto *NP = dyn_cast<NamedPattern>(P)) {
+          checkNamedPattern(NP, fixedLayoutStructContext, isTypeContext,
+                            seenVars);
           return;
-        if (!theVar->isUsableFromInline())
+        }
+
+        auto *TP = dyn_cast<TypedPattern>(P);
+        if (!TP)
           return;
-        if (seenVars.count(theVar) || theVar->isInvalid())
-          return;
-
-        checkTypeAccess(theVar->getType(), nullptr, theVar,
-                        [&](AccessScope typeAccessScope,
-                            const TypeRepr *complainRepr,
-                            DowngradeToWarning downgradeToWarning) {
-          auto diagID = diag::pattern_type_not_usable_from_inline_inferred;
-          if (!TC.Context.isSwiftVersionAtLeast(5))
-            diagID = diag::pattern_type_not_usable_from_inline_inferred_warn;
-          TC.diagnose(P->getLoc(),
-                      diagID,
-                      theVar->isLet(),
-                      isTypeContext,
-                      theVar->getType());
-        });
-        return;
-      }
-
-      auto *TP = dyn_cast<TypedPattern>(P);
-      if (!TP)
-        return;
-
-      // FIXME: We need an access level to check against, so we pull one out of
-      // some random VarDecl in the pattern. They're all going to be the same,
-      // but still, ick.
-      const VarDecl *anyVar = nullptr;
-      TP->forEachVariable([&](VarDecl *V) {
-        seenVars.insert(V);
-        anyVar = V;
+        checkTypedPattern(TP, fixedLayoutStructContext, isTypeContext,
+                          seenVars);
       });
-      if (!anyVar)
-        return;
-      if (anyVar->getFormalAccess() != AccessLevel::Internal)
-        return;
-      if (!anyVar->isUsableFromInline())
-        return;
-
-      checkTypeAccess(TP->getTypeLoc(), anyVar,
-                      [&](AccessScope typeAccessScope,
-                          const TypeRepr *complainRepr,
-                          DowngradeToWarning downgradeToWarning) {
-        auto diagID = diag::pattern_type_not_usable_from_inline;
-        if (!TC.Context.isSwiftVersionAtLeast(5))
-          diagID = diag::pattern_type_not_usable_from_inline_warn;
-        auto diag = TC.diagnose(P->getLoc(),
-                                diagID,
-                                anyVar->isLet(),
-                                isTypeContext);
-        highlightOffendingType(TC, diag, complainRepr);
-      });
-    });
-    return;
+      seenVars.clear();
+    }
   }
 
-  case DeclKind::TypeAlias: {
-    auto TAD = cast<TypeAliasDecl>(D);
-
+  void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     checkTypeAccess(TAD->getUnderlyingTypeLoc(), TAD,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
@@ -1048,13 +1078,9 @@ void UsableFromInlineChecker::check(Decl *D) {
       auto diag = TC.diagnose(TAD, diagID);
       highlightOffendingType(TC, diag, complainRepr);
     });
-
-    return;
   }
 
-  case DeclKind::AssociatedType: {
-    auto assocType = cast<AssociatedTypeDecl>(D);
-
+  void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
     // This must stay in sync with diag::associated_type_not_usable_from_inline.
     enum {
       ACEK_DefaultDefinition = 0,
@@ -1102,13 +1128,9 @@ void UsableFromInlineChecker::check(Decl *D) {
         highlightOffendingType(TC, diag, complainRepr);
       });
     }
-
-    return;
   }
 
-  case DeclKind::Enum: {
-    auto ED = cast<EnumDecl>(D);
-
+  void visitEnumDecl(const EnumDecl *ED) {
     checkGenericParamAccess(ED->getGenericParams(), ED);
 
     if (ED->hasRawType()) {
@@ -1133,19 +1155,13 @@ void UsableFromInlineChecker::check(Decl *D) {
         highlightOffendingType(TC, diag, complainRepr);
       });
     }
-
-    return;
   }
 
-  case DeclKind::Struct: {
-    auto SD = cast<StructDecl>(D);
+  void visitStructDecl(StructDecl *SD) {
     checkGenericParamAccess(SD->getGenericParams(), SD);
-    return;
   }
 
-  case DeclKind::Class: {
-    auto CD = cast<ClassDecl>(D);
-
+  void visitClassDecl(ClassDecl *CD) {
     checkGenericParamAccess(CD->getGenericParams(), CD);
 
     if (CD->hasSuperclass()) {
@@ -1181,13 +1197,9 @@ void UsableFromInlineChecker::check(Decl *D) {
         highlightOffendingType(TC, diag, complainRepr);
       });
     }
-
-    return;
   }
 
-  case DeclKind::Protocol: {
-    auto proto = cast<ProtocolDecl>(D);
-
+  void visitProtocolDecl(ProtocolDecl *proto) {
     // This must stay in sync with diag::protocol_usable_from_inline.
     enum {
       PCEK_Refine = 0,
@@ -1225,13 +1237,9 @@ void UsableFromInlineChecker::check(Decl *D) {
         highlightOffendingType(TC, diag, complainRepr);
       });
     }
-
-    return;
   }
 
-  case DeclKind::Subscript: {
-    auto SD = cast<SubscriptDecl>(D);
-
+  void visitSubscriptDecl(SubscriptDecl *SD) {
     for (auto &P : *SD->getIndices()) {
       checkTypeAccess(P->getTypeLoc(), SD,
                       [&](AccessScope typeAccessScope,
@@ -1257,16 +1265,9 @@ void UsableFromInlineChecker::check(Decl *D) {
                               /*problemIsElement=*/true);
       highlightOffendingType(TC, diag, complainRepr);
     });
-
-    return;
   }
 
-  case DeclKind::Accessor:
-    return;
-
-  case DeclKind::Func:
-  case DeclKind::Constructor: {
-    auto fn = cast<AbstractFunctionDecl>(D);
+  void visitAbstractFunctionDecl(AbstractFunctionDecl *fn) {
     bool isTypeContext = fn->getDeclContext()->isTypeContext();
 
     checkGenericParamAccess(fn->getGenericParams(), fn);
@@ -1309,13 +1310,9 @@ void UsableFromInlineChecker::check(Decl *D) {
         highlightOffendingType(TC, diag, complainRepr);
       });
     }
-
-    return;
   }
 
-  case DeclKind::EnumElement: {
-    auto EED = cast<EnumElementDecl>(D);
-
+  void visitEnumElementDecl(EnumElementDecl *EED) {
     if (!EED->hasAssociatedValues())
       return;
     for (auto &P : *EED->getParameterList()) {
@@ -1330,8 +1327,40 @@ void UsableFromInlineChecker::check(Decl *D) {
         highlightOffendingType(TC, diag, complainRepr);
       });
     }
+  }
+};
+} // end anonymous namespace
 
-    return;
+void swift::checkAccessControl(TypeChecker &TC, Decl *D) {
+  AccessControlChecker(TC).visit(D);
+  UsableFromInlineChecker(TC).visit(D);
+}
+
+void swift::checkExtensionGenericParamAccess(TypeChecker &TC,
+                                             const ExtensionDecl *ED,
+                                             AccessLevel userSpecifiedAccess) {
+  AccessScope desiredAccessScope = AccessScope::getPublic();
+  switch (userSpecifiedAccess) {
+  case AccessLevel::Private:
+    assert((ED->isInvalid() ||
+            ED->getDeclContext()->isModuleScopeContext()) &&
+           "non-top-level extensions make 'private' != 'fileprivate'");
+    LLVM_FALLTHROUGH;
+  case AccessLevel::FilePrivate: {
+    const DeclContext *DC = ED->getModuleScopeContext();
+    bool isPrivate = (userSpecifiedAccess == AccessLevel::Private);
+    desiredAccessScope = AccessScope(DC, isPrivate);
+    break;
   }
+  case AccessLevel::Internal:
+    desiredAccessScope = AccessScope(ED->getModuleContext());
+    break;
+  case AccessLevel::Public:
+  case AccessLevel::Open:
+    break;
   }
+
+  AccessControlChecker(TC).checkGenericParamAccess(ED->getGenericParams(), ED,
+                                                   desiredAccessScope,
+                                                   userSpecifiedAccess);
 }

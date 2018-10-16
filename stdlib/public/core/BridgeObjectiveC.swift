@@ -78,6 +78,7 @@ public protocol _ObjectiveCBridgeable {
   /// implementation of `Swift.Array`'s conformance to
   /// `_ObjectiveCBridgeable` will produce an empty array rather than
   /// dynamically failing.
+  @_effects(readonly)
   static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Self
 }
@@ -133,6 +134,7 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(_ source: AnyObject?)
       -> _BridgeableMetatype {
     var result: _BridgeableMetatype?
@@ -596,7 +598,7 @@ protocol _NSSwiftValue: class {
 }
 
 @usableFromInline
-internal class _SwiftValue {
+internal class __SwiftValue {
   @usableFromInline
   let value: Any
   
@@ -606,7 +608,7 @@ internal class _SwiftValue {
   }
   
   @usableFromInline
-  static let null = _SwiftValue(Optional<Any>.none as Any)
+  static let null = __SwiftValue(Optional<Any>.none as Any)
 }
 
 // Internal stdlib SPI
@@ -623,7 +625,7 @@ public func swift_unboxFromSwiftValueWithType<T>(
     }
   }
     
-  if let box = source as? _SwiftValue {
+  if let box = source as? __SwiftValue {
     if let value = box.value as? T {
       result.initialize(to: value)
       return true
@@ -644,7 +646,7 @@ public func _swiftValueConformsTo<T>(_ type: T.Type) -> Bool {
   if let foundationType = _foundationSwiftValueType {
     return foundationType is T.Type
   } else {
-    return _SwiftValue.self is T.Type
+    return __SwiftValue.self is T.Type
   }
 }
 
@@ -665,14 +667,14 @@ extension Optional: _Unwrappable {
   }
 }
 
-private let _foundationSwiftValueType = _typeByName("Foundation._SwiftValue") as? _NSSwiftValue.Type
+private let _foundationSwiftValueType = _typeByName("Foundation.__SwiftValue") as? _NSSwiftValue.Type
 
 @usableFromInline
 internal var _nullPlaceholder: AnyObject {
   if let foundationType = _foundationSwiftValueType {
     return foundationType.null
   } else {
-    return _SwiftValue.null
+    return __SwiftValue.null
   }
 }
 
@@ -681,7 +683,7 @@ func _makeSwiftValue(_ value: Any) -> AnyObject {
   if let foundationType = _foundationSwiftValueType {
     return foundationType.init(value)
   } else {
-    return _SwiftValue(value)
+    return __SwiftValue(value)
   }
 }
 
@@ -699,7 +701,6 @@ func _makeSwiftValue(_ value: Any) -> AnyObject {
 ///   the boxed value, but is otherwise opaque.
 ///
 /// COMPILER_INTRINSIC
-@inlinable // FIXME(sil-serialize-all)
 public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   var done = false
   var result: AnyObject!

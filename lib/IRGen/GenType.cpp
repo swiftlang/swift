@@ -29,6 +29,7 @@
 #include "clang/CodeGen/SwiftCallingConv.h"
 
 #include "EnumPayload.h"
+#include "LegacyLayoutFormat.h"
 #include "LoadableTypeInfo.h"
 #include "GenMeta.h"
 #include "GenProto.h"
@@ -55,17 +56,11 @@ Alignment IRGenModule::getCappedAlignment(Alignment align) {
   return std::min(align, Alignment(MaximumAlignment));
 }
 
-llvm::DenseMap<TypeBase*, TypeCacheEntry> &
-TypeConverter::Types_t::getCacheFor(bool isDependent, bool completelyFragile) {
-  if (completelyFragile) {
-    return (isDependent
-            ? FragileDependentCache
-            : FragileIndependentCache);
-  }
-
+llvm::DenseMap<TypeBase *, const TypeInfo *> &
+TypeConverter::Types_t::getCacheFor(bool isDependent, TypeConverter::Mode mode) {
   return (isDependent
-          ? DependentCache
-          : IndependentCache);
+          ? DependentCache[unsigned(mode)]
+          : IndependentCache[unsigned(mode)]);
 }
 
 void TypeInfo::assign(IRGenFunction &IGF, Address dest, Address src,
@@ -1071,6 +1066,54 @@ TypeConverter::createImmovable(llvm::Type *type, Size size, Alignment align) {
 
 static TypeInfo *invalidTypeInfo() { return (TypeInfo*) 1; }
 
+bool TypeConverter::readLegacyTypeInfo(StringRef path) {
+  auto fileOrErr = llvm::MemoryBuffer::getFile(path);
+  if (!fileOrErr)
+    return true;
+
+  auto file = std::move(fileOrErr.get());
+
+  llvm::yaml::Input yin(file->getBuffer());
+
+  // Read the document list.
+  std::vector<YAMLModuleNode> modules;
+  yin >> modules;
+
+  if (yin.error())
+    return true;
+
+  for (auto &module : modules) {
+    for (auto &decl : module.Decls) {
+      auto result = LegacyTypeInfos.insert(std::make_pair(
+                                             decl.Name,
+                                             decl));
+      assert(result.second);
+      (void) result;
+    }
+  }
+
+  return false;
+}
+
+static std::string mangleTypeAsContext(const NominalTypeDecl *decl) {
+  Mangle::ASTMangler Mangler;
+  return Mangler.mangleTypeAsContextUSR(decl);
+}
+
+Optional<YAMLTypeInfoNode>
+TypeConverter::getLegacyTypeInfo(NominalTypeDecl *decl) const {
+  auto &mangledName = const_cast<TypeConverter *>(this)->DeclMangledNames[decl];
+  if (mangledName.empty())
+    mangledName = mangleTypeAsContext(decl);
+  assert(!mangledName.empty());
+
+  auto found = LegacyTypeInfos.find(mangledName);
+  if (found == LegacyTypeInfos.end())
+    return None;
+
+  return found->second;
+}
+
 TypeConverter::TypeConverter(IRGenModule &IGM)
   : IGM(IGM),
     FirstType(invalidTypeInfo()) {
@@ -1080,7 +1123,15 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
   // sync with the binary module. Once LLDB can calculate type layouts at
   // runtime (using remote mirrors or some other mechanism), we can remove this.
   if (IGM.IRGen.Opts.EnableResilienceBypass)
-    CompletelyFragile = true;
+    LoweringMode = Mode::CompletelyFragile;
+
+  StringRef path = IGM.IRGen.Opts.ReadTypeInfoPath;
+  if (!path.empty()) {
+    bool error = readLegacyTypeInfo(path);
+    if (error) {
+      llvm::report_fatal_error("Cannot read '" + path + "'");
+    }
+  }
 }
 
 TypeConverter::~TypeConverter() {
@@ -1102,8 +1153,9 @@ void TypeConverter::pushGenericContext(CanGenericSignature signature) {
 
   // Clear the dependent type info cache since we have a new active signature
   // now.
-  Types.getCacheFor(/*isDependent*/ true, /*isFragile*/ false).clear();
-  Types.getCacheFor(/*isDependent*/ true, /*isFragile*/ true).clear();
+  Types.getCacheFor(/*isDependent*/ true, Mode::Normal).clear();
+  Types.getCacheFor(/*isDependent*/ true, Mode::Legacy).clear();
+  Types.getCacheFor(/*isDependent*/ true, Mode::CompletelyFragile).clear();
 }
 
 void TypeConverter::popGenericContext(CanGenericSignature signature) {
@@ -1113,8 +1165,9 @@ void TypeConverter::popGenericContext(CanGenericSignature signature) {
   // Pop the SIL TypeConverter's generic context too.
   IGM.getSILTypes().popGenericContext(signature);
   
-  Types.getCacheFor(/*isDependent*/ true, /*isFragile*/ false).clear();
-  Types.getCacheFor(/*isDependent*/ true, /*isFragile*/ true).clear();
+  Types.getCacheFor(/*isDependent*/ true, Mode::Normal).clear();
+  Types.getCacheFor(/*isDependent*/ true, Mode::Legacy).clear();
+  Types.getCacheFor(/*isDependent*/ true, Mode::CompletelyFragile).clear();
 }
 
 GenericEnvironment *TypeConverter::getGenericEnvironment() {
@@ -1128,12 +1181,13 @@ GenericEnvironment *IRGenModule::getGenericEnvironment() {
 
 /// Add a temporary forward declaration for a type.  This will live
 /// only until a proper mapping is added.
-void TypeConverter::addForwardDecl(TypeBase *key, llvm::Type *type) {
+void TypeConverter::addForwardDecl(TypeBase *key) {
   assert(key->isCanonical());
   assert(!key->hasTypeParameter());
-  auto &Cache = Types.getCacheFor(/*isDependent*/ false, CompletelyFragile);
-  assert(!Cache.count(key) && "entry already exists for type!");
-  Cache.insert(std::make_pair(key, type));
+  auto &Cache = Types.getCacheFor(/*isDependent*/ false, LoweringMode);
+  auto result = Cache.insert(std::make_pair(key, nullptr));
+  assert(result.second && "entry already exists for type!");
+  (void) result;
 }
 
 const TypeInfo &IRGenModule::getWitnessTablePtrTypeInfo() {
@@ -1322,17 +1376,9 @@ llvm::Type *IRGenModule::getStorageType(SILType T) {
   return getStorageTypeForLowered(T.getASTType());
 }
 
-/// Get the storage type for the given type.  Note that, unlike
-/// fetching the type info and asking it for the storage type, this
-/// operation will succeed for forward-declarations.
+/// Get the storage type for the given type.
 llvm::Type *IRGenModule::getStorageTypeForLowered(CanType T) {
-  // TODO: we can avoid creating entries for some obvious cases here.
-  auto entry = Types.getTypeEntry(T);
-  if (auto ti = entry.dyn_cast<const TypeInfo*>()) {
-    return ti->getStorageType();
-  } else {
-    return entry.get<llvm::Type*>();
-  }
+  return Types.getTypeEntry(T)->getStorageType();
 }
 
 /// Get the type information for the given type, which may not have
@@ -1370,9 +1416,7 @@ const TypeInfo &IRGenModule::getTypeInfoForLowered(CanType T) {
 
 /// 
 const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
-  auto entry = getTypeEntry(T);
-  assert(entry.is<const TypeInfo*>() && "getting TypeInfo recursively!");
-  return *entry.get<const TypeInfo*>();
+  return *getTypeEntry(T);
 }
 
 ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
@@ -1418,20 +1462,10 @@ CanType TypeConverter::getExemplarType(CanType contextTy) {
   }
 }
 
-void TypeConverter::pushCompletelyFragile() {
-  assert(!CompletelyFragile);
-  CompletelyFragile = true;
-}
-
-void TypeConverter::popCompletelyFragile() {
-  assert(CompletelyFragile);
-  CompletelyFragile = false;
-}
-
-TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
+const TypeInfo *TypeConverter::getTypeEntry(CanType canonicalTy) {
   // Cache this entry in the dependent or independent cache appropriate to it.
   auto &Cache = Types.getCacheFor(canonicalTy->hasTypeParameter(),
-                                  CompletelyFragile);
+                                  LoweringMode);
 
   {
     auto it = Cache.find(canonicalTy.getPointer());
@@ -1456,7 +1490,7 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   
   // See whether we lowered a type equivalent to this one.
   if (exemplarTy != canonicalTy) {
-    auto &Cache = Types.getCacheFor(/*isDependent*/ false, CompletelyFragile);
+    auto &Cache = Types.getCacheFor(/*isDependent*/ false, LoweringMode);
     auto it = Cache.find(exemplarTy.getPointer());
     if (it != Cache.end()) {
       // Record the object under the original type.
@@ -1467,28 +1501,18 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   }
 
   // Convert the type.
-  TypeCacheEntry convertedEntry = convertType(exemplarTy);
-  auto convertedTI = convertedEntry.dyn_cast<const TypeInfo*>();
-
-  // If that gives us a forward declaration (which can happen with
-  // bound generic types), don't propagate that into the cache here,
-  // because we won't know how to clear it later.
-  if (!convertedTI) {
-    return convertedEntry;
-  }
+  auto *convertedTI = convertType(exemplarTy);
 
   // Cache the entry under the original type and the exemplar type, so that
   // we can avoid relowering equivalent types.
-  auto insertEntry = [&](TypeCacheEntry &entry) {
-    assert(entry == TypeCacheEntry() ||
-           (entry.is<llvm::Type*>() &&
-            entry.get<llvm::Type*>() == convertedTI->getStorageType()));
+  auto insertEntry = [&](const TypeInfo *&entry) {
+    assert(entry == nullptr);
     entry = convertedTI;
   };
   insertEntry(Cache[canonicalTy.getPointer()]);
   if (canonicalTy != exemplarTy) {
     auto &IndependentCache = Types.getCacheFor(/*isDependent*/ false,
-                                               CompletelyFragile);
+                                               LoweringMode);
     insertEntry(IndependentCache[exemplarTy.getPointer()]);
   }
   
@@ -1557,8 +1581,12 @@ convertPrimitiveBuiltin(IRGenModule &IGM, CanType canTy) {
       return RetTy{ llvm::Type::getFloatTy(ctx), Size(4), Alignment(4) };
     case BuiltinFloatType::IEEE64:
       return RetTy{ llvm::Type::getDoubleTy(ctx), Size(8), Alignment(8) };
-    case BuiltinFloatType::IEEE80:
-      return RetTy{ llvm::Type::getX86_FP80Ty(ctx), Size(16), Alignment(16) };
+    case BuiltinFloatType::IEEE80: {
+      llvm::Type *floatTy = llvm::Type::getX86_FP80Ty(ctx);
+      uint64_t ByteSize = IGM.DataLayout.getTypeAllocSize(floatTy);
+      unsigned align = IGM.DataLayout.getABITypeAlignment(floatTy);
+      return RetTy{ floatTy, Size(ByteSize), Alignment(align) };
+    }
     case BuiltinFloatType::IEEE128:
       return RetTy{ llvm::Type::getFP128Ty(ctx), Size(16), Alignment(16) };
     case BuiltinFloatType::PPC128:
@@ -1596,7 +1624,7 @@ convertPrimitiveBuiltin(IRGenModule &IGM, CanType canTy) {
   }
 }
 
-TypeCacheEntry TypeConverter::convertType(CanType ty) {
+const TypeInfo *TypeConverter::convertType(CanType ty) {
   PrettyStackTraceType stackTrace(IGM.Context, "converting", ty);
 
   switch (ty->getKind()) {
@@ -1715,10 +1743,10 @@ TypeConverter::convert##Name##StorageType(Name##StorageType *refType) { \
 }
 #include "swift/AST/ReferenceStorage.def"
 
-static void overwriteForwardDecl(llvm::DenseMap<TypeBase*, TypeCacheEntry> &cache,
+static void overwriteForwardDecl(llvm::DenseMap<TypeBase *, const TypeInfo *> &cache,
                                  TypeBase *key, const TypeInfo *result) {
   assert(cache.count(key) && "no forward declaration?");
-  assert(cache[key].is<llvm::Type*>() && "overwriting real entry!");
+  assert(cache[key] == nullptr && "overwriting real entry!");
   cache[key] = result;
 }
 
@@ -1824,10 +1852,93 @@ static bool isIRTypeDependent(IRGenModule &IGM, NominalTypeDecl *decl) {
   }
 }
 
-TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
-                                                    NominalTypeDecl *decl) {
+namespace {
+
+class LegacyTypeInfo : public FixedTypeInfo {
+  unsigned NumExtraInhabitants;
+
+public:
+  LegacyTypeInfo(llvm::Type *type, const SpareBitVector &spareBits,
+                 const YAMLTypeInfoNode &node)
+    : FixedTypeInfo(type,
+                    Size(node.Size),
+                    spareBits,
+                    Alignment(node.Alignment),
+                    IsNotPOD, /* irrelevant */
+                    IsNotBitwiseTakable, /* irrelevant */
+                    IsFixedSize /* irrelevant */),
+      NumExtraInhabitants(node.NumExtraInhabitants) {}
+
+  virtual unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
+    return NumExtraInhabitants;
+  }
+
+  virtual APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
+    llvm_unreachable("TypeConverter::Mode::Legacy is not for real values");
+  }
+
+  virtual APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                             unsigned bits,
+                                             unsigned index) const override {
+    llvm_unreachable("TypeConverter::Mode::Legacy is not for real values");
+  }
+
+  virtual void getSchema(ExplosionSchema &schema) const override {
+    llvm_unreachable("TypeConverter::Mode::Legacy is not for real values");
+  }
+
+  virtual void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                              SILType T, bool isOutlined) const override {
+    llvm_unreachable("TypeConverter::Mode::Legacy is not for real values");
+  }
+
+  virtual void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
+                              SILType T, bool isOutlined) const override {
+    llvm_unreachable("TypeConverter::Mode::Legacy is not for real values");
+  }
+
+  virtual void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
+                                  Address srcAddr, SILType T,
+                                  bool isOutlined) const override {
+    llvm_unreachable("TypeConverter::Mode::Legacy is not for real values");
+  }
+
+  virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                                    Address src, SILType T,
+                                    bool isOutlined) const override {
+    llvm_unreachable("TypeConverter::Mode::Legacy is not for real values");
+  }
+
+  virtual void destroy(IRGenFunction &IGF, Address address, SILType T,
+                       bool isOutlined) const override {
+    llvm_unreachable("TypeConverter::Mode::Legacy is not for real values");
+  }
+};
+
+} // namespace
+
+const TypeInfo *TypeConverter::convertAnyNominalType(CanType type,
+                                                     NominalTypeDecl *decl) {
   // By "any", we don't mean existentials.
   assert(!isa<ProtocolDecl>(decl));
+
+  // If we're producing a legacy type layout, and we have a serialized
+  // record for this type, produce it now.
+  if (LoweringMode == Mode::Legacy) {
+    auto node = getLegacyTypeInfo(decl);
+
+    if (node) {
+      Size size(node->Size);
+
+      auto ty = IGM.createNominalType(type);
+      ty->setBody(llvm::ArrayType::get(IGM.Int8Ty, size.getValue()));
+
+      SpareBitVector spareBits;
+      spareBits.appendClearBits(size.getValueInBits());
+
+      return new LegacyTypeInfo(ty, spareBits, *node);
+    }
+  }
 
   // We need to give generic specializations distinct TypeInfo objects
   // if their IR-gen might be different, e.g. if they use different IR
@@ -1864,7 +1975,7 @@ TypeCacheEntry TypeConverter::convertAnyNominalType(CanType type,
   assert(decl->getDeclaredType()->isCanonical());
   assert(decl->getDeclaredType()->hasUnboundGenericType());
   TypeBase *key = decl->getDeclaredType().getPointer();
-  auto &Cache = Types.getCacheFor(/*isDependent*/ false, CompletelyFragile);
+  auto &Cache = Types.getCacheFor(/*isDependent*/ false, LoweringMode);
   auto entry = Cache.find(key);
   if (entry != Cache.end())
     return entry->second;
@@ -1957,86 +2068,6 @@ IRGenModule::createNominalType(ProtocolCompositionType *type) {
   return llvm::StructType::create(getLLVMContext(), StringRef(typeName));
 }
 
-/// Compute the explosion schema for the given type.
-ExplosionSchema IRGenModule::getSchema(SILType type) {
-  ExplosionSchema schema;
-  getSchema(type, schema);
-  return schema;
-}
-
-/// Compute the explosion schema for the given type.
-void IRGenModule::getSchema(SILType type, ExplosionSchema &schema) {
-  // As an optimization, avoid actually building a TypeInfo for any
-  // obvious TupleTypes.  This assumes that a TupleType's explosion
-  // schema is always the concatenation of its component's schemas.
-  if (CanTupleType tuple = type.getAs<TupleType>()) {
-    for (auto index : indices(tuple.getElementTypes()))
-      getSchema(type.getTupleElementType(index), schema);
-    return;
-  }
-
-  // Okay, that didn't work;  just do the general thing.
-  getTypeInfo(type).getSchema(schema);
-}
-
-/// Compute the explosion schema for the given type.
-unsigned IRGenModule::getExplosionSize(SILType type) {
-  // As an optimization, avoid actually building a TypeInfo for any
-  // obvious TupleTypes.  This assumes that a TupleType's explosion
-  // schema is always the concatenation of its component's schemas.
-  if (auto tuple = type.getAs<TupleType>()) {
-    unsigned count = 0;
-    for (auto index : indices(tuple.getElementTypes()))
-      count += getExplosionSize(type.getTupleElementType(index));
-    return count;
-  }
-
-  // If the type isn't loadable, the explosion size is always 1.
-  auto *loadableTI = dyn_cast<LoadableTypeInfo>(&getTypeInfo(type));
-  if (!loadableTI) return 1;
-
-  // Okay, that didn't work;  just do the general thing.
-  return loadableTI->getExplosionSize();
-}
-
-/// Determine whether this type is a single value that is passed
-/// indirectly at the given level.
-llvm::PointerType *IRGenModule::isSingleIndirectValue(SILType type) {
-  if (auto archetype = type.getAs<ArchetypeType>()) {
-    if (!archetype->requiresClass())
-      return OpaquePtrTy;
-  }
-
-  ExplosionSchema schema;
-  getSchema(type, schema);
-  if (schema.size() == 1 && schema.begin()->isAggregate())
-    return schema.begin()->getAggregateType()->getPointerTo(0);
-  return nullptr;
-}
-
-/// Determine whether this type is known to be POD.
-bool IRGenModule::isPOD(SILType type, ResilienceExpansion expansion) {
-  if (type.is<ArchetypeType>()) return false;
-  if (type.is<ClassType>()) return false;
-  if (type.is<BoundGenericClassType>()) return false;
-  if (auto tuple = type.getAs<TupleType>()) {
-    for (auto index : indices(tuple.getElementTypes()))
-      if (!isPOD(type.getTupleElementType(index), expansion))
-        return false;
-    return true;
-  }
-  return getTypeInfo(type).isPOD(expansion);
-}
-
-/// Determine whether this type is known to be empty.
-bool IRGenModule::isKnownEmpty(SILType type, ResilienceExpansion expansion) {
-  if (auto tuple = type.getAs<TupleType>()) {
-    if (tuple->getNumElements() == 0)
-      return true;
-  }
-  return getTypeInfo(type).isKnownEmpty(expansion);
-}
-
 SpareBitVector IRGenModule::getSpareBitsForType(llvm::Type *scalarTy, Size size) {
   auto it = SpareBitsForTypes.find(scalarTy);
   if (it != SpareBitsForTypes.end())
@@ -2046,13 +2077,9 @@ SpareBitVector IRGenModule::getSpareBitsForType(llvm::Type *scalarTy, Size size)
          "using a size that's smaller than LLVM's alloc size?");
   
   {
-    // FIXME: Currently we only implement spare bits for single-element
-    // primitive integer types.
-    while (auto structTy = dyn_cast<llvm::StructType>(scalarTy)) {
-      if (structTy->getNumElements() != 1)
-        goto no_spare_bits;
-      scalarTy = structTy->getElementType(0);
-    }
+    // FIXME: Currently we only implement spare bits for primitive integer
+    // types.
+    assert(!isa<llvm::StructType>(scalarTy));
 
     auto *intTy = dyn_cast<llvm::IntegerType>(scalarTy);
     if (!intTy)

@@ -79,7 +79,7 @@ extension LazyCollection : Sequence {
   ///
   /// - Complexity: O(1).
   @inlinable
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return _base.makeIterator()
   }
 
@@ -93,13 +93,13 @@ extension LazyCollection : Sequence {
   public var underestimatedCount: Int { return _base.underestimatedCount }
 
   @inlinable
-  public func _copyToContiguousArray()
+  public __consuming func _copyToContiguousArray()
      -> ContiguousArray<Base.Element> {
     return _base._copyToContiguousArray()
   }
 
   @inlinable
-  public func _copyContents(
+  public __consuming func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
     return _base._copyContents(initializing: buf)

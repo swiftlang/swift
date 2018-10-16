@@ -69,6 +69,10 @@ public:
   bool isWeak() const { return ReferenceOwnership.isWeak(); }
   bool isUnowned() const { return ReferenceOwnership.isUnowned(); }
   bool isUnmanaged() const { return ReferenceOwnership.isUnmanaged(); }
+
+  TypeReferenceOwnership getReferenceOwnership() const {
+    return ReferenceOwnership;
+  }
 };
 
 #if SWIFT_HAS_ISA_MASKING
@@ -231,12 +235,90 @@ public:
   using SubstGenericParameterFn =
     llvm::function_ref<const Metadata *(unsigned depth, unsigned index)>;
 
+  /// Function object that produces substitutions for the generic parameters
+  /// that occur within a mangled name, using the generic arguments from
+  /// the given metadata.
+  ///
+  /// Use with \c _getTypeByMangledName to decode potentially-generic types.
+  class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromMetadata {
+    const Metadata *base;
+
+    /// An element in the descriptor path.
+    struct PathElement {
+      /// The context described by this path element.
+      const ContextDescriptor *context;
+
+      /// The number of key parameters in the parent.
+      unsigned numKeyGenericParamsInParent;
+
+      /// The number of key parameters locally introduced here.
+      unsigned numKeyGenericParamsHere;
+
+      /// Whether this context has any non-key generic parameters.
+      bool hasNonKeyGenericParams;
+    };
+
+    /// Information about the generic context descriptors that make up \c
+    /// descriptor, from the outermost to the innermost.
+    mutable std::vector<PathElement> descriptorPath;
+
+    /// Builds the descriptor path.
+    ///
+    /// \returns a pair containing the number of key generic parameters in
+    /// the path up to this point.
+    unsigned buildDescriptorPath(const ContextDescriptor *context) const;
+
+    // Set up the state we need to compute substitutions.
+    void setup() const;
+
+  public:
+    /// Produce substitutions entirely from the given metadata.
+    explicit SubstGenericParametersFromMetadata(const Metadata *base)
+      : base(base) { }
+
+    const Metadata *operator()(unsigned flatIndex) const;
+    const Metadata *operator()(unsigned depth, unsigned index) const;
+  };
+
   /// Retrieve the type metadata described by the given type name.
   ///
   /// \p substGenericParam Function that provides generic argument metadata
   /// given a particular generic parameter specified by depth/index.
   TypeInfo _getTypeByMangledName(StringRef typeName,
                                  SubstGenericParameterFn substGenericParam);
+
+  /// Function object that produces substitutions for the generic parameters
+  /// that occur within a mangled name, using the complete set of generic
+  /// arguments "as written".
+  ///
+  /// Use with \c _getTypeByMangledName to decode potentially-generic types.
+  class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromWrittenArgs {
+    /// The complete set of generic arguments.
+    const std::vector<const Metadata *> &allGenericArgs;
+
+    /// The counts of generic parameters at each level.
+    const std::vector<unsigned> &genericParamCounts;
+
+  public:
+    /// Initialize a new function object to handle substitutions. Both
+    /// parameters are references to vectors that must live longer than
+    /// this function object.
+    ///
+    /// \param allGenericArgs The complete set of generic arguments, as written.
+    /// This could come directly from "source" (where all generic arguments are
+    /// encoded) or from metadata via gatherWrittenGenericArgs().
+    ///
+    /// \param genericParamCounts The count of generic parameters at each
+    /// generic level, typically gathered by _gatherGenericParameterCounts.
+    explicit SubstGenericParametersFromWrittenArgs(
+        const std::vector<const Metadata *> &allGenericArgs,
+        const std::vector<unsigned> &genericParamCounts)
+      : allGenericArgs(allGenericArgs), genericParamCounts(genericParamCounts) {
+    }
+
+    const Metadata *operator()(unsigned flatIndex) const;
+    const Metadata *operator()(unsigned depth, unsigned index) const;
+  };
 
   /// Gather generic parameter counts from a context descriptor.
   ///
@@ -293,10 +375,25 @@ public:
 
   void *allocateMetadata(size_t size, size_t align);
 
+  /// Gather the set of generic arguments that would be written in the
+  /// source, as a f
+  ///
+  /// This function computes generic arguments even when they are not
+  /// directly represented in the metadata, e.g., generic parameters that
+  /// are canonicalized away by same-type constraints and are therefore not
+  /// "key" parameters.
+  ///
+  /// \code
+  ///   extension Array where Element == String { }
+  ///   extension Dictionary where Key == Value { }
+  /// \endcode
+  void gatherWrittenGenericArgs(const Metadata *metadata,
+                                const TypeContextDescriptor *description,
+                                std::vector<const Metadata *> &allGenericArgs);
+
   Demangle::NodePointer
   _buildDemanglingForContext(const ContextDescriptor *context,
                              llvm::ArrayRef<NodePointer> demangledGenerics,
-                             bool concretizedGenerics,
                              Demangle::Demangler &Dem);
   
   /// Symbolic reference resolver that produces the demangling tree for the
@@ -311,7 +408,7 @@ public:
       auto descriptor =
         (const ContextDescriptor *)detail::applyRelativeOffset(base, offset);
       
-      return _buildDemanglingForContext(descriptor, {}, false, Dem);
+      return _buildDemanglingForContext(descriptor, {}, Dem);
     }
   };
 
@@ -330,6 +427,11 @@ public:
                            const Metadata *type,
                            ProtocolDescriptorRef protocol,
                            const WitnessTable **conformance);
+
+  /// Given a type that we know conforms to the given protocol, find the
+  /// superclass that introduced the conformance.
+  const Metadata *findConformingSuperclass(const Metadata *type,
+                                           const ProtocolDescriptor *protocol);
 
 } // end namespace swift
 

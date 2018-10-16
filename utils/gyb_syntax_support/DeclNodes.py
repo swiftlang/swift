@@ -662,23 +662,26 @@ DECL_NODES = [
                        'PrefixOperatorToken',
                        'PostfixOperatorToken',
                    ]),
-             Child('InfixOperatorGroup', kind='InfixOperatorGroup',
+             Child('OperatorPrecedenceAndTypes', kind='OperatorPrecedenceAndTypes',
                    description='''
-                   Optionally specify a precedence group
+                   Optionally specify a precedence group and designated types.
                    ''',
                    is_optional=True),
          ]),
 
-    # infix-operator-group -> ':' identifier
-    Node('InfixOperatorGroup', kind='Syntax',
+    Node('IdentifierList', kind='SyntaxCollection',
+         element='IdentifierToken'),
+
+    # infix-operator-group -> ':' identifier ','? identifier?
+    Node('OperatorPrecedenceAndTypes', kind='Syntax',
          description='''
-         A clause to specify precedence group in infix operator declaration.
+         A clause to specify precedence group in infix operator declarations, and designated types in any operator declaration.
          ''',
          children=[
              Child('Colon', kind='ColonToken'),
-             Child('PrecedenceGroupName', kind='IdentifierToken',
+             Child('PrecedenceGroupAndDesignatedTypes', kind='IdentifierList',
                    description='''
-                   The name of the precedence group for the operator
+                   The precedence group and designated types for this operator
                    '''),
          ]),
 

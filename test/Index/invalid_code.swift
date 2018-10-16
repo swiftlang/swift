@@ -3,6 +3,12 @@
 // CHECK: [[@LINE+1]]:8 | struct/Swift | Int | {{.*}} | Ref | rel: 0
 var _: Int { get { return 1 } }
 
+func test() {
+  for o in allObjects {
+    _ = o.something // don't crash
+  }
+}
+
 class CrashTest {
   var something = 0
   func returnSelf(_ h: [AnyHashable: Any?]) -> CrashTest {

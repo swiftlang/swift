@@ -405,7 +405,11 @@ bool swift::isCriticalEdge(TermInst *T, unsigned EdgeIdx) {
   assert(T->getSuccessors().size() > EdgeIdx && "Not enough successors");
 
   auto SrcSuccs = T->getSuccessors();
-  if (SrcSuccs.size() <= 1)
+  
+  if (SrcSuccs.size() <= 1 &&
+      // Also consider non-branch instructions with a single successor for
+      // critical edges, for example: a switch_enum of a single-case enum.
+      (isa<BranchInst>(T) || isa<CondBranchInst>(T)))
     return false;
 
   SILBasicBlock *DestBB = SrcSuccs[EdgeIdx];
@@ -459,7 +463,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     assert(SuccBB->getNumArguments() < 2 && "Can take at most one argument");
     if (!SuccBB->getNumArguments())
       return;
-    Args.push_back(NewEdgeBB->createPHIArgument(
+    Args.push_back(NewEdgeBB->createPhiArgument(
         SuccBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
     return;
   }
@@ -471,7 +475,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
         (EdgeIdx == 0) ? DMBI->getHasMethodBB() : DMBI->getNoMethodBB();
     if (!SuccBB->getNumArguments())
       return;
-    Args.push_back(NewEdgeBB->createPHIArgument(
+    Args.push_back(NewEdgeBB->createPhiArgument(
         SuccBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
     return;
   }
@@ -482,7 +486,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!SuccBB->getNumArguments())
       return;
-    Args.push_back(NewEdgeBB->createPHIArgument(
+    Args.push_back(NewEdgeBB->createPhiArgument(
         SuccBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
     return;
   }
@@ -491,7 +495,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!SuccBB->getNumArguments())
       return;
-    Args.push_back(NewEdgeBB->createPHIArgument(
+    Args.push_back(NewEdgeBB->createPhiArgument(
         SuccBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
     return;
   }
@@ -500,7 +504,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
     if (!SuccBB->getNumArguments())
       return;
-    Args.push_back(NewEdgeBB->createPHIArgument(
+    Args.push_back(NewEdgeBB->createPhiArgument(
         SuccBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
     return;
   }
@@ -510,7 +514,7 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
     auto *SuccBB = EdgeIdx == 0 ? TAI->getNormalBB() : TAI->getErrorBB();
     if (!SuccBB->getNumArguments())
       return;
-    Args.push_back(NewEdgeBB->createPHIArgument(
+    Args.push_back(NewEdgeBB->createPhiArgument(
         SuccBB->getArgument(0)->getType(), ValueOwnershipKind::Owned));
     return;
   }
@@ -753,7 +757,7 @@ bool swift::mergeBasicBlockWithSuccessor(SILBasicBlock *BB, DominanceInfo *DT,
       auto *BBNode = DT->getNode(BB);
       SmallVector<DominanceInfoNode *, 8> Children(SuccBBNode->begin(),
                                                    SuccBBNode->end());
-      for (auto *ChildNode : *SuccBBNode)
+      for (auto *ChildNode : Children)
         DT->changeImmediateDominator(ChildNode, BBNode);
 
       DT->eraseNode(SuccBB);

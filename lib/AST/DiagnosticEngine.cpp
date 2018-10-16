@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrintOptions.h"
@@ -55,9 +56,10 @@ struct StoredDiagnosticInfo {
   bool pointsToFirstBadToken : 1;
   bool isFatal : 1;
 
-  StoredDiagnosticInfo(DiagnosticKind k, bool firstBadToken, bool fatal)
+  constexpr StoredDiagnosticInfo(DiagnosticKind k, bool firstBadToken,
+                                 bool fatal)
       : kind(k), pointsToFirstBadToken(firstBadToken), isFatal(fatal) {}
-  StoredDiagnosticInfo(DiagnosticKind k, DiagnosticOptions opts)
+  constexpr StoredDiagnosticInfo(DiagnosticKind k, DiagnosticOptions opts)
       : StoredDiagnosticInfo(k,
                              opts == DiagnosticOptions::PointsToFirstBadToken,
                              opts == DiagnosticOptions::Fatal) {}
@@ -73,7 +75,7 @@ enum LocalDiagID : uint32_t {
 } // end anonymous namespace
 
 // TODO: categorization
-static StoredDiagnosticInfo storedDiagnosticInfos[] = {
+static const constexpr StoredDiagnosticInfo storedDiagnosticInfos[] = {
 #define ERROR(ID, Options, Text, Signature)                                    \
   StoredDiagnosticInfo(DiagnosticKind::Error, DiagnosticOptions::Options),
 #define WARNING(ID, Options, Text, Signature)                                  \
@@ -88,7 +90,7 @@ static_assert(sizeof(storedDiagnosticInfos) / sizeof(StoredDiagnosticInfo) ==
                   LocalDiagID::NumDiags,
               "array size mismatch");
 
-static const char *diagnosticStrings[] = {
+static constexpr const char * const diagnosticStrings[] = {
 #define ERROR(ID, Options, Text, Signature) Text,
 #define WARNING(ID, Options, Text, Signature) Text,
 #define NOTE(ID, Options, Text, Signature) Text,
@@ -829,4 +831,15 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
 
 const char *DiagnosticEngine::diagnosticStringFor(const DiagID id) {
   return diagnosticStrings[(unsigned)id];
+}
+
+DiagnosticSuppression::DiagnosticSuppression(DiagnosticEngine &diags)
+  : diags(diags)
+{
+  consumers = diags.takeConsumers();
+}
+
+DiagnosticSuppression::~DiagnosticSuppression() {
+  for (auto consumer : consumers)
+    diags.addConsumer(*consumer);
 }

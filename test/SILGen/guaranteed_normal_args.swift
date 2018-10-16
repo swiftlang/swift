@@ -112,11 +112,11 @@ class KlassWithBuffer {
   var buffer: Buffer
 
   // Make sure that the allocating init forwards into the initializing init at +1.
-  // CHECK-LABEL: sil hidden @$Ss15KlassWithBufferC3inKABs0A0C_tcfC : $@convention(method) (@owned Klass, @thick KlassWithBuffer.Type) -> @owned KlassWithBuffer {
+  // CHECK-LABEL: sil hidden @$ss15KlassWithBufferC3inKABs0A0C_tcfC : $@convention(method) (@owned Klass, @thick KlassWithBuffer.Type) -> @owned KlassWithBuffer {
   // CHECK: bb0([[ARG:%.*]] : @owned $Klass,
-  // CHECK:   [[INITIALIZING_INIT:%.*]] = function_ref @$Ss15KlassWithBufferC3inKABs0A0C_tcfc : $@convention(method) (@owned Klass, @owned KlassWithBuffer) -> @owned KlassWithBuffer
+  // CHECK:   [[INITIALIZING_INIT:%.*]] = function_ref @$ss15KlassWithBufferC3inKABs0A0C_tcfc : $@convention(method) (@owned Klass, @owned KlassWithBuffer) -> @owned KlassWithBuffer
   // CHECK:   apply [[INITIALIZING_INIT]]([[ARG]],
-  // CHECK: } // end sil function '$Ss15KlassWithBufferC3inKABs0A0C_tcfC'
+  // CHECK: } // end sil function '$ss15KlassWithBufferC3inKABs0A0C_tcfC'
   init(inK: Klass = Klass()) {
     buffer = Buffer(inK: inK)
   }
@@ -126,22 +126,23 @@ class KlassWithBuffer {
   // 1. Are able to propagate a +0 value value buffer.k into a +0 value and that
   // we then copy that +0 value into a +1 value, before we begin the epilog and
   // then return that value.
-  // CHECK-LABEL: sil hidden @$Ss15KlassWithBufferC03getC14AsNativeObjectBoyF : $@convention(method) (@guaranteed KlassWithBuffer) -> @owned Builtin.NativeObject {
+  // CHECK-LABEL: sil hidden @$ss15KlassWithBufferC03getC14AsNativeObjectBoyF : $@convention(method) (@guaranteed KlassWithBuffer) -> @owned Builtin.NativeObject {
   // CHECK: bb0([[SELF:%.*]] : @guaranteed $KlassWithBuffer):
-  // CHECK:   [[BUF_BOX:%.*]] = alloc_stack $Buffer
   // CHECK:   [[METHOD:%.*]] = class_method [[SELF]] : $KlassWithBuffer, #KlassWithBuffer.buffer!getter.1
   // CHECK:   [[BUF:%.*]] = apply [[METHOD]]([[SELF]])
-  // CHECK:   store [[BUF]] to [init] [[BUF_BOX]]
-  // CHECK:   [[GEP:%.*]] = struct_element_addr [[BUF_BOX]] : $*Buffer, #Buffer.k
-  // CHECK:   [[BUF_KLASS:%.*]] = load [copy] [[GEP]]
-  // CHECK:   destroy_addr [[BUF_BOX]]
-  // CHECK:   [[BORROWED_BUF_KLASS:%.*]] = begin_borrow [[BUF_KLASS]]
-  // CHECK:   [[CASTED_BORROWED_BUF_KLASS:%.*]] = unchecked_ref_cast [[BORROWED_BUF_KLASS]]
+  // CHECK:   [[BUF_BORROW:%.*]] = begin_borrow [[BUF]]
+  // CHECK:   [[K:%.*]] = struct_extract [[BUF_BORROW]] : $Buffer, #Buffer.k
+  // CHECK:   [[COPIED_K:%.*]] = copy_value [[K]]
+  //   FIXME: this borrow-and-copy is really dumb and unnecessary
+  // CHECK:   [[COPIED_BORROWED_K:%.*]] = begin_borrow [[COPIED_K]]
+  // CHECK:   [[CASTED_BORROWED_BUF_KLASS:%.*]] = unchecked_ref_cast [[COPIED_BORROWED_K]]
   // CHECK:   [[COPY_CASTED_BORROWED_BUF_KLASS:%.*]] = copy_value [[CASTED_BORROWED_BUF_KLASS]]
-  // CHECK:   end_borrow [[BORROWED_BUF_KLASS]]
-  // CHECK:   destroy_value [[BUF_KLASS]]
+  // CHECK:   end_borrow  [[COPIED_BORROWED_K]]
+  // CHECK:   destroy_value [[COPIED_K]]
+  // CHECK:   end_borrow [[BUF_BORROW]]
+  // CHECK:   destroy_value [[BUF]]
   // CHECK:   return [[COPY_CASTED_BORROWED_BUF_KLASS]]
-  // CHECK: } // end sil function '$Ss15KlassWithBufferC03getC14AsNativeObjectBoyF'
+  // CHECK: } // end sil function '$ss15KlassWithBufferC03getC14AsNativeObjectBoyF'
   func getBufferAsNativeObject() -> Builtin.NativeObject {
     return Builtin.unsafeCastToNativeObject(buffer.k)
   }
@@ -150,13 +151,13 @@ class KlassWithBuffer {
 struct StructContainingBridgeObject {
   var rawValue: Builtin.BridgeObject
 
-  // CHECK-LABEL: sil hidden @$Ss28StructContainingBridgeObjectV8swiftObjAByXl_tcfC : $@convention(method) (@owned AnyObject, @thin StructContainingBridgeObject.Type) -> @owned StructContainingBridgeObject {
+  // CHECK-LABEL: sil hidden @$ss28StructContainingBridgeObjectV8swiftObjAByXl_tcfC : $@convention(method) (@owned AnyObject, @thin StructContainingBridgeObject.Type) -> @owned StructContainingBridgeObject {
   // CHECK: bb0([[ARG:%.*]] : @owned $AnyObject,
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[CASTED_ARG:%.*]] = unchecked_ref_cast [[BORROWED_ARG]] : $AnyObject to $Builtin.BridgeObject
   // CHECK:   [[COPY_CASTED_ARG:%.*]] = copy_value [[CASTED_ARG]]
   // CHECK:   assign [[COPY_CASTED_ARG]] to
-  // CHECK: } // end sil function '$Ss28StructContainingBridgeObjectV8swiftObjAByXl_tcfC'
+  // CHECK: } // end sil function '$ss28StructContainingBridgeObjectV8swiftObjAByXl_tcfC'
   init(swiftObj: AnyObject) {
     rawValue = Builtin.reinterpretCast(swiftObj)
   }
@@ -173,7 +174,7 @@ struct ReabstractionThunkTest : Protocol {
 // Make sure that we provide a cleanup to x properly before we pass it to
 // result.
 extension FakeDictionary {
-  // CHECK-LABEL: sil hidden @$Ss14FakeDictionaryV20makeSureToCopyTuplesyyF : $@convention(method) <Key, Value> (FakeDictionary<Key, Value>) -> () {
+  // CHECK-LABEL: sil hidden @$ss14FakeDictionaryV20makeSureToCopyTuplesyyF : $@convention(method) <Key, Value> (FakeDictionary<Key, Value>) -> () {
   // CHECK:   [[X:%.*]] = alloc_stack $(Key, Value), let, name "x"
   // CHECK:   [[INDUCTION_VAR:%.*]] = unchecked_take_enum_data_addr {{%.*}} : $*Optional<(Key, Value)>, #Optional.some!enumelt.1
   // CHECK:   [[INDUCTION_VAR_0:%.*]] = tuple_element_addr [[INDUCTION_VAR]] : $*(Key, Value), 0
@@ -193,9 +194,9 @@ extension FakeDictionary {
   // CHECK:   [[TMP_1:%.*]] = alloc_stack $Value
   // CHECK:   copy_addr [[X_1]] to [initialization] [[TMP_1]]
   // CHECK:   copy_addr [take] [[TMP_1]] to [initialization] [[TMP_X_1]]
-  // CHECK:   [[FUNC:%.*]] = function_ref @$Ss9FakeArrayV6appendyyxF : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @inout FakeArray<τ_0_0>) -> ()
+  // CHECK:   [[FUNC:%.*]] = function_ref @$ss9FakeArrayV6appendyyxF : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @inout FakeArray<τ_0_0>) -> ()
   // CHECK:   apply [[FUNC]]<(Key, Value)>([[TMP_X]],
-  // CHECK: } // end sil function '$Ss14FakeDictionaryV20makeSureToCopyTuplesyyF'
+  // CHECK: } // end sil function '$ss14FakeDictionaryV20makeSureToCopyTuplesyyF'
   func makeSureToCopyTuples() {
     var result = FakeArray<Element>(k: Klass())
     for x in self {

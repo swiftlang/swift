@@ -411,7 +411,7 @@ DictionaryTestSuite.test("COW.Fast.UpdateValueForKeyDoesNotReallocate") {
   }
 }
 
-DictionaryTestSuite.test("COW.Slow.AddDoesNotReallocate") {
+DictionaryTestSuite.test("COW.Slow.UpdateValueForKeyDoesNotReallocate") {
   do {
     var d1 = getCOWSlowDictionary()
     let identity1 = d1._rawIdentifier()
@@ -731,6 +731,30 @@ DictionaryTestSuite.test("COW.Fast.MergeDictionaryDoesNotReallocate")
     // Keep variables alive.
     _fixLifetime(d1)
     _fixLifetime(d2)
+  }
+}
+
+
+DictionaryTestSuite.test("Merge.ThrowingIsSafe") {
+  var d: [TestKeyTy: TestValueTy] = [
+    TestKeyTy(10): TestValueTy(1),
+    TestKeyTy(20): TestValueTy(2),
+    TestKeyTy(30): TestValueTy(3),
+  ]
+
+  let d2: [TestKeyTy: TestValueTy] = [
+    TestKeyTy(40): TestValueTy(4),
+    TestKeyTy(50): TestValueTy(5),
+    TestKeyTy(10): TestValueTy(1),
+  ]
+
+  struct TE: Error {}
+  do {
+    // Throwing must not leave the dictionary in an inconsistent state.
+    try d.merge(d2) { v1, v2 in throw TE() }
+    expectTrue(false, "merge did not throw")
+  } catch {
+    expectTrue(error is TE)
   }
 }
 
@@ -1374,7 +1398,7 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
   { $0 == $1 }
   
   do {
-    let d2: [MinimalHashableValue : Int] = [
+    var d2: [MinimalHashableValue : Int] = [
       MinimalHashableValue(10): 1010,
       MinimalHashableValue(20): 1020,
       MinimalHashableValue(30): 1030,
@@ -1385,6 +1409,8 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
       MinimalHashableValue(80): 1080,
       MinimalHashableValue(90): 1090,
     ]
+    // Make collisions less likely
+    d2.reserveCapacity(1000)
     
     // Find the last key in the dictionary
     var lastKey: MinimalHashableValue = d2.first!.key
@@ -2591,12 +2617,14 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveValueForKey")
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var d = getBridgedVerbatimDictionary([:])
-    let identity1 = d._rawIdentifier()
     assert(isCocoaDictionary(d))
     assert(d.count == 0)
 
+    let empty = Dictionary<Int, Int>()
+    expectNotEqual(empty._rawIdentifier(), d._rawIdentifier())
+
     d.removeAll()
-    assert(identity1 == d._rawIdentifier())
+    assert(empty._rawIdentifier() == d._rawIdentifier())
     assert(d.count == 0)
   }
 
@@ -2674,12 +2702,14 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var d = getBridgedNonverbatimDictionary([:])
-    let identity1 = d._rawIdentifier()
     assert(isNativeDictionary(d))
     assert(d.count == 0)
 
+    let empty = Dictionary<Int, Int>()
+    expectNotEqual(empty._rawIdentifier(), d._rawIdentifier())
+
     d.removeAll()
-    assert(identity1 == d._rawIdentifier())
+    assert(empty._rawIdentifier() == d._rawIdentifier())
     assert(d.count == 0)
   }
 
@@ -4636,6 +4666,32 @@ DictionaryTestSuite.test("removeAt") {
   }
 }
 
+DictionaryTestSuite.test("updateValue") {
+  let key1 = TestKeyTy(42)
+  let key2 = TestKeyTy(42)
+  let value1 = TestValueTy(1)
+  let value2 = TestValueTy(2)
+
+  var d: [TestKeyTy: TestValueTy] = [:]
+
+  expectNil(d.updateValue(value1, forKey: key1))
+
+  expectEqual(d.count, 1)
+  let index1 = d.index(forKey: key2)
+  expectNotNil(index1)
+  expectTrue(d[index1!].key === key1)
+  expectTrue(d[index1!].value === value1)
+
+  expectTrue(d.updateValue(value2, forKey: key2) === value1)
+
+  expectEqual(d.count, 1)
+  let index2 = d.index(forKey: key2)
+  expectEqual(index1, index2)
+  // We expect updateValue to keep the original key in place.
+  expectTrue(d[index2!].key === key1) // Not key2
+  expectTrue(d[index2!].value === value2)
+}
+
 DictionaryTestSuite.test("localHashSeeds") {
   // With global hashing, copying elements in hash order between hash tables
   // can become quadratic. (See https://bugs.swift.org/browse/SR-3268)
@@ -4721,6 +4777,41 @@ DictionaryTestSuite.test("Hashable") {
   }
   checkHashable(variants, equalityOracle: { _, _ in true })
 }
+
+#if _runtime(_ObjC)
+DictionaryTestSuite.test("Values.MutationDoesNotInvalidateIndices") {
+  let objects: [NSNumber] = [1, 2, 3, 4]
+  let keys: [NSString] = ["Blanche", "Rose", "Dorothy", "Sophia"]
+  let ns = NSDictionary(objects: objects, forKeys: keys)
+  var d = ns as! Dictionary<NSString, NSNumber>
+
+  let i = d.index(forKey: "Rose")!
+  expectEqual(d[i].key, "Rose")
+  expectEqual(d[i].value, 2 as NSNumber)
+
+  // Mutating a value through the Values view will convert the bridged
+  // NSDictionary instance to native Dictionary storage. However, Values is a
+  // MutableCollection, so doing so must not invalidate existing indices.
+  d.values[i] = 20 as NSNumber
+
+  // The old Cocoa-based index must still work with the new dictionary.
+  expectEqual(d.values[i], 20 as NSNumber)
+
+  let i2 = d.index(forKey: "Rose")
+
+  // You should also be able to advance Cocoa indices.
+  let j = d.index(after: i)
+  expectLT(i, j)
+
+  // Unfortunately, Cocoa and Native indices aren't comparable, so the
+  // Collection conformance is not quite perfect.
+  expectCrash() {
+    print(i == i2)
+  }
+}
+#endif
+
+
 
 DictionaryTestSuite.setUp {
 #if _runtime(_ObjC)

@@ -390,7 +390,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     /// Initialize with the characters in the given string.
     ///
     /// - parameter string: The string content to inspect for characters.
-    public init(charactersIn string: String) {
+    public init(charactersIn string: __shared String) {
         _storage = _CharacterSetStorage(immutableReference: CFCharacterSetCreateWithCharactersInString(nil, string as CFString))
     }
     
@@ -398,7 +398,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     ///
     /// This method is useful for creating a character set object with data from a file or other external data source.
     /// - parameter data: The bitmap representation.
-    public init(bitmapRepresentation data: Data) {
+    public init(bitmapRepresentation data: __shared Data) {
         _storage = _CharacterSetStorage(immutableReference: CFCharacterSetCreateWithBitmapRepresentation(nil, data as CFData))
     }
     
@@ -406,7 +406,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     ///
     /// Returns `nil` if there was an error reading the file.
     /// - parameter file: The file to read.
-    public init?(contentsOfFile file: String) {
+    public init?(contentsOfFile file: __shared String) {
         do {
             let data = try Data(contentsOf: URL(fileURLWithPath: file), options: .mappedIfSafe)
             _storage = _CharacterSetStorage(immutableReference: CFCharacterSetCreateWithBitmapRepresentation(nil, data as CFData))
@@ -415,7 +415,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
         }
     }
 
-    fileprivate init(_bridged characterSet: NSCharacterSet) {
+    fileprivate init(_bridged characterSet: __shared NSCharacterSet) {
         _storage = _CharacterSetStorage(immutableReference: characterSet.copy() as! CFCharacterSet)
     }
     
@@ -427,7 +427,7 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
         _storage = _uncopiedStorage
     }
 
-    fileprivate init(_builtIn: CFCharacterSetPredefinedSet) {
+    fileprivate init(_builtIn: __shared CFCharacterSetPredefinedSet) {
         _storage = _CharacterSetStorage(immutableReference: CFCharacterSetGetPredefined(_builtIn))
     }
     
@@ -782,6 +782,7 @@ extension CharacterSet : _ObjectiveCBridgeable {
         return true
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSCharacterSet?) -> CharacterSet {
         guard let src = source else { return CharacterSet() }
         return CharacterSet(_bridged: src)

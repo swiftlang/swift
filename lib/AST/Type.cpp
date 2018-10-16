@@ -42,6 +42,11 @@
 #include <iterator>
 using namespace swift;
 
+#define TYPE(Id, _) \
+  static_assert(IsTriviallyDestructible<Id##Type>::value, \
+                "Types are BumpPtrAllocated; the destructor is never called");
+#include "swift/AST/TypeNodes.def"
+
 Type QueryTypeSubstitutionMap::operator()(SubstitutableType *type) const {
   auto key = type->getCanonicalType()->castTo<SubstitutableType>();
   auto known = substitutions.find(key);
@@ -742,10 +747,10 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
   return FunctionType::get(inputType, resultType, fnType->getExtInfo());
 }
 
-llvm::SmallBitVector
+SmallBitVector
 swift::computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
                          const ValueDecl *paramOwner, unsigned level) {
-  llvm::SmallBitVector resultVector(params.size());
+  SmallBitVector resultVector(params.size());
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
   //
@@ -1119,12 +1124,10 @@ CanType TypeBase::computeCanonicalType() {
 
     if (genericSig) {
       Result = GenericFunctionType::get(genericSig, canParams, resultTy,
-                                        funcTy->getExtInfo(),
-                                        /*canonicalVararg=*/true);
+                                        funcTy->getExtInfo());
     } else {
       Result = FunctionType::get(canParams, resultTy,
-                                 funcTy->getExtInfo(),
-                                 /*canonicalVararg=*/true);
+                                 funcTy->getExtInfo());
     }
     assert(Result->isCanonical());
     break;
@@ -1540,8 +1543,8 @@ bool TypeBase::isBindableTo(Type b) {
           return false;
         
         for (unsigned i : indices(func->getParams())) {
-          if (!visit(func->getParams()[i].getType(),
-                     substFunc.getParams()[i].getType()))
+          if (!visit(func->getParams()[i].getOldType(),
+                     substFunc.getParams()[i].getOldType()))
             return false;
         }
         
@@ -1918,7 +1921,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     for (const auto &param : functionType->getParams()) {
       if (param.isVariadic())
         return failure();
-      if (recurse(param.getType()))
+      if (recurse(param.getOldType()))
         return failure();
     }
 
@@ -2279,7 +2282,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
 
       // Inputs are contravariant.
       for (auto i : indices(fn2.getParams())) {
-        if (!matches(fn2Params[i].getType(), fn1Params[i].getType(),
+        if (!matches(fn2Params[i].getOldType(), fn1Params[i].getOldType(),
                      matchMode, ParameterPosition::ParameterTupleElement,
                      OptionalUnwrapping::None)) {
           return false;
@@ -2678,17 +2681,6 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   // TODO: Canonicalize away HasExplicitAnyObject if it is implied
   // by one of our member protocols.
   return build(C, CanTypes, HasExplicitAnyObject);
-}
-
-bool AnyFunctionType::isCanonicalFunctionInputType(Type input) {
-  // Canonically, we should have a tuple type or parenthesized type.
-  if (auto tupleTy = dyn_cast<TupleType>(input.getPointer()))
-    return tupleTy->isCanonical();
-  if (auto parenTy = dyn_cast<ParenType>(input.getPointer()))
-    return parenTy->getUnderlyingType()->isCanonical();
-
-  // FIXME: Still required for the constraint solver.
-  return isa<TypeVariableType>(input.getPointer());
 }
 
 FunctionType *
@@ -3751,15 +3743,13 @@ case TypeKind::Id:
 
       auto genericSig = genericFnType->getGenericSignature();
       return GenericFunctionType::get(genericSig, substParams, resultTy,
-                                      function->getExtInfo(),
-                                   /*canonicalVararg=*/function->isCanonical());
+                                      function->getExtInfo());
     }
 
     if (isUnchanged) return *this;
 
     return FunctionType::get(substParams, resultTy,
-                             function->getExtInfo(),
-                             /*canonicalVararg=*/function->isCanonical());
+                             function->getExtInfo());
   }
 
   case TypeKind::ArraySlice: {

@@ -26,7 +26,7 @@ func testCall(_ f: (() -> ())?) {
 // CHECK:    [[NOTHING_BLOCK_EXIT]]:
 // CHECK-NEXT: enum $Optional<()>, #Optional.none!enumelt
 // CHECK-NEXT: br [[EXIT]]
-// CHECK: } // end sil function '$S8optional8testCallyyyycSgF'
+// CHECK: } // end sil function '$s8optional8testCallyyyycSgF'
 
 func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
   var f = f
@@ -75,7 +75,7 @@ func testAddrOnlyCallResult<T>(_ f: (() -> T)?) {
 
 func wrap<T>(_ x: T) -> T? { return x }
 
-// CHECK-LABEL: sil hidden @$S8optional16wrap_then_unwrap{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s8optional16wrap_then_unwrap{{[_0-9a-zA-Z]*}}F
 func wrap_then_unwrap<T>(_ x: T) -> T {
   // CHECK:   switch_enum_addr {{.*}}, case #Optional.some!enumelt.1: [[OK:bb[0-9]+]], case #Optional.none!enumelt: [[FAIL:bb[0-9]+]]
   // CHECK: [[FAIL]]:
@@ -85,7 +85,7 @@ func wrap_then_unwrap<T>(_ x: T) -> T {
   return wrap(x)!
 }
 
-// CHECK-LABEL: sil hidden @$S8optional10tuple_bind{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s8optional10tuple_bind{{[_0-9a-zA-Z]*}}F
 func tuple_bind(_ x: (Int, String)?) -> String? {
   return x?.1
   // CHECK:   switch_enum {{%.*}}, case #Optional.some!enumelt.1: [[NONNULL:bb[0-9]+]], case #Optional.none!enumelt: [[NULL:bb[0-9]+]]
@@ -98,7 +98,7 @@ func tuple_bind(_ x: (Int, String)?) -> String? {
 
 // rdar://21883752 - We were crashing on this function because the deallocation happened
 // out of scope.
-// CHECK-LABEL: sil hidden @$S8optional16crash_on_deallocyySDySiSaySiGGFfA_
+// CHECK-LABEL: sil hidden @$s8optional16crash_on_deallocyySDySiSaySiGGFfA_
 func crash_on_dealloc(_ dict : [Int : [Int]] = [:]) {
   var dict = dict
   dict[1]?.append(2)
@@ -106,53 +106,53 @@ func crash_on_dealloc(_ dict : [Int : [Int]] = [:]) {
 
 func use_unwrapped(_: Int) {}
 
-// CHECK-LABEL: sil hidden @$S8optional15explicit_unwrap{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s8optional15explicit_unwrap{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[FILESTR:%.*]] = string_literal utf8 "{{.*}}optional.swift"
 // CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
 // CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[COLUMN:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[IMPLICIT:%.*]] = integer_literal $Builtin.Int1, 0
-// CHECK:         [[PRECOND:%.*]] = function_ref @$Ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
+// CHECK:         [[PRECOND:%.*]] = function_ref @$ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[PRECOND]]([[FILESTR]], [[FILESIZ]], [[FILEASC]], [[LINE]], [[IMPLICIT]])
 func explicit_unwrap(_ value: Int?) {
   use_unwrapped(value!)
 }
 
-// CHECK-LABEL: sil hidden @$S8optional19explicit_iuo_unwrap{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s8optional19explicit_iuo_unwrap{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[FILESTR:%.*]] = string_literal utf8 "{{.*}}optional.swift"
 // CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
 // CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[COLUMN:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[IMPLICIT:%.*]] = integer_literal $Builtin.Int1, 0
-// CHECK:         [[PRECOND:%.*]] = function_ref @$Ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
+// CHECK:         [[PRECOND:%.*]] = function_ref @$ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[PRECOND]]([[FILESTR]], [[FILESIZ]], [[FILEASC]], [[LINE]], [[IMPLICIT]])
 func explicit_iuo_unwrap(_ value: Int!) {
   use_unwrapped(value!)
 }
 
-// CHECK-LABEL: sil hidden @$S8optional19implicit_iuo_unwrap{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s8optional19implicit_iuo_unwrap{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[FILESTR:%.*]] = string_literal utf8 "{{.*}}optional.swift"
 // CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
 // CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[COLUMN:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[IMPLICIT:%.*]] = integer_literal $Builtin.Int1, -1
-// CHECK:         [[PRECOND:%.*]] = function_ref @$Ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
+// CHECK:         [[PRECOND:%.*]] = function_ref @$ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[PRECOND]]([[FILESTR]], [[FILESIZ]], [[FILEASC]], [[LINE]], [[IMPLICIT]])
 func implicit_iuo_unwrap(_ value: Int!) {
   use_unwrapped(value)
 }
 
-// CHECK-LABEL: sil hidden @$S8optional34implicit_iuo_unwrap_sourceLocation{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s8optional34implicit_iuo_unwrap_sourceLocation{{[_0-9a-zA-Z]*}}F
 // CHECK:         [[FILESTR:%.*]] = string_literal utf8 "custom.swuft"
 // CHECK-NEXT:         [[FILESIZ:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[FILEASC:%.*]] = integer_literal $Builtin.Int1, 
 // CHECK-NEXT:         [[LINE:%.*]] = integer_literal $Builtin.Word, 2000
 // CHECK-NEXT:         [[COLUMN:%.*]] = integer_literal $Builtin.Word, 
 // CHECK-NEXT:         [[IMPLICIT:%.*]] = integer_literal $Builtin.Int1, -1
-// CHECK:         [[PRECOND:%.*]] = function_ref @$Ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
+// CHECK:         [[PRECOND:%.*]] = function_ref @$ss30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[PRECOND]]([[FILESTR]], [[FILESIZ]], [[FILEASC]], [[LINE]], [[IMPLICIT]])
 func implicit_iuo_unwrap_sourceLocation(_ value: Int!) {
 #sourceLocation(file: "custom.swuft", line: 2000)

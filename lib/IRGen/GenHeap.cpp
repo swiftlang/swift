@@ -1876,6 +1876,7 @@ llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
     // ObjC classes.
     return emitDynamicTypeOfOpaqueHeapObject(IGF, object, repr);
   }
+  llvm_unreachable("unhandled ISA encoding");
 }
 
 static ClassDecl *getRootClass(ClassDecl *theClass) {

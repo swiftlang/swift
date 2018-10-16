@@ -39,7 +39,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   llvm::Expected<AccessLevel> evaluate(Evaluator &evaluator,
@@ -68,7 +68,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   llvm::Expected<AccessLevel>
@@ -95,7 +95,7 @@ public:
   using SimpleRequest::SimpleRequest;
   using DefaultAndMax = std::pair<AccessLevel, AccessLevel>;
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   llvm::Expected<DefaultAndMax>

@@ -175,6 +175,13 @@ namespace {
 void swift::
 recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
                                            bool Force, CallbackTy Callback) {
+  SILBasicBlock::iterator instIter;
+  recursivelyDeleteTriviallyDeadInstructions(IA, instIter, Force, Callback);
+}
+
+void swift::recursivelyDeleteTriviallyDeadInstructions(
+    ArrayRef<SILInstruction *> IA, SILBasicBlock::iterator &InstIter,
+    bool Force, CallbackTy Callback) {
   // Delete these instruction and others that become dead after it's deleted.
   llvm::SmallPtrSet<SILInstruction *, 8> DeadInsts;
   for (auto I : IA) {
@@ -217,8 +224,7 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
 
     for (auto I : DeadInsts) {
       // This will remove this instruction and all its uses.
-      
-      eraseFromParentWithDebugInsts(I);
+      eraseFromParentWithDebugInsts(I, InstIter);
     }
 
     NextInsts.swap(DeadInsts);
@@ -232,12 +238,13 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
 /// \param I The instruction to be deleted.
 /// \param Force If Force is set, don't check if the top level instruction is
 ///        considered dead - delete it regardless.
-void swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
-                                                       bool Force,
-                                                       CallbackTy Callback) {
-
+SILBasicBlock::iterator
+swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I, bool Force,
+                                                  CallbackTy Callback) {
+  SILBasicBlock::iterator nextI = std::next(I->getIterator());
   ArrayRef<SILInstruction *> AI = ArrayRef<SILInstruction *>(I);
-  recursivelyDeleteTriviallyDeadInstructions(AI, Force, Callback);
+  recursivelyDeleteTriviallyDeadInstructions(AI, nextI, Force, Callback);
+  return nextI;
 }
 
 void swift::eraseUsesOfInstruction(SILInstruction *Inst,
@@ -542,7 +549,7 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
     auto *CurBB = B->getInsertionPoint()->getParent();
 
     auto *ContBB = CurBB->split(B->getInsertionPoint());
-    ContBB->createPHIArgument(DestTy, ValueOwnershipKind::Owned);
+    ContBB->createPhiArgument(DestTy, ValueOwnershipKind::Owned);
 
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> CaseBBs;
     CaseBBs.push_back(std::make_pair(SomeDecl, SomeBB));
@@ -1329,6 +1336,7 @@ void ValueLifetimeAnalysis::dump() const {
   llvm::errs() << '\n';
 }
 
+// FIXME: Remove this. SILCloner should not create critical edges.
 bool EdgeThreadingCloner::splitCriticalEdges(DominanceInfo *DT,
                                              SILLoopInfo *LI) {
   bool changed = false;
@@ -1547,56 +1555,6 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
   llvm_unreachable("Unhandled access level in switch.");
 }
 
-void swift::hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,
-                                    DominanceInfo *DomTree) {
-  SILValue V = Op.get();
-  SILInstruction *Prev = nullptr;
-  auto *InsertPt = InsertBefore;
-  while (true) {
-    SILValue Incoming = stripSinglePredecessorArgs(V);
-    
-    // Forward the incoming arg from a single predecessor.
-    if (V != Incoming) {
-      if (V == Op.get()) {
-        // If we are the operand itself set the operand to the incoming
-        // argument.
-        Op.set(Incoming);
-        V = Incoming;
-      } else {
-        // Otherwise, set the previous projections operand to the incoming
-        // argument.
-        assert(Prev && "Must have seen a projection");
-        Prev->setOperand(0, Incoming);
-        V = Incoming;
-      }
-    }
-    
-    switch (V->getKind()) {
-      case ValueKind::StructElementAddrInst:
-      case ValueKind::TupleElementAddrInst:
-      case ValueKind::RefElementAddrInst:
-      case ValueKind::RefTailAddrInst:
-      case ValueKind::UncheckedTakeEnumDataAddrInst: {
-        auto *Inst = cast<SingleValueInstruction>(V);
-        // We are done once the current projection dominates the insert point.
-        if (DomTree->dominates(Inst->getParent(), InsertBefore->getParent()))
-          return;
-        
-        // Move the current projection and memorize it for the next iteration.
-        Prev = Inst;
-        Inst->moveBefore(InsertPt);
-        InsertPt = Inst;
-        V = Inst->getOperand(0);
-        continue;
-      }
-      default:
-        assert(DomTree->dominates(V->getParentBlock(), InsertBefore->getParent()) &&
-               "The projected value must dominate the insertion point");
-        return;
-    }
-  }
-}
-
 void StaticInitCloner::add(SILInstruction *InitVal) {
   // Don't schedule an instruction twice for cloning.
   if (NumOpsToClone.count(InitVal) != 0)
@@ -1636,9 +1594,7 @@ StaticInitCloner::clone(SingleValueInstruction *InitVal) {
       }
     }
   }
-  assert(ValueMap.count(InitVal) != 0 &&
-         "Could not schedule all instructions for cloning");
-  return cast<SingleValueInstruction>(ValueMap[InitVal]);
+  return cast<SingleValueInstruction>(remapValue(InitVal));
 }
 
 Optional<FindLocalApplySitesResult>

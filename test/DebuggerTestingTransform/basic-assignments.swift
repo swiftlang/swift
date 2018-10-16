@@ -9,7 +9,7 @@
 var a = 1001
 a = 1002
 
-// CHECK-SIL-LABEL: sil private @$S1MyyXEfU0_ : {{.*}} () -> ()
+// CHECK-SIL-LABEL: sil private @$s1MyyXEfU0_ : {{.*}} () -> ()
 // CHECK-SIL: [[int:%.*]] = integer_literal {{.*}}, 1002
 // CHECK-SIL: [[struct:%.*]] = struct $Int ([[int]] : {{.*}})
 // CHECK-SIL: store [[struct]] {{.*}} : $*Int
@@ -21,19 +21,19 @@ a = 1002
 
 print("a = \(a)") // CHECK-E2E: a = 1002
 
-// CHECK-SIL-LABEL: sil private @$S1MyyXEfU_yyXEfU1_
+// CHECK-SIL-LABEL: sil private @$s1MyyXEfU_yyXEfU1_
 ({ () -> () in
   a = 1003
   // CHECK-SIL: function_ref {{.*}}_debuggerTestingCheckExpectyySS_SStF
   print("a = \(a)") // CHECK-E2E-NEXT: a = 1003
  })()
 
-// CHECK-SIL-LABEL: sil private @$S1MyyXEfU2_
+// CHECK-SIL-LABEL: sil private @$s1MyyXEfU2_
 // CHECK-SIL: function_ref {{.*}}_debuggerTestingCheckExpectyySS_SStF
 a = 1004
 print("a = \(a)") // CHECK-E2E-NEXT: a = 1004
 
-// CHECK-SIL-LABEL: sil private @$S1M2f1yyFyyXEfU3_
+// CHECK-SIL-LABEL: sil private @$s1M2f1yyFyyXEfU3_
 func f1() {
   var b = 2001
   b = 2002
@@ -43,7 +43,7 @@ func f1() {
 
 f1()
 
-// CHECK-SIL-LABEL: sil private @$S1M2f2yyFyyXEfU_yyXEfU4_
+// CHECK-SIL-LABEL: sil private @$s1M2f2yyFyyXEfU_yyXEfU4_
 func f2() {
   var c: Int = 3001
   ({ () -> () in
@@ -55,7 +55,7 @@ func f2() {
 
 f2()
 
-// CHECK-SIL-LABEL: sil private @$S1M2f3yySaySiGzFyyXEfU5_
+// CHECK-SIL-LABEL: sil private @$s1M2f3yySaySiGzFyyXEfU5_
 func f3(_ d: inout [Int]) {
   d[0] = 4002
   // CHECK-SIL: function_ref {{.*}}_debuggerTestingCheckExpectyySS_SStF
@@ -65,7 +65,7 @@ func f3(_ d: inout [Int]) {
 var d: [Int] = [4001]
 f3(&d)
 
-// CHECK-SIL-LABEL: sil hidden @$S1M2f4yyF
+// CHECK-SIL-LABEL: sil hidden @$s1M2f4yyF
 // CHECK-SIL-NOT: _debuggerTestingCheckExpect
 func f4() {
   // We don't attempt to instrument in this case because we don't try
@@ -77,7 +77,7 @@ func f4() {
 
 f4()
 
-// CHECK-SIL-LABEL: sil private @$S1M2f5yySSzFyyXEfU6_
+// CHECK-SIL-LABEL: sil private @$s1M2f5yySSzFyyXEfU6_
 func f5(_ v: inout String) {
   v = "Hello world"
   // CHECK-SIL: function_ref {{.*}}_debuggerTestingCheckExpectyySS_SStF

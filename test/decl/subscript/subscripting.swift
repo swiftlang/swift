@@ -195,7 +195,7 @@ func test_subscript(_ x2: inout X2, i: Int, j: Int, value: inout Int, no: NoSubs
 
   value = ovl[(i, j, i)] // expected-error{{cannot convert value of type '(Int, Int, Int)' to expected argument type 'Int'}}
 
-  ret[i] // expected-error{{ambiguous use of 'subscript'}}
+  ret[i] // expected-error{{ambiguous use of 'subscript(_:)'}}
 
   value = ret[i]
   ret[i] = value
@@ -303,7 +303,7 @@ func testSubscript1(_ s1 : SubscriptTest1) {
   // expected-note@-2 {{to match this opening '('}}
 
   let _ = s1["hello"]
-  // expected-error@-1 {{ambiguous use of 'subscript'}}
+  // expected-error@-1 {{ambiguous use of 'subscript(_:)'}}
   // expected-error@-2 {{expected ')' in expression list}}
 }
 
@@ -331,12 +331,12 @@ func testSubscript1(_ s2 : SubscriptTest2) {
 // sr-114 & rdar://22007370
 
 class Foo {
-    subscript(key: String) -> String { // expected-note {{'subscript' previously declared here}}
+    subscript(key: String) -> String { // expected-note {{'subscript(_:)' previously declared here}}
         get { a } // expected-error {{use of unresolved identifier 'a'}}
         set { b } // expected-error {{use of unresolved identifier 'b'}}
     }
     
-    subscript(key: String) -> String { // expected-error {{invalid redeclaration of 'subscript'}}
+    subscript(key: String) -> String { // expected-error {{invalid redeclaration of 'subscript(_:)'}}
         get { a } // expected-error {{use of unresolved identifier 'a'}}
         set { b } // expected-error {{use of unresolved identifier 'b'}}
     }
@@ -346,9 +346,9 @@ class Foo {
 protocol r23952125 {
   associatedtype ItemType
   var count: Int { get }
-  subscript(index: Int) -> ItemType  // expected-error {{subscript in protocol must have explicit { get } or { get set } specifier}} {{36-36= { get set \}}}
-  
-  var c : Int // expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
+  subscript(index: Int) -> ItemType  // expected-error {{subscript in protocol must have explicit { get } or { get set } specifier}} {{36-36= { get <#set#> \}}}
+
+  var c : Int // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-14= { get <#set#> \}}}
 }
 
 // <rdar://problem/16812341> QoI: Poor error message when providing a default value for a subscript parameter

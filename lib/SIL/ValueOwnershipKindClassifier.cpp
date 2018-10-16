@@ -277,7 +277,7 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitSILUndef(SILUndef *Arg) {
 }
 
 ValueOwnershipKind
-ValueOwnershipKindClassifier::visitSILPHIArgument(SILPHIArgument *Arg) {
+ValueOwnershipKindClassifier::visitSILPhiArgument(SILPhiArgument *Arg) {
   return Arg->getOwnershipKind();
 }
 
@@ -401,6 +401,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, AShr)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Add)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, And)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, AssumeNonNegative)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, AssumeTrue)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, BitCast)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, ExactSDiv)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, ExactUDiv)

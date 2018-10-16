@@ -110,20 +110,21 @@ func equalsUnordered(_ lhs: Set<Int>, _ rhs: Set<Int>) -> Bool {
 }
 
 func isNativeSet<T : Hashable>(_ s: Set<T>) -> Bool {
-  switch s._variant {
-  case .native:
-    return true
 #if _runtime(_ObjC)
-  case .cocoa:
-    return false
+  return s._variant.isNative
+#else
+  return true
 #endif
-  }
 }
 
 #if _runtime(_ObjC)
 func isNativeNSSet(_ s: NSSet) -> Bool {
   let className: NSString = NSStringFromClass(type(of: s)) as NSString
-  return ["_SwiftDeferredNSSet", "NativeSetStorage"].contains {
+  return [
+    "_SwiftDeferredNSSet",
+    "_EmptySetSingleton",
+    "_SetStorage"
+  ].contains {
     className.range(of: $0).length > 0
   }
 }
@@ -1168,7 +1169,7 @@ SetTestSuite.test("deleteChainCollisionRandomized") {
     if Int.random(in: 0 ..< (chainLength * 2), using: &generator) == 0 {
       s.remove(key)
     } else {
-      s.insert(TestKeyTy(key.value))
+      s.insert(key)
     }
     check(s)
   }
@@ -1791,12 +1792,14 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Remove")
 SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
   do {
     var s = getBridgedVerbatimSet([])
-    let identity1 = s._rawIdentifier()
     expectTrue(isCocoaSet(s))
     expectEqual(0, s.count)
 
+    let emptySet = Set<Int>()
+    expectNotEqual(emptySet._rawIdentifier(), s._rawIdentifier())
+
     s.removeAll()
-    expectEqual(identity1, s._rawIdentifier())
+    expectEqual(emptySet._rawIdentifier(), s._rawIdentifier())
     expectEqual(0, s.count)
   }
 
@@ -1853,12 +1856,14 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
   do {
     var s = getBridgedNonverbatimSet([])
-    let identity1 = s._rawIdentifier()
     expectTrue(isNativeSet(s))
     expectEqual(0, s.count)
 
+    let emptySet = Set<Int>()
+    expectNotEqual(emptySet._rawIdentifier(), s._rawIdentifier())
+
     s.removeAll()
-    expectEqual(identity1, s._rawIdentifier())
+    expectEqual(emptySet._rawIdentifier(), s._rawIdentifier())
     expectEqual(0, s.count)
   }
 
@@ -3070,6 +3075,7 @@ SetTestSuite.test("formSymmetricDifference")
   .code {
   // Overlap with 4040, 5050, 6060
   var s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
+  let s1_copy = s1
   let s2 = Set([1010])
   let result = Set([2020, 3030, 4040, 5050, 6060])
 
@@ -3077,10 +3083,11 @@ SetTestSuite.test("formSymmetricDifference")
   let identity1 = s1._rawIdentifier()
   s1.formSymmetricDifference(s2)
 
-  // Removing just one element shouldn't cause an identity change
-  expectEqual(identity1, s1._rawIdentifier())
+  // COW should trigger a copy
+  expectNotEqual(identity1, s1._rawIdentifier())
 
   expectEqual(s1, result)
+  expectEqual(s1_copy, Set([1010, 2020, 3030, 4040, 5050, 6060]))
 
   // A ⨁ A == {}
   s1.formSymmetricDifference(s1)

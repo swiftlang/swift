@@ -164,10 +164,10 @@ print(allToAll(type(of: C()), AnyObject.self))
 // CHECK-native: false
 
 // Bridging
-// NSNumber on Darwin, _SwiftValue on Linux.
+// NSNumber on Darwin, __SwiftValue on Linux.
 print(allToAll(0, AnyObject.self)) // CHECK: true
 
-// This will get bridged using _SwiftValue.
+// This will get bridged using __SwiftValue.
 struct NotBridged { var x: Int }
 print(allToAll(NotBridged(x: 0), AnyObject.self)) // CHECK: true
 
@@ -176,7 +176,7 @@ print(allToAll(NotBridged(x: 0), AnyObject.self)) // CHECK: true
 print(allToAll(NotBridged(x: 0), NSCopying.self)) // CHECK-objc: true
 #endif
 
-// On Darwin, these casts fail (intentionally) even though _SwiftValue does
+// On Darwin, these casts fail (intentionally) even though __SwiftValue does
 // technically conform to these protocols through NSObject.
 // Off Darwin, it should not conform at all.
 print(allToAll(NotBridged(x: 0), CustomStringConvertible.self)) // CHECK: false

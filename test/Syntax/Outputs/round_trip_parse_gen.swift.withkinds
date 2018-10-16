@@ -492,7 +492,7 @@ precedencegroup BazPrecedence {<PrecedenceGroupAssociativity>
   lowerThan: <PrecedenceGroupNameElement>DefaultPrecedence</PrecedenceGroupNameElement></PrecedenceGroupRelation>
 }</PrecedenceGroupDecl><OperatorDecl><DeclModifier>
 
-infix </DeclModifier>operator<++><InfixOperatorGroup>:FooPrecedence</InfixOperatorGroup></OperatorDecl><OperatorDecl><DeclModifier>
+infix </DeclModifier>operator<++><OperatorPrecedenceAndTypes>:FooPrecedence</OperatorPrecedenceAndTypes></OperatorDecl><OperatorDecl><DeclModifier>
 prefix </DeclModifier>operator..<<</OperatorDecl><OperatorDecl><DeclModifier>
 postfix </DeclModifier>operator <-</OperatorDecl><FunctionDecl>
 
@@ -536,6 +536,17 @@ struct S <TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Q</Simple
 
   @available(<AvailabilityArgument>*, </AvailabilityArgument><AvailabilityArgument><AvailabilityLabeledArgument>deprecated: <VersionTuple>1.2</VersionTuple></AvailabilityLabeledArgument>, </AvailabilityArgument><AvailabilityArgument><AvailabilityLabeledArgument>message: "ABC"</AvailabilityLabeledArgument></AvailabilityArgument>)</Attribute><DeclModifier>
   fileprivate(set) </DeclModifier>var <PatternBinding><IdentifierPattern>x</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>String</SimpleTypeIdentifier></TypeAnnotation></PatternBinding></VariableDecl></MemberDeclListItem>
+}</MemberDeclBlock></StructDecl><StructDecl>
+
+struct ReadModify <MemberDeclBlock>{<MemberDeclListItem><VariableDecl>
+  var <PatternBinding><IdentifierPattern>st0 </IdentifierPattern><InitializerClause>= <TupleExpr>(<TupleElement><StringLiteralExpr>"a"</StringLiteralExpr>, </TupleElement><TupleElement><StringLiteralExpr>"b"</StringLiteralExpr></TupleElement>)</TupleExpr></InitializerClause></PatternBinding></VariableDecl></MemberDeclListItem><MemberDeclListItem><VariableDecl>
+  var <PatternBinding><IdentifierPattern>rm0</IdentifierPattern><TypeAnnotation>: <TupleType>(<TupleTypeElement><SimpleTypeIdentifier>String</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement><SimpleTypeIdentifier>String</SimpleTypeIdentifier></TupleTypeElement>) </TupleType></TypeAnnotation><AccessorBlock>{<AccessorDecl>
+    _read <CodeBlock>{ <YieldStmt>yield <YieldList>(<TupleExpr>(<TupleElement><StringLiteralExpr>"a"</StringLiteralExpr>, </TupleElement><TupleElement><StringLiteralExpr>"b"</StringLiteralExpr></TupleElement>)</TupleExpr>) </YieldList></YieldStmt>}</CodeBlock></AccessorDecl><AccessorDecl>
+    _modify <CodeBlock>{ <YieldStmt>yield <InOutExpr>&<IdentifierExpr>st0 </IdentifierExpr></InOutExpr></YieldStmt>}</CodeBlock></AccessorDecl>
+  }</AccessorBlock></PatternBinding></VariableDecl></MemberDeclListItem><MemberDeclListItem><VariableDecl>
+  var <PatternBinding><IdentifierPattern>rm1</IdentifierPattern><TypeAnnotation>: <TupleType>(<TupleTypeElement><SimpleTypeIdentifier>String</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement><SimpleTypeIdentifier>String</SimpleTypeIdentifier></TupleTypeElement>) </TupleType></TypeAnnotation><AccessorBlock>{<AccessorDecl>
+    _read <CodeBlock>{ <YieldStmt>yield <YieldList>(<IdentifierExpr>st0</IdentifierExpr>) </YieldList></YieldStmt>}</CodeBlock></AccessorDecl>
+  }</AccessorBlock></PatternBinding></VariableDecl></MemberDeclListItem>
 }</MemberDeclBlock></StructDecl><StructDecl><Attribute>
 
 @_alignment(16) </Attribute><DeclModifier>public </DeclModifier>struct float3 <MemberDeclBlock>{ <MemberDeclListItem><VariableDecl><DeclModifier>public </DeclModifier>var <PatternBinding><IdentifierPattern>x</IdentifierPattern>, </PatternBinding><PatternBinding><IdentifierPattern>y</IdentifierPattern>, </PatternBinding><PatternBinding><IdentifierPattern>z</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Float </SimpleTypeIdentifier></TypeAnnotation></PatternBinding></VariableDecl></MemberDeclListItem>}</MemberDeclBlock></StructDecl><PoundSourceLocation>

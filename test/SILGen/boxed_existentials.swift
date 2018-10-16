@@ -3,7 +3,7 @@
 // RUN: %target-swift-emit-silgen -module-name boxed_existentials -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck %s --check-prefix=GUARANTEED
 
 func test_type_lowering(_ x: Error) { }
-// CHECK-LABEL: sil hidden @$S18boxed_existentials18test_type_loweringyys5Error_pF : $@convention(thin) (@guaranteed Error) -> () {
+// CHECK-LABEL: sil hidden @$s18boxed_existentials18test_type_loweringyys5Error_pF : $@convention(thin) (@guaranteed Error) -> () {
 // CHECK-NOT:         destroy_value %0 : $Error
 
 class Document {}
@@ -18,7 +18,7 @@ enum ClericalError: Error {
 func test_concrete_erasure(_ x: ClericalError) -> Error {
   return x
 }
-// CHECK-LABEL: sil hidden @$S18boxed_existentials21test_concrete_erasureys5Error_pAA08ClericalF0OF
+// CHECK-LABEL: sil hidden @$s18boxed_existentials21test_concrete_erasureys5Error_pAA08ClericalF0OF
 // CHECK:       bb0([[ARG:%.*]] : @guaranteed $ClericalError):
 // CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:         [[EXISTENTIAL:%.*]] = alloc_existential_box $Error, $ClericalError
@@ -34,7 +34,7 @@ protocol HairType {}
 func test_composition_erasure(_ x: HairType & Error) -> Error {
   return x
 }
-// CHECK-LABEL: sil hidden @$S18boxed_existentials24test_composition_erasureys5Error_psAC_AA8HairTypepF
+// CHECK-LABEL: sil hidden @$s18boxed_existentials24test_composition_erasureys5Error_psAC_AA8HairTypepF
 // CHECK:         [[VALUE_ADDR:%.*]] = open_existential_addr immutable_access [[OLD_EXISTENTIAL:%.*]] : $*Error & HairType to $*[[VALUE_TYPE:@opened\(.*\) Error & HairType]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $Error, $[[VALUE_TYPE]]
 // CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $Error
@@ -49,7 +49,7 @@ protocol HairClass: class {}
 func test_class_composition_erasure(_ x: HairClass & Error) -> Error {
   return x
 }
-// CHECK-LABEL: sil hidden @$S18boxed_existentials30test_class_composition_erasureys5Error_psAC_AA9HairClasspF
+// CHECK-LABEL: sil hidden @$s18boxed_existentials30test_class_composition_erasureys5Error_psAC_AA9HairClasspF
 // CHECK:         [[VALUE:%.*]] = open_existential_ref [[OLD_EXISTENTIAL:%.*]] : $Error & HairClass to $[[VALUE_TYPE:@opened\(.*\) Error & HairClass]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $Error, $[[VALUE_TYPE]]
 // CHECK:         [[ADDR:%.*]] = project_existential_box $[[VALUE_TYPE]] in [[NEW_EXISTENTIAL]] : $Error
@@ -62,7 +62,7 @@ func test_class_composition_erasure(_ x: HairClass & Error) -> Error {
 func test_property(_ x: Error) -> String {
   return x._domain
 }
-// CHECK-LABEL: sil hidden @$S18boxed_existentials13test_propertyySSs5Error_pF
+// CHECK-LABEL: sil hidden @$s18boxed_existentials13test_propertyySSs5Error_pF
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Error):
 // CHECK:         [[VALUE:%.*]] = open_existential_box [[ARG]] : $Error to $*[[VALUE_TYPE:@opened\(.*\) Error]]
 // FIXME: Extraneous copy here
@@ -80,7 +80,7 @@ func test_property_of_lvalue(_ x: Error) -> String {
   return x._domain
 }
 
-// CHECK-LABEL: sil hidden @$S18boxed_existentials23test_property_of_lvalueySSs5Error_pF :
+// CHECK-LABEL: sil hidden @$s18boxed_existentials23test_property_of_lvalueySSs5Error_pF :
 // CHECK:       bb0([[ARG:%.*]] : @guaranteed $Error):
 // CHECK:         [[VAR:%.*]] = alloc_box ${ var Error }
 // CHECK:         [[PVAR:%.*]] = project_box [[VAR]]
@@ -91,20 +91,22 @@ func test_property_of_lvalue(_ x: Error) -> String {
 // CHECK:         [[VALUE:%.*]] = open_existential_box [[VALUE_BOX]] : $Error to $*[[VALUE_TYPE:@opened\(.*\) Error]]
 // CHECK:         [[COPY:%.*]] = alloc_stack $[[VALUE_TYPE]]
 // CHECK:         copy_addr [[VALUE]] to [initialization] [[COPY]]
+// CHECK:         [[BORROW:%.*]] = alloc_stack $[[VALUE_TYPE]]
+// CHECK:         copy_addr [[COPY]] to [initialization] [[BORROW]]
 // CHECK:         [[METHOD:%.*]] = witness_method $[[VALUE_TYPE]], #Error._domain!getter.1
-// CHECK:         [[RESULT:%.*]] = apply [[METHOD]]<[[VALUE_TYPE]]>([[COPY]])
+// CHECK:         [[RESULT:%.*]] = apply [[METHOD]]<[[VALUE_TYPE]]>([[BORROW]])
 // CHECK:         destroy_addr [[COPY]]
 // CHECK:         dealloc_stack [[COPY]]
 // CHECK:         destroy_value [[VALUE_BOX]]
 // CHECK:         destroy_value [[VAR]]
 // CHECK-NOT:         destroy_value [[ARG]]
 // CHECK:         return [[RESULT]]
-// CHECK:      } // end sil function '$S18boxed_existentials23test_property_of_lvalueySSs5Error_pF'
+// CHECK:      } // end sil function '$s18boxed_existentials23test_property_of_lvalueySSs5Error_pF'
 extension Error {
   func extensionMethod() { }
 }
 
-// CHECK-LABEL: sil hidden @$S18boxed_existentials21test_extension_methodyys5Error_pF
+// CHECK-LABEL: sil hidden @$s18boxed_existentials21test_extension_methodyys5Error_pF
 func test_extension_method(_ error: Error) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Error):
   // CHECK: [[VALUE:%.*]] = open_existential_box [[ARG]]
@@ -121,8 +123,8 @@ func test_extension_method(_ error: Error) {
 
 func plusOneError() -> Error { }
 
-// CHECK-LABEL: sil hidden @$S18boxed_existentials31test_open_existential_semanticsyys5Error_p_sAC_ptF
-// GUARANTEED-LABEL: sil hidden @$S18boxed_existentials31test_open_existential_semanticsyys5Error_p_sAC_ptF
+// CHECK-LABEL: sil hidden @$s18boxed_existentials31test_open_existential_semanticsyys5Error_p_sAC_ptF
+// GUARANTEED-LABEL: sil hidden @$s18boxed_existentials31test_open_existential_semanticsyys5Error_p_sAC_ptF
 // CHECK: bb0([[ARG0:%.*]]: @guaranteed $Error,
 // GUARANTEED: bb0([[ARG0:%.*]]: @guaranteed $Error,
 func test_open_existential_semantics(_ guaranteed: Error,
@@ -189,7 +191,7 @@ func test_open_existential_semantics(_ guaranteed: Error,
   plusOneError().extensionMethod()
 }
 
-// CHECK-LABEL: sil hidden @$S18boxed_existentials14erasure_to_anyyyps5Error_p_sAC_ptF
+// CHECK-LABEL: sil hidden @$s18boxed_existentials14erasure_to_anyyyps5Error_p_sAC_ptF
 // CHECK:       bb0([[OUT:%.*]] : @trivial $*Any, [[GUAR:%.*]] : @guaranteed $Error,
 func erasure_to_any(_ guaranteed: Error, _ immediate: Error) -> Any {
   var immediate = immediate

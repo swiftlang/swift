@@ -269,7 +269,7 @@ public struct DateComponents : ReferenceConvertible, Hashable, Equatable, _Mutab
     
     // MARK: - Bridging Helpers
     
-    fileprivate init(reference: NSDateComponents) {
+    fileprivate init(reference: __shared NSDateComponents) {
         _handle = _MutableHandle(reference: reference)
     }
 
@@ -338,6 +338,7 @@ extension DateComponents : _ObjectiveCBridgeable {
         return true
     }
 
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSDateComponents?) -> DateComponents {
         guard let src = source else { return DateComponents() }
         return DateComponents(reference: src)

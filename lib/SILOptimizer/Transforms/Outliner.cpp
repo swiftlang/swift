@@ -79,6 +79,7 @@ private:
     case BridgedMethod:
       return 'm';
     }
+    llvm_unreachable("unhandled kind");
   }
 };
 } // end anonymous namespace.
@@ -144,7 +145,9 @@ static SILDeclRef getBridgeToObjectiveC(CanType NativeType,
   FuncDecl *Requirement = nullptr;
   // bridgeToObjectiveC
   DeclName Name(Ctx, Ctx.Id_bridgeToObjectiveC, llvm::ArrayRef<Identifier>());
-  for (auto Member : Proto->lookupDirect(Name, true)) {
+  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+  for (auto Member : Proto->lookupDirect(Name, flags)) {
     if (auto Func = dyn_cast<FuncDecl>(Member)) {
       Requirement = Func;
       break;
@@ -174,7 +177,9 @@ SILDeclRef getBridgeFromObjectiveC(CanType NativeType,
   // _unconditionallyBridgeFromObjectiveC
   DeclName Name(Ctx, Ctx.getIdentifier("_unconditionallyBridgeFromObjectiveC"),
                 llvm::makeArrayRef(Identifier()));
-  for (auto Member : Proto->lookupDirect(Name, true)) {
+  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+  for (auto Member : Proto->lookupDirect(Name, flags)) {
     if (auto Func = dyn_cast<FuncDecl>(Member)) {
       Requirement = Func;
       break;

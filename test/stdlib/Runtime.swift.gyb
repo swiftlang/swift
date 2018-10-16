@@ -39,7 +39,7 @@ func _stdlib_demangleName(_ mangledName: String) -> String {
 
     if let demangledNamePtr = demangledNamePtr {
       let demangledName = String(cString: demangledNamePtr)
-      _stdlib_free(demangledNamePtr)
+      _swift_stdlib_free(demangledNamePtr)
       return demangledName
     }
     return mangledName
@@ -364,10 +364,10 @@ Runtime.test("demangleName") {
   expectEqual("", _stdlib_demangleName(""))
   expectEqual("abc", _stdlib_demangleName("abc"))
   expectEqual("\0", _stdlib_demangleName("\0"))
-  expectEqual("Swift.Double", _stdlib_demangleName("$SSdD"))
+  expectEqual("Swift.Double", _stdlib_demangleName("$sSdD"))
   expectEqual("x.a : x.Foo<x.Foo<x.Foo<Swift.Int, Swift.Int>, x.Foo<Swift.Int, Swift.Int>>, x.Foo<x.Foo<Swift.Int, Swift.Int>, x.Foo<Swift.Int, Swift.Int>>>",
-      _stdlib_demangleName("$S1x1aAA3FooCyADyADySiSiGADySiSiGGADyADySiSiGADySiSiGGGvp"))
-  expectEqual("Foobar", _stdlib_demangleName("$S13__lldb_expr_46FoobarCD"))
+      _stdlib_demangleName("$s1x1aAA3FooCyADyADySiSiGADySiSiGGADyADySiSiGADySiSiGGGvp"))
+  expectEqual("Foobar", _stdlib_demangleName("$s13__lldb_expr_46FoobarCD"))
 }
 
 % for optionality in ['', '?']:
@@ -558,6 +558,14 @@ Runtime.test("SwiftError layout constants for LLDB") {
   let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)
 #elseif os(Linux)
   let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)
+#elseif os(Android)
+  #if arch(arm)
+    let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0xffffffff)
+  #elseif arch(arm64)
+    let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)
+  #else
+    _UnimplementedError()
+  #endif
 #else
   _UnimplementedError()
 #endif
@@ -574,7 +582,7 @@ Runtime.test("SwiftError layout constants for LLDB") {
   expectEqual(40, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
   expectEqual(72, sizeof_SwiftError.load(as: UInt.self))
 #endif
-#elseif os(Linux)
+#elseif os(Linux) || os(Android)
   expectEqual(16, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
   expectEqual(32, sizeof_SwiftError.load(as: UInt.self))
 #else

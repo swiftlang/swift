@@ -96,6 +96,7 @@ struct WrapperTypeTraits<syntax::SyntaxKind> {
 %   end
 % end
     }
+    llvm_unreachable("unhandled kind");
   }
 
   static void write(ByteTreeWriter &Writer, const syntax::SyntaxKind &Kind,
@@ -122,6 +123,7 @@ struct ScalarReferenceTraits<syntax::SyntaxKind> {
         return "\"${node.syntax_kind}\"";
 % end
     }
+    llvm_unreachable("unhandled kind");
   }
 
   static bool mustQuote(StringRef) {

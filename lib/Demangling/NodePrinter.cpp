@@ -308,6 +308,8 @@ private:
     case Node::Kind::ProtocolListWithClass:
     case Node::Kind::Allocator:
     case Node::Kind::ArgumentTuple:
+    case Node::Kind::AssociatedConformanceDescriptor:
+    case Node::Kind::AssociatedTypeDescriptor:
     case Node::Kind::AssociatedTypeMetadataAccessor:
     case Node::Kind::AssociatedTypeWitnessTableAccessor:
     case Node::Kind::AutoClosureType:
@@ -320,6 +322,8 @@ private:
     case Node::Kind::Deallocator:
     case Node::Kind::DeclContext:
     case Node::Kind::DefaultArgumentInitializer:
+    case Node::Kind::DefaultAssociatedTypeMetadataAccessor:
+    case Node::Kind::DefaultAssociatedConformanceAccessor:
     case Node::Kind::DependentAssociatedTypeRef:
     case Node::Kind::DependentGenericSignature:
     case Node::Kind::DependentGenericParamCount:
@@ -406,6 +410,7 @@ private:
     case Node::Kind::ProtocolConformance:
     case Node::Kind::ProtocolConformanceDescriptor:
     case Node::Kind::ProtocolDescriptor:
+    case Node::Kind::ProtocolRequirementsBaseDescriptor:
     case Node::Kind::ProtocolWitness:
     case Node::Kind::ProtocolWitnessTable:
     case Node::Kind::ProtocolWitnessTableAccessor:
@@ -1516,6 +1521,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "protocol descriptor for ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::ProtocolRequirementsBaseDescriptor:
+    Printer << "protocol requirements base descriptor for ";
+    print(Node->getChild(0));
+    return nullptr;
   case Node::Kind::FullTypeMetadata:
     Printer << "full type metadata for ";
     print(Node->getChild(0));
@@ -1548,10 +1557,34 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "lazy cache variable for type metadata for ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::AssociatedConformanceDescriptor:
+    Printer << "associated conformance descriptor for ";
+    print(Node->getChild(0));
+    Printer << ".";
+    print(Node->getChild(1));
+    Printer << ": ";
+    print(Node->getChild(2));
+    return nullptr;
+  case Node::Kind::DefaultAssociatedConformanceAccessor:
+    Printer << "default associated conformance accessor for ";
+    print(Node->getChild(0));
+    Printer << ".";
+    print(Node->getChild(1));
+    Printer << ": ";
+    print(Node->getChild(2));
+    return nullptr;
+  case Node::Kind::AssociatedTypeDescriptor:
+    Printer << "associated type descriptor for ";
+    print(Node->getChild(0));
+    return nullptr;
   case Node::Kind::AssociatedTypeMetadataAccessor:
     Printer << "associated type metadata accessor for ";
     print(Node->getChild(1));
     Printer << " in ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::DefaultAssociatedTypeMetadataAccessor:
+    Printer << "default associated type metadata accessor for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::AssociatedTypeWitnessTableAccessor:

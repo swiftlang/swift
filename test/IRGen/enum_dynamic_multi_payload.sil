@@ -417,10 +417,10 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
   return undef : $()
 }
 
-// CHECK: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$S26enum_dynamic_multi_payload8EitherOrOMi"(%swift.type_descriptor*, i8**, i8*) {{.*}} {
+// CHECK: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$s26enum_dynamic_multi_payload8EitherOrOMi"(%swift.type_descriptor*, i8**, i8*) {{.*}} {
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericValueMetadata
 
-// CHECK: define{{( protected)?}} internal swiftcc %swift.metadata_response @"$S26enum_dynamic_multi_payload8EitherOrOMr"
+// CHECK: define{{( protected)?}} internal swiftcc %swift.metadata_response @"$s26enum_dynamic_multi_payload8EitherOrOMr"
 // CHECK-SAME: (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
 
 // CHECK:      [[BUF:%.*]] = alloca [2 x i8**]

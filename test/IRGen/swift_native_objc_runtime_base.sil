@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -enable-objc-interop -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s
 
-// CHECK-LABEL: @"$S30swift_native_objc_runtime_base1CCMm" = hidden global %objc_class {
+// CHECK-LABEL: @"$s30swift_native_objc_runtime_base1CCMm" = hidden global %objc_class {
 // -- metaclass "isa" is root metaclass
 // CHECK:         %objc_class* @"OBJC_METACLASS_$_NSObject",
 // -- metaclass "super" is super metaclass

@@ -89,6 +89,10 @@ fatalError(uint32_t flags, const char *format, ...);
 
 /// swift::warning() emits a warning from the runtime.
 extern void
+warningv(uint32_t flags, const char *format, va_list args);
+
+/// swift::warning() emits a warning from the runtime.
+extern void
 warning(uint32_t flags, const char *format, ...);
 
 // swift_dynamicCastFailure halts using fatalError()

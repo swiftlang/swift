@@ -36,7 +36,7 @@ func foo(f f: (() -> ())!) {
 
 func wrap<T>(x x: T) -> T! { return x }
 
-// CHECK-LABEL: sil hidden @$S29implicitly_unwrapped_optional16wrap_then_unwrap{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s29implicitly_unwrapped_optional16wrap_then_unwrap{{[_0-9a-zA-Z]*}}F
 func wrap_then_unwrap<T>(x x: T) -> T {
   // CHECK:   switch_enum_addr {{%.*}}, case #Optional.some!enumelt.1: [[OK:bb[0-9]+]], case #Optional.none!enumelt: [[FAIL:bb[0-9]+]]
   // CHECK: [[FAIL]]:
@@ -45,7 +45,7 @@ func wrap_then_unwrap<T>(x x: T) -> T {
   return wrap(x: x)!
 }
 
-// CHECK-LABEL: sil hidden @$S29implicitly_unwrapped_optional10tuple_bind1xSSSgSi_SStSg_tF : $@convention(thin) (@guaranteed Optional<(Int, String)>) -> @owned Optional<String> {
+// CHECK-LABEL: sil hidden @$s29implicitly_unwrapped_optional10tuple_bind1xSSSgSi_SStSg_tF : $@convention(thin) (@guaranteed Optional<(Int, String)>) -> @owned Optional<String> {
 func tuple_bind(x x: (Int, String)!) -> String? {
   return x?.1
   // CHECK:   switch_enum {{%.*}}, case #Optional.some!enumelt.1: [[NONNULL:bb[0-9]+]], case #Optional.none!enumelt: [[NULL:bb[0-9]+]]
@@ -54,7 +54,7 @@ func tuple_bind(x x: (Int, String)!) -> String? {
   // CHECK-NOT: destroy_value [[STRING]]
 }
 
-// CHECK-LABEL: sil hidden @$S29implicitly_unwrapped_optional011tuple_bind_a1_B01xSSSi_SStSg_tF
+// CHECK-LABEL: sil hidden @$s29implicitly_unwrapped_optional011tuple_bind_a1_B01xSSSi_SStSg_tF
 func tuple_bind_implicitly_unwrapped(x x: (Int, String)!) -> String {
   return x.1
 }
@@ -64,10 +64,10 @@ func bind_any() {
   let object : AnyObject? = return_any()
 }
 
-// CHECK-LABEL: sil hidden @$S29implicitly_unwrapped_optional6sr3758yyF
+// CHECK-LABEL: sil hidden @$s29implicitly_unwrapped_optional6sr3758yyF
 func sr3758() {
   // Verify that there are no additional reabstractions introduced.
-  // CHECK: [[CLOSURE:%.+]] = function_ref @$S29implicitly_unwrapped_optional6sr3758yyFyypSgcfU_ : $@convention(thin) (@in_guaranteed Optional<Any>) -> ()
+  // CHECK: [[CLOSURE:%.+]] = function_ref @$s29implicitly_unwrapped_optional6sr3758yyFyypSgcfU_ : $@convention(thin) (@in_guaranteed Optional<Any>) -> ()
   // CHECK: [[F:%.+]] = thin_to_thick_function [[CLOSURE]] : $@convention(thin) (@in_guaranteed Optional<Any>) -> () to $@callee_guaranteed (@in_guaranteed Optional<Any>) -> ()
   // CHECK: [[BORROWED_F:%.*]] = begin_borrow [[F]]
   // CHECK: [[CALLEE:%.+]] = copy_value [[BORROWED_F]] : $@callee_guaranteed (@in_guaranteed Optional<Any>) -> ()
@@ -79,4 +79,4 @@ func sr3758() {
   // CHECK: destroy_value [[F]]
   let f: ((Any?) -> Void) = { (arg: Any!) in }
   f(nil)
-} // CHECK: end sil function '$S29implicitly_unwrapped_optional6sr3758yyF'
+} // CHECK: end sil function '$s29implicitly_unwrapped_optional6sr3758yyF'

@@ -40,7 +40,7 @@ struct SomeError: Error {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.error* @alloc_boxed_existential_concrete
 sil @alloc_boxed_existential_concrete : $@convention(thin) (@owned SomeError) -> @owned Error {
 entry(%x : $SomeError):
-  // CHECK: [[BOX_PAIR:%.*]] = call swiftcc { %swift.error*, %swift.opaque* } @swift_allocError(%swift.type* {{.*}} @"$S17boxed_existential9SomeErrorVMf", {{.*}}, i8** {{%.*|@"\$S17boxed_existential9SomeErrorVs0D0AAWP"}}, %swift.opaque* null, i1 false)
+  // CHECK: [[BOX_PAIR:%.*]] = call swiftcc { %swift.error*, %swift.opaque* } @swift_allocError(%swift.type* {{.*}} @"$s17boxed_existential9SomeErrorVMf", {{.*}}, i8** {{%.*|@"\$s17boxed_existential9SomeErrorVs0D0AAWP"}}, %swift.opaque* null, i1 false)
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 0
   // CHECK: [[OPAQUE_ADDR:%.*]] = extractvalue { %swift.error*, %swift.opaque* } [[BOX_PAIR]], 1
   // CHECK: [[ADDR:%.*]] = bitcast %swift.opaque* [[OPAQUE_ADDR]] to %T17boxed_existential9SomeErrorV*

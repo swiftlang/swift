@@ -75,9 +75,7 @@ public protocol TextOutputStream {
 }
 
 extension TextOutputStream {
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func _lock() {}
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func _unlock() {}
 }
 
@@ -278,7 +276,6 @@ internal func _getEnumCaseName<T>(_ value: T) -> UnsafePointer<CChar>?
 internal func _opaqueSummary(_ metadata: Any.Type) -> UnsafePointer<CChar>?
 
 /// Do our best to print a value that cannot be printed directly.
-@inlinable // FIXME(sil-serialize-all)
 @_semantics("optimize.sil.specialize.generic.never")
 internal func _adHocPrint_unlocked<T, TargetStream : TextOutputStream>(
     _ value: T, _ mirror: Mirror, _ target: inout TargetStream,
@@ -460,7 +457,6 @@ public func _debugPrint_unlocked<T, TargetStream : TextOutputStream>(
   _adHocPrint_unlocked(value, mirror, &target, isDebugPrint: true)
 }
 
-@inlinable // FIXME(sil-serialize-all)
 @_semantics("optimize.sil.specialize.generic.never")
 internal func _dumpPrint_unlocked<T, TargetStream : TextOutputStream>(
     _ value: T, _ mirror: Mirror, _ target: inout TargetStream
@@ -549,12 +545,12 @@ internal struct _Stdout : TextOutputStream {
     if _fastPath(string._guts.isASCII) {
       defer { _fixLifetime(string) }
       let ascii = string._guts._unmanagedASCIIView
-      _stdlib_fwrite_stdout(ascii.start, ascii.count, 1)
+      _swift_stdlib_fwrite_stdout(ascii.start, ascii.count, 1)
       return
     }
 
     for c in string.utf8 {
-      _stdlib_putchar_unlocked(Int32(c))
+      _swift_stdlib_putchar_unlocked(Int32(c))
     }
   }
 }

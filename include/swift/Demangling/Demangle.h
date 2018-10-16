@@ -274,6 +274,11 @@ bool isProtocol(llvm::StringRef mangledName);
 /// \param mangledName A null-terminated string containing a mangled name.
 bool isStruct(llvm::StringRef mangledName);
 
+/// Returns true if the mangled name is an Objective-C symbol.
+///
+/// \param mangledName A null-terminated string containing a mangled name.
+bool isObjCSymbol(llvm::StringRef mangledName);
+
 /// Returns true if the mangled name has the old scheme of function type
 /// mangling where labels are part of the type.
 ///
@@ -352,7 +357,7 @@ public:
   /// Returns true if the mangledName refers to a thunk function.
   ///
   /// Thunk functions are either (ObjC) partial apply forwarder, swift-as-ObjC
-  /// or ObjC-as-swift thunks.
+  /// or ObjC-as-swift thunks or allocating init functions.
   bool isThunkSymbol(llvm::StringRef MangledName);
 
   /// Returns the mangled name of the target of a thunk.

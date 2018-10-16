@@ -116,10 +116,10 @@ sil public_external @c_return_func : $@convention(thin) () -> () -> @owned BigSt
 // CHECK: [[CALLEXT:%.*]] = call swiftcc { i8*, %swift.refcounted* } @c_return_func()
 // CHECK: [[VALEXT:%.*]] = extractvalue { i8*, %swift.refcounted* } [[CALLEXT]], 1
 // CHECK: store %swift.refcounted* [[VALEXT]], %swift.refcounted**
-// CHECK: [[RET:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%T22big_types_corner_cases9BigStructV*, i64, %swift.refcounted*)* @"$S17part_apply_calleeTA" to i8*), %swift.refcounted* undef }, %swift.refcounted*
+// CHECK: [[RET:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%T22big_types_corner_cases9BigStructV*, i64, %swift.refcounted*)* @"$s17part_apply_calleeTA" to i8*), %swift.refcounted* undef }, %swift.refcounted*
 // CHECK: ret { i8*, %swift.refcounted* } [[RET]]
 
-// CHECK-LABEL: define internal swiftcc void @"$S17part_apply_calleeTA"(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, i64, %swift.refcounted* swiftself)
+// CHECK-LABEL: define internal swiftcc void @"$s17part_apply_calleeTA"(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, i64, %swift.refcounted* swiftself)
 // CHECK: bitcast %swift.refcounted* %2 to <{ %swift.refcounted, %swift.function }>*
 // CHECK: ret void
 
@@ -191,7 +191,7 @@ sil @autoclosure_partialapply : $@convention(thin) (@owned @callee_owned () -> (
 // CHECK-64: [[ALLOC2:%.*]] = alloca %T22big_types_corner_cases9BigStructV
 // CHECK-64: [[ALLOC3:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
 // CHECK-64: [[ALLOC4:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
-// CHECK-64: call swiftcc void @"$S22big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_AFyKXKfu_TA"(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC1]], %swift.refcounted* swiftself {{.*}}, %swift.error** nocapture swifterror %swifterror)
+// CHECK-64: call swiftcc void @"$s22big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_AFyKXKfu_TA"(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC1]], %swift.refcounted* swiftself {{.*}}, %swift.error** nocapture swifterror %swifterror)
 // CHECK: ret void
 sil @closure : $@convention(thin) (@owned SuperSub) -> BigStruct {
 bb0(%0 : $SuperSub):
@@ -287,7 +287,7 @@ class X {
 }
 sil_vtable X {}
 
-sil @$S22big_types_corner_cases1XC3fooSo11BitfieldOneVyFTo : $@convention(objc_method) (X) -> BitfieldOne {
+sil @$s22big_types_corner_cases1XC3fooSo11BitfieldOneVyFTo : $@convention(objc_method) (X) -> BitfieldOne {
 bb0(%1 : $X):
   %4 = function_ref @$getLargeObjCType : $@convention(thin) () -> BitfieldOne
   %7 = apply %4() : $@convention(thin) () -> BitfieldOne

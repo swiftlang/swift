@@ -348,7 +348,7 @@ func takesRawBuffer(_ b: UnsafeRawBufferPointer) {}
 
 // <rdar://problem/29586888> UnsafeRawBufferPointer range subscript is inconsistent with Collection.
 func f29586888(b: UnsafeRawBufferPointer) {
-  takesRawBuffer(b[1..<2]) // expected-error {{'subscript' is unavailable: use 'UnsafeRawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.}}
+  takesRawBuffer(b[1..<2]) // expected-error {{'subscript(_:)' is unavailable: use 'UnsafeRawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.}}
   let slice = b[1..<2]
   takesRawBuffer(slice) // expected-error {{cannot convert value of type 'UnsafeRawBufferPointer.SubSequence' (aka 'Slice<UnsafeRawBufferPointer>') to expected argument type 'UnsafeRawBufferPointer'}}
 }

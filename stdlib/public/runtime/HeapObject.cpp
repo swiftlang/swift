@@ -61,7 +61,7 @@ using namespace swift;
 /// Returns true if the pointer passed to a native retain or release is valid.
 /// If false, the operation should immediately return.
 static inline bool isValidPointerForNativeRetain(const void *p) {
-#if defined(__x86_64__) || defined(__arm64__)
+#if defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
   // On these platforms, the upper half of address space is reserved for the
   // kernel, so we can assume that pointer values in this range are invalid.
   return (intptr_t)p > 0;
@@ -154,7 +154,7 @@ swift::swift_verifyEndOfLifetime(HeapObject *object) {
 /// \brief Allocate a reference-counted object on the heap that
 /// occupies <size> bytes of maximally-aligned storage.  The object is
 /// uninitialized except for its header.
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 HeapObject* swift_bufferAllocate(
   HeapMetadata const* bufferType, size_t size, size_t alignMask)
 {
@@ -365,7 +365,9 @@ void swift::swift_nonatomic_release_n(HeapObject *object, uint32_t n) {
 }
 
 size_t swift::swift_retainCount(HeapObject *object) {
-  return object->refCounts.getCount();
+  if (isValidPointerForNativeRetain(object))
+    return object->refCounts.getCount();
+  return 0;
 }
 
 size_t swift::swift_unownedRetainCount(HeapObject *object) {

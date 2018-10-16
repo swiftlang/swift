@@ -19,11 +19,11 @@ extension A {
 
 func markUsed<T>(_ t: T) {}
 
-// CHECK-LABEL: sil hidden @$S11def_structA1AV04ext_B1AE4testyyF
+// CHECK-LABEL: sil hidden @$s11def_structA1AV04ext_B1AE4testyyF
 var a = A()
 markUsed(a.test())
 
-// CHECK-LABEL: sil hidden @$S11def_structA1AV04ext_B1AE10NestedTypeV4testyyF
+// CHECK-LABEL: sil hidden @$s11def_structA1AV04ext_B1AE10NestedTypeV4testyyF
 
 var nestedType = A.NestedType()
 markUsed(nestedType.test())

@@ -32,7 +32,7 @@ class ConcreteClass : NotClassBound, ClassBound, ClassBound2 {
 
 class ConcreteSubclass : ConcreteClass { }
 
-// CHECK-LABEL: sil hidden @$Ss19class_bound_generic{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$ss19class_bound_generic{{[_0-9a-zA-Z]*}}F
 func class_bound_generic<T : ClassBound>(x: T) -> T {
   var x = x
   // CHECK: bb0([[X:%.*]] : @guaranteed $T):
@@ -47,7 +47,7 @@ func class_bound_generic<T : ClassBound>(x: T) -> T {
   // CHECK:   return [[X1]]
 }
 
-// CHECK-LABEL: sil hidden @$Ss21class_bound_generic_2{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$ss21class_bound_generic_2{{[_0-9a-zA-Z]*}}F
 func class_bound_generic_2<T : ClassBound & NotClassBound>(x: T) -> T {
   var x = x
   // CHECK: bb0([[X:%.*]] : @guaranteed $T):
@@ -61,7 +61,7 @@ func class_bound_generic_2<T : ClassBound & NotClassBound>(x: T) -> T {
   // CHECK:   return [[X1]]
 }
 
-// CHECK-LABEL: sil hidden @$Ss20class_bound_protocol{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$ss20class_bound_protocol{{[_0-9a-zA-Z]*}}F
 func class_bound_protocol(x: ClassBound) -> ClassBound {
   var x = x
   // CHECK: bb0([[X:%.*]] : @guaranteed $ClassBound):
@@ -75,7 +75,7 @@ func class_bound_protocol(x: ClassBound) -> ClassBound {
   // CHECK:   return [[X1]]
 }
 
-// CHECK-LABEL: sil hidden @$Ss32class_bound_protocol_composition{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$ss32class_bound_protocol_composition{{[_0-9a-zA-Z]*}}F
 func class_bound_protocol_composition(x: ClassBound & NotClassBound)
 -> ClassBound & NotClassBound {
   var x = x
@@ -90,14 +90,14 @@ func class_bound_protocol_composition(x: ClassBound & NotClassBound)
   // CHECK:   return [[X1]]
 }
 
-// CHECK-LABEL: sil hidden @$Ss19class_bound_erasure{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$ss19class_bound_erasure{{[_0-9a-zA-Z]*}}F
 func class_bound_erasure(x: ConcreteClass) -> ClassBound {
   return x
   // CHECK: [[PROTO:%.*]] = init_existential_ref {{%.*}} : $ConcreteClass, $ClassBound
   // CHECK: return [[PROTO]]
 }
 
-// CHECK-LABEL: sil hidden @$Ss30class_bound_existential_upcast1xs10ClassBound_psAC_s0E6Bound2p_tF :
+// CHECK-LABEL: sil hidden @$ss30class_bound_existential_upcast1xs10ClassBound_psAC_s0E6Bound2p_tF :
 func class_bound_existential_upcast(x: ClassBound & ClassBound2)
 -> ClassBound {
   return x
@@ -107,9 +107,9 @@ func class_bound_existential_upcast(x: ClassBound & ClassBound2)
   // CHECK:   [[PROTO:%.*]] = init_existential_ref [[OPENED_COPY]] : [[OPENED_TYPE]] : [[OPENED_TYPE]], $ClassBound
   // CHECK:   return [[PROTO]]
 }
-// CHECK: } // end sil function '$Ss30class_bound_existential_upcast1xs10ClassBound_psAC_s0E6Bound2p_tF'
+// CHECK: } // end sil function '$ss30class_bound_existential_upcast1xs10ClassBound_psAC_s0E6Bound2p_tF'
 
-// CHECK-LABEL: sil hidden @$Ss41class_bound_to_unbound_existential_upcast1xs13NotClassBound_ps0hI0_sACp_tF :
+// CHECK-LABEL: sil hidden @$ss41class_bound_to_unbound_existential_upcast1xs13NotClassBound_ps0hI0_sACp_tF :
 // CHECK: bb0([[ARG0:%.*]] : @trivial $*NotClassBound, [[ARG1:%.*]] : @guaranteed $ClassBound & NotClassBound):
 // CHECK:   [[X_OPENED:%.*]] = open_existential_ref [[ARG1]] : $ClassBound & NotClassBound to [[OPENED_TYPE:\$@opened(.*) ClassBound & NotClassBound]]
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = init_existential_addr [[ARG0]] : $*NotClassBound, [[OPENED_TYPE]]
@@ -120,7 +120,7 @@ func class_bound_to_unbound_existential_upcast
   return x
 }
 
-// CHECK-LABEL: sil hidden @$Ss18class_bound_method1xys10ClassBound_p_tF :
+// CHECK-LABEL: sil hidden @$ss18class_bound_method1xys10ClassBound_p_tF :
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $ClassBound):
 func class_bound_method(x: ClassBound) {
   var x = x
@@ -137,7 +137,7 @@ func class_bound_method(x: ClassBound) {
   // CHECK: destroy_value [[PROJ]]
   // CHECK: destroy_value [[XBOX]]
 }
-// CHECK: } // end sil function '$Ss18class_bound_method1xys10ClassBound_p_tF'
+// CHECK: } // end sil function '$ss18class_bound_method1xys10ClassBound_p_tF'
 
 // rdar://problem/31858378
 struct Value {}
@@ -152,7 +152,7 @@ protocol InheritsMutatingMethod : class, HasMutatingMethod {}
 
 func takesInOut<T>(_: inout T) {}
 
-// CHECK-LABEL: sil hidden @$Ss27takesInheritsMutatingMethod1x1yys0bcD0_pz_s5ValueVtF : $@convention(thin) (@inout InheritsMutatingMethod, Value) -> () {
+// CHECK-LABEL: sil hidden @$ss27takesInheritsMutatingMethod1x1yys0bcD0_pz_s5ValueVtF : $@convention(thin) (@inout InheritsMutatingMethod, Value) -> () {
 func takesInheritsMutatingMethod(x: inout InheritsMutatingMethod,
                                  y: Value) {
   // CHECK:      [[X_ADDR:%.*]] = begin_access [modify] [unknown] %0 : $*InheritsMutatingMethod
@@ -176,7 +176,7 @@ func takesInheritsMutatingMethod(x: inout InheritsMutatingMethod,
   // CHECK-NEXT: [[X_PAYLOAD:%.*]] = open_existential_ref [[X_VALUE]] : $InheritsMutatingMethod to $@opened("{{.*}}") InheritsMutatingMethod
   // CHECK-NEXT: [[TEMPORARY:%.*]] = alloc_stack $@opened("{{.*}}") InheritsMutatingMethod
   // CHECK-NEXT: store [[X_PAYLOAD]] to [init] [[TEMPORARY]] : $*@opened("{{.*}}") InheritsMutatingMethod
-  // CHECK-NEXT: [[X_PAYLOAD_RELOADED:%.*]] = load [take] [[TEMPORARY]]
+  // CHECK-NEXT: [[X_PAYLOAD_RELOADED:%.*]] = load_borrow [[TEMPORARY]]
   //
   // ** *NOTE* This extra copy is here since RValue invariants enforce that all
   // ** loadable objects are actually loaded. So we form the RValue and
@@ -184,12 +184,13 @@ func takesInheritsMutatingMethod(x: inout InheritsMutatingMethod,
   // ** pass to an in_guaranteed method. PredictableMemOpts is able to handle this
   // ** type of temporary codegen successfully.
   // CHECK-NEXT: [[TEMPORARY_2:%.*]] = alloc_stack $@opened("{{.*}}") InheritsMutatingMethod
-  // CHECK-NEXT: store [[X_PAYLOAD_RELOADED:%.*]] to [init] [[TEMPORARY_2]]
+  // CHECK-NEXT: store_borrow [[X_PAYLOAD_RELOADED:%.*]] to [[TEMPORARY_2]]
   // 
   // CHECK-NEXT: [[METHOD:%.*]] = witness_method $@opened("{{.*}}") InheritsMutatingMethod, #HasMutatingMethod.mutatingCounter!getter.1 : <Self where Self : HasMutatingMethod> (Self) -> () -> Value, [[X_PAYLOAD]] : $@opened("{{.*}}") InheritsMutatingMethod : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@in_guaranteed τ_0_0) -> Value
   // CHECK-NEXT: [[RESULT_VALUE:%.*]] = apply [[METHOD]]<@opened("{{.*}}") InheritsMutatingMethod>([[TEMPORARY_2]]) : $@convention(witness_method: HasMutatingMethod) <τ_0_0 where τ_0_0 : HasMutatingMethod> (@in_guaranteed τ_0_0) -> Value
-  // CHECK-NEXT: destroy_addr [[TEMPORARY_2]] : $*@opened("{{.*}}") InheritsMutatingMethod
   // CHECK-NEXT: dealloc_stack  [[TEMPORARY_2]]
+  // CHECK-NEXT: end_borrow
+  // CHECK-NEXT: destroy_addr
   // CHECK-NEXT: end_access [[X_ADDR]] : $*InheritsMutatingMethod
   // CHECK-NEXT: assign [[RESULT_VALUE]] to [[RESULT]] : $*Value
   // CHECK-NEXT: dealloc_stack [[TEMPORARY]] : $*@opened("{{.*}}") InheritsMutatingMethod

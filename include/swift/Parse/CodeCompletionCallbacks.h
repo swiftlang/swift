@@ -183,6 +183,10 @@ public:
   /// @available.
   virtual void completeDeclAttrParam(DeclAttrKind DK, int Index) = 0;
 
+  /// Complete within a precedence group decl or after a colon in an
+  /// operator decl.
+  virtual void completeInPrecedenceGroup(SyntaxKind SK) = 0;
+
   /// Complete the platform names inside #available statements.
   virtual void completePoundAvailablePlatform() = 0;
 
@@ -196,7 +200,7 @@ public:
 
   virtual void completeAssignmentRHS(AssignExpr *E) = 0;
 
-  virtual void completeCallArg(CallExpr *E) = 0;
+  virtual void completeCallArg(CodeCompletionExpr *E) = 0;
 
   virtual void completeReturnStmt(CodeCompletionExpr *E) = 0;
 

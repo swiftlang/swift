@@ -55,15 +55,15 @@ entry(%0 : @owned $Mongrel):
 
 // ObjC stubs expected by ObjC metadata emission
 
-sil private @$S18class_isa_pointers7MongrelC6methodyyFTo : $@convention(objc_method) (Purebred) -> () {
+sil private @$s18class_isa_pointers7MongrelC6methodyyFTo : $@convention(objc_method) (Purebred) -> () {
 entry(%0 : @unowned $Purebred):
   unreachable
 }
-sil private @$S18class_isa_pointers7MongrelC7bellsOnACSgSi_tcfcTo : $@convention(objc_method) (Int, Purebred) -> () {
+sil private @$s18class_isa_pointers7MongrelC7bellsOnACSgSi_tcfcTo : $@convention(objc_method) (Int, Purebred) -> () {
 entry(%0 : @trivial $Int, %1 : @unowned $Purebred):
   unreachable
 }
-sil private @$S18class_isa_pointers7MongrelCACycfcTo : $@convention(objc_method) (Purebred) -> () {
+sil private @$s18class_isa_pointers7MongrelCACycfcTo : $@convention(objc_method) (Purebred) -> () {
 entry(%0 : @unowned $Purebred):
   unreachable
 }

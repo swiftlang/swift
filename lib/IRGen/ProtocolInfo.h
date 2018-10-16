@@ -247,13 +247,8 @@ public:
 
   /// Return the witness index for the type metadata access function
   /// for the given associated type.
-  WitnessIndex getAssociatedTypeIndex(AssociatedType assocType) const {
-    for (auto &witness : getWitnessEntries()) {
-      if (witness.matchesAssociatedType(assocType))
-        return getNonBaseWitnessIndex(&witness);
-    }
-    llvm_unreachable("didn't find entry for associated type");
-  }
+  WitnessIndex getAssociatedTypeIndex(IRGenModule &IGM,
+                                      AssociatedType assocType) const;
 
   /// Return the witness index for the protocol witness table access
   /// function for the given associated protocol conformance.

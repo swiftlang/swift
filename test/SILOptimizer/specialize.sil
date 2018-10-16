@@ -9,11 +9,11 @@ import Swift
 // CHECK-LABEL: sil @exp1 : $@convention(thin) () -> () {
 // CHECK-NOT: apply
 // Call of specialized initializer: <Int32>
-// CHECK: [[CTOR:%[0-9]+]] = function_ref @$S8XXX_inits5Int32V_Tg5
+// CHECK: [[CTOR:%[0-9]+]] = function_ref @$s8XXX_inits5Int32V_Tg5
 // CHECK: apply [[CTOR]]
 // CHECK: [[ACCEPTS_INT:%[0-9]+]] = function_ref @acceptsInt
 // Call of specialized XXX_foo: <Int32>
-// CHECK: [[FOO:%[0-9]+]] = function_ref @$S7XXX_foos5Int32V_Tg5
+// CHECK: [[FOO:%[0-9]+]] = function_ref @$s7XXX_foos5Int32V_Tg5
 // CHECK: apply [[FOO]]
 // CHECK: apply [[ACCEPTS_INT]]
 // CHECK: return
@@ -102,7 +102,7 @@ bb0(%0 : $*T, %1 : $*XXX<T>):
 }
 
 // Swift.Int32._convertFromBuiltinIntegerLiteral (Swift.Int32.Type)(Builtin.Int2048) -> Swift.Int32
-sil public_external [transparent] @$SSi33_convertFromBuiltinIntegerLiteralySiBi2048_cSimF : $@convention(thin) (Builtin.Int2048, @thin Int32.Type) -> Int32 {
+sil public_external [transparent] @$sSi33_convertFromBuiltinIntegerLiteralySiBi2048_cSimF : $@convention(thin) (Builtin.Int2048, @thin Int32.Type) -> Int32 {
 bb0(%0 : $Builtin.Int2048, %1 : $@thin Int32.Type):
   %3 = builtin "s_to_s_checked_trunc_Int2048_Int32"(%0 : $Builtin.Int2048) : $(Builtin.Int32, Builtin.Int1)
   %4 = tuple_extract %3 : $(Builtin.Int32, Builtin.Int1), 0 // user: %5
@@ -226,10 +226,10 @@ bb0:
   store %2 to %6 : $*UInt8                      // id: %7
   %8 = apply %5<UInt8>(%6) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned @callee_owned () -> @out τ_0_0 // user: %10
   // function_ref reabstraction thunk helper from @callee_owned () -> (@out Swift.UInt8) to @callee_owned () -> (@unowned Swift.UInt8)
-  %9 = function_ref @$Ss5UInt8VIxr_ABIxd_TR : $@convention(thin) (@owned @callee_owned () -> @out UInt8) -> UInt8 // user: %10
+  %9 = function_ref @$ss5UInt8VIxr_ABIxd_TR : $@convention(thin) (@owned @callee_owned () -> @out UInt8) -> UInt8 // user: %10
   %10 = partial_apply %9(%8) : $@convention(thin) (@owned @callee_owned () -> @out UInt8) -> UInt8 // user: %12
   // function_ref reabstraction thunk helper from @callee_owned () -> (@unowned Swift.UInt8) to @callee_owned () -> (@out Swift.UInt8)
-  %11 = function_ref @$Ss5UInt8VIxd_ABIxr_TR : $@convention(thin) (@owned @callee_owned () -> UInt8) -> @out UInt8 // user: %12
+  %11 = function_ref @$ss5UInt8VIxd_ABIxr_TR : $@convention(thin) (@owned @callee_owned () -> UInt8) -> @out UInt8 // user: %12
   %12 = partial_apply %11(%10) : $@convention(thin) (@owned @callee_owned () -> UInt8) -> @out UInt8 // user: %14
   %13 = alloc_stack $UInt8                        // users: %14, %15, %16
   %14 = apply %4<UInt8>(%13, %12) : $@convention(thin) <τ_0_0> (@owned @callee_owned () -> @out τ_0_0) -> @out τ_0_0
@@ -241,7 +241,7 @@ bb0:
 }
 
 // reabstraction thunk helper from @callee_owned () -> (@out Swift.UInt8) to @callee_owned () -> (@unowned Swift.UInt8)
-sil shared [transparent] @$Ss5UInt8VIxr_ABIxd_TR : $@convention(thin) (@owned @callee_owned () -> @out UInt8) -> UInt8 {
+sil shared [transparent] @$ss5UInt8VIxr_ABIxd_TR : $@convention(thin) (@owned @callee_owned () -> @out UInt8) -> UInt8 {
 bb0(%0 : $@callee_owned () -> @out UInt8):
   %1 = alloc_stack $UInt8                         // users: %2, %3, %4
   %2 = apply %0(%1) : $@callee_owned () -> @out UInt8
@@ -251,7 +251,7 @@ bb0(%0 : $@callee_owned () -> @out UInt8):
 }
 
 // reabstraction thunk helper from @callee_owned () -> (@unowned Swift.UInt8) to @callee_owned () -> (@out Swift.UInt8)
-sil shared [transparent] @$Ss5UInt8VIxd_ABIxr_TR : $@convention(thin) (@owned @callee_owned () -> UInt8) -> @out UInt8 {
+sil shared [transparent] @$ss5UInt8VIxd_ABIxr_TR : $@convention(thin) (@owned @callee_owned () -> UInt8) -> @out UInt8 {
 bb0(%0 : $*UInt8, %1 : $@callee_owned () -> UInt8):
   %2 = apply %1() : $@callee_owned () -> UInt8    // user: %3
   store %2 to %0 : $*UInt8                        // id: %3
@@ -367,7 +367,7 @@ bb0(%0 : $Int32, %1 : $*T, %2 : $<τ_0_0> { var τ_0_0 } <U>):
 }
 
 // static Swift.+ infix (Swift.Int32, Swift.Int32) -> Swift.Int32
-sil public_external [transparent] [serialized] @$Ss1poiys5Int32VAC_ACtFZ : $@convention(thin) (Int32, Int32) -> Int32 {
+sil public_external [transparent] [serialized] @$ss1poiys5Int32VAC_ACtFZ : $@convention(thin) (Int32, Int32) -> Int32 {
 bb0(%0 : $Int32, %1 : $Int32):
   %2 = struct_extract %0 : $Int32, #Int32._value   // user: %5
   %3 = struct_extract %1 : $Int32, #Int32._value   // user: %5
@@ -443,20 +443,20 @@ bb0(%0 : $Int32, %1 : $<τ_0_0> { var τ_0_0 } <T>):
 }
 
 // check that there is a generic specialization of boo
-// CHECK-LABEL: sil shared [noinline] @$S3booxs5Int32VSfACIexyid_4main1PRzSfRs_r0_lIetio_Tp5AD1CV_Tg5 : $@convention(thin) (C) -> @owned @callee_owned (Int32, @in Float) -> Int32
-// CHECK: [[CLOSURE_SPECIALIZATION:%[0-9]+]] = function_ref @$S11boo_closures5Int32VSfxz_x_lXXAC4main1PRzSfRs_r0_lIetyyxd_TP5AD1CV_TG5
+// CHECK-LABEL: sil shared [noinline] @$s3booxs5Int32VSfACIexyid_4main1PRzSfRs_r0_lIetio_Tp5AD1CV_Tg5 : $@convention(thin) (C) -> @owned @callee_owned (Int32, @in Float) -> Int32
+// CHECK: [[CLOSURE_SPECIALIZATION:%[0-9]+]] = function_ref @$s11boo_closures5Int32VSfxz_x_lXXAC4main1PRzSfRs_r0_lIetyyxd_TP5AD1CV_TG5
 // CHECK: partial_apply [[CLOSURE_SPECIALIZATION:%[0-9]+]]
 // CHECK: return
 
 // Check that there is a generic specialization of a closure from boo
-// CHECK-LABEL: sil shared [noinline] @$S11boo_closures5Int32VSfxz_x_lXXAC4main1PRzSfRs_r0_lIetyyxd_Tp5AD1CV_Tg5
+// CHECK-LABEL: sil shared [noinline] @$s11boo_closures5Int32VSfxz_x_lXXAC4main1PRzSfRs_r0_lIetyyxd_Tp5AD1CV_Tg5
 // CHECK: return
 
 // Check that there is a generic specialization of foo
-// CHECK-LABEL: sil shared [noinline] @$S3foo4main1CV_ADTg5 : $@convention(thin) (C, C) -> @owned @callee_owned (Int32, Float) -> Int32
-// CHECK: function_ref @$S3booxs5Int32VSfACIexyid_4main1PRzSfRs_r0_lIetio_Tp5AD1CV_Tg5
+// CHECK-LABEL: sil shared [noinline] @$s3foo4main1CV_ADTg5 : $@convention(thin) (C, C) -> @owned @callee_owned (Int32, Float) -> Int32
+// CHECK: function_ref @$s3booxs5Int32VSfACIexyid_4main1PRzSfRs_r0_lIetio_Tp5AD1CV_Tg5
 // check that it invokes a generic specialization of the reabstraction thunk helper which invokes a specialization boo
-// CHECK: [[THUNK_SPECIALIZATION:%[0-9]+]] = function_ref @$S053_TTRG1_RPq_P5test41P_Pq0_PS0___XFo_dVs5Int32iSf_dS1__f2_dj2_di2_dJ2__4main1CV_ADTg5
+// CHECK: [[THUNK_SPECIALIZATION:%[0-9]+]] = function_ref @$s053_TTRG1_RPq_P5test41P_Pq0_PS0___XFo_dVs5Int32iSf_dS1__f2_dj2_di2_dJ2__4main1CV_ADTg5
 // CHECK-NOT: apply
 // CHECK: partial_apply [[THUNK_SPECIALIZATION]]
 // CHECK-NOT: apply
@@ -464,16 +464,16 @@ bb0(%0 : $Int32, %1 : $<τ_0_0> { var τ_0_0 } <T>):
 
 
 // Check that there is a generic specialization of gen1
-// CHECK-LABEL: sil shared [noinline] @$S4gen14main1CV_Tg5 : $@convention(thin) (C) -> @owned @callee_owned (Int32) -> Int32
+// CHECK-LABEL: sil shared [noinline] @$s4gen14main1CV_Tg5 : $@convention(thin) (C) -> @owned @callee_owned (Int32) -> Int32
 // check that it invokes a generic specialization of the closure by mean of partial_apply
-// CHECK: [[CLOSURE_SPECIALIZATION:%[0-9]+]] = function_ref @$S12gen1_closure4main1CV_Tg5
+// CHECK: [[CLOSURE_SPECIALIZATION:%[0-9]+]] = function_ref @$s12gen1_closure4main1CV_Tg5
 // CHECK-NOT: apply
 // CHECK: partial_apply [[CLOSURE_SPECIALIZATION]]
 // CHECK-NOT: apply
 // CHECK: return
 
 // Check that there is a generic specialization of a closure from gen1
-// CHECK-LABEL: sil shared [noinline] @$S12gen1_closure4main1CV_Tg5 : $@convention(thin) (Int32, @owned <τ_0_0> { var τ_0_0 } <C>) -> Int32
+// CHECK-LABEL: sil shared [noinline] @$s12gen1_closure4main1CV_Tg5 : $@convention(thin) (Int32, @owned <τ_0_0> { var τ_0_0 } <C>) -> Int32
 // CHECK: return
 
 
@@ -483,7 +483,7 @@ bb0(%0 : $Int32, %1 : $<τ_0_0> { var τ_0_0 } <T>):
 // check that it does not invoke a generic specialization of foo
 // CHECK-NOT:  function_ref @foo
 // check that it invokes a generic specialization of foo
-// CHECK: function_ref @$S3foo4main1CV_ADTg5
+// CHECK: function_ref @$s3foo4main1CV_ADTg5
 sil hidden @bar : $@convention(thin) () -> Int32 {
 bb0:
   %0 = alloc_stack $@callee_owned (Int32, Float) -> Int32, var, name "f" // users: %11, %22
@@ -529,7 +529,7 @@ bb0:
 // CHECK: apply
 // Reference to the generic specialization of gen1
 // CHECK-NOT: function_ref @gen1
-// CHECK: function_ref @$S4gen14main1CV_Tg5 : $@convention(thin) (C) -> @owned @callee_owned (Int32) -> Int32
+// CHECK: function_ref @$s4gen14main1CV_Tg5 : $@convention(thin) (C) -> @owned @callee_owned (Int32) -> Int32
 sil @testGen1 : $@convention(thin) () -> Int32 {
 bb0:
   %0 = alloc_stack $@callee_owned (Int32) -> Int32, var, name "f" // users: %9, %16
@@ -556,7 +556,7 @@ bb0:
 
 // test_bind<A> (Builtin.RawPointer, A.Type) -> ()
 // Check that this is specialized as T=Int.
-// CHECK-LABEL: sil shared @$S9test_bindSi_Tg5 : $@convention(thin) (Builtin.RawPointer, @thick Int.Type) -> ()
+// CHECK-LABEL: sil shared @$s9test_bindSi_Tg5 : $@convention(thin) (Builtin.RawPointer, @thick Int.Type) -> ()
 // CHECK: bind_memory %0 : $Builtin.RawPointer, {{%.*}} : $Builtin.Word to $*Int
 // CHECK: return
 sil hidden @test_bind : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> () {
@@ -613,7 +613,7 @@ sil @action_thunk : $@convention(thin) (@owned @callee_owned () -> (Never, @erro
 //
 // CHECK-LABEL: sil @testGenericClosureSpecialization
 // Call of the generic specialization of invokeGenericClosure<Never>
-// CHECK: function_ref @$S20invokeGenericClosures5NeverO_Tg5 : $@convention(thin) (@owned @callee_owned () -> (@out Never, @error Error)) -> (Never, @error Error)
+// CHECK: function_ref @$s20invokeGenericClosures5NeverO_Tg5 : $@convention(thin) (@owned @callee_owned () -> (@out Never, @error Error)) -> (Never, @error Error)
 // CHECK: apply [nothrow]
 // CHECK: unreachable
 // CHECK: end sil function 'testGenericClosureSpecialization'
@@ -635,13 +635,13 @@ bb0:
 
 // Test a specialization of a self-recursive generic closure.
 
-// CHECK-LABEL: sil shared @$S27selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lIetnyy_Tp5 : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, Builtin.Int64, Builtin.Int64) -> () {
-// CHECK: [[SPECIALIZED_FN:%[0-9]+]] = function_ref @$S27selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lIetnyy_Tp5
+// CHECK-LABEL: sil shared @$s27selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lIetnyy_Tp5 : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, Builtin.Int64, Builtin.Int64) -> () {
+// CHECK: [[SPECIALIZED_FN:%[0-9]+]] = function_ref @$s27selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lIetnyy_Tp5
 // CHECK: partial_apply [[SPECIALIZED_FN]]{{.*}}({{.*}}) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, Builtin.Int64, Builtin.Int64) -> ()
 
 // CHECK-LABEL: sil @selfReferringGenericClosure : $@convention(thin) <R, S> (@in_guaranteed R, @in_guaranteed S, Builtin.Int64) -> ()
 // Refer to the specialized version of the function
-// CHECK: [[SPECIALIZED_FN:%[0-9]+]] = function_ref @$S27selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lIetnyy_Tp5
+// CHECK: [[SPECIALIZED_FN:%[0-9]+]] = function_ref @$s27selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lIetnyy_Tp5
 // CHECK: partial_apply [[SPECIALIZED_FN]]<R, Builtin.Int64>({{.*}}) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, Builtin.Int64, Builtin.Int64) -> ()
 sil @selfReferringGenericClosure : $@convention(thin) <R, S> (@in_guaranteed R, @in_guaranteed S, Builtin.Int64) -> () {
 bb0(%0 : $*R, %1 : $*S, %2 : $Builtin.Int64):
@@ -675,7 +675,7 @@ enum MyOptional<T> {
 
 // Check that a specialization of a self-recursive function is produced
 // and it is not crashing the compiler.
-// CHECK-LABEL: sil shared @$S25testSelfRecursiveFunction4main10MyOptionalOyAB3YYYVyypGG_Tg5 : $@convention(thin) (MyOptional<YYY<Any>>) -> ()
+// CHECK-LABEL: sil shared @$s25testSelfRecursiveFunction4main10MyOptionalOyAB3YYYVyypGG_Tg5 : $@convention(thin) (MyOptional<YYY<Any>>) -> ()
 sil @testSelfRecursiveFunction : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
   %2 = function_ref @testSelfRecursiveFunction : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()

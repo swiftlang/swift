@@ -65,8 +65,8 @@ static bool isAnyObjectOrAny(Type type) {
 
 /// Returns true if \p name matches a keyword in any Clang language mode.
 static bool isClangKeyword(Identifier name) {
-  static const llvm::StringSet<> keywords = []{
-    llvm::StringSet<> set;
+  static const llvm::DenseSet<StringRef> keywords = []{
+    llvm::DenseSet<StringRef> set;
     // FIXME: clang::IdentifierInfo /nearly/ has the API we need to do this
     // in a more principled way, but not quite.
 #define KEYWORD(SPELLING, FLAGS) \
@@ -1909,7 +1909,7 @@ private:
     if (!FT->getParams().empty()) {
       interleave(FT->getParams(),
                  [this](const AnyFunctionType::Param &param) {
-                   print(param.getType(), OTK_None, param.getLabel(),
+                   print(param.getOldType(), OTK_None, param.getLabel(),
                          IsFunctionParam);
                  },
                  [this] { os << ", "; });
@@ -2061,7 +2061,7 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
 
   void visitAnyFunctionType(AnyFunctionType *fnTy) {
     for (auto &param : fnTy->getParams())
-      visit(param.getType());
+      visit(param.getOldType());
     visit(fnTy->getResult());
   }
 

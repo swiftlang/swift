@@ -113,7 +113,7 @@ internal class Other {
      self.s = s;
    }
 
-// CHECK-LABEL: sil hidden [noinline] @$S25sil_combine_protocol_conf5OtherC11doWorkClassSiyF : $@convention(method) (@guaranteed Other) -> Int {
+// CHECK-LABEL: sil hidden [noinline] @$s25sil_combine_protocol_conf5OtherC11doWorkClassSiyF : $@convention(method) (@guaranteed Other) -> Int {
 // CHECK: bb0
 // CHECK: debug_value
 // CHECK: integer_literal
@@ -161,7 +161,7 @@ internal class Other {
 // CHECK: cond_fail
 // CHECK: struct 
 // CHECK: return
-// CHECK: } // end sil function '$S25sil_combine_protocol_conf5OtherC11doWorkClassSiyF'
+// CHECK: } // end sil function '$s25sil_combine_protocol_conf5OtherC11doWorkClassSiyF'
    @inline(never) func doWorkClass () ->Int {
       return self.x.foo(x:self.x) // optimize
              + self.y.bar(x:self.y) // optimize
@@ -234,7 +234,7 @@ internal class OtherClass {
      self.arg4 = arg4
   }
 
-// CHECK-LABEL: sil hidden [noinline] @$S25sil_combine_protocol_conf10OtherClassC12doWorkStructSiyF : $@convention(method) (@guaranteed OtherClass) -> Int {
+// CHECK-LABEL: sil hidden [noinline] @$s25sil_combine_protocol_conf10OtherClassC12doWorkStructSiyF : $@convention(method) (@guaranteed OtherClass) -> Int {
 // CHECK: bb0
 // CHECK: debug_value
 // CHECK: [[A1:%.*]] = alloc_stack $PropProtocol
@@ -265,10 +265,7 @@ internal class OtherClass {
 // CHECK: [[R4:%.*]] = ref_element_addr %0 : $OtherClass, #OtherClass.arg3
 // CHECK: copy_addr [[R4]] to [initialization] [[A4]] : $*NestedPropProtocol
 // CHECK: [[O4:%.*]] = open_existential_addr immutable_access [[A4]] : $*NestedPropProtocol to $*@opened("{{.*}}") NestedPropProtocol
-// CHECK: [[AA:%.*]] = alloc_stack $@opened("{{.*}}") NestedPropProtocol
-// CHECK: copy_addr [[O4]] to [initialization] [[AA]] : $*@opened("{{.*}}") NestedPropProtocol
-// CHECK: destroy_addr [[A4]] : $*NestedPropProtocol
-// CHECK: [[U4:%.*]] = unchecked_addr_cast [[AA]] : $*@opened("{{.*}}") NestedPropProtocol to $*Outer.Inner
+// CHECK: [[U4:%.*]] = unchecked_addr_cast [[O4]] : $*@opened("{{.*}}") NestedPropProtocol to $*Outer.Inner
 // CHECK: [[S4:%.*]] = struct_element_addr [[U4]] : $*Outer.Inner, #Outer.Inner.val
 // CHECK: [[S41:%.*]] = struct_element_addr [[S4]] : $*Int, #Int._value
 // CHECK: load [[S41]]
@@ -281,22 +278,18 @@ internal class OtherClass {
 // CHECK: [[R5:%.*]] = ref_element_addr %0 : $OtherClass, #OtherClass.arg4
 // CHECK:  copy_addr [[R5]] to [initialization] [[A5]] : $*GenericNestedPropProtocol
 // CHECK: [[O5:%.*]] = open_existential_addr immutable_access [[A5]] : $*GenericNestedPropProtocol to $*@opened("{{.*}}") GenericNestedPropProtocol
-// CHECK: [[A6:%.*]] = alloc_stack $@opened("{{.*}}") GenericNestedPropProtocol
-// CHECK: copy_addr [[O5]] to [initialization] [[A6]] : $*@opened("{{.*}}") GenericNestedPropProtocol
-// CHECK: destroy_addr [[A5]] : $*GenericNestedPropProtocol
 // CHECK: [[W5:%.*]] = witness_method $@opened("{{.*}}") GenericNestedPropProtocol, #GenericNestedPropProtocol.val!getter.1 : <Self where Self : GenericNestedPropProtocol> (Self) -> () -> Int, [[O5:%.*]] : $*@opened("{{.*}}") GenericNestedPropProtocol : $@convention(witness_method: GenericNestedPropProtocol) <τ_0_0 where τ_0_0 : GenericNestedPropProtocol> (@in_guaranteed τ_0_0) -> Int 
-// CHECK: apply [[W5]]<@opened("{{.*}}") GenericNestedPropProtocol>([[A6]]) : $@convention(witness_method: GenericNestedPropProtocol) <τ_0_0 where τ_0_0 : GenericNestedPropProtocol> (@in_guaranteed τ_0_0) -> Int
-// CHECK: destroy_addr [[A6]] : $*@opened("{{.*}}") GenericNestedPropProtocol
+// CHECK: apply [[W5]]<@opened("{{.*}}") GenericNestedPropProtocol>([[O5]]) : $@convention(witness_method: GenericNestedPropProtocol) <τ_0_0 where τ_0_0 : GenericNestedPropProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract
 // CHECK: builtin
 // CHECK: tuple_extract
 // CHECK: tuple_extract
 // CHECK: cond_fail
 // CHECK: struct
-// CHECK: dealloc_stack [[A6]] : $*@opened("{{.*}}") GenericNestedPropProtocol
+// CHECK: destroy_addr [[A5]] : $*GenericNestedPropProtocol
 // CHECK: dealloc_stack [[A5]] : $*GenericNestedPropProtocol
 // CHECK: return
-// CHECK: } // end sil function '$S25sil_combine_protocol_conf10OtherClassC12doWorkStructSiyF'
+// CHECK: } // end sil function '$s25sil_combine_protocol_conf10OtherClassC12doWorkStructSiyF'
   @inline(never) func doWorkStruct () -> Int{
     return self.arg1.val  // optimize
            + self.arg2.val  // do not optimize
@@ -342,7 +335,7 @@ internal class OtherKlass {
      self.arg2 = arg2
   }
 
-// CHECK-LABEL: sil hidden [noinline] @$S25sil_combine_protocol_conf10OtherKlassC10doWorkEnumSiyF : $@convention(method) (@guaranteed OtherKlass) -> Int {
+// CHECK-LABEL: sil hidden [noinline] @$s25sil_combine_protocol_conf10OtherKlassC10doWorkEnumSiyF : $@convention(method) (@guaranteed OtherKlass) -> Int {
 // CHECK: bb0
 // CHECK: debug_value
 // CHECK: integer_literal
@@ -350,12 +343,8 @@ internal class OtherKlass {
 // CHECK: [[R1:%.*]] = ref_element_addr %0 : $OtherKlass, #OtherKlass.arg2
 // CHECK: copy_addr [[R1]] to [initialization] [[A1]] : $*AGenericProtocol 
 // CHECK: [[O1:%.*]] = open_existential_addr immutable_access [[A1]] : $*AGenericProtocol to $*@opened("{{.*}}") AGenericProtocol
-// CHECK: [[A2:%.*]] = alloc_stack $@opened("{{.*}}") AGenericProtocol
-// CHECK: copy_addr [[O1]] to [initialization] [[A2]] : $*@opened("{{.*}}") AGenericProtocol
-// CHECK: destroy_addr [[A1]] : $*AGenericProtocol
 // CHECK: [[W1:%.*]] = witness_method $@opened("{{.*}}") AGenericProtocol, #AGenericProtocol.val!getter.1 : <Self where Self : AGenericProtocol> (Self) -> () -> Int, [[O1]] : $*@opened("{{.*}}") AGenericProtocol : $@convention(witness_method: AGenericProtocol) <τ_0_0 where τ_0_0 : AGenericProtocol> (@in_guaranteed τ_0_0) -> Int
-// CHECK: apply [[W1]]<@opened("{{.*}}") AGenericProtocol>([[A2]]) : $@convention(witness_method: AGenericProtocol) <τ_0_0 where τ_0_0 : AGenericProtocol> (@in_guaranteed τ_0_0) -> Int
-// CHECK: destroy_addr [[A2]] : $*@opened("{{.*}}") AGenericProtocol
+// CHECK: apply [[W1]]<@opened("{{.*}}") AGenericProtocol>([[O1]]) : $@convention(witness_method: AGenericProtocol) <τ_0_0 where τ_0_0 : AGenericProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract
 // CHECK: integer_literal
 // CHECK: builtin
@@ -363,10 +352,10 @@ internal class OtherKlass {
 // CHECK: tuple_extract
 // CHECK: cond_fail
 // CHECK: struct
-// CHECK: dealloc_stack [[A2]] : $*@opened("{{.*}}") AGenericProtocol
+// CHECK: destroy_addr [[A1]] : $*AGenericProtocol
 // CHECK: dealloc_stack [[A1]] : $*AGenericProtocol
 // CHECK: return
-// CHECK: } // end sil function '$S25sil_combine_protocol_conf10OtherKlassC10doWorkEnumSiyF'
+// CHECK: } // end sil function '$s25sil_combine_protocol_conf10OtherKlassC10doWorkEnumSiyF'
   @inline(never) func doWorkEnum() -> Int {
     return self.arg1.val  // optimize
            + self.arg2.val // do not optimize

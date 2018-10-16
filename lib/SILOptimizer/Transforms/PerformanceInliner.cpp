@@ -833,27 +833,23 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
                             << "] " << Callee->getName() << "\n");
 
     SILOpenedArchetypesTracker OpenedArchetypesTracker(Caller);
-    Caller->getModule().registerDeleteNotificationHandler(&OpenedArchetypesTracker);
+    Caller->getModule().registerDeleteNotificationHandler(
+        &OpenedArchetypesTracker);
     // The callee only needs to know about opened archetypes used in
     // the substitution list.
     OpenedArchetypesTracker.registerUsedOpenedArchetypes(AI.getInstruction());
 
-    SILInliner Inliner(FuncBuilder, *Caller, *Callee,
-                       SILInliner::InlineKind::PerformanceInline,
-                       AI.getSubstitutionMap(),
-                       OpenedArchetypesTracker);
+    SILInliner Inliner(FuncBuilder, SILInliner::InlineKind::PerformanceInline,
+                       AI.getSubstitutionMap(), OpenedArchetypesTracker);
 
     // We've already determined we should be able to inline this, so
     // unconditionally inline the function.
     //
     // If for whatever reason we can not inline this function, inlineFunction
     // will assert, so we are safe making this assumption.
-    Inliner.inlineFunction(AI, Args);
-    recursivelyDeleteTriviallyDeadInstructions(AI.getInstruction(), true);
-
+    Inliner.inlineFunction(Callee, AI, Args);
     NumFunctionsInlined++;
   }
-
   return true;
 }
 

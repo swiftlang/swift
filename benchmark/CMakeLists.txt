@@ -56,6 +56,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Chars
     single-source/ClassArrayGetter
     single-source/Combos
+    single-source/CountAlgo
     single-source/DataBenchmarks
     single-source/DeadArray
     single-source/DictOfArraysToArrayOfDicts
@@ -169,16 +170,13 @@ set(SWIFT_BENCH_MODULES
     single-source/XorLoop
 )
 
-set(SWIFT_MULTISOURCE_SWIFT3_BENCHES
+set(SWIFT_MULTISOURCE_SWIFT_BENCHES
   multi-source/PrimsSplit
 )
 
 set(PrimsSplit_sources
     multi-source/PrimsSplit/Prims.swift
     multi-source/PrimsSplit/Prims_main.swift)
-
-set(SWIFT_MULTISOURCE_SWIFT4_BENCHES
-)
 
 set(BENCH_DRIVER_LIBRARY_FLAGS)
 if (SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)

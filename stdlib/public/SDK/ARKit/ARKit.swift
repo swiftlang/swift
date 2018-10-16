@@ -190,3 +190,60 @@ extension ARPlaneGeometry {
         return Array(buffer)
     }
 }
+
+@available(iOS, introduced: 12.0)
+extension ARPlaneAnchor {
+    /**
+     A value describing the classification of a plane anchor.
+     */
+    public enum Classification {
+        
+        public enum Status {
+            
+            /** Plane classification is currently unavailable. */
+            case notAvailable
+            
+            /** ARKit has not yet determined the classification of this plane. */
+            case undetermined
+            
+            /** ARKit is confident the plane is not any of the known classes. */
+            case unknown
+        }
+        
+        /** The classification is not any of the known classes. */
+        case none(Status)
+        
+        case wall
+        
+        case floor
+        
+        case ceiling
+        
+        case table
+        
+        case seat
+    }
+    
+    
+    /**
+     Classification of the plane.
+     */
+    public var classification: ARPlaneAnchor.Classification {
+        switch __classification {
+        case .wall: return .wall
+        case .floor: return .floor
+        case .ceiling: return .ceiling
+        case .table: return .table
+        case .seat: return .seat
+        case .none: fallthrough
+        default:
+            switch __classificationStatus {
+            case .notAvailable: return .none(.notAvailable)
+            case .unknown: return .none(.unknown)
+            case .undetermined: fallthrough
+            case .known: fallthrough
+            default: return .none(.undetermined)
+            }
+        }
+    }
+}

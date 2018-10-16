@@ -1452,6 +1452,11 @@ public:
   /// Whether this is an explicitly-stated requirement.
   bool isExplicit() const;
 
+  /// Whether this is a top-level requirement written in source.
+  /// FIXME: This is a hack because expandConformanceRequirement()
+  /// is too eager; we should remove this once we fix it properly.
+  bool isTopLevel() const { return kind == Explicit; }
+
   /// Return the "inferred" version of this source, if it isn't already
   /// inferred.
   FloatingRequirementSource asInferred(const TypeRepr *typeRepr) const;
@@ -1732,6 +1737,7 @@ inline bool isErrorResult(GenericSignatureBuilder::ConstraintResult result) {
   case GenericSignatureBuilder::ConstraintResult::Unresolved:
     return false;
   }
+  llvm_unreachable("unhandled result");
 }
 
 /// Canonical ordering for dependent types.

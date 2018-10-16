@@ -8,11 +8,11 @@ func liftOptional(_ x : Int) -> Int? { return x }
 func test0() {
   takeFn(liftOptional)
 }
-// CHECK:    sil hidden @$S10reabstract5test0yyF : $@convention(thin) () -> () {
+// CHECK:    sil hidden @$s10reabstract5test0yyF : $@convention(thin) () -> () {
 //   Emit a generalized reference to liftOptional.
 //   TODO: just emit a globalized thunk
 // CHECK:      reabstract.liftOptional
-// CHECK-NEXT: [[T1:%.*]] = function_ref @$S10reabstract12liftOptional{{[_0-9a-zA-Z]*}}F
+// CHECK-NEXT: [[T1:%.*]] = function_ref @$s10reabstract12liftOptional{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT: [[T2:%.*]] = thin_to_thick_function [[T1]]
 // CHECK-NEXT: [[CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[T2]]
 // CHECK-NEXT: reabstraction thunk
@@ -21,17 +21,17 @@ func test0() {
 // CHECK-NEXT: [[CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[T4]]
 // CHECK: destroy_value [[T4]]
 // CHECK-NEXT: destroy_value [[T2]]
-// CHECK:      [[T0:%.*]] = function_ref @$S10reabstract6takeFn{{[_0-9a-zA-Z]*}}F
+// CHECK:      [[T0:%.*]] = function_ref @$s10reabstract6takeFn{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT: apply [[T0]]<Int>([[CVT]])
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
-// CHECK-NEXT: } // end sil function '$S10reabstract5test0yyF'
+// CHECK-NEXT: } // end sil function '$s10reabstract5test0yyF'
 
-// MANDATORY:    sil hidden @$S10reabstract5test0yyF : $@convention(thin) () -> () {
+// MANDATORY:    sil hidden @$s10reabstract5test0yyF : $@convention(thin) () -> () {
 //   Emit a generalized reference to liftOptional.
 //   TODO: just emit a globalized thunk
 // MANDATORY:      reabstract.liftOptional
-// MANDATORY-NEXT: [[T1:%.*]] = function_ref @$S10reabstract12liftOptional{{[_0-9a-zA-Z]*}}F
+// MANDATORY-NEXT: [[T1:%.*]] = function_ref @$s10reabstract12liftOptional{{[_0-9a-zA-Z]*}}F
 // MANDATORY-NEXT: [[T2:%.*]] = thin_to_thick_function [[T1]]
 // MANDATORY-NEXT: strong_retain [[T2]]
 // MANDATORY-NEXT: [[CVT:%.*]] = convert_escape_to_noescape [[T2]]
@@ -41,13 +41,13 @@ func test0() {
 // MANDATORY-NEXT: [[CVT:%.*]] = convert_escape_to_noescape [[T4]]
 // MANDATORY-NEXT: strong_release [[T2]]
 // MANDATORY-NEXT: // function_ref
-// MANDATORY-NEXT: [[T0:%.*]] = function_ref @$S10reabstract6takeFn{{[_0-9a-zA-Z]*}}F
+// MANDATORY-NEXT: [[T0:%.*]] = function_ref @$s10reabstract6takeFn{{[_0-9a-zA-Z]*}}F
 // MANDATORY-NEXT: apply [[T0]]<Int>([[CVT]])
 // MANDATORY-NEXT: strong_release [[T4]]
 // MANDATORY-NEXT: strong_release [[T2]]
 // MANDATORY-NEXT: tuple ()
 // MANDATORY-NEXT: return
-// MANDATORY-NEXT: } // end sil function '$S10reabstract5test0yyF'
+// MANDATORY-NEXT: } // end sil function '$s10reabstract5test0yyF'
 
 // CHECK:    sil shared [transparent] [serializable] [reabstraction_thunk] [[THUNK]] : $@convention(thin) (@in_guaranteed Int, @noescape @callee_guaranteed (Int) -> Optional<Int>) -> @out Optional<Int> {
 // CHECK:      [[T0:%.*]] = load [trivial] %1 : $*Int
@@ -56,9 +56,9 @@ func test0() {
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 
-// CHECK-LABEL: sil hidden @$S10reabstract10testThrowsyyypF
-// CHECK:         function_ref @$SytytIegnr_Ieg_TR
-// CHECK:         function_ref @$Sytyts5Error_pIegnrzo_sAA_pIegzo_TR
+// CHECK-LABEL: sil hidden @$s10reabstract10testThrowsyyypF
+// CHECK:         function_ref @$sytIegr_Ieg_TR
+// CHECK:         function_ref @$syts5Error_pIegrzo_sAA_pIegzo_TR
 func testThrows(_ x: Any) {
   _ = x as? () -> ()
   _ = x as? () throws -> ()
@@ -80,25 +80,25 @@ func testInoutOpaque(_ c: C, i: Int) {
   box.t(&c, i)
 }
 
-// CHECK-LABEL: sil hidden @$S10reabstract15testInoutOpaque_1iyAA1CC_SitF
-// CHECK:         function_ref @$S10reabstract6notFun_1iyAA1CCz_SitF
+// CHECK-LABEL: sil hidden @$s10reabstract15testInoutOpaque_1iyAA1CC_SitF
+// CHECK:         function_ref @$s10reabstract6notFun_1iyAA1CCz_SitF
 // CHECK:         thin_to_thick_function {{%[0-9]+}}
-// CHECK:         function_ref @$S10reabstract1CCSiIegly_ACSiytIeglnr_TR
+// CHECK:         function_ref @$s10reabstract1CCSiIegly_ACSiytIeglnr_TR
 // CHECK:         partial_apply
 // CHECK:         store
 // CHECK:         load
-// CHECK:         function_ref @$S10reabstract1CCSiytIeglnr_ACSiIegly_TR
+// CHECK:         function_ref @$s10reabstract1CCSiytIeglnr_ACSiIegly_TR
 // CHECK:         partial_apply
 // CHECK:         apply
-// CHECK: } // end sil function '$S10reabstract15testInoutOpaque_1iyAA1CC_SitF'
+// CHECK: } // end sil function '$s10reabstract15testInoutOpaque_1iyAA1CC_SitF'
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$S10reabstract1CCSiIegly_ACSiytIeglnr_TR : $@convention(thin) (@inout C, @in_guaranteed Int, @guaranteed @callee_guaranteed (@inout C, Int) -> ()) -> @out () {
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$S10reabstract1CCSiytIeglnr_ACSiIegly_TR : $@convention(thin) (@inout C, Int, @guaranteed @callee_guaranteed (@inout C, @in_guaranteed Int) -> @out ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$s10reabstract1CCSiIegly_ACSiytIeglnr_TR : $@convention(thin) (@inout C, @in_guaranteed Int, @guaranteed @callee_guaranteed (@inout C, Int) -> ()) -> @out () {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$s10reabstract1CCSiytIeglnr_ACSiIegly_TR : $@convention(thin) (@inout C, Int, @guaranteed @callee_guaranteed (@inout C, @in_guaranteed Int) -> @out ()) -> () {
 
 func closureTakingOptional(_ fn: (Int?) -> ()) {}
 closureTakingOptional({ (_: Any) -> () in })
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SypIgn_SiSgIegy_TR : $@convention(thin) (Optional<Int>, @noescape @callee_guaranteed (@in_guaranteed Any) -> ()) -> ()
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$sypIgn_SiSgIegy_TR : $@convention(thin) (Optional<Int>, @noescape @callee_guaranteed (@in_guaranteed Any) -> ()) -> ()
 // CHECK:   [[ANYADDR:%.*]] = alloc_stack $Any
 // CHECK:   [[OPTADDR:%.*]] = init_existential_addr [[ANYADDR]] : $*Any, $Optional<Int>
 // CHECK:   store %0 to [trivial] [[OPTADDR]] : $*Optional<Int>
@@ -107,8 +107,8 @@ closureTakingOptional({ (_: Any) -> () in })
 // Same behavior as above with other ownership qualifiers.
 func evenLessFun(_ s: __shared C, _ o: __owned C) {}
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$S10reabstract1CCACIeggx_A2CytIegnir_TR : $@convention(thin) (@in_guaranteed C, @in C, @guaranteed @callee_guaranteed (@guaranteed C, @owned C) -> ()) -> @out ()
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$S10reabstract1CCACytIegnir_A2CIeggx_TR : $@convention(thin) (@guaranteed C, @owned C, @guaranteed @callee_guaranteed (@in_guaranteed C, @in C) -> @out ()) -> ()
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$s10reabstract1CCACIeggx_A2CytIegnir_TR : $@convention(thin) (@in_guaranteed C, @in C, @guaranteed @callee_guaranteed (@guaranteed C, @owned C) -> ()) -> @out ()
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$s10reabstract1CCACytIegnir_A2CIeggx_TR : $@convention(thin) (@guaranteed C, @owned C, @guaranteed @callee_guaranteed (@in_guaranteed C, @in C) -> @out ()) -> ()
 func testSharedOwnedOpaque(_ s: C, o: C) {
   let box = Box(t: evenLessFun)
   box.t(s, o)

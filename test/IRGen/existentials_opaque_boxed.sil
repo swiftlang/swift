@@ -432,7 +432,7 @@ bb0(%0 : $*Existential):
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_assignWithTake_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
 // CHECK:   [[ALLOCA:%.*]] = alloca %T25existentials_opaque_boxed11ExistentialP
 // CHECK:   call void @__swift_destroy_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP* [[ALLOCA]])
-// CHECK:   call %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWOb"(%T25existentials_opaque_boxed11ExistentialP* %0, %T25existentials_opaque_boxed11ExistentialP* [[ALLOCA]])
+// CHECK:   call %T25existentials_opaque_boxed11ExistentialP* @"$s25existentials_opaque_boxed11Existential_pWOb"(%T25existentials_opaque_boxed11ExistentialP* %0, %T25existentials_opaque_boxed11ExistentialP* [[ALLOCA]])
 // CHECK:   ret void
 sil @test_assignWithTake_existential_addr : $@convention(thin) (@in Existential) -> () {
 bb0(%0 : $*Existential):
@@ -443,7 +443,7 @@ bb0(%0 : $*Existential):
   return %t : $()
 }
 
-// CHECK-LABEL: define linkonce_odr hidden %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWOb"(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
+// CHECK-LABEL: define linkonce_odr hidden %T25existentials_opaque_boxed11ExistentialP* @"$s25existentials_opaque_boxed11Existential_pWOb"(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
 // CHECK:  %2 = bitcast %T25existentials_opaque_boxed11ExistentialP* %1 to i8*
 // CHECK:  %3 = bitcast %T25existentials_opaque_boxed11ExistentialP* %0 to i8*
 // CHECK:  call void @llvm.memcpy.p0i8.p0i8.{{(i64|i32)}}(i8* align {{(8|4)}} %2, i8* align {{(8|4)}} %3, {{(i64 40|i32 20)}}, i1 false)
@@ -451,7 +451,7 @@ bb0(%0 : $*Existential):
 
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_initWithTake_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
 // CHECK:   [[LOCAL:%.*]] = alloca %T25existentials_opaque_boxed11ExistentialP
-// CHECK:    call %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWOb"(%T25existentials_opaque_boxed11ExistentialP* %0, %T25existentials_opaque_boxed11ExistentialP* [[LOCAL]])
+// CHECK:    call %T25existentials_opaque_boxed11ExistentialP* @"$s25existentials_opaque_boxed11Existential_pWOb"(%T25existentials_opaque_boxed11ExistentialP* %0, %T25existentials_opaque_boxed11ExistentialP* [[LOCAL]])
 // CHECK:   ret void
 sil @test_initWithTake_existential_addr : $@convention(thin) (@in Existential) -> () {
 bb0(%0 : $*Existential):
@@ -464,9 +464,9 @@ bb0(%0 : $*Existential):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_initWithCopy_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
 // CHECK:   [[LOCAL:%.*]] = alloca %T25existentials_opaque_boxed11ExistentialP
-// CHECK:   call %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWOc"(%T25existentials_opaque_boxed11ExistentialP* %0, %T25existentials_opaque_boxed11ExistentialP* [[LOCAL]])
+// CHECK:   call %T25existentials_opaque_boxed11ExistentialP* @"$s25existentials_opaque_boxed11Existential_pWOc"(%T25existentials_opaque_boxed11ExistentialP* %0, %T25existentials_opaque_boxed11ExistentialP* [[LOCAL]])
 // CHECK:   ret void
-// CHECK-LABEL: define linkonce_odr hidden %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWOc"(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
+// CHECK-LABEL: define linkonce_odr hidden %T25existentials_opaque_boxed11ExistentialP* @"$s25existentials_opaque_boxed11Existential_pWOc"(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
 // CHECK:   [[TYPE_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 1
 // CHECK:   [[ARG_TYPE:%.*]] = load %swift.type*, %swift.type** [[TYPE_ADDR]]
 // CHECK:   [[LOCAL_TYPE_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %1, i32 0, i32 1

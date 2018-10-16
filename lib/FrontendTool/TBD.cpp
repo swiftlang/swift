@@ -69,6 +69,7 @@ bool swift::inputFileKindCanHaveTBDValidated(InputFileKind kind) {
   case InputFileKind::LLVM:
     return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 static bool validateSymbolSet(DiagnosticEngine &diags,

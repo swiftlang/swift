@@ -156,7 +156,7 @@ static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
     for (auto &Param : Params) {
       unsigned TypeWidth;
       unsigned TypeDepth;
-      std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(Param.getType());
+      std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(Param.getOldType());
       if (TypeDepth > MaxTypeDepth)
         MaxTypeDepth = TypeDepth;
       Width += TypeWidth;
@@ -434,7 +434,11 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   bool HasConcreteGenericParams = false;
   bool HasNonArchetypeGenericParams = false;
   HasUnboundGenericParams = false;
-  for (auto GP : CalleeGenericSig->getSubstitutableParams()) {
+
+  CalleeGenericSig->forEachParam([&](GenericTypeParamType *GP, bool Canonical) {
+    if (!Canonical)
+      return;
+
     // Check only the substitutions for the generic parameters.
     // Ignore any dependent types, etc.
     auto Replacement = Type(GP).subst(CalleeParamSubMap);
@@ -458,11 +462,10 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
             HasNonArchetypeGenericParams = true;
         }
       }
-      continue;
+    } else {
+      HasConcreteGenericParams = true;
     }
-
-    HasConcreteGenericParams = true;
-  }
+  });
 
   if (HasUnboundGenericParams) {
     // Bail if we cannot specialize generic substitutions, but all substitutions
@@ -1561,14 +1564,16 @@ void FunctionSignaturePartialSpecializer::
   // Simply create a set of same-type requirements based on concrete
   // substitutions.
   SmallVector<Requirement, 4> Requirements;
-  for (auto GP : CalleeGenericSig->getSubstitutableParams()) {
+  CalleeGenericSig->forEachParam([&](GenericTypeParamType *GP, bool Canonical) {
+    if (!Canonical)
+      return;
     auto Replacement = Type(GP).subst(CalleeInterfaceToCallerArchetypeMap);
     if (Replacement->hasArchetype())
-      continue;
+      return;
     // Replacement is concrete. Add a same type requirement.
     Requirement Req(RequirementKind::SameType, GP, Replacement);
     Requirements.push_back(Req);
-  }
+  });
 
   // Create a new generic signature by taking the existing one
   // and adding new requirements to it. No need to introduce
@@ -1980,7 +1985,7 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
       Builder.setInsertionPoint(ResultBB->begin());
       fixUsedVoidType(ResultBB->getArgument(0), Loc, Builder);
 
-      SILArgument *Arg = ResultBB->replacePHIArgument(
+      SILArgument *Arg = ResultBB->replacePhiArgument(
           0, StoreResultTo->getType().getObjectType(),
           ValueOwnershipKind::Owned);
       // Store the direct result to the original result address.
@@ -2161,12 +2166,12 @@ SILValue ReabstractionThunkGenerator::createReabstractionThunkApply(
   SILBasicBlock *NormalBB = Thunk->createBasicBlock();
   SILBasicBlock *ErrorBB = Thunk->createBasicBlock();
   Builder.createTryApply(Loc, FRI, Subs, Arguments, NormalBB, ErrorBB);
-  auto *ErrorVal = ErrorBB->createPHIArgument(
+  auto *ErrorVal = ErrorBB->createPhiArgument(
       SpecializedFunc->mapTypeIntoContext(specConv.getSILErrorType()),
       ValueOwnershipKind::Owned);
   Builder.setInsertionPoint(ErrorBB);
   Builder.createThrow(Loc, ErrorVal);
-  SILValue ReturnValue = NormalBB->createPHIArgument(
+  SILValue ReturnValue = NormalBB->createPhiArgument(
       SpecializedFunc->mapTypeIntoContext(specConv.getSILResultType()),
       ValueOwnershipKind::Owned);
   Builder.setInsertionPoint(NormalBB);

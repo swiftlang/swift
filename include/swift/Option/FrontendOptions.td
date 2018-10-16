@@ -63,9 +63,10 @@ def emit_fixits_path
   : Separate<["-"], "emit-fixits-path">, MetaVarName<"<path>">,
     HelpText<"Output compiler fixits as source edits to <path>">;
 
+// For transition purposes.
 def emit_interface_path
-  : Separate<["-"], "emit-interface-path">, MetaVarName<"<path>">,
-    HelpText<"Output textual interface file to <path>">;
+  : Separate<["-"], "emit-interface-path">,
+    Alias<emit_parseable_module_interface_path>;
 
 def tbd_install_name
   : Separate<["-"], "tbd-install_name">, MetaVarName<"<path>">,
@@ -105,26 +106,8 @@ def verify_syntax_tree : Flag<["-"], "verify-syntax-tree">,
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
 
-def enable_objc_interop :
-  Flag<["-"], "enable-objc-interop">,
-  HelpText<"Enable Objective-C interop code generation and config directives">;
-
-def disable_objc_interop :
-  Flag<["-"], "disable-objc-interop">,
-  HelpText<"Disable Objective-C interop code generation and config directives">;
-
 def enable_swiftcall : Flag<["-"], "enable-swiftcall">,
   HelpText<"Enable the use of LLVM swiftcall support">;
-
-def enable_objc_attr_requires_foundation_module :
-  Flag<["-"], "enable-objc-attr-requires-foundation-module">,
-  HelpText<"Enable requiring uses of @objc to require importing the "
-           "Foundation module">;
-
-def disable_objc_attr_requires_foundation_module :
-  Flag<["-"], "disable-objc-attr-requires-foundation-module">,
-  HelpText<"Disable requiring uses of @objc to require importing the "
-           "Foundation module">;
 
 def enable_testable_attr_requires_testable_module :
   Flag<["-"], "enable-testable-attr-requires-testable-module">,
@@ -166,6 +149,40 @@ def disable_serialization_nested_type_lookup_table :
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
 class DebugCrashOpt : Group<debug_crash_Group>;
 
+
+// Flags that are saved into parseable interfaces
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ParseableInterfaceOption] in {
+
+def enable_objc_interop :
+  Flag<["-"], "enable-objc-interop">,
+  HelpText<"Enable Objective-C interop code generation and config directives">;
+
+def disable_objc_interop :
+  Flag<["-"], "disable-objc-interop">,
+  HelpText<"Disable Objective-C interop code generation and config directives">;
+
+def enable_objc_attr_requires_foundation_module :
+  Flag<["-"], "enable-objc-attr-requires-foundation-module">,
+  HelpText<"Enable requiring uses of @objc to require importing the "
+           "Foundation module">;
+
+def disable_objc_attr_requires_foundation_module :
+  Flag<["-"], "disable-objc-attr-requires-foundation-module">,
+  HelpText<"Disable requiring uses of @objc to require importing the "
+           "Foundation module">;
+
+def enable_resilience : Flag<["-"], "enable-resilience">,
+   HelpText<"Compile the module to export resilient interfaces for all "
+            "public declarations by default">;
+
+def enable_class_resilience : Flag<["-"], "enable-class-resilience">,
+   HelpText<"Enable resilient layout for classes containing resilient value types">;
+
+def read_type_info_path_EQ : Joined<["-"], "read-type-info-path=">,
+  HelpText<"Read legacy type layout from the given path">;
+}
+
+
 // HIDDEN FLAGS
 let Flags = [FrontendOption, NoDriverOption, HelpHidden] in {
 
@@ -196,9 +213,6 @@ def debug_time_function_bodies : Flag<["-"], "debug-time-function-bodies">,
   HelpText<"Dumps the time it takes to type-check each function body">;
 def debug_time_expression_type_checking : Flag<["-"], "debug-time-expression-type-checking">,
   HelpText<"Dumps the time it takes to type-check each expression">;
-
-def disable_constraint_solver_performance_hacks : Flag<["-"], "disable-constraint-solver-performance-hacks">,
-  HelpText<"Disable all the hacks in the constraint solver">;
 
 def debug_assert_immediately : Flag<["-"], "debug-assert-immediately">,
   DebugCrashOpt, HelpText<"Force an assertion failure immediately">;
@@ -309,10 +323,6 @@ def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
   HelpText<"Enable experimental property behaviors">;
   
-def enable_operator_designated_protocols :
-  Flag<["-"], "enable-operator-designated-protocols">,
-  HelpText<"Enable operator designated protocols">;
-
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;
@@ -376,6 +386,17 @@ def solver_disable_shrink :
   Flag<["-"], "solver-disable-shrink">,
   HelpText<"Disable the shrink phase of expression type checking">;
 
+def disable_constraint_solver_performance_hacks : Flag<["-"], "disable-constraint-solver-performance-hacks">,
+  HelpText<"Disable all the hacks in the constraint solver">;
+
+def enable_operator_designated_types :
+  Flag<["-"], "enable-operator-designated-types">,
+  HelpText<"Enable operator designated types">;
+
+def solver_enable_operator_designated_types :
+  Flag<["-"], "solver-enable-operator-designated-types">,
+  HelpText<"Enable operator designated types in constraint solver">;
+
 def switch_checking_invocation_threshold_EQ : Joined<["-"],
     "switch-checking-invocation-threshold=">;
 
@@ -423,6 +444,9 @@ def sil_inline_caller_benefit_reduction_factor : Separate<["-"], "sil-inline-cal
 def sil_unroll_threshold : Separate<["-"], "sil-unroll-threshold">,
   MetaVarName<"<250>">,
   HelpText<"Controls the aggressiveness of loop unrolling">;
+
+def sil_existential_specializer : Flag<["-"], "sil-existential-specializer">,
+  HelpText<"Enable SIL existential specializer optimization">;
 
 def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
   HelpText<"Merge SIL from all partial swiftmodules into the final module">;
@@ -477,18 +501,11 @@ def dump_interface_hash : Flag<["-"], "dump-interface-hash">,
    HelpText<"Parse input file(s) and dump interface token hash(es)">,
    ModeOpt;
 
-def dump_api_path : Separate<["-"], "dump-api-path">,
-  HelpText<"The path to output swift interface files for the compiled source files">;
-
-def enable_resilience : Flag<["-"], "enable-resilience">,
-   HelpText<"Compile the module to export resilient interfaces for all "
-            "public declarations by default">;
-
-def enable_class_resilience : Flag<["-"], "enable-class-resilience">,
-   HelpText<"Enable resilient layout for classes containing resilient value types">;
-
 def enable_resilience_bypass : Flag<["-"], "enable-resilience-bypass">,
    HelpText<"Completely bypass resilience when accessing types in resilient frameworks">;
+
+def dump_api_path : Separate<["-"], "dump-api-path">,
+  HelpText<"The path to output swift interface files for the compiled source files">;
 
 def group_info_path : Separate<["-"], "group-info-path">,
   HelpText<"The path to collect the group information of the compiled module">;

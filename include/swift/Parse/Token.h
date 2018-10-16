@@ -220,6 +220,21 @@ public:
     default: return false;
     }
   }
+
+  /// \brief True if the string literal token is multiline.
+  bool isMultilineString() const {
+    return MultilineString;
+  }
+  /// \brief Count of extending escaping '#'.
+  unsigned getCustomDelimiterLen() const {
+    return CustomDelimiterLen;
+  }
+  /// \brief Set characteristics of string literal token.
+  void setStringLiteral(bool IsMultilineString, unsigned CustomDelimiterLen) {
+    assert(Kind == tok::string_literal);
+    this->MultilineString = IsMultilineString;
+    this->CustomDelimiterLen = CustomDelimiterLen;
+  }
   
   /// getLoc - Return a source location identifier for the specified
   /// offset in the current file.
@@ -268,24 +283,15 @@ public:
   void setText(StringRef T) { Text = T; }
 
   /// \brief Set the token to the specified kind and source range.
-  void setToken(tok K, StringRef T, unsigned CommentLength = 0,
-                bool IsMultilineString = false, unsigned CustomDelimiterLen = 0) {
+  void setToken(tok K, StringRef T, unsigned CommentLength = 0) {
     Kind = K;
     Text = T;
     this->CommentLength = CommentLength;
     EscapedIdentifier = false;
-    this->MultilineString = IsMultilineString;
-    this->CustomDelimiterLen = CustomDelimiterLen;
+    this->MultilineString = false;
+    this->CustomDelimiterLen = 0;
     assert(this->CustomDelimiterLen == CustomDelimiterLen &&
            "custom string delimiter length > 255");
-  }
-
-  bool isMultilineString() const {
-    return MultilineString;
-  }
-
-  unsigned getCustomDelimiterLen() const {
-    return CustomDelimiterLen;
   }
 };
   

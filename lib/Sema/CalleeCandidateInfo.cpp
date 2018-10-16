@@ -321,7 +321,7 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
     return {CC_GeneralMismatch, {}};
 
   auto candArgs = candidate.getParameters();
-  llvm::SmallBitVector candDefaultMap =
+  SmallBitVector candDefaultMap =
     computeDefaultMap(candArgs, candidate.getDecl(), candidate.level);
   
   struct OurListener : public MatchCallArgumentListener {
@@ -400,11 +400,11 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
     // If parameter is marked as @autoclosure, we are
     // only interested in it's resulting type.
     if (param.isAutoClosure()) {
-      if (auto fnType = param.getType()->getAs<AnyFunctionType>())
+      if (auto fnType = param.getOldType()->getAs<AnyFunctionType>())
         return fnType->getResult();
     }
     
-    return param.getType();
+    return param.getOldType();
   };
   
   for (unsigned i = 0, e = paramBindings.size(); i != e; ++i) {
@@ -537,7 +537,7 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
   // Check to see if the first argument expects an inout argument, but is not
   // an lvalue.
   if (candArgs[0].isInOut() &&
-      !(actualArgs[0].getType()->hasLValueType() || actualArgs[0].isInOut())) {
+      !(actualArgs[0].getOldType()->hasLValueType() || actualArgs[0].isInOut())) {
     return { CC_NonLValueInOut, {}};
   }
   

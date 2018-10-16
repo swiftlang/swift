@@ -178,7 +178,12 @@ public:
 
     // Build a SubstitutionMap.
     auto *genericSig = decl->getGenericSignature();
-    auto genericParams = genericSig->getSubstitutableParams();
+
+    SmallVector<GenericTypeParamType *, 4> genericParams;
+    genericSig->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
+      if (canonical)
+        genericParams.push_back(gp);
+    });
     if (genericParams.size() != args.size())
       return Type();
 
@@ -402,8 +407,10 @@ public:
     if (!base->isTypeParameter())
       return Type();
 
+    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
     for (auto member : protocol->lookupDirect(Ctx.getIdentifier(member),
-                                              /*ignoreNew=*/true)) {
+                                              flags)) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member))
         return DependentMemberType::get(base, assocType);
     }

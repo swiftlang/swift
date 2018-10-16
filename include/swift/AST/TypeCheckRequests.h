@@ -55,7 +55,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   llvm::Expected<Type>
@@ -86,7 +86,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   llvm::Expected<Type>
@@ -115,7 +115,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   llvm::Expected<Type>
@@ -144,7 +144,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   llvm::Expected<llvm::TinyPtrVector<ValueDecl *>>
@@ -171,7 +171,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
@@ -197,7 +197,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
@@ -275,7 +275,7 @@ public:
       llvm::function_ref<bool(Requirement, RequirementRepr*)> callback);
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   /// Retrieve the requirement this request operates on.
   RequirementRepr &getRequirement() const;
@@ -308,7 +308,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   llvm::Expected<std::string> evaluate(Evaluator &eval, const ValueDecl* d) const;

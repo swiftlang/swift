@@ -83,10 +83,12 @@ std::string GenericSpecializationMangler::mangle(GenericSignature *Sig) {
   }
 
   bool First = true;
-  for (auto ParamType : Sig->getSubstitutableParams()) {
-    appendType(Type(ParamType).subst(SubMap)->getCanonicalType());
-    appendListSeparator(First);
-  }
+  Sig->forEachParam([&](GenericTypeParamType *ParamType, bool Canonical) {
+    if (Canonical) {
+      appendType(Type(ParamType).subst(SubMap)->getCanonicalType());
+      appendListSeparator(First);
+    }
+  });
   assert(!First && "no generic substitutions");
 
   if (isInlined)

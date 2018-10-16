@@ -1,6 +1,6 @@
 // RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
-// CHECK-LABEL: sil hidden @$S16generic_literals0A14IntegerLiteral1xyx_ts013ExpressibleBycD0RzlF : $@convention(thin) <T where T : ExpressibleByIntegerLiteral> (@in_guaranteed T) -> () {
+// CHECK-LABEL: sil hidden @$s16generic_literals0A14IntegerLiteral1xyx_ts013ExpressibleBycD0RzlF : $@convention(thin) <T where T : ExpressibleByIntegerLiteral> (@in_guaranteed T) -> () {
 func genericIntegerLiteral<T : ExpressibleByIntegerLiteral>(x: T) {
   var x = x
   // CHECK: [[ADDR:%.*]] = alloc_stack $T
@@ -16,7 +16,7 @@ func genericIntegerLiteral<T : ExpressibleByIntegerLiteral>(x: T) {
   x = 17
 }
 
-// CHECK-LABEL: sil hidden @$S16generic_literals0A15FloatingLiteral1xyx_ts018ExpressibleByFloatD0RzlF : $@convention(thin) <T where T : ExpressibleByFloatLiteral> (@in_guaranteed T) -> () {
+// CHECK-LABEL: sil hidden @$s16generic_literals0A15FloatingLiteral1xyx_ts018ExpressibleByFloatD0RzlF : $@convention(thin) <T where T : ExpressibleByFloatLiteral> (@in_guaranteed T) -> () {
 func genericFloatingLiteral<T : ExpressibleByFloatLiteral>(x: T) {
   var x = x
   // CHECK: [[TVAL:%.*]] = alloc_stack $T
@@ -32,7 +32,7 @@ func genericFloatingLiteral<T : ExpressibleByFloatLiteral>(x: T) {
   x = 2.5
 }
 
-// CHECK-LABEL: sil hidden @$S16generic_literals0A13StringLiteral1xyx_ts013ExpressibleBycD0RzlF : $@convention(thin) <T where T : ExpressibleByStringLiteral> (@in_guaranteed T) -> () {
+// CHECK-LABEL: sil hidden @$s16generic_literals0A13StringLiteral1xyx_ts013ExpressibleBycD0RzlF : $@convention(thin) <T where T : ExpressibleByStringLiteral> (@in_guaranteed T) -> () {
 
 func genericStringLiteral<T : ExpressibleByStringLiteral>(x: T) {
   var x = x

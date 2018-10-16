@@ -20,12 +20,7 @@ public func convertNSDictionaryToDictionary<
 
 func isNativeDictionary<KeyTy : Hashable, ValueTy>(
   _ d: Dictionary<KeyTy, ValueTy>) -> Bool {
-  switch d._variant {
-  case .native:
-    return true
-  case .cocoa:
-    return false
-  }
+  return d._variant.isNative
 }
 
 func isCocoaDictionary<KeyTy : Hashable, ValueTy>(
@@ -35,7 +30,10 @@ func isCocoaDictionary<KeyTy : Hashable, ValueTy>(
 
 func isNativeNSDictionary(_ d: NSDictionary) -> Bool {
   let className: NSString = NSStringFromClass(type(of: d)) as NSString
-  return ["_SwiftDeferredNSDictionary", "NativeDictionaryStorage"].contains {
+  return [
+    "_SwiftDeferredNSDictionary",
+    "_EmptyDictionarySingleton",
+    "_DictionaryStorage"].contains {
     className.range(of: $0).length > 0
   }
 }
@@ -48,7 +46,7 @@ func isCocoaNSDictionary(_ d: NSDictionary) -> Bool {
 
 func isNativeNSArray(_ d: NSArray) -> Bool {
   let className: NSString = NSStringFromClass(type(of: d)) as NSString
-  return ["_SwiftDeferredNSArray", "_ContiguousArray", "_EmptyArray"].contains {
+  return ["__SwiftDeferredNSArray", "_ContiguousArray", "_EmptyArray"].contains {
     className.range(of: $0).length > 0
   }
 }

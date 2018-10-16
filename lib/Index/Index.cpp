@@ -159,7 +159,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
     StringRef name;
   };
   typedef llvm::PointerIntPair<Decl *, 3> DeclAccessorPair;
-  llvm::DenseMap<Decl *, NameAndUSR> nameAndUSRCache;
+  llvm::DenseMap<void *, NameAndUSR> nameAndUSRCache;
   llvm::DenseMap<DeclAccessorPair, NameAndUSR> accessorNameAndUSRCache;
   StringScratchSpace stringStorage;
 
@@ -188,6 +188,28 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
       }
     }
 
+    name = result.name;
+    USR = result.USR;
+    return false;
+  }
+
+  bool getModuleNameAndUSR(ModuleEntity Mod, StringRef &name, StringRef &USR) {
+    auto &result = nameAndUSRCache[Mod.getOpaqueValue()];
+    if (result.USR.empty()) {
+      SmallString<128> storage;
+      {
+        llvm::raw_svector_ostream OS(storage);
+        if (ide::printModuleUSR(Mod, OS))
+          return true;
+        result.USR = stringStorage.copyString(OS.str());
+      }
+      storage.clear();
+      {
+        llvm::raw_svector_ostream OS(storage);
+        OS << Mod.getFullName();
+        result.name = stringStorage.copyString(OS.str());
+      }
+    }
     name = result.name;
     USR = result.USR;
     return false;
@@ -377,6 +399,30 @@ private:
     return true;
   }
 
+  bool visitModuleReference(ModuleEntity Mod, CharSourceRange Range) override {
+    SourceLoc Loc = Range.getStart();
+
+    if (Loc.isInvalid())
+      return true;
+
+    IndexSymbol Info;
+    std::tie(Info.line, Info.column) = getLineCol(Loc);
+    Info.roles |= (unsigned)SymbolRole::Reference;
+    Info.symInfo = getSymbolInfoForModule(Mod);
+    getModuleNameAndUSR(Mod, Info.name, Info.USR);
+
+    auto Parent = getParentDecl();
+    if (Parent && isa<AbstractFunctionDecl>(Parent))
+      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Parent);
+
+    if (!IdxConsumer.startSourceEntity(Info)) {
+      Cancelled = true;
+      return true;
+    }
+
+    return finishSourceEntity(Info.symInfo, Info.roles);
+  }
+
   Decl *getParentDecl() const {
     if (!EntitiesStack.empty())
       return EntitiesStack.back().D;
@@ -441,7 +487,11 @@ private:
   bool finishCurrentEntity() {
     Entity CurrEnt = EntitiesStack.pop_back_val();
     assert(CurrEnt.SymInfo.Kind != SymbolKind::Unknown);
-    if (!IdxConsumer.finishSourceEntity(CurrEnt.SymInfo, CurrEnt.Roles)) {
+    return finishSourceEntity(CurrEnt.SymInfo, CurrEnt.Roles);
+  }
+
+  bool finishSourceEntity(SymbolInfo symInfo, SymbolRoleSet roles) {
+    if (!IdxConsumer.finishSourceEntity(symInfo, roles)) {
       Cancelled = true;
       return false;
     }
@@ -661,6 +711,9 @@ bool IndexSwiftASTWalker::handleValueWitnesses(Decl *D, SmallVectorImpl<ValueWit
         return;
 
       auto *decl = witness.getDecl();
+      if (decl == nullptr)
+        return;
+
       if (decl->getDeclContext() == DC) {
         explicitValueWitnesses.push_back(ValueWitness{decl, req});
       } else {

@@ -308,7 +308,7 @@ class DeadObjectAnalysis {
   UserList AllUsers;
 
   // Trie of stored locations.
-  IndexTrieNode *AddressProjectionTrie;
+  std::unique_ptr<IndexTrieNode> AddressProjectionTrie;
 
   // Track all stores of refcounted elements per address projection.
   AddressToStoreMap StoredLocations;
@@ -320,10 +320,6 @@ public:
   explicit DeadObjectAnalysis(SILValue V):
     NewAddrValue(V), AddressProjectionTrie(nullptr), SeenPtrToAddr(false) {}
 
-  ~DeadObjectAnalysis() {
-    delete AddressProjectionTrie;
-  }
-
   bool analyze();
 
   ArrayRef<SILInstruction*> getAllUsers() const {
@@ -332,7 +328,7 @@ public:
 
   template<typename Visitor>
   void visitStoreLocations(Visitor visitor) {
-    visitStoreLocations(visitor, AddressProjectionTrie);
+    visitStoreLocations(visitor, AddressProjectionTrie.get());
   }
 
 private:
@@ -473,9 +469,9 @@ bool DeadObjectAnalysis::analyze() {
                           << NewAddrValue);
 
   // Populate AllValues, AddressProjectionTrie, and StoredLocations.
-  AddressProjectionTrie = new IndexTrieNode();
+  AddressProjectionTrie.reset(new IndexTrieNode());
   if (!recursivelyCollectInteriorUses(NewAddrValue,
-                                      AddressProjectionTrie, false)) {
+                                      AddressProjectionTrie.get(), false)) {
     return false;
   }
   // If all stores are leaves in the AddressProjectionTrie, then we can analyze

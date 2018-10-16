@@ -17,7 +17,7 @@ sil_vtable TestClass {}
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @alloc_on_stack
 // CHECK:      %reference.raw = alloca i8, i32 28, align 8
-// CHECK-NEXT: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S{{[a-zA-Z0-9_]+}}Ma"([[INT]] 0)
+// CHECK-NEXT: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s{{[a-zA-Z0-9_]+}}Ma"([[INT]] 0)
 // CHECK-NEXT: [[M:%[0-9]+]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[O:%[0-9]+]] = bitcast i8* %reference.raw to %swift.refcounted*
 // CHECK-NEXT: %reference.new = call %swift.refcounted* @swift_initStackObject(%swift.type* [[M]], %swift.refcounted* [[O]])
@@ -35,7 +35,7 @@ bb0:
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} {{.*}}* @alloc_on_heap
-// CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S{{[a-zA-Z0-9_]+}}Ma"([[INT]] 0)
+// CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s{{[a-zA-Z0-9_]+}}Ma"([[INT]] 0)
 // CHECK:      [[M:%[0-9]+]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[M]], i64 28, i64 7)
 // CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C:.*TestClass.*]]*
@@ -48,7 +48,7 @@ bb0:
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} {{.*}}* @alloc_3_on_heap
-// CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S{{[a-zA-Z0-9_]+}}CMa"([[INT]] 0)
+// CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s{{[a-zA-Z0-9_]+}}CMa"([[INT]] 0)
 // CHECK:      [[M:%[0-9]+]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[O:%[0-9]+]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* [[M]], i64 40, i64 7)
 // CHECK-NEXT: [[O2:%[0-9]+]] = bitcast %swift.refcounted* [[O]] to %[[C:.*TestClass.*]]*
@@ -63,7 +63,7 @@ bb0:
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} {{.*}}* @alloc_non_const_count
-// CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S{{[a-zA-Z0-9_]+}}Ma"([[INT]] 0)
+// CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s{{[a-zA-Z0-9_]+}}Ma"([[INT]] 0)
 // CHECK:      [[M:%[0-9]+]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[S:%[0-9]+]] = mul i64 4, %0
 // CHECK-NEXT: [[A:%[0-9]+]] = add i64 20, [[S]]
@@ -77,7 +77,7 @@ bb0(%c : $Builtin.Word):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} {{.*}}* @alloc_2_non_const_count
-// CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S{{[a-zA-Z0-9_]+}}Ma"([[INT]] 0)
+// CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s{{[a-zA-Z0-9_]+}}Ma"([[INT]] 0)
 // CHECK:      [[M:%[0-9]+]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[S1:%[0-9]+]] = mul i64 1, %0
 // CHECK-NEXT: [[S2:%[0-9]+]] = add i64 17, [[S1]]

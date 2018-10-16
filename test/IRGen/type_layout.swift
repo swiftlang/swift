@@ -21,9 +21,9 @@ struct FourInts { var x,y,z,w: Int32 }
 @_alignment(16)
 struct AlignedFourInts { var x: FourInts }
 
-// CHECK:       @"$S11type_layout14TypeLayoutTestVMn" = hidden constant {{.*}} @"$S11type_layout14TypeLayoutTestVMP"
-// CHECK:       define internal %swift.type* @"$S11type_layout14TypeLayoutTestVMi"
-// CHECK:       define internal swiftcc %swift.metadata_response @"$S11type_layout14TypeLayoutTestVMr"
+// CHECK:       @"$s11type_layout14TypeLayoutTestVMn" = hidden constant {{.*}} @"$s11type_layout14TypeLayoutTestVMP"
+// CHECK:       define internal %swift.type* @"$s11type_layout14TypeLayoutTestVMi"
+// CHECK:       define internal swiftcc %swift.metadata_response @"$s11type_layout14TypeLayoutTestVMr"
 struct TypeLayoutTest<T> {
   // CHECK:       [[TUPLE_LAYOUT_M:%.*]] = alloca %swift.full_type_layout,
   // CHECK:       [[TUPLE_LAYOUT_N:%.*]] = alloca %swift.full_type_layout,
@@ -42,10 +42,10 @@ struct TypeLayoutTest<T> {
   // CHECK:       store i8** [[T_LAYOUT]]
   var z: T
   // -- native class, use standard NativeObject value witness
-  // CHECK:       store i8** getelementptr inbounds (i8*, i8** @"$SBoWV", i32 8)
+  // CHECK:       store i8** getelementptr inbounds (i8*, i8** @"$sBoWV", i32 8)
   var a: C
   // -- Single-element struct, shares layout of its field (Builtin.Int64)
-  // CHECK:       store i8** getelementptr inbounds (i8*, i8** @"$SBi64_WV", i32 8)
+  // CHECK:       store i8** getelementptr inbounds (i8*, i8** @"$sBi64_WV", i32 8)
   var c: SSing
   // -- Multi-element structs use open-coded layouts
   // CHECK:    store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_16_8_0_pod, i32 0, i32 0)
@@ -57,7 +57,7 @@ struct TypeLayoutTest<T> {
   // CHECK-32:    store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_4_[[REF_XI]]_bt, i32 0, i32 0)
   var f: SMult3
   // -- Single-case enum, shares layout of its field (Builtin.Int64)
-  // CHECK:       store i8** getelementptr inbounds (i8*, i8** @"$SBi64_WV", i32 8)
+  // CHECK:       store i8** getelementptr inbounds (i8*, i8** @"$sBi64_WV", i32 8)
   var g: ESing
   // -- Multi-case enum, open-coded layout
   // CHECK:    store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_9_8_0_pod, i32 0, i32 0)
@@ -67,7 +67,7 @@ struct TypeLayoutTest<T> {
   // CHECK:       store i8** [[T_LAYOUT]]
   var i: GSing<T>
   // -- Multi-element generic struct, need to derive from metadata
-  // CHECK:       [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S11type_layout5GMultVMa"([[INT]] 319, %swift.type* [[T_CHECKED]])
+  // CHECK:       [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s11type_layout5GMultVMa"([[INT]] 319, %swift.type* [[T_CHECKED]])
   // CHECK:       [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
   // CHECK:       [[METADATA_STATUS:%.*]] = extractvalue %swift.metadata_response [[TMP]], 1
   // CHECK:       [[METADATA_OK:%.*]] = icmp ule [[INT]] [[METADATA_STATUS]], 63
@@ -79,10 +79,10 @@ struct TypeLayoutTest<T> {
   // CHECK:       store i8** [[LAYOUT]]
   var j: GMult<T>
   // -- Common layout, reuse common value witness table layout
-  // CHECK:       store i8** getelementptr (i8*, i8** @"$SBi32_WV", i32 8)
+  // CHECK:       store i8** getelementptr (i8*, i8** @"$sBi32_WV", i32 8)
   var k: CommonLayout
   // -- Single-field aggregate with alignment
-  // CHECK:       store i8** getelementptr (i8*, i8** @"$SBi128_WV", i32 8)
+  // CHECK:       store i8** getelementptr (i8*, i8** @"$sBi128_WV", i32 8)
   var l: AlignedFourInts
   // -- Tuple with two elements
   // CHECK:       [[T_LAYOUT_1:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE_WITNESSES]], i32 8

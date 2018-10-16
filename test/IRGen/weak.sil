@@ -17,7 +17,7 @@ import Swift
 
 public class C {}
 sil_vtable C {}
-sil @$S4weak1CCfD : $@convention(method) (C) -> ()
+sil @$s4weak1CCfD : $@convention(method) (C) -> ()
 
 protocol P : class {
   func explode()
@@ -30,7 +30,7 @@ public struct A {
 // size 8
 // flags 0x130007 == 1245191 (non-POD, non-inline, non-bitwise-takable)
 // stride 8
-// CHECK: @"$S4weak1AVWV" = {{.*}} i8* inttoptr (i64 8 to i8*), i8* inttoptr (i64 1245191 to i8*), i8* inttoptr (i64 8 to i8*)]
+// CHECK: @"$s4weak1AVWV" = {{.*}} i8* inttoptr (i64 8 to i8*), i8* inttoptr (i64 1245191 to i8*), i8* inttoptr (i64 8 to i8*)]
 
 sil @test_weak_load_store : $@convention(thin) (@inout A, Optional<C>) -> () {
 bb0(%0 : $*A, %1 : $Optional<C>):
@@ -76,7 +76,7 @@ bb0(%0 : $*B, %1 : $Optional<P>):
 // CHECK-NEXT: store i8** [[TMPTAB]], i8*** [[T0]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 0
 // CHECK-NEXT: call [[WEAK]]* @swift_unknownObjectWeakAssign([[WEAK]]* returned [[T0]], [[UNKNOWN]]* [[TMPOBJ]])
-// CHECK: call void @"$S4weak1P_pSgWOe"
+// CHECK: call void @"$s4weak1P_pSgWOe"
 
 sil @test_weak_alloc_stack : $@convention(thin) (Optional<P>) -> () {
 bb0(%0 : $Optional<P>):
@@ -95,7 +95,7 @@ bb0(%0 : $Optional<P>):
 // CHECK-NEXT: store i8** [[TMPTAB:%.*]], i8*** [[T0]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 0
 // CHECK-NEXT: call [[WEAK]]* @swift_unknownObjectWeakInit([[WEAK]]* returned [[T0]], [[UNKNOWN]]* [[TMPOBJ:%.*]])
-// CHECK-NEXT: call { %swift.weak, i8** }* @"$S4weak1P_pSgXwWOh"({ %swift.weak, i8** }* [[X]])
+// CHECK-NEXT: call { %swift.weak, i8** }* @"$s4weak1P_pSgXwWOh"({ %swift.weak, i8** }* [[X]])
 // CHECK-NEXT: bitcast
 // CHECK-NEXT: llvm.lifetime.end
 // CHECK-NEXT: ret void
@@ -103,7 +103,7 @@ bb0(%0 : $Optional<P>):
 // Value witnesses for A:
 
 //   initializeBufferWithCopyOfBuffer
-// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @"$S4weak1AVwCP"([[BUFFER:\[24 x i8\]]]* noalias [[DESTBUF:%.*]], [[BUFFER]]* noalias [[SRCBUF:%.*]], [[TYPE]]*
+// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @"$s4weak1AVwCP"([[BUFFER:\[24 x i8\]]]* noalias [[DESTBUF:%.*]], [[BUFFER]]* noalias [[SRCBUF:%.*]], [[TYPE]]*
 // CHECK:  [[DEST:%.*]] = bitcast [[BUFFER]]* [[DESTBUF]] to %swift.refcounted**
 // CHECK:  [[SRC:%.*]] = bitcast [[BUFFER]]* [[SRCBUF]] to %swift.refcounted**
 // CHECK:  [[REF:%.*]] = load %swift.refcounted*, %swift.refcounted** [[SRC]]
@@ -119,17 +119,17 @@ bb0(%0 : $Optional<P>):
 // CHECK:  ret %swift.opaque* [[CAST3]]
 
 //   destroy
-// CHECK:    define linkonce_odr hidden void @"$S4weak1AVwxx"([[OPAQUE]]* noalias [[ARG:%.*]], [[TYPE]]*
+// CHECK:    define linkonce_odr hidden void @"$s4weak1AVwxx"([[OPAQUE]]* noalias [[ARG:%.*]], [[TYPE]]*
 // CHECK:      [[T0:%.*]] = bitcast [[OPAQUE]]* [[ARG]] to [[A]]*
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds [[A]], [[A]]* [[T0]], i32 0, i32 0
 // CHECK-NEXT: call void @swift_weakDestroy([[WEAK]]* [[T1]])
 // CHECK-NEXT: ret void
 
-// TAILCALL: {{_?}}$S4weak1AVwxx:
+// TAILCALL: {{_?}}$s4weak1AVwxx:
 // TAILCALL:  jmp{{q?}} {{(\*__imp_)?_?}}swift_weakDestroy
 
 //   initializeWithCopy
-// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @"$S4weak1AVwcp"([[OPAQUE]]* noalias [[DEST_OPQ:%.*]], [[OPAQUE]]* noalias [[SRC_OPQ:%.*]], [[TYPE]]*
+// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @"$s4weak1AVwcp"([[OPAQUE]]* noalias [[DEST_OPQ:%.*]], [[OPAQUE]]* noalias [[SRC_OPQ:%.*]], [[TYPE]]*
 // CHECK:      [[DEST:%.*]] = bitcast [[OPAQUE]]* [[DEST_OPQ]] to [[A]]*
 // CHECK-NEXT: [[SRC:%.*]] = bitcast [[OPAQUE]]* [[SRC_OPQ]] to [[A]]*
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]], [[A]]* [[DEST]], i32 0, i32 0
@@ -138,11 +138,11 @@ bb0(%0 : $Optional<P>):
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
 
-// TAILCALL: {{_?}}$S4weak1AVwcp:
+// TAILCALL: {{_?}}$s4weak1AVwcp:
 // TAILCALL:  jmp{{q?}} {{(\*__imp_)?_?}}swift_weakCopyInit
 
 //   assignWithCopy
-// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @"$S4weak1AVwca"([[OPAQUE]]* [[DEST_OPQ:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
+// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @"$s4weak1AVwca"([[OPAQUE]]* [[DEST_OPQ:%.*]], [[OPAQUE]]* [[SRC_OPQ:%.*]], [[TYPE]]*
 // CHECK:      [[DEST:%.*]] = bitcast [[OPAQUE]]* [[DEST_OPQ]] to [[A]]*
 // CHECK-NEXT: [[SRC:%.*]] = bitcast [[OPAQUE]]* [[SRC_OPQ]] to [[A]]*
 // CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds [[A]], [[A]]* [[DEST]], i32 0, i32 0
@@ -151,11 +151,11 @@ bb0(%0 : $Optional<P>):
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
 
-// TAILCALL: {{_?}}$S4weak1AVwca:
+// TAILCALL: {{_?}}$s4weak1AVwca:
 // TAILCALL:  jmp{{q?}} {{(\*__imp_)?_?}}swift_weakCopyAssign
 
 //   assignWithTake
-// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @"$S4weak1AVwta"([[OPAQUE]]* noalias [[DEST_OPQ:%.*]], [[OPAQUE]]* noalias [[SRC_OPQ:%.*]], [[TYPE]]*
+// CHECK:    define linkonce_odr hidden [[OPAQUE]]* @"$s4weak1AVwta"([[OPAQUE]]* noalias [[DEST_OPQ:%.*]], [[OPAQUE]]* noalias [[SRC_OPQ:%.*]], [[TYPE]]*
 // CHECK:      [[DEST:%.*]] = bitcast [[OPAQUE]]* [[DEST_OPQ]] to [[A]]*
 // CHECK-NEXT: [[SRC:%.*]] = bitcast [[OPAQUE]]* [[SRC_OPQ]] to [[A]]*
 // CHECK-NEXT: [[DEST_X:%.*]] = getelementptr inbounds [[A]], [[A]]* [[DEST]], i32 0, i32 0
@@ -164,8 +164,8 @@ bb0(%0 : $Optional<P>):
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[A]]* [[DEST]] to [[OPAQUE]]*
 // CHECK-NEXT: ret [[OPAQUE]]* [[T0]]
 
-// TAILCALL: {{_?}}$S4weak1AVwtk:
+// TAILCALL: {{_?}}$s4weak1AVwtk:
 // TAILCALL:  jmp{{q?}} {{(\*__imp_)?_?}}swift_weakTakeInit
 
-// TAILCALL: {{_?}}$S4weak1AVwta:
+// TAILCALL: {{_?}}$s4weak1AVwta:
 // TAILCALL:  jmp{{q?}} {{(\*__imp_)?_?}}swift_weakTakeAssign

@@ -11,6 +11,6 @@
 // CHECK: sil_stage raw
 //
 // Verify that the '[canonical]' attribute was set.
-// CHECK: sil [serialized] [canonical] @$S5stage21functionToReserializeyyF : $@convention(thin) () -> () {
+// CHECK: sil [serialized] [canonical] @$s5stage21functionToReserializeyyF : $@convention(thin) () -> () {
 @inlinable
 public func functionToReserialize() {}

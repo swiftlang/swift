@@ -434,7 +434,7 @@ class BenchmarkDoctor(object):
         measurements = dict(
             [('{0} {1} i{2}{3}'.format(benchmark, o, i, suffix),
               self.driver.run(benchmark, num_samples=s, num_iters=i,
-                              verbose=True))
+                              verbose=True, measure_memory=True))
              for o in opts
              for s, i in run_args
              for suffix in list('abcde')

@@ -38,7 +38,7 @@
 using namespace swift;
 using namespace irgen;
 
-/// A fixed-size buffer is always 16 bytes and pointer-aligned.
+/// A fixed-size buffer is always three pointers in size and pointer-aligned.
 /// If we align them more, we'll need to introduce padding to
 /// make protocol types work.
 Size irgen::getFixedBufferSize(IRGenModule &IGM) {
@@ -294,6 +294,22 @@ llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
   if (index.getValue() != 0)
     slot = IGF.Builder.CreateConstInBoundsGEP1_32(
         /*Ty=*/nullptr, table, index.getValue());
+
+  auto witness =
+    IGF.Builder.CreateLoad(Address(slot, IGF.IGM.getPointerAlignment()));
+  IGF.setInvariantLoad(witness);
+  return witness;
+}
+
+/// Load a specific witness from a known table.  The result is
+/// always an i8*.
+llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
+                                                     llvm::Value *table,
+                                                     llvm::Value *index) {
+  assert(table->getType() == IGF.IGM.WitnessTablePtrTy);
+
+  // GEP to the appropriate index.
+  llvm::Value *slot = IGF.Builder.CreateInBoundsGEP(table, index);
 
   auto witness =
     IGF.Builder.CreateLoad(Address(slot, IGF.IGM.getPointerAlignment()));

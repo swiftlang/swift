@@ -330,6 +330,9 @@ extension _ExpressibleByColorLiteral {
   }
 }
 
+@available(swift, deprecated: 5.0, renamed: "KeyValuePairs")
+public typealias DictionaryLiteral<Key, Value> = KeyValuePairs<Key, Value>
+
 extension LazySequenceProtocol {
   /// Returns the non-`nil` results of mapping the given transformation over
   /// this sequence.
@@ -380,6 +383,30 @@ extension FixedWidthInteger {
   /// The empty bitset.
   @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0")
   public static var allZeros: Self { return 0 }
+  
+  @available(*, unavailable, message:
+    "Use operators or addingReportingOverflow instead.")
+  public func unsafeAdding(_ other: Self) -> Self {
+    fatalError("unavailable")
+  }
+  
+  @available(*, unavailable, message:
+    "Use operators or subtractingReportingOverflow instead.")
+  public func unsafeSubtracting(_ other: Self) -> Self {
+    fatalError("unavailable")
+  }
+  
+  @available(*, unavailable, message:
+    "Use operators or multipliedReportingOverflow(by:) instead.")
+  public func unsafeMultiplied(by other: Self) -> Self {
+    fatalError("unavailable")
+  }
+  
+  @available(*, unavailable, message:
+    "Use operators or dividedReportingOverflow(by:) instead.")
+  public func unsafeDivided(by other: Self) -> Self {
+    fatalError("unavailable")
+  }
 }
 
 extension LazyCollectionProtocol {
@@ -1170,7 +1197,7 @@ extension Dictionary {
   }
 
   @available(swift, obsoleted: 4.0)
-  public func filter(
+  public __consuming func filter(
     _ isIncluded: (Element) throws -> Bool, obsoletedInSwift4: () = ()
   ) rethrows -> [Element] {
     var result: [Element] = []
@@ -1185,7 +1212,7 @@ extension Dictionary {
 
 extension Set {
   @available(swift, obsoleted: 4.0)
-  public func filter(
+  public __consuming func filter(
     _ isIncluded: (Element) throws -> Bool, obsoletedInSwift4: () = ()
   ) rethrows -> [Element] {
     var result: [Element] = []

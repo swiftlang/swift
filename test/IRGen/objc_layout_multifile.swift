@@ -7,7 +7,7 @@
 // REQUIRES: objc_interop
 
 class Foo {
-  // CHECK-LABEL: define hidden swiftcc void @"$S21objc_layout_multifile3FooC3barAA3BarCSgvs"
+  // CHECK-LABEL: define hidden swiftcc void @"$s21objc_layout_multifile3FooC3barAA3BarCSgvs"
   // CHECK-NOT: ret
   // CHECK: @objc_retain
   var bar: Bar?

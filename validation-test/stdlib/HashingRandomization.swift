@@ -11,7 +11,7 @@
 // environment variable is set.
 
 print("Deterministic: \(Hasher._isDeterministic)")
-print("Seed: \(Hasher._seed)")
+print("Seed: \(Hasher._executionSeed)")
 print("Hash values: <\(0.hashValue), \(1.hashValue)>")
 
 // With randomized hashing, we get a new seed and a new set of hash values on

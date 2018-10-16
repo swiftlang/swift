@@ -47,6 +47,10 @@ def DoesNotAffectIncrementalBuild : OptionFlag;
 // current working directory.
 def ArgumentIsPath : OptionFlag;
 
+// The option should be written into a .swiftinterface parseable interface file,
+// and read/parsed from there when reconstituting a .swiftmodule from it.
+def ParseableInterfaceOption : OptionFlag;
+
 /////////
 // Options
 
@@ -116,9 +120,10 @@ def driver_batch_count : Separate<["-"], "driver-batch-count">,
 def driver_batch_size_limit : Separate<["-"], "driver-batch-size-limit">,
   InternalDebugOpt,
   HelpText<"Use the given number as the upper limit on dynamic batch-mode partition size">;
-def driver_force_one_batch_repartition : Flag<["-"], "driver-force-one-batch-repartition">,
+
+def driver_force_response_files : Flag<["-"], "driver-force-response-files">,
   InternalDebugOpt,
-  HelpText<"Force one batch repartitioning for testing">;
+  HelpText<"Force the use of response files for testing">;
 
 def driver_always_rebuild_dependents :
   Flag<["-"], "driver-always-rebuild-dependents">, InternalDebugOpt,
@@ -159,7 +164,7 @@ def j : JoinedOrSeparate<["-"], "j">, Flags<[DoesNotAffectIncrementalBuild]>,
 def sdk : Separate<["-"], "sdk">, Flags<[FrontendOption, ArgumentIsPath]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
 
-def swift_version : Separate<["-"], "swift-version">, Flags<[FrontendOption]>,
+def swift_version : Separate<["-"], "swift-version">, Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Interpret input according to a specific Swift language version number">,
   MetaVarName<"<vers>">;
 
@@ -269,7 +274,7 @@ def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Specifies the Clang module cache path">;
 
-def module_name : Separate<["-"], "module-name">, Flags<[FrontendOption]>,
+def module_name : Separate<["-"], "module-name">, Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Name of the module to build">;
 def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
@@ -296,9 +301,20 @@ def emit_module_path_EQ : Joined<["-"], "emit-module-path=">,
          ArgumentIsPath]>,
   Alias<emit_module_path>;
 
-def experimental_emit_interface : Flag<["-"], "experimental-emit-interface">,
-  Flags<[NoInteractiveOption, HelpHidden]>,
-  HelpText<"Test out the textual interfaces feature">;
+def emit_parseable_module_interface :
+  Flag<["-"], "emit-parseable-module-interface">,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Output parseable interface file">;
+def emit_parseable_module_interface_path :
+  Separate<["-"], "emit-parseable-module-interface-path">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         ArgumentIsPath]>,
+  MetaVarName<"<path>">, HelpText<"Output parseable interface file to <path>">;
+def enable_parseable_module_interface :
+  Flag<["-"], "enable-parseable-module-interface">,
+  Flags<[FrontendOption, HelpHidden, NoInteractiveOption,
+         DoesNotAffectIncrementalBuild]>,
+  HelpText<"Accept parseable .swiftinterface form of modules">;
 
 def emit_objc_header : Flag<["-"], "emit-objc-header">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
@@ -600,7 +616,7 @@ def parse_sil : Flag<["-"], "parse-sil">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Parse the input file as SIL code, not Swift source">;
 def parse_stdlib : Flag<["-"], "parse-stdlib">,
-  Flags<[FrontendOption, HelpHidden]>,
+  Flags<[FrontendOption, HelpHidden, ParseableInterfaceOption]>,
   HelpText<"Parse the input file(s) as the Swift standard library">;
 
 def modes_Group : OptionGroup<"<mode options>">, HelpText<"MODES">;
@@ -738,12 +754,12 @@ def resource_dir : Separate<["-"], "resource-dir">,
   HelpText<"The directory that holds the compiler resource files">;
 
 def target : Separate<["-"], "target">,
-  Flags<[FrontendOption, ModuleWrapOption]>,
+  Flags<[FrontendOption, ModuleWrapOption, ParseableInterfaceOption]>,
   HelpText<"Generate code for the given target">;
 def target_legacy_spelling : Joined<["--"], "target=">,
   Flags<[FrontendOption]>, Alias<target>;
 
-def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption]>,
+def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Generate code for a particular CPU variant">;
 
 def profile_generate : Flag<["-"], "profile-generate">,

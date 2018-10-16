@@ -47,6 +47,7 @@ struct ScalarReferenceTraits<syntax::SourcePresence> {
     case syntax::SourcePresence::Missing:
       return "\"Missing\"";
     }
+    llvm_unreachable("unhandled presence");
   }
 
   static bool mustQuote(StringRef) {
@@ -243,6 +244,7 @@ template <>
     case syntax::SourcePresence::Missing: return 0;
     case syntax::SourcePresence::Present: return 1;
     }
+    llvm_unreachable("unhandled presence");
   }
 
   static void write(ByteTreeWriter &Writer,
@@ -330,12 +332,14 @@ struct ObjectTraits<syntax::RawSyntax> {
       case Layout: return 6;
       case Omitted: return 2;
       }
+      llvm_unreachable("unhandled kind");
     } else {
       switch (nodeKind(Syntax, UserInfo)) {
       case Token: return 6;
       case Layout: return 5;
       case Omitted: return 2;
       }
+      llvm_unreachable("unhandled kind");
     }
   }
 

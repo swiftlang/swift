@@ -97,45 +97,42 @@ GenericSignature::getInnermostGenericParams() const {
   return params;
 }
 
-
-SmallVector<GenericTypeParamType *, 2>
-GenericSignature::getSubstitutableParams() const {
+void GenericSignature::forEachParam(
+    llvm::function_ref<void(GenericTypeParamType *, bool)> callback) const {
   // Figure out which generic parameters are concrete or same-typed to another
-  // generic parameter.
+  // type parameter.
   auto genericParams = getGenericParams();
-  auto genericParamsAreNotSubstitutable =
-    SmallVector<bool, 4>(genericParams.size(), false);
+  auto genericParamsAreCanonical =
+    SmallVector<bool, 4>(genericParams.size(), true);
+
   for (auto req : getRequirements()) {
     if (req.getKind() != RequirementKind::SameType) continue;
 
     GenericTypeParamType *gp;
     if (auto secondGP = req.getSecondType()->getAs<GenericTypeParamType>()) {
-      // If two generic parameters are same-typed, then the left-hand one
-      // is canonical.
+      // If two generic parameters are same-typed, then the right-hand one
+      // is non-canonical.
+      assert(req.getFirstType()->is<GenericTypeParamType>());
       gp = secondGP;
     } else {
-      // If an associated type is same-typed, it doesn't constrain the generic
-      // parameter itself.
-      if (req.getSecondType()->isTypeParameter()) continue;
-
-      // Otherwise, the generic parameter is concrete.
+      // Otherwise, the right-hand side is an associated type or concrete type,
+      // and the left-hand one is non-canonical.
       gp = req.getFirstType()->getAs<GenericTypeParamType>();
       if (!gp) continue;
+
+      // If an associated type is same-typed, it doesn't constrain the generic
+      // parameter itself. That is, if T == U.Foo, then T is canonical, whereas
+      // U.Foo is not.
+      if (req.getSecondType()->isTypeParameter()) continue;
     }
 
     unsigned index = GenericParamKey(gp).findIndexIn(genericParams);
-    genericParamsAreNotSubstitutable[index] = true;
+    genericParamsAreCanonical[index] = false;
   }
 
-  // Collect the generic parameters that are substitutable.
-  SmallVector<GenericTypeParamType *, 2> result;
-  for (auto index : indices(genericParams)) {
-    auto gp = genericParams[index];
-    if (!genericParamsAreNotSubstitutable[index])
-      result.push_back(gp);
-  }
-
-  return result;
+  // Call the callback with each parameter and the result of the above analysis.
+  for (auto index : indices(genericParams))
+    callback(genericParams[index], genericParamsAreCanonical[index]);
 }
 
 bool GenericSignature::areAllParamsConcrete() const {
@@ -186,6 +183,7 @@ static unsigned getRequirementKindOrder(RequirementKind kind) {
   case RequirementKind::SameType: return 3;
   case RequirementKind::Layout: return 1;
   }
+  llvm_unreachable("unhandled kind");
 }
 #endif
 
@@ -585,6 +583,7 @@ bool GenericSignature::isRequirementSatisfied(Requirement requirement) {
     return true;
   }
   }
+  llvm_unreachable("unhandled kind");
 }
 
 SmallVector<Requirement, 4> GenericSignature::requirementsNotSatisfiedBy(

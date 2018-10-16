@@ -163,11 +163,23 @@ mangleProtocolForLLVMTypeName(ProtocolCompositionType *type) {
 }
 
 std::string IRGenMangler::
-mangleSymbolNameForSymbolicMangling(const SymbolicMangling &mangling) {
+mangleSymbolNameForSymbolicMangling(const SymbolicMangling &mangling,
+                                    MangledTypeRefRole role) {
   beginManglingWithoutPrefix();
-  static const char prefix[] = "symbolic ";
+  const char *prefix;
+  switch (role) {
+  case MangledTypeRefRole::DefaultAssociatedTypeWitness:
+    prefix = "default assoc type ";
+    break;
+
+  case MangledTypeRefRole::Metadata:
+  case MangledTypeRefRole::Reflection:
+    prefix = "symbolic ";
+    break;
+  }
+  auto prefixLen = strlen(prefix);
+
   Buffer << prefix << mangling.String;
-  auto prefixLen = sizeof(prefix) - 1;
 
   for (auto &symbol : mangling.SymbolicReferences) {
     // Fill in the placeholder space with something printable.

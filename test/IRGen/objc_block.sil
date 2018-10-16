@@ -7,7 +7,7 @@ import Swift
 class Foo {}
 sil_vtable Foo {}
 
-sil @$S10objc_block3FooCfD : $(Foo) -> ()
+sil @$s10objc_block3FooCfD : $(Foo) -> ()
 
 sil @call_block : $@convention(thin) (@convention(block) (Foo) -> Foo, Foo) -> Foo {
 entry(%b : $@convention(block) (Foo) -> Foo, %x : $Foo):
@@ -36,4 +36,4 @@ entry(%b : $*@convention(block) () -> ()):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @generic_with_block(%objc_block** noalias nocapture dereferenceable({{.*}}))
 // --                                                                               0x100_0001 = block convention, 1 arg
-// CHECK: call %swift.type* @swift_getFunctionTypeMetadata0([[WORD:i(32|64)]] 65536, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$SytN", i32 0, i32 1))
+// CHECK: call %swift.type* @swift_getFunctionTypeMetadata0([[WORD:i(32|64)]] 65536, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sytN", i32 0, i32 1))

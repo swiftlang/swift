@@ -28,7 +28,7 @@ class Foo {
   @objc dynamic subscript(x: Int) -> ObjCClass { get {} }
 
   @objc dynamic subscript(x: Int) -> NotObjCAble { get {} } // expected-error{{subscript cannot be marked @objc because its type cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
-  // expected-error@-1{{'dynamic' subscript 'subscript' must also be '@objc'}}
+  // expected-error@-1{{'dynamic' subscript 'subscript(_:)' must also be '@objc'}}
   
   dynamic deinit {} // expected-error{{'dynamic' modifier cannot be applied to this declaration}} {{3-11=}}
 

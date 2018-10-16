@@ -81,7 +81,7 @@ bb0:
 
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @argument_with_incomplete_epilogue_release
 // CHECK: [[IN2:%.*]] = struct_extract [[IN1:%.*]] : $goo, #goo.top
-// CHECK: function_ref @$S41argument_with_incomplete_epilogue_releaseTf4x_nTf4gn_n : $@convention(thin) (@guaranteed foo, @owned foo) -> ()
+// CHECK: function_ref @$s41argument_with_incomplete_epilogue_releaseTf4x_nTf4gn_n : $@convention(thin) (@guaranteed foo, @owned foo) -> ()
 // CHECK: release_value [[IN2]]
 sil @argument_with_incomplete_epilogue_release : $@convention(thin) (@owned goo) -> () {
 bb0(%0 : $goo):
@@ -140,7 +140,7 @@ sil [serialized] @create_object : $@convention(thin) () -> Builtin.NativeObject
 // is a release.
 //
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @dead_argument_due_to_only_release_user
-// CHECK: [[IN:%.*]] = function_ref @$S38dead_argument_due_to_only_release_userTf4gX_n
+// CHECK: [[IN:%.*]] = function_ref @$s38dead_argument_due_to_only_release_userTf4gX_n
 // CHECK: [[IN2:%.*]] = struct_extract [[IN1:%.*]] : $boo, #boo.a
 // CHECK: apply [[IN]]([[IN2]])
 sil @dead_argument_due_to_only_release_user : $@convention(thin) (@owned boo) -> (Int, Int) {
@@ -179,7 +179,7 @@ bb0(%0 : $boo):
 // Make sure argument is exploded and the baz part is not passed in as argument, as its only use
 // is a release.
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @dead_argument_due_to_only_release_user_but__exploded
-// CHECK: [[FN1:%.*]] = function_ref @$S52dead_argument_due_to_only_release_user_but__explodedTf4gX_n
+// CHECK: [[FN1:%.*]] = function_ref @$s52dead_argument_due_to_only_release_user_but__explodedTf4gX_n
 // CHECK: [[IN1:%.*]] = struct_extract %0 : $lotsoffield, #lotsoffield.c
 // CHECK: [[IN2:%.*]] = struct_extract %0 : $lotsoffield, #lotsoffield.b
 // CHECK: [[IN3:%.*]] = struct_extract %0 : $lotsoffield, #lotsoffield.a
@@ -222,7 +222,7 @@ bb0(%0 : $lotsoffield):
 // Make sure argument is exploded and the baz part is not passed in as argument, as its only use
 // is a release.
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @dead_argument_due_to_more_than_release_user
-// CHECK: [[FN1:%.*]] = function_ref @$S43dead_argument_due_to_more_than_release_userTf4gX_n : $@convention(thin) (@guaranteed baz, Int) -> (Int, Int)
+// CHECK: [[FN1:%.*]] = function_ref @$s43dead_argument_due_to_more_than_release_userTf4gX_n : $@convention(thin) (@guaranteed baz, Int) -> (Int, Int)
 sil @dead_argument_due_to_more_than_release_user : $@convention(thin) (@owned boo) -> (Int, Int) {
 bb0(%0 : $boo):
   // make it a non-trivial function
@@ -305,7 +305,7 @@ bb3:
 //
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @exploded_release_to_dead_argument
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
-// CHECK: [[IN1:%.*]] = function_ref @$S33exploded_release_to_dead_argumentTf4d_n
+// CHECK: [[IN1:%.*]] = function_ref @$s33exploded_release_to_dead_argumentTf4d_n
 // CHECK: apply [[IN1]]()
 // CHECK: release_value [[INPUT_ARG0]]
 sil @exploded_release_to_dead_argument : $@convention(thin) (@owned boo) -> () {
@@ -350,7 +350,7 @@ bb0(%0 : $boo):
 //
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @exploded_release_to_guaranteed_param
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
-// CHECK: [[IN1:%.*]] = function_ref @$S36exploded_release_to_guaranteed_paramTf4gX_n
+// CHECK: [[IN1:%.*]] = function_ref @$s36exploded_release_to_guaranteed_paramTf4gX_n
 // CHECK: release_value [[INPUT_ARG0]]
 sil @exploded_release_to_guaranteed_param : $@convention(thin) (@owned boo) -> () {
 bb0(%0 : $boo):
@@ -392,7 +392,7 @@ bb0(%0 : $boo):
 
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @single_owned_return_value
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
-// CHECK: [[IN1:%.*]] = function_ref @$S25single_owned_return_valueTf4n_g
+// CHECK: [[IN1:%.*]] = function_ref @$s25single_owned_return_valueTf4n_g
 // CHECK: [[IN2:%.*]] = apply [[IN1]]([[INPUT_ARG0]]
 // CHECK: retain_value [[IN2]]
 sil @single_owned_return_value : $@convention(thin) (@owned boo) -> @owned boo {
@@ -427,7 +427,7 @@ bb0(%0 : $boo):
 
 
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @single_owned_return_value_with_self_recursion
-// CHECK: function_ref @$S45single_owned_return_value_with_self_recursionTf4n_g
+// CHECK: function_ref @$s45single_owned_return_value_with_self_recursionTf4n_g
 // CHECK: [[RET:%.*]] = apply
 // CHECK: retain_value [[RET]]
 sil @single_owned_return_value_with_self_recursion : $@convention(thin) (@owned boo) -> @owned boo {
@@ -470,7 +470,7 @@ bb3(%4 : $boo):
 
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @single_owned_return_value_with_interfering_release
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
-// CHECK: [[IN1:%.*]] = function_ref @$S50single_owned_return_value_with_interfering_releaseTf4x_nTf4gnn_n
+// CHECK: [[IN1:%.*]] = function_ref @$s50single_owned_return_value_with_interfering_releaseTf4x_nTf4gnn_n
 // CHECK-NOT: retain_value
 // CHECK: return
 sil @single_owned_return_value_with_interfering_release : $@convention(thin) (@owned boo) ->  boo {
@@ -509,7 +509,7 @@ bb0(%0 : $boo):
 // Make sure we do not move the retain_value in the throw block.
 //
 // CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (@owned boo, @error Error) {
-// CHECK: function_ref @$S41owned_to_unowned_retval_with_error_resultTfq4n_g : $@convention(thin) (@owned boo) -> (boo, @error Error)
+// CHECK: function_ref @$s41owned_to_unowned_retval_with_error_resultTfq4n_g : $@convention(thin) (@owned boo) -> (boo, @error Error)
 // CHECK: bb1
 // CHECK-NOT: retain_value
 // CHECK: bb2
@@ -553,7 +553,7 @@ bb2:
 // CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
 // CHECK: bb0
 // CHECK-NEXT: function_ref
-// CHECK-NEXT: function_ref @$S23dead_arg_with_callsitesTfq4dn_n : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK-NEXT: function_ref @$s23dead_arg_with_callsitesTfq4dn_n : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK-NEXT: apply
 // CHECK-NEXT: return
 sil [serialized] @dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
@@ -642,9 +642,9 @@ bb3:
 
 // CHECK-LABEL: sil [serialized] @dead_arg_callsite_1 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
 // CHECK: bb0
-// CHECK: [[OPT_FUN:%[0-9]+]] = function_ref @$S23dead_arg_with_callsitesTfq4dn_n : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK: [[OPT_FUN:%[0-9]+]] = function_ref @$s23dead_arg_with_callsitesTfq4dn_n : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK-NEXT: apply [[OPT_FUN]](
-// CHECK: [[PRIV_OPT_FUN:%[0-9]+]] = function_ref @$S31private_dead_arg_with_callsitesTfq4dn_n : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK: [[PRIV_OPT_FUN:%[0-9]+]] = function_ref @$s31private_dead_arg_with_callsitesTfq4dn_n : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK-NEXT: apply [[PRIV_OPT_FUN]]
 sil [serialized] @dead_arg_callsite_1 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
@@ -662,7 +662,7 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
 
 // This test makes sure we can look up an already specialized callee instead of regenerating one.
 // CHECK-LABEL: sil [serialized] @dead_arg_callsite_2 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
-// CHECK: [[OPT_FUN:%[0-9]+]] = function_ref @$S23dead_arg_with_callsitesTfq4dn_n : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK: [[OPT_FUN:%[0-9]+]] = function_ref @$s23dead_arg_with_callsitesTfq4dn_n : $@convention(thin) (Builtin.NativeObject) -> ()
 // CHECK-NEXT: apply [[OPT_FUN]](
 sil [serialized] @dead_arg_callsite_2 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
@@ -819,7 +819,7 @@ bb0(%0 : $goo):
 // @owned => @guaranteed with error result
 
 // CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @owned_to_guaranteed_with_error_result : $@convention(thin) (@owned Builtin.NativeObject, Int) -> (Int, @error Error) {
-// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @$S37owned_to_guaranteed_with_error_resultTfq4gn_n : $@convention(thin) (@guaranteed Builtin.NativeObject, Int)
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @$s37owned_to_guaranteed_with_error_resultTfq4gn_n : $@convention(thin) (@guaranteed Builtin.NativeObject, Int)
 // CHECK: try_apply [[FUNC_REF]]({{.*}}, normal bb1, error bb2
 // CHECK: bb1([[NORMRET:%[0-9]+]] : $Int):
 // CHECK-NEXT: release_value
@@ -867,7 +867,7 @@ bb2:
 }
 
 // CHECK-LABEL: sil [serialized] @owned_to_guaranteed_with_error_caller : $@convention(thin) (Builtin.NativeObject, Int) -> (Int, @error Error) {
-// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @$S37owned_to_guaranteed_with_error_resultTfq4gn_n : $@convention(thin) (@guaranteed Builtin.NativeObject, Int)
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @$s37owned_to_guaranteed_with_error_resultTfq4gn_n : $@convention(thin) (@guaranteed Builtin.NativeObject, Int)
 // CHECK: try_apply [[FUNC_REF]]({{.*}}, normal bb1, error bb2
 // CHECK: bb1([[NORMRET:%[0-9]+]] : $Int):
 // CHECK-NEXT: release_value
@@ -886,7 +886,7 @@ bb2(%a2 : $Error):
 }
 
 // CHECK-LABEL: sil [serialized] @owned_to_guaranteed_with_nothrow_caller : $@convention(thin) (Builtin.NativeObject, Int) -> Int {
-// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @$S37owned_to_guaranteed_with_error_resultTfq4gn_n : $@convention(thin) (@guaranteed Builtin.NativeObject, Int)
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @$s37owned_to_guaranteed_with_error_resultTfq4gn_n : $@convention(thin) (@guaranteed Builtin.NativeObject, Int)
 // CHECK: try_apply [[FUNC_REF]]({{.*}}, normal bb1, error bb2
 // CHECK: bb1([[NORMRET:%[0-9]+]] : $Int):
 // CHECK-NEXT: release_value
@@ -904,7 +904,7 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Int):
 
 // We should optimize this call.
 // CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @owned_to_guaranteed_simple_singlebb_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @$S42owned_to_guaranteed_simple_singlebb_calleeTfq4g_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @$s42owned_to_guaranteed_simple_singlebb_calleeTfq4g_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[FUNC_REF]]
 // CHECK-NOT: fix_lifetime
 // CHECK: release_value
@@ -1281,28 +1281,28 @@ bb2(%5 : $Builtin.NativeObject):
 
 // CHECK-LABEL: sil [serialized] @owned_to_guaranteed_simple_singlebb_multiple_arg_caller : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
 // CHECK: bb0([[INPUT_PTR_1:%.*]] : $Builtin.NativeObject, [[INPUT_PTR_2:%.*]] : $Builtin.NativeObject):
-// CHECK: [[SINGLEBB_MULTIPLEARG_CALLEE:%.*]] = function_ref @$S55owned_to_guaranteed_simple_singlebb_multiple_arg_calleeTfq4ngn_n : $@convention(thin) (Builtin.Int1, @guaranteed Builtin.NativeObject, Builtin.Int1) -> ()
+// CHECK: [[SINGLEBB_MULTIPLEARG_CALLEE:%.*]] = function_ref @$s55owned_to_guaranteed_simple_singlebb_multiple_arg_calleeTfq4ngn_n : $@convention(thin) (Builtin.Int1, @guaranteed Builtin.NativeObject, Builtin.Int1) -> ()
 // CHECK: apply [[SINGLEBB_MULTIPLEARG_CALLEE]]({{%.*}}, [[INPUT_PTR_1]], {{%.*}})
 // CHECK: release_value [[INPUT_PTR_1]]
 // CHECK: [[MULTIBB_RELEASENOTINEXIT_CALLEE:%.*]] = function_ref @owned_to_guaranteed_multibb_callee_with_release_not_in_exit : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASENOTINEXIT_CALLEE]]([[INPUT_PTR_1]])
-// CHECK: [[MULTIBB_RELEASEINEXIT_CALLEE:%.*]] = function_ref @$S55owned_to_guaranteed_multibb_callee_with_release_in_exitTfq4dg_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+// CHECK: [[MULTIBB_RELEASEINEXIT_CALLEE:%.*]] = function_ref @$s55owned_to_guaranteed_multibb_callee_with_release_in_exitTfq4dg_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASEINEXIT_CALLEE]]([[INPUT_PTR_1]])
 // CHECK-NEXT: release_value [[INPUT_PTR_1]] : $Builtin.NativeObject
-// CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS1:%.*]] = function_ref @$S66owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1Tfq4gg_n : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+// CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS1:%.*]] = function_ref @$s66owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1Tfq4gg_n : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS1]]([[INPUT_PTR_1]], [[INPUT_PTR_2]])
 // CHECK: release_value [[INPUT_PTR_2]]
 // CHECK: release_value [[INPUT_PTR_1]]
-// CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS1:%.*]] = function_ref @$S66owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1Tfq4gg_n : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+// CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS1:%.*]] = function_ref @$s66owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1Tfq4gg_n : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS1]]([[INPUT_PTR_2]], [[INPUT_PTR_1]])
 // CHECK: release_value [[INPUT_PTR_1]]
 // CHECK: release_value [[INPUT_PTR_2]]
 
-// CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS2:%.*]] = function_ref @$S66owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2Tfq4gg_n : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+// CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS2:%.*]] = function_ref @$s66owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2Tfq4gg_n : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS2]]([[INPUT_PTR_2]], [[INPUT_PTR_1]])
 // CHECK: release_value [[INPUT_PTR_1]]
 // CHECK: release_value [[INPUT_PTR_2]]
-// CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS2:%.*]] = function_ref @$S66owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2Tfq4gg_n : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
+// CHECK: [[MULTIBB_RELEASEINEXIT_TWOARGS2:%.*]] = function_ref @$s66owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2Tfq4gg_n : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[MULTIBB_RELEASEINEXIT_TWOARGS2]]([[INPUT_PTR_1]], [[INPUT_PTR_2]])
 // CHECK: release_value [[INPUT_PTR_2]]
 // CHECK: release_value [[INPUT_PTR_1]]
@@ -1364,7 +1364,7 @@ bb0(%0 : $foo):
 }
 
 // CHECK-LABEL: sil @call_externally_available
-// CHECK: [[F:%[0-9]+]] = function_ref @$S34externally_available_with_dead_argTf4d_n : $@convention(thin) () -> ()
+// CHECK: [[F:%[0-9]+]] = function_ref @$s34externally_available_with_dead_argTf4d_n : $@convention(thin) () -> ()
 // CHECK: apply [[F]]()
 // CHECK: return
 sil @call_externally_available : $@convention(thin) (@guaranteed foo) -> () {
@@ -1379,7 +1379,7 @@ bb0(%0 : $foo):
 // We should remove the array semantic from specialized calls.
 
 // CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] [_semantics "array.foobar"] @array_semantic : $@convention(method) (@owned Builtin.NativeObject) -> () {
-// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @$S14array_semanticTfq4g_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @$s14array_semanticTfq4g_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[FUNC_REF]]
 // CHECK: release_value
 sil [serialized] [_semantics "array.foobar"] @array_semantic : $@convention(method) (@owned Builtin.NativeObject) -> () {
@@ -1416,7 +1416,7 @@ bb0(%0 : $Builtin.NativeObject):
 }
 
 // CHECK-LABEL: sil [serialized] @array_semantic_caller : $@convention(thin) (Builtin.NativeObject) -> () {
-// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @$S14array_semanticTfq4g_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+// CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @$s14array_semanticTfq4g_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[FUNC_REF]]
 // CHECK: release_value
 sil [serialized] @array_semantic_caller : $@convention(thin) (Builtin.NativeObject) -> () {
@@ -1434,7 +1434,7 @@ bb0(%0 : $Builtin.NativeObject):
 // call s2 instead of s2 with the dead argument.
 //
 // CHECK-LABEL: sil [serialized] @s3 : $@convention(thin) (Builtin.Int32) -> () {
-// CHECK: [[FUN:%.*]] = function_ref @$S2s2Tfq4d_n
+// CHECK: [[FUN:%.*]] = function_ref @$s2s2Tfq4d_n
 // CHECK: apply [[FUN]](
 sil [serialized] @s3 : $@convention(thin) (Builtin.Int32) -> () {
 bb0(%0 : $Builtin.Int32):
@@ -1513,13 +1513,13 @@ bb0(%0 : $Builtin.Int32):
 }
 
 // CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @generic_owned_to_guaranteed : $@convention(thin) <T where T : KlassFoo> (@owned T) -> Int64
-// CHECK: function_ref @$S27generic_owned_to_guaranteedTf4g_n 
+// CHECK: function_ref @$s27generic_owned_to_guaranteedTf4g_n 
 // CHECK: apply
 // CHECK: release_value
 // CHECK: end sil function 'generic_owned_to_guaranteed'
 
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @generic_owned_to_guaranteed_caller : $@convention(thin) <T where T : KlassFoo> (@owned T) -> Int64
-// CHECK: function_ref @$S34generic_owned_to_guaranteed_callerTf4g_n 
+// CHECK: function_ref @$s34generic_owned_to_guaranteed_callerTf4g_n 
 // CHECK: apply
 // CHECK: release_value
 // CHECK: end sil function 'generic_owned_to_guaranteed_caller'
@@ -1553,13 +1553,13 @@ bb0(%0 : $T):
 }
 
 // CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @generic_in_to_guaranteed : $@convention(thin) <T where T : P> (@in T) -> Int64
-// CHECK: function_ref @$S24generic_in_to_guaranteedTf4g_n 
+// CHECK: function_ref @$s24generic_in_to_guaranteedTf4g_n 
 // CHECK: apply
 // CHECK: destroy_addr
 // CHECK: end sil function 'generic_in_to_guaranteed'
 
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @generic_in_to_guaranteed_caller : $@convention(thin) <T where T : P> (@in T) -> Int64
-// CHECK: function_ref @$S31generic_in_to_guaranteed_callerTf4g_n 
+// CHECK: function_ref @$s31generic_in_to_guaranteed_callerTf4g_n 
 // CHECK: apply
 // CHECK: destroy_addr
 // CHECK: end sil function 'generic_in_to_guaranteed_caller'
@@ -1592,7 +1592,7 @@ bb0(%0 : $*T):
 }
 
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @generic_func_with_dead_non_generic_arg : $@convention(thin) <T> (@owned foo, @in T) -> ()
-// CHECK: function_ref @$S027generic_func_with_dead_non_A4_argTf4dd_n : $@convention(thin) () -> ()
+// CHECK: function_ref @$s027generic_func_with_dead_non_A4_argTf4dd_n : $@convention(thin) () -> ()
 // Call the specialization which is not polymorphic.
 // CHECK: apply
 // CHECK: destroy_addr
@@ -1605,7 +1605,7 @@ bb0(%0 : $foo, %1 : $*T):
 }
 
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @generic_func_with_dead_generic_arg : $@convention(thin) <T> (Int64, @in T) -> Int64
-// CHECK: function_ref @$S023generic_func_with_dead_A4_argTf4nd_n : $@convention(thin) (Int64) -> Int64 
+// CHECK: function_ref @$s023generic_func_with_dead_A4_argTf4nd_n : $@convention(thin) (Int64) -> Int64 
 // Call the specialization which is not polymorphic.
 // CHECK: apply
 // CHECK: destroy_addr
@@ -1617,7 +1617,7 @@ bb0(%0 : $Int64, %1 : $*T):
 }
 
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @generic_func_with_unused_generic_param_and_non_generic_arg : $@convention(thin) <T> (Int64) -> Int64
-// CHECK: function_ref @$S025generic_func_with_unused_a15_param_and_non_A4_argTf4n_n : $@convention(thin) (Int64) -> Int64 
+// CHECK: function_ref @$s025generic_func_with_unused_a15_param_and_non_A4_argTf4n_n : $@convention(thin) (Int64) -> Int64 
 // Call the specialization which is not polymorphic.
 // CHECK: apply
 // CHECK: end sil function 'generic_func_with_unused_generic_param_and_non_generic_arg'
@@ -1634,7 +1634,7 @@ bb0(%0 : $Int64):
 }
 
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @generic_func_with_unused_generic_param_and_dead_non_generic_arg : $@convention(thin) <T> (Int64, Int64) -> Int64
-// CHECK: function_ref @$S025generic_func_with_unused_a20_param_and_dead_non_A4_argTf4nd_n : $@convention(thin) (Int64) -> Int64 
+// CHECK: function_ref @$s025generic_func_with_unused_a20_param_and_dead_non_A4_argTf4nd_n : $@convention(thin) (Int64) -> Int64 
 // Call the specialization which is not polymorphic.
 // CHECK: apply
 // CHECK: end sil function 'generic_func_with_unused_generic_param_and_dead_non_generic_arg'
@@ -1651,7 +1651,7 @@ bb0(%0 : $Int64):
 }
 
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @generic_func_with_unused_generic_param_and_dead_generic_arg : $@convention(thin) <T> (@in_guaranteed T) -> ()
-// CHECK: function_ref @$S025generic_func_with_unused_a16_param_and_dead_A4_argTf4d_n : $@convention(thin) () -> ()
+// CHECK: function_ref @$s025generic_func_with_unused_a16_param_and_dead_A4_argTf4d_n : $@convention(thin) () -> ()
 // Call the specialization which is not polymorphic.
 // CHECK: apply
 // CHECK: end sil function 'generic_func_with_unused_generic_param_and_dead_generic_arg'
@@ -1670,7 +1670,7 @@ bb0(%0 : $*T):
 }
 
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @generic_func_with_unused_generic_param_and_dead_owned_generic_arg : $@convention(thin) <T where T : KlassFoo> (@owned T) -> ()
-// CHECK: function_ref @$S025generic_func_with_unused_a22_param_and_dead_owned_A4_argTf4d_n : $@convention(thin) () -> ()
+// CHECK: function_ref @$s025generic_func_with_unused_a22_param_and_dead_owned_A4_argTf4d_n : $@convention(thin) () -> ()
 // Call the specialization which is not polymorphic.
 // CHECK: apply
 // CHECK: release_value %0
@@ -1691,7 +1691,7 @@ bb0(%0 : $T):
 }
 
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @generic_func_with_multple_generic_args_and_dead_generic_arg : $@convention(thin) <T, S> (@in T, @in S) -> ()
-// CHECK: function_ref @$S026generic_func_with_multple_a15_args_and_dead_A4_argTf4nd_n : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0) -> ()
+// CHECK: function_ref @$s026generic_func_with_multple_a15_args_and_dead_A4_argTf4nd_n : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0) -> ()
 // Call the specialization which has only one function argument, because another one is dead
 // and was eliminated.
 // CHECK: apply
@@ -1718,24 +1718,24 @@ bb0(%0 : $*T):
   return %r : $()
 }
 
-// CHECK-LABEL: sil shared @$S36exploded_release_to_guaranteed_paramTf4gX_n
+// CHECK-LABEL: sil shared @$s36exploded_release_to_guaranteed_paramTf4gX_n
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $Int):
 // CHECK-NOT: strong_release
 // CHECK: return
 
-// CHECK-LABEL: sil shared @$S25single_owned_return_valueTf4n_g : $@convention(thin) (@owned boo) -> boo
+// CHECK-LABEL: sil shared @$s25single_owned_return_valueTf4n_g : $@convention(thin) (@owned boo) -> boo
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
 // CHECK-NOT: retain_value
 // CHECK: return
 
 // There should not be a single retain in this function.
 //
-// CHECK-LABEL: sil shared @$S45single_owned_return_value_with_self_recursionTf4n_g : $@convention(thin) (@owned boo) -> boo
+// CHECK-LABEL: sil shared @$s45single_owned_return_value_with_self_recursionTf4n_g : $@convention(thin) (@owned boo) -> boo
 // CHECK: bb0
 // CHECK-NOT: retain_value
 // CHECK: return
 
-// CHECK-LABEL: @$S41owned_to_unowned_retval_with_error_resultTfq4n_g : $@convention(thin) (@owned boo) -> (boo, @error Error) {
+// CHECK-LABEL: @$s41owned_to_unowned_retval_with_error_resultTfq4n_g : $@convention(thin) (@owned boo) -> (boo, @error Error) {
 // CHECK: bb2
 // CHECK: retain_value
 // CHECK: throw
@@ -1743,7 +1743,7 @@ bb0(%0 : $*T):
 // Check that we specialized this function by removing the dead argument and
 // copied everything appropriately.
 
-// CHECK-LABEL: sil shared [serialized] @$S23dead_arg_with_callsitesTfq4dn_n : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil shared [serialized] @$s23dead_arg_with_callsitesTfq4dn_n : $@convention(thin) (Builtin.NativeObject) -> () {
 // CHECK: bb0([[INPUT_ARG:%[0-9]+]] : $Builtin.NativeObject):
 // CHECK: cond_br undef, bb1, bb2
 // CHECK: bb1:
@@ -1757,16 +1757,16 @@ bb0(%0 : $*T):
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 
-// CHECK-LABEL: sil shared [serialized] @$S31private_dead_arg_with_callsitesTfq4dn_n : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil shared [serialized] @$s31private_dead_arg_with_callsitesTfq4dn_n : $@convention(thin) (Builtin.NativeObject) -> () {
 // CHECK: bb0(
 
-// CHECK-LABEL: sil shared [serialized] @$S37owned_to_guaranteed_with_error_resultTfq4gn_n : $@convention(thin) (@guaranteed Builtin.NativeObject, Int) -> (Int, @error Error) {
+// CHECK-LABEL: sil shared [serialized] @$s37owned_to_guaranteed_with_error_resultTfq4gn_n : $@convention(thin) (@guaranteed Builtin.NativeObject, Int) -> (Int, @error Error) {
 // CHECK-NOT: release
 // CHECK: throw
 
-// CHECK-LABEL: sil shared [serialized] @$S42owned_to_guaranteed_simple_singlebb_calleeTfq4g_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil shared [serialized] @$s42owned_to_guaranteed_simple_singlebb_calleeTfq4g_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 
-// CHECK-LABEL: sil shared [serialized] @$S55owned_to_guaranteed_multibb_callee_with_release_in_exitTfq4dg_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil shared [serialized] @$s55owned_to_guaranteed_multibb_callee_with_release_in_exitTfq4dg_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 // CHECK: bb0(
 // CHECK:  function_ref user
 // CHECK:  function_ref @user
@@ -1784,7 +1784,7 @@ bb0(%0 : $*T):
 // Also make sure we have change the calling convention to freestanding from
 // method because we have changed the self argument.
 
-// CHECK-LABEL: sil shared [serialized] @$S14array_semanticTfq4g_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil shared [serialized] @$s14array_semanticTfq4g_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 // CHECK: bb0(%0 : $Builtin.NativeObject)
 // CHECK:  function_ref user
 // CHECK:  function_ref @user
@@ -1793,28 +1793,28 @@ bb0(%0 : $*T):
 // CHECK:  return
 
 // Check that an owned-to-guaranteed has happened.
-// CHECK-LABEL: sil shared [noinline] @$S27generic_owned_to_guaranteedTf4g_n : $@convention(thin) <T where T : KlassFoo> (@guaranteed T) -> Int64
+// CHECK-LABEL: sil shared [noinline] @$s27generic_owned_to_guaranteedTf4g_n : $@convention(thin) <T where T : KlassFoo> (@guaranteed T) -> Int64
 // CHECK-NOT: release_value
 // CHECK-NOT: strong_release 
 // CHECK-NOT: destroy_addr 
-// CHECK: end sil function '$S27generic_owned_to_guaranteedTf4g_n'
+// CHECK: end sil function '$s27generic_owned_to_guaranteedTf4g_n'
 
 // Check that an owned-to-guaranteed has happened.
-// CHECK-LABEL: sil shared @$S34generic_owned_to_guaranteed_callerTf4g_n : $@convention(thin) <T where T : KlassFoo> (@guaranteed T) -> Int64
+// CHECK-LABEL: sil shared @$s34generic_owned_to_guaranteed_callerTf4g_n : $@convention(thin) <T where T : KlassFoo> (@guaranteed T) -> Int64
 // Call the specialized function. It should have a guaranteed param now.
-// CHECK: function_ref @$S27generic_owned_to_guaranteedTf4g_n : $@convention(thin) <τ_0_0 where τ_0_0 : KlassFoo> (@guaranteed τ_0_0) -> Int64
+// CHECK: function_ref @$s27generic_owned_to_guaranteedTf4g_n : $@convention(thin) <τ_0_0 where τ_0_0 : KlassFoo> (@guaranteed τ_0_0) -> Int64
 // CHECK: apply
-// CHECK: end sil function '$S34generic_owned_to_guaranteed_callerTf4g_n'
+// CHECK: end sil function '$s34generic_owned_to_guaranteed_callerTf4g_n'
 
 // Check that a in-to-guaranteed has happened.
-// CHECK-LABEL: sil shared [noinline] @$S24generic_in_to_guaranteedTf4g_n : $@convention(thin) <T where T : P> (@in_guaranteed T) -> Int64
+// CHECK-LABEL: sil shared [noinline] @$s24generic_in_to_guaranteedTf4g_n : $@convention(thin) <T where T : P> (@in_guaranteed T) -> Int64
 // CHECK-NOT: destroy_addr
-// CHECK: end sil function '$S24generic_in_to_guaranteedTf4g_n'
+// CHECK: end sil function '$s24generic_in_to_guaranteedTf4g_n'
 
 // Check that a in-to-guaranteed has happened.
-// CHECK-LABEL: sil shared @$S31generic_in_to_guaranteed_callerTf4g_n : $@convention(thin) <T where T : P> (@in_guaranteed T) -> Int64
+// CHECK-LABEL: sil shared @$s31generic_in_to_guaranteed_callerTf4g_n : $@convention(thin) <T where T : P> (@in_guaranteed T) -> Int64
 // Call the specialized function. It should have a guaranteed param now. 
-// CHECK: function_ref @$S24generic_in_to_guaranteedTf4g_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+// CHECK: function_ref @$s24generic_in_to_guaranteedTf4g_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
 // CHECK: apply
-// CHECK: end sil function '$S31generic_in_to_guaranteed_callerTf4g_n'
+// CHECK: end sil function '$s31generic_in_to_guaranteed_callerTf4g_n'
 

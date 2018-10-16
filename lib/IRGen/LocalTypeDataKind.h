@@ -25,7 +25,6 @@
 #include "llvm/ADT/DenseMapInfo.h"
 
 namespace swift {
-  class NormalProtocolConformance;
   class ProtocolDecl;
 
 namespace irgen {

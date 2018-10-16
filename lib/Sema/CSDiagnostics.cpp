@@ -82,9 +82,14 @@ Type RequirementFailure::getOwnerType() const {
   return getType(getAnchor())->getInOutObjectType()->getMetatypeInstanceType();
 }
 
+const GenericContext *RequirementFailure::getGenericContext() const {
+  if (auto *genericCtx = AffectedDecl->getAsGenericContext())
+    return genericCtx;
+  return AffectedDecl->getDeclContext()->getAsDecl()->getAsGenericContext();
+}
+
 const Requirement &RequirementFailure::getRequirement() const {
-  auto *genericCtx = AffectedDecl->getAsGenericContext();
-  return genericCtx->getGenericRequirements()[getRequirementIndex()];
+  return getGenericContext()->getGenericRequirements()[getRequirementIndex()];
 }
 
 ValueDecl *RequirementFailure::getDeclRef() const {
@@ -102,6 +107,10 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     ConstraintLocatorBuilder member(locator);
     locator =
         cs.getConstraintLocator(member.withPathElement(PathEltKind::Member));
+  } else if (isa<SubscriptExpr>(anchor)) {
+    ConstraintLocatorBuilder subscript(locator);
+    locator = cs.getConstraintLocator(
+        subscript.withPathElement(PathEltKind::SubscriptMember));
   }
 
   auto overload = getOverloadChoiceIfAvailable(locator);
@@ -135,7 +144,7 @@ bool RequirementFailure::diagnoseAsError() {
 
   auto *anchor = getAnchor();
   const auto *reqDC = getRequirementDC();
-  auto *genericCtx = AffectedDecl->getAsGenericContext();
+  auto *genericCtx = getGenericContext();
 
   if (reqDC != genericCtx) {
     auto *NTD = reqDC->getSelfNominalTypeDecl();
@@ -212,7 +221,7 @@ bool MissingConformanceFailure::diagnoseAsError() {
     if (auto *fnType = ownerType->getAs<AnyFunctionType>()) {
       auto parameters = fnType->getParams();
       for (auto index : indices(parameters)) {
-        if (parameters[index].getType()->isEqual(nonConformingType)) {
+        if (parameters[index].getOldType()->isEqual(nonConformingType)) {
           atParameterPos = index;
           break;
         }
@@ -267,12 +276,12 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseAsError() {
     return false;
 
   auto &last = path.back();
-  if (last.getKind() != ConstraintLocator::Archetype)
+  if (last.getKind() != ConstraintLocator::GenericParameter)
     return false;
 
-  auto *archetype = last.getArchetype();
+  auto *paramTy = last.getGenericParameter();
   emitDiagnostic(anchor->getLoc(), diag::converting_noescape_to_type,
-                 archetype);
+                 paramTy);
   return true;
 }
 
@@ -318,6 +327,7 @@ bool MissingForcedDowncastFailure::diagnoseAsError() {
         .fixItReplace(coerceExpr->getLoc(), "as!");
     return true;
   }
+  llvm_unreachable("unhandled cast kind");
 }
 
 bool MissingAddressOfFailure::diagnoseAsError() {
@@ -757,6 +767,28 @@ bool AssignmentFailure::diagnoseAsError() {
 
     emitDiagnostic(Loc, DeclDiagnostic, message)
         .highlight(immInfo.first->getSourceRange());
+
+    // If there is a masked instance variable of the same type, emit a
+    // note to fixit prepend a 'self.'.
+    if (auto typeContext = DC->getInnermostTypeContext()) {
+      UnqualifiedLookup lookup(VD->getFullName(), typeContext,
+                               getASTContext().getLazyResolver());
+      for (auto &result : lookup.Results) {
+        const VarDecl *typeVar = dyn_cast<VarDecl>(result.getValueDecl());
+        if (typeVar && typeVar != VD && typeVar->isSettable(DC) &&
+            typeVar->isSetterAccessibleFrom(DC) &&
+            typeVar->getType()->isEqual(VD->getType())) {
+          // But not in its own accessor.
+          auto AD =
+              dyn_cast_or_null<AccessorDecl>(DC->getInnermostMethodContext());
+          if (!AD || AD->getStorage() != typeVar) {
+            emitDiagnostic(Loc, diag::masked_instance_variable,
+                           typeContext->getSelfTypeInContext())
+                .fixItInsert(Loc, "self.");
+          }
+        }
+      }
+    }
 
     // If this is a simple variable marked with a 'let', emit a note to fixit
     // hint it to 'var'.

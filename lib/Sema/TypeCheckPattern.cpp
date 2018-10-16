@@ -539,16 +539,11 @@ public:
   //   then required to have keywords for every argument that name properties
   //   of the type.
   Pattern *visitCallExpr(CallExpr *ce) {
-    if (!TC.Context.isSwiftVersion3()) {
-      // swift(>=4) mode.
-      // Specialized call are not allowed anyway.
-      // Let it be diagnosed as an expression.
-      // For Swift3 mode, we emit warnings just before constructing the
-      // enum-element-pattern below.
-      if (isa<UnresolvedSpecializeExpr>(ce->getFn()))
-        return nullptr;
-    }
-    
+    // Specialized call are not allowed anyway.
+    // Let it be diagnosed as an expression.
+    if (isa<UnresolvedSpecializeExpr>(ce->getFn()))
+      return nullptr;
+
     SmallVector<ComponentIdentTypeRepr *, 2> components;
     if (!ExprToIdentTypeRepr(components, TC.Context).visit(ce->getFn()))
       return nullptr;
@@ -597,19 +592,8 @@ public:
       loc.setType(enumTy);
     }
 
-    if (auto generic = dyn_cast<GenericIdentTypeRepr>(tailComponent)) {
-      assert(TC.Context.isSwiftVersion3() && "should be handled above");
-
-      // Swift3 used to ignore the last generic argument clause:
-      //   EnumTy.CaseVal<SomeType>()
-      // used to be wrongfully converted to
-      //   (pattern_enum_element type='EnumTy' EnumTy.CaseVal
-      //     (pattern_tuple type='()' names=))
-      // To keep source compatibility, just emit a warning with fix-it.
-      TC.diagnose(generic->getAngleBrackets().Start,
-                  diag::swift3_ignore_specialized_enum_element_call)
-        .fixItRemove(generic->getAngleBrackets());
-    }
+    assert(!isa<GenericIdentTypeRepr>(tailComponent) &&
+           "should be handled above");
 
     auto *subPattern = getSubExprPattern(ce->getArg());
     return new (TC.Context) EnumElementPattern(loc,
@@ -1451,7 +1435,7 @@ recur:
     validateDeclForNameLookup(elt);
     if (EEP->hasSubPattern()) {
       Pattern *sub = EEP->getSubPattern();
-      if (!Context.isSwiftVersion3() && !elt->hasAssociatedValues()) {
+      if (!elt->hasAssociatedValues()) {
         diagnose(EEP->getLoc(),
                  diag::enum_element_pattern_assoc_values_mismatch,
                  EEP->getName());
@@ -1584,7 +1568,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
   bool hadError = false;
   for (const auto &param : FN->getParams()) {
     params.push_back(param);
-    hadError |= param.getType()->hasError();
+    hadError |= param.getOldType()->hasError();
   }
 
   // Local function to check if the given type is valid e.g. doesn't have

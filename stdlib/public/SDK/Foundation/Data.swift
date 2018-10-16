@@ -929,20 +929,20 @@ internal final class _DataStorage {
         
         switch _backing {
         case .swift:
-            return _NSSwiftData(backing: self, range: range)
+            return __NSSwiftData(backing: self, range: range)
         case .immutable(let d):
             guard range.lowerBound == 0 && range.upperBound == _length else {
-                return _NSSwiftData(backing: self, range: range)
+                return __NSSwiftData(backing: self, range: range)
             }
             return d
         case .mutable(let d):
             guard range.lowerBound == 0 && range.upperBound == _length else {
-                return _NSSwiftData(backing: self, range: range)
+                return __NSSwiftData(backing: self, range: range)
             }
             return d
         case .customReference(let d):
             guard range.lowerBound == 0 && range.upperBound == d.length else {
-                return _NSSwiftData(backing: self, range: range)
+                return __NSSwiftData(backing: self, range: range)
             }
             return d
         case .customMutableReference(let d):
@@ -966,7 +966,10 @@ internal final class _DataStorage {
     }
 }
 
-internal class _NSSwiftData : NSData {
+// NOTE: older runtimes called this _NSSwiftData. The two must
+// coexist, so it was renamed. The old name must not be used in the new
+// runtime.
+internal class __NSSwiftData : NSData {
     var _backing: _DataStorage!
     var _range: Range<Data.Index>!
     
@@ -1178,7 +1181,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter url: The `URL` to read.
     /// - parameter options: Options for the read operation. Default value is `[]`.
     /// - throws: An error in the Cocoa domain, if `url` cannot be read.
-    public init(contentsOf url: URL, options: Data.ReadingOptions = []) throws {
+    public init(contentsOf url: __shared URL, options: Data.ReadingOptions = []) throws {
         let d = try NSData(contentsOf: url, options: ReadingOptions(rawValue: options.rawValue))
         _backing = _DataStorage(immutableReference: d, offset: 0)
         _sliceRange = 0..<d.length
@@ -1189,7 +1192,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// Returns nil when the input is not recognized as valid Base-64.
     /// - parameter base64String: The string to parse.
     /// - parameter options: Encoding options. Default value is `[]`.
-    public init?(base64Encoded base64String: String, options: Data.Base64DecodingOptions = []) {
+    public init?(base64Encoded base64String: __shared String, options: Data.Base64DecodingOptions = []) {
         if let d = NSData(base64Encoded: base64String, options: Base64DecodingOptions(rawValue: options.rawValue)) {
             _backing = _DataStorage(immutableReference: d, offset: 0)
             _sliceRange = 0..<d.length
@@ -1204,7 +1207,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     ///
     /// - parameter base64Data: Base-64, UTF-8 encoded input data.
     /// - parameter options: Decoding options. Default value is `[]`.
-    public init?(base64Encoded base64Data: Data, options: Data.Base64DecodingOptions = []) {
+    public init?(base64Encoded base64Data: __shared Data, options: Data.Base64DecodingOptions = []) {
         if let d = NSData(base64Encoded: base64Data, options: Base64DecodingOptions(rawValue: options.rawValue)) {
             _backing = _DataStorage(immutableReference: d, offset: 0)
             _sliceRange = 0..<d.length
@@ -1220,7 +1223,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// If the resulting value is mutated, then `Data` will invoke the `mutableCopy()` function on the reference to copy the contents. You may customize the behavior of that function if you wish to return a specialized mutable subclass.
     ///
     /// - parameter reference: The instance of `NSData` that you wish to wrap. This instance will be copied by `struct Data`.
-    public init(referencing reference: NSData) {
+    public init(referencing reference: __shared NSData) {
 #if DEPLOYMENT_RUNTIME_SWIFT
         let providesConcreteBacking = reference._providesConcreteBacking()
 #else
@@ -1899,7 +1902,8 @@ extension Data : _ObjectiveCBridgeable {
         result = Data(referencing: input)
         return true
     }
-    
+
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSData?) -> Data {
         guard let src = source else { return Data() }
         return Data(referencing: src)

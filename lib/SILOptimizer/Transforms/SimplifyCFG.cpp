@@ -320,8 +320,7 @@ public:
     auto *SrcTerm = cast<BranchInst>(Src->getTerminator());
 
     EdgeThreadingCloner Cloner(SrcTerm);
-    for (auto &I : *Dest)
-      Cloner.process(&I);
+    Cloner.cloneFrom(Dest);
 
     // We have copied the threaded block into the edge.
     Src = Cloner.getEdgeBB();
@@ -1053,8 +1052,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // destination block into this one, rewriting uses of the BBArgs to use the
   // branch arguments as we go.
   EdgeThreadingCloner Cloner(BI);
-  for (auto &I : *DestBB)
-    Cloner.process(&I);
+  Cloner.cloneFrom(DestBB);
 
   // Does not currently update DominanceInfo.
   Cloner.splitCriticalEdges(nullptr, nullptr);
@@ -2434,9 +2432,7 @@ bool SimplifyCFG::tailDuplicateObjCMethodCallSuccessorBlocks() {
     // destination block into this one, rewriting uses of the BBArgs to use the
     // branch arguments as we go.
     EdgeThreadingCloner Cloner(Branch);
-
-    for (auto &I : *DestBB)
-      Cloner.process(&I);
+    Cloner.cloneFrom(DestBB);
 
     // Does not currently update DominanceInfo.
     Cloner.splitCriticalEdges(nullptr, nullptr);
@@ -2651,7 +2647,7 @@ bool ArgumentSplitter::createNewArguments() {
   // old one.
   llvm::SmallVector<SILValue, 4> NewArgumentValues;
   for (auto &P : Projections) {
-    auto *NewArg = ParentBB->createPHIArgument(P.getType(Ty, Mod),
+    auto *NewArg = ParentBB->createPhiArgument(P.getType(Ty, Mod),
                                                ValueOwnershipKind::Owned);
     // This is unfortunate, but it feels wrong to put in an API into SILBuilder
     // that only takes in arguments.
@@ -3427,7 +3423,7 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   LLVM_DEBUG(llvm::dbgs() << "unwrap argument:" << *A);
   A->replaceAllUsesWith(SILUndef::get(A->getType(), BB->getModule()));
   auto *NewArg =
-      BB->replacePHIArgument(i, proj->getType(), ValueOwnershipKind::Owned);
+      BB->replacePhiArgument(i, proj->getType(), ValueOwnershipKind::Owned);
   proj->replaceAllUsesWith(NewArg);
 
   // Rewrite the branch operand for each incoming branch.

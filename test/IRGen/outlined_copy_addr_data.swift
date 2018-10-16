@@ -8,7 +8,7 @@ struct Resource<A> {
     let parse: (Data) -> A?
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$S11outcopyaddr13CrashMetaTypeC10apiRequest4base8resourceySS_AA8ResourceVyxGtlFZ"
+// CHECK-LABEL: define hidden swiftcc void @"$s11outcopyaddr13CrashMetaTypeC10apiRequest4base8resourceySS_AA8ResourceVyxGtlFZ"
 // CHECK: entry:
 // CHECK: alloca
 // CHECK: alloca

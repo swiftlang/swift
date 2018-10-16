@@ -211,7 +211,7 @@ public:
           Formatted = "";
 
         Output.replace(Offset, Length, Formatted);
-        Doc.updateCode(llvm::MemoryBuffer::getMemBuffer(Output));        
+        Doc.updateCode(llvm::MemoryBuffer::getMemBufferCopy(Output));
       }
       if (Filename == "-" || (!InPlace && OutputFilename == "-")) {
         llvm::outs() << Output;

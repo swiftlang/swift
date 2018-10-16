@@ -62,6 +62,17 @@ class TestPerformanceTestSamples(unittest.TestCase):
         self.assertEquals(s.num_iters, 42)
         self.assertEquals(s.runtime, 1000)
 
+    def test_quantile(self):
+        self.assertEquals(self.samples.quantile(1), 1000)
+        self.assertEquals(self.samples.quantile(0), 1000)
+        self.samples.add(Sample(2, 1, 1100))
+        self.assertEquals(self.samples.quantile(0), 1000)
+        self.assertEquals(self.samples.quantile(1), 1100)
+        self.samples.add(Sample(3, 1, 1050))
+        self.assertEquals(self.samples.quantile(0), 1000)
+        self.assertEquals(self.samples.quantile(.5), 1050)
+        self.assertEquals(self.samples.quantile(1), 1100)
+
     def assertEqualFiveNumberSummary(self, ss, expected_fns):
         e_min, e_q1, e_median, e_q3, e_max = expected_fns
         self.assertEquals(ss.min, e_min)
@@ -75,13 +86,13 @@ class TestPerformanceTestSamples(unittest.TestCase):
             self.samples, (1000, 1000, 1000, 1000, 1000))
         self.samples.add(Sample(2, 1, 1100))
         self.assertEqualFiveNumberSummary(
-            self.samples, (1000, 1000, 1100, 1100, 1100))
+            self.samples, (1000, 1000, 1000, 1100, 1100))
         self.samples.add(Sample(3, 1, 1050))
         self.assertEqualFiveNumberSummary(
-            self.samples, (1000, 1000, 1050, 1050, 1100))
+            self.samples, (1000, 1000, 1050, 1100, 1100))
         self.samples.add(Sample(4, 1, 1025))
         self.assertEqualFiveNumberSummary(
-            self.samples, (1000, 1025, 1050, 1100, 1100))
+            self.samples, (1000, 1000, 1025, 1050, 1100))
         self.samples.add(Sample(5, 1, 1075))
         self.assertEqualFiveNumberSummary(
             self.samples, (1000, 1025, 1050, 1075, 1100))
@@ -156,11 +167,12 @@ class TestPerformanceTestSamples(unittest.TestCase):
         self.samples.add(Sample(0, 2, 23))
         self.samples.add(Sample(1, 2, 18))
         self.samples.add(Sample(2, 2, 18))
+        self.samples.add(Sample(3, 2, 18))
         self.assertEquals(self.samples.iqr, 0)
 
         self.samples.exclude_outliers()
 
-        self.assertEquals(self.samples.count, 2)
+        self.assertEquals(self.samples.count, 3)
         self.assertEqualStats(
             (self.samples.min, self.samples.max), (18, 18))
 
@@ -368,7 +380,6 @@ Running AngryPhonebook for 3 samples.
     Sample 0,11812
     Measuring with scale 90.
     Sample 1,13898
-    Measuring with scale 91.
     Sample 2,11467
 1,AngryPhonebook,3,11467,13898,12392,1315,11812
 Running Array2D for 3 samples.
@@ -388,7 +399,7 @@ Totals,2"""
         )
         self.assertEquals(r.num_samples, r.samples.num_samples)
         self.assertEquals(results[0].samples.all_samples,
-                          [(0, 78, 11812), (1, 90, 13898), (2, 91, 11467)])
+                          [(0, 78, 11812), (1, 90, 13898), (2, 90, 11467)])
 
         r = results[1]
         self.assertEquals(
@@ -447,7 +458,7 @@ Totals,2"""
         self.assertTrue(isinstance(result, PerformanceTestResult))
         self.assertEquals(result.min, 350815)
         self.assertEquals(result.max, 376131)
-        self.assertEquals(result.median, 363094)
+        self.assertEquals(result.median, 358817)
         self.assertAlmostEquals(result.sd, 8443.37, places=2)
         self.assertAlmostEquals(result.mean, 361463.25, places=2)
         self.assertEquals(result.num_samples, 8)
@@ -587,21 +598,21 @@ class TestReportFormatter(OldAndNewLog):
         comparison_result = self.tc.increased[0]
         self.assertEquals(
             ReportFormatter.header_for(comparison_result),
-            ('TEST', 'OLD', 'NEW', 'DELTA', 'SPEEDUP')
+            ('TEST', 'OLD', 'NEW', 'DELTA', 'RATIO')
         )
         self.assert_markdown_contains([
-            'TEST                  | OLD    | NEW    | DELTA   | SPEEDUP',
+            'TEST                  | OLD    | NEW    | DELTA   | RATIO',
             '---                   | ---    | ---    | ---     | ---    ',
             'TEST                  | MIN    | MAX    | MEAN    | MAX_RSS'])
         self.assert_git_contains([
-            'TEST                    OLD      NEW      DELTA     SPEEDUP',
+            'TEST                    OLD      NEW      DELTA     RATIO',
             'TEST                    MIN      MAX      MEAN      MAX_RSS'])
         self.assert_html_contains([
             """
                 <th align='left'>OLD</th>
                 <th align='left'>NEW</th>
                 <th align='left'>DELTA</th>
-                <th align='left'>SPEEDUP</th>""",
+                <th align='left'>RATIO</th>""",
             """
                 <th align='left'>MIN</th>
                 <th align='left'>MAX</th>
@@ -764,12 +775,12 @@ class Test_compare_perf_tests_main(OldAndNewLog, FileSystemIntegration):
     """Integration test that invokes the whole comparison script."""
     markdown = [
         '<summary>Regression (1)</summary>',
-        'TEST                  | OLD    | NEW    | DELTA   | SPEEDUP',
+        'TEST                  | OLD    | NEW    | DELTA   | RATIO',
         'BitCount              | 3      | 9      | +199.9% | **0.33x**',
     ]
     git = [
         'Regression (1):',
-        'TEST                    OLD      NEW      DELTA     SPEEDUP',
+        'TEST                    OLD      NEW      DELTA     RATIO',
         'BitCount                3        9        +199.9%   **0.33x**',
     ]
     html = ['<html>', "<td align='left'>BitCount</td>"]

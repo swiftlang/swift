@@ -40,6 +40,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -720,31 +721,25 @@ public:
   }
 
   /// To make it unambiguous whether a `var` binding has been initialized,
-  /// zero-initialize the first pointer-sized field. LLDB uses this to
-  /// recognize to detect uninitizialized variables. This can be removed once
-  /// swiftc switches to @llvm.dbg.addr() intrinsics.
+  /// zero-initialize the shadow copy alloca. LLDB uses the first pointer-sized
+  /// field to recognize to detect uninitizialized variables. This can be
+  /// removed once swiftc switches to @llvm.dbg.addr() intrinsics.
   void zeroInit(llvm::AllocaInst *AI) {
     if (!AI)
       return;
 
     // Only do this at -Onone.
-    if (IGM.IRGen.Opts.shouldOptimize())
-      return;
-
-    auto &DL = IGM.DataLayout;
-    if (DL.getTypeSizeInBits(AI->getAllocatedType()) <
-        DL.getPointerSizeInBits())
+    uint64_t Size = *AI->getAllocationSizeInBits(IGM.DataLayout) / 8;
+    if (IGM.IRGen.Opts.shouldOptimize() || !Size)
       return;
 
     llvm::IRBuilder<> ZeroInitBuilder(AI->getNextNode());
 
     // No debug location is how LLVM marks prologue instructions.
     ZeroInitBuilder.SetCurrentDebugLocation(nullptr);
-    auto *BC =
-        ZeroInitBuilder.CreateBitCast(AI, IGM.OpaquePtrTy->getPointerTo());
-    ZeroInitBuilder.CreateAlignedStore(
-        llvm::ConstantPointerNull::get(IGM.OpaquePtrTy), BC,
-        IGM.getPointerAlignment().getValue());
+    ZeroInitBuilder.CreateMemSet(
+        AI, llvm::ConstantInt::get(IGM.Int8Ty, 0),
+        Size, AI->getAlignment());
   }
 
   /// Account for bugs in LLVM.
@@ -769,10 +764,10 @@ public:
 
     auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, Name}}];
     if (!Alloca.isValid())
-      Alloca = createAlloca(Storage->getType(), Align, Name+".addr");
-    zeroInit(dyn_cast<llvm::AllocaInst>(Alloca.getAddress()));
+      Alloca = createAlloca(Storage->getType(), Align, Name+".debug");
+    zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress()));
 
-    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo, Builder);
+    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
     Builder.CreateStore(Storage, Alloca.getAddress(), Align);
     return Alloca.getAddress();
   }
@@ -848,8 +843,9 @@ public:
 
     SILType Type = SILVal->getType();
     auto &LTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(Type));
-    auto Alloca = LTI.allocateStack(*this, Type, "debug.copy");
-    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo, Builder);
+    auto Alloca = LTI.allocateStack(*this, Type, Name+".debug");
+    zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress().getAddress()));
+    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
     LTI.initialize(*this, e, Alloca.getAddress(), false /* isOutlined */);
     copy.push_back(Alloca.getAddressPointer());
   }
@@ -878,7 +874,7 @@ public:
                                     IndirectionKind Indirection = DirectValue) {
     assert(IGM.DebugInfo && "debug info not enabled");
     if (ArgNo) {
-      PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
+      PrologueLocation AutoRestore(IGM.DebugInfo.get(), Builder);
       IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, VarDecl,
                                              Name, ArgNo, Indirection);
     } else
@@ -1555,7 +1551,8 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 
   // emitPolymorphicParameters() may create function calls, so we need
   // to initialize the debug location here.
-  ArtificialLocation Loc(IGF.getDebugScope(), IGF.IGM.DebugInfo, IGF.Builder);
+  ArtificialLocation Loc(IGF.getDebugScope(), IGF.IGM.DebugInfo.get(),
+                         IGF.Builder);
   
   // Bind polymorphic arguments. This can only be done after binding
   // all the value parameters, and must be done even for non-polymorphic
@@ -2085,37 +2082,19 @@ static llvm::Value *getObjCClassForValue(IRGenFunction &IGF,
   llvm_unreachable("bad metatype representation");
 }
 
-static llvm::Value *emitWitnessTableForLoweredCallee(IRGenSILFunction &IGF,
-                                              CanSILFunctionType origCalleeType,
-                                              SubstitutionMap subs) {
-  llvm::Value *wtable;
+static llvm::Value *
+emitWitnessTableForLoweredCallee(IRGenSILFunction &IGF,
+                                 CanSILFunctionType substCalleeType) {
+  // This use of getSelfInstanceType() assumes that the instance type is
+  // always a meaningful formal type.
+  auto substSelfType = substCalleeType->getSelfInstanceType();
+  auto substConformance = substCalleeType->getWitnessMethodConformance();
 
-  if (auto *proto = origCalleeType->getDefaultWitnessMethodProtocol()) {
-    // The generic signature for a witness method with abstract Self must
-    // have exactly one protocol requirement.
-    //
-    // We recover the witness table from the substitution that was used to
-    // produce the substituted callee type.
-    auto origSelfType = proto->getSelfInterfaceType()->getCanonicalType();
-    auto substSelfType = origSelfType.subst(subs)->getCanonicalType();
-    auto conformance = *subs.lookupConformance(origSelfType, proto);
+  llvm::Value *argMetadata = IGF.emitTypeMetadataRef(substSelfType);
+  llvm::Value *wtable =
+    emitWitnessTableRef(IGF, substSelfType, &argMetadata, substConformance);
 
-    llvm::Value *argMetadata = IGF.emitTypeMetadataRef(substSelfType);
-    wtable = emitWitnessTableRef(IGF, substSelfType, &argMetadata,
-                                 conformance);
-  } else {
-    // Otherwise, we have no way of knowing the original protocol or
-    // conformance, since the witness has a concrete self type.
-    //
-    // Protocol witnesses for concrete types are thus not allowed to touch
-    // the witness table; they already know all the witnesses, and we can't
-    // say who they are.
-    wtable = llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrTy);
-  }
-
-  assert(wtable->getType() == IGF.IGM.WitnessTablePtrTy);
   return wtable;
-
 }
 
 Callee LoweredValue::getCallee(IRGenFunction &IGF,
@@ -2209,8 +2188,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
 
   switch (origCalleeType->getRepresentation()) {
   case SILFunctionType::Representation::WitnessMethod: {
-    llvm::Value *wtable = emitWitnessTableForLoweredCallee(
-        IGF, origCalleeType, substitutions);
+    auto wtable = emitWitnessTableForLoweredCallee(IGF, substCalleeType);
     witnessMetadata->SelfWitnessTable = wtable;
     break;
   }
@@ -2406,7 +2384,8 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
 /// applying to 'v'.
 static std::tuple<FunctionPointer, llvm::Value*, CanSILFunctionType>
 getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
-                              SubstitutionMap subs) {
+                              SubstitutionMap subs,
+                              CanSILFunctionType substFnType) {
   LoweredValue &lv = IGF.getLoweredValue(v);
   auto fnType = v->getType().castTo<SILFunctionType>();
 
@@ -2431,7 +2410,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
       llvm_unreachable("partial_apply of foreign functions not implemented");
         
     case SILFunctionTypeRepresentation::WitnessMethod:
-      context = emitWitnessTableForLoweredCallee(IGF, fnType, subs);
+      context = emitWitnessTableForLoweredCallee(IGF, substFnType);
       break;
     case SILFunctionTypeRepresentation::Thick:
     case SILFunctionTypeRepresentation::Thin:
@@ -2451,7 +2430,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
     assert(repr != SILFunctionType::Representation::Block &&
            "partial apply of block not implemented");
     if (repr == SILFunctionType::Representation::WitnessMethod) {
-      context = emitWitnessTableForLoweredCallee(IGF, fnType, subs);
+      context = emitWitnessTableForLoweredCallee(IGF, substFnType);
     }
     return std::make_tuple(fn, context, fnType);
   }
@@ -2515,7 +2494,8 @@ void IRGenSILFunction::visitPartialApplyInst(swift::PartialApplyInst *i) {
   
   // Get the function value.
   auto result = getPartialApplicationFunction(*this, i->getCallee(),
-                                              i->getSubstitutionMap());
+                                              i->getSubstitutionMap(),
+                                              i->getSubstCalleeType());
   FunctionPointer calleeFn = std::get<0>(result);
   llvm::Value *innerContext = std::get<1>(result);
   CanSILFunctionType origCalleeTy = std::get<2>(result);
@@ -4194,8 +4174,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   IGM.DebugInfo->emitVariableDeclaration(
       Builder,
       Storage,
-      DbgTy, i->getDebugScope(), Decl, Name, 0,
-      DbgTy.isImplicitlyIndirect() ? DirectValue : IndirectValue);
+      DbgTy, i->getDebugScope(), Decl, Name, 0, IndirectValue);
 }
 
 void IRGenSILFunction::visitProjectBoxInst(swift::ProjectBoxInst *i) {
@@ -4229,13 +4208,8 @@ static ExclusivityFlags getExclusivityAction(SILAccessKind kind) {
 
 static ExclusivityFlags getExclusivityFlags(SILModule &M,
                                             SILAccessKind kind,
-                                            bool noNestedConflict,
-                                            bool fromBuiltin) {
+                                            bool noNestedConflict) {
   auto flags = getExclusivityAction(kind);
-
-  // In old Swift compatibility modes, downgrade this to a warning.
-  if (!fromBuiltin && M.getASTContext().LangOpts.isSwiftVersion3())
-    flags |= ExclusivityFlags::WarningOnly;
 
   if (!noNestedConflict)
     flags |= ExclusivityFlags::Tracking;
@@ -4255,8 +4229,8 @@ static SILAccessEnforcement getEffectiveEnforcement(IRGenFunction &IGF,
   // of cases where this triggers, because of the restrictions on abstracting
   // over addresses and the fact that we use static enforcement on inouts.
   if (enforcement == SILAccessEnforcement::Dynamic &&
-      IGF.IGM.isKnownEmpty(access->getSource()->getType(),
-                           ResilienceExpansion::Maximal)) {
+      IGF.IGM.getTypeInfo(access->getSource()->getType())
+             .isKnownEmpty(ResilienceExpansion::Maximal)) {
     enforcement = SILAccessEnforcement::Unsafe;
   }
 
@@ -4266,7 +4240,7 @@ static SILAccessEnforcement getEffectiveEnforcement(IRGenFunction &IGF,
 template <class BeginAccessInst>
 static ExclusivityFlags getExclusivityFlags(BeginAccessInst *i) {
   return getExclusivityFlags(i->getModule(), i->getAccessKind(),
-                             i->hasNoNestedConflict(), i->isFromBuiltin());
+                             i->hasNoNestedConflict());
 }
 
 void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {
@@ -5358,19 +5332,7 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   ProtocolConformanceRef conformance = i->getConformance();
   SILDeclRef member = i->getMember();
 
-  // Find the original entry in the witness table.
-  bool wasOverriding = false;
-  while (auto overridden = member.getOverridden()) {
-    member = overridden;
-    wasOverriding = true;
-  }
-
-  // If the requirement given override another requirement, adjust the
-  // conformance appropriately.
-  if (wasOverriding) {
-    auto memberProto = cast<ProtocolDecl>(member.getDecl()->getDeclContext());
-    conformance = conformance.getInheritedConformanceRef(memberProto);
-  }
+  assert(member.requiresNewWitnessTableEntry());
 
   if (IGM.isResilient(conformance.getRequirement(),
                       ResilienceExpansion::Maximal)) {

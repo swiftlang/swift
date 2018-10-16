@@ -135,14 +135,14 @@ public var defined_global: Int64
 //
 // A global defined in the current module must have a Swift declaration.
 // The variable name is derived from the mangled SIL name.
-sil_global @$S25accessed_storage_analysis14defined_globalSivp : $Int64
+sil_global @$s25accessed_storage_analysis14defined_globalSivp : $Int64
 
 sil_global private @globalinit_33_45D320C25F1882286C6F155330EA3839_token0 : $Builtin.Word
 
 sil private @globalinit_33_45D320C25F1882286C6F155330EA3839_func0 : $@convention(c) () -> () {
 bb0:
-  alloc_global @$S25accessed_storage_analysis14defined_globalSivp
-  %1 = global_addr @$S25accessed_storage_analysis14defined_globalSivp : $*Int64
+  alloc_global @$s25accessed_storage_analysis14defined_globalSivp
+  %1 = global_addr @$s25accessed_storage_analysis14defined_globalSivp : $*Int64
   %2 = integer_literal $Builtin.Int64, 0
   %3 = struct $Int64 (%2 : $Builtin.Int64)
   store %3 to %1 : $*Int64
@@ -151,23 +151,23 @@ bb0:
 }
 
 // defined_global.unsafeMutableAddressor
-sil hidden [global_init] @$S25accessed_storage_analysis14defined_globalSivau : $@convention(thin) () -> Builtin.RawPointer {
+sil hidden [global_init] @$s25accessed_storage_analysis14defined_globalSivau : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
   %0 = global_addr @globalinit_33_45D320C25F1882286C6F155330EA3839_token0 : $*Builtin.Word
   %1 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
   %2 = function_ref @globalinit_33_45D320C25F1882286C6F155330EA3839_func0 : $@convention(c) () -> ()
   %3 = builtin "once"(%1 : $Builtin.RawPointer, %2 : $@convention(c) () -> ()) : $()
-  %4 = global_addr @$S25accessed_storage_analysis14defined_globalSivp : $*Int64
+  %4 = global_addr @$s25accessed_storage_analysis14defined_globalSivp : $*Int64
   %5 = address_to_pointer %4 : $*Int64 to $Builtin.RawPointer
   return %5 : $Builtin.RawPointer
 }
 
 // CHECK-LABEL: @readIdentifiedDefinedGlobal
 // CHECK: [read] Global // defined_global
-// CHECK: sil_global @$S25accessed_storage_analysis14defined_globalSivp : $Int64
+// CHECK: sil_global @$s25accessed_storage_analysis14defined_globalSivp : $Int64
 sil @readIdentifiedDefinedGlobal : $@convention(thin) () -> Int64 {
 bb0:
-  %1 = global_addr @$S25accessed_storage_analysis14defined_globalSivp : $*Int64
+  %1 = global_addr @$s25accessed_storage_analysis14defined_globalSivp : $*Int64
   %2 = begin_access [read] [dynamic] %1 : $*Int64
   %3 = load %2 : $*Int64
   end_access %2 : $*Int64
@@ -176,10 +176,10 @@ bb0:
 
 // CHECK-LABEL: @writeIdentifiedDefinedGlobal
 // CHECK: [modify] Global // defined_global
-// CHECK: sil_global @$S25accessed_storage_analysis14defined_globalSivp : $Int64
+// CHECK: sil_global @$s25accessed_storage_analysis14defined_globalSivp : $Int64
 sil @writeIdentifiedDefinedGlobal : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
-  %1 = global_addr @$S25accessed_storage_analysis14defined_globalSivp : $*Int64
+  %1 = global_addr @$s25accessed_storage_analysis14defined_globalSivp : $*Int64
   %2 = begin_access [modify] [dynamic] %1 : $*Int64
   store %0 to %2 : $*Int64
   end_access %2 : $*Int64
@@ -189,12 +189,12 @@ bb0(%0 : $Int64):
 
 // CHECK-LABEL: @readWriteIdentifiedDefinedGlobal
 // CHECK: [modify] Global // defined_global
-// CHECK: sil_global @$S25accessed_storage_analysis14defined_globalSivp : $Int64
+// CHECK: sil_global @$s25accessed_storage_analysis14defined_globalSivp : $Int64
 sil @readWriteIdentifiedDefinedGlobal : $@convention(thin) (Int64) -> (Int64) {
 bb0(%0 : $Int64):
   %1 = function_ref @writeIdentifiedDefinedGlobal : $@convention(thin) (Int64) -> ()
   %2 = apply %1(%0) : $@convention(thin) (Int64) -> ()
-  %3 = global_addr @$S25accessed_storage_analysis14defined_globalSivp : $*Int64
+  %3 = global_addr @$s25accessed_storage_analysis14defined_globalSivp : $*Int64
   %4 = begin_access [read] [dynamic] %3 : $*Int64
   %5 = load %4 : $*Int64
   end_access %4 : $*Int64
@@ -203,11 +203,11 @@ bb0(%0 : $Int64):
 
 // CHECK-LABEL: @readIdentifiedAddressedGlobal
 // CHECK: [read] Global // defined_global
-// CHECK: sil_global @$S25accessed_storage_analysis14defined_globalSivp : $Int64
+// CHECK: sil_global @$s25accessed_storage_analysis14defined_globalSivp : $Int64
 sil @readIdentifiedAddressedGlobal : $@convention(thin) () -> Int64 {
 bb0:
   // function_ref myGlobal.unsafeMutableAddressor
-  %0 = function_ref @$S25accessed_storage_analysis14defined_globalSivau : $@convention(thin) () -> Builtin.RawPointer
+  %0 = function_ref @$s25accessed_storage_analysis14defined_globalSivau : $@convention(thin) () -> Builtin.RawPointer
   %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int64
   %3 = begin_access [read] [dynamic] %2 : $*Int64
@@ -218,11 +218,11 @@ bb0:
 
 // CHECK-LABEL: @writeIdentifiedAddressedGlobal
 // CHECK: [modify] Global // defined_global
-// CHECK: sil_global @$S25accessed_storage_analysis14defined_globalSivp : $Int64
+// CHECK: sil_global @$s25accessed_storage_analysis14defined_globalSivp : $Int64
 sil @writeIdentifiedAddressedGlobal : $@convention(thin) (Int64) -> () {
 bb0(%0 : $Int64):
   // function_ref myGlobal.unsafeMutableAddressor
-  %1 = function_ref @$S25accessed_storage_analysis14defined_globalSivau : $@convention(thin) () -> Builtin.RawPointer
+  %1 = function_ref @$s25accessed_storage_analysis14defined_globalSivau : $@convention(thin) () -> Builtin.RawPointer
   %2 = apply %1() : $@convention(thin) () -> Builtin.RawPointer
   %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Int64
   %4 = begin_access [modify] [dynamic] %3 : $*Int64
@@ -234,13 +234,13 @@ bb0(%0 : $Int64):
 
 // CHECK-LABEL: @readWriteIdentifiedAddressedGlobal
 // CHECK: [modify] Global // defined_global
-// CHECK: sil_global @$S25accessed_storage_analysis14defined_globalSivp : $Int64
+// CHECK: sil_global @$s25accessed_storage_analysis14defined_globalSivp : $Int64
 sil @readWriteIdentifiedAddressedGlobal : $@convention(thin) (Int64) -> (Int64) {
 bb0(%0 : $Int64):
   %1 = function_ref @writeIdentifiedAddressedGlobal : $@convention(thin) (Int64) -> ()
   %2 = apply %1(%0) : $@convention(thin) (Int64) -> ()
   // function_ref myGlobal.unsafeMutableAddressor
-  %3 = function_ref @$S25accessed_storage_analysis14defined_globalSivau : $@convention(thin) () -> Builtin.RawPointer
+  %3 = function_ref @$s25accessed_storage_analysis14defined_globalSivau : $@convention(thin) () -> Builtin.RawPointer
   %4 = apply %3() : $@convention(thin) () -> Builtin.RawPointer
   %5 = pointer_to_address %4 : $Builtin.RawPointer to [strict] $*Int64
   %6 = begin_access [modify] [dynamic] %5 : $*Int64
@@ -255,15 +255,15 @@ public var static_global: Int64
 //
 // A global defined in the current module must have a Swift declaration.
 // The variable name is derived from the mangled SIL name.
-sil_global @$S25accessed_storage_analysis13static_globalSivp : $Int64 = {
+sil_global @$s25accessed_storage_analysis13static_globalSivp : $Int64 = {
   %0 = integer_literal $Builtin.Int64, 0
   %initval = struct $Int64 (%0 : $Builtin.Int64)
 }
 
 // static_global.unsafeMutableAddressor
-sil hidden [global_init] @$S25accessed_storage_analysis13static_globalSivau : $@convention(thin) () -> Builtin.RawPointer {
+sil hidden [global_init] @$s25accessed_storage_analysis13static_globalSivau : $@convention(thin) () -> Builtin.RawPointer {
 bb0:
-  %0 = global_addr @$S25accessed_storage_analysis14defined_globalSivp : $*Int64
+  %0 = global_addr @$s25accessed_storage_analysis14defined_globalSivp : $*Int64
   %1 = address_to_pointer %0 : $*Int64 to $Builtin.RawPointer
   return %1 : $Builtin.RawPointer
 }

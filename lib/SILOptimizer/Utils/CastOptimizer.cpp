@@ -148,7 +148,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
       // from ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
       if (isConditional) {
         SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-        CastSuccessBB->createPHIArgument(SILBridgedTy,
+        CastSuccessBB->createPhiArgument(SILBridgedTy,
                                          ValueOwnershipKind::Owned);
         Builder.createBranch(Loc, CastSuccessBB, SILValue(Load));
         Builder.setInsertionPoint(CastSuccessBB);
@@ -158,7 +158,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
       }
     } else if (isConditional) {
       SILBasicBlock *CastSuccessBB = Inst->getFunction()->createBasicBlock();
-      CastSuccessBB->createPHIArgument(SILBridgedTy, ValueOwnershipKind::Owned);
+      CastSuccessBB->createPhiArgument(SILBridgedTy, ValueOwnershipKind::Owned);
       auto *CCBI = Builder.createCheckedCastBranch(Loc, false, Load,
                                       SILBridgedTy, CastSuccessBB, ConvFailBB);
       NewI = CCBI;
@@ -242,13 +242,19 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   }
 
   if (auto *CCABI = dyn_cast<CheckedCastAddrBranchInst>(Inst)) {
-    if (CCABI->getConsumptionKind() == CastConsumptionKind::TakeAlways) {
+    switch (CCABI->getConsumptionKind()) {
+    case CastConsumptionKind::TakeAlways:
       Builder.createReleaseValue(Loc, SrcOp, Builder.getDefaultAtomicity());
-    } else if (CCABI->getConsumptionKind() ==
-               CastConsumptionKind::TakeOnSuccess) {
+      break;
+    case CastConsumptionKind::TakeOnSuccess:
       // Insert a release in the success BB.
       Builder.setInsertionPoint(SuccessBB->begin());
       Builder.createReleaseValue(Loc, SrcOp, Builder.getDefaultAtomicity());
+      break;
+    case CastConsumptionKind::BorrowAlways:
+      llvm_unreachable("checked_cast_addr_br never has BorrowAlways");
+    case CastConsumptionKind::CopyOnSuccess:
+      break;
     }
   }
 
@@ -442,6 +448,7 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
     case CastConsumptionKind::TakeOnSuccess:
       needReleaseInSuccess = true;
       break;
+    case CastConsumptionKind::BorrowAlways:
     case CastConsumptionKind::CopyOnSuccess:
       // Conservatively insert a retain/release pair around the conversion
       // function because the conversion function could decrement the
@@ -564,7 +571,7 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
         // In case of a conditional cast, we should handle it gracefully.
         auto CondBrSuccessBB =
             NewAI->getFunction()->createBasicBlockAfter(NewAI->getParent());
-        CondBrSuccessBB->createPHIArgument(DestTy, ValueOwnershipKind::Owned,
+        CondBrSuccessBB->createPhiArgument(DestTy, ValueOwnershipKind::Owned,
                                            nullptr);
         Builder.createCheckedCastBranch(Loc, /* isExact*/ false, NewAI, DestTy,
                                         CondBrSuccessBB, FailureBB);
@@ -771,12 +778,21 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
     if (!Src->getType().isAddress() || !Dest->getType().isAddress()) {
       return nullptr;
     }
+
     // For CopyOnSuccess casts, we could insert an explicit copy here, but this
     // case does not happen in practice.
+    //
     // Both TakeOnSuccess and TakeAlways can be reduced to an
     // UnconditionalCheckedCast, since the failure path is irrelevant.
-    if (Inst->getConsumptionKind() == CastConsumptionKind::CopyOnSuccess)
+    switch (Inst->getConsumptionKind()) {
+    case CastConsumptionKind::BorrowAlways:
+      llvm_unreachable("checked_cast_addr_br never has BorrowAlways");
+    case CastConsumptionKind::CopyOnSuccess:
       return nullptr;
+    case CastConsumptionKind::TakeAlways:
+    case CastConsumptionKind::TakeOnSuccess:
+      break;
+    }
 
     if (!emitSuccessfulIndirectUnconditionalCast(Builder, Mod.getSwiftModule(),
                                                  Loc, Src, SourceType, Dest,
@@ -1057,7 +1073,7 @@ SILInstruction *CastOptimizer::optimizeCheckedCastAddrBranchInst(
               Loc, false /*isExact*/, MI, Dest->getType().getObjectType(),
               SuccessBB, FailureBB, Inst->getTrueBBCount(),
               Inst->getFalseBBCount());
-          SuccessBB->createPHIArgument(Dest->getType().getObjectType(),
+          SuccessBB->createPhiArgument(Dest->getType().getObjectType(),
                                        ValueOwnershipKind::Owned);
           B.setInsertionPoint(SuccessBB->begin());
           // Store the result

@@ -7,7 +7,7 @@
 
 import Foundation
 
-// CHECK-LABEL: define {{.+}} @"$S6SR82094test10ObjectiveC8SelectorVyF"() {{#[0-9]+}} {
+// CHECK-LABEL: define {{.+}} @"$s6SR82094test10ObjectiveC8SelectorVyF"() {{#[0-9]+}} {
 func test() -> Selector {
   // CHECK: = load {{.+}} @"\01L_selector(isAsynchronous)"
   return #selector(getter: AsyncValueBlockOperation.isAsynchronous)

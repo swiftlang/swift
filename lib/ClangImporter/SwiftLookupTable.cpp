@@ -50,6 +50,17 @@ static bool matchesExistingDecl(clang::Decl *decl, clang::Decl *existingDecl) {
   return false;
 }
 
+namespace {
+  class BaseNameToEntitiesTableReaderInfo;
+  class GlobalsAsMembersTableReaderInfo;
+
+  using SerializedBaseNameToEntitiesTable =
+    llvm::OnDiskIterableChainedHashTable<BaseNameToEntitiesTableReaderInfo>;
+
+  using SerializedGlobalsAsMembersTable =
+    llvm::OnDiskIterableChainedHashTable<GlobalsAsMembersTableReaderInfo>;
+} // end anonymous namespace
+
 namespace swift {
 /// Module file extension writer for the Swift lookup tables.
 class SwiftLookupTableWriter : public clang::ModuleFileExtensionWriter {
@@ -78,20 +89,23 @@ class SwiftLookupTableReader : public clang::ModuleFileExtensionReader {
   clang::serialization::ModuleFile &ModuleFile;
   std::function<void()> OnRemove;
 
-  void *SerializedTable;
+  std::unique_ptr<SerializedBaseNameToEntitiesTable> SerializedTable;
   ArrayRef<clang::serialization::DeclID> Categories;
-  void *GlobalsAsMembersTable;
+  std::unique_ptr<SerializedGlobalsAsMembersTable> GlobalsAsMembersTable;
 
   SwiftLookupTableReader(clang::ModuleFileExtension *extension,
                          clang::ASTReader &reader,
                          clang::serialization::ModuleFile &moduleFile,
-                         std::function<void()> onRemove, void *serializedTable,
+                         std::function<void()> onRemove,
+                         std::unique_ptr<SerializedBaseNameToEntitiesTable>
+                             serializedTable,
                          ArrayRef<clang::serialization::DeclID> categories,
-                         void *globalsAsMembersTable)
+                         std::unique_ptr<SerializedGlobalsAsMembersTable>
+                             globalsAsMembersTable)
       : ModuleFileExtensionReader(extension), Reader(reader),
         ModuleFile(moduleFile), OnRemove(onRemove),
-        SerializedTable(serializedTable), Categories(categories),
-        GlobalsAsMembersTable(globalsAsMembersTable) {}
+        SerializedTable(std::move(serializedTable)), Categories(categories),
+        GlobalsAsMembersTable(std::move(globalsAsMembersTable)) {}
 
 public:
   /// Create a new lookup table reader for the given AST reader and stream
@@ -147,6 +161,7 @@ DeclBaseName SerializedSwiftName::toDeclBaseName(ASTContext &Context) const {
   case DeclBaseName::Kind::Destructor:
     return DeclBaseName::createDestructor();
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool SwiftLookupTable::contextRequiresName(ContextKind kind) {
@@ -1349,14 +1364,6 @@ namespace {
   };
 } // end anonymous namespace
 
-namespace swift {
-  using SerializedBaseNameToEntitiesTable =
-    llvm::OnDiskIterableChainedHashTable<BaseNameToEntitiesTableReaderInfo>;
-
-  using SerializedGlobalsAsMembersTable =
-    llvm::OnDiskIterableChainedHashTable<GlobalsAsMembersTableReaderInfo>;
-} // namespace swift
-
 clang::NamedDecl *SwiftLookupTable::mapStoredDecl(uint64_t &entry) {
   assert(isDeclEntry(entry) && "Not a declaration entry");
 
@@ -1441,8 +1448,6 @@ SwiftLookupTable::SingleEntry SwiftLookupTable::mapStored(uint64_t &entry,
 
 SwiftLookupTableReader::~SwiftLookupTableReader() {
   OnRemove();
-  delete static_cast<SerializedBaseNameToEntitiesTable *>(SerializedTable);
-  delete static_cast<SerializedGlobalsAsMembersTable *>(GlobalsAsMembersTable);
 }
 
 std::unique_ptr<SwiftLookupTableReader>
@@ -1533,17 +1538,18 @@ SwiftLookupTableReader::create(clang::ModuleFileExtension *extension,
   if (!serializedTable) return nullptr;
 
   // Create the reader.
+  // Note: This doesn't use llvm::make_unique because the constructor is
+  // private.
   return std::unique_ptr<SwiftLookupTableReader>(
            new SwiftLookupTableReader(extension, reader, moduleFile, onRemove,
-                                      serializedTable.release(), categories,
-                                      globalsAsMembersTable.release()));
+                                      std::move(serializedTable), categories,
+                                      std::move(globalsAsMembersTable)));
 
 }
 
 SmallVector<SerializedSwiftName, 4> SwiftLookupTableReader::getBaseNames() {
-  auto table = static_cast<SerializedBaseNameToEntitiesTable*>(SerializedTable);
   SmallVector<SerializedSwiftName, 4> results;
-  for (auto key : table->keys()) {
+  for (auto key : SerializedTable->keys()) {
     results.push_back(key);
   }
   return results;
@@ -1552,11 +1558,9 @@ SmallVector<SerializedSwiftName, 4> SwiftLookupTableReader::getBaseNames() {
 bool SwiftLookupTableReader::lookup(
     SerializedSwiftName baseName,
     SmallVectorImpl<SwiftLookupTable::FullTableEntry> &entries) {
-  auto table = static_cast<SerializedBaseNameToEntitiesTable*>(SerializedTable);
-
   // Look for an entry with this base name.
-  auto known = table->find(baseName);
-  if (known == table->end()) return false;
+  auto known = SerializedTable->find(baseName);
+  if (known == SerializedTable->end()) return false;
 
   // Grab the results.
   entries = std::move(*known);
@@ -1565,13 +1569,10 @@ bool SwiftLookupTableReader::lookup(
 
 SmallVector<SwiftLookupTable::StoredContext, 4>
 SwiftLookupTableReader::getGlobalsAsMembersContexts() {
-  auto table =
-    static_cast<SerializedGlobalsAsMembersTable*>(GlobalsAsMembersTable);
-
   SmallVector<SwiftLookupTable::StoredContext, 4> results;
-  if (!table) return results;
+  if (!GlobalsAsMembersTable) return results;
 
-  for (auto key : table->keys()) {
+  for (auto key : GlobalsAsMembersTable->keys()) {
     results.push_back(key);
   }
   return results;
@@ -1580,13 +1581,11 @@ SwiftLookupTableReader::getGlobalsAsMembersContexts() {
 bool SwiftLookupTableReader::lookupGlobalsAsMembers(
        SwiftLookupTable::StoredContext context,
        SmallVectorImpl<uint64_t> &entries) {
-  auto table =
-    static_cast<SerializedGlobalsAsMembersTable*>(GlobalsAsMembersTable);
-  if (!table) return false;
+  if (!GlobalsAsMembersTable) return false;
 
   // Look for an entry with this context name.
-  auto known = table->find(context);
-  if (known == table->end()) return false;
+  auto known = GlobalsAsMembersTable->find(context);
+  if (known == GlobalsAsMembersTable->end()) return false;
 
   // Grab the results.
   entries = std::move(*known);

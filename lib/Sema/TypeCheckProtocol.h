@@ -833,6 +833,11 @@ public:
   ///
   /// \returns \c true if an error occurred, \c false otherwise
   Optional<InferredTypeWitnesses> solve(ConformanceChecker &checker);
+
+  /// Find an associated type declaration that provides a default definition.
+  static AssociatedTypeDecl *findDefaultedAssociatedType(
+                                                 TypeChecker &tc,
+                                                 AssociatedTypeDecl *assocType);
 };
 
 /// \brief Match the given witness to the given requirement.

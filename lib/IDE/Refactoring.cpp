@@ -387,7 +387,7 @@ public:
 };
 
 class TextReplacementsRenamer : public Renamer {
-  llvm::StringMap<char> &ReplaceTextContext;
+  llvm::StringSet<> &ReplaceTextContext;
   std::vector<Replacement> Replacements;
 
 public:
@@ -395,7 +395,9 @@ public:
 
 private:
   StringRef registerText(StringRef Text) {
-    return ReplaceTextContext.insert({Text, char()}).first->getKey();
+    if (Text.empty())
+      return Text;
+    return ReplaceTextContext.insert(Text).first->getKey();
   }
 
   StringRef getCallArgLabelReplacement(StringRef OldLabelRange,
@@ -497,7 +499,7 @@ private:
 public:
   TextReplacementsRenamer(const SourceManager &SM, StringRef OldName,
                           StringRef NewName,
-                          llvm::StringMap<char> &ReplaceTextContext)
+                          llvm::StringSet<> &ReplaceTextContext)
       : Renamer(SM, OldName), ReplaceTextContext(ReplaceTextContext),
         New(NewName) {
     assert(Old.isValid() && New.isValid());
@@ -963,6 +965,7 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
       success({CannotExtractReason::VoidType});
   }
   }
+  llvm_unreachable("unhandled kind");
 }
 
 static StringRef correctNameInternal(ASTContext &Ctx, StringRef Name,
@@ -1492,6 +1495,7 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
     case RangeKind::Invalid:
       return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool RefactoringActionExtractExpr::performChange() {
@@ -1514,6 +1518,7 @@ isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
     case RangeKind::Invalid:
       return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 bool RefactoringActionExtractRepeatedExpr::performChange() {
   return RefactoringActionExtractExprBase(TheFile, RangeInfo,
@@ -1573,6 +1578,7 @@ bool RefactoringActionMoveMembersToExtension::isApplicable(
   case RangeKind::Invalid:
     return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool RefactoringActionMoveMembersToExtension::performChange() {
@@ -1643,6 +1649,7 @@ bool RefactoringActionReplaceBodiesWithFatalError::isApplicable(
   case RangeKind::Invalid:
     return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool RefactoringActionReplaceBodiesWithFatalError::performChange() {
@@ -2966,6 +2973,7 @@ static bool rangeStartMayNeedRename(ResolvedRangeInfo Info) {
     case RangeKind::Invalid:
       return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 }// end of anonymous namespace
 
@@ -2977,6 +2985,7 @@ getDescriptiveRefactoringKindName(RefactoringKind Kind) {
 #define REFACTORING(KIND, NAME, ID) case RefactoringKind::KIND: return NAME;
 #include "swift/IDE/RefactoringKinds.def"
     }
+    llvm_unreachable("unhandled kind");
   }
 
   StringRef swift::ide::
@@ -2995,6 +3004,7 @@ getDescriptiveRefactoringKindName(RefactoringKind Kind) {
       case RenameAvailableKind::Unavailable_decl_from_clang:
         return "cannot rename a Clang symbol from its Swift reference";
     }
+    llvm_unreachable("unhandled kind");
   }
 
 SourceLoc swift::ide::RangeConfig::getStart(SourceManager &SM) {
@@ -3030,6 +3040,7 @@ struct swift::ide::FindRenameRangesAnnotatingConsumer::Implementation {
       case RefactoringRangeKind::SelectorArgumentLabel:
         return "sel";
     }
+    llvm_unreachable("unhandled kind");
   }
   void accept(SourceManager &SM, const RenameRangeDetail &Range) {
     std::string NewText;
@@ -3212,6 +3223,7 @@ case RefactoringKind::KIND: {                                                  \
     case RefactoringKind::None:
       llvm_unreachable("should not enter here.");
   }
+  llvm_unreachable("unhandled kind");
 }
 
 static std::vector<ResolvedLoc>
@@ -3285,7 +3297,7 @@ int swift::ide::syntacticRename(SourceFile *SF, ArrayRef<RenameLoc> RenameLocs,
     return true; // Already diagnosed.
 
   size_t index = 0;
-  llvm::StringMap<char> ReplaceTextContext;
+  llvm::StringSet<> ReplaceTextContext;
   for(const RenameLoc &Rename: RenameLocs) {
     ResolvedLoc &Resolved = ResolvedLocs[index++];
     TextReplacementsRenamer Renamer(SM, Rename.OldName, Rename.NewName,

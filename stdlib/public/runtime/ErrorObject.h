@@ -214,7 +214,11 @@ void swift_willThrow(SWIFT_CONTEXT void *unused,
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API LLVM_ATTRIBUTE_NORETURN
 void swift_errorInMain(SwiftError *object);
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API LLVM_ATTRIBUTE_NORETURN
-void swift_unexpectedError(SwiftError *object);
+void swift_unexpectedError(SwiftError *object,
+                           OpaqueValue *filenameStart,
+                           long filenameLength,
+                           bool isAscii,
+                           unsigned long line);
 
 #if SWIFT_OBJC_INTEROP
 

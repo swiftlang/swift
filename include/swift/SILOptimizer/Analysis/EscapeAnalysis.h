@@ -146,7 +146,7 @@ public:
     /// Information where the node's value is used in its function.
     /// Each bit corresponds to an argument/instruction where the value is used.
     /// The UsePoints on demand when calling ConnectionGraph::getUsePoints().
-    llvm::SmallBitVector UsePoints;
+    SmallBitVector UsePoints;
 
     /// The actual result of the escape analysis. It tells if and how (global or
     /// through arguments) the value escapes.

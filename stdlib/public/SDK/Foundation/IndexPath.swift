@@ -156,7 +156,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
             }
         }
         
-        mutating func append(contentsOf other: [Int]) {
+        mutating func append(contentsOf other: __owned [Int]) {
             switch self {
             case .empty:
                 switch other.count {
@@ -684,7 +684,7 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
     
     // MARK: - Bridging Helpers
     
-    fileprivate init(nsIndexPath: ReferenceType) {
+    fileprivate init(nsIndexPath: __shared ReferenceType) {
         let count = nsIndexPath.length
         if count == 0 {
             _indexes = []
@@ -780,6 +780,7 @@ extension IndexPath : _ObjectiveCBridgeable {
         return true
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSIndexPath?) -> IndexPath {
         guard let src = source else { return IndexPath() }
         return IndexPath(nsIndexPath: src)

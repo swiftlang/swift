@@ -52,13 +52,13 @@ static int Errors;
 
 // Add methods to class SwiftObject that can be called by performSelector: et al
 
-#if __APPLE__ && !SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
-// Pre-stable ABI uses un-mangled name for SwiftObject.
-#define SwiftObjectDemangledName "SwiftObject"
-#else
+#if SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
 // mangled Swift._SwiftObject
 #define SwiftObject _TtCs12_SwiftObject
 #define SwiftObjectDemangledName "Swift._SwiftObject"
+#else
+// Pre-stable ABI uses un-mangled name for SwiftObject.
+#define SwiftObjectDemangledName "SwiftObject"
 #endif
 
 @interface SwiftObject /* trust me, I know what I'm doing */ @end

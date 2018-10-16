@@ -9,9 +9,9 @@ class X {
 public func ifelseexpr() -> Int64 {
   var x = X(i:0)
   // CHECK: [[ALLOCA:%.*]] = alloca %T6return1XC*
-  // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S6return1XCMa"(
+  // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s6return1XCMa"(
   // CHECK: [[META:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
-  // CHECK: [[X:%.*]] = call {{.*}}%T6return1XC* @"$S6return1XC1iACs5Int64V_tcfC"(
+  // CHECK: [[X:%.*]] = call {{.*}}%T6return1XC* @"$s6return1XC1iACs5Int64V_tcfC"(
   // CHECK-SAME:                                  i64 0, %swift.type* swiftself [[META]])
   // CHECK:  store %T6return1XC* [[X]], %T6return1XC** [[ALLOCA]]
   // CHECK:  @swift_release to void (%T6return1XC*)*)(%T6return1XC* [[X]])

@@ -14,9 +14,8 @@
 /// `_ArrayBufferProtocol`.  This buffer does not provide value semantics.
 @usableFromInline
 internal protocol _ArrayBufferProtocol
-  : MutableCollection, RandomAccessCollection {
-
-  associatedtype Indices = Range<Int>
+  : MutableCollection, RandomAccessCollection 
+where Indices == Range<Int> {
 
   /// Create an empty buffer.
   init()
@@ -30,13 +29,10 @@ internal protocol _ArrayBufferProtocol
   /// memory starting at `target`.  Return a pointer "past the end" of the
   /// just-initialized memory.
   @discardableResult
-  func _copyContents(
+  __consuming func _copyContents(
     subRange bounds: Range<Int>,
     initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element>
-
-  /// Get or set the index'th element.
-  subscript(index: Int) -> Element { get nonmutating set }
 
   /// If this buffer is backed by a uniquely-referenced mutable
   /// `_ContiguousArrayBuffer` that can be grown in-place to allow the `self`
@@ -74,7 +70,7 @@ internal protocol _ArrayBufferProtocol
   mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newCount: Int,
-    elementsOf newValues: C
+    elementsOf newValues: __owned C
   ) where C : Collection, C.Element == Element
 
   /// Returns a `_SliceBuffer` containing the elements in `bounds`.
@@ -121,9 +117,6 @@ internal protocol _ArrayBufferProtocol
   /// buffers address the same elements when they have the same
   /// identity and count.
   var identity: UnsafeRawPointer { get }
-
-  var startIndex: Int { get }
-  var endIndex: Int { get }
 }
 
 extension _ArrayBufferProtocol where Indices == Range<Int>{
@@ -149,7 +142,7 @@ extension _ArrayBufferProtocol where Indices == Range<Int>{
   internal mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newCount: Int,
-    elementsOf newValues: C
+    elementsOf newValues: __owned C
   ) where C : Collection, C.Element == Element {
     _sanityCheck(startIndex == 0, "_SliceBuffer should override this function.")
     let oldCount = self.count

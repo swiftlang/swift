@@ -7,30 +7,11 @@
       "kind": "TypeDecl",
       "name": "ClangInterface",
       "printedName": "ClangInterface",
-      "declKind": "Class",
-      "usr": "c:objc(cs)ClangInterface",
-      "location": "",
-      "moduleName": "Foo",
-      "superclassUsr": "c:objc(cs)NSObject",
-      "conformingProtocols": [
-        "ObjcProt",
-        "NSObjectProtocol"
-      ],
-      "declAttributes": [
-        "ObjC"
-      ],
       "children": [
         {
           "kind": "Function",
           "name": "someFunction",
           "printedName": "someFunction()",
-          "declKind": "Func",
-          "usr": "c:objc(cs)ClangInterface(im)someFunction",
-          "location": "",
-          "moduleName": "Foo",
-          "declAttributes": [
-            "ObjC"
-          ],
           "children": [
             {
               "kind": "TypeNameAlias",
@@ -44,20 +25,20 @@
                 }
               ]
             }
-          ]
+          ],
+          "declKind": "Func",
+          "usr": "c:objc(cs)ClangInterface(im)someFunction",
+          "moduleName": "Foo",
+          "isOpen": true,
+          "declAttributes": [
+            "ObjC"
+          ],
+          "funcSelfKind": "NonMutating"
         },
         {
           "kind": "Constructor",
           "name": "init",
           "printedName": "init()",
-          "declKind": "Constructor",
-          "usr": "c:objc(cs)NSObject(im)init",
-          "location": "",
-          "moduleName": "Foo",
-          "declAttributes": [
-            "Override",
-            "ObjC"
-          ],
           "children": [
             {
               "kind": "TypeNominal",
@@ -65,34 +46,43 @@
               "printedName": "ClangInterface",
               "usr": "c:objc(cs)ClangInterface"
             }
+          ],
+          "declKind": "Constructor",
+          "usr": "c:objc(cs)NSObject(im)init",
+          "moduleName": "Foo",
+          "overriding": true,
+          "implicit": true,
+          "declAttributes": [
+            "Override",
+            "ObjC"
           ]
         }
+      ],
+      "declKind": "Class",
+      "usr": "c:objc(cs)ClangInterface",
+      "moduleName": "Foo",
+      "isOpen": true,
+      "declAttributes": [
+        "ObjC"
+      ],
+      "superclassUsr": "c:objc(cs)NSObject",
+      "superclassNames": [
+        "NSObject"
+      ],
+      "conformingProtocols": [
+        "ObjcProt",
+        "NSObjectProtocol"
       ]
     },
     {
       "kind": "TypeDecl",
       "name": "ObjcProt",
       "printedName": "ObjcProt",
-      "declKind": "Protocol",
-      "usr": "c:objc(pl)ObjcProt",
-      "location": "",
-      "moduleName": "Foo",
-      "declAttributes": [
-        "ObjC"
-      ],
       "children": [
         {
           "kind": "Function",
           "name": "someFunctionFromProt",
           "printedName": "someFunctionFromProt()",
-          "declKind": "Func",
-          "usr": "c:objc(pl)ObjcProt(im)someFunctionFromProt",
-          "location": "",
-          "moduleName": "Foo",
-          "genericSig": "<Self where Self : ObjcProt>",
-          "declAttributes": [
-            "ObjC"
-          ],
           "children": [
             {
               "kind": "TypeNameAlias",
@@ -106,8 +96,23 @@
                 }
               ]
             }
-          ]
+          ],
+          "declKind": "Func",
+          "usr": "c:objc(pl)ObjcProt(im)someFunctionFromProt",
+          "moduleName": "Foo",
+          "genericSig": "<Self where Self : ObjcProt>",
+          "protocolReq": true,
+          "declAttributes": [
+            "ObjC"
+          ],
+          "funcSelfKind": "NonMutating"
         }
+      ],
+      "declKind": "Protocol",
+      "usr": "c:objc(pl)ObjcProt",
+      "moduleName": "Foo",
+      "declAttributes": [
+        "ObjC"
       ]
     }
   ]

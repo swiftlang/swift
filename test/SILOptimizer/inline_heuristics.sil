@@ -377,7 +377,7 @@ bb3(%7 : $Int32):
 // CHECK-PARTIAL-SPECIALIZATION-LABEL: sil @testSpecializationAfterGenericInlining
 // CHECK-PARTIAL-SPECIALIZATION-NOT: apply
 // Reference to the partial specialization of checkSpecializationAfterGenericInlining
-// CHECK-PARTIAL-SPECIALIZATION: function_ref @$S39checkSpecializationAfterGenericInlinings5Int64Vq_ACRszr0_lIetyi_Tp5
+// CHECK-PARTIAL-SPECIALIZATION: function_ref @$s39checkSpecializationAfterGenericInlinings5Int64Vq_ACRszr0_lIetyi_Tp5
 // CHECK-PARTIAL-SPECIALIZATION: apply
 // CHECK-PARTIAL-SPECIALIZATION-NOT: apply
 // CHECK-PARTIAL-SPECIALIZATION: return

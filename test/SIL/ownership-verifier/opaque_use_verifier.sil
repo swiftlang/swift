@@ -79,3 +79,13 @@ bb0(%0 : @owned $AnyObject):
   %18 = tuple ()
   return %18 : $()
 }
+
+sil @passTrivialAsOpaqueValue : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : @trivial $Builtin.Int64):
+  %1 = function_ref @opaque_copy : $@convention(thin) <T> (@in_guaranteed T) -> @out T
+  %2 = apply %1<Builtin.Int64>(%0) : $@convention(thin) <T> (@in_guaranteed T) -> @out T
+  %3 = function_ref @opaque_arg_copy : $@convention(thin) <T> (@in T) -> @out T
+  apply %3<Builtin.Int64>(%0) : $@convention(thin) <T> (@in T) -> @out T
+  %9999 = tuple()
+  return %9999 : $()
+}

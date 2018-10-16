@@ -249,6 +249,17 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator, const ValueDecl* D) 
   return NewMangler.mangleDeclAsUSR(D, getUSRSpacePrefix());
 }
 
+bool ide::printModuleUSR(ModuleEntity Mod, raw_ostream &OS) {
+  if (auto *D = Mod.getAsSwiftModule()) {
+    StringRef moduleName = D->getName().str();
+    return clang::index::generateFullUSRForTopLevelModuleName(moduleName, OS);
+  } else if (auto ClangM = Mod.getAsClangModule()) {
+    return clang::index::generateFullUSRForModule(ClangM, OS);
+  } else {
+    return true;
+  }
+}
+
 bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
   auto result = evaluateOrDefault(D->getASTContext().evaluator,
                                   USRGenerationRequest { D },

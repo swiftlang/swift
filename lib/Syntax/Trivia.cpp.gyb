@@ -55,6 +55,7 @@ bool TriviaPiece::isComment() const {
 % end
 % end
   }
+  llvm_unreachable("unknown kind");
 }
 
 void TriviaPiece::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
@@ -86,6 +87,7 @@ bool TriviaPiece::trySquash(const TriviaPiece &Next) {
 % end
 % end
   }
+  llvm_unreachable("unknown kind");
 }
 
 void TriviaPiece::print(llvm::raw_ostream &OS) const {

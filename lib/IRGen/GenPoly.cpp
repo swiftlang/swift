@@ -60,9 +60,16 @@ void irgen::reemitAsUnsubstituted(IRGenFunction &IGF,
                                   Explosion &in, Explosion &out) {
   expectedTy = applyContextArchetypes(IGF, expectedTy);
 
-  ExplosionSchema expectedSchema = IGF.IGM.getSchema(expectedTy);
+  ExplosionSchema expectedSchema;
+  cast<LoadableTypeInfo>(IGF.IGM.getTypeInfo(expectedTy))
+    .getSchema(expectedSchema);
+
+#ifndef NDEBUG
+  auto &substTI = IGF.IGM.getTypeInfo(applyContextArchetypes(IGF, substTy));
   assert(expectedSchema.size() ==
-         IGF.IGM.getExplosionSize(applyContextArchetypes(IGF, substTy)));
+         cast<LoadableTypeInfo>(substTI).getExplosionSize());
+#endif
+
   for (ExplosionSchema::Element &elt : expectedSchema) {
     llvm::Value *value = in.claimNext();
     assert(elt.isScalar());

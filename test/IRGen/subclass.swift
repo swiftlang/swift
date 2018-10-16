@@ -11,30 +11,30 @@
 // CHECK-DAG: [[B:%T8subclass1BC]] = type <{ [[REF]], [[INT]], [[INT]], [[INT]] }>
 
 // CHECK: @_DATA__TtC8subclass1A = private constant {{.*\* } }}{
-// CHECK: @"$S8subclass1ACMf" = internal global [[A_METADATA:<{.*i64 }>]] <{
-// CHECK:   void ([[A]]*)* @"$S8subclass1ACfD",
-// CHECK:   i8** @"$SBoWV",
-// CHECK:   i64 ptrtoint ([[OBJC_CLASS]]* @"$S8subclass1ACMm" to i64),
+// CHECK: @"$s8subclass1ACMf" = internal global [[A_METADATA:<{.*i64 }>]] <{
+// CHECK:   void ([[A]]*)* @"$s8subclass1ACfD",
+// CHECK:   i8** @"$sBoWV",
+// CHECK:   i64 ptrtoint ([[OBJC_CLASS]]* @"$s8subclass1ACMm" to i64),
 // CHECK:   [[OBJC_CLASS]]* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
 // CHECK:   [[OPAQUE]]* @_objc_empty_cache,
 // CHECK:   [[OPAQUE]]* null,
 // CHECK:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1A to i64), i64 1),
-// CHECK:   i64 ([[A]]*)* @"$S8subclass1AC1fSiyF",
-// CHECK:   [[A]]* ([[TYPE]]*)* @"$S8subclass1AC1gACyFZ"
+// CHECK:   i64 ([[A]]*)* @"$s8subclass1AC1fSiyF",
+// CHECK:   [[A]]* ([[TYPE]]*)* @"$s8subclass1AC1gACyFZ"
 // CHECK: }>
 // CHECK: @_DATA__TtC8subclass1B = private constant {{.*\* } }}{
-// CHECK: @"$S8subclass1BCMf" = internal global <{ {{.*}} }> <{
-// CHECK:   void ([[B]]*)* @"$S8subclass1BCfD",
-// CHECK:   i8** @"$SBoWV",
-// CHECK:   i64 ptrtoint ([[OBJC_CLASS]]* @"$S8subclass1BCMm" to i64),
-// CHECK:   [[TYPE]]* {{.*}} @"$S8subclass1ACMf",
+// CHECK: @"$s8subclass1BCMf" = internal global <{ {{.*}} }> <{
+// CHECK:   void ([[B]]*)* @"$s8subclass1BCfD",
+// CHECK:   i8** @"$sBoWV",
+// CHECK:   i64 ptrtoint ([[OBJC_CLASS]]* @"$s8subclass1BCMm" to i64),
+// CHECK:   [[TYPE]]* {{.*}} @"$s8subclass1ACMf",
 // CHECK:   [[OPAQUE]]* @_objc_empty_cache,
 // CHECK:   [[OPAQUE]]* null,
 // CHECK:   i64 add (i64 ptrtoint ({ {{.*}} }* @_DATA__TtC8subclass1B to i64), i64 1),
-// CHECK:   i64 ([[B]]*)* @"$S8subclass1BC1fSiyF",
-// CHECK:   [[A]]* ([[TYPE]]*)* @"$S8subclass1AC1gACyFZ"
+// CHECK:   i64 ([[B]]*)* @"$s8subclass1BC1fSiyF",
+// CHECK:   [[A]]* ([[TYPE]]*)* @"$s8subclass1AC1gACyFZ"
 // CHECK: }>
-// CHECK: @objc_classes = internal global [2 x i8*] [i8* {{.*}} @"$S8subclass1ACN" {{.*}}, i8* {{.*}} @"$S8subclass1BCN" {{.*}}]
+// CHECK: @objc_classes = internal global [2 x i8*] [i8* {{.*}} @"$s8subclass1ACN" {{.*}}, i8* {{.*}} @"$s8subclass1BCN" {{.*}}]
 
 class A {
   var x = 0
@@ -56,9 +56,9 @@ class G<T> : A {
 // Ensure that downcasts to generic types instantiate generic metadata instead
 // of trying to reference global metadata. <rdar://problem/14265663>
 
-// CHECK: define hidden swiftcc %T8subclass1GCySiG* @"$S8subclass9a_to_gint1aAA1GCySiGAA1AC_tF"(%T8subclass1AC*) {{.*}} {
+// CHECK: define hidden swiftcc %T8subclass1GCySiG* @"$s8subclass9a_to_gint1aAA1GCySiGAA1AC_tF"(%T8subclass1AC*) {{.*}} {
 func a_to_gint(a: A) -> G<Int> {
-  // CHECK: call swiftcc %swift.metadata_response @"$S8subclass1GCySiGMa"(i64 0)
+  // CHECK: call swiftcc %swift.metadata_response @"$s8subclass1GCySiGMa"(i64 0)
   // CHECK: call i8* @swift_dynamicCastClassUnconditional
   return a as! G<Int>
 }

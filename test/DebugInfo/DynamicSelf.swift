@@ -10,11 +10,11 @@ class C {
 extension C {
   class func Factory() -> Self {
     // Currently we emit the static type C for r.
-    // CHECK: ![[BASE:.*]] = !DICompositeType({{.*}}identifier: "$S11DynamicSelf1CCD"
+    // CHECK: ![[BASE:.*]] = !DICompositeType({{.*}}identifier: "$s11DynamicSelf1CCD"
     // CHECK: !DILocalVariable(name: "r",
     // CHECK-SAME:             line: [[@LINE+4]], type: ![[SELFTY:[0-9]+]])
     // CHECK: ![[SELFTY]] = !DIDerivedType(tag: DW_TAG_typedef,
-    // CHECK-SAME:                         name: "$S11DynamicSelf1CCXDD",
+    // CHECK-SAME:                         name: "$s11DynamicSelf1CCXDD",
     // CHECK-SAME:                         baseType: ![[BASE]])
     let r = self.init(number: 0)
     return r

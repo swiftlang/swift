@@ -97,7 +97,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     /// Returns a new Calendar.
     ///
     /// - parameter identifier: The kind of calendar to use.
-    public init(identifier: Identifier) {
+    public init(identifier: __shared Identifier) {
         let result = __NSCalendarCreate(Calendar._toNSCalendarIdentifier(identifier))
         _handle = _MutableHandle(adoptingReference: result as! NSCalendar)
         _autoupdating = false
@@ -106,7 +106,7 @@ public struct Calendar : Hashable, Equatable, ReferenceConvertible, _MutableBoxi
     // MARK: -
     // MARK: Bridging
     
-    fileprivate init(reference : NSCalendar) {
+    fileprivate init(reference : __shared NSCalendar) {
         _handle = _MutableHandle(reference: reference)
         if __NSCalendarIsAutoupdating(reference) {
             _autoupdating = true
@@ -1113,6 +1113,7 @@ extension Calendar : _ObjectiveCBridgeable {
         return true
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSCalendar?) -> Calendar {
         var result: Calendar?
         _forceBridgeFromObjectiveC(source!, result: &result)

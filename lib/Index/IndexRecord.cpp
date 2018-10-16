@@ -356,18 +356,12 @@ recordSourceFile(SourceFile *SF, StringRef indexStorePath,
 // Used to get std::string pointers to pass as writer::OpaqueModule.
 namespace {
 class StringScratchSpace {
-  std::vector<const std::string *> StrsCreated;
+  std::vector<std::unique_ptr<std::string>> StrsCreated;
 
 public:
   const std::string *createString(StringRef str) {
-    auto *s = new std::string(str);
-    StrsCreated.push_back(s);
-    return s;
-  }
-
-  ~StringScratchSpace() {
-    for (auto *str : StrsCreated)
-      delete str;
+    StrsCreated.emplace_back(llvm::make_unique<std::string>(str));
+    return StrsCreated.back().get();
   }
 };
 }

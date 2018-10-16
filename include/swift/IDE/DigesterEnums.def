@@ -14,6 +14,22 @@
 #define KEY(NAME)
 #endif
 
+#ifndef KEY_STRING
+#define KEY_STRING(NAME, EXTERNAL_NAME) KEY(EXTERNAL_NAME)
+#endif
+
+#ifndef KEY_BOOL
+#define KEY_BOOL(NAME, EXTERNAL_NAME) KEY(EXTERNAL_NAME)
+#endif
+
+#ifndef KEY_STRING_ARR
+#define KEY_STRING_ARR(NAME, EXTERNAL_NAME) KEY(EXTERNAL_NAME)
+#endif
+
+#ifndef KEY_UINT
+#define KEY_UINT(NAME, EXTERNAL_NAME) KEY(EXTERNAL_NAME)
+#endif
+
 #ifndef KNOWN_TYPE
 #define KNOWN_TYPE(NAME)
 #endif
@@ -34,17 +50,29 @@
 #define SPECIAL_CASE_ID(NAME)
 #endif
 
+#ifndef NODE_KIND_RANGE
+#define NODE_KIND_RANGE(ID, First, Last)
+#endif
+
 NODE_KIND(Root, Root)
 NODE_KIND(TypeNominal, TypeNominal)
 NODE_KIND(TypeFunc, TypeFunc)
 NODE_KIND(TypeAlias, TypeNameAlias)
-NODE_KIND(DeclType, TypeDecl)
+NODE_KIND_RANGE(Type, TypeNominal, TypeAlias)
+
 NODE_KIND(DeclFunction, Function)
 NODE_KIND(DeclConstructor, Constructor)
 NODE_KIND(DeclGetter, Getter)
 NODE_KIND(DeclSetter, Setter)
+NODE_KIND(DeclSubscript, Subscript)
+NODE_KIND_RANGE(DeclAbstractFunc, DeclFunction, DeclSubscript)
+
+NODE_KIND(DeclOperator, OperatorDecl)
+NODE_KIND(DeclType, TypeDecl)
 NODE_KIND(DeclVar, Var)
 NODE_KIND(DeclTypeAlias, TypeAlias)
+NODE_KIND(DeclAssociatedType, AssociatedType)
+NODE_KIND_RANGE(Decl, DeclFunction, DeclAssociatedType)
 
 NODE_ANNOTATION(Added)
 NODE_ANNOTATION(Removed)
@@ -88,27 +116,46 @@ NODE_ANNOTATION_CHANGE_KIND(Rename)
 // Keep type rewritten the last one.
 NODE_ANNOTATION_CHANGE_KIND(TypeRewritten)
 
+KEY_BOOL(IsImplicit, implicit)
+KEY_BOOL(IsThrowing, throwing)
+KEY_BOOL(IsMutating, mutating)
+KEY_BOOL(IsStatic, static)
+KEY_BOOL(IsDeprecated, deprecated)
+KEY_BOOL(IsOverriding, overriding)
+KEY_BOOL(IsProtocolReq, protocolReq)
+KEY_BOOL(HasDefaultArg, hasDefaultArg)
+KEY_BOOL(HasSetter, hasSetter)
+KEY_BOOL(IsLet, isLet)
+KEY_BOOL(IsOpen, isOpen)
+KEY_BOOL(IsInternal, isInternal)
+KEY_BOOL(HasStorage, hasStorage)
+KEY_BOOL(HasDidset, hasDidset)
+KEY_BOOL(HasWillset, hasWillset)
+
 KEY(kind)
-KEY(name)
-KEY(selfIndex)
-KEY(usr)
-KEY(location)
+
+KEY_STRING(Name, name)
+KEY_STRING(PrintedName, printedName)
+KEY_STRING(Usr, usr)
+KEY_STRING(Location, location)
+KEY_STRING(ModuleName, moduleName)
+KEY_STRING(SuperclassUsr, superclassUsr)
+KEY_STRING(EnumRawTypeName, enumRawTypeName)
+KEY_STRING(GenericSig, genericSig)
+KEY_STRING(FuncSelfKind, funcSelfKind)
+KEY_STRING(ParamValueOwnership, paramValueOwnership)
+
+KEY_STRING_ARR(SuperclassNames, superclassNames)
+KEY_STRING_ARR(ConformingProtocols, conformingProtocols)
+
+KEY_UINT(SelfIndex, selfIndex)
+KEY_UINT(FixedBinaryOrder, fixedbinaryorder)
+
 KEY(children)
-KEY(printedName)
-KEY(moduleName)
-KEY(throwing)
-KEY(mutating)
-KEY(static)
-KEY(deprecated)
 KEY(typeAttributes)
 KEY(declAttributes)
 KEY(declKind)
 KEY(ownership)
-KEY(superclassUsr)
-KEY(hasDefaultArg)
-KEY(conformingProtocols)
-KEY(enumRawTypeName)
-KEY(genericSig)
 
 KNOWN_TYPE(Optional)
 KNOWN_TYPE(ImplicitlyUnwrappedOptional)
@@ -164,6 +211,7 @@ SPECIAL_CASE_ID(ToIntMax)
 SPECIAL_CASE_ID(ToUIntMax)
 SPECIAL_CASE_ID(UIApplicationMain)
 
+#undef NODE_KIND_RANGE
 #undef SPECIAL_CASE_ID
 #undef DIFF_ITEM_KEY_KIND_INT
 #undef DIFF_ITEM_KEY_KIND_STRING
@@ -172,6 +220,10 @@ SPECIAL_CASE_ID(UIApplicationMain)
 #undef DIFF_ITEM_KIND
 #undef KNOWN_TYPE
 #undef KNOWN_PROTOCOL
+#undef KEY_UINT
+#undef KEY_STRING_ARR
+#undef KEY_BOOL
+#undef KEY_STRING
 #undef KEY
 #undef NODE_ANNOTATION_CHANGE_KIND
 #undef NODE_ANNOTATION

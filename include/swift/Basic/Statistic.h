@@ -68,6 +68,16 @@ class SourceManager;
 class Stmt;
 class TypeRepr;
 
+// There are a handful of cases where the swift compiler can introduce
+// counter-measurement noise via nondeterminism, especially via
+// parallelism; inhibiting all such cases reliably using existing avenues
+// is a bit tricky and depends both on delicate build-setting management
+// and some build-system support that is still pending (see
+// rdar://39528362); in the meantime we support an environment variable
+// ourselves to request blanket suppression of parallelism (and anything
+// else nondeterministic we find).
+bool environmentVariableRequestedMaximumDeterminism();
+
 class UnifiedStatsReporter {
 
 public:

@@ -28,9 +28,9 @@ public enum MaybePair {
 }
 
 // SIL-LABEL: // pgo_switchenum.guess1
-// SIL-LABEL: sil @$S14pgo_switchenum6guess11xs5Int32VAA9MaybePairO_tF : $@convention(thin) (@guaranteed MaybePair) -> Int32 !function_entry_count(5011) {
-// IR-LABEL: define swiftcc i32 @$S9pgo_switchenum6guess1s5Int32VAD1x_tF
-// IR-OPT-LABEL: define swiftcc i32 @$S9pgo_switchenum6guess1s5Int32VAD1x_tF
+// SIL-LABEL: sil @$s14pgo_switchenum6guess11xs5Int32VAA9MaybePairO_tF : $@convention(thin) (@guaranteed MaybePair) -> Int32 !function_entry_count(5011) {
+// IR-LABEL: define swiftcc i32 @$s9pgo_switchenum6guess1s5Int32VAD1x_tF
+// IR-OPT-LABEL: define swiftcc i32 @$s9pgo_switchenum6guess1s5Int32VAD1x_tF
 
 public func guess1(x: MaybePair) -> Int32 {
   // SIL: switch_enum {{.*}} : $MaybePair, case #MaybePair.Neither!enumelt: {{.*}} !case_count(2), case #MaybePair.Left!enumelt.1: {{.*}} !case_count(5001), case #MaybePair.Right!enumelt.1: {{.*}} !case_count(3), case #MaybePair.Both!enumelt.1: {{.*}} !case_count(5)
@@ -48,7 +48,7 @@ public func guess1(x: MaybePair) -> Int32 {
 }
 
 // SIL-LABEL: // pgo_switchenum.guess2
-// SIL-LABEL: sil @$S14pgo_switchenum6guess21xs5Int32VAA9MaybePairO_tF : $@convention(thin) (@guaranteed MaybePair) -> Int32 !function_entry_count(5011) {
+// SIL-LABEL: sil @$s14pgo_switchenum6guess21xs5Int32VAA9MaybePairO_tF : $@convention(thin) (@guaranteed MaybePair) -> Int32 !function_entry_count(5011) {
 public func guess2(x: MaybePair) -> Int32 {
   // SIL: switch_enum {{.*}} : $MaybePair, case #MaybePair.Neither!enumelt: {{.*}} !case_count(2), case #MaybePair.Left!enumelt.1: {{.*}} !case_count(5001), default {{.*}} !default_count(8)
   // SIL-OPT: switch_enum {{.*}} : $MaybePair, case #MaybePair.Neither!enumelt: {{.*}} !case_count(2), case #MaybePair.Left!enumelt.1: {{.*}} !case_count(5001), default {{.*}} !default_count(8)

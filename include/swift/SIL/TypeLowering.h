@@ -41,29 +41,6 @@ namespace swift {
 
 namespace Lowering {
 
-/// Should this tuple type always be expanded into its elements, even
-/// when emitted against an opaque abstraction pattern?
-///
-/// FIXME: Remove this once function signature lowering always explodes
-/// the top-level argument list.
-inline bool shouldExpandTupleType(TupleType *type) {
-  // Tuples with inout, __shared and __owned elements cannot be lowered
-  // to SIL types.
-  if (type->hasElementWithOwnership())
-    return true;
-
-  // A one-element tuple with a vararg element is essentially
-  // equivalent to the element itself, and we also can't lower it, since
-  // that would strip off the vararg-ness and produce a non-tuple type.
-  if (type->getNumElements() == 1 &&
-      type->getElement(0).isVararg()) {
-    return true;
-  }
-
-  // Everything else is OK.
-  return false;
-}
-
 /// The default convention for handling the callee object on thick
 /// callees.
 const ParameterConvention DefaultThickCalleeConvention =
@@ -496,6 +473,7 @@ public:
     case TypeExpansionKind::MostDerivedDescendents:
       return emitLoweredCopyValueMostDerivedDescendents(B, loc, value);
     }
+    llvm_unreachable("unhandled style");
   }
 
   /// Allocate a new TypeLowering using the TypeConverter's allocator.
@@ -530,20 +508,15 @@ struct SILConstantInfo {
 
   /// The SIL function type of the constant.
   CanSILFunctionType SILFnType;
-  
-  /// The generic environment used by the constant.
-  GenericEnvironment *GenericEnv;
 
   SILConstantInfo(CanAnyFunctionType formalType,
                   AbstractionPattern formalPattern,
                   CanAnyFunctionType loweredType,
-                  CanSILFunctionType silFnTy,
-                  GenericEnvironment *env)
+                  CanSILFunctionType silFnTy)
     : FormalType(formalType),
       FormalPattern(formalPattern),
       LoweredType(loweredType),
-      SILFnType(silFnTy),
-      GenericEnv(env) {}
+      SILFnType(silFnTy) {}
   
   SILType getSILType() const {
     return SILType::getPrimitiveObjectType(SILFnType);
@@ -552,8 +525,7 @@ struct SILConstantInfo {
   friend bool operator==(SILConstantInfo lhs, SILConstantInfo rhs) {
     return lhs.FormalType == rhs.FormalType &&
            lhs.LoweredType == rhs.LoweredType &&
-           lhs.SILFnType == rhs.SILFnType &&
-           lhs.GenericEnv == rhs.GenericEnv;
+           lhs.SILFnType == rhs.SILFnType;
   }
   friend bool operator!=(SILConstantInfo lhs, SILConstantInfo rhs) {
     return !(lhs == rhs);
@@ -692,9 +664,6 @@ class TypeConverter {
 
   CanAnyFunctionType makeConstantInterfaceType(SILDeclRef constant);
   
-  /// Get the generic environment for a constant.
-  GenericEnvironment *getConstantGenericEnvironment(SILDeclRef constant);
-  
   // Types converted during foreign bridging.
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
   Optional<CanType> BridgedType##Ty;
@@ -814,6 +783,9 @@ public:
   /// Returns the formal type, lowered AST type, and SILFunctionType
   /// for a constant reference.
   const SILConstantInfo &getConstantInfo(SILDeclRef constant);
+  
+  /// Get the generic environment for a constant.
+  GenericEnvironment *getConstantGenericEnvironment(SILDeclRef constant);
   
   /// Returns the SIL type of a constant reference.
   SILType getConstantType(SILDeclRef constant) {

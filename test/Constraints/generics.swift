@@ -253,7 +253,7 @@ struct V27515965 {
 
 func test(x: S27515965) -> V27515965 {
   return V27515965(x)
-  // expected-error@-1 {{initializer 'init' requires the types 'Any' and 'Float' be equivalent}}
+  // expected-error@-1 {{initializer 'init(_:)' requires the types 'Any' and 'Float' be equivalent}}
 }
 
 protocol BaseProto {}
@@ -563,7 +563,7 @@ do {
 }
 
 func rdar35890334(_ arr: inout [Int]) {
-  _ = arr.popFirst() // expected-error {{value of type '[Int]' has no member 'popFirst'}}
+  _ = arr.popFirst() // expected-error {{referencing instance method 'popFirst()' on 'Collection' requires the types '[Int]' and 'ArraySlice<Int>' be equivalent}}
 }
 
 // rdar://problem/39616039
@@ -621,3 +621,11 @@ func rdar40537858() {
   let _: E = .foo(s)   // expected-error {{generic enum 'E' requires that 'S' conform to 'P'}}
   let _: E = .bar([s]) // expected-error {{generic enum 'E' requires that 'S' conform to 'P'}}
 }
+
+// SR-8934
+struct BottleLayout {
+    let count : Int
+}
+let arr = [BottleLayout]()
+let layout = BottleLayout(count:1)
+let ix = arr.firstIndex(of:layout) // expected-error {{argument type 'BottleLayout' does not conform to expected type 'Equatable'}}

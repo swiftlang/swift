@@ -143,33 +143,6 @@ private:
 
   LoadResult loadFromBuffer(const void *node, llvm::MemoryBuffer &buffer);
 
-  // FIXME: We should be able to use llvm::mapped_iterator for this, but
-  // StringMapConstIterator isn't quite an InputIterator (no ->).
-  class StringSetIterator {
-    llvm::StringSet<>::const_iterator I;
-  public:
-    using value_type = llvm::StringSet<>::const_iterator::value_type;
-    using iterator_category = std::input_iterator_tag;
-    using difference_type = ptrdiff_t;
-    using reference = value_type &;
-    using pointer = value_type *;
-
-    /*implicit*/ StringSetIterator(llvm::StringSet<>::const_iterator base)
-       : I(base) {}
-
-    StringSetIterator &operator++() {
-      ++I;
-      return *this;
-    }
-
-    StringRef operator*() const {
-      return I->getKey();
-    }
-
-    bool operator==(StringSetIterator other) const { return I == other.I; }
-    bool operator!=(StringSetIterator other) const { return I != other.I; }
-  };
-
 protected:
   LoadResult loadFromString(const void *node, StringRef data);
   LoadResult loadFromPath(const void *node, StringRef path);
@@ -195,9 +168,8 @@ protected:
   }
 
 public:
-  llvm::iterator_range<StringSetIterator> getExternalDependencies() const {
-    return llvm::make_range(StringSetIterator(ExternalDependencies.begin()),
-                            StringSetIterator(ExternalDependencies.end()));
+  decltype(ExternalDependencies.keys()) getExternalDependencies() const {
+    return ExternalDependencies.keys();
   }
 };
 

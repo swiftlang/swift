@@ -141,8 +141,9 @@ class TypeResolutionOptions {
   Context context = Context::None;
   // TypeResolutionFlags
   uint16_t flags = 0;
-  static_assert(sizeof(flags) == sizeof(TypeResolutionFlags),
-      "Flags size error");
+  static_assert(sizeof(TypeResolutionOptions::flags) ==
+                    sizeof(TypeResolutionFlags),
+                "Flags size error");
 
 public:
   ~TypeResolutionOptions() = default;
@@ -211,6 +212,7 @@ public:
     case Context::AbstractFunctionDecl:
       return false;
     }
+    llvm_unreachable("unhandled kind");
   }
 
   /// Determine whether all of the given options are set.
@@ -348,6 +350,11 @@ public:
   Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
                                   SourceRange baseRange,
                                   ComponentIdentTypeRepr *ref) const;
+
+  /// Resolve an unqualified reference to an associated type or type alias
+  /// in a protocol.
+  Type resolveSelfAssociatedType(Type baseTy, DeclContext *DC,
+                                 Identifier name) const;
 
   /// Determine whether the given two types are equivalent within this
   /// type resolution context.

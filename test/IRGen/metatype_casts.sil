@@ -72,7 +72,7 @@ sil_vtable OtherClass {}
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @value_metatype_cast(%T14metatype_casts9SomeClassC*)
 // CHECK:         [[T0:%.*]] = bitcast %T14metatype_casts9SomeClassC* %0 to %swift.type**
 // CHECK:         [[T1:%.*]] = load %swift.type*, %swift.type** [[T0]]
-// CHECK:         [[T2:%.*]] = icmp eq %swift.type* [[T1]], {{.*}} @"$S14metatype_casts10OtherClassCMf"
+// CHECK:         [[T2:%.*]] = icmp eq %swift.type* [[T1]], {{.*}} @"$s14metatype_casts10OtherClassCMf"
 sil @value_metatype_cast : $@convention(thin) (SomeClass) -> () {
 entry(%0 : $SomeClass):
   %1 = value_metatype $@thick SomeClass.Type, %0 : $SomeClass
@@ -104,7 +104,7 @@ entry(%0 : $@thick Any.Type):
 // to check.
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @checked_cast_class_to_anyobject_type
-// CHECK:         [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S14metatype_casts9SomeClassCMa"([[INT]] 0)
+// CHECK:         [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s14metatype_casts9SomeClassCMa"([[INT]] 0)
 // CHECK:         [[METATYPE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK:         ret %swift.type* [[METATYPE]]
 sil @checked_cast_class_to_anyobject_type : $@convention(thin) () -> @thick AnyObject.Type {

@@ -1,0 +1,59 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t/ObjC.swiftmodule -O -enable-objc-interop %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t/ObjC.swiftmodule -O -enable-objc-interop -enable-resilience %s
+
+// FIXME: This test is self-contained, so it shouldn't require objc_interop
+// (just -enable-objc-interop), but it's failing in Linux SILGen.
+// https://bugs.swift.org/browse/SR-8877
+// REQUIRES: objc_interop
+
+import Foundation
+
+public class SomeClass {
+  @objc init?(_: Any)
+  @objc func foo()
+  @objc var bar: Int { get set }
+  @objc subscript(_: Int) -> Int { get set }
+  @objc deinit
+}
+
+public class SomeClassInlinable {
+  @usableFromInline init()
+  @objc @inlinable convenience init?(_: Any) { self.init() }
+  @objc @inlinable func foo() {}
+  @objc var bar: Int {
+    @inlinable get { return 0 }
+    @inlinable set {}
+  }
+  @objc @inlinable subscript(_: Int) -> Int {
+    @inlinable get { return 0 }
+    @inlinable set {}
+  }
+  @objc @inlinable deinit {
+    print("bye")
+  }
+}
+public class SomeNSObject : NSObject {
+  @objc init?(_: Any)
+  @objc func foo()
+  @objc var bar: Int { get set }
+  @objc subscript(_: Int) -> Int { get set }
+  @objc deinit
+}
+
+public class SomeNSObjectInlinable : NSObject {
+  public override init()
+  @objc @inlinable convenience init?(_: Any) { self.init() }
+  @objc @inlinable func foo() {}
+  @objc var bar: Int {
+    @inlinable get { return 0 }
+    @inlinable set {}
+  }
+  @objc @inlinable subscript(_: Int) -> Int {
+    @inlinable get { return 0 }
+    @inlinable set {}
+  }
+  @objc @inlinable deinit {
+    print("bye")
+  }
+}

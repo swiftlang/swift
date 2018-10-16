@@ -208,8 +208,8 @@ struct S4d : P4 {
   func reqP4a() -> Bool { return false }
 }
 
-extension P4 where Self.AssocP4 == Int {
-  func extP4Int() { } // expected-note {{candidate requires that the types 'Bool' and 'Int' be equivalent (requirement specified as 'Self.AssocP4' == 'Int')}}
+extension P4 where Self.AssocP4 == Int { // expected-note {{where 'Self.AssocP4' = 'Bool'}}
+  func extP4Int() { }
 }
 
 extension P4 where Self.AssocP4 == Bool {
@@ -229,7 +229,7 @@ func testP4(_ s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {
   s4c.extP4Int() // okay
   var b1 = s4d.extP4a() // okay, "Bool" version
   b1 = true // checks type above
-  s4d.extP4Int() // expected-error{{value of type 'S4d' has no member 'extP4Int'}}
+  s4d.extP4Int() // expected-error{{referencing instance method 'extP4Int()' on 'P4' requires the types 'Bool' and 'Int' be equivalent}}
   _ = b1
 }
 
@@ -870,26 +870,26 @@ extension PConstrained6 {
   var prop2: Int { return 0 } // expected-note{{'prop2' previously declared here}}
 
   subscript (key: Int) -> Int { return key }
-  subscript (key: Double) -> Double { return key } // expected-note{{'subscript' previously declared here}}
+  subscript (key: Double) -> Double { return key } // expected-note{{'subscript(_:)' previously declared here}}
 }
 
 extension PConstrained6 {
   var prop2: Int { return 0 } // expected-error{{invalid redeclaration of 'prop2'}}
-  subscript (key: Double) -> Double { return key } // expected-error{{invalid redeclaration of 'subscript'}}
+  subscript (key: Double) -> Double { return key } // expected-error{{invalid redeclaration of 'subscript(_:)'}}
 }
 
 extension PConstrained6 where Assoc : PConstrained5 {
   var prop1: Int { return 0 } // okay
   var prop3: Int { return 0 } // expected-note{{'prop3' previously declared here}}
   subscript (key: Int) -> Int { return key } // ok
-  subscript (key: String) -> String { return key } // expected-note{{'subscript' previously declared here}}
+  subscript (key: String) -> String { return key } // expected-note{{'subscript(_:)' previously declared here}}
 
   func foo() { } // expected-note{{'foo()' previously declared here}}
 }
 
 extension PConstrained6 where Assoc : PConstrained5 {
   var prop3: Int { return 0 } // expected-error{{invalid redeclaration of 'prop3'}}
-  subscript (key: String) -> String { return key } // expected-error{{invalid redeclaration of 'subscript'}}
+  subscript (key: String) -> String { return key } // expected-error{{invalid redeclaration of 'subscript(_:)'}}
   func foo() { } // expected-error{{invalid redeclaration of 'foo()'}}
 }
 

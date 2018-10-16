@@ -497,8 +497,8 @@ sr3520_1 { $0 = 1 } // expected-error {{cannot convert value of type '()' to clo
 struct S_3520 {
   var number1: Int
 }
-func sr3520_set_via_closure<S, T>(_ closure: (inout S, T) -> ()) {}
-sr3520_set_via_closure({ $0.number1 = $1 }) // expected-error {{type of expression is ambiguous without more context}}
+func sr3520_set_via_closure<S, T>(_ closure: (inout S, T) -> ()) {} // expected-note {{in call to function 'sr3520_set_via_closure'}}
+sr3520_set_via_closure({ $0.number1 = $1 }) // expected-error {{generic parameter 'S' could not be inferred}}
 
 // SR-3073: UnresolvedDotExpr in single expression closure
 
@@ -749,3 +749,51 @@ func f20371273() {
   let y: UInt = 4
   _ = x.filter { ($0 + y)  > 42 } // expected-error {{'+' is unavailable}}
 }
+
+// rdar://problem/42337247
+
+func overloaded(_ handler: () -> Int) {} // expected-note {{found this candidate}}
+func overloaded(_ handler: () -> Void) {} // expected-note {{found this candidate}}
+
+overloaded { } // empty body => inferred as returning ()
+
+overloaded { print("hi") } // single-expression closure => typechecked with body
+
+overloaded { print("hi"); print("bye") } // multiple expression closure without explicit returns; can default to any return type
+// expected-error@-1 {{ambiguous use of 'overloaded'}}
+
+func not_overloaded(_ handler: () -> Int) {}
+
+not_overloaded { } // empty body
+// expected-error@-1 {{cannot convert value of type '() -> ()' to expected argument type '() -> Int'}}
+
+not_overloaded { print("hi") } // single-expression closure
+// expected-error@-1 {{cannot convert value of type '()' to closure result type 'Int'}}
+
+// no error in -typecheck, but dataflow diagnostics will complain about missing return
+not_overloaded { print("hi"); print("bye") } // multiple expression closure
+
+func apply(_ fn: (Int) throws -> Int) rethrows -> Int {
+  return try fn(0)
+}
+
+enum E : Error {
+  case E
+}
+
+func test() -> Int? {
+  return try? apply({ _ in throw E.E })
+}
+
+var fn: () -> [Int] = {}
+// expected-error@-1 {{cannot convert value of type '() -> ()' to specified type '() -> [Int]'}}
+
+fn = {}
+// expected-error@-1 {{cannot assign value of type '() -> ()' to type '() -> [Int]'}}
+
+func test<Instances : Collection>(
+  _ instances: Instances,
+  _ fn: (Instances.Index, Instances.Index) -> Bool
+) { fatalError() }
+
+test([1]) { _, _ in fatalError(); () }

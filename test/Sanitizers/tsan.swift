@@ -5,6 +5,10 @@
 // REQUIRES: tsan_runtime
 // UNSUPPORTED: OS=tvos
 
+// FIXME: This should be covered by "tsan_runtime"; older versions of Apple OSs
+// don't support TSan.
+// UNSUPPORTED: remote_run
+
 // https://bugs.swift.org/browse/SR-6622
 // XFAIL: linux
 

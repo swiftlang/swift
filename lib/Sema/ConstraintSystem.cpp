@@ -801,8 +801,7 @@ void ConstraintSystem::recordOpenedTypes(
   SmallVector<LocatorPathElt, 2> pathElts;
   Expr *anchor = locator.getLocatorParts(pathElts);
   if (!pathElts.empty() &&
-      (pathElts.back().getKind() == ConstraintLocator::Archetype ||
-       pathElts.back().getKind() == ConstraintLocator::AssociatedType))
+      pathElts.back().getKind() == ConstraintLocator::GenericParameter)
     return;
 
   // If the locator is empty, ignore it.
@@ -977,26 +976,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
   assert(!valueType->hasUnboundGenericType() &&
          !valueType->hasTypeParameter());
-
-  // If this is a let-param whose type is a type variable, this is an untyped
-  // closure param that may be bound to an inout type later. References to the
-  // param should have lvalue type instead. Express the relationship with a new
-  // constraint.
-  if (auto *param = dyn_cast<ParamDecl>(varDecl)) {
-    if (param->isLet() && valueType->is<TypeVariableType>()) {
-      auto found = OpenedParameterTypes.find(param);
-      if (found != OpenedParameterTypes.end())
-        return { found->second, found->second };
-
-      auto typeVar = createTypeVariable(getConstraintLocator(locator),
-                                        TVO_CanBindToLValue);
-      addConstraint(ConstraintKind::BindParam, valueType, typeVar,
-                    getConstraintLocator(locator));
-      OpenedParameterTypes.insert(std::make_pair(param, typeVar));
-      return { typeVar, typeVar };
-    }
-  }
-
   return { valueType, valueType };
 }
 
@@ -1037,8 +1016,6 @@ static void bindArchetypesFromContext(
     ConstraintLocator *locatorPtr,
     const OpenedTypeMap &replacements) {
 
-  auto *genericEnv = cs.DC->getGenericEnvironmentOfContext();
-
   auto bindContextArchetype = [&](Type paramTy, Type contextTy) {
     auto found = replacements.find(cast<GenericTypeParamType>(
                                      paramTy->getCanonicalType()));
@@ -1074,7 +1051,7 @@ static void bindArchetypesFromContext(
       break;
 
     for (auto *paramTy : genericSig->getGenericParams()) {
-      Type contextTy = genericEnv->mapTypeIntoContext(paramTy);
+      Type contextTy = cs.DC->mapTypeIntoContext(paramTy);
       bindContextArchetype(paramTy, contextTy);
     }
 
@@ -1093,14 +1070,11 @@ void ConstraintSystem::openGeneric(
     return;
 
   auto locatorPtr = getConstraintLocator(locator);
-  auto *genericEnv = innerDC->getGenericEnvironmentOfContext();
 
   // Create the type variables for the generic parameters.
   for (auto gp : sig->getGenericParams()) {
-    auto contextTy = GenericEnvironment::mapTypeIntoContext(genericEnv, gp);
-    if (auto *archetype = contextTy->getAs<ArchetypeType>())
-      locatorPtr = getConstraintLocator(
-          locator.withPathElement(LocatorPathElt(archetype)));
+    locatorPtr = getConstraintLocator(
+        locator.withPathElement(LocatorPathElt(gp)));
 
     auto typeVar = createTypeVariable(locatorPtr,
                                       TVO_PrefersSubtypeBinding);
@@ -2050,6 +2024,7 @@ bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
   case FunctionRefKind::DoubleApply:
     return true;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
@@ -2071,7 +2046,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     state.recordFixes = true;
 
     // Solve the system.
-    solveRec(viable);
+    solve(viable);
 
     // Check whether we have a best solution; this can happen if we found
     // a series of fixes that worked.

@@ -154,7 +154,7 @@ extension EnumeratedSequence.Iterator: IteratorProtocol, Sequence {
 extension EnumeratedSequence: Sequence {
   /// Returns an iterator over the elements of this sequence.
   @inlinable
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator())
   }
 }

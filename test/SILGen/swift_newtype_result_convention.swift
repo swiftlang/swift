@@ -4,6 +4,6 @@
 import Foundation
 
 @objc class ThingHolder: NSObject {
-  // CHECK: sil hidden [thunk] @$S{{.*}}5thing{{.*}}To : $@convention(objc_method) (ThingHolder) -> @autoreleased NSThing
+  // CHECK: sil hidden [thunk] @$s{{.*}}5thing{{.*}}To : $@convention(objc_method) (ThingHolder) -> @autoreleased NSThing
   @objc let thing: NSThing = NSThing("")
 }

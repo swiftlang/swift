@@ -15,6 +15,7 @@
 
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProtocolConformanceAnalysis.h"
 
@@ -95,8 +96,6 @@ struct ConcreteExistentialInfo {
   // instructions to cast OpenedArchetypeDef to ConcreteType.
   ConcreteExistentialInfo(Operand &ArgOperand, CanType ConcreteType,
                           ProtocolDecl *Protocol);
-
-  ConcreteExistentialInfo(ConcreteExistentialInfo &) = delete;
 
   /// For scenerios where ConcreteExistentialInfo is created using a known
   /// ConcreteType and ProtocolDecl, both of InitExistential

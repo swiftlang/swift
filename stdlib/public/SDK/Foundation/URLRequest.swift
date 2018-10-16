@@ -41,7 +41,7 @@ public struct URLRequest : ReferenceConvertible, Equatable, Hashable {
         _handle = _MutableHandle(adoptingReference: NSMutableURLRequest(url: url, cachePolicy: cachePolicy, timeoutInterval: timeoutInterval))
     }
 
-    fileprivate init(_bridged request: NSURLRequest) {
+    fileprivate init(_bridged request: __shared NSURLRequest) {
         _handle = _MutableHandle(reference: request.mutableCopy() as! NSMutableURLRequest)
     }
     
@@ -286,6 +286,7 @@ extension URLRequest : _ObjectiveCBridgeable {
         return true
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSURLRequest?) -> URLRequest {
         var result: URLRequest?
         _forceBridgeFromObjectiveC(source!, result: &result)

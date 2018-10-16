@@ -13,15 +13,15 @@ public class C {
   func returnInt() -> Int { return 0 }
 }
 
-// CHECK-LABEL: sil @$S22closure_lifetime_fixup10testSimple1cyAA1CC_tF : $@convention(thin) (@guaranteed C) -> () {
+// CHECK-LABEL: sil @$s22closure_lifetime_fixup10testSimple1cyAA1CC_tF : $@convention(thin) (@guaranteed C) -> () {
 // CHECK: bb0([[ARG:%.*]] : $C):
-// CHECK: [[F:%.*]]  = function_ref @$S22closure_lifetime_fixup10testSimple1cyAA1CC_tFyyXEfU_
+// CHECK: [[F:%.*]]  = function_ref @$s22closure_lifetime_fixup10testSimple1cyAA1CC_tFyyXEfU_
 // CHECK-NEXT:  strong_retain [[ARG]] : $C
 // CHECK-NEXT:  [[PA:%.*]] = partial_apply [callee_guaranteed] [[F]]([[ARG]]) : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NEXT: strong_retain [[PA]] : $@callee_guaranteed () -> ()
 // CHECK-NEXT:  [[CVT:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 // CHECK-NEXT:  // function_ref use_closure(_:)
-// CHECK-NEXT:  [[F2:%.*]] = function_ref @$S22closure_lifetime_fixup04use_A0yyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+// CHECK-NEXT:  [[F2:%.*]] = function_ref @$s22closure_lifetime_fixup04use_A0yyyyXEF : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
 // CHECK-NEXT:  apply [[F2]]([[CVT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
 // CHECK-NEXT:  strong_release [[PA]] : $@callee_guaranteed () -> ()
 // CHECK-NEXT:  strong_release [[PA]] : $@callee_guaranteed () -> ()
@@ -31,20 +31,20 @@ public func testSimple(c: C) {
   use_closure { c.doIt() }
 }
 
-// CHECK-LABEL: sil @$S22closure_lifetime_fixup11testGeneric1cyAA1CC_tF : $@convention(thin) (@guaranteed C) -> () {
+// CHECK-LABEL: sil @$s22closure_lifetime_fixup11testGeneric1cyAA1CC_tF : $@convention(thin) (@guaranteed C) -> () {
 // CHECK:bb0([[ARG:%.*]] : $C):
-// CHECK:  [[F:%.*]] = function_ref @$S22closure_lifetime_fixup11testGeneric1cyAA1CC_tFSiyXEfU_ : $@convention(thin) (@guaranteed C) -> Int
+// CHECK:  [[F:%.*]] = function_ref @$s22closure_lifetime_fixup11testGeneric1cyAA1CC_tFSiyXEfU_ : $@convention(thin) (@guaranteed C) -> Int
 // CHECK-NEXT:  strong_retain [[ARG]] : $C
 // CHECK-NEXT:  [[PA:%.*]] = partial_apply [callee_guaranteed] [[F]]([[ARG]]) : $@convention(thin) (@guaranteed C) -> Int
 // CHECK-NEXT:  strong_retain [[PA]] : $@callee_guaranteed () -> Int
 // CHECK-NEXT:  [[CVT:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_guaranteed () -> Int to $@noescape @callee_guaranteed () -> Int
 // CHECK-NEXT:  // function_ref thunk for @callee_guaranteed () -> (@unowned Int)
-// CHECK-NEXT:  [[F:%.*]] = function_ref @$SSiIgd_SiIegr_TR : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @out Int
+// CHECK-NEXT:  [[F:%.*]] = function_ref @$sSiIgd_SiIegr_TR : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @out Int
 // CHECK-NEXT:  [[PA2:%.*]] = partial_apply [callee_guaranteed] [[F]]([[CVT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> @out Int
 // CHECK-NEXT:  [[CVT2:%.*]] = convert_escape_to_noescape [[PA2]] : $@callee_guaranteed () -> @out Int to $@noescape @callee_guaranteed () -> @out Int
 // CHECK-NEXT:  strong_release [[PA]] : $@callee_guaranteed () -> Int
 // CHECK-NEXT:  // function_ref use_closureGeneric<A>(_:)
-// CHECK-NEXT:  [[F2:%.*]] = function_ref @$S22closure_lifetime_fixup04use_A7GenericyyxyXElF : $@convention(thin) <τ_0_0> (@noescape @callee_guaranteed () -> @out τ_0_0) -> ()
+// CHECK-NEXT:  [[F2:%.*]] = function_ref @$s22closure_lifetime_fixup04use_A7GenericyyxyXElF : $@convention(thin) <τ_0_0> (@noescape @callee_guaranteed () -> @out τ_0_0) -> ()
 // CHECK-NEXT:  %12 = apply [[F2]]<Int>([[CVT2]]) : $@convention(thin) <τ_0_0> (@noescape @callee_guaranteed () -> @out τ_0_0) -> ()
 // CHECK-NEXT:  strong_release [[PA2]] : $@callee_guaranteed () -> @out Int
 // CHECK-NEXT:  strong_release [[PA]] : $@callee_guaranteed () -> Int
@@ -62,7 +62,7 @@ public protocol P {
 
 // Make sure we keep the closure alive up until after the write back.
 
-// CHECK-LABEL: sil @$S22closure_lifetime_fixup10testModify1pyxz_tAA1PRzSS7ElementRtzlF : $@convention(thin) <T where T : P, T.Element == String> (@inout T) -> () {
+// CHECK-LABEL: sil @$s22closure_lifetime_fixup10testModify1pyxz_tAA1PRzSS7ElementRtzlF : $@convention(thin) <T where T : P, T.Element == String> (@inout T) -> () {
 // CHECK: bb0
 // CHECK:  [[PA1:%.*]] = partial_apply [callee_guaranteed]
 // CHECK:  [[ENUM1:%.*]] = enum $Optional<@callee_guaranteed (@in_guaranteed String) -> @out Int>, #Optional.some!enumelt.1, [[PA1]] 

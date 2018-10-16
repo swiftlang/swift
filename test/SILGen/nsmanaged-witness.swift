@@ -61,5 +61,5 @@ extension Foo: NativeIntProperty {}
 // TODO: We can't emit a vtable entry for modify for ObjC types.
 // CHECK-NOT: class_method {{.*}}Foo{{.*}}intProperty{{.*}}modify
 
-// CHECK-LABEL: sil shared [serializable] @$SSo3FooC11intPropertys5Int32VvM
+// CHECK-LABEL: sil shared [serializable] @$sSo3FooC11intPropertys5Int32VvM
 

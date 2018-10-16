@@ -53,6 +53,7 @@ bool swift::shouldDiagnoseObjCReason(ObjCReason reason, ASTContext &ctx) {
   case ObjCReason::Accessor:
     return false;
   }
+  llvm_unreachable("unhandled reason");
 }
 
 unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
@@ -78,6 +79,7 @@ unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
   case ObjCReason::Accessor:
     llvm_unreachable("should not diagnose this @objc reason");
   }
+  llvm_unreachable("unhandled reason");
 }
 
 /// Emit an additional diagnostic describing why we are applying @objc to the
@@ -757,6 +759,11 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   if (!VD->hasInterfaceType()) {
     VD->getASTContext().getLazyResolver()->resolveDeclSignature(
                                               const_cast<VarDecl *>(VD));
+    if (!VD->hasInterfaceType()) {
+      VD->diagnose(diag::recursive_type_reference, VD->getDescriptiveKind(),
+                   VD->getName());
+      return false;
+    }
   }
 
   Type T = VD->getDeclContext()->mapTypeIntoContext(VD->getInterfaceType());
@@ -817,7 +824,7 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   if (SubscriptType->getParams().size() != 1)
     return false;
 
-  Type IndicesType = SubscriptType->getParams()[0].getType();
+  Type IndicesType = SubscriptType->getParams()[0].getOldType();
   if (IndicesType->hasError())
     return false;
 
@@ -965,7 +972,7 @@ void swift::checkBridgedFunctions(ASTContext &ctx) {
   }
 }
 
-#pragma mark @objc declaration handling
+#pragma mark "@objc declaration handling"
 
 /// Whether this declaration is a member of a class extension marked @objc.
 static bool isMemberOfObjCClassExtension(const ValueDecl *VD) {
@@ -1532,8 +1539,11 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
   }
 
   if (!isa<TypeDecl>(D) && !isa<AccessorDecl>(D) && !isa<EnumElementDecl>(D)) {
-    useObjectiveCBridgeableConformances(D->getInnermostDeclContext(),
-                                        D->getInterfaceType());
+    if (ctx.getLazyResolver()) {
+      // Only record conformances when we have a lazy resolver.
+      useObjectiveCBridgeableConformances(D->getInnermostDeclContext(),
+                                          D->getInterfaceType());
+    }
   }
 
   if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
@@ -1574,13 +1584,8 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
           // Swift 3 and earlier allowed you to override `initialize`, but
           // Swift's semantics do not guarantee that it will be called at
           // the point you expect. It is disallowed in Swift 4 and later.
-          if (sel.getSelectorPieces().front() == ctx.Id_initialize) {
-            if (ctx.LangOpts.isSwiftVersion3())
-              return
-                diag::objc_class_method_not_permitted_swift3_compat_warning;
-            else
-              return diag::objc_class_method_not_permitted;
-          }
+          if (sel.getSelectorPieces().front() == ctx.Id_initialize)
+            return diag::objc_class_method_not_permitted;
           return None;
         case 1:
           if (sel.getSelectorPieces().front() == ctx.Id_allocWithZone)

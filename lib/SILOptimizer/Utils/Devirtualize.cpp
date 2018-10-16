@@ -249,7 +249,7 @@ SILValue swift::getInstanceWithExactDynamicType(SILValue S, SILModule &M,
     // Traverse the chain of predecessors.
     if (isa<BranchInst>(SinglePred->getTerminator()) ||
         isa<CondBranchInst>(SinglePred->getTerminator())) {
-      S = cast<SILPHIArgument>(Arg)->getIncomingPhiValue(SinglePred);
+      S = cast<SILPhiArgument>(Arg)->getIncomingPhiValue(SinglePred);
       continue;
     }
 
@@ -498,7 +498,7 @@ static TryApplyInst *replaceTryApplyInst(SILBuilder &B, SILLocation Loc,
     ResultBB = NormalBB;
   } else {
     ResultBB = B.getFunction().createBasicBlockBefore(NormalBB);
-    ResultBB->createPHIArgument(NewResultTy, ValueOwnershipKind::Owned);
+    ResultBB->createPhiArgument(NewResultTy, ValueOwnershipKind::Owned);
   }
 
   // We can always just use the original error BB because we'll be

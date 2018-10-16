@@ -169,7 +169,7 @@ struct MagicKingdom<K> : Kingdom {
 }
 func magify<T>(_ t: T) -> MagicKingdom<T> { return MagicKingdom() }
 func foo(_ pair: (Int, Int)) -> Victory<(x: Int, y: Int)> {
-  return Victory(magify(pair)) // expected-error {{initializer 'init' requires the types '(x: Int, y: Int)' and '(Int, Int)' be equivalent}}
+  return Victory(magify(pair)) // expected-error {{initializer 'init(_:)' requires the types '(x: Int, y: Int)' and '(Int, Int)' be equivalent}}
 }
 
 

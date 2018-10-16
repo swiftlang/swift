@@ -66,19 +66,16 @@ function(add_sourcekit_default_compiler_flags target)
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
     RESULT_VAR_NAME link_flags)
 
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-    # TODO(compnerd) this should really use target_compile_options but the use
-    # of keyword and non-keyword flags prevents this
-    list(APPEND c_compile_flags "-fblocks")
-    # TODO(compnerd) this should really use target_link_libraries but the use of
-    # explicit_llvm_config using target_link_libraries without keywords on
-    # executables causes conflicts here
-    list(APPEND link_flags "-L${SWIFT_PATH_TO_LIBDISPATCH_BUILD}")
-    list(APPEND link_flags "-lBlocksRuntime")
-    # NOTE(compnerd) since we do not use target_link_libraries, we do not get
-    # the implicit dependency tracking.  Add an explicit dependency until we can
-    # use target_link_libraries.
-    add_dependencies(${target} BlocksRuntime)
+  # TODO(compnerd) this should really use target_compile_options but the use
+  # of keyword and non-keyword flags prevents this
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    list(APPEND c_compile_flags -fblocks)
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    if(SWIFT_COMPILER_IS_MSVC_LIKE)
+      list(APPEND c_compile_flags -Xclang;-fblocks)
+    else()
+      list(APPEND c_compile_flags -fblocks)
+    endif()
   endif()
 
   # Convert variables to space-separated strings.
@@ -158,7 +155,7 @@ macro(add_sourcekit_library name)
   set(prefixed_link_libraries)
   foreach(dep ${SOURCEKITLIB_LINK_LIBS})
     if("${dep}" MATCHES "^clang")
-      set(dep "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
+      set(dep "${LLVM_LIBRARY_OUTPUT_INTDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}${dep}${CMAKE_STATIC_LIBRARY_SUFFIX}")
     endif()
     list(APPEND prefixed_link_libraries "${dep}")
   endforeach()

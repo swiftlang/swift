@@ -18,71 +18,71 @@ func get<T>() -> T
 // The purpose of these tests is to make sure the storage is never released
 // before the call to the opaque function.
 
-// CHECK-LABEL: sil @$S18pointer_conversion9testArrayyyF
+// CHECK-LABEL: sil @$s18pointer_conversion9testArrayyyF
 public func testArray() {
   let array: [Int] = get()
   takesConstRawPointer(array)
   // CHECK: [[POINTER:%.+]] = struct $UnsafeRawPointer (
-  // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on {{.*}} : $_ContiguousArrayStorageBase
+  // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on {{.*}} : $__ContiguousArrayStorageBase
   // CHECK: [[FN:%.+]] = function_ref @takesConstRawPointer
   // CHECK-NEXT: apply [[FN]]([[DEP_POINTER]])
   // CHECK-NOT: release
   // CHECK-NOT: {{^bb[0-9]+:}}
-  // CHECK: strong_release {{%.+}} : ${{Builtin[.]BridgeObject|_ContiguousArrayStorageBase}}
+  // CHECK: strong_release {{%.+}} : ${{Builtin[.]BridgeObject|__ContiguousArrayStorageBase}}
   // CHECK-NEXT: [[EMPTY:%.+]] = tuple ()
   // CHECK-NEXT: return [[EMPTY]]
 }
 
-// CHECK-LABEL: sil @$S18pointer_conversion19testArrayToOptionalyyF
+// CHECK-LABEL: sil @$s18pointer_conversion19testArrayToOptionalyyF
 public func testArrayToOptional() {
   let array: [Int] = get()
   takesOptConstRawPointer(array)
   // CHECK: [[POINTER:%.+]] = struct $UnsafeRawPointer (
-  // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on {{.*}} : $_ContiguousArrayStorageBase
+  // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeRawPointer on {{.*}} : $__ContiguousArrayStorageBase
   // CHECK-NEXT: [[OPT_POINTER:%.+]] = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt.1, [[DEP_POINTER]]
   // CHECK: [[FN:%.+]] = function_ref @takesOptConstRawPointer
   // CHECK-NEXT: apply [[FN]]([[OPT_POINTER]])
   // CHECK-NOT: release
   // CHECK-NOT: {{^bb[0-9]+:}}
-  // CHECK: strong_release {{%.+}} : ${{Builtin[.]BridgeObject|_ContiguousArrayStorageBase}}
+  // CHECK: strong_release {{%.+}} : ${{Builtin[.]BridgeObject|__ContiguousArrayStorageBase}}
   // CHECK-NEXT: [[EMPTY:%.+]] = tuple ()
   // CHECK-NEXT: return [[EMPTY]]
 }
 
-// CHECK-LABEL: sil @$S18pointer_conversion16testMutableArrayyyF
+// CHECK-LABEL: sil @$s18pointer_conversion16testMutableArrayyyF
 public func testMutableArray() {
   var array: [Int] = get()
   takesMutableRawPointer(&array)
   // CHECK: [[POINTER:%.+]] = struct $UnsafeMutableRawPointer (
-  // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeMutableRawPointer on {{.*}} : $_ContiguousArrayStorageBase
+  // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeMutableRawPointer on {{.*}} : $__ContiguousArrayStorageBase
   // CHECK: [[FN:%.+]] = function_ref @takesMutableRawPointer
   // CHECK-NEXT: apply [[FN]]([[DEP_POINTER]])
   // CHECK-NOT: release
   // CHECK-NOT: {{^bb[0-9]+:}}
-  // CHECK: strong_release {{%.+}} : ${{Builtin[.]BridgeObject|_ContiguousArrayStorageBase}}
+  // CHECK: strong_release {{%.+}} : ${{Builtin[.]BridgeObject|__ContiguousArrayStorageBase}}
   // CHECK-NEXT: dealloc_stack {{%.+}} : $*Array<Int>
   // CHECK-NEXT: [[EMPTY:%.+]] = tuple ()
   // CHECK-NEXT: return [[EMPTY]]
 }
 
-// CHECK-LABEL: sil @$S18pointer_conversion26testMutableArrayToOptionalyyF
+// CHECK-LABEL: sil @$s18pointer_conversion26testMutableArrayToOptionalyyF
 public func testMutableArrayToOptional() {
   var array: [Int] = get()
   takesOptMutableRawPointer(&array)
   // CHECK: [[POINTER:%.+]] = struct $UnsafeMutableRawPointer (
-  // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeMutableRawPointer on {{.*}} : $_ContiguousArrayStorageBase
+  // CHECK-NEXT: [[DEP_POINTER:%.+]] = mark_dependence [[POINTER]] : $UnsafeMutableRawPointer on {{.*}} : $__ContiguousArrayStorageBase
   // CHECK-NEXT: [[OPT_POINTER:%.+]] = enum $Optional<UnsafeMutableRawPointer>, #Optional.some!enumelt.1, [[DEP_POINTER]]
   // CHECK: [[FN:%.+]] = function_ref @takesOptMutableRawPointer
   // CHECK-NEXT: apply [[FN]]([[OPT_POINTER]])
   // CHECK-NOT: release
   // CHECK-NOT: {{^bb[0-9]+:}}
-  // CHECK: strong_release {{%.+}} : ${{Builtin[.]BridgeObject|_ContiguousArrayStorageBase}}
+  // CHECK: strong_release {{%.+}} : ${{Builtin[.]BridgeObject|__ContiguousArrayStorageBase}}
   // CHECK-NEXT: dealloc_stack {{%.+}} : $*Array<Int>
   // CHECK-NEXT: [[EMPTY:%.+]] = tuple ()
   // CHECK-NEXT: return [[EMPTY]]
 }
 
-// CHECK-LABEL: sil @$S18pointer_conversion21arrayLiteralPromotionyyF
+// CHECK-LABEL: sil @$s18pointer_conversion21arrayLiteralPromotionyyF
 public func arrayLiteralPromotion() {
   takesConstRawPointer([41,42,43,44])
   

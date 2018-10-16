@@ -56,7 +56,7 @@ bool ClangImporter::Implementation::isOverAligned(const clang::TypeDecl *decl) {
 
 bool ClangImporter::Implementation::isOverAligned(clang::QualType type) {
   auto align = getClangASTContext().getTypeAlignInChars(type);
-  return align.getQuantity() > MaximumAlignment;
+  return align > clang::CharUnits::fromQuantity(MaximumAlignment);
 }
 
 namespace {
@@ -797,8 +797,9 @@ namespace {
         if (attr->getProtocolKind() ==
             KnownProtocolKind::BridgedStoredNSError) {
           auto &ctx = nominal->getASTContext();
-          auto lookup = nominal->lookupDirect(ctx.Id_Code,
-                                              /*ignoreNewExtensions=*/true);
+          auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+          flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+          auto lookup = nominal->lookupDirect(ctx.Id_Code, flags);
           for (auto found : lookup) {
             if (auto codeDecl = dyn_cast<TypeDecl>(found))
               return codeDecl;
@@ -1651,7 +1652,7 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   // Import the parameters.
   SmallVector<ParamDecl *, 4> parameters;
   unsigned index = 0;
-  llvm::SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
+  SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
 
   for (auto param : params) {
     auto paramTy = param->getType();
@@ -2009,7 +2010,7 @@ ImportedType ClangImporter::Implementation::importMethodType(
 
   CanType errorParamType;
 
-  llvm::SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
+  SmallBitVector nonNullArgs = getNonNullArgs(clangDecl, params);
 
   // Import the parameters.
   SmallVector<ParamDecl*, 4> swiftParams;

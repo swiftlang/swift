@@ -185,36 +185,62 @@ LSLocation::expand(LSLocation Base, SILModule *M, LSLocationList &Locs,
   }
 }
 
-bool
-LSLocation::reduce(LSLocation Base, SILModule *M, LSLocationSet &Locs) {
+/// Gets the sub-locations of \p Base in \p SubLocations.
+/// Returns false if this is not possible or too complex.
+static bool
+getSubLocations(LSLocationList &SubLocations, LSLocation Base, SILModule *M,
+             const LSLocationList &Locs) {
   // If this is a class reference type, we have reached end of the type tree.
   if (Base.getType(M).getClassOrBoundGenericClass())
-    return Locs.find(Base) != Locs.end();
+    return false;
 
-  // This a don't expand node.
-  if (!shouldExpand(*M, Base.getType(M))) {
-    return Locs.find(Base) != Locs.end();
+  // Don't expand if it would be too complex. As Locs is a list (and not a set)
+  // we want to avoid quadratic complexity in replaceInner().
+  // Usually Locs is small anyway, because we limit expansion to 6 members.
+  // But with deeply nested types we could run in a corner case where Locs is
+  // large.
+  if (!shouldExpand(*M, Base.getType(M)) || Locs.size() >= 8) {
+    return false;
   }
 
   // This is a leaf node.
-  LSLocationList NextLevel;
-  Base.getNextLevelLSLocations(NextLevel, M);
-  if (NextLevel.empty())
-    return Locs.find(Base) != Locs.end();
+  Base.getNextLevelLSLocations(SubLocations, M);
+  return !SubLocations.empty();
+}
 
-  // This is not a leaf node, try to find whether all its children are alive.
+/// Replaces \p SubLocations with \p Base in \p Locs if all sub-locations are
+/// alive, i.e. present in \p Locs.
+static bool
+replaceSubLocations(LSLocation Base, SILModule *M, LSLocationList &Locs,
+                    const LSLocationList &SubLocations) {
+  // Find whether all its children of Base are alive.
   bool Alive = true;
-  for (auto &X : NextLevel) {
-    Alive &= LSLocation::reduce(X, M, Locs);
+  for (auto &X : SubLocations) {
+    // Recurse into the next level.
+    LSLocationList NextInnerLevel;
+    if (getSubLocations(NextInnerLevel, X, M, Locs)) {
+      Alive &= replaceSubLocations(X, M, Locs, NextInnerLevel);
+    } else {
+      Alive &= is_contained(Locs, X);
+    }
   }
 
   // All next level locations are alive, create the new aggregated location.
-  if (Alive) {
-    for (auto &X : NextLevel)
-      Locs.erase(X);
-    Locs.insert(Base);
-  }
-  return Alive;
+  if (!Alive)
+    return false;
+
+  auto newEnd = std::remove_if(Locs.begin(), Locs.end(), [&](const LSLocation &L) {
+    return is_contained(SubLocations, L);
+  });
+  Locs.erase(newEnd, Locs.end());
+  Locs.push_back(Base);
+  return true;
+}
+
+void LSLocation::reduce(LSLocation Base, SILModule *M, LSLocationList &Locs) {
+  LSLocationList SubLocations;
+  if (getSubLocations(SubLocations, Base, M, Locs))
+    replaceSubLocations(Base, M, Locs, SubLocations);
 }
 
 void

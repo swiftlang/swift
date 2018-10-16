@@ -265,8 +265,8 @@ class Base24646184 {
   func foo(ok: SubTy) { }
 }
 class Derived24646184 : Base24646184 {
-  override init(_: Ty) { } // expected-note {{'init' previously overridden here}}
-  override init(_: SubTy) { } // expected-error {{'init' has already been overridden}}
+  override init(_: Ty) { } // expected-note {{'init(_:)' previously overridden here}}
+  override init(_: SubTy) { } // expected-error {{'init(_:)' has already been overridden}}
   override func foo(_: Ty) { } // expected-note {{'foo' previously overridden here}}
   override func foo(_: SubTy) { } // expected-error {{'foo' has already been overridden}}
 
@@ -276,6 +276,17 @@ class Derived24646184 : Base24646184 {
   override func foo(ok: SubTy) { }
 }
 
+
+// Subscripts
+
+class SubscriptBase {
+  subscript(a a: Int) -> Int { return a }
+}
+
+class SubscriptDerived : SubscriptBase {
+  override subscript(a: Int) -> Int { return a }
+  // expected-error@-1 {{argument labels for method 'subscript(_:)' do not match those of overridden method 'subscript(a:)'}}
+}
 
 // Generic subscripts
 

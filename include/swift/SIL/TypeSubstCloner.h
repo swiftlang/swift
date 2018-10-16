@@ -135,8 +135,8 @@ public:
   using SILClonerWithScopes<ImplClass>::getTypeInClonedContext;
   using SILClonerWithScopes<ImplClass>::getOpType;
   using SILClonerWithScopes<ImplClass>::getOpBasicBlock;
-  using SILClonerWithScopes<ImplClass>::doPostProcess;
-  using SILClonerWithScopes<ImplClass>::ValueMap;
+  using SILClonerWithScopes<ImplClass>::recordClonedInstruction;
+  using SILClonerWithScopes<ImplClass>::recordFoldedValue;
   using SILClonerWithScopes<ImplClass>::addBlockWithUnreachable;
   using SILClonerWithScopes<ImplClass>::OpenedArchetypesTracker;
 
@@ -193,7 +193,7 @@ protected:
                                  Helper.getArguments(), Inst->isNonThrowing(),
                                  GenericSpecializationInformation::create(
                                    Inst, getBuilder()));
-    doPostProcess(Inst, N);
+    recordClonedInstruction(Inst, N);
   }
 
   void visitTryApplyInst(TryApplyInst *Inst) {
@@ -205,7 +205,7 @@ protected:
         getOpBasicBlock(Inst->getErrorBB()),
         GenericSpecializationInformation::create(
           Inst, getBuilder()));
-    doPostProcess(Inst, N);
+    recordClonedInstruction(Inst, N);
   }
 
   void visitPartialApplyInst(PartialApplyInst *Inst) {
@@ -217,7 +217,7 @@ protected:
         Helper.getSubstitutions(), Helper.getArguments(), ParamConvention,
         GenericSpecializationInformation::create(
           Inst, getBuilder()));
-    doPostProcess(Inst, N);
+    recordClonedInstruction(Inst, N);
   }
 
   /// Attempt to simplify a conditional checked cast.
@@ -258,7 +258,7 @@ protected:
     // there is no need for an upcast and we can just use the operand.
     if (getOpType(Upcast->getType()) ==
         getOpValue(Upcast->getOperand())->getType()) {
-      ValueMap.insert({SILValue(Upcast), getOpValue(Upcast->getOperand())});
+      recordFoldedValue(SILValue(Upcast), getOpValue(Upcast->getOperand()));
       return;
     }
     super::visitUpcastInst(Upcast);
@@ -268,7 +268,7 @@ protected:
     // If the substituted type is trivial, ignore the copy.
     SILType copyTy = getOpType(Copy->getType());
     if (copyTy.isTrivial(Copy->getModule())) {
-      ValueMap.insert({SILValue(Copy), getOpValue(Copy->getOperand())});
+      recordFoldedValue(SILValue(Copy), getOpValue(Copy->getOperand()));
       return;
     }
     super::visitCopyValueInst(Copy);
@@ -297,12 +297,15 @@ protected:
     if (SubsMap.empty())
       return false;
 
-    for (auto ParamType : Sig->getSubstitutableParams()) {
+    bool Result = false;
+    Sig->forEachParam([&](GenericTypeParamType *ParamType, bool Canonical) {
+      if (!Canonical)
+        return;
       if (!Type(ParamType).subst(SubsMap)->isEqual(ParamType))
-        return true;
-    }
+        Result = true;
+    });
 
-    return false;
+    return Result;
   }
 
   enum { ForInlining = true };

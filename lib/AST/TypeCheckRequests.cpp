@@ -389,6 +389,7 @@ Optional<Requirement> RequirementRequest::getCachedResult() const {
     return Requirement(RequirementKind::Layout, reqRepr.getSubject(),
                        reqRepr.getLayoutConstraint());
   }
+  llvm_unreachable("unhandled kind");
 }
 
 void RequirementRequest::cacheResult(Requirement value) const {

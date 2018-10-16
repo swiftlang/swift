@@ -179,15 +179,15 @@ extension SCNGeometryElement {
 extension SCNGeometrySource {
   @nonobjc
   public convenience init(vertices: [SCNVector3]) {
-    self.init(vertices: UnsafePointer(vertices), count: vertices.count)
+    self.init(vertices: vertices, count: vertices.count)
   }
   @nonobjc
   public convenience init(normals: [SCNVector3]) {
-    self.init(normals: UnsafePointer(normals), count: normals.count)
+    self.init(normals: normals, count: normals.count)
   }
   @nonobjc
   public convenience init(textureCoordinates: [CGPoint]) {
-    self.init(textureCoordinates: UnsafePointer(textureCoordinates), count: textureCoordinates.count)
+    self.init(textureCoordinates: textureCoordinates, count: textureCoordinates.count)
   }
 }
 

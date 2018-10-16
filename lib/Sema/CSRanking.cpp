@@ -357,13 +357,13 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
 
 /// Retrieve the adjusted parameter type for overloading purposes.
 static Type getAdjustedParamType(const AnyFunctionType::Param &param) {
-  if (auto funcTy = param.getType()->getAs<FunctionType>()) {
+  if (auto funcTy = param.getOldType()->getAs<FunctionType>()) {
     if (funcTy->isAutoClosure()) {
       return funcTy->getResult();
     }
   }
 
-  return param.getType();
+  return param.getOldType();
 }
 
 // Is a particular parameter of a function or subscript declaration
@@ -471,10 +471,10 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       //    }
       //
       if (tc.Context.isSwiftVersionAtLeast(5) && !isDynamicOverloadComparison) {
-        auto *proto1 = dyn_cast<ProtocolDecl>(outerDC1);
-        auto *proto2 = dyn_cast<ProtocolDecl>(outerDC2);
-        if (proto1 != proto2)
-          return proto2;
+        auto inProto1 = isa<ProtocolDecl>(outerDC1);
+        auto inProto2 = isa<ProtocolDecl>(outerDC2);
+        if (inProto1 != inProto2)
+          return inProto2;
       }
 
       Type type1 = decl1->getInterfaceType();
@@ -646,8 +646,8 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         // If they both have trailing closures, compare those separately.
         bool compareTrailingClosureParamsSeparately = false;
         if (numParams1 > 0 && numParams2 > 0 &&
-            params1.back().getType()->is<AnyFunctionType>() &&
-            params2.back().getType()->is<AnyFunctionType>()) {
+            params1.back().getOldType()->is<AnyFunctionType>() &&
+            params2.back().getOldType()->is<AnyFunctionType>()) {
           compareTrailingClosureParamsSeparately = true;
         }
 
@@ -1062,8 +1062,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         auto params = fnTy->getParams();
         assert(params.size() == 2);
 
-        auto param1 = params[0].getType();
-        auto param2 = params[1].getType()->castTo<AnyFunctionType>();
+        auto param1 = params[0].getOldType();
+        auto param2 = params[1].getOldType()->castTo<AnyFunctionType>();
 
         assert(param1->getOptionalObjectType());
         assert(param2->isAutoClosure());
@@ -1463,7 +1463,7 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {
 }
 
 InputMatcher::InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
-                           const llvm::SmallBitVector &defaultValueMap)
+                           const SmallBitVector &defaultValueMap)
     : NumSkippedParameters(0), DefaultValueMap(defaultValueMap),
       Params(params) {}
 

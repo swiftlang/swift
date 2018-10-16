@@ -108,7 +108,7 @@ bool SubstitutionMap::hasAnySubstitutableParams() const {
 }
 
 bool SubstitutionMap::hasArchetypes() const {
-  for (Type replacementTy : getReplacementTypes()) {
+  for (Type replacementTy : getReplacementTypesBuffer()) {
     if (replacementTy && replacementTy->hasArchetype())
       return true;
   }
@@ -116,7 +116,7 @@ bool SubstitutionMap::hasArchetypes() const {
 }
 
 bool SubstitutionMap::hasOpenedExistential() const {
-  for (Type replacementTy : getReplacementTypes()) {
+  for (Type replacementTy : getReplacementTypesBuffer()) {
     if (replacementTy && replacementTy->hasOpenedExistential())
       return true;
   }
@@ -124,7 +124,7 @@ bool SubstitutionMap::hasOpenedExistential() const {
 }
 
 bool SubstitutionMap::hasDynamicSelf() const {
-  for (Type replacementTy : getReplacementTypes()) {
+  for (Type replacementTy : getReplacementTypesBuffer()) {
     if (replacementTy && replacementTy->hasDynamicSelfType())
       return true;
   }
@@ -136,7 +136,7 @@ bool SubstitutionMap::isCanonical() const {
 
   if (!getGenericSignature()->isCanonical()) return false;
 
-  for (Type replacementTy : getReplacementTypes()) {
+  for (Type replacementTy : getReplacementTypesBuffer()) {
     if (replacementTy && !replacementTy->isCanonical())
       return false;
   }
@@ -154,7 +154,7 @@ SubstitutionMap SubstitutionMap::getCanonical() const {
 
   auto canonicalSig = getGenericSignature()->getCanonicalSignature();
   SmallVector<Type, 4> replacementTypes;
-  for (Type replacementType : getReplacementTypes()) {
+  for (Type replacementType : getReplacementTypesBuffer()) {
     if (replacementType)
       replacementTypes.push_back(replacementType->getCanonicalType());
     else
@@ -200,18 +200,19 @@ SubstitutionMap SubstitutionMap::get(GenericSignature *genericSig,
   // Form the replacement types.
   SmallVector<Type, 4> replacementTypes;
   replacementTypes.reserve(genericSig->getGenericParams().size());
-  for (auto gp : genericSig->getGenericParams()) {
+
+  genericSig->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
     // Don't eagerly form replacements for non-canonical generic parameters.
-    if (!genericSig->isCanonicalTypeInContext(gp->getCanonicalType())) {
+    if (!canonical) {
       replacementTypes.push_back(Type());
-      continue;
+      return;
     }
 
     // Record the replacement.
     Type replacement = Type(gp).subst(subs, lookupConformance,
                                       SubstFlags::UseErrorType);
     replacementTypes.push_back(replacement);
-  }
+  });
 
   // Form the stored conformances.
   SmallVector<ProtocolConformanceRef, 4> conformances;
@@ -318,6 +319,20 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   if (!type->isTypeParameter())
     return None;
 
+  auto genericSig = getGenericSignature();
+
+  // Fast path
+  unsigned index = 0;
+  for (auto reqt : genericSig->getRequirements()) {
+    if (reqt.getKind() == RequirementKind::Conformance) {
+      if (reqt.getFirstType()->isEqual(type) &&
+          reqt.getSecondType()->isEqual(proto->getDeclaredType()))
+        return getConformances()[index];
+
+      index++;
+    }
+  }
+
   // Retrieve the starting conformance from the conformance map.
   auto getInitialConformance =
     [&](Type type, ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
@@ -337,8 +352,6 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
       return None;
     };
-
-  auto genericSig = getGenericSignature();
 
   // If the type doesn't conform to this protocol, the result isn't formed
   // from these requirements.
@@ -512,7 +525,7 @@ SubstitutionMap::getOverrideSubstitutions(
   // For overrides within a protocol hierarchy, substitute the Self type.
   if (auto baseProto = baseDecl->getDeclContext()->getSelfProtocolDecl()) {
     if (auto derivedProtoSelf =
-          derivedDecl->getDeclContext()->getProtocolSelfType()) {
+          derivedDecl->getDeclContext()->getSelfInterfaceType()) {
       return SubstitutionMap::getProtocolSubstitutions(
                                              baseProto,
                                              derivedProtoSelf,

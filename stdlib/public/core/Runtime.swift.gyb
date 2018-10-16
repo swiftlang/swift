@@ -478,17 +478,21 @@ internal func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
 }
 
 #if _runtime(_ObjC)
-// At runtime, these classes are derived from `_SwiftNativeNSXXXBase`,
+// At runtime, these classes are derived from `__SwiftNativeNSXXXBase`,
 // which are derived from `NSXXX`.
 //
 // The @swift_native_objc_runtime_base attribute
 // allows us to subclass an Objective-C class and still use the fast Swift
 // memory allocator.
+//
+// NOTE: older runtimes called these _SwiftNativeNSXXX. The two must
+// coexist, so they were renamed. The old names must not be used in the
+// new runtime.
 
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
-@objc @_swift_native_objc_runtime_base(_SwiftNativeNSArrayBase)
-internal class _SwiftNativeNSArray {
+@objc @_swift_native_objc_runtime_base(__SwiftNativeNSArrayBase)
+internal class __SwiftNativeNSArray {
   @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal init() {}
@@ -498,8 +502,8 @@ internal class _SwiftNativeNSArray {
 
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
-@objc @_swift_native_objc_runtime_base(_SwiftNativeNSDictionaryBase)
-internal class _SwiftNativeNSDictionary {
+@objc @_swift_native_objc_runtime_base(__SwiftNativeNSDictionaryBase)
+internal class __SwiftNativeNSDictionary {
   @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal init() {}
@@ -509,8 +513,8 @@ internal class _SwiftNativeNSDictionary {
 
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
-@objc @_swift_native_objc_runtime_base(_SwiftNativeNSSetBase)
-internal class _SwiftNativeNSSet {
+@objc @_swift_native_objc_runtime_base(__SwiftNativeNSSetBase)
+internal class __SwiftNativeNSSet {
   @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal init() {}
@@ -520,8 +524,8 @@ internal class _SwiftNativeNSSet {
 
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
-@objc @_swift_native_objc_runtime_base(_SwiftNativeNSEnumeratorBase)
-internal class _SwiftNativeNSEnumerator {
+@objc @_swift_native_objc_runtime_base(__SwiftNativeNSEnumeratorBase)
+internal class __SwiftNativeNSEnumerator {
   @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal init() {}
@@ -531,8 +535,8 @@ internal class _SwiftNativeNSEnumerator {
 
 // FIXME(ABI)#60 : move into the Foundation overlay and remove 'open'
 @_fixed_layout // FIXME(sil-serialize-all)
-@objc @_swift_native_objc_runtime_base(_SwiftNativeNSDataBase)
-open class _SwiftNativeNSData {
+@objc @_swift_native_objc_runtime_base(__SwiftNativeNSDataBase)
+open class __SwiftNativeNSData {
   @inlinable // FIXME(sil-serialize-all)
   @objc public init() {}
   @inlinable // FIXME(sil-serialize-all)
@@ -544,7 +548,7 @@ open class _SwiftNativeNSData {
 //===----------------------------------------------------------------------===//
 
 @objc
-internal class _stdlib_ReturnAutoreleasedDummy {
+internal class __stdlib_ReturnAutoreleasedDummy {
   @objc
   internal init() {}
 
@@ -572,7 +576,7 @@ public func _stdlib_initializeReturnAutoreleased() {
 #if arch(x86_64)
   // On x86_64 it is sufficient to perform one cycle of return-autoreleased
   // call sequence in order to initialize all required PLT entries.
-  let dummy = _stdlib_ReturnAutoreleasedDummy()
+  let dummy = __stdlib_ReturnAutoreleasedDummy()
   _ = dummy.returnsAutoreleased(dummy)
 #endif
 }
@@ -580,7 +584,7 @@ public func _stdlib_initializeReturnAutoreleased() {
 
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
-internal class _SwiftNativeNSArray {
+internal class __SwiftNativeNSArray {
   @inlinable // FIXME(sil-serialize-all)
   internal init() {}
   @inlinable // FIXME(sil-serialize-all)
@@ -588,7 +592,7 @@ internal class _SwiftNativeNSArray {
 }
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
-internal class _SwiftNativeNSDictionary {
+internal class __SwiftNativeNSDictionary {
   @inlinable // FIXME(sil-serialize-all)
   internal init() {}
   @inlinable // FIXME(sil-serialize-all)
@@ -596,7 +600,7 @@ internal class _SwiftNativeNSDictionary {
 }
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
-internal class _SwiftNativeNSSet {
+internal class __SwiftNativeNSSet {
   @inlinable // FIXME(sil-serialize-all)
   internal init() {}
   @inlinable // FIXME(sil-serialize-all)

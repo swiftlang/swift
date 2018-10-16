@@ -58,6 +58,7 @@ uint8_t WrapperTypeTraits<tok>::numericValue(const tok &Value) {
     case tok::NUM_TOKENS:
       llvm_unreachable("Should not get serialized in a syntax tree");
   }
+  llvm_unreachable("unhandled token");
 }
 } // namespace byteTree
 } // namespace swift

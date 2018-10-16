@@ -14,7 +14,7 @@ entry(%b : $Error):
   // CHECK: [[WITNESS:%.*]] = load {{.*}} [[OUT_WITNESS]]
   %o = open_existential_box %b : $Error to $*@opened("01234567-89AB-CDEF-0123-000000000000") Error
   %m = witness_method $@opened("01234567-89AB-CDEF-0123-000000000000") Error, #Error._code!getter.1, %o : $*@opened("01234567-89AB-CDEF-0123-000000000000") Error : $@convention(witness_method: Error) <Self: Error> (@in_guaranteed Self) -> Int
-  // CHECK: [[RESULT:%.*]] =  call swiftcc [[INT:i[0-9]+]] @"$Ss5ErrorP5_codeSivgTj"(%swift.opaque* noalias nocapture swiftself [[ADDR]], %swift.type* [[TYPE]], i8** [[WITNESS]])
+  // CHECK: [[RESULT:%.*]] =  call swiftcc [[INT:i[0-9]+]] @"$ss5ErrorP5_codeSivgTj"(%swift.opaque* noalias nocapture swiftself [[ADDR]], %swift.type* [[TYPE]], i8** [[WITNESS]])
   %c = apply %m<@opened("01234567-89AB-CDEF-0123-000000000000") Error>(%o) : $@convention(witness_method: Error) <Self: Error> (@in_guaranteed Self) -> Int
   // CHECK: ret [[INT]] [[RESULT]]
   return %c : $Int

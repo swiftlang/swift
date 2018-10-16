@@ -1,4 +1,4 @@
-//===--- SwiftNativeNSBase.swift - Test _SwiftNativeNS*Base classes -------===//
+//===--- SwiftNativeNSBase.swift - Test __SwiftNativeNS*Base classes -------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -46,26 +46,26 @@ SwiftNativeNSBaseTestSuite.test("UnwantedCdtors") {
   expectTrue(TestSwiftNativeNSBase_UnwantedCdtors())
 }
 
-SwiftNativeNSBaseTestSuite.test("_SwiftNativeNSArrayBase.retainCount") {
+SwiftNativeNSBaseTestSuite.test("__SwiftNativeNSArrayBase.retainCount") {
   let bridged = getBridgedNSArrayOfRefTypeVerbatimBridged()
-  assert(classChain(of: type(of: bridged)).contains("_SwiftNativeNSArrayBase"))
+  assert(classChain(of: type(of: bridged)).contains("__SwiftNativeNSArrayBase"))
   expectTrue(TestSwiftNativeNSBase_RetainCount(
       Unmanaged.passUnretained(bridged).toOpaque()))
   _fixLifetime(bridged)
 }
 
-SwiftNativeNSBaseTestSuite.test("_SwiftNativeNSDictionaryBase.retainCount") {
+SwiftNativeNSBaseTestSuite.test("__SwiftNativeNSDictionaryBase.retainCount") {
   let bridged = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
   assert(classChain(of: type(of: bridged))
-    .contains("_SwiftNativeNSDictionaryBase"))
+    .contains("__SwiftNativeNSDictionaryBase"))
   expectTrue(TestSwiftNativeNSBase_RetainCount(
       Unmanaged.passUnretained(bridged).toOpaque()))
   _fixLifetime(bridged)
 }
 
-SwiftNativeNSBaseTestSuite.test("_SwiftNativeNSSetBase.retainCount") {
+SwiftNativeNSBaseTestSuite.test("__SwiftNativeNSSetBase.retainCount") {
   let bridged = Set([10, 20, 30].map{ TestObjCKeyTy($0) })._bridgeToObjectiveC()
-  assert(classChain(of: type(of: bridged)).contains("_SwiftNativeNSSetBase"))
+  assert(classChain(of: type(of: bridged)).contains("__SwiftNativeNSSetBase"))
   expectTrue(TestSwiftNativeNSBase_RetainCount(
       Unmanaged.passUnretained(bridged).toOpaque()))
   _fixLifetime(bridged)

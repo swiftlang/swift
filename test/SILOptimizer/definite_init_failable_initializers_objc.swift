@@ -7,12 +7,12 @@
 }
 
 extension P3 {
-  // CHECK-LABEL: sil hidden @$S40definite_init_failable_initializers_objc2P3PAAE3p3axSgs5Int64V_tcfC : $@convention(method) <Self where Self : P3> (Int64, @thick Self.Type) -> @owned Optional<Self>
+  // CHECK-LABEL: sil hidden @$s40definite_init_failable_initializers_objc2P3PAAE3p3axSgs5Int64V_tcfC : $@convention(method) <Self where Self : P3> (Int64, @thick Self.Type) -> @owned Optional<Self>
   init!(p3a: Int64) {
     self.init(p3: p3a)! // unnecessary-but-correct '!'
   }
 
-  // CHECK-LABEL: sil hidden @$S40definite_init_failable_initializers_objc2P3PAAE3p3bxs5Int64V_tcfC : $@convention(method) <Self where Self : P3> (Int64, @thick Self.Type) -> @owned Self
+  // CHECK-LABEL: sil hidden @$s40definite_init_failable_initializers_objc2P3PAAE3p3bxs5Int64V_tcfC : $@convention(method) <Self where Self : P3> (Int64, @thick Self.Type) -> @owned Self
   init(p3b: Int64) {
     self.init(p3: p3b)! // necessary '!'
   }
@@ -29,7 +29,7 @@ class FakeNSObject {
 class Cat : FakeNSObject {
   let x: LifetimeTracked
 
-  // CHECK-LABEL: sil hidden @$S40definite_init_failable_initializers_objc3CatC1n5afterACSgSi_Sbtcfc : $@convention(method) (Int, Bool, @owned Cat) -> @owned Optional<Cat>
+  // CHECK-LABEL: sil hidden @$s40definite_init_failable_initializers_objc3CatC1n5afterACSgSi_Sbtcfc : $@convention(method) (Int, Bool, @owned Cat) -> @owned Optional<Cat>
   // CHECK: bb0(%0 : $Int, %1 : $Bool, %2 : $Cat):
     // CHECK-NEXT: [[SELF_BOX:%.*]] = alloc_stack $Cat
     // CHECK:      store %2 to [[SELF_BOX]] : $*Cat

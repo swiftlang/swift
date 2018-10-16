@@ -540,7 +540,7 @@ protocols as class-only protocols to get better runtime performance.
 
 ::
 
-  protocol Pingable : class { func ping() -> Int }
+  protocol Pingable : AnyObject { func ping() -> Int }
 
 .. https://developer.apple.com/library/ios/documentation/Swift/Conceptual/Swift_Programming_Language/Protocols.html
 

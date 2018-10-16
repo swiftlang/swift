@@ -20,6 +20,7 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/SIL/SILPrintContext.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILCoverageMap.h"
@@ -397,6 +398,7 @@ static StringRef getCastConsumptionKindName(CastConsumptionKind kind) {
   case CastConsumptionKind::TakeAlways: return "take_always";
   case CastConsumptionKind::TakeOnSuccess: return "take_on_success";
   case CastConsumptionKind::CopyOnSuccess: return "copy_on_success";
+  case CastConsumptionKind::BorrowAlways: return "borrow_always";
   }
   llvm_unreachable("bad cast consumption kind");
 }
@@ -2762,6 +2764,68 @@ static bool printAssociatedTypePath(llvm::raw_ostream &OS, CanType path) {
   }
 }
 
+void SILWitnessTable::Entry::print(llvm::raw_ostream &out, bool verbose,
+                                   const PrintOptions &options) const {
+  PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
+  out << "  ";
+  switch (getKind()) {
+  case WitnessKind::Invalid:
+    out << "no_default";
+    break;
+  case WitnessKind::Method: {
+    // method #declref: @function
+    auto &methodWitness = getMethodWitness();
+    out << "method ";
+    methodWitness.Requirement.print(out);
+    out << ": ";
+    QualifiedSILTypeOptions.CurrentModule =
+        methodWitness.Requirement.getDecl()
+            ->getDeclContext()
+            ->getParentModule();
+    methodWitness.Requirement.getDecl()->getInterfaceType().print(
+        out, QualifiedSILTypeOptions);
+    out << " : ";
+    if (methodWitness.Witness) {
+      methodWitness.Witness->printName(out);
+      out << "\t// "
+         << demangleSymbol(methodWitness.Witness->getName());
+    } else {
+      out << "nil";
+    }
+    break;
+  }
+  case WitnessKind::AssociatedType: {
+    // associated_type AssociatedTypeName: ConformingType
+    auto &assocWitness = getAssociatedTypeWitness();
+    out << "associated_type ";
+    out << assocWitness.Requirement->getName() << ": ";
+    assocWitness.Witness->print(out, options);
+    break;
+  }
+  case WitnessKind::AssociatedTypeProtocol: {
+    // associated_type_protocol (AssociatedTypeName: Protocol): <conformance>
+    auto &assocProtoWitness = getAssociatedTypeProtocolWitness();
+    out << "associated_type_protocol (";
+    (void) printAssociatedTypePath(out, assocProtoWitness.Requirement);
+    out << ": " << assocProtoWitness.Protocol->getName() << "): ";
+    if (assocProtoWitness.Witness.isConcrete())
+      assocProtoWitness.Witness.getConcrete()->printName(out, options);
+    else
+      out << "dependent";
+    break;
+  }
+  case WitnessKind::BaseProtocol: {
+    // base_protocol Protocol: <conformance>
+    auto &baseProtoWitness = getBaseProtocolWitness();
+    out << "base_protocol "
+        << baseProtoWitness.Requirement->getName() << ": ";
+    baseProtoWitness.Witness->printName(out, options);
+    break;
+  }
+  }
+  out << '\n';
+}
+
 void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   PrintOptions Options = PrintOptions::printSIL();
   PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
@@ -2782,62 +2846,7 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << " {\n";
   
   for (auto &witness : getEntries()) {
-    OS << "  ";
-    switch (witness.getKind()) {
-    case Invalid:
-      llvm_unreachable("invalid witness?!");
-    case Method: {
-      // method #declref: @function
-      auto &methodWitness = witness.getMethodWitness();
-      OS << "method ";
-      methodWitness.Requirement.print(OS);
-      OS << ": ";
-      QualifiedSILTypeOptions.CurrentModule =
-          methodWitness.Requirement.getDecl()
-              ->getDeclContext()
-              ->getParentModule();
-      methodWitness.Requirement.getDecl()->getInterfaceType().print(
-          OS, QualifiedSILTypeOptions);
-      OS << " : ";
-      if (methodWitness.Witness) {
-        methodWitness.Witness->printName(OS);
-        OS << "\t// "
-           << demangleSymbol(methodWitness.Witness->getName());
-      } else {
-        OS << "nil";
-      }
-      break;
-    }
-    case AssociatedType: {
-      // associated_type AssociatedTypeName: ConformingType
-      auto &assocWitness = witness.getAssociatedTypeWitness();
-      OS << "associated_type ";
-      OS << assocWitness.Requirement->getName() << ": ";
-      assocWitness.Witness->print(OS, Options);
-      break;
-    }
-    case AssociatedTypeProtocol: {
-      // associated_type_protocol (AssociatedTypeName: Protocol): <conformance>
-      auto &assocProtoWitness = witness.getAssociatedTypeProtocolWitness();
-      OS << "associated_type_protocol (";
-      (void) printAssociatedTypePath(OS, assocProtoWitness.Requirement);
-      OS << ": " << assocProtoWitness.Protocol->getName() << "): ";
-      if (assocProtoWitness.Witness.isConcrete())
-        assocProtoWitness.Witness.getConcrete()->printName(OS, Options);
-      else
-        OS << "dependent";
-      break;
-    }
-    case BaseProtocol: {
-      // base_protocol Protocol: <conformance>
-      auto &baseProtoWitness = witness.getBaseProtocolWitness();
-      OS << "base_protocol "
-         << baseProtoWitness.Requirement->getName() << ": ";
-      baseProtoWitness.Witness->printName(OS, Options);
-      break;
-    }
-    }
-    OS << '\n';
+    witness.print(OS, Verbose, Options);
   }
 
   for (auto conditionalConformance : getConditionalConformances()) {
@@ -2869,25 +2878,11 @@ void SILDefaultWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   printLinkage(OS, getLinkage(), ForDefinition);
   OS << getProtocol()->getName() << " {\n";
   
-  for (auto &witness : getEntries()) {
-    if (!witness.isValid()) {
-      OS << "  no_default\n";
-      continue;
-    }
+  PrintOptions options = PrintOptions::printSIL();
+  options.GenericEnv = Protocol->getGenericEnvironmentOfContext();
 
-    // method #declref: @function
-    OS << "  method ";
-    witness.getRequirement().print(OS);
-    OS << ": ";
-    QualifiedSILTypeOptions.CurrentModule =
-        witness.getRequirement().getDecl()->getDeclContext()->getParentModule();
-    witness.getRequirement().getDecl()->getInterfaceType().print(
-        OS, QualifiedSILTypeOptions);
-    OS << " : ";
-    witness.getWitness()->printName(OS);
-    OS << "\t// "
-       << Demangle::demangleSymbolAsString(witness.getWitness()->getName());
-    OS << '\n';
+  for (auto &witness : getEntries()) {
+    witness.print(OS, Verbose, options);
   }
   
   OS << "}\n\n";

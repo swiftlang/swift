@@ -365,6 +365,10 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   setAccess(AccessLevel::Public);
 }
 
+bool ModuleDecl::isClangModule() const {
+  return findUnderlyingClangModule() != nullptr;
+}
+
 void ModuleDecl::addFile(FileUnit &newFile) {
   // Require Main and REPL files to be the first file added.
   assert(Files.empty() ||
@@ -541,6 +545,20 @@ void ModuleDecl::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
 
 void SourceFile::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   Results.append(Decls.begin(), Decls.end());
+}
+
+void ModuleDecl::getPrecedenceGroups(
+       SmallVectorImpl<PrecedenceGroupDecl*> &Results) const {
+  FORWARD(getPrecedenceGroups, (Results));
+}
+
+void SourceFile::getPrecedenceGroups(
+       SmallVectorImpl<PrecedenceGroupDecl*> &Results) const {
+  for (auto pair : PrecedenceGroups) {
+    if (pair.second.getPointer() && pair.second.getInt()) {
+      Results.push_back(pair.second.getPointer());
+    }
+  }
 }
 
 void SourceFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
@@ -774,16 +792,16 @@ struct SourceFile::SourceFileSyntaxInfo {
 };
 
 bool SourceFile::hasSyntaxRoot() const {
-  return SyntaxInfo.SyntaxRoot.hasValue();
+  return SyntaxInfo->SyntaxRoot.hasValue();
 }
 
 syntax::SourceFileSyntax SourceFile::getSyntaxRoot() const {
   assert(hasSyntaxRoot() && "no syntax root is set.");
-  return *SyntaxInfo.SyntaxRoot;
+  return *SyntaxInfo->SyntaxRoot;
 }
 
 void SourceFile::setSyntaxRoot(syntax::SourceFileSyntax &&Root) {
-  SyntaxInfo.SyntaxRoot.emplace(Root);
+  SyntaxInfo->SyntaxRoot.emplace(Root);
 }
 
 template<typename OP_DECL>
@@ -1305,6 +1323,12 @@ SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
     if (next->getName() == getParentModule()->getName())
       return true;
 
+    // Hack: Assume other REPL files already have their libraries linked.
+    if (!next->getFiles().empty())
+      if (auto *nextSource = dyn_cast<SourceFile>(next->getFiles().front()))
+        if (nextSource->Kind == SourceFileKind::REPL)
+          return true;
+
     next->collectLinkLibraries(callback);
     return true;
   });
@@ -1431,7 +1455,7 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        bool KeepParsedTokens, bool BuildSyntaxTree)
   : FileUnit(FileUnitKind::Source, M),
     BufferID(bufferID ? *bufferID : -1),
-    Kind(K), SyntaxInfo(*new SourceFileSyntaxInfo(BuildSyntaxTree)) {
+    Kind(K), SyntaxInfo(new SourceFileSyntaxInfo(BuildSyntaxTree)) {
   M.getASTContext().addDestructorCleanup(*this);
   performAutoImport(*this, ModImpKind);
 
@@ -1444,8 +1468,6 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
     AllCorrectedTokens = std::vector<Token>();
   }
 }
-
-SourceFile::~SourceFile() { delete &SyntaxInfo; }
 
 std::vector<Token> &SourceFile::getTokenVector() {
   assert(shouldCollectToken() && "Disabled");
@@ -1467,6 +1489,7 @@ bool SourceFile::shouldCollectToken() const {
   case SourceFileKind::SIL:
     return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool SourceFile::shouldBuildSyntaxTree() const {
@@ -1474,11 +1497,12 @@ bool SourceFile::shouldBuildSyntaxTree() const {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
   case SourceFileKind::Interface:
-    return SyntaxInfo.Enable;
+    return SyntaxInfo->Enable;
   case SourceFileKind::REPL:
   case SourceFileKind::SIL:
     return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool FileUnit::walk(ASTWalker &walker) {
@@ -1628,6 +1652,13 @@ const ModuleDecl* ModuleEntity::getAsSwiftModule() const {
   if (auto SwiftMod = Mod.dyn_cast<const ModuleDecl*>())
     return SwiftMod;
   return nullptr;
+}
+
+const clang::Module* ModuleEntity::getAsClangModule() const {
+  assert(!Mod.isNull());
+  if (Mod.is<const ModuleDecl*>())
+    return nullptr;
+  return getClangModule(Mod);
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing SourceFiles, is

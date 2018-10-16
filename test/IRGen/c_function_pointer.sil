@@ -19,12 +19,12 @@ entry(%f : $@convention(c) () -> ()):
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @c_function_pointer_metadata()
 sil @c_function_pointer_metadata : $@convention(thin) () -> @thick Any.Type {
 entry:
-  // CHECK: call swiftcc %swift.metadata_response @"$SyyXCMa"([[INT]] 0)
+  // CHECK: call swiftcc %swift.metadata_response @"$syyXCMa"([[INT]] 0)
   %m = metatype $@thick (@convention(c) () -> ()).Type
   %a = init_existential_metatype %m : $@thick (@convention(c) () -> ()).Type, $@thick Any.Type
   return %a : $@thick Any.Type
 }
 
-// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SyyXCMa"(
+// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$syyXCMa"(
 // --                                                                               0x3000001 -- C convention, 1 argument
-// CHECK: call %swift.type* @swift_getFunctionTypeMetadata0([[WORD:i(32|64)]] 196608, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$SytN", i32 0, i32 1))
+// CHECK: call %swift.type* @swift_getFunctionTypeMetadata0([[WORD:i(32|64)]] 196608, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sytN", i32 0, i32 1))

@@ -226,7 +226,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   }
   
   @usableFromInline
-  internal final func projectReadOnly(from root: Root) -> Value {
+  internal final func _projectReadOnly(from root: Root) -> Value {
     // TODO: For perf, we could use a local growable buffer instead of Any
     var curBase: Any = root
     return withBuffer {
@@ -241,7 +241,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
         
         func project<CurValue>(_ base: CurValue) -> Value? {
           func project2<NewValue>(_: NewValue.Type) -> Value? {
-            switch rawComponent.projectReadOnly(base,
+            switch rawComponent._projectReadOnly(base,
               to: NewValue.self, endingWith: Value.self) {
             case .continue(let newBase):
               if isLast {
@@ -281,7 +281,7 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
   // `base` is assumed to be undergoing a formal access for the duration of the
   // call, so must not be mutated by an alias
   @usableFromInline
-  internal func projectMutableAddress(from base: UnsafePointer<Root>)
+  internal func _projectMutableAddress(from base: UnsafePointer<Root>)
       -> (pointer: UnsafeMutablePointer<Value>, owner: AnyObject?) {
     var p = UnsafeRawPointer(base)
     var type: Any.Type = Root.self
@@ -306,7 +306,7 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
         
         func project<CurValue>(_: CurValue.Type) {
           func project2<NewValue>(_: NewValue.Type) {
-            p = rawComponent.projectMutableAddress(p,
+            p = rawComponent._projectMutableAddress(p,
                                            from: CurValue.self,
                                            to: NewValue.self,
                                            isRoot: p == UnsafeRawPointer(base),
@@ -329,16 +329,6 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
   }
 }
 
-extension WritableKeyPath where Root == Value {
-  // FIXME: Replace with proper surface syntax
-
-  /// Returns an identity key path that references the entire input value.
-  @inlinable
-  public static var _identity: WritableKeyPath<Root, Root> {
-    return Builtin.identityKeyPath()
-  }
-}
-
 /// A key path that supports reading from and writing to the resulting value
 /// with reference semantics.
 public class ReferenceWritableKeyPath<
@@ -348,16 +338,16 @@ public class ReferenceWritableKeyPath<
 
   internal final override class var kind: Kind { return .reference }
   
-  internal final override func projectMutableAddress(
+  internal final override func _projectMutableAddress(
     from base: UnsafePointer<Root>
   ) -> (pointer: UnsafeMutablePointer<Value>, owner: AnyObject?) {
     // Since we're a ReferenceWritableKeyPath, we know we don't mutate the base
     // in practice.
-    return projectMutableAddress(from: base.pointee)
+    return _projectMutableAddress(from: base.pointee)
   }
   
   @usableFromInline
-  internal final func projectMutableAddress(from origBase: Root)
+  internal final func _projectMutableAddress(from origBase: Root)
       -> (pointer: UnsafeMutablePointer<Value>, owner: AnyObject?) {
     var keepAlive: AnyObject?
     var address: UnsafeMutablePointer<Value> = withBuffer {
@@ -372,7 +362,7 @@ public class ReferenceWritableKeyPath<
         
         func project<NewValue>(_: NewValue.Type) -> Any {
           func project2<CurValue>(_ base: CurValue) -> Any {
-            return rawComponent.projectReadOnly(
+            return rawComponent._projectReadOnly(
               base, to: NewValue.self, endingWith: Value.self)
               .assumingContinue
           }
@@ -394,7 +384,7 @@ public class ReferenceWritableKeyPath<
             let nextType = optNextType ?? Value.self
             func project<CurValue>(_: CurValue.Type) {
               func project2<NewValue>(_: NewValue.Type) {
-                p = rawComponent.projectMutableAddress(p,
+                p = rawComponent._projectMutableAddress(p,
                                              from: CurValue.self,
                                              to: NewValue.self,
                                              isRoot: p == baseBytes.baseAddress,
@@ -1315,7 +1305,7 @@ internal struct RawKeyPathComponent {
     }
   }
 
-  internal func projectReadOnly<CurValue, NewValue, LeafValue>(
+  internal func _projectReadOnly<CurValue, NewValue, LeafValue>(
     _ base: CurValue,
     to: NewValue.Type,
     endingWith: LeafValue.Type
@@ -1384,7 +1374,7 @@ internal struct RawKeyPathComponent {
     }
   }
 
-  internal func projectMutableAddress<CurValue, NewValue>(
+  internal func _projectMutableAddress<CurValue, NewValue>(
     _ base: UnsafeRawPointer,
     from _: CurValue.Type,
     to _: NewValue.Type,
@@ -1663,7 +1653,7 @@ func _projectKeyPathReadOnly<Root, Value>(
   root: Root,
   keyPath: KeyPath<Root, Value>
 ) -> Value {
-  return keyPath.projectReadOnly(from: root)
+  return keyPath._projectReadOnly(from: root)
 }
 
 @inlinable
@@ -1672,7 +1662,7 @@ func _projectKeyPathWritable<Root, Value>(
   root: UnsafeMutablePointer<Root>,
   keyPath: WritableKeyPath<Root, Value>
 ) -> (UnsafeMutablePointer<Value>, AnyObject?) {
-  return keyPath.projectMutableAddress(from: root)
+  return keyPath._projectMutableAddress(from: root)
 }
 
 @inlinable
@@ -1681,7 +1671,7 @@ func _projectKeyPathReferenceWritable<Root, Value>(
   root: Root,
   keyPath: ReferenceWritableKeyPath<Root, Value>
 ) -> (UnsafeMutablePointer<Value>, AnyObject?) {
-  return keyPath.projectMutableAddress(from: root)
+  return keyPath._projectMutableAddress(from: root)
 }
 
 // MARK: Appending type system
@@ -1987,8 +1977,8 @@ internal func _appendingKeyPaths<
 
       if let rootPtr = root._kvcKeyPathStringPtr,
          let leafPtr = leaf._kvcKeyPathStringPtr {
-        rootKVCLength = Int(_stdlib_strlen(rootPtr))
-        leafKVCLength = Int(_stdlib_strlen(leafPtr))
+        rootKVCLength = Int(_swift_stdlib_strlen(rootPtr))
+        leafKVCLength = Int(_swift_stdlib_strlen(leafPtr))
         // root + "." + leaf
         appendedKVCLength = rootKVCLength + 1 + leafKVCLength
       } else {

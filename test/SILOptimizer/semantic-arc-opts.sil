@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-sil-ownership -semantic-arc-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -enable-sil-ownership -semantic-arc-opts %s | %FileCheck %s
 
 sil_stage canonical
 

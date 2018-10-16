@@ -8,12 +8,12 @@ import Swift
 
 // CHECK-LABEL: sil @main
 // CHECK: bb0({{.*}}):
-// CHECK: function_ref @$Ss9ContainerVAByxGycfCBi32__Tg5{{.*}}
-// CHECK: function_ref @$Ss9ContainerV11doSomethingyyFBi32__Tg5{{.*}} 
+// CHECK: function_ref @$ss9ContainerVAByxGycfCBi32__Tg5{{.*}}
+// CHECK: function_ref @$ss9ContainerV11doSomethingyyFBi32__Tg5{{.*}} 
 
-// CHECK-LABEL: sil shared [noinline] @$Ss9ContainerVAByxGycfCBi32__Tg5Tf4d_n
+// CHECK-LABEL: sil shared [noinline] @$ss9ContainerVAByxGycfCBi32__Tg5Tf4d_n
 
-// CHECK-LABEL: sil shared [noinline] @$Ss9ContainerV11doSomethingyyFBi32__Tg5Tf4d_n
+// CHECK-LABEL: sil shared [noinline] @$ss9ContainerV11doSomethingyyFBi32__Tg5Tf4d_n
 
 var c = Container<Int>()
 c.doSomething()

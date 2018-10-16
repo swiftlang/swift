@@ -107,15 +107,15 @@ public func bar(_ x: Int64) -> Int64 {
   return ret
 }
 
-// SIL-LABEL: sil @$S18pgo_si_inlinelarge3fooyys5Int64VF : $@convention(thin) (Int64) -> () !function_entry_count(1) {
-// SIL-OPT-LABEL: sil @$S18pgo_si_inlinelarge3fooyys5Int64VF : $@convention(thin) (Int64) -> () !function_entry_count(1) {
+// SIL-LABEL: sil @$s18pgo_si_inlinelarge3fooyys5Int64VF : $@convention(thin) (Int64) -> () !function_entry_count(1) {
+// SIL-OPT-LABEL: sil @$s18pgo_si_inlinelarge3fooyys5Int64VF : $@convention(thin) (Int64) -> () !function_entry_count(1) {
 public func foo(_ x: Int64) {
   // SIL: switch_enum {{.*}} : $Optional<Int64>, case #Optional.some!enumelt.1: {{.*}} !case_count(100), case #Optional.none!enumelt: {{.*}} !case_count(1)
   // SIL: cond_br {{.*}}, {{.*}}, {{.*}} !true_count(50)
   // SIL: cond_br {{.*}}, {{.*}}, {{.*}} !true_count(1)
   // SIL-OPT: integer_literal $Builtin.Int64, 93
   // SIL-OPT: integer_literal $Builtin.Int64, 42
-  // SIL-OPT: function_ref @$S18pgo_si_inlinelarge3barys5Int64VADF : $@convention(thin) (Int64) -> Int64
+  // SIL-OPT: function_ref @$s18pgo_si_inlinelarge3barys5Int64VADF : $@convention(thin) (Int64) -> Int64
 
   var sum : Int64 = 0
   for index in 1...x {
@@ -129,7 +129,7 @@ public func foo(_ x: Int64) {
   }
   print(sum)
 }
-// SIL-LABEL: } // end sil function '$S18pgo_si_inlinelarge3fooyys5Int64VF'
-// SIL-OPT-LABEL: } // end sil function '$S18pgo_si_inlinelarge3fooyys5Int64VF'
+// SIL-LABEL: } // end sil function '$s18pgo_si_inlinelarge3fooyys5Int64VF'
+// SIL-OPT-LABEL: } // end sil function '$s18pgo_si_inlinelarge3fooyys5Int64VF'
 
 foo(100)

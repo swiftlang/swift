@@ -5,7 +5,7 @@ import Swift
 
 sil @simple_partial_apply_fun : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
 
-// CHECK-LABEL: sil shared @$S27simple_partial_apply_caller0a1_b1_C4_funBi1_Tf1c_n : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
+// CHECK-LABEL: sil shared @$s27simple_partial_apply_caller0a1_b1_C4_funBi1_Tf1c_n : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
 // CHECK: bb0([[CAPTURED_ARG:%.*]] : $Builtin.Int1):
 // CHECK: [[CLOSED_OVER_FUN:%.*]] = function_ref @simple_partial_apply_fun :
 // CHECK: [[NEW_PAI:%.*]] = partial_apply [[CLOSED_OVER_FUN]]
@@ -26,9 +26,9 @@ bb2:
   return %2 : $Builtin.Int1
 }
 
-// CHECK-LABEL: sil shared @$S37simple_partial_apply_2nd_level_caller0a1_b1_C4_funBi1_Tf1c_n : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
+// CHECK-LABEL: sil shared @$s37simple_partial_apply_2nd_level_caller0a1_b1_C4_funBi1_Tf1c_n : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
 // CHECK: bb0([[CAPTURED_ARG:%.*]] : $Builtin.Int1):
-// CHECK: [[SPECIALIZED_CALLEE:%.*]] = function_ref @$S27simple_partial_apply_caller0a1_b1_C4_funBi1_Tf1c_n  :
+// CHECK: [[SPECIALIZED_CALLEE:%.*]] = function_ref @$s27simple_partial_apply_caller0a1_b1_C4_funBi1_Tf1c_n  :
 // CHECK: [[RET:%.*]]= apply [[SPECIALIZED_CALLEE]]([[CAPTURED_ARG]])
 // CHECK: return [[RET]]
 sil @simple_partial_apply_2nd_level_caller : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1 {
@@ -194,8 +194,8 @@ bb2:
 }
 
 // CHECK-LABEL: sil @loop_driver : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> () {
-// CHECK-DAG: [[SPECIALIZED_FUN:%.*]] = function_ref @$S27simple_partial_apply_caller0a1_b1_C4_funBi1_Tf1c_n : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
-// CHECK-DAG: [[SPECIALIZED_FUN2:%.*]] = function_ref @$S37simple_partial_apply_2nd_level_caller0a1_b1_C4_funBi1_Tf1c_n : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+// CHECK-DAG: [[SPECIALIZED_FUN:%.*]] = function_ref @$s27simple_partial_apply_caller0a1_b1_C4_funBi1_Tf1c_n : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+// CHECK-DAG: [[SPECIALIZED_FUN2:%.*]] = function_ref @$s37simple_partial_apply_2nd_level_caller0a1_b1_C4_funBi1_Tf1c_n : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
 // CHECK: apply [[SPECIALIZED_FUN]]
 // CHECK: apply [[SPECIALIZED_FUN2]]
 
@@ -206,7 +206,7 @@ bb2:
 // We handle closures with indirect results.
 // CHECK: [[CLOSUREFUN:%.*]] = function_ref @indirect_parameter_partial_apply_fun
 // CHECK-NOT: partial_apply [[CLOSUREFUN]]()
-// CHECK: [[INLINEDCLOSURE_CALLER1:%.*]] = function_ref @$S40indirect_parameter_partial_apply_caller10a1_b1_c1_D4_funTf1c_n
+// CHECK: [[INLINEDCLOSURE_CALLER1:%.*]] = function_ref @$s40indirect_parameter_partial_apply_caller10a1_b1_c1_D4_funTf1c_n
 // CHECK-NOT: partial_apply [[CLOSUREFUN]]()
 
 // We don't handle captured indirect @in and @in_guaranteed parameters yet.

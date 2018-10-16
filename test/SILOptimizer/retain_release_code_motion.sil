@@ -667,7 +667,7 @@ bb1:
   return %5 : $()
 }
 
-sil [_semantics "arc.programtermination_point"] @fatalError : $@convention(thin) () -> Never
+sil [_semantics "programtermination_point"] @fatalError : $@convention(thin) () -> Never
 
 // This should eliminate all retains except for the first one b/c of user.
 // CHECK-LABEL: sil @eliminate_retains_on_fatalError_path_single_bb : $@convention(thin) (@owned Builtin.NativeObject) -> () {

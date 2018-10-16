@@ -37,6 +37,30 @@ SILFunctionConventions::getSILArgumentConvention(unsigned index) const {
   }
 }
 
+struct SILArgumentKind {
+  enum innerty : std::underlying_type<ValueKind>::type {
+#define ARGUMENT(ID, PARENT) ID = unsigned(SILNodeKind::ID),
+#define ARGUMENT_RANGE(ID, FIRST, LAST) First_##ID = FIRST, Last_##ID = LAST,
+#include "swift/SIL/SILNodes.def"
+  } value;
+
+  explicit SILArgumentKind(ValueKind kind)
+      : value(*SILArgumentKind::fromValueKind(kind)) {}
+  SILArgumentKind(innerty value) : value(value) {}
+  operator innerty() const { return value; }
+
+  static Optional<SILArgumentKind> fromValueKind(ValueKind kind) {
+    switch (kind) {
+#define ARGUMENT(ID, PARENT)                                                   \
+  case ValueKind::ID:                                                          \
+    return SILArgumentKind(ID);
+#include "swift/SIL/SILNodes.def"
+    default:
+      return None;
+    }
+  }
+};
+
 class SILArgument : public ValueBase {
   void operator=(const SILArgument &) = delete;
   void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED
@@ -123,6 +147,11 @@ public:
   /// is the enum itself (the operand of the switch_enum).
   SILValue getSingleTerminatorOperand() const;
 
+  /// Return the SILArgumentKind of this argument.
+  SILArgumentKind getKind() const {
+    return SILArgumentKind(ValueBase::getKind());
+  }
+
 protected:
   SILArgument(ValueKind SubClassKind, SILBasicBlock *ParentBB, SILType Ty,
               ValueOwnershipKind OwnershipKind,
@@ -146,7 +175,7 @@ protected:
   friend SILBasicBlock;
 };
 
-class SILPHIArgument : public SILArgument {
+class SILPhiArgument : public SILArgument {
 public:
   /// Return true if this is block argument is actually a phi argument as
   /// opposed to a cast or projection.
@@ -155,7 +184,7 @@ public:
   /// If this argument is a phi, return the incoming phi value for the given
   /// predecessor BB. If this argument is not a phi, return an invalid SILValue.
   ///
-  /// FIXME: Once SILPHIArgument actually implies that it is a phi argument,
+  /// FIXME: Once SILPhiArgument actually implies that it is a phi argument,
   /// this will be guaranteed to return a valid SILValue.
   SILValue getIncomingPhiValue(SILBasicBlock *BB);
 
@@ -163,14 +192,14 @@ public:
   /// values for each predecessor BB. If this argument is not a phi, return
   /// false.
   ///
-  /// FIXME: Once SILPHIArgument actually implies that it is a phi argument,
+  /// FIXME: Once SILPhiArgument actually implies that it is a phi argument,
   /// this will always succeed.
   bool getIncomingPhiValues(llvm::SmallVectorImpl<SILValue> &OutArray);
 
   /// If this argument is a phi, populate `OutArray` with each predecessor block
   /// and its incoming phi value. If this argument is not a phi, return false.
   ///
-  /// FIXME: Once SILPHIArgument actually implies that it is a phi argument,
+  /// FIXME: Once SILPhiArgument actually implies that it is a phi argument,
   /// this will always succeed.
   bool getIncomingPhiValues(
       llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>> &OutArray);
@@ -205,24 +234,24 @@ public:
   static bool classof(const SILInstruction *) = delete;
   static bool classof(const SILUndef *) = delete;
   static bool classof(const SILNode *node) {
-    return node->getKind() == SILNodeKind::SILPHIArgument;
+    return node->getKind() == SILNodeKind::SILPhiArgument;
   }
 
 private:
   friend SILBasicBlock;
-  SILPHIArgument(SILBasicBlock *ParentBB, SILType Ty, ValueOwnershipKind OwnershipKind,
+  SILPhiArgument(SILBasicBlock *ParentBB, SILType Ty, ValueOwnershipKind OwnershipKind,
                  const ValueDecl *D = nullptr)
-      : SILArgument(ValueKind::SILPHIArgument, ParentBB, Ty, OwnershipKind, D) {}
-  SILPHIArgument(SILBasicBlock *ParentBB, SILBasicBlock::arg_iterator Pos,
+      : SILArgument(ValueKind::SILPhiArgument, ParentBB, Ty, OwnershipKind, D) {}
+  SILPhiArgument(SILBasicBlock *ParentBB, SILBasicBlock::arg_iterator Pos,
                  SILType Ty, ValueOwnershipKind OwnershipKind,
                  const ValueDecl *D = nullptr)
-      : SILArgument(ValueKind::SILPHIArgument, ParentBB, Pos, Ty, OwnershipKind, D) {}
+      : SILArgument(ValueKind::SILPhiArgument, ParentBB, Pos, Ty, OwnershipKind, D) {}
 
   // A special constructor, only intended for use in
   // SILBasicBlock::replacePHIArg.
-  explicit SILPHIArgument(SILType Ty, ValueOwnershipKind OwnershipKind,
+  explicit SILPhiArgument(SILType Ty, ValueOwnershipKind OwnershipKind,
                           const ValueDecl *D = nullptr)
-      : SILArgument(ValueKind::SILPHIArgument, Ty, OwnershipKind, D) {}
+      : SILArgument(ValueKind::SILPhiArgument, Ty, OwnershipKind, D) {}
 };
 
 class SILFunctionArgument : public SILArgument {
@@ -283,7 +312,7 @@ private:
 //===----------------------------------------------------------------------===//
 
 inline bool SILArgument::isPhiArgument() {
-  if (auto *phiArg = dyn_cast<SILPHIArgument>(this))
+  if (auto *phiArg = dyn_cast<SILPhiArgument>(this))
     return phiArg->isPhiArgument();
 
   return false;
@@ -292,35 +321,35 @@ inline bool SILArgument::isPhiArgument() {
 inline SILValue SILArgument::getIncomingPhiValue(SILBasicBlock *BB) {
   if (isa<SILFunctionArgument>(this))
     return SILValue();
-  return cast<SILPHIArgument>(this)->getIncomingPhiValue(BB);
+  return cast<SILPhiArgument>(this)->getIncomingPhiValue(BB);
 }
 
 inline bool
 SILArgument::getIncomingPhiValues(llvm::SmallVectorImpl<SILValue> &OutArray) {
   if (isa<SILFunctionArgument>(this))
     return false;
-  return cast<SILPHIArgument>(this)->getIncomingPhiValues(OutArray);
+  return cast<SILPhiArgument>(this)->getIncomingPhiValues(OutArray);
 }
 
 inline bool SILArgument::getIncomingPhiValues(
     llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>> &OutArray) {
   if (isa<SILFunctionArgument>(this))
     return false;
-  return cast<SILPHIArgument>(this)->getIncomingPhiValues(OutArray);
+  return cast<SILPhiArgument>(this)->getIncomingPhiValues(OutArray);
 }
 
 inline bool SILArgument::getSingleTerminatorOperands(
     llvm::SmallVectorImpl<SILValue> &OutArray) {
   if (isa<SILFunctionArgument>(this))
     return false;
-  return cast<SILPHIArgument>(this)->getSingleTerminatorOperands(OutArray);
+  return cast<SILPhiArgument>(this)->getSingleTerminatorOperands(OutArray);
 }
 
 inline bool SILArgument::getSingleTerminatorOperands(
     llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>> &OutArray) {
   if (isa<SILFunctionArgument>(this))
     return false;
-  return cast<SILPHIArgument>(this)->getSingleTerminatorOperands(OutArray);
+  return cast<SILPhiArgument>(this)->getSingleTerminatorOperands(OutArray);
 }
 
 } // end swift namespace

@@ -121,9 +121,15 @@ ArrayRef<const char *> Driver::getArgsWithoutProgramNameAndDriverMode(
 
 static void validateBridgingHeaderArgs(DiagnosticEngine &diags,
                                        const ArgList &args) {
-  if (args.hasArgNoClaim(options::OPT_import_underlying_module) &&
-      args.hasArgNoClaim(options::OPT_import_objc_header)) {
+  if (!args.hasArgNoClaim(options::OPT_import_objc_header))
+    return;
+
+  if (args.hasArgNoClaim(options::OPT_import_underlying_module))
     diags.diagnose({}, diag::error_framework_bridging_header);
+
+  if (args.hasArgNoClaim(options::OPT_emit_parseable_module_interface,
+                         options::OPT_emit_parseable_module_interface_path)) {
+    diags.diagnose({}, diag::error_bridging_header_parseable_interface);
   }
 }
 
@@ -296,6 +302,11 @@ std::unique_ptr<sys::TaskQueue> Driver::buildTaskQueue(const Compilation &C) {
                      A->getAsString(ArgList), A->getValue());
       return nullptr;
     }
+  }
+  if (environmentVariableRequestedMaximumDeterminism()) {
+      NumberOfParallelCommands = 1;
+      Diags.diagnose(SourceLoc(), diag::remark_max_determinism_overriding,
+                     "-j");
   }
 
   const bool DriverSkipExecution =
@@ -586,7 +597,7 @@ static bool populateOutOfDateMap(InputInfoMap &map,
     // If a file was removed, we've lost its dependency info. Rebuild everything.
     // FIXME: Can we do better?
     if (ShowIncrementalBuildDecisions) {
-      llvm::StringSet<> inputArgs;
+      llvm::DenseSet<StringRef> inputArgs;
       for (auto &inputPair : inputs) {
         inputArgs.insert(inputPair.second->getValue());
       }
@@ -904,8 +915,6 @@ Driver::buildCompilation(const ToolChain &TC,
     const Optional<unsigned> DriverBatchCount = getDriverBatchCount(*ArgList, Diags);
     const Optional<unsigned> DriverBatchSizeLimit =
       getDriverBatchSizeLimit(*ArgList, Diags);
-    const bool DriverForceOneBatchRepartition =
-    ArgList->hasArg(options::OPT_driver_force_one_batch_repartition);
     const bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
     const bool ShowDriverTimeCompilation =
         ArgList->hasArg(options::OPT_driver_time_compilation);
@@ -928,7 +937,6 @@ Driver::buildCompilation(const ToolChain &TC,
         DriverBatchSeed,
         DriverBatchCount,
         DriverBatchSizeLimit,
-        DriverForceOneBatchRepartition,
         SaveTemps,
         ShowDriverTimeCompilation,
         std::move(StatsReporter));
@@ -1181,7 +1189,7 @@ static bool checkInputExistence(const Driver &D, const DerivedArgList &Args,
 void Driver::buildInputs(const ToolChain &TC,
                          const DerivedArgList &Args,
                          InputFileList &Inputs) const {
-  llvm::StringMap<StringRef> SourceFileNames;
+  llvm::DenseMap<StringRef, StringRef> SourceFileNames;
 
   for (Arg *A : Args) {
     if (A->getOption().getKind() == Option::InputClass) {
@@ -1489,7 +1497,8 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     OI.ShouldTreatModuleAsTopLevelOutput = false;
   } else if (Args.hasArg(options::OPT_emit_objc_header,
                          options::OPT_emit_objc_header_path,
-                         options::OPT_experimental_emit_interface) &&
+                         options::OPT_emit_parseable_module_interface,
+                         options::OPT_emit_parseable_module_interface_path) &&
              OI.CompilerMode != OutputInfo::Mode::SingleCompile) {
     // An option has been passed which requires whole-module knowledge, but we
     // don't have that. Generate a module, but treat it as an intermediate
@@ -1770,7 +1779,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_TBD:
       case file_types::TY_ModuleTrace:
       case file_types::TY_OptRecord:
-      case file_types::TY_SwiftModuleInterfaceFile:
+      case file_types::TY_SwiftParseableInterfaceFile:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
@@ -2468,8 +2477,9 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     chooseSwiftModuleDocOutputPath(C, OutputMap, workingDirectory,
                                    Output.get());
 
-  if (C.getArgs().hasArg(options::OPT_experimental_emit_interface))
-    chooseTextualInterfacePath(C, JA, workingDirectory, Buf, Output.get());
+  if (C.getArgs().hasArg(options::OPT_emit_parseable_module_interface,
+                         options::OPT_emit_parseable_module_interface_path))
+    chooseParseableInterfacePath(C, JA, workingDirectory, Buf, Output.get());
 
   if (C.getArgs().hasArg(options::OPT_update_code) && isa<CompileJobAction>(JA))
     chooseRemappingOutputPath(C, OutputMap, Output.get());
@@ -2767,10 +2777,10 @@ void Driver::chooseRemappingOutputPath(Compilation &C,
   }
 }
 
-void Driver::chooseTextualInterfacePath(Compilation &C, const JobAction *JA,
-                                        StringRef workingDirectory,
-                                        llvm::SmallString<128> &buffer,
-                                        CommandOutput *output) const {
+void Driver::chooseParseableInterfacePath(Compilation &C, const JobAction *JA,
+                                          StringRef workingDirectory,
+                                          llvm::SmallString<128> &buffer,
+                                          CommandOutput *output) const {
   switch (C.getOutputInfo().CompilerMode) {
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::BatchModeCompile:
@@ -2787,10 +2797,11 @@ void Driver::chooseTextualInterfacePath(Compilation &C, const JobAction *JA,
   }
 
   StringRef outputPath = *getOutputFilenameFromPathArgOrAsTopLevel(
-        C.getOutputInfo(), C.getArgs(), llvm::opt::OptSpecifier(),
-        file_types::TY_SwiftModuleInterfaceFile,
-        /*TreatAsTopLevelOutput*/true, workingDirectory, buffer);
-  output->setAdditionalOutputForType(file_types::TY_SwiftModuleInterfaceFile,
+      C.getOutputInfo(), C.getArgs(),
+      options::OPT_emit_parseable_module_interface_path,
+      file_types::TY_SwiftParseableInterfaceFile,
+      /*TreatAsTopLevelOutput*/true, workingDirectory, buffer);
+  output->setAdditionalOutputForType(file_types::TY_SwiftParseableInterfaceFile,
                                      outputPath);
 }
 
@@ -3005,4 +3016,5 @@ bool OutputInfo::mightHaveExplicitPrimaryInputs(
   case Mode::REPL:
     llvm_unreachable("REPL and immediate modes handled elsewhere");
   }
+  llvm_unreachable("unhandled mode");
 }

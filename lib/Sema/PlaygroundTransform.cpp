@@ -280,7 +280,7 @@ public:
         BraceStmt *NB = transformBraceStmt(B);
         if (NB != B) {
           FD->setBody(NB);
-          TypeChecker(Context).checkFunctionErrorHandling(FD);
+          TypeChecker::createForContext(Context).checkFunctionErrorHandling(FD);
         }
       }
     } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -893,7 +893,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
             BraceStmt *NewBody = I.transformBraceStmt(Body);
             if (NewBody != Body) {
               FD->setBody(NewBody);
-              TypeChecker(ctx).checkFunctionErrorHandling(FD);
+              TypeChecker::createForContext(ctx).checkFunctionErrorHandling(FD);
             }
             return false;
           }
@@ -906,7 +906,8 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
             BraceStmt *NewBody = I.transformBraceStmt(Body, true);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
-              TypeChecker(ctx).checkTopLevelErrorHandling(TLCD);
+              TypeChecker::createForContext(ctx)
+                .checkTopLevelErrorHandling(TLCD);
             }
             return false;
           }

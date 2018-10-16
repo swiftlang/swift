@@ -86,7 +86,7 @@ for x in s_m {
   print(x)
 }
 
-// Enumeration over a _SwiftDeferredNSArray
+// Enumeration over a __SwiftDeferredNSArray
 // CHECK: 3
 // CHECK: 2
 // CHECK: 1

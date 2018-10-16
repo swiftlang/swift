@@ -189,7 +189,7 @@ static void indexModule(llvm::MemoryBuffer *Input,
   }
 
   // Setup a typechecker for protocol conformance resolving.
-  OwnedResolver TypeResolver = createLazyResolver(Ctx);
+  (void)createTypeChecker(Ctx);
 
   SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
   index::indexModule(Mod, Hash, IdxDataConsumer);
@@ -251,10 +251,10 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   CompilerInvocation Invocation;
   bool Failed = true;
   if (IsModuleIndexing) {
-    Failed = getASTManager().initCompilerInvocationNoInputs(
+    Failed = getASTManager()->initCompilerInvocationNoInputs(
         Invocation, Args, CI.getDiags(), Error);
   } else {
-    Failed = getASTManager().initCompilerInvocation(
+    Failed = getASTManager()->initCompilerInvocation(
         Invocation, Args, CI.getDiags(), InputFile, Error);
   }
   if (Failed) {
@@ -301,7 +301,7 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   }
 
   // Setup a typechecker for protocol conformance resolving.
-  OwnedResolver TypeResolver = createLazyResolver(CI.getASTContext());
+  (void)createTypeChecker(CI.getASTContext());
 
   SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
   index::indexSourceFile(CI.getPrimarySourceFile(), Hash, IdxDataConsumer);

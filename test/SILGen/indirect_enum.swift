@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name indirect_enum -Xllvm -sil-print-debuginfo %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -module-name indirect_enum -Xllvm -sil-print-debuginfo %s | %FileCheck %s
 
 indirect enum TreeA<T> {
   case Nil
@@ -7,7 +7,7 @@ indirect enum TreeA<T> {
   case Branch(left: TreeA<T>, right: TreeA<T>)
 }
 
-// CHECK-LABEL: sil hidden @$S13indirect_enum11TreeA_cases_1l1ryx_AA0C1AOyxGAGtlF : $@convention(thin) <T> (@in_guaranteed T, @guaranteed TreeA<T>, @guaranteed TreeA<T>) -> () {
+// CHECK-LABEL: sil hidden @$s13indirect_enum11TreeA_cases_1l1ryx_AA0C1AOyxGAGtlF : $@convention(thin) <T> (@in_guaranteed T, @guaranteed TreeA<T>, @guaranteed TreeA<T>) -> () {
 func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
 // CHECK: bb0([[ARG1:%.*]] : @trivial $*T, [[ARG2:%.*]] : @guaranteed $TreeA<T>, [[ARG3:%.*]] : @guaranteed $TreeA<T>):
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeA<T>.Type
@@ -37,17 +37,17 @@ func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
   let _ = TreeA<T>.Branch(left: l, right: r)
 
 }
-// CHECK: // end sil function '$S13indirect_enum11TreeA_cases_1l1ryx_AA0C1AOyxGAGtlF'
+// CHECK: // end sil function '$s13indirect_enum11TreeA_cases_1l1ryx_AA0C1AOyxGAGtlF'
 
 
-// CHECK-LABEL: sil hidden @$S13indirect_enum16TreeA_reabstractyyS2icF : $@convention(thin) (@guaranteed @callee_guaranteed (Int) -> Int) -> () {
+// CHECK-LABEL: sil hidden @$s13indirect_enum16TreeA_reabstractyyS2icF : $@convention(thin) (@guaranteed @callee_guaranteed (Int) -> Int) -> () {
 func TreeA_reabstract(_ f: @escaping (Int) -> Int) {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed (Int) -> Int):
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeA<(Int) -> Int>.Type
 // CHECK-NEXT:    [[BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <(Int) -> Int>
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT:    [[ARG_COPY:%.*]] = copy_value [[ARG]]
-// CHECK:         [[THUNK:%.*]] = function_ref @$SS2iIegyd_S2iIegnr_TR
+// CHECK:         [[THUNK:%.*]] = function_ref @$sS2iIegyd_S2iIegnr_TR
 // CHECK-NEXT:    [[FN:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[ARG_COPY]])
 // CHECK-NEXT:    store [[FN]] to [init] [[PB]]
 // CHECK-NEXT:    [[LEAF:%.*]] = enum $TreeA<(Int) -> Int>, #TreeA.Leaf!enumelt.1, [[BOX]]
@@ -55,7 +55,7 @@ func TreeA_reabstract(_ f: @escaping (Int) -> Int) {
 // CHECK: return
   let _ = TreeA<(Int) -> Int>.Leaf(f)
 }
-// CHECK: } // end sil function '$S13indirect_enum16TreeA_reabstractyyS2icF'
+// CHECK: } // end sil function '$s13indirect_enum16TreeA_reabstractyyS2icF'
 
 enum TreeB<T> {
   case Nil
@@ -63,7 +63,7 @@ enum TreeB<T> {
   indirect case Branch(left: TreeB<T>, right: TreeB<T>)
 }
 
-// CHECK-LABEL: sil hidden @$S13indirect_enum11TreeB_cases_1l1ryx_AA0C1BOyxGAGtlF
+// CHECK-LABEL: sil hidden @$s13indirect_enum11TreeB_cases_1l1ryx_AA0C1BOyxGAGtlF
 func TreeB_cases<T>(_ t: T, l: TreeB<T>, r: TreeB<T>) {
 
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeB<T>.Type
@@ -101,7 +101,7 @@ func TreeB_cases<T>(_ t: T, l: TreeB<T>, r: TreeB<T>) {
 
 }
 
-// CHECK-LABEL: sil hidden @$S13indirect_enum13TreeInt_cases_1l1rySi_AA0cD0OAFtF : $@convention(thin) (Int, @guaranteed TreeInt, @guaranteed TreeInt) -> ()
+// CHECK-LABEL: sil hidden @$s13indirect_enum13TreeInt_cases_1l1rySi_AA0cD0OAFtF : $@convention(thin) (Int, @guaranteed TreeInt, @guaranteed TreeInt) -> ()
 func TreeInt_cases(_ t: Int, l: TreeInt, r: TreeInt) {
 // CHECK: bb0([[ARG1:%.*]] : @trivial $Int, [[ARG2:%.*]] : @guaranteed $TreeInt, [[ARG3:%.*]] : @guaranteed $TreeInt):
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeInt.Type
@@ -127,7 +127,7 @@ func TreeInt_cases(_ t: Int, l: TreeInt, r: TreeInt) {
 // CHECK-NEXT:    destroy_value [[BRANCH]]
   let _ = TreeInt.Branch(left: l, right: r)
 }
-// CHECK: } // end sil function '$S13indirect_enum13TreeInt_cases_1l1rySi_AA0cD0OAFtF'
+// CHECK: } // end sil function '$s13indirect_enum13TreeInt_cases_1l1rySi_AA0cD0OAFtF'
 
 enum TreeInt {
   case Nil
@@ -146,60 +146,58 @@ func b<T>(_ x: T) {}
 func c<T>(_ x: T, _ y: T) {}
 func d() {}
 
-// CHECK-LABEL: sil hidden @$S13indirect_enum11switchTreeAyyAA0D1AOyxGlF : $@convention(thin) <T> (@guaranteed TreeA<T>) -> () {
+// CHECK-LABEL: sil hidden @$s13indirect_enum11switchTreeAyyAA0D1AOyxGlF : $@convention(thin) <T> (@guaranteed TreeA<T>) -> () {
 func switchTreeA<T>(_ x: TreeA<T>) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $TreeA<T>):
   // --           x +2
   // CHECK:       [[ARG_COPY:%.*]] = copy_value [[ARG]]
-  // CHECK:       switch_enum [[ARG_COPY]] : $TreeA<T>,
+  // CHECK:       [[BORROWED_ARG_COPY:%.*]] = begin_borrow [[ARG_COPY]]
+  // CHECK:       switch_enum [[BORROWED_ARG_COPY]] : $TreeA<T>,
   // CHECK:          case #TreeA.Nil!enumelt: [[NIL_CASE:bb1]],
   // CHECK:          case #TreeA.Leaf!enumelt.1: [[LEAF_CASE:bb2]],
   // CHECK:          case #TreeA.Branch!enumelt.1: [[BRANCH_CASE:bb3]],
   switch x {
   // CHECK:     [[NIL_CASE]]:
-  // CHECK:       function_ref @$S13indirect_enum1ayyF
+  // CHECK:       function_ref @$s13indirect_enum1ayyF
   // CHECK:       br [[OUTER_CONT:bb[0-9]+]]
   case .Nil:
     a()
-  // CHECK:     [[LEAF_CASE]]([[LEAF_BOX:%.*]] : @owned $<τ_0_0> { var τ_0_0 } <T>):
+  // CHECK:     [[LEAF_CASE]]([[LEAF_BOX:%.*]] : @guaranteed $<τ_0_0> { var τ_0_0 } <T>):
   // CHECK:       [[VALUE:%.*]] = project_box [[LEAF_BOX]]
   // CHECK:       copy_addr [[VALUE]] to [initialization] [[X:%.*]] : $*T
-  // CHECK:       function_ref @$S13indirect_enum1b{{[_0-9a-zA-Z]*}}F
+  // CHECK:       function_ref @$s13indirect_enum1b{{[_0-9a-zA-Z]*}}F
   // CHECK:       destroy_addr [[X]]
   // CHECK:       dealloc_stack [[X]]
   // --           x +1
-  // CHECK:       destroy_value [[LEAF_BOX]]
   // CHECK:       br [[OUTER_CONT]]
   case .Leaf(let x):
     b(x)
 
-  // CHECK:     [[BRANCH_CASE]]([[NODE_BOX:%.*]] : @owned $<τ_0_0> { var (left: TreeA<τ_0_0>, right: TreeA<τ_0_0>) } <T>):
+  // CHECK:     [[BRANCH_CASE]]([[NODE_BOX:%.*]] : @guaranteed $<τ_0_0> { var (left: TreeA<τ_0_0>, right: TreeA<τ_0_0>) } <T>):
   // CHECK:       [[TUPLE_ADDR:%.*]] = project_box [[NODE_BOX]]
   // CHECK:       [[TUPLE:%.*]] = load_borrow [[TUPLE_ADDR]]
-  // CHECK:       [[LEFT:%.*]] = tuple_extract [[TUPLE]] {{.*}}, 0
-  // CHECK:       [[RIGHT:%.*]] = tuple_extract [[TUPLE]] {{.*}}, 1
+  // CHECK:       ([[LEFT:%.*]], [[RIGHT:%.*]]) = destructure_tuple [[TUPLE]]
   // CHECK:       switch_enum [[LEFT]] : $TreeA<T>,
   // CHECK:          case #TreeA.Leaf!enumelt.1: [[LEAF_CASE_LEFT:bb[0-9]+]],
   // CHECK:          default [[FAIL_LEFT:bb[0-9]+]]
 
-  // CHECK:     [[LEAF_CASE_LEFT]]([[LEFT_LEAF_BOX:%.*]] : @owned $<τ_0_0> { var τ_0_0 } <T>):
+  // CHECK:     [[LEAF_CASE_LEFT]]([[LEFT_LEAF_BOX:%.*]] : @guaranteed $<τ_0_0> { var τ_0_0 } <T>):
   // CHECK:       [[LEFT_LEAF_VALUE:%.*]] = project_box [[LEFT_LEAF_BOX]]
   // CHECK:       switch_enum [[RIGHT]] : $TreeA<T>,
   // CHECK:          case #TreeA.Leaf!enumelt.1: [[LEAF_CASE_RIGHT:bb[0-9]+]],
   // CHECK:          default [[FAIL_RIGHT:bb[0-9]+]]
 
-  // CHECK:     [[LEAF_CASE_RIGHT]]([[RIGHT_LEAF_BOX:%.*]] : @owned $<τ_0_0> { var τ_0_0 } <T>):
+  // CHECK:     [[LEAF_CASE_RIGHT]]([[RIGHT_LEAF_BOX:%.*]] : @guaranteed $<τ_0_0> { var τ_0_0 } <T>):
   // CHECK:       [[RIGHT_LEAF_VALUE:%.*]] = project_box [[RIGHT_LEAF_BOX]]
   // CHECK:       copy_addr [[LEFT_LEAF_VALUE]]
   // CHECK:       copy_addr [[RIGHT_LEAF_VALUE]]
   // --           x +1
-  // CHECK:       destroy_value [[NODE_BOX]]
   // CHECK:       br [[OUTER_CONT]]
 
-  // CHECK:     [[FAIL_RIGHT]]:
+  // CHECK:     [[FAIL_RIGHT]]([[DEFAULT_VAL:%.*]] : @guaranteed
   // CHECK:       br [[DEFAULT:bb[0-9]+]]
 
-  // CHECK:     [[FAIL_LEFT]]:
+  // CHECK:     [[FAIL_LEFT]]([[DEFAULT_VAL:%.*]] : @guaranteed
   // CHECK:       br [[DEFAULT]]
 
   case .Branch(.Leaf(let x), .Leaf(let y)):
@@ -215,9 +213,9 @@ func switchTreeA<T>(_ x: TreeA<T>) {
   // CHECK:     [[OUTER_CONT:%.*]]:
   // --           x +0
 }
-// CHECK: } // end sil function '$S13indirect_enum11switchTreeAyyAA0D1AOyxGlF'
+// CHECK: } // end sil function '$s13indirect_enum11switchTreeAyyAA0D1AOyxGlF'
 
-// CHECK-LABEL: sil hidden @$S13indirect_enum11switchTreeB{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13indirect_enum11switchTreeB{{[_0-9a-zA-Z]*}}F
 func switchTreeB<T>(_ x: TreeB<T>) {
   // CHECK:       copy_addr %0 to [initialization] [[SCRATCH:%.*]] :
   // CHECK:       switch_enum_addr [[SCRATCH]]
@@ -226,7 +224,7 @@ func switchTreeB<T>(_ x: TreeB<T>) {
   // CHECK:     bb{{.*}}:
   // CHECK:       destroy_addr [[SCRATCH]]
   // CHECK:       dealloc_stack [[SCRATCH]]
-  // CHECK:       function_ref @$S13indirect_enum1ayyF
+  // CHECK:       function_ref @$s13indirect_enum1ayyF
   // CHECK:       br [[OUTER_CONT:bb[0-9]+]]
   case .Nil:
     a()
@@ -235,7 +233,7 @@ func switchTreeB<T>(_ x: TreeB<T>) {
   // CHECK:       copy_addr [[SCRATCH]] to [initialization] [[LEAF_COPY:%.*]] :
   // CHECK:       [[LEAF_ADDR:%.*]] = unchecked_take_enum_data_addr [[LEAF_COPY]]
   // CHECK:       copy_addr [take] [[LEAF_ADDR]] to [initialization] [[LEAF:%.*]] :
-  // CHECK:       function_ref @$S13indirect_enum1b{{[_0-9a-zA-Z]*}}F
+  // CHECK:       function_ref @$s13indirect_enum1b{{[_0-9a-zA-Z]*}}F
   // CHECK:       destroy_addr [[LEAF]]
   // CHECK:       dealloc_stack [[LEAF]]
   // CHECK-NOT:   destroy_addr [[LEAF_COPY]]
@@ -266,7 +264,7 @@ func switchTreeB<T>(_ x: TreeB<T>) {
   // CHECK:       [[RIGHT_LEAF:%.*]] = unchecked_take_enum_data_addr [[RIGHT_COPY]] : $*TreeB<T>, #TreeB.Leaf
   // CHECK:       copy_addr [take] [[LEFT_LEAF]] to [initialization] [[X:%.*]] :
   // CHECK:       copy_addr [take] [[RIGHT_LEAF]] to [initialization] [[Y:%.*]] :
-  // CHECK:       function_ref @$S13indirect_enum1c{{[_0-9a-zA-Z]*}}F
+  // CHECK:       function_ref @$s13indirect_enum1c{{[_0-9a-zA-Z]*}}F
   // CHECK:       destroy_addr [[Y]]
   // CHECK:       dealloc_stack [[Y]]
   // CHECK:       destroy_addr [[X]]
@@ -302,7 +300,7 @@ func switchTreeB<T>(_ x: TreeB<T>) {
   // CHECK:     [[INNER_CONT]]:
   // CHECK:       destroy_addr [[SCRATCH]]
   // CHECK:       dealloc_stack [[SCRATCH]]
-  // CHECK:       function_ref @$S13indirect_enum1dyyF
+  // CHECK:       function_ref @$s13indirect_enum1dyyF
   // CHECK:       br [[OUTER_CONT]]
   default:
     d()
@@ -311,7 +309,28 @@ func switchTreeB<T>(_ x: TreeB<T>) {
   // CHECK:       return
 }
 
-// CHECK-LABEL: sil hidden @$S13indirect_enum10guardTreeA{{[_0-9a-zA-Z]*}}F
+// Make sure that switchTreeInt obeys ownership invariants.
+//
+// CHECK-LABEL: sil hidden @$s13indirect_enum13switchTreeInt{{[_0-9a-zA-Z]*}}F
+func switchTreeInt(_ x: TreeInt) {
+  switch x {
+
+  case .Nil:
+    a()
+
+  case .Leaf(let x):
+    b(x)
+
+  case .Branch(.Leaf(let x), .Leaf(let y)):
+    c(x, y)
+
+  default:
+    d()
+  }
+}
+// CHECK: } // end sil function '$s13indirect_enum13switchTreeInt{{[_0-9a-zA-Z]*}}F'
+
+// CHECK-LABEL: sil hidden @$s13indirect_enum10guardTreeA{{[_0-9a-zA-Z]*}}F
 func guardTreeA<T>(_ tree: TreeA<T>) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $TreeA<T>):
   do {
@@ -341,8 +360,9 @@ func guardTreeA<T>(_ tree: TreeA<T>) {
     // CHECK:   destroy_value [[ORIGINAL_VALUE]]
     // CHECK: [[YES]]([[BOX:%.*]] : @owned $<τ_0_0> { var (left: TreeA<τ_0_0>, right: TreeA<τ_0_0>) } <T>):
     // CHECK:   [[VALUE_ADDR:%.*]] = project_box [[BOX]]
-    // CHECK:   [[TUPLE:%.*]] = load [take] [[VALUE_ADDR]]
+    // CHECK:   [[TUPLE:%.*]] = load_borrow [[VALUE_ADDR]]
     // CHECK:   [[TUPLE_COPY:%.*]] = copy_value [[TUPLE]]
+    // CHECK:   end_borrow [[TUPLE]]
     // CHECK:   ([[L:%.*]], [[R:%.*]]) = destructure_tuple [[TUPLE_COPY]]
     // CHECK:   destroy_value [[BOX]]
     guard case .Branch(left: let l, right: let r) = tree else { return }
@@ -382,8 +402,9 @@ func guardTreeA<T>(_ tree: TreeA<T>) {
     // CHECK:   destroy_value [[ORIGINAL_VALUE]]
     // CHECK: [[YES]]([[BOX:%.*]] : @owned $<τ_0_0> { var (left: TreeA<τ_0_0>, right: TreeA<τ_0_0>) } <T>):
     // CHECK:   [[VALUE_ADDR:%.*]] = project_box [[BOX]]
-    // CHECK:   [[TUPLE:%.*]] = load [take] [[VALUE_ADDR]]
+    // CHECK:   [[TUPLE:%.*]] = load_borrow [[VALUE_ADDR]]
     // CHECK:   [[TUPLE_COPY:%.*]] = copy_value [[TUPLE]]
+    // CHECK:   end_borrow [[TUPLE]]
     // CHECK:   ([[L:%.*]], [[R:%.*]]) = destructure_tuple [[TUPLE_COPY]]
     // CHECK:   destroy_value [[BOX]]
     // CHECK:   destroy_value [[R]]
@@ -391,8 +412,7 @@ func guardTreeA<T>(_ tree: TreeA<T>) {
     if case .Branch(left: let l, right: let r) = tree { }
   }
 }
-
-// CHECK-LABEL: sil hidden @$S13indirect_enum10guardTreeB{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s13indirect_enum10guardTreeB{{[_0-9a-zA-Z]*}}F
 func guardTreeB<T>(_ tree: TreeB<T>) {
   do {
     // CHECK:   copy_addr %0 to [initialization] [[TMP:%.*]] :
@@ -480,8 +500,27 @@ func guardTreeB<T>(_ tree: TreeB<T>) {
   }
 }
 
+// Just run guardTreeInt through the ownership verifier
+//
+// CHECK-LABEL: sil hidden @$s13indirect_enum12guardTreeInt{{[_0-9a-zA-Z]*}}F
+func guardTreeInt(_ tree: TreeInt) {
+  do {
+    guard case .Nil = tree else { return }
+
+    guard case .Leaf(let x) = tree else { return }
+
+    guard case .Branch(left: let l, right: let r) = tree else { return }
+  }
+
+  do {
+    if case .Nil = tree { }
+    if case .Leaf(let x) = tree { }
+    if case .Branch(left: let l, right: let r) = tree { }
+  }
+}
+
 // SEMANTIC ARC TODO: This test needs to be made far more comprehensive.
-// CHECK-LABEL: sil hidden @$S13indirect_enum35dontDisableCleanupOfIndirectPayloadyyAA010TrivialButG0OF : $@convention(thin) (@guaranteed TrivialButIndirect) -> () {
+// CHECK-LABEL: sil hidden @$s13indirect_enum35dontDisableCleanupOfIndirectPayloadyyAA010TrivialButG0OF : $@convention(thin) (@guaranteed TrivialButIndirect) -> () {
 func dontDisableCleanupOfIndirectPayload(_ x: TrivialButIndirect) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $TrivialButIndirect):
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
@@ -503,4 +542,4 @@ func dontDisableCleanupOfIndirectPayload(_ x: TrivialButIndirect) {
 
   guard case .Indirect(let bar) = x else { return }
 }
-// CHECK: } // end sil function '$S13indirect_enum35dontDisableCleanupOfIndirectPayloadyyAA010TrivialButG0OF'
+// CHECK: } // end sil function '$s13indirect_enum35dontDisableCleanupOfIndirectPayloadyyAA010TrivialButG0OF'

@@ -15,7 +15,7 @@
 import Typedefs
 import Lib
 
-// CHECK-IR-LABEL: define{{.*}} void @"$S4main19testWitnessDispatch
+// CHECK-IR-LABEL: define{{.*}} void @"$s4main19testWitnessDispatch
 public func testWitnessDispatch(user: Proto) {
   // The important thing in this CHECK line is the "i32 11", which is the offset
   // for the witness table slot for 'lastMethod()'. If the layout here
@@ -31,7 +31,7 @@ public func testWitnessDispatch(user: Proto) {
   _ = user.lastMethod()
 } // CHECK-IR: ret void
 
-// CHECK-IR-LABEL: define{{.*}} void @"$S4main19testGenericDispatch
+// CHECK-IR-LABEL: define{{.*}} void @"$s4main19testGenericDispatch
 public func testGenericDispatch<T: Proto>(user: T) {
   // The important thing in this CHECK line is the "i32 11", which is the offset
   // for the witness table slot for 'lastMethod()'. If the layout here

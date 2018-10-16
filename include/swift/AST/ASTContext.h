@@ -208,6 +208,12 @@ public:
                          DiagnosticEngine &Diags);
   ~ASTContext();
 
+  /// Optional table of counters to report, nullptr when not collecting.
+  ///
+  /// This must be initialized early so that Allocate() doesn't try to access
+  /// it before being set to null.
+  UnifiedStatsReporter *Stats = nullptr;
+
   /// \brief The language options used for translation.
   LangOptions &LangOpts;
 
@@ -261,12 +267,6 @@ public:
   /// Cache of remapped types (useful for diagnostics).
   llvm::StringMap<Type> RemappedTypes;
 
-  /// Optional table of counters to report, nullptr when not collecting.
-  UnifiedStatsReporter *Stats = nullptr;
-
-  /// Set a new stats reporter.
-  void setStatsReporter(UnifiedStatsReporter *stats);
-
 private:
   /// \brief The current generation number, which reflects the number of
   /// times that external modules have been loaded.
@@ -287,11 +287,11 @@ private:
   /// Cache of module names that fail the 'canImport' test in this context.
   llvm::SmallPtrSet<Identifier, 8> FailedModuleImportNames;
   
-public:
   /// \brief Retrieve the allocator for the given arena.
   llvm::BumpPtrAllocator &
   getAllocator(AllocationArena arena = AllocationArena::Permanent) const;
 
+public:
   /// Allocate - Allocate memory from the ASTContext bump pointer.
   void *Allocate(unsigned long bytes, unsigned alignment,
                  AllocationArena arena = AllocationArena::Permanent) const {
@@ -300,7 +300,9 @@ public:
 
     if (LangOpts.UseMalloc)
       return AlignedAlloc(bytes, alignment);
-    
+
+    if (arena == AllocationArena::Permanent && Stats)
+      Stats->getFrontendCounters().NumASTBytesAllocated += bytes;
     return getAllocator(arena).Allocate(bytes, alignment);
   }
 
@@ -395,12 +397,38 @@ public:
   /// Retrive the syntax node memory manager for this context.
   llvm::IntrusiveRefCntPtr<syntax::SyntaxArena> getSyntaxArena() const;
 
+  /// Set a new stats reporter.
+  void setStatsReporter(UnifiedStatsReporter *stats);
+
+  /// Creates a new lazy resolver by passing the ASTContext and the other
+  /// given arguments to a newly-allocated instance of \c ResolverType.
+  ///
+  /// \returns true if a new lazy resolver was created, false if there was
+  /// already a lazy resolver registered.
+  template<typename ResolverType, typename ... Args>
+  bool createLazyResolverIfMissing(Args && ...args) {
+    if (getLazyResolver())
+      return false;
+
+    setLazyResolver(new ResolverType(*this, std::forward<Args>(args)...));
+    return true;
+  }
+
+  /// Remove the lazy resolver, if there is one.
+  ///
+  /// FIXME: We probably don't ever want to do this.
+  void removeLazyResolver() {
+    setLazyResolver(nullptr);
+  }
+
   /// Retrieve the lazy resolver for this context.
   LazyResolver *getLazyResolver() const;
 
+private:
   /// Set the lazy resolver for this context.
   void setLazyResolver(LazyResolver *resolver);
 
+public:
   /// Add a lazy parser for resolving members later.
   void addLazyParser(LazyMemberParser *parser);
 
@@ -790,6 +818,10 @@ public:
   ///
   /// \param IDC The context whose member decls should be lazily parsed.
   void parseMembers(IterableDeclContext *IDC);
+
+  /// Use the lazy parsers associated with the context to check whether the decl
+  /// context has been parsed.
+  bool hasUnparsedMembers(const IterableDeclContext *IDC) const;
 
   /// Get the lazy function data for the given generic context.
   ///

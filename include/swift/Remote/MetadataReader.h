@@ -309,7 +309,7 @@ public:
     // error existential with NSError-compatible layout.
     std::string ObjCClassName;
     if (readObjCClassName(*MetadataAddress, ObjCClassName)) {
-      if (ObjCClassName == "_SwiftNativeNSError")
+      if (ObjCClassName == "__SwiftNativeNSError")
         isObjC = true;
     } else {
       // Otherwise, we can check to see if this is a class metadata with the
@@ -728,15 +728,18 @@ public:
   Optional<ClassMetadataBounds>
   readMetadataBoundsOfSuperclass(ContextDescriptorRef subclassRef) {
     auto subclass = cast<TargetClassDescriptor<Runtime>>(subclassRef);
+    if (!subclass->hasResilientSuperclass())
+      return ClassMetadataBounds::forSwiftRootClass();
 
     auto rawSuperclass =
-      resolveNullableRelativeField(subclassRef, subclass->Superclass);
+      resolveNullableRelativeField(subclassRef,
+                                   subclass->getResilientSuperclass());
     if (!rawSuperclass) {
       return ClassMetadataBounds::forSwiftRootClass();
     }
 
     return forTypeReference<ClassMetadataBounds>(
-      subclass->getSuperclassReferenceKind(), *rawSuperclass,
+      subclass->getResilientSuperclassReferenceKind(), *rawSuperclass,
       [&](ContextDescriptorRef superclass)
             -> Optional<ClassMetadataBounds> {
         if (!isa<TargetClassDescriptor<Runtime>>(superclass))
@@ -1087,8 +1090,8 @@ protected:
         return _readMetadata<TargetStructMetadata>(address);
       case MetadataKind::Tuple: {
         auto numElementsAddress = address +
-          TargetTupleTypeMetadata<Runtime>::OffsetToNumElements;
-        StoredSize numElements;
+          TargetTupleTypeMetadata<Runtime>::getOffsetToNumElements();
+        uint32_t numElements;
         if (!Reader->readInteger(RemoteAddress(numElementsAddress),
                                  &numElements))
           return nullptr;

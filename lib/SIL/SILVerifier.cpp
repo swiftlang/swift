@@ -379,7 +379,7 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   SmallVector<StringRef, 16> DebugVars;
   const SILInstruction *CurInstruction = nullptr;
   const SILArgument *CurArgument = nullptr;
-  DominanceInfo *Dominance = nullptr;
+  std::unique_ptr<DominanceInfo> Dominance;
 
   // Used for dominance checking within a basic block.
   llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
@@ -590,17 +590,12 @@ public:
         InstNumbers[&I] = InstIdx++;
     }
 
-    Dominance = new DominanceInfo(const_cast<SILFunction *>(&F));
+    Dominance.reset(new DominanceInfo(const_cast<SILFunction *>(&F)));
 
     auto *DebugScope = F.getDebugScope();
     require(DebugScope, "All SIL functions must have a debug scope");
     require(DebugScope->Parent.get<SILFunction *>() == &F,
             "Scope of SIL function points to different function");
-  }
-
-  ~SILVerifier() {
-    if (Dominance)
-      delete Dominance;
   }
 
   // Checks dominance between two instructions.
@@ -638,7 +633,7 @@ public:
     return M.getStage() == SILStage::Raw;
   }
 
-  void visitSILPHIArgument(SILPHIArgument *arg) {
+  void visitSILPhiArgument(SILPhiArgument *arg) {
     // Verify that the `isPhiArgument` property is sound:
     // - Phi arguments come from branches.
     // - Non-phi arguments have a single predecessor.
@@ -668,9 +663,9 @@ public:
     CurArgument = arg;
     checkLegalType(arg->getFunction(), arg, nullptr);
     checkValueBaseOwnership(arg);
-    if (auto *phiArg = dyn_cast<SILPHIArgument>(arg)) {
+    if (auto *phiArg = dyn_cast<SILPhiArgument>(arg)) {
       if (phiArg->isPhiArgument())
-        visitSILPHIArgument(phiArg);
+        visitSILPhiArgument(phiArg);
       else {
         // A non-phi BlockArgument must have a single predecessor unless it is
         // unreachable.
@@ -2532,7 +2527,7 @@ public:
     assert(!methodTy->isCoroutine());
 
     // Map interface types to archetypes.
-    if (auto *env = constantInfo.GenericEnv) {
+    if (auto *env = F.getModule().Types.getConstantGenericEnvironment(method)) {
       auto subs = env->getForwardingSubstitutionMap();
       methodTy = methodTy->substGenericArgs(F.getModule(), subs);
     }
@@ -2865,9 +2860,15 @@ public:
           return true;
         }
         case SILInstructionKind::CheckedCastAddrBranchInst:
-          if (cast<CheckedCastAddrBranchInst>(inst)->getConsumptionKind() !=
-              CastConsumptionKind::CopyOnSuccess)
+          switch (cast<CheckedCastAddrBranchInst>(inst)->getConsumptionKind()) {
+          case CastConsumptionKind::BorrowAlways:
+            llvm_unreachable("checked_cast_addr_br cannot have BorrowAlways");
+          case CastConsumptionKind::CopyOnSuccess:
+            break;
+          case CastConsumptionKind::TakeAlways:
+          case CastConsumptionKind::TakeOnSuccess:
             return true;
+          }
           break;
         case SILInstructionKind::LoadInst:
           // A 'non-taking' value load is harmless.
@@ -5008,10 +5009,11 @@ void SILWitnessTable::verify(const SILModule &M) const {
 void SILDefaultWitnessTable::verify(const SILModule &M) const {
 #ifndef NDEBUG
   for (const Entry &E : getEntries()) {
-    if (!E.isValid())
+    // FIXME: associated type witnesses.
+    if (!E.isValid() || E.getKind() != SILWitnessTable::Method)
       continue;
 
-    SILFunction *F = E.getWitness();
+    SILFunction *F = E.getMethodWitness().Witness;
 
 #if 0
     // FIXME: For now, all default witnesses are private.
@@ -5065,7 +5067,7 @@ void SILModule::verify() const {
     return;
 #endif
   // Uniquing set to catch symbol name collisions.
-  llvm::StringSet<> symbolNames;
+  llvm::DenseSet<StringRef> symbolNames;
 
   // When merging partial modules, we only link functions from the current
   // module, without enabling "LinkAll" mode or running the SILLinker pass;

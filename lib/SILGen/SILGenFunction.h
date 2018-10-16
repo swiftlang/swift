@@ -166,6 +166,12 @@ static inline bool isReadAccess(SGFAccessKind kind) {
   return uint8_t(kind) <= uint8_t(SGFAccessKind::OwnedObjectRead);
 }
 
+/// Given a read access kind, does it require an owned result?
+static inline bool isReadAccessResultOwned(SGFAccessKind kind) {
+  assert(isReadAccess(kind));
+  return uint8_t(kind) >= uint8_t(SGFAccessKind::OwnedAddressRead);
+}
+
 /// Return an address-preferring version of the given access kind.
 static inline SGFAccessKind getAddressAccessKind(SGFAccessKind kind) {
   switch (kind) {
@@ -211,7 +217,7 @@ enum class TSanKind : bool {
 
 /// Represents an LValue opened for mutating access.
 ///
-/// This is used by LogicalPathComponent::getMaterialized().
+/// This is used by LogicalPathComponent::projectAsBase().
 struct MaterializedLValue {
   ManagedValue temporary;
 
@@ -1276,7 +1282,7 @@ public:
                                                     SILValue borrowedValue);
   ManagedValue emitManagedBorrowedRValueWithCleanup(
       SILValue original, SILValue borrowedValue, const TypeLowering &lowering);
-  ManagedValue emitManagedBorrowedArgumentWithCleanup(SILPHIArgument *arg);
+  ManagedValue emitManagedBorrowedArgumentWithCleanup(SILPhiArgument *arg);
   ManagedValue emitFormalEvaluationManagedBorrowedRValueWithCleanup(
       SILLocation loc, SILValue original, SILValue borrowedValue);
   ManagedValue emitFormalEvaluationManagedBorrowedRValueWithCleanup(
@@ -1363,6 +1369,8 @@ public:
                           Initialization *dest);
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue &&src,
                                    TSanKind tsanKind = TSanKind::None);
+  ManagedValue emitBorrowedLValue(SILLocation loc, LValue &&src,
+                                  TSanKind tsanKind = TSanKind::None);
   LValue emitOpenExistentialLValue(SILLocation loc,
                                    LValue &&existentialLV,
                                    CanArchetypeType openedArchetype,
@@ -1586,20 +1594,6 @@ public:
       llvm::function_ref<void(Optional<ManagedValue>)> handleFalse,
       ProfileCounter TrueCount = ProfileCounter(),
       ProfileCounter FalseCount = ProfileCounter());
-
-  /// A form of checked cast branch that uses the old non-ownership preserving
-  /// semantics.
-  ///
-  /// The main difference is that this code does not pass the old argument as a
-  /// block argument in the failure case. This causes values to be double
-  /// consumed.
-  void
-  emitCheckedCastBranchOld(SILLocation loc, ConsumableManagedValue src,
-                           Type sourceType, CanType targetType, SGFContext ctx,
-                           llvm::function_ref<void(ManagedValue)> handleTrue,
-                           llvm::function_ref<void()> handleFalse,
-                           ProfileCounter TrueCount = ProfileCounter(),
-                           ProfileCounter FalseCount = ProfileCounter());
 
   /// Emit the control flow for an optional 'bind' operation, branching to the
   /// active failure destination if the optional value addressed by optionalAddr
@@ -1903,11 +1897,11 @@ public:
 
   class ForceTryEmission {
     SILGenFunction &SGF;
-    Expr *Loc;
+    ForceTryExpr *Loc;
     JumpDest OldThrowDest;
 
   public:
-    ForceTryEmission(SILGenFunction &SGF, Expr *loc);
+    ForceTryEmission(SILGenFunction &SGF, ForceTryExpr *loc);
 
     ForceTryEmission(const ForceTryEmission &) = delete;
     ForceTryEmission &operator=(const ForceTryEmission &) = delete;

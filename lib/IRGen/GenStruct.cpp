@@ -108,8 +108,6 @@ namespace {
   class StructTypeInfoBase :
      public RecordTypeInfo<Impl, Base, FieldInfoType> {
     using super = RecordTypeInfo<Impl, Base, FieldInfoType>;
-   mutable Optional<const FieldInfoType *> ExtraInhabitantProvidingField;
-   mutable Optional<bool> MayHaveExtraInhabitants;
   protected:
     template <class... As>
     StructTypeInfoBase(StructTypeInfoKind kind, As &&...args)
@@ -145,9 +143,18 @@ namespace {
       auto elements = in.getRange(fieldRange.first, fieldRange.second);
       out.add(elements);
     }
+       
+    /// Given the address of a struct value, project out the address of a
+    /// single field.
+    Address projectFieldAddress(IRGenFunction &IGF,
+                                Address addr,
+                                SILType T,
+                                const FieldInfoType &field) const {
+      return asImpl().projectFieldAddress(IGF, addr, T, field.Field);
+    }
 
-    /// Given the address of a tuple, project out the address of a
-    /// single element.
+    /// Given the address of a struct value, project out the address of a
+    /// single field.
     Address projectFieldAddress(IRGenFunction &IGF,
                                 Address addr,
                                 SILType T,
@@ -202,216 +209,6 @@ namespace {
       return fieldInfo.getStructIndex();
     }
 
-    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
-      if (!MayHaveExtraInhabitants.hasValue()) {
-        MayHaveExtraInhabitants = false;
-        for (auto &field : asImpl().getFields())
-          if (field.getTypeInfo().mayHaveExtraInhabitants(IGM)) {
-            MayHaveExtraInhabitants = true;
-            break;
-          }
-      }
-      return *MayHaveExtraInhabitants;
-    }
-
-    // This is dead code in NonFixedStructTypeInfo.
-    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const {
-      if (auto field = asImpl().getFixedExtraInhabitantProvidingField(IGM)) {
-        auto &fieldTI = cast<FixedTypeInfo>(field->getTypeInfo());
-        return fieldTI.getFixedExtraInhabitantCount(IGM);
-      }
-      
-      return 0;
-    }
-
-    // This is dead code in NonFixedStructTypeInfo.
-    APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
-                                       unsigned bits,
-                                       unsigned index) const {
-      // We are only called if the type is known statically to have extra
-      // inhabitants.
-      auto &field = *asImpl().getFixedExtraInhabitantProvidingField(IGM);
-      auto &fieldTI = cast<FixedTypeInfo>(field.getTypeInfo());
-      APInt fieldValue = fieldTI.getFixedExtraInhabitantValue(IGM, bits, index);
-      return fieldValue.shl(field.getFixedByteOffset().getValueInBits());
-    }
-
-    // This is dead code in NonFixedStructTypeInfo.
-    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const {
-      auto field = asImpl().getFixedExtraInhabitantProvidingField(IGM);
-      if (!field)
-        return APInt();
-      
-      const FixedTypeInfo &fieldTI
-        = cast<FixedTypeInfo>(field->getTypeInfo());
-      auto targetSize = asImpl().getFixedSize().getValueInBits();
-      
-      if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal))
-        return APInt(targetSize, 0);
-      
-      APInt fieldMask = fieldTI.getFixedExtraInhabitantMask(IGM);
-      if (targetSize > fieldMask.getBitWidth())
-        fieldMask = fieldMask.zext(targetSize);
-      fieldMask = fieldMask.shl(field->getFixedByteOffset().getValueInBits());
-      return fieldMask;
-    }
-    
-    // Perform an operation using the field that provides extra inhabitants for
-    // the aggregate, whether that field is known statically or dynamically.
-    llvm::Value *withExtraInhabitantProvidingField(IRGenFunction &IGF,
-           Address structAddr,
-           SILType structType,
-           bool isOutlined,
-           llvm::Type *resultTy,
-           llvm::function_ref<llvm::Value* (const FieldInfoType &field)> body,
-           llvm::function_ref<llvm::Value* ()> outline) const {
-      // If we know one field consistently provides extra inhabitants, delegate
-      // to that field.
-      if (auto field = asImpl().getFixedExtraInhabitantProvidingField(IGF.IGM)){
-        return body(*field);
-      }
-      
-      // Otherwise, we have to figure out which field at runtime.
-      // The decision tree could be rather large, so invoke the value witness
-      // unless we're emitting the value witness.
-      if (!isOutlined)
-        return outline();
-
-      // The number of extra inhabitants the instantiated type has can be used
-      // to figure out which field the runtime chose. The runtime uses the same
-      // algorithm as above--use the field with the most extra inhabitants,
-      // favoring the earliest field in a tie. If we test the number of extra
-      // inhabitants in the struct against each field type's, then the first
-      // match should indicate which field we chose.
-      //
-      // We can reduce the decision space somewhat if there are fixed-layout
-      // fields, since we know the only possible runtime choices are
-      // either the fixed field with the most extra inhabitants (if any), or
-      // one of the unknown-layout fields.
-      //
-      // See whether we have a fixed candidate.
-      const FieldInfoType *fixedCandidate = nullptr;
-      unsigned fixedCount = 0;
-      for (auto &field : asImpl().getFields()) {
-        if (!field.getTypeInfo().mayHaveExtraInhabitants(IGF.IGM))
-          continue;
-        
-        if (const FixedTypeInfo *fixed =
-              dyn_cast<FixedTypeInfo>(&field.getTypeInfo())) {
-          auto fieldCount = fixed->getFixedExtraInhabitantCount(IGF.IGM);
-          if (fieldCount > fixedCount) {
-            fixedCandidate = &field;
-            fixedCount = fieldCount;
-          }
-        }
-      }
-      
-      // Loop through checking to see whether we picked the fixed candidate
-      // (if any) or one of the unknown-layout fields.
-      llvm::Value *instantiatedCount
-        = emitLoadOfExtraInhabitantCount(IGF, structType);
-      
-      auto contBB = IGF.createBasicBlock("chose_field_for_xi");
-      llvm::PHINode *contPhi = nullptr;
-      if (resultTy != IGF.IGM.VoidTy)
-        contPhi = llvm::PHINode::Create(resultTy,
-                                        asImpl().getFields().size());
-      
-      // If two fields have the same type, they have the same extra inhabitant
-      // count, and we'll pick the first. We don't have to check both.
-      SmallPtrSet<SILType, 4> visitedTypes;
-      
-      for (auto &field : asImpl().getFields()) {
-        if (!field.getTypeInfo().mayHaveExtraInhabitants(IGF.IGM))
-          continue;
-
-        ConditionalDominanceScope condition(IGF);
-
-        llvm::Value *fieldCount;
-        if (isa<FixedTypeInfo>(field.getTypeInfo())) {
-          // Skip fixed fields except for the candidate with the most known
-          // extra inhabitants we picked above.
-          if (&field != fixedCandidate)
-            continue;
-          
-          fieldCount = llvm::ConstantInt::get(IGF.IGM.SizeTy, fixedCount);
-        } else {
-          auto fieldTy = field.getType(IGF.IGM, structType);
-          // If this field has the same type as a field we already tested,
-          // we'll never pick this one, since they both have the same count.
-          if (!visitedTypes.insert(fieldTy).second)
-            continue;
-        
-          fieldCount = emitLoadOfExtraInhabitantCount(IGF, fieldTy);
-        }
-        auto equalsCount = IGF.Builder.CreateICmpEQ(instantiatedCount,
-                                                    fieldCount);
-        
-        auto yesBB = IGF.createBasicBlock("");
-        auto noBB = IGF.createBasicBlock("");
-        
-        IGF.Builder.CreateCondBr(equalsCount, yesBB, noBB);
-        
-        IGF.Builder.emitBlock(yesBB);
-        auto value = body(field);
-        if (contPhi)
-          contPhi->addIncoming(value, IGF.Builder.GetInsertBlock());
-        IGF.Builder.CreateBr(contBB);
-        
-        IGF.Builder.emitBlock(noBB);
-      }
-      
-      // We shouldn't have picked a number of extra inhabitants inconsistent
-      // with any individual field.
-      IGF.Builder.CreateUnreachable();
-      
-      IGF.Builder.emitBlock(contBB);
-      if (contPhi)
-        IGF.Builder.Insert(contPhi);
-     
-      return contPhi;
-    }
-
-    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                         Address structAddr,
-                                         SILType structType,
-                                         bool isOutlined) const override {
-      return withExtraInhabitantProvidingField(IGF, structAddr, structType,
-                                               isOutlined,
-                                               IGF.IGM.Int32Ty,
-        [&](const FieldInfoType &field) -> llvm::Value* {
-          Address fieldAddr = asImpl().projectFieldAddress(
-                                     IGF, structAddr, structType, field.Field);
-          return field.getTypeInfo().getExtraInhabitantIndex(IGF, fieldAddr,
-                                           field.getType(IGF.IGM, structType),
-                                           false /*not outlined for field*/);
-        },
-        [&]() -> llvm::Value * {
-          return emitGetExtraInhabitantIndexCall(IGF, structType, structAddr);
-        });
-    }
-
-    void storeExtraInhabitant(IRGenFunction &IGF,
-                              llvm::Value *index,
-                              Address structAddr,
-                              SILType structType,
-                              bool isOutlined) const override {
-      withExtraInhabitantProvidingField(IGF, structAddr, structType, isOutlined,
-                                        IGF.IGM.VoidTy,
-        [&](const FieldInfoType &field) -> llvm::Value* {
-          Address fieldAddr = asImpl().projectFieldAddress(
-                                     IGF, structAddr, structType, field.Field);
-          field.getTypeInfo().storeExtraInhabitant(IGF, index, fieldAddr,
-                                           field.getType(IGF.IGM, structType),
-                                           false /*not outlined for field*/);
-          return nullptr;
-        },
-        [&]() -> llvm::Value * {
-          emitStoreExtraInhabitantCall(IGF, structType, index, structAddr);
-          return nullptr;
-        });
-    }
-       
     bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                    ReferenceCounting *rc) const override {
       auto fields = asImpl().getFields();
@@ -487,68 +284,6 @@ namespace {
           continue;
         }
       }
-    }
-       
-    const FieldInfoType *
-    getFixedExtraInhabitantProvidingField(IRGenModule &IGM) const {
-      if (!ExtraInhabitantProvidingField.hasValue()) {
-        unsigned mostExtraInhabitants = 0;
-        const FieldInfoType *fieldWithMost = nullptr;
-        const FieldInfoType *singleNonFixedField = nullptr;
-
-        // TODO: If two fields have the same type, they have the same extra
-        // inhabitant count, and we'll pick the first. We don't have to check
-        // both. However, we don't always have access to the substituted struct
-        // type from this context, which would be necessary to make that
-        // judgment reliably.
-        
-        for (auto &field : asImpl().getFields()) {
-          auto &ti = field.getTypeInfo();
-          if (!ti.mayHaveExtraInhabitants(IGM))
-            continue;
-          
-          auto *fixed = dyn_cast<FixedTypeInfo>(&field.getTypeInfo());
-          // If any field is non-fixed, we can't definitively pick a best one,
-          // unless it happens to be the only non-fixed field and none of the
-          // other fields have extra inhabitants.
-          if (!fixed) {
-            // If we already saw a non-fixed field, then we can't pick one
-            // at compile time.
-            if (singleNonFixedField) {
-              singleNonFixedField = fieldWithMost = nullptr;
-              break;
-            }
-            
-            // Otherwise, note this field for later. If we have no fixed
-            // candidates, it may be the only choice for extra inhabitants.
-            singleNonFixedField = &field;
-            continue;
-          }
-          
-          unsigned count = fixed->getFixedExtraInhabitantCount(IGM);
-          if (count > mostExtraInhabitants) {
-            mostExtraInhabitants = count;
-            fieldWithMost = &field;
-          }
-        }
-        
-        if (fieldWithMost) {
-          if (singleNonFixedField) {
-            // If we have a non-fixed and fixed candidate, we can't know for
-            // sure now.
-            ExtraInhabitantProvidingField = nullptr;
-          } else {
-            // If we had all fixed fields, pick the one with the most extra
-            // inhabitants.
-            ExtraInhabitantProvidingField = fieldWithMost;
-          }
-        } else {
-          // If there were no fixed candidates, but we had a single non-fixed
-          // field with potential extra inhabitants, then it's our only choice.
-          ExtraInhabitantProvidingField = singleNonFixedField;
-        }
-      }
-      return *ExtraInhabitantProvidingField;
     }
   };
   
@@ -1125,7 +860,7 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
   auto ty = IGM.createNominalType(type);
 
   // Register a forward declaration before we look at any of the child types.
-  addForwardDecl(key, ty);
+  addForwardDecl(key);
 
   // Use different rules for types imported from C.
   if (D->hasClangNode()) {

@@ -1,5 +1,3 @@
-// REQUIRES: objc_interop
-
 // RUN: rm -rf %t
 // RUN: %target-swift-frontend -index-store-path %t/idx -primary-file %s -o %t/s1.o -I %S/Inputs -typecheck -module-cache-path %t/mcp
 // RUN: c-index-test core -print-unit %t/idx | %FileCheck %s -check-prefix=FILE1
@@ -74,6 +72,7 @@ func test() {
 // FILE2-NOT: Unit |{{.*}}ClangModuleB
 // FILE2-NOT: Record
 // FILE2: Unit | user | ClangModuleA | {{.*}}ClangModuleA-{{[A-Z0-9]*}}.pcm | ClangModuleA-{{[A-Z0-9]*}}.pcm-
+// FILE2: Record | user | {{.*}}s2.swift | s2.swift-
 // FILE2-NOT: Unit |{{.*}}ClangModuleB
 // FILE2-NOT: Record
 // FILE2: DEPEND END

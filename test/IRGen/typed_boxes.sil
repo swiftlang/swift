@@ -121,7 +121,7 @@ sil @take_t : $@convention(thin) <T> (@in T) -> ()
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dyn_box_a
 sil @dyn_box_a : $@convention(thin) <T> () -> () {
 entry:
-  // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S11typed_boxes3DynVMa"([[INT]] 0, %swift.type* %T)
+  // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s11typed_boxes3DynVMa"([[INT]] 0, %swift.type* %T)
   // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
   // CHECK: [[ALLOC:%.*]] = call swiftcc { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* [[METADATA]])
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 0

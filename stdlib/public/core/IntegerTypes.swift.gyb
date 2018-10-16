@@ -911,7 +911,7 @@ def assignmentOperatorComment(operator, fixedWidth):
 # by the related operator:
 #     +   addingReportingOverflow(_:)
 #     -   subtractingReportingOverflow(_:)
-#     *   multiplyingReportingOverflow(_:)
+#     *   multipliedReportingOverflow(by:)
 #     /   dividedReportingOverflow(by:)
 #     %   remainderReportingOverflow(dividingBy:)
 def overflowOperationComment(operator):
@@ -1617,7 +1617,7 @@ ${assignmentOperatorComment(x.operator, True)}
 % if BuiltinName == 'Int32':
     self._value = Builtin.truncOrBitCast_Word_Int32(_v)
 % elif BuiltinName == 'Int64':
-    self._value = Builtin.zextOrBitCast_Word_Int64(_v)
+    self._value = Builtin.${z}extOrBitCast_Word_Int64(_v)
 % end
   }
 
@@ -1625,7 +1625,7 @@ ${assignmentOperatorComment(x.operator, True)}
   public // @testable
   var _builtinWordValue: Builtin.Word {
 % if BuiltinName == 'Int32':
-    return Builtin.zextOrBitCast_Int32_Word(_value)
+    return Builtin.${z}extOrBitCast_Int32_Word(_value)
 % elif BuiltinName == 'Int64':
     return Builtin.truncOrBitCast_Int64_Word(_value)
 % end
@@ -1673,7 +1673,7 @@ extension ${Self} : Hashable {
   }
 
   @inlinable
-  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+  public func _rawHashValue(seed: Int) -> Int {
     % if bits == 64:
     return Hasher._hash(seed: seed, UInt64(_value))
     % elif bits == word_bits:
@@ -1770,11 +1770,6 @@ ${assignmentOperatorComment(x.operator, True)}
   }
 
 %   end
-
-  @_transparent
-  public static func != (lhs: ${Self}, rhs: ${Self}) -> Bool {
-    return !(lhs == rhs)
-  }
 
   @_transparent
   public static func <= (lhs: ${Self}, rhs: ${Self}) -> Bool {
@@ -1905,7 +1900,7 @@ internal struct _IntegerAnyHashableBox<
     _value.hash(into: &hasher)
   }
 
-  internal func _rawHashValue(_seed: (UInt64, UInt64)) -> Int {
+  internal func _rawHashValue(_seed: Int) -> Int {
     _sanityCheck(Base.self == UInt64.self || Base.self == Int64.self,
       "self isn't canonical")
     return _value._rawHashValue(seed: _seed)

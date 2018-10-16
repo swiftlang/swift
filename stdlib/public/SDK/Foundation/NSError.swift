@@ -359,7 +359,7 @@ extension CFError : Error {
 public protocol _ObjectiveCBridgeableError : Error {
   /// Produce a value of the error type corresponding to the given NSError,
   /// or return nil if it cannot be bridged.
-  init?(_bridgedNSError: NSError)
+  init?(_bridgedNSError: __shared NSError)
 }
 
 /// A hook for the runtime to use _ObjectiveCBridgeableError in order to
@@ -398,7 +398,7 @@ extension _BridgedNSError {
 extension _BridgedNSError where Self.RawValue: FixedWidthInteger {
   public var _code: Int { return Int(rawValue) }
 
-  public init?(_bridgedNSError: NSError) {
+  public init?(_bridgedNSError: __shared NSError) {
     if _bridgedNSError.domain != Self._nsErrorDomain {
       return nil
     }
@@ -547,6 +547,7 @@ extension _SwiftNewtypeWrapper where Self.RawValue == Error {
   }
 
   @inlinable // FIXME(sil-serialize-all)
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSError?
   ) -> Self {

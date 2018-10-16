@@ -34,6 +34,11 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT CMAKE_CROSSCOMPILING)
   set(CMAKE_OSX_DEPLOYMENT_TARGET "")
 endif()
 
+# If we were don't have XPC, just build inproc.
+if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" OR NOT HAVE_XPC_H)
+  set(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY TRUE)
+endif()
+
 # Now include AddSwiftSourceKit
 include(AddSwiftSourceKit)
 
@@ -45,7 +50,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     execute_process(COMMAND sw_vers -productVersion
                     OUTPUT_VARIABLE SOURCEKIT_DEPLOYMENT_TARGET
                     OUTPUT_STRIP_TRAILING_WHITESPACE)
-    string(REGEX MATCH "[0-9]+\\.[0-9]+" SOURCEKIT_DEPLOYMENT_TARGET ${SOURCEKIT_DEPLOYMENT_TARGET})
+    string(REGEX MATCH "[0-9]+\\.[0-9]+" SOURCEKIT_DEPLOYMENT_TARGET "${SOURCEKIT_DEPLOYMENT_TARGET}")
   endif()
 
   # Sadly there are two OS naming conventions.
@@ -90,71 +95,93 @@ include_directories(BEFORE
   ${SOURCEKIT_BINARY_DIR}/tools/SourceKit/include
 )
 
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-  set(SOURCEKIT_DEFAULT_TARGET_SDK "LINUX")
+if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+  string(TOUPPER "${CMAKE_SYSTEM_NAME}" SOURCEKIT_DEFAULT_TARGET_SDK)
+  set(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH TRUE)
+
   if(SWIFT_BUILD_SOURCEKIT)
+    if(CMAKE_C_COMPILER_ID STREQUAL Clang AND
+       CMAKE_C_COMPILER_VERSION VERSION_GREATER 3.8)
+     set(SWIFT_SOURCEKIT_C_COMPILER ${CMAKE_C_COMPILER})
+     set(SWIFT_SOURCEKIT_CXX_COMPILER ${CMAKE_CXX_COMPILER})
+   elseif(${CMAKE_SYSTEM_NAME} STREQUAL ${CMAKE_HOST_SYSTEM_NAME})
+     set(SWIFT_SOURCEKIT_C_COMPILER ${PATH_TO_CLANG_BUILD}/bin/clang)
+     set(SWIFT_SOURCEKIT_CXX_COMPILER ${PATH_TO_CLANG_BUILD}/bin/clang++)
+   else()
+     message(SEND_ERROR "libdispatch requires a newer clang compiler (${CMAKE_C_COMPILER_VERSION} < 3.9)")
+   endif()
+
     include(ExternalProject)
     ExternalProject_Add(libdispatch
                         SOURCE_DIR
                           "${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}"
-                        BINARY_DIR
-                          "${SWIFT_PATH_TO_LIBDISPATCH_BUILD}"
                         CMAKE_ARGS
-                          -DCMAKE_BUILD_TYPE=${LIBDISPATCH_CMAKE_BUILD_TYPE}
-                          -DCMAKE_C_COMPILER=${PATH_TO_CLANG_BUILD}/bin/clang
-                          -DCMAKE_CXX_COMPILER=${PATH_TO_CLANG_BUILD}/bin/clang++
+                          -DCMAKE_AR=${CMAKE_AR}
+                          -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+                          -DCMAKE_C_COMPILER=${SWIFT_SOURCEKIT_C_COMPILER}
+                          -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
+                          -DCMAKE_CXX_COMPILER=${SWIFT_SOURCEKIT_CXX_COMPILER}
+                          -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
                           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
-                          -DCMAKE_SWIFT_COMPILER=$<TARGET_FILE:swift>c
                           -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-                          -DENABLE_SWIFT=YES
+                          -DCMAKE_LINKER=${CMAKE_LINKER}
+                          -DCMAKE_RANLIB=${CMAKE_RANLIB}
+                          -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
+                          -DENABLE_SWIFT=NO
+                          -DENABLE_TESTING=NO
+                        INSTALL_COMMAND
+                          # NOTE(compnerd) provide a custom install command to
+                          # ensure that we strip out the DESTDIR environment
+                          # from the sub-build
+                          ${CMAKE_COMMAND} -E env --unset=DESTDIR ${CMAKE_COMMAND} --build . --target install
                         BUILD_BYPRODUCTS
-                          ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src/${CMAKE_SHARED_LIBRARY_PREFIX}dispatch${CMAKE_SHARED_LIBRARY_SUFFIX}
-                          ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/${CMAKE_STATIC_LIBRARY_PREFIX}BlocksRuntime${CMAKE_STATIC_LIBRARY_SUFFIX}
-                        STEP_TARGETS
-                          configure
+                          <INSTALL_DIR>/lib/${CMAKE_SHARED_LIBRARY_PREFIX}dispatch${CMAKE_SHARED_LIBRARY_SUFFIX}
+                          <INSTALL_DIR>/lib/${CMAKE_IMPORT_LIBRARY_PREFIX}dispatch${CMAKE_IMPORT_LIBRARY_SUFFIX}
+                          <INSTALL_DIR>/lib/${CMAKE_SHARED_LIBRARY_PREFIX}BlocksRuntime${CMAKE_SHARED_LIBRARY_SUFFIX}
+                          <INSTALL_DIR>/lib/${CMAKE_IMPORT_LIBRARY_PREFIX}BlocksRuntime${CMAKE_IMPORT_LIBRARY_SUFFIX}
                         BUILD_ALWAYS
                           1)
+
+    ExternalProject_Get_Property(libdispatch install_dir)
 
     # CMake does not like the addition of INTERFACE_INCLUDE_DIRECTORIES without
     # the directory existing.  Just create the location which will be populated
     # during the installation.
-    ExternalProject_Get_Property(libdispatch install_dir)
     file(MAKE_DIRECTORY ${install_dir}/include)
 
-    # TODO(compnerd) this should be taken care of by the
-    # INTERFACE_INCLUDE_DIRECTORIES below
+    add_library(dispatch SHARED IMPORTED)
+    set_target_properties(dispatch
+                          PROPERTIES
+                            IMPORTED_LOCATION
+                              ${install_dir}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}dispatch${CMAKE_SHARED_LIBRARY_SUFFIX}
+                            IMPORTED_IMPLIB
+                              ${install_dir}/lib/${CMAKE_IMPORT_LIBRARY_PREFIX}dispatch${CMAKE_IMPORT_LIBRARY_SUFFIX}
+                            INTERFACE_INCLUDE_DIRECTORIES
+                              ${install_dir}/include)
+
+    add_library(BlocksRuntime SHARED IMPORTED)
+    set_target_properties(BlocksRuntime
+                          PROPERTIES
+                            IMPORTED_LOCATION
+                              ${install_dir}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}BlocksRuntime${CMAKE_SHARED_LIBRARY_SUFFIX}
+                            IMPORTED_IMPLIB
+                              ${install_dir}/lib/${CMAKE_IMPORT_LIBRARY_PREFIX}BlocksRuntime${CMAKE_IMPORT_LIBRARY_SUFFIX}
+                            INTERFACE_INCLUDE_DIRECTORIES
+                              ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}/src/BlocksRuntime)
+
+    swift_install_in_component(sourcekit-inproc
+                               FILES
+                                 $<TARGET_FILE:dispatch>
+                                 $<TARGET_FILE:BlocksRuntime>
+                               DESTINATION
+                                 lib${LLVM_LIBDIR_SUFFIX})
+
+    # FIXME(compnerd) this should be taken care of by the
+    # INTERFACE_INCLUDE_DIRECTORIES above
     include_directories(AFTER
                           ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}/src/BlocksRuntime
                           ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
-    add_dependencies(libdispatch
-                       swift
-                       copy_shim_headers
-                       swiftCore-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}
-                       swiftSwiftOnoneSupport-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}
-                       swiftCore-swiftmodule-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}
-                       swiftSwiftOnoneSupport-swiftmodule-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH})
   endif()
-
-  ExternalProject_Get_Property(libdispatch install_dir)
-  add_library(dispatch SHARED IMPORTED)
-  set_target_properties(dispatch
-                        PROPERTIES
-                          IMPORTED_LOCATION
-                            ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src/${CMAKE_SHARED_LIBRARY_PREFIX}dispatch${CMAKE_SHARED_LIBRARY_SUFFIX}
-                          INTERFACE_INCLUDE_DIRECTORIES
-                            ${install_dir}/include
-                          IMPORTED_LINK_INTERFACE_LIBRARIES
-                            swiftCore-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH})
-
-  add_library(BlocksRuntime STATIC IMPORTED)
-  set_target_properties(BlocksRuntime
-                        PROPERTIES
-                          IMPORTED_LOCATION
-                            ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/${CMAKE_STATIC_LIBRARY_PREFIX}BlocksRuntime${CMAKE_STATIC_LIBRARY_SUFFIX}
-                          INTERFACE_INCLUDE_DIRECTORIES
-                            ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}/src/BlocksRuntime)
-
-  set(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH TRUE)
 endif()
 
 add_subdirectory(include)

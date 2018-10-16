@@ -1346,7 +1346,7 @@ static void convertBBArgType(SILBuilder &argBuilder, SILType newSILType,
       SILUndef::get(newSILType, arg->getFunction()->getModule()));
 
   arg->replaceAllUsesWith(copyArg);
-  arg = arg->getParent()->replacePHIArgument(arg->getIndex(), newSILType,
+  arg = arg->getParent()->replacePhiArgument(arg->getIndex(), newSILType,
                                              arg->getOwnershipKind());
 
   copyArg->replaceAllUsesWith(arg);

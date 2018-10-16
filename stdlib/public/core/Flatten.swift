@@ -92,7 +92,7 @@ extension FlattenSequence: Sequence {
   ///
   /// - Complexity: O(1).
   @inlinable // lazy-performance
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator())
   }
 }
@@ -122,7 +122,7 @@ extension Sequence where Element : Sequence {
   /// - Returns: A flattened view of the elements of this
   ///   sequence of sequences.
   @inlinable // lazy-performance
-  public func joined() -> FlattenSequence<Self> {
+  public __consuming func joined() -> FlattenSequence<Self> {
     return FlattenSequence(_base: self)
   }
 }
@@ -131,7 +131,7 @@ extension LazySequenceProtocol where Element : Sequence {
   /// Returns a lazy sequence that concatenates the elements of this sequence of
   /// sequences.
   @inlinable // lazy-performance
-  public func joined() -> LazySequence<FlattenSequence<Elements>> {
+  public __consuming func joined() -> LazySequence<FlattenSequence<Elements>> {
     return FlattenSequence(_base: elements).lazy
   }
 }
@@ -251,7 +251,7 @@ extension FlattenCollection : Sequence {
   ///
   /// - Complexity: O(1).
   @inlinable // lazy-performance
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator())
   }
 
@@ -261,7 +261,7 @@ extension FlattenCollection : Sequence {
   public var underestimatedCount: Int { return 0 }
 
   @inlinable // lazy-performance
-  public func _copyToContiguousArray() -> ContiguousArray<Base.Element.Element> {
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Base.Element.Element> {
     // The default implementation of `_copyToContiguousArray` queries the
     // `count` property, which materializes every inner collection.  This is a
     // bad default for `flatMap()`.  So we treat `self` as a sequence and only
@@ -514,7 +514,7 @@ extension Collection where Element : Collection {
   /// - Returns: A flattened view of the elements of this
   ///   collection of collections.
   @inlinable // lazy-performance
-  public func joined() -> FlattenCollection<Self> {
+  public __consuming func joined() -> FlattenCollection<Self> {
     return FlattenCollection(self)
   }
 }
@@ -523,7 +523,7 @@ extension LazyCollectionProtocol
   where Self : Collection, Element : Collection {
   /// A concatenation of the elements of `self`.
   @inlinable // lazy-performance
-  public func joined() -> LazyCollection<FlattenCollection<Elements>> {
+  public __consuming func joined() -> LazyCollection<FlattenCollection<Elements>> {
     return FlattenCollection(elements).lazy
   }
 }

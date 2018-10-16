@@ -328,7 +328,18 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBox
   static constexpr size_t stride = sizeof(Container);
   static constexpr size_t isPOD = false;
   static constexpr bool isBitwiseTakable = true;
-  static constexpr unsigned numExtraInhabitants = 0;
+  static constexpr unsigned numExtraInhabitants =
+    swift_getHeapObjectExtraInhabitantCount();
+  
+  static void storeExtraInhabitant(Container *dest, int index) {
+    swift_storeHeapObjectExtraInhabitant((HeapObject**)&dest->Header.Type,
+                                         index);
+  }
+
+  static int getExtraInhabitantIndex(const Container *src) {
+    return swift_getHeapObjectExtraInhabitantIndex(
+                                        (HeapObject* const *)&src->Header.Type);
+  }
 };
 
 /// A non-fixed box implementation class for an opaque existential
@@ -371,7 +382,18 @@ struct LLVM_LIBRARY_VISIBILITY NonFixedOpaqueExistentialBox
   };
 
   using type = Container;
-  static constexpr unsigned numExtraInhabitants = 0;
+  static constexpr unsigned numExtraInhabitants =
+    swift_getHeapObjectExtraInhabitantCount();
+  
+  static void storeExtraInhabitant(Container *dest, int index) {
+    swift_storeHeapObjectExtraInhabitant(
+                            (HeapObject**)(uintptr_t)&dest->Header.Type, index);
+  }
+
+  static int getExtraInhabitantIndex(const Container *src) {
+    return swift_getHeapObjectExtraInhabitantIndex(
+                             (HeapObject* const *)(uintptr_t)&src->Header.Type);
+  }
 };
 
 /// A common base class for fixed and non-fixed class-existential box

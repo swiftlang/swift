@@ -80,7 +80,7 @@ public:
 /// while global variables and class properties are not. Unidentified storage is
 /// associated with a SILValue that produces the accessed address but has not
 /// been determined to be the base of a storage object. It may, for example,
-/// be a SILPHIArgument.
+/// be a SILPhiArgument.
 ///
 /// An invalid AccessedStorage object is marked Unidentified and contains an
 /// invalid value. This signals that analysis has failed to recognize an
@@ -237,6 +237,7 @@ public:
     case Class:
       return objProj == other.objProj;
     }
+    llvm_unreachable("unhandled kind");
   }
 
   /// Return true if the storage is guaranteed local.
@@ -253,6 +254,7 @@ public:
     case Unidentified:
       return false;
     }
+    llvm_unreachable("unhandled kind");
   }
 
   bool isUniquelyIdentified() const {
@@ -268,6 +270,7 @@ public:
     case Unidentified:
       return false;
     }
+    llvm_unreachable("unhandled kind");
   }
 
   bool isDistinctFrom(const AccessedStorage &other) const {
@@ -377,7 +380,7 @@ namespace swift {
 /// The returned AccessedStorage represents the best attempt to find the base of
 /// the storage object being accessed at `sourceAddr`. This may be a fully
 /// identified storage base of known kind, or a valid but Unidentified storage
-/// object, such as a SILPHIArgument.
+/// object, such as a SILPhiArgument.
 ///
 /// This may return an invalid storage object if the address producer is not
 /// recognized by a whitelist of recognizable access patterns. The result must

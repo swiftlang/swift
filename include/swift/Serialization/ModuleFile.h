@@ -241,7 +241,7 @@ public:
     T Value;
 
     /// The offset.
-    serialization::BitOffset Offset;
+    unsigned Offset : 31;
 
     unsigned IsFullyDeserialized : 1;
 
@@ -285,40 +285,64 @@ public:
   };
 
 private:
+  /// An allocator for buffers owned by the file.
+  llvm::BumpPtrAllocator Allocator;
+
+  /// Allocates a buffer using #Allocator and initializes it with the contents
+  /// of the container \p rawData, then stores it in \p buffer.
+  ///
+  /// \p buffer is passed as an argument rather than returned so that the
+  /// element type can be inferred.
+  template <typename T, typename RawData>
+  void allocateBuffer(MutableArrayRef<T> &buffer, const RawData &rawData);
+
+  /// Allocates a buffer using #Allocator and initializes it with the contents
+  /// of the container \p rawData, then stores it in \p buffer.
+  ///
+  /// \p buffer is passed as an argument rather than returned so that the
+  /// element type can be inferred.
+  template <typename T, typename RawData>
+  void allocateBuffer(ArrayRef<T> &buffer, const RawData &rawData) {
+    assert(buffer.empty());
+    MutableArrayRef<T> result;
+    allocateBuffer(result, rawData);
+    buffer = result;
+  }
+
   /// Decls referenced by this module.
-  std::vector<Serialized<Decl*>> Decls;
+  MutableArrayRef<Serialized<Decl*>> Decls;
 
   /// DeclContexts referenced by this module.
-  std::vector<Serialized<DeclContext*>> DeclContexts;
+  MutableArrayRef<Serialized<DeclContext*>> DeclContexts;
 
   /// Local DeclContexts referenced by this module.
-  std::vector<Serialized<DeclContext*>> LocalDeclContexts;
+  MutableArrayRef<Serialized<DeclContext*>> LocalDeclContexts;
 
   /// Normal protocol conformances referenced by this module.
-  std::vector<Serialized<NormalProtocolConformance *>> NormalConformances;
+  MutableArrayRef<Serialized<NormalProtocolConformance *>> NormalConformances;
 
   /// SILLayouts referenced by this module.
-  std::vector<Serialized<SILLayout *>> SILLayouts;
+  MutableArrayRef<Serialized<SILLayout *>> SILLayouts;
 
   /// Types referenced by this module.
-  std::vector<Serialized<Type>> Types;
+  MutableArrayRef<Serialized<Type>> Types;
 
   /// Generic signatures referenced by this module.
-  std::vector<Serialized<GenericSignature *>> GenericSignatures;
+  MutableArrayRef<Serialized<GenericSignature *>> GenericSignatures;
 
   /// Generic environments referenced by this module.
-  std::vector<Serialized<GenericEnvironment *>> GenericEnvironments;
+  MutableArrayRef<Serialized<GenericEnvironment *>> GenericEnvironments;
 
   /// Substitution maps referenced by this module.
-  std::vector<Serialized<SubstitutionMap>> SubstitutionMaps;
+  MutableArrayRef<Serialized<SubstitutionMap>> SubstitutionMaps;
 
   /// Represents an identifier that may or may not have been deserialized yet.
   ///
-  /// If \c Offset is non-zero, the identifier has not been loaded yet.
+  /// If \c Ident is empty, the identifier has not been loaded yet.
   class SerializedIdentifier {
   public:
     Identifier Ident;
-    serialization::BitOffset Offset;
+    unsigned Offset;
 
     template <typename IntTy>
     /*implicit*/ SerializedIdentifier(IntTy rawOffset)
@@ -328,7 +352,7 @@ private:
   };
 
   /// Identifiers referenced by this module.
-  std::vector<SerializedIdentifier> Identifiers;
+  MutableArrayRef<SerializedIdentifier> Identifiers;
 
   class DeclTableInfo;
   using SerializedDeclTable =
@@ -377,9 +401,7 @@ private:
 
   TinyPtrVector<Decl *> ImportDecls;
 
-  using DeclIDVector = SmallVector<serialization::DeclID, 4>;
-
-  DeclIDVector OrderedTopLevelDecls;
+  ArrayRef<serialization::DeclID> OrderedTopLevelDecls;
 
   class DeclCommentTableInfo;
   using SerializedDeclCommentTable =
@@ -716,6 +738,9 @@ public:
   /// Adds all top-level decls to the given vector.
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results);
 
+  /// Adds all precedence groups to the given vector.
+  void getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results);
+
   /// Adds all local type decls to the given vector.
   void getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results);
 
@@ -793,6 +818,11 @@ public:
   /// given ID. Asserts that the name with this ID is not special.
   Identifier getIdentifier(serialization::IdentifierID IID);
 
+  /// Convenience method to retrieve the text of the name with the given ID.
+  /// This can be used if the result doesn't need to be uniqued in the
+  /// ASTContext. Asserts that the name with this ID is not special.
+  StringRef getIdentifierText(serialization::IdentifierID IID);
+
   /// Returns the decl with the given ID, deserializing it if needed.
   ///
   /// \param DID The ID for the decl within this module.
@@ -857,7 +887,26 @@ public:
 
   /// Reads a foreign error conformance from \c DeclTypeCursor, if present.
   Optional<ForeignErrorConvention> maybeReadForeignErrorConvention();
+
+  /// Reads inlinable body text from \c DeclTypeCursor, if present.
+  Optional<StringRef> maybeReadInlinableBodyText();
+
+  /// Reads pattern initializer text from \c DeclTypeCursor, if present.
+  Optional<StringRef> maybeReadPatternInitializerText();
 };
+
+template <typename T, typename RawData>
+void ModuleFile::allocateBuffer(MutableArrayRef<T> &buffer,
+                                const RawData &rawData) {
+  assert(buffer.empty() && "reallocating deserialized buffer");
+  if (rawData.empty())
+    return;
+
+  void *rawBuffer = Allocator.Allocate(sizeof(T) * rawData.size(), alignof(T));
+  buffer = llvm::makeMutableArrayRef(static_cast<T *>(rawBuffer),
+                                     rawData.size());
+  std::uninitialized_copy(rawData.begin(), rawData.end(), buffer.begin());
+}
 
 } // end namespace swift
 

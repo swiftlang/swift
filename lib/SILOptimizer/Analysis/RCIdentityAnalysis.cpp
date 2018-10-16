@@ -116,7 +116,7 @@ static SILValue stripRCIdentityPreservingInsts(SILValue V) {
   // since we will only visit it twice if we go around a back edge due to a
   // different SILArgument that is actually being used for its phi node like
   // purposes.
-  if (auto *A = dyn_cast<SILPHIArgument>(V))
+  if (auto *A = dyn_cast<SILPhiArgument>(V))
     if (SILValue Result = A->getSingleTerminatorOperand())
       return Result;
 
@@ -301,7 +301,7 @@ static SILValue allIncomingValuesEqual(
 /// potentially mismatch
 SILValue RCIdentityFunctionInfo::stripRCIdentityPreservingArgs(SILValue V,
                                                       unsigned RecursionDepth) {
-  auto *A = dyn_cast<SILPHIArgument>(V);
+  auto *A = dyn_cast<SILPhiArgument>(V);
   if (!A) {
     return SILValue();
   }

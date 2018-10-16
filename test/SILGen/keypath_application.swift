@@ -134,28 +134,28 @@ func writebackNesting(x: inout Int,
                       z: WritableKeyPath<Int, Int>,
                       w: Int) -> Int {
   // -- get 'b'
-  // CHECK: function_ref @$SSi19keypath_applicationE1bSivg
+  // CHECK: function_ref @$sSi19keypath_applicationE1bSivg
   // -- apply keypath y
   // CHECK: [[PROJECT_FN:%.*]] = function_ref @{{.*}}_projectKeyPathWritable
   // CHECK: [[PROJECT_RET:%.*]] = apply [[PROJECT_FN]]
   // CHECK: ({{%.*}}, [[OWNER_Y:%.*]]) = destructure_tuple [[PROJECT_RET]]
   // -- get 'u'
-  // CHECK: function_ref @$SSi19keypath_applicationE1uSivg
+  // CHECK: function_ref @$sSi19keypath_applicationE1uSivg
   // -- apply keypath z
   // CHECK: [[PROJECT_FN:%.*]] = function_ref @{{.*}}_projectKeyPathWritable
   // CHECK: [[PROJECT_RET:%.*]] = apply [[PROJECT_FN]]
   // CHECK: ({{%.*}}, [[OWNER_Z:%.*]]) = destructure_tuple [[PROJECT_RET]]
 
   // -- set 'tt'
-  // CHECK: function_ref @$SSi19keypath_applicationE2ttSivs
+  // CHECK: function_ref @$sSi19keypath_applicationE2ttSivs
   // -- destroy owner for keypath projection z
   // CHECK: destroy_value [[OWNER_Z]]
   // -- set 'u'
-  // CHECK: function_ref @$SSi19keypath_applicationE1uSivs
+  // CHECK: function_ref @$sSi19keypath_applicationE1uSivs
   // -- destroy owner for keypath projection y
   // CHECK: destroy_value [[OWNER_Y]]
   // -- set 'b'
-  // CHECK: function_ref @$SSi19keypath_applicationE1bSivs
+  // CHECK: function_ref @$sSi19keypath_applicationE1bSivs
 
   x.b[keyPath: y].u[keyPath: z].tt = w
 }

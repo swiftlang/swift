@@ -9,7 +9,7 @@ enum NullableObjCRefcounted {
   case Ref(Builtin.UnknownObject)
   case None
 }
-// CHECK-LABEL: define linkonce_odr hidden void @"$S39enum_value_semantics_special_cases_objc22NullableObjCRefcountedOwxx"(%swift.opaque* noalias %object, %swift.type* %NullableObjCRefcounted) {{.*}} {
+// CHECK-LABEL: define linkonce_odr hidden void @"$s39enum_value_semantics_special_cases_objc22NullableObjCRefcountedOwxx"(%swift.opaque* noalias %object, %swift.type* %NullableObjCRefcounted) {{.*}} {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %object to %T39enum_value_semantics_special_cases_objc22NullableObjCRefcountedO*
 // CHECK:   %1 = bitcast %T39enum_value_semantics_special_cases_objc22NullableObjCRefcountedO* %0 to %objc_object**
@@ -21,7 +21,7 @@ enum NullableObjCRefcounted {
 class C {}
 sil_vtable C {}
 
-sil @$S39enum_value_semantics_special_cases_objc1CCfD : $@convention(method) (C) -> ()
+sil @$s39enum_value_semantics_special_cases_objc1CCfD : $@convention(method) (C) -> ()
 
 enum AllMixedRefcounted {
   case Ref(Builtin.NativeObject)
@@ -30,7 +30,7 @@ enum AllMixedRefcounted {
   case None
 }
 
-// CHECK-LABEL: define linkonce_odr hidden void @"$S39enum_value_semantics_special_cases_objc18AllMixedRefcountedOwxx"(%swift.opaque* noalias %object, %swift.type* %AllMixedRefcounted) {{.*}} {
+// CHECK-LABEL: define linkonce_odr hidden void @"$s39enum_value_semantics_special_cases_objc18AllMixedRefcountedOwxx"(%swift.opaque* noalias %object, %swift.type* %AllMixedRefcounted) {{.*}} {
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %object to %T39enum_value_semantics_special_cases_objc18AllMixedRefcountedO*
 // CHECK:   %1 = bitcast %T39enum_value_semantics_special_cases_objc18AllMixedRefcountedO* %0 to i64*
@@ -38,7 +38,7 @@ enum AllMixedRefcounted {
 // CHECK:   %3 = lshr i64 %2, 62
 // CHECK:   %4 = trunc i64 %3 to i8
 // CHECK:   %5 = and i8 %4, 3
-// CHECK:   call void @"$S39enum_value_semantics_special_cases_objc18AllMixedRefcountedOWOe"(i64 %2)
+// CHECK:   call void @"$s39enum_value_semantics_special_cases_objc18AllMixedRefcountedOWOe"(i64 %2)
 // CHECK:   ret void
 // CHECK: }
 
@@ -50,8 +50,8 @@ enum AllMixedRefcountedTwoSimple {
   case Nothing
 }
 
-// CHECK-LABEL: define linkonce_odr hidden void @"$S39enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimpleOwxx"
-// CHECK:   call void @"$S39enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimpleOWOy"
+// CHECK-LABEL: define linkonce_odr hidden void @"$s39enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimpleOwxx"
+// CHECK:   call void @"$s39enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimpleOWOy"
 
 struct Val {
 }
@@ -64,7 +64,7 @@ enum MixedRefcountedWithIndirect {
   case None
 }
 
-// CHECK-LABEL: define linkonce_odr hidden void @"$S39enum_value_semantics_special_cases_objc27MixedRefcountedWithIndirectOwxx"(%swift.opaque* noalias %object, %swift.type* %MixedRefcountedWithIndirect)
+// CHECK-LABEL: define linkonce_odr hidden void @"$s39enum_value_semantics_special_cases_objc27MixedRefcountedWithIndirectOwxx"(%swift.opaque* noalias %object, %swift.type* %MixedRefcountedWithIndirect)
 // CHECK: entry:
 // CHECK:   %0 = bitcast %swift.opaque* %object to %T39enum_value_semantics_special_cases_objc27MixedRefcountedWithIndirectO*
 // CHECK:   %1 = bitcast %T39enum_value_semantics_special_cases_objc27MixedRefcountedWithIndirectO* %0 to i64*
@@ -72,12 +72,12 @@ enum MixedRefcountedWithIndirect {
 // CHECK:   %3 = lshr i64 %2, 62
 // CHECK:   %4 = trunc i64 %3 to i8
 // CHECK:   %5 = and i8 %4, 3
-// CHECK:   call void @"$S39enum_value_semantics_special_cases_objc27MixedRefcountedWithIndirectOWOe"(i64 %2)
+// CHECK:   call void @"$s39enum_value_semantics_special_cases_objc27MixedRefcountedWithIndirectOWOe"(i64 %2)
 // CHECK:   ret void
 // CHECK: }
 
 
-// CHECK-LABEL: define linkonce_odr hidden void @"$S39enum_value_semantics_special_cases_objc27MixedRefcountedWithIndirectOWOe"(i64)
+// CHECK-LABEL: define linkonce_odr hidden void @"$s39enum_value_semantics_special_cases_objc27MixedRefcountedWithIndirectOWOe"(i64)
 // CHECK: entry:
 // CHECK:   %1 = lshr i64 %0, 62
 // CHECK:   %2 = trunc i64 %1 to i8

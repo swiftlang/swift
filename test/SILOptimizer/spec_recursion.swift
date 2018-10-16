@@ -19,8 +19,8 @@ struct Test<T> {
 }
 
 // Make sure that the specialized function calls itself.
-//CHECK:   sil shared @$S14spec_recursion4TestV9recursive{{[_0-9a-zA-Z]*}}FSi_Tg5
-//CHECK: function_ref @$S14spec_recursion4TestV9recursive{{[_0-9a-zA-Z]*}}FSi_Tg5
+//CHECK:   sil shared @$s14spec_recursion4TestV9recursive{{[_0-9a-zA-Z]*}}FSi_Tg5
+//CHECK: function_ref @$s14spec_recursion4TestV9recursive{{[_0-9a-zA-Z]*}}FSi_Tg5
 //CHECK: return
 var x2 = Test<Int>()
 x2.recursive(x: 3)

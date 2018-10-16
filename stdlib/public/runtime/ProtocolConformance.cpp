@@ -173,36 +173,20 @@ ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
     return getStaticWitnessTable();
 
   case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
-    return getWitnessTableAccessor()(type, nullptr, 0);
+    return getWitnessTableAccessor()(type, nullptr);
 
   case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor: {
     // Check the conditional requirements.
-    std::vector<unsigned> genericParamCounts;
-    (void)_gatherGenericParameterCounts(type->getTypeContextDescriptor(),
-                                        genericParamCounts);
-    auto genericArgs = type->getGenericArgs();
+    SubstGenericParametersFromMetadata substitutions(type);
     std::vector<const void *> conditionalArgs;
     bool failed =
       _checkGenericRequirements(getConditionalRequirements(), conditionalArgs,
-        [&](unsigned flatIndex) {
-          // FIXME: Adjust for non-key type parameters.
-          return genericArgs[flatIndex];
-        },
-        [&](unsigned depth, unsigned index) -> const Metadata *  {
-          // FIXME: Adjust for non-key type parameters.
-          if (auto flatIndex = _depthIndexToFlatIndex(depth, index,
-                                                      genericParamCounts)) {
-            return genericArgs[*flatIndex];
-          }
-
-          return nullptr;
-        });
+                                substitutions, substitutions);
     if (failed) return nullptr;
 
     return getWitnessTableAccessor()(
                            type,
-                           (const swift::WitnessTable**)conditionalArgs.data(),
-                           conditionalArgs.size());
+                           (const swift::WitnessTable**)conditionalArgs.data());
   }
   }
   return nullptr;
@@ -682,14 +666,15 @@ static const Metadata *resolveGenericParamRef(
       swift_conformsToProtocol(current, assocTypeRef.Protocol);
     if (!witnessTable) return nullptr;
 
-    // Call the associated type access function.
-    using AssociatedTypeAccessFn =
-      const Metadata *(*)(const Metadata *base, const WitnessTable *);
-    unsigned adjustedIndex =
-      assocTypeRef.Index + WitnessTableFirstRequirementOffset;
-    current =
-      ((const AssociatedTypeAccessFn *)witnessTable)[adjustedIndex]
-        (current, witnessTable);
+    // Retrieve the associated type.
+    auto assocTypeReq = assocTypeRef.Requirement.get();
+    current = swift_getAssociatedTypeWitness(
+                                    MetadataState::Abstract,
+                                    const_cast<WitnessTable *>(witnessTable),
+                                    current,
+                                    assocTypeRef.Protocol
+                                      ->getRequirementBaseDescriptor(),
+                                    assocTypeReq).Value;
     if (!current) return nullptr;
   }
 
@@ -761,6 +746,8 @@ bool swift::_checkGenericRequirements(
 
       // Check whether it's dynamically castable, which works as a superclass
       // check.
+      // FIXME: We should be explicitly checking the superclass, so we
+      // don't require the subject type to be complete.
       if (!swift_dynamicCastMetatype(subjectType, baseType)) return true;
 
       continue;
@@ -778,6 +765,22 @@ bool swift::_checkGenericRequirements(
 
   // Success!
   return false;
+}
+
+const Metadata *swift::findConformingSuperclass(
+                                          const Metadata *type,
+                                          const ProtocolDescriptor *protocol) {
+  const Metadata *conformingType = type;
+  while (true) {
+    const Metadata *superclass = _swift_class_getSuperclass(conformingType);
+    if (!superclass)
+      break;
+    if (!swift_conformsToProtocol(superclass, protocol))
+      break;
+    conformingType = superclass;
+  }
+
+  return conformingType;
 }
 
 #define OVERRIDE_PROTOCOLCONFORMANCE COMPATIBILITY_OVERRIDE

@@ -67,6 +67,7 @@ namespace SourceKit {
   class SwiftASTManager;
   class SwiftLangSupport;
   class Context;
+  class NotificationCenter;
 
 class SwiftEditorDocument :
     public ThreadSafeRefCountedBase<SwiftEditorDocument> {
@@ -81,7 +82,8 @@ public:
   ~SwiftEditorDocument();
 
   ImmutableTextSnapshotRef initializeText(llvm::MemoryBuffer *Buf,
-                                          ArrayRef<const char *> Args);
+                                          ArrayRef<const char *> Args,
+                                          bool ProvideSemanticInfo);
   ImmutableTextSnapshotRef replaceText(unsigned Offset, unsigned Length,
                                        llvm::MemoryBuffer *Buf,
                                        bool ProvideSemanticInfo,
@@ -270,34 +272,34 @@ struct SwiftStatistics {
 };
 
 class SwiftLangSupport : public LangSupport {
-  SourceKit::Context &SKCtx;
+  std::shared_ptr<NotificationCenter> NotificationCtr;
   std::string RuntimeResourcePath;
-  std::unique_ptr<SwiftASTManager> ASTMgr;
-  SwiftEditorDocumentFileMap EditorDocuments;
+  std::shared_ptr<SwiftASTManager> ASTMgr;
+  std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocuments;
   SwiftInterfaceGenMap IFaceGenContexts;
   ThreadSafeRefCntPtr<SwiftCompletionCache> CCCache;
   ThreadSafeRefCntPtr<SwiftPopularAPI> PopularAPI;
   CodeCompletion::SessionCacheMap CCSessions;
   ThreadSafeRefCntPtr<SwiftCustomCompletions> CustomCompletions;
-  SwiftStatistics Stats;
+  std::shared_ptr<SwiftStatistics> Stats;
 
 public:
   explicit SwiftLangSupport(SourceKit::Context &SKCtx);
   ~SwiftLangSupport();
 
-  SourceKit::Context &getContext() { return SKCtx; }
+  std::shared_ptr<NotificationCenter> getNotificationCenter() const {
+    return NotificationCtr;
+  }
 
   StringRef getRuntimeResourcePath() const { return RuntimeResourcePath; }
 
-  SwiftASTManager &getASTManager() { return *ASTMgr; }
+  std::shared_ptr<SwiftASTManager> getASTManager() { return ASTMgr; }
 
-  SwiftEditorDocumentFileMap &getEditorDocuments() { return EditorDocuments; }
+  std::shared_ptr<SwiftEditorDocumentFileMap> getEditorDocuments() { return EditorDocuments; }
   SwiftInterfaceGenMap &getIFaceGenContexts() { return IFaceGenContexts; }
   IntrusiveRefCntPtr<SwiftCompletionCache> getCodeCompletionCache() {
     return CCCache;
   }
-
-  SwiftStatistics &getStatistics() { return Stats; }
 
   static SourceKit::UIdent getUIDForDecl(const swift::Decl *D,
                                          bool IsRef = false);

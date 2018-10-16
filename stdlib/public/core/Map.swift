@@ -74,7 +74,7 @@ extension LazyMapSequence: LazySequenceProtocol {
   ///
   /// - Complexity: O(1).
   @inlinable
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator(), _transform: _transform)
   }
 
@@ -119,7 +119,7 @@ extension LazyMapCollection: Sequence {
   ///
   /// - Complexity: O(1).
   @inlinable
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator(), _transform: _transform)
   }
 

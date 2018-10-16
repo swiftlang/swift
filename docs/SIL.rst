@@ -1666,7 +1666,7 @@ typed, so aliasing of classes is constrained by the type system as follows:
 A violation of the above aliasing rules only results in undefined
 behavior if the aliasing references are dereferenced within Swift code.
 For example,
-``_SwiftNativeNS[Array|Dictionary|String]`` classes alias with
+``__SwiftNativeNS[Array|Dictionary|String]`` classes alias with
 ``NS[Array|Dictionary|String]`` classes even though they are not
 statically related. Since Swift never directly accesses stored
 properties on the Foundation classes, this aliasing does not pose a

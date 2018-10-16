@@ -17,31 +17,31 @@
 //===----------------------------------------------------------------------===//
 
 #include "../SwiftShims/GlobalObjects.h"
-#include "../SwiftShims/LibcShims.h"
+#include "../SwiftShims/Random.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Debug.h"
 #include <stdlib.h>
 
 namespace swift {
 // FIXME(ABI)#76 : does this declaration need SWIFT_RUNTIME_STDLIB_API?
-// _direct type metadata for Swift._EmptyArrayStorage
+// _direct type metadata for Swift.__EmptyArrayStorage
 SWIFT_RUNTIME_STDLIB_API
-ClassMetadata CLASS_METADATA_SYM(s18_EmptyArrayStorage);
+ClassMetadata CLASS_METADATA_SYM(s19__EmptyArrayStorage);
 
-// _direct type metadata for Swift._RawNativeDictionaryStorage
+// _direct type metadata for Swift._EmptyDictionarySingleton
 SWIFT_RUNTIME_STDLIB_API
-ClassMetadata CLASS_METADATA_SYM(s27_RawNativeDictionaryStorage);
+ClassMetadata CLASS_METADATA_SYM(s25_EmptyDictionarySingleton);
 
-// _direct type metadata for Swift._RawNativeSetStorage
+// _direct type metadata for Swift._EmptySetSingleton
 SWIFT_RUNTIME_STDLIB_API
-ClassMetadata CLASS_METADATA_SYM(s20_RawNativeSetStorage);
+ClassMetadata CLASS_METADATA_SYM(s18_EmptySetSingleton);
 } // namespace swift
 
 SWIFT_RUNTIME_STDLIB_API
 swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
   // HeapObject header;
   {
-    &swift::CLASS_METADATA_SYM(s18_EmptyArrayStorage), // isa pointer
+    &swift::CLASS_METADATA_SYM(s19__EmptyArrayStorage), // isa pointer
   },
   
   // _SwiftArrayBodyStorage body;
@@ -52,58 +52,56 @@ swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
 };
 
 SWIFT_RUNTIME_STDLIB_API
-swift::_SwiftEmptyDictionaryStorage swift::_swiftEmptyDictionaryStorage = {
+swift::_SwiftEmptyDictionarySingleton swift::_swiftEmptyDictionarySingleton = {
   // HeapObject header;
   {
-    &swift::CLASS_METADATA_SYM(s27_RawNativeDictionaryStorage), // isa pointer
+    &swift::CLASS_METADATA_SYM(s25_EmptyDictionarySingleton), // isa pointer
   },
   
   // _SwiftDictionaryBodyStorage body;
   {
-    // We set the capacity to 1 so that there's an empty hole to search.
-    // Any insertion will lead to a real storage being allocated, because 
-    // Dictionary guarantees there's always another empty hole after insertion.
-    1, // int capacity;                               
+    // Setting the scale to 0 makes for a bucketCount of 1 -- so that the
+    // storage consists of a single unoccupied bucket. The capacity is set to
+    // 0 so that any insertion will lead to real storage being allocated.
     0, // int count;
-    
-    // _SwiftUnsafeBitMap initializedEntries
-    {
-      &swift::_swiftEmptyDictionaryStorage.entries, // unsigned int* values;
-      1 // int bitCount; (1 so there's something for iterators to read)
-    },
-    
-    (void*)1, // void* keys; (non-null garbage)
-    (void*)1  // void* values; (non-null garbage)
+    0, // int capacity;                                    
+    0, // int8 scale;
+    0, // int8 reservedScale;
+    0, // int16 extra;
+    0, // int32 age;
+    0, // int seed;
+    (void *)1, // void* keys; (non-null garbage)
+    (void *)1  // void* values; (non-null garbage)
   },
 
-  0 // int entries; (zero'd bits)
+  // bucket 0 is unoccupied; other buckets are out-of-bounds
+  static_cast<__swift_uintptr_t>(~1) // int metadata; 
 };
 
 SWIFT_RUNTIME_STDLIB_API
-swift::_SwiftEmptySetStorage swift::_swiftEmptySetStorage = {
+swift::_SwiftEmptySetSingleton swift::_swiftEmptySetSingleton = {
   // HeapObject header;
   {
-    &swift::CLASS_METADATA_SYM(s20_RawNativeSetStorage), // isa pointer
+    &swift::CLASS_METADATA_SYM(s18_EmptySetSingleton), // isa pointer
   },
   
-  // _SwiftDictionaryBodyStorage body;
+  // _SwiftSetBodyStorage body;
   {
-    // We set the capacity to 1 so that there's an empty hole to search.
-    // Any insertion will lead to a real storage being allocated, because 
-    // Dictionary guarantees there's always another empty hole after insertion.
-    1, // int capacity;                                    
+    // Setting the scale to 0 makes for a bucketCount of 1 -- so that the
+    // storage consists of a single unoccupied bucket. The capacity is set to
+    // 0 so that any insertion will lead to real storage being allocated.
     0, // int count;
-    
-    // _SwiftUnsafeBitMap initializedEntries
-    {
-      &swift::_swiftEmptySetStorage.entries, // unsigned int* values;
-      1 // int bitCount; (1 so there's something for iterators to read)
-    },
-    
-    (void*)1 // void* keys; (non-null garbage)
+    0, // int capacity;                                    
+    0, // int8 scale;
+    0, // int8 reservedScale;
+    0, // int16 extra;
+    0, // int32 age;
+    0, // int seed;
+    (void *)1, // void *rawElements; (non-null garbage)
   },
 
-  0 // int entries; (zero'd bits)
+  // bucket 0 is unoccupied; other buckets are out-of-bounds
+  static_cast<__swift_uintptr_t>(~1) // int metadata;
 };
 
 static swift::_SwiftHashingParameters initializeHashingParameters() {
@@ -117,8 +115,8 @@ static swift::_SwiftHashingParameters initializeHashingParameters() {
     return { 0, 0, true };
   }
   __swift_uint64_t seed0 = 0, seed1 = 0;
-  swift::_stdlib_random(&seed0, sizeof(seed0));
-  swift::_stdlib_random(&seed1, sizeof(seed1));
+  swift::swift_stdlib_random(&seed0, sizeof(seed0));
+  swift::swift_stdlib_random(&seed1, sizeof(seed1));
   return { seed0, seed1, false };
 }
 

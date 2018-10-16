@@ -30,7 +30,7 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
         }
     }
     
-    fileprivate init(reference: NSUUID) {
+    fileprivate init(reference: __shared NSUUID) {
         var bytes: uuid_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         withUnsafeMutablePointer(to: &bytes) {
             $0.withMemoryRebound(to: UInt8.self, capacity: 16) {
@@ -43,7 +43,7 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
     /// Create a UUID from a string such as "E621E1F8-C36C-495A-93FC-0C247A3E6E5F".
     /// 
     /// Returns nil for invalid strings.
-    public init?(uuidString string: String) {
+    public init?(uuidString string: __shared String) {
         let res = withUnsafeMutablePointer(to: &uuid) {
             $0.withMemoryRebound(to: UInt8.self, capacity: 16) {
                 return uuid_parse(string, $0)
@@ -148,6 +148,7 @@ extension UUID : _ObjectiveCBridgeable {
         return true
     }
 
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSUUID?) -> UUID {
         var result: UUID?
         _forceBridgeFromObjectiveC(source!, result: &result)

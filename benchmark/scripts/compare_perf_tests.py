@@ -34,7 +34,7 @@ import re
 import sys
 from bisect import bisect, bisect_left, bisect_right
 from collections import namedtuple
-from math import sqrt
+from math import ceil, sqrt
 
 
 class Sample(namedtuple('Sample', 'i num_iters runtime')):
@@ -141,20 +141,29 @@ class PerformanceTestSamples(object):
         """Maximum sampled value."""
         return self.samples[-1].runtime
 
+    def quantile(self, q):
+        """Return runtime for given quantile.
+
+        Equivalent to quantile estimate type R-1, SAS-3. See:
+        https://en.wikipedia.org/wiki/Quantile#Estimating_quantiles_from_a_sample
+        """
+        index = max(0, int(ceil(self.count * float(q))) - 1)
+        return self.samples[index].runtime
+
     @property
     def median(self):
         """Median sampled value."""
-        return self.samples[self.count / 2].runtime
+        return self.quantile(0.5)
 
     @property
     def q1(self):
         """First Quartile (25th Percentile)."""
-        return self.samples[self.count / 4].runtime
+        return self.quantile(0.25)
 
     @property
     def q3(self):
         """Third Quartile (75th Percentile)."""
-        return self.samples[(self.count / 2) + (self.count / 4)].runtime
+        return self.quantile(0.75)
 
     @property
     def iqr(self):
@@ -487,7 +496,7 @@ class ReportFormatter(object):
 {0} ({1}): {2}"""
 
     PERFORMANCE_TEST_RESULT_HEADER = ('TEST', 'MIN', 'MAX', 'MEAN', 'MAX_RSS')
-    RESULT_COMPARISON_HEADER = ('TEST', 'OLD', 'NEW', 'DELTA', 'SPEEDUP')
+    RESULT_COMPARISON_HEADER = ('TEST', 'OLD', 'NEW', 'DELTA', 'RATIO')
 
     @staticmethod
     def header_for(result):

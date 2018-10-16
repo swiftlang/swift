@@ -52,7 +52,7 @@ public struct Locale : Hashable, Equatable, ReferenceConvertible {
         _autoupdating = false
     }
     
-    fileprivate init(reference: NSLocale) {
+    fileprivate init(reference: __shared NSLocale) {
         _wrapped = reference.copy() as! NSLocale
         if __NSLocaleIsAutoupdating(reference) {
             _autoupdating = true
@@ -466,6 +466,7 @@ extension Locale : _ObjectiveCBridgeable {
         return true
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSLocale?) -> Locale {
         var result: Locale?
         _forceBridgeFromObjectiveC(source!, result: &result)

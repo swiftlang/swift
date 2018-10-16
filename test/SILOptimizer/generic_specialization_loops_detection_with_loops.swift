@@ -14,20 +14,20 @@
 // CHECK-LABEL: sil_stage canonical
 
 // Check that a specialization information for a specialized function was produced.
-// CHECK-LABEL: // Generic specialization information for function $S044generic_specialization_loops_detection_with_C04foo4yyx_q_tr0_lFSi_SdTg5
-// CHECK-NEXT:  // Caller: $S044generic_specialization_loops_detection_with_C011testFooBar4yyF
-// CHECK-NEXT:  // Parent: $S044generic_specialization_loops_detection_with_C04foo4yyx_q_tr0_lF
+// CHECK-LABEL: // Generic specialization information for function $s044generic_specialization_loops_detection_with_C04foo4yyx_q_tr0_lFSi_SdTg5
+// CHECK-NEXT:  // Caller: $s044generic_specialization_loops_detection_with_C011testFooBar4yyF
+// CHECK-NEXT:  // Parent: $s044generic_specialization_loops_detection_with_C04foo4yyx_q_tr0_lF
 // CHECK-NEXT:  // Substitutions: <Int, Double>
 
 // Check that the compiler has produced a specialization information for a call-site that
 // was inlined from a specialized generic function.
-// CHECK-LABEL: // Generic specialization information for call-site $S044generic_specialization_loops_detection_with_C04foo4yyx_q_tr0_lFSaySays5UInt8VGG_SaySaySiGGTg5:
-// CHECK-NEXT:  // Caller: $S044generic_specialization_loops_detection_with_C04foo4yyx_q_tr0_lFSi_SdTg5
-// CHECK-NEXT:  // Parent: $S044generic_specialization_loops_detection_with_C04bar4yyx_q_tr0_lF
+// CHECK-LABEL: // Generic specialization information for call-site $s044generic_specialization_loops_detection_with_C04foo4yyx_q_tr0_lFSaySays5UInt8VGG_SaySaySiGGTg5:
+// CHECK-NEXT:  // Caller: $s044generic_specialization_loops_detection_with_C04foo4yyx_q_tr0_lFSi_SdTg5
+// CHECK-NEXT:  // Parent: $s044generic_specialization_loops_detection_with_C04bar4yyx_q_tr0_lF
 // CHECK-NEXT:  // Substitutions: <Array<UInt8>, Array<Int>>
 // CHECK-NEXT:  //
-// CHECK-NEXT:  // Caller: $S044generic_specialization_loops_detection_with_C011testFooBar4yyF
-// CHECK-NEXT:  // Parent: $S044generic_specialization_loops_detection_with_C04foo4yyx_q_tr0_lF
+// CHECK-NEXT:  // Caller: $s044generic_specialization_loops_detection_with_C011testFooBar4yyF
+// CHECK-NEXT:  // Parent: $s044generic_specialization_loops_detection_with_C04foo4yyx_q_tr0_lF
 // CHECK-NEXT:  // Substitutions: <Int, Double>
 // CHECK-NEXT:  //
 // CHECK-NEXT: apply %{{.*}}Array<Array<UInt8>>

@@ -306,13 +306,11 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
     Info.ID = BuiltinValueKind::AtomicStore;
   else if (OperationName.startswith("allocWithTailElems_"))
     Info.ID = BuiltinValueKind::AllocWithTailElems;
-  else {
-    // Switch through the rest of builtins.
-#define BUILTIN(Id, Name, Attrs) \
-    if (OperationName == Name) { Info.ID = BuiltinValueKind::Id; } else
+  else
+    Info.ID = llvm::StringSwitch<BuiltinValueKind>(OperationName)
+#define BUILTIN(id, name, attrs) .Case(name, BuiltinValueKind::id)
 #include "swift/AST/Builtins.def"
-    /* final "else" */ { Info.ID = BuiltinValueKind::None; }
-  }
+      .Default(BuiltinValueKind::None);
 
   return Info;
 }
@@ -537,16 +535,16 @@ SILModule::lookUpFunctionInDefaultWitnessTable(const ProtocolDecl *Protocol,
 
   // Okay, we found the correct default witness table. Now look for the method.
   for (auto &Entry : Ret->getEntries()) {
-    // Ignore dummy entries semitted for non-method requirements, as well as
+    // Ignore dummy entries emitted for non-method requirements, as well as
     // requirements without default implementations.
-    if (!Entry.isValid())
+    if (!Entry.isValid() || Entry.getKind() != SILWitnessTable::Method)
       continue;
 
     // Check if this is the member we were looking for.
-    if (Entry.getRequirement() != Requirement)
+    if (Entry.getMethodWitness().Requirement != Requirement)
       continue;
 
-    return std::make_pair(Entry.getWitness(), Ret);
+    return std::make_pair(Entry.getMethodWitness().Witness, Ret);
   }
 
   // This requirement doesn't have a default implementation.
@@ -660,6 +658,10 @@ void SILModule::setOptRecordStream(
     std::unique_ptr<llvm::raw_ostream> &&RawStream) {
   OptRecordStream = std::move(Stream);
   OptRecordRawStream = std::move(RawStream);
+}
+
+bool SILModule::isStdlibModule() const {
+  return TheSwiftModule->isStdlibModule();
 }
 
 SILProperty *SILProperty::create(SILModule &M,

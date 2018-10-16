@@ -2114,10 +2114,10 @@ public:
   /// that trailing commas are currently allowed, and that invalid code may have
   /// stray or missing commas.
   MutableArrayRef<SourceLoc> getCommaLocs() {
-    return {getTrailingSourceLocs(), Bits.CollectionExpr.NumCommas};
+    return {getTrailingSourceLocs(), static_cast<size_t>(Bits.CollectionExpr.NumCommas)};
   }
   ArrayRef<SourceLoc> getCommaLocs() const {
-    return {getTrailingSourceLocs(), Bits.CollectionExpr.NumCommas};
+    return {getTrailingSourceLocs(), static_cast<size_t>(Bits.CollectionExpr.NumCommas)};
   }
   unsigned getNumCommas() const { return Bits.CollectionExpr.NumCommas; }
 
@@ -2911,7 +2911,7 @@ public:
 
   ArrayRef<int> getElementMapping() const {
     return {getTrailingObjects<int>(),
-            Bits.TupleShuffleExpr.NumElementMappings};
+            static_cast<size_t>(Bits.TupleShuffleExpr.NumElementMappings)};
   }
 
   /// What is the type impact of this shuffle?
@@ -2938,7 +2938,7 @@ public:
   /// Retrieve the argument indices for the variadic arguments.
   ArrayRef<unsigned> getVariadicArgs() const {
     return {getTrailingObjects<unsigned>(),
-            Bits.TupleShuffleExpr.NumVariadicArgs};
+            static_cast<size_t>(Bits.TupleShuffleExpr.NumVariadicArgs)};
   }
 
   /// Retrieve the owner of the default arguments.
@@ -2947,13 +2947,13 @@ public:
   /// Retrieve the caller-defaulted arguments.
   ArrayRef<Expr *> getCallerDefaultArgs() const {
     return {getTrailingObjects<Expr*>(),
-            Bits.TupleShuffleExpr.NumCallerDefaultArgs};
+            static_cast<size_t>(Bits.TupleShuffleExpr.NumCallerDefaultArgs)};
   }
 
   /// Retrieve the caller-defaulted arguments.
   MutableArrayRef<Expr *> getCallerDefaultArgs() {
     return {getTrailingObjects<Expr*>(),
-            Bits.TupleShuffleExpr.NumCallerDefaultArgs};
+            static_cast<size_t>(Bits.TupleShuffleExpr.NumCallerDefaultArgs)};
   }
 
   static bool classof(const Expr *E) {
@@ -3652,6 +3652,9 @@ public:
   /// This routine cannot change whether a closure has a single expression as
   /// its body; it can only update that expression.
   void setSingleExpressionBody(Expr *NewBody);
+
+  /// \brief Is this a completely empty closure?
+  bool hasEmptyBody() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Closure;
@@ -4770,7 +4773,8 @@ public:
       Subscript,
       OptionalForce,
       OptionalChain,
-      OptionalWrap
+      OptionalWrap,
+      Identity,
     };
   
   private:
@@ -4784,9 +4788,11 @@ public:
     } Decl;
     
     
-    llvm::PointerIntPair<Expr *, 3, Kind> SubscriptIndexExprAndKind;
-    ArrayRef<Identifier> SubscriptLabels;
-    ArrayRef<ProtocolConformanceRef> SubscriptHashableConformances;
+    Expr *SubscriptIndexExpr;
+    const Identifier *SubscriptLabelsData;
+    const ProtocolConformanceRef *SubscriptHashableConformancesData;
+    unsigned SubscriptSize;
+    Kind KindValue;
     Type ComponentType;
     SourceLoc Loc;
     
@@ -4911,75 +4917,89 @@ public:
                        SourceLoc());
     }
     
+    static Component forIdentity(SourceLoc selfLoc) {
+      return Component(nullptr, {}, nullptr, {}, {},
+                       Kind::Identity, Type(),
+                       selfLoc);
+    }
+    
     SourceLoc getLoc() const {
       return Loc;
     }
     
     Kind getKind() const {
-      return SubscriptIndexExprAndKind.getInt();
+      return KindValue;
     }
     
     bool isValid() const {
       return getKind() != Kind::Invalid;
     }
-    
+
     bool isResolved() const {
       if (!getComponentType())
         return false;
-      
+
       switch (getKind()) {
       case Kind::Subscript:
       case Kind::OptionalChain:
       case Kind::OptionalWrap:
       case Kind::OptionalForce:
       case Kind::Property:
+      case Kind::Identity:
         return true;
-      
+
       case Kind::UnresolvedSubscript:
       case Kind::UnresolvedProperty:
       case Kind::Invalid:
         return false;
       }
+      llvm_unreachable("unhandled kind");
     }
-    
+
     Expr *getIndexExpr() const {
       switch (getKind()) {
       case Kind::Subscript:
       case Kind::UnresolvedSubscript:
-        return SubscriptIndexExprAndKind.getPointer();
-        
+        return SubscriptIndexExpr;
+
       case Kind::Invalid:
       case Kind::OptionalChain:
       case Kind::OptionalWrap:
       case Kind::OptionalForce:
       case Kind::UnresolvedProperty:
       case Kind::Property:
+      case Kind::Identity:
         return nullptr;
       }
+      llvm_unreachable("unhandled kind");
     }
 
     ArrayRef<Identifier> getSubscriptLabels() const {
       switch (getKind()) {
       case Kind::Subscript:
       case Kind::UnresolvedSubscript:
-        return SubscriptLabels;
-        
+        return {SubscriptLabelsData, (size_t)SubscriptSize};
+
       case Kind::Invalid:
       case Kind::OptionalChain:
       case Kind::OptionalWrap:
       case Kind::OptionalForce:
       case Kind::UnresolvedProperty:
       case Kind::Property:
+      case Kind::Identity:
         llvm_unreachable("no subscript labels for this kind");
       }
+      llvm_unreachable("unhandled kind");
     }
-    
+
     ArrayRef<ProtocolConformanceRef>
     getSubscriptIndexHashableConformances() const {
       switch (getKind()) {
       case Kind::Subscript:
-        return SubscriptHashableConformances;
-        
+        if (!SubscriptHashableConformancesData)
+          return {};
+        return {SubscriptHashableConformancesData, (size_t)SubscriptSize};
+
       case Kind::UnresolvedSubscript:
       case Kind::Invalid:
       case Kind::OptionalChain:
@@ -4987,10 +5007,12 @@ public:
       case Kind::OptionalForce:
       case Kind::UnresolvedProperty:
       case Kind::Property:
+      case Kind::Identity:
         return {};
       }
+      llvm_unreachable("unhandled kind");
     }
-    
+
     void setSubscriptIndexHashableConformances(
       ArrayRef<ProtocolConformanceRef> hashables);
 
@@ -5006,10 +5028,12 @@ public:
       case Kind::OptionalWrap:
       case Kind::OptionalForce:
       case Kind::Property:
+      case Kind::Identity:
         llvm_unreachable("no unresolved name for this kind");
       }
+      llvm_unreachable("unhandled kind");
     }
-    
+
     ConcreteDeclRef getDeclRef() const {
       switch (getKind()) {
       case Kind::Property:
@@ -5022,10 +5046,12 @@ public:
       case Kind::OptionalChain:
       case Kind::OptionalWrap:
       case Kind::OptionalForce:
+      case Kind::Identity:
         llvm_unreachable("no decl ref for this kind");
       }
+      llvm_unreachable("unhandled kind");
     }
-    
+
     Type getComponentType() const {
       return ComponentType;
     }

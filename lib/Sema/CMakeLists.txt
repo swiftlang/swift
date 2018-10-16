@@ -11,6 +11,7 @@ add_swift_library(swiftSema STATIC
   CSRanking.cpp
   CSSimplify.cpp
   CSSolver.cpp
+  CSStep.cpp
   CSFix.cpp
   CSDiagnostics.cpp
   CalleeCandidateInfo.cpp

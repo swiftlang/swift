@@ -57,6 +57,9 @@ enum NLOptions : unsigned {
   /// This lookup should only return type declarations.
   NL_OnlyTypes = 0x80,
 
+  /// Include synonyms declared with @_implements()
+  NL_IncludeAttributeImplements = 0x100,
+
   /// This lookup is known to not add any additional dependencies to the
   /// primary source file.
   ///

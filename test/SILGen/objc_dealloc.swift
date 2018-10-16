@@ -9,13 +9,13 @@ func onDestruct() { }
 class SwiftGizmo : Gizmo {
   var x = X()
 
-  // CHECK-LABEL: sil hidden [transparent] @$S12objc_dealloc10SwiftGizmoC1xAA1XCvpfi : $@convention(thin) () -> @owned X
+  // CHECK-LABEL: sil hidden [transparent] @$s12objc_dealloc10SwiftGizmoC1xAA1XCvpfi : $@convention(thin) () -> @owned X
   // CHECK:      [[METATYPE:%.*]] = metatype $@thick X.Type
-  // CHECK:      [[FN:%.*]] = function_ref @$S12objc_dealloc1XCACycfC : $@convention(method) (@thick X.Type) -> @owned X
+  // CHECK:      [[FN:%.*]] = function_ref @$s12objc_dealloc1XCACycfC : $@convention(method) (@thick X.Type) -> @owned X
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[FN]]([[METATYPE]]) : $@convention(method) (@thick X.Type) -> @owned X
   // CHECK-NEXT: return [[RESULT]] : $X
 
-  // CHECK-LABEL: sil hidden @$S12objc_dealloc10SwiftGizmoC{{[_0-9a-zA-Z]*}}fc
+  // CHECK-LABEL: sil hidden @$s12objc_dealloc10SwiftGizmoC{{[_0-9a-zA-Z]*}}fc
   // CHECK: bb0([[SELF_PARAM:%[0-9]+]] : @owned $SwiftGizmo):
   override init() {
     // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var SwiftGizmo }, let, name "self"
@@ -32,11 +32,11 @@ class SwiftGizmo : Gizmo {
     super.init()
   }
 
-  // CHECK-LABEL: sil hidden @$S12objc_dealloc10SwiftGizmoCfD : $@convention(method) (@owned SwiftGizmo) -> ()
+  // CHECK-LABEL: sil hidden @$s12objc_dealloc10SwiftGizmoCfD : $@convention(method) (@owned SwiftGizmo) -> ()
   deinit {
     // CHECK: bb0([[SELF:%[0-9]+]] : @owned $SwiftGizmo):
     // Call onDestruct()
-    // CHECK:   [[ONDESTRUCT_REF:%[0-9]+]] = function_ref @$S12objc_dealloc10onDestructyyF : $@convention(thin) () -> ()
+    // CHECK:   [[ONDESTRUCT_REF:%[0-9]+]] = function_ref @$s12objc_dealloc10onDestructyyF : $@convention(thin) () -> ()
     // CHECK:   [[ONDESTRUCT_RESULT:%[0-9]+]] = apply [[ONDESTRUCT_REF]]() : $@convention(thin) () -> ()
     onDestruct()
 
@@ -53,20 +53,20 @@ class SwiftGizmo : Gizmo {
   }
 
   // Objective-C deallocation deinit thunk (i.e., -dealloc).
-  // CHECK-LABEL: sil hidden [thunk] @$S12objc_dealloc10SwiftGizmoCfDTo : $@convention(objc_method) (SwiftGizmo) -> ()
+  // CHECK-LABEL: sil hidden [thunk] @$s12objc_dealloc10SwiftGizmoCfDTo : $@convention(objc_method) (SwiftGizmo) -> ()
   // CHECK: bb0([[SELF:%[0-9]+]] : @unowned $SwiftGizmo):
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
 
-  // CHECK:   [[GIZMO_DTOR:%[0-9]+]] = function_ref @$S12objc_dealloc10SwiftGizmoCfD : $@convention(method) (@owned SwiftGizmo) -> ()
+  // CHECK:   [[GIZMO_DTOR:%[0-9]+]] = function_ref @$s12objc_dealloc10SwiftGizmoCfD : $@convention(method) (@owned SwiftGizmo) -> ()
   // CHECK:   [[RESULT:%[0-9]+]] = apply [[GIZMO_DTOR]]([[SELF_COPY]]) : $@convention(method) (@owned SwiftGizmo) -> ()
   // CHECK:   return [[RESULT]] : $()
 
   // Objective-C IVar initializer (i.e., -.cxx_construct)
-  // CHECK-LABEL: sil hidden @$S12objc_dealloc10SwiftGizmoCfeTo : $@convention(objc_method) (@owned SwiftGizmo) -> @owned SwiftGizmo
+  // CHECK-LABEL: sil hidden @$s12objc_dealloc10SwiftGizmoCfeTo : $@convention(objc_method) (@owned SwiftGizmo) -> @owned SwiftGizmo
   // CHECK: bb0([[SELF_PARAM:%[0-9]+]] : @owned $SwiftGizmo):
   // CHECK-NEXT:   debug_value [[SELF_PARAM]] : $SwiftGizmo, let, name "self"
   // CHECK-NEXT:   [[SELF:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_PARAM]] : $SwiftGizmo
-  // CHECK:        [[XINIT:%[0-9]+]] = function_ref @$S12objc_dealloc10SwiftGizmoC1xAA1XCvpfi
+  // CHECK:        [[XINIT:%[0-9]+]] = function_ref @$s12objc_dealloc10SwiftGizmoC1xAA1XCvpfi
   // CHECK-NEXT:   [[XOBJ:%[0-9]+]] = apply [[XINIT]]() : $@convention(thin) () -> @owned X
   // CHECK-NEXT:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
   // CHECK-NEXT:   [[X:%[0-9]+]] = ref_element_addr [[BORROWED_SELF]] : $SwiftGizmo, #SwiftGizmo.x
@@ -77,7 +77,7 @@ class SwiftGizmo : Gizmo {
   // CHECK-NEXT:   return [[SELF]] : $SwiftGizmo
 
   // Objective-C IVar destroyer (i.e., -.cxx_destruct)
-  // CHECK-LABEL: sil hidden @$S12objc_dealloc10SwiftGizmoCfETo : $@convention(objc_method) (SwiftGizmo) -> ()
+  // CHECK-LABEL: sil hidden @$s12objc_dealloc10SwiftGizmoCfETo : $@convention(objc_method) (SwiftGizmo) -> ()
   // CHECK:      bb0([[SELF:%[0-9]+]] : @unowned $SwiftGizmo):
   // CHECK-NEXT: debug_value [[SELF]] : $SwiftGizmo, let, name "self"
   // CHECK-NEXT: [[SELF_BORROW:%.*]] = begin_borrow [[SELF]]
@@ -88,6 +88,6 @@ class SwiftGizmo : Gizmo {
   // CHECK-NEXT: return [[RESULT]] : $()
 }
 
-// CHECK-NOT: sil hidden [thunk] @$SSo11SwiftGizmo2CfETo : $@convention(objc_method) (SwiftGizmo2) -> ()
+// CHECK-NOT: sil hidden [thunk] @$sSo11SwiftGizmo2CfETo : $@convention(objc_method) (SwiftGizmo2) -> ()
 class SwiftGizmo2 : Gizmo {
 }

@@ -686,7 +686,7 @@ extension _UnmanagedString where CodeUnit == UInt8 {
       return (self.count &- other.count).signum()
     }
     var cmp = Int(truncatingIfNeeded:
-      _stdlib_memcmp(
+      _swift_stdlib_memcmp(
         self.rawStart, other.rawStart,
         Swift.min(self.count, other.count)))
     if cmp == 0 {

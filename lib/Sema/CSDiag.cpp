@@ -472,15 +472,16 @@ private:
   /// true.
   bool diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure);
 
-  /// Check the associated constraint system to see if it has any archetypes
-  /// not properly resolved or missing. If so, diagnose the problem with
-  /// an error and return true.
-  bool diagnoseArchetypeAmbiguity();
+  /// Check the associated constraint system to see if it has any opened generic
+  /// parameters that were not bound to a fixed type. If so, diagnose the
+  /// problem with an error and return true.
+  bool diagnoseAmbiguousGenericParameters();
 
-  /// Emit an error message about an unbound generic parameter existing, and
-  /// emit notes referring to the target of a diagnostic, e.g., the function
-  /// or parameter being used.
-  void diagnoseUnboundArchetype(ArchetypeType *archetype, Expr *anchor);
+  /// Emit an error message about an unbound generic parameter, and emit notes
+  /// referring to the target of a diagnostic, e.g., the function or parameter
+  /// being used.
+  void diagnoseAmbiguousGenericParameter(GenericTypeParamType *paramTy,
+                                         Expr *anchor);
 
   /// Produce a diagnostic for a general member-lookup failure (irrespective of
   /// the exact expression kind).
@@ -549,6 +550,14 @@ private:
   /// Diagnose the usage of 'subscript' instead of the operator when calling
   /// a subscript and offer a fixit if the inputs are compatible.
   bool diagnoseSubscriptMisuse(ApplyExpr *callExpr);
+
+  /// Try to diagnose common errors involving implicitly non-escaping parameters
+  /// of function type, giving more specific and simpler diagnostics, attaching
+  /// notes on the parameter, and offering fixits to insert @escaping. Returns
+  /// true if it detects and issues an error, false if it does nothing.
+  bool diagnoseNonEscapingParameterToEscaping(Expr *expr, Type srcType,
+                                              Type dstType,
+                                              ContextualTypePurpose dstPurpose);
 
   bool visitExpr(Expr *E);
   bool visitIdentityExpr(IdentityExpr *E);
@@ -1440,12 +1449,14 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
         return true;
       }
 
-      if (srcFT->isNoEscape() && !destFT->isNoEscape()) {
-        diagnose(expr->getLoc(), diag::noescape_functiontype_mismatch,
-                 fromType, toType)
-        .highlight(expr->getSourceRange());
+      auto destPurpose = CTP_Unused;
+      if (constraint->getKind() == ConstraintKind::ArgumentConversion ||
+          constraint->getKind() == ConstraintKind::OperatorArgumentConversion)
+        destPurpose = CTP_CallArgument;
+
+      if (diagnoseNonEscapingParameterToEscaping(anchor, fromType, toType,
+                                                 destPurpose))
         return true;
-      }
     }
 
   // If this is a callee that mismatches an expected return type, we can emit a
@@ -2343,9 +2354,8 @@ static bool addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem &CS,
 /// of function type, giving more specific and simpler diagnostics, attaching
 /// notes on the parameter, and offering fixits to insert @escaping. Returns
 /// true if it detects and issues an error, false if it does nothing.
-static bool tryDiagnoseNonEscapingParameterToEscaping(
-    Expr *expr, Type srcType, Type dstType, ContextualTypePurpose dstPurpose,
-    ConstraintSystem &CS) {
+bool FailureDiagnosis::diagnoseNonEscapingParameterToEscaping(
+    Expr *expr, Type srcType, Type dstType, ContextualTypePurpose dstPurpose) {
   assert(expr);
   // Need to be referencing a parameter of function type
   auto declRef = dyn_cast<DeclRefExpr>(expr);
@@ -2683,8 +2693,8 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   }
 
   // Try for better/more specific diagnostics for non-escaping to @escaping
-  if (tryDiagnoseNonEscapingParameterToEscaping(expr, exprType, contextualType,
-                                                CTP, CS))
+  if (diagnoseNonEscapingParameterToEscaping(expr, exprType, contextualType,
+                                             CTP))
     return true;
 
   // Don't attempt fixits if we have an unsolved type variable, since
@@ -3039,7 +3049,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     
     // If we have a candidate function around, compute the position of its
     // default arguments.
-    llvm::SmallBitVector defaultMap(params.size());
+    SmallBitVector defaultMap(params.size());
     if (!candidates.empty()) {
       defaultMap = computeDefaultMap(params, candidates[0].getDecl(),
                                      candidates[0].level);
@@ -3078,7 +3088,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
           options |= TCC_AllowLValue;
 
         // Look at each of the arguments assigned to this parameter.
-        auto currentParamType = param.getType();
+        auto currentParamType = param.getOldType();
         for (auto inArgNo : paramBindings[paramIdx]) {
           // Determine the argument type.
           auto currentArgType = TE->getElement(inArgNo);
@@ -3554,8 +3564,8 @@ static bool diagnoseTupleParameterMismatch(CalleeCandidateInfo &CCI,
   }
 
   if (params.size() == 1 && args.size() == 1) {
-    auto paramType = params.front().getType();
-    auto argType = args.front().getType();
+    auto paramType = params.front().getOldType();
+    auto argType = args.front().getOldType();
 
     if (auto *paramFnType = paramType->getAs<AnyFunctionType>()) {
       // Only if both of the parameter and argument types are functions
@@ -3571,10 +3581,10 @@ static bool diagnoseTupleParameterMismatch(CalleeCandidateInfo &CCI,
   if (params.size() != 1 || args.empty())
     return false;
 
-  auto paramType = params.front().getType();
+  auto paramType = params.front().getOldType();
 
   if (args.size() == 1) {
-    auto argType = args.front().getType();
+    auto argType = args.front().getOldType();
     if (auto *paramFnType = paramType->getAs<AnyFunctionType>()) {
       // Only if both of the parameter and argument types are functions
       // let's recur into diagnosing their arguments.
@@ -3649,7 +3659,7 @@ class ArgumentMatcher : public MatchCallArgumentListener {
   Expr *FnExpr;
   Expr *ArgExpr;
   ArrayRef<AnyFunctionType::Param> &Parameters;
-  const llvm::SmallBitVector &DefaultMap;
+  const SmallBitVector &DefaultMap;
   SmallVectorImpl<AnyFunctionType::Param> &Arguments;
 
   CalleeCandidateInfo CandidateInfo;
@@ -3667,7 +3677,7 @@ class ArgumentMatcher : public MatchCallArgumentListener {
 public:
   ArgumentMatcher(Expr *fnExpr, Expr *argExpr,
                   ArrayRef<AnyFunctionType::Param> &params,
-                  const llvm::SmallBitVector &defaultMap,
+                  const SmallBitVector &defaultMap,
                   SmallVectorImpl<AnyFunctionType::Param> &args,
                   CalleeCandidateInfo &CCI, bool isSubscript)
       : TC(CCI.CS.TC), FnExpr(fnExpr), ArgExpr(argExpr), Parameters(params),
@@ -3737,14 +3747,14 @@ public:
       insertText << ", ";
     if (!name.empty())
       insertText << name.str() << ": ";
-    Type Ty = param.getType();
+    Type Ty = param.getOldType();
     // Explode inout type.
     if (param.isInOut()) {
       insertText << "&";
       Ty = param.getPlainType();
     }
     // @autoclosure; the type should be the result type.
-    if (auto FT = param.getType()->getAs<AnyFunctionType>())
+    if (auto FT = param.getOldType()->getAs<AnyFunctionType>())
       if (FT->isAutoClosure())
         Ty = FT->getResult();
     insertText << "<#" << Ty << "#>";
@@ -4009,7 +4019,7 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
 
   auto params = candidate.getParameters();
 
-  llvm::SmallBitVector defaultMap =
+  SmallBitVector defaultMap =
     computeDefaultMap(params, candidate.getDecl(), candidate.level);
   auto args = decomposeArgType(CCI.CS.getType(argExpr), argLabels);
 
@@ -4029,7 +4039,7 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
     auto resTy =
         candidate.getResultType()->lookThroughAllOptionalTypes();
     auto rawTy = isRawRepresentable(resTy, CCI.CS);
-    if (rawTy && arg.getType() && resTy->isEqual(arg.getType())) {
+    if (rawTy && arg.getOldType() && resTy->isEqual(arg.getOldType())) {
       auto getInnerExpr = [](Expr *E) -> Expr * {
         auto *parenE = dyn_cast<ParenExpr>(E);
         if (!parenE)
@@ -4153,8 +4163,8 @@ static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
       continue;
 
     for (unsigned i = 0, n = parameters.size(); i != n; ++i) {
-      auto paramType = parameters[i].getType();
-      auto argType = arguments[i].getType();
+      auto paramType = parameters[i].getOldType();
+      auto argType = arguments[i].getOldType();
 
       for (auto kind : rawRepresentableProtocols) {
         // If trying to convert from raw type to raw representable,
@@ -4181,8 +4191,8 @@ static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
   expr = expr->getValueProvidingExpr();
 
   auto parameters = bestMatchCandidate->getParameters();
-  auto paramType = parameters[bestMatchIndex].getType();
-  auto singleArgType = arguments[bestMatchIndex].getType();
+  auto paramType = parameters[bestMatchIndex].getOldType();
+  auto singleArgType = arguments[bestMatchIndex].getOldType();
 
   auto diag = CS.TC.diagnose(expr->getLoc(),
                              diag::cannot_convert_argument_value,
@@ -4657,7 +4667,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     return false;
 
   auto params = candidate.getParameters();
-  llvm::SmallBitVector defaultMap =
+  SmallBitVector defaultMap =
     computeDefaultMap(params, candidate.getDecl(), candidate.level);
   auto args = decomposeArgType(CS.getType(argExpr), argLabels);
 
@@ -4684,12 +4694,15 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     // this returns a non-singular value is when there are varargs in play.
     for (auto argNo : bindings[i]) {
       auto argType = args[argNo]
-                         .getType()
+                         .getOldType()
                          ->getWithoutSpecifierType();
 
-      if (argType->is<ArchetypeType>()) {
-        diagnoseUnboundArchetype(archetype, fnExpr);
-        return true;
+      if (auto *archetype = argType->getAs<ArchetypeType>()) {
+        auto interfaceTy = archetype->getInterfaceType();
+        if (auto *paramTy = interfaceTy->getAs<GenericTypeParamType>()) {
+          diagnoseAmbiguousGenericParameter(paramTy, fnExpr);
+          return true;
+        }
       }
 
       if (isUnresolvedOrTypeVarType(argType) || argType->hasError())
@@ -4854,8 +4867,8 @@ static bool diagnoseClosureExplicitParameterMismatch(
     return false;
 
   for (unsigned i = 0, n = params.size(); i != n; ++i) {
-    auto paramType = params[i].getType();
-    auto argType = args[i].getType();
+    auto paramType = params[i].getOldType();
+    auto argType = args[i].getOldType();
 
     if (auto paramFnType = paramType->getAs<AnyFunctionType>()) {
       if (auto argFnType = argType->getAs<AnyFunctionType>())
@@ -4968,7 +4981,7 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
     if (params.size() != 1)
       return false;
 
-    Type paramType = params.front().getType();
+    Type paramType = params.front().getOldType();
     if (auto paramFnType = paramType->getAs<AnyFunctionType>()) {
       auto closureType = CS.getType(closureExpr);
       if (auto *argFnType = closureType->getAs<AnyFunctionType>()) {
@@ -5122,9 +5135,9 @@ bool FailureDiagnosis::diagnoseSubscriptMisuse(ApplyExpr *callExpr) {
       return {CC_GeneralMismatch, {}};
 
     for (unsigned i = 0, e = params.size(); i < e; i ++) {
-      if (CS.TC.isConvertibleTo(params[i].getType(),
-                                candParams[i].getType(), CS.DC) ||
-          candParams[i].getType()->is<GenericTypeParamType>())
+      if (CS.TC.isConvertibleTo(params[i].getOldType(),
+                                candParams[i].getOldType(), CS.DC) ||
+          candParams[i].getOldType()->is<GenericTypeParamType>())
         continue;
       return {CC_GeneralMismatch, {}};
     }
@@ -5478,19 +5491,52 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     }
   }
 
+  auto isFailingConstraintRelevant = [&]() -> bool {
+    auto *constraint = CS.failedConstraint;
+    if (!constraint)
+      return false;
+
+    auto *locator = constraint->getLocator();
+    return locator && locator->getAnchor() == callExpr;
+  };
+
   // If there is a failing constraint associated with current constraint
   // system which points to the argument/parameter mismatch, let's use
   // that information while re-typechecking argument expression, this
   // makes it a lot easier to determine contextual mismatch.
-  if (CS.failedConstraint && !hasTrailingClosure) {
+  if (isFailingConstraintRelevant() && !hasTrailingClosure) {
     auto *constraint = CS.failedConstraint;
     if (constraint->getKind() == ConstraintKind::ApplicableFunction) {
-      if (auto *locator = constraint->getLocator()) {
-        if (locator->getAnchor() == callExpr) {
-          auto calleeType = CS.simplifyType(constraint->getSecondType());
-          if (auto *fnType = calleeType->getAs<FunctionType>())
-            argType = fnType->getInput();
+      auto calleeType = CS.simplifyType(constraint->getSecondType());
+      if (auto *fnType = calleeType->getAs<FunctionType>())
+        argType = AnyFunctionType::composeInput(fnType->getASTContext(),
+                                                fnType->getParams(),
+                                                /*canonicalVararg=*/false);
+    } else if (constraint->getKind() == ConstraintKind::ArgumentConversion ||
+               constraint->getKind() ==
+                   ConstraintKind::OperatorArgumentConversion) {
+      using PathEltKind = ConstraintLocator::PathElementKind;
+      // Dig up type variable which represents the overload choice that fit
+      // this call expression after simplifying `ApplicableFunction` constraint.
+      for (auto *typeVar : CS.getTypeVariables()) {
+        auto *locator = typeVar->getImpl().getLocator();
+        auto path = locator->getPath();
+
+        // Check whether this type variable in anchored at current
+        // expression and path ends with `apply function`, which means
+        // that it's related to `ApplicableFunction` constraint.
+        if (locator->getAnchor() != callExpr || path.empty() ||
+            path.back().getKind() != PathEltKind::ApplyFunction)
+          continue;
+
+        if (auto type = typeVar->getImpl().getFixedType(nullptr)) {
+          fnType = type;
+          if (auto *FT = fnType->getAs<AnyFunctionType>())
+            argType = AnyFunctionType::composeInput(FT->getASTContext(),
+                                                    FT->getParams(),
+                                                    /*canonicalVararg=*/false);
         }
+        break;
       }
     }
   }
@@ -5641,8 +5687,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         if (params.size() != 2)
           return false;
 
-        auto lhsCandidate = params[0].getType();
-        auto rhsCandidate = params[1].getType();
+        auto lhsCandidate = params[0].getOldType();
+        auto rhsCandidate = params[1].getOldType();
         auto lhsIsCandidate = lhsType->isEqual(lhsCandidate);
         auto rhsIsCandidate = rhsType->isEqual(rhsCandidate);
 
@@ -6126,7 +6172,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
       }
 
       if (inferredArgCount == 1 && actualArgCount > 1) {
-        auto *argTupleTy = inferredArgs.front().getType()->getAs<TupleType>();
+        auto *argTupleTy = inferredArgs.front().getOldType()->getAs<TupleType>();
         // Let's see if inferred argument is actually a tuple inside of Paren.
         if (argTupleTy) {
           // Looks like the number of closure parameters matches number
@@ -6269,7 +6315,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
       // Before doing so, strip attributes off the function type so that they
       // don't confuse the issue.
       fnType = FunctionType::get(fnType->getParams(), fnType->getResult(),
-                                 fnType->getExtInfo(), false);
+                                 fnType->getExtInfo());
       auto diag = diagnose(
           params->getStartLoc(), diag::closure_argument_list_tuple, fnType,
           inferredArgCount, actualArgCount, (actualArgCount == 1));
@@ -6308,20 +6354,6 @@ bool FailureDiagnosis::diagnoseClosureExpr(
     // Coerce parameter types here only if there are no unresolved
     if (CS.TC.coerceParameterListToType(params, CE, fnType))
       return true;
-
-    for (auto param : *params) {
-      auto paramType = param->getType();
-      // If this is unresolved 'inout' parameter, it's better to drop
-      // 'inout' from type because that might help to diagnose actual problem
-      // e.g. type inference doesn't give us much information anyway.
-      if (param->isInOut() && paramType->hasUnresolvedType()) {
-        assert(!param->isImmutable() || !paramType->is<InOutType>());
-        param->setType(CS.getASTContext().TheUnresolvedType);
-        param->setInterfaceType(paramType->getInOutObjectType());
-        param->setSpecifier(swift::VarDecl::Specifier::Default);
-      }
-    }
-
     expectedResultType = fnType->getResult();
   }
 
@@ -6635,6 +6667,7 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
       break;
 
     case KeyPathExpr::Component::Kind::Invalid:
+    case KeyPathExpr::Component::Kind::Identity:
     case KeyPathExpr::Component::Kind::OptionalChain:
     case KeyPathExpr::Component::Kind::OptionalForce:
       // FIXME: Diagnose optional chaining and forcing properly.
@@ -7746,22 +7779,18 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   diagnosis.diagnoseAmbiguity(expr);
 }
 
-// FIXME: Instead of doing this, we should store the decl in the type
-// variable, or in the locator.
-static bool hasArchetype(const GenericTypeDecl *generic,
-                         ArchetypeType *archetype) {
-  assert(!archetype->getOpenedExistentialType() &&
-         !archetype->getParent());
-
-  auto genericEnv = generic->getGenericEnvironment();
-  if (!genericEnv)
+static bool hasGenericParameter(const GenericTypeDecl *generic,
+                                GenericTypeParamType *paramTy) {
+  auto *decl = paramTy->getDecl();
+  if (!decl)
     return false;
 
-  return archetype->getGenericEnvironment() == genericEnv;
+  return decl->getDeclContext() == generic;
 }
 
-static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
-                                ConstraintSystem &cs) {
+static void noteGenericParameterSource(const TypeLoc &loc,
+                                       GenericTypeParamType *paramTy,
+                                       ConstraintSystem &cs) {
   const GenericTypeDecl *FoundDecl = nullptr;
   const ComponentIdentTypeRepr *FoundGenericTypeBase = nullptr;
 
@@ -7770,10 +7799,10 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
     struct FindGenericTypeDecl : public ASTWalker {
       const GenericTypeDecl *FoundDecl = nullptr;
       const ComponentIdentTypeRepr *FoundGenericTypeBase = nullptr;
-      ArchetypeType *Archetype;
+      GenericTypeParamType *ParamTy;
 
-      FindGenericTypeDecl(ArchetypeType *Archetype)
-          : Archetype(Archetype) {}
+      FindGenericTypeDecl(GenericTypeParamType *ParamTy)
+          : ParamTy(ParamTy) {}
       
       bool walkToTypeReprPre(TypeRepr *T) override {
         // If we already emitted the note, we're done.
@@ -7782,7 +7811,7 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
         if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
           auto *generic =
               dyn_cast_or_null<GenericTypeDecl>(ident->getBoundDecl());
-          if (generic && hasArchetype(generic, Archetype)) {
+          if (generic && hasGenericParameter(generic, ParamTy)) {
             FoundDecl = generic;
             FoundGenericTypeBase = ident;
             return false;
@@ -7791,7 +7820,7 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
         // Keep walking.
         return true;
       }
-    } findGenericTypeDecl(archetype);
+    } findGenericTypeDecl(paramTy);
 
     typerepr->walk(findGenericTypeDecl);
     FoundDecl = findGenericTypeDecl.FoundDecl;
@@ -7802,7 +7831,7 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
   // type checked expression.
   if (!FoundDecl) {
     if (const GenericTypeDecl *generic = loc.getType()->getAnyGeneric())
-      if (hasArchetype(generic, archetype))
+      if (hasGenericParameter(generic, paramTy))
         FoundDecl = generic;
   }
 
@@ -7815,7 +7844,7 @@ static void noteArchetypeSource(const TypeLoc &loc, ArchetypeType *archetype,
       type = typeAlias->getUnboundGenericType();
     else
       type = FoundDecl->getDeclaredInterfaceType();
-    tc.diagnose(FoundDecl, diag::archetype_declared_in_type, archetype, type);
+    tc.diagnose(FoundDecl, diag::archetype_declared_in_type, paramTy, type);
   }
 
   if (FoundGenericTypeBase && !isa<GenericIdentTypeRepr>(FoundGenericTypeBase)){
@@ -8076,25 +8105,23 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
 /// Check the associated constraint system to see if it has any archetypes
 /// not properly resolved or missing. If so, diagnose the problem with
 /// an error and return true.
-bool FailureDiagnosis::diagnoseArchetypeAmbiguity() {
-  using Archetype = std::tuple<ArchetypeType *, ConstraintLocator *, unsigned>;
+bool FailureDiagnosis::diagnoseAmbiguousGenericParameters() {
+  using GenericParameter = std::tuple<GenericTypeParamType *,
+                                      ConstraintLocator *,
+                                      unsigned>;
 
-  llvm::SmallVector<Archetype, 2> unboundParams;
-  // Check out all of the type variables lurking in the system.  If any are
-  // unbound archetypes, then the problem is that it couldn't be resolved.
+  llvm::SmallVector<GenericParameter, 2> unboundParams;
+  // Check out all of the type variables lurking in the system.  If any free
+  // type variables were created when opening generic parameters, diagnose
+  // that the generic parameter could not be inferred.
   for (auto tv : CS.getTypeVariables()) {
     auto &impl = tv->getImpl();
 
     if (impl.hasRepresentativeOrFixed())
       continue;
 
-    // If this is a conversion to a type variable used to form an archetype,
-    // Then diagnose this as a generic parameter that could not be resolved.
-    auto archetype = impl.getArchetype();
-
-    // Only diagnose archetypes that don't have a parent, i.e., ones
-    // that correspond to generic parameters.
-    if (!archetype || archetype->getParent())
+    auto *paramTy = impl.getGenericParameter();
+    if (!paramTy)
       continue;
 
     // Number of constraints related to particular unbound parameter
@@ -8128,22 +8155,22 @@ bool FailureDiagnosis::diagnoseArchetypeAmbiguity() {
     }
 
     auto locator = impl.getLocator();
-    unboundParams.push_back(
-        std::make_tuple(archetype, locator, numConstraints));
+    unboundParams.emplace_back(paramTy, locator, numConstraints);
   }
 
   // We've found unbound generic parameters, let's diagnose
   // based on the number of constraints each one is related to.
   if (!unboundParams.empty()) {
-    // Let's prioritize archetypes that don't have any constraints associated.
+    // Let's prioritize generic parameters that don't have any constraints
+    // associated.
     std::stable_sort(unboundParams.begin(), unboundParams.end(),
-                     [](Archetype a, Archetype b) {
+                     [](GenericParameter a, GenericParameter b) {
                        return std::get<2>(a) < std::get<2>(b);
                      });
 
     auto param = unboundParams.front();
-    diagnoseUnboundArchetype(std::get<0>(param),
-                             std::get<1>(param)->getAnchor());
+    diagnoseAmbiguousGenericParameter(std::get<0>(param),
+                                      std::get<1>(param)->getAnchor());
     return true;
   }
 
@@ -8153,18 +8180,19 @@ bool FailureDiagnosis::diagnoseArchetypeAmbiguity() {
 /// Emit an error message about an unbound generic parameter existing, and
 /// emit notes referring to the target of a diagnostic, e.g., the function
 /// or parameter being used.
-void FailureDiagnosis::diagnoseUnboundArchetype(ArchetypeType *archetype,
-                                                Expr *anchor) {
+void FailureDiagnosis::
+diagnoseAmbiguousGenericParameter(GenericTypeParamType *paramTy,
+                                  Expr *anchor) {
   auto &tc = CS.getTypeChecker();
 
-  // The archetype may come from the explicit type in a cast expression.
+  // The generic parameter may come from the explicit type in a cast expression.
   if (auto *ECE = dyn_cast_or_null<ExplicitCastExpr>(anchor)) {
     tc.diagnose(ECE->getLoc(), diag::unbound_generic_parameter_cast,
-                archetype, ECE->getCastTypeLoc().getType())
+                paramTy, ECE->getCastTypeLoc().getType())
       .highlight(ECE->getCastTypeLoc().getSourceRange());
 
     // Emit a note specifying where this came from, if we can find it.
-    noteArchetypeSource(ECE->getCastTypeLoc(), archetype, CS);
+    noteGenericParameterSource(ECE->getCastTypeLoc(), paramTy, CS);
     return;
   }
 
@@ -8184,17 +8212,17 @@ void FailureDiagnosis::diagnoseUnboundArchetype(ArchetypeType *archetype,
 
   
   // Otherwise, emit an error message on the expr we have, and emit a note
-  // about where the archetype came from.
-  tc.diagnose(expr->getLoc(), diag::unbound_generic_parameter, archetype);
+  // about where the generic parameter came from.
+  tc.diagnose(expr->getLoc(), diag::unbound_generic_parameter, paramTy);
   
   // If we have an anchor, drill into it to emit a
-  // "note: archetype declared here".
+  // "note: generic parameter declared here".
   if (!anchor) return;
 
 
   if (auto TE = dyn_cast<TypeExpr>(anchor)) {
     // Emit a note specifying where this came from, if we can find it.
-    noteArchetypeSource(TE->getTypeLoc(), archetype, CS);
+    noteGenericParameterSource(TE->getTypeLoc(), paramTy, CS);
     return;
   }
 
@@ -8243,8 +8271,8 @@ void FailureDiagnosis::diagnoseUnboundArchetype(ArchetypeType *archetype,
 /// Emit an ambiguity diagnostic about the specified expression.
 void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   // First, let's try to diagnose any problems related to ambiguous
-  // archetypes (generic parameters) present in the constraint system.
-  if (diagnoseArchetypeAmbiguity())
+  // generic parameters present in the constraint system.
+  if (diagnoseAmbiguousGenericParameters())
     return;
 
   // Unresolved/Anonymous ClosureExprs are common enough that we should give

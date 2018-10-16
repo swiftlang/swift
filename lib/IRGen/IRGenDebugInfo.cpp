@@ -361,6 +361,7 @@ private:
     StringRef File = llvm::sys::path::filename(Filename);
     llvm::SmallString<512> Path(Filename);
     llvm::sys::path::remove_filename(Path);
+    llvm::sys::path::remove_dots(Path);
     llvm::DIFile *F = DBuilder.createFile(DebugPrefixMap.remapPath(File),
                                           DebugPrefixMap.remapPath(Path));
 
@@ -2129,11 +2130,11 @@ SILLocation::DebugLoc IRGenDebugInfoImpl::decodeSourceLoc(SourceLoc SL) {
 
 } // anonymous namespace
 
-IRGenDebugInfo *IRGenDebugInfo::createIRGenDebugInfo(
+std::unique_ptr<IRGenDebugInfo> IRGenDebugInfo::createIRGenDebugInfo(
     const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
     llvm::Module &M, StringRef MainOutputFilenameForDebugInfo) {
-  return new IRGenDebugInfoImpl(Opts, CI, IGM, M,
-                                MainOutputFilenameForDebugInfo);
+  return llvm::make_unique<IRGenDebugInfoImpl>(Opts, CI, IGM, M,
+                                               MainOutputFilenameForDebugInfo);
 }
 
 

@@ -115,7 +115,18 @@ ErrorTests.test("try!")
   .code {
     expectCrashLater()
     let _: () = try! { throw SillyError.JazzHands }()
-  }
+}
+
+ErrorTests.test("try!/location")
+  .skip(.custom({ _isFastAssertConfiguration() },
+                reason: "trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches(_isDebugAssertConfiguration()
+                        ? "test/stdlib/Error.swift, line 128"
+                        : "")
+  .code {
+    expectCrashLater()
+    let _: () = try! { throw SillyError.JazzHands }()
+}
 
 ErrorTests.test("try?") {
   var value = try? { () throws -> Int in return 1 }()

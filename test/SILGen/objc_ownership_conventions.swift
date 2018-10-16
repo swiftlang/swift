@@ -2,24 +2,24 @@
 
 import gizmo
 
-// CHECK-LABEL: sil hidden @$S26objc_ownership_conventions5test3So8NSObjectCyF
+// CHECK-LABEL: sil hidden @$s26objc_ownership_conventions5test3So8NSObjectCyF
 func test3() -> NSObject {
   // initializer returns at +1
   return Gizmo()
   // CHECK: [[GIZMO_META:%[0-9]+]] = metatype $@thick Gizmo.Type
-  // CHECK: [[CTOR:%[0-9]+]] = function_ref @$SSo5GizmoC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick Gizmo.Type) -> @owned Optional<Gizmo>
+  // CHECK: [[CTOR:%[0-9]+]] = function_ref @$sSo5GizmoC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick Gizmo.Type) -> @owned Optional<Gizmo>
   // CHECK-NEXT: [[GIZMO:%[0-9]+]] = apply [[CTOR]]([[GIZMO_META]]) : $@convention(method) (@thick Gizmo.Type) -> @owned Optional<Gizmo>
   // CHECK: [[GIZMO_NS:%[0-9]+]] = upcast [[GIZMO:%[0-9]+]] : $Gizmo to $NSObject
   // CHECK: return [[GIZMO_NS]] : $NSObject
 
-  // CHECK-LABEL: sil shared [serializable] @$SSo5GizmoC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick Gizmo.Type) -> @owned Optional<Gizmo>
+  // CHECK-LABEL: sil shared [serializable] @$sSo5GizmoC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick Gizmo.Type) -> @owned Optional<Gizmo>
   // alloc is implicitly ns_returns_retained
   // init is implicitly ns_consumes_self and ns_returns_retained
   // CHECK: bb0([[GIZMO_META:%[0-9]+]] : @trivial $@thick Gizmo.Type):
   // CHECK-NEXT: [[GIZMO_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[GIZMO_META]] : $@thick Gizmo.Type to $@objc_metatype Gizmo.Type
   // CHECK-NEXT: [[GIZMO:%[0-9]+]] = alloc_ref_dynamic [objc] [[GIZMO_META_OBJC]] : $@objc_metatype Gizmo.Type, $Gizmo
   // CHECK-NEXT: // function_ref
-  // CHECK-NEXT: [[INIT_CTOR:%[0-9]+]] = function_ref @$SSo5GizmoC{{[_0-9a-zA-Z]*}}fcTO
+  // CHECK-NEXT: [[INIT_CTOR:%[0-9]+]] = function_ref @$sSo5GizmoC{{[_0-9a-zA-Z]*}}fcTO
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[INIT_CTOR]]([[GIZMO]]) : $@convention(method) (@owned Gizmo) -> @owned Optional<Gizmo>
   // CHECK-NEXT: return [[RESULT]] : $Optional<Gizmo>
 }
@@ -27,7 +27,7 @@ func test3() -> NSObject {
 
 
 // Normal message send with argument, no transfers.
-// CHECK-LABEL: sil hidden @$S26objc_ownership_conventions5test5{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s26objc_ownership_conventions5test5{{[_0-9a-zA-Z]*}}F
 func test5(_ g: Gizmo) {
   var g = g
   Gizmo.inspect(g)
@@ -46,10 +46,10 @@ func test5(_ g: Gizmo) {
   // CHECK:   destroy_value [[GIZMO_BOX]]
   // CHECK-NOT:   destroy_value [[ARG]]
 }
-// CHECK: } // end sil function '$S26objc_ownership_conventions5test5{{[_0-9a-zA-Z]*}}F'
+// CHECK: } // end sil function '$s26objc_ownership_conventions5test5{{[_0-9a-zA-Z]*}}F'
 
 // The argument to consume is __attribute__((ns_consumed)).
-// CHECK-LABEL: sil hidden @$S26objc_ownership_conventions5test6{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s26objc_ownership_conventions5test6{{[_0-9a-zA-Z]*}}F
 func test6(_ g: Gizmo) {
   var g = g
   Gizmo.consume(g)
@@ -70,10 +70,10 @@ func test6(_ g: Gizmo) {
   // CHECK-NOT:   destroy_value [[ARG]]
   // CHECK-NOT:  destroy_value [[G]]
 }
-// CHECK: } // end sil function '$S26objc_ownership_conventions5test6{{[_0-9a-zA-Z]*}}F'
+// CHECK: } // end sil function '$s26objc_ownership_conventions5test6{{[_0-9a-zA-Z]*}}F'
 
 // fork is __attribute__((ns_consumes_self)).
-// CHECK-LABEL: sil hidden @$S26objc_ownership_conventions5test7{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s26objc_ownership_conventions5test7{{[_0-9a-zA-Z]*}}F
 func test7(_ g: Gizmo) {
   var g = g
   g.fork()
@@ -92,10 +92,10 @@ func test7(_ g: Gizmo) {
   // CHECK-NOT:   destroy_value [[ARG]]
   // CHECK-NOT:  destroy_value [[G]]
 }
-// CHECK: } // end sil function '$S26objc_ownership_conventions5test7{{[_0-9a-zA-Z]*}}F'
+// CHECK: } // end sil function '$s26objc_ownership_conventions5test7{{[_0-9a-zA-Z]*}}F'
 
 // clone is __attribute__((ns_returns_retained)).
-// CHECK-LABEL: sil hidden @$S26objc_ownership_conventions5test8{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s26objc_ownership_conventions5test8{{[_0-9a-zA-Z]*}}F
 func test8(_ g: Gizmo) -> Gizmo {
   return g.clone()
   // CHECK: bb0([[G:%.*]] : @guaranteed $Gizmo):
@@ -108,7 +108,7 @@ func test8(_ g: Gizmo) -> Gizmo {
   // CHECK-NEXT: return [[RESULT]]
 }
 // duplicate returns an autoreleased object at +0.
-// CHECK-LABEL: sil hidden @$S26objc_ownership_conventions5test9{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s26objc_ownership_conventions5test9{{[_0-9a-zA-Z]*}}F
 func test9(_ g: Gizmo) -> Gizmo {
   return g.duplicate()
   // CHECK: bb0([[G:%.*]] : @guaranteed $Gizmo):
@@ -122,13 +122,14 @@ func test9(_ g: Gizmo) -> Gizmo {
   // CHECK-NEXT: return [[RESULT]]
 }
 
-// CHECK-LABEL: sil hidden @$S26objc_ownership_conventions6test10{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s26objc_ownership_conventions6test10{{[_0-9a-zA-Z]*}}F
 func test10(_ g: Gizmo) -> AnyClass {
   // CHECK: bb0([[G:%[0-9]+]] : @guaranteed $Gizmo):
   // CHECK:      [[G_COPY:%.*]] = copy_value [[G]]
   // CHECK-NEXT: [[NS_G_COPY:%[0-9]+]] = upcast [[G_COPY]] : $Gizmo to $NSObject
-  // CHECK-NEXT: [[GETTER:%[0-9]+]] = objc_method [[NS_G_COPY]] : $NSObject, #NSObject.classProp!getter.1.foreign : (NSObject) -> () -> AnyObject.Type?, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
-  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_COPY]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
+  // CHECK-NEXT: [[NS_G_BORROW:%.*]] = begin_borrow [[NS_G_COPY]]
+  // CHECK-NEXT: [[GETTER:%[0-9]+]] = objc_method [[NS_G_BORROW]] : $NSObject, #NSObject.classProp!getter.1.foreign : (NSObject) -> () -> AnyObject.Type?, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
+  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_BORROW]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype AnyObject.Type>
   // CHECK-NEXT: switch_enum [[OPT_OBJC]] : $Optional<{{.*}}>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
   //
   // CHECK: [[SOME_BB]]([[OBJC:%.*]] : @trivial $@objc_metatype AnyObject.Type):
@@ -142,13 +143,14 @@ func test10(_ g: Gizmo) -> AnyClass {
   return g.classProp
 }
 
-// CHECK-LABEL: sil hidden @$S26objc_ownership_conventions6test11{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s26objc_ownership_conventions6test11{{[_0-9a-zA-Z]*}}F
 func test11(_ g: Gizmo) -> AnyClass {
   // CHECK: bb0([[G:%[0-9]+]] : @guaranteed $Gizmo):
   // CHECK: [[G_COPY:%.*]] = copy_value [[G]]
   // CHECK: [[NS_G_COPY:%[0-9]+]] = upcast [[G_COPY:%[0-9]+]] : $Gizmo to $NSObject
-  // CHECK-NEXT: [[GETTER:%[0-9]+]] = objc_method [[NS_G_COPY]] : $NSObject, #NSObject.qualifiedClassProp!getter.1.foreign : (NSObject) -> () -> NSAnsing.Type?, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
-  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_COPY]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
+  // CHECK-NEXT: [[NS_G_BORROW:%.*]] = begin_borrow [[NS_G_COPY]]
+  // CHECK-NEXT: [[GETTER:%[0-9]+]] = objc_method [[NS_G_BORROW]] : $NSObject, #NSObject.qualifiedClassProp!getter.1.foreign : (NSObject) -> () -> NSAnsing.Type?, $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
+  // CHECK-NEXT: [[OPT_OBJC:%.*]] = apply [[GETTER]]([[NS_G_BORROW]]) : $@convention(objc_method) (NSObject) -> Optional<@objc_metatype NSAnsing.Type>
   // CHECK-NEXT: switch_enum [[OPT_OBJC]] : $Optional<{{.*}}>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
   //
   // CHECK: [[SOME_BB]]([[OBJC:%.*]] : @trivial $@objc_metatype NSAnsing.Type):
@@ -166,7 +168,7 @@ func test11(_ g: Gizmo) -> AnyClass {
 
 // ObjC blocks should have cdecl calling convention and follow C/ObjC
 // ownership conventions, where the callee, arguments, and return are all +0.
-// CHECK-LABEL: sil hidden @$S26objc_ownership_conventions10applyBlock{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s26objc_ownership_conventions10applyBlock{{[_0-9a-zA-Z]*}}F
 func applyBlock(_ f: @convention(block) (Gizmo) -> Gizmo, x: Gizmo) -> Gizmo {
   // CHECK:     bb0([[BLOCK:%.*]] : @guaranteed $@convention(block) @noescape (Gizmo) -> @autoreleased Gizmo, [[ARG:%.*]] : @guaranteed $Gizmo):
   // CHECK:       [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
@@ -182,7 +184,7 @@ func applyBlock(_ f: @convention(block) (Gizmo) -> Gizmo, x: Gizmo) -> Gizmo {
   return f(x)
 }
 
-// CHECK-LABEL: sil hidden @$S26objc_ownership_conventions15maybeApplyBlock{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s26objc_ownership_conventions15maybeApplyBlock{{[_0-9a-zA-Z]*}}F
 func maybeApplyBlock(_ f: (@convention(block) (Gizmo) -> Gizmo)?, x: Gizmo) -> Gizmo? {
   // CHECK:     bb0([[BLOCK:%.*]] : @guaranteed $Optional<@convention(block) (Gizmo) -> @autoreleased Gizmo>, [[ARG:%.*]] : @guaranteed $Gizmo):
   // CHECK:       [[BLOCK_COPY:%.*]] = copy_block [[BLOCK]]
@@ -192,7 +194,7 @@ func maybeApplyBlock(_ f: (@convention(block) (Gizmo) -> Gizmo)?, x: Gizmo) -> G
 func useInnerPointer(_ p: UnsafeMutableRawPointer) {}
 
 // Handle inner-pointer methods by autoreleasing self after the call.
-// CHECK-LABEL: sil hidden @$S26objc_ownership_conventions18innerPointerMethodyySo5GizmoCF : $@convention(thin) (@guaranteed Gizmo) -> () {
+// CHECK-LABEL: sil hidden @$s26objc_ownership_conventions18innerPointerMethodyySo5GizmoCF : $@convention(thin) (@guaranteed Gizmo) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Gizmo):
 // CHECK:         [[METHOD:%.*]] = objc_method [[ARG]] : $Gizmo, #Gizmo.getBytes!1.foreign : (Gizmo) -> () -> UnsafeMutableRawPointer, $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutableRawPointer
 // CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
@@ -200,24 +202,24 @@ func useInnerPointer(_ p: UnsafeMutableRawPointer) {}
 // it is today though since we are using a reference type.
 // CHECK:         [[PTR:%.*]] = apply [[METHOD]]([[ARG]])
 // CHECK:         autorelease_value [[ARG_COPY]]
-// CHECK:         [[USE:%.*]] = function_ref @$S26objc_ownership_conventions15useInnerPointer{{[_0-9a-zA-Z]*}}F
+// CHECK:         [[USE:%.*]] = function_ref @$s26objc_ownership_conventions15useInnerPointer{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[USE]]([[PTR]])
 // CHECK-NOT:         destroy_value [[ARG]]
 func innerPointerMethod(_ g: Gizmo) {
   useInnerPointer(g.getBytes())
 }
 
-// CHECK-LABEL: sil hidden @$S26objc_ownership_conventions20innerPointerPropertyyySo5GizmoCF : $@convention(thin) (@guaranteed Gizmo) -> () {
+// CHECK-LABEL: sil hidden @$s26objc_ownership_conventions20innerPointerPropertyyySo5GizmoCF : $@convention(thin) (@guaranteed Gizmo) -> () {
 // CHECK:       bb0([[ARG:%.*]] : @guaranteed $Gizmo):
 // CHECK:         [[METHOD:%.*]] = objc_method [[ARG]] : $Gizmo, #Gizmo.innerProperty!getter.1.foreign : (Gizmo) -> () -> UnsafeMutableRawPointer, $@convention(objc_method) (Gizmo) -> @unowned_inner_pointer UnsafeMutableRawPointer
 // CHECK:         [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // => SEMANTIC ARC TODO: The apply below should be on ARG_COPY. It is benign since objc objects are reference types.
 // CHECK:         [[PTR:%.*]] = apply [[METHOD]]([[ARG]])
 // CHECK:         autorelease_value [[ARG_COPY]]
-// CHECK:         [[USE:%.*]] = function_ref @$S26objc_ownership_conventions15useInnerPointer{{[_0-9a-zA-Z]*}}F
+// CHECK:         [[USE:%.*]] = function_ref @$s26objc_ownership_conventions15useInnerPointer{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[USE]]([[PTR]])
 // CHECK-NOT:         destroy_value [[ARG]]
-// CHECK: } // end sil function '$S26objc_ownership_conventions20innerPointerPropertyyySo5GizmoCF'
+// CHECK: } // end sil function '$s26objc_ownership_conventions20innerPointerPropertyyySo5GizmoCF'
 func innerPointerProperty(_ g: Gizmo) {
   useInnerPointer(g.innerProperty)
 }

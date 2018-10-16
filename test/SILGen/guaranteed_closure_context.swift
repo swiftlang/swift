@@ -8,7 +8,7 @@ protocol P {}
 class C: P {}
 struct S {}
 
-// CHECK-LABEL: sil hidden @$S26guaranteed_closure_context0A9_capturesyyF
+// CHECK-LABEL: sil hidden @$s26guaranteed_closure_context0A9_capturesyyF
 func guaranteed_captures() {
   // CHECK: [[MUTABLE_TRIVIAL_BOX:%.*]] = alloc_box ${ var S }
   var mutableTrivial = S()
@@ -41,7 +41,7 @@ func guaranteed_captures() {
   // CHECK:     [[IMMUTABLE_AO_BOX:%.*]] = alloc_box ${ var P }
   // CHECK:     [[B_IMMUTABLE_AO_BOX:%.*]] = begin_borrow [[IMMUTABLE_AO_BOX]] : ${ var P }
 
-  // CHECK: [[FN:%.*]] = function_ref [[FN_NAME:@\$S26guaranteed_closure_context0A9_capturesyyF17captureEverythingL_yyF]]
+  // CHECK: [[FN:%.*]] = function_ref [[FN_NAME:@\$s26guaranteed_closure_context0A9_capturesyyF17captureEverythingL_yyF]]
   // CHECK: apply [[FN]]([[B_MUTABLE_TRIVIAL_BOX]], [[B_MUTABLE_RETAINABLE_BOX]], [[B_MUTABLE_ADDRESS_ONLY_BOX]], [[IMMUTABLE_TRIVIAL]], [[B_IMMUTABLE_RETAINABLE]], [[B_IMMUTABLE_AO_BOX]])
   captureEverything()
 

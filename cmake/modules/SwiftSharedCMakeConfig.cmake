@@ -270,7 +270,11 @@ endmacro()
 macro(swift_common_cxx_warnings)
   # Make unhandled switch cases be an error in assert builds
   if(DEFINED LLVM_ENABLE_ASSERTIONS)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=switch")
+    check_cxx_compiler_flag("-Werror=switch" CXX_SUPPORTS_WERROR_SWITCH_FLAG)
+    append_if(CXX_SUPPORTS_WERROR_SWITCH_FLAG "-Werror=switch" CMAKE_CXX_FLAGS)
+
+    check_cxx_compiler_flag("/we4062" CXX_SUPPORTS_WE4062)
+    append_if(CXX_SUPPORTS_WE4062 "/we4062" CMAKE_CXX_FLAGS)
   endif()
 
   check_cxx_compiler_flag("-Werror -Wdocumentation" CXX_SUPPORTS_DOCUMENTATION_FLAG)

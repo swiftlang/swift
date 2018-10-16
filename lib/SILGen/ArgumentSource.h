@@ -54,7 +54,6 @@ class ArgumentSource {
     RValue,
     LValue,
     Expr,
-    Tuple,
   };
 
   struct RValueStorage {
@@ -65,25 +64,9 @@ class ArgumentSource {
     LValue Value;
     SILLocation Loc;
   };
-  struct TupleStorage {
-    CanTupleType SubstType;
-    SILLocation Loc;
-    std::vector<ArgumentSource> Elements;
-
-    TupleStorage(CanTupleType type, SILLocation loc,
-                 MutableArrayRef<ArgumentSource> elements)
-        : SubstType(type), Loc(loc) {
-      assert(type->getNumElements() == elements.size());
-      Elements.reserve(elements.size());
-      for (auto i : indices(elements)) {
-        Elements.push_back(std::move(elements[i]));
-      }
-    }
-  };
 
   using StorageMembers =
-    ExternalUnionMembers<void, RValueStorage, LValueStorage,
-                         Expr*, TupleStorage>;
+    ExternalUnionMembers<void, RValueStorage, LValueStorage, Expr*>;
 
   static StorageMembers::Index getStorageIndexForKind(Kind kind) {
     switch (kind) {
@@ -92,7 +75,6 @@ class ArgumentSource {
       return StorageMembers::indexOf<RValueStorage>();
     case Kind::LValue: return StorageMembers::indexOf<LValueStorage>();
     case Kind::Expr: return StorageMembers::indexOf<Expr*>();
-    case Kind::Tuple: return StorageMembers::indexOf<TupleStorage>();
     }
     llvm_unreachable("bad kind");
   }
@@ -112,12 +94,6 @@ public:
     assert(e && "initializing ArgumentSource with null expression");
     Storage.emplace<Expr*>(StoredKind, e);
   }
-  ArgumentSource(SILLocation loc, CanTupleType type,
-                 MutableArrayRef<ArgumentSource> elements)
-      : StoredKind(Kind::Tuple) {
-    Storage.emplace<TupleStorage>(StoredKind, type, loc, elements);
-  }
-
   // Cannot be copied.
   ArgumentSource(const ArgumentSource &other) = delete;
   ArgumentSource &operator=(const ArgumentSource &other) = delete;
@@ -149,29 +125,9 @@ public:
       return asKnownLValue().isValid();
     case Kind::Expr:
       return asKnownExpr() != nullptr;
-    case Kind::Tuple:
-      return true;
     }
     llvm_unreachable("bad kind");
   }
-
-  CanType getSubstType() const & {
-    switch (StoredKind) {
-    case Kind::Invalid:
-      llvm_unreachable("argument source is invalid");
-    case Kind::RValue:
-      return asKnownRValue().getType();
-    case Kind::LValue:
-      return CanInOutType::get(asKnownLValue().getSubstFormalType());
-    case Kind::Expr:
-      return asKnownExpr()->getType()->getCanonicalType();
-    case Kind::Tuple:
-      return Storage.get<TupleStorage>(StoredKind).SubstType;
-    }
-    llvm_unreachable("bad kind");
-  }
-
-  SILType getSILSubstType(SILGenFunction &SGF) const &;
 
   CanType getSubstRValueType() const & {
     switch (StoredKind) {
@@ -183,13 +139,9 @@ public:
       return asKnownLValue().getSubstFormalType();
     case Kind::Expr:
       return asKnownExpr()->getType()->getInOutObjectType()->getCanonicalType();
-    case Kind::Tuple:
-      return Storage.get<TupleStorage>(StoredKind).SubstType;
     }
     llvm_unreachable("bad kind");
   }
-
-  SILType getSILSubstRValueType(SILGenFunction &SGF) const &;
 
   bool hasLValueType() const & {
     switch (StoredKind) {
@@ -198,7 +150,6 @@ public:
       return false;
     case Kind::LValue: return true;
     case Kind::Expr: return asKnownExpr()->isSemanticallyInOutExpr();
-    case Kind::Tuple: return false;
     }
     llvm_unreachable("bad kind");    
   }
@@ -213,8 +164,6 @@ public:
       return getKnownLValueLocation();
     case Kind::Expr:
       return asKnownExpr();
-    case Kind::Tuple:
-      return getKnownTupleLocation();
     }
     llvm_unreachable("bad kind");
   }
@@ -222,7 +171,6 @@ public:
   bool isExpr() const & { return StoredKind == Kind::Expr; }
   bool isRValue() const & { return StoredKind == Kind::RValue; }
   bool isLValue() const & { return StoredKind == Kind::LValue; }
-  bool isTuple() const & { return StoredKind == Kind::Tuple; }
 
   /// Given that this source is storing an RValue, extract and clear
   /// that value.
@@ -248,31 +196,14 @@ public:
     return Storage.get<LValueStorage>(StoredKind).Loc;
   }
 
+  Expr *findStorageReferenceExprForBorrow() &&;
+
   /// Given that this source is an expression, extract and clear
   /// that expression.
   Expr *asKnownExpr() && {
     Expr *result = Storage.get<Expr*>(StoredKind);
     Storage.resetToEmpty<Expr*>(StoredKind, Kind::Invalid);
     StoredKind = Kind::Invalid;
-    return result;
-  }
-
-  SILLocation getKnownTupleLocation() const & {
-    return Storage.get<TupleStorage>(StoredKind).Loc;
-  }
-
-  template <class ResultType>
-  ResultType withKnownTupleElementSources(
-    llvm::function_ref<ResultType(SILLocation loc, CanTupleType type,
-                         MutableArrayRef<ArgumentSource> elts)> callback) && {
-    auto &tuple = Storage.get<TupleStorage>(StoredKind);
-
-    auto result = callback(tuple.Loc, tuple.SubstType, tuple.Elements);
-
-    // We've consumed the tuple.
-    Storage.resetToEmpty<TupleStorage>(StoredKind, Kind::Invalid);
-    StoredKind = Kind::Invalid;
-
     return result;
   }
 
@@ -303,17 +234,14 @@ public:
   /// Emit this value to memory so that it follows the abstraction
   /// patterns of the original formal type.
   ///
-  /// \param expectedType - the lowering of getSubstType() under the
+  /// \param expectedType - the lowering of getSubstRValueType() under the
   ///   abstractions of origFormalType
   ManagedValue materialize(SILGenFunction &SGF,
                            AbstractionPattern origFormalType,
                            SILType expectedType = SILType()) &&;
 
-  // This is a hack and should be avoided.
-  void rewriteType(CanType newType) &;
-
-  /// Whether this argument source requires the callee to evaluate.
-  bool requiresCalleeToEvaluate() const;
+  /// Whether this argument source is a TupleShuffleExpr.
+  bool isShuffle() const;
 
   bool isObviouslyEqual(const ArgumentSource &other) const;
 
@@ -331,19 +259,18 @@ private:
   Expr *asKnownExpr() const & {
     return Storage.get<Expr*>(StoredKind);
   }
-
-  RValue getKnownTupleAsRValue(SILGenFunction &SGF, SGFContext C) &&;
 };
 
 class PreparedArguments {
-  // TODO: replace this formal type with an array of parameter types.
-  CanType FormalType;
+  SmallVector<AnyFunctionType::Param, 8> Params;
   std::vector<ArgumentSource> Arguments;
-  bool IsScalar = false;
+  unsigned IsScalar : 1;
+  unsigned IsNull : 1;
 public:
-  PreparedArguments() {}
-  PreparedArguments(CanType formalType, bool isScalar) {
-    emplace(formalType, isScalar);
+  PreparedArguments() : IsScalar(false), IsNull(true) {}
+  PreparedArguments(ArrayRef<AnyFunctionType::Param> params, bool isScalar)
+      : IsNull(true) {
+    emplace(params, isScalar);
   }
 
   // Move-only.
@@ -351,39 +278,34 @@ public:
   PreparedArguments &operator=(const PreparedArguments &) = delete;
 
   PreparedArguments(PreparedArguments &&other)
-    : FormalType(other.FormalType), Arguments(std::move(other.Arguments)),
-      IsScalar(other.IsScalar) {
-    other.FormalType = CanType();
-  }
+    : Params(std::move(other.Params)), Arguments(std::move(other.Arguments)),
+      IsScalar(other.IsScalar), IsNull(other.IsNull) {}
   PreparedArguments &operator=(PreparedArguments &&other) {
-    FormalType = other.FormalType;
+    Params = std::move(other.Params);
     IsScalar = other.IsScalar;
     Arguments = std::move(other.Arguments);
-    other.FormalType = CanType();
+    IsNull = other.IsNull;
+    other.IsNull = true;
     return *this;
   }
 
   /// Returns true if this is a null argument list.  Note that this always
   /// indicates the total absence of an argument list rather than the
   /// possible presence of an empty argument list.
-  bool isNull() const { return !FormalType; }
+  bool isNull() const { return IsNull; }
 
   /// Returns true if this is a non-null and completed argument list.
   bool isValid() const {
     assert(!isNull());
-    if (IsScalar) {
+    if (IsScalar)
       return Arguments.size() == 1;
-    } else if (auto tuple = dyn_cast<TupleType>(FormalType)) {
-      return Arguments.size() == tuple->getNumElements();
-    } else {
-      return Arguments.size() == 1;
-    }
+    return Arguments.size() == Params.size();
   }
 
   /// Return the formal type of this argument list.
-  CanType getFormalType() const {
+  ArrayRef<AnyFunctionType::Param> getParams() const {
     assert(!isNull());
-    return FormalType;
+    return Params;
   }
 
   /// Is this a single-argument list?  Note that the argument might be a tuple.
@@ -398,12 +320,11 @@ public:
   }
 
   /// Emplace a (probably incomplete) argument list.
-  void emplace(CanType formalType, bool isScalar) {
+  void emplace(ArrayRef<AnyFunctionType::Param> params, bool isScalar) {
     assert(isNull());
-    assert(!formalType->hasTypeParameter() && "should be a contextual type!");
-    assert(isScalar || isa<TupleType>(formalType));
-    FormalType = formalType;
+    Params.append(params.begin(), params.end());
     IsScalar = isScalar;
+    IsNull = false;
   }
 
   /// Emplace an empty argument list.

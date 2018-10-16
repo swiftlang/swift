@@ -28,7 +28,7 @@ public struct URLComponents : ReferenceConvertible, Hashable, Equatable, _Mutabl
     /// Initialize with the components of a URL.
     ///
     /// If resolvingAgainstBaseURL is `true` and url is a relative URL, the components of url.absoluteURL are used. If the url string from the URL is malformed, nil is returned.
-    public init?(url: URL, resolvingAgainstBaseURL resolve: Bool) {
+    public init?(url: __shared URL, resolvingAgainstBaseURL resolve: Bool) {
         guard let result = NSURLComponents(url: url, resolvingAgainstBaseURL: resolve) else { return nil }
         _handle = _MutableHandle(adoptingReference: result)
     }
@@ -36,7 +36,7 @@ public struct URLComponents : ReferenceConvertible, Hashable, Equatable, _Mutabl
     /// Initialize with a URL string.
     ///
     /// If the URLString is malformed, nil is returned.
-    public init?(string: String) {
+    public init?(string: __shared String) {
         guard let result = NSURLComponents(string: string) else { return nil }
         _handle = _MutableHandle(adoptingReference: result)
     }
@@ -306,7 +306,7 @@ public struct URLComponents : ReferenceConvertible, Hashable, Equatable, _Mutabl
     
     // MARK: - Bridging
     
-    fileprivate init(reference: NSURLComponents) {
+    fileprivate init(reference: __shared NSURLComponents) {
         _handle = _MutableHandle(reference: reference)
     }
     
@@ -372,6 +372,7 @@ extension URLComponents : _ObjectiveCBridgeable {
         return true
     }
 
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSURLComponents?) -> URLComponents {
         guard let src = source else { return URLComponents() }
         return URLComponents(reference: src)
@@ -394,11 +395,11 @@ public struct URLQueryItem : ReferenceConvertible, Hashable, Equatable {
     
     fileprivate var _queryItem : NSURLQueryItem
     
-    public init(name: String, value: String?) {
+    public init(name: __shared String, value: __shared String?) {
         _queryItem = NSURLQueryItem(name: name, value: value)
     }
     
-    fileprivate init(reference: NSURLQueryItem) { _queryItem = reference.copy() as! NSURLQueryItem }
+    fileprivate init(reference: __shared NSURLQueryItem) { _queryItem = reference.copy() as! NSURLQueryItem }
     fileprivate var reference : NSURLQueryItem { return _queryItem }
     
     public var name : String {
@@ -465,6 +466,7 @@ extension URLQueryItem : _ObjectiveCBridgeable {
         return true
     }
 
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSURLQueryItem?) -> URLQueryItem {
         var result: URLQueryItem?
         _forceBridgeFromObjectiveC(source!, result: &result)

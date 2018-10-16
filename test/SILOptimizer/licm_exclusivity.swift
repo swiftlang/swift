@@ -11,7 +11,7 @@
 // TEST1: Hoisted
 // TEST1: Successfully hosited and sank pair
 
-// TESTSIL-LABEL: sil hidden @$S16licm_exclusivity17run_ReversedArrayyySiF : $@convention(thin) (Int) -> () {
+// TESTSIL-LABEL: sil hidden @$s16licm_exclusivity17run_ReversedArrayyySiF : $@convention(thin) (Int) -> () {
 // TESTSIL: bb
 // TESTSIL: begin_access [modify] [dynamic] [no_nested_conflict]
 // TESTSIL: br bb{{.*}}
@@ -35,9 +35,9 @@ func run_ReversedArray(_ N: Int) {
 // TEST2: Hoist and Sink pairs attempt
 // TEST2: Hoisted
 
-// TESTSIL-LABEL: sil @$S16licm_exclusivity20count_unicodeScalarsyySS17UnicodeScalarViewVF : $@convention(thin) (@guaranteed String.UnicodeScalarView) -> () {
+// TESTSIL-LABEL: sil @$s16licm_exclusivity20count_unicodeScalarsyySS17UnicodeScalarViewVF : $@convention(thin) (@guaranteed String.UnicodeScalarView) -> () {
 // TESTSIL: bb0(%0 : $String.UnicodeScalarView)
-// TESTSIL-NEXT: %1 = global_addr @$S16licm_exclusivity5countSivp : $*Int
+// TESTSIL-NEXT: %1 = global_addr @$s16licm_exclusivity5countSivp : $*Int
 // TESTSIL: begin_access [modify] [dynamic] [no_nested_conflict] %1 : $*Int
 // TESTSIL: end_access
 // TESTSIL: return
@@ -67,7 +67,7 @@ public class ClassWithArrs {
 // TEST3: Successfully hosited and sank pair
 // TEST3: Hoisted
 // TEST3: Successfully hosited and sank pair
-// TESTSIL2-LABEL: sil @$S16licm_exclusivity13ClassWithArrsC7readArryyF : $@convention(method) (@guaranteed ClassWithArrs) -> () {
+// TESTSIL2-LABEL: sil @$s16licm_exclusivity13ClassWithArrsC7readArryyF : $@convention(method) (@guaranteed ClassWithArrs) -> () {
 // TESTSIL2: [[R1:%.*]] = ref_element_addr %0 : $ClassWithArrs, #ClassWithArrs.A
 // TESTSIL2: [[R2:%.*]] = ref_element_addr %0 : $ClassWithArrs, #ClassWithArrs.B
 // TESTSIL2:  begin_access [read] [static] [no_nested_conflict] [[R1]]

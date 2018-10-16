@@ -31,7 +31,7 @@ set(swift_runtime_objc_sources
     SwiftObject.mm
     SwiftValue.mm
     ReflectionMirror.mm
-    ObjCRuntimeGetImageNameFromClass.cpp
+    ObjCRuntimeGetImageNameFromClass.mm
     "${SWIFT_SOURCE_DIR}/lib/Demangling/OldRemangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/TypeDecoder.cpp"
@@ -193,6 +193,8 @@ add_swift_library(swiftImageRegistrationObjectELF
                   LINK_FLAGS ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
                   TARGET_SDKS ${ELFISH_SDKS}
                   INSTALL_IN_COMPONENT none)
+# FIXME(compnerd) this should be compiled twice, once for static and once for
+# shared.  The static version should be used for building the standard library.
 add_swift_library(swiftImageRegistrationObjectCOFF
                   OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
                   SwiftRT-COFF.cpp
@@ -212,20 +214,34 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
       # to a version which supports it.
       # set(swiftrtObject "$<TARGET_OBJECTS:swiftImageRegistrationObject${SWIFT_SDK_${sdk}_OBJECT_FORMAT}-${arch_suffix}>")
       set(swiftrtObject ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/swiftImageRegistrationObject${SWIFT_SDK_${sdk}_OBJECT_FORMAT}-${arch_suffix}.dir/SwiftRT-${SWIFT_SDK_${sdk}_OBJECT_FORMAT}.cpp${CMAKE_C_OUTPUT_EXTENSION})
-      set(swiftrtPath "${SWIFTLIB_DIR}/${arch_subdir}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
+      set(shared_runtime_registrar "${SWIFTLIB_DIR}/${arch_subdir}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
+      set(static_runtime_registrar "${SWIFTSTATICLIB_DIR}/${arch_subdir}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
 
       add_custom_command_target(swiftImageRegistration-${arch_suffix}
                                 COMMAND
-                                  "${CMAKE_COMMAND}" -E copy "${swiftrtObject}" "${swiftrtPath}"
+                                  "${CMAKE_COMMAND}" -E copy "${swiftrtObject}" "${shared_runtime_registrar}"
+                                COMMAND
+                                  "${CMAKE_COMMAND}" -E copy "${swiftrtObject}" "${static_runtime_registrar}"
                                 OUTPUT
-                                  "${swiftrtPath}"
+                                  "${shared_runtime_registrar}"
+                                  "${static_runtime_registrar}"
                                 DEPENDS
                                   "${swiftrtObject}")
-      swift_install_in_component(stdlib
-                                 FILES
-                                   "${swiftrtPath}"
-                                 DESTINATION
-                                   "lib/swift/${arch_subdir}")
+      if(SWIFT_BUILD_DYNAMIC_STDLIB)
+        swift_install_in_component(stdlib
+                                   FILES
+                                     "${shared_runtime_registrar}"
+                                   DESTINATION
+                                     "lib/swift/${arch_subdir}")
+      endif()
+      if(SWIFT_BUILD_STATIC_STDLIB)
+        swift_install_in_component(stdlib
+                                   FILES
+                                     "${static_runtime_registrar}"
+                                   DESTINATION
+                                     "lib/swift_static/${arch_subdir}")
+      endif()
+
       add_dependencies(swift-stdlib-${arch_suffix} ${swiftImageRegistration-${arch_suffix}})
 
       add_custom_target(swiftImageRegistration-${arch_suffix}

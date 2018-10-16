@@ -117,7 +117,7 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
   ///
   /// - Complexity: O(1)
   @inlinable // trivial-implementation
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_elements: _element)
   }
 

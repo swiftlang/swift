@@ -14,6 +14,7 @@
 #define SWIFT_SILOPTIMIZER_ANALYSIS_ALIASANALYSIS_H
 
 #include "swift/Basic/ValueEnumerator.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"

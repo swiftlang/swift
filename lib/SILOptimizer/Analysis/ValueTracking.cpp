@@ -63,7 +63,7 @@ static bool isLocalObject(SILValue Obj) {
       continue;
     }
 
-    if (auto *Arg = dyn_cast<SILPHIArgument>(V)) {
+    if (auto *Arg = dyn_cast<SILPhiArgument>(V)) {
       // A BB argument is local if all of its
       // incoming values are local.
       SmallVector<SILValue, 4> IncomingValues;

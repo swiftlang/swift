@@ -49,14 +49,44 @@ extension CGColor {
 }
 
 public protocol _CGColorInitTrampoline {
+#if os(macOS)
   init(red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat)
+#else
+  init?(colorSpace space: CGColorSpace, components: UnsafePointer<CGFloat>)
+#endif
 }
 
 extension _CGColorInitTrampoline {
   public init(_colorLiteralRed red: Float, green: Float, blue: Float,
               alpha: Float) {
-    self.init(red: CGFloat(red), green: CGFloat(green), blue: CGFloat(blue),
-              alpha: CGFloat(alpha))
+    let red = CGFloat(red)
+    let green = CGFloat(green)
+    let blue = CGFloat(blue)
+    let alpha = CGFloat(alpha)
+    // This initializer used to call the CGColorCreateGenericRGB, which is
+    // known to Swift as CGColor(red:green:blue:alpha:). Unfortunately this API
+    // is not available on platforms other than macOS. It would be possible to
+    // replicate the exact functionality of that API using
+    // kGColorSpaceGenericRGB, but it is marked as unavailable for Swift. The
+    // next best option is to use an sRGB color space, which is available but
+    // was introduced a little later than the (now legacy) generic RGB color
+    // space.
+    // Should be OK, since this code only affects the playgrounds, where
+    // you can't really pick the OS version other than "what's currently
+    // shipping".
+#if os(macOS)
+    self.init(red: red, green: green, blue: blue, alpha: alpha)
+#else
+    if #available(iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
+      guard let space = CGColorSpace(name: CGColorSpace.sRGB) else {
+        fatalError("Unable to create an sRGB color space")
+      }
+      self.init(colorSpace: space, components: [red, green, blue, alpha])!
+    }
+    else {
+      fatalError("Cannot create a CGColor on this version of OS")
+    }
+#endif
   }
 }
 
@@ -517,7 +547,7 @@ extension CGAffineTransform : Codable {
 
 extension CGImage {
   public func copy(maskingColorComponents components: [CGFloat]) -> CGImage? {
-    return self.__copy(maskingColorComponents: UnsafePointer(components))
+    return self.__copy(maskingColorComponents: components)
   }
 }
 

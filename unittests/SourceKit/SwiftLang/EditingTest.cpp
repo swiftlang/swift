@@ -114,7 +114,7 @@ public:
                                  SourceKit::createSwiftLangSupport,
                                  /*dispatchOnMain=*/false);
     auto localDocUpdState = std::make_shared<DocUpdateMutexState>();
-    Ctx->getNotificationCenter().addDocumentUpdateNotificationReceiver(
+    Ctx->getNotificationCenter()->addDocumentUpdateNotificationReceiver(
         [localDocUpdState](StringRef docName) {
           std::unique_lock<std::mutex> lk(localDocUpdState->Mtx);
           localDocUpdState->HasUpdate = true;
@@ -133,11 +133,11 @@ public:
   }
 
   void addNotificationReceiver(DocumentUpdateNotificationReceiver Receiver) {
-    Ctx->getNotificationCenter().addDocumentUpdateNotificationReceiver(Receiver);
+    Ctx->getNotificationCenter()->addDocumentUpdateNotificationReceiver(Receiver);
   }
 
   bool waitForDocUpdate(bool reset = false) {
-    std::chrono::seconds secondsToWait(10);
+    std::chrono::seconds secondsToWait(20);
     std::unique_lock<std::mutex> lk(DocUpdState->Mtx);
     auto when = std::chrono::system_clock::now() + secondsToWait;
     auto result = !DocUpdState->CV.wait_until(
@@ -253,7 +253,7 @@ void EditTest::doubleOpenWithDelay(useconds_t delay, bool closeDoc) {
   // be queried, since the semantic info from the first open is unreachable.
   for (int i = 0; i < 2; ++i) {
     bool expired = waitForDocUpdate(/*reset=*/true);
-    ASSERT_FALSE(expired) << "no second notification";
+    ASSERT_FALSE(expired) << "no " << (i ? "second " : "") << "notification";
     replaceText(DocName, 0, 0, StringRef(), Consumer);
     if (!Consumer.Diags.empty())
       break;
@@ -262,10 +262,11 @@ void EditTest::doubleOpenWithDelay(useconds_t delay, bool closeDoc) {
 
   ASSERT_EQ(1u, Consumer.Diags.size());
   EXPECT_STREQ("use of unresolved identifier 'unknown_name'", Consumer.Diags[0].Description.c_str());
+
+  close(DocName);
 }
 
-// This test is failing occassionally in CI: rdar://42483323
-TEST_F(EditTest, DISABLED_DiagsAfterCloseAndReopen) {
+TEST_F(EditTest, DiagsAfterCloseAndReopen) {
   // Attempt to open the same file twice in a row. This tests (subject to
   // timing) cases where:
   // * the 2nd open happens before the first AST starts building

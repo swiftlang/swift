@@ -18,17 +18,17 @@
 ///   is a `LazyFilterSequence`.
 @_fixed_layout // lazy-performance
 public struct LazyFilterSequence<Base: Sequence> {
-  @usableFromInline // FIXME(sil-serialize-all)
+  @usableFromInline // lazy-performance
   internal var _base: Base
 
   /// The predicate used to determine which elements produced by
   /// `base` are also produced by `self`.
-  @usableFromInline // FIXME(sil-serialize-all)
+  @usableFromInline // lazy-performance
   internal let _predicate: (Base.Element) -> Bool
 
   /// Creates an instance consisting of the elements `x` of `base` for
   /// which `isIncluded(x) == true`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // lazy-performance
   public // @testable
   init(_base base: Base, _ isIncluded: @escaping (Base.Element) -> Bool) {
     self._base = base
@@ -89,7 +89,7 @@ extension LazyFilterSequence: LazySequenceProtocol {
   ///
   /// - Complexity: O(1).
   @inlinable // lazy-performance
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator(), _predicate)
   }
 
@@ -140,7 +140,7 @@ extension LazyFilterCollection : LazySequenceProtocol {
   public var underestimatedCount: Int { return 0 }
 
   @inlinable // lazy-performance
-  public func _copyToContiguousArray() -> ContiguousArray<Base.Element> {
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Base.Element> {
 
     // The default implementation of `_copyToContiguousArray` queries the
     // `count` property, which evaluates `_predicate` for every element --
@@ -153,7 +153,7 @@ extension LazyFilterCollection : LazySequenceProtocol {
   ///
   /// - Complexity: O(1).
   @inlinable // lazy-performance
-  public func makeIterator() -> Iterator {
+  public __consuming func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator(), _predicate)
   }
 
@@ -365,7 +365,7 @@ extension LazySequenceProtocol {
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
   @inlinable // lazy-performance
-  public func filter(
+  public __consuming func filter(
     _ isIncluded: @escaping (Elements.Element) -> Bool
   ) -> LazyFilterSequence<Self.Elements> {
     return LazyFilterSequence(_base: self.elements, isIncluded)
@@ -380,7 +380,7 @@ extension LazyCollectionProtocol {
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
   @inlinable // lazy-performance
-  public func filter(
+  public __consuming func filter(
     _ isIncluded: @escaping (Elements.Element) -> Bool
   ) -> LazyFilterCollection<Self.Elements> {
     return LazyFilterCollection(_base: self.elements, isIncluded)
@@ -389,7 +389,7 @@ extension LazyCollectionProtocol {
 
 extension LazyFilterSequence {
   @available(swift, introduced: 5)
-  public func filter(
+  public __consuming func filter(
     _ isIncluded: @escaping (Element) -> Bool
   ) -> LazyFilterSequence<Base> {
     return LazyFilterSequence(_base: _base) {
@@ -400,7 +400,7 @@ extension LazyFilterSequence {
 
 extension LazyFilterCollection {
   @available(swift, introduced: 5)
-  public func filter(
+  public __consuming func filter(
     _ isIncluded: @escaping (Element) -> Bool
   ) -> LazyFilterCollection<Base> {
     return LazyFilterCollection(_base: _base) {

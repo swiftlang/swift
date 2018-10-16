@@ -72,8 +72,8 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME: root $C<τ_0_0>;
   // CHECK-SAME: settable_property $S<τ_0_0>, 
   // CHECK-SAME:   id #C.nonfinal!getter.1 : <T> (C<T>) -> () -> S<T>,
-  // CHECK-SAME:   getter @$S8keypaths1CC8nonfinalAA1SVyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>,
-  // CHECK-SAME:   setter @$S8keypaths1CC8nonfinalAA1SVyxGvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>, @in_guaranteed C<τ_0_0>) -> ()
+  // CHECK-SAME:   getter @$s8keypaths1CC8nonfinalAA1SVyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>,
+  // CHECK-SAME:   setter @$s8keypaths1CC8nonfinalAA1SVyxGvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>, @in_guaranteed C<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
   _ = \C<T>.nonfinal
 
@@ -81,7 +81,7 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME: root $C<τ_0_0>;
   // CHECK-SAME: gettable_property $S<τ_0_0>,
   // CHECK-SAME:   id #C.computed!getter.1 : <T> (C<T>) -> () -> S<T>,
-  // CHECK-SAME:   getter @$S8keypaths1CC8computedAA1SVyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>
+  // CHECK-SAME:   getter @$s8keypaths1CC8computedAA1SVyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>
   // CHECK-SAME: ) <T>
   _ = \C<T>.computed
 
@@ -89,8 +89,8 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME: root $C<τ_0_0>;
   // CHECK-SAME: settable_property $S<τ_0_0>, 
   // CHECK-SAME:   id #C.observed!getter.1 : <T> (C<T>) -> () -> S<T>,
-  // CHECK-SAME:   getter @$S8keypaths1CC8observedAA1SVyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>,
-  // CHECK-SAME:   setter @$S8keypaths1CC8observedAA1SVyxGvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>, @in_guaranteed C<τ_0_0>) -> ()
+  // CHECK-SAME:   getter @$s8keypaths1CC8observedAA1SVyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>,
+  // CHECK-SAME:   setter @$s8keypaths1CC8observedAA1SVyxGvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>, @in_guaranteed C<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
   _ = \C<T>.observed
 
@@ -105,24 +105,24 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME: root $C<τ_0_0>;
   // CHECK-SAME: settable_property $() -> (), 
   // CHECK-SAME:   id ##C.reabstracted,
-  // CHECK-SAME:   getter @$S8keypaths1CC12reabstractedyycvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out @callee_guaranteed (@in_guaranteed ()) -> @out (),
-  // CHECK-SAME:   setter @$S8keypaths1CC12reabstractedyycvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed @callee_guaranteed (@in_guaranteed ()) -> @out (), @in_guaranteed C<τ_0_0>) -> ()
+  // CHECK-SAME:   getter @$s8keypaths1CC12reabstractedyycvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out @callee_guaranteed () -> @out (),
+  // CHECK-SAME:   setter @$s8keypaths1CC12reabstractedyycvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed @callee_guaranteed () -> @out (), @in_guaranteed C<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
   _ = \C<T>.reabstracted
 
   // CHECK: keypath $KeyPath<S<T>, C<T>>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $S<τ_0_0>; gettable_property $C<τ_0_0>,
-  // CHECK-SAME: id @$S8keypaths1SV8computedAA1CCyxGvg : $@convention(method) <τ_0_0> (@in_guaranteed S<τ_0_0>) -> @owned C<τ_0_0>,
-  // CHECK-SAME:   getter @$S8keypaths1SV8computedAA1CCyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>) -> @out C<τ_0_0>
+  // CHECK-SAME: id @$s8keypaths1SV8computedAA1CCyxGvg : $@convention(method) <τ_0_0> (@in_guaranteed S<τ_0_0>) -> @owned C<τ_0_0>,
+  // CHECK-SAME:   getter @$s8keypaths1SV8computedAA1CCyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>) -> @out C<τ_0_0>
   // CHECK-SAME: ) <T>
   _ = \S<T>.computed
 
   // CHECK: keypath $WritableKeyPath<S<T>, C<T>>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $S<τ_0_0>;
   // CHECK-SAME: settable_property $C<τ_0_0>,
-  // CHECK-SAME:   id @$S8keypaths1SV8observedAA1CCyxGvg : $@convention(method) <τ_0_0> (@in_guaranteed S<τ_0_0>) -> @owned C<τ_0_0>,
-  // CHECK-SAME:   getter @$S8keypaths1SV8observedAA1CCyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>) -> @out C<τ_0_0>,
-  // CHECK-SAME:   setter @$S8keypaths1SV8observedAA1CCyxGvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>, @inout S<τ_0_0>) -> ()
+  // CHECK-SAME:   id @$s8keypaths1SV8observedAA1CCyxGvg : $@convention(method) <τ_0_0> (@in_guaranteed S<τ_0_0>) -> @owned C<τ_0_0>,
+  // CHECK-SAME:   getter @$s8keypaths1SV8observedAA1CCyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>) -> @out C<τ_0_0>,
+  // CHECK-SAME:   setter @$s8keypaths1SV8observedAA1CCyxGvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>, @inout S<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
   _ = \S<T>.observed
   _ = \S<T>.z.nonfinal
@@ -134,8 +134,8 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME:  root $S<τ_0_0>;
   // CHECK-SAME:  settable_property $() -> (),
   // CHECK-SAME:    id ##S.reabstracted,
-  // CHECK-SAME:    getter @$S8keypaths1SV12reabstractedyycvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>) -> @out @callee_guaranteed (@in_guaranteed ()) -> @out (),
-  // CHECK-SAME:    setter @$S8keypaths1SV12reabstractedyycvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed @callee_guaranteed (@in_guaranteed ()) -> @out (), @inout S<τ_0_0>) -> ()
+  // CHECK-SAME:    getter @$s8keypaths1SV12reabstractedyycvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>) -> @out @callee_guaranteed () -> @out (),
+  // CHECK-SAME:    setter @$s8keypaths1SV12reabstractedyycvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed @callee_guaranteed () -> @out (), @inout S<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
   _ = \S<T>.reabstracted
 
@@ -143,22 +143,22 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME: root $τ_0_0;
   // CHECK-SAME: gettable_property $Int, 
   // CHECK-SAME:   id #P.x!getter.1 : <Self where Self : P> (Self) -> () -> Int,
-  // CHECK-SAME:   getter @$S8keypaths1PP1xSivpAaBRzlxTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out Int
+  // CHECK-SAME:   getter @$s8keypaths1PP1xSivpAaBRzlxTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out Int
   // CHECK-SAME: ) <T>
   _ = \T.x
   // CHECK: keypath $WritableKeyPath<T, String>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $τ_0_0;
   // CHECK-SAME: settable_property $String,
   // CHECK-SAME:   id #P.y!getter.1 : <Self where Self : P> (Self) -> () -> String,
-  // CHECK-SAME:   getter @$S8keypaths1PP1ySSvpAaBRzlxTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out String,
-  // CHECK-SAME:   setter @$S8keypaths1PP1ySSvpAaBRzlxTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed String, @inout τ_0_0) -> ()
+  // CHECK-SAME:   getter @$s8keypaths1PP1ySSvpAaBRzlxTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out String,
+  // CHECK-SAME:   setter @$s8keypaths1PP1ySSvpAaBRzlxTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed String, @inout τ_0_0) -> ()
   // CHECK-SAME: ) <T>
   _ = \T.y
 
   // CHECK: keypath $KeyPath<T, String>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $τ_0_0;
   // CHECK-SAME: gettable_property $String,
-  // CHECK-SAME:   id @$S8keypaths1PPAAE1zSSvg
+  // CHECK-SAME:   id @$s8keypaths1PPAAE1zSSvg
   _ = \T.z
 }
 
@@ -167,12 +167,12 @@ struct Concrete: P {
   var y: String
 }
 
-// CHECK-LABEL: sil hidden @$S8keypaths35keyPathsWithSpecificGenericInstanceyyF
+// CHECK-LABEL: sil hidden @$s8keypaths35keyPathsWithSpecificGenericInstanceyyF
 func keyPathsWithSpecificGenericInstance() {
   // CHECK: keypath $KeyPath<Concrete, String>, (
   // CHECK-SAME: gettable_property $String,
-  // CHECK-SAME:   id @$S8keypaths1PPAAE1zSSvg
-  // CHECK-SAME:   getter @$S8keypaths1PPAAE1zSSvpAA8ConcreteVTK : $@convention(thin) (@in_guaranteed Concrete) -> @out String
+  // CHECK-SAME:   id @$s8keypaths1PPAAE1zSSvg
+  // CHECK-SAME:   getter @$s8keypaths1PPAAE1zSSvpAA8ConcreteVTK : $@convention(thin) (@in_guaranteed Concrete) -> @out String
   _ = \Concrete.z
   _ = \S<Concrete>.computed
 }
@@ -201,7 +201,7 @@ struct OptionalFields2 {
   var y: OptionalFields?
 }
 
-// CHECK-LABEL: sil hidden @$S8keypaths18keyPathForOptionalyyF
+// CHECK-LABEL: sil hidden @$s8keypaths18keyPathForOptionalyyF
 func keyPathForOptional() {
   // CHECK: keypath $WritableKeyPath<OptionalFields, S<Int>>, (
   // CHECK-SAME:   stored_property #OptionalFields.x : $Optional<S<Int>>;
@@ -389,10 +389,10 @@ func subclass_generics<T: C<Int>, U: C<V>, V/*: PoC*/>(_: T, _: U, _: V) {
 // CHECK-LABEL: sil hidden @{{.*}}identity
 func identity<T>(_: T) {
   // CHECK: keypath $WritableKeyPath<T, T>, <τ_0_0> ({{.*}}root $τ_0_0) <T>
-  let _: WritableKeyPath<T, T> = Builtin.identityKeyPath()
-  // CHECK: keypath $WritableKeyPath<Array<T>, Array<T>>, <τ_0_0> ({{.*}}root $τ_0_0) <Array<T>>
-  let _: WritableKeyPath<[T], [T]> = Builtin.identityKeyPath()
+  let _: WritableKeyPath<T, T> = \T.self
+  // CHECK: keypath $WritableKeyPath<Array<T>, Array<T>>, <τ_0_0> ({{.*}}root $Array<τ_0_0>) <T>
+  let _: WritableKeyPath<[T], [T]> = \[T].self
   // CHECK: keypath $WritableKeyPath<String, String>, ({{.*}}root $String)
-  let _: WritableKeyPath<String, String> = Builtin.identityKeyPath()
+  let _: WritableKeyPath<String, String> = \String.self
 }
 

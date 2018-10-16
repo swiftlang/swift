@@ -82,7 +82,7 @@ clang::SwiftNewtypeAttr *getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
 
 /// Retrieve a bit vector containing the non-null argument
 /// annotations for the given declaration.
-llvm::SmallBitVector
+SmallBitVector
 getNonNullArgs(const clang::Decl *decl,
                ArrayRef<const clang::ParmVarDecl *> params);
 

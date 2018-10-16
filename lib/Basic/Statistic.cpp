@@ -50,6 +50,12 @@ namespace swift {
 using namespace llvm;
 using namespace llvm::sys;
 
+bool environmentVariableRequestedMaximumDeterminism() {
+  if (const char *S = ::getenv("SWIFTC_MAXIMUM_DETERMINISM"))
+    return (S[0] != '\0');
+  return false;
+}
+
 static int64_t
 getChildrenMaxResidentSetSize() {
 #if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)

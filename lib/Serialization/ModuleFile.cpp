@@ -561,6 +561,8 @@ public:
       return {DeclBaseName::Kind::Subscript, StringRef()};
     case static_cast<uint8_t>(DeclNameKind::Destructor):
       return {DeclBaseName::Kind::Destructor, StringRef()};
+    case static_cast<uint8_t>(DeclNameKind::Constructor):
+      return {DeclBaseName::Kind::Constructor, StringRef()};
     default:
       llvm_unreachable("Unknown DeclNameKind");
     }
@@ -796,19 +798,19 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
       switch (kind) {
       case index_block::DECL_OFFSETS:
         assert(blobData.empty());
-        Decls.assign(scratch.begin(), scratch.end());
+        allocateBuffer(Decls, scratch);
         break;
       case index_block::DECL_CONTEXT_OFFSETS:
         assert(blobData.empty());
-        DeclContexts.assign(scratch.begin(), scratch.end());
+        allocateBuffer(DeclContexts, scratch);
         break;
       case index_block::TYPE_OFFSETS:
         assert(blobData.empty());
-        Types.assign(scratch.begin(), scratch.end());
+        allocateBuffer(Types, scratch);
         break;
       case index_block::IDENTIFIER_OFFSETS:
         assert(blobData.empty());
-        Identifiers.assign(scratch.begin(), scratch.end());
+        allocateBuffer(Identifiers, scratch);
         break;
       case index_block::TOP_LEVEL_DECLS:
         TopLevelDecls = readDeclTable(scratch, blobData);
@@ -836,7 +838,7 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         setEntryPointClassID(scratch.front());
         break;
       case index_block::ORDERED_TOP_LEVEL_DECLS:
-        OrderedTopLevelDecls.assign(scratch.begin(), scratch.end());
+        allocateBuffer(OrderedTopLevelDecls, scratch);
         break;
       case index_block::LOCAL_TYPE_DECLS:
         LocalTypeDecls = readLocalDeclTable(scratch, blobData);
@@ -849,27 +851,27 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         break;
       case index_block::LOCAL_DECL_CONTEXT_OFFSETS:
         assert(blobData.empty());
-        LocalDeclContexts.assign(scratch.begin(), scratch.end());
+        allocateBuffer(LocalDeclContexts, scratch);
         break;
       case index_block::GENERIC_SIGNATURE_OFFSETS:
         assert(blobData.empty());
-        GenericSignatures.assign(scratch.begin(), scratch.end());
+        allocateBuffer(GenericSignatures, scratch);
         break;
       case index_block::GENERIC_ENVIRONMENT_OFFSETS:
         assert(blobData.empty());
-        GenericEnvironments.assign(scratch.begin(), scratch.end());
+        allocateBuffer(GenericEnvironments, scratch);
         break;
       case index_block::SUBSTITUTION_MAP_OFFSETS:
         assert(blobData.empty());
-        SubstitutionMaps.assign(scratch.begin(), scratch.end());
+        allocateBuffer(SubstitutionMaps, scratch);
         break;
       case index_block::NORMAL_CONFORMANCE_OFFSETS:
         assert(blobData.empty());
-        NormalConformances.assign(scratch.begin(), scratch.end());
+        allocateBuffer(NormalConformances, scratch);
         break;
       case index_block::SIL_LAYOUT_OFFSETS:
         assert(blobData.empty());
-        SILLayouts.assign(scratch.begin(), scratch.end());
+        allocateBuffer(SILLayouts, scratch);
         break;
 
       default:
@@ -1360,7 +1362,8 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
   assert(!FileContext && "already associated with an AST module");
   FileContext = file;
 
-  if (file->getParentModule()->getName().str() != Name)
+  ModuleDecl *M = file->getParentModule();
+  if (M->getName().str() != Name)
     return error(Status::NameMismatch);
 
   ASTContext &ctx = getContext();
@@ -1371,6 +1374,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
     return error(Status::TargetIncompatible);
   }
   if (ctx.LangOpts.EnableTargetOSChecking &&
+      M->getResilienceStrategy() != ResilienceStrategy::Resilient &&
       isTargetTooNew(moduleTarget, ctx.LangOpts.Target)) {
     return error(Status::TargetTooNew);
   }
@@ -1999,6 +2003,17 @@ void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
       continue;
     }
     results.push_back(declOrError.get());
+  }
+}
+
+void ModuleFile::getPrecedenceGroups(
+       SmallVectorImpl<PrecedenceGroupDecl*> &results) {
+  PrettyStackTraceModuleFile stackEntry(*this);
+  if (PrecedenceGroupDecls) {
+    for (auto entry : PrecedenceGroupDecls->data()) {
+      for (auto item : entry)
+        results.push_back(cast<PrecedenceGroupDecl>(getDecl(item.second)));
+    }
   }
 }
 

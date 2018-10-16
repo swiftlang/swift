@@ -160,6 +160,7 @@ public:
     case MetadataLayout::Kind::ForeignClass:
       return false;
     }
+    llvm_unreachable("unhandled kind");
   }
 };
 

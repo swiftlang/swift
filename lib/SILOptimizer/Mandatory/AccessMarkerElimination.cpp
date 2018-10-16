@@ -81,6 +81,7 @@ bool AccessMarkerElimination::shouldPreserveAccess(
   case SILAccessEnforcement::Dynamic:
     return Mod->getOptions().EnforceExclusivityDynamic;
   }
+  llvm_unreachable("unhandled enforcement");
 }
 
 // Check if the instruction is a marker that should be eliminated. If so, delete

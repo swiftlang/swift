@@ -21,7 +21,7 @@ func get<T>() -> T
 // The purpose of these tests is to make sure the storage is never released
 // before the call to the opaque function.
 
-// CHECK-LABEL: sil @$S18pointer_conversion17testOptionalArrayyyF
+// CHECK-LABEL: sil @$s18pointer_conversion17testOptionalArrayyyF
 public func testOptionalArray() {
   let array: [Int]? = get()
   takesOptConstRawPointer(array)
@@ -57,4 +57,4 @@ public func testOptionalArray() {
   // CHECK-NEXT: [[EMPTY:%.+]] = tuple ()
   // CHECK-NEXT: return [[EMPTY]]
 
-} // CHECK-LABEL: end sil function '$S18pointer_conversion17testOptionalArrayyyF'
+} // CHECK-LABEL: end sil function '$s18pointer_conversion17testOptionalArrayyyF'

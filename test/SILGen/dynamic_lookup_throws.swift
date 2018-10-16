@@ -12,7 +12,7 @@ class Blub : NSObject {
    @objc func blub() throws {}
 }
 
-// CHECK-LABEL: sil hidden @$S21dynamic_lookup_throws8testBlub1ayyXl_tKF : $@convention(thin) (@guaranteed AnyObject) -> @error Error
+// CHECK-LABEL: sil hidden @$s21dynamic_lookup_throws8testBlub1ayyXl_tKF : $@convention(thin) (@guaranteed AnyObject) -> @error Error
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $AnyObject):
 func testBlub(a: AnyObject) throws {
   // CHECK:   [[ANYOBJECT_REF:%.*]] = open_existential_ref [[ARG]] : $AnyObject to $@opened("[[OPENED:.*]]") AnyObject
@@ -24,7 +24,7 @@ func testBlub(a: AnyObject) throws {
   // CHECK:   return
 
   // CHECK: bb2
-  // CHECK:   function_ref @$S10Foundation22_convertNSErrorToErrorys0E0_pSo0C0CSgF
+  // CHECK:   function_ref @$s10Foundation22_convertNSErrorToErrorys0E0_pSo0C0CSgF
   // CHECK:   throw {{%.*}} : $Error
   try a.blub()
 }

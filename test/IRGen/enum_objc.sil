@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-ptrsize-simulator-%target-is-simulator
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 
@@ -11,7 +11,7 @@ import Swift
 
 @objc class OC {}
 sil_vtable OC {}
-sil hidden @$S9enum_objc2OCCACycfcTo : $@convention(thin) (OC) -> OC {
+sil hidden @$s9enum_objc2OCCACycfcTo : $@convention(thin) (OC) -> OC {
 entry(%x : $OC):
   return %x : $OC
 }
@@ -32,8 +32,10 @@ enum SinglePayloadObjCProtocol {
 // CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_class_protocol_switch(i64, i64) {{.*}} {
 // CHECK-64:   switch i64 %0, label {{%.*}} [
 // CHECK-64:     i64 0, label {{%.*}}
-// CHECK-64:     i64 2, label {{%.*}}
-// CHECK-64:     i64 4, label {{%.*}}
+// CHECK-64-simulator-false:     i64 2, label {{%.*}}
+// CHECK-64-simulator-false:     i64 4, label {{%.*}}
+// CHECK-64-simulator-true:     i64 1, label {{%.*}}
+// CHECK-64-simulator-true:     i64 2, label {{%.*}}
 // CHECK-64:   ]
 
 // CHECK-64:     inttoptr i64 %0 to %objc_object*
@@ -69,8 +71,10 @@ end:
 // CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_objc_protocol_switch(i64) {{.*}} {
 // CHECK-64:   switch i64 %0, label {{%.*}}
 // CHECK-64:     i64 0, label {{%.*}}
-// CHECK-64:     i64 2, label {{%.*}}
-// CHECK-64:     i64 4, label {{%.*}}
+// CHECK-64-simulator-false:     i64 2, label {{%.*}}
+// CHECK-64-simulator-false:     i64 4, label {{%.*}}
+// CHECK-64-simulator-true:     i64 1, label {{%.*}}
+// CHECK-64-simulator-true:     i64 2, label {{%.*}}
 // CHECK-64:   ]
 // CHECK-64:     inttoptr i64 %0 to %objc_object*
 
@@ -125,4 +129,4 @@ x:
 }
 
 // Weak existentials allow extra inhabitants if not @objc, therefore StructWithWeakVar must emit:
-// CHECK: define linkonce_odr hidden void @"$S9enum_objc17StructWithWeakVarVwxs"
+// CHECK: define linkonce_odr hidden void @"$s9enum_objc17StructWithWeakVarVwxs"

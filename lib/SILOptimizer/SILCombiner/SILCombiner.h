@@ -295,9 +295,12 @@ public:
 private:
   FullApplySite rewriteApplyCallee(FullApplySite apply, SILValue callee);
 
-  SILInstruction *createApplyWithConcreteType(FullApplySite Apply,
-                                              const ConcreteExistentialInfo &CEI,
-                                              SILBuilderContext &BuilderCtx);
+  bool canReplaceArg(FullApplySite Apply, const ConcreteExistentialInfo &CEI,
+                     unsigned ArgIdx);
+  SILInstruction *createApplyWithConcreteType(
+      FullApplySite Apply,
+      const llvm::SmallDenseMap<unsigned, ConcreteExistentialInfo> &CEIs,
+      SILBuilderContext &BuilderCtx);
 
   // Common utility function to replace the WitnessMethodInst using a
   // BuilderCtx.

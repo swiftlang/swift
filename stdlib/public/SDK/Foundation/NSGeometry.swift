@@ -20,35 +20,15 @@ import CoreGraphics
 // NSRectEdge
 //===----------------------------------------------------------------------===//
 
-// In the SDK, the following NS*Edge constants are defined as macros for the
-// corresponding CGRectEdge enumerators.  Thus, in the SDK, NS*Edge constants
-// have CGRectEdge type.  This is not correct for Swift (as there is no
-// implicit conversion to NSRectEdge).
-
-@available(*, unavailable, renamed: "NSRectEdge.MinX")
-public var NSMinXEdge: NSRectEdge {
-  fatalError("unavailable property can't be accessed")
-}
-@available(*, unavailable, renamed: "NSRectEdge.MinY")
-public var NSMinYEdge: NSRectEdge {
-  fatalError("unavailable property can't be accessed")
-}
-@available(*, unavailable, renamed: "NSRectEdge.MaxX")
-public var NSMaxXEdge: NSRectEdge {
-  fatalError("unavailable property can't be accessed")
-}
-@available(*, unavailable, renamed: "NSRectEdge.MaxY")
-public var NSMaxYEdge: NSRectEdge {
-  fatalError("unavailable property can't be accessed")
-}
-
 extension NSRectEdge {
+  @inlinable
   public init(rectEdge: CGRectEdge) {
     self = NSRectEdge(rawValue: UInt(rectEdge.rawValue))!
   }
 }
 
 extension CGRectEdge {
+  @inlinable
   public init(rectEdge: NSRectEdge) {
     self = CGRectEdge(rawValue: UInt32(rectEdge.rawValue))!
   }

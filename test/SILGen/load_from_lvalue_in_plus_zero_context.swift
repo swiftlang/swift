@@ -15,7 +15,7 @@ struct C {
   let d: String
 }
 
-// CHECK-LABEL: sil hidden @$S37load_from_lvalue_in_plus_zero_context4test1ayAA1AC_tF : $@convention(thin) (@guaranteed A) -> () {
+// CHECK-LABEL: sil hidden @$s37load_from_lvalue_in_plus_zero_context4test1ayAA1AC_tF : $@convention(thin) (@guaranteed A) -> () {
 func test(a: A) {
   let s: String?
   // CHECK:   [[C_TEMP:%.*]] = alloc_stack $Optional<C>

@@ -113,6 +113,7 @@ extension INShortcut : _ObjectiveCBridgeable {
     return true
   }
 
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(_ source: INShortcutReference?) -> INShortcut {
     guard let src = source else { fatalError("Missing source") }
     return INShortcut(from: src)

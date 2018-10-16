@@ -56,13 +56,6 @@ public struct CGFloat {
     self.native = value.native
   }
 
-% for src_ty in all_integer_types(word_bits):
-  @_transparent public init(_ value: ${src_ty.stdlib_name}) {
-    self.native = NativeType(value)
-  }
-
-% end
-
   /// The native value.
   public var native: NativeType
 }

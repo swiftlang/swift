@@ -206,9 +206,15 @@ extension Measurement {
 
 // Implementation note: similar to NSArray, NSDictionary, etc., NSMeasurement's import as an ObjC generic type is suppressed by the importer. Eventually we will need a more general purpose mechanism to correctly import generic types.
 
+// FIXME: Remove @usableFromInline from MeasurementBridgeType once
+// rdar://problem/44662501 is fixed. (The Radar basically just says "look
+// through typealiases and inherited protocols when printing extensions".)
+
 #if DEPLOYMENT_RUNTIME_SWIFT
+@usableFromInline
 internal typealias MeasurementBridgeType = _ObjectTypeBridgeable
 #else
+@usableFromInline
 internal typealias MeasurementBridgeType = _ObjectiveCBridgeable
 #endif
 
@@ -232,6 +238,7 @@ extension Measurement : MeasurementBridgeType {
         }
     }
 
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSMeasurement?) -> Measurement {
         let u = source!.unit as! UnitType
         return Measurement(value: source!.doubleValue, unit: u)

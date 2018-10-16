@@ -862,6 +862,7 @@ static bool isSupportedProjection(const Projection &p) {
   case ProjectionKind::Index:
     return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 void
