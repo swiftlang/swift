@@ -357,7 +357,7 @@ public:
   /// Returns true if the mangledName refers to a thunk function.
   ///
   /// Thunk functions are either (ObjC) partial apply forwarder, swift-as-ObjC
-  /// or ObjC-as-swift thunks.
+  /// or ObjC-as-swift thunks or allocating init functions.
   bool isThunkSymbol(llvm::StringRef MangledName);
 
   /// Returns the mangled name of the target of a thunk.
