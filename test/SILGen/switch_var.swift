@@ -572,36 +572,32 @@ func test_multiple_patterns1() {
   }
 }
 
-// FIXME(integers): the following checks should be updated for the new integer
-// protocols. <rdar://problem/29939484>
-// XCHECK-LABEL: sil hidden @$s10switch_var23test_multiple_patterns2yyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden @$s10switch_var23test_multiple_patterns2yyF : $@convention(thin) () -> () {
 func test_multiple_patterns2() {
   let t1 = 2
   let t2 = 4
-  // XCHECK:   debug_value [[T1:%.*]] :
-  // XCHECK:   debug_value [[T2:%.*]] :
+  // CHECK:   debug_value [[T1:%.+]] :
+  // CHECK:   debug_value [[T2:%.+]] :
   switch (0,0) {
-    // XCHECK-NOT: br bb
+    // CHECK-NOT: br bb
   case (_, let x) where x > t1, (let x, _) where x > t2:
-    // XCHECK:   [[FIRST_X:%.*]] = tuple_extract {{%.*}} : $(Int, Int), 1
-    // XCHECK:   debug_value [[FIRST_X]] :
-    // XCHECK:   apply {{%.*}}([[FIRST_X]], [[T1]])
-    // XCHECK:   cond_br {{%.*}}, [[FIRST_MATCH_CASE:bb[0-9]+]], [[FIRST_FAIL:bb[0-9]+]]
-    // XCHECK:   [[FIRST_MATCH_CASE]]:
-    // XCHECK:     br [[CASE_BODY:bb[0-9]+]]([[FIRST_X]] : $Int)
-    // XCHECK:   [[FIRST_FAIL]]:
-    // XCHECK:     debug_value [[SECOND_X:%.*]] :
-    // XCHECK:     apply {{%.*}}([[SECOND_X]], [[T2]])
-    // XCHECK:     cond_br {{%.*}}, [[SECOND_MATCH_CASE:bb[0-9]+]], [[SECOND_FAIL:bb[0-9]+]]
-    // XCHECK:   [[SECOND_MATCH_CASE]]:
-    // XCHECK:     br [[CASE_BODY]]([[SECOND_X]] : $Int)
-    // XCHECK:   [[CASE_BODY]]([[BODY_VAR:%.*]] : $Int):
-    // XCHECK:     [[A:%.*]] = function_ref @$s10switch_var1aySi1x_tF
-    // XCHECK:     apply [[A]]([[BODY_VAR]])
+    // CHECK:   ([[FIRST:%[0-9]+]], [[SECOND:%[0-9]+]]) = destructure_tuple {{%.+}} : $(Int, Int)
+    // CHECK:   apply {{%.+}}([[SECOND]], [[T1]], {{%.+}})
+    // CHECK:   cond_br {{%.*}}, [[FIRST_MATCH_CASE:bb[0-9]+]], [[FIRST_FAIL:bb[0-9]+]]
+    // CHECK:   [[FIRST_MATCH_CASE]]:
+    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[SECOND]] : $Int)
+    // CHECK:   [[FIRST_FAIL]]:
+    // CHECK:     apply {{%.*}}([[FIRST]], [[T2]], {{%.+}})
+    // CHECK:     cond_br {{%.*}}, [[SECOND_MATCH_CASE:bb[0-9]+]], [[SECOND_FAIL:bb[0-9]+]]
+    // CHECK:   [[SECOND_MATCH_CASE]]:
+    // CHECK:     br [[CASE_BODY]]([[FIRST]] : $Int)
+    // CHECK:   [[CASE_BODY]]([[BODY_VAR:%.*]] : @trivial $Int):
+    // CHECK:     [[A:%.*]] = function_ref @$s10switch_var1a1xySi_tF
+    // CHECK:     apply [[A]]([[BODY_VAR]])
     a(x: x)
   default:
-    // XCHECK:   [[SECOND_FAIL]]:
-    // XCHECK:     function_ref @$s10switch_var1byyF
+    // CHECK:   [[SECOND_FAIL]]:
+    // CHECK:     function_ref @$s10switch_var1byyF
     b()
   }
 }

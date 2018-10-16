@@ -215,16 +215,16 @@ func small_closure_capture_with_argument(_ x: Int) -> (_ y: Int) -> Int {
   // CHECK: destroy_value [[XBOX]]
   // CHECK: return [[ANON_CLOSURE_APP]]
 }
-// FIXME(integers): the following checks should be updated for the new way +
-// gets invoked. <rdar://problem/29939484>
-// XCHECK: sil private @[[CLOSURE_NAME]] : $@convention(thin) (Int, @guaranteed { var Int }) -> Int
-// XCHECK: bb0([[DOLLAR0:%[0-9]+]] : $Int, [[XBOX:%[0-9]+]] : ${ var Int }):
-// XCHECK: [[XADDR:%[0-9]+]] = project_box [[XBOX]]
-// XCHECK: [[PLUS:%[0-9]+]] = function_ref @$ss1poiS2i_SitF{{.*}}
-// XCHECK: [[LHS:%[0-9]+]] = load [trivial] [[XADDR]]
-// XCHECK: [[RET:%[0-9]+]] = apply [[PLUS]]([[LHS]], [[DOLLAR0]])
-// XCHECK: destroy_value [[XBOX]]
-// XCHECK: return [[RET]]
+// CHECK: sil private @[[CLOSURE_NAME]] : $@convention(thin) (Int, @guaranteed { var Int }) -> Int
+// CHECK: bb0([[DOLLAR0:%[0-9]+]] : @trivial $Int, [[XBOX:%[0-9]+]] : @guaranteed ${ var Int }):
+// CHECK: [[XADDR:%[0-9]+]] = project_box [[XBOX]]
+// CHECK: [[INTTYPE:%[0-9]+]] = metatype $@thin Int.Type
+// CHECK: [[XACCESS:%[0-9]+]] = begin_access [read] [unknown] [[XADDR]] : $*Int
+// CHECK: [[LHS:%[0-9]+]] = load [trivial] [[XACCESS]]
+// CHECK: end_access [[XACCESS]] : $*Int
+// CHECK: [[PLUS:%[0-9]+]] = function_ref @$sSi1poiyS2i_SitFZ{{.*}}
+// CHECK: [[RET:%[0-9]+]] = apply [[PLUS]]([[LHS]], [[DOLLAR0]], [[INTTYPE]])
+// CHECK: return [[RET]]
 
 // CHECK-LABEL: sil hidden @$s8closures24small_closure_no_capture{{[_0-9a-zA-Z]*}}F
 func small_closure_no_capture() -> (_ y: Int) -> Int {
