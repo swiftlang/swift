@@ -2,10 +2,11 @@
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 
-func f() {
-% for i in range(N):
-  let collection${i} = [String]()
-% end
-
+func f(
+%for i in range(N):
+  collection${i}: [String],
+%end
+  collection${N+1}: [String]
+) {
   _ = ${' + '.join("collection%s" % i for i in range(N))}
 }
