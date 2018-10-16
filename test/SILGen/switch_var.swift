@@ -1,5 +1,4 @@
-
-// RUN: %target-swift-emit-silgen -module-name switch_var %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -module-name switch_var %s | %FileCheck %s
 
 // TODO: Implement tuple equality in the library.
 // BLOCKED: <rdar://problem/13822406>
@@ -402,7 +401,8 @@ func test_var_return() {
 func test_let() {
   // CHECK: [[FOOS:%.*]] = function_ref @$s10switch_var4foosSSyF
   // CHECK: [[VAL:%.*]] = apply [[FOOS]]()
-  // CHECK: [[VAL_COPY:%.*]] = copy_value [[VAL]]
+  // CHECK: [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
+  // CHECK: [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
   // CHECK: function_ref @$s10switch_var6runcedSbyF
   // CHECK: cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NO_CASE1:bb[0-9]+]]
   switch foos() {
@@ -419,7 +419,8 @@ func test_let() {
   // CHECK:   destroy_value [[VAL_COPY]]
   // CHECK:   br [[TRY_CASE2:bb[0-9]+]]
   // CHECK: [[TRY_CASE2]]:
-  // CHECK:   [[VAL_COPY_2:%.*]] = copy_value [[VAL]]
+  // CHECK:   [[BORROWED_VAL_2:%.*]] = begin_borrow [[VAL]]
+  // CHECK:   [[VAL_COPY_2:%.*]] = copy_value [[BORROWED_VAL_2]]
   // CHECK:   function_ref @$s10switch_var6fungedSbyF
   // CHECK:   cond_br {{%.*}}, [[CASE2:bb[0-9]+]], [[NO_CASE2:bb[0-9]+]]
   case let y where funged():
@@ -436,7 +437,8 @@ func test_let() {
   // CHECK:   br [[NEXT_CASE:bb6]]
 
   // CHECK: [[NEXT_CASE]]:
-  // CHECK:   [[VAL_COPY_3:%.*]] = copy_value [[VAL]]
+  // CHECK:   [[BORROWED_VAL_3:%.*]] = begin_borrow [[VAL]]
+  // CHECK:   [[VAL_COPY_3:%.*]] = copy_value [[BORROWED_VAL_3]]
   // CHECK:   function_ref @$s10switch_var4barsSSyF
   // CHECK:   [[BORROWED_VAL_COPY_3:%.*]] = begin_borrow [[VAL_COPY_3]]
   // CHECK:   store_borrow [[BORROWED_VAL_COPY_3]] to [[IN_ARG:%.*]] :
@@ -472,20 +474,22 @@ func test_mixed_let_var() {
   // CHECK: bb0:
   // CHECK:   [[FOOS:%.*]] = function_ref @$s10switch_var4foosSSyF
   // CHECK:   [[VAL:%.*]] = apply [[FOOS]]()
+  // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
   switch foos() {
 
   // First pattern.
   // CHECK:   [[BOX:%.*]] = alloc_box ${ var String }, var, name "x"
   // CHECK:   [[PBOX:%.*]] = project_box [[BOX]]
-  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
+  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
   // CHECK:   store [[VAL_COPY]] to [init] [[PBOX]]
   // CHECK:   cond_br {{.*}}, [[CASE1:bb[0-9]+]], [[NOCASE1:bb[0-9]+]]
   case var x where runced():
   // CHECK: [[CASE1]]:
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOX]]
   // CHECK:   [[X:%.*]] = load [copy] [[READ]]
+  // CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
   // CHECK:   [[A:%.*]] = function_ref @$s10switch_var1a1xySS_tF
-  // CHECK:   apply [[A]]([[X]])
+  // CHECK:   apply [[A]]([[BORROWED_X]])
   // CHECK:   destroy_value [[BOX]]
   // CHECK:   br [[CONT:bb[0-9]+]]
     a(x: x)
@@ -495,7 +499,8 @@ func test_mixed_let_var() {
   // CHECK:   br [[NEXT_PATTERN:bb[0-9]+]]
 
   // CHECK: [[NEXT_PATTERN]]:
-  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
+  // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
+  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
   // CHECK:   cond_br {{.*}}, [[CASE2:bb[0-9]+]], [[NOCASE2:bb[0-9]+]]
   case let y where funged():
 
@@ -514,7 +519,8 @@ func test_mixed_let_var() {
   // CHECK:   br [[NEXT_CASE:bb[0-9]+]]
 
   // CHECK: [[NEXT_CASE]]
-  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
+  // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
+  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
   // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [[VAL_COPY]]
   // CHECK:   store_borrow [[BORROWED_VAL_COPY]] to [[TMP_VAL_COPY_ADDR:%.*]] :
   // CHECK:   apply {{.*}}<String>({{.*}}, [[TMP_VAL_COPY_ADDR]])

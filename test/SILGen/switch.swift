@@ -1,5 +1,4 @@
-
-// RUN: %target-swift-emit-silgen -module-name switch %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -module-name switch %s | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -722,6 +721,7 @@ func test_union_1(u: MaybePair) {
 func test_union_3(u: MaybePair) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $MaybePair):
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK:   [[SUBJECT:%.*]] = begin_borrow [[ARG_COPY]]
   // CHECK:   switch_enum [[SUBJECT]] : $MaybePair,
   // CHECK:     case #MaybePair.Neither!enumelt: [[IS_NEITHER:bb[0-9]+]],
   // CHECK:     case #MaybePair.Left!enumelt.1: [[IS_LEFT:bb[0-9]+]],
@@ -740,14 +740,13 @@ func test_union_3(u: MaybePair) {
   // CHECK:   br [[CONT]]
     b()
 
-  // CHECK: [[IS_RIGHT]]([[STR:%.*]] : @owned $String):
+  // CHECK: [[IS_RIGHT]]([[STR:%.*]] : @guaranteed $String):
   case .Right:
-  // CHECK:   destroy_value [[STR]] : $String
   // CHECK:   function_ref @$s6switch1cyyF
   // CHECK:   br [[CONT]]
     c()
 
-  // CHECK: [[DEFAULT]]:
+  // CHECK: [[DEFAULT]](
   // -- Ensure the fully-opaque value is destroyed in the default case.
   // CHECK:   destroy_value [[ARG_COPY]] :
   // CHECK:   function_ref @$s6switch1dyyF
@@ -923,21 +922,21 @@ func test_switch_two_unions(x: Foo, y: Foo) {
   // CHECK:   function_ref @$s6switch1ayyF
     a()
 
-  // CHECK: [[IS_NOT_CASE1]]:
+  // CHECK: [[IS_NOT_CASE1]](
   // CHECK:   switch_enum [[X]] : $Foo, case #Foo.B!enumelt: [[IS_CASE2:bb[0-9]+]], default [[IS_NOT_CASE2:bb[0-9]+]]
   // CHECK: [[IS_CASE2]]:
   case (Foo.B, _):
   // CHECK:   function_ref @$s6switch1byyF
     b()
 
-  // CHECK: [[IS_NOT_CASE2]]:
+  // CHECK: [[IS_NOT_CASE2]](
   // CHECK:   switch_enum [[Y]] : $Foo, case #Foo.B!enumelt: [[IS_CASE3:bb[0-9]+]], default [[UNREACHABLE:bb[0-9]+]]
   // CHECK: [[IS_CASE3]]:
   case (_, Foo.B):
   // CHECK:   function_ref @$s6switch1cyyF
     c()
 
-  // CHECK: [[UNREACHABLE]]:
+  // CHECK: [[UNREACHABLE]](
   // CHECK:   unreachable
   }
 }
@@ -981,7 +980,7 @@ enum ABC { case A, B, C }
 // CHECK:         switch_enum [[X]] : $ABC, case #ABC.A!enumelt: [[X_A:bb[0-9]+]], default [[X_NOT_A:bb[0-9]+]]
 // CHECK:       [[X_A]]:
 // CHECK:         function_ref @$s6switch1ayyF
-// CHECK:       [[X_NOT_A]]:
+// CHECK:       [[X_NOT_A]](
 // CHECK:         switch_enum [[Y]] : $ABC, case #ABC.A!enumelt: [[Y_A:bb[0-9]+]], case #ABC.B!enumelt: [[Y_B:bb[0-9]+]], case #ABC.C!enumelt: [[Y_C:bb[0-9]+]]
 // CHECK-NOT: default
 // CHECK:       [[Y_A]]:
@@ -992,7 +991,7 @@ enum ABC { case A, B, C }
 // CHECK:         switch_enum [[X]] : $ABC, case #ABC.C!enumelt: [[X_C:bb[0-9]+]], default [[X_NOT_C:bb[0-9]+]]
 // CHECK:       [[X_C]]:
 // CHECK:         function_ref @$s6switch1dyyF
-// CHECK:       [[X_NOT_C]]:
+// CHECK:       [[X_NOT_C]](
 // CHECK:         function_ref @$s6switch1eyyF
 func testTupleWildcards(_ x: ABC, _ y: ABC) {
   switch (x, y) {
