@@ -415,13 +415,13 @@ ProtocolConformanceRef::getInheritedConformanceRef(ProtocolDecl *base) const {
   auto proto = concrete->getProtocol();
   auto path =
     proto->getGenericSignature()->getConformanceAccessPath(
-                                            proto->getProtocolSelfType(), base);
+                                            proto->getSelfInterfaceType(), base);
   ProtocolConformanceRef result = *this;
   Type resultType = concrete->getType();
   bool first = true;
   for (const auto &step : path) {
     if (first) {
-      assert(step.first->isEqual(proto->getProtocolSelfType()));
+      assert(step.first->isEqual(proto->getSelfInterfaceType()));
       assert(step.second == proto);
       first = false;
       continue;
@@ -774,7 +774,7 @@ Type ProtocolConformanceRef::getAssociatedType(Type conformingType,
 
   // Fast path for dependent member types on 'Self' of our associated types.
   auto memberType = cast<DependentMemberType>(type);
-  if (memberType.getBase()->isEqual(proto->getProtocolSelfType()) &&
+  if (memberType.getBase()->isEqual(proto->getSelfInterfaceType()) &&
       memberType->getAssocType()->getProtocol() == proto &&
       isConcrete())
     return getConcrete()->getTypeWitness(memberType->getAssocType(), resolver);

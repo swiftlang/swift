@@ -817,9 +817,7 @@ namespace {
         conformance.getConcrete()->getType()->hasArchetype();
       if (hasArchetype) {
         // Bind local Self type data from the metadata argument.
-        CanType selfInContext =
-            Proto->mapTypeIntoContext(Proto->getProtocolSelfType())
-              ->getCanonicalType();
+        auto selfInContext = Proto->getSelfTypeInContext()->getCanonicalType();
         IGF.bindLocalTypeDataFromTypeMetadata(selfInContext, IsExact, self,
                                               MetadataState::Abstract);
         IGF.setUnscopedLocalTypeData(
