@@ -406,6 +406,10 @@ ConstraintSystem::SolverState::SolverState(
   ++NumSolutionAttempts;
   SolutionAttempt = NumSolutionAttempts;
 
+  // Record active constraints for re-activation at the end of lifetime.
+  for (auto &constraint : cs.ActiveConstraints)
+    activeConstraints.push_back(&constraint);
+
   // If we're supposed to debug a specific constraint solver attempt,
   // turn on debugging now.
   ASTContext &ctx = CS.getTypeChecker().Context;
@@ -424,6 +428,34 @@ ConstraintSystem::SolverState::~SolverState() {
   assert((CS.solverState == this) &&
          "Expected constraint system to have this solver state!");
   CS.solverState = nullptr;
+
+  // Make sure that all of the retired constraints have been returned
+  // to constraint system.
+  assert(!hasRetiredConstraints());
+
+  // Make sure that all of the generated constraints have been handled.
+  assert(generatedConstraints.empty());
+
+  // Re-activate constraints which were initially marked as "active"
+  // to restore original state of the constraint system.
+  for (auto *constraint : activeConstraints) {
+    // If the constraint is already active we can just move on.
+    if (constraint->isActive())
+      continue;
+
+    // Make sure that constraint is present in the "inactive" set
+    // before transferring it to "active".
+    auto existing = llvm::find_if(CS.InactiveConstraints,
+                                  [&constraint](const Constraint &inactive) {
+                                    return &inactive == constraint;
+                                  });
+    assert(existing != CS.InactiveConstraints.end());
+
+    // Transfer the constraint to "active" set.
+    CS.InactiveConstraints.erase(existing);
+    CS.ActiveConstraints.push_back(constraint);
+    constraint->setActive(true);
+  }
 
   // Restore debugging state.
   LangOptions &langOpts = CS.getTypeChecker().Context.LangOpts;
@@ -1229,6 +1261,17 @@ bool ConstraintSystem::solve(Expr *const expr,
 
 void ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
   assert(solverState);
+
+  // If constraint system failed while trying to
+  // genenerate constraints, let's stop right here.
+  if (failedConstraint)
+    return;
+
+  // Allocate new solver scope, so constraint system
+  // could be restored to its original state afterwards.
+  // Otherwise there is a risk that some of the constraints
+  // are not going to be re-introduced to the system.
+  SolverScope scope(*this);
 
   SmallVector<std::unique_ptr<SolverStep>, 16> workList;
   // First step is always wraps whole constraint system.

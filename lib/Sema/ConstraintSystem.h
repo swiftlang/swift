@@ -1308,6 +1308,10 @@ private:
     /// are added back to the circulation.
     ConstraintList retiredConstraints;
 
+    /// The set of constraints which were active at the time of this state
+    /// creating, it's used to re-activate them on destruction.
+    SmallVector<Constraint *, 4> activeConstraints;
+
     /// The current set of generated constraints.
     SmallVector<Constraint *, 4> generatedConstraints;
 
