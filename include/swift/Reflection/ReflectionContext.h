@@ -156,9 +156,11 @@ public:
             SectAddress + (I * sizeof(typename T::Section)));
         if (strncmp(S->sectname, Name.c_str(), strlen(Name.c_str())) != 0)
           continue;
-        auto SecStart = Start + S->offset;
+        auto Slide = ImageStart.getAddressData() - Command->vmaddr;
+        auto RemoteSecStart = S->addr + Slide;
+        auto LocalSecStart = RemoteSecStart - ImageStart.getAddressData() + Start;
         auto SecSize = S->size;
-        return {{SecStart, SecStart + SecSize}, 0};
+        return {{LocalSecStart, LocalSecStart + SecSize}, 0};
       }
       return {{nullptr, nullptr}, 0};
     };
