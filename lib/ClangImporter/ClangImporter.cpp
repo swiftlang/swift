@@ -407,8 +407,6 @@ void ClangImporter::clearTypeResolver() {
 
 #pragma mark Module loading
 
-#define SHIMS_INCLUDE_FLAG "-isystem"
-
 static void
 getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
                              ASTContext &ctx,
@@ -439,7 +437,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
       "-fretain-comments-from-system-headers",
 
-      SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
+      "-isystem", searchPathOpts.RuntimeResourcePath,
   });
 
   // Enable Position Independence.  `-fPIC` is not supported on Windows, which
