@@ -566,37 +566,34 @@ func getFridge(_ home: APPHouse) -> Refrigerator {
   return home.fridge
 }
 
-// FIXME(integers): the following checks should be updated for the new integer
-// protocols. <rdar://problem/29939484>
-// XCHECK-LABEL: sil hidden @$s13objc_bridging16updateFridgeTemp{{.*}}F
-// XCHECK: bb0([[HOME:%[0-9]+]] : $APPHouse, [[DELTA:%[0-9]+]] : $Double):
+// CHECK-LABEL: sil hidden @$s13objc_bridging16updateFridgeTemp{{.*}}F
+// CHECK: bb0([[HOME:%[0-9]+]] : @guaranteed $APPHouse, [[DELTA:%[0-9]+]] : @trivial $Double):
 func updateFridgeTemp(_ home: APPHouse, delta: Double) {
-  // +=
-  // XCHECK: [[PLUS_EQ:%[0-9]+]] = function_ref @$ss2peoiyySdz_SdtF
-
   // Temporary fridge
-  // XCHECK: [[TEMP_FRIDGE:%[0-9]+]]  = alloc_stack $Refrigerator
+  // CHECK: [[TEMP_FRIDGE:%[0-9]+]]  = alloc_stack $Refrigerator
 
   // Get operation
-  // CHECK: [[GETTER:%[0-9]+]] = objc_method [[HOME]] : $APPHouse, #APPHouse.fridge!getter.1.foreign
-  // CHECK: [[OBJC_FRIDGE:%[0-9]+]] = apply [[GETTER]]([[HOME]])
+  // CHECK-NEXT: [[GETTER:%[0-9]+]] = objc_method [[HOME]] : $APPHouse, #APPHouse.fridge!getter.1.foreign
+  // CHECK-NEXT: [[OBJC_FRIDGE:%[0-9]+]] = apply [[GETTER]]([[HOME]])
   // CHECK: [[BRIDGE_FROM_FN:%[0-9]+]] = function_ref @$s10Appliances12RefrigeratorV36_unconditionallyBridgeFromObjectiveCyACSo15APPRefrigeratorCSgFZ
-  // CHECK: [[REFRIGERATOR_META:%[0-9]+]] = metatype $@thin Refrigerator.Type
-  // CHECK: [[FRIDGE:%[0-9]+]] = apply [[BRIDGE_FROM_FN]]([[OBJC_FRIDGE]], [[REFRIGERATOR_META]])
+  // CHECK-NEXT: [[REFRIGERATOR_META:%[0-9]+]] = metatype $@thin Refrigerator.Type
+  // CHECK-NEXT: [[FRIDGE:%[0-9]+]] = apply [[BRIDGE_FROM_FN]]([[OBJC_FRIDGE]], [[REFRIGERATOR_META]])
+  // CHECK-NEXT: store [[FRIDGE]] to [trivial] [[TEMP_FRIDGE]]
 
   // Addition
-  // XCHECK: [[TEMP:%[0-9]+]] = struct_element_addr [[TEMP_FRIDGE]] : $*Refrigerator, #Refrigerator.temperature
-  // XCHECK: apply [[PLUS_EQ]]([[TEMP]], [[DELTA]])
+  // CHECK-NEXT: [[TEMP:%[0-9]+]] = struct_element_addr [[TEMP_FRIDGE]] : $*Refrigerator, #Refrigerator.temperature
+  // CHECK: [[PLUS_EQ:%[0-9]+]] = function_ref @$sSd2peoiyySdz_SdtFZ
+  // CHECK-NEXT: apply [[PLUS_EQ]]([[TEMP]], [[DELTA]], [[METATYPE:%[0-9]+]])
 
   // Setter
-  // XCHECK: [[FRIDGE:%[0-9]+]] = load [trivial] [[TEMP_FRIDGE]] : $*Refrigerator
-  // XCHECK: [[SETTER:%[0-9]+]] = objc_method [[BORROWED_HOME]] : $APPHouse, #APPHouse.fridge!setter.1.foreign
-  // XCHECK: [[BRIDGE_TO_FN:%[0-9]+]] = function_ref @$s10Appliances12RefrigeratorV19_bridgeToObjectiveCSo15APPRefrigeratorCyF
-  // XCHECK: [[OBJC_ARG:%[0-9]+]] = apply [[BRIDGE_TO_FN]]([[FRIDGE]])
-  // XCHECK: apply [[SETTER]]([[OBJC_ARG]], [[BORROWED_HOME]]) : $@convention(objc_method) (APPRefrigerator, APPHouse) -> ()
-  // XCHECK: destroy_value [[OBJC_ARG]]
-  // XCHECK: end_borrow [[BORROWED_HOME]]
-  // XCHECK: destroy_value [[HOME]]
+  // CHECK: [[FRIDGE:%[0-9]+]] = load [trivial] [[TEMP_FRIDGE]] : $*Refrigerator
+  // CHECK: [[BRIDGE_TO_FN:%[0-9]+]] = function_ref @$s10Appliances12RefrigeratorV19_bridgeToObjectiveCSo15APPRefrigeratorCyF
+  // CHECK-NEXT: [[OBJC_ARG:%[0-9]+]] = apply [[BRIDGE_TO_FN]]([[FRIDGE]])
+  // CHECK-NEXT: [[SETTER:%[0-9]+]] = objc_method [[HOME]] : $APPHouse, #APPHouse.fridge!setter.1.foreign
+  // CHECK-NEXT: apply [[SETTER]]([[OBJC_ARG]], [[HOME]]) : $@convention(objc_method) (APPRefrigerator, APPHouse) -> ()
+  // CHECK-NEXT: destroy_value [[OBJC_ARG]]
+  // CHECK-NEXT: destroy_value [[OBJC_FRIDGE]]
+  // CHECK-NEXT: dealloc_stack [[TEMP_FRIDGE]]
   home.fridge.temperature += delta
 }
 
