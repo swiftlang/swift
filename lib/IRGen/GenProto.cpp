@@ -972,7 +972,7 @@ bool irgen::isDependentConformance(const NormalProtocolConformance *conformance)
   auto proto = conformance->getProtocol();
   for (const auto &req : proto->getRequirementSignature()) {
     if (req.getKind() != RequirementKind::Conformance ||
-        !req.getFirstType()->isEqual(proto->getProtocolSelfType()))
+        !req.getFirstType()->isEqual(proto->getSelfInterfaceType()))
       continue;
 
     auto inherited = req.getSecondType()->castTo<ProtocolType>()->getDecl();

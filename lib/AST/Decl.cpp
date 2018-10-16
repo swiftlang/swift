@@ -731,6 +731,7 @@ GenericSignature *GenericContext::getGenericSignature() const {
   // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
   // it.
   if (auto PD = dyn_cast<ProtocolDecl>(this)) {
+    const_cast<ProtocolDecl *>(PD)->createGenericParamsIfMissing();
     auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
     auto req =
         Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
@@ -3884,13 +3885,13 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   }
 
   // A direct reference to 'Self' is covariant.
-  if (proto->getProtocolSelfType()->isEqual(type))
+  if (proto->getSelfInterfaceType()->isEqual(type))
     return SelfReferenceKind::Result();
 
   // Special handling for associated types.
   if (!skipAssocTypes && type->is<DependentMemberType>()) {
     type = type->getRootGenericParam();
-    if (proto->getProtocolSelfType()->isEqual(type))
+    if (proto->getSelfInterfaceType()->isEqual(type))
       return SelfReferenceKind::Other();
   }
 
@@ -4771,8 +4772,12 @@ Type DeclContext::getSelfTypeInContext() const {
   assert(isTypeContext());
 
   // For a protocol or extension thereof, the type is 'Self'.
-  if (getSelfProtocolDecl())
-    return mapTypeIntoContext(getProtocolSelfType());
+  if (getSelfProtocolDecl()) {
+    auto selfType = getProtocolSelfType();
+    if (!selfType)
+      return ErrorType::get(getASTContext());
+    return mapTypeIntoContext(selfType);
+  }
   return getDeclaredTypeInContext();
 }
 
@@ -4781,8 +4786,12 @@ Type DeclContext::getSelfInterfaceType() const {
   assert(isTypeContext());
 
   // For a protocol or extension thereof, the type is 'Self'.
-  if (getSelfProtocolDecl())
-    return getProtocolSelfType();
+  if (getSelfProtocolDecl()) {
+    auto selfType = getProtocolSelfType();
+    if (!selfType)
+      return ErrorType::get(getASTContext());
+    return selfType;
+  }
   return getDeclaredInterfaceType();
 }
 

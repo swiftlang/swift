@@ -166,3 +166,14 @@ class CircularValidationWithTypo {
     didSet { }
   }
 }
+
+// Crash with invalid extension that has not been bound -- https://bugs.swift.org/browse/SR-8984
+protocol PP {}
+
+func boo() { // expected-note {{did you mean 'boo'?}}
+  extension PP { // expected-error {{declaration is only valid at file scope}}
+    func g() {
+      booo() // expected-error {{use of unresolved identifier 'booo'}}
+    }
+  }
+}
