@@ -1400,31 +1400,31 @@ ${assignmentOperatorComment(x.operator, True)}
   }
 
   /// A type that represents the words of this integer.
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @_fixed_layout
   public struct Words : RandomAccessCollection {
     public typealias Indices = Range<Int>
     public typealias SubSequence = Slice<${Self}.Words>
 
-    @usableFromInline // FIXME(sil-serialize-all)
+    @usableFromInline
     internal var _value: ${Self}
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public init(_ value: ${Self}) {
       self._value = value
     }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public var count: Int {
       return (${bits} + ${word_bits} - 1) / ${word_bits}
     }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public var startIndex: Int { return 0 }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public var endIndex: Int { return count }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public var indices: Indices { return startIndex ..< endIndex }
 
     @_transparent
@@ -1433,7 +1433,7 @@ ${assignmentOperatorComment(x.operator, True)}
     @_transparent
     public func index(before i: Int) -> Int { return i - 1 }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public subscript(position: Int) -> UInt {
       get {
         _precondition(position >= 0, "Negative word index")
@@ -1530,7 +1530,7 @@ ${assignmentOperatorComment(x.operator, True)}
   /// - Parameter other: The value to multiply this value by.
   /// - Returns: A tuple containing the high and low parts of the result of
   ///   multiplying this value and `other`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func multipliedFullWidth(by other: ${Self})
     -> (high: ${Self}, low: ${Self}.Magnitude) {
     // FIXME(integers): tests
@@ -1563,7 +1563,7 @@ ${assignmentOperatorComment(x.operator, True)}
   ///   sign, if the type is signed.
   /// - Returns: A tuple containing the quotient and remainder of `dividend`
   ///   divided by this value.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func dividingFullWidth(
     _ dividend: (high: ${Self}, low: ${Self}.Magnitude)
   ) -> (quotient: ${Self}, remainder: ${Self}) {
@@ -1632,17 +1632,14 @@ ${assignmentOperatorComment(x.operator, True)}
   }
 % end
 
-  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4.0, message: "Use initializers instead")
   public func to${U}IntMax() -> ${U}Int64 {
     return numericCast(self)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4, message: "Use bitWidth instead.")
   public static var _sizeInBits: ${Self} { return ${bits} }
 
-  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   public static var _sizeInBytes: ${Self} { return ${bits}/8 }
 
@@ -1651,7 +1648,7 @@ ${assignmentOperatorComment(x.operator, True)}
   ///
   /// - Returns: The sign of this number, expressed as an integer of the same
   ///   type.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   public func signum() -> ${Self} {
     let isPositive = ${Self}(Builtin.zext_Int1_Int${bits}(
@@ -1708,7 +1705,6 @@ extension ${Self} {
   ///
   /// - Parameter source: An integer to use as the source of the new value's
   ///   bit pattern.
-  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4.0, renamed: "init(truncatingIfNeeded:)")
   @_transparent
   public init(truncatingBitPattern source: ${Src}) {
@@ -1746,7 +1742,6 @@ ${operatorComment(x.operator, True)}
 %   for op in maskingShifts:
 
 ${operatorComment(x.operator, True)}
-  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
@@ -1759,7 +1754,6 @@ ${operatorComment(x.operator, True)}
   }
 
 ${assignmentOperatorComment(x.operator, True)}
-  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
@@ -1837,7 +1831,8 @@ extension Int {
 }
 
 // FIXME(integers): switch to using `FixedWidthInteger.unsafeAdding`
-@inlinable // FIXME(sil-serialize-all)
+@_transparent
+@inlinable
 internal func _unsafePlus(_ lhs: Int, _ rhs: Int) -> Int {
 #if INTERNAL_CHECKS_ENABLED
   return lhs + rhs
@@ -1847,7 +1842,8 @@ internal func _unsafePlus(_ lhs: Int, _ rhs: Int) -> Int {
 }
 
 // FIXME(integers): switch to using `FixedWidthInteger.unsafeSubtracting`
-@inlinable // FIXME(sil-serialize-all)
+@_transparent
+@inlinable
 internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
 #if INTERNAL_CHECKS_ENABLED
   return lhs - rhs
