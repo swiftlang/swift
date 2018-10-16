@@ -429,10 +429,10 @@ static Address alignAddress(IRGenFunction &IGF,
   auto &Builder = IGF.Builder;
   auto &IGM = IGF.IGM;
   auto *alignedAddress = Builder.CreateBitCast(originAddress, IGM.Int8PtrTy).getAddress();
-#if defined(__linux__) && defined(__BIG_ENDIAN__)
-  alignedAddress = Builder.CreateConstGEP1_32(alignedAddress, 4);
-  alignedAddress = Builder.CreateGEP(alignedAddress, Builder.CreateNeg(shift));
-#endif
+  if (IGM.Triple.getOS() == llvm::Triple::Linux && !IGM.Triple.isLittleEndian()) {
+    alignedAddress = Builder.CreateConstGEP1_32(alignedAddress, 4);
+    alignedAddress = Builder.CreateGEP(alignedAddress, Builder.CreateNeg(shift));
+  }
   return Address(alignedAddress, Alignment(0));
 }
 
