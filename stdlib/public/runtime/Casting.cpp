@@ -3085,9 +3085,17 @@ bool _swift_isClassOrObjCExistentialType(const Metadata *value,
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 const Metadata *swift::_swift_class_getSuperclass(const Metadata *theClass) {
-  if (const ClassMetadata *classType = theClass->getClassObject())
+  if (const ClassMetadata *classType = theClass->getClassObject()) {
     if (classHasSuperclass(classType))
       return getMetadataForClass(classType->Superclass);
+  }
+
+  if (const ForeignClassMetadata *foreignClassType
+        = dyn_cast<ForeignClassMetadata>(theClass)) {
+    if (const Metadata *superclass = foreignClassType->Superclass)
+      return superclass;
+  }
+
   return nullptr;
 }
 
