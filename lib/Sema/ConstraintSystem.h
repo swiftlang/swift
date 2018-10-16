@@ -3054,10 +3054,13 @@ public:
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
+  /// \param allowFixes Whether to allow fixes in the solution.
+  ///
   /// \returns a solution if a single unambiguous one could be found, or None if
   /// ambiguous or unsolvable.
   Optional<Solution> solveSingle(FreeTypeVariableBinding allowFreeTypeVariables
-                                    = FreeTypeVariableBinding::Disallow);
+                                 = FreeTypeVariableBinding::Disallow,
+                                 bool allowFixes = false);
 
 private:
   /// \brief Solve the system of constraints.
