@@ -890,6 +890,13 @@ private:
   /// We only collect interface hash for primary input files.
   llvm::Optional<llvm::MD5> InterfaceHash;
 
+  /// A hash of ONLY the interface-contributing tokens that cannot be accounted
+  /// for by the additional experimental dependency scheme. This hash is
+  /// combined with the InterfaceHash in the swiftdeps file in such a way that a
+  /// driver without EnableExperimentalDependencies can fall back to the old
+  /// behavior.
+  llvm::Optional<llvm::MD5> ExperimentalInterfaceHash;
+
   /// \brief The ID for the memory buffer containing this file's source.
   ///
   /// May be -1, to indicate no association with a buffer.
@@ -1136,6 +1143,7 @@ public:
   void enableInterfaceHash() {
     assert(!hasInterfaceHash());
     InterfaceHash.emplace();
+    ExperimentalInterfaceHash.emplace();
   }
 
   bool hasInterfaceHash() const {
@@ -1150,6 +1158,15 @@ public:
     InterfaceHash->update(a);
   }
 
+  void
+  recordInterfaceTokenNotDetectedByExperimentalDependencies(StringRef token) {
+    assert(!token.empty());
+    ExperimentalInterfaceHash->update(token);
+    // Add null byte to separate tokens.
+    uint8_t a[1] = {0};
+    ExperimentalInterfaceHash->update(a);
+  }
+
   void getInterfaceHash(llvm::SmallString<32> &str) {
     llvm::MD5::MD5Result result;
     InterfaceHash->final(result);
@@ -1160,6 +1177,12 @@ public:
     llvm::SmallString<32> str;
     getInterfaceHash(str);
     out << str << '\n';
+  }
+
+  void getExperimentalInterfaceHash(llvm::SmallString<32> &str) {
+    llvm::MD5::MD5Result result;
+    ExperimentalInterfaceHash->final(result);
+    llvm::MD5::stringifyResult(result, str);
   }
 
   std::vector<Token> &getTokenVector();

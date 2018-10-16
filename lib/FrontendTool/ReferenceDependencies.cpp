@@ -249,7 +249,16 @@ void ReferenceDependenciesEmitter::emitDepends() const {
 void ReferenceDependenciesEmitter::emitInterfaceHash() const {
   llvm::SmallString<32> interfaceHash;
   SF->getInterfaceHash(interfaceHash);
-  out << reference_dependency_keys::interfaceHash << ": \"" << interfaceHash
+  if (!SF->getEnableExternalDependencies()) {
+    out << reference_dependency_keys::interfaceHash << ": \"" << interfaceHash
+        << "\"\n";
+    return;
+  }
+  llvm::SmallString<32> experimentalInterfaceHash;
+  SF->getExperimentalInterfaceHash(experimentalInterfaceHash);
+  out << reference_dependency_keys::interfaceHash << ": \""
+      << ExperimentalDependencies::combineNames(interfaceHash.str(),
+                                                experimentalInterfaceHash.str())
       << "\"\n";
 }
 

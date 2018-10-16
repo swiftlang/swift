@@ -523,6 +523,7 @@ SourceLoc Parser::consumeTokenWithoutFeedingReceiver() {
 
   if (IsParsingInterfaceTokens && !Tok.getText().empty()) {
     SF.recordInterfaceToken(Tok.getText());
+    SF.recordInterfaceTokenNotDetectedByExperimentalDependencies(Tok.getText());
   }
   L->lex(Tok, LeadingTrivia, TrailingTrivia);
   PreviousLoc = Loc;
