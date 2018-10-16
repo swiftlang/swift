@@ -91,5 +91,10 @@ DemangleToMetadataTests.test("members of runtime-only Objective-C classes") {
     _typeByMangledName("So17OS_dispatch_queueC8DispatchE10AttributesV")!)
 }
 
+DemangleToMetadataTests.test("runtime conformance lookup via foreign superclasses") {
+  expectEqual(Set<CFMutableString>.self,
+    _typeByMangledName("ShySo18CFMutableStringRefaG")!)
+}
+
 runAllTests()
 
