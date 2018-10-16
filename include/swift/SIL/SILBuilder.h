@@ -375,6 +375,16 @@ public:
   /// continuation block.
   SILBasicBlock *splitBlockForFallthrough();
 
+  /// Convenience for creating a fall-through basic block on-the-fly without
+  /// affecting the insertion point.
+  SILBasicBlock *createFallthroughBlock(SILLocation loc,
+                                        SILBasicBlock *targetBB) {
+    auto *newBB = F->createBasicBlock();
+    SILBuilder(newBB, this->getCurrentDebugScope(), this->getBuilderContext())
+        .createBranch(loc, targetBB);
+    return newBB;
+  }
+
   //===--------------------------------------------------------------------===//
   // SILInstruction Creation Methods
   //===--------------------------------------------------------------------===//
