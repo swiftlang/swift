@@ -35,10 +35,12 @@ public class Child : Parent {
   // CHECK-LABEL: sil @$s5super5ChildC8propertySSvg : $@convention(method) (@guaranteed Child) -> @owned String {
   // CHECK:       bb0([[SELF:%.*]] : @guaranteed $Child):
   // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]]
-  // CHECK:         [[CASTED_SELF_COPY:%[0-9]+]] = upcast [[SELF_COPY]] : $Child to $Parent
+  // CHECK:         [[CAST_SELF_COPY:%[0-9]+]] = upcast [[SELF_COPY]] : $Child to $Parent
+  // CHECK:         [[CAST_SELF_BORROW:%[0-9]+]] = begin_borrow [[CAST_SELF_COPY]]
   // CHECK:         [[SUPER_METHOD:%[0-9]+]] = function_ref @$s5super6ParentC8propertySSvg : $@convention(method) (@guaranteed Parent) -> @owned String
-  // CHECK:         [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[CASTED_SELF_COPY]])
-  // CHECK:         destroy_value [[CASTED_SELF_COPY]]
+  // CHECK:         [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[CAST_SELF_BORROW]])
+  // CHECK:         end_borrow [[CAST_SELF_BORROW]]
+  // CHECK:         destroy_value [[CAST_SELF_COPY]]
   // CHECK:         return [[RESULT]]
   public override var property: String {
     return super.property
@@ -47,10 +49,12 @@ public class Child : Parent {
   // CHECK-LABEL: sil @$s5super5ChildC13otherPropertySSvg : $@convention(method) (@guaranteed Child) -> @owned String {
   // CHECK:       bb0([[SELF:%.*]] : @guaranteed $Child):
   // CHECK:         [[COPIED_SELF:%.*]] = copy_value [[SELF]]
-  // CHECK:         [[CASTED_SELF_COPY:%[0-9]+]] = upcast [[COPIED_SELF]] : $Child to $Parent
+  // CHECK:         [[CAST_SELF_COPY:%[0-9]+]] = upcast [[COPIED_SELF]] : $Child to $Parent
+  // CHECK:         [[CAST_SELF_BORROW:%[0-9]+]] = begin_borrow [[CAST_SELF_COPY]]
   // CHECK:         [[SUPER_METHOD:%[0-9]+]] = function_ref @$s5super6ParentC13finalPropertySSvg
-  // CHECK:         [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[CASTED_SELF_COPY]])
-  // CHECK:         destroy_value [[CASTED_SELF_COPY]]
+  // CHECK:         [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[CAST_SELF_BORROW]])
+  // CHECK:         end_borrow [[CAST_SELF_BORROW]]
+  // CHECK:         destroy_value [[CAST_SELF_COPY]]
   // CHECK:         return [[RESULT]]
   public var otherProperty: String {
     return super.finalProperty
