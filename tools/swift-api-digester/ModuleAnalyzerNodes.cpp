@@ -654,13 +654,29 @@ static bool hasSameContents(ArrayRef<StringRef> Left,
   return LeftMinusRight.empty() && RightMinusLeft.empty();
 }
 
-bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) {
+static bool hasSameParameterFlags(const SDKNodeType *Left, const SDKNodeType *Right) {
+  if (Left->hasDefaultArgument() != Right->hasDefaultArgument())
+    return false;
+  if (Left->getParamValueOwnership() != Right->getParamValueOwnership())
+    return false;
+
+  return true;
+}
+
+static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) {
   auto *LeftAlias = dyn_cast<SDKNodeTypeAlias>(&L);
   auto *RightAlias = dyn_cast<SDKNodeTypeAlias>(&R);
   if (LeftAlias || RightAlias) {
+    auto Left = L.getAs<SDKNodeType>();
+    auto Right = R.getAs<SDKNodeType>();
+
+    // First compare the parameter attributes.
+    if (!hasSameParameterFlags(Left, Right))
+      return false;
+
     // Comparing the underlying types if any of the inputs are alias.
-    const SDKNode *Left = LeftAlias ? LeftAlias->getUnderlyingType() : &L;
-    const SDKNode *Right = RightAlias ? RightAlias->getUnderlyingType() : &R;
+    Left = LeftAlias ? LeftAlias->getUnderlyingType() : Left;
+    Right = RightAlias ? RightAlias->getUnderlyingType() : Right;
     return *Left == *Right;
   }
 
@@ -676,9 +692,7 @@ bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
       auto Right = R.getAs<SDKNodeType>();
       if (Left->hasAttributeChange(*Right))
         return false;
-      if (Left->hasDefaultArgument() != Right->hasDefaultArgument())
-        return false;
-      if (Left->getParamValueOwnership() != Right->getParamValueOwnership())
+      if (!hasSameParameterFlags(Left, Right))
         return false;
       if (Left->getPrintedName() == Right->getPrintedName())
         return true;
@@ -740,8 +754,6 @@ bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         if (auto *Right = dyn_cast<SDKNodeDeclSubscript>(&R)) {
           if (Left->hasSetter() != Right->hasSetter())
             return false;
-          if (Left->hasStorage() != Right->hasStorage())
-            return false;
         }
       }
       LLVM_FALLTHROUGH;
@@ -776,7 +788,7 @@ bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
     }
   }
 
-  llvm_unreachable("Unhanlded SDKNodeKind in switch.");
+  llvm_unreachable("Unhandled SDKNodeKind in switch.");
 }
 
 bool SDKContext::isEqual(const SDKNode &Left, const SDKNode &Right) {
@@ -1166,16 +1178,15 @@ SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
   if (Ctx.checkingABI()) {
     T = T->getCanonicalType();
   }
-  SDKNode* Root = SDKNodeInitInfo(Ctx, T, Info).createSDKNode(SDKNodeKind::TypeNominal);
 
   if (auto NAT = dyn_cast<NameAliasType>(T.getPointer())) {
-    SDKNode* Root = SDKNodeInitInfo(Ctx, T).createSDKNode(SDKNodeKind::TypeAlias);
-    Root->addChild(constructTypeNode(NAT->getCanonicalType()));
+    SDKNode* Root = SDKNodeInitInfo(Ctx, T, Info).createSDKNode(SDKNodeKind::TypeAlias);
+    Root->addChild(constructTypeNode(NAT->getSinglyDesugaredType()));
     return Root;
   }
 
   if (auto Fun = T->getAs<AnyFunctionType>()) {
-    SDKNode* Root = SDKNodeInitInfo(Ctx, T).createSDKNode(SDKNodeKind::TypeFunc);
+    SDKNode* Root = SDKNodeInitInfo(Ctx, T, Info).createSDKNode(SDKNodeKind::TypeFunc);
 
     // Still, return type first
     Root->addChild(constructTypeNode(Fun->getResult()));
@@ -1186,6 +1197,8 @@ SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
     Root->addChild(constructTypeNode(Input));
     return Root;
   }
+
+  SDKNode* Root = SDKNodeInitInfo(Ctx, T, Info).createSDKNode(SDKNodeKind::TypeNominal);
 
   // Keep paren type as a stand-alone level.
   if (auto *PT = dyn_cast<ParenType>(T.getPointer())) {
