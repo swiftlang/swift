@@ -749,6 +749,40 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
           continue;
         }
 
+        // Check if this is a preheader of another loop.
+        SILLoop *succBlockLoop = nullptr;
+        if (SILBasicBlock* succBlockLoopHeader = succ->getSingleSuccessorBlock()) {
+          succBlockLoop = LI->getLoopFor(succBlockLoopHeader);
+          if (succBlockLoop &&
+              LI->getLoopFor(succ) != succBlockLoop &&
+              succBlockLoop->getHeader() == succBlockLoopHeader &&
+              !succBlockLoop->contains(loop) &&
+              !loop->contains(succBlockLoop)) {
+            // `succ` is a pre-header of a loop that does not contain this loop
+            // or contained within this loop. Before moving this loop into our
+            // loop, we should first perform the canonicalization on that loop
+            // first.
+            SingleExitLoopTransformer::doIt(deviceInfo, LI, DI, succBlockLoop, PDI);
+            // // Remove from the top-level loops before making it a child.
+            // if (succBlockLoop->getParentLoop() == nullptr) {
+            //   LI->removeLoop(llvm::find(*LI, succBlockLoop));
+            // }
+            // loop->addChildLoop(succBlockLoop);
+            // // Add the block to this loop and all its parents.
+            // for (SILBasicBlock* bb : succBlockLoop->getBlocks()) {
+            //   auto *L = loop;
+            //   while (L) {
+            //     L->addBlockEntry(bb);
+            //     L = L->getParentLoop();
+            //   }
+            // }
+            // Reinitialize succ as it might have been changed by the transformer.
+            // succ = succBlockLoop->getHeader();
+          } else {
+            succBlockLoop = nullptr;
+          }
+        }
+
         if (DI->properlyDominates(header, succ)) {
           worklist.insert(succ);
           continue;
@@ -766,6 +800,17 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
 
         // Clone the block and rewire the edge.
         SILBasicBlock *clonedSucc = cloner.initAndCloneBlock(succ);
+        if (succBlockLoop) {
+          // We will have to clone the entire loop now.
+          SILLoop *clonedLoop =
+              cloner.cloneLoop(LI, succBlockLoop, succBlockLoop->getHeader());
+          //clonedLoop->setParentLoop(loop->getParentLoop());
+          if (clonedLoop->getParentLoop() == nullptr) {
+            LI->addTopLevelLoop(clonedLoop);
+          }
+          changeBranchTarget(clonedSucc->getTerminator(), 0, clonedLoop->getHeader(), /*preserveArgs*/ true);
+          // succBlockLoop->addBasicBlockToLoop(clonedSucc, LI->getBase());
+        }
         changeBranchTarget(current->getTerminator(), edgeIdx, clonedSucc,
                            /*preserveArgs*/ true);
         worklist.insert(clonedSucc);
@@ -785,7 +830,9 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
 
     // Update loop info if this belongs to a parent loop.
     SILLoop *outsideBlockLoop = LI->getLoopFor(outsideBlock);
-    if (outsideBlockLoop != nullptr) {
+    if (outsideBlockLoop == nullptr) {
+      loop->addBasicBlockToLoop(outsideBlock, LI->getBase());
+    } else {
       // FIXME: We don't deal with cases where the nodes being moved in
       // belong to another loop yet. e.g.,
       // while ... {
@@ -795,15 +842,32 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
       //   }
       // }
       // Check that `loop` is nested within `reachableLoop`.
-      assert(outsideBlockLoop->contains(loop) &&
-             "Nodes being moved belong to a non-nested loop.");
-      // Move the node into our loop.
-      outsideBlockLoop->removeBlockFromLoop(outsideBlock);
-      LI->changeLoopFor(outsideBlock, nullptr);
+      // assert(outsideBlockLoop->contains(loop) &&
+      //        "Nodes being moved belong to a non-nested loop.");
+      if (outsideBlockLoop->contains(loop)) {
+        // `loop` is nested within `outsideBlockLoop`.
+        // Move the node into our loop.
+        outsideBlockLoop->removeBlockFromLoop(outsideBlock);
+        LI->changeLoopFor(outsideBlock, nullptr);
+        loop->addBasicBlockToLoop(outsideBlock, LI->getBase());
+      } else {
+        if (!loop->contains(outsideBlockLoop)) {
+          if (outsideBlockLoop->getParentLoop() == nullptr) {
+            LI->removeLoop(llvm::find(*LI, outsideBlockLoop));
+          }
+          loop->addChildLoop(outsideBlockLoop);
+        }
+        // Add the block to this loop and all its parents.
+        auto *L = loop;
+        while (L) {
+          L->addBlockEntry(outsideBlock);
+          L = L->getParentLoop();
+        }
+      }
       // top-level loop is already correct.
     }
-    loop->addBasicBlockToLoop(outsideBlock, LI->getBase());
   }
+
   if (cloner.hasCloned()) {
     // TODO(https://bugs.swift.org/browse/SR-8336): the transformations here are
     // simple that we should be able to incrementally update the DI & PDI.
@@ -1298,7 +1362,7 @@ void SESERegionBuilder::ensureSingleExitFromLoops() {
       continue;
     }
     bool loopChanged =
-        SingleExitLoopTransformer::doIt(&deviceInfo, &LI, &DI, loop, &PDI);
+      SingleExitLoopTransformer::doIt(&deviceInfo, &LI, &DI, loop, &PDI);
     changed |= loopChanged;
   }
   if (changed) {
