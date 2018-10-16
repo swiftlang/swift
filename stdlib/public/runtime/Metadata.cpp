@@ -4676,6 +4676,8 @@ static bool referencesAnonymousContext(Demangle::Node *node) {
 
 void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
   Demangle::Demangler Dem;
+  Dem.setSymbolicReferenceResolver(ResolveToDemanglingForContext(Dem));
+
   auto node = _swift_buildDemanglingForMetadata(metadata, Dem);
   // If the mangled node involves types in an AnonymousContext, then by design,
   // it cannot be looked up by name.
