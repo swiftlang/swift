@@ -316,6 +316,11 @@ foreach(SDK ${SWIFT_SDKS})
             COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE}"
             USES_TERMINAL)
 
+        set(test_dependencies_target_name
+            "swift${test_subset_target_suffix}${test_mode_target_suffix}${VARIANT_SUFFIX}-test-depends")
+        add_custom_target("${test_dependencies_target_name}"
+            DEPENDS ${dependencies})
+
         add_custom_target("${test_target_name}-custom"
             ${command_upload_stdlib}
             ${command_upload_swift_reflection_test}
@@ -353,5 +358,8 @@ foreach(test_mode ${TEST_MODES})
         DEPENDS "${test_target_name}${SWIFT_PRIMARY_VARIANT_SUFFIX}")
     set_property(TARGET "${test_target_name}"
         PROPERTY FOLDER "Tests/check-swift")
+
+    add_custom_target("swift${test_subset_target_suffix}${test_mode_target_suffix}-test-depends"
+        DEPENDS "swift${test_subset_target_suffix}${test_mode_target_suffix}${SWIFT_PRIMARY_VARIANT_SUFFIX}-test-depends")
   endforeach()
 endforeach()
