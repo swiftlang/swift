@@ -1145,9 +1145,14 @@ namespace {
                         ManagedValue base, SILDeclRef accessor) &&
     {
       AccessorArgs result;
-      if (base)
-        result.base = SGF.prepareAccessorBaseArg(loc, base, BaseFormalType,
-                                                 accessor);
+      if (base) {
+        // Borrow the base, because we may need it again to invoke other
+        // accessors.
+        result.base = SGF.prepareAccessorBaseArg(loc,
+                                             base.formalAccessBorrow(SGF, loc),
+                                             BaseFormalType,
+                                             accessor);
+      }
 
       if (!Indices.isNull())
         result.Indices = std::move(Indices);

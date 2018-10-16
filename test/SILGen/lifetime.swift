@@ -1,4 +1,3 @@
-
 // RUN: %target-swift-emit-silgen -module-name lifetime -Xllvm -sil-full-demangle -parse-as-library -primary-file %s | %FileCheck %s
 
 struct Buh<T> {
@@ -367,8 +366,9 @@ func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
   r.aleph_prop.b = v
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PR]]
   // CHECK: [[R2:%[0-9]+]] = load [copy] [[READ]]
-  // CHECK: [[MODIFY:%[0-9]+]] = class_method [[R2]] : $RefWithProp, #RefWithProp.aleph_prop!modify.1 :
-  // CHECK: ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[MODIFY]]([[R2]])
+  // CHECK: [[R2BORROW:%[0-9]+]] = begin_borrow [[R2]]
+  // CHECK: [[MODIFY:%[0-9]+]] = class_method [[R2BORROW]] : $RefWithProp, #RefWithProp.aleph_prop!modify.1 :
+  // CHECK: ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[MODIFY]]([[R2BORROW]])
   // CHECK: end_apply [[TOKEN]]
 }
 
