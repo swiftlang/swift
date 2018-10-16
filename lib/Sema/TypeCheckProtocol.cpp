@@ -766,7 +766,7 @@ swift::matchWitness(TypeChecker &tc,
   auto setup = [&]() -> std::tuple<Optional<RequirementMatch>, Type, Type> {
     // Construct a constraint system to use to solve the equality between
     // the required type and the witness type.
-    cs.emplace(tc, dc, ConstraintSystemOptions());
+    cs.emplace(tc, dc, ConstraintSystemFlags::AllowFixes);
 
     auto reqGenericEnv = reqEnvironment.getSyntheticEnvironment();
     auto reqSubMap = reqEnvironment.getRequirementToSyntheticMap();
@@ -848,8 +848,34 @@ swift::matchWitness(TypeChecker &tc,
     // Try to solve the system disallowing free type variables, because
     // that would resolve in incorrect substitution matching when witness
     // type has free type variables present as well.
-    auto solution = cs->solveSingle(FreeTypeVariableBinding::Disallow);
-    if (!solution)
+    auto solution = cs->solveSingle(FreeTypeVariableBinding::Disallow,
+                                    /* allowFixes */ true);
+
+    // If the types would match but for some other missing conformance, find and
+    // call that out.
+    if (solution && solution->Fixes.size() == 1 &&
+        solution->Fixes.front()->getKind() == FixKind::AddConformance) {
+      auto fix = (MissingConformance *)solution->Fixes.front();
+      auto type = fix->getNonConformingType()->mapTypeOutOfContext();
+      auto protocolType = fix->getProtocol()->getDeclaredType();
+      if (auto memberTy = type->getAs<DependentMemberType>())
+        if (memberTy->getBase()->isEqual(conformance->getType()))
+          return RequirementMatch(witness, MatchKind::MissingConformance, type,
+                                  protocolType);
+      if (auto typeParamTy = type->getAs<GenericTypeParamType>())
+        if (auto assocType =
+            conformance->getGenericEnvironment()->mapTypeIntoContext(typeParamTy))
+          return RequirementMatch(witness, MatchKind::MissingConformance,
+                                  assocType, protocolType);
+      if (type->isEqual(conformance->getType())) {
+        if (auto bgt = type->getAs<BoundGenericType>())
+          type = bgt->getDecl()->getDeclaredType();
+        return RequirementMatch(witness, MatchKind::MissingConformance, type,
+                                protocolType);
+      }
+    }
+
+    if (!solution || solution->Fixes.size())
       return RequirementMatch(witness, MatchKind::TypeConflict,
                               witnessType);
 
@@ -2031,6 +2057,11 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
       fixItOverrideDeclarationTypes(diag, match.Witness, req);
     break;
   }
+
+  case MatchKind::MissingConformance:
+    diags.diagnose(match.Witness, diag::protocol_witness_missing_conformance,
+                   match.WitnessType, match.SecondType);
+    break;
 
   case MatchKind::ThrowsConflict:
     diags.diagnose(match.Witness, diag::protocol_witness_throws_conflict);

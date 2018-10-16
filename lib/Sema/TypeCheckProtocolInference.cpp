@@ -1749,7 +1749,7 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
 
           diags.diagnose(failed.Witness,
                          diag::associated_type_deduction_witness_failed,
-                         failed.Requirement->getFullName(),
+                         assocType->getName(),
                          failed.TypeWitness,
                          failed.Result.getRequirement(),
                          failed.Result.isConformanceRequirement());

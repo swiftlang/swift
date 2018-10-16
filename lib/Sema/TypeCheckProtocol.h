@@ -168,6 +168,9 @@ enum class MatchKind : uint8_t {
   /// \brief The types conflict.
   TypeConflict,
 
+  /// \brief The witness would match with an additional conformance.
+  MissingConformance,
+
   /// The witness throws, but the requirement does not.
   ThrowsConflict,
 
@@ -352,6 +355,19 @@ struct RequirementMatch {
            "Should (or should not) have witness type");
   }
 
+  RequirementMatch(ValueDecl *witness, MatchKind kind,
+                   Type witnessType, Type secondType,
+                   Optional<RequirementEnvironment> env = None,
+                   ArrayRef<OptionalAdjustment> optionalAdjustments = {})
+    : Witness(witness), Kind(kind), WitnessType(witnessType),
+      SecondType(secondType), ReqEnv(std::move(env)),
+      OptionalAdjustments(optionalAdjustments.begin(),
+                          optionalAdjustments.end())
+  {
+      assert(hasWitnessType() && hasSecondType() &&
+             "Should have witness type and second type");
+  }
+
   /// \brief The witness that matches the (implied) requirement.
   ValueDecl *Witness;
 
@@ -360,6 +376,9 @@ struct RequirementMatch {
 
   /// \brief The type of the witness when it is referenced.
   Type WitnessType;
+
+  /// \brief Explanatory second type.
+  Type SecondType;
 
   /// \brief The requirement environment to use for the witness thunk.
   Optional<RequirementEnvironment> ReqEnv;
@@ -382,6 +401,7 @@ struct RequirementMatch {
     case MatchKind::WitnessInvalid:
     case MatchKind::KindConflict:
     case MatchKind::TypeConflict:
+    case MatchKind::MissingConformance:
     case MatchKind::StaticNonStaticConflict:
     case MatchKind::SettableConflict:
     case MatchKind::PrefixNonPrefixConflict:
@@ -404,6 +424,7 @@ struct RequirementMatch {
     case MatchKind::ExactMatch:
     case MatchKind::RenamedMatch:
     case MatchKind::TypeConflict:
+    case MatchKind::MissingConformance:
     case MatchKind::OptionalityConflict:
       return true;
 
@@ -423,6 +444,11 @@ struct RequirementMatch {
     }
 
     llvm_unreachable("Unhandled MatchKind in switch.");
+  }
+
+  /// \brief Determine whether this requirement match has a second type.
+  bool hasSecondType() {
+    return Kind == MatchKind::MissingConformance;
   }
 
   swift::Witness getWitness(ASTContext &ctx) const;
