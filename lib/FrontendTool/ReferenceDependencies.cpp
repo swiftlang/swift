@@ -256,9 +256,11 @@ void ReferenceDependenciesEmitter::emitInterfaceHash() const {
   }
   llvm::SmallString<32> experimentalInterfaceHash;
   SF->getExperimentalInterfaceHash(experimentalInterfaceHash);
+
   out << reference_dependency_keys::interfaceHash << ": \""
-      << ExperimentalDependencies::combineNames(interfaceHash.str(),
-                                                experimentalInterfaceHash.str())
+      << ExperimentalDependencies::InterfaceHashes(
+             interfaceHash.str(), experimentalInterfaceHash.str())
+             .combined()
       << "\"\n";
 }
 

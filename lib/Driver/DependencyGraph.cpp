@@ -10,18 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Driver/DependencyGraph.h"
+#include "swift/Basic/ExperimentalDependencies.h"
 #include "swift/Basic/ReferenceDependencyKeys.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/Driver/DependencyGraph.h"
 #include "swift/Demangling/Demangle.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/YAMLParser.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -52,11 +53,12 @@ using DependencyKind = DependencyGraphImpl::DependencyKind;
 using DependencyCallbackTy = LoadResult(StringRef, DependencyKind, bool);
 using InterfaceHashCallbackTy = LoadResult(StringRef);
 
-static LoadResult
-parseDependencyFile(llvm::MemoryBuffer &buffer,
-                    llvm::function_ref<DependencyCallbackTy> providesCallback,
-                    llvm::function_ref<DependencyCallbackTy> dependsCallback,
-                    llvm::function_ref<InterfaceHashCallbackTy> interfaceHashCallback) {
+static LoadResult parseDependencyFile(
+    llvm::MemoryBuffer &buffer,
+    llvm::function_ref<DependencyCallbackTy> providesCallback,
+    llvm::function_ref<DependencyCallbackTy> dependsCallback,
+    llvm::function_ref<InterfaceHashCallbackTy> interfaceHashCallback,
+    const bool EnableExperimentalDependencies) {
   namespace yaml = llvm::yaml;
 
   // FIXME: Switch to a format other than YAML.
@@ -108,7 +110,12 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
         return LoadResult::HadError;
 
       StringRef valueString = value->getValue(scratch);
-      UPDATE_RESULT(interfaceHashCallback(valueString));
+      if (EnableExperimentalDependencies) {
+        ExperimentalDependencies::InterfaceHashes hashes(valueString);
+        UPDATE_RESULT(interfaceHashCallback(hashes.experimental));
+      } else {
+        UPDATE_RESULT(interfaceHashCallback(valueString));
+      }
 
     } else {
       enum class DependencyDirection : bool {
@@ -211,21 +218,25 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
   return result;
 }
 
-LoadResult DependencyGraphImpl::loadFromPath(const void *node, StringRef path) {
+LoadResult
+DependencyGraphImpl::loadFromPath(const void *node, StringRef path,
+                                  const bool EnableExperimentalDependencies) {
   auto buffer = llvm::MemoryBuffer::getFile(path);
   if (!buffer)
     return LoadResult::HadError;
-  return loadFromBuffer(node, *buffer.get());
+  return loadFromBuffer(node, *buffer.get(), EnableExperimentalDependencies);
 }
 
 LoadResult
 DependencyGraphImpl::loadFromString(const void *node, StringRef data) {
   auto buffer = llvm::MemoryBuffer::getMemBuffer(data);
-  return loadFromBuffer(node, *buffer);
+  return loadFromBuffer(node, *buffer, false);
 }
 
-LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
-                                               llvm::MemoryBuffer &buffer) {
+LoadResult
+DependencyGraphImpl::loadFromBuffer(const void *node,
+                                    llvm::MemoryBuffer &buffer,
+                                    const bool EnableExperimentalDependencies) {
   auto &provides = Provides[node];
 
   auto dependsCallback = [this, node](StringRef name, DependencyKind kind,
@@ -274,7 +285,7 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
 
   auto interfaceHashCallback = [this, node](StringRef hash) -> LoadResult {
     auto insertResult = InterfaceHashes.insert(std::make_pair(node, hash));
-
+    
     if (insertResult.second) {
       // Treat a newly-added hash as up-to-date. This includes the initial
       // load of the file.
@@ -291,7 +302,8 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
   };
 
   return parseDependencyFile(buffer, providesCallback, dependsCallback,
-                             interfaceHashCallback);
+                             interfaceHashCallback,
+                             EnableExperimentalDependencies);
 }
 
 void DependencyGraphImpl::markExternal(SmallVectorImpl<const void *> &visited,
