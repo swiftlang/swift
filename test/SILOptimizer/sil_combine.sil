@@ -3637,3 +3637,15 @@ bb0:
   return %36 : $Builtin.Int64
 }
 
+// CHECK-LABEL: sil @conversion_to_and_from_bridge_object
+// CHECK:      bb0(%0 : $Builtin.Int64):
+// CHECK-NEXT:   return %0
+sil @conversion_to_and_from_bridge_object : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64) {
+bb0(%0 : $Builtin.Int64):
+  %1 = struct $UInt64 (%0 : $Builtin.Int64)
+  %2 = value_to_bridge_object %1 : $UInt64
+  %3 = bridge_object_to_word %2 : $Builtin.BridgeObject to $Builtin.Word
+  %4 = builtin "zextOrBitCast_Word_Int64"(%3 : $Builtin.Word) : $Builtin.Int64
+  return %4 : $Builtin.Int64
+}
+
