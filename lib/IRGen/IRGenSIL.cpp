@@ -1954,6 +1954,7 @@ static const char *inputListNumberAttr(StringRef opName) {
 // The code structure resembles
 // TFGraphFunctionLowering::visitGraphOperationInst().
 void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
+  auto &astCtx = CurSILFn->getASTContext();
   tf::GraphOperationInfo opInfo(i);
 
   if (!CurSILFn->processedByDeabstraction) {
@@ -2053,38 +2054,87 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     checkOk(status);
   };
 
-  // Handle inputs.
+  // Handle inputs and dynamic attributes.
   for (auto structuredArgument : opInfo.getStructuredArguments()) {
-    assert(structuredArgument.getArgumentNameWithSuffix().empty() &&
-           "cannot lower named arguments");
-    switch (structuredArgument.getKind()) {
-    case GraphOperationInfo::SAK_Single: {
-      LLVM_DEBUG(llvm::dbgs() << " Adding a single input.\n");
-      auto tensorHandle = structuredArgument.getSingleArgument();
-      addTensorhandleAsOpInput(tensorHandle);
+    auto argumentNameAndLowering =
+        structuredArgument.getArgumentNameAndLowering();
+    std::string argumentName = std::get<0>(argumentNameAndLowering);
+    auto argumentLowering = std::get<1>(argumentNameAndLowering);
+    LLVM_DEBUG(llvm::dbgs() << "IRGen graph_op argument " << argumentName
+               << "with lowering " << (unsigned)argumentLowering);
+    switch (argumentLowering) {
+    case GraphOperationInfo::ArgumentLowering::Out:
+      assert(0 && "Attributes cannot be output parameters");
+    case GraphOperationInfo::ArgumentLowering::UnknownShapeListAttribute:
+      assert(0 && "UnknownShapeListAttribute should have been eliminated "
+                  "by deabstraction");
+    case GraphOperationInfo::ArgumentLowering::TypeListAttribute:
+      assert(0 && "TypeListAttribute should have been eliminated by "
+                  "deabstraction");
+    case GraphOperationInfo::ArgumentLowering::TensorAttribute:
+      // See the comment on the declaration of the enum case
+      // `GraphOperationInfo::ArgumentLowering::TensorAttribute` for more
+      // information on why this cannot be dynamic.
+      assert(0 && "TensorAttributes cannot be dynamic");
+    case GraphOperationInfo::ArgumentLowering::Input: {
+      assert(argumentName.empty() && "inputs cannot have names");
+      switch (structuredArgument.getKind()) {
+      case GraphOperationInfo::SAK_Single: {
+        LLVM_DEBUG(llvm::dbgs() << " Adding a single input.\n");
+        auto tensorHandle = structuredArgument.getSingleArgument();
+        addTensorhandleAsOpInput(tensorHandle);
+        break;
+      }
+      case GraphOperationInfo::SAK_List: {
+        LLVM_DEBUG(llvm::dbgs()
+                   << " Adding input list of size "
+                   << structuredArgument.getArgumentList().size() << ".\n");
+        for (auto tensorHandle : structuredArgument.getArgumentList()) {
+          addTensorhandleAsOpInput(tensorHandle);
+        }
+        // Set special attr to represent the list length, if needed. This is not
+        // needed in graph lowering.
+        if (auto numberAttr = inputListNumberAttr(opInfo.getOperationName())) {
+          auto setAttrFn = IGM.getTFE_OpSetAttrIntFn();
+          auto listLenAddr = createStringValAddr(IGM, numberAttr);
+          auto listLenVal = llvm::ConstantInt::get(
+              IGM.Int64Ty, structuredArgument.getArgumentList().size());
+          Builder.CreateCall(setAttrFn, {op, listLenAddr, listLenVal});
+        }
+      }
+      }
       break;
     }
-    case GraphOperationInfo::SAK_List: {
-      LLVM_DEBUG(llvm::dbgs()
-                 << " Adding input list of size "
-                 << structuredArgument.getArgumentList().size() << ".\n");
-      for (auto tensorHandle : structuredArgument.getArgumentList()) {
-        addTensorhandleAsOpInput(tensorHandle);
+    case GraphOperationInfo::ArgumentLowering::TFDataTypeAttribute: {
+      switch (structuredArgument.getKind()) {
+      case GraphOperationInfo::SAK_Single: {
+        auto silValue = structuredArgument.getSingleArgument();
+        auto silType = silValue->getType();
+        if (silType == SILType::getBuiltinIntegerType(32, astCtx)) {
+          // Deabstraction extracts the Builtin.Int32 that's inside the
+          // TensorDataType.
+          auto dtypeAttrValue = getLoweredSingletonExplosion(silValue);
+          auto *setAttrTypeFn = IGM.getTFE_OpSetAttrTypeFn();
+          auto attrNameValAddr = createStringValAddr(IGM, argumentName.c_str());
+          Builder.CreateCall(setAttrTypeFn,
+                             {op, attrNameValAddr, dtypeAttrValue});
+        } else {
+          // TODO: Implement dynamic type list attribute
+          assert(0 && "unknown TFDataTypeAttribute argument type");
+        }
+        break;
       }
-      // Set special attr to represent the list length, if needed. This is not
-      // needed in graph lowering.
-      if (auto numberAttr = inputListNumberAttr(opInfo.getOperationName())) {
-        auto setAttrFn = IGM.getTFE_OpSetAttrIntFn();
-        auto listLenAddr = createStringValAddr(IGM, numberAttr);
-        auto listLenVal = llvm::ConstantInt::get(
-            IGM.Int64Ty, structuredArgument.getArgumentList().size());
-        Builder.CreateCall(setAttrFn, {op, listLenAddr, listLenVal});
+      case GraphOperationInfo::SAK_List:
+        assert(0 && "TODO: Implement dynamic type list attribute");
       }
+      break;
     }
+    default:
+      assert(0 && "TODO: implement this dynamic attribute");
     }
   }
 
-  // Handle attributes.
+  // Handle const-evaluated attributes.
   unsigned dtypeAttr = 0;
   std::string opDevice;
   for (unsigned nextAttributeNumber = 0, e = i->getNumAttributes();

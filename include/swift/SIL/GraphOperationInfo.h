@@ -55,6 +55,21 @@ public:
     /// to an attribute.
     ///
     /// Written as named argument with "$tensor" suffix.
+    ///
+    /// graph_op lowering in TFLowerGraph.cpp and in IRGenSIL.cpp relies on
+    /// other attributes in order to interpret the meaning of a
+    /// TensorAttribute:
+    /// - TensorAttributes must come after a $dtype attr specifying the dtype
+    ///   for the Tensor
+    /// - TensorAttributes with array values must have a $shape attr immediately
+    ///   after them, specifying the shape of the tensor
+    ///
+    /// Dynamic graph_op lowering in IRGenSIL.cpp cannot lower TensorAttributes,
+    /// so all TensorAttributes, and the corresponding $dtype and $shape
+    /// attributes must be fully const-evaluated before lowering. This does not
+    /// limit anything, because programs that need to initialize tensors at
+    /// runtime can simply use the runtime tensor initialization functions in
+    /// the TensorFlow module.
     TensorAttribute,
 
     /// An array of integers that should be lowered to a shape attribute.
@@ -146,6 +161,13 @@ public:
 
     /// Returns this argument's name, without suffix, and the ArgumentLowering.
     std::pair<StringRef, ArgumentLowering> getArgumentNameAndLowering() const;
+
+    /// Whether this argument must be lowered to a constant, even for IRGen'd
+    /// graph_ops.
+    bool mustBeLoweredToConstant() const {
+      return std::get<1>(getArgumentNameAndLowering()) ==
+          ArgumentLowering::TensorAttribute;
+    }
   };
 
 private:
