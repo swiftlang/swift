@@ -79,6 +79,14 @@ SILBasicBlock *SILGenFunction::createBasicBlock(FunctionSection section) {
   llvm_unreachable("bad function section");
 }
 
+SILBasicBlock *
+SILGenFunction::createBasicBlockAndBranch(SILLocation loc,
+                                          SILBasicBlock *destBB) {
+  auto *newBB = createBasicBlock();
+  SILGenBuilder(B, newBB).createBranch(loc, destBB);
+  return newBB;
+}
+
 void SILGenFunction::eraseBasicBlock(SILBasicBlock *block) {
   assert(block->pred_empty() && "erasing block with predecessors");
   assert(block->empty() && "erasing block with content");
