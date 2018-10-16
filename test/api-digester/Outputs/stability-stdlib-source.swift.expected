@@ -10,6 +10,53 @@
 /* Renamed Decls */
 
 /* Type Changes */
+Func AnyBidirectionalCollection.formIndex(_:offsetBy:) has parameter 0 changing from Default to InOut
+Func AnyBidirectionalCollection.formIndex(_:offsetBy:limitedBy:) has parameter 0 changing from Default to InOut
+Func AnyBidirectionalCollection.formIndex(after:) has parameter 0 changing from Default to InOut
+Func AnyBidirectionalCollection.formIndex(before:) has parameter 0 changing from Default to InOut
+Func AnyCollection.formIndex(_:offsetBy:) has parameter 0 changing from Default to InOut
+Func AnyCollection.formIndex(_:offsetBy:limitedBy:) has parameter 0 changing from Default to InOut
+Func AnyCollection.formIndex(after:) has parameter 0 changing from Default to InOut
+Func AnyRandomAccessCollection.formIndex(_:offsetBy:) has parameter 0 changing from Default to InOut
+Func AnyRandomAccessCollection.formIndex(_:offsetBy:limitedBy:) has parameter 0 changing from Default to InOut
+Func AnyRandomAccessCollection.formIndex(after:) has parameter 0 changing from Default to InOut
+Func AnyRandomAccessCollection.formIndex(before:) has parameter 0 changing from Default to InOut
+Func Array.append(_:) has parameter 0 changing from Default to Owned
+Func Array.append(_:) has parameter 0 type change from Array<Element>.Element to Element
+Func Array.insert(_:at:) has parameter 0 changing from Default to Owned
+Func Array.insert(_:at:) has parameter 0 type change from Array<Element>.Element to Element
+Func ArraySlice.append(_:) has parameter 0 changing from Default to Owned
+Func ArraySlice.append(_:) has parameter 0 type change from ArraySlice<Element>.Element to Element
+Func ArraySlice.insert(_:at:) has parameter 0 changing from Default to Owned
+Func ArraySlice.insert(_:at:) has parameter 0 type change from ArraySlice<Element>.Element to Element
+Func ContiguousArray.append(_:) has parameter 0 changing from Default to Owned
+Func ContiguousArray.append(_:) has parameter 0 type change from ContiguousArray<Element>.Element to Element
+Func ContiguousArray.insert(_:at:) has parameter 0 changing from Default to Owned
+Func ContiguousArray.insert(_:at:) has parameter 0 type change from ContiguousArray<Element>.Element to Element
+Func DefaultIndices.formIndex(after:) has parameter 0 changing from Default to InOut
+Func DefaultIndices.formIndex(before:) has parameter 0 changing from Default to InOut
+Func Dictionary.updateValue(_:forKey:) has parameter 0 changing from Default to Owned
+Func Dictionary.updateValue(_:forKey:) has parameter 0 type change from Dictionary<Key, Value>.Value to Value
+Func LazyFilterCollection.formIndex(_:offsetBy:) has parameter 0 changing from Default to InOut
+Func LazyFilterCollection.formIndex(_:offsetBy:limitedBy:) has parameter 0 changing from Default to InOut
+Func LazyFilterCollection.formIndex(after:) has parameter 0 changing from Default to InOut
+Func LazyFilterCollection.formIndex(before:) has parameter 0 changing from Default to InOut
+Func LazyMapCollection.formIndex(after:) has parameter 0 changing from Default to InOut
+Func LazyMapCollection.formIndex(before:) has parameter 0 changing from Default to InOut
+Func Set.insert(_:) has parameter 0 changing from Default to Owned
+Func Set.insert(_:) has parameter 0 type change from Set<Element>.Element to Element
+Func Set.update(with:) has parameter 0 changing from Default to Owned
+Func Set.update(with:) has parameter 0 type change from Set<Element>.Element to Element
+Func Slice.formIndex(after:) has parameter 0 changing from Default to InOut
+Func Slice.formIndex(before:) has parameter 0 changing from Default to InOut
+Func String.UTF16View.Indices.formIndex(after:) has parameter 0 changing from Default to InOut
+Func String.UTF16View.Indices.formIndex(before:) has parameter 0 changing from Default to InOut
+Func Substring.UTF16View.formIndex(after:) has parameter 0 changing from Default to InOut
+Func Substring.UTF16View.formIndex(before:) has parameter 0 changing from Default to InOut
+Func Substring.UTF8View.formIndex(after:) has parameter 0 changing from Default to InOut
+Func Substring.UTF8View.formIndex(before:) has parameter 0 changing from Default to InOut
+Func Substring.UnicodeScalarView.formIndex(after:) has parameter 0 changing from Default to InOut
+Func Substring.UnicodeScalarView.formIndex(before:) has parameter 0 changing from Default to InOut
 
 /* Decl Attribute changes */
 

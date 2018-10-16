@@ -66,7 +66,8 @@ class X {
 
 // <rdar://problem/17144076> recursive typealias causes a segfault in the type checker
 struct SomeStruct<A> {
-  typealias A = A // expected-error {{type alias 'A' references itself}}
+  typealias A = A // this is OK now -- the underlying type is the generic parameter 'A'
+  typealias B = B // expected-error {{type alias 'B' references itself}}
   // expected-note@-1 {{type declared here}}
 }
 
