@@ -1267,7 +1267,7 @@ namespace {
         // The semanticExpr must have the same type as this node.
         auto semanticTV = CS.getType(semanticExpr);
         auto semanticLocator = CS.getConstraintLocator(semanticExpr);
-        CS.addConstraint(ConstraintKind::Equal, tv, semanticTV,
+        CS.addConstraint(ConstraintKind::Bind, tv, semanticTV,
                          semanticLocator);
       }
       else if (auto appendingExpr = expr->getAppendingExpr()) {
@@ -3129,7 +3129,7 @@ namespace {
 
       if (auto subExpr = expr->getSubExpr()) {
         auto subExprType = CS.getType(subExpr);
-        CS.addConstraint(ConstraintKind::Equal, subExprType, tv, locator);
+        CS.addConstraint(ConstraintKind::Bind, subExprType, tv, locator);
       }
 
       return tv;
