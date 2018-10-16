@@ -422,15 +422,15 @@ infix operator &>> : BitwiseShiftPrecedence, FixedWidthInteger
 
 infix operator   * : MultiplicationPrecedence, Numeric
 infix operator  &* : MultiplicationPrecedence, FixedWidthInteger
-infix operator   / : MultiplicationPrecedence, BinaryInteger
+infix operator   / : MultiplicationPrecedence, BinaryInteger, FloatingPoint
 infix operator   % : MultiplicationPrecedence, BinaryInteger
 infix operator   & : MultiplicationPrecedence, BinaryInteger
 
 // "Additive"
 
-infix operator   + : AdditionPrecedence, Numeric
+infix operator   + : AdditionPrecedence, Numeric, String, Strideable
 infix operator  &+ : AdditionPrecedence, FixedWidthInteger
-infix operator   - : AdditionPrecedence, Numeric
+infix operator   - : AdditionPrecedence, Numeric, Strideable
 infix operator  &- : AdditionPrecedence, FixedWidthInteger
 infix operator   | : AdditionPrecedence, BinaryInteger
 infix operator   ^ : AdditionPrecedence, BinaryInteger
@@ -482,9 +482,9 @@ infix operator   *= : AssignmentPrecedence, Numeric
 infix operator  &*= : AssignmentPrecedence, FixedWidthInteger
 infix operator   /= : AssignmentPrecedence, BinaryInteger
 infix operator   %= : AssignmentPrecedence, BinaryInteger
-infix operator   += : AssignmentPrecedence, Numeric
+infix operator   += : AssignmentPrecedence, Numeric, String, Strideable
 infix operator  &+= : AssignmentPrecedence, FixedWidthInteger
-infix operator   -= : AssignmentPrecedence, Numeric
+infix operator   -= : AssignmentPrecedence, Numeric, Strideable
 infix operator  &-= : AssignmentPrecedence, FixedWidthInteger
 infix operator  <<= : AssignmentPrecedence, BinaryInteger
 infix operator &<<= : AssignmentPrecedence, FixedWidthInteger
