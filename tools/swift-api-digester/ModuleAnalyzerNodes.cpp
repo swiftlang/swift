@@ -754,8 +754,6 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         if (auto *Right = dyn_cast<SDKNodeDeclSubscript>(&R)) {
           if (Left->hasSetter() != Right->hasSetter())
             return false;
-          if (Left->hasStorage() != Right->hasStorage())
-            return false;
         }
       }
       LLVM_FALLTHROUGH;
