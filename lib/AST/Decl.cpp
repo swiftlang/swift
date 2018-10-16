@@ -6293,8 +6293,10 @@ void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *decl) {
 // ExperimentalDependencies
 template <typename DeclT> std::string Decl::getHash(const DeclT *D) {
   llvm::MD5 DeclHash;
-  DeclHash.update(ArrayRef<u_int8_t>((const u_int8_t *)D, sizeof(DeclT)));
+  auto a = ArrayRef<u_int8_t>((const u_int8_t *)D, sizeof(DeclT));
+  DeclHash.update(a);
   llvm::MD5::MD5Result result;
+  DeclHash.final(result);
   llvm::SmallString<32> str;
   llvm::MD5::stringifyResult(result, str);
   return str.str().str();
