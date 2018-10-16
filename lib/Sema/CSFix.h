@@ -288,6 +288,10 @@ public:
   static MissingConformance *create(ConstraintSystem &cs, Type type,
                                     ProtocolDecl *protocol,
                                     ConstraintLocator *locator);
+
+  Type getNonConformingType() { return NonConformingType; }
+
+  ProtocolDecl *getProtocol() { return Protocol; }
 };
 
 /// Skip same-type generic requirement constraint,
