@@ -78,10 +78,13 @@ private:
 /// Emits the declarations provided by a source file.
 class ProvidesEmitter {
   const SourceFile *const SF;
+  const bool EnableExperimentalDependencies;
   llvm::raw_ostream &out;
 
   ProvidesEmitter(const SourceFile *const SF, llvm::raw_ostream &out)
-      : SF(SF), out(out) {}
+      : SF(SF),
+        EnableExperimentalDependencies(SF->getEnableExperimentalDependencies()),
+        out(out) {}
 
 public:
   static void emit(const SourceFile *SF, llvm::raw_ostream &out);
@@ -124,6 +127,9 @@ private:
 
   static bool extendedTypeIsPrivate(TypeLoc inheritedType);
   static bool declIsPrivate(const Decl *member);
+
+  template <typename DeclT>
+  void emitExperimentalTopLevel(const DeclBaseName &, const DeclT *) const;
 };
 
 /// Emit the depended-upon declartions.
@@ -249,7 +255,7 @@ void ReferenceDependenciesEmitter::emitDepends() const {
 void ReferenceDependenciesEmitter::emitInterfaceHash() const {
   llvm::SmallString<32> interfaceHash;
   SF->getInterfaceHash(interfaceHash);
-  if (!SF->getEnableExternalDependencies()) {
+  if (!SF->getEnableExperimentalDependencies()) {
     out << reference_dependency_keys::interfaceHash << ": \"" << interfaceHash
         << "\"\n";
     return;
@@ -278,6 +284,7 @@ ProvidesEmitter::emitTopLevelNames() const {
 
 void ProvidesEmitter::emitTopLevelDecl(const Decl *const D,
                                        CollectedDeclarations &cpd) const {
+
   switch (D->getKind()) {
   case DeclKind::Module:
     break;
@@ -294,10 +301,14 @@ void ProvidesEmitter::emitTopLevelDecl(const Decl *const D,
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
     out << "- \"" << escape(cast<OperatorDecl>(D)->getName()) << "\"\n";
+    emitExperimentalTopLevel(cast<OperatorDecl>(D)->getName(),
+                             cast<OperatorDecl>(D));
     break;
 
   case DeclKind::PrecedenceGroup:
     out << "- \"" << escape(cast<PrecedenceGroupDecl>(D)->getName()) << "\"\n";
+    emitExperimentalTopLevel(cast<PrecedenceGroupDecl>(D)->getName(),
+                             cast<PrecedenceGroupDecl>(D));
     break;
 
   case DeclKind::Enum:
@@ -335,6 +346,18 @@ void ProvidesEmitter::emitTopLevelDecl(const Decl *const D,
   }
 }
 
+template <typename DeclT>
+void ProvidesEmitter::emitExperimentalTopLevel(const DeclBaseName &N,
+                                               const DeclT *D) const {
+  if (EnableExperimentalDependencies) {
+    out << "- \""
+        << llvm::yaml::escape(ExperimentalDependencies::TopLevel(
+                                  N.userFacingName(), Decl::getHash(D))
+                                  .combined())
+        << "\"\n";
+  }
+}
+
 void ProvidesEmitter::emitExtensionDecl(const ExtensionDecl *const ED,
                                         CollectedDeclarations &cpd) const {
   auto *NTD = ED->getExtendedNominal();
@@ -368,6 +391,8 @@ void ProvidesEmitter::emitNominalTypeDecl(const NominalTypeDecl *const NTD,
     return;
   }
   out << "- \"" << escape(NTD->getName()) << "\"\n";
+  emitExperimentalTopLevel(NTD->getName(), NTD);
+
   cpd.extendedNominals[NTD] |= true;
   cpd.findNominalsAndOperators(NTD->getMembers());
 }
@@ -403,6 +428,7 @@ void ProvidesEmitter::emitValueDecl(const ValueDecl *const VD) const {
     return;
   }
   out << "- \"" << escape(VD->getBaseName()) << "\"\n";
+  emitExperimentalTopLevel(VD->getBaseName(), VD);
 }
 
 void ProvidesEmitter::emitNominalTypes(

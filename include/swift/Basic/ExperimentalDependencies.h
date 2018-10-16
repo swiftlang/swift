@@ -47,6 +47,19 @@ struct InterfaceHashes {
   std::string combined() { return Utils::combineNames(normal, experimental); }
 };
 
+struct TopLevel {
+  const std::string base;
+  const std::string hash;
+
+  TopLevel(StringRef base, StringRef hash)
+      : base(base.str()), hash(hash.str()) {}
+  TopLevel(StringRef combined) : TopLevel(Utils::separateNames(combined)) {}
+  TopLevel(std::pair<StringRef, StringRef> bh)
+      : base(bh.first.str()), hash(bh.second.str()) {}
+
+  std::string combined() { return Utils::combineNames(base, hash); }
+};
+
 } // namespace ExperimentalDependencies
 
 } // end namespace swift

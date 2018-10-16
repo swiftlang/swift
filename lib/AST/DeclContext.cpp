@@ -622,7 +622,7 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
   return Depth + 1;
 }
 
-bool DeclContext::getEnableExternalDependencies() const {
+bool DeclContext::getEnableExperimentalDependencies() const {
   return getASTContext().LangOpts.EnableExperimentalDependencies;
 }
 

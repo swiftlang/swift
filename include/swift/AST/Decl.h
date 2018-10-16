@@ -943,6 +943,8 @@ public:
     assert(Mem); 
     return Mem; 
   }
+
+  template <typename DeclT> static std::string getHash(const DeclT *D);
 };
 
 /// \brief Use RAII to track Decl validation progress and non-reentrancy.
