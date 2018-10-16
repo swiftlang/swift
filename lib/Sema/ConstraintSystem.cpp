@@ -2045,15 +2045,6 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     SolverState state(expr, *this, FreeTypeVariableBinding::Disallow);
     state.recordFixes = true;
 
-    // Retry all inactive and failed constraints
-    if (failedConstraint) {
-      addUnsolvedConstraint(failedConstraint);
-      failedConstraint = nullptr;
-    }
-    ActiveConstraints.splice(ActiveConstraints.end(), InactiveConstraints);
-    for (auto &constraint : ActiveConstraints)
-      constraint.setActive(true);
-
     // Solve the system.
     solve(viable);
 

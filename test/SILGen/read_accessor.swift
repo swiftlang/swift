@@ -22,11 +22,13 @@ struct SimpleTest {
 // CHECK:         [[T0:%.*]] = begin_access [read] [unknown] %0
 // CHECK-NEXT:    [[SELF:%.*]] = load [copy] [[T0]] : $*SimpleTest
 // CHECK-NEXT:    end_access [[T0]]
+// CHECK-NEXT:    [[SELF_BORROW:%.*]] = begin_borrow [[SELF]]
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[READFN:%.*]] = function_ref @$s13read_accessor10SimpleTestV8readableSSvr : $@yield_once @convention(method) (@guaranteed SimpleTest) -> @yields @guaranteed String
-// CHECK-NEXT:    ([[VALUE:%.*]], [[TOKEN:%.*]]) = begin_apply [[READFN]]([[SELF]])
+// CHECK-NEXT:    ([[VALUE:%.*]], [[TOKEN:%.*]]) = begin_apply [[READFN]]([[SELF_BORROW]])
 // CHECK-NEXT:    [[RET:%.*]] = copy_value [[VALUE]] : $String
 // CHECK-NEXT:    end_apply [[TOKEN]]
+// CHECK-NEXT:    end_borrow [[SELF_BORROW]]
 // CHECK-NEXT:    destroy_value [[SELF]]
 // CHECK-NEXT:    return [[RET]] : $String
   mutating func get() -> String {
