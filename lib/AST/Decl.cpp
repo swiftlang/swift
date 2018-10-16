@@ -3884,13 +3884,13 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   }
 
   // A direct reference to 'Self' is covariant.
-  if (proto->getProtocolSelfType()->isEqual(type))
+  if (proto->getSelfInterfaceType()->isEqual(type))
     return SelfReferenceKind::Result();
 
   // Special handling for associated types.
   if (!skipAssocTypes && type->is<DependentMemberType>()) {
     type = type->getRootGenericParam();
-    if (proto->getProtocolSelfType()->isEqual(type))
+    if (proto->getSelfInterfaceType()->isEqual(type))
       return SelfReferenceKind::Other();
   }
 

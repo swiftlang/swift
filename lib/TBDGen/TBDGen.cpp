@@ -420,7 +420,7 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
         continue;
 
       // Skip inherited requirements.
-      if (req.getFirstType()->isEqual(PD->getProtocolSelfType()))
+      if (req.getFirstType()->isEqual(PD->getSelfInterfaceType()))
         continue;
 
       AssociatedConformance conformance(
