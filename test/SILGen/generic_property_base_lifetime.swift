@@ -83,8 +83,9 @@ func getIntPropGeneric<T: ProtocolB>(_ a: T) -> Int {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $ProtocolO):
 // CHECK:  [[PROJECTION:%.*]] = open_existential_ref [[ARG]]
 // CHECK:  [[PROJECTION_COPY:%.*]] = copy_value [[PROJECTION]]
-// CHECK:  [[METHOD:%.*]] = objc_method [[PROJECTION_COPY]] : $@opened({{.*}}) ProtocolO, #ProtocolO.intProp!getter.1.foreign : {{.*}}
-// CHECK:  apply [[METHOD]]<@opened{{.*}}>([[PROJECTION_COPY]])
+// CHECK:  [[PROJECTION_BORROW:%.*]] = begin_borrow [[PROJECTION_COPY]]
+// CHECK:  [[METHOD:%.*]] = objc_method [[PROJECTION_BORROW]] : $@opened({{.*}}) ProtocolO, #ProtocolO.intProp!getter.1.foreign : {{.*}}
+// CHECK:  apply [[METHOD]]<@opened{{.*}}>([[PROJECTION_BORROW]])
 // CHECK:  destroy_value [[PROJECTION_COPY]]
 // CHECK: } // end sil function '$S30generic_property_base_lifetime21getIntPropExistentialySiAA9ProtocolO_pF'
 func getIntPropExistential(_ a: ProtocolO) -> Int {

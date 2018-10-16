@@ -453,9 +453,9 @@ public class Sub : Base {
   // CHECK-LABEL: sil private [transparent] @$S7dynamic3SubC1xSbvgSbyKXKfu_ : $@convention(thin) (@guaranteed Sub) -> (Bool, @error Error) {
   // CHECK: bb0([[VALUE:%.*]] : $Sub):
   // CHECK:     [[VALUE_COPY:%.*]] = copy_value [[VALUE]]
-  // CHECK:     [[CASTED_VALUE_COPY:%.*]] = upcast [[VALUE_COPY]]
-  // CHECK:     [[BORROWED_CASTED_VALUE_COPY:%.*]] = begin_borrow [[CASTED_VALUE_COPY]]
-  // CHECK:     [[DOWNCAST_FOR_SUPERMETHOD:%.*]] = unchecked_ref_cast [[BORROWED_CASTED_VALUE_COPY]]
+  // CHECK:     [[CAST_VALUE_COPY:%.*]] = upcast [[VALUE_COPY]]
+  // CHECK:     [[BORROWED_CAST_VALUE_COPY:%.*]] = begin_borrow [[CAST_VALUE_COPY]]
+  // CHECK:     [[DOWNCAST_FOR_SUPERMETHOD:%.*]] = unchecked_ref_cast [[BORROWED_CAST_VALUE_COPY]]
   // CHECK:     [[SUPER:%.*]] = objc_super_method [[DOWNCAST_FOR_SUPERMETHOD]] : $Sub, #Base.x!getter.1.foreign : (Base) -> () -> Bool, $@convention(objc_method) (Base) -> ObjCBool
   // CHECK:     end_borrow [[BORROWED_CASTED_VALUE_COPY]]
   // CHECK:     = apply [[SUPER]]([[CASTED_VALUE_COPY]])

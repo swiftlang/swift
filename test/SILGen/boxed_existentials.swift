@@ -85,8 +85,10 @@ func test_property_of_lvalue(_ x: Error) -> String {
 // CHECK:         [[VALUE:%.*]] = open_existential_box [[VALUE_BOX]] : $Error to $*[[VALUE_TYPE:@opened\(.*\) Error]]
 // CHECK:         [[COPY:%.*]] = alloc_stack $[[VALUE_TYPE]]
 // CHECK:         copy_addr [[VALUE]] to [initialization] [[COPY]]
+// CHECK:         [[BORROW:%.*]] = alloc_stack $[[VALUE_TYPE]]
+// CHECK:         copy_addr [[COPY]] to [initialization] [[BORROW]]
 // CHECK:         [[METHOD:%.*]] = witness_method $[[VALUE_TYPE]], #Error._domain!getter.1
-// CHECK:         [[RESULT:%.*]] = apply [[METHOD]]<[[VALUE_TYPE]]>([[COPY]])
+// CHECK:         [[RESULT:%.*]] = apply [[METHOD]]<[[VALUE_TYPE]]>([[BORROW]])
 // CHECK:         destroy_addr [[COPY]]
 // CHECK:         dealloc_stack [[COPY]]
 // CHECK:         destroy_value [[VALUE_BOX]]

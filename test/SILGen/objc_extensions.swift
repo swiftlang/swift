@@ -34,9 +34,9 @@ extension Sub {
     // CHECK: [[BORROWED_SELF_COPY_CAST:%.*]] = begin_borrow [[SELF_COPY_CAST]]
     // CHECK: [[CAST_BACK:%.*]] = unchecked_ref_cast [[BORROWED_SELF_COPY_CAST]] : $Base to $Sub
     // CHECK: [[SUPER_METHOD:%.*]] = objc_super_method [[CAST_BACK]] : $Sub, #Base.prop!getter.1.foreign
-    // CHECK: end_borrow [[BORROWED_SELF_COPY_CAST]]
-    // CHECK: [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[SELF_COPY_CAST]])
+    // CHECK: [[RESULT:%.*]] = apply [[SUPER_METHOD]]([[BORROWED_SELF_COPY_CAST]])
     // CHECK: bb3(
+    // CHECK: end_borrow [[BORROWED_SELF_COPY_CAST]]
     // CHECK: destroy_value [[SELF_COPY_CAST]]
     // CHECK: } // end sil function '$S15objc_extensions3SubC4propSSSgvg'
 
