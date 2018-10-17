@@ -4926,8 +4926,11 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
   if (equivClass2)
     equivClass->modified(*this);
 
-  // Same-type requirements.
+  // Same-type requirements, delayed requirements.
   if (equivClass2) {
+    Impl->DelayedRequirements.append(equivClass2->delayedRequirements.begin(),
+                                     equivClass2->delayedRequirements.end());
+
     equivClass->sameTypeConstraints.insert(
                                    equivClass->sameTypeConstraints.end(),
                                    equivClass2->sameTypeConstraints.begin(),
