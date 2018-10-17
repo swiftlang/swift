@@ -266,7 +266,7 @@ protocol P12 {
 struct XIndexType : P11 { }
 
 struct X12 : P12 { // expected-error{{type 'X12' does not conform to protocol 'P12'}}
-  func getIndex() -> XIndexType { return XIndexType() } // expected-note{{candidate would match and infer 'Index'='XIndexType' if 'XIndexType' conformed to 'P1'}}
+  func getIndex() -> XIndexType { return XIndexType() } // expected-note{{candidate would match and infer 'Index' = 'XIndexType' if 'XIndexType' conformed to 'P1'}}
 }
 
 func ==(x: X12.Index, y: X12.Index) -> Bool { return true }

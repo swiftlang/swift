@@ -17,7 +17,7 @@ func bad_containers_2(bc: BadContainer2) {
 }
 
 struct BadContainer3 : Sequence { // expected-error{{type 'BadContainer3' does not conform to protocol 'Sequence'}}
-  func makeIterator() { } // expected-note{{candidate would match and infer 'Iterator'='()' if '()' conformed to 'IteratorProtocol'}}
+  func makeIterator() { } // expected-note{{candidate can not infer 'Iterator' = '()' because '()' is not a nominal type and so can't conform to 'IteratorProtocol'}}
 }
 
 func bad_containers_3(bc: BadContainer3) {
