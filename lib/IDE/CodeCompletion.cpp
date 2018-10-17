@@ -2637,6 +2637,10 @@ public:
       for (auto *init : initializers) {
         if (shouldHideDeclFromCompletionResults(init))
           continue;
+        if (IsUnresolvedMember &&
+            cast<ConstructorDecl>(init)->getFailability() == OTK_Optional) {
+          continue;
+        }
         addConstructorCall(cast<ConstructorDecl>(init), Reason, type, None,
                            /*IsOnType=*/true, name);
       }
