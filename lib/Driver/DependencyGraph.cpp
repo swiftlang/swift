@@ -48,12 +48,14 @@ DependencyGraphImpl::MarkTracerImpl::MarkTracerImpl(UnifiedStatsReporter *Stats)
   : Stats(Stats) {}
 DependencyGraphImpl::MarkTracerImpl::~MarkTracerImpl() = default;
 
+using ExtendedLoadResult = DependencyGraphImpl::ExtendedLoadResult;
 using LoadResult = DependencyGraphImpl::LoadResult;
 using DependencyKind = DependencyGraphImpl::DependencyKind;
-using DependencyCallbackTy = LoadResult(StringRef, DependencyKind, bool);
-using InterfaceHashCallbackTy = LoadResult(StringRef);
+using DependencyCallbackTy = ExtendedLoadResult(StringRef, DependencyKind,
+                                                bool);
+using InterfaceHashCallbackTy = ExtendedLoadResult(StringRef);
 
-static LoadResult parseDependencyFile(
+static ExtendedLoadResult parseDependencyFile(
     llvm::MemoryBuffer &buffer,
     llvm::function_ref<DependencyCallbackTy> providesCallback,
     llvm::function_ref<DependencyCallbackTy> dependsCallback,
@@ -66,30 +68,38 @@ static LoadResult parseDependencyFile(
   yaml::Stream stream(buffer.getMemBufferRef(), SM);
   auto I = stream.begin();
   if (I == stream.end() || !I->getRoot())
-    return LoadResult::HadError;
+    return ExtendedLoadResult::hadError();
 
   auto *topLevelMap = dyn_cast<yaml::MappingNode>(I->getRoot());
   if (!topLevelMap) {
     if (isa<yaml::NullNode>(I->getRoot()))
-      return LoadResult::UpToDate;
-    return LoadResult::HadError;
+      return ExtendedLoadResult::upToDate();
+    return ExtendedLoadResult::hadError();
   }
 
-  LoadResult result = LoadResult::UpToDate;
-  SmallString<64> scratch;
+  ExtendedLoadResult providesAndDependsResult = ExtendedLoadResult::upToDate();
+  ExtendedLoadResult interfaceHashResult = ExtendedLoadResult::upToDate();
+  bool sawNonselectiveProvides = false;
+
+  SmallString<64> scratch, scratch2;
 
   // After an entry, we know more about the node as a whole.
-  // Update the "result" variable above.
+  // Update the "providesAndDependsResult" variable above.
   // This is a macro rather than a lambda because it contains a return.
-#define UPDATE_RESULT(update) switch (update) {\
-    case LoadResult::HadError: \
-      return LoadResult::HadError; \
-    case LoadResult::UpToDate: \
-      break; \
-    case LoadResult::AffectsDownstream: \
-      result = LoadResult::AffectsDownstream; \
-      break; \
-    } \
+#define UPDATE_RESULT(dir, r)                                                  \
+  {                                                                            \
+    switch (r.simpleResult) {                                                  \
+    case LoadResult::HadError:                                                 \
+      return r;                                                                \
+    case LoadResult::UpToDate:                                                 \
+      break;                                                                   \
+    case LoadResult::AffectsDownstream:                                        \
+      const bool isProvides = dir == DependencyDirection::Provides;            \
+      sawNonselectiveProvides |= (isProvides & r.changedProviders == None);    \
+      providesAndDependsResult = providesAndDependsResult.withChangesIn(r);    \
+      break;                                                                   \
+    }                                                                          \
+  }
 
   // FIXME: LLVM's YAML support does incremental parsing in such a way that
   // for-range loops break.
@@ -99,7 +109,7 @@ static LoadResult parseDependencyFile(
 
     auto *key = dyn_cast<yaml::ScalarNode>(i->getKey());
     if (!key)
-      return LoadResult::HadError;
+      return ExtendedLoadResult::hadError();
     StringRef keyString = key->getValue(scratch);
 
     using namespace reference_dependency_keys;
@@ -107,15 +117,18 @@ static LoadResult parseDependencyFile(
     if (keyString == interfaceHash) {
       auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
       if (!value)
-        return LoadResult::HadError;
+        return ExtendedLoadResult::hadError();
 
       StringRef valueString = value->getValue(scratch);
+
       if (EnableExperimentalDependencies) {
         ExperimentalDependencies::InterfaceHashes hashes(valueString);
-        UPDATE_RESULT(interfaceHashCallback(hashes.experimental));
+        interfaceHashResult = interfaceHashCallback(hashes.experimental);
       } else {
-        UPDATE_RESULT(interfaceHashCallback(valueString));
+        interfaceHashResult = interfaceHashCallback(valueString);
       }
+      if (interfaceHashResult.simpleResult == LoadResult::HadError)
+        return interfaceHashResult;
 
     } else {
       enum class DependencyDirection : bool {
@@ -155,31 +168,32 @@ static LoadResult parseDependencyFile(
         .Default(std::make_pair(DependencyKind(),
                                 DependencyDirection::Depends));
       if (dirAndKind.first == DependencyKind())
-        return LoadResult::HadError;
+        return ExtendedLoadResult::hadError();
 
       auto *entries = dyn_cast<yaml::SequenceNode>(i->getValue());
       if (!entries)
-        return LoadResult::HadError;
+        return ExtendedLoadResult::hadError();
 
       if (dirAndKind.first == DependencyKind::NominalTypeMember) {
         // Handle member dependencies specially. Rather than being a single
         // string, they come in the form ["{MangledBaseName}", "memberName"].
         for (yaml::Node &rawEntry : *entries) {
+
           bool isCascading = rawEntry.getRawTag() != "!private";
 
           auto *entry = dyn_cast<yaml::SequenceNode>(&rawEntry);
           if (!entry)
-            return LoadResult::HadError;
+            return ExtendedLoadResult::hadError();
 
           auto iter = entry->begin();
           auto *base = dyn_cast<yaml::ScalarNode>(&*iter);
           if (!base)
-            return LoadResult::HadError;
+            return ExtendedLoadResult::hadError();
           ++iter;
 
           auto *member = dyn_cast<yaml::ScalarNode>(&*iter);
           if (!member)
-            return LoadResult::HadError;
+            return ExtendedLoadResult::hadError();
           ++iter;
 
           // FIXME: LLVM's YAML support doesn't implement == correctly for end
@@ -196,51 +210,71 @@ static LoadResult parseDependencyFile(
           appended.push_back('\0');
           appended += member->getValue(scratch);
 
-          UPDATE_RESULT(callback(appended.str(), dirAndKind.first,
-                                 isCascading));
+          const ExtendedLoadResult r =
+              callback(appended.str(), dirAndKind.first, isCascading);
+          UPDATE_RESULT(dirAndKind.second, r);
         }
       } else {
         for (const yaml::Node &rawEntry : *entries) {
           auto *entry = dyn_cast<yaml::ScalarNode>(&rawEntry);
           if (!entry)
-            return LoadResult::HadError;
+            return ExtendedLoadResult::hadError();
 
           bool isDepends = dirAndKind.second == DependencyDirection::Depends;
           auto &callback = isDepends ? dependsCallback : providesCallback;
 
-          UPDATE_RESULT(callback(entry->getValue(scratch), dirAndKind.first,
-                                 entry->getRawTag() != "!private"));
+          const ExtendedLoadResult r =
+              callback(entry->getValue(scratch), dirAndKind.first,
+                       entry->getRawTag() != "!private");
+          UPDATE_RESULT(dirAndKind.second, r);
         }
       }
     }
   }
 
-  return result;
+  switch (interfaceHashResult.simpleResult) {
+  case LoadResult::UpToDate:
+    return providesAndDependsResult;
+  case LoadResult::AffectsDownstream:
+    if (sawNonselectiveProvides)
+      return interfaceHashResult;
+    break;
+  case LoadResult::HadError:
+    llvm::llvm_unreachable_internal();
+  }
+  switch (providesAndDependsResult.simpleResult) {
+  case LoadResult::UpToDate:
+    return interfaceHashResult;
+  case LoadResult::AffectsDownstream:
+    return providesAndDependsResult;
+  case LoadResult::HadError:
+    llvm::llvm_unreachable_internal();
+  }
 }
 
-LoadResult
+ExtendedLoadResult
 DependencyGraphImpl::loadFromPath(const void *node, StringRef path,
                                   const bool EnableExperimentalDependencies) {
   auto buffer = llvm::MemoryBuffer::getFile(path);
   if (!buffer)
-    return LoadResult::HadError;
+    return ExtendedLoadResult::hadError();
   return loadFromBuffer(node, *buffer.get(), EnableExperimentalDependencies);
 }
 
-LoadResult
-DependencyGraphImpl::loadFromString(const void *node, StringRef data) {
+ExtendedLoadResult DependencyGraphImpl::loadFromString(const void *node,
+                                                       StringRef data) {
   auto buffer = llvm::MemoryBuffer::getMemBuffer(data);
   return loadFromBuffer(node, *buffer, false);
 }
 
-LoadResult
+ExtendedLoadResult
 DependencyGraphImpl::loadFromBuffer(const void *node,
                                     llvm::MemoryBuffer &buffer,
                                     const bool EnableExperimentalDependencies) {
   auto &provides = Provides[node];
 
   auto dependsCallback = [this, node](StringRef name, DependencyKind kind,
-                                      bool isCascading) -> LoadResult {
+                                      bool isCascading) -> ExtendedLoadResult {
     if (kind == DependencyKind::ExternalFile)
       ExternalDependencies.insert(name);
 
@@ -262,43 +296,58 @@ DependencyGraphImpl::loadFromBuffer(const void *node,
     }
 
     if (isCascading && (entries.second & kind))
-      return LoadResult::AffectsDownstream;
-    return LoadResult::UpToDate;
+      return ExtendedLoadResult::affectsDownstream(None);
+    return ExtendedLoadResult::upToDate();
   };
 
-  auto providesCallback =
-      [&provides](StringRef name, DependencyKind kind,
-                              bool isCascading) -> LoadResult {
+  auto providesCallback = [&provides, EnableExperimentalDependencies](
+                              StringRef nameArg, DependencyKind kind,
+                              bool isCascading) -> ExtendedLoadResult {
+    std::string name = nameArg.str();
+    std::string hash = std::string();
     assert(isCascading);
+    if (EnableExperimentalDependencies) {
+      ExperimentalDependencies::TopLevel tl(nameArg);
+      name = tl.base;
+      hash = tl.hash;
+    }
     auto iter = std::find_if(provides.begin(), provides.end(),
                              [name](const ProvidesEntryTy &entry) -> bool {
       return name == entry.name;
     });
 
-    if (iter == provides.end())
-      provides.push_back({name, kind});
-    else
-      iter->kindMask |= kind;
-
-    return LoadResult::UpToDate;
+    if (iter == provides.end()) {
+      provides.push_back({name, hash, kind});
+      std::vector<ProvidesEntryTy> v{provides.back()};
+      return ExtendedLoadResult::affectsDownstream(v);
+    }
+    auto prevMask = iter->kindMask;
+    iter->kindMask |= kind;
+    auto prevHash = iter->hash;
+    iter->hash = hash;
+    std::vector<ProvidesEntryTy> v{*iter};
+    return prevMask.contains(kind) && prevHash == iter->hash
+               ? ExtendedLoadResult::upToDate()
+               : ExtendedLoadResult::affectsDownstream(v);
   };
 
-  auto interfaceHashCallback = [this, node](StringRef hash) -> LoadResult {
+  auto interfaceHashCallback = [this,
+                                node](StringRef hash) -> ExtendedLoadResult {
     auto insertResult = InterfaceHashes.insert(std::make_pair(node, hash));
     
     if (insertResult.second) {
       // Treat a newly-added hash as up-to-date. This includes the initial
       // load of the file.
-      return LoadResult::UpToDate;
+      return ExtendedLoadResult::upToDate();
     }
 
     auto iter = insertResult.first;
     if (hash != iter->second) {
       iter->second = hash;
-      return LoadResult::AffectsDownstream;
+      return ExtendedLoadResult::affectsDownstream(None);
     }
 
-    return LoadResult::UpToDate;
+    return ExtendedLoadResult::upToDate();
   };
 
   return parseDependencyFile(buffer, providesCallback, dependsCallback,
@@ -323,9 +372,10 @@ void DependencyGraphImpl::markExternal(SmallVectorImpl<const void *> &visited,
   }
 }
 
-void
-DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
-                                    const void *node, MarkTracerImpl *tracer) {
+void DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
+                                         const void *node,
+                                         MarkTracerImpl *tracer,
+                                         ExtendedLoadResult loadResult) {
   assert(Provides.count(node) && "node is not in the graph");
   llvm::SpecificBumpPtrAllocator<MarkTracerImpl::Entry> scratchAlloc;
 
@@ -344,7 +394,13 @@ DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
     if (allProvided == Provides.end())
       return;
 
-    for (const auto &provided : allProvided->second) {
+    const std::vector<ProvidesEntryTy> &providersToCheck =
+        loadResult.changedProviders.hasValue()
+            ? loadResult.changedProviders.getValue()
+            : allProvided->getSecond();
+
+    for (const auto &provided : providersToCheck) {
+
       auto allDependents = Dependencies.find(provided.name);
       if (allDependents == Dependencies.end())
         continue;

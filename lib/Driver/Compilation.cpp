@@ -407,9 +407,10 @@ namespace driver {
         if (ReturnCode == EXIT_SUCCESS || ReturnCode == EXIT_FAILURE) {
           bool wasCascading = DepGraph.isMarked(FinishedCmd);
 
-          switch (
+          const DependencyGraphImpl::ExtendedLoadResult extendedLoadResult =
               DepGraph.loadFromPath(FinishedCmd, DependenciesFile,
-                                    Comp.getEnableExperimentalDependencies())) {
+                                    Comp.getEnableExperimentalDependencies());
+          switch (extendedLoadResult.simpleResult) {
           case DependencyGraphImpl::LoadResult::HadError:
             if (ReturnCode == EXIT_SUCCESS) {
               dependencyLoadFailed(DependenciesFile);
@@ -421,8 +422,8 @@ namespace driver {
               break;
             LLVM_FALLTHROUGH;
           case DependencyGraphImpl::LoadResult::AffectsDownstream:
-            DepGraph.markTransitive(Dependents, FinishedCmd,
-                                    IncrementalTracer);
+            DepGraph.markTransitive(Dependents, FinishedCmd, IncrementalTracer,
+                                    extendedLoadResult);
             break;
           }
         } else {
@@ -700,9 +701,10 @@ namespace driver {
           if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
             DepGraph.addIndependentNode(Cmd);
           } else {
-            switch (DepGraph.loadFromPath(
-                Cmd, DependenciesFile,
-                Comp.getEnableExperimentalDependencies())) {
+            const DependencyGraphImpl::ExtendedLoadResult extendedLoadResult =
+                DepGraph.loadFromPath(Cmd, DependenciesFile,
+                                      Comp.getEnableExperimentalDependencies());
+            switch (extendedLoadResult.simpleResult) {
             case DependencyGraphImpl::LoadResult::HadError:
               dependencyLoadFailed(DependenciesFile, /*Warn=*/false);
               break;
@@ -710,6 +712,13 @@ namespace driver {
               Condition = Cmd->getCondition();
               break;
             case DependencyGraphImpl::LoadResult::AffectsDownstream:
+              if (Comp.getEnableExperimentalDependencies()) { // added providers
+                                                              // will return
+                                                              // this in this
+                                                              // mode
+                Condition = Cmd->getCondition();
+                break;
+              }
               llvm_unreachable("we haven't marked anything in this graph yet");
             }
           }

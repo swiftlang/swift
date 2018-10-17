@@ -93,10 +93,46 @@ private:
 
   struct ProvidesEntryTy {
     std::string name;
+    std::string hash;
     DependencyMaskTy kindMask;
   };
   static_assert(std::is_move_constructible<ProvidesEntryTy>::value, "");
 
+public:
+  struct ExtendedLoadResult {
+    ExtendedLoadResult(LoadResult simpleResult,
+                       Optional<std::vector<ProvidesEntryTy>> changedProviders)
+        : simpleResult(simpleResult), changedProviders(changedProviders) {}
+
+    LoadResult simpleResult; // should be const
+    Optional<std::vector<ProvidesEntryTy>> changedProviders;
+
+    static ExtendedLoadResult hadError() {
+      return ExtendedLoadResult(LoadResult::HadError, None);
+    }
+    static ExtendedLoadResult upToDate() {
+      return ExtendedLoadResult(LoadResult::UpToDate, None);
+    }
+    static ExtendedLoadResult
+    affectsDownstream(Optional<std::vector<ProvidesEntryTy>> changedProviders) {
+      return ExtendedLoadResult(LoadResult::AffectsDownstream,
+                                changedProviders);
+    }
+
+    ExtendedLoadResult withChangesIn(const ExtendedLoadResult other) const {
+      assert(other.simpleResult == LoadResult::AffectsDownstream);
+      if (!other.changedProviders.hasValue())
+        return ExtendedLoadResult::affectsDownstream(changedProviders);
+      if (!changedProviders.hasValue())
+        return other;
+      std::vector<ProvidesEntryTy> allChanges = changedProviders.getValue();
+      for (const auto &p : other.changedProviders.getValue())
+        allChanges.push_back(p);
+      return ExtendedLoadResult::affectsDownstream(allChanges);
+    }
+  };
+
+private:
   /// The "outgoing" edge map. This lists all outgoing (kind, string) edges
   /// representing satisfied dependencies from a particular node.
   ///
@@ -141,13 +177,14 @@ private:
   /// \sa SourceFile::getInterfaceHash
   llvm::DenseMap<const void *, std::string> InterfaceHashes;
 
-  LoadResult loadFromBuffer(const void *node, llvm::MemoryBuffer &buffer,
-                            const bool EnableExperimentalDependencies);
+  ExtendedLoadResult loadFromBuffer(const void *node,
+                                    llvm::MemoryBuffer &buffer,
+                                    const bool EnableExperimentalDependencies);
 
 protected:
-  LoadResult loadFromString(const void *node, StringRef data);
-  LoadResult loadFromPath(const void *node, StringRef path,
-                          const bool EnableExperimentalDependencies);
+  ExtendedLoadResult loadFromString(const void *node, StringRef data);
+  ExtendedLoadResult loadFromPath(const void *node, StringRef path,
+                                  const bool EnableExperimentalDependencies);
 
   void addIndependentNode(const void *node) {
     bool newlyInserted = Provides.insert({node, {}}).second;
@@ -155,8 +192,10 @@ protected:
     (void)newlyInserted;
   }
 
-  void markTransitive(SmallVectorImpl<const void *> &visited,
-                      const void *node, MarkTracerImpl *tracer = nullptr);
+  void markTransitive(SmallVectorImpl<const void *> &visited, const void *node,
+                      MarkTracerImpl *tracer = nullptr,
+                      ExtendedLoadResult loadResult =
+                          ExtendedLoadResult::affectsDownstream(None));
   bool markIntransitive(const void *node) {
     assert(Provides.count(node) && "node is not in the graph");
     return Marked.insert(node).second;
@@ -230,8 +269,8 @@ public:
   /// ("depends") are not cleared; new dependencies are considered additive.
   ///
   /// If \p node has already been marked, only its outgoing edges are updated.
-  LoadResult loadFromPath(T node, StringRef path,
-                          const bool EnableExperimentalDependencies) {
+  ExtendedLoadResult loadFromPath(T node, StringRef path,
+                                  const bool EnableExperimentalDependencies) {
     return DependencyGraphImpl::loadFromPath(
         Traits::getAsVoidPointer(node), path, EnableExperimentalDependencies);
   }
@@ -241,7 +280,7 @@ public:
   /// This is only intended for testing purposes.
   ///
   /// \sa loadFromPath
-  LoadResult loadFromString(T node, StringRef data) {
+  ExtendedLoadResult loadFromString(T node, StringRef data) {
     return DependencyGraphImpl::loadFromString(Traits::getAsVoidPointer(node),
                                                data);
   }
@@ -269,11 +308,12 @@ public:
   /// MarkTracer instance to \p tracer.
   template <unsigned N>
   void markTransitive(SmallVector<T, N> &visited, T node,
-                      MarkTracer *tracer = nullptr) {
+                      MarkTracer *tracer = nullptr,
+                      ExtendedLoadResult loadResult =
+                          ExtendedLoadResult::affectsDownstream(None)) {
     SmallVector<const void *, N> rawMarked;
-    DependencyGraphImpl::markTransitive(rawMarked,
-                                        Traits::getAsVoidPointer(node),
-                                        tracer);
+    DependencyGraphImpl::markTransitive(
+        rawMarked, Traits::getAsVoidPointer(node), tracer, loadResult);
     // FIXME: How can we avoid this copy?
     copyBack(visited, rawMarked);
   }
