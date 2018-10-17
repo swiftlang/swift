@@ -3825,7 +3825,12 @@ public:
       // convertible to the contextual type.
       if (auto CD = dyn_cast<TypeDecl>(VD)) {
         declTy = declTy->getMetatypeInstanceType();
-        return declTy->isEqual(T) || swift::isConvertibleTo(declTy, T, *DC);
+
+        // Emit construction for the same type via typealias doesn't make sense
+        // because we are emitting all `.init()`s.
+        if (declTy->isEqual(T))
+          return false;
+        return swift::isConvertibleTo(declTy, T, *DC);
       }
 
       // Only static member can be referenced.
