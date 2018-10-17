@@ -845,20 +845,21 @@ swift::matchWitness(TypeChecker &tc,
 
     // If the types would match but for some other missing conformance, find and
     // call that out.
-    if (solution && solution->Fixes.size() == 1 &&
+    if (solution && conformance && solution->Fixes.size() == 1 &&
         solution->Fixes.front()->getKind() == FixKind::AddConformance) {
       auto fix = (MissingConformance *)solution->Fixes.front();
-      auto type = fix->getNonConformingType()->mapTypeOutOfContext();
+      auto type = fix->getNonConformingType();
       auto protocolType = fix->getProtocol()->getDeclaredType();
       if (auto memberTy = type->getAs<DependentMemberType>())
-        if (memberTy->getBase()->isEqual(conformance->getType()))
-          return RequirementMatch(witness, MatchKind::MissingConformance, type,
-                                  protocolType);
+        return RequirementMatch(witness, MatchKind::MissingConformance, type,
+                                protocolType);
+
+      type = type->mapTypeOutOfContext();
       if (auto typeParamTy = type->getAs<GenericTypeParamType>())
-        if (auto assocType =
-            conformance->getGenericEnvironment()->mapTypeIntoContext(typeParamTy))
-          return RequirementMatch(witness, MatchKind::MissingConformance,
-                                  assocType, protocolType);
+        if (auto env = conformance->getGenericEnvironment())
+          if (auto assocType = env->mapTypeIntoContext(typeParamTy))
+            return RequirementMatch(witness, MatchKind::MissingConformance,
+                                    assocType, protocolType);
       if (type->isEqual(conformance->getType())) {
         if (auto bgt = type->getAs<BoundGenericType>())
           type = bgt->getDecl()->getDeclaredType();
