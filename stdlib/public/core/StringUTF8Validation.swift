@@ -47,6 +47,45 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
     try guaranteeIn(_isContinuation)
   }
 
+  func _legacyInvalidLengthCalculation(_ _buffer: (_storage: UInt32, ())) -> Int {
+    // function body copied from UTF8.ForwardParser._invalidLength
+    if _buffer._storage               & 0b0__1100_0000__1111_0000
+                                     == 0b0__1000_0000__1110_0000 {
+      // 2-byte prefix of 3-byte sequence. The top 5 bits of the decoded result
+      // must be nonzero and not a surrogate
+      let top5Bits = _buffer._storage & 0b0__0010_0000__0000_1111
+      if top5Bits != 0 && top5Bits   != 0b0__0010_0000__0000_1101 { return 2 }
+    }
+    else if _buffer._storage                & 0b0__1100_0000__1111_1000
+                                           == 0b0__1000_0000__1111_0000
+    {
+      // Prefix of 4-byte sequence. The top 5 bits of the decoded result
+      // must be nonzero and no greater than 0b0__0100_0000
+      let top5bits = UInt16(_buffer._storage & 0b0__0011_0000__0000_0111)
+      if top5bits != 0 && top5bits.byteSwapped <= 0b0__0000_0100__0000_0000 {
+        return _buffer._storage   & 0b0__1100_0000__0000_0000__0000_0000
+                                 == 0b0__1000_0000__0000_0000__0000_0000 ? 3 : 2
+      }
+    }
+    return 1
+  }
+
+  func _legacyNarrowIllegalRange(buf: Slice<UnsafeBufferPointer<UInt8>>) -> Range<Int> {
+    var reversePacked: UInt32 = 0
+    if let third = buf.dropFirst(2).first {
+      reversePacked |= UInt32(third)
+      reversePacked <<= 8
+    }
+    if let second = buf.dropFirst().first {
+      reversePacked |= UInt32(second)
+      reversePacked <<= 8
+    }
+    reversePacked |= UInt32(buf.first!)
+    let _buffer: (_storage: UInt32, x: ()) = (reversePacked, ())
+    let invalids = _legacyInvalidLengthCalculation(_buffer)
+    return buf.startIndex ..< buf.startIndex + invalids
+  }
+
   func findInvalidRange(_ buf: Slice<UnsafeBufferPointer<UInt8>>) -> Range<Int> {
     var endIndex = buf.startIndex
     var iter = buf.makeIterator()
@@ -57,7 +96,8 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
     let illegalRange = Range(buf.startIndex...endIndex)
     _sanityCheck(illegalRange.clamped(to: (buf.startIndex..<buf.endIndex)) == illegalRange,
                  "illegal range out of full range")
-    return illegalRange
+    // FIXME: Remove the call to `_legacyNarrowIllegalRange` and return `illegalRange` directly
+    return _legacyNarrowIllegalRange(buf: buf[illegalRange])
   }
 
   do {
