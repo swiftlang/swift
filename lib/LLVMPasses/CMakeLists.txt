@@ -1,4 +1,4 @@
-add_swift_library(swiftLLVMPasses STATIC
+swift_add_library(swiftLLVMPasses STATIC
   LLVMSwiftAA.cpp
   LLVMSwiftRCIdentity.cpp
   LLVMARCOpts.cpp

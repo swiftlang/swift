@@ -26,17 +26,17 @@ set(swift_stubs_c_compile_flags ${SWIFT_RUNTIME_CORE_CXX_FLAGS})
 list(APPEND swift_stubs_c_compile_flags -DswiftCore_EXPORTS)
 list(APPEND swift_stubs_c_compile_flags -I${SWIFT_SOURCE_DIR}/include)
 
-add_swift_library(swiftStdlibStubs
-                  OBJECT_LIBRARY TARGET_LIBRARY
-                    ${swift_stubs_sources}
-                    ${swift_stubs_objc_sources}
-                    ${swift_stubs_unicode_normalization_sources}
-                  C_COMPILE_FLAGS
-                    ${swift_stubs_c_compile_flags}
-                  LINK_FLAGS
-                    ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
-                  INSTALL_IN_COMPONENT
-                    stdlib)
+swift_add_target_library(swiftStdlibStubs
+                         OBJECT_LIBRARY
+                           ${swift_stubs_sources}
+                           ${swift_stubs_objc_sources}
+                           ${swift_stubs_unicode_normalization_sources}
+                         C_COMPILE_FLAGS
+                           ${swift_stubs_c_compile_flags}
+                         LINK_FLAGS
+                           ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
+                         INSTALL_IN_COMPONENT
+                           stdlib)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   set_property(SOURCE

@@ -5,7 +5,7 @@ set(swift_platform_sources
     TiocConstants.swift
     tgmath.swift.gyb)
 
-add_swift_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+swift_add_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     Darwin.swift.gyb
     ${swift_platform_sources}
     POSIXError.swift
@@ -16,7 +16,7 @@ add_swift_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     TARGET_SDKS ALL_APPLE_PLATFORMS
     API_NOTES_NON_OVERLAY)
 
-add_swift_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+swift_add_target_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     Glibc.swift.gyb
     ${swift_platform_sources}
 
@@ -25,7 +25,7 @@ add_swift_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     TARGET_SDKS ANDROID CYGWIN FREEBSD LINUX HAIKU
     DEPENDS glibc_modulemap)
 
-add_swift_library(swiftMSVCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+swift_add_target_library(swiftMSVCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     msvcrt.swift
     ${swift_platform_sources}
 

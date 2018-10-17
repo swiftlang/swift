@@ -1,4 +1,4 @@
-add_swift_library(swiftMarkup STATIC
+swift_add_library(swiftMarkup STATIC
   AST.cpp
   LineList.cpp
   Markup.cpp

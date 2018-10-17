@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.4.3)
 include("../../../../cmake/modules/StandaloneOverlay.cmake")
 
-add_swift_library(swiftSpriteKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+swift_add_target_library(swiftSpriteKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   SpriteKit.swift
   SpriteKitQuickLooks.swift.gyb
 

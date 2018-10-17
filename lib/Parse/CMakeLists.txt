@@ -1,4 +1,4 @@
-add_swift_library(swiftParse STATIC
+swift_add_library(swiftParse STATIC
   Confusables.cpp
   Lexer.cpp
   ParseDecl.cpp

@@ -1,4 +1,4 @@
-add_swift_library(swiftSerialization STATIC
+swift_add_library(swiftSerialization STATIC
   Deserialization.cpp
   DeserializeSIL.cpp
   ModuleFile.cpp

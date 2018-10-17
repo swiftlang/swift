@@ -4,7 +4,7 @@ if(NOT SWIFT_SOURCEKIT_USE_INPROC_LIBRARY AND SWIFT_BUILD_STDLIB)
   set(INSTALLED_COMP sourcekit-xpc-service)
   set(DEPENDS_LIST "sourcekitd-test")
 
-  add_swift_library(swiftSwiftLang SHARED
+  swift_add_target_library(swiftSwiftLang SHARED
     SwiftLang.swift
     SourceKitdClient.swift
     SourceKitdRequest.swift

@@ -1,4 +1,4 @@
-add_swift_library(swiftFrontendTool STATIC
+swift_add_library(swiftFrontendTool STATIC
   FrontendTool.cpp
   ImportedModules.cpp
   ReferenceDependencies.cpp

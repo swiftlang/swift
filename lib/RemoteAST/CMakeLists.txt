@@ -11,7 +11,7 @@ else()
   set(REMOTE_LIB_HEADERS)
 endif()
 
-add_swift_library(swiftRemoteAST STATIC
+swift_add_library(swiftRemoteAST STATIC
   RemoteAST.cpp
   InProcessMemoryReader.cpp
   ${REMOTE_LIB_HEADERS}

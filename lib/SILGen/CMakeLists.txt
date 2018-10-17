@@ -1,4 +1,4 @@
-add_swift_library(swiftSILGen STATIC
+swift_add_library(swiftSILGen STATIC
   ArgumentSource.cpp
   Cleanup.cpp
   Condition.cpp

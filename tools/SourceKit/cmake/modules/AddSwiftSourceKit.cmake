@@ -37,7 +37,7 @@ endfunction()
 # Add default compiler and linker flags to 'target'.
 #
 # FIXME: this is a HACK.  All SourceKit CMake code using this function
-# should be rewritten to use 'add_swift_library'.
+# should be rewritten to use 'swift_add_library'.
 function(add_sourcekit_default_compiler_flags target)
   set(sdk "${SWIFT_HOST_VARIANT_SDK}")
   set(arch "${SWIFT_HOST_VARIANT_ARCH}")

@@ -105,7 +105,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   string(TOLOWER "${sdk}" lowercase_sdk)
 
   # These two libraries are only used with the static swiftcore
-  add_swift_library(swiftImageInspectionShared TARGET_LIBRARY STATIC
+  swift_add_target_library(swiftImageInspectionShared STATIC
     ImageInspectionELF.cpp
     C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
     LINK_FLAGS ${swift_runtime_linker_flags}
@@ -161,14 +161,14 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   endforeach()
   add_dependencies(static_binary_magic ${swift_image_inspection_static_primary_arch})
 
-  add_swift_library(swiftImageInspectionSharedObject OBJECT_LIBRARY TARGET_LIBRARY
+  swift_add_target_library(swiftImageInspectionSharedObject OBJECT_LIBRARY
     ImageInspectionELF.cpp
     C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
     LINK_FLAGS ${swift_runtime_linker_flags}
     INSTALL_IN_COMPONENT never_install)
 endif()
 
-add_swift_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
+swift_add_target_library(swiftRuntime OBJECT_LIBRARY
   ${swift_runtime_sources}
   ${swift_runtime_objc_sources}
   ${swift_runtime_leaks_sources}
@@ -186,22 +186,22 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
   endif()
 endforeach()
 
-add_swift_library(swiftImageRegistrationObjectELF
-                  OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
-                  SwiftRT-ELF.cpp
-                  C_COMPILE_FLAGS ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
-                  LINK_FLAGS ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
-                  TARGET_SDKS ${ELFISH_SDKS}
-                  INSTALL_IN_COMPONENT none)
+swift_add_target_library(swiftImageRegistrationObjectELF
+                         OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
+                         SwiftRT-ELF.cpp
+                         C_COMPILE_FLAGS ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
+                         LINK_FLAGS ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
+                         TARGET_SDKS ${ELFISH_SDKS}
+                         INSTALL_IN_COMPONENT none)
 # FIXME(compnerd) this should be compiled twice, once for static and once for
 # shared.  The static version should be used for building the standard library.
-add_swift_library(swiftImageRegistrationObjectCOFF
-                  OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
-                  SwiftRT-COFF.cpp
-                  C_COMPILE_FLAGS ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
-                  LINK_FLAGS ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
-                  TARGET_SDKS ${COFF_SDKS}
-                  INSTALL_IN_COMPONENT none)
+swift_add_target_library(swiftImageRegistrationObjectCOFF
+                         OBJECT_LIBRARY IS_STDLIB IS_STDLIB_CORE
+                         SwiftRT-COFF.cpp
+                         C_COMPILE_FLAGS ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
+                         LINK_FLAGS ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
+                         TARGET_SDKS ${COFF_SDKS}
+                         INSTALL_IN_COMPONENT none)
 
 foreach(sdk ${SWIFT_CONFIGURED_SDKS})
   foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
