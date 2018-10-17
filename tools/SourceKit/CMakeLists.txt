@@ -134,6 +134,8 @@ if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
                           # ensure that we strip out the DESTDIR environment
                           # from the sub-build
                           ${CMAKE_COMMAND} -E env --unset=DESTDIR ${CMAKE_COMMAND} --build . --target install
+                        STEP_TARGETS
+                          install
                         BUILD_BYPRODUCTS
                           <INSTALL_DIR>/lib/${CMAKE_SHARED_LIBRARY_PREFIX}dispatch${CMAKE_SHARED_LIBRARY_SUFFIX}
                           <INSTALL_DIR>/lib/${CMAKE_IMPORT_LIBRARY_PREFIX}dispatch${CMAKE_IMPORT_LIBRARY_SUFFIX}
@@ -168,6 +170,9 @@ if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
                               ${install_dir}/lib/${CMAKE_IMPORT_LIBRARY_PREFIX}BlocksRuntime${CMAKE_IMPORT_LIBRARY_SUFFIX}
                             INTERFACE_INCLUDE_DIRECTORIES
                               ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}/src/BlocksRuntime)
+
+    add_dependencies(dispatch libdispatch-install)
+    add_dependencies(BlocksRuntime libdispatch-install)
 
     swift_install_in_component(sourcekit-inproc
                                FILES
