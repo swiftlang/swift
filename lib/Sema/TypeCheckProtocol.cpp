@@ -861,8 +861,8 @@ swift::matchWitness(TypeChecker &tc,
             return RequirementMatch(witness, MatchKind::MissingConformance,
                                     assocType, protocolType);
       if (type->isEqual(conformance->getType())) {
-        if (auto bgt = type->getAs<BoundGenericType>())
-          type = bgt->getDecl()->getDeclaredType();
+        if (auto agt = type->getAs<AnyGenericType>())
+          type = agt->getDecl()->getDeclaredInterfaceType();
         return RequirementMatch(witness, MatchKind::MissingConformance, type,
                                 protocolType);
       }

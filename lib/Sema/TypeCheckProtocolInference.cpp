@@ -1747,6 +1747,23 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
           if (failed.Result.isError())
             continue;
 
+          if (!failed.TypeWitness->is<NominalType>() &&
+              failed.Result.isConformanceRequirement()) {
+            diags.diagnose(failed.Witness,
+                           diag::associated_type_witness_conform_impossible,
+                           assocType->getName(), failed.TypeWitness,
+                           failed.Result.getRequirement());
+            continue;
+          }
+          if (!failed.TypeWitness->is<ClassType>() &&
+              !failed.Result.isConformanceRequirement()) {
+            diags.diagnose(failed.Witness,
+                           diag::associated_type_witness_inherit_impossible,
+                           assocType->getName(), failed.TypeWitness,
+                           failed.Result.getRequirement());
+            continue;
+          }
+
           diags.diagnose(failed.Witness,
                          diag::associated_type_deduction_witness_failed,
                          assocType->getName(),

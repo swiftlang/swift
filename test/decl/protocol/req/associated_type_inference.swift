@@ -50,8 +50,8 @@ struct X0f : P0 { // okay: Assoc1 = Int because Float doesn't conform to PSimple
 }
 
 struct X0g : P0 { // expected-error{{type 'X0g' does not conform to protocol 'P0'}}
-  func f0(_: Float) { } // expected-note{{candidate would match and infer 'Assoc1'='Float' if 'Float' conformed to 'PSimple'}}
-  func g0(_: Float) { } // expected-note{{candidate would match and infer 'Assoc1'='Float' if 'Float' conformed to 'PSimple'}}
+  func f0(_: Float) { } // expected-note{{candidate would match and infer 'Assoc1' = 'Float' if 'Float' conformed to 'PSimple'}}
+  func g0(_: Float) { } // expected-note{{candidate would match and infer 'Assoc1' = 'Float' if 'Float' conformed to 'PSimple'}}
 }
 
 struct X0h<T : PSimple> : P0 {
@@ -93,8 +93,8 @@ protocol P2 {
 }
 
 extension P2 where Self.P2Assoc : PSimple {
-  func f0(_ x: P2Assoc) { } // expected-note{{candidate would match and infer 'Assoc1'='Float' if 'Float' conformed to 'PSimple'}}
-  func g0(_ x: P2Assoc) { } // expected-note{{candidate would match and infer 'Assoc1'='Float' if 'Float' conformed to 'PSimple'}}
+  func f0(_ x: P2Assoc) { } // expected-note{{candidate would match and infer 'Assoc1' = 'Float' if 'Float' conformed to 'PSimple'}}
+  func g0(_ x: P2Assoc) { } // expected-note{{candidate would match and infer 'Assoc1' = 'Float' if 'Float' conformed to 'PSimple'}}
 }
 
 struct X0k : P0, P2 {
@@ -123,7 +123,7 @@ struct XProp0a : PropertyP0 { // okay PropType = Int
 }
 
 struct XProp0b : PropertyP0 { // expected-error{{type 'XProp0b' does not conform to protocol 'PropertyP0'}}
-  var property: Float // expected-note{{candidate would match and infer 'Prop'='Float' if 'Float' conformed to 'PSimple'}}
+  var property: Float // expected-note{{candidate would match and infer 'Prop' = 'Float' if 'Float' conformed to 'PSimple'}}
 }
 
 // Inference from subscripts
@@ -144,7 +144,7 @@ struct XSubP0a : SubscriptP0 {
 
 struct XSubP0b : SubscriptP0 {
 // expected-error@-1{{type 'XSubP0b' does not conform to protocol 'SubscriptP0'}}
-  subscript (i: Int) -> Float { get { return Float(i) } } // expected-note{{candidate would match and infer 'Element'='Float' if 'Float' conformed to 'PSimple'}}
+  subscript (i: Int) -> Float { get { return Float(i) } } // expected-note{{candidate would match and infer 'Element' = 'Float' if 'Float' conformed to 'PSimple'}}
 }
 
 struct XSubP0c : SubscriptP0 {
