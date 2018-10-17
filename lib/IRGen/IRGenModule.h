@@ -1309,6 +1309,9 @@ public:
   Address getAddrOfObjCClassRef(ClassDecl *D);
   llvm::Constant *getAddrOfMetaclassObject(ClassDecl *D,
                                            ForDefinition_t forDefinition);
+  llvm::Function *getAddrOfObjCMetadataUpdateFunction(ClassDecl *D,
+                                                      ForDefinition_t forDefinition);
+
   llvm::Function *getAddrOfSILFunction(SILFunction *f,
                                        ForDefinition_t forDefinition);
   llvm::Function *getAddrOfContinuationPrototype(CanSILFunctionType fnType);

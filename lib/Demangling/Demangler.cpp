@@ -1540,6 +1540,8 @@ NodePointer Demangler::demangleMetatype() {
       return createWithChild(Node::Kind::ProtocolDescriptor, popProtocol());
     case 'u':
       return createWithPoppedType(Node::Kind::MethodLookupFunction);
+    case 'U':
+      return createWithPoppedType(Node::Kind::ObjCMetadataUpdateFunction);
     case 'B':
       return createWithChild(Node::Kind::ReflectionMetadataBuiltinDescriptor,
                              popNode(Node::Kind::Type));

@@ -1233,7 +1233,7 @@ namespace {
           IGM.getObjCRuntimeBaseForSwiftRootClass(getClass()));
       }
 
-      auto dataPtr = emitROData(ForMetaClass);
+      auto dataPtr = emitROData(ForMetaClass, DoesNotHaveUpdateCallback);
       dataPtr = llvm::ConstantExpr::getPtrToInt(dataPtr, IGM.IntPtrTy);
 
       llvm::Constant *fields[] = {
@@ -1357,12 +1357,14 @@ namespace {
       return buildGlobalVariable(fields, "_PROTOCOL_");
     }
 
-    void emitRODataFields(ConstantStructBuilder &b, ForMetaClass_t forMeta) {
+    void emitRODataFields(ConstantStructBuilder &b,
+                          ForMetaClass_t forMeta,
+                          HasUpdateCallback_t hasUpdater) {
       assert(FieldLayout && "can't emit rodata for a category");
 
       // struct _class_ro_t {
       //   uint32_t flags;
-      b.addInt32(unsigned(buildFlags(forMeta)));
+      b.addInt32(unsigned(buildFlags(forMeta, hasUpdater)));
 
       //   uint32_t instanceStart;
       //   uint32_t instanceSize;
@@ -1374,6 +1376,8 @@ namespace {
       Size instanceStart;
       Size instanceSize;
       if (forMeta) {
+        assert(!hasUpdater);
+
         // sizeof(struct class_t)
         instanceSize = Size(5 * IGM.getPointerSize().getValue());
         // historical nonsense
@@ -1420,24 +1424,36 @@ namespace {
       //   const property_list_t *baseProperties;
       b.add(buildPropertyList(forMeta));
 
+      // If hasUpdater is true, the metadata update callback goes here.
+      if (hasUpdater) {
+        //   Class _Nullable (*metadataUpdateCallback)(Class _Nonnull cls,
+        //                                             void * _Nullable arg);
+        b.add(IGM.getAddrOfObjCMetadataUpdateFunction(
+                TheEntity.get<ClassDecl *>(),
+                NotForDefinition));
+      }
+
       // };
     }
     
-    llvm::Constant *emitROData(ForMetaClass_t forMeta) {
+    llvm::Constant *emitROData(ForMetaClass_t forMeta,
+                               HasUpdateCallback_t hasUpdater) {
       ConstantInitBuilder builder(IGM);
       auto fields = builder.beginStruct();
-      emitRODataFields(fields, forMeta);
+      emitRODataFields(fields, forMeta, hasUpdater);
       
       auto dataSuffix = forMeta ? "_METACLASS_DATA_" : "_DATA_";
       return buildGlobalVariable(fields, dataSuffix);
     }
 
   private:
-    ObjCClassFlags buildFlags(ForMetaClass_t forMeta) {
+    ObjCClassFlags buildFlags(ForMetaClass_t forMeta,
+                              HasUpdateCallback_t hasUpdater) {
       ObjCClassFlags flags = ObjCClassFlags::CompiledByARC;
 
       // Mark metaclasses as appropriate.
       if (forMeta) {
+        assert(!hasUpdater);
         flags |= ObjCClassFlags::Meta;
 
       // Non-metaclasses need us to record things whether primitive
@@ -1447,6 +1463,9 @@ namespace {
         if (!HasNonTrivialConstructor)
           flags |= ObjCClassFlags::HasCXXDestructorOnly;
       }
+
+      if (hasUpdater)
+        flags |= ObjCClassFlags::HasMetadataUpdateCallback;
 
       // FIXME: set ObjCClassFlags::Hidden when appropriate
       return flags;
@@ -2065,6 +2084,34 @@ namespace {
   };
 } // end anonymous namespace
 
+static llvm::Function *emitObjCMetadataUpdateFunction(IRGenModule &IGM,
+                                                      ClassDecl *cls) {
+  llvm::Function *f =
+    IGM.getAddrOfObjCMetadataUpdateFunction(cls, ForDefinition);
+  f->setAttributes(IGM.constructInitialAttributes());
+
+  IRGenFunction IGF(IGM, f);
+  if (IGM.DebugInfo)
+    IGM.DebugInfo->emitArtificialFunction(IGF, f);
+
+  // Our parameters are the metadata pointer, and an argument for
+  // future use. We just ignore them.
+  Explosion params = IGF.collectParameters();
+  (void) params.claimAll();
+
+  // Just directly call our metadata accessor. This should actually
+  // return the same metadata; the Objective-C runtime enforces this.
+  auto type = cls->getDeclaredType()->getCanonicalType();
+  auto *metadata = IGF.emitTypeMetadataRef(type,
+                                           MetadataState::Complete)
+    .getMetadata();
+  IGF.Builder.CreateRet(
+    IGF.Builder.CreateBitCast(metadata,
+                              IGM.ObjCClassPtrTy));
+
+  return f;
+}
+
 /// Emit the private data (RO-data) associated with a class.
 llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
                                             ClassDecl *cls) {
@@ -2081,8 +2128,15 @@ llvm::Constant *irgen::emitClassPrivateData(IRGenModule &IGM,
   // First, build the metaclass object.
   builder.buildMetaclassStub();
 
+  HasUpdateCallback_t hasUpdater = DoesNotHaveUpdateCallback;
+  if (doesClassMetadataRequireUpdate(IGM, cls) &&
+      !doesClassMetadataRequireInitialization(IGM, cls)) {
+    hasUpdater = HasUpdateCallback;
+    emitObjCMetadataUpdateFunction(IGM, cls);
+  }
+
   // Then build the class RO-data.
-  return builder.emitROData(ForClass);
+  return builder.emitROData(ForClass, hasUpdater);
 }
 
 std::pair<Size, Size>
@@ -2091,6 +2145,9 @@ irgen::emitClassPrivateDataFields(IRGenModule &IGM,
                                   ClassDecl *cls) {
   assert(IGM.ObjCInterop && "emitting RO-data outside of interop mode");
   PrettyStackTraceDecl stackTraceRAII("emitting ObjC metadata for", cls);
+
+  // This should only be used with generic classes.
+  assert(cls->isGenericContext());
 
   SILType selfType = getSelfType(cls);
   auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
@@ -2105,7 +2162,12 @@ irgen::emitClassPrivateDataFields(IRGenModule &IGM,
   assert(startOfClassRO.isMultipleOf(IGM.getPointerSize()));
   {
     auto classRO = init.beginStruct();
-    builder.emitRODataFields(classRO, ForClass);
+
+    // Note: an update callback is only ever used with the in-place
+    // initialization pattern, which precludes generic classes.
+    builder.emitRODataFields(classRO,
+                             ForClass,
+                             DoesNotHaveUpdateCallback);
     classRO.finishAndAddTo(init);
   }
 
@@ -2113,7 +2175,7 @@ irgen::emitClassPrivateDataFields(IRGenModule &IGM,
   assert(startOfMetaclassRO.isMultipleOf(IGM.getPointerSize()));
   {
     auto classRO = init.beginStruct();
-    builder.emitRODataFields(classRO, ForMetaClass);
+    builder.emitRODataFields(classRO, ForMetaClass, DoesNotHaveUpdateCallback);
     classRO.finishAndAddTo(init);
   }
 

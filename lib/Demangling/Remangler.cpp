@@ -1962,6 +1962,11 @@ void Remangler::mangleMethodLookupFunction(Node *node) {
   Buffer << "Mu";
 }
 
+void Remangler::mangleObjCMetadataUpdateFunction(Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "MU";
+}
+
 void Remangler::mangleThrowsAnnotation(Node *node) {
   Buffer << 'K';
 }

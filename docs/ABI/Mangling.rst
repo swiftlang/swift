@@ -106,6 +106,7 @@ Globals
   global ::= nominal-type 'Mm'           // class metaclass
   global ::= nominal-type 'Mn'           // nominal type descriptor
   global ::= nominal-type 'Mu'           // class method lookup function
+  global ::= nominal-type 'MU'           // ObjC metadata update callback function
   global ::= module 'MXM'                // module descriptor
   global ::= context 'MXE'               // extension descriptor
   global ::= context 'MXX'               // anonymous context descriptor

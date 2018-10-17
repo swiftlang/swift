@@ -2725,6 +2725,28 @@ IRGenModule::getAddrOfMetaclassObject(ClassDecl *decl,
   return addr;
 }
 
+/// Fetch the declaration of an Objective-C metadata update callback.
+llvm::Function *
+IRGenModule::getAddrOfObjCMetadataUpdateFunction(ClassDecl *classDecl,
+                                                 ForDefinition_t forDefinition) {
+  IRGen.noteUseOfTypeMetadata(classDecl);
+
+  LinkEntity entity = LinkEntity::forObjCMetadataUpdateFunction(classDecl);
+  llvm::Function *&entry = GlobalFuncs[entity];
+  if (entry) {
+    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
+    return entry;
+  }
+
+  // Class _Nullable callback(Class _Nonnull cls, void * _Nullable arg);
+  llvm::Type *params[] = { ObjCClassPtrTy, Int8PtrTy };
+  auto fnType = llvm::FunctionType::get(ObjCClassPtrTy, params, false);
+  Signature signature(fnType, llvm::AttributeList(), DefaultCC);
+  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
+  entry = createFunction(*this, link, signature);
+  return entry;
+}
+
 /// Fetch the type metadata access function for a non-generic type.
 llvm::Function *
 IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,

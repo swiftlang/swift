@@ -41,6 +41,17 @@ sil_vtable SubclassOfClassWithResilientField {}
 // CHECK-DAG: @"$s31completely_fragile_class_layout23ClassWithResilientFieldC5thirdSivpWvd" = hidden constant i64 40, align 8
 
 
+// RO-data for ClassWithResilientField:
+// CHECK-LABEL: @_DATA__TtC31completely_fragile_class_layout23ClassWithResilientField = private constant {
+
+// -- flags: compiled with ARC, has update callback
+// CHECK-SAME: i32 192,
+
+// -- the update callback
+// CHECK-SAME: @"$s31completely_fragile_class_layout23ClassWithResilientFieldCMU"
+
+// CHECK-SAME: }, section "__DATA, __objc_const", align 8
+
 // Class has static metadata:
 // CHECK-LABEL: @"$s31completely_fragile_class_layout23ClassWithResilientFieldCMf"
 
@@ -186,6 +197,16 @@ bb0(%0 : @guaranteed $ClassWithResilientField):
 // CHECK-NEXT:   ret i64 [[VALUE]]
   return %2 : $Int
 }
+
+
+// Objective-C metadata update callback function for ClassWithResilientField:
+
+// CHECK-LABEL: define internal %objc_class* @"$s31completely_fragile_class_layout23ClassWithResilientFieldCMU"(%objc_class*, i8*)
+// CHECK: entry:
+// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$s31completely_fragile_class_layout23ClassWithResilientFieldCMa"(i64 0)
+// CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
+// CHECK-NEXT: [[RESULT:%.*]] = bitcast %swift.type* [[METADATA]] to %objc_class*
+// CHECK-NEXT: ret %objc_class* [[RESULT]]
 
 
 // Metadata initialization function for ClassWithResilientField calls swift_updateClassMetadata():

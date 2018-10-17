@@ -1973,6 +1973,10 @@ void Remangler::mangleMethodLookupFunction(Node *node) {
   Out << "<method-lookup-function>";
 }
 
+void Remangler::mangleObjCMetadataUpdateFunction(Node *node) {
+  Out << "<objc-metadata-update-function>";
+}
+
 void Remangler::mangleEmptyList(Node *node) {
   Out << "<empty>";
 }
