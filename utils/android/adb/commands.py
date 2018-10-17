@@ -17,6 +17,7 @@
 
 from __future__ import print_function
 
+import os
 import subprocess
 import tempfile
 import uuid
@@ -24,6 +25,7 @@ import uuid
 
 # A temporary directory on the Android device.
 DEVICE_TEMP_DIR = '/data/local/tmp'
+ENV_PREFIX = 'ANDROID_CHILD_'
 
 
 def shell(args):
@@ -93,6 +95,10 @@ def execute_on_device(executable_path, executable_arguments):
     executable = '{}/__executable'.format(uuid_dir)
     push(executable_path, executable)
 
+    child_environment = ['{}="{}"'.format(k.replace(ENV_PREFIX, '', 1), v)
+                         for (k, v) in os.environ.items()
+                         if k.startswith(ENV_PREFIX)]
+
     # When running the executable on the device, we need to pass it the same
     # arguments, as well as specify the correct LD_LIBRARY_PATH. Save these
     # to a file we can easily call multiple times.
@@ -100,9 +106,10 @@ def execute_on_device(executable_path, executable_arguments):
     _create_executable_on_device(
         executable_with_args,
         'LD_LIBRARY_PATH={uuid_dir}:{tmp_dir} '
-        '{executable} {executable_arguments}'.format(
+        '{child_environment} {executable} {executable_arguments}'.format(
             uuid_dir=uuid_dir,
             tmp_dir=DEVICE_TEMP_DIR,
+            child_environment=' '.join(child_environment),
             executable=executable,
             executable_arguments=' '.join(executable_arguments)))
 
@@ -146,7 +153,7 @@ def execute_on_device(executable_path, executable_arguments):
         # the executable on the device.
         return 1
 
-    print(stdout)
+    print(stdout, end='')
 
     shell(['rm', '-rf', uuid_dir])
     return 0
