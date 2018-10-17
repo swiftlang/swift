@@ -21,6 +21,8 @@ if (SOURCEKIT_INSTALLING_INPROC)
   else()
     add_sourcekit_library(sourcekitdInProc
       ${sourcekitdInProc_args}
+      HEADERS
+        ${SOURCEKITD_SOURCE_DIR}/include/sourcekitd/sourcekitd.h
       INSTALL_IN_COMPONENT sourcekit-inproc
       SHARED
     )
@@ -28,6 +30,8 @@ if (SOURCEKIT_INSTALLING_INPROC)
 else()
   add_sourcekit_library(sourcekitdInProc
     ${sourcekitdInProc_args}
+    HEADERS
+      ${SOURCEKITD_SOURCE_DIR}/include/sourcekitd/sourcekitd.h
     INSTALL_IN_COMPONENT sourcekit-inproc
     SHARED
   )
@@ -38,6 +42,8 @@ endif()
 # that is in the same directory as the swift library directory.
 if (SOURCEKITD_BUILD_STATIC_INPROC)
   add_sourcekit_library(sourcekitdInProc_Static
+    HEADERS
+      ${SOURCEKITD_SOURCE_DIR}/include/sourcekitd/sourcekitd.h
     ${sourcekitdInProc_args}
   )
 endif()
