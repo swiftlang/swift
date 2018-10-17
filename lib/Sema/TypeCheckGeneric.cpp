@@ -931,9 +931,7 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
 
       case RequirementKind::Superclass: {
         // Superclass requirements.
-        // FIXME: Don't use the type checker instance here?
-        TypeChecker &tc = static_cast<TypeChecker &>(*ctx.getLazyResolver());
-        if (!tc.isSubclassOf(firstType, secondType, dc)) {
+        if (!secondType->isExactSuperclassOf(firstType)) {
           diagnostic = diag::type_does_not_inherit;
           diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
           requirementFailure = true;

@@ -1557,7 +1557,7 @@ compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
     if (!t2)
       return true;
 
-    return TC.isSubclassOf(t1, t2, DC);
+    return t2->isExactSuperclassOf(t1);
   };
 
   bool protos1AreSubsetOf2 = protos1.empty();
