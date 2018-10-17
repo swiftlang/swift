@@ -1787,7 +1787,7 @@ extension BinaryInteger {
   
   @_transparent
   public static func < (lhs: Self, rhs: Self) -> Bool {
-    reutrn lhs < rhs 
+    return lhs < rhs 
   }
 }
 
