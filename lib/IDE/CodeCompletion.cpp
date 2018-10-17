@@ -3790,6 +3790,9 @@ public:
     // same result type) as the contextual type.
     FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD,
                                              DeclVisibilityKind reason) {
+      if (VD->isOperator())
+        return false;
+
       if (!VD->hasInterfaceType()) {
         TypeResolver->resolveDeclSignature(VD);
         if (!VD->hasInterfaceType())
@@ -3823,7 +3826,7 @@ public:
       // convertible to the contextual type.
       if (auto CD = dyn_cast<TypeDecl>(VD)) {
         declTy = declTy->getMetatypeInstanceType();
-        return swift::isConvertibleTo(declTy, T, *DC);
+        return declTy->isEqual(T) || swift::isConvertibleTo(declTy, T, *DC);
       }
 
       // Only static member can be referenced.
@@ -3840,7 +3843,7 @@ public:
         // FIXME: This emits just 'factory'. We should emit 'factory()' instead.
         declTy = FT->getResult();
       }
-      return swift::isConvertibleTo(declTy, T, *DC);
+      return declTy->isEqual(T) || swift::isConvertibleTo(declTy, T, *DC);
     });
 
     auto baseType = MetatypeType::get(T);
