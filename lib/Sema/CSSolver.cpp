@@ -443,17 +443,21 @@ ConstraintSystem::SolverState::~SolverState() {
     if (constraint->isActive())
       continue;
 
+#ifndef NDEBUG
     // Make sure that constraint is present in the "inactive" set
     // before transferring it to "active".
     auto existing = llvm::find_if(CS.InactiveConstraints,
                                   [&constraint](const Constraint &inactive) {
                                     return &inactive == constraint;
                                   });
-    assert(existing != CS.InactiveConstraints.end());
+    assert(existing != CS.InactiveConstraints.end() &&
+           "All constraints should be present in 'inactive' list");
+#endif
 
     // Transfer the constraint to "active" set.
-    CS.InactiveConstraints.erase(existing);
-    CS.ActiveConstraints.push_back(constraint);
+    CS.ActiveConstraints.splice(CS.ActiveConstraints.end(),
+                                CS.InactiveConstraints, constraint);
+
     constraint->setActive(true);
   }
 
