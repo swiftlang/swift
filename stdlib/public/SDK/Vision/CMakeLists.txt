@@ -7,9 +7,9 @@ add_swift_library(swiftVision ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OV
   SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR
-  SWIFT_MODULE_DEPENDS_OSX Darwin CoreFoundation CoreGraphics CoreImage Dispatch Foundation IOKit ObjectiveC simd XPC # auto-updated
-  SWIFT_MODULE_DEPENDS_IOS Darwin CoreFoundation CoreGraphics CoreImage Dispatch Foundation ObjectiveC simd # auto-updated
-  SWIFT_MODULE_DEPENDS_TVOS Darwin CoreFoundation CoreGraphics CoreImage Dispatch Foundation ObjectiveC simd # auto-updated
+  SWIFT_MODULE_DEPENDS_OSX Darwin CoreImage CoreGraphics Metal Dispatch IOKit simd Foundation XPC CoreFoundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_IOS Darwin CoreImage CoreGraphics Metal Dispatch simd Foundation CoreFoundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_TVOS Darwin CoreImage CoreGraphics Metal Dispatch simd Foundation CoreFoundation ObjectiveC # auto-updated
 
   FRAMEWORK_DEPENDS_WEAK Vision
 
