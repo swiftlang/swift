@@ -866,7 +866,7 @@ function(_add_swift_library_single target name)
       ${SWIFTLIB_SINGLE_IS_STDLIB_CORE_keyword}
       ${SWIFTLIB_SINGLE_IS_SDK_OVERLAY_keyword}
       ${embed_bitcode_arg}
-      INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}")
+      INSTALL_IN_COMPONENT "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}")
   add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")
 
   # If there were any swift sources, then a .swiftmodule may have been created.
