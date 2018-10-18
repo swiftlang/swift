@@ -43,6 +43,7 @@
 #else
 #include <sys/mman.h>
 #include <unistd.h>
+#include <dlfcn.h>
 #endif
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
@@ -2610,58 +2611,96 @@ swift::swift_initClassMetadata(ClassMetadata *self,
 }
 
 #if SWIFT_OBJC_INTEROP
+
+// Suppress diagnostic about the availability of _objc_realizeClassFromSwift.
+// We test availability with a nullptr check, but the compiler doesn't see that.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunguarded-availability-new"
+
 void
 swift::swift_updateClassMetadata(ClassMetadata *self,
                                  ClassLayoutFlags layoutFlags,
                                  size_t numFields,
                                  const TypeLayout * const *fieldTypes,
                                  size_t *fieldOffsets) {
-#ifndef NDEBUG
-  // If there is a mangled superclass name, demangle it to the superclass
-  // type.
+#ifndef OBJC_REALIZECLASSFROMSWIFT_DEFINED
+  // Temporary workaround until _objc_realizeClassFromSwift is in the SDK.
+  static auto _objc_realizeClassFromSwift =
+    (Class (*)(Class _Nullable, void* _Nullable))
+    dlsym(RTLD_NEXT, "_objc_realizeClassFromSwift");
+#endif
+
+  bool requiresUpdate = (_objc_realizeClassFromSwift != nullptr);
+
+  // If we're on a newer runtime, we're going to be initializing the
+  // field offset vector. Realize the superclass metadata first, even
+  // though our superclass field references it statically.
   const ClassMetadata *super = nullptr;
-  if (auto superclassNameBase = self->getDescription()->SuperclassType.get()) {
-    StringRef superclassName =
-      Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
-    SubstGenericParametersFromMetadata substitutions(self);
-    const Metadata *superclass =
-      _getTypeByMangledName(superclassName, substitutions);
-    if (!superclass) {
-      fatalError(0,
-                 "failed to demangle superclass of %s from mangled name '%s'\n",
-                 self->getDescription()->Name.get(),
-                 superclassName.str().c_str());
+
+  // In assert builds, realize the superclass metadata even if we're
+  // on an older runtime.
+#ifndef NDEBUG
+  bool realizeSuperclass = true;
+#else
+  bool realizeSuperclass = requiresUpdate;
+#endif
+
+  if (realizeSuperclass) {
+    if (auto superclassNameBase = self->getDescription()->SuperclassType.get()) {
+      StringRef superclassName =
+        Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
+      SubstGenericParametersFromMetadata substitutions(self);
+      const Metadata *superclass =
+        _getTypeByMangledName(superclassName, substitutions);
+      if (!superclass) {
+        fatalError(0,
+                   "failed to demangle superclass of %s from mangled name '%s'\n",
+                   self->getDescription()->Name.get(),
+                   superclassName.str().c_str());
+      }
+
+      if (auto objcWrapper = dyn_cast<ObjCClassWrapperMetadata>(superclass))
+        superclass = objcWrapper->Class;
+
+      super = cast<ClassMetadata>(superclass);
     }
 
-#if SWIFT_OBJC_INTEROP
-    if (auto objcWrapper = dyn_cast<ObjCClassWrapperMetadata>(superclass))
-      superclass = objcWrapper->Class;
-#endif
-
-    super = cast<ClassMetadata>(superclass);
+    // Check that it matches what's already in there.
+    if (!super)
+      assert(self->Superclass == getRootSuperclass());
+    else
+      assert(self->Superclass == super);
   }
 
-  if (!super)
-    assert(self->Superclass == getRootSuperclass());
-  else
-    assert(self->Superclass == super);
-#endif
+  (void) super;
 
-  // FIXME: Plumb this through
-#if 1
-  swift_getInitializedObjCClass((Class)self);
-#else
-  initClassFieldOffsetVector(self, numFields, fieldTypes, fieldOffsets);
-  initObjCClass(self, numFields, fieldTypes, fieldOffsets);
+  // If we're running on a older Objective-C runtime, just realize
+  // the class.
+  if (!requiresUpdate) {
+    // Realize the class. This causes the runtime to slide the field offsets
+    // stored in the field offset globals.
+    //
+    // Note that the field offset vector is *not* updated; however in
+    // Objective-C interop mode, we don't actually use the field offset vector
+    // of non-generic classes.
+    //
+    // In particular, class mirrors always use the Objective-C ivar descriptors,
+    // which point at field offset globals and not the field offset vector.
+    swift_getInitializedObjCClass((Class)self);
+  } else {
+    // Update the field offset vector using runtime type information; the layout
+    // of resilient types might be different than the statically-emitted layout.
+    initClassFieldOffsetVector(self, numFields, fieldTypes, fieldOffsets);
 
-  // Register this class with the runtime. This will also cause the
-  // runtime to slide the field offsets stored in the field offset
-  // globals. Note that the field offset vector is *not* updated;
-  // however we should not be using it for anything in a non-generic
-  // class.
-  swift_getInitializedObjCClassWithoutCallback(self);
-#endif
+    // Copy field offset vector entries to the field offset globals.
+    initObjCClass(self, numFields, fieldTypes, fieldOffsets);
+
+    // See remark above about how this slides field offset globals.
+    _objc_realizeClassFromSwift((Class)self, (Class)self);
+  }
 }
+
+#pragma clang diagnostic pop
 #endif
 
 #ifndef NDEBUG
