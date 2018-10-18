@@ -717,7 +717,16 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
   if (auto UDE = dyn_cast<UnresolvedDotExpr>(fn)) {
     declName = UDE->getName().getBaseName().userFacingName();
     uncurryLevel = 1;
-    
+
+    // If base is a module or metatype, this is just a simple
+    // reference so its curry level should be 0.
+    if (auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase())) {
+      if (auto baseType = DRE->getType())
+        uncurryLevel =
+            (baseType->is<ModuleType>() || baseType->is<AnyMetatypeType>()) ? 0
+                                                                            : 1;
+    }
+
     // If we actually resolved the member to use, return it.
     auto loc = CS.getConstraintLocator(UDE, ConstraintLocator::Member);
     if (auto *member = CS.findResolvedMemberRef(loc)) {
