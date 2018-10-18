@@ -176,6 +176,9 @@ public:
   virtual void completeNominalMemberBeginning(
       SmallVectorImpl<StringRef> &Keywords) = 0;
 
+  /// Complete at the beginning of accessor in a accessor block.
+  virtual void completeAccessorBeginning() = 0;
+
   /// Complete the keyword in attribute, for instance, @available.
   virtual void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) = 0;
 
