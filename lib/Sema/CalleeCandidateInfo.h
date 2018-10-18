@@ -59,7 +59,7 @@ namespace swift {
   ///
   struct UncurriedCandidate {
     PointerUnion<ValueDecl *, Expr*> declOrExpr;
-    unsigned level;
+    bool skipCurriedSelf;
     Type entityType;
     
     // If true, entityType is written in terms of caller archetypes,
@@ -71,9 +71,10 @@ namespace swift {
     // FIXME: Clean this up.
     bool substituted;
     
-    UncurriedCandidate(ValueDecl *decl, unsigned level);
+    UncurriedCandidate(ValueDecl *decl, bool skipCurriedSelf);
     UncurriedCandidate(Expr *expr, Type type)
-    : declOrExpr(expr), level(0), entityType(type), substituted(true) {}
+    : declOrExpr(expr), skipCurriedSelf(false), entityType(type),
+      substituted(true) {}
     
     ValueDecl *getDecl() const {
       return declOrExpr.dyn_cast<ValueDecl*>();
@@ -86,12 +87,11 @@ namespace swift {
     Type getUncurriedType() const {
       // Start with the known type of the decl.
       auto type = entityType;
-      for (unsigned i = 0, e = level; i != e; ++i) {
+      if (skipCurriedSelf) {
         auto funcTy = type->getAs<AnyFunctionType>();
         if (!funcTy) return Type();
         type = funcTy->getResult();
       }
-      
       return type;
     }
     
