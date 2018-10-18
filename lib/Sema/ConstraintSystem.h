@@ -1432,10 +1432,7 @@ private:
   }
 
   void incrementScopeCounter();
-
-  void numLeafScopes(unsigned adjustment);
-  void incrementLeafScopes(unsigned increment =1);
-  void decrementLeafScopes(unsigned decrement =1);
+  void incrementLeafScopes();
 
 public:
   /// \brief Introduces a new solver scope, which any changes to the
