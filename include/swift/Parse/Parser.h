@@ -894,30 +894,23 @@ public:
   void consumeGetSetBody(AbstractFunctionDecl *AFD, SourceLoc LBLoc);
 
   struct ParsedAccessors;
-  bool parseGetSetImpl(ParseDeclOptions Flags,
-                       GenericParamList *GenericParams,
-                       ParameterList *Indices,
-                       TypeLoc ElementTy,
-                       ParsedAccessors &accessors,
-                       AbstractStorageDecl *storage,
-                       SourceLoc &LastValidLoc,
-                       SourceLoc StaticLoc, SourceLoc VarLBLoc);
-  bool parseGetSet(ParseDeclOptions Flags,
-                   GenericParamList *GenericParams,
-                   ParameterList *Indices,
-                   TypeLoc ElementTy,
-                   ParsedAccessors &accessors,
-                   AbstractStorageDecl *storage,
-                   SourceLoc StaticLoc);
+  ParserStatus parseGetSet(ParseDeclOptions Flags,
+                           GenericParamList *GenericParams,
+                           ParameterList *Indices,
+                           TypeLoc ElementTy,
+                           ParsedAccessors &accessors,
+                           AbstractStorageDecl *storage,
+                           SourceLoc StaticLoc);
   void recordAccessors(AbstractStorageDecl *storage, ParseDeclOptions flags,
                        TypeLoc elementTy, const DeclAttributes &attrs,
                        SourceLoc staticLoc, ParsedAccessors &accessors);
-  void parseAccessorBodyDelayed(AbstractFunctionDecl *AFD);
-  VarDecl *parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
-                              SourceLoc StaticLoc, SourceLoc VarLoc,
-                              bool hasInitializer,
-                              const DeclAttributes &Attributes,
-                              SmallVectorImpl<Decl *> &Decls);
+  ParserResult<VarDecl> parseDeclVarGetSet(Pattern *pattern,
+                                           ParseDeclOptions Flags,
+                                           SourceLoc StaticLoc,
+                                           SourceLoc VarLoc,
+                                           bool hasInitializer,
+                                           const DeclAttributes &Attributes,
+                                           SmallVectorImpl<Decl *> &Decls);
   
   void consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
                                    const DeclAttributes &Attrs);
