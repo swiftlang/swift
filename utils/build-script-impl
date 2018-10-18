@@ -2628,7 +2628,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_INSTALL_LIBDIR:PATH="lib"
 
                     -DENABLE_SWIFT=YES
-                    -DSWIFT_RUNTIME_LIBDIR:PATH="${SWIFT_BUILD_PATH}/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+                    -DSwift_DIR="${SWIFT_BUILD_PATH}/lib/cmake/swift"
 
                     -DENABLE_TESTING=YES
                   )
