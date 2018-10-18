@@ -4212,10 +4212,12 @@ struct Parser::ParsedAccessors {
   }
 };
 
-static bool parseAccessorIntroducer(Parser &P, DeclAttributes &Attributes,
+static bool parseAccessorIntroducer(Parser &P,
+                                    DeclAttributes &Attributes,
                                     AccessorKind &Kind,
                                     AddressorKind &addressorKind,
                                     SourceLoc &Loc) {
+  assert(Attributes.isEmpty());
   bool FoundCCToken;
   P.parseDeclAttributeList(Attributes, FoundCCToken);
 
@@ -4258,12 +4260,12 @@ static bool parseAccessorIntroducer(Parser &P, DeclAttributes &Attributes,
   return false;
 }
 
-bool Parser::parseGetSet(ParseDeclOptions Flags,
-                         GenericParamList *GenericParams,
-                         ParameterList *Indices,
-                         TypeLoc ElementTy, ParsedAccessors &accessors,
-                         AbstractStorageDecl *storage,
-                         SourceLoc StaticLoc) {
+ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
+                                 GenericParamList *GenericParams,
+                                 ParameterList *Indices,
+                                 TypeLoc ElementTy, ParsedAccessors &accessors,
+                                 AbstractStorageDecl *storage,
+                                 SourceLoc StaticLoc) {
   assert(Tok.is(tok::l_brace));
 
   // Properties in protocols use a very limited syntax.
@@ -4288,14 +4290,14 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
 
     // In the limited syntax, fall out and let the caller handle it.
     if (parsingLimitedSyntax)
-      return false;
+      return makeParserSuccess();
 
     diagnose(accessors.RBLoc, diag::computed_property_no_accessors,
              /*subscript*/ Indices != nullptr);
-    return true;
+    return makeParserError();
   }
 
-  auto parseImplicitGetter = [&]() -> bool {
+  auto parseImplicitGetter = [&]() {
     assert(Tok.is(tok::l_brace));
     accessors.LBLoc = Tok.getLoc();
     auto getter =
@@ -4306,7 +4308,6 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
     accessors.add(getter);
     parseAbstractFunctionBody(getter);
     accessors.RBLoc = getter->getEndLoc();
-    return false;
   };
 
   // Prepare backtracking for implicit getter.
@@ -4314,6 +4315,7 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
   backtrack.emplace(*this);
 
   bool Invalid = false;
+  bool accessorHasCodeCompletion = false;
   bool IsFirstAccessor = true;
   accessors.LBLoc = consumeToken(tok::l_brace);
   while (!Tok.isAny(tok::r_brace, tok::eof)) {
@@ -4330,6 +4332,29 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
     if (NotAccessor) {
       AccessorCtx->setTransparent();
       AccessorCtx.reset();
+
+      if (Tok.is(tok::code_complete)) {
+        if (CodeCompletion) {
+          if (IsFirstAccessor && !parsingLimitedSyntax) {
+            // If CC token is the first token after '{', it might be implicit
+            // getter. Set up dummy accessor as the decl context to populate
+            // 'self' decl.
+            auto getter = createAccessorFunc(
+                accessors.LBLoc, /*ValueNamePattern*/ nullptr, GenericParams,
+                Indices, ElementTy, StaticLoc, Flags, AccessorKind::Get,
+                AddressorKind::NotAddressor, storage, this,
+                /*AccessorKeywordLoc*/ SourceLoc());
+            accessors.add(getter);
+            CodeCompletion->setParsedDecl(getter);
+          } else {
+            CodeCompletion->setParsedDecl(storage);
+          }
+          CodeCompletion->completeAccessorBeginning();
+        }
+        consumeToken(tok::code_complete);
+        accessorHasCodeCompletion = true;
+        break;
+      }
 
       // parsingLimitedSyntax mode cannot have a body.
       if (parsingLimitedSyntax) {
@@ -4350,7 +4375,8 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
       // position.
       backtrack.reset();
       AccessorListCtx.setTransparent();
-      return parseImplicitGetter();
+      parseImplicitGetter();
+      return makeParserSuccess();
     }
     IsFirstAccessor = false;
 
@@ -4415,7 +4441,9 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
 
   parseMatchingToken(tok::r_brace, accessors.RBLoc,
                      diag::expected_rbrace_in_getset, accessors.LBLoc);
-  return Invalid;
+  if (accessorHasCodeCompletion)
+    return makeParserCodeCompletionStatus();
+  return Invalid ? makeParserError() : makeParserSuccess();
 }
 
 static void fillInAccessorTypeErrors(Parser &P, FuncDecl *accessor,
@@ -4461,12 +4489,12 @@ static void fillInAccessorTypeErrors(Parser &P,
 }
 
 /// \brief Parse the brace-enclosed getter and setter for a variable.
-VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
-                                    ParseDeclOptions Flags,
-                                    SourceLoc StaticLoc, SourceLoc VarLoc,
-                                    bool hasInitializer,
-                                    const DeclAttributes &Attributes,
-                                    SmallVectorImpl<Decl *> &Decls) {
+ParserResult<VarDecl>
+Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
+                           SourceLoc StaticLoc, SourceLoc VarLoc,
+                           bool hasInitializer,
+                           const DeclAttributes &Attributes,
+                           SmallVectorImpl<Decl *> &Decls) {
   bool Invalid = false;
   
   // The grammar syntactically requires a simple identifier for the variable
@@ -4539,8 +4567,12 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
 
   // Parse getter and setter.
   ParsedAccessors accessors;
-  if (parseGetSet(Flags, /*GenericParams=*/nullptr,
-                  /*Indices=*/nullptr, TyLoc, accessors, storage, StaticLoc))
+  auto AccessorStatus = parseGetSet(Flags, /*GenericParams=*/nullptr,
+                                    /*Indices=*/nullptr, TyLoc, accessors,
+                                    storage, StaticLoc);
+  if (AccessorStatus.hasCodeCompletion())
+    return makeParserCodeCompletionStatus();
+  if (AccessorStatus.isError())
     Invalid = true;
 
   // If we have an invalid case, bail out now.
@@ -4588,7 +4620,7 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
   accessors.record(*this, PrimaryVar, Invalid, Flags, StaticLoc,
                    Attributes, TyLoc, /*indices*/ nullptr, Decls);
 
-  return PrimaryVar;
+  return makeParserResult(PrimaryVar);
 }
 
 /// Add the given accessor to the collection of parsed accessors.  If
@@ -5124,16 +5156,16 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     // var-get-set clause, parse the var-get-set clause.
     } else if (Tok.is(tok::l_brace)) {
       HasAccessors = true;
-      
-      if (auto *boundVar = parseDeclVarGetSet(pattern, Flags,
-                                              StaticLoc, VarLoc,
-                                              PatternInit != nullptr,
-                                              Attributes, Decls)) {
-        if (PatternInit && !boundVar->hasStorage()) {
-          diagnose(pattern->getLoc(), diag::getset_init)
+      auto boundVar = parseDeclVarGetSet(pattern, Flags, StaticLoc, VarLoc,
+                                         PatternInit != nullptr,Attributes,
+                                         Decls);
+      if (boundVar.hasCodeCompletion())
+        return makeResult(makeParserCodeCompletionStatus());
+      if (PatternInit && boundVar.isNonNull() &&
+          !boundVar.get()->hasStorage()) {
+        diagnose(pattern->getLoc(), diag::getset_init)
             .highlight(PatternInit->getSourceRange());
-          PatternInit = nullptr;
-        }
+        PatternInit = nullptr;
       }
     }
     
@@ -6225,10 +6257,9 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
       Status.setIsParseError();
     }
   } else {
-    if (parseGetSet(Flags, GenericParams,
-                    Indices.get(), ElementTy.get(),
-                    accessors, Subscript, /*StaticLoc=*/SourceLoc()))
-      Status.setIsParseError();
+    Status |= parseGetSet(Flags, GenericParams,
+                          Indices.get(), ElementTy.get(),
+                          accessors, Subscript, /*StaticLoc=*/SourceLoc());
   }
 
   bool Invalid = false;
