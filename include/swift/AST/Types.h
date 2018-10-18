@@ -3078,7 +3078,7 @@ END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
 /// it.
 SmallBitVector
 computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
-                  const ValueDecl *paramOwner, unsigned level);
+                  const ValueDecl *paramOwner, bool skipCurriedSelf);
 
 /// Turn a param list into a symbolic and printable representation that does not
 /// include the types, something like (: , b:, c:)
