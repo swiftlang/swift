@@ -749,7 +749,7 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
 
 SmallBitVector
 swift::computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
-                         const ValueDecl *paramOwner, unsigned level) {
+                         const ValueDecl *paramOwner, bool skipCurriedSelf) {
   SmallBitVector resultVector(params.size());
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
@@ -762,15 +762,15 @@ swift::computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
   const ParameterList *paramList = nullptr;
   if (auto *func = dyn_cast<AbstractFunctionDecl>(paramOwner)) {
     if (func->hasImplicitSelfDecl()) {
-      if (level == 1)
+      if (skipCurriedSelf)
         paramList = func->getParameters();
-    } else if (level == 0)
+    } else if (!skipCurriedSelf)
       paramList = func->getParameters();
   } else if (auto *subscript = dyn_cast<SubscriptDecl>(paramOwner)) {
-    if (level == 1)
+    if (skipCurriedSelf)
       paramList = subscript->getIndices();
   } else if (auto *enumElement = dyn_cast<EnumElementDecl>(paramOwner)) {
-    if (level == 1)
+    if (skipCurriedSelf)
       paramList = enumElement->getParameterList();
   }
 
