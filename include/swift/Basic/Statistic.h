@@ -28,13 +28,6 @@
     ++FStat;                                                            \
   } while (0)
 
-#define SWIFT_FUNC_STAT_INCREMENT(x)                                    \
-  do {                                                                  \
-    static llvm::Statistic FStat =                                      \
-      {DEBUG_TYPE, __func__, __func__, {0}, {false}};                   \
-    FStat += (x);                                                       \
-  } while (0)
-
 // Helper class designed to consolidate reporting of LLVM statistics and timers
 // across swift compilations that typically invoke many drivers, each running
 // many frontends. Additionally collects some cheap "always-on" statistics,
