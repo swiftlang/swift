@@ -28,7 +28,9 @@ struct Utils {
   }
   static std::pair<StringRef, StringRef> separateNames(StringRef s) {
     const size_t sepIndex = s.find(separator);
-    assert(sepIndex != StringRef::npos);
+    if (sepIndex == StringRef::npos) {
+      return std::make_pair(s, StringRef());
+    }
     return std::make_pair(s.take_front(sepIndex), s.drop_front(sepIndex + 1));
   }
 };

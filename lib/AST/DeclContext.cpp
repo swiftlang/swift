@@ -950,3 +950,7 @@ static void verify_DeclContext_is_start_of_node() {
 #include "swift/AST/ExprNodes.def"
 }
 #endif
+
+void DeclContext::updateHash(llvm::MD5& hash) const {
+#error unimp
+}

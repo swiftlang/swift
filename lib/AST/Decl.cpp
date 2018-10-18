@@ -6291,10 +6291,9 @@ void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *decl) {
 }
 
 // ExperimentalDependencies
-template <typename DeclT> std::string Decl::getHash(const DeclT *D) {
+std::string Decl::getExperimentalDependencyHash() const {
   llvm::MD5 DeclHash;
-  auto a = ArrayRef<u_int8_t>((const u_int8_t *)D, sizeof(DeclT));
-  DeclHash.update(a);
+  updateHash(DeclHash);
   llvm::MD5::MD5Result result;
   DeclHash.final(result);
   llvm::SmallString<32> str;
@@ -6302,8 +6301,38 @@ template <typename DeclT> std::string Decl::getHash(const DeclT *D) {
   return str.str().str();
 }
 
-template std::string Decl::getHash<OperatorDecl>(const OperatorDecl *);
-template std::string Decl::getHash<NominalTypeDecl>(const NominalTypeDecl *);
-template std::string
-Decl::getHash<PrecedenceGroupDecl>(const PrecedenceGroupDecl *);
-template std::string Decl::getHash<ValueDecl>(const ValueDecl *);
+
+void Decl::updateHash(llvm::MD5& hash) const {
+  auto a = ArrayRef<u_int8_t>((const u_int8_t *)&Bits, sizeof(Bits));
+  hash.update(a);
+  
+  getAttrs().updateHash(hash);
+  
+  DeclContext *dc = getDeclContext();
+  dc->updateHash(hash);
+}
+
+void OperatorDecl::updateHash(llvm::MD5& hash) const {
+  hash.update(name.str());
+  Decl::updateHash(hash);
+}
+
+void NominalTypeDecl::updateHash(llvm::MD5& hash) const {
+#error unimp
+  Type DeclaredTy;
+  Type DeclaredTyInContext;
+  Type DeclaredInterfaceTy;
+  extensions
+  GenericTypeDecl::updateHash(hash);
+}
+
+void PrecedenceGroupDecl::updateHash(llvm::MD5& hash) const {
+#error unimp
+}
+
+void ValueDecl::updateHash(llvm::MD5& hash) const {
+#error unimp
+}
+void GenericTypeDecl::updateHash(llvm::MD5& hash) const {
+#error unimp
+}

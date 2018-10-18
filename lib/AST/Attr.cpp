@@ -976,3 +976,7 @@ TypeLoc ImplementsAttr::getProtocolType() const {
 TypeLoc &ImplementsAttr::getProtocolType() {
   return ProtocolType;
 }
+
+void DeclAttributes::updateHash(llvm::MD5 &hash) const {
+#error unimp
+}

@@ -20,6 +20,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/STLExtras.h"
+#includfe "llvm/Support/MD5.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/AST/LayoutConstraint.h"
@@ -359,6 +360,8 @@ public:
   /// more-general existential type, or None if we cannot yet compute a
   /// correct join but one better than Any may exist.
   static Optional<Type> join(Type first, Type second);
+    
+  void updateHash(llvm::MD5&) const;
 
 private:
   // Direct comparison is disabled for types, because they may not be canonical.

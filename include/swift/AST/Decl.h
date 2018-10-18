@@ -944,7 +944,8 @@ public:
     return Mem; 
   }
 
-  template <typename DeclT> static std::string getHash(const DeclT *D);
+  std::string getExperimentalDependencyHash() const;
+  virtual void updateHash(llvm::MD5&) const;
 };
 
 /// \brief Use RAII to track Decl validation progress and non-reentrancy.
@@ -2631,6 +2632,8 @@ public:
   /// True if this is a C function that was imported as a member of a type in
   /// Swift.
   bool isImportAsMember() const;
+  
+  void updateHash(llvm::MD5& hash) const;
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -3271,6 +3274,8 @@ public:
   }
   static bool classof(const NominalTypeDecl *D) { return true; }
   static bool classof(const ExtensionDecl *D) { return false; }
+  
+  void updateHash(llvm::MD5& hash) const;
 };
 
 /// \brief This is the declaration of an enum.
@@ -6367,6 +6372,8 @@ public:
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PrecedenceGroup;
   }
+  
+  void updateHash(llvm::MD5& hash) const;
 };
 
 /// Abstract base class of operator declarations.
@@ -6422,6 +6429,8 @@ public:
     return D->getKind() >= DeclKind::First_OperatorDecl
         && D->getKind() <= DeclKind::Last_OperatorDecl;
   }
+  
+  void updateHash(llvm::MD5& hash) const;
 };
 
 /// Declares the behavior of an infix operator. For example:

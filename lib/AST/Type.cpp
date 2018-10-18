@@ -4079,3 +4079,7 @@ Type TypeBase::openAnyExistentialType(ArchetypeType *&opened) {
   opened = ArchetypeType::getOpened(this);
   return opened;
 }
+
+void Type::updateHash(llvm::MD5 &hash) const {
+  getPointer()->updateHash(MD5);
+}

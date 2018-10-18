@@ -36,6 +36,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/MD5.h"
 #include "llvm/Support/TrailingObjects.h"
 #include "llvm/Support/VersionTuple.h"
 
@@ -1466,6 +1467,8 @@ public:
   }
 
   SourceLoc getStartLoc(bool forModifiers = false) const;
+  
+  void updateHash(llvm::MD5&) const;
 };
 
 } // end namespace swift

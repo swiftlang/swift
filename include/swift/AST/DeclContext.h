@@ -29,6 +29,7 @@
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/Support/MD5.h"
 
 namespace llvm {
   class raw_ostream;
@@ -594,6 +595,8 @@ public:
   
   // Some Decls are DeclContexts, but not all. See swift/AST/Decl.h
   static bool classof(const Decl *D);
+  
+  void updateHash(llvm::MD5& hash) const;
 };
 
 /// SerializedLocalDeclContext - the base class for DeclContexts that were
@@ -619,6 +622,7 @@ public:
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::SerializedLocal;
   }
+  void updateHash(llvm::MD5& hash) const;
 };
 
 /// An iterator that walks through a list of declarations stored
@@ -767,6 +771,8 @@ public:
 
   // Some Decls are IterableDeclContexts, but not all.
   static bool classof(const Decl *D);
+
+  void updateHash(llvm::MD5& hash) const;
 
 private:
   /// Add a member to the list for iteration purposes, but do not notify the
