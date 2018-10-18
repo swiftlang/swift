@@ -440,6 +440,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_TBD:
   case file_types::TY_OptRecord:
   case file_types::TY_SwiftParseableInterfaceFile:
+  case file_types::TY_SwiftParseableInterfaceDeps:
     llvm_unreachable("Output type can never be primary output.");
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID");
@@ -672,6 +673,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ModuleTrace:
     case file_types::TY_OptRecord:
     case file_types::TY_SwiftParseableInterfaceFile:
+    case file_types::TY_SwiftParseableInterfaceDeps:
       llvm_unreachable("Output type can never be primary output.");
     case file_types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
