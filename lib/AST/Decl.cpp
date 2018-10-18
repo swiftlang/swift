@@ -47,6 +47,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
+#include "swift/Basic/ExperimentalDependencies.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Statistic.h"
@@ -694,6 +695,10 @@ TrailingWhereClause *TrailingWhereClause::create(
   unsigned size = totalSizeToAlloc<RequirementRepr>(requirements.size());
   void *mem = ctx.Allocate(size, alignof(TrailingWhereClause));
   return new (mem) TrailingWhereClause(whereLoc, requirements);
+}
+
+void TrailingWhereClause::updateHash(llvm::MD5 &hash) const {
+#error unimp
 }
 
 TypeArrayView<GenericTypeParamType>
@@ -3262,6 +3267,10 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   Bits.ClassDecl.HasMissingVTableEntries = 0;
 }
 
+void ClassDecl::updateHash(llvm::MD5 &hash) const {
+#error unimp // from ObjCBridgedAttr
+}
+
 DestructorDecl *ClassDecl::getDestructor() {
   auto results = lookupDirect(DeclBaseName::createDestructor());
   assert(!results.empty() && "Class without destructor?");
@@ -4095,6 +4104,10 @@ void ProtocolDecl::setRequirementSignature(ArrayRef<Requirement> requirements) {
     RequirementSignature = getASTContext().AllocateCopy(requirements).data();
     Bits.ProtocolDecl.NumRequirementsInSignature = requirements.size();
   }
+}
+
+void ProtocolDecl::updateHash(llvm::MD5& hash) const {
+#error unimp
 }
 
 void AbstractStorageDecl::overwriteImplInfo(StorageImplInfo implInfo) {
@@ -6303,8 +6316,7 @@ std::string Decl::getExperimentalDependencyHash() const {
 
 
 void Decl::updateHash(llvm::MD5& hash) const {
-  auto a = ArrayRef<u_int8_t>((const u_int8_t *)&Bits, sizeof(Bits));
-  hash.update(a);
+  ExperimentalDependencies::updateHashFromBits(hash, Bits);
   
   getAttrs().updateHash(hash);
   

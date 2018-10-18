@@ -469,6 +469,8 @@ public:
   bool operator!=(CanType T) const { return !operator==(T); }
 
   bool operator<(CanType T) const { return getPointer() < T.getPointer(); }
+  
+  void updateHash(llvm::MD5&) const;
 };
 
 template <class Proxied> class CanTypeWrapper;

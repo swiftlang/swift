@@ -62,6 +62,13 @@ struct TopLevel {
   std::string combined() { return Utils::combineNames(base, hash); }
 };
 
+  
+  template <typename T>
+  void updateHashFromBits(llvm::MD5 &hash, const T& bits);
+
+  template <typename T>
+  void updateHashFromOptionalBits(llvm::MD5 &hash, const T& bits);
+
 } // namespace ExperimentalDependencies
 
 } // end namespace swift

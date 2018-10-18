@@ -28,6 +28,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/ArrayRefView.h"
+#include "swift/Basic/ExperimentalDependencies.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/UUID.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -1072,6 +1073,8 @@ public:
   /// Return whether this type is or can be substituted for a bridgeable
   /// object type.
   TypeTraitResult canBeClass();
+  
+  void updateHash(llvm::MD5&) const;
 
 private:
   // Make vanilla new/delete illegal for Types.
@@ -5363,6 +5366,14 @@ inline bool TypeBase::hasSimpleTypeRepr() const {
     return true;
   }
 }
+  
+  inline void TypeBase::updateHash(llvm::MD5 &hash) const {
+    // TODO: more!
+    ExperimentalDependencies::updateHashFromBits(hash, Bits);
+    assert(hasCanonicalTypeComputed());
+    CanType ct = getCanonicalType();
+    ct.updateHash(hash);
+  }
 
 } // end namespace swift
 

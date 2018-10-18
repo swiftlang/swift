@@ -22,6 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/ExperimentalDependencies.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -978,5 +979,175 @@ TypeLoc &ImplementsAttr::getProtocolType() {
 }
 
 void DeclAttributes::updateHash(llvm::MD5 &hash) const {
-#error unimp
+  for (const auto A: *this) {
+    A->updateHash(hash);
+  }
+}
+
+void DeclAttribute::updateHash(llvm::MD5 &hash) const {
+#error subclasses
+  ExperimentalDependencies::updateHashFromBits(hash, &Bits);
+  switch (getKind()) {
+//      CONTEXTUAL_SIMPLE_DECL_ATTR
+    case DAK_Final:
+    case DAK_Required:
+    case DAK_Optional:
+    case DAK_Lazy:
+    case DAK_Dynamic:
+    case DAK_Infix:
+    case DAK_Prefix:
+    case DAK_Postfix:
+    case DAK_Consuming:
+    case DAK_Mutating:
+    case DAK_NonMutating:
+    case DAK_Convenience:
+    case DAK_Override:
+    case DAK_Indirect:
+      break;
+
+      // Classes w/o state
+      
+    case DAK_NoReturn:
+    case DAK_AccessControl:
+    case DAK_SetterAccess:
+    case DAK_RawDocComment:
+    case DAK_ReferenceOwnership:
+    case DAK_Effects:
+    case DAK_Inline:
+    case DAK_Optimize:
+    case DAK_Alignment:
+      break;
+      
+// SIMPLE_DECL_ATTR
+    case DAK_Exported:
+    case DAK_DynamicMemberLookup:
+    case DAK_NSCopying:
+    case DAK_IBAction:
+    case DAK_IBDesignable:
+    case DAK_IBInspectable:
+    case DAK_IBOutlet:
+    case DAK_NSManaged:
+    case DAK_LLDBDebuggerFunction:
+    case DAK_UIApplicationMain:
+    case DAK_UnsafeNoObjCTaggedPointer:
+    case DAK_Transparent:
+    case DAK_RequiresStoredPropertyInits:
+    case DAK_NonObjC:
+    case DAK_FixedLayout:
+    case DAK_Inlinable:
+    case DAK_ObjCMembers:
+    case DAK_SILStored:
+    case DAK_NSApplicationMain:
+    case DAK_ObjCNonLazyRealization:
+    case DAK_Testable:
+    case DAK_Rethrows:
+    case DAK_WarnUnqualifiedAccess:
+    case DAK_ShowInInterface:
+    case DAK_UsableFromInline:
+    case DAK_DiscardableResult:
+    case DAK_GKInspectable:
+    case DAK_StaticInitializeObjCMetadata:
+    case DAK_ImplicitlyUnwrappedOptional:
+    case DAK_WeakLinked:
+    case DAK_Frozen:
+    case DAK_ForbidSerializingReference:
+    case DAK_HasInitialValue:
+    case DAK_NonOverride:
+      break;
+
+      // classes with state:
+      
+    case DAK_SwiftNativeObjCRuntimeBase:
+      cast<const SwiftNativeObjCRuntimeBaseAttr>(this)->updateHashInner(hash);
+      break;
+    case DAK_CDecl:
+      cast<const CDeclAttr>(this)->updateHashInner(hash);
+      break;
+    case DAK_SILGenName:
+      cast<const SILGenNameAttr>(this)->updateHashInner(hash);
+      break;
+    case DAK_Available:
+      cast<const AvailableAttr>(this)->updateHashInner(hash);
+      break;
+    case DAK_ObjC:
+      cast<const ObjCAttr>(this)->updateHashInner(hash);
+      break;
+    case DAK_Semantics:
+      cast<const SemanticsAttr>(this)->updateHashInner(hash);
+      break;
+    case DAK_Specialize:
+      cast<const SpecializeAttr>(this)->updateHashInner(hash);
+      break;
+    case DAK_ObjCBridged:
+      cast<const ObjCBridgedAttr>(this)->updateHashInner(hash);
+      break;
+    case DAK_SynthesizedProtocol:
+      cast<const SynthesizedProtocolAttr>(this)->updateHashInner(hash);
+      break;
+    case DAK_Implements:
+      cast<const ImplementsAttr>(this)->updateHashInner(hash);
+      break;
+    case DAK_ObjCRuntimeName:
+      cast<const ObjCRuntimeNameAttr>(this)->updateHashInner(hash);
+      break;
+    case DAK_RestatedObjCConformance:
+      cast<const RestatedObjCConformanceAttr>(this)->updateHashInner(hash);
+      break;
+    case DAK_ClangImporterSynthesizedType:
+      cast<const ClangImporterSynthesizedTypeAttr>(this)->updateHashInner(hash);
+      break;
+      
+    case DAK_Count:
+      llvm_unreachable("impossible");
+      break;
+      
+  }
+}
+
+void AvailableAttr::updateHashInner(llvm::MD5 &hash) const {
+  hash.update(Message);
+  hash.update(Rename);
+  ExperimentalDependencies::updateHashFromOptionalBits(hash, Introduced);
+  ExperimentalDependencies::updateHashFromOptionalBits(hash, Deprecated);
+  ExperimentalDependencies::updateHashFromOptionalBits(hash, Obsoleted);
+  ExperimentalDependencies::updateHashFromBits(hash, PlatformAgnostic);
+  ExperimentalDependencies::updateHashFromBits(hash, Platform);
+}
+
+void ObjCAttr::updateHashInner(llvm::MD5 &hash) const {
+  if (hasName()) {
+    SmallString<64> scratch;
+    hash.update(getName().getValue().getString(scratch));
+  }
+  ExperimentalDependencies::updateHashFromBits(hash, Bits);
+}
+
+void ObjCBridgedAttr::updateHashInner(llvm::MD5 &hash) const {
+  getObjCClass()->updateHash(hash);
+}
+
+void SynthesizedProtocolAttr::updateHashInner(llvm::MD5 &hash) const {
+#error unimp Loader subclasses
+}
+
+void SpecializeAttr::updateHashInner(llvm::MD5 &hash) const {
+  trailingWhereClause->updateHash(hash);
+}
+
+void ImplementsAttr::updateHashInner(llvm::MD5 &hash) const {
+  // ProtocolType.updateHash(hash); // FIXME: OK to ignore type loc??
+  getMemberName().updateHash(hash);
+}
+void ObjCRuntimeNameAttr::updateHashInner(llvm::MD5 &hash) const {
+  hash.update(Name);
+}
+void RestatedObjCConformanceAttr::updateHashInner(llvm::MD5 &hash) const {
+  Proto->updateHash(hash);
+}
+void ClangImporterSynthesizedTypeAttr::updateHashInner(llvm::MD5 &hash) const {
+  hash.update(originalTypeName);
+}
+
+void SwiftNativeObjCRuntimeBaseAttr::updateHashInner(llvm::MD5 &hash) const {
+  BaseClassName.updateHash(hash);
 }

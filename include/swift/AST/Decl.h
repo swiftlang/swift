@@ -1455,6 +1455,7 @@ public:
     return SourceRange(WhereLoc,
                        getRequirements().back().getSourceRange().End);
   }
+  void updateHash(llvm::MD5 &hash) const;
 };
 
 // A private class for forcing exact field layout.
@@ -3756,6 +3757,8 @@ public:
   bool hasKnownSwiftImplementation() const {
     return !hasClangNode();
   }
+  
+  void updateHash(llvm::MD5&) const;
 };
 
 
@@ -4094,6 +4097,7 @@ public:
     auto NTD = dyn_cast<NominalTypeDecl>(C);
     return NTD && classof(NTD);
   }
+  void updateHash(llvm::MD5&) const;
 };
 
 /// Information about a behavior instantiated by a storage declaration.

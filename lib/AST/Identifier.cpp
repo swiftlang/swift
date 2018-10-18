@@ -147,6 +147,11 @@ StringRef DeclName::getString(llvm::SmallVectorImpl<char> &scratch,
   return StringRef(scratch.data(), scratch.size());
 }
 
+void DeclName::updateHash(llvm::MD5 &hash) const {
+  SmallString<64> scratch;
+  hash.update(getString(scratch));
+}
+
 llvm::raw_ostream &DeclName::print(llvm::raw_ostream &os,
                                    bool skipEmptyArgumentNames) const {
   // Print the base name.

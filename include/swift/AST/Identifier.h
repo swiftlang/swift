@@ -21,6 +21,7 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/Support/MD5.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace llvm {
@@ -590,6 +591,8 @@ public:
   /// Dump this name to standard error.
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
                             "only for use within the debugger");
+  
+  void updateHash(llvm::MD5&) const;
 };
 
 /// Represents an Objective-C selector.
