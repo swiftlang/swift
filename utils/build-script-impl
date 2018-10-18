@@ -3399,6 +3399,12 @@ for host in "${ALL_HOSTS[@]}"; do
               '(' -perm -0111 -or -name "*.a" ')' -type f -print | \
               xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool strip) -S
 
+            # Codesign dylibs after strip tool
+            # rdar://45388785
+            find "${host_install_destdir}${TOOLCHAIN_PREFIX}/" \
+              '(' -name "*.dylib" ')' -type f -print | \
+              xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool codesign) -f -s -
+
             { set +x; } 2>/dev/null
         fi
     fi
