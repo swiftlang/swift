@@ -20,6 +20,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "clang/Basic/Module.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/CrashRecoveryContext.h"
@@ -66,6 +67,38 @@ extractSwiftInterfaceVersionAndArgs(DiagnosticEngine &Diags,
   return false;
 }
 
+/// Construct a cache key for the .swiftmodule being generated. There is a
+/// balance to be struck here between things that go in the cache key and
+/// things that go in the "up to date" check of the cache entry. We want to
+/// avoid fighting over a single cache entry too much when (say) running
+/// different compiler versions on the same machine or different inputs
+/// that happen to have the same short module name, so we will disambiguate
+/// those in the key. But we want to invalidate and rebuild a cache entry
+/// -- rather than making a new one and potentially filling up the cache
+/// with dead entries -- when other factors change, such as the contents of
+/// the .swiftinterface input or its dependencies.
+std::string getCacheHash(ASTContext &Ctx,
+                         CompilerInvocation &SubInvocation,
+                         StringRef InPath) {
+  // Start with the compiler version (which will be either tag names or revs).
+  std::string vers = swift::version::getSwiftFullVersion(
+      Ctx.LangOpts.EffectiveLanguageVersion);
+  llvm::hash_code H = llvm::hash_value(vers);
+
+  // Simplest representation of input "identity" (not content) is just a
+  // pathname, and probably all we can get from the VFS in this regard anyways.
+  H = llvm::hash_combine(H, InPath);
+
+  // ClangImporterOpts does include the target CPU, which is redundant: we
+  // already have separate .swiftinterface files per target due to expanding
+  // preprocessing directives, but further specializing the cache key to that
+  // target is harmless and will not make any extra cache entries, so allow it.
+  H = llvm::hash_combine(
+      H, SubInvocation.getClangImporterOptions().getPCHHashComponents());
+
+  return llvm::APInt(64, H).toString(36, /*Signed=*/false);
+}
+
 void
 ParseableInterfaceModuleLoader::configureSubInvocationAndOutputPath(
     CompilerInvocation &SubInvocation,
@@ -84,13 +117,13 @@ ParseableInterfaceModuleLoader::configureSubInvocationAndOutputPath(
   SubInvocation.setRuntimeResourcePath(SearchPathOpts.RuntimeResourcePath);
   SubInvocation.setTargetTriple(LangOpts.Target);
 
-  // Calculate an output filename based on the SubInvocation hash, and
-  // wire up the SubInvocation's InputsAndOutputs to contain both
-  // input and output filenames.
+  // Calculate an output filename that includes a hash of relevant key data, and
+  // wire up the SubInvocation's InputsAndOutputs to contain both input and
+  // output filenames.
   OutPath = CacheDir;
   llvm::sys::path::append(OutPath, llvm::sys::path::stem(InPath));
   OutPath.append("-");
-  OutPath.append(SubInvocation.getPCHHash());
+  OutPath.append(getCacheHash(Ctx, SubInvocation, InPath));
   OutPath.append(".");
   auto Ext = file_types::getExtension(file_types::TY_SwiftModuleFile);
   OutPath.append(Ext);
