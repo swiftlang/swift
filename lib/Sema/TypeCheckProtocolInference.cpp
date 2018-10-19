@@ -1747,7 +1747,7 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
           if (failed.Result.isError())
             continue;
 
-          if (!failed.TypeWitness->is<NominalType>() &&
+          if (!failed.TypeWitness->getAnyNominal() &&
               failed.Result.isConformanceRequirement()) {
             diags.diagnose(failed.Witness,
                            diag::associated_type_witness_conform_impossible,
@@ -1755,8 +1755,8 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
                            failed.Result.getRequirement());
             continue;
           }
-          if (!failed.TypeWitness->is<ClassType>() &&
-              !failed.Result.isConformanceRequirement()) {
+          if (!failed.TypeWitness->getClassOrBoundGenericClass() &&
+              failed.Result.isSuperclassRequirement()) {
             diags.diagnose(failed.Witness,
                            diag::associated_type_witness_inherit_impossible,
                            assocType->getName(), failed.TypeWitness,
