@@ -143,8 +143,8 @@ void OverloadCandidate::dump() const {
     llvm::errs() << "<<EXPR>>";
   llvm::errs() << " - ignore curried self = " << (skipCurriedSelf ? "yes"
                                                                   : "no");
-  
-  if (auto FT = getUncurriedFunctionType())
+
+  if (auto FT = getFunctionType())
     llvm::errs() << " - type: " << Type(FT) << "\n";
   else
     llvm::errs() << " - type <<NONFUNCTION>>: " << entityType << "\n";
