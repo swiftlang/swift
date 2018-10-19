@@ -103,7 +103,7 @@ macro(add_sourcekit_library name)
   cmake_parse_arguments(SOURCEKITLIB
       "SHARED"
       "INSTALL_IN_COMPONENT"
-      "LINK_LIBS;DEPENDS;LLVM_COMPONENT_DEPENDS"
+      "HEADERS;LINK_LIBS;DEPENDS;LLVM_COMPONENT_DEPENDS"
       ${ARGN})
   set(srcs ${SOURCEKITLIB_UNPARSED_ARGUMENTS})
 
@@ -199,6 +199,9 @@ macro(add_sourcekit_library name)
       LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
       ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
       RUNTIME DESTINATION "bin")
+  swift_install_in_component("${SOURCEKITLIB_INSTALL_IN_COMPONENT}"
+    FILES ${SOURCEKITLIB_HEADERS}
+    DESTINATION "include/SourceKit")
   set_target_properties(${name} PROPERTIES FOLDER "SourceKit libraries")
   add_sourcekit_default_compiler_flags("${name}")
 endmacro()
