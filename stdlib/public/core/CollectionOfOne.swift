@@ -131,9 +131,9 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
       _precondition(position == 0, "Index out of range")
       return _element
     }
-    set {
+    _modify {
       _precondition(position == 0, "Index out of range")
-      _element = newValue
+      yield &_element
     }
   }
 
