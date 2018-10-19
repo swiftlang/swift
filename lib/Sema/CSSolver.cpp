@@ -1694,41 +1694,41 @@ void ConstraintSystem::partitionForDesignatedTypes(
   if (designatedNominalTypes.empty())
     return;
 
-  forEachChoice(
-      Choices, [&](unsigned constraintIndex, Constraint *constraint) -> bool {
-        auto *decl = constraint->getOverloadChoice().getDecl();
-        auto *funcDecl = cast<FuncDecl>(decl);
+  auto examineConstraint =
+    [&](unsigned constraintIndex, Constraint *constraint) -> bool {
+    auto *decl = constraint->getOverloadChoice().getDecl();
+    auto *funcDecl = cast<FuncDecl>(decl);
 
-        auto *parentDecl = funcDecl->getParent()->getAsDecl();
-        for (auto designatedTypeIndex : indices(designatedNominalTypes)) {
-          auto *designatedNominal =
-            designatedNominalTypes[designatedTypeIndex];
-          if (parentDecl == designatedNominal) {
-            if (designatedTypeIndex >= definedInDesignatedType.size())
-              definedInDesignatedType.resize(designatedTypeIndex + 1);
-            auto &constraints = definedInDesignatedType[designatedTypeIndex];
-            constraints.push_back(constraintIndex);
-            return true;
-          }
+    auto *parentDecl = funcDecl->getParent()->getAsDecl();
+    for (auto designatedTypeIndex : indices(designatedNominalTypes)) {
+      auto *designatedNominal =
+        designatedNominalTypes[designatedTypeIndex];
 
-          if (auto *extensionDecl = dyn_cast<ExtensionDecl>(parentDecl)) {
-            parentDecl = extensionDecl->getExtendedNominal();
-            if (parentDecl == designatedNominal) {
-              if (designatedTypeIndex >=
-                  definedInExtensionOfDesignatedType.size())
-                definedInExtensionOfDesignatedType.resize(
-                    designatedTypeIndex + 1);
+      if (parentDecl == designatedNominal) {
+        auto &constraints = definedInDesignatedType[designatedTypeIndex];
+        constraints.push_back(constraintIndex);
+        return true;
+      }
 
-              auto &constraints =
-                definedInExtensionOfDesignatedType[designatedTypeIndex];
-              constraints.push_back(constraintIndex);
-              return true;
-            }
-          }
-        }
+      auto *extensionDecl = dyn_cast<ExtensionDecl>(parentDecl);
+      if (!extensionDecl)
+        continue;
 
-        return false;
-      });
+      if (extensionDecl->getExtendedNominal() == designatedNominal) {
+        auto &constraints =
+          definedInExtensionOfDesignatedType[designatedTypeIndex];
+        constraints.push_back(constraintIndex);
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  definedInDesignatedType.resize(designatedNominalTypes.size());
+  definedInExtensionOfDesignatedType.resize(designatedNominalTypes.size());
+
+  forEachChoice(Choices, examineConstraint);
 
   // Now collect the overload choices that are defined within the type
   // that was designated in the operator declaration.
