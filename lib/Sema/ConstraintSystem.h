@@ -3224,6 +3224,22 @@ public:
 
   bool haveTypeInformationForAllArguments(FunctionType *fnType);
 
+  typedef std::function<bool(unsigned index, Constraint *)> ConstraintMatcher;
+  typedef std::function<void(ArrayRef<Constraint *>, ConstraintMatcher)>
+      ConstraintMatchLoop;
+  typedef std::function<void(SmallVectorImpl<unsigned> &options)>
+      PartitionAppendCallback;
+
+  // Partition the choices in a disjunction based on those that match
+  // the designated types for the operator that the disjunction was
+  // formed for.
+  void partitionForDesignatedTypes(
+      ArrayRef<Constraint *> Choices, ConstraintMatchLoop forEachChoice,
+      PartitionAppendCallback appendPartition,
+      SmallVectorImpl<SmallVector<unsigned, 4>> &definedInDesignatedType,
+      SmallVectorImpl<SmallVector<unsigned, 4>>
+          &definedInExtensionOfDesignatedType);
+
   // Partition the choices in the disjunction into groups that we will
   // iterate over in an order appropriate to attempt to stop before we
   // have to visit all of the options.
