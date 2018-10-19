@@ -312,7 +312,7 @@ private:
     /// Advances the current instruction to the next instruction.
     void nextInst() {
       assert(CurrentInst);
-      if (isa<TerminatorInst>(CurrentInst)) {
+      if (CurrentInst->isTerminator()) {
         auto BlockIter = std::next(CurrentInst->getParent()->getIterator());
         if (BlockIter == F->end()) {
           CurrentInst = nullptr;

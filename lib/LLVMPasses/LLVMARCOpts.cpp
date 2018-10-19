@@ -718,7 +718,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
       // it is perfectly fine to delete this instruction if all uses of the
       // instruction are also eliminable.
 
-      if (I->mayHaveSideEffects() || isa<TerminatorInst>(I))
+      if (I->mayHaveSideEffects() || I->isTerminator())
         return false;
       break;
 
