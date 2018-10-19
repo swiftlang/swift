@@ -697,8 +697,8 @@ TrailingWhereClause *TrailingWhereClause::create(
   return new (mem) TrailingWhereClause(whereLoc, requirements);
 }
 
-void TrailingWhereClause::updateHash(llvm::MD5 &hash) const {
-#error unimp
+ExperimentalDependencies::unimpLocation_t  TrailingWhereClause::updateExpDepHash(llvm::MD5 &hash) const {
+  RETURN_UNIMP;
 }
 
 TypeArrayView<GenericTypeParamType>
@@ -3267,8 +3267,8 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   Bits.ClassDecl.HasMissingVTableEntries = 0;
 }
 
-void ClassDecl::updateHash(llvm::MD5 &hash) const {
-#error unimp // from ObjCBridgedAttr
+ExperimentalDependencies::unimpLocation_t  ClassDecl::updateExpDepHash(llvm::MD5 &hash) const {
+  RETURN_UNIMP;
 }
 
 DestructorDecl *ClassDecl::getDestructor() {
@@ -4106,8 +4106,8 @@ void ProtocolDecl::setRequirementSignature(ArrayRef<Requirement> requirements) {
   }
 }
 
-void ProtocolDecl::updateHash(llvm::MD5& hash) const {
-#error unimp
+ExperimentalDependencies::unimpLocation_t  ProtocolDecl::updateExpDepHash(llvm::MD5& hash) const {
+  RETURN_UNIMP;
 }
 
 void AbstractStorageDecl::overwriteImplInfo(StorageImplInfo implInfo) {
@@ -6306,7 +6306,10 @@ void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *decl) {
 // ExperimentalDependencies
 std::string Decl::getExperimentalDependencyHash() const {
   llvm::MD5 DeclHash;
-  updateHash(DeclHash);
+  const char* maybeUnimp = updateExpDepHash(DeclHash);
+  if (maybeUnimp) {
+#error unimp how to pass it along?
+  }
   llvm::MD5::MD5Result result;
   DeclHash.final(result);
   llvm::SmallString<32> str;
@@ -6315,36 +6318,37 @@ std::string Decl::getExperimentalDependencyHash() const {
 }
 
 
-void Decl::updateHash(llvm::MD5& hash) const {
-  ExperimentalDependencies::updateHashFromBits(hash, Bits);
+ExperimentalDependencies::unimpLocation_t  Decl::updateExpDepHash(llvm::MD5& hash) const {
+  ExperimentalDependencies::updateExpDepFromBits(hash, Bits);
   
-  getAttrs().updateHash(hash);
+  TRY_UPDATE_HASH(getAttrs().updateExpDepHash(hash))
   
   DeclContext *dc = getDeclContext();
-  dc->updateHash(hash);
+  return dc->updateExpDepHash(hash);
 }
 
-void OperatorDecl::updateHash(llvm::MD5& hash) const {
-  name.updateHash(hash);
-  Decl::updateHash(hash);
+ExperimentalDependencies::unimpLocation_t  OperatorDecl::updateExpDepHash(llvm::MD5& hash) const {
+  TRY_UPDATE_HASH(name.updateExpDepHash(hash))
+  return Decl::updateExpDepHash(hash);
 }
 
-void NominalTypeDecl::updateHash(llvm::MD5& hash) const {
-#error unimp
+ExperimentalDependencies::unimpLocation_t  NominalTypeDecl::updateExpDepHash(llvm::MD5& hash) const {
+  RETURN_UNIMP;
 //  Type DeclaredTy;
 //  Type DeclaredTyInContext;
 //  Type DeclaredInterfaceTy;
 //  extensions
-//  GenericTypeDecl::updateHash(hash);
+//  GenericTypeDecl::updateExpDepHash(hash);
 }
 
-void PrecedenceGroupDecl::updateHash(llvm::MD5& hash) const {
-#error unimp
+ExperimentalDependencies::unimpLocation_t  PrecedenceGroupDecl::updateExpDepHash(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+
 }
 
-void ValueDecl::updateHash(llvm::MD5& hash) const {
-#error unimp
+ExperimentalDependencies::unimpLocation_t  ValueDecl::updateExpDepHash(llvm::MD5& hash) const {
+  RETURN_UNIMP;
 }
-//void GenericTypeDecl::updateHash(llvm::MD5& hash) const {
+//unimpLocation_t  GenericTypeDecl::updateExpDepHash(llvm::MD5& hash) const {
 //#error unimp
 //}

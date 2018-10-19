@@ -568,7 +568,7 @@ public:
   void *operator new(size_t Bytes, const ASTContext &C,
                      unsigned Alignment = alignof(ModuleDecl));
   
-  void updateHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5&) const;
 };
 
 static inline unsigned alignOfFileUnit();
@@ -822,7 +822,7 @@ public:
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = alignOfFileUnit());
   
-  void updateHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5&) const;
 };
 
 static inline unsigned alignOfFileUnit() {

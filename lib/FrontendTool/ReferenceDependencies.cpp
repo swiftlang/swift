@@ -674,12 +674,12 @@ DependsEmitter::sortedByName(const llvm::DenseMap<DeclBaseName, bool> map) {
 
 
 template <typename T>
-void ExperimentalDependencies::updateHashFromBits(llvm::MD5 &hash, const T& bits) {
+void ExperimentalDependencies::updateExpDepFromBits(llvm::MD5 &hash, const T& bits) {
   hash.update(ArrayRef<u_int8_t>(reinterpret_cast<u_int8_t*>(bits, sizeof(bits))));
   }
 
 template <typename T>
-void ExperimentalDependencies::updateHashFromOptionalBits(llvm::MD5 &hash, const T& bits) {
+void ExperimentalDependencies::updateExpDepFromOptionalBits(llvm::MD5 &hash, const T& bits) {
   if (bits.hasValue())
-    updateHashFromBits(hash, bits.getValue());
+    updateExpDepFromBits(hash, bits.getValue());
 }

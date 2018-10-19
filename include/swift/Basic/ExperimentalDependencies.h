@@ -64,15 +64,26 @@ struct TopLevel {
   std::string combined() { return Utils::combineNames(base, hash); }
 };
 
+  // if updateExpDepHash(Inner) is unimplemented, return where it was unimplemented
+# define ExpDepQ1(a) #a
+# define ExpDepQ2(a) ExpDepQ1(a)
+# define RETURN_UNIMP return __FILE__ ":" ExpDepQ2(__LINE__)
+  typedef const char*  unimpLocation_t;
+  
+# define TRY_UPDATE_HASH(what) \
+if (ExperimentalDependencies::unimpLocation_t r  = (what)) \
+  return r;
+
   
   template <typename T>
-  void updateHashFromBits(llvm::MD5 &hash, const T& bits);
+  void updateExpDepFromBits(llvm::MD5 &hash, const T& bits);
 
   template <typename T>
-  void updateHashFromOptionalBits(llvm::MD5 &hash, const T& bits);
+  void updateExpDepFromOptionalBits(llvm::MD5 &hash, const T& bits);
 
 } // namespace ExperimentalDependencies
 
 } // end namespace swift
+
 
 #endif /* ExperimentalDependencies_h */

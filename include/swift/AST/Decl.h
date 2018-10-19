@@ -945,7 +945,7 @@ public:
   }
 
   std::string getExperimentalDependencyHash() const;
-  virtual void updateHash(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepHash(llvm::MD5&) const;
 };
 
 /// \brief Use RAII to track Decl validation progress and non-reentrancy.
@@ -1455,7 +1455,7 @@ public:
     return SourceRange(WhereLoc,
                        getRequirements().back().getSourceRange().End);
   }
-  void updateHash(llvm::MD5 &hash) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepHash(llvm::MD5 &hash) const;
 };
 
 // A private class for forcing exact field layout.
@@ -1809,7 +1809,7 @@ public:
 
   using DeclContext::operator new;
                               
-  void updateHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5&) const;
 };
 
 /// \brief Iterator that walks the extensions of a particular type.
@@ -2181,7 +2181,7 @@ public:
   
   using DeclContext::operator new;
   
-  void updateHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5&) const;
 };
 
 /// SerializedTopLevelCodeDeclContext - This represents what was originally a
@@ -2638,7 +2638,7 @@ public:
   /// Swift.
   bool isImportAsMember() const;
   
-  void updateHash(llvm::MD5& hash) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepHash(llvm::MD5& hash) const;
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -2712,7 +2712,7 @@ public:
     return D->getKind() >= DeclKind::First_GenericTypeDecl &&
            D->getKind() <= DeclKind::Last_GenericTypeDecl;
   }
-  void updateHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5&) const;
 };
 
 
@@ -2783,7 +2783,7 @@ public:
       return classof(D);
     return false;
   }
-  void updateHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5&) const;
 };
 
 /// Abstract class describing generic type parameters and associated types,
@@ -3282,7 +3282,7 @@ public:
   static bool classof(const NominalTypeDecl *D) { return true; }
   static bool classof(const ExtensionDecl *D) { return false; }
   
-  void updateHash(llvm::MD5& hash) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepHash(llvm::MD5& hash) const;
 };
 
 /// \brief This is the declaration of an enum.
@@ -3764,7 +3764,7 @@ public:
     return !hasClangNode();
   }
   
-  void updateHash(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepHash(llvm::MD5&) const;
 };
 
 
@@ -4103,7 +4103,7 @@ public:
     auto NTD = dyn_cast<NominalTypeDecl>(C);
     return NTD && classof(NTD);
   }
-  void updateHash(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepHash(llvm::MD5&) const;
 };
 
 /// Information about a behavior instantiated by a storage declaration.
@@ -5012,7 +5012,7 @@ public:
   using DeclContext::operator new;
   using Decl::getASTContext;
   
-  void updateHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5&) const;
 };
 
 /// Encodes imported-as-member status for C functions that get imported
@@ -5424,7 +5424,7 @@ public:
   using DeclContext::operator new;
   using Decl::getASTContext;
   
-  void updateHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5&) const;
 };
 
 class OperatorDecl;
@@ -6387,7 +6387,7 @@ public:
     return D->getKind() == DeclKind::PrecedenceGroup;
   }
   
-  void updateHash(llvm::MD5& hash) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepHash(llvm::MD5& hash) const;
 };
 
 /// Abstract base class of operator declarations.
@@ -6444,7 +6444,7 @@ public:
         && D->getKind() <= DeclKind::Last_OperatorDecl;
   }
   
-  void updateHash(llvm::MD5& hash) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepHash(llvm::MD5& hash) const;
 };
 
 /// Declares the behavior of an infix operator. For example:

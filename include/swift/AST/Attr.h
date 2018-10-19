@@ -458,7 +458,7 @@ public:
   ///
   static DeclAttrKind getAttrKindFromString(StringRef Str);
   
-  void updateHash(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepHash(llvm::MD5&) const;
 };
 
 /// Describes a "simple" declaration attribute that carries no data.
@@ -502,8 +502,9 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_SILGenName;
   }
-  void updateHashInner(llvm::MD5& hash) const {
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5& hash) const {
     hash.update(Name);
+    return nullptr;
   }
 };
 
@@ -523,8 +524,9 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_CDecl;
   }
-  void updateHashInner(llvm::MD5& hash) const {
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5& hash) const {
     hash.update(Name);
+    return nullptr;
   }
 };
 
@@ -545,8 +547,9 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Semantics;
   }
-  void updateHashInner(llvm::MD5& hash) const {
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5& hash) const {
     hash.update(Value);
+    return nullptr;
   }
 };
 
@@ -590,7 +593,7 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_SwiftNativeObjCRuntimeBase;
   }
-  void updateHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5&) const;
 };
 
 /// Determine the result of comparing an availability attribute to a specific
@@ -744,7 +747,7 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Available;
   }
-  void updateHashInner(llvm::MD5 &hash) const;
+ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5 &hash) const;
 };
 
 /// Indicates that the given declaration is visible to Objective-C.
@@ -906,7 +909,7 @@ public:
     return DA->getKind() == DAK_ObjC;
   }
       
-  void updateHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5&) const;
 };
 
 /// Represents any sort of access control modifier.
@@ -1080,7 +1083,7 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_ObjCBridged;
   }
-  void updateHashInner(llvm::MD5& hash) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5& hash) const;
 };
 
 /// An attribute that specifies a synthesized conformance of a known
@@ -1114,7 +1117,7 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_SynthesizedProtocol;
   }
-  void updateHashInner(llvm::MD5& hash) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5& hash) const;
 };
 
 /// The @_specialize attribute, which forces specialization on the specified
@@ -1182,7 +1185,7 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Specialize;
   }
-  void updateHashInner(llvm::MD5& hash) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5& hash) const;
 };
 
 /// The @_implements attribute, which treats a decl as the implementation for
@@ -1214,7 +1217,7 @@ public:
     return DA->getKind() == DAK_Implements;
   }
   
-  void updateHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5&) const;
 };
 
 /// A limited variant of \c @objc that's used for classes with generic ancestry.
@@ -1239,7 +1242,7 @@ public:
     return DA->getKind() == DAK_ObjCRuntimeName;
   }
   
-  void updateHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5&) const;
 };
 
 /// Attribute that specifies a protocol conformance that has been restated
@@ -1258,7 +1261,7 @@ public:
     return DA->getKind() == DAK_RestatedObjCConformance;
   }
   
-  void updateHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5&) const;
 };
 
 /// Attached to type declarations synthesized by the Clang importer.
@@ -1320,7 +1323,7 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_ClangImporterSynthesizedType;
   }
-  void updateHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5&) const;
 };
 
 /// \brief Attributes that may be applied to declarations.
@@ -1493,7 +1496,7 @@ public:
 
   SourceLoc getStartLoc(bool forModifiers = false) const;
   
-  void updateHash(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepHash(llvm::MD5&) const;
 };
 
 } // end namespace swift

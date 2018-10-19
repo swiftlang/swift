@@ -1074,7 +1074,7 @@ public:
   /// object type.
   TypeTraitResult canBeClass();
   
-  void updateHash(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepHash(llvm::MD5&) const;
 
 private:
   // Make vanilla new/delete illegal for Types.

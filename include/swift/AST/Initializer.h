@@ -115,7 +115,7 @@ public:
     return I->getInitializerKind() == InitializerKind::PatternBinding;
   }
   
-  void updateHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5&) const;
 };
 
 /// SerializedPatternBindingInitializer - This represents what was originally a
@@ -148,7 +148,7 @@ public:
     return false;
   }
   
-  void updateHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5&) const;
 };
 
 /// A default argument expression.  The parent context is the function
@@ -182,7 +182,7 @@ public:
     return I->getInitializerKind() == InitializerKind::DefaultArgument;
   }
   
-  void updateHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5&) const;
 };
 
 /// SerializedDefaultArgumentInitializer - This represents what was originally a

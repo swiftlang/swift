@@ -361,7 +361,7 @@ public:
   /// correct join but one better than Any may exist.
   static Optional<Type> join(Type first, Type second);
     
-  void updateHash(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepHash(llvm::MD5&) const;
 
 private:
   // Direct comparison is disabled for types, because they may not be canonical.
@@ -470,7 +470,7 @@ public:
 
   bool operator<(CanType T) const { return getPointer() < T.getPointer(); }
   
-  void updateHash(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepHash(llvm::MD5&) const;
 };
 
 template <class Proxied> class CanTypeWrapper;

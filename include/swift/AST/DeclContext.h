@@ -23,6 +23,7 @@
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/Basic/ExperimentalDependencies.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
@@ -596,7 +597,7 @@ public:
   // Some Decls are DeclContexts, but not all. See swift/AST/Decl.h
   static bool classof(const Decl *D);
   
-  void updateHash(llvm::MD5& hash) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepHash(llvm::MD5& hash) const;
 };
 
 /// SerializedLocalDeclContext - the base class for DeclContexts that were
@@ -622,7 +623,7 @@ public:
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::SerializedLocal;
   }
-  void updateHashInner(llvm::MD5& hash) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5& hash) const;
 };
 
 /// An iterator that walks through a list of declarations stored
@@ -772,7 +773,7 @@ public:
   // Some Decls are IterableDeclContexts, but not all.
   static bool classof(const Decl *D);
 
-  void updateHash(llvm::MD5& hash) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepHash(llvm::MD5& hash) const;
 
 private:
   /// Add a member to the list for iteration purposes, but do not notify the

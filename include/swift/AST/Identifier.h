@@ -18,6 +18,7 @@
 #define SWIFT_AST_IDENTIFIER_H
 
 #include "swift/Basic/EditorPlaceholder.h"
+#include "swift/Basic/ExperimentalDependencies.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -162,8 +163,9 @@ public:
                       llvm::DenseMapInfo<const void*>::getTombstoneKey());
   }
   
-  void updateHash(llvm::MD5 &hash) const {
+  ExperimentalDependencies::unimpLocation_t  updateExpDepHash(llvm::MD5 &hash) const {
     hash.update(str());
+    return nullptr;
   }
 
 private:
@@ -596,7 +598,7 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
                             "only for use within the debugger");
   
-  void updateHash(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepHash(llvm::MD5&) const;
 };
 
 /// Represents an Objective-C selector.

@@ -4081,22 +4081,23 @@ Type TypeBase::openAnyExistentialType(ArchetypeType *&opened) {
 }
 
 
-void TypeBase::updateHash(llvm::MD5 &hash) const {
-  ExperimentalDependencies::updateHashFromBits(hash, Bits);
+ExperimentalDependencies::unimpLocation_t  TypeBase::updateExpDepHash(llvm::MD5 &hash) const {
+  ExperimentalDependencies::updateExpDepFromBits(hash, Bits);
   assert(hasCanonicalTypeComputed());
   CanType ct = getCanonicalType();
-  ct.updateHash(hash);
+  TRY_UPDATE_HASH(ct.updateExpDepHash(hash))
   
-  //const issue getOptionalObjectType().updateHash(hash);
+  //const issue getOptionalObjectType().updateExpDepHash(hash);
   
-#error TBD:
+  RETURN_UNIMP;
   //getContextSubstitutions: adjustSuperclassMemberDeclType, getTypeOfMember, getMemberSubstitutions, getContextSubstitutionMap, getContextSubstitutions, getContextSubstitutionMap
 }
-void Type::updateHash(llvm::MD5 &hash) const {
-  getPointer()->updateHash(hash);
+ExperimentalDependencies::unimpLocation_t  Type::updateExpDepHash(llvm::MD5 &hash) const {
+  return getPointer()->updateExpDepHash(hash);
 }
 
-void CanType::updateHash(llvm::MD5 &hash) const {
-#error inf recursion
-  Type::updateHash(hash);
+ExperimentalDependencies::unimpLocation_t  CanType::updateExpDepHash(llvm::MD5 &hash) const {
+// error inf recursion
+  RETURN_UNIMP;
+//  return Type::updateExpDepHash(hash);
 }
