@@ -81,8 +81,8 @@ namespace swift {
     Expr *getExpr() const {
       return declOrExpr.dyn_cast<Expr*>();
     }
-    
-    Type getUncurriedType() const {
+
+    Type getType() const {
       // Start with the known type of the decl.
       auto type = entityType;
       if (skipCurriedSelf) {
@@ -92,13 +92,13 @@ namespace swift {
       }
       return type;
     }
-    
-    AnyFunctionType *getUncurriedFunctionType() const {
-      if (auto type = getUncurriedType())
+
+    AnyFunctionType *getFunctionType() const {
+      if (auto type = getType())
         return type->getAs<AnyFunctionType>();
       return nullptr;
     }
-    
+
     /// Given a function candidate with an uncurry level, return the parameter
     /// type at the specified uncurry level.  If there is an error getting to
     /// the specified input, this returns a null Type.
@@ -110,20 +110,18 @@ namespace swift {
       return FunctionType::composeInput(ctx, params, false);
     }
 
-    bool hasParameters() const {
-      return getUncurriedFunctionType();
-    }
+    bool hasParameters() const { return getFunctionType(); }
 
     ArrayRef<AnyFunctionType::Param> getParameters() const {
       assert(hasParameters());
-      return getUncurriedFunctionType()->getParams();
+      return getFunctionType()->getParams();
     }
     
     /// Given a function candidate with an uncurry level, return the parameter
     /// type at the specified uncurry level.  If there is an error getting to
     /// the specified input, this returns a null Type.
     Type getResultType() const {
-      if (auto *funcTy = getUncurriedFunctionType())
+      if (auto *funcTy = getFunctionType())
         return funcTy->getResult();
       return Type();
     }
