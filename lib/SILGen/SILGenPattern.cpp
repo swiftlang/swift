@@ -1463,12 +1463,38 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     auto &fieldTL = SGF.getTypeLowering(fieldTy);
 
     SILValue member = SGF.B.createTupleElementAddr(loc, v, i, fieldTy);
-    if (!fieldTL.isAddressOnly()) {
-      member =
-          fieldTL.emitLoad(SGF.B, loc, member, LoadOwnershipQualifier::Take);
+    ConsumableManagedValue memberCMV;
+
+    // If we have a loadable sub-type of our tuple...
+    if (fieldTL.isLoadable()) {
+      switch (src.getFinalConsumption()) {
+      case CastConsumptionKind::TakeAlways: {
+        // and our consumption is take always, perform a load [take] and
+        // continue.
+        auto memberMV = ManagedValue::forUnmanaged(member);
+        memberCMV = {SGF.B.createLoadTake(loc, memberMV),
+                     CastConsumptionKind::TakeAlways};
+        break;
+      }
+      case CastConsumptionKind::TakeOnSuccess:
+      case CastConsumptionKind::CopyOnSuccess: {
+        // otherwise we have take on success or copy on success perform a
+        // load_borrow.
+        auto memberMV = ManagedValue::forUnmanaged(member);
+        memberCMV = {SGF.B.createLoadBorrow(loc, memberMV),
+                     CastConsumptionKind::BorrowAlways};
+        break;
+      }
+      case CastConsumptionKind::BorrowAlways:
+        llvm_unreachable("Borrow always can not be used on objects");
+      }
+    } else {
+      // Otherwise, if we have an address only type, just get the managed
+      // subobject.
+      memberCMV =
+          getManagedSubobject(SGF, member, fieldTL, src.getFinalConsumption());
     }
-    auto memberCMV = getManagedSubobject(SGF, member, fieldTL,
-                                         src.getFinalConsumption());
+
     destructured.push_back(memberCMV);
   }
 
