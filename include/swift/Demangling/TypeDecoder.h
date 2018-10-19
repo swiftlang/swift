@@ -246,10 +246,13 @@ class TypeDecoder {
     case NodeKind::CFunctionPointer:
     case NodeKind::ThinFunctionType:
     case NodeKind::NoEscapeFunctionType:
+    case NodeKind::AutoClosureType:
+    case NodeKind::EscapingAutoClosureType:
     case NodeKind::FunctionType: {
       if (Node->getNumChildren() < 2)
         return BuiltType();
 
+      // FIXME: autoclosure is not represented in function metadata
       FunctionTypeFlags flags;
       if (Node->getKind() == NodeKind::ObjCBlock) {
         flags = flags.withConvention(FunctionMetadataConvention::Block);
@@ -275,7 +278,9 @@ class TypeDecoder {
       flags =
           flags.withNumParameters(parameters.size())
               .withParameterFlags(hasParamFlags)
-              .withEscaping(Node->getKind() == NodeKind::FunctionType);
+              .withEscaping(
+                          Node->getKind() == NodeKind::FunctionType ||
+                          Node->getKind() == NodeKind::EscapingAutoClosureType);
 
       auto result = decodeMangledType(Node->getChild(isThrow ? 2 : 1));
       if (!result) return BuiltType();
