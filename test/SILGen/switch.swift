@@ -1148,3 +1148,56 @@ func testUninhabitedSwitchScrutinee() {
     switch myFatalError() {}
   }
 }
+
+// Make sure that we properly can handle address only tuples with loadable
+// subtypes.
+class Klass {}
+
+enum TrivialSingleCaseEnum {
+case a
+}
+
+enum NonTrivialSingleCaseEnum {
+case a(Klass)
+}
+
+// CHECK-LABEL: sil hidden @$s6switch33address_only_with_trivial_subtypeyyAA21TrivialSingleCaseEnumO_yptF : $@convention(thin) (TrivialSingleCaseEnum, @in_guaranteed Any) -> () {
+// CHECK: [[MEM:%.*]] = alloc_stack $(TrivialSingleCaseEnum, Any)
+// CHECK: [[INIT_TUP_0:%.*]] = tuple_element_addr [[MEM]] : $*(TrivialSingleCaseEnum, Any), 0
+// CHECK: [[INIT_TUP_1:%.*]] = tuple_element_addr [[MEM]] : $*(TrivialSingleCaseEnum, Any), 1
+// CHECK: store {{%.*}} to [trivial] [[INIT_TUP_0]]
+// CHECK: copy_addr [take] {{%.*}} to [initialization] [[INIT_TUP_1]]
+// CHECK: [[TUP_0:%.*]] = tuple_element_addr [[MEM]] : $*(TrivialSingleCaseEnum, Any), 0
+// CHECK: [[TUP_0_VAL:%.*]] = load [trivial] [[TUP_0]]
+// CHECK: [[TUP_1:%.*]] = tuple_element_addr [[MEM]] : $*(TrivialSingleCaseEnum, Any), 1
+// CHECK: switch_enum [[TUP_0_VAL]]
+//
+// CHECK: } // end sil function '$s6switch33address_only_with_trivial_subtypeyyAA21TrivialSingleCaseEnumO_yptF'
+func address_only_with_trivial_subtype(_ a: TrivialSingleCaseEnum, _ value: Any) {
+  switch (a, value) {
+  case (.a, _):
+    break
+  default:
+    break
+  }
+}
+
+// CHECK-LABEL: sil hidden @$s6switch36address_only_with_nontrivial_subtypeyyAA24NonTrivialSingleCaseEnumO_yptF : $@convention(thin) (@guaranteed NonTrivialSingleCaseEnum, @in_guaranteed Any) -> () {
+// CHECK: [[MEM:%.*]] = alloc_stack $(NonTrivialSingleCaseEnum, Any)
+// CHECK: [[INIT_TUP_0:%.*]] = tuple_element_addr [[MEM]] : $*(NonTrivialSingleCaseEnum, Any), 0
+// CHECK: [[INIT_TUP_1:%.*]] = tuple_element_addr [[MEM]] : $*(NonTrivialSingleCaseEnum, Any), 1
+// CHECK: store {{%.*}} to [init] [[INIT_TUP_0]]
+// CHECK: copy_addr [take] {{%.*}} to [initialization] [[INIT_TUP_1]]
+// CHECK: [[TUP_0:%.*]] = tuple_element_addr [[MEM]] : $*(NonTrivialSingleCaseEnum, Any), 0
+// CHECK: [[TUP_0_VAL:%.*]] = load_borrow [[TUP_0]]
+// CHECK: [[TUP_1:%.*]] = tuple_element_addr [[MEM]] : $*(NonTrivialSingleCaseEnum, Any), 1
+// CHECK: switch_enum [[TUP_0_VAL]]
+// CHECK: } // end sil function '$s6switch36address_only_with_nontrivial_subtypeyyAA24NonTrivialSingleCaseEnumO_yptF'
+func address_only_with_nontrivial_subtype(_ a: NonTrivialSingleCaseEnum, _ value: Any) {
+  switch (a, value) {
+  case (.a, _):
+    break
+  default:
+    break
+  }
+}
