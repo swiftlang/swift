@@ -338,31 +338,33 @@ macro(add_sourcekit_framework name)
         LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
         ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
         RUNTIME DESTINATION bin)
-    set_target_properties(${name} PROPERTIES FOLDER "SourceKit frameworks")
     set_output_directory(${name}
         BINARY_DIR ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR}
         LIBRARY_DIR ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
-    set_target_properties(${name} PROPERTIES FRAMEWORK TRUE)
-    set_target_properties(${name} PROPERTIES PUBLIC_HEADER "${headers}")
-    set_target_properties(${name} PROPERTIES MACOSX_FRAMEWORK_INFO_PLIST "${SOURCEKIT_SOURCE_DIR}/cmake/MacOSXFrameworkInfo.plist.in")
-    set_target_properties(${name} PROPERTIES MACOSX_FRAMEWORK_IDENTIFIER "com.apple.${name}")
-    set_target_properties(${name} PROPERTIES MACOSX_FRAMEWORK_SHORT_VERSION_STRING "1.0")
-    set_target_properties(${name} PROPERTIES MACOSX_FRAMEWORK_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}")
-    set_target_properties(${name} PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
-    set_target_properties(${name} PROPERTIES INSTALL_NAME_DIR "@rpath")
+    set_target_properties(${name} PROPERTIES
+                          BUILD_WITH_INSTALL_RPATH TRUE
+                          FOLDER "SourceKit frameworks"
+                          FRAMEWORK TRUE
+                          INSTALL_NAME_DIR "@rpath"
+                          MACOSX_FRAMEWORK_INFO_PLIST "${SOURCEKIT_SOURCE_DIR}/cmake/MacOSXFrameworkInfo.plist.in"
+                          MACOSX_FRAMEWORK_IDENTIFIER "com.apple.${name}"
+                          MACOSX_FRAMEWORK_SHORT_VERSION_STRING "1.0"
+                          MACOSX_FRAMEWORK_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}"
+                          PUBLIC_HEADER "${headers}")
   else()
     swift_install_in_component(${SOURCEKITFW_INSTALL_IN_COMPONENT}
         DIRECTORY ${framework_location}
         DESTINATION lib${LLVM_LIBDIR_SUFFIX}
         USE_SOURCE_PERMISSIONS)
-    set_target_properties(${name} PROPERTIES FOLDER "SourceKit frameworks")
     set_output_directory(${name}
         BINARY_DIR ${framework_location}
         LIBRARY_DIR ${framework_location})
-    set_target_properties(${name} PROPERTIES PREFIX "")
-    set_target_properties(${name} PROPERTIES SUFFIX "")
-    set_target_properties(${name} PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
-    set_target_properties(${name} PROPERTIES INSTALL_NAME_DIR "@rpath/${name}.framework")
+    set_target_properties(${name} PROPERTIES
+                          BUILD_WITH_INSTALL_RPATH TRUE
+                          FOLDER "SourceKit frameworks"
+                          INSTALL_NAME_DIR "@rpath/${name}.framework"
+                          PREFIX ""
+                          SUFFIX "")
 
     foreach(hdr ${headers})
       get_filename_component(hdrname ${hdr} NAME)
