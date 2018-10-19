@@ -80,3 +80,21 @@ protocol P8 {
 struct B : P8 { // expected-error {{type 'B' does not conform to protocol 'P8'}}
     func g(t: (Int, String)) {} // expected-note {{candidate can not infer 'T' = '(Int, String)' because '(Int, String)' is not a nominal type and so can't conform to 'P7'}}
 }
+
+protocol P9 {
+    func foo() // expected-note {{protocol requires function 'foo()' with type '() -> ()'; do you want to add a stub?}}
+}
+class C2 {}
+extension P9 where Self : C2 {
+    func foo() {} // expected-note {{candidate would match if 'C3' subclassed 'C2'}}
+}
+class C3 : P9 {} // expected-error {{type 'C3' does not conform to protocol 'P9'}}
+
+protocol P10 {
+    associatedtype A
+    func bar() // expected-note {{protocol requires function 'bar()' with type '() -> ()'; do you want to add a stub?}}
+}
+extension P10 where A == Int {
+    func bar() {} // expected-note {{candidate would match if 'A' was the same type as 'Int'}}
+}
+struct S2<A> : P10 {} // expected-error {{type 'S2<A>' does not conform to protocol 'P10'}}

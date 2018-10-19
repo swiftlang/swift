@@ -853,26 +853,58 @@ swift::matchWitness(TypeChecker &tc,
 
     // If the types would match but for some other missing conformance, find and
     // call that out.
-    if (solution && conformance && solution->Fixes.size() == 1 &&
-        solution->Fixes.front()->getKind() == FixKind::AddConformance) {
-      auto fix = (MissingConformance *)solution->Fixes.front();
-      auto type = fix->getNonConformingType();
-      auto protocolType = fix->getProtocol()->getDeclaredType();
+    if (solution && conformance && solution->Fixes.size() == 1) {
+      auto fix = solution->Fixes.front();
+      Type type, missingType;
+      RequirementKind requirementKind;
+      switch (fix->getKind()) {
+      case FixKind::AddConformance: {
+        auto missingConform = (MissingConformance *)fix;
+        requirementKind = RequirementKind::Conformance;
+        type = missingConform->getNonConformingType();
+        missingType = missingConform->getProtocol()->getDeclaredType();
+        break;
+      }
+      case FixKind::SkipSameTypeRequirement: {
+        requirementKind = RequirementKind::SameType;
+        auto requirementFix = (SkipSameTypeRequirement *)fix;
+        type = requirementFix->lhsType();
+        missingType = requirementFix->rhsType();
+        break;
+      }
+      case FixKind::SkipSuperclassRequirement: {
+        requirementKind = RequirementKind::Superclass;
+        auto requirementFix = (SkipSuperclassRequirement *)fix;
+        type = requirementFix->subclassType();
+        missingType = requirementFix->superclassType();
+        break;
+      }
+      default:
+        return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
+      }
+
+      auto missingRequirementMatch = [&](Type type) -> RequirementMatch {
+        Requirement requirement(requirementKind, type, missingType);
+        return RequirementMatch(witness, MatchKind::MissingRequirement,
+                                requirement);
+      };
+
       if (auto memberTy = type->getAs<DependentMemberType>())
-        return RequirementMatch(witness, MatchKind::MissingConformance, type,
-                                protocolType);
+        return missingRequirementMatch(type);
 
       type = type->mapTypeOutOfContext();
       if (auto typeParamTy = type->getAs<GenericTypeParamType>())
         if (auto env = conformance->getGenericEnvironment())
           if (auto assocType = env->mapTypeIntoContext(typeParamTy))
-            return RequirementMatch(witness, MatchKind::MissingConformance,
-                                    assocType, protocolType);
-      if (type->isEqual(conformance->getType())) {
+            return missingRequirementMatch(assocType);
+
+      auto reqSubMap = reqEnvironment.getRequirementToSyntheticMap();
+      Type selfTy = proto->getSelfInterfaceType().subst(reqSubMap);
+      if (type->isEqual(selfTy) /*type->isEqual(conformance->getType())*/) {
+        type = conformance->getType();
         if (auto agt = type->getAs<AnyGenericType>())
           type = agt->getDecl()->getDeclaredInterfaceType();
-        return RequirementMatch(witness, MatchKind::MissingConformance, type,
-                                protocolType);
+        return missingRequirementMatch(type);
       }
     }
 
@@ -2059,9 +2091,10 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     break;
   }
 
-  case MatchKind::MissingConformance:
-    diags.diagnose(match.Witness, diag::protocol_witness_missing_conformance,
-                   match.WitnessType, match.SecondType);
+  case MatchKind::MissingRequirement:
+    diags.diagnose(match.Witness, diag::protocol_witness_missing_requirement,
+                   match.WitnessType, match.MissingRequirement->getSecondType(),
+                   (unsigned)match.MissingRequirement->getKind());
     break;
 
   case MatchKind::ThrowsConflict:

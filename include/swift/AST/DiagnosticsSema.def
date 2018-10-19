@@ -1802,8 +1802,9 @@ NOTE(protocol_witness_kind_conflict,none,
      "a subscript}0", (RequirementKind))
 NOTE(protocol_witness_type_conflict,none,
      "candidate has non-matching type %0%1", (Type, StringRef))
-NOTE(protocol_witness_missing_conformance,none,
-     "candidate would match if %0 conformed to %1", (Type, Type))
+NOTE(protocol_witness_missing_requirement,none,
+     "candidate would match if %0 %select{conformed to|subclassed|"
+     "was the same type as}2 %1", (Type, Type, unsigned))
 
 NOTE(protocol_witness_optionality_conflict,none,
      "candidate %select{type has|result type has|parameter type has|"
