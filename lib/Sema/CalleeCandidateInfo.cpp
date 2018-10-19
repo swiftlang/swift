@@ -56,8 +56,8 @@ static bool isSubstitutableFor(Type type, ArchetypeType *archetype,
   return true;
 }
 
-UncurriedCandidate::UncurriedCandidate(ValueDecl *decl, bool skipCurriedSelf)
-: declOrExpr(decl), skipCurriedSelf(skipCurriedSelf), substituted(false) {
+OverloadCandidate::OverloadCandidate(ValueDecl *decl, bool skipCurriedSelf)
+    : declOrExpr(decl), skipCurriedSelf(skipCurriedSelf), substituted(false) {
 
   if (auto *PD = dyn_cast<ParamDecl>(decl)) {
     if (PD->hasValidSignature())
@@ -89,8 +89,8 @@ UncurriedCandidate::UncurriedCandidate(ValueDecl *decl, bool skipCurriedSelf)
   }
 }
 
-ArrayRef<Identifier> UncurriedCandidate::getArgumentLabels(
-                                       SmallVectorImpl<Identifier> &scratch) {
+ArrayRef<Identifier>
+OverloadCandidate::getArgumentLabels(SmallVectorImpl<Identifier> &scratch) {
   scratch.clear();
   if (auto decl = getDecl()) {
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
@@ -136,7 +136,7 @@ ArrayRef<Identifier> UncurriedCandidate::getArgumentLabels(
   return scratch;
 }
 
-void UncurriedCandidate::dump() const {
+void OverloadCandidate::dump() const {
   if (auto decl = getDecl())
     decl->dumpRef(llvm::errs());
   else
@@ -309,9 +309,8 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
 /// Determine how close an argument list is to an already decomposed argument
 /// list.  If the closeness is a miss by a single argument, then this returns
 /// information about that failure.
-CalleeCandidateInfo::ClosenessResultTy
-CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
-                                       ArrayRef<AnyFunctionType::Param> actualArgs) {
+CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
+    OverloadCandidate candidate, ArrayRef<AnyFunctionType::Param> actualArgs) {
   auto *dc = candidate.getDecl()
   ? candidate.getDecl()->getInnermostDeclContext()
   : nullptr;
@@ -787,7 +786,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
 void CalleeCandidateInfo::filterListArgs(ArrayRef<AnyFunctionType::Param> actualArgs) {
   // Now that we have the candidate list, figure out what the best matches from
   // the candidate list are, and remove all the ones that aren't at that level.
-  filterList([&](UncurriedCandidate candidate) -> ClosenessResultTy {
+  filterList([&](OverloadCandidate candidate) -> ClosenessResultTy {
     // If this isn't a function or isn't valid at this uncurry level, treat it
     // as a general mismatch.
     if (!candidate.hasParameters())
@@ -801,7 +800,7 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
   
   // If the argument is not present then we expect members without arguments.
   if (!argExpr) {
-    return filterList([&](UncurriedCandidate candidate) -> ClosenessResultTy {
+    return filterList([&](OverloadCandidate candidate) -> ClosenessResultTy {
       // If this candidate has no arguments, then we're a match.
       if (!candidate.hasParameters())
         return {CC_ExactMatch, {}};

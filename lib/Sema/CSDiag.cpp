@@ -4146,7 +4146,7 @@ static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
   auto arguments = decomposeArgType(argType, argLabels);
 
   auto bestMatchKind = RawRepresentableMismatch::NotApplicable;
-  const UncurriedCandidate *bestMatchCandidate = nullptr;
+  const OverloadCandidate *bestMatchCandidate = nullptr;
   KnownProtocolKind bestMatchProtocol;
   size_t bestMatchIndex;
 
@@ -4341,7 +4341,7 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
     auto decomposedBaseType = decomposeArgType(baseType, {Identifier()});
     auto decomposedIndexType = decomposeArgType(indexType, argLabels);
     calleeInfo.filterList(
-        [&](UncurriedCandidate cand) -> CalleeCandidateInfo::ClosenessResultTy {
+        [&](OverloadCandidate cand) -> CalleeCandidateInfo::ClosenessResultTy {
           // Classify how close this match is.  Non-subscript decls don't match.
           auto subscriptDecl = dyn_cast_or_null<SubscriptDecl>(cand.getDecl());
           if (!subscriptDecl ||
@@ -4402,7 +4402,7 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
         // and more concrete expected type for this subscript decl, in order
         // to diagnose a better error.
         if (baseType && indexType->hasUnresolvedType()) {
-          UncurriedCandidate cand = calleeInfo.candidates[0];
+          auto cand = calleeInfo.candidates[0];
           auto candType = baseType->getTypeOfMember(CS.DC->getParentModule(),
                                                     cand.getDecl(), nullptr);
           if (auto *candFunc = candType->getAs<FunctionType>()) {
@@ -5125,7 +5125,7 @@ bool FailureDiagnosis::diagnoseSubscriptMisuse(ApplyExpr *callExpr) {
   auto params = decomposeArgType(CS.getType(argExpr), argLabels);
   using ClosenessPair = CalleeCandidateInfo::ClosenessResultTy;
 
-  candidateInfo.filterList([&](UncurriedCandidate cand) -> ClosenessPair {
+  candidateInfo.filterList([&](OverloadCandidate cand) -> ClosenessPair {
     auto candFuncType = cand.getUncurriedFunctionType();
     if (!candFuncType)
       return {CC_GeneralMismatch, {}};
@@ -5443,7 +5443,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (auto fn = fnType->getAs<AnyFunctionType>()) {
     using Closeness = CalleeCandidateInfo::ClosenessResultTy;
 
-    calleeInfo.filterList([&](UncurriedCandidate candidate) -> Closeness {
+    calleeInfo.filterList([&](OverloadCandidate candidate) -> Closeness {
       auto resultType = candidate.getResultType();
       if (!resultType)
         return {CC_GeneralMismatch, {}};
