@@ -1123,49 +1123,79 @@ static bool onlyHasTerminatorAndDebugInsts(SILBasicBlock *BB) {
   return true;
 }
 
-/// \return If this basic blocks has a single br instruction passing all of the
-/// arguments in the original order, then returns the destination of that br.
-static SILBasicBlock *getTrampolineDest(SILBasicBlock *SBB) {
-  // Ignore blocks with more than one instruction.
-  if (!onlyHasTerminatorAndDebugInsts(SBB))
-    return nullptr;
+namespace {
 
-  auto *BI = dyn_cast<BranchInst>(SBB->getTerminator());
-  if (!BI)
-    return nullptr;
+/// Will be valid if the constructor's targetBB has a a single branch and all
+/// its block arguments are only used by that branch.
+struct TrampolineDest {
+  SILBasicBlock *destBB = nullptr;
+  // Source block's branch args after bypassing targetBB.
+  SmallVector<SILValue, 4> newSourceBranchArgs;
 
-  // Disallow infinite loops through SBB.
-  llvm::SmallPtrSet<SILBasicBlock *, 8> VisitedBBs;
-  BranchInst *NextBI = BI;
-  do {
-    SILBasicBlock *NextBB = NextBI->getDestBB();
-    // We don't care about infinite loops after SBB.
-    if (!VisitedBBs.insert(NextBB).second)
-      break;
-    // Only if the infinite loop goes through SBB directly we bail.
-    if (NextBB == SBB)
-      return nullptr;
-    NextBI = dyn_cast<BranchInst>(NextBB->getTerminator());
-  } while (NextBI);
+  TrampolineDest() {}
+  TrampolineDest(SILBasicBlock *sourceBB, SILBasicBlock *targetBB);
+  TrampolineDest(const TrampolineDest &) = delete;
+  TrampolineDest &operator=(const TrampolineDest &) = delete;
+  TrampolineDest(TrampolineDest &&) = default;
+  TrampolineDest &operator=(TrampolineDest &&) = default;
 
-  auto BrArgs = BI->getArgs();
-  if (BrArgs.size() != SBB->getNumArguments())
-    return nullptr;
-
-  // Check that the arguments are the same and in the right order.
-  for (int i = 0, e = SBB->getNumArguments(); i < e; ++i) {
-    SILArgument *BBArg = SBB->getArgument(i);
-    if (BrArgs[i] != BBArg)
-      return nullptr;
-    
-    // The arguments may not be used in another block, because when the
-    // predecessor of SBB directly jumps to the successor, the SBB block does
-    // not dominate the other use anymore.
-    if (!BBArg->hasOneUse())
-      return nullptr;
+  bool operator==(const TrampolineDest &rhs) {
+    return destBB == rhs.destBB
+           && newSourceBranchArgs == rhs.newSourceBranchArgs;
+  }
+  bool operator!=(const TrampolineDest &rhs) {
+    return !(*this == rhs);
   }
 
-  return BI->getDestBB();
+  operator bool() const { return destBB != nullptr; }
+};
+
+} // end anonymous namespace
+
+TrampolineDest::TrampolineDest(SILBasicBlock *sourceBB,
+                               SILBasicBlock *targetBB) {
+  // Ignore blocks with more than one instruction.
+  if (!onlyHasTerminatorAndDebugInsts(targetBB))
+    return;
+
+  auto *targetBranch = dyn_cast<BranchInst>(targetBB->getTerminator());
+  if (!targetBranch)
+    return;
+
+  // Disallow infinite loops through targetBB.
+  llvm::SmallPtrSet<SILBasicBlock *, 8> VisitedBBs;
+  BranchInst *nextBI = targetBranch;
+  do {
+    SILBasicBlock *nextBB = nextBI->getDestBB();
+    // We don't care about infinite loops after SBB.
+    if (!VisitedBBs.insert(nextBB).second)
+      break;
+    // Only if the infinite loop goes through SBB directly we bail.
+    if (nextBB == targetBB)
+      return;
+    nextBI = dyn_cast<BranchInst>(nextBB->getTerminator());
+  } while (nextBI);
+
+  // Check that all the target block arguments are only used by the branch.
+  for (SILValue blockArg : targetBB->getArguments()) {
+    Operand *operand = blockArg->getSingleUse();
+    if (!operand || operand->getUser() != targetBranch) {
+      return;
+    }
+  }
+  newSourceBranchArgs.reserve(targetBranch->getArgs().size());
+  for (SILValue branchArg : targetBranch->getArgs()) {
+    if (branchArg->getParentBlock() == targetBB) {
+      auto *phi = dyn_cast<SILPhiArgument>(branchArg);
+      if (!phi || !phi->isPhiArgument()) {
+        return;
+      }
+      branchArg = phi->getIncomingPhiValue(sourceBB);
+    }
+    newSourceBranchArgs.push_back(branchArg);
+  }
+  // Setting destBB constructs a valid TrampolineDest.
+  destBB = targetBranch->getDestBB();
 }
 
 /// \return If this is a basic block without any arguments and it has
@@ -1334,17 +1364,18 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
 
   // If the destination block is a simple trampoline (jump to another block)
   // then jump directly.
-  if (SILBasicBlock *TrampolineDest = getTrampolineDest(DestBB)) {
-    LLVM_DEBUG(llvm::dbgs() << "jump to trampoline from bb" << BB->getDebugID()
-                            << " to bb" << TrampolineDest->getDebugID() <<'\n');
-    SILBuilderWithScope(BI).createBranch(BI->getLoc(), TrampolineDest,
-                                            BI->getArgs());
+  if (auto trampolineDest = TrampolineDest(BB, DestBB)) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "jump to trampoline from bb" << BB->getDebugID() << " to bb"
+               << trampolineDest.destBB->getDebugID() << '\n');
+    SILBuilderWithScope(BI).createBranch(BI->getLoc(), trampolineDest.destBB,
+                                         trampolineDest.newSourceBranchArgs);
     // Eliminating the trampoline can expose opportunities to improve the
     // new block we branch to.
     if (LoopHeaders.count(DestBB))
       LoopHeaders.insert(BB);
 
-    addToWorklist(TrampolineDest);
+    addToWorklist(trampolineDest.destBB);
     BI->eraseFromParent();
     removeIfDead(DestBB);
     addToWorklist(BB);
@@ -1535,14 +1566,17 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
 
   // If the destination block is a simple trampoline (jump to another block)
   // then jump directly.
-  SILBasicBlock *TrueTrampolineDest = getTrampolineDest(TrueSide);
-  if (TrueTrampolineDest && TrueTrampolineDest != FalseSide) {
-    LLVM_DEBUG(llvm::dbgs() << "true-trampoline from bb" << ThisBB->getDebugID()
-                            << " to bb" << TrueTrampolineDest->getDebugID()
-                            << '\n');
+  auto trueTrampolineDest = TrampolineDest(ThisBB, TrueSide);
+  if (trueTrampolineDest
+      && trueTrampolineDest.destBB->getSinglePredecessorBlock()) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "true-trampoline from bb" << ThisBB->getDebugID() << " to bb"
+               << trueTrampolineDest.destBB->getDebugID() << '\n');
+    SmallVector<SILValue, 4> falseArgsCopy(FalseArgs.begin(), FalseArgs.end());
     SILBuilderWithScope(BI).createCondBranch(
-        BI->getLoc(), BI->getCondition(), TrueTrampolineDest, TrueArgs,
-        FalseSide, FalseArgs, BI->getTrueBBCount(), BI->getFalseBBCount());
+        BI->getLoc(), BI->getCondition(), trueTrampolineDest.destBB,
+        trueTrampolineDest.newSourceBranchArgs, FalseSide, falseArgsCopy,
+        BI->getTrueBBCount(), BI->getFalseBBCount());
     BI->eraseFromParent();
 
     if (LoopHeaders.count(TrueSide))
@@ -1552,15 +1586,17 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     return true;
   }
 
-  SILBasicBlock *FalseTrampolineDest = getTrampolineDest(FalseSide);
-  if (FalseTrampolineDest && FalseTrampolineDest != TrueSide) {
-    LLVM_DEBUG(llvm::dbgs() << "false-trampoline from bb"
-                            << ThisBB->getDebugID() << " to bb"
-                            << FalseTrampolineDest->getDebugID() << '\n');
+  auto falseTrampolineDest = TrampolineDest(ThisBB, FalseSide);
+  if (falseTrampolineDest
+      && falseTrampolineDest.destBB->getSinglePredecessorBlock()) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "false-trampoline from bb" << ThisBB->getDebugID() << " to bb"
+               << falseTrampolineDest.destBB->getDebugID() << '\n');
+    SmallVector<SILValue, 4> trueArgsCopy(TrueArgs.begin(), TrueArgs.end());
     SILBuilderWithScope(BI).createCondBranch(
-        BI->getLoc(), BI->getCondition(), TrueSide, TrueArgs,
-        FalseTrampolineDest, FalseArgs, BI->getTrueBBCount(),
-        BI->getFalseBBCount());
+        BI->getLoc(), BI->getCondition(), TrueSide, trueArgsCopy,
+        falseTrampolineDest.destBB, falseTrampolineDest.newSourceBranchArgs,
+        BI->getTrueBBCount(), BI->getFalseBBCount());
     BI->eraseFromParent();
     if (LoopHeaders.count(FalseSide))
       LoopHeaders.insert(ThisBB);
@@ -1571,8 +1607,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
 
   // Simplify cond_br where both sides jump to the same blocks with the same
   // args.
-  auto condBrToBr = [&](OperandValueArrayRef branchArgs,
-                        SILBasicBlock *newDest) {
+  auto condBrToBr = [&](ArrayRef<SILValue> branchArgs, SILBasicBlock *newDest) {
     LLVM_DEBUG(llvm::dbgs()
                << "replace cond_br with same dests with br: " << *BI);
     SILBuilderWithScope(BI).createBranch(BI->getLoc(), newDest, branchArgs);
@@ -1580,22 +1615,24 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     addToWorklist(ThisBB);
     ++NumConstantFolded;
   };
-  if (TrueArgs == FalseArgs) {
-    if (TrueTrampolineDest) {
-      if (TrueTrampolineDest == FalseSide
-          || TrueTrampolineDest == FalseTrampolineDest) {
-        condBrToBr(TrueArgs, TrueTrampolineDest);
-        removeIfDead(TrueSide);
-        removeIfDead(FalseSide);
-        return true;
-      }
-    } else if (FalseTrampolineDest == TrueSide) {
-      condBrToBr(TrueArgs, FalseTrampolineDest);
-      removeIfDead(FalseSide);
-      return true;
-    }
+  if (trueTrampolineDest.destBB == FalseSide
+      && trueTrampolineDest.newSourceBranchArgs == FalseArgs) {
+    condBrToBr(trueTrampolineDest.newSourceBranchArgs, FalseSide);
+    removeIfDead(TrueSide);
+    return true;
   }
-
+  if (falseTrampolineDest.destBB == TrueSide) {
+    condBrToBr(falseTrampolineDest.newSourceBranchArgs, TrueSide);
+    removeIfDead(FalseSide);
+    return true;
+  }
+  if (trueTrampolineDest && (trueTrampolineDest == falseTrampolineDest)) {
+    condBrToBr(trueTrampolineDest.newSourceBranchArgs,
+               trueTrampolineDest.destBB);
+    removeIfDead(TrueSide);
+    removeIfDead(FalseSide);
+    return true;
+  }
   auto *TrueTrampolineBr = getTrampolineWithoutBBArgsTerminator(TrueSide);
   if (TrueTrampolineBr &&
       !wouldIntroduceCriticalEdge(BI, TrueTrampolineBr->getDestBB())) {
@@ -2531,32 +2568,31 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
 // to trampoline jumps to the same destination block. The successor blocks
 // and the destination blocks may have no arguments.
 bool SimplifyCFG::simplifyTermWithIdenticalDestBlocks(SILBasicBlock *BB) {
-  SILBasicBlock *commonDest = nullptr;
+  TrampolineDest commonDest;
   for (auto *SuccBlock : BB->getSuccessorBlocks()) {
     if (SuccBlock->getNumArguments() != 0)
       return false;
-    SILBasicBlock *DestBlock = getTrampolineDest(SuccBlock);
-    if (!DestBlock)
+    auto trampolineDest = TrampolineDest(BB, SuccBlock);
+    if (!trampolineDest) {
       return false;
+    }
+    // The branch must have the same destination and same branch arguments.
     if (!commonDest) {
-      commonDest = DestBlock;
-    } else if (DestBlock != commonDest) {
+      commonDest = std::move(trampolineDest);
+    } else if (trampolineDest != commonDest) {
       return false;
     }
   }
-  if (!commonDest)
+  if (!commonDest) {
     return false;
-
-  assert(commonDest->getNumArguments() == 0 &&
-         "getTrampolineDest should have checked that commonDest has no args");
-
+  }
   TermInst *Term = BB->getTerminator();
   LLVM_DEBUG(llvm::dbgs() << "replace term with identical dests: " << *Term);
-  SILBuilderWithScope(Term).createBranch(Term->getLoc(), commonDest,
-                                         ArrayRef<SILValue>());
+  SILBuilderWithScope(Term).createBranch(Term->getLoc(), commonDest.destBB,
+                                         commonDest.newSourceBranchArgs);
   Term->eraseFromParent();
   addToWorklist(BB);
-  addToWorklist(commonDest);
+  addToWorklist(commonDest.destBB);
   return true;
 }
 
