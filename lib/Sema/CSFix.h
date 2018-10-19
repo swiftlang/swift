@@ -75,6 +75,11 @@ enum class FixKind : uint8_t {
   /// Skip same-type generic requirement constraint,
   /// and assume that types are equal.
   SkipSameTypeRequirement,
+
+  /// Skip superclass generic requirement constraint,
+  /// and assume that types are related.
+  SkipSuperclassRequirement,
+
 };
 
 class ConstraintFix {
@@ -311,6 +316,9 @@ public:
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
+  Type lhsType() { return LHS; }
+  Type rhsType() { return RHS; }
+
   static SkipSameTypeRequirement *create(ConstraintSystem &cs, Type lhs,
                                          Type rhs, ConstraintLocator *locator);
 };
@@ -322,8 +330,8 @@ class SkipSuperclassRequirement final : public ConstraintFix {
 
   SkipSuperclassRequirement(ConstraintSystem &cs, Type lhs, Type rhs,
                             ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::SkipSameTypeRequirement, locator), LHS(lhs),
-        RHS(rhs) {}
+      : ConstraintFix(cs, FixKind::SkipSuperclassRequirement, locator),
+        LHS(lhs), RHS(rhs) {}
 
 public:
   std::string getName() const override {
@@ -331,6 +339,9 @@ public:
   }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
+
+  Type subclassType() { return LHS; }
+  Type superclassType() { return RHS; }
 
   static SkipSuperclassRequirement *
   create(ConstraintSystem &cs, Type lhs, Type rhs, ConstraintLocator *locator);
