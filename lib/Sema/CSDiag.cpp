@@ -5126,7 +5126,7 @@ bool FailureDiagnosis::diagnoseSubscriptMisuse(ApplyExpr *callExpr) {
   using ClosenessPair = CalleeCandidateInfo::ClosenessResultTy;
 
   candidateInfo.filterList([&](OverloadCandidate cand) -> ClosenessPair {
-    auto candFuncType = cand.getUncurriedFunctionType();
+    auto candFuncType = cand.getFunctionType();
     if (!candFuncType)
       return {CC_GeneralMismatch, {}};
 
@@ -5679,7 +5679,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
           return false;
 
         auto candidate = calleeInfo[0];
-        auto *fnType = candidate.getUncurriedFunctionType();
+        auto *fnType = candidate.getFunctionType();
         if (!fnType)
           return false;
 
@@ -7228,7 +7228,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
       // expected result type.
       auto resultTy = candidateInfo[0].getResultType();
       if (!resultTy)
-        resultTy = candidateInfo[0].getUncurriedType();
+        resultTy = candidateInfo[0].getType();
 
       if (resultTy && !CS.getContextualType()->is<UnboundGenericType>() &&
           !CS.TC.isConvertibleTo(resultTy, CS.getContextualType(), CS.DC)) {
