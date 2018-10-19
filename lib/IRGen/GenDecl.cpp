@@ -901,7 +901,7 @@ llvm::Constant *IRGenModule::getAddrOfAssociatedTypeGenericParamRef(
   // Otherwise, build the reference path.
   ConstantInitBuilder builder(*this);
   auto B = builder.beginStruct();
-  B.addInt32(ordinal << 1);
+  B.addInt32(ordinal);
 
   for (auto *assocType : reversed(assocTypePath)) {
     auto proto = getConstantReferenceForProtocolDescriptor(
