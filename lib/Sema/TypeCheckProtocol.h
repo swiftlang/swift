@@ -79,6 +79,9 @@ public:
   bool isConformanceRequirement() const {
     return Requirement->isExistentialType();
   }
+  bool isSuperclassRequirement() const {
+    return !isConformanceRequirement();
+  }
   bool isError() const {
     return Requirement->is<ErrorType>();
   }

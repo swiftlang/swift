@@ -893,9 +893,9 @@ swift::matchWitness(TypeChecker &tc,
         return missingRequirementMatch(type);
 
       type = type->mapTypeOutOfContext();
-      if (auto typeParamTy = type->getAs<GenericTypeParamType>())
+      if (type->hasTypeParameter())
         if (auto env = conformance->getGenericEnvironment())
-          if (auto assocType = env->mapTypeIntoContext(typeParamTy))
+          if (auto assocType = env->mapTypeIntoContext(type))
             return missingRequirementMatch(assocType);
 
       auto reqSubMap = reqEnvironment.getRequirementToSyntheticMap();
