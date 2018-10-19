@@ -53,6 +53,6 @@ func test_arch() {
   arch({(x: inout Int, y: Double, z: String, w: Int8) -> () in })
 
   // CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden swiftcc %swift.metadata_response @"$syyyccMa"
-  // CHECK: call %swift.type* @swift_getFunctionTypeMetadata1(i64 67108865
+  // CHECK: call %swift.type* @swift_getFunctionTypeMetadata1({{i(32|64)}} 67108865
   arch({(x: @escaping () -> ()) -> () in })
 }
