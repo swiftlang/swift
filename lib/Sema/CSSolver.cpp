@@ -1702,12 +1702,6 @@ void ConstraintSystem::partitionDisjunction(
     return;
   }
 
-  SmallVector<unsigned, 4> disabled;
-  SmallVector<unsigned, 4> unavailable;
-  SmallVector<unsigned, 4> globalScope;
-  SmallVector<SmallVector<unsigned, 4>, 4> definedInDesignatedType;
-  SmallVector<SmallVector<unsigned, 4>, 4> definedInExtensionOfDesignatedType;
-  SmallVector<unsigned, 4> everythingElse;
   SmallSet<Constraint *, 16> taken;
 
   // Local function used to iterate over the untaken choices from the
@@ -1728,6 +1722,14 @@ void ConstraintSystem::partitionDisjunction(
             taken.insert(constraint);
         }
       };
+
+
+  // First collect some things that we'll generally put near the end
+  // of the partitioning.
+
+  SmallVector<unsigned, 4> disabled;
+  SmallVector<unsigned, 4> unavailable;
+  SmallVector<unsigned, 4> globalScope;
 
   // First collect disabled constraints.
   forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
@@ -1764,6 +1766,19 @@ void ConstraintSystem::partitionDisjunction(
     globalScope.push_back(index);
     return true;
   });
+
+  // Local function to create the next partition based on the options
+  // passed in.
+  auto appendPartition = [&](SmallVectorImpl<unsigned> &options) {
+    if (options.size()) {
+      PartitionBeginning.push_back(Ordering.size());
+      Ordering.insert(Ordering.end(), options.begin(), options.end());
+    }
+  };
+
+  SmallVector<SmallVector<unsigned, 4>, 4> definedInDesignatedType;
+  SmallVector<SmallVector<unsigned, 4>, 4> definedInExtensionOfDesignatedType;
+  SmallVector<unsigned, 4> everythingElse;
 
   // Now collect the overload choices that are defined within the type
   // that was designated in the operator declaration.
@@ -1806,25 +1821,8 @@ void ConstraintSystem::partitionDisjunction(
         });
   }
 
-  // Gather the remaining options.
-  forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
-    everythingElse.push_back(index);
-    return true;
-  });
-
-  // Local function to create the next partition based on the options
-  // passed in.
-  auto appendPartition = [&](SmallVectorImpl<unsigned> &options) {
-    if (options.size()) {
-      PartitionBeginning.push_back(Ordering.size());
-      Ordering.insert(Ordering.end(), options.begin(), options.end());
-    }
-  };
-
-  // Now create the partitioning based on what was collected.
-
-  // First we'll add partitions for each of the overloads we found in
-  // types that were designated as part of the operator declaration.
+  // Add partitions for each of the overloads we found in types that
+  // were designated as part of the operator declaration.
   for (auto designatedTypeIndex : indices(designatedNominalTypes)) {
     if (designatedTypeIndex < definedInDesignatedType.size()) {
       auto &primary = definedInDesignatedType[designatedTypeIndex];
@@ -1835,6 +1833,15 @@ void ConstraintSystem::partitionDisjunction(
       appendPartition(secondary);
     }
   }
+
+  // Gather the remaining options.
+  forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
+    everythingElse.push_back(index);
+    return true;
+  });
+
+  // Now create the remaining partitions from what we previously collected.
+
   appendPartition(everythingElse);
   appendPartition(globalScope);
   appendPartition(unavailable);
