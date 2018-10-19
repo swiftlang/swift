@@ -952,5 +952,112 @@ static void verify_DeclContext_is_start_of_node() {
 #endif
 
 void DeclContext::updateHash(llvm::MD5& hash) const {
+  // see ASTMangler::appendContext
+  switch (getContextKind()) {
+      
+    case DeclContextKind::TopLevelCodeDecl:
+      cast<TopLevelCodeDecl>(this)->updateHashInner(hash);
+      
+    case DeclContextKind::SerializedLocal: {
+      auto local = cast<SerializedLocalDeclContext>(this);
+      switch (local->getLocalDeclContextKind()) {
+        case LocalDeclContextKind::AbstractClosure:
+          cast<SerializedAbstractClosureExpr>(local)->updateHashInner(hash);
+          break;
+        case LocalDeclContextKind::DefaultArgumentInitializer:
+          cast<SerializedDefaultArgumentInitializer>(local)->updateHashInner(hash);
+          break;
+        case LocalDeclContextKind::PatternBindingInitializer:
+          cast<SerializedPatternBindingInitializer>(local)->updateHashInner(hash);
+          break;
+        case LocalDeclContextKind::TopLevelCodeDecl:
+          cast<TopLevelCodeDecl>(local)->updateHashInner(hash);
+          break;
+      }
+    }
+      break;
+      
+    case DeclContextKind::AbstractClosureExpr:
+      cast<AbstractClosureExpr>(this)->updateHashInner(hash);
+      break;
+    case DeclContextKind::Initializer:
+      switch (cast<Initializer>(this)->getInitializerKind()) {
+          case InitializerKind::DefaultArgument:
+           cast<DefaultArgumentInitializer>(this)->updateHashInner(hash);
+          break;
+          case InitializerKind::PatternBinding:
+          cast<PatternBindingInitializer>(this)->updateHashInner(hash);
+          break;
+      }
+      break;
+     case DeclContextKind::SubscriptDecl:
+      cast<SubscriptDecl>(this)->updateHashInner(hash);
+      break;
+    case DeclContextKind::AbstractFunctionDecl:
+      cast<AbstractFunctionDecl>(this)->updateHashInner(hash);
+      break;
+    case DeclContextKind::Module:
+      cast<ModuleDecl>(this)->updateHashInner(hash);
+      break;
+    case DeclContextKind::FileUnit:
+      cast<FileUnit>(this)->updateHashInner(hash);
+      
+      break;
+    case DeclContextKind::GenericTypeDecl:
+       cast<GenericTypeDecl>(this)->updateHashInner(hash);
+      break;
+    case DeclContextKind::ExtensionDecl:
+      cast<ExtensionDecl>(this)->updateHashInner(hash);
+      break;
+  }
+}
+
+void SerializedLocalDeclContext::updateHashInner(llvm::MD5 &hash) const {
+  ExperimentalDependencies::updateHashFromBits(hash, LocalKind);
+}
+
+void SerializedAbstractClosureExpr::updateHashInner(llvm::MD5 &hash) const {
+  Ty.updateHash(hash);
+  TypeAndImplicit.getAddrOfPointer()->updateHash(hash);
+  bool isI = isImplicit();
+  ExperimentalDependencies::updateHashFromBits(hash, isI);
+  ExperimentalDependencies::updateHashFromBits(hash, Discriminator);
+  SerializedLocalDeclContext::updateHashInner(hash);
+}
+
+void SerializedPatternBindingInitializer::updateHashInner(llvm::MD5 &hash) const {
+  Binding->updateHash(hash);
+  SerializedLocalDeclContext::updateHashInner(hash);
+}
+
+void TopLevelCodeDecl::updateHashInner(llvm::MD5 &hash) const {
+#error get here twice?
+#error unimp
+}
+void AbstractClosureExpr::updateHashInner(llvm::MD5 &hash) const {
+#error unimp
+}
+void SubscriptDecl::updateHashInner(llvm::MD5 &hash) const {
+#error unimp
+}
+void AbstractFunctionDecl::updateHashInner(llvm::MD5 &hash) const {
+#error unimp
+}
+void ModuleDecl::updateHashInner(llvm::MD5 &hash) const {
+#error unimp
+}
+void FileUnit::updateHashInner(llvm::MD5 &hash) const {
+#error unimp
+}
+void GenericTypeDecl::updateHashInner(llvm::MD5 &hash) const {
+#error unimp
+}
+void ExtensionDecl::updateHashInner(llvm::MD5 &hash) const {
+#error unimp
+}
+void PatternBindingInitializer::updateHashInner(llvm::MD5 &hash) const {
+#error unimp
+}
+void GenericTypeDecl::updateHashInner(llvm::MD5 &hash) const {
 #error unimp
 }

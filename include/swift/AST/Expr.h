@@ -3485,6 +3485,8 @@ public:
 
   using DeclContext::operator new;
   using Expr::dump;
+  
+  void updateHashInner(llvm::MD5&) const;
 };
 
 /// SerializedAbstractClosureExpr - This represents what was originally an
@@ -3521,6 +3523,7 @@ public:
         LocalDeclContextKind::AbstractClosure;
     return false;
   }
+  void updateHashInner(llvm::MD5&) const;
 };
 
 /// \brief An explicit unnamed function expression, which can optionally have

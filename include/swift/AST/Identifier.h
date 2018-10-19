@@ -161,6 +161,10 @@ public:
     return Identifier((const char*)
                       llvm::DenseMapInfo<const void*>::getTombstoneKey());
   }
+  
+  void updateHash(llvm::MD5 &hash) const {
+    hash.update(str());
+  }
 
 private:
   bool isOperatorSlow() const;

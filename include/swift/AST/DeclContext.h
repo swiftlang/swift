@@ -622,7 +622,7 @@ public:
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::SerializedLocal;
   }
-  void updateHash(llvm::MD5& hash) const;
+  void updateHashInner(llvm::MD5& hash) const;
 };
 
 /// An iterator that walks through a list of declarations stored

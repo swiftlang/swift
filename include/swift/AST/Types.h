@@ -5366,15 +5366,6 @@ inline bool TypeBase::hasSimpleTypeRepr() const {
     return true;
   }
 }
-  
-  inline void TypeBase::updateHash(llvm::MD5 &hash) const {
-    // TODO: more!
-    ExperimentalDependencies::updateHashFromBits(hash, Bits);
-    assert(hasCanonicalTypeComputed());
-    CanType ct = getCanonicalType();
-    ct.updateHash(hash);
-  }
-
 } // end namespace swift
 
 namespace llvm {

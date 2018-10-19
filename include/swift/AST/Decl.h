@@ -1808,6 +1808,8 @@ public:
   }
 
   using DeclContext::operator new;
+                              
+  void updateHashInner(llvm::MD5&) const;
 };
 
 /// \brief Iterator that walks the extensions of a particular type.
@@ -2178,6 +2180,8 @@ public:
   }
   
   using DeclContext::operator new;
+  
+  void updateHashInner(llvm::MD5&) const;
 };
 
 /// SerializedTopLevelCodeDeclContext - This represents what was originally a
@@ -2708,6 +2712,7 @@ public:
     return D->getKind() >= DeclKind::First_GenericTypeDecl &&
            D->getKind() <= DeclKind::Last_GenericTypeDecl;
   }
+  void updateHashInner(llvm::MD5&) const;
 };
 
 
@@ -2778,6 +2783,7 @@ public:
       return classof(D);
     return false;
   }
+  void updateHashInner(llvm::MD5&) const;
 };
 
 /// Abstract class describing generic type parameters and associated types,
@@ -5005,6 +5011,8 @@ public:
 
   using DeclContext::operator new;
   using Decl::getASTContext;
+  
+  void updateHashInner(llvm::MD5&) const;
 };
 
 /// Encodes imported-as-member status for C functions that get imported
@@ -5415,6 +5423,8 @@ public:
 
   using DeclContext::operator new;
   using Decl::getASTContext;
+  
+  void updateHashInner(llvm::MD5&) const;
 };
 
 class OperatorDecl;

@@ -13,6 +13,8 @@
 #ifndef ExperimentalDependencies_h
 #define ExperimentalDependencies_h
 
+#include "llvm/Support/MD5.h"
+
 namespace swift {
 /// Experimental dependencies evolve Swift towards finer-grained dependencies
 /// and faster incremental rebuilds.

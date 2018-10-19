@@ -567,6 +567,8 @@ public:
   // or by doing a placement new.
   void *operator new(size_t Bytes, const ASTContext &C,
                      unsigned Alignment = alignof(ModuleDecl));
+  
+  void updateHashInner(llvm::MD5&) const;
 };
 
 static inline unsigned alignOfFileUnit();
@@ -819,6 +821,8 @@ public:
   // or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
                      unsigned Alignment = alignOfFileUnit());
+  
+  void updateHashInner(llvm::MD5&) const;
 };
 
 static inline unsigned alignOfFileUnit() {

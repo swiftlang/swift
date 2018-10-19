@@ -114,6 +114,8 @@ public:
   static bool classof(const Initializer *I) {
     return I->getInitializerKind() == InitializerKind::PatternBinding;
   }
+  
+  void updateHashInner(llvm::MD5&) const;
 };
 
 /// SerializedPatternBindingInitializer - This represents what was originally a
@@ -145,6 +147,8 @@ public:
       LocalDeclContextKind::PatternBindingInitializer;
     return false;
   }
+  
+  void updateHashInner(llvm::MD5&) const;
 };
 
 /// A default argument expression.  The parent context is the function
@@ -177,6 +181,8 @@ public:
   static bool classof(const Initializer *I) {
     return I->getInitializerKind() == InitializerKind::DefaultArgument;
   }
+  
+  void updateHashInner(llvm::MD5&) const;
 };
 
 /// SerializedDefaultArgumentInitializer - This represents what was originally a

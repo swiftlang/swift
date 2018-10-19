@@ -6325,17 +6325,17 @@ void Decl::updateHash(llvm::MD5& hash) const {
 }
 
 void OperatorDecl::updateHash(llvm::MD5& hash) const {
-  hash.update(name.str());
+  name.updateHash(hash);
   Decl::updateHash(hash);
 }
 
 void NominalTypeDecl::updateHash(llvm::MD5& hash) const {
 #error unimp
-  Type DeclaredTy;
-  Type DeclaredTyInContext;
-  Type DeclaredInterfaceTy;
-  extensions
-  GenericTypeDecl::updateHash(hash);
+//  Type DeclaredTy;
+//  Type DeclaredTyInContext;
+//  Type DeclaredInterfaceTy;
+//  extensions
+//  GenericTypeDecl::updateHash(hash);
 }
 
 void PrecedenceGroupDecl::updateHash(llvm::MD5& hash) const {
@@ -6345,6 +6345,6 @@ void PrecedenceGroupDecl::updateHash(llvm::MD5& hash) const {
 void ValueDecl::updateHash(llvm::MD5& hash) const {
 #error unimp
 }
-void GenericTypeDecl::updateHash(llvm::MD5& hash) const {
-#error unimp
-}
+//void GenericTypeDecl::updateHash(llvm::MD5& hash) const {
+//#error unimp
+//}

@@ -672,15 +672,14 @@ DependsEmitter::sortedByName(const llvm::DenseMap<DeclBaseName, bool> map) {
   return pairs;
 }
 
-#error move
 
 template <typename T>
-void updateHashFromBits(llvm::MD5 &hash, const T& bits) {
+void ExperimentalDependencies::updateHashFromBits(llvm::MD5 &hash, const T& bits) {
   hash.update(ArrayRef<u_int8_t>(reinterpret_cast<u_int8_t*>(bits, sizeof(bits))));
   }
 
 template <typename T>
-void updateHashFromOptionalBits(llvm::MD5 &hash, const llvm::Optional<const T> bits) {
+void ExperimentalDependencies::updateHashFromOptionalBits(llvm::MD5 &hash, const T& bits) {
   if (bits.hasValue())
     updateHashFromBits(hash, bits.getValue());
 }

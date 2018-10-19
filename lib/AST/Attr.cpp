@@ -985,7 +985,6 @@ void DeclAttributes::updateHash(llvm::MD5 &hash) const {
 }
 
 void DeclAttribute::updateHash(llvm::MD5 &hash) const {
-#error subclasses
   ExperimentalDependencies::updateHashFromBits(hash, &Bits);
   switch (getKind()) {
 //      CONTEXTUAL_SIMPLE_DECL_ATTR
@@ -1127,7 +1126,7 @@ void ObjCBridgedAttr::updateHashInner(llvm::MD5 &hash) const {
 }
 
 void SynthesizedProtocolAttr::updateHashInner(llvm::MD5 &hash) const {
-#error unimp Loader subclasses
+  // probably OK
 }
 
 void SpecializeAttr::updateHashInner(llvm::MD5 &hash) const {

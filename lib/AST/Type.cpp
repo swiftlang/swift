@@ -4080,6 +4080,23 @@ Type TypeBase::openAnyExistentialType(ArchetypeType *&opened) {
   return opened;
 }
 
+
+void TypeBase::updateHash(llvm::MD5 &hash) const {
+  ExperimentalDependencies::updateHashFromBits(hash, Bits);
+  assert(hasCanonicalTypeComputed());
+  CanType ct = getCanonicalType();
+  ct.updateHash(hash);
+  
+  //const issue getOptionalObjectType().updateHash(hash);
+  
+#error TBD:
+  //getContextSubstitutions: adjustSuperclassMemberDeclType, getTypeOfMember, getMemberSubstitutions, getContextSubstitutionMap, getContextSubstitutions, getContextSubstitutionMap
+}
 void Type::updateHash(llvm::MD5 &hash) const {
-  getPointer()->updateHash(MD5);
+  getPointer()->updateHash(hash);
+}
+
+void CanType::updateHash(llvm::MD5 &hash) const {
+#error inf recursion
+  Type::updateHash(hash);
 }
