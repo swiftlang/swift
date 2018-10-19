@@ -892,7 +892,7 @@ swift::matchWitness(TypeChecker &tc,
 
       auto reqSubMap = reqEnvironment.getRequirementToSyntheticMap();
       Type selfTy = proto->getSelfInterfaceType().subst(reqSubMap);
-      if (type->isEqual(selfTy) /*type->isEqual(conformance->getType())*/) {
+      if (type->isEqual(selfTy)) {
         type = conformance->getType();
         if (auto agt = type->getAs<AnyGenericType>())
           type = agt->getDecl()->getDeclaredInterfaceType();
