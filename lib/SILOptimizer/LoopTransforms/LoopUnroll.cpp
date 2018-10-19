@@ -33,6 +33,8 @@ using llvm::MapVector;
 namespace {
 
 /// Clone the basic blocks in a loop.
+///
+/// Currently invalidates the DomTree.
 class LoopCloner : public SILCloner<LoopCloner> {
   SILLoop *Loop;
 
