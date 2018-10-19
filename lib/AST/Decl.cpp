@@ -6304,19 +6304,149 @@ void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *decl) {
 }
 
 // ExperimentalDependencies
-std::pair<std::string, ExperimentalDependencies::unimpLocation_t>
-Decl::getExperimentalDependencyHash() const {
-  llvm::MD5 DeclHash;
-  const char* maybeUnimp = updateExpDepHash(DeclHash);
-  if (maybeUnimp) {
-    return std::make_pair(std::string(), maybeUnimp);
+
+  
+ExperimentalDependencies::unimpLocation_t Decl::updateExpDepHash(llvm::MD5& hash) const {
+  
+  switch (getKind()) {
+#error casts wrong and sub impls
+    case DeclKind::Enum:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Struct:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Class:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Protocol:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::First_NominalTypeDecl:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Last_NominalTypeDecl:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::TypeAlias:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::First_GenericTypeDecl:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Last_GenericTypeDecl:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::GenericTypeParam:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::AssociatedType:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::First_AbstractTypeParamDecl:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Last_AbstractTypeParamDecl:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Module:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::First_TypeDecl:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Last_TypeDecl:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Var:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Param:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Subscript:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::First_AbstractStorageDecl:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Last_AbstractStorageDecl:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Constructor:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Destructor:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Func:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Accessor:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::First_AbstractFunctionDecl:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Last_AbstractFunctionDecl:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::EnumElement:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::First_ValueDecl:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Last_ValueDecl:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Extension:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::TopLevelCode:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Import:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::IfConfig:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::PoundDiagnostic:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::PrecedenceGroup:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::MissingMember:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::PatternBinding:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::EnumCase:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::InfixOperator:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::PrefixOperator:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::PostfixOperator:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::First_OperatorDecl:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Last_OperatorDecl:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
+    case DeclKind::Last_Decl:
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
+      break;
   }
-  llvm::MD5::MD5Result result;
-  DeclHash.final(result);
-  llvm::SmallString<32> str;
-  llvm::MD5::stringifyResult(result, str);
-#error do subclasses
-  return std::make_pair(str.str().str(), nullptr);
+
 }
 
 

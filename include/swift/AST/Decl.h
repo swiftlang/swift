@@ -944,7 +944,6 @@ public:
     return Mem; 
   }
 
-  std::pair<std::string, ExperimentalDependencies::unimpLocation_t> getExperimentalDependencyHash() const;
   ExperimentalDependencies::unimpLocation_t  updateExpDepHash(llvm::MD5&) const;
 };
 

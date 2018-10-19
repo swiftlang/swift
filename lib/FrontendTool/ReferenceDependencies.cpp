@@ -129,6 +129,10 @@ private:
   static bool declIsPrivate(const Decl *member);
 
   void emitExperimentalTopLevel(const DeclBaseName &, const Decl *) const;
+  
+  static std::pair<std::string, ExperimentalDependencies::unimpLocation_t>
+  getExperimentalDependencyHash(const Decl *D);
+
 };
 
 /// Emit the depended-upon declartions.
@@ -337,7 +341,7 @@ void ProvidesEmitter::emitTopLevelDecl(const Decl *const D,
 void ProvidesEmitter::emitExperimentalTopLevel(const DeclBaseName &N,
                                                const Decl *D) const {
   if (EnableExperimentalDependencies) {
-    std::pair<std::string, const char*> hashOrUnimpLoc = D->getExperimentalDependencyHash();
+    std::pair<std::string, const char*> hashOrUnimpLoc = getExperimentalDependencyHash(D);
     out << "- \""
         << llvm::yaml::escape(ExperimentalDependencies::CompoundProvides(
                                   N.userFacingName(), hashOrUnimpLoc.first, hashOrUnimpLoc.second)
@@ -346,6 +350,21 @@ void ProvidesEmitter::emitExperimentalTopLevel(const DeclBaseName &N,
   }
   else
     out << "- \"" << escape(N) << "\"\n";
+}
+
+std::pair<std::string, ExperimentalDependencies::unimpLocation_t>
+ProvidesEmitter::getExperimentalDependencyHash(const Decl *D) {
+  
+  llvm::MD5 DeclHash;
+  
+  if (ExperimentalDependencies::unimpLocation_t r  = D->updateExpDepHash(DeclHash))
+    return make_pair(std::string(), r);
+  
+  llvm::MD5::MD5Result result;
+  DeclHash.final(result);
+  llvm::SmallString<32> str;
+  llvm::MD5::stringifyResult(result, str);
+  return std::make_pair(str.str().str(), nullptr);
 }
 
 void ProvidesEmitter::emitExtensionDecl(const ExtensionDecl *const ED,
