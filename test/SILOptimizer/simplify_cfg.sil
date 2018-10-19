@@ -453,18 +453,16 @@ bb5(%6 : $Int64):
   return %6 : $Int64
 }
 
-// Make sure that a conditional branch to a trampoline without parameters
-// gets eliminated by branching to a target of this trampoline.
+// Eliminate the trampoline from from a cond_br at bb5->bb3->bb4/
+// This becomes a cond_br at bb8->bb5
 // CHECK-LABEL: @elim_trampoline5
 // CHECK: cond_br
-// CHECK: bb3:
-// CHECK: cond_br
-// CHECK: bb4{{.*}}:
-// Last cond_br should branch directly to the target of a trampoline
-// instead of the original bb3
-// CHECK: cond_br {{.*}}, bb3, bb5
 // CHECK: bb5:
-// CHECK-NEXT: br bb4
+// CHECK: cond_br
+// CHECK: bb8{{.*}}:
+// CHECK: cond_br {{.*}}, bb5, bb9
+// CHECK: bb9:
+// CHECK-NEXT: br bb8
 // CHECK: }
 sil @elim_trampoline5 : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
@@ -1837,7 +1835,7 @@ bb2:
 
 // CHECK-LABEL: sil @dont_remove_cond_fail_wrong_const
 // CHECK:      bb0(%0 : $Builtin.Int1):
-// CHECK-NEXT:   cond_br %0, bb1, bb2
+// CHECK-NEXT:   cond_br %0, bb2, bb1
 sil @dont_remove_cond_fail_wrong_const : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb2
@@ -1930,7 +1928,7 @@ bb3:
 // CHECK-LABEL: sil @dont_remove_cond_fail_same_cond_in_false
 // CHECK: bb0([[COND:%[0-9]*]]
 // CHECK-NEXT: cond_br
-// CHECK: bb1:
+// CHECK: bb2:
 // CHECK-NEXT: cond_fail [[COND]]
 // CHECK: return
 sil @dont_remove_cond_fail_same_cond_in_false : $@convention(thin)(Builtin.Int1, Builtin.Int1) -> () {
@@ -2051,13 +2049,13 @@ bb3(%a3 : $Builtin.Int1):
 // CHECK:      bb1:
 // CHECK-NEXT:   apply
 // CHECK-NEXT:   integer_literal
-// CHECK-NEXT:   br bb4
+// CHECK-NEXT:   br bb5
 // CHECK:      bb2:
 // CHECK-NEXT:   apply
 // CHECK-NEXT:   cond_br
 // CHECK:      bb3:
-// CHECK:        br bb4
-// CHECK:      bb4({{.*}}):
+// CHECK:        br bb6
+// CHECK:      bb5({{.*}}):
 // CHECK-NEXT:   apply
 // CHECK-NEXT:   cond_fail
 sil @dont_move_cond_fail_no_postdom : $@convention(thin) (Builtin.Int1, Builtin.Int1, Builtin.Int1) -> () {
@@ -2202,19 +2200,19 @@ bb3 (%10: $Builtin.Int32):
 
 // CHECK-LABEL: sil @thread_objc_method_call_succ_block
 // CHECK: bb0
-// CHECK:  cond_br {{.*}}, bb1, bb2
+// CHECK:  cond_br {{.*}}, bb1, bb3
 // CHECK: bb1
 // CHECK:  objc_method
 // CHECK:  apply
 // CHECK:  strong_release
-// CHECK:  cond_br {{.*}}, bb3, bb4
-// CHECK: bb2
-// CHECK:  strong_release
-// CHECK:  cond_br {{.*}}, bb3, bb4
+// CHECK:  cond_br {{.*}}, bb2, bb6
 // CHECK: bb3
+// CHECK:  strong_release
+// CHECK:  cond_br {{.*}}, bb5, bb4
+// CHECK: bb7
 // CHECK:  cond_fail
-// CHECK:  br bb4
-// CHECK: bb4:
+// CHECK:  br bb8
+// CHECK: bb8:
 // CHECK:  strong_release
 // CHECK:  return
 
@@ -2248,20 +2246,20 @@ sil @f_use : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK: bb1:
 // CHECK:  [[INVADD:%.*]] = builtin "sadd
 // CHECK:  [[EXT:%.*]] = tuple_extract [[INVADD]]
-// CHECK:  switch_enum {{.*}} case #Optional.some!enumelt: bb2
+// CHECK:  switch_enum {{.*}} case #Optional.some!enumelt: bb3
 
-// CHECK: bb2{{.*}}
-// CHECK:  br bb4({{.*}} : $Builtin.Int32, %2 : $Builtin.Int32, [[EXT]]
+// CHECK: bb3{{.*}}
+// CHECK:  br bb5({{.*}} : $Builtin.Int32, %2 : $Builtin.Int32, [[EXT]]
 
-// CHECK: bb4({{.*}} : $Builtin.Int32, [[CUR:%.*]] : $Builtin.Int32, [[NEXT:%.*]] : $Builtin.Int32
+// CHECK: bb5({{.*}} : $Builtin.Int32, [[CUR:%.*]] : $Builtin.Int32, [[NEXT:%.*]] : $Builtin.Int32
 // CHECK:  [[F:%.*]] = function_ref @f
 // CHECK:  apply [[F]]([[CUR]])
-// CHECK:  cond_br {{.*}}, bb5, bb6
+// CHECK:  cond_br {{.*}}, bb7, bb6
 
-// CHECK: bb5:
+// CHECK: bb7:
 // CHECK:   [[VARADD:%.*]] = builtin "sadd_with_overflow_Int32"([[NEXT]] : $Builtin.Int32
 // CHECK:   [[NEXT2:%.*]] = tuple_extract [[VARADD]]
-// CHECK:   br bb4({{.*}} : $Builtin.Int32, [[NEXT]] : $Builtin.Int32, [[NEXT2]]
+// CHECK:   br bb5({{.*}} : $Builtin.Int32, [[NEXT]] : $Builtin.Int32, [[NEXT2]]
 
 
 sil @switch_enum_jumpthreading_bug : $@convention(thin) (Optional<Builtin.Int32>, Builtin.Int1, Builtin.Int32, Builtin.Int1) -> Builtin.Int32 {
@@ -3047,7 +3045,7 @@ bb3(%11 : $String):
 // CHECK-LABEL: sil @dont_hang
 // CHECK:      bb6:
 // CHECK:        integer_literal $Builtin.Int64, 1
-// CHECK-NEXT:   br bb5
+// CHECK-NEXT:   br bb6
 // CHECK-NEXT: }
 sil @dont_hang : $@convention(thin) () -> () {
 bb0:

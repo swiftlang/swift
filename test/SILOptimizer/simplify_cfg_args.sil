@@ -61,7 +61,7 @@ bb3(%35 : $()):                                   // Preds: bb2
 
 //CHECK-LABEL: remove_dead_args
 //CHECK-NOT: br bb2([[VAR_21:%[0-9]+]] : $Bool)
-//CHECK: bb2:
+//CHECK: bb3:
 //CHECK-NEXT: tuple ()
 //CHECK-NEXT: return
 sil @remove_dead_args: $@convention(thin) (Int32) -> () {
