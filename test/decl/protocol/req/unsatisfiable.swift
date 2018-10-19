@@ -10,7 +10,7 @@ protocol P {
 
 extension P {
   func f<T: P>(_: T) where T.A == Self.A, T.A == Self.B { }
-  // expected-note@-1 {{candidate has non-matching type '<Self, T> (T) -> ()'}}
+  // expected-note@-1 {{candidate would match if 'X' was the same type as 'X.B' (aka 'Int')}}
 }
 
 struct X : P { // expected-error {{type 'X' does not conform to protocol 'P'}}
