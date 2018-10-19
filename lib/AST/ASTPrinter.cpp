@@ -110,6 +110,10 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
           if (auto *ASD = dyn_cast<AbstractStorageDecl>(VD))
             if (contributesToParentTypeStorage(ASD))
               return true;
+          // We do want to print willSet/didSet observers, to indicate
+          // a stored-with-non-trivial-setter property.
+          if (auto *accessor = dyn_cast<AccessorDecl>(VD))
+            return accessor->isObservingAccessor();
           return false;
         }
       }
@@ -1691,11 +1695,9 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   // Otherwise, print all the concrete defining accessors.
   bool PrintAccessorBody = Options.FunctionDefinitions;
 
-  // Helper to print an accessor. Returns true if the
-  // accessor was present but skipped.
-  auto PrintAccessor = [&](AccessorDecl *Accessor) -> bool {
-    if (!Accessor || !shouldPrint(Accessor))
-      return true;
+  // Helper to print an accessor.
+  auto PrintAccessor = [&](AccessorDecl *Accessor) {
+    if (!Accessor) return;
     if (!PrintAccessorBody) {
       Printer << " ";
       printMutatingModifiersIfNeeded(Accessor);
@@ -1709,7 +1711,6 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       indent();
       Printer.printNewline();
     }
-    return false;
   };
 
   // Determine if we should print the getter without the 'get { ... }'
@@ -1755,12 +1756,8 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       llvm_unreachable("simply-stored variable should have been filtered out");
     case WriteImplKind::StoredWithObservers:
     case WriteImplKind::InheritedWithObservers: {
-      bool skippedWillSet = PrintAccessor(ASD->getWillSetFunc());
-      bool skippedDidSet = PrintAccessor(ASD->getDidSetFunc());
-      if (skippedDidSet && skippedWillSet) {
-        PrintAccessor(ASD->getGetter());
-        PrintAccessor(ASD->getSetter());
-      }
+      PrintAccessor(ASD->getWillSetFunc());
+      PrintAccessor(ASD->getDidSetFunc());
       break;
     }
     case WriteImplKind::Set:
