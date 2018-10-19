@@ -1,11 +1,12 @@
-// RUN: %scale-test --begin 2 --end 10 --step 1 --select incrementScopeCounter %s
+// RUN: %scale-test --begin 2 --end 10 --step 1 --select NumConstraintScopes %s
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 
-func f() {
-% for i in range(N):
-  let collection${i} = [String]()
-% end
-
+func f(
+%for i in range(N):
+  collection${i}: [String],
+%end
+  collection${N+1}: [String]
+) {
   _ = ${' + '.join("collection%s" % i for i in range(N))}
 }

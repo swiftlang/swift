@@ -1244,7 +1244,6 @@ bool ConstraintSystem::solve(Expr *const expr,
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log << "---Solver statistics---\n";
     log << "Total number of scopes explored: " << solverState->NumStatesExplored << "\n";
-    log << "Number of leaf scopes explored: " << solverState->leafScopes << "\n";
     log << "Maximum depth reached while exploring solutions: " << solverState->maxDepth << "\n";
     if (Timer) {
       auto timeInMillis =

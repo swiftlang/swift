@@ -83,11 +83,15 @@ ConstraintSystem::~ConstraintSystem() {
 }
 
 void ConstraintSystem::incrementScopeCounter() {
-  SWIFT_FUNC_STAT;
   CountScopes++;
   // FIXME: (transitional) increment the redundant "always-on" counter.
   if (TC.Context.Stats)
     TC.Context.Stats->getFrontendCounters().NumConstraintScopes++;
+}
+
+void ConstraintSystem::incrementLeafScopes() {
+  if (TC.Context.Stats)
+    TC.Context.Stats->getFrontendCounters().NumLeafScopes++;
 }
 
 bool ConstraintSystem::hasFreeTypeVariables() {

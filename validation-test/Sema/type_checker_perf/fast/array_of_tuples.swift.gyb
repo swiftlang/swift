@@ -1,0 +1,9 @@
+// RUN: %scale-test --begin 1 --end 20 --step 1 --select NumLeafScopes %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+let a = [
+%for i in range(0, N):
+  (1, 1),
+%end
+]
