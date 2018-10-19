@@ -1183,12 +1183,6 @@ public:
     out << str << '\n';
   }
 
-  void getExperimentalInterfaceHash(llvm::SmallString<32> &str) {
-    llvm::MD5::MD5Result result;
-    ExperimentalInterfaceHash->final(result);
-    llvm::MD5::stringifyResult(result, str);
-  }
-
   std::vector<Token> &getTokenVector();
 
   ArrayRef<Token> getAllTokens() const;

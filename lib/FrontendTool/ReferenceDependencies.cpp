@@ -254,19 +254,8 @@ void ReferenceDependenciesEmitter::emitDepends() const {
 void ReferenceDependenciesEmitter::emitInterfaceHash() const {
   llvm::SmallString<32> interfaceHash;
   SF->getInterfaceHash(interfaceHash);
-  if (!SF->getEnableExperimentalDependencies()) {
-    out << reference_dependency_keys::interfaceHash << ": \"" << interfaceHash
-        << "\"\n";
-    return;
-  }
-  llvm::SmallString<32> experimentalInterfaceHash;
-  SF->getExperimentalInterfaceHash(experimentalInterfaceHash);
-
-  out << reference_dependency_keys::interfaceHash << ": \""
-      << ExperimentalDependencies::InterfaceHashes(
-             interfaceHash.str(), experimentalInterfaceHash.str())
-             .combined()
-      << "\"\n";
+  out << reference_dependency_keys::interfaceHash << ": \"" << interfaceHash
+  << "\"\n";
 }
 
 ProvidesEmitter::CollectedDeclarations
@@ -348,9 +337,10 @@ void ProvidesEmitter::emitTopLevelDecl(const Decl *const D,
 void ProvidesEmitter::emitExperimentalTopLevel(const DeclBaseName &N,
                                                const Decl *D) const {
   if (EnableExperimentalDependencies) {
+    std::pair<std::string, const char*> hashOrUnimpLoc = D->getExperimentalDependencyHash();
     out << "- \""
-        << llvm::yaml::escape(ExperimentalDependencies::TopLevel(
-                                  N.userFacingName(), D->getExperimentalDependencyHash())
+        << llvm::yaml::escape(ExperimentalDependencies::CompoundProvides(
+                                  N.userFacingName(), hashOrUnimpLoc.first, hashOrUnimpLoc.second)
                                   .combined())
         << "\"\n";
   }

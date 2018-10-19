@@ -121,12 +121,7 @@ static ExtendedLoadResult parseDependencyFile(
 
       StringRef valueString = value->getValue(scratch);
 
-      if (EnableExperimentalDependencies) {
-        ExperimentalDependencies::InterfaceHashes hashes(valueString);
-        interfaceHashResult = interfaceHashCallback(hashes.experimental);
-      } else {
-        interfaceHashResult = interfaceHashCallback(valueString);
-      }
+      interfaceHashResult = interfaceHashCallback(valueString);
       if (interfaceHashResult.simpleResult == LoadResult::HadError)
         return interfaceHashResult;
 
@@ -307,9 +302,10 @@ DependencyGraphImpl::loadFromBuffer(const void *node,
     std::string hash = std::string();
     assert(isCascading);
     if (EnableExperimentalDependencies) {
-      ExperimentalDependencies::TopLevel tl(nameArg);
-      name = tl.base;
-      hash = tl.hash;
+      ExperimentalDependencies::CompoundProvides nh(nameArg);
+#error unimp
+      name = nh.base;
+      hash = nh.hash;
     }
     auto iter = std::find_if(provides.begin(), provides.end(),
                              [name](const ProvidesEntryTy &entry) -> bool {

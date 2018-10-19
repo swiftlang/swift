@@ -6304,17 +6304,19 @@ void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *decl) {
 }
 
 // ExperimentalDependencies
-std::string Decl::getExperimentalDependencyHash() const {
+std::pair<std::string, ExperimentalDependencies::unimpLocation_t>
+Decl::getExperimentalDependencyHash() const {
   llvm::MD5 DeclHash;
   const char* maybeUnimp = updateExpDepHash(DeclHash);
   if (maybeUnimp) {
-#error unimp how to pass it along?
+    return std::make_pair(std::string(), maybeUnimp);
   }
   llvm::MD5::MD5Result result;
   DeclHash.final(result);
   llvm::SmallString<32> str;
   llvm::MD5::stringifyResult(result, str);
-  return str.str().str();
+#error do subclasses
+  return std::make_pair(str.str().str(), nullptr);
 }
 
 
