@@ -29,9 +29,10 @@ func s010______PAndS_cases() {
 // ---
 // CHECK-LABEL: sil hidden @$ss21s020__________bitCast_2toq_x_q_mtr0_lF : $@convention(thin) <T, U> (@in_guaranteed T, @thick U.Type) -> @out U {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $T,
-// CHECK: [[CAST:%.*]] = unchecked_bitwise_cast [[ARG]] : $T to $U
+// CHECK: [[COPY:%.*]] = copy_value [[ARG]] : $T
+// CHECK: [[CAST:%.*]] = unchecked_bitwise_cast [[COPY]] : $T to $U
 // CHECK: [[RET:%.*]] = copy_value [[CAST]] : $U
-// CHECK-NOT: destroy_value [[COPY]] : $T
+// CHECK: destroy_value [[COPY]] : $T
 // CHECK: return [[RET]] : $U
 // CHECK-LABEL: } // end sil function '$ss21s020__________bitCast_2toq_x_q_mtr0_lF'
 func s020__________bitCast<T, U>(_ x: T, to type: U.Type) -> U {
