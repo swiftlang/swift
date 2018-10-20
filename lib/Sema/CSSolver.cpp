@@ -1685,41 +1685,40 @@ getOperatorDesignatedNominalTypes(Constraint *bindOverload) {
 
 void ConstraintSystem::partitionForDesignatedTypes(
     ArrayRef<Constraint *> Choices, ConstraintMatchLoop forEachChoice,
-    PartitionAppendCallback appendPartition,
-    SmallVectorImpl<SmallVector<unsigned, 4>> &definedInDesignatedType,
-    SmallVectorImpl<SmallVector<unsigned, 4>>
-        &definedInExtensionOfDesignatedType) {
+    PartitionAppendCallback appendPartition) {
 
   auto designatedNominalTypes = getOperatorDesignatedNominalTypes(Choices[0]);
   if (designatedNominalTypes.empty())
     return;
+
+  SmallVector<SmallVector<unsigned, 4>, 4> definedInDesignatedType;
+  SmallVector<SmallVector<unsigned, 4>, 4> definedInExtensionOfDesignatedType;
 
   auto examineConstraint =
     [&](unsigned constraintIndex, Constraint *constraint) -> bool {
     auto *decl = constraint->getOverloadChoice().getDecl();
     auto *funcDecl = cast<FuncDecl>(decl);
 
-    auto *parentDecl = funcDecl->getParent()->getAsDecl();
+    auto *parentDC = funcDecl->getParent();
+    auto *parentDecl = parentDC->getAsDecl();
+
+    if (parentDC->isExtensionContext())
+      parentDecl = cast<ExtensionDecl>(parentDecl)->getExtendedNominal();
+
     for (auto designatedTypeIndex : indices(designatedNominalTypes)) {
       auto *designatedNominal =
         designatedNominalTypes[designatedTypeIndex];
 
-      if (parentDecl == designatedNominal) {
-        auto &constraints = definedInDesignatedType[designatedTypeIndex];
-        constraints.push_back(constraintIndex);
-        return true;
-      }
-
-      auto *extensionDecl = dyn_cast<ExtensionDecl>(parentDecl);
-      if (!extensionDecl)
+      if (parentDecl != designatedNominal)
         continue;
 
-      if (extensionDecl->getExtendedNominal() == designatedNominal) {
-        auto &constraints =
-          definedInExtensionOfDesignatedType[designatedTypeIndex];
-        constraints.push_back(constraintIndex);
-        return true;
-      }
+      auto &constraints =
+          parentDC->isExtensionContext()
+              ? definedInExtensionOfDesignatedType[designatedTypeIndex]
+              : definedInDesignatedType[designatedTypeIndex];
+
+      constraints.push_back(constraintIndex);
+      return true;
     }
 
     return false;
@@ -1839,12 +1838,7 @@ void ConstraintSystem::partitionDisjunction(
         }
       };
 
-  SmallVector<SmallVector<unsigned, 4>, 4> definedInDesignatedType;
-  SmallVector<SmallVector<unsigned, 4>, 4> definedInExtensionOfDesignatedType;
-
-  partitionForDesignatedTypes(Choices, forEachChoice, appendPartition,
-                              definedInDesignatedType,
-                              definedInExtensionOfDesignatedType);
+  partitionForDesignatedTypes(Choices, forEachChoice, appendPartition);
 
   SmallVector<unsigned, 4> everythingElse;
   // Gather the remaining options.

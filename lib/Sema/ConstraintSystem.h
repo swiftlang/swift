@@ -3230,12 +3230,9 @@ public:
   // Partition the choices in a disjunction based on those that match
   // the designated types for the operator that the disjunction was
   // formed for.
-  void partitionForDesignatedTypes(
-      ArrayRef<Constraint *> Choices, ConstraintMatchLoop forEachChoice,
-      PartitionAppendCallback appendPartition,
-      SmallVectorImpl<SmallVector<unsigned, 4>> &definedInDesignatedType,
-      SmallVectorImpl<SmallVector<unsigned, 4>>
-          &definedInExtensionOfDesignatedType);
+  void partitionForDesignatedTypes(ArrayRef<Constraint *> Choices,
+                                   ConstraintMatchLoop forEachChoice,
+                                   PartitionAppendCallback appendPartition);
 
   // Partition the choices in the disjunction into groups that we will
   // iterate over in an order appropriate to attempt to stop before we
