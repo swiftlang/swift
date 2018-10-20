@@ -367,7 +367,7 @@ ProvidesEmitter::getExperimentalDependencyHash(const Decl *D) {
   std::string buf;
   llvm::raw_string_ostream OS(buf);
   D->dump(OS);
-  return std::make_pair(OS.str(), nullptr);
+  return std::make_pair(ExperimentalDependencies::scrub(OS.str()), nullptr);
 }
 
 void ProvidesEmitter::emitExtensionDecl(const ExtensionDecl *const ED,

@@ -711,3 +711,20 @@ CompoundProvides::separate(StringRef combined) {
 //  u.visit(const_cast<Decl *>(D));
 //  return u.unimpLocation;
 //}
+
+static std::string scrubpe(StringRef input, const char* prefix, const char endChar) {
+  std::string result;
+
+  for (size_t pos = 0;;) {
+    size_t i = input.find(prefix, pos);
+    result += input.slice(pos, i);
+    if (i == StringRef::npos)
+      break;
+    pos = input.find(endChar, i) + 1;
+  }
+  return result;
+}
+
+std::string ExperimentalDependencies::scrub(StringRef input) {
+  return scrubpe(scrubpe( scrubpe(input, "range=[", ']'), "location=", ' '), "@/", ' ');
+}

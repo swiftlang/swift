@@ -30,7 +30,7 @@ struct CompoundProvides {
   const std::string unimpLoc;
   
   CompoundProvides(std::string name, std::string hash, const char *unimpLoc)
-  : name(name), hash(hash), unimpLoc(unimpLoc) {}
+  : name(name), hash(hash), unimpLoc(unimpLoc ? std::string(unimpLoc) : std::string() ) {}
 
   CompoundProvides(StringRef combined) : CompoundProvides(separate(combined)) {}
   
@@ -69,6 +69,8 @@ if (ExperimentalDependencies::unimpLocation_t r  = (what)) \
 //qqq  void updateExpDepFromBits(llvm::MD5 &hash, const void *bits, size_t size);
   
   unimpLocation_t updateExpDepDeclHash(llvm::MD5&, const Decl*);
+  
+  std::string scrub(StringRef);
 
 } // namespace ExperimentalDependencies
 
