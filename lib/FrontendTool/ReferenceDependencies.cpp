@@ -356,8 +356,7 @@ std::pair<std::string, ExperimentalDependencies::unimpLocation_t>
 ProvidesEmitter::getExperimentalDependencyHash(const Decl *D) {
   
   llvm::MD5 DeclHash;
-  D->dump();//qqq
-  if (ExperimentalDependencies::unimpLocation_t r  = D->updateExpDepDeclHash(DeclHash))
+  if (ExperimentalDependencies::unimpLocation_t r  = ExperimentalDependencies::updateExpDepDeclHash(DeclHash, D))
     return make_pair(std::string(), r);
   
   llvm::MD5::MD5Result result;
@@ -452,7 +451,7 @@ void ProvidesEmitter::emitNominalTypes(
 }
 
 void ProvidesEmitter::emitMembers(const CollectedDeclarations &cpd) const {
-#error emit all
+  //qqq #error emit all
   out << providesMember << ":\n";
   for (auto entry : cpd.extendedNominals) {
     out << "- [\"";
@@ -681,16 +680,3 @@ DependsEmitter::sortedByName(const llvm::DenseMap<DeclBaseName, bool> map) {
                        });
   return pairs;
 }
-
-//qqq unused?
-//void ExperimentalDependencies::updateExpDepFromBits(llvm::MD5 &hash, const void *bits, size_t size) {
-//  hash.update(
-//              ArrayRef<u_int8_t>(reinterpret_cast<u_int8_t*>(const_cast<void*>(bits)), size)
-//              );
-//}
-
-
-#error move
-//ExperimentalDependencies::unimpLocation_t Decl::updateExpDepDeclHash(llvm::MD5 &hash) const {
-//  XXX
-//}

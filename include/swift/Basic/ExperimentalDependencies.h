@@ -14,10 +14,13 @@
 #define ExperimentalDependencies_h
 
 #include "llvm/Support/MD5.h"
+#include "swift/Basic/LLVM.h"
 
 namespace swift {
 /// Experimental dependencies evolve Swift towards finer-grained dependencies
 /// and faster incremental rebuilds.
+  
+  class Decl;
 
 namespace ExperimentalDependencies {
 
@@ -47,25 +50,7 @@ private:
   static const char *hashPrefix() { return  "###"; }
   
   static std::tuple<std::string, std::string, std::string>
-  separate(StringRef combined) {
-    std::string name;
-    std::string hash;
-    std::string unimpLoc;
-    
-    const size_t sepIndex = combined.find(nameTrailer());
-    if (sepIndex == StringRef::npos) {
-      name = combined;
-    }
-    else {
-      name = combined.take_front(sepIndex);
-      const std::string hashOrUnimpLoc = combined.drop_front(sepIndex + 1);
-      if (StringRef(hashOrUnimpLoc).startswith(hashPrefix()))
-        hash = hashOrUnimpLoc.substr(strlen(hashPrefix()));
-      else
-        unimpLoc = hashOrUnimpLoc;
-    }
-    return std::make_tuple(name, hash, unimpLoc);
-  }
+  separate(StringRef combined);
 };
 
   typedef const char*  unimpLocation_t;
@@ -82,6 +67,8 @@ if (ExperimentalDependencies::unimpLocation_t r  = (what)) \
 
   
 //qqq  void updateExpDepFromBits(llvm::MD5 &hash, const void *bits, size_t size);
+  
+  unimpLocation_t updateExpDepDeclHash(llvm::MD5&, const Decl*);
 
 } // namespace ExperimentalDependencies
 
