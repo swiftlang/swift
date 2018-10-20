@@ -597,7 +597,7 @@ public:
   // Some Decls are DeclContexts, but not all. See swift/AST/Decl.h
   static bool classof(const Decl *D);
   
-  ExperimentalDependencies::unimpLocation_t  updateExpDepHash(llvm::MD5& hash) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepDeclCtxHash(llvm::MD5& hash) const;
 };
 
 /// SerializedLocalDeclContext - the base class for DeclContexts that were
@@ -623,7 +623,7 @@ public:
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::SerializedLocal;
   }
-  ExperimentalDependencies::unimpLocation_t  updateExpDepHashInner(llvm::MD5& hash) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepDeclCtxHashInner(llvm::MD5& hash) const;
 };
 
 /// An iterator that walks through a list of declarations stored

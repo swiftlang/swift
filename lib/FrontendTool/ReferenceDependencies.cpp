@@ -357,7 +357,7 @@ ProvidesEmitter::getExperimentalDependencyHash(const Decl *D) {
   
   llvm::MD5 DeclHash;
   
-  if (ExperimentalDependencies::unimpLocation_t r  = D->updateExpDepHash(DeclHash))
+  if (ExperimentalDependencies::unimpLocation_t r  = D->updateExpDepDeclHash(DeclHash))
     return make_pair(std::string(), r);
   
   llvm::MD5::MD5Result result;
@@ -453,6 +453,7 @@ void ProvidesEmitter::emitNominalTypes(
 
 void ProvidesEmitter::emitMembers(const CollectedDeclarations &cpd) const {
   out << providesMember << ":\n";
+#error emitMoreMembers
   for (auto entry : cpd.extendedNominals) {
     out << "- [\"";
     out << mangleTypeAsContext(entry.first);

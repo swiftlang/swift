@@ -980,12 +980,12 @@ TypeLoc &ImplementsAttr::getProtocolType() {
 
 ExperimentalDependencies::unimpLocation_t  DeclAttributes::updateExpDepHash(llvm::MD5 &hash) const {
   for (const auto A: *this) {
-    TRY_UPDATE_HASH(A->updateExpDepHash(hash));
+    TRY_UPDATE_HASH(A->updateExpDepAttrHash(hash));
   }
   return nullptr;
 }
 
-ExperimentalDependencies::unimpLocation_t  DeclAttribute::updateExpDepHash(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  DeclAttribute::updateExpDepAttrHash(llvm::MD5 &hash) const {
   ExperimentalDependencies::updateExpDepFromBits(hash, &Bits);
   switch (getKind()) {
  //      CONTEXTUAL_SIMPLE_DECL_ATTR
@@ -1058,38 +1058,38 @@ ExperimentalDependencies::unimpLocation_t  DeclAttribute::updateExpDepHash(llvm:
       // classes with state:
       
     case DAK_SwiftNativeObjCRuntimeBase:
-      return cast<const SwiftNativeObjCRuntimeBaseAttr>(this)->updateExpDepHashInner(hash);
+      return cast<const SwiftNativeObjCRuntimeBaseAttr>(this)->updateExpDepAttrHashInner(hash);
     case DAK_CDecl:
-      return cast<const CDeclAttr>(this)->updateExpDepHashInner(hash);
+      return cast<const CDeclAttr>(this)->updateExpDepAttrHashInner(hash);
     case DAK_SILGenName:
-      return cast<const SILGenNameAttr>(this)->updateExpDepHashInner(hash);
+      return cast<const SILGenNameAttr>(this)->updateExpDepAttrHashInner(hash);
     case DAK_Available:
-      return cast<const AvailableAttr>(this)->updateExpDepHashInner(hash);
+      return cast<const AvailableAttr>(this)->updateExpDepAttrHashInner(hash);
     case DAK_ObjC:
-      return cast<const ObjCAttr>(this)->updateExpDepHashInner(hash);
+      return cast<const ObjCAttr>(this)->updateExpDepAttrHashInner(hash);
     case DAK_Semantics:
-      return cast<const SemanticsAttr>(this)->updateExpDepHashInner(hash);
+      return cast<const SemanticsAttr>(this)->updateExpDepAttrHashInner(hash);
     case DAK_Specialize:
-      return cast<const SpecializeAttr>(this)->updateExpDepHashInner(hash);
+      return cast<const SpecializeAttr>(this)->updateExpDepAttrHashInner(hash);
     case DAK_ObjCBridged:
-      return cast<const ObjCBridgedAttr>(this)->updateExpDepHashInner(hash);
+      return cast<const ObjCBridgedAttr>(this)->updateExpDepAttrHashInner(hash);
     case DAK_SynthesizedProtocol:
-      return cast<const SynthesizedProtocolAttr>(this)->updateExpDepHashInner(hash);
+      return cast<const SynthesizedProtocolAttr>(this)->updateExpDepAttrHashInner(hash);
     case DAK_Implements:
-      return cast<const ImplementsAttr>(this)->updateExpDepHashInner(hash);
+      return cast<const ImplementsAttr>(this)->updateExpDepAttrHashInner(hash);
     case DAK_ObjCRuntimeName:
-      return cast<const ObjCRuntimeNameAttr>(this)->updateExpDepHashInner(hash);
+      return cast<const ObjCRuntimeNameAttr>(this)->updateExpDepAttrHashInner(hash);
     case DAK_RestatedObjCConformance:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepHashInner(hash);
+      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepAttrHashInner(hash);
     case DAK_ClangImporterSynthesizedType:
-      return cast<const ClangImporterSynthesizedTypeAttr>(this)->updateExpDepHashInner(hash);
+      return cast<const ClangImporterSynthesizedTypeAttr>(this)->updateExpDepAttrHashInner(hash);
     case DAK_Count:
       llvm_unreachable("impossible case");
   }
   return nullptr;
 }
 
-ExperimentalDependencies::unimpLocation_t  AvailableAttr::updateExpDepHashInner(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  AvailableAttr::updateExpDepAttrHashInner(llvm::MD5 &hash) const {
   hash.update(Message);
   hash.update(Rename);
   ExperimentalDependencies::updateExpDepFromOptionalBits(hash, Introduced);
@@ -1101,7 +1101,7 @@ ExperimentalDependencies::unimpLocation_t  AvailableAttr::updateExpDepHashInner(
   return nullptr;
 }
 
-ExperimentalDependencies::unimpLocation_t  ObjCAttr::updateExpDepHashInner(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  ObjCAttr::updateExpDepAttrHashInner(llvm::MD5 &hash) const {
   if (hasName()) {
     SmallString<64> scratch;
     hash.update(getName().getValue().getString(scratch));
@@ -1111,35 +1111,36 @@ ExperimentalDependencies::unimpLocation_t  ObjCAttr::updateExpDepHashInner(llvm:
   return nullptr;
 }
 
-ExperimentalDependencies::unimpLocation_t  ObjCBridgedAttr::updateExpDepHashInner(llvm::MD5 &hash) const {
-  return getObjCClass()->updateExpDepHash(hash);
+ExperimentalDependencies::unimpLocation_t  ObjCBridgedAttr::updateExpDepAttrHashInner(llvm::MD5 &hash) const {
+  return getObjCClass()->updateExpDepDeclHash(hash);
 }
 
-ExperimentalDependencies::unimpLocation_t  SynthesizedProtocolAttr::updateExpDepHashInner(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  SynthesizedProtocolAttr::updateExpDepAttrHashInner(llvm::MD5 &hash) const {
   // probably OK
   RETURN_UNIMP;
 }
 
-ExperimentalDependencies::unimpLocation_t  SpecializeAttr::updateExpDepHashInner(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  SpecializeAttr::updateExpDepAttrHashInner(llvm::MD5 &hash) const {
   return trailingWhereClause->updateExpDepHash(hash);
 }
 
-ExperimentalDependencies::unimpLocation_t  ImplementsAttr::updateExpDepHashInner(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  ImplementsAttr::updateExpDepAttrHashInner(llvm::MD5 &hash) const {
   // ProtocolType.updateExpDepHash(hash); // FIXME: OK to ignore type loc??
+  RETURN_UNIMP;
   return getMemberName().updateExpDepHash(hash);
 }
-ExperimentalDependencies::unimpLocation_t  ObjCRuntimeNameAttr::updateExpDepHashInner(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  ObjCRuntimeNameAttr::updateExpDepAttrHashInner(llvm::MD5 &hash) const {
   hash.update(Name);
   return nullptr;
 }
-ExperimentalDependencies::unimpLocation_t  RestatedObjCConformanceAttr::updateExpDepHashInner(llvm::MD5 &hash) const {
-  return Proto->updateExpDepHash(hash);
+ExperimentalDependencies::unimpLocation_t  RestatedObjCConformanceAttr::updateExpDepAttrHashInner(llvm::MD5 &hash) const {
+  return Proto->updateExpDepDeclHash(hash);
 }
-ExperimentalDependencies::unimpLocation_t  ClangImporterSynthesizedTypeAttr::updateExpDepHashInner(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  ClangImporterSynthesizedTypeAttr::updateExpDepAttrHashInner(llvm::MD5 &hash) const {
   hash.update(originalTypeName);
   return nullptr;
 }
 
-ExperimentalDependencies::unimpLocation_t  SwiftNativeObjCRuntimeBaseAttr::updateExpDepHashInner(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  SwiftNativeObjCRuntimeBaseAttr::updateExpDepAttrHashInner(llvm::MD5 &hash) const {
   return BaseClassName.updateExpDepHash(hash);
 }

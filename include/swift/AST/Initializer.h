@@ -63,6 +63,8 @@ public:
     return DC->getContextKind() == DeclContextKind::Initializer;
   }
   static bool classof(const Initializer *I) { return true; }
+  
+  ExperimentalDependencies::unimpLocation_t  updateExpDepDeclCtxHashInner(llvm::MD5&) const;
 };
 
 /// The initializer expression of a non-local pattern binding
@@ -115,7 +117,7 @@ public:
     return I->getInitializerKind() == InitializerKind::PatternBinding;
   }
   
-  ExperimentalDependencies::unimpLocation_t  updateExpDepHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepDeclCtxHashInner(llvm::MD5&) const;
 };
 
 /// SerializedPatternBindingInitializer - This represents what was originally a
@@ -148,7 +150,7 @@ public:
     return false;
   }
   
-  ExperimentalDependencies::unimpLocation_t  updateExpDepHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepDeclCtxHashInner(llvm::MD5&) const;
 };
 
 /// A default argument expression.  The parent context is the function
@@ -182,7 +184,7 @@ public:
     return I->getInitializerKind() == InitializerKind::DefaultArgument;
   }
   
-  ExperimentalDependencies::unimpLocation_t  updateExpDepHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepDeclCtxHashInner(llvm::MD5&) const;
 };
 
 /// SerializedDefaultArgumentInitializer - This represents what was originally a
@@ -206,6 +208,7 @@ public:
         LocalDeclContextKind::DefaultArgumentInitializer;
     return false;
   }
+  ExperimentalDependencies::unimpLocation_t  updateExpDepDeclCtxHashInner(llvm::MD5&) const;
 };
   
 } // end namespace swift

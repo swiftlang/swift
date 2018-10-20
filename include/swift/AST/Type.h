@@ -361,7 +361,7 @@ public:
   /// correct join but one better than Any may exist.
   static Optional<Type> join(Type first, Type second);
     
-  ExperimentalDependencies::unimpLocation_t  updateExpDepHash(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepTypeHash(llvm::MD5&) const;
 
 private:
   // Direct comparison is disabled for types, because they may not be canonical.

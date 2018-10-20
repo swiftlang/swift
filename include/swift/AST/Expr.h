@@ -3486,7 +3486,7 @@ public:
   using DeclContext::operator new;
   using Expr::dump;
   
-  ExperimentalDependencies::unimpLocation_t  updateExpDepHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepDeclCtxHashInner(llvm::MD5&) const;
 };
 
 /// SerializedAbstractClosureExpr - This represents what was originally an
@@ -3523,7 +3523,7 @@ public:
         LocalDeclContextKind::AbstractClosure;
     return false;
   }
-  ExperimentalDependencies::unimpLocation_t  updateExpDepHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepDeclCtxHashInner(llvm::MD5&) const;
 };
 
 /// \brief An explicit unnamed function expression, which can optionally have
