@@ -5450,36 +5450,36 @@ static bool isReferenceToMetatypeMember(ConstraintSystem &cs, Expr *expr) {
   return false;
 }
 
-static unsigned computeCallLevel(ConstraintSystem &cs, ConcreteDeclRef callee,
-                                 ApplyExpr *apply) {
-  // If we do not have a callee, return a level of 0.
+static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
+                           ApplyExpr *apply) {
+  // If we do not have a callee, return false.
   if (!callee) {
-    return 0;
+    return false;
   }
 
-  // Only calls to members of types can have level > 0.
+  // Only calls to members of types can have curried 'self'.
   auto calleeDecl = callee.getDecl();
   if (!calleeDecl->getDeclContext()->isTypeContext()) {
-    return 0;
+    return false;
   }
 
-  // Level 1 if we're not applying "self".
+  // Would have `self`, if we're not applying it.
   if (auto *call = dyn_cast<CallExpr>(apply)) {
     if (!calleeDecl->isInstanceMember() ||
         !isReferenceToMetatypeMember(cs, call->getDirectCallee())) {
-      return 1;
+      return true;
     }
-    return 0;
+    return false;
   }
 
-  // Level 1 if we have an operator.
+  // Operators have curried self.
   if (isa<PrefixUnaryExpr>(apply) || isa<PostfixUnaryExpr>(apply) ||
       isa<BinaryExpr>(apply)) {
-    return 1;
+    return true;
   }
 
   // Otherwise, we have a normal application.
-  return 0;
+  return false;
 }
 
 Expr *ExprRewriter::coerceCallArguments(
@@ -5507,12 +5507,12 @@ Expr *ExprRewriter::coerceCallArguments(
   ConcreteDeclRef callee =
     findCalleeDeclRef(cs, solution, cs.getConstraintLocator(locator));
 
-  // Determine the level,
-  unsigned level = apply ? computeCallLevel(cs, callee, apply) : 0;
+  // Determine whether this application has curried self.
+  bool skipCurriedSelf = apply ? hasCurriedSelf(cs, callee, apply) : false;
 
   // Determine the parameter bindings.
   SmallBitVector defaultMap
-    = computeDefaultMap(params, callee.getDecl(), level);
+    = computeDefaultMap(params, callee.getDecl(), skipCurriedSelf);
 
   SmallVector<AnyFunctionType::Param, 8> args;
   AnyFunctionType::decomposeInput(cs.getType(arg), args);

@@ -93,7 +93,7 @@ static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
 
 bool constraints::
 areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
-                                          unsigned parameterDepth,
+                                          bool hasCurriedSelf,
                                           ArrayRef<Identifier> labels,
                                           bool hasTrailingClosure) {
   // Bail out conservatively if this isn't a function declaration.
@@ -108,14 +108,14 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
   }
 
   const AnyFunctionType *levelTy = fTy;
-  for (auto level = parameterDepth; level != 0; --level) {
+  if (hasCurriedSelf) {
     levelTy = levelTy->getResult()->getAs<AnyFunctionType>();
     assert(levelTy && "Parameter list curry level does not match type");
   }
   
   auto params = levelTy->getParams();
   SmallBitVector defaultMap =
-    computeDefaultMap(params, decl, parameterDepth);
+    computeDefaultMap(params, decl, hasCurriedSelf);
 
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 8> unusedParamBindings;
@@ -576,7 +576,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
 
 /// Find the callee declaration and uncurry level for a given call
 /// locator.
-static std::tuple<ValueDecl *, unsigned, ArrayRef<Identifier>, bool>
+static std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool>
 getCalleeDeclAndArgs(ConstraintSystem &cs,
                      ConstraintLocatorBuilder callLocator,
                      SmallVectorImpl<Identifier> &argLabelsScratch) {
@@ -586,14 +586,16 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
   // Break down the call.
   SmallVector<LocatorPathElt, 2> path;
   auto callExpr = callLocator.getLocatorParts(path);
-  if (!callExpr) 
-    return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
+  if (!callExpr)
+    return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
+                           hasTrailingClosure);
 
   // Our remaining path can only be 'ApplyArgument'.
   if (!path.empty() &&
       !(path.size() <= 2 &&
         path.back().getKind() == ConstraintLocator::ApplyArgument))
-    return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
+    return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
+                           hasTrailingClosure);
 
   // Dig out the callee.
   ConstraintLocator *targetLocator;
@@ -617,11 +619,13 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
     if (path.size() != 2 ||
         path[0].getKind() != ConstraintLocator::KeyPathComponent ||
         path[1].getKind() != ConstraintLocator::ApplyArgument)
-      return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
-    
+      return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
+                             hasTrailingClosure);
+
     auto componentIndex = path[0].getValue();
     if (componentIndex >= keyPath->getComponents().size())
-      return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
+      return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
+                             hasTrailingClosure);
 
     auto &component = keyPath->getComponents()[componentIndex];
     switch (component.getKind()) {
@@ -639,7 +643,8 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
     case KeyPathExpr::Component::Kind::OptionalChain:
     case KeyPathExpr::Component::Kind::OptionalWrap:
     case KeyPathExpr::Component::Kind::Identity:
-      return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
+      return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
+                             hasTrailingClosure);
     }
 
   } else {
@@ -650,7 +655,8 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
       argLabels = objectLiteral->getArgumentLabels();
       hasTrailingClosure = objectLiteral->hasTrailingClosure();
     }
-    return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
+    return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
+                           hasTrailingClosure);
   }
 
   // Find the overload choice corresponding to the callee locator.
@@ -690,12 +696,13 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
   
   // If we didn't find any matching overloads, we're done.
   if (!choice)
-    return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
+    return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
+                           hasTrailingClosure);
 
   // If there's a declaration, return it.
   if (choice->isDecl()) {
     auto decl = choice->getDecl();
-    unsigned level = 0;
+    bool hasCurriedSelf = false;
     if (decl->getDeclContext()->isTypeContext()) {
       if (auto function = dyn_cast<AbstractFunctionDecl>(decl)) {
         // References to instance members on a metatype stay at level 0.
@@ -704,20 +711,21 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
               cs.getFixedTypeRecursive(choice->getBaseType(),
                                        /*wantRValue=*/true)
                 ->is<AnyMetatypeType>()))
-          level = 1;
+          hasCurriedSelf = true;
       } else if (isa<SubscriptDecl>(decl)) {
         // Subscript level 1 == the indices.
-        level = 1;
+        hasCurriedSelf = true;
       } else if (isa<EnumElementDecl>(decl)) {
         // Enum element level 1 == the payload.
-        level = 1;
+        hasCurriedSelf = true;
       }
     }
 
-    return std::make_tuple(decl, level, argLabels, hasTrailingClosure);
+    return std::make_tuple(decl, hasCurriedSelf, argLabels, hasTrailingClosure);
   }
 
-  return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
+  return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
+                         hasTrailingClosure);
 }
 
 class ArgumentFailureTracker : public MatchCallArgumentListener {
@@ -761,15 +769,15 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     ArrayRef<AnyFunctionType::Param> params, ConstraintLocatorBuilder locator) {
   // Extract the parameters.
   ValueDecl *callee;
-  unsigned calleeLevel;
+  bool hasCurriedSelf;
   ArrayRef<Identifier> argLabels;
   SmallVector<Identifier, 2> argLabelsScratch;
   bool hasTrailingClosure = false;
-  std::tie(callee, calleeLevel, argLabels, hasTrailingClosure) =
+  std::tie(callee, hasCurriedSelf, argLabels, hasTrailingClosure) =
     getCalleeDeclAndArgs(cs, locator, argLabelsScratch);
 
   SmallBitVector defaultMap =
-    computeDefaultMap(params, callee, calleeLevel);
+    computeDefaultMap(params, callee, hasCurriedSelf);
 
   // Apply labels to arguments.
   SmallVector<AnyFunctionType::Param, 8> argsWithLabels;
@@ -3186,16 +3194,16 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // (if we have any) will apply to the second level of parameters, with
     // the member lookup binding the first level.  But there are cases where
     // we can get an unapplied declaration reference back.
-    unsigned parameterDepth;
+    bool hasCurriedSelf;
     if (baseObjTy->is<ModuleType>()) {
-      parameterDepth = 0;
+      hasCurriedSelf = false;
     } else if (baseObjTy->is<AnyMetatypeType>() && decl->isInstanceMember()) {
-      parameterDepth = 0;
+      hasCurriedSelf = false;
     } else {
-      parameterDepth = 1;
+      hasCurriedSelf = true;
     }
 
-    return areConservativelyCompatibleArgumentLabels(decl, parameterDepth,
+    return areConservativelyCompatibleArgumentLabels(decl, hasCurriedSelf,
                                           argumentLabels->Labels,
                                           argumentLabels->HasTrailingClosure);
   };

@@ -3365,7 +3365,7 @@ matchCallArguments(ConstraintSystem &cs,
 /// given parameter depth cannot be used with the given value.
 /// If this cannot be proven, conservatively returns true.
 bool areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
-                                               unsigned parameterDepth,
+                                               bool hasCurriedSelf,
                                                ArrayRef<Identifier> labels,
                                                bool hasTrailingClosure);
 
