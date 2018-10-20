@@ -1133,6 +1133,7 @@ public:
     return T->getKind() >= TypeKind::First_AnyGenericType &&
            T->getKind() <= TypeKind::Last_AnyGenericType;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 BEGIN_CAN_TYPE_WRAPPER(AnyGenericType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getParent)
@@ -1155,6 +1156,7 @@ public:
     return T->getKind() >= TypeKind::First_NominalOrBoundGenericNominalType &&
            T->getKind() <= TypeKind::Last_NominalOrBoundGenericNominalType;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(NominalOrBoundGenericNominalType, AnyGenericType)
 
@@ -1197,6 +1199,8 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Error;
   }
+  
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ErrorType, Type)
 
@@ -1215,6 +1219,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Unresolved;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnresolvedType, Type)
 
@@ -1229,6 +1234,7 @@ public:
     return T->getKind() >= TypeKind::First_BuiltinType &&
            T->getKind() <= TypeKind::Last_BuiltinType;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinType, Type)
 
@@ -1242,6 +1248,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BuiltinRawPointer;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinRawPointerType, BuiltinType);
 
@@ -1256,6 +1263,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BuiltinNativeObject;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinNativeObjectType, BuiltinType);
 
@@ -1270,6 +1278,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BuiltinBridgeObject;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinBridgeObjectType, BuiltinType);
 
@@ -1283,6 +1292,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BuiltinUnknownObject;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinUnknownObjectType, BuiltinType);
 
@@ -1302,6 +1312,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BuiltinUnsafeValueBuffer;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinUnsafeValueBufferType, BuiltinType);
 
@@ -1339,6 +1350,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BuiltinVector;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 BEGIN_CAN_TYPE_WRAPPER(BuiltinVectorType, BuiltinType)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getElementType)
@@ -1480,6 +1492,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BuiltinInteger;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinIntegerType, BuiltinType)
   
@@ -1519,6 +1532,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BuiltinFloat;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinFloatType, BuiltinType)
   
@@ -1571,6 +1585,7 @@ public:
     return T->getKind() >= TypeKind::First_SugarType &&
            T->getKind() <= TypeKind::Last_SugarType;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 
 /// A reference to a type alias that is somehow generic, along with the
@@ -1646,6 +1661,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::NameAlias;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 
 // TODO: As part of AST modernization, replace with a proper
@@ -1839,6 +1855,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Paren;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 
 /// TupleTypeElt - This represents a single element of a tuple.
@@ -1971,6 +1988,8 @@ private:
      std::uninitialized_copy(elements.begin(), elements.end(),
                              getTrailingObjects<TupleTypeElt>());
   }
+    public:
+      ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 BEGIN_CAN_TYPE_WRAPPER(TupleType, Type)
   CanType getElementType(unsigned elementNo) const {
@@ -2006,6 +2025,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::UnboundGeneric;
   }
+      ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(UnboundGenericType, AnyGenericType)
 
@@ -2049,6 +2069,7 @@ public:
     return T->getKind() >= TypeKind::First_BoundGenericType &&
            T->getKind() <= TypeKind::Last_BoundGenericType;
   }
+      ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 BEGIN_CAN_TYPE_WRAPPER(BoundGenericType, NominalOrBoundGenericNominalType)
   CanTypeArrayRef getGenericArgs() const {
@@ -2088,6 +2109,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BoundGenericClass;
   }
+      ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericClassType, BoundGenericType)
 
@@ -2122,6 +2144,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BoundGenericEnum;
   }
+      ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericEnumType, BoundGenericType)
 
@@ -2156,6 +2179,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::BoundGenericStruct;
   }
+      ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BoundGenericStructType, BoundGenericType)
 
@@ -2178,6 +2202,7 @@ public:
     return T->getKind() >= TypeKind::First_NominalType &&
            T->getKind() <= TypeKind::Last_NominalType;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(NominalType, NominalOrBoundGenericNominalType)
 
@@ -2206,6 +2231,8 @@ public:
 private:
   EnumType(EnumDecl *TheDecl, Type Parent, const ASTContext &Ctx,
             RecursiveTypeProperties properties);
+public:
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(EnumType, NominalType)
 
@@ -2234,6 +2261,8 @@ public:
 private:
   StructType(StructDecl *TheDecl, Type Parent, const ASTContext &Ctx,
              RecursiveTypeProperties properties);
+public:
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(StructType, NominalType)
 
@@ -2262,6 +2291,8 @@ public:
 private:
   ClassType(ClassDecl *TheDecl, Type Parent, const ASTContext &Ctx,
             RecursiveTypeProperties properties);
+public:
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ClassType, NominalType)
 
@@ -2329,6 +2360,7 @@ public:
     return T->getKind() == TypeKind::Metatype ||
            T->getKind() == TypeKind::ExistentialMetatype;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 BEGIN_CAN_TYPE_WRAPPER(AnyMetatypeType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getInstanceType)
@@ -2376,6 +2408,8 @@ private:
                RecursiveTypeProperties properties,
                Optional<MetatypeRepresentation> repr);
   friend class TypeDecl;
+public:
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 BEGIN_CAN_TYPE_WRAPPER(MetatypeType, AnyMetatypeType)
   static CanMetatypeType get(CanType type) {
@@ -2424,6 +2458,8 @@ private:
                           RecursiveTypeProperties properties,
                           Optional<MetatypeRepresentation> repr);
   friend class TypeDecl;
+public:
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 BEGIN_CAN_TYPE_WRAPPER(ExistentialMetatypeType, AnyMetatypeType)
   static CanExistentialMetatypeType get(CanType type) {
@@ -2458,6 +2494,8 @@ private:
                RecursiveTypeProperties()),
       TheModule(M) {
   }
+public:
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(ModuleType, Type)
   
@@ -2496,6 +2534,8 @@ private:
       SelfType(selfType) { }
 
   friend class TypeDecl;
+public:
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 BEGIN_CAN_TYPE_WRAPPER(DynamicSelfType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getSelfType)
@@ -3001,6 +3041,7 @@ public:
     return T->getKind() >= TypeKind::First_AnyFunctionType &&
            T->getKind() <= TypeKind::Last_AnyFunctionType;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
   using ExtInfo = AnyFunctionType::ExtInfo;
@@ -3063,6 +3104,8 @@ public:
 private:
   FunctionType(ArrayRef<Param> params, Type result, ExtInfo info,
                const ASTContext *ctx, RecursiveTypeProperties properties);
+    public:
+      ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
   static CanFunctionType get(CanParamArrayRef params, CanType result,
@@ -3150,6 +3193,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::GenericFunction;
   }
+      ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 
 BEGIN_CAN_TYPE_WRAPPER(GenericFunctionType, AnyFunctionType)
@@ -4088,6 +4132,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::SILFunction;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILFunctionType, Type)
 
@@ -4137,6 +4182,7 @@ public:
   void Profile(llvm::FoldingSetNodeID &id) {
     Profile(id, getLayout(), getSubstitutions());
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILBoxType, Type)
 
@@ -4167,6 +4213,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::SILBlockStorage;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILBlockStorageType, Type)
 
@@ -4184,6 +4231,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::SILToken;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILTokenType, Type)
 
@@ -4209,6 +4257,7 @@ public:
     return T->getKind() >= TypeKind::First_SyntaxSugarType &&
            T->getKind() <= TypeKind::Last_SyntaxSugarType;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 
 /// A type with a special syntax that is always sugar for a library type that
@@ -4233,6 +4282,7 @@ public:
     return T->getKind() >= TypeKind::First_UnarySyntaxSugarType &&
            T->getKind() <= TypeKind::Last_UnarySyntaxSugarType;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
   
 /// The type [T], which is always sugar for a library type.
@@ -4248,6 +4298,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ArraySlice;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 
 /// The type T?, which is always sugar for a library type.
@@ -4264,6 +4315,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Optional;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 
 /// The dictionary type [K : V], which is syntactic sugar for Dictionary<K, V>.
@@ -4297,6 +4349,7 @@ public:
   static bool classof(const DictionaryType *T) {
     return true;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 
 /// ProtocolType - A protocol type describes an abstract interface implemented
@@ -4343,6 +4396,8 @@ private:
   friend class NominalTypeDecl;
   ProtocolType(ProtocolDecl *TheDecl, Type Parent, const ASTContext &Ctx,
                RecursiveTypeProperties properties);
+public:
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 BEGIN_CAN_TYPE_WRAPPER(ProtocolType, NominalType)
 END_CAN_TYPE_WRAPPER(ProtocolType, NominalType)
@@ -4427,6 +4482,8 @@ private:
     std::uninitialized_copy(members.begin(), members.end(),
                             getTrailingObjects<Type>());
   }
+    public:
+      ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 BEGIN_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 END_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
@@ -4468,6 +4525,7 @@ public:
   static bool classof(const TypeBase *type) {
     return type->getKind() == TypeKind::LValue;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 BEGIN_CAN_TYPE_WRAPPER(LValueType, Type)
   PROXY_CAN_TYPE_SIMPLE_GETTER(getObjectType)
@@ -4498,6 +4556,7 @@ public:
   static bool classof(const TypeBase *type) {
     return type->getKind() == TypeKind::InOut;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 BEGIN_CAN_TYPE_WRAPPER(InOutType, Type)
 PROXY_CAN_TYPE_SIMPLE_GETTER(getObjectType)
@@ -4521,6 +4580,7 @@ public:
     return T->getKind() >= TypeKind::First_SubstitutableType &&
            T->getKind() <= TypeKind::Last_SubstitutableType;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SubstitutableType, Type)
 
@@ -4745,6 +4805,8 @@ private:
   ArchetypeType(const ASTContext &Ctx, Type Existential,
                 ArrayRef<ProtocolDecl *> ConformsTo, Type Superclass,
                 LayoutConstraint Layout, UUID uuid);
+public:
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 BEGIN_CAN_TYPE_WRAPPER(ArchetypeType, SubstitutableType)
 CanArchetypeType getParent() const {
@@ -4818,6 +4880,8 @@ private:
     : SubstitutableType(TypeKind::GenericTypeParam, &ctx,
                         RecursiveTypeProperties::HasTypeParameter),
       ParamOrDepthIndex(depth << 16 | index) { }
+public:
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 BEGIN_CAN_TYPE_WRAPPER(GenericTypeParamType, SubstitutableType)
   static CanGenericTypeParamType get(unsigned depth, unsigned index,
@@ -4876,6 +4940,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::DependentMember;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 BEGIN_CAN_TYPE_WRAPPER(DependentMemberType, Type)
   static CanDependentMemberType get(CanType base, AssociatedTypeDecl *assocType,
@@ -4925,6 +4990,7 @@ public:
     return T->getKind() >= TypeKind::First_ReferenceStorageType &&
            T->getKind() <= TypeKind::Last_ReferenceStorageType;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 BEGIN_CAN_TYPE_WRAPPER(ReferenceStorageType, Type)
 static CanReferenceStorageType get(CanType referent,
@@ -4950,6 +5016,7 @@ public: \
   static bool classof(const TypeBase *T) { \
     return T->getKind() == TypeKind::Name##Storage; \
   } \
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const; \
 }; \
 BEGIN_CAN_TYPE_WRAPPER(Name##StorageType, ReferenceStorageType) \
   static Can##Name##StorageType get(CanType referent) { \
@@ -5018,6 +5085,7 @@ public:
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::TypeVariable;
   }
+  ExperimentalDependencies::unimpLocation_t updateExpDepTypeHashInner(llvm::MD5 &hash) const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(TypeVariableType, Type)
 

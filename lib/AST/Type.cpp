@@ -4081,11 +4081,104 @@ Type TypeBase::openAnyExistentialType(ArchetypeType *&opened) {
 }
 
 
-ExperimentalDependencies::unimpLocation_t  TypeBase::updateExpDepTypeBaseHash(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t TypeBase::updateExpDepTypeBaseHash(llvm::MD5 &hash) const {
   ExperimentalDependencies::updateExpDepFromBits(hash, &Bits, sizeof(Bits));
-  assert(hasCanonicalTypeComputed());
-  CanType ct = getCanonicalType();
-  TRY_UPDATE_HASH(ct.updateExpDepCanonTypeHash(hash))
+  
+  switch (getKind()) {
+    case TypeKind::Error:
+      return cast<const ErrorType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::Unresolved:
+      return cast<const UnresolvedType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::BuiltinInteger:
+      return cast<const BuiltinIntegerType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::BuiltinFloat:
+      return cast<const BuiltinFloatType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::BuiltinRawPointer:
+      return cast<const BuiltinRawPointerType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::BuiltinNativeObject:
+      return cast<const BuiltinNativeObjectType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::BuiltinBridgeObject:
+      return cast<const BuiltinBridgeObjectType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::BuiltinUnknownObject:
+      return cast<const BuiltinUnknownObjectType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::BuiltinUnsafeValueBuffer:
+      return cast<const BuiltinUnsafeValueBufferType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::BuiltinVector:
+      return cast<const BuiltinVectorType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::Tuple:
+      return cast<const TupleType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::WeakStorage:
+      return cast<const WeakStorageType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::UnownedStorage:
+      return cast<const UnownedStorageType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::UnmanagedStorage:
+      return cast<const UnmanagedStorageType>(this)->updateExpDepTypeHashInner(hash);
+     case TypeKind::Enum:
+      return cast<const EnumType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::Struct:
+      return cast<const StructType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::Class:
+      return cast<const ClassType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::Protocol:
+      return cast<const ProtocolType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::BoundGenericClass:
+      return cast<const BoundGenericClassType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::BoundGenericEnum:
+      return cast<const BoundGenericEnumType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::BoundGenericStruct:
+      return cast<const BoundGenericStructType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::UnboundGeneric:
+      return cast<const UnboundGenericType>(this)->updateExpDepTypeHashInner(hash);
+     case TypeKind::Metatype:
+      return cast<const MetatypeType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::ExistentialMetatype:
+      return cast<const ExistentialMetatypeType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::Module:
+      return cast<const ModuleType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::DynamicSelf:
+      return cast<const DynamicSelfType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::Archetype:
+      return cast<const ArchetypeType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::GenericTypeParam:
+      return cast<const GenericTypeParamType>(this)->updateExpDepTypeHashInner(hash);
+     case TypeKind::DependentMember:
+      return cast<const DependentMemberType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::Function:
+      return cast<const FunctionType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::GenericFunction:
+      return cast<const GenericFunctionType>(this)->updateExpDepTypeHashInner(hash);
+     case TypeKind::SILFunction:
+      return cast<const SILFunctionType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::SILBlockStorage:
+      return cast<const SILBlockStorageType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::SILBox:
+      return cast<const SILBoxType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::SILToken:
+      return cast<const SILTokenType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::ProtocolComposition:
+      return cast<const ProtocolCompositionType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::LValue:
+      return cast<const LValueType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::InOut:
+      return cast<const InOutType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::TypeVariable:
+      return cast<const TypeVariableType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::Paren:
+      return cast<const ParenType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::NameAlias:
+      return cast<const NameAliasType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::ArraySlice:
+      return cast<const ArraySliceType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::Optional:
+      return cast<const OptionalType>(this)->updateExpDepTypeHashInner(hash);
+    case TypeKind::Dictionary:
+      return cast<const DictionaryType>(this)->updateExpDepTypeHashInner(hash);
+  }
+  
+  
+//  assert(hasCanonicalTypeComputed());
+//  CanType ct = getCanonicalType();
+//  TRY_UPDATE_HASH(ct.updateExpDepCanonTypeHash(hash))
   //Kind and inner
   
   //const issue getOptionalObjectType().updateExpDepTypeHash(hash);
@@ -4094,12 +4187,220 @@ ExperimentalDependencies::unimpLocation_t  TypeBase::updateExpDepTypeBaseHash(ll
   //getContextSubstitutions: adjustSuperclassMemberDeclType, getTypeOfMember, getMemberSubstitutions, getContextSubstitutionMap, getContextSubstitutions, getContextSubstitutionMap
 }
 ExperimentalDependencies::unimpLocation_t  Type::updateExpDepTypeHash(llvm::MD5 &hash) const {
-  RETURN_UNIMP; // where is the state?
-  return getPointer()->updateExpDepTypeBaseHash(hash);
+   return getPointer()->updateExpDepTypeBaseHash(hash);
 }
 
 ExperimentalDependencies::unimpLocation_t  CanType::updateExpDepCanonTypeHash(llvm::MD5 &hash) const {
 // error inf recursion
   RETURN_UNIMP;
 //  return Type::updateExpDepHash(hash);
+}
+
+
+
+
+
+ExperimentalDependencies::unimpLocation_t  ErrorType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  UnresolvedType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  BuiltinIntegerType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return BuiltinType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  BuiltinFloatType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+    return BuiltinType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  BuiltinRawPointerType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return BuiltinType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  BuiltinNativeObjectType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return BuiltinType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  BuiltinBridgeObjectType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return BuiltinType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  BuiltinUnknownObjectType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return BuiltinType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  BuiltinUnsafeValueBufferType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return BuiltinType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  BuiltinVectorType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return BuiltinType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  TupleType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  WeakStorageType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  UnownedStorageType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  UnmanagedStorageType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  EnumType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return NominalType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  StructType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return NominalType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  ClassType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return NominalType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  ProtocolType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return NominalType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  BoundGenericClassType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return BoundGenericType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  BoundGenericEnumType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return BoundGenericType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  BoundGenericStructType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return BoundGenericType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  UnboundGenericType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return AnyGenericType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  MetatypeType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return AnyMetatypeType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  ExistentialMetatypeType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return AnyMetatypeType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  ModuleType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  DynamicSelfType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  ArchetypeType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return SubstitutableType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  GenericTypeParamType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return SubstitutableType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  DependentMemberType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  FunctionType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+   return AnyFunctionType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  GenericFunctionType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return AnyFunctionType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  SILFunctionType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  SILBlockStorageType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  SILBoxType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  SILTokenType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  ProtocolCompositionType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  LValueType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  InOutType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  TypeVariableType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  ParenType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+   return SugarType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  NameAliasType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return SugarType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  ArraySliceType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return UnarySyntaxSugarType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  OptionalType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return UnarySyntaxSugarType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  DictionaryType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+RETURN_UNIMP;
+  return SugarType::updateExpDepTypeHashInner(hash);
+}
+
+
+
+
+ExperimentalDependencies::unimpLocation_t  AnyFunctionType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+  RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  AnyGenericType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+  RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  AnyMetatypeType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+  RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  BoundGenericType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+  RETURN_UNIMP;
+  return NominalOrBoundGenericNominalType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  BuiltinType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+  RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  NominalType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+  RETURN_UNIMP;
+  return NominalOrBoundGenericNominalType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  SubstitutableType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+  RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  SugarType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+  RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t  UnarySyntaxSugarType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+  RETURN_UNIMP;
+  return SyntaxSugarType::updateExpDepTypeHashInner(hash);
+}
+
+
+
+ExperimentalDependencies::unimpLocation_t  NominalOrBoundGenericNominalType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+  RETURN_UNIMP;
+  return AnyGenericType::updateExpDepTypeHashInner(hash);
+}
+ExperimentalDependencies::unimpLocation_t  SyntaxSugarType::updateExpDepTypeHashInner(llvm::MD5 &hash) const {
+  RETURN_UNIMP;
+  return SugarType::updateExpDepTypeHashInner(hash);
 }
