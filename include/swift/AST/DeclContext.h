@@ -623,7 +623,7 @@ public:
   static bool classof(const DeclContext *DC) {
     return DC->getContextKind() == DeclContextKind::SerializedLocal;
   }
-  ExperimentalDependencies::unimpLocation_t  updateExpDepInner(llvm::MD5& hash) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepHashInner(llvm::MD5& hash) const;
 };
 
 /// An iterator that walks through a list of declarations stored

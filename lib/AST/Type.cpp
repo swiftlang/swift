@@ -4093,10 +4093,11 @@ ExperimentalDependencies::unimpLocation_t  TypeBase::updateExpDepHash(llvm::MD5 
   //getContextSubstitutions: adjustSuperclassMemberDeclType, getTypeOfMember, getMemberSubstitutions, getContextSubstitutionMap, getContextSubstitutions, getContextSubstitutionMap
 }
 ExperimentalDependencies::unimpLocation_t  Type::updateExpDepHash(llvm::MD5 &hash) const {
-  return getPointer()->updateExpDepHash(hash);
+  RETURN_UNIMP; // where is the state?
+//  return getPointer()->updateExpDepHash(hash);
 }
 
-ExperimentalDependencies::unimpLocation_t  CanType::updateExpDepHash(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  CanType::updateExpDepHashInner(llvm::MD5 &hash) const {
 // error inf recursion
   RETURN_UNIMP;
 //  return Type::updateExpDepHash(hash);

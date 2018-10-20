@@ -956,90 +956,90 @@ ExperimentalDependencies::unimpLocation_t  DeclContext::updateExpDepHash(llvm::M
   switch (getContextKind()) {
       
     case DeclContextKind::TopLevelCodeDecl:
-      return cast<TopLevelCodeDecl>(this)->updateExpDepInner(hash);
+      return cast<TopLevelCodeDecl>(this)->updateExpDepHashInner(hash);
       
     case DeclContextKind::SerializedLocal: {
       auto local = cast<SerializedLocalDeclContext>(this);
       switch (local->getLocalDeclContextKind()) {
         case LocalDeclContextKind::AbstractClosure:
-          return cast<SerializedAbstractClosureExpr>(local)->updateExpDepInner(hash);
+          return cast<SerializedAbstractClosureExpr>(local)->updateExpDepHashInner(hash);
         case LocalDeclContextKind::DefaultArgumentInitializer:
-          return cast<SerializedDefaultArgumentInitializer>(local)->updateExpDepInner(hash);
+          return cast<SerializedDefaultArgumentInitializer>(local)->updateExpDepHashInner(hash);
         case LocalDeclContextKind::PatternBindingInitializer:
-          return cast<SerializedPatternBindingInitializer>(local)->updateExpDepInner(hash);
+          return cast<SerializedPatternBindingInitializer>(local)->updateExpDepHashInner(hash);
         case LocalDeclContextKind::TopLevelCodeDecl:
-          return cast<TopLevelCodeDecl>(local)->updateExpDepInner(hash);
+          return cast<TopLevelCodeDecl>(local)->updateExpDepHashInner(hash);
       }
     }
       
     case DeclContextKind::AbstractClosureExpr:
-      return cast<AbstractClosureExpr>(this)->updateExpDepInner(hash);
+      return cast<AbstractClosureExpr>(this)->updateExpDepHashInner(hash);
     case DeclContextKind::Initializer:
       switch (cast<Initializer>(this)->getInitializerKind()) {
         case InitializerKind::DefaultArgument:
-          return cast<DefaultArgumentInitializer>(this)->updateExpDepInner(hash);
+          return cast<DefaultArgumentInitializer>(this)->updateExpDepHashInner(hash);
         case InitializerKind::PatternBinding:
-          return cast<PatternBindingInitializer>(this)->updateExpDepInner(hash);
+          return cast<PatternBindingInitializer>(this)->updateExpDepHashInner(hash);
       }
     case DeclContextKind::SubscriptDecl:
-      return cast<SubscriptDecl>(this)->updateExpDepInner(hash);
+      return cast<SubscriptDecl>(this)->updateExpDepHashInner(hash);
     case DeclContextKind::AbstractFunctionDecl:
-      return cast<AbstractFunctionDecl>(this)->updateExpDepInner(hash);
+      return cast<AbstractFunctionDecl>(this)->updateExpDepHashInner(hash);
     case DeclContextKind::Module:
-      return cast<ModuleDecl>(this)->updateExpDepInner(hash);
+      return cast<ModuleDecl>(this)->updateExpDepHashInner(hash);
     case DeclContextKind::FileUnit:
-      return cast<FileUnit>(this)->updateExpDepInner(hash);
+      return cast<FileUnit>(this)->updateExpDepHashInner(hash);
       
     case DeclContextKind::GenericTypeDecl:
-      return cast<GenericTypeDecl>(this)->updateExpDepInner(hash);
+      return cast<GenericTypeDecl>(this)->updateExpDepHashInner(hash);
     case DeclContextKind::ExtensionDecl:
-      return cast<ExtensionDecl>(this)->updateExpDepInner(hash);
+      return cast<ExtensionDecl>(this)->updateExpDepHashInner(hash);
   }
 }
 
-ExperimentalDependencies::unimpLocation_t  SerializedLocalDeclContext::updateExpDepInner(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  SerializedLocalDeclContext::updateExpDepHashInner(llvm::MD5 &hash) const {
   ExperimentalDependencies::updateExpDepFromBits(hash, LocalKind);
   return nullptr;
 }
 
-ExperimentalDependencies::unimpLocation_t  SerializedAbstractClosureExpr::updateExpDepInner(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  SerializedAbstractClosureExpr::updateExpDepHashInner(llvm::MD5 &hash) const {
   TRY_UPDATE_HASH(Ty.updateExpDepHash(hash))
   TRY_UPDATE_HASH(TypeAndImplicit.getPointer()->updateExpDepHash(hash))
   bool isI = isImplicit();
   ExperimentalDependencies::updateExpDepFromBits(hash, isI);
   ExperimentalDependencies::updateExpDepFromBits(hash, Discriminator);
-  return SerializedLocalDeclContext::updateExpDepInner(hash);
+  return SerializedLocalDeclContext::updateExpDepHashInner(hash);
 }
 
-ExperimentalDependencies::unimpLocation_t  SerializedPatternBindingInitializer::updateExpDepInner(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  SerializedPatternBindingInitializer::updateExpDepHashInner(llvm::MD5 &hash) const {
   TRY_UPDATE_HASH(Binding->updateExpDepHash(hash))
-  return SerializedLocalDeclContext::updateExpDepInner(hash);
+  return SerializedLocalDeclContext::updateExpDepHashInner(hash);
 }
 
-ExperimentalDependencies::unimpLocation_t  TopLevelCodeDecl::updateExpDepInner(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  TopLevelCodeDecl::updateExpDepHashInner(llvm::MD5 &hash) const {
   RETURN_UNIMP;
 }
-ExperimentalDependencies::unimpLocation_t  AbstractClosureExpr::updateExpDepInner(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  AbstractClosureExpr::updateExpDepHashInner(llvm::MD5 &hash) const {
   RETURN_UNIMP;
 }
-ExperimentalDependencies::unimpLocation_t  SubscriptDecl::updateExpDepInner(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  SubscriptDecl::updateExpDepHashInner(llvm::MD5 &hash) const {
   RETURN_UNIMP;
 }
-ExperimentalDependencies::unimpLocation_t  AbstractFunctionDecl::updateExpDepInner(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  AbstractFunctionDecl::updateExpDepHashInner(llvm::MD5 &hash) const {
   RETURN_UNIMP;
 }
-ExperimentalDependencies::unimpLocation_t  ModuleDecl::updateExpDepInner(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  ModuleDecl::updateExpDepHashInner(llvm::MD5 &hash) const {
   RETURN_UNIMP;
 }
-ExperimentalDependencies::unimpLocation_t  FileUnit::updateExpDepInner(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  FileUnit::updateExpDepHashInner(llvm::MD5 &hash) const {
   RETURN_UNIMP;
 }
-ExperimentalDependencies::unimpLocation_t  GenericTypeDecl::updateExpDepInner(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  GenericTypeDecl::updateExpDepHashInner(llvm::MD5 &hash) const {
   RETURN_UNIMP;
 }
-ExperimentalDependencies::unimpLocation_t  ExtensionDecl::updateExpDepInner(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  ExtensionDecl::updateExpDepHashInner(llvm::MD5 &hash) const {
   RETURN_UNIMP;
 }
-ExperimentalDependencies::unimpLocation_t  PatternBindingInitializer::updateExpDepInner(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  PatternBindingInitializer::updateExpDepHashInner(llvm::MD5 &hash) const {
   RETURN_UNIMP;
 }

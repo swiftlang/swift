@@ -697,10 +697,6 @@ TrailingWhereClause *TrailingWhereClause::create(
   return new (mem) TrailingWhereClause(whereLoc, requirements);
 }
 
-ExperimentalDependencies::unimpLocation_t  TrailingWhereClause::updateExpDepHash(llvm::MD5 &hash) const {
-  RETURN_UNIMP;
-}
-
 TypeArrayView<GenericTypeParamType>
 GenericContext::getInnermostGenericParamTypes() const {
   if (auto sig = getGenericSignature())
@@ -3250,6 +3246,7 @@ StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
   Bits.StructDecl.HasUnreferenceableStorage = false;
 }
 
+
 ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
                      MutableArrayRef<TypeLoc> Inherited,
                      GenericParamList *GenericParams, DeclContext *Parent)
@@ -3265,10 +3262,6 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   Bits.ClassDecl.ObjCKind = 0;
   Bits.ClassDecl.HasMissingDesignatedInitializers = 0;
   Bits.ClassDecl.HasMissingVTableEntries = 0;
-}
-
-ExperimentalDependencies::unimpLocation_t  ClassDecl::updateExpDepHash(llvm::MD5 &hash) const {
-  RETURN_UNIMP;
 }
 
 DestructorDecl *ClassDecl::getDestructor() {
@@ -4104,10 +4097,6 @@ void ProtocolDecl::setRequirementSignature(ArrayRef<Requirement> requirements) {
     RequirementSignature = getASTContext().AllocateCopy(requirements).data();
     Bits.ProtocolDecl.NumRequirementsInSignature = requirements.size();
   }
-}
-
-ExperimentalDependencies::unimpLocation_t  ProtocolDecl::updateExpDepHash(llvm::MD5& hash) const {
-  RETURN_UNIMP;
 }
 
 void AbstractStorageDecl::overwriteImplInfo(StorageImplInfo implInfo) {
@@ -6309,142 +6298,62 @@ void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *decl) {
 ExperimentalDependencies::unimpLocation_t Decl::updateExpDepHash(llvm::MD5& hash) const {
   
   switch (getKind()) {
-#error casts wrong and sub impls
     case DeclKind::Enum:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const EnumDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::Struct:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const StructDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::Class:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const ClassDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::Protocol:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
-    case DeclKind::First_NominalTypeDecl:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
-    case DeclKind::Last_NominalTypeDecl:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const ProtocolDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::TypeAlias:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
-    case DeclKind::First_GenericTypeDecl:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
-    case DeclKind::Last_GenericTypeDecl:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const TypeAliasDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::GenericTypeParam:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const GenericTypeParamDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::AssociatedType:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
-    case DeclKind::First_AbstractTypeParamDecl:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
-    case DeclKind::Last_AbstractTypeParamDecl:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const AssociatedTypeDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::Module:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
-    case DeclKind::First_TypeDecl:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
-    case DeclKind::Last_TypeDecl:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const ModuleDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::Var:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const VarDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::Param:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const ParamDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::Subscript:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
-    case DeclKind::First_AbstractStorageDecl:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
-    case DeclKind::Last_AbstractStorageDecl:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const SubscriptDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::Constructor:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const ConstructorDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::Destructor:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const DestructorDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::Func:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const FuncDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::Accessor:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
-    case DeclKind::First_AbstractFunctionDecl:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
-    case DeclKind::Last_AbstractFunctionDecl:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const AccessorDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::EnumElement:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
-    case DeclKind::First_ValueDecl:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
-    case DeclKind::Last_ValueDecl:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const EnumElementDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::Extension:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const ExtensionDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::TopLevelCode:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const TopLevelCodeDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::Import:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const ImportDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::IfConfig:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const IfConfigDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::PoundDiagnostic:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const PoundDiagnosticDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::PrecedenceGroup:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const PrecedenceGroupDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::MissingMember:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const MissingMemberDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::PatternBinding:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const PatternBindingDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::EnumCase:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const EnumCaseDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::InfixOperator:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const InfixOperatorDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::PrefixOperator:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const PrefixOperatorDecl>(this)->updateExpDepHashInner(hash);
     case DeclKind::PostfixOperator:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
-    case DeclKind::First_OperatorDecl:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
-    case DeclKind::Last_OperatorDecl:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
-    case DeclKind::Last_Decl:
-      return cast<const RestatedObjCConformanceAttr>(this)->updateExpDepInner(hash);
-      break;
+      return cast<const PostfixOperatorDecl>(this)->updateExpDepHashInner(hash);
   }
 
 }
@@ -6459,28 +6368,84 @@ ExperimentalDependencies::unimpLocation_t  Decl::updateExpDepHash(llvm::MD5& has
   return dc->updateExpDepHash(hash);
 }
 
-ExperimentalDependencies::unimpLocation_t  OperatorDecl::updateExpDepHash(llvm::MD5& hash) const {
-  TRY_UPDATE_HASH(name.updateExpDepHash(hash))
-  return Decl::updateExpDepHash(hash);
+ExperimentalDependencies::unimpLocation_t  OperatorDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  return name.updateExpDepHash(hash);
 }
 
-ExperimentalDependencies::unimpLocation_t  NominalTypeDecl::updateExpDepHash(llvm::MD5& hash) const {
+ExperimentalDependencies::unimpLocation_t  NominalTypeDecl::updateExpDepHashInner(llvm::MD5& hash) const {
   RETURN_UNIMP;
 //  Type DeclaredTy;
 //  Type DeclaredTyInContext;
 //  Type DeclaredInterfaceTy;
 //  extensions
 //  GenericTypeDecl::updateExpDepHash(hash);
+  return GenericTypeDecl::updateExpDepHashInner(hash);
 }
 
-ExperimentalDependencies::unimpLocation_t  PrecedenceGroupDecl::updateExpDepHash(llvm::MD5& hash) const {
+ExperimentalDependencies::unimpLocation_t  PrecedenceGroupDecl::updateExpDepHashInner(llvm::MD5& hash) const {
   RETURN_UNIMP;
 
 }
 
-ExperimentalDependencies::unimpLocation_t  ValueDecl::updateExpDepHash(llvm::MD5& hash) const {
+ExperimentalDependencies::unimpLocation_t  ValueDecl::updateExpDepHashInner(llvm::MD5& hash) const {
   RETURN_UNIMP;
 }
-//unimpLocation_t  GenericTypeDecl::updateExpDepHash(llvm::MD5& hash) const {
-//#error unimp
-//}
+
+
+ExperimentalDependencies::unimpLocation_t  TrailingWhereClause::updateExpDepHash(llvm::MD5 &hash) const {
+  RETURN_UNIMP;
+}
+
+ExperimentalDependencies::unimpLocation_t  TypeAliasDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+   RETURN_UNIMP;
+  return GenericTypeDecl::updateExpDepHashInner(hash);
+}
+
+ExperimentalDependencies::unimpLocation_t EnumDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  assert(hasRawType());
+  TRY_UPDATE_HASH(getRawType().updateExpDepHash(hash));
+  return NominalTypeDecl::updateExpDepHashInner(hash);
+  
+}
+
+ExperimentalDependencies::unimpLocation_t StructDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  return NominalTypeDecl::updateExpDepHashInner(hash);
+}
+
+ExperimentalDependencies::unimpLocation_t  ClassDecl::updateExpDepHashInner(llvm::MD5 &hash) const {
+  if (hasSuperclass()) {
+    TRY_UPDATE_HASH(getSuperclass().updateExpDepHash(hash));
+  }
+  if (getSuperclassDecl()) {
+    TRY_UPDATE_HASH(getSuperclassDecl()->updateExpDepHash(hash));
+  }
+  const ForeignKind fk = getForeignClassKind();
+  ExperimentalDependencies::updateExpDepFromBits(hash, fk);
+  
+  const bool flags[] = {
+    requiresStoredPropertyInits(),
+    hasMissingDesignatedInitializers(),
+    hasMissingVTableEntries(),
+    hasDestructor(),
+    usesObjCGenericsModel(),
+    hasKnownSwiftImplementation()
+  };
+  ExperimentalDependencies::updateExpDepFromBits(hash, flags);
+  
+  if (hasDestructor()) {
+    RETURN_UNIMP; // non-const getDestructor
+    //    TRY_UPDATE_HASH(getDestructor()->updateExpDepHash(hash));
+  }
+  const MetaclassKind mk = getMetaclassKind();
+  ExperimentalDependencies::updateExpDepFromBits(hash, mk);
+  llvm::SmallString<64> scratch;
+  hash.update(getObjCRuntimeName(&scratch));
+  // getArtificialMainKind
+  
+  return NominalTypeDecl::updateExpDepHashInner(hash);
+}
+
+ExperimentalDependencies::unimpLocation_t  ProtocolDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+  return NominalTypeDecl::updateExpDepHashInner(hash);
+}
