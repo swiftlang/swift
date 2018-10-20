@@ -357,7 +357,7 @@ std::pair<std::string, ExperimentalDependencies::unimpLocation_t>
 ProvidesEmitter::getExperimentalDependencyHash(const Decl *D) {
   
   llvm::MD5 DeclHash;
-  
+  D->dump();
   if (ExperimentalDependencies::unimpLocation_t r  = D->updateExpDepDeclHash(DeclHash))
     return make_pair(std::string(), r);
   
