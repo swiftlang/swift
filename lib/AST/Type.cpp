@@ -4081,11 +4081,12 @@ Type TypeBase::openAnyExistentialType(ArchetypeType *&opened) {
 }
 
 
-ExperimentalDependencies::unimpLocation_t  TypeBase::updateExpDepTypeHash(llvm::MD5 &hash) const {
+ExperimentalDependencies::unimpLocation_t  TypeBase::updateExpDepTypeBaseHash(llvm::MD5 &hash) const {
   ExperimentalDependencies::updateExpDepFromBits(hash, &Bits, sizeof(Bits));
   assert(hasCanonicalTypeComputed());
   CanType ct = getCanonicalType();
   TRY_UPDATE_HASH(ct.updateExpDepCanonTypeHash(hash))
+  //Kind and inner
   
   //const issue getOptionalObjectType().updateExpDepTypeHash(hash);
   
@@ -4094,7 +4095,7 @@ ExperimentalDependencies::unimpLocation_t  TypeBase::updateExpDepTypeHash(llvm::
 }
 ExperimentalDependencies::unimpLocation_t  Type::updateExpDepTypeHash(llvm::MD5 &hash) const {
   RETURN_UNIMP; // where is the state?
-//  return getPointer()->updateExpDepHash(hash);
+  return getPointer()->updateExpDepTypeBaseHash(hash);
 }
 
 ExperimentalDependencies::unimpLocation_t  CanType::updateExpDepCanonTypeHash(llvm::MD5 &hash) const {

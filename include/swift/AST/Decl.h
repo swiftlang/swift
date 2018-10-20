@@ -4151,6 +4151,8 @@ struct alignas(1 << 3) BehaviorRecord {
   {}
   
   SourceLoc getLoc() const;
+  
+  ExperimentalDependencies::unimpLocation_t updateExpDepHash(llvm::MD5&) const;
 };
 
 /// AbstractStorageDecl - This is the common superclass for VarDecl and

@@ -6488,7 +6488,13 @@ ExperimentalDependencies::unimpLocation_t  DestructorDecl::updateExpDepDeclHashI
 }
 
 ExperimentalDependencies::unimpLocation_t  FuncDecl::updateExpDepDeclHashInner(llvm::MD5& hash) const {
-  RETURN_UNIMP;
+  TRY_UPDATE_HASH(getReturnTypeLoc().updateExpDepHash(hash));
+  if (auto pb = getParamBehavior()) {
+    TRY_UPDATE_HASH(pb->updateExpDepHash(hash));
+  }
+  if (auto od = getOperatorDecl()) {
+    TRY_UPDATE_HASH(od->updateExpDepDeclHash(hash));
+  }
   return AbstractFunctionDecl::updateExpDepDeclHashInner(hash);
 }
 
@@ -6550,6 +6556,15 @@ ExperimentalDependencies::unimpLocation_t  PostfixOperatorDecl::updateExpDepDecl
 ExperimentalDependencies::unimpLocation_t  EnumCaseDecl::updateExpDepDeclHashInner(llvm::MD5& hash) const {
   return nullptr;
 }
+ExperimentalDependencies::unimpLocation_t  AbstractFunctionDecl::updateExpDepDeclHashInner(llvm::MD5& hash) const {
+  const BodyKind bk = getBodyKind();
+  ExperimentalDependencies::updateExpDepFromBits(hash, &bk, sizeof(bk));
+  //Params ParameterList
+  // the union
+  // Captures
+  RETURN_UNIMP;
+  return ValueDecl::updateExpDepDeclHash(hash);
+}
 
 ExperimentalDependencies::unimpLocation_t GenericContext::updateExpDepDeclCtxHashInner(llvm::MD5&) const {
   RETURN_UNIMP;
@@ -6560,5 +6575,11 @@ ExperimentalDependencies::unimpLocation_t DefaultArgumentInitializer::updateExpD
 }
 ExperimentalDependencies::unimpLocation_t SerializedDefaultArgumentInitializer::updateExpDepDeclCtxHashInner(llvm::MD5& hash) const {
   TRY_UPDATE_HASH(SerializedLocalDeclContext::updateExpDepDeclCtxHashInner(hash));
+  RETURN_UNIMP;
+}
+
+ExperimentalDependencies::unimpLocation_t BehaviorRecord::updateExpDepHash(llvm::MD5& hash) const{
+//ProtocolName // TypeRepr
+//  Para // Expr
   RETURN_UNIMP;
 }

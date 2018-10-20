@@ -1005,7 +1005,7 @@ ExperimentalDependencies::unimpLocation_t  SerializedLocalDeclContext::updateExp
 
 ExperimentalDependencies::unimpLocation_t  SerializedAbstractClosureExpr::updateExpDepDeclCtxHashInner(llvm::MD5 &hash) const {
   TRY_UPDATE_HASH(Ty.updateExpDepTypeHash(hash))
-  TRY_UPDATE_HASH(TypeAndImplicit.getPointer()->updateExpDepTypeHash(hash))
+  TRY_UPDATE_HASH(TypeAndImplicit.getPointer().updateExpDepTypeHash(hash))
   bool isI = isImplicit();
   ExperimentalDependencies::updateExpDepFromBits(hash, &isI, sizeof(isI));
   ExperimentalDependencies::updateExpDepFromBits(hash, &Discriminator, sizeof(Discriminator));
@@ -1035,7 +1035,8 @@ ExperimentalDependencies::unimpLocation_t  ModuleDecl::updateExpDepDeclCtxHashIn
   RETURN_UNIMP;
 }
 ExperimentalDependencies::unimpLocation_t  FileUnit::updateExpDepDeclCtxHashInner(llvm::MD5 &hash) const {
-  RETURN_UNIMP;
+  ExperimentalDependencies::updateExpDepFromBits(hash, &Kind, sizeof(Kind));
+  return nullptr;
 }
 ExperimentalDependencies::unimpLocation_t  GenericTypeDecl::updateExpDepDeclCtxHashInner(llvm::MD5 &hash) const {
   return GenericContext::updateExpDepDeclCtxHashInner(hash);

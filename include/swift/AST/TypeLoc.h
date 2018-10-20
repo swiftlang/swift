@@ -17,9 +17,11 @@
 #ifndef SWIFT_TYPELOC_H
 #define SWIFT_TYPELOC_H
 
+#include "swift/Basic/ExperimentalDependencies.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/Support/MD5.h"
 
 namespace swift {
 
@@ -66,6 +68,10 @@ public:
   void setType(Type Ty);
 
   TypeLoc clone(ASTContext &ctx) const;
+  
+  ExperimentalDependencies::unimpLocation_t updateExpDepHash(llvm::MD5& hash) const {
+    return getType().updateExpDepTypeHash(hash);
+  }
 };
 
 } // end namespace llvm
