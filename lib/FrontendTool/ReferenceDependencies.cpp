@@ -128,8 +128,7 @@ private:
   static bool extendedTypeIsPrivate(TypeLoc inheritedType);
   static bool declIsPrivate(const Decl *member);
 
-  template <typename DeclT>
-  void emitExperimentalTopLevel(const DeclBaseName &, const DeclT *) const;
+  void emitExperimentalTopLevel(const DeclBaseName &, const Decl *) const;
 };
 
 /// Emit the depended-upon declartions.
@@ -346,16 +345,17 @@ void ProvidesEmitter::emitTopLevelDecl(const Decl *const D,
   }
 }
 
-template <typename DeclT>
 void ProvidesEmitter::emitExperimentalTopLevel(const DeclBaseName &N,
-                                               const DeclT *D) const {
+                                               const Decl *D) const {
   if (EnableExperimentalDependencies) {
     out << "- \""
         << llvm::yaml::escape(ExperimentalDependencies::TopLevel(
-                                  N.userFacingName(), Decl::getHash(D))
+                                  N.userFacingName(), D->getExperimentalDependencyHash())
                                   .combined())
         << "\"\n";
   }
+  else
+    out << "- \"" << escape(N) << "\"\n";
 }
 
 void ProvidesEmitter::emitExtensionDecl(const ExtensionDecl *const ED,
@@ -390,7 +390,6 @@ void ProvidesEmitter::emitNominalTypeDecl(const NominalTypeDecl *const NTD,
   if (NTD->getFormalAccess() <= AccessLevel::FilePrivate) {
     return;
   }
-  out << "- \"" << escape(NTD->getName()) << "\"\n";
   emitExperimentalTopLevel(NTD->getName(), NTD);
 
   cpd.extendedNominals[NTD] |= true;
@@ -427,7 +426,6 @@ void ProvidesEmitter::emitValueDecl(const ValueDecl *const VD) const {
   if (VD->getFormalAccess() <= AccessLevel::FilePrivate) {
     return;
   }
-  out << "- \"" << escape(VD->getBaseName()) << "\"\n";
   emitExperimentalTopLevel(VD->getBaseName(), VD);
 }
 
