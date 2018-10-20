@@ -613,7 +613,7 @@ void IRGenModule::emitRuntimeRegistration() {
   if (DebugInfo && !Context.LangOpts.DebuggerSupport)
     DebugInfo->emitArtificialFunction(RegIGF, RegistrationFunction);
   
-  // Register ObjC protocols, classes, and extensions we added.
+  // Register ObjC protocols we added.
   if (ObjCInterop) {
     if (!ObjCProtocols.empty()) {
       // We need to initialize ObjC protocols in inheritance order, parents
@@ -648,14 +648,6 @@ void IRGenModule::emitRuntimeRegistration() {
         ObjCProtocolInitializerVisitor(RegIGF)
           .visitMembers(proto);
       }
-    }
-    
-    for (llvm::WeakTrackingVH &ObjCClass : ObjCClasses) {
-      RegIGF.Builder.CreateCall(getInstantiateObjCClassFn(), {ObjCClass});
-    }
-      
-    for (ExtensionDecl *ext : ObjCCategoryDecls) {
-      CategoryInitializerVisitor(RegIGF, ext).visitMembers(ext);
     }
   }
 
@@ -714,6 +706,17 @@ void IRGenModule::emitRuntimeRegistration() {
         /*Ty=*/nullptr, records, endIndices);
 
     RegIGF.Builder.CreateCall(getRegisterTypeMetadataRecordsFn(), {begin, end});
+  }
+
+  // Register Objective-C classes and extensions we added.
+  if (ObjCInterop) {
+    for (llvm::WeakTrackingVH &ObjCClass : ObjCClasses) {
+      RegIGF.Builder.CreateCall(getInstantiateObjCClassFn(), {ObjCClass});
+    }
+
+    for (ExtensionDecl *ext : ObjCCategoryDecls) {
+      CategoryInitializerVisitor(RegIGF, ext).visitMembers(ext);
+    }
   }
 
   if (!FieldDescriptors.empty()) {
@@ -898,7 +901,7 @@ llvm::Constant *IRGenModule::getAddrOfAssociatedTypeGenericParamRef(
   // Otherwise, build the reference path.
   ConstantInitBuilder builder(*this);
   auto B = builder.beginStruct();
-  B.addInt32(ordinal << 1);
+  B.addInt32(ordinal);
 
   for (auto *assocType : reversed(assocTypePath)) {
     auto proto = getConstantReferenceForProtocolDescriptor(

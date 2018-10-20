@@ -93,20 +93,6 @@
 // CHECK-SAME:   i32 {{3|2}},
 // CHECK-SAME: }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$s13generic_types1ACMi"(%swift.type_descriptor*, i8**, i8*) {{.*}} {
-// CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
-// CHECK:   %T = load %swift.type*, %swift.type** [[T0]],
-// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8* %2)
-// CHECK-NEXT:   ret %swift.type* [[METADATA]]
-// CHECK: }
-
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$s13generic_types1BCMi"(%swift.type_descriptor*, i8**, i8*) {{.*}} {
-// CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
-// CHECK:   %T = load %swift.type*, %swift.type** [[T0]],
-// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8* %2)
-// CHECK-NEXT: ret %swift.type* [[METADATA]]
-// CHECK: }
-
 class A<T> {
   var x = 0
 
@@ -149,3 +135,38 @@ func testFixed() {
   var a = F(value: ClassA()).value
   var b = F(value: ClassB()).value
 }
+
+// Checking generic requirement encoding
+protocol P1 { }
+protocol P2 {
+  associatedtype A
+}
+
+struct X1: P1 { }
+struct X2: P2 {
+  typealias A = X1
+}
+
+// Check for correct root generic parameters in the generic requirements of X3.
+// CHECK-LABEL: @"$sq_1A13generic_types2P2P_MXA" = linkonce_odr hidden constant
+
+// Root: generic parameter 1
+// CHECK-SAME: i32 1
+
+// Protocol P2
+// CHECK-SAME: $s13generic_types2P2Mp
+struct X3<T, U> where U: P2, U.A: P1 { }
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$s13generic_types1ACMi"(%swift.type_descriptor*, i8**, i8*) {{.*}} {
+// CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
+// CHECK:   %T = load %swift.type*, %swift.type** [[T0]],
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8* %2)
+// CHECK-NEXT:   ret %swift.type* [[METADATA]]
+// CHECK: }
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$s13generic_types1BCMi"(%swift.type_descriptor*, i8**, i8*) {{.*}} {
+// CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
+// CHECK:   %T = load %swift.type*, %swift.type** [[T0]],
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8* %2)
+// CHECK-NEXT: ret %swift.type* [[METADATA]]
+// CHECK: }
