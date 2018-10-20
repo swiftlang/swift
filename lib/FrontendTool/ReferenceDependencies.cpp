@@ -355,15 +355,19 @@ void ProvidesEmitter::emitExperimentalTopLevel(const DeclBaseName &N,
 std::pair<std::string, ExperimentalDependencies::unimpLocation_t>
 ProvidesEmitter::getExperimentalDependencyHash(const Decl *D) {
   
-  llvm::MD5 DeclHash;
-  if (ExperimentalDependencies::unimpLocation_t r  = ExperimentalDependencies::updateExpDepDeclHash(DeclHash, D))
-    return make_pair(std::string(), r);
-  
-  llvm::MD5::MD5Result result;
-  DeclHash.final(result);
-  llvm::SmallString<32> str;
-  llvm::MD5::stringifyResult(result, str);
-  return std::make_pair(str.str().str(), nullptr);
+//  llvm::MD5 DeclHash;
+//  if (ExperimentalDependencies::unimpLocation_t r  = ExperimentalDependencies::updateExpDepDeclHash(DeclHash, D))
+//    return make_pair(std::string(), r);
+//
+//  llvm::MD5::MD5Result result;
+//  DeclHash.final(result);
+//  llvm::SmallString<32> str;
+//  llvm::MD5::stringifyResult(result, str);
+//  return std::make_pair(str.str().str(), nullptr);
+  std::string buf;
+  llvm::raw_string_ostream OS(buf);
+  D->dump(OS);
+  return std::make_pair(OS.str(), nullptr);
 }
 
 void ProvidesEmitter::emitExtensionDecl(const ExtensionDecl *const ED,

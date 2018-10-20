@@ -71,33 +71,33 @@ CompoundProvides::separate(StringRef combined) {
 //public:
 //  llvm::MD5 &hash;
 //  unimpLocation_t unimpLocation;
-//  
+//
 //  explicit UpdateExpDepDeclHash(llvm::MD5 &hash) : hash(hash), unimpLocation("never set in UpdateExpDepDeclHash")
 //{}
-//  
+//
 //  void updateExpDepHashRec(Decl *D) { UpdateExpDepDeclHash(hash).visit(D); }
 //  void updateExpDepHashRec(Expr *E) { E->print(OS, Indent+2); }
 //  void updateExpDepHashRec(Stmt *S, const ASTContext &Ctx) { S->print(OS, &Ctx, Indent+2); }
 //  void updateExpDepHashRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
 //  void updateExpDepHashRec(TypeRepr *T); // was printRec
-//  
+//
 //  // Print a field with a value.
 //  template<typename T>
 //  unimpLocation_t updateExpDepHashField(StringRef name, const T &value) {
 ////     snort( value );
 //    RETURN_UNIMP
 //  }
-//  
+//
 //  void updateExpDepHashCommon(Decl *D, const char *Name) {
 //    hash.update(Name);
-//    
+//
 //    if (D->isImplicit())
 //      hash.update("implicit");
-//    
+//
 //    if (D->TrailingSemiLoc.isValid())
 //      hash.update("trailing_semi");
 //  }
-//  
+//
 //  void updateExpDepHashInherited(ArrayRef<TypeLoc> Inherited) {
 //    if (Inherited.empty())
 //      return;
@@ -107,13 +107,13 @@ CompoundProvides::separate(StringRef combined) {
 //      RETURN_UNIMP;
 //    }
 //  }
-//  
+//
 //  void visitImportDecl(ImportDecl *ID) {
 //    updateExpDepHashCommon(ID, "import_decl");
-//    
+//
 //    if (ID->isExported())
 //      hash.update("exported");
-//    
+//
 //    if (ID->getImportKind() != ImportKind::Module) {
 //      hash.update("kind=");
 //      hash.update(getImportKindString(ID->getImportKind()));
@@ -123,7 +123,7 @@ CompoundProvides::separate(StringRef combined) {
 //      RETURN_UNIMP
 //    }
 //  }
-//  
+//
 //  void visitExtensionDecl(ExtensionDecl *ED) {
 //    updateExpDepHashCommon(ED, "extension_decl");
 //    snort(ED->getExtendedType());
@@ -134,7 +134,7 @@ CompoundProvides::separate(StringRef combined) {
 //      updateExpDepHashRec(Member);
 //    }
 //  }
-//  
+//
 //  void updateExpDepHashName(const ValueDecl *D) {
 //    if (D->getFullName()) {
 //      hash.update(D->getFullName();
@@ -143,7 +143,7 @@ CompoundProvides::separate(StringRef combined) {
 //      RETURN_UNIMP;
 //    }
 //  }
-//  
+//
 //  void visitTypeAliasDecl(TypeAliasDecl *TAD) {
 //    updateExpDepHashCommon(TAD, "typealias");
 //    hash.update("type=");
@@ -155,7 +155,7 @@ CompoundProvides::separate(StringRef combined) {
 //    printInherited(TAD->getInherited());
 //    OS << "')";
 //  }
-//  
+//
 //  void updateExpDepHashAbstractTypeParamCommon(AbstractTypeParamDecl *decl,
 //                                    const char *name) {
 //    updateExpDepHashCommon(decl, name);
@@ -166,7 +166,7 @@ CompoundProvides::separate(StringRef combined) {
 //      }
 //    }
 //  }
-//  
+//
 //  void visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
 //    updateExpDepHashAbstractTypeParamCommon(decl, "generic_type_param");
 //    hash.update("depth=");
@@ -174,7 +174,7 @@ CompoundProvides::separate(StringRef combined) {
 //    hash.update("index=");
 //    ExperimentalDependencies::updateExpDepBits(decl.getIndex());
 //  }
-//  
+//
 //  void visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
 //    updateExpDepHashAbstractTypeParamCommon(decl, "associated_type_decl");
 //    if (auto defaultDef = decl->getDefaultDefinitionType()) {
@@ -196,10 +196,10 @@ CompoundProvides::separate(StringRef combined) {
 //      }
 //    }
 //  }
-//  
+//
 //  void visitProtocolDecl(ProtocolDecl *PD) {
 //    printCommon(PD, "protocol");
-//    
+//
 //    OS << " requirement signature=";
 //    if (PD->isRequirementSignatureComputed()) {
 //      OS << GenericSignature::get({PD->getProtocolSelfType()} ,
@@ -215,23 +215,23 @@ CompoundProvides::separate(StringRef combined) {
 //                 [&](const RequirementRepr &req) { req.print(OS); },
 //                 [&] { OS << ", "; });
 //    }
-//    
+//
 //    for (auto VD : PD->getMembers()) {
 //      OS << '\n';
 //      printRec(VD);
 //    }
 //    PrintWithColorRAII(OS, ParenthesisColor) << ')';
 //  }
-//  
+//
 //  void updateExpDepHashCommon(ValueDecl *VD, const char *Name) {
 //    updateExpDepHashCommon((Decl*)VD, Name);
-//    
+//
 //    updateExpDepHashDeclName(VD);
 //    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
 //      updateExpDepHashGenericParameters(AFD->getGenericParams());
 //    if (auto *GTD = dyn_cast<GenericTypeDecl>(VD))
 //      updateExpDepHashGenericParameters(GTD->getGenericParams());
-//    
+//
 //    if (auto *var = dyn_cast<VarDecl>(VD)) {
 //      hash.update("type=");
 //      if (var->hasType()) {
@@ -241,17 +241,17 @@ CompoundProvides::separate(StringRef combined) {
 //      else
 //        hash.update("<null type>");
 //    }
-//    
+//
 //    if (VD->hasInterfaceType()) {
 //      hash.update("interface type");
 //      snortMprint(VD->getInterfaceType());
 //    }
-//    
+//
 //    if (VD->hasAccess()) {
 //      hash.update("access=");
 //      hash.update(getAccessLevelSpelling(VD->getFormalAccess()));
 //    }
-//    
+//
 //    if (VD->overriddenDeclsComputed()) {
 //      auto overridden = VD->getOverriddenDecls();
 //      if (!overridden.empty()) {
@@ -262,7 +262,7 @@ CompoundProvides::separate(StringRef combined) {
 //        }
 //      }
 //    }
-//    
+//
 //    if (VD->isFinal())
 //      hash.update("final");
 //    if (VD->isObjC())
@@ -270,24 +270,24 @@ CompoundProvides::separate(StringRef combined) {
 //    if (VD->isDynamic())
 //      hash.update("dynamic");
 //  }
-//  
+//
 //  void updateExpDepHashCommon(NominalTypeDecl *NTD, const char *Name) {
 //    updateExpDepHashCommon((ValueDecl *)NTD, Name);
-//    
+//
 //    if (NTD->hasInterfaceType()) {
 //      hash.update(NTD->isResilient() ? "resilient" : "non-resilient");
 //  }
-//  
+//
 //  void visitSourceFile(const SourceFile &SF) {
 //    hash.update("source_file");
 //    hash.update(SF.getFilename());
-//    
+//
 //    for (Decl *D : SF.Decls) {
 //      if (!D->isImplicit())
 //        updateExpDepHashRec(D);
 //    }
 //  }
-//  
+//
 //  void visitVarDecl(VarDecl *VD) {
 //    updateExpDepHashCommon(VD, "var_decl");
 //    if (VD->isStatic())
@@ -301,7 +301,7 @@ CompoundProvides::separate(StringRef combined) {
 //    updateExpDepHashStorageImpl(VD);
 //    updateExpDepHashAccessors(VD);
 //  }
-//  
+//
 //  void updateExpDepHashStorageImpl(AbstractStorageDecl *D) {
 //    auto impl = D->getImplInfo();
 //    hash.update("readImpl=");
@@ -315,24 +315,24 @@ CompoundProvides::separate(StringRef combined) {
 //      hash.update(getReadWriteImplKindName(impl.getReadWriteImpl()));
 //    }
 //  }
-//  
+//
 //  void updateExpDepHashAccessors(AbstractStorageDecl *D) {
 //    for (auto accessor : D->getAllAccessors()) {
 //      updateExpDepHashRec(accessor);
 //    }
 //  }
-//  
+//
 //  void visitParamDecl(ParamDecl *PD) {
 //    updateExpDepHashParameter(PD);
 //  }
-//  
+//
 //  void visitEnumCaseDecl(EnumCaseDecl *ECD) {
 //    updateExpDepHashCommon(ECD, "enum_case_decl");
 //    for (EnumElementDecl *D : ECD->getElements()) {
 //      updateExpDepHashRec(D);
 //    }
 //  }
-//  
+//
 //  void visitEnumDecl(EnumDecl *ED) {
 //    updateExpDepHashCommon(ED, "enum_decl");
 //   updateExpDepHashInherited(ED->getInherited());
@@ -340,11 +340,11 @@ CompoundProvides::separate(StringRef combined) {
 //      updateExpDepHashRec(D);
 //    }
 //  }
-//  
+//
 //  void visitEnumElementDecl(EnumElementDecl *EED) {
 //    updateExpDepHashCommon(EED, "enum_element_decl");
 //  }
-//  
+//
 //  void visitStructDecl(StructDecl *SD) {
 //    updateExpDepHashCommon(SD, "struct_decl");
 //    updateExpDepHashInherited(SD->getInherited());
@@ -352,7 +352,7 @@ CompoundProvides::separate(StringRef combined) {
 //      updateExpDepHashRec(D);
 //    }
 //  }
-//  
+//
 //  void visitClassDecl(ClassDecl *CD) {
 //    updateExpDepHashCommon(CD, "class_decl");
 //    if (CD->getAttrs().hasAttribute<StaticInitializeObjCMetadataAttr>())
@@ -362,10 +362,10 @@ CompoundProvides::separate(StringRef combined) {
 //      updateExpDepHashRec(D);
 //    }
 //  }
-//  
+//
 //  void visitPatternBindingDecl(PatternBindingDecl *PBD) {
 //    updateExpDepHashCommon(PBD, "pattern_binding_decl");
-//    
+//
 //    for (auto entry : PBD->getPatternList()) {
 //      updateExpDepHashRec(entry.getPattern());
 //      if (entry.getInit()) {
@@ -373,26 +373,26 @@ CompoundProvides::separate(StringRef combined) {
 //      }
 //    }
 //  }
-//  
+//
 //  void visitSubscriptDecl(SubscriptDecl *SD) {
 //    updateExpDepHashCommon(SD, "subscript_decl");
 //    updateExpDepHashStorageImpl(SD);
 //    updateExpDepHashAccessors(SD);
 //  }
-//  
+//
 //  void updateExpDepHashCommonAFD(AbstractFunctionDecl *D, const char *Type) {
 //    updateExpDepHashCommon(D, Type);
 //    if (!D->getCaptureInfo().isTrivial()) {
 //      snortMPrint(D->getCaptureInfo());
 //    }
-//    
+//
 //    if (auto fec = D->getForeignErrorConvention()) {
 //      hash.update("foreign_error=");
 //      hash.update(getForeignErrorConventionKindString(fec->getKind()));
 //      bool wantResultType = (
 //                             fec->getKind() == ForeignErrorConvention::ZeroResult ||
 //                             fec->getKind() == ForeignErrorConvention::NonZeroResult);
-//      
+//
 //      hash.update((fec->isErrorOwned() == ForeignErrorConvention::IsOwned)
 //                  ? ",owned"
 //                  : ",unowned");
@@ -406,7 +406,7 @@ CompoundProvides::separate(StringRef combined) {
 //      }
 //    }
 //  }
-//  
+//
 //  void updateExpDepHashParameter(const ParamDecl *P) {
 //    hash.update("parameter");
 //    updateExpDepHashDeclName(P);
@@ -414,13 +414,13 @@ CompoundProvides::separate(StringRef combined) {
 //      hash.update("apiName=");
 //      hash.update(P->getArgumentName());
 //    }
-//    
+//
 //    if (P->hasType()) {
 //      hash.update("type=");
 //      snortMprint(P->getType());
 //      RETURN_UNIMP
 //    }
-//    
+//
 //    if (P->hasInterfaceType()) {
 //      hash.update("interface type=");
 //      snortMprint(P->getInterfaceType());
@@ -444,22 +444,22 @@ CompoundProvides::separate(StringRef combined) {
 //        OS << " owned";
 //        break;
 //    }
-//    
+//
 //    if (P->isVariadic())
 //      OS << " variadic";
-//    
+//
 //    if (P->getDefaultArgumentKind() != DefaultArgumentKind::None)
 //      printField("default_arg",
 //                 getDefaultArgumentKindString(P->getDefaultArgumentKind()));
-//    
+//
 //    if (auto init = P->getDefaultValue()) {
 //      OS << " expression=\n";
 //      printRec(init);
 //    }
-//    
+//
 //    PrintWithColorRAII(OS, ParenthesisColor) << ')';
 //  }
-//  
+//
 //  void printParameterList(const ParameterList *params, const ASTContext *ctx = nullptr) {
 //    OS.indent(Indent);
 //    PrintWithColorRAII(OS, ParenthesisColor) << '(';
@@ -469,10 +469,10 @@ CompoundProvides::separate(StringRef combined) {
 //      OS << '\n';
 //      printParameter(P);
 //    }
-//    
+//
 //    if (!ctx && params->size() != 0 && params->get(0))
 //      ctx = &params->get(0)->getASTContext();
-//    
+//
 //    if (ctx) {
 //      auto R = params->getSourceRange();
 //      if (R.isValid()) {
@@ -481,22 +481,22 @@ CompoundProvides::separate(StringRef combined) {
 //                ctx->SourceMgr, /*PrintText=*/false);
 //      }
 //    }
-//    
+//
 //    PrintWithColorRAII(OS, ParenthesisColor) << ')';
 //    Indent -= 2;
 //  }
-//  
+//
 //  void printAbstractFunctionDecl(AbstractFunctionDecl *D) {
 //    Indent += 2;
 //    if (auto *P = D->getImplicitSelfDecl()) {
 //      OS << '\n';
 //      printParameter(P);
 //    }
-//    
+//
 //    OS << '\n';
 //    printParameterList(D->getParameters(), &D->getASTContext());
 //    Indent -= 2;
-//    
+//
 //    if (auto FD = dyn_cast<FuncDecl>(D)) {
 //      if (FD->getBodyResultTypeLoc().getTypeRepr()) {
 //        OS << '\n';
@@ -514,19 +514,19 @@ CompoundProvides::separate(StringRef combined) {
 //      printRec(Body, D->getASTContext());
 //    }
 //  }
-//  
+//
 //  void printCommonFD(FuncDecl *FD, const char *type) {
 //    printCommonAFD(FD, type);
 //    if (FD->isStatic())
 //      OS << " type";
 //  }
-//  
+//
 //  void visitFuncDecl(FuncDecl *FD) {
 //    printCommonFD(FD, "func_decl");
 //    printAbstractFunctionDecl(FD);
 //    PrintWithColorRAII(OS, ParenthesisColor) << ')';
 //  }
-//  
+//
 //  void visitAccessorDecl(AccessorDecl *AD) {
 //    printCommonFD(AD, "accessor_decl");
 //    OS << " " << getAccessorKindString(AD->getAccessorKind());
@@ -534,7 +534,7 @@ CompoundProvides::separate(StringRef combined) {
 //    printAbstractFunctionDecl(AD);
 //    PrintWithColorRAII(OS, ParenthesisColor) << ')';
 //  }
-//  
+//
 //  void visitConstructorDecl(ConstructorDecl *CD) {
 //    printCommonAFD(CD, "constructor_decl");
 //    if (CD->isRequired())
@@ -547,13 +547,13 @@ CompoundProvides::separate(StringRef combined) {
 //    printAbstractFunctionDecl(CD);
 //    PrintWithColorRAII(OS, ParenthesisColor) << ')';
 //  }
-//  
+//
 //  void visitDestructorDecl(DestructorDecl *DD) {
 //    printCommonAFD(DD, "destructor_decl");
 //    printAbstractFunctionDecl(DD);
 //    PrintWithColorRAII(OS, ParenthesisColor) << ')';
 //  }
-//  
+//
 //  void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
 //    printCommon(TLCD, "top_level_code_decl");
 //    if (TLCD->getBody()) {
@@ -562,7 +562,7 @@ CompoundProvides::separate(StringRef combined) {
 //    }
 //    PrintWithColorRAII(OS, ParenthesisColor) << ')';
 //  }
-//  
+//
 //  void printASTNodes(const ArrayRef<ASTNode> &Elements, const ASTContext &Ctx, StringRef Name) {
 //    OS.indent(Indent);
 //    PrintWithColorRAII(OS, ParenthesisColor) << "(";
@@ -578,7 +578,7 @@ CompoundProvides::separate(StringRef combined) {
 //    }
 //    PrintWithColorRAII(OS, ParenthesisColor) << ')';
 //  }
-//  
+//
 //  void visitIfConfigDecl(IfConfigDecl *ICD) {
 //    printCommon(ICD, "if_config_decl");
 //    Indent += 2;
@@ -592,17 +592,17 @@ CompoundProvides::separate(StringRef combined) {
 //        OS << "\n";
 //        printRec(Clause.Cond);
 //      }
-//      
+//
 //      OS << '\n';
 //      Indent += 2;
 //      printASTNodes(Clause.Elements, ICD->getASTContext(), "elements");
 //      Indent -= 2;
 //    }
-//    
+//
 //    Indent -= 2;
 //    PrintWithColorRAII(OS, ParenthesisColor) << ')';
 //  }
-//  
+//
 //  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
 //    printCommon(PDD, "pound_diagnostic_decl");
 //    auto kind = PDD->isError() ? "error" : "warning";
@@ -612,18 +612,18 @@ CompoundProvides::separate(StringRef combined) {
 //    Indent -= 2;
 //    PrintWithColorRAII(OS, ParenthesisColor) << ')';
 //  }
-//  
+//
 //  void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
 //    printCommon(PGD, "precedence_group_decl ");
 //    OS << PGD->getName() << "\n";
-//    
+//
 //    OS.indent(Indent+2);
 //    OS << "associativity "
 //    << getAssociativityString(PGD->getAssociativity()) << "\n";
-//    
+//
 //    OS.indent(Indent+2);
 //    OS << "assignment " << (PGD->isAssignment() ? "true" : "false");
-//    
+//
 //    auto printRelations =
 //    [&](StringRef label, ArrayRef<PrecedenceGroupDecl::Relation> rels) {
 //      if (rels.empty()) return;
@@ -635,10 +635,10 @@ CompoundProvides::separate(StringRef combined) {
 //    };
 //    printRelations("higherThan", PGD->getHigherThan());
 //    printRelations("lowerThan", PGD->getLowerThan());
-//    
+//
 //    PrintWithColorRAII(OS, ParenthesisColor) << ')';
 //  }
-//  
+//
 //  void printOperatorIdentifiers(OperatorDecl *OD) {
 //    auto identifiers = OD->getIdentifiers();
 //    for (auto index : indices(identifiers)) {
@@ -648,7 +648,7 @@ CompoundProvides::separate(StringRef combined) {
 //        OS << "\n";
 //    }
 //  }
-//  
+//
 //  void visitInfixOperatorDecl(InfixOperatorDecl *IOD) {
 //    printCommon(IOD, "infix_operator_decl");
 //    OS << " " << IOD->getName();
@@ -658,7 +658,7 @@ CompoundProvides::separate(StringRef combined) {
 //    }
 //    PrintWithColorRAII(OS, ParenthesisColor) << ')';
 //  }
-//  
+//
 //  void visitPrefixOperatorDecl(PrefixOperatorDecl *POD) {
 //    printCommon(POD, "prefix_operator_decl");
 //    OS << " " << POD->getName();
@@ -668,7 +668,7 @@ CompoundProvides::separate(StringRef combined) {
 //    }
 //    PrintWithColorRAII(OS, ParenthesisColor) << ')';
 //  }
-//  
+//
 //  void visitPostfixOperatorDecl(PostfixOperatorDecl *POD) {
 //    printCommon(POD, "postfix_operator_decl");
 //    OS << " " << POD->getName();
@@ -678,12 +678,12 @@ CompoundProvides::separate(StringRef combined) {
 //    }
 //    PrintWithColorRAII(OS, ParenthesisColor) << ')';
 //  }
-//  
+//
 //  void visitModuleDecl(ModuleDecl *MD) {
 //    printCommon(MD, "module");
 //    PrintWithColorRAII(OS, ParenthesisColor) << ')';
 //  }
-//  
+//
 //  void visitMissingMemberDecl(MissingMemberDecl *MMD) {
 //    printCommon(MMD, "missing_member_decl ");
 //    PrintWithColorRAII(OS, IdentifierColor)
@@ -695,6 +695,15 @@ CompoundProvides::separate(StringRef combined) {
 //
 //
 //
+//unimpLocation_t ExperimentalDependencies::updateExpDepDeclHash(llvm::MD5& hash, const Decl* D) {
+//  //qqq
+//  //  D->dump();
+//  UpdateExpDepDeclHash u(hash);
+//  u.visit(const_cast<Decl *>(D));
+//  return u.unimpLocation;
+//}
+
+
 //unimpLocation_t ExperimentalDependencies::updateExpDepDeclHash(llvm::MD5& hash, const Decl* D) {
 //  //qqq
 //  //  D->dump();
