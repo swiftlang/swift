@@ -98,3 +98,15 @@ extension P10 where A == Int {
     func bar() {} // expected-note {{candidate would match if 'A' was the same type as 'Int'}}
 }
 struct S2<A> : P10 {} // expected-error {{type 'S2<A>' does not conform to protocol 'P10'}}
+
+protocol P11 {}
+protocol P12 {
+    associatedtype A : P11 // expected-note {{unable to infer associated type 'A' for protocol 'P12'}}
+    func bar() -> A
+}
+extension Int : P11 {}
+struct S3 : P12 { // expected-error {{type 'S3' does not conform to protocol 'P12'}}
+    func bar() -> P11 { return 0 }
+    // expected-note@-1 {{candidate can not infer 'A' = 'P11' because 'P11' is not a nominal type and so can't conform to 'P11'}}
+}
+

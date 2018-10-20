@@ -1747,7 +1747,8 @@ bool AssociatedTypeInference::diagnoseNoSolutions(
           if (failed.Result.isError())
             continue;
 
-          if (!failed.TypeWitness->getAnyNominal() &&
+          if ((!failed.TypeWitness->getAnyNominal() ||
+               failed.TypeWitness->isExistentialType()) &&
               failed.Result.isConformanceRequirement()) {
             diags.diagnose(failed.Witness,
                            diag::associated_type_witness_conform_impossible,
