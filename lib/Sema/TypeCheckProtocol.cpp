@@ -686,6 +686,69 @@ static const RequirementEnvironment &getOrCreateRequirementEnvironment(
   return cacheIter->getSecond();
 }
 
+static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
+    constraints::ConstraintFix *fix, ValueDecl *witness,
+    ProtocolConformance *conformance,
+    const RequirementEnvironment &reqEnvironment) {
+  Type type, missingType;
+  RequirementKind requirementKind;
+
+  using namespace constraints;
+
+  switch (fix->getKind()) {
+  case FixKind::AddConformance: {
+    auto missingConform = (MissingConformance *)fix;
+    requirementKind = RequirementKind::Conformance;
+    type = missingConform->getNonConformingType();
+    missingType = missingConform->getProtocol()->getDeclaredType();
+    break;
+  }
+  case FixKind::SkipSameTypeRequirement: {
+    requirementKind = RequirementKind::SameType;
+    auto requirementFix = (SkipSameTypeRequirement *)fix;
+    type = requirementFix->lhsType();
+    missingType = requirementFix->rhsType();
+    break;
+  }
+  case FixKind::SkipSuperclassRequirement: {
+    requirementKind = RequirementKind::Superclass;
+    auto requirementFix = (SkipSuperclassRequirement *)fix;
+    type = requirementFix->subclassType();
+    missingType = requirementFix->superclassType();
+    break;
+  }
+  default:
+    return Optional<RequirementMatch>();
+  }
+
+  auto missingRequirementMatch = [&](Type type) -> RequirementMatch {
+    Requirement requirement(requirementKind, type, missingType);
+    return RequirementMatch(witness, MatchKind::MissingRequirement,
+                            requirement);
+  };
+
+  if (auto memberTy = type->getAs<DependentMemberType>())
+    return missingRequirementMatch(type);
+
+  type = type->mapTypeOutOfContext();
+  if (type->hasTypeParameter())
+    if (auto env = conformance->getGenericEnvironment())
+      if (auto assocType = env->mapTypeIntoContext(type))
+        return missingRequirementMatch(assocType);
+
+  auto reqSubMap = reqEnvironment.getRequirementToSyntheticMap();
+  auto proto = conformance->getProtocol();
+  Type selfTy = proto->getSelfInterfaceType().subst(reqSubMap);
+  if (type->isEqual(selfTy)) {
+    type = conformance->getType();
+    if (auto agt = type->getAs<AnyGenericType>())
+      type = agt->getDecl()->getDeclaredInterfaceType();
+    return missingRequirementMatch(type);
+  }
+
+  return Optional<RequirementMatch>();
+}
+
 RequirementMatch
 swift::matchWitness(TypeChecker &tc,
                     WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
@@ -853,61 +916,13 @@ swift::matchWitness(TypeChecker &tc,
 
     // If the types would match but for some other missing conformance, find and
     // call that out.
-    if (solution && conformance && solution->Fixes.size() == 1) {
-      auto fix = solution->Fixes.front();
-      Type type, missingType;
-      RequirementKind requirementKind;
-      switch (fix->getKind()) {
-      case FixKind::AddConformance: {
-        auto missingConform = (MissingConformance *)fix;
-        requirementKind = RequirementKind::Conformance;
-        type = missingConform->getNonConformingType();
-        missingType = missingConform->getProtocol()->getDeclaredType();
-        break;
-      }
-      case FixKind::SkipSameTypeRequirement: {
-        requirementKind = RequirementKind::SameType;
-        auto requirementFix = (SkipSameTypeRequirement *)fix;
-        type = requirementFix->lhsType();
-        missingType = requirementFix->rhsType();
-        break;
-      }
-      case FixKind::SkipSuperclassRequirement: {
-        requirementKind = RequirementKind::Superclass;
-        auto requirementFix = (SkipSuperclassRequirement *)fix;
-        type = requirementFix->subclassType();
-        missingType = requirementFix->superclassType();
-        break;
-      }
-      default:
-        return RequirementMatch(witness, MatchKind::TypeConflict, witnessType);
-      }
-
-      auto missingRequirementMatch = [&](Type type) -> RequirementMatch {
-        Requirement requirement(requirementKind, type, missingType);
-        return RequirementMatch(witness, MatchKind::MissingRequirement,
-                                requirement);
-      };
-
-      if (auto memberTy = type->getAs<DependentMemberType>())
-        return missingRequirementMatch(type);
-
-      type = type->mapTypeOutOfContext();
-      if (type->hasTypeParameter())
-        if (auto env = conformance->getGenericEnvironment())
-          if (auto assocType = env->mapTypeIntoContext(type))
-            return missingRequirementMatch(assocType);
-
-      auto reqSubMap = reqEnvironment.getRequirementToSyntheticMap();
-      Type selfTy = proto->getSelfInterfaceType().subst(reqSubMap);
-      if (type->isEqual(selfTy)) {
-        type = conformance->getType();
-        if (auto agt = type->getAs<AnyGenericType>())
-          type = agt->getDecl()->getDeclaredInterfaceType();
-        return missingRequirementMatch(type);
+    if (solution && conformance && solution->Fixes.size()) {
+      for (auto fix : solution->Fixes) {
+        if (auto result = findMissingGenericRequirementForSolutionFix(
+                fix, witness, conformance, reqEnvironment))
+          return *result;
       }
     }
-
     if (!solution || solution->Fixes.size())
       return RequirementMatch(witness, MatchKind::TypeConflict,
                               witnessType);
