@@ -196,9 +196,9 @@ getBuiltinGenericFunction(Identifier Id,
   SmallVector<ParamDecl*, 4> params;
   for (unsigned i = 0, e = ArgParamTypes.size(); i < e; i++) {
     auto paramIfaceType = ArgParamTypes[i].getPlainType();
-    auto specifier = (ArgParamTypes[i].getParameterFlags().isInOut())
-                         ? VarDecl::Specifier::InOut
-                         : VarDecl::Specifier::Default;
+    auto specifier =
+      VarDecl::getParameterSpecifierForValueOwnership(
+        ArgParamTypes[i].getParameterFlags().getValueOwnership());
     auto PD = new (Context) ParamDecl(specifier,
                                       SourceLoc(), SourceLoc(),
                                       Identifier(), SourceLoc(),
@@ -474,19 +474,13 @@ namespace {
     }
 
     template <class G>
-    void addParameter(const G &generator) {
+    void addParameter(const G &generator,
+                      ValueOwnership ownership = ValueOwnership::Default) {
       Type gTyIface = generator.build(*this);
-      auto flags = ParameterTypeFlags();
+      auto flags = ParameterTypeFlags().withValueOwnership(ownership);
       InterfaceParams.emplace_back(gTyIface, Identifier(), flags);
     }
 
-    template <class G>
-    void addInOutParameter(const G &generator) {
-      Type gTyIface = generator.build(*this);
-      auto flags = ParameterTypeFlags().withInOut(true);
-      InterfaceParams.emplace_back(gTyIface, Identifier(), flags);
-    }
-    
     template <class G>
     void setResult(const G &generator) {
       InterfaceResult = generator.build(*this);
@@ -591,7 +585,7 @@ static ValueDecl *getLoadOperation(ASTContext &Context, Identifier Id) {
 
 static ValueDecl *getStoreOperation(ASTContext &Context, Identifier Id) {
   BuiltinGenericSignatureBuilder builder(Context);
-  builder.addParameter(makeGenericParam());
+  builder.addParameter(makeGenericParam(), ValueOwnership::Owned);
   builder.addParameter(makeConcrete(Context.TheRawPointerType));
   builder.setResult(makeConcrete(TupleType::getEmpty(Context)));
   return builder.build(Id);
@@ -633,7 +627,7 @@ static ValueDecl *getIsUniqueOperation(ASTContext &Context, Identifier Id) {
   Type Int1Ty = BuiltinIntegerType::get(1, Context);
 
   BuiltinGenericSignatureBuilder builder(Context);
-  builder.addInOutParameter(makeGenericParam());
+  builder.addParameter(makeGenericParam(), ValueOwnership::InOut);
   builder.setResult(makeConcrete(Int1Ty));
   return builder.build(Id);
 }
@@ -808,21 +802,35 @@ static ValueDecl *getAtomicStoreOperation(ASTContext &Context, Identifier Id,
 
 static ValueDecl *getNativeObjectCast(ASTContext &Context, Identifier Id,
                                       BuiltinValueKind BV) {
-  Type BuiltinTy;
-  if (BV == BuiltinValueKind::BridgeToRawPointer ||
-      BV == BuiltinValueKind::BridgeFromRawPointer)
-    BuiltinTy = Context.TheRawPointerType;
-  else
-    BuiltinTy = Context.TheNativeObjectType;
+
+  ValueOwnership ownership;
+  Type builtinTy;
+  switch (BV) {
+  case BuiltinValueKind::CastToNativeObject:
+  case BuiltinValueKind::UnsafeCastToNativeObject:
+  case BuiltinValueKind::CastFromNativeObject:
+    builtinTy = Context.TheNativeObjectType;
+    ownership = ValueOwnership::Owned;
+    break;
+
+  case BuiltinValueKind::BridgeToRawPointer:
+  case BuiltinValueKind::BridgeFromRawPointer:
+    builtinTy = Context.TheRawPointerType;
+    ownership = ValueOwnership::Default;
+    break;
+
+  default:
+    llvm_unreachable("unexpected kind");
+  }
 
   BuiltinGenericSignatureBuilder builder(Context);
   if (BV == BuiltinValueKind::CastToNativeObject ||
       BV == BuiltinValueKind::UnsafeCastToNativeObject ||
       BV == BuiltinValueKind::BridgeToRawPointer) {
-    builder.addParameter(makeGenericParam());
-    builder.setResult(makeConcrete(BuiltinTy));
+    builder.addParameter(makeGenericParam(), ownership);
+    builder.setResult(makeConcrete(builtinTy));
   } else {
-    builder.addParameter(makeConcrete(BuiltinTy));
+    builder.addParameter(makeConcrete(builtinTy), ownership);
     builder.setResult(makeGenericParam());
   }
   return builder.build(Id);
@@ -833,7 +841,7 @@ static ValueDecl *getCastToBridgeObjectOperation(ASTContext &C,
   auto wordType = BuiltinIntegerType::get(BuiltinIntegerWidth::pointer(),
                                           C);
   BuiltinGenericSignatureBuilder builder(C);
-  builder.addParameter(makeGenericParam());
+  builder.addParameter(makeGenericParam(), ValueOwnership::Owned);
   builder.addParameter(makeConcrete(wordType));
   builder.setResult(makeConcrete(C.TheBridgeObjectType));
   return builder.build(Id);
@@ -846,7 +854,7 @@ static ValueDecl *getCastFromBridgeObjectOperation(ASTContext &C,
   switch (BV) {
   case BuiltinValueKind::CastReferenceFromBridgeObject: {
     BuiltinGenericSignatureBuilder builder(C);
-    builder.addParameter(makeConcrete(BridgeTy));
+    builder.addParameter(makeConcrete(BridgeTy), ValueOwnership::Owned);
     builder.setResult(makeGenericParam());
     return builder.build(Id);
   }
@@ -906,7 +914,7 @@ static ValueDecl *getCastReferenceOperation(ASTContext &ctx,
   // <T, U> T -> U
   // SILGen and IRGen check additional constraints during lowering.
   BuiltinGenericSignatureBuilder builder(ctx, 2);
-  builder.addParameter(makeGenericParam(0));
+  builder.addParameter(makeGenericParam(0), ValueOwnership::Owned);
   builder.setResult(makeGenericParam(1));
   return builder.build(name);
 }
@@ -916,7 +924,7 @@ static ValueDecl *getReinterpretCastOperation(ASTContext &ctx,
   // <T, U> T -> U
   // SILGen and IRGen check additional constraints during lowering.
   BuiltinGenericSignatureBuilder builder(ctx, 2);
-  builder.addParameter(makeGenericParam(0));
+  builder.addParameter(makeGenericParam(0), ValueOwnership::Owned);
   builder.setResult(makeGenericParam(1));
   return builder.build(name);
 }
@@ -949,7 +957,7 @@ static ValueDecl *getTSanInoutAccess(ASTContext &Context, Identifier Id) {
 static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
   // <T> (@inout T) -> RawPointer
   BuiltinGenericSignatureBuilder builder(Context);
-  builder.addInOutParameter(makeGenericParam());
+  builder.addParameter(makeGenericParam(), ValueOwnership::InOut);
   builder.setResult(makeConcrete(Context.TheRawPointerType));
   return builder.build(Id);
 }
@@ -976,7 +984,7 @@ static ValueDecl *getTypeJoinInoutOperation(ASTContext &Context,
                                             Identifier Id) {
   // <T,U,V> (inout T, U.Type) -> V.Type
   BuiltinGenericSignatureBuilder builder(Context, 3);
-  builder.addInOutParameter(makeGenericParam(0));
+  builder.addParameter(makeGenericParam(0), ValueOwnership::InOut);
   builder.addParameter(makeMetatype(makeGenericParam(1)));
   builder.setResult(makeMetatype(makeGenericParam(2)));
   return builder.build(Id);

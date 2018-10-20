@@ -133,15 +133,10 @@ class KlassWithBuffer {
   // CHECK:   [[BUF_BORROW:%.*]] = begin_borrow [[BUF]]
   // CHECK:   [[K:%.*]] = struct_extract [[BUF_BORROW]] : $Buffer, #Buffer.k
   // CHECK:   [[COPIED_K:%.*]] = copy_value [[K]]
-  //   FIXME: this borrow-and-copy is really dumb and unnecessary
-  // CHECK:   [[COPIED_BORROWED_K:%.*]] = begin_borrow [[COPIED_K]]
-  // CHECK:   [[CASTED_BORROWED_BUF_KLASS:%.*]] = unchecked_ref_cast [[COPIED_BORROWED_K]]
-  // CHECK:   [[COPY_CASTED_BORROWED_BUF_KLASS:%.*]] = copy_value [[CASTED_BORROWED_BUF_KLASS]]
-  // CHECK:   end_borrow  [[COPIED_BORROWED_K]]
-  // CHECK:   destroy_value [[COPIED_K]]
+  // CHECK:   [[CASTED_COPIED_K:%.*]] = unchecked_ref_cast [[COPIED_K]]
   // CHECK:   end_borrow [[BUF_BORROW]]
   // CHECK:   destroy_value [[BUF]]
-  // CHECK:   return [[COPY_CASTED_BORROWED_BUF_KLASS]]
+  // CHECK:   return [[CASTED_COPIED_K]]
   // CHECK: } // end sil function '$ss15KlassWithBufferC03getC14AsNativeObjectBoyF'
   func getBufferAsNativeObject() -> Builtin.NativeObject {
     return Builtin.unsafeCastToNativeObject(buffer.k)
@@ -154,9 +149,9 @@ struct StructContainingBridgeObject {
   // CHECK-LABEL: sil hidden @$ss28StructContainingBridgeObjectV8swiftObjAByXl_tcfC : $@convention(method) (@owned AnyObject, @thin StructContainingBridgeObject.Type) -> @owned StructContainingBridgeObject {
   // CHECK: bb0([[ARG:%.*]] : @owned $AnyObject,
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-  // CHECK:   [[CASTED_ARG:%.*]] = unchecked_ref_cast [[BORROWED_ARG]] : $AnyObject to $Builtin.BridgeObject
-  // CHECK:   [[COPY_CASTED_ARG:%.*]] = copy_value [[CASTED_ARG]]
-  // CHECK:   assign [[COPY_CASTED_ARG]] to
+  // CHECK:   [[COPIED_ARG:%.*]] = copy_value [[BORROWED_ARG]]
+  // CHECK:   [[CASTED_ARG:%.*]] = unchecked_ref_cast [[COPIED_ARG]] : $AnyObject to $Builtin.BridgeObject
+  // CHECK:   assign [[CASTED_ARG]] to
   // CHECK: } // end sil function '$ss28StructContainingBridgeObjectV8swiftObjAByXl_tcfC'
   init(swiftObj: AnyObject) {
     rawValue = Builtin.reinterpretCast(swiftObj)
