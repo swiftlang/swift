@@ -88,6 +88,7 @@ static ExtendedLoadResult parseDependencyFile(
   // This is a macro rather than a lambda because it contains a return.
 #define UPDATE_RESULT(dir, r)                                                  \
   {                                                                            \
+    assert(EnableExperimentalDependencies || !r.changedProviders.hasValue());  \
     switch (r.simpleResult) {                                                  \
     case LoadResult::HadError:                                                 \
       return r;                                                                \
@@ -121,12 +122,8 @@ static ExtendedLoadResult parseDependencyFile(
 
       StringRef valueString = value->getValue(scratch);
 
-      if (EnableExperimentalDependencies) {
-        ExperimentalDependencies::InterfaceHashes hashes(valueString);
-        interfaceHashResult = interfaceHashCallback(hashes.experimental);
-      } else {
-        interfaceHashResult = interfaceHashCallback(valueString);
-      }
+      interfaceHashResult = interfaceHashCallback(valueString);
+
       if (interfaceHashResult.simpleResult == LoadResult::HadError)
         return interfaceHashResult;
 
@@ -307,9 +304,9 @@ DependencyGraphImpl::loadFromBuffer(const void *node,
     std::string hash = std::string();
     assert(isCascading);
     if (EnableExperimentalDependencies) {
-      ExperimentalDependencies::TopLevel tl(nameArg);
-      name = tl.base;
-      hash = tl.hash;
+      ExperimentalDependencies::CompoundProvides cp(nameArg);
+      name = cp.name;
+      hash = cp.hash;
     }
     auto iter = std::find_if(provides.begin(), provides.end(),
                              [name](const ProvidesEntryTy &entry) -> bool {
@@ -321,14 +318,22 @@ DependencyGraphImpl::loadFromBuffer(const void *node,
       std::vector<ProvidesEntryTy> v{provides.back()};
       return ExtendedLoadResult::affectsDownstream(v);
     }
-    auto prevMask = iter->kindMask;
+    const bool kindChanged = !iter->kindMask.contains(kind);
     iter->kindMask |= kind;
-    auto prevHash = iter->hash;
+    if (!EnableExperimentalDependencies)
+      return ExtendedLoadResult::upToDate();
+    
+    const bool hashChanged = iter->hash != hash;
+    const bool haveOldAndNewHashes = !iter->hash.empty() && !hash.empty();
     iter->hash = hash;
+    if (!haveOldAndNewHashes)
+      return ExtendedLoadResult::affectsDownstream(None); // use interface hash
+
     std::vector<ProvidesEntryTy> v{*iter};
-    return prevMask.contains(kind) && prevHash == iter->hash
-               ? ExtendedLoadResult::upToDate()
-               : ExtendedLoadResult::affectsDownstream(v);
+
+    return kindChanged ||  hashChanged
+    ? ExtendedLoadResult::affectsDownstream(v)
+    : ExtendedLoadResult::upToDate();
   };
 
   auto interfaceHashCallback = [this,
