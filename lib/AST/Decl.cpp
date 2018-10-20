@@ -6296,7 +6296,11 @@ void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *decl) {
 
   
 ExperimentalDependencies::unimpLocation_t Decl::updateExpDepHash(llvm::MD5& hash) const {
-  
+  ExperimentalDependencies::updateExpDepFromBits(hash, Bits);
+  TRY_UPDATE_HASH(getAttrs().updateExpDepHash(hash))
+  DeclContext *dc = getDeclContext();
+  TRY_UPDATE_HASH(dc->updateExpDepHash(hash));
+
   switch (getKind()) {
     case DeclKind::Enum:
       return cast<const EnumDecl>(this)->updateExpDepHashInner(hash);
@@ -6359,14 +6363,6 @@ ExperimentalDependencies::unimpLocation_t Decl::updateExpDepHash(llvm::MD5& hash
 }
 
 
-ExperimentalDependencies::unimpLocation_t  Decl::updateExpDepHash(llvm::MD5& hash) const {
-  ExperimentalDependencies::updateExpDepFromBits(hash, Bits);
-  
-  TRY_UPDATE_HASH(getAttrs().updateExpDepHash(hash))
-  
-  DeclContext *dc = getDeclContext();
-  return dc->updateExpDepHash(hash);
-}
 
 ExperimentalDependencies::unimpLocation_t  OperatorDecl::updateExpDepHashInner(llvm::MD5& hash) const {
   return name.updateExpDepHash(hash);
@@ -6439,7 +6435,7 @@ ExperimentalDependencies::unimpLocation_t  ClassDecl::updateExpDepHashInner(llvm
   const MetaclassKind mk = getMetaclassKind();
   ExperimentalDependencies::updateExpDepFromBits(hash, mk);
   llvm::SmallString<64> scratch;
-  hash.update(getObjCRuntimeName(&scratch));
+  hash.update(getObjCRuntimeName(scratch));
   // getArtificialMainKind
   
   return NominalTypeDecl::updateExpDepHashInner(hash);
@@ -6449,3 +6445,108 @@ ExperimentalDependencies::unimpLocation_t  ProtocolDecl::updateExpDepHashInner(l
   RETURN_UNIMP;
   return NominalTypeDecl::updateExpDepHashInner(hash);
 }
+
+
+
+
+ExperimentalDependencies::unimpLocation_t  GenericTypeParamDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+  return AbstractTypeParamDecl::updateExpDepHashInner(hash);
+}
+
+ExperimentalDependencies::unimpLocation_t  AssociatedTypeDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+  return AbstractTypeParamDecl::updateExpDepHashInner(hash);
+}
+
+ExperimentalDependencies::unimpLocation_t  ModuleDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+  return TypeDecl::updateExpDepHashInner(hash);}
+
+ExperimentalDependencies::unimpLocation_t  VarDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+  return AbstractStorageDecl::updateExpDepHashInner(hash);
+}
+
+ExperimentalDependencies::unimpLocation_t  ParamDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+  return VarDecl::updateExpDepHashInner(hash);
+}
+
+ExperimentalDependencies::unimpLocation_t  SubscriptDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+  // GenericContext
+  return AbstractStorageDecl::updateExpDepHashInner(hash);
+}
+
+ExperimentalDependencies::unimpLocation_t  ConstructorDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+  return AbstractFunctionDecl::updateExpDepHashInner(hash);
+}
+
+ExperimentalDependencies::unimpLocation_t  DestructorDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+  return AbstractFunctionDecl::updateExpDepHashInner(hash);
+}
+
+ExperimentalDependencies::unimpLocation_t  FuncDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+  return AbstractFunctionDecl::updateExpDepHashInner(hash);
+}
+
+ExperimentalDependencies::unimpLocation_t  AccessorDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+  return FuncDecl::updateExpDepHashInner(hash);
+}
+
+ExperimentalDependencies::unimpLocation_t  EnumElementDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+  return ValueDecl::updateExpDepHashInner(hash);
+}
+
+ExperimentalDependencies::unimpLocation_t  ExtensionDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  //  GenericContext
+  //  IterableDeclContext
+  RETURN_UNIMP;
+}
+
+ExperimentalDependencies::unimpLocation_t  TopLevelCodeDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  // DeclContext
+  RETURN_UNIMP;
+}
+
+ExperimentalDependencies::unimpLocation_t  ImportDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+}
+
+ExperimentalDependencies::unimpLocation_t  IfConfigDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+}
+
+ExperimentalDependencies::unimpLocation_t  PoundDiagnosticDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+}
+
+ExperimentalDependencies::unimpLocation_t  MissingMemberDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+}
+
+ExperimentalDependencies::unimpLocation_t  PatternBindingDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+}
+
+ExperimentalDependencies::unimpLocation_t  InfixOperatorDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+  return OperatorDecl::updateExpDepHashInner(hash);
+}
+
+ExperimentalDependencies::unimpLocation_t  PrefixOperatorDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+  return OperatorDecl::updateExpDepHashInner(hash);
+}
+
+ExperimentalDependencies::unimpLocation_t  PostfixOperatorDecl::updateExpDepHashInner(llvm::MD5& hash) const {
+  RETURN_UNIMP;
+  return OperatorDecl::updateExpDepHashInner(hash);
+}
+
