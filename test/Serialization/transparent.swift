@@ -42,7 +42,6 @@ func wrap_br() {
 
 // SIL-LABEL: sil public_external [transparent] [serialized] @$s15def_transparent9do_switch1uyAA9MaybePairO_tF : $@convention(thin) (@guaranteed MaybePair) -> () {
 // SIL: bb0(%0 : $MaybePair):
-// SIL: retain_value %0 : $MaybePair
 // SIL: switch_enum %0 : $MaybePair, case #MaybePair.Neither!enumelt: bb[[CASE1:[0-9]+]], case #MaybePair.Left!enumelt.1: bb[[CASE2:[0-9]+]], case #MaybePair.Right!enumelt.1: bb[[CASE3:[0-9]+]], case #MaybePair.Both!enumelt.1: bb[[CASE4:[0-9]+]]
 // SIL: bb[[CASE4]](%{{.*}} : $(Int32, String)):
 // SIL: bb[[CASE3]](%{{.*}} : $String):

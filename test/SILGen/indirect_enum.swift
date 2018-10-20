@@ -149,10 +149,8 @@ func d() {}
 // CHECK-LABEL: sil hidden @$s13indirect_enum11switchTreeAyyAA0D1AOyxGlF : $@convention(thin) <T> (@guaranteed TreeA<T>) -> () {
 func switchTreeA<T>(_ x: TreeA<T>) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $TreeA<T>):
-  // --           x +2
-  // CHECK:       [[ARG_COPY:%.*]] = copy_value [[ARG]]
-  // CHECK:       [[BORROWED_ARG_COPY:%.*]] = begin_borrow [[ARG_COPY]]
-  // CHECK:       switch_enum [[BORROWED_ARG_COPY]] : $TreeA<T>,
+  // --           x +0
+  // CHECK:       switch_enum [[ARG]] : $TreeA<T>,
   // CHECK:          case #TreeA.Nil!enumelt: [[NIL_CASE:bb1]],
   // CHECK:          case #TreeA.Leaf!enumelt.1: [[LEAF_CASE:bb2]],
   // CHECK:          case #TreeA.Branch!enumelt.1: [[BRANCH_CASE:bb3]],
@@ -168,7 +166,7 @@ func switchTreeA<T>(_ x: TreeA<T>) {
   // CHECK:       function_ref @$s13indirect_enum1b{{[_0-9a-zA-Z]*}}F
   // CHECK:       destroy_addr [[X]]
   // CHECK:       dealloc_stack [[X]]
-  // --           x +1
+  // --           x +0
   // CHECK:       br [[OUTER_CONT]]
   case .Leaf(let x):
     b(x)
@@ -204,8 +202,7 @@ func switchTreeA<T>(_ x: TreeA<T>) {
     c(x, y)
 
   // CHECK:     [[DEFAULT]]:
-  // --           x +1
-  // CHECK:       destroy_value [[ARG_COPY]]
+  // --           x +0
   default:
     d()
   }
