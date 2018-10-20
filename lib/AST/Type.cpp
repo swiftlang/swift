@@ -4187,6 +4187,8 @@ ExperimentalDependencies::unimpLocation_t TypeBase::updateExpDepTypeBaseHash(llv
   //getContextSubstitutions: adjustSuperclassMemberDeclType, getTypeOfMember, getMemberSubstitutions, getContextSubstitutionMap, getContextSubstitutions, getContextSubstitutionMap
 }
 ExperimentalDependencies::unimpLocation_t  Type::updateExpDepTypeHash(llvm::MD5 &hash) const {
+  if (isNull())
+    return "Type::updateExpDepTypeHash isNull";
    return getPointer()->updateExpDepTypeBaseHash(hash);
 }
 
