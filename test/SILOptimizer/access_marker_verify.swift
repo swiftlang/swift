@@ -379,7 +379,7 @@ enum IntEnum {
 // CHECK-LABEL: sil hidden @$s20access_marker_verify7IntEnumO8getValueSivg : $@convention(method) (@guaranteed IntEnum) -> Int {
 // CHECK: bb0(%0 : @guaranteed $IntEnum):
 // CHECK:   switch_enum %{{.*}} : $IntEnum, case #IntEnum.int!enumelt.1: bb1
-// CHECK: bb1(%{{.*}} : @owned ${ var Int }):
+// CHECK: bb1(%{{.*}} : @guaranteed ${ var Int }):
 // CHECK:   [[PROJ:%.*]] = project_box
 // CHECK-NOT: begin_access
 // CHECK:   load [trivial] [[PROJ]] : $*Int
@@ -398,7 +398,7 @@ enum RefEnum {
 // CHECK-LABEL: sil hidden @$s20access_marker_verify7RefEnumO8getValueAA9BaseClassCvg : $@convention(method) (@guaranteed RefEnum) -> @owned BaseClass {
 // CHECK: bb0(%0 : @guaranteed $RefEnum):
 // CHECK:   switch_enum %{{.*}} : $RefEnum, case #RefEnum.ref!enumelt.1: bb1
-// CHECK: bb1(%{{.*}} : @owned ${ var BaseClass }):
+// CHECK: bb1(%{{.*}} : @guaranteed ${ var BaseClass }):
 // CHECK:   [[PROJ:%.*]] = project_box %{{.*}} : ${ var BaseClass }, 0
 // CHECK-NOT: begin_access
 // CHECK:   load_borrow [[PROJ]] : $*BaseClass

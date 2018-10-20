@@ -22,7 +22,12 @@ case some(T)
 case none
 }
 
-class SuperKlass {}
+class SuperKlass {
+  func doSomething()
+}
+
+class Klass : SuperKlass {
+}
 
 ///////////
 // Tests //
@@ -431,6 +436,24 @@ bb2(%3 : @guaranteed $Builtin.NativeObject):
 
 bb3:
   destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: Function: 'consume_with_classmethod'
+// CHECK: Found use after free?!
+// CHECK: Value:   %2 = upcast %0 : $Klass to $SuperKlass
+// CHECK: Consuming User:   store %2 to [init] %1 : $*SuperKlass
+// CHECK: Non Consuming User:   %4 = class_method %2 : $SuperKlass, #SuperKlass.doSomething!1 : (SuperKlass) -> () -> (), $@convention(method) (@guaranteed SuperKlass) -> ()
+// CHECK: Block: bb0
+sil @consume_with_classmethod : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $SuperKlass
+  %2 = upcast %0 : $Klass to $SuperKlass
+  store %2 to [init] %1 : $*SuperKlass
+  %3 = class_method %2 : $SuperKlass, #SuperKlass.doSomething!1 : (SuperKlass) -> () -> (), $@convention(method) (@guaranteed SuperKlass) -> ()
+  destroy_addr %1 : $*SuperKlass
+  dealloc_stack %1 : $*SuperKlass
   %9999 = tuple()
   return %9999 : $()
 }
