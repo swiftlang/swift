@@ -154,16 +154,13 @@ void CleanupManager::emitCleanupsForReturn(CleanupLocation loc,
 }
 
 /// Emit a new block that jumps to the specified location and runs necessary
-/// cleanups based on its level.  If there are no cleanups to run, this just
-/// returns the dest block.
+/// cleanups based on its level. Emit a block even if there are no cleanups;
+/// this is usually the destination of a conditional branch, so jumping
+/// straight to `dest` creates a critical edge.
 SILBasicBlock *CleanupManager::emitBlockForCleanups(JumpDest dest,
                                                     SILLocation branchLoc,
                                                     ArrayRef<SILValue> args,
                                                     ForUnwind_t forUnwind) {
-  // If there are no cleanups to run, just return the Dest block directly.
-  if (!hasAnyActiveCleanups(dest.getDepth()))
-    return dest.getBlock();
-
   // Otherwise, create and emit a new block.
   auto *newBlock = SGF.createBasicBlock();
   SILGenSavedInsertionPoint IPRAII(SGF, newBlock);

@@ -221,14 +221,11 @@ public func constructResilientEnumPayload(_ s: Size) -> Medium {
 // CHECK: br label %[[END]]
 
 // CHECK: ; <label>:[[DEFAULT_CASE]]
-// CHECK: br label %[[DEFAULT_CASE_DESTROY:.*]]
-
-// CHECK: <label>:[[DEFAULT_CASE_DESTROY]]
 // CHeCK: call void %destroy
 // CHECK: br label %[[END]]
 
 // CHECK: ; <label>:[[END]]
-// CHECK: = phi [[INT]] [ 3, %[[DEFAULT_CASE_DESTROY]] ], [ {{.*}}, %[[PAMPHLET_CASE_LABEL]] ], [ 2, %[[CANVAS_CASE_LABEL]] ], [ 1, %[[PAPER_CASE_LABEL]] ]
+// CHECK: = phi [[INT]] [ 3, %[[DEFAULT_CASE]] ], [ {{.*}}, %[[PAMPHLET_CASE_LABEL]] ], [ 2, %[[CANVAS_CASE_LABEL]] ], [ 1, %[[PAPER_CASE_LABEL]] ]
 // CHECK: ret
 
 public func resilientSwitchTest(_ m: Medium) -> Int {

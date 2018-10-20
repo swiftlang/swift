@@ -480,23 +480,9 @@ func accessOptionalArray(_ dict : MyDict<Int, [Int]>) {
 // ----- access the temporary array result of the getter
 // CHECK:   [[TEMPACCESS:%.*]] = begin_access [modify] [unsafe] [[TEMP]]
 // CHECK:   [[HAS_VALUE:%.*]] = select_enum_addr [[TEMPACCESS]]
-// CHECK:   cond_br [[HAS_VALUE]], bb2, bb1
+// CHECK:   cond_br [[HAS_VALUE]], [[TRUEBB:bb[0-9]+]], [[FALSEBB:bb[0-9]+]]
 //
-// CHECK: bb1:
-// CHECK:   [[TEMPARRAY:%.*]] = load [copy] [[TEMPACCESS]]
-// CHECK:   [[WRITEBACK:%.*]] = alloc_stack $Optional<Array<Int>>
-// CHECK-NOT: begin_access
-// CHECK:   store [[TEMPARRAY]] to [init] [[WRITEBACK]]
-// CHECK:   [[TEMP3:%.*]] = alloc_stack $Int
-// CHECK-NOT: begin_access
-// CHECK:   store %{{.*}} to [trivial] [[TEMP3]] : $*Int
-// Call MyDict.subscript.setter
-// CHECK:   apply %{{.*}}<Int, [Int]>([[WRITEBACK]], [[TEMP3]], [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout MyDict<τ_0_0, τ_0_1>) -> ()
-// CHECK:   end_access [[TEMPACCESS]] : $*Optional<Array<Int>>
-// CHECK:   end_access [[BOXACCESS]] : $*MyDict<Int, Array<Int>>
-// CHECK:   br
-//
-// CHECK: bb2:
+// CHECK: [[TRUEBB]]:
 // CHECK-NOT: begin_access
 // CHECK:   [[TEMPARRAYADR:%.*]] = unchecked_take_enum_data_addr [[TEMPACCESS]] : $*Optional<Array<Int>>, #Optional.some!enumelt.1
 // ----- call Array.append
@@ -511,6 +497,22 @@ func accessOptionalArray(_ dict : MyDict<Int, [Int]>) {
 // CHECK:   store %{{.*}} to [trivial]
 // ----- call MyDict.subscript.setter
 // CHECK: apply %{{.*}}<Int, [Int]>([[ARRAYCOPY]], %{{.*}}, [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout MyDict<τ_0_0, τ_0_1>) -> ()
+// CHECK:   br [[RETBB:bb[0-9]+]]
+//
+// CHECK: [[FALSEBB]]:
+// CHECK:   [[TEMPARRAY:%.*]] = load [copy] [[TEMPACCESS]]
+// CHECK:   [[WRITEBACK:%.*]] = alloc_stack $Optional<Array<Int>>
+// CHECK-NOT: begin_access
+// CHECK:   store [[TEMPARRAY]] to [init] [[WRITEBACK]]
+// CHECK:   [[TEMP3:%.*]] = alloc_stack $Int
+// CHECK-NOT: begin_access
+// CHECK:   store %{{.*}} to [trivial] [[TEMP3]] : $*Int
+// Call MyDict.subscript.setter
+// CHECK:   apply %{{.*}}<Int, [Int]>([[WRITEBACK]], [[TEMP3]], [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout MyDict<τ_0_0, τ_0_1>) -> ()
+// CHECK:   end_access [[TEMPACCESS]] : $*Optional<Array<Int>>
+// CHECK:   end_access [[BOXACCESS]] : $*MyDict<Int, Array<Int>>
+// CHECK:   br [[RETBB]]
+//
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify0A13OptionalArrayyyAA6MyDictVySiSaySiGGF'
 
 // --- Optional map.

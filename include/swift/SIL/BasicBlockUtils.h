@@ -20,6 +20,11 @@ namespace swift {
 class SILFunction;
 class SILBasicBlock;
 
+/// \brief Merge a basic block ending in a branch with its successor
+/// if possible.
+void mergeBasicBlockWithSingleSuccessor(SILBasicBlock *BB,
+                                        SILBasicBlock *succBB);
+
 /// A utility for finding dead-end blocks.
 ///
 /// Dead-end blocks are blocks from which there is no path to the function exit
