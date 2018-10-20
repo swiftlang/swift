@@ -1183,7 +1183,7 @@ public:
     if (!typeResult)
       return getFailure<std::pair<Type, RemoteAddress>>();
     return std::make_pair<Type, RemoteAddress>(std::move(typeResult),
-                                               std::move(object));
+                                               RemoteAddress(*pointerval));
   }
 
   Result<std::pair<Type, RemoteAddress>>
