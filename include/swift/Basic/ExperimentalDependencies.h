@@ -111,11 +111,7 @@ if (ExperimentalDependencies::unimpLocation_t r  = (what)) \
   return r;
 
   
-  template <typename T>
-  void updateExpDepFromBits(llvm::MD5 &hash, const T& bits);
-
-  template <typename T>
-  void updateExpDepFromOptionalBits(llvm::MD5 &hash, const T& bits);
+  void updateExpDepFromBits(llvm::MD5 &hash, const void *bits, size_t size);
 
 } // namespace ExperimentalDependencies
 

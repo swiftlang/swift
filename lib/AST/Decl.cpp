@@ -6296,7 +6296,7 @@ void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *decl) {
 
   
 ExperimentalDependencies::unimpLocation_t Decl::updateExpDepDeclHash(llvm::MD5& hash) const {
-  ExperimentalDependencies::updateExpDepFromBits(hash, Bits);
+  ExperimentalDependencies::updateExpDepFromBits(hash, &Bits, sizeof(Bits));
   TRY_UPDATE_HASH(getAttrs().updateExpDepHash(hash))
   DeclContext *dc = getDeclContext();
   TRY_UPDATE_HASH(dc->updateExpDepDeclCtxHash(hash));
@@ -6416,7 +6416,7 @@ ExperimentalDependencies::unimpLocation_t  ClassDecl::updateExpDepDeclHashInner(
     TRY_UPDATE_HASH(getSuperclassDecl()->updateExpDepDeclHash(hash));
   }
   const ForeignKind fk = getForeignClassKind();
-  ExperimentalDependencies::updateExpDepFromBits(hash, fk);
+  ExperimentalDependencies::updateExpDepFromBits(hash, &fk, sizeof(fk));
   
   const bool flags[] = {
     requiresStoredPropertyInits(),
@@ -6426,14 +6426,14 @@ ExperimentalDependencies::unimpLocation_t  ClassDecl::updateExpDepDeclHashInner(
     usesObjCGenericsModel(),
     hasKnownSwiftImplementation()
   };
-  ExperimentalDependencies::updateExpDepFromBits(hash, flags);
+  ExperimentalDependencies::updateExpDepFromBits(hash, &flags, sizeof(flags));
   
   if (hasDestructor()) {
     RETURN_UNIMP; // non-const getDestructor
     //    TRY_UPDATE_HASH(getDestructor()->updateExpDepDeclHash(hash));
   }
   const MetaclassKind mk = getMetaclassKind();
-  ExperimentalDependencies::updateExpDepFromBits(hash, mk);
+  ExperimentalDependencies::updateExpDepFromBits(hash, &mk, sizeof(mk));
   llvm::SmallString<64> scratch;
   hash.update(getObjCRuntimeName(scratch));
   // getArtificialMainKind
@@ -6547,4 +6547,18 @@ ExperimentalDependencies::unimpLocation_t  PostfixOperatorDecl::updateExpDepDecl
   RETURN_UNIMP;
   return OperatorDecl::updateExpDepDeclHashInner(hash);
 }
+ExperimentalDependencies::unimpLocation_t  EnumCaseDecl::updateExpDepDeclHashInner(llvm::MD5& hash) const {
+  return nullptr;
+}
 
+ExperimentalDependencies::unimpLocation_t GenericContext::updateExpDepDeclCtxHashInner(llvm::MD5&) const {
+  RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t DefaultArgumentInitializer::updateExpDepDeclCtxHashInner(llvm::MD5& hash) const {
+  TRY_UPDATE_HASH(Initializer::updateExpDepDeclCtxHashInner(hash));
+  RETURN_UNIMP;
+}
+ExperimentalDependencies::unimpLocation_t SerializedDefaultArgumentInitializer::updateExpDepDeclCtxHashInner(llvm::MD5& hash) const {
+  TRY_UPDATE_HASH(SerializedLocalDeclContext::updateExpDepDeclCtxHashInner(hash));
+  RETURN_UNIMP;
+}

@@ -28,6 +28,7 @@
 #include "swift/Basic/ReferenceDependencyKeys.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/FileSystem.h"
@@ -453,7 +454,6 @@ void ProvidesEmitter::emitNominalTypes(
 
 void ProvidesEmitter::emitMembers(const CollectedDeclarations &cpd) const {
   out << providesMember << ":\n";
-#error emitMoreMembers
   for (auto entry : cpd.extendedNominals) {
     out << "- [\"";
     out << mangleTypeAsContext(entry.first);
@@ -683,13 +683,8 @@ DependsEmitter::sortedByName(const llvm::DenseMap<DeclBaseName, bool> map) {
 }
 
 
-template <typename T>
-void ExperimentalDependencies::updateExpDepFromBits(llvm::MD5 &hash, const T& bits) {
-  hash.update(ArrayRef<u_int8_t>(reinterpret_cast<u_int8_t*>(bits, sizeof(bits))));
-  }
-
-template <typename T>
-void ExperimentalDependencies::updateExpDepFromOptionalBits(llvm::MD5 &hash, const T& bits) {
-  if (bits.hasValue())
-    updateExpDepFromBits(hash, bits.getValue());
+void ExperimentalDependencies::updateExpDepFromBits(llvm::MD5 &hash, const void *bits, size_t size) {
+  hash.update(
+              ArrayRef<u_int8_t>(reinterpret_cast<u_int8_t*>(const_cast<void*>(bits)), size)
+              );
 }

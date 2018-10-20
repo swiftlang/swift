@@ -470,7 +470,7 @@ public:
 
   bool operator<(CanType T) const { return getPointer() < T.getPointer(); }
   
-  ExperimentalDependencies::unimpLocation_t  updateExpDepHashInner(llvm::MD5&) const;
+  ExperimentalDependencies::unimpLocation_t  updateExpDepCanonTypeHash(llvm::MD5&) const;
 };
 
 template <class Proxied> class CanTypeWrapper;

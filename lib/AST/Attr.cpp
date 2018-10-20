@@ -986,7 +986,7 @@ ExperimentalDependencies::unimpLocation_t  DeclAttributes::updateExpDepHash(llvm
 }
 
 ExperimentalDependencies::unimpLocation_t  DeclAttribute::updateExpDepAttrHash(llvm::MD5 &hash) const {
-  ExperimentalDependencies::updateExpDepFromBits(hash, &Bits);
+  ExperimentalDependencies::updateExpDepFromBits(hash, &Bits, sizeof(Bits));
   switch (getKind()) {
  //      CONTEXTUAL_SIMPLE_DECL_ATTR
     case DAK_Final:
@@ -1092,11 +1092,14 @@ ExperimentalDependencies::unimpLocation_t  DeclAttribute::updateExpDepAttrHash(l
 ExperimentalDependencies::unimpLocation_t  AvailableAttr::updateExpDepAttrHashInner(llvm::MD5 &hash) const {
   hash.update(Message);
   hash.update(Rename);
-  ExperimentalDependencies::updateExpDepFromOptionalBits(hash, Introduced);
-  ExperimentalDependencies::updateExpDepFromOptionalBits(hash, Deprecated);
-  ExperimentalDependencies::updateExpDepFromOptionalBits(hash, Obsoleted);
-  ExperimentalDependencies::updateExpDepFromBits(hash, PlatformAgnostic);
-  ExperimentalDependencies::updateExpDepFromBits(hash, Platform);
+  if (Introduced.hasValue())
+    ExperimentalDependencies::updateExpDepFromBits(hash, Introduced.getPointer(), sizeof(Introduced.getValue()));
+  if (Deprecated.hasValue())
+    ExperimentalDependencies::updateExpDepFromBits(hash, Deprecated.getPointer(), sizeof(Deprecated.getValue()));
+  if (Obsoleted.hasValue())
+    ExperimentalDependencies::updateExpDepFromBits(hash, Obsoleted.getPointer(), sizeof(Obsoleted.getValue()));
+  ExperimentalDependencies::updateExpDepFromBits(hash, &PlatformAgnostic, sizeof(PlatformAgnostic));
+  ExperimentalDependencies::updateExpDepFromBits(hash, &Platform, sizeof(Platform));
   
   return nullptr;
 }
@@ -1106,7 +1109,7 @@ ExperimentalDependencies::unimpLocation_t  ObjCAttr::updateExpDepAttrHashInner(l
     SmallString<64> scratch;
     hash.update(getName().getValue().getString(scratch));
   }
-  ExperimentalDependencies::updateExpDepFromBits(hash, Bits);
+  ExperimentalDependencies::updateExpDepFromBits(hash, &Bits, sizeof(Bits));
   
   return nullptr;
 }

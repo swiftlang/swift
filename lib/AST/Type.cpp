@@ -4082,7 +4082,7 @@ Type TypeBase::openAnyExistentialType(ArchetypeType *&opened) {
 
 
 ExperimentalDependencies::unimpLocation_t  TypeBase::updateExpDepTypeHash(llvm::MD5 &hash) const {
-  ExperimentalDependencies::updateExpDepFromBits(hash, Bits);
+  ExperimentalDependencies::updateExpDepFromBits(hash, &Bits, sizeof(Bits));
   assert(hasCanonicalTypeComputed());
   CanType ct = getCanonicalType();
   TRY_UPDATE_HASH(ct.updateExpDepCanonTypeHash(hash))

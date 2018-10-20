@@ -1572,7 +1572,7 @@ SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   // discriminator invariant across source checkout locations.
   // FIXME: Use a faster hash here? We don't need security, just uniqueness.
   llvm::MD5 hash;
-  getParentModule()->getName().updateHash(hash);
+  hash.update(getParentModule()->getName().str());
   hash.update(llvm::sys::path::filename(name));
   llvm::MD5::MD5Result result;
   hash.final(result);
