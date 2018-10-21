@@ -64,9 +64,10 @@ class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
   std::string CacheDir;
 
   void
-  configureSubInvocationAndOutputPath(CompilerInvocation &SubInvocation,
-                                      StringRef InPath,
-                                      llvm::SmallString<128> &OutPath);
+  configureSubInvocationAndOutputPaths(CompilerInvocation &SubInvocation,
+                                       StringRef InPath,
+                                       llvm::SmallString<128> &OutPath,
+                                       llvm::SmallString<128> &DepPath);
 
   std::error_code
   openModuleFiles(StringRef DirName, StringRef ModuleFilename,
