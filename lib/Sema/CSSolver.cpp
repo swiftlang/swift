@@ -1690,13 +1690,90 @@ getOperatorDesignatedNominalTypes(Constraint *bindOverload) {
   return operatorDecl->getDesignatedNominalTypes();
 }
 
+void ConstraintSystem::sortDesignatedTypes(
+    SmallVectorImpl<NominalTypeDecl *> &nominalTypes,
+    Constraint *bindOverload) {
+  auto *tyvar = bindOverload->getFirstType()->castTo<TypeVariableType>();
+  llvm::SetVector<Constraint *> applicableFns;
+  getConstraintGraph().gatherConstraints(
+      tyvar, applicableFns, ConstraintGraph::GatheringKind::EquivalenceClass,
+      [](Constraint *match) {
+        return match->getKind() == ConstraintKind::ApplicableFunction;
+      });
+
+  // FIXME: This is not true when we run the constraint optimizer.
+  // assert(applicableFns.size() <= 1);
+
+  // We have a disjunction for an operator but no application of it,
+  // so it's being passed as an argument.
+  if (applicableFns.size() == 0)
+    return;
+
+  // FIXME: We have more than one applicable per disjunction as a
+  //        result of merging disjunction type variables. We may want
+  //        to rip that out at some point.
+  Constraint *foundApplicable = nullptr;
+  SmallVector<Optional<Type>, 2> argumentTypes;
+  for (auto *applicableFn : applicableFns) {
+    argumentTypes.clear();
+    auto *fnTy = applicableFn->getFirstType()->castTo<FunctionType>();
+    ArgumentInfoCollector argInfo(*this, fnTy);
+    // Stop if we hit anything with concrete types or conformances to
+    // literals.
+    if (!argInfo.getTypes().empty() || !argInfo.getLiteralProtocols().empty()) {
+      foundApplicable = applicableFn;
+      break;
+    }
+  }
+
+  if (!foundApplicable)
+    return;
+
+  // FIXME: It would be good to avoid this redundancy.
+  auto *fnTy = foundApplicable->getFirstType()->castTo<FunctionType>();
+  ArgumentInfoCollector argInfo(*this, fnTy);
+
+  size_t nextType = 0;
+  for (auto argType : argInfo.getTypes()) {
+    auto *nominal = argType->getAnyNominal();
+    for (size_t i = nextType + 1; i < nominalTypes.size(); ++i) {
+      if (nominal == nominalTypes[i]) {
+        std::swap(nominalTypes[nextType], nominalTypes[i]);
+        ++nextType;
+        break;
+      }
+    }
+  }
+
+  if (nextType + 1 >= nominalTypes.size())
+    return;
+
+  for (auto *protocol : argInfo.getLiteralProtocols()) {
+    auto defaultType = TC.getDefaultType(protocol, DC);
+    auto *nominal = defaultType->getAnyNominal();
+    for (size_t i = nextType + 1; i < nominalTypes.size(); ++i) {
+      if (nominal == nominalTypes[i]) {
+        std::swap(nominalTypes[nextType], nominalTypes[i]);
+        ++nextType;
+        break;
+      }
+    }
+  }
+}
+
 void ConstraintSystem::partitionForDesignatedTypes(
     ArrayRef<Constraint *> Choices, ConstraintMatchLoop forEachChoice,
     PartitionAppendCallback appendPartition) {
 
-  auto designatedNominalTypes = getOperatorDesignatedNominalTypes(Choices[0]);
-  if (designatedNominalTypes.empty())
+  auto types = getOperatorDesignatedNominalTypes(Choices[0]);
+  if (types.empty())
     return;
+
+  SmallVector<NominalTypeDecl *, 4> designatedNominalTypes(types.begin(),
+                                                           types.end());
+
+  if (designatedNominalTypes.size() > 1)
+    sortDesignatedTypes(designatedNominalTypes, Choices[0]);
 
   SmallVector<SmallVector<unsigned, 4>, 4> definedInDesignatedType;
   SmallVector<SmallVector<unsigned, 4>, 4> definedInExtensionOfDesignatedType;
