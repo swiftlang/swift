@@ -117,9 +117,10 @@ private:
   name(both.first), hashOrUnimpLoc(both.second) {}
 };
 
-  typedef const char*  unimpLocation_t;
-
+  std::string getCombinedNameAndTopLevelHash(StringRef name, const Decl *D);
   
+   typedef const char*  unimpLocation_t;
+
   // if updateExpDepHash(Inner) is unimplemented, return where it was unimplemented
 # define ExpDepQ1(a) #a
 # define ExpDepQ2(a) ExpDepQ1(a)

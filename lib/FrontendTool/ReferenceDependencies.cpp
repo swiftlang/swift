@@ -128,14 +128,11 @@ private:
   static bool extendedTypeIsPrivate(TypeLoc inheritedType);
   static bool declIsPrivate(const Decl *member);
 
-  void emitOneTopLevelDecl(const DeclBaseName &, const Decl *) const;
+  void emitNormalOrExperimentalTopLevelDecl(const DeclBaseName &, const Decl *) const;
   void emitExperimentalNominalType(const NominalTypeDecl *) const;
   void emitExperimentalDynamicLookupMembers() const;
   void emitNameAndTopLevelDeclHash(StringRef name, const Decl *) const;
   std::string nameAndMaybeTopLevelDeclHash(StringRef name, const Decl *) const;
-  static std::pair<std::string, ExperimentalDependencies::unimpLocation_t>
-  getExperimentalTopLevelDependencyHash(const Decl *D);
-
 };
 
 /// Emit the depended-upon declartions.
@@ -273,7 +270,7 @@ ProvidesEmitter::emitTopLevelNames() const {
   for (const Decl *D : SF->Decls)
     emitTopLevelDecl(D, cpd);
   for (auto *operatorFunction : cpd.memberOperatorDecls)
-    out << "- \"" << escape(operatorFunction->getName()) << "\"\n";
+    emitNormalOrExperimentalTopLevelDecl(operatorFunction->getName(), operatorFunction);
   return cpd;
 }
 
@@ -295,12 +292,12 @@ void ProvidesEmitter::emitTopLevelDecl(const Decl *const D,
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
   case DeclKind::PostfixOperator:
-    emitOneTopLevelDecl(cast<OperatorDecl>(D)->getName(),
+    emitNormalOrExperimentalTopLevelDecl(cast<OperatorDecl>(D)->getName(),
                              cast<OperatorDecl>(D));
     break;
 
   case DeclKind::PrecedenceGroup:
-    emitOneTopLevelDecl(cast<PrecedenceGroupDecl>(D)->getName(),
+    emitNormalOrExperimentalTopLevelDecl(cast<PrecedenceGroupDecl>(D)->getName(),
                              cast<PrecedenceGroupDecl>(D));
     break;
 
@@ -340,29 +337,18 @@ void ProvidesEmitter::emitTopLevelDecl(const Decl *const D,
 }
 
 void ProvidesEmitter::emitNameAndTopLevelDeclHash(StringRef name, const Decl *D) const {
-  std::pair<std::string, const char*> hashOrUnimpLoc = getExperimentalTopLevelDependencyHash(D);
-  ExperimentalDependencies::CompoundProvides combiner(
-                                                      name,
-                                                      hashOrUnimpLoc.first,
-                                                      hashOrUnimpLoc.second);
+  std::string stringToEmit = nameAndMaybeTopLevelDeclHash(name, D);
   out << "- \""
-  << llvm::yaml::escape(combiner.combined())
+  << llvm::yaml::escape(stringToEmit)
   << "\"\n";
 }
 
 std::string ProvidesEmitter::nameAndMaybeTopLevelDeclHash(StringRef name, const Decl *D) const {
-  if (!EnableExperimentalDependencies)
-    return name;
-  std::pair<std::string, const char*> hashOrUnimpLoc = getExperimentalTopLevelDependencyHash(D);
-  ExperimentalDependencies::CompoundProvides combiner(
-                                                      name,
-                                                      hashOrUnimpLoc.first,
-                                                      hashOrUnimpLoc.second);
-  return combiner.combined();
+  return !EnableExperimentalDependencies ? name.str() : ExperimentalDependencies::getCombinedNameAndTopLevelHash(name, D);
 }
 
-//qqq
-void ProvidesEmitter::emitOneTopLevelDecl(const DeclBaseName &N,
+
+void ProvidesEmitter::emitNormalOrExperimentalTopLevelDecl(const DeclBaseName &N,
                                                const Decl *D) const {
   if (EnableExperimentalDependencies) {
     emitNameAndTopLevelDeclHash(N.userFacingName(), D);
@@ -376,23 +362,7 @@ void ProvidesEmitter::emitExperimentalNominalType(const NominalTypeDecl *NTD) co
   emitNameAndTopLevelDeclHash(mangleTypeAsContext(NTD), NTD);
 }
 
-std::pair<std::string, ExperimentalDependencies::unimpLocation_t>
-ProvidesEmitter::getExperimentalTopLevelDependencyHash(const Decl *D) {
-  
-//  llvm::MD5 DeclHash;
-//  if (ExperimentalDependencies::unimpLocation_t r  = ExperimentalDependencies::updateExpDepDeclHash(DeclHash, D))
-//    return make_pair(std::string(), r);
-//
-//  llvm::MD5::MD5Result result;
-//  DeclHash.final(result);
-//  llvm::SmallString<32> str;
-//  llvm::MD5::stringifyResult(result, str);
-//  return std::make_pair(str.str().str(), nullptr);
-  std::string buf;
-  llvm::raw_string_ostream OS(buf);
-  D->dump(OS);
-  return std::make_pair(ExperimentalDependencies::scrub(OS.str()), nullptr);
-}
+
 
 void ProvidesEmitter::emitExtensionDecl(const ExtensionDecl *const ED,
                                         CollectedDeclarations &cpd) const {
@@ -426,7 +396,7 @@ void ProvidesEmitter::emitNominalTypeDecl(const NominalTypeDecl *const NTD,
   if (NTD->getFormalAccess() <= AccessLevel::FilePrivate) {
     return;
   }
-  emitOneTopLevelDecl(NTD->getName(), NTD);
+  emitNormalOrExperimentalTopLevelDecl(NTD->getName(), NTD);
 
   cpd.extendedNominals[NTD] |= true;
   cpd.findNominalsAndOperators(NTD->getMembers());
@@ -462,7 +432,7 @@ void ProvidesEmitter::emitValueDecl(const ValueDecl *const VD) const {
   if (VD->getFormalAccess() <= AccessLevel::FilePrivate) {
     return;
   }
-  emitOneTopLevelDecl(VD->getBaseName(), VD);
+  emitNormalOrExperimentalTopLevelDecl(VD->getBaseName(), VD);
 }
 
 void ProvidesEmitter::emitNominalTypes(

@@ -306,7 +306,7 @@ DependencyGraphImpl::loadFromBuffer(const void *node,
     if (EnableExperimentalDependencies) {
       ExperimentalDependencies::CompoundProvides cp(nameArg);
       name = cp.name;
-      hash = cp.hash;
+      hash = cp.hash();
     }
     auto iter = std::find_if(provides.begin(), provides.end(),
                              [name](const ProvidesEntryTy &entry) -> bool {

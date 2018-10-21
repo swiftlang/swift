@@ -37,6 +37,50 @@
 using namespace swift;
 using namespace ExperimentalDependencies;
 
+static HashOrUnimpLoc getTopLevelDependencyHash(const Decl *D);
+static std::string scrubOne(StringRef input, const char* prefix, const char endChar);
+static std::string scrubAll(StringRef input);
+
+std::string
+ExperimentalDependencies::getCombinedNameAndTopLevelHash(StringRef name, const Decl *D) {
+  return CompoundProvides(name, getTopLevelDependencyHash(D))
+  .combined();
+}
+
+static HashOrUnimpLoc getTopLevelDependencyHash(const Decl *D) {
+  
+  //  llvm::MD5 DeclHash;
+  //  if (ExperimentalDependencies::unimpLocation_t r  = ExperimentalDependencies::updateExpDepDeclHash(DeclHash, D))
+  //    return make_pair(std::string(), r);
+  //
+  //  llvm::MD5::MD5Result result;
+  //  DeclHash.final(result);
+  //  llvm::SmallString<32> str;
+  //  llvm::MD5::stringifyResult(result, str);
+  //  return std::make_pair(str.str().str(), nullptr);
+  std::string buf;
+  llvm::raw_string_ostream OS(buf);
+  D->dump(OS);
+  return ExperimentalDependencies::HashOrUnimpLoc(scrubAll(OS.str()), std::string());
+}
+
+
+static std::string scrubOne(StringRef input, const char* prefix, const char endChar) {
+  std::string result;
+
+  for (size_t pos = 0;;) {
+    size_t i = input.find(prefix, pos);
+    result += input.slice(pos, i);
+    if (i == StringRef::npos)
+      break;
+    pos = input.find(endChar, i) + 1;
+  }
+  return result;
+}
+
+static std::string scrubAll(StringRef input) {
+  return scrubOne(scrubOne( scrubOne(input, "range=[", ']'), "location=", ' '), "@/", ' ');
+}
 
 
 //qqq unused?
@@ -692,20 +736,3 @@ using namespace ExperimentalDependencies;
 //  u.visit(const_cast<Decl *>(D));
 //  return u.unimpLocation;
 //}
-
-static std::string scrubpe(StringRef input, const char* prefix, const char endChar) {
-  std::string result;
-
-  for (size_t pos = 0;;) {
-    size_t i = input.find(prefix, pos);
-    result += input.slice(pos, i);
-    if (i == StringRef::npos)
-      break;
-    pos = input.find(endChar, i) + 1;
-  }
-  return result;
-}
-
-std::string ExperimentalDependencies::scrub(StringRef input) {
-  return scrubpe(scrubpe( scrubpe(input, "range=[", ']'), "location=", ' '), "@/", ' ');
-}
