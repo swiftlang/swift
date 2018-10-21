@@ -129,10 +129,10 @@ private:
   static bool declIsPrivate(const Decl *member);
 
   void emitNormalOrExperimentalTopLevelDecl(const DeclBaseName &, const Decl *) const;
-  void emitExperimentalDynamicLookupMembers() const;
   void emitNameAndTopLevelDeclHash(StringRef name, const Decl *) const;
   std::string nameAndMaybeTopLevelDeclHash(StringRef name, const Decl *) const;
   std::string nameAndMaybeNominalHash(StringRef name, const NominalTypeDecl *) const;
+  std::string nameAndMaybeDynamicLookupHash(StringRef name, const ValueDecl *) const;
 };
 
 /// Emit the depended-upon declartions.
@@ -363,6 +363,9 @@ std::string ProvidesEmitter::nameAndMaybeNominalHash(StringRef name, const Nomin
   return !EnableExperimentalDependencies ? name.str() : ExperimentalDependencies::getCombinedNameAndNominalHash(name, NTD);
 }
 
+std::string ProvidesEmitter::nameAndMaybeDynamicLookupHash(StringRef name, const ValueDecl *VD) const {
+  return !EnableExperimentalDependencies ? name.str() : ExperimentalDependencies::getCombinedNameAndDynamicLookupHash(name, VD);
+}
 
 
 void ProvidesEmitter::emitExtensionDecl(const ExtensionDecl *const ED,
@@ -480,68 +483,35 @@ void ProvidesEmitter::emitDynamicLookupMembers() const {
     // and/or (b) see if we can fast-path cases where there's no ObjC
     // involved.
     out << providesDynamicLookup << ":\n";
-    if (EnableExperimentalDependencies) {
-      emitExperimentalDynamicLookupMembers();
-      return;
-    }
+ 
     class NameCollector : public VisibleDeclConsumer {
     private:
-      SmallVector<DeclBaseName, 16> names;
+      const ProvidesEmitter &e;
+      SmallVector<std::string, 16> stringsToEmit;
 
     public:
+      NameCollector(const ProvidesEmitter &e) : e(e) {}
+      
       void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-        names.push_back(VD->getBaseName());
+        stringsToEmit.push_back(
+          e.nameAndMaybeDynamicLookupHash(VD->getBaseName().userFacingName(),
+                                        VD));
       }
-      ArrayRef<DeclBaseName> getNames() {
+      ArrayRef<std::string> getStringsToEmit() {
         llvm::array_pod_sort(
-            names.begin(), names.end(),
-            [](const DeclBaseName *lhs, const DeclBaseName *rhs) {
-              return lhs->compare(*rhs);
+            stringsToEmit.begin(), stringsToEmit.end(),
+                             [](const std::string *lhs, const std::string *rhs) {
+                               return ExperimentalDependencies::CompoundProvides(*lhs).name .compare(ExperimentalDependencies::CompoundProvides(*rhs).name);
             });
-        names.erase(std::unique(names.begin(), names.end()), names.end());
-        return names;
+        stringsToEmit.erase(std::unique(stringsToEmit.begin(), stringsToEmit.end()), stringsToEmit.end());
+        return stringsToEmit;
       }
     };
-    NameCollector collector;
+    NameCollector collector(*this);
     SF->lookupClassMembers({}, collector);
-    for (DeclBaseName name : collector.getNames()) {
-      out << "- \"" << escape(name) << "\"\n";
+    for (std::string s : collector.getStringsToEmit()) {
+      out << "- \"" << llvm::yaml::escape(s) << "\"\n";
     }
-  }
-}
-
-void ProvidesEmitter::emitExperimentalDynamicLookupMembers() const {
-  assert(EnableExperimentalDependencies);
-  typedef std::pair<DeclBaseName, const ValueDecl*> ND;
-  
-  class NameAndDeclCollector : public VisibleDeclConsumer {
-  private:
-    SmallVector<ND, 16> namesAndDecls;
-    
-  public:
-    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-      namesAndDecls.push_back(std::make_pair(VD->getBaseName(), VD));
-    }
-    ArrayRef<ND> getNamesAndDecls() {
-      llvm::array_pod_sort(
-                           namesAndDecls.begin(), namesAndDecls.end(),
-                           [](const ND *lhs, const ND *rhs) {
-                             return lhs->first.compare(rhs->first);
-                           });
-      namesAndDecls.erase(std::unique(namesAndDecls.begin(),
-                                      namesAndDecls.end(),
-                                      [](const ND lhs, const ND rhs) {
-                                        return lhs.first == rhs.first;
-                                      }
-                                      ),
-                          namesAndDecls.end());
-      return namesAndDecls;
-    }
-  };
-  NameAndDeclCollector collector;
-  SF->lookupClassMembers({}, collector);
-  for (ND nd : collector.getNamesAndDecls()) {
-    emitNameAndTopLevelDeclHash(nd.first.userFacingName(), nd.second);
   }
 }
 

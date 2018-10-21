@@ -22,6 +22,7 @@ namespace swift {
   
   class Decl;
   class NominalTypeDecl;
+  class ValueDecl;
 
 namespace ExperimentalDependencies {
   
@@ -120,6 +121,7 @@ private:
 
   std::string getCombinedNameAndTopLevelHash(StringRef name, const Decl *D);
   std::string getCombinedNameAndNominalHash(StringRef name, const NominalTypeDecl *NTD);
+  std::string getCombinedNameAndDynamicLookupHash(StringRef name, const ValueDecl *VD);
 
    typedef const char*  unimpLocation_t;
 

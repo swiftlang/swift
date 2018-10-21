@@ -39,6 +39,7 @@ using namespace ExperimentalDependencies;
 
 static HashOrUnimpLoc getTopLevelDependencyHash(const Decl *D);
 static HashOrUnimpLoc getNominalDependencyHash(const NominalTypeDecl *NTD);
+static HashOrUnimpLoc getDynamicLookupDependencyHash(const ValueDecl *VD);
 
 
 
@@ -54,6 +55,11 @@ ExperimentalDependencies::getCombinedNameAndNominalHash(StringRef name, const No
   .combined();
 }
 
+std::string
+ExperimentalDependencies::getCombinedNameAndDynamicLookupHash(StringRef name, const ValueDecl *VD) {
+  return CompoundProvides(name, getDynamicLookupDependencyHash(VD))
+  .combined();
+}
 
 
 static std::string scrubOne(StringRef input, const char* prefix, const char endChar);
@@ -77,6 +83,9 @@ static HashOrUnimpLoc getTopLevelDependencyHash(const Decl *D) {
 }
 
 static HashOrUnimpLoc getNominalDependencyHash(const NominalTypeDecl *NTD) {
+  return HashOrUnimpLoc::forUnimpLoc(UNIMP_HASH);
+}
+static HashOrUnimpLoc getDynamicLookupDependencyHash(const ValueDecl *VD) {
   return HashOrUnimpLoc::forUnimpLoc(UNIMP_HASH);
 }
 
