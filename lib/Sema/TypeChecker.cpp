@@ -122,7 +122,8 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
 
     if (SLE->isSingleExtendedGraphemeCluster())
       return getProtocol(
-          expr->getLoc(),
+          expr->getLoc(), SLE->isCharacterLiteral() ?
+          KnownProtocolKind::ExpressibleByCharacterLiteral :
           KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral);
 
     return getProtocol(expr->getLoc(),

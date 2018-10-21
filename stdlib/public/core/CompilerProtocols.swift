@@ -449,8 +449,7 @@ public protocol _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
 /// To add `ExpressibleByExtendedGraphemeClusterLiteral` conformance to your
 /// custom type, implement the required initializer.
 public protocol ExpressibleByExtendedGraphemeClusterLiteral
-  : ExpressibleByUnicodeScalarLiteral {
-
+  : ExpressibleByCharacterLiteral {
   /// A type that represents an extended grapheme cluster literal.
   ///
   /// Valid types for `ExtendedGraphemeClusterLiteralType` are `Character`,
@@ -463,6 +462,10 @@ public protocol ExpressibleByExtendedGraphemeClusterLiteral
   /// - Parameter value: The value of the new instance.
   init(extendedGraphemeClusterLiteral value: ExtendedGraphemeClusterLiteralType)
 }
+
+// Used to ensure default type of 'character' literals is `Character`
+public protocol ExpressibleByCharacterLiteral
+  : ExpressibleByUnicodeScalarLiteral {}
 
 extension ExpressibleByExtendedGraphemeClusterLiteral
   where ExtendedGraphemeClusterLiteralType == UnicodeScalarLiteralType {

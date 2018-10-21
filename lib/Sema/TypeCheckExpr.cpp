@@ -589,6 +589,14 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
     type = &CodepointLiteralType;
     name = "CodepointLiteralType";
   }
+  // ExpressibleByCharacterLiteral -> CharacterLiteralType
+  else if (protocol ==
+           getProtocol(
+               SourceLoc(),
+               KnownProtocolKind::ExpressibleByCharacterLiteral)) {
+    type = &CharacterLiteralType;
+    name = "CharacterLiteralType";
+  }
   // ExpressibleByStringLiteral -> StringLiteralType
   // ExpressibleByStringInterpolation -> StringLiteralType
   else if (protocol == getProtocol(

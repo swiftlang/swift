@@ -2448,7 +2448,7 @@ void Lexer::lexImpl() {
     CurPtr = TokStart + 1;
     lexStringLiteral();
     StringRef Text = NextToken.getText().drop_front().drop_back();
-    if (!swift::unicode::isSingleExtendedGraphemeCluster(Text))
+    if (!unicode::isSingleExtendedGraphemeCluster(Text))
       diagnose(TokStart, diag::lex_character_not_cluster);
     return;
   }
