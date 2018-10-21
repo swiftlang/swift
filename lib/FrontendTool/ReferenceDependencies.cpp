@@ -347,11 +347,7 @@ void ProvidesEmitter::emitNameAndTopLevelDeclHash(StringRef name, const Decl *D)
 
 void ProvidesEmitter::emitNormalOrExperimentalTopLevelDecl(const DeclBaseName &N,
                                                const Decl *D) const {
-  if (EnableExperimentalDependencies) {
-    emitNameAndTopLevelDeclHash(N.userFacingName(), D);
-  }
-  else
-    out << "- \"" << escape(N) << "\"\n";
+  emitNameAndTopLevelDeclHash(N.userFacingName(), D);
 }
 
 template<ExperimentalDependencies::ProvidesKind kind, typename DeclT>
