@@ -3227,6 +3227,12 @@ public:
   typedef std::function<void(SmallVectorImpl<unsigned> &options)>
       PartitionAppendCallback;
 
+  // Attempt to sort nominalTypes based on what we can discover about
+  // calls into the overloads in the disjunction that bindOverload is
+  // a part of.
+  void sortDesignatedTypes(SmallVectorImpl<NominalTypeDecl *> &nominalTypes,
+                           Constraint *bindOverload);
+
   // Partition the choices in a disjunction based on those that match
   // the designated types for the operator that the disjunction was
   // formed for.
