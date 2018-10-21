@@ -190,7 +190,8 @@ public:
 }
 }
 
-template <> struct llvm::DenseMapInfo<swift::irgen::LocalTypeDataKey> {
+namespace llvm {
+template <> struct DenseMapInfo<swift::irgen::LocalTypeDataKey> {
   using LocalTypeDataKey = swift::irgen::LocalTypeDataKey;
   using CanTypeInfo = DenseMapInfo<swift::CanType>;
   static inline LocalTypeDataKey getEmptyKey() {
@@ -209,5 +210,6 @@ template <> struct llvm::DenseMapInfo<swift::irgen::LocalTypeDataKey> {
     return a == b;
   }
 };
+}
 
 #endif
