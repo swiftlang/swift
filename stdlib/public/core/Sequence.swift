@@ -646,52 +646,44 @@ extension Sequence where Self.Iterator == Self {
 /// `Base` iterator before possibly returning the first available element.
 ///
 /// The underlying iterator's sequence may be infinite.
-@usableFromInline
 @_fixed_layout
-internal struct _DropFirstSequence<Base : IteratorProtocol>
-    : Sequence, IteratorProtocol {
-
+@usableFromInline
+internal struct DropFirstSequence<Base: Sequence> {
   @usableFromInline
-  internal var _iterator: Base
+  internal let _base: Base
   @usableFromInline
   internal let _limit: Int
-  @usableFromInline
-  internal var _dropped: Int
+  
+  @inlinable 
+  public init(_ base: Base, dropping limit: Int) {
+    _precondition(limit >= 0, 
+      "Can't drop a negative number of elements from a sequence")
+    _base = base
+    _limit = limit
+  }
+}
 
+extension DropFirstSequence: Sequence {
+  public typealias Element = Base.Element
+  public typealias Iterator = Base.Iterator
+  public typealias SubSequence = AnySequence<Element>
+  
   @inlinable
-  internal init(_iterator: Base, limit: Int, dropped: Int = 0) {
-    self._iterator = _iterator
-    self._limit = limit
-    self._dropped = dropped
+  public __consuming func makeIterator() -> Iterator {
+    var it = _base.makeIterator()
+    var dropped = 0
+    while dropped < _limit, it.next() != nil { dropped &+= 1 }
+    return it
   }
 
   @inlinable
-  __consuming internal func makeIterator() -> _DropFirstSequence<Base> {
-    return self
-  }
-
-  @inlinable
-  internal mutating func next() -> Base.Element? {
-    while _dropped < _limit {
-      if _iterator.next() == nil {
-        _dropped = _limit
-        return nil
-      }
-      _dropped += 1
-    }
-    return _iterator.next()
-  }
-
-  @inlinable
-  internal __consuming func dropFirst(_ k: Int) -> AnySequence<Base.Element> {
+  public __consuming func dropFirst(_ k: Int) -> AnySequence<Element> {
     // If this is already a _DropFirstSequence, we need to fold in
     // the current drop count and drop limit so no data is lost.
     //
     // i.e. [1,2,3,4].dropFirst(1).dropFirst(1) should be equivalent to
     // [1,2,3,4].dropFirst(2).
-    return AnySequence(
-      _DropFirstSequence(
-        _iterator: _iterator, limit: _limit + k, dropped: _dropped))
+    return AnySequence(DropFirstSequence(_base, dropping: _limit + k))
   }
 }
 
@@ -1223,9 +1215,7 @@ extension Sequence where SubSequence == AnySequence<Element> {
   ///   the sequence.
   @inlinable
   public __consuming func dropFirst(_ k: Int) -> AnySequence<Element> {
-    _precondition(k >= 0, "Can't drop a negative number of elements from a sequence")
-    if k == 0 { return AnySequence(self) }
-    return AnySequence(_DropFirstSequence(_iterator: makeIterator(), limit: k))
+    return AnySequence(DropFirstSequence(self, dropping: k))
   }
 
   /// Returns a subsequence containing all but the given number of final
