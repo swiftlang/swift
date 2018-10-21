@@ -17,6 +17,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/FileSystem.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -5158,19 +5159,6 @@ void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
   S.writeToStream(os);
 }
 
-static inline bool
-withOutputFile(ASTContext &ctx, StringRef outputPath,
-               llvm::function_ref<void(raw_ostream &)> action){
-  std::error_code EC = swift::atomicallyWritingToFile(outputPath,
-                                                      action);
-  if (!EC)
-    return false;
-
-  ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                     outputPath, EC.message());
-  return true;
-}
-
 void swift::serialize(ModuleOrSourceFile DC,
                       const SerializationOptions &options,
                       const SILModule *M) {
@@ -5183,20 +5171,24 @@ void swift::serialize(ModuleOrSourceFile DC,
     return;
   }
 
-  bool hadError = withOutputFile(getContext(DC), options.OutputPath,
+  bool hadError = withOutputFile(getContext(DC).Diags,
+                                 options.OutputPath,
                                  [&](raw_ostream &out) {
     SharedTimer timer("Serialization, swiftmodule");
     Serializer::writeToStream(out, DC, M, options);
+    return false;
   });
   if (hadError)
     return;
 
   if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
-    (void)withOutputFile(getContext(DC), options.DocOutputPath,
+    (void)withOutputFile(getContext(DC).Diags,
+                         options.DocOutputPath,
                          [&](raw_ostream &out) {
       SharedTimer timer("Serialization, swiftdoc");
       Serializer::writeDocToStream(out, DC, options.GroupInfoPath,
                                    getContext(DC));
+      return false;
     });
   }
 }

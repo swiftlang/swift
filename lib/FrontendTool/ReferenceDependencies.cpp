@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
@@ -193,17 +194,10 @@ bool ReferenceDependenciesEmitter::emit(DiagnosticEngine &diags,
   // that may have been there. No error handling -- this is just a nicety, it
   // doesn't matter if it fails.
   llvm::sys::fs::rename(outputPath, outputPath + "~");
-  std::error_code EC =
-      swift::atomicallyWritingToFile(outputPath,
-                                     [&](llvm::raw_pwrite_stream &out) {
+  return withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
     ReferenceDependenciesEmitter::emit(SF, depTracker, out);
+    return false;
   });
-  if (EC) {
-    diags.diagnose(SourceLoc(), diag::error_opening_output, outputPath,
-                   EC.message());
-    return true;
-  }
-  return false;
 }
 
 void ReferenceDependenciesEmitter::emit(SourceFile *SF,
