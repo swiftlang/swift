@@ -242,9 +242,9 @@ extension _StringGuts {
         }
         return
       }
-      // TODO(UTF8 perf): Iterate and insert
-      // TODO(UTF8 merge): Needed for `reserveCapacity` test in
-      //   validation-test/stdlib/String.swift
+      uniqueNativeReplaceSubrange(
+        bounds, with: newElements.lazy.flatMap { $0.utf8 })
+      return
     }
 
     var result = String()
@@ -274,7 +274,27 @@ extension _StringGuts {
       with: codeUnits)
     self = _StringGuts(_object.nativeStorage)
   }
+
+  internal mutating func uniqueNativeReplaceSubrange<C: Collection>(
+    _ bounds: Range<Index>,
+    with codeUnits: C
+  ) where C.Element == UInt8 {
+    let replCount = codeUnits.count
+
+    let neededCapacity =
+      bounds.lowerBound.encodedOffset
+      + replCount + (self.count - bounds.upperBound.encodedOffset)
+    reserveCapacity(neededCapacity)
+
+    _sanityCheck(bounds.lowerBound.transcodedOffset == 0)
+    _sanityCheck(bounds.upperBound.transcodedOffset == 0)
+
+    _object.nativeStorage.replace(
+      from: bounds.lowerBound.encodedOffset,
+      to: bounds.upperBound.encodedOffset,
+      with: codeUnits,
+      replacementCount: replCount)
+    self = _StringGuts(_object.nativeStorage)
+  }
 }
-
-
 
