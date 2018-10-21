@@ -59,13 +59,9 @@ static InFlightDiagnostic diagnose(SILModule &M, SILLocation loc,
 /// Insert a CFG diamond at the position specified by the SILBuilder, with a
 /// conditional branch based on "Cond".
 ///
-/// This returns the true, false, and continuation block.  If createTrueBB or
-/// createFalseBB is false, then only one of the two blocks is created - a CFG
-/// triangle instead of a diamond. The SILBuilder is left at the start of the
-/// ContBB block.
+/// This returns the true, false, and continuation block. The SILBuilder is left
+/// at the start of the ContBB block.
 static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
-                             bool createTrueBB,
-                             bool createFalseBB,
                              SILBasicBlock *&TrueBB,
                              SILBasicBlock *&FalseBB,
                              SILBasicBlock *&ContBB) {
@@ -74,37 +70,21 @@ static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
   // Start by splitting the current block.
   ContBB = StartBB->split(B.getInsertionPoint());
 
-  // Create the true block if requested.
-  SILBasicBlock *TrueDest;
-  if (!createTrueBB) {
-    TrueDest = ContBB;
-    TrueBB = nullptr;
-  } else {
-    TrueDest = StartBB->getParent()->createBasicBlock();
-    B.moveBlockTo(TrueDest, ContBB);
-    B.setInsertionPoint(TrueDest);
-    B.createBranch(Loc, ContBB);
-    TrueBB = TrueDest;
-  }
-  
-  // Create the false block if requested.
-  SILBasicBlock *FalseDest;
-  if (!createFalseBB) {
-    FalseDest = ContBB;
-    FalseBB = nullptr;
-  } else {
-    FalseDest = StartBB->getParent()->createBasicBlock();
-    B.moveBlockTo(FalseDest, ContBB);
-    B.setInsertionPoint(FalseDest);
-    B.createBranch(Loc, ContBB);
-    FalseBB = FalseDest;
-  }
-  
+  TrueBB = StartBB->getParent()->createBasicBlock();
+  B.moveBlockTo(TrueBB, ContBB);
+  B.setInsertionPoint(TrueBB);
+  B.createBranch(Loc, ContBB);
+
+  FalseBB = StartBB->getParent()->createBasicBlock();
+  B.moveBlockTo(FalseBB, ContBB);
+  B.setInsertionPoint(FalseBB);
+  B.createBranch(Loc, ContBB);
+
   // Now that we have our destinations, insert a conditional branch on the
   // condition.
   B.setInsertionPoint(StartBB);
-  B.createCondBranch(Loc, Cond, TrueDest, FalseDest);
-  
+  B.createCondBranch(Loc, Cond, TrueBB, FalseBB);
+
   B.setInsertionPoint(ContBB, ContBB->begin());
 }
 
@@ -2267,8 +2247,6 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
       
       SILBasicBlock *TrueBB, *FalseBB, *ContBB;
       InsertCFGDiamond(CondVal, Loc, B,
-                       /*createTrueBB=*/true,
-                       /*createFalseBB=*/false,
                        TrueBB, FalseBB, ContBB);
 
       // Emit a destroy_addr in the taken block.
@@ -2390,8 +2368,6 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
       SILBasicBlock *ReleaseBlock, *DeallocBlock, *ContBlock;
 
       InsertCFGDiamond(CondVal, Loc, B,
-                       /*createTrueBB=*/true,
-                       /*createFalseBB=*/false,
                        ReleaseBlock, DeallocBlock, ContBlock);
 
       // Set up the initialized release block.
@@ -2415,8 +2391,6 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
     SILBasicBlock *ReleaseBlock, *ConsumedBlock, *ContBlock;
 
     InsertCFGDiamond(CondVal, Loc, B,
-                     /*createTrueBB=*/true,
-                     /*createFalseBB=*/true,
                      ReleaseBlock, ConsumedBlock, ContBlock);
 
     // If true, self is fully initialized; just release it as usual.
@@ -2504,8 +2478,6 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         SILBasicBlock *ConsumedBlock, *DeallocBlock, *ContBlock;
 
         InsertCFGDiamond(CondVal, Loc, B,
-                         /*createTrueBB=*/true,
-                         /*createFalseBB=*/true,
                          ConsumedBlock, DeallocBlock, ContBlock);
 
         // If true, self.init or super.init was called and self was consumed.
@@ -2540,8 +2512,6 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         SILBasicBlock *LiveBlock, *DeallocBlock, *ContBlock;
 
         InsertCFGDiamond(CondVal, Loc, B,
-                         /*createTrueBB=*/true,
-                         /*createFalseBB=*/true,
                          LiveBlock, DeallocBlock, ContBlock);
 
         // If true, self was consumed or is fully initialized.
