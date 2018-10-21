@@ -1658,9 +1658,8 @@ class ParameterTypeFlags {
     Variadic    = 1 << 0,
     AutoClosure = 1 << 1,
     Escaping    = 1 << 2,
-    InOut       = 1 << 3,
-    Shared      = 1 << 4,
-    Owned       = 1 << 5,
+    OwnershipShift = 3,
+    Ownership   = 7 << OwnershipShift,
 
     NumBits = 6
   };
@@ -1679,9 +1678,7 @@ public:
                      ValueOwnership ownership)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (escaping ? Escaping : 0) |
-              (ownership == ValueOwnership::InOut ? InOut : 0) |
-              (ownership == ValueOwnership::Shared ? Shared : 0) |
-              (ownership == ValueOwnership::Owned ? Owned : 0)) {}
+              uint8_t(ownership) << OwnershipShift) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
@@ -1691,19 +1688,12 @@ public:
   bool isVariadic() const { return value.contains(Variadic); }
   bool isAutoClosure() const { return value.contains(AutoClosure); }
   bool isEscaping() const { return value.contains(Escaping); }
-  bool isInOut() const { return value.contains(InOut); }
-  bool isShared() const { return value.contains(Shared); }
-  bool isOwned() const { return value.contains(Owned); }
+  bool isInOut() const { return getValueOwnership() == ValueOwnership::InOut; }
+  bool isShared() const { return getValueOwnership() == ValueOwnership::Shared;}
+  bool isOwned() const { return getValueOwnership() == ValueOwnership::Owned; }
 
   ValueOwnership getValueOwnership() const {
-    if (isInOut())
-      return ValueOwnership::InOut;
-    else if (isShared())
-      return ValueOwnership::Shared;
-    else if (isOwned())
-      return ValueOwnership::Owned;
-
-    return ValueOwnership::Default;
+    return ValueOwnership((value.toRaw() & Ownership) >> OwnershipShift);
   }
 
   ParameterTypeFlags withVariadic(bool variadic) const {
@@ -1717,18 +1707,23 @@ public:
   }
 
   ParameterTypeFlags withInOut(bool isInout) const {
-    return ParameterTypeFlags(isInout ? value | ParameterTypeFlags::InOut
-                                      : value - ParameterTypeFlags::InOut);
+    return withValueOwnership(isInout ? ValueOwnership::InOut
+                                      : ValueOwnership::Default);
   }
   
   ParameterTypeFlags withShared(bool isShared) const {
-    return ParameterTypeFlags(isShared ? value | ParameterTypeFlags::Shared
-                                       : value - ParameterTypeFlags::Shared);
+    return withValueOwnership(isShared ? ValueOwnership::Shared
+                                       : ValueOwnership::Default);
   }
 
   ParameterTypeFlags withOwned(bool isOwned) const {
-    return ParameterTypeFlags(isOwned ? value | ParameterTypeFlags::Owned
-                                      : value - ParameterTypeFlags::Owned);
+    return withValueOwnership(isOwned ? ValueOwnership::Owned
+                                      : ValueOwnership::Default);
+  }
+
+  ParameterTypeFlags withValueOwnership(ValueOwnership ownership) const {
+    return (value - ParameterTypeFlags::Ownership)
+            | ParameterFlags(uint8_t(ownership) << OwnershipShift);
   }
 
   bool operator ==(const ParameterTypeFlags &other) const {
@@ -1745,9 +1740,8 @@ public:
 class YieldTypeFlags {
   enum YieldFlags : uint8_t {
     None        = 0,
-    InOut       = 1 << 1,
-    Shared      = 1 << 2,
-    Owned       = 1 << 3,
+    Ownership   = 7,
+    OwnershipShift = 0,
 
     NumBits = 3
   };
@@ -1764,35 +1758,34 @@ public:
   }
 
   YieldTypeFlags(ValueOwnership ownership)
-      : value((ownership == ValueOwnership::InOut ? InOut : 0) |
-              (ownership == ValueOwnership::Shared ? Shared : 0) |
-              (ownership == ValueOwnership::Owned ? Owned : 0)) {}
+      : value(uint8_t(ownership) << OwnershipShift) {}
 
-  bool isInOut() const { return value.contains(InOut); }
-  bool isShared() const { return value.contains(Shared); }
-  bool isOwned() const { return value.contains(Owned); }
+  bool isInOut() const { return getValueOwnership() == ValueOwnership::InOut; }
+  bool isShared() const { return getValueOwnership() == ValueOwnership::Shared;}
+  bool isOwned() const { return getValueOwnership() == ValueOwnership::Owned; }
 
   ValueOwnership getValueOwnership() const {
-    if (isInOut())
-      return ValueOwnership::InOut;
-    else if (isShared())
-      return ValueOwnership::Shared;
-    else if (isOwned())
-      return ValueOwnership::Owned;
-
-    return ValueOwnership::Default;
+    return ValueOwnership((value.toRaw() & Ownership) >> OwnershipShift);
   }
 
   YieldTypeFlags withInOut(bool isInout) const {
-    return YieldTypeFlags(isInout ? value | InOut : value - InOut);
+    return withValueOwnership(isInout ? ValueOwnership::InOut
+                                      : ValueOwnership::Default);
   }
   
   YieldTypeFlags withShared(bool isShared) const {
-    return YieldTypeFlags(isShared ? value | Shared : value - Shared);
+    return withValueOwnership(isShared ? ValueOwnership::Shared
+                                       : ValueOwnership::Default);
   }
 
   YieldTypeFlags withOwned(bool isOwned) const {
-    return YieldTypeFlags(isOwned ? value | Owned : value - Owned);
+    return withValueOwnership(isOwned ? ValueOwnership::Owned
+                                      : ValueOwnership::Default);
+  }
+
+  YieldTypeFlags withValueOwnership(ValueOwnership ownership) const {
+    return (value - YieldTypeFlags::Ownership)
+            | YieldFlags(uint8_t(ownership) << OwnershipShift);
   }
 
   /// Return these flags interpreted as parameter flags.
@@ -3078,7 +3071,7 @@ END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
 /// it.
 SmallBitVector
 computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
-                  const ValueDecl *paramOwner, unsigned level);
+                  const ValueDecl *paramOwner, bool skipCurriedSelf);
 
 /// Turn a param list into a symbolic and printable representation that does not
 /// include the types, something like (: , b:, c:)

@@ -3166,6 +3166,12 @@ namespace {
       printFlag(paramFlags.isVariadic(), "vararg");
       printFlag(paramFlags.isAutoClosure(), "autoclosure");
       printFlag(paramFlags.isEscaping(), "escaping");
+      switch (paramFlags.getValueOwnership()) {
+      case ValueOwnership::Default: break;
+      case ValueOwnership::Owned: printFlag("owned"); break;
+      case ValueOwnership::Shared: printFlag("shared"); break;
+      case ValueOwnership::InOut: printFlag("inout"); break;
+      }
     }
 
   public:
@@ -3417,7 +3423,7 @@ namespace {
         if (param.hasLabel())
           printField("name", param.getLabel().str());
         dumpParameterFlags(param.getParameterFlags());
-        printRec(param.getOldType());
+        printRec(param.getPlainType());
         OS << ")";
       }
       Indent -= 2;

@@ -31,10 +31,8 @@ func test1() {
   // CHECK:   function_ref @$s6switch3fooSiyF
   case _:
   // CHECK:   function_ref @$s6switch1ayyF
-  // CHECK:   br [[CONT:bb[0-9]+]]
     a()
   }
-  // CHECK: [[CONT]]:
   // CHECK:   function_ref @$s6switch1byyF
   b()
 }
@@ -60,7 +58,7 @@ func test3() {
   switch foo() {
   // CHECK:   function_ref @$s6switch3fooSiyF
   // CHECK:   function_ref @$s6switch6runcedSbyF
-  // CHECK:   cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NO_CASE2:bb[0-9]+]]
+  // CHECK:   cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[CASE2:bb[0-9]+]]
 
   case _ where runced():
   // CHECK: [[CASE1]]:
@@ -68,8 +66,6 @@ func test3() {
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
 
-  // CHECK: [[NO_CASE2]]:
-  // CHECK:   br [[CASE2:bb[0-9]+]]
   case _:
   // CHECK: [[CASE2]]:
   // CHECK:   function_ref @$s6switch1byyF
@@ -88,10 +84,8 @@ func test4() {
   // CHECK:   function_ref @$s6switch3barSiyF
   case _:
   // CHECK:   function_ref @$s6switch1ayyF
-  // CHECK:   br [[CONT:bb[0-9]+]]
     a()
   }
-  // CHECK: [[CONT]]:
   // CHECK:   function_ref @$s6switch1byyF
   b()
 }
@@ -118,15 +112,11 @@ func test5() {
   // CHECK:   br [[CONT]]
     b()
 
-  // CHECK: [[NOT_CASE2]]:
-  // CHECK:   br [[CASE3:bb[0-9]+]]
   case _:
-  // CHECK: [[CASE3]]:
+  // CHECK: [[NOT_CASE2]]:
   // CHECK:   function_ref @$s6switch1cyyF
-  // CHECK:   br [[CONT]]
     c()
   }
-  // CHECK: [[CONT]]:
   // CHECK:   function_ref @$s6switch1dyyF
   d()
 }
@@ -161,16 +151,12 @@ func test7() {
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
 
-  // CHECK: [[NOT_CASE1]]:
-  // CHECK:   br [[CASE2:bb[0-9]+]]
   case (_, _):
-  // CHECK: [[CASE2]]:
+  // CHECK: [[NOT_CASE1]]:
   // CHECK:   function_ref @$s6switch1byyF
-  // CHECK:   br [[CONT]]
     b()
   }
   c()
-  // CHECK: [[CONT]]:
   // CHECK:   function_ref @$s6switch1cyyF
 }
 
@@ -269,15 +255,11 @@ func test9() {
   // CHECK:   br [[CONT]]
     b()
 
-  // CHECK: [[NOT_CASE2]]:
-  // CHECK:   br [[CASE3:bb[0-9]+]]
   case _:
-  // CHECK: [[CASE3]]:
+  // CHECK: [[NOT_CASE2]]:
   // CHECK:   function_ref @$s6switch1cyyF
-  // CHECK:   br [[CONT]]
     c()
   }
-  // CHECK: [[CONT]]:
   // CHECK:   function_ref @$s6switch1dyyF
   d()
 }
@@ -294,10 +276,8 @@ func test10() {
   // CHECK:   br [[CONT:bb[0-9]+]]
     a()
 
-  // CHECK: [[NOT_CASE1]]:
-  // CHECK:   br [[CASE2:bb[0-9]+]]
   case _:
-  // CHECK: [[CASE2]]:
+  // CHECK: [[NOT_CASE1]]:
   // CHECK:   function_ref @$s6switch1byyF
   // CHECK:   br [[CONT]]
     b()
@@ -457,7 +437,7 @@ func test_isa_class_1(x: B) {
   // CHECK-NEXT:   destroy_value [[CAST_D1_COPY]]
   // CHECK-NEXT:   end_borrow [[CAST_D1]]
   // CHECK-NEXT:   end_borrow [[BORROWED_X_COPY]]
-  // CHECK-NEXT:   br [[NEXT_CASE:bb5]]
+  // CHECK:   br [[NEXT_CASE:bb[0-9]+]]
 
   // CHECK: [[IS_NOT_D1]]([[CASTFAIL_D1:%.*]] : @guaranteed $B):
   // CHECK-NEXT:   end_borrow [[CASTFAIL_D1]]
@@ -479,9 +459,6 @@ func test_isa_class_1(x: B) {
 
   // CHECK: [[IS_NOT_D2]]([[CASTFAIL_D2:%.*]] : @guaranteed $B):
   // CHECK:   end_borrow [[CASTFAIL_D2]]
-  // CHECK:   br [[NEXT_CASE:bb8]]
-
-  // CHECK: [[NEXT_CASE]]:
   // CHECK:   [[BORROWED_X_COPY:%.*]] = begin_borrow [[X_COPY]]
   // CHECK:   checked_cast_br [[BORROWED_X_COPY]] : $B to $E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
   case is E where funged():
@@ -502,7 +479,7 @@ func test_isa_class_1(x: B) {
   // CHECK-NEXT:   destroy_value [[CAST_E_COPY]]
   // CHECK-NEXT:   end_borrow
   // CHECK-NEXT:   end_borrow [[BORROWED_X_COPY]]
-  // CHECK-NEXT:   br [[NEXT_CASE:bb13]]
+  // CHECK:   br [[NEXT_CASE:bb[0-9]+]]
 
   // CHECK: [[IS_NOT_E]]([[NOTCAST_E:%.*]] : @guaranteed $B):
   // CHECK:   end_borrow [[NOTCAST_E]]
@@ -524,9 +501,6 @@ func test_isa_class_1(x: B) {
 
   // CHECK: [[IS_NOT_C]]([[NOCAST_C:%.*]] : @guaranteed $B):
   // CHECK:   end_borrow [[NOCAST_C]]
-  // CHECK:   br [[NEXT_CASE:bb16]]
-
-  // CHECK: [[NEXT_CASE]]:
   default:
   // CHECK:    destroy_value [[X_COPY]]
   // CHECK:    function_ref @$s6switch1eyyF
@@ -595,9 +569,6 @@ func test_isa_class_2(x: B) -> AnyObject {
 
   // CHECK: [[IS_NOT_D2]]([[NOCAST_D2:%.*]] : @guaranteed $B):
   // CHECK:   end_borrow [[NOCAST_D2]]
-  // CHECK:   br [[NEXT_CASE:bb8]]
-
-  // CHECK: [[NEXT_CASE]]:
   // CHECK:   [[BORROWED_X_COPY:%.*]] = begin_borrow [[X_COPY]]
   // CHECK:   checked_cast_br [[BORROWED_X_COPY]] : $B to $E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
   case let y as E where funged():
@@ -621,7 +592,7 @@ func test_isa_class_2(x: B) -> AnyObject {
 
   // CHECK: [[NO_CASE3]]:
   // CHECK    destroy_value [[CAST_E_COPY]]
-  // CHECK:   br [[NEXT_CASE:bb13]]
+  // CHECK:   br [[NEXT_CASE:bb[0-9]+]]
 
   // CHECK: [[IS_NOT_E]]([[NOCAST_E:%.*]] : @guaranteed $B):
   // CHECK:   end_borrow [[NOCAST_E]]
@@ -647,9 +618,6 @@ func test_isa_class_2(x: B) -> AnyObject {
 
   // CHECK: [[IS_NOT_C]]([[NOCAST_C:%.*]] : @guaranteed $B):
   // CHECK:   end_borrow [[NOCAST_C]]
-  // CHECK:   br [[NEXT_CASE:bb16]]
-
-  // CHECK: [[NEXT_CASE]]:
   default:
   // CHECK:   destroy_value [[X_COPY]]
   // CHECK:   function_ref @$s6switch1eyyF
@@ -1146,5 +1114,58 @@ func testUninhabitedSwitchScrutinee() {
     // CHECK-NEXT: %1 = apply %0() : $@convention(thin) () -> MyNever
     // CHECK-NEXT: unreachable
     switch myFatalError() {}
+  }
+}
+
+// Make sure that we properly can handle address only tuples with loadable
+// subtypes.
+class Klass {}
+
+enum TrivialSingleCaseEnum {
+case a
+}
+
+enum NonTrivialSingleCaseEnum {
+case a(Klass)
+}
+
+// CHECK-LABEL: sil hidden @$s6switch33address_only_with_trivial_subtypeyyAA21TrivialSingleCaseEnumO_yptF : $@convention(thin) (TrivialSingleCaseEnum, @in_guaranteed Any) -> () {
+// CHECK: [[MEM:%.*]] = alloc_stack $(TrivialSingleCaseEnum, Any)
+// CHECK: [[INIT_TUP_0:%.*]] = tuple_element_addr [[MEM]] : $*(TrivialSingleCaseEnum, Any), 0
+// CHECK: [[INIT_TUP_1:%.*]] = tuple_element_addr [[MEM]] : $*(TrivialSingleCaseEnum, Any), 1
+// CHECK: store {{%.*}} to [trivial] [[INIT_TUP_0]]
+// CHECK: copy_addr [take] {{%.*}} to [initialization] [[INIT_TUP_1]]
+// CHECK: [[TUP_0:%.*]] = tuple_element_addr [[MEM]] : $*(TrivialSingleCaseEnum, Any), 0
+// CHECK: [[TUP_0_VAL:%.*]] = load [trivial] [[TUP_0]]
+// CHECK: [[TUP_1:%.*]] = tuple_element_addr [[MEM]] : $*(TrivialSingleCaseEnum, Any), 1
+// CHECK: switch_enum [[TUP_0_VAL]]
+//
+// CHECK: } // end sil function '$s6switch33address_only_with_trivial_subtypeyyAA21TrivialSingleCaseEnumO_yptF'
+func address_only_with_trivial_subtype(_ a: TrivialSingleCaseEnum, _ value: Any) {
+  switch (a, value) {
+  case (.a, _):
+    break
+  default:
+    break
+  }
+}
+
+// CHECK-LABEL: sil hidden @$s6switch36address_only_with_nontrivial_subtypeyyAA24NonTrivialSingleCaseEnumO_yptF : $@convention(thin) (@guaranteed NonTrivialSingleCaseEnum, @in_guaranteed Any) -> () {
+// CHECK: [[MEM:%.*]] = alloc_stack $(NonTrivialSingleCaseEnum, Any)
+// CHECK: [[INIT_TUP_0:%.*]] = tuple_element_addr [[MEM]] : $*(NonTrivialSingleCaseEnum, Any), 0
+// CHECK: [[INIT_TUP_1:%.*]] = tuple_element_addr [[MEM]] : $*(NonTrivialSingleCaseEnum, Any), 1
+// CHECK: store {{%.*}} to [init] [[INIT_TUP_0]]
+// CHECK: copy_addr [take] {{%.*}} to [initialization] [[INIT_TUP_1]]
+// CHECK: [[TUP_0:%.*]] = tuple_element_addr [[MEM]] : $*(NonTrivialSingleCaseEnum, Any), 0
+// CHECK: [[TUP_0_VAL:%.*]] = load_borrow [[TUP_0]]
+// CHECK: [[TUP_1:%.*]] = tuple_element_addr [[MEM]] : $*(NonTrivialSingleCaseEnum, Any), 1
+// CHECK: switch_enum [[TUP_0_VAL]]
+// CHECK: } // end sil function '$s6switch36address_only_with_nontrivial_subtypeyyAA24NonTrivialSingleCaseEnumO_yptF'
+func address_only_with_nontrivial_subtype(_ a: NonTrivialSingleCaseEnum, _ value: Any) {
+  switch (a, value) {
+  case (.a, _):
+    break
+  default:
+    break
   }
 }

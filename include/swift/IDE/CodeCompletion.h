@@ -495,6 +495,7 @@ enum class CompletionKind {
   CaseStmtBeginning,
   CaseStmtDotPrefix,
   NominalMemberBeginning,
+  AccessorBeginning,
   AttributeBegin,
   AttributeDeclParen,
   PoundAvailablePlatform,

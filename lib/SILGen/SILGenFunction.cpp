@@ -401,6 +401,8 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
   emitStmt(fd->getBody());
 
   emitEpilog(fd);
+
+  mergeCleanupBlocks();
 }
 
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {

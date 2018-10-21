@@ -2856,10 +2856,10 @@ static bool candidatesHaveAnyDefaultValues(
     if (!function) continue;
 
     if (function->hasImplicitSelfDecl()) {
-      if (cand.level != 1)
+      if (!cand.skipCurriedSelf)
         return false;
     } else {
-      if (cand.level != 0)
+      if (cand.skipCurriedSelf)
         return false;
     }
 
@@ -2910,10 +2910,10 @@ static Optional<unsigned> getElementForScalarInitOfArg(
   if (!function) return getElementForScalarInitSimple(tupleTy);
 
   if (function->hasImplicitSelfDecl()) {
-    if (cand.level != 1)
+    if (!cand.skipCurriedSelf)
       return getElementForScalarInitSimple(tupleTy);
   } else {
-    if (cand.level != 0)
+    if (cand.skipCurriedSelf)
       return getElementForScalarInitSimple(tupleTy);
   }
 
@@ -2987,7 +2987,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
   // diagnostics when we don't force the self type down.
   if (argType && !candidates.empty())
     if (auto decl = candidates[0].getDecl())
-      if (decl->isInstanceMember() && candidates[0].level == 0 &&
+      if (decl->isInstanceMember() && !candidates[0].skipCurriedSelf &&
           !isa<SubscriptDecl>(decl))
         argType = Type();
 
@@ -3052,7 +3052,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     SmallBitVector defaultMap(params.size());
     if (!candidates.empty()) {
       defaultMap = computeDefaultMap(params, candidates[0].getDecl(),
-                                     candidates[0].level);
+                                     candidates[0].skipCurriedSelf);
     }
 
     // Form a set of call arguments, using a dummy type (Void), because the
@@ -3461,14 +3461,15 @@ diagnoseInstanceMethodAsCurriedMemberOnType(CalleeCandidateInfo &CCI,
     // it might be worth while to check if it's instance method as curried
     // member of type problem.
     if (CCI.closeness == CC_ExactMatch &&
-        (decl->isInstanceMember() && candidate.level == 1))
+        (decl->isInstanceMember() && candidate.skipCurriedSelf))
       continue;
 
     auto params = candidate.getParameters();
     // If one of the candidates is an instance method with a single parameter
     // at the level 0, this might be viable situation for calling instance
     // method as curried member of type problem.
-    if (params.size() != 1 || !decl->isInstanceMember() || candidate.level > 0)
+    if (params.size() != 1 || !decl->isInstanceMember() ||
+        candidate.skipCurriedSelf)
       return false;
   }
 
@@ -4020,7 +4021,7 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
   auto params = candidate.getParameters();
 
   SmallBitVector defaultMap =
-    computeDefaultMap(params, candidate.getDecl(), candidate.level);
+    computeDefaultMap(params, candidate.getDecl(), candidate.skipCurriedSelf);
   auto args = decomposeArgType(CCI.CS.getType(argExpr), argLabels);
 
   // Check the case where a raw-representable type is constructed from an
@@ -4034,7 +4035,7 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
   //    MyEnumType.foo
   //
   if (params.size() == 1 && args.size() == 1 && candidate.getDecl() &&
-      isa<ConstructorDecl>(candidate.getDecl()) && candidate.level == 1) {
+      isa<ConstructorDecl>(candidate.getDecl()) && candidate.skipCurriedSelf) {
     AnyFunctionType::Param &arg = args[0];
     auto resTy =
         candidate.getResultType()->lookThroughAllOptionalTypes();
@@ -4145,7 +4146,7 @@ static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
   auto arguments = decomposeArgType(argType, argLabels);
 
   auto bestMatchKind = RawRepresentableMismatch::NotApplicable;
-  const UncurriedCandidate *bestMatchCandidate = nullptr;
+  const OverloadCandidate *bestMatchCandidate = nullptr;
   KnownProtocolKind bestMatchProtocol;
   size_t bestMatchIndex;
 
@@ -4320,7 +4321,7 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
     // We're about to typecheck the index list, which needs to be processed with
     // self already applied.
     for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
-      ++calleeInfo.candidates[i].level;
+      calleeInfo.candidates[i].skipCurriedSelf = true;
 
     auto indexExpr =
         typeCheckArgumentChildIndependently(SE->getIndex(), Type(), calleeInfo);
@@ -4329,7 +4330,7 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
 
     // Back to analyzing the candidate list with self applied.
     for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
-      --calleeInfo.candidates[i].level;
+      calleeInfo.candidates[i].skipCurriedSelf = false;
 
     ArrayRef<Identifier> argLabels = SE->getArgumentLabels();
     if (diagnoseParameterErrors(calleeInfo, SE, indexExpr, argLabels))
@@ -4340,7 +4341,7 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
     auto decomposedBaseType = decomposeArgType(baseType, {Identifier()});
     auto decomposedIndexType = decomposeArgType(indexType, argLabels);
     calleeInfo.filterList(
-        [&](UncurriedCandidate cand) -> CalleeCandidateInfo::ClosenessResultTy {
+        [&](OverloadCandidate cand) -> CalleeCandidateInfo::ClosenessResultTy {
           // Classify how close this match is.  Non-subscript decls don't match.
           auto subscriptDecl = dyn_cast_or_null<SubscriptDecl>(cand.getDecl());
           if (!subscriptDecl ||
@@ -4353,9 +4354,8 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
               CC_ExactMatch)
             selfConstraint = CC_SelfMismatch;
 
-          // Increase the uncurry level to look past the self argument to the
-          // indices.
-          cand.level++;
+          // Set a flag to look past the self argument to the indices.
+          cand.skipCurriedSelf = true;
 
           // Explode out multi-index subscripts to find the best match.
           auto indexResult =
@@ -4378,7 +4378,7 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
 
     // Any other failures relate to the index list.
     for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
-      ++calleeInfo.candidates[i].level;
+      calleeInfo.candidates[i].skipCurriedSelf = true;
 
     // TODO: Is there any reason to check for CC_NonLValueInOut here?
 
@@ -4402,7 +4402,7 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
         // and more concrete expected type for this subscript decl, in order
         // to diagnose a better error.
         if (baseType && indexType->hasUnresolvedType()) {
-          UncurriedCandidate cand = calleeInfo.candidates[0];
+          auto cand = calleeInfo.candidates[0];
           auto candType = baseType->getTypeOfMember(CS.DC->getParentModule(),
                                                     cand.getDecl(), nullptr);
           if (auto *candFunc = candType->getAs<FunctionType>()) {
@@ -4668,7 +4668,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
 
   auto params = candidate.getParameters();
   SmallBitVector defaultMap =
-    computeDefaultMap(params, candidate.getDecl(), candidate.level);
+    computeDefaultMap(params, candidate.getDecl(), candidate.skipCurriedSelf);
   auto args = decomposeArgType(CS.getType(argExpr), argLabels);
 
   SmallVector<ParamBinding, 4> bindings;
@@ -5125,8 +5125,8 @@ bool FailureDiagnosis::diagnoseSubscriptMisuse(ApplyExpr *callExpr) {
   auto params = decomposeArgType(CS.getType(argExpr), argLabels);
   using ClosenessPair = CalleeCandidateInfo::ClosenessResultTy;
 
-  candidateInfo.filterList([&](UncurriedCandidate cand) -> ClosenessPair {
-    auto candFuncType = cand.getUncurriedFunctionType();
+  candidateInfo.filterList([&](OverloadCandidate cand) -> ClosenessPair {
+    auto candFuncType = cand.getFunctionType();
     if (!candFuncType)
       return {CC_GeneralMismatch, {}};
 
@@ -5232,7 +5232,7 @@ static bool isViableOverloadSet(const CalleeCandidateInfo &CCI,
       return true;
     };
 
-    auto defaultMap = computeDefaultMap(params, funcDecl, cand.level);
+    auto defaultMap = computeDefaultMap(params, funcDecl, cand.skipCurriedSelf);
     InputMatcher IM(params, defaultMap);
     auto result = IM.match(numArgs, pairMatcher);
     if (result == InputMatcher::IM_Succeeded)
@@ -5413,7 +5413,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     if (!calleeInfo.empty()) {
       auto &&cand = calleeInfo[0];
       auto decl = cand.getDecl();
-      if (decl && decl->isInstanceMember() && cand.level == 0 &&
+      if (decl && decl->isInstanceMember() && !cand.skipCurriedSelf &&
           cand.getParameters().size() == 1)
         isInstanceMethodAsCurriedMemberOnType = true;
     }
@@ -5443,7 +5443,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (auto fn = fnType->getAs<AnyFunctionType>()) {
     using Closeness = CalleeCandidateInfo::ClosenessResultTy;
 
-    calleeInfo.filterList([&](UncurriedCandidate candidate) -> Closeness {
+    calleeInfo.filterList([&](OverloadCandidate candidate) -> Closeness {
       auto resultType = candidate.getResultType();
       if (!resultType)
         return {CC_GeneralMismatch, {}};
@@ -5679,7 +5679,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
           return false;
 
         auto candidate = calleeInfo[0];
-        auto *fnType = candidate.getUncurriedFunctionType();
+        auto *fnType = candidate.getFunctionType();
         if (!fnType)
           return false;
 
@@ -7228,7 +7228,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
       // expected result type.
       auto resultTy = candidateInfo[0].getResultType();
       if (!resultTy)
-        resultTy = candidateInfo[0].getUncurriedType();
+        resultTy = candidateInfo[0].getType();
 
       if (resultTy && !CS.getContextualType()->is<UnboundGenericType>() &&
           !CS.TC.isConvertibleTo(resultTy, CS.getContextualType(), CS.DC)) {
