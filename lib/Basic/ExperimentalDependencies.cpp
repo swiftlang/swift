@@ -46,9 +46,13 @@ template<>
 HashOrUnimpLoc getProvidesHash<ProvidesKind::nominal, NominalTypeDecl>(const NominalTypeDecl*);
 template<>
 HashOrUnimpLoc getProvidesHash<ProvidesKind::dynamicLookup, ValueDecl>(const ValueDecl*);
+template<>
+HashOrUnimpLoc getProvidesHash<ProvidesKind::memberHolder, NominalTypeDecl>(const NominalTypeDecl*);
+template<>
+HashOrUnimpLoc getProvidesHash<ProvidesKind::member, ValueDecl>(const ValueDecl*);
 
 template<ProvidesKind kind, typename DeclT>
-std::string ExperimentalDependencies::getCombinedNameAndProvidesHash(StringRef name, const DeclT*D) {
+std::string ExperimentalDependencies::getCombinedNameAndProvidesHash(StringRef name, const DeclT* D) {
   return CompoundProvides(name, getProvidesHash<kind, DeclT>(D)).combined();
 }
 
@@ -58,14 +62,15 @@ template
 std::string ExperimentalDependencies::getCombinedNameAndProvidesHash<ProvidesKind::nominal, NominalTypeDecl>(StringRef, const NominalTypeDecl*);
 template
 std::string ExperimentalDependencies::getCombinedNameAndProvidesHash<ProvidesKind::dynamicLookup, ValueDecl>(StringRef, const ValueDecl*);
+template
+std::string ExperimentalDependencies::getCombinedNameAndProvidesHash<ProvidesKind::memberHolder, NominalTypeDecl>(StringRef, const NominalTypeDecl*);
+template
+std::string ExperimentalDependencies::getCombinedNameAndProvidesHash<ProvidesKind::member, ValueDecl>(StringRef, const ValueDecl*);
 
 
-//template
-//std::string getCombinedNameAndProvidesHash<ProvidesKind::topLevel, Decl>(StringRef name, const Decl*);
-//template
-//std::string getCombinedNameAndProvidesHash<ProvidesKind::nominal, NominalTypeDecl>(StringRef name, const NominalTypeDecl*);
-//template
-//std::string getCombinedNameAndProvidesHash<ProvidesKind::dynamicLookup, ValueDecl>(StringRef name, const ValueDecl*);
+
+
+
 
 static std::string scrubOne(StringRef input, const char* prefix, const char endChar);
 static std::string scrubAll(StringRef input);
@@ -96,6 +101,16 @@ HashOrUnimpLoc getProvidesHash<ProvidesKind::nominal, NominalTypeDecl>(const Nom
 
 template<>
 HashOrUnimpLoc getProvidesHash<ProvidesKind::dynamicLookup, ValueDecl>(const ValueDecl* VD) {
+  return HashOrUnimpLoc::forUnimpLoc(UNIMP_HASH);
+}
+
+template<>
+HashOrUnimpLoc getProvidesHash<ProvidesKind::memberHolder, NominalTypeDecl>(const NominalTypeDecl* NTD) {
+  return HashOrUnimpLoc::forUnimpLoc(UNIMP_HASH);
+}
+
+template<>
+HashOrUnimpLoc getProvidesHash<ProvidesKind::member, ValueDecl>(const ValueDecl* VD) {
   return HashOrUnimpLoc::forUnimpLoc(UNIMP_HASH);
 }
 

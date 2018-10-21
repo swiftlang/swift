@@ -28,7 +28,7 @@ namespace ExperimentalDependencies {
   
   // could bring in the thing in DependencyGraph
   enum class ProvidesKind {
-    topLevel, nominal, member, dynamicLookup
+    topLevel, nominal, dynamicLookup, memberHolder, member
   };
   
   /// Encode whether we have a hash or unimplemented location by prefixing the hash with ###
@@ -127,9 +127,8 @@ private:
   template<ProvidesKind kind, typename DeclT>
   std::string getCombinedNameAndProvidesHash(StringRef, const DeclT*);
   
-
-
-   typedef const char*  unimpLocation_t;
+  
+  typedef const char*  unimpLocation_t;
 
   // if updateExpDepHash(Inner) is unimplemented, return where it was unimplemented
 # define ExpDepQ1(a) #a

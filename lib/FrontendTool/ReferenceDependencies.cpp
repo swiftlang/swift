@@ -133,6 +133,9 @@ private:
   
   template<ExperimentalDependencies::ProvidesKind, typename DeclT>
   std::string nameAndMaybeProvidesHash(StringRef name, const DeclT*) const;
+  
+  std::pair<std::string, std::string>
+  namesAndMaybeProvidesHashes(const NominalTypeDecl *holder, const ValueDecl *member) const;
 };
 
 /// Emit the depended-upon declartions.
@@ -442,27 +445,43 @@ const {
 }
 
 void ProvidesEmitter::emitMembers(const CollectedDeclarations &cpd) const {
+  typedef std::pair<std::string, std::string> Names;
   out << providesMember << ":\n";
   for (auto entry : cpd.extendedNominals) {
+    Names names = namesAndMaybeProvidesHashes(entry.first, nullptr);
     out << "- [\"";
-    out << mangleTypeAsContext(entry.first);
-    out << "\", \"\"]\n";
+    out << names.first;
+    out << "\", \"" << names.second << "\"]\n";
   }
 
   // This is also part of providesMember.
   for (auto *ED : cpd.extensionsWithJustMembers) {
-    auto mangledName = mangleTypeAsContext(ED->getExtendedNominal());
-
     for (auto *member : ED->getMembers()) {
       auto *VD = dyn_cast<ValueDecl>(member);
       if (!VD || !VD->hasName() ||
           VD->getFormalAccess() <= AccessLevel::FilePrivate) {
         continue;
       }
-      out << "- [\"" << mangledName << "\", \"" << escape(VD->getBaseName())
+      Names names = namesAndMaybeProvidesHashes(ED->getExtendedNominal(), VD);
+      out << "- [\"" << names.first << "\", \"" << names.second
           << "\"]\n";
     }
   }
+}
+
+std::pair<std::string, std::string>
+ProvidesEmitter::namesAndMaybeProvidesHashes(const NominalTypeDecl *extendedDecl, const ValueDecl *member) const {
+  const std::string holderName = llvm::yaml::escape(mangleTypeAsContext(extendedDecl));
+  const std::string memberName = llvm::yaml::escape(
+                                              !member
+                                              ? std::string()
+                                              : member->getBaseName().userFacingName().str()
+                                              );
+  return EnableExperimentalDependencies
+  ? std::make_pair(holderName, memberName)
+  : std::make_pair(
+                   ExperimentalDependencies::getCombinedNameAndProvidesHash<ExperimentalDependencies::ProvidesKind::memberHolder, NominalTypeDecl>(holderName, extendedDecl),
+                   ExperimentalDependencies::getCombinedNameAndProvidesHash<ExperimentalDependencies::ProvidesKind::member, ValueDecl>(memberName, member));
 }
 
 void ProvidesEmitter::emitDynamicLookupMembers() const {
