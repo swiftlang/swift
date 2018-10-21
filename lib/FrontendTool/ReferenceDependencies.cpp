@@ -440,7 +440,7 @@ const {
       continue;
 
     std::string toEmit = nameAndMaybeProvidesHash<ExperimentalDependencies::ProvidesKind::nominal, NominalTypeDecl>(mangleTypeAsContext(entry.first), entry.first);
-    out << "- \"" << toEmit << "\"\n";
+    out << "- \"" << llvm::yaml::escape(toEmit) << "\"\n";
   }
 }
 
@@ -450,8 +450,8 @@ void ProvidesEmitter::emitMembers(const CollectedDeclarations &cpd) const {
   for (auto entry : cpd.extendedNominals) {
     Names names = namesAndMaybeProvidesHashes(entry.first, nullptr);
     out << "- [\"";
-    out << names.first;
-    out << "\", \"" << names.second << "\"]\n";
+    out << llvm::yaml::escape(names.first);
+    out << "\", \"" << llvm::yaml::escape(names.second) << "\"]\n";
   }
 
   // This is also part of providesMember.
@@ -463,8 +463,9 @@ void ProvidesEmitter::emitMembers(const CollectedDeclarations &cpd) const {
         continue;
       }
       Names names = namesAndMaybeProvidesHashes(ED->getExtendedNominal(), VD);
-      out << "- [\"" << names.first << "\", \"" << names.second
-          << "\"]\n";
+      out << "- [\"" << llvm::yaml::escape(names.first) << "\", \""
+      << llvm::yaml::escape(names.second)
+      << "\"]\n";
     }
   }
 }
