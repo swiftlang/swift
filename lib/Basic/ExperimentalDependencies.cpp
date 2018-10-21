@@ -38,14 +38,26 @@ using namespace swift;
 using namespace ExperimentalDependencies;
 
 static HashOrUnimpLoc getTopLevelDependencyHash(const Decl *D);
-static std::string scrubOne(StringRef input, const char* prefix, const char endChar);
-static std::string scrubAll(StringRef input);
+static HashOrUnimpLoc getNominalDependencyHash(const NominalTypeDecl *NTD);
+
+
 
 std::string
 ExperimentalDependencies::getCombinedNameAndTopLevelHash(StringRef name, const Decl *D) {
   return CompoundProvides(name, getTopLevelDependencyHash(D))
   .combined();
 }
+
+std::string
+ExperimentalDependencies::getCombinedNameAndNominalHash(StringRef name, const NominalTypeDecl *NTD) {
+  return CompoundProvides(name, getNominalDependencyHash(NTD))
+  .combined();
+}
+
+
+
+static std::string scrubOne(StringRef input, const char* prefix, const char endChar);
+static std::string scrubAll(StringRef input);
 
 static HashOrUnimpLoc getTopLevelDependencyHash(const Decl *D) {
   
@@ -62,6 +74,10 @@ static HashOrUnimpLoc getTopLevelDependencyHash(const Decl *D) {
   llvm::raw_string_ostream OS(buf);
   D->dump(OS);
   return ExperimentalDependencies::HashOrUnimpLoc(scrubAll(OS.str()), std::string());
+}
+
+static HashOrUnimpLoc getNominalDependencyHash(const NominalTypeDecl *NTD) {
+  return HashOrUnimpLoc::forUnimpLoc(UNIMP_HASH);
 }
 
 
@@ -110,7 +126,7 @@ static std::string scrubAll(StringRef input) {
 //  template<typename T>
 //  unimpLocation_t updateExpDepHashField(StringRef name, const T &value) {
 ////     snort( value );
-//    RETURN_UNIMP
+//    return UNIMP_HASH;
 //  }
 //
 //  void updateExpDepHashCommon(Decl *D, const char *Name) {
@@ -129,7 +145,7 @@ static std::string scrubAll(StringRef input) {
 //    hash.update("inherits: ");
 //    for (auto *s in Super) {
 //      // snort(s.getType()); // print
-//      RETURN_UNIMP;
+//      return UNIMP_HASH;
 //    }
 //  }
 //
@@ -145,16 +161,16 @@ static std::string scrubAll(StringRef input) {
 //    }
 //    for (auto *ap: ID->getFullAccessPath()) {
 //      snort(ap.first);
-//      RETURN_UNIMP
+//      return UNIMP_HASH;
 //    }
 //  }
 //
 //  void visitExtensionDecl(ExtensionDecl *ED) {
 //    updateExpDepHashCommon(ED, "extension_decl");
 //    snort(ED->getExtendedType());
-//    RETURN_UNIMP
+//    return UNIMP_HASH;
 //    snortInherited(ED->getInherited());
-//    RETURN_UNIMP
+//    return UNIMP_HASH;
 //    for (Decl *Member : ED->getMembers()) {
 //      updateExpDepHashRec(Member);
 //    }
@@ -165,7 +181,7 @@ static std::string scrubAll(StringRef input) {
 //      hash.update(D->getFullName();
 //    } else {
 //      hash.update("anonname");
-//      RETURN_UNIMP;
+//      return UNIMP_HASH;
 //    }
 //  }
 //
@@ -205,13 +221,13 @@ static std::string scrubAll(StringRef input) {
 //    if (auto defaultDef = decl->getDefaultDefinitionType()) {
 //      hash.update("default=");
 //      snortMprint(defaultDef);
-//      RETURN_UNIMP
+//      return UNIMP_HASH;
 //    }
 //    if (auto whereClause = decl->getTrailingWhereClause()) {
 //      hash.update("where requirements: ");
 //      for (auto *req = whereClause->getRequirements()) {
 //        snortMprint(req);
-//        RETURN_UNIMP
+//        return UNIMP_HASH;
 //      }
 //    }
 //    if (decl->overriddenDeclsComputed()) {
@@ -261,7 +277,7 @@ static std::string scrubAll(StringRef input) {
 //      hash.update("type=");
 //      if (var->hasType()) {
 //        snortMprint(var->getType())
-//        RETURN_UNIMP
+//        return UNIMP_HASH;
 //      }
 //      else
 //        hash.update("<null type>");
@@ -283,7 +299,7 @@ static std::string scrubAll(StringRef input) {
 //        hash.update("override=");
 //        for (auto *ov: overridden) {
 //          snortMref(ov);
-//          RETURN_UNIMP
+//          return UNIMP_HASH;
 //        }
 //      }
 //    }
@@ -443,13 +459,13 @@ static std::string scrubAll(StringRef input) {
 //    if (P->hasType()) {
 //      hash.update("type=");
 //      snortMprint(P->getType());
-//      RETURN_UNIMP
+//      return UNIMP_HASH;
 //    }
 //
 //    if (P->hasInterfaceType()) {
 //      hash.update("interface type=");
 //      snortMprint(P->getInterfaceType());
-//      RETURN_UNIMP
+//      return UNIMP_HASH;
 //    }
 ////    UP TO HERE
 //    switch (P->getSpecifier()) {

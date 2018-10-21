@@ -129,10 +129,10 @@ private:
   static bool declIsPrivate(const Decl *member);
 
   void emitNormalOrExperimentalTopLevelDecl(const DeclBaseName &, const Decl *) const;
-  void emitExperimentalNominalType(const NominalTypeDecl *) const;
   void emitExperimentalDynamicLookupMembers() const;
   void emitNameAndTopLevelDeclHash(StringRef name, const Decl *) const;
   std::string nameAndMaybeTopLevelDeclHash(StringRef name, const Decl *) const;
+  std::string nameAndMaybeNominalHash(StringRef name, const NominalTypeDecl *) const;
 };
 
 /// Emit the depended-upon declartions.
@@ -343,9 +343,6 @@ void ProvidesEmitter::emitNameAndTopLevelDeclHash(StringRef name, const Decl *D)
   << "\"\n";
 }
 
-std::string ProvidesEmitter::nameAndMaybeTopLevelDeclHash(StringRef name, const Decl *D) const {
-  return !EnableExperimentalDependencies ? name.str() : ExperimentalDependencies::getCombinedNameAndTopLevelHash(name, D);
-}
 
 
 void ProvidesEmitter::emitNormalOrExperimentalTopLevelDecl(const DeclBaseName &N,
@@ -357,9 +354,13 @@ void ProvidesEmitter::emitNormalOrExperimentalTopLevelDecl(const DeclBaseName &N
     out << "- \"" << escape(N) << "\"\n";
 }
 
-void ProvidesEmitter::emitExperimentalNominalType(const NominalTypeDecl *NTD) const {
-  assert(EnableExperimentalDependencies);
-  emitNameAndTopLevelDeclHash(mangleTypeAsContext(NTD), NTD);
+
+std::string ProvidesEmitter::nameAndMaybeTopLevelDeclHash(StringRef name, const Decl *D) const {
+  return !EnableExperimentalDependencies ? name.str() : ExperimentalDependencies::getCombinedNameAndTopLevelHash(name, D);
+}
+
+std::string ProvidesEmitter::nameAndMaybeNominalHash(StringRef name, const NominalTypeDecl *NTD) const {
+  return !EnableExperimentalDependencies ? name.str() : ExperimentalDependencies::getCombinedNameAndNominalHash(name, NTD);
 }
 
 
@@ -436,24 +437,19 @@ void ProvidesEmitter::emitValueDecl(const ValueDecl *const VD) const {
 }
 
 void ProvidesEmitter::emitNominalTypes(
-    const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals)
-    const {
+     const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals)
+const {
   out << providesNominal << ":\n";
   for (auto entry : extendedNominals) {
     if (!entry.second)
       continue;
-    if (EnableExperimentalDependencies) {
-      emitExperimentalNominalType(entry.first);
-      return;
-    }
-    out << "- \"";
-    out << mangleTypeAsContext(entry.first);
-    out << "\"\n";
+
+    std::string toEmit = nameAndMaybeNominalHash(mangleTypeAsContext(entry.first), entry.first);
+    out << "- \"" << toEmit << "\"\n";
   }
 }
 
 void ProvidesEmitter::emitMembers(const CollectedDeclarations &cpd) const {
-  //qqq #error emit all
   out << providesMember << ":\n";
   for (auto entry : cpd.extendedNominals) {
     out << "- [\"";

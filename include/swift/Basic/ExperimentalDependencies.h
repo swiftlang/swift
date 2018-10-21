@@ -21,6 +21,7 @@ namespace swift {
 /// and faster incremental rebuilds.
   
   class Decl;
+  class NominalTypeDecl;
 
 namespace ExperimentalDependencies {
   
@@ -118,13 +119,14 @@ private:
 };
 
   std::string getCombinedNameAndTopLevelHash(StringRef name, const Decl *D);
-  
+  std::string getCombinedNameAndNominalHash(StringRef name, const NominalTypeDecl *NTD);
+
    typedef const char*  unimpLocation_t;
 
   // if updateExpDepHash(Inner) is unimplemented, return where it was unimplemented
 # define ExpDepQ1(a) #a
 # define ExpDepQ2(a) ExpDepQ1(a)
-# define RETURN_UNIMP return __FILE__ ":" ExpDepQ2(__LINE__)
+# define UNIMP_HASH __FILE__ ":" ExpDepQ2(__LINE__)
   
 # define TRY_UPDATE_HASH(what) \
 if (ExperimentalDependencies::unimpLocation_t r  = (what)) \
