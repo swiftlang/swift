@@ -130,6 +130,7 @@ private:
 
   void emitExperimentalTopLevel(const DeclBaseName &, const Decl *) const;
   void emitExperimentalNominalType(const NominalTypeDecl *) const;
+  void emitExperimentalDynamicLookupMembers() const;
   void emitNameAndDeclHash(StringRef name, const Decl *) const;
   
   static std::pair<std::string, ExperimentalDependencies::unimpLocation_t>
@@ -502,6 +503,10 @@ void ProvidesEmitter::emitDynamicLookupMembers() const {
     // and/or (b) see if we can fast-path cases where there's no ObjC
     // involved.
     out << providesDynamicLookup << ":\n";
+    if (EnableExperimentalDependencies) {
+      emitExperimentalDynamicLookupMembers();
+      return;
+    }
     class NameCollector : public VisibleDeclConsumer {
     private:
       SmallVector<DeclBaseName, 16> names;
@@ -525,6 +530,41 @@ void ProvidesEmitter::emitDynamicLookupMembers() const {
     for (DeclBaseName name : collector.getNames()) {
       out << "- \"" << escape(name) << "\"\n";
     }
+  }
+}
+
+void ProvidesEmitter::emitExperimentalDynamicLookupMembers() const {
+  assert(EnableExperimentalDependencies);
+  typedef std::pair<DeclBaseName, const ValueDecl*> ND;
+  
+  class NameAndDeclCollector : public VisibleDeclConsumer {
+  private:
+    SmallVector<ND, 16> namesAndDecls;
+    
+  public:
+    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+      namesAndDecls.push_back(std::make_pair(VD->getBaseName(), VD));
+    }
+    ArrayRef<ND> getNamesAndDecls() {
+      llvm::array_pod_sort(
+                           namesAndDecls.begin(), namesAndDecls.end(),
+                           [](const ND *lhs, const ND *rhs) {
+                             return lhs->first.compare(rhs->first);
+                           });
+      namesAndDecls.erase(std::unique(namesAndDecls.begin(),
+                                      namesAndDecls.end(),
+                                      [](const ND *lhs, const ND *rhs) {
+                                        return lhs->first == rhs->first;
+                                      }
+                                      ),
+                          namesAndDecls.end());
+      return namesAndDecls;
+    }
+  };
+  NameAndDeclCollector collector;
+  SF->lookupClassMembers({}, collector);
+  for (ND nd : collector.getNamesAndDecls()) {
+    emitNameAndDeclHash(nd.first.userFacingName(), nd.second);
   }
 }
 
