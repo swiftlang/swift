@@ -2,26 +2,38 @@
 /* Generic Signature Changes */
 Func _DropFirstSequence.dropFirst(_:) has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
 Func _DropFirstSequence.makeIterator() has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
+Func _PrefixSequence.makeIterator() has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
+Func _PrefixSequence.prefix(_:) has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
 Struct _DropFirstSequence has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
+Struct _PrefixSequence has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
 
 /* RawRepresentable Changes */
 
 /* Removed Decls */
 Constructor _DropFirstSequence.init(_iterator:limit:dropped:) has been removed
+Constructor _PrefixSequence.init(_iterator:maxLength:taken:) has been removed
 Func _DropFirstSequence.next() has been removed
+Func _PrefixSequence.next() has been removed
 Var _DropFirstSequence._dropped has been removed
 Var _DropFirstSequence._iterator has been removed
+Var _PrefixSequence._iterator has been removed
+Var _PrefixSequence._taken has been removed
 
 /* Moved Decls */
 Struct _DropFirstSequence has been renamed to Struct DropFirstSequence
+Struct _PrefixSequence has been renamed to Struct PrefixSequence
 
 /* Renamed Decls */
 
 /* Type Changes */
 Func _DropFirstSequence.makeIterator() has return type change from _DropFirstSequence<τ_0_0> to τ_0_0.Iterator
+Func _PrefixSequence.makeIterator() has return type change from _PrefixSequence<τ_0_0> to PrefixSequence<τ_0_0>.Iterator
 Var DropFirstSequence._base is added to a non-resilient type
+Var PrefixSequence._base is added to a non-resilient type
+Var _PrefixSequence._maxLength in a non-resilient type changes position from 0 to 1
 
 /* Decl Attribute changes */
 
 /* Protocol Requirement Changes */
 Struct _DropFirstSequence has removed conformance to IteratorProtocol
+Struct _PrefixSequence has removed conformance to IteratorProtocol

@@ -693,47 +693,60 @@ extension DropFirstSequence: Sequence {
 /// The underlying iterator's sequence may be infinite.
 @_fixed_layout
 @usableFromInline
-internal struct _PrefixSequence<Base : IteratorProtocol>
-    : Sequence, IteratorProtocol {
+internal struct PrefixSequence<Base: Sequence> {
+  @usableFromInline
+  internal var _base: Base
   @usableFromInline
   internal let _maxLength: Int
-  @usableFromInline
-  internal var _iterator: Base
-  @usableFromInline
-  internal var _taken: Int
 
   @inlinable
-  internal init(_iterator: Base, maxLength: Int, taken: Int = 0) {
-    self._iterator = _iterator
-    self._maxLength = maxLength
-    self._taken = taken
+  public init(_ base: Base, maxLength: Int) {
+    _precondition(maxLength >= 0, "Can't take a prefix of negative length")
+    _base = base
+    _maxLength = maxLength
   }
+}
 
-  @inlinable
-  __consuming internal func makeIterator() -> _PrefixSequence<Base> {
-    return self
-  }
-
-  @inlinable
-  internal mutating func next() -> Base.Element? {
-    if _taken >= _maxLength { return nil }
-    _taken += 1
-
-    if let next = _iterator.next() {
-      return next
+extension PrefixSequence {
+  @_fixed_layout
+  public struct Iterator {
+    @usableFromInline
+    internal var _base: Base.Iterator
+    @usableFromInline
+    internal var _remaining: Int
+    
+    @inlinable
+    internal init(_ base: Base.Iterator, maxLength: Int) {
+      _base = base
+      _remaining = maxLength
     }
+  }  
+}
 
-    _taken = _maxLength
-    return nil
+extension PrefixSequence.Iterator: IteratorProtocol {
+  public typealias Element = Base.Element
+  
+  @inlinable
+  internal mutating func next() -> Element? {
+    if _remaining != 0 {
+      _remaining &-= 1
+      return _base.next()
+    } else {
+      return nil
+    }
+  }  
+}
+
+extension PrefixSequence: Sequence {
+  @inlinable
+  public __consuming func makeIterator() -> Iterator {
+    return Iterator(_base.makeIterator(), maxLength: _maxLength)
   }
 
   @inlinable
-  internal __consuming func prefix(_ maxLength: Int) -> AnySequence<Base.Element> {
-    return AnySequence(
-      _PrefixSequence(
-        _iterator: _iterator,
-        maxLength: Swift.min(maxLength, self._maxLength),
-        taken: _taken))
+  public __consuming func prefix(_ maxLength: Int) -> AnySequence<Element> {
+    let length = Swift.min(maxLength, self._maxLength)
+    return AnySequence(PrefixSequence(_base, maxLength: length))
   }
 }
 
@@ -1315,12 +1328,7 @@ extension Sequence where SubSequence == AnySequence<Element> {
   /// - Complexity: O(1)
   @inlinable
   public __consuming func prefix(_ maxLength: Int) -> AnySequence<Element> {
-    _precondition(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
-    if maxLength == 0 {
-      return AnySequence(EmptyCollection<Element>())
-    }
-    return AnySequence(
-      _PrefixSequence(_iterator: makeIterator(), maxLength: maxLength))
+    return AnySequence(PrefixSequence(self, maxLength: maxLength))
   }
 
   /// Returns a subsequence containing the initial, consecutive elements that
