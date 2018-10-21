@@ -899,26 +899,28 @@ void copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
 } // end namespace ide
 } // end namespace swift
 
-template <> struct llvm::DenseMapInfo<swift::ide::CodeCompletionKeywordKind> {
+namespace llvm {
+template <> struct DenseMapInfo<swift::ide::CodeCompletionKeywordKind> {
   using Kind = swift::ide::CodeCompletionKeywordKind;
   static Kind getEmptyKey() { return Kind(~0u); }
   static Kind getTombstoneKey() { return Kind(~1u); }
   static unsigned getHashValue(const Kind &Val) { return unsigned(Val); }
   static bool isEqual(const Kind &LHS, const Kind &RHS) { return LHS == RHS; }
 };
-template <> struct llvm::DenseMapInfo<swift::ide::CodeCompletionLiteralKind> {
+template <> struct DenseMapInfo<swift::ide::CodeCompletionLiteralKind> {
   using Kind = swift::ide::CodeCompletionLiteralKind;
   static Kind getEmptyKey() { return Kind(~0u); }
   static Kind getTombstoneKey() { return Kind(~1u); }
   static unsigned getHashValue(const Kind &Val) { return unsigned(Val); }
   static bool isEqual(const Kind &LHS, const Kind &RHS) { return LHS == RHS; }
 };
-template <> struct llvm::DenseMapInfo<swift::ide::CodeCompletionDeclKind> {
+template <> struct DenseMapInfo<swift::ide::CodeCompletionDeclKind> {
   using Kind = swift::ide::CodeCompletionDeclKind;
   static Kind getEmptyKey() { return Kind(~0u); }
   static Kind getTombstoneKey() { return Kind(~1u); }
   static unsigned getHashValue(const Kind &Val) { return unsigned(Val); }
   static bool isEqual(const Kind &LHS, const Kind &RHS) { return LHS == RHS; }
 };
+}
 
 #endif // SWIFT_IDE_CODECOMPLETION_H
