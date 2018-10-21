@@ -37,35 +37,42 @@
 using namespace swift;
 using namespace ExperimentalDependencies;
 
-static HashOrUnimpLoc getTopLevelDependencyHash(const Decl *D);
-static HashOrUnimpLoc getNominalDependencyHash(const NominalTypeDecl *NTD);
-static HashOrUnimpLoc getDynamicLookupDependencyHash(const ValueDecl *VD);
+template<ProvidesKind kind, typename DeclT>
+static HashOrUnimpLoc getProvidesHash(const DeclT*);
 
+template<>
+HashOrUnimpLoc getProvidesHash<ProvidesKind::topLevel, Decl>(const Decl *);
+template<>
+HashOrUnimpLoc getProvidesHash<ProvidesKind::nominal, NominalTypeDecl>(const NominalTypeDecl*);
+template<>
+HashOrUnimpLoc getProvidesHash<ProvidesKind::dynamicLookup, ValueDecl>(const ValueDecl*);
 
-
-std::string
-ExperimentalDependencies::getCombinedNameAndTopLevelHash(StringRef name, const Decl *D) {
-  return CompoundProvides(name, getTopLevelDependencyHash(D))
-  .combined();
+template<ProvidesKind kind, typename DeclT>
+std::string ExperimentalDependencies::getCombinedNameAndProvidesHash(StringRef name, const DeclT*D) {
+  return CompoundProvides(name, getProvidesHash<kind, DeclT>(D)).combined();
 }
 
-std::string
-ExperimentalDependencies::getCombinedNameAndNominalHash(StringRef name, const NominalTypeDecl *NTD) {
-  return CompoundProvides(name, getNominalDependencyHash(NTD))
-  .combined();
-}
+template
+std::string ExperimentalDependencies::getCombinedNameAndProvidesHash<ProvidesKind::topLevel, Decl>(StringRef, const Decl*);
+template
+std::string ExperimentalDependencies::getCombinedNameAndProvidesHash<ProvidesKind::nominal, NominalTypeDecl>(StringRef, const NominalTypeDecl*);
+template
+std::string ExperimentalDependencies::getCombinedNameAndProvidesHash<ProvidesKind::dynamicLookup, ValueDecl>(StringRef, const ValueDecl*);
 
-std::string
-ExperimentalDependencies::getCombinedNameAndDynamicLookupHash(StringRef name, const ValueDecl *VD) {
-  return CompoundProvides(name, getDynamicLookupDependencyHash(VD))
-  .combined();
-}
 
+//template
+//std::string getCombinedNameAndProvidesHash<ProvidesKind::topLevel, Decl>(StringRef name, const Decl*);
+//template
+//std::string getCombinedNameAndProvidesHash<ProvidesKind::nominal, NominalTypeDecl>(StringRef name, const NominalTypeDecl*);
+//template
+//std::string getCombinedNameAndProvidesHash<ProvidesKind::dynamicLookup, ValueDecl>(StringRef name, const ValueDecl*);
 
 static std::string scrubOne(StringRef input, const char* prefix, const char endChar);
 static std::string scrubAll(StringRef input);
 
-static HashOrUnimpLoc getTopLevelDependencyHash(const Decl *D) {
+
+template<>
+HashOrUnimpLoc getProvidesHash<ProvidesKind::topLevel, Decl>(const Decl *D) {
   
   //  llvm::MD5 DeclHash;
   //  if (ExperimentalDependencies::unimpLocation_t r  = ExperimentalDependencies::updateExpDepDeclHash(DeclHash, D))
@@ -82,13 +89,15 @@ static HashOrUnimpLoc getTopLevelDependencyHash(const Decl *D) {
   return ExperimentalDependencies::HashOrUnimpLoc(scrubAll(OS.str()), std::string());
 }
 
-static HashOrUnimpLoc getNominalDependencyHash(const NominalTypeDecl *NTD) {
-  return HashOrUnimpLoc::forUnimpLoc(UNIMP_HASH);
-}
-static HashOrUnimpLoc getDynamicLookupDependencyHash(const ValueDecl *VD) {
+template<>
+HashOrUnimpLoc getProvidesHash<ProvidesKind::nominal, NominalTypeDecl>(const NominalTypeDecl* NTD) {
   return HashOrUnimpLoc::forUnimpLoc(UNIMP_HASH);
 }
 
+template<>
+HashOrUnimpLoc getProvidesHash<ProvidesKind::dynamicLookup, ValueDecl>(const ValueDecl* VD) {
+  return HashOrUnimpLoc::forUnimpLoc(UNIMP_HASH);
+}
 
 static std::string scrubOne(StringRef input, const char* prefix, const char endChar) {
   std::string result;

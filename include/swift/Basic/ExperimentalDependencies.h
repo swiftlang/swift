@@ -26,6 +26,11 @@ namespace swift {
 
 namespace ExperimentalDependencies {
   
+  // could bring in the thing in DependencyGraph
+  enum class ProvidesKind {
+    topLevel, nominal, member, dynamicLookup
+  };
+  
   /// Encode whether we have a hash or unimplemented location by prefixing the hash with ###
   class HashOrUnimpLoc {
     static const char *hashPrefix() { return  "###"; }
@@ -118,10 +123,11 @@ private:
   CompoundProvides(std::pair<std::string, HashOrUnimpLoc> both) :
   name(both.first), hashOrUnimpLoc(both.second) {}
 };
+  
+  template<ProvidesKind kind, typename DeclT>
+  std::string getCombinedNameAndProvidesHash(StringRef, const DeclT*);
+  
 
-  std::string getCombinedNameAndTopLevelHash(StringRef name, const Decl *D);
-  std::string getCombinedNameAndNominalHash(StringRef name, const NominalTypeDecl *NTD);
-  std::string getCombinedNameAndDynamicLookupHash(StringRef name, const ValueDecl *VD);
 
    typedef const char*  unimpLocation_t;
 

@@ -130,9 +130,9 @@ private:
 
   void emitNormalOrExperimentalTopLevelDecl(const DeclBaseName &, const Decl *) const;
   void emitNameAndTopLevelDeclHash(StringRef name, const Decl *) const;
-  std::string nameAndMaybeTopLevelDeclHash(StringRef name, const Decl *) const;
-  std::string nameAndMaybeNominalHash(StringRef name, const NominalTypeDecl *) const;
-  std::string nameAndMaybeDynamicLookupHash(StringRef name, const ValueDecl *) const;
+  
+  template<ExperimentalDependencies::ProvidesKind, typename DeclT>
+  std::string nameAndMaybeProvidesHash(StringRef name, const DeclT*) const;
 };
 
 /// Emit the depended-upon declartions.
@@ -337,7 +337,7 @@ void ProvidesEmitter::emitTopLevelDecl(const Decl *const D,
 }
 
 void ProvidesEmitter::emitNameAndTopLevelDeclHash(StringRef name, const Decl *D) const {
-  std::string stringToEmit = nameAndMaybeTopLevelDeclHash(name, D);
+  std::string stringToEmit = nameAndMaybeProvidesHash<ExperimentalDependencies::ProvidesKind::topLevel, Decl>(name, D);
   out << "- \""
   << llvm::yaml::escape(stringToEmit)
   << "\"\n";
@@ -354,19 +354,12 @@ void ProvidesEmitter::emitNormalOrExperimentalTopLevelDecl(const DeclBaseName &N
     out << "- \"" << escape(N) << "\"\n";
 }
 
-
-std::string ProvidesEmitter::nameAndMaybeTopLevelDeclHash(StringRef name, const Decl *D) const {
-  return !EnableExperimentalDependencies ? name.str() : ExperimentalDependencies::getCombinedNameAndTopLevelHash(name, D);
+template<ExperimentalDependencies::ProvidesKind kind, typename DeclT>
+std::string ProvidesEmitter::nameAndMaybeProvidesHash(StringRef name, const DeclT* D) const {
+  return !EnableExperimentalDependencies
+  ? name.str()
+  : ExperimentalDependencies::getCombinedNameAndProvidesHash<kind>(name, D);
 }
-
-std::string ProvidesEmitter::nameAndMaybeNominalHash(StringRef name, const NominalTypeDecl *NTD) const {
-  return !EnableExperimentalDependencies ? name.str() : ExperimentalDependencies::getCombinedNameAndNominalHash(name, NTD);
-}
-
-std::string ProvidesEmitter::nameAndMaybeDynamicLookupHash(StringRef name, const ValueDecl *VD) const {
-  return !EnableExperimentalDependencies ? name.str() : ExperimentalDependencies::getCombinedNameAndDynamicLookupHash(name, VD);
-}
-
 
 void ProvidesEmitter::emitExtensionDecl(const ExtensionDecl *const ED,
                                         CollectedDeclarations &cpd) const {
@@ -447,7 +440,7 @@ const {
     if (!entry.second)
       continue;
 
-    std::string toEmit = nameAndMaybeNominalHash(mangleTypeAsContext(entry.first), entry.first);
+    std::string toEmit = nameAndMaybeProvidesHash<ExperimentalDependencies::ProvidesKind::nominal, NominalTypeDecl>(mangleTypeAsContext(entry.first), entry.first);
     out << "- \"" << toEmit << "\"\n";
   }
 }
@@ -493,9 +486,11 @@ void ProvidesEmitter::emitDynamicLookupMembers() const {
       NameCollector(const ProvidesEmitter &e) : e(e) {}
       
       void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-        stringsToEmit.push_back(
-          e.nameAndMaybeDynamicLookupHash(VD->getBaseName().userFacingName(),
-                                        VD));
+        std::string s = e.nameAndMaybeProvidesHash<
+           ExperimentalDependencies::ProvidesKind::dynamicLookup,
+           ValueDecl
+        >(VD->getBaseName().userFacingName(), VD);
+        stringsToEmit.push_back(s);
       }
       ArrayRef<std::string> getStringsToEmit() {
         llvm::array_pod_sort(
