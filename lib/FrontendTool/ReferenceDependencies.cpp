@@ -129,6 +129,8 @@ private:
   static bool declIsPrivate(const Decl *member);
 
   void emitExperimentalTopLevel(const DeclBaseName &, const Decl *) const;
+  void emitExperimentalNominalType(const NominalTypeDecl *) const;
+  void emitNameAndDeclHash(StringRef name, const Decl *) const;
   
   static std::pair<std::string, ExperimentalDependencies::unimpLocation_t>
   getExperimentalDependencyHash(const Decl *D);
@@ -338,18 +340,28 @@ void ProvidesEmitter::emitTopLevelDecl(const Decl *const D,
   }
 }
 
+void ProvidesEmitter::emitNameAndDeclHash(StringRef name, const Decl *D) const {
+  std::pair<std::string, const char*> hashOrUnimpLoc = getExperimentalDependencyHash(D);
+  ExperimentalDependencies::CompoundProvides combiner(
+                                                      name,
+                                                      hashOrUnimpLoc.first,
+                                                      hashOrUnimpLoc.second);
+  out << "- \""
+  << llvm::yaml::escape(combiner.combined())
+  << "\"\n";
+}
 void ProvidesEmitter::emitExperimentalTopLevel(const DeclBaseName &N,
                                                const Decl *D) const {
   if (EnableExperimentalDependencies) {
-    std::pair<std::string, const char*> hashOrUnimpLoc = getExperimentalDependencyHash(D);
-    out << "- \""
-        << llvm::yaml::escape(ExperimentalDependencies::CompoundProvides(
-                                  N.userFacingName(), hashOrUnimpLoc.first, hashOrUnimpLoc.second)
-                                  .combined())
-        << "\"\n";
+    emitNameAndDeclHash(N.userFacingName(), D);
   }
   else
     out << "- \"" << escape(N) << "\"\n";
+}
+
+void ProvidesEmitter::emitExperimentalNominalType(const NominalTypeDecl *NTD) const {
+  assert(EnableExperimentalDependencies);
+  emitNameAndDeclHash(mangleTypeAsContext(NTD), NTD);
 }
 
 std::pair<std::string, ExperimentalDependencies::unimpLocation_t>
@@ -448,6 +460,10 @@ void ProvidesEmitter::emitNominalTypes(
   for (auto entry : extendedNominals) {
     if (!entry.second)
       continue;
+    if (EnableExperimentalDependencies) {
+      emitExperimentalNominalType(entry.first);
+      return;
+    }
     out << "- \"";
     out << mangleTypeAsContext(entry.first);
     out << "\"\n";
