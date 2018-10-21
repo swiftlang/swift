@@ -553,8 +553,8 @@ void ProvidesEmitter::emitExperimentalDynamicLookupMembers() const {
                            });
       namesAndDecls.erase(std::unique(namesAndDecls.begin(),
                                       namesAndDecls.end(),
-                                      [](const ND *lhs, const ND *rhs) {
-                                        return lhs->first == rhs->first;
+                                      [](const ND lhs, const ND rhs) {
+                                        return lhs.first == rhs.first;
                                       }
                                       ),
                           namesAndDecls.end());
