@@ -37,26 +37,7 @@
 using namespace swift;
 using namespace ExperimentalDependencies;
 
-std::tuple<std::string, std::string, std::string>
-CompoundProvides::separate(StringRef combined) {
-  std::string name;
-  std::string hash;
-  std::string unimpLoc;
-  
-  const size_t sepIndex = combined.find(nameTrailer());
-  if (sepIndex == StringRef::npos) {
-    name = combined;
-  }
-  else {
-    name = combined.take_front(sepIndex);
-    const std::string hashOrUnimpLoc = combined.drop_front(sepIndex + 1);
-    if (StringRef(hashOrUnimpLoc).startswith(hashPrefix()))
-      hash = hashOrUnimpLoc.substr(strlen(hashPrefix()));
-    else
-      unimpLoc = hashOrUnimpLoc;
-  }
-  return std::make_tuple(name, hash, unimpLoc);
-}
+
 
 //qqq unused?
 //void ExperimentalDependencies::updateExpDepFromBits(llvm::MD5 &hash, const void *bits, size_t size) {

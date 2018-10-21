@@ -23,34 +23,98 @@ namespace swift {
   class Decl;
 
 namespace ExperimentalDependencies {
-
-struct CompoundProvides {
-  const std::string name;
-  const std::string hash;
-  const std::string unimpLoc;
   
-  CompoundProvides(std::string name, std::string hash, const char *unimpLoc)
-  : name(name), hash(hash), unimpLoc(unimpLoc ? std::string(unimpLoc) : std::string() ) {}
+  /// Encode whether we have a hash or unimplemented location by prefixing the hash with ###
+  class HashOrUnimpLoc {
+    static const char *hashPrefix() { return  "###"; }
+
+  public:
+    const std::string hash;
+    const std::string unimpLoc;
+    
+    bool hasHash() const { return !hash.empty(); }
+    
+    std::string combined() const {
+      return hasHash()
+      ? std::string(hashPrefix()) + hash
+      : unimpLoc;
+    }
+    
+    
+    explicit HashOrUnimpLoc(StringRef combined) : HashOrUnimpLoc(separate(combined)) {}
+    
+  private:
+    static std::pair<std::string, std::string>
+    separate(StringRef combined) {
+      return combined.startswith(hashPrefix())
+      ? std::make_pair(
+                       combined.drop_front(strlen(hashPrefix())).str(),
+                       std::string()
+                       )
+      : std::make_pair(std::string(), combined.str());
+    }
+    
+    HashOrUnimpLoc(std::pair<std::string, std::string> both) :
+    HashOrUnimpLoc(both.first, both.second) {}
+  public:
+    
+    static HashOrUnimpLoc forHash(StringRef hash) {
+      return HashOrUnimpLoc(hash, std::string());
+    }
+    static HashOrUnimpLoc forUnimpLoc(StringRef unimpLoc) {
+      return HashOrUnimpLoc(std::string(), unimpLoc.str());
+    }
+    
+    HashOrUnimpLoc(StringRef hash, StringRef unimpLoc) :
+    hash(hash.str()), unimpLoc(unimpLoc) {}
+  };
+
+class CompoundProvides {
+private:
+  static char nameTrailer() { return ' '; }
+  
+public:
+  const std::string name;
+  const HashOrUnimpLoc hashOrUnimpLoc;
+  
+  bool hasHash() const { return hashOrUnimpLoc.hasHash(); }
+  std::string hash() const { return hashOrUnimpLoc.hash; }
+  
+  std::string combined() {
+    return std::string(name) + nameTrailer() + hashOrUnimpLoc.combined();
+  }
+
+  
+  
+  CompoundProvides(std::string name, std::string hash, std::string unimpLoc)
+  : CompoundProvides(name, HashOrUnimpLoc(hash, unimpLoc)) {}
+  
+  CompoundProvides(std::string name, HashOrUnimpLoc hashOrUnimpLoc)
+  : name(verifyName(name)), hashOrUnimpLoc(hashOrUnimpLoc) {}
+  
+private:
+  static std::string const &verifyName(const std::string &name) {
+    assert(name.find(nameTrailer()) == std::string::npos);
+    return name;
+  }
+public:
 
   CompoundProvides(StringRef combined) : CompoundProvides(separate(combined)) {}
   
-  CompoundProvides(std::tuple<std::string, std::string, std::string> separated) :
-  name(std::get<0>(separated)), hash(std::get<1>(separated)), unimpLoc(std::get<2>(separated)) {}
- 
- 
-
-  std::string combined() {
-    // no spaces in Swift names, assume hashes don't start with ###
-    return std::string(name) + nameTrailer() + (!unimpLoc.empty() ? unimpLoc : hashPrefix() + hash);
-  }
-
 private:
+  static std::pair<std::string, HashOrUnimpLoc>
+  separate(StringRef combined) {
+    const size_t sepIndex = combined.find(nameTrailer());
+    if (sepIndex == StringRef::npos) {
+      HashOrUnimpLoc huc = HashOrUnimpLoc::forUnimpLoc("no hash");
+      return std::make_pair(combined.str(), huc);
+    }
+    HashOrUnimpLoc huc = HashOrUnimpLoc(combined.drop_front(sepIndex + 1));
+    return std::make_pair( combined.take_front(sepIndex), huc);
+  }
   
-  static char nameTrailer() { return ' '; }
-  static const char *hashPrefix() { return  "###"; }
-  
-  static std::tuple<std::string, std::string, std::string>
-  separate(StringRef combined);
+  CompoundProvides(std::pair<std::string, HashOrUnimpLoc> both) :
+  name(both.first), hashOrUnimpLoc(both.second) {}
 };
 
   typedef const char*  unimpLocation_t;
