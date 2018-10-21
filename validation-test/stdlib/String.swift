@@ -1583,6 +1583,20 @@ let replaceSubrangeTests = [
     expected: "bmeelab",
     closedExpected: "bmeela"
   ),
+  ReplaceSubrangeTest(
+    original: "bobbobbobbobbobbobbobbobbobbob",
+    newElements: "meela",
+    rangeSelection: .offsets(1, 2),
+    expected: "bmeelabbobbobbobbobbobbobbobbobbob",
+    closedExpected: "bmeelabobbobbobbobbobbobbobbobbob"
+  ),
+  ReplaceSubrangeTest(
+    original: "bob",
+    newElements: "meelameelameelameelameela",
+    rangeSelection: .offsets(1, 2),
+    expected: "bmeelameelameelameelameelab",
+    closedExpected: "bmeelameelameelameelameela"
+  ),
 ]
 
 let removeSubrangeTests = [
@@ -1627,6 +1641,12 @@ let removeSubrangeTests = [
     rangeSelection: .offsets(3, 6),
     expected: "perus",
     closedExpected: "pers"
+  ),
+  RemoveSubrangeTest(
+    original: "perdicusaliceandbob",
+    rangeSelection: .offsets(3, 6),
+    expected: "perusaliceandbob",
+    closedExpected: "persaliceandbob"
   )
 ]
 
@@ -1641,6 +1661,12 @@ StringTests.test("String.replaceSubrange()/characters/range") {
       test.expected,
       theString,
       stackTrace: SourceLocStack().with(test.loc))
+
+    // Test unique-native optimized path
+    var uniqNative = String(Array(test.original))
+    uniqNative.replaceSubrange(rangeToReplace, with: newCharacters)
+    expectEqual(theString, uniqNative,
+      stackTrace: SourceLocStack().with(test.loc))
   }
 }
 
@@ -1653,6 +1679,12 @@ StringTests.test("String.replaceSubrange()/string/range") {
     expectEqual(
       test.expected,
       theString,
+      stackTrace: SourceLocStack().with(test.loc))
+
+    // Test unique-native optimized path
+    var uniqNative = String(Array(test.original))
+    uniqNative.replaceSubrange(rangeToReplace, with: test.newElements)
+    expectEqual(theString, uniqNative,
       stackTrace: SourceLocStack().with(test.loc))
   }
 }
@@ -1671,6 +1703,12 @@ StringTests.test("String.replaceSubrange()/characters/closedRange") {
       closedExpected,
       theString,
       stackTrace: SourceLocStack().with(test.loc))
+
+    // Test unique-native optimized path
+    var uniqNative = String(Array(test.original))
+    uniqNative.replaceSubrange(rangeToReplace, with: newCharacters)
+    expectEqual(theString, uniqNative,
+      stackTrace: SourceLocStack().with(test.loc))
   }
 }
 
@@ -1687,6 +1725,12 @@ StringTests.test("String.replaceSubrange()/string/closedRange") {
       closedExpected,
       theString,
       stackTrace: SourceLocStack().with(test.loc))
+
+    // Test unique-native optimized path
+    var uniqNative = String(Array(test.original))
+    uniqNative.replaceSubrange(rangeToReplace, with: test.newElements)
+    expectEqual(theString, uniqNative,
+      stackTrace: SourceLocStack().with(test.loc))
   }
 }
 
@@ -1699,6 +1743,12 @@ StringTests.test("String.removeSubrange()/range") {
     expectEqual(
       test.expected,
       theString,
+      stackTrace: SourceLocStack().with(test.loc))
+
+    // Test unique-native optimized path
+    var uniqNative = String(Array(test.original))
+    uniqNative.removeSubrange(rangeToRemove)
+    expectEqual(theString, uniqNative,
       stackTrace: SourceLocStack().with(test.loc))
   }
 }
@@ -1716,6 +1766,12 @@ StringTests.test("String.removeSubrange()/closedRange") {
     expectEqual(
       test.closedExpected,
       theString,
+      stackTrace: SourceLocStack().with(test.loc))
+
+    // Test unique-native optimized path
+    var uniqNative = String(Array(test.original))
+    uniqNative.removeSubrange(rangeToRemove)
+    expectEqual(theString, uniqNative,
       stackTrace: SourceLocStack().with(test.loc))
   }
 }
