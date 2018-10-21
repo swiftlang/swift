@@ -331,25 +331,38 @@ extension _StringStorage {
 
 // Appending
 extension _StringStorage {
+  // Perform common post-RRC adjustments and invariant enforcement
+  @_effects(releasenone)
+  @nonobjc
+  private func _postRRCAdjust(newCount: Int, newIsASCII: Bool) {
+    self._countAndFlags = CountAndFlags(
+      count: newCount, isASCII: newIsASCII)
+    self.terminator.pointee = 0
+    _invariantCheck()
+  }
+
+  // Perform common post-append adjustments and invariant enforcement
+  @_effects(releasenone)
+  @nonobjc
+  private func _postAppendAdjust(
+    appendedCount: Int, appendedIsASCII isASCII: Bool
+  ) {
+    let oldTerminator = self.terminator
+    _postRRCAdjust(
+      newCount: self.count + appendedCount, newIsASCII: self.isASCII && isASCII)
+    _sanityCheck(oldTerminator + appendedCount == self.terminator)
+  }
+
   @_effects(releasenone)
   @nonobjc
   internal func appendInPlace(
     _ other: UnsafeBufferPointer<UInt8>, isASCII: Bool
   ) {
     _sanityCheck(self.capacity >= other.count)
-    let oldTerminator = self.terminator
-
     let srcAddr = other.baseAddress._unsafelyUnwrappedUnchecked
     let srcCount = other.count
     self.mutableEnd.initialize(from: srcAddr, count: srcCount)
-    self._countAndFlags = CountAndFlags(
-      count: self.count + srcCount,
-      isASCII: self.isASCII && isASCII)
-
-    _sanityCheck(oldTerminator + other.count == self.terminator)
-    self.terminator.pointee = 0
-
-    _invariantCheck()
+    _postAppendAdjust(appendedCount: srcCount, appendedIsASCII: isASCII)
   }
 
   @_effects(releasenone)
@@ -357,21 +370,13 @@ extension _StringStorage {
   internal func appendInPlace<Iter: IteratorProtocol>(
     _ other: inout Iter, isASCII: Bool
   ) where Iter.Element == UInt8 {
-    let oldTerminator = self.terminator
     var srcCount = 0
     while let cu = other.next() {
       _sanityCheck(self.unusedCapacity >= 1)
       unusedStorage[srcCount] = cu
       srcCount += 1
     }
-    self._countAndFlags = CountAndFlags(
-      count: self.count + srcCount,
-      isASCII: self.isASCII && isASCII)
-
-    _sanityCheck(oldTerminator + srcCount == self.terminator)
-    self.terminator.pointee = 0
-
-    _invariantCheck()
+    _postAppendAdjust(appendedCount: srcCount, appendedIsASCII: isASCII)
   }
 
   @nonobjc
@@ -392,9 +397,23 @@ extension _StringStorage {
     let upperPtr = mutableStart + upper
     let tailCount = mutableEnd - upperPtr
     lowerPtr.moveInitialize(from: upperPtr, count: tailCount)
-    self.count -= (upper &- lower)
-    self.terminator.pointee = 0
-    _invariantCheck()
+
+    _postRRCAdjust(
+      newCount: self.count &- (upper &- lower), newIsASCII: self.isASCII)
+  }
+
+  // Reposition a tail of this storage from src to dst. Returns the length of
+  // the tail.
+  @_effects(releasenone)
+  @nonobjc
+  internal func _slideTail(
+    src: UnsafeMutablePointer<UInt8>,
+    dst: UnsafeMutablePointer<UInt8>
+  ) -> Int {
+    _sanityCheck(dst >= mutableStart && src <= mutableEnd)
+    let tailCount = mutableEnd - src
+    dst.moveInitialize(from: src, count: tailCount)
+    return tailCount
   }
 
   @_effects(releasenone)
@@ -403,17 +422,13 @@ extension _StringStorage {
     from lower: Int, to upper: Int, with replacement: UnsafeBufferPointer<UInt8>
   ) {
     _sanityCheck(lower <= upper)
-
-    let lowerPtr = mutableStart + lower
-    let upperPtr = mutableStart + upper
-
     let replCount = replacement.count
     _sanityCheck((upper - lower) + replCount <= unusedCapacity)
 
     // Position the tail
-    let tailCount = mutableEnd - upperPtr
-    let tailPtr = lowerPtr + replCount
-    tailPtr.moveInitialize(from: upperPtr, count: tailCount)
+    let lowerPtr = mutableStart + lower
+    let tailCount = _slideTail(
+      src: mutableStart + upper, dst: lowerPtr + replCount)
 
     // Copy in the contents
     lowerPtr.moveInitialize(
@@ -421,9 +436,41 @@ extension _StringStorage {
         mutating: replacement.baseAddress._unsafelyUnwrappedUnchecked),
       count: replCount)
 
-    self.count = lower + replCount + tailCount
-    self.terminator.pointee = 0
-    _invariantCheck()
+    _postRRCAdjust(
+      newCount: lower + replCount + tailCount,
+      newIsASCII: self.isASCII && isASCII)
+  }
+
+
+  @_effects(releasenone)
+  @nonobjc
+  internal func replace<C: Collection>(
+    from lower: Int,
+    to upper: Int,
+    with replacement: C,
+    replacementCount replCount: Int
+  ) where C.Element == UInt8 {
+    _sanityCheck(lower <= upper)
+    _sanityCheck((upper - lower) + replCount <= unusedCapacity)
+
+    // Position the tail
+    let lowerPtr = mutableStart + lower
+    let tailCount = _slideTail(
+      src: mutableStart + upper, dst: lowerPtr + replCount)
+
+    // Copy in the contents
+    var isASCII = true
+    var srcCount = 0
+    for cu in replacement {
+      if cu >= 0x80 { isASCII = false }
+      lowerPtr[srcCount] = cu
+      srcCount += 1
+    }
+    _sanityCheck(srcCount == replCount)
+
+    _postRRCAdjust(
+      newCount: lower + replCount + tailCount,
+      newIsASCII: self.isASCII && isASCII)
   }
 }
 
