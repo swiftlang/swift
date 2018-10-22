@@ -560,10 +560,17 @@ ConstraintSystem::SolverScope::~SolverScope() {
 /// \returns a solution if a single unambiguous one could be found, or None if
 /// ambiguous or unsolvable.
 Optional<Solution>
-ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables) {
+ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables,
+                              bool allowFixes) {
+
+  SolverState state(nullptr, *this, allowFreeTypeVariables);
+  state.recordFixes = allowFixes;
+
   SmallVector<Solution, 4> solutions;
-  if (solve(nullptr, solutions, allowFreeTypeVariables) ||
-      solutions.size() != 1)
+  solve(solutions);
+  filterSolutions(solutions, state.ExprWeights);
+
+  if (solutions.size() != 1)
     return Optional<Solution>();
 
   return std::move(solutions[0]);

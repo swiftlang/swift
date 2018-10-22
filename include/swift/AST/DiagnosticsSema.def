@@ -1770,9 +1770,18 @@ NOTE(bad_associated_type_deduction,none,
      "unable to infer associated type %0 for protocol %1",
      (DeclName, DeclName))
 NOTE(associated_type_deduction_witness_failed,none,
-     "inferred type %1 (by matching requirement %0) is invalid: "
-     "does not %select{inherit from|conform to}3 %2",
+     "candidate would match and infer %0 = %1 if %1 "
+     "%select{inherited from|conformed to}3 %2",
      (DeclName, Type, Type, bool))
+NOTE(associated_type_witness_conform_impossible,none,
+     "candidate can not infer %0 = %1 because %1 "
+     "is not a nominal type and so can't conform to %2",
+     (DeclName, Type, Type))
+NOTE(associated_type_witness_inherit_impossible,none,
+     "candidate can not infer %0 = %1 because %1 "
+     "is not a class type and so can't inherit from %2",
+     (DeclName, Type, Type))
+
 NOTE(ambiguous_associated_type_deduction,none,
      "ambiguous inference of associated type %0: %1 vs. %2",
      (DeclName, Type, Type))
@@ -1793,6 +1802,9 @@ NOTE(protocol_witness_kind_conflict,none,
      "a subscript}0", (RequirementKind))
 NOTE(protocol_witness_type_conflict,none,
      "candidate has non-matching type %0%1", (Type, StringRef))
+NOTE(protocol_witness_missing_requirement,none,
+     "candidate would match if %0 %select{conformed to|subclassed|"
+     "was the same type as}2 %1", (Type, Type, unsigned))
 
 NOTE(protocol_witness_optionality_conflict,none,
      "candidate %select{type has|result type has|parameter type has|"
