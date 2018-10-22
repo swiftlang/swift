@@ -5,42 +5,23 @@ set(datafiles
   watchos4.json
   overlay4.json
 )
-set(SWIFTLIB_DIR
-    "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift")
-set(output_dir "${SWIFTLIB_DIR}/migrator")
 
-add_custom_command(
-    OUTPUT "${output_dir}"
-    COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${output_dir}")
-
-set(outputs)
-
-foreach(input ${datafiles})
-  set(source "${CMAKE_CURRENT_SOURCE_DIR}/${input}")
-  set(dest "${output_dir}/${input}")
-  if(CMAKE_SYSTEM_NAME STREQUAL Windows)
-    set(CMAKE_SYMLINK_COMMAND copy)
-  else()
-    set(CMAKE_SYMLINK_COMMAND create_symlink)
-  endif()
-
-  add_custom_command(OUTPUT
-                       "${output_dir}/${input}"
-                     DEPENDS
-                       "${CMAKE_CURRENT_SOURCE_DIR}/${input}"
-                     COMMAND
-                       "${CMAKE_COMMAND}" "-E" "${CMAKE_SYMLINK_COMMAND}" "${source}" "${dest}")
-  list(APPEND outputs "${output_dir}/${input}")
-endforeach()
-list(APPEND outputs "${output_dir}")
-
-add_custom_target("symlink_migrator_data"
-    DEPENDS "${output_dir}" "${outputs}"
-    COMMENT "Symlinking migrator data to ${output_dir}")
+add_custom_target(swift-migrator-data ALL
+                  COMMAND
+                    ${CMAKE_COMMAND} -E make_directory ${SWIFTLIB_DIR}/migrator
+                  COMMAND
+                    ${CMAKE_COMMAND} -E copy_if_different ${datafiles} ${SWIFTLIB_DIR}/migrator/
+                  WORKING_DIRECTORY
+                    ${CMAKE_CURRENT_SOURCE_DIR}
+                  DEPENDS
+                    ${datafiles})
 
 swift_install_in_component(compiler
-  FILES ${datafiles}
-DESTINATION "lib/swift/migrator")
+                           FILES ${datafiles}
+                           DESTINATION "lib/swift/migrator"
+                           COMPONENT swift-migrator-data)
+add_llvm_install_targets(install-swift-migrator-data
+                         COMPONENT swift-migrator-data)
 
 add_swift_library(swiftMigrator STATIC
   APIDiffMigratorPass.cpp
@@ -50,6 +31,5 @@ add_swift_library(swiftMigrator STATIC
   MigrationState.cpp
   RewriteBufferEditsReceiver.cpp
   LINK_LIBRARIES swiftSyntax swiftIDE)
+add_dependencies(swiftMigrator swift-migrator-data)
 
-add_dependencies(swiftMigrator
-  "symlink_migrator_data")
