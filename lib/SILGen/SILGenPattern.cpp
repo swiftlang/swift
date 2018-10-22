@@ -983,6 +983,11 @@ chooseNecessaryColumn(const ClauseMatrix &matrix, unsigned firstRow) {
 /// Recursively emit a decision tree from the given pattern matrix.
 void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
                                         const FailureHandler &outerFailure) {
+  if (clauses.rows() == 0) {
+    SGF.B.createUnreachable(SILLocation(PatternMatchStmt));
+    return;
+  }
+
   unsigned firstRow = 0;
   while (true) {
     // If there are no rows remaining, then we fail.
