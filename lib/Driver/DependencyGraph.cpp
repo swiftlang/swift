@@ -316,7 +316,9 @@ DependencyGraphImpl::loadFromBuffer(const void *node,
     if (iter == provides.end()) {
       provides.push_back({name, hash, kind});
       std::vector<ProvidesEntryTy> v{provides.back()};
-      return ExtendedLoadResult::affectsDownstream(v);
+      return EnableExperimentalDependencies
+      ? ExtendedLoadResult::affectsDownstream(v)
+      : ExtendedLoadResult::upToDate();
     }
     const bool kindChanged = !iter->kindMask.contains(kind);
     iter->kindMask |= kind;
@@ -326,12 +328,13 @@ DependencyGraphImpl::loadFromBuffer(const void *node,
     const bool hashChanged = iter->hash != hash;
     const bool haveOldAndNewHashes = !iter->hash.empty() && !hash.empty();
     iter->hash = hash;
+    
     if (!haveOldAndNewHashes)
       return ExtendedLoadResult::affectsDownstream(None); // use interface hash
 
     std::vector<ProvidesEntryTy> v{*iter};
 
-    return EnableExperimentalDependencies && (kindChanged ||  hashChanged)
+    return kindChanged ||  hashChanged
     ? ExtendedLoadResult::affectsDownstream(v)
     : ExtendedLoadResult::upToDate();
   };
