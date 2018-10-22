@@ -431,6 +431,8 @@ func testInStringInterpolation() {
 class BaseClass {
   class SubClass : BaseClass { init() {} }
   static var subInstance: SubClass = SubClass()
+  init() {}
+  init?(failable: Void) {}
 }
 protocol MyProtocol {
   typealias Concrete1 = BaseClass
@@ -441,17 +443,19 @@ struct AnotherTy: MyProtocol {}
 func testSubType() {
   var _: BaseClass = .#^SUBTYPE_1^#
 }
-// SUBTYPE_1: Begin completions, 4 items
+// SUBTYPE_1: Begin completions, 3 items
+// SUBTYPE_1-NOT: init(failable:
+// SUBTYPE_1-NOT: Concrete1(
 // SUBTYPE_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Identical]: init()[#BaseClass#];
 // SUBTYPE_1-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: SubClass()[#BaseClass.SubClass#];
 // SUBTYPE_1-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: subInstance[#BaseClass.SubClass#];
-// SUBTYPE_1-DAG: Decl[Constructor]/Super/TypeRelation[Identical]: Concrete1()[#BaseClass#];
 // SUBTYPE_1: End completions
 
 func testMemberTypealias() {
   var _: MyProtocol = .#^SUBTYPE_2^#
 }
 // SUBTYPE_2: Begin completions, 2 items
+// SUBTYPE_1-NOT: Concrete1(failable:
 // SUBTYPE_2-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: Concrete1()[#BaseClass#];
 // SUBTYPE_2-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: Concrete2()[#AnotherTy#];
 // SUBTYPE_2: End completions

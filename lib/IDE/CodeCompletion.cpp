@@ -2638,6 +2638,10 @@ public:
       for (auto *init : initializers) {
         if (shouldHideDeclFromCompletionResults(init))
           continue;
+        if (IsUnresolvedMember &&
+            cast<ConstructorDecl>(init)->getFailability() == OTK_Optional) {
+          continue;
+        }
         addConstructorCall(cast<ConstructorDecl>(init), Reason, type, None,
                            /*IsOnType=*/true, name);
       }
@@ -3786,6 +3790,9 @@ public:
     // same result type) as the contextual type.
     FilteredDeclConsumer consumer(*this, [=](ValueDecl *VD,
                                              DeclVisibilityKind reason) {
+      if (VD->isOperator())
+        return false;
+
       if (!VD->hasInterfaceType()) {
         TypeResolver->resolveDeclSignature(VD);
         if (!VD->hasInterfaceType())
@@ -3819,6 +3826,11 @@ public:
       // convertible to the contextual type.
       if (auto CD = dyn_cast<TypeDecl>(VD)) {
         declTy = declTy->getMetatypeInstanceType();
+
+        // Emit construction for the same type via typealias doesn't make sense
+        // because we are emitting all `.init()`s.
+        if (declTy->isEqual(T))
+          return false;
         return swift::isConvertibleTo(declTy, T, *DC);
       }
 
@@ -3836,7 +3848,7 @@ public:
         // FIXME: This emits just 'factory'. We should emit 'factory()' instead.
         declTy = FT->getResult();
       }
-      return swift::isConvertibleTo(declTy, T, *DC);
+      return declTy->isEqual(T) || swift::isConvertibleTo(declTy, T, *DC);
     });
 
     auto baseType = MetatypeType::get(T);
