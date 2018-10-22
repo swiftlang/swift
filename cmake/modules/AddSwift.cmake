@@ -2326,44 +2326,53 @@ macro(add_swift_lib_subdirectory name)
 endmacro()
 
 function(add_swift_host_tool executable)
-  set(ADDSWIFTHOSTTOOL_multiple_parameter_options
-        SWIFT_COMPONENT
+  set(options)
+  set(single_parameter_options)
+  set(multiple_parameter_options
         COMPILE_FLAGS
         DEPENDS
+        SWIFT_COMPONENT
         SWIFT_MODULE_DEPENDS)
 
-  cmake_parse_arguments(
-      ADDSWIFTHOSTTOOL # prefix
-      "" # options
-      "" # single-value args
-      "${ADDSWIFTHOSTTOOL_multiple_parameter_options}" # multi-value args
-      ${ARGN})
+  cmake_parse_arguments(ASHT
+                        "${options}"
+                        "${single_parameter_options}"
+                        "${multiple_parameter_options}"
+                        ${ARGN})
 
-  # Configure variables for this subdirectory.
-  set(MODULE_VARIANT_SUFFIX "-swiftmodule${SWIFT_HOST_VARIANT_SUFFIX}")
-
-  foreach(mod ${ADDSWIFTHOSTTOOL_SWIFT_MODULE_DEPENDS})
-    list(APPEND ADDSWIFTHOSTTOOL_DEPENDS "swift${mod}${MODULE_VARIANT_SUFFIX}")
-    list(APPEND ADDSWIFTHOSTTOOL_DEPENDS "swift${mod}${SWIFT_HOST_VARIANT_SUFFIX}")
+  foreach(mod ${ASHT_SWIFT_MODULE_DEPENDS})
+    list(APPEND ASHT_DEPENDS
+         "swift${mod}-swiftmodule${SWIFT_HOST_VARIANT_SUFFIX}"
+         "swift${mod}${SWIFT_HOST_VARIANT_SUFFIX}")
   endforeach()
 
   # Create the executable rule.
-  add_swift_executable(
-    ${executable} 
-    ${ADDSWIFTHOSTTOOL_UNPARSED_ARGUMENTS}
-    DEPENDS ${ADDSWIFTHOSTTOOL_DEPENDS}
-    COMPILE_FLAGS ${ADDSWIFTHOSTTOOL_COMPILE_FLAGS}
-  )
+  add_swift_executable(${executable}
+                       ${ASHT_UNPARSED_ARGUMENTS}
+                       DEPENDS ${ASHT_DEPENDS}
+                       COMPILE_FLAGS ${ASHT_COMPILE_FLAGS})
+  # NOTE we currently generate dSYM bundles for macOS in build-script-impl.
+  # That additional step can be encapsulated into the build and be generalized
+  # for all targets.  We would like CMake to handle as much of the heavy lifting
+  # as possible and thus are reusing the LLVM infrastructure for the debug info
+  # splitting and codesigning of binaries.  Once fully transitioned, we should
+  # eb able to remove that from build-script-impl
+  llvm_externalize_debuginfo(${executable})
+  llvm_codesign(${executable})
 
   # And then create the install rule if we are asked to.
-  if (ADDSWIFTHOSTTOOL_SWIFT_COMPONENT)
-    swift_install_in_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
-      TARGETS ${executable}
-      RUNTIME DESTINATION bin)
+  if(ASHT_SWIFT_COMPONENT)
+    swift_install_in_component(${ASHT_SWIFT_COMPONENT}
+                               TARGETS ${executable}
+                               RUNTIME DESTINATION bin
+                               COMPONENT ${executable})
+    if(NOT LLVM_ENABLE_IDE)
+      add_llvm_install_targets(install-${executable}
+                               DEPENDS ${executable}
+                               COMPONENT ${executable})
+    endif()
 
-    swift_is_installing_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
-      is_installing)
-  
+    swift_is_installing_component(${ASHT_SWIFT_COMPONENT} is_installing)
     if(NOT is_installing)
       set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${executable})
     else()
@@ -2387,5 +2396,15 @@ endfunction()
 
 macro(add_swift_tool_symlink name dest component)
   add_llvm_tool_symlink(${name} ${dest} ALWAYS_GENERATE)
-  llvm_install_symlink(${name} ${dest} ALWAYS_GENERATE COMPONENT ${component})
+
+  # NOTE always generate the symlink since this is the current behaviour that
+  # swift needs.  We assign a LLVM component to the target so that it does not
+  # occur but the target is created to allow the user to create the symlink if
+  # they so desire.
+  swift_is_installing_component(${component} is_installing)
+  if(is_installing)
+    llvm_install_symlink(${name} ${dest} ALWAYS_GENERATE)
+  else()
+    llvm_install_symlink(${name} ${dest} ALWAYS_GENERATE COMPONENT ${component})
+  endif()
 endmacro()
