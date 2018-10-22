@@ -88,7 +88,7 @@ public:
   std::string hash() const { return hashOrUnimpLoc.hash; }
   
   std::string combined() {
-    return std::string(name) + nameTrailer() + hashOrUnimpLoc.combined();
+    return name + nameTrailer() + hashOrUnimpLoc.combined();
   }
 
   
