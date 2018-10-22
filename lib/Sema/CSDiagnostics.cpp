@@ -103,10 +103,16 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     locator = cs.getConstraintLocator(
         ctor.withPathElement(PathEltKind::ApplyFunction)
             .withPathElement(PathEltKind::ConstructorMember));
-  } else if (isa<UnresolvedDotExpr>(anchor)) {
+  } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
     ConstraintLocatorBuilder member(locator);
-    locator =
-        cs.getConstraintLocator(member.withPathElement(PathEltKind::Member));
+
+    if (UDE->getName().isSimpleName(DeclBaseName::createConstructor())) {
+      member = member.withPathElement(PathEltKind::ConstructorMember);
+    } else {
+      member = member.withPathElement(PathEltKind::Member);
+    }
+
+    locator = cs.getConstraintLocator(member);
   } else if (isa<SubscriptExpr>(anchor)) {
     ConstraintLocatorBuilder subscript(locator);
     locator = cs.getConstraintLocator(
