@@ -96,22 +96,31 @@ HashOrUnimpLoc getProvidesHash<ProvidesKind::topLevel, Decl>(const Decl *D) {
 
 template<>
 HashOrUnimpLoc getProvidesHash<ProvidesKind::nominal, NominalTypeDecl>(const NominalTypeDecl* NTD) {
-  return HashOrUnimpLoc::forUnimpLoc(UNIMP_HASH);
+  Mangle::ASTMangler Mangler;
+  return HashOrUnimpLoc::forHash(Mangler.mangleTypeAsContextUSR(NTD));
+  //  return HashOrUnimpLoc::forUnimpLoc(UNIMP_HASH);
 }
 
 template<>
 HashOrUnimpLoc getProvidesHash<ProvidesKind::dynamicLookup, ValueDecl>(const ValueDecl* VD) {
-  return HashOrUnimpLoc::forUnimpLoc(UNIMP_HASH);
+  Mangle::ASTMangler Mangler;
+  std::string MangledName = Mangler.mangleDeclType(VD);
+  return HashOrUnimpLoc::forHash(MangledName);
 }
 
 template<>
 HashOrUnimpLoc getProvidesHash<ProvidesKind::memberHolder, NominalTypeDecl>(const NominalTypeDecl* NTD) {
-  return HashOrUnimpLoc::forUnimpLoc(UNIMP_HASH);
+  Mangle::ASTMangler Mangler;
+  return HashOrUnimpLoc::forHash(Mangler.mangleTypeAsContextUSR(NTD));
+//  return HashOrUnimpLoc::forUnimpLoc(UNIMP_HASH);
 }
 
 template<>
 HashOrUnimpLoc getProvidesHash<ProvidesKind::member, ValueDecl>(const ValueDecl* VD) {
-  return HashOrUnimpLoc::forUnimpLoc(UNIMP_HASH);
+  Mangle::ASTMangler Mangler;
+  std::string MangledName = Mangler.mangleDeclType(VD);
+  return HashOrUnimpLoc::forHash(MangledName);
+//  return HashOrUnimpLoc::forUnimpLoc(UNIMP_HASH);
 }
 
 static std::string scrubOne(StringRef input, const char* prefix, const char endChar) {
