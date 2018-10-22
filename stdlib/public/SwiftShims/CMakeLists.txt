@@ -136,10 +136,9 @@ swift_install_in_component(clang-builtin-headers
     DESTINATION "lib/swift/clang"
     PATTERN "*.h")
 
-swift_install_symlink_component(clang-resource-dir-symlink
-  LINK_NAME clang
-  TARGET ../clang/${CLANG_VERSION}
-  DESTINATION "lib/swift")
+swift_install_symlink(clang ../clang/${CLANG_VERSION}
+                      DESTINATION "lib/swift"
+                      COMPONENT clang-resource-dir-symlink)
 
 # Possibly install Clang headers under Clang's resource directory in case we
 # need to use a different version of the headers than the installed Clang. This
