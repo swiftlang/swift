@@ -1668,6 +1668,11 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
     EditableBuffer = Impl.EditableBuffer;
     SemanticInfo = Impl.SemanticInfo;
 
+    if (Offset > 0 && Offset % 499 == 0) {
+      error = "TESTING ERRROR 499";
+      return nullptr;
+    }
+
     // Validate offset and length.
     if ((Offset + Length) > EditableBuffer->getSize()) {
       error = "'offset' + 'length' is out of range";
