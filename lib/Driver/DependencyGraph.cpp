@@ -331,7 +331,7 @@ DependencyGraphImpl::loadFromBuffer(const void *node,
 
     std::vector<ProvidesEntryTy> v{*iter};
 
-    return kindChanged ||  hashChanged
+    return EnableExperimentalDependencies && (kindChanged ||  hashChanged)
     ? ExtendedLoadResult::affectsDownstream(v)
     : ExtendedLoadResult::upToDate();
   };
