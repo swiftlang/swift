@@ -19,6 +19,30 @@
 using namespace swift;
 using namespace Lowering;
 
+//===----------------------------------------------------------------------===//
+//                                CleanupState
+//===----------------------------------------------------------------------===//
+
+llvm::raw_ostream &Lowering::operator<<(llvm::raw_ostream &os,
+                                        CleanupState state) {
+  switch (state) {
+  case CleanupState::Dormant:
+    return os << "Dormant";
+  case CleanupState::Dead:
+    return os << "Dead";
+  case CleanupState::Active:
+    return os << "Active";
+  case CleanupState::PersistentlyActive:
+    return os << "PersistentlyActive";
+  }
+
+  llvm_unreachable("Unhandled CleanupState in switch.");
+}
+
+//===----------------------------------------------------------------------===//
+//                               CleanupManager
+//===----------------------------------------------------------------------===//
+
 /// Are there any active cleanups in the given range?
 static bool hasAnyActiveCleanups(DiverseStackImpl<Cleanup>::iterator begin,
                                  DiverseStackImpl<Cleanup>::iterator end) {
@@ -218,6 +242,38 @@ void CleanupManager::setCleanupState(Cleanup &cleanup, CleanupState state) {
   // code to be emitted at transition points.
 }
 
+void CleanupManager::dump() const {
+#ifndef NDEBUG
+  auto begin = stack.stable_begin();
+  auto end = stack.stable_end();
+  while (begin != end) {
+    auto iter = stack.find(begin);
+    const Cleanup &stackCleanup = *iter;
+    llvm::errs() << "CLEANUP DEPTH: " << begin.getDepth() << "\n";
+    stackCleanup.dump(SGF);
+    begin = stack.stabilize(++iter);
+    stack.checkIterator(begin);
+  }
+#endif
+}
+
+void CleanupManager::dump(CleanupHandle handle) const {
+  auto iter = stack.find(handle);
+  const Cleanup &stackCleanup = *iter;
+  llvm::errs() << "CLEANUP DEPTH: " << handle.getDepth() << "\n";
+  stackCleanup.dump(SGF);
+}
+
+void CleanupManager::checkIterator(CleanupHandle handle) const {
+#ifndef NDEBUG
+  stack.checkIterator(handle);
+#endif
+}
+
+//===----------------------------------------------------------------------===//
+//                        CleanupStateRestorationScope
+//===----------------------------------------------------------------------===//
+
 void CleanupStateRestorationScope::pushCleanupState(CleanupHandle handle,
                                                     CleanupState newState) {
   // Don't put the cleanup in a state we can't restore it from.
@@ -266,50 +322,6 @@ void CleanupStateRestorationScope::popImpl() {
 }
 
 void CleanupStateRestorationScope::pop() && { popImpl(); }
-
-llvm::raw_ostream &Lowering::operator<<(llvm::raw_ostream &os,
-                                        CleanupState state) {
-  switch (state) {
-  case CleanupState::Dormant:
-    return os << "Dormant";
-  case CleanupState::Dead:
-    return os << "Dead";
-  case CleanupState::Active:
-    return os << "Active";
-  case CleanupState::PersistentlyActive:
-    return os << "PersistentlyActive";
-  }
-
-  llvm_unreachable("Unhandled CleanupState in switch.");
-}
-
-void CleanupManager::dump() const {
-#ifndef NDEBUG
-  auto begin = stack.stable_begin();
-  auto end = stack.stable_end();
-  while (begin != end) {
-    auto iter = stack.find(begin);
-    const Cleanup &stackCleanup = *iter;
-    llvm::errs() << "CLEANUP DEPTH: " << begin.getDepth() << "\n";
-    stackCleanup.dump(SGF);
-    begin = stack.stabilize(++iter);
-    stack.checkIterator(begin);
-  }
-#endif
-}
-
-void CleanupManager::dump(CleanupHandle handle) const {
-  auto iter = stack.find(handle);
-  const Cleanup &stackCleanup = *iter;
-  llvm::errs() << "CLEANUP DEPTH: " << handle.getDepth() << "\n";
-  stackCleanup.dump(SGF);
-}
-
-void CleanupManager::checkIterator(CleanupHandle handle) const {
-#ifndef NDEBUG
-  stack.checkIterator(handle);
-#endif
-}
 
 //===----------------------------------------------------------------------===//
 //                               Cleanup Cloner
