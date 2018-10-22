@@ -2028,7 +2028,26 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
     return false;
 
   auto ClangNode = VD->getClangNode();
-  assert(ClangNode);
+  if (!ClangNode) {
+    // If we synthesized a ValueDecl, it won't have a Clang node. But so far
+    // all the situations where we synthesize top-level declarations are
+    // situations where we don't have to worry about C redeclarations.
+    // We should only consider the declaration visible from its owning module.
+    auto *SynthesizedTypeAttr =
+        VD->getAttrs().getAttribute<ClangImporterSynthesizedTypeAttr>();
+    assert(SynthesizedTypeAttr);
+
+    // When adding new ClangImporterSynthesizedTypeAttr::Kinds, make sure that
+    // the above statement still holds: "we don't want to allow these
+    // declarations to be treated as present in multiple modules".
+    switch (SynthesizedTypeAttr->getKind()) {
+    case ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapper:
+    case ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapperAnon:
+      break;
+    }
+
+    return false;
+  }
 
   auto &ClangASTContext = ModuleFilter->getClangASTContext();
   auto OwningClangModule = getClangOwningModule(ClangNode, ClangASTContext);
