@@ -1219,6 +1219,7 @@
         "Numeric",
         "CustomStringConvertible",
         "Strideable",
+        "Arithmetic",
         "ExpressibleByIntegerLiteral",
         "FixedWidthInteger",
         "P1",

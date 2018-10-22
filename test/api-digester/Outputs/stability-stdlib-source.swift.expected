@@ -10,6 +10,13 @@
 /* Renamed Decls */
 
 /* Type Changes */
+Protocol Numeric has generic signature change from <Self : Equatable, Self : ExpressibleByIntegerLiteral, Self.Magnitude : Comparable, Self.Magnitude : Numeric> to <Self : Arithmetic, Self : Equatable, Self : ExpressibleByIntegerLiteral, Self.Magnitude : Comparable, Self.Magnitude : Numeric>
+Func Numeric.*(_:_:) has been removed
+Func Numeric.*=(_:_:) has been removed
+Func Numeric.+(_:_:) has been removed
+Func Numeric.+=(_:_:) has been removed
+Func Numeric.-(_:_:) has been removed
+Func Numeric.-=(_:_:) has been removed
 Func AnyBidirectionalCollection.formIndex(_:offsetBy:) has parameter 0 changing from Default to InOut
 Func AnyBidirectionalCollection.formIndex(_:offsetBy:limitedBy:) has parameter 0 changing from Default to InOut
 Func AnyBidirectionalCollection.formIndex(after:) has parameter 0 changing from Default to InOut
@@ -57,6 +64,14 @@ Func Substring.UTF8View.formIndex(after:) has parameter 0 changing from Default 
 Func Substring.UTF8View.formIndex(before:) has parameter 0 changing from Default to InOut
 Func Substring.UnicodeScalarView.formIndex(after:) has parameter 0 changing from Default to InOut
 Func Substring.UnicodeScalarView.formIndex(before:) has parameter 0 changing from Default to InOut
+Protocol BinaryFloatingPoint has added inherited protocol Arithmetic
+Protocol BinaryInteger has added inherited protocol Arithmetic
+Protocol FixedWidthInteger has added inherited protocol Arithmetic
+Protocol FloatingPoint has added inherited protocol Arithmetic
+Protocol Numeric has added inherited protocol Arithmetic
+Protocol SignedInteger has added inherited protocol Arithmetic
+Protocol SignedNumeric has added inherited protocol Arithmetic
+Protocol UnsignedInteger has added inherited protocol Arithmetic
 
 /* Decl Attribute changes */
 

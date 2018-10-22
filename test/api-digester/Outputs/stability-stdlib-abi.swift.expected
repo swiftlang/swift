@@ -4,6 +4,7 @@ Func _DropFirstSequence.dropFirst(_:) has generic signature change from <τ_0_0 
 Func _DropFirstSequence.makeIterator() has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
 Func _PrefixSequence.makeIterator() has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
 Func _PrefixSequence.prefix(_:) has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
+Protocol Numeric has generic signature change from <τ_0_0 : Equatable, τ_0_0 : ExpressibleByIntegerLiteral, τ_0_0.Magnitude : Comparable, τ_0_0.Magnitude : Numeric> to <τ_0_0 : Arithmetic, τ_0_0 : Equatable, τ_0_0 : ExpressibleByIntegerLiteral, τ_0_0.Magnitude : Comparable, τ_0_0.Magnitude : Numeric>
 Struct _DropFirstSequence has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
 Struct _PrefixSequence has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
 
@@ -12,6 +13,12 @@ Struct _PrefixSequence has generic signature change from <τ_0_0 where τ_0_0 : 
 /* Removed Decls */
 Constructor _DropFirstSequence.init(_iterator:limit:dropped:) has been removed
 Constructor _PrefixSequence.init(_iterator:maxLength:taken:) has been removed
+Func Numeric.*(_:_:) has been removed
+Func Numeric.*=(_:_:) has been removed
+Func Numeric.+(_:_:) has been removed
+Func Numeric.+=(_:_:) has been removed
+Func Numeric.-(_:_:) has been removed
+Func Numeric.-=(_:_:) has been removed
 Func _DropFirstSequence.next() has been removed
 Func _PrefixSequence.next() has been removed
 Var _DropFirstSequence._dropped has been removed
@@ -31,6 +38,14 @@ Func _PrefixSequence.makeIterator() has return type change from _PrefixSequence<
 Var DropFirstSequence._base is added to a non-resilient type
 Var PrefixSequence._base is added to a non-resilient type
 Var _PrefixSequence._maxLength in a non-resilient type changes position from 0 to 1
+Protocol BinaryFloatingPoint has added inherited protocol Arithmetic
+Protocol BinaryInteger has added inherited protocol Arithmetic
+Protocol FixedWidthInteger has added inherited protocol Arithmetic
+Protocol FloatingPoint has added inherited protocol Arithmetic
+Protocol Numeric has added inherited protocol Arithmetic
+Protocol SignedInteger has added inherited protocol Arithmetic
+Protocol SignedNumeric has added inherited protocol Arithmetic
+Protocol UnsignedInteger has added inherited protocol Arithmetic
 
 /* Decl Attribute changes */
 

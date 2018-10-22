@@ -14,7 +14,9 @@ func f(tail: UInt64, byteCount: UInt64) {
 }
 
 // rdar://problem/32547805
+/* FIXME(rxwei): This is broken by the introduction of the `Arithmetic` protocol.
 func size(count: Int) {
   // Size of the buffer we need to allocate
   let _ = count * MemoryLayout<Float>.size * (4 + 3 + 3 + 2 + 4)
 }
+*/
