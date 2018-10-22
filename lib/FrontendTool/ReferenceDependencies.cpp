@@ -480,9 +480,9 @@ ProvidesEmitter::namesAndMaybeProvidesHashes(const NominalTypeDecl *extendedDecl
                                               );
   return !EnableExperimentalDependencies
   ? std::make_pair(holderName, memberName)
-  : std::make_pair(
-                   ExperimentalDependencies::getCombinedNameAndProvidesHash<ExperimentalDependencies::ProvidesKind::memberHolder, NominalTypeDecl>(holderName, extendedDecl),
-                   ExperimentalDependencies::getCombinedNameAndProvidesHash<ExperimentalDependencies::ProvidesKind::member, ValueDecl>(memberName, member));
+  : std::make_pair(ExperimentalDependencies::getCombinedNameAndProvidesHash<ExperimentalDependencies::ProvidesKind::memberHolder, NominalTypeDecl>(holderName, extendedDecl),
+                   !member ? std::string()
+                   : ExperimentalDependencies::getCombinedNameAndProvidesHash<ExperimentalDependencies::ProvidesKind::member, ValueDecl>(memberName, member));
 }
 
 void ProvidesEmitter::emitDynamicLookupMembers() const {
