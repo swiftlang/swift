@@ -27,89 +27,72 @@ func buildWorkload() {
     blackHole(str)
 }
 
-@inline(never)
-func run_InsertCharacterEndIndex(_ N: Int) {
-    var workload = str
-    let character: Character = "a"
-    let scale = 3000
-    for _ in 0..<N * scale {
-        workload.insert(character, at: workload.endIndex)
-    }
-    blackHole(workload)
-    CheckResults(workload.count == str.count + N * scale)
+// Insert towards end index
+
+@inline(__always)
+func insertTowardsEndIndex(_ c: Character, in string: String, count: Int) {
+	var workload = string
+	var index = workload.endIndex
+	for i in 0..<count {
+		workload.insert(identity(c), at: index)
+		if i % 1000 == 0 {
+			index = workload.endIndex
+		}
+	}
+	blackHole(workload)
 }
 
 @inline(never)
 func run_InsertCharacterTowardsEndIndex(_ N: Int) {
-    var workload = str
-    let character: Character = "b"
-    var index = workload.endIndex
-    let scale = 3000
-    for i in 0..<N * scale {
-        workload.insert(character, at: index)
-        if i % 1000 == 0 {
-            index = workload.endIndex
-        }
-    }
-    blackHole(workload)
-    CheckResults(workload.count == str.count + N * scale)
-}
-
-@inline(never)
-func run_InsertCharacterStartIndex(_ N: Int) {
-    var workload = str
-    let character: Character = "c"
-    let scale = 75
-    let insertionsCount = 50
-    for _ in 0..<N * scale {
-        for _ in 0..<insertionsCount {
-            workload.insert(character, at: workload.startIndex)
-        }
-        workload = str
-    }
-    blackHole(workload)
-    CheckResults(workload.count == str.count)
-}
-
-@inline(never)
-func run_InsertCharacterEndIndexNonASCII(_ N: Int) {
-    var workload = str
-    let character: Character = "👩🏼‍💻"
-    let scale = 1000
-    for _ in 0..<N * scale {
-        workload.insert(character, at: workload.endIndex)
-    }
-    blackHole(workload)
-    CheckResults(workload.count == str.count + N * scale)
+	insertTowardsEndIndex("s", in: str, count: N * 3000)
 }
 
 @inline(never)
 func run_InsertCharacterTowardsEndIndexNonASCII(_ N: Int) {
-    var workload = str
-    let character: Character = "👩🏾‍🏫"
-    var index = workload.endIndex
-    let scale = 1000
-    for i in 0..<N * scale {
-        workload.insert(character, at: index)
-        if i % 100 == 0 {
-            index = workload.endIndex
-        }
-    }
-    blackHole(workload)
-    CheckResults(workload.count == str.count + N * scale)
+	insertTowardsEndIndex("👩🏼‍💻", in: str, count: N * 1000)
+}
+
+// Insert at end index
+
+@inline(__always)
+func insertAtEndIndex(_ c: Character, in string: String, count: Int) {
+	var workload = string
+	for _ in 0..<count {
+		workload.insert(identity(c), at: workload.endIndex)
+	}
+	blackHole(workload)
 }
 
 @inline(never)
-func run_InsertCharacterStartIndexNonASCII(_ N: Int) {
-    var workload = str
-    let character: Character = "👨🏽‍🏫"
-    let scale = 50
-    for _ in 0..<N * scale {
-        for _ in 0..<25 {
-            workload.insert(character, at: workload.startIndex)
+func run_InsertCharacterEndIndex(_ N: Int) {
+	insertAtEndIndex("s", in: str, count: N * 3000)
+}
+
+@inline(never)
+func run_InsertCharacterEndIndexNonASCII(_ N: Int) {
+	insertAtEndIndex("👩🏾‍🏫", in: str, count: N * 1000)
+}
+
+// Insert at start index
+
+@inline(__always)
+func insertAtStartIndex(_ c: Character, in string: String, count: Int, insertions: Int) {
+	var workload = str
+    for _ in 0..<count {
+        for _ in 0..<insertions {
+            workload.insert(identity(c), at: workload.startIndex)	
         }
         workload = str
     }
     blackHole(workload)
-    CheckResults(workload.count == str.count)
+}
+
+@inline(never)
+func run_InsertCharacterStartIndex(_ N: Int) {
+	insertAtStartIndex("w", in: str, count: N * 75, insertions: 50)
+}
+
+@inline(never)
+func run_InsertCharacterStartIndexNonASCII(_ N: Int) {
+	insertAtStartIndex("👩🏾‍🏫", in: str, count: N * 75, insertions: 25)
 }
