@@ -278,13 +278,13 @@ endif()
 add_swift_library(swiftCore
                   ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
                     ${SWIFTLIB_SOURCES}
-                  # The copy_shim_headers target dependency is required to let the
+                  # The swift-shim-headers target dependency is required to let the
                   # build system know that there's a rule to produce the shims
                   # directory, but is not sufficient to cause the object file to be rebuilt
                   # when the shim header changes.  Therefore, we pass both the target
                   # and the generated directory as dependencies.
                   FILE_DEPENDS
-                    copy_shim_headers "${SWIFTLIB_DIR}/shims" ${GROUP_INFO_JSON_FILE}
+                    swift-shim-headers "${SWIFTLIB_DIR}/shims" ${GROUP_INFO_JSON_FILE}
                   SWIFT_COMPILE_FLAGS
                     ${swift_stdlib_compile_flags} -Xcc -DswiftCore_EXPORTS
                   LINK_FLAGS
