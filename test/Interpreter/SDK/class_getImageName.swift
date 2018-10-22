@@ -115,7 +115,7 @@ testSuite.test("KVO/ObjC") {
 }
 
 testSuite.test("dynamic") {
-  let newClass: AnyClass = objc_allocateClassPair(/*superclass*/nil,
+  let newClass: AnyClass = objc_allocateClassPair(/*superclass*/NSObject.self,
                                                   "CompletelyDynamic",
                                                   /*extraBytes*/0)!
   objc_registerClassPair(newClass)
