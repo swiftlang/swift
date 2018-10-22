@@ -3599,6 +3599,7 @@ namespace {
 
         literalInit->setImplicit(false);
 
+        cs.setType(expr, toType);
         // Keep the coercion around, because it contains the source range
         // for the original constructor call.
         return expr;
