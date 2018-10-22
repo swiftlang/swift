@@ -131,6 +131,8 @@ private:
   void emitNormalOrExperimentalTopLevelDecl(const DeclBaseName &, const Decl *) const;
   void emitNameAndTopLevelDeclHash(StringRef name, const Decl *) const;
   
+  void emitMembersOfOneAggregate(const IterableDeclContext *DC, const NominalTypeDecl *) const;
+  
   template<ExperimentalDependencies::ProvidesKind, typename DeclT>
   std::string nameAndMaybeProvidesHash(StringRef name, const DeclT*) const;
   
@@ -456,17 +458,29 @@ void ProvidesEmitter::emitMembers(const CollectedDeclarations &cpd) const {
 
   // This is also part of providesMember.
   for (auto *ED : cpd.extensionsWithJustMembers) {
-    for (auto *member : ED->getMembers()) {
-      auto *VD = dyn_cast<ValueDecl>(member);
-      if (!VD || !VD->hasName() ||
-          VD->getFormalAccess() <= AccessLevel::FilePrivate) {
-        continue;
-      }
-      Names names = namesAndMaybeProvidesHashes(ED->getExtendedNominal(), VD);
-      out << "- [\"" << llvm::yaml::escape(names.first) << "\", \""
-      << llvm::yaml::escape(names.second)
-      << "\"]\n";
+    emitMembersOfOneAggregate(ED, ED->getExtendedNominal());
+  }
+  if (!EnableExperimentalDependencies)
+    return;
+  for (const auto &ENpair : cpd.extendedNominals) {
+    const NominalTypeDecl *NTD = ENpair.first;
+    emitMembersOfOneAggregate(NTD, NTD);
+  }
+}
+
+void ProvidesEmitter::emitMembersOfOneAggregate(const IterableDeclContext *DC, const NominalTypeDecl *NTD) const {
+  typedef std::pair<std::string, std::string> Names;
+
+  for (auto *member : DC->getMembers()) {
+    auto *VD = dyn_cast<ValueDecl>(member);
+    if (!VD || !VD->hasName() ||
+        VD->getFormalAccess() <= AccessLevel::FilePrivate) {
+      continue;
     }
+    Names names = namesAndMaybeProvidesHashes(NTD, VD);
+    out << "- [\"" << llvm::yaml::escape(names.first) << "\", \""
+    << llvm::yaml::escape(names.second)
+    << "\"]\n";
   }
 }
 
