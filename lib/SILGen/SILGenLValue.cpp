@@ -1192,7 +1192,7 @@ namespace {
       OS.indent(indent) << name << "(" << Storage->getBaseName() << ")";
       if (IndexExprForDiagnostics) {
         OS << " subscript_index:\n";
-        IndexExprForDiagnostics->print(OS, 2);
+        IndexExprForDiagnostics->dump(OS, 2);
       }
       OS << '\n';
     }
@@ -2274,6 +2274,7 @@ LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
 LValue SILGenLValue::visitExpr(Expr *e, SGFAccessKind accessKind,
                                LValueOptions options) {
   e->dump(llvm::errs());
+  llvm::errs() << "\n";
   llvm_unreachable("unimplemented lvalue expr");
 }
 

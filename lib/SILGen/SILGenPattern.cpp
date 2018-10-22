@@ -2606,7 +2606,7 @@ static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
 
 void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   LLVM_DEBUG(llvm::dbgs() << "emitting switch stmt\n";
-             S->print(llvm::dbgs());
+             S->dump(llvm::dbgs());
              llvm::dbgs() << '\n');
   // If the subject expression is uninhabited, we're already dead.
   // Emit an unreachable in place of the switch statement.

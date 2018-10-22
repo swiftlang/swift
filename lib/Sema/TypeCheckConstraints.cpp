@@ -2042,6 +2042,7 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Type-checked expression---\n";
     result->dump(log);
+    log << "\n";
   }
 
   // If there's a listener, notify it that we've applied the solution.
@@ -2231,7 +2232,7 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
   if (getLangOpts().DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
-    expr->print(log);
+    expr->dump(log);
     log << "\n";
     CS.print(log);
   }
@@ -2269,7 +2270,7 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc) {
   if (getLangOpts().DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
-    expr->print(log);
+    expr->dump(log);
     log << "\n";
     cs.print(log);
   }
@@ -2300,6 +2301,7 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Type-checked expression---\n";
     result->dump(log);
+    log << "\n";
   }
 
   expr = result;
@@ -3101,7 +3103,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   if (getLangOpts().DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
-    expr->print(log);
+    expr->dump(log);
     log << "\n";
     cs.print(log);
   }
@@ -3137,6 +3139,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Type-checked expression---\n";
     result->dump(log);
+    log << "\n";
   }
 
   expr = result;
@@ -3300,7 +3303,7 @@ void ConstraintSystem::dump(Expr *E) {
     return Type();
   };
 
-  E->dump(getTypeOfExpr, getTypeOfTypeLoc);
+  E->dump(llvm::errs(), getTypeOfExpr, getTypeOfTypeLoc);
 }
 
 void ConstraintSystem::print(raw_ostream &out) {

@@ -536,22 +536,11 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(llvm::function_ref<Type(const Expr *)> getType,
-                llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc)
-          const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getType,
-                llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc)
-          const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
-
-  void dump(raw_ostream &OS) const;
-  void print(raw_ostream &OS, unsigned Indent = 0) const;
-  void print(raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getType,
-             llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
-             unsigned Indent = 0) const;
+  void dump(raw_ostream &OS, unsigned Indent = 0) const;
+  void dump(raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getType,
+            llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
+            unsigned Indent = 0) const;
+  
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
 
   // Only allow allocation of Exprs using the allocator in ASTContext
