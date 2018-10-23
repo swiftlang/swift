@@ -3619,15 +3619,6 @@ IRGenModule::getResilienceExpansionForLayout(SILGlobalVariable *global) {
   return ResilienceExpansion::Maximal;
 }
 
-llvm::Constant *IRGenModule::
-getAddrOfGenericWitnessTableCache(const NormalProtocolConformance *conf,
-                                  ForDefinition_t forDefinition) {
-  auto entity = LinkEntity::forGenericProtocolWitnessTableCache(conf);
-  auto expectedTy = getGenericWitnessTableCacheTy();
-  return getAddrOfLLVMVariable(entity, getPointerAlignment(), forDefinition,
-                               expectedTy, DebugTypeInfo());
-}
-
 llvm::Function *
 IRGenModule::getAddrOfGenericWitnessTableInstantiationFunction(
                                       const NormalProtocolConformance *conf) {
@@ -3648,25 +3639,6 @@ IRGenModule::getAddrOfGenericWitnessTableInstantiationFunction(
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
   entry = createFunction(*this, link, signature);
   return entry;
-}
-
-llvm::StructType *IRGenModule::getGenericWitnessTableCacheTy() {
-  if (auto ty = GenericWitnessTableCacheTy) return ty;
-
-  GenericWitnessTableCacheTy = llvm::StructType::create(getLLVMContext(),
-    {
-      // WitnessTableSizeInWords
-      Int16Ty,
-      // WitnessTablePrivateSizeInWords + RequiresInstantiation bit
-      Int16Ty,
-      // Pattern
-      RelativeAddressTy,
-      // Instantiator
-      RelativeAddressTy,
-      // PrivateData
-      RelativeAddressTy
-    }, "swift.generic_witness_table_cache");
-  return GenericWitnessTableCacheTy;
 }
 
 /// Fetch the witness table access function for a protocol conformance.

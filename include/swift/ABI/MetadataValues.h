@@ -629,6 +629,7 @@ private:
     NumConditionalRequirementsShift = 8,
 
     HasResilientWitnessesMask = 0x01 << 16,
+    HasGenericWitnessTableMask = 0x01 << 17,
   };
 
   int_type Value;
@@ -666,6 +667,14 @@ public:
     return ConformanceFlags((Value & ~HasResilientWitnessesMask)
                             | (hasResilientWitnesses? HasResilientWitnessesMask
                                                     : 0));
+  }
+
+  ConformanceFlags withHasGenericWitnessTable(
+                                           bool hasGenericWitnessTable) const {
+    return ConformanceFlags((Value & ~HasGenericWitnessTableMask)
+                            | (hasGenericWitnessTable
+                                 ? HasGenericWitnessTableMask
+                                 : 0));
   }
 
   /// Retrieve the conformance kind.
@@ -707,6 +716,12 @@ public:
   /// Whether this conformance has any resilient witnesses.
   bool hasResilientWitnesses() const {
     return Value & HasResilientWitnessesMask;
+  }
+
+  /// Whether this conformance has a generic witness table that may need to
+  /// be instantiated.
+  bool hasGenericWitnessTable() const {
+    return Value & HasGenericWitnessTableMask;
   }
 
   int_type getIntValue() const { return Value; }

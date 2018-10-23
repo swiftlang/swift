@@ -635,12 +635,12 @@ FUNCTION(CheckMetadataState, swift_checkMetadataState, SwiftCC,
          ATTRS(NoUnwind, ReadOnly))
 
 // const ProtocolWitnessTable *
-// swift_getGenericWitnessTable(GenericProtocolWitnessTable *genericTable,
-//                              const Metadata *type,
-//                              void ** const *instantiationArgs);
-FUNCTION(GetGenericWitnessTable, swift_getGenericWitnessTable, C_CC,
+// swift_instantiateWitnessTable(const ProtocolConformanceDescriptor *conf,
+//                               const Metadata *type,
+//                               void ** const *instantiationArgs);
+FUNCTION(InstantiateWitnessTable, swift_instantiateWitnessTable, C_CC,
          RETURNS(WitnessTablePtrTy),
-         ARGS(getGenericWitnessTableCacheTy()->getPointerTo(),
+         ARGS(ProtocolConformanceDescriptorPtrTy,
               TypeMetadataPtrTy,
               WitnessTablePtrPtrTy),
          ATTRS(NoUnwind, ReadOnly))

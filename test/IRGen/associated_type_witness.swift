@@ -98,28 +98,29 @@ struct Pair<T, U> : P, Q {}
 // GLOBAL-SAME:    i8* bitcast (i8** (%swift.type*, %swift.type*, i8**)* @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAA5Assoc_AA1QPWT" to i8*)
 // GLOBAL-SAME:    @"symbolic 23associated_type_witness4PairVyxq_G"
 // GLOBAL-SAME:  ]
-//   Generic witness table cache for Computed : Assocked.
-// GLOBAL-LABEL: @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAWG" = internal constant %swift.generic_witness_table_cache {
-// GLOBAL-SAME:    i16 4,
-// GLOBAL-SAME:    i16 1,
-
-//    Relative reference to witness table template
-// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([4 x i8*]* @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAWp" to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.generic_witness_table_cache, %swift.generic_witness_table_cache* @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAWG", i32 0, i32 2) to i64)) to i32
-
-//    No instantiator function
-// GLOBAL-SAME:    i32 0,
-// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([16 x i8*]* [[PRIVATE:@.*]] to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.generic_witness_table_cache, %swift.generic_witness_table_cache* @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAWG", i32 0, i32 4) to i64)) to i32)
-// GLOBAL-SAME:  }
-// GLOBAL:       [[PRIVATE]] = internal global [16 x i8*] zeroinitializer
 
 struct Computed<T, U> : Assocked {
   typealias Assoc = Pair<T, U>
 }
 
+//   Instantiation function for GenericComputed : DerivedFromSimpleAssoc.
+// CHECK-LABEL: define internal void @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI"(i8**, %swift.type* %"GenericComputed<T>", i8**)
+// CHECK:         [[T0:%.*]] = call i8** @"$s23associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAWa"(%swift.type* %"GenericComputed<T>", i8*** undef)
+// CHECK-NEXT:    [[T1:%.*]] = bitcast i8** [[T0]] to i8*
+// CHECK-NEXT:    [[T2:%.*]] = getelementptr inbounds i8*, i8** %0, i32 1
+// CHECK-NEXT:    store i8* [[T1]], i8** [[T2]], align 8
+// CHECK-NEXT:    ret void
+
+//   Witness table accessor function for GenericComputed : HasSimpleAssoc..
+// CHECK-LABEL: define hidden i8** @"$s23associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAWa"(%swift.type*, i8***)
+// CHECK-NEXT:   entry:
+// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_instantiateWitnessTable(%swift.protocol_conformance_descriptor* bitcast{{.*}}@"$s23associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAMc"{{.*}}, %swift.type* %0, i8*** %1)
+// CHECK-NEXT:    ret i8** [[WTABLE]]
+
 //   Witness table accessor function for Computed : Assocked.
 // CHECK-LABEL: define hidden i8** @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWa"(%swift.type*, i8***)
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:     [[WTABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWG", %swift.type* %0, i8*** %1)
+// CHECK-NEXT:     [[WTABLE:%.*]] = call i8** @swift_instantiateWitnessTable(%swift.protocol_conformance_descriptor* bitcast{{.*}}@"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAMc"{{.*}}, %swift.type* %0, i8*** %1)
 // CHECK-NEXT:     ret i8** [[WTABLE]]
 
 
@@ -134,36 +135,10 @@ protocol DerivedFromSimpleAssoc : HasSimpleAssoc {}
 // GLOBAL-SAME: @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAMc"
 // GLOBAL-SAME: i8* null
 
-//   Generic witness table cache for GenericComputed : DerivedFromSimpleAssoc.
-// GLOBAL-LABEL: @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWG" = internal constant %swift.generic_witness_table_cache {
-// GLOBAL-SAME:    i16 2,
-// GLOBAL-SAME:    i16 1,
-
-//   Relative reference to witness table template
-// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([2 x i8*]* @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWp" to i64
-
-//   Relative reference to instantiator function
-// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint (void (i8**, %swift.type*, i8**)* @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI" to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.generic_witness_table_cache, %swift.generic_witness_table_cache* @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWG", i32 0, i32 3) to i64)) to i32)
-
 //   Relative reference to private data
 struct GenericComputed<T: P> : DerivedFromSimpleAssoc {
   typealias Assoc = PBox<T>
 }
-
-//   Instantiation function for GenericComputed : DerivedFromSimpleAssoc.
-// CHECK-LABEL: define internal void @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI"(i8**, %swift.type* %"GenericComputed<T>", i8**)
-// CHECK:         [[T0:%.*]] = call i8** @"$s23associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAWa"(%swift.type* %"GenericComputed<T>", i8*** undef)
-// CHECK-NEXT:    [[T1:%.*]] = bitcast i8** [[T0]] to i8*
-// CHECK-NEXT:    [[T2:%.*]] = getelementptr inbounds i8*, i8** %0, i32 1
-// CHECK-NEXT:    store i8* [[T1]], i8** [[T2]], align 8
-// CHECK-NEXT:    ret void
-
-//   Witness table accessor function for GenericComputed : HasSimpleAssoc..
-// CHECK-LABEL: define hidden i8** @"$s23associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAWa"(%swift.type*, i8***)
-// CHECK-NEXT:   entry:
-// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$s23associated_type_witness15GenericComputedVyxGAA14HasSimpleAssocAAWG", %swift.type* %0, i8*** %1)
-// CHECK-NEXT:    ret i8** [[WTABLE]]
-
 
 protocol HasAssocked {
   associatedtype Contents : Assocked
@@ -175,3 +150,27 @@ struct FulfilledFromAssociatedType<T : HasAssocked> : HasSimpleAssoc {
 struct UsesVoid : HasSimpleAssoc {
   typealias Assoc = ()
 }
+
+//   Protocol conformance descriptor for Computed : Assocked.
+// GLOBAL-LABEL: @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAMc" = hidden constant
+// GLOBAL-SAME:    i16 4,
+// GLOBAL-SAME:    i16 1,
+
+//    Relative reference to witness table template
+// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([4 x i8*]* @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAWp" to i64), i64 ptrtoint
+
+//    No instantiator function
+// GLOBAL-SAME:    i32 0,
+// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([16 x i8*]* [[PRIVATE:@.*]] to i64), i64 ptrtoint
+// GLOBAL-SAME:  }
+
+//   Protocol conformance descriptor for GenericComputed : DerivedFromSimpleAssoc.
+// GLOBAL-LABEL: @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAMc" = hidden constant
+// GLOBAL-SAME:    i16 2,
+// GLOBAL-SAME:    i16 1,
+
+//   Relative reference to witness table template
+// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([2 x i8*]* @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWp" to i64
+
+//   Relative reference to instantiator function
+// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint (void (i8**, %swift.type*, i8**)* @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI" to i64),
