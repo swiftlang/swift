@@ -179,7 +179,9 @@ if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
                                  $<TARGET_FILE:dispatch>
                                  $<TARGET_FILE:BlocksRuntime>
                                DESTINATION
-                                 lib${LLVM_LIBDIR_SUFFIX})
+                                 lib${LLVM_LIBDIR_SUFFIX}
+                               COMPONENT
+                                 sourcekit-inproc)
 
     # FIXME(compnerd) this should be taken care of by the
     # INTERFACE_INCLUDE_DIRECTORIES above
@@ -192,3 +194,12 @@ endif()
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(tools)
+
+
+if(SOURCEKIT_INSTALLING_INPROC)
+  add_custom_target(sourcekit-inproc)
+  add_llvm_install_targets(install-sourcekit-inproc
+                           COMPONENT sourcekit-inproc
+                           DEPENDS dispatch BlocksRuntime sourcekitdInProc)
+endif()
+
