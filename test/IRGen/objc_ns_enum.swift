@@ -90,7 +90,7 @@ use_metadata(NSRuncingOptions.mince)
 // CHECK:         call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata([[INT]] %0, {{.*}} @"$sSo16NSRuncingOptionsVN" {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
 
 // CHECK-LABEL: define linkonce_odr hidden i8** @"$sSo16NSRuncingOptionsVSQSCWa"()
-// CHECK:  [[NONUNIQUE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$sSo16NSRuncingOptionsVSQSCWG", %swift.type* null, i8*** null)
+// CHECK:  [[NONUNIQUE:%.*]] = call i8** @swift_instantiateWitnessTable(%swift.protocol_conformance_descriptor* bitcast{{.*}}@"$sSo16NSRuncingOptionsVSQSCMc" to %swift.protocol_conformance_descriptor*), %swift.type* null, i8*** null)
 // CHECK:  [[UNIQUE:%.*]] = call i8** @swift_getForeignWitnessTable(i8** [[NONUNIQUE]], %swift.type_descriptor* bitcast (<{ {{.*}} }>* @"$sSo16NSRuncingOptionsVMn" to %swift.type_descriptor*), %swift.protocol* @"$sSQMp")
 // CHECK:  ret i8** [[UNIQUE]]
 
