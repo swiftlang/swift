@@ -657,9 +657,9 @@
 
 // CHECK: TypesToReflect.HasFileprivateProtocol
 // CHECK: -------------------------------------
-// CHECK: x: TypesToReflect.(FileprivateProtocol in _{{[0-9A-F]+}})
+// CHECK: x: TypesToReflect.(FileprivateProtocol in ${{[0-9a-fA-F]+}})
 // CHECK: (protocol_composition
-// CHECK-NEXT: (protocol TypesToReflect.(FileprivateProtocol in _{{[0-9A-F]+}})))
+// CHECK-NEXT: (protocol TypesToReflect.(FileprivateProtocol in ${{[0-9a-fA-F]+}})))
 
 // CHECK: ASSOCIATED TYPES:
 // CHECK: =================

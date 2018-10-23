@@ -2231,44 +2231,70 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
     // Assume anything else isn't a definition.
     return false;
   };
-
-  // If the variable has already been defined in this TU,
-  // then it definitely doesn't need a GOT entry, and we can
-  // relative-reference it directly.
+  
   //
-  // TODO: If we know the target entry is going to be linked into the same
-  // binary, then we ought to be able to directly relative-reference the
-  // symbol. However, some platforms don't have the necessary relocations to
-  // represent a relative reference to an undefined symbol, so conservatively
-  // produce an indirect reference in this case. Also, the integrated REPL
-  // incrementally adds new definitions that refer back to existing ones
-  // relatively, so always use indirect references in this situation.
   auto entry = GlobalVars[entity];
-  if (forceIndirectness == ConstantReference::Direct &&
-      !IRGen.Opts.IntegratedREPL &&
-      (!entity.isAvailableExternally(*this) || isDefinition(entry))) {
+  
+  /// Returns a direct reference.
+  auto direct = [&]() -> ConstantReference {
     // FIXME: Relative references to aliases break MC on 32-bit Mach-O
     // platforms (rdar://problem/22450593 ), so substitute an alias with its
     // aliasee to work around that.
     if (auto alias = dyn_cast<llvm::GlobalAlias>(entry))
-      entry = alias->getAliasee();
+      return {alias->getAliasee(), ConstantReference::Direct};
     return {entry, ConstantReference::Direct};
+  };
+  
+  /// Returns an indirect reference.
+  auto indirect = [&]() -> ConstantReference {
+    auto &gotEntry = GlobalGOTEquivalents[entity];
+    if (gotEntry) {
+      return {gotEntry, ConstantReference::Indirect};
+    }
+
+    // Look up the global variable.
+    auto global = cast<llvm::GlobalValue>(entry);
+    // Use it as the initializer for an anonymous constant. LLVM can treat this as
+    // equivalent to the global's GOT entry.
+    llvm::SmallString<64> name;
+    entity.mangle(name);
+    auto gotEquivalent = createGOTEquivalent(*this, global, name);
+    gotEntry = gotEquivalent;
+    return {gotEquivalent, ConstantReference::Indirect};
+  };
+  
+  // Return the GOT entry if we were asked to.
+  if (forceIndirectness == ConstantReference::Indirect)
+    return indirect();
+  
+  // The integrated REPL incrementally adds new definitions, so always use
+  // indirect references in this mode.
+  if (IRGen.Opts.IntegratedREPL)
+    return indirect();
+  
+  // If the variable has already been defined in this TU,
+  // then it definitely doesn't need a GOT entry, and we can
+  // relative-reference it directly.
+  if ((!entity.isAvailableExternally(*this) || isDefinition(entry))) {
+    return direct();
   }
 
-  auto &gotEntry = GlobalGOTEquivalents[entity];
-  if (gotEntry) {
-    return {gotEntry, ConstantReference::Indirect};
-  }
+  // If the entity will be emitted as part of the current source file
+  // (if we know what that is), then we can reference it directly.
+  if (CurSourceFile
+      && !isa<ClangModuleUnit>(CurSourceFile)
+      && CurSourceFile == entity.getSourceFileForEmission())
+    return direct();
+  
+  // TODO: If we know the target entry is going to be linked into the same
+  // binary, then we ought to be able to directly relative-reference the
+  // symbol. However, some platforms don't have the necessary relocations to
+  // represent a relative reference to an undefined symbol, so conservatively
+  // produce an indirect reference in this case.
 
-  // Look up the global variable.
-  auto global = cast<llvm::GlobalValue>(entry);
-  // Use it as the initializer for an anonymous constant. LLVM can treat this as
-  // equivalent to the global's GOT entry.
-  llvm::SmallString<64> name;
-  entity.mangle(name);
-  auto gotEquivalent = createGOTEquivalent(*this, global, name);
-  gotEntry = gotEquivalent;
-  return {gotEquivalent, ConstantReference::Indirect};
+  // Fall back to an indirect reference if we can't establish that a direct
+  // reference is OK.
+  return indirect();
 }
 
 static TypeEntityReference

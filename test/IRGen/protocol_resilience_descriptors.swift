@@ -23,7 +23,7 @@
 
 // Associated type default + flags
 // CHECK-DEFINITION-SAME: [[INT]] add
-// CHECK-DEFINITION-SAME: @"default assoc type \01____y2T118resilient_protocol29ProtocolWithAssocTypeDefaultsPQzG 18resilient_protocol7WrapperV"
+// CHECK-DEFINITION-SAME: @"default assoc type _____y2T118resilient_protocol29ProtocolWithAssocTypeDefaultsPQzG 18resilient_protocol7WrapperV"
 // CHECK-DEFINITION-SAME: [[INT]] 1
 
 // Protocol requirements base descriptor
