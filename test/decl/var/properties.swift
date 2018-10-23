@@ -1272,7 +1272,16 @@ class WeakFixItTest {
 // Stored properties cannot have uninhabited types
 
 struct SR8811 {
-  var x: Never // expected-error {{stored property 'x' cannot have uninhabited type 'Never'}}
+  var x: Never // expected-error {{stored property 'x' cannot have enum type 'Never' with no cases}}
   
-  var y: (Int, Never, Bool) // expected-error {{stored property 'y' cannot have uninhabited type '(Int, Never, Bool)'}}
+  var y: (Int, Never, Bool) // expected-error {{stored property 'y' cannot have tuple type '(Int, Never, Bool)' containing enum with no cases}}
+}
+
+let sr8811x: Never // expected-error {{constant 'sr8811x' cannot have enum type 'Never' with no cases}}
+
+var sr8811y: (Int, Never) // expected-error {{variable 'sr8811y' cannot have tuple type '(Int, Never)' containing enum with no cases}}
+
+// Ok
+var sr8811z: Never {
+  return fatalError()
 }

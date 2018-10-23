@@ -2461,12 +2461,18 @@ public:
       }
     }
 
-    // Reject variable if it is a stored property with a structurally
-    // uninhabited type
-    if (VD->isInstanceMember() && VD->hasStorage() && 
+    // Reject variable if it is a stored property with an uninhabited type
+    if (VD->hasStorage() && 
         VD->getInterfaceType()->isStructurallyUninhabited()) {
-      TC.diagnose(VD->getLoc(), diag::stored_property_no_uninhabited_type,
-                  VD->getName(), VD->getInterfaceType());
+      auto uninhabitedTypeDiag = diag::pattern_no_uninhabited_type;
+      
+      if (VD->getInterfaceType()->is<TupleType>()) {
+        uninhabitedTypeDiag = diag::pattern_no_uninhabited_tuple_type;
+      }
+          
+      TC.diagnose(VD->getLoc(), uninhabitedTypeDiag, VD->isLet(),
+                  VD->isInstanceMember(), VD->getName(),
+                  VD->getInterfaceType());
       VD->markInvalid();
     }
 
