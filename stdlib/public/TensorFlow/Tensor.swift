@@ -91,7 +91,6 @@ func _TFGetScalar<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar? {
 func _TFTensorFromScalars<Scalar>(
   _ scalars: [Scalar], shape: [Int32]
 ) -> TensorHandle<Scalar> {
-  debugLog("Calling @__tf_tensor_from_scalars() with scalars=\(scalars) and shape=\(shape).")
   let contiguousSize = shape.map(Int.init).reduce(1, *)
   precondition(scalars.count == contiguousSize,
                "The number of scalars does not match the shape.")
