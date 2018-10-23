@@ -1321,7 +1321,8 @@ public:
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfWitnessTable(const NormalProtocolConformance *C,
                                       ConstantInit definition = ConstantInit());
-  llvm::Constant *getAddrOfWitnessTablePattern(const NormalProtocolConformance *C,
+  llvm::Constant *getAddrOfWitnessTablePattern(
+                                      const NormalProtocolConformance *C,
                                       ConstantInit definition = ConstantInit());
 
   llvm::Function *
@@ -1341,8 +1342,7 @@ public:
   GenericEnvironment *getGenericEnvironment();
 
   ConstantReference
-  getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity, Alignment alignment,
-       llvm::Type *defaultType,
+  getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
        ConstantReference::Directness forceIndirect = ConstantReference::Direct);
 
   llvm::Constant *
@@ -1376,21 +1376,17 @@ private:
                                    llvm::function_ref<void()> emit);
   
   llvm::Constant *getAddrOfLLVMVariable(LinkEntity entity,
-                                        Alignment alignment,
                                         ConstantInit definition,
-                                        llvm::Type *defaultType,
-                                        DebugTypeInfo debugType);
+                                        DebugTypeInfo debugType,
+                                        llvm::Type *overrideDeclType = nullptr);
   llvm::Constant *getAddrOfLLVMVariable(LinkEntity entity,
-                                        Alignment alignment,
                                         ForDefinition_t forDefinition,
-                                        llvm::Type *defaultType,
                                         DebugTypeInfo debugType);
   ConstantReference getAddrOfLLVMVariable(LinkEntity entity,
-                                        Alignment alignment,
                                         ConstantInit definition,
-                                        llvm::Type *defaultType,
                                         DebugTypeInfo debugType,
-                                        SymbolReferenceKind refKind);
+                                        SymbolReferenceKind refKind,
+                                        llvm::Type *overrideDeclType = nullptr);
 
   void emitLazyPrivateDefinitions();
   void addRuntimeResolvableType(NominalTypeDecl *nominal);

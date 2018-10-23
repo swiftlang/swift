@@ -639,3 +639,238 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   }
   llvm_unreachable("bad link entity kind");
 }
+
+llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
+  switch (getKind()) {
+  case Kind::ModuleDescriptor:
+  case Kind::ExtensionDescriptor:
+  case Kind::AnonymousDescriptor:
+  case Kind::NominalTypeDescriptor:
+  case Kind::PropertyDescriptor:
+    return IGM.TypeContextDescriptorTy;
+  case Kind::ProtocolDescriptor:
+    return IGM.ProtocolDescriptorStructTy;
+  case Kind::AssociatedTypeDescriptor:
+  case Kind::AssociatedConformanceDescriptor:
+  case Kind::ProtocolRequirementsBaseDescriptor:
+    return IGM.ProtocolRequirementStructTy;
+  case Kind::ProtocolConformanceDescriptor:
+    return IGM.ProtocolConformanceDescriptorTy;
+  case Kind::ObjCClassRef:
+    return IGM.ObjCClassPtrTy;
+  case Kind::ObjCClass:
+  case Kind::ObjCMetaclass:
+  case Kind::SwiftMetaclassStub:
+    return IGM.ObjCClassStructTy;
+  case Kind::TypeMetadataLazyCacheVariable:
+    return IGM.TypeMetadataPtrTy;
+  case Kind::TypeMetadataSingletonInitializationCache:
+    // TODO: put a cache variable on IGM
+    return llvm::StructType::get(IGM.getLLVMContext(),
+                                 {IGM.TypeMetadataPtrTy, IGM.Int8PtrTy});
+  case Kind::TypeMetadata:
+    switch (getMetadataAddress()) {
+    case TypeMetadataAddress::FullMetadata:
+      if (getType().getClassOrBoundGenericClass())
+        return IGM.FullHeapMetadataStructTy;
+      else
+        return IGM.FullTypeMetadataStructTy;
+    case TypeMetadataAddress::AddressPoint:
+      return IGM.TypeMetadataStructTy;
+    }
+    
+  case Kind::TypeMetadataPattern:
+    // TODO: Use a real type?
+    return IGM.Int8Ty;
+    
+  case Kind::ClassMetadataBaseOffset:
+    // TODO: put a cache variable on IGM
+    return llvm::StructType::get(IGM.getLLVMContext(), {
+      IGM.SizeTy,  // Immediate members offset
+      IGM.Int32Ty, // Negative size in words
+      IGM.Int32Ty  // Positive size in words
+    });
+    
+  case Kind::TypeMetadataInstantiationCache:
+    // TODO: put a cache variable on IGM
+    return llvm::ArrayType::get(IGM.Int8PtrTy,
+                                NumGenericMetadataPrivateDataWords);
+  case Kind::ReflectionBuiltinDescriptor:
+  case Kind::ReflectionFieldDescriptor:
+  case Kind::ReflectionAssociatedTypeDescriptor:
+    return IGM.FieldDescriptorTy;
+  case Kind::ValueWitnessTable:
+  case Kind::DirectProtocolWitnessTable:
+  case Kind::ProtocolWitnessTablePattern:
+    return IGM.WitnessTableTy;
+  case Kind::FieldOffset:
+    return IGM.SizeTy;
+  case Kind::EnumCase:
+    return IGM.Int32Ty;
+  case Kind::ProtocolWitnessTableLazyCacheVariable:
+    return IGM.WitnessTablePtrTy;
+  case Kind::SILFunction:
+    return IGM.FunctionPtrTy->getPointerTo();
+  case Kind::MethodDescriptor:
+  case Kind::MethodDescriptorInitializer:
+  case Kind::MethodDescriptorAllocator:
+    return IGM.MethodDescriptorStructTy;
+    
+  default:
+    llvm_unreachable("declaration LLVM type not specified");
+  }
+}
+
+Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
+  switch (getKind()) {
+  case Kind::ModuleDescriptor:
+  case Kind::ExtensionDescriptor:
+  case Kind::AnonymousDescriptor:
+  case Kind::NominalTypeDescriptor:
+  case Kind::ProtocolDescriptor:
+  case Kind::AssociatedTypeDescriptor:
+  case Kind::AssociatedConformanceDescriptor:
+  case Kind::ProtocolConformanceDescriptor:
+  case Kind::ProtocolRequirementsBaseDescriptor:
+  case Kind::ReflectionBuiltinDescriptor:
+  case Kind::ReflectionFieldDescriptor:
+  case Kind::ReflectionAssociatedTypeDescriptor:
+  case Kind::PropertyDescriptor:
+  case Kind::EnumCase:
+  case Kind::MethodDescriptor:
+  case Kind::MethodDescriptorInitializer:
+  case Kind::MethodDescriptorAllocator:
+    return Alignment(4);
+  case Kind::ObjCClassRef:
+  case Kind::ObjCClass:
+  case Kind::TypeMetadataLazyCacheVariable:
+  case Kind::TypeMetadataSingletonInitializationCache:
+  case Kind::TypeMetadata:
+  case Kind::TypeMetadataPattern:
+  case Kind::ClassMetadataBaseOffset:
+  case Kind::TypeMetadataInstantiationCache:
+  case Kind::ValueWitnessTable:
+  case Kind::FieldOffset:
+  case Kind::ProtocolWitnessTableLazyCacheVariable:
+  case Kind::DirectProtocolWitnessTable:
+  case Kind::ProtocolWitnessTablePattern:
+  case Kind::ObjCMetaclass:
+  case Kind::SwiftMetaclassStub:
+    return IGM.getPointerAlignment();
+  case Kind::SILFunction:
+    return Alignment(1);
+  default:
+    llvm_unreachable("alignment not specified");
+  }
+}
+
+const SourceFile *LinkEntity::getSourceFileForEmission() const {
+  const SourceFile *sf;
+  
+  // Shared-linkage entities don't get emitted with any particular file.
+  if (hasSharedVisibility(getLinkage(NotForDefinition)))
+    return nullptr;
+  
+  auto getSourceFileForDeclContext =
+  [](const DeclContext *dc) -> const SourceFile * {
+    if (!dc)
+      return nullptr;
+    return dc->getParentSourceFile();
+  };
+  
+  switch (getKind()) {
+  case Kind::DispatchThunk:
+  case Kind::DispatchThunkInitializer:
+  case Kind::DispatchThunkAllocator:
+  case Kind::MethodDescriptor:
+  case Kind::MethodDescriptorInitializer:
+  case Kind::MethodDescriptorAllocator:
+  case Kind::MethodLookupFunction:
+  case Kind::EnumCase:
+  case Kind::FieldOffset:
+  case Kind::ObjCClass:
+  case Kind::ObjCMetaclass:
+  case Kind::SwiftMetaclassStub:
+  case Kind::ClassMetadataBaseOffset:
+  case Kind::PropertyDescriptor:
+  case Kind::NominalTypeDescriptor:
+  case Kind::TypeMetadataPattern:
+  case Kind::TypeMetadataInstantiationCache:
+  case Kind::TypeMetadataInstantiationFunction:
+  case Kind::TypeMetadataSingletonInitializationCache:
+  case Kind::TypeMetadataCompletionFunction:
+  case Kind::ProtocolDescriptor:
+  case Kind::ProtocolRequirementsBaseDescriptor:
+  case Kind::AssociatedTypeDescriptor:
+  case Kind::AssociatedConformanceDescriptor:
+  case Kind::DefaultAssociatedConformanceAccessor:
+    sf = getSourceFileForDeclContext(getDecl()->getDeclContext());
+    if (!sf)
+      return nullptr;
+    break;
+  
+  case Kind::SILFunction:
+    sf = getSourceFileForDeclContext(getSILFunction()->getDeclContext());
+    if (!sf)
+      return nullptr;
+    break;
+  
+  case Kind::SILGlobalVariable:
+    if (auto decl = getSILGlobalVariable()->getDecl()) {
+      sf = getSourceFileForDeclContext(decl->getDeclContext());
+      if (!sf)
+        return nullptr;
+    } else {
+      return nullptr;
+    }
+    break;
+    
+  case Kind::DirectProtocolWitnessTable:
+  case Kind::ProtocolWitnessTablePattern:
+  case Kind::ProtocolWitnessTableAccessFunction:
+  case Kind::GenericProtocolWitnessTableInstantiationFunction:
+  case Kind::AssociatedTypeWitnessTableAccessFunction:
+  case Kind::ReflectionAssociatedTypeDescriptor:
+  case Kind::ProtocolConformanceDescriptor:
+  case Kind::ProtocolWitnessTableLazyCacheVariable:
+  case Kind::ProtocolWitnessTableLazyAccessFunction:
+    sf = getSourceFileForDeclContext(
+      getProtocolConformance()->getRootNormalConformance()->getDeclContext());
+    if (!sf)
+      return nullptr;
+    break;
+    
+  case Kind::TypeMetadata: {
+    auto ty = getType();
+    // Only fully concrete nominal type metadata gets emitted eagerly.
+    auto nom = ty->getAnyNominal();
+    if (!nom || nom->isGenericContext())
+      return nullptr;
+    
+    sf = getSourceFileForDeclContext(nom);
+    if (!sf)
+      return nullptr;
+    break;
+  }
+
+  // Always shared linkage
+  case Kind::ModuleDescriptor:
+  case Kind::ExtensionDescriptor:
+  case Kind::AnonymousDescriptor:
+  case Kind::ObjCClassRef:
+  case Kind::TypeMetadataAccessFunction:
+  case Kind::TypeMetadataLazyCacheVariable:
+  case Kind::ForeignTypeMetadataCandidate:
+    return nullptr;
+
+  // TODO
+  case Kind::CoroutineContinuationPrototype:
+  case Kind::ReflectionFieldDescriptor:
+  case Kind::ReflectionBuiltinDescriptor:
+  case Kind::ValueWitness:
+  case Kind::ValueWitnessTable:
+    return nullptr;
+  }
+  
+  return sf;
+}
