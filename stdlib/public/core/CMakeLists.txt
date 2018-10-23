@@ -122,7 +122,6 @@ set(SWIFTLIB_ESSENTIAL
   SipHash.swift
   Sequence.swift
   SequenceAlgorithms.swift
-  SequenceWrapper.swift
   Set.swift
   SetAlgebra.swift
   SetAnyHashableExtensions.swift
