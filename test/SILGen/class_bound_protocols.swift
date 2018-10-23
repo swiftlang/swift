@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -parse-stdlib -parse-as-library -module-name Swift %s | %FileCheck %s
 
 enum Optional<T> {
   case some(T)
@@ -132,8 +132,9 @@ func class_bound_method(x: ClassBound) {
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[XBOX_PB]] : $*ClassBound
   // CHECK: [[X:%.*]] = load [copy] [[READ]] : $*ClassBound
   // CHECK: [[PROJ:%.*]] = open_existential_ref [[X]] : $ClassBound to $[[OPENED:@opened(.*) ClassBound]]
+  // CHECK: [[BORROWED_PROJ:%.*]] = begin_borrow [[PROJ]]
   // CHECK: [[METHOD:%.*]] = witness_method $[[OPENED]], #ClassBound.classBoundMethod!1
-  // CHECK: apply [[METHOD]]<[[OPENED]]>([[PROJ]])
+  // CHECK: apply [[METHOD]]<[[OPENED]]>([[BORROWED_PROJ]])
   // CHECK: destroy_value [[PROJ]]
   // CHECK: destroy_value [[XBOX]]
 }
