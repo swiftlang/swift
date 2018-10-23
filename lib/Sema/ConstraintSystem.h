@@ -3053,10 +3053,13 @@ public:
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
+  /// \param allowFixes Whether to allow fixes in the solution.
+  ///
   /// \returns a solution if a single unambiguous one could be found, or None if
   /// ambiguous or unsolvable.
   Optional<Solution> solveSingle(FreeTypeVariableBinding allowFreeTypeVariables
-                                    = FreeTypeVariableBinding::Disallow);
+                                 = FreeTypeVariableBinding::Disallow,
+                                 bool allowFixes = false);
 
 private:
   /// \brief Solve the system of constraints.
@@ -3226,6 +3229,12 @@ public:
       ConstraintMatchLoop;
   typedef std::function<void(SmallVectorImpl<unsigned> &options)>
       PartitionAppendCallback;
+
+  // Attempt to sort nominalTypes based on what we can discover about
+  // calls into the overloads in the disjunction that bindOverload is
+  // a part of.
+  void sortDesignatedTypes(SmallVectorImpl<NominalTypeDecl *> &nominalTypes,
+                           Constraint *bindOverload);
 
   // Partition the choices in a disjunction based on those that match
   // the designated types for the operator that the disjunction was

@@ -119,8 +119,8 @@ function(_add_variant_c_compile_link_flags)
     endif()
   endif()
 
-  # MSVC and clang-cl don't understand -target.
-  if (NOT SWIFT_COMPILER_IS_MSVC_LIKE)
+  # MSVC, clang-cl, gcc don't understand -target.
+  if(CMAKE_C_COMPILER_ID STREQUAL Clang AND NOT SWIFT_COMPILER_IS_MSVC_LIKE)
     list(APPEND result "-target" "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}${DEPLOYMENT_VERSION}")
   endif()
 
