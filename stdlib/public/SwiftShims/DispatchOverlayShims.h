@@ -193,9 +193,9 @@ static inline void _swift_dispatch_after(
 
 static inline void _swift_dispatch_apply_current(
     size_t iterations,
-    void SWIFT_DISPATCH_NOESCAPE (^block)(long)) {
+    void SWIFT_DISPATCH_NOESCAPE (^block)(intptr_t)) {
   dispatch_apply(iterations, (dispatch_queue_t _Nonnull)0, ^(size_t i){
-    block((long)i);
+    block((intptr_t)i);
   });
 }
 
