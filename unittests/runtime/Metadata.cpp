@@ -788,76 +788,6 @@ const void *witnesses[] = {
 
 WitnessTable *conditionalTablesBuffer[] = {(WitnessTable *)678};
 
-TEST(WitnessTableTest, getGenericWitnessTable) {
-  EXPECT_EQ(sizeof(GenericWitnessTableStorage), sizeof(GenericWitnessTable));
-
-  // Conformance provides all requirements, and we don't have an
-  // instantiator, so we can just return the pattern.
-  {
-    tableStorage1.WitnessTableSizeInWords = 7;
-    tableStorage1.WitnessTablePrivateSizeInWords = 0;
-    initializeRelativePointer(&tableStorage1.Protocol, &testProtocol.descriptor);
-    initializeRelativePointer(&tableStorage1.Pattern, witnesses);
-    initializeRelativePointer(&tableStorage1.Instantiator, nullptr);
-    initializeRelativePointer(&tableStorage1.PrivateData, &tablePrivateData1);
-
-    GenericWitnessTable *table = reinterpret_cast<GenericWitnessTable *>(
-        &tableStorage1);
-
-    RaceTest_ExpectEqual<const WitnessTable *>(
-      [&]() -> const WitnessTable * {
-        const WitnessTable *instantiatedTable =
-            swift_getGenericWitnessTable(table, nullptr, nullptr);
-
-        EXPECT_EQ(instantiatedTable, table->Pattern.get());
-        return instantiatedTable;
-      });
-  }
-
-  // Conformance provides all requirements, but we have private storage
-  // and an initializer, so we must instantiate.
-  {
-    tableStorage2.WitnessTableSizeInWords = 7;
-    tableStorage2.WitnessTablePrivateSizeInWords = (1 + 1) << 1;
-    initializeRelativePointer(&tableStorage2.Protocol, &testProtocol.descriptor);
-    initializeRelativePointer(&tableStorage2.Pattern, witnesses);
-    initializeRelativePointer(&tableStorage2.Instantiator,
-                              (const void *) witnessTableInstantiator);
-    initializeRelativePointer(&tableStorage2.PrivateData, &tablePrivateData2);
-
-    GenericWitnessTable *table = reinterpret_cast<GenericWitnessTable *>(
-        &tableStorage2);
-
-    RaceTest_ExpectEqual<const WitnessTable *>(
-      [&]() -> const WitnessTable * {
-        const WitnessTable *instantiatedTable = swift_getGenericWitnessTable(
-            table, nullptr, (void ***)conditionalTablesBuffer);
-
-        EXPECT_NE(instantiatedTable, table->Pattern.get());
-
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[-2],
-                  reinterpret_cast<void *>(0));
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[-1],
-                  reinterpret_cast<void *>(678));
-
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[1],
-                  reinterpret_cast<void *>(777));
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[2],
-                  reinterpret_cast<void *>(123));
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[3],
-                  reinterpret_cast<void *>(234));
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[4],
-                  reinterpret_cast<void *>(345));
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[5],
-                  reinterpret_cast<void *>(456));
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[6],
-                  reinterpret_cast<void *>(567));
-
-        return instantiatedTable;
-      });
-  }
-}
-
 static GenericWitnessTableStorage tableStorage3;
 static GenericWitnessTable::PrivateDataType tablePrivateData3;
 
@@ -913,52 +843,6 @@ struct ResilientWitnessTableStorage {
       fakeWitness5);
   }
 };
-
-static ResilientWitnessTableStorage resilientWitnesses;
-
-TEST(WitnessTableTest, ResilientWitnessTable) {
-  ResilientWitnessTableStorage wtable;
-
-  // Conformance needs both default requirements to be filled in
-  {
-    tableStorage3.WitnessTableSizeInWords = 2;
-    initializeRelativePointer(&tableStorage3.Protocol, &testProtocol.descriptor);
-    initializeRelativePointer(&tableStorage3.Pattern, witnesses);
-    initializeRelativePointer(&tableStorage3.ResilientWitnesses,
-                              &resilientWitnesses);
-    initializeRelativePointer(&tableStorage3.PrivateData, &tablePrivateData3);
-
-    GenericWitnessTable *table = reinterpret_cast<GenericWitnessTable *>(
-        &tableStorage3);
-
-    RaceTest_ExpectEqual<const WitnessTable *>(
-      [&]() -> const WitnessTable * {
-        const WitnessTable *instantiatedTable = swift_getGenericWitnessTable(
-            table, nullptr, (void ***)conditionalTablesBuffer);
-
-        EXPECT_NE(instantiatedTable, table->Pattern.get());
-
-        // From the pattern
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[1],
-                  reinterpret_cast<void *>(777));
-
-        // The rest come from the order-independent resilient witness
-        // descriptors
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[2],
-                  reinterpret_cast<void *>(fakeWitness1));
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[3],
-                  reinterpret_cast<void *>(fakeWitness2));
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[4],
-                  reinterpret_cast<void *>(fakeWitness3));
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[5],
-                  reinterpret_cast<void *>(fakeDefaultWitness1));
-        EXPECT_EQ(reinterpret_cast<void * const *>(instantiatedTable)[6],
-                  reinterpret_cast<void *>(fakeWitness5));
-
-        return instantiatedTable;
-      });
-  }
-}
 
 static void initialize_pod_witness_table(ValueWitnessTable &testTable) {
   testTable.size = sizeof(ValueBuffer);

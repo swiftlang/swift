@@ -1989,7 +1989,7 @@ struct TargetResilientWitnessTable final
 using ResilientWitnessTable = TargetResilientWitnessTable<InProcess>;
 
 /// \brief The control structure of a generic or resilient protocol
-/// conformance.
+/// conformance, which is embedded in the protocol conformance descriptor.
 ///
 /// Witness tables need to be instantiated at runtime in these cases:
 /// - For a generic conforming type, associated type requirements might be
@@ -2245,14 +2245,16 @@ struct TargetProtocolConformanceDescriptor final
              RelativeContextPointer<Runtime>,
              TargetGenericRequirementDescriptor<Runtime>,
              TargetResilientWitnessesHeader<Runtime>,
-             TargetResilientWitness<Runtime>> {
+             TargetResilientWitness<Runtime>,
+             TargetGenericWitnessTable<Runtime>> {
 
   using TrailingObjects = swift::ABI::TrailingObjects<
                              TargetProtocolConformanceDescriptor<Runtime>,
                              RelativeContextPointer<Runtime>,
                              TargetGenericRequirementDescriptor<Runtime>,
                              TargetResilientWitnessesHeader<Runtime>,
-                             TargetResilientWitness<Runtime>>;
+                             TargetResilientWitness<Runtime>,
+                             TargetGenericWitnessTable<Runtime>>;
   friend TrailingObjects;
 
   template<typename T>
@@ -2268,6 +2270,7 @@ public:
 
   using ResilientWitnessesHeader = TargetResilientWitnessesHeader<Runtime>;
   using ResilientWitness = TargetResilientWitness<Runtime>;
+  using GenericWitnessTable = TargetGenericWitnessTable<Runtime>;
 
 private:
   /// The protocol being conformed to.
@@ -2375,6 +2378,14 @@ public:
              numTrailingObjects(OverloadToken<ResilientWitness>()));
   }
 
+  ConstTargetPointer<Runtime, GenericWitnessTable>
+  getGenericWitnessTable() const {
+    if (!Flags.hasGenericWitnessTable())
+      return nullptr;
+
+    return this->template getTrailingObjects<GenericWitnessTable>();
+  }
+
 #if !defined(NDEBUG) && SWIFT_OBJC_INTEROP
   void dump() const;
 #endif
@@ -2408,6 +2419,10 @@ private:
       ? this->template getTrailingObjects<ResilientWitnessesHeader>()
           ->NumWitnesses
       : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericWitnessTable>) const {
+    return Flags.hasGenericWitnessTable() ? 1 : 0;
   }
 };
 using ProtocolConformanceDescriptor
