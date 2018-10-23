@@ -1203,7 +1203,7 @@ public func _TFCCreateTensorHandleFromC(
 
 @usableFromInline
 @_silgen_name("_swift_tfc_OpSetAttrBoolArray")
-func _TFCOpSetAttrBoolArray(_ op: OpaquePointer,
+func _TFCOpSetAttrBoolArray(_ op: CTFEOp,
                             _ attrName: UnsafePointer<Int8>,
                             _ value: Array<Bool>) {
   value.map({ $0 ? UInt8(1) : UInt8(0) }).withUnsafeBufferPointer { buffer in
@@ -1213,7 +1213,7 @@ func _TFCOpSetAttrBoolArray(_ op: OpaquePointer,
 
 @usableFromInline
 @_silgen_name("_swift_tfc_OpSetAttrInt32Array")
-func _TFCOpSetAttrInt32Array(_ op: OpaquePointer,
+func _TFCOpSetAttrInt32Array(_ op: CTFEOp,
                              _ attrName: UnsafePointer<Int8>,
                              _ value: Array<Int32>) {
   value.map(Int64.init).withUnsafeBufferPointer { buffer in
@@ -1223,7 +1223,7 @@ func _TFCOpSetAttrInt32Array(_ op: OpaquePointer,
 
 @usableFromInline
 @_silgen_name("_swift_tfc_OpSetAttrInt64Array")
-func _TFCOpSetAttrInt64Array(_ op: OpaquePointer,
+func _TFCOpSetAttrInt64Array(_ op: CTFEOp,
                              _ attrName: UnsafePointer<Int8>,
                              _ value: Array<Int64>) {
   value.withUnsafeBufferPointer { buffer in
@@ -1233,7 +1233,7 @@ func _TFCOpSetAttrInt64Array(_ op: OpaquePointer,
 
 @usableFromInline
 @_silgen_name("_swift_tfc_OpSetAttrDoubleArray")
-func _TFCOpSetAttrDoubleArray(_ op: OpaquePointer,
+func _TFCOpSetAttrDoubleArray(_ op: CTFEOp,
                               _ attrName: UnsafePointer<Int8>,
                               _ value: Array<Double>) {
   value.map(Float.init).withUnsafeBufferPointer { buffer in
@@ -1243,7 +1243,7 @@ func _TFCOpSetAttrDoubleArray(_ op: OpaquePointer,
 
 @usableFromInline
 @_silgen_name("_swift_tfc_OpSetAttrFloatArray")
-func _TFCOpSetAttrFloatArray(_ op: OpaquePointer,
+func _TFCOpSetAttrFloatArray(_ op: CTFEOp,
                              _ attrName: UnsafePointer<Int8>,
                              _ value: Array<Float>) {
   value.withUnsafeBufferPointer { buffer in
@@ -1253,7 +1253,7 @@ func _TFCOpSetAttrFloatArray(_ op: OpaquePointer,
 
 @usableFromInline
 @_silgen_name("_swift_tfc_OpSetAttrTypeArray")
-func _TFCOpSetAttrTypeArray(_ op: OpaquePointer,
+func _TFCOpSetAttrTypeArray(_ op: CTFEOp,
                              _ attrName: UnsafePointer<Int8>,
                              _ value: Array<TensorDataType>) {
   value.withUnsafeBufferPointer { buffer in
@@ -1266,7 +1266,7 @@ func _TFCOpSetAttrTypeArray(_ op: OpaquePointer,
 
 @usableFromInline
 @_silgen_name("_swift_tfc_OpSetAttrTensorShapeArray")
-func _TFCOpSetAttrTensorShapeArray(_ op: OpaquePointer,
+func _TFCOpSetAttrTensorShapeArray(_ op: CTFEOp,
                              _ attrName: UnsafePointer<Int8>,
                              _ value: Array<TensorShape>,
                              _ status: CTFStatus) {
@@ -1278,7 +1278,7 @@ func _TFCOpSetAttrTensorShapeArray(_ op: OpaquePointer,
 
 @usableFromInline
 @_silgen_name("_swift_tfc_OpSetAttrOptionalTensorShapeArray")
-func _TFCOpSetAttrOptionalTensorShapeArray(_ op: OpaquePointer,
+func _TFCOpSetAttrOptionalTensorShapeArray(_ op: CTFEOp,
                              _ attrName: UnsafePointer<Int8>,
                              _ value: Array<TensorShape?>,
                              _ status: CTFStatus) {
@@ -1305,7 +1305,7 @@ func _TFCOpSetAttrOptionalTensorShapeArray(_ op: OpaquePointer,
 ///   - flattenedDims: all the shapes' dimensions concatenated together in
 ///     order
 ///   - ranks: all the shapes' ranks (-1 denotes unknown rank)
-func setAttrShapeList(op: OpaquePointer, attrName: UnsafePointer<Int8>,
+func setAttrShapeList(op: CTFEOp, attrName: UnsafePointer<Int8>,
                       flattenedDims: Array<Int64>, ranks: Array<Int32>,
                       status: CTFStatus) {
   flattenedDims.withUnsafeBufferPointer { flattenedDimsBuffer in
@@ -1331,7 +1331,7 @@ func setAttrShapeList(op: OpaquePointer, attrName: UnsafePointer<Int8>,
 /// String into a buffer that TFE_OpSetAttrString can read.
 @usableFromInline
 @_silgen_name("_swift_tfc_OpSetAttrString")
-func _TFCOpSetAttrString(_ op: OpaquePointer,
+func _TFCOpSetAttrString(_ op: CTFEOp,
                          _ attrName: UnsafePointer<Int8>,
                          _ value: String) {
   value.utf8CString.withUnsafeBufferPointer { buffer in

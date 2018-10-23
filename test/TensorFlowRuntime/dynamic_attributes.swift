@@ -9,7 +9,7 @@ import StdlibUnittest
 
 var DynamicAttributeTests = TestSuite("DynamicAttribute")
 
-// ===== Dynamic Attribe Values ====
+// ===== Dynamic Attribute Values ====
 // These global vars with @inline(never) loaders ensure that the compiler
 // can't find the constant value of the attributes.
 
