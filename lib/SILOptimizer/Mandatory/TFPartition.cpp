@@ -159,9 +159,9 @@ static PartitioningClass classifyInst(SILInstruction *inst) {
         return PartitioningClass::GetScalarOrDie;
       if (fn->getName().startswith("__tf_hoistable_"))
         return PartitioningClass::Hoistable;
-      if (fn->getName() == "__tf_send")
+      if (fn->getName() == "__tf_to_accel")
         return PartitioningClass::ExplicitToAccel;
-      if (fn->getName() == "__tf_receive")
+      if (fn->getName() == "__tf_to_host")
         return PartitioningClass::ExplicitToHost;
     }
   }
@@ -697,7 +697,7 @@ public:
   /// The set of values that must be sent to the accelerator.
   SmallPtrSet<SILValue, 8> valuesToSend;
 
-  /// Set of all of the __tf_send calls that silence copy-in warnings.
+  /// Set of all of the __tf_to_accel calls that silence copy-in warnings.
   SmallPtrSet<SILInstruction *, 8> explicitCopyMarkers;
 
   /// Set of source locations where we have issued copy-to-host warnings.

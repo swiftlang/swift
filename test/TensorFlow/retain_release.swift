@@ -96,12 +96,12 @@ public func testBalancedRetainReleases() {
 // CHECK: function_ref @_swift_tfc_FinishTensorComputation
 // CHECK: [[H:%.*]] = alloc_ref $TensorHandle<Float>
 //
-// __tf_receive is called here
-// CHECK: [[RECV:%.*]] = function_ref @__tf_receive
+// __tf_to_host is called here
+// CHECK: [[TOHOST:%.*]] = function_ref @__tf_to_host
 //
 // Currently we generate a retain for the use of apply below
 // CHECK: strong_retain [[H]] : $TensorHandle<Float>
-// CHECK: apply [[RECV]]<Float>([[H]])
+// CHECK: apply [[TOHOST]]<Float>([[H]])
 //
 // CHECK: strong_release [[H]] : $TensorHandle<Float>
 // CHECK: strong_release [[H]] : $TensorHandle<Float>
