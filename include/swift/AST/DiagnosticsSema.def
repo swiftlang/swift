@@ -2277,7 +2277,7 @@ ERROR(multiple_enum_raw_types,none,
 ERROR(raw_type_not_first,none,
   "raw type %0 must appear first in the enum inheritance clause", (Type))
 ERROR(raw_type_not_literal_convertible,none,
-      "raw type %0 is not expressible by any literal",
+      "raw type %0 is not expressible by a string, integer, or floating-point literal",
       (Type))
 ERROR(enum_raw_type_not_equatable,none,
       "RawRepresentable conformance cannot be synthesized because raw type %0 is not "
