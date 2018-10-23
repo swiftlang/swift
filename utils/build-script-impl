@@ -3081,7 +3081,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 # If libdispatch is being built, TestFoundation will need access to it
                 if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
-                    LIBDISPATCH_LIB_DIR=":$(build_directory ${host} libdispatch)/src/.libs"
+                    LIBDISPATCH_LIB_DIR=":$(build_directory ${host} libdispatch):$(build_directory ${host} libdispatch)/src"
                 else
                     LIBDISPATCH_LIB_DIR=""
                 fi
