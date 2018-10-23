@@ -73,6 +73,7 @@ extension LazyCollection: LazyCollectionProtocol {
 /// Forward implementations to the base collection, to pick up any
 /// optimizations it might implement.
 extension LazyCollection : Sequence {
+  public typealias Element = Base.Element
   public typealias Iterator = Base.Iterator
 
   /// Returns an iterator over the elements of this sequence.
@@ -118,9 +119,9 @@ extension LazyCollection : Collection {
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
-  public typealias Element = Base.Element
   public typealias Index = Base.Index
   public typealias Indices = Base.Indices
+  public typealias SubSequence = Slice<LazyCollection>
 
   /// The position of the first element in a non-empty collection.
   ///

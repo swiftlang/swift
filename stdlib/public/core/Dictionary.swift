@@ -618,6 +618,8 @@ extension Dictionary {
 }
 
 extension Dictionary: Collection {
+  public typealias SubSequence = Slice<Dictionary>
+  
   /// The position of the first element in a nonempty dictionary.
   ///
   /// If the collection is empty, `startIndex` is equal to `endIndex`.
@@ -1320,6 +1322,7 @@ extension Dictionary {
     : Collection, Equatable,
       CustomStringConvertible, CustomDebugStringConvertible {
     public typealias Element = Key
+    public typealias SubSequence = Slice<Dictionary.Keys>
 
     @usableFromInline
     internal var _variant: Dictionary<Key, Value>._Variant
