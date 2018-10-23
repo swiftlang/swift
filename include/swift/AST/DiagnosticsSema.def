@@ -1367,6 +1367,10 @@ ERROR(pattern_binds_no_variables,none,
       "variables",
       (unsigned))
 
+ERROR(stored_property_no_uninhabited_type,none,
+      "stored property %0 cannot have uninhabited type %1",
+      (Identifier, Type))
+
 ERROR(nscoding_unstable_mangled_name,none,
       "%select{private|fileprivate|nested|local}0 class %1 has an "
       "unstable name when archiving via 'NSCoding'",

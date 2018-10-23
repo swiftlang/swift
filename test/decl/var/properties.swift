@@ -1267,3 +1267,12 @@ class WeakFixItTest {
   // expected-error @+1 {{'weak' variable should have optional type '(WFI_P1 & WFI_P2)?'}} {{18-18=(}} {{33-33=)?}}
   weak var bar : WFI_P1 & WFI_P2
 }
+
+// SR-8811
+// Stored properties cannot have uninhabited types
+
+struct SR8811 {
+  var x: Never // expected-error {{stored property 'x' cannot have uninhabited type 'Never'}}
+  
+  var y: (Int, Never, Bool) // expected-error {{stored property 'y' cannot have uninhabited type '(Int, Never, Bool)'}}
+}

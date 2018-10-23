@@ -2461,6 +2461,15 @@ public:
       }
     }
 
+    // Reject variable if it is a stored property with a structurally
+    // uninhabited type
+    if (VD->isInstanceMember() && VD->hasStorage() && 
+        VD->getInterfaceType()->isStructurallyUninhabited()) {
+      TC.diagnose(VD->getLoc(), diag::stored_property_no_uninhabited_type,
+                  VD->getName(), VD->getInterfaceType());
+      VD->markInvalid();
+    }
+
     if (!checkOverrides(VD)) {
       // If a property has an override attribute but does not override
       // anything, complain.
