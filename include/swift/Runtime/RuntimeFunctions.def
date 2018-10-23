@@ -1418,6 +1418,36 @@ FUNCTION(TFC_GetCTensorHandleFromSwift, _swift_tfc_GetCTensorHandleFromSwift, C_
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind))
 
+FUNCTION(TFC_OpAddInputFromTensorHandle, _swift_tfc_OpAddInputFromTensorHandle,
+         C_CC,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFC_OpAddInputFromTensorGroup,
+         _swift_tfc_OpAddInputFromTensorGroup,
+         C_CC,
+         RETURNS(Int32Ty),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy, WitnessTablePtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFC_GetTensorGroupResultBuffer,
+         _swift_tfc_GetTensorGroupResultBuffer, SwiftCC,
+         RETURNS(Int8PtrTy),
+         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy, WitnessTablePtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFC_GetTensorGroupResultBufferSize,
+         _swift_tfc_GetTensorGroupResultBufferSize, SwiftCC,
+         RETURNS(Int32Ty),
+         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy, WitnessTablePtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFC_InitTensorGroup, _swift_tfc_InitTensorGroup, SwiftCC,
+         RETURNS(VoidTy),
+         ARGS(OpaquePtrTy, Int8PtrTy, TypeMetadataPtrTy, WitnessTablePtrTy),
+         ATTRS(NoUnwind, FirstParamStructRet))
+
 FUNCTION(TFC_CreateTensorHandleFromC, _swift_tfc_CreateTensorHandleFromC, C_CC,
          RETURNS(Int8PtrTy),
          ARGS(Int8PtrTy),

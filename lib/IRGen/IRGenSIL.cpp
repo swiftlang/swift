@@ -1900,25 +1900,6 @@ static void abortOnGraphOp(IRGenFunction &IGF, llvm::StringRef errMessage) {
   IGF.Builder.CreateCall(abortFunc, {});
 }
 
-// Create and return a (i8*-typed) address value to a constant string.
-// TODO: As a code size optimization, if we have created this global string
-// before, we can avoid creating a new one.
-static llvm::Value *createStringValAddr(IRGenModule &IGM, StringRef strVal) {
-  auto &llvmModule = IGM.Module;
-  auto &llvmContext = llvmModule.getContext();
-  auto opNameVal = llvm::ConstantDataArray::getString(llvmContext, strVal);
-  auto global =
-      new llvm::GlobalVariable(IGM.Module, opNameVal->getType(), true,
-                               llvm::GlobalValue::PrivateLinkage, opNameVal);
-
-  // Make an i8*.
-  auto zero = llvm::ConstantInt::get(IGM.Int32Ty, 0);
-  llvm::Constant *indices[] = {zero, zero};
-  auto opNameValAddr = llvm::ConstantExpr::getInBoundsGetElementPtr(
-      global->getValueType(), global, indices);
-  return opNameValAddr;
-}
-
 template <typename SrcT>
 llvm::Value *IRGenSILFunction::createArrayAndSize(
     ArrayRef<SrcT> elements, llvm::Type *eltTy, const char *arrayName,
@@ -1941,12 +1922,13 @@ llvm::Value *IRGenSILFunction::createArrayAndSize(
 /// FIXME: This is incomplete. We should derive this from op metadata. We can
 /// get it from the "number_attr" field of the input's "input_arg". The raw op
 /// generator is probably the right place to put this.
-static const char *inputListNumberAttr(StringRef opName) {
-  if (opName == "Pack")
+static const char *inputListNumberAttr(StringRef opName, unsigned inputIdx) {
+  if (inputIdx == 0 && opName == "Pack")
     return "N";
-  if (opName == "Concat" || opName == "ConcatV2" || opName == "ConcatOffset")
+  if (inputIdx == 0 &&
+      (opName == "Concat" || opName == "ConcatV2" || opName == "ConcatOffset"))
     return "N";
-  if (opName == "ZipDataset")
+  if (inputIdx == 0 && opName == "ZipDataset")
     return "N";
   return nullptr;
 }
@@ -1967,7 +1949,13 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   auto &astCtx = CurSILFn->getASTContext();
   tf::GraphOperationInfo opInfo(i);
 
-  if (!CurSILFn->processedByDeabstraction) {
+  auto tfModule = astCtx.getLoadedModule(astCtx.Id_TensorFlow);
+  assert(tfModule && "could not find TensorFlow module");
+  auto tensorGroupProto =
+      astCtx.getProtocol(KnownProtocolKind::TensorGroup);
+  assert(tensorGroupProto && "could not find TensorGroup protocol");
+
+  if (CurSILFn->skippedByDeabstraction) {
     // graph_ops do make it here when building functions that don't get
     // deabstracted (e.g. TensorFlow stdlib functions).
     // IRGen is currently not powerful enough to handle graph_ops in functions
@@ -2024,43 +2012,79 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   LLVM_DEBUG(llvm::dbgs() << "Calling TFE_NewOp(ctx, op, status) with op name "
                           << opInfo.getOperationName() << ".\n");
   auto *TFENewOpFn = IGM.getTFE_NewOpFn();
-  auto opNameValAddr = createStringValAddr(IGM, opInfo.getOperationName());
+  auto opNameValAddr = IGM.getAddrOfGlobalString(opInfo.getOperationName());
   auto op =
       Builder.CreateCall(TFENewOpFn, {eagerContext, opNameValAddr, status});
   checkOk(status);
 
-  auto addTensorhandleAsOpInput = [&](SILValue tensorHandle) {
+  // Unpacks the tensor handles in `opInput`, adds them all as inputs, and
+  // returns an Int32 value for the number of inputs that it has added. There
+  // are a few different cases that can be unpacked:
+  // - if `opInput` is a TensorFlow value, then we just add its handle;
+  // - if `opInput` is an archetype conforming to TensorGroup, then we
+  //   ask the conformance for the handles and add those;
+  // This function crashes if it receives an unhandled case. Earlier
+  // typechecking should ensure that inputs match the cases that this function
+  // handles.
+  //
+  // TODO: We should also handle the following cases:
+  // - if `opInput` is an array of TensorFlow values, then we add all the
+  //   elements' handles;
+  // - if `opInput` is an array of archetypes conforming to TensorGroup,
+  //   then we ask the conformance for all the elements' handles, flatten the
+  //   results together, and add those;
+  auto unpackAndAddInput = [&](SILValue opInput) -> llvm::Value* {
     LLVM_DEBUG(llvm::dbgs()
-               << " Adding input of type " << tensorHandle->getType() << ".\n");
-    assert(tf::isTensorFlowValue(tensorHandle->getType()) &&
-           "all op inputs should be TensorFlow values");
+               << " Adding input of type " << opInput->getType() << ".\n");
 
-    auto tensorHandleValue = getLoweredSingletonExplosion(tensorHandle);
-    auto *extractHandleFn = IGM.getTFC_GetCTensorHandleFromSwiftFn();
-    // Cast to a void*, as required by TFC_GetCTensorHandleFromSwift().
-    auto tensorHandleValueUntyped =
+    if (tf::isTensorFlowValue(opInput->getType())) {
+      auto *tensorHandleValue = getLoweredSingletonExplosion(opInput);
+      auto *opAddInputFromTensorHandleFn =
+          IGM.getTFC_OpAddInputFromTensorHandleFn();
+      auto *tensorHandleValueUntyped =
+          Builder.CreateBitCast(tensorHandleValue, IGM.Int8PtrTy);
+      Builder.CreateCall(opAddInputFromTensorHandleFn,
+                         {op, tensorHandleValueUntyped, status});
+      checkOk(status);
+      return llvm::ConstantInt::get(IGM.Int32Ty, 1);
+    }
+
+    auto canType = opInput->getType().getASTType()->getCanonicalType();
+    auto conformance = tfModule->lookupConformance(canType,
+                                                   tensorGroupProto);
+    assert(conformance && "input type does not conform to TensorGroup");
+    auto *typeMetadata = emitTypeMetadataRef(canType);
+    auto *wtable = emitWitnessTableRef(*this, canType, *conformance);
+
+    auto *tensorHandleValue = getLoweredAddress(opInput).getAddress();
+    auto *tensorHandleValueUntyped =
         Builder.CreateBitCast(tensorHandleValue, IGM.Int8PtrTy);
-    auto cHandle =
-        Builder.CreateCall(extractHandleFn, {tensorHandleValueUntyped});
 
-    // Add an op input as in:
-    //   TFE_OpAddInput(op, cHandle);
-    auto *opAddInputFn = IGM.getTFE_OpAddInputFn();
-    Builder.CreateCall(opAddInputFn, {op, cHandle, status});
+    auto *opAddInputFromTensorGroupFn =
+        IGM.getTFC_OpAddInputFromTensorGroupFn();
+    auto *ret = Builder.CreateCall(
+        opAddInputFromTensorGroupFn,
+        {op, tensorHandleValueUntyped, status, typeMetadata, wtable});
     checkOk(status);
+    return ret;
   };
 
+  // If we find an out parameter, we'll keep track of its address and some data
+  // about its type.
+  Address outParameterAddress;
+  llvm::Value *outParameterTypeMetadata = nullptr;
+  llvm::Value *outParameterTensorGroupWitnessTable = nullptr;
+
   // Handle inputs and dynamic attributes.
+  unsigned inputIdx = 0;
   for (auto structuredArgument : opInfo.getStructuredArguments()) {
     auto argumentNameAndLowering =
         structuredArgument.getArgumentNameAndLowering();
     std::string argumentName = std::get<0>(argumentNameAndLowering);
     auto argumentLowering = std::get<1>(argumentNameAndLowering);
     LLVM_DEBUG(llvm::dbgs() << "IRGen graph_op argument " << argumentName
-               << "with lowering " << (unsigned)argumentLowering);
+               << " with lowering " << (unsigned)argumentLowering << "\n");
     switch (argumentLowering) {
-    case GraphOperationInfo::ArgumentLowering::Out:
-      assert(0 && "Attributes cannot be output parameters");
     case GraphOperationInfo::ArgumentLowering::UnknownShapeListAttribute:
       assert(0 && "UnknownShapeListAttribute should have been eliminated "
                   "by deabstraction");
@@ -2074,11 +2098,31 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       assert(0 && "TensorAttributes cannot be dynamic");
     case GraphOperationInfo::ArgumentLowering::Input: {
       assert(argumentName.empty() && "inputs cannot have names");
+
+      // Special attr to represent the list length, if needed. This is necessary
+      // because we add list inputs one element at a time rather than by using a
+      // TFE_OpAddInputList function (which doesn't exist yet). This is null
+      // when the input does not have a number attr.
+      const char *numberAttr = inputListNumberAttr(opInfo.getOperationName(),
+                                                   inputIdx);
+
+      // Keep track of the list length when we have a number attr.
+      llvm::Value *listLength = nullptr;
+      auto incrementListLength = [&](llvm::Value *amount) {
+        if (!numberAttr)
+          return;
+
+        if (listLength)
+          listLength = Builder.CreateAdd(listLength, amount);
+        else
+          listLength = amount;
+      };
+
       switch (structuredArgument.getKind()) {
       case GraphOperationInfo::SAK_Single: {
         LLVM_DEBUG(llvm::dbgs() << " Adding a single input.\n");
         auto tensorHandle = structuredArgument.getSingleArgument();
-        addTensorhandleAsOpInput(tensorHandle);
+        incrementListLength(unpackAndAddInput(tensorHandle));
         break;
       }
       case GraphOperationInfo::SAK_List: {
@@ -2086,19 +2130,37 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
                    << " Adding input list of size "
                    << structuredArgument.getArgumentList().size() << ".\n");
         for (auto tensorHandle : structuredArgument.getArgumentList()) {
-          addTensorhandleAsOpInput(tensorHandle);
-        }
-        // Set special attr to represent the list length, if needed. This is not
-        // needed in graph lowering.
-        if (auto numberAttr = inputListNumberAttr(opInfo.getOperationName())) {
-          auto setAttrFn = IGM.getTFE_OpSetAttrIntFn();
-          auto listLenAddr = createStringValAddr(IGM, numberAttr);
-          auto listLenVal = llvm::ConstantInt::get(
-              IGM.Int64Ty, structuredArgument.getArgumentList().size());
-          Builder.CreateCall(setAttrFn, {op, listLenAddr, listLenVal});
+          incrementListLength(unpackAndAddInput(tensorHandle));
         }
       }
       }
+
+      if (numberAttr) {
+        assert(listLength && "should have set a list length");
+        listLength = Builder.CreateSExt(listLength, IGM.Int64Ty);
+        auto setAttrFn = IGM.getTFE_OpSetAttrIntFn();
+        auto numberAttrAddrVal = IGM.getAddrOfGlobalString(numberAttr);
+        Builder.CreateCall(setAttrFn, {op, numberAttrAddrVal, listLength});
+      }
+
+      ++inputIdx;
+      break;
+    }
+    case GraphOperationInfo::ArgumentLowering::Out: {
+      assert(structuredArgument.getKind() == GraphOperationInfo::SAK_Single &&
+             "the out parameter should be a single argument");
+      assert(!outParameterAddress.isValid() &&
+             "there can only be one out parameter");
+      auto silValue = structuredArgument.getSingleArgument();
+      outParameterAddress = getLoweredAddress(silValue);
+
+      auto canType = silValue->getType().getASTType()->getCanonicalType();
+      auto conformance = tfModule->lookupConformance(canType,
+                                                     tensorGroupProto);
+      assert(conformance && "out type does not conform to TensorGroup");
+      outParameterTypeMetadata = emitTypeMetadataRef(canType);
+      outParameterTensorGroupWitnessTable =
+          emitWitnessTableRef(*this, canType, *conformance);
       break;
     }
     case GraphOperationInfo::ArgumentLowering::NormalAttribute: {
@@ -2111,7 +2173,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       LLVM_DEBUG(llvm::dbgs() << " Adding dynamic NormalAttribute of type "
                  << astType << "\n");
 
-      auto *attrNameValAddr = createStringValAddr(IGM, argumentName.c_str());
+      auto *attrNameValAddr = IGM.getAddrOfGlobalString(argumentName.c_str());
 
       // Deabstraction extracts builtin types out of stdlib types, so we match
       // on builtin types. If we remove that part of deabstraction, we should
@@ -2247,7 +2309,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       LLVM_DEBUG(llvm::dbgs() << " Adding dynamic TFDataTypeAttribute of type "
                  << astType << "\n");
 
-      auto *attrNameValAddr = createStringValAddr(IGM, argumentName.c_str());
+      auto *attrNameValAddr = IGM.getAddrOfGlobalString(argumentName.c_str());
 
       // Deabstraction extracts the Builtin.Int32 that's inside the
       // TensorDataType.
@@ -2323,8 +2385,8 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         auto silFuncName = attr.value.getFunctionValue()->getName();
         auto graphFuncName = getGraphFuncNameForFuncAttr(silFuncName);
         auto setAttrFn = IGM.getTFE_OpSetAttrFunctionNameFn();
-        auto attrNameAddr = createStringValAddr(IGM, attrName.c_str());
-        auto graphFuncNameAddr = createStringValAddr(IGM, graphFuncName);
+        auto attrNameAddr = IGM.getAddrOfGlobalString(attrName.c_str());
+        auto graphFuncNameAddr = IGM.getAddrOfGlobalString(graphFuncName);
         auto graphFuncNameSize = llvm::ConstantInt::get(IGM.SizeTy,
                                                         graphFuncName.size());
         Builder.CreateCall(
@@ -2366,7 +2428,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
               Builder.CreateBitCast(vals.getAddress(), IGM.Int8PtrTy);
 
           auto setAttrFn = IGM.getTFE_OpSetAttrIntListFn();
-          auto attrNameAddr = createStringValAddr(IGM, attrName.c_str());
+          auto attrNameAddr = IGM.getAddrOfGlobalString(attrName.c_str());
           Builder.CreateCall(setAttrFn,
                              {op, attrNameAddr, valsUntyped, numElts});
           break;
@@ -2429,7 +2491,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
               numDimsBuffer.getAddress(), IGM.Int8PtrTy);
 
           auto *setAttrShapeListFn = IGM.getTFE_OpSetAttrShapeListFn();
-          auto attrNameValAddr = createStringValAddr(IGM, attrName.c_str());
+          auto attrNameValAddr = IGM.getAddrOfGlobalString(attrName.c_str());
           Builder.CreateCall(
               setAttrShapeListFn,
               {op, attrNameValAddr, dimsBufferBufferUntyped,
@@ -2441,7 +2503,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       }
       case SymbolicValue::Integer:
       case SymbolicValue::Float: {
-        auto attrNameAddr = createStringValAddr(IGM, attrName.c_str());
+        auto attrNameAddr = IGM.getAddrOfGlobalString(attrName.c_str());
         llvm::Constant *setAttrFn = nullptr;
         llvm::Value *attrVal = nullptr;
         if (attr.value.getKind() == SymbolicValue::Float) {
@@ -2476,8 +2538,8 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       case SymbolicValue::String: {
         auto attrValue = attr.value.getStringValue();
         if (attrName != "__device") {
-          auto attrNameAddr = createStringValAddr(IGM, attrName.c_str());
-          auto attrValAddr = createStringValAddr(IGM, attrValue);
+          auto attrNameAddr = IGM.getAddrOfGlobalString(attrName.c_str());
+          auto attrValAddr = IGM.getAddrOfGlobalString(attrValue);
           auto attrLength =
               llvm::ConstantInt::get(IGM.SizeTy, attrValue.size());
           auto *setAttrFn = IGM.getTFE_OpSetAttrStringFn();
@@ -2588,7 +2650,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       // Set up the tensor-typed value attr as in:
       //   TFE_OpSetAttrTensor(op, "value", tensor, status);
       auto *setTensorAttrFn = IGM.getTFE_OpSetAttrTensorFn();
-      auto valueAttrAddr = createStringValAddr(IGM, "value");
+      auto valueAttrAddr = IGM.getAddrOfGlobalString("value");
       Builder.CreateCall(setTensorAttrFn, {op, valueAttrAddr, tensor, status});
       checkOk(status);
 
@@ -2602,7 +2664,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         // Set up dtype attr as in:
         //   TFE_OpSetAttrType(op, "dtype", TF_FLOAT);
         auto *setAttrTypeFn = IGM.getTFE_OpSetAttrTypeFn();
-        auto attrNameValAddr = createStringValAddr(IGM, attrName.c_str());
+        auto attrNameValAddr = IGM.getAddrOfGlobalString(attrName.c_str());
         dtypeAttr = getTFDataType(attr.value);
         auto dtypeAttrConst = llvm::ConstantInt::get(IGM.Int32Ty, dtypeAttr);
         Builder.CreateCall(setAttrTypeFn,
@@ -2625,7 +2687,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
                                                      IGM.Int8PtrTy);
 
         auto *setAttrTypeListFn = IGM.getTFE_OpSetAttrTypeListFn();
-        auto attrNameValAddr = createStringValAddr(IGM, attrName.c_str());
+        auto attrNameValAddr = IGM.getAddrOfGlobalString(attrName.c_str());
         Builder.CreateCall(setAttrTypeListFn,
                            {op, attrNameValAddr, typeListUntyped, numTypes});
         break;
@@ -2647,38 +2709,56 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   assert(!opDevice.empty());
   if (opDevice != TF_ALL_DEVICES) {
     auto *setDeviceFn = IGM.getTFE_OpSetDeviceFn();
-    auto device = createStringValAddr(IGM, opDevice);
+    auto device = IGM.getAddrOfGlobalString(opDevice);
     Builder.CreateCall(setDeviceFn, {op, device, status});
     checkOk(status);
   }
 
+  // Calculate how many results we have, and allocate space for them.
+  llvm::Value *expectedReturnValueCount = nullptr;
+  llvm::Value *returnValuesAddress = nullptr;
+  if (outParameterAddress.isValid()) {
+    // If we have an out parameter, then we need to call generic functions that
+    // calculate how many results we have and allocate space for them.
+    LLVM_DEBUG(llvm::dbgs() << " Returns indirect result.\n");
+    auto *getTensorGroupResultBufferSizeFn =
+        IGM.getTFC_GetTensorGroupResultBufferSizeFn();
+    expectedReturnValueCount = Builder.CreateCall(
+        getTensorGroupResultBufferSizeFn,
+        {outParameterTypeMetadata, outParameterTypeMetadata,
+         outParameterTensorGroupWitnessTable});
+    auto *getTensorGroupResultBufferFn =
+        IGM.getTFC_GetTensorGroupResultBufferFn();
+    returnValuesAddress = Builder.CreateCall(
+        getTensorGroupResultBufferFn,
+        {outParameterTypeMetadata, outParameterTypeMetadata,
+         outParameterTensorGroupWitnessTable});
+    returnValuesAddress = Builder.CreateBitCast(returnValuesAddress,
+                                          IGM.Int8PtrPtrTy);
+  } else {
+    // If we're returning results directly, we can tell how many results we have
+    // by looking at the instruction.
+    LLVM_DEBUG(llvm::dbgs() << " Returns " << i->getNumResults()
+               << " direct result(s).\n");
+    expectedReturnValueCount = llvm::ConstantInt::get(IGM.Int32Ty,
+                                                      i->getNumResults());
+    returnValuesAddress = createAlloca(IGM.Int8PtrTy, expectedReturnValueCount,
+                                       IGM.getPointerAlignment(),
+                                       "returnValues").getAddress();
+  }
+
   // Now we execute the TFE op as in:
-  //   TFE_TensorHandle* retval;
-  //   int num_retvals = 1;
+  //   TFE_TensorHandle* retval = <allocated above>
+  //   int num_retvals = <calculated above>
   //   TFE_Execute(op, &retval, &num_retvals, status);
-  //
-  // The LLVM IR code looks like:
-  //   %returnValues = alloca %struct.TFE_TensorHandle*, align 8
-  //   %returnValueCount = alloca i32, align 8
-  //   store i32 1, i32* %returnValueCount, align 8
-  //   %134 = bitcast i8** %returnValues to %struct.TFE_TensorHandle**
-  //   call void @TFE_Execute(%struct.TFE_Op* %130,
-  //                          %struct.TFE_TensorHandle** %134,
-  //                          i32* %returnValueCount,
-  //                          %struct.TF_Status* %128)
-  //   %135 = load %struct.TFE_TensorHandle*, %struct.TFE_TensorHandle** %134,
   //
   // FIXME: getPointerAlignment is likely excessive. "align 4" might be
   // sufficient.
   auto returnValueCount =
       createAlloca(IGM.Int32Ty, IGM.getPointerAlignment(), "returnValueCount");
-  auto expectedReturnValueCount =
-      llvm::ConstantInt::get(IGM.Int32Ty, i->getNumResults());
   Builder.CreateStore(expectedReturnValueCount, returnValueCount);
-  auto returnValues = createAlloca(IGM.Int8PtrTy, expectedReturnValueCount,
-                                   IGM.getPointerAlignment(), "returnValues");
   auto *tfeExecuteFn = IGM.getTFE_ExecuteFn();
-  Builder.CreateCall(tfeExecuteFn, {op, returnValues.getAddress(),
+  Builder.CreateCall(tfeExecuteFn, {op, returnValuesAddress,
                                     returnValueCount.getAddress(), status});
   checkOk(status);
 
@@ -2693,28 +2773,45 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   auto *deleteStatusFn = IGM.getTF_DeleteStatusFn();
   Builder.CreateCall(deleteStatusFn, {status});
 
-  for (unsigned resultIdx = 0; resultIdx < i->getNumResults(); ++resultIdx) {
-    auto resultIdxVal = llvm::ConstantInt::get(IGM.Int32Ty, resultIdx);
-    auto resultAddr = Builder.CreateInBoundsGEP(returnValues.getAddress(),
-                                                resultIdxVal);
-    auto cTensorHandle = Builder.CreateLoad(resultAddr,
-                                            IGM.getPointerAlignment());
+  if (outParameterAddress.isValid()) {
+    // If we have an out parameter, store the results there.
+    assert(i->getNumResults() == 0 &&
+           "can't handle direct and indirect results at the same time");
+    auto *initTensorGroupFn = IGM.getTFC_InitTensorGroupFn();
+    auto *outParameterAddressOpaque = Builder.CreateBitCast(
+        outParameterAddress.getAddress(), IGM.OpaquePtrTy);
+    auto *returnValuesAddressUntyped = Builder.CreateBitCast(
+        returnValuesAddress, IGM.Int8PtrTy);
+    Builder.CreateCall(initTensorGroupFn,
+                       {outParameterAddressOpaque,
+                        returnValuesAddressUntyped,
+                        outParameterTypeMetadata,
+                        outParameterTensorGroupWitnessTable});
+  } else {
+    // There is no out parameter. Return the results directly.
+    for (unsigned resultIdx = 0; resultIdx < i->getNumResults(); ++resultIdx) {
+      auto resultIdxVal = llvm::ConstantInt::get(IGM.Int32Ty, resultIdx);
+      auto resultAddr = Builder.CreateInBoundsGEP(returnValuesAddress,
+                                                  resultIdxVal);
+      auto cTensorHandle = Builder.CreateLoad(resultAddr,
+                                              IGM.getPointerAlignment());
 
-    // Wrap `cTensorHandle` into a _AnyTensorHandle object, and get an untyped
-    // pointer to the _AnyTensorHandle.
-    auto *createHandleFn = IGM.getTFC_CreateTensorHandleFromCFn();
-    llvm::Value *tensorHandle = Builder.CreateCall(createHandleFn,
-                                                   {cTensorHandle});
+      // Wrap `cTensorHandle` into a _AnyTensorHandle object, and get an untyped
+      // pointer to the _AnyTensorHandle.
+      auto *createHandleFn = IGM.getTFC_CreateTensorHandleFromCFn();
+      llvm::Value *tensorHandle = Builder.CreateCall(createHandleFn,
+                                                     {cTensorHandle});
 
-    // Cast to a pointer of the expected result type (for example,
-    // TensorHandle<Float>).
-    SILValue result = i->getResults()[resultIdx];
-    tensorHandle = Builder.CreateBitCast(
-        tensorHandle, IGM.getStorageType(result->getType()));
+      // Cast to a pointer of the expected result type (for example,
+      // TensorHandle<Float>).
+      SILValue result = i->getResults()[resultIdx];
+      tensorHandle = Builder.CreateBitCast(
+          tensorHandle, IGM.getStorageType(result->getType()));
 
-    Explosion e;
-    e.add(tensorHandle);
-    setLoweredExplosion(result, e);
+      Explosion e;
+      e.add(tensorHandle);
+      setLoweredExplosion(result, e);
+    }
   }
 }
 

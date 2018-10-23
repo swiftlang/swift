@@ -1172,6 +1172,65 @@ public func _TFCGetCTensorHandleFromSwift(
   return handle.cTensorHandle
 }
 
+/// Adds `handle` as an input to `op`.
+@usableFromInline
+@_silgen_name("_swift_tfc_OpAddInputFromTensorHandle")
+func _TFCOpAddInputFromTensorHandle(_ op: CTFEOp,
+                                    _ handle: _AnyTensorHandle,
+                                    _ status: CTFStatus) {
+  TFE_OpAddInput(op, handle.cTensorHandle, status)
+}
+
+/// Adds `t` as an input or inputs to `op`.
+@usableFromInline
+@_silgen_name("_swift_tfc_OpAddInputFromTensorGroup")
+func _TFCOpAddInputFromTensorGroup<T: TensorGroup>(
+    _ op: CTFEOp, _ t: T, _ status: CTFStatus
+) -> Int32 {
+  let count = T._tensorHandleCount
+  let buffer = UnsafeMutablePointer<CTensorHandle>.allocate(capacity: Int(count))
+  defer { buffer.deallocate() }
+  t._unpackTensorHandles(resultBuffer: buffer)
+  for i in 0..<count {
+    TFE_OpAddInput(op, buffer.advanced(by: Int(i)).pointee, status)
+    if TF_GetCode(status) != TF_OK {
+      return 0
+    }
+  }
+  return count
+}
+
+/// Initializes a TensorGroup value, taking ownership of all the tensor
+/// handles in `tensorHandles`. Also deallocates `tensorHandles`.
+@usableFromInline
+@_silgen_name("_swift_tfc_InitTensorGroup")
+func _TFCInitTensorGroup<T: TensorGroup>(
+    owning tensorHandles: UnsafeMutablePointer<CTensorHandle>
+) -> T {
+  let t = T(_owning: tensorHandles)
+  tensorHandles.deallocate()
+  return t
+}
+
+/// Allocates a buffer with enough capacity to hold tensor operation results
+/// corresponding to a TensorGroup of type `T`.
+@usableFromInline
+@_silgen_name("_swift_tfc_GetTensorGroupResultBuffer")
+func _TFCGetTensorGroupResultBuffer<T: TensorGroup>(
+  _ type: T.Type
+) -> UnsafeMutablePointer<CTensorHandle> {
+  return UnsafeMutablePointer.allocate(capacity: Int(T._tensorHandleCount))
+}
+
+/// Returns the number of tensor operation results required to initialize a
+/// TensorGroup of type `T`.
+@_silgen_name("_swift_tfc_GetTensorGroupResultBufferSize")
+public func _TFCGetTensorGroupResultBufferSize<T: TensorGroup>(
+    _ type: T.Type
+) -> Int32 {
+  return T._tensorHandleCount
+}
+
 @inlinable
 @_silgen_name("_swift_tfc_CreateTensorHandleFromC")
 public func _TFCCreateTensorHandleFromC(

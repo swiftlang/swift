@@ -26,7 +26,7 @@ public class _AnyTensorHandle {
   /// - Note: The compiler knows that `_AnyTensorHandle` has a single stored
   /// property, and assumes that this is it. Changing the design of
   /// `TensorHandle` will require tweaking the compiler.
-  @usableFromInline let cTensorHandle: CTensorHandle
+  public let cTensorHandle: CTensorHandle
   
   /// Private initializer from a `CTensorHandle`. Should only be called from
   /// `TensorHandle<Scalar>.init`.
@@ -42,8 +42,7 @@ public class _AnyTensorHandle {
 @_fixed_layout // required because the compiler accesses cTensorHandle directly.
 public final class TensorHandle<Scalar> : _AnyTensorHandle
   where Scalar : AccelerableByTensorFlow {
-  @usableFromInline
-  init(owning cTensorHandle: CTensorHandle) {
+  public init(owning cTensorHandle: CTensorHandle) {
     super.init(base: cTensorHandle)
   }
   

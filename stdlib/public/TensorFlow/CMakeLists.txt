@@ -45,6 +45,7 @@ set(SOURCES
   Random.swift
   ShapedArray.swift
   Tensor.swift
+  TensorGroup.swift
   TensorHandle.swift
   TensorProtocol.swift
   TensorShape.swift
