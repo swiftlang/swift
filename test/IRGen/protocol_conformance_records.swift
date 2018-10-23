@@ -8,22 +8,7 @@ public protocol Associate {
   associatedtype X
 }
 
-// Dependent conformance
-// CHECK-LABEL: @"$s28protocol_conformance_records9DependentVyxGAA9AssociateAAMc" ={{ dllexport | protected | }}constant
-// -- protocol descriptor
-// CHECK-SAME:           @"$s28protocol_conformance_records9AssociateMp"
-// -- nominal type descriptor
-// CHECK-SAME:           @"$s28protocol_conformance_records9DependentVMn"
-// -- witness table accessor
-// CHECK-SAME:           @"$s28protocol_conformance_records9DependentVyxGAA9AssociateAAWa"
-// -- flags
-// CHECK-SAME:           i32 1
-// CHECK-SAME:         }
 public struct Dependent<T> {}
-
-extension Dependent : Associate {
-  public typealias X = (T, T)
-}
 
 public protocol Runcible {
   func runce()
@@ -117,7 +102,7 @@ public protocol Spoon { }
 // -- witness table accessor
 // CHECK-SAME:           @"$s28protocol_conformance_records17NativeGenericTypeVyxGAA5SpoonA2aERzlWa
 // -- flags
-// CHECK-SAME:           i32 258
+// CHECK-SAME:           i32 131330
 // -- conditional requirement #1
 // CHECK-SAME:           i32 128,
 // CHECK-SAME:           i32 0,
@@ -136,11 +121,26 @@ extension NativeGenericType : Spoon where T: Spoon {
 // -- witness table accessor
 // CHECK-SAME:           @"$sSi18resilient_protocol22OtherResilientProtocol0B20_conformance_recordsWa"
 // -- flags
-// CHECK-SAME:           i32 73,
+// CHECK-SAME:           i32 131145,
 // -- module context for retroactive conformance
 // CHECK-SAME:           @"$s28protocol_conformance_recordsMXM"
 // CHECK-SAME:         }
 extension Int : OtherResilientProtocol { }
+
+// Dependent conformance
+// CHECK-LABEL: @"$s28protocol_conformance_records9DependentVyxGAA9AssociateAAMc" ={{ dllexport | protected | }}constant
+// -- protocol descriptor
+// CHECK-SAME:           @"$s28protocol_conformance_records9AssociateMp"
+// -- nominal type descriptor
+// CHECK-SAME:           @"$s28protocol_conformance_records9DependentVMn"
+// -- witness table accessor
+// CHECK-SAME:           @"$s28protocol_conformance_records9DependentVyxGAA9AssociateAAWa"
+// -- flags
+// CHECK-SAME:           i32 1
+// CHECK-SAME:         }
+extension Dependent : Associate {
+  public typealias X = (T, T)
+}
 
 // CHECK-LABEL: @"\01l_protocol_conformances" = private constant
 // CHECK-SAME: @"$s28protocol_conformance_records15NativeValueTypeVAA8RuncibleAAMc"

@@ -12,26 +12,6 @@ import SwiftShims
 import resilient_protocol
 
 
-// Generic witness table pattern for ConformingType : ResilientProtocol
-
-// CHECK: @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWG"
-
-// CHECK-SAME: internal constant %swift.generic_witness_table_cache {
-
-// -- number of witness table entries
-// CHECK-SAME:   i16 1,
-
-// -- size of private area + 'needs instantiation' bit
-// CHECK-SAME:   i16 1,
-
-// -- the template
-// CHECK-SAME:   @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWp"
-
-// -- instantiator function
-// CHECK-SAME:   i32 0
-
-// CHECK-SAME: }
-
 // Protocol descriptor for ResilientProtocol
 // CHECK: [[RESILIENT_PROTOCOL_NAME:@.*]] = private constant [18 x i8] c"ResilientProtocol\00
 // CHECK: [[ASSOCIATED_TYPES_T:@.*]] = private constant [2 x i8] c"T\00"
@@ -84,7 +64,6 @@ public protocol ResilientProtocol {
   static func defaultF()
 }
 
-
 // Protocol is not public -- doesn't need default witness table
 
 // CHECK: @"$s19protocol_resilience16InternalProtocolMp" = hidden constant
@@ -99,10 +78,9 @@ protocol InternalProtocol {
   func f()
 }
 
-
 // Generic witness table pattern for ConformsWithRequirements : ProtocolWithRequirements
 
-// CHECK: @"$s19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWp"
+// CHECK: @"$s19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWp" =
 
 // CHECK-SAME: internal constant [1 x i8*] [
 
@@ -112,7 +90,18 @@ protocol InternalProtocol {
 // CHECK-SAME: ]
 
 
-// CHECK: @"$s19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWG"
+// Witness table for conformance with resilient associated type
+
+// CHECK: @"$s19protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWP" = {{(protected )?}}hidden global [3 x i8*] [
+// CHECK-SAME:   i8* bitcast (i8** ()* @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWa" to i8*)
+// CHECK-SAME:   @"symbolic 19protocol_resilience23ResilientConformingTypeV"
+// CHECK-SAME: ]
+
+// Protocol conformance descriptor for ResilientConformingType : OtherResilientProtocol
+
+// CHECK: @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAMc" =
+
+// CHECK-SAME: i32 131073,
 
 // -- number of witness table entries
 // CHECK-SAME:   i16 1,
@@ -121,26 +110,19 @@ protocol InternalProtocol {
 // CHECK-SAME:   i16 1,
 
 // -- the template
-// CHECK-SAME:   @"$s19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWp"
+// CHECK-SAME:   @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWp"
 
 // -- instantiator function
 // CHECK-SAME:   i32 0
 
 // CHECK-SAME: }
 
-// Witness table for conformance with resilient associated type
-
-// CHECK: @"$s19protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWP" = {{(protected )?}}hidden global [3 x i8*] [
-// CHECK-SAME:   i8* bitcast (i8** ()* @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWa" to i8*)
-// CHECK-SAME:   @"symbolic 19protocol_resilience23ResilientConformingTypeV"
-// CHECK-SAME: ]
-
 // ConformsWithRequirements protocol conformance descriptor
 
 // CHECK: "$s19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAMc" = hidden constant {
 
 // -- flags
-// CHECK-SAME: i32 65537,
+// CHECK-SAME: i32 196609,
 
 // CHECK-SAME: i32 3,
 
@@ -153,6 +135,18 @@ protocol InternalProtocol {
 
 // CHECK-SAME: @"{{got.|__imp_}}$s18resilient_protocol24ProtocolWithRequirementsP6secondyyFTq"
 // CHECK-SAME: @secondWitness
+
+// -- number of witness table entries
+// CHECK-SAME:   i16 1,
+
+// -- size of private area + 'needs instantiation' bit
+// CHECK-SAME:   i16 1,
+
+// -- the template
+// CHECK-SAME:   @"$s19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWp"
+
+// -- instantiator function
+// CHECK-SAME:   i32 0
 
 // CHECK-SAME: }
 
@@ -391,7 +385,7 @@ bb0(%0 : $*ResilientConformingType):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} i8** @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWa"()
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWG", %swift.type* null, i8*** null)
+// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_instantiateWitnessTable(%swift.protocol_conformance_descriptor* bitcast ({{[{].*[}]}}* @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAMc" to %swift.protocol_conformance_descriptor*), %swift.type* null, i8*** null)
 // CHECK-NEXT:    ret i8** [[WTABLE]]
 
 

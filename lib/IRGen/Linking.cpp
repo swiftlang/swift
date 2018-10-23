@@ -208,10 +208,6 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::DirectProtocolWitnessTable:
     return mangler.mangleDirectProtocolWitnessTable(getProtocolConformance());
 
-  case Kind::GenericProtocolWitnessTableCache:
-    return mangler.mangleGenericProtocolWitnessTableCache(
-                                                    getProtocolConformance());
-
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
     return mangler.mangleGenericProtocolWitnessTableInstantiationFunction(
                                                     getProtocolConformance());
@@ -493,7 +489,6 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   case Kind::AssociatedTypeWitnessTableAccessFunction:
   case Kind::DefaultAssociatedConformanceAccessor:
-  case Kind::GenericProtocolWitnessTableCache:
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
     return SILLinkage::Private;
 
@@ -633,7 +628,6 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::ProtocolWitnessTableLazyAccessFunction:
   case Kind::ProtocolWitnessTableLazyCacheVariable:
   case Kind::AssociatedTypeWitnessTableAccessFunction:
-  case Kind::GenericProtocolWitnessTableCache:
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
   case Kind::SILFunction:
   case Kind::SILGlobalVariable:
