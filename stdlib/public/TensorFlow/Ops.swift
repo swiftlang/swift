@@ -1145,7 +1145,7 @@ public extension Tensor where Scalar : Numeric {
     }
     return Raw.padV2(
       self,
-      paddings: Tensor<Int32>(handle: _TFSend(paddings)),
+      paddings: Tensor<Int32>(handle: _TFToAcclerator(paddings)),
       constantValues: Tensor(value))
   }
 }
