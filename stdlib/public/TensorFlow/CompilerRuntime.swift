@@ -1254,8 +1254,8 @@ func _TFCOpSetAttrFloatArray(_ op: CTFEOp,
 @usableFromInline
 @_silgen_name("_swift_tfc_OpSetAttrTypeArray")
 func _TFCOpSetAttrTypeArray(_ op: CTFEOp,
-                             _ attrName: UnsafePointer<Int8>,
-                             _ value: Array<TensorDataType>) {
+                            _ attrName: UnsafePointer<Int8>,
+                            _ value: Array<TensorDataType>) {
   value.withUnsafeBufferPointer { buffer in
     buffer.withMemoryRebound(to: TF_DataType.self) { reboundBuffer in
       TFE_OpSetAttrTypeList(op, attrName, reboundBuffer.baseAddress,
@@ -1267,9 +1267,9 @@ func _TFCOpSetAttrTypeArray(_ op: CTFEOp,
 @usableFromInline
 @_silgen_name("_swift_tfc_OpSetAttrTensorShapeArray")
 func _TFCOpSetAttrTensorShapeArray(_ op: CTFEOp,
-                             _ attrName: UnsafePointer<Int8>,
-                             _ value: Array<TensorShape>,
-                             _ status: CTFStatus) {
+                                   _ attrName: UnsafePointer<Int8>,
+                                   _ value: Array<TensorShape>,
+                                   _ status: CTFStatus) {
   let flattenedDims = value.flatMap { $0.dimensions.map(Int64.init) }
   let ranks = value.map { $0.rank }
   setAttrShapeList(op: op, attrName: attrName, flattenedDims: flattenedDims,
@@ -1279,9 +1279,9 @@ func _TFCOpSetAttrTensorShapeArray(_ op: CTFEOp,
 @usableFromInline
 @_silgen_name("_swift_tfc_OpSetAttrOptionalTensorShapeArray")
 func _TFCOpSetAttrOptionalTensorShapeArray(_ op: CTFEOp,
-                             _ attrName: UnsafePointer<Int8>,
-                             _ value: Array<TensorShape?>,
-                             _ status: CTFStatus) {
+                                           _ attrName: UnsafePointer<Int8>,
+                                           _ value: Array<TensorShape?>,
+                                           _ status: CTFStatus) {
   let flattenedDims = value.flatMap { (tensorShapeOpt) -> [Int64] in
     if let tensorShape = tensorShapeOpt {
       return tensorShape.dimensions.map(Int64.init)
