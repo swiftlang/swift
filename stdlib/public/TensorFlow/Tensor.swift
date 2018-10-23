@@ -55,15 +55,14 @@ public struct Tensor<Scalar : AccelerableByTensorFlow> : TensorProtocol {
 // functions".
 
 @usableFromInline @inline(never)
-@_silgen_name("__tf_send")
-@_effects(readnone)
-func _TFSend<Scalar>(_ handle: TensorHandle<Scalar>) -> TensorHandle<Scalar> {
+@_silgen_name("__tf_to_accel")
+func _TFToAcclerator<Scalar>(_ handle: TensorHandle<Scalar>) -> TensorHandle<Scalar> {
   return handle
 }
 
 @usableFromInline @inline(never)
-@_silgen_name("__tf_receive")
-func _TFReceive<Scalar>(_ handle: TensorHandle<Scalar>)
+@_silgen_name("__tf_to_host")
+func _TFToHost<Scalar>(_ handle: TensorHandle<Scalar>)
   -> TensorHandle<Scalar> {
   return handle
 }
@@ -169,7 +168,7 @@ public extension Tensor {
   /// Mark memory transfer to accelerator.
   @inlinable @inline(__always)
   func toAccelerator() -> Tensor {
-    return Tensor(handle: _TFSend(handle))
+    return Tensor(handle: _TFToAcclerator(handle))
   }
 
   /// Mark memory transfer to host.
@@ -190,7 +189,7 @@ public extension Tensor {
   /// Mark memory transfer to host.
   @inlinable @inline(__always)
   func toHost() -> Tensor {
-    return Tensor(handle: _TFReceive(handle))
+    return Tensor(handle: _TFToHost(handle))
   }
 }
 
