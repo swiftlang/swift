@@ -2855,13 +2855,14 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
 
   // Set up an initial clause matrix.
   ClauseMatrix clauseMatrix(clauseRows);
-  ConsumableManagedValue subject;
-  if (F.getModule().getOptions().EnableSILOwnership &&
-      exn.getType().isObject()) {
-    subject = {exn.borrow(*this, S), CastConsumptionKind::BorrowAlways};
-  } else {
-    subject = {exn, CastConsumptionKind::TakeOnSuccess};
-  }
+
+  assert(exn.getType().isObject() &&
+         "Error is special and should always be an object");
+  // Our model is that sub-cases get the exception at +0 and the throw (if we
+  // need to rethrow the exception) gets the exception at +1 since we need to
+  // trampoline it's ownership to our caller.
+  ConsumableManagedValue subject = {exn.borrow(*this, S),
+                                    CastConsumptionKind::BorrowAlways};
 
   auto failure = [&](SILLocation location) {
     // If we fail to match anything, just rethrow the exception.
@@ -2874,7 +2875,10 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
       return;
     }
 
-    // Don't actually kill the exception's cleanup.
+    // Since we borrowed exn before sending it to our subcases, we know that it
+    // must be at +1 at this point. That being said, SILGenPattern will
+    // potentially invoke this for each of the catch statements, so we need to
+    // copy before we pass it into the throw.
     CleanupStateRestorationScope scope(Cleanups);
     if (exn.hasCleanup()) {
       scope.pushCleanupState(exn.getCleanup(),
