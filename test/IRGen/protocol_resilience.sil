@@ -99,7 +99,7 @@ protocol InternalProtocol {
 
 // Protocol conformance descriptor for ResilientConformingType : OtherResilientProtocol
 
-// CHECK: @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAMc" = constant
+// CHECK: @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAMc" =
 
 // CHECK-SAME: i32 131073,
 
