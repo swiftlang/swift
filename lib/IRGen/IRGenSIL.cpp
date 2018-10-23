@@ -2149,13 +2149,15 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
           astCtx.getStringDecl()->getDeclaredInterfaceType())) {
         auto *fn = IGM.getTFC_OpSetAttrStringFn();
 
-        // String values contain a ptr and an i64.
+        // Swift Strings are passed in LLVM IR by passing the 2 LLVM values that
+        // are inside them, so we get the 2 LLVM values from the explosion and
+        // pass them to the runtime function.
         auto attrExplosion = getLoweredExplosion(silValue);
-        auto *untypedPtrValue = Builder.CreateBitCast(
-            attrExplosion.claimNext(), IGM.Int8PtrTy);
-        auto *i64Value = attrExplosion.claimNext();
+        assert(attrExplosion.size() == 2 &&
+               "expected 2 LLVM values in Swift String");
         Builder.CreateCall(fn,
-                           {op, attrNameValAddr, untypedPtrValue, i64Value});
+                           {op, attrNameValAddr, attrExplosion.claimNext(),
+                            attrExplosion.claimNext()});
         break;
       }
 

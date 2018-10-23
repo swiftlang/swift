@@ -1464,9 +1464,12 @@ FUNCTION(TFC_OpSetAttrOptionalTensorShapeArray,
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
+// The swift function signature is (CTFEOp, UnsafePointer<Int8>, String) -> ().
+// In LLVM IR, the String gets exploded to (BridgeObjectPtrTy, Int64Ty), so
+// IRGen passes those two values in place of the Swift String.
 FUNCTION(TFC_OpSetAttrString, _swift_tfc_OpSetAttrString, C_CC,
          RETURNS(),
-         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int64Ty),
+         ARGS(Int8PtrTy, Int8PtrTy, BridgeObjectPtrTy, Int64Ty),
          ATTRS(NoUnwind))
 
 FUNCTION(TFC_CheckOk, _swift_tfc_CheckOk, C_CC,
