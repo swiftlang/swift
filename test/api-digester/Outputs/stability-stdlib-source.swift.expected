@@ -1,18 +1,32 @@
 
 /* Generic Signature Changes */
+Func Sequence.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has generic signature change from <Self where Self : Sequence, Self.SubSequence == AnySequence<Self.Element>> to <Self where Self : Sequence>
 
 /* RawRepresentable Changes */
 
 /* Removed Decls */
+Func AnyBidirectionalCollection.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func AnyCollection.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func AnyRandomAccessCollection.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func AnySequence.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
 Func Collection.prefix(through:) has been removed
 Func Collection.prefix(upTo:) has been removed
 Func Collection.suffix(from:) has been removed
+Func Sequence.dropFirst() has been removed
+Func Sequence.dropLast() has been removed
 Func Sequence.filter(_:) has been removed
 Func Sequence.forEach(_:) has been removed
 Func Sequence.map(_:) has been removed
+Func _SequenceWrapper.drop(while:) has been removed
+Func _SequenceWrapper.dropFirst(_:) has been removed
+Func _SequenceWrapper.dropLast(_:) has been removed
 Func _SequenceWrapper.filter(_:) has been removed
 Func _SequenceWrapper.forEach(_:) has been removed
 Func _SequenceWrapper.map(_:) has been removed
+Func _SequenceWrapper.prefix(_:) has been removed
+Func _SequenceWrapper.prefix(while:) has been removed
+Func _SequenceWrapper.suffix(_:) has been removed
+Struct Iterator has been removed
 Var AnyBidirectionalCollection.first has been removed
 Var AnyBidirectionalCollection.last has been removed
 Var AnyCollection.first has been removed
@@ -26,6 +40,18 @@ Var LazyCollection.last has been removed
 Var LazyMapCollection.first has been removed
 Var LazyMapCollection.last has been removed
 Var Set.first has been removed
+Func AnySequence.dropLast(_:) has return type change from AnySequence<Element> to [Element]
+Func AnySequence.prefix(while:) has return type change from AnySequence<Element> to [Element]
+Func AnySequence.suffix(_:) has return type change from AnySequence<Element> to [Element]
+Func DropFirstSequence.dropFirst(_:) has return type change from AnySequence<DropFirstSequence<Base>.Element> to DropFirstSequence<Base>
+Func PrefixSequence.prefix(_:) has return type change from AnySequence<Base.Element> to PrefixSequence<Base>
+Func Sequence.drop(while:) has return type change from Self.SubSequence to DropWhileSequence<Self>
+Func Sequence.dropFirst(_:) has return type change from Self.SubSequence to DropFirstSequence<Self>
+Func Sequence.dropLast(_:) has return type change from Self.SubSequence to [Self.Element]
+Func Sequence.prefix(_:) has return type change from Self.SubSequence to PrefixSequence<Self>
+Func Sequence.prefix(while:) has return type change from Self.SubSequence to [Self.Element]
+Func Sequence.suffix(_:) has return type change from Self.SubSequence to [Self.Element]
+Struct AnySequence has removed conformance to Sequence
 
 /* Moved Decls */
 

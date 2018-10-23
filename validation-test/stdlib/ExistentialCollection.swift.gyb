@@ -151,34 +151,6 @@ tests.test("${TestedType}: dispatch to wrapped, SequenceLog") {
     _ = s.underestimatedCount
   }
 
-  Log.dropFirst.expectIncrement(Base.self) {
-    _ = s.dropFirst(0)
-  }
-
-  Log.dropLast.expectIncrement(Base.self) {
-    _ = s.dropLast(0)
-  }
-
-  Log.dropWhile.expectIncrement(Base.self) {
-    _ = s.drop { (_) in true }
-  }
-
-  Log.prefixWhile.expectIncrement(Base.self) {
-    _ = s.prefix { (_) in true }
-  }
-
-  Log.prefixMaxLength.expectIncrement(Base.self) {
-    _ = s.prefix(0)
-  }
-
-  Log.suffixMaxLength.expectIncrement(Base.self) {
-    _ = s.suffix(0)
-  }
-
-  Log.split.expectIncrement(Base.self) {
-    _ = s.split { (_) in true }
-  }
-
   Log._customContainsEquatableElement.expectIncrement(Base.self) {
     _ = s._customContainsEquatableElement(OpaqueValue(42))
   }

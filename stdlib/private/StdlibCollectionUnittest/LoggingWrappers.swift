@@ -214,39 +214,39 @@ extension LoggingSequence: Sequence {
     return base.underestimatedCount
   }
 
-  public func dropFirst(_ n: Int) -> SubSequence {
-    SequenceLog.dropFirst[selfType] += 1
-    return base.dropFirst(n)
-  }
-
-  public func dropLast(_ n: Int) -> SubSequence {
-    SequenceLog.dropLast[selfType] += 1
-    return base.dropLast(n)
-  }
-
-  public func drop(
-    while predicate: (Element) throws -> Bool
-  ) rethrows -> SubSequence {
-    SequenceLog.dropWhile[selfType] += 1
-    return try base.drop(while: predicate)
-  }
-
-  public func prefix(_ maxLength: Int) -> SubSequence {
-    SequenceLog.prefixMaxLength[selfType] += 1
-    return base.prefix(maxLength)
-  }
-
-  public func prefix(
-    while predicate: (Element) throws -> Bool
-  ) rethrows -> SubSequence {
-    SequenceLog.prefixWhile[selfType] += 1
-    return try base.prefix(while: predicate)
-  }
-
-  public func suffix(_ maxLength: Int) -> SubSequence {
-    SequenceLog.suffixMaxLength[selfType] += 1
-    return base.suffix(maxLength)
-  }
+  // public func dropFirst(_ n: Int) -> SubSequence {
+  //   SequenceLog.dropFirst[selfType] += 1
+  //   return base.dropFirst(n)
+  // }
+  //
+  // public func dropLast(_ n: Int) -> SubSequence {
+  //   SequenceLog.dropLast[selfType] += 1
+  //   return base.dropLast(n)
+  // }
+  //
+  // public func drop(
+  //   while predicate: (Element) throws -> Bool
+  // ) rethrows -> SubSequence {
+  //   SequenceLog.dropWhile[selfType] += 1
+  //   return try base.drop(while: predicate)
+  // }
+  //
+  // public func prefix(_ maxLength: Int) -> SubSequence {
+  //   SequenceLog.prefixMaxLength[selfType] += 1
+  //   return base.prefix(maxLength)
+  // }
+  //
+  // public func prefix(
+  //   while predicate: (Element) throws -> Bool
+  // ) rethrows -> SubSequence {
+  //   SequenceLog.prefixWhile[selfType] += 1
+  //   return try base.prefix(while: predicate)
+  // }
+  //
+  // public func suffix(_ maxLength: Int) -> SubSequence {
+  //   SequenceLog.suffixMaxLength[selfType] += 1
+  //   return base.suffix(maxLength)
+  // }
 
   public func split(
     maxSplits: Int = Int.max,

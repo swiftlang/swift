@@ -4,23 +4,49 @@
 /* RawRepresentable Changes */
 
 /* Removed Decls */
+Func Sequence.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has generic signature change from <τ_0_0 where τ_0_0 : Sequence, τ_0_0.SubSequence == AnySequence<τ_0_0.Element>> to <τ_0_0 where τ_0_0 : Sequence>
+Func _DropWhileSequence.drop(while:) has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
+Func _DropWhileSequence.makeIterator() has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
+Struct _DropWhileSequence has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
 Constructor AnyHashable.init(_box:) has been removed
 Constructor AnyHashable.init(_usingDefaultRepresentationOf:) has been removed
 Constructor ManagedBufferPointer.init(_:_:_:) has been removed
 Constructor _BridgeableMetatype.init(value:) has been removed
+Constructor _DropWhileSequence.init(iterator:nextElement:predicate:) has been removed
+Func AnyBidirectionalCollection.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func AnyCollection.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
 Func AnyHashable._downCastConditional(into:) has been removed
+Func AnyRandomAccessCollection.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func AnySequence.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
 Func Collection.prefix(through:) has been removed
 Func Collection.prefix(upTo:) has been removed
 Func Collection.suffix(from:) has been removed
+Func Sequence.dropFirst() has been removed
+Func Sequence.dropLast() has been removed
 Func Sequence.filter(_:) has been removed
 Func Sequence.forEach(_:) has been removed
 Func Sequence.map(_:) has been removed
+Func _AnyBidirectionalCollectionBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _AnyCollectionBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _AnyRandomAccessCollectionBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _AnySequenceBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _BidirectionalCollectionBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
 Func _CocoaDictionary.Index.copy() has been removed
+Func _CollectionBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
 Func _ContiguousArrayStorage._getNonVerbatimBridgedHeapBuffer() has been removed
 Func _ContiguousArrayStorage._withVerbatimBridgedUnsafeBufferImpl(_:) has been removed
+Func _DropWhileSequence.next() has been removed
+Func _RandomAccessCollectionBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _SequenceBox._split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
+Func _SequenceWrapper.drop(while:) has been removed
+Func _SequenceWrapper.dropFirst(_:) has been removed
+Func _SequenceWrapper.dropLast(_:) has been removed
 Func _SequenceWrapper.filter(_:) has been removed
 Func _SequenceWrapper.forEach(_:) has been removed
 Func _SequenceWrapper.map(_:) has been removed
+Func _SequenceWrapper.prefix(_:) has been removed
+Func _SequenceWrapper.prefix(while:) has been removed
+Func _SequenceWrapper.suffix(_:) has been removed
 Func __ContiguousArrayStorageBase._getNonVerbatimBridgedHeapBuffer() has been removed
 Func __EmptyArrayStorage._getNonVerbatimBridgedHeapBuffer() has been removed
 Func __SwiftDeferredNSArray._destroyBridgedStorage(_:) has been removed
@@ -65,9 +91,41 @@ Var __SwiftDeferredNSArray._heapBufferBridgedPtr has been removed
 /* Moved Decls */
 
 /* Renamed Decls */
+Struct _DropWhileSequence has been renamed to Struct DropWhileSequence
+Func AnySequence.dropLast(_:) has return type change from AnySequence<τ_0_0> to Array<τ_0_0>
+Func AnySequence.prefix(while:) has return type change from AnySequence<τ_0_0> to Array<τ_0_0>
+Func AnySequence.suffix(_:) has return type change from AnySequence<τ_0_0> to Array<τ_0_0>
+Func DropFirstSequence.dropFirst(_:) has return type change from AnySequence<τ_0_0.Element> to DropFirstSequence<τ_0_0>
+Func PrefixSequence.prefix(_:) has return type change from AnySequence<τ_0_0.Element> to PrefixSequence<τ_0_0>
+Func Sequence.drop(while:) has return type change from τ_0_0.SubSequence to DropWhileSequence<τ_0_0>
+Func Sequence.dropFirst(_:) has return type change from τ_0_0.SubSequence to DropFirstSequence<τ_0_0>
+Func Sequence.dropLast(_:) has return type change from τ_0_0.SubSequence to Array<τ_0_0.Element>
+Func Sequence.prefix(_:) has return type change from τ_0_0.SubSequence to PrefixSequence<τ_0_0>
+Func Sequence.prefix(while:) has return type change from τ_0_0.SubSequence to Array<τ_0_0.Element>
+Func Sequence.suffix(_:) has return type change from τ_0_0.SubSequence to Array<τ_0_0.Element>
+Func _AnySequenceBox._dropLast(_:) has return type change from _AnySequenceBox<τ_0_0> to Array<τ_0_0>
+Func _AnySequenceBox._prefix(while:) has return type change from _AnySequenceBox<τ_0_0> to Array<τ_0_0>
+Func _AnySequenceBox._suffix(_:) has return type change from _AnySequenceBox<τ_0_0> to Array<τ_0_0>
+Func _DropWhileSequence.drop(while:) has return type change from AnySequence<τ_0_0.Element> to DropWhileSequence<τ_0_0>
+Func _DropWhileSequence.makeIterator() has return type change from _DropWhileSequence<τ_0_0> to DropWhileSequence<τ_0_0>.Iterator
+Func _SequenceBox._dropLast(_:) has return type change from _AnySequenceBox<τ_0_0.Element> to Array<τ_0_0.Element>
+Func _SequenceBox._prefix(while:) has return type change from _AnySequenceBox<τ_0_0.Element> to Array<τ_0_0.Element>
+Func _SequenceBox._suffix(_:) has return type change from _AnySequenceBox<τ_0_0.Element> to Array<τ_0_0.Element>
+Struct _DropWhileSequence has type witness type for Sequence.Iterator changing from _DropWhileSequence<τ_0_0> to DropWhileSequence<τ_0_0>.Iterator
+Var _DropWhileSequence._iterator has declared type change from τ_0_0 to τ_0_0.Iterator
+Func _DropWhileSequence.makeIterator() has self access kind changing from __Consuming to NonMutating
 
 /* Type Changes */
 Struct _BridgeableMetatype is now without @_fixed_layout
+Func _AnyBidirectionalCollectionBox._formIndex(before:) in a non-resilient type changes position from 8 to 7
+Func _AnyBidirectionalCollectionBox._index(before:) in a non-resilient type changes position from 7 to 6
+Func _AnyCollectionBox._distance(from:to:) in a non-resilient type changes position from 13 to 12
+Func _AnyCollectionBox._formIndex(_:offsetBy:) in a non-resilient type changes position from 11 to 10
+Func _AnyCollectionBox._formIndex(_:offsetBy:limitedBy:) in a non-resilient type changes position from 12 to 11
+Func _AnyCollectionBox._formIndex(after:) in a non-resilient type changes position from 8 to 7
+Func _AnyCollectionBox._index(_:offsetBy:) in a non-resilient type changes position from 9 to 8
+Func _AnyCollectionBox._index(_:offsetBy:limitedBy:) in a non-resilient type changes position from 10 to 9
+Func _AnyCollectionBox._index(after:) in a non-resilient type changes position from 7 to 6
 Func __ContiguousArrayStorageBase._getNonVerbatimBridgingBuffer() is added to a non-resilient type
 Var _CocoaDictionary.Index._offset is added to a non-resilient type
 Var _CocoaDictionary.Index._storage in a non-resilient type changes position from 1 to 0
@@ -77,3 +135,5 @@ Var _CocoaSet.Index._storage in a non-resilient type changes position from 1 to 
 /* Decl Attribute changes */
 
 /* Protocol Requirement Changes */
+Struct AnySequence has removed conformance to Sequence
+Struct _DropWhileSequence has removed conformance to IteratorProtocol
