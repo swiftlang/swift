@@ -47,6 +47,7 @@
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
+#include "ShouldPrintForParseableInterface.h"
 #include <algorithm>
 #include <queue>
 
@@ -64,22 +65,7 @@ void PrintOptions::clearSynthesizedExtension() {
   TransformContext.reset();
 }
 
-static bool isPublicOrUsableFromInline(const ValueDecl *VD) {
-  AccessScope scope =
-      VD->getFormalAccessScope(/*useDC*/nullptr,
-                               /*treatUsableFromInlineAsPublic*/true);
-  return scope.isPublic();
-}
-
-static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
-  auto *DC = ASD->getDeclContext()->getAsDecl();
-  if (!DC) return false;
-  auto *ND = dyn_cast<NominalTypeDecl>(DC);
-  if (!ND) return false;
-  return !ND->isResilient() && ASD->hasStorage() && !ASD->isStatic();
-}
-
-PrintOptions PrintOptions::printParseableInterfaceFile() {
+PrintOptions PrintOptions::printParseableInterfaceFile(ModuleDecl *module) {
   PrintOptions result;
   result.PrintLongAttrsOnSeparateLines = true;
   result.TypeDefinitions = true;
@@ -100,50 +86,8 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
     printer << " " << AFD->getInlinableBodyText(scratch);
   };
 
-  class ShouldPrintForParseableInterface : public ShouldPrintChecker {
-    bool shouldPrint(const Decl *D, const PrintOptions &options) override {
-      // Skip anything that isn't 'public' or '@usableFromInline'.
-      if (auto *VD = dyn_cast<ValueDecl>(D)) {
-        if (!isPublicOrUsableFromInline(VD)) {
-          // We do want to print private stored properties, without their
-          // original names present.
-          if (auto *ASD = dyn_cast<AbstractStorageDecl>(VD))
-            if (contributesToParentTypeStorage(ASD))
-              return true;
-          return false;
-        }
-      }
-
-      // Skip extensions that extend things we wouldn't print.
-      if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-        if (!shouldPrint(ED->getExtendedNominal(), options))
-          return false;
-        // FIXME: We also need to check the generic signature for constraints
-        // that we can't reference.
-      }
-
-      // Skip typealiases that just redeclare generic parameters.
-      if (auto *alias = dyn_cast<TypeAliasDecl>(D)) {
-        if (alias->isImplicit()) {
-          const Decl *parent =
-              D->getDeclContext()->getAsDecl();
-          if (auto *genericCtx = parent->getAsGenericContext()) {
-            bool matchesGenericParam =
-                llvm::any_of(genericCtx->getInnermostGenericParamTypes(),
-                             [alias](const GenericTypeParamType *param) {
-              return param->getName() == alias->getName();
-            });
-            if (matchesGenericParam)
-              return false;
-          }
-        }
-      }
-
-      return ShouldPrintChecker::shouldPrint(D, options);
-    }
-  };
   result.CurrentPrintabilityChecker =
-      std::make_shared<ShouldPrintForParseableInterface>();
+    ShouldPrintForParseableInterface::create(module);
 
   // FIXME: We don't really need 'public' on everything; we could just change
   // the default to 'public' and mark the 'internal' things.

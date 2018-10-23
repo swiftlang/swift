@@ -408,7 +408,8 @@ bool swift::emitParseableInterface(raw_ostream &out,
   printToolVersionAndFlagsComment(out, Opts, M);
   printImports(out, M);
 
-  const PrintOptions printOptions = PrintOptions::printParseableInterfaceFile();
+  const PrintOptions printOptions =
+    PrintOptions::printParseableInterfaceFile(M);
   SmallVector<Decl *, 16> topLevelDecls;
   M->getTopLevelDecls(topLevelDecls);
   for (const Decl *D : topLevelDecls) {

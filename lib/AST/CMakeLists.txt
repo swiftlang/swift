@@ -50,6 +50,7 @@ add_swift_library(swiftAST STATIC
   RawComment.cpp
   RequirementEnvironment.cpp
   SyntaxASTMap.cpp
+  ShouldPrintForParseableInterface.cpp
   SILLayout.cpp
   Stmt.cpp
   SubstitutionMap.cpp
