@@ -9,9 +9,15 @@ Mangling
 --------
 ::
 
-  mangled-name ::= '$s' global
+  mangled-name ::= '$s' global  // Swift stable mangling
+  mangled-name ::= '_T0' global // Swift 4.0
+  mangled-name ::= '$S' global  // Swift 4.2
 
-All Swift-mangled names begin with this prefix.
+All Swift-mangled names begin with a common prefix. Since Swift 4.0, the
+compiler has used variations of the mangling described in this document, though
+pre-stable versions may not exactly conform to this description. By using
+distinct prefixes, tools can attempt to accommodate bugs and version variations
+in pre-stable versions of Swift.
 
 The basic mangling scheme is a list of 'operators' where the operators are
 structured in a post-fix order. For example the mangling may start with an
@@ -19,8 +25,6 @@ identifier but only later in the mangling a type-like operator defines how this
 identifier has to be interpreted::
 
   4Test3FooC   // The trailing 'C' says that 'Foo' is a class in module 'Test'
-
-
 
 Operators are either identifiers or a sequence of one or more characters,
 like ``C`` for class.
