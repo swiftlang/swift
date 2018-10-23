@@ -1423,6 +1423,55 @@ FUNCTION(TFC_CreateTensorHandleFromC, _swift_tfc_CreateTensorHandleFromC, C_CC,
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind))
 
+FUNCTION(TFC_OpSetAttrBoolArray, _swift_tfc_OpSetAttrBoolArray, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFC_OpSetAttrInt32Array, _swift_tfc_OpSetAttrInt32Array, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFC_OpSetAttrInt64Array, _swift_tfc_OpSetAttrInt64Array, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFC_OpSetAttrDoubleArray, _swift_tfc_OpSetAttrDoubleArray, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFC_OpSetAttrFloatArray, _swift_tfc_OpSetAttrFloatArray, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFC_OpSetAttrTypeArray, _swift_tfc_OpSetAttrTypeArray, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFC_OpSetAttrTensorShapeArray, _swift_tfc_OpSetAttrTensorShapeArray,
+         C_CC, RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFC_OpSetAttrOptionalTensorShapeArray,
+	 _swift_tfc_OpSetAttrOptionalTensorShapeArray,
+         C_CC, RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
+// The swift function signature is (CTFEOp, UnsafePointer<Int8>, String) -> ().
+// In LLVM IR, the String gets exploded to (BridgeObjectPtrTy, Int64Ty), so
+// IRGen passes those two values in place of the Swift String.
+FUNCTION(TFC_OpSetAttrString, _swift_tfc_OpSetAttrString, C_CC,
+         RETURNS(),
+         ARGS(Int8PtrTy, Int8PtrTy, BridgeObjectPtrTy, Int64Ty),
+         ATTRS(NoUnwind))
+
 FUNCTION(TFC_CheckOk, _swift_tfc_CheckOk, C_CC,
          RETURNS(),
          ARGS(Int8PtrTy),

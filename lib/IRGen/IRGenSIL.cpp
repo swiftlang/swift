@@ -1951,6 +1951,16 @@ static const char *inputListNumberAttr(StringRef opName) {
   return nullptr;
 }
 
+/// Returns the type Optional<`element`>.
+static Type getOptionalType(const ASTContext &ctx, Type element) {
+  return BoundGenericType::get(ctx.getOptionalDecl(), Type(), {element});
+}
+
+/// Returns the type Array<`element`>.
+static Type getArrayType(const ASTContext &ctx, Type element) {
+  return BoundGenericType::get(ctx.getArrayDecl(), Type(), {element});
+}
+
 // The code structure resembles
 // TFGraphFunctionLowering::visitGraphOperationInst().
 void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
@@ -2004,20 +2014,6 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
   auto *TFNewStatusFn = IGM.getTF_NewStatusFn();
   auto status = Builder.CreateCall(TFNewStatusFn, {});
-
-  // TODO: Remove these. They are a temporary way of testing that dynamic
-  // attributes make it here.
-  if (opInfo.getOperationName() == "_DynamicOp") {
-    LLVM_DEBUG(llvm::dbgs()
-               << "Done with IRGen for dynamic graph_op; setting explosion.\n");
-    // The added explosion is incorrect, but is good enough for unit testing.
-    Explosion e;
-    e.add(TFNewStatusFn);
-
-    SILValue result = i->getResults()[0];
-    setLoweredExplosion(result, e);
-    return;
-  }
 
   // The true return type is TFE_Context*, which is an opaque pointer, so it
   // maps to void* in the Swift-C calling convention. `eagerContext` has type
@@ -2105,32 +2101,187 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       }
       break;
     }
-    case GraphOperationInfo::ArgumentLowering::TFDataTypeAttribute: {
-      switch (structuredArgument.getKind()) {
-      case GraphOperationInfo::SAK_Single: {
-        auto silValue = structuredArgument.getSingleArgument();
-        auto silType = silValue->getType();
-        if (silType == SILType::getBuiltinIntegerType(32, astCtx)) {
-          // Deabstraction extracts the Builtin.Int32 that's inside the
-          // TensorDataType.
-          auto dtypeAttrValue = getLoweredSingletonExplosion(silValue);
-          auto *setAttrTypeFn = IGM.getTFE_OpSetAttrTypeFn();
-          auto attrNameValAddr = createStringValAddr(IGM, argumentName.c_str());
-          Builder.CreateCall(setAttrTypeFn,
-                             {op, attrNameValAddr, dtypeAttrValue});
-        } else {
-          // TODO: Implement dynamic type list attribute
-          assert(0 && "unknown TFDataTypeAttribute argument type");
-        }
+    case GraphOperationInfo::ArgumentLowering::NormalAttribute: {
+      assert(structuredArgument.getKind() == GraphOperationInfo::SAK_Single &&
+             "deabstraction should not generate NormalAttribute lists");
+      auto silValue = structuredArgument.getSingleArgument();
+      auto silType = silValue->getType();
+      auto astType = silType.getASTType();
+
+      LLVM_DEBUG(llvm::dbgs() << " Adding dynamic NormalAttribute of type "
+                 << astType << "\n");
+
+      auto *attrNameValAddr = createStringValAddr(IGM, argumentName.c_str());
+
+      // Deabstraction extracts builtin types out of stdlib types, so we match
+      // on builtin types. If we remove that part of deabstraction, we should
+      // change this to match on stdlib types.
+
+      if (astType->isBuiltinIntegerType(1)) {
+        auto *fn = IGM.getTFE_OpSetAttrBoolFn();
+        auto *attrValue = getLoweredSingletonExplosion(silValue);
+        Builder.CreateCall(fn, {op, attrNameValAddr, attrValue});
         break;
       }
-      case GraphOperationInfo::SAK_List:
-        assert(0 && "TODO: Implement dynamic type list attribute");
+
+      if (astType->isBuiltinIntegerType(64)) {
+        auto *fn = IGM.getTFE_OpSetAttrIntFn();
+        auto *attrValue = getLoweredSingletonExplosion(silValue);
+        Builder.CreateCall(fn, {op, attrNameValAddr, attrValue});
+        break;
       }
-      break;
+
+      if (auto floatType = dyn_cast<BuiltinFloatType>(astType)) {
+        auto *fn = IGM.getTFE_OpSetAttrFloatFn();
+        auto *attrValue = getLoweredSingletonExplosion(silValue);
+        if (floatType->getFPKind() == BuiltinFloatType::IEEE32) {
+          Builder.CreateCall(fn, {op, attrNameValAddr, attrValue});
+          break;
+        }
+        if (floatType->getFPKind() == BuiltinFloatType::IEEE64) {
+          auto *truncValue = Builder.CreateFPTrunc(attrValue, IGM.FloatTy);
+          Builder.CreateCall(fn, {op, attrNameValAddr, truncValue});
+          break;
+        }
+      }
+
+      if (astType->isEqual(
+          astCtx.getStringDecl()->getDeclaredInterfaceType())) {
+        auto *fn = IGM.getTFC_OpSetAttrStringFn();
+
+        // Swift Strings are passed in LLVM IR by passing the 2 LLVM values that
+        // are inside them, so we get the 2 LLVM values from the explosion and
+        // pass them to the runtime function.
+        auto attrExplosion = getLoweredExplosion(silValue);
+        assert(attrExplosion.size() == 2 &&
+               "expected 2 LLVM values in Swift String");
+        Builder.CreateCall(fn,
+                           {op, attrNameValAddr, attrExplosion.claimNext(),
+                            attrExplosion.claimNext()});
+        break;
+      }
+
+      if (astType->isEqual(getArrayType(
+          astCtx, astCtx.getBoolDecl()->getDeclaredInterfaceType()))) {
+        auto *fn = IGM.getTFC_OpSetAttrBoolArrayFn();
+        auto *attrValue = getLoweredSingletonExplosion(silValue);
+        auto *attrValueUntyped = Builder.CreateBitCast(attrValue, IGM.Int8PtrTy);
+        Builder.CreateCall(fn, {op, attrNameValAddr, attrValueUntyped});
+        break;
+      }
+
+      if (astType->isEqual(getArrayType(
+          astCtx, astCtx.getInt32Decl()->getDeclaredInterfaceType()))) {
+        auto *fn = IGM.getTFC_OpSetAttrInt32ArrayFn();
+        auto *attrValue = getLoweredSingletonExplosion(silValue);
+        auto *attrValueUntyped = Builder.CreateBitCast(attrValue, IGM.Int8PtrTy);
+        Builder.CreateCall(fn, {op, attrNameValAddr, attrValueUntyped});
+        break;
+      }
+
+      if (astType->isEqual(getArrayType(
+          astCtx, astCtx.getInt64Decl()->getDeclaredInterfaceType()))) {
+        auto *fn = IGM.getTFC_OpSetAttrInt64ArrayFn();
+        auto *attrValue = getLoweredSingletonExplosion(silValue);
+        auto *attrValueUntyped = Builder.CreateBitCast(attrValue, IGM.Int8PtrTy);
+        Builder.CreateCall(fn, {op, attrNameValAddr, attrValueUntyped});
+        break;
+      }
+
+      if (astType->isEqual(getArrayType(
+          astCtx, astCtx.getDoubleDecl()->getDeclaredInterfaceType()))) {
+        auto *fn = IGM.getTFC_OpSetAttrDoubleArrayFn();
+        auto *attrValue = getLoweredSingletonExplosion(silValue);
+        auto *attrValueUntyped = Builder.CreateBitCast(attrValue, IGM.Int8PtrTy);
+        Builder.CreateCall(fn, {op, attrNameValAddr, attrValueUntyped});
+        break;
+      }
+
+      if (astType->isEqual(getArrayType(
+          astCtx, astCtx.getFloatDecl()->getDeclaredInterfaceType()))) {
+        auto *fn = IGM.getTFC_OpSetAttrFloatArrayFn();
+        auto *attrValue = getLoweredSingletonExplosion(silValue);
+        auto *attrValueUntyped = Builder.CreateBitCast(attrValue, IGM.Int8PtrTy);
+        Builder.CreateCall(fn, {op, attrNameValAddr, attrValueUntyped});
+        break;
+      }
+
+      if (astType->isEqual(getArrayType(
+          astCtx, astCtx.getTensorShapeDecl()->getDeclaredInterfaceType()))) {
+        auto *fn = IGM.getTFC_OpSetAttrTensorShapeArrayFn();
+        auto *attrValue = getLoweredSingletonExplosion(silValue);
+        auto *attrValueUntyped = Builder.CreateBitCast(attrValue, IGM.Int8PtrTy);
+        Builder.CreateCall(fn, {op, attrNameValAddr, attrValueUntyped, status});
+        checkOk(status);
+        break;
+      }
+
+      if (astType->isEqual(getArrayType(astCtx, getOptionalType(
+          astCtx, astCtx.getTensorShapeDecl()->getDeclaredInterfaceType())))) {
+        auto *fn = IGM.getTFC_OpSetAttrOptionalTensorShapeArrayFn();
+        auto *attrValue = getLoweredSingletonExplosion(silValue);
+        auto *attrValueUntyped = Builder.CreateBitCast(attrValue, IGM.Int8PtrTy);
+        Builder.CreateCall(fn, {op, attrNameValAddr, attrValueUntyped, status});
+        checkOk(status);
+        break;
+      }
+
+      if (astType->isEqual(getArrayType(
+          astCtx, astCtx.getStringDecl()->getDeclaredInterfaceType()))) {
+        assert(0 && "TODO: dynamic string list attributes");
+      }
+
+      if (astType->is<AnyFunctionType>()) {
+        assert(0 && "TODO: dynamic function attributes");
+      }
+
+      assert(0 && "unknown NormalAttribute type");
     }
-    default:
-      assert(0 && "TODO: implement this dynamic attribute");
+    case GraphOperationInfo::ArgumentLowering::TFDataTypeAttribute: {
+      assert(structuredArgument.getKind() == GraphOperationInfo::SAK_Single &&
+             "deabstraction should not generate TFDataTypeAttribute lists");
+      auto silValue = structuredArgument.getSingleArgument();
+      auto silType = silValue->getType();
+      auto astType = silType.getASTType();
+
+      LLVM_DEBUG(llvm::dbgs() << " Adding dynamic TFDataTypeAttribute of type "
+                 << astType << "\n");
+
+      auto *attrNameValAddr = createStringValAddr(IGM, argumentName.c_str());
+
+      // Deabstraction extracts the Builtin.Int32 that's inside the
+      // TensorDataType.
+      if (astType->isBuiltinIntegerType(32)) {
+        auto *fn = IGM.getTFE_OpSetAttrTypeFn();
+        auto *attrValue = getLoweredSingletonExplosion(silValue);
+        Builder.CreateCall(fn, {op, attrNameValAddr, attrValue});
+        break;
+      }
+
+      if (astType->isEqual(getArrayType(
+          astCtx,
+          astCtx.getTensorDataTypeDecl()->getDeclaredInterfaceType()))) {
+        auto *fn = IGM.getTFC_OpSetAttrTypeArrayFn();
+        auto *attrValue = getLoweredSingletonExplosion(silValue);
+        auto *attrValueUntyped = Builder.CreateBitCast(attrValue, IGM.Int8PtrTy);
+        Builder.CreateCall(fn, {op, attrNameValAddr, attrValueUntyped});
+        checkOk(status);
+        break;
+      }
+
+      assert(0 && "unknown TFDataTypeAttribute type");
+    }
+    case GraphOperationInfo::ArgumentLowering::ShapeAttribute:
+      assert(structuredArgument.getKind() == GraphOperationInfo::SAK_Single &&
+             "deabstraction should not generate ShapeAttribute lists");
+      auto silValue = structuredArgument.getSingleArgument();
+      auto silType = silValue->getType();
+      auto astType = silType.getASTType();
+
+      LLVM_DEBUG(llvm::dbgs() << " Adding dynamic ShapeAttribute of type "
+                 << astType << "\n");
+
+      assert(0 && "TODO: implement dynamic ShapeAttribute");
     }
   }
 
@@ -2223,7 +2374,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
         if (elementTypeString == "Float" || elementTypeString == "Double" ||
             elementTypeString == "Bool" || elementTypeString == "String") {
-          assert(0 && "TODO: implement type list typed attr");
+          assert(0 && "TODO: implement list(Float|Double|Bool|String) attr");
         }
         if (elementTypeString == "TensorShape" ||
             elementTypeString == "Optional<TensorShape>") {

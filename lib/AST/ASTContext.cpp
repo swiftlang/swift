@@ -151,6 +151,8 @@ struct ASTContext::Implementation {
   ClassDecl *TensorHandleDecl = nullptr;
   /// The declaration of TensorFlow.TensorShape.
   StructDecl *TensorShapeDecl = nullptr;
+  /// The declaration of TensorFlow.TensorDataType.
+  StructDecl *TensorDataTypeDecl = nullptr;
 
   /// The declaration of Swift._AutoDiffTape<T>.
   ClassDecl *AutoDiffTapeDecl = nullptr;
@@ -846,6 +848,27 @@ StructDecl *ASTContext::getTensorShapeDecl() const {
   for (auto result : results)
     if (auto CD = dyn_cast<StructDecl>(result))
       return getImpl().TensorShapeDecl = CD;
+  return nullptr;
+}
+
+/// Retrieve the decl for TensorFlow.TensorDataType iff the TensorFlow module has
+/// been imported.  Otherwise, this returns null.
+StructDecl *ASTContext::getTensorDataTypeDecl() const {
+  if (getImpl().TensorDataTypeDecl)
+    return getImpl().TensorDataTypeDecl;
+
+  // See if the TensorFlow module was imported.  If not, return null.
+  auto tfModule = getLoadedModule(Id_TensorFlow);
+  if (!tfModule)
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> results;
+  tfModule->lookupValue({}, getIdentifier("TensorDataType"),
+                        NLKind::UnqualifiedLookup, results);
+
+  for (auto result : results)
+    if (auto CD = dyn_cast<StructDecl>(result))
+      return getImpl().TensorDataTypeDecl = CD;
   return nullptr;
 }
 
