@@ -9,8 +9,11 @@ enum Optionable<T> {
 }
 
 // CHECK-LABEL: sil hidden @$s18switch_abstraction18enum_reabstraction1x1ayAA10OptionableOyAA1AVAHcG_AHtF : $@convention(thin) (@guaranteed Optionable<(A) -> A>, A) -> ()
-// CHECK: switch_enum {{%.*}} : $Optionable<(A) -> A>, case #Optionable.Summn!enumelt.1: [[DEST:bb[0-9]+]]
-// CHECK: [[DEST]]([[ORIG:%.*]] : @owned $@callee_guaranteed (@in_guaranteed A) -> @out A):
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $Optionable<(A) -> A>,
+// CHECK: switch_enum [[ARG]] : $Optionable<(A) -> A>, case #Optionable.Summn!enumelt.1: [[DEST:bb[0-9]+]]
+//
+// CHECK: [[DEST]]([[ARG:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed A) -> @out A):
+// CHECK:   [[ORIG:%.*]] = copy_value [[ARG]]
 // CHECK:   [[REABSTRACT:%.*]] = function_ref @$s{{.*}}TR :
 // CHECK:   [[SUBST:%.*]] = partial_apply [callee_guaranteed] [[REABSTRACT]]([[ORIG]])
 func enum_reabstraction(x x: Optionable<(A) -> A>, a: A) {

@@ -163,6 +163,7 @@ public:
   RequirementFailure(Expr *expr, ConstraintSystem &cs,
                      ConstraintLocator *locator)
       : FailureDiagnostic(expr, cs, locator), AffectedDecl(getDeclRef()) {
+    assert(AffectedDecl);
     auto *anchor = getAnchor();
     expr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
       auto *AE = dyn_cast<ApplyExpr>(subExpr);

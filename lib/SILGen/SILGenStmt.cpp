@@ -800,6 +800,12 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
     // Emit all the catch clauses, branching to the end destination if
     // we fall out of one.
     SGF.emitCatchDispatch(S, exn, S->getCatches(), endDest);
+
+    // We assume that exn's cleanup is still valid at this point. To ensure that
+    // we do not re-emit it and do a double consume, we rely on us having
+    // finished emitting code and thus unsetting the insertion point here. This
+    // assert is to make sure this invariant is clear in the code and validated.
+    assert(!SGF.B.hasValidInsertionPoint());
   }
 
   if (hasLabel) {

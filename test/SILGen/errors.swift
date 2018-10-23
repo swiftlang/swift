@@ -1,17 +1,5 @@
 // RUN: %target-swift-emit-silgen -parse-stdlib -enable-sil-ownership -Xllvm -sil-print-debuginfo -verify -primary-file %s %S/Inputs/errors_other.swift | %FileCheck %s
 
-// TODO: Turn back on ownership verification. I turned off the verification on
-// this file since it shows an ownership error that does not affect
-// codegen. Specifically when we destroy the temporary array we use for the
-// variadic tuple, we try to borrow the temporary array when we pass it to the
-// destroy function. This makes the ownership verifier think that the owned
-// value we are trying to destroy is not cleaned up. But once ownership is
-// stripped out, the destroy array function still does what it needs to do. The
-// actual fix for this would require a bunch of surgery in SILGenApply around
-// how function types are computed and preserving non-canonical function types
-// through SILGenApply. This is something that can be done after +0 is turned
-// on.
-
 import Swift
 
 class Cat {}
@@ -173,6 +161,83 @@ func all_together_now(_ flag: Bool) -> Cat {
     return cat
   } catch _ {
     return Cat()
+  }
+}
+
+// Make sure that if we catch an error in a throwing function we borrow the
+// error and only consume the error in the rethrow block.
+//
+// CHECK-LABEL: sil hidden @$s6errors20all_together_now_twoyAA3CatCSgSbKF : $@convention(thin) (Bool) -> (@owned Optional<Cat>, @error Error) {
+// CHECK: bb0(
+// CHECK-NOT: bb1
+// CHECK:   try_apply {{.*}}, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+//
+// CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $Error):
+// CHECK:   [[BORROWED_ERROR:%.*]] = begin_borrow [[ERROR]]
+// CHECK:   [[COPIED_ERROR:%.*]] = copy_value [[BORROWED_ERROR]]
+// CHECK:   store [[COPIED_ERROR]] to [init] [[CAST_INPUT_MEM:%.*]] : $*Error
+// CHECK:   checked_cast_addr_br copy_on_success Error in [[CAST_INPUT_MEM]] : $*Error to HomeworkError in [[CAST_OUTPUT_MEM:%.*]] : $*HomeworkError, [[CAST_YES_BB:bb[0-9]+]], [[CAST_NO_BB:bb[0-9]+]],
+//
+// CHECK: [[CAST_YES_BB]]:
+// CHECK:   [[SUBERROR:%.*]] = load [take] [[CAST_OUTPUT_MEM]]
+// CHECK:   switch_enum [[SUBERROR]] : $HomeworkError, case #HomeworkError.TooHard!enumelt: {{bb[0-9]+}}, default [[SWITCH_MATCH_FAIL_BB:bb[0-9]+]],
+//
+// CHECK: [[SWITCH_MATCH_FAIL_BB]]([[SUBERROR:%.*]] : @owned $HomeworkError):
+// CHECK:   destroy_value [[SUBERROR]]
+// CHECK:   end_borrow [[BORROWED_ERROR]]
+// CHECK:   br [[RETHROW_BB:bb[0-9]+]]([[ERROR]] : $Error)
+//
+// CHECK: [[CAST_NO_BB]]:
+// CHECK:   end_borrow [[BORROWED_ERROR]]
+// CHECK:   br [[RETHROW_BB]]([[ERROR]] : $Error)
+//
+// CHECK: [[RETHROW_BB]]([[ERROR_FOR_RETHROW:%.*]] : @owned $Error):
+// CHECK:   throw [[ERROR_FOR_RETHROW]]
+// CHECK: } // end sil function '$s6errors20all_together_now_twoyAA3CatCSgSbKF'
+func all_together_now_two(_ flag: Bool) throws -> Cat? {
+  do {
+    return try dont_return(Cat())
+  } catch HomeworkError.TooHard {
+    return nil
+  }
+}
+
+// Same as the previous test, but with multiple cases instead of just one.
+//
+// CHECK-LABEL: sil hidden @$s6errors22all_together_now_threeyAA3CatCSgSbKF : $@convention(thin) (Bool) -> (@owned Optional<Cat>, @error Error) {
+// CHECK: bb0(
+// CHECK-NOT: bb1
+// CHECK:   try_apply {{.*}}, normal [[NORMAL_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+//
+// CHECK: [[ERROR_BB]]([[ERROR:%.*]] : @owned $Error):
+// CHECK:   [[BORROWED_ERROR:%.*]] = begin_borrow [[ERROR]]
+// CHECK:   [[COPIED_ERROR:%.*]] = copy_value [[BORROWED_ERROR]]
+// CHECK:   store [[COPIED_ERROR]] to [init] [[CAST_INPUT_MEM:%.*]] : $*Error
+// CHECK:   checked_cast_addr_br copy_on_success Error in [[CAST_INPUT_MEM]] : $*Error to HomeworkError in [[CAST_OUTPUT_MEM:%.*]] : $*HomeworkError, [[CAST_YES_BB:bb[0-9]+]], [[CAST_NO_BB:bb[0-9]+]],
+//
+// CHECK: [[CAST_YES_BB]]:
+// CHECK:   [[SUBERROR:%.*]] = load [take] [[CAST_OUTPUT_MEM]]
+// CHECK:   switch_enum [[SUBERROR]] : $HomeworkError, case #HomeworkError.TooHard!enumelt: {{bb[0-9]+}}, case #HomeworkError.TooMuch!enumelt: {{bb[0-9]+}}, default [[SWITCH_MATCH_FAIL_BB:bb[0-9]+]],
+//
+// CHECK: [[SWITCH_MATCH_FAIL_BB]]([[SUBERROR:%.*]] : @owned $HomeworkError):
+// CHECK:   destroy_value [[SUBERROR]]
+// CHECK:   end_borrow [[BORROWED_ERROR]]
+// CHECK:   br [[RETHROW_BB:bb[0-9]+]]([[ERROR]] : $Error)
+//
+// CHECK: [[CAST_NO_BB]]:
+// CHECK:   end_borrow [[BORROWED_ERROR]]
+// CHECK:   br [[RETHROW_BB]]([[ERROR]] : $Error)
+//
+// CHECK: [[RETHROW_BB]]([[ERROR_FOR_RETHROW:%.*]] : @owned $Error):
+// CHECK:   throw [[ERROR_FOR_RETHROW]]
+// CHECK: } // end sil function '$s6errors22all_together_now_threeyAA3CatCSgSbKF'
+func all_together_now_three(_ flag: Bool) throws -> Cat? {
+  do {
+    return try dont_return(Cat())
+  } catch HomeworkError.TooHard {
+    return nil
+  } catch HomeworkError.TooMuch {
+    return nil
   }
 }
 
