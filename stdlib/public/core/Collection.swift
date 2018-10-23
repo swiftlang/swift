@@ -332,7 +332,7 @@ extension IndexingIterator: IteratorProtocol, Sequence {
 /// or bidirectional collection must traverse the entire collection to count
 /// the number of contained elements, accessing its `count` property is an
 /// O(*n*) operation.
-public protocol Collection: Sequence where SubSequence: Collection {
+public protocol Collection: Sequence {
   // FIXME: ideally this would be in MigrationSupport.swift, but it needs
   // to be on the protocol instead of as an extension
   @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")
@@ -390,7 +390,10 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// This associated type appears as a requirement in the `Sequence`
   /// protocol, but it is restated here with stricter constraints. In a
   /// collection, the subsequence should also conform to `Collection`.
-  associatedtype SubSequence = Slice<Self> where SubSequence.Index == Index
+  associatedtype SubSequence: Collection = Slice<Self>
+  where SubSequence.Index == Index,
+        Element == SubSequence.Element,
+        SubSequence.SubSequence == SubSequence
 
   /// Accesses the element at the specified position.
   ///
@@ -1227,7 +1230,7 @@ extension Collection {
   ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
   ///   elements to drop from the beginning of the collection.
   @inlinable
-  public __consuming func dropFirst(_ k: Int) -> SubSequence {
+  public __consuming func dropFirst(_ k: Int = 1) -> SubSequence {
     _precondition(k >= 0, "Can't drop a negative number of elements from a collection")
     let start = index(startIndex, offsetBy: k, limitedBy: endIndex) ?? endIndex
     return self[start..<endIndex]
@@ -1254,7 +1257,7 @@ extension Collection {
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
   ///   the collection.
   @inlinable
-  public __consuming func dropLast(_ k: Int) -> SubSequence {
+  public __consuming func dropLast(_ k: Int = 1) -> SubSequence {
     _precondition(
       k >= 0, "Can't drop a negative number of elements from a collection")
     let amount = Swift.max(0, count - k)
@@ -1262,7 +1265,7 @@ extension Collection {
       offsetBy: amount, limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
   }
-  
+    
   /// Returns a subsequence by skipping elements while `predicate` returns
   /// `true` and returning the remaining elements.
   ///

@@ -1643,14 +1643,6 @@ extension TestSuite {
 
     testNamePrefix += String(describing: S.Type.self)
 
-    let isMultiPass = makeSequence([])
-      ._preprocessingPass { true } ?? false
-    let isEquatableMultiPass = makeSequenceOfEquatable([])
-      ._preprocessingPass { true } ?? false
-    expectEqual(
-      isMultiPass, isEquatableMultiPass,
-      "Two sequence types are of different kinds?")
-
     // FIXME: swift-3-indexing-model: add tests for `underestimatedCount`
     // Check that it is non-negative, and an underestimate of the actual
     // element count.
@@ -1667,12 +1659,6 @@ self.test("\(testNamePrefix).contains()/WhereElementIsEquatable/semantics") {
       test.expected != nil,
       s.contains(wrapValueIntoEquatable(test.element)),
       stackTrace: SourceLocStack().with(test.loc))
-
-    if !isMultiPass {
-      expectEqualSequence(
-        test.expectedLeftoverSequence, s.map(extractValueFromEquatable),
-        stackTrace: SourceLocStack().with(test.loc))
-    }
   }
 }
 

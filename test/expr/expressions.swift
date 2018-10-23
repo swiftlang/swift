@@ -739,8 +739,8 @@ func invalidDictionaryLiteral() {
 }
 
 
-[4].joined(separator: [1]) // expected-error {{referencing instance method 'joined()' on 'Collection' requires that 'Int' conform to 'Collection'}}
-[4].joined(separator: [[[1]]]) // expected-error {{referencing instance method 'joined()' on 'Collection' requires that 'Int' conform to 'Collection'}}
+[4].joined(separator: [1]) // expected-error {{referencing instance method 'joined(separator:)' on 'Sequence' requires that 'Int' conform to 'StringProtocol'}}
+[4].joined(separator: [[[1]]]) // expected-error {{referencing instance method 'joined(separator:)' on 'Sequence' requires that 'Int' conform to 'StringProtocol'}}
 
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
