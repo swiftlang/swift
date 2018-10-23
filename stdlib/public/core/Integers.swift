@@ -28,7 +28,7 @@ extension ExpressibleByIntegerLiteral
 //===----------------------------------------------------------------------===//
 
 public protocol Arithmetic {
-  var zero: Self { get }
+  static var zero: Self { get }
 
   /// Adds two values and produces their sum.
   ///
@@ -121,7 +121,7 @@ public protocol Arithmetic {
 }
 
 public extension Arithmetic where Self : ExpressibleByIntegerLiteral {
-  var zero: Self {
+  static var zero: Self {
     return 0
   }
 }
