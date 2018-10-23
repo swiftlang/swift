@@ -70,38 +70,7 @@ extension _SequenceWrapper {
   }
 }
 
-extension _SequenceWrapper where SubSequence == Base.SubSequence {
-  @inlinable // generic-performance
-  public __consuming func dropFirst(_ n: Int) -> SubSequence {
-    return _base.dropFirst(n)
-  }
-  @inlinable // generic-performance
-  public __consuming func dropLast(_ n: Int) -> SubSequence {
-    return _base.dropLast(n)
-  }
-  @inlinable // generic-performance
-  public __consuming func prefix(_ maxLength: Int) -> SubSequence {
-    return _base.prefix(maxLength)
-  }
-  @inlinable // generic-performance
-  public __consuming func suffix(_ maxLength: Int) -> SubSequence {
-    return _base.suffix(maxLength)
-  }
-
-  @inlinable // generic-performance
-  public __consuming func drop(
-    while predicate: (Element) throws -> Bool
-  ) rethrows -> SubSequence {
-    return try _base.drop(while: predicate)
-  }
-
-  @inlinable // generic-performance
-  public __consuming func prefix(
-    while predicate: (Element) throws -> Bool
-  ) rethrows -> SubSequence {
-    return try _base.prefix(while: predicate)
-  }
-  
+extension _SequenceWrapper where SubSequence == Base.SubSequence {  
   @inlinable // generic-performance
   public __consuming func split(
     maxSplits: Int, omittingEmptySubsequences: Bool,

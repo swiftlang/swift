@@ -1226,7 +1226,7 @@ extension Collection {
   ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
   ///   elements to drop from the beginning of the collection.
   @inlinable
-  public __consuming func dropFirst(_ k: Int) -> SubSequence {
+  public __consuming func dropFirst(_ k: Int = 1) -> SubSequence {
     _precondition(k >= 0, "Can't drop a negative number of elements from a collection")
     let start = index(startIndex, offsetBy: k, limitedBy: endIndex) ?? endIndex
     return self[start..<endIndex]
@@ -1253,7 +1253,7 @@ extension Collection {
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
   ///   the collection.
   @inlinable
-  public __consuming func dropLast(_ k: Int) -> SubSequence {
+  public __consuming func dropLast(_ k: Int = 1) -> SubSequence {
     _precondition(
       k >= 0, "Can't drop a negative number of elements from a collection")
     let amount = Swift.max(0, count - k)
@@ -1261,7 +1261,7 @@ extension Collection {
       offsetBy: amount, limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
   }
-  
+    
   /// Returns a subsequence by skipping elements while `predicate` returns
   /// `true` and returning the remaining elements.
   ///
