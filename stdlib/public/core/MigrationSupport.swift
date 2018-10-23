@@ -117,8 +117,8 @@ public typealias _BuiltinBooleanLiteralConvertible = _ExpressibleByBuiltinBoolea
 public typealias BooleanLiteralConvertible = ExpressibleByBooleanLiteral
 @available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByBuiltinUnicodeScalarLiteral")
 public typealias _BuiltinUnicodeScalarLiteralConvertible = _ExpressibleByBuiltinUnicodeScalarLiteral
-@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByUnicodeScalarLiteral")
-public typealias UnicodeScalarLiteralConvertible = ExpressibleByUnicodeScalarLiteral
+@available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByLegacyUnicodeScalarLiteral")
+public typealias UnicodeScalarLiteralConvertible = ExpressibleByLegacyUnicodeScalarLiteral
 @available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "_ExpressibleByBuiltinExtendedGraphemeClusterLiteral")
 public typealias _BuiltinExtendedGraphemeClusterLiteralConvertible = _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
 @available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByExtendedGraphemeClusterLiteral")

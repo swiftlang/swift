@@ -498,8 +498,8 @@ extension Character: Hashable {
   }
 }
 
-extension Character : ExpressibleByCodepointLiteral {
-  public init(codepointLiteral value: IntegerLiteralType) {
+extension Character : ExpressibleByUnicodeScalarLiteral {
+  public init(integerUnicodeScalarLiteral value: IntegerLiteralType) {
     self.init(Unicode.Scalar(_value: UInt32(value)))
   }
 }

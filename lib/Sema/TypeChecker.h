@@ -653,9 +653,9 @@ private:
   Type MaxIntegerType;
   Type FloatLiteralType;
   Type BooleanLiteralType;
-  Type UnicodeScalarType;
+  Type LegacyUnicodeScalarType;
   Type ExtendedGraphemeClusterType;
-  Type CodepointLiteralType;
+  Type UnicodeScalarLiteralType;
   Type CharacterLiteralType;
   Type StringLiteralType;
   Type ArrayLiteralType;

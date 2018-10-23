@@ -1554,7 +1554,7 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
   case CodeCompletionLiteralKind::NilLiteral:
     return KnownProtocolKind::ExpressibleByNilLiteral;
   case CodeCompletionLiteralKind::StringLiteral:
-    return KnownProtocolKind::ExpressibleByUnicodeScalarLiteral;
+    return KnownProtocolKind::ExpressibleByLegacyUnicodeScalarLiteral;
   case CodeCompletionLiteralKind::Tuple:
     llvm_unreachable("no such protocol kind");
   }
