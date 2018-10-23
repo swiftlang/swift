@@ -2046,8 +2046,7 @@ namespace {
       // Relative reference to the protocol descriptor.
       auto protocol = Conformance->getProtocol();
       auto descriptorRef = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
-                    LinkEntity::forProtocolDescriptor(protocol),
-                    IGM.getPointerAlignment(), IGM.ProtocolDescriptorStructTy);
+                                   LinkEntity::forProtocolDescriptor(protocol));
       B.addRelativeAddress(descriptorRef);
     }
 
@@ -2143,8 +2142,7 @@ namespace {
           auto assocType = entry.getAssociatedTypeWitness().Requirement;
           auto assocTypeDescriptor =
             IGM.getAddrOfLLVMVariableOrGOTEquivalent(
-              LinkEntity::forAssociatedTypeDescriptor(assocType),
-              Alignment(4), IGM.ProtocolRequirementStructTy);
+              LinkEntity::forAssociatedTypeDescriptor(assocType));
           B.addRelativeAddress(assocTypeDescriptor);
         } else if (entry.getKind() == SILWitnessTable::AssociatedTypeProtocol) {
           // Associated conformance descriptor.
@@ -2156,16 +2154,14 @@ namespace {
                                   witness.Protocol);
           auto assocConformanceDescriptor =
             IGM.getAddrOfLLVMVariableOrGOTEquivalent(
-              LinkEntity::forAssociatedConformanceDescriptor(requirement),
-              Alignment(4), IGM.ProtocolRequirementStructTy);
+              LinkEntity::forAssociatedConformanceDescriptor(requirement));
           B.addRelativeAddress(assocConformanceDescriptor);
         } else if (entry.getKind() == SILWitnessTable::Method) {
           // Method descriptor.
           auto declRef = entry.getMethodWitness().Requirement;
           auto requirement =
             IGM.getAddrOfLLVMVariableOrGOTEquivalent(
-              LinkEntity::forMethodDescriptor(declRef),
-              Alignment(4), IGM.ProtocolRequirementStructTy);
+              LinkEntity::forMethodDescriptor(declRef));
           B.addRelativeAddress(requirement);
         } else {
           // Not part of the resilient witness table.
