@@ -334,3 +334,8 @@ next to the other projects and it will be bootstrapped automatically:
     git clone git@github.com:ninja-build/ninja.git && cd ninja
     git checkout release
     cat README
+
+## Quick links for learning more about Swift
+
+1. https://developer.apple.com/swift/resources/
+2. https://metova.com/our-top-10-favorite-ios-and-swift-resources/
