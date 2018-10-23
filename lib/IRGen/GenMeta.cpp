@@ -1554,19 +1554,16 @@ namespace {
 
       // The class containing the base method.
       auto *baseClass = cast<ClassDecl>(baseRef.getDecl()->getDeclContext());
+      IGM.IRGen.noteUseOfTypeContextDescriptor(baseClass, DontRequireMetadata);
       auto baseClassEntity = LinkEntity::forNominalTypeDescriptor(baseClass);
       auto baseClassDescriptor =
-        IGM.getAddrOfLLVMVariableOrGOTEquivalent(
-          baseClassEntity, IGM.getPointerAlignment(),
-          IGM.Int8Ty);
+        IGM.getAddrOfLLVMVariableOrGOTEquivalent(baseClassEntity);
       descriptor.addRelativeAddress(baseClassDescriptor);
 
       // The base method.
       auto baseMethodEntity = LinkEntity::forMethodDescriptor(baseRef);
       auto baseMethodDescriptor =
-        IGM.getAddrOfLLVMVariableOrGOTEquivalent(
-          baseMethodEntity, Alignment(4),
-          IGM.MethodDescriptorStructTy);
+        IGM.getAddrOfLLVMVariableOrGOTEquivalent(baseMethodEntity);
       descriptor.addRelativeAddress(baseMethodDescriptor);
 
       // The implementation of the override.
@@ -1716,9 +1713,8 @@ IRGenModule::getAddrOfSharedContextDescriptor(LinkEntity entity,
     }
   }
   
-  return getAddrOfLLVMVariable(entity, Alignment(4),
+  return getAddrOfLLVMVariable(entity,
                                definition,
-                               TypeContextDescriptorTy,
                                DebugTypeInfo());
 }
 

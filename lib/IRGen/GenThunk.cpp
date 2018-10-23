@@ -129,8 +129,7 @@ IRGenModule::getAddrOfMethodDescriptor(SILDeclRef declRef,
   assert(declRef.getOverriddenWitnessTableEntry() == declRef &&
          "Overriding protocol requirements do not have method descriptors");
   LinkEntity entity = LinkEntity::forMethodDescriptor(declRef);
-  return getAddrOfLLVMVariable(entity, Alignment(4), forDefinition,
-                               MethodDescriptorStructTy, DebugTypeInfo());
+  return getAddrOfLLVMVariable(entity, forDefinition, DebugTypeInfo());
 }
 
 /// Fetch the method lookup function for a resilient class.
