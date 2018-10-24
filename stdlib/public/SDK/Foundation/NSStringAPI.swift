@@ -1217,12 +1217,12 @@ extension StringProtocol where Index == String.Index {
     let range = range.relative(to: self)
     _ns.enumerateLinguisticTags(
       in: _toRelativeNSRange(range),
-      scheme: tagScheme._ephemeralString,
+      scheme: NSLinguisticTagScheme(rawValue: tagScheme._ephemeralString),
       options: opts,
       orthography: orthography != nil ? orthography! : nil
     ) {
       var stop_ = false
-      body($0, self._range($1), self._range($2), &stop_)
+      body($0!.rawValue, self._range($1), self._range($2), &stop_)
       if stop_ {
         $3.pointee = true
       }
@@ -1463,7 +1463,7 @@ extension StringProtocol where Index == String.Index {
     let result = tokenRanges._withNilOrAddress(of: &nsTokenRanges) {
       self._ns.linguisticTags(
         in: _toRelativeNSRange(range.relative(to: self)),
-        scheme: tagScheme._ephemeralString,
+        scheme: NSLinguisticTagScheme(rawValue: tagScheme._ephemeralString),
         options: opts,
         orthography: orthography,
         tokenRanges: $0) as NSArray

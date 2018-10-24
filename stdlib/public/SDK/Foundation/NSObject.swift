@@ -149,8 +149,8 @@ public class NSKeyValueObservation : NSObject {
         let bridgeClass: AnyClass = NSKeyValueObservation.self
         let observeSel = #selector(NSObject.observeValue(forKeyPath:of:change:context:))
         let swapSel = #selector(NSKeyValueObservation._swizzle_me_observeValue(forKeyPath:of:change:context:))
-        let rootObserveImpl = class_getInstanceMethod(bridgeClass, observeSel)
-        let swapObserveImpl = class_getInstanceMethod(bridgeClass, swapSel)
+        let rootObserveImpl = class_getInstanceMethod(bridgeClass, observeSel)!
+        let swapObserveImpl = class_getInstanceMethod(bridgeClass, swapSel)!
         method_exchangeImplementations(rootObserveImpl, swapObserveImpl)
         return nil
     }()
