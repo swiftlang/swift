@@ -659,8 +659,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
              if (astNode) {
                if (auto *decl = astNode.dyn_cast<ValueDecl *>()) {
                  decl->dump(llvm::dbgs());
-               }
-               else {
+               } else {
                  astNode.get<Expr *>()->dump(llvm::dbgs());
                  llvm::dbgs() << "\n";
                }

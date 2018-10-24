@@ -1385,7 +1385,7 @@ void Pattern::dump() const {
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// PrintStmt - Visitor implementation of Expr::dump.
+/// PrintStmt - Visitor implementation of Stmt::dump.
 class PrintStmt : public StmtVisitor<PrintStmt> {
 public:
   raw_ostream &OS;
