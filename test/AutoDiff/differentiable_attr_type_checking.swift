@@ -464,11 +464,11 @@ protocol ProtoWithDiffReqs {
   @differentiable(reverse, wrt: (.1))
   func req5(x: Float) -> Float
 
-  // expected-error @+1 {{cannot specify primal on function declaration without definition}}
+  // expected-error @+1 {{cannot specify primal on protocol requirement}}
   @differentiable(reverse, primal: dummyPrimal)
   func req6(x: Float) -> Float
 
-  // expected-error @+1 {{cannot specify adjoint on function declaration without definition}}
+  // expected-error @+1 {{cannot specify adjoint on protocol requirement}}
   @differentiable(reverse, adjoint: dummyAdjoint)
   func req7(x: Float) -> Float
 }

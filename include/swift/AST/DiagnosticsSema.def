@@ -2694,9 +2694,9 @@ ERROR(differentiable_attr_no_parameters,none,
 ERROR(differentiable_attr_void_result,none,
       "cannot differentiate void function %0", (DeclName))
 ERROR(differentiable_attr_primal_no_definition,none,
-      "cannot specify primal on function declaration without definition", ())
+      "cannot specify primal on protocol requirement", ())
 ERROR(differentiable_attr_adjoint_no_definition,none,
-      "cannot specify adjoint on function declaration without definition", ())
+      "cannot specify adjoint on protocol requirement", ())
 ERROR(differentiable_attr_has_primal_but_not_adjoint,none,
       "a corresponding adjoint must be specified when the primal is provided; "
       "if you want this function to be automatically differentiated, do not "
