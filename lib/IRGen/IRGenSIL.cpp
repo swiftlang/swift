@@ -2754,7 +2754,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
   // Set the device.
   opDevice = deviceInfo->handleDevicePlacement(opInfo.getOperationName(),
-                                               opDevice);
+                                               opDevice, i->getAttributes());
   assert(!opDevice.empty());
   if (opDevice != TF_ALL_DEVICES) {
     auto *setDeviceFn = IGM.getTFE_OpSetDeviceFn();

@@ -22,6 +22,7 @@
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -54,6 +55,8 @@ public:
   /// buiding the GraphOperationInst.
   GraphOperationAttribute &addAttribute(
       const GraphOperationAttribute &attribute);
+
+  ArrayRef<GraphOperationAttribute> getAttributes() const { return Attributes; }
 
   /// Build the GraphOperationInst.
   GraphOperationInst* build(
