@@ -247,10 +247,15 @@ public struct PublicResilientStructWithInit {
   var y = publicGlobal // OK
 }
 
+private func privateIntReturningFunc() -> Int { return 0 }
+internal func internalIntReturningFunc() -> Int { return 0 }
+
 @_fixed_layout
 public struct PublicFixedStructWithInit {
   var x = internalGlobal // expected-error {{let 'internalGlobal' is internal and cannot be referenced from a property initializer in a '@_fixed_layout' type}}
   var y = publicGlobal // OK
+  static var z = privateIntReturningFunc() // OK
+  static var a = internalIntReturningFunc() // OK
 }
 
 public struct KeypathStruct {

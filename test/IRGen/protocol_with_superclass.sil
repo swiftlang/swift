@@ -6,7 +6,6 @@ import Builtin
 import Swift
 
 // CHECK-LABEL: @"$s24protocol_with_superclass17ProtoRefinesClassMp" =
-// FIXME: Need to fill in superclass field in protocol descriptor
 
 class Concrete {}
 

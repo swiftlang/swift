@@ -62,6 +62,17 @@ class TestPerformanceTestSamples(unittest.TestCase):
         self.assertEquals(s.num_iters, 42)
         self.assertEquals(s.runtime, 1000)
 
+    def test_quantile(self):
+        self.assertEquals(self.samples.quantile(1), 1000)
+        self.assertEquals(self.samples.quantile(0), 1000)
+        self.samples.add(Sample(2, 1, 1100))
+        self.assertEquals(self.samples.quantile(0), 1000)
+        self.assertEquals(self.samples.quantile(1), 1100)
+        self.samples.add(Sample(3, 1, 1050))
+        self.assertEquals(self.samples.quantile(0), 1000)
+        self.assertEquals(self.samples.quantile(.5), 1050)
+        self.assertEquals(self.samples.quantile(1), 1100)
+
     def assertEqualFiveNumberSummary(self, ss, expected_fns):
         e_min, e_q1, e_median, e_q3, e_max = expected_fns
         self.assertEquals(ss.min, e_min)
@@ -81,7 +92,7 @@ class TestPerformanceTestSamples(unittest.TestCase):
             self.samples, (1000, 1000, 1050, 1100, 1100))
         self.samples.add(Sample(4, 1, 1025))
         self.assertEqualFiveNumberSummary(
-            self.samples, (1000, 1025, 1050, 1050, 1100))
+            self.samples, (1000, 1000, 1025, 1050, 1100))
         self.samples.add(Sample(5, 1, 1075))
         self.assertEqualFiveNumberSummary(
             self.samples, (1000, 1025, 1050, 1075, 1100))
@@ -447,7 +458,7 @@ Totals,2"""
         self.assertTrue(isinstance(result, PerformanceTestResult))
         self.assertEquals(result.min, 350815)
         self.assertEquals(result.max, 376131)
-        self.assertEquals(result.median, 363094)
+        self.assertEquals(result.median, 358817)
         self.assertAlmostEquals(result.sd, 8443.37, places=2)
         self.assertAlmostEquals(result.mean, 361463.25, places=2)
         self.assertEquals(result.num_samples, 8)

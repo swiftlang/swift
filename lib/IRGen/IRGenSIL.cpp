@@ -5102,13 +5102,8 @@ static ExclusivityFlags getExclusivityAction(SILAccessKind kind) {
 
 static ExclusivityFlags getExclusivityFlags(SILModule &M,
                                             SILAccessKind kind,
-                                            bool noNestedConflict,
-                                            bool fromBuiltin) {
+                                            bool noNestedConflict) {
   auto flags = getExclusivityAction(kind);
-
-  // In old Swift compatibility modes, downgrade this to a warning.
-  if (!fromBuiltin && M.getASTContext().LangOpts.isSwiftVersion3())
-    flags |= ExclusivityFlags::WarningOnly;
 
   if (!noNestedConflict)
     flags |= ExclusivityFlags::Tracking;
@@ -5128,8 +5123,8 @@ static SILAccessEnforcement getEffectiveEnforcement(IRGenFunction &IGF,
   // of cases where this triggers, because of the restrictions on abstracting
   // over addresses and the fact that we use static enforcement on inouts.
   if (enforcement == SILAccessEnforcement::Dynamic &&
-      IGF.IGM.isKnownEmpty(access->getSource()->getType(),
-                           ResilienceExpansion::Maximal)) {
+      IGF.IGM.getTypeInfo(access->getSource()->getType())
+             .isKnownEmpty(ResilienceExpansion::Maximal)) {
     enforcement = SILAccessEnforcement::Unsafe;
   }
 
@@ -5139,7 +5134,7 @@ static SILAccessEnforcement getEffectiveEnforcement(IRGenFunction &IGF,
 template <class BeginAccessInst>
 static ExclusivityFlags getExclusivityFlags(BeginAccessInst *i) {
   return getExclusivityFlags(i->getModule(), i->getAccessKind(),
-                             i->hasNoNestedConflict(), i->isFromBuiltin());
+                             i->hasNoNestedConflict());
 }
 
 void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {

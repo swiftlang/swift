@@ -184,9 +184,9 @@
         "swift-5.0-branch" : {
             "aliases": ["swift-5.0-branch"],
             "repos": {
-                "llvm": "swift-4.2-branch",
-                "clang": "swift-4.2-branch",
-                "compiler-rt": "swift-4.2-branch",
+                "llvm": "swift-5.0-branch",
+                "clang": "swift-5.0-branch",
+                "compiler-rt": "swift-5.0-branch",
                 "swift": "swift-5.0-branch",
                 "lldb": "swift-5.0-branch",
                 "cmark": "master",

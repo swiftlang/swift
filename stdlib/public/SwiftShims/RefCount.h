@@ -788,7 +788,6 @@ class RefCounts {
     if (bits.hasSideTable())
       return bits.getSideTable()->getCount();
     
-    assert(!bits.getIsDeiniting());  // FIXME: can we assert this?
     return bits.getStrongExtraRefCount() + 1;
   }
 

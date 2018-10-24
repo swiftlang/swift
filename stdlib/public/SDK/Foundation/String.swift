@@ -50,6 +50,7 @@ extension String : _ObjectiveCBridgeable {
     return result != nil
   }
 
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSString?
   ) -> String {
@@ -82,6 +83,7 @@ extension Substring : _ObjectiveCBridgeable {
     return result != nil
   }
 
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSString?
   ) -> Substring {

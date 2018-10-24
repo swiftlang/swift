@@ -38,6 +38,7 @@
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILSuccessor.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/ilist.h"
@@ -1367,12 +1368,12 @@ public:
 
   ArrayRef<Operand> getAllOperands() const {
     return { getTrailingObjects<Operand>(),
-             SILInstruction::Bits.AllocStackInst.NumOperands };
+             static_cast<size_t>(SILInstruction::Bits.AllocStackInst.NumOperands) };
   }
 
   MutableArrayRef<Operand> getAllOperands() {
     return { getTrailingObjects<Operand>(),
-             SILInstruction::Bits.AllocStackInst.NumOperands };
+             static_cast<size_t>(SILInstruction::Bits.AllocStackInst.NumOperands) };
   }
 
   ArrayRef<Operand> getTypeDependentOperands() const {
@@ -1823,6 +1824,14 @@ public:
   bool isCalleeThin() const {
     auto Rep = getSubstCalleeType()->getRepresentation();
     return Rep == FunctionType::Representation::Thin;
+  }
+
+  /// Returns true if the callee function is annotated with
+  /// @_semantics("programtermination_point")
+  bool isCalleeKnownProgramTerminationPoint() const {
+    auto calleeFn = getCalleeFunction();
+    if (!calleeFn) return false;
+    return calleeFn->hasSemanticsAttr(SEMANTICS_PROGRAMTERMINATION_POINT);
   }
 
   /// True if this application has generic substitutions.
@@ -6652,6 +6661,9 @@ public:
   /// Returns true if this terminator exits the function.
   bool isFunctionExiting() const;
 
+  /// Returns true if this terminator terminates the program.
+  bool isProgramTerminating() const;
+
   TermKind getTermKind() const { return TermKind(getKind()); }
 };
 
@@ -7397,7 +7409,10 @@ class CheckedCastAddrBranchInst
       : InstructionBase(DebugLoc), ConsumptionKind(consumptionKind),
         Operands{this, src, dest}, DestBBs{{this, successBB, Target1Count},
                                            {this, failureBB, Target2Count}},
-        SourceType(srcType), TargetType(targetType) {}
+        SourceType(srcType), TargetType(targetType) {
+    assert(ConsumptionKind != CastConsumptionKind::BorrowAlways &&
+           "BorrowAlways is not supported on addresses");
+  }
 
 public:
   enum {

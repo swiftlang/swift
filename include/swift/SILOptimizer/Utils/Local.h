@@ -65,6 +65,20 @@ recursivelyDeleteTriviallyDeadInstructions(
   ArrayRef<SILInstruction*> I, bool Force = false,
   llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *){});
 
+/// \brief For each of the given instructions, if they are dead delete them
+/// along with their dead operands.
+///
+/// \param I The ArrayRef of instructions to be deleted.
+/// \param InstIter is updated to the next valid instruction if it points to any
+/// deleted instruction, including debug values.
+/// \param Force If Force is set, don't check if the top level instructions
+///        are considered dead - delete them regardless.
+/// \param C a callback called whenever an instruction is deleted.
+void recursivelyDeleteTriviallyDeadInstructions(
+    ArrayRef<SILInstruction *> I, SILBasicBlock::iterator &InstIter,
+    bool Force = false,
+    llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *) {});
+
 /// \brief If the given instruction is dead, delete it along with its dead
 /// operands.
 ///
@@ -72,11 +86,12 @@ recursivelyDeleteTriviallyDeadInstructions(
 /// \param Force If Force is set, don't check if the top level instruction is
 ///        considered dead - delete it regardless.
 /// \param C a callback called whenever an instruction is deleted.
-void
-recursivelyDeleteTriviallyDeadInstructions(
-  SILInstruction *I,
-  bool Force = false,
-  llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *){});
+///
+/// Returns a valid instruction iterator to the next nondeleted instruction
+/// after `I`.
+SILBasicBlock::iterator recursivelyDeleteTriviallyDeadInstructions(
+    SILInstruction *I, bool Force = false,
+    llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *) {});
 
 /// \brief Perform a fast local check to see if the instruction is dead.
 ///
@@ -246,8 +261,8 @@ public:
   /// In this case, if \p mode is AllowToModifyCFG, those critical edges are
   /// split, otherwise nothing is done and the returned \p Fr is not valid.
   ///
-  /// If \p DEBlocks is provided, all dead-end blocks are ignored. This prevents
-  /// unreachable-blocks to be included in the frontier.
+  /// If \p deadEndBlocks is provided, all dead-end blocks are ignored. This
+  /// prevents unreachable-blocks to be included in the frontier.
   bool computeFrontier(Frontier &Fr, Mode mode,
                        DeadEndBlocks *DEBlocks = nullptr);
 
@@ -305,8 +320,6 @@ class BaseThreadingCloner : public SILClonerWithScopes<BaseThreadingCloner> {
       : SILClonerWithScopes(To, From->getParent() == &To), FromBB(From),
         DestBB(Dest) {}
 
-  void process(SILInstruction *I) { visit(I); }
-
   SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
 
   SILValue remapValue(SILValue Value) {
@@ -326,7 +339,6 @@ class BaseThreadingCloner : public SILClonerWithScopes<BaseThreadingCloner> {
   }
 
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
-    DestBB->push_back(Cloned);
     SILCloner<BaseThreadingCloner>::postProcess(Orig, Cloned);
     // A terminator defines no values. Keeping terminators in the AvailVals list
     // is problematic because terminators get replaced during SSA update.
@@ -363,7 +375,11 @@ public:
              "Types must match");
       auto *BlockArg = DestBB->createPhiArgument(
           DestPHIArg->getType(), DestPHIArg->getOwnershipKind());
-      ValueMap[DestPHIArg] = SILValue(BlockArg);
+      // Since we don't call any CFG cloning entry point, we can call
+      // `recordFoldedValue` immediately as if cloning has already started. This
+      // simply avoids handling AvailVals during `remap` or defining a custom
+      // visitSILPhiArgument().
+      recordFoldedValue(DestPHIArg, BlockArg);
       AvailVals.push_back(std::make_pair(DestPHIArg, BlockArg));
     }
 
@@ -376,6 +392,13 @@ public:
     // DestBB really is the edge basic block we created to clone instructions
     // to.
     return DestBB;
+  }
+
+  // Clone all instructions in `FromBB` onto the newly created `EdgeBB`.
+  void cloneFrom(SILBasicBlock *FromBB) {
+    getBuilder().setInsertionPoint(DestBB);
+    visitInstructionsInBlock(FromBB);
+    visitTerminator(FromBB);
   }
 
   /// Call this after processing all instructions to fix the control flow
@@ -402,7 +425,11 @@ class BasicBlockCloner : public BaseThreadingCloner {
       // Populate the value map so that uses of the BBArgs in the SrcBB are
       // replaced with the BBArgs of the DestBB.
       for (unsigned i = 0, e = FromBB->args_size(); i != e; ++i) {
-        ValueMap[FromBB->getArgument(i)] = DestBB->getArgument(i);
+        // Since we don't call any CFG cloning entry point, we can call
+        // `recordFoldedValue` immediately as if cloning has already
+        // started. This simply avoids handling AvailVals during `remap` or
+        // defining a custom visitSILPhiArgument().
+        recordFoldedValue(FromBB->getArgument(i), DestBB->getArgument(i));
         AvailVals.push_back(
             std::make_pair(FromBB->getArgument(i), DestBB->getArgument(i)));
       }
@@ -410,8 +437,9 @@ class BasicBlockCloner : public BaseThreadingCloner {
 
     // Clone all instructions of the FromBB into DestBB
     void clone() {
-      for (auto &I : *FromBB)
-        process(&I);
+      getBuilder().setInsertionPoint(DestBB);
+      visitInstructionsInBlock(FromBB);
+      visitTerminator(FromBB);
     }
 
     SILBasicBlock *getDestBB() { return DestBB; }
@@ -599,13 +627,6 @@ SILType getExactDynamicType(SILValue S, SILModule &M,
 /// if the exact type could not be determined.
 SILType getExactDynamicTypeOfUnderlyingObject(SILValue S, SILModule &M,
                                               ClassHierarchyAnalysis *CHA);
-
-/// Hoist the address projection rooted in \p Op to \p InsertBefore.
-/// Requires the projected value to dominate the insertion point.
-///
-/// Will look through single basic block predecessor arguments.
-void hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,
-                             DominanceInfo *DomTree);
 
 /// Utility class for cloning init values into the static initializer of a
 /// SILGlobalVariable.

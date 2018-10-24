@@ -309,7 +309,14 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   P.addSimplifyCFG();
 
   P.addCSE();
-  P.addRedundantLoadElimination();
+  if (OpLevel == OptimizationLevelKind::HighLevel) {
+    // Early RLE does not touch loads from Arrays. This is important because
+    // later array optimizations, like ABCOpt, get confused if an array load in
+    // a loop is converted to a pattern with a phi argument.
+    P.addEarlyRedundantLoadElimination();
+  } else {
+    P.addRedundantLoadElimination();
+  }
 
   P.addPerformanceConstantPropagation();
   P.addCSE();

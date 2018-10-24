@@ -1145,9 +1145,14 @@ namespace {
                         ManagedValue base, SILDeclRef accessor) &&
     {
       AccessorArgs result;
-      if (base)
-        result.base = SGF.prepareAccessorBaseArg(loc, base, BaseFormalType,
-                                                 accessor);
+      if (base) {
+        // Borrow the base, because we may need it again to invoke other
+        // accessors.
+        result.base = SGF.prepareAccessorBaseArg(loc,
+                                             base.formalAccessBorrow(SGF, loc),
+                                             BaseFormalType,
+                                             accessor);
+      }
 
       if (!Indices.isNull())
         result.Indices = std::move(Indices);
@@ -1634,15 +1639,14 @@ namespace {
       // 'read' returns a borrowed r-value, which might or might not be
       // an address of the right type.
 
-      // Use the address if we have one.
+      // Use the yield value directly if it's the right type.
       if (!getOrigFormalType().isTuple()) {
         assert(yields.size() == 1);
-        if (yields[0].isLValue()) {
-          return yields[0];
-        }
+        return yields[0];
       }
 
       // Otherwise, we need to make a temporary.
+      // TODO: build a scalar tuple if possible.
       auto temporary =
         SGF.emitTemporary(loc, SGF.getTypeLowering(getTypeOfRValue()));
       auto yieldsAsArray = llvm::makeArrayRef(yields);
@@ -3761,6 +3765,21 @@ ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
   assert(addr.getType().isAddress() &&
          "resolving lvalue did not give an address");
   return ManagedValue::forLValue(addr.getValue());
+}
+
+ManagedValue SILGenFunction::emitBorrowedLValue(SILLocation loc,
+                                                LValue &&src,
+                                                TSanKind tsanKind) {
+  assert(src.getAccessKind() == SGFAccessKind::IgnoredRead ||
+         src.getAccessKind() == SGFAccessKind::BorrowedAddressRead ||
+         src.getAccessKind() == SGFAccessKind::BorrowedObjectRead);
+
+  ManagedValue base;
+  PathComponent &&component =
+    drillToLastComponent(*this, loc, std::move(src), base, tsanKind);
+
+  base = drillIntoComponent(*this, loc, std::move(component), base, tsanKind);
+  return ManagedValue::forBorrowedRValue(base.getValue());
 }
 
 LValue

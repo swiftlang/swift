@@ -50,8 +50,8 @@ class B : A {}
 // CHECK-SAME: i32 {{.*}} [[B_NAME]]
 //   Metadata access function.
 // CHECK-SAME: i32 {{.*}} @"$s14class_metadata1BCMa"
-//   Superclass.
-// CHECK-SAME: @"$s14class_metadata1ACMn"
+//   Superclass type.
+// CHECK-SAME: @"symbolic \01____ 14class_metadata1AC"
 //   Negative size in words.
 // CHECK-SAME: i32 2,
 //   Positive size in words.
@@ -88,8 +88,8 @@ class C<T> : B {}
 // CHECK-SAME: i32 {{.*}} [[C_NAME]]
 //   Metadata access function.
 // CHECK-SAME: i32 {{.*}} @"$s14class_metadata1CCMa"
-//   Superclass.
-// CHECK-SAME: i32 {{.*}} @"$s14class_metadata1BCMn"
+//   Superclass type.
+// CHECK-SAME: @"symbolic \01____ 14class_metadata1BC"
 //   Negative size in words.
 // CHECK-SAME: i32 2,
 //   Positive size in words.
@@ -141,16 +141,16 @@ class D : E {}
 
 // CHECK:      [[D_NAME:@.*]] = private constant [2 x i8] c"D\00"
 // CHECK-LABEL: @"$s14class_metadata1DCMn" =
-//   Flags. 0x4200_0050 == HasOverrideTable | IndirectSuperclass | Unique | Class
-// CHECK-SAME: <i32 0x4200_0050>,
+//   Flags. 0x4200_0050 == HasOverrideTable | Unique | Class
+// CHECK-SAME: <i32 0x4000_0050>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$s14class_metadataMXM"
 //   Name.
 // CHECK-SAME: i32 {{.*}} [[D_NAME]]
 //   Metadata access function.
 // CHECK-SAME: i32 {{.*}} @"$s14class_metadata1DCMa"
-//   Superclass.
-// CHECK-SAME: @"got.$s14class_metadata1ECMn.1"
+//   Superclass type.
+// CHECK-SAME: @"symbolic \01____ 14class_metadata1EC"
 //   Negative size in words.
 // CHECK-SAME: i32 2,
 //   Positive size in words.
@@ -174,3 +174,7 @@ class D : E {}
 // CHECK-SAME: @"$s14class_metadata1DCACycfC"
 // CHECK-SAME: }>, section
 class E {}
+
+// CHECK-LABEL: @"$s14class_metadata1FCMn" =
+// CHECK-SAME: @"symbolic \01____yq_G 14class_metadata1CC"
+class F<T, U> : C<U> { }

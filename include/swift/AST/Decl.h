@@ -1151,14 +1151,6 @@ public:
     return SecondLayout;
   }
 
-  /// \brief Retrieve the location of the ':' in an explicitly-written
-  /// conformance requirement.
-  SourceLoc getColonLoc() const {
-    assert(getKind() == RequirementReprKind::TypeConstraint ||
-           getKind() == RequirementReprKind::LayoutConstraint);
-    return SeparatorLoc;
-  }
-
   /// \brief Retrieve the first type of a same-type requirement.
   Type getFirstType() const {
     assert(getKind() == RequirementReprKind::SameType);
@@ -1201,10 +1193,9 @@ public:
     return SecondType;
   }
 
-  /// \brief Retrieve the location of the '==' in an explicitly-written
-  /// same-type requirement.
-  SourceLoc getEqualLoc() const {
-    assert(getKind() == RequirementReprKind::SameType);
+  /// \brief Retrieve the location of the ':' or '==' in an explicitly-written
+  /// conformance or same-type requirement respectively.
+  SourceLoc getSeparatorLoc() const {
     return SeparatorLoc;
   }
 
@@ -1462,7 +1453,7 @@ public:
 };
 
 // A private class for forcing exact field layout.
-class _GenericContext {
+class alignas(8) _GenericContext {
 // Not really public. See GenericContext.
 public:
   GenericParamList *GenericParams = nullptr;
@@ -1599,7 +1590,7 @@ public:
 
   ArrayRef<AccessPathElement> getFullAccessPath() const {
     return {getTrailingObjects<AccessPathElement>(),
-            Bits.ImportDecl.NumPathElements};
+            static_cast<size_t>(Bits.ImportDecl.NumPathElements)};
   }
 
   ArrayRef<AccessPathElement> getModulePath() const {
@@ -1864,38 +1855,49 @@ public:
 /// Pattern and Initialization expression.  The pattern is always present, but
 /// the initializer can be null if there is none.
 class PatternBindingEntry {
-  Pattern *ThePattern;
-
-  /// The location of the equal '=' token.
-  SourceLoc EqualLoc;
-
   enum class Flags {
     Checked = 1 << 0,
     Removed = 1 << 1,
-    Lazy    = 1 << 2,
+    Lazy    = 1 << 2
+  };
+  llvm::PointerIntPair<Pattern *, 3, OptionSet<Flags>> PatternAndFlags;
+
+  struct ExprAndEqualLoc {
+    // When the initializer is removed we don't actually clear the pointer
+    // because we might need to get initializer's source range. Since the
+    // initializer is ASTContext-allocated it is safe.
+    Expr *Node;
+    /// The location of the equal '=' token.
+    SourceLoc EqualLoc;
   };
 
-  // When the initializer is removed we don't actually clear the pointer
-  // because we might need to get initializer's source range. Since the
-  // initializer is ASTContext-allocated it is safe.
-  llvm::PointerIntPair<Expr *, 3, OptionSet<Flags>> InitAndFlags;
+  union {
+    /// The initializer expression and its '=' token loc.
+    ExprAndEqualLoc InitExpr;
+
+    /// The text of the initializer expression if deserialized from a module.
+    StringRef InitStringRepresentation;
+  };
 
   /// The initializer context used for this pattern binding entry.
-  DeclContext *InitContext = nullptr;
+  llvm::PointerIntPair<DeclContext *, 1, bool> InitContextAndIsText;
 
   friend class PatternBindingInitializer;
 
 public:
   PatternBindingEntry(Pattern *P, SourceLoc EqualLoc, Expr *E,
                       DeclContext *InitContext)
-      : ThePattern(P), EqualLoc(EqualLoc), InitAndFlags(E, {}),
-        InitContext(InitContext) {}
+    : PatternAndFlags(P, {}), InitExpr({E, EqualLoc}),
+      InitContextAndIsText({InitContext, false}) {
+  }
 
-  Pattern *getPattern() const { return ThePattern; }
-  void setPattern(Pattern *P) { ThePattern = P; }
+  Pattern *getPattern() const { return PatternAndFlags.getPointer(); }
+  void setPattern(Pattern *P) { PatternAndFlags.setPointer(P); }
   Expr *getInit() const {
-    return (InitAndFlags.getInt().contains(Flags::Removed))
-      ? nullptr : InitAndFlags.getPointer();
+    if (PatternAndFlags.getInt().contains(Flags::Removed) ||
+        InitContextAndIsText.getInt())
+      return nullptr;
+    return InitExpr.Node;
   }
   Expr *getNonLazyInit() const {
     return isInitializerLazy() ? nullptr : getInit();
@@ -1903,37 +1905,64 @@ public:
   SourceRange getOrigInitRange() const;
   void setInit(Expr *E);
 
+  /// Gets the text of the initializer expression, stripping out inactive
+  /// branches of any #ifs inside the expression.
+  StringRef getInitStringRepresentation(SmallVectorImpl<char> &scratch) const;
+
+  /// Sets the initializer string representation to the string that was
+  /// deserialized from a partial module.
+  void setInitStringRepresentation(StringRef str) {
+    InitStringRepresentation = str;
+    InitContextAndIsText.setInt(true);
+  }
+
+  /// Whether this pattern entry can generate a string representation of its
+  /// initializer expression.
+  bool hasInitStringRepresentation() const;
+
   /// Retrieve the location of the equal '=' token.
-  SourceLoc getEqualLoc() const { return EqualLoc; }
+  SourceLoc getEqualLoc() const {
+    return InitContextAndIsText.getInt() ? SourceLoc() : InitExpr.EqualLoc;
+  }
 
   /// Set the location of the equal '=' token.
-  void setEqualLoc(SourceLoc equalLoc) { EqualLoc = equalLoc; }
+  void setEqualLoc(SourceLoc equalLoc) {
+    assert(!InitContextAndIsText.getInt() &&
+           "cannot set equal loc for textual initializer");
+    InitExpr.EqualLoc = equalLoc;
+  }
 
   /// Retrieve the initializer as it was written in the source.
-  Expr *getInitAsWritten() const { return InitAndFlags.getPointer(); }
+  Expr *getInitAsWritten() const {
+    return InitContextAndIsText.getInt() ? nullptr : InitExpr.Node;
+  }
 
   bool isInitializerChecked() const {
-    return InitAndFlags.getInt().contains(Flags::Checked);
+    return PatternAndFlags.getInt().contains(Flags::Checked);
   }
   void setInitializerChecked() {
-    InitAndFlags.setInt(InitAndFlags.getInt() | Flags::Checked);
+    PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Checked);
   }
 
   bool isInitializerLazy() const {
-    return InitAndFlags.getInt().contains(Flags::Lazy);
+    return PatternAndFlags.getInt().contains(Flags::Lazy);
   }
   void setInitializerLazy() {
-    InitAndFlags.setInt(InitAndFlags.getInt() | Flags::Lazy);
+    PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Lazy);
   }
 
   // Return the first variable initialized by this pattern.
   VarDecl *getAnchoringVarDecl() const;
 
   // Retrieve the declaration context for the initializer.
-  DeclContext *getInitContext() const { return InitContext; }
+  DeclContext *getInitContext() const {
+    return InitContextAndIsText.getPointer();
+  }
 
   /// Override the initializer context.
-  void setInitContext(DeclContext *dc) { InitContext = dc; }
+  void setInitContext(DeclContext *dc) {
+    InitContextAndIsText.setPointer(dc);
+  }
 
   /// Retrieve the source range covered by this pattern binding.
   ///
@@ -2007,6 +2036,10 @@ public:
     return const_cast<PatternBindingDecl*>(this)->getMutablePatternList();
   }
 
+  void setInitStringRepresentation(unsigned i, StringRef str) {
+    getMutablePatternList()[i].setInitStringRepresentation(str);
+  }
+
   Expr *getInit(unsigned i) const {
     return getPatternList()[i].getInit();
   }
@@ -2039,7 +2072,8 @@ public:
   
   /// Return the PatternEntry (a pattern + initializer pair) for the specified
   /// VarDecl.
-  PatternBindingEntry getPatternEntryForVarDecl(const VarDecl *VD) const {
+  const PatternBindingEntry &getPatternEntryForVarDecl(
+    const VarDecl *VD) const {
     return getPatternList()[getPatternEntryIndexForVarDecl(VD)];
   }
   
@@ -2097,7 +2131,7 @@ public:
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::PatternBinding;
   }
-  
+
 private:
   MutableArrayRef<PatternBindingEntry> getMutablePatternList() {
     // Pattern entries are tail allocated.
@@ -3200,10 +3234,7 @@ public:
                                                      ToStoredProperty>;
 
   /// Return a collection of the stored member variables of this type.
-  StoredPropertyRange getStoredProperties(bool skipInaccessible = false) const {
-    return StoredPropertyRange(getMembers(),
-                               ToStoredProperty(skipInaccessible));
-  }
+  StoredPropertyRange getStoredProperties(bool skipInaccessible = false) const;
 
 private:
   /// Predicate used to filter StoredPropertyRange.
@@ -4616,6 +4647,14 @@ public:
     return nullptr;
   }
 
+  // Return whether this VarDecl has an initial value, either by checking
+  // if it has an initializer in its parent pattern binding or if it has
+  // the @_hasInitialValue attribute.
+  bool hasInitialValue() const {
+    return getAttrs().hasAttribute<HasInitialValueAttr>() ||
+           getParentInitializer();
+  }
+
   VarDecl *getOverriddenDecl() const {
     return cast_or_null<VarDecl>(AbstractStorageDecl::getOverriddenDecl());
   }
@@ -4670,7 +4709,11 @@ public:
   bool isOwned() const { return getSpecifier() == Specifier::Owned; }
 
   ValueOwnership getValueOwnership() const {
-    switch (getSpecifier()) {
+    return getValueOwnershipForSpecifier(getSpecifier());
+  }
+
+  static ValueOwnership getValueOwnershipForSpecifier(Specifier specifier) {
+    switch (specifier) {
     case Specifier::Let:
       return ValueOwnership::Default;
     case Specifier::Var:
@@ -4685,6 +4728,21 @@ public:
     llvm_unreachable("unhandled specifier");
   }
 
+  static Specifier
+  getParameterSpecifierForValueOwnership(ValueOwnership ownership) {
+    switch (ownership) {
+    case ValueOwnership::Default:
+      return Specifier::Let;
+    case ValueOwnership::Shared:
+      return Specifier::Shared;
+    case ValueOwnership::InOut:
+      return Specifier::InOut;
+    case ValueOwnership::Owned:
+      return Specifier::Owned;
+    }
+    llvm_unreachable("unhandled ownership");
+  }
+
   /// Is this an element in a capture list?
   bool isCaptureList() const { return Bits.VarDecl.IsCaptureList; }
 
@@ -4697,6 +4755,13 @@ public:
   void setHasNonPatternBindingInit(bool V = true) {
     Bits.VarDecl.HasNonPatternBindingInit = V;
   }
+
+  /// Determines if this var has an initializer expression that should be
+  /// exposed to clients.
+  /// There's a very narrow case when we would: if the decl is an instance
+  /// member with an initializer expression and the parent type is
+  /// @_fixed_layout and resides in a resilient module.
+  bool isInitExposedToClients() const;
   
   /// Is this a special debugger variable?
   bool isDebuggerVar() const { return Bits.VarDecl.IsDebuggerVar; }
@@ -6335,24 +6400,23 @@ class OperatorDecl : public Decl {
   
   Identifier name;
 
-  Identifier DesignatedProtocolName;
-  SourceLoc DesignatedProtocolNameLoc;
-  ProtocolDecl *DesignatedProtocol = nullptr;
+  ArrayRef<Identifier> Identifiers;
+  ArrayRef<SourceLoc> IdentifierLocs;
+  ArrayRef<NominalTypeDecl *> DesignatedNominalTypes;
 
 public:
   OperatorDecl(DeclKind kind, DeclContext *DC, SourceLoc OperatorLoc,
                Identifier Name, SourceLoc NameLoc,
-               Identifier DesignatedProtocolName = Identifier(),
-               SourceLoc DesignatedProtocolNameLoc = SourceLoc())
+               ArrayRef<Identifier> Identifiers,
+               ArrayRef<SourceLoc> IdentifierLocs)
       : Decl(kind, DC), OperatorLoc(OperatorLoc), NameLoc(NameLoc), name(Name),
-        DesignatedProtocolName(DesignatedProtocolName),
-        DesignatedProtocolNameLoc(DesignatedProtocolNameLoc) {}
+        Identifiers(Identifiers), IdentifierLocs(IdentifierLocs) {}
 
   OperatorDecl(DeclKind kind, DeclContext *DC, SourceLoc OperatorLoc,
                Identifier Name, SourceLoc NameLoc,
-               ProtocolDecl *DesignatedProtocol)
+               ArrayRef<NominalTypeDecl *> DesignatedNominalTypes)
       : Decl(kind, DC), OperatorLoc(OperatorLoc), NameLoc(NameLoc), name(Name),
-        DesignatedProtocol(DesignatedProtocol) {}
+        DesignatedNominalTypes(DesignatedNominalTypes) {}
 
   SourceLoc getLoc() const { return NameLoc; }
 
@@ -6360,18 +6424,20 @@ public:
   SourceLoc getNameLoc() const { return NameLoc; }
   Identifier getName() const { return name; }
 
-  Identifier getDesignatedProtocolName() const {
-    return DesignatedProtocolName;
+  ArrayRef<Identifier> getIdentifiers() const {
+    return Identifiers;
   }
 
-  SourceLoc getDesignatedProtocolNameLoc() const {
-    return DesignatedProtocolNameLoc;
+  ArrayRef<SourceLoc> getIdentifierLocs() const {
+    return IdentifierLocs;
   }
 
-  ProtocolDecl *getDesignatedProtocol() const { return DesignatedProtocol; }
+  ArrayRef<NominalTypeDecl *> getDesignatedNominalTypes() const {
+    return DesignatedNominalTypes;
+  }
 
-  void setDesignatedProtocol(ProtocolDecl *protocol) {
-    DesignatedProtocol = protocol;
+  void setDesignatedNominalTypes(ArrayRef<NominalTypeDecl *> nominalTypes) {
+    DesignatedNominalTypes = nominalTypes;
   }
 
   static bool classof(const Decl *D) {
@@ -6389,47 +6455,39 @@ public:
 /// infix operator /+/ : AdditionPrecedence, Numeric
 /// \endcode
 class InfixOperatorDecl : public OperatorDecl {
-  SourceLoc ColonLoc, FirstIdentifierLoc, SecondIdentifierLoc;
-  Identifier FirstIdentifier, SecondIdentifier;
+  SourceLoc ColonLoc;
   PrecedenceGroupDecl *PrecedenceGroup = nullptr;
 
 public:
   InfixOperatorDecl(DeclContext *DC, SourceLoc operatorLoc, Identifier name,
                     SourceLoc nameLoc, SourceLoc colonLoc,
-                    Identifier firstIdentifier, SourceLoc firstIdentifierLoc,
-                    Identifier secondIdentifier = Identifier(),
-                    SourceLoc secondIdentifierLoc = SourceLoc())
-      : OperatorDecl(DeclKind::InfixOperator, DC, operatorLoc, name, nameLoc),
-        ColonLoc(colonLoc), FirstIdentifierLoc(firstIdentifierLoc),
-        SecondIdentifierLoc(secondIdentifierLoc),
-        FirstIdentifier(firstIdentifier), SecondIdentifier(secondIdentifier) {}
+                    ArrayRef<Identifier> identifiers,
+                    ArrayRef<SourceLoc> identifierLocs)
+      : OperatorDecl(DeclKind::InfixOperator, DC, operatorLoc, name, nameLoc,
+                     identifiers, identifierLocs),
+        ColonLoc(colonLoc) {}
 
   InfixOperatorDecl(DeclContext *DC, SourceLoc operatorLoc, Identifier name,
                     SourceLoc nameLoc, SourceLoc colonLoc,
-                    Identifier firstIdentifier, SourceLoc firstIdentifierLoc,
-                    ProtocolDecl *designatedProtocol)
+                    PrecedenceGroupDecl *precedenceGroup,
+                    ArrayRef<NominalTypeDecl *> designatedNominalTypes)
       : OperatorDecl(DeclKind::InfixOperator, DC, operatorLoc, name, nameLoc,
-                     designatedProtocol),
-        ColonLoc(colonLoc), FirstIdentifierLoc(firstIdentifierLoc),
-        FirstIdentifier(firstIdentifier) {}
+                     designatedNominalTypes),
+        ColonLoc(colonLoc), PrecedenceGroup(precedenceGroup) {}
 
   SourceLoc getEndLoc() const {
-    if (!SecondIdentifier.empty())
-      return SecondIdentifierLoc;
-    if (!FirstIdentifier.empty())
-      return FirstIdentifierLoc;
-    return getNameLoc();
+    auto identifierLocs = getIdentifierLocs();
+    if (identifierLocs.empty())
+      return getNameLoc();
+
+    return identifierLocs.back();
   }
+
   SourceRange getSourceRange() const {
     return { getOperatorLoc(), getEndLoc() };
   }
 
   SourceLoc getColonLoc() const { return ColonLoc; }
-  SourceLoc getFirstIdentifierLoc() const { return FirstIdentifierLoc; }
-  SourceLoc getSecondIdentifierLoc() const { return SecondIdentifierLoc; }
-
-  Identifier getFirstIdentifier() const { return FirstIdentifier; }
-  Identifier getSecondIdentifier() const { return SecondIdentifier; }
 
   PrecedenceGroupDecl *getPrecedenceGroup() const { return PrecedenceGroup; }
   void setPrecedenceGroup(PrecedenceGroupDecl *PGD) {
@@ -6456,15 +6514,16 @@ class PrefixOperatorDecl : public OperatorDecl {
 public:
   PrefixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
                      SourceLoc NameLoc,
-                     Identifier DesignatedProtocolName = Identifier(),
-                     SourceLoc DesignatedProtocolNameLoc = SourceLoc())
+                     ArrayRef<Identifier> Identifiers,
+                     ArrayRef<SourceLoc> IdentifierLocs)
       : OperatorDecl(DeclKind::PrefixOperator, DC, OperatorLoc, Name, NameLoc,
-                     DesignatedProtocolName, DesignatedProtocolNameLoc) {}
+                     Identifiers, IdentifierLocs) {}
 
   PrefixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
-                     SourceLoc NameLoc, ProtocolDecl *DesignatedProtocol)
+                     SourceLoc NameLoc,
+                     ArrayRef<NominalTypeDecl *> designatedNominalTypes)
       : OperatorDecl(DeclKind::PrefixOperator, DC, OperatorLoc, Name, NameLoc,
-                     DesignatedProtocol) {}
+                     designatedNominalTypes) {}
 
   SourceRange getSourceRange() const {
     return { getOperatorLoc(), getNameLoc() };
@@ -6490,15 +6549,16 @@ class PostfixOperatorDecl : public OperatorDecl {
 public:
   PostfixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
                       SourceLoc NameLoc,
-                      Identifier DesignatedProtocolName = Identifier(),
-                      SourceLoc DesignatedProtocolNameLoc = SourceLoc())
+                      ArrayRef<Identifier> Identifiers,
+                      ArrayRef<SourceLoc> IdentifierLocs)
       : OperatorDecl(DeclKind::PostfixOperator, DC, OperatorLoc, Name, NameLoc,
-                     DesignatedProtocolName, DesignatedProtocolNameLoc) {}
+                     Identifiers, IdentifierLocs) {}
 
   PostfixOperatorDecl(DeclContext *DC, SourceLoc OperatorLoc, Identifier Name,
-                      SourceLoc NameLoc, ProtocolDecl *DesignatedProtocol)
+                      SourceLoc NameLoc,
+                      ArrayRef<NominalTypeDecl *> designatedNominalTypes)
       : OperatorDecl(DeclKind::PostfixOperator, DC, OperatorLoc, Name, NameLoc,
-                     DesignatedProtocol) {}
+                     designatedNominalTypes) {}
 
   SourceRange getSourceRange() const {
     return { getOperatorLoc(), getNameLoc() };

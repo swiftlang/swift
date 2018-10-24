@@ -1,13 +1,8 @@
 set(datafiles
-  macos3.json
   macos4.json
-  ios3.json
   ios4.json
-  tvos3.json
   tvos4.json
-  watchos3.json
   watchos4.json
-  overlay3.json
   overlay4.json
 )
 set(SWIFTLIB_DIR

@@ -407,8 +407,6 @@ void ClangImporter::clearTypeResolver() {
 
 #pragma mark Module loading
 
-#define SHIMS_INCLUDE_FLAG "-isystem"
-
 static void
 getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
                              ASTContext &ctx,
@@ -439,7 +437,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
       "-fretain-comments-from-system-headers",
 
-      SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
+      "-isystem", searchPathOpts.RuntimeResourcePath,
   });
 
   // Enable Position Independence.  `-fPIC` is not supported on Windows, which
@@ -535,7 +533,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     // using Glibc or a libc that respects that flag. This will cause some
     // source breakage however (specifically with strerror_r()) on Linux
     // without a workaround.
-    if (triple.isOSFuchsia()) {
+    if (triple.isOSFuchsia() || triple.isAndroid()) {
       // Many of the modern libc features are hidden behind feature macros like
       // _GNU_SOURCE or _XOPEN_SOURCE.
       invocationArgStrs.insert(invocationArgStrs.end(), {

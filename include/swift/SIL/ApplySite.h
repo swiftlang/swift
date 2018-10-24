@@ -1,4 +1,4 @@
-//===--- ApplySite.h ------------------------------------------------------===//
+//===--- ApplySite.h -------------------------------------*- mode: c++ -*--===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -169,6 +169,12 @@ public:
   /// Get the conventions of the callee with the applied substitutions.
   SILFunctionConventions getSubstCalleeConv() const {
     return SILFunctionConventions(getSubstCalleeType(), getModule());
+  }
+
+  /// Returns true if the callee function is annotated with
+  /// @_semantics("programtermination_point")
+  bool isCalleeKnownProgramTerminationPoint() const {
+    FOREACH_IMPL_RETURN(isCalleeKnownProgramTerminationPoint());
   }
 
   /// Check if this is a call of a never-returning function.
@@ -459,6 +465,18 @@ public:
 
   OperandValueArrayRef getArgumentsWithoutIndirectResults() const {
     return getArguments().slice(getNumIndirectSILResults());
+  }
+
+  /// Returns true if \p op is the callee operand of this apply site
+  /// and not an argument operand.
+  bool isCalleeOperand(const Operand &op) const {
+    return op.getOperandNumber() < getOperandIndexOfFirstArgument();
+  }
+
+  /// Returns true if \p op is an operand that passes an indirect
+  /// result argument to the apply site.
+  bool isIndirectResultOperand(const Operand &op) const {
+    return getCalleeArgIndex(op) < getNumIndirectSILResults();
   }
 
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }

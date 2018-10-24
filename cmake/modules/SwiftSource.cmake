@@ -245,6 +245,10 @@ function(_compile_swift_files
     list(APPEND swift_flags "-Xfrontend" "-enable-sil-ownership")
   endif()
 
+  if(SWIFT_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING AND SWIFTFILE_IS_STDLIB)
+    list(APPEND swift_flags "-Xfrontend" "-enforce-exclusivity=checked")
+  endif()
+
   if(SWIFT_EMIT_SORTED_SIL_OUTPUT)
     list(APPEND swift_flags "-Xfrontend" "-emit-sorted-sil")
   endif()
@@ -501,7 +505,7 @@ function(_compile_swift_files
         COMMAND
           "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}"
-          "-experimental-emit-interface" ${swift_flags} "@${file_path}"
+          "-emit-parseable-module-interface" ${swift_flags} "@${file_path}"
         ${command_touch_module_outputs}
         OUTPUT ${module_outputs}
         DEPENDS

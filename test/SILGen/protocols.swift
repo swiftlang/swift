@@ -28,9 +28,13 @@ func use_subscript_rvalue_get(_ i : Int) -> Int {
 // CHECK: [[ALLOCSTACK:%[0-9]+]] = alloc_stack $[[OPENED]]
 // CHECK: copy_addr [[PROJ]] to [initialization] [[ALLOCSTACK]] : $*[[OPENED]]
 // CHECK-NEXT: end_access [[READ]] : $*SubscriptableGet
+// CHECK-NEXT: [[TMP:%.*]] = alloc_stack
+// CHECK-NEXT: copy_addr [[ALLOCSTACK]] to [initialization] [[TMP]]
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #SubscriptableGet.subscript!getter.1
-// CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[METH]]<[[OPENED]]>(%0, [[ALLOCSTACK]])
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[METH]]<[[OPENED]]>(%0, [[TMP]])
+// CHECK-NEXT: destroy_addr [[TMP]]
 // CHECK-NEXT: destroy_addr [[ALLOCSTACK]]
+// CHECK-NEXT: dealloc_stack [[TMP]]
 // CHECK-NEXT: dealloc_stack [[ALLOCSTACK]] : $*[[OPENED]]
 // CHECK-NEXT: return [[RESULT]]
 
@@ -135,8 +139,10 @@ func use_property_rvalue_get() -> Int {
 // CHECK: [[COPY:%.*]] = alloc_stack $[[OPENED]]
 // CHECK-NEXT: copy_addr [[PROJ]] to [initialization] [[COPY]] : $*[[OPENED]]
 // CHECK-NEXT: end_access [[READ]] : $*PropertyWithGetter
+// CHECK: [[BORROW:%.*]] = alloc_stack $[[OPENED]]
+// CHECK-NEXT: copy_addr [[COPY]] to [initialization] [[BORROW]] : $*[[OPENED]]
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #PropertyWithGetter.a!getter.1
-// CHECK-NEXT: apply [[METH]]<[[OPENED]]>([[COPY]])
+// CHECK-NEXT: apply [[METH]]<[[OPENED]]>([[BORROW]])
 
 func use_property_lvalue_get() -> Int {
   return propertyGetSet.b

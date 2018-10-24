@@ -51,4 +51,8 @@ func test_arch() {
   // CHECK: store %swift.type* @"$ss4Int8VN", %swift.type** [[T:%.*]], align [[ALIGN:(4|8)]]
   // CHECK: call %swift.type* @swift_getFunctionTypeMetadata([[WORD]] 100663300, %swift.type** {{%.*}}, i32* getelementptr inbounds ([4 x i32], [4 x i32]* @parameter-flags.{{.*}}, i32 0, i32 0), %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sytN", i32 0, i32 1))
   arch({(x: inout Int, y: Double, z: String, w: Int8) -> () in })
+
+  // CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden swiftcc %swift.metadata_response @"$syyyccMa"
+  // CHECK: call %swift.type* @swift_getFunctionTypeMetadata1({{i(32|64)}} 67108865
+  arch({(x: @escaping () -> ()) -> () in })
 }

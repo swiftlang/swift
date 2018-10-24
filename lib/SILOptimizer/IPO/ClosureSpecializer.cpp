@@ -60,7 +60,6 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
@@ -69,7 +68,9 @@
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
@@ -720,19 +721,23 @@ void ClosureSpecCloner::populateCloned() {
   SILBasicBlock *ClosureUserEntryBB = &*ClosureUser->begin();
   SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
 
+  SmallVector<SILValue, 4> entryArgs;
+  entryArgs.reserve(ClosureUserEntryBB->getArguments().size());
+
   // Remove the closure argument.
   SILArgument *ClosureArg = nullptr;
   for (size_t i = 0, e = ClosureUserEntryBB->args_size(); i != e; ++i) {
     SILArgument *Arg = ClosureUserEntryBB->getArgument(i);
     if (i == CallSiteDesc.getClosureIndex()) {
       ClosureArg = Arg;
+      entryArgs.push_back(SILValue());
       continue;
     }
 
     // Otherwise, create a new argument which copies the original argument
     SILValue MappedValue =
         ClonedEntryBB->createFunctionArgument(Arg->getType(), Arg->getDecl());
-    ValueMap.insert(std::make_pair(Arg, MappedValue));
+    entryArgs.push_back(MappedValue);
   }
 
   // Next we need to add in any arguments that are not captured as arguments to
@@ -773,18 +778,11 @@ void ClosureSpecCloner::populateCloned() {
   // closure was passed trivial.
   assert(NeedsRelease.empty() || CallSiteDesc.isTrivialNoEscapeParameter());
 
-  ValueMap.insert(std::make_pair(ClosureArg, ConvertedCallee));
+  entryArgs[CallSiteDesc.getClosureIndex()] = ConvertedCallee;
 
-  BBMap.insert(std::make_pair(ClosureUserEntryBB, ClonedEntryBB));
-  // Recursively visit original BBs in depth-first preorder, starting with the
-  // entry block, cloning all instructions other than terminators.
-  visitSILBasicBlock(ClosureUserEntryBB);
-
-  // Now iterate over the BBs and fix up the terminators.
-  for (auto BI = BBMap.begin(), BE = BBMap.end(); BI != BE; ++BI) {
-    Builder.setInsertionPoint(BI->second);
-    visit(BI->first->getTerminator());
-  }
+  // Visit original BBs in depth-first preorder, starting with the
+  // entry block, cloning all instructions and terminators.
+  cloneFunctionBody(ClosureUser, ClonedEntryBB, entryArgs);
 
   // Then insert a release in all non failure exit BBs if our partial apply was
   // guaranteed. This is b/c it was passed at +0 originally and we need to
@@ -794,7 +792,7 @@ void ClosureSpecCloner::populateCloned() {
        CallSiteDesc.isTrivialNoEscapeParameter()) &&
       (ClosureHasRefSemantics || !NeedsRelease.empty())) {
     for (SILBasicBlock *BB : CallSiteDesc.getNonFailureExitBBs()) {
-      SILBasicBlock *OpBB = BBMap[BB];
+      SILBasicBlock *OpBB = getOpBasicBlock(BB);
 
       TermInst *TI = OpBB->getTerminator();
       auto Loc = CleanupLocation::get(NewClosure->getLoc());

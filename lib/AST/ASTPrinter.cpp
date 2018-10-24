@@ -79,7 +79,7 @@ static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
   return !ND->isResilient() && ASD->hasStorage() && !ASD->isStatic();
 }
 
-PrintOptions PrintOptions::printTextualInterfaceFile() {
+PrintOptions PrintOptions::printParseableInterfaceFile() {
   PrintOptions result;
   result.PrintLongAttrsOnSeparateLines = true;
   result.TypeDefinitions = true;
@@ -100,7 +100,7 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
     printer << " " << AFD->getInlinableBodyText(scratch);
   };
 
-  class ShouldPrintForTextualInterface : public ShouldPrintChecker {
+  class ShouldPrintForParseableInterface : public ShouldPrintChecker {
     bool shouldPrint(const Decl *D, const PrintOptions &options) override {
       // Skip anything that isn't 'public' or '@usableFromInline'.
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
@@ -143,7 +143,7 @@ PrintOptions PrintOptions::printTextualInterfaceFile() {
     }
   };
   result.CurrentPrintabilityChecker =
-      std::make_shared<ShouldPrintForTextualInterface>();
+      std::make_shared<ShouldPrintForParseableInterface>();
 
   // FIXME: We don't really need 'public' on everything; we could just change
   // the default to 'public' and mark the 'internal' things.
@@ -842,26 +842,35 @@ void PrintAST::printAttributes(const Decl *D) {
   if (Options.SkipAttributes)
     return;
 
-  // Don't print a redundant 'final' if we are printing a 'static' decl.
+  // Save the current number of exclude attrs to restore once we're done.
   unsigned originalExcludeAttrCount = Options.ExcludeAttrList.size();
-  if (Options.PrintImplicitAttrs &&
-      D->getDeclContext()->getSelfClassDecl() &&
-      getCorrectStaticSpelling(D) == StaticSpellingKind::KeywordStatic) {
-    Options.ExcludeAttrList.push_back(DAK_Final);
-  }
 
-  // Don't print any contextual decl modifiers.
-  // We will handle 'mutating' and 'nonmutating' separately.
-  if (Options.PrintImplicitAttrs && isa<AccessorDecl>(D)) {
+  if (Options.PrintImplicitAttrs) {
+
+    // Don't print a redundant 'final' if we are printing a 'static' decl.
+    if (D->getDeclContext()->getSelfClassDecl() &&
+        getCorrectStaticSpelling(D) == StaticSpellingKind::KeywordStatic) {
+      Options.ExcludeAttrList.push_back(DAK_Final);
+    }
+
+    // Don't print @_hasInitialValue if we're printing an initializer
+    // expression.
+    if (auto vd = dyn_cast<VarDecl>(D)) {
+      if (vd->isInitExposedToClients())
+        Options.ExcludeAttrList.push_back(DAK_HasInitialValue);
+    }
+
+    // Don't print any contextual decl modifiers.
+    // We will handle 'mutating' and 'nonmutating' separately.
+    if (isa<AccessorDecl>(D)) {
 #define EXCLUDE_ATTR(Class) Options.ExcludeAttrList.push_back(DAK_##Class);
 #define CONTEXTUAL_DECL_ATTR(X, Class, Y, Z) EXCLUDE_ATTR(Class)
 #define CONTEXTUAL_SIMPLE_DECL_ATTR(X, Class, Y, Z) EXCLUDE_ATTR(Class)
 #define CONTEXTUAL_DECL_ATTR_ALIAS(X, Class) EXCLUDE_ATTR(Class)
 #include "swift/AST/Attr.def"
-  }
+    }
 
-  // If the declaration is implicitly @objc, print the attribute now.
-  if (Options.PrintImplicitAttrs) {
+    // If the declaration is implicitly @objc, print the attribute now.
     if (auto VD = dyn_cast<ValueDecl>(D)) {
       if (VD->isObjC() && !VD->getAttrs().hasAttribute<ObjCAttr>()) {
         Printer.printAttrName("@objc");
@@ -899,7 +908,10 @@ void PrintAST::printPattern(const Pattern *pattern) {
     recordDeclLoc(decl, [&]{
       if (Options.OmitNameOfInaccessibleProperties &&
           contributesToParentTypeStorage(decl) &&
-          !isPublicOrUsableFromInline(decl))
+          !isPublicOrUsableFromInline(decl) &&
+          // FIXME: We need to figure out a way to generate an entry point
+          //        for the initializer expression without revealing the name.
+          !decl->hasInitialValue())
         Printer << "_";
       else
         Printer.printName(named->getBoundName());
@@ -2045,7 +2057,7 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   }
 
   bool isFirst = true;
-  for (auto entry : decl->getPatternList()) {
+  for (auto &entry : decl->getPatternList()) {
     if (!shouldPrintPattern(entry.getPattern()))
       continue;
     if (isFirst)
@@ -2064,6 +2076,13 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
 
     if (Options.VarInitializers) {
       // FIXME: Implement once we can pretty-print expressions.
+    }
+
+    auto vd = entry.getAnchoringVarDecl();
+    if (entry.hasInitStringRepresentation() &&
+        vd->isInitExposedToClients()) {
+      SmallString<128> scratch;
+      Printer << " = " << entry.getInitStringRepresentation(scratch);
     }
   }
 }
@@ -2854,10 +2873,17 @@ void PrintAST::visitInfixOperatorDecl(InfixOperatorDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
-  if (!decl->getFirstIdentifier().empty())
-    Printer << " : " << decl->getFirstIdentifier();
-  if (!decl->getSecondIdentifier().empty())
-    Printer << ", " << decl->getSecondIdentifier();
+  if (auto *group = decl->getPrecedenceGroup())
+    Printer << " : " << group->getName();
+  auto designatedNominalTypes = decl->getDesignatedNominalTypes();
+  auto first = true;
+  for (auto typeDecl : designatedNominalTypes) {
+    if (first && !decl->getPrecedenceGroup())
+      Printer << " : " << typeDecl->getName();
+    else
+      Printer << ", " << typeDecl->getName();
+    first = false;
+  }
 }
 
 void PrintAST::visitPrecedenceGroupDecl(PrecedenceGroupDecl *decl) {
@@ -2930,8 +2956,15 @@ void PrintAST::visitPrefixOperatorDecl(PrefixOperatorDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
-  if (!decl->getDesignatedProtocolName().empty())
-    Printer << " : " << decl->getDesignatedProtocolName();
+  auto designatedNominalTypes = decl->getDesignatedNominalTypes();
+  auto first = true;
+  for (auto typeDecl : designatedNominalTypes) {
+    if (first)
+      Printer << " : " << typeDecl->getName();
+    else
+      Printer << ", " << typeDecl->getName();
+    first = false;
+  }
 }
 
 void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
@@ -2941,8 +2974,15 @@ void PrintAST::visitPostfixOperatorDecl(PostfixOperatorDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     });
-  if (!decl->getDesignatedProtocolName().empty())
-    Printer << " : " << decl->getDesignatedProtocolName();
+  auto designatedNominalTypes = decl->getDesignatedNominalTypes();
+  auto first = true;
+  for (auto typeDecl : designatedNominalTypes) {
+    if (first)
+      Printer << " : " << typeDecl->getName();
+    else
+      Printer << ", " << typeDecl->getName();
+    first = false;
+  }
 }
 
 void PrintAST::visitModuleDecl(ModuleDecl *decl) { }

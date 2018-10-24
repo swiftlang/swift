@@ -42,7 +42,7 @@ import resilient_protocol
 // ----------------------------------------------------------------------------
 // Resilient witness tables
 // ----------------------------------------------------------------------------
-// CHECK-USAGE-LABEL: $s31protocol_resilience_descriptors34ConformsToProtocolWithRequirementsVyxG010resilient_A00fgH0AAWr" = internal
+// CHECK-USAGE-LABEL: $s31protocol_resilience_descriptors34ConformsToProtocolWithRequirementsVyxG010resilient_A00fgH0AAMc" =
 // CHECK-USAGE-SAME: {{got.|__imp_}}$s1T18resilient_protocol24ProtocolWithRequirementsPTl
 // CHECK-USAGE-SAME: @"symbolic x"
 public struct ConformsToProtocolWithRequirements<Element>
@@ -56,7 +56,7 @@ public protocol P { }
 public struct ConditionallyConforms<Element> { }
 public struct Y { }
 
-// CHECK-USAGE: @"$s31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAAWr" = internal
+// CHECK-USAGE: @"$s31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAAMc" =
 // CHECK-USAGE-SAME: $s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2AC_AA014OtherResilientC0Tn
 // CHECK-USAGE-SAME: $s31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAA2T2AdEP_AD014OtherResilientI0PWT
 public struct ConformsWithAssocRequirements : ProtocolWithAssocTypeDefaults {
@@ -82,7 +82,7 @@ where Element: ProtocolWithRequirements, Element.T == Y {
 
 // CHECK-USAGE: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @"$s31protocol_resilience_descriptors17assocTypeMetadatay1TQzmxm010resilient_A024ProtocolWithRequirementsRzlF"(%swift.type*, %swift.type* [[PWD:%.*]], i8** [[WTABLE:%.*]])
 public func assocTypeMetadata<PWR: ProtocolWithRequirements>(_: PWR.Type) -> PWR.T.Type {
-  // CHECK-USAGE: call %swift.metadata_response @swift_getAssociatedTypeWitness([[INT]] 0, i8** %PWR.ProtocolWithRequirements, %swift.type* %PWR, %swift.protocol_requirement* @"$s1T18resilient_protocol24ProtocolWithRequirementsPTl")
+  // CHECK-USAGE: call %swift.metadata_response @swift_getAssociatedTypeWitness([[INT]] 0, i8** %PWR.ProtocolWithRequirements, %swift.type* %PWR, %swift.protocol_requirement* @"$s18resilient_protocol24ProtocolWithRequirementsTL", %swift.protocol_requirement* @"$s1T18resilient_protocol24ProtocolWithRequirementsPTl")
   return PWR.T.self
 }
 

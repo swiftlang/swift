@@ -1,6 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+
 // RUN: %target-swift-frontend  -I %t -emit-ir -enable-resilience %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+
+// RUN: %target-swift-frontend  -I %t -emit-ir -enable-resilience %s -read-type-info-path=%S/Inputs/legacy_type_info/a.yaml | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+
 // RUN: %target-swift-frontend  -I %t -emit-ir -enable-resilience -O %s
 
 // We only use fragile class layouts when Objective-C interop is enabled.
@@ -78,6 +82,20 @@ sil_vtable ClassWithResilientEnum {}
 // Field offsets are statically known:
 // CHECK-LABEL: @"$s31completely_fragile_class_layout22ClassWithResilientEnumC5firstAA0hfG7PayloadOvpWvd" = hidden constant i64 16, align 8
 // CHECK-LABEL: @"$s31completely_fragile_class_layout22ClassWithResilientEnumC6seconds4Int8VvpWvd" = hidden constant i64 25, align 8
+
+
+// Make sure extra inhabitants work when reading a legacy layout -- the
+// Optional<ResilientRef> should be 8 bytes in size, not 9
+public class ClassWithResilientRef {
+  var first: ResilientRef?
+  var second: Int
+}
+
+sil_vtable ClassWithResilientRef {}
+
+// Field offsets are statically known:
+// CHECK-LABEL: @"$s31completely_fragile_class_layout21ClassWithResilientRefC5first16resilient_struct0gH0VSgvpWvd" = hidden constant i64 16, align 8
+// CHECK-LABEL: @"$s31completely_fragile_class_layout21ClassWithResilientRefC6secondSivpWvd" = hidden constant i64 24, align 8
 
 
 // When allocating a class with resiliently-sized fields, we must still load
@@ -191,7 +209,7 @@ bb0(%0 : @guaranteed $ClassWithResilientField):
 // CHECK: dependency-satisfied:
 
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
-// CHECK:      void @swift_updateClassMetadata(%swift.type* %0, %swift.type* null, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK:      void @swift_updateClassMetadata(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
 
 // CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
 // CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$s31completely_fragile_class_layout23ClassWithResilientFieldC1s16resilient_struct4SizeVvpWvd"
@@ -222,33 +240,10 @@ bb0(%0 : @guaranteed $ClassWithResilientField):
 // CHECK-NEXT: call void @llvm.lifetime.start.p0i8(i64 0, i8* [[FIELDS_ADDR]])
 // CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds [0 x i8**], [0 x i8**]* [[FIELDS]], i32 0, i32 0
 
-// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s31completely_fragile_class_layout23ClassWithResilientFieldCMa"([[INT]] 257)
-// CHECK-NEXT: [[SUPER:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK-NEXT: [[STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
-// CHECK-NEXT: [[RESULT:%.*]] = icmp ule [[INT]] [[STATUS]], 1
-// CHECK-NEXT: br i1 [[RESULT]], label %dependency-satisfied, label %metadata-dependencies.cont
-
-// CHECK: dependency-satisfied:
-
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
-// CHECK:      void @swift_updateClassMetadata(%swift.type* %0, %swift.type* [[SUPER]], [[INT]] 256, [[INT]] 0, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK:      void @swift_updateClassMetadata(%swift.type* %0, [[INT]] 256, [[INT]] 0, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
 
-// CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
-// CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$s31completely_fragile_class_layout23ClassWithResilientFieldC1s16resilient_struct4SizeVvpWvd"
-
-// CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
-// CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$s31completely_fragile_class_layout23ClassWithResilientFieldC5colors5Int32VvpWvd"
-
-// CHECK:      br label %metadata-dependencies.cont
-
-// CHECK: metadata-dependencies.cont:
-
-// CHECK-NEXT: [[PENDING_METADATA:%.*]] = phi %swift.type* [ [[SUPER]], %entry ], [ null, %dependency-satisfied ]
-// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ 1, %entry ], [ 0, %dependency-satisfied ]
-// CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[PENDING_METADATA]], 0
-// CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
-// CHECK-NEXT: ret %swift.metadata_response [[T1]]
-
+// CHECK: ret %swift.metadata_response zeroinitializer
 
 // Metadata accessor for ClassWithResilientEnum looks like singleton initialization:
 

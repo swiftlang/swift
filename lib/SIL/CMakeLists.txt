@@ -12,7 +12,9 @@ add_swift_library(swiftSIL STATIC
   LinearLifetimeChecker.cpp
   LoopInfo.cpp
   Notifications.cpp
+  OperandOwnership.cpp
   OptimizationRemark.cpp
+  OwnershipUtils.cpp
   PrettyStackTrace.cpp
   Projection.cpp
   SIL.cpp

@@ -622,7 +622,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // looking for the conformance of 'Self'.
   if (reqtSubMap) {
     auto requirement = conformance.getRequirement();
-    auto self = requirement->getProtocolSelfType()->getCanonicalType();
+    auto self = requirement->getSelfInterfaceType()->getCanonicalType();
 
     conformance = *reqtSubMap.lookupConformance(self, requirement);
   }

@@ -46,6 +46,7 @@ extension Int8 : _ObjectiveCBridgeable {
         return true
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSNumber?) -> Int8 {
         var result: Int8?
         guard let src = source else { return Int8(0) }
@@ -87,6 +88,7 @@ extension UInt8 : _ObjectiveCBridgeable {
         return true
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSNumber?) -> UInt8 {
         var result: UInt8?
         guard let src = source else { return UInt8(0) }
@@ -128,6 +130,7 @@ extension Int16 : _ObjectiveCBridgeable {
         return true
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSNumber?) -> Int16 {
         var result: Int16?
         guard let src = source else { return Int16(0) }
@@ -169,6 +172,7 @@ extension UInt16 : _ObjectiveCBridgeable {
         return true
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSNumber?) -> UInt16 {
         var result: UInt16?
         guard let src = source else { return UInt16(0) }
@@ -210,6 +214,7 @@ extension Int32 : _ObjectiveCBridgeable {
         return true
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSNumber?) -> Int32 {
         var result: Int32?
         guard let src = source else { return Int32(0) }
@@ -251,6 +256,7 @@ extension UInt32 : _ObjectiveCBridgeable {
         return true
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSNumber?) -> UInt32 {
         var result: UInt32?
         guard let src = source else { return UInt32(0) }
@@ -292,6 +298,7 @@ extension Int64 : _ObjectiveCBridgeable {
         return true
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSNumber?) -> Int64 {
         var result: Int64?
         guard let src = source else { return Int64(0) }
@@ -332,7 +339,8 @@ extension UInt64 : _ObjectiveCBridgeable {
         result = value
         return true
     }
-    
+
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSNumber?) -> UInt64 {
         var result: UInt64?
         guard let src = source else { return UInt64(0) }
@@ -374,6 +382,7 @@ extension Int : _ObjectiveCBridgeable {
         return true
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSNumber?) -> Int {
         var result: Int?
         guard let src = source else { return Int(0) }
@@ -415,6 +424,7 @@ extension UInt : _ObjectiveCBridgeable {
         return true
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSNumber?) -> UInt {
         var result: UInt?
         guard let src = source else { return UInt(0) }
@@ -467,6 +477,7 @@ extension Float : _ObjectiveCBridgeable {
         return result != nil
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSNumber?) -> Float {
         var result: Float?
         guard let src = source else { return Float(0) }
@@ -521,6 +532,7 @@ extension Double : _ObjectiveCBridgeable {
         return result != nil
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSNumber?) -> Double {
         var result: Double?
         guard let src = source else { return Double(0) }
@@ -572,6 +584,7 @@ extension Bool : _ObjectiveCBridgeable {
         return false
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSNumber?) -> Bool {
         var result: Bool?
         guard let src = source else { return false }
@@ -614,6 +627,7 @@ extension CGFloat : _ObjectiveCBridgeable {
         return true
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSNumber?) -> CGFloat {
         var result: CGFloat?
         guard let src = source else { return CGFloat(0) }

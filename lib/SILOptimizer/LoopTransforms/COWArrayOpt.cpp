@@ -38,12 +38,6 @@
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
-#ifndef NDEBUG
-llvm::cl::opt<std::string>
-COWViewCFGFunction("view-cfg-before-cow-for", llvm::cl::init(""),
-                   llvm::cl::desc("Only print out the sil for this function"));
-#endif
-
 /// \return a sequence of integers representing the access path of this element
 /// within a Struct/Ref/Tuple.
 ///
@@ -52,8 +46,13 @@ COWViewCFGFunction("view-cfg-before-cow-for", llvm::cl::init(""),
 /// either refer to the next element (indexed) or a subelement.
 static SILValue getAccessPath(SILValue V, SmallVectorImpl<unsigned>& Path) {
   V = stripCasts(V);
+  if (auto *IA = dyn_cast<IndexAddrInst>(V)) {
+    // Don't include index_addr projections in the access path. We could if
+    // the index is constant. For simplicity we just ignore them.
+    V = stripCasts(IA->getBase());
+  }
   ProjectionIndex PI(V);
-  if (!PI.isValid() || isa<IndexAddrInst>(V))
+  if (!PI.isValid())
     return V;
 
   SILValue UnderlyingObject = getAccessPath(PI.Aggregate, Path);
@@ -137,6 +136,17 @@ public:
     }
   }
 
+  /// Returns true if there is a single address user of the value.
+  bool hasSingleAddressUse(SILInstruction *SingleAddressUser) {
+    if (!AggregateAddressUsers.empty())
+      return false;
+    if (!ElementAddressUsers.empty())
+      return false;
+    if (StructAddressUsers.size() != 1)
+      return false;
+    return StructAddressUsers[0] == SingleAddressUser;
+  }
+
 protected:
 
   static bool definesSingleObjectType(ValueBase *V) {
@@ -158,6 +168,10 @@ protected:
       }
 
       SILInstruction *UseInst = UI->getUser();
+
+      if (UseInst->isDebugInstruction())
+        continue;
+
       if (StructVal) {
         // Found a use of an element.
         assert(AccessPathSuffix.empty() && "should have accessed struct");
@@ -172,6 +186,13 @@ protected:
         }
 
         ElementAddressUsers.push_back(std::make_pair(UseInst,StructVal));
+        continue;
+      }
+
+      if (isa<UncheckedRefCastInst>(UseInst) || isa<IndexAddrInst>(UseInst)) {
+        // Skip over unchecked_ref_cast and index_addr.
+        collectAddressUses(cast<SingleValueInstruction>(UseInst),
+                           AccessPathSuffix, nullptr);
         continue;
       }
 
@@ -200,7 +221,7 @@ protected:
       // Check for uses of projections.
 
       // These are all single-value instructions.
-      auto ProjInst = dyn_cast<SingleValueInstruction>(UseInst);
+      auto *ProjInst = dyn_cast<SingleValueInstruction>(UseInst);
       if (!ProjInst) {
         AggregateAddressUsers.push_back(UseInst);
         continue;
@@ -208,7 +229,7 @@ protected:
       ProjectionIndex PI(ProjInst);
       // Do not form a path from an IndexAddrInst without otherwise
       // distinguishing it from subelement addressing.
-      if (!PI.isValid() || isa<IndexAddrInst>(V)) {
+      if (!PI.isValid()) {
         // Found a use of an aggregate containing the given element.
         AggregateAddressUsers.push_back(UseInst);
         continue;
@@ -358,11 +379,6 @@ class COWArrayOpt {
   // Set of all blocks that may reach the loop, not including loop blocks.
   llvm::SmallPtrSet<SILBasicBlock*,32> ReachingBlocks;
 
-  // Map an array to a hoisted make_mutable call for the current loop. An array
-  // is only mapped to a call once the analysis has determined that no
-  // make_mutable calls are required within the loop body for that array.
-  llvm::SmallDenseMap<SILValue, ApplyInst*> ArrayMakeMutableMap;
-
   /// \brief Transient per-Array user set.
   ///
   /// Track all known array users with the exception of struct_extract users
@@ -372,6 +388,11 @@ class COWArrayOpt {
   /// the array. If the array escaped through an unknown use, the analysis must
   /// abort earlier.
   SmallPtrSet<SILInstruction*, 8> ArrayUserSet;
+
+  /// Array loads which can be hoisted because a make_mutable of that array
+  /// was hoisted previously.
+  /// This is important to handle the two dimensional array case.
+  SmallPtrSet<LoadInst *, 4> HoistableLoads;
 
   // When matching retains to releases we must not match the same release twice.
   //
@@ -407,12 +428,9 @@ protected:
   bool checkSafeArrayElementUse(SILInstruction *UseInst, SILValue ArrayVal);
   bool checkSafeElementValueUses(UserOperList &ElementValueUsers);
   bool hoistMakeMutable(ArraySemanticsCall MakeMutable);
-  void hoistMakeMutableAndSelfProjection(ArraySemanticsCall MakeMutable,
-                                         bool HoistProjection);
+  void hoistAddressProjections(Operand &ArrayOp);
   bool hasLoopOnlyDestructorSafeArrayOperations();
-  bool isArrayValueReleasedBeforeMutate(
-      SILValue V, llvm::SmallSet<SILInstruction *, 16> &Releases);
-  bool hoistInLoopWithOnlyNonArrayValueMutatingOperations();
+  SILValue getArrayAddressBase(SILValue V);
 };
 } // end anonymous namespace
 
@@ -447,6 +465,17 @@ bool COWArrayOpt::checkUniqueArrayContainer(SILValue ArrayContainer) {
   }
   else if (isa<AllocStackInst>(ArrayContainer))
     return true;
+
+  if (auto *LI = dyn_cast<LoadInst>(ArrayContainer)) {
+    // A load of another array, which follows a make_mutable, also guarantees
+    // a unique container. This is the case if the current array is an element
+    // of the outer array in nested arrays.
+    if (HoistableLoads.count(LI) != 0)
+      return true;
+  }
+
+  // TODO: we should also take advantage of access markers to identify
+  // unique arrays.
 
   LLVM_DEBUG(llvm::dbgs()
              << "    Skipping Array: Not an argument or local variable!\n");
@@ -486,7 +515,6 @@ static bool isNonMutatingArraySemanticCall(SILInstruction *Inst) {
   case ArrayCallKind::kGetCount:
   case ArrayCallKind::kGetCapacity:
   case ArrayCallKind::kGetElement:
-  case ArrayCallKind::kGetArrayOwner:
   case ArrayCallKind::kGetElementAddress:
     return true;
   case ArrayCallKind::kMakeMutable:
@@ -579,9 +607,6 @@ bool COWArrayOpt::isRetainReleasedBeforeMutate(SILInstruction *RetainInst,
 bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
 
   for (auto *UseInst : AddressUsers) {
-
-    if (UseInst->isDebugInstruction())
-      continue;
 
     if (auto *AI = dyn_cast<ApplyInst>(UseInst)) {
       if (ArraySemanticsCall(AI))
@@ -746,6 +771,10 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
     // buffer that is loaded from a local array struct.
     return true;
 
+  if (isa<RefTailAddrInst>(UseInst)) {
+    return true;
+  }
+
   // Look for a safe mark_dependence instruction use.
   //
   // This use looks something like:
@@ -797,546 +826,6 @@ bool COWArrayOpt::checkSafeElementValueUses(UserOperList &ElementValueUsers) {
       return false;
   }
   return true;
-}
-
-/// Check whether the array semantic operation could change an array value to
-/// not be uniquely referenced.
-///
-/// Array.append for example can capture another array value.
-static bool mayChangeArrayValueToNonUniqueState(ArraySemanticsCall &Call) {
-  switch (Call.getKind()) {
-  case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
-  case ArrayCallKind::kCheckSubscript:
-  case ArrayCallKind::kCheckIndex:
-  case ArrayCallKind::kGetCount:
-  case ArrayCallKind::kGetCapacity:
-  case ArrayCallKind::kGetElement:
-  case ArrayCallKind::kGetArrayOwner:
-  case ArrayCallKind::kGetElementAddress:
-  case ArrayCallKind::kMakeMutable:
-    return false;
-
-  case ArrayCallKind::kNone:
-  case ArrayCallKind::kMutateUnknown:
-  case ArrayCallKind::kReserveCapacityForAppend:
-  case ArrayCallKind::kWithUnsafeMutableBufferPointer:
-  case ArrayCallKind::kArrayInit:
-  case ArrayCallKind::kArrayUninitialized:
-  case ArrayCallKind::kAppendContentsOf:
-  case ArrayCallKind::kAppendElement:
-    return true;
-  }
-
-  llvm_unreachable("Unhandled ArrayCallKind in switch.");
-}
-
-/// Check that the array value stored in \p ArrayStruct is released by \Inst.
-static bool isReleaseOfArrayValueAt(AllocStackInst *ArrayStruct,
-                                    SILInstruction *Inst,
-                                    RCIdentityFunctionInfo *RCIA) {
-  auto *SRI = dyn_cast<StrongReleaseInst>(Inst);
-  if (!SRI)
-   return false;
-  auto Root = RCIA->getRCIdentityRoot(SRI->getOperand());
-  auto *ArrayLoad = dyn_cast<LoadInst>(Root);
-  if (!ArrayLoad)
-    return false;
-
-  if (ArrayLoad->getOperand() == ArrayStruct)
-    return true;
-
-  return false;
-}
-
-static bool isReleaseOfArrayValue(SILValue Array, SILInstruction *Inst,
-                                  RCIdentityFunctionInfo *RCIA) {
-  if (!isa<StrongReleaseInst>(Inst) && !isa<ReleaseValueInst>(Inst))
-    return false;
-  SILValue Root = RCIA->getRCIdentityRoot(Inst->getOperand(0));
-  return Root == Array;
-}
-
-/// Check that the array value is released before a mutating operation happens.
-bool COWArrayOpt::isArrayValueReleasedBeforeMutate(
-    SILValue V, llvm::SmallSet<SILInstruction *, 16> &Releases) {
-  AllocStackInst *ASI = nullptr;
-  SILInstruction *StartInst = nullptr;
-  if (V->getType().isAddress()) {
-    ASI = dyn_cast<AllocStackInst>(V);
-    if (!ASI)
-      return false;
-    StartInst = ASI;
-  } else {
-    // True because of the caller.
-    StartInst = V->getDefiningInstruction();
-  }
-  for (auto II = std::next(SILBasicBlock::iterator(StartInst)),
-            IE = StartInst->getParent()->end();
-       II != IE; ++II) {
-    auto *Inst = &*II;
-    // Ignore matched releases.
-    if (auto SRI = dyn_cast<StrongReleaseInst>(Inst))
-      if (MatchedReleases.count(&SRI->getOperandRef()))
-        continue;
-    if (auto RVI = dyn_cast<ReleaseValueInst>(Inst))
-      if (MatchedReleases.count(&RVI->getOperandRef()))
-        continue;
-
-    if (ASI) {
-      if (isReleaseOfArrayValueAt(ASI, &*II, RCIA)) {
-        Releases.erase(&*II);
-        return true;
-      }
-    } else {
-      if (isReleaseOfArrayValue(V, &*II, RCIA)) {
-        Releases.erase(&*II);
-        return true;
-      }
-    }
-
-    if (isa<RetainValueInst>(II) || isa<StrongRetainInst>(II))
-      continue;
-
-    // A side effect free instruction cannot mutate the array.
-    if (!II->mayHaveSideEffects())
-      continue;
-
-    // Non mutating array calls are safe.
-    if (isNonMutatingArraySemanticCall(&*II))
-      continue;
-
-    return false;
-  }
-  return true;
-}
-
-static SILInstruction *getInstBefore(SILInstruction *I) {
-  auto It = ++I->getIterator().getReverse();
-  if (I->getParent()->rend() == It)
-    return nullptr;
-  return &*It;
-}
-
-static SILInstruction *getInstAfter(SILInstruction *I) {
-  auto It = SILBasicBlock::iterator(I);
-  It = std::next(It);
-  if (I->getParent()->end() == It)
-    return nullptr;
-  return &*It;
-}
-
-/// Strips and stores the struct_extract projections leading to the array
-/// storage reference.
-static SILValue
-stripValueProjections(SILValue V,
-                      SmallVectorImpl<SILInstruction *> &ValuePrjs) {
-  while (auto SEI = dyn_cast<StructExtractInst>(V)) {
-    ValuePrjs.push_back(SEI);
-    V = SEI->getOperand();
-  }
-  return V;
-}
-
-/// Finds the preceding check_subscript, make_mutable call or returns nil.
-///
-/// If we found a make_mutable call this means that check_subscript was removed
-/// by the array bounds check elimination pass.
-static SILInstruction *
-findPrecedingCheckSubscriptOrMakeMutable(ApplyInst *GetElementAddr) {
-  for (auto ReverseIt = ++GetElementAddr->getIterator().getReverse(),
-            End = GetElementAddr->getParent()->rend();
-       ReverseIt != End; ++ReverseIt) {
-    auto Apply = dyn_cast<ApplyInst>(&*ReverseIt);
-    if (!Apply)
-      continue;
-    ArraySemanticsCall CheckSubscript(Apply);
-    if (!CheckSubscript ||
-        (CheckSubscript.getKind() != ArrayCallKind::kCheckSubscript &&
-         CheckSubscript.getKind() != ArrayCallKind::kMakeMutable))
-      return nullptr;
-    return CheckSubscript;
-  }
-  return nullptr;
-}
-
-/// Matches the self parameter arguments, verifies that \p Self is called and
-/// stores the instructions in \p DepInsts in order.
-static bool
-matchSelfParameterSetup(ArraySemanticsCall Call, LoadInst *Self,
-                        SmallVectorImpl<SILInstruction *> &DepInsts) {
-  bool MayHaveBridgedObjectElementType = Call.mayHaveBridgedObjectElementType();
-  // We only need the retain/release for the guaranteed parameter if the call
-  // could release self. This can only happen if the array is backed by an
-  // Objective-C array. If this is not the case we can safely hoist the call
-  // without the retain/releases.
-  auto *RetainArray = dyn_cast_or_null<StrongRetainInst>(getInstBefore(Call));
-  if (!RetainArray && MayHaveBridgedObjectElementType)
-    return false;
-  auto *ReleaseArray = dyn_cast_or_null<StrongReleaseInst>(getInstAfter(Call));
-  if (!ReleaseArray && MayHaveBridgedObjectElementType)
-    return false;
-  if (ReleaseArray && RetainArray &&
-      ReleaseArray->getOperand() != RetainArray->getOperand())
-    return false;
-
-  if (ReleaseArray)
-    DepInsts.push_back(ReleaseArray);
-  DepInsts.push_back(Call);
-  if (RetainArray)
-    DepInsts.push_back(RetainArray);
-
-  if (RetainArray) {
-    auto ArrayLoad = stripValueProjections(RetainArray->getOperand(), DepInsts);
-    if (ArrayLoad != Self)
-      return false;
-  }
-
-  DepInsts.push_back(Self);
-  return true;
-}
-
-/// Match a hoistable make_mutable call.
-///
-/// Precondition: The client must make sure that it is valid to actually hoist
-/// the call. It must make sure that no write and no increment to the array
-/// reference has happened such that hoisting is not valid.
-///
-/// This helper only checks that the operands computing the array reference
-/// are also hoistable.
-struct HoistableMakeMutable {
-  SILLoop *Loop;
-  bool IsHoistable;
-  ApplyInst *MakeMutable;
-  SmallVector<SILInstruction *, 24> DepInsts;
-
-  HoistableMakeMutable(ArraySemanticsCall M, SILLoop *L) {
-    IsHoistable = false;
-    Loop = L;
-    MakeMutable = M;
-
-    // The function_ref needs to be invariant.
-    if (Loop->contains(MakeMutable->getCallee()->getParentBlock()))
-      return;
-
-    // The array reference is invariant.
-    if (!L->contains(M.getSelf()->getParentBlock())) {
-      IsHoistable = true;
-      return;
-    }
-
-    // Check whether we can hoist the dependent instructions resulting in the
-    // array reference.
-    if (canHoistDependentInstructions(M))
-      IsHoistable = true;
-  }
-
-  /// Is this a hoistable make_mutable call.
-  bool isHoistable() {
-    return IsHoistable;
-  }
-
-  /// Hoist this make_mutable call and depend instructions to the preheader.
-  void hoist() {
-    auto *Term = Loop->getLoopPreheader()->getTerminator();
-    for (auto *It : swift::reversed(DepInsts)) {
-      if (It->getParent() != Term->getParent())
-        It->moveBefore(Term);
-    }
-    MakeMutable->moveBefore(Term);
-  }
-
-private:
-
-  /// Check whether we can hoist the dependent instructions resulting in the
-  /// array reference passed to the make_mutable call.
-  /// We pattern match the first dimension's array access here.
-  bool canHoistDependentInstructions(ArraySemanticsCall &M) {
-    // Match get_element_addr call.
-    // %124 = load %3
-    // %125 = struct_extract %124
-    // %126 = struct_extract %125
-    // %127 = struct_extract %126
-    // strong_retain %127
-    // %129 = apply %70(%30, %124)
-    // strong_release %127
-    //
-    // %131 = load %73
-    // %132 = unchecked_ref_cast %131
-    // %133 = enum $Optional<NativeObject>, #Optional.Some!enumelt.1, %132
-    // %134 = struct_extract %129
-    // %135 = pointer_to_address %134 to strict $*Array<Int>
-    // %136 = mark_dependence %135 on %133
-
-    auto *MarkDependence = dyn_cast<MarkDependenceInst>(M.getSelf());
-    if (!MarkDependence)
-      return false;
-    DepInsts.push_back(MarkDependence);
-
-    auto *PtrToAddrArrayAddr =
-        dyn_cast<PointerToAddressInst>(MarkDependence->getValue());
-    if (!PtrToAddrArrayAddr)
-      return false;
-    DepInsts.push_back(PtrToAddrArrayAddr);
-
-    auto *StructExtractArrayAddr =
-        dyn_cast<StructExtractInst>(PtrToAddrArrayAddr->getOperand());
-    if (!StructExtractArrayAddr)
-      return false;
-    DepInsts.push_back(StructExtractArrayAddr);
-
-    // Check the base the array element address is dependent on.
-    SILValue base = MarkDependence->getBase();
-
-    // We can optionally have an enum instruction here.
-    if (auto *EnumArrayAddr = dyn_cast<EnumInst>(base)) {
-      DepInsts.push_back(EnumArrayAddr);
-      base = EnumArrayAddr->getOperand();
-    }
-
-    // We can optionally have an unchecked cast.
-    if (auto *UncheckedRefCast = dyn_cast<UncheckedRefCastInst>(base)) {
-      DepInsts.push_back(UncheckedRefCast);
-      base = UncheckedRefCast->getOperand();
-    }
-
-    SILValue ArrayBuffer = stripValueProjections(base, DepInsts);
-    auto *BaseLoad = dyn_cast<LoadInst>(ArrayBuffer);
-    if (!BaseLoad ||  Loop->contains(BaseLoad->getOperand()->getParentBlock()))
-      return false;
-    DepInsts.push_back(BaseLoad);
-
-    // Check the get_element_addr call.
-    ArraySemanticsCall GetElementAddrCall(
-        StructExtractArrayAddr->getOperand());
-    if (!GetElementAddrCall ||
-        GetElementAddrCall.getKind() != ArrayCallKind::kGetElementAddress)
-      return false;
-    if (Loop->contains(
-            ((ApplyInst *)GetElementAddrCall)->getCallee()->getParentBlock()))
-      return false;
-    if (Loop->contains(GetElementAddrCall.getIndex()->getParentBlock()))
-      return false;
-
-    auto *GetElementAddrArrayLoad =
-        dyn_cast<LoadInst>(GetElementAddrCall.getSelf());
-    if (!GetElementAddrArrayLoad ||
-        Loop->contains(GetElementAddrArrayLoad->getOperand()->getParentBlock()))
-      return false;
-
-    // Check the retain/release around the get_element_addr call.
-    if (!matchSelfParameterSetup(GetElementAddrCall, GetElementAddrArrayLoad,
-                                 DepInsts))
-      return false;
-
-    // Check check_subscript.
-    // %116 = load %3
-    // %118 = struct_extract %116
-    // %119 = struct_extract %118
-    // %120 = struct_extract %119
-    // strong_retain %120
-    // %122 = apply %23(%30, %69, %116)
-    // strong_release %120
-    //
-    // Find the check_subscript call.
-    auto *Check = findPrecedingCheckSubscriptOrMakeMutable(GetElementAddrCall);
-    if (!Check)
-      return false;
-
-    ArraySemanticsCall CheckSubscript(Check);
-    // The check_subscript call was removed.
-    if (CheckSubscript.getKind() == ArrayCallKind::kMakeMutable)
-      return true;
-
-    if (Loop->contains(CheckSubscript.getIndex()->getParentBlock()) ||
-        Loop->contains(CheckSubscript.getArrayPropertyIsNativeTypeChecked()
-                           ->getParentBlock()))
-      return false;
-
-    auto *CheckSubscriptArrayLoad =
-        dyn_cast<LoadInst>(CheckSubscript.getSelf());
-    if (!CheckSubscript ||
-        Loop->contains(CheckSubscriptArrayLoad->getOperand()->getParentBlock()))
-      return false;
-  if (Loop->contains(
-            ((ApplyInst *)CheckSubscript)->getCallee()->getParentBlock()))
-      return false;
-
-    // The array must match get_element_addr's array.
-    if (CheckSubscriptArrayLoad->getOperand() !=
-        GetElementAddrArrayLoad->getOperand())
-      return false;
-
-    // Check the retain/release around the check_subscript call.
-    if (!matchSelfParameterSetup(CheckSubscript, CheckSubscriptArrayLoad,
-                                 DepInsts))
-      return false;
-
-    return true;
-  }
-};
-
-/// Prove that there are not array value mutating or capturing operations in the
-/// loop and hoist make_mutable.
-bool COWArrayOpt::hoistInLoopWithOnlyNonArrayValueMutatingOperations() {
-  // Only handle innermost loops.
-  assert(Loop->getSubLoops().empty() && "Only works in innermost loops");
-
-  LLVM_DEBUG(llvm::dbgs() << "    Checking whether loop only has only "
-                             "non array value mutating operations ...\n");
-
-  // There is no current array addr value.
-  CurrentArrayAddr = SILValue();
-
-  // We need to cleanup the MatchedRelease on return.
-  auto ReturnWithCleanup = [&] (bool LoopHasSafeOperations) {
-    MatchedReleases.clear();
-    return LoopHasSafeOperations;
-  };
-
-  llvm::SmallSet<SILValue, 16> ArrayValues;
-  llvm::SmallSetVector<SILValue, 16> CreatedNonTrivialValues;
-  llvm::SmallSet<SILInstruction *, 16> Releases;
-  llvm::SmallVector<ArraySemanticsCall, 8> MakeMutableCalls;
-
-
-  /// Make sure that no writes to an array value happens in the loop and that
-  /// no array values are retained without being released before hitting a
-  /// make_unique:
-  ///
-  /// * array semantic functions that don't change the uniqueness state to
-  ///   non-unique are safe.
-  /// * retains must be matched by a release before hitting a mutating operation
-  /// * stores must not store an array value (only trivial stores are safe).
-  ///
-  auto &Module = Function->getModule();
-  for (auto *BB : Loop->getBlocks()) {
-    for (auto &InstIt : *BB) {
-      auto *Inst = &InstIt;
-      ArraySemanticsCall Sem(Inst);
-      if (Sem) {
-        // Give up if the array semantic function might change the uniqueness
-        // state of an array value in the loop. An example of such an operation
-        // would be append. We also give up for array initializations.
-        if (mayChangeArrayValueToNonUniqueState(Sem))
-          return ReturnWithCleanup(false);
-
-        // Collect both the value and the pointer.
-        ArrayValues.insert(Sem.getSelf());
-        if (auto *LI = dyn_cast<LoadInst>(Sem.getSelf()))
-          ArrayValues.insert(LI->getOperand());
-
-        // Collect non-trivial generated values. This could be an array value.
-        // We must make sure that any non-trivial generated values (== +1)
-        // are release before we hit a make_unique instruction.
-        ApplyInst *SemCall = Sem;
-        if (Sem.getKind() == ArrayCallKind::kGetElement) {
-          SILValue Elem = (Sem.hasGetElementDirectResult()
-                            ? Sem.getCallResult()
-                            : SemCall->getArgument(0));
-          if (!Elem->getType().isTrivial(Module))
-            CreatedNonTrivialValues.insert(Elem);
-        } else if (Sem.getKind() == ArrayCallKind::kMakeMutable) {
-          MakeMutableCalls.push_back(Sem);
-        }
-
-        continue;
-      }
-
-      // Instructions without side effects are safe.
-      if (!Inst->mayHaveSideEffects())
-        continue;
-      if (isa<CondFailInst>(Inst))
-        continue;
-      if (isa<AllocationInst>(Inst) || isa<DeallocStackInst>(Inst))
-        continue;
-
-      // A retain must be released before make_unique.
-      if (isa<RetainValueInst>(Inst) ||
-          isa<StrongRetainInst>(Inst)) {
-        if (!isRetainReleasedBeforeMutate(Inst, false)) {
-          LLVM_DEBUG(llvm::dbgs()
-                     << "    (NO) retain not released before mutate "
-                     << *Inst);
-          return ReturnWithCleanup(false);
-        }
-        continue;
-      }
-      // A store is only safe if it is to an array element and the element type
-      // is trivial.
-      if (auto *SI = dyn_cast<StoreInst>(Inst)) {
-        if (!isAddressOfArrayElement(SI->getDest()) ||
-            !SI->getSrc()->getType().isTrivial(Module)) {
-          LLVM_DEBUG(llvm::dbgs()
-                     <<"     (NO) non trivial store could store an array value "
-                     << *Inst);
-          return ReturnWithCleanup(false);
-        }
-        continue;
-      }
-      // Releases must be matched by a retain otherwise a destructor could run.
-      if (auto SRI = dyn_cast<StrongReleaseInst>(Inst)) {
-        if (!MatchedReleases.count(&SRI->getOperandRef()))
-          Releases.insert(Inst);
-        continue;
-      }
-      if (auto RVI = dyn_cast<ReleaseValueInst>(Inst)) {
-        if (!MatchedReleases.count(&RVI->getOperandRef()))
-          Releases.insert(Inst);
-        continue;
-      }
-
-      LLVM_DEBUG(llvm::dbgs()
-                 << "    (NO) instruction prevents make_unique hoisting "
-                 << *Inst);
-      return ReturnWithCleanup(false);
-    }
-  }
-
-  // Nothing to do.
-  if (MakeMutableCalls.empty())
-    return ReturnWithCleanup(false);
-
-  // Verify that all created non trivial values are array values and that they
-  // are released before mutation.
-  for (auto &NonTrivial : CreatedNonTrivialValues) {
-    if (!ArrayValues.count(NonTrivial)) {
-      LLVM_DEBUG(llvm::dbgs() << "    (NO) non-trivial non-array value: "
-                 << NonTrivial);
-      return ReturnWithCleanup(false);
-    }
-
-    if (!isArrayValueReleasedBeforeMutate(NonTrivial, Releases)) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "    (NO) array value not released before mutation "
-                 << NonTrivial);
-      return ReturnWithCleanup(false);
-    }
-  }
-
-  if (!Releases.empty()) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "    (NO) remaining releases not matched by retain\n");
-    return ReturnWithCleanup(false);
-  }
-
-  // Collect all recursively hoistable calls.
-  SmallVector<std::unique_ptr<HoistableMakeMutable>, 16> CallsToHoist;
-  for (auto M : MakeMutableCalls) {
-    auto Call = llvm::make_unique<HoistableMakeMutable>(M, Loop);
-    if (!Call->isHoistable()) {
-      LLVM_DEBUG(llvm::dbgs() << "    (NO) make_mutable not hoistable"
-                              << *Call->MakeMutable);
-      return ReturnWithCleanup(false);
-    }
-    CallsToHoist.push_back(std::move(Call));
-  }
-
-  for (auto &Call: CallsToHoist)
-    Call->hoist();
-
-  LLVM_DEBUG(llvm::dbgs() << "    Hoisting make_mutable in "
-                          << Function->getName() << "\n");
-  return ReturnWithCleanup(true);
 }
 
 /// Check if a loop has only 'safe' array operations such that we can hoist the
@@ -1446,21 +935,104 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
   return ReturnWithCleanup(true);
 }
 
-/// Hoist the make_mutable call and optionally the projection chain that feeds
-/// the array self argument.
-void COWArrayOpt::hoistMakeMutableAndSelfProjection(
-    ArraySemanticsCall MakeMutable, bool HoistProjection) {
-  // Hoist projections.
-  if (HoistProjection)
-    hoistAddressProjections(MakeMutable.getSelfOperand(),
-      Preheader->getTerminator(), DomTree);
+/// Return the underlying Array address after stripping off all address
+/// projections. Returns an invalid SILValue if the array base does not dominate
+/// the loop.
+SILValue COWArrayOpt::getArrayAddressBase(SILValue V) {
+  while (true) {
+    V = stripSinglePredecessorArgs(V);
+    if (auto *RefCast = dyn_cast<UncheckedRefCastInst>(V)) {
+      V = RefCast->getOperand();
+      continue;
+    }
+    if (auto *SE = dyn_cast<StructExtractInst>(V)) {
+      V = SE->getOperand();
+      continue;
+    }
+    if (auto *IA = dyn_cast<IndexAddrInst>(V)) {
+      // index_addr is the only projection which has a second operand: the index.
+      // Check if the index is loop invariant.
+      SILBasicBlock *IndexBlock = IA->getIndex()->getParentBlock();
+      if (IndexBlock && !DomTree->dominates(IndexBlock, Preheader))
+        return SILValue();
+      V = IA->getBase();
+      continue;
+    }
+    if (!Projection::isAddressProjection(V))
+      break;
+    auto *Inst = cast<SingleValueInstruction>(V);
+    if (Inst->getNumOperands() > 1)
+      break;
+    V = Inst->getOperand(0);
+  }
+  if (auto *LI = dyn_cast<LoadInst>(V)) {
+    if (HoistableLoads.count(LI) != 0)
+      return V;
+  }
+  SILBasicBlock *ArrayAddrBaseBB = V->getParentBlock();
+  if (ArrayAddrBaseBB && !DomTree->dominates(ArrayAddrBaseBB, Preheader))
+    return SILValue();
 
-  assert(MakeMutable.canHoist(Preheader->getTerminator(), DomTree) &&
-         "Should be able to hoist make_mutable");
+  return V;
+}
 
-  // Hoist this call to make_mutable.
-  LLVM_DEBUG(llvm::dbgs() << "    Hoisting make_mutable: " << *MakeMutable);
-  MakeMutable.hoist(Preheader->getTerminator(), DomTree);
+/// Hoist the address projection rooted in \p Op to \p InsertBefore.
+/// Requires the projected value to dominate the insertion point.
+///
+/// Will look through single basic block predecessor arguments.
+void COWArrayOpt::hoistAddressProjections(Operand &ArrayOp) {
+  SILValue V = ArrayOp.get();
+  SILInstruction *Prev = nullptr;
+  SILInstruction *InsertPt = Preheader->getTerminator();
+  while (true) {
+    SILValue Incoming = stripSinglePredecessorArgs(V);
+
+    // Forward the incoming arg from a single predecessor.
+    if (V != Incoming) {
+      if (V == ArrayOp.get()) {
+        // If we are the operand itself set the operand to the incoming
+        // argument.
+        ArrayOp.set(Incoming);
+        V = Incoming;
+      } else {
+        // Otherwise, set the previous projections operand to the incoming
+        // argument.
+        assert(Prev && "Must have seen a projection");
+        Prev->setOperand(0, Incoming);
+        V = Incoming;
+      }
+    }
+
+    switch (V->getKind()) {
+      case ValueKind::LoadInst:
+      case ValueKind::StructElementAddrInst:
+      case ValueKind::TupleElementAddrInst:
+      case ValueKind::RefElementAddrInst:
+      case ValueKind::RefTailAddrInst:
+      case ValueKind::UncheckedRefCastInst:
+      case ValueKind::StructExtractInst:
+      case ValueKind::IndexAddrInst:
+      case ValueKind::UncheckedTakeEnumDataAddrInst: {
+        auto *Inst = cast<SingleValueInstruction>(V);
+        // We are done once the current projection dominates the insert point.
+        if (DomTree->dominates(Inst->getParent(), Preheader))
+          return;
+
+        assert(!isa<LoadInst>(V) || HoistableLoads.count(cast<LoadInst>(V)) != 0);
+
+        // Move the current projection and memorize it for the next iteration.
+        Prev = Inst;
+        Inst->moveBefore(InsertPt);
+        InsertPt = Inst;
+        V = Inst->getOperand(0);
+        continue;
+      }
+      default:
+        assert(DomTree->dominates(V->getParentBlock(), Preheader) &&
+               "The projected value must dominate the insertion point");
+        return;
+    }
+  }
 }
 
 /// Check if this call to "make_mutable" is hoistable, and move it, or delete it
@@ -1470,49 +1042,67 @@ bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable) {
 
   // We can hoist address projections (even if they are only conditionally
   // executed).
-  auto ArrayAddrBase = stripUnaryAddressProjections(CurrentArrayAddr);
-  SILBasicBlock *ArrayAddrBaseBB = ArrayAddrBase->getParentBlock();
-
-  if (ArrayAddrBaseBB && !DomTree->dominates(ArrayAddrBaseBB, Preheader)) {
+  SILValue ArrayAddrBase = getArrayAddressBase(CurrentArrayAddr);
+  if (!ArrayAddrBase) {
     LLVM_DEBUG(llvm::dbgs() << "    Skipping Array: does not dominate loop!\n");
     return false;
   }
 
   SmallVector<unsigned, 4> AccessPath;
   SILValue ArrayContainer = getAccessPath(CurrentArrayAddr, AccessPath);
+  bool arrayContainerIsUnique = checkUniqueArrayContainer(ArrayContainer);
+
+  StructUseCollector StructUses;
 
   // Check whether we can hoist make_mutable based on the operations that are
   // in the loop.
   if (hasLoopOnlyDestructorSafeArrayOperations()) {
-    hoistMakeMutableAndSelfProjection(MakeMutable,
-                                      CurrentArrayAddr != ArrayAddrBase);
-    LLVM_DEBUG(llvm::dbgs()
-               << "    Can Hoist: loop only has 'safe' array operations!\n");
-    return true;
+    // Done. We can hoist the make_mutable.
+    // We still need the array uses later to check if we can add loads to
+    // HoistableLoads.
+    StructUses.collectUses(ArrayContainer, AccessPath);
+  } else {
+    // There are some unsafe operations in the loop. If the array is uniquely
+    // identifyable and not escaping, then we are good if all the array uses
+    // are safe.
+    if (!arrayContainerIsUnique) {
+      LLVM_DEBUG(llvm::dbgs() << "    Skipping Array: is not unique!\n");
+      return false;
+    }
+
+    // Check that the Array is not retained with this loop and it's address does
+    // not escape within this function.
+    StructUses.collectUses(ArrayContainer, AccessPath);
+    for (auto *Oper : StructUses.Visited)
+      ArrayUserSet.insert(Oper->getUser());
+
+    if (!checkSafeArrayAddressUses(StructUses.AggregateAddressUsers) ||
+        !checkSafeArrayAddressUses(StructUses.StructAddressUsers) ||
+        !checkSafeArrayValueUses(StructUses.StructValueUsers) ||
+        !checkSafeElementValueUses(StructUses.ElementValueUsers) ||
+        !StructUses.ElementAddressUsers.empty())
+      return false;
   }
 
-  // Check that the array is a member of an inout argument or return value.
-  if (!checkUniqueArrayContainer(ArrayContainer)) {
-    LLVM_DEBUG(llvm::dbgs() << "    Skipping Array: is not unique!\n");
-    return false;
+  // Hoist the make_mutable.
+  LLVM_DEBUG(llvm::dbgs() << "    Hoisting make_mutable: " << *MakeMutable);
+
+  hoistAddressProjections(MakeMutable.getSelfOperand());
+
+  assert(MakeMutable.canHoist(Preheader->getTerminator(), DomTree) &&
+         "Should be able to hoist make_mutable");
+
+  MakeMutable.hoist(Preheader->getTerminator(), DomTree);
+
+  // Register array loads. This is needed for hoisting make_mutable calls of
+  // inner arrays in the two-dimensional case.
+  if (arrayContainerIsUnique &&
+      StructUses.hasSingleAddressUse((ApplyInst *)MakeMutable)) {
+    for (auto use : MakeMutable.getSelf()->getUses()) {
+      if (auto *LI = dyn_cast<LoadInst>(use->getUser()))
+        HoistableLoads.insert(LI);
+    }
   }
-
-  // Check that the Array is not retained with this loop and it's address does
-  // not escape within this function.
-  StructUseCollector StructUses;
-  StructUses.collectUses(ArrayContainer, AccessPath);
-  for (auto *Oper : StructUses.Visited)
-    ArrayUserSet.insert(Oper->getUser());
-
-  if (!checkSafeArrayAddressUses(StructUses.AggregateAddressUsers) ||
-      !checkSafeArrayAddressUses(StructUses.StructAddressUsers) ||
-      !checkSafeArrayValueUses(StructUses.StructValueUsers) ||
-      !checkSafeElementValueUses(StructUses.ElementValueUsers) ||
-      !StructUses.ElementAddressUsers.empty())
-    return false;
-
-  hoistMakeMutableAndSelfProjection(MakeMutable,
-                                    CurrentArrayAddr != ArrayAddrBase);
   return true;
 }
 
@@ -1525,12 +1115,10 @@ bool COWArrayOpt::run() {
     return false;
   }
 
-  // Hoist make_mutable in two dimensional arrays if there are no array value
-  // mutating operations in the loop.
-  if (Loop->getSubLoops().empty() &&
-      hoistInLoopWithOnlyNonArrayValueMutatingOperations()) {
-    return true;
-  }
+  // Map an array to a hoisted make_mutable call for the current loop. An array
+  // is only mapped to a call once the analysis has determined that no
+  // make_mutable calls are required within the loop body for that array.
+  llvm::SmallDenseMap<SILValue, ApplyInst*> ArrayMakeMutableMap;
 
   for (auto *BB : Loop->getBlocks()) {
     if (ColdBlocks.isCold(BB))
@@ -1584,13 +1172,6 @@ class COWArrayOptPass : public SILFunctionTransform {
       LLVM_DEBUG(llvm::dbgs() << "  Skipping Function: No loops.\n");
       return;
     }
-
-#ifndef NDEBUG
-    if (!COWViewCFGFunction.empty() && getFunction()->getName() == COWViewCFGFunction) {
-      getFunction()->dump();
-      getFunction()->viewCFG();
-    }
-#endif
 
     // Create a flat list of loops in loop-tree postorder (bottom-up).
     llvm::SmallVector<SILLoop *, 16> Loops;
@@ -1937,35 +1518,32 @@ namespace {
 /// Clone a single exit multiple exit region starting at basic block and ending
 /// in a set of basic blocks. Updates the dominator tree with the cloned blocks.
 /// However, the client needs to update the dominator of the exit blocks.
+///
+/// FIXME: SILCloner is used to cloned CFG regions by multiple clients. All
+/// functionality for generating valid SIL (including the DomTree) should be
+/// handled by the common SILCloner.
 class RegionCloner : public SILCloner<RegionCloner> {
   DominanceInfo &DomTree;
   SILBasicBlock *StartBB;
-  SmallPtrSet<SILBasicBlock *, 16> OutsideBBs;
 
   friend class SILInstructionVisitor<RegionCloner>;
   friend class SILCloner<RegionCloner>;
 
 public:
-  RegionCloner(SILBasicBlock *EntryBB,
-               SmallVectorImpl<SILBasicBlock *> &ExitBlocks, DominanceInfo &DT)
+  RegionCloner(SILBasicBlock *EntryBB, DominanceInfo &DT)
       : SILCloner<RegionCloner>(*EntryBB->getParent()), DomTree(DT),
-        StartBB(EntryBB), OutsideBBs(ExitBlocks.begin(), ExitBlocks.end()) {}
+        StartBB(EntryBB) {}
 
-  SILBasicBlock *cloneRegion() {
+  SILBasicBlock *cloneRegion(ArrayRef<SILBasicBlock *> exitBBs) {
     assert (DomTree.getNode(StartBB) != nullptr && "Can't cloned dead code");
-    auto CurFun = StartBB->getParent();
-
-    // We don't want to visit blocks outside of the region. visitSILBasicBlocks
-    // checks BBMap before it clones a block. So we mark exiting blocks as
-    // visited by putting them in the BBMap.
-    for (auto *BB : OutsideBBs)
-      BBMap[BB] = BB;
 
     // We need to split any edge from a non cond_br basic block leading to a
     // exit block. After cloning this edge will become critical if it came from
     // inside the cloned region. The SSAUpdater can't handle critical non
     // cond_br edges.
-    for (auto *BB : OutsideBBs) {
+    //
+    // FIXME: remove this in the next commit. The SILCloner will always do it.
+    for (auto *BB : exitBBs) {
       SmallVector<SILBasicBlock *, 8> Preds(BB->getPredecessorBlocks());
       for (auto *Pred : Preds)
         if (!isa<CondBranchInst>(Pred->getTerminator()) &&
@@ -1973,72 +1551,32 @@ public:
           splitEdgesFromTo(Pred, BB, &DomTree, nullptr);
     }
 
-    // Create the cloned start basic block.
-    auto *ClonedStartBB = CurFun->createBasicBlock();
-    BBMap[StartBB] = ClonedStartBB;
-
-    // Clone the arguments.
-    for (auto &Arg : StartBB->getArguments()) {
-      SILValue MappedArg = ClonedStartBB->createPhiArgument(
-          getOpType(Arg->getType()), ValueOwnershipKind::Owned);
-      ValueMap.insert(std::make_pair(Arg, MappedArg));
-    }
-
-    // Clone the instructions in this basic block and recursively clone
-    // successor blocks.
-    getBuilder().setInsertionPoint(ClonedStartBB);
-    visitSILBasicBlock(StartBB);
-
-    // Fix-up terminators.
-    for (auto BBPair : BBMap)
-      if (BBPair.first != BBPair.second) {
-        getBuilder().setInsertionPoint(BBPair.second);
-        visit(BBPair.first->getTerminator());
-      }
+    cloneReachableBlocks(StartBB, exitBBs);
 
     // Add dominator tree nodes for the new basic blocks.
-    fixDomTreeNodes(DomTree.getNode(StartBB));
+    fixDomTree();
 
     // Update SSA form for values used outside of the copied region.
     updateSSAForm();
-    return ClonedStartBB;
+    return getOpBasicBlock(StartBB);
   }
-
-  llvm::MapVector<SILBasicBlock *, SILBasicBlock *> &getBBMap() { return BBMap; }
 
 protected:
   /// Clone the dominator tree from the original region to the cloned region.
-  void fixDomTreeNodes(DominanceInfoNode *OrigNode) {
-    auto *BB = OrigNode->getBlock();
-    auto MapIt = BBMap.find(BB);
-    // Outside the cloned region.
-    if (MapIt == BBMap.end())
-      return;
-
-    auto *ClonedBB = MapIt->second;
-    // Exit blocks (BBMap[BB] == BB) end the recursion.
-    if (ClonedBB == BB)
-      return;
-
-    auto *OrigDom = OrigNode->getIDom();
-    assert(OrigDom);
-
-    if (BB == StartBB) {
-      // The cloned start node shares the same dominator as the original node.
-      auto *ClonedNode = DomTree.addNewBlock(ClonedBB, OrigDom->getBlock());
-      (void) ClonedNode;
-      assert(ClonedNode);
-    } else {
+  void fixDomTree() {
+    for (auto *BB : originalPreorderBlocks()) {
+      auto *ClonedBB = getOpBasicBlock(BB);
+      auto *OrigDomBB = DomTree.getNode(BB)->getIDom()->getBlock();
+      if (BB == StartBB) {
+        // The cloned start node shares the same dominator as the original node.
+        auto *ClonedNode = DomTree.addNewBlock(ClonedBB, OrigDomBB);
+        (void)ClonedNode;
+        assert(ClonedNode);
+        continue;
+      }
       // Otherwise, map the dominator structure using the mapped block.
-      auto *OrigDomBB = OrigDom->getBlock();
-      assert(BBMap.count(OrigDomBB) && "Must have visited dominating block");
-      auto *MappedDomBB = BBMap[OrigDomBB];
-      assert(MappedDomBB);
-      DomTree.addNewBlock(ClonedBB, MappedDomBB);
+      DomTree.addNewBlock(ClonedBB, getOpBasicBlock(OrigDomBB));
     }
-
-    for (auto *Child : *OrigNode)
-      fixDomTreeNodes(Child);
   }
 
   SILValue remapValue(SILValue V) {
@@ -2063,8 +1601,7 @@ protected:
     // Collect outside uses.
     SmallVector<UseWrapper, 16> UseList;
     for (auto Use : V->getUses())
-      if (OutsideBBs.count(Use->getUser()->getParent()) ||
-          !BBMap.count(Use->getUser()->getParent())) {
+      if (!isBlockCloned(Use->getUser()->getParent())) {
         UseList.push_back(UseWrapper(Use));
       }
     if (UseList.empty())
@@ -2074,7 +1611,7 @@ protected:
     SSAUp.Initialize(V->getType());
     SSAUp.AddAvailableValue(OrigBB, V);
     SILValue NewVal = remapValue(V);
-    SSAUp.AddAvailableValue(BBMap[OrigBB], NewVal);
+    SSAUp.AddAvailableValue(getOpBasicBlock(OrigBB), NewVal);
     for (auto U : UseList) {
       Operand *Use = U;
       SSAUp.RewriteUse(*Use);
@@ -2083,20 +1620,15 @@ protected:
 
   void updateSSAForm() {
     SILSSAUpdater SSAUp;
-    for (auto Entry : BBMap) {
-      // Ignore exit blocks.
-      if (Entry.first == Entry.second)
-        continue;
-      auto *OrigBB = Entry.first;
-
+    for (auto *origBB : originalPreorderBlocks()) {
       // Update outside used phi values.
-      for (auto *Arg : OrigBB->getArguments())
-        updateSSAForValue(OrigBB, Arg, SSAUp);
+      for (auto *arg : origBB->getArguments())
+        updateSSAForValue(origBB, arg, SSAUp);
 
       // Update outside used instruction values.
-      for (auto &Inst : *OrigBB) {
-        for (auto result : Inst.getResults())
-          updateSSAForValue(OrigBB, result, SSAUp);
+      for (auto &inst : *origBB) {
+        for (auto result : inst.getResults())
+          updateSSAForValue(origBB, result, SSAUp);
       }
     }
   }
@@ -2185,21 +1717,17 @@ createFastNativeArraysCheck(SmallVectorImpl<ArraySemanticsCall> &ArrayProps,
 
 /// Collect all array.props calls in the cloned basic blocks stored in the map,
 /// asserting that we found at least one.
-static void collectArrayPropsCalls(
-    llvm::MapVector<SILBasicBlock *, SILBasicBlock *> &OrigToClonedBBMap,
-    SmallVectorImpl<SILBasicBlock *> &ExitBlocks,
-    SmallVectorImpl<ArraySemanticsCall> &Calls) {
-  for (auto &P : OrigToClonedBBMap) {
-    // Collect array.props calls in all cloned blocks, excluding the exit
-    // blocks.
-    if (std::find(ExitBlocks.begin(), ExitBlocks.end(), P.second) ==
-        ExitBlocks.end())
-      for (auto &Inst : *P.second) {
-        ArraySemanticsCall ArrayProps(&Inst, "array.props", true);
-        if (!ArrayProps)
-          continue;
-        Calls.push_back(ArrayProps);
-      }
+static void collectArrayPropsCalls(RegionCloner &Cloner,
+                                   SmallVectorImpl<SILBasicBlock *> &ExitBlocks,
+                                   SmallVectorImpl<ArraySemanticsCall> &Calls) {
+  for (auto *origBB : Cloner.originalPreorderBlocks()) {
+    auto clonedBB = Cloner.getOpBasicBlock(origBB);
+    for (auto &Inst : *clonedBB) {
+      ArraySemanticsCall ArrayProps(&Inst, "array.props", true);
+      if (!ArrayProps)
+        continue;
+      Calls.push_back(ArrayProps);
+    }
   }
   assert(!Calls.empty() && "Should have a least one array.props call");
 }
@@ -2272,13 +1800,13 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
 
   // Clone the region from the new preheader up to (not including) the exit
   // blocks. This creates a second loop nest.
-  RegionCloner Cloner(NewPreheader, ExitBlocks, *DomTree);
-  auto *ClonedPreheader = Cloner.cloneRegion();
+  RegionCloner Cloner(NewPreheader, *DomTree);
+  auto *ClonedPreheader = Cloner.cloneRegion(ExitBlocks);
 
   // Collect the array.props call that we will specialize on that we have
   // cloned in the cloned loop.
   SmallVector<ArraySemanticsCall, 16> ArrayPropCalls;
-  collectArrayPropsCalls(Cloner.getBBMap(), ExitBlocks, ArrayPropCalls);
+  collectArrayPropsCalls(Cloner, ExitBlocks, ArrayPropCalls);
 
   // Move them to the check block.
   SmallVector<ArraySemanticsCall, 16> HoistedArrayPropCalls;

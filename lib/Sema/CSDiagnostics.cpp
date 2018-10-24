@@ -82,9 +82,14 @@ Type RequirementFailure::getOwnerType() const {
   return getType(getAnchor())->getInOutObjectType()->getMetatypeInstanceType();
 }
 
+const GenericContext *RequirementFailure::getGenericContext() const {
+  if (auto *genericCtx = AffectedDecl->getAsGenericContext())
+    return genericCtx;
+  return AffectedDecl->getDeclContext()->getAsDecl()->getAsGenericContext();
+}
+
 const Requirement &RequirementFailure::getRequirement() const {
-  auto *genericCtx = AffectedDecl->getAsGenericContext();
-  return genericCtx->getGenericRequirements()[getRequirementIndex()];
+  return getGenericContext()->getGenericRequirements()[getRequirementIndex()];
 }
 
 ValueDecl *RequirementFailure::getDeclRef() const {
@@ -139,7 +144,7 @@ bool RequirementFailure::diagnoseAsError() {
 
   auto *anchor = getAnchor();
   const auto *reqDC = getRequirementDC();
-  auto *genericCtx = AffectedDecl->getAsGenericContext();
+  auto *genericCtx = getGenericContext();
 
   if (reqDC != genericCtx) {
     auto *NTD = reqDC->getSelfNominalTypeDecl();

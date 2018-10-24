@@ -313,3 +313,24 @@ class FirstConformer : FirstClass, SecondProtocol {}
 // expected-note@-2 {{requirement specified as 'Self' : 'SecondClass' [with Self = FirstConformer]}}
 
 class SecondConformer : SecondClass, SecondProtocol {}
+
+// Duplicate superclass
+// FIXME: Duplicate diagnostics
+protocol DuplicateSuper : Concrete, Concrete {}
+// expected-note@-1 {{superclass constraint 'Self' : 'Concrete' written here}}
+// expected-warning@-2 {{redundant superclass constraint 'Self' : 'Concrete'}}
+// expected-error@-3 {{duplicate inheritance from 'Concrete'}}
+
+// Ambigous name lookup situation
+protocol Amb : Concrete {}
+// expected-note@-1 {{'Amb' previously declared here}}
+// expected-note@-2 {{found this candidate}}
+protocol Amb : Concrete {}
+// expected-error@-1 {{invalid redeclaration of 'Amb'}}
+// expected-note@-2 {{found this candidate}}
+
+extension Amb { // expected-error {{'Amb' is ambiguous for type lookup in this context}}
+  func extensionMethodUsesClassTypes() {
+    _ = ConcreteAlias.self
+  }
+}

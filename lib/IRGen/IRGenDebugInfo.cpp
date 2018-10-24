@@ -361,6 +361,7 @@ private:
     StringRef File = llvm::sys::path::filename(Filename);
     llvm::SmallString<512> Path(Filename);
     llvm::sys::path::remove_filename(Path);
+    llvm::sys::path::remove_dots(Path);
     llvm::DIFile *F = DBuilder.createFile(DebugPrefixMap.remapPath(File),
                                           DebugPrefixMap.remapPath(Path));
 

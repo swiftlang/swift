@@ -76,6 +76,7 @@ enum CastConsumptionKindEncoding : uint8_t {
   SIL_CAST_CONSUMPTION_TAKE_ALWAYS,
   SIL_CAST_CONSUMPTION_TAKE_ON_SUCCESS,
   SIL_CAST_CONSUMPTION_COPY_ON_SUCCESS,
+  SIL_CAST_CONSUMPTION_BORROW_ALWAYS,
 };
 
 enum class KeyPathComponentKindEncoding : uint8_t {

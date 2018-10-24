@@ -735,9 +735,16 @@ private:
   /// \returns NULL if the constructed expression does not typecheck.
   Expr* constructCallToSuperInit(ConstructorDecl *ctor, ClassDecl *ClDecl);
 
+  TypeChecker(ASTContext &Ctx);
+  friend class ASTContext;
+
 public:
-  TypeChecker(ASTContext &Ctx) : TypeChecker(Ctx, Ctx.Diags) { }
-  TypeChecker(ASTContext &Ctx, DiagnosticEngine &Diags);
+  /// Create a new type checker instance for the given ASTContext, if it
+  /// doesn't already have one.
+  ///
+  /// \returns a reference to the type vchecker.
+  static TypeChecker &createForContext(ASTContext &ctx);
+
   TypeChecker(const TypeChecker&) = delete;
   TypeChecker& operator=(const TypeChecker&) = delete;
   ~TypeChecker();
@@ -989,15 +996,6 @@ public:
   ///
   /// \returns true if \c t1 is a subtype of \c t2.
   bool isSubtypeOf(Type t1, Type t2, DeclContext *dc);
-
-  /// \brief Determine whether one type is a subclass of another.
-  ///
-  /// \param t1 The potential subtype.
-  /// \param t2 The potential supertype.
-  /// \param dc The context of the check.
-  ///
-  /// \returns true if \c t1 is a subtype of \c t2.
-  bool isSubclassOf(Type t1, Type t2, DeclContext *dc);
   
   /// \brief Determine whether one type is implicitly convertible to another.
   ///

@@ -679,12 +679,10 @@ public:
   //===--------------------------------------------------------------------===//
   // Control flow
   //===--------------------------------------------------------------------===//
-  
+
   /// emitCondition - Emit a boolean expression as a control-flow condition.
   ///
   /// \param E - The expression to be evaluated as a condition.
-  /// \param hasFalseCode - true if the false branch doesn't just lead
-  ///        to the fallthrough.
   /// \param invertValue - true if this routine should invert the value before
   ///        testing true/false.
   /// \param contArgs - the types of the arguments to the continuation BB.
@@ -693,14 +691,15 @@ public:
   /// \param NumTrueTaken - The number of times the condition evaluates to true.
   /// \param NumFalseTaken - The number of times the condition evaluates to
   /// false.
-  Condition emitCondition(Expr *E, bool hasFalseCode = true,
-                          bool invertValue = false,
+  ///
+  /// If `contArgs` is nonempty, then both Condition::exitTrue() and
+  /// Condition::exitFalse() must be called.
+  Condition emitCondition(Expr *E, bool invertValue = false,
                           ArrayRef<SILType> contArgs = {},
                           ProfileCounter NumTrueTaken = ProfileCounter(),
                           ProfileCounter NumFalseTaken = ProfileCounter());
 
-  Condition emitCondition(SILValue V, SILLocation Loc, bool hasFalseCode = true,
-                          bool invertValue = false,
+  Condition emitCondition(SILValue V, SILLocation Loc, bool invertValue = false,
                           ArrayRef<SILType> contArgs = {},
                           ProfileCounter NumTrueTaken = ProfileCounter(),
                           ProfileCounter NumFalseTaken = ProfileCounter());
@@ -727,6 +726,9 @@ public:
   /// section.
   SILBasicBlock *createBasicBlock(FunctionSection section);
 
+  SILBasicBlock *createBasicBlockAndBranch(SILLocation loc,
+                                           SILBasicBlock *destBB);
+
   /// Erase a basic block that was speculatively created and turned
   /// out to be unneeded.
   ///
@@ -735,6 +737,8 @@ public:
   ///
   /// The block should be empty and have no predecessors.
   void eraseBasicBlock(SILBasicBlock *block);
+
+  void mergeCleanupBlocks();
 
   //===--------------------------------------------------------------------===//
   // Memory management
@@ -1041,7 +1045,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   SILValue emitOSVersionRangeCheck(SILLocation loc, const VersionRange &range);
-  void emitStmtCondition(StmtCondition Cond, JumpDest FailDest, SILLocation loc,
+  void emitStmtCondition(StmtCondition Cond, JumpDest FalseDest, SILLocation loc,
                          ProfileCounter NumTrueTaken = ProfileCounter(),
                          ProfileCounter NumFalseTaken = ProfileCounter());
 
@@ -1369,6 +1373,8 @@ public:
                           Initialization *dest);
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue &&src,
                                    TSanKind tsanKind = TSanKind::None);
+  ManagedValue emitBorrowedLValue(SILLocation loc, LValue &&src,
+                                  TSanKind tsanKind = TSanKind::None);
   LValue emitOpenExistentialLValue(SILLocation loc,
                                    LValue &&existentialLV,
                                    CanArchetypeType openedArchetype,
@@ -1592,20 +1598,6 @@ public:
       llvm::function_ref<void(Optional<ManagedValue>)> handleFalse,
       ProfileCounter TrueCount = ProfileCounter(),
       ProfileCounter FalseCount = ProfileCounter());
-
-  /// A form of checked cast branch that uses the old non-ownership preserving
-  /// semantics.
-  ///
-  /// The main difference is that this code does not pass the old argument as a
-  /// block argument in the failure case. This causes values to be double
-  /// consumed.
-  void
-  emitCheckedCastBranchOld(SILLocation loc, ConsumableManagedValue src,
-                           Type sourceType, CanType targetType, SGFContext ctx,
-                           llvm::function_ref<void(ManagedValue)> handleTrue,
-                           llvm::function_ref<void()> handleFalse,
-                           ProfileCounter TrueCount = ProfileCounter(),
-                           ProfileCounter FalseCount = ProfileCounter());
 
   /// Emit the control flow for an optional 'bind' operation, branching to the
   /// active failure destination if the optional value addressed by optionalAddr

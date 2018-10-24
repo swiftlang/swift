@@ -1,4 +1,4 @@
-// RUN: %scale-test --begin 7 --end 12 --step 1 --select incrementScopeCounter %s
+// RUN: %scale-test --begin 7 --end 12 --step 1 --select NumLeafScopes %s -Xfrontend=-swift-version -Xfrontend=5 -Xfrontend=-solver-disable-shrink -Xfrontend=-disable-constraint-solver-performance-hacks -Xfrontend=-solver-enable-operator-designated-types
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 // REQUIRES: rdar42650365

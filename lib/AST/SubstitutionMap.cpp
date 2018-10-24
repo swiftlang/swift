@@ -108,7 +108,7 @@ bool SubstitutionMap::hasAnySubstitutableParams() const {
 }
 
 bool SubstitutionMap::hasArchetypes() const {
-  for (Type replacementTy : getReplacementTypes()) {
+  for (Type replacementTy : getReplacementTypesBuffer()) {
     if (replacementTy && replacementTy->hasArchetype())
       return true;
   }
@@ -116,7 +116,7 @@ bool SubstitutionMap::hasArchetypes() const {
 }
 
 bool SubstitutionMap::hasOpenedExistential() const {
-  for (Type replacementTy : getReplacementTypes()) {
+  for (Type replacementTy : getReplacementTypesBuffer()) {
     if (replacementTy && replacementTy->hasOpenedExistential())
       return true;
   }
@@ -124,7 +124,7 @@ bool SubstitutionMap::hasOpenedExistential() const {
 }
 
 bool SubstitutionMap::hasDynamicSelf() const {
-  for (Type replacementTy : getReplacementTypes()) {
+  for (Type replacementTy : getReplacementTypesBuffer()) {
     if (replacementTy && replacementTy->hasDynamicSelfType())
       return true;
   }
@@ -136,7 +136,7 @@ bool SubstitutionMap::isCanonical() const {
 
   if (!getGenericSignature()->isCanonical()) return false;
 
-  for (Type replacementTy : getReplacementTypes()) {
+  for (Type replacementTy : getReplacementTypesBuffer()) {
     if (replacementTy && !replacementTy->isCanonical())
       return false;
   }
@@ -154,7 +154,7 @@ SubstitutionMap SubstitutionMap::getCanonical() const {
 
   auto canonicalSig = getGenericSignature()->getCanonicalSignature();
   SmallVector<Type, 4> replacementTypes;
-  for (Type replacementType : getReplacementTypes()) {
+  for (Type replacementType : getReplacementTypesBuffer()) {
     if (replacementType)
       replacementTypes.push_back(replacementType->getCanonicalType());
     else
@@ -525,7 +525,7 @@ SubstitutionMap::getOverrideSubstitutions(
   // For overrides within a protocol hierarchy, substitute the Self type.
   if (auto baseProto = baseDecl->getDeclContext()->getSelfProtocolDecl()) {
     if (auto derivedProtoSelf =
-          derivedDecl->getDeclContext()->getProtocolSelfType()) {
+          derivedDecl->getDeclContext()->getSelfInterfaceType()) {
       return SubstitutionMap::getProtocolSubstitutions(
                                              baseProto,
                                              derivedProtoSelf,

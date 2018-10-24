@@ -67,6 +67,16 @@ STATISTIC(NumLazyGenericEnvironments,
 STATISTIC(NumLazyGenericEnvironmentsLoaded,
           "# of lazily-deserialized generic environments loaded");
 
+#define DECL(Id, _) \
+  static_assert((DeclKind::Id == DeclKind::Module) ^ \
+                IsTriviallyDestructible<Id##Decl>::value, \
+                "Decls are BumpPtrAllocated; the destructor is never called");
+#include "swift/AST/DeclNodes.def"
+static_assert(IsTriviallyDestructible<ParameterList>::value,
+              "ParameterLists are BumpPtrAllocated; the d'tor is never called");
+static_assert(IsTriviallyDestructible<GenericParamList>::value,
+              "GenericParamLists are BumpPtrAllocated; the d'tor isn't called");
+
 const clang::MacroInfo *ClangNode::getAsMacro() const {
   if (auto MM = getAsModuleMacro())
     return MM->getMacroInfo();
@@ -611,7 +621,7 @@ GenericParamList::clone(DeclContext *dc) const {
       auto second = reqt.getConstraintLoc();
       reqt = RequirementRepr::getTypeConstraint(
           first.clone(ctx),
-          reqt.getColonLoc(),
+          reqt.getSeparatorLoc(),
           second.clone(ctx));
       break;
     }
@@ -620,7 +630,7 @@ GenericParamList::clone(DeclContext *dc) const {
       auto second = reqt.getSecondTypeLoc();
       reqt = RequirementRepr::getSameType(
           first.clone(ctx),
-          reqt.getEqualLoc(),
+          reqt.getSeparatorLoc(),
           second.clone(ctx));
       break;
     }
@@ -629,7 +639,7 @@ GenericParamList::clone(DeclContext *dc) const {
       auto layout = reqt.getLayoutConstraintLoc();
       reqt = RequirementRepr::getLayoutConstraint(
           first.clone(ctx),
-          reqt.getColonLoc(),
+          reqt.getSeparatorLoc(),
           layout);
       break;
     }
@@ -721,6 +731,7 @@ GenericSignature *GenericContext::getGenericSignature() const {
   // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
   // it.
   if (auto PD = dyn_cast<ProtocolDecl>(this)) {
+    const_cast<ProtocolDecl *>(PD)->createGenericParamsIfMissing();
     auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
     auto req =
         Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
@@ -1171,18 +1182,19 @@ unsigned PatternBindingDecl::getPatternEntryIndexForVarDecl(const VarDecl *VD) c
 }
 
 SourceRange PatternBindingEntry::getOrigInitRange() const {
-  auto Init = InitAndFlags.getPointer();
+  auto Init = getInitAsWritten();
   return Init ? Init->getSourceRange() : SourceRange();
 }
 
 void PatternBindingEntry::setInit(Expr *E) {
-  auto F = InitAndFlags.getInt();
+  auto F = PatternAndFlags.getInt();
   if (E) {
-    InitAndFlags.setInt(F - Flags::Removed);
-    InitAndFlags.setPointer(E);
+    PatternAndFlags.setInt(F - Flags::Removed);
   } else {
-    InitAndFlags.setInt(F | Flags::Removed);
+    PatternAndFlags.setInt(F | Flags::Removed);
   }
+  InitExpr.Node = E;
+  InitContextAndIsText.setInt(false);
 }
 
 VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
@@ -1213,6 +1225,25 @@ SourceRange PatternBindingEntry::getSourceRange(bool omitAccessors) const {
   if (startLoc.isValid() != endLoc.isValid()) return SourceRange();
 
   return SourceRange(startLoc, endLoc);
+}
+
+bool PatternBindingEntry::hasInitStringRepresentation() const {
+  if (InitContextAndIsText.getInt())
+    return !InitStringRepresentation.empty();
+  return getInit() && getInit()->getSourceRange().isValid();
+}
+
+StringRef PatternBindingEntry::getInitStringRepresentation(
+  SmallVectorImpl<char> &scratch) const {
+
+  assert(hasInitStringRepresentation() &&
+         "must check if pattern has string representation");
+
+  if (InitContextAndIsText.getInt() && !InitStringRepresentation.empty())
+    return InitStringRepresentation;
+  auto &sourceMgr = getAnchoringVarDecl()->getASTContext().SourceMgr;
+  auto init = getInit();
+  return extractInlinableText(sourceMgr, init, scratch);
 }
 
 SourceRange PatternBindingDecl::getSourceRange() const {
@@ -1267,6 +1298,14 @@ VarDecl *PatternBindingDecl::getSingleVar() const {
   if (getNumPatternEntries() == 1)
     return getPatternList()[0].getPattern()->getSingleVar();
   return nullptr;
+}
+
+bool VarDecl::isInitExposedToClients() const {
+  auto parent = dyn_cast<NominalTypeDecl>(getDeclContext());
+  if (!parent) return false;
+  if (!hasInitialValue()) return false;
+  if (isStatic()) return false;
+  return parent->getAttrs().hasAttribute<FixedLayoutAttr>();
 }
 
 /// Check whether the given type representation will be
@@ -2348,9 +2387,11 @@ bool ValueDecl::isUsableFromInline() const {
     if (EED->getParentEnum()->getAttrs().hasAttribute<UsableFromInlineAttr>())
       return true;
 
-  if (auto *ATD = dyn_cast<AssociatedTypeDecl>(this))
-    if (ATD->getProtocol()->getAttrs().hasAttribute<UsableFromInlineAttr>())
+  if (auto *containingProto = dyn_cast<ProtocolDecl>(getDeclContext())) {
+    if (isProtocolRequirement() &&
+        containingProto->getAttrs().hasAttribute<UsableFromInlineAttr>())
       return true;
+  }
 
   if (auto *DD = dyn_cast<DestructorDecl>(this))
     if (auto *CD = dyn_cast<ClassDecl>(DD->getDeclContext()))
@@ -2953,6 +2994,17 @@ void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
   // Add to the end of the list.
   LastExtension->NextExtension.setPointer(extension);
   LastExtension = extension;
+}
+
+auto NominalTypeDecl::getStoredProperties(bool skipInaccessible) const
+    -> StoredPropertyRange {
+  // Clang-imported classes never have stored properties.
+  if (hasClangNode() && isa<ClassDecl>(this))
+    return StoredPropertyRange(DeclRange(nullptr, nullptr),
+                               ToStoredProperty(skipInaccessible));
+
+  return StoredPropertyRange(getMembers(),
+                             ToStoredProperty(skipInaccessible));
 }
 
 bool NominalTypeDecl::isOptionalDecl() const {
@@ -3604,7 +3656,7 @@ ProtocolDecl::getInheritedProtocols() const {
   SmallPtrSet<const ProtocolDecl *, 4> known;
   known.insert(this);
   bool anyObject = false;
-  for (const auto &found :
+  for (const auto found :
            getDirectlyInheritedNominalTypeDecls(
              const_cast<ProtocolDecl *>(this), anyObject)) {
     if (auto proto = dyn_cast<ProtocolDecl>(found.second)) {
@@ -3619,13 +3671,22 @@ ProtocolDecl::getInheritedProtocols() const {
 llvm::TinyPtrVector<AssociatedTypeDecl *>
 ProtocolDecl::getAssociatedTypeMembers() const {
   llvm::TinyPtrVector<AssociatedTypeDecl *> result;
-  if (!isObjC()) {
-    for (auto member : getMembers()) {
-      if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
-        result.push_back(ATD);
-      }
+
+  // Clang-imported protocols never have associated types.
+  if (hasClangNode())
+    return result;
+
+  // Deserialized @objc protocols never have associated types.
+  if (!getParentSourceFile() && isObjC())
+    return result;
+
+  // Find the associated type declarations.
+  for (auto member : getMembers()) {
+    if (auto ATD = dyn_cast<AssociatedTypeDecl>(member)) {
+      result.push_back(ATD);
     }
   }
+
   return result;
 }
 
@@ -3711,12 +3772,14 @@ bool ProtocolDecl::requiresClassSlow() {
     getDirectlyInheritedNominalTypeDecls(this, anyObject);
 
   // Quick check: do we inherit AnyObject?
-  if (anyObject)
-    return Bits.ProtocolDecl.RequiresClass = true;
+  if (anyObject) {
+    Bits.ProtocolDecl.RequiresClass = true;
+    return true;
+  }
 
   // Look through all of the inherited nominals for a superclass or a
   // class-bound protocol.
-  for (const auto &found : allInheritedNominals) {
+  for (const auto found : allInheritedNominals) {
     // Superclass bound.
     if (isa<ClassDecl>(found.second))
       return Bits.ProtocolDecl.RequiresClass = true;
@@ -3835,13 +3898,13 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
   }
 
   // A direct reference to 'Self' is covariant.
-  if (proto->getProtocolSelfType()->isEqual(type))
+  if (proto->getSelfInterfaceType()->isEqual(type))
     return SelfReferenceKind::Result();
 
   // Special handling for associated types.
   if (!skipAssocTypes && type->is<DependentMemberType>()) {
     type = type->getRootGenericParam();
-    if (proto->getProtocolSelfType()->isEqual(type))
+    if (proto->getSelfInterfaceType()->isEqual(type))
       return SelfReferenceKind::Other();
   }
 
@@ -4722,8 +4785,12 @@ Type DeclContext::getSelfTypeInContext() const {
   assert(isTypeContext());
 
   // For a protocol or extension thereof, the type is 'Self'.
-  if (getSelfProtocolDecl())
-    return mapTypeIntoContext(getProtocolSelfType());
+  if (getSelfProtocolDecl()) {
+    auto selfType = getProtocolSelfType();
+    if (!selfType)
+      return ErrorType::get(getASTContext());
+    return mapTypeIntoContext(selfType);
+  }
   return getDeclaredTypeInContext();
 }
 
@@ -4732,8 +4799,12 @@ Type DeclContext::getSelfInterfaceType() const {
   assert(isTypeContext());
 
   // For a protocol or extension thereof, the type is 'Self'.
-  if (getSelfProtocolDecl())
-    return getProtocolSelfType();
+  if (getSelfProtocolDecl()) {
+    auto selfType = getProtocolSelfType();
+    if (!selfType)
+      return ErrorType::get(getASTContext());
+    return selfType;
+  }
   return getDeclaredInterfaceType();
 }
 
@@ -6013,6 +6084,15 @@ SourceRange DestructorDecl::getSourceRange() const {
     return getDestructorLoc();
 
   return { getDestructorLoc(), getBody()->getEndLoc() };
+}
+
+StringRef swift::getAssociativitySpelling(Associativity value) {
+  switch (value) {
+  case Associativity::None: return "none";
+  case Associativity::Left: return "left";
+  case Associativity::Right: return "right";
+  }
+  llvm_unreachable("Unhandled Associativity in switch.");
 }
 
 PrecedenceGroupDecl *

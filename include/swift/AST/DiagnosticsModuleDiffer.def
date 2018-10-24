@@ -58,6 +58,10 @@ ERROR(decl_reorder,none,"%0 in a non-resilient type changes position from %1 to 
 
 ERROR(decl_added,none,"%0 is added to a non-resilient type", (StringRef))
 
+ERROR(var_has_fixed_order_change,none,"%0 is %select{now|no longer}1 a stored property", (StringRef, bool))
+
+ERROR(func_has_fixed_order_change,none,"%0 is %select{now|no longer}1 a non-final instance function", (StringRef, bool))
+
 ERROR(default_arg_removed,none,"%0 has removed default argument from %1", (StringRef, StringRef))
 
 ERROR(conformance_removed,none,"%0 has removed %select{conformance to|inherited protocol}2 %1", (StringRef, StringRef, bool))
@@ -72,7 +76,7 @@ ERROR(super_class_removed,none,"%0 has removed its super class %1", (StringRef, 
 
 ERROR(super_class_changed,none,"%0 has changed its super class from %1 to %2", (StringRef, StringRef, StringRef))
 
-ERROR(nominal_type_kind_changed,none,"%0 has been changed to a %1", (StringRef, StringRef))
+ERROR(decl_kind_changed,none,"%0 has been changed to a %1", (StringRef, StringRef))
 
 ERROR(optional_req_changed,none,"%0 is %select{now|no longer}1 an optional requirement", (StringRef, bool))
 
@@ -81,6 +85,10 @@ ERROR(var_let_changed,none,"%0 changes from %select{var|let}1 to %select{let|var
 ERROR(no_longer_open,none,"%0 is no longer open for subclassing", (StringRef))
 
 ERROR(func_type_escaping_changed,none,"%0 has %select{removed|added}2 @escaping in %1", (StringRef, StringRef, bool))
+
+ERROR(func_self_access_change,none,"%0 has self access kind changing from %1 to %2", (StringRef, StringRef, StringRef))
+
+ERROR(param_ownership_change,none,"%0 has %1 changing from %2 to %3", (StringRef, StringRef, StringRef, StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

@@ -8,15 +8,14 @@ if(HAVE_UNICODE_LIBEDIT)
     set(SOURCEKITD_REPL_LINK_LIBS sourcekitd)
   endif()
 
-  if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
-    set(SOURCEKITD_REPL_LINK_LIBS ${SOURCEKITD_REPL_LINK_LIBS} dispatch)
-  endif()
-
   add_sourcekit_executable(sourcekitd-repl
     sourcekitd-repl.cpp
     LINK_LIBS ${SOURCEKITD_REPL_LINK_LIBS} edit
     LLVM_COMPONENT_DEPENDS support coverage lto
   )
+  if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
+    target_link_libraries(sourcekitd-repl PRIVATE dispatch BlocksRuntime)
+  endif()
 
   if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set_target_properties(sourcekitd-repl

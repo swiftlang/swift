@@ -55,6 +55,10 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
     // Note that we're parsing a declaration.
     StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
                                     StructureMarkerKind::Declaration);
+    
+    if (ParsingDecl.isFailed()) {
+      return makeParserError();
+    }
 
     // Parse attributes.
     DeclAttributes attributes;
@@ -225,12 +229,8 @@ Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
   if (Tok.is(tok::kw_where))
     WhereClauseText << ',';
 
-  // For Swift 3, keep this warning. 
-  const auto Message = Context.isSwiftVersion3() 
-                             ? diag::swift3_where_inside_brackets 
-                             : diag::where_inside_brackets;
-
-  auto Diag = diagnose(WhereRangeInsideBrackets.Start, Message);
+  auto Diag = diagnose(WhereRangeInsideBrackets.Start,
+                       diag::where_inside_brackets);
 
   Diag.fixItRemoveChars(RemoveWhereRange.getStart(),
                         RemoveWhereRange.getEnd());

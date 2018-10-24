@@ -124,7 +124,7 @@ void FrontendOptions::forAllOutputPaths(
       input.getPrimarySpecificPaths().SupplementaryOutputs;
   const std::string *outputs[] = {&outs.ModuleOutputPath,
                                   &outs.ModuleDocOutputPath,
-                                  &outs.ModuleInterfaceOutputPath,
+                                  &outs.ParseableInterfaceOutputPath,
                                   &outs.ObjCHeaderOutputPath};
   for (const std::string *next : outputs) {
     if (!next->empty())
@@ -374,7 +374,6 @@ bool FrontendOptions::canActionEmitInterface(ActionType action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
   case ActionType::ResolveImports:
-  case ActionType::Typecheck:
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
@@ -390,6 +389,7 @@ bool FrontendOptions::canActionEmitInterface(ActionType action) {
   case ActionType::REPL:
   case ActionType::EmitImportedModules:
     return false;
+  case ActionType::Typecheck:
   case ActionType::MergeModules:
   case ActionType::EmitModuleOnly:
   case ActionType::EmitSIL:

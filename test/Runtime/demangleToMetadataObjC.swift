@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift-swift3
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
@@ -60,7 +60,7 @@ DemangleToMetadataTests.test("Imported swift_wrapper types") {
 }
 
 DemangleToMetadataTests.test("Imported enum types") {
-  expectEqual(NSURLSessionTask.State.self,
+  expectEqual(URLSessionTask.State.self,
     _typeByMangledName("So21NSURLSessionTaskStateV")!)
 }
 
@@ -89,6 +89,11 @@ DemangleToMetadataTests.test("synthesized declarations") {
 DemangleToMetadataTests.test("members of runtime-only Objective-C classes") {
   expectEqual(DispatchQueue.Attributes.self,
     _typeByMangledName("So17OS_dispatch_queueC8DispatchE10AttributesV")!)
+}
+
+DemangleToMetadataTests.test("runtime conformance lookup via foreign superclasses") {
+  expectEqual(Set<CFMutableString>.self,
+    _typeByMangledName("ShySo18CFMutableStringRefaG")!)
 }
 
 runAllTests()

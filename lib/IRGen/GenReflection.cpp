@@ -165,6 +165,21 @@ public:
 };
 
 llvm::Constant *IRGenModule::getTypeRef(CanType type, MangledTypeRefRole role) {
+  switch (role) {
+  case MangledTypeRefRole::DefaultAssociatedTypeWitness:
+  case MangledTypeRefRole::Metadata:
+    // Note that we're using all of the nominal types referenced by this type.
+    type.findIf([&](CanType type) -> bool {
+      if (auto nominal = type.getAnyNominal())
+        this->IRGen.noteUseOfTypeMetadata(nominal);
+      return false;
+    });
+    break;
+
+  case MangledTypeRefRole::Reflection:
+    break;
+  }
+
   IRGenMangler Mangler;
   auto SymbolicName = Mangler.mangleTypeForReflection(*this, type);
   return getAddrOfStringForTypeRef(SymbolicName, role);

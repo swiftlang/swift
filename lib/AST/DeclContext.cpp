@@ -88,11 +88,13 @@ ProtocolDecl *DeclContext::getExtendedProtocolDecl() const {
 GenericTypeParamType *DeclContext::getProtocolSelfType() const {
   assert(getSelfProtocolDecl() && "not a protocol");
 
+  GenericParamList *genericParams;
   if (auto proto = dyn_cast<ProtocolDecl>(this)) {
-    const_cast<ProtocolDecl *>(proto)->createGenericParamsIfMissing();
+    genericParams = proto->getGenericParams();
+  } else {
+    genericParams = cast<ExtensionDecl>(this)->getGenericParams();
   }
 
-  auto *genericParams = getGenericParamsOfContext();
   if (genericParams == nullptr)
     return nullptr;
 
@@ -780,9 +782,6 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
 /// declaration or extension, the supplied context is returned.
 static const DeclContext *
 getPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
-  if (DC->getASTContext().isSwiftVersion3())
-    return DC;
-
   auto NTD = DC->getSelfNominalTypeDecl();
   if (!NTD)
     return DC;
@@ -833,10 +832,6 @@ bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContex
   // Check the lexical scope.
   if (useDC->isChildContextOf(sourceDC))
     return true;
-
-  // Only check lexical scope in Swift 3 mode
-  if (useDC->getASTContext().isSwiftVersion3())
-    return false;
 
   // Do not allow access if the sourceDC is in a different file
   auto useSF = useDC->getParentSourceFile();

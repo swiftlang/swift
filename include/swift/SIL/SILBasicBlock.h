@@ -370,7 +370,7 @@ public:
   /// no-return apply or builtin.
   bool isNoReturn() const;
 
-  /// Returns true if this instruction only contains a branch instruction.
+  /// Returns true if this block only contains a branch instruction.
   bool isTrampoline() const;
 
   /// Returns true if it is legal to hoist instructions into this block.

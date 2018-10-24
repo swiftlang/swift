@@ -738,6 +738,9 @@ public:
   /// Adds all top-level decls to the given vector.
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results);
 
+  /// Adds all precedence groups to the given vector.
+  void getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results);
+
   /// Adds all local type decls to the given vector.
   void getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results);
 
@@ -887,6 +890,9 @@ public:
 
   /// Reads inlinable body text from \c DeclTypeCursor, if present.
   Optional<StringRef> maybeReadInlinableBodyText();
+
+  /// Reads pattern initializer text from \c DeclTypeCursor, if present.
+  Optional<StringRef> maybeReadPatternInitializerText();
 };
 
 template <typename T, typename RawData>

@@ -36,3 +36,24 @@ func givesNoneGeneric(_ fn: () -> ()) {
 
 // reabstraction thunk helper from @callee_guaranteed () -> () to @escaping @callee_guaranteed (@in_guaranteed ()) -> ()
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$sIg_ytIegn_TR : $@convention(thin) (@in_guaranteed (), @noescape @callee_guaranteed () -> ()) -> ()
+
+
+// "Tuple splat" still works if there are __owned parameters.
+// Make sure the memory management is correct also.
+
+// CHECK-LABEL: sil hidden @$s19function_conversion17takesTwoAnyObjectyyyyXl_yXlt_tXEF : $@convention(thin) (@noescape @callee_guaranteed (@guaranteed AnyObject, @guaranteed AnyObject) -> ()) -> ()
+func takesTwoAnyObject(_: ((AnyObject, AnyObject)) -> ()) {}
+
+// CHECK-LABEL: sil hidden @$s19function_conversion22givesTwoAnyObjectOwnedyyyyXln_yXlntXEF : $@convention(thin) (@noescape @callee_guaranteed (@owned AnyObject, @owned AnyObject) -> ()) -> ()
+func givesTwoAnyObjectOwned(_ fn: (__owned AnyObject, __owned AnyObject) -> ()) {
+  takesTwoAnyObject(fn)
+}
+
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$syXlyXlIgxx_yXlyXlIeggg_TR : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject, @noescape @callee_guaranteed (@owned AnyObject, @owned AnyObject) -> ()) -> () {
+// CHECK: bb0(%0 : @guaranteed $AnyObject, %1 : @guaranteed $AnyObject, %2 : @trivial $@noescape @callee_guaranteed (@owned AnyObject, @owned AnyObject) -> ()):
+// CHECK-NEXT: [[FIRST:%.*]] = copy_value %0
+// CHECK-NEXT: [[SECOND:%.*]] = copy_value %1
+// CHECK-NEXT: apply %2([[FIRST]], [[SECOND]]) : $@noescape @callee_guaranteed (@owned AnyObject, @owned AnyObject) -> ()
+// CHECK-NEXT: [[RESULT:%.*]] = tuple ()
+// CHECK-NEXT: return [[RESULT]] : $()
+// CHECK-NEXT: }

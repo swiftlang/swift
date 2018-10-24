@@ -114,6 +114,8 @@ BUILTIN_UNARY_OPERATION(FNeg, "fneg", "n", FloatOrVector)
 // It has only an effect if the argument is a load or call.
 // TODO: consider printing a warning if it is not used on a load or call.
 BUILTIN_UNARY_OPERATION(AssumeNonNegative, "assumeNonNegative", "n", Integer)
+// It only works on i1.
+BUILTIN_UNARY_OPERATION(AssumeTrue, "assume", "", Integer)
 
 #undef BUILTIN_UNARY_OPERATION
 

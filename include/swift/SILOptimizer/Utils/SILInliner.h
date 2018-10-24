@@ -18,12 +18,16 @@
 #ifndef SWIFT_SIL_SILINLINER_H
 #define SWIFT_SIL_SILINLINER_H
 
+#include "swift/AST/SubstitutionMap.h"
+#include "swift/SIL/ApplySite.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILOpenedArchetypesTracker.h"
 #include "llvm/ADT/DenseMap.h"
-#include "swift/SIL/TypeSubstCloner.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include <functional>
 
 namespace swift {
+
+class SILOptFunctionBuilder;
 
 // For now Free is 0 and Expensive is 1. This can be changed in the future by
 // adding more categories.
@@ -53,100 +57,54 @@ class SILInliner : public TypeSubstCloner<SILInliner, SILOptFunctionBuilder> {
 public:
   enum class InlineKind { MandatoryInline, PerformanceInline };
 
-  // Returns true if this an apply site that can't be inlined for some
-  // structural reason.
-  static bool canInline(FullApplySite AI);
+  using DeletionFuncTy = std::function<void(SILInstruction *)>;
 
 private:
-  InlineKind IKind;
-
-  SILBasicBlock *CalleeEntryBB = nullptr;
-
-  /// \brief The location representing the inlined instructions.
-  ///
-  /// This location wraps the call site AST node that is being inlined.
-  /// Alternatively, it can be the SIL file location of the call site (in case
-  /// of SIL-to-SIL transformations).
-  Optional<SILLocation> Loc;
-  const SILDebugScope *CallSiteScope = nullptr;
-  SILFunction *CalleeFunction = nullptr;
-  llvm::SmallDenseMap<const SILDebugScope *, const SILDebugScope *, 8>
-      InlinedScopeCache;
-  CloneCollector::CallbackType Callback;
   SILOptFunctionBuilder &FuncBuilder;
+  InlineKind IKind;
+  SubstitutionMap ApplySubs;
+  SILOpenedArchetypesTracker &OpenedArchetypesTracker;
+
+  DeletionFuncTy DeletionCallback;
 
 public:
-  SILInliner(SILOptFunctionBuilder &FuncBuilder,
-	     SILFunction &To, SILFunction &From, InlineKind IKind,
+  SILInliner(SILOptFunctionBuilder &FuncBuilder, InlineKind IKind,
              SubstitutionMap ApplySubs,
-             SILOpenedArchetypesTracker &OpenedArchetypesTracker,
-             CloneCollector::CallbackType Callback = nullptr)
-      : SuperTy(To, From, ApplySubs, OpenedArchetypesTracker, true),
-        IKind(IKind), CalleeFunction(&Original), Callback(Callback),
-	FuncBuilder(FuncBuilder) {
-    // CalleeEntryBB is initialized later in case the callee is modified.
-  }
+             SILOpenedArchetypesTracker &OpenedArchetypesTracker)
+      : FuncBuilder(FuncBuilder), IKind(IKind), ApplySubs(ApplySubs),
+        OpenedArchetypesTracker(OpenedArchetypesTracker) {}
 
   /// Returns true if we are able to inline \arg AI.
   ///
   /// *NOTE* This must be checked before attempting to inline \arg AI. If one
   /// attempts to inline \arg AI and this returns false, an assert will fire.
-  bool canInlineFunction(FullApplySite AI);
+  static bool canInlineApplySite(FullApplySite apply);
 
-  /// inlineFunction - This method inlines a callee function, assuming that it
-  /// is called with the given arguments, into the caller at a given instruction
-  /// (as specified by a basic block iterator), assuming that the instruction
-  /// corresponds semantically to an application of the function. It only
-  /// performs one step of inlining: it does not recursively inline functions
-  /// called by the callee.
+  /// Allow the client to track instructions before they are deleted. The
+  /// registered callback is called from
+  /// recursivelyDeleteTriviallyDeadInstructions.
   ///
-  /// After completion, I now points to the first inlined instruction, or the
-  /// next instruction after the removed instruction in the original function,
-  /// in case the inlined function is completely trivial
+  /// (This is safer than the SILModule deletion callback because the
+  /// instruction is still in a valid form and its operands can be inspected.)
+  void setDeletionCallback(DeletionFuncTy f) { DeletionCallback = f; }
+
+  /// Inline a callee function at the given apply site with the given
+  /// arguments. Delete the apply and any dead arguments. Return a valid
+  /// iterator to the first inlined instruction (or first instruction after the
+  /// call for an empty function).
+  ///
+  /// This may split basic blocks and delete instructions.
+  ///
+  /// This only performs one step of inlining: it does not recursively
+  /// inline functions called by the callee.
   ///
   /// *NOTE*: This attempts to perform inlining unconditionally and thus asserts
   /// if inlining will fail. All users /must/ check that a function is allowed
-  /// to be inlined using SILInliner::canInlineFunction before calling this
+  /// to be inlined using SILInliner::canInlineApplySite before calling this
   /// function.
-  void inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args);
-
-private:
-  SILValue borrowFunctionArgument(SILValue callArg, FullApplySite AI);
-
-  void visitDebugValueInst(DebugValueInst *Inst);
-  void visitDebugValueAddrInst(DebugValueAddrInst *Inst);
-
-  const SILDebugScope *getOrCreateInlineScope(const SILDebugScope *DS);
-
-  void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
-    // Call client-supplied callback function.
-    if (Callback)
-      Callback(Orig, Cloned);
-
-    // We just updated the debug scope information. Intentionally
-    // don't call SILClonerWithScopes<SILInliner>::postProcess().
-    SILCloner<SILInliner>::postProcess(Orig, Cloned);
-  }
-
-  SILLocation remapLocation(SILLocation InLoc) {
-    // For performance inlining return the original location.
-    if (IKind == InlineKind::PerformanceInline)
-      return InLoc;
-    // Inlined location wraps the call site that is being inlined, regardless
-    // of the input location.
-    return Loc.hasValue() ? Loc.getValue() :
-      MandatoryInlinedLocation::getMandatoryInlinedLocation((Decl*)nullptr);
-  }
-
-  const SILDebugScope *remapScope(const SILDebugScope *DS) {
-    if (IKind == InlineKind::MandatoryInline)
-      // Transparent functions are absorbed into the call
-      // site. No soup, err, debugging for you!
-      return CallSiteScope;
-    else
-      // Create an inlined version of the scope.
-      return getOrCreateInlineScope(DS);
-  }
+  SILBasicBlock::iterator inlineFunction(SILFunction *calleeFunction,
+                                         FullApplySite apply,
+                                         ArrayRef<SILValue> appliedArgs);
 };
 
 } // end namespace swift

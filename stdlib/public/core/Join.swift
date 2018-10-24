@@ -50,14 +50,14 @@ extension JoinedSequence {
     
     @_frozen // lazy-performance
     @usableFromInline // lazy-performance
-    internal enum JoinIteratorState {
+    internal enum _JoinIteratorState {
       case start
       case generatingElements
       case generatingSeparator
       case end
     }
     @usableFromInline // lazy-performance
-    internal var _state: JoinIteratorState = .start
+    internal var _state: _JoinIteratorState = .start
 
     /// Creates a sequence that presents the elements of `base` sequences
     /// concatenated using `separator`.
@@ -131,7 +131,7 @@ extension JoinedSequence: Sequence {
   }
 
   @inlinable // lazy-performance
-  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     var result = ContiguousArray<Element>()
     let separatorSize: Int = numericCast(_separator.count)
 

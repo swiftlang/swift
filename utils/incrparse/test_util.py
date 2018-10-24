@@ -27,8 +27,6 @@ def run_command(cmd):
 
 def parseLine(line, line_no, test_case, incremental_edit_args, reparse_args, 
               current_reparse_start):
-    pre_column_offset = 1
-    post_column_offset = 1
     pre_edit_line = ""
     post_edit_line = ""
 
@@ -55,31 +53,29 @@ def parseLine(line, line_no, test_case, incremental_edit_args, reparse_args,
             suffix = subst_match.group(5)
 
             if match_test_case == test_case:
-                pre_edit_line += prefix + pre_edit
-                post_edit_line += prefix + post_edit
-
                 # Compute the -incremental-edit argument for swift-syntax-test
-                column = pre_column_offset + len(prefix)
+                column = len(pre_edit_line) + len(prefix) + 1
                 edit_arg = '%d:%d-%d:%d=%s' % \
                     (line_no, column, line_no, column + len(pre_edit), 
                      post_edit)
                 incremental_edit_args.append('-incremental-edit')
                 incremental_edit_args.append(edit_arg)
+
+                pre_edit_line += prefix + pre_edit
+                post_edit_line += prefix + post_edit
             else:
                 # For different test cases just take the pre-edit text
                 pre_edit_line += prefix + pre_edit
                 post_edit_line += prefix + pre_edit
 
             line = suffix
-            pre_column_offset += len(pre_edit_line)
-            post_column_offset += len(post_edit_line)
         elif reparse_match:
             prefix = reparse_match.group(1)
             is_closing = len(reparse_match.group(2)) > 0
             match_test_case = reparse_match.group(3)
             suffix = reparse_match.group(4)
             if match_test_case == test_case:
-                column = post_column_offset + len(prefix)
+                column = len(post_edit_line) + len(prefix) + 1
                 if is_closing:
                     if not current_reparse_start:
                         raise TestFailedError('Closing unopened reparse tag '

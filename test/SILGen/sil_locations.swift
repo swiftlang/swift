@@ -12,8 +12,10 @@ func ifexpr() -> Int {
   // CHECK-LABEL: sil hidden @$s13sil_locations6ifexprSiyF
   // CHECK: apply {{.*}}, loc "{{.*}}":[[@LINE-5]]:6
   // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]], loc "{{.*}}":[[@LINE-6]]:6
-  // CHECK: br [[FALSE_BB]], loc "{{.*}}":[[@LINE-5]]:3
-  // CHECK: return {{.*}}, loc "{{.*}}":[[@LINE-5]]:3, {{.*}}:return
+  // CHECK: [[TRUE_BB]]:
+  // CHECK: br [[CONT_BB:bb[0-9]+]], loc "{{.*}}":[[@LINE-6]]:3
+  // CHECK: [[CONT_BB]]:
+  // CHECK: return {{.*}}, loc "{{.*}}":[[@LINE-7]]:3, {{.*}}:return
 }
 
 func ifelseexpr() -> Int {
@@ -77,7 +79,7 @@ func templateTest<T>(_ value: T) -> T {
 func useTemplateTest() -> Int {
   return templateTest(5);
   // CHECK-LABEL: sil hidden @$s13sil_locations15useTemplateTestSiyF
-  // CHECK: function_ref @$sSi2{{[_0-9a-zA-Z]*}}fC :{{.*}}, loc "{{.*}}":78
+  // CHECK: function_ref @$sSi2{{[_0-9a-zA-Z]*}}fC :{{.*}}, loc "{{.*}}":[[@LINE-2]]
 }
 
 func foo(_ x: Int) -> Int {

@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 452; // Last change: @autodiff type attribute
+const uint16_t VERSION_MINOR = 454; // Last change: multiple nominal types for operators
 
 using DeclIDField = BCFixed<31>;
 
@@ -1123,7 +1123,7 @@ namespace decls_block {
     Code, // ID field
     IdentifierIDField,  // name
     DeclContextIDField, // context decl
-    DeclIDField         // protocol
+    BCArray<DeclIDField> // designated types
   >;
 
   using PrefixOperatorLayout = UnaryOperatorLayout<PREFIX_OPERATOR_DECL>;
@@ -1134,7 +1134,7 @@ namespace decls_block {
     IdentifierIDField, // name
     DeclContextIDField,// context decl
     DeclIDField,       // precedence group
-    DeclIDField        // protocol
+    BCArray<DeclIDField> // designated types
   >;
 
   using PrecedenceGroupLayout = BCRecordLayout<
@@ -1502,7 +1502,8 @@ namespace decls_block {
   using PatternBindingInitializerLayout = BCRecordLayout<
     PATTERN_BINDING_INITIALIZER_CONTEXT,
     DeclIDField, // parent pattern binding decl
-    BCVBR<3>     // binding index in the pattern binding decl
+    BCVBR<3>,    // binding index in the pattern binding decl
+    BCBlob       // initializer text, if present
   >;
 
   using DefaultArgumentInitializerLayout = BCRecordLayout<

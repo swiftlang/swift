@@ -1,4 +1,4 @@
-// RUN: %scale-test --begin 2 --end 10 --step 2 --select incrementScopeCounter --polynomial-threshold 1.5 %s
+// RUN: %scale-test --begin 2 --end 10 --step 2 --select NumConstraintScopes --polynomial-threshold 1.5 %s
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 

@@ -92,7 +92,7 @@ internal struct _SliceBuffer<Element>
   internal mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with insertCount: Int,
-    elementsOf newValues: C
+    elementsOf newValues: __owned C
   ) where C : Collection, C.Element == Element {
 
     _invariantCheck()
@@ -221,7 +221,7 @@ internal struct _SliceBuffer<Element>
 
   @inlinable // FIXME(sil-serialize-all)
   @discardableResult
-  internal func _copyContents(
+  internal __consuming func _copyContents(
     subRange bounds: Range<Int>,
     initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
@@ -372,7 +372,7 @@ internal struct _SliceBuffer<Element>
 
 extension _SliceBuffer {
   @inlinable // FIXME(sil-serialize-all)
-  internal func _copyToContiguousArray() -> ContiguousArray<Element> {
+  internal __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     if _hasNativeBuffer {
       let n = nativeBuffer
       if count == n.count {

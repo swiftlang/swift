@@ -103,11 +103,27 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Optional<FrontendInputsAndOutputs> inputsAndOutputs =
       ArgsToFrontendInputsConverter(Diags, Args).convert(buffers);
+
+  // None here means error, not just "no inputs". Propagage unconditionally.
   if (!inputsAndOutputs)
     return true;
-  Opts.InputsAndOutputs = std::move(inputsAndOutputs).getValue();
 
-  Opts.RequestedAction = determineRequestedAction(Args);
+  // InputsAndOutputs can only get set up once; if it was set already when we
+  // entered this function, we should not set it again (and should assert this
+  // is not being done). Further, the computeMainAndSupplementaryOutputFilenames
+  // call below needs to only happen when there was a new InputsAndOutputs,
+  // since it clobbers the existing one rather than adding to it.
+  bool HaveNewInputsAndOutputs = false;
+  if (Opts.InputsAndOutputs.hasInputs()) {
+    assert(!inputsAndOutputs->hasInputs());
+  } else {
+    HaveNewInputsAndOutputs = true;
+    Opts.InputsAndOutputs = std::move(inputsAndOutputs).getValue();
+  }
+
+  if (Opts.RequestedAction == FrontendOptions::ActionType::NoneAction) {
+    Opts.RequestedAction = determineRequestedAction(Args);
+  }
 
   if (Opts.RequestedAction == FrontendOptions::ActionType::Immediate &&
       Opts.InputsAndOutputs.hasPrimaryInputs()) {
@@ -121,7 +137,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (computeModuleName())
     return true;
 
-  if (computeMainAndSupplementaryOutputFilenames())
+  if (HaveNewInputsAndOutputs &&
+      computeMainAndSupplementaryOutputFilenames())
     return true;
 
   if (checkUnusedSupplementaryOutputPaths())
@@ -134,6 +151,8 @@ bool ArgsToFrontendOptionsConverter::convert(
       Args.hasArg(OPT_serialize_debugging_options);
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
   Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
+  Opts.EnableParseableModuleInterface |=
+      Args.hasArg(OPT_enable_parseable_module_interface);
   Opts.EnableSerializationNestedTypeLookupTable &=
       !Args.hasArg(OPT_disable_serialization_nested_type_lookup_table);
 
@@ -496,7 +515,7 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
     return true;
   }
   if (!FrontendOptions::canActionEmitInterface(Opts.RequestedAction) &&
-      Opts.InputsAndOutputs.hasModuleInterfaceOutputPath()) {
+      Opts.InputsAndOutputs.hasParseableInterfaceOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_interface);
     return true;
   }

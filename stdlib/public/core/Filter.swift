@@ -140,7 +140,7 @@ extension LazyFilterCollection : LazySequenceProtocol {
   public var underestimatedCount: Int { return 0 }
 
   @inlinable // lazy-performance
-  public func _copyToContiguousArray() -> ContiguousArray<Base.Element> {
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Base.Element> {
 
     // The default implementation of `_copyToContiguousArray` queries the
     // `count` property, which evaluates `_predicate` for every element --

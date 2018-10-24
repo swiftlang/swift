@@ -34,7 +34,7 @@ entry(%c : $C, %w : $Builtin.Word):
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { %objc_object*, i64 } @convert_from_bridge_object
 // CHECK:         [[BOBITS:%.*]] = ptrtoint [[BRIDGE]] %0 to i64
 // --                                                     0x8000_0000_0000_0001
-// CHECK:         [[TAGBITS:%.*]] = and i64 [[BOBITS]], -9223372036854775807
+// CHECK:         [[TAGBITS:%.*]] = and i64 [[BOBITS]], 1
 // CHECK:         [[TAGGED:%.*]] = icmp eq i64 [[TAGBITS]], 0
 // CHECK:         br i1 [[TAGGED]], label %not-tagged-pointer, label %tagged-pointer
 // CHECK:       tagged-pointer:

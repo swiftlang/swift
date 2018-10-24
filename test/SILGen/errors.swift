@@ -114,8 +114,7 @@ func dont_return<T>(_ argument: T) throws -> T {
 //   Catch HomeworkError.
 // CHECK:    [[IS_HWE]]:
 // CHECK-NEXT: [[T0_ORIG:%.*]] = load [take] [[DEST_TEMP]] : $*HomeworkError
-// CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[T0_ORIG]]
-// CHECK-NEXT: switch_enum [[T0_COPY]] : $HomeworkError, case #HomeworkError.CatAteIt!enumelt.1: [[MATCH:bb[0-9]+]], default [[NO_MATCH:bb[0-9]+]]
+// CHECK-NEXT: switch_enum [[T0_ORIG]] : $HomeworkError, case #HomeworkError.CatAteIt!enumelt.1: [[MATCH:bb[0-9]+]], default [[NO_MATCH:bb[0-9]+]]
 
 //   Catch HomeworkError.CatAteIt.
 // CHECK:    [[MATCH]]([[T0:%.*]] : @owned $Cat):
@@ -124,7 +123,6 @@ func dont_return<T>(_ argument: T) throws -> T {
 // CHECK-NEXT: [[T0_COPY:%.*]] = copy_value [[BORROWED_T0]]
 // CHECK-NEXT: end_borrow [[BORROWED_T0]]
 // CHECK-NEXT: destroy_value [[T0]]
-// CHECK-NEXT: destroy_value [[T0_ORIG]]
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
 // CHECK-NEXT: destroy_addr [[SRC_TEMP]]
 // CHECK-NEXT: dealloc_stack [[SRC_TEMP]]
@@ -135,7 +133,6 @@ func dont_return<T>(_ argument: T) throws -> T {
 //   Catch other HomeworkErrors.
 // CHECK:    [[NO_MATCH]]([[CATCHALL_ERROR:%.*]] : @owned $HomeworkError):
 // CHECK-NEXT: destroy_value [[CATCHALL_ERROR]]
-// CHECK-NEXT: destroy_value [[T0_ORIG]]
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
 // CHECK-NEXT: destroy_addr [[SRC_TEMP]]
 // CHECK-NEXT: dealloc_stack [[SRC_TEMP]]
@@ -697,12 +694,10 @@ func testForcePeephole(_ f: () throws -> Int?) -> Int {
 // CHECK-NEXT: destroy_value [[RESULT]] : $Optional<Cat>
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
-// CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : @owned $Error):
+// CHECK: [[CLEANUPS:.+]]([[ERROR:%.*]] : @owned $Error):
 // CHECK-NEXT: destroy_value [[ERROR]]
 // CHECK-NEXT: [[NONE:%.+]] = enum $Optional<Cat>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]([[NONE]] : $Optional<Cat>)
-// CHECK: [[CLEANUPS]]([[ERROR:%.+]] : @owned $Error):
-// CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $Error)
 // CHECK: } // end sil function '$s6errors15testOptionalTryyyF'
 func testOptionalTry() {
   _ = try? make_a_cat()
@@ -732,12 +727,10 @@ func testOptionalTryThatNeverThrows() {
 // CHECK-NEXT: destroy_value [[BOX]] : ${ var Optional<Cat> }
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
-// CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : @owned $Error):
+// CHECK: [[CLEANUPS:.+]]([[ERROR:%.*]] : @owned $Error):
 // CHECK-NEXT: destroy_value [[ERROR]]
 // CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<Cat>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]
-// CHECK: [[CLEANUPS]]([[ERROR:%.+]] : @owned $Error):
-// CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $Error)
 // CHECK: } // end sil function '$s6errors18testOptionalTryVaryyF'
 func testOptionalTryVar() {
   var cat = try? make_a_cat() // expected-warning {{initialization of variable 'cat' was never used; consider replacing with assignment to '_' or removing it}}
@@ -758,12 +751,10 @@ func testOptionalTryVar() {
 // CHECK-NOT: destroy_addr %0 : $*T
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
-// CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : @owned $Error):
+// CHECK: [[CLEANUPS]]([[ERROR:%.+]] : @owned $Error):
 // CHECK-NEXT: destroy_value [[ERROR]]
 // CHECK-NEXT: inject_enum_addr [[BOX]] : $*Optional<T>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]
-// CHECK: [[CLEANUPS]]([[ERROR:%.+]] : @owned $Error):
-// CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $Error)
 // CHECK: } // end sil function '$s6errors26testOptionalTryAddressOnlyyyxlF'
 func testOptionalTryAddressOnly<T>(_ obj: T) {
   _ = try? dont_return(obj)
@@ -784,12 +775,10 @@ func testOptionalTryAddressOnly<T>(_ obj: T) {
 // CHECK-NOT: destroy_addr %0 : $*T
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
-// CHECK: [[FAILURE:.+]]([[ERROR:%.*]] : @owned $Error):
+// CHECK: [[CLEANUPS]]([[ERROR:%.+]] : @owned $Error):
 // CHECK-NEXT: destroy_value [[ERROR]]
 // CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<T>, #Optional.none!enumelt
 // CHECK-NEXT: br [[DONE]]
-// CHECK: [[CLEANUPS]]([[ERROR:%.+]] : @owned $Error):
-// CHECK-NEXT: br [[FAILURE]]([[ERROR]] : $Error)
 // CHECK: } // end sil function '$s6errors29testOptionalTryAddressOnlyVaryyxlF'
 func testOptionalTryAddressOnlyVar<T>(_ obj: T) {
   var copy = try? dont_return(obj) // expected-warning {{initialization of variable 'copy' was never used; consider replacing with assignment to '_' or removing it}}

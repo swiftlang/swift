@@ -2550,8 +2550,10 @@ MetadataResponse _getBridgedObjectiveCType(
   assert(assocTypeRequirement->Flags.getKind() ==
          ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction);
   auto mutableWTable = (WitnessTable *)wtable;
-  return swift_getAssociatedTypeWitness(request, mutableWTable, conformingType,
-                                        assocTypeRequirement);
+  return swift_getAssociatedTypeWitness(
+                                      request, mutableWTable, conformingType,
+                                      protocol->getRequirementBaseDescriptor(),
+                                      assocTypeRequirement);
 }
   
 } // unnamed namespace
@@ -3083,9 +3085,17 @@ bool _swift_isClassOrObjCExistentialType(const Metadata *value,
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 const Metadata *swift::_swift_class_getSuperclass(const Metadata *theClass) {
-  if (const ClassMetadata *classType = theClass->getClassObject())
+  if (const ClassMetadata *classType = theClass->getClassObject()) {
     if (classHasSuperclass(classType))
       return getMetadataForClass(classType->Superclass);
+  }
+
+  if (const ForeignClassMetadata *foreignClassType
+        = dyn_cast<ForeignClassMetadata>(theClass)) {
+    if (const Metadata *superclass = foreignClassType->Superclass)
+      return superclass;
+  }
+
   return nullptr;
 }
 
@@ -3107,7 +3117,7 @@ bool _swift_isOptional(OpaqueValue *src, const Metadata *type) {
   return swift_isOptionalType(type);
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 HeapObject *_swift_extractDynamicValue(OpaqueValue *value, const Metadata *self) {
   OpaqueValue *outValue;
   const Metadata *outType;

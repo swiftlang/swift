@@ -148,7 +148,6 @@ bb0(%0 : @owned $Builtin.NativeObject):
 // CHECK-LABEL: Function: 'ref_element_addr_requires_borrow'
 // CHECK: Have operand with incompatible ownership?!
 // CHECK: Value:   %0 = argument of bb0 : $RefWithInt
-// CHECK: BaseValue:    %0 = argument of bb0 : $RefWithInt
 // CHECK: User:   %1 = ref_element_addr %0 : $RefWithInt, #RefWithInt.value
 // CHECK: Conv: owned
 sil @ref_element_addr_requires_borrow : $@convention(thin) (@owned RefWithInt) -> () {
@@ -176,11 +175,17 @@ bb0(%0 : @owned $Optional<Builtin.NativeObject>):
 }
 
 // CHECK-LABEL: Function: 'switch_enum_mismatching_argument_guaranteed_to_owned'
-// CHECK: Error! Argument ownership kind does not match terminator!
-// CHECK: Terminator:   switch_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
-// CHECK: Argument:   %2 = argument of bb1 : $Builtin.NativeObject
-// CHECK: Expected convention: guaranteed.
-// CHECK: Actual convention:   owned
+// CHECK: Have operand with incompatible ownership?!
+// CHECK: Value: %0 = argument of bb0
+// CHECK: User:   switch_enum %0
+// CHECK: Conv: guaranteed
+// CHECK: OwnershipMap:
+// CHECK: -- OperandOwnershipKindMap --
+// CHECK: trivial:  Yes. Liveness: MustBeLive
+// CHECK: unowned:  No.
+// CHECK: owned: Yes. Liveness: MustBeInvalidated
+// CHECK: guaranteed:  No.
+// CHECK: any: Yes. Liveness: MustBeLive
 sil @switch_enum_mismatching_argument_guaranteed_to_owned : $@convention(thin) (@guaranteed Optional<Builtin.NativeObject>) -> () {
 bb0(%0 : @guaranteed $Optional<Builtin.NativeObject>):
   switch_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
@@ -198,11 +203,17 @@ bb3:
 }
 
 // CHECK-LABEL: Function: 'switch_enum_mismatching_argument_owned_to_guaranteed'
-// CHECK: Error! Argument ownership kind does not match terminator!
-// CHECK: Terminator:   switch_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
-// CHECK: Argument:   %2 = argument of bb1 : $Builtin.NativeObject
-// CHECK: Expected convention: owned.
-// CHECK: Actual convention: guaranteed
+// CHECK: Have operand with incompatible ownership?!
+// CHECK: Value: %0 = argument of bb0 : $Optional<Builtin.NativeObject>
+// CHECK: User:   switch_enum %0 : $Optional<Builtin.NativeObject>
+// CHECK: Conv: owned
+// CHECK: OwnershipMap:
+// CHECK: -- OperandOwnershipKindMap --
+// CHECK: trivial:  Yes. Liveness: MustBeLive
+// CHECK: unowned:  No.
+// CHECK: owned:  No.
+// CHECK: guaranteed: Yes. Liveness: MustBeLive
+// CHECK: any: Yes. Liveness: MustBeLive
 sil @switch_enum_mismatching_argument_owned_to_guaranteed : $@convention(thin) (@owned Optional<Builtin.NativeObject>) -> () {
 bb0(%0 : @owned $Optional<Builtin.NativeObject>):
   switch_enum %0 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
@@ -247,18 +258,17 @@ bb3:
 }
 
 // CHECK-LABEL: Function: 'checked_cast_br_mismatching_argument_guaranteed_to_owned_1'
-// CHECK: Error! Argument ownership kind does not match terminator!
-// CHECK: Terminator:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
-// CHECK: Argument:   %2 = argument of bb1 : $SuperKlass
-// CHECK: Expected convention: guaranteed.
-// CHECK: Actual convention:   owned
-
-// CHECK-LABEL: Function: 'checked_cast_br_mismatching_argument_guaranteed_to_owned_1'
-// CHECK: Error! Argument ownership kind does not match terminator!
-// CHECK: Terminator:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
-// CHECK: Argument:   %5 = argument of bb2 : $Builtin.NativeObject
-// CHECK: Expected convention: guaranteed.
-// CHECK: Actual convention:   owned
+// CHECK: Have operand with incompatible ownership?!
+// CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
+// CHECK: Conv: guaranteed
+// CHECK: OwnershipMap:
+// CHECK: -- OperandOwnershipKindMap --
+// CHECK: trivial:  No.
+// CHECK: unowned:  No.
+// CHECK: owned: Yes. Liveness: MustBeInvalidated
+// CHECK: guaranteed:  No.
+// CHECK: any: Yes. Liveness: MustBeLive
 sil @checked_cast_br_mismatching_argument_guaranteed_to_owned_1 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
@@ -277,11 +287,11 @@ bb3:
 }
 
 // CHECK-LABEL: Function: 'checked_cast_br_mismatching_argument_guaranteed_to_owned_2'
-// CHECK: Error! Argument ownership kind does not match terminator!
-// CHECK: Terminator:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
-// CHECK: Argument:   %5 = argument of bb2 : $Builtin.NativeObject
-// CHECK: Expected convention: guaranteed.
-// CHECK: Actual convention:   owned
+// CHECK: Ill-formed SIL! Unable to compute ownership kind map for user?!
+// CHECK: For terminator users, check that successors have compatible ownership kinds.
+// CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
+// CHECK: Conv: guaranteed
 sil @checked_cast_br_mismatching_argument_guaranteed_to_owned_2 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
@@ -300,11 +310,11 @@ bb3:
 }
 
 // CHECK-LABEL: Function: 'checked_cast_br_mismatching_argument_guaranteed_to_owned_3'
-// CHECK: Error! Argument ownership kind does not match terminator!
-// CHECK: Terminator:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
-// CHECK: Argument:   %2 = argument of bb1 : $SuperKlass
-// CHECK: Expected convention: guaranteed.
-// CHECK: Actual convention:   owned
+// CHECK: Ill-formed SIL! Unable to compute ownership kind map for user?!
+// CHECK: For terminator users, check that successors have compatible ownership kinds.
+// CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
+// CHECK: Conv: guaranteed
 sil @checked_cast_br_mismatching_argument_guaranteed_to_owned_3 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
@@ -323,17 +333,17 @@ bb3:
 }
 
 // CHECK-LABEL: Function: 'checked_cast_br_mismatching_argument_owned_to_guaranteed_1'
-// CHECK: Error! Argument ownership kind does not match terminator!
-// CHECK: Terminator:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
-// CHECK: Argument:   %2 = argument of bb1 : $SuperKlass
-// CHECK: Expected convention: owned.
-// CHECK: Actual convention:   guaranteed
-// CHECK-LABEL: Function: 'checked_cast_br_mismatching_argument_owned_to_guaranteed_1'
-// CHECK: Error! Argument ownership kind does not match terminator!
-// CHECK: Terminator:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
-// CHECK: Argument:   %5 = argument of bb2 : $Builtin.NativeObject
-// CHECK: Expected convention: owned.
-// CHECK: Actual convention:   guaranteed
+// CHECK: Have operand with incompatible ownership?!
+// CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
+// CHECK: Conv: owned
+// CHECK: OwnershipMap:
+// CHECK: -- OperandOwnershipKindMap --
+// CHECK: trivial:  No.
+// CHECK: unowned:  No.
+// CHECK: owned:  No.
+// CHECK: guaranteed: Yes. Liveness: MustBeLive
+// CHECK: any: Yes. Liveness: MustBeLive
 sil @checked_cast_br_mismatching_argument_owned_to_guaranteed_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
@@ -353,11 +363,11 @@ bb3:
 
 
 // CHECK-LABEL: Function: 'checked_cast_br_mismatching_argument_owned_to_guaranteed_2'
-// CHECK: Error! Argument ownership kind does not match terminator!
-// CHECK: Terminator:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
-// CHECK: Argument:   %2 = argument of bb1 : $SuperKlass
-// CHECK: Expected convention: owned.
-// CHECK: Actual convention:   guaranteed
+// CHECK: Ill-formed SIL! Unable to compute ownership kind map for user?!
+// CHECK: For terminator users, check that successors have compatible ownership kinds.
+// CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
+// CHECK: Conv: owned
 sil @checked_cast_br_mismatching_argument_owned_to_guaranteed_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
@@ -376,11 +386,11 @@ bb3:
 }
 
 // CHECK-LABEL: Function: 'checked_cast_br_mismatching_argument_owned_to_guaranteed_3'
-// CHECK: Error! Argument ownership kind does not match terminator!
-// CHECK: Terminator:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
-// CHECK: Argument:   %5 = argument of bb2 : $Builtin.NativeObject
-// CHECK: Expected convention: owned.
-// CHECK: Actual convention:   guaranteed
+// CHECK: Ill-formed SIL! Unable to compute ownership kind map for user?!
+// CHECK: For terminator users, check that successors have compatible ownership kinds.
+// CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
+// CHECK: Conv: owned
 sil @checked_cast_br_mismatching_argument_owned_to_guaranteed_3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2

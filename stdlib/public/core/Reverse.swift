@@ -257,7 +257,7 @@ extension ReversedCollection {
   /// - Complexity: O(1)
   @inlinable
   @available(swift, introduced: 4.2)
-  public func reversed() -> Base {
+  public __consuming func reversed() -> Base {
     return _base
   }
 }
@@ -289,7 +289,7 @@ extension BidirectionalCollection {
   ///
   /// - Complexity: O(1)
   @inlinable
-  public func reversed() -> ReversedCollection<Self> {
+  public __consuming func reversed() -> ReversedCollection<Self> {
     return ReversedCollection(_base: self)
   }
 }
@@ -303,7 +303,7 @@ extension LazyCollectionProtocol
   ///
   /// - Complexity: O(1)
   @inlinable
-  public func reversed() -> LazyCollection<ReversedCollection<Elements>> {
+  public __consuming func reversed() -> LazyCollection<ReversedCollection<Elements>> {
     return ReversedCollection(_base: elements).lazy
   }
 }

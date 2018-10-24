@@ -2291,13 +2291,10 @@ class User: NSObject {
   }
 }
 
-// 'dynamic' methods cannot be @inlinable or @usableFromInline
+// 'dynamic' methods cannot be @inlinable.
 class BadClass {
   @inlinable @objc dynamic func badMethod1() {}
   // expected-error@-1 {{'@inlinable' attribute cannot be applied to 'dynamic' declarations}}
-
-  @usableFromInline @objc dynamic func badMethod2() {}
-  // expected-error@-1 {{'@usableFromInline' attribute cannot be applied to 'dynamic' declarations}}
 }
 
 @objc

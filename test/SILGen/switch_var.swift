@@ -1,5 +1,4 @@
-
-// RUN: %target-swift-emit-silgen -module-name switch_var %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -module-name switch_var %s | %FileCheck %s
 
 // TODO: Implement tuple equality in the library.
 // BLOCKED: <rdar://problem/13822406>
@@ -55,10 +54,8 @@ func test_var_1() {
   // CHECK:   load [trivial] [[READ]]
   // CHECK:   function_ref @$s10switch_var1a1xySi_tF
   // CHECK:   destroy_value [[XADDR]]
-  // CHECK:   br [[CONT:bb[0-9]+]]
     a(x: x)
   }
-  // CHECK: [[CONT]]:
   // CHECK:   function_ref @$s10switch_var1byyF
   b()
 }
@@ -97,10 +94,8 @@ func test_var_2() {
   // CHECK:   destroy_value [[YADDR]]
   // CHECK:   br [[CONT]]
     b(x: y)
-  // CHECK: [[NO_CASE2]]:
-  // CHECK:   br [[CASE3:bb[0-9]+]]
   case var z:
-  // CHECK: [[CASE3]]:
+  // CHECK: [[NO_CASE2]]:
   // CHECK:   [[ZADDR:%.*]] = alloc_box ${ var Int }
   // CHECK:   [[Z:%.*]] = project_box [[ZADDR]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[Z]]
@@ -134,10 +129,8 @@ func test_var_3() {
   // CHECK:   destroy_value [[XADDR]]
   // CHECK:   br [[CONT:bb[0-9]+]]
     aa(x: x)
-  // CHECK: [[NO_CASE1]]:
-  // CHECK:   br [[NO_CASE1_TARGET:bb[0-9]+]]
 
-  // CHECK: [[NO_CASE1_TARGET]]:
+  // CHECK: [[NO_CASE1]]:
   // CHECK:   [[YADDR:%.*]] = alloc_box ${ var Int }
   // CHECK:   [[Y:%.*]] = project_box [[YADDR]]
   // CHECK:   [[ZADDR:%.*]] = alloc_box ${ var Int }
@@ -175,9 +168,7 @@ func test_var_3() {
     bb(x: w)
   // CHECK: [[NO_CASE3]]:
   // CHECK:   destroy_value [[WADDR]]
-  // CHECK:   br [[CASE4:bb[0-9]+]]
   case var v:
-  // CHECK: [[CASE4]]:
   // CHECK:   [[VADDR:%.*]] = alloc_box ${ var (Int, Int) } 
   // CHECK:   [[V:%.*]] = project_box [[VADDR]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[V]]
@@ -290,9 +281,7 @@ func test_var_4(p p: P) {
 
   // CHECK: [[DFLT_NO_CASE3]]:
   // CHECK:   destroy_value [[ZADDR]]
-  // CHECK:   br [[CASE4:bb[0-9]+]]
   case (_, var w):
-  // CHECK: [[CASE4]]:
   // CHECK:   [[PAIR_0:%.*]] = tuple_element_addr [[PAIR]] : $*(P, Int), 0
   // CHECK:   [[WADDR:%.*]] = alloc_box ${ var Int }
   // CHECK:   [[W:%.*]] = project_box [[WADDR]]
@@ -344,10 +333,8 @@ func test_var_5() {
   // CHECK:   br [[CASE4:bb[0-9]+]]
   case _:
   // CHECK: [[CASE4]]:
-  // CHECK:   br [[CONT]]
     d()
   }
-  // CHECK: [[CONT]]:
   e()
 }
 
@@ -402,7 +389,8 @@ func test_var_return() {
 func test_let() {
   // CHECK: [[FOOS:%.*]] = function_ref @$s10switch_var4foosSSyF
   // CHECK: [[VAL:%.*]] = apply [[FOOS]]()
-  // CHECK: [[VAL_COPY:%.*]] = copy_value [[VAL]]
+  // CHECK: [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
+  // CHECK: [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
   // CHECK: function_ref @$s10switch_var6runcedSbyF
   // CHECK: cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NO_CASE1:bb[0-9]+]]
   switch foos() {
@@ -417,9 +405,8 @@ func test_let() {
     a(x: x)
   // CHECK: [[NO_CASE1]]:
   // CHECK:   destroy_value [[VAL_COPY]]
-  // CHECK:   br [[TRY_CASE2:bb[0-9]+]]
-  // CHECK: [[TRY_CASE2]]:
-  // CHECK:   [[VAL_COPY_2:%.*]] = copy_value [[VAL]]
+  // CHECK:   [[BORROWED_VAL_2:%.*]] = begin_borrow [[VAL]]
+  // CHECK:   [[VAL_COPY_2:%.*]] = copy_value [[BORROWED_VAL_2]]
   // CHECK:   function_ref @$s10switch_var6fungedSbyF
   // CHECK:   cond_br {{%.*}}, [[CASE2:bb[0-9]+]], [[NO_CASE2:bb[0-9]+]]
   case let y where funged():
@@ -433,10 +420,8 @@ func test_let() {
     b(x: y)
   // CHECK: [[NO_CASE2]]:
   // CHECK:   destroy_value [[VAL_COPY_2]]
-  // CHECK:   br [[NEXT_CASE:bb6]]
-
-  // CHECK: [[NEXT_CASE]]:
-  // CHECK:   [[VAL_COPY_3:%.*]] = copy_value [[VAL]]
+  // CHECK:   [[BORROWED_VAL_3:%.*]] = begin_borrow [[VAL]]
+  // CHECK:   [[VAL_COPY_3:%.*]] = copy_value [[BORROWED_VAL_3]]
   // CHECK:   function_ref @$s10switch_var4barsSSyF
   // CHECK:   [[BORROWED_VAL_COPY_3:%.*]] = begin_borrow [[VAL_COPY_3]]
   // CHECK:   store_borrow [[BORROWED_VAL_COPY_3]] to [[IN_ARG:%.*]] :
@@ -452,9 +437,7 @@ func test_let() {
     c()
   // CHECK: [[NO_CASE3]]:
   // CHECK:   destroy_value [[VAL_COPY_3]]
-  // CHECK:   br [[NEXT_CASE:bb9+]]
 
-  // CHECK: [[NEXT_CASE]]:
   case _:
     // CHECK:   destroy_value [[VAL]]
     // CHECK:   function_ref @$s10switch_var1dyyF
@@ -472,30 +455,31 @@ func test_mixed_let_var() {
   // CHECK: bb0:
   // CHECK:   [[FOOS:%.*]] = function_ref @$s10switch_var4foosSSyF
   // CHECK:   [[VAL:%.*]] = apply [[FOOS]]()
+  // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
   switch foos() {
 
   // First pattern.
   // CHECK:   [[BOX:%.*]] = alloc_box ${ var String }, var, name "x"
   // CHECK:   [[PBOX:%.*]] = project_box [[BOX]]
-  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
+  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
   // CHECK:   store [[VAL_COPY]] to [init] [[PBOX]]
   // CHECK:   cond_br {{.*}}, [[CASE1:bb[0-9]+]], [[NOCASE1:bb[0-9]+]]
   case var x where runced():
   // CHECK: [[CASE1]]:
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOX]]
   // CHECK:   [[X:%.*]] = load [copy] [[READ]]
+  // CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
   // CHECK:   [[A:%.*]] = function_ref @$s10switch_var1a1xySS_tF
-  // CHECK:   apply [[A]]([[X]])
+  // CHECK:   apply [[A]]([[BORROWED_X]])
   // CHECK:   destroy_value [[BOX]]
   // CHECK:   br [[CONT:bb[0-9]+]]
     a(x: x)
 
   // CHECK: [[NOCASE1]]:
   // CHECK:   destroy_value [[BOX]]
-  // CHECK:   br [[NEXT_PATTERN:bb[0-9]+]]
 
-  // CHECK: [[NEXT_PATTERN]]:
-  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
+  // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
+  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
   // CHECK:   cond_br {{.*}}, [[CASE2:bb[0-9]+]], [[NOCASE2:bb[0-9]+]]
   case let y where funged():
 
@@ -511,10 +495,9 @@ func test_mixed_let_var() {
 
   // CHECK: [[NOCASE2]]:
   // CHECK:   destroy_value [[VAL_COPY]]
-  // CHECK:   br [[NEXT_CASE:bb[0-9]+]]
 
-  // CHECK: [[NEXT_CASE]]
-  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[VAL]]
+  // CHECK:   [[BORROWED_VAL:%.*]] = begin_borrow [[VAL]]
+  // CHECK:   [[VAL_COPY:%.*]] = copy_value [[BORROWED_VAL]]
   // CHECK:   [[BORROWED_VAL_COPY:%.*]] = begin_borrow [[VAL_COPY]]
   // CHECK:   store_borrow [[BORROWED_VAL_COPY]] to [[TMP_VAL_COPY_ADDR:%.*]] :
   // CHECK:   apply {{.*}}<String>({{.*}}, [[TMP_VAL_COPY_ADDR]])
@@ -530,9 +513,7 @@ func test_mixed_let_var() {
 
   // CHECK: [[NOCASE3]]:
   // CHECK:   destroy_value [[VAL_COPY]]
-  // CHECK:   br [[NEXT_CASE:bb[0-9]+]]
 
-  // CHECK: [[NEXT_CASE]]:
   // CHECK:   destroy_value [[VAL]]
   // CHECK:   [[D_FUNC:%.*]] = function_ref @$s10switch_var1dyyF : $@convention(thin) () -> ()
   // CHECK:   apply [[D_FUNC]]()
@@ -572,36 +553,32 @@ func test_multiple_patterns1() {
   }
 }
 
-// FIXME(integers): the following checks should be updated for the new integer
-// protocols. <rdar://problem/29939484>
-// XCHECK-LABEL: sil hidden @$s10switch_var23test_multiple_patterns2yyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden @$s10switch_var23test_multiple_patterns2yyF : $@convention(thin) () -> () {
 func test_multiple_patterns2() {
   let t1 = 2
   let t2 = 4
-  // XCHECK:   debug_value [[T1:%.*]] :
-  // XCHECK:   debug_value [[T2:%.*]] :
+  // CHECK:   debug_value [[T1:%.+]] :
+  // CHECK:   debug_value [[T2:%.+]] :
   switch (0,0) {
-    // XCHECK-NOT: br bb
+    // CHECK-NOT: br bb
   case (_, let x) where x > t1, (let x, _) where x > t2:
-    // XCHECK:   [[FIRST_X:%.*]] = tuple_extract {{%.*}} : $(Int, Int), 1
-    // XCHECK:   debug_value [[FIRST_X]] :
-    // XCHECK:   apply {{%.*}}([[FIRST_X]], [[T1]])
-    // XCHECK:   cond_br {{%.*}}, [[FIRST_MATCH_CASE:bb[0-9]+]], [[FIRST_FAIL:bb[0-9]+]]
-    // XCHECK:   [[FIRST_MATCH_CASE]]:
-    // XCHECK:     br [[CASE_BODY:bb[0-9]+]]([[FIRST_X]] : $Int)
-    // XCHECK:   [[FIRST_FAIL]]:
-    // XCHECK:     debug_value [[SECOND_X:%.*]] :
-    // XCHECK:     apply {{%.*}}([[SECOND_X]], [[T2]])
-    // XCHECK:     cond_br {{%.*}}, [[SECOND_MATCH_CASE:bb[0-9]+]], [[SECOND_FAIL:bb[0-9]+]]
-    // XCHECK:   [[SECOND_MATCH_CASE]]:
-    // XCHECK:     br [[CASE_BODY]]([[SECOND_X]] : $Int)
-    // XCHECK:   [[CASE_BODY]]([[BODY_VAR:%.*]] : $Int):
-    // XCHECK:     [[A:%.*]] = function_ref @$s10switch_var1aySi1x_tF
-    // XCHECK:     apply [[A]]([[BODY_VAR]])
+    // CHECK:   ([[FIRST:%[0-9]+]], [[SECOND:%[0-9]+]]) = destructure_tuple {{%.+}} : $(Int, Int)
+    // CHECK:   apply {{%.+}}([[SECOND]], [[T1]], {{%.+}})
+    // CHECK:   cond_br {{%.*}}, [[FIRST_MATCH_CASE:bb[0-9]+]], [[FIRST_FAIL:bb[0-9]+]]
+    // CHECK:   [[FIRST_MATCH_CASE]]:
+    // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[SECOND]] : $Int)
+    // CHECK:   [[FIRST_FAIL]]:
+    // CHECK:     apply {{%.*}}([[FIRST]], [[T2]], {{%.+}})
+    // CHECK:     cond_br {{%.*}}, [[SECOND_MATCH_CASE:bb[0-9]+]], [[SECOND_FAIL:bb[0-9]+]]
+    // CHECK:   [[SECOND_MATCH_CASE]]:
+    // CHECK:     br [[CASE_BODY]]([[FIRST]] : $Int)
+    // CHECK:   [[CASE_BODY]]([[BODY_VAR:%.*]] : @trivial $Int):
+    // CHECK:     [[A:%.*]] = function_ref @$s10switch_var1a1xySi_tF
+    // CHECK:     apply [[A]]([[BODY_VAR]])
     a(x: x)
   default:
-    // XCHECK:   [[SECOND_FAIL]]:
-    // XCHECK:     function_ref @$s10switch_var1byyF
+    // CHECK:   [[SECOND_FAIL]]:
+    // CHECK:     function_ref @$s10switch_var1byyF
     b()
   }
 }
@@ -618,20 +595,16 @@ func test_multiple_patterns3() {
   switch f {
     // CHECK:   switch_enum {{%.*}} : $Foo, case #Foo.A!enumelt.1: [[A:bb[0-9]+]], case #Foo.B!enumelt.1: [[B:bb[0-9]+]], case #Foo.C!enumelt.1: [[C:bb[0-9]+]]
   case .A(let x, let n), .B(let n, let x), .C(_, let x, let n):
-    // CHECK:   [[A]]({{%.*}} : @trivial $(Int, Double)):
-    // CHECK:     [[A_X:%.*]] = tuple_extract
-    // CHECK:     [[A_N:%.*]] = tuple_extract
+    // CHECK:   [[A]]([[A_TUP:%.*]] : @trivial $(Int, Double)):
+    // CHECK:     ([[A_X:%.*]], [[A_N:%.*]]) = destructure_tuple [[A_TUP]]
     // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[A_X]] : $Int, [[A_N]] : $Double)
     
-    // CHECK:   [[B]]({{%.*}} : @trivial $(Double, Int)):
-    // CHECK:     [[B_N:%.*]] = tuple_extract
-    // CHECK:     [[B_X:%.*]] = tuple_extract
+    // CHECK:   [[B]]([[B_TUP:%.*]] : @trivial $(Double, Int)):
+    // CHECK:     ([[B_N:%.*]], [[B_X:%.*]]) = destructure_tuple [[B_TUP]]
     // CHECK:     br [[CASE_BODY]]([[B_X]] : $Int, [[B_N]] : $Double)
 
-    // CHECK:   [[C]]({{%.*}} : @trivial $(Int, Int, Double)):
-    // CHECK:     [[C__:%.*]] = tuple_extract
-    // CHECK:     [[C_X:%.*]] = tuple_extract
-    // CHECK:     [[C_N:%.*]] = tuple_extract
+    // CHECK:   [[C]]([[C_TUP:%.*]] : @trivial $(Int, Int, Double)):
+    // CHECK:     ([[C__:%.*]], [[C_X:%.*]], [[C_N:%.*]]) = destructure_tuple [[C_TUP]]
     // CHECK:     br [[CASE_BODY]]([[C_X]] : $Int, [[C_N]] : $Double)
 
     // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : @trivial $Int, [[BODY_N:%.*]] : @trivial $Double):
@@ -652,27 +625,23 @@ func test_multiple_patterns4() {
   switch b {
     // CHECK:   switch_enum {{%.*}} : $Bar, case #Bar.Y!enumelt.1: [[Y:bb[0-9]+]], case #Bar.Z!enumelt.1: [[Z:bb[0-9]+]]
   case .Y(.A(let x, _), _), .Y(.B(_, let x), _), .Y(.C, let x), .Z(let x, _):
-    // CHECK:   [[Y]]({{%.*}} : @trivial $(Foo, Int)):
-    // CHECK:     [[Y_F:%.*]] = tuple_extract
-    // CHECK:     [[Y_X:%.*]] = tuple_extract
+    // CHECK:   [[Y]]([[Y_TUP:%.*]] : @trivial $(Foo, Int)):
+    // CHECK:     ([[Y_F:%.*]], [[Y_X:%.*]]) = destructure_tuple [[Y_TUP]]
     // CHECK:     switch_enum [[Y_F]] : $Foo, case #Foo.A!enumelt.1: [[A:bb[0-9]+]], case #Foo.B!enumelt.1: [[B:bb[0-9]+]], case #Foo.C!enumelt.1: [[C:bb[0-9]+]]
     
-    // CHECK:   [[A]]({{%.*}} : @trivial $(Int, Double)):
-    // CHECK:     [[A_X:%.*]] = tuple_extract
-    // CHECK:     [[A_N:%.*]] = tuple_extract
+    // CHECK:   [[A]]([[A_TUP:%.*]] : @trivial $(Int, Double)):
+    // CHECK:     ([[A_X:%.*]], [[A_N:%.*]]) = destructure_tuple [[A_TUP]]
     // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[A_X]] : $Int)
     
-    // CHECK:   [[B]]({{%.*}} : @trivial $(Double, Int)):
-    // CHECK:     [[B_N:%.*]] = tuple_extract
-    // CHECK:     [[B_X:%.*]] = tuple_extract
+    // CHECK:   [[B]]([[B_TUP:%.*]] : @trivial $(Double, Int)):
+    // CHECK:     ([[B_N:%.*]], [[B_X:%.*]]) = destructure_tuple [[B_TUP]]
     // CHECK:     br [[CASE_BODY]]([[B_X]] : $Int)
     
     // CHECK:   [[C]]({{%.*}} : @trivial $(Int, Int, Double)):
     // CHECK:     br [[CASE_BODY]]([[Y_X]] : $Int)
 
-    // CHECK:   [[Z]]({{%.*}} : @trivial $(Int, Foo)):
-    // CHECK:     [[Z_X:%.*]] = tuple_extract
-    // CHECK:     [[Z_F:%.*]] = tuple_extract
+    // CHECK:   [[Z]]([[Z_TUP:%.*]] : @trivial $(Int, Foo)):
+    // CHECK:     ([[Z_X:%.*]], [[Z_F:%.*]]) = destructure_tuple [[Z_TUP]]
     // CHECK:     br [[CASE_BODY]]([[Z_X]] : $Int)
 
     // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : @trivial $Int):
@@ -690,27 +659,23 @@ func test_multiple_patterns5() {
   switch b {
     // CHECK:   switch_enum {{%.*}} : $Bar, case #Bar.Y!enumelt.1: [[Y:bb[0-9]+]], case #Bar.Z!enumelt.1: [[Z:bb[0-9]+]]
   case .Y(.A(var x, _), _), .Y(.B(_, var x), _), .Y(.C, var x), .Z(var x, _):
-    // CHECK:   [[Y]]({{%.*}} : @trivial $(Foo, Int)):
-    // CHECK:     [[Y_F:%.*]] = tuple_extract
-    // CHECK:     [[Y_X:%.*]] = tuple_extract
+    // CHECK:   [[Y]]([[Y_TUP:%.*]] : @trivial $(Foo, Int)):
+    // CHECK:     ([[Y_F:%.*]], [[Y_X:%.*]]) = destructure_tuple [[Y_TUP]]
     // CHECK:     switch_enum [[Y_F]] : $Foo, case #Foo.A!enumelt.1: [[A:bb[0-9]+]], case #Foo.B!enumelt.1: [[B:bb[0-9]+]], case #Foo.C!enumelt.1: [[C:bb[0-9]+]]
     
-    // CHECK:   [[A]]({{%.*}} : @trivial $(Int, Double)):
-    // CHECK:     [[A_X:%.*]] = tuple_extract
-    // CHECK:     [[A_N:%.*]] = tuple_extract
+    // CHECK:   [[A]]([[A_TUP:%.*]] : @trivial $(Int, Double)):
+    // CHECK:     ([[A_X:%.*]], [[A_N:%.*]]) = destructure_tuple [[A_TUP]]
     // CHECK:     br [[CASE_BODY:bb[0-9]+]]([[A_X]] : $Int)
     
-    // CHECK:   [[B]]({{%.*}} : @trivial $(Double, Int)):
-    // CHECK:     [[B_N:%.*]] = tuple_extract
-    // CHECK:     [[B_X:%.*]] = tuple_extract
+    // CHECK:   [[B]]([[B_TUP:%.*]] : @trivial $(Double, Int)):
+    // CHECK:     ([[B_N:%.*]], [[B_X:%.*]]) = destructure_tuple [[B_TUP]]
     // CHECK:     br [[CASE_BODY]]([[B_X]] : $Int)
     
     // CHECK:   [[C]]({{%.*}} : @trivial $(Int, Int, Double)):
     // CHECK:     br [[CASE_BODY]]([[Y_X]] : $Int)
     
-    // CHECK:   [[Z]]({{%.*}} : @trivial $(Int, Foo)):
-    // CHECK:     [[Z_X:%.*]] = tuple_extract
-    // CHECK:     [[Z_F:%.*]] = tuple_extract
+    // CHECK:   [[Z]]([[Z_TUP:%.*]] : @trivial $(Int, Foo)):
+    // CHECK:     ([[Z_X:%.*]], [[Z_F:%.*]]) = destructure_tuple [[Z_TUP]]
     // CHECK:     br [[CASE_BODY]]([[Z_X]] : $Int)
     
     // CHECK:   [[CASE_BODY]]([[BODY_X:%.*]] : @trivial $Int):

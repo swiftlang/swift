@@ -41,6 +41,9 @@ class GenericCloner
   llvm::SmallDenseMap<const SILDebugScope *, const SILDebugScope *, 8>
       RemappedScopeCache;
 
+  llvm::SmallVector<AllocStackInst *, 8> AllocStacks;
+  AllocStackInst *ReturnValueAddr = nullptr;
+
 public:
   friend class SILCloner<GenericCloner>;
 
@@ -70,11 +73,12 @@ public:
     GenericCloner SC(FuncBuilder, F, Serialized, ReInfo, ParamSubs,
                      NewName, Callback);
     SC.populateCloned();
-    SC.cleanUp(SC.getCloned());
     return SC.getCloned();
   }
 
 protected:
+  void visitTerminator(SILBasicBlock *BB);
+
   // FIXME: We intentionally call SILClonerWithScopes here to ensure
   //        the debug scopes are set correctly for cloned
   //        functions. TypeSubstCloner, SILClonerWithScopes, and

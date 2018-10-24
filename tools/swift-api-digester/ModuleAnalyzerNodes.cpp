@@ -39,22 +39,37 @@ struct swift::ide::api::SDKNodeInitInfo {
   std::vector<TypeAttrKind> TypeAttrs;
 
   SDKNodeInitInfo(SDKContext &Ctx) : Ctx(Ctx) {}
+  SDKNodeInitInfo(SDKContext &Ctx, Decl *D);
   SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD);
-  SDKNodeInitInfo(SDKContext &Ctx, Type Ty, bool IsImplicitlyUnwrappedOptional,
-                  bool hasDefaultArgument);
+  SDKNodeInitInfo(SDKContext &Ctx, OperatorDecl *D);
+  SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info = TypeInitInfo());
   SDKNode* createSDKNode(SDKNodeKind Kind);
 };
 
 SDKContext::SDKContext(CheckerOptions Opts): Diags(SourceMgr), Opts(Opts) {
-#define ADD(NAME) ABIAttrs.push_back({DeclAttrKind::DAK_##NAME, \
+#define ADD(NAME) BreakingAttrs.push_back({DeclAttrKind::DAK_##NAME, \
       getAttrName(DeclAttrKind::DAK_##NAME)});
-  ADD(ObjC)
-  ADD(FixedLayout)
-  ADD(Frozen)
-  ADD(Dynamic)
+  // Add attributes that both break ABI and API.
+  ADD(Final)
+  if (checkingABI()) {
+    // Add ABI-breaking-specific attributes.
+    ADD(ObjC)
+    ADD(FixedLayout)
+    ADD(Frozen)
+    ADD(Dynamic)
+  }
 #undef ADD
 }
 
+void SDKNodeRoot::registerDescendant(SDKNode *D) {
+  // Operator doesn't have usr
+  if (isa<SDKNodeDeclOperator>(D))
+    return;
+  if (auto DD = dyn_cast<SDKNodeDecl>(D)) {
+    assert(!DD->getUsr().empty());
+    DescendantDeclTable[DD->getUsr()].insert(DD);
+  }
+}
 
 SDKNode::SDKNode(SDKNodeInitInfo Info, SDKNodeKind Kind): Ctx(Info.Ctx),
   Name(Info.Name), PrintedName(Info.PrintedName), TheKind(unsigned(Kind)) {}
@@ -71,11 +86,12 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
         IsOpen(Info.IsOpen),
         IsInternal(Info.IsInternal),
         ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
-        GenericSig(Info.GenericSig) {}
+        GenericSig(Info.GenericSig), FixedBinaryOrder(Info.FixedBinaryOrder) {}
 
 SDKNodeType::SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind):
   SDKNode(Info, Kind), TypeAttributes(Info.TypeAttrs),
-  HasDefaultArg(Info.HasDefaultArg) {}
+  HasDefaultArg(Info.HasDefaultArg),
+  ParamValueOwnership(Info.ParamValueOwnership) {}
 
 SDKNodeTypeNominal::SDKNodeTypeNominal(SDKNodeInitInfo Info):
   SDKNodeType(Info, SDKNodeKind::TypeNominal), USR(Info.Usr) {}
@@ -86,26 +102,30 @@ SDKNodeTypeFunc::SDKNodeTypeFunc(SDKNodeInitInfo Info):
 SDKNodeTypeAlias::SDKNodeTypeAlias(SDKNodeInitInfo Info):
   SDKNodeType(Info, SDKNodeKind::TypeAlias) {}
 
-SDKNodeDeclType::SDKNodeDeclType(SDKNodeInitInfo Info): 
+SDKNodeDeclType::SDKNodeDeclType(SDKNodeInitInfo Info):
   SDKNodeDecl(Info, SDKNodeKind::DeclType), SuperclassUsr(Info.SuperclassUsr),
   SuperclassNames(Info.SuperclassNames),
   ConformingProtocols(Info.ConformingProtocols),
   EnumRawTypeName(Info.EnumRawTypeName) {}
 
+SDKNodeDeclOperator::SDKNodeDeclOperator(SDKNodeInitInfo Info):
+  SDKNodeDecl(Info, SDKNodeKind::DeclOperator) {}
+
 SDKNodeDeclTypeAlias::SDKNodeDeclTypeAlias(SDKNodeInitInfo Info):
   SDKNodeDecl(Info, SDKNodeKind::DeclTypeAlias) {}
 
 SDKNodeDeclVar::SDKNodeDeclVar(SDKNodeInitInfo Info): 
-  SDKNodeDecl(Info, SDKNodeKind::DeclVar),
-  FixedBinaryOrder(Info.FixedBinaryOrder), IsLet(Info.IsLet),
-  HasStorage(Info.HasStorage) {}
+  SDKNodeDecl(Info, SDKNodeKind::DeclVar), IsLet(Info.IsLet),
+  HasStorage(Info.HasStorage), HasDidSet(Info.HasDidset),
+  HasWillSet(Info.HasWillset) {}
 
 SDKNodeDeclAbstractFunc::SDKNodeDeclAbstractFunc(SDKNodeInitInfo Info,
   SDKNodeKind Kind): SDKNodeDecl(Info, Kind), IsThrowing(Info.IsThrowing),
-                     IsMutating(Info.IsMutating), SelfIndex(Info.SelfIndex) {}
+                     SelfIndex(Info.SelfIndex) {}
 
 SDKNodeDeclFunction::SDKNodeDeclFunction(SDKNodeInitInfo Info):
-  SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclFunction) {}
+  SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclFunction),
+  FuncSelfKind(Info.FuncSelfKind) {}
 
 SDKNodeDeclConstructor::SDKNodeDeclConstructor(SDKNodeInitInfo Info):
   SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclConstructor) {}
@@ -121,7 +141,8 @@ SDKNodeDeclAssociatedType::SDKNodeDeclAssociatedType(SDKNodeInitInfo Info):
 
 SDKNodeDeclSubscript::SDKNodeDeclSubscript(SDKNodeInitInfo Info):
   SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclSubscript),
-  HasSetter(Info.HasSetter), HasStorage(Info.HasStorage) {}
+  HasSetter(Info.HasSetter), HasStorage(Info.HasStorage),
+  HasDidSet(Info.HasDidset), HasWillSet(Info.HasWillset) {}
 
 StringRef SDKNodeDecl::getHeaderName() const {
   if (Location.empty())
@@ -297,6 +318,10 @@ bool SDKNodeType::hasTypeAttribute(TypeAttrKind DAKind) const {
     TypeAttributes.end();
 }
 
+StringRef SDKNodeType::getParamValueOwnership() const {
+  return ParamValueOwnership.empty() ? "Default" : ParamValueOwnership;
+}
+
 StringRef SDKNodeType::getTypeRoleDescription() const {
   assert(isTopLevelType());
   auto P = cast<SDKNodeDecl>(getParent());
@@ -306,6 +331,7 @@ StringRef SDKNodeType::getTypeRoleDescription() const {
   case SDKNodeKind::TypeFunc:
   case SDKNodeKind::TypeAlias:
   case SDKNodeKind::DeclType:
+  case SDKNodeKind::DeclOperator:
     llvm_unreachable("Type Parent is wrong");
   case SDKNodeKind::DeclFunction:
   case SDKNodeKind::DeclConstructor:
@@ -628,13 +654,29 @@ static bool hasSameContents(ArrayRef<StringRef> Left,
   return LeftMinusRight.empty() && RightMinusLeft.empty();
 }
 
-bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) {
+static bool hasSameParameterFlags(const SDKNodeType *Left, const SDKNodeType *Right) {
+  if (Left->hasDefaultArgument() != Right->hasDefaultArgument())
+    return false;
+  if (Left->getParamValueOwnership() != Right->getParamValueOwnership())
+    return false;
+
+  return true;
+}
+
+static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) {
   auto *LeftAlias = dyn_cast<SDKNodeTypeAlias>(&L);
   auto *RightAlias = dyn_cast<SDKNodeTypeAlias>(&R);
   if (LeftAlias || RightAlias) {
+    auto Left = L.getAs<SDKNodeType>();
+    auto Right = R.getAs<SDKNodeType>();
+
+    // First compare the parameter attributes.
+    if (!hasSameParameterFlags(Left, Right))
+      return false;
+
     // Comparing the underlying types if any of the inputs are alias.
-    const SDKNode *Left = LeftAlias ? LeftAlias->getUnderlyingType() : &L;
-    const SDKNode *Right = RightAlias ? RightAlias->getUnderlyingType() : &R;
+    Left = LeftAlias ? LeftAlias->getUnderlyingType() : Left;
+    Right = RightAlias ? RightAlias->getUnderlyingType() : Right;
     return *Left == *Right;
   }
 
@@ -650,7 +692,7 @@ bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
       auto Right = R.getAs<SDKNodeType>();
       if (Left->hasAttributeChange(*Right))
         return false;
-      if (Left->hasDefaultArgument() != Right->hasDefaultArgument())
+      if (!hasSameParameterFlags(Left, Right))
         return false;
       if (Left->getPrintedName() == Right->getPrintedName())
         return true;
@@ -658,19 +700,22 @@ bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         Left->hasSameChildren(*Right);
     }
 
-    case SDKNodeKind::DeclFunction:
+    case SDKNodeKind::DeclFunction: {
+      auto Left = L.getAs<SDKNodeDeclFunction>();
+      auto Right = R.getAs<SDKNodeDeclFunction>();
+      if (Left->getSelfAccessKind() != Right->getSelfAccessKind())
+        return false;
+      LLVM_FALLTHROUGH;
+    }
     case SDKNodeKind::DeclConstructor:
     case SDKNodeKind::DeclGetter:
     case SDKNodeKind::DeclSetter: {
       auto Left = L.getAs<SDKNodeDeclAbstractFunc>();
       auto Right = R.getAs<SDKNodeDeclAbstractFunc>();
-      if (Left->isMutating() ^ Right->isMutating())
-        return false;
       if (Left->isThrowing() ^ Right->isThrowing())
         return false;
       LLVM_FALLTHROUGH;
     }
-
     case SDKNodeKind::DeclVar: {
       if (Ctx.checkingABI()) {
         // If we're checking ABI, the definition order matters.
@@ -678,10 +723,6 @@ bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         // them equal because we need to check definition orders.
         if (auto *LV = dyn_cast<SDKNodeDeclVar>(&L)) {
           if (auto *RV = dyn_cast<SDKNodeDeclVar>(&R)) {
-            if (LV->hasFixedBinaryOrder() && RV->hasFixedBinaryOrder()) {
-              if (LV->getFixedBinaryOrder() != RV->getFixedBinaryOrder())
-                return false;
-            }
             if (LV->isLet() != RV->isLet())
               return false;
             if (LV->hasStorage() != RV->hasStorage())
@@ -713,12 +754,11 @@ bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         if (auto *Right = dyn_cast<SDKNodeDeclSubscript>(&R)) {
           if (Left->hasSetter() != Right->hasSetter())
             return false;
-          if (Left->hasStorage() != Right->hasStorage())
-            return false;
         }
       }
       LLVM_FALLTHROUGH;
     }
+    case SDKNodeKind::DeclOperator:
     case SDKNodeKind::DeclTypeAlias: {
       auto Left = L.getAs<SDKNodeDecl>();
       auto Right = R.getAs<SDKNodeDecl>();
@@ -734,6 +774,12 @@ bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         return false;
       if (Left->isInternal() != Right->isInternal())
         return false;
+      if (Left->hasFixedBinaryOrder() != Right->hasFixedBinaryOrder())
+        return false;
+      if (Left->hasFixedBinaryOrder()) {
+        if (Left->getFixedBinaryOrder() != Right->getFixedBinaryOrder())
+          return false;
+      }
       LLVM_FALLTHROUGH;
     }
     case SDKNodeKind::Root: {
@@ -742,7 +788,7 @@ bool static isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
     }
   }
 
-  llvm_unreachable("Unhanlded SDKNodeKind in switch.");
+  llvm_unreachable("Unhandled SDKNodeKind in switch.");
 }
 
 bool SDKContext::isEqual(const SDKNode &Left, const SDKNode &Right) {
@@ -750,6 +796,10 @@ bool SDKContext::isEqual(const SDKNode &Left, const SDKNode &Right) {
     EqualCache[&Left][&Right] = isSDKNodeEqual(*this, Left, Right);
   }
   return EqualCache[&Left][&Right];
+}
+
+AccessLevel SDKContext::getAccessLevel(const ValueDecl *VD) const {
+  return checkingABI() ? VD->getEffectiveAccess() : VD->getFormalAccess();
 }
 
 bool SDKNode::operator==(const SDKNode &Other) const {
@@ -820,14 +870,14 @@ static StringRef calculateUsr(SDKContext &Ctx, ValueDecl *VD) {
   return StringRef();
 }
 
-static StringRef calculateLocation(SDKContext &SDKCtx, ValueDecl *VD) {
+static StringRef calculateLocation(SDKContext &SDKCtx, Decl *D) {
   if (SDKCtx.getOpts().AvoidLocation)
     return StringRef();
-  auto &Ctx = VD->getASTContext();
+  auto &Ctx = D->getASTContext();
   auto &Importer = static_cast<ClangImporter &>(*Ctx.getClangModuleLoader());
 
   clang::SourceManager &SM = Importer.getClangPreprocessor().getSourceManager();
-  if (ClangNode CN = VD->getClangNode()) {
+  if (ClangNode CN = D->getClangNode()) {
     clang::SourceLocation Loc = CN.getLocation();
     Loc = SM.getFileLoc(Loc);
     if (Loc.isValid())
@@ -892,13 +942,6 @@ static bool isFuncThrowing(ValueDecl *VD) {
   return false;
 }
 
-static bool isFuncMutating(ValueDecl *VD) {
-  if (auto AF = dyn_cast<FuncDecl>(VD)) {
-    return AF->isMutating();
-  }
-  return false;
-}
-
 static Optional<uint8_t> getSelfIndex(ValueDecl *VD) {
   if (auto AF = dyn_cast<AbstractFunctionDecl>(VD)) {
     if (AF->isImportAsInstanceMember())
@@ -926,10 +969,10 @@ Requirement getCanonicalRequirement(Requirement &Req) {
   }
 }
 
-static StringRef printGenericSignature(SDKContext &Ctx, ValueDecl *VD) {
+static StringRef printGenericSignature(SDKContext &Ctx, Decl *D) {
   llvm::SmallString<32> Result;
   llvm::raw_svector_ostream OS(Result);
-  if (auto *PD = dyn_cast<ProtocolDecl>(VD)) {
+  if (auto *PD = dyn_cast<ProtocolDecl>(D)) {
     if (PD->getRequirementSignature().empty())
       return StringRef();
     OS << "<";
@@ -949,7 +992,7 @@ static StringRef printGenericSignature(SDKContext &Ctx, ValueDecl *VD) {
     return Ctx.buffer(OS.str());
   }
 
-  if (auto *GC = VD->getAsGenericContext()) {
+  if (auto *GC = D->getAsGenericContext()) {
     if (auto *Sig = GC->getGenericSignature()) {
       if (Ctx.checkingABI())
         Sig->getCanonicalSignature()->print(OS);
@@ -961,45 +1004,68 @@ static StringRef printGenericSignature(SDKContext &Ctx, ValueDecl *VD) {
   return StringRef();
 }
 
-static Optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) {
-  auto D = VD->getDeclContext()->getAsDecl();
-  if (!D)
+static Optional<uint8_t> getSimilarMemberCount(NominalTypeDecl *NTD,
+                                               ValueDecl *VD,
+                                        llvm::function_ref<bool(Decl*)> Check) {
+  if (!Check(VD))
     return None;
-
-  if (auto *ED = dyn_cast<EnumDecl>(D)) {
-    auto Check = [](Decl *M) {
-      return isa<EnumElementDecl>(M);
-    };
-    if (!ED->isResilient() && Check(VD)) {
-      auto Members = ED->getMembers();
-      auto End = std::find(Members.begin(), Members.end(), VD);
-      assert(End != Members.end());
-      return std::count_if(Members.begin(), End, Check);
-    }
-  }
-  if (auto *SD = dyn_cast<StructDecl>(D)) {
-    auto Check = [](Decl *M) {
-      if (auto *STD = dyn_cast<AbstractStorageDecl>(M)) {
-        return STD->hasStorage() && !STD->isStatic();
-      }
-      return false;
-    };
-    if (!SD->isResilient() && Check(VD)) {
-      auto Members = SD->getMembers();
-      auto End = std::find(Members.begin(), Members.end(), VD);
-      assert(End != Members.end());
-      return std::count_if(Members.begin(), End, Check);
-    }
-  }
-  return llvm::None;
+  auto Members = NTD->getMembers();
+  auto End = std::find(Members.begin(), Members.end(), VD);
+  assert(End != Members.end());
+  return std::count_if(Members.begin(), End, Check);
 }
 
-SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty,
-                                 bool IsImplicitlyUnwrappedOptional = false,
-                                 bool hasDefaultArgument = false) :
-    Ctx(Ctx), Name(getTypeName(Ctx, Ty, IsImplicitlyUnwrappedOptional)),
-    PrintedName(getPrintedName(Ctx, Ty, IsImplicitlyUnwrappedOptional)),
-    HasDefaultArg(hasDefaultArgument) {
+Optional<uint8_t> SDKContext::getFixedBinaryOrder(ValueDecl *VD) const {
+  // We don't need fixed binary order when checking API stability.
+  if (!checkingABI())
+    return None;
+  auto *NTD = dyn_cast_or_null<NominalTypeDecl>(VD->getDeclContext()->
+    getAsDecl());
+
+  if (!NTD || isa<ProtocolDecl>(NTD) || NTD->isResilient())
+    return None;
+
+  // The relative order of stored properties matters for non-resilient type.
+  auto isStored = [](Decl *M) {
+    if (auto *STD = dyn_cast<AbstractStorageDecl>(M)) {
+      return STD->hasStorage() && !STD->isStatic();
+    }
+    return false;
+  };
+  // The relative order of non-final instance functions matters for non-resilient
+  // class.
+  auto isNonfinalFunc = [](Decl *M) {
+    if (auto *FD = dyn_cast<FuncDecl>(M)) {
+      return !isa<AccessorDecl>(FD) && !FD->isFinal();
+    }
+    return false;
+  };
+  switch (NTD->getKind()) {
+  case DeclKind::Enum: {
+    return getSimilarMemberCount(NTD, VD, [](Decl *M) {
+      return isa<EnumElementDecl>(M);
+    });
+  }
+  case DeclKind::Struct: {
+    return getSimilarMemberCount(NTD, VD, isStored);
+  }
+  case DeclKind::Class: {
+    if (auto count = getSimilarMemberCount(NTD, VD, isStored)) {
+      return count;
+    } else {
+      return getSimilarMemberCount(NTD, VD, isNonfinalFunc);
+    }
+  }
+  default:
+    llvm_unreachable("bad nominal type kind.");
+  }
+}
+
+SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info) :
+    Ctx(Ctx), Name(getTypeName(Ctx, Ty, Info.IsImplicitlyUnwrappedOptional)),
+    PrintedName(getPrintedName(Ctx, Ty, Info.IsImplicitlyUnwrappedOptional)),
+    ParamValueOwnership(Info.ValueOwnership),
+    HasDefaultArg(Info.hasDefaultArgument) {
   if (isFunctionTypeNoEscape(Ty))
     TypeAttrs.push_back(TypeAttrKind::TAK_noescape);
   // If this is a nominal type, get its Usr.
@@ -1008,23 +1074,39 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty,
   }
 }
 
+SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
+      Ctx(Ctx), DKind(D->getKind()),
+      Location(calculateLocation(Ctx, D)),
+      ModuleName(D->getModuleContext()->getName().str()),
+      GenericSig(printGenericSignature(Ctx, D)),
+      IsImplicit(D->isImplicit()),
+      IsDeprecated(D->getAttrs().getDeprecated(D->getASTContext())) {
+  // Capture all attributes.
+  auto AllAttrs = D->getAttrs();
+  std::transform(AllAttrs.begin(), AllAttrs.end(), std::back_inserter(DeclAttrs),
+                 [](DeclAttribute *attr) { return attr->getKind(); });
+}
+
+SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, OperatorDecl *OD):
+    SDKNodeInitInfo(Ctx, cast<Decl>(OD)) {
+  Name = OD->getName().str();
+  PrintedName = OD->getName().str();
+}
+
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
-    : Ctx(Ctx), DKind(VD->getKind()),
-      Name(VD->hasName() ? getEscapedName(VD->getBaseName()) : Ctx.buffer("_")),
-      PrintedName(getPrintedName(Ctx, VD)),
-      Usr(calculateUsr(Ctx, VD)), Location(calculateLocation(Ctx, VD)),
-      ModuleName(VD->getModuleContext()->getName().str()),
-      GenericSig(printGenericSignature(Ctx, VD)),
-      IsImplicit(VD->isImplicit()),
-      IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
-      IsStatic(VD->isStatic()),
-      IsDeprecated(VD->getAttrs().getDeprecated(VD->getASTContext())),
-      IsOverriding(VD->getOverriddenDecl()),
-      IsProtocolReq(isa<ProtocolDecl>(VD->getDeclContext()) && VD->isProtocolRequirement()),
-      IsOpen(VD->getFormalAccess() == AccessLevel::Open),
-      IsInternal(VD->getFormalAccess() < AccessLevel::Public),
-      SelfIndex(getSelfIndex(VD)), FixedBinaryOrder(getFixedBinaryOrder(VD)),
-      ReferenceOwnership(getReferenceOwnership(VD)) {
+    : SDKNodeInitInfo(Ctx, cast<Decl>(VD)) {
+  Name = VD->hasName() ? getEscapedName(VD->getBaseName()) : Ctx.buffer("_");
+  PrintedName = getPrintedName(Ctx, VD);
+  Usr = calculateUsr(Ctx, VD);
+  IsThrowing = isFuncThrowing(VD);
+  IsStatic = VD->isStatic();
+  IsOverriding = VD->getOverriddenDecl();
+  IsProtocolReq = isa<ProtocolDecl>(VD->getDeclContext()) && VD->isProtocolRequirement();
+  IsOpen = Ctx.getAccessLevel(VD) == AccessLevel::Open;
+  IsInternal = Ctx.getAccessLevel(VD) < AccessLevel::Public;
+  SelfIndex = getSelfIndex(VD);
+  FixedBinaryOrder = Ctx.getFixedBinaryOrder(VD);
+  ReferenceOwnership = getReferenceOwnership(VD);
 
   // Calculate usr for its super class.
   if (auto *CD = dyn_cast_or_null<ClassDecl>(VD)) {
@@ -1036,15 +1118,22 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
     }
   }
 
-  // Capture all attributes.
-  auto AllAttrs = VD->getAttrs();
-  std::transform(AllAttrs.begin(), AllAttrs.end(), std::back_inserter(DeclAttrs),
-                 [](DeclAttribute *attr) { return attr->getKind(); });
+#define CASE(BASE, KIND, KEY) case BASE::KIND: KEY = #KIND; break;
+  if (auto *FD = dyn_cast<FuncDecl>(VD)) {
+    switch(FD->getSelfAccessKind()) {
+    CASE(SelfAccessKind, Mutating, FuncSelfKind)
+    CASE(SelfAccessKind, __Consuming, FuncSelfKind)
+    CASE(SelfAccessKind, NonMutating, FuncSelfKind)
+    }
+  }
+#undef CASE
 
   // Get all protocol names this type decl conforms to.
   if (auto *NTD = dyn_cast<NominalTypeDecl>(VD)) {
     for (auto *P: NTD->getAllProtocols()) {
-      ConformingProtocols.push_back(P->getName().str());
+      if (!Ctx.shouldIgnore(P)) {
+        ConformingProtocols.push_back(P->getName().str());
+      }
     }
   }
 
@@ -1066,6 +1155,8 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
 
   if (auto *VAR = dyn_cast<AbstractStorageDecl>(VD)) {
     HasStorage = VAR->hasStorage();
+    HasDidset = VAR->getDidSetFunc();
+    HasWillset = VAR->getWillSetFunc();
   }
 }
 
@@ -1083,23 +1174,19 @@ case SDKNodeKind::X:                                                           \
 // Recursively construct a node that represents a type, for instance,
 // representing the return value type of a function decl.
 SDKNode *swift::ide::api::
-SwiftDeclCollector::constructTypeNode(Type T,
-                                      bool IsImplicitlyUnwrappedOptional,
-                                      bool hasDefaultArgument) {
+SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
   if (Ctx.checkingABI()) {
     T = T->getCanonicalType();
   }
-  SDKNode* Root = SDKNodeInitInfo(Ctx, T, IsImplicitlyUnwrappedOptional,
-    hasDefaultArgument).createSDKNode(SDKNodeKind::TypeNominal);
 
   if (auto NAT = dyn_cast<NameAliasType>(T.getPointer())) {
-    SDKNode* Root = SDKNodeInitInfo(Ctx, T).createSDKNode(SDKNodeKind::TypeAlias);
-    Root->addChild(constructTypeNode(NAT->getCanonicalType()));
+    SDKNode* Root = SDKNodeInitInfo(Ctx, T, Info).createSDKNode(SDKNodeKind::TypeAlias);
+    Root->addChild(constructTypeNode(NAT->getSinglyDesugaredType()));
     return Root;
   }
 
   if (auto Fun = T->getAs<AnyFunctionType>()) {
-    SDKNode* Root = SDKNodeInitInfo(Ctx, T).createSDKNode(SDKNodeKind::TypeFunc);
+    SDKNode* Root = SDKNodeInitInfo(Ctx, T, Info).createSDKNode(SDKNodeKind::TypeFunc);
 
     // Still, return type first
     Root->addChild(constructTypeNode(Fun->getResult()));
@@ -1110,6 +1197,8 @@ SwiftDeclCollector::constructTypeNode(Type T,
     Root->addChild(constructTypeNode(Input));
     return Root;
   }
+
+  SDKNode* Root = SDKNodeInitInfo(Ctx, T, Info).createSDKNode(SDKNodeKind::TypeNominal);
 
   // Keep paren type as a stand-alone level.
   if (auto *PT = dyn_cast<ParenType>(T.getPointer())) {
@@ -1139,9 +1228,20 @@ std::vector<SDKNode*> swift::ide::api::
 SwiftDeclCollector::createParameterNodes(ParameterList *PL) {
   std::vector<SDKNode*> Result;
   for (auto param: *PL) {
-    Result.push_back(constructTypeNode(param->getInterfaceType(),
-      param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>(),
-      param->getDefaultArgumentKind() != DefaultArgumentKind::None));
+    TypeInitInfo Info;
+    Info.IsImplicitlyUnwrappedOptional = param->getAttrs().
+      hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    Info.hasDefaultArgument = param->getDefaultArgumentKind() !=
+      DefaultArgumentKind::None;
+    switch (param->getValueOwnership()) {
+#define CASE(KIND) case ValueOwnership::KIND: Info.ValueOwnership = #KIND; break;
+    CASE(Owned)
+    CASE(InOut)
+    CASE(Shared)
+    case ValueOwnership::Default: break;
+#undef CASE
+    }
+    Result.push_back(constructTypeNode(param->getInterfaceType(), Info));
   }
   return Result;
 }
@@ -1154,8 +1254,10 @@ SDKNode *swift::ide::api::
 SwiftDeclCollector::constructFunctionNode(FuncDecl* FD,
                                           SDKNodeKind Kind) {
   auto Func = SDKNodeInitInfo(Ctx, FD).createSDKNode(Kind);
-  Func->addChild(constructTypeNode(FD->getResultInterfaceType(),
-    FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()));
+  TypeInitInfo Info;
+  Info.IsImplicitlyUnwrappedOptional = FD->getAttrs().
+    hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  Func->addChild(constructTypeNode(FD->getResultInterfaceType(), Info));
   for (auto *Node : createParameterNodes(FD->getParameters()))
     Func->addChild(Node);
   return Func;
@@ -1171,30 +1273,36 @@ SwiftDeclCollector::constructInitNode(ConstructorDecl *CD) {
 }
 
 bool swift::ide::api::
-SwiftDeclCollector::shouldIgnore(Decl *D, const Decl* Parent) {
-  if (D->isPrivateStdlibDecl(false))
+SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
+  // Exclude all clang nodes if we're comparing Swift decls specifically.
+  if (Opts.SwiftOnly && isFromClang(D)) {
     return true;
-  if (AvailableAttr::isUnavailable(D))
-    return true;
+  }
+  if (checkingABI()) {
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      // Private vars with fixed binary orders can have ABI-impact, so we should
+      // whitelist them if we're checking ABI.
+      if (getFixedBinaryOrder(VD).hasValue())
+        return false;
+      // Typealias should have no impact on ABI.
+      if (isa<TypeAliasDecl>(VD))
+        return true;
+    }
+  } else {
+    if (D->isPrivateStdlibDecl(false))
+      return true;
+    if (AvailableAttr::isUnavailable(D))
+      return true;
+  }
   if (isa<ConstructorDecl>(D))
     return false;
-  if (isa<OperatorDecl>(D))
-    return true;
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     if (VD->getBaseName().empty())
       return true;
-
-    // Exclude type alias decls because they should have no impact on ABI.
-    if (isa<TypeAliasDecl>(VD) && Ctx.checkingABI())
-      return true;
-    switch (VD->getFormalAccess()) {
+    switch (getAccessLevel(VD)) {
     case AccessLevel::Internal:
     case AccessLevel::Private:
     case AccessLevel::FilePrivate:
-      // Private vars with fixed binary orders can have ABI-impact, so we should
-      // whitelist them if we're checking ABI.
-      if (Ctx.checkingABI() && getFixedBinaryOrder(VD).hasValue())
-        break;
       return true;
     case AccessLevel::Public:
     case AccessLevel::Open:
@@ -1252,8 +1360,10 @@ SwiftDeclCollector::constructExternalExtensionNode(NominalTypeDecl *NTD,
 SDKNode *swift::ide::api::
 SwiftDeclCollector::constructVarNode(ValueDecl *VD) {
   auto Var = SDKNodeInitInfo(Ctx, VD).createSDKNode(SDKNodeKind::DeclVar);
-  Var->addChild(constructTypeNode(VD->getInterfaceType(),
-    VD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()));
+  TypeInitInfo Info;
+  Info.IsImplicitlyUnwrappedOptional = VD->getAttrs().
+    hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  Var->addChild(constructTypeNode(VD->getInterfaceType(), Info));
   if (auto VAD = dyn_cast<AbstractStorageDecl>(VD)) {
     if (auto Getter = VAD->getGetter())
       Var->addChild(constructFunctionNode(Getter, SDKNodeKind::DeclGetter));
@@ -1294,7 +1404,7 @@ SwiftDeclCollector::constructSubscriptDeclNode(SubscriptDecl *SD) {
 void swift::ide::api::
 SwiftDeclCollector::addMembersToRoot(SDKNode *Root, IterableDeclContext *Context) {
   for (auto *Member : Context->getMembers()) {
-    if (shouldIgnore(Member, Context->getDecl()))
+    if (Ctx.shouldIgnore(Member, Context->getDecl()))
       continue;
     if (auto Func = dyn_cast<FuncDecl>(Member)) {
       Root->addChild(constructFunctionNode(Func, SDKNodeKind::DeclFunction));
@@ -1333,13 +1443,15 @@ void SwiftDeclCollector::lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
     llvm::SmallVector<Decl*, 512> Decls;
     M->getDisplayDecls(Decls);
     for (auto D : Decls) {
-      if (shouldIgnore(D, nullptr))
+      if (Ctx.shouldIgnore(D))
         continue;
       if (KnownDecls.count(D))
         continue;
       KnownDecls.insert(D);
       if (auto VD = dyn_cast<ValueDecl>(D))
         foundDecl(VD, DeclVisibilityKind::DynamicLookup);
+      else
+        processDecl(D);
     }
   }
 
@@ -1353,7 +1465,7 @@ void SwiftDeclCollector::lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
      });
 
   for (auto *VD : ClangMacros)
-    processDecl(VD);
+    processValueDecl(VD);
 
   // Collect extensions to types from other modules and synthesize type nodes
   // for them.
@@ -1370,7 +1482,18 @@ void SwiftDeclCollector::lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
   }
 }
 
-void SwiftDeclCollector::processDecl(ValueDecl *VD) {
+SDKNode *SwiftDeclCollector::constructOperatorDeclNode(OperatorDecl *OD) {
+  return SDKNodeInitInfo(Ctx, OD).createSDKNode(SDKNodeKind::DeclOperator);
+}
+
+void SwiftDeclCollector::processDecl(Decl *D) {
+  assert(!isa<ValueDecl>(D));
+  if (auto *OD = dyn_cast<OperatorDecl>(D)) {
+    RootNode->addChild(constructOperatorDeclNode(OD));
+  }
+}
+
+void SwiftDeclCollector::processValueDecl(ValueDecl *VD) {
   if (auto FD = dyn_cast<FuncDecl>(VD)) {
     RootNode->addChild(constructFunctionNode(FD, SDKNodeKind::DeclFunction));
   } else if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
@@ -1391,7 +1514,7 @@ void SwiftDeclCollector::foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) {
     return;
   }
 
-  processDecl(VD);
+  processValueDecl(VD);
 }
 
 void SDKNode::output(json::Output &out, KeyKind Key, bool Value) {
@@ -1427,6 +1550,7 @@ void SDKNodeDecl::jsonize(json::Output &out) {
   output(out, KeyKind::KK_isOpen, IsOpen);
   output(out, KeyKind::KK_isInternal, IsInternal);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_declAttributes).data(), DeclAttributes);
+  out.mapOptional(getKeyContent(Ctx, KeyKind::KK_fixedbinaryorder).data(), FixedBinaryOrder);
   // Strong reference is implied, no need for serialization.
   if (getReferenceOwnership() != ReferenceOwnership::Strong) {
     uint8_t Raw = uint8_t(getReferenceOwnership());
@@ -1437,8 +1561,12 @@ void SDKNodeDecl::jsonize(json::Output &out) {
 void SDKNodeDeclAbstractFunc::jsonize(json::Output &out) {
   SDKNodeDecl::jsonize(out);
   output(out, KeyKind::KK_throwing, IsThrowing);
-  output(out, KeyKind::KK_mutating, IsMutating);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_selfIndex).data(), SelfIndex);
+}
+
+void SDKNodeDeclFunction::jsonize(json::Output &out) {
+  SDKNodeDeclAbstractFunc::jsonize(out);
+  output(out, KeyKind::KK_funcSelfKind, FuncSelfKind);
 }
 
 void SDKNodeDeclType::jsonize(json::Output &out) {
@@ -1453,6 +1581,7 @@ void SDKNodeType::jsonize(json::Output &out) {
   SDKNode::jsonize(out);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_typeAttributes).data(), TypeAttributes);
   output(out, KeyKind::KK_hasDefaultArg, HasDefaultArg);
+  output(out, KeyKind::KK_paramValueOwnership, ParamValueOwnership);
 }
 
 void SDKNodeTypeNominal::jsonize(json::Output &out) {
@@ -1464,13 +1593,16 @@ void SDKNodeDeclSubscript::jsonize(json::Output &out) {
   SDKNodeDeclAbstractFunc::jsonize(out);
   output(out, KeyKind::KK_hasSetter, HasSetter);
   output(out, KeyKind::KK_hasStorage, HasStorage);
+  output(out, KeyKind::KK_hasDidset, HasDidSet);
+  output(out, KeyKind::KK_hasWillset, HasWillSet);
 }
 
 void SDKNodeDeclVar::jsonize(json::Output &out) {
   SDKNodeDecl::jsonize(out);
-  out.mapOptional(getKeyContent(Ctx, KeyKind::KK_fixedbinaryorder).data(), FixedBinaryOrder);
   output(out, KeyKind::KK_isLet, IsLet);
   output(out, KeyKind::KK_hasStorage, HasStorage);
+  output(out, KeyKind::KK_hasDidset, HasDidSet);
+  output(out, KeyKind::KK_hasWillset, HasWillSet);
 }
 
 namespace swift {

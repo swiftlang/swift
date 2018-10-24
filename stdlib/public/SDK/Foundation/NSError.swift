@@ -547,6 +547,7 @@ extension _SwiftNewtypeWrapper where Self.RawValue == Error {
   }
 
   @inlinable // FIXME(sil-serialize-all)
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSError?
   ) -> Self {

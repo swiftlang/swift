@@ -533,8 +533,8 @@ bb2:
   // CHECK:   cond_br
   // CHECK: bb3:
   // CHECK:   destroy_addr [[CLASSVAL]]
-  // CHECK:   br bb4
-  // CHECK: bb4:
+  // CHECK:   br bb5
+  // CHECK: bb5:
   // CHECK: store [[V2]] to [init] [[CLASSVAL]]
   assign %17 to %6 : $*SomeClass                // id: %18
   destroy_addr %6 : $*SomeClass                 // id: %19

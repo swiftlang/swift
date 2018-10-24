@@ -89,18 +89,12 @@ struct Pair<T, U> : P, Q {}
 // GLOBAL-SAME:    i16 4,
 // GLOBAL-SAME:    i16 1,
 
-//    Relative reference to protocol
-// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ({{.*}} @"$s23associated_type_witness8AssockedMp" to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.generic_witness_table_cache, %swift.generic_witness_table_cache* @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAWG", i32 0, i32 2) to i64)) to i32
-
 //    Relative reference to witness table template
-// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([4 x i8*]* @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAWp" to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.generic_witness_table_cache, %swift.generic_witness_table_cache* @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAWG", i32 0, i32 3) to i64)) to i32
-
-//    Relative reference to resilient witnesses
-// GLOBAL-SAME:    i32 0,
+// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([4 x i8*]* @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAWp" to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.generic_witness_table_cache, %swift.generic_witness_table_cache* @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAWG", i32 0, i32 2) to i64)) to i32
 
 //    No instantiator function
 // GLOBAL-SAME:    i32 0,
-// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([16 x i8*]* [[PRIVATE:@.*]] to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.generic_witness_table_cache, %swift.generic_witness_table_cache* @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAWG", i32 0, i32 6) to i64)) to i32)
+// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([16 x i8*]* [[PRIVATE:@.*]] to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.generic_witness_table_cache, %swift.generic_witness_table_cache* @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAWG", i32 0, i32 4) to i64)) to i32)
 // GLOBAL-SAME:  }
 // GLOBAL:       [[PRIVATE]] = internal global [16 x i8*] zeroinitializer
 
@@ -132,17 +126,11 @@ protocol DerivedFromSimpleAssoc : HasSimpleAssoc {}
 // GLOBAL-SAME:    i16 2,
 // GLOBAL-SAME:    i16 1,
 
-//   Relative reference to protocol
-// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ({{.*}} @"$s23associated_type_witness22DerivedFromSimpleAssocMp" to i64
-
 //   Relative reference to witness table template
 // GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([2 x i8*]* @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWp" to i64
 
-//   Relative reference to resilient witnesses
-// GLOBAL-SAME:    i32 0,
-
 //   Relative reference to instantiator function
-// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint (void (i8**, %swift.type*, i8**)* @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI" to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.generic_witness_table_cache, %swift.generic_witness_table_cache* @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWG", i32 0, i32 5) to i64)) to i32)
+// GLOBAL-SAME:    i32 trunc (i64 sub (i64 ptrtoint (void (i8**, %swift.type*, i8**)* @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWI" to i64), i64 ptrtoint (i32* getelementptr inbounds (%swift.generic_witness_table_cache, %swift.generic_witness_table_cache* @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWG", i32 0, i32 3) to i64)) to i32)
 
 //   Relative reference to private data
 struct GenericComputed<T: P> : DerivedFromSimpleAssoc {

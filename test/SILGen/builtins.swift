@@ -199,61 +199,61 @@ class D {}
 // CHECK-LABEL: sil hidden @$s8builtins22class_to_native_object{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $C):
 // CHECK-NEXT:   debug_value
-// CHECK-NEXT:   [[OBJ:%.*]] = unchecked_ref_cast [[ARG:%.*]] to $Builtin.NativeObject
-// CHECK-NEXT:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
-// CHECK-NEXT:   return [[OBJ_COPY]]
+// CHECK-NEXT:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK-NEXT:   [[OBJ:%.*]] = unchecked_ref_cast [[ARG_COPY]] : $C to $Builtin.NativeObject
+// CHECK-NEXT:   return [[OBJ]]
 func class_to_native_object(_ c:C) -> Builtin.NativeObject {
   return Builtin.castToNativeObject(c)
 }
 
 // CHECK-LABEL: sil hidden @$s8builtins32class_archetype_to_native_object{{[_0-9a-zA-Z]*}}F
 func class_archetype_to_native_object<T : C>(_ t: T) -> Builtin.NativeObject {
-  // CHECK: [[OBJ:%.*]] = unchecked_ref_cast [[C:%.*]] to $Builtin.NativeObject
-  // CHECK-NEXT: [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
-  // CHECK-NOT: destroy_value [[C]]
+  // CHECK: [[COPY:%.*]] = copy_value %0
+  // CHECK: [[OBJ:%.*]] = unchecked_ref_cast [[COPY]] : $T to $Builtin.NativeObject
+  // CHECK-NOT: destroy_value [[COPY]]
   // CHECK-NOT: destroy_value [[OBJ]]
-  // CHECK: return [[OBJ_COPY]]
+  // CHECK: return [[OBJ]]
   return Builtin.castToNativeObject(t)
 }
 
 // CHECK-LABEL: sil hidden @$s8builtins34class_existential_to_native_object{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $ClassProto):
 // CHECK-NEXT:   debug_value
-// CHECK-NEXT:   [[REF:%[0-9]+]] = open_existential_ref [[ARG]] : $ClassProto
+// CHECK-NEXT:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK-NEXT:   [[REF:%[0-9]+]] = open_existential_ref [[ARG_COPY]] : $ClassProto
 // CHECK-NEXT:   [[PTR:%[0-9]+]] = unchecked_ref_cast [[REF]] : $@opened({{.*}}) ClassProto to $Builtin.NativeObject
-// CHECK-NEXT:   [[PTR_COPY:%.*]] = copy_value [[PTR]]
-// CHECK-NEXT:   return [[PTR_COPY]]
+// CHECK-NEXT:   return [[PTR]]
 func class_existential_to_native_object(_ t:ClassProto) -> Builtin.NativeObject {
   return Builtin.unsafeCastToNativeObject(t)
 }
 
 // CHECK-LABEL: sil hidden @$s8builtins24class_from_native_object{{[_0-9a-zA-Z]*}}F
 func class_from_native_object(_ p: Builtin.NativeObject) -> C {
-  // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] to $C
-  // CHECK: [[C_RETURN:%.*]] = copy_value [[C]]
-  // CHECK-NOT: destroy_value [[C]]
-  // CHECK-NOT: destroy_value [[OBJ]]
-  // CHECK: return [[C_RETURN]]
+  // CHECK: [[COPY:%.*]] = copy_value %0
+  // CHECK: [[CAST:%.*]] = unchecked_ref_cast [[COPY]] : $Builtin.NativeObject to $C
+  // CHECK-NOT: destroy_value [[COPY]]
+  // CHECK-NOT: destroy_value [[CAST]]
+  // CHECK: return [[CAST]]
   return Builtin.castFromNativeObject(p)
 }
 
 // CHECK-LABEL: sil hidden @$s8builtins34class_archetype_from_native_object{{[_0-9a-zA-Z]*}}F
 func class_archetype_from_native_object<T : C>(_ p: Builtin.NativeObject) -> T {
-  // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] : $Builtin.NativeObject to $T
-  // CHECK: [[C_RETURN:%.*]] = copy_value [[C]]
-  // CHECK-NOT: destroy_value [[C]]
-  // CHECK-NOT: destroy_value [[OBJ]]
-  // CHECK: return [[C_RETURN]]
+  // CHECK: [[COPY:%.*]] = copy_value %0
+  // CHECK: [[CAST:%.*]] = unchecked_ref_cast [[COPY]] : $Builtin.NativeObject to $T
+  // CHECK-NOT: destroy_value [[COPY]]
+  // CHECK-NOT: destroy_value [[CAST]]
+  // CHECK: return [[CAST]]
   return Builtin.castFromNativeObject(p)
 }
 
 // CHECK-LABEL: sil hidden @$s8builtins41objc_class_existential_from_native_object{{[_0-9a-zA-Z]*}}F
 func objc_class_existential_from_native_object(_ p: Builtin.NativeObject) -> AnyObject {
-  // CHECK: [[C:%.*]] = unchecked_ref_cast [[OBJ:%.*]] : $Builtin.NativeObject to $AnyObject
-  // CHECK: [[C_RETURN:%.*]] = copy_value [[C]]
-  // CHECK-NOT: destroy_value [[C]]
-  // CHECK-NOT: destroy_value [[OBJ]]
-  // CHECK: return [[C_RETURN]]
+  // CHECK: [[COPY:%.*]] = copy_value %0
+  // CHECK: [[CAST:%.*]] = unchecked_ref_cast [[COPY]] : $Builtin.NativeObject to $AnyObject
+  // CHECK-NOT: destroy_value [[COPY]]
+  // CHECK-NOT: destroy_value [[CAST]]
+  // CHECK: return [[CAST]]
   return Builtin.castFromNativeObject(p)
 }
 
@@ -510,14 +510,16 @@ func unreachable() {
 // CHECK:       bb0([[ARG1:%.*]] : @guaranteed $C, [[ARG2:%.*]] : @trivial $Builtin.Word):
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    debug_value
-// CHECK-NEXT:    [[ARG1_TRIVIAL:%.*]] = unchecked_trivial_bit_cast [[ARG1]] : $C to $Builtin.Word
-// CHECK-NEXT:    [[ARG1_D:%.*]] = unchecked_ref_cast [[ARG1]] : $C to $D
-// CHECK-NEXT:    [[ARG1_OPT:%.*]] = unchecked_ref_cast [[ARG1]] : $C to $Optional<C>
+// CHECK-NEXT:    [[ARG1_COPY1:%.*]] = copy_value [[ARG1]]
+// CHECK-NEXT:    [[ARG1_TRIVIAL:%.*]] = unchecked_trivial_bit_cast [[ARG1_COPY1]] : $C to $Builtin.Word
+// CHECK-NEXT:    [[ARG1_COPY2:%.*]] = copy_value [[ARG1]]
+// CHECK-NEXT:    [[ARG1_D:%.*]] = unchecked_ref_cast [[ARG1_COPY2]] : $C to $D
+// CHECK-NEXT:    [[ARG1_COPY3:%.*]] = copy_value [[ARG1]]
+// CHECK-NEXT:    [[ARG1_OPT:%.*]] = unchecked_ref_cast [[ARG1_COPY3]] : $C to $Optional<C>
 // CHECK-NEXT:    [[ARG2_FROM_WORD:%.*]] = unchecked_bitwise_cast [[ARG2]] : $Builtin.Word to $C
 // CHECK-NEXT:    [[ARG2_FROM_WORD_COPY:%.*]] = copy_value [[ARG2_FROM_WORD]]
-// CHECK-NEXT:    [[ARG1_D_COPY:%.*]] = copy_value [[ARG1_D]]
-// CHECK-NEXT:    [[ARG1_OPT_COPY:%.*]] = copy_value [[ARG1_OPT]]
-// CHECK-NEXT:    [[RESULT:%.*]] = tuple ([[ARG1_TRIVIAL]] : $Builtin.Word, [[ARG1_D_COPY]] : $D, [[ARG1_OPT_COPY]] : $Optional<C>, [[ARG2_FROM_WORD_COPY:%.*]] : $C)
+// CHECK-NEXT:    destroy_value [[ARG1_COPY1]]
+// CHECK-NEXT:    [[RESULT:%.*]] = tuple ([[ARG1_TRIVIAL]] : $Builtin.Word, [[ARG1_D]] : $D, [[ARG1_OPT]] : $Optional<C>, [[ARG2_FROM_WORD_COPY:%.*]] : $C)
 // CHECK:         return [[RESULT]]
 func reinterpretCast(_ c: C, x: Builtin.Word) -> (Builtin.Word, D, C?, C) {
   return (Builtin.reinterpretCast(c) as Builtin.Word,
@@ -534,9 +536,10 @@ func reinterpretAddrOnly<T, U>(_ t: T) -> U {
 
 // CHECK-LABEL: sil hidden @$s8builtins28reinterpretAddrOnlyToTrivial{{[_0-9a-zA-Z]*}}F
 func reinterpretAddrOnlyToTrivial<T>(_ t: T) -> Int {
-  // CHECK: [[ADDR:%.*]] = unchecked_addr_cast [[INPUT:%.*]] : $*T to $*Int
+  // CHECK: copy_addr %0 to [initialization] [[INPUT:%.*]] : $*T
+  // CHECK: [[ADDR:%.*]] = unchecked_addr_cast [[INPUT]] : $*T to $*Int
   // CHECK: [[VALUE:%.*]] = load [trivial] [[ADDR]]
-  // CHECK-NOT: destroy_addr [[INPUT]]
+  // CHECK: destroy_addr [[INPUT]]
   return Builtin.reinterpretCast(t)
 }
 
@@ -553,9 +556,10 @@ func reinterpretAddrOnlyLoadable<T>(_ a: Int, _ b: T) -> (T, Int) {
 }
 
 // CHECK-LABEL: sil hidden @$s8builtins18castToBridgeObject{{[_0-9a-zA-Z]*}}F
-// CHECK:         [[BO:%.*]] = ref_to_bridge_object {{%.*}} : $C, {{%.*}} : $Builtin.Word
-// CHECK:         [[BO_COPY:%.*]] = copy_value [[BO]]
-// CHECK:         return [[BO_COPY]]
+// CHECK:         [[ARG_COPY:%.*]] = copy_value %0
+// CHECK:         [[BO:%.*]] = ref_to_bridge_object [[ARG_COPY]] : $C, {{%.*}} : $Builtin.Word
+// CHECK-NOT:     destroy_value [[ARG_COPY]]
+// CHECK:         return [[BO]]
 func castToBridgeObject(_ c: C, _ w: Builtin.Word) -> Builtin.BridgeObject {
   return Builtin.castToBridgeObject(c, w)
 }
@@ -660,10 +664,10 @@ func refcast_generic_any<T>(_ o: T) -> AnyObject {
 
 // CHECK-LABEL: sil hidden @$s8builtins17refcast_class_anyyyXlAA1ACF :
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $A):
-// CHECK:   [[ARG_CASTED:%.*]] = unchecked_ref_cast [[ARG]] : $A to $AnyObject
-// CHECK:   [[ARG_CASTED_COPY:%.*]] = copy_value [[ARG_CASTED]]
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[ARG_CASTED:%.*]] = unchecked_ref_cast [[ARG_COPY]] : $A to $AnyObject
 // CHECK-NOT:   destroy_value [[ARG]]
-// CHECK:   return [[ARG_CASTED_COPY]]
+// CHECK:   return [[ARG_CASTED]]
 // CHECK: } // end sil function '$s8builtins17refcast_class_anyyyXlAA1ACF'
 func refcast_class_any(_ o: A) -> AnyObject {
   return Builtin.castReference(o)
@@ -677,9 +681,9 @@ func refcast_punknown_any(_ o: PUnknown) -> AnyObject {
 
 // CHECK-LABEL: sil hidden @$s8builtins18refcast_pclass_anyyyXlAA6PClass_pF :
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $PClass):
-// CHECK:   [[ARG_CAST:%.*]] = unchecked_ref_cast [[ARG]] : $PClass to $AnyObject
-// CHECK:   [[ARG_CAST_COPY:%.*]] = copy_value [[ARG_CAST]]
-// CHECK:   return [[ARG_CAST_COPY]]
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[ARG_CAST:%.*]] = unchecked_ref_cast [[ARG_COPY]] : $PClass to $AnyObject
+// CHECK:   return [[ARG_CAST]]
 // CHECK: } // end sil function '$s8builtins18refcast_pclass_anyyyXlAA6PClass_pF'
 func refcast_pclass_any(_ o: PClass) -> AnyObject {
   return Builtin.castReference(o)
@@ -819,4 +823,10 @@ func once(control: Builtin.RawPointer) {
 func valueToBridgeObject(_ x: UInt) -> Builtin.BridgeObject {
   return Builtin.valueToBridgeObject(x)
 }
- 
+
+// CHECK-LABEL: sil hidden @$s8builtins10assumeTrueyyBi1_F
+// CHECK: builtin "assume_Int1"({{.*}} : $Builtin.Int1)
+// CHECK: return
+func assumeTrue(_ x: Builtin.Int1) {
+  Builtin.assume_Int1(x)
+}

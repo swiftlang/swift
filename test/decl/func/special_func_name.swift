@@ -18,7 +18,6 @@ protocol P2 {
 }
 
 struct S21 : P2 { // expected-error {{type 'S21' does not conform to protocol 'P2'}}
-  // expected-note@-1 {{candidate has non-matching type '()'}}
   static func `init`(_: Int) {}
 }
 

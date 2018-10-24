@@ -395,7 +395,7 @@ private:
 
     ComponentScope = llvm::make_unique<Scope>(*this);
     // If this component has oprhaned constraint attached,
-    // let's return it ot the graph.
+    // let's return it to the graph.
     CS.CG.setOrphanedConstraint(OrphanedConstraint);
   }
 };

@@ -84,6 +84,7 @@ extension Array : _ObjectiveCBridgeable {
     return result != nil
   }
 
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSArray?
   ) -> Array {

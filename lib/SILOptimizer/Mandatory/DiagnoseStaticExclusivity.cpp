@@ -542,15 +542,8 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
   unsigned AccessKindForMain =
       static_cast<unsigned>(MainAccess.getAccessKind());
 
-  // For now, all exclusivity violations are warning in Swift 3 mode.
-  // Also treat some violations as warnings to allow them to be staged in.
-  bool DiagnoseAsWarning = Ctx.LangOpts.isSwiftVersion3();
-
   if (const ValueDecl *VD = Storage.getDecl(F)) {
     // We have a declaration, so mention the identifier in the diagnostic.
-    auto DiagnosticID = (DiagnoseAsWarning ?
-                         diag::exclusivity_access_required_warn :
-                         diag::exclusivity_access_required);
     SILType BaseType = FirstAccess.getInstruction()->getType().getAddressType();
     SILModule &M = FirstAccess.getInstruction()->getModule();
     std::string PathDescription = getPathDescription(
@@ -570,18 +563,16 @@ static void diagnoseExclusivityViolation(const ConflictingAccess &Violation,
     }
 
     auto D =
-        diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(), DiagnosticID,
+        diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(),
+                 diag::exclusivity_access_required,
                  PathDescription, AccessKindForMain, SuggestSwapAt);
     D.highlight(RangeForMain);
     if (SuggestSwapAt)
       addSwapAtFixit(D, CallToReplace, Base, SwapIndex1, SwapIndex2,
                      Ctx.SourceMgr);
   } else {
-    auto DiagnosticID = (DiagnoseAsWarning ?
-                         diag::exclusivity_access_required_unknown_decl_warn :
-                         diag::exclusivity_access_required_unknown_decl);
-    diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(), DiagnosticID,
-             AccessKindForMain)
+    diagnose(Ctx, MainAccess.getAccessLoc().getSourceLoc(),
+             diag::exclusivity_access_required_unknown_decl, AccessKindForMain)
         .highlight(RangeForMain);
   }
   diagnose(Ctx, NoteAccess.getAccessLoc().getSourceLoc(),
