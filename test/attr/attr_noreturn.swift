@@ -34,7 +34,8 @@ func noReturn3(_: Int)
 // expected-error@-2 {{'@noreturn' has been removed; functions that never return should have a return type of 'Never' instead}}{{1-11=}}{{53-56=Never}}
 
 // Test that error recovery gives us the 'Never' return type
-let x: Never = noReturn1(0) // No error
+let x: Never = noReturn1(0)
+// expected-error@-1 {{constant 'x' cannot have enum type 'Never' with no cases}}
 
 // @noreturn in function type declarations
 let valueNoReturn: @noreturn () -> ()
