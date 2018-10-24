@@ -1,6 +1,10 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir > %t.ll
 // RUN: %FileCheck %s -check-prefix=GLOBAL < %t.ll
 // RUN: %FileCheck %s < %t.ll
+
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir -wmo -num-threads 1 > %t.ll.wmo
+// RUN: %FileCheck %s -check-prefix=GLOBAL < %t.ll.wmo
+// RUN: %FileCheck %s < %t.ll.wmo
 // REQUIRES: CPU=x86_64
 
 protocol P {}
@@ -11,6 +15,16 @@ protocol Assocked {
 }
 
 struct Universal : P, Q {}
+
+
+// CHECK-LABEL: @"symbolic _____ 23associated_type_witness12OuterPrivate{{.*}}V" = linkonce_odr hidden constant
+// CHECK-SAME: @"$s23associated_type_witness12OuterPrivate{{.*}}5InnerE0V9InnermostVMn"
+private struct OuterPrivate {
+  struct InnerPrivate: HasSimpleAssoc {
+    struct Innermost { }
+    typealias Assoc = Innermost
+  }
+}
 
 // CHECK: [[ASSOC_TYPE_NAMES:@.*]] = private constant [29 x i8] c"OneAssoc TwoAssoc ThreeAssoc\00"
 // CHECK: @"$s23associated_type_witness18HasThreeAssocTypesMp" =
@@ -115,7 +129,6 @@ protocol HasSimpleAssoc {
   associatedtype Assoc
 }
 protocol DerivedFromSimpleAssoc : HasSimpleAssoc {}
-
 
 //   Generic witness table pattern for GenericComputed : DerivedFromSimpleAssoc.
 // GLOBAL-LABEL: @"$s23associated_type_witness15GenericComputedVyxGAA22DerivedFromSimpleAssocAAWp" = internal constant [2 x i8*]
