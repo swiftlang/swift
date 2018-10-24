@@ -728,14 +728,47 @@ extension  AnySequence: Sequence {
 extension Any${Kind} {
 %   if Kind == 'Sequence':
   /// Returns an iterator over the elements of this sequence.
-%   else:
-  /// Returns an iterator over the elements of this collection.
-%   end
   @inline(__always)
   @inlinable
   public __consuming func makeIterator() -> Iterator {
     return _box._makeIterator()
   }
+  @inlinable
+  public __consuming func dropLast(_ n: Int = 1) -> [Element] {
+    return _box._dropLast(n)
+  }
+  @inlinable
+  public __consuming func prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> [Element] {
+    return try _box._prefix(while: predicate)
+  }
+  @inlinable
+  public __consuming func suffix(_ maxLength: Int) -> [Element] {
+    return _box._suffix(maxLength)
+  }
+%   else:
+  /// Returns an iterator over the elements of this collection.
+  @inline(__always)
+  @inlinable
+  public __consuming func makeIterator() -> Iterator {
+    return _box._makeIterator()
+  }
+  @inlinable
+  public __consuming func dropLast(_ n: Int = 1) -> Any${Kind}<Element> {
+    return Any${Kind}(_box: _box._dropLast(n))
+  }
+  @inlinable
+  public __consuming func prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> Any${Kind}<Element> {
+    return try Any${Kind}(_box: _box._prefix(while: predicate))
+  }
+  @inlinable
+  public __consuming func suffix(_ maxLength: Int) -> Any${Kind}<Element> {
+    return Any${Kind}(_box: _box._suffix(maxLength))
+  }
+%   end
 
   @inlinable
   public var underestimatedCount: Int {
@@ -763,7 +796,6 @@ extension Any${Kind} {
     return try _box._forEach(body)
   }
 
-  /*
   @inlinable
   public __consuming func drop(
     while predicate: (Element) throws -> Bool
@@ -772,32 +804,14 @@ extension Any${Kind} {
   }
 
   @inlinable
-  public __consuming func dropFirst(_ n: Int) -> Any${Kind}<Element> {
+  public __consuming func dropFirst(_ n: Int = 1) -> Any${Kind}<Element> {
     return Any${Kind}(_box: _box._dropFirst(n))
-  }
-
-  @inlinable
-  public __consuming func dropLast(_ n: Int) -> Any${Kind}<Element> {
-    return Any${Kind}(_box: _box._dropLast(n))
-  }
-
-  @inlinable
-  public __consuming func prefix(
-    while predicate: (Element) throws -> Bool
-  ) rethrows -> Any${Kind}<Element> {
-    return try Any${Kind}(_box: _box._prefix(while: predicate))
   }
 
   @inlinable
   public __consuming func prefix(_ maxLength: Int) -> Any${Kind}<Element> {
     return Any${Kind}(_box: _box._prefix(maxLength))
   }
-
-  @inlinable
-  public __consuming func suffix(_ maxLength: Int) -> Any${Kind}<Element> {
-    return Any${Kind}(_box: _box._suffix(maxLength))
-  }
-  */
 
   @inlinable
   public func _customContainsEquatableElement(
