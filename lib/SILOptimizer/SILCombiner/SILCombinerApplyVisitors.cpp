@@ -712,7 +712,8 @@ static bool canReplaceCopiedArg(FullApplySite Apply,
   // If the witness method mutates Arg, we cannot replace Arg with
   // the source of a copy. Otherwise the call would modify another value than
   // the original argument.
-  if (Apply.getOrigCalleeType()->getParameters()[ArgIdx].isIndirectMutating())
+  auto origConv = Apply.getOrigCalleeConv();
+  if (origConv.getParamInfoForSILArg(ArgIdx).isIndirectMutating())
     return false;
 
   auto *DT = DA->get(Apply.getFunction());
@@ -838,9 +839,15 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
   // Create the new set of arguments to apply including their substitutions.
   SubstitutionMap NewCallSubs = Apply.getSubstitutionMap();
   SmallVector<SILValue, 8> NewArgs;
-  unsigned NumApplyArgs = Apply.getNumArguments();
   bool UpdatedArgs = false;
-  for (unsigned ArgIdx = 0; ArgIdx < NumApplyArgs; ArgIdx++) {
+  unsigned ArgIdx = 0;
+  // Push the indirect result arguments.
+  for (unsigned EndIdx = Apply.getSubstCalleeConv().getSILArgIndexOfFirstParam();
+       ArgIdx < EndIdx; ++ArgIdx) {
+      NewArgs.push_back(Apply.getArgument(ArgIdx));
+  }
+  // Transform the parameter arguments.
+  for (unsigned EndIdx = Apply.getNumArguments(); ArgIdx < EndIdx; ++ArgIdx) {
     auto ArgIt = CEIs.find(ArgIdx);
     if (ArgIt == CEIs.end()) {
       // Use the old argument if it does not have a valid concrete existential.
