@@ -9,9 +9,7 @@ struct S { var x, y: Int }
 // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK: // function_ref
 // CHECK: [[FN:%.*]] = function_ref @$ss15_arrayForceCastySayq_GSayxGr0_lF
-// CHECK: [[BORROWED_ARG_COPY:%.*]] = begin_borrow [[ARG_COPY]]
-// CHECK: [[RESULT:%.*]] = apply [[FN]]<S, Any>([[BORROWED_ARG_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
-// CHECK: end_borrow [[BORROWED_ARG_COPY]]
+// CHECK: [[RESULT:%.*]] = apply [[FN]]<S, Any>([[ARG_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1> (@guaranteed Array<τ_0_0>) -> @owned Array<τ_0_1>
 // CHECK: destroy_value [[ARG_COPY]]
 // CHECK: return [[RESULT]]
 func array_upcast(array: [S]) -> [Any] {
@@ -34,8 +32,7 @@ func ==(lhs: S, rhs: S) -> Bool {
 // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK: // function_ref
 // CHECK: [[FN:%.*]] = function_ref @$ss17_dictionaryUpCastySDyq0_q1_GSDyxq_GSHRzSHR0_r2_lF
-// CHECK: [[BORROWED_ARG_COPY:%.*]] = begin_borrow [[ARG_COPY]]
-// CHECK: [[RESULT:%.*]] = apply [[FN]]<S, Int, S, Any>([[BORROWED_ARG_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
+// CHECK: [[RESULT:%.*]] = apply [[FN]]<S, Int, S, Any>([[ARG_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Dictionary<τ_0_2, τ_0_3>
 // CHECK: destroy_value [[ARG_COPY]]
 // CHECK: return [[RESULT]]
 func dict_upcast(dict: [S: Int]) -> [S: Any] {
