@@ -1575,25 +1575,29 @@ TypeDecl *ModuleFile::lookupNestedType(Identifier name,
                                        const NominalTypeDecl *parent) {
   PrettyStackTraceModuleFile stackEntry(*this);
 
-  if (!NestedTypeDecls)
-    return nullptr;
+  if (NestedTypeDecls) {
+    auto iter = NestedTypeDecls->find(name);
+    if (iter != NestedTypeDecls->end()) {
+      for (std::pair<DeclID, DeclID> entry : *iter) {
+        assert(entry.first);
+        auto declOrOffset = Decls[entry.first - 1];
+        if (!declOrOffset.isComplete())
+          continue;
 
-  auto iter = NestedTypeDecls->find(name);
-  if (iter == NestedTypeDecls->end())
-    return nullptr;
-
-  auto data = *iter;
-  for (std::pair<DeclID, DeclID> entry : data) {
-    assert(entry.first);
-    auto declOrOffset = Decls[entry.first - 1];
-    if (!declOrOffset.isComplete())
-      continue;
-
-    Decl *decl = declOrOffset;
-    if (decl != parent)
-      continue;
-    return cast<TypeDecl>(getDecl(entry.second));
+        Decl *decl = declOrOffset;
+        if (decl != parent)
+          continue;
+        return cast<TypeDecl>(getDecl(entry.second));
+      }
+    }
   }
+
+  if (!ShadowedModule)
+    return nullptr;
+
+  for (FileUnit *file : ShadowedModule->getFiles())
+    if (auto *nestedType = file->lookupNestedType(name, parent))
+      return nestedType;
 
   return nullptr;
 }
