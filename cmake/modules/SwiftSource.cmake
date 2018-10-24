@@ -454,13 +454,14 @@ function(_compile_swift_files
   # Then we can compile both the object files and the swiftmodule files
   # in parallel in this target for the object file, and ...
 
-  # Windows doesn't support long command line paths, of 8191 chars or over.
-  # We need to work around this by avoiding long command line arguments. This can be
-  # achieved by writing the list of file paths to a file, then reading that list
-  # in the Python script.
+  # Windows doesn't support long command line paths, of 8191 chars or over. We
+  # need to work around this by avoiding long command line arguments. This can
+  # be achieved by writing the list of file paths to a file, then reading that
+  # list in the Python script.
   string(RANDOM file_name)
   set(file_path "${CMAKE_CURRENT_BINARY_DIR}/${file_name}.txt")
-  file(WRITE "${file_path}" "${source_files}")
+  string(REPLACE ";" "'\n'" source_files_quoted "${source_files}")
+  file(WRITE "${file_path}" "'${source_files_quoted}'")
   
   add_custom_command_target(
       dependency_target
