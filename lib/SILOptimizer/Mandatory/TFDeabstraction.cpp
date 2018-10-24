@@ -2140,9 +2140,14 @@ unwrapAggregateInstructions(SILValue value,
   return unwrapped;
 }
 
-/// Recursively unpacks aggregates to `inputList`, using the already-lowered
-/// values when possible to avoid code bloat.  Returns true to represent error
-/// if it detects a non-TensorFlow leaf field.
+/// Recursively unpacks aggregates of TensorFlow values to `inputList`, using
+/// the already-lowered values when possible to avoid code bloat.  Returns true
+/// to represent error if it detects a non-TensorFlow leaf field.
+///
+/// If `acceptTensorGroupConformingLeaves` is true, then we accept types that
+/// conform to TensorGroup as allowed leaf fields that get unpacked to
+/// `inputList`. Otherwise, we only accept types as leaf fields when they are
+/// one of our well-known TensorFlow types.
 static bool unpackTensorAggregates(
     const ASTContext &ctx, SILLocation loc, SILBuilder &B, SILValue rootAggregate,
     bool acceptTensorGroupConformingLeaves,
@@ -2332,11 +2337,6 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
       // Remove the argument so decodeArrayElements doesn't see the use.
       origInst->setOperand(i, SILUndef::get(argumentTy, fn.getModule()));
 
-      // In dynamic compilation mode, we can handle inputs that conform to
-      // TensorGroup even if we cannot completely unpack them.
-      bool acceptTensorGroupConformingLeaves =
-          llvm::TFDynamicCompilation && !isAcceleratorOnly(fn);
-
       // Handle the case where this is an array, representing an input list.
       ArrayElementDecoder arrayDecoder;
       auto elementType = arrayDecoder.decode(argumentValue);
@@ -2345,8 +2345,12 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
         // Add each element to the input list we're building, drilling down
         // through any aggregates that may be around it.
         for (auto *use : arrayDecoder.elementsAtInit) {
-          auto *store = dyn_cast<StoreInst>(use->getUser());
-          if (!store) {
+          SILValue element;
+          if (auto *store = dyn_cast<StoreInst>(use->getUser()))
+            element = store->getSrc();
+          if (auto *copyAddr = dyn_cast<CopyAddrInst>(use->getUser()))
+            element = copyAddr->getSrc();
+          if (!element) {
             diagnoseInvalid(argumentLoc,
                             "argument of type '" + elementType->getString() +
                             "' is not a TensorFlow value or an aggregate of "
@@ -2354,8 +2358,12 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
             return;
           }
 
-          if (unpackTensorAggregates(context, origInst->getLoc(), B,
-                                     store->getSrc(),
+          // In dynamic compilation mode, we can handle inputs that conform to
+          // TensorGroup even if we cannot completely unpack them.
+          bool acceptTensorGroupConformingLeaves =
+              llvm::TFDynamicCompilation && !isAcceleratorOnly(fn);
+
+          if (unpackTensorAggregates(context, origInst->getLoc(), B, element,
                                      acceptTensorGroupConformingLeaves,
                                      loweredTupleElts, loweredStructFields,
                                      unwrapCache, inputList)) {
@@ -2372,7 +2380,7 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
 
       // Otherwise, this must be a single input.
       if (unpackTensorAggregates(context, origInst->getLoc(), B, argumentValue,
-                                 acceptTensorGroupConformingLeaves,
+                                 /*acceptTensorGroupConformingLeaves=*/false,
                                  loweredTupleElts, loweredStructFields,
                                  unwrapCache, inputList)) {
         // FIXME: Since TFDeabstraction happens after mandatory inlining,

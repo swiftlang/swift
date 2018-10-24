@@ -7,12 +7,16 @@ import StdlibUnittest
 
 var DynamicCompilationGenericsTest = TestSuite("DynamicCompilationGenerics")
 
+/// This function cannot be compiled in graph mode because it passes a value
+/// of generic type T to a #tfop.
 @inline(never)
 func tensorSliceDataset<T: TensorGroup>(_ t: T) -> VariantHandle {
-  return #tfop("TensorSliceDataset", t, Toutput_types$dtype: T._typeList,
+  return #tfop("TensorSliceDataset", [t], Toutput_types$dtype: T._typeList,
                output_shapes: T._unknownShapeList)
 }
 
+/// This function cannot be compiled in graph mode because it executes a #tfop
+/// with generic return type T.
 @inline(never)
 func first<T: TensorGroup>(_ dataset: VariantHandle) -> T {
   let iterator: ResourceHandle = #tfop(
@@ -29,24 +33,23 @@ struct Example {
 
 extension Example : TensorGroup {
   static let _tensorHandleCount: Int32 = 2
-  static let _unknownShapeList: [TensorShape?] = [nil, nil]
   static let _typeList: [TensorDataType] =
       [Float.tensorFlowDataType, Float.tensorFlowDataType]
-  func _unpackTensorHandles(resultBuffer: UnsafeMutablePointer<CTensorHandle>) {
-    resultBuffer.advanced(by: 0).initialize(to: x.handle.cTensorHandle)
-    resultBuffer.advanced(by: 1).initialize(to: y.handle.cTensorHandle)
+  func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>) {
+   address.advanced(by: 0).initialize(to: x.handle._cTensorHandle)
+   address.advanced(by: 1).initialize(to: y.handle._cTensorHandle)
   }
   init(_owning tensorHandles: UnsafePointer<CTensorHandle>) {
-    x = Tensor(handle: TensorHandle(owning: tensorHandles.advanced(by: 0).pointee))
-    y = Tensor(handle: TensorHandle(owning: tensorHandles.advanced(by: 1).pointee))
+    x = Tensor(handle: TensorHandle(_owning: tensorHandles.advanced(by: 0).pointee))
+    y = Tensor(handle: TensorHandle(_owning: tensorHandles.advanced(by: 1).pointee))
   }
 }
 
 DynamicCompilationGenericsTest.testAllBackends("dataset") {
-  let dataset = tensorSliceDataset(Example(x: Tensor([1, 2, 3]), y: Tensor([2, 4, 6])))
+  let dataset = tensorSliceDataset(Example(x: Tensor([1, 2, 3]), y: Tensor([4, 5, 6])))
   let example: Example = first(dataset)
   expectEqual(1, example.x.scalar!)
-  expectEqual(2, example.y.scalar!)
+  expectEqual(4, example.y.scalar!)
 }
 
 runAllTests()

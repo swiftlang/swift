@@ -1,4 +1,4 @@
-//===-- TensorGroup.swift ---------------------------------*- swift -*-===//
+//===-- TensorGroup.swift -------------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -26,18 +26,24 @@ public protocol TensorGroup {
   /// The number of tensor fields in this type.
   static var _tensorHandleCount: Int32 { get }
 
-  /// An array of `nil`s with size equal to `_tensorHandleCount`.
-  static var _unknownShapeList: [TensorShape?] { get }
-
-  /// The types of the tensor fields in this type.
+  /// The types of the tensor stored properties in this type.
   static var _typeList: [TensorDataType] { get }
 
-  /// Writes the tensor handles to `resultBuffer`, which must be allocated
-  /// with enough capacity to hold `_tensorHandleCount` handles. The returned
-  /// tensor handles are borrowed: this container still owns them.
-  func _unpackTensorHandles(resultBuffer: UnsafeMutablePointer<CTensorHandle>)
+  /// Writes the tensor handles to `address`, which must be allocated
+  /// with enough capacity to hold `_tensorHandleCount` handles. The tensor
+  /// handles written to `address` are borrowed: this container still
+  /// owns them.
+  func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>)
 
   /// Initializes a value of this type, taking ownership of the
   /// `_tensorHandleCount` tensors that are at `tensorHandles`.
   init(_owning tensorHandles: UnsafePointer<CTensorHandle>)
+}
+
+public extension TensorGroup {
+  /// An array of `nil`s with size equal to `_tensorHandleCount`. The `nil`
+  /// represents unknown shape.
+  static var _unknownShapeList: [TensorShape?] {
+    return Array(repeating: nil, count: Int(_tensorHandleCount))
+  }
 }

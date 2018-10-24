@@ -479,6 +479,7 @@ namespace RuntimeConstants {
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
   const auto FirstParamReturned = llvm::Attribute::Returned;
+  // SWIFT_ENABLE_TENSORFLOW
   const auto FirstParamStructRet = llvm::Attribute::StructRet;
 } // namespace RuntimeConstants
 
@@ -493,6 +494,7 @@ static bool isReturnAttribute(llvm::Attribute::AttrKind Attr) {
 static bool isReturnedAttribute(llvm::Attribute::AttrKind Attr) {
   return Attr == llvm::Attribute::Returned;
 }
+// SWIFT_ENABLE_TENSORFLOW
 // Similar to the 'return' attribute we assume that the 'sret' attributed is
 // associated with the first function parameter.
 static bool isStructRetAttribute(llvm::Attribute::AttrKind Attr) {

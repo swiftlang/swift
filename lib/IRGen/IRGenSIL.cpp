@@ -1917,19 +1917,46 @@ llvm::Value *IRGenSILFunction::createArrayAndSize(
   return numElts;
 }
 
-/// The name of the number attr that describes the length of the input list to
-/// the op. Returns nullptr if no number attr is required.
+/// The name of the numberAttr for `opName`'s `inputIdx` argument. The
+/// numberAttr is an attr whose value must be set to describe the length of an
+/// input list. Returns nullptr if no number attr is required. For example,
+/// "Concat" is registered as:
+///
+///   REGISTER_OP("Concat")
+///       .Input("concat_dim: int32")
+///       .Input("values: N * T")
+///       .Output("output: T")
+///       .Attr("N: int >= 2")
+///       .Attr("T: type")
+///
+/// Therefore:
+///   * inputListNumberAttr("Concat", 0) == null, because the 0-th input is
+///     not a list
+///   * inputListNumberAttr("Concat", 1) == "N", because the 1-st input is
+///     a list and its numberAttr is "N"
+///
 /// FIXME: This is incomplete. We should derive this from op metadata. We can
-/// get it from the "number_attr" field of the input's "input_arg". The raw op
-/// generator is probably the right place to put this.
+/// get it from the "number_attr" field of the input's "input_arg".
 static const char *inputListNumberAttr(StringRef opName, unsigned inputIdx) {
-  if (inputIdx == 0 && opName == "Pack")
-    return "N";
-  if (inputIdx == 0 &&
-      (opName == "Concat" || opName == "ConcatV2" || opName == "ConcatOffset"))
-    return "N";
-  if (inputIdx == 0 && opName == "ZipDataset")
-    return "N";
+  if (opName == "Pack") {
+    if (inputIdx == 0)
+      return "N";
+  } else if (opName == "Concat") {
+    if (inputIdx == 1)
+      return "N";
+  } else if (opName == "ConcatV2") {
+    if (inputIdx == 0)
+      return "N";
+  } else if (opName == "ConcatOffset") {
+    if (inputIdx == 0)
+      return "N";
+  } else if (opName == "Pack") {
+    if (inputIdx == 0)
+      return "N";
+  } else if (opName == "ZipDataset") {
+    if (inputIdx == 0)
+      return "N";
+  }
   return nullptr;
 }
 
@@ -1949,6 +1976,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   auto &astCtx = CurSILFn->getASTContext();
   tf::GraphOperationInfo opInfo(i);
 
+  // TODO: As an optimization, do this lookup once per CurSILFn
   auto tfModule = astCtx.getLoadedModule(astCtx.Id_TensorFlow);
   assert(tfModule && "could not find TensorFlow module");
   auto tensorGroupProto =
@@ -2062,11 +2090,11 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
     auto *opAddInputFromTensorGroupFn =
         IGM.getTFC_OpAddInputFromTensorGroupFn();
-    auto *ret = Builder.CreateCall(
+    auto *numInputs = Builder.CreateCall(
         opAddInputFromTensorGroupFn,
         {op, tensorHandleValueUntyped, status, typeMetadata, wtable});
     checkOk(status);
-    return ret;
+    return numInputs;
   };
 
   // If we find an out parameter, we'll keep track of its address and some data
@@ -2076,7 +2104,34 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   llvm::Value *outParameterTensorGroupWitnessTable = nullptr;
 
   // Handle inputs and dynamic attributes.
+
+  // Each `structuredArgument` in the below loop corresponds to exactly one
+  // Input or Attr registered with the op. The Input `structuredArgument`s
+  // appear in the same order that they are registered in the op, and `inputIdx`
+  // keeps track of which Input we are on. For example, "ParseExample" is
+  // registered as:
+  //
+  //   REGISTER_OP("ParseExample")
+  //     .Input("serialized: string")
+  //     .Input("names: string")
+  //     .Input("sparse_keys: Nsparse * string")
+  //     .Input("dense_keys: Ndense * string")
+  //     .Input("dense_defaults: Tdense")
+  //     ...
+  //
+  // So "serialized" has `inputIdx == 0`, "names" has `inputIdx == 1`,
+  // "sparse_keys" has `inputIdx == 2`, "dense_keys" has `inputIdx == 3`, and
+  // "dense_defaults" has `inputIdx == 4`.
+  //
+  // Note that each registered Input corresponds to exactly one
+  // `structuredArgument` and exactly one `inputIdx`, even if the registered
+  // Input is an input list (e.g. "sparse_keys" and "dense_keys"). We lower
+  // input lists by calling TFE_OpAddInput once per element of the list. Then we
+  // set the numberAttr (e.g. "Nsparse" and "Ndense") corresponding to the
+  // Input, which tells TensorFlow to treat all the added inputs as part of a
+  // single input list Input.
   unsigned inputIdx = 0;
+
   for (auto structuredArgument : opInfo.getStructuredArguments()) {
     auto argumentNameAndLowering =
         structuredArgument.getArgumentNameAndLowering();
@@ -2099,23 +2154,13 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     case GraphOperationInfo::ArgumentLowering::Input: {
       assert(argumentName.empty() && "inputs cannot have names");
 
-      // Special attr to represent the list length, if needed. This is necessary
-      // because we add list inputs one element at a time rather than by using a
-      // TFE_OpAddInputList function (which doesn't exist yet). This is null
-      // when the input does not have a number attr.
-      const char *numberAttr = inputListNumberAttr(opInfo.getOperationName(),
-                                                   inputIdx);
-
-      // Keep track of the list length when we have a number attr.
-      llvm::Value *listLength = nullptr;
+      // Keep track of how many inputs we have added for this
+      // `structuredArgument`. (It is possible to add more than one input per
+      // `structuredArgument` in the case of an input list. See the
+      // "ParseExample" example above for more information.)
+      llvm::Value *listLength = llvm::ConstantInt::get(IGM.Int32Ty, 0);
       auto incrementListLength = [&](llvm::Value *amount) {
-        if (!numberAttr)
-          return;
-
-        if (listLength)
-          listLength = Builder.CreateAdd(listLength, amount);
-        else
-          listLength = amount;
+        listLength = Builder.CreateAdd(listLength, amount);
       };
 
       switch (structuredArgument.getKind()) {
@@ -2135,8 +2180,11 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       }
       }
 
-      if (numberAttr) {
-        assert(listLength && "should have set a list length");
+      // If the current `inputIdx` for the current op is an input list that
+      // requires a numberAttr, set that numberAttr. See the "ParseExample"
+      // example above for more information.
+      if (auto numberAttr = inputListNumberAttr(opInfo.getOperationName(),
+                                                inputIdx)) {
         listLength = Builder.CreateSExt(listLength, IGM.Int64Ty);
         auto setAttrFn = IGM.getTFE_OpSetAttrIntFn();
         auto numberAttrAddrVal = IGM.getAddrOfGlobalString(numberAttr);
@@ -2721,20 +2769,20 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     // If we have an out parameter, then we need to call generic functions that
     // calculate how many results we have and allocate space for them.
     LLVM_DEBUG(llvm::dbgs() << " Returns indirect result.\n");
-    auto *getTensorGroupResultBufferSizeFn =
-        IGM.getTFC_GetTensorGroupResultBufferSizeFn();
+    auto *getTensorGroupCHandleCountFn =
+        IGM.getTFC_GetTensorGroupCHandleCountFn();
     expectedReturnValueCount = Builder.CreateCall(
-        getTensorGroupResultBufferSizeFn,
+        getTensorGroupCHandleCountFn,
         {outParameterTypeMetadata, outParameterTypeMetadata,
          outParameterTensorGroupWitnessTable});
-    auto *getTensorGroupResultBufferFn =
-        IGM.getTFC_GetTensorGroupResultBufferFn();
+    auto *allocateTensorGroupCHandleBufferFn =
+        IGM.getTFC_AllocateTensorGroupCHandleBufferFn();
     returnValuesAddress = Builder.CreateCall(
-        getTensorGroupResultBufferFn,
+        allocateTensorGroupCHandleBufferFn,
         {outParameterTypeMetadata, outParameterTypeMetadata,
          outParameterTensorGroupWitnessTable});
     returnValuesAddress = Builder.CreateBitCast(returnValuesAddress,
-                                          IGM.Int8PtrPtrTy);
+                                                IGM.Int8PtrPtrTy);
   } else {
     // If we're returning results directly, we can tell how many results we have
     // by looking at the instruction.
