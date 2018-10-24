@@ -864,7 +864,7 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitGradientInst(GradientInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
+  recordClonedInstruction(Inst,
     getBuilder().createGradient(getOpLocation(Inst->getLoc()),
                                 getOpValue(Inst->getOriginal()),
                                 Inst->getConfig()));
@@ -1773,7 +1773,7 @@ void SILCloner<ImplClass>::visitGraphOperationInst(GraphOperationInst *Inst) {
   SmallVector<SILType, 4> resultTypes;
   for (auto result : Inst->getResults())
     resultTypes.push_back(getOpType(result->getType()));
-  doPostProcess(Inst,
+  recordClonedInstruction(Inst,
       getBuilder().createGraphOperation(getOpLocation(Inst->getLoc()),
                                         Inst->getName(), arguments,
                                         Inst->getAttributes(), resultTypes));

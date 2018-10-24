@@ -216,6 +216,9 @@ CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, UncheckedTakeEnumDataAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, UnconditionalCheckedCastAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, AllocValueBuffer)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, DeallocValueBuffer)
+// SWIFT_ENABLE_TENSORFLOW
+CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, Gradient)
+CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, GraphOperation)
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
   CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, Load##Name)
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
@@ -1149,6 +1152,14 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ZExt)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ZExtOrBitCast)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, ZeroInitializer)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, Swift3ImplicitObjCEntrypoint)
+// SWIFT_ENABLE_TENSORFLOW
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, TensorFlowSend)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, TensorFlowReceive)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AutoDiffCreateTape)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AutoDiffPushToTape)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AutoDiffPopFromTape)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AutoDiffDestroyTape)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, PoundAssert)
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
 // Builtins that should be lowered to SIL instructions so we should never see
