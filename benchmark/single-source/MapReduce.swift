@@ -17,8 +17,10 @@ public let MapReduce = [
   BenchmarkInfo(name: "MapReduce", runFunction: run_MapReduce, tags: [.validation, .algorithm]),
   BenchmarkInfo(name: "MapReduceAnyCollection", runFunction: run_MapReduceAnyCollection, tags: [.validation, .algorithm]),
   BenchmarkInfo(name: "MapReduceAnyCollectionShort", runFunction: run_MapReduceAnyCollectionShort, tags: [.validation, .algorithm]),
-  BenchmarkInfo(name: "MapReduceClass", runFunction: run_MapReduceClass, tags: [.validation, .algorithm]),
-  BenchmarkInfo(name: "MapReduceClassShort", runFunction: run_MapReduceClassShort, tags: [.validation, .algorithm]),
+  BenchmarkInfo(name: "MapReduceClass2", runFunction: run_MapReduceClass, tags: [.validation, .algorithm],
+    setUpFunction: { decimals(1000) }, tearDownFunction: releaseDecimals),
+  BenchmarkInfo(name: "MapReduceClassShort2", runFunction: run_MapReduceClassShort, tags: [.validation, .algorithm],
+    setUpFunction: { decimals(10) }, tearDownFunction: releaseDecimals),
   BenchmarkInfo(name: "MapReduceLazyCollection", runFunction: run_MapReduceLazyCollection, tags: [.validation, .algorithm]),
   BenchmarkInfo(name: "MapReduceLazyCollectionShort", runFunction: run_MapReduceLazyCollectionShort, tags: [.validation, .algorithm]),
   BenchmarkInfo(name: "MapReduceLazySequence", runFunction: run_MapReduceLazySequence, tags: [.validation, .algorithm]),
@@ -27,6 +29,17 @@ public let MapReduce = [
   BenchmarkInfo(name: "MapReduceShortString", runFunction: run_MapReduceShortString, tags: [.validation, .algorithm, .String]),
   BenchmarkInfo(name: "MapReduceString", runFunction: run_MapReduceString, tags: [.validation, .algorithm, .String]),
 ]
+
+#if _runtime(_ObjC)
+var decimals : [NSDecimalNumber]!
+func decimals(_ n: Int) {
+  decimals = (0..<n).map { NSDecimalNumber(value: $0) }
+}
+func releaseDecimals() { decimals = nil }
+#else
+func decimals(_ n: Int) {}
+func releaseDecimals() {}
+#endif
 
 @inline(never)
 public func run_MapReduce(_ N: Int) {
@@ -149,7 +162,7 @@ public func run_MapReduceShortString(_ N: Int) {
 @inline(never)
 public func run_MapReduceClass(_ N: Int) {
 #if _runtime(_ObjC)
-  let numbers = (0..<1000).map { NSDecimalNumber(value: $0) }
+  let numbers: [NSDecimalNumber] = decimals
 
   var c = 0
   for _ in 1...N*100 {
@@ -163,7 +176,7 @@ public func run_MapReduceClass(_ N: Int) {
 @inline(never)
 public func run_MapReduceClassShort(_ N: Int) {
 #if _runtime(_ObjC)
-  let numbers = (0..<10).map { NSDecimalNumber(value: $0) }
+  let numbers: [NSDecimalNumber] = decimals
 
   var c = 0
   for _ in 1...N*10000 {
@@ -173,4 +186,3 @@ public func run_MapReduceClassShort(_ N: Int) {
   CheckResults(c != 0)
 #endif
 }
-
