@@ -50,11 +50,9 @@ extension _AbstractStringStorage {
     let range = Range(
       uncheckedBounds: (aRange.location, aRange.location+aRange.length))
     let str = asString
-    let slice = str.utf16[str._toUTF16Indices(range)]
-    let outputBufPtr = UnsafeMutableBufferPointer(
-      start: buffer, count: range.count)
-
-    let _ = slice._copyContents(initializing: outputBufPtr)
+    str._copyUTF16CodeUnits(
+      into: UnsafeMutableBufferPointer(start: buffer, count: range.count),
+      range: range)
   }
 
   @objc(_fastCharacterContents)
