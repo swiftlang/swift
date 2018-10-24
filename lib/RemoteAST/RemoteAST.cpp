@@ -365,7 +365,8 @@ public:
       auto ownership = flags.getValueOwnership();
       auto parameterFlags = ParameterTypeFlags()
                                 .withValueOwnership(ownership)
-                                .withVariadic(flags.isVariadic());
+                                .withVariadic(flags.isVariadic())
+                                .withAutoClosure(flags.isAutoClosure());
 
       funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
     }
