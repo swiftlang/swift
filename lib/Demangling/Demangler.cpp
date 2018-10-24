@@ -39,8 +39,8 @@ static bool isDeclName(Node::Kind kind) {
     case Node::Kind::PrefixOperator:
     case Node::Kind::PostfixOperator:
     case Node::Kind::InfixOperator:
-    case Node::Kind::UnresolvedSymbolicReference:
-    case Node::Kind::SymbolicReference:
+    case Node::Kind::TypeSymbolicReference:
+    case Node::Kind::ProtocolSymbolicReference:
       return true;
     default:
       return false;
@@ -65,10 +65,10 @@ static bool isAnyGeneric(Node::Kind kind) {
     case Node::Kind::Class:
     case Node::Kind::Enum:
     case Node::Kind::Protocol:
+    case Node::Kind::ProtocolSymbolicReference:
     case Node::Kind::OtherNominalType:
     case Node::Kind::TypeAlias:
-    case Node::Kind::SymbolicReference:
-    case Node::Kind::UnresolvedSymbolicReference:
+    case Node::Kind::TypeSymbolicReference:
       return true;
     default:
       return false;
@@ -241,6 +241,7 @@ static bool isProtocolNode(Demangle::NodePointer Node) {
   case Demangle::Node::Kind::Type:
     return isProtocolNode(Node->getChild(0));
   case Demangle::Node::Kind::Protocol:
+  case Demangle::Node::Kind::ProtocolSymbolicReference:
     return true;
   default:
     return false;
@@ -547,31 +548,52 @@ NodePointer Demangler::demangleTypeMangling() {
   return TypeMangling;
 }
   
-NodePointer Demangler::demangleSymbolicReference(const void *at) {
+NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind,
+                                                 const void *at) {
   // The symbolic reference is a 4-byte machine integer encoded in the following
   // four bytes.
   int32_t value;
   memcpy(&value, Text.data() + Pos, 4);
   Pos += 4;
   
+  // Map the encoded kind to a specific kind and directness.
+  SymbolicReferenceKind kind;
+  Directness direct;
+  switch (rawKind) {
+  case 1:
+    kind = SymbolicReferenceKind::Context;
+    direct = Directness::Direct;
+    break;
+  case 2:
+    kind = SymbolicReferenceKind::Context;
+    direct = Directness::Indirect;
+    break;
+  default:
+    return nullptr;
+  }
+  
   // Use the resolver, if any, to produce the demangling tree the symbolic
   // reference represents.
   NodePointer resolved = nullptr;
   if (SymbolicReferenceResolver)
-    resolved = SymbolicReferenceResolver(value, at);
-  // With no resolver, or a resolver that failed, simply preserve the raw
-  // information in the node.
+    resolved = SymbolicReferenceResolver(kind, direct, value, at);
+  // With no resolver, or a resolver that failed, refuse to demangle further.
   if (!resolved)
-    resolved = createNode(Node::Kind::UnresolvedSymbolicReference, value);
+    return nullptr;
   
-  // Register the result as a substitution.
-  addSubstitution(resolved);
+  // Types register as substitutions even when symbolically referenced.
+  if (kind == SymbolicReferenceKind::Context)
+    addSubstitution(resolved);
   return resolved;
 }
 
 NodePointer Demangler::demangleOperator() {
   switch (char c = nextChar()) {
-    case '\1': return demangleSymbolicReference(Text.data() + Pos);
+    case '\1':
+    case '\2':
+    case '\3':
+    case '\4':
+      return demangleSymbolicReference((unsigned char)c, Text.data() + Pos);
     case 'A': return demangleMultiSubstitutions();
     case 'B': return demangleBuiltinType();
     case 'C': return demangleAnyGenericType(Node::Kind::Class);
@@ -1204,11 +1226,14 @@ NodePointer Demangler::popProtocol() {
     if (Type->getNumChildren() < 1)
       return nullptr;
 
-    NodePointer Proto = Type->getChild(0);
-    if (Proto->getKind() != Node::Kind::Protocol)
+    if (!isProtocolNode(Type))
       return nullptr;
 
     return Type;
+  }
+  
+  if (NodePointer SymbolicRef = popNode(Node::Kind::ProtocolSymbolicReference)){
+    return SymbolicRef;
   }
 
   NodePointer Name = popNode(isDeclName);
@@ -1273,9 +1298,10 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
   if (TypeListIdx >= TypeLists.size())
     return nullptr;
 
-  // Associate a symbolic reference with all remaining generic arguments.
-  if (Nominal->getKind() == Node::Kind::SymbolicReference
-      || Nominal->getKind() == Node::Kind::UnresolvedSymbolicReference) {
+  // Associate a context symbolic reference with all remaining generic
+  // arguments.
+  if (Nominal->getKind() == Node::Kind::TypeSymbolicReference
+      || Nominal->getKind() == Node::Kind::ProtocolSymbolicReference) {
     auto remainingTypeList = createNode(Node::Kind::TypeList);
     for (unsigned i = TypeLists.size() - 1;
          i >= TypeListIdx && i < TypeLists.size();
@@ -1349,30 +1375,30 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
 
   Node::Kind kind;
   switch (Nominal->getKind()) {
-    case Node::Kind::Class:
-      kind = Node::Kind::BoundGenericClass;
-      break;
-    case Node::Kind::Structure:
-      kind = Node::Kind::BoundGenericStructure;
-      break;
-    case Node::Kind::Enum:
-      kind = Node::Kind::BoundGenericEnum;
-      break;
-    case Node::Kind::Protocol:
-      kind = Node::Kind::BoundGenericProtocol;
-      break;
-    case Node::Kind::OtherNominalType:
-      kind = Node::Kind::BoundGenericOtherNominalType;
-      break;
-    case Node::Kind::TypeAlias:
-      kind = Node::Kind::BoundGenericTypeAlias;
-      break;
-    case Node::Kind::Function:
-    case Node::Kind::Constructor:
-      // Well, not really a nominal type.
-      return createWithChildren(Node::Kind::BoundGenericFunction, Nominal, args);
-    default:
-      return nullptr;
+  case Node::Kind::Class:
+    kind = Node::Kind::BoundGenericClass;
+    break;
+  case Node::Kind::Structure:
+    kind = Node::Kind::BoundGenericStructure;
+    break;
+  case Node::Kind::Enum:
+    kind = Node::Kind::BoundGenericEnum;
+    break;
+  case Node::Kind::Protocol:
+    kind = Node::Kind::BoundGenericProtocol;
+    break;
+  case Node::Kind::OtherNominalType:
+    kind = Node::Kind::BoundGenericOtherNominalType;
+    break;
+  case Node::Kind::TypeAlias:
+    kind = Node::Kind::BoundGenericTypeAlias;
+    break;
+  case Node::Kind::Function:
+  case Node::Kind::Constructor:
+    // Well, not really a nominal type.
+    return createWithChildren(Node::Kind::BoundGenericFunction, Nominal, args);
+  default:
+    return nullptr;
   }
   return createWithChildren(kind, createType(Nominal), args);
 }
@@ -1655,7 +1681,7 @@ NodePointer Demangler::demangleAssociatedTypeCompound(
 
 NodePointer Demangler::popAssocTypeName() {
   NodePointer Proto = popNode(Node::Kind::Type);
-  if (Proto && Proto->getFirstChild()->getKind() != Node::Kind::Protocol)
+  if (Proto && !isProtocolNode(Proto))
     return nullptr;
 
   NodePointer Id = popNode(Node::Kind::Identifier);

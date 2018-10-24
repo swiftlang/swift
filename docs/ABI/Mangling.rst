@@ -9,9 +9,15 @@ Mangling
 --------
 ::
 
-  mangled-name ::= '$s' global
+  mangled-name ::= '$s' global  // Swift stable mangling
+  mangled-name ::= '_T0' global // Swift 4.0
+  mangled-name ::= '$S' global  // Swift 4.2
 
-All Swift-mangled names begin with this prefix.
+All Swift-mangled names begin with a common prefix. Since Swift 4.0, the
+compiler has used variations of the mangling described in this document, though
+pre-stable versions may not exactly conform to this description. By using
+distinct prefixes, tools can attempt to accommodate bugs and version variations
+in pre-stable versions of Swift.
 
 The basic mangling scheme is a list of 'operators' where the operators are
 structured in a post-fix order. For example the mangling may start with an
@@ -19,8 +25,6 @@ identifier but only later in the mangling a type-like operator defines how this
 identifier has to be interpreted::
 
   4Test3FooC   // The trailing 'C' says that 'Foo' is a class in module 'Test'
-
-
 
 Operators are either identifiers or a sequence of one or more characters,
 like ``C`` for class.
@@ -41,6 +45,48 @@ mangled name will start with the module name (after the ``_S``).
 
 In the following, productions which are only _part_ of an operator, are
 named with uppercase letters.
+
+Symbolic references
+~~~~~~~~~~~~~~~~~~~
+
+The Swift compiler emits mangled names into binary images to encode
+references to types for runtime instantiation and reflection. In a binary,
+these mangled names may embed pointers to runtime data
+structures in order to more efficiently represent locally-defined types.
+We call these pointers **symbolic references**.
+These references will be introduced by a control character in the range
+`\x01` ... `\x1F`, which indicates the kind of symbolic reference, followed by
+some number of arbitrary bytes *which may include null bytes*. Code that
+processes mangled names out of Swift binaries needs to be aware of symbolic
+references in order to properly terminate strings; a null terminator may be
+part of a symbolic reference.
+
+::
+
+  symbolic-reference ::= [\x01-\x17] .{4} // Relative symbolic reference
+   #if sizeof(void*) == 8
+     symbolic-reference ::= [\x18-\x1F] .{8} // Absolute symbolic reference
+   #elif sizeof(void*) == 4
+     symbolic-reference ::= [\x18-\x1F] .{4} // Absolute symbolic reference
+   #endif
+
+Symbolic references are only valid in compiler-emitted metadata structures
+and must only appear in read-only parts of a binary image. APIs and tools
+that interpret Swift mangled names from potentially uncontrolled inputs must
+refuse to interpret symbolic references.
+
+The following symbolic reference kinds are currently implemented:
+
+::
+
+   {any-generic-type, protocol} ::= '\x01' .{4}              // Reference points directly to context descriptor
+   {any-generic-type, protocol} ::= '\x02' .{4}              // Reference points indirectly to context descriptor
+   // The grammatical role of the symbolic reference is determined by the
+   // kind of context descriptor referenced
+
+   protocol-conformance-ref ::= '\x03' .{4}  // Reference points directly to protocol conformance descriptor (NOT IMPLEMENTED)
+   protocol-conformance-ref ::= '\x04' .{4}  // Reference points indirectly to protocol conformance descriptor (NOT IMPLEMENTED)
+
 
 Globals
 ~~~~~~~
@@ -549,7 +595,9 @@ Generics
 
 ::
 
-  protocol-conformance ::= type protocol module generic-signature?
+  protocol-conformance-context ::= protocol module generic-signature?
+
+  protocol-conformance ::= type protocol-conformance-context
 
 ``<protocol-conformance>`` refers to a type's conformance to a protocol. The
 named module is the one containing the extension or type declaration that
@@ -557,9 +605,25 @@ declared the conformance.
 
 ::
 
+  protocol-conformance ::= type protocol
+
+If ``type`` is a generic parameter or associated type of one, then no module
+is mangled, because the conformance must be resolved from the generic
+environment.
+
   protocol-conformance ::= context identifier protocol identifier generic-signature?  // Property behavior conformance
 
 Property behaviors are implemented using private protocol conformances.
+
+::
+
+  concrete-protocol-conformance ::= type protocol-conformance-ref
+  protocol-conformance-ref ::= protocol module?
+
+A compact representation used to represent mangled protocol conformance witness
+arguments at runtime. The ``module`` is only specified for conformances that
+are "retroactive", meaning that the context in which the conformance is defined
+is in neither the protocol or type module.
 
 ::
 
