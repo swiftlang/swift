@@ -215,8 +215,16 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
                diag::expr_unsupported_objc_key_path_component,
                (unsigned)kind);
       continue;
-    case KeyPathExpr::Component::Kind::OptionalWrap:
     case KeyPathExpr::Component::Kind::Property:
+    case KeyPathExpr::Component::Kind::Type: {
+      //For code completion purposes, we only care about the last expression.
+      if (&component == &expr->getComponents().back()) {
+        return component.getComponentType();
+      } else {
+        continue;
+      }
+    }
+    case KeyPathExpr::Component::Kind::OptionalWrap:
     case KeyPathExpr::Component::Kind::Subscript:
       llvm_unreachable("already resolved!");
     }
@@ -321,10 +329,11 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
 
       // Resolve this component to the variable we found.
       auto varRef = ConcreteDeclRef(var);
+      Type type = var->getInterfaceType();
       auto resolved =
-        KeyPathExpr::Component::forProperty(varRef, Type(), componentNameLoc);
+        KeyPathExpr::Component::forProperty(varRef, type, componentNameLoc);
       resolvedComponents.push_back(resolved);
-      updateState(/*isProperty=*/true, var->getInterfaceType());
+      updateState(/*isProperty=*/true, type);
 
       // Check that the property is @objc.
       if (!var->isObjC()) {
@@ -388,6 +397,11 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
         break;
       }
 
+      // Resolve this component to the type we found.
+      auto typeRef = ConcreteDeclRef(type);
+      auto resolved =
+      KeyPathExpr::Component::forType(typeRef, newType, componentNameLoc);
+      resolvedComponents.push_back(resolved);
       updateState(/*isProperty=*/false, newType);
       continue;
     }

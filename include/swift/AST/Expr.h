@@ -4775,6 +4775,7 @@ public:
       OptionalChain,
       OptionalWrap,
       Identity,
+      Type,
     };
   
   private:
@@ -4871,7 +4872,17 @@ public:
                        propertyType,
                        loc);
     }
-    
+
+    /// Create a component for a type.
+    static Component forType(ConcreteDeclRef typeRef,
+                             Type type,
+                             SourceLoc loc) {
+      return Component(nullptr, typeRef, nullptr, {}, {},
+                       Kind::Type,
+                       type,
+                       loc);
+    }
+
     /// Create a component for a subscript.
     static Component forSubscript(ASTContext &ctx,
                               ConcreteDeclRef subscript,
@@ -4946,6 +4957,7 @@ public:
       case Kind::OptionalForce:
       case Kind::Property:
       case Kind::Identity:
+      case Kind::Type:
         return true;
 
       case Kind::UnresolvedSubscript:
@@ -4969,6 +4981,7 @@ public:
       case Kind::UnresolvedProperty:
       case Kind::Property:
       case Kind::Identity:
+      case Kind::Type:
         return nullptr;
       }
       llvm_unreachable("unhandled kind");
@@ -4987,6 +5000,7 @@ public:
       case Kind::UnresolvedProperty:
       case Kind::Property:
       case Kind::Identity:
+      case Kind::Type:
         llvm_unreachable("no subscript labels for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5008,6 +5022,7 @@ public:
       case Kind::UnresolvedProperty:
       case Kind::Property:
       case Kind::Identity:
+      case Kind::Type:
         return {};
       }
       llvm_unreachable("unhandled kind");
@@ -5029,6 +5044,7 @@ public:
       case Kind::OptionalForce:
       case Kind::Property:
       case Kind::Identity:
+      case Kind::Type:
         llvm_unreachable("no unresolved name for this kind");
       }
       llvm_unreachable("unhandled kind");
@@ -5038,6 +5054,7 @@ public:
       switch (getKind()) {
       case Kind::Property:
       case Kind::Subscript:
+      case Kind::Type:
         return Decl.ResolvedDecl;
 
       case Kind::Invalid:

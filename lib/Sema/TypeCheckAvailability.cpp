@@ -2433,7 +2433,8 @@ private:
     for (auto &component : KP->getComponents()) {
       switch (component.getKind()) {
       case KeyPathExpr::Component::Kind::Property:
-      case KeyPathExpr::Component::Kind::Subscript: {
+      case KeyPathExpr::Component::Kind::Subscript:
+      case KeyPathExpr::Component::Kind::Type: {
         auto *decl = component.getDeclRef().getDecl();
         auto loc = component.getLoc();
         SourceRange range(loc, loc);

@@ -1034,6 +1034,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       case KeyPathExpr::Component::Kind::UnresolvedProperty:
       case KeyPathExpr::Component::Kind::Invalid:
       case KeyPathExpr::Component::Kind::Identity:
+      case KeyPathExpr::Component::Kind::Type:
         // No subexpr to visit.
         break;
       }
