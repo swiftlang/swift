@@ -24,6 +24,11 @@
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/raw_ostream.h"
 
+#define EXPERIMENTAL_DEPENDENCIES_DEBUG_PRINT 1
+#if EXPERIMENTAL_DEPENDENCIES_DEBUG_PRINT
+#include "swift/Driver/Job.h"
+#endif
+
 using namespace swift;
 
 enum class DependencyGraphImpl::DependencyKind : uint8_t {
@@ -438,6 +443,16 @@ void DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
           new (&newReason.back()) MarkTracerImpl::Entry({next, provided.name,
                                                          intersectingKinds});
         }
+#if EXPERIMENTAL_DEPENDENCIES_DEBUG_PRINT
+        driver::Job* nextJob = (driver::Job*)next;
+        driver::Job* dependentJob = (driver::Job*)dependent.node;
+        llvm::errs() << "HERE ";
+        dependentJob->printSummary(llvm::errs());
+        llvm::errs() << " from ";
+        nextJob->printSummary(llvm::errs());
+        llvm::errs() << " kind " << (int)intersectingKinds.toRaw() << " reas " << provided.name << (isCascading ? " casc" : " noncasc");
+        llvm::errs() << "\n";
+#endif
         worklist.push_back({ newReason, dependent.node, isCascading });
       }
     }

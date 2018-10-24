@@ -130,7 +130,12 @@ static std::string scrubOne(StringRef input, const char* prefix, const char endC
 }
 
 static std::string scrubAll(StringRef input) {
-  return scrubOne(scrubOne( scrubOne(input, "range=[", ']'), "location=", ' '), "@/", ' ');
+  return scrubOne(
+                  scrubOne(
+                           scrubOne(
+                                    scrubOne(input, "range=[", ']'), "location=", ' '),
+                           "@/", ' '),
+                  "anonname=", '\'');
 }
 
 
