@@ -2156,11 +2156,11 @@ void Remangler::mangleAssociatedTypeGenericParamRef(Node *node) {
   unreachable("unsupported");
 }
 
-void Remangler::mangleUnresolvedSymbolicReference(Node *node, EntityContext&) {
+void Remangler::mangleTypeSymbolicReference(Node *node, EntityContext&) {
   unreachable("unsupported");
 }
 
-void Remangler::mangleSymbolicReference(Node *node, EntityContext&) {
+void Remangler::mangleProtocolSymbolicReference(Node *node, EntityContext&) {
   unreachable("unsupported");
 }
 
