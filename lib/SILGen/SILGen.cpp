@@ -809,8 +809,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
         AFD->getAttrs().getAttribute(DeclAttrKind::DAK_Differentiable))) {
     switch (diffAttr->getMode()) {
     case AutoDiffMode::Forward:
-      // TODO: Handle forward mode once [forward_differentiable] is
-      // implemented.
+      // TODO: Handle forward mode once [forward_differentiable] is implemented.
       llvm_unreachable("Unimplemented");
       break;
     case AutoDiffMode::Reverse: {
@@ -822,12 +821,11 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
       if (auto *primFn = diffAttr->getPrimalFunction())
         primName = getFunction(SILDeclRef(primFn), ForDefinition)->getName();
       if (auto *adjointFn = diffAttr->getAdjointFunction()) {
-        // If the adjoint is specified but the primal is not, then we treat
-        // the original as the primal.
+        // If the adjoint is specified but the primal is not, then we treat the
+        // original as the primal.
         if (primName.empty())
           primName = silOriginalFn->getName();
-        adjName =
-            getFunction(SILDeclRef(adjointFn), ForDefinition)->getName();
+        adjName = getFunction(SILDeclRef(adjointFn), ForDefinition)->getName();
         hasPrimitiveAdjoint = true;
       }
       else {
