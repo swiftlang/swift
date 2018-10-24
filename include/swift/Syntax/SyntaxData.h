@@ -294,7 +294,7 @@ public:
 namespace llvm {
   using SD = swift::syntax::SyntaxData;
   using RCSD = swift::RC<SD>;
-  template <> struct llvm::DenseMapInfo<RCSD> {
+  template <> struct DenseMapInfo<RCSD> {
     static inline RCSD getEmptyKey() {
       return SD::make(nullptr, nullptr, 0);
     }
