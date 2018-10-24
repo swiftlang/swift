@@ -466,7 +466,8 @@ ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
           anchor, {*componentElt, ConstraintLocator::SubscriptMember});
     case ComponentKind::UnresolvedProperty:
     case ComponentKind::Property:
-      // For a property, the choice is just given by the component.
+    case ComponentKind::Type:
+      // For properties and types, the choice is just given by the component.
       return getConstraintLocator(anchor, *componentElt);
     case ComponentKind::TupleElement:
       llvm_unreachable("Not implemented by CSGen");

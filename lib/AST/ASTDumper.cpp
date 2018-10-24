@@ -2734,6 +2734,7 @@ public:
         PrintWithColorRAII(OS, ASTNodeColor) << "unresolved_subscript";
         printArgumentLabels(component.getSubscriptLabels());
         break;
+
       case KeyPathExpr::Component::Kind::Identity:
         PrintWithColorRAII(OS, ASTNodeColor) << "identity";
         break;
@@ -2742,6 +2743,10 @@ public:
         PrintWithColorRAII(OS, ASTNodeColor) << "tuple_element ";
         PrintWithColorRAII(OS, DiscriminatorColor)
           << "#" << component.getTupleIndex();
+        break;
+
+      case KeyPathExpr::Component::Kind::Type:
+        OS << "type_ref ";
         break;
       }
       PrintWithColorRAII(OS, TypeColor)

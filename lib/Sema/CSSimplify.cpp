@@ -6949,6 +6949,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
       
     case KeyPathExpr::Component::Kind::Property:
     case KeyPathExpr::Component::Kind::Subscript:
+    case KeyPathExpr::Component::Kind::Type:
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
     case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
       auto *componentLoc = getConstraintLocator(

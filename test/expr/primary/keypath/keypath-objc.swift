@@ -57,7 +57,7 @@ func testKeyPath(a: A, b: B) {
   let _: String = #keyPath(A.propString)
 
   // Property of String property (which looks on NSString)
-  let _: String = #keyPath(A.propString.URLsInText)
+  let _: String = #keyPath(A.propString.urlsInText)
 
   // String property with a suffix
   let _: String = #keyPath(A.propString).description
@@ -72,7 +72,7 @@ func testKeyPath(a: A, b: B) {
 
   // Array property (make sure we look at the array element).
   let _: String = #keyPath(A.propArray)
-  let _: String = #keyPath(A.propArray.URLsInText)
+  let _: String = #keyPath(A.propArray.urlsInText)
 
   // Dictionary property (make sure we look at the value type).
   let _: String = #keyPath(A.propDict.anyKeyName)
@@ -80,20 +80,20 @@ func testKeyPath(a: A, b: B) {
 
   // Set property (make sure we look at the set element).
   let _: String = #keyPath(A.propSet)
-  let _: String = #keyPath(A.propSet.URLsInText)
+  let _: String = #keyPath(A.propSet.urlsInText)
 
   // AnyObject property
-  let _: String = #keyPath(A.propAnyObject.URLsInText)  
+  let _: String = #keyPath(A.propAnyObject.urlsInText)
   let _: String = #keyPath(A.propAnyObject.propA)  
   let _: String = #keyPath(A.propAnyObject.propB)  
   let _: String = #keyPath(A.propAnyObject.description)  
 
   // NSString property
-  let _: String = #keyPath(A.propNSString.URLsInText)  
+  let _: String = #keyPath(A.propNSString.urlsInText)
 
   // NSArray property (AnyObject array element).
   let _: String = #keyPath(A.propNSArray)
-  let _: String = #keyPath(A.propNSArray.URLsInText)
+  let _: String = #keyPath(A.propNSArray.urlsInText)
 
   // NSDictionary property (AnyObject value type).
   let _: String = #keyPath(A.propNSDict.anyKeyName)
@@ -101,7 +101,7 @@ func testKeyPath(a: A, b: B) {
 
   // NSSet property (AnyObject set element).
   let _: String = #keyPath(A.propNSSet)
-  let _: String = #keyPath(A.propNSSet.URLsInText)
+  let _: String = #keyPath(A.propNSSet.urlsInText)
 
   // Property with keyword name.
   let _: String = #keyPath(A.repeat)
