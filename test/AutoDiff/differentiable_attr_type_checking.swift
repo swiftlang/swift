@@ -437,3 +437,38 @@ class ClassWithDifferentiableMethods {
     return ClassWithDifferentiableMethods()
   }
 }
+
+// @differentiable attribute on protocol requirements
+
+func dummyPrimal() {}
+func dummyAdjoint() {}
+
+protocol ProtoWithDiffReqs {
+  // OK
+  @differentiable(reverse)
+  func req1(x: Float) -> Float
+
+  // OK
+  @differentiable(reverse, wrt: (self))
+  func req2(x: Float) -> Float
+
+  // OK
+  @differentiable(reverse, wrt: (.0))
+  func req3(x: Float) -> Float
+
+  // OK
+  @differentiable(reverse)
+  static func req4(x: Float) -> Float
+
+  // expected-error @+1 {{parameter index out of bounds}}
+  @differentiable(reverse, wrt: (.1))
+  func req5(x: Float) -> Float
+
+  // expected-error @+1 {{cannot specify primal on function declaration without definition}}
+  @differentiable(reverse, primal: dummyPrimal)
+  func req6(x: Float) -> Float
+
+  // expected-error @+1 {{cannot specify adjoint on function declaration without definition}}
+  @differentiable(reverse, adjoint: dummyAdjoint)
+  func req7(x: Float) -> Float
+}

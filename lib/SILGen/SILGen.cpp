@@ -794,49 +794,54 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  // If the declaration has a @differentiable(reverse) attribute, turn it into a
-  // SIL [reverse_differentiable] attribute with lowered primal and adjoint
-  // function names and lowered differentiation parameter indices.
+  // If the declaration has a definition and a @differentiable(reverse)
+  // attribute, turn it into a SIL [reverse_differentiable] attribute with
+  // lowered primal and adjoint function names and lowered differentiation
+  // parameter indices.
   //
   // FIXME: Handle multiple @differentiable attributes.
-  if (auto *diffAttr = cast_or_null<DifferentiableAttr>(
-        AFD->getAttrs().getAttribute(DeclAttrKind::DAK_Differentiable))) {
-    switch (diffAttr->getMode()) {
-    case AutoDiffMode::Forward:
-      // TODO: Handle forward mode once [forward_differentiable] is implemented.
-      llvm_unreachable("Unimplemented");
-      break;
-    case AutoDiffMode::Reverse: {
-      auto silOriginalFn = getFunction(SILDeclRef(AFD), ForDefinition);
-      // Either only adjoint is specified, or both primal and adjoint are
-      // spcified.
-      StringRef primName, adjName;
-      bool hasPrimitiveAdjoint = false;
-      if (auto *primFn = diffAttr->getPrimalFunction())
-        primName = getFunction(SILDeclRef(primFn), ForDefinition)->getName();
-      if (auto *adjointFn = diffAttr->getAdjointFunction()) {
-        // If the adjoint is specified but the primal is not, then we treat the
-        // original as the primal.
-        if (primName.empty())
-          primName = silOriginalFn->getName();
-        adjName = getFunction(SILDeclRef(adjointFn), ForDefinition)->getName();
-        hasPrimitiveAdjoint = true;
+  if (AFD->hasBody()) {
+    if (auto *diffAttr = cast_or_null<DifferentiableAttr>(
+          AFD->getAttrs().getAttribute(DeclAttrKind::DAK_Differentiable))) {
+      switch (diffAttr->getMode()) {
+      case AutoDiffMode::Forward:
+        // TODO: Handle forward mode once [forward_differentiable] is
+        // implemented.
+        llvm_unreachable("Unimplemented");
+        break;
+      case AutoDiffMode::Reverse: {
+        auto silOriginalFn = getFunction(SILDeclRef(AFD), ForDefinition);
+        // Either only adjoint is specified, or both primal and adjoint are
+        // spcified.
+        StringRef primName, adjName;
+        bool hasPrimitiveAdjoint = false;
+        if (auto *primFn = diffAttr->getPrimalFunction())
+          primName = getFunction(SILDeclRef(primFn), ForDefinition)->getName();
+        if (auto *adjointFn = diffAttr->getAdjointFunction()) {
+          // If the adjoint is specified but the primal is not, then we treat
+          // the original as the primal.
+          if (primName.empty())
+            primName = silOriginalFn->getName();
+          adjName =
+              getFunction(SILDeclRef(adjointFn), ForDefinition)->getName();
+          hasPrimitiveAdjoint = true;
+        }
+        else {
+          assert(primName.empty() &&
+                 "Primal cannot be present if adjoint is not");
+        }
+        // Get lowered argument indices.
+        auto paramIndices =
+            getLoweredAutoDiffParameterIndices(*this, AFD, silOriginalFn,
+                                               diffAttr);
+        SILReverseAutoDiffIndices indices(/*source*/ 0, paramIndices);
+        silOriginalFn->addReverseDifferentiableAttr(
+            SILReverseDifferentiableAttr::create(
+              M, indices, primName, adjName,
+              /*primitive*/ hasPrimitiveAdjoint));
+        break;
       }
-      else {
-        assert(primName.empty() &&
-               "Primal cannot be present if adjoint is not");
       }
-      // Get lowered argument indices.
-      auto paramIndices =
-          getLoweredAutoDiffParameterIndices(*this, AFD, silOriginalFn,
-                                             diffAttr);
-      SILReverseAutoDiffIndices indices(/*source*/ 0, paramIndices);
-      silOriginalFn->addReverseDifferentiableAttr(
-          SILReverseDifferentiableAttr::create(
-            M, indices, primName, adjName,
-            /*primitive*/ hasPrimitiveAdjoint));
-      break;
-    }
     }
   }
 }
