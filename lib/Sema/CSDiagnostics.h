@@ -160,10 +160,23 @@ protected:
   const ApplyExpr *Apply = nullptr;
 
 public:
-  RequirementFailure(Expr *expr, ConstraintSystem &cs,
+  RequirementFailure(ConstraintSystem &cs, Expr *expr, RequirementKind kind,
                      ConstraintLocator *locator)
       : FailureDiagnostic(expr, cs, locator), AffectedDecl(getDeclRef()) {
+    assert(locator);
     assert(AffectedDecl);
+
+    auto path = locator->getPath();
+    assert(!path.empty());
+
+    auto &last = path.back();
+    assert(last.getKind() == ConstraintLocator::TypeParameterRequirement);
+    assert(static_cast<RequirementKind>(last.getValue2()) == kind);
+
+    // It's possible sometimes not to have no base expression.
+    if (!expr)
+      return;
+
     auto *anchor = getAnchor();
     expr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
       auto *AE = dyn_cast<ApplyExpr>(subExpr);
@@ -246,7 +259,7 @@ public:
   MissingConformanceFailure(Expr *expr, ConstraintSystem &cs,
                             ConstraintLocator *locator,
                             std::pair<Type, ProtocolDecl *> conformance)
-      : RequirementFailure(expr, cs, locator),
+      : RequirementFailure(cs, expr, RequirementKind::Conformance, locator),
         NonConformingType(conformance.first), Protocol(conformance.second) {}
 
   bool diagnoseAsError() override;
@@ -294,7 +307,8 @@ class SameTypeRequirementFailure final : public RequirementFailure {
 public:
   SameTypeRequirementFailure(Expr *expr, ConstraintSystem &cs, Type lhs,
                              Type rhs, ConstraintLocator *locator)
-      : RequirementFailure(expr, cs, locator), LHS(lhs), RHS(rhs) {}
+      : RequirementFailure(cs, expr, RequirementKind::SameType, locator),
+        LHS(lhs), RHS(rhs) {}
 
   Type getLHS() const override { return LHS; }
   Type getRHS() const override { return RHS; }
@@ -332,7 +346,8 @@ class SuperclassRequirementFailure final : public RequirementFailure {
 public:
   SuperclassRequirementFailure(Expr *expr, ConstraintSystem &cs, Type lhs,
                                Type rhs, ConstraintLocator *locator)
-      : RequirementFailure(expr, cs, locator), LHS(lhs), RHS(rhs) {}
+      : RequirementFailure(cs, expr, RequirementKind::Superclass, locator),
+        LHS(lhs), RHS(rhs) {}
 
   Type getLHS() const override { return LHS; }
   Type getRHS() const override { return RHS; }
