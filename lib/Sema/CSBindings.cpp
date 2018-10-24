@@ -757,6 +757,29 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
   return result;
 }
 
+// Given a possibly-Optional type, return the direct superclass of the
+// (underlying) type wrapped in the same number of optional levels as
+// type.
+static Type getOptionalSuperclass(Type type) {
+  int optionalLevels = 0;
+  while (auto underlying = type->getOptionalObjectType()) {
+    ++optionalLevels;
+    type = underlying;
+  }
+
+  if (!type->mayHaveSuperclass())
+    return Type();
+
+  auto superclass = type->getSuperclass();
+  if (!superclass)
+    return Type();
+
+  while (optionalLevels--)
+    superclass = OptionalType::get(superclass);
+
+  return superclass;
+}
+
 /// \brief Enumerates all of the 'direct' supertypes of the given type.
 ///
 /// The direct supertype S of a type T is a supertype of T (e.g., T < S)
@@ -764,18 +787,18 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
 static SmallVector<Type, 4> enumerateDirectSupertypes(Type type) {
   SmallVector<Type, 4> result;
 
-  if (type->mayHaveSuperclass()) {
+  if (type->is<InOutType>() || type->is<LValueType>()) {
+    type = type->getWithoutSpecifierType();
+    result.push_back(type);
+  }
+
+  if (auto superclass = getOptionalSuperclass(type)) {
     // FIXME: Can also weaken to the set of protocol constraints, but only
     // if there are any protocols that the type conforms to but the superclass
     // does not.
 
-    // If there is a superclass, it is a direct supertype.
-    if (auto superclass = type->getSuperclass())
-      result.push_back(superclass);
+    result.push_back(superclass);
   }
-
-  if (type->is<InOutType>() || type->is<LValueType>())
-    result.push_back(type->getWithoutSpecifierType());
 
   // FIXME: lots of other cases to consider!
   return result;
