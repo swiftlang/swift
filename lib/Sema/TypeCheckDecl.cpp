@@ -2469,7 +2469,8 @@ public:
       if (VD->getInterfaceType()->is<TupleType>()) {
         uninhabitedTypeDiag = diag::pattern_no_uninhabited_tuple_type;
       } else {
-        assert(VD->getInterfaceType()->is<EnumType>() && 
+        assert((VD->getInterfaceType()->is<EnumType>() || 
+                VD->getInterfaceType()->is<BoundGenericEnumType>()) && 
           "unknown structurally uninhabited type");
       }
           

@@ -1285,3 +1285,7 @@ var sr8811y: (Int, Never) // expected-error {{variable 'sr8811y' cannot have tup
 var sr8811z: Never {
   return fatalError()
 }
+
+enum SR8811EmptyGenericEnum<A> {}
+
+let sr8811z: SR8811SR8811EmptyGenericEnum<Int> // expected-error {{constant 'sr8811z' cannot have enum type 'SR8811EmptyGenericEnum<Int>' with no cases}}
