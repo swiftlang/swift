@@ -1020,7 +1020,7 @@ extension Sequence {
   ///   where *k* is the number of elements to drop from the beginning of
   ///   the sequence.
   @inlinable
-  public __consuming func dropFirst(_ k: Int) -> DropFirstSequence<Self> {
+  public __consuming func dropFirst(_ k: Int = 1) -> DropFirstSequence<Self> {
     return DropFirstSequence(self, dropping: k)
   }
 
@@ -1043,7 +1043,7 @@ extension Sequence {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @inlinable
-  public __consuming func dropLast(_ k: Int) -> [Element] {
+  public __consuming func dropLast(_ k: Int = 1) -> [Element] {
     _precondition(k >= 0, "Can't drop a negative number of elements from a sequence")
     // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
     // Put incoming elements from this sequence in a holding tank, a ring buffer
@@ -1157,53 +1157,6 @@ extension Sequence {
     }
     return result
   }
-}
-
-extension Sequence {
-  /// Returns a subsequence containing all but the first element of the
-  /// sequence.
-  ///
-  /// The following example drops the first element from an array of integers.
-  ///
-  ///     let numbers = [1, 2, 3, 4, 5]
-  ///     print(numbers.dropFirst())
-  ///     // Prints "[2, 3, 4, 5]"
-  ///
-  /// If the sequence has no elements, the result is an empty subsequence.
-  ///
-  ///     let empty: [Int] = []
-  ///     print(empty.dropFirst())
-  ///     // Prints "[]"
-  ///
-  /// - Returns: A subsequence starting after the first element of the
-  ///   sequence.
-  ///
-  /// - Complexity: O(1)
-  @inlinable
-  public __consuming func dropFirst() -> DropFirstSequence<Self> {
-    return dropFirst(1) 
-  }
-
-  /// Returns a subsequence containing all but the last element of the
-  /// sequence.
-  ///
-  /// The sequence must be finite.
-  ///
-  ///     let numbers = [1, 2, 3, 4, 5]
-  ///     print(numbers.dropLast())
-  ///     // Prints "[1, 2, 3, 4]"
-  ///
-  /// If the sequence has no elements, the result is an empty subsequence.
-  ///
-  ///     let empty: [Int] = []
-  ///     print(empty.dropLast())
-  ///     // Prints "[]"
-  ///
-  /// - Returns: A subsequence leaving off the last element of the sequence.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @inlinable
-  public __consuming func dropLast() -> [Element]  { return dropLast(1) }
 }
 
 extension Sequence {

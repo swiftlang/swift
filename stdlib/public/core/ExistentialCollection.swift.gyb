@@ -244,17 +244,51 @@ internal class _AnyRandomAccessCollectionBox<Element>
   @inlinable // FIXME(sil-serialize-all)
   deinit {}
 
-/*
-%   override = 'override' if Kind != 'Sequence' else ''
+%   if Kind == 'Sequence':
   @inlinable
-  internal ${override} func _drop(
+  internal func _drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> _AnySequenceBox<Element> {
+    _abstract()
+  }
+
+  @inlinable
+  internal func _dropFirst(_ n: Int) -> _AnySequenceBox<Element> {
+    _abstract()
+  }
+
+  @inlinable
+  internal func _dropLast(_ n: Int) -> [Element] {
+    _abstract()
+  }
+
+  @inlinable
+  internal func _prefix(_ maxLength: Int) -> _AnySequenceBox<Element> {
+    _abstract()
+  }
+
+  @inlinable
+  internal func _prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> [Element] {
+    _abstract()
+  }
+
+  @inlinable
+  internal func _suffix(_ maxLength: Int) -> [Element] {
+    _abstract()
+  }
+%   else:
+%     override = 'override' if Kind != 'Collection' else ''
+  @inlinable
+  internal override func _drop(
     while predicate: (Element) throws -> Bool
   ) rethrows -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
   @inlinable
-  internal ${override} func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
+  internal override func _dropFirst(_ n: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
@@ -264,7 +298,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
   }
 
   @inlinable
-  internal ${override} func _prefix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
+  internal override func _prefix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
 
@@ -279,14 +313,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
   internal ${override} func _suffix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     _abstract()
   }
-*/
-  @inlinable
-  internal func _split(
-    maxSplits: Int, omittingEmptySubsequences: Bool,
-    whereSeparator isSeparator: (Element) throws -> Bool
-  ) rethrows -> [Any${Kind}<Element>] {
-    _abstract()
-  }
+%   end
 
 %   if Kind == 'Collection':
   @inlinable
@@ -459,7 +486,27 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
     let (it,idx) = _base._copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
-/*  @inlinable
+%   if Kind == 'Sequence':
+  @inlinable
+  internal override func _dropFirst(_ n: Int) -> _AnySequenceBox<Element> {
+    return _SequenceBox<DropFirstSequence<S>>(_base: _base.dropFirst(n))
+  }
+  @inlinable
+  internal override func _dropLast(_ n: Int) -> [Element] {
+    return _base.dropLast(n)
+  }
+  @inlinable
+  internal override func _prefix(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> [Element] {
+    return try _base.prefix(while: predicate)
+  }
+  @inlinable
+  internal override func _suffix(_ maxLength: Int) -> [Element] {
+    return _base.suffix(maxLength)
+  }
+%   else:
+  @inlinable
   internal override func _drop(
     while predicate: (Element) throws -> Bool
   ) rethrows -> _Any${Kind}Box<Element> {
@@ -486,21 +533,6 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
   @inlinable
   internal override func _suffix(_ maxLength: Int) -> _Any${Kind}Box<Element> {
     return _${Kind}Box<S.SubSequence>(_base: _base.suffix(maxLength))
-  }
-*/
-%   for ResultKind in EqualAndWeakerKinds:
-  @inlinable
-  internal override func _split(
-    maxSplits: Int, omittingEmptySubsequences: Bool,
-    whereSeparator isSeparator: (Element) throws -> Bool
-  ) rethrows -> [Any${ResultKind}<Element>] {
-    return try _base.split(
-      maxSplits: maxSplits,
-      omittingEmptySubsequences: omittingEmptySubsequences,
-      whereSeparator: isSeparator)
-      .map {
-        Any${ResultKind}(_box: _${Kind}Box<S.SubSequence>(_base: $0))
-      }
   }
 %   end
 
@@ -766,18 +798,6 @@ extension Any${Kind} {
     return Any${Kind}(_box: _box._suffix(maxLength))
   }
   */
-
-  @inlinable
-  public __consuming func split(
-    maxSplits: Int = Int.max,
-    omittingEmptySubsequences: Bool = true,
-    whereSeparator isSeparator: (Element) throws -> Bool
-  ) rethrows -> [Any${Kind}<Element>] {
-    return try _box._split(
-      maxSplits: maxSplits,
-      omittingEmptySubsequences: omittingEmptySubsequences,
-      whereSeparator: isSeparator)
-  }
 
   @inlinable
   public func _customContainsEquatableElement(
