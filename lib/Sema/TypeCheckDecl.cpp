@@ -4970,6 +4970,13 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   if (!isa<SourceFile>(dc))
     return;
 
+  // If this is not bound to any decls at this point, this extension is in
+  // inactive coditional compilation block. It's not safe to typecheck this
+  // extension. This happens if code completion is triggered in inactive
+  // conditional complation block.
+  if (!ext->alreadyBoundToNominal())
+    return;
+
   // Validate the nominal type declaration being extended.
   validateDecl(nominal);
 
