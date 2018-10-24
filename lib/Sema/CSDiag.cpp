@@ -1289,7 +1289,8 @@ diagnoseUnresolvedDotExprTypeRequirementFailure(ConstraintSystem &cs,
   // If we actually resolved the member to use, use it.
   auto loc = cs.getConstraintLocator(UDE, ConstraintLocator::Member);
   auto *member = cs.findResolvedMemberRef(loc);
-  if (!member)
+  // If the problem is contextual it's diagnosed elsewhere.
+  if (!member || !member->getAsGenericContext())
     return false;
 
   auto req = member->getAsGenericContext()
