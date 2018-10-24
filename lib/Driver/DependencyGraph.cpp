@@ -24,7 +24,7 @@
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/raw_ostream.h"
 
-#define EXPERIMENTAL_DEPENDENCIES_DEBUG_PRINT 1
+#define EXPERIMENTAL_DEPENDENCIES_DEBUG_PRINT 0
 #if EXPERIMENTAL_DEPENDENCIES_DEBUG_PRINT
 #include "swift/Driver/Job.h"
 #endif
