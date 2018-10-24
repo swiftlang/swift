@@ -635,7 +635,7 @@ bool ConstraintSystem::Candidate::solve(
     }
     log << " ---\n";
 
-    E->print(log);
+    E->dump(log);
     log << '\n';
     cs.print(log);
   }
@@ -1225,7 +1225,7 @@ ConstraintSystem::solveImpl(Expr *&expr,
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
 
-    expr->print(log, getTypeOfExpr, getTypeOfTypeLoc);
+    expr->dump(log, getTypeOfExpr, getTypeOfTypeLoc);
     log << "\n";
     print(log);
   }
