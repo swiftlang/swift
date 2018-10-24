@@ -928,8 +928,9 @@ namespace {
       // flags.
       auto getABIParameterFlags = [](ParameterTypeFlags flags) {
         return ParameterFlags()
-                 .withValueOwnership(flags.getValueOwnership())
-                 .withVariadic(flags.isVariadic());
+            .withValueOwnership(flags.getValueOwnership())
+            .withVariadic(flags.isVariadic())
+            .withAutoClosure(flags.isAutoClosure());
       };
 
       bool hasFlags = false;

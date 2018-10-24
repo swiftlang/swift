@@ -56,6 +56,7 @@ public:
   void setType(BuiltType type) { Type = type; }
 
   void setVariadic() { Flags = Flags.withVariadic(true); }
+  void setAutoClosure() { Flags = Flags.withAutoClosure(true); }
   void setValueOwnership(ValueOwnership ownership) {
     Flags = Flags.withValueOwnership(ownership);
   }
@@ -252,7 +253,6 @@ class TypeDecoder {
       if (Node->getNumChildren() < 2)
         return BuiltType();
 
-      // FIXME: autoclosure is not represented in function metadata
       FunctionTypeFlags flags;
       if (Node->getKind() == NodeKind::ObjCBlock) {
         flags = flags.withConvention(FunctionMetadataConvention::Block);
@@ -563,6 +563,13 @@ private:
       case NodeKind::Owned:
         setOwnership(ValueOwnership::Owned);
         break;
+
+      case NodeKind::AutoClosureType:
+      case NodeKind::EscapingAutoClosureType: {
+        param.setAutoClosure();
+        hasParamFlags = true;
+        break;
+      }
 
       default:
         break;
