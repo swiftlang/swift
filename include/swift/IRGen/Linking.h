@@ -994,7 +994,8 @@ StringRef encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
 }
 
 /// Allow LinkEntity to be used as a key for a DenseMap.
-template <> struct llvm::DenseMapInfo<swift::irgen::LinkEntity> {
+namespace llvm {
+template <> struct DenseMapInfo<swift::irgen::LinkEntity> {
   using LinkEntity = swift::irgen::LinkEntity;
   static LinkEntity getEmptyKey() {
     LinkEntity entity;
@@ -1020,4 +1021,5 @@ template <> struct llvm::DenseMapInfo<swift::irgen::LinkEntity> {
            LHS.SecondaryPointer == RHS.SecondaryPointer && LHS.Data == RHS.Data;
   }
 };
+}
 #endif
