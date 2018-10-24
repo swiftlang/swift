@@ -492,8 +492,18 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
     return _SequenceBox<DropFirstSequence<S>>(_base: _base.dropFirst(n))
   }
   @inlinable
+  internal override func _drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> _Any${Kind}Box<Element> {
+    return try _SequenceBox<DropWhileSequence<S>>(_base: _base.drop(while: predicate))
+  }
+  @inlinable
   internal override func _dropLast(_ n: Int) -> [Element] {
     return _base.dropLast(n)
+  }
+  @inlinable
+  internal override func _prefix(_ n: Int) -> _AnySequenceBox<Element> {
+    return _SequenceBox<PrefixSequence<S>>(_base: _base.prefix(n))
   }
   @inlinable
   internal override func _prefix(
@@ -809,7 +819,7 @@ extension Any${Kind} {
   }
 
   @inlinable
-  public __consuming func prefix(_ maxLength: Int) -> Any${Kind}<Element> {
+  public __consuming func prefix(_ maxLength: Int = 1) -> Any${Kind}<Element> {
     return Any${Kind}(_box: _box._prefix(maxLength))
   }
 

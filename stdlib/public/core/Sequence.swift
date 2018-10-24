@@ -548,57 +548,75 @@ extension PrefixSequence: Sequence {
   }
 }
 
+
 /// A sequence that lazily consumes and drops `n` elements from an underlying
 /// `Base` iterator before possibly returning the first available element.
 ///
 /// The underlying iterator's sequence may be infinite.
 @_fixed_layout
-public struct DropWhileSequence<Base : IteratorProtocol>: Sequence, IteratorProtocol {
+public struct DropWhileSequence<Base: Sequence> {
   public typealias Element = Base.Element
-
+  
   @usableFromInline
-  internal var _iterator: Base
+  internal var _iterator: Base.Iterator
   @usableFromInline
-  internal var _nextElement: Base.Element?
-
+  internal var _nextElement: Element?
+  
   @inlinable
-  internal init(
-    iterator: Base,
-    nextElement: Base.Element?,
-    predicate: (Base.Element) throws -> Bool
-  ) rethrows {
-    self._iterator = iterator
-    self._nextElement = nextElement ?? _iterator.next()
-
-    while try _nextElement.flatMap(predicate) == true {
+  internal init(iterator: Base.Iterator, predicate: (Element) throws -> Bool) rethrows {
+    _iterator = iterator
+    _nextElement = _iterator.next()
+    
+    while let x = _nextElement, try predicate(x) {
       _nextElement = _iterator.next()
     }
   }
-
+  
   @inlinable
-  public __consuming func makeIterator() -> DropWhileSequence<Base> {
-    return self
+  internal init(_ base: Base, predicate: (Element) throws -> Bool) rethrows {
+    self = try DropWhileSequence(iterator: base.makeIterator(), predicate: predicate)
   }
+}
 
+extension DropWhileSequence {
+  @_fixed_layout
+  public struct Iterator {
+    @usableFromInline
+    internal var _iterator: Base.Iterator
+    @usableFromInline
+    internal var _nextElement: Element?
+    
+    @inlinable
+    internal init(_ iterator: Base.Iterator, nextElement: Element?) {
+      _iterator = iterator
+      _nextElement = nextElement
+    }
+  }
+}
+
+extension DropWhileSequence.Iterator: IteratorProtocol {
+  public typealias Element = Base.Element
+  
   @inlinable
   public mutating func next() -> Element? {
-    guard _nextElement != nil else {
-      return _iterator.next()
-    }
-
-    let next = _nextElement
-    _nextElement = nil
+    guard let next = _nextElement else { return nil }
+    _nextElement = _iterator.next()
     return next
   }
+}
 
+extension DropWhileSequence: Sequence {
+  @inlinable
+  public func makeIterator() -> Iterator {
+    return Iterator(_iterator, nextElement: _nextElement)
+  }
+  
   @inlinable
   public __consuming func drop(
     while predicate: (Element) throws -> Bool
   ) rethrows -> DropWhileSequence<Base> {
-    // If this is already a DropWhileSequence, avoid multiple
-    // layers of wrapping and keep the same iterator.
-    return try DropWhileSequence(
-        iterator: _iterator, nextElement: _nextElement, predicate: predicate)
+    guard let x = _nextElement, try predicate(x) else { return self }
+    return try DropWhileSequence(iterator: _iterator, predicate: predicate)
   }
 }
 
@@ -1093,9 +1111,8 @@ extension Sequence {
   @inlinable
   public __consuming func drop(
     while predicate: (Element) throws -> Bool
-  ) rethrows -> DropWhileSequence<Iterator> {
-    return try DropWhileSequence(
-        iterator: makeIterator(), nextElement: nil, predicate: predicate)
+  ) rethrows -> DropWhileSequence<Self> {
+    return try DropWhileSequence(self, predicate: predicate)
   }
 
   /// Returns a subsequence, up to the specified maximum length, containing the
