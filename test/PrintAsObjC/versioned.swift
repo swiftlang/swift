@@ -24,6 +24,9 @@ import VersionedFMWK
   // CHECK-NEXT: - (nullable instancetype)initFormerlyFailableValue:(NSInteger)value OBJC_DESIGNATED_INITIALIZER;
 } // CHECK-NEXT: @end
 
+// Make sure we use forward declarations like we would for non-versioned names.
+// CHECK: @class InnerClass;
+
 // CHECK-LABEL: @interface UsesNestedClass
 @objc class UsesNestedClass : NSObject {
   // CHECK-NEXT: - (InnerClass * _Nullable)foo SWIFT_WARN_UNUSED_RESULT;
