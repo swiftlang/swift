@@ -47,8 +47,6 @@ HashOrUnimpLoc getProvidesHash<ProvidesKind::nominal, NominalTypeDecl>(const Nom
 template<>
 HashOrUnimpLoc getProvidesHash<ProvidesKind::dynamicLookup, ValueDecl>(const ValueDecl*);
 template<>
-HashOrUnimpLoc getProvidesHash<ProvidesKind::memberHolder, NominalTypeDecl>(const NominalTypeDecl*);
-template<>
 HashOrUnimpLoc getProvidesHash<ProvidesKind::member, ValueDecl>(const ValueDecl*);
 
 template<ProvidesKind kind, typename DeclT>
@@ -62,8 +60,6 @@ template
 std::string ExperimentalDependencies::getCombinedNameAndProvidesHash<ProvidesKind::nominal, NominalTypeDecl>(StringRef, const NominalTypeDecl*);
 template
 std::string ExperimentalDependencies::getCombinedNameAndProvidesHash<ProvidesKind::dynamicLookup, ValueDecl>(StringRef, const ValueDecl*);
-template
-std::string ExperimentalDependencies::getCombinedNameAndProvidesHash<ProvidesKind::memberHolder, NominalTypeDecl>(StringRef, const NominalTypeDecl*);
 template
 std::string ExperimentalDependencies::getCombinedNameAndProvidesHash<ProvidesKind::member, ValueDecl>(StringRef, const ValueDecl*);
 
@@ -88,10 +84,14 @@ HashOrUnimpLoc getProvidesHash<ProvidesKind::topLevel, Decl>(const Decl *D) {
   //  llvm::SmallString<32> str;
   //  llvm::MD5::stringifyResult(result, str);
   //  return std::make_pair(str.str().str(), nullptr);
+  
   std::string buf;
   llvm::raw_string_ostream OS(buf);
   D->dump(OS);
   return ExperimentalDependencies::HashOrUnimpLoc(scrubAll(OS.str()), std::string());
+  
+//  Mangle::ASTMangler Mangler;
+//  mangleDeclAsUSR(const ValueDecl *Decl, StringRef USRPrefix)
 }
 
 template<>
@@ -106,13 +106,6 @@ HashOrUnimpLoc getProvidesHash<ProvidesKind::dynamicLookup, ValueDecl>(const Val
   Mangle::ASTMangler Mangler;
   std::string MangledName = Mangler.mangleDeclType(VD);
   return HashOrUnimpLoc::forHash(MangledName);
-}
-
-template<>
-HashOrUnimpLoc getProvidesHash<ProvidesKind::memberHolder, NominalTypeDecl>(const NominalTypeDecl* NTD) {
-  Mangle::ASTMangler Mangler;
-  return HashOrUnimpLoc::forHash(Mangler.mangleTypeAsContextUSR(NTD));
-//  return HashOrUnimpLoc::forUnimpLoc(UNIMP_HASH);
 }
 
 template<>

@@ -28,7 +28,7 @@ namespace ExperimentalDependencies {
   
   // could bring in the thing in DependencyGraph
   enum class ProvidesKind {
-    topLevel, nominal, dynamicLookup, memberHolder, member
+    topLevel, nominal, dynamicLookup, member
   };
   
   /// Encode whether we have a hash or unimplemented location by prefixing the hash with ###

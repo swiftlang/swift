@@ -491,11 +491,12 @@ ProvidesEmitter::namesAndMaybeProvidesHashes(const NominalTypeDecl *extendedDecl
                                               !member
                                               ? std::string()
                                               : member->getBaseName().userFacingName().str()
-                                              );
+                                                    );
   return !EnableExperimentalDependencies
   ? std::make_pair(holderName, memberName)
-  : std::make_pair(ExperimentalDependencies::getCombinedNameAndProvidesHash<ExperimentalDependencies::ProvidesKind::memberHolder, NominalTypeDecl>(holderName, extendedDecl),
-                   !member ? std::string()
+  : std::make_pair(holderName,
+                   !member
+                   ? std::string()
                    : ExperimentalDependencies::getCombinedNameAndProvidesHash<ExperimentalDependencies::ProvidesKind::member, ValueDecl>(memberName, member));
 }
 
