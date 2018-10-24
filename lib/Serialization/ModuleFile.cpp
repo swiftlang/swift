@@ -12,6 +12,7 @@
 
 #include "swift/Serialization/ModuleFile.h"
 #include "DeserializationErrors.h"
+#include "DocFormat.h"
 #include "swift/Serialization/ModuleFormat.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
@@ -36,15 +37,9 @@ using namespace swift::serialization;
 using namespace llvm::support;
 using llvm::Expected;
 
-static bool checkModuleSignature(llvm::BitstreamCursor &cursor) {
-  for (unsigned char byte : MODULE_SIGNATURE)
-    if (cursor.AtEndOfStream() || cursor.Read(8) != byte)
-      return false;
-  return true;
-}
-
-static bool checkModuleDocSignature(llvm::BitstreamCursor &cursor) {
-  for (unsigned char byte : MODULE_DOC_SIGNATURE)
+static bool checkModuleSignature(llvm::BitstreamCursor &cursor,
+                                 ArrayRef<unsigned char> signature) {
+  for (unsigned char byte : signature)
     if (cursor.AtEndOfStream() || cursor.Read(8) != byte)
       return false;
   return true;
@@ -134,6 +129,7 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
 static ValidationInfo
 validateControlBlock(llvm::BitstreamCursor &cursor,
                      SmallVectorImpl<uint64_t> &scratch,
+                     std::pair<uint16_t, uint16_t> expectedVersion,
                      ExtendedValidationInfo *extendedInfo) {
   // The control block is malformed until we've at least read a major version
   // number.
@@ -179,9 +175,9 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
       }
 
       uint16_t versionMajor = scratch[0];
-      if (versionMajor > VERSION_MAJOR)
+      if (versionMajor > expectedVersion.first)
         result.status = Status::FormatTooNew;
-      else if (versionMajor < VERSION_MAJOR)
+      else if (versionMajor < expectedVersion.first)
         result.status = Status::FormatTooOld;
       else
         result.status = Status::Valid;
@@ -189,8 +185,8 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
       // Major version 0 does not have stable minor versions.
       if (versionMajor == 0) {
         uint16_t versionMinor = scratch[1];
-        if (versionMinor != VERSION_MINOR) {
-          if (versionMinor < VERSION_MINOR)
+        if (versionMinor != expectedVersion.second) {
+          if (versionMinor < expectedVersion.second)
             result.status = Status::FormatTooOld;
           else
             result.status = Status::FormatTooNew;
@@ -202,9 +198,11 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
       default:
         // Add new cases here, in descending order.
       case 4:
-        result.compatibilityVersion =
-          version::Version(blobData.substr(scratch[2]+1, scratch[3]),
-                           SourceLoc(), nullptr);
+        if (scratch[3] != 0) {
+          result.compatibilityVersion =
+            version::Version(blobData.substr(scratch[2]+1, scratch[3]),
+                             SourceLoc(), nullptr);
+        }
         LLVM_FALLTHROUGH;
       case 3:
         result.shortVersion = blobData.slice(0, scratch[2]);
@@ -235,8 +233,8 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
 }
 
 bool serialization::isSerializedAST(StringRef data) {
-  StringRef signatureStr(reinterpret_cast<const char *>(MODULE_SIGNATURE),
-                         llvm::array_lengthof(MODULE_SIGNATURE));
+  StringRef signatureStr(reinterpret_cast<const char *>(SWIFTMODULE_SIGNATURE),
+                         llvm::array_lengthof(SWIFTMODULE_SIGNATURE));
   return data.startswith(signatureStr);
 }
 
@@ -253,7 +251,7 @@ ValidationInfo serialization::validateSerializedAST(
   llvm::BitstreamCursor cursor(data);
   SmallVector<uint64_t, 32> scratch;
 
-  if (!checkModuleSignature(cursor) ||
+  if (!checkModuleSignature(cursor, SWIFTMODULE_SIGNATURE) ||
       !enterTopLevelModuleBlock(cursor, MODULE_BLOCK_ID, false))
     return result;
 
@@ -266,7 +264,10 @@ ValidationInfo serialization::validateSerializedAST(
 
     if (topLevelEntry.ID == CONTROL_BLOCK_ID) {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
-      result = validateControlBlock(cursor, scratch, extendedInfo);
+      result = validateControlBlock(cursor, scratch,
+                                    {SWIFTMODULE_VERSION_MAJOR,
+                                     SWIFTMODULE_VERSION_MINOR},
+                                    extendedInfo);
       if (result.status == Status::Malformed)
         return result;
     } else {
@@ -954,8 +955,9 @@ public:
 std::unique_ptr<ModuleFile::SerializedDeclCommentTable>
 ModuleFile::readDeclCommentTable(ArrayRef<uint64_t> fields,
                                  StringRef blobData) {
-  uint32_t tableOffset;
-  index_block::DeclListLayout::readRecord(fields, tableOffset);
+  if (fields.empty() || blobData.empty())
+    return nullptr;
+  uint32_t tableOffset = static_cast<uint32_t>(fields.front());
   auto base = reinterpret_cast<const uint8_t *>(blobData.data());
 
   return std::unique_ptr<SerializedDeclCommentTable>(
@@ -1084,6 +1086,65 @@ static bool isTargetTooNew(const llvm::Triple &moduleTarget,
   return ctxTarget.isOSVersionLT(major, minor, micro);
 }
 
+bool ModuleFile::readModuleDocIfPresent() {
+  if (!this->ModuleDocInputBuffer)
+    return true;
+
+  llvm::BitstreamCursor docCursor{ModuleDocInputBuffer->getMemBufferRef()};
+  if (!checkModuleSignature(docCursor, SWIFTDOC_SIGNATURE) ||
+      !enterTopLevelModuleBlock(docCursor, MODULE_DOC_BLOCK_ID)) {
+    return false;
+  }
+
+  SmallVector<uint64_t, 64> scratch;
+  llvm::BitstreamEntry topLevelEntry;
+
+  bool hasValidControlBlock = false;
+  ValidationInfo info;
+
+  while (!docCursor.AtEndOfStream()) {
+    topLevelEntry = docCursor.advance(AF_DontPopBlockAtEnd);
+    if (topLevelEntry.Kind != llvm::BitstreamEntry::SubBlock)
+      break;
+
+    switch (topLevelEntry.ID) {
+    case CONTROL_BLOCK_ID: {
+      docCursor.EnterSubBlock(CONTROL_BLOCK_ID);
+
+      info = validateControlBlock(docCursor, scratch,
+                                  {SWIFTDOC_VERSION_MAJOR,
+                                   SWIFTDOC_VERSION_MINOR},
+                                  /*extendedInfo*/nullptr);
+      if (info.status != Status::Valid)
+        return false;
+      // Check that the swiftdoc is actually for this module.
+      if (info.name != Name)
+        return false;
+      hasValidControlBlock = true;
+      break;
+    }
+
+    case COMMENT_BLOCK_ID: {
+      if (!hasValidControlBlock || !readCommentBlock(docCursor))
+        return false;
+      break;
+    }
+
+    default:
+      // Unknown top-level block, possibly for use by a future version of the
+      // module format.
+      if (docCursor.SkipBlock())
+        return false;
+      break;
+    }
+  }
+
+  if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock)
+    return false;
+
+  return true;
+}
+
 ModuleFile::ModuleFile(
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
@@ -1099,7 +1160,7 @@ ModuleFile::ModuleFile(
 
   llvm::BitstreamCursor cursor{ModuleInputBuffer->getMemBufferRef()};
 
-  if (!checkModuleSignature(cursor) ||
+  if (!checkModuleSignature(cursor, SWIFTMODULE_SIGNATURE) ||
       !enterTopLevelModuleBlock(cursor, MODULE_BLOCK_ID)) {
     error();
     return;
@@ -1121,7 +1182,10 @@ ModuleFile::ModuleFile(
     case CONTROL_BLOCK_ID: {
       cursor.EnterSubBlock(CONTROL_BLOCK_ID);
 
-      info = validateControlBlock(cursor, scratch, extInfo);
+      info = validateControlBlock(cursor, scratch,
+                                  {SWIFTMODULE_VERSION_MAJOR,
+                                   SWIFTMODULE_VERSION_MINOR},
+                                  extInfo);
       if (info.status != Status::Valid) {
         error(info.status);
         return;
@@ -1313,42 +1377,7 @@ ModuleFile::ModuleFile(
     return;
   }
 
-  if (!this->ModuleDocInputBuffer)
-    return;
-
-  llvm::BitstreamCursor docCursor{ModuleDocInputBuffer->getMemBufferRef()};
-  if (!checkModuleDocSignature(docCursor) ||
-      !enterTopLevelModuleBlock(docCursor, MODULE_DOC_BLOCK_ID)) {
-    error(Status::MalformedDocumentation);
-    return;
-  }
-
-  while (!docCursor.AtEndOfStream()) {
-    topLevelEntry = docCursor.advance(AF_DontPopBlockAtEnd);
-    if (topLevelEntry.Kind != llvm::BitstreamEntry::SubBlock)
-      break;
-
-    switch (topLevelEntry.ID) {
-    case COMMENT_BLOCK_ID: {
-      if (!hasValidControlBlock || !readCommentBlock(docCursor)) {
-        error(Status::MalformedDocumentation);
-        return;
-      }
-      break;
-    }
-
-    default:
-      // Unknown top-level block, possibly for use by a future version of the
-      // module format.
-      if (docCursor.SkipBlock()) {
-        error(Status::MalformedDocumentation);
-        return;
-      }
-      break;
-    }
-  }
-
-  if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock) {
+  if (!readModuleDocIfPresent()) {
     error(Status::MalformedDocumentation);
     return;
   }
