@@ -3887,6 +3887,53 @@ public:
 
   using FunctionParams = ArrayRef<AnyFunctionType::Param>;
 
+  static void collectPossibleParamListByQualifiedLookup(
+      DeclContext &DC, Type baseTy, DeclBaseName name,
+      SmallVectorImpl<FunctionParams> &candidates) {
+
+    SmallVector<ValueDecl *, 2> decls;
+    auto resolver = DC.getASTContext().getLazyResolver();
+    if (!DC.lookupQualified(baseTy, name, NL_QualifiedDefault, resolver, decls))
+      return;
+
+    for (auto *VD : decls) {
+      if (!isa<AbstractFunctionDecl>(VD) ||
+          shouldHideDeclFromCompletionResults(VD))
+        continue;
+      resolver->resolveDeclSignature(VD);
+      if (!VD->hasInterfaceType())
+        continue;
+      Type declaredMemberType = VD->getInterfaceType();
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
+        declaredMemberType = AFD->getMethodInterfaceType();
+
+      auto fnType =
+          baseTy->getTypeOfMember(DC.getParentModule(), VD, declaredMemberType);
+
+      if (!fnType || fnType->hasError())
+        continue;
+      if (auto *AFT = fnType->getAs<AnyFunctionType>()) {
+        candidates.push_back(AFT->getParams());
+      }
+    }
+  }
+
+  static void collectPossibleParamListByQualifiedLookup(
+      DeclContext &DC, Expr *baseExpr, DeclBaseName name,
+      SmallVectorImpl<FunctionParams> &candidates) {
+    ConcreteDeclRef ref = nullptr;
+    auto baseTyOpt = getTypeOfCompletionContextExpr(
+        DC.getASTContext(), &DC, CompletionTypeCheckKind::Normal, baseExpr,
+        ref);
+    if (!baseTyOpt)
+      return;
+    auto baseTy = (*baseTyOpt)->getRValueType()->getMetatypeInstanceType();
+    if (!baseTy->mayHaveMembers())
+      return;
+
+    collectPossibleParamListByQualifiedLookup(DC, baseTy, name, candidates);
+  }
+
   static bool
   collectPossibleParamLists(DeclContext &DC, ApplyExpr *callExpr,
                             SmallVectorImpl<FunctionParams> &candidates) {
@@ -3907,17 +3954,27 @@ public:
         if (auto *funcType = declType->getAs<AnyFunctionType>())
           candidates.push_back(funcType->getParams());
       }
-    } else {
-      ConcreteDeclRef ref = nullptr;
-      auto fnType = getTypeOfCompletionContextExpr(DC.getASTContext(),
-                                                   &DC, CompletionTypeCheckKind::Normal,
-                                                   fnExpr, ref);
+    } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
+      collectPossibleParamListByQualifiedLookup(
+          DC, UDE->getBase(), UDE->getName().getBaseName(), candidates);
+    }
 
+    if (candidates.empty()) {
+      ConcreteDeclRef ref = nullptr;
+      auto fnType = getTypeOfCompletionContextExpr(
+          DC.getASTContext(), &DC, CompletionTypeCheckKind::Normal, fnExpr,
+          ref);
       if (!fnType)
         return false;
 
-      if (auto *AFT = (*fnType)->getAs<AnyFunctionType>())
+      if (auto *AFT = (*fnType)->getAs<AnyFunctionType>()) {
         candidates.push_back(AFT->getParams());
+      } else if (auto *AMT = (*fnType)->getAs<AnyMetatypeType>()) {
+        auto baseTy = AMT->getInstanceType();
+        if (baseTy->mayHaveMembers())
+          collectPossibleParamListByQualifiedLookup(
+              DC, baseTy, DeclBaseName::createConstructor(), candidates);
+      }
     }
 
     return !candidates.empty();
@@ -5165,30 +5222,30 @@ namespace  {
 
   public:
     llvm::SmallVector<ParentTy, 5> Ancestors;
-    ParentTy ParentClosest;
-    ParentTy ParentFarthest;
     ExprParentFinder(Expr* ChildExpr,
                      llvm::function_ref<bool(ParentTy, ParentTy)> Predicate) :
                      ChildExpr(ChildExpr), Predicate(Predicate) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      if (E != ChildExpr && Predicate(E, Parent)) {
+      // Finish if we found the target.
+      if (E == ChildExpr)
+        return { false, nullptr };
+
+      if (Predicate(E, Parent))
         Ancestors.push_back(E);
-        return { true, E };
-      }
-      if (E == ChildExpr || arePositionsSame(E, ChildExpr)) {
-        if (!Ancestors.empty()) {
-          ParentClosest = Ancestors.back();
-          ParentFarthest = Ancestors.front();
-        }
-        return {false, nullptr};
-      }
       return { true, E };
     }
 
     Expr *walkToExprPost(Expr *E) override {
       if (Predicate(E, Parent))
         Ancestors.pop_back();
+
+      // 'ChildExpr' might have been replaced with typechecked expression. In
+      // that case, find deepest expression that position is the same as the
+      // target.
+      if (arePositionsSame(E, ChildExpr))
+        return nullptr;
+
       return E;
     }
 

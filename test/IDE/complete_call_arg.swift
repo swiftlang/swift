@@ -398,11 +398,9 @@ struct EmptyOverload {
   init(foo: Int) {}
 }
 _ = EmptyOverload(foo: #^EMPTY_OVERLOAD_2^#)
-// FIXME: we should have a TypeRelation[Identical] here for Ints. For now just
-// check it's not empty.
 // EMPTY_OVERLOAD: Begin completions
-// EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local{{.*}}: i2[#Int#];
-// EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local{{.*}}: i1[#Int#];
+// EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local/TypeRelation[Identical]: i2[#Int#];
+// EMPTY_OVERLOAD-DAG: Decl[GlobalVar]/Local/TypeRelation[Identical]: i1[#Int#];
 // EMPTY_OVERLOAD: End completions
 
 public func fopen() -> TestBoundGeneric1! { fatalError() }
