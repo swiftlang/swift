@@ -2440,6 +2440,15 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Dictionary:
     return { 1, ctx.getDictionaryDecl()};
 
+  case TypeReprKind::Tuple: {
+    auto tupleRepr = cast<TupleTypeRepr>(typeRepr);
+    if (tupleRepr->isParenType()) {
+      return directReferencesForTypeRepr(evaluator, ctx,
+                                         tupleRepr->getElementType(0), dc);
+    }
+    return { };
+  }
+
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::InOut:
@@ -2448,7 +2457,6 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Protocol:
   case TypeReprKind::Shared:
   case TypeReprKind::SILBox:
-  case TypeReprKind::Tuple:
     return { };
 
   case TypeReprKind::Fixed:
