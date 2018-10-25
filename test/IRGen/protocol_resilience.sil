@@ -106,8 +106,8 @@ protocol InternalProtocol {
 // -- number of witness table entries
 // CHECK-SAME:   i16 1,
 
-// -- size of private area + 'needs instantiation' bit
-// CHECK-SAME:   i16 1,
+// -- size of private area + 'requires instantiation' bit (not set)
+// CHECK-SAME:   i16 0,
 
 // -- the template
 // CHECK-SAME:   @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWp"
@@ -139,8 +139,8 @@ protocol InternalProtocol {
 // -- number of witness table entries
 // CHECK-SAME:   i16 1,
 
-// -- size of private area + 'needs instantiation' bit
-// CHECK-SAME:   i16 1,
+// -- size of private area + 'requires instantiation' bit (not set)
+// CHECK-SAME:   i16 0,
 
 // -- the template
 // CHECK-SAME:   @"$s19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWp"
