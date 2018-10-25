@@ -94,24 +94,19 @@ public protocol _ObjectiveCBridgeable {
 /// a metatype, make it conform to _ObjectiveCBridgeable, and its witness table
 /// will be ABI-compatible with one that directly provided conformance to the
 /// metatype type itself.
-@_fixed_layout
 public struct _BridgeableMetatype: _ObjectiveCBridgeable {
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var value: AnyObject.Type
 
-  @inlinable // FIXME(sil-serialize-all)
   internal init(value: AnyObject.Type) {
     self.value = value
   }
 
   public typealias _ObjectiveCType = AnyObject
 
-  @inlinable // FIXME(sil-serialize-all)
   public func _bridgeToObjectiveC() -> AnyObject {
     return value
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public static func _forceBridgeFromObjectiveC(
     _ source: AnyObject,
     result: inout _BridgeableMetatype?
@@ -119,7 +114,6 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
     result = _BridgeableMetatype(value: source as! AnyObject.Type)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public static func _conditionallyBridgeFromObjectiveC(
     _ source: AnyObject,
     result: inout _BridgeableMetatype?
@@ -133,7 +127,6 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
     return false
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(_ source: AnyObject?)
       -> _BridgeableMetatype {
