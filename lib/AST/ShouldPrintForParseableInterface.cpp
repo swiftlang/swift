@@ -12,10 +12,11 @@
 
 #include "ShouldPrintForParseableInterface.h"
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/TypeWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeWalker.h"
 
 using namespace swift;
 
@@ -50,18 +51,22 @@ bool swift::contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
 /// its layout, and so on.
 class FindReferencedNonPublicTypeDecls: public ASTWalker {
   using TypeDecls = SmallPtrSetImpl<TypeDecl *>;
+  SmallVector<ValueDecl *, 8> workList;
 
   /// Finds all nominal types or typealiases referenced in the type being
   /// walked.
   class FindTypeDecls: public TypeWalker {
     TypeDecls &foundDecls;
+    SmallVectorImpl<ValueDecl *> &workList;
   public:
-    FindTypeDecls(TypeDecls &foundDecls): foundDecls(foundDecls) {}
+    FindTypeDecls(TypeDecls &foundDecls, SmallVectorImpl<ValueDecl *> &workList)
+      : foundDecls(foundDecls), workList(workList) {}
 
     void addIfNonPublic(TypeDecl *typeDecl) {
       if (isPublicOrUsableFromInline(typeDecl))
         return;
-      foundDecls.insert(typeDecl);
+      if (foundDecls.insert(typeDecl).second)
+        workList.push_back(typeDecl);
     }
 
     /// Finds all nominal types or typealiases referenced by the
@@ -69,6 +74,10 @@ class FindReferencedNonPublicTypeDecls: public ASTWalker {
       if (auto nominal =
           dyn_cast<NominalOrBoundGenericNominalType>(type.getPointer()))
         addIfNonPublic(nominal->getDecl());
+      if (auto enumType = dyn_cast<EnumType>(type.getPointer()))
+        addIfNonPublic(enumType->getDecl());
+      if (auto protocol = dyn_cast<ProtocolType>(type.getPointer()))
+        addIfNonPublic(protocol->getDecl());
       if (auto alias = dyn_cast<NameAliasType>(type.getPointer())) {
         // Add the typealias to the found decls
         auto decl = alias->getDecl();
@@ -83,12 +92,63 @@ class FindReferencedNonPublicTypeDecls: public ASTWalker {
   FindTypeDecls findTypeDecls;
 public:
   FindReferencedNonPublicTypeDecls(TypeDecls &foundDecls):
-    findTypeDecls(foundDecls) {}
+    findTypeDecls(foundDecls, workList) {}
+
+  void search(ModuleDecl *module) {
+    SmallVector<Decl *, 8> topLevelDecls;
+    module->getTopLevelDecls(topLevelDecls);
+    for (auto decl : topLevelDecls) {
+      auto vd = dyn_cast<ValueDecl>(decl);
+      if (!vd || !isPublicOrUsableFromInline(vd))
+        continue;
+      workList.push_back(vd);
+    }
+
+    while (!workList.empty()) {
+      Decl *d = workList.pop_back_val();
+      d->walk(*this);
+    }
+  }
+
+  void visitAbstractStorageDecl(AbstractStorageDecl *decl) {
+    if (!contributesToParentTypeStorage(decl))
+      return;
+    decl->getInterfaceType().walk(findTypeDecls);
+  }
+
+  void visitEnumElementDecl(EnumElementDecl *decl) {
+    auto params = decl->getParameterList();
+    if (!params) return;
+    for (auto param : params->getArray()) {
+      param->getInterfaceType().walk(findTypeDecls);
+    }
+  }
+
+  void visitProtocolDecl(ProtocolDecl *decl) {
+    for (auto inherited : decl->getInheritedProtocols())
+      inherited->getInterfaceType().walk(findTypeDecls);
+  }
+
   bool walkToDeclPre(Decl *decl) {
-    auto asd = dyn_cast<AbstractStorageDecl>(decl);
-    if (!asd) return true;
-    if (contributesToParentTypeStorage(asd))
-      asd->getInterfaceType().walk(findTypeDecls);
+    if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
+      visitAbstractStorageDecl(storage);
+      return false;
+    }
+
+    if (auto enumElement = dyn_cast<EnumElementDecl>(decl)) {
+      visitEnumElementDecl(enumElement);
+      return false;
+    }
+
+    if (auto protocol = dyn_cast<ProtocolDecl>(decl)) {
+      visitProtocolDecl(protocol);
+      return false;
+    }
+
+    // Don't walk into function bodies
+    if (isa<AbstractFunctionDecl>(decl))
+      return false;
+
     return true;
   }
 };
@@ -103,7 +163,7 @@ ShouldPrintForParseableInterface::create(ModuleDecl *module) {
   // print them.
   auto findTypeDecls = FindReferencedNonPublicTypeDecls(
     shouldPrint->referencedNonPublicTypeDecls);
-  module->walk(findTypeDecls);
+  findTypeDecls.search(module);
   return shouldPrint;
 }
 
@@ -111,6 +171,11 @@ bool ShouldPrintForParseableInterface::shouldPrint(
   const Decl *D, const PrintOptions &options) {
   // Skip anything that isn't 'public' or '@usableFromInline'.
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
+
+    // Always print enum elements if the enum itself is printed.
+    if (auto enumElement = dyn_cast<EnumElementDecl>(VD))
+      return shouldPrint(enumElement->getParentEnum(), options);
+
     if (!isPublicOrUsableFromInline(VD)) {
       // We do want to print private stored properties, without their
       // original names present.
@@ -122,9 +187,14 @@ bool ShouldPrintForParseableInterface::shouldPrint(
       // types in this module, then we should print it.
       if (auto typeDecl = dyn_cast<TypeDecl>(VD))
         return referencedNonPublicTypeDecls.count(typeDecl) != 0;
+
       return false;
     }
   }
+
+  // Skip enum cases, since we're always printing their elements.
+  if (isa<EnumCaseDecl>(D))
+    return false;
 
   // Skip extensions that extend things we wouldn't print.
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
