@@ -403,8 +403,53 @@ extension String.UTF16View {
   }
 }
 
-// TODO(UTF8 perf): Breadcrumb-accelerate:
-//   * distance
-//   * index(_:offsetBy), index(_:offsetBy:limitedBy:)
-//   * count
-//
+extension String {
+  @usableFromInline // @testable
+  internal func _nativeCopyUTF16CodeUnits(
+    into buffer: UnsafeMutableBufferPointer<UInt16>,
+    range: Range<String.Index>
+  ) {
+    _sanityCheck(_guts.isFastUTF8)
+
+    return _guts.withFastUTF8 { utf8 in
+      var writeIdx = 0
+      let writeEnd = buffer.count
+      var readIdx = range.lowerBound.encodedOffset
+      let readEnd = range.upperBound.encodedOffset
+
+      // Handle mid-transcoded-scalar initial index
+      if _slowPath(range.lowerBound.transcodedOffset != 0) {
+        _sanityCheck(range.lowerBound.transcodedOffset == 1)
+        let (scalar, len) = _decodeScalar(utf8, startingAt: readIdx)
+        buffer[writeIdx] = scalar.utf16[1]
+        readIdx &+= len
+        writeIdx &+= 1
+      }
+
+      // Transcode middle
+      while readIdx < readEnd {
+        let (scalar, len) = _decodeScalar(utf8, startingAt: readIdx)
+        buffer[writeIdx] = scalar.utf16[0]
+        readIdx &+= len
+        writeIdx &+= 1
+        if _slowPath(scalar.utf16.count == 2) {
+          buffer[writeIdx] = scalar.utf16[1]
+          writeIdx &+= 1
+        }
+      }
+
+      // Handle mid-transcoded-scalar final index
+      if _slowPath(range.upperBound.transcodedOffset == 1) {
+        _sanityCheck(writeIdx < writeEnd)
+        let (scalar, _) = _decodeScalar(utf8, startingAt: readIdx)
+        _sanityCheck(scalar.utf16.count == 2)
+
+        buffer[writeIdx] = scalar.utf16[0]
+        writeIdx &+= 1
+      }
+      _sanityCheck(writeIdx <= writeEnd)
+
+    }
+  }
+}
+
