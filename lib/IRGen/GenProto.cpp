@@ -961,6 +961,31 @@ static bool isResilientConformance(const NormalProtocolConformance *conformance)
   return true;
 }
 
+/// Whether this protocol conformance has a dependent type witness.
+static bool hasDependentTypeWitness(
+                                const NormalProtocolConformance *conformance) {
+  auto DC = conformance->getDeclContext();
+  // If the conforming type isn't dependent, the below check is never true.
+  if (!DC->isGenericContext())
+    return false;
+
+  // Check whether any of the associated types are dependent.
+  if (conformance->forEachTypeWitness(nullptr,
+        [&](AssociatedTypeDecl *requirement, Type type,
+            TypeDecl *explicitDecl) -> bool {
+          // Skip associated types that don't have witness table entries.
+          if (!requirement->getOverriddenDecls().empty())
+            return false;
+
+          // RESILIENCE: this could be an opaque conformance
+          return type->hasTypeParameter();
+       })) {
+    return true;
+  }
+
+  return false;
+}
+
 /// Is there anything about the given conformance that requires witness
 /// tables to be dependently-generated?
 bool irgen::isDependentConformance(const NormalProtocolConformance *conformance) {
@@ -984,20 +1009,8 @@ bool irgen::isDependentConformance(const NormalProtocolConformance *conformance)
       return true;
   }
 
-  auto DC = conformance->getDeclContext();
-  // If the conforming type isn't dependent, the below check is never true.
-  if (!DC->isGenericContext())
-    return false;
-
-  // Check whether any of the associated types are dependent.
-  if (conformance->forEachTypeWitness(nullptr,
-        [&](AssociatedTypeDecl *requirement, Type type,
-            TypeDecl *explicitDecl) -> bool {
-          // RESILIENCE: this could be an opaque conformance
-          return type->hasTypeParameter();
-       })) {
+  if (hasDependentTypeWitness(conformance))
     return true;
-  }
 
   // Check if there are any conditional conformances. Other forms of conditional
   // requirements don't exist in the witness table.
@@ -2184,7 +2197,7 @@ namespace {
       // WitnessTablePrivateSizeInWordsAndRequiresInstantiation
       B.addInt(IGM.Int16Ty,
                (Description.witnessTablePrivateSize << 1) |
-                Description.requiresSpecialization);
+                Description.hasDependentAssociatedTypeWitnesses);
       // RelativePointer<WitnessTable>
       B.addRelativeAddress(Description.pattern);
       // Instantiation function
@@ -2413,7 +2426,8 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   ConformanceDescription description(conf, wt, global,
                                      wtableBuilder.getTableSize(),
                                      wtableBuilder.getTablePrivateSize(),
-                                     wtableBuilder.requiresSpecialization());
+                                     wtableBuilder.requiresSpecialization(),
+                                     hasDependentTypeWitness(conf));
 
   // Build the instantiation function, we if need one.
   description.instantiationFn = wtableBuilder.buildInstantiationFunction();
