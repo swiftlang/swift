@@ -98,7 +98,7 @@ sil hidden_external @takingEmptyAndQ : $@convention(thin) <τ_0_0 where  τ_0_0 
 // CHECK:   [[GENPARAMSADDR:%.*]] = bitcast %swift.type* [[TY]] to %swift.type**
 // CHECK:   [[PARAMTYADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[GENPARAMSADDR]], {{(i64 10|i32 13)}}
 // CHECK:   %"BaseProducer<\CF\84_0_1>" = load %swift.type*, %swift.type** [[PARAMTYADDR]]
-// CHECK:   [[WITNESS:%.*]] = call i8** @"$s23partial_apply_forwarder12BaseProducerVyxGAA1QAAWa"(%swift.type* %"BaseProducer<\CF\84_0_1>", i8*** undef)
+// CHECK:   [[WITNESS:%.*]] = call i8** @swift_getWitnessTable(
 // CHECK:   [[OBJ:%.*]] = bitcast %swift.refcounted* %0 to %T23partial_apply_forwarder7WeakBoxC.1*
 // CHECK:   tail call swiftcc void @takingQ(%T23partial_apply_forwarder7WeakBoxC.1* [[OBJ]], i8** [[WITNESS]])
 // CHECK: }
@@ -157,7 +157,7 @@ bb0(%0 : $*τ_0_1, %2: $EmptyType):
 // CHECK:   [[TYPARAMSADDR:%.*]] = bitcast %swift.type* [[TY]] to %swift.type**
 // CHECK:   [[TYPARAM:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[TYPARAMSADDR]], {{(i64 10|i32 13)}}
 // CHECK:   %"BaseProducer<\CF\84_0_1>" = load %swift.type*, %swift.type** [[TYPARAM]]
-// CHECK:   [[WITNESS:%.*]] = call i8** @"$s23partial_apply_forwarder12BaseProducerVyxGAA1QAAWa"(%swift.type* %"BaseProducer<\CF\84_0_1>", i8*** undef)
+// CHECK:   [[WITNESS:%.*]] = call i8** @swift_getWitnessTable
 // CHECK:   tail call swiftcc void @takingQ(%T23partial_apply_forwarder7WeakBoxC.1* [[CAST]], i8** [[WITNESS]])
 // CHECK:   ret void
 
@@ -211,7 +211,7 @@ sil hidden_external @takingQAndS : $@convention(thin) <τ_0_0 where  τ_0_0 : Q>
 // CHECK:   [[GENPARAMSADDR:%.*]] = bitcast %swift.type* [[TY]] to %swift.type**
 // CHECK:   [[GENPARAMADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[GENPARAMSADDR]], {{(i64 10|i32 13)}}
 // CHECK:   %"BaseProducer<\CF\84_0_1>" = load %swift.type*, %swift.type** [[GENPARAMADDR]]
-// CHECK:   [[WITNESS:%.*]] = call i8** @"$s23partial_apply_forwarder12BaseProducerVyxGAA1QAAWa"(%swift.type* %"BaseProducer<\CF\84_0_1>", i8*** undef)
+// CHECK:   [[WITNESS:%.*]] = call i8** @swift_getWitnessTable
 // CHECK:   tail call swiftcc void @takingQAndS(i64 [[X]], %T23partial_apply_forwarder7WeakBoxC.1* %.asUnsubstituted, i8** [[WITNESS]])
 
 sil public @bind_polymorphic_param_from_context_with_layout : $@convention(thin) <τ_0_1>(@in τ_0_1, S) -> @owned @callee_owned () -> () {

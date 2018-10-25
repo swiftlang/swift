@@ -20,7 +20,7 @@ struct SB: B {
   func foo() {}
 }
 // CHECK-LABEL: @"$s34witness_table_objc_associated_type2SBVAA1BAAWP" = hidden global [4 x i8*] [
-// CHECK:         i8* bitcast (i8** ()* @"$s34witness_table_objc_associated_type2SAVAA1AAAWa" to i8*)
+// CHECK:         i8* bitcast (i8** ()* @"$s34witness_table_objc_associated_type2SAVAcA1AAAWl
 // CHECK:         @"symbolic 34witness_table_objc_associated_type2SAV"
 // CHECK:         i8* bitcast {{.*}} @"$s34witness_table_objc_associated_type2SBVAA1BA2aDP3fooyyFTW"
 // CHECK:       ]

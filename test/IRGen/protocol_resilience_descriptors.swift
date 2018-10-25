@@ -57,7 +57,7 @@ public struct ConditionallyConforms<Element> { }
 public struct Y { }
 
 // CHECK-USAGE-LABEL: @"$s31protocol_resilience_descriptors1YV010resilient_A022OtherResilientProtocolAAMc" =
-// CHECK-USAGE-SAME: i32 131073,
+// CHECK-USAGE-SAME: i32 131072,
 // CHECK-USAGE-SAME: i16 1,
 // CHECK-USAGE-SAME: i16 0
 extension Y: OtherResilientProtocol { }
