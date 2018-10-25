@@ -76,6 +76,7 @@ import Hanoi
 import Hash
 import HashQuadratic
 import Histogram
+import InsertCharacter
 import Integrate
 import IterateData
 import Join
@@ -241,6 +242,7 @@ registerBenchmark(Hanoi)
 registerBenchmark(HashTest)
 registerBenchmark(HashQuadratic)
 registerBenchmark(Histogram)
+registerBenchmark(InsertCharacter)
 registerBenchmark(IntegrateTest)
 registerBenchmark(IterateData)
 registerBenchmark(Join)
