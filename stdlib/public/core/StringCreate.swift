@@ -15,8 +15,8 @@
 internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
   // NOTE: Avoiding for-in syntax to avoid bounds checks
   //
-  // TODO(UTF8 perf): Vectorize and/or incorporate into validity checking,
-  // perhaps both.
+  // TODO(String performance): Vectorize and/or incorporate into validity
+  // checking, perhaps both.
   //
   let ptr = input.baseAddress._unsafelyUnwrappedUnchecked
   var i = 0
@@ -59,7 +59,9 @@ extension String {
   ) -> (result: String, repairsMade: Bool) {
     switch validateUTF8(input) {
     case .success(let extraInfo):
-        return (String._uncheckedFromUTF8(input, asciiPreScanResult: extraInfo.isASCII), false)
+        return (String._uncheckedFromUTF8(
+          input, asciiPreScanResult: extraInfo.isASCII
+        ), false)
     case .error(let initialRange):
         return (repairUTF8(input, firstKnownBrokenRange: initialRange), true)
     }
@@ -105,11 +107,10 @@ extension String {
   internal static func _uncheckedFromUTF16(
     _ input: UnsafeBufferPointer<UInt16>
   ) -> String {
-    // TODO(UTF8): smol strings
+    // TODO(String Performance): Attempt to form smol strings
 
-    // TODO(UTF8): Faster transcoding...
-
-    // TODO(UTF8): Skip intermediary array
+    // TODO(String performance): Skip intermediary array, transcode directly
+    // into a StringStorage space.
     var contents: [UInt8] = []
     contents.reserveCapacity(input.count)
     let repaired = transcode(
@@ -144,9 +145,10 @@ extension String {
     repair: Bool
   ) -> (String, repairsMade: Bool)?
   where Input.Element == Encoding.CodeUnit {
-    // TODO(SSO): small check
+    // TODO(String Performance): Attempt to form smol strings
 
-    // TODO(UTF8): Skip intermediary array
+    // TODO(String performance): Skip intermediary array, transcode directly
+    // into a StringStorage space.
     var contents: [UInt8] = []
     contents.reserveCapacity(input.underestimatedCount)
     let repaired = transcode(
@@ -165,9 +167,6 @@ extension String {
   static func _fromInvalidUTF16(
     _ utf16: UnsafeBufferPointer<UInt16>
   ) -> String {
-    // TODO(UTF8 test): How much does ahead-of-time fix defeat the purpose of
-    // validation-test/stdlib/StringViews.swift ?
-
     return String._fromCodeUnits(utf16, encoding: UTF16.self, repair: true)!.0
   }
 }

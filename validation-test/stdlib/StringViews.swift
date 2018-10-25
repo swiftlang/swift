@@ -179,8 +179,6 @@ tests.test("index-mapping/utf16-to-utf8/\(id)") {
     [
       [0xf0, 0x9f, 0x8f],
 
-      // TODO(UTF8 merge): Verify reasoning below:
-      //
       // Prior to UTF-8 String, this tested for empty array in "legacy mode" or
       // the replacemnet character otherwise. However, SE-0180 (String Index
       // Overhual) dictates subscript behavior should treat it as emergent
@@ -452,8 +450,6 @@ tests.test("index-mapping/utf16-to-unicode-scalar/\(id)") {
   let winterUtf16UnicodeScalars: [UnicodeScalar?] = [
     UnicodeScalar(0x1f3c2),
 
-  // TODO(UTF8 merge): Verify reasoning below:
-  //
   // Prior to UTF-8 String, this tested for empty array in "legacy mode" or
   // the replacemnet character otherwise. However, SE-0180 (String Index
   // Overhual) dictates subscript behavior should treat it as emergent
@@ -588,15 +584,13 @@ tests.test("index-mapping/utf16-to-character/\(id)") {
   let winterUtf16Characters: [Character?] = [
       "🏂",
 
-      // TODO(UTF8 merge): Verify reasoning below:
-      //
       // Prior to UTF-8 String, this tested for empty array in "legacy mode" or
       // the replacemnet character otherwise. However, SE-0180 (String Index
       // Overhual) dictates subscript behavior should treat it as emergent
       // behavior from its encoded offset, hence we should get the same 3 code
-      // units as prior for non-scalar-aligned UTF-16 offsets applied to the UTF-8
-      // view. Under a mixed-encoding String model, we necessarily have to clamp
-      // all indices to the nearest prior scalar boundary...
+      // units as prior for non-scalar-aligned UTF-16 offsets applied to the
+      // UTF-8 view. Under a mixed-encoding String model, we necessarily have to
+      // clamp all indices to the nearest prior scalar boundary...
       //
       // Old code:
       //  err(replacementCharacter),

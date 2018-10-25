@@ -30,9 +30,6 @@ let largeString: String = {
 
 let StringBreadcrumbsTests = TestSuite("StringBreadcrumbsTests")
 
-// TODO(UTF8 testing): test the other entry points (somewhat redundant with
-// UTF16View testing for huge strings)
-
 StringBreadcrumbsTests.test("largeString") {
   var utf16CodeUnits = Array(largeString.utf16)
   var utf16Indices = Array(largeString.utf16.indices)
@@ -66,7 +63,7 @@ StringBreadcrumbsTests.test("largeString") {
   }
 }
 
-// TODO(UTF8 testing): hammer breadcrumb boundaries more, maybe internals too
+// TODO(String testing): hammer breadcrumb boundaries more, maybe internals too
 
 runAllTests()
 

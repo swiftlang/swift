@@ -29,9 +29,14 @@ extension String {
   }
 }
 
-// TODO(UTF8 merge): Disable longSharedPrefix hashing benchmark, which is enabled here for 1-to-1 comparison vs master
 
-// TODO(UTF8 merge): Enable NormalizedIteratorWorkloads for ["ascii", "latin1", "fastPrenormal", "slowerPrenormal", "nonBMPSlowestPrenormal", "emoji", "abnormal", "zalgo"]
+// TODO(UTF8 post-merge): Disable longSharedPrefix hashing benchmark, which is
+// enabled here for 1-to-1 comparison vs master
+
+// TODO(UTF8 post-merge): Enable NormalizedIteratorWorkloads for ["ascii",
+// "latin1", "fastPrenormal", "slowerPrenormal", "nonBMPSlowestPrenormal",
+// "emoji", "abnormal", "zalgo"]
+
 
 public let StringComparison: [BenchmarkInfo] = [
   BenchmarkInfo(

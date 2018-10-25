@@ -97,7 +97,8 @@ extension _StringGuts {
 
   @inline(never) // slow-path
   private mutating func _foreignGrow(_ n: Int) {
-    // TODO(UTF8 perf): skip the intermediary arrays
+    // TODO(String performance): Skip intermediary array, transcode directly
+    // into a StringStorage space.
     let selfUTF8 = Array(String(self).utf8)
     selfUTF8.withUnsafeBufferPointer {
       self = _StringGuts(_StringStorage.create(
@@ -230,7 +231,7 @@ extension _StringGuts {
       return
     }
 
-    // TODO(UTF8 perf): Add append on guts taking range, use that
+    // TODO(cleanup): Add append on guts taking range, use that
     var result = String()
     result.reserveCapacity(self.count &- (upperOffset &- lowerOffset))
     result.append(contentsOf: String(self)[..<lower])
