@@ -1726,6 +1726,12 @@ public:
             | ParameterFlags(uint8_t(ownership) << OwnershipShift);
   }
 
+  ParameterTypeFlags withAutoClosure(bool isAutoClosure) const {
+    return ParameterTypeFlags(isAutoClosure
+                                  ? value | ParameterTypeFlags::AutoClosure
+                                  : value - ParameterTypeFlags::AutoClosure);
+  }
+
   bool operator ==(const ParameterTypeFlags &other) const {
     return value.toRaw() == other.value.toRaw();
   }

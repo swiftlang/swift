@@ -880,7 +880,11 @@ using FunctionTypeFlags = TargetFunctionTypeFlags<size_t>;
 
 template <typename int_type>
 class TargetParameterTypeFlags {
-  enum : int_type { ValueOwnershipMask = 0x7F, VariadicMask = 0x80 };
+  enum : int_type {
+    ValueOwnershipMask = 0x7F,
+    VariadicMask       = 0x80,
+    AutoClosureMask    = 0x100,
+  };
   int_type Data;
 
   constexpr TargetParameterTypeFlags(int_type Data) : Data(Data) {}
@@ -900,8 +904,15 @@ public:
                                               (isVariadic ? VariadicMask : 0));
   }
 
+  constexpr TargetParameterTypeFlags<int_type>
+  withAutoClosure(bool isAutoClosure) const {
+    return TargetParameterTypeFlags<int_type>(
+        (Data & ~AutoClosureMask) | (isAutoClosure ? AutoClosureMask : 0));
+  }
+
   bool isNone() const { return Data == 0; }
   bool isVariadic() const { return Data & VariadicMask; }
+  bool isAutoClosure() const { return Data & AutoClosureMask; }
 
   ValueOwnership getValueOwnership() const {
     return (ValueOwnership)(Data & ValueOwnershipMask);
