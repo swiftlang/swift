@@ -134,10 +134,6 @@ func _bridgeKeyPathToString(_ keyPath:AnyKeyPath) -> String {
     return __KVOKeyPathBridgeMachinery._bridgeKeyPath(keyPath)
 }
 
-func _bridgeStringToKeyPath(_ keyPath:String) -> AnyKeyPath? {
-    return __KVOKeyPathBridgeMachinery._bridgeKeyPath(keyPath)
-}
-
 // NOTE: older overlays called this NSKeyValueObservation. We now use
 // that name in the source code, but add an underscore to the runtime
 // name to avoid conflicts when both are loaded into the same process.
