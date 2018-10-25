@@ -2,7 +2,7 @@
 
 public protocol P1 {}
 public protocol P2 {}
-
+public protocol P3: P2, P1 {}
 @_fixed_layout
 public struct S1: P1 {
   public static func foo1() {}

@@ -55,6 +55,8 @@
 #endif
 
 NODE_KIND(Root, Root)
+NODE_KIND(Conformance, Conformance)
+NODE_KIND(TypeWitness, TypeWitness)
 NODE_KIND(TypeNominal, TypeNominal)
 NODE_KIND(TypeFunc, TypeFunc)
 NODE_KIND(TypeAlias, TypeNameAlias)
@@ -146,12 +148,12 @@ KEY_STRING(FuncSelfKind, funcSelfKind)
 KEY_STRING(ParamValueOwnership, paramValueOwnership)
 
 KEY_STRING_ARR(SuperclassNames, superclassNames)
-KEY_STRING_ARR(ConformingProtocols, conformingProtocols)
 
 KEY_UINT(SelfIndex, selfIndex)
 KEY_UINT(FixedBinaryOrder, fixedbinaryorder)
 
 KEY(children)
+KEY(conformances)
 KEY(typeAttributes)
 KEY(declAttributes)
 KEY(declKind)

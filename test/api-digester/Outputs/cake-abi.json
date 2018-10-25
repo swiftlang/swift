@@ -54,6 +54,27 @@
     },
     {
       "kind": "TypeDecl",
+      "name": "P3",
+      "printedName": "P3",
+      "declKind": "Protocol",
+      "usr": "s:4cake2P3P",
+      "moduleName": "cake",
+      "genericSig": "<τ_0_0 : P1, τ_0_0 : P2>",
+      "conformances": [
+        {
+          "kind": "Conformance",
+          "name": "P2",
+          "printedName": "P2"
+        },
+        {
+          "kind": "Conformance",
+          "name": "P1",
+          "printedName": "P1"
+        }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
       "name": "S1",
       "printedName": "S1",
       "children": [
@@ -105,24 +126,6 @@
           "usr": "s:4cake2S1V4foo6yyF",
           "moduleName": "cake",
           "funcSelfKind": "NonMutating"
-        },
-        {
-          "kind": "Constructor",
-          "name": "init",
-          "printedName": "init()",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "S1",
-              "printedName": "S1",
-              "usr": "s:4cake2S1V"
-            }
-          ],
-          "declKind": "Constructor",
-          "usr": "s:4cake2S1VACycfc",
-          "moduleName": "cake",
-          "implicit": true,
-          "isInternal": true
         }
       ],
       "declKind": "Struct",
@@ -131,9 +134,17 @@
       "declAttributes": [
         "FixedLayout"
       ],
-      "conformingProtocols": [
-        "P1",
-        "P2"
+      "conformances": [
+        {
+          "kind": "Conformance",
+          "name": "P1",
+          "printedName": "P1"
+        },
+        {
+          "kind": "Conformance",
+          "name": "P2",
+          "printedName": "P2"
+        }
       ]
     },
     {
@@ -141,42 +152,6 @@
       "name": "C0",
       "printedName": "C0",
       "children": [
-        {
-          "kind": "Constructor",
-          "name": "init",
-          "printedName": "init()",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "C0",
-              "printedName": "C0<τ_0_0, τ_0_1, τ_0_2>",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "τ_0_0"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "τ_0_1"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "τ_0_2"
-                }
-              ],
-              "usr": "s:4cake2C0C"
-            }
-          ],
-          "declKind": "Constructor",
-          "usr": "s:4cake2C0CACyxq_q0_Gycfc",
-          "moduleName": "cake",
-          "genericSig": "<τ_0_0, τ_0_1, τ_0_2>",
-          "implicit": true,
-          "isInternal": true
-        },
         {
           "kind": "Function",
           "name": "conditionalFooExt",
@@ -389,25 +364,6 @@
           "fixedbinaryorder": 1,
           "ownership": 2,
           "hasStorage": true
-        },
-        {
-          "kind": "Constructor",
-          "name": "init",
-          "printedName": "init()",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "C1",
-              "printedName": "C1",
-              "usr": "s:4cake2C1C"
-            }
-          ],
-          "declKind": "Constructor",
-          "usr": "s:4cake2C1CACycfc",
-          "moduleName": "cake",
-          "overriding": true,
-          "implicit": true,
-          "isInternal": true
         }
       ],
       "declKind": "Class",
@@ -652,10 +608,37 @@
       "usr": "s:4cake6NumberO",
       "moduleName": "cake",
       "enumRawTypeName": "Int",
-      "conformingProtocols": [
-        "Equatable",
-        "Hashable",
-        "RawRepresentable"
+      "conformances": [
+        {
+          "kind": "Conformance",
+          "name": "Equatable",
+          "printedName": "Equatable"
+        },
+        {
+          "kind": "Conformance",
+          "name": "Hashable",
+          "printedName": "Hashable"
+        },
+        {
+          "kind": "Conformance",
+          "name": "RawRepresentable",
+          "printedName": "RawRepresentable",
+          "children": [
+            {
+              "kind": "TypeWitness",
+              "name": "RawValue",
+              "printedName": "RawValue",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ]
+            }
+          ]
+        }
       ]
     },
     {
@@ -895,60 +878,6 @@
           "fixedbinaryorder": 3,
           "isLet": true,
           "hasStorage": true
-        },
-        {
-          "kind": "Constructor",
-          "name": "init",
-          "printedName": "init(a:b:c:)",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "fixedLayoutStruct",
-              "printedName": "fixedLayoutStruct",
-              "usr": "s:4cake17fixedLayoutStructV"
-            },
-            {
-              "kind": "TypeNominal",
-              "name": "Int",
-              "printedName": "Int",
-              "usr": "s:Si"
-            },
-            {
-              "kind": "TypeNominal",
-              "name": "Int",
-              "printedName": "Int",
-              "usr": "s:Si"
-            },
-            {
-              "kind": "TypeNominal",
-              "name": "Int",
-              "printedName": "Int",
-              "usr": "s:Si"
-            }
-          ],
-          "declKind": "Constructor",
-          "usr": "s:4cake17fixedLayoutStructV1a1b1cACSi_S2itc33_3D8926C30F7417F2EF9A277D0C73FBDBLlfc",
-          "moduleName": "cake",
-          "implicit": true,
-          "isInternal": true
-        },
-        {
-          "kind": "Constructor",
-          "name": "init",
-          "printedName": "init()",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "fixedLayoutStruct",
-              "printedName": "fixedLayoutStruct",
-              "usr": "s:4cake17fixedLayoutStructV"
-            }
-          ],
-          "declKind": "Constructor",
-          "usr": "s:4cake17fixedLayoutStructVACycfc",
-          "moduleName": "cake",
-          "implicit": true,
-          "isInternal": true
         }
       ],
       "declKind": "Struct",
@@ -1182,8 +1111,12 @@
       "usr": "s:4cake4PSubP",
       "moduleName": "cake",
       "genericSig": "<τ_0_0 : PSuper>",
-      "conformingProtocols": [
-        "PSuper"
+      "conformances": [
+        {
+          "kind": "Conformance",
+          "name": "PSuper",
+          "printedName": "PSuper"
+        }
       ]
     },
     {
@@ -1264,24 +1197,6 @@
           ],
           "fixedbinaryorder": 0,
           "hasStorage": true
-        },
-        {
-          "kind": "Constructor",
-          "name": "init",
-          "printedName": "init()",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "UsableFromInlineClass",
-              "printedName": "UsableFromInlineClass",
-              "usr": "s:4cake21UsableFromInlineClassC"
-            }
-          ],
-          "declKind": "Constructor",
-          "usr": "s:4cake21UsableFromInlineClassCACycfc",
-          "moduleName": "cake",
-          "implicit": true,
-          "isInternal": true
         }
       ],
       "declKind": "Class",
@@ -1336,28 +1251,172 @@
       "declAttributes": [
         "FixedLayout"
       ],
-      "conformingProtocols": [
-        "Comparable",
-        "SignedInteger",
-        "_ExpressibleByBuiltinIntegerLiteral",
-        "BinaryInteger",
-        "LosslessStringConvertible",
-        "SignedNumeric",
-        "Numeric",
-        "CustomStringConvertible",
-        "Strideable",
-        "ExpressibleByIntegerLiteral",
-        "FixedWidthInteger",
-        "P1",
-        "Encodable",
-        "Decodable",
-        "Hashable",
-        "Equatable",
-        "_HasCustomAnyHashableRepresentation",
-        "CustomReflectable",
-        "_CustomPlaygroundQuickLookable",
-        "MirrorPath",
-        "CVarArg"
+      "conformances": [
+        {
+          "kind": "Conformance",
+          "name": "Comparable",
+          "printedName": "Comparable"
+        },
+        {
+          "kind": "Conformance",
+          "name": "SignedInteger",
+          "printedName": "SignedInteger"
+        },
+        {
+          "kind": "Conformance",
+          "name": "_ExpressibleByBuiltinIntegerLiteral",
+          "printedName": "_ExpressibleByBuiltinIntegerLiteral"
+        },
+        {
+          "kind": "Conformance",
+          "name": "BinaryInteger",
+          "printedName": "BinaryInteger",
+          "children": [
+            {
+              "kind": "TypeWitness",
+              "name": "Words",
+              "printedName": "Words",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Words",
+                  "printedName": "Int.Words",
+                  "usr": "s:Si5WordsV"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "Conformance",
+          "name": "LosslessStringConvertible",
+          "printedName": "LosslessStringConvertible"
+        },
+        {
+          "kind": "Conformance",
+          "name": "SignedNumeric",
+          "printedName": "SignedNumeric"
+        },
+        {
+          "kind": "Conformance",
+          "name": "Numeric",
+          "printedName": "Numeric",
+          "children": [
+            {
+              "kind": "TypeWitness",
+              "name": "Magnitude",
+              "printedName": "Magnitude",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "UInt",
+                  "printedName": "UInt",
+                  "usr": "s:Su"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "Conformance",
+          "name": "CustomStringConvertible",
+          "printedName": "CustomStringConvertible"
+        },
+        {
+          "kind": "Conformance",
+          "name": "Strideable",
+          "printedName": "Strideable",
+          "children": [
+            {
+              "kind": "TypeWitness",
+              "name": "Stride",
+              "printedName": "Stride",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "Conformance",
+          "name": "ExpressibleByIntegerLiteral",
+          "printedName": "ExpressibleByIntegerLiteral",
+          "children": [
+            {
+              "kind": "TypeWitness",
+              "name": "IntegerLiteralType",
+              "printedName": "IntegerLiteralType",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "Conformance",
+          "name": "FixedWidthInteger",
+          "printedName": "FixedWidthInteger"
+        },
+        {
+          "kind": "Conformance",
+          "name": "P1",
+          "printedName": "P1"
+        },
+        {
+          "kind": "Conformance",
+          "name": "Encodable",
+          "printedName": "Encodable"
+        },
+        {
+          "kind": "Conformance",
+          "name": "Decodable",
+          "printedName": "Decodable"
+        },
+        {
+          "kind": "Conformance",
+          "name": "Hashable",
+          "printedName": "Hashable"
+        },
+        {
+          "kind": "Conformance",
+          "name": "Equatable",
+          "printedName": "Equatable"
+        },
+        {
+          "kind": "Conformance",
+          "name": "_HasCustomAnyHashableRepresentation",
+          "printedName": "_HasCustomAnyHashableRepresentation"
+        },
+        {
+          "kind": "Conformance",
+          "name": "CustomReflectable",
+          "printedName": "CustomReflectable"
+        },
+        {
+          "kind": "Conformance",
+          "name": "_CustomPlaygroundQuickLookable",
+          "printedName": "_CustomPlaygroundQuickLookable"
+        },
+        {
+          "kind": "Conformance",
+          "name": "MirrorPath",
+          "printedName": "MirrorPath"
+        },
+        {
+          "kind": "Conformance",
+          "name": "CVarArg",
+          "printedName": "CVarArg"
+        }
       ]
     }
   ]
