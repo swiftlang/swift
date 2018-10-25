@@ -4,9 +4,6 @@
 // REQUIRES: stress_test
 // REQUIRES: tsan_runtime
 
-// https://bugs.swift.org/browse/SR-6622
-// XFAIL: linux
-
 // Check that TSan does not report spurious races in witness table lookup.
 
 func consume(_ x: Any) {}
