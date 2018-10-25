@@ -78,6 +78,31 @@ SILInstruction *SILGlobalVariable::getStaticInitializerValue() {
   return &StaticInitializerBlock.back();
 }
 
+BuiltinInst *SILGlobalVariable::getOffsetSubtract(const TupleExtractInst *TE,
+                                                  SILModule &M) {
+
+  // Match the pattern:
+  // tuple_extract(usub_with_overflow(x, integer_literal, integer_literal 0), 0)
+
+  if (TE->getFieldNo() != 0)
+    return nullptr;
+
+  auto *BI = dyn_cast<BuiltinInst>(TE->getOperand());
+  if (!BI)
+    return nullptr;
+  if (M.getBuiltinInfo(BI->getName()).ID != BuiltinValueKind::USubOver)
+    return nullptr;
+
+  if (!isa<IntegerLiteralInst>(BI->getArguments()[1]))
+    return nullptr;
+
+  auto *overflowFlag = dyn_cast<IntegerLiteralInst>(BI->getArguments()[2]);
+  if (!overflowFlag || !overflowFlag->getValue().isNullValue())
+    return nullptr;
+
+  return BI;
+}
+
 bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
                                                      SILModule &M) {
   switch (I->getKind()) {
@@ -99,10 +124,26 @@ bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
           break;
         case BuiltinValueKind::ZExtOrBitCast:
           return true;
+        case BuiltinValueKind::USubOver: {
+          // Handle StringObjectOr(tuple_extract(usub_with_overflow(x, offset)), bits)
+          // This pattern appears in UTF8 String literal construction.
+          auto *TE = bi->getSingleUserOfType<TupleExtractInst>();
+          return TE && getOffsetSubtract(TE, M);
+        }
         default:
           break;
       }
       return false;
+    }
+    case SILInstructionKind::TupleExtractInst: {
+      // Handle StringObjectOr(tuple_extract(usub_with_overflow(x, offset)), bits)
+      // This pattern appears in UTF8 String literal construction.
+      auto *TE = cast<TupleExtractInst>(I);
+      if (!getOffsetSubtract(TE, M))
+        return false;
+      auto *BI = TE->getSingleUserOfType<BuiltinInst>();
+      return BI &&
+        M.getBuiltinInfo(BI->getName()).ID == BuiltinValueKind::StringObjectOr;
     }
     case SILInstructionKind::StringLiteralInst:
       switch (cast<StringLiteralInst>(I)->getEncoding()) {

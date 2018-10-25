@@ -280,7 +280,7 @@ public:
   inline Operand *getSingleUse() const;
 
   template <class T>
-  inline T *getSingleUserOfType();
+  inline T *getSingleUserOfType() const;
 
   /// Return the instruction that defines this value, or null if it is
   /// not defined by an instruction.
@@ -706,7 +706,7 @@ inline Operand *ValueBase::getSingleUse() const {
 }
 
 template <class T>
-inline T *ValueBase::getSingleUserOfType() {
+inline T *ValueBase::getSingleUserOfType() const {
   T *Result = nullptr;
   for (auto *Op : getUses()) {
     if (auto *Tmp = dyn_cast<T>(Op->getUser())) {
