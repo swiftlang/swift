@@ -85,13 +85,15 @@ static bool isValidParametersStruct(NominalTypeDecl *nominal,
   if (!memberwiseInitDecl)
     return false;
 
+  SmallVector<VarDecl *, 8> tfParamDecls;
+  nominal->getAllTFParameters(tfParamDecls);
   // If there's a parameter count mismatch, return false.
-  if (nominal->getAllTFParameters().size() != parameters.size())
+  if (tfParamDecls.size() != parameters.size())
     return false;
 
   // Check that each parameter of the nominal type maps to a stored property in
   // the `Parameters` struct.
-  for (auto parameter : nominal->getAllTFParameters()) {
+  for (auto parameter : tfParamDecls) {
     auto it = parameters.find(parameter->getName());
     if (it == parameters.end() ||
         !it->second->getType()->isEqual(getParameterType(parameter))) {
@@ -180,12 +182,14 @@ static void derivedBody_allParametersGetter(AbstractFunctionDecl *getterDecl) {
   // The `Parameters` struct initializer may take parameters in a different
   // order than marked in the nominal type. Thus, mapping parameters to their
   // name is necessary to maintain correctness.
-  llvm::DenseMap<Identifier, VarDecl *> parameters;
-  for (auto param : nominal->getAllTFParameters())
-    parameters[param->getName()] = param;
+  llvm::DenseMap<Identifier, VarDecl *> parameterMap;
+  SmallVector<VarDecl *, 8> parameters;
+  nominal->getAllTFParameters(parameters);
+  for (auto *param : parameters)
+    parameterMap[param->getName()] = param;
 
   for (auto initParam : *parametersInitDecl->getParameters()) {
-    auto param = parameters[initParam->getName()];
+    auto param = parameterMap[initParam->getName()];
     Expr *member = new (C) MemberRefExpr(selfDRE, SourceLoc(), param,
                                          DeclNameLoc(), /*Implicit*/ true);
     member->setType(param->getType());
@@ -242,7 +246,9 @@ static void derivedBody_allParametersSetter(AbstractFunctionDecl *setterDecl) {
   }
 
   SmallVector<ASTNode, 2> assignNodes;
-  for (auto param : nominal->getAllTFParameters()) {
+  SmallVector<VarDecl *, 8> tfParamDecls;
+  nominal->getAllTFParameters(tfParamDecls);
+  for (auto param : tfParamDecls) {
     Expr *lhs;
     auto lhsParam = getUnderlyingParameter(param);
     if (param == lhsParam) {
@@ -342,7 +348,9 @@ static Type deriveParameterized_Parameters(DerivedConformance &derived) {
   TC.validateDecl(parametersDecl);
 
   auto *parameterizedProto = C.getProtocol(KnownProtocolKind::Parameterized);
-  for (auto parameter : nominal->getAllTFParameters()) {
+  SmallVector<VarDecl *, 8> tfParamDecls;
+  nominal->getAllTFParameters(tfParamDecls);
+  for (auto *parameter : tfParamDecls) {
     Type newParameterType;
     auto conf =
         TC.conformsToProtocol(parameter->getType(), parameterizedProto,

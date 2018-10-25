@@ -600,7 +600,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
       }
 
       // SWIFT_ENABLE_TENSORFLOW
-      SILInliner Inliner(FuncBuilder, *F, *CalleeFunction, inlineKind, Subs,
+      SILInliner Inliner(FuncBuilder, inlineKind, Subs,
                          OpenedArchetypesTracker);
       if (!Inliner.canInlineApplySite(InnerAI)) {
         // See comment above about casting when devirtualizing and how this

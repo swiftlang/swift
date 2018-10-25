@@ -66,8 +66,11 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   // The only requirement for deriving Parameterized is that there exist some
   // stored properties marked with @TFParameter. The `Parameters` struct can
   // always be derived, even if parameters have different types.
-  if (*knownProtocol == KnownProtocolKind::Parameterized)
-    return !Nominal->getAllTFParameters().empty();
+  if (*knownProtocol == KnownProtocolKind::Parameterized) {
+    SmallVector<VarDecl *, 8> params;
+    Nominal->getAllTFParameters(params);
+    return !params.empty();
+  }
 
   // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::ParameterGroup)

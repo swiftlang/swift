@@ -3056,11 +3056,6 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
     getSatisfiedProtocolRequirementsForMember(const ValueDecl *Member,
                                               bool Sorted) const;
 
-  // SWIFT_ENABLE_TENSORFLOW
-  /// \brief The parameters of the nominal type (instance stored properties
-  /// declared with @TFParameter).
-  Optional<SmallVector<VarDecl *, 2>> TFParameters;
-
   friend class ASTContext;
   friend class MemberLookupTable;
   friend class ConformanceLookupTable;
@@ -3217,7 +3212,7 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   /// Retrieve all parameters of the nominal type (instance stored properties
   /// declared with @TFParameter).
-  ArrayRef<VarDecl *> getAllTFParameters();
+  void getAllTFParameters(SmallVectorImpl<VarDecl *> &result) const;
 
 private:
   /// Predicate used to filter StoredPropertyRange.

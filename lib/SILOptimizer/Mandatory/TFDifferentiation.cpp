@@ -2279,25 +2279,19 @@ public:
                                   << *cloned << '\n');
   }
 
-  void visitSILBasicBlock(SILBasicBlock *bb) {
-    if (errorOccurred)
-      return;
-    SILClonerWithScopes::visitSILBasicBlock(bb);
-  }
-
   void visitSILFunction(SILFunction *original) {
     LLVM_DEBUG(getADDebugStream() << "Running PrimalGen on\n" << *original);
     // Create entry BB and arguments.
     auto *entry = getPrimal()->createBasicBlock();
     // Map the original's arguments to the new function's arguments.
+    SmallVector<SILValue, 8> entryArgs;
     for (auto *origArg : original->getArguments()) {
       auto *newArg = entry->createFunctionArgument(origArg->getType());
-      ValueMap.insert({origArg, newArg});
+      entryArgs.push_back(newArg);
     }
-    BBMap.insert({original->getEntryBlock(), entry});
     getBuilder().setInsertionPoint(entry);
     // Clone.
-    SILClonerWithScopes::visitSILFunction(original);
+    cloneFunctionBody(original, entry, entryArgs);
     // If errors occurred, back out.
     if (errorOccurred)
       return;

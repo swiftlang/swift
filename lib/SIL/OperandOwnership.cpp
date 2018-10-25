@@ -216,9 +216,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, UncheckedTakeEnumDataAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, UnconditionalCheckedCastAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, AllocValueBuffer)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, DeallocValueBuffer)
-// SWIFT_ENABLE_TENSORFLOW
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, Gradient)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, GraphOperation)
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
   CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, Load##Name)
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
@@ -376,6 +373,8 @@ FORWARD_ANY_OWNERSHIP_INST(MarkUninitialized)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
 FORWARD_ANY_OWNERSHIP_INST(DestructureStruct)
 FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
+// SWIFT_ENABLE_TENSORFLOW
+FORWARD_ANY_OWNERSHIP_INST(Gradient)
 #undef FORWARD_ANY_OWNERSHIP_INST
 
 // An instruction that forwards a constant ownership or trivial ownership.
@@ -1175,6 +1174,15 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, PoundAssert)
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitBuiltinInst(BuiltinInst *bi) {
   return OperandOwnershipKindBuiltinClassifier().check(bi);
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+OperandOwnershipKindMap
+OperandOwnershipKindClassifier::visitGraphOperationInst(
+    GraphOperationInst *gi) {
+  // Graph ops take operands at +0.
+  return {gi->getOperand(getOperandIndex()).getOwnershipKind(),
+          UseLifetimeConstraint::MustBeLive};
 }
 
 //===----------------------------------------------------------------------===//

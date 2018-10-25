@@ -49,11 +49,7 @@ typedef std::function<bool(FullApplySite site, SILFunction &callee)>
 void inlineForTFDeabstraction(SILOptFunctionBuilder &FB, SILFunction &fn,
                               const ShouldMandatoryInlineFnPred &predicate);
 
-class SILInliner : public TypeSubstCloner<SILInliner, SILOptFunctionBuilder> {
-  friend class SILInstructionVisitor<SILInliner>;
-  friend class SILCloner<SILInliner>;
-  using SuperTy = TypeSubstCloner<SILInliner, SILOptFunctionBuilder>;
-
+class SILInliner {
 public:
   enum class InlineKind { MandatoryInline, PerformanceInline };
 
