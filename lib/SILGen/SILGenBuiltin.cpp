@@ -867,9 +867,15 @@ static ManagedValue emitBuiltinValueToBridgeObject(SILGenFunction &SGF,
   assert(args.size() == 1 && "ValueToBridgeObject should have one argument");
   assert(subs.getReplacementTypes().size() == 1 &&
          "ValueToBridgeObject should have one sub");
-  auto &fromTL = SGF.getTypeLowering(subs.getReplacementTypes()[0]);
-  assert(fromTL.isTrivial() && "Expected a trivial type");
-  (void)fromTL;
+
+  Type argTy = subs.getReplacementTypes()[0];
+  if (!argTy->is<BuiltinIntegerType>()) {
+    SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
+                     "argument to builtin should be a builtin integer");
+    SILType objPointerType = SILType::getBridgeObjectType(SGF.F.getASTContext());
+    SILValue undef = SILUndef::get(objPointerType, SGF.SGM.M);
+    return ManagedValue::forUnmanaged(undef);
+  }
 
   SILValue result = SGF.B.createValueToBridgeObject(loc, args[0].getValue());
   return SGF.emitManagedRetain(loc, result);

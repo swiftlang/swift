@@ -809,12 +809,13 @@ func once(control: Builtin.RawPointer) {
 
 // CHECK-LABEL: sil hidden @$s8builtins19valueToBridgeObjectyBbSuF : $@convention(thin) (UInt) -> @owned Builtin.BridgeObject {
 // CHECK: bb0([[UINT:%.*]] : @trivial $UInt):
-// CHECK:   [[CAST:%.*]] = value_to_bridge_object [[UINT]] : $UInt
+// CHECK:   [[BI:%.*]] = struct_extract [[UINT]] : $UInt, #UInt._value
+// CHECK:   [[CAST:%.*]] = value_to_bridge_object [[BI]]
 // CHECK:   [[RET:%.*]] = copy_value [[CAST]] : $Builtin.BridgeObject
 // CHECK:   return [[RET]] : $Builtin.BridgeObject
 // CHECK: } // end sil function '$s8builtins19valueToBridgeObjectyBbSuF'
 func valueToBridgeObject(_ x: UInt) -> Builtin.BridgeObject {
-  return Builtin.valueToBridgeObject(x)
+  return Builtin.valueToBridgeObject(x._value)
 }
 
 // CHECK-LABEL: sil hidden @$s8builtins10assumeTrueyyBi1_F
