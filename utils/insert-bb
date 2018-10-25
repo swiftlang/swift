@@ -1,0 +1,33 @@
+#!/usr/bin/perl
+
+# This script is mainly useful when you're trying to diff two SIL files where
+# most BBs correspond to a BB in the opposite file, but some BBs in one file are
+# missing from the other. You can use it to insert a placeholder block and make
+# the numbering match up.
+
+use strict;
+use warnings;
+
+my $start_num = shift @ARGV;
+
+die <<"END" unless $start_num + 0;
+Usage: $0 <bb-number> [<files>...]
+
+Insert a placeholder basic block with the specified number into a fragment of
+textual SIL, editing references to higher-numbered blocks to match.
+
+  <bb-number>   The number of the basic block to insert, without the bb prefix.
+      <files>   Files to be used as input. If not specified, stdin is used
+                instead.
+END
+
+while(<>) {
+  if (/^bb$start_num:/) {
+    print "bb$start_num:\n  placeholder\n\n";
+  }
+
+  s{ bb (\d+) \b }{ 'bb' . ($1 >= $start_num ? $1 + 1 : $1) }xeg;
+
+  print;
+}
+
