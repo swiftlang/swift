@@ -39,7 +39,6 @@
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/ABI/KeyPath.h"
-#include "swift/ABI/HeapObject.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -1120,9 +1119,9 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   auto endOfObjectHeader = fields.getNextOffsetFromGlobal();
   unsigned expectedObjectHeaderSize;
   if (SizeTy == Int64Ty)
-    expectedObjectHeaderSize = SWIFT_ABI_HEAP_OBJECT_HEADER_SIZE_64;
+    expectedObjectHeaderSize = 16;
   else if (SizeTy == Int32Ty)
-    expectedObjectHeaderSize = SWIFT_ABI_HEAP_OBJECT_HEADER_SIZE_32;
+    expectedObjectHeaderSize = 8;
   else
     llvm_unreachable("unexpected pointer size");
   assert((endOfObjectHeader - startOfObject).getValue()

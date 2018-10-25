@@ -17,9 +17,6 @@
 #include "System.h"
 #include "Target.h"
 
-#define SWIFT_ABI_HEAP_OBJECT_HEADER_SIZE_64 16
-#define SWIFT_ABI_HEAP_OBJECT_HEADER_SIZE_32 8
-
 #ifdef __cplusplus
 #include <type_traits>
 #include "swift/Basic/type_traits.h"
@@ -63,6 +60,11 @@ struct HeapObject {
 
 #endif // __cplusplus
 };
+
+#if defined(__cplusplus)
+static_assert(sizeof(HeapObject) == 2 * sizeof(uintptr_t),
+              "HeapObject should be a 2-word pair");
+#endif
 
 #ifdef __cplusplus
 extern "C" {
