@@ -8,7 +8,13 @@ add_swift_target_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
   Calendar.swift
   CharacterSet.swift
   Codable.swift
+  Collections+DataProtocol.swift
+  ContiguousBytes.swift
   Data.swift
+  DataProtocol.swift
+  DispatchData+DataProtocol.swift
+  NSData+DataProtocol.swift
+  Pointers+DataProtocol.swift
   DataThunks.m
   Date.swift
   DateComponents.swift
