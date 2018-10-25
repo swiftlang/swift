@@ -557,7 +557,6 @@ extension String : TextOutputStream {
   /// Appends the given string to this string.
   /// 
   /// - Parameter other: A string to append.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func write(_ other: String) {
     self += other
   }
@@ -571,7 +570,6 @@ extension String : TextOutputStreamable {
   /// Writes the string into the given output stream.
   /// 
   /// - Parameter target: An output stream.
-  @inlinable // FIXME(sil-serialize-all)
   public func write<Target : TextOutputStream>(to target: inout Target) {
     target.write(self)
   }
@@ -581,7 +579,6 @@ extension Character : TextOutputStreamable {
   /// Writes the character into the given output stream.
   ///
   /// - Parameter target: An output stream.
-  @inlinable // FIXME(sil-serialize-all)
   public func write<Target : TextOutputStream>(to target: inout Target) {
     target.write(String(self))
   }
@@ -592,7 +589,6 @@ extension Unicode.Scalar : TextOutputStreamable {
   /// output stream.
   ///
   /// - Parameter target: An output stream.
-  @inlinable // FIXME(sil-serialize-all)
   public func write<Target : TextOutputStream>(to target: inout Target) {
     target.write(String(Character(self)))
   }
