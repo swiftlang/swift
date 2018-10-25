@@ -330,6 +330,7 @@ foreach(SDK ${SWIFT_SDKS})
               ${LIT_ARGS}
               "--param" "swift_test_subset=${test_subset}"
               "--param" "swift_test_mode=${test_mode}"
+              ${SWIFT_LIT_TEST_PATHS}
             DEPENDS ${dependencies}
             COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE} from custom test locations"
             USES_TERMINAL)
