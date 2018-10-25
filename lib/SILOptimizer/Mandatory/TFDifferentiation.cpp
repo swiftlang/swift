@@ -2236,17 +2236,6 @@ public:
         /*loopInfo(loopInfo),*/
         primalGen(primalGen) {}
 
-  /// Entry of primal generation for a function. Returns true if any error
-  /// occurred.
-  bool run() {
-    LLVM_DEBUG(getADDebugStream()
-               << "Cloning original @" << getOriginal()->getName()
-               << " to primal @" << synthesis.target->getName() << '\n');
-    // Kick off the cloner.
-    visitSILFunction(getOriginal());
-    return errorOccurred;
-  }
-
   void postProcess(SILInstruction *orig, SILInstruction *cloned) {
     if (errorOccurred)
       return;
@@ -2279,8 +2268,12 @@ public:
                                   << *cloned << '\n');
   }
 
-  void visitSILFunction(SILFunction *original) {
-    LLVM_DEBUG(getADDebugStream() << "Running PrimalGen on\n" << *original);
+  // Run primal generation. Returns true on error.
+  bool run() {
+    auto *original = getOriginal();
+    LLVM_DEBUG(getADDebugStream()
+               << "Cloning original @" << getOriginal()->getName()
+               << " to primal @" << synthesis.target->getName() << '\n');
     // Create entry BB and arguments.
     auto *entry = getPrimal()->createBasicBlock();
     // Map the original's arguments to the new function's arguments.
@@ -2289,12 +2282,11 @@ public:
       auto *newArg = entry->createFunctionArgument(origArg->getType());
       entryArgs.push_back(newArg);
     }
-    getBuilder().setInsertionPoint(entry);
     // Clone.
     cloneFunctionBody(original, entry, entryArgs);
     // If errors occurred, back out.
     if (errorOccurred)
-      return;
+      return true;
     auto *origExit = &*original->findReturnBB();
     auto *exit = BBMap.lookup(origExit);
     assert(exit->getParent() == getPrimal());
@@ -2347,6 +2339,8 @@ public:
     LLVM_DEBUG(getADDebugStream() << "Finished PrimalGen for function "
                                   << original->getName() << ":\n"
                                   << *getPrimal());
+    debugDump(*getPrimal());
+    return errorOccurred;
   }
 
   /// General visitor for all instruction. If there is any error emitted by
@@ -2355,6 +2349,11 @@ public:
     if (errorOccurred)
       return;
     SILClonerWithScopes::visit(inst);
+  }
+  
+  void visitReturnInst(ReturnInst *ri) {
+    // The original return is not to be cloned.
+    return;
   }
 
   /// Handle the primal transformation of an `apply` instruction. We do not
@@ -3197,7 +3196,28 @@ public:
     // differentiation in each block.
     // NOTE: For now we just assume single basic block.
     for (auto *bb : llvm::breadth_first(origRetBB)) {
-      visitSILBasicBlock(bb);
+      if (errorOccurred)
+        break;
+      auto indices = getDifferentiationTask()->getIndices();
+      // Get the corresponding adjoint basic block.
+      auto adjBB = getAdjointBlock(bb);
+      // Prepare the remat cloner for on-demand rematerialization.
+      rematCloner.setInsertionPointBeforeAnyTerminator(bb);
+      getBuilder().setInsertionPoint(adjBB);
+      // Visit each instruction in reverse order.
+      for (auto &inst : reversed(*bb)) {
+        // If any results are active on the differentiation path, we'll
+        // differentiate it.
+        if (isa<NonValueInstruction>(inst))
+          continue;
+        auto needsDiff = llvm::any_of(inst.getResults(), [&](SILValue val) {
+          return activityInfo.isActive(val, indices);
+        });
+        if (!needsDiff)
+          continue;
+        // Differentiate instruction.
+        visit(&inst);
+      }
     }
 
     // If errors occurred, back out.
@@ -3252,31 +3272,6 @@ public:
 
   void visitSILInstruction(SILInstruction *inst) {
     llvm_unreachable("Unsupport instruction visited");
-  }
-
-  void visitSILBasicBlock(SILBasicBlock *bb) {
-    if (errorOccurred)
-      return;
-    auto indices = getDifferentiationTask()->getIndices();
-    // Get the corresponding adjoint basic block.
-    auto adjBB = getAdjointBlock(bb);
-    // Prepare the remat cloner for on-demand rematerialization.
-    rematCloner.setInsertionPointBeforeAnyTerminator(bb);
-    getBuilder().setInsertionPoint(adjBB);
-    // Visit each instruction in reverse order.
-    for (auto &inst : reversed(*bb)) {
-      // If any results are active on the differentiation path, we'll
-      // differentiate it.
-      if (isa<NonValueInstruction>(inst))
-        continue;
-      auto needsDiff = llvm::any_of(inst.getResults(), [&](SILValue val) {
-        return activityInfo.isActive(val, indices);
-      });
-      if (!needsDiff)
-        continue;
-      // Differentiate instruction.
-      visit(&inst);
-    }
   }
 
   SILLocation remapLocation(SILLocation loc) { return loc; }
