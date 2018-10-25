@@ -1919,7 +1919,7 @@ llvm::Value *IRGenSILFunction::createArrayAndSize(
 
 /// The name of the numberAttr for `opName`'s `inputIdx` argument. The
 /// numberAttr is an attr whose value must be set to describe the length of an
-/// input list. Returns nullptr if no number attr is required. For example,
+/// input list. Returns nullptr if no numberAttr is required. For example,
 /// "Concat" is registered as:
 ///
 ///   REGISTER_OP("Concat")
@@ -2158,27 +2158,28 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       // `structuredArgument`. (It is possible to add more than one input per
       // `structuredArgument` in the case of an input list. See the
       // "ParseExample" example above for more information.)
-      llvm::Value *listLength = llvm::ConstantInt::get(IGM.Int32Ty, 0);
-      auto incrementListLength = [&](llvm::Value *amount) {
-        listLength = Builder.CreateAdd(listLength, amount);
-      };
+      llvm::Value *listLength = nullptr;
 
       switch (structuredArgument.getKind()) {
       case GraphOperationInfo::SAK_Single: {
         LLVM_DEBUG(llvm::dbgs() << " Adding a single input.\n");
         auto tensorHandle = structuredArgument.getSingleArgument();
-        incrementListLength(unpackAndAddInput(tensorHandle));
+        listLength = unpackAndAddInput(tensorHandle);
         break;
       }
       case GraphOperationInfo::SAK_List: {
         LLVM_DEBUG(llvm::dbgs()
                    << " Adding input list of size "
                    << structuredArgument.getArgumentList().size() << ".\n");
+        listLength = llvm::ConstantInt::get(IGM.Int32Ty, 0);
         for (auto tensorHandle : structuredArgument.getArgumentList()) {
-          incrementListLength(unpackAndAddInput(tensorHandle));
+          listLength = Builder.CreateAdd(listLength,
+                                         unpackAndAddInput(tensorHandle));
         }
       }
       }
+
+      assert(listLength && "all cases must set listLength");
 
       // If the current `inputIdx` for the current op is an input list that
       // requires a numberAttr, set that numberAttr. See the "ParseExample"
@@ -2837,7 +2838,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
                         outParameterTensorGroupWitnessTable});
   } else {
     // There is no out parameter. Return the results directly.
-    for (unsigned resultIdx = 0; resultIdx < i->getNumResults(); ++resultIdx) {
+    for (unsigned resultIdx : range(i->getNumResults())) {
       auto resultIdxVal = llvm::ConstantInt::get(IGM.Int32Ty, resultIdx);
       auto resultAddr = Builder.CreateInBoundsGEP(returnValuesAddress,
                                                   resultIdxVal);

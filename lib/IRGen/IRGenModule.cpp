@@ -569,6 +569,7 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
     for (auto Attr : attrs) {
       if (isReturnAttribute(Attr))
         buildRetAttr.addAttribute(Attr);
+      // SWIFT_ENABLE_TENSORFLOW
       else if (isReturnedAttribute(Attr) || isStructRetAttribute(Attr))
         buildFirstParamAttr.addAttribute(Attr);
       else

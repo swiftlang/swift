@@ -1184,7 +1184,7 @@ func _TFCOpAddInputFromTensorGroup<T : TensorGroup>(
   let buffer =
       UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: count)
   defer { buffer.deallocate() }
-  t._unpackTensorHandles(into: buffer.baseAddress!)
+  t._unpackTensorHandles(into: buffer.baseAddress)
   for handle in buffer {
     TFE_OpAddInput(op, handle, status)
     guard TF_GetCode(status) == TF_OK else {

@@ -2348,8 +2348,9 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
           SILValue element;
           if (auto *store = dyn_cast<StoreInst>(use->getUser()))
             element = store->getSrc();
-          if (auto *copyAddr = dyn_cast<CopyAddrInst>(use->getUser()))
+          else if (auto *copyAddr = dyn_cast<CopyAddrInst>(use->getUser()))
             element = copyAddr->getSrc();
+
           if (!element) {
             diagnoseInvalid(argumentLoc,
                             "argument of type '" + elementType->getString() +
