@@ -59,31 +59,35 @@ fileprivate extension NSObject {
          NSObject's automaticallyNotifiesObserversForKey:, and keyPathsForValuesAffectingValueForKey: methods replace NSObject's __old_unswizzled_* methods
          NSObject's _old_unswizzled_* methods replace __KVOKeyPathBridgeMachinery's methods, and are never invoked
          */
-        let rootClass: AnyClass = NSObject.self
-        let bridgeClass: AnyClass = __KVOKeyPathBridgeMachinery.self
-        
-        let dependentSel = #selector(NSObject.keyPathsForValuesAffectingValue(forKey:))
-        let rootDependentImpl = class_getClassMethod(rootClass, dependentSel)!
-        let bridgeDependentImpl = class_getClassMethod(bridgeClass, dependentSel)!
-        method_exchangeImplementations(rootDependentImpl, bridgeDependentImpl) // NSObject <-> Us
-        
-        let originalDependentImpl = class_getClassMethod(bridgeClass, dependentSel)! //we swizzled it onto this class, so this is actually NSObject's old implementation
-        let originalDependentSel = #selector(NSObject.__old_unswizzled_keyPathsForValuesAffectingValue(forKey:))
-        let dummyDependentImpl = class_getClassMethod(rootClass, originalDependentSel)!
-        method_exchangeImplementations(originalDependentImpl, dummyDependentImpl) // NSObject's original version <-> NSObject's __old_unswizzled_ version
-        
-        let autoSel = #selector(NSObject.automaticallyNotifiesObservers(forKey:))
-        let rootAutoImpl = class_getClassMethod(rootClass, autoSel)!
-        let bridgeAutoImpl = class_getClassMethod(bridgeClass, autoSel)!
-        method_exchangeImplementations(rootAutoImpl, bridgeAutoImpl) // NSObject <-> Us
-        
-        let originalAutoImpl = class_getClassMethod(bridgeClass, autoSel)! //we swizzled it onto this class, so this is actually NSObject's old implementation
-        let originalAutoSel = #selector(NSObject.__old_unswizzled_automaticallyNotifiesObservers(forKey:))
-        let dummyAutoImpl = class_getClassMethod(rootClass, originalAutoSel)!
-        method_exchangeImplementations(originalAutoImpl, dummyAutoImpl) // NSObject's original version <-> NSObject's __old_unswizzled_ version
+        threeWaySwizzle(#selector(NSObject.keyPathsForValuesAffectingValue(forKey:)), with: #selector(NSObject.__old_unswizzled_keyPathsForValuesAffectingValue(forKey:)))
+        threeWaySwizzle(#selector(NSObject.automaticallyNotifiesObservers(forKey:)), with: #selector(NSObject.__old_unswizzled_automaticallyNotifiesObservers(forKey:)))
         
         return [:]
     }()
+    
+    /// Performs a 3-way swizzle between `NSObject` and `__KVOKeyPathBridgeMachinery`.
+    ///
+    /// The end result of this swizzle is the following:
+    /// * `NSObject.selector` contains the IMP from `__KVOKeyPathBridgeMachinery.selector`
+    /// * `NSObject.unswizzledSelector` contains the IMP from the original `NSObject.selector`.
+    /// * __KVOKeyPathBridgeMachinery.selector` contains the (useless) IMP from `NSObject.unswizzledSelector`.
+    ///
+    /// This swizzle is done in a manner that modifies `NSObject.selector` last, in order to ensure thread safety
+    /// (by the time `NSObject.selector` is swizzled, `NSObject.unswizzledSelector` will contain the original IMP)
+    private static func threeWaySwizzle(_ selector: Selector, with unswizzledSelector: Selector) {
+        let rootClass: AnyClass = NSObject.self
+        let bridgeClass: AnyClass = __KVOKeyPathBridgeMachinery.self
+        
+        // Swap bridge.selector <-> NSObject.unswizzledSelector
+        let unswizzledMethod = class_getClassMethod(rootClass, unswizzledSelector)!
+        let bridgeMethod = class_getClassMethod(bridgeClass, selector)!
+        method_exchangeImplementations(unswizzledMethod, bridgeMethod)
+        
+        // Swap NSObject.selector <-> NSObject.unswizzledSelector
+        // NSObject.unswizzledSelector at this point contains the bridge IMP
+        let rootMethod = class_getClassMethod(rootClass, selector)!
+        method_exchangeImplementations(rootMethod, unswizzledMethod)
+    }
     
     @nonobjc static var keyPathTableLock = NSLock()
     
