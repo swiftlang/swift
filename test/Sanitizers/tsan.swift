@@ -9,9 +9,6 @@
 // don't support TSan.
 // UNSUPPORTED: remote_run
 
-// https://bugs.swift.org/browse/SR-6622
-// XFAIL: linux
-
 #if os(macOS) || os(iOS)
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin)
