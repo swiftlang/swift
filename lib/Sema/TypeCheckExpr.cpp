@@ -565,11 +565,11 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
   Type *type = nullptr;
   const char *name = nullptr;
 
-  // ExpressibleByUnicodeScalarLiteral -> UnicodeScalarType
+  // LegacyExpressibleByUnicodeScalarLiteral -> UnicodeScalarType
   if (protocol ==
            getProtocol(
                SourceLoc(),
-               KnownProtocolKind::ExpressibleByUnicodeScalarLiteral)) {
+               KnownProtocolKind::LegacyExpressibleByUnicodeScalarLiteral)) {
     type = &UnicodeScalarType;
     name = "UnicodeScalarType";
   }
@@ -581,13 +581,13 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
     type = &ExtendedGraphemeClusterType;
     name = "ExtendedGraphemeClusterType";
   }
-  // ExpressibleByCodepointLiteral -> CodepointLiteralType
+  // ExpressibleByUnicodeScalarLiteral -> UnicodeScalarLiteralType
   else if (protocol ==
            getProtocol(
                SourceLoc(),
-               KnownProtocolKind::ExpressibleByCodepointLiteral)) {
-    type = &CodepointLiteralType;
-    name = "CodepointLiteralType";
+               KnownProtocolKind::ExpressibleByUnicodeScalarLiteral)) {
+    type = &UnicodeScalarLiteralType;
+    name = "UnicodeScalarLiteralType";
   }
   // ExpressibleByCharacterLiteral -> CharacterLiteralType
   else if (protocol ==

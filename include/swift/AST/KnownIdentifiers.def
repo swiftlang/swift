@@ -162,6 +162,7 @@ IDENTIFIER(extendedGraphemeClusterLiteral)
 IDENTIFIER(UnicodeScalarLiteralType)
 IDENTIFIER_(builtinUnicodeScalarLiteral)
 IDENTIFIER(unicodeScalarLiteral)
+IDENTIFIER(legacyUnicodeScalarLiteral)
 
 IDENTIFIER(stringLiteral)
 IDENTIFIER_(builtinUTF16StringLiteral)

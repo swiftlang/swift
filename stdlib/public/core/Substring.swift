@@ -830,9 +830,9 @@ extension Substring : TextOutputStreamable {
   }
 }
 
-extension Substring : ExpressibleByUnicodeScalarLiteral {
+extension Substring : _LegacyExpressibleByUnicodeScalarLiteral {
   @inlinable // FIXME(sil-serialize-all)
-  public init(unicodeScalarLiteral value: String) {
+  public init(legacyUnicodeScalarLiteral value: String) {
      self.init(_base: value, value.startIndex ..< value.endIndex)
   }
 }

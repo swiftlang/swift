@@ -655,7 +655,7 @@ private:
   Type BooleanLiteralType;
   Type UnicodeScalarType;
   Type ExtendedGraphemeClusterType;
-  Type CodepointLiteralType;
+  Type UnicodeScalarLiteralType;
   Type CharacterLiteralType;
   Type StringLiteralType;
   Type ArrayLiteralType;

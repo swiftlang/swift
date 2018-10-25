@@ -106,7 +106,7 @@ public typealias ExtendedGraphemeClusterType = String
 /// The default type for an otherwise-unconstrained "string" literal.
 public typealias StringLiteralType = String
 /// The default type for an otherwise-unconstrained 'codepoint' literal.
-public typealias CodepointLiteralType = Character
+public typealias UnicodeScalarLiteralType = Character
 /// The default type for an otherwise-unconstrained 'codepoint' literal.
 public typealias CharacterLiteralType = Character
 

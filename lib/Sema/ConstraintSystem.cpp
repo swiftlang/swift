@@ -337,8 +337,8 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   case KnownProtocolKind::ExpressibleByColorLiteral: index = 10; break;
   case KnownProtocolKind::ExpressibleByImageLiteral: index = 11; break;
   case KnownProtocolKind::ExpressibleByFileReferenceLiteral: index = 12; break;
-  case KnownProtocolKind::ExpressibleByCodepointLiteral: index = 13; break;
-  case KnownProtocolKind::ExpressibleByCharacterLiteral: index = 14; break;
+  case KnownProtocolKind::ExpressibleByCharacterLiteral: index = 13; break;
+  case KnownProtocolKind::LegacyExpressibleByUnicodeScalarLiteral: index = 14; break;
   }
   static_assert(NumAlternativeLiteralTypes == 15, "Wrong # of literal types");
 
@@ -363,6 +363,8 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   case KnownProtocolKind::ExpressibleByStringInterpolation:
   case KnownProtocolKind::ExpressibleByStringLiteral:
   case KnownProtocolKind::ExpressibleByUnicodeScalarLiteral:
+  case KnownProtocolKind::ExpressibleByCharacterLiteral:
+  case KnownProtocolKind::LegacyExpressibleByUnicodeScalarLiteral:
     break;
 
   case KnownProtocolKind::ExpressibleByIntegerLiteral:
@@ -384,8 +386,6 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
   case KnownProtocolKind::ExpressibleByColorLiteral:
   case KnownProtocolKind::ExpressibleByImageLiteral:
   case KnownProtocolKind::ExpressibleByFileReferenceLiteral:
-  case KnownProtocolKind::ExpressibleByCodepointLiteral:
-  case KnownProtocolKind::ExpressibleByCharacterLiteral:
     break;
   }
 

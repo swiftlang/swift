@@ -1316,7 +1316,7 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
 
   static auto otherLiteralProtocolKinds = {
     KnownProtocolKind::ExpressibleByFloatLiteral,
-    KnownProtocolKind::ExpressibleByUnicodeScalarLiteral,
+    KnownProtocolKind::LegacyExpressibleByUnicodeScalarLiteral,
     KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral,
   };
 
@@ -5022,8 +5022,9 @@ static Optional<std::string> buildDefaultInitializerString(TypeChecker &tc,
     }
     CHECK_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "[]")
     CHECK_LITERAL_PROTOCOL(ExpressibleByDictionaryLiteral, "[:]")
-    CHECK_LITERAL_PROTOCOL(ExpressibleByUnicodeScalarLiteral, "\"\"")
+    CHECK_LITERAL_PROTOCOL(LegacyExpressibleByUnicodeScalarLiteral, "\"\"")
     CHECK_LITERAL_PROTOCOL(ExpressibleByExtendedGraphemeClusterLiteral, "\"\"")
+    CHECK_LITERAL_PROTOCOL(ExpressibleByUnicodeScalarLiteral, "''")
     CHECK_LITERAL_PROTOCOL(ExpressibleByCharacterLiteral, "''")
     CHECK_LITERAL_PROTOCOL(ExpressibleByFloatLiteral, "0.0")
     CHECK_LITERAL_PROTOCOL(ExpressibleByIntegerLiteral, "0")
