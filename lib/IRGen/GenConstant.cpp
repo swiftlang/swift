@@ -94,11 +94,23 @@ static llvm::Constant *emitConstantValue(IRGenModule &IGM, SILValue operand) {
         return llvm::ConstantExpr::getZExtOrBitCast(value, IGM.getStorageType(BI->getType()));
       }
       case BuiltinValueKind::StringObjectOr: {
-        llvm::Constant *lhs = emitConstantValue(IGM, BI->getArguments()[0]);
-        llvm::Constant *rhs = emitConstantValue(IGM, BI->getArguments()[1]);
         // It is a requirement that the or'd bits in the left argument are
         // initialized with 0. Therefore the or-operation is equivalent to an
         // addition. We need an addition to generate a valid relocation.
+        llvm::Constant *rhs = emitConstantValue(IGM, BI->getArguments()[1]);
+        if (auto *TE = dyn_cast<TupleExtractInst>(BI->getArguments()[0])) {
+          // Handle StringObjectOr(tuple_extract(usub_with_overflow(x, offset)), bits)
+          // This pattern appears in UTF8 String literal construction.
+          // Generate the equivalent: add(x, sub(bits - offset)
+          BuiltinInst *SubtrBI =
+            SILGlobalVariable::getOffsetSubtract(TE, IGM.getSILModule());
+          assert(SubtrBI && "unsupported argument of StringObjectOr");
+          auto *ptr = emitConstantValue(IGM, SubtrBI->getArguments()[0]);
+          auto *offset = emitConstantValue(IGM, SubtrBI->getArguments()[1]);
+          auto *totalOffset = llvm::ConstantExpr::getSub(rhs, offset);
+          return llvm::ConstantExpr::getAdd(ptr, totalOffset);
+        }
+        llvm::Constant *lhs = emitConstantValue(IGM, BI->getArguments()[0]);
         return llvm::ConstantExpr::getAdd(lhs, rhs);
       }
       default:
