@@ -1164,12 +1164,64 @@ func _TFCGetGlobalEagerContext() -> CTFEContext {
 // Some of the functions are marked with @silgen_name instead of @_cdecl,
 // because their input/output data types are not C-compatible
 // (e.g. AnyTensorHandle).
-@inlinable
-@_silgen_name("_swift_tfc_GetCTensorHandleFromSwift")
-public func _TFCGetCTensorHandleFromSwift(
-  _ handle: _AnyTensorHandle
-) -> CTensorHandle {
-  return handle.cTensorHandle
+
+/// Adds `handle` as an input to `op`.
+@usableFromInline
+@_silgen_name("_swift_tfc_OpAddInputFromTensorHandle")
+func _TFCOpAddInputFromTensorHandle(_ op: CTFEOp,
+                                    _ handle: _AnyTensorHandle,
+                                    _ status: CTFStatus) {
+  TFE_OpAddInput(op, handle._cTensorHandle, status)
+}
+
+/// Adds `t` as an input or inputs to `op`. Returns the number of inputs added.
+@usableFromInline
+@_silgen_name("_swift_tfc_OpAddInputFromTensorGroup")
+func _TFCOpAddInputFromTensorGroup<T : TensorGroup>(
+    _ op: CTFEOp, _ t: T, _ status: CTFStatus
+) -> Int32 {
+  let count = Int(T._tensorHandleCount)
+  let buffer =
+      UnsafeMutableBufferPointer<CTensorHandle>.allocate(capacity: count)
+  defer { buffer.deallocate() }
+  t._unpackTensorHandles(into: buffer.baseAddress)
+  for handle in buffer {
+    TFE_OpAddInput(op, handle, status)
+    guard TF_GetCode(status) == TF_OK else {
+      return 0
+    }
+  }
+  return T._tensorHandleCount
+}
+
+/// Initializes a TensorGroup value, taking ownership of all the tensor
+/// handles in `tensorHandles`. Also deallocates `tensorHandles`.
+@usableFromInline
+@_silgen_name("_swift_tfc_InitTensorGroup")
+func _TFCInitTensorGroup<T : TensorGroup>(
+    _ tensorHandles: UnsafeMutablePointer<CTensorHandle>
+) -> T {
+  let t = T(_owning: tensorHandles)
+  tensorHandles.deallocate()
+  return t
+}
+
+/// Allocates a buffer with enough capacity to hold all the CTensorHandles for
+/// a TensorGroup of type T.
+@usableFromInline
+@_silgen_name("_swift_tfc_AllocateTensorGroupCHandleBuffer")
+func _TFCAllocateTensorGroupCHandleBuffer<T : TensorGroup>(
+  _ type: T.Type
+) -> UnsafeMutablePointer<CTensorHandle> {
+  return UnsafeMutablePointer.allocate(capacity: Int(T._tensorHandleCount))
+}
+
+/// Returns the number of CTensorHandles in a TensorGroup of type T.
+@_silgen_name("_swift_tfc_GetTensorGroupCHandleCount")
+public func _TFCGetTensorGroupCHandleCount<T : TensorGroup>(
+    _ type: T.Type
+) -> Int32 {
+  return T._tensorHandleCount
 }
 
 @inlinable
@@ -1179,18 +1231,18 @@ public func _TFCCreateTensorHandleFromC(
 ) -> _AnyTensorHandle {
   let dtype = TFE_TensorHandleDataType(cHandle)
   switch dtype {
-  case TF_BFLOAT16: return TensorHandle<BFloat16>(owning: cHandle)
-  case TF_UINT8: return TensorHandle<UInt8>(owning: cHandle)
-  case TF_INT8: return TensorHandle<Int8>(owning: cHandle)
-  case TF_UINT16: return TensorHandle<UInt16>(owning: cHandle)
-  case TF_INT16: return TensorHandle<Int16>(owning: cHandle)
-  case TF_UINT32: return TensorHandle<UInt32>(owning: cHandle)
-  case TF_INT32: return TensorHandle<Int32>(owning: cHandle)
-  case TF_UINT64: return TensorHandle<UInt64>(owning: cHandle)
-  case TF_INT64: return TensorHandle<Int64>(owning: cHandle)
-  case TF_FLOAT: return TensorHandle<Float>(owning: cHandle)
-  case TF_DOUBLE: return TensorHandle<Double>(owning: cHandle)
-  case TF_BOOL: return TensorHandle<Bool>(owning: cHandle)
+  case TF_BFLOAT16: return TensorHandle<BFloat16>(_owning: cHandle)
+  case TF_UINT8: return TensorHandle<UInt8>(_owning: cHandle)
+  case TF_INT8: return TensorHandle<Int8>(_owning: cHandle)
+  case TF_UINT16: return TensorHandle<UInt16>(_owning: cHandle)
+  case TF_INT16: return TensorHandle<Int16>(_owning: cHandle)
+  case TF_UINT32: return TensorHandle<UInt32>(_owning: cHandle)
+  case TF_INT32: return TensorHandle<Int32>(_owning: cHandle)
+  case TF_UINT64: return TensorHandle<UInt64>(_owning: cHandle)
+  case TF_INT64: return TensorHandle<Int64>(_owning: cHandle)
+  case TF_FLOAT: return TensorHandle<Float>(_owning: cHandle)
+  case TF_DOUBLE: return TensorHandle<Double>(_owning: cHandle)
+  case TF_BOOL: return TensorHandle<Bool>(_owning: cHandle)
   case TF_RESOURCE: return ResourceHandle(owning: cHandle)
   case TF_VARIANT: return VariantHandle(owning: cHandle)
   default: fatalError("Unsupported dtype \(dtype)")

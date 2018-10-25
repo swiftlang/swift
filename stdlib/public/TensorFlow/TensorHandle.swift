@@ -19,19 +19,19 @@ import CTensorFlow
 /// `_AnyTensorHandle` is the scalar-agnostic base type for `TensorHandle`, used
 /// specifically for low-level, type-erased passings of Swift-level tensor
 /// handles in the compiler.
-@_fixed_layout // required because the compiler accesses cTensorHandle directly.
+@_fixed_layout // required because the compiler accesses _cTensorHandle directly.
 public class _AnyTensorHandle {
   /// The underlying `TF_TensorHandle *`.
   ///
   /// - Note: The compiler knows that `_AnyTensorHandle` has a single stored
   /// property, and assumes that this is it. Changing the design of
   /// `TensorHandle` will require tweaking the compiler.
-  @usableFromInline let cTensorHandle: CTensorHandle
+  public let _cTensorHandle: CTensorHandle
   
   /// Private initializer from a `CTensorHandle`. Should only be called from
   /// `TensorHandle<Scalar>.init`.
   fileprivate init(base: CTensorHandle) {
-    self.cTensorHandle = base
+    self._cTensorHandle = base
   }
 }
 
@@ -39,11 +39,10 @@ public class _AnyTensorHandle {
 /// specifically. It includes a `Scalar` type, which compiler internals depend
 /// on to determine the datatypes of parameters when they are extracted
 /// into a tensor program.
-@_fixed_layout // required because the compiler accesses cTensorHandle directly.
+@_fixed_layout // required because the compiler accesses _cTensorHandle directly.
 public final class TensorHandle<Scalar> : _AnyTensorHandle
   where Scalar : AccelerableByTensorFlow {
-  @usableFromInline
-  init(owning cTensorHandle: CTensorHandle) {
+  public init(_owning cTensorHandle: CTensorHandle) {
     super.init(base: cTensorHandle)
   }
   
@@ -52,13 +51,13 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
     let status = TF_NewStatus()
     let cTensorHandle = TFE_NewTensorHandle(cTensor, status)
     checkOk(status)
-    self.init(owning: cTensorHandle!)
+    self.init(_owning: cTensorHandle!)
     TF_DeleteStatus(status)
   }
 
   deinit {
     debugLog("De-initializing TensorHandle.")
-    TFE_DeleteTensorHandle(cTensorHandle)
+    TFE_DeleteTensorHandle(_cTensorHandle)
     debugLog("Returning from deinit of TensorHandle.")
   }
   
@@ -98,7 +97,7 @@ internal extension TensorHandle {
   @usableFromInline
   @inline(never)
   func makeHostCopy() -> ShapedArray<Scalar> {
-    return ShapedArray(cTensorHandle: cTensorHandle)
+    return ShapedArray(cTensorHandle: _cTensorHandle)
   }
 }
 
@@ -117,7 +116,7 @@ extension TensorHandle : TensorSendableReceivable {
         context.eagerContext, Int32(tensorID),
         Scalar.tensorFlowDataType.cDataType, status)
       checkOk(status)
-      tensorHandle = TensorHandle<Scalar>(owning: cTensorHandle!)
+      tensorHandle = TensorHandle<Scalar>(_owning: cTensorHandle!)
     } else {
       let cTensor: CTensor! = TF_DequeueNamedTensor(
         computation.cSession, Int32(tensorID), status)
@@ -131,7 +130,7 @@ extension TensorHandle : TensorSendableReceivable {
     }
     if _RuntimeConfig.printsDebugLog {
       debugLog("The received tensor of id \(tensorID) has content:")
-      dumpTensorContent(tensorHandle.cTensorHandle, Scalar.self)
+      dumpTensorContent(tensorHandle._cTensorHandle, Scalar.self)
     }
     return tensorHandle
   }
@@ -141,16 +140,16 @@ extension TensorHandle : TensorSendableReceivable {
                          _ tensorID: Int) {
     if _RuntimeConfig.printsDebugLog {
       debugLog("Sending tensor of id \(tensorID) and type \(Scalar.self) with:")
-      dumpTensorContent(cTensorHandle, Scalar.self)
+      dumpTensorContent(_cTensorHandle, Scalar.self)
     }
     let status = TF_NewStatus()
     internalConsistencyCheck(status != nil)
     if _RuntimeConfig.usesTFEagerAPI {
       let context = _ExecutionContext.global
       TFE_EnqueueNamedTensorFromCtx(
-        context.eagerContext, Int32(tensorID), cTensorHandle, status)
+        context.eagerContext, Int32(tensorID), _cTensorHandle, status)
     } else {
-      let cTensor = TFE_TensorHandleResolve(cTensorHandle, status)
+      let cTensor = TFE_TensorHandleResolve(_cTensorHandle, status)
       checkOk(status)
       TF_EnqueueNamedTensor(
         computation.cSession, Int32(tensorID), cTensor, status)
@@ -166,7 +165,7 @@ extension TensorHandle : TensorSendableReceivable {
     debugLog("Creating a tensor from scalar \(scalar).")
     let cTensorHandle = _TFCCreateCTensorHandle(
         scalar, Scalar.tensorFlowDataType.cDataType)
-    return TensorHandle<Scalar>(owning: cTensorHandle)
+    return TensorHandle<Scalar>(_owning: cTensorHandle)
   }
 }
 
@@ -207,7 +206,7 @@ public final class ResourceHandle : _AnyTensorHandle {
 
   deinit {
     debugLog("De-initializing TensorHandle.")
-    TFE_DeleteTensorHandle(cTensorHandle)
+    TFE_DeleteTensorHandle(_cTensorHandle)
     debugLog("Returning from deinit of ResourceHandle.")
   }
 }
@@ -236,7 +235,7 @@ extension ResourceHandle : TensorSendableReceivable {
     let status = TF_NewStatus()
     let context = _ExecutionContext.global
     TFE_EnqueueNamedTensorFromCtx(
-      context.eagerContext, Int32(tensorID), self.cTensorHandle, status)
+      context.eagerContext, Int32(tensorID), self._cTensorHandle, status)
     TF_DeleteStatus(status)
     debugLog("Done sending resource tensor of id \(tensorID).")
   }
@@ -260,7 +259,7 @@ public final class VariantHandle : _AnyTensorHandle {
 
   deinit {
     debugLog("De-initializing TensorHandle.")
-    TFE_DeleteTensorHandle(cTensorHandle)
+    TFE_DeleteTensorHandle(_cTensorHandle)
     debugLog("Returning from deinit of VariantHandle.")
   }
 }
@@ -289,7 +288,7 @@ extension VariantHandle : TensorSendableReceivable {
     let status = TF_NewStatus()
     let context = _ExecutionContext.global
     TFE_EnqueueNamedTensorFromCtx(
-      context.eagerContext, Int32(tensorID), self.cTensorHandle, status)
+      context.eagerContext, Int32(tensorID), self._cTensorHandle, status)
     TF_DeleteStatus(status)
     debugLog("Done sending variant tensor of id \(tensorID).")
   }

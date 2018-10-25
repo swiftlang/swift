@@ -1412,11 +1412,35 @@ FUNCTION(TFC_GetGlobalEagerContext, _swift_tfc_GetGlobalEagerContext, C_CC,
          ARGS(),
          ATTRS(NoUnwind))
 
-// TODO: enable these decls once we have AnyTensorHandle.
-FUNCTION(TFC_GetCTensorHandleFromSwift, _swift_tfc_GetCTensorHandleFromSwift, C_CC,
-         RETURNS(Int8PtrTy),
-         ARGS(Int8PtrTy),
+FUNCTION(TFC_OpAddInputFromTensorHandle, _swift_tfc_OpAddInputFromTensorHandle,
+         C_CC,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind))
+
+FUNCTION(TFC_OpAddInputFromTensorGroup,
+         _swift_tfc_OpAddInputFromTensorGroup,
+         C_CC,
+         RETURNS(Int32Ty),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy, WitnessTablePtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFC_AllocateTensorGroupCHandleBuffer,
+         _swift_tfc_AllocateTensorGroupCHandleBuffer, SwiftCC,
+         RETURNS(Int8PtrTy),
+         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy, WitnessTablePtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFC_GetTensorGroupCHandleCount,
+         _swift_tfc_GetTensorGroupCHandleCount, SwiftCC,
+         RETURNS(Int32Ty),
+         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy, WitnessTablePtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFC_InitTensorGroup, _swift_tfc_InitTensorGroup, SwiftCC,
+         RETURNS(VoidTy),
+         ARGS(OpaquePtrTy, Int8PtrTy, TypeMetadataPtrTy, WitnessTablePtrTy),
+         ATTRS(NoUnwind, FirstParamStructRet))
 
 FUNCTION(TFC_CreateTensorHandleFromC, _swift_tfc_CreateTensorHandleFromC, C_CC,
          RETURNS(Int8PtrTy),

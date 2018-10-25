@@ -27,6 +27,7 @@
 #include "TFConstExpr.h"
 #include "TFUtilities.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/Module.h"
 #include "swift/SIL/GraphOperationBuilder.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -350,7 +351,8 @@ static SILValue lookThroughSingleElementStructInsts(SILValue value) {
 ///
 static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
                                             TFDeabstraction &TFDA) {
-  auto &ctx = origInst->getFunction()->getASTContext();
+  auto *fn = origInst->getFunction();
+  auto &ctx = fn->getASTContext();
   GraphOperationInfo opInfo(origInst);
 
   /// Return a VarDecl if this is a struct wrapping a single field which is a
@@ -449,6 +451,15 @@ static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
       auto argumentType = argumentValue->getType();
       assert(argumentType.isAddress());
       if (!argumentType.isLoadable(origInst->getModule())) {
+        // When we're in dynamic compilation mode, it is okay to keep the
+        // generic out parameter because dynamic compilation knows how to deal
+        // with generic out parameters.
+        if (llvm::TFDynamicCompilation && !isAcceleratorOnly(*fn)) {
+          opBuilder.addArgument(argumentValue,
+                                argument.getArgumentNameWithSuffix());
+          continue;
+        }
+
         auto astType = argumentType.getASTType();
         if (astType->hasArchetype()) {
           diagnose(ctx, getUserSourceLocation(origInst).getSourceLoc(),
@@ -2129,11 +2140,17 @@ unwrapAggregateInstructions(SILValue value,
   return unwrapped;
 }
 
-/// Recursively unpacks aggregates to `inputList`, using the already-lowered
-/// values when possible to avoid code bloat.  Returns true to represent error
-/// if it detects a non-TensorFlow leaf field.
+/// Recursively unpacks aggregates of TensorFlow values to `inputList`, using
+/// the already-lowered values when possible to avoid code bloat.  Returns true
+/// to represent error if it detects a non-TensorFlow leaf field.
+///
+/// If `acceptTensorGroupConformingLeaves` is true, then we accept types that
+/// conform to TensorGroup as allowed leaf fields that get unpacked to
+/// `inputList`. Otherwise, we only accept types as leaf fields when they are
+/// one of our well-known TensorFlow types.
 static bool unpackTensorAggregates(
-    SILLocation loc, SILBuilder &B, SILValue rootAggregate,
+    const ASTContext &ctx, SILLocation loc, SILBuilder &B, SILValue rootAggregate,
+    bool acceptTensorGroupConformingLeaves,
     llvm::DenseMap<std::pair<SILValue, unsigned>, SILValue> &loweredTupleElts,
     llvm::DenseMap<std::pair<SILValue, VarDecl*>, SILValue>
         &loweredStructFields,
@@ -2157,6 +2174,12 @@ static bool unpackTensorAggregates(
       return si->getFieldValue(field);
     return B.createStructExtract(loc, structValue, field);
   };
+
+  auto tfModule = ctx.getLoadedModule(ctx.Id_TensorFlow);
+  assert(tfModule && "could not find TensorFlow module");
+  auto tensorGroupProto =
+      ctx.getProtocol(KnownProtocolKind::TensorGroup);
+  assert(tensorGroupProto && "could not find TensorGroup protocol");
 
   std::function<bool(SILValue)> recurse;
   recurse = [&](SILValue aggregate) -> bool {
@@ -2191,6 +2214,12 @@ static bool unpackTensorAggregates(
         if (recurse(fieldValue))
           return true;
       }
+      return false;
+    }
+    if (acceptTensorGroupConformingLeaves &&
+        tfModule->lookupConformance(aggregateTy.getASTType(),
+                                    tensorGroupProto)) {
+      inputList.push_back(aggregate);
       return false;
     }
     return true;
@@ -2316,8 +2345,13 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
         // Add each element to the input list we're building, drilling down
         // through any aggregates that may be around it.
         for (auto *use : arrayDecoder.elementsAtInit) {
-          auto *store = dyn_cast<StoreInst>(use->getUser());
-          if (!store) {
+          SILValue element;
+          if (auto *store = dyn_cast<StoreInst>(use->getUser()))
+            element = store->getSrc();
+          else if (auto *copyAddr = dyn_cast<CopyAddrInst>(use->getUser()))
+            element = copyAddr->getSrc();
+
+          if (!element) {
             diagnoseInvalid(argumentLoc,
                             "argument of type '" + elementType->getString() +
                             "' is not a TensorFlow value or an aggregate of "
@@ -2325,7 +2359,13 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
             return;
           }
 
-          if (unpackTensorAggregates(origInst->getLoc(), B, store->getSrc(),
+          // In dynamic compilation mode, we can handle inputs that conform to
+          // TensorGroup even if we cannot completely unpack them.
+          bool acceptTensorGroupConformingLeaves =
+              llvm::TFDynamicCompilation && !isAcceleratorOnly(fn);
+
+          if (unpackTensorAggregates(context, origInst->getLoc(), B, element,
+                                     acceptTensorGroupConformingLeaves,
                                      loweredTupleElts, loweredStructFields,
                                      unwrapCache, inputList)) {
             diagnoseInvalid(argumentLoc,
@@ -2340,7 +2380,8 @@ void TFDeabstraction::evaluateAttributesAndDoPacking(
       }
 
       // Otherwise, this must be a single input.
-      if (unpackTensorAggregates(origInst->getLoc(), B, argumentValue,
+      if (unpackTensorAggregates(context, origInst->getLoc(), B, argumentValue,
+                                 /*acceptTensorGroupConformingLeaves=*/false,
                                  loweredTupleElts, loweredStructFields,
                                  unwrapCache, inputList)) {
         // FIXME: Since TFDeabstraction happens after mandatory inlining,
@@ -2829,8 +2870,11 @@ void TFDeabstractionPass::run() {
   // TODO: Rework the heuristics in inlineCalls() to be smarter.  In an ideal
   // world, we would be lazy about inlining, and only inline calls due to actual
   // inter-op value uses.
-  if (module->getSwiftModule() == tfModule)
+  if (module->getSwiftModule() == tfModule) {
+    for (auto &fn : *module)
+      fn.skippedByDeabstraction = true;
     return;
+  }
 
   TensorFunctionClassifier tfc;
   ConstExprEvaluator constantEvaluator(*module);
@@ -2844,8 +2888,10 @@ void TFDeabstractionPass::run() {
     // If this function is a building block of larger tensor programs (e.g.
     // the ops defined in the TensorFlow module), then don't transform it in
     // isolation.
-    if (!tfc.shouldBePartitioned(&fn, /*forceTFFunctions*/false))
+    if (!tfc.shouldBePartitioned(&fn, /*forceTFFunctions*/false)) {
+      fn.skippedByDeabstraction = true;
       continue;
+    }
 
     // If something crashes, make sure the pretty stack trace says what we
     // were doing.
@@ -2853,7 +2899,6 @@ void TFDeabstractionPass::run() {
                                    fn.getName().str().c_str());
 
     TFDeabstraction(*this, fn, tfc, constantEvaluator, PM).doIt();
-    fn.processedByDeabstraction = true;
     partitionedFunctions.insert(&fn);
 
     // TODO(clattner): This should eventually be the driver that kicks off
