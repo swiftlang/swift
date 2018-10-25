@@ -72,11 +72,18 @@ public protocol TextOutputStream {
 
   /// Appends the given string to the stream.
   mutating func write(_ string: String)
+
+  mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>)
 }
 
 extension TextOutputStream {
   public mutating func _lock() {}
   public mutating func _unlock() {}
+
+  @inlinable
+  public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
+    write(String._fromASCII(buffer))
+  }
 }
 
 /// A source of text-streaming operations.
@@ -559,6 +566,10 @@ extension String : TextOutputStream {
   /// - Parameter other: A string to append.
   public mutating func write(_ other: String) {
     self += other
+  }
+
+  public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
+    self._guts.append(_UnmanagedString(buffer))
   }
 }
 

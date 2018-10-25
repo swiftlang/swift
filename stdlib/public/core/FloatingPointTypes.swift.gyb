@@ -83,7 +83,11 @@ extension ${Self} : CustomStringConvertible {
     if isNaN {
       return "nan"
     } else {
-      return _float${bits}ToString(self, debug: false)
+      var (buffer, length) = _float${bits}ToString(self, debug: false)
+      return buffer.withBytes { (bufferPtr) in
+        String._fromASCII(
+          UnsafeBufferPointer(start: bufferPtr, count: length))
+      }
     }
   }
 }
@@ -91,7 +95,21 @@ extension ${Self} : CustomStringConvertible {
 extension ${Self} : CustomDebugStringConvertible {
   /// A textual representation of the value, suitable for debugging.
   public var debugDescription: String {
-    return _float${bits}ToString(self, debug: true)
+    var (buffer, length) = _float${bits}ToString(self, debug: true)
+    return buffer.withBytes { (bufferPtr) in
+      String._fromASCII(
+        UnsafeBufferPointer(start: bufferPtr, count: length))
+    }
+  }
+}
+
+extension ${Self} : TextOutputStreamable {
+  public func write<Target>(to target: inout Target) where Target : TextOutputStream {
+    var (buffer, length) = _float${bits}ToString(self, debug: true)
+    buffer.withBytes { (bufferPtr) in
+      let bufPtr = UnsafeBufferPointer(start: bufferPtr, count: length)
+      target._writeASCII(bufPtr)
+    }
   }
 }
 
