@@ -24,6 +24,8 @@ from gyb_stdlib_support import (
 
 import SwiftShims
 
+// FIXME: remove once new String lands
+@usableFromInline
 internal func _abstract(
   file: StaticString = #file,
   line: UInt = #line
@@ -623,7 +625,6 @@ extension  AnySequence: Sequence {
 extension Any${Kind} {
 %   if Kind == 'Sequence':
   /// Returns an iterator over the elements of this sequence.
-  @inline(__always)
   public __consuming func makeIterator() -> Iterator {
     return _box._makeIterator()
   }
@@ -640,7 +641,6 @@ extension Any${Kind} {
   }
 %   else:
   /// Returns an iterator over the elements of this collection.
-  @inline(__always)
   public __consuming func makeIterator() -> Iterator {
     return _box._makeIterator()
   }
