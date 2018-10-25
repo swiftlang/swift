@@ -500,11 +500,6 @@ extension Character: Hashable {
 
 extension Character : ExpressibleByCharacterLiteral {
   @_transparent
-  public init(codepointLiteral value: UInt32) {
-    self.init(Unicode.Scalar(_value: value))
-  }
-  
-  @_transparent
   public init(characterLiteral value: Character) {
     self = value
   }

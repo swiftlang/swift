@@ -2471,10 +2471,18 @@ uint32_t Lexer::lexCodepointLiteral(const char *&CurPtr, const char *TokStart) {
       case 'n': CodePoint = '\n'; break;
       case '\\': CodePoint = '\\'; break;
       case '\'': ++CurPtr; CodePoint = '\''; break;
-      case 'u':
+      case 'u': {  //  \u HEX HEX HEX HEX
         ++CurPtr;
+        if (*CurPtr != '{') {
+          if (Diags)
+            diagnose(CurPtr-1, diag::lex_unicode_escape_braces);
+          return ~0U;
+        }
+
         CodePoint = lexUnicodeEscape(CurPtr, Diags ? this : nullptr);
         break;
+      }
+      
       default:
         if (TokStart)
           diagnose(CurPtr, diag::lex_character_invalid_escape);
@@ -2494,6 +2502,13 @@ uint32_t Lexer::lexCodepointLiteral(const char *&CurPtr, const char *TokStart) {
   }
 
   while (*CurPtr && *CurPtr != '\n' && *CurPtr++ != '\'');
+  
+  // validate scalar 
+  llvm::SmallString<64> TempString;
+  if (CodePoint >= 0x80 && EncodeToUTF8(CodePoint, TempString)) {
+    CodePoint = ~0U;
+  }
+  
   return CodePoint;
 }
 

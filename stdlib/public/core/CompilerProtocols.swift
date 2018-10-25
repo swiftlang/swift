@@ -355,10 +355,17 @@ public protocol ExpressibleByBooleanLiteral {
   init(booleanLiteral value: BooleanLiteralType)
 }
 
-
+// hacky way to get Unicode.Scalar as a valid input on ExpressibleByCodepointLiteral 
+// seems to have no side effects
+extension Unicode.Scalar : _ExpressibleByBuiltinIntegerLiteral {
+  @_transparent 
+  public init(_builtinIntegerLiteral value: _MaxBuiltinIntegerType) {
+    self.init(_value: UInt32(_builtinIntegerLiteral: value))
+  }
+}
 
 public protocol _ExpressibleByBuiltinCharacterLiteral : 
-    _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {}
+  _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {}
 
 extension Character : _ExpressibleByBuiltinCharacterLiteral {}
 

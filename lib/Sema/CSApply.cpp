@@ -2061,6 +2061,7 @@ namespace {
 
       bool isStringLiteral = true;
       bool isGraphemeClusterLiteral = false;
+      bool isCharacterLiteral = stringLiteral && stringLiteral->isCharacterLiteral();
       ProtocolDecl *protocol = tc.getProtocol(
           expr->getLoc(), KnownProtocolKind::ExpressibleByStringLiteral);
 
@@ -2069,7 +2070,8 @@ namespace {
         // If the type does not conform to ExpressibleByStringLiteral, it should
         // be ExpressibleByExtendedGraphemeClusterLiteral.
         protocol = tc.getProtocol(
-            expr->getLoc(),
+            expr->getLoc(), isCharacterLiteral ?
+            KnownProtocolKind::ExpressibleByCharacterLiteral :
             KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral);
         isStringLiteral = false;
         isGraphemeClusterLiteral = true;
@@ -2151,10 +2153,14 @@ namespace {
         brokenProtocolDiag = diag::string_literal_broken_proto;
         brokenBuiltinProtocolDiag = diag::builtin_string_literal_broken_proto;
       } else if (isGraphemeClusterLiteral) {
-        literalType = tc.Context.Id_ExtendedGraphemeClusterLiteralType;
+          literalType = isCharacterLiteral ?
+            tc.Context.Id_CharacterLiteralType :
+            tc.Context.Id_ExtendedGraphemeClusterLiteralType;
         literalFuncName
           = DeclName(tc.Context, DeclBaseName::createConstructor(),
-                     {tc.Context.Id_extendedGraphemeClusterLiteral});
+                     {isCharacterLiteral ?
+                       tc.Context.Id_characterLiteral :
+                       tc.Context.Id_extendedGraphemeClusterLiteral});
         builtinLiteralFuncName
           = DeclName(tc.Context, DeclBaseName::createConstructor(),
                      { tc.Context.Id_builtinExtendedGraphemeClusterLiteral,

@@ -118,9 +118,9 @@ ERROR(lex_invalid_utf8,none,
 ERROR(lex_character_empty,none,
        "empty character literal", ())
 ERROR(lex_character_invalid_escape,none,
-       "invalid escape in character literal", ())
+       "invalid escape sequence in literal", ())
 ERROR(lex_character_not_cluster,none,
-       "character literal is not single extended grapheme cluster", ())
+       "character literal is not a single extended grapheme cluster", ())
 ERROR(lex_single_quote_string,none,
       "single-quoted string literal found, use '\"'", ())
 ERROR(lex_invalid_curly_quote,none,
