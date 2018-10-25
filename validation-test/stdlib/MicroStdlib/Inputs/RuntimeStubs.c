@@ -14,4 +14,4 @@ void swift_allocateGenericValueMetadata(void) {}
 void swift_initEnumMetadataSinglePayload(void) {}
 void swift_retain(){}
 void swift_allocBox(){}
-void swift_instantiateWitnessTable(void) {}
+void swift_getWitnessTable(void) {}

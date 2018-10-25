@@ -167,7 +167,7 @@ ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
     if (failed) return nullptr;
   }
 
-  return swift_instantiateWitnessTable(this, type, conditionalArgs.data());
+  return swift_getWitnessTable(this, type, conditionalArgs.data());
 }
 
 namespace {

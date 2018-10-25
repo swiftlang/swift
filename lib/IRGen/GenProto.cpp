@@ -1074,7 +1074,7 @@ static llvm::Value *emitWitnessTableAccessorCall(
   auto conditionalTables =
       emitConditionalConformancesBuffer(IGF, conformance);
 
-  auto call = IGF.Builder.CreateCall(IGF.IGM.getInstantiateWitnessTableFn(),
+  auto call = IGF.Builder.CreateCall(IGF.IGM.getGetWitnessTableFn(),
                                      {conformanceDescriptor, *srcMetadataCache,
                                       conditionalTables});
 

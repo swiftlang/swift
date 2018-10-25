@@ -385,18 +385,13 @@ SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse swift_checkMetadataState(MetadataRequest request,
                                           const Metadata *type);
 
-/// Instantiate a resilient or generic protocol witness table.
+/// Retrieve a witness table based on a given conformance.
 ///
 /// \param conformance - The protocol conformance descriptor, which
-///   contains the generic witness table record. It may either have fields
-///   that require runtime initialization, or be missing requirements at the
-///   end for which default witnesses are available.
+///   contains any information required to form the witness table.
 ///
 /// \param type - The conforming type, used to form a uniquing key
-///   for the conformance. If the witness table is not dependent on
-///   the substituted type of the conformance, this can be set to
-///   nullptr, in which case there will only be one instantiated
-///   witness table per witness table template.
+///   for the conformance.
 ///
 /// \param instantiationArgs - An opaque pointer that's forwarded to
 ///   the instantiation function, used for conditional conformances.
@@ -406,9 +401,9 @@ MetadataResponse swift_checkMetadataState(MetadataRequest request,
 ///   conformances.
 SWIFT_RUNTIME_EXPORT
 const WitnessTable *
-swift_instantiateWitnessTable(const ProtocolConformanceDescriptor *conformance,
-                              const Metadata *type,
-                              const void * const *instantiationArgs);
+swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
+                      const Metadata *type,
+                      const void * const *instantiationArgs);
 
 /// Retrieve an associated type witness from the given witness table.
 ///

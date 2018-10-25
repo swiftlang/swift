@@ -3962,10 +3962,9 @@ WitnessTableCacheEntry::allocate(
 }
 
 const WitnessTable *
-swift::swift_instantiateWitnessTable(
-                               const ProtocolConformanceDescriptor *conformance,
-                               const Metadata *type,
-                               const void * const *instantiationArgs) {
+swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
+                             const Metadata *type,
+                             const void * const *instantiationArgs) {
   /// Local function to unique a foreign witness table, if needed.
   auto uniqueForeignWitnessTableRef =
       [conformance, type](const WitnessTable *candidate)

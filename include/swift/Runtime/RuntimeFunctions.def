@@ -625,10 +625,10 @@ FUNCTION(CheckMetadataState, swift_checkMetadataState, SwiftCC,
          ATTRS(NoUnwind, ReadOnly))
 
 // const ProtocolWitnessTable *
-// swift_instantiateWitnessTable(const ProtocolConformanceDescriptor *conf,
-//                               const Metadata *type,
-//                               const void * const *instantiationArgs);
-FUNCTION(InstantiateWitnessTable, swift_instantiateWitnessTable, C_CC,
+// swift_getWitnessTable(const ProtocolConformanceDescriptor *conf,
+//                       const Metadata *type,
+//                       const void * const *instantiationArgs);
+FUNCTION(GetWitnessTable, swift_getWitnessTable, C_CC,
          RETURNS(WitnessTablePtrTy),
          ARGS(ProtocolConformanceDescriptorPtrTy,
               TypeMetadataPtrTy,
