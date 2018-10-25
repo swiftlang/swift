@@ -105,9 +105,7 @@ static llvm::Constant *emitConstantValue(IRGenModule &IGM, SILValue operand) {
         llvm_unreachable("unsupported builtin for constant expression");
     }
   } else if (auto *VTBI = dyn_cast<ValueToBridgeObjectInst>(operand)) {
-    auto *SI = cast<StructInst>(VTBI->getOperand());
-    assert(SI->getElements().size() == 1);
-    auto *val = emitConstantValue(IGM, SI->getElements()[0]);
+    auto *val = emitConstantValue(IGM, VTBI->getOperand());
     auto *sTy = IGM.getTypeInfo(VTBI->getType()).getStorageType();
     return llvm::ConstantExpr::getIntToPtr(val, sTy);
   } else {
