@@ -30,19 +30,17 @@ extension ProtoRefinesClass {
     // CHECK:      [[SELF:%.*]] = copy_value %3 : $Self
     // CHECK-NEXT: [[UPCAST:%.*]] = upcast [[SELF]] : $Self to $Generic<Int>
     // CHECK-NEXT: [[UPCAST2:%.*]] = upcast [[UPCAST]] : $Generic<Int> to $Concrete
-    // CHECK-NEXT: [[BORROW:%.*]] = begin_borrow [[UPCAST2]] : $Concrete
-    // CHECK-NEXT: [[METHOD:%.*]] = class_method [[BORROW:%.*]] : $Concrete, #Concrete.concreteMethod!1 : (Concrete) -> (String) -> (), $@convention(method) (@guaranteed String, @guaranteed Concrete) -> ()
-    // CHECK-NEXT: apply [[METHOD]](%0, [[BORROW]])
-    // CHECK-NEXT: end_borrow [[BORROW]]
+    // CHECK-NEXT: [[METHOD:%.*]] = class_method [[UPCAST2]] : $Concrete, #Concrete.concreteMethod!1 : (Concrete) -> (String) -> (), $@convention(method) (@guaranteed String, @guaranteed Concrete) -> ()
+    // CHECK-NEXT: apply [[METHOD]](%0, [[UPCAST2]])
     // CHECK-NEXT: destroy_value [[UPCAST2]]
     concreteMethod(x)
 
     // CHECK:      [[SELF:%.*]] = copy_value %3 : $Self
     // CHECK-NEXT: [[UPCAST:%.*]] = upcast [[SELF]] : $Self to $Generic<Int>
-    // CHECK-NEXT: [[BORROW:%.*]] = begin_borrow [[UPCAST]] : $Generic<Int>
-    // CHECK:      [[METHOD:%.*]] = class_method [[BORROW:%.*]] : $Generic<Int>, #Generic.genericMethod!1 : <T> (Generic<T>) -> ((T, T)) -> (), $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @guaranteed Generic<τ_0_0>) -> ()
-    // CHECK-NEXT: apply [[METHOD]]<Int>({{.*}}, [[BORROW]])
-    // CHECK:      end_borrow [[BORROW]]
+    // CHECK:      [[METHOD:%.*]] = class_method [[UPCAST]] : $Generic<Int>, #Generic.genericMethod!1 : <T> (Generic<T>) -> ((T, T)) -> (), $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @guaranteed Generic<τ_0_0>) -> ()
+    // CHECK-NEXT: apply [[METHOD]]<Int>({{.*}}, [[UPCAST]])
+    // CHECK-NEXT: dealloc_stack
+    // CHECK-NEXT: dealloc_stack
     // CHECK-NEXT: destroy_value [[UPCAST]]
     genericMethod(y)
 

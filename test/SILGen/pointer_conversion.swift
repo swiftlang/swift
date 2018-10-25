@@ -312,9 +312,8 @@ func optArrayToOptPointer(array: [Int]?) {
   //
   // CHECK: [[SOME_BB]]([[SOME_VALUE:%.*]] :
   // CHECK:   [[CONVERT:%.*]] = function_ref @$ss35_convertConstArrayToPointerArgumentyyXlSg_q_tSayxGs01_E0R_r0_lF
-  // CHECK:   [[BORROW_SOME_VALUE:%.*]] = begin_borrow [[SOME_VALUE]]
   // CHECK:   [[TEMP:%.*]] = alloc_stack $UnsafePointer<Int>
-  // CHECK:   [[OWNER:%.*]] = apply [[CONVERT]]<Int, UnsafePointer<Int>>([[TEMP:%.*]], [[BORROW_SOME_VALUE]])
+  // CHECK:   [[OWNER:%.*]] = apply [[CONVERT]]<Int, UnsafePointer<Int>>([[TEMP:%.*]], [[SOME_VALUE]])
   // CHECK:   [[PTR:%.*]] = load [trivial] [[TEMP]]
   // CHECK:   [[DEP:%.*]] = mark_dependence [[PTR]] : $UnsafePointer<Int> on [[OWNER]]
   // CHECK:   [[OPTPTR:%.*]] = enum $Optional<UnsafePointer<Int>>, #Optional.some!enumelt.1, [[DEP]]
@@ -345,9 +344,8 @@ func optOptArrayToOptOptPointer(array: [Int]??) {
   //
   // CHECK: [[SOME_SOME_BB]]([[SOME_SOME_VALUE:%.*]] :
   // CHECK:   [[CONVERT:%.*]] = function_ref @$ss35_convertConstArrayToPointerArgumentyyXlSg_q_tSayxGs01_E0R_r0_lF
-  // CHECK:   [[SOME_SOME_VALUE_BORROW:%.*]] = begin_borrow [[SOME_SOME_VALUE]]
   // CHECK:   [[TEMP:%.*]] = alloc_stack $UnsafePointer<Int>
-  // CHECK:   [[OWNER:%.*]] = apply [[CONVERT]]<Int, UnsafePointer<Int>>([[TEMP:%.*]], [[SOME_SOME_VALUE_BORROW]])
+  // CHECK:   [[OWNER:%.*]] = apply [[CONVERT]]<Int, UnsafePointer<Int>>([[TEMP:%.*]], [[SOME_SOME_VALUE]])
   // CHECK:   [[PTR:%.*]] = load [trivial] [[TEMP]]
   // CHECK:   [[DEP:%.*]] = mark_dependence [[PTR]] : $UnsafePointer<Int> on [[OWNER]]
   // CHECK:   [[OPTPTR:%.*]] = enum $Optional<UnsafePointer<Int>>, #Optional.some!enumelt.1, [[DEP]]
@@ -383,9 +381,8 @@ func optStringToOptPointer(string: String?) {
   //
   // CHECK: [[SOME_BB]]([[SOME_VALUE:%.*]] :
   // CHECK:   [[CONVERT:%.*]] = function_ref @$ss40_convertConstStringToUTF8PointerArgumentyyXlSg_xtSSs01_F0RzlF
-  // CHECK:   [[BORROWED_SOME_VALUE:%.*]] = begin_borrow [[SOME_VALUE]]
   // CHECK:   [[TEMP:%.*]] = alloc_stack $UnsafeRawPointer
-  // CHECK:   [[OWNER:%.*]] = apply [[CONVERT]]<UnsafeRawPointer>([[TEMP:%.*]], [[BORROWED_SOME_VALUE]])
+  // CHECK:   [[OWNER:%.*]] = apply [[CONVERT]]<UnsafeRawPointer>([[TEMP:%.*]], [[SOME_VALUE]])
   // CHECK:   [[PTR:%.*]] = load [trivial] [[TEMP]]
   // CHECK:   [[DEP:%.*]] = mark_dependence [[PTR]] : $UnsafeRawPointer on [[OWNER]]
   // CHECK:   [[OPTPTR:%.*]] = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt.1, [[DEP]]
@@ -416,9 +413,8 @@ func optOptStringToOptOptPointer(string: String??) {
   // CHECK:   switch_enum [[SOME_VALUE]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[SOME_NONE_BB:bb[0-9]+]]
   // CHECK: [[SOME_SOME_BB]]([[SOME_SOME_VALUE:%.*]] :
   // CHECK:   [[CONVERT:%.*]] = function_ref @$ss40_convertConstStringToUTF8PointerArgumentyyXlSg_xtSSs01_F0RzlF
-  // CHECK:   [[BORROWED_SOME_SOME_VALUE:%.*]] = begin_borrow [[SOME_SOME_VALUE]]
   // CHECK:   [[TEMP:%.*]] = alloc_stack $UnsafeRawPointer
-  // CHECK:   [[OWNER:%.*]] = apply [[CONVERT]]<UnsafeRawPointer>([[TEMP:%.*]], [[BORROWED_SOME_SOME_VALUE]])
+  // CHECK:   [[OWNER:%.*]] = apply [[CONVERT]]<UnsafeRawPointer>([[TEMP:%.*]], [[SOME_SOME_VALUE]])
   // CHECK:   [[PTR:%.*]] = load [trivial] [[TEMP]]
   // CHECK:   [[DEP:%.*]] = mark_dependence [[PTR]] : $UnsafeRawPointer on [[OWNER]]
   // CHECK:   [[OPTPTR:%.*]] = enum $Optional<UnsafeRawPointer>, #Optional.some!enumelt.1, [[DEP]]

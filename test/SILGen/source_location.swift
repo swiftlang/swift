@@ -7,11 +7,10 @@ func printSourceLocation(file: String = #file, line: Int = #line) {}
 _ = printSourceLocation()
 // CHECK: [[CALLER_FILE_VAL:%.*]] = string_literal utf16 "caller.swift",
 // CHECK: [[CALLER_FILE:%.*]] = apply {{.*}}([[CALLER_FILE_VAL]],
-// CHECK: [[BORROWED_CALLER_FILE:%.*]] = begin_borrow [[CALLER_FILE]]
 // CHECK: [[CALLER_LINE_VAL:%.*]] = integer_literal $Builtin.Int{{[0-9]+}}, 10000,
 // CHECK: [[CALLER_LINE:%.*]] = apply {{.*}}([[CALLER_LINE_VAL]],
 // CHECK: [[PRINT_SOURCE_LOCATION:%.*]] = function_ref @$s15source_location19printSourceLocation4file4lineySS_SitF
-// CHECK: apply [[PRINT_SOURCE_LOCATION]]([[BORROWED_CALLER_FILE]], [[CALLER_LINE]])
+// CHECK: apply [[PRINT_SOURCE_LOCATION]]([[CALLER_FILE]], [[CALLER_LINE]])
 
 #sourceLocation(file: "inplace.swift", line: 20000)
 let FILE = #file, LINE = #line

@@ -17,9 +17,8 @@ func loadable(readonly: A, writable: inout A,
   // CHECK: store [[ROOT_COPY]] to [init] [[ROOT_TMP]]
   // CHECK: [[KP_COPY:%.*]] = copy_value %3
   // CHECK: [[PROJECT:%.*]] = function_ref @{{.*}}_projectKeyPathReadOnly
-  // CHECK: [[BORROWED_KP_COPY:%.*]] = begin_borrow [[KP_COPY]]
   // CHECK: [[RESULT_TMP:%.*]] = alloc_stack $B
-  // CHECK: apply [[PROJECT]]<A, B>([[RESULT_TMP]], [[ROOT_TMP]], [[BORROWED_KP_COPY]])
+  // CHECK: apply [[PROJECT]]<A, B>([[RESULT_TMP]], [[ROOT_TMP]], [[KP_COPY]])
   // CHECK: [[RESULT:%.*]] = load [take] [[RESULT_TMP]]
   // CHECK: destroy_value [[RESULT]]
   _ = readonly[keyPath: kp]

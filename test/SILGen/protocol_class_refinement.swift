@@ -61,7 +61,6 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // -- call x.uid()
   // CHECK: [[READ1:%.*]] = begin_access [read] [unknown] [[PB]] : $*T
   // CHECK: [[X1:%.*]] = load [copy] [[READ1]]
-  // CHECK: [[BORROWED_X1:%.*]] = begin_borrow [[X1]]
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*T
   // CHECK: [[X:%.*]] = load [copy] [[READ]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
@@ -72,8 +71,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: destroy_addr [[X_TMP]]
   // -- call secondNextCLSID from class-constrained protocol ext
   // CHECK: [[SET_SECONDNEXT:%.*]] = function_ref @$s25protocol_class_refinement9ObjectUIDPAAE15secondNextCLSIDSivs
-  // CHECK: apply [[SET_SECONDNEXT]]<T>([[UID]], [[BORROWED_X1]])
-  // CHECK: end_borrow [[BORROWED_X1]]
+  // CHECK: apply [[SET_SECONDNEXT]]<T>([[UID]], [[X1]])
   // CHECK: destroy_value [[X1]]
   x.secondNextCLSID = x.uid()
   return (x.iid, x.clsid, x.nextCLSID, x.secondNextCLSID)
