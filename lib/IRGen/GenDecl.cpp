@@ -3643,36 +3643,6 @@ IRGenModule::getAddrOfGenericWitnessTableInstantiationFunction(
   return entry;
 }
 
-/// Fetch the witness table access function for a protocol conformance.
-llvm::Function *
-IRGenModule::getAddrOfWitnessTableAccessFunction(
-                                      const NormalProtocolConformance *conf,
-                                              ForDefinition_t forDefinition) {
-  IRGen.addLazyWitnessTable(conf);
-
-  LinkEntity entity = LinkEntity::forProtocolWitnessTableAccessFunction(conf);
-  llvm::Function *&entry = GlobalFuncs[entity];
-  if (entry) {
-    if (forDefinition) updateLinkageForDefinition(*this, entry, entity);
-    return entry;
-  }
-
-  llvm::FunctionType *fnType;
-  if (conf->witnessTableAccessorRequiresArguments()) {
-    // conditional requirements are passed indirectly, as an array of witness
-    // tables.
-    fnType = llvm::FunctionType::get(
-        WitnessTablePtrTy, {TypeMetadataPtrTy, WitnessTablePtrPtrTy}, false);
-  } else {
-    fnType = llvm::FunctionType::get(WitnessTablePtrTy, false);
-  }
-
-  Signature signature(fnType, llvm::AttributeList(), DefaultCC);
-  LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = createFunction(*this, link, signature);
-  return entry;
-}
-
 /// Fetch the lazy witness table access function for a protocol conformance.
 llvm::Function *
 IRGenModule::getAddrOfWitnessTableLazyAccessFunction(

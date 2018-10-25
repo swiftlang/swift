@@ -3625,7 +3625,7 @@ namespace {
 
 static SimpleGlobalCache<ForeignWitnessTableCacheEntry> ForeignWitnessTables;
 
-const WitnessTable *swift::swift_getForeignWitnessTable(
+static const WitnessTable *_getForeignWitnessTable(
     const WitnessTable *witnessTableCandidate,
     const TypeContextDescriptor *contextDescriptor,
     const ProtocolDescriptor *protocol) {
@@ -3760,18 +3760,18 @@ class WitnessTableCacheEntry :
   /// The type for which this table was instantiated.
   const Metadata * const Type;
 
-  /// The generic table.  This is only kept around so that we can
-  /// compute the size of an entry correctly in case of a race to
+  /// The protocol conformance descriptor. This is only kept around so that we
+  /// can compute the size of an entry correctly in case of a race to
   /// allocate the entry.
-  const GenericWitnessTable * const GenericTable;
+  const ProtocolConformanceDescriptor * const Conformance;
 
 public:
   /// Do the structural initialization necessary for this entry to appear
   /// in a concurrent map.
   WitnessTableCacheEntry(const Metadata *type,
-                         const GenericWitnessTable *genericTable,
-                         void ** const *instantiationArgs)
-    : Type(type), GenericTable(genericTable) {}
+                         const ProtocolConformanceDescriptor *conformance,
+                         const void * const *instantiationArgs)
+    : Type(type), Conformance(conformance) {}
 
   intptr_t getKeyIntValueForDump() const {
     return reinterpret_cast<intptr_t>(Type);
@@ -3782,26 +3782,29 @@ public:
     return comparePointers(Type, type);
   }
 
-  static size_t getExtraAllocationSize(const Metadata *type,
-                                       const GenericWitnessTable *genericTable,
-                                       void ** const *instantiationArgs) {
-    return getWitnessTableSize(genericTable);
+  static size_t getExtraAllocationSize(
+                             const Metadata *type,
+                             const ProtocolConformanceDescriptor *conformance,
+                             const void * const *instantiationArgs) {
+    return getWitnessTableSize(conformance);
   }
 
   size_t getExtraAllocationSize() const {
-    return getWitnessTableSize(GenericTable);
+    return getWitnessTableSize(Conformance);
   }
 
-  static size_t getWitnessTableSize(const GenericWitnessTable *genericTable) {
-    auto protocol = genericTable->getProtocol();
+  static size_t getWitnessTableSize(
+                            const ProtocolConformanceDescriptor *conformance) {
+    auto protocol = conformance->getProtocol();
+    auto genericTable = conformance->getGenericWitnessTable();
     size_t numPrivateWords = genericTable->getWitnessTablePrivateSizeInWords();
     size_t numRequirementWords =
       WitnessTableFirstRequirementOffset + protocol->NumRequirements;
     return (numPrivateWords + numRequirementWords) * sizeof(void*);
   }
 
-  WitnessTable *allocate(const GenericWitnessTable *genericTable,
-                         void ** const *instantiationArgs);
+  WitnessTable *allocate(const ProtocolConformanceDescriptor *conformance,
+                         const void * const *instantiationArgs);
 };
 
 } // end anonymous namespace
@@ -3826,7 +3829,7 @@ static GenericWitnessTableCache &getCache(const GenericWitnessTable *gen) {
 /// are present, we don't have to instantiate anything; just return the
 /// witness table template.
 static bool doesNotRequireInstantiation(
-                              ProtocolConformanceDescriptor *conformance,
+                              const ProtocolConformanceDescriptor *conformance,
                               const GenericWitnessTable *genericTable) {
   // If the table says it requires instantiation, it does.
   if (genericTable->requiresInstantiation()) {
@@ -3859,9 +3862,9 @@ static bool doesNotRequireInstantiation(
 /// Initialize witness table entries from order independent resilient
 /// witnesses stored in the generic witness table structure itself.
 static void initializeResilientWitnessTable(
-                                        const GenericWitnessTable *genericTable,
-                                        void **table) {
-  auto conformance = genericTable->getConformance();
+                              const ProtocolConformanceDescriptor *conformance,
+                              const GenericWitnessTable *genericTable,
+                              void **table) {
   auto protocol = conformance->getProtocol();
 
   auto requirements = protocol->getRequirements();
@@ -3910,12 +3913,14 @@ static void initializeResilientWitnessTable(
 /// Instantiate a brand new witness table for a resilient or generic
 /// protocol conformance.
 WitnessTable *
-WitnessTableCacheEntry::allocate(const GenericWitnessTable *genericTable,
-                                 void ** const *instantiationArgs) {
+WitnessTableCacheEntry::allocate(
+                               const ProtocolConformanceDescriptor *conformance,
+                               const void * const *instantiationArgs) {
+  auto protocol = conformance->getProtocol();
+  auto genericTable = conformance->getGenericWitnessTable();
+
   // The number of witnesses provided by the table pattern.
   size_t numPatternWitnesses = genericTable->WitnessTableSizeInWords;
-
-  auto protocol = genericTable->getProtocol();
 
   // The total number of requirements.
   size_t numRequirements =
@@ -3935,7 +3940,8 @@ WitnessTableCacheEntry::allocate(const GenericWitnessTable *genericTable,
   // Advance the address point; the private storage area is accessed via
   // negative offsets.
   auto table = fullTable + privateSizeInWords;
-  auto pattern = reinterpret_cast<void * const *>(&*genericTable->Pattern);
+  auto pattern = reinterpret_cast<void * const *>(
+                   &*conformance->getWitnessTablePattern());
 
   // Fill in the provided part of the requirements from the pattern.
   for (size_t i = 0, e = numPatternWitnesses; i < e; ++i) {
@@ -3943,7 +3949,7 @@ WitnessTableCacheEntry::allocate(const GenericWitnessTable *genericTable,
   }
 
   // Fill in any default requirements.
-  initializeResilientWitnessTable(genericTable, table);
+  initializeResilientWitnessTable(conformance, genericTable, table);
 
   auto castTable = reinterpret_cast<WitnessTable*>(table);
 
@@ -3956,19 +3962,38 @@ WitnessTableCacheEntry::allocate(const GenericWitnessTable *genericTable,
 }
 
 const WitnessTable *
-swift::swift_instantiateWitnessTable(ProtocolConformanceDescriptor *conformance,
-                                     const Metadata *type,
-                                     void **const *instantiationArgs) {
+swift::swift_instantiateWitnessTable(
+                               const ProtocolConformanceDescriptor *conformance,
+                               const Metadata *type,
+                               const void * const *instantiationArgs) {
+  /// Local function to unique a foreign witness table, if needed.
+  auto uniqueForeignWitnessTableRef =
+      [conformance, type](const WitnessTable *candidate)
+          -> const WitnessTable * {
+        if (!candidate || !conformance->isSynthesizedNonUnique())
+          return candidate;
+
+        return _getForeignWitnessTable(candidate,
+                                       type->getTypeContextDescriptor(),
+                                       conformance->getProtocol());
+      };
+
+  // When there is no generic table, use the static witness table or
+  // accessor directly.
   auto genericTable = conformance->getGenericWitnessTable();
+  if (!genericTable) {
+    return uniqueForeignWitnessTableRef(conformance->getWitnessTablePattern());
+  }
+
   if (doesNotRequireInstantiation(conformance, genericTable)) {
-    return genericTable->Pattern;
+    return uniqueForeignWitnessTableRef(conformance->getWitnessTablePattern());
   }
 
   auto &cache = getCache(genericTable);
-  auto result = cache.getOrInsert(type, genericTable, instantiationArgs);
+  auto result = cache.getOrInsert(type, conformance, instantiationArgs);
 
   // Our returned 'status' is the witness table itself.
-  return result.second;
+  return uniqueForeignWitnessTableRef(result.second);
 }
 
 /// Find the name of the associated type with the given descriptor.

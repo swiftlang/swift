@@ -406,9 +406,9 @@ MetadataResponse swift_checkMetadataState(MetadataRequest request,
 ///   conformances.
 SWIFT_RUNTIME_EXPORT
 const WitnessTable *
-swift_instantiateWitnessTable(ProtocolConformanceDescriptor *conformance,
+swift_instantiateWitnessTable(const ProtocolConformanceDescriptor *conformance,
                               const Metadata *type,
-                              void **const *instantiationArgs);
+                              const void * const *instantiationArgs);
 
 /// Retrieve an associated type witness from the given witness table.
 ///
@@ -489,13 +489,6 @@ SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 MetadataResponse
 swift_getForeignTypeMetadata(MetadataRequest request,
                              ForeignTypeMetadata *nonUnique);
-
-/// \brief Fetch a unique witness table for a foreign witness table.
-SWIFT_RUNTIME_EXPORT
-const WitnessTable *
-swift_getForeignWitnessTable(const WitnessTable *nonUniqueWitnessCandidate,
-                             const TypeContextDescriptor *forForeignType,
-                             const ProtocolDescriptor *forProtocol);
 
 /// \brief Fetch a uniqued metadata for a tuple type.
 ///

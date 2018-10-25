@@ -246,19 +246,24 @@ static const WitnessTable *getNSErrorConformanceToError() {
   // safe to assume that that's been linked in if a user is using NSError in
   // their Swift source.
 
-  auto getter = getErrorBridgingInfo().GetCFErrorErrorConformance;
-  assert(getter &&
+  auto conformance = getErrorBridgingInfo().CFErrorErrorConformance;
+  assert(conformance &&
          "Foundation overlay not loaded, or 'CFError : Error' conformance "
          "not available");
-  return getter();
+  return swift_instantiateWitnessTable(conformance,
+                                       conformance->getCanonicalTypeMetadata(),
+                                       nullptr);
 }
 
 static const HashableWitnessTable *getNSErrorConformanceToHashable() {
-  auto getter = getErrorBridgingInfo().GetNSObjectHashableConformance;
-  assert(getter &&
+  auto conformance = getErrorBridgingInfo().NSObjectHashableConformance;
+  assert(conformance &&
          "ObjectiveC overlay not loaded, or 'NSObject : Hashable' conformance "
          "not available");
-  return getter();
+  return (const HashableWitnessTable *)swift_instantiateWitnessTable(
+           conformance,
+           conformance->getCanonicalTypeMetadata(),
+           nullptr);
 }
 
 bool SwiftError::isPureNSError() const {

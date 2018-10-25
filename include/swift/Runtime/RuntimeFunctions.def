@@ -585,16 +585,6 @@ FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, SwiftCC,
          ARGS(SizeTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone)) // only writes to runtime-private fields
 
-// WitnessTable *swift_getForeignWitnessTable(
-//                                  const WitnessTable *candidate,
-//                                  const TypeContextDescriptor *forType,
-//                                  const ProtocolDescriptor *forProtocol);
-FUNCTION(GetForeignWitnessTable, swift_getForeignWitnessTable, C_CC,
-         RETURNS(WitnessTablePtrTy),
-         ARGS(WitnessTablePtrTy, TypeContextDescriptorPtrTy,
-              ProtocolDescriptorPtrTy),
-         ATTRS(NoUnwind, ReadNone))
-
 // MetadataResponse swift_getSingletonMetadata(MetadataRequest request,
 //                                             TypeContextDescriptor *type);
 FUNCTION(GetSingletonMetadata, swift_getSingletonMetadata, SwiftCC,
@@ -637,7 +627,7 @@ FUNCTION(CheckMetadataState, swift_checkMetadataState, SwiftCC,
 // const ProtocolWitnessTable *
 // swift_instantiateWitnessTable(const ProtocolConformanceDescriptor *conf,
 //                               const Metadata *type,
-//                               void ** const *instantiationArgs);
+//                               const void * const *instantiationArgs);
 FUNCTION(InstantiateWitnessTable, swift_instantiateWitnessTable, C_CC,
          RETURNS(WitnessTablePtrTy),
          ARGS(ProtocolConformanceDescriptorPtrTy,

@@ -88,19 +88,7 @@ template<> void ProtocolConformanceDescriptor::dump() const {
   
   printf(" => ");
   
-  switch (getConformanceKind()) {
-    case ConformanceFlags::ConformanceKind::WitnessTable:
-      printf("witness table %s\n", symbolName(getStaticWitnessTable()));
-      break;
-    case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
-      printf("witness table accessor %s\n",
-             symbolName((const void *)(uintptr_t)getWitnessTableAccessor()));
-      break;
-    case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor:
-      printf("conditional witness table accessor %s\n",
-             symbolName((const void *)(uintptr_t)getWitnessTableAccessor()));
-      break;
-  }
+  printf("witness table %pattern s\n", symbolName(getWitnessTablePattern()));
 }
 #endif
 
@@ -110,12 +98,6 @@ template<> void ProtocolConformanceDescriptor::verify() const {
   assert(((unsigned(TypeReferenceKind::First_Kind) <= typeKind) &&
           (unsigned(TypeReferenceKind::Last_Kind) >= typeKind)) &&
          "Corrupted type metadata record kind");
-
-  auto confKind = unsigned(getConformanceKind());
-  using ConformanceKind = ConformanceFlags::ConformanceKind;
-  assert(((unsigned(ConformanceKind::First_Kind) <= confKind) &&
-          (unsigned(ConformanceKind::Last_Kind) >= confKind)) &&
-         "Corrupted conformance kind");
 }
 #endif
 
@@ -158,8 +140,15 @@ ProtocolConformanceDescriptor::getCanonicalTypeMetadata() const {
     return nullptr;
 
   case TypeReferenceKind::DirectNominalTypeDescriptor:
-  case TypeReferenceKind::IndirectNominalTypeDescriptor:
+  case TypeReferenceKind::IndirectNominalTypeDescriptor: {
+    auto type = getTypeContextDescriptor();
+    if (!type->isGeneric()) {
+      if (auto accessFn = type->getAccessFunction())
+        return accessFn(MetadataState::Abstract).Value;
+    }
+
     return nullptr;
+  }
   }
 
   swift_runtime_unreachable("Unhandled TypeReferenceKind in switch.");
@@ -168,28 +157,17 @@ ProtocolConformanceDescriptor::getCanonicalTypeMetadata() const {
 template<>
 const WitnessTable *
 ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
-  switch (getConformanceKind()) {
-  case ConformanceFlags::ConformanceKind::WitnessTable:
-    return getStaticWitnessTable();
-
-  case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
-    return getWitnessTableAccessor()(type, nullptr);
-
-  case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor: {
-    // Check the conditional requirements.
+  // If needed, check the conditional requirements.
+  std::vector<const void *> conditionalArgs;
+  if (hasConditionalRequirements()) {
     SubstGenericParametersFromMetadata substitutions(type);
-    std::vector<const void *> conditionalArgs;
     bool failed =
       _checkGenericRequirements(getConditionalRequirements(), conditionalArgs,
                                 substitutions, substitutions);
     if (failed) return nullptr;
+  }
 
-    return getWitnessTableAccessor()(
-                           type,
-                           (const swift::WitnessTable**)conditionalArgs.data());
-  }
-  }
-  return nullptr;
+  return swift_instantiateWitnessTable(this, type, conditionalArgs.data());
 }
 
 namespace {
@@ -549,32 +527,11 @@ swift_conformsToProtocolImpl(const Metadata * const type,
   /// Local function to retrieve the witness table and record the result.
   auto recordWitnessTable = [&](const ProtocolConformanceDescriptor &descriptor,
                                 const Metadata *type) {
-    switch (descriptor.getConformanceKind()) {
-    case ConformanceFlags::ConformanceKind::WitnessTable:
-      // If the record provides a nondependent witness table for all
-      // instances of a generic type, cache it for the generic pattern.
-      C.cacheSuccess(type, protocol, descriptor.getStaticWitnessTable());
-      return;
-
-    case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
-      // If the record provides a dependent witness table accessor,
-      // cache the result for the instantiated type metadata.
-      C.cacheSuccess(type, protocol, descriptor.getWitnessTable(type));
-      return;
-
-    case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor: {
-      auto witnessTable = descriptor.getWitnessTable(type);
-      if (witnessTable)
-        C.cacheSuccess(type, protocol, witnessTable);
-      else
-        C.cacheFailure(type, protocol, snapshot.count());
-      return;
-    }
-    }
-
-    // Always fail, because we cannot interpret a future conformance
-    // kind.
-    C.cacheFailure(type, protocol, snapshot.count());
+    auto witnessTable = descriptor.getWitnessTable(type);
+    if (witnessTable)
+      C.cacheSuccess(type, protocol, witnessTable);
+    else
+      C.cacheFailure(type, protocol, snapshot.count());
   };
 
   // Really scan conformance records.
