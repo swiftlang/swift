@@ -989,12 +989,10 @@ extension _StringGuts {
   @inlinable // @testable
   internal
   mutating func append(_ other: _StringGuts) {
-    // FIXME(TODO: JIRA): shouldn't _isEmptySingleton be sufficient?
-    if _isEmptySingleton || self.count == 0 && !_object.isNative {
-      // We must be careful not to discard any capacity that
-      // may have been reserved for the append -- this is why
-      // we check for the empty string singleton rather than
-      // a zero `count` above.
+    // We inline only the _isEmptySingleton check because it can often be
+    // proven or disproven at compile time. A full length check is often
+    // inconclusive.
+    if _isEmptySingleton {
       self = other
       return
     }
@@ -1004,6 +1002,15 @@ extension _StringGuts {
   @usableFromInline
   internal
   mutating func _appendSlow(_ other: _StringGuts) {
+    // FIXME(TODO: JIRA): shouldn't _isEmptySingleton be sufficient?
+    if self.count == 0 && !_object.isNative {
+      // We must be careful not to discard any capacity that
+      // may have been reserved for the append -- this is why
+      // we check for the empty string singleton rather than
+      // a zero `count` above.
+      self = other
+      return
+    }
     if _slowPath(other._isOpaque) {
       _opaqueAppend(opaqueOther: other)
       return
