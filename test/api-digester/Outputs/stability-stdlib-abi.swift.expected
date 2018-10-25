@@ -14,6 +14,12 @@ Constructor _DropFirstSequence.init(_iterator:limit:dropped:) has been removed
 Constructor _PrefixSequence.init(_iterator:maxLength:taken:) has been removed
 Func _DropFirstSequence.next() has been removed
 Func _PrefixSequence.next() has been removed
+Func _float32ToString(_:debug:) has been removed
+Func _float32ToStringImpl(_:_:_:_:) has been removed
+Func _float64ToString(_:debug:) has been removed
+Func _float64ToStringImpl(_:_:_:_:) has been removed
+Func _float80ToString(_:debug:) has been removed
+Func _float80ToStringImpl(_:_:_:_:) has been removed
 Var _DropFirstSequence._dropped has been removed
 Var _DropFirstSequence._iterator has been removed
 Var _PrefixSequence._iterator has been removed

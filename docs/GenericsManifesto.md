@@ -346,7 +346,7 @@ public struct ZipIterator<... Iterators : IteratorProtocol> : Iterator {  // zer
   public mutating func next() -> Element? {
     if reachedEnd { return nil }
 
-    guard let values = (iterators.next()...) {   // call "next" on each of the iterators, put the results into a tuple named "values"
+    guard let values = (iterators.next()...) else {   // call "next" on each of the iterators, put the results into a tuple named "values"
       reachedEnd = true
       return nil
     }
