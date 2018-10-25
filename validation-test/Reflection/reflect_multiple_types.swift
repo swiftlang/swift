@@ -225,14 +225,10 @@ reflect(object: obj)
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=1 alignment=1 stride=1 num_extra_inhabitants=254))))
 // CHECK-32-NEXT:   (field name=t02 offset=16
-// CHECK-32-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
-// CHECK-32-NEXT:       (field name=_representation offset=0
-// CHECK-32-NEXT:         (multi_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=0
-// CHECK-32-NEXT:           (field name=smallUTF16 offset=0
-// CHECK-32-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
-// CHECK-32-NEXT:           (field name=large offset=0
-// CHECK-32-NEXT:             (reference kind=strong refcounting=native))))))
-// CHECK-32-NEXT:   (field name=t03 offset=24
+// CHECK-32-NEXT:     (struct size=12 alignment=4 stride=12 num_extra_inhabitants=128
+// CHECK-32-NEXT:       (field name=_str offset=0
+// (unstable implementation details omitted)
+// CHECK-32:   (field name=t03 offset=28
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=1
 // (unstable implementation details omitted)
 // CHECK-32:   (field name=t04 offset=32
@@ -275,7 +271,7 @@ reflect(object: obj)
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=1
 // (unstable implementation details omitted)
 // CHECK-32:   (field name=t16 offset=88
-// CHECK-32-NEXT:     (struct size=12 alignment=4 stride=12 num_extra_inhabitants=4092
+// CHECK-32-NEXT:     (struct size=12 alignment=4 stride=12 num_extra_inhabitants=128
 // (unstable implementation details omitted)
 // CHECK-32:   (field name=t17 offset=100
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0

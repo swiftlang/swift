@@ -84,6 +84,9 @@ extension _AbstractStringStorage {
 }
 #endif // _runtime(_ObjC)
 
+#if arch(i386) || arch(arm)
+private typealias Flags = _StringObject.Flags
+#endif
 private typealias CountAndFlags = _StringObject.CountAndFlags
 
 //
@@ -95,11 +98,36 @@ private typealias CountAndFlags = _StringObject.CountAndFlags
 @_fixed_layout
 @usableFromInline
 final internal class _StringStorage: _AbstractStringStorage {
+#if arch(i386) || arch(arm)
+  // The total allocated storage capacity. Note that this includes the required
+  // nul-terminator
+  @nonobjc
+  @usableFromInline
+  internal var _realCapacity: Int
+
+  @nonobjc
+  @usableFromInline
+  internal var _count: Int
+
+  @nonobjc
+  @usableFromInline
+  internal var _flags: _StringObject.Flags
+
+  @nonobjc
+  internal var _reserved: UInt16
+
+  @nonobjc
+  @inlinable
+  override internal var count: Int {
+    @inline(__always) get { return _count }
+    @inline(__always) set { _count = newValue }
+  }
+#else
   // The capacity of our allocation. Note that this includes the nul-terminator,
   // which is not available for overridding.
   @nonobjc
   @usableFromInline
-  internal var _realCapacityAndFlags: UInt
+  internal var _realCapacityAndFlags: UInt64
 
   @nonobjc
   @usableFromInline
@@ -111,6 +139,17 @@ final internal class _StringStorage: _AbstractStringStorage {
     @inline(__always) get { return _countAndFlags.count }
     @inline(__always) set { _countAndFlags.count = newValue }
   }
+
+  // The total allocated storage capacity. Note that this includes the required
+  // nul-terminator
+  @nonobjc
+  internal var _realCapacity: Int {
+    @inline(__always) get {
+      return Int(truncatingIfNeeded:
+        _realCapacityAndFlags & _StringObject.Nibbles.largeAddressMask)
+    }
+  }
+#endif
 
   @nonobjc
   override internal var asString: String {
@@ -137,9 +176,16 @@ final internal class _StringStorage: _AbstractStringStorage {
 // curve.
 private func determineCodeUnitCapacity(_ desiredCapacity: Int) -> Int {
 #if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
+  // FIXME: Adapt to actual 32-bit allocator. For now, let's arrange things so
+  // that the instance size will be a multiple of 4.
+  let bias = Int(bitPattern: _StringObject.nativeBias)
+  let minimum = bias + desiredCapacity + 1
+  let size = (minimum + 3) & ~3
+  _sanityCheck(size % 4 == 0)
+  let capacity = size - bias
+  _sanityCheck(capacity > desiredCapacity)
+  return capacity
 #else
-
   // Bigger than _SmallString, and we need 1 extra for nul-terminator
   let minCap = 1 + Swift.max(desiredCapacity, _SmallString.capacity)
   _sanityCheck(minCap < 0x1_0000_0000_0000, "max 48-bit length")
@@ -149,7 +195,6 @@ private func determineCodeUnitCapacity(_ desiredCapacity: Int) -> Int {
   _sanityCheck(
     capacity > desiredCapacity && capacity % 8 == 0 && capacity % 16 != 0)
   return capacity
-
 #endif
 }
 
@@ -165,9 +210,15 @@ extension _StringStorage {
       _StringStorage.self,
       realCodeUnitCapacity._builtinWordValue, UInt8.self,
       1._builtinWordValue, Optional<_StringBreadcrumbs>.self)
-
-    storage._realCapacityAndFlags = UInt(bitPattern: realCodeUnitCapacity)
+#if arch(i386) || arch(arm)
+    storage._realCapacity = realCodeUnitCapacity
+    storage._count = countAndFlags.count
+    storage._flags = countAndFlags.flags
+#else
+    storage._realCapacityAndFlags =
+      UInt64(truncatingIfNeeded: realCodeUnitCapacity)
     storage._countAndFlags = countAndFlags
+#endif
 
     storage._breadcrumbsAddress.initialize(to: nil)
     storage.terminator.pointee = 0 // nul-terminated
@@ -197,7 +248,12 @@ extension _StringStorage {
     capacity: Int,
     isASCII: Bool
   ) -> _StringStorage {
+#if arch(i386) || arch(arm)
+    let flags = Flags(isASCII: isASCII)
+    let countAndFlags = CountAndFlags(count: bufPtr.count, flags: flags)
+#else
     let countAndFlags = CountAndFlags(count: bufPtr.count, isASCII: isASCII)
+#endif
     _sanityCheck(capacity >= bufPtr.count)
     let storage = _StringStorage.create(
       capacity: capacity, countAndFlags: countAndFlags)
@@ -256,14 +312,20 @@ extension _StringStorage {
   }
 
   @nonobjc
-  private var isASCII: Bool { return _countAndFlags.isASCII }
+  private var isASCII: Bool {
+#if arch(i386) || arch(arm)
+    return _flags.isASCII
+#else
+    return _countAndFlags.isASCII
+#endif
+  }
 
   @nonobjc
   // @opaque
   internal var _breadcrumbsAddress: UnsafeMutablePointer<_StringBreadcrumbs?> {
     let raw = Builtin.getTailAddr_Word(
       start._rawValue,
-      realCapacity._builtinWordValue,
+      _realCapacity._builtinWordValue,
       UInt8.self,
       Optional<_StringBreadcrumbs>.self)
     return UnsafeMutablePointer(raw)
@@ -273,15 +335,7 @@ extension _StringStorage {
   // required nul-terminator
   @nonobjc
   internal var capacity: Int {
-    return realCapacity &- 1
-  }
-
-  // The total capacity available for code units. Note that this excludes the
-  // required nul-terminator
-  @nonobjc
-  private var realCapacity: Int {
-    return Int(bitPattern:
-      _realCapacityAndFlags & _StringObject.Nibbles.largeAddressMask)
+    return _realCapacity &- 1
   }
 
   // The unused capacity available for appending. Note that this excludes the
@@ -300,7 +354,7 @@ extension _StringStorage {
   // nul-terminator
   @nonobjc
   internal var unusedCapacity: Int {
-    get { return realCapacity &- count &- 1 }
+    get { return _realCapacity &- count &- 1 }
   }
 
   #if !INTERNAL_CHECKS_ENABLED
@@ -313,10 +367,14 @@ extension _StringStorage {
     _sanityCheck(unusedCapacity >= 0)
     _sanityCheck(count <= capacity)
     _sanityCheck(rawSelf + Int(_StringObject.nativeBias) == rawStart)
-    _sanityCheck(self.realCapacity > self.count, "no room for nul-terminator")
+    _sanityCheck(self._realCapacity > self.count, "no room for nul-terminator")
     _sanityCheck(self.terminator.pointee == 0, "not nul terminated")
 
+#if arch(i386) || arch(arm)
+    _flags._invariantCheck()
+#else
     _countAndFlags._invariantCheck()
+#endif
     if isASCII {
       _sanityCheck(_allASCII(self.codeUnits))
     }
@@ -333,8 +391,13 @@ extension _StringStorage {
   @_effects(releasenone)
   @nonobjc
   private func _postRRCAdjust(newCount: Int, newIsASCII: Bool) {
+#if arch(i386) || arch(arm)
+    self._count = newCount
+    self._flags = Flags(isASCII: newIsASCII)
+#else
     self._countAndFlags = CountAndFlags(
       count: newCount, isASCII: newIsASCII)
+#endif
     self.terminator.pointee = 0
     _invariantCheck()
   }
@@ -379,8 +442,7 @@ extension _StringStorage {
 
   @nonobjc
   internal func clear() {
-    self._countAndFlags = CountAndFlags(count: 0, isASCII: true)
-    self.terminator.pointee = 0
+    _postRRCAdjust(newCount: 0, newIsASCII: true)
   }
 }
 
@@ -480,8 +542,24 @@ final internal class _SharedStringStorage: _AbstractStringStorage {
   @nonobjc
   internal var _start: UnsafePointer<UInt8>
 
+#if arch(i386) || arch(arm)
+  @nonobjc
+  internal var _count: Int
+
+  @nonobjc
+  internal var _flags: _StringObject.Flags
+
+  @inlinable
+  @nonobjc
+  internal var _countAndFlags: _StringObject.CountAndFlags {
+    @inline(__always) get {
+      return CountAndFlags(count: _count, flags: _flags)
+    }
+  }
+#else
   @nonobjc
   internal var _countAndFlags: _StringObject.CountAndFlags
+#endif
 
   @nonobjc
   internal var _breadcrumbs: _StringBreadcrumbs? = nil
@@ -490,7 +568,13 @@ final internal class _SharedStringStorage: _AbstractStringStorage {
   internal var start: UnsafePointer<UInt8> { return _start }
 
   @nonobjc
-  override internal var count: Int { return _countAndFlags.count }
+  override internal var count: Int {
+#if arch(i386) || arch(arm)
+    return _count
+#else
+    return _countAndFlags.count
+#endif
+  }
 
   @nonobjc
   internal init(
@@ -499,7 +583,12 @@ final internal class _SharedStringStorage: _AbstractStringStorage {
   ) {
     self._owner = nil
     self._start = ptr
+#if arch(i386) || arch(arm)
+    self._count = countAndFlags.count
+    self._flags = countAndFlags.flags
+#else
     self._countAndFlags = countAndFlags
+#endif
     super.init()
     self._invariantCheck()
   }

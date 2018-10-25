@@ -48,15 +48,12 @@ reflect(object: obj)
 // CHECK-32: (class reflect_Character.TestClass)
 
 // CHECK-32: Type info:
-// CHECK-32-NEXT: (class_instance size=16 alignment=8 stride=16 num_extra_inhabitants=0
+// CHECK-32-NEXT: (class_instance size=20 alignment=4 stride=20 num_extra_inhabitants=0
 // CHECK-32-NEXT:   (field name=t offset=8
-// CHECK-32-NEXT:     (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0
-// CHECK-32-NEXT:       (field name=_representation offset=0
-// CHECK-32-NEXT:         (multi_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=0
-// CHECK-32-NEXT:           (field name=smallUTF16 offset=0
-// CHECK-32-NEXT:             (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=2147483647))
-// CHECK-32-NEXT:           (field name=large offset=0
-// CHECK-32-NEXT:            (reference kind=strong refcounting=native)))))))
+// CHECK-32-NEXT:     (struct size=12 alignment=4 stride=12 num_extra_inhabitants=128
+// CHECK-32-NEXT:       (field name=_str offset=0
+// CHECK-32-NEXT:         (struct size=12 alignment=4 stride=12 num_extra_inhabitants=128
+// (unstable implementation details omitted)
 
 doneReflecting()
 
