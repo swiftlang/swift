@@ -27,6 +27,13 @@ Var _CocoaDictionary.Index._object has been removed
 Var _CocoaSet.Index._object has been removed
 Var __SwiftDeferredNSArray._heapBufferBridged has been removed
 Var __SwiftDeferredNSArray._heapBufferBridgedPtr has been removed
+Func MutableCollection._heapSort(within:by:) has been removed
+Func MutableCollection._heapify(within:by:) has been removed
+Func MutableCollection._introSort(within:by:) has been removed
+Func MutableCollection._introSortImpl(within:by:depthLimit:) has been removed
+Func MutableCollection._partition(within:by:) has been removed
+Func MutableCollection._siftDown(_:within:by:) has been removed
+Func MutableCollection._sort3(_:_:_:by:) has been removed
 
 /* Moved Decls */
 
@@ -42,3 +49,4 @@ Var _CocoaSet.Index._storage in a non-resilient type changes position from 1 to 
 /* Decl Attribute changes */
 
 /* Protocol Requirement Changes */
+Func MutableCollection._stableSortImpl(by:) has been added as a protocol requirement
