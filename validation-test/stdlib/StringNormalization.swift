@@ -18,27 +18,64 @@ import Swift
 import StdlibUnittest
 import StdlibUnicodeUnittest
 
-private func expectEqualIterators(expected: [UInt8], others: [[UInt8]]) {
+private func expectEqualIterators(
+  label: String,
+  expected: [UInt8],
+  others: [String: [UInt8]],
+  _ message: @autoclosure () -> String = "",
+  showFrame: Bool = true,
+  stackTrace: SourceLocStack = SourceLocStack(),
+  file: String = #file,
+  line: UInt = #line
+) {
   let expectedString = String(decoding: expected, as: UTF8.self)
   let expectedCodeUnits = expectedString._nfcCodeUnits
-  
-  for other in others {
+  for (otherLabel, other) in others {
     let otherString = String(decoding: other, as: UTF8.self)
-    expectEqual(expectedCodeUnits, otherString._nfcCodeUnits)
+    expectEqual(
+      expectedCodeUnits,
+      otherString._nfcCodeUnits,
+      "\(label) vs \(otherLabel)",
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
   }
 }
 
 var tests = TestSuite("StringNormalization")
 
-tests.test("StringNormalization/ConvertToNFC") {
+tests.test("StringNormalization/ConvertToNFC")
+.skip(.custom({
+      if #available(macOS 10.14, iOS 12, watchOS 5, tvOS 12, *) { return false }
+      return true
+    }, reason: "NormalizationTest.txt requires Unicode 11"))
+.code {
   for test in normalizationTests {
-    expectEqualIterators(expected: test.NFC, others: [test.source, test.NFC, test.NFD])
+    expectEqualIterators(
+      label: "NFC",
+      expected: test.NFC,
+      others: [
+        "source": test.source,
+        "NFC": test.NFC,
+        "NFD": test.NFD
+      ],
+      stackTrace: SourceLocStack(test.loc))
   }
 }
 
-tests.test("StringNormalization/ConvertNFK*ToNFKC") {
+tests.test("StringNormalization/ConvertNFK*ToNFKC")
+.skip(.custom({
+      if #available(macOS 10.14, iOS 12, watchOS 5, tvOS 12, *) { return false }
+      return true
+    }, reason: "NormalizationTest.txt requires Unicode 11"))
+.code {
   for test in normalizationTests {
-    expectEqualIterators(expected: test.NFKC, others: [test.NFKC, test.NFKD])
+    expectEqualIterators(
+      label: "NFKC",
+      expected: test.NFKC,
+      others: [
+        "NFKC": test.NFKC,
+        "NFKD": test.NFKD
+      ],
+      stackTrace: SourceLocStack(test.loc))
   }
 }
 

@@ -11,10 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 //
-// NOTE: This is a prototype, it does not have e.g. 32-bit support yet.
-//
-
-//
 // StringObject abstracts the bit-level interpretation and creation of the
 // String struct.
 //
@@ -23,6 +19,139 @@
 
 @_fixed_layout @usableFromInline
 internal struct _StringObject {
+  /*
+
+  On 64-bit platforms, the discriminator is the most significant 8 bits of the
+  bridge object.
+
+  ┌─────────────────────╥─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┐
+  │ Form                ║  7  │  6  │  5  │  4  │  3  │  2  │  1  │  0  │
+  ╞═════════════════════╬═════╪═════╪═════╪═════╪═════╧═════╧═════╧═════╡
+  │ Immortal, Small     ║  1  │ASCII│  1  │  0  │      small count      │
+  ├─────────────────────╫─────┼─────┼─────┼─────┼─────┬─────┬─────┬─────┤
+  │ Immortal, Large     ║  1  │  0  │  0  │  0  │  0  │ TBD │ TBD │ TBD │
+  ╞═════════════════════╬═════╪═════╪═════╪═════╪═════╪═════╪═════╪═════╡
+  │ Native, Regular     ║  0  │  0  │  0  │  0  │  0  │ TBD │ TBD │ TBD │
+  ├─────────────────────╫─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┤
+  │ Native, Shared      ║  0  │  0  │  0  │  0  │  1  │ TBD │ TBD │ TBD │
+  ├─────────────────────╫─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┤
+  │ Native, Exotic      ║  0  │  0  │  0  │  1  │  1  │ TBD │ TBD │ TBD │
+  ╞═════════════════════╬═════╪═════╪═════╪═════╪═════╪═════╪═════╪═════╡
+  │ Bridged, Contiguous ║  0  │  1  │  0  │  0  │  1  │ TBD │ TBD │ TBD │
+  ├─────────────────────╫─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┤
+  │ Bridged, Slow       ║  0  │  1  │  0  │  1  │  1  │ TBD │ TBD │ TBD │
+  └─────────────────────╨─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┘
+
+  b3: isForeign (i.e., object payload isn't a biased pointer)
+  b4: isSlow
+  b5: isSmall
+  b6: isBridged/isASCII
+  b7: isImmortal
+
+  On 32-bit platforms, we use an explicit discriminator with the same encoding
+  as above, except bit 7 is omitted from storage -- it is left free, to supply
+  extra inhabitants in the StringObject structure. The missing bit can be
+  recovered by looking at `_variant.isImmortal`.
+
+  */
+  @_fixed_layout @usableFromInline
+  struct Discriminator {
+    @usableFromInline
+    internal var _value: UInt8
+
+    @inlinable @inline(__always)
+    internal init(_ value: UInt8) {
+      self._value = value
+    }
+  }
+
+#if arch(i386) || arch(arm)
+  @usableFromInline @_frozen
+  internal enum Variant {
+    case immortal(UInt)
+    case native(_AbstractStringStorage)
+    case bridged(_CocoaString)
+
+    @inlinable @inline(__always)
+    internal static func immortal(start: UnsafePointer<UInt8>) -> Variant {
+      let biased = UInt(bitPattern: start) &- _StringObject.nativeBias
+      return .immortal(biased)
+    }
+
+    @inlinable
+    internal var isImmortal: Bool {
+      @inline(__always) get {
+        if case .immortal = self { return true }
+        return false
+      }
+    }
+  }
+
+  @_fixed_layout @usableFromInline
+  struct Flags {
+    @usableFromInline
+    internal var _value: UInt16
+
+    @inlinable @inline(__always)
+    init(_ value: UInt16) {
+      self._value = value
+    }
+  }
+
+  @_fixed_layout @usableFromInline
+  struct CountAndFlags {
+    @usableFromInline
+    internal var count: Int
+
+    @usableFromInline
+    internal var flags: Flags
+
+    @inlinable @inline(__always)
+    init(count: Int, flags: Flags) {
+      self.count = count
+      self.flags = flags
+    }
+
+    @inlinable @inline(__always)
+    internal func _invariantCheck() {
+      flags._invariantCheck()
+    }
+  }
+
+  @usableFromInline
+  internal var _count: Int
+
+  @usableFromInline
+  internal var _variant: Variant
+
+  @usableFromInline
+  internal var _discriminator: Builtin.Int7
+
+  @usableFromInline
+  internal var _flags: Flags
+
+  @inlinable @inline(__always)
+  init(
+    count: Int,
+    variant: Variant,
+    discriminator: Discriminator,
+    flags: Flags
+  ) {
+    _sanityCheck(variant.isImmortal == discriminator.isImmortal)
+    self._count = count
+    self._variant = variant
+    self._discriminator =
+      Builtin.truncOrBitCast_Int8_Int7(discriminator._value._value)
+    self._flags = flags
+  }
+
+  @inlinable
+  internal var _countAndFlags: CountAndFlags {
+    @inline(__always) get {
+      return CountAndFlags(count: _count, flags: _flags)
+    }
+  }
+#else
   // Abstract the count and performance-flags containing word
   @_fixed_layout @usableFromInline
   struct CountAndFlags {
@@ -48,17 +177,60 @@ internal struct _StringObject {
     self._countAndFlags = CountAndFlags(zero:())
     self._object = Builtin.reinterpretCast(0)
   }
+#endif
 
   // Namespace to hold magic numbers
   @usableFromInline @_frozen
   enum Nibbles {}
 }
 
+extension _StringObject {
+#if arch(i386) || arch(arm)
+  @inlinable @inline(__always)
+  internal func discriminator(isImmortal: Bool) -> Discriminator {
+    let lowBits = UInt8(Builtin.zextOrBitCast_Int7_Int8(_discriminator))
+    guard isImmortal else { return Discriminator(lowBits) }
+    return Discriminator(lowBits | 0x80)
+  }
+#endif
+
+  @inlinable
+  internal var discriminator: Discriminator {
+    @inline(__always) get {
+#if arch(i386) || arch(arm)
+      return self.discriminator(isImmortal: _variant.isImmortal)
+#else
+      let d = objectRawBits &>> Nibbles.discriminatorShift
+      return Discriminator(UInt8(truncatingIfNeeded: d))
+#endif
+    }
+  }
+}
+
 // Raw
 extension _StringObject {
   @usableFromInline
-  internal typealias RawBitPattern = (UInt, UInt)
+  internal typealias RawBitPattern = (UInt64, UInt64)
 
+#if arch(i386) || arch(arm)
+  // On 32-bit platforms, raw bit conversion is one-way only and uses the same
+  // layout as on 64-bit platforms.
+  @usableFromInline
+  internal var rawBits: RawBitPattern {
+    @inline(__always) get {
+      let count = UInt64(truncatingIfNeeded: UInt(bitPattern: _count))
+      let payload = UInt64(truncatingIfNeeded: undiscriminatedObjectRawBits)
+      let flags = UInt64(truncatingIfNeeded: _flags._value)
+      let discr = UInt64(truncatingIfNeeded: discriminator._value)
+      if isSmall {
+        // Rearrange small strings in a different way, compacting bytes into a
+        // contiguous sequence. See comment on small string layout below.
+        return (count | (payload &<< 32), flags | (discr &<< 56))
+      }
+      return (count | (flags &<< 48), payload | (discr &<< 56))
+    }
+  }
+#else
   @inlinable
   internal var rawBits: RawBitPattern {
     @inline(__always) get { return (_countAndFlags.rawBits, objectRawBits) }
@@ -75,7 +247,7 @@ extension _StringObject {
 
   @inlinable @inline(__always)
   internal init(
-    object: AnyObject, discriminator: UInt, countAndFlags: CountAndFlags
+    object: AnyObject, discriminator: UInt64, countAndFlags: CountAndFlags
   ) {
     let builtinRawObject: Builtin.Int64 = Builtin.reinterpretCast(object)
     let builtinDiscrim: Builtin.Int64 = discriminator._value
@@ -88,19 +260,7 @@ extension _StringObject {
   // Initializer to use for tagged (unmanaged) values
   @inlinable @inline(__always)
   internal init(
-    discriminator: UInt, valueLeading: UInt, valueTrailing: UInt
-  ) {
-    // NOTE: Do not use stringObjectOr, which is only meant for pointers.
-    _sanityCheck(valueTrailing & Nibbles.discriminatorMask == 0)
-    self.init(
-      bridgeObject: Builtin.valueToBridgeObject(valueTrailing | discriminator),
-      countAndFlags: CountAndFlags(rawUnchecked: valueLeading))
-  }
-
-  // Initializer to use for tagged (unmanaged) values
-  @inlinable @inline(__always)
-  internal init(
-    pointerBits: UInt, discriminator: UInt, countAndFlags: CountAndFlags
+    pointerBits: UInt64, discriminator: UInt64, countAndFlags: CountAndFlags
   ) {
     let builtinValueBits: Builtin.Int64 = pointerBits._value
     let builtinDiscrim: Builtin.Int64 = discriminator._value
@@ -125,30 +285,45 @@ extension _StringObject {
   }
 
   @inlinable @_transparent
-  internal var objectRawBits: UInt {
+  internal var objectRawBits: UInt64 {
     @inline(__always) get { return Builtin.reinterpretCast(_object) }
   }
+#endif
+}
 
+extension _StringObject {
   @inlinable @_transparent
   internal var undiscriminatedObjectRawBits: UInt {
     @inline(__always) get {
-      return (objectRawBits & Nibbles.largeAddressMask)
+#if arch(i386) || arch(arm)
+      switch _variant {
+      case .immortal(let bitPattern):
+        return bitPattern
+      case .native(let storage):
+        return Builtin.reinterpretCast(storage)
+      case .bridged(let object):
+        return Builtin.reinterpretCast(object)
+      }
+#else
+      return UInt(truncatingIfNeeded: objectRawBits & Nibbles.largeAddressMask)
+#endif
     }
   }
-
 }
+
+#if !(arch(i386) || arch(arm))
 extension _StringObject.CountAndFlags {
   @usableFromInline
-  internal typealias RawBitPattern = UInt
+  internal typealias RawBitPattern = UInt64
 
   @inlinable
   internal var rawBits: RawBitPattern {
-    @inline(__always) get { return _storage }
+    @inline(__always) get { return UInt64(truncatingIfNeeded: _storage) }
   }
 
   @inlinable @inline(__always)
   internal init(rawUnchecked bits: RawBitPattern) {
-    self._storage = bits
+    self._storage = UInt(truncatingIfNeeded: bits)
   }
 
   @inlinable @inline(__always)
@@ -157,6 +332,7 @@ extension _StringObject.CountAndFlags {
     _invariantCheck()
   }
 }
+#endif
 
 /*
 
@@ -190,13 +366,24 @@ extension _StringObject.CountAndFlags {
  nibble of 1110, and all other bits are 0.
 
 */
+#if arch(i386) || arch(arm)
+extension _StringObject.Discriminator {
+  @inlinable
+  internal static var empty: _StringObject.Discriminator {
+    @inline(__always) get {
+      return _StringObject.Discriminator.small(withCount: 0, isASCII: true)
+    }
+  }
+}
+#else
 extension _StringObject.Nibbles {
   // The canonical empty sting is an empty small string
   @inlinable
-  internal static var emptyString: UInt {
+  internal static var emptyString: UInt64 {
     @inline(__always) get { return _StringObject.Nibbles.small(isASCII: true) }
   }
 }
+#endif
 
 /*
 
@@ -257,98 +444,205 @@ extension _StringObject.Nibbles {
 extension _StringObject.Nibbles {
   // Mask for address bits, i.e. non-discriminator and non-extra high bits
   @inlinable
-  static internal var largeAddressMask: UInt {
+  static internal var largeAddressMask: UInt64 {
     @inline(__always) get {
-#if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
-#else
-    return 0x00FF_FFFF_FFFF_FFFF
-#endif
+      return 0x00FF_FFFF_FFFF_FFFF
     }
   }
 
   // Mask for discriminator bits
   @inlinable
-  static internal var discriminatorMask: UInt {
+  static internal var discriminatorMask: UInt64 {
     @inline(__always) get {
-#if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
-#else
-    return ~largeAddressMask
-#endif
+      return ~largeAddressMask
     }
   }
 
+  // Position of discriminator bits
+  @inlinable
+  static internal var discriminatorShift: Int {
+    @inline(__always) get {
+      return 56
+    }
+  }
+}
+
+extension _StringObject.Discriminator {
   // Discriminator for small strings
   @inlinable @inline(__always)
-  internal static func small(isASCII: Bool) -> UInt {
-#if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
-#else
-    return isASCII ? 0xE000_0000_0000_0000 : 0xA000_0000_0000_0000
-#endif
+  internal static func small(
+    withCount count: Int,
+    isASCII: Bool
+  ) -> _StringObject.Discriminator {
+    _sanityCheck(count >= 0 && count <= _SmallString.capacity)
+    let c = UInt8(truncatingIfNeeded: count)
+    return _StringObject.Discriminator((isASCII ? 0xE0 : 0xA0) | c)
   }
 
-  // Discriminator for small strings
-  @inlinable @inline(__always)
-  internal static func small(withCount count: Int, isASCII: Bool) -> UInt {
 #if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
-#else
-    _sanityCheck(count <= _SmallString.capacity)
-    return small(isASCII: isASCII) | UInt(bitPattern: count) &<< 56
-#endif
-  }
-
   // Discriminator for large, immortal, swift-native strings
   @inlinable @inline(__always)
-  internal static func largeImmortal() -> UInt {
-#if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
-#else
-    return 0x8000_0000_0000_0000
-#endif
+  internal static func largeImmortal() -> _StringObject.Discriminator {
+    return _StringObject.Discriminator(0x80)
   }
 
   // Discriminator for large, mortal (i.e. managed), swift-native strings
   @inlinable @inline(__always)
-  internal static func largeMortal() -> UInt {
-#if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
-#else
-    return 0x0000_0000_0000_0000
-#endif
+  internal static func largeMortal() -> _StringObject.Discriminator {
+    return _StringObject.Discriminator(0x00)
   }
 
   // Discriminator for large, shared, mortal (i.e. managed), swift-native
   // strings
   @inlinable @inline(__always)
-  internal static func largeSharedMortal() -> UInt {
-#if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
-#else
-    return 0x0800_0000_0000_0000
-#endif
+  internal static func largeSharedMortal() -> _StringObject.Discriminator {
+    return _StringObject.Discriminator(0x08)
   }
 
-  internal static func largeCocoa(providesFastUTF8: Bool) -> UInt {
-#if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
-#else
-    return providesFastUTF8 ? 0x4800_0000_0000_0000 : 0x5800_0000_0000_0000
+  internal static func largeCocoa(
+    providesFastUTF8: Bool
+  ) -> _StringObject.Discriminator {
+    return _StringObject.Discriminator(providesFastUTF8 ? 0x48 : 0x58)
+  }
 #endif
+}
+
+#if !(arch(i386) || arch(arm))
+// FIXME: Can we just switch to using the Discriminator factories above?
+extension _StringObject.Nibbles {
+  // Discriminator for small strings
+  @inlinable @inline(__always)
+  internal static func small(isASCII: Bool) -> UInt64 {
+    return isASCII ? 0xE000_0000_0000_0000 : 0xA000_0000_0000_0000
+  }
+
+  // Discriminator for small strings
+  @inlinable @inline(__always)
+  internal static func small(withCount count: Int, isASCII: Bool) -> UInt64 {
+    _sanityCheck(count <= _SmallString.capacity)
+    return small(isASCII: isASCII) | UInt64(truncatingIfNeeded: count) &<< 56
+  }
+
+  // Discriminator for large, immortal, swift-native strings
+  @inlinable @inline(__always)
+  internal static func largeImmortal() -> UInt64 {
+    return 0x8000_0000_0000_0000
+  }
+
+  // Discriminator for large, mortal (i.e. managed), swift-native strings
+  @inlinable @inline(__always)
+  internal static func largeMortal() -> UInt64 {
+    return 0x0000_0000_0000_0000
+  }
+
+  // Discriminator for large, shared, mortal (i.e. managed), swift-native
+  // strings
+  @inlinable @inline(__always)
+  internal static func largeSharedMortal() -> UInt64 {
+    return 0x0800_0000_0000_0000
+  }
+
+  internal static func largeCocoa(providesFastUTF8: Bool) -> UInt64 {
+    return providesFastUTF8 ? 0x4800_0000_0000_0000 : 0x5800_0000_0000_0000
+  }
+}
+#endif
+
+extension _StringObject.Discriminator {
+  @inlinable
+  internal var isImmortal: Bool {
+    @inline(__always) get {
+      return (_value & 0x80) != 0
+    }
+  }
+
+  @inlinable
+  internal var isSmall: Bool {
+    @inline(__always) get {
+      return (_value & 0x20) != 0
+    }
+  }
+
+  @inlinable
+  internal var smallIsASCII: Bool {
+    @inline(__always) get {
+      _sanityCheck(isSmall)
+      return (_value & 0x40) != 0
+    }
+  }
+
+  @inlinable
+  internal var smallCount: Int {
+    @inline(__always) get {
+      _sanityCheck(isSmall)
+      return Int(truncatingIfNeeded: _value & 0x0F)
+    }
+  }
+
+  @inlinable
+  internal var providesFastUTF8: Bool {
+    @inline(__always) get {
+      return (_value & 0x10) == 0
+    }
+  }
+
+  // Whether we are a mortal, native string
+  @inlinable
+  internal var hasNativeStorage: Bool {
+    @inline(__always) get {
+      return (_value & 0xF8) == 0
+    }
+  }
+
+  // Whether we are a mortal, shared string (managed by Swift runtime)
+  internal var hasSharedStorage: Bool {
+    @inline(__always) get {
+      return (_value & 0xF8) == 0x08
+    }
+  }
+
+  @inlinable
+  internal var largeFastIsNative: Bool {
+    @inline(__always) get {
+      _sanityCheck(!isSmall && providesFastUTF8)
+      return (_value & 0x08) == 0
+    }
+  }
+
+  // Whether this string is a lazily-bridged NSString, presupposing it is large
+  @inlinable
+  internal var largeIsCocoa: Bool {
+    @inline(__always) get {
+      _sanityCheck(!isSmall)
+      return (_value & 0x40) != 0
+    }
+  }
+}
+
+extension _StringObject.Discriminator {
+  @inlinable
+  internal var rawBits: UInt64 {
+    return UInt64(_value) &<< _StringObject.Nibbles.discriminatorShift
   }
 }
 
 extension _StringObject {
   @inlinable
-  internal static var nativeBias: UInt { @inline(__always) get { return 32 } }
+  internal static var nativeBias: UInt {
+    @inline(__always) get {
+#if arch(i386) || arch(arm)
+      return 20
+#else
+      return 32
+#endif
+    }
+  }
 
   @inlinable
   internal var isImmortal: Bool {
     @inline(__always) get {
 #if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
+      return _variant.isImmortal
 #else
       return (objectRawBits & 0x8000_0000_0000_0000) != 0
 #endif
@@ -364,7 +658,9 @@ extension _StringObject {
   internal var isSmall: Bool {
     @inline(__always) get {
 #if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
+      // Note: This assumes that the `isSmall` predicate doesn't look at the
+      // immortal bit. We may or may not actually be immortal.
+      return discriminator(isImmortal: true).isSmall
 #else
       return (objectRawBits & 0x2000_0000_0000_0000) != 0
 #endif
@@ -384,7 +680,9 @@ extension _StringObject {
   internal var providesFastUTF8: Bool {
     @inline(__always) get {
 #if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
+      // Note: This assumes that the `providesFastUTF8` predicate doesn't look
+      // at the immortal bit. We may or may not actually be immortal.
+      return discriminator(isImmortal: false).providesFastUTF8
 #else
       return (objectRawBits & 0x1000_0000_0000_0000) == 0
 #endif
@@ -401,7 +699,7 @@ extension _StringObject {
   internal var hasNativeStorage: Bool {
     @inline(__always) get {
 #if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
+      return discriminator.hasNativeStorage
 #else
       return (objectRawBits & 0xF800_0000_0000_0000) == 0
 #endif
@@ -412,7 +710,7 @@ extension _StringObject {
   internal var hasSharedStorage: Bool {
     @inline(__always) get {
 #if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
+      return discriminator.hasSharedStorage
 #else
       return (objectRawBits & 0xF800_0000_0000_0000)
         == Nibbles.largeSharedMortal()
@@ -427,14 +725,17 @@ extension _StringObject {
   @inlinable
   internal var largeFastIsNative: Bool {
     @inline(__always) get {
-#if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
-#else
       _sanityCheck(isLarge && providesFastUTF8)
+#if arch(i386) || arch(arm)
+      // Note: This assumes that the `largeFastIsNative` predicate doesn't look
+      // at the immortal bit. We may or may not actually be immortal.
+      return discriminator(isImmortal: false).largeFastIsNative
+#else
       return (objectRawBits & 0x0800_0000_0000_0000) == 0
 #endif
     }
   }
+
   // Whether this string is shared, presupposing it is both large and fast
   @inlinable
   internal var largeFastIsShared: Bool {
@@ -445,10 +746,12 @@ extension _StringObject {
   @inlinable
   internal var largeIsCocoa: Bool {
     @inline(__always) get {
-#if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
-#else
       _sanityCheck(isLarge)
+#if arch(i386) || arch(arm)
+      // Note: This assumes that the `largeIsCocoa` predicate doesn't look at
+      // the immortal bit. We may or may not actually be immortal.
+      return discriminator(isImmortal: false).largeIsCocoa
+#else
       return (objectRawBits & 0x4000_0000_0000_0000) != 0
 #endif
     }
@@ -458,15 +761,29 @@ extension _StringObject {
 
 /*
 
- Small strings have the following per-byte layout. When stored in memory
- (little-endian), their first character ('a') is in the lowest address and their
- top-nibble and count is in the highest address.
+ On 64-bit platforms, small strings have the following per-byte layout. When
+ stored in memory (little-endian), their first character ('a') is in the lowest
+ address and their top-nibble and count is in the highest address.
 
- ┌───┬───┬───┬───┬───┬───┬───┬───┬────┬────┬────┬────┬────┬────┬───┬───────────┐
- │ 7 │ 6 │ 5 │ 4 │ 3 │ 2 │ 1 │ 0 │ 15 │ 14 │ 13 │ 12 │ 11 │ 10 │ 9 │     8     │
- ├───┼───┼───┼───┼───┼───┼───┼───┼────┼────┼────┼────┼────┼────┼───┼───────────┤
- │ h │ g │ f │ e │ d │ c │ b │ a │ p  │ o  │ n  │ l  │ k  │ j  │ i │ 1x0x count│
- └───┴───┴───┴───┴───┴───┴───┴───┴────┴────┴────┴────┴────┴────┴───┴───────────┘
+ ┌───────────────────────────────┬─────────────────────────────────────────────┐
+ │ _countAndFlags                │ _object                                     │
+ ├───┬───┬───┬───┬───┬───┬───┬───┼───┬───┬────┬────┬────┬────┬────┬────────────┤
+ │ 0 │ 1 │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │ 9 │ 10 │ 11 │ 12 │ 13 │ 14 │     15     │
+ ├───┼───┼───┼───┼───┼───┼───┼───┼───┼───┼────┼────┼────┼────┼────┼────────────┤
+ │ a │ b │ c │ d │ e │ f │ g │ h │ i │ j │ k  │ l  │ m  │ n  │ o  │ 1x0x count │
+ └───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴────┴────┴────┴────┴────┴────────────┘
+
+ On 32-bit platforms, we have less space to store code units, and it isn't
+ contiguous. However, we still use the above layout for the RawBitPattern
+ representation.
+
+ ┌───────────────┬───────────────────┬───────┬─────────┐
+ │ _count        │_variant .immortal │_discr │ _flags  │
+ ├───┬───┬───┬───┼───┬───┬───┬───┬───┼───────┼────┬────┤
+ │ 0 │ 1 │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 │   9   │ 10 │ 11 │
+ ├───┼───┼───┼───┼───┴───┴───┴───┴───┼───────┼────┼────┤
+ │ a │ b │ c │ d │   e   f   g   h   │x10 cnt│ i  │ j  │
+ └───┴───┴───┴───┴───────────────────┴───────┴────┴────┘
 
  */
 extension _StringObject {
@@ -474,37 +791,25 @@ extension _StringObject {
   internal var smallCount: Int {
     @inline(__always)
     get {
-#if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
-#else
       _sanityCheck(isSmall)
-      return Int(bitPattern: (objectRawBits & 0x0F00_0000_0000_0000) &>> 56)
+#if arch(i386) || arch(arm)
+      // Note: This assumes that `isSmall` implies that we're immortal.
+      return discriminator(isImmortal: true).smallCount
+#else
+      return discriminator.smallCount
 #endif
     }
-  }
-
-  @inlinable @inline(__always)
-  mutating internal func setSmallCount(_ count: Int, isASCII: Bool) {
-    // TODO(UTF8 codegen): Ensure this is just a couple simple ops
-    _sanityCheck(isSmall && count <= _SmallString.capacity)
-
-    let valueBits = self.undiscriminatedObjectRawBits
-    let discrim = Nibbles.small(isASCII: isASCII)
-                | (UInt(bitPattern: count) &<< 56)
-    self = _StringObject(
-      pointerBits: valueBits, // TODO: remove
-      discriminator: discrim,
-      countAndFlags: self._countAndFlags)
   }
 
   @inlinable
   internal var smallIsASCII: Bool {
     @inline(__always)
     get {
-#if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
-#else
       _sanityCheck(isSmall)
+#if arch(i386) || arch(arm)
+      // Note: This assumes that `isSmall` implies that we're immortal.
+      return discriminator(isImmortal: true).smallIsASCII
+#else
       return objectRawBits & 0x4000_0000_0000_0000 != 0
 #endif
     }
@@ -512,15 +817,38 @@ extension _StringObject {
 
   @inlinable @inline(__always)
   internal init(_ small: _SmallString) {
+#if arch(i386) || arch(arm)
+    let (word1, word2) = small.rawBits
+    let countBits = Int(truncatingIfNeeded: word1)
+    let variantBits = UInt(truncatingIfNeeded: word1 &>> 32)
+    let flagBits = UInt16(truncatingIfNeeded: word2)
+    let discriminatorBits = UInt8(truncatingIfNeeded: word2 &>> 56)
+    _sanityCheck(discriminatorBits & 0xA0 == 0xA0)
+    self.init(
+      count: countBits,
+      variant: .immortal(variantBits),
+      discriminator: Discriminator(discriminatorBits),
+      flags: Flags(flagBits)
+    )
+#else
     self.init(rawValue: small.rawBits)
+#endif
+    _sanityCheck(isSmall)
   }
 
-  // Canonical empty pattern: small zero-length string
   @inlinable @inline(__always)
   internal init(empty:()) {
+    // Canonical empty pattern: small zero-length string
+#if arch(i386) || arch(arm)
+    self.init(
+      count: 0,
+      variant: .immortal(0),
+      discriminator: .empty,
+      flags: Flags(0))
+#else
     self._countAndFlags = CountAndFlags(zero:())
     self._object = Builtin.reinterpretCast(Nibbles.emptyString)
-
+#endif
     _sanityCheck(self.smallCount == 0)
     _invariantCheck()
   }
@@ -552,6 +880,40 @@ extension _StringObject {
  future use. Count stores the number of code units: corresponds to `endIndex`.
 
 */
+#if arch(i386) || arch(arm)
+extension _StringObject.Flags {
+  @inlinable
+  internal var isASCII: Bool {
+    @inline(__always) get {
+      return _value & 0x8000 != 0
+    }
+  }
+
+  @inlinable
+  internal var isNFC: Bool {
+    @inline(__always) get {
+      return _value & 0x4000 != 0
+    }
+  }
+
+  @inlinable @inline(__always)
+  init(isASCII: Bool) {
+    // ASCII also entails NFC
+    self._value = isASCII ? 0xC000 : 0x0000
+  }
+
+  #if !INTERNAL_CHECKS_ENABLED
+  @inlinable @inline(__always) internal func _invariantCheck() {}
+  #else
+  @usableFromInline @inline(never) @_effects(releasenone)
+  internal func _invariantCheck() {
+    if isASCII {
+      _sanityCheck(isNFC)
+    }
+  }
+  #endif // INTERNAL_CHECKS_ENABLED
+}
+#else
 extension _StringObject.CountAndFlags {
   @inlinable @inline(__always)
   internal init(count: Int) {
@@ -565,7 +927,7 @@ extension _StringObject.CountAndFlags {
     self.init(zero:())
     self.count = count
     if isASCII {
-      // ASCII also entails NFC
+      // ASCII implies NFC
       self._storage |= 0xC000_0000_0000_0000
     }
     _invariantCheck()
@@ -574,11 +936,7 @@ extension _StringObject.CountAndFlags {
   @inlinable
   internal var countMask: UInt {
     @inline(__always) get {
-#if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
-#else
      return 0x0000_FFFF_FFFF_FFFF
-#endif
     }
   }
 
@@ -596,19 +954,11 @@ extension _StringObject.CountAndFlags {
 
   @inlinable
   internal var isASCII: Bool {
-#if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
-#else
     return 0 != _storage & 0x8000_0000_0000_0000
-#endif
   }
   @inlinable
   internal var isNFC: Bool {
-#if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
-#else
     return 0 != _storage & 0x4000_0000_0000_0000
-#endif
   }
 
   #if !INTERNAL_CHECKS_ENABLED
@@ -621,9 +971,9 @@ extension _StringObject.CountAndFlags {
     }
   }
   #endif // INTERNAL_CHECKS_ENABLED
-
-
 }
+#endif
+
 
 // Extract
 extension _StringObject {
@@ -631,10 +981,18 @@ extension _StringObject {
   internal var largeCount: Int {
     @inline(__always) get {
       _sanityCheck(isLarge)
+#if arch(i386) || arch(arm)
+      return _count
+#else
       return _countAndFlags.count
+#endif
     }
     @inline(__always) set {
+#if arch(i386) || arch(arm)
+      _count = newValue
+#else
       _countAndFlags.count = newValue
+#endif
       _sanityCheck(newValue == largeCount)
       _invariantCheck()
     }
@@ -652,13 +1010,12 @@ extension _StringObject {
   internal var nativeUTF8Start: UnsafePointer<UInt8> {
     @inline(__always) get {
       _sanityCheck(largeFastIsNative)
-      let largeAddressBits = objectRawBits & Nibbles.largeAddressMask
-
       return UnsafePointer(
         bitPattern: largeAddressBits &+ _StringObject.nativeBias
       )._unsafelyUnwrappedUnchecked
     }
   }
+
   @inlinable
   internal var nativeUTF8: UnsafeBufferPointer<UInt8> {
     @inline(__always) get {
@@ -691,23 +1048,44 @@ extension _StringObject {
   @inlinable
   internal var nativeStorage: _StringStorage {
     @inline(__always) get {
+#if arch(i386) || arch(arm)
+      guard case .native(let storage) = _variant else {
+        _sanityCheckFailure()
+      }
+      return _unsafeUncheckedDowncast(storage, to: _StringStorage.self)
+#else
       _sanityCheck(hasNativeStorage)
       return Builtin.reinterpretCast(largeAddressBits)
+#endif
     }
   }
 
   internal var sharedStorage: _SharedStringStorage {
     @inline(__always) get {
+#if arch(i386) || arch(arm)
+      guard case .native(let storage) = _variant else {
+        _sanityCheckFailure()
+      }
+      return _unsafeUncheckedDowncast(storage, to: _SharedStringStorage.self)
+#else
       _sanityCheck(largeFastIsShared && !largeIsCocoa)
       _sanityCheck(hasSharedStorage)
       return Builtin.reinterpretCast(largeAddressBits)
+#endif
     }
   }
 
   internal var cocoaObject: AnyObject {
     @inline(__always) get {
+#if arch(i386) || arch(arm)
+      guard case .bridged(let object) = _variant else {
+        _sanityCheckFailure()
+      }
+      return object
+#else
       _sanityCheck(largeIsCocoa && !isImmortal)
       return Builtin.reinterpretCast(largeAddressBits)
+#endif
     }
   }
 }
@@ -729,7 +1107,11 @@ extension _StringObject {
   internal var isASCII: Bool {
     @inline(__always) get {
       if isSmall { return smallIsASCII }
+#if arch(i386) || arch(arm)
+      return _flags.isASCII
+#else
       return _countAndFlags.isASCII
+#endif
     }
   }
 
@@ -742,7 +1124,11 @@ extension _StringObject {
         // it with isASCII
         return smallIsASCII
       }
+#if arch(i386) || arch(arm)
+      return _flags.isNFC
+#else
       return _countAndFlags.isNFC
+#endif
     }
   }
 
@@ -798,6 +1184,13 @@ extension _StringObject {
 extension _StringObject {
   @inlinable @inline(__always)
   internal init(immortal bufPtr: UnsafeBufferPointer<UInt8>, isASCII: Bool) {
+#if arch(i386) || arch(arm)
+    self.init(
+      count: bufPtr.count,
+      variant: .immortal(start: bufPtr.baseAddress._unsafelyUnwrappedUnchecked),
+      discriminator: .largeImmortal(),
+      flags: Flags(isASCII: isASCII))
+#else
     // We bias to align code paths for mortal and immortal strings
     let biasedAddress = UInt(
       bitPattern: bufPtr.baseAddress._unsafelyUnwrappedUnchecked
@@ -805,37 +1198,61 @@ extension _StringObject {
     let countAndFlags = CountAndFlags(count: bufPtr.count, isASCII: isASCII)
 
     self.init(
-      pointerBits: biasedAddress,
+      pointerBits: UInt64(truncatingIfNeeded: biasedAddress),
       discriminator: Nibbles.largeImmortal(),
       countAndFlags: countAndFlags)
+#endif
   }
+
   @inlinable @inline(__always)
   internal init(_ storage: _StringStorage) {
+#if arch(i386) || arch(arm)
+    self.init(
+      count: storage._count,
+      variant: .native(storage),
+      discriminator: .largeMortal(),
+      flags: storage._flags)
+#else
     self.init(
       object: storage,
       discriminator: Nibbles.largeMortal(),
       countAndFlags: storage._countAndFlags)
+#endif
   }
 
   internal init(_ storage: _SharedStringStorage, isASCII: Bool) {
+#if arch(i386) || arch(arm)
+    self.init(
+      count: storage._count,
+      variant: .native(storage),
+      discriminator: .largeSharedMortal(),
+      flags: storage._flags)
+#else
     self.init(
       object: storage,
       discriminator: Nibbles.largeSharedMortal(),
       countAndFlags: storage._countAndFlags)
+#endif
   }
 
   internal init(
     cocoa: AnyObject, providesFastUTF8: Bool, isASCII: Bool, length: Int
   ) {
+#if arch(i386) || arch(arm)
+    self.init(
+      count: length,
+      variant: .bridged(cocoa),
+      discriminator: .largeCocoa(providesFastUTF8: providesFastUTF8),
+      flags: Flags(isASCII: isASCII))
+#else
     let countAndFlags = CountAndFlags(count: length, isASCII: isASCII)
     let discriminator = Nibbles.largeCocoa(providesFastUTF8: providesFastUTF8)
-
     self.init(
       object: cocoa, discriminator: discriminator, countAndFlags: countAndFlags)
-
     _sanityCheck(self.largeAddressBits == Builtin.reinterpretCast(cocoa))
     _sanityCheck(self.providesFastUTF8 == providesFastUTF8)
     _sanityCheck(self.largeCount == length)
+#endif
   }
 }
 
@@ -846,7 +1263,20 @@ extension _StringObject {
   #else
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
+    #if arch(i386) || arch(arm)
+    _sanityCheck(MemoryLayout<_StringObject>.size == 12)
+    _sanityCheck(MemoryLayout<_StringObject>.stride == 12)
+    _sanityCheck(MemoryLayout<_StringObject>.alignment == 4)
+
+    _sanityCheck(MemoryLayout<_StringObject?>.size == 12)
+    _sanityCheck(MemoryLayout<_StringObject?>.stride == 12)
+    _sanityCheck(MemoryLayout<_StringObject?>.alignment == 4)
+    #else
     _sanityCheck(MemoryLayout<_StringObject>.size == 16)
+
+    _sanityCheck(MemoryLayout<_StringObject?>.size == 16)
+    #endif
+
     if isForeign {
       _sanityCheck(largeIsCocoa, "No other foreign forms yet")
     }
@@ -884,30 +1314,60 @@ extension _StringObject {
         }
       }
     }
+    #if arch(i386) || arch(arm)
+    switch _variant {
+    case .immortal:
+      _sanityCheck(isImmortal)
+    case .native:
+      _sanityCheck(hasNativeStorage || hasSharedStorage)
+    case .bridged:
+      _sanityCheck(isLarge)
+      _sanityCheck(largeIsCocoa)
+    }
+    #endif
   }
   #endif // INTERNAL_CHECKS_ENABLED
 
   @inline(never)
   internal func _dump() {
     // TODO(UTF8): Print out any useful internal information
-    #if INTERNAL_CHECKS_ENABLED
-    if isSmall {
+#if INTERNAL_CHECKS_ENABLED
+    let raw = self.rawBits
+    let word0 = ("0000000000000000" + String(raw.0, radix: 16)).suffix(16)
+    let word1 = ("0000000000000000" + String(raw.1, radix: 16)).suffix(16)
+#if arch(i386) || arch(arm)
+    print("""
+      StringObject(\
+      <\(word0) \(word1)> \
+      count: \(String(_count, radix: 16)), \
+      variant: \(_variant), \
+      discriminator: \(discriminator), \
+      flags: \(_flags))
+      """)
+#else
+    print("StringObject(<\(word0) \(word1)>)")
+#endif
+    let repr = _StringGuts(self)._classify()
+    switch repr._form {
+    case ._small:
       _SmallString(self)._dump()
-      return
-    }
-    if providesFastUTF8 && largeFastIsNative {
-      let repr = _StringGuts(self)._classify()
+    case ._immortal(address: let address):
+      print("""
+        Immortal(\
+        start: \(UnsafeRawPointer(bitPattern: address)!), \
+        count: \(repr._count))
+        """)
+    case ._native(_):
       print("""
         Native(\
         owner: \(repr._objectIdentifier!), \
         count: \(repr._count), \
         capacity: \(repr._capacity))
         """)
-    } else if largeIsCocoa {
-      print("Cocoa")
-    } else {
-      print("TODO...")
+    case ._cocoa(object: let object):
+      let address: UnsafeRawPointer = Builtin.reinterpretCast(object)
+      print("Cocoa(address: \(address))")
     }
-    #endif // INTERNAL_CHECKS_ENABLED
+#endif // INTERNAL_CHECKS_ENABLED
   }
 }
