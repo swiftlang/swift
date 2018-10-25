@@ -499,6 +499,7 @@ public:
 class SDKNodeTypeWitness: public SDKNode {
 public:
   SDKNodeTypeWitness(SDKNodeInitInfo Info);
+  StringRef getWitnessedTypeName() const;
   SDKNodeType *getUnderlyingType() const;
   static bool classof(const SDKNode *N);
 };

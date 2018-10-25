@@ -32,6 +32,7 @@ cake1: Func C7.foo(_:_:) has removed default argument from parameter 0
 cake1: Func C7.foo(_:_:) has removed default argument from parameter 1
 cake1: Func ownershipChange(_:_:) has parameter 0 changing from InOut to Default
 cake1: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned
+cake1: TypeAlias TChangesFromIntToString.T has underlying type change from Int to String
 
 /* Decl Attribute changes */
 cake1: Func C1.foo1() is now not static
