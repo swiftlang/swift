@@ -306,17 +306,16 @@ extension StringProtocol {
     let upperbound = _toUTF16Index(range.lowerBound + range.count)
     return Range(uncheckedBounds: (lower: lowerbound, upper: upperbound))
   }
+}
 
-  @_specialize(where Self == String)
-  @_specialize(where Self == Substring)
-  @usableFromInline // @testable
-  internal func _copyUTF16CodeUnits(
+extension String {
+  public // @testable / @benchmarkable
+  func _copyUTF16CodeUnits(
     into buffer: UnsafeMutableBufferPointer<UInt16>,
     range: Range<Int>
   ) {
     _sanityCheck(buffer.count >= range.count)
-
-    let slice = self.utf16[self._toUTF16Indices(range)]
-    let _ = slice._copyContents(initializing: buffer)
+    let indexRange = self._toUTF16Indices(range)
+    self._nativeCopyUTF16CodeUnits(into: buffer, range: indexRange)
   }
 }
