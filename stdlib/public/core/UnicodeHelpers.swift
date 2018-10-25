@@ -28,7 +28,7 @@ internal func _isLeadingSurrogate(_ cu: UInt16) -> Bool {
 }
 @inline(__always)
 internal func _isSurrogate(_ cu: UInt16) -> Bool {
-  // TODO(UTF8 perf): check codegen
+  // TODO(String micro-performance): check codegen
   return _isLeadingSurrogate(cu) || _isTrailingSurrogate(cu)
 }
 
@@ -114,7 +114,7 @@ internal func _decodeScalar(
 internal func _utf8ScalarLength(_ x: UInt8) -> Int {
   _sanityCheck(!_isContinuation(x))
   if _isASCII(x) { return 1 }
-  // TODO(UTF8): Not great codegen on x86
+  // TODO(String micro-performance): check codegen
   return (~x).leadingZeroBitCount
 }
 
@@ -174,7 +174,7 @@ internal func _numUTF16CodeUnits(_ scalar: Unicode.Scalar) -> Int {
 extension _StringGuts {
   @usableFromInline @inline(__always) // fast-path: fold common fastUTF8 check
   internal func scalarAlign(_ idx: Index) -> Index {
-    // TODO(UTF8 perf): isASCII check
+    // TODO(String performance): isASCII check
 
     if _slowPath(idx.transcodedOffset != 0 || idx.encodedOffset == 0) {
       // Transcoded indices are already scalar aligned
@@ -188,9 +188,6 @@ extension _StringGuts {
       var i = idx.encodedOffset
       while _slowPath(_isContinuation(utf8[i])) {
         i -= 1
-        // TODO(UTF8 merge): Verify it's not possible to form Substring from
-        // sub-scalar indices, otherwise `utf8` could start with continuation
-        // byte.
         _sanityCheck(
           i >= 0, "Malformed contents: starts with continuation byte")
       }
@@ -203,7 +200,6 @@ extension _StringGuts {
     }
   }
 
-  // TODO(UTF8): Should probably take a String.Index, assert no transcoding
   @inlinable
   internal func fastUTF8ScalarLength(startingAt i: Int) -> Int {
     _sanityCheck(isFastUTF8)
@@ -212,7 +208,6 @@ extension _StringGuts {
     return len
   }
 
-  // TODO(UTF8): Should probably take a String.Index, assert no transcoding
   @inlinable
   internal func fastUTF8ScalarLength(endingAt i: Int) -> Int {
     _sanityCheck(isFastUTF8)
@@ -238,12 +233,9 @@ extension _StringGuts {
   @usableFromInline
   @_effects(releasenone)
   internal func isOnUnicodeScalarBoundary(_ i: String.Index) -> Bool {
-    // TODO(UTF8 perf): isASCII check
-    // TODO(UTF8): Guts bounds check helper, or something in terms of Index
+    // TODO(String micro-performance): check isASCII
 
     // Beginning and end are always scalar aligned; mid-scalar never is
-    //
-    // TODO(UTF8 merge): Is this only under guarantee of well-formedness?
     guard i.transcodedOffset == 0 else { return false }
     if i == self.startIndex || i == self.endIndex { return true }
 
@@ -262,8 +254,12 @@ extension _StringGuts {
 extension _StringGuts {
   @_effects(releasenone)
   private func _getForeignCodeUnit(at i: Int) -> UInt16 {
+#if _runtime(_ObjC)
     // Currently, foreign  means NSString
     return _cocoaStringSubscript(_object.cocoaObject, i)
+#else
+  fatalError("No foreign strings on Linux in this version of Swift")
+#endif
   }
 
   @_effects(releasenone)
@@ -283,8 +279,8 @@ extension _StringGuts {
     // Validate foreign strings on-read: trailing surrogates are invalid,
     // leading need following trailing
     //
-    // TODO(UTF8 perf flags): Have a valid bit available to check, and assert
-    // it's not set in the condition here.
+    // TODO(String performance): Consider having a valid performance flag
+    // available to check, and assert it's not set in the condition here.
     let nextOffset = start &+ 1
     if _slowPath(_isTrailingSurrogate(leading) || nextOffset == self.count) {
       return (Unicode.Scalar._replacementCharacter, 1)
@@ -316,8 +312,8 @@ extension _StringGuts {
     // Validate foreign strings on-read: trailing surrogates are invalid,
     // leading need following trailing
     //
-    // TODO(UTF8 perf flags): Have a valid bit available to check, and assert
-    // it's not set in the condition here.
+    // TODO(String performance): Consider having a valid performance flag
+    // available to check, and assert it's not set in the condition here.
     let priorOffset = end &- 2
     if _slowPath(_isLeadingSurrogate(trailing) || priorOffset < 0) {
       return (Unicode.Scalar._replacementCharacter, 1)
@@ -348,8 +344,8 @@ extension _StringGuts {
     // Validate foreign strings on-read: trailing surrogates are invalid,
     // leading need following trailing
     //
-    // TODO(UTF8 perf flags): Have a valid bit available to check, and assert
-    // it's not set in the condition here.
+    // TODO(String performance): Consider having a valid performance flag
+    // available to check, and assert it's not set in the condition here.
     if _isLeadingSurrogate(cu) {
       let nextOffset = start &+ 1
       guard nextOffset < self.count,

@@ -35,7 +35,8 @@ internal final class _StringBreadcrumbs {
     self.crumbs.reserveCapacity(
       (str._guts.count / 3) / stride)
 
-    // TODO(UTF8 perf): More efficient implementation
+    // TODO(String performance): More efficient implementation of initial scan.
+    // We'll also want to benchmark this initial scan in order to track changes.
 
     let utf16 = str.utf16
     var i = 0

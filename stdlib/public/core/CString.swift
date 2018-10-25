@@ -186,3 +186,20 @@ extension String {
   }
 }
 
+extension UnsafePointer where Pointee == UInt8 {
+  @inlinable
+  internal var _asCChar: UnsafePointer<CChar> {
+    @inline(__always) get {
+      return UnsafeRawPointer(self).assumingMemoryBound(to: CChar.self)
+    }
+  }
+}
+extension UnsafePointer where Pointee == CChar {
+  @inlinable
+  internal var _asUInt8: UnsafePointer<UInt8> {
+    @inline(__always) get {
+      return UnsafeRawPointer(self).assumingMemoryBound(to: UInt8.self)
+    }
+  }
+}
+

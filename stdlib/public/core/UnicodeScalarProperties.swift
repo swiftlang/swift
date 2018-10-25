@@ -691,7 +691,7 @@ extension Unicode.Scalar.Properties {
   /// all current case mappings. In the event more space is needed, it will be
   /// allocated on the heap.
   internal func _applyMapping(_ u_strTo: _U_StrToX) -> String {
-    // TODO(UTF8 perf): Stack buffer first and then detect real count
+    // TODO(String performance): Stack buffer first and then detect real count
     let count = 64
     var array = Array<UInt16>(repeating: 0, count: count)
     let len: Int = array.withUnsafeMutableBufferPointer { bufPtr in

@@ -15,7 +15,7 @@
 // String struct.
 //
 
-// TODO: Word-level diagram
+// TODO(String docs): Word-level diagram
 
 @_fixed_layout @usableFromInline
 internal struct _StringObject {
@@ -31,22 +31,34 @@ internal struct _StringObject {
   ├─────────────────────╫─────┼─────┼─────┼─────┼─────┬─────┬─────┬─────┤
   │ Immortal, Large     ║  1  │  0  │  0  │  0  │  0  │ TBD │ TBD │ TBD │
   ╞═════════════════════╬═════╪═════╪═════╪═════╪═════╪═════╪═════╪═════╡
-  │ Native, Regular     ║  0  │  0  │  0  │  0  │  0  │ TBD │ TBD │ TBD │
+  │ Native              ║  0  │  0  │  0  │  0  │  0  │ TBD │ TBD │ TBD │
   ├─────────────────────╫─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┤
-  │ Native, Shared      ║  0  │  0  │  0  │  0  │  1  │ TBD │ TBD │ TBD │
+  │ Shared              ║  x  │  0  │  0  │  0  │  1  │ TBD │ TBD │ TBD │
   ├─────────────────────╫─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┤
-  │ Native, Exotic      ║  0  │  0  │  0  │  1  │  1  │ TBD │ TBD │ TBD │
+  │ Shared, Bridged     ║  0  │  1  │  0  │  0  │  1  │ TBD │ TBD │ TBD │
   ╞═════════════════════╬═════╪═════╪═════╪═════╪═════╪═════╪═════╪═════╡
-  │ Bridged, Contiguous ║  0  │  1  │  0  │  0  │  1  │ TBD │ TBD │ TBD │
+  │ Foreign             ║  x  │  0  │  0  │  1  │  1  │ TBD │ TBD │ TBD │
   ├─────────────────────╫─────┼─────┼─────┼─────┼─────┼─────┼─────┼─────┤
-  │ Bridged, Slow       ║  0  │  1  │  0  │  1  │  1  │ TBD │ TBD │ TBD │
+  │ Foreign, Bridged    ║  0  │  1  │  0  │  1  │  1  │ TBD │ TBD │ TBD │
   └─────────────────────╨─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┘
 
-  b3: isForeign (i.e., object payload isn't a biased pointer)
-  b4: isSlow
-  b5: isSmall
-  b6: isBridged/isASCII
-  b7: isImmortal
+  b7: isImmortal: Should the Swift runtime skip ARC
+    - Small strings are just values, always immortal
+    - Large strings can sometimes be immortal, e.g. literals
+  b6: (large) isBridged / (small) isASCII
+    - For large strings, this means lazily-bridged NSString: perform ObjC ARC
+    - Small strings repurpose this as a dedicated bit to remember ASCII-ness
+  b5: isSmall: Dedicated bit to denote small strings
+  b4: isForeign: aka isSlow, cannot provide access to contiguous UTF-8
+  b3: (large) not isTailAllocated: payload isn't a biased pointer
+    - Shared strings provide contiguous UTF-8 through extra level of indirection
+
+  The canonical empty string is the zero-sized small string. It has a leading
+  nibble of 1110, and all other bits are 0.
+
+  A "dedicated" bit is used for the most frequent fast-path queries so that they
+  can compile to a fused check-and-branch, even if that burns part of the
+  encoding space.
 
   On 32-bit platforms, we use an explicit discriminator with the same encoding
   as above, except bit 7 is omitted from storage -- it is left free, to supply
@@ -175,7 +187,7 @@ internal struct _StringObject {
   @inlinable @inline(__always)
   internal init(zero: ()) {
     self._countAndFlags = CountAndFlags(zero:())
-    self._object = Builtin.reinterpretCast(0)
+    self._object = Builtin.valueToBridgeObject(UInt64(0)._value)
   }
 #endif
 
@@ -274,7 +286,7 @@ extension _StringObject {
   internal init(rawUncheckedValue bits: RawBitPattern) {
     self.init(zero:())
     self._countAndFlags = CountAndFlags(rawUnchecked: bits.0)
-    self._object = Builtin.reinterpretCast(bits.1)
+    self._object = Builtin.valueToBridgeObject(bits.1._value)
     _sanityCheck(self.rawBits == bits)
   }
 
@@ -341,30 +353,7 @@ extension _StringObject.CountAndFlags {
  high nibble mask, and thus can all be encoded as a logical immediate operand
  on arm64.
 
- The high nibble of the bridge object has the following encoding:
-
- ┌───────┬──────────┬───────┬─────┬──────┐
- │ Form  │   b63    │  b62  │ b61 │ b60  │
- ├───────┼──────────┼───────┼─────┼──────┤
- │ Small │    1     │ ASCII │  1  │  0   │
- │ Large │ Immortal │ ObjC  │  0  │ Slow │
- └───────┴──────────┴───────┴─────┴──────┘
-
- Immortal (b63): Should the Swift runtime skip ARC
-   - Small strings are just values, always immortal
-   - Large strings can sometimes be immortal, e.g. literals
- ObjC (b62): Should the runtime perform ObjC ARC rather than Swift ARC
-   - Lazily-bridged NSStrings set this bit, are managed by ObjC ARC
-   - Note: Small strings repurpose this bit to denote ASCII-only contents
- isSmall (b61): Dedicated bit to denote small strings
- Slow (b60): If set, string is unable to provide access to contiguous UTF-8
-   - Small strings can spill to the stack
-   - Native strings are UTF-8
-   - Lazily bridged Cocoa strings or other foreign strings may be able to
-
- The canonical empty string is the zero-sized small string. It has a leading
- nibble of 1110, and all other bits are 0.
-
+ See docs for _StringOjbect.Discriminator for the layout of the high nibble
 */
 #if arch(i386) || arch(arm)
 extension _StringObject.Discriminator {
@@ -401,10 +390,11 @@ extension _StringObject.Nibbles {
  string's pointer should always be behind a resilience barrier, permitting
  future evolution.
 
- Foreign strings, currently, only encompass lazily-bridged NSStrings that
- cannot be treated as "shared". Such strings may provide access to contiguous
- UTF-16, or may be discontiguous in storage. Accessing foreign strings should
- remain behind a resilience barrier for future evolution.
+ Foreign strings cannot provide access to contiguous UTF-8. Currently, this only
+ encompasses lazily-bridged NSStrings that cannot be treated as "shared". Such
+ strings may provide access to contiguous UTF-16, or may be discontiguous in
+ storage. Accessing foreign strings should remain behind a resilience barrier
+ for future evolution. Other foreign forms are reserved for the future.
 
  Shared and foreign strings are always created and accessed behind a resilience
  barrier, providing flexibility for the future.
@@ -415,30 +405,18 @@ extension _StringObject.Nibbles {
  │     32     │
  └────────────┘
 
- The rest of the "object" bit representation for large strings:
+ ┌───────────────┬────────────┐
+ │    b63:b56    │   b55:b0   │
+ ├───────────────┼────────────┤
+ │ discriminator │ objectAddr │
+ └───────────────┴────────────┘
 
- ┌──────────┬─────────┬─────┬─────┬─────┬─────┬────────────┐
- │   Form   │ b63:b60 │ b59 │ b58 │ b57 │ b56 │   b55:b0   │
- ├──────────┼─────────┼─────┼─────┼─────┼─────┼────────────┤
- │ Native   │ x 0 0 0 │  0  │ TBD │ TBD │ TBD │ objectAddr │
- │ Shared   │ x x 0 0 │  1  │ TBD │ TBD │ TBD │ objectAddr │
- │ Foreign  │ x 0 0 1 │  1  │ TBD │ TBD │ TBD │ objectAddr │
- └──────────┴─────────┴─────┴─────┴─────┴─────┴────────────┘
-
- b59: Set if not a typical tail-allocated native Swift string
-   - Native Swift strings are tail-allocated contiguous UTF-8
-   - Shared strings can provide access to contiguous UTF-8
-   - Foreign string cannot
-
- TODO(UTF8): Allocate the rest of the bits appropriately
-
- TODO(UTF8): For Foreign strings, consider allocating a bit for whether they can
- provide contiguous UTF-16 code units, which would allow us to avoid doing the
- full call for non-contiguous NSString.
-
+ discriminator: See comment for _StringObject.Discriminator
  objectAddr: The address of the beginning of the potentially-managed object.
 
- Other foreign forms are reserved for the future.
+ TODO(Future): For Foreign strings, consider allocating a bit for whether they
+ can provide contiguous UTF-16 code units, which would allow us to avoid doing
+ the full call for non-contiguous NSString.
 
 */
 extension _StringObject.Nibbles {
@@ -675,7 +653,7 @@ extension _StringObject {
   //   - Large native strings can through an offset
   //   - Shared strings can:
   //     - Cocoa strings which respond to e.g. CFStringGetCStringPtr()
-  //     - TODO(UTF8): non-Cocoa shared strings
+  //     - Non-Cocoa shared strings
   @inlinable
   internal var providesFastUTF8: Bool {
     @inline(__always) get {
@@ -847,7 +825,7 @@ extension _StringObject {
       flags: Flags(0))
 #else
     self._countAndFlags = CountAndFlags(zero:())
-    self._object = Builtin.reinterpretCast(Nibbles.emptyString)
+    self._object = Builtin.valueToBridgeObject(Nibbles.emptyString._value)
 #endif
     _sanityCheck(self.smallCount == 0)
     _invariantCheck()
@@ -855,6 +833,10 @@ extension _StringObject {
 }
 
 /*
+
+ // TODO(String docs): Combine this with Nibbles table, and perhaps small string
+ // table, into something that describes the higher-level structure of
+ // _StringObject.
 
  All non-small forms share the same structure for the other half of the bits
  (i.e. non-object bits) as a word containing code unit count and various
@@ -1029,9 +1011,11 @@ extension _StringObject {
   @_effects(releasenone)
   internal func getSharedUTF8Start() -> UnsafePointer<UInt8> {
     _sanityCheck(largeFastIsShared)
+#if _runtime(_ObjC)
     if largeIsCocoa {
       return _cocoaUTF8Pointer(cocoaObject)._unsafelyUnwrappedUnchecked
     }
+#endif
 
     return sharedStorage.start
   }
@@ -1094,7 +1078,7 @@ extension _StringObject {
 extension _StringObject {
   // The number of code units stored
   //
-  // TODO(UTF8 compiles): Check generated code
+  // TODO(String micro-performance): Check generated code
   @inlinable
   internal var count: Int {
     @inline(__always) get { return isSmall ? smallCount : largeCount }
@@ -1119,9 +1103,9 @@ extension _StringObject {
   internal var isNFC: Bool {
     @inline(__always) get {
       if isSmall {
-        // TODO(UTF8 perf): Worth implementing more sophisiticated check, or
-        // else performing normalization on-construction. For now, approximate
-        // it with isASCII
+        // TODO(String performance): Worth implementing more sophisiticated
+        // check, or else performing normalization on- construction. For now,
+        // approximate it with isASCII
         return smallIsASCII
       }
 #if arch(i386) || arch(arm)
@@ -1172,9 +1156,9 @@ extension _StringObject {
     // Small strings nul-terminate when spilling for contiguous access
     if isSmall { return true }
 
-    // TODO(UTF8 perf): Use performance flag, which could be more inclusive. For
-    // now, we only know native strings and small strings (when accessed) are.
-    // We could also know about some shared strings.
+    // TODO(String performance): Use performance flag, which could be more
+    // inclusive. For now, we only know native strings and small strings (when
+    // accessed) are. We could also know about some shared strings.
 
     return largeFastIsNative
   }
@@ -1330,7 +1314,6 @@ extension _StringObject {
 
   @inline(never)
   internal func _dump() {
-    // TODO(UTF8): Print out any useful internal information
 #if INTERNAL_CHECKS_ENABLED
     let raw = self.rawBits
     let word0 = ("0000000000000000" + String(raw.0, radix: 16)).suffix(16)

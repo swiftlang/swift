@@ -36,8 +36,7 @@ extension Unicode.Scalar {
   }
   internal var _isNFCQCYes: Bool {
     return __swift_stdlib_u_getIntPropertyValue(
-      // FIXME(UTF8): use the enum, not magic number
-      Builtin.reinterpretCast(value), Builtin.reinterpretCast(0x100E)
+      Builtin.reinterpretCast(value), __swift_stdlib_UCHAR_NFC_QUICK_CHECK
     ) == 1
   }
 }
@@ -444,25 +443,6 @@ extension _SegmentSource {
     return tryFill(into: _castOutputBuffer(output))
   }
 }
-
-// Just for testing!
-
-extension Unicode.Scalar {
- public // Just for testin! TODO(UTF8): Internalize
- func hasBinaryProperty(
-    _ property: __swift_stdlib_UProperty
-  ) -> Bool {
-    return __swift_stdlib_u_hasBinaryProperty(
-      Builtin.reinterpretCast(value), property
-    ) != 0
-  }
-
-  public // Just for testin! TODO(UTF8): Remove
-  var hasNormalizationBoundaryBefore: Bool {
-    return _hasNormalizationBoundaryBefore
-  }
-}
-
 
 internal struct _NormalizedUTF8CodeUnitIterator_2: Sequence, IteratorProtocol {
   private var outputBuffer = _SmallBuffer<UInt8>()

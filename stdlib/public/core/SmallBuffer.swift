@@ -18,7 +18,7 @@ internal struct _SmallBuffer<T: FixedWidthInteger> {
   // actually hides a normalization bug in validation-test/stdlib/String.swift,
   // where exceedingly long segments may compare only the first `n` code units
   // worth of a given segment before moving on to the next segment. We'd also
-  // like to make this be 32-bits, as commented out below. Adjusting the size
+  // like to make this be 32-bytes, as commented out below. Adjusting the size
   // here was simpler than XFAILing the test, but when fixed, restore size to 32
   // bytes.
   //

@@ -10,6 +10,69 @@
 //
 //===----------------------------------------------------------------------===//
 
+// FIXME(ABI)#71 : The UTF-16 string view should have a custom iterator type to
+// allow performance optimizations of linear traversals.
+
+extension String {
+  /// A view of a string's contents as a collection of Unicode scalar values.
+  ///
+  /// You can access a string's view of Unicode scalar values by using its
+  /// `unicodeScalars` property. Unicode scalar values are the 21-bit codes
+  /// that are the basic unit of Unicode. Each scalar value is represented by
+  /// a `Unicode.Scalar` instance and is equivalent to a UTF-32 code unit.
+  ///
+  ///     let flowers = "Flowers 💐"
+  ///     for v in flowers.unicodeScalars {
+  ///         print(v.value)
+  ///     }
+  ///     // 70
+  ///     // 108
+  ///     // 111
+  ///     // 119
+  ///     // 101
+  ///     // 114
+  ///     // 115
+  ///     // 32
+  ///     // 128144
+  ///
+  /// Some characters that are visible in a string are made up of more than one
+  /// Unicode scalar value. In that case, a string's `unicodeScalars` view
+  /// contains more elements than the string itself.
+  ///
+  ///     let flag = "🇵🇷"
+  ///     for c in flag {
+  ///         print(c)
+  ///     }
+  ///     // 🇵🇷
+  ///
+  ///     for v in flag.unicodeScalars {
+  ///         print(v.value)
+  ///     }
+  ///     // 127477
+  ///     // 127479
+  ///
+  /// You can convert a `String.UnicodeScalarView` instance back into a string
+  /// using the `String` type's `init(_:)` initializer.
+  ///
+  ///     let favemoji = "My favorite emoji is 🎉"
+  ///     if let i = favemoji.unicodeScalars.firstIndex(where: { $0.value >= 128 }) {
+  ///         let asciiPrefix = String(favemoji.unicodeScalars[..<i])
+  ///         print(asciiPrefix)
+  ///     }
+  ///     // Prints "My favorite emoji is "
+  @_fixed_layout
+  public struct UnicodeScalarView {
+    @usableFromInline
+    internal var _guts: _StringGuts
+
+    @inlinable @inline(__always)
+    internal init(_ _guts: _StringGuts) {
+      self._guts = _guts
+      _invariantCheck()
+    }
+  }
+}
+
 extension String.UnicodeScalarView {
   #if !INTERNAL_CHECKS_ENABLED
   @inlinable @inline(__always) internal func _invariantCheck() {}
@@ -48,7 +111,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   @inlinable @inline(__always)
   public func index(after i: Index) -> Index {
     _sanityCheck(i < endIndex)
-    // TODO(UTF8): isASCII bit fast-path...
+    // TODO(String performance): isASCII fast-path
 
     if _fastPath(_guts.isFastUTF8) {
       let len = _guts.fastUTF8ScalarLength(startingAt: i.encodedOffset)
@@ -64,9 +127,9 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   @inlinable @inline(__always)
   public func index(before i: Index) -> Index {
     precondition(i.encodedOffset > 0)
-    if _fastPath(_guts.isFastUTF8) {
-      // TODO(UTF8): isASCII bit fast-path...
+    // TODO(String performance): isASCII fast-path
 
+    if _fastPath(_guts.isFastUTF8) {
       let len = _guts.withFastUTF8 { utf8 -> Int in
         return _utf8ScalarLength(utf8, endingAt: i.encodedOffset)
       }
@@ -106,38 +169,6 @@ extension String.UnicodeScalarView: BidirectionalCollection {
     }
   }
 }
-
-// TODO(UTF8): design specialized iterator, rather than default indexing one
-// extension String.UnicodeScalarView {
-//   /// An iterator over the Unicode scalars that make up a `UnicodeScalarView`
-//   /// collection.
-//   @_fixed_layout
-//   public struct Iterator : IteratorProtocol {
-//     // TODO:
-
-//     /// Advances to the next element and returns it, or `nil` if no next
-//     /// element exists.
-//     ///
-//     /// Once `nil` has been returned, all subsequent calls return `nil`.
-//     ///
-//     /// - Precondition: `next()` has not been applied to a copy of `self`
-//     ///   since the copy was made.
-//     @inlinable @inline(__always)
-//     public mutating func next() -> Unicode.Scalar? {
-//       unimplemented_utf8()
-//     }
-//   }
-// }
-
-// extension String.UnicodeScalarView {
-//   /// Returns an iterator over the Unicode scalars that make up this view.
-//   ///
-//   /// - Returns: An iterator over this collection's `Unicode.Scalar` elements.
-//   @inlinable @inline(__always)
-//   public func makeIterator() -> Iterator {
-//     unimplemented_utf8()
-//   }
-// }
 
 extension String.UnicodeScalarView: CustomStringConvertible {
  @inlinable
@@ -223,7 +254,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   /// - Complexity: O(*n*), where *n* is the length of the resulting view.
   public mutating func append<S : Sequence>(contentsOf newElements: S)
   where S.Element == Unicode.Scalar {
-    // TODO(UTF8 perf): This is a horribly slow means...
+    // TODO(String performance): Skip extra String allocation
     let scalars = String(decoding: newElements.map { $0.value }, as: UTF32.self)
     self = (String(self._guts) + scalars).unicodeScalars
   }
@@ -247,10 +278,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
     _ bounds: Range<Index>,
     with newElements: C
   ) where C : Collection, C.Element == Unicode.Scalar {
-    // TODO(UTF8 perf): This is a horribly slow means...
-    //
-    // TODO(UTF8 perf): Consider storing a string directly, or implemeting RSR
-    // on guts.
+    // TODO(String performance): Skip extra String and Array allocation
 
     let utf8Replacement = newElements.flatMap { String($0).utf8 }
     let replacement = utf8Replacement.withUnsafeBufferPointer {

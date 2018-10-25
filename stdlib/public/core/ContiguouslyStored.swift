@@ -27,8 +27,13 @@ extension _HasContiguousBytes {
 extension Array: _HasContiguousBytes {
   @inlinable
   var _providesContiguousBytesNoCopy: Bool {
-    // TODO(UTF8 merge): Query `_buffer._isNative`, which is internal
-    @inline(__always) get { return true }
+    @inline(__always) get {
+#if _runtime(_ObjC)
+      return _buffer._isNative
+#else
+      return true
+#endif
+    }
   }
 }
 extension ContiguousArray: _HasContiguousBytes {}
@@ -87,15 +92,24 @@ extension Substring: _HasContiguousBytes {
   }
 
   @inlinable @inline(__always)
-  internal func withUnsafeBytes<R>(
-    _ body: (UnsafeRawBufferPointer) throws -> R
+  internal func _withUTF8<R>(
+    _ body: (UnsafeBufferPointer<UInt8>) throws -> R
   ) rethrows -> R {
-    if _wholeGuts.isFastUTF8 {
+    if _fastPath(_wholeGuts.isFastUTF8) {
       return try _wholeGuts.withFastUTF8(range: self._offsetRange) {
-        return try body(UnsafeRawBufferPointer($0))
+        return try body($0)
       }
     }
 
-    return try ContiguousArray(self.utf8).withUnsafeBytes { try body($0) }
+    return try ContiguousArray(self.utf8).withUnsafeBufferPointer {
+      try body($0)
+    }
+  }
+
+  @inlinable @inline(__always)
+  internal func withUnsafeBytes<R>(
+    _ body: (UnsafeRawBufferPointer) throws -> R
+  ) rethrows -> R {
+    return try self._withUTF8 { return try body(UnsafeRawBufferPointer($0)) }
   }
 }
