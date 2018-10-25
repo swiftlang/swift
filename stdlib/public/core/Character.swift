@@ -498,8 +498,35 @@ extension Character: Hashable {
   }
 }
 
-extension Character : ExpressibleByCodepointLiteral {
-  public init(codepointLiteral value: IntegerLiteralType) {
-    self.init(Unicode.Scalar(_value: UInt32(value)))
+extension Character : ExpressibleByCharacterLiteral {
+  @_transparent
+  public init(codepointLiteral value: UInt32) {
+    self.init(Unicode.Scalar(_value: value))
   }
+  
+  @_transparent
+  public init(characterLiteral value: Character) {
+    self = value
+  }
+}
+
+
+extension String {
+    @_transparent 
+    public static func + (lhs: String, rhs: Character) -> String {
+        var string = lhs
+        string.append(rhs)
+        return string
+    }
+}
+extension Character {
+    @_transparent 
+    public static func + (lhs: Character, rhs: Character) -> String {
+        return String(lhs) + rhs
+    }
+    
+    @_transparent 
+    public static func * (repeatedValue: Character, count: Int) -> String {
+        return String(repeatElement(repeatedValue, count: count))
+    }
 }

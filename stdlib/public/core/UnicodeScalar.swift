@@ -499,7 +499,8 @@ extension Unicode.Scalar {
 }
 
 extension Unicode.Scalar : ExpressibleByCodepointLiteral {
-  public init(codepointLiteral value: IntegerLiteralType) {
-    self.init(_value: UInt32(value))
+  @_transparent 
+  public init(codepointLiteral value: UInt32) {
+    self.init(_value: value)
   }
 }

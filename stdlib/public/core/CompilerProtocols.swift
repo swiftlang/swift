@@ -279,25 +279,6 @@ public protocol ExpressibleByIntegerLiteral {
   init(integerLiteral value: IntegerLiteralType)
 }
 
-public protocol ExpressibleByCodepointLiteral {
-  /// A type that represents a single quoted codepoint literal.
-  ///
-  associatedtype IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral
-
-  /// Creates an instance initialized to the specified codepoint value.
-  ///
-  /// Do not call this initializer directly. Instead, initialize a variable or
-  /// constant using an integer literal. For example:
-  ///
-  ///     let x = 'A'
-  ///
-  /// In this example, the assignment to the `x` constant calls this codepoint
-  /// literal initializer behind the scenes.
-  ///
-  /// - Parameter value: The value to create.
-  init(codepointLiteral value: IntegerLiteralType)
-}
-
 public protocol _ExpressibleByBuiltinFloatLiteral {
   init(_builtinFloatLiteral value: _MaxBuiltinFloatType)
 }
@@ -374,6 +355,46 @@ public protocol ExpressibleByBooleanLiteral {
   init(booleanLiteral value: BooleanLiteralType)
 }
 
+
+
+public protocol _ExpressibleByBuiltinCharacterLiteral : 
+    _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {}
+
+extension Character : _ExpressibleByBuiltinCharacterLiteral {}
+
+public protocol ExpressibleByCodepointLiteral {
+  /// A type that represents a single quoted codepoint literal.
+  ///
+  associatedtype IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral
+
+  /// Creates an instance initialized to the specified codepoint value.
+  ///
+  /// Do not call this initializer directly. Instead, initialize a variable or
+  /// constant using an integer literal. For example:
+  ///
+  ///     let x = 'A'
+  ///
+  /// In this example, the assignment to the `x` constant calls this codepoint
+  /// literal initializer behind the scenes.
+  ///
+  /// - Parameter value: The value to create.
+  init(codepointLiteral value: IntegerLiteralType)
+}
+
+public protocol ExpressibleByCharacterLiteral : ExpressibleByCodepointLiteral {
+  associatedtype CharacterLiteralType : _ExpressibleByBuiltinCharacterLiteral
+  init(characterLiteral value: CharacterLiteralType)
+}
+
+extension ExpressibleByCharacterLiteral where CharacterLiteralType == Character {
+  @_transparent
+  public init(codepointLiteral value: UInt32) {
+    self.init(characterLiteral: Character(Unicode.Scalar(_value: value)))
+  }
+}
+
+
+
 public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32)
 }
@@ -449,7 +470,7 @@ public protocol _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
 /// To add `ExpressibleByExtendedGraphemeClusterLiteral` conformance to your
 /// custom type, implement the required initializer.
 public protocol ExpressibleByExtendedGraphemeClusterLiteral
-  : ExpressibleByCharacterLiteral {
+  : ExpressibleByUnicodeScalarLiteral {
   /// A type that represents an extended grapheme cluster literal.
   ///
   /// Valid types for `ExtendedGraphemeClusterLiteralType` are `Character`,
@@ -462,10 +483,6 @@ public protocol ExpressibleByExtendedGraphemeClusterLiteral
   /// - Parameter value: The value of the new instance.
   init(extendedGraphemeClusterLiteral value: ExtendedGraphemeClusterLiteralType)
 }
-
-// Used to ensure default type of 'character' literals is `Character`
-public protocol ExpressibleByCharacterLiteral
-  : ExpressibleByUnicodeScalarLiteral {}
 
 extension ExpressibleByExtendedGraphemeClusterLiteral
   where ExtendedGraphemeClusterLiteralType == UnicodeScalarLiteralType {
