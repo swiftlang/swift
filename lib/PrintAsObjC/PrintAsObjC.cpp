@@ -2014,10 +2014,12 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
   }
 
   void visitNameAliasType(NameAliasType *aliasTy) {
-    if (aliasTy->getDecl()->hasClangNode())
+    if (aliasTy->getDecl()->hasClangNode() &&
+        !aliasTy->getDecl()->isCompatibilityAlias()) {
       Callback(*this, aliasTy->getDecl());
-    else
+    } else {
       visit(aliasTy->getSinglyDesugaredType());
+    }
   }
 
   void visitParenType(ParenType *parenTy) {
