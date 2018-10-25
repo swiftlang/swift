@@ -511,15 +511,20 @@ class SameNameNodeMatcher : public NodeMatcher {
     PrintedNameAndUSR,
   };
 
+  static bool isUSRSame(SDKNode *L, SDKNode *R) {
+    auto *LD = dyn_cast<SDKNodeDecl>(L);
+    auto *RD = dyn_cast<SDKNodeDecl>(R);
+    if (!LD || !RD)
+      return false;
+    return LD->getUsr() == RD->getUsr();
+  }
+
   // Given two SDK nodes, figure out the reason for why they have the same name.
   Optional<NameMatchKind> getNameMatchKind(SDKNode *L, SDKNode *R) {
     if (L->getKind() != R->getKind())
       return None;
-    auto *LD = L->getAs<SDKNodeDecl>();
-    auto *RD = R->getAs<SDKNodeDecl>();
-    assert(LD && RD);
-    auto NameEqual = LD->getPrintedName() == RD->getPrintedName();
-    auto UsrEqual = LD->getUsr() == RD->getUsr();
+    auto NameEqual = L->getPrintedName() == R->getPrintedName();
+    auto UsrEqual = isUSRSame(L, R);
     if (NameEqual && UsrEqual)
       return NameMatchKind::PrintedNameAndUSR;
     else if (NameEqual)
@@ -679,23 +684,7 @@ void swift::ide::api::SDKNodeDeclType::diagnose(SDKNode *Right) {
 
   assert(getDeclKind() == R->getDeclKind());
   auto DKind = getDeclKind();
-  std::vector<StringRef> LeftMinusRight;
-  std::vector<StringRef> RightMinusLeft;
-  swift::ide::api::stringSetDifference(getAllProtocols(), R->getAllProtocols(),
-                                       LeftMinusRight, RightMinusLeft);
-  bool isProtocol = getDeclKind() == DeclKind::Protocol;
-  std::for_each(LeftMinusRight.begin(), LeftMinusRight.end(), [&](StringRef Name) {
-    Diags.diagnose(SourceLoc(), diag::conformance_removed, getScreenInfo(), Name,
-                   isProtocol);
-  });
   switch (DKind) {
-  case DeclKind::Protocol: {
-    std::for_each(RightMinusLeft.begin(), RightMinusLeft.end(), [&](StringRef Name) {
-      Diags.diagnose(SourceLoc(), diag::conformance_added, getScreenInfo(),
-                     Name);
-    });
-    break;
-  }
   case DeclKind::Class: {
     auto LSuperClass = getSuperClassName();
     auto RSuperClass = R->getSuperClassName();
@@ -911,23 +900,18 @@ namespace {
 // This is first pass on two given SDKNode trees. This pass removes the common part
 // of two versions of SDK, leaving only the changed part.
 class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
-  static void removeCommonChildren(NodePtr Left, NodePtr Right) {
-    llvm::SmallPtrSet<NodePtr, 16> LeftToRemove;
-    llvm::SmallPtrSet<NodePtr, 16> RightToRemove;
-    for (auto LC : Left->getChildren()) {
-      for (auto RC : Right->getChildren()) {
-        if (*LC == *RC) {
-          LeftToRemove.insert(LC);
-          RightToRemove.insert(RC);
-          break;
-        }
-      }
-    }
-    for (NodePtr L : LeftToRemove)
-      Left->removeChild(L);
-    for (NodePtr R : RightToRemove)
-      Right->removeChild(R);
+
+  static void removeCommon(NodeVector &Left, NodeVector &Right) {
+    NodeVector LeftMinusRight, RightMinusLeft;
+    nodeSetDifference(Left, Right, LeftMinusRight, RightMinusLeft);
+    Left = LeftMinusRight;
+    Right = RightMinusLeft;
   }
+
+  static void removeCommonChildren(NodePtr Left, NodePtr Right) {
+    removeCommon(Left->getChildren(), Right->getChildren());
+  }
+
   SDKContext &Ctx;
   UpdatedNodesMap &UpdateMap;
 
@@ -993,6 +977,16 @@ public:
                                     D->getScreenInfo());
         }
       }
+      // Diagnose an inherited protocol has been added.
+      if (auto *Conf = dyn_cast<SDKNodeConformance>(Right)) {
+        auto *TD = Conf->getNominalTypeDecl();
+        if (TD->isProtocol()) {
+          Ctx.getDiags().diagnose(SourceLoc(), diag::conformance_added,
+                                  TD->getScreenInfo(),
+                                  Conf->getName());
+        }
+      }
+
       return;
     case NodeMatchReason::Removed:
       assert(!Right);
@@ -1003,6 +997,13 @@ public:
                                   diag::default_associated_type_removed,
                                   AT->getScreenInfo(), LT->getPrintedName());
         }
+      }
+      // Diagnose a protocol conformance has been removed.
+      if (auto *Conf = dyn_cast<SDKNodeConformance>(Left)) {
+        auto *TD = Conf->getNominalTypeDecl();
+        Ctx.getDiags().diagnose(SourceLoc(), diag::conformance_removed,
+                                TD->getScreenInfo(), Conf->getName(),
+                                TD->isProtocol());
       }
       return;
     case NodeMatchReason::FuncToProperty:
@@ -1032,8 +1033,16 @@ public:
     SDKNodeKind Kind = Left->getKind();
     assert(Kind == SDKNodeKind::Root || *Left != *Right);
     switch(Kind) {
-    case SDKNodeKind::Root:
     case SDKNodeKind::DeclType: {
+      // Remove common conformances and diagnose conformance changes.
+      auto LConf = cast<SDKNodeDeclType>(Left)->getConformances();
+      auto RConf = cast<SDKNodeDeclType>(Right)->getConformances();
+      removeCommon(LConf, RConf);
+      SameNameNodeMatcher(LConf, RConf, *this).match();
+      LLVM_FALLTHROUGH;
+    }
+    case SDKNodeKind::Conformance:
+    case SDKNodeKind::Root: {
       // If the matched nodes are both modules, remove the contained
       // type decls that are identical. If the matched nodes are both type decls,
       // remove the contained function decls that are identical.
@@ -1042,7 +1051,7 @@ public:
       SNMatcher.match();
       break;
     }
-
+    case SDKNodeKind::TypeWitness:
     case SDKNodeKind::DeclOperator:
     case SDKNodeKind::DeclSubscript:
     case SDKNodeKind::DeclAssociatedType:
