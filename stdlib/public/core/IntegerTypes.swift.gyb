@@ -1691,9 +1691,9 @@ extension ${Self} : _HasCustomAnyHashableRepresentation {
   }
 }
 
-extension ${Self}: ExpressibleByUnicodeScalarLiteral {
+extension ${Self}: ExpressibleByCodepointLiteral {
   @_transparent
-  public init(integerUnicodeScalarLiteral value: IntegerLiteralType) {
+  public init(codepointLiteral value: IntegerLiteralType) {
     self.init(${Self}(value))
   }
 }

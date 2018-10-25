@@ -279,7 +279,7 @@ public protocol ExpressibleByIntegerLiteral {
   init(integerLiteral value: IntegerLiteralType)
 }
 
-public protocol ExpressibleByUnicodeScalarLiteral {
+public protocol ExpressibleByCodepointLiteral {
   /// A type that represents a single quoted codepoint literal.
   ///
   associatedtype IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral
@@ -295,7 +295,7 @@ public protocol ExpressibleByUnicodeScalarLiteral {
   /// literal initializer behind the scenes.
   ///
   /// - Parameter value: The value to create.
-  init(integerUnicodeScalarLiteral value: IntegerLiteralType)
+  init(codepointLiteral value: IntegerLiteralType)
 }
 
 public protocol _ExpressibleByBuiltinFloatLiteral {
@@ -382,7 +382,7 @@ public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
 /// Unicode scalar value.
 ///
 /// The `String`, `StaticString`, `Character`, and `Unicode.Scalar` types all
-/// conform to the `ExpressibleByLegacyUnicodeScalarLiteral` protocol. You can
+/// conform to the `ExpressibleByUnicodeScalarLiteral` protocol. You can
 /// initialize a variable of any of these types using a string literal that
 /// holds a single Unicode scalar.
 ///
@@ -390,12 +390,12 @@ public protocol _ExpressibleByBuiltinUnicodeScalarLiteral {
 ///     print(ñ)
 ///     // Prints "ñ"
 ///
-/// Conforming to ExpressibleByLegacyUnicodeScalarLiteral
+/// Conforming to ExpressibleByUnicodeScalarLiteral
 /// ===============================================
 ///
-/// To add `ExpressibleByLegacyUnicodeScalarLiteral` conformance to your custom type,
+/// To add `ExpressibleByUnicodeScalarLiteral` conformance to your custom type,
 /// implement the required initializer.
-public protocol ExpressibleByLegacyUnicodeScalarLiteral {
+public protocol ExpressibleByUnicodeScalarLiteral {
   /// A type that represents a Unicode scalar literal.
   ///
   /// Valid types for `UnicodeScalarLiteralType` are `Unicode.Scalar`,
@@ -405,7 +405,7 @@ public protocol ExpressibleByLegacyUnicodeScalarLiteral {
   /// Creates an instance initialized to the given value.
   ///
   /// - Parameter value: The value of the new instance.
-  init(legacyUnicodeScalarLiteral value: UnicodeScalarLiteralType)
+  init(unicodeScalarLiteral value: UnicodeScalarLiteralType)
 }
 
 public protocol _ExpressibleByBuiltinUTF16ExtendedGraphemeClusterLiteral
@@ -465,13 +465,13 @@ public protocol ExpressibleByExtendedGraphemeClusterLiteral
 
 // Used to ensure default type of 'character' literals is `Character`
 public protocol ExpressibleByCharacterLiteral
-  : ExpressibleByLegacyUnicodeScalarLiteral {}
+  : ExpressibleByUnicodeScalarLiteral {}
 
 extension ExpressibleByExtendedGraphemeClusterLiteral
   where ExtendedGraphemeClusterLiteralType == UnicodeScalarLiteralType {
 
   @_transparent
-  public init(legacyUnicodeScalarLiteral value: ExtendedGraphemeClusterLiteralType) {
+  public init(unicodeScalarLiteral value: ExtendedGraphemeClusterLiteralType) {
     self.init(extendedGraphemeClusterLiteral: value)
   }
 }

@@ -2791,7 +2791,7 @@ ERROR(boolean_literal_broken_proto,none,
 ERROR(builtin_unicode_scalar_literal_broken_proto,none,
       "protocol '_ExpressibleByBuiltinUnicodeScalarLiteral' is broken", ())
 ERROR(unicode_scalar_literal_broken_proto,none,
-      "protocol 'ExpressibleByLegacyUnicodeScalarLiteral' is broken", ())
+      "protocol 'ExpressibleByUnicodeScalarLiteral' is broken", ())
 
 ERROR(builtin_utf16_extended_grapheme_cluster_literal_broken_proto,none,
       "protocol '_ExpressibleByBuiltinUTF16ExtendedGraphemeClusterLiteral' is broken", ())

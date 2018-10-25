@@ -99,14 +99,14 @@ public typealias FloatLiteralType = Double
 public typealias BooleanLiteralType = Bool
 
 /// The default type for an otherwise-unconstrained unicode scalar literal.
-public typealias LegacyUnicodeScalarType = String
+public typealias UnicodeScalarType = String
 /// The default type for an otherwise-unconstrained Unicode extended
 /// grapheme cluster literal.
 public typealias ExtendedGraphemeClusterType = String
 /// The default type for an otherwise-unconstrained "string" literal.
 public typealias StringLiteralType = String
 /// The default type for an otherwise-unconstrained 'codepoint' literal.
-public typealias UnicodeScalarLiteralType = Character
+public typealias CodepointLiteralType = Character
 /// The default type for an otherwise-unconstrained 'codepoint' literal.
 public typealias CharacterLiteralType = Character
 

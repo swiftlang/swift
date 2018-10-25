@@ -29,7 +29,7 @@ public struct StaticString
   : _ExpressibleByBuiltinUnicodeScalarLiteral,
     _ExpressibleByBuiltinExtendedGraphemeClusterLiteral,
     _ExpressibleByBuiltinStringLiteral,
-    ExpressibleByLegacyUnicodeScalarLiteral,
+    ExpressibleByUnicodeScalarLiteral,
     ExpressibleByExtendedGraphemeClusterLiteral,
     ExpressibleByStringLiteral,
     CustomStringConvertible,
@@ -199,7 +199,7 @@ public struct StaticString
   /// when you initialize a static string with a Unicode scalar.
   @_effects(readonly)
   @_transparent
-  public init(legacyUnicodeScalarLiteral value: StaticString) {
+  public init(unicodeScalarLiteral value: StaticString) {
     self = value
   }
 

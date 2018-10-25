@@ -4023,12 +4023,12 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral:
   case KnownProtocolKind::ExpressibleByFloatLiteral:
   case KnownProtocolKind::ExpressibleByIntegerLiteral:
-  case KnownProtocolKind::ExpressibleByUnicodeScalarLiteral:
+  case KnownProtocolKind::ExpressibleByCodepointLiteral:
   case KnownProtocolKind::ExpressibleByCharacterLiteral:
   case KnownProtocolKind::ExpressibleByStringInterpolation:
   case KnownProtocolKind::ExpressibleByStringLiteral:
   case KnownProtocolKind::ExpressibleByNilLiteral:
-  case KnownProtocolKind::ExpressibleByLegacyUnicodeScalarLiteral:
+  case KnownProtocolKind::ExpressibleByUnicodeScalarLiteral:
   case KnownProtocolKind::ExpressibleByColorLiteral:
   case KnownProtocolKind::ExpressibleByImageLiteral:
   case KnownProtocolKind::ExpressibleByFileReferenceLiteral:

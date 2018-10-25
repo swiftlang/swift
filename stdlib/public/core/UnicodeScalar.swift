@@ -46,7 +46,7 @@ extension Unicode {
 
 extension Unicode.Scalar :
     _ExpressibleByBuiltinUnicodeScalarLiteral,
-    ExpressibleByLegacyUnicodeScalarLiteral {
+    ExpressibleByUnicodeScalarLiteral {
   /// A numeric representation of the Unicode scalar.
   @inlinable // FIXME(sil-serialize-all)
   public var value: UInt32 { return _value }
@@ -68,7 +68,7 @@ extension Unicode.Scalar :
   /// In this example, the assignment to the `letterK` constant is handled by
   /// this initializer behind the scenes.
   @_transparent
-  public init(legacyUnicodeScalarLiteral value: Unicode.Scalar) {
+  public init(unicodeScalarLiteral value: Unicode.Scalar) {
     self = value
   }
 
@@ -498,8 +498,8 @@ extension Unicode.Scalar {
   }
 }
 
-extension Unicode.Scalar : ExpressibleByUnicodeScalarLiteral {
-  public init(integerUnicodeScalarLiteral value: IntegerLiteralType) {
+extension Unicode.Scalar : ExpressibleByCodepointLiteral {
+  public init(codepointLiteral value: IntegerLiteralType) {
     self.init(_value: UInt32(value))
   }
 }
