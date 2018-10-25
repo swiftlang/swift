@@ -668,10 +668,8 @@ func evaluateIgnoredKeyPathExpr(_ s: inout NonTrivialStruct, _ kp: WritableKeyPa
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = alloc_stack $Int
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[PROJECT_FN:%[0-9]+]] = function_ref @$ss23_projectKeyPathReadOnly{{[_0-9a-zA-Z]*}}F
-// CHECK-NEXT: [[KP_BORROW:%.*]] = begin_borrow [[KP]]
-// CHECK-NEXT: apply [[PROJECT_FN]]<NonTrivialStruct, Int>([[RESULT]], [[S_TEMP]], [[KP_BORROW]])
+// CHECK-NEXT: apply [[PROJECT_FN]]<NonTrivialStruct, Int>([[RESULT]], [[S_TEMP]], [[KP]])
 // CHECK-NEXT: end_access [[S_READ]]
-// CHECK-NEXT: end_borrow [[KP_BORROW]]
 // CHECK-NEXT: dealloc_stack [[RESULT]]
 // CHECK-NEXT: destroy_value [[KP]]
 // CHECK-NEXT: destroy_addr [[S_TEMP]]

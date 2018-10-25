@@ -211,17 +211,19 @@ static ManagedValue borrowedCastToOriginalSelfType(SILGenFunction &SGF,
                                       originalSelfType);
 }
 
-static ManagedValue convertOwnershipConventionGivenParamInfo(SILGenFunction &SGF,
-                                                             SILParameterInfo param,
-                                                             ManagedValue value,
-                                                             SILLocation loc) {
+static ManagedValue convertOwnershipConventionGivenParamInfo(
+    SILGenFunction &SGF, SILParameterInfo param, ManagedValue value,
+    SILLocation loc, bool isForCoroutine) {
   if (param.isConsumed() &&
       value.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
     return value.copyUnmanaged(SGF, loc);
   }
 
-  if (SGF.F.getModule().getOptions().EnableSILOwnership &&
-      value.getOwnershipKind() == ValueOwnershipKind::Owned) {
+  // If we are emitting arguments for a coroutine, we need to borrow owned
+  // values to ensure that they are live over the entire closure invocation. If
+  // we do not have a coroutine, then we have an immediate non-consuming use so
+  // no borrow is necessary.
+  if (isForCoroutine && value.getOwnershipKind() == ValueOwnershipKind::Owned) {
     if (param.isDirectGuaranteed() || (!SGF.silConv.useLoweredAddresses() &&
                                        param.isIndirectInGuaranteed())) {
       return value.borrow(SGF, loc);
@@ -232,16 +234,15 @@ static ManagedValue convertOwnershipConventionGivenParamInfo(SILGenFunction &SGF
 }
 
 static void convertOwnershipConventionsGivenParamInfos(
-    SILGenFunction &SGF,
-    ArrayRef<SILParameterInfo> params,
-    ArrayRef<ManagedValue> values,
-    SILLocation loc,
+    SILGenFunction &SGF, ArrayRef<SILParameterInfo> params,
+    ArrayRef<ManagedValue> values, SILLocation loc, bool isForCoroutine,
     llvm::SmallVectorImpl<ManagedValue> &outVar) {
   assert(params.size() == values.size() &&
          "Different number of params from arguments");
   transform(indices(params), std::back_inserter(outVar),
             [&](unsigned i) -> ManagedValue {
-              return convertOwnershipConventionGivenParamInfo(SGF, params[i], values[i], loc);
+              return convertOwnershipConventionGivenParamInfo(
+                  SGF, params[i], values[i], loc, isForCoroutine);
             });
 }
 
@@ -2571,6 +2572,7 @@ class ArgEmitter {
   SILGenFunction &SGF;
   SILFunctionTypeRepresentation Rep;
   bool IsYield;
+  bool IsForCoroutine;
   Optional<ForeignErrorConvention> ForeignError;
   ImportAsMemberStatus ForeignSelf;
   ClaimedParamsRef ParamInfos;
@@ -2583,16 +2585,16 @@ class ArgEmitter {
   Optional<ArgSpecialDestArray> SpecialDests;
 public:
   ArgEmitter(SILGenFunction &SGF, SILFunctionTypeRepresentation Rep,
-             bool isYield, ClaimedParamsRef paramInfos,
+             bool isYield, bool isForCoroutine, ClaimedParamsRef paramInfos,
              SmallVectorImpl<ManagedValue> &args,
              SmallVectorImpl<DelayedArgument> &delayedArgs,
              const Optional<ForeignErrorConvention> &foreignError,
              ImportAsMemberStatus foreignSelf,
              Optional<ArgSpecialDestArray> specialDests = None)
-    : SGF(SGF), Rep(Rep), IsYield(isYield), ForeignError(foreignError),
-      ForeignSelf(foreignSelf),
-      ParamInfos(paramInfos),
-      Args(args), DelayedArguments(delayedArgs), SpecialDests(specialDests) {
+      : SGF(SGF), Rep(Rep), IsYield(isYield), IsForCoroutine(isForCoroutine),
+        ForeignError(foreignError), ForeignSelf(foreignSelf),
+        ParamInfos(paramInfos), Args(args), DelayedArguments(delayedArgs),
+        SpecialDests(specialDests) {
     assert(!specialDests || specialDests->size() == paramInfos.size());
   }
 
@@ -2961,7 +2963,8 @@ private:
     auto loc = arg.getLocation();
 
     auto convertOwnershipConvention = [&](ManagedValue value) {
-      return convertOwnershipConventionGivenParamInfo(SGF, param, value, loc);
+      return convertOwnershipConventionGivenParamInfo(SGF, param, value, loc,
+                                                      IsForCoroutine);
     };
 
     auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
@@ -3224,11 +3227,11 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
   SmallVector<ManagedValue, 4> loweredArgs;
   SmallVector<DelayedArgument, 4> delayedArgs;
   Optional<ForeignErrorConvention> errorConvention = None;
-  auto emitter = ArgEmitter(SGF, info.functionRepresentation, /*yield*/ false,
-                            info.paramsToEmit,
-                            loweredArgs, delayedArgs,
-                            errorConvention, ImportAsMemberStatus());
-  
+  auto emitter =
+      ArgEmitter(SGF, info.functionRepresentation, /*yield*/ false,
+                 /*coroutine*/ false, info.paramsToEmit, loweredArgs,
+                 delayedArgs, errorConvention, ImportAsMemberStatus());
+
   emitter.emitSingleArg(ArgumentSource(info.loc, std::move(value)),
                         info.origResultType);
   assert(delayedArgs.empty());
@@ -3707,7 +3710,7 @@ void TupleShuffleArgEmitter::emit(ArgEmitter &parent) {
 
   // Emit the inner expression.
   if (!innerParams.empty()) {
-    ArgEmitter(parent.SGF, parent.Rep, parent.IsYield,
+    ArgEmitter(parent.SGF, parent.Rep, parent.IsYield, parent.IsForCoroutine,
                ClaimedParamsRef(innerParams), innerArgs, innerDelayedArgs,
                /*foreign error*/ None, /*foreign self*/ ImportAsMemberStatus(),
                (innerSpecialDests ? ArgSpecialDestArray(*innerSpecialDests)
@@ -3965,7 +3968,8 @@ public:
 
   /// Evaluate arguments and begin any inout formal accesses.
   void emit(SILGenFunction &SGF, AbstractionPattern origFormalType,
-            ParamLowering &lowering, SmallVectorImpl<ManagedValue> &args,
+            CanSILFunctionType substFnType, ParamLowering &lowering,
+            SmallVectorImpl<ManagedValue> &args,
             SmallVectorImpl<DelayedArgument> &delayedArgs,
             const Optional<ForeignErrorConvention> &foreignError,
             ImportAsMemberStatus foreignSelf) && {
@@ -3973,8 +3977,8 @@ public:
                                        foreignError, foreignSelf);
 
     ArgEmitter emitter(SGF, lowering.Rep, /*yield*/ false,
-                       params, args, delayedArgs,
-                       foreignError, foreignSelf);
+                       /*isForCoroutine*/ substFnType->isCoroutine(), params,
+                       args, delayedArgs, foreignError, foreignSelf);
     emitter.emitPreparedArgs(std::move(Args), origFormalType);
   }
 
@@ -4603,8 +4607,8 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
 
       bool isParamSite = &site == &uncurriedSites.back();
 
-      std::move(site).emit(SGF, origFormalType, paramLowering, args.back(),
-                           delayedArgs,
+      std::move(site).emit(SGF, origFormalType, substFnType, paramLowering,
+                           args.back(), delayedArgs,
                            // Claim the foreign error with the method
                            // formal params.
                            isParamSite ? foreignError : None,
@@ -4683,8 +4687,9 @@ RValue CallEmission::applyRemainingCallSites(RValue &&result,
     ArgumentScope argScope(SGF, loc);
 
     std::move(extraSites[i])
-        .emit(SGF, origFormalType, paramLowering, siteArgs, delayedArgs,
-              calleeTypeInfo.foreignError, calleeTypeInfo.foreignSelf);
+        .emit(SGF, origFormalType, substFnType, paramLowering, siteArgs,
+              delayedArgs, calleeTypeInfo.foreignError,
+              calleeTypeInfo.foreignSelf);
     if (!delayedArgs.empty()) {
       emitDelayedArguments(SGF, delayedArgs, siteArgs);
     }
@@ -5049,10 +5054,9 @@ void SILGenFunction::emitYield(SILLocation loc,
   }
 
   ArgEmitter emitter(*this, fnType->getRepresentation(), /*yield*/ true,
-                     ClaimedParamsRef(substYieldTys),
+                     /*isForCoroutine*/ false, ClaimedParamsRef(substYieldTys),
                      yieldArgs, delayedArgs,
-                     /*foreign error*/None,
-                     ImportAsMemberStatus());
+                     /*foreign error*/ None, ImportAsMemberStatus());
 
   for (auto i : indices(valueSources)) {
     emitter.emitSingleArg(std::move(valueSources[i]), origTypes[i]);
@@ -5234,8 +5238,9 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
 
   SILFunctionConventions silConv(calleeTypeInfo.substFnType, getModule());
   llvm::SmallVector<ManagedValue, 8> finalArgs;
-  convertOwnershipConventionsGivenParamInfos(*this, silConv.getParameters(),
-                                             args, loc, finalArgs);
+  convertOwnershipConventionsGivenParamInfos(
+      *this, silConv.getParameters(), args, loc,
+      /*isForCoroutine*/ calleeTypeInfo.substFnType->isCoroutine(), finalArgs);
 
   ResultPlanPtr resultPlan =
   ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, ctx);
@@ -5834,11 +5839,11 @@ SILGenFunction::prepareSubscriptIndices(SubscriptDecl *subscript,
   SmallVector<ManagedValue, 4> argValues;
   SmallVector<DelayedArgument, 2> delayedArgs;
 
-  ArgEmitter emitter(*this, SILFunctionTypeRepresentation::Thin, /*yield*/false,
-                     ClaimedParamsRef(substParamTys),
+  ArgEmitter emitter(*this, SILFunctionTypeRepresentation::Thin,
+                     /*yield*/ false,
+                     /*isForCoroutine*/ false, ClaimedParamsRef(substParamTys),
                      argValues, delayedArgs,
-                     /*foreign error*/None,
-                     ImportAsMemberStatus());
+                     /*foreign error*/ None, ImportAsMemberStatus());
 
   emitter.emitTopLevel(indexExpr, AbstractionPattern(substFnType));
 
