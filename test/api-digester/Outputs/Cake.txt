@@ -8,7 +8,6 @@ cake1: Protocol P3 has generic signature change from <Self : P1, Self : P2> to <
 /* Removed Decls */
 cake1: AssociatedType RequiementChanges.removedType has been removed
 cake1: Constructor Somestruct2.init(_:) has been removed
-cake1: Constructor fixedLayoutStruct.init(b:a:) has been removed
 cake1: Func C4.foo() has been removed
 cake1: Func RequiementChanges.removedFunc() has been removed
 cake1: Subscript RemoveSetters.subscript(_:) has removed its setter

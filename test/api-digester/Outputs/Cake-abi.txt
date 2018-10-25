@@ -9,8 +9,6 @@ cake1: Protocol P3 has generic signature change from <τ_0_0 : P1, τ_0_0 : P2> 
 cake1: AssociatedType RequiementChanges.removedType has been removed
 cake1: Class C3 has been removed
 cake1: Constructor Somestruct2.init(_:) has been removed
-cake1: Constructor fixedLayoutStruct.init(b:a:) has been removed
-cake1: Constructor fixedLayoutStruct2.init(NoLongerWithFixedBinaryOrder:) has been removed
 cake1: Func C4.foo() has been removed
 cake1: Func RequiementChanges.removedFunc() has been removed
 cake1: Subscript RemoveSetters.subscript(_:) has removed its setter

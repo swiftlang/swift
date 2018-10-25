@@ -126,24 +126,6 @@
           "usr": "s:4cake2S1V4foo6yyF",
           "moduleName": "cake",
           "funcSelfKind": "NonMutating"
-        },
-        {
-          "kind": "Constructor",
-          "name": "init",
-          "printedName": "init()",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "S1",
-              "printedName": "S1",
-              "usr": "s:4cake2S1V"
-            }
-          ],
-          "declKind": "Constructor",
-          "usr": "s:4cake2S1VACycfc",
-          "moduleName": "cake",
-          "implicit": true,
-          "isInternal": true
         }
       ],
       "declKind": "Struct",
@@ -170,42 +152,6 @@
       "name": "C0",
       "printedName": "C0",
       "children": [
-        {
-          "kind": "Constructor",
-          "name": "init",
-          "printedName": "init()",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "C0",
-              "printedName": "C0<τ_0_0, τ_0_1, τ_0_2>",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "τ_0_0"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "τ_0_1"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "GenericTypeParam",
-                  "printedName": "τ_0_2"
-                }
-              ],
-              "usr": "s:4cake2C0C"
-            }
-          ],
-          "declKind": "Constructor",
-          "usr": "s:4cake2C0CACyxq_q0_Gycfc",
-          "moduleName": "cake",
-          "genericSig": "<τ_0_0, τ_0_1, τ_0_2>",
-          "implicit": true,
-          "isInternal": true
-        },
         {
           "kind": "Function",
           "name": "conditionalFooExt",
@@ -418,25 +364,6 @@
           "fixedbinaryorder": 1,
           "ownership": 2,
           "hasStorage": true
-        },
-        {
-          "kind": "Constructor",
-          "name": "init",
-          "printedName": "init()",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "C1",
-              "printedName": "C1",
-              "usr": "s:4cake2C1C"
-            }
-          ],
-          "declKind": "Constructor",
-          "usr": "s:4cake2C1CACycfc",
-          "moduleName": "cake",
-          "overriding": true,
-          "implicit": true,
-          "isInternal": true
         }
       ],
       "declKind": "Class",
@@ -951,60 +878,6 @@
           "fixedbinaryorder": 3,
           "isLet": true,
           "hasStorage": true
-        },
-        {
-          "kind": "Constructor",
-          "name": "init",
-          "printedName": "init(a:b:c:)",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "fixedLayoutStruct",
-              "printedName": "fixedLayoutStruct",
-              "usr": "s:4cake17fixedLayoutStructV"
-            },
-            {
-              "kind": "TypeNominal",
-              "name": "Int",
-              "printedName": "Int",
-              "usr": "s:Si"
-            },
-            {
-              "kind": "TypeNominal",
-              "name": "Int",
-              "printedName": "Int",
-              "usr": "s:Si"
-            },
-            {
-              "kind": "TypeNominal",
-              "name": "Int",
-              "printedName": "Int",
-              "usr": "s:Si"
-            }
-          ],
-          "declKind": "Constructor",
-          "usr": "s:4cake17fixedLayoutStructV1a1b1cACSi_S2itc33_3D8926C30F7417F2EF9A277D0C73FBDBLlfc",
-          "moduleName": "cake",
-          "implicit": true,
-          "isInternal": true
-        },
-        {
-          "kind": "Constructor",
-          "name": "init",
-          "printedName": "init()",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "fixedLayoutStruct",
-              "printedName": "fixedLayoutStruct",
-              "usr": "s:4cake17fixedLayoutStructV"
-            }
-          ],
-          "declKind": "Constructor",
-          "usr": "s:4cake17fixedLayoutStructVACycfc",
-          "moduleName": "cake",
-          "implicit": true,
-          "isInternal": true
         }
       ],
       "declKind": "Struct",
@@ -1324,24 +1197,6 @@
           ],
           "fixedbinaryorder": 0,
           "hasStorage": true
-        },
-        {
-          "kind": "Constructor",
-          "name": "init",
-          "printedName": "init()",
-          "children": [
-            {
-              "kind": "TypeNominal",
-              "name": "UsableFromInlineClass",
-              "printedName": "UsableFromInlineClass",
-              "usr": "s:4cake21UsableFromInlineClassC"
-            }
-          ],
-          "declKind": "Constructor",
-          "usr": "s:4cake21UsableFromInlineClassCACycfc",
-          "moduleName": "cake",
-          "implicit": true,
-          "isInternal": true
         }
       ],
       "declKind": "Class",

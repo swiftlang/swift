@@ -1324,8 +1324,6 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
     if (AvailableAttr::isUnavailable(D))
       return true;
   }
-  if (isa<ConstructorDecl>(D))
-    return false;
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     if (VD->getBaseName().empty())
       return true;
