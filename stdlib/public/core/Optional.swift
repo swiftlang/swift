@@ -668,13 +668,11 @@ public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T?)
 #if _runtime(_ObjC)
 extension Optional : _ObjectiveCBridgeable {
   // The object that represents `none` for an Optional of this type.
-  @inlinable // FIXME(sil-serialize-all)
   internal static var _nilSentinel : AnyObject {
     @_silgen_name("_swift_Foundation_getOptionalNilSentinelObject")
     get
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public func _bridgeToObjectiveC() -> AnyObject {
     // Bridge a wrapped value by unwrapping.
     if let value = self {
@@ -684,7 +682,6 @@ extension Optional : _ObjectiveCBridgeable {
     return type(of: self)._nilSentinel
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public static func _forceBridgeFromObjectiveC(
     _ source: AnyObject,
     result: inout Optional<Wrapped>?
@@ -702,7 +699,6 @@ extension Optional : _ObjectiveCBridgeable {
     result = .some(.some(unwrappedResult))
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public static func _conditionallyBridgeFromObjectiveC(
     _ source: AnyObject,
     result: inout Optional<Wrapped>?
@@ -726,7 +722,6 @@ extension Optional : _ObjectiveCBridgeable {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(_ source: AnyObject?)
       -> Optional<Wrapped> {
