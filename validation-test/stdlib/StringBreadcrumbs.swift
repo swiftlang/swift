@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift -Xfrontend -disable-access-control
+// RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
 
 // Some targetted tests for the breadcrumbs path. There is some overlap with
@@ -41,17 +41,17 @@ StringBreadcrumbsTests.test("largeString") {
   for i in 0..<(utf16CodeUnits.count-1) {
     for j in (i+1)..<utf16CodeUnits.count {
       let range = Range(uncheckedBounds: (i, j))
+      let indexRange = largeString._toUTF16Indices(range)
+
+      // Range<String.Index> from Range<Int>
+      expectEqualSequence(
+        utf16CodeUnits[i..<j], largeString.utf16[indexRange])
 
       // Copy characters      
       outputBuffer.withUnsafeMutableBufferPointer {
         largeString._copyUTF16CodeUnits(into: $0, range: range)
       }
       expectEqualSequence(utf16CodeUnits[i..<j], outputBuffer[..<range.count])
-
-      // Range<String.Index> from Range<Int>
-      let indexRange = largeString._toUTF16Indices(range)
-      expectEqualSequence(
-        largeString.utf16[indexRange], outputBuffer[..<range.count])
 
       // Range<Int> from Range<String.Index>
       let roundTripOffsets = largeString._toUTF16Offsets(indexRange)

@@ -33,13 +33,13 @@ extension _AbstractStringStorage {
   final internal var length: Int { return asString.utf16.count }
 
   @objc(characterAtIndex:)
-  final func character(at offset: Int) -> UInt16 {
+  final internal func character(at offset: Int) -> UInt16 {
     let str = asString
     return str.utf16[str._toUTF16Index(offset)]
   }
 
   @objc(getCharacters:range:)
-  final func getCharacters(
+  final internal func getCharacters(
    _ buffer: UnsafeMutablePointer<UInt16>,
    range aRange: _SwiftNSRange) {
     _precondition(aRange.location >= 0 && aRange.length >= 0,
@@ -56,12 +56,12 @@ extension _AbstractStringStorage {
   }
 
   @objc(_fastCharacterContents)
-  final func _fastCharacterContents() -> UnsafePointer<UInt16>? {
+  final internal func _fastCharacterContents() -> UnsafePointer<UInt16>? {
     return nil
   }
 
   @objc(_fastCStringContents)
-  final func _fastCStringContents() -> UnsafePointer<CChar>? {
+  final internal func _fastCStringContents() -> UnsafePointer<CChar>? {
     if let native = self as? _StringStorage {
       // FIXME(UTF8): Need to check for interior nul
       return native.start._asCChar
@@ -74,7 +74,7 @@ extension _AbstractStringStorage {
 
   @objc(copyWithZone:)
   @usableFromInline
-  final func copy(with zone: _SwiftNSZone?) -> AnyObject {
+  final internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     // While _StringStorage instances aren't immutable in general,
     // mutations may only occur when instances are uniquely referenced.
     // Therefore, it is safe to return self here; any outstanding Objective-C
