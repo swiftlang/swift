@@ -2009,7 +2009,11 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
 
 static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
                                                  llvm::Constant *global,
-                                                 StringRef globalName) {
+                                                 LinkEntity entity) {
+  // Determine the name of this entity.
+  llvm::SmallString<64> globalName;
+  entity.mangle(globalName);
+
   if (IGM.Triple.getObjectFormat() == llvm::Triple::COFF) {
     if (cast<llvm::GlobalValue>(global)->hasDLLImportStorageClass()) {
       llvm::GlobalVariable *GV =
@@ -2178,7 +2182,7 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
 
     // Make a new GOT equivalent referring to the new variable with its
     // definition type.
-    auto newGOTEquiv = createGOTEquivalent(*this, var, var->getName());
+    auto newGOTEquiv = createGOTEquivalent(*this, var, entity);
     auto castGOTEquiv = llvm::ConstantExpr::getBitCast(newGOTEquiv,
                                                    existingGOTEquiv->getType());
     existingGOTEquiv->replaceAllUsesWith(castGOTEquiv);
@@ -2256,9 +2260,7 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
     auto global = cast<llvm::GlobalValue>(entry);
     // Use it as the initializer for an anonymous constant. LLVM can treat this as
     // equivalent to the global's GOT entry.
-    llvm::SmallString<64> name;
-    entity.mangle(name);
-    auto gotEquivalent = createGOTEquivalent(*this, global, name);
+    auto gotEquivalent = createGOTEquivalent(*this, global, entity);
     gotEntry = gotEquivalent;
     return {gotEquivalent, ConstantReference::Indirect};
   };

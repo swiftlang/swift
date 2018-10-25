@@ -470,6 +470,9 @@ struct ConformanceDescription {
   /// Whether this witness table requires runtime specialization.
   const unsigned requiresSpecialization : 1;
 
+  /// Whether this witness table contains dependent associated type witnesses.
+  const unsigned hasDependentAssociatedTypeWitnesses : 1;
+
   /// The instantiation function, to be run at the end of witness table
   /// instantiation.
   llvm::Constant *instantiationFn = nullptr;
@@ -482,11 +485,15 @@ struct ConformanceDescription {
                          llvm::Constant *pattern,
                          uint16_t witnessTableSize,
                          uint16_t witnessTablePrivateSize,
-                         bool requiresSpecialization)
+                         bool requiresSpecialization,
+                         bool hasDependentAssociatedTypeWitnesses)
     : conformance(conformance), wtable(wtable), pattern(pattern),
       witnessTableSize(witnessTableSize),
       witnessTablePrivateSize(witnessTablePrivateSize),
-      requiresSpecialization(requiresSpecialization) { }
+      requiresSpecialization(requiresSpecialization),
+      hasDependentAssociatedTypeWitnesses(hasDependentAssociatedTypeWitnesses)
+  {
+  }
 };
 
 /// IRGenModule - Primary class for emitting IR for global declarations.

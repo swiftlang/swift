@@ -137,6 +137,10 @@ extension Int : OtherResilientProtocol { }
 // CHECK-SAME:           @"$s28protocol_conformance_records9DependentVyxGAA9AssociateAAWa"
 // -- flags
 // CHECK-SAME:           i32 1
+// -- number of words in witness table
+// CHECK-SAME:           i16 2,
+// -- number of private words in witness table + bit for "needs instantiation"
+// CHECK-SAME:           i16 1
 // CHECK-SAME:         }
 extension Dependent : Associate {
   public typealias X = (T, T)
