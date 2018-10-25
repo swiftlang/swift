@@ -72,9 +72,9 @@ cake2: Var fixedLayoutStruct.lazy_d.storage is added to a non-resilient type
 /* Conformance changes */
 cake1: Func ObjCProtocol.addOptional() is now an optional requirement
 cake1: Func ObjCProtocol.removeOptional() is no longer an optional requirement
-cake1: Protocol P3 has added inherited protocol P4
 cake1: Protocol P3 has removed inherited protocol P2
 cake1: Struct fixedLayoutStruct has removed conformance to P1
+cake2: Protocol P3 has added inherited protocol P4
 
 /* Protocol Requirement Change */
 cake1: AssociatedType AssociatedTypePro.T1 has removed default type Int
