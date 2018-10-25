@@ -165,7 +165,7 @@ CharacterTests.test("sizeof") {
   // <rdar://problem/16754935> MemoryLayout<Character>.size is 9, should be 8
 
   let size1 = MemoryLayout<Character>.size
-  expectTrue(size1 == 16)
+  expectTrue(size1 == MemoryLayout<String>.size)
 
   let a: Character = "a"
   let size2 = MemoryLayout.size(ofValue: a)

@@ -79,6 +79,7 @@ private var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x8000100 }
 }
 
+#if !(arch(i386) || arch(arm))
 // Resiliently write a tagged cocoa string's contents into a buffer
 @_effects(releasenone) // @opaque
 internal func _bridgeTagged(
@@ -95,6 +96,7 @@ internal func _bridgeTagged(
     kCFStringEncodingUTF8, 0, 0, ptr, bufPtr.count, &count)
   return length == numCharWritten ? count : nil
 }
+#endif
 
 @_effects(releasenone) // @opaque
 internal func _cocoaUTF8Pointer(_ str: _CocoaString) -> UnsafePointer<UInt8>? {
@@ -133,9 +135,12 @@ private func _getCocoaStringPointer(
 internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
   if let abstract = cocoaString as? _AbstractStringStorage {
     return abstract.asString._guts
-  } else if _isObjCTaggedPointer(cocoaString) {
+  }
+#if !(arch(i386) || arch(arm))
+  if _isObjCTaggedPointer(cocoaString) {
     return _StringGuts(_SmallString(taggedCocoa: cocoaString))
   }
+#endif
 
   // "copy" it into a value to be sure nobody will modify behind
   // our backs.  In practice, when value is already immutable, this
@@ -150,9 +155,11 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
   let immutableCopy
     = _stdlib_binary_CFStringCreateCopy(cocoaString) as AnyObject
 
+#if !(arch(i386) || arch(arm))
   if _isObjCTaggedPointer(immutableCopy) {
     return _StringGuts(_SmallString(taggedCocoa: immutableCopy))
   }
+#endif
 
   let (fastUTF8, isASCII): (Bool, Bool)
   switch _getCocoaStringPointer(immutableCopy) {
