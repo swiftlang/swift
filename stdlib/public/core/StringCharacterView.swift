@@ -195,17 +195,14 @@ extension String: BidirectionalCollection {
     @inline(__always) get {
       _boundsCheck(i)
 
-      // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
       let i = _guts.scalarAlign(i)
       let distance = _characterStride(startingAt: i)
 
-      // TODO(UTF8): Probably worth making into `extractRange` on StringGuts.
       if _fastPath(_guts.isFastUTF8) {
-        return _guts.withFastUTF8 { utf8 in
-          let start = i.encodedOffset
-          let end = start + distance
-          let cus = UnsafeBufferPointer(rebasing: utf8[start..<end])
-          return Character(unchecked: String._uncheckedFromUTF8(cus))
+        let start = i.encodedOffset
+        let end = start + distance
+        return _guts.withFastUTF8(range: start..<end) { utf8 in
+          return Character(unchecked: String._uncheckedFromUTF8(utf8))
         }
       }
 
@@ -220,14 +217,11 @@ extension String: BidirectionalCollection {
 
     if i == endIndex { return 0 }
 
-    // TODO: Known-single-scalar-grapheme fast path
     return _guts._opaqueCharacterStride(startingAt: i.encodedOffset)
   }
 
   @inlinable @inline(__always)
   internal func _characterStride(endingAt i: Index) -> Int {
-    // TODO: Known-single-scalar-grapheme fast path
-
     if i == startIndex { return 0 }
 
     return _guts._opaqueCharacterStride(endingAt: i.encodedOffset)
@@ -239,6 +233,7 @@ extension String {
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _foreignSubscript(position: Index, distance: Int) -> Character {
+#if _runtime(_ObjC)
     _sanityCheck(_guts.isForeign)
 
     // Both a fast-path for single-code-unit graphemes and validation:
@@ -252,7 +247,7 @@ extension String {
     let end = start + distance
     let count = end - start
 
-    // TODO(UTF8 perf): Stack buffer if small enough...
+    // TODO(String performance): Stack buffer if small enough
 
     var cus = Array<UInt16>(repeating: 0, count: count)
     cus.withUnsafeMutableBufferPointer {
@@ -264,6 +259,9 @@ extension String {
     return cus.withUnsafeBufferPointer {
       return Character(String._uncheckedFromUTF16($0))
     }
+#else
+    fatalError("No foreign strings on Linux in this version of Swift")
+#endif
   }
 }
 

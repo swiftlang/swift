@@ -155,7 +155,8 @@ extension FixedWidthInteger {
       return
     }
 
-    // TODO(UTF8 perf): fast paths...
+    // TODO(String performance): We can provide fast paths for common radices,
+    // native UTF-8 storage, etc.
 
     var iter = text.utf8.makeIterator()
     guard let ret = Self._parseASCIISlowPath(

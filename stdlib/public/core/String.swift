@@ -20,97 +20,6 @@ internal func unimplemented_utf8_32bit(
   fatalError("32-bit: Unimplemented for UTF-8 support", file: file, line: line)
 }
 
-// TODO(UTF8): Find a better place to stick these...
-extension UnsafePointer where Pointee == UInt8 {
-  @inlinable
-  internal var _asCChar: UnsafePointer<CChar> {
-    @inline(__always) get {
-      return UnsafeRawPointer(self).assumingMemoryBound(to: CChar.self)
-    }
-  }
-}
-extension UnsafeBufferPointer where Element == UInt8 {
-  @inlinable
-  internal var _asCChar: UnsafeBufferPointer<CChar> {
-    @inline(__always) get {
-      return UnsafeBufferPointer<CChar>(
-        start: self.baseAddress._unsafelyUnwrappedUnchecked._asCChar,
-        count: self.count)
-    }
-  }
-}
-extension UnsafeRawPointer {
-  @inlinable
-  internal var _asCChar: UnsafePointer<CChar> {
-    @inline(__always) get {
-      return self.assumingMemoryBound(to: CChar.self)
-    }
-  }
-}
-extension UnsafeRawBufferPointer {
-  @inlinable
-  internal var _asCChar: UnsafeBufferPointer<CChar> {
-    @inline(__always) get {
-      return UnsafeBufferPointer<CChar>(
-        start: self.baseAddress._unsafelyUnwrappedUnchecked._asCChar,
-        count: self.count)
-    }
-  }
-}
-extension UnsafePointer where Pointee == CChar {
-  @inlinable
-  internal var _asUInt8: UnsafePointer<UInt8> {
-    @inline(__always) get {
-      return UnsafeRawPointer(self).assumingMemoryBound(to: UInt8.self)
-    }
-  }
-}
-extension UnsafeBufferPointer where Element == CChar {
-  @inlinable
-  internal var _asUInt8: UnsafeBufferPointer<UInt8> {
-    @inline(__always) get {
-      return UnsafeBufferPointer<UInt8>(
-        start: self.baseAddress._unsafelyUnwrappedUnchecked._asUInt8,
-        count: self.count)
-    }
-  }
-}
-extension UnsafeRawPointer {
-  @inlinable
-  internal var _asUInt8: UnsafePointer<UInt8> {
-    @inline(__always) get {
-      return self.assumingMemoryBound(to: UInt8.self)
-    }
-  }
-}
-extension UnsafeRawBufferPointer {
-  @inlinable
-  internal var _asUInt8: UnsafeBufferPointer<UInt8> {
-    @inline(__always) get {
-      return UnsafeBufferPointer<UInt8>(
-        start: self.baseAddress._unsafelyUnwrappedUnchecked._asUInt8,
-        count: self.count)
-    }
-  }
-}
-
-extension Slice where Base == UnsafeBufferPointer<UInt8> {
-  @inlinable
-  internal var _rebased: UnsafeBufferPointer<UInt8> {
-    @inline(__always) get {
-      return UnsafeBufferPointer<UInt8>(rebasing: self)
-    }
-  }
-}
-extension Slice where Base == UnsafeBufferPointer<CChar> {
-  @inlinable
-  internal var _rebased: UnsafeBufferPointer<CChar> {
-    @inline(__always) get {
-      return UnsafeBufferPointer<CChar>(rebasing: self)
-    }
-  }
-}
-
 /// A Unicode string value that is a collection of characters.
 ///
 /// A string is a series of characters, such as `"Swift"`, that forms a
@@ -459,249 +368,6 @@ public struct String {
   ///     let alsoEmpty = String()
   @inlinable @inline(__always)
   public init() { self.init(_StringGuts()) }
-
-  // TODO(UTF8 merge): Move these declarations back to their appropriate files.
-  // Currently, they can crash the compiler in some build configurations.
-
-  /// A view of a string's contents as a collection of Unicode scalar values.
-  ///
-  /// You can access a string's view of Unicode scalar values by using its
-  /// `unicodeScalars` property. Unicode scalar values are the 21-bit codes
-  /// that are the basic unit of Unicode. Each scalar value is represented by
-  /// a `Unicode.Scalar` instance and is equivalent to a UTF-32 code unit.
-  ///
-  ///     let flowers = "Flowers 💐"
-  ///     for v in flowers.unicodeScalars {
-  ///         print(v.value)
-  ///     }
-  ///     // 70
-  ///     // 108
-  ///     // 111
-  ///     // 119
-  ///     // 101
-  ///     // 114
-  ///     // 115
-  ///     // 32
-  ///     // 128144
-  ///
-  /// Some characters that are visible in a string are made up of more than one
-  /// Unicode scalar value. In that case, a string's `unicodeScalars` view
-  /// contains more elements than the string itself.
-  ///
-  ///     let flag = "🇵🇷"
-  ///     for c in flag {
-  ///         print(c)
-  ///     }
-  ///     // 🇵🇷
-  ///
-  ///     for v in flag.unicodeScalars {
-  ///         print(v.value)
-  ///     }
-  ///     // 127477
-  ///     // 127479
-  ///
-  /// You can convert a `String.UnicodeScalarView` instance back into a string
-  /// using the `String` type's `init(_:)` initializer.
-  ///
-  ///     let favemoji = "My favorite emoji is 🎉"
-  ///     if let i = favemoji.unicodeScalars.firstIndex(where: { $0.value >= 128 }) {
-  ///         let asciiPrefix = String(favemoji.unicodeScalars[..<i])
-  ///         print(asciiPrefix)
-  ///     }
-  ///     // Prints "My favorite emoji is "
-  @_fixed_layout
-  public struct UnicodeScalarView {
-    @usableFromInline
-    internal var _guts: _StringGuts
-
-    @inlinable @inline(__always)
-    internal init(_ _guts: _StringGuts) {
-      self._guts = _guts
-      _invariantCheck()
-    }
-  }
-
-  /// A view of a string's contents as a collection of UTF-16 code units.
-  ///
-  /// You can access a string's view of UTF-16 code units by using its `utf16`
-  /// property. A string's UTF-16 view encodes the string's Unicode scalar
-  /// values as 16-bit integers.
-  ///
-  ///     let flowers = "Flowers 💐"
-  ///     for v in flowers.utf16 {
-  ///         print(v)
-  ///     }
-  ///     // 70
-  ///     // 108
-  ///     // 111
-  ///     // 119
-  ///     // 101
-  ///     // 114
-  ///     // 115
-  ///     // 32
-  ///     // 55357
-  ///     // 56464
-  ///
-  /// Unicode scalar values that make up a string's contents can be up to 21
-  /// bits long. The longer scalar values may need two `UInt16` values for
-  /// storage. Those "pairs" of code units are called *surrogate pairs*.
-  ///
-  ///     let flowermoji = "💐"
-  ///     for v in flowermoji.unicodeScalars {
-  ///         print(v, v.value)
-  ///     }
-  ///     // 💐 128144
-  ///
-  ///     for v in flowermoji.utf16 {
-  ///         print(v)
-  ///     }
-  ///     // 55357
-  ///     // 56464
-  ///
-  /// To convert a `String.UTF16View` instance back into a string, use the
-  /// `String` type's `init(_:)` initializer.
-  ///
-  ///     let favemoji = "My favorite emoji is 🎉"
-  ///     if let i = favemoji.utf16.firstIndex(where: { $0 >= 128 }) {
-  ///         let asciiPrefix = String(favemoji.utf16[..<i])
-  ///         print(asciiPrefix)
-  ///     }
-  ///     // Prints "My favorite emoji is "
-  ///
-  /// UTF16View Elements Match NSString Characters
-  /// ============================================
-  ///
-  /// The UTF-16 code units of a string's `utf16` view match the elements
-  /// accessed through indexed `NSString` APIs.
-  ///
-  ///     print(flowers.utf16.count)
-  ///     // Prints "10"
-  ///
-  ///     let nsflowers = flowers as NSString
-  ///     print(nsflowers.length)
-  ///     // Prints "10"
-  ///
-  /// Unlike `NSString`, however, `String.UTF16View` does not use integer
-  /// indices. If you need to access a specific position in a UTF-16 view, use
-  /// Swift's index manipulation methods. The following example accesses the
-  /// fourth code unit in both the `flowers` and `nsflowers` strings:
-  ///
-  ///     print(nsflowers.character(at: 3))
-  ///     // Prints "119"
-  ///
-  ///     let i = flowers.utf16.index(flowers.utf16.startIndex, offsetBy: 3)
-  ///     print(flowers.utf16[i])
-  ///     // Prints "119"
-  ///
-  /// Although the Swift overlay updates many Objective-C methods to return
-  /// native Swift indices and index ranges, some still return instances of
-  /// `NSRange`. To convert an `NSRange` instance to a range of
-  /// `String.Index`, use the `Range(_:in:)` initializer, which takes an
-  /// `NSRange` and a string as arguments.
-  ///
-  ///     let snowy = "❄️ Let it snow! ☃️"
-  ///     let nsrange = NSRange(location: 3, length: 12)
-  ///     if let range = Range(nsrange, in: snowy) {
-  ///         print(snowy[range])
-  ///     }
-  ///     // Prints "Let it snow!"
-  @_fixed_layout // FIXME(sil-serialize-all)
-  public struct UTF16View {
-    @usableFromInline
-    internal var _guts: _StringGuts
-
-    @inlinable // FIXME(sil-serialize-all)
-    internal init(_ guts: _StringGuts) {
-      self._guts = guts
-      _invariantCheck()
-    }
-  }
-
-  /// A view of a string's contents as a collection of UTF-8 code units.
-  ///
-  /// You can access a string's view of UTF-8 code units by using its `utf8`
-  /// property. A string's UTF-8 view encodes the string's Unicode scalar
-  /// values as 8-bit integers.
-  ///
-  ///     let flowers = "Flowers 💐"
-  ///     for v in flowers.utf8 {
-  ///         print(v)
-  ///     }
-  ///     // 70
-  ///     // 108
-  ///     // 111
-  ///     // 119
-  ///     // 101
-  ///     // 114
-  ///     // 115
-  ///     // 32
-  ///     // 240
-  ///     // 159
-  ///     // 146
-  ///     // 144
-  ///
-  /// A string's Unicode scalar values can be up to 21 bits in length. To
-  /// represent those scalar values using 8-bit integers, more than one UTF-8
-  /// code unit is often required.
-  ///
-  ///     let flowermoji = "💐"
-  ///     for v in flowermoji.unicodeScalars {
-  ///         print(v, v.value)
-  ///     }
-  ///     // 💐 128144
-  ///
-  ///     for v in flowermoji.utf8 {
-  ///         print(v)
-  ///     }
-  ///     // 240
-  ///     // 159
-  ///     // 146
-  ///     // 144
-  ///
-  /// In the encoded representation of a Unicode scalar value, each UTF-8 code
-  /// unit after the first is called a *continuation byte*.
-  ///
-  /// UTF8View Elements Match Encoded C Strings
-  /// =========================================
-  ///
-  /// Swift streamlines interoperation with C string APIs by letting you pass a
-  /// `String` instance to a function as an `Int8` or `UInt8` pointer. When you
-  /// call a C function using a `String`, Swift automatically creates a buffer
-  /// of UTF-8 code units and passes a pointer to that buffer. The code units
-  /// of that buffer match the code units in the string's `utf8` view.
-  ///
-  /// The following example uses the C `strncmp` function to compare the
-  /// beginning of two Swift strings. The `strncmp` function takes two
-  /// `const char*` pointers and an integer specifying the number of characters
-  /// to compare. Because the strings are identical up to the 14th character,
-  /// comparing only those characters results in a return value of `0`.
-  ///
-  ///     let s1 = "They call me 'Bell'"
-  ///     let s2 = "They call me 'Stacey'"
-  ///
-  ///     print(strncmp(s1, s2, 14))
-  ///     // Prints "0"
-  ///     print(String(s1.utf8.prefix(14)))
-  ///     // Prints "They call me '"
-  ///
-  /// Extending the compared character count to 15 includes the differing
-  /// characters, so a nonzero result is returned.
-  ///
-  ///     print(strncmp(s1, s2, 15))
-  ///     // Prints "-17"
-  ///     print(String(s1.utf8.prefix(15)))
-  ///     // Prints "They call me 'B"
-  @_fixed_layout
-  public struct UTF8View {
-    @usableFromInline
-    internal var _guts: _StringGuts
-
-    @inlinable @inline(__always)
-    internal init(_ guts: _StringGuts) {
-      self._guts = guts
-      _invariantCheck()
-    }
-  }
 }
 
 extension String {
@@ -792,19 +458,19 @@ extension String {
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result {
-    // TODO(UTF8 perf): Transcode from guts directly
-    let codeUnits = Array(self.utf8)
-    var arg = Array<TargetEncoding.CodeUnit>()
-    arg.reserveCapacity(1 &+ self._guts.count / 4)
-    let repaired = transcode(
-      codeUnits.makeIterator(),
-      from: UTF8.self,
-      to: targetEncoding,
-      stoppingOnError: false,
-      into: { arg.append($0) })
-    arg.append(TargetEncoding.CodeUnit(0))
-    _sanityCheck(!repaired)
-    return try body(arg)
+    return try self._withUTF8 { utf8 in
+      var arg = Array<TargetEncoding.CodeUnit>()
+      arg.reserveCapacity(1 &+ self._guts.count / 4)
+      let repaired = transcode(
+        utf8.makeIterator(),
+        from: UTF8.self,
+        to: targetEncoding,
+        stoppingOnError: false,
+        into: { arg.append($0) })
+      arg.append(TargetEncoding.CodeUnit(0))
+      _sanityCheck(!repaired)
+      return try body(arg)
+    }
   }
 }
 
@@ -856,11 +522,6 @@ extension String: _ExpressibleByBuiltinStringLiteral {
 }
 
 extension String: ExpressibleByStringLiteral {
-  // TODO(UTF8 merge): drop all of the below
-  public typealias StringLiteralType = String
-  public typealias UnicodeScalarLiteralType = String
-  public typealias ExtendedGraphemeClusterLiteralType = String
-
   /// Creates an instance initialized to the given string value.
   ///
   /// Do not call this initializer directly. It is used by the compiler when you
@@ -879,10 +540,9 @@ extension String: ExpressibleByStringLiteral {
 extension String: CustomDebugStringConvertible {
   /// A representation of the string that is suitable for debugging.
   public var debugDescription: String {
-    // TODO(UTF8): Drop some explicig `String` calls; needed for the SPM build
-    var result: String = "\""
+    var result = "\""
     for us in self.unicodeScalars {
-      result += String(us.escaped(asASCII: false))
+      result += us.escaped(asASCII: false)
     }
     result += "\""
     return result
@@ -932,7 +592,7 @@ extension Sequence where Element: StringProtocol {
     // for large Sequences.
     let understimatedCap =
       (1 &+ separator._guts.count) &* self.underestimatedCount
-    var result = String() // TODO(UTF8 merge): replace String() with ""
+    var result = ""
     result.reserveCapacity(understimatedCap)
     if separator.isEmpty {
       for x in self {
@@ -976,18 +636,6 @@ extension BidirectionalCollection where Element == String {
     return _joined(separator: separator)
   }
 }
-
-// TODO(UTF8): Can we change the test and remove this? This is only here for
-// test/RuntimeObjC.swift
-#if _runtime(_ObjC)
-@usableFromInline // FIXME(sil-serialize-all)
-@_silgen_name("swift_stdlib_NSStringLowercaseString")
-internal func _stdlib_NSStringLowercaseString(_ str: AnyObject) -> _CocoaString
-
-@usableFromInline // FIXME(sil-serialize-all)
-@_silgen_name("swift_stdlib_NSStringUppercaseString")
-internal func _stdlib_NSStringUppercaseString(_ str: AnyObject) -> _CocoaString
-#endif
 
 // Unicode algorithms
 extension String {
@@ -1055,7 +703,7 @@ extension String {
   public func lowercased() -> String {
     if _fastPath(_guts.isFastASCII) {
       return _guts.withFastUTF8 { utf8 in
-        // TODO(UTF8 perf): code-unit appendInPlace on guts
+        // TODO(String performance): We can directly call appendInPlace
         var result = String()
         result.reserveCapacity(utf8.count)
         for u8 in utf8 {
@@ -1065,7 +713,8 @@ extension String {
       }
     }
 
-    // TODO(UTF8 perf): This is a horribly slow means...
+    // TODO(String performance): Try out incremental case-conversion rather than
+    // make UTF-16 array beforehand
     let codeUnits = Array(self.utf16).withUnsafeBufferPointer {
       (uChars: UnsafeBufferPointer<UInt16>) -> Array<UInt16> in
       var result = Array<UInt16>(repeating: 0, count: uChars.count)
@@ -1078,7 +727,7 @@ extension String {
             Int32(output.count),
             uChars.baseAddress._unsafelyUnwrappedUnchecked,
             Int32(uChars.count),
-            "", // TODO(UTF8): with new root, nil
+            "",
             &err))
       }
       if len > uChars.count {
@@ -1091,7 +740,7 @@ extension String {
             Int32(output.count),
             uChars.baseAddress._unsafelyUnwrappedUnchecked,
             Int32(uChars.count),
-            "", // TODO(UTF8): with new root, nil
+            "",
             &err)
         }
       }
@@ -1115,7 +764,7 @@ extension String {
   public func uppercased() -> String {
     if _fastPath(_guts.isFastASCII) {
       return _guts.withFastUTF8 { utf8 in
-        // TODO(UTF8 perf): code-unit appendInPlace on guts
+        // TODO(String performance): code-unit appendInPlace on guts
         var result = String()
         result.reserveCapacity(utf8.count)
         for u8 in utf8 {
@@ -1125,7 +774,8 @@ extension String {
       }
     }
 
-    // TODO(UTF8 perf): This is a horribly slow means...
+    // TODO(String performance): Try out incremental case-conversion rather than
+    // make UTF-16 array beforehand
     let codeUnits = Array(self.utf16).withUnsafeBufferPointer {
       (uChars: UnsafeBufferPointer<UInt16>) -> Array<UInt16> in
       var result = Array<UInt16>(repeating: 0, count: uChars.count)
@@ -1138,7 +788,7 @@ extension String {
             Int32(output.count),
             uChars.baseAddress._unsafelyUnwrappedUnchecked,
             Int32(uChars.count),
-            "", // TODO(UTF8): with new root, nil
+            "",
             &err))
       }
       if len > uChars.count {
@@ -1151,7 +801,7 @@ extension String {
             Int32(output.count),
             uChars.baseAddress._unsafelyUnwrappedUnchecked,
             Int32(uChars.count),
-            "", // TODO(UTF8): with new root, nil
+            "",
             &err)
         }
       }
@@ -1177,28 +827,12 @@ extension String: CustomStringConvertible {
   public var description: String { return self }
 }
 
-// TODO(UTF8): Move this decl back to StringIndex.swift
-extension String {
-  /// A position of a character or code unit in a string.
-  @_fixed_layout // FIXME(sil-serialize-all)
-  public struct Index {
-    @usableFromInline
-    internal var _rawBits: UInt64
-
-    @inlinable @inline(__always)
-    init(_ raw: UInt64) {
-      self._rawBits = raw
-      self._invariantCheck()
-    }
-  }
-}
-
 extension String {
   public // @testable
   var _nfcCodeUnits: [UInt8] {
     return _gutsSlice.withNFCCodeUnitsIterator_2 { Array($0) }
   }
-  
+
   public // @testable
   func _withNFCCodeUnits(_ f: (UInt8) throws -> Void) rethrows {
     try _gutsSlice.withNFCCodeUnitsIterator_2 {

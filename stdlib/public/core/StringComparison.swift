@@ -137,7 +137,6 @@ extension _StringGutsSlice {
   ) rethrows -> R {
     defer { _fixLifetime(self) }
     if self.isNFCFastUTF8 {
-      // TODO(UTF8 perf): Faster iterator if we're already normal
       return try self.withFastUTF8 {
         return try f(_NormalizedUTF8CodeUnitIterator($0, range: 0..<$0.count))
       }

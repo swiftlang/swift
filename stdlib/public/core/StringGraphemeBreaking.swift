@@ -186,9 +186,10 @@ extension _StringGuts {
   @inline(never)
   @_effects(releasenone)
   private func _foreignOpaqueCharacterStride(startingAt i: Int) -> Int {
+#if _runtime(_ObjC)
     _sanityCheck(isForeign)
 
-    // TODO(UTF8 perf): Faster to do it from pointer directly
+    // TODO(String performance): Faster to do it from a pointer directly
     let count = _object.largeCount
     let cocoa = _object.cocoaObject
 
@@ -209,9 +210,8 @@ extension _StringGuts {
       return _measureCharacterStrideICU(of: utf16, startingAt: i)
     }
 
-    // TODO(UTF8 perf): local stack first, before nuclear solution
-    // TODO(UTF8 perf): even nuclear solution should copy to larger arrays in a
-    //                  loop
+    // TODO(String performance): Local small stack first, before making large
+    // array. Also, make a smaller initial array and grow over time.
     var codeUnits = Array<UInt16>(repeating: 0, count: count)
 
     codeUnits.withUnsafeMutableBufferPointer {
@@ -223,6 +223,9 @@ extension _StringGuts {
     return codeUnits.withUnsafeBufferPointer {
       _measureCharacterStrideICU(of: $0, startingAt: i)
     }
+#else
+  fatalError("No foreign strings on Linux in this version of Swift")
+#endif
   }
 
   @usableFromInline @inline(never)
@@ -249,9 +252,10 @@ extension _StringGuts {
   @inline(never)
   @_effects(releasenone)
   private func _foreignOpaqueCharacterStride(endingAt i: Int) -> Int {
+#if _runtime(_ObjC)
     _sanityCheck(isForeign)
 
-    // TODO(UTF8 perf): Faster to do it from pointer directly
+    // TODO(String performance): Faster to do it from a pointer directly
     let count = _object.largeCount
     let cocoa = _object.cocoaObject
 
@@ -272,10 +276,8 @@ extension _StringGuts {
       return _measureCharacterStrideICU(of: utf16, endingAt: i)
     }
 
-    // TODO(UTF8 perf): local stack first, before nuclear solution
-    // TODO(UTF8 perf): even nuclear solution should copy to larger arrays in a
-    //                  loop
-
+    // TODO(String performance): Local small stack first, before making large
+    // array. Also, make a smaller initial array and grow over time.
     var codeUnits = Array<UInt16>(repeating: 0, count: count)
 
     codeUnits.withUnsafeMutableBufferPointer {
@@ -287,6 +289,9 @@ extension _StringGuts {
     return codeUnits.withUnsafeBufferPointer {
       _measureCharacterStrideICU(of: $0, endingAt: i)
     }
+#else
+  fatalError("No foreign strings on Linux in this version of Swift")
+#endif
   }
 }
 

@@ -34,7 +34,7 @@ extension String {
       return
     }
 
-    // TODO(UTF8 perf): Not the fastest approach...
+    // TODO(String performance): We can directly call appendInPlace
     var result = String()
     result.reserveCapacity(repeatedValue._guts.count &* count)
     for _ in 0..<count {

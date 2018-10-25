@@ -13,6 +13,104 @@
 // FIXME(ABI)#71 : The UTF-16 string view should have a custom iterator type to
 // allow performance optimizations of linear traversals.
 
+extension String {
+  /// A view of a string's contents as a collection of UTF-16 code units.
+  ///
+  /// You can access a string's view of UTF-16 code units by using its `utf16`
+  /// property. A string's UTF-16 view encodes the string's Unicode scalar
+  /// values as 16-bit integers.
+  ///
+  ///     let flowers = "Flowers 💐"
+  ///     for v in flowers.utf16 {
+  ///         print(v)
+  ///     }
+  ///     // 70
+  ///     // 108
+  ///     // 111
+  ///     // 119
+  ///     // 101
+  ///     // 114
+  ///     // 115
+  ///     // 32
+  ///     // 55357
+  ///     // 56464
+  ///
+  /// Unicode scalar values that make up a string's contents can be up to 21
+  /// bits long. The longer scalar values may need two `UInt16` values for
+  /// storage. Those "pairs" of code units are called *surrogate pairs*.
+  ///
+  ///     let flowermoji = "💐"
+  ///     for v in flowermoji.unicodeScalars {
+  ///         print(v, v.value)
+  ///     }
+  ///     // 💐 128144
+  ///
+  ///     for v in flowermoji.utf16 {
+  ///         print(v)
+  ///     }
+  ///     // 55357
+  ///     // 56464
+  ///
+  /// To convert a `String.UTF16View` instance back into a string, use the
+  /// `String` type's `init(_:)` initializer.
+  ///
+  ///     let favemoji = "My favorite emoji is 🎉"
+  ///     if let i = favemoji.utf16.firstIndex(where: { $0 >= 128 }) {
+  ///         let asciiPrefix = String(favemoji.utf16[..<i])
+  ///         print(asciiPrefix)
+  ///     }
+  ///     // Prints "My favorite emoji is "
+  ///
+  /// UTF16View Elements Match NSString Characters
+  /// ============================================
+  ///
+  /// The UTF-16 code units of a string's `utf16` view match the elements
+  /// accessed through indexed `NSString` APIs.
+  ///
+  ///     print(flowers.utf16.count)
+  ///     // Prints "10"
+  ///
+  ///     let nsflowers = flowers as NSString
+  ///     print(nsflowers.length)
+  ///     // Prints "10"
+  ///
+  /// Unlike `NSString`, however, `String.UTF16View` does not use integer
+  /// indices. If you need to access a specific position in a UTF-16 view, use
+  /// Swift's index manipulation methods. The following example accesses the
+  /// fourth code unit in both the `flowers` and `nsflowers` strings:
+  ///
+  ///     print(nsflowers.character(at: 3))
+  ///     // Prints "119"
+  ///
+  ///     let i = flowers.utf16.index(flowers.utf16.startIndex, offsetBy: 3)
+  ///     print(flowers.utf16[i])
+  ///     // Prints "119"
+  ///
+  /// Although the Swift overlay updates many Objective-C methods to return
+  /// native Swift indices and index ranges, some still return instances of
+  /// `NSRange`. To convert an `NSRange` instance to a range of
+  /// `String.Index`, use the `Range(_:in:)` initializer, which takes an
+  /// `NSRange` and a string as arguments.
+  ///
+  ///     let snowy = "❄️ Let it snow! ☃️"
+  ///     let nsrange = NSRange(location: 3, length: 12)
+  ///     if let range = Range(nsrange, in: snowy) {
+  ///         print(snowy[range])
+  ///     }
+  ///     // Prints "Let it snow!"
+  @_fixed_layout // FIXME(sil-serialize-all)
+  public struct UTF16View {
+    @usableFromInline
+    internal var _guts: _StringGuts
+
+    @inlinable // FIXME(sil-serialize-all)
+    internal init(_ guts: _StringGuts) {
+      self._guts = guts
+      _invariantCheck()
+    }
+  }
+}
+
 extension String.UTF16View {
   #if !INTERNAL_CHECKS_ENABLED
   @inlinable @inline(__always) internal func _invariantCheck() {}
@@ -45,7 +143,7 @@ extension String.UTF16View: BidirectionalCollection {
 
   @inlinable @inline(__always)
   public func index(after i: Index) -> Index {
-    // TODO(UTF8) known-ASCII fast path
+    // TODO(String performance) known-ASCII fast path
 
     if _slowPath(_guts.isForeign) { return _foreignIndex(after: i) }
 
@@ -61,10 +159,9 @@ extension String.UTF16View: BidirectionalCollection {
   @inlinable @inline(__always)
   public func index(before i: Index) -> Index {
     precondition(!i.isZeroPosition)
+    // TODO(String performance) known-ASCII fast path
 
     if _slowPath(_guts.isForeign) { return _foreignIndex(before: i) }
-
-    // TODO(UTF8) known-ASCII fast path
 
     if i.transcodedOffset != 0 {
       _sanityCheck(i.transcodedOffset == 1)
@@ -84,11 +181,10 @@ extension String.UTF16View: BidirectionalCollection {
   }
 
   public func index(_ i: Index, offsetBy n: Int) -> Index {
+    // TODO(String performance) known-ASCII fast path
     if _slowPath(_guts.isForeign) {
       return _foreignIndex(i, offsetBy: n)
     }
-
-    // TODO(UTF8) known-ASCII fast path
 
     let lowerOffset = _getOffset(for: i)
     let result = _getIndex(for: lowerOffset + n)
@@ -98,11 +194,10 @@ extension String.UTF16View: BidirectionalCollection {
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
+    // TODO(String performance) known-ASCII fast path
     if _slowPath(_guts.isForeign) {
       return _foreignIndex(i, offsetBy: n, limitedBy: limit)
     }
-
-    // TODO(UTF8) known-ASCII fast path
 
     let iOffset = _getOffset(for: i)
     let limitOffset = _getOffset(for: limit)
@@ -121,11 +216,10 @@ extension String.UTF16View: BidirectionalCollection {
   }
 
   public func distance(from start: Index, to end: Index) -> Int {
+    // TODO(String performance) known-ASCII fast path
     if _slowPath(_guts.isForeign) {
       return _foreignDistance(from: start, to: end)
     }
-
-    // TODO(UTF8) known-ASCII fast paths
 
     let lower = _getOffset(for: start)
     let upper = _getOffset(for: end)
@@ -155,8 +249,8 @@ extension String.UTF16View: BidirectionalCollection {
   @inlinable
   public subscript(i: Index) -> UTF16.CodeUnit {
     @inline(__always) get {
+      // TODO(String performance) known-ASCII fast path
       String(_guts)._boundsCheck(i)
-      // TODO(UTF8): known-ASCII fast path
 
       if _fastPath(_guts.isFastUTF8) {
         let scalar = _guts.fastUTF8Scalar(

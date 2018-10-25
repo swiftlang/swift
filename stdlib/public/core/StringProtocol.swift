@@ -119,10 +119,10 @@ public protocol StringProtocol
 }
 
 extension StringProtocol {
-  // TODO(UTF8 perf): Make a _SharedString for some Substrings
+  // TODO(String performance): Make a _SharedString for non-smol Substrings
   //
-  // TODO(UTF8 perf): Make a closure-based call with stack-allocated
-  // _SharedString for some Substrings
+  // TODO(String performance): Provide a closure-based call with stack-allocated
+  // _SharedString for non-smol Substrings
   //
   public // @SPI(NSStringAPI.swift)
   var _ephemeralString: String {

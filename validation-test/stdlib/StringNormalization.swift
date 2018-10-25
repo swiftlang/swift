@@ -13,6 +13,7 @@
 // RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-run %t/a.out %S/Inputs/NormalizationTest.txt
 // REQUIRES: executable_test
+// REQUIRES: objc_interop
 
 import Swift
 import StdlibUnittest

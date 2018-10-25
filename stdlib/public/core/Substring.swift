@@ -20,9 +20,7 @@ extension String {
   /// - Complexity: O(*n*), where *n* is the length of `substring`.
   @inlinable
   public init(_ substring: __shared Substring) {
-    self = substring.withUnsafeBytes {
-      return String._uncheckedFromUTF8($0._asUInt8)
-    }
+    self = substring._withUTF8 { return String._uncheckedFromUTF8($0) }
   }
 }
 
@@ -276,8 +274,8 @@ extension Substring: StringProtocol {
   @inlinable // specialization
   public func withCString<Result>(
     _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
-    // TODO(UTF8 perf): Detect when we cover the rest of a nul-terminated
-    // String, and thus can avoid a copy.
+    // TODO(String performance): Detect when we cover the rest of a nul-
+    // terminated String, and thus can avoid a copy.
     return try String(self).withCString(body)
   }
 
@@ -302,8 +300,8 @@ extension Substring: StringProtocol {
     encodedAs targetEncoding: TargetEncoding.Type,
     _ body: (UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result
   ) rethrows -> Result {
-    // TODO(UTF8 perf): Detect when we cover the rest of a nul-terminated
-    // String, and thus can avoid a copy.
+    // TODO(String performance): Detect when we cover the rest of a nul-
+    // terminated String, and thus can avoid a copy.
     return try String(self).withCString(encodedAs: targetEncoding, body)
   }
 }
@@ -312,13 +310,6 @@ extension Substring : CustomReflectable {
  public var customMirror: Mirror { return String(self).customMirror }
 }
 
-//extension Substring : CustomPlaygroundQuickLookable {
-//  @available(*, deprecated, message: "Substring.customPlaygroundQuickLook will be removed in a future Swift version")
-//  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-//    return String(self).customPlaygroundQuickLook
-//  }
-//}
-//
 extension Substring : CustomStringConvertible {
   @inlinable
   public var description: String {
@@ -337,7 +328,6 @@ extension Substring : LosslessStringConvertible {
   }
 }
 
-// TODO(UTF8 merge): Can we just unify all these?
 extension Substring {
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct UTF8View {

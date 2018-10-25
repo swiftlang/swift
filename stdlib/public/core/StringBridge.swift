@@ -100,7 +100,7 @@ internal func _bridgeTagged(
 
 @_effects(releasenone) // @opaque
 internal func _cocoaUTF8Pointer(_ str: _CocoaString) -> UnsafePointer<UInt8>? {
-  // TODO(UTF8): Is there a better interface here? This requires nul
+  // TODO(String bridging): Is there a better interface here? This requires nul
   // termination and may assume ASCII.
   guard let ptr = _swift_stdlib_CFStringGetCStringPtr(
     str, kCFStringEncodingUTF8
@@ -187,12 +187,9 @@ extension String {
   @_effects(releasenone)
   public // SPI(Foundation)
   func _bridgeToObjectiveCImpl() -> AnyObject {
-    // TODO(UTF8): create and use a visit pattern on _StringGuts to handle each
-    // form, rather than querying object directly. Presumably there will be
-    // other such visitors.
     if _guts.isSmall {
       return _guts.asSmall.withUTF8 { bufPtr in
-        // TODO(UTF8 perf): worth isASCII check for different encoding?
+        // TODO(String bridging): worth isASCII check for different encoding?
         return _swift_stdlib_CFStringCreateWithBytes(
             nil, bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
             bufPtr.count,
