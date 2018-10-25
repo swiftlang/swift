@@ -56,6 +56,12 @@ public protocol P { }
 public struct ConditionallyConforms<Element> { }
 public struct Y { }
 
+// CHECK-USAGE-LABEL: @"$s31protocol_resilience_descriptors1YV010resilient_A022OtherResilientProtocolAAMc" =
+// CHECK-USAGE-SAME: i32 131073,
+// CHECK-USAGE-SAME: i16 1,
+// CHECK-USAGE-SAME: i16 0
+extension Y: OtherResilientProtocol { }
+
 // CHECK-USAGE: @"$s31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAAMc" =
 // CHECK-USAGE-SAME: $s18resilient_protocol29ProtocolWithAssocTypeDefaultsP2T2AC_AA014OtherResilientC0Tn
 // CHECK-USAGE-SAME: $s31protocol_resilience_descriptors29ConformsWithAssocRequirementsV010resilient_A008ProtocoleF12TypeDefaultsAA2T2AdEP_AD014OtherResilientI0PWT
