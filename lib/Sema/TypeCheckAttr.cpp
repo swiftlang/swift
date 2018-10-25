@@ -2205,6 +2205,24 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   
   // Start type-checking the arguments of the @differentiable attribute. This
   // covers 'wrt:', 'primal:' and 'adjoint:', all of which are optional.
+
+  // If the declaration has no definition (e.g. it is a protocol requirement),
+  // then you are not allowed to specify a primal or adjoint.
+  if (!original->hasBody()) {
+    if (attr->getPrimal()) {
+      TC.diagnose(attr->getPrimal()->Loc,
+                  diag::differentiable_attr_primal_no_definition);
+      attr->setInvalid();
+      return;
+    }
+    if (attr->getAdjoint()) {
+      TC.diagnose(attr->getAdjoint()->Loc,
+                  diag::differentiable_attr_adjoint_no_definition);
+      attr->setInvalid();
+      return;
+    }
+  }
+
   // If primal exists but adjoint does not, this is an error.
   if (attr->getPrimal() && !attr->getAdjoint()) {
     TC.diagnose(attr->getPrimal()->Loc,

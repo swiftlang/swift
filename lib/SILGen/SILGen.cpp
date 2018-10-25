@@ -794,6 +794,12 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
+  // [reverse_differentiable] attributes only make sense on functions with
+  // bodies, because [reverse_differentiable] attributes declare actual primals
+  // and adjoints corresponding to the function body.
+  if (!AFD->hasBody())
+    return;
+
   // If the declaration has a @differentiable(reverse) attribute, turn it into a
   // SIL [reverse_differentiable] attribute with lowered primal and adjoint
   // function names and lowered differentiation parameter indices.
