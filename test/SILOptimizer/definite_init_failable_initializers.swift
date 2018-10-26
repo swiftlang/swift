@@ -474,11 +474,11 @@ struct ThrowStruct {
 // CHECK-NEXT:    br bb5([[ERROR]] : $Error)
 // CHECK:       bb5([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    [[COND:%.*]] = load [[BITMAP_BOX]]
-// CHECK-NEXT:    cond_br [[COND]], bb7, bb6
+// CHECK-NEXT:    cond_br [[COND]], bb6, bb7
 // CHECK:       bb6:
+// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    br bb8
 // CHECK:       bb7:
-// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    br bb8
 // CHECK:       bb8:
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
@@ -517,11 +517,11 @@ struct ThrowStruct {
 // CHECK-NEXT:    br bb5([[ERROR]] : $Error)
 // CHECK:       bb5([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    [[COND:%.*]] = load [[BITMAP_BOX]]
-// CHECK-NEXT:    cond_br [[COND]], bb7, bb6
+// CHECK-NEXT:    cond_br [[COND]], bb6, bb7
 // CHECK:       bb6:
+// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    br bb8
 // CHECK:       bb7:
-// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    br bb8
 // CHECK:       bb8:
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
@@ -1403,11 +1403,11 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    br bb5([[ERROR2]] : $Error)
 // CHECK:       bb5([[ERROR3:%.*]] : $Error):
 // CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
-// CHECK:         cond_br {{.*}}, bb7, bb6
+// CHECK:         cond_br {{.*}}, bb6, bb7
 // CHECK:       bb6:
+// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    br bb8
 // CHECK:       bb7:
-// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    br bb8
 // CHECK:       bb8:
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
@@ -1446,11 +1446,11 @@ class ThrowDerivedClass : ThrowBaseClass {
 // CHECK-NEXT:    br bb5([[ERROR]] : $Error)
 // CHECK:       bb5([[ERROR:%.*]] : $Error):
 // CHECK-NEXT:    [[BITMAP:%.*]] = load [[BITMAP_BOX]]
-// CHECK:         cond_br {{.*}}, bb7, bb6
+// CHECK:         cond_br {{.*}}, bb6, bb7
 // CHECK:       bb6:
+// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    br bb8
 // CHECK:       bb7:
-// CHECK-NEXT:    destroy_addr [[SELF_BOX]]
 // CHECK-NEXT:    br bb8
 // CHECK:       bb8:
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]

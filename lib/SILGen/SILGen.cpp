@@ -924,7 +924,7 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
       emitClassAllocatorThunk();
 
       // Constructors may not have bodies if they've been imported, or if they've
-      // been parsed from a textual interface.
+      // been parsed from a parseable interface.
       if (decl->hasBody()) {
         SILDeclRef initConstant(decl, SILDeclRef::Kind::Initializer);
         emitOrDelayFunction(

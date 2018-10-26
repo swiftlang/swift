@@ -495,6 +495,7 @@ enum class CompletionKind {
   CaseStmtBeginning,
   CaseStmtDotPrefix,
   NominalMemberBeginning,
+  AccessorBeginning,
   AttributeBegin,
   AttributeDeclParen,
   PoundAvailablePlatform,
@@ -508,6 +509,7 @@ enum class CompletionKind {
   PlatformConditon,
   AfterIfStmtElse,
   GenericParams,
+  PrecedenceGroup,
 };
 
 /// \brief A single code completion result.
@@ -891,7 +893,8 @@ void lookupCodeCompletionResultsFromModule(CodeCompletionResultSink &targetSink,
 /// restricting by \p onlyTypes.
 void copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
                                CodeCompletionResultSink &sourceSink,
-                               bool onlyTypes);
+                               bool onlyTypes,
+                               bool onlyPrecedenceGroups);
 
 } // end namespace ide
 } // end namespace swift

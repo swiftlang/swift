@@ -342,3 +342,43 @@ StringRef swift::getSILValueName(ValueKind Kind) {
   }
 }
 #endif
+
+//===----------------------------------------------------------------------===//
+//                          OperandOwnershipKindMap
+//===----------------------------------------------------------------------===//
+
+void OperandOwnershipKindMap::print(llvm::raw_ostream &os) const {
+  os << "-- OperandOwnershipKindMap --\n";
+
+  unsigned index = 0;
+  unsigned end = unsigned(ValueOwnershipKind::LastValueOwnershipKind) + 1;
+  while (index != end) {
+    auto kind = ValueOwnershipKind(index);
+    if (canAcceptKind(kind)) {
+      os << kind << ": Yes. Liveness: " << getLifetimeConstraint(kind) << "\n";
+    } else {
+      os << kind << ":  No."
+         << "\n";
+    }
+    ++index;
+  }
+}
+
+void OperandOwnershipKindMap::dump() const { print(llvm::dbgs()); }
+
+//===----------------------------------------------------------------------===//
+//                           UseLifetimeConstraint
+//===----------------------------------------------------------------------===//
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
+                                     UseLifetimeConstraint constraint) {
+  switch (constraint) {
+  case UseLifetimeConstraint::MustBeLive:
+    os << "MustBeLive";
+    break;
+  case UseLifetimeConstraint::MustBeInvalidated:
+    os << "MustBeInvalidated";
+    break;
+  }
+  return os;
+}

@@ -431,6 +431,12 @@ public:
   /// The order of the results is not guaranteed to be meaningful.
   void getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const;
 
+  /// Finds all precedence group decls of this module.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  void getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results) const;
+
   /// Finds all top-level decls that should be displayed to a client of this
   /// module.
   ///
@@ -689,6 +695,13 @@ public:
   /// The order of the results is not guaranteed to be meaningful.
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {}
 
+
+  /// Finds all precedence group decls in this file.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  virtual void
+  getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results) const {}
 
   /// Finds all local type decls in this file.
   ///
@@ -987,6 +1000,9 @@ public:
          SmallVectorImpl<AbstractFunctionDecl *> &results) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
+
+  virtual void
+  getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &results) const override;
 
   virtual void
   getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &results) const override;

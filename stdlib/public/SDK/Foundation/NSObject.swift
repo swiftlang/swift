@@ -13,7 +13,10 @@
 @_exported import Foundation // Clang module
 import ObjectiveC
 
+// This exists to allow for dynamic dispatch on KVO methods added to NSObject.
+// Extending NSObject with these methods would disallow overrides.
 public protocol _KeyValueCodingAndObserving {}
+extension NSObject : _KeyValueCodingAndObserving {}
 
 public struct NSKeyValueObservedChange<Value> {
     public typealias Kind = NSKeyValueChange
@@ -131,20 +134,21 @@ func _bridgeStringToKeyPath(_ keyPath:String) -> AnyKeyPath? {
     return __KVOKeyPathBridgeMachinery._bridgeKeyPath(keyPath)
 }
 
-// NOTE: older overlays called this NSKeyValueObservation. The two must
-// coexist, so it was renamed. The old name must not be used in the new
-// runtime.
-public class _NSKeyValueObservation : NSObject {
+// NOTE: older overlays called this NSKeyValueObservation. We now use
+// that name in the source code, but add an underscore to the runtime
+// name to avoid conflicts when both are loaded into the same process.
+@objc(_NSKeyValueObservation)
+public class NSKeyValueObservation : NSObject {
     
     @nonobjc weak var object : NSObject?
     @nonobjc let callback : (NSObject, NSKeyValueObservedChange<Any>) -> Void
     @nonobjc let path : String
     
     //workaround for <rdar://problem/31640524> Erroneous (?) error when using bridging in the Foundation overlay
-    @nonobjc static var swizzler : _NSKeyValueObservation? = {
-        let bridgeClass: AnyClass = _NSKeyValueObservation.self
+    @nonobjc static var swizzler : NSKeyValueObservation? = {
+        let bridgeClass: AnyClass = NSKeyValueObservation.self
         let observeSel = #selector(NSObject.observeValue(forKeyPath:of:change:context:))
-        let swapSel = #selector(_NSKeyValueObservation._swizzle_me_observeValue(forKeyPath:of:change:context:))
+        let swapSel = #selector(NSKeyValueObservation._swizzle_me_observeValue(forKeyPath:of:change:context:))
         let rootObserveImpl = class_getInstanceMethod(bridgeClass, observeSel)
         let swapObserveImpl = class_getInstanceMethod(bridgeClass, swapSel)
         method_exchangeImplementations(rootObserveImpl, swapObserveImpl)
@@ -153,7 +157,7 @@ public class _NSKeyValueObservation : NSObject {
     
     fileprivate init(object: NSObject, keyPath: AnyKeyPath, callback: @escaping (NSObject, NSKeyValueObservedChange<Any>) -> Void) {
         path = _bridgeKeyPathToString(keyPath)
-        let _ = _NSKeyValueObservation.swizzler
+        let _ = NSKeyValueObservation.swizzler
         self.object = object
         self.callback = callback
     }
@@ -162,7 +166,7 @@ public class _NSKeyValueObservation : NSObject {
         object?.addObserver(self, forKeyPath: path, options: options, context: nil)
     }
     
-    ///invalidate() will be called automatically when an _NSKeyValueObservation is deinited
+    ///invalidate() will be called automatically when an NSKeyValueObservation is deinited
     @objc public func invalidate() {
         object?.removeObserver(self, forKeyPath: path, context: nil)
         object = nil
@@ -187,13 +191,13 @@ public class _NSKeyValueObservation : NSObject {
 
 extension _KeyValueCodingAndObserving {
     
-    ///when the returned _NSKeyValueObservation is deinited or invalidated, it will stop observing
+    ///when the returned NSKeyValueObservation is deinited or invalidated, it will stop observing
     public func observe<Value>(
             _ keyPath: KeyPath<Self, Value>,
             options: NSKeyValueObservingOptions = [],
             changeHandler: @escaping (Self, NSKeyValueObservedChange<Value>) -> Void)
-        -> _NSKeyValueObservation {
-        let result = _NSKeyValueObservation(object: self as! NSObject, keyPath: keyPath) { (obj, change) in
+        -> NSKeyValueObservation {
+        let result = NSKeyValueObservation(object: self as! NSObject, keyPath: keyPath) { (obj, change) in
             let notification = NSKeyValueObservedChange(kind: change.kind,
                                                         newValue: change.newValue as? Value,
                                                         oldValue: change.oldValue as? Value,
@@ -229,5 +233,3 @@ extension _KeyValueCodingAndObserving {
         (self as! NSObject).didChangeValue(forKey: _bridgeKeyPathToString(keyPath), withSetMutation: mutation, using: set)
     }
 }
-
-extension NSObject : _KeyValueCodingAndObserving {}

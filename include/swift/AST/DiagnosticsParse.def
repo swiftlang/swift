@@ -1,3 +1,4 @@
+
 //===--- DiagnosticsParse.def - Diagnostics Text ----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
@@ -431,8 +432,10 @@ ERROR(deprecated_operator_body_use_group,PointsToFirstBadToken,
 ERROR(operator_decl_no_fixity,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
 
+ERROR(operator_decl_expected_type,none,
+      "expected designated type in operator declaration", ())
 ERROR(operator_decl_trailing_comma,none,
-      "expected designated protocol in operator declaration", ())
+      "trailing comma in operator declaration", ())
 
 // PrecedenceGroup
 ERROR(precedencegroup_not_infix,none,
@@ -1558,9 +1561,6 @@ ERROR(where_without_generic_params,none,
       "'where' clause cannot be attached to "
       "%select{a non-generic|a protocol|an associated type}0 "
       "declaration", (unsigned))
-WARNING(swift3_where_inside_brackets,none,
-        "'where' clause next to generic parameters is deprecated "
-        "and will be removed in the future version of Swift", ())
 ERROR(where_inside_brackets,none,
         "'where' clause next to generic parameters is obsolete, "
         "must be written following the declaration's type", ())

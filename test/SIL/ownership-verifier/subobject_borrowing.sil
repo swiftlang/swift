@@ -77,7 +77,6 @@ bb0(%0 : @owned $B):
 // CHECK-LABEL: Function: 'value_subobject_with_destroy_of_subobject'
 // CHECK: Have operand with incompatible ownership?!
 // CHECK: Value:   %5 = tuple_extract %4 : $(Builtin.NativeObject, Builtin.NativeObject), 1
-// CHECK: BaseValue:   %1 = begin_borrow %0 : $B
 // CHECK: User:   destroy_value %5 : $Builtin.NativeObject
 // CHECK: Conv: guaranteed
 
@@ -140,7 +139,6 @@ bb0(%0 : @guaranteed $B):
 // CHECK-LABEL: Function: 'funcarg_subobject_with_destroy_of_subobject'
 // CHECK: Have operand with incompatible ownership?!
 // CHECK: Value:   %4 = tuple_extract %3 : $(Builtin.NativeObject, Builtin.NativeObject), 1
-// CHECK: BaseValue:   %0 = argument of bb0 : $B
 // CHECK: User:   destroy_value %4 : $Builtin.NativeObject
 // CHECK: Conv: guaranteed
 sil @funcarg_subobject_with_destroy_of_subobject : $@convention(thin) (@guaranteed B) -> () {

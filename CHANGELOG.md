@@ -128,6 +128,45 @@ Swift 4.2
 
 ### 2018-09-17 (Xcode 10.0)
 
+* [SE-0202][]
+
+  The standard library now provides a unified set of randomization functionality.
+  Integer types, floating point types, and Bool all introduce a new static
+  method that creates a random value.
+  
+  ```swift
+  let diceRoll = Int.random(in: 1 ... 6)
+  let randomUnit = Double.random(in: 0 ..< 1)
+  let randomBool = Bool.random()
+  ```
+  
+  There are also additions to select a random element from a collection or
+  shuffle its contents.
+  
+  ```swift
+  let greetings = ["hey", "hello", "hi", "hola"]
+  let randomGreeting = greetings.randomElement()! // This returns an Optional
+  let newGreetings = greetings.shuffled() // ["hola", "hi", "hey", "hello"]
+  ```
+
+  Core to the randomization functionality is a new `RandomNumberGenerator`
+  protocol. The standard library defines its own random number generator
+  called `SystemRandomNumberGenerator` which is backed by a secure and
+  thread-safe random number generator on each platform. All the randomization
+  functions have a `using:` parameter that take a `RandomNumberGenerator` that
+  users can pass in their own random number generator.
+  
+  ```swift
+  struct MersenneTwister: RandomNumberGenerator {
+    func next() -> UInt64 {
+      // implementation
+    }
+  }
+  
+  var mt = MersenneTwister()
+  let diceRoll = Int.random(in: 1 ... 6, using: &mt)
+  ```
+
 * [SE-0194][]
 
   The new CaseIterable protocol describes types which have a static

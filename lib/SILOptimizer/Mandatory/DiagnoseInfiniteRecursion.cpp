@@ -94,37 +94,65 @@ static bool hasRecursiveCallInPath(SILBasicBlock &Block,
   return false;
 }
 
-static bool hasInfinitelyRecursiveApply(SILFunction &Fn,
-                                        SILFunction *TargetFn) {
-  SmallPtrSet<SILBasicBlock *, 16> Visited;
-  SmallVector<SILBasicBlock *, 16> WorkList;
-  // Keep track of whether we found at least one recursive path.
+/// Returns true if the block has a call to a function marked with
+/// @_semantics("programtermination_point").
+static bool isKnownProgramTerminationPoint(const SILBasicBlock *bb) {
+  // Skip checking anything if this block doesn't end in a program terminator.
+  if (!bb->getTerminator()->isProgramTerminating())
+    return false;
+
+  // Check each instruction for a call to something that's a known
+  // programtermination_point
+  for (auto it = bb->rbegin(); it != bb->rend(); ++it) {
+    auto applySite = FullApplySite::isa(const_cast<SILInstruction *>(&*it));
+    if (!applySite) continue;
+    if (applySite.isCalleeKnownProgramTerminationPoint())
+      return true;
+  }
+  return false;
+}
+
+/// Perform a DFS through the target function to find any paths to an exit node
+/// that do not call into the target.
+static bool hasInfinitelyRecursiveApply(SILFunction *targetFn) {
+  SmallPtrSet<SILBasicBlock *, 32> visited = { targetFn->getEntryBlock() };
+  SmallVector<SILBasicBlock *, 32> workList = { targetFn->getEntryBlock() };
+
+  // Keep track of if we've found any recursive blocks at all.
+  // We return true if we found any recursion and did not find any
+  // non-recursive, function-exiting blocks.
   bool foundRecursion = false;
+  auto *targetModule = targetFn->getModule().getSwiftModule();
 
-  auto *TargetModule = TargetFn->getModule().getSwiftModule();
-  auto analyzeSuccessor = [&](SILBasicBlock *Succ) -> bool {
-    if (!Visited.insert(Succ).second)
-      return false;
+  while (!workList.empty()) {
+    SILBasicBlock *curBlock = workList.pop_back_val();
 
-    // If the successor block contains a recursive call, end analysis there.
-    if (!hasRecursiveCallInPath(*Succ, TargetFn, TargetModule)) {
-      WorkList.push_back(Succ);
-      return false;
+    // Before checking for infinite recursion, see if we're calling something
+    // that's @_semantics("programtermination_point"). We explicitly don't
+    // want this call to disqualify the warning for infinite recursion,
+    // because they're reserved for exceptional circumstances.
+    if (isKnownProgramTerminationPoint(curBlock))
+      continue;
+
+    // We're looking for functions that are recursive on _all_ paths. If this
+    // block is recursive, mark that we found recursion and check the next
+    // block in the work list.
+    if (hasRecursiveCallInPath(*curBlock, targetFn, targetModule)) {
+      foundRecursion = true;
+      continue;
     }
-    return true;
-  };
 
-  // Seed the work list with the entry block.
-  foundRecursion |= analyzeSuccessor(Fn.getEntryBlock());
-  
-  while (!WorkList.empty()) {
-    SILBasicBlock *CurBlock = WorkList.pop_back_val();
-    // Found a path to the exit node without a recursive call.
-    if (CurBlock->getTerminator()->isFunctionExiting())
+    // If this block doesn't have a recursive call, and it exits the function,
+    // then we know the function is not infinitely recursive.
+    auto term = curBlock->getTerminator();
+    if (term->isFunctionExiting() || term->isProgramTerminating())
       return false;
 
-    for (SILBasicBlock *Succ : CurBlock->getSuccessorBlocks())
-      foundRecursion |= analyzeSuccessor(Succ);
+    // Otherwise, push the successors onto the stack if we haven't visited them.
+    for (auto *succ : curBlock->getSuccessorBlocks()) {
+      if (visited.insert(succ).second)
+        workList.push_back(succ);
+    }
   }
   return foundRecursion;
 }
@@ -149,7 +177,7 @@ namespace {
       if (!Fn->hasLocation() || Fn->getLocation().getSourceLoc().isInvalid())
         return;
 
-      if (hasInfinitelyRecursiveApply(*Fn, Fn)) {
+      if (hasInfinitelyRecursiveApply(Fn)) {
         diagnose(Fn->getModule().getASTContext(),
                  Fn->getLocation().getSourceLoc(),
                  diag::warn_infinite_recursive_function);

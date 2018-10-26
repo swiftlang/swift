@@ -2361,7 +2361,7 @@ void PartitionCloner::visitBranchInst(BranchInst *inst) {
   auto br =
       getBuilder().createBranch(getOpLocation(inst->getLoc()),
                                 getOpBasicBlock(inst->getDestBB()), operands);
-  doPostProcess(inst, br);
+  recordClonedInstruction(inst, br);
 }
 
 /// For conditional branches, we do exactly what the normal cloner does, except
@@ -2389,11 +2389,11 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
         cond, B, getOpLocation(inst->getLoc()), FP.deviceInfo));
   }
 
-  doPostProcess(inst, B.createCondBranch(
-                          getOpLocation(inst->getLoc()), cond,
-                          getOpBasicBlock(inst->getTrueBB()), TrueArgs,
-                          getOpBasicBlock(inst->getFalseBB()), FalseArgs,
-                          inst->getTrueBBCount(), inst->getFalseBBCount()));
+  recordClonedInstruction(inst, B.createCondBranch(
+                              getOpLocation(inst->getLoc()), cond,
+                              getOpBasicBlock(inst->getTrueBB()), TrueArgs,
+                              getOpBasicBlock(inst->getFalseBB()), FalseArgs,
+                              inst->getTrueBBCount(), inst->getFalseBBCount()));
 }
 
 void PartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {

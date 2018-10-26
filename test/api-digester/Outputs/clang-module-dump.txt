@@ -32,7 +32,8 @@
           "isOpen": true,
           "declAttributes": [
             "ObjC"
-          ]
+          ],
+          "funcSelfKind": "NonMutating"
         },
         {
           "kind": "Constructor",
@@ -103,7 +104,8 @@
           "protocolReq": true,
           "declAttributes": [
             "ObjC"
-          ]
+          ],
+          "funcSelfKind": "NonMutating"
         }
       ],
       "declKind": "Protocol",

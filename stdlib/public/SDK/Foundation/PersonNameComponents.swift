@@ -129,6 +129,7 @@ extension PersonNameComponents : _ObjectiveCBridgeable {
         return true
     }
 
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSPersonNameComponents?) -> PersonNameComponents {
         var result: PersonNameComponents?
         _forceBridgeFromObjectiveC(source!, result: &result)

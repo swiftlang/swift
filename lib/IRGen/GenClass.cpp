@@ -373,7 +373,12 @@ namespace {
         // Lower the field type.
         auto *eltType = &IGM.getTypeInfo(type);
         if (CompletelyFragileLayout && !eltType->isFixedSize()) {
-          CompletelyFragileScope scope(IGM);
+          // For staging purposes, only do the new thing if the path flag
+          // is provided.
+          auto mode = (IGM.IRGen.Opts.ReadTypeInfoPath.empty()
+                       ? TypeConverter::Mode::CompletelyFragile
+                       : TypeConverter::Mode::Legacy);
+          LoweringModeScope scope(IGM, mode);
           eltType = &IGM.getTypeInfo(type);
         }
 
@@ -970,22 +975,7 @@ void irgen::emitPartialClassDeallocation(IRGenFunction &IGF,
                                          llvm::Value *selfValue,
                                          llvm::Value *metadataValue) {
   auto *theClass = selfType.getClassOrBoundGenericClass();
-
-  // Foreign classes should not be freed by sending -release.
-  // They should also probably not be freed with object_dispose(),
-  // either.
-  //
-  // However, in practice, the only time we should try to free an
-  // instance of a foreign class here is inside an initializer
-  // delegating to a factory initializer. In this case, the object
-  // was allocated with +allocWithZone:, so calling object_dispose()
-  // should be OK.
-  if (theClass->getForeignClassKind() == ClassDecl::ForeignKind::RuntimeOnly) {
-    selfValue = IGF.Builder.CreateBitCast(selfValue, IGF.IGM.ObjCPtrTy);
-    IGF.Builder.CreateCall(IGF.IGM.getObjectDisposeFn(),
-                           {selfValue});
-    return;
-  }
+  assert(theClass->getForeignClassKind() == ClassDecl::ForeignKind::Normal);
 
   llvm::Value *size, *alignMask;
   getInstanceSizeAndAlignMask(IGF, selfType, theClass, selfValue,

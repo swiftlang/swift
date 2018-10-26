@@ -905,6 +905,7 @@ extension Sequence {
   }
 
   @inlinable
+  @inline(__always)
   public func _preprocessingPass<R>(
     _ preprocess: () throws -> R
   ) rethrows -> R? {
@@ -912,6 +913,7 @@ extension Sequence {
   }
 
   @inlinable
+  @inline(__always)
   public func _customContainsEquatableElement(
     _ element: Iterator.Element
   ) -> Bool? {

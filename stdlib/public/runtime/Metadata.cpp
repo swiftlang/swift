@@ -139,9 +139,9 @@ static ClassMetadataBounds computeMetadataBoundsFromSuperclass(
 
   // Compute the bounds for the superclass, extending it to the minimum
   // bounds of a Swift class.
-  if (const void *superRef = description->Superclass.get()) {
+  if (const void *superRef = description->getResilientSuperclass()) {
     bounds = computeMetadataBoundsForSuperclass(superRef,
-                                     description->getSuperclassReferenceKind());
+                           description->getResilientSuperclassReferenceKind());
   } else {
     bounds = ClassMetadataBounds::forSwiftRootClass();
   }
@@ -2539,11 +2539,34 @@ static void initGenericObjCClass(ClassMetadata *self,
 
 void
 swift::swift_initClassMetadata(ClassMetadata *self,
-                               ClassMetadata *super,
                                ClassLayoutFlags layoutFlags,
                                size_t numFields,
                                const TypeLayout * const *fieldTypes,
                                size_t *fieldOffsets) {
+  // If there is a mangled superclass name, demangle it to the superclass
+  // type.
+  const ClassMetadata *super = nullptr;
+  if (auto superclassNameBase = self->getDescription()->SuperclassType.get()) {
+    StringRef superclassName =
+      Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
+    SubstGenericParametersFromMetadata substitutions(self);
+    const Metadata *superclass =
+      _getTypeByMangledName(superclassName, substitutions);
+    if (!superclass) {
+      fatalError(0,
+                 "failed to demangle superclass of %s from mangled name '%s'\n",
+                 self->getDescription()->Name.get(),
+                 superclassName.str().c_str());
+    }
+
+#if SWIFT_OBJC_INTEROP
+    if (auto objcWrapper = dyn_cast<ObjCClassWrapperMetadata>(superclass))
+      superclass = objcWrapper->Class;
+#endif
+
+    super = cast<ClassMetadata>(superclass);
+  }
+
   self->Superclass = super;
 
 #if SWIFT_OBJC_INTEROP
@@ -2589,15 +2612,40 @@ swift::swift_initClassMetadata(ClassMetadata *self,
 #if SWIFT_OBJC_INTEROP
 void
 swift::swift_updateClassMetadata(ClassMetadata *self,
-                                 ClassMetadata *super,
                                  ClassLayoutFlags layoutFlags,
                                  size_t numFields,
                                  const TypeLayout * const *fieldTypes,
                                  size_t *fieldOffsets) {
+#ifndef NDEBUG
+  // If there is a mangled superclass name, demangle it to the superclass
+  // type.
+  const ClassMetadata *super = nullptr;
+  if (auto superclassNameBase = self->getDescription()->SuperclassType.get()) {
+    StringRef superclassName =
+      Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
+    SubstGenericParametersFromMetadata substitutions(self);
+    const Metadata *superclass =
+      _getTypeByMangledName(superclassName, substitutions);
+    if (!superclass) {
+      fatalError(0,
+                 "failed to demangle superclass of %s from mangled name '%s'\n",
+                 self->getDescription()->Name.get(),
+                 superclassName.str().c_str());
+    }
+
+#if SWIFT_OBJC_INTEROP
+    if (auto objcWrapper = dyn_cast<ObjCClassWrapperMetadata>(superclass))
+      superclass = objcWrapper->Class;
+#endif
+
+    super = cast<ClassMetadata>(superclass);
+  }
+
   if (!super)
     assert(self->Superclass == getRootSuperclass());
   else
     assert(self->Superclass == super);
+#endif
 
   // FIXME: Plumb this through
 #if 1
@@ -3745,7 +3793,7 @@ public:
   }
 
   static size_t getWitnessTableSize(GenericWitnessTable *genericTable) {
-    auto protocol = genericTable->Protocol.get();
+    auto protocol = genericTable->getProtocol();
     size_t numPrivateWords = genericTable->getWitnessTablePrivateSizeInWords();
     size_t numRequirementWords =
       WitnessTableFirstRequirementOffset + protocol->NumRequirements;
@@ -3784,14 +3832,15 @@ static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
   }
 
   // If we have resilient witnesses, we require instantiation.
-  if (!genericTable->ResilientWitnesses.isNull()) {
+  auto conformance = genericTable->getConformance();
+  if (!conformance->getResilientWitnesses().empty()) {
     return false;
   }
 
   // If we don't have the exact number of witnesses expected, we require
   // instantiation.
   if (genericTable->WitnessTableSizeInWords !=
-          (genericTable->Protocol->NumRequirements +
+          (conformance->getProtocol()->NumRequirements +
            WitnessTableFirstRequirementOffset)) {
     return false;
   }
@@ -3810,12 +3859,11 @@ static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
 /// witnesses stored in the generic witness table structure itself.
 static void initializeResilientWitnessTable(GenericWitnessTable *genericTable,
                                             void **table) {
-  auto protocol = genericTable->Protocol.get();
+  auto conformance = genericTable->getConformance();
+  auto protocol = conformance->getProtocol();
 
   auto requirements = protocol->getRequirements();
-  llvm::ArrayRef<TargetResilientWitness<InProcess>> witnesses;
-  if (auto resilientWitnesses = genericTable->ResilientWitnesses.get())
-    witnesses = resilientWitnesses->getWitnesses();
+  auto witnesses = conformance->getResilientWitnesses();
 
   // Loop over the provided witnesses, filling in appropriate entry.
   for (const auto &witness : witnesses) {
@@ -3865,7 +3913,7 @@ WitnessTableCacheEntry::allocate(GenericWitnessTable *genericTable,
   // The number of witnesses provided by the table pattern.
   size_t numPatternWitnesses = genericTable->WitnessTableSizeInWords;
 
-  auto protocol = genericTable->Protocol.get();
+  auto protocol = genericTable->getProtocol();
 
   // The total number of requirements.
   size_t numRequirements =
@@ -3950,21 +3998,24 @@ MetadataResponse
 swift::swift_getAssociatedTypeWitness(MetadataRequest request,
                                       WitnessTable *wtable,
                                       const Metadata *conformingType,
+                                      const ProtocolRequirement *reqBase,
                                       const ProtocolRequirement *assocType) {
-  const ProtocolConformanceDescriptor *conformance = wtable->Description;
-  const ProtocolDescriptor *protocol = conformance->getProtocol();
 
-  auto requirements = protocol->getRequirements();
-  assert(assocType >= requirements.begin() &&
-         assocType < requirements.end());
-  const auto &req = *assocType;
-  (void)req;
-  assert(req.Flags.getKind() ==
+#ifndef NDEBUG
+  {
+    const ProtocolConformanceDescriptor *conformance = wtable->Description;
+    const ProtocolDescriptor *protocol = conformance->getProtocol();
+    auto requirements = protocol->getRequirements();
+    assert(assocType >= requirements.begin() &&
+           assocType < requirements.end());
+    assert(reqBase == requirements.data() - WitnessTableFirstRequirementOffset);
+    assert(assocType->Flags.getKind() ==
            ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction);
+  }
+#endif
 
   // If the low bit of the witness is clear, it's already a metadata pointer.
-  unsigned witnessIndex = (assocType - requirements.begin()) +
-    WitnessTableFirstRequirementOffset;
+  unsigned witnessIndex = assocType - reqBase;
   auto witness = ((const void* const *)wtable)[witnessIndex];
   if (LLVM_LIKELY((uintptr_t(witness) &
          ProtocolRequirementFlags::AssociatedTypeMangledNameBit) == 0)) {
@@ -3985,6 +4036,10 @@ swift::swift_getAssociatedTypeWitness(MetadataRequest request,
     inProtocolContext = true;
     ++mangledNameBase;
   }
+
+  // Dig out the protocol.
+  const ProtocolConformanceDescriptor *conformance = wtable->Description;
+  const ProtocolDescriptor *protocol = conformance->getProtocol();
 
   // Extract the mangled name itself.
   StringRef mangledName =
@@ -4633,6 +4688,8 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
   if (!verificationEnabled) return;
   
   Demangle::Demangler Dem;
+  Dem.setSymbolicReferenceResolver(ResolveToDemanglingForContext(Dem));
+
   auto node = _swift_buildDemanglingForMetadata(metadata, Dem);
   // If the mangled node involves types in an AnonymousContext, then by design,
   // it cannot be looked up by name.

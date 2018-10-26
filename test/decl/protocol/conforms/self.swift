@@ -86,3 +86,29 @@ extension Node {
 }
 
 class IntNode: Node {}
+
+// SR-8902
+protocol P8902 {
+    associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+    func f(_ x: A) -> Self
+}
+struct S : P8902 {
+    func f(_ x: Bool) -> S { fatalError() }
+}
+class C8902 : P8902 { // expected-error {{type 'C8902' does not conform to protocol 'P8902'}}
+    func f(_ x: Bool) -> C8902 { fatalError() }
+}
+final class C8902b : P8902 {
+    func f(_ x: Bool) -> C8902b { fatalError() }
+}
+class C8902c : P8902 {
+    func f(_ x: Bool) -> Self { fatalError() }
+}
+protocol P8902complex {
+  associatedtype A
+  func f() -> (A, Self?)
+}
+final class C8902complex : P8902complex {
+  func f() -> (Bool, C8902complex?) { fatalError() }
+}
+

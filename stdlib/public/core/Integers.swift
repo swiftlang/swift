@@ -2875,7 +2875,7 @@ extension FixedWidthInteger {
 }
 
 extension FixedWidthInteger {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @_semantics("optimize.sil.specialize.generic.partial.never")
   public // @testable
   static func _convert<Source : BinaryFloatingPoint>(
@@ -2926,7 +2926,7 @@ extension FixedWidthInteger {
   /// - Parameter source: A floating-point value to convert to an integer.
   ///   `source` must be representable in this type after rounding toward
   ///   zero.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init<T : BinaryFloatingPoint>(_ source: T) {

@@ -303,14 +303,14 @@ extension Unicode.UTF8 : UnicodeCodec {
   public static func _nullCodeUnitOffset(
     in input: UnsafePointer<CodeUnit>
   ) -> Int {
-    return Int(_stdlib_strlen_unsigned(input))
+    return Int(_swift_stdlib_strlen_unsigned(input))
   }
   // Support parsing C strings as-if they are UTF8 strings.
   @inlinable // FIXME(sil-serialize-all)
   public static func _nullCodeUnitOffset(
     in input: UnsafePointer<CChar>
   ) -> Int {
-    return Int(_stdlib_strlen(input))
+    return Int(_swift_stdlib_strlen(input))
   }
 }
 

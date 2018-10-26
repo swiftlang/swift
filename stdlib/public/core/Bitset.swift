@@ -38,7 +38,10 @@ extension _UnsafeBitset {
   @inline(__always)
   internal static func word(for element: Int) -> Int {
     _sanityCheck(element >= 0)
-    return element / Word.capacity
+    // Note: We perform on UInts to get faster unsigned math (shifts).
+    let element = UInt(bitPattern: element)
+    let capacity = UInt(bitPattern: Word.capacity)
+    return Int(bitPattern: element / capacity)
   }
 
   @inlinable
@@ -61,7 +64,7 @@ extension _UnsafeBitset {
   @inline(__always)
   internal static func join(word: Int, bit: Int) -> Int {
     _sanityCheck(bit >= 0 && bit < Word.capacity)
-    return word * Word.capacity + bit
+    return word &* Word.capacity &+ bit
   }
 }
 
@@ -69,14 +72,14 @@ extension _UnsafeBitset {
   @inlinable
   @inline(__always)
   internal static func wordCount(forCapacity capacity: Int) -> Int {
-    return (capacity + Word.capacity - 1) / Word.capacity
+    return word(for: capacity &+ Word.capacity &- 1)
   }
 
   @inlinable
   internal var capacity: Int {
     @inline(__always)
     get {
-      return wordCount * Word.capacity
+      return wordCount &* Word.capacity
     }
   }
 

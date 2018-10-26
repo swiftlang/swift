@@ -57,10 +57,6 @@ SILValue stripAddressAccess(SILValue V);
 /// instructions.
 SILValue stripAddressProjections(SILValue V);
 
-/// Return the underlying SILValue after stripping off all address projection
-/// instructions which have a single operand.
-SILValue stripUnaryAddressProjections(SILValue V);
-
 /// Return the underlying SILValue after stripping off all aggregate projection
 /// instructions.
 ///

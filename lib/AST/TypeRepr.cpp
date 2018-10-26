@@ -28,6 +28,11 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
+#define TYPEREPR(Id, _) \
+  static_assert(IsTriviallyDestructible<Id##TypeRepr>::value, \
+                "TypeReprs are BumpPtrAllocated; the d'tor is never called");
+#include "swift/AST/TypeReprNodes.def"
+
 SourceLoc TypeRepr::getLoc() const {
   switch (getKind()) {
 #define TYPEREPR(CLASS, PARENT) \
@@ -256,28 +261,6 @@ TypeRepr *CloneVisitor::visitSILBoxTypeRepr(SILBoxTypeRepr *type) {
 TypeRepr *TypeRepr::clone(const ASTContext &ctx) const {
   CloneVisitor visitor(ctx);
   return visitor.visit(const_cast<TypeRepr *>(this));
-}
-
-void TypeRepr::visitTopLevelTypeReprs(
-       llvm::function_ref<void(IdentTypeRepr *)> visitor) {
-  TypeRepr *typeRepr = this;
-
-  // Look through attributed type representations.
-  while (auto attr = dyn_cast<AttributedTypeRepr>(typeRepr))
-    typeRepr = attr->getTypeRepr();
-
-  // Handle identifier type representations.
-  if (auto ident = dyn_cast<IdentTypeRepr>(typeRepr)) {
-    visitor(ident);
-    return;
-  }
-
-  // Recurse into protocol compositions.
-  if (auto composition = dyn_cast<CompositionTypeRepr>(typeRepr)) {
-    for (auto type: composition->getTypes())
-      type->visitTopLevelTypeReprs(visitor);
-    return;
-  }
 }
 
 void ErrorTypeRepr::printImpl(ASTPrinter &Printer,

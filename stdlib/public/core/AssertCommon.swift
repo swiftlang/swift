@@ -59,8 +59,7 @@ func _isStdlibInternalChecksEnabled() -> Bool {
 }
 
 @usableFromInline @_transparent
-internal
-func _fatalErrorFlags() -> UInt32 {
+internal func _fatalErrorFlags() -> UInt32 {
   // The current flags are:
   // (1 << 0): Report backtrace on fatal error
 #if os(iOS) || os(tvOS) || os(watchOS)
@@ -77,6 +76,7 @@ func _fatalErrorFlags() -> UInt32 {
 /// bloats code.
 @usableFromInline
 @inline(never)
+@_semantics("programtermination_point")
 internal func _assertionFailure(
   _ prefix: StaticString, _ message: StaticString,
   file: StaticString, line: UInt,
@@ -107,6 +107,7 @@ internal func _assertionFailure(
 /// bloats code.
 @usableFromInline
 @inline(never)
+@_semantics("programtermination_point")
 internal func _assertionFailure(
   _ prefix: StaticString, _ message: String,
   file: StaticString, line: UInt,
@@ -137,6 +138,7 @@ internal func _assertionFailure(
 /// bloats code.
 @usableFromInline
 @inline(never)
+@_semantics("programtermination_point")
 internal func _assertionFailure(
   _ prefix: StaticString, _ message: String,
   flags: UInt32
@@ -162,18 +164,18 @@ internal func _assertionFailure(
 /// bloats code.
 @usableFromInline
 @inline(never)
-@_semantics("arc.programtermination_point")
+@_semantics("programtermination_point")
 internal func _fatalErrorMessage(
   _ prefix: StaticString, _ message: StaticString,
   file: StaticString, line: UInt,
   flags: UInt32
 ) -> Never {
 #if INTERNAL_CHECKS_ENABLED
-  prefix.withUTF8Buffer {
+  prefix.withUTF8Buffer() {
     (prefix) in
-    message.withUTF8Buffer {
+    message.withUTF8Buffer() {
       (message) in
-      file.withUTF8Buffer {
+      file.withUTF8Buffer() {
         (file) in
         _swift_stdlib_reportFatalErrorInFile(
           prefix.baseAddress!, CInt(prefix.count),
@@ -184,9 +186,9 @@ internal func _fatalErrorMessage(
     }
   }
 #else
-  prefix.withUTF8Buffer {
+  prefix.withUTF8Buffer() {
     (prefix) in
-    message.withUTF8Buffer {
+    message.withUTF8Buffer() {
       (message) in
       _swift_stdlib_reportFatalError(
         prefix.baseAddress!, CInt(prefix.count),

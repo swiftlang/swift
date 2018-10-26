@@ -9,7 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-stdlib-swift-swift3
+// RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
 
 // FIXME: This test runs very slowly on watchOS.
@@ -17,9 +17,9 @@
 
 public enum ApproximateCount {
   case Unknown
-  case Precise(IntMax)
-  case Underestimate(IntMax)
-  case Overestimate(IntMax)
+  case Precise(Int64)
+  case Underestimate(Int64)
+  case Overestimate(Int64)
 }
 
 public protocol ApproximateCountableSequence : Sequence {

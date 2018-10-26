@@ -66,8 +66,11 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   // The only requirement for deriving Parameterized is that there exist some
   // stored properties marked with @TFParameter. The `Parameters` struct can
   // always be derived, even if parameters have different types.
-  if (*knownProtocol == KnownProtocolKind::Parameterized)
-    return !Nominal->getAllTFParameters().empty();
+  if (*knownProtocol == KnownProtocolKind::Parameterized) {
+    SmallVector<VarDecl *, 8> params;
+    Nominal->getAllTFParameters(params);
+    return !params.empty();
+  }
 
   // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::ParameterGroup)
@@ -439,19 +442,6 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
       Protocol->isSpecificProtocol(KnownProtocolKind::Hashable)) {
     auto ED = dyn_cast<EnumDecl>(Nominal);
     allowCrossfileExtensions = ED && ED->hasOnlyCasesWithoutAssociatedValues();
-  }
-
-  if (TC.Context.isSwiftVersion3()) {
-    // In Swift 3, a 'private' property can't be accessed in any extensions, so
-    // we can't synthesize anything that uses them. Thus, we stick to the old
-    // rule for synthesis, which is never in an extension except for the
-    // Equatable/Hashable cases mentioned above.
-    if (!allowCrossfileExtensions && Nominal != ConformanceDecl) {
-      TC.diagnose(ConformanceDecl->getLoc(),
-                  diag::swift3_cannot_synthesize_in_extension,
-                  getProtocolType());
-      return true;
-    }
   }
 
   if (!allowCrossfileExtensions &&

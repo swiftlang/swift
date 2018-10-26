@@ -508,3 +508,22 @@ protocol P20 {
 struct S19 : P20 {  // expected-error{{type 'S19' does not conform to protocol 'P20'}}
   typealias TT = Int?
 }
+
+// rdar://problem/44777661
+struct S30<T> where T : P30 {}
+
+protocol P30 {
+  static func bar()
+}
+
+protocol P31 {
+  associatedtype T : P30
+}
+
+extension S30 : P31 where T : P31 {}
+
+extension S30 {
+  func foo() {
+    T.bar()
+  }
+}

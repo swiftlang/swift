@@ -275,15 +275,13 @@ extension _NativeDictionary {
   @inlinable
   @inline(__always)
   func validatedBucket(for index: Dictionary<Key, Value>.Index) -> Bucket {
-    switch index._variant {
-    case .native(let native):
-      return validatedBucket(for: native)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoa):
+    guard index._isNative else {
       index._cocoaPath()
       // Accept Cocoa indices as long as they contain a key that exists in this
       // dictionary, and the address of their Cocoa object generates the same
       // age.
+      let cocoa = index._asCocoa
       if cocoa.age == self.age {
         let key = _forceBridgeFromObjectiveC(cocoa.key, Key.self)
         let (bucket, found) = find(key)
@@ -293,8 +291,9 @@ extension _NativeDictionary {
       }
       _preconditionFailure(
         "Attempting to access Dictionary elements using an invalid index")
-#endif
     }
+#endif
+    return validatedBucket(for: index._asNative)
   }
 }
 
@@ -316,7 +315,13 @@ extension _NativeDictionary: _DictionaryBuffer {
 
   @inlinable
   internal func index(after index: Index) -> Index {
-    // Note that _asNative forces this not to work on Cocoa indices.
+#if _runtime(_ObjC)
+    guard _fastPath(index._isNative) else {
+      let _ = validatedBucket(for: index)
+      let i = index._asCocoa
+      return Index(_cocoa: i.dictionary.index(after: i))
+    }
+#endif
     let bucket = validatedBucket(for: index._asNative)
     let next = hashTable.occupiedBucket(after: bucket)
     return Index(_native: _HashTable.Index(bucket: next, age: age))
@@ -421,7 +426,7 @@ extension _NativeDictionary { // Insertions
       let bucket = hashTable.insertNew(hashValue: hashValue)
       uncheckedInitialize(at: bucket, toKey: key, value: value)
     }
-    _storage._count += 1
+    _storage._count &+= 1
   }
 
   /// Insert a new entry into uniquely held storage.
@@ -521,6 +526,43 @@ extension _NativeDictionary {
   }
 }
 
+extension _NativeDictionary where Value: Equatable {
+  @inlinable
+  @inline(__always)
+  func isEqual(to other: _NativeDictionary) -> Bool {
+    if self._storage === other._storage { return true }
+    if self.count != other.count { return false }
+
+    for (key, value) in self {
+      let (bucket, found) = other.find(key)
+      guard found, other.uncheckedValue(at: bucket) == value else {
+        return false
+      }
+    }
+    return true
+  }
+
+#if _runtime(_ObjC)
+  @inlinable
+  func isEqual(to other: _CocoaDictionary) -> Bool {
+    if self.count != other.count { return false }
+
+    defer { _fixLifetime(self) }
+    for bucket in self.hashTable {
+      let key = self.uncheckedKey(at: bucket)
+      let value = self.uncheckedValue(at: bucket)
+      guard
+        let cocoaValue = other.lookup(_bridgeAnythingToObjectiveC(key)),
+        value == _forceBridgeFromObjectiveC(cocoaValue, Value.self)
+      else {
+        return false
+      }
+    }
+    return true
+  }
+#endif
+}
+
 extension _NativeDictionary: _HashTableDelegate {
   @inlinable
   @inline(__always)
@@ -540,6 +582,7 @@ extension _NativeDictionary: _HashTableDelegate {
 
 extension _NativeDictionary { // Deletion
   @inlinable
+  @_effects(releasenone)
   internal func _delete(at bucket: Bucket) {
     hashTable.delete(at: bucket, with: self)
     _storage._count -= 1
@@ -655,6 +698,7 @@ extension _NativeDictionary: Sequence {
     internal var iterator: _HashTable.Iterator
 
     @inlinable
+    @inline(__always)
     init(_ base: __owned _NativeDictionary) {
       self.base = base
       self.iterator = base.hashTable.makeIterator()
@@ -672,18 +716,21 @@ extension _NativeDictionary.Iterator: IteratorProtocol {
   internal typealias Element = (key: Key, value: Value)
 
   @inlinable
+  @inline(__always)
   internal mutating func nextKey() -> Key? {
     guard let index = iterator.next() else { return nil }
     return base.uncheckedKey(at: index)
   }
 
   @inlinable
+  @inline(__always)
   internal mutating func nextValue() -> Value? {
     guard let index = iterator.next() else { return nil }
     return base.uncheckedValue(at: index)
   }
 
   @inlinable
+  @inline(__always)
   internal mutating func next() -> Element? {
     guard let index = iterator.next() else { return nil }
     let key = base.uncheckedKey(at: index)

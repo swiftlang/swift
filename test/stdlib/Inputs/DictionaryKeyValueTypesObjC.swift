@@ -20,12 +20,7 @@ public func convertNSDictionaryToDictionary<
 
 func isNativeDictionary<KeyTy : Hashable, ValueTy>(
   _ d: Dictionary<KeyTy, ValueTy>) -> Bool {
-  switch d._variant {
-  case .native:
-    return true
-  case .cocoa:
-    return false
-  }
+  return d._variant.isNative
 }
 
 func isCocoaDictionary<KeyTy : Hashable, ValueTy>(

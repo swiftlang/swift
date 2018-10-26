@@ -43,8 +43,6 @@
 // CHECK-SAME:   @"$s16class_resilience14ResilientChildCMa"
 // --       field descriptor:
 // CHECK-SAME:   @"$s16class_resilience14ResilientChildCMF"
-// -- superclass:
-// CHECK-SAME:   @"got.$s15resilient_class22ResilientOutsideParentCMn"
 // -- metadata bounds:
 // CHECK-SAME:   @"$s16class_resilience14ResilientChildCMo"
 // --       metadata positive size in words (not used):
@@ -55,6 +53,8 @@
 // CHECK-SAME:   i32 1,
 // --       field offset vector offset:
 // CHECK-SAME:   i32 3,
+// -- superclass:
+// CHECK-SAME:   @"got.$s15resilient_class22ResilientOutsideParentCMn"
 // --       singleton metadata initialization cache:
 // CHECK-SAME:   @"$s16class_resilience14ResilientChildCMl"
 // --       resilient pattern:
@@ -415,7 +415,7 @@ extension ResilientGenericOutsideParent {
 // CHECK: dependency-satisfied:
 
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
-// CHECK:      void @swift_initClassMetadata(%swift.type* %0, %swift.type* null, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK:      void @swift_initClassMetadata(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
 
 // CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
 // CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$s16class_resilience26ClassWithResilientPropertyC1s16resilient_struct4SizeVvpWvd"
@@ -463,7 +463,7 @@ extension ResilientGenericOutsideParent {
 // CHECK: dependency-satisfied:
 
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
-// CHECK:      call void @swift_initClassMetadata(%swift.type* %0, %swift.type* null, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+// CHECK:      call void @swift_initClassMetadata(%swift.type* %0, [[INT]] 256, [[INT]] 2, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
 
 // CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
 // CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$s16class_resilience33ClassWithResilientlySizedPropertyC1r16resilient_struct9RectangleVvpWvd"
@@ -495,27 +495,10 @@ extension ResilientGenericOutsideParent {
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s16class_resilience14ResilientChildCMr"(%swift.type*, i8*, i8**)
 
-// Initialize the superclass field...
-// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s15resilient_class22ResilientOutsideParentCMa"([[INT]] 257)
-// CHECK:      [[SUPER:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK-NEXT: [[STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
-// CHECK-NEXT: [[RESULT:%.*]] = icmp ule [[INT]] [[STATUS]], 1
-// CHECK-NEXT: br i1 [[RESULT]], label %dependency-satisfied, label %metadata-dependencies.cont
-
-// CHECK: dependency-satisfied:
-
 // Initialize field offset vector...
-// CHECK:      call void @swift_initClassMetadata(%swift.type* %0, %swift.type* [[SUPER]], [[INT]] 0, [[INT]] 1, i8*** {{.*}}, [[INT]]* {{.*}})
+// CHECK:      call void @swift_initClassMetadata(%swift.type* %0, [[INT]] 0, [[INT]] 1, i8*** {{.*}}, [[INT]]* {{.*}})
 
-// CHECK:      br label %metadata-dependencies.cont
-
-// CHECK: metadata-dependencies.cont:
-
-// CHECK-NEXT: [[PENDING_METADATA:%.*]] = phi %swift.type* [ [[SUPER]], %entry ], [ null, %dependency-satisfied ]
-// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ 1, %entry ], [ 0, %dependency-satisfied ]
-// CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[PENDING_METADATA]], 0
-// CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
-// CHECK-NEXT: ret %swift.metadata_response [[T1]]
+// CHECK: ret %swift.metadata_response
 
 
 // ResilientChild method lookup function
@@ -555,25 +538,7 @@ extension ResilientGenericOutsideParent {
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s16class_resilience16FixedLayoutChildCMr"(%swift.type*, i8*, i8**)
 
 // Initialize the superclass field...
-// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s15resilient_class22ResilientOutsideParentCMa"([[INT]] 257)
-// CHECK:      [[SUPER:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK-NEXT: [[STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
-// CHECK-NEXT: [[RESULT:%.*]] = icmp ule [[INT]] [[STATUS]], 1
-// CHECK-NEXT: br i1 [[RESULT]], label %dependency-satisfied, label %metadata-dependencies.cont
-
-// CHECK: dependency-satisfied:
-
-// CHECK:      call void @swift_initClassMetadata(%swift.type* %0, %swift.type* [[SUPER]], [[INT]] 0, [[INT]] 1, i8*** {{%.*}}, [[INT]]* {{%.*}})
-
-// CHECK:      br label %metadata-dependencies.cont
-
-// CHECK: metadata-dependencies.cont:
-
-// CHECK-NEXT: [[PENDING_METADATA:%.*]] = phi %swift.type* [ [[SUPER]], %entry ], [ null, %dependency-satisfied ]
-// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ 1, %entry ], [ 0, %dependency-satisfied ]
-// CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[PENDING_METADATA]], 0
-// CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
-// CHECK-NEXT: ret %swift.metadata_response [[T1]]
+// CHECK:      call void @swift_initClassMetadata(%swift.type* %0, [[INT]] 0, [[INT]] 1, i8*** {{%.*}}, [[INT]]* {{%.*}})
 
 
 // FixedLayoutChild metadata relocation function
@@ -593,19 +558,8 @@ extension ResilientGenericOutsideParent {
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s16class_resilience21ResilientGenericChildCMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**)
 
-// Initialize the superclass pointer...
-// CHECK:              [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s15resilient_class29ResilientGenericOutsideParentCMa"([[INT]] 257, %swift.type* %T)
-// CHECK:              [[SUPER:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK:              [[SUPER_STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
-// CHECK:              [[SUPER_OK:%.*]] = icmp ule [[INT]] [[SUPER_STATUS]], 1
-// CHECK:              br i1 [[SUPER_OK]],
-
-// CHECK:              call void @swift_initClassMetadata(%swift.type* [[METADATA]], %swift.type* [[SUPER]], [[INT]] 0,
-// CHECK:              [[DEP:%.*]] = phi %swift.type* [ [[SUPER]], {{.*}} ], [ null, {{.*}} ]
-// CHECK:              [[DEP_REQ:%.*]] = phi [[INT]] [ 1, {{.*}} ], [ 0, {{.*}} ]
-// CHECK:              [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[DEP]], 0
-// CHECK:              [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[DEP_REQ]], 1
-// CHECK:              ret %swift.metadata_response [[T1]]
+// CHECK:              call void @swift_initClassMetadata(%swift.type* [[METADATA]], [[INT]] 0,
+// CHECK:              ret %swift.metadata_response
 
 
 // ResilientGenericChild method lookup function

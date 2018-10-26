@@ -1,6 +1,4 @@
-
-// RUN: %target-swift-frontend -module-name access_enforcement_noescape -enable-sil-ownership -enforce-exclusivity=checked -Onone -emit-sil -swift-version 4 -verify -parse-as-library %s
-// RUN: %target-swift-frontend -module-name access_enforcement_noescape -enable-sil-ownership -enforce-exclusivity=checked -Onone -emit-sil -swift-version 3 -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name access_enforcement_noescape -enable-sil-ownership -enforce-exclusivity=checked -Onone -emit-sil -swift-version 4 -parse-as-library %s | %FileCheck %s
 // REQUIRES: asserts
 
 // This tests SILGen and AccessEnforcementSelection as a single set of tests.
@@ -10,6 +8,11 @@
 // These tests attempt to fully cover the possibilities of reads and
 // modifications to captures along with `inout` arguments on both the caller and
 // callee side.
+//
+// Tests that result in a compile-time error have been commented out
+// here so we can FileCheck this output. Instead, copies of these
+// tests are compiled access_enforcement_noescape_error.swift to check
+// the compiler diagnostics.
 
 // Helper
 func doOne(_ f: () -> ()) {
@@ -177,29 +180,11 @@ func readWrite() {
 func inoutReadWrite(x: inout Int) {
   // Inside closure 1: [read] [static]
   // Inside closure 2: [modify] [static]
-  doTwo({ _ = x }, { x = 3 })
+  // Compile time error: see access_enforcement_noescape_error.swift.
+  // doTwo({ _ = x }, { x = 3 })
 }
 
 // CHECK-LABEL: sil hidden @$s27access_enforcement_noescape14inoutReadWrite1xySiz_tF : $@convention(thin) (@inout Int) -> () {
-// CHECK: [[PA1:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT1:%.*]] = convert_escape_to_noescape [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
-// CHECK: [[PA2:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT2:%.*]] = convert_escape_to_noescape [[PA2]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
-// CHECK: apply %{{.*}}([[CVT1]], [[CVT2]])
-// CHECK-LABEL: } // end sil function '$s27access_enforcement_noescape14inoutReadWrite1xySiz_tF'
-
-// closure #1 in inoutReadWrite(x:)
-// CHECK-LABEL: sil private @$s27access_enforcement_noescape14inoutReadWrite1xySiz_tFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
-// CHECK: [[ACCESS:%.*]] = begin_access [read] [static] %0 : $*Int
-// CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$s27access_enforcement_noescape14inoutReadWrite1xySiz_tFyyXEfU_'
-
-// closure #2 in inoutReadWrite(x:)
-// CHECK-LABEL: sil private @$s27access_enforcement_noescape14inoutReadWrite1xySiz_tFyyXEfU0_ : $@convention(thin) (@inout_aliasable Int) -> () {
-// CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] %0 : $*Int
-// CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$s27access_enforcement_noescape14inoutReadWrite1xySiz_tFyyXEfU0_'
-
 
 func readBoxWrite() {
   var x = 3
@@ -277,47 +262,21 @@ func readWriteInout() {
   var x = 3
   // Around the call: [modify] [static]
   // Inside closure: [modify] [static]
-  // expected-error@+2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
-  // expected-note@+1{{conflicting access is here}}
-  doOneInout({ _ = x }, &x)
+  // Compile time error: see access_enforcement_noescape_error.swift.
+  // doOneInout({ _ = x }, &x)
 }
 
 // CHECK-LABEL: sil hidden @$s27access_enforcement_noescape14readWriteInoutyyF : $@convention(thin) () -> () {
-// CHECK: [[PA1:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT:%.*]] = convert_escape_to_noescape [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
-// CHECK: [[ACCESS2:%.*]] = begin_access [modify] [static] %0 : $*Int
-// CHECK: apply %{{.*}}([[CVT]], [[ACCESS2]])
-// CHECK: end_access [[ACCESS2]]
-// CHECK-LABEL: } // end sil function '$s27access_enforcement_noescape14readWriteInoutyyF'
-
-// closure #1 in readWriteInout()
-// CHECK-LABEL: sil private @$s27access_enforcement_noescape14readWriteInoutyyFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
-// CHECK: [[ACCESS:%.*]] = begin_access [read] [static] %0 : $*Int
-// CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$s27access_enforcement_noescape14readWriteInoutyyFyyXEfU_'
 
 // Error: noescape read + write inout of an inout.
 func inoutReadWriteInout(x: inout Int) {
   // Around the call: [modify] [static]
   // Inside closure: [modify] [static]
-  // expected-error@+2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
-  // expected-note@+1{{conflicting access is here}}
-  doOneInout({ _ = x }, &x)
+  // Compile time error: see access_enforcement_noescape_error.swift.
+  // doOneInout({ _ = x }, &x)
 }
 
 // CHECK-LABEL: sil hidden @$s27access_enforcement_noescape19inoutReadWriteInout1xySiz_tF : $@convention(thin) (@inout Int) -> () {
-// CHECK: [[PA1:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT:%.*]] = convert_escape_to_noescape [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
-// CHECK: [[ACCESS2:%.*]] = begin_access [modify] [static] %0 : $*Int
-// CHECK: apply %{{.*}}([[CVT]], [[ACCESS2]])
-// CHECK: end_access [[ACCESS2]]
-// CHECK-LABEL: } // end sil function '$s27access_enforcement_noescape19inoutReadWriteInout1xySiz_tF'
-
-// closure #1 in inoutReadWriteInout(x:)
-// CHECK-LABEL: sil private @$s27access_enforcement_noescape19inoutReadWriteInout1xySiz_tFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
-// CHECK: [[ACCESS:%.*]] = begin_access [read] [static] %0 : $*Int
-// CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$s27access_enforcement_noescape19inoutReadWriteInout1xySiz_tFyyXEfU_'
 
 // Traps on boxed read + write inout.
 // Covered by Interpreter/enforce_exclusive_access.swift.
@@ -454,48 +413,21 @@ func writeWriteInout() {
   var x = 3
   // Around the call: [modify] [static]
   // Inside closure: [modify] [static]
-  // expected-error@+2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
-  // expected-note@+1{{conflicting access is here}}
-  doOneInout({ x = 42 }, &x)
+  // Compile time error: see access_enforcement_noescape_error.swift.
+  // doOneInout({ x = 42 }, &x)
 }
 
 // CHECK-LABEL: sil hidden @$s27access_enforcement_noescape15writeWriteInoutyyF : $@convention(thin) () -> () {
-// CHECK: [[PA1:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT:%.*]] = convert_escape_to_noescape [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
-// CHECK: [[ACCESS2:%.*]] = begin_access [modify] [static] %0 : $*Int
-// CHECK: apply %{{.*}}([[CVT]], [[ACCESS2]])
-// CHECK: end_access [[ACCESS2]]
-// CHECK-LABEL: } // end sil function '$s27access_enforcement_noescape15writeWriteInoutyyF'
-
-// closure #1 in writeWriteInout()
-// CHECK-LABEL: sil private @$s27access_enforcement_noescape15writeWriteInoutyyFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
-// CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] %0 : $*Int
-// CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$s27access_enforcement_noescape15writeWriteInoutyyFyyXEfU_'
 
 // Error: on noescape write + write inout.
 func inoutWriteWriteInout(x: inout Int) {
   // Around the call: [modify] [static]
   // Inside closure: [modify] [static]
-  // expected-error@+2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
-  // expected-note@+1{{conflicting access is here}}
-  doOneInout({ x = 42 }, &x)
+  // Compile time error: see access_enforcement_noescape_error.swift.
+  // doOneInout({ x = 42 }, &x)
 }
 
 // inoutWriteWriteInout(x:)
-// CHECK-LABEL: sil hidden @$s27access_enforcement_noescape010inoutWriteE5Inout1xySiz_tF : $@convention(thin) (@inout Int) -> () {
-// CHECK: [[PA1:%.*]] = partial_apply [callee_guaranteed]
-// CHECK: [[CVT:%.*]] = convert_escape_to_noescape [[PA1]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
-// CHECK: [[ACCESS2:%.*]] = begin_access [modify] [static] %0 : $*Int
-// CHECK: apply %{{.*}}([[CVT]], [[ACCESS2]])
-// CHECK: end_access [[ACCESS2]]
-// CHECK-LABEL: // end sil function '$s27access_enforcement_noescape010inoutWriteE5Inout1xySiz_tF'
-
-// closure #1 in inoutWriteWriteInout(x:)
-// CHECK-LABEL: sil private @$s27access_enforcement_noescape010inoutWriteE5Inout1xySiz_tFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
-// CHECK: [[ACCESS:%.*]] = begin_access [modify] [static] %0 : $*Int
-// CHECK: end_access [[ACCESS]] 
-// CHECK-LABEL: } // end sil function '$s27access_enforcement_noescape010inoutWriteE5Inout1xySiz_tFyyXEfU_'
 
 // Traps on boxed write + write inout.
 // Covered by Interpreter/enforce_exclusive_access.swift.
@@ -536,23 +468,11 @@ func readBlockWriteInout() {
   var x = 3
   // Around the call: [modify] [static]
   // Inside closure: [read] [static]
-  // expected-error@+2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
-  // expected-note@+1{{conflicting access is here}}
-  doBlockInout({ _ = x }, &x)
+  // Compile time error: see access_enforcement_noescape_error.swift.
+  // doBlockInout({ _ = x }, &x)
 }
 
 // CHECK-LABEL: sil hidden @$s27access_enforcement_noescape19readBlockWriteInoutyyF : $@convention(thin) () -> () {
-// CHECK: [[F1:%.*]] = function_ref @$s27access_enforcement_noescape19readBlockWriteInoutyyFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> ()
-// CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] [[F1]](%0) : $@convention(thin) (@inout_aliasable Int) -> ()
-// CHECK-NOT: begin_access
-// CHECK: [[WRITE:%.*]] = begin_access [modify] [static] %0 : $*Int
-// CHECK: apply
-// CHECK: end_access [[WRITE]] : $*Int
-// CHECK-LABEL: } // end sil function '$s27access_enforcement_noescape19readBlockWriteInoutyyF'
-
-// CHECK-LABEL: sil private @$s27access_enforcement_noescape19readBlockWriteInoutyyFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
-// CHECK: begin_access [read] [static] %0 : $*Int
-// CHECK-LABEL: } // end sil function '$s27access_enforcement_noescape19readBlockWriteInoutyyFyyXEfU_'
 
 // Test AccessSummaryAnalysis.
 //
@@ -561,36 +481,8 @@ func readBlockWriteInout() {
 func noEscapeBlock() {
   var x = 3
   doOne {
-    // expected-error@+2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
-    // expected-note@+1{{conflicting access is here}}
-    doBlockInout({ _ = x }, &x)
+    // Compile time error: see access_enforcement_noescape_error.swift.
+    // doBlockInout({ _ = x }, &x)
   }
 }
 // CHECK-LABEL: sil hidden @$s27access_enforcement_noescape13noEscapeBlockyyF : $@convention(thin) () -> () {
-// CHECK: partial_apply [callee_guaranteed]
-// CHECK-NOT: begin_access
-// CHECK: apply
-// CHECK-LABEL: } // end sil function '$s27access_enforcement_noescape13noEscapeBlockyyF'
-
-// CHECK-LABEL: sil private @$s27access_enforcement_noescape13noEscapeBlockyyFyyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
-// CHECK: [[F1:%.*]] = function_ref @$s27access_enforcement_noescape13noEscapeBlockyyFyyXEfU_yyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> ()
-// CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] [[F1]](%0) : $@convention(thin) (@inout_aliasable Int) -> ()
-// CHECK: [[CVT:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
-// CHECK: [[PA2:%.*]] = partial_apply
-// CHECK: [[SENTINEL:%.*]] = mark_dependence [[PA2]]{{.*}}on{{.*}}[[CVT]]
-// CHECK: strong_retain [[SENTINEL]]
-// CHECK: [[STORAGE:%.*]] = alloc_stack $@block_storage @callee_guaranteed () -> ()
-// CHECK: [[ADDR:%.*]] = project_block_storage [[STORAGE]] : $*@block_storage @callee_guaranteed () -> ()
-// CHECK: store [[SENTINEL]] to [[ADDR]] : $*@callee_guaranteed () -> ()
-// CHECK: [[F2:%.*]] = function_ref @$sIeg_IyB_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
-// CHECK: [[BLOCK:%.*]] = init_block_storage_header [[STORAGE]] : $*@block_storage @callee_guaranteed () -> (), invoke [[F2]] : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
-// CHECK: [[ARG:%.*]] = copy_block [[BLOCK]] : $@convention(block) @noescape () -> ()
-// CHECK: [[WRITE:%.*]] = begin_access [modify] [static] %0 : $*Int
-// CHECK: apply %{{.*}}([[ARG]], [[WRITE]]) : $@convention(thin) (@guaranteed @convention(block) @noescape () -> (), @inout Int) -> ()
-// CHECK: end_access [[WRITE]] : $*Int
-// CHECK: dealloc_stack [[STORAGE]] : $*@block_storage @callee_guaranteed () -> ()
-// CHECK-LABEL: } // end sil function '$s27access_enforcement_noescape13noEscapeBlockyyFyyXEfU_'
-
-// CHECK-LABEL: sil private @$s27access_enforcement_noescape13noEscapeBlockyyFyyXEfU_yyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> () {
-// CHECK: begin_access [read] [static] %0 : $*Int
-// CHECK-LABEL: } // end sil function '$s27access_enforcement_noescape13noEscapeBlockyyFyyXEfU_yyXEfU_'

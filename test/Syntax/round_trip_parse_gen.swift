@@ -540,6 +540,17 @@ struct S : Q, Equatable {
   fileprivate(set) var x: String
 }
 
+struct ReadModify {
+  var st0 = ("a", "b")
+  var rm0: (String, String) {
+    _read { yield (("a", "b")) }
+    _modify { yield &st0 }
+  }
+  var rm1: (String, String) {
+    _read { yield (st0) }
+  }
+}
+
 @_alignment(16) public struct float3 { public var x, y, z: Float }
 
 #sourceLocation(file: "otherFile.swift", line: 5)

@@ -1093,6 +1093,30 @@ bool TermInst::isFunctionExiting() const {
   llvm_unreachable("Unhandled TermKind in switch.");
 }
 
+bool TermInst::isProgramTerminating() const {
+  switch (getTermKind()) {
+  case TermKind::BranchInst:
+  case TermKind::CondBranchInst:
+  case TermKind::SwitchValueInst:
+  case TermKind::SwitchEnumInst:
+  case TermKind::SwitchEnumAddrInst:
+  case TermKind::DynamicMethodBranchInst:
+  case TermKind::CheckedCastBranchInst:
+  case TermKind::CheckedCastValueBranchInst:
+  case TermKind::CheckedCastAddrBranchInst:
+  case TermKind::ReturnInst:
+  case TermKind::ThrowInst:
+  case TermKind::UnwindInst:
+  case TermKind::TryApplyInst:
+  case TermKind::YieldInst:
+    return false;
+  case TermKind::UnreachableInst:
+    return true;
+  }
+
+  llvm_unreachable("Unhandled TermKind in switch.");
+}
+
 TermInst::SuccessorBlockArgumentsListTy
 TermInst::getSuccessorBlockArguments() const {
   function_ref<PhiArgumentArrayRef(const SILSuccessor &)> op;

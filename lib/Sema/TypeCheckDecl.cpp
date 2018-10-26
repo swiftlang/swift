@@ -383,18 +383,6 @@ static void checkInheritanceClause(
         if (!inheritedTy)
           continue;
       }
-
-      // Swift 3 compatibility -- a class inheriting from AnyObject is a no-op.
-      if (ctx.LangOpts.isSwiftVersion3() && isa<ClassDecl>(decl) &&
-          inheritedTy->isAnyObject()) {
-        auto classDecl = cast<ClassDecl>(decl);
-        auto removeRange = getRemovalRange(i);
-        diags.diagnose(inherited.getSourceRange().Start,
-                       diag::class_inherits_anyobject,
-                       classDecl->getDeclaredInterfaceType())
-          .fixItRemoveChars(removeRange.Start, removeRange.End);
-        continue;
-      }
     }
     
     // If this is an enum inheritance clause, check for a raw type.
@@ -2061,31 +2049,42 @@ PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
   return group;
 }
 
-static void checkDesignatedProtocol(OperatorDecl *OD, Identifier name,
-                                    SourceLoc loc, TypeChecker &tc,
-                                    ASTContext &ctx) {
-  auto *dc = OD->getDeclContext();
-  auto *TyR = new (ctx) SimpleIdentTypeRepr(loc, name);
+static NominalTypeDecl *resolveSingleNominalTypeDecl(
+    DeclContext *DC, SourceLoc loc, Identifier ident, TypeChecker &tc,
+    TypeResolutionFlags flags = TypeResolutionFlags(0)) {
+  auto *TyR = new (tc.Context) SimpleIdentTypeRepr(loc, ident);
   TypeLoc typeLoc = TypeLoc(TyR);
 
   TypeResolutionOptions options = TypeResolverContext::TypeAliasDecl;
-  if (tc.validateType(typeLoc, TypeResolution::forContextual(dc), options)) {
-    typeLoc.setInvalidType(ctx);
+  options |= flags;
+  if (tc.validateType(typeLoc, TypeResolution::forInterface(DC), options))
+    return nullptr;
+
+  return typeLoc.getType()->getAnyNominal();
+}
+
+static bool checkDesignatedTypes(OperatorDecl *OD,
+                                 ArrayRef<Identifier> identifiers,
+                                 ArrayRef<SourceLoc> identifierLocs,
+                                 TypeChecker &TC) {
+  assert(identifiers.size() == identifierLocs.size());
+
+  SmallVector<NominalTypeDecl *, 1> designatedNominalTypes;
+  auto *DC = OD->getDeclContext();
+
+  for (auto index : indices(identifiers)) {
+    auto *decl = resolveSingleNominalTypeDecl(DC, identifierLocs[index],
+                                              identifiers[index], TC);
+
+    if (!decl)
+      return true;
+
+    designatedNominalTypes.push_back(decl);
   }
 
-  if (!typeLoc.isError()) {
-    auto *decl = typeLoc.getType()->getNominalOrBoundGenericNominal();
-    if (!decl || !isa<ProtocolDecl>(decl)) {
-      tc.diagnose(typeLoc.getLoc(),
-                  diag::operators_designated_protocol_not_a_protocol,
-                  typeLoc.getType());
-      OD->setInvalid();
-    } else {
-      OD->setDesignatedProtocol(cast<ProtocolDecl>(decl));
-      // FIXME: verify this operator has a declaration within this
-      //        protocol with the same arity and fixity
-    }
-  }
+  auto &ctx = TC.Context;
+  OD->setDesignatedNominalTypes(ctx.AllocateCopy(designatedNominalTypes));
+  return false;
 }
 
 /// Validate the given operator declaration.
@@ -2099,17 +2098,17 @@ void TypeChecker::validateDecl(OperatorDecl *OD) {
 
   auto IOD = dyn_cast<InfixOperatorDecl>(OD);
 
-  auto enableOperatorDesignatedProtocols =
-      getLangOpts().EnableOperatorDesignatedProtocols;
+  auto enableOperatorDesignatedTypes =
+      getLangOpts().EnableOperatorDesignatedTypes;
 
   // Pre- or post-fix operator?
   if (!IOD) {
-    auto *protocol = OD->getDesignatedProtocol();
-    auto protocolId = OD->getDesignatedProtocolName();
-    if (!protocol && !protocolId.empty() &&
-        enableOperatorDesignatedProtocols) {
-      auto protocolIdLoc = OD->getDesignatedProtocolNameLoc();
-      checkDesignatedProtocol(OD, protocolId, protocolIdLoc, *this, Context);
+    auto nominalTypes = OD->getDesignatedNominalTypes();
+    if (nominalTypes.empty() && enableOperatorDesignatedTypes) {
+      auto identifiers = OD->getIdentifiers();
+      auto identifierLocs = OD->getIdentifierLocs();
+      if (checkDesignatedTypes(OD, identifiers, identifierLocs, *this))
+        OD->setInvalid();
     }
     return;
   }
@@ -2117,45 +2116,60 @@ void TypeChecker::validateDecl(OperatorDecl *OD) {
   if (!IOD->getPrecedenceGroup()) {
     PrecedenceGroupDecl *group = nullptr;
 
-    auto firstId = IOD->getFirstIdentifier();
-    auto firstIdLoc = IOD->getFirstIdentifierLoc();
+    auto identifiers = IOD->getIdentifiers();
+    auto identifierLocs = IOD->getIdentifierLocs();
 
-    // If a name was given, try to look it up.
-    if (!firstId.empty()) {
-      group = lookupPrecedenceGroupPrimitive(IOD->getDeclContext(), firstId,
-                                             firstIdLoc);
-    }
-
-    auto secondId = IOD->getSecondIdentifier();
-    auto *protocol = IOD->getDesignatedProtocol();
-    if (!protocol && enableOperatorDesignatedProtocols) {
-      auto secondIdLoc = IOD->getSecondIdentifierLoc();
-      assert(secondId.empty() || !firstId.empty());
-
-      auto protocolId = group ? secondId : firstId;
-      auto protocolIdLoc = group ? secondIdLoc : firstIdLoc;
-      if (!protocolId.empty())
-        checkDesignatedProtocol(IOD, protocolId, protocolIdLoc, *this, Context);
-    }
-
-    if (!group && !IOD->isInvalid()) {
-      if (!firstId.empty() &&
-          (!secondId.empty() || !IOD->getDesignatedProtocol())) {
-        diagnose(firstIdLoc, diag::unknown_precedence_group, firstId);
-        IOD->setInvalid();
+    if (!identifiers.empty()) {
+      group = lookupPrecedenceGroupPrimitive(IOD->getDeclContext(),
+                                             identifiers[0], identifierLocs[0]);
+      if (group) {
+        identifiers = identifiers.slice(1);
+        identifierLocs = identifierLocs.slice(1);
+      } else {
+        // If we're either not allowing types, or we are allowing them
+        // and this identifier is not a type, emit an error as if it's
+        // a precedence group.
+        auto *DC = OD->getDeclContext();
+        if (!(enableOperatorDesignatedTypes &&
+              resolveSingleNominalTypeDecl(
+                  DC, identifierLocs[0], identifiers[0], *this,
+                  TypeResolutionFlags::SilenceErrors))) {
+          diagnose(identifierLocs[0], diag::unknown_precedence_group,
+                   identifiers[0]);
+          identifiers = identifiers.slice(1);
+          identifierLocs = identifierLocs.slice(1);
+        }
       }
+    }
 
+    if (!identifiers.empty() && !enableOperatorDesignatedTypes) {
+      assert(!group);
+      diagnose(identifierLocs[0], diag::unknown_precedence_group,
+               identifiers[0]);
+      identifiers = identifiers.slice(1);
+      identifierLocs = identifierLocs.slice(1);
+      assert(identifiers.empty() && identifierLocs.empty());
+    }
+
+    if (!group) {
       group = lookupPrecedenceGroupPrimitive(
           IOD->getDeclContext(), Context.Id_DefaultPrecedence, SourceLoc());
-      if (!group && firstId.empty() && !IOD->isInvalid()) {
-        diagnose(IOD->getLoc(), diag::missing_builtin_precedence_group,
-                 Context.Id_DefaultPrecedence);
-      }
     }
 
     if (group) {
       validateDecl(group);
       IOD->setPrecedenceGroup(group);
+    } else {
+      diagnose(IOD->getLoc(), diag::missing_builtin_precedence_group,
+               Context.Id_DefaultPrecedence);
+    }
+
+    auto nominalTypes = IOD->getDesignatedNominalTypes();
+    if (nominalTypes.empty() && enableOperatorDesignatedTypes) {
+      if (checkDesignatedTypes(IOD, identifiers, identifierLocs, *this)) {
+        IOD->setInvalid();
+        return;
+      }
     }
   }
 }
@@ -2294,7 +2308,7 @@ static void checkProtocolSelfRequirements(ProtocolDecl *proto,
         case RequirementKind::Layout:
         case RequirementKind::Superclass:
           if (reqRepr &&
-              req.getFirstType()->isEqual(proto->getProtocolSelfType())) {
+              req.getFirstType()->isEqual(proto->getSelfInterfaceType())) {
             auto &diags = proto->getASTContext().Diags;
             diags.diagnose(reqRepr->getSubjectLoc().getLoc(),
                            diag::protocol_where_clause_self_requirement);
@@ -2583,7 +2597,7 @@ public:
         // Static/class declarations require an initializer unless in a
         // protocol.
         if (var->isStatic() && !isa<ProtocolDecl>(varDC)) {
-          // ...but don't enforce this for SIL or textual interface files.
+          // ...but don't enforce this for SIL or parseable interface files.
           switch (varDC->getParentSourceFile()->Kind) {
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
@@ -3063,7 +3077,6 @@ public:
     checkAccessControl(TC, PD);
 
     checkInheritanceClause(PD);
-    checkProtocolSelfRequirements(PD, PD);
 
     TC.checkDeclCircularity(PD);
     if (PD->isResilient())
@@ -3123,7 +3136,7 @@ public:
         return false;
     }
 
-    // Declarations in SIL and textual interface files don't require
+    // Declarations in SIL and parseable interface files don't require
     // definitions.
     if (auto sourceFile = decl->getDeclContext()->getParentSourceFile()) {
       switch (sourceFile->Kind) {
@@ -3456,7 +3469,7 @@ static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
   }
 
   if (tc.validateType(typeAlias->getUnderlyingTypeLoc(),
-                      TypeResolution::forContextual(typeAlias), options)) {
+                      TypeResolution::forInterface(typeAlias), options)) {
     typeAlias->setInvalid();
     typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
   }
@@ -5181,7 +5194,7 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
 
 void TypeChecker::maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   if (auto *SF = classDecl->getParentSourceFile()) {
-    // Allow classes without initializers in SIL and textual interface files.
+    // Allow classes without initializers in SIL and parseable interface files.
     switch (SF->Kind) {
     case SourceFileKind::SIL:
     case SourceFileKind::Interface:
@@ -5316,7 +5329,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   if (decl->isInvalid())
     return;
 
-  // Don't add implicit constructors in textual interfaces.
+  // Don't add implicit constructors in parseable interfaces.
   if (auto *SF = decl->getParentSourceFile()) {
     if (SF->Kind == SourceFileKind::Interface) {
       decl->setAddedImplicitInitializers();

@@ -127,9 +127,9 @@ protocol P2 {
 }
 
 // P2: Begin completions
-// P2-DAG: Decl[GenericTypeParam]/CurrNominal: Self[#Self#];
-// P2-DAG: Decl[AssociatedType]/CurrNominal:   T;
-// P2-DAG: Decl[AssociatedType]/CurrNominal:   U;
+// P2-DAG: Decl[GenericTypeParam]/Super: Self[#Self#];
+// P2-DAG: Decl[AssociatedType]/Super:   T;
+// P2-DAG: Decl[AssociatedType]/Super:   U;
 // P2: End completions
 
 // U_DOT: Begin completions

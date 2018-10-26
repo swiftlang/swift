@@ -31,15 +31,13 @@ struct BenchResults {
     self.stats = self.samples.reduce(into: Stats(), Stats.collect)
   }
 
-  /// Return sample at index nearest to the `quantile`.
+  /// Return measured value for given `quantile`.
   ///
-  /// Explicitly uses round-half-to-even rounding algorithm to match the
-  /// behavior of numpy's quantile(interpolation='nearest') and quantile
-  /// estimate type R-3, SAS-2. See:
+  /// Equivalent to quantile estimate type R-1, SAS-3. See:
   /// https://en.wikipedia.org/wiki/Quantile#Estimating_quantiles_from_a_sample
   subscript(_ quantile: Double) -> T {
-    let index = Int(
-      (Double(samples.count - 1) * quantile).rounded(.toNearestOrEven))
+    let index = Swift.max(0,
+      Int((Double(samples.count) * quantile).rounded(.up)) - 1)
     return samples[index]
   }
 

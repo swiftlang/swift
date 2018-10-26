@@ -1121,7 +1121,7 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
   auto result =
     tc.checkGenericArguments(dc, SourceLoc(), SourceLoc(),
                              typeInContext,
-                             { Type(proto->getProtocolSelfType()) },
+                             { proto->getSelfInterfaceType() },
                              sanitizedRequirements,
                              QuerySubstitutionMap{substitutions},
                              TypeChecker::LookUpConformance(dc),
@@ -1557,7 +1557,7 @@ compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
     if (!t2)
       return true;
 
-    return TC.isSubclassOf(t1, t2, DC);
+    return t2->isExactSuperclassOf(t1);
   };
 
   bool protos1AreSubsetOf2 = protos1.empty();

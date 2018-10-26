@@ -2483,7 +2483,7 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   // Add the attribute that preserves the "has an initializer" value across
   // module generation, as required for TBDGen.
   PBD->getPattern(patternNumber)->forEachVariable([&](VarDecl *VD) {
-    if (VD->hasStorage())
+    if (VD->hasStorage() && !VD->getAttrs().hasAttribute<HasInitialValueAttr>())
       VD->getAttrs().add(new (ctx) HasInitialValueAttr(/*IsImplicit=*/true));
   });
 
@@ -2924,21 +2924,6 @@ bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
 }
 
 bool TypeChecker::isSubtypeOf(Type type1, Type type2, DeclContext *dc) {
-  return typesSatisfyConstraint(type1, type2,
-                                /*openArchetypes=*/false,
-                                ConstraintKind::Subtype, dc);
-}
-
-bool TypeChecker::isSubclassOf(Type type1, Type type2, DeclContext *dc) {
-  assert(type2->getClassOrBoundGenericClass());
-
-  if (!typesSatisfyConstraint(type1,
-                              Context.getAnyObjectType(),
-                              /*openArchetypes=*/false,
-                              ConstraintKind::ConformsTo, dc)) {
-    return false;
-  }
-
   return typesSatisfyConstraint(type1, type2,
                                 /*openArchetypes=*/false,
                                 ConstraintKind::Subtype, dc);

@@ -77,8 +77,8 @@ constexpr static const char BUILTIN_TYPE_NAME_VEC[] = "Builtin.Vec";
 constexpr static const char BUILTIN_TYPE_NAME_SILTOKEN[] = "Builtin.SILToken";
 /// The name of the Builtin type for Word
 constexpr static const char BUILTIN_TYPE_NAME_WORD[] = "Builtin.Word";
-constexpr static StringLiteral SEMANTICS_ARC_PROGRAMTERMINATION_POINT =
-    "arc.programtermination_point";
+constexpr static StringLiteral SEMANTICS_PROGRAMTERMINATION_POINT =
+    "programtermination_point";
 } // end namespace swift
 
 #endif // SWIFT_STRINGS_H

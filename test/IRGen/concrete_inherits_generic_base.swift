@@ -82,16 +82,5 @@ presentBase(Base(x: "two"))
 presentBase(Base(x: 2))
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s3foo12SuperDerivedCMr"(%swift.type*, i8*, i8**)
-// CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s3foo7DerivedCMa"([[INT]] 257)
-// CHECK-NEXT:    [[SUPERCLASS:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK-NEXT:    [[STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
-// CHECK-NEXT:    [[RESULT:%.*]] = icmp ule [[INT]] [[STATUS]], 1
-// CHECK-NEXT:    br i1 [[RESULT]], label %dependency-satisfied, label %metadata-dependencies.cont
-
-// CHECK: dependency-satisfied:
-
 // -- ClassLayoutFlags = 0x100 (HasStaticVTable)
-// CHECK:         call void @swift_initClassMetadata(%swift.type* %0, %swift.type* [[SUPERCLASS]], [[INT]] 256, {{.*}})
-
-// CHECK: metadata-dependencies.cont:
-// CHECK:         ret %swift.metadata_response
+// CHECK:         call void @swift_initClassMetadata(%swift.type* %0, [[INT]] 256, {{.*}})

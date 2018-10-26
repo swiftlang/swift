@@ -9,7 +9,7 @@ Mangling
 --------
 ::
 
-  mangled-name ::= '$S' global
+  mangled-name ::= '$s' global
 
 All Swift-mangled names begin with this prefix.
 
@@ -86,7 +86,7 @@ Globals
 
   global ::= protocol-conformance 'WG'   // generic protocol witness table
   global ::= protocol-conformance 'Wp'   // protocol witness table pattern
-  global ::= protocol-conformance 'Wr'   // resilient witness table
+  global ::= protocol-conformance 'Wr'   // resilient witness table (HISTORICAL)
   global ::= protocol-conformance 'WI'   // generic protocol witness table instantiation function
   global ::= type protocol-conformance 'WL'   // lazy protocol witness table cache variable
 
@@ -114,6 +114,7 @@ field offsets are therefore required when accessing fields in generic
 types where the metadata itself has unknown layout.)
 
 ::
+
   global ::= global 'Tj'                 // resilient method dispatch thunk
   global ::= global 'Tq'                 // method descriptor
 

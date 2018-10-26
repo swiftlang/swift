@@ -59,6 +59,13 @@ public struct fixedLayoutStruct {
   private lazy var lazy_d = 4
 }
 
+@usableFromInline
+@_fixed_layout
+struct fixedLayoutStruct2 {
+  public var NoLongerWithFixedBinaryOrder: Int { return 1 }
+  public var BecomeFixedBinaryOrder = 1
+}
+
 @_frozen
 public enum FrozenKind {
   case Unchanged
@@ -134,4 +141,23 @@ public class ClassWithOpenMember {
 public class EscapingFunctionType {
   public func removedEscaping(_ a: ()->()) {}
   public func addedEscaping(_ a: @escaping ()->()) {}
+}
+
+prefix operator ..*..
+
+public func ownershipChange(_ a: Int, _ b: __owned Int) {}
+
+@usableFromInline
+@_fixed_layout
+class _NoResilientClass {
+  @usableFromInline
+  func NoLongerFinalFunc() {}
+  private func FuncPositionChange1() {}
+  private func FuncPositionChange0() {}
+  private func FuncPositionChange2() {}
+}
+
+public class FinalFuncContainer {
+  public final func NewFinalFunc() {}
+  public func NoLongerFinalFunc() {}
 }

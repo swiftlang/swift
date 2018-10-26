@@ -78,6 +78,7 @@ public protocol _ObjectiveCBridgeable {
   /// implementation of `Swift.Array`'s conformance to
   /// `_ObjectiveCBridgeable` will produce an empty array rather than
   /// dynamically failing.
+  @_effects(readonly)
   static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Self
 }
@@ -133,6 +134,7 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
   }
 
   @inlinable // FIXME(sil-serialize-all)
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(_ source: AnyObject?)
       -> _BridgeableMetatype {
     var result: _BridgeableMetatype?
@@ -699,7 +701,6 @@ func _makeSwiftValue(_ value: Any) -> AnyObject {
 ///   the boxed value, but is otherwise opaque.
 ///
 /// COMPILER_INTRINSIC
-@inlinable // FIXME(sil-serialize-all)
 public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   var done = false
   var result: AnyObject!

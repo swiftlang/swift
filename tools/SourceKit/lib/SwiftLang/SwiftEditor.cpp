@@ -1625,7 +1625,8 @@ SwiftEditorDocument::~SwiftEditorDocument()
 }
 
 ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
-    llvm::MemoryBuffer *Buf, ArrayRef<const char *> Args) {
+    llvm::MemoryBuffer *Buf, ArrayRef<const char *> Args,
+    bool ProvideSemanticInfo) {
 
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
@@ -1637,9 +1638,13 @@ ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
   Impl.SyntaxMap.Tokens.clear();
   Impl.AffectedRange = {0, static_cast<unsigned>(Buf->getBufferSize())};
 
-  Impl.SemanticInfo = new SwiftDocumentSemanticInfo(Impl.FilePath, Impl.ASTMgr,
-                                                    Impl.NotificationCtr);
-  Impl.SemanticInfo->setCompilerArgs(Args);
+  // Try to create a compiler invocation object if needing semantic info
+  // or it's syntactic-only but with passed-in compiler arguments.
+  if (ProvideSemanticInfo || !Args.empty()) {
+    Impl.SemanticInfo = new SwiftDocumentSemanticInfo(Impl.FilePath, Impl.ASTMgr,
+                                                      Impl.NotificationCtr);
+    Impl.SemanticInfo->setCompilerArgs(Args);
+  }
   return Impl.EditableBuffer->getSnapshot();
 }
 
@@ -2038,7 +2043,7 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
   auto EditorDoc = EditorDocuments->getByUnresolvedName(Name);
   if (!EditorDoc) {
     EditorDoc = new SwiftEditorDocument(Name, *this);
-    Snapshot = EditorDoc->initializeText(Buf, Args);
+    Snapshot = EditorDoc->initializeText(Buf, Args, Consumer.needsSemanticInfo());
     EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled());
     if (EditorDocuments->getOrUpdate(Name, *this, EditorDoc)) {
       // Document already exists, re-initialize it. This should only happen
@@ -2051,7 +2056,7 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
   }
 
   if (!Snapshot) {
-    Snapshot = EditorDoc->initializeText(Buf, Args);
+    Snapshot = EditorDoc->initializeText(Buf, Args, Consumer.needsSemanticInfo());
     EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled());
   }
 

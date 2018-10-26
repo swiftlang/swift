@@ -27,8 +27,14 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include <fstream>
+#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
 #include <unistd.h>
 #include <sys/param.h>
+#elif defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
+#endif
 
 // FIXME: Platform compatibility.
 #include <dispatch/dispatch.h>
@@ -36,6 +42,21 @@
 using namespace llvm;
 
 using namespace sourcekitd_test;
+
+#if defined(_WIN32)
+namespace {
+int STDOUT_FILENO = _fileno(stdout);
+const constexpr size_t MAXPATHLEN = MAX_PATH + 1;
+char *realpath(const char *path, char *resolved_path) {
+  DWORD dwLength = GetFullPathNameA(path, 0, nullptr, nullptr);
+  if (dwLength == 0)
+    return nullptr;
+  if ((resolved_path = static_cast<char *>(malloc(dwLength + 1))))
+    GetFullPathNameA(path, dwLength, resolved_path, nullptr);
+  return resolved_path;
+}
+}
+#endif
 
 static int handleTestInvocation(ArrayRef<const char *> Args, TestOptions &InitOpts);
 static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
@@ -1975,7 +1996,7 @@ static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
     exit(1);
   }
   Ptr = LineStart;
-  for (; Ptr < End; ++Ptr) {
+  for (; Ptr <= End; ++Ptr) {
     --Col;
     if (Col == 0)
       return Ptr - InputBuf->getBufferStart();

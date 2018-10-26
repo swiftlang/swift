@@ -8,10 +8,6 @@ func takeClosure(_ a : () -> Int) {}
 // CHECK-LABEL: sil hidden @{{.*}}test1
 func test1(_ a : Int) -> Int {
   // CHECK-NOT: alloc_box
-  // FIXME(integers): the following check should be updated for the new way +
-  // gets invoked. <rdar://problem/29939484>
-  // XCHECK-NOT: alloc_stack
-
   let (b,c) = (a, 32)
 
   return b+c

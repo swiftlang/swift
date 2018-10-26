@@ -672,7 +672,6 @@ extension _ClosureBasedSequence: Sequence {
 /// An instance of `AnySequence` forwards its operations to an underlying base
 /// sequence having the same `Element` type, hiding the specifics of the
 /// underlying sequence.
-//@usableFromInline
 @_fixed_layout
 public struct AnySequence<Element> {
   @usableFromInline
@@ -805,12 +804,12 @@ extension Any${Kind} {
   }
 
   @inlinable
-  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     return self._box.__copyToContiguousArray()
   }
 
   @inlinable
-  public func _copyContents(initializing buf: UnsafeMutableBufferPointer<Element>)
+  public __consuming func _copyContents(initializing buf: UnsafeMutableBufferPointer<Element>)
   -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
     let (it,idx) = _box.__copyContents(initializing: buf)
     return (AnyIterator(it),idx)
@@ -834,9 +833,7 @@ internal protocol _AnyIndexBox : class {
 
 @_fixed_layout
 @usableFromInline
-internal final class _IndexBox<
-  BaseIndex : Comparable
-> : _AnyIndexBox {
+internal final class _IndexBox<BaseIndex: Comparable>: _AnyIndexBox {
   @usableFromInline
   internal var _base: BaseIndex
 

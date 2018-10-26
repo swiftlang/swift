@@ -80,11 +80,11 @@ internal let _countGPRegisters = 6
 // from 8 to 16 based on reading the spec, probably the bug you're looking for
 // is elsewhere.
 @usableFromInline
-internal let _countSSERegisters = 8
+internal let _countFPRegisters = 8
 @usableFromInline
-internal let _sseRegisterWords = 2
+internal let _fpRegisterWords = 2
 @usableFromInline
-internal let _registerSaveWords = _countGPRegisters + _countSSERegisters * _sseRegisterWords
+internal let _registerSaveWords = _countGPRegisters + _countFPRegisters * _fpRegisterWords
 #elseif arch(s390x)
 @usableFromInline
 internal let _countGPRegisters = 16
@@ -422,18 +422,19 @@ final internal class _VaListBuilder {
     var encoded = arg._cVarArgEncoding
 
 #if arch(x86_64)
-    if arg is _CVarArgPassedAsDouble
-      && sseRegistersUsed < _countSSERegisters {
+    let isDouble = arg is _CVarArgPassedAsDouble
+
+    if isDouble && fpRegistersUsed < _countFPRegisters {
       var startIndex = _countGPRegisters
-           + (sseRegistersUsed * _sseRegisterWords)
+           + (fpRegistersUsed * _fpRegisterWords)
       for w in encoded {
         storage[startIndex] = w
         startIndex += 1
       }
-      sseRegistersUsed += 1
+      fpRegistersUsed += 1
     }
     else if encoded.count == 1
-      && !(arg is _CVarArgPassedAsDouble)
+      && !isDouble
       && gpRegistersUsed < _countGPRegisters {
       storage[gpRegistersUsed] = encoded[0]
       gpRegistersUsed += 1
@@ -471,7 +472,7 @@ final internal class _VaListBuilder {
   @usableFromInline // FIXME(sil-serialize-all)
   internal var gpRegistersUsed = 0
   @usableFromInline // FIXME(sil-serialize-all)
-  internal var sseRegistersUsed = 0
+  internal var fpRegistersUsed = 0
 
   @usableFromInline // FIXME(sil-serialize-all)
   final  // Property must be final since it is used by Builtin.addressof.

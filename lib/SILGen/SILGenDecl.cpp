@@ -889,23 +889,33 @@ void EnumElementPatternInitialization::emitEnumMatch(
 
         // If the payload is indirect, project it out of the box.
         if (eltDecl->isIndirect() || eltDecl->getParentEnum()->isIndirect()) {
-          SILValue boxedValue = SGF.B.createProjectBox(loc, mv.getValue(), 0);
-          auto &boxedTL = SGF.getTypeLowering(boxedValue->getType());
-          // SEMANTIC ARC TODO: Revisit this when the verifier is enabled.
-          if (boxedTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
-            UnenforcedAccess access;
-            SILValue accessAddress =
-              access.beginAccess(SGF, loc, boxedValue, SILAccessKind::Read);
-            boxedValue = boxedTL.emitLoad(SGF.B, loc, accessAddress,
-                                          LoadOwnershipQualifier::Take);
-            access.endAccess(SGF);
-          }
+          ManagedValue boxedValue = SGF.B.createProjectBox(loc, mv, 0);
+          auto &boxedTL = SGF.getTypeLowering(boxedValue.getType());
+
           // We must treat the boxed value as +0 since it may be shared. Copy it
           // if nontrivial.
           //
-          // TODO: Should be able to hand it off at +0 in some cases.
-          mv = ManagedValue::forUnmanaged(boxedValue);
-          mv = mv.copyUnmanaged(SGF, loc);
+          // NOTE: The APIs that we are usinng here will ensure that if we have
+          // a trivial value, the load_borrow will become a load [trivial] and
+          // the copies will be "automagically" elided.
+          if (boxedTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
+            UnenforcedAccess access;
+            SILValue accessAddress = access.beginAccess(
+                SGF, loc, boxedValue.getValue(), SILAccessKind::Read);
+            auto mvAccessAddress = ManagedValue::forUnmanaged(accessAddress);
+            {
+              Scope loadScope(SGF, loc);
+              ManagedValue borrowedVal =
+                  SGF.B.createLoadBorrow(loc, mvAccessAddress);
+              mv = loadScope.popPreservingValue(
+                  borrowedVal.copyUnmanaged(SGF, loc));
+            }
+            access.endAccess(SGF);
+          } else {
+            // If we do not have a loadable value, just do a copy of the
+            // boxedValue.
+            mv = boxedValue.copyUnmanaged(SGF, loc);
+          }
         }
 
         // Reabstract to the substituted type, if needed.
@@ -1254,7 +1264,7 @@ SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
 /// specified JumpDest.  The insertion point is left in the block where the
 /// condition has matched and any bound variables are in scope.
 ///
-void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FailDest,
+void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
                                        SILLocation loc,
                                        ProfileCounter NumTrueTaken,
                                        ProfileCounter NumFalseTaken) {
@@ -1269,7 +1279,7 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FailDest,
     switch (elt.getKind()) {
     case StmtConditionElement::CK_PatternBinding: {
       InitializationPtr initialization =
-      InitializationForPattern(*this, FailDest).visit(elt.getPattern());
+      InitializationForPattern(*this, FalseDest).visit(elt.getPattern());
 
       // Emit the initial value into the initialization.
       FullExpr Scope(Cleanups, CleanupLocation(elt.getInitializer()));
@@ -1310,8 +1320,8 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond, JumpDest FailDest,
     
     // Just branch on the condition.  On failure, we unwind any active cleanups,
     // on success we fall through to a new block.
+    auto FailBB = Cleanups.emitBlockForCleanups(FalseDest, loc);
     SILBasicBlock *ContBB = createBasicBlock();
-    auto FailBB = Cleanups.emitBlockForCleanups(FailDest, loc);
     B.createCondBranch(booleanTestLoc, booleanTestValue, ContBB, FailBB,
                        NumTrueTaken, NumFalseTaken);
 

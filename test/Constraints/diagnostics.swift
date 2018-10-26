@@ -953,7 +953,7 @@ func SR_6272_a() {
     case bar
   }
 
-  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'Float'}} {{35-35=Int(}} {{42-42=)}}
+  // expected-error@+2 {{binary operator '*' cannot be applied to operands of type 'Int' and 'Float'}} {{35-35=Int(}} {{43-43=)}}
   // expected-note@+1 {{expected an argument list of type '(Int, Int)'}}
   let _: Int = Foo.bar.rawValue * Float(0)
 

@@ -368,13 +368,13 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
 }
 
 std::string toolchains::Android::getTargetForLinker() const {
-  // Explicitly set the linker target to "androideabi", as opposed to the
-  // llvm::Triple representation of "armv7-none-linux-android".
-  // This is the only ABI we currently support for Android.
-  assert(getTriple().getArch() == llvm::Triple::arm &&
-         getTriple().getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v7 &&
-         "Only armv7 targets are supported for Android");
-  return "armv7-none-linux-androideabi";
+  const llvm::Triple &T = getTriple();
+  if (T.getArch() == llvm::Triple::arm &&
+      T.getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v7)
+    // Explicitly set the linker target to "androideabi", as opposed to the
+    // llvm::Triple representation of "armv7-none-linux-android".
+    return "armv7-none-linux-androideabi";
+  return T.str();
 }
 
 bool toolchains::Android::shouldProvideRPathToLinker() const { return false; }

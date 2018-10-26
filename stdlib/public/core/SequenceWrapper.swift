@@ -48,7 +48,7 @@ extension _SequenceWrapper where Iterator == Base.Iterator {
   
   @inlinable // generic-performance
   @discardableResult
-  public func _copyContents(
+  public __consuming func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
     return _base._copyContents(initializing: buf)

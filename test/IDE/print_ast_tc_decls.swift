@@ -1113,7 +1113,7 @@ infix operator %%%
 func %%%(lhs: inout d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int {
   return 0
 }
-// PASS_2500-LABEL: {{^}}infix operator %%%{{$}}
+// PASS_2500-LABEL: {{^}}infix operator %%% : DefaultPrecedence{{$}}
 // PASS_2500: {{^}}func %%% (lhs: inout d2601_TestAssignment, rhs: d2601_TestAssignment) -> Int{{$}}
 
 precedencegroup BoringPrecedence {

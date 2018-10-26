@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrintOptions.h"
@@ -830,4 +831,15 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
 
 const char *DiagnosticEngine::diagnosticStringFor(const DiagID id) {
   return diagnosticStrings[(unsigned)id];
+}
+
+DiagnosticSuppression::DiagnosticSuppression(DiagnosticEngine &diags)
+  : diags(diags)
+{
+  consumers = diags.takeConsumers();
+}
+
+DiagnosticSuppression::~DiagnosticSuppression() {
+  for (auto consumer : consumers)
+    diags.addConsumer(*consumer);
 }

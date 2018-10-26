@@ -129,7 +129,7 @@ void _swift_makeAnyHashableUsingDefaultRepresentation(
 // public func _makeAnyHashableUpcastingToHashableBaseType<H : Hashable>(
 //   _ value: H,
 //   storingResultInto result: UnsafeMutablePointer<AnyHashable>)
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 void _swift_makeAnyHashableUpcastingToHashableBaseType(
   OpaqueValue *value,
   const void *anyHashableResultPointer,

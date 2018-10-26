@@ -18,17 +18,3 @@ bb0:
   // CHECK-NEXT:  ret %objc_class*
   return %0 : $@objc_metatype A.Type
 }
-
-// CHECK: define {{(dllexport )?}}{{(protected )?}}swiftcc void @deallocA(%TSo1AC*) #0 {
-sil @deallocA : $@convention(thin) (@owned A) -> () {
-bb0(%0 : $A):
-  %1 = metatype $@thick A.Type
-
-  // CHECK: call %objc_object* @object_dispose
-  dealloc_partial_ref %0 : $A, %1 : $@thick A.Type
-
-  %2 = tuple ()
-
-  // CHECK-NEXT: ret
-  return %2 : $()
-}

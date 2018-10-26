@@ -4,6 +4,7 @@ set(swift_stubs_sources
     GlobalObjects.cpp
     KeyPaths.cpp
     LibcShims.cpp
+    Random.cpp
     Stubs.cpp
     ThreadLocalStorage.cpp
     MathStubs.cpp

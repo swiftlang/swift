@@ -13,8 +13,6 @@ import Builtin
 // Declarations //
 //////////////////
 
-sil @allocate_object : $@convention(thin) () -> @owned Builtin.NativeObject
-
 typealias AnyObject = Builtin.AnyObject
 
 public protocol Error {}
@@ -35,8 +33,6 @@ case nopayload
 case trivial_payload(Builtin.Int32)
 case nontrivial_payload(Builtin.NativeObject)
 }
-
-sil @three_differing_payload_enum_user : $@convention(thin) (@owned ThreeDifferingPayloadEnum, @guaranteed ThreeDifferingPayloadEnum, ThreeDifferingPayloadEnum) -> ()
 
 struct TrivialStruct {
   var f1: Builtin.Int32
@@ -67,8 +63,6 @@ protocol SwiftKlassP : class {
   func foo()
 }
 
-sil @nontrivial_unowned_user : $@convention(thin) (Builtin.NativeObject) -> ()
-
 struct Val {
 }
 class Ref {
@@ -78,14 +72,9 @@ struct Aleph {
   var b:Val
 }
 
-sil @borrow_tuple_user : $@convention(thin) (@guaranteed (Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)) -> ()
-sil @unowned_tuple_user : $@convention(thin) ((Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)) -> ()
-
 struct Int {
   var value: Builtin.Int64
 }
-
-sil @no_arg_or_output_function : $@convention(thin) () -> ()
 
 class RefWithInt {
   var value: Builtin.Int32
@@ -100,6 +89,21 @@ class RefWithRef {
 
   init()
 }
+
+sil @no_arg_or_output_function : $@convention(thin) () -> ()
+
+
+sil @allocate_object : $@convention(thin) () -> @owned Builtin.NativeObject
+
+sil @three_differing_payload_enum_user : $@convention(thin) (@owned ThreeDifferingPayloadEnum, @guaranteed ThreeDifferingPayloadEnum, ThreeDifferingPayloadEnum) -> ()
+
+sil @nontrivial_unowned_user : $@convention(thin) (Builtin.NativeObject) -> ()
+
+sil @borrow_tuple_user : $@convention(thin) (@guaranteed (Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)) -> ()
+sil @unowned_tuple_user : $@convention(thin) ((Builtin.Int32, Builtin.NativeObject, Builtin.Int32, Builtin.NativeObject)) -> ()
+
+sil @produce_owned_optional : $@convention(thin) () -> @owned Optional<Builtin.NativeObject>
+sil @guaranteed_nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 
 ////////////////
 // Test Cases //
@@ -441,6 +445,61 @@ bb1(%2 : @owned $Builtin.NativeObject):
   br bb3
 
 bb2:
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that we can propagate through an argument through an enum that is
+// switched upon and whose payload is then destroyed.
+sil @switch_enum_owned_payload_test2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %0 : $Builtin.NativeObject
+  switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt.1: bb2
+
+bb1:
+  br bb3
+
+bb2(%2 : @owned $Builtin.NativeObject):
+  destroy_value %2 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @switch_enum_owned_payload_test3 : $@convention(thin) () -> () {
+bb0:
+  %1 = enum $Optional<Builtin.NativeObject>, #Optional.none!enumelt
+  switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt.1: bb2
+
+bb1:
+  br bb3
+
+bb2(%2 : @owned $Builtin.NativeObject):
+  destroy_value %2 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that we can propagate through an argument through an enum that is
+// switched upon and whose payload is then destroyed.
+sil @switch_enum_owned_payload_test4 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %0 : $Builtin.NativeObject
+  switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  br bb3
+
+bb2(%2 : @owned $Builtin.NativeObject):
+  destroy_value %2 : $Builtin.NativeObject
   br bb3
 
 bb3:
@@ -1029,3 +1088,40 @@ bb0(%0 : @trivial $@thick SubKlass.Type):
   %9999 = tuple()
   return %9999 : $()
 }
+
+sil @switch_enum_apply_test : $@convention(thin) () -> @owned Builtin.NativeObject {
+bb0:
+  %0 = function_ref @produce_owned_optional : $@convention(thin) () -> @owned Optional<Builtin.NativeObject>
+  %1 = apply %0() : $@convention(thin) () -> @owned Optional<Builtin.NativeObject>
+  switch_enum %1 : $Optional<Builtin.NativeObject>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  unreachable
+
+bb2(%2 : @owned $Builtin.NativeObject):
+  return %2 : $Builtin.NativeObject
+}
+
+// Make sure that we allow for @owned parameters to be passed as @guaranteed
+// parameters since we are performing an "instantaneous" borrow.
+sil @owned_passed_to_guaranteed_apply_parameter : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0k(%0 : @owned $Builtin.NativeObject):
+  %1 = function_ref @guaranteed_nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @owned_partial_apply_used_as_callee_guaranteed : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @allocate_object : $@convention(thin) () -> @owned Builtin.NativeObject
+  %1 = partial_apply %0() : $@convention(thin) () -> @owned Builtin.NativeObject
+  %2 = convert_function %1 : $@callee_owned () -> @owned Builtin.NativeObject to $@callee_guaranteed () -> @owned Builtin.NativeObject
+  %3 = apply %2() : $@callee_guaranteed () -> @owned Builtin.NativeObject
+  destroy_value %3 : $Builtin.NativeObject
+  destroy_value %2 : $@callee_guaranteed () -> @owned Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+

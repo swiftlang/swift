@@ -380,6 +380,8 @@ public:
     return wholeModule;
   }
 
+  bool isStdlibModule() const;
+
   /// Returns true if it is the optimized OnoneSupport module.
   bool isOptimizedOnoneSupportModule() const;
 

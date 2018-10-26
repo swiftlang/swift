@@ -1902,7 +1902,8 @@ extension Data : _ObjectiveCBridgeable {
         result = Data(referencing: input)
         return true
     }
-    
+
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSData?) -> Data {
         guard let src = source else { return Data() }
         return Data(referencing: src)

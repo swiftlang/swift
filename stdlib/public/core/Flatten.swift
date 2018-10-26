@@ -261,7 +261,7 @@ extension FlattenCollection : Sequence {
   public var underestimatedCount: Int { return 0 }
 
   @inlinable // lazy-performance
-  public func _copyToContiguousArray() -> ContiguousArray<Base.Element.Element> {
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Base.Element.Element> {
     // The default implementation of `_copyToContiguousArray` queries the
     // `count` property, which materializes every inner collection.  This is a
     // bad default for `flatMap()`.  So we treat `self` as a sequence and only

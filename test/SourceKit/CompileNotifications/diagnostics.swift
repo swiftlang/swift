@@ -1,5 +1,3 @@
-// REQUIRES: rdar39260564
-
 // RUN: %sourcekitd-test -req=track-compiles == -req=sema %s -- %s | %FileCheck %s -check-prefix=NODIAGS
 // NODIAGS: key.notification: source.notification.compile-did-finish
 // NODIAGS-NEXT: key.diagnostics: [
@@ -70,15 +68,22 @@
 // FIXME: invalid arguments cause us to early-exit and not send the notifications
 // RUN_DISABLED: %sourcekitd-test -req=track-compiles == -req=sema %s -- %s -invalid-arg | %FileCheck %s -check-prefix=INVALID_ARG
 
-// RUN: %sourcekitd-test -req=track-compiles == -req=sema %s -- %s -Xcc -invalid-arg | %FileCheck %s -check-prefix=INVALID_ARG_CLANG
-// INVALID_ARG_CLANG: key.notification: source.notification.compile-did-finish,
-// INVALID_ARG_CLANG-NEXT: key.diagnostics: [
-// INVALID_ARG_CLANG-NEXT:   {
-// INVALID_ARG_CLANG-NEXT:     key.filepath: "<unknown>"
-// INVALID_ARG_CLANG-NEXT:     key.severity: source.diagnostic.severity.warning,
-// INVALID_ARG_CLANG-NEXT:     key.offset: 0
-// INVALID_ARG_CLANG-NEXT:     key.description: "argument unused
+// RUN: %sourcekitd-test -req=track-compiles == -req=sema %s -- %s -Xcc -invalid-arg | %FileCheck %s -check-prefix=INVALID_ARG
+// INVALID_ARG: key.notification: source.notification.compile-did-finish,
+// INVALID_ARG-NEXT: key.diagnostics: [
+// INVALID_ARG-NEXT:   {
+// INVALID_ARG-NEXT:     key.filepath: "<unknown>"
+// INVALID_ARG-NEXT:     key.severity: source.diagnostic.severity.error,
+// INVALID_ARG-NEXT:     key.offset: 0
+// INVALID_ARG-NEXT:     key.description: "unknown argument
 
 // Ignore the spurious -wmo + -enable-batch-mode warning.
 // RUN: %sourcekitd-test -req=track-compiles == -req=sema %s -- %s -enable-batch-mode | %FileCheck %s -check-prefix=NODIAGS
 // RUN: %sourcekitd-test -req=track-compiles == -req=complete -offset=0 %s -- %s -enable-batch-mode | %FileCheck %s -check-prefix=NODIAGS
+
+// Report syntactic-only requests that have arguments.
+// RUN: %sourcekitd-test -req=track-compiles == -req=syntax-map %s -- %s -invalid-arg | %FileCheck %s -check-prefix=INVALID_ARG
+// But ignore syntactic-only requests with no arguments.
+// RUN: %sourcekitd-test -req=track-compiles == -req=syntax-map %s | %FileCheck %s -check-prefix=SYNTACTIC
+// SYNTACTIC: key.syntaxmap:
+// SYNTACTIC_NOT: key.notification: source.notification.compile-did-finish

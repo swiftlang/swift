@@ -463,12 +463,10 @@ recur:
     }
   }
 
-  // If the type is a class, try its superclass.
-  if (const ClassMetadata *classType = type->getClassObject()) {
-    if (classHasSuperclass(classType)) {
-      type = getMetadataForClass(classType->Superclass);
-      goto recur;
-    }
+  // If there is a superclass, look there.
+  if (auto superclass = _swift_class_getSuperclass(type)) {
+    type = superclass;
+    goto recur;
   }
 
   // We did not find an up-to-date cache entry.
@@ -506,12 +504,10 @@ bool isRelatedType(const Metadata *type, const void *candidate,
         return true;
     }
 
-    // If the type is a class, try its superclass.
-    if (const ClassMetadata *classType = type->getClassObject()) {
-      if (classHasSuperclass(classType)) {
-        type = getMetadataForClass(classType->Superclass);
-        continue;
-      }
+    // If there is a superclass, look there.
+    if (auto superclass = _swift_class_getSuperclass(type)) {
+      type = superclass;
+      continue;
     }
 
     break;
@@ -671,7 +667,10 @@ static const Metadata *resolveGenericParamRef(
     current = swift_getAssociatedTypeWitness(
                                     MetadataState::Abstract,
                                     const_cast<WitnessTable *>(witnessTable),
-                                    current, assocTypeReq).Value;
+                                    current,
+                                    assocTypeRef.Protocol
+                                      ->getRequirementBaseDescriptor(),
+                                    assocTypeReq).Value;
     if (!current) return nullptr;
   }
 

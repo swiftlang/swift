@@ -113,12 +113,10 @@ _swift_dispatch_source_create(
   return source;
 }
 
-static inline __swift_shims_dispatch_block_t
+static inline SWIFT_DISPATCH_RETURNS_RETAINED __swift_shims_dispatch_block_t
 _swift_dispatch_block_create_with_qos_class(
-    dispatch_block_flags_t flags,
-    dispatch_qos_class_t qos,
-    int relative_priority,
-    __swift_shims_dispatch_block_t _Nonnull block) {
+    dispatch_block_flags_t flags, dispatch_qos_class_t qos,
+    int relative_priority, __swift_shims_dispatch_block_t _Nonnull block) {
   return dispatch_block_create_with_qos_class(
       flags, qos, relative_priority, block);
 }

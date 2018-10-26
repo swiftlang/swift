@@ -97,6 +97,7 @@ static bool isFunctionAttr(Node::Kind kind) {
   switch (kind) {
     case Node::Kind::FunctionSignatureSpecialization:
     case Node::Kind::GenericSpecialization:
+    case Node::Kind::InlinedGenericFunction:
     case Node::Kind::GenericSpecializationNotReAbstracted:
     case Node::Kind::GenericPartialSpecialization:
     case Node::Kind::GenericPartialSpecializationNotReAbstracted:
@@ -1289,6 +1290,8 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
   }
 
   // Generic arguments for the outermost type come first.
+  if (Nominal->getNumChildren() == 0)
+    return nullptr;
   NodePointer Context = Nominal->getFirstChild();
 
   bool consumesGenericArgs = true;

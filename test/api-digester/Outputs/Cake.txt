@@ -18,6 +18,7 @@ cake1: Var RequiementChanges.removedVar has been removed
 
 /* Moved Decls */
 cake1: Class ClassToStruct has been changed to a Struct
+cake1: InfixOperator ..*.. has been changed to a PrefixOperator
 cake1: Protocol ProtocolToEnum has been changed to a Enum
 
 /* Renamed Decls */
@@ -30,10 +31,14 @@ cake1: Constructor S1.init(_:) has parameter 0 type change from Int to Double
 cake1: Func C1.foo2(_:) has parameter 0 type change from Int to () -> ()
 cake1: Func C7.foo(_:_:) has removed default argument from parameter 0
 cake1: Func C7.foo(_:_:) has removed default argument from parameter 1
+cake1: Func ownershipChange(_:_:) has parameter 0 changing from InOut to Default
+cake1: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned
 
 /* Decl Attribute changes */
 cake1: Func C1.foo1() is now not static
-cake1: Func S1.foo1() is now mutating
+cake1: Func FinalFuncContainer.NewFinalFunc() is now with final
+cake1: Func FinalFuncContainer.NoLongerFinalFunc() is now without final
+cake1: Func S1.foo1() has self access kind changing from NonMutating to Mutating
 cake1: Func S1.foo3() is now static
 cake1: Var C1.CIIns1 changes from weak to strong
 cake1: Var C1.CIIns2 changes from strong to weak

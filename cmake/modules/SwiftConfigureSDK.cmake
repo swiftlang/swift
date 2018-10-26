@@ -40,30 +40,28 @@ function(_report_sdk prefix)
       message(STATUS "  ${arch} Path: ${SWIFT_SDK_${prefix}_ARCH_${arch}_PATH}")
     endforeach()
   endif()
-  message(STATUS "  Version: ${SWIFT_SDK_${prefix}_VERSION}")
-  message(STATUS "  Build number: ${SWIFT_SDK_${prefix}_BUILD_NUMBER}")
-  message(STATUS "  Deployment version: ${SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION}")
+  if(prefix IN_LIST SWIFT_APPLE_PLATFORMS)
+    message(STATUS "  Version: ${SWIFT_SDK_${prefix}_VERSION}")
+    message(STATUS "  Build number: ${SWIFT_SDK_${prefix}_BUILD_NUMBER}")
+    message(STATUS "  Deployment version: ${SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION}")
+  endif()
   message(STATUS "  Library subdir: ${SWIFT_SDK_${prefix}_LIB_SUBDIR}")
-  message(STATUS "  Version min name: ${SWIFT_SDK_${prefix}_VERSION_MIN_NAME}")
-  message(STATUS "  Triple name: ${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
+  if(prefix IN_LIST SWIFT_APPLE_PLATFORMS)
+    message(STATUS "  Version min name: ${SWIFT_SDK_${prefix}_VERSION_MIN_NAME}")
+    message(STATUS "  Triple name: ${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
+  endif()
   message(STATUS "  Architectures: ${SWIFT_SDK_${prefix}_ARCHITECTURES}")
-  is_darwin_based_sdk(${prefix} IS_DARWIN_BASED_SDK)
-  if(NOT ${IS_DARWIN_BASED_SDK})
-    foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
-      message(STATUS "  ICU i18n INCLUDE (${arch}): ${SWIFT_${prefix}_${arch}_ICU_I18N_INCLUDE}")
-      message(STATUS "  ICU i18n LIB (${arch}): ${SWIFT_${prefix}_${arch}_ICU_I18N}")
-      message(STATUS "  ICU unicode INCLUDE (${arch}): ${SWIFT_${prefix}_${arch}_ICU_UC_INCLUDE}")
-      message(STATUS "  ICU unicode LIB (${arch}): ${SWIFT_${prefix}_${arch}_ICU_UC}")
-    endforeach()
+  if(NOT prefix IN_LIST SWIFT_APPLE_PLATFORMS)
+    if(SWIFT_BUILD_STDLIB)
+      foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
+        message(STATUS "  ICU i18n INCLUDE (${arch}): ${SWIFT_${prefix}_${arch}_ICU_I18N_INCLUDE}")
+        message(STATUS "  ICU i18n LIB (${arch}): ${SWIFT_${prefix}_${arch}_ICU_I18N}")
+        message(STATUS "  ICU unicode INCLUDE (${arch}): ${SWIFT_${prefix}_${arch}_ICU_UC_INCLUDE}")
+        message(STATUS "  ICU unicode LIB (${arch}): ${SWIFT_${prefix}_${arch}_ICU_UC}")
+      endforeach()
+    endif()
   endif()
   message(STATUS "  Object Format: ${SWIFT_SDK_${prefix}_OBJECT_FORMAT}")
-  foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
-    if(SWIFT_SDK_${prefix}_ARCH_${arch}_LINKER)
-      message(STATUS "  Linker (${arch}): ${SWIFT_SDK_${prefix}_ARCH_${arch}_LINKER}")
-    else()
-      message(STATUS "  Linker (${arch}): ${CMAKE_LINKER}")
-    endif()
-  endforeach()
 
   foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
     message(STATUS
@@ -160,18 +158,15 @@ macro(configure_sdk_darwin
   _report_sdk("${prefix}")
 endmacro()
 
-macro(configure_sdk_unix
-    prefix name lib_subdir triple_name architectures triple sdkpath)
+macro(configure_sdk_unix name architectures)
   # Note: this has to be implemented as a macro because it sets global
   # variables.
 
+  string(TOUPPER ${name} prefix)
+  string(TOLOWER ${name} platform)
+
   set(SWIFT_SDK_${prefix}_NAME "${name}")
-  set(SWIFT_SDK_${prefix}_VERSION "don't use")
-  set(SWIFT_SDK_${prefix}_BUILD_NUMBER "don't use")
-  set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "")
-  set(SWIFT_SDK_${prefix}_LIB_SUBDIR "${lib_subdir}")
-  set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "")
-  set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${triple_name}")
+  set(SWIFT_SDK_${prefix}_LIB_SUBDIR "${platform}")
   set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
   if("${prefix}" STREQUAL "CYGWIN")
     set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "COFF")
@@ -203,14 +198,45 @@ macro(configure_sdk_unix
       endif()
       set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_PREBUILT_PATH
           "${SWIFT_ANDROID_NDK_PATH}/toolchains/${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE}-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/${_swift_android_prebuilt_build}")
-
-      # Resolve the correct linker based on the file name of CMAKE_LINKER (being 'ld' or 'ld.gold' the options)
-      get_filename_component(SWIFT_ANDROID_LINKER_NAME "${CMAKE_LINKER}" NAME)
-      set(SWIFT_SDK_ANDROID_ARCH_${arch}_LINKER
-          "${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_PREBUILT_PATH}/bin/${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE}-${SWIFT_ANDROID_LINKER_NAME}")
     else()
-      set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "${sdkpath}")
-      set(SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE "${triple}")
+      if(NOT SWIFT_SDK_${prefix}_ARCH_${arch}_PATH)
+        set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "/")
+      endif()
+
+      if("${prefix}" STREQUAL "LINUX")
+        if(arch MATCHES "(armv6|armv7)")
+          set(SWIFT_SDK_LINUX_ARCH_${arch}_TRIPLE "${arch}-unknown-linux-gnueabihf")
+        elseif(arch MATCHES "(aarch64|i686|powerpc64|powerpc64le|s390x|x86_64)")
+          set(SWIFT_SDK_LINUX_ARCH_${arch}_TRIPLE "${arch}-unknown-linux-gnu")
+        else()
+          message(FATAL_ERROR "unknown arch for ${prefix}: ${arch}")
+        endif()
+      elseif("${prefix}" STREQUAL "FREEBSD")
+        if(arch STREQUAL x86_64)
+          message(FATAL_ERROR "unsupported arch for FreeBSD: ${arch}")
+        endif()
+
+        if(CMAKE_HOST_SYSTEM_NAME NOT STREQUAL FreeBSD)
+          message(WARNING "CMAKE_SYSTEM_VERSION will not match target")
+        endif()
+
+        string(REPLACE "[-].*" "" freebsd_system_version ${CMAKE_SYSTEM_VERSION})
+        message(STATUS "FreeBSD Version: ${freebsd_system_version}")
+
+        set(SWIFT_SDK_FREEBSD_ARCH_x86_64_TRIPLE "x86_64-unknown-freebsd${freebsd_system_version}")
+      elseif("${prefix}" STREQUAL "CYGWIN")
+        if(NOT arch STREQUAL x86_64)
+          message(FATAL_ERROR "unsupported arch for cygwin: ${arch}")
+        endif()
+        set(SWIFT_SDK_CYGWIN_ARCH_x86_64_TRIPLE "x86_64-unknown-windows-cygnus")
+      elseif("${prefix}" STREQUAL "HAIKU")
+        if(NOT arch STREQUAL x86_64)
+          message(FATAL_ERROR "unsupported arch for Haiku: ${arch}")
+        endif()
+        set(SWIFT_SDK_HAIKU_ARCH_x86_64_TRIPLE "x86_64-unknown-haiku")
+      else()
+        message(FATAL_ERROR "unknown Unix OS: ${prefix}")
+      endif()
     endif()
   endforeach()
 
@@ -220,17 +246,15 @@ macro(configure_sdk_unix
   _report_sdk("${prefix}")
 endmacro()
 
-macro(configure_sdk_windows prefix sdk_name environment architectures)
+macro(configure_sdk_windows name environment architectures)
   # Note: this has to be implemented as a macro because it sets global
   # variables.
 
+  string(TOUPPER ${name} prefix)
+  string(TOLOWER ${name} platform)
+
   set(SWIFT_SDK_${prefix}_NAME "${sdk_name}")
-  set(SWIFT_SDK_${prefix}_VERSION "NOTFOUND")
-  set(SWIFT_SDK_${prefix}_BUILD_NUMBER "NOTFOUND")
-  set(SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION "")
   set(SWIFT_SDK_${prefix}_LIB_SUBDIR "windows")
-  set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "NOTFOUND")
-  set(SWIFT_SDK_${prefix}_TRIPLE_NAME "Win32")
   set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
   set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "COFF")
 
@@ -246,6 +270,26 @@ macro(configure_sdk_windows prefix sdk_name environment architectures)
     # to the driver -- rely on the `INCLUDE` AND `LIB` environment variables
     # instead.
     set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "/")
+
+    # NOTE(compnerd) workaround incorrectly extensioned import libraries from
+    # the Windows SDK on case sensitive file systems.
+    swift_windows_arch_spelling(${arch} WinSDKArchitecture)
+    set(WinSDK${arch}UMDir "$ENV{UniversalCRTSdkDir}/Lib/$ENV{UCRTVersion}/um/${WinSDKArchitecture}")
+    set(OverlayDirectory "${CMAKE_BINARY_DIR}/winsdk_lib_${arch}_symlinks")
+
+    file(MAKE_DIRECTORY ${OverlayDirectory})
+
+    file(GLOB libraries RELATIVE "${WinSDK${arch}UMDir}" "${WinSDK${arch}UMDir}/*")
+    foreach(library ${libraries})
+      get_filename_component(name_we "${library}" NAME_WE)
+      get_filename_component(ext "${library}" EXT)
+      string(TOLOWER "${ext}" lowercase_ext)
+      set(lowercase_ext_symlink_name "${name_we}${lowercase_ext}")
+      if(NOT library STREQUAL lowercase_ext_symlink_name)
+        execute_process(COMMAND
+                        "${CMAKE_COMMAND}" -E create_symlink "${WinSDK${arch}UMDir}/${library}" "${OverlayDirectory}/${lowercase_ext_symlink_name}")
+      endif()
+    endforeach()
   endforeach()
 
   # Add this to the list of known SDKs.

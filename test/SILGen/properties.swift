@@ -153,8 +153,9 @@ func physical_class_rvalue() -> Int {
   return class_rvalue().y
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @$s10properties12class_rvalueAA3RefCyF
   // CHECK: [[CLASS:%[0-9]+]] = apply [[FUNC]]()
-  // CHECK: [[FN:%[0-9]+]] = class_method [[CLASS]] : $Ref, #Ref.y!getter.1
-  // CHECK: [[RET:%[0-9]+]] = apply [[FN]]([[CLASS]])
+  // CHECK: [[BORROW:%.*]] = begin_borrow [[CLASS]]
+  // CHECK: [[FN:%[0-9]+]] = class_method [[BORROW]] : $Ref, #Ref.y!getter.1
+  // CHECK: [[RET:%[0-9]+]] = apply [[FN]]([[BORROW]])
   // CHECK: return [[RET]]
 }
 
@@ -163,8 +164,9 @@ func logical_struct_get() -> Int {
   return struct_rvalue().z
   // CHECK: [[GET_RVAL:%[0-9]+]] = function_ref @$s10properties13struct_rvalue{{[_0-9a-zA-Z]*}}F
   // CHECK: [[STRUCT:%[0-9]+]] = apply [[GET_RVAL]]()
+  // CHECK: [[BORROW:%[0-9]+]] = begin_borrow [[STRUCT]]
   // CHECK: [[GET_METHOD:%[0-9]+]] = function_ref @$s10properties3ValV1z{{[_0-9a-zA-Z]*}}vg
-  // CHECK: [[VALUE:%[0-9]+]] = apply [[GET_METHOD]]([[STRUCT]])
+  // CHECK: [[VALUE:%[0-9]+]] = apply [[GET_METHOD]]([[BORROW]])
   // CHECK: return [[VALUE]]
 }
 
@@ -199,8 +201,9 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: [[VAL_REF:%[0-9]+]] = load [copy] [[VAL_REF_ADDR]]
   // -- getters and setters
   // -- val.ref.val_prop
+  // CHECK: [[BORROW:%.*]] = begin_borrow [[VAL_REF]]
   // CHECK: [[MAT_VAL_PROP_METHOD:%[0-9]+]] = class_method {{.*}} : $Ref, #Ref.val_prop!modify.1 : (Ref) -> ()
-  // CHECK: ([[VAL_REF_VAL_PROP_MAT:%[0-9]+]], [[TOKEN:%.*]]) = begin_apply [[MAT_VAL_PROP_METHOD]]([[VAL_REF]])
+  // CHECK: ([[VAL_REF_VAL_PROP_MAT:%[0-9]+]], [[TOKEN:%.*]]) = begin_apply [[MAT_VAL_PROP_METHOD]]([[BORROW]])
   // -- val.ref.val_prop.z_tuple
   // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)
   // CHECK: [[LD:%[0-9]+]] = load_borrow [[VAL_REF_VAL_PROP_MAT]]
@@ -850,8 +853,9 @@ class DerivedProperty : BaseProperty {
 // CHECK: bb0([[SELF:%.*]] : @guaranteed $DerivedProperty):
 // CHECK:   [[SELF_COPY:%[0-9]+]] = copy_value [[SELF]]
 // CHECK:   [[BASEPTR:%[0-9]+]] = upcast [[SELF_COPY]] : $DerivedProperty to $BaseProperty
+// CHECK:   [[BORROW:%[0-9]+]] = begin_borrow [[BASEPTR]]
 // CHECK:   [[FN:%[0-9]+]] = function_ref @$s10properties12BasePropertyC1xSivg : $@convention(method) (@guaranteed BaseProperty) -> Int 
-// CHECK:   [[RESULT:%.*]] = apply [[FN]]([[BASEPTR]]) : $@convention(method) (@guaranteed BaseProperty) -> Int
+// CHECK:   [[RESULT:%.*]] = apply [[FN]]([[BORROW]]) : $@convention(method) (@guaranteed BaseProperty) -> Int
 // CHECK:   destroy_value [[BASEPTR]]
 // CHECK:   return [[RESULT]] : $Int
 // CHECK: } // end sil function '$s10properties15DerivedPropertyC24super_property_referenceSiyF'
@@ -1125,8 +1129,9 @@ struct AddressOnlyReadOnlySubscript {
 // CHECK-LABEL: sil hidden @$s10properties015addressOnlyReadC24SubscriptFromMutableBase
 // CHECK:         [[BASE:%.*]] = alloc_box ${ var AddressOnlyReadOnlySubscript }
 // CHECK:         copy_addr [[BASE:%.*]] to [initialization] [[COPY:%.*]] :
+// CHECK:         copy_addr [[COPY:%.*]] to [initialization] [[COPY2:%.*]] :
 // CHECK:         [[GETTER:%.*]] = function_ref @$s10properties015AddressOnlyReadC9SubscriptV{{[_0-9a-zA-Z]*}}ig
-// CHECK:         apply [[GETTER]]({{%.*}}, [[COPY]])
+// CHECK:         apply [[GETTER]]({{%.*}}, [[COPY2]])
 func addressOnlyReadOnlySubscriptFromMutableBase(_ x: Int) {
   var base = AddressOnlyReadOnlySubscript()
   _ = base[x]
@@ -1184,8 +1189,8 @@ public class DerivedClassWithPublicProperty : BaseClassWithInternalProperty {
 // CHECK-NEXT:    [[BORROWED_SUPER:%.*]] = begin_borrow [[SUPER]]
 // CHECK-NEXT:    [[DOWNCAST_BORROWED_SUPER:%.*]] = unchecked_ref_cast [[BORROWED_SUPER]] : $BaseClassWithInternalProperty to $DerivedClassWithPublicProperty
 // CHECK-NEXT:    [[METHOD:%.*]] = super_method [[DOWNCAST_BORROWED_SUPER]] : $DerivedClassWithPublicProperty, #BaseClassWithInternalProperty.x!getter.1 : (BaseClassWithInternalProperty) -> () -> (), $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
+// CHECK-NEXT:    [[RESULT:%.*]] = apply [[METHOD]]([[BORROWED_SUPER]]) : $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
 // CHECK-NEXT:    end_borrow [[BORROWED_SUPER]]
-// CHECK-NEXT:    [[RESULT:%.*]] = apply [[METHOD]]([[SUPER]]) : $@convention(method) (@guaranteed BaseClassWithInternalProperty) -> ()
 // CHECK-NEXT:    destroy_value [[SUPER]] : $BaseClassWithInternalProperty
 // CHECK: } // end sil function '$s10properties30DerivedClassWithPublicPropertyC1xytvg'
 
@@ -1212,18 +1217,24 @@ protocol NonmutatingProtocol {
 // CHECK-NEXT:   [[C_INOUT:%.*]] = begin_access [read] [unknown] %0 : $*ReferenceType
 // CHECK-NEXT:   [[C:%.*]] = load [copy] [[C_INOUT:%.*]] : $*ReferenceType
 // CHECK-NEXT:   end_access [[C_INOUT]] : $*ReferenceType
+// CHECK-NEXT:   [[C_BORROW:%.*]] = begin_borrow [[C]]
 // CHECK-NEXT:   [[C_FIELD_BOX:%.*]] = alloc_stack $NonmutatingProtocol
-// CHECK-NEXT:   [[GETTER:%.*]] = class_method [[C]] : $ReferenceType, #ReferenceType.p!getter.1 : (ReferenceType) -> () -> NonmutatingProtocol, $@convention(method) (@guaranteed ReferenceType) -> @out NonmutatingProtocol
-// CHECK-NEXT:   apply [[GETTER]]([[C_FIELD_BOX]], [[C]]) : $@convention(method) (@guaranteed ReferenceType) -> @out NonmutatingProtocol
+// CHECK-NEXT:   [[GETTER:%.*]] = class_method [[C_BORROW]] : $ReferenceType, #ReferenceType.p!getter.1 : (ReferenceType) -> () -> NonmutatingProtocol, $@convention(method) (@guaranteed ReferenceType) -> @out NonmutatingProtocol
+// CHECK-NEXT:   apply [[GETTER]]([[C_FIELD_BOX]], [[C_BORROW]]) : $@convention(method) (@guaranteed ReferenceType) -> @out NonmutatingProtocol
+// CHECK-NEXT:   end_borrow [[C_BORROW]]
 
 // CHECK-NEXT:   [[C_FIELD_PAYLOAD:%.*]] = open_existential_addr immutable_access [[C_FIELD_BOX]] : $*NonmutatingProtocol to $*@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   [[C_FIELD_COPY:%.*]] = alloc_stack $@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   copy_addr [[C_FIELD_PAYLOAD]] to [initialization] [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   destroy_value [[C]] : $ReferenceType
+// CHECK-NEXT:   [[C_FIELD_BORROW:%.*]] = alloc_stack
+// CHECK-NEXT:   copy_addr [[C_FIELD_COPY]] to [initialization] [[C_FIELD_BORROW]]
 // CHECK-NEXT:   [[GETTER:%.*]] = witness_method $@opened("{{.*}}") NonmutatingProtocol, #NonmutatingProtocol.x!getter.1 : <Self where Self : NonmutatingProtocol> (Self) -> () -> Int, [[C_FIELD_PAYLOAD]] : $*@opened("{{.*}}") NonmutatingProtocol : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
-// CHECK-NEXT:   [[RESULT_VALUE:%.*]] = apply [[GETTER]]<@opened("{{.*}}") NonmutatingProtocol>([[C_FIELD_COPY]]) : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK-NEXT:   [[RESULT_VALUE:%.*]] = apply [[GETTER]]<@opened("{{.*}}") NonmutatingProtocol>([[C_FIELD_BORROW]]) : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK-NEXT:   destroy_addr [[C_FIELD_BORROW]]
 // CHECK-NEXT:   assign [[RESULT_VALUE]] to [[UNINIT]] : $*Int
 // CHECK-NEXT:   destroy_addr [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
+// CHECK-NEXT:   dealloc_stack [[C_FIELD_BORROW]]
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   destroy_addr [[C_FIELD_BOX]] : $*NonmutatingProtocol
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_BOX]] : $*NonmutatingProtocol

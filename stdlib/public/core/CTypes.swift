@@ -217,19 +217,19 @@ extension UInt {
 @_fixed_layout
 public struct CVaListPointer {
   @usableFromInline // unsafe-performance
-  internal var value: UnsafeMutableRawPointer
+  internal var _value: UnsafeMutableRawPointer
 
   @inlinable // unsafe-performance
   public // @testable
   init(_fromUnsafeMutablePointer from: UnsafeMutableRawPointer) {
-    value = from
+    _value = from
   }
 }
 
 extension CVaListPointer : CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
   public var debugDescription: String {
-    return value.debugDescription
+    return _value.debugDescription
   }
 }
 

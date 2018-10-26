@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1 
+// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 class A {
@@ -204,3 +204,13 @@ func g<T : Init & Derived>(_: T.Type) {
   _ = T(x: ())
   _ = T(y: ())
 }
+
+// Binding a class-constrained generic parameter to a subclass existential is
+// not sound.
+struct G<T : Base> {}
+// expected-note@-1 2 {{requirement specified as 'T' : 'Base' [with T = Base & P]}}
+
+_ = G<Base & P>() // expected-error {{'G' requires that 'Base & P' inherit from 'Base'}}
+
+func badClassConstrainedType(_: G<Base & P>) {}
+// expected-error@-1 {{'G' requires that 'Base & P' inherit from 'Base'}}

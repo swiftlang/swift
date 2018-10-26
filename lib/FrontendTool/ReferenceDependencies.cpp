@@ -17,11 +17,13 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/ReferenceDependencyKeys.h"
 #include "swift/Frontend/FrontendOptions.h"
@@ -65,11 +67,6 @@ public:
                    llvm::raw_ostream &out);
 
 private:
-  /// Opens file for reference dependencies. Emits diagnostic if needed.
-  ///
-  /// \return nullptr on error
-  static std::unique_ptr<llvm::raw_fd_ostream> openFile(DiagnosticEngine &diags,
-                                                        StringRef OutputPath);
   /// Emits all the dependency information.
   void emit() const;
 
@@ -189,36 +186,18 @@ static std::string escape(DeclBaseName name) {
   return llvm::yaml::escape(name.userFacingName());
 }
 
-std::unique_ptr<llvm::raw_fd_ostream>
-ReferenceDependenciesEmitter::openFile(DiagnosticEngine &diags,
-                                       StringRef outputPath) {
-  // Before writing to the dependencies file path, preserve any previous file
-  // that may have been there. No error handling -- this is just a nicety, it
-  // doesn't matter if it fails.
-  llvm::sys::fs::rename(outputPath, outputPath + "~");
-
-  std::error_code EC;
-  auto out = llvm::make_unique<llvm::raw_fd_ostream>(outputPath, EC,
-                                                     llvm::sys::fs::F_None);
-
-  if (out->has_error() || EC) {
-    diags.diagnose(SourceLoc(), diag::error_opening_output, outputPath,
-                   EC.message());
-    out->clear_error();
-    return nullptr;
-  }
-  return out;
-}
-
 bool ReferenceDependenciesEmitter::emit(DiagnosticEngine &diags,
                                         SourceFile *const SF,
                                         const DependencyTracker &depTracker,
                                         StringRef outputPath) {
-  const std::unique_ptr<llvm::raw_ostream> out = openFile(diags, outputPath);
-  if (!out.get())
-    return true;
-  ReferenceDependenciesEmitter::emit(SF, depTracker, *out);
-  return false;
+  // Before writing to the dependencies file path, preserve any previous file
+  // that may have been there. No error handling -- this is just a nicety, it
+  // doesn't matter if it fails.
+  llvm::sys::fs::rename(outputPath, outputPath + "~");
+  return withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
+    ReferenceDependenciesEmitter::emit(SF, depTracker, out);
+    return false;
+  });
 }
 
 void ReferenceDependenciesEmitter::emit(SourceFile *SF,

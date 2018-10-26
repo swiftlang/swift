@@ -321,7 +321,7 @@ FunctionSideEffectFlags *FunctionSideEffects::getEffectsOn(SILValue Addr) {
 // Return true if the given function has defined effects that were successfully
 // recorded in this FunctionSideEffects object.
 bool FunctionSideEffects::setDefinedEffects(SILFunction *F) {
-  if (F->hasSemanticsAttr("arc.programtermination_point")) {
+  if (F->hasSemanticsAttr(SEMANTICS_PROGRAMTERMINATION_POINT)) {
     Traps = true;
     return true;
   }

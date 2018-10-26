@@ -4778,6 +4778,41 @@ DictionaryTestSuite.test("Hashable") {
   checkHashable(variants, equalityOracle: { _, _ in true })
 }
 
+#if _runtime(_ObjC)
+DictionaryTestSuite.test("Values.MutationDoesNotInvalidateIndices") {
+  let objects: [NSNumber] = [1, 2, 3, 4]
+  let keys: [NSString] = ["Blanche", "Rose", "Dorothy", "Sophia"]
+  let ns = NSDictionary(objects: objects, forKeys: keys)
+  var d = ns as! Dictionary<NSString, NSNumber>
+
+  let i = d.index(forKey: "Rose")!
+  expectEqual(d[i].key, "Rose")
+  expectEqual(d[i].value, 2 as NSNumber)
+
+  // Mutating a value through the Values view will convert the bridged
+  // NSDictionary instance to native Dictionary storage. However, Values is a
+  // MutableCollection, so doing so must not invalidate existing indices.
+  d.values[i] = 20 as NSNumber
+
+  // The old Cocoa-based index must still work with the new dictionary.
+  expectEqual(d.values[i], 20 as NSNumber)
+
+  let i2 = d.index(forKey: "Rose")
+
+  // You should also be able to advance Cocoa indices.
+  let j = d.index(after: i)
+  expectLT(i, j)
+
+  // Unfortunately, Cocoa and Native indices aren't comparable, so the
+  // Collection conformance is not quite perfect.
+  expectCrash() {
+    print(i == i2)
+  }
+}
+#endif
+
+
+
 DictionaryTestSuite.setUp {
 #if _runtime(_ObjC)
   // Exercise ARC's autoreleased return value optimization in Foundation.

@@ -860,7 +860,7 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
   auto ty = IGM.createNominalType(type);
 
   // Register a forward declaration before we look at any of the child types.
-  addForwardDecl(key, ty);
+  addForwardDecl(key);
 
   // Use different rules for types imported from C.
   if (D->hasClangNode()) {

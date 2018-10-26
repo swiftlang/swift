@@ -17,6 +17,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/FileSystem.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -2482,9 +2483,19 @@ void Serializer::writePatternBindingInitializer(PatternBindingDecl *binding,
                                                 unsigned bindingIndex) {
   using namespace decls_block;
   auto abbrCode = DeclTypeAbbrCodes[PatternBindingInitializerLayout::Code];
+
+  StringRef initStr;
+  SmallString<128> scratch;
+  auto &entry = binding->getPatternList()[bindingIndex];
+  auto varDecl = entry.getAnchoringVarDecl();
+  if (entry.hasInitStringRepresentation() &&
+      varDecl->isInitExposedToClients()) {
+    initStr = entry.getInitStringRepresentation(scratch);
+  }
+
   PatternBindingInitializerLayout::emitRecord(Out, ScratchRecord,
                                               abbrCode, addDeclRef(binding),
-                                              bindingIndex);
+                                              bindingIndex, initStr);
 }
 
 void
@@ -2912,11 +2923,14 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(op->getDeclContext());
     auto nameID = addDeclBaseNameRef(op->getName());
     auto groupID = addDeclRef(op->getPrecedenceGroup());
-    auto protoID = addDeclRef(op->getDesignatedProtocol());
+    SmallVector<DeclID, 1> designatedNominalTypeDeclIDs;
+    for (auto *decl : op->getDesignatedNominalTypes())
+      designatedNominalTypeDeclIDs.push_back(addDeclRef(decl));
 
     unsigned abbrCode = DeclTypeAbbrCodes[InfixOperatorLayout::Code];
     InfixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode, nameID,
-                                    contextID, groupID, protoID);
+                                    contextID, groupID,
+                                    designatedNominalTypeDeclIDs);
     break;
   }
 
@@ -2925,12 +2939,14 @@ void Serializer::writeDecl(const Decl *D) {
     verifyAttrSerializable(op);
 
     auto contextID = addDeclContextRef(op->getDeclContext());
-    auto protoID = addDeclRef(op->getDesignatedProtocol());
+    SmallVector<DeclID, 1> designatedNominalTypeDeclIDs;
+    for (auto *decl : op->getDesignatedNominalTypes())
+      designatedNominalTypeDeclIDs.push_back(addDeclRef(decl));
 
     unsigned abbrCode = DeclTypeAbbrCodes[PrefixOperatorLayout::Code];
     PrefixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                      addDeclBaseNameRef(op->getName()),
-                                     contextID, protoID);
+                                     contextID, designatedNominalTypeDeclIDs);
     break;
   }
 
@@ -2939,12 +2955,14 @@ void Serializer::writeDecl(const Decl *D) {
     verifyAttrSerializable(op);
 
     auto contextID = addDeclContextRef(op->getDeclContext());
-    auto protoID = addDeclRef(op->getDesignatedProtocol());
+    SmallVector<DeclID, 1> designatedNominalTypeDeclIDs;
+    for (auto *decl : op->getDesignatedNominalTypes())
+      designatedNominalTypeDeclIDs.push_back(addDeclRef(decl));
 
     unsigned abbrCode = DeclTypeAbbrCodes[PostfixOperatorLayout::Code];
     PostfixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                       addDeclBaseNameRef(op->getName()),
-                                      contextID, protoID);
+                                      contextID, designatedNominalTypeDeclIDs);
     break;
   }
 
@@ -5218,19 +5236,6 @@ void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
   S.writeToStream(os);
 }
 
-static inline bool
-withOutputFile(ASTContext &ctx, StringRef outputPath,
-               llvm::function_ref<void(raw_ostream &)> action){
-  std::error_code EC = swift::atomicallyWritingToFile(outputPath,
-                                                      action);
-  if (!EC)
-    return false;
-
-  ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                     outputPath, EC.message());
-  return true;
-}
-
 void swift::serialize(ModuleOrSourceFile DC,
                       const SerializationOptions &options,
                       const SILModule *M) {
@@ -5243,20 +5248,24 @@ void swift::serialize(ModuleOrSourceFile DC,
     return;
   }
 
-  bool hadError = withOutputFile(getContext(DC), options.OutputPath,
+  bool hadError = withOutputFile(getContext(DC).Diags,
+                                 options.OutputPath,
                                  [&](raw_ostream &out) {
     SharedTimer timer("Serialization, swiftmodule");
     Serializer::writeToStream(out, DC, M, options);
+    return false;
   });
   if (hadError)
     return;
 
   if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
-    (void)withOutputFile(getContext(DC), options.DocOutputPath,
+    (void)withOutputFile(getContext(DC).Diags,
+                         options.DocOutputPath,
                          [&](raw_ostream &out) {
       SharedTimer timer("Serialization, swiftdoc");
       Serializer::writeDocToStream(out, DC, options.GroupInfoPath,
                                    getContext(DC));
+      return false;
     });
   }
 }

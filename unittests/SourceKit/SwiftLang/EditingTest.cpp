@@ -137,7 +137,7 @@ public:
   }
 
   bool waitForDocUpdate(bool reset = false) {
-    std::chrono::seconds secondsToWait(10);
+    std::chrono::seconds secondsToWait(20);
     std::unique_lock<std::mutex> lk(DocUpdState->Mtx);
     auto when = std::chrono::system_clock::now() + secondsToWait;
     auto result = !DocUpdState->CV.wait_until(

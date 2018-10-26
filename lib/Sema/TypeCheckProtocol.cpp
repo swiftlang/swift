@@ -545,6 +545,14 @@ swift::matchWitness(
     // Result types must match.
     // FIXME: Could allow (trivial?) subtyping here.
     if (!ignoreReturnType) {
+      if (reqResultType->hasDynamicSelfType()) {
+        auto classDecl = witness->getDeclContext()->getSelfClassDecl();
+        if (!classDecl || classDecl->isFinal() ||
+            witnessResultType->hasDynamicSelfType())
+          reqResultType = reqResultType->eraseDynamicSelfType();
+        witnessResultType = witnessResultType->eraseDynamicSelfType();
+      }
+
       auto reqTypeIsIUO =
           req->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
       auto witnessTypeIsIUO =
@@ -1092,7 +1100,7 @@ bool WitnessChecker::findBestWitness(
   }
 
   if (numViable == 0) {
-    // Assume any missing value witnesses for a conformance in a textual
+    // Assume any missing value witnesses for a conformance in a parseable
     // interface can be treated as opaque.
     // FIXME: ...but we should do something better about types.
     if (conformance && !conformance->isInvalid()) {
@@ -1961,7 +1969,17 @@ static void addOptionalityFixIts(
 /// \brief Diagnose a requirement match, describing what went wrong (or not).
 static void
 diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
-              ValueDecl *req, const RequirementMatch &match){
+              ValueDecl *req, const RequirementMatch &match) {
+
+  // If the name doesn't match and that's not the only problem,
+  // it is likely this witness wasn't intended to be a match at all, so omit
+  // diagnosis.
+  if (match.Kind != MatchKind::RenamedMatch &&
+      !match.Witness->getAttrs().hasAttribute<ImplementsAttr>() &&
+      match.Witness->getFullName() &&
+      req->getFullName() != match.Witness->getFullName())
+    return;
+
   // Form a string describing the associated type deductions.
   // FIXME: Determine which associated types matter, and only print those.
   llvm::SmallString<128> withAssocTypes;
@@ -2711,11 +2729,11 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
       emitDeclaredHereIfNeeded(diags, diagLoc, witness);
 
       if (auto requirementRepr = *constraint) {
-        diags.diagnose(requirementRepr->getEqualLoc(),
+        diags.diagnose(requirementRepr->getSeparatorLoc(),
                        diag::witness_self_weaken_same_type,
                        requirementRepr->getFirstType(),
                        requirementRepr->getSecondType())
-          .fixItReplace(requirementRepr->getEqualLoc(), ":");
+          .fixItReplace(requirementRepr->getSeparatorLoc(), ":");
       }
     }
   }
@@ -3433,7 +3451,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
       DC, Loc, Loc,
       // FIXME: maybe this should be the conformance's type
       proto->getDeclaredInterfaceType(),
-      { Type(proto->getProtocolSelfType()) },
+      { proto->getSelfInterfaceType() },
       proto->getRequirementSignature(),
       QuerySubstitutionMap{substitutions},
       TypeChecker::LookUpConformance(DC),
@@ -3958,7 +3976,7 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
 
     auto conditionalCheckResult = checkGenericArguments(
         DC, ComplainLoc, noteLoc, T,
-        {Type(lookupResult->getRequirement()->getProtocolSelfType())},
+        {lookupResult->getRequirement()->getSelfInterfaceType()},
         *condReqs,
         [](SubstitutableType *dependentType) { return Type(dependentType); },
         LookUpConformance(DC), options);
@@ -4713,10 +4731,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
         if (kind && getLangOpts().EnableNSKeyedArchiverDiagnostics &&
             isa<NormalProtocolConformance>(conformance) &&
             !hasExplicitObjCName(classDecl)) {
-          bool emitWarning = Context.LangOpts.isSwiftVersion3();
           diagnose(cast<NormalProtocolConformance>(conformance)->getLoc(),
-                   emitWarning ? diag::nscoding_unstable_mangled_name_warn
-                               : diag::nscoding_unstable_mangled_name,
+                   diag::nscoding_unstable_mangled_name,
                    static_cast<unsigned>(kind.getValue()),
                    classDecl->getDeclaredInterfaceType());
           auto insertionLoc =
@@ -5335,7 +5351,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
   for (const auto &req : proto->getRequirementSignature()) {
     if (req.getKind() != RequirementKind::Conformance)
       continue;
-    if (req.getFirstType()->isEqual(proto->getProtocolSelfType()))
+    if (req.getFirstType()->isEqual(proto->getSelfInterfaceType()))
       continue;
 
     // Find the innermost dependent member type (e.g., Self.AssocType), so
@@ -5348,7 +5364,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
              depMemTy->getBase()->getAs<DependentMemberType>())
       depMemTy = innerDepMemTy;
 
-    if (!depMemTy->getBase()->isEqual(proto->getProtocolSelfType()))
+    if (!depMemTy->getBase()->isEqual(proto->getSelfInterfaceType()))
       continue;
 
     auto assocType = depMemTy->getAssocType();

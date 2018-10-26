@@ -15,6 +15,7 @@
 #include "RefCount.h"
 #include "SwiftStddef.h"
 #include "System.h"
+#include "Target.h"
 
 #define SWIFT_ABI_HEAP_OBJECT_HEADER_SIZE_64 16
 #define SWIFT_ABI_HEAP_OBJECT_HEADER_SIZE_32 8
@@ -117,10 +118,20 @@ static_assert(alignof(HeapObject) == alignof(void*),
 #endif
 #define _swift_abi_SwiftSpareBitsMask                                          \
   (__swift_uintptr_t) SWIFT_ABI_X86_64_SWIFT_SPARE_BITS_MASK
+#if SWIFT_TARGET_OS_SIMULATOR
+#define _swift_abi_ObjCReservedBitsMask                                        \
+  (__swift_uintptr_t) SWIFT_ABI_X86_64_SIMULATOR_OBJC_RESERVED_BITS_MASK
+#define _swift_abi_ObjCReservedLowBits                                         \
+  (unsigned) SWIFT_ABI_X86_64_SIMULATOR_OBJC_NUM_RESERVED_LOW_BITS
+#else
 #define _swift_abi_ObjCReservedBitsMask                                        \
   (__swift_uintptr_t) SWIFT_ABI_X86_64_OBJC_RESERVED_BITS_MASK
 #define _swift_abi_ObjCReservedLowBits                                         \
   (unsigned) SWIFT_ABI_X86_64_OBJC_NUM_RESERVED_LOW_BITS
+#endif
+
+#define _swift_BridgeObject_TaggedPointerBits                                  \
+  (__swift_uintptr_t) SWIFT_ABI_DEFAULT_BRIDGEOBJECT_TAG_64
 
 #elif defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64)
 
@@ -137,6 +148,8 @@ static_assert(alignof(HeapObject) == alignof(void*),
   (__swift_uintptr_t) SWIFT_ABI_ARM64_OBJC_RESERVED_BITS_MASK
 #define _swift_abi_ObjCReservedLowBits                                         \
   (unsigned) SWIFT_ABI_ARM64_OBJC_NUM_RESERVED_LOW_BITS
+#define _swift_BridgeObject_TaggedPointerBits                                  \
+  (__swift_uintptr_t) SWIFT_ABI_DEFAULT_BRIDGEOBJECT_TAG_64
 
 #elif defined(__powerpc64__)
 
@@ -148,6 +161,8 @@ static_assert(alignof(HeapObject) == alignof(void*),
   (__swift_uintptr_t) SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK
 #define _swift_abi_ObjCReservedLowBits                                         \
   (unsigned) SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS
+#define _swift_BridgeObject_TaggedPointerBits                                  \
+  (__swift_uintptr_t) SWIFT_ABI_DEFAULT_BRIDGEOBJECT_TAG_64
 
 #elif defined(__s390x__)
 
@@ -159,6 +174,8 @@ static_assert(alignof(HeapObject) == alignof(void*),
   (__swift_uintptr_t) SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK
 #define _swift_abi_ObjCReservedLowBits                                         \
   (unsigned) SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS
+#define _swift_BridgeObject_TaggedPointerBits                                  \
+  (__swift_uintptr_t) SWIFT_ABI_DEFAULT_BRIDGEOBJECT_TAG_64
 
 #else
 
@@ -180,6 +197,15 @@ static_assert(alignof(HeapObject) == alignof(void*),
   (__swift_uintptr_t) SWIFT_ABI_DEFAULT_OBJC_RESERVED_BITS_MASK
 #define _swift_abi_ObjCReservedLowBits                                         \
   (unsigned) SWIFT_ABI_DEFAULT_OBJC_NUM_RESERVED_LOW_BITS
+
+#if __POINTER_WIDTH__ == 64
+#define _swift_BridgeObject_TaggedPointerBits                                  \
+  (__swift_uintptr_t) SWIFT_ABI_DEFAULT_BRIDGEOBJECT_TAG_64
+#else
+#define _swift_BridgeObject_TaggedPointerBits                                  \
+  (__swift_uintptr_t) SWIFT_ABI_DEFAULT_BRIDGEOBJECT_TAG_32
+#endif
+
 #endif
 
 /// Corresponding namespaced decls
@@ -191,13 +217,11 @@ static const __swift_uintptr_t SwiftSpareBitsMask =
     _swift_abi_SwiftSpareBitsMask;
 static const __swift_uintptr_t ObjCReservedBitsMask =
     _swift_abi_ObjCReservedBitsMask;
-static const unsigned ObjCReservedLowBits = _swift_abi_ObjCReservedLowBits;
+static const unsigned ObjCReservedLowBits =
+    _swift_abi_ObjCReservedLowBits;
+static const __swift_uintptr_t BridgeObjectTagBitsMask =
+    _swift_BridgeObject_TaggedPointerBits;
 } // heap_object_abi
 #endif // __cplusplus
-
-/// BridgeObject masks
-
-#define _swift_BridgeObject_TaggedPointerBits _swift_abi_ObjCReservedBitsMask
-
 
 #endif // SWIFT_STDLIB_SHIMS_HEAPOBJECT_H

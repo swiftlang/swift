@@ -62,8 +62,7 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
     /// Returns a string created from the UUID, such as "E621E1F8-C36C-495A-93FC-0C247A3E6E5F"
     public var uuidString: String {
         var bytes: uuid_string_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-        var localValue = uuid
-        return withUnsafeMutablePointer(to: &localValue) {
+        return withUnsafePointer(to: uuid) {
             $0.withMemoryRebound(to: UInt8.self, capacity: 16) { val in
                 withUnsafeMutablePointer(to: &bytes) {
                     $0.withMemoryRebound(to: Int8.self, capacity: 37) { str in
@@ -76,10 +75,9 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
     }
     
     public var hashValue: Int {
-        var localValue = uuid
-        return withUnsafeMutablePointer(to: &localValue) {
+        return withUnsafePointer(to: uuid) {
               $0.withMemoryRebound(to: UInt8.self, capacity: 16) {
-                  return Int(bitPattern: CFHashBytes($0, CFIndex(MemoryLayout<uuid_t>.size)))
+                  return Int(bitPattern: CFHashBytes(UnsafeMutablePointer(mutating: $0), CFIndex(MemoryLayout<uuid_t>.size)))
               }
         }
     }
@@ -95,8 +93,7 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
     // MARK: - Bridging Support
     
     fileprivate var reference: NSUUID {
-        var bytes = uuid
-        return withUnsafePointer(to: &bytes) {
+        return withUnsafePointer(to: uuid) {
             $0.withMemoryRebound(to: UInt8.self, capacity: 16) {
                 return NSUUID(uuidBytes: $0)
             }
@@ -148,6 +145,7 @@ extension UUID : _ObjectiveCBridgeable {
         return true
     }
 
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSUUID?) -> UUID {
         var result: UUID?
         _forceBridgeFromObjectiveC(source!, result: &result)

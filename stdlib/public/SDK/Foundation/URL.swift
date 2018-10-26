@@ -1205,6 +1205,7 @@ extension URL : _ObjectiveCBridgeable {
         return true
     }
 
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSURL?) -> URL {
         var result: URL?
         _forceBridgeFromObjectiveC(source!, result: &result)

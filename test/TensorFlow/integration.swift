@@ -160,7 +160,7 @@ public func test_bool_param(cond: Bool, x: Tensor<Float>, y: Tensor<Float>) {
 // CHECK: sil private @{{.*}}test_bool_param{{.*}} : $@callee_owned (TensorHandle<Builtin.Int1>, TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float>
 // CHECK: bb0(%0 : @unowned $TensorHandle<Builtin.Int1>, %1 : @unowned $TensorHandle<Float>, %2 : @unowned $TensorHandle<Float>):
 // CHECK: %3 = graph_op "tf_tensor_to_i1"(%0 : $TensorHandle<Builtin.Int1>) {{.*}} : $Builtin.Int1
-// CHECK: cond_br %3, bb2, bb1
+// CHECK: cond_br %3, bb1, bb2
 
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test_bool_param{{.*}}
@@ -227,11 +227,11 @@ public func test_multiple_ifs(status: Bool) {
 // CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}test_multiple_ifs{{.*}}
 // CHECK-NEXT: [sequence
 // CHECK-NEXT:   {condition Header: bb0
-// CHECK-NEXT:     block bb2
-// CHECK-NEXT:     block bb1}
+// CHECK-NEXT:     block bb1
+// CHECK-NEXT:     block bb2}
 // CHECK-NEXT:   {condition Header: bb3
-// CHECK-NEXT:     block bb5
-// CHECK-NEXT:     block bb4}
+// CHECK-NEXT:     block bb4
+// CHECK-NEXT:     block bb5}
 // CHECK-NEXT:   block bb6]
 
 public func test_while1(maxCount: Int, arg1: Tensor<Float>, arg2: Tensor<Float>) {

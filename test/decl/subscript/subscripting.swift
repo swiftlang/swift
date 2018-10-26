@@ -346,9 +346,9 @@ class Foo {
 protocol r23952125 {
   associatedtype ItemType
   var count: Int { get }
-  subscript(index: Int) -> ItemType  // expected-error {{subscript in protocol must have explicit { get } or { get set } specifier}} {{36-36= { get set \}}}
-  
-  var c : Int // expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
+  subscript(index: Int) -> ItemType  // expected-error {{subscript in protocol must have explicit { get } or { get set } specifier}} {{36-36= { get <#set#> \}}}
+
+  var c : Int // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-14= { get <#set#> \}}}
 }
 
 // <rdar://problem/16812341> QoI: Poor error message when providing a default value for a subscript parameter

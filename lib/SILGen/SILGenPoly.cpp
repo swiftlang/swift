@@ -896,12 +896,18 @@ namespace {
         }
         auto outputOrigType = AbstractionPattern::getTuple(outputOrigTypes);
 
-        // Build the substituted output tuple type.
+        // Build the substituted output tuple type. Note that we deliberately
+        // don't use composeInput() because we want to drop ownership
+        // qualifiers.
+        SmallVector<TupleTypeElt, 8> elts;
+        for (auto param : outputSubstTypes) {
+          assert(!param.isVariadic());
+          assert(!param.isInOut());
+          elts.emplace_back(param.getParameterType());
+        }
         auto outputSubstType = cast<TupleType>(
-            AnyFunctionType::composeInput(SGF.getASTContext(),
-                                          outputSubstTypes,
-                                          /*canonicalVararg=*/true)
-              ->getCanonicalType());
+          TupleType::get(elts, SGF.getASTContext())
+            ->getCanonicalType());
 
         // Translate the input tuple value into the output tuple value. Note
         // that the output abstraction pattern is a tuple, and we explode tuples

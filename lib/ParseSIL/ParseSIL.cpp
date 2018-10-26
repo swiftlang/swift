@@ -3640,6 +3640,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
                            "cast consumption kind")) {
       return true;
     }
+    // NOTE: BorrowAlways is not a supported cast kind for address types, so we
+    // purposely do not parse it here.
     auto kind = llvm::StringSwitch<Optional<CastConsumptionKind>>(
                     consumptionKindToken.str())
                     .Case("take_always", CastConsumptionKind::TakeAlways)

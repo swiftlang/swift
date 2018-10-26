@@ -33,7 +33,7 @@ class X {
   init()
 }
 
-sil [_semantics "arc.programtermination_point"] @exitfunc : $@convention(thin) () -> Never
+sil [_semantics "programtermination_point"] @exitfunc : $@convention(thin) () -> Never
 sil [readnone] @pure_func : $@convention(thin) () -> ()
 sil [releasenone] @releasenone_func : $@convention(thin) () -> ()
 sil [readonly] @readonly_owned : $@convention(thin) (@owned X) -> ()

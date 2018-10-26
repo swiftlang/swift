@@ -85,6 +85,8 @@ static unsigned toStableCastConsumptionKind(CastConsumptionKind kind) {
     return SIL_CAST_CONSUMPTION_TAKE_ON_SUCCESS;
   case CastConsumptionKind::CopyOnSuccess:
     return SIL_CAST_CONSUMPTION_COPY_ON_SUCCESS;
+  case CastConsumptionKind::BorrowAlways:
+    return SIL_CAST_CONSUMPTION_BORROW_ALWAYS;
   }
   llvm_unreachable("bad cast consumption kind");
 }
@@ -428,6 +430,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   BasicBlockMap.clear();
   // Assign a value ID to each SILInstruction that has value and to each basic
   // block argument.
+  //
+  // FIXME: Add reverse iteration to SILSuccessor and convert this to a "stable"
+  // RPO order. Currently, the serializer inverts the order of successors each
+  // time they are processed.
   unsigned ValueID = 0;
   llvm::ReversePostOrderTraversal<SILFunction *> RPOT(
       const_cast<SILFunction *>(&F));

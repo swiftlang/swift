@@ -20,9 +20,7 @@ func matchesEither(input: Hive, a: Hive, b: Hive) -> Bool {
     return true
 
   // CHECK: [[NOT_CASE2]]:
-  // CHECK:   br [[RET_FALSE:bb[0-9]+]]
   default:
-  // CHECK: [[RET_FALSE]]:
   // CHECK:   function_ref @$sSb2{{[_0-9a-zA-Z]*}}fC
     return false
   }

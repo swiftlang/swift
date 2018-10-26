@@ -130,10 +130,6 @@ public class Base {
    var a: UInt32 = 0
 }
 // CHECK-LABEL: %swift.metadata_response @{{.*}}7DerivedCMr"(
-// CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_{{.*}}_pod, i32 0, i32 0),
-// CHECK-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_4_{{.*}}_pod, i32 0, i32 0),
-// CHECK: store i8** getelementptr inbounds (i8*, i8** @"$sBoWV", i32 8),
-// CHECK: call swiftcc %swift.metadata_response @"$s29type_layout_reference_storage4BaseCMa"
 // CHECK: call void @swift_initClassMetadata
 // CHECK: ret
 public class Derived<T> : Base {

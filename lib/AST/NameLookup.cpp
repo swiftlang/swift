@@ -556,18 +556,26 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
                           SmallVectorImpl<ModuleDecl *> &modulesFound,
                           bool &anyObject);
 
-TinyPtrVector<NominalTypeDecl *>
-SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
-                                           ExtensionDecl *ext) const {
-  auto proto = ext->getExtendedProtocolDecl();
-  assert(proto && "Not a protocol extension?");
+SelfBounds
+SelfBoundsFromWhereClauseRequest::evaluate(
+    Evaluator &evaluator,
+    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) const {
+  auto *typeDecl = decl.dyn_cast<TypeDecl *>();
+  auto *protoDecl = dyn_cast_or_null<ProtocolDecl>(typeDecl);
+  auto *extDecl = decl.dyn_cast<ExtensionDecl *>();
 
-  ASTContext &ctx = proto->getASTContext();
-  TinyPtrVector<NominalTypeDecl *> result;
-  if (!ext->getGenericParams())
+  DeclContext *dc = protoDecl ? (DeclContext *)protoDecl : (DeclContext *)extDecl;
+  auto requirements = protoDecl ? protoDecl->getTrailingWhereClause()
+                                : extDecl->getTrailingWhereClause();
+
+  ASTContext &ctx = dc->getASTContext();
+
+  SelfBounds result;
+
+  if (requirements == nullptr)
     return result;
 
-  for (const auto &req : ext->getGenericParams()->getTrailingRequirements()) {
+  for (const auto &req : requirements->getRequirements()) {
     // We only care about type constraints.
     if (req.getKind() != RequirementReprKind::TypeConstraint)
       continue;
@@ -578,7 +586,7 @@ SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
       if (auto identTypeRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr))
         isSelfLHS = (identTypeRepr->getIdentifier() == ctx.Id_Self);
     } else if (Type type = req.getSubject()) {
-      isSelfLHS = type->isEqual(proto->getSelfInterfaceType());
+      isSelfLHS = type->isEqual(dc->getSelfInterfaceType());
     }
     if (!isSelfLHS)
       continue;
@@ -586,19 +594,50 @@ SelfBoundsFromWhereClauseRequest::evaluate(Evaluator &evaluator,
     // Resolve the right-hand side.
     DirectlyReferencedTypeDecls rhsDecls;
     if (auto typeRepr = req.getConstraintRepr()) {
-      rhsDecls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
+      rhsDecls = directReferencesForTypeRepr(evaluator, ctx, typeRepr, dc);
     } else if (Type type = req.getConstraint()) {
       rhsDecls = directReferencesForType(type);
     }
 
     SmallVector<ModuleDecl *, 2> modulesFound;
-    bool anyObject = false;
     auto rhsNominals = resolveTypeDeclsToNominal(evaluator, ctx, rhsDecls,
-                                                 modulesFound, anyObject);
-    result.insert(result.end(), rhsNominals.begin(), rhsNominals.end());
+                                                 modulesFound,
+                                                 result.anyObject);
+    result.decls.insert(result.decls.end(),
+                        rhsNominals.begin(),
+                        rhsNominals.end());
   }
 
   return result;
+}
+
+SelfBounds swift::getSelfBoundsFromWhereClause(
+    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) {
+  auto *typeDecl = decl.dyn_cast<TypeDecl *>();
+  auto *extDecl = decl.dyn_cast<ExtensionDecl *>();
+  auto &ctx = typeDecl ? typeDecl->getASTContext()
+                       : extDecl->getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           SelfBoundsFromWhereClauseRequest{decl}, {});
+}
+
+static void
+populateLookupDeclsFromContext(DeclContext *dc,
+                               SmallVectorImpl<NominalTypeDecl *> &lookupDecls) {
+  auto nominal = dc->getSelfNominalTypeDecl();
+  if (!nominal)
+    return;
+
+  lookupDecls.push_back(nominal);
+
+  // For a protocol extension, check whether there are additional "Self"
+  // constraints that can affect name lookup.
+  if (dc->getExtendedProtocolDecl()) {
+    auto ext = cast<ExtensionDecl>(dc);
+    auto bounds = getSelfBoundsFromWhereClause(ext);
+    for (auto bound : bounds.decls)
+      lookupDecls.push_back(bound);
+  }
 }
 
 TinyPtrVector<TypeDecl *>
@@ -811,19 +850,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         if (!nominal) continue;
 
         // Dig out the type we're looking into.
-        SmallVector<TypeDecl *, 2> lookupDecls;
-        lookupDecls.push_back(nominal);
-
-        // For a protocol extension, check whether there are additional
-        // "Self" constraints that can affect name lookup.
-        if (isa<ProtocolDecl>(nominal)) {
-          if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-            auto bounds = evaluateOrDefault(Ctx.evaluator,
-              SelfBoundsFromWhereClauseRequest{ext}, {});
-            for (auto bound : bounds)
-              lookupDecls.push_back(bound);
-          }
-        }
+        SmallVector<NominalTypeDecl *, 2> lookupDecls;
+        populateLookupDeclsFromContext(dc, lookupDecls);
 
         NLOptions options = baseNLOptions;
         // Perform lookup into the type.
@@ -888,29 +916,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         DeclContext *MetaBaseDC = nullptr;
         GenericParamList *GenericParams = nullptr;
 
-        // Dig out the type we're looking into.
-        SmallVector<TypeDecl *, 2> lookupDecls;
-
-        // Local function to populate the set of lookup declarations from
-        // the given DeclContext.
-        auto populateLookupDeclsFromContext = [&](DeclContext *dc) {
-          auto nominal = dc->getSelfNominalTypeDecl();
-          if (!nominal)
-            return;
-
-          lookupDecls.push_back(nominal);
-
-          // For a protocol extension, check whether there are additional
-          // "Self" constraints that can affect name lookup.
-          if (isa<ProtocolDecl>(nominal)) {
-            if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-              auto bounds = evaluateOrDefault(Ctx.evaluator,
-                SelfBoundsFromWhereClauseRequest{ext}, {});
-              for (auto bound : bounds)
-                lookupDecls.push_back(bound);
-            }
-          }
-        };
+        SmallVector<NominalTypeDecl *, 2> lookupDecls;
 
         if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC)) {
           auto *PBD = PBI->getBinding();
@@ -926,7 +932,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
             DC = DC->getParent();
 
-            populateLookupDeclsFromContext(DC);
+            populateLookupDeclsFromContext(DC, lookupDecls);
             MetaBaseDC = DC;
             BaseDC = PBI;
           }
@@ -935,7 +941,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           else if (PBD->getDeclContext()->isTypeContext()) {
             DC = DC->getParent();
 
-            populateLookupDeclsFromContext(DC);
+            populateLookupDeclsFromContext(DC, lookupDecls);
             MetaBaseDC = DC;
             BaseDC = MetaBaseDC;
 
@@ -973,7 +979,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             isCascadingUse = AFD->isCascadingContextForLookup(false);
 
           if (AFD->getDeclContext()->isTypeContext()) {
-            populateLookupDeclsFromContext(AFD->getDeclContext());
+            populateLookupDeclsFromContext(AFD->getDeclContext(),
+                                           lookupDecls);
             BaseDC = AFD;
             MetaBaseDC = AFD->getDeclContext();
             DC = DC->getParent();
@@ -992,8 +999,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
           // Look in the generic parameters after checking our local declaration.
           GenericParams = AFD->getGenericParams();
-        } else if (auto *SD = dyn_cast<SubscriptDecl>(DC)) {
-          GenericParams = SD->getGenericParams();
         } else if (auto *ACE = dyn_cast<AbstractClosureExpr>(DC)) {
           // Look for local variables; normally, the parser resolves these
           // for us, but it can't do the right thing inside local types.
@@ -1014,7 +1019,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             isCascadingUse = ACE->isCascadingContextForLookup(false);
         } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
           if (shouldLookupMembers(ED, Loc))
-            populateLookupDeclsFromContext(ED);
+            populateLookupDeclsFromContext(ED, lookupDecls);
 
           BaseDC = ED;
           MetaBaseDC = ED;
@@ -1022,7 +1027,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             isCascadingUse = ED->isCascadingContextForLookup(false);
         } else if (auto *ND = dyn_cast<NominalTypeDecl>(DC)) {
           if (shouldLookupMembers(ND, Loc))
-            populateLookupDeclsFromContext(ND);
+            populateLookupDeclsFromContext(ND, lookupDecls);
           BaseDC = DC;
           MetaBaseDC = DC;
           if (!isCascadingUse.hasValue())
@@ -1035,18 +1040,44 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           continue;
         } else {
           assert(isa<TopLevelCodeDecl>(DC) || isa<Initializer>(DC) ||
-                 isa<TypeAliasDecl>(DC));
+                 isa<TypeAliasDecl>(DC) || isa<SubscriptDecl>(DC));
           if (!isCascadingUse.hasValue())
             isCascadingUse = DC->isCascadingContextForLookup(false);
         }
 
-        // Check the generic parameters for something with the given name.
+        // If we're inside a function context, we've already moved to
+        // the parent DC, so we have to check the function's generic
+        // parameters first.
         if (GenericParams) {
           namelookup::FindLocalVal localVal(SM, Loc, Consumer);
           localVal.checkGenericParams(GenericParams);
 
           if (shouldReturnBasedOnResults())
             return;
+        }
+
+        // Check the generic parameters of our context.
+        GenericParamList *dcGenericParams = nullptr;
+        if (auto nominal = dyn_cast<NominalTypeDecl>(DC))
+          dcGenericParams = nominal->getGenericParams();
+        else if (auto ext = dyn_cast<ExtensionDecl>(DC))
+          dcGenericParams = ext->getGenericParams();
+        else if (auto subscript = dyn_cast<SubscriptDecl>(DC))
+          dcGenericParams = subscript->getGenericParams();
+
+        while (dcGenericParams) {
+          namelookup::FindLocalVal localVal(SM, Loc, Consumer);
+          localVal.checkGenericParams(dcGenericParams);
+
+          if (shouldReturnBasedOnResults())
+            return;
+
+          // Extensions of nested types have multiple levels of
+          // generic parameters, so we have to visit them explicitly.
+          if (!isa<ExtensionDecl>(DC))
+            break;
+
+          dcGenericParams = dcGenericParams->getOuterParameters();
         }
 
         if (BaseDC && !lookupDecls.empty()) {
@@ -1064,12 +1095,9 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             // Classify this declaration.
             FoundAny = true;
 
-            // Types are local or metatype members.
+            // Types are formally members of the metatype.
             if (auto TD = dyn_cast<TypeDecl>(Result)) {
-              if (isa<GenericTypeParamDecl>(TD))
-                Results.push_back(LookupResultEntry(Result));
-              else
-                Results.push_back(LookupResultEntry(MetaBaseDC, Result));
+              Results.push_back(LookupResultEntry(MetaBaseDC, Result));
               continue;
             }
 
@@ -1099,29 +1127,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                 return;
             }
           }
-        }
-
-        // Check the generic parameters if our context is a generic type or
-        // extension thereof.
-        GenericParamList *dcGenericParams = nullptr;
-        if (auto nominal = dyn_cast<NominalTypeDecl>(DC))
-          dcGenericParams = nominal->getGenericParams();
-        else if (auto ext = dyn_cast<ExtensionDecl>(DC))
-          dcGenericParams = ext->getGenericParams();
-        else if (auto subscript = dyn_cast<SubscriptDecl>(DC))
-          dcGenericParams = subscript->getGenericParams();
-
-        while (dcGenericParams) {
-          namelookup::FindLocalVal localVal(SM, Loc, Consumer);
-          localVal.checkGenericParams(dcGenericParams);
-
-          if (shouldReturnBasedOnResults())
-            return;
-
-          if (!isa<ExtensionDecl>(DC))
-            break;
-
-          dcGenericParams = dcGenericParams->getOuterParameters();
         }
 
         DC = DC->getParentForLookup();
@@ -1952,15 +1957,10 @@ bool DeclContext::lookupQualified(Type type,
   SmallVector<NominalTypeDecl *, 4> nominalTypesToLookInto;
   extractDirectlyReferencedNominalTypes(type, nominalTypesToLookInto);
 
-  SmallVector<TypeDecl *, 4> typeDeclsToLookInto;
-  typeDeclsToLookInto.reserve(nominalTypesToLookInto.size());
-  for (auto nominal : nominalTypesToLookInto)
-    typeDeclsToLookInto.push_back(nominal);
-
-  return lookupQualified(typeDeclsToLookInto, member, options, decls);
+  return lookupQualified(nominalTypesToLookInto, member, options, decls);
 }
 
-bool DeclContext::lookupQualified(ArrayRef<TypeDecl *> typeDecls,
+bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
                                   DeclName member,
                                   NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
@@ -1989,31 +1989,9 @@ bool DeclContext::lookupQualified(ArrayRef<TypeDecl *> typeDecls,
     return true;
   };
 
-  // Look through the type declarations we were given, resolving them down
-  // to nominal type declarations, module declarations, and
-  ASTContext &ctx = getASTContext();
-  SmallVector<ModuleDecl *, 2> moduleDecls;
-  bool anyObject = false;
-  auto nominalTypeDecls =
-    resolveTypeDeclsToNominal(ctx.evaluator, ctx, typeDecls, moduleDecls,
-                              anyObject);
-
-  // If the only declaration we were given was AnyObject, this is AnyObject
-  // lookup.
-  if (anyObject && nominalTypeDecls.empty() && moduleDecls.empty())
-    return lookupAnyObject(member, options, decls);
-
   // Add all of the nominal types to the stack.
-  for (auto nominal : nominalTypeDecls) {
+  for (auto nominal : typeDecls) {
     addNominalType(nominal);
-  }
-
-  // Search all of the modules.
-  for (auto module : moduleDecls) {
-    auto innerOptions = options;
-    innerOptions &= ~NL_RemoveOverridden;
-    innerOptions &= ~NL_RemoveNonVisible;
-    lookupQualified(module, member, innerOptions, decls);
   }
 
   // Whether we only want to return complete object initializers.
@@ -2021,6 +1999,7 @@ bool DeclContext::lookupQualified(ArrayRef<TypeDecl *> typeDecls,
 
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
+  auto &ctx = getASTContext();
   auto typeResolver = ctx.getLazyResolver();
   bool wantProtocolMembers = (options & NL_ProtocolMembers);
   while (!stack.empty()) {
@@ -2356,7 +2335,25 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
     // Look into the base types.
     SmallVector<ValueDecl *, 4> members;
     auto options = NL_RemoveNonVisible | NL_OnlyTypes;
-    dc->lookupQualified(baseTypes, name, options, members);
+
+    // Look through the type declarations we were given, resolving them down
+    // to nominal type declarations, module declarations, and
+    SmallVector<ModuleDecl *, 2> moduleDecls;
+    bool anyObject = false;
+    auto nominalTypeDecls =
+      resolveTypeDeclsToNominal(ctx.evaluator, ctx, baseTypes, moduleDecls,
+                                anyObject);
+
+    dc->lookupQualified(nominalTypeDecls, name, options, members);
+
+    // Search all of the modules.
+    for (auto module : moduleDecls) {
+      auto innerOptions = options;
+      innerOptions &= ~NL_RemoveOverridden;
+      innerOptions &= ~NL_RemoveNonVisible;
+      dc->lookupQualified(module, name, innerOptions, members);
+    }
+
     addResults(members);
   }
 
@@ -2543,6 +2540,8 @@ DirectlyReferencedTypeDecls UnderlyingTypeDeclsReferencedRequest::evaluate(
 llvm::Expected<ClassDecl *>
 SuperclassDeclRequest::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *subject) const {
+  auto &Ctx = subject->getASTContext();
+
   for (unsigned i : indices(subject->getInherited())) {
     // Find the inherited declarations referenced at this position.
     auto inheritedTypes = evaluateOrDefault(evaluator,
@@ -2552,7 +2551,7 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
     SmallVector<ModuleDecl *, 2> modulesFound;
     bool anyObject = false;
     auto inheritedNominalTypes
-      = resolveTypeDeclsToNominal(evaluator, subject->getASTContext(),
+      = resolveTypeDeclsToNominal(evaluator, Ctx,
                                   inheritedTypes, modulesFound, anyObject);
 
     // Look for a class declaration.
@@ -2561,6 +2560,16 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
         return classDecl;
     }
   }
+
+  // Protocols also support '... where Self : Superclass'.
+  auto *proto = dyn_cast<ProtocolDecl>(subject);
+  if (proto == nullptr)
+    return nullptr;
+
+  auto selfBounds = getSelfBoundsFromWhereClause(proto);
+  for (auto inheritedNominal : selfBounds.decls)
+    if (auto classDecl = dyn_cast<ClassDecl>(inheritedNominal))
+      return classDecl;
 
   return nullptr;
 }
@@ -2641,6 +2650,19 @@ swift::getDirectlyInheritedNominalTypeDecls(
   for (unsigned i : range(numInherited)) {
     getDirectlyInheritedNominalTypeDecls(decl, i, result, anyObject);
   }
+
+  auto *protoDecl = dyn_cast_or_null<ProtocolDecl>(typeDecl);
+  if (protoDecl == nullptr)
+    return result;
+
+  // FIXME: Refactor SelfBoundsFromWhereClauseRequest to dig out
+  // the source location.
+  SourceLoc loc = SourceLoc();
+  auto selfBounds = getSelfBoundsFromWhereClause(decl);
+  anyObject |= selfBounds.anyObject;
+
+  for (auto inheritedNominal : selfBounds.decls)
+    result.emplace_back(loc, inheritedNominal);
 
   return result;
 }

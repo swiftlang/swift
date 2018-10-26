@@ -2972,9 +2972,15 @@ public:
           return true;
         }
         case SILInstructionKind::CheckedCastAddrBranchInst:
-          if (cast<CheckedCastAddrBranchInst>(inst)->getConsumptionKind() !=
-              CastConsumptionKind::CopyOnSuccess)
+          switch (cast<CheckedCastAddrBranchInst>(inst)->getConsumptionKind()) {
+          case CastConsumptionKind::BorrowAlways:
+            llvm_unreachable("checked_cast_addr_br cannot have BorrowAlways");
+          case CastConsumptionKind::CopyOnSuccess:
+            break;
+          case CastConsumptionKind::TakeAlways:
+          case CastConsumptionKind::TakeOnSuccess:
             return true;
+          }
           break;
         case SILInstructionKind::LoadInst:
           // A 'non-taking' value load is harmless.

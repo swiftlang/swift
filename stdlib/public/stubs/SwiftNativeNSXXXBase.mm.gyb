@@ -105,7 +105,7 @@ SWIFT_RUNTIME_STDLIB_API
 @end
 % end
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 bool
 swift_stdlib_NSObject_isEqual(NSObject *lhs,
                               NSObject *rhs) {
