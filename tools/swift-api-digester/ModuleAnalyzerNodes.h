@@ -320,7 +320,6 @@ public:
   DeclKind getDeclKind() const { return DKind; }
   void printFullyQualifiedName(llvm::raw_ostream &OS) const;
   StringRef getFullyQualifiedName() const;
-  bool isSDKPrivate() const;
   bool isDeprecated() const { return IsDeprecated; };
   bool isProtocolRequirement() const { return IsProtocolReq; }
   bool hasDeclAttribute(DeclAttrKind DAKind) const;
@@ -499,6 +498,7 @@ public:
 class SDKNodeTypeWitness: public SDKNode {
 public:
   SDKNodeTypeWitness(SDKNodeInitInfo Info);
+  StringRef getWitnessedTypeName() const;
   SDKNodeType *getUnderlyingType() const;
   static bool classof(const SDKNode *N);
 };

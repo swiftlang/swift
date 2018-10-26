@@ -848,8 +848,7 @@ void swift::ide::api::SDKNodeDeclVar::diagnose(SDKNode *Right) {
 }
 
 static bool shouldDiagnoseType(SDKNodeType *T) {
-  return T->isTopLevelType() &&
-    !cast<SDKNodeDecl>(T->getParent())->isSDKPrivate();
+  return T->isTopLevelType();
 }
 
 void swift::ide::api::SDKNodeType::diagnose(SDKNode *Right) {
@@ -859,7 +858,21 @@ void swift::ide::api::SDKNodeType::diagnose(SDKNode *Right) {
   if (!RT || !shouldDiagnoseType(this))
     return;
   assert(isTopLevelType());
+
+  // Diagnose type witness changes when diagnosing ABI breakages.
+  if (auto *Wit = dyn_cast<SDKNodeTypeWitness>(getParent())) {
+    auto *Conform = Wit->getParent()->getAs<SDKNodeConformance>();
+    if (Ctx.checkingABI() && getPrintedName() != RT->getPrintedName()) {
+      Diags.diagnose(SourceLoc(), diag::type_witness_change,
+                     Conform->getNominalTypeDecl()->getScreenInfo(),
+                     Wit->getWitnessedTypeName(),
+                     getPrintedName(), RT->getPrintedName());
+    }
+    return;
+  }
+
   StringRef Descriptor = getTypeRoleDescription();
+  assert(isa<SDKNodeDecl>(getParent()));
   auto LParent = cast<SDKNodeDecl>(getParent());
   assert(LParent->getKind() == RT->getParent()->getAs<SDKNodeDecl>()->getKind());
 
@@ -1900,8 +1913,6 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
 }
 
 void DiagnosisEmitter::visitDecl(SDKNodeDecl *Node) {
-  if (Node->isSDKPrivate())
-    return;
   std::vector<NodeAnnotation> Scratch;
   for (auto Anno : Node->getAnnotations(Scratch))
     handle(Node, Anno);

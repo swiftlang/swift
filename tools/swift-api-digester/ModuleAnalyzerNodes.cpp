@@ -326,7 +326,7 @@ StringRef SDKNodeType::getParamValueOwnership() const {
 
 StringRef SDKNodeType::getTypeRoleDescription() const {
   assert(isTopLevelType());
-  auto P = cast<SDKNodeDecl>(getParent());
+  auto P = getParent();
   switch(P->getKind()) {
   case SDKNodeKind::Root:
   case SDKNodeKind::TypeNominal:
@@ -335,7 +335,6 @@ StringRef SDKNodeType::getTypeRoleDescription() const {
   case SDKNodeKind::DeclType:
   case SDKNodeKind::DeclOperator:
   case SDKNodeKind::Conformance:
-  case SDKNodeKind::TypeWitness:
     llvm_unreachable("Type Parent is wrong");
   case SDKNodeKind::DeclFunction:
   case SDKNodeKind::DeclConstructor:
@@ -350,6 +349,8 @@ StringRef SDKNodeType::getTypeRoleDescription() const {
     return "underlying";
   case SDKNodeKind::DeclAssociatedType:
     return "default";
+  case SDKNodeKind::TypeWitness:
+    return "type witness type";
   }
 }
 
@@ -374,14 +375,6 @@ StringRef SDKNodeDecl::getScreenInfo() const {
     OS << ": ";
   OS << getDeclKind() << " " << getFullyQualifiedName();
   return Ctx.buffer(OS.str());
-}
-
-bool SDKNodeDecl::isSDKPrivate() const {
-  if (getName().startswith("__"))
-    return true;
-  if (auto *PD = dyn_cast<SDKNodeDecl>(getParent()))
-    return PD->isSDKPrivate();
-  return false;
 }
 
 void SDKNodeDecl::printFullyQualifiedName(llvm::raw_ostream &OS) const {
@@ -438,6 +431,11 @@ void SDKNodeDeclType::addConformance(SDKNode *Conf) {
 
 SDKNodeType *SDKNodeTypeWitness::getUnderlyingType() const {
   return getOnlyChild()->getAs<SDKNodeType>();
+}
+
+StringRef SDKNodeTypeWitness::getWitnessedTypeName() const {
+  return Ctx.buffer((llvm::Twine(getParent()->getAs<SDKNodeConformance>()->
+    getName()) + "." + getName()).str());
 }
 
 Optional<SDKNodeDeclType*> SDKNodeDeclType::getSuperclass() const {
