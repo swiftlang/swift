@@ -533,7 +533,10 @@ bool SILDeclRef::isNoinline() const {
   if (auto InlineA = getDecl()->getAttrs().getAttribute<InlineAttr>())
     if (InlineA->getKind() == InlineKind::Never)
       return true;
-   return false;
+  if (auto *semanticsA = getDecl()->getAttrs().getAttribute<SemanticsAttr>())
+    if (semanticsA->Value.equals("keypath.entry"))
+      return true;
+  return false;
 }
 
 /// \brief True if the function has noinline attribute.

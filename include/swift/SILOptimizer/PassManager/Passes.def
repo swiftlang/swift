@@ -54,6 +54,8 @@ PASS(AADumper, "aa-dump",
      "Dump Alias Analysis over all Pairs")
 PASS(ABCOpt, "abcopts",
      "Array Bounds Check Optimization")
+PASS(AccessEnforcementDom, "access-enforcement-dom",
+     "Remove dominated access checks with no nested conflict")
 PASS(AccessEnforcementOpts, "access-enforcement-opts",
      "Access Enforcement Optimization")
 PASS(AccessEnforcementSelection, "access-enforcement-selection",
