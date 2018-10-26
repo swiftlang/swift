@@ -333,3 +333,44 @@ bb0:
   %10 = tuple ()
   return %10 : $()
 }
+
+sil [_semantics "keypath.entry"] @stdlibKeyPathEntry: $@convention(thin) () -> () {
+bb0:
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// public func testDomKeyPath() {
+// Checks 3 scopes, two of which are dominated and access the same storage
+// However, There's a call to a "fake" key-path entry function - bail for now
+//
+// CHECK-LABEL: sil @testDomKeyPath : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NOT: begin_access
+// CHECK-LABEL: } // end sil function 'testDomKeyPath'
+sil @testDomKeyPath : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [read] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  %4 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*X
+  %5 = load %4 : $*X
+  end_access %4 : $*X
+  %7 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*X
+  %8 = load %7 : $*X
+  end_access %7 : $*X
+  %keyRef = function_ref @stdlibKeyPathEntry : $@convention(thin) () -> ()
+  apply %keyRef() : $@convention(thin) () -> ()
+  %10 = tuple ()
+  return %10 : $()
+}

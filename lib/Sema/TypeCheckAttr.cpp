@@ -117,7 +117,6 @@ public:
   IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
   IGNORED_ATTR(UsableFromInline)
   IGNORED_ATTR(WeakLinked)
-  IGNORED_ATTR(KeyPathEntryPoint)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -819,7 +818,6 @@ public:
     IGNORED_ATTR(Transparent)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(WeakLinked)
-    IGNORED_ATTR(KeyPathEntryPoint)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
