@@ -1622,7 +1622,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   bool NeedLeadingDot = false;
 
   bool NeedOptionalUnwrap = false;
-  unsigned NumBytesToEraseForOptionalUnwrap = 0;
+  unsigned NumBytesToEraseDot = 0;
 
   bool HaveLParen = false;
   bool IsSuperRefExpr = false;
@@ -1952,7 +1952,7 @@ public:
 
   void addLeadingDot(CodeCompletionResultBuilder &Builder) {
     if (NeedOptionalUnwrap) {
-      Builder.setNumBytesToErase(NumBytesToEraseForOptionalUnwrap);
+      Builder.setNumBytesToErase(NumBytesToEraseDot);
       Builder.addQuestionMark();
       Builder.addLeadingDot();
       return;
@@ -2671,7 +2671,7 @@ public:
       Builder.addLeadingDot();
 
     if (NeedOptionalUnwrap) {
-      Builder.setNumBytesToErase(NumBytesToEraseForOptionalUnwrap);
+      Builder.setNumBytesToErase(NumBytesToEraseDot);
       Builder.addQuestionMark();
     }
 
@@ -3157,13 +3157,12 @@ public:
       llvm::SaveAndRestore<bool> ChangeNeedOptionalUnwrap(NeedOptionalUnwrap,
                                                           true);
       if (DotLoc.isValid()) {
-        NumBytesToEraseForOptionalUnwrap = Ctx.SourceMgr.getByteDistance(
+        NumBytesToEraseDot = Ctx.SourceMgr.getByteDistance(
             DotLoc, Ctx.SourceMgr.getCodeCompletionLoc());
       } else {
-        NumBytesToEraseForOptionalUnwrap = 0;
+        NumBytesToEraseDot = 0;
       }
-      if (NumBytesToEraseForOptionalUnwrap <=
-          CodeCompletionResult::MaxNumBytesToErase) {
+      if (NumBytesToEraseDot <= CodeCompletionResult::MaxNumBytesToErase) {
         if (!tryTupleExprCompletions(Unwrapped)) {
           lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
                                    TypeResolver,
