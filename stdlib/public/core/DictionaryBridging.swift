@@ -16,7 +16,6 @@ import SwiftShims
 
 /// Equivalent to `NSDictionary.allKeys`, but does not leave objects on the
 /// autorelease pool.
-@usableFromInline
 internal func _stdlib_NSDictionary_allKeys(
   _ nsd: _NSDictionary
 ) -> _BridgingBuffer {

@@ -21,7 +21,6 @@ func _stdlib_CFSetGetValues(_ nss: _NSSet, _: UnsafeMutablePointer<AnyObject>)
 
 /// Equivalent to `NSSet.allObjects`, but does not leave objects on the
 /// autorelease pool.
-@usableFromInline
 internal func _stdlib_NSSet_allObjects(_ nss: _NSSet) -> _BridgingBuffer {
   let storage = _BridgingBuffer(nss.count)
   _stdlib_CFSetGetValues(nss, storage.baseAddress)
