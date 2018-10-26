@@ -210,6 +210,13 @@ private:
   /// faster rebuilds.
   const bool EnableExperimentalDependencies;
 
+  /// Really slows down the driver--so only turn on when needed.
+  const bool VerifyExperimentalDependencyGraphAfterEveryImport;
+  const bool EmitExperimentalDependencyDotFileAfterEveryImport;
+
+  /// Experiment with inter-file dependencies
+  const bool ExperimentalDependencyIncludePrivateDeps;
+
   template <typename T>
   static T *unwrap(const std::unique_ptr<T> &p) {
     return p.get();
@@ -239,7 +246,10 @@ public:
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
-              bool EnableExperimentalDependencies = false);
+              bool EnableExperimentalDependencies = false,
+              bool VerifyExperimentalDependencyGraphAfterEveryImport = false,
+              bool EmitExperimentalDependencyDotFileAfterEveryImport = false,
+              bool ExperimentalDependencyIncludePrivateDeps = false);
   ~Compilation();
 
   ToolChain const &getToolChain() const {
@@ -296,6 +306,18 @@ public:
 
   bool getEnableExperimentalDependencies() const {
     return EnableExperimentalDependencies;
+  }
+
+  bool getVerifyExperimentalDependencyGraphAfterEveryImport() const {
+    return VerifyExperimentalDependencyGraphAfterEveryImport;
+  }
+
+  bool getEmitExperimentalDependencyDotFileAfterEveryImport() const {
+    return EmitExperimentalDependencyDotFileAfterEveryImport;
+  }
+
+  bool getExperimentalDependencyIncludePrivateDeps() const {
+    return ExperimentalDependencyIncludePrivateDeps;
   }
 
   bool getBatchModeEnabled() const {

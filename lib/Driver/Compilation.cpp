@@ -14,6 +14,7 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
+#include "swift/AST/ExperimentalDependencies.h"
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/STLExtras.h"
@@ -24,6 +25,7 @@
 #include "swift/Driver/Action.h"
 #include "swift/Driver/DependencyGraph.h"
 #include "swift/Driver/Driver.h"
+#include "swift/Driver/ExperimentalDependencyDriverGraph.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/ParseableOutput.h"
 #include "swift/Driver/ToolChain.h"
@@ -118,7 +120,10 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
                          std::unique_ptr<UnifiedStatsReporter> StatsReporter,
-                         bool EnableExperimentalDependencies)
+                         bool EnableExperimentalDependencies,
+                         bool VerifyExperimentalDependencyGraphAfterEveryImport,
+                         bool EmitExperimentalDependencyDotFileAfterEveryImport,
+                         bool ExperimentalDependencyIncludePrivateDeps)
   : Diags(Diags), TheToolChain(TC),
     TheOutputInfo(OI),
     Level(Level),
@@ -140,8 +145,14 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     ShowDriverTimeCompilation(ShowDriverTimeCompilation),
     Stats(std::move(StatsReporter)),
     FilelistThreshold(FilelistThreshold),
-    EnableExperimentalDependencies(EnableExperimentalDependencies) {
-        
+    EnableExperimentalDependencies(EnableExperimentalDependencies),
+    VerifyExperimentalDependencyGraphAfterEveryImport(
+      VerifyExperimentalDependencyGraphAfterEveryImport),
+    EmitExperimentalDependencyDotFileAfterEveryImport(
+      EmitExperimentalDependencyDotFileAfterEveryImport),
+    ExperimentalDependencyIncludePrivateDeps(
+      ExperimentalDependencyIncludePrivateDeps) {
+      
 };
 
 static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
@@ -211,11 +222,16 @@ namespace driver {
     /// Set by scheduleInitialJobs and used only by scheduleAdditionalJobs.
     SmallVector<const Job *, 16> InitialCascadingCommands;
 
+  public:
     /// Dependency graph for deciding which jobs are dirty (need running)
     /// or clean (can be skipped).
     using DependencyGraph = DependencyGraph<const Job *>;
-    DependencyGraph DepGraph;
+    DependencyGraph StandardDepGraph;
 
+    /// Experimental Dependency graph for finer-grained dependencies
+    Optional<experimental_dependencies::ModuleDepGraph> ExpDepGraph;
+
+  private:
     /// Helper for tracing the propagation of marks in the graph.
     DependencyGraph::MarkTracer ActualIncrementalTracer;
     DependencyGraph::MarkTracer *IncrementalTracer = nullptr;
@@ -240,10 +256,11 @@ namespace driver {
       if (ScheduledCommands.count(cmd))
         return;
       llvm::outs() << "Queuing " << reason << ": " << LogJob(cmd) << "\n";
-      IncrementalTracer->printPath(
-        llvm::outs(), cmd, [](raw_ostream &out, const Job *base) {
-          out << llvm::sys::path::filename(base->getOutput().getBaseInput(0));
-        });
+      if (!Comp.getEnableExperimentalDependencies())
+        IncrementalTracer->printPath(
+                                     llvm::outs(), cmd, [](raw_ostream &out, const Job *base) {
+                                       out << llvm::sys::path::filename(base->getOutput().getBaseInput(0));
+                                     });
     }
 
     const Job *findUnfinishedJob(ArrayRef<const Job *> JL) {
@@ -387,10 +404,11 @@ namespace driver {
     /// exits, and re-run transitive marking to ensure everything is properly
     /// invalidated by any new dependency edges introduced by it. If reloading
     /// fails, this can cause deferred jobs to be immediately scheduled.
-    template <unsigned N>
+    template <unsigned N, typename DependencyGraphT>
     void reloadAndRemarkDeps(const Job *FinishedCmd,
                              int ReturnCode,
-                             SmallVector<const Job *, N> &Dependents) {
+                             SmallVector<const Job *, N> &Dependents,
+                             DependencyGraphT &DepGraph) {
       const CommandOutput &Output = FinishedCmd->getOutput();
       StringRef DependenciesFile =
           Output.getAdditionalOutputForType(file_types::TY_SwiftDeps);
@@ -416,7 +434,8 @@ namespace driver {
           // result if that were the case.
           bool wasCascading = DepGraph.isMarked(FinishedCmd);
 
-          switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
+          switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile,
+                                        Comp.getDiags())) {
           case DependencyGraphImpl::LoadResult::HadError:
             if (ReturnCode == EXIT_SUCCESS) {
               dependencyLoadFailed(DependenciesFile);
@@ -589,7 +608,12 @@ namespace driver {
       // Do this whether or not the build succeeded.
       SmallVector<const Job *, 16> Dependents;
       if (Comp.getIncrementalBuildEnabled()) {
-        reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents);
+        if (Comp.getEnableExperimentalDependencies())
+          reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents,
+                              ExpDepGraph.getValue());
+        else
+          reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents,
+                              StandardDepGraph);
       }
 
       if (ReturnCode != EXIT_SUCCESS) {
@@ -682,12 +706,30 @@ namespace driver {
     PerformJobsState(Compilation &Comp, std::unique_ptr<TaskQueue> &&TaskQueue)
       : Comp(Comp), ActualIncrementalTracer(Comp.getStatsReporter()),
         TQ(std::move(TaskQueue)) {
-      if (Comp.getShowIncrementalBuildDecisions() || Comp.getStatsReporter())
+      if (Comp.getEnableExperimentalDependencies())
+        ExpDepGraph.emplace(
+            Comp.getVerifyExperimentalDependencyGraphAfterEveryImport(),
+            Comp.getEmitExperimentalDependencyDotFileAfterEveryImport(),
+            Comp.getStatsReporter());
+      else if (Comp.getShowIncrementalBuildDecisions() ||
+               Comp.getStatsReporter())
         IncrementalTracer = &ActualIncrementalTracer;
     }
 
+    /// Schedule and run initial, additional, and batch jobs.
+    template <typename DependencyGraphT>
+    void runJobs(DependencyGraphT &DepGraph) {
+      scheduleInitialJobs(DepGraph);
+      scheduleAdditionalJobs(DepGraph);
+      formBatchJobsAndAddPendingJobsToTaskQueue();
+      runTaskQueueToCompletion();
+      checkUnfinishedJobs(DepGraph);
+    }
+
+  private:
     /// Schedule all jobs we can from the initial list provided by Compilation.
-    void scheduleInitialJobs() {
+    template <typename DependencyGraphT>
+    void scheduleInitialJobs(DependencyGraphT &DepGraph) {
       for (const Job *Cmd : Comp.getJobs()) {
         if (!Comp.getIncrementalBuildEnabled()) {
           scheduleCommandIfNecessaryAndPossible(Cmd);
@@ -707,7 +749,8 @@ namespace driver {
           if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
             DepGraph.addIndependentNode(Cmd);
           } else {
-            switch (DepGraph.loadFromPath(Cmd, DependenciesFile)) {
+            switch (
+                DepGraph.loadFromPath(Cmd, DependenciesFile, Comp.getDiags())) {
             case DependencyGraphImpl::LoadResult::HadError:
               dependencyLoadFailed(DependenciesFile, /*Warn=*/false);
               break;
@@ -715,6 +758,12 @@ namespace driver {
               Condition = Cmd->getCondition();
               break;
             case DependencyGraphImpl::LoadResult::AffectsDownstream:
+              if (Comp.getEnableExperimentalDependencies()) {
+                // The experimental graph reports a change, since it lumps new
+                // files together with new "Provides".
+                Condition = Cmd->getCondition();
+                break;
+              }
               llvm_unreachable("we haven't marked anything in this graph yet");
             }
           }
@@ -746,10 +795,13 @@ namespace driver {
           llvm_unreachable("handled above");
         }
       }
+      if (ExpDepGraph.hasValue())
+        assert(ExpDepGraph.getValue().emitAndVerify(Comp.getDiags()));
     }
 
     /// Schedule transitive closure of initial jobs, and external jobs.
-    void scheduleAdditionalJobs() {
+    template <typename DependencyGraphT>
+    void scheduleAdditionalJobs(DependencyGraphT &DepGraph) {
       if (Comp.getIncrementalBuildEnabled()) {
         SmallVector<const Job *, 16> AdditionalOutOfDateCommands;
 
@@ -1115,7 +1167,8 @@ namespace driver {
       } while (Result == 0 && TQ->hasRemainingTasks());
     }
 
-    void checkUnfinishedJobs() {
+    template <typename DependencyGraphT>
+    void checkUnfinishedJobs(DependencyGraphT &DepGraph) {
       if (Result == 0) {
         assert(BlockingCommands.empty() &&
                "some blocking commands never finished properly");
@@ -1143,6 +1196,7 @@ namespace driver {
       }
     }
 
+  public:
     void populateInputInfoMap(InputInfoMap &inputs) const {
       for (auto &entry : UnfinishedCommands) {
         for (auto *action : entry.first->getSource().getInputs()) {
@@ -1354,11 +1408,10 @@ int Compilation::performJobsImpl(bool &abnormalExit,
                                  std::unique_ptr<TaskQueue> &&TQ) {
   PerformJobsState State(*this, std::move(TQ));
 
-  State.scheduleInitialJobs();
-  State.scheduleAdditionalJobs();
-  State.formBatchJobsAndAddPendingJobsToTaskQueue();
-  State.runTaskQueueToCompletion();
-  State.checkUnfinishedJobs();
+  if (getEnableExperimentalDependencies())
+    State.runJobs(State.ExpDepGraph.getValue());
+  else
+    State.runJobs(State.StandardDepGraph);
 
   if (!CompilationRecordPath.empty()) {
     InputInfoMap InputInfo;
@@ -1373,7 +1426,8 @@ int Compilation::performJobsImpl(bool &abnormalExit,
                                CompilationRecordPath + "~moduleonly");
     }
   }
-
+  if (State.ExpDepGraph.hasValue())
+    assert(State.ExpDepGraph.getValue().emitAndVerify(getDiags()));
   abnormalExit = State.hadAnyAbnormalExit();
   return State.getResult();
 }

@@ -282,6 +282,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_enable_experimental_dependencies))
     Opts.EnableExperimentalDependencies = true;
 
+  if (Args.hasArg(OPT_experimental_dependency_include_private_deps))
+    Opts.ExperimentalDependenciesIncludePrivateDeps = true;
+
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
     Opts.EnableDollarIdentifiers = true;
