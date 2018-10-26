@@ -4,6 +4,10 @@
 /* RawRepresentable Changes */
 
 /* Removed Decls */
+Constructor AnyHashable.init(_box:) has been removed
+Constructor AnyHashable.init(_usingDefaultRepresentationOf:) has been removed
+Func AnyHashable._downCastConditional(into:) has been removed
+Struct _ConcreteHashableBox has been removed
 
 /* Moved Decls */
 
