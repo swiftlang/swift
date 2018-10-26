@@ -3897,7 +3897,7 @@ public:
       return;
 
     for (auto *VD : decls) {
-      if (!isa<AbstractFunctionDecl>(VD) ||
+      if ((!isa<AbstractFunctionDecl>(VD) && !isa<SubscriptDecl>(VD)) ||
           shouldHideDeclFromCompletionResults(VD))
         continue;
       resolver->resolveDeclSignature(VD);
@@ -3905,7 +3905,8 @@ public:
         continue;
       Type declaredMemberType = VD->getInterfaceType();
       if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD))
-        declaredMemberType = AFD->getMethodInterfaceType();
+        if (AFD->getDeclContext()->isTypeContext())
+          declaredMemberType = AFD->getMethodInterfaceType();
 
       auto fnType =
           baseTy->getTypeOfMember(DC.getParentModule(), VD, declaredMemberType);
@@ -3935,8 +3936,8 @@ public:
   }
 
   static bool
-  collectPossibleParamLists(DeclContext &DC, ApplyExpr *callExpr,
-                            SmallVectorImpl<FunctionParams> &candidates) {
+  collectPossibleParamListsApply(DeclContext &DC, ApplyExpr *callExpr,
+                                 SmallVectorImpl<FunctionParams> &candidates) {
     auto *fnExpr = callExpr->getFn();
 
     if (auto type = fnExpr->getType()) {
@@ -3977,6 +3978,24 @@ public:
       }
     }
 
+    return !candidates.empty();
+  }
+
+  static bool collectPossibleParamListsSubscript(
+      DeclContext &DC, SubscriptExpr *subscriptExpr,
+      SmallVectorImpl<FunctionParams> &candidates) {
+    if (subscriptExpr->hasDecl()) {
+      if (auto SD =
+              dyn_cast<SubscriptDecl>(subscriptExpr->getDecl().getDecl())) {
+        auto declType = SD->getInterfaceType();
+        if (auto *funcType = declType->getAs<AnyFunctionType>())
+          candidates.push_back(funcType->getParams());
+      }
+    } else {
+      collectPossibleParamListByQualifiedLookup(DC, subscriptExpr->getBase(),
+                                                DeclBaseName::createSubscript(),
+                                                candidates);
+    }
     return !candidates.empty();
   }
 
@@ -4040,26 +4059,34 @@ public:
   }
 
   static bool
-  collectArgumentExpectation(DeclContext &DC, ApplyExpr *CallE, Expr *CCExpr,
+  collectArgumentExpectation(DeclContext &DC, Expr *E, Expr *CCExpr,
                              std::vector<Type> &ExpectedTypes,
                              std::vector<StringRef> &ExpectedNames) {
     // Collect parameter lists for possible func decls.
     SmallVector<FunctionParams, 4> Candidates;
-    if (!collectPossibleParamLists(DC, CallE, Candidates))
-      return false;
+    Expr *Arg = nullptr;
+    if (auto *applyExpr = dyn_cast<ApplyExpr>(E)) {
+      if (!collectPossibleParamListsApply(DC, applyExpr, Candidates))
+        return false;
+      Arg = applyExpr->getArg();
+    } else if (auto *subscriptExpr = dyn_cast<SubscriptExpr>(E)) {
+      if (!collectPossibleParamListsSubscript(DC, subscriptExpr, Candidates))
+        return false;
+      Arg = subscriptExpr->getIndex();
+    }
 
     // Determine the position of code completion token in call argument.
     unsigned Position;
     bool HasName;
-    if (!getPositionInArgs(DC, CallE->getArg(), CCExpr, Position, HasName))
+    if (!getPositionInArgs(DC, Arg, CCExpr, Position, HasName))
       return false;
-    if (!translateArgIndexToParamIndex(CallE->getArg(), Position, HasName))
+    if (!translateArgIndexToParamIndex(Arg, Position, HasName))
       return false;
 
     // Collect possible types (or labels) at the position.
     {
-      bool MayNeedName =
-          !HasName && isa<CallExpr>(CallE) && !CallE->isImplicit();
+      bool MayNeedName = !HasName && !E->isImplicit() &&
+                         (isa<CallExpr>(E) | isa<SubscriptExpr>(E));
       SmallPtrSet<TypeBase *, 4> seenTypes;
       SmallPtrSet<Identifier, 4> seenNames;
       for (auto Params : Candidates) {
@@ -5307,11 +5334,13 @@ public:
         case ExprKind::Binary:
         case ExprKind::PrefixUnary:
         case ExprKind::Assign:
+        case ExprKind::Subscript:
           return true;
         case ExprKind::Tuple: {
           auto ParentE = Parent.getAsExpr();
           return !ParentE || (!isa<CallExpr>(ParentE) &&
-                              !isa<BinaryExpr>(ParentE)&&
+                              !isa<SubscriptExpr>(ParentE) &&
+                              !isa<BinaryExpr>(ParentE) &&
                               !isa<TupleShuffleExpr>(ParentE));
         }
         default:
@@ -5351,13 +5380,13 @@ public:
                    SmallVectorImpl<StringRef> &PossibleNames) {
     switch (Parent->getKind()) {
       case ExprKind::Call:
+      case ExprKind::Subscript:
       case ExprKind::Binary:
       case ExprKind::PrefixUnary: {
         std::vector<Type> PotentialTypes;
         std::vector<StringRef> ExpectedNames;
         CompletionLookup::collectArgumentExpectation(
-            *DC, cast<ApplyExpr>(Parent), ParsedExpr, PotentialTypes,
-            ExpectedNames);
+            *DC, Parent, ParsedExpr, PotentialTypes, ExpectedNames);
         for (Type Ty : PotentialTypes)
           Callback(Ty);
         for (auto name : ExpectedNames)
