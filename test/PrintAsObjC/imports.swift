@@ -5,9 +5,15 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules/ -F %S/Inputs/ -parse-as-library %t/imports.swiftmodule -typecheck -emit-objc-header-path %t/imports.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/imports.h
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t/imports.h
-// RUN: %check-in-clang %t/imports.h -I %S/Inputs/custom-modules/ -F %S/Inputs/
+// RUN: %check-in-clang %t/imports.h -I %S/Inputs/custom-modules/ -F %S/Inputs/ -Watimport-in-framework-header
 
 // REQUIRES: objc_interop
+
+// CHECK: #pragma clang diagnostic push
+
+// CHECK: #if __has_warning("-Watimport-in-framework-header")
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Watimport-in-framework-header"
+// CHECK-NEXT: #endif
 
 // CHECK: @import Base;
 // CHECK-NEXT: @import Base.ExplicitSub;
@@ -18,6 +24,8 @@
 // CHECK-NEXT: @import MostlyPrivate1_Private;
 // CHECK-NEXT: @import MostlyPrivate2_Private;
 // CHECK-NEXT: @import ctypes.bits;
+
+// CHECK: #pragma clang diagnostic pop
 
 // NEGATIVE-NOT: ctypes;
 // NEGATIVE-NOT: ImSub;
