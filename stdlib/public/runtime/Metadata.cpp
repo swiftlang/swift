@@ -3967,13 +3967,12 @@ swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
                              const void * const *instantiationArgs) {
   /// Local function to unique a foreign witness table, if needed.
   auto uniqueForeignWitnessTableRef =
-      [conformance, type](const WitnessTable *candidate)
-          -> const WitnessTable * {
+      [conformance](const WitnessTable *candidate) {
         if (!candidate || !conformance->isSynthesizedNonUnique())
           return candidate;
 
         return _getForeignWitnessTable(candidate,
-                                       type->getTypeContextDescriptor(),
+                                       conformance->getTypeContextDescriptor(),
                                        conformance->getProtocol());
       };
 
