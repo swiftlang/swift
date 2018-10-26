@@ -44,6 +44,10 @@ namespace {
   struct alignas(64) int512_like {
     char data[64];
   };
+
+  struct alignas(16) float80_like {
+    char data[10];
+  };
 } // end anonymous namespace
 
 namespace ctypes {
@@ -60,8 +64,11 @@ namespace ctypes {
 
     using Bw = intptr_t;
 
+    using Bf16_ = uint16_t;
     using Bf32_ = float;
     using Bf64_ = double;
+    using Bf80_ = float80_like;
+    using Bf128_ = int128_like;
 
     /// The value-witness table for UnsafeValueBuffer.  You can do layout
     /// with this, but the type isn't copyable, so most of the value
