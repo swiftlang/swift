@@ -813,31 +813,32 @@ extension Dictionary {
       // Move the old value (if any) out of storage, wrapping it into an
       // optional before yielding it.
       let native = _variant.asNative
-      var value: Value?
       if found {
-        value = (native._values + bucket.offset).move()
+        var value: Value? = (native._values + bucket.offset).move()
+        yield &value
+        if let value = value {
+          // **Mutation**
+          //
+          // Initialize storage to new value.
+          (native._values + bucket.offset).initialize(to: value)
+        } else {
+          // **Removal**
+          //
+          // We've already deinitialized the value; deinitialize the key too and
+          // register the removal.
+          (native._keys + bucket.offset).deinitialize(count: 1)
+          native._delete(at: bucket)
+        }
       } else {
-        value = nil
-      }
-      yield &value
-
-      // Value is now potentially different. Check which one of the four
-      // possible cases apply.
-      switch (value, found) {
-      case (let value?, true): // Mutation
-        // Initialize storage to new value.
-        (native._values + bucket.offset).initialize(to: value)
-      case (let value?, false): // Insertion
-        // Insert the new entry at the correct place.
-        // We've already ensured we have enough capacity.
-        native._insert(at: bucket, key: key, value: value)
-      case (nil, true): // Removal
-        // We've already removed the value; deinitialize and remove the key too.
-        (native._values + bucket.offset).deinitialize(count: 1)
-        native._delete(at: bucket)
-      case (nil, false): // Noop
-        // Easy!
-        break
+        var value: Value? = nil
+        yield &value
+        if let value = value {
+          // **Insertion**
+          //
+          // Insert the new entry at the correct place.  Note that
+          // `mutatingFind` already ensured that we have enough capacity.
+          native._insert(at: bucket, key: key, value: value)
+        }
       }
       _fixLifetime(self)
     }
