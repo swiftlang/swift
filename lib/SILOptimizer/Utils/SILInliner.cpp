@@ -72,7 +72,7 @@ namespace swift {
 /// Utility class for rewiring control-flow of inlined begin_apply functions.
 class BeginApplySite {
   SILLocation Loc;
-  SILBuilder &Builder;
+  SILBuilder *Builder;
   BeginApplyInst *BeginApply;
   bool HasYield = false;
 
@@ -86,11 +86,11 @@ class BeginApplySite {
 
 public:
   BeginApplySite(BeginApplyInst *BeginApply, SILLocation Loc,
-                 SILBuilder &Builder)
+                 SILBuilder *Builder)
       : Loc(Loc), Builder(Builder), BeginApply(BeginApply) {}
 
   static Optional<BeginApplySite> get(FullApplySite AI, SILLocation Loc,
-                                      SILBuilder &Builder) {
+                                      SILBuilder *Builder) {
     auto *BeginApply = dyn_cast<BeginApplyInst>(AI);
     if (!BeginApply)
       return None;
@@ -150,18 +150,18 @@ public:
         auto remappedYield = remapValue(calleeYields[i]);
         callerYields[i]->replaceAllUsesWith(remappedYield);
       }
-      Builder.createBranch(Loc, returnToBB);
+      Builder->createBranch(Loc, returnToBB);
 
       // Add branches at the resumption sites to the resume/unwind block.
       if (EndApply) {
-        SavedInsertionPointRAII savedIP(Builder, EndApplyBB);
+        SavedInsertionPointRAII savedIP(*Builder, EndApplyBB);
         auto resumeBB = remapBlock(yield->getResumeBB());
-        Builder.createBranch(EndApply->getLoc(), resumeBB);
+        Builder->createBranch(EndApply->getLoc(), resumeBB);
       }
       if (AbortApply) {
-        SavedInsertionPointRAII savedIP(Builder, AbortApplyBB);
+        SavedInsertionPointRAII savedIP(*Builder, AbortApplyBB);
         auto unwindBB = remapBlock(yield->getUnwindBB());
-        Builder.createBranch(AbortApply->getLoc(), unwindBB);
+        Builder->createBranch(AbortApply->getLoc(), unwindBB);
       }
       return true;
     }
@@ -175,9 +175,9 @@ public:
       bool isNormal = isa<ReturnInst>(terminator);
       auto returnBB = isNormal ? EndApplyReturnBB : AbortApplyReturnBB;
       if (returnBB) {
-        Builder.createBranch(Loc, returnBB);
+        Builder->createBranch(Loc, returnBB);
       } else {
-        Builder.createUnreachable(Loc);
+        Builder->createUnreachable(Loc);
       }
       return true;
     }
@@ -200,18 +200,18 @@ public:
     if (!HasYield) {
       // Make sure the split resumption blocks have terminators.
       if (EndApplyBB) {
-        SavedInsertionPointRAII savedIP(Builder, EndApplyBB);
-        Builder.createUnreachable(Loc);
+        SavedInsertionPointRAII savedIP(*Builder, EndApplyBB);
+        Builder->createUnreachable(Loc);
       }
       if (AbortApplyBB) {
-        SavedInsertionPointRAII savedIP(Builder, AbortApplyBB);
-        Builder.createUnreachable(Loc);
+        SavedInsertionPointRAII savedIP(*Builder, AbortApplyBB);
+        Builder->createUnreachable(Loc);
       }
 
       // Replace all the yielded values in the callee with undef.
       for (auto calleeYield : BeginApply->getYieldedValues()) {
-        calleeYield->replaceAllUsesWith(SILUndef::get(calleeYield->getType(),
-                                                      Builder.getModule()));
+        calleeYield->replaceAllUsesWith(
+            SILUndef::get(calleeYield->getType(), Builder->getModule()));
       }
     }
 
@@ -380,7 +380,7 @@ SILInlineCloner::SILInlineCloner(
   assert(CallSiteScope->getParentFunction() == &F);
 
   // Set up the coroutine-specific inliner if applicable.
-  BeginApply = BeginApplySite::get(apply, Loc.getValue(), getBuilder());
+  BeginApply = BeginApplySite::get(apply, Loc.getValue(), &getBuilder());
 }
 
 // Clone the entire callee function into the caller function at the apply site.
