@@ -151,6 +151,11 @@ class LinkEntity {
     /// A swift metaclass-stub reference.  The pointer is a ClassDecl*.
     SwiftMetaclassStub,
 
+    /// A callback used by newer Objective-C runtimes to initialize class
+    /// metadata for classes where doesClassMetadataRequireUpdate() is true
+    /// but doesClassMetadataRequireInitialization() is false.
+    ObjCMetadataUpdateFunction,
+
     /// A class metadata base offset global variable.  This stores the offset
     /// of the immediate members of a class (generic parameters, field offsets,
     /// vtable offsets) in the class's metadata.  The immediate members begin
@@ -562,6 +567,12 @@ public:
   static LinkEntity forSwiftMetaclassStub(ClassDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::SwiftMetaclassStub, decl);
+    return entity;
+  }
+
+  static LinkEntity forObjCMetadataUpdateFunction(ClassDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::ObjCMetadataUpdateFunction, decl);
     return entity;
   }
 

@@ -148,6 +148,9 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::SwiftMetaclassStub:
     return mangler.mangleClassMetaClass(cast<ClassDecl>(getDecl()));
 
+  case Kind::ObjCMetadataUpdateFunction:
+    return mangler.mangleObjCMetadataUpdateFunction(cast<ClassDecl>(getDecl()));
+
   case Kind::ClassMetadataBaseOffset:               // class metadata base offset
     return mangler.mangleClassMetadataBaseOffset(cast<ClassDecl>(getDecl()));
 
@@ -351,6 +354,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return SILLinkage::Private;
   }
 
+  case Kind::ObjCMetadataUpdateFunction:
   case Kind::TypeMetadataInstantiationCache:
   case Kind::TypeMetadataInstantiationFunction:
   case Kind::TypeMetadataSingletonInitializationCache:
@@ -615,6 +619,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::DefaultAssociatedConformanceAccessor:
     return false;
 
+  case Kind::ObjCMetadataUpdateFunction:
   case Kind::ValueWitness:
   case Kind::TypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
@@ -785,6 +790,7 @@ const SourceFile *LinkEntity::getSourceFileForEmission() const {
   case Kind::ObjCClass:
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
+  case Kind::ObjCMetadataUpdateFunction:
   case Kind::ClassMetadataBaseOffset:
   case Kind::PropertyDescriptor:
   case Kind::NominalTypeDescriptor:
