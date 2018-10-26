@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk -I %t) -module-name newtype -I %S/Inputs -I %S/Inputs -I %S/../IDE/Inputs/custom-modules -enable-objc-interop -enable-source-import %s | %FileCheck %s -check-prefix=CHECK-RAW
-// RUN: %target-swift-emit-sil(mock-sdk: %clang-importer-sdk -I %t) -module-name newtype -I %S/Inputs -I %S/Inputs -I %S/../IDE/Inputs/custom-modules -enable-objc-interop -enable-source-import %s | %FileCheck %s -check-prefix=CHECK-CANONICAL
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk -I %t) -module-name newtype -I %S/Inputs -I %S/Inputs -I %S/../IDE/Inputs/custom-modules -enable-sil-ownership -enable-objc-interop -enable-source-import %s | %FileCheck %s -check-prefix=CHECK-RAW
+// RUN: %target-swift-emit-sil(mock-sdk: %clang-importer-sdk -I %t) -module-name newtype -I %S/Inputs -I %S/Inputs -I %S/../IDE/Inputs/custom-modules -enable-sil-ownership -enable-objc-interop -enable-source-import %s | %FileCheck %s -check-prefix=CHECK-CANONICAL
 
 // REQUIRES: objc_interop
 
