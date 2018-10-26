@@ -13,6 +13,7 @@
 #include "Cleanup.h"
 #include "ManagedValue.h"
 #include "RValue.h"
+#include "Scope.h"
 #include "SILGenBuilder.h"
 #include "SILGenFunction.h"
 
@@ -70,7 +71,9 @@ namespace {
   };
 } // end anonymous namespace
 
-void CleanupManager::popTopDeadCleanups(CleanupsDepth end) {
+void CleanupManager::popTopDeadCleanups() {
+  auto end = (innermostScope ? innermostScope->depth : stack.stable_end());
+  assert(end.isValid());
   stack.checkIterator(end);
 
   while (stack.stable_begin() != end && stack.begin()->isDead()) {
@@ -201,13 +204,28 @@ Cleanup &CleanupManager::initCleanup(Cleanup &cleanup,
   return cleanup;
 }
 
+#ifndef NDEBUG
+static void checkCleanupDeactivation(SILGenFunction &SGF,
+                                     CleanupsDepth handle,
+                                     CleanupState state) {
+  if (state != CleanupState::Dead) return;
+  SGF.FormalEvalContext.checkCleanupDeactivation(handle);
+}
+#endif
+
 void CleanupManager::setCleanupState(CleanupsDepth depth, CleanupState state) {
   auto iter = stack.find(depth);
   assert(iter != stack.end() && "can't change end of cleanups stack");
   setCleanupState(*iter, state);
 
+#ifndef NDEBUG
+  // This must be done after setting the state because setting the state can
+  // itself finish a formal evaluation in some cases.
+  checkCleanupDeactivation(SGF, depth, state);
+#endif
+
   if (state == CleanupState::Dead && iter == stack.begin())
-    popTopDeadCleanups(innermostScope);
+    popTopDeadCleanups();
 }
 
 void CleanupManager::forwardCleanup(CleanupsDepth handle) {
@@ -221,8 +239,14 @@ void CleanupManager::forwardCleanup(CleanupsDepth handle) {
                              : CleanupState::Dormant);
   setCleanupState(cleanup, newState);
 
+#ifndef NDEBUG
+  // This must be done after setting the state because setting the state can
+  // itself finish a formal evaluation in some cases.
+  checkCleanupDeactivation(SGF, handle, newState);
+#endif
+
   if (newState == CleanupState::Dead && iter == stack.begin())
-    popTopDeadCleanups(innermostScope);
+    popTopDeadCleanups();
 }
 
 void CleanupManager::setCleanupState(Cleanup &cleanup, CleanupState state) {
