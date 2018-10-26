@@ -387,11 +387,9 @@ extension Double : _CVarArgPassedAsDouble, _CVarArgAligned {
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.
-@_fixed_layout // FIXME(sil-serialize-all)
-@_fixed_layout // c-abi
+@_fixed_layout
 @usableFromInline // c-abi
 final internal class _VaListBuilder {
-
   @_fixed_layout // c-abi
   @usableFromInline
   internal struct Header {
@@ -408,6 +406,17 @@ final internal class _VaListBuilder {
     @usableFromInline // c-abi
     internal var reg_save_area: UnsafeMutablePointer<Int>?
   }
+
+  @usableFromInline // c-abi
+  internal var gpRegistersUsed = 0
+  @usableFromInline // c-abi
+  internal var fpRegistersUsed = 0
+
+  @usableFromInline // c-abi
+  final  // Property must be final since it is used by Builtin.addressof.
+  internal var header = Header()
+  @usableFromInline // c-abi
+  internal var storage: ContiguousArray<Int>
 
   @inlinable // c-abi
   internal init() {
@@ -469,25 +478,13 @@ final internal class _VaListBuilder {
              _fromUnsafeMutablePointer: UnsafeMutableRawPointer(
                Builtin.addressof(&self.header)))
   }
-
-  @usableFromInline // c-abi
-  internal var gpRegistersUsed = 0
-  @usableFromInline // c-abi
-  internal var fpRegistersUsed = 0
-
-  @usableFromInline // c-abi
-  final  // Property must be final since it is used by Builtin.addressof.
-  internal var header = Header()
-  @usableFromInline // c-abi
-  internal var storage: ContiguousArray<Int>
 }
 
 #else
 
 /// An object that can manage the lifetime of storage backing a
 /// `CVaListPointer`.
-@_fixed_layout // FIXME(sil-serialize-all)
-@_fixed_layout // c-abi
+@_fixed_layout
 @usableFromInline // c-abi
 final internal class _VaListBuilder {
 
