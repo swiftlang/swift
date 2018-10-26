@@ -17,11 +17,13 @@
 #ifndef SWIFT_SIL_GRAPHFUNCTIONDEVICEINFO_H
 #define SWIFT_SIL_GRAPHFUNCTIONDEVICEINFO_H
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
 class ASTContext;
 class SILFunction;
+struct GraphOperationAttribute;
 
 namespace tf {
 class GraphOperationBuilder;
@@ -178,9 +180,14 @@ struct GraphFunctionDeviceInfo {
   // chooses a device based on this deviceInfo and op kernel device
   // availability.
   //
+  // `attributes` are a list of GraphOperation level attributes which will
+  // eventually be passed to TF_OpSetAttr*. These are used here to determine
+  // kernel availability on a device.
+  //
   // Returns the chosen device.
   std::string
-  handleDevicePlacement(llvm::StringRef opType, llvm::StringRef opDevice);
+  handleDevicePlacement(llvm::StringRef opType, llvm::StringRef opDevice,
+                        llvm::ArrayRef<GraphOperationAttribute> attributes);
 
   // Same as above, but adds a "__device" attribute to `opBuilder` instead of
   // returning the device.
@@ -202,7 +209,11 @@ private:
     numUsedDeviceTypes = 1;
   }
 
-  DeviceType chooseDevice(llvm::StringRef opType) const;
+  // `attributes` are used here to determine kernel availability (primarily
+  // dtype constraints).
+  DeviceType
+  chooseDevice(llvm::StringRef opType,
+               llvm::ArrayRef<GraphOperationAttribute> attributes) const;
 
   // Actual TF devices involved in the tensor computation.
   // It cannot contain DeviceType::ALL.

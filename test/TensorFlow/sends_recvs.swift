@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -O -emit-sil %s -verify | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -Xllvm -tf-module-level-graph=false -O -emit-sil %s -verify | %FileCheck %filecheck-tensorflow-extra-options %s
 
 // In this file, send means accelerator->host, and recv means the opposite.
 
@@ -25,7 +25,7 @@ public func test1Send() {
 
 // CHECK:      function_ref @_swift_tfc_FinishTensorComputation
 
-
+#if CUDA
 public func test1SendWithParam(x: Float) {
   TensorFlow.enableGPU()
   var a = Tensor<Float>(x)
@@ -35,28 +35,29 @@ public func test1SendWithParam(x: Float) {
   // This one should not be a send.
   _hostOp(a.toHost())
 }
+#endif  // CUDA
 
 // CPU function takes no input arg.
-// CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}test1SendWithParam{{.*}}CPU{{.*}}
-// CHECK: bb0:
-// CHECK: graph_op "tfc.D2DTensorRecv
+// CHECK-GPU-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}test1SendWithParam{{.*}}CPU{{.*}}
+// CHECK-GPU: bb0:
+// CHECK-GPU: graph_op "tfc.D2DTensorRecv
 
 // GPU function takes the input arg of x.
-// CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}test1SendWithParam{{.*}}GPU{{.*}}
-// CHECK: bb0(%0 : @unowned $TensorHandle
-// CHECK: graph_op "tfc.D2DTensorSend
+// CHECK-GPU-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}test1SendWithParam{{.*}}GPU{{.*}}
+// CHECK-GPU: bb0(%0 : @unowned $TensorHandle
+// CHECK-GPU: graph_op "tfc.D2DTensorSend
 
 // The _Send node should be hooked up as a control dependency on the return
  // node, so that Sends gets run before the function returns.
-// CHECK:        function {
-// CHECK:          name: "{{.*}}test1SendWithParam{{.*}}.tf_GPU.device_partition"
-// CHECK:          node_def {
-// CHECK:            name: "RunControlDependency"
-// CHECK:            op: "Identity"
-// CHECK-NEXT:       input: "op/test1SendWithParam.x_
-// CHECK-NEXT:       input: "^tf_send_0"
-// CHECK:        function {
-// CHECK:          name: "{{.*}}test1SendWithParam{{.*}}.tf_CPU.device_partition"
+// CHECK-GPU:        function {
+// CHECK-GPU:          name: "{{.*}}test1SendWithParam{{.*}}.tf_GPU.device_partition"
+// CHECK-GPU:          node_def {
+// CHECK-GPU:            name: "RunControlDependency"
+// CHECK-GPU:            op: "Identity"
+// CHECK-GPU-NEXT:       input: "op/test1SendWithParam.x_
+// CHECK-GPU-NEXT:       input: "^tf_send_0"
+// CHECK-GPU:        function {
+// CHECK-GPU:          name: "{{.*}}test1SendWithParam{{.*}}.tf_CPU.device_partition"
 
 public func test2Sends() {
   var a = Tensor<Float>(1.0)

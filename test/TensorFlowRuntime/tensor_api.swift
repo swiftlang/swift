@@ -14,12 +14,6 @@ import StdlibUnittest
 var TensorNonTPUTests = TestSuite("TensorNonTPU")
 
 TensorNonTPUTests.testAllBackends("SliceUpdate") {
-#if CUDA
-  // TODO: fix GPU compilation error:
-  // Not found: No registered 'Slice' OpKernel for GPU devices compatible with node {{node op/_S4mainyycfU_.tf_GPU.15.50_/device_GPU_0_961}} = Slice[Index=DT_INT32, T=DT_BOOL, _device="/device:GPU:0"](op/_S4mainyycfU_.tf_GPU.15.50_/device_GPU_0_895, op/_S4mainyycfU_.tf_GPU.15.50_/device_GPU_0_910, op/_S4mainyycfU_.tf_GPU.15.50_/device_GPU_0_960)
-  return
-#endif //CUDA
-  
   var t1 = Tensor<Float>([[1, 2, 3], [4, 5, 6]])
   t1[0] = Tensor(zeros: [3])
   expectEqual(ShapedArray(shape:[2, 3], scalars: [0, 0, 0, 4, 5, 6]), t1.array)

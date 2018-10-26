@@ -14,20 +14,63 @@
 //
 //===----------------------------------------------------------------------===//
 
-
 #include "swift/SIL/GraphFunctionDeviceInfo.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/GraphOperationBuilder.h"
 #include "swift/SIL/GraphOperationInfo.h"
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/Local.h"
-#include "llvm/ADT/StringRef.h"
+#include "tensorflow/c/c_api_experimental.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
 using namespace tf;
+
+// Only DataType attributes are considered in this CanRunOnDevice property. All
+// others are currently not relevant for kernel selection.
+bool CanRunOnDevice(llvm::StringRef opType,
+                    llvm::ArrayRef<GraphOperationAttribute> attributes,
+                    const char *deviceType) {
+  auto *builder = TF_NewAttrBuilder(std::string(opType).c_str());
+
+  unsigned dtypeAttr = 0;
+  for (const auto &attr : attributes) {
+    auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
+    std::string name = attrInfo.first.str();
+    auto attrValue = attr.value;
+    if (attrInfo.second ==
+        GraphOperationInfo::ArgumentLowering::TFDataTypeAttribute) {
+      switch (attrValue.getKind()) {
+      case SymbolicValue::Integer:
+        dtypeAttr = getTFDataType(attrValue);
+        TF_AttrBuilderSetType(builder, name.c_str(), (TF_DataType)dtypeAttr);
+        break;
+      case SymbolicValue::Array: {
+        CanType eltTy;
+        SmallVector<TF_DataType, 4> types;
+        for (auto elt : attrValue.getArrayValue(eltTy))
+          types.push_back((TF_DataType)getTFDataType(elt));
+        TF_AttrBuilderSetTypeList(builder, name.c_str(), types.data(),
+                                  types.size());
+        break;
+      }
+      default:
+        llvm_unreachable(
+            "only integers and arrays are possible for TF_DataType attrs");
+      }
+    }
+  }
+
+  auto *status = TF_NewStatus();
+  TF_AttrBuilderCheckCanRunOnDevice(builder, deviceType, status);
+  bool isOk = TF_GetCode(status) == TF_OK;
+  TF_DeleteAttrBuilder(builder);
+  TF_DeleteStatus(status);
+  return isOk;
+}
 
 static llvm::cl::opt<bool> TFTargetTPU(
     "tf-target-tpu", llvm::cl::init(false),
@@ -125,14 +168,15 @@ bool GraphFunctionDeviceInfo::isConfigOp(const GraphOperationInfo &opInfo) {
          opInfo.getOperationName() == "tfc.configureCPU";
 }
 
-std::string
-GraphFunctionDeviceInfo::handleDevicePlacement(StringRef opType,
-                                               StringRef opDevice) {
+std::string GraphFunctionDeviceInfo::handleDevicePlacement(
+    StringRef opType, StringRef opDevice,
+    llvm::ArrayRef<GraphOperationAttribute> attributes) {
   DeviceType chosenDevice;
   if (!opDevice.empty())
     chosenDevice = getOpDeviceType(opDevice);
   else
-    chosenDevice = chooseDevice(opType);
+    chosenDevice = chooseDevice(opType, attributes);
+
   markDeviceUsed(chosenDevice);
   return getDeviceString(chosenDevice);
 }
@@ -140,7 +184,9 @@ GraphFunctionDeviceInfo::handleDevicePlacement(StringRef opType,
 void GraphFunctionDeviceInfo::handleDevicePlacement(
     StringRef opType, StringRef opDevice, ASTContext &ctx,
     GraphOperationBuilder *opBuilder) {
-  auto deviceString = handleDevicePlacement(opType, opDevice);
+
+  auto deviceString =
+      handleDevicePlacement(opType, opDevice, opBuilder->getAttributes());
 
   // Example output SIL:
   // graph_op "Const"() {dtype: $Float, value$tensor: f32 0x3F800000 /* 1 */,
@@ -151,23 +197,18 @@ void GraphFunctionDeviceInfo::handleDevicePlacement(
        SymbolicValue::getString(deviceString, ctx.getAllocator())});
 }
 
-DeviceType GraphFunctionDeviceInfo::chooseDevice(llvm::StringRef opType) const {
+DeviceType GraphFunctionDeviceInfo::chooseDevice(
+    llvm::StringRef opType,
+    llvm::ArrayRef<GraphOperationAttribute> attributes) const {
   if (opType == "tfc.RecvFromHost" || opType == "tfc.SendToHost")
     return DeviceType::CPU;
 
-  // Dataset / iterator related ops.
-  if (opType == "OneShotIterator" || opType == "IteratorGetNext" ||
-      opType == "TensorSliceDataset")
+  // TODO: A similar statement might be necessary for TPU.
+  if (primaryDeviceType == DeviceType::GPU) {
+    if (CanRunOnDevice(opType, attributes, "GPU")) {
+      return DeviceType::GPU;
+    }
     return DeviceType::CPU;
-
-  // Scalar summary related tops.
-  if (opType == "SummaryWriter" || opType == "CreateSummaryFileWriter" ||
-      opType == "WriteScalarSummary")
-    return DeviceType::CPU;
-
-  // Place this inst on the device given by this deviceInfo.
-  // FIXME: Use the op kernel device availability info to select a device for
-  // `opType` -- if that op has no available kernel on `primaryDeviceType`, a
-  // different device should be returned.
+  }
   return primaryDeviceType;
 }

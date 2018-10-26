@@ -1,3 +1,8 @@
+if(SWIFT_ENABLE_TENSORFLOW)
+  find_package(TensorFlow REQUIRED)
+  include_directories(BEFORE "${TF_INCLUDE_DIR}" )
+endif()
+
 add_swift_library(swiftSIL STATIC
   AbstractionPattern.cpp
   BasicBlockUtils.cpp
@@ -49,6 +54,7 @@ add_swift_library(swiftSIL STATIC
   LINK_LIBRARIES
     swiftSerialization
     swiftSema
+  INTERFACE_LINK_LIBRARIES "${TF_LIBRARIES}"
 )
 
 # intrinsics_gen is the LLVM tablegen target that generates the include files
