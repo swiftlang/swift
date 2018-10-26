@@ -4849,7 +4849,12 @@ class ParamDecl : public VarDecl {
 
   /// The default value, if any, along with whether this is varargs.
   llvm::PointerIntPair<StoredDefaultArgument *, 1> DefaultValueAndIsVariadic;
-  
+
+  /// `@autoclosure` flag associated with this parameter.
+  /// FIXME: This has to become declaration attribute after
+  /// `@autoclosure` is removed from function type.
+  bool IsAutoClosure = false;
+
 public:
   ParamDecl(VarDecl::Specifier specifier,
             SourceLoc specifierLoc, SourceLoc argumentNameLoc,
@@ -4933,7 +4938,11 @@ public:
   /// Whether or not this parameter is varargs.
   bool isVariadic() const { return DefaultValueAndIsVariadic.getInt(); }
   void setVariadic(bool value = true) {DefaultValueAndIsVariadic.setInt(value);}
-  
+
+  /// Whether or not this parameter is marked with `@autoclosure`.
+  bool isAutoClosure() const { return IsAutoClosure; }
+  void setAutoClosure(bool value = true) { IsAutoClosure = value; }
+
   /// Remove the type of this varargs element designator, without the array
   /// type wrapping it.  A parameter like "Int..." will have formal parameter
   /// type of "[Int]" and this returns "Int".
