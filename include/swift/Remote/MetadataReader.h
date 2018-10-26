@@ -1528,7 +1528,7 @@ private:
     if (!demangling)
       return nullptr;
 
-    NodePointer top;
+    Demangle::NodePointer top;
     // References to type nodes behave as types in the mangling.
     if (isa<TargetTypeContextDescriptor<Runtime>>(descriptor.getLocalBuffer()) ||
         isa<TargetProtocolDescriptor<Runtime>>(descriptor.getLocalBuffer())) {
