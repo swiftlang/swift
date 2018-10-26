@@ -72,6 +72,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DictionaryGroup
     single-source/DictionaryKeysContains
     single-source/DictionaryLiteral
+    single-source/DictionaryOfAnyHashableStrings
     single-source/DictionaryRemove
     single-source/DictionarySubscriptDefault
     single-source/DictionarySwap

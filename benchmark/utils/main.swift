@@ -60,6 +60,7 @@ import DictionaryCopy
 import DictionaryGroup
 import DictionaryKeysContains
 import DictionaryLiteral
+import DictionaryOfAnyHashableStrings
 import DictionaryRemove
 import DictionarySubscriptDefault
 import DictionarySwap
@@ -226,6 +227,7 @@ registerBenchmark(DictionaryCopy)
 registerBenchmark(DictionaryGroup)
 registerBenchmark(DictionaryKeysContains)
 registerBenchmark(DictionaryLiteral)
+registerBenchmark(DictionaryOfAnyHashableStrings)
 registerBenchmark(DictionaryRemove)
 registerBenchmark(DictionarySubscriptDefault)
 registerBenchmark(DictionarySwap)
