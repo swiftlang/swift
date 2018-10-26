@@ -1436,6 +1436,91 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
   }
 }
 
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Insertion") {
+  var d = getCOWSlowEquatableDictionary()
+
+  d[TestKeyTy(40)] = TestEquatableValueTy(1040)
+  expectEqual(TestEquatableValueTy(1040), d[TestKeyTy(40)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Mutation") {
+  var d = getCOWSlowEquatableDictionary()
+
+  d[TestKeyTy(10)] = TestEquatableValueTy(2010)
+  expectEqual(TestEquatableValueTy(2010), d[TestKeyTy(10)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Removal") {
+  var d = getCOWSlowEquatableDictionary()
+
+  d[TestKeyTy(10)] = nil
+  expectNil(d[TestKeyTy(10)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Noop") {
+  var d = getCOWSlowEquatableDictionary()
+
+  d[TestKeyTy(40)] = nil
+  expectNil(d[TestKeyTy(40)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+extension Optional {
+  @inline(never)
+  mutating func setWrapped(to value: Wrapped) {
+    self = .some(value)
+  }
+
+  @inline(never)
+  mutating func clear() {
+    self = .none
+  }
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Insertion_modify") {
+  var d = getCOWSlowEquatableDictionary()
+
+  d[TestKeyTy(40)].setWrapped(to: TestEquatableValueTy(1040))
+  expectEqual(TestEquatableValueTy(1040), d[TestKeyTy(40)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Mutation_modify") {
+  var d = getCOWSlowEquatableDictionary()
+
+  d[TestKeyTy(10)].setWrapped(to: TestEquatableValueTy(2010))
+  expectEqual(TestEquatableValueTy(2010), d[TestKeyTy(10)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Removal_modify") {
+  var d = getCOWSlowEquatableDictionary()
+
+  d[TestKeyTy(10)].clear()
+  expectNil(d[TestKeyTy(10)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+DictionaryTestSuite.test("COW.Slow.SubscriptWithKeys_Noop_modify") {
+  var d = getCOWSlowEquatableDictionary()
+
+  d[TestKeyTy(40)].clear()
+  expectNil(d[TestKeyTy(40)])
+
+  // Note: Leak tests are done in tearDown.
+}
+
+
 //===---
 // Native dictionary tests.
 //===---
