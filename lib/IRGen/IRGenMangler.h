@@ -103,6 +103,10 @@ public:
     return mangleNominalTypeSymbol(Decl, "Mm");
   }
 
+  std::string mangleObjCMetadataUpdateFunction(const ClassDecl *Decl) {
+    return mangleNominalTypeSymbol(Decl, "MU");
+  }
+
   std::string mangleClassMetadataBaseOffset(const ClassDecl *Decl) {
     return mangleNominalTypeSymbol(Decl, "Mo");
   }

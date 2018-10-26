@@ -404,6 +404,7 @@ private:
     case Node::Kind::Number:
     case Node::Kind::ObjCAttribute:
     case Node::Kind::ObjCBlock:
+    case Node::Kind::ObjCMetadataUpdateFunction:
     case Node::Kind::Owned:
     case Node::Kind::OwningAddressor:
     case Node::Kind::OwningMutableAddressor:
@@ -937,6 +938,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::MethodLookupFunction:
     Printer << "method lookup function for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::ObjCMetadataUpdateFunction:
+    Printer << "ObjC metadata update function for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::OutlinedBridgedMethod:
