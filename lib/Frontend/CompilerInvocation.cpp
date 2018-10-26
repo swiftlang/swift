@@ -273,6 +273,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.BuildSyntaxTree = true;
     Opts.VerifySyntaxTree = true;
   }
+  
+  if (Args.hasArg(OPT_enable_experimental_dependencies))
+    Opts.EnableExperimentalDependencies = true;
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)

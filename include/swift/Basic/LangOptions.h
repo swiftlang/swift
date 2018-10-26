@@ -288,6 +288,10 @@ namespace swift {
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
     bool VerifySyntaxTree = false;
 
+    /// Scaffolding to permit experimentation with finer-grained dependencies
+    /// and faster rebuilds.
+    bool EnableExperimentalDependencies = false;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///

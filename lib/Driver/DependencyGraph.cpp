@@ -52,11 +52,12 @@ using DependencyKind = DependencyGraphImpl::DependencyKind;
 using DependencyCallbackTy = LoadResult(StringRef, DependencyKind, bool);
 using InterfaceHashCallbackTy = LoadResult(StringRef);
 
-static LoadResult
-parseDependencyFile(llvm::MemoryBuffer &buffer,
-                    llvm::function_ref<DependencyCallbackTy> providesCallback,
-                    llvm::function_ref<DependencyCallbackTy> dependsCallback,
-                    llvm::function_ref<InterfaceHashCallbackTy> interfaceHashCallback) {
+static LoadResult parseDependencyFile(
+    llvm::MemoryBuffer &buffer,
+    llvm::function_ref<DependencyCallbackTy> providesCallback,
+    llvm::function_ref<DependencyCallbackTy> dependsCallback,
+    llvm::function_ref<InterfaceHashCallbackTy> interfaceHashCallback,
+    const bool EnableExperimentalDependencies) {
   namespace yaml = llvm::yaml;
 
   // FIXME: Switch to a format other than YAML.
@@ -211,21 +212,25 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
   return result;
 }
 
-LoadResult DependencyGraphImpl::loadFromPath(const void *node, StringRef path) {
+LoadResult
+DependencyGraphImpl::loadFromPath(const void *node, StringRef path,
+                                  const bool EnableExperimentalDependencies) {
   auto buffer = llvm::MemoryBuffer::getFile(path);
   if (!buffer)
     return LoadResult::HadError;
-  return loadFromBuffer(node, *buffer.get());
+  return loadFromBuffer(node, *buffer.get(), EnableExperimentalDependencies);
 }
 
 LoadResult
 DependencyGraphImpl::loadFromString(const void *node, StringRef data) {
   auto buffer = llvm::MemoryBuffer::getMemBuffer(data);
-  return loadFromBuffer(node, *buffer);
+  return loadFromBuffer(node, *buffer, false);
 }
 
-LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
-                                               llvm::MemoryBuffer &buffer) {
+LoadResult
+DependencyGraphImpl::loadFromBuffer(const void *node,
+                                    llvm::MemoryBuffer &buffer,
+                                    const bool EnableExperimentalDependencies) {
   auto &provides = Provides[node];
 
   auto dependsCallback = [this, node](StringRef name, DependencyKind kind,
@@ -291,7 +296,8 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
   };
 
   return parseDependencyFile(buffer, providesCallback, dependsCallback,
-                             interfaceHashCallback);
+                             interfaceHashCallback,
+                             EnableExperimentalDependencies);
 }
 
 void DependencyGraphImpl::markExternal(SmallVectorImpl<const void *> &visited,
