@@ -3977,14 +3977,11 @@ swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
                                        conformance->getProtocol());
       };
 
-  // When there is no generic table, use the static witness table or
+  // When there is no generic table, or it doesn't require instantiation,
+  // use the pattern directly.
   // accessor directly.
   auto genericTable = conformance->getGenericWitnessTable();
-  if (!genericTable) {
-    return uniqueForeignWitnessTableRef(conformance->getWitnessTablePattern());
-  }
-
-  if (doesNotRequireInstantiation(conformance, genericTable)) {
+  if (!genericTable || doesNotRequireInstantiation(conformance, genericTable)) {
     return uniqueForeignWitnessTableRef(conformance->getWitnessTablePattern());
   }
 
