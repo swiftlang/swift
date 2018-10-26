@@ -244,10 +244,6 @@ class LinkEntity {
     /// ProtocolConformance*.
     ProtocolWitnessTablePattern,
 
-    /// A witness accessor function. The secondary pointer is a
-    /// ProtocolConformance*.
-    ProtocolWitnessTableAccessFunction,
-
     /// The instantiation function for a generic protocol witness table.
     /// The secondary pointer is a ProtocolConformance*.
     GenericProtocolWitnessTableInstantiationFunction,
@@ -724,14 +720,6 @@ public:
   forProtocolWitnessTablePattern(const ProtocolConformance *C) {
     LinkEntity entity;
     entity.setForProtocolConformance(Kind::ProtocolWitnessTablePattern, C);
-    return entity;
-  }
-
-  static LinkEntity
-  forProtocolWitnessTableAccessFunction(const ProtocolConformance *C) {
-    LinkEntity entity;
-    entity.setForProtocolConformance(Kind::ProtocolWitnessTableAccessFunction,
-                                     C);
     return entity;
   }
 

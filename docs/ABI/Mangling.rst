@@ -128,7 +128,7 @@ Globals
 
   global ::= protocol-conformance 'Mc'   // protocol conformance descriptor
   global ::= protocol-conformance 'WP'   // protocol witness table
-  global ::= protocol-conformance 'Wa'   // protocol witness table accessor
+  global ::= protocol-conformance 'Wa'   // protocol witness table accessor (HISTORICAL)
 
   global ::= protocol-conformance 'WG'   // generic protocol witness table (HISTORICAL)
   global ::= protocol-conformance 'Wp'   // protocol witness table pattern
