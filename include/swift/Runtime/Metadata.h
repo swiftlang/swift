@@ -218,39 +218,11 @@ inline unsigned TypeLayout::getNumExtraInhabitants() const {
 
 // Standard value-witness tables.
 
-// The "Int" tables are used for arbitrary POD data with the matching
-// size/alignment characteristics.
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi8_);   // Builtin.Int8
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi16_);  // Builtin.Int16
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi32_);  // Builtin.Int32
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi64_);  // Builtin.Int64
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi128_); // Builtin.Int128
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi256_); // Builtin.Int256
-SWIFT_RUNTIME_EXPORT
-const ValueWitnessTable VALUE_WITNESS_SYM(Bi512_); // Builtin.Int512
-
-// The object-pointer table can be used for arbitrary Swift refcounted
-// pointer types.
-SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(Bo); // Builtin.NativeObject
-
-SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(Bb); // Builtin.BridgeObject
-
-SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(Bp); // Builtin.RawPointer
-
-#if SWIFT_OBJC_INTEROP
-// The ObjC-pointer table can be used for arbitrary ObjC pointer types.
-SWIFT_RUNTIME_EXPORT
-const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(BO); // Builtin.UnknownObject
-#endif
+#define BUILTIN_TYPE(Symbol, _) \
+  SWIFT_RUNTIME_EXPORT const ValueWitnessTable VALUE_WITNESS_SYM(Symbol);
+#define BUILTIN_POINTER_TYPE(Symbol, _) \
+  SWIFT_RUNTIME_EXPORT const ExtraInhabitantsValueWitnessTable VALUE_WITNESS_SYM(Symbol);
+#include "swift/Runtime/BuiltinTypes.def"
 
 // The () -> () table can be used for arbitrary function types.
 SWIFT_RUNTIME_EXPORT

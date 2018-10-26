@@ -46,56 +46,97 @@ namespace {
   };
 } // end anonymous namespace
 
-// We use explicit sizes and alignments here just in case the C ABI
-// under-aligns any or all of them.
-const ValueWitnessTable swift::VALUE_WITNESS_SYM(Bi8_) =
-  ValueWitnessTableForBox<NativeBox<uint8_t, 1>>::table;
-const ValueWitnessTable swift::VALUE_WITNESS_SYM(Bi16_) =
-  ValueWitnessTableForBox<NativeBox<uint16_t, 2>>::table;
-const ValueWitnessTable swift::VALUE_WITNESS_SYM(Bi32_) =
-  ValueWitnessTableForBox<NativeBox<uint32_t, 4>>::table;
-const ValueWitnessTable swift::VALUE_WITNESS_SYM(Bi64_) =
-  ValueWitnessTableForBox<NativeBox<uint64_t, 8>>::table;
-const ValueWitnessTable swift::VALUE_WITNESS_SYM(Bi128_) =
-  ValueWitnessTableForBox<NativeBox<int128_like, 16>>::table;
-const ValueWitnessTable swift::VALUE_WITNESS_SYM(Bi256_) =
-  ValueWitnessTableForBox<NativeBox<int256_like, 32>>::table;
-const ValueWitnessTable swift::VALUE_WITNESS_SYM(Bi512_) =
-  ValueWitnessTableForBox<NativeBox<int512_like, 64>>::table;
+namespace ctypes {
+  namespace {
+    // Type definitions that map each names Swift builtin type to their
+    // C counterparts.
+    using Bi8_ = uint8_t;
+    using Bi16_ = uint16_t;
+    using Bi32_ = uint32_t;
+    using Bi64_ = uint64_t;
+    using Bi128_ = int128_like;
+    using Bi256_ = int256_like;
+    using Bi512_ = int512_like;
 
-/// The basic value-witness table for Swift object pointers.
-const ExtraInhabitantsValueWitnessTable swift::VALUE_WITNESS_SYM(Bo) =
-  ValueWitnessTableForBox<SwiftRetainableBox>::table;
+    using Bw = intptr_t;
+
+    using Bf32_ = float;
+    using Bf64_ = double;
+
+    /// The value-witness table for UnsafeValueBuffer.  You can do layout
+    /// with this, but the type isn't copyable, so most of the value
+    /// operations are meaningless.
+    using BB = ValueBuffer;
+  }
+}
+
+namespace pointer_types {
+  namespace {
+    /// The basic value-witness table for Swift object pointers.
+    using Bo = SwiftRetainableBox;
+
+    /// The value-witness table for raw pointers.
+    using Bp = RawPointerBox;
+
+    /// The value-witness table for BridgeObject.
+    using Bb = BridgeObjectBox;
+
+#if SWIFT_OBJC_INTEROP
+    /*** Objective-C pointers *************************************************/
+
+    // This section can reasonably be suppressed in builds that don't
+    // need to support Objective-C.
+
+    /// The basic value-witness table for ObjC object pointers.
+    using BO = ObjCRetainableBox;
+#endif
+
+  }
+}
+
+namespace {
+  template<typename T>
+  constexpr size_t getAlignment() { return alignof(T); }
+
+#define SET_FIXED_ALIGNMENT(Type, Align) \
+template<> constexpr size_t getAlignment<Type>() { return Align; }
+
+  SET_FIXED_ALIGNMENT(uint8_t, 1)
+  SET_FIXED_ALIGNMENT(uint16_t, 2)
+  SET_FIXED_ALIGNMENT(uint32_t, 4)
+  SET_FIXED_ALIGNMENT(uint64_t, 8)
+  SET_FIXED_ALIGNMENT(int128_like, 16)
+  SET_FIXED_ALIGNMENT(int256_like, 32)
+  SET_FIXED_ALIGNMENT(int512_like, 64)
+
+#undef SET_FIXED_ALIGNMENT
+
+  template<typename T, unsigned N>
+  struct SwiftVecT {
+    typedef T type __attribute__((ext_vector_type(N)));
+  };
+
+  template<typename T, unsigned N>
+  using SwiftVec = typename SwiftVecT<T, N>::type;
+}
+
+#define BUILTIN_TYPE(Symbol, Name)                         \
+const ValueWitnessTable swift::VALUE_WITNESS_SYM(Symbol) = \
+  ValueWitnessTableForBox<NativeBox<ctypes::Symbol,        \
+                                    getAlignment<ctypes::Symbol>()>>::table;
+#define BUILTIN_POINTER_TYPE(Symbol, Name)                 \
+const ExtraInhabitantsValueWitnessTable swift::VALUE_WITNESS_SYM(Symbol) = \
+  ValueWitnessTableForBox<pointer_types::Symbol>::table;
+#define BUILTIN_VECTOR_TYPE(ElementSymbol, _, Width)                          \
+  const ValueWitnessTable                                                     \
+  swift::VALUE_WITNESS_SYM(VECTOR_BUILTIN_SYMBOL_NAME(ElementSymbol,Width)) = \
+  ValueWitnessTableForBox<NativeBox<SwiftVec<ctypes::ElementSymbol,           \
+                                             Width>>>::table;
+#include "swift/Runtime/BuiltinTypes.def"
 
 /// The value-witness table for pointer-aligned unmanaged pointer types.
 const ExtraInhabitantsValueWitnessTable swift::METATYPE_VALUE_WITNESS_SYM(Bo) =
   ValueWitnessTableForBox<PointerPointerBox>::table;
-
-/// The value-witness table for raw pointers.
-const ExtraInhabitantsValueWitnessTable swift::VALUE_WITNESS_SYM(Bp) =
-  ValueWitnessTableForBox<RawPointerBox>::table;
-
-/// The value-witness table for BridgeObject.
-const ExtraInhabitantsValueWitnessTable swift::VALUE_WITNESS_SYM(Bb) =
-  ValueWitnessTableForBox<BridgeObjectBox>::table;
-
-/// The value-witness table for UnsafeValueBuffer.  You can do layout
-/// with this, but the type isn't copyable, so most of the value
-/// operations are meaningless.
-static const ValueWitnessTable VALUE_WITNESS_SYM(BB) =
-  ValueWitnessTableForBox<NativeBox<ValueBuffer>>::table;
-
-#if SWIFT_OBJC_INTEROP
-/*** Objective-C pointers ****************************************************/
-
-// This section can reasonably be suppressed in builds that don't
-// need to support Objective-C.
-
-/// The basic value-witness table for ObjC object pointers.
-const ExtraInhabitantsValueWitnessTable swift::VALUE_WITNESS_SYM(BO) =
-  ValueWitnessTableForBox<ObjCRetainableBox>::table;
-
-#endif
 
 /*** Functions ***************************************************************/
 
