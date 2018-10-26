@@ -52,7 +52,7 @@ fileprivate extension NSObject {
 // must coexist, so it was renamed. The old name must not be used in the
 // new runtime.
 @objc private class __KVOKeyPathBridgeMachinery : NSObject {
-    @nonobjc static var keyPathTable: [String : AnyKeyPath] = {
+    @nonobjc static var swizzler: ()? = {
         /*
          Move all our methods into place. We want the following:
          __KVOKeyPathBridgeMachinery's automaticallyNotifiesObserversForKey:, and keyPathsForValuesAffectingValueForKey: methods replaces NSObject's versions of them
@@ -62,7 +62,7 @@ fileprivate extension NSObject {
         threeWaySwizzle(#selector(NSObject.keyPathsForValuesAffectingValue(forKey:)), with: #selector(NSObject.__old_unswizzled_keyPathsForValuesAffectingValue(forKey:)))
         threeWaySwizzle(#selector(NSObject.automaticallyNotifiesObservers(forKey:)), with: #selector(NSObject.__old_unswizzled_automaticallyNotifiesObservers(forKey:)))
         
-        return [:]
+        return nil
     }()
     
     /// Performs a 3-way swizzle between `NSObject` and `__KVOKeyPathBridgeMachinery`.
@@ -88,23 +88,45 @@ fileprivate extension NSObject {
         let rootMethod = class_getClassMethod(rootClass, selector)!
         method_exchangeImplementations(rootMethod, unswizzledMethod)
     }
-    
-    @nonobjc static var keyPathTableLock = NSLock()
-    
-    @nonobjc fileprivate static func _bridgeKeyPath(_ keyPath: __owned AnyKeyPath) -> String {
-        guard let keyPathString = keyPath._kvcKeyPathString else { fatalError("Could not extract a String from KeyPath \(keyPath)") }
-        __KVOKeyPathBridgeMachinery.keyPathTableLock.lock()
-        defer { __KVOKeyPathBridgeMachinery.keyPathTableLock.unlock() }
-        __KVOKeyPathBridgeMachinery.keyPathTable[keyPathString] = keyPath
-        return keyPathString
+
+    private class BridgeKey : NSObject, NSCopying {
+        let value: String
+
+        init(_ value: String) {
+            self.value = value
+        }
+
+        func copy(with zone: NSZone? = nil) -> Any {
+            return self
+        }
+
+        override func isEqual(_ object: Any?) -> Bool {
+            return value == (object as? BridgeKey)?.value
+        }
+
+        override var hash: Int {
+            var hasher = Hasher()
+            hasher.combine(ObjectIdentifier(BridgeKey.self))
+            hasher.combine(value)
+            return hasher.finalize()
+        }
+    }
+
+    /// Temporarily maps a `String` to an `AnyKeyPath` that can be retrieved with `_bridgeKeyPath(_:)`.
+    ///
+    /// This uses a per-thread storage so key paths on other threads don't interfere.
+    @nonobjc fileprivate static func _withBridgeableKeyPath(from keyPathString: String, to keyPath: AnyKeyPath, block: () -> Void) {
+        _ = __KVOKeyPathBridgeMachinery.swizzler
+        let key = BridgeKey(keyPathString)
+        let oldValue = Thread.current.threadDictionary[key]
+        Thread.current.threadDictionary[key] = keyPath
+        defer { Thread.current.threadDictionary[key] = oldValue }
+        block()
     }
     
     @nonobjc fileprivate static func _bridgeKeyPath(_ keyPath:String?) -> AnyKeyPath? {
         guard let keyPath = keyPath else { return nil }
-        __KVOKeyPathBridgeMachinery.keyPathTableLock.lock()
-        defer { __KVOKeyPathBridgeMachinery.keyPathTableLock.unlock() }
-        let path = __KVOKeyPathBridgeMachinery.keyPathTable[keyPath]
-        return path
+        return Thread.current.threadDictionary[BridgeKey(keyPath)] as? AnyKeyPath
     }
     
     @objc override class func automaticallyNotifiesObservers(forKey key: String) -> Bool {
@@ -131,7 +153,8 @@ fileprivate extension NSObject {
 }
 
 func _bridgeKeyPathToString(_ keyPath:AnyKeyPath) -> String {
-    return __KVOKeyPathBridgeMachinery._bridgeKeyPath(keyPath)
+    guard let keyPathString = keyPath._kvcKeyPathString else { fatalError("Could not extract a String from KeyPath \(keyPath)") }
+    return keyPathString
 }
 
 // NOTE: older overlays called this NSKeyValueObservation. We now use
@@ -168,7 +191,9 @@ public class NSKeyValueObservation : NSObject {
             self.callback = callback
             super.init()
             objc_setAssociatedObject(object, associationKey(), self, .OBJC_ASSOCIATION_RETAIN)
-            object.addObserver(self, forKeyPath: path, options: options, context: nil)
+            __KVOKeyPathBridgeMachinery._withBridgeableKeyPath(from: path, to: keyPath) {
+                object.addObserver(self, forKeyPath: path, options: options, context: nil)
+            }
         }
         
         @nonobjc func invalidate() {
