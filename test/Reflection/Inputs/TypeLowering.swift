@@ -144,7 +144,13 @@ public struct MetatypeStruct {
   public let abstractMetatype: MetadataHolder<BasicStruct.Type, BasicStruct>
 }
 
+// We don't allow stored properties to have uninhabited types now, but make a
+// wrapper over one to continue testing this 
 public enum EmptyEnum {}
+
+public struct EmptyEnumWrapper<T> {
+  public var value: T
+}
 
 public enum NoPayloadEnum {
   case A
@@ -194,7 +200,7 @@ public enum MultiPayloadGenericDynamic<T, U> {
 }
 
 public struct EnumStruct {
-  public let empty: EmptyEnum
+  public let empty: EmptyEnumWrapper<EmptyEnum>
   public let noPayload: NoPayloadEnum
   public let sillyNoPayload: SillyNoPayloadEnum
   public let singleton: SingletonEnum

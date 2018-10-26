@@ -6,4 +6,5 @@ struct Bar<A1, A2> {
 }
 
 enum Foo<A>{
+  case bar
 }

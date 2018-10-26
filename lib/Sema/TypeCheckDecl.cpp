@@ -2461,6 +2461,25 @@ public:
       }
     }
 
+    // Reject variable if it is a stored property with an uninhabited type
+    if (VD->hasStorage() && 
+        VD->getInterfaceType()->isStructurallyUninhabited()) {
+      auto uninhabitedTypeDiag = diag::pattern_no_uninhabited_type;
+      
+      if (VD->getInterfaceType()->is<TupleType>()) {
+        uninhabitedTypeDiag = diag::pattern_no_uninhabited_tuple_type;
+      } else {
+        assert((VD->getInterfaceType()->is<EnumType>() || 
+                VD->getInterfaceType()->is<BoundGenericEnumType>()) && 
+          "unknown structurally uninhabited type");
+      }
+          
+      TC.diagnose(VD->getLoc(), uninhabitedTypeDiag, VD->isLet(),
+                  VD->isInstanceMember(), VD->getName(),
+                  VD->getInterfaceType());
+      VD->markInvalid();
+    }
+
     if (!checkOverrides(VD)) {
       // If a property has an override attribute but does not override
       // anything, complain.

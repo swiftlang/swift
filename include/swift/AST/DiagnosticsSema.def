@@ -1367,6 +1367,15 @@ ERROR(pattern_binds_no_variables,none,
       "variables",
       (unsigned))
 
+ERROR(pattern_no_uninhabited_type,none,
+      "%select{%select{variable|constant}0|stored property}1 %2 cannot have "
+      "enum type %3 with no cases",
+      (bool, bool, Identifier, Type))
+ERROR(pattern_no_uninhabited_tuple_type,none,
+      "%select{%select{variable|constant}0|stored property}1 %2 cannot have "
+      "tuple type %3 containing enum with no cases",
+      (bool, bool, Identifier, Type))
+
 ERROR(nscoding_unstable_mangled_name,none,
       "%select{private|fileprivate|nested|local}0 class %1 has an "
       "unstable name when archiving via 'NSCoding'",
