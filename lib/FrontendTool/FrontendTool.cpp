@@ -37,6 +37,7 @@
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Edit.h"
+#include "swift/Basic/ExperimentalDependencies.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/LLVMContext.h"
@@ -763,10 +764,16 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
     const std::string &referenceDependenciesFilePath =
         Invocation.getReferenceDependenciesFilePathForPrimary(
             SF->getFilename());
-    if (!referenceDependenciesFilePath.empty())
-      (void)emitReferenceDependencies(Instance.getASTContext().Diags, SF,
-                                      *Instance.getDependencyTracker(),
-                                      referenceDependenciesFilePath);
+    if (!referenceDependenciesFilePath.empty()) {
+      if (Invocation.getLangOptions().EnableExperimentalDependencies)
+        (void)experimental_dependencies::emitReferenceDependencies(
+            Instance.getASTContext().Diags, SF,
+            *Instance.getDependencyTracker(), referenceDependenciesFilePath);
+      else
+        (void)emitReferenceDependencies(Instance.getASTContext().Diags, SF,
+                                        *Instance.getDependencyTracker(),
+                                        referenceDependenciesFilePath);
+    }
   }
 }
 

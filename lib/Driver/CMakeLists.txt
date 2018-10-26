@@ -4,6 +4,7 @@ set(swiftDriver_sources
   DarwinToolChains.cpp
   DependencyGraph.cpp
   Driver.cpp
+  ExperimentalDependencyDriverGraph.cpp
   FrontendUtil.cpp
   Job.cpp
   ParseableOutput.cpp

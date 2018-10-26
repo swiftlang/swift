@@ -14,6 +14,7 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
+#include "swift/Basic/ExperimentalDependencies.h"
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/STLExtras.h"
@@ -24,6 +25,7 @@
 #include "swift/Driver/Action.h"
 #include "swift/Driver/DependencyGraph.h"
 #include "swift/Driver/Driver.h"
+#include "swift/Driver/ExperimentalDependencyDriverGraph.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/ParseableOutput.h"
 #include "swift/Driver/ToolChain.h"
@@ -206,15 +208,21 @@ namespace driver {
     /// Jobs that incremental-mode has decided it can skip.
     CommandSet DeferredCommands;
 
-    /// Jobs in the initial set with Condition::Always, or lacking existing
+    /// Jobs in the initial set with Condition::Always, or lacking an existing
     /// .swiftdeps files.
+    /// Set by scheduleInitialJobs and used only by scheduleAdditionalJobs.
     SmallVector<const Job *, 16> InitialOutOfDateCommands;
 
+  public:
     /// Dependency graph for deciding which jobs are dirty (need running)
     /// or clean (can be skipped).
     using DependencyGraph = DependencyGraph<const Job *>;
-    DependencyGraph DepGraph;
+    DependencyGraph StandardDepGraph;
 
+    /// Experimental Dependency graph for finer-grained dependencies
+    Optional<experimental_dependencies::DriverGraph> ExpDepGraph;
+
+  private:
     /// Helper for tracing the propagation of marks in the graph.
     DependencyGraph::MarkTracer ActualIncrementalTracer;
     DependencyGraph::MarkTracer *IncrementalTracer = nullptr;
@@ -382,14 +390,15 @@ namespace driver {
       DeferredCommands.clear();
     }
 
-    /// Helper that attmepts to reload a job's .swiftdeps file after the job
+    /// Helper that attempts to reload a job's .swiftdeps file after the job
     /// exits, and re-run transitive marking to ensure everything is properly
     /// invalidated by any new dependency edges introduced by it. If reloading
     /// fails, this can cause deferred jobs to be immediately scheduled.
-    template <unsigned N>
+    template <unsigned N, typename DependencyGraphT>
     void reloadAndRemarkDeps(const Job *FinishedCmd,
                              int ReturnCode,
-                             SmallVector<const Job *, N> &Dependents) {
+                             SmallVector<const Job *, N> &Dependents,
+                             DependencyGraphT &DepGraph) {
       const CommandOutput &Output = FinishedCmd->getOutput();
       StringRef DependenciesFile =
           Output.getAdditionalOutputForType(file_types::TY_SwiftDeps);
@@ -581,7 +590,12 @@ namespace driver {
       // Do this whether or not the build succeeded.
       SmallVector<const Job *, 16> Dependents;
       if (Comp.getIncrementalBuildEnabled()) {
-        reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents);
+        if (Comp.getEnableExperimentalDependencies())
+          reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents,
+                              ExpDepGraph.getValue());
+        else
+          reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents,
+                              StandardDepGraph);
       }
 
       if (ReturnCode != EXIT_SUCCESS) {
@@ -674,12 +688,27 @@ namespace driver {
     PerformJobsState(Compilation &Comp, std::unique_ptr<TaskQueue> &&TaskQueue)
       : Comp(Comp), ActualIncrementalTracer(Comp.getStatsReporter()),
         TQ(std::move(TaskQueue)) {
-      if (Comp.getShowIncrementalBuildDecisions() || Comp.getStatsReporter())
+      if (Comp.getEnableExperimentalDependencies())
+        ExpDepGraph.emplace(experimental_dependencies::DriverGraph());
+      else if (Comp.getShowIncrementalBuildDecisions() ||
+               Comp.getStatsReporter())
         IncrementalTracer = &ActualIncrementalTracer;
     }
 
+    /// Schedule and run initial, additional, and batch jobs.
+    template <typename DependencyGraphT>
+    void runJobs(DependencyGraphT &DepGraph) {
+      scheduleInitialJobs(DepGraph);
+      scheduleAdditionalJobs(DepGraph);
+      formBatchJobsAndAddPendingJobsToTaskQueue();
+      runTaskQueueToCompletion();
+      checkUnfinishedJobs(DepGraph);
+    }
+
+  private:
     /// Schedule all jobs we can from the initial list provided by Compilation.
-    void scheduleInitialJobs() {
+    template <typename DependencyGraphT>
+    void scheduleInitialJobs(DependencyGraphT &DepGraph) {
       for (const Job *Cmd : Comp.getJobs()) {
         if (!Comp.getIncrementalBuildEnabled()) {
           scheduleCommandIfNecessaryAndPossible(Cmd);
@@ -707,6 +736,12 @@ namespace driver {
               Condition = Cmd->getCondition();
               break;
             case DependencyGraphImpl::LoadResult::AffectsDownstream:
+              if (Comp.getEnableExperimentalDependencies()) {
+                // The experimental graph reports a change, since it lumps new
+                // files together with new "Provides".
+                Condition = Cmd->getCondition();
+                break;
+              }
               llvm_unreachable("we haven't marked anything in this graph yet");
             }
           }
@@ -733,7 +768,8 @@ namespace driver {
     }
 
     /// Schedule transitive closure of initial jobs, and external jobs.
-    void scheduleAdditionalJobs() {
+    template <typename DependencyGraphT>
+    void scheduleAdditionalJobs(DependencyGraphT &DepGraph) {
       if (Comp.getIncrementalBuildEnabled()) {
         SmallVector<const Job *, 16> AdditionalOutOfDateCommands;
 
@@ -1099,7 +1135,8 @@ namespace driver {
       } while (Result == 0 && TQ->hasRemainingTasks());
     }
 
-    void checkUnfinishedJobs() {
+    template <typename DependencyGraphT>
+    void checkUnfinishedJobs(DependencyGraphT &DepGraph) {
       if (Result == 0) {
         assert(BlockingCommands.empty() &&
                "some blocking commands never finished properly");
@@ -1127,6 +1164,7 @@ namespace driver {
       }
     }
 
+  public:
     void populateInputInfoMap(InputInfoMap &inputs) const {
       for (auto &entry : UnfinishedCommands) {
         for (auto *action : entry.first->getSource().getInputs()) {
@@ -1338,11 +1376,10 @@ int Compilation::performJobsImpl(bool &abnormalExit,
                                  std::unique_ptr<TaskQueue> &&TQ) {
   PerformJobsState State(*this, std::move(TQ));
 
-  State.scheduleInitialJobs();
-  State.scheduleAdditionalJobs();
-  State.formBatchJobsAndAddPendingJobsToTaskQueue();
-  State.runTaskQueueToCompletion();
-  State.checkUnfinishedJobs();
+  if (getEnableExperimentalDependencies())
+    State.runJobs(State.ExpDepGraph.getValue());
+  else
+    State.runJobs(State.StandardDepGraph);
 
   if (!CompilationRecordPath.empty()) {
     InputInfoMap InputInfo;
