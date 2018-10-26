@@ -53,7 +53,6 @@ internal class __SwiftNativeNSArrayWithContiguousStorage
   deinit {}
 
   // Operate on our contiguous storage
-  @inlinable
   internal func withUnsafeBufferOfObjects<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
@@ -146,7 +145,6 @@ extension __SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   // operations on it.
   //
   // Do not access this property directly.
-  @usableFromInline
   @nonobjc
   internal var _heapBufferBridged_DoNotUse: AnyObject?
 
@@ -156,14 +154,12 @@ extension __SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   @nonobjc
   internal let _nativeStorage: __ContiguousArrayStorageBase
 
-  @inlinable
   @nonobjc
   internal var _heapBufferBridgedPtr: UnsafeMutablePointer<AnyObject?> {
     return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
       to: Optional<AnyObject>.self)
   }
 
-  @inlinable
   internal var _heapBufferBridged: _BridgingBufferStorage? {
     if let ref =
       _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
@@ -178,7 +174,6 @@ extension __SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
     self._nativeStorage = _nativeStorage
   }
 
-  @inlinable
   internal func _destroyBridgedStorage(_ hb: _BridgingBufferStorage?) {
     if let bridgedStorage = hb {
       let buffer = _BridgingBuffer(bridgedStorage)
@@ -187,12 +182,10 @@ extension __SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   deinit {
     _destroyBridgedStorage(_heapBufferBridged)
   }
 
-  @inlinable
   internal override func withUnsafeBufferOfObjects<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
@@ -281,7 +274,6 @@ internal class __ContiguousArrayStorageBase
   }
   
 #if _runtime(_ObjC)
-  @inlinable
   internal override func withUnsafeBufferOfObjects<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
@@ -295,7 +287,6 @@ internal class __ContiguousArrayStorageBase
   /// If the stored type is bridged verbatim, invoke `body` on an
   /// `UnsafeBufferPointer` to the elements and return the result.
   /// Otherwise, return `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   internal func _withVerbatimBridgedUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R? {
@@ -303,14 +294,12 @@ internal class __ContiguousArrayStorageBase
       "Concrete subclasses must implement _withVerbatimBridgedUnsafeBuffer")
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @nonobjc
   internal func _getNonVerbatimBridgedCount() -> Int {
     _sanityCheckFailure(
       "Concrete subclasses must implement _getNonVerbatimBridgedCount")
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal func _getNonVerbatimBridgingBuffer() -> _BridgingBuffer {
     _sanityCheckFailure(
       "Concrete subclasses must implement _getNonVerbatimBridgingBuffer")
