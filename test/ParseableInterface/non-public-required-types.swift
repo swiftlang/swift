@@ -1,109 +1,109 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -typecheck -emit-parseable-module-interface-path %t.swiftinterface %s -disable-objc-attr-requires-foundation-module
-// RUN: %FileCheck %s < %t.swiftinterface
+// RUN: %FileCheck %s -check-prefix COMMON -check-prefix NONRESILIENT < %t.swiftinterface
 
 // RUN: %target-swift-frontend -typecheck -emit-parseable-module-interface-path %t-resilient.swiftinterface -enable-resilience %s -disable-objc-attr-requires-foundation-module
-// RUN: %FileCheck %s < %t-resilient.swiftinterface
+// RUN: %FileCheck %s -check-prefix COMMON -implicit-check-not NONRESILIENT< %t-resilient.swiftinterface
 
 // RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule %t.swiftinterface -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -module-name Test -emit-parseable-module-interface-path - | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/Test.swiftmodule -module-name Test -emit-parseable-module-interface-path - | %FileCheck %s -check-prefix COMMON -check-prefix NONRESILIENT
 
 // RUN: %target-swift-frontend -emit-module -o %t/TestResilient.swiftmodule -enable-resilience %t.swiftinterface -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/TestResilient.swiftmodule -module-name TestResilient -enable-resilience -emit-parseable-module-interface-path - -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules %t/TestResilient.swiftmodule -module-name TestResilient -enable-resilience -emit-parseable-module-interface-path - -disable-objc-attr-requires-foundation-module | %FileCheck %s -check-prefix COMMON -implicit-check-not NONRESILIENT
 
 
-// CHECK: internal struct GenericStruct<T> {
+// COMMON: internal struct GenericStruct<T> {
 internal struct GenericStruct<T> {
-  // CHECK-NEXT: internal let _: T
+  // COMMON-NEXT: internal let _: T
   internal let x: T
 
-  // CHECK-NOT: internal func shouldNotAppear()
+  // COMMON-NOT: internal func shouldNotAppear()
   internal func shouldNotAppear() {}
 
-// CHECK: }
+// COMMON: }
 }
 
-// CHECK: internal struct UsedFromGenericEnum {
-// CHECK-NEXT: }
+// COMMON: internal struct UsedFromGenericEnum {
+// COMMON-NEXT: }
 internal struct UsedFromGenericEnum {}
 
-// CHECK: internal enum GenericEnum<T> {
+// COMMON: internal enum GenericEnum<T> {
 internal enum GenericEnum<T> {
-  // CHECK-NEXT: case a(T)
-  // CHECK-NEXT: case c(T)
+  // COMMON-NEXT: case a(T)
+  // COMMON-NEXT: case c(T)
   case a(T), c(T)
 
-  // CHECK-NEXT: case b({{.*}}UsedFromGenericEnum)
+  // COMMON-NEXT: case b({{.*}}UsedFromGenericEnum)
   case b(UsedFromGenericEnum)
 
-  // CHECK-NOT: internal func notExposed()
+  // COMMON-NOT: internal func notExposed()
   internal func notExposed() {}
 
-// CHECK-NEXT: }
+// COMMON-NEXT: }
 }
 
-// CHECK: private struct OnlyReferencedFromPrivateType {
-// CHECK-NEXT: }
+// COMMON: private struct OnlyReferencedFromPrivateType {
+// COMMON-NEXT: }
 private struct OnlyReferencedFromPrivateType {}
 
-// CHECK: @_fixed_layout public class Foo {
+// COMMON: @_fixed_layout public class Foo {
 @_fixed_layout
 public class Foo {
-  // CHECK-NEXT: internal typealias MyCustomInt = {{.*}}Int
+  // COMMON-NEXT: internal typealias MyCustomInt = {{.*}}Int
   internal typealias MyCustomInt = Int
-  // CHECK-NEXT: internal typealias MyCustomBool = {{.*}}Bool
+  // COMMON-NEXT: internal typealias MyCustomBool = {{.*}}Bool
   internal typealias MyCustomBool = Bool
-  // CHECK-NEXT: internal typealias MyCustomTuple = ({{.*}}MyCustomInt, {{.*}}MyCustomBool)
+  // COMMON-NEXT: internal typealias MyCustomTuple = ({{.*}}MyCustomInt, {{.*}}MyCustomBool)
   internal typealias MyCustomTuple = (MyCustomInt, MyCustomBool)
-  // CHECK-NEXT: internal typealias MyCustomString = {{.*}}String
+  // COMMON-NEXT: internal typealias MyCustomString = {{.*}}String
   internal typealias MyCustomString = String
-  // CHECK-NOT: internal typealias NotReferenced = {{.*}}String
+  // COMMON-NOT: internal typealias NotReferenced = {{.*}}String
   internal typealias NotReferenced = String
 
-  // CHECK: private class Bar {
+  // COMMON: private class Bar {
   private class Bar {
-    // CHECK-NEXT: private let _: {{.*}}MyCustomInt
+    // COMMON-NEXT: private let _: {{.*}}MyCustomInt
     private let x: MyCustomInt
 
-    // CHECK-NEXT: private let _: [{{.*}}MyCustomTuple]
+    // COMMON-NEXT: private let _: [{{.*}}MyCustomTuple]
     private let y: [MyCustomTuple]
 
-    // CHECK-NEXT: private let _: {{.*}}OnlyReferencedFromPrivateType
+    // COMMON-NEXT: private let _: {{.*}}OnlyReferencedFromPrivateType
     private let z: OnlyReferencedFromPrivateType
 
-    // CHECK-NOT: internal func shouldNotAppear(_ type: {{.*}}NotReferenced)
+    // COMMON-NOT: internal func shouldNotAppear(_ type: {{.*}}NotReferenced)
     internal func shouldNotAppear(_ type: NotReferenced) {}
 
-    // CHECK-NOT: init
+    // COMMON-NOT: init
     init() {
       self.x = 0
       self.y = []
       self.z = OnlyReferencedFromPrivateType()
     }
 
-  // CHECK: }
+  // COMMON: }
   }
 
-  // CHECK-NEXT: private let _: {{.*}}Bar
+  // COMMON-NEXT: private let _: {{.*}}Bar
   private let privateLet: Bar
 
-  // CHECK-NEXT: internal var _: ({{.*}}MyCustomInt, {{.*}}MyCustomInt)
+  // COMMON-NEXT: internal var _: ({{.*}}MyCustomInt, {{.*}}MyCustomInt)
   internal var internalVar: (MyCustomInt, MyCustomInt)
 
-  // CHECK-NEXT: private var _: {{.*}}GenericStruct<{{.*}}MyCustomString>
+  // COMMON-NEXT: private var _: {{.*}}GenericStruct<{{.*}}MyCustomString>
   private var privateVar: GenericStruct<MyCustomString>
 
-  // CHECK-NEXT: private var privateVarHasInitialValue: {{.*}}MyCustomInt = 0
+  // COMMON-NEXT: private var privateVarHasInitialValue: {{.*}}MyCustomInt = 0
   private var privateVarHasInitialValue: MyCustomInt = 0
 
-  // CHECK-NEXT: public var publicVar: {{.*}}Int
+  // COMMON-NEXT: public var publicVar: {{.*}}Int
   public var publicVar: Int
 
-  // CHECK-NEXT: private var _: {{.*}}GenericEnum<{{.*}}MyCustomInt>
+  // COMMON-NEXT: private var _: {{.*}}GenericEnum<{{.*}}MyCustomInt>
   private var privateEnumVar: GenericEnum<MyCustomInt>
 
-  // CHECK-NOT: {{^}}  init
+  // COMMON-NOT: {{^}}  init
   init() {
     self.privateLet = Bar()
     self.internalVar = (0, 0)
@@ -112,48 +112,95 @@ public class Foo {
     self.privateEnumVar = .a(0)
   }
 
-// CHECK: }
+// COMMON: }
 }
 
-// CHECK: private protocol InheritedProtocol {
-// CHECK-NEXT: }
+// COMMON: private protocol InheritedProtocol {
+// COMMON-NEXT: }
 private protocol InheritedProtocol {
 }
 
-// CHECK: private protocol UsableAsExistential : InheritedProtocol {
-// CHECK-NEXT: }
+// COMMON: private protocol UsableAsExistential : InheritedProtocol {
+// COMMON-NEXT: }
 private protocol UsableAsExistential: InheritedProtocol {
 }
 
-// CHECK: @objc private protocol ObjCUsableAsExistential {
-// CHECK-NEXT: }
+// COMMON: @objc private protocol ObjCUsableAsExistential {
+// COMMON-NEXT: }
 @objc private protocol ObjCUsableAsExistential {
 }
 
-// CHECK: private protocol ClassUsableAsExistential : AnyObject {
-// CHECK-NEXT: }
+// COMMON: private protocol ClassUsableAsExistential : AnyObject {
+// COMMON-NEXT: }
 private protocol ClassUsableAsExistential: class {
   func foo()
 }
 
-// CHECK: @objc @_fixed_layout public class ContainsExistentials {
+// COMMON: internal protocol CompositionA {
+// COMMON-NEXT: }
+internal protocol CompositionA {
+}
+
+// COMMON: internal protocol CompositionB {
+// COMMON-NEXT: }
+internal protocol CompositionB {
+}
+
+// COMMON-NOT: internal protocol NeverReferenced {
+// COMMON-NOT: }
+internal protocol NeverReferenced {
+}
+
+// COMMON: @objc @_fixed_layout public class ContainsExistentials {
 @objc
 @_fixed_layout
 public class ContainsExistentials {
-// CHECK-NEXT: private var _: UsableAsExistential
+// COMMON-NEXT: private var _: UsableAsExistential
   private var existential: UsableAsExistential
 
-// CHECK-NEXT: private var _: ObjCUsableAsExistential
+// COMMON-NEXT: private var _: ObjCUsableAsExistential
   private var objcExistential: ObjCUsableAsExistential
 
-// CHECK-NEXT: private var _: ClassUsableAsExistential
+// COMMON-NEXT: private var _: ClassUsableAsExistential
   private var classExistential: ClassUsableAsExistential
 
-// CHECK-NOT: private init(a: UsableAsExistential, b: ObjCUsableAsExistential, c: ClassUsableAsExistential)
-  private init(a: UsableAsExistential, b: ObjCUsableAsExistential, c: ClassUsableAsExistential) {
+// COMMON-NEXT: private var _: CompositionA & CompositionB
+  private var composition: CompositionA & CompositionB
+
+// COMMON-NOT: private init
+  private init(a: UsableAsExistential, b: ObjCUsableAsExistential,
+               c: ClassUsableAsExistential, d: CompositionA & CompositionB) {
     existential = a
     objcExistential = b
     classExistential = c
+    composition = d
   }
-// CHECK: }
+// COMMON: }
+}
+
+// NONRESILIENT: internal protocol GenericConstraint {
+// NONRESILIENT-NEXT: }
+internal protocol GenericConstraint {
+}
+
+// NONRESILIENT: internal class Superclass {
+// NONRESILIENT-NEXT: }
+internal class Superclass {
+}
+
+// NONRESILIENT: internal class HasConstraint<T> : {{.*}}Superclass where T : GenericConstraint {
+// NONRESILIENT-NEXT: }
+internal class HasConstraint<T: GenericConstraint> : Superclass {
+}
+
+// NONRESILIENT: internal struct SatisfiesConstraint : GenericConstraint {
+// NONRESILIENT-NEXT: }
+internal struct SatisfiesConstraint: GenericConstraint {
+}
+
+// COMMON: public struct HasGenericClassMember {
+public struct HasGenericClassMember {
+  // NONRESILIENT: internal let _: {{.*}}HasConstraint<{{.*}}SatisfiesConstraint>
+  internal let member: HasConstraint<SatisfiesConstraint>
+// COMMON: }
 }

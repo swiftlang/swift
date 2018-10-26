@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -76,8 +76,6 @@ class FindReferencedNonPublicTypeDecls: public ASTWalker {
         addIfNonPublic(nominal->getDecl());
       if (auto enumType = dyn_cast<EnumType>(type.getPointer()))
         addIfNonPublic(enumType->getDecl());
-      if (auto protocol = dyn_cast<ProtocolType>(type.getPointer()))
-        addIfNonPublic(protocol->getDecl());
       if (auto alias = dyn_cast<NameAliasType>(type.getPointer())) {
         // Add the typealias to the found decls
         auto decl = alias->getDecl();
@@ -119,30 +117,40 @@ public:
   void visitEnumElementDecl(EnumElementDecl *decl) {
     auto params = decl->getParameterList();
     if (!params) return;
-    for (auto param : params->getArray()) {
+    for (auto param : *params) {
       param->getInterfaceType().walk(findTypeDecls);
     }
   }
 
-  void visitProtocolDecl(ProtocolDecl *decl) {
-    for (auto inherited : decl->getInheritedProtocols())
-      inherited->getInterfaceType().walk(findTypeDecls);
+  void visitNominalTypeDecl(NominalTypeDecl *decl) {
+    for (auto inherited : decl->getInherited())
+      inherited.getType().walk(findTypeDecls);
+    for (auto requirement : decl->getGenericRequirements()) {
+      requirement.getFirstType().walk(findTypeDecls);
+      if (requirement.getKind() != RequirementKind::Layout)
+        requirement.getSecondType().walk(findTypeDecls);
+    }
   }
 
   bool walkToDeclPre(Decl *decl) {
+    // If we see an abstract storage decl that contributes to
+    // type layout, walk into its interface type.
     if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
       visitAbstractStorageDecl(storage);
       return false;
     }
 
+    // If we see an enum element, walk into its associated values.
     if (auto enumElement = dyn_cast<EnumElementDecl>(decl)) {
       visitEnumElementDecl(enumElement);
       return false;
     }
 
-    if (auto protocol = dyn_cast<ProtocolDecl>(decl)) {
-      visitProtocolDecl(protocol);
-      return false;
+    // If we see a nominal type decl, walk its inherited types and generic
+    // requirements, and continue walking into it children.
+    if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+      visitNominalTypeDecl(nominal);
+      return true;
     }
 
     // Don't walk into function bodies
