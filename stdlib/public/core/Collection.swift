@@ -634,7 +634,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
 
   // FIXME(move-only types): `first` might not be implementable by collections
   // with move-only elements, since they would need to be able to somehow form
-  // a temporary `Optional<Element>` value from a nonoptional Element without
+  // a temporary `Optional<Element>` value from a non-optional Element without
   // modifying the collection.
 
   /// The first element of the collection.

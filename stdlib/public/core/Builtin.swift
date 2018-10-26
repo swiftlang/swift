@@ -735,7 +735,7 @@ func _trueAfterDiagnostics() -> Builtin.Int1 {
 /// particularly when the dynamic type is different from the static type. The
 /// *static type* of a value is the known, compile-time type of the value. The
 /// *dynamic type* of a value is the value's actual type at run-time, which
-/// can be nested inside its concrete type.
+/// can be a subtype of its concrete type.
 ///
 /// In the following code, the `count` variable has the same static and dynamic
 /// type: `Int`. When `count` is passed to the `printInfo(_:)` function,
