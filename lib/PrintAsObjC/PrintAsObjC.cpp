@@ -943,12 +943,6 @@ private:
                                              nullptr,
                                              SourceLoc(),
                                              UnqualifiedLookup::Flags::TypeLookup);
-        if (specificTypeLookup.getSingleTypeResult()) {
-          fprintf(stderr, "Declared type : %s\n", typeDecl->getDeclaredInterfaceType()->getStringAsComponent().data());
-          fprintf(stderr, "Looked up type : %s\n", specificTypeLookup.getSingleTypeResult()->getDeclaredInterfaceType()->getStringAsComponent().data());
-          fprintf(stderr, "Result %d\n", specificTypeLookup.getSingleTypeResult()->getDeclaredInterfaceType()->matches(typeDecl->getDeclaredInterfaceType(), matchMode));
-          fprintf(stderr, "Result %d\n", typeDecl->getDeclaredInterfaceType()->matches(specificTypeLookup.getSingleTypeResult()->getDeclaredInterfaceType(), matchMode));
-        }
         if (!specificTypeLookup.getSingleTypeResult()) {
           renamedDecl = nullptr;
           goto printing_rename_attribute;
