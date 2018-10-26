@@ -138,8 +138,21 @@ public:
 
   void visitFuncDecl(FuncDecl *func) {
     assert(!isa<AccessorDecl>(func));
-    if (SILDeclRef::requiresNewWitnessTableEntry(func))
-      asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
+    // SWIFT_ENABLE_TENSORFLOW
+    if (!SILDeclRef::requiresNewWitnessTableEntry(func))
+      return;
+
+    asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
+
+    // TODO: Handle multiple @differentiable attributes.
+    // TODO: The primal/adjoint aren't generated yet, so this currently only
+    // works for custom primal/adjoint.
+    if (func->getAttrs().hasAttribute<DifferentiableAttr>()) {
+      asDerived().addMethod(SILDeclRef::getDifferentiationFunc(
+          func, DifferentiationFuncId(DifferentiationFuncId::Kind::Primal)));
+      asDerived().addMethod(SILDeclRef::getDifferentiationFunc(
+          func, DifferentiationFuncId(DifferentiationFuncId::Kind::Adjoint)));
+    }
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {

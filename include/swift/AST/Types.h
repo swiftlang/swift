@@ -3032,7 +3032,10 @@ public:
   unsigned getNumParams() const { return Bits.AnyFunctionType.NumParams; }
 
   GenericSignature *getOptGenericSignature() const;
-  
+
+  // SWIFT_ENABLE_TENSORFLOW
+  AnyFunctionType *getAdjointType();
+
   ExtInfo getExtInfo() const {
     return ExtInfo(Bits.AnyFunctionType.ExtInfo);
   }

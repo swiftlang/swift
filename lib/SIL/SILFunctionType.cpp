@@ -1392,6 +1392,8 @@ static CanSILFunctionType getNativeSILFunctionType(
                                 DefaultAllocatorConventions(), ForeignInfo(),
                                 origConstant, constant, reqtSubs,
                                 witnessMethodConformance);
+    // SWIFT_ENABLE_TENSORFLOW
+    case SILDeclRef::Kind::DifferentiationFunc:
     case SILDeclRef::Kind::Func:
       // If we have a setter, use the special setter convention. This ensures
       // that we take normal parameters at +1.
@@ -1900,6 +1902,8 @@ static SelectorFamily getSelectorFamily(Identifier name) {
 static SelectorFamily getSelectorFamily(SILDeclRef c) {
   assert(c.isForeign);
   switch (c.kind) {
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILDeclRef::Kind::DifferentiationFunc:
   case SILDeclRef::Kind::Func: {
     if (!c.hasDecl())
       return SelectorFamily::None;
@@ -2181,6 +2185,8 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     case SILDeclRef::Kind::StoredPropertyInitializer:
       return SILFunctionTypeRepresentation::Thin;
 
+    // SWIFT_ENABLE_TENSORFLOW
+    case SILDeclRef::Kind::DifferentiationFunc:
     case SILDeclRef::Kind::Func:
       if (c.getDecl()->getDeclContext()->isTypeContext())
         return SILFunctionTypeRepresentation::Method;
@@ -2237,7 +2243,7 @@ const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
     ::getUncachedSILFunctionTypeForConstant(M, constant,
                                             loweredInterfaceType);
 
-  LLVM_DEBUG(llvm::dbgs() << "lowering type for constant ";
+  llvm::dbgs() << "lowering type for constant ";
              constant.print(llvm::dbgs());
              llvm::dbgs() << "\n  formal type: ";
              formalInterfaceType.print(llvm::dbgs());
@@ -2245,7 +2251,7 @@ const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
              loweredInterfaceType.print(llvm::dbgs());
              llvm::dbgs() << "\n  SIL type: ";
              silFnType.print(llvm::dbgs());
-             llvm::dbgs() << "\n");
+             llvm::dbgs() << "\n";
 
   auto resultBuf = M.allocate(sizeof(SILConstantInfo),
                               alignof(SILConstantInfo));
@@ -2260,6 +2266,7 @@ const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
   auto inserted = ConstantTypes.insert({constant, result});
   assert(inserted.second);
   (void)inserted;
+  llvm::dbgs() << "i am here\n";
   return *result;
 }
 
@@ -2703,6 +2710,8 @@ TypeConverter::getBridgedFunctionType(AbstractionPattern pattern,
 
 static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   switch (declRef.kind) {
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILDeclRef::Kind::DifferentiationFunc:
   case SILDeclRef::Kind::Func:
   case SILDeclRef::Kind::Allocator:
   case SILDeclRef::Kind::Initializer:
@@ -2762,6 +2771,9 @@ getAbstractionPatternForConstant(ASTContext &ctx, SILDeclRef constant,
 TypeConverter::LoweredFormalTypes
 TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
                                      CanAnyFunctionType fnType) {
+  llvm::dbgs() << "getLoweredFormalTypes " << constant << "\n";
+  fnType->dump();
+
   unsigned numParameterLists = constant.getParameterListCount();
   auto extInfo = fnType->getExtInfo();
 
@@ -2863,6 +2875,8 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
                             llvm::makeArrayRef(bridgedParams),
                             bridgedResultType,
                             extInfo);
+
+  llvm::dbgs() << "done getLoweredFormalTypes\n";
 
   return { bridgingFnPattern, uncurried };
 }

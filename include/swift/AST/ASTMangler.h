@@ -16,6 +16,7 @@
 #include "swift/Basic/Mangler.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/SIL/SILDeclRef.h"
 
 namespace clang {
 class NamedDecl;
@@ -112,6 +113,11 @@ public:
 
   std::string mangleClosureWitnessThunk(const ProtocolConformance *Conformance,
                                         const AbstractClosureExpr *Closure);
+
+  std::string mangleDifferentiationFuncWitnessThunk(
+      const ProtocolConformance *Conformance,
+      const ValueDecl *Requirement,
+      const DifferentiationFuncId differentiationFuncId);
 
   std::string mangleBehaviorInitThunk(const VarDecl *decl);
 

@@ -70,6 +70,22 @@ enum ForDefinition_t : bool {
   ForDefinition = true
 };
 
+struct DifferentiationFuncId {
+  enum class Kind : unsigned {
+    Primal,
+    Adjoint
+  };
+
+  Kind kind : 1;
+
+  DifferentiationFuncId() : kind(Kind::Primal) {}
+  DifferentiationFuncId(Kind kind) : kind(kind) {}
+
+  bool operator==(DifferentiationFuncId rhs) const {
+    return kind == rhs.kind;
+  }
+};
+
 /// \brief A key for referencing a Swift declaration in SIL.
 ///
 /// This can currently be either a reference to a ValueDecl for functions,
@@ -133,8 +149,12 @@ struct SILDeclRef {
     /// routines have an ivar destroyer, which is emitted as
     /// .cxx_destruct.
     IVarDestroyer,
+
+    // SWIFT_ENABLE_TENSORFLOW
+    /// TODO: Document
+    DifferentiationFunc,
   };
-  
+
   /// The ValueDecl or AbstractClosureExpr represented by this SILDeclRef.
   Loc loc;
   /// The Kind of this SILDeclRef.
@@ -148,17 +168,23 @@ struct SILDeclRef {
   unsigned isDirectReference : 1;
   /// The default argument index for a default argument getter.
   unsigned defaultArgIndex : 10;
-  
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // TODO: Document
+  // TODO: Can probably form some sort of union with `defaultArgIndex` because
+  // we never need both at the same time.
+  DifferentiationFuncId differentiationFuncId;
+
   /// Produces a null SILDeclRef.
   SILDeclRef() : loc(), kind(Kind::Func),
                  isCurried(0), isForeign(0), isDirectReference(0),
-                 defaultArgIndex(0) {}
-  
+                 defaultArgIndex(0), differentiationFuncId() {}
+
   /// Produces a SILDeclRef of the given kind for the given decl.
   explicit SILDeclRef(ValueDecl *decl, Kind kind,
                       bool isCurried = false,
                       bool isForeign = false);
-  
+
   /// Produces a SILDeclRef for the given ValueDecl or
   /// AbstractClosureExpr:
   /// - If 'loc' is a func or closure, this returns a Func SILDeclRef.
@@ -181,6 +207,14 @@ struct SILDeclRef {
 
   /// Produce a SIL constant for a default argument generator.
   static SILDeclRef getDefaultArgGenerator(Loc loc, unsigned defaultArgIndex);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Produce a SIL constant for a DifferentiationFunc.
+  static SILDeclRef getDifferentiationFunc(
+      Loc loc, DifferentiationFuncId differentiationFuncId);
+
+  // TODO: Document
+  SILDeclRef forWitnessDecl(ValueDecl *witnessDecl);
 
   bool isNull() const { return loc.isNull(); }
   explicit operator bool() const { return !isNull(); }
@@ -284,7 +318,8 @@ struct SILDeclRef {
       && isCurried == rhs.isCurried
       && isForeign == rhs.isForeign
       && isDirectReference == rhs.isDirectReference
-      && defaultArgIndex == rhs.defaultArgIndex;
+      && defaultArgIndex == rhs.defaultArgIndex
+      && differentiationFuncId == rhs.differentiationFuncId;
   }
   bool operator!=(SILDeclRef rhs) const {
     return !(*this == rhs);

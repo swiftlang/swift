@@ -816,22 +816,33 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
       auto silOriginalFn = getFunction(SILDeclRef(AFD), ForDefinition);
       // Either only adjoint is specified, or both primal and adjoint are
       // spcified.
-      StringRef primName, adjName;
+      SILFunction *primSilFn = nullptr, *adjSilFn = nullptr;
       bool hasPrimitiveAdjoint = false;
       if (auto *primFn = diffAttr->getPrimalFunction())
-        primName = getFunction(SILDeclRef(primFn), ForDefinition)->getName();
+        primSilFn = getFunction(SILDeclRef(primFn), ForDefinition);
       if (auto *adjointFn = diffAttr->getAdjointFunction()) {
         // If the adjoint is specified but the primal is not, then we treat the
         // original as the primal.
-        if (primName.empty())
-          primName = silOriginalFn->getName();
-        adjName = getFunction(SILDeclRef(adjointFn), ForDefinition)->getName();
+        if (!primSilFn)
+          primSilFn = silOriginalFn;
+        adjSilFn = getFunction(SILDeclRef(adjointFn), ForDefinition);
         hasPrimitiveAdjoint = true;
       }
       else {
-        assert(primName.empty() &&
+        assert(!primSilFn &&
                "Primal cannot be present if adjoint is not");
       }
+
+      // Register the primal and adjoint as "emitted" so that we find them when
+      // we look them up by SILDeclRef::getDifferentiationFunc(origFn, ...).
+      // TODO: We should emit blank primal and adjoints here if they're not
+      // user-specified, so that these lookups also work for non-user-specified
+      // functions.
+      if (primSilFn)
+        emittedFunctions[SILDeclRef::getDifferentiationFunc(AFD, DifferentiationFuncId(DifferentiationFuncId::Kind::Primal))] = primSilFn;
+      if (adjSilFn)
+        emittedFunctions[SILDeclRef::getDifferentiationFunc(AFD, DifferentiationFuncId(DifferentiationFuncId::Kind::Adjoint))] = adjSilFn;
+
       // Get lowered argument indices.
       auto paramIndices =
           getLoweredAutoDiffParameterIndices(*this, AFD, silOriginalFn,
@@ -839,7 +850,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
       SILAutoDiffIndices indices(/*source*/ 0, paramIndices);
       silOriginalFn->addReverseDifferentiableAttr(
           SILReverseDifferentiableAttr::create(
-            M, indices, primName, adjName,
+            M, indices, primSilFn->getName(), adjSilFn->getName(),
             /*primitive*/ hasPrimitiveAdjoint));
       break;
     }

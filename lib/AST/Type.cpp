@@ -4085,3 +4085,66 @@ Type TypeBase::openAnyExistentialType(ArchetypeType *&opened) {
   opened = ArchetypeType::getOpened(this);
   return opened;
 }
+
+/// SWIFT_ENABLE_TENSORFLOW
+AnyFunctionType *AnyFunctionType::getAdjointType() {
+  // Compute the original parameters.
+  const AnyFunctionType::Param *origSelfParamType = nullptr;
+  ArrayRef<AnyFunctionType::Param> origParamTypes;
+  Type origResult;
+  if (auto resultFunc = getResult()->getAs<AnyFunctionType>()) {
+    origSelfParamType = getParams().data();
+    origParamTypes = resultFunc->getParams();
+    origResult = resultFunc->getResult();
+  } else {
+    origParamTypes = getParams();
+    origResult = getResult();
+  }
+
+  llvm::dbgs() << "getAdjointType params:\n";
+  if (origSelfParamType)
+    llvm::dbgs() << "  self: " << origSelfParamType->getPlainType() << "\n";
+  for (auto param : origParamTypes) {
+    llvm::dbgs() << "  " << param.getPlainType() << "\n";
+  }
+  llvm::dbgs() << "end\n";
+  this->dump();
+
+  // Compute the return type.
+  SmallVector<TupleTypeElt, 8> retTypes;
+
+  // Assume empty "wrt:" params for now.
+  for (auto param : origParamTypes)
+    retTypes.push_back(param.getPlainType());
+
+  Type retTy = retTypes.size() > 1
+      ? TupleType::get(retTypes, getASTContext())
+      : retTypes[0].getType();
+
+  // Compute the adjoint parameters.
+  SmallVector<AnyFunctionType::Param, 8> paramTypes;
+
+  for (auto param : origParamTypes)
+    paramTypes.push_back(param);
+
+  // Ignore the primal for now.
+
+  paramTypes.append(2, AnyFunctionType::Param(origResult));
+
+  // Create the result function.
+  auto getFunctionType = [&](GenericSignature *genSig,
+                             ArrayRef<AnyFunctionType::Param> params,
+                             Type result) -> AnyFunctionType * {
+    AnyFunctionType::ExtInfo extInfo;
+    if (genSig)
+      return GenericFunctionType::get(genSig, params, result, extInfo);
+    return FunctionType::get(params, result, extInfo);
+  };
+  AnyFunctionType *result = getFunctionType(nullptr, paramTypes, retTy); // TODO<- correct generic sig
+  if (origSelfParamType)
+    result = getFunctionType(getOptGenericSignature(), {origSelfParamType, 1}, result);
+
+  result->dump();
+
+  return result;
+}

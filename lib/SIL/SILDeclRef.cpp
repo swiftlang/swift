@@ -115,12 +115,14 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind,
                        bool isCurried, bool isForeign)
   : loc(vd), kind(kind),
     isCurried(isCurried), isForeign(isForeign),
-    isDirectReference(0), defaultArgIndex(0)
+    isDirectReference(0), defaultArgIndex(0),
+    differentiationFuncId()
 {}
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc,
                        bool isCurried, bool asForeign) 
-  : isCurried(isCurried), isDirectReference(0), defaultArgIndex(0)
+  : isCurried(isCurried), isDirectReference(0), defaultArgIndex(0),
+    differentiationFuncId()
 {
   if (auto *vd = baseLoc.dyn_cast<ValueDecl*>()) {
     if (auto *fd = dyn_cast<FuncDecl>(vd)) {
@@ -378,6 +380,22 @@ SILDeclRef SILDeclRef::getDefaultArgGenerator(Loc loc,
   result.loc = loc;
   result.kind = Kind::DefaultArgGenerator;
   result.defaultArgIndex = defaultArgIndex;
+  return result;
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+SILDeclRef SILDeclRef::getDifferentiationFunc(
+    Loc loc, DifferentiationFuncId differentiationFuncId) {
+  SILDeclRef result;
+  result.loc = loc;
+  result.kind = Kind::DifferentiationFunc;
+  result.differentiationFuncId = differentiationFuncId;
+  return result;
+}
+
+SILDeclRef SILDeclRef::forWitnessDecl(ValueDecl *witnessDecl) {
+  SILDeclRef result = *this;
+  result.loc = witnessDecl;
   return result;
 }
 
@@ -641,6 +659,8 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   }
 
   switch (kind) {
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILDeclRef::Kind::DifferentiationFunc:
   case SILDeclRef::Kind::Func:
     if (!hasDecl())
       return mangler.mangleClosureEntity(getAbstractClosureExpr(), SKind);

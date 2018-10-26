@@ -960,8 +960,7 @@ emitKeyPathComponent(IRGenModule &IGM,
         auto methodProto = cast<ProtocolDecl>(dc);
         auto &protoInfo = IGM.getProtocolInfo(methodProto,
                                               ProtocolInfoKind::Full);
-        auto index = protoInfo.getFunctionIndex(
-                             cast<AbstractFunctionDecl>(declRef.getDecl()));
+        auto index = protoInfo.getFunctionIndex(declRef);
         idValue = llvm::ConstantInt::get(IGM.SizeTy, -index.getValue());
         idResolved = true;
       }

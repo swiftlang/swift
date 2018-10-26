@@ -777,7 +777,7 @@ namespace {
 
     void addMethod(SILDeclRef func) {
       auto decl = cast<AbstractFunctionDecl>(func.getDecl());
-      Entries.push_back(WitnessTableEntry::forFunction(decl));
+      Entries.push_back(WitnessTableEntry::forFunction(func));
     }
 
     void addPlaceholder(MissingMemberDecl *placeholder) {
@@ -1324,7 +1324,10 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
       assert(entry.getMethodWitness().Requirement == requirement
              && "sil witness table does not match protocol");
       auto piIndex =
-        PI.getFunctionIndex(cast<AbstractFunctionDecl>(requirement.getDecl()));
+        PI.getFunctionIndex(requirement);
+      llvm::dbgs() << "doing req " << requirement << "\n";
+      llvm::dbgs() << "  piIndex " << piIndex.getValue() << "\n";
+      llvm::dbgs() << "  should be " << Table.size() - WitnessTableFirstRequirementOffset << "\n";
       assert((size_t)piIndex.getValue() ==
               Table.size() - WitnessTableFirstRequirementOffset &&
              "offset doesn't match ProtocolInfo layout");
@@ -3498,7 +3501,7 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
 
   // Find the witness we're interested in.
   auto &fnProtoInfo = IGF.IGM.getProtocolInfo(proto, ProtocolInfoKind::Full);
-  auto index = fnProtoInfo.getFunctionIndex(fn);
+  auto index = fnProtoInfo.getFunctionIndex(member);
   llvm::Value *witnessFnPtr =
     emitInvariantLoadOfOpaqueWitness(IGF, wtable,
                                      index.forProtocolWitnessTable());

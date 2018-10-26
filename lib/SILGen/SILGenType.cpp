@@ -319,17 +319,20 @@ template<typename T> class SILGenWitnessTable : public SILWitnessVisitor<T> {
 
 public:
   void addMethod(SILDeclRef requirementRef) {
+    llvm::dbgs() << "adding method " << requirementRef << "\n";
+
     auto reqAccessor = dyn_cast<AccessorDecl>(requirementRef.getDecl());
 
     // If it's not an accessor, just look for the witness.
     if (!reqAccessor) {
       if (auto witness = asDerived().getWitness(requirementRef.getDecl())) {
-        return addMethodImplementation(requirementRef,
-                                       SILDeclRef(witness.getDecl(),
-                                                  requirementRef.kind),
-                                       witness);
+        llvm::dbgs() << "haz witness\n";
+        return addMethodImplementation(
+            requirementRef, requirementRef.forWitnessDecl(witness.getDecl()),
+            witness);
       }
 
+      llvm::dbgs() << "no haz witness\n";
       return asDerived().addMissingMethod(requirementRef);
     }
 
@@ -597,10 +600,23 @@ SILFunction *SILGenModule::emitProtocolWitness(
     ProtocolConformanceRef conformance, SILLinkage linkage,
     IsSerialized_t isSerialized, SILDeclRef requirement, SILDeclRef witnessRef,
     IsFreeFunctionWitness_t isFree, Witness witness) {
+
+  llvm::dbgs() << "emitProtocolWitness " << requirement << " --- " << witnessRef << "\n";
+
   auto requirementInfo = Types.getConstantInfo(requirement);
+
+  llvm::dbgs() << "got requirement info\n";
 
   // Work out the lowered function type of the SIL witness thunk.
   auto reqtOrigTy = cast<GenericFunctionType>(requirementInfo.LoweredType);
+  llvm::dbgs() << "about do to werid stuff to the type\n";
+  // if (requirement.kind == SILDeclRef::Kind::DifferentiationFunc) {
+  //   auto fn = getEmittedFunction(witnessRef, NotForDefinition);
+  //   llvm::dbgs() << fn->getLoweredType().getASTType();
+  //   reqtOrigTy = cast<GenericFunctionType>(fn->getLoweredType().getASTType());
+  // }
+
+  llvm::dbgs() << "did the wtf stuff\n";
 
   // Mapping from the requirement's generic signature to the witness
   // thunk's generic signature.
@@ -663,12 +679,21 @@ SILFunction *SILGenModule::emitProtocolWitness(
       M, AbstractionPattern(reqtOrigTy), reqtSubstTy,
       requirement, witnessRef, witnessSubsForTypeLowering, conformance);
 
+  llvm::dbgs() << "about to mangle name of witness thunk\n";
+
   // Mangle the name of the witness thunk.
   Mangle::ASTMangler NewMangler;
   auto manglingConformance =
       conformance.isConcrete() ? conformance.getConcrete() : nullptr;
-  std::string nameBuffer =
-      NewMangler.mangleWitnessThunk(manglingConformance, requirement.getDecl());
+  std::string nameBuffer;
+  if (requirement.kind == SILDeclRef::Kind::DifferentiationFunc) {
+    nameBuffer = NewMangler.mangleDifferentiationFuncWitnessThunk(
+        manglingConformance, requirement.getDecl(),
+        requirement.differentiationFuncId);
+  } else {
+    nameBuffer = NewMangler.mangleWitnessThunk(manglingConformance,
+                                               requirement.getDecl());
+  }
 
   // If the thunked-to function is set to be always inlined, do the
   // same with the witness, on the theory that the user wants all
@@ -679,6 +704,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
   Inline_t InlineStrategy = InlineDefault;
   if (witnessRef.isAlwaysInline())
     InlineStrategy = AlwaysInline;
+
+  llvm::dbgs() << "about to create fn\n";
 
   SILGenFunctionBuilder builder(*this);
   auto *f = builder.createFunction(

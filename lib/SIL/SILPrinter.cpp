@@ -332,6 +332,18 @@ void SILDeclRef::print(raw_ostream &OS) const {
   case SILDeclRef::Kind::StoredPropertyInitializer:
     OS << "!propertyinit";
     break;
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILDeclRef::Kind::DifferentiationFunc:
+    OS << "!differentiationfunc";
+    switch (differentiationFuncId.kind) {
+    case DifferentiationFuncId::Kind::Primal:
+      OS << ".primal";
+      break;
+    case DifferentiationFuncId::Kind::Adjoint:
+      OS << ".adjoint";
+      break;
+    }
+    break;
   }
 
   auto uncurryLevel = getParameterListCount() - 1;

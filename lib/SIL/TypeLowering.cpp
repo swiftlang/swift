@@ -1769,6 +1769,10 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   auto *vd = c.loc.dyn_cast<ValueDecl *>();
 
   switch (c.kind) {
+  // SWIFT_ENABLE_TENSORFLOW
+  // TODO: This is Wrong. We should calculate the appropriate primal/adjoint
+  // type here.
+  case SILDeclRef::Kind::DifferentiationFunc:
   case SILDeclRef::Kind::Func: {
     if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
       // FIXME: Closures could have an interface type computed by Sema.
@@ -1782,6 +1786,8 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     FuncDecl *func = cast<FuncDecl>(vd);
     auto funcTy = cast<AnyFunctionType>(
         func->getInterfaceType()->eraseDynamicSelfType()->getCanonicalType());
+    if (c.kind == SILDeclRef::Kind::DifferentiationFunc && c.differentiationFuncId.kind == DifferentiationFuncId::Kind::Adjoint)
+      funcTy = cast<AnyFunctionType>(funcTy->getAdjointType()->getCanonicalType());
     return getFunctionInterfaceTypeWithCaptures(funcTy, func);
   }
 
@@ -1841,6 +1847,8 @@ TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
   
   /// Get the function generic params, including outer params.
   switch (c.kind) {
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILDeclRef::Kind::DifferentiationFunc:
   case SILDeclRef::Kind::Func: {
     if (auto *ACE = c.getAbstractClosureExpr()) {
       auto captureInfo = getLoweredLocalCaptures(ACE);

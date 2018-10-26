@@ -42,17 +42,18 @@ class WitnessTableEntry {
 public:
   llvm::PointerUnion<Decl *, TypeBase *> MemberOrAssociatedType;
   ProtocolDecl *Protocol;
+  SILDeclRef declRef;
 
   WitnessTableEntry(llvm::PointerUnion<Decl *, TypeBase *> member,
-                    ProtocolDecl *protocol)
-    : MemberOrAssociatedType(member), Protocol(protocol) {}
+                    ProtocolDecl *protocol, SILDeclRef declRef)
+    : MemberOrAssociatedType(member), Protocol(protocol), declRef(declRef) {}
 
 public:
   WitnessTableEntry() = default;
 
   static WitnessTableEntry forOutOfLineBase(ProtocolDecl *proto) {
     assert(proto != nullptr);
-    return WitnessTableEntry({}, proto);
+    return WitnessTableEntry({}, proto, SILDeclRef());
   }
 
   /// Is this a base-protocol entry?
@@ -75,9 +76,10 @@ public:
     return Protocol;
   }
 
-  static WitnessTableEntry forFunction(AbstractFunctionDecl *func) {
+  static WitnessTableEntry forFunction(SILDeclRef declRef) {
+    auto func = cast<AbstractFunctionDecl>(declRef.getDecl());
     assert(func != nullptr);
-    return WitnessTableEntry(func, nullptr);
+    return WitnessTableEntry(func, nullptr, declRef);
   }
   
   bool isFunction() const {
@@ -85,10 +87,11 @@ public:
     return Protocol == nullptr && decl && isa<AbstractFunctionDecl>(decl);
   }
 
-  bool matchesFunction(AbstractFunctionDecl *func) const {
+  bool matchesFunction(SILDeclRef dr) const {
+    auto func = cast<AbstractFunctionDecl>(dr.getDecl());
     assert(func != nullptr);
     if (auto decl = MemberOrAssociatedType.dyn_cast<Decl*>())
-      return decl == func && Protocol == nullptr;
+      return decl == func && Protocol == nullptr && declRef == dr;
     return false;
   }
 
@@ -99,7 +102,7 @@ public:
   }
 
   static WitnessTableEntry forAssociatedType(AssociatedType ty) {
-    return WitnessTableEntry(ty.getAssociation(), nullptr);
+    return WitnessTableEntry(ty.getAssociation(), nullptr, SILDeclRef());
   }
   
   bool isAssociatedType() const {
@@ -122,7 +125,8 @@ public:
 
   static WitnessTableEntry forAssociatedConformance(AssociatedConformance conf){
     return WitnessTableEntry(conf.getAssociation().getPointer(),
-                             conf.getAssociatedRequirement());
+                             conf.getAssociatedRequirement(),
+                             SILDeclRef());
   }
 
   bool isAssociatedConformance() const {
@@ -236,10 +240,10 @@ public:
 
   /// Return the witness index for the witness function for the given
   /// function requirement.
-  WitnessIndex getFunctionIndex(AbstractFunctionDecl *function) const {
+  WitnessIndex getFunctionIndex(SILDeclRef declRef) const {
     assert(getKind() >= ProtocolInfoKind::Full);
     for (auto &witness : getWitnessEntries()) {
-      if (witness.matchesFunction(function))
+      if (witness.matchesFunction(declRef))
         return getNonBaseWitnessIndex(&witness);
     }
     llvm_unreachable("didn't find entry for function");

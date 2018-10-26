@@ -30,6 +30,7 @@
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Strings.h"
+#include "swift/SIL/SILDeclRef.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
@@ -239,6 +240,29 @@ std::string ASTMangler::mangleClosureWitnessThunk(
   appendProtocolConformance(Conformance);
   appendClosureEntity(Closure);
   appendOperator("TW");
+  return finalize();
+}
+
+// TODO: Indices.
+// TODO: Proper mangling.
+std::string ASTMangler::mangleDifferentiationFuncWitnessThunk(
+    const ProtocolConformance *Conformance,
+    const ValueDecl *Requirement,
+    const DifferentiationFuncId differentiationFuncId) {
+  beginMangling();
+  switch (differentiationFuncId.kind) {
+  case DifferentiationFuncId::Kind::Primal:
+    appendIdentifier("Primal ");
+    break;
+  case DifferentiationFuncId::Kind::Adjoint:
+    appendIdentifier("Adjoint ");
+    break;
+  }
+  appendProtocolConformance(Conformance);
+  assert(isa<FuncDecl>(Requirement) && "expected function");
+  appendEntity(cast<FuncDecl>(Requirement));
+  if (Conformance)
+    appendOperator("TW");
   return finalize();
 }
 
