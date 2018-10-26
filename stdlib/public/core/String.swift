@@ -902,19 +902,9 @@ extension Sequence where Element: StringProtocol {
     let separatorSize = separator._guts.count
     var width = separator._guts.byteWidth
 
-    let reservation = self._preprocessingPass {
-      () -> Int in
-      var r = 0
-      for chunk in self {
-        r += separatorSize + chunk._encodedOffsetRange.count
-        width = Swift.max(width, chunk._wholeString._guts.byteWidth)
-      }
-      return r > 0 ? r - separatorSize : 0
-    }
-
-    let capacity = reservation ?? separatorSize
     var result = ""
-    result.reserveCapacity(capacity)
+    result.reserveCapacity(separatorSize)
+
     if separator.isEmpty {
       for x in self {
         result._guts.append(x)

@@ -1668,13 +1668,3 @@ extension Collection where SubSequence == Self {
     self = self[index(startIndex, offsetBy: k)..<endIndex]
   }
 }
-
-extension Collection {
-  @inlinable
-  @inline(__always)
-  public func _preprocessingPass<R>(
-    _ preprocess: () throws -> R
-  ) rethrows -> R? {
-    return try preprocess()
-  }
-}

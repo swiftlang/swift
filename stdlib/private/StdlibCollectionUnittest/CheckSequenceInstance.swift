@@ -88,6 +88,7 @@ public func checkSequence<
     expectedCount, sequence.underestimatedCount, message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 
+  /*
   // Test `_copyContents(initializing:)` if we can do so without destroying the
   // sequence.
   _ = sequence._preprocessingPass { () -> Void in
@@ -113,6 +114,7 @@ public func checkSequence<
     expectEqualSequence(expected, copy, message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), sameValue: sameValue)
   }
+  */
 }
 
 public func checkSequence<
@@ -207,6 +209,7 @@ public func checkSequence<
     expectedCount, sequence.underestimatedCount, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 
+/*
   // Test `_copyContents(initializing:)` if we can do so without destroying the
   // sequence.
   _ = sequence._preprocessingPass { () -> Void in
@@ -232,6 +235,7 @@ public func checkSequence<
     expectEqualSequence(expected, copy, message(),
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), sameValue: sameValue)
   }
+*/
 }
 
 public func checkSequence<

@@ -67,13 +67,6 @@ sequenceWrapperTests.test("Dispatch/_customContainsEquatableElement") {
     dispatchLog._customContainsEquatableElement)
 }
 
-sequenceWrapperTests.test("Dispatch/_preprocessingPass") {
-  expectWrapperDispatch(
-    direct._preprocessingPass { 1 },
-    indirect._preprocessingPass { 1 },
-    dispatchLog._preprocessingPass)
-}
-
 sequenceWrapperTests.test("Dispatch/_copyToContiguousArray") {
   expectWrapperDispatch(
     direct._copyToContiguousArray(), indirect._copyToContiguousArray(),

@@ -31,13 +31,6 @@ extension _SequenceWrapper  {
   public var underestimatedCount: Int {
     return _base.underestimatedCount
   }
-
-  @inlinable // generic-performance
-  public func _preprocessingPass<R>(
-    _ preprocess: () throws -> R
-  ) rethrows -> R? {
-    return try _base._preprocessingPass(preprocess)
-  }
 }
 
 extension _SequenceWrapper where Iterator == Base.Iterator {

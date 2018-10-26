@@ -183,10 +183,6 @@ tests.test("${TestedType}: dispatch to wrapped, SequenceLog") {
     _ = s._customContainsEquatableElement(OpaqueValue(42))
   }
 
-  Log._preprocessingPass.expectIncrement(Base.self) {
-    _ = s._preprocessingPass {}
-  }
-
   Log._copyToContiguousArray.expectIncrement(Base.self) {
     _ = s._copyToContiguousArray()
   }

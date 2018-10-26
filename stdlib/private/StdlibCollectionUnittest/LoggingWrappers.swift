@@ -85,7 +85,6 @@ public class SequenceLog {
   public static var suffixMaxLength = TypeIndexed(0)
   public static var split = TypeIndexed(0)
   public static var _customContainsEquatableElement = TypeIndexed(0)
-  public static var _preprocessingPass = TypeIndexed(0)
   public static var _copyToContiguousArray = TypeIndexed(0)
   public static var _copyContents = TypeIndexed(0)  
   // Collection
@@ -263,16 +262,6 @@ extension LoggingSequence: Sequence {
   public func _customContainsEquatableElement(_ element: Element) -> Bool? {
     SequenceLog._customContainsEquatableElement[selfType] += 1
     return base._customContainsEquatableElement(element)
-  }
-
-  /// If `self` is multi-pass (i.e., a `Collection`), invoke
-  /// `preprocess` on `self` and return its result.  Otherwise, return
-  /// `nil`.
-  public func _preprocessingPass<R>(
-    _ preprocess: () throws -> R
-  ) rethrows -> R? {
-    SequenceLog._preprocessingPass[selfType] += 1
-    return try base._preprocessingPass(preprocess)
   }
 
   /// Create a native array buffer containing the elements of `self`,

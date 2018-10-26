@@ -135,19 +135,6 @@ extension JoinedSequence: Sequence {
     var result = ContiguousArray<Element>()
     let separatorSize: Int = numericCast(_separator.count)
 
-    let reservation = _base._preprocessingPass {
-      () -> Int in
-      var r = 0
-      for chunk in _base {
-        r += separatorSize + chunk.underestimatedCount
-      }
-      return r - separatorSize
-    }
-
-    if let n = reservation {
-      result.reserveCapacity(numericCast(n))
-    }
-
     if separatorSize == 0 {
       for x in _base {
         result.append(contentsOf: x)

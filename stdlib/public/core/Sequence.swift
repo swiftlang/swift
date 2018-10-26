@@ -533,12 +533,6 @@ public protocol Sequence {
     _ element: Element
   ) -> Bool?
 
-  /// If `self` is multi-pass (i.e., a `Collection`), invoke `preprocess` and
-  /// return its result.  Otherwise, return `nil`.
-  func _preprocessingPass<R>(
-    _ preprocess: () throws -> R
-  ) rethrows -> R?
-
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
   __consuming func _copyToContiguousArray() -> ContiguousArray<Element>
@@ -832,14 +826,6 @@ extension Sequence {
   @inlinable
   public var underestimatedCount: Int {
     return 0
-  }
-
-  @inlinable
-  @inline(__always)
-  public func _preprocessingPass<R>(
-    _ preprocess: () throws -> R
-  ) rethrows -> R? {
-    return nil
   }
 
   @inlinable

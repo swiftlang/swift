@@ -221,13 +221,6 @@ internal class _AnyRandomAccessCollectionBox<Element>
   }
 
   @inlinable
-  internal func __preprocessingPass<R>(
-    _ preprocess: () throws -> R
-  ) rethrows -> R? {
-    _abstract()
-  }
-
-  @inlinable
   internal func __copyToContiguousArray() -> ContiguousArray<Element> {
     _abstract()
   }
@@ -441,12 +434,6 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
     _ element: Element
   ) -> Bool? {
     return _base._customContainsEquatableElement(element)
-  }
-  @inlinable
-  internal override func __preprocessingPass<R>(
-    _ preprocess: () throws -> R
-  ) rethrows -> R? {
-    return try _base._preprocessingPass(preprocess)
   }
   @inlinable
   internal override func __copyToContiguousArray() -> ContiguousArray<Element> {
@@ -780,13 +767,6 @@ extension Any${Kind} {
     _ element: Element
   ) -> Bool? {
     return _box.__customContainsEquatableElement(element)
-  }
-
-  @inlinable
-  public func _preprocessingPass<R>(
-    _ preprocess: () throws -> R
-  ) rethrows -> R? {
-    return try _box.__preprocessingPass(preprocess)
   }
 
   @inlinable
