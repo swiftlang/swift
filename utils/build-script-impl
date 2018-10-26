@@ -3007,7 +3007,7 @@ for host in "${ALL_HOSTS[@]}"; do
                         ${LLDB_DOTEST_CC_OPTS} \
                         ${LLDB_FORMATTER_OPTS} \
                         --build-dir "${lldb_build_dir}/lldb-test-build.noindex" \
-                        -E "${DOTEST_EXTRA}"
+                        -t -E "${DOTEST_EXTRA}"
                     if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
                         echo "Running LLDB swift compatibility tests against" \
                              "${LLDB_TEST_SWIFT_COMPATIBILITY}"
@@ -3023,7 +3023,7 @@ for host in "${ALL_HOSTS[@]}"; do
                              --build-dir "${lldb_build_dir}/lldb-test-build.noindex" \
                              -G swift-history \
                              --swift-compiler "${LLDB_TEST_SWIFT_COMPATIBILITY}" \
-                             -E "${DOTEST_EXTRA}"
+                             -t -E "${DOTEST_EXTRA}"
                     fi
                 fi
 
