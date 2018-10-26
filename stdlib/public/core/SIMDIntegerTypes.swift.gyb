@@ -121,7 +121,7 @@ public extension ${Element} {
 %   end
 
 %   prefix = 's' if signed else 'u'
-%   for (op, inst) in [('<','lt'), ('<=','le'), ('>','gt'), ('>=','ge')]:
+%   for (op, inst) in [('.<','lt'), ('.<=','le'), ('.>','gt'), ('.>=','ge')]:
     @_transparent
     public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> Mask {
       return Mask(Int${bits}.Vector${count}(${sext}(

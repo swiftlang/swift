@@ -32,13 +32,13 @@ public protocol SIMDIntegerVector : SIMDVector
   /// The ordering of elements within the vector is unchanged.
   var elementBytesSwapped: Self { get }
   
-  static func <(lhs: Self, rhs: Self) -> Mask
+  static func .<(lhs: Self, rhs: Self) -> Mask
   
-  static func <=(lhs: Self, rhs: Self) -> Mask
+  static func .<=(lhs: Self, rhs: Self) -> Mask
   
-  static func >(lhs: Self, rhs: Self) -> Mask
+  static func .>(lhs: Self, rhs: Self) -> Mask
   
-  static func >=(lhs: Self, rhs: Self) -> Mask
+  static func .>=(lhs: Self, rhs: Self) -> Mask
   
   static prefix func ~(rhs: Self) -> Self
   
@@ -89,31 +89,31 @@ public extension SIMDIntegerVector {
   }
   
   @inlinable
-  static func < <Scalar>(lhs: Self, rhs: Scalar) -> Mask
+  static func .< <Scalar>(lhs: Self, rhs: Scalar) -> Mask
   where Scalar : BinaryInteger {
     guard rhs >= Element.min else { return Mask(repeating: false) }
     guard rhs <= Element.max else { return Mask(repeating: true) }
-    return lhs < Self(repeating: Self.Element(truncatingIfNeeded: rhs))
+    return lhs .< Self(repeating: Self.Element(truncatingIfNeeded: rhs))
   }
   
   @inlinable
-  static func <= <Scalar>(lhs: Self, rhs: Scalar) -> Mask
+  static func .<= <Scalar>(lhs: Self, rhs: Scalar) -> Mask
   where Scalar : BinaryInteger {
     guard rhs >= Element.min else { return Mask(repeating: false) }
     guard rhs <= Element.max else { return Mask(repeating: true) }
-    return lhs <= Self(repeating: Self.Element(truncatingIfNeeded: rhs))
+    return lhs .<= Self(repeating: Self.Element(truncatingIfNeeded: rhs))
   }
   
   @inlinable
-  static func > <Scalar>(lhs: Self, rhs: Scalar) -> Mask
+  static func .> <Scalar>(lhs: Self, rhs: Scalar) -> Mask
   where Scalar : BinaryInteger {
-    return !(lhs <= rhs)
+    return !(lhs .<= rhs)
   }
   
   @inlinable
-  static func >= <Scalar>(lhs: Self, rhs: Scalar) -> Mask
+  static func .>= <Scalar>(lhs: Self, rhs: Scalar) -> Mask
   where Scalar : BinaryInteger {
-    return !(lhs < rhs)
+    return !(lhs .< rhs)
   }
   
   @inlinable
@@ -129,27 +129,27 @@ public extension SIMDIntegerVector {
   }
   
   @inlinable
-  static func < <Scalar>(lhs: Scalar, rhs: Self) -> Mask
+  static func .< <Scalar>(lhs: Scalar, rhs: Self) -> Mask
   where Scalar : BinaryInteger {
-    return rhs > lhs
+    return rhs .> lhs
   }
   
   @inlinable
-  static func <= <Scalar>(lhs: Scalar, rhs: Self) -> Mask
+  static func .<= <Scalar>(lhs: Scalar, rhs: Self) -> Mask
   where Scalar : BinaryInteger {
-    return rhs >= lhs
+    return rhs .>= lhs
   }
   
   @inlinable
-  static func > <Scalar>(lhs: Scalar, rhs: Self) -> Mask
+  static func .> <Scalar>(lhs: Scalar, rhs: Self) -> Mask
   where Scalar : BinaryInteger {
-    return rhs < lhs
+    return rhs .< lhs
   }
   
   @inlinable
-  static func >= <Scalar>(lhs: Scalar, rhs: Self) -> Mask
+  static func .>= <Scalar>(lhs: Scalar, rhs: Self) -> Mask
   where Scalar : BinaryInteger {
-    return rhs <= lhs
+    return rhs .<= lhs
   }
   
   // MARK: Bitwise operators
@@ -221,12 +221,12 @@ public extension SIMDIntegerVector {
     let limit = Element(Element.bitWidth - 1)
     if Element.isSigned {
       let negated = 0 &- rhs
-      let left = (lhs &<< negated).replacing(with: 0, where: negated > limit)
+      let left = (lhs &<< negated).replacing(with: 0, where: negated .> limit)
       let right = lhs &>> Swift.min(rhs, limit)
-      return left.replacing(with: right, where: rhs >= 0)
+      return left.replacing(with: right, where: rhs .>= 0)
     } else {
       let right = lhs &>> rhs
-      return right.replacing(with: 0, where: rhs > limit)
+      return right.replacing(with: 0, where: rhs .> limit)
     }
   }
   
@@ -234,12 +234,12 @@ public extension SIMDIntegerVector {
   static func <<(lhs: Self, rhs: Self) -> Self {
     let limit = Element(Element.bitWidth - 1)
     if Element.isSigned {
-      let left = (lhs &<< rhs).replacing(with: 0, where: rhs > limit)
+      let left = (lhs &<< rhs).replacing(with: 0, where: rhs .> limit)
       let right = lhs &>> Swift.min(0 &- rhs, limit)
-      return left.replacing(with: right, where: rhs <= 0)
+      return left.replacing(with: right, where: rhs .<= 0)
     } else {
       let right = lhs &>> rhs
-      return right.replacing(with: 0, where: rhs > limit)
+      return right.replacing(with: 0, where: rhs .> limit)
     }
   }
   
@@ -444,7 +444,7 @@ public extension SIMDIntegerVector {
 // MARK: Free functions implemented on the SIMDIntegerVector
 @inlinable
 public func min<V>(_ lhs: V, _ rhs: V) -> V where V: SIMDIntegerVector {
-  return lhs.replacing(with: rhs, where: rhs < lhs)
+  return lhs.replacing(with: rhs, where: rhs .< lhs)
 }
 
 @inlinable
@@ -459,7 +459,7 @@ public func min<V>(_ lhs: V.Element, _ rhs: V) -> V where V: SIMDIntegerVector {
 
 @inlinable
 public func max<V>(_ lhs: V, _ rhs: V) -> V where V: SIMDIntegerVector {
-  return lhs.replacing(with: rhs, where: rhs >= lhs)
+  return lhs.replacing(with: rhs, where: rhs .>= lhs)
 }
 
 @inlinable

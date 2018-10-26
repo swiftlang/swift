@@ -4,13 +4,13 @@ public protocol SIMDFloatingPointVector : SIMDVector
   
   static var zero: Self { get }
   
-  static func <(lhs: Self, rhs: Self) -> Mask
+  static func .<(lhs: Self, rhs: Self) -> Mask
   
-  static func <=(lhs: Self, rhs: Self) -> Mask
+  static func .<=(lhs: Self, rhs: Self) -> Mask
   
-  static func >(lhs: Self, rhs: Self) -> Mask
+  static func .>(lhs: Self, rhs: Self) -> Mask
   
-  static func >=(lhs: Self, rhs: Self) -> Mask
+  static func .>=(lhs: Self, rhs: Self) -> Mask
   
   static func +(lhs: Self, rhs: Self) -> Self
   
@@ -44,23 +44,23 @@ public extension SIMDFloatingPointVector {
   }
 
   @inlinable
-  static func <(lhs: Self, rhs: Element) -> Mask {
-    return lhs < Self(repeating: rhs)
+  static func .<(lhs: Self, rhs: Element) -> Mask {
+    return lhs .< Self(repeating: rhs)
   }
   
   @inlinable
-  static func <=(lhs: Self, rhs: Element) -> Mask {
-    return lhs <= Self(repeating: rhs)
+  static func .<=(lhs: Self, rhs: Element) -> Mask {
+    return lhs .<= Self(repeating: rhs)
   }
   
   @inlinable
-  static func >(lhs: Self, rhs: Element) -> Mask {
-    return lhs > Self(repeating: rhs)
+  static func .>(lhs: Self, rhs: Element) -> Mask {
+    return lhs .> Self(repeating: rhs)
   }
   
   @inlinable
-  static func >=(lhs: Self, rhs: Element) -> Mask {
-    return lhs >= Self(repeating: rhs)
+  static func .>=(lhs: Self, rhs: Element) -> Mask {
+    return lhs .>= Self(repeating: rhs)
   }
   
   @inlinable
@@ -74,23 +74,23 @@ public extension SIMDFloatingPointVector {
   }
   
   @inlinable
-  static func <(lhs: Element, rhs: Self) -> Mask {
-    return Self(repeating: lhs) < rhs
+  static func .<(lhs: Element, rhs: Self) -> Mask {
+    return Self(repeating: lhs) .< rhs
   }
   
   @inlinable
-  static func <=(lhs: Element, rhs: Self) -> Mask {
-    return Self(repeating: lhs) <= rhs
+  static func .<=(lhs: Element, rhs: Self) -> Mask {
+    return Self(repeating: lhs) .<= rhs
   }
   
   @inlinable
-  static func >(lhs: Element, rhs: Self) -> Mask {
-    return Self(repeating: lhs) > rhs
+  static func .>(lhs: Element, rhs: Self) -> Mask {
+    return Self(repeating: lhs) .> rhs
   }
   
   @inlinable
-  static func >=(lhs: Element, rhs: Self) -> Mask {
-    return Self(repeating: lhs) >= rhs
+  static func .>=(lhs: Element, rhs: Self) -> Mask {
+    return Self(repeating: lhs) .>= rhs
   }
   
   // MARK: Arithmetic operators

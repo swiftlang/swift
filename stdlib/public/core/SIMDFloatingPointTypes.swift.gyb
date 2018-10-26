@@ -96,7 +96,7 @@ public extension ${Element} {
     }
 
     // Conformance to SIMDFloatingPointVector --------------------------------
-%   for (op, inst) in [('<','lt'), ('<=','le'), ('>','gt'), ('>=','ge')]:
+%   for (op, inst) in [('.<','lt'), ('.<=','le'), ('.>','gt'), ('.>=','ge')]:
     @_transparent
     public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> Mask {
       return Mask(Int${bits}.Vector${N}(${sext}(
@@ -130,7 +130,7 @@ public extension ${Element} {
       case .awayFromZero:
         let roundedUp = ${Self}(Builtin.int_ceil_${LLVM}(_value))
         let roundedDown = ${Self}(Builtin.int_floor_${LLVM}(_value))
-        self = roundedUp.replacing(with: roundedDown, where: self < 0)
+        self = roundedUp.replacing(with: roundedDown, where: self .< 0)
       case .up:
         _value = Builtin.int_ceil_${LLVM}(_value)
       case .down:
