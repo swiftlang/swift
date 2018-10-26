@@ -115,34 +115,34 @@ public class Foo {
 // COMMON: }
 }
 
-// COMMON: private protocol InheritedProtocol {
-// COMMON-NEXT: }
+// NONRESILIENT: private protocol InheritedProtocol {
+// NONRESILIENT-NEXT: }
 private protocol InheritedProtocol {
 }
 
-// COMMON: private protocol UsableAsExistential : InheritedProtocol {
-// COMMON-NEXT: }
+// NONRESILIENT: private protocol UsableAsExistential : InheritedProtocol {
+// NONRESILIENT-NEXT: }
 private protocol UsableAsExistential: InheritedProtocol {
 }
 
-// COMMON: @objc private protocol ObjCUsableAsExistential {
-// COMMON-NEXT: }
+// NONRESILIENT: @objc private protocol ObjCUsableAsExistential {
+// NONRESILIENT-NEXT: }
 @objc private protocol ObjCUsableAsExistential {
 }
 
-// COMMON: private protocol ClassUsableAsExistential : AnyObject {
-// COMMON-NEXT: }
+// NONRESILIENT: private protocol ClassUsableAsExistential : AnyObject {
+// NONRESILIENT-NEXT: }
 private protocol ClassUsableAsExistential: class {
   func foo()
 }
 
-// COMMON: internal protocol CompositionA {
-// COMMON-NEXT: }
+// NONRESILIENT: internal protocol CompositionA {
+// NONRESILIENT-NEXT: }
 internal protocol CompositionA {
 }
 
-// COMMON: internal protocol CompositionB {
-// COMMON-NEXT: }
+// NONRESILIENT: internal protocol CompositionB {
+// NONRESILIENT-NEXT: }
 internal protocol CompositionB {
 }
 
@@ -151,20 +151,18 @@ internal protocol CompositionB {
 internal protocol NeverReferenced {
 }
 
-// COMMON: @objc @_fixed_layout public class ContainsExistentials {
-@objc
-@_fixed_layout
-public class ContainsExistentials {
-// COMMON-NEXT: private var _: UsableAsExistential
+// COMMON: @objc public class ContainsExistentials {
+@objc public class ContainsExistentials {
+// NONRESILIENT: private var _: UsableAsExistential
   private var existential: UsableAsExistential
 
-// COMMON-NEXT: private var _: ObjCUsableAsExistential
+// NONRESILIENT-NEXT: private var _: ObjCUsableAsExistential
   private var objcExistential: ObjCUsableAsExistential
 
-// COMMON-NEXT: private var _: ClassUsableAsExistential
+// NONRESILIENT-NEXT: private var _: ClassUsableAsExistential
   private var classExistential: ClassUsableAsExistential
 
-// COMMON-NEXT: private var _: CompositionA & CompositionB
+// NONRESILIENT-NEXT: private var _: CompositionA & CompositionB
   private var composition: CompositionA & CompositionB
 
 // COMMON-NOT: private init
@@ -202,5 +200,31 @@ internal struct SatisfiesConstraint: GenericConstraint {
 public struct HasGenericClassMember {
   // NONRESILIENT: internal let _: {{.*}}HasConstraint<{{.*}}SatisfiesConstraint>
   internal let member: HasConstraint<SatisfiesConstraint>
+// COMMON: }
+}
+
+// NONRESILIENT: internal protocol ExtensionConformance {
+internal protocol ExtensionConformance {
+  // NONRESILIENT-NOT: associatedtype MyType
+  associatedtype MyType
+// NONRESILIENT: }
+}
+
+// NONRESILIENT internal class GetsConformanceThroughExtension {
+// NONRESILIENT: }
+internal class GetsConformanceThroughExtension {
+}
+
+// NONRESILIENT: extension GetsConformanceThroughExtension : ExtensionConformance {
+extension GetsConformanceThroughExtension: ExtensionConformance {
+  // COMMON-NOT: typealias MyType = {{.*}}Int
+  typealias MyType = Int
+// NONRESILIENT: }
+}
+
+// COMMON: public struct HasClassMemberWithExtensionConformance {
+public struct HasClassMemberWithExtensionConformance {
+  // NONRESILIENT: internal let _: {{.*}}GetsConformanceThroughExtension
+  let member: GetsConformanceThroughExtension
 // COMMON: }
 }

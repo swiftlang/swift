@@ -15,6 +15,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeWalker.h"
 
@@ -49,90 +50,84 @@ bool swift::contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
 /// Since `A`'s size depends on `B`, we need to print `B` even though it's
 /// private. `B`'s children will also be checked for types that contribute to
 /// its layout, and so on.
-class FindReferencedNonPublicTypeDecls: public ASTWalker {
-  using TypeDecls = SmallPtrSetImpl<TypeDecl *>;
-  SmallVector<ValueDecl *, 8> workList;
+class FindReferencedNonPublicTypeDecls: public ASTWalker, public TypeWalker {
+  SmallPtrSetImpl<TypeDecl *> &foundDecls;
+  SmallVector<Decl *, 8> workList;
 
-  /// Finds all nominal types or typealiases referenced in the type being
-  /// walked.
-  class FindTypeDecls: public TypeWalker {
-    TypeDecls &foundDecls;
-    SmallVectorImpl<ValueDecl *> &workList;
-  public:
-    FindTypeDecls(TypeDecls &foundDecls, SmallVectorImpl<ValueDecl *> &workList)
-      : foundDecls(foundDecls), workList(workList) {}
-
-    void addIfNonPublic(TypeDecl *typeDecl) {
-      if (isPublicOrUsableFromInline(typeDecl))
-        return;
-      if (foundDecls.insert(typeDecl).second)
-        workList.push_back(typeDecl);
-    }
-
-    /// Finds all nominal types or typealiases referenced by the
-    Action walkToTypePre(Type type) override {
-      if (auto nominal =
-          dyn_cast<NominalOrBoundGenericNominalType>(type.getPointer()))
-        addIfNonPublic(nominal->getDecl());
-      if (auto enumType = dyn_cast<EnumType>(type.getPointer()))
-        addIfNonPublic(enumType->getDecl());
-      if (auto alias = dyn_cast<NameAliasType>(type.getPointer())) {
-        // Add the typealias to the found decls
-        auto decl = alias->getDecl();
-        addIfNonPublic(decl);
-
-        // Also walk into the RHS of the typealias to find extra types we need.
-        decl->getUnderlyingTypeLoc().getType().walk(*this);
-      }
-      return Action::Continue;
-    }
-  };
-  FindTypeDecls findTypeDecls;
-public:
-  FindReferencedNonPublicTypeDecls(TypeDecls &foundDecls):
-    findTypeDecls(foundDecls, workList) {}
-
-  void search(ModuleDecl *module) {
-    SmallVector<Decl *, 8> topLevelDecls;
-    module->getTopLevelDecls(topLevelDecls);
-    for (auto decl : topLevelDecls) {
-      auto vd = dyn_cast<ValueDecl>(decl);
-      if (!vd || !isPublicOrUsableFromInline(vd))
-        continue;
-      workList.push_back(vd);
-    }
-
-    while (!workList.empty()) {
-      Decl *d = workList.pop_back_val();
-      d->walk(*this);
-    }
+  /// If the provided decl is non-public-or-usableFromInline, add it to the
+  /// set of found decls and add it to the worklist.
+  void addIfNonPublic(TypeDecl *typeDecl) {
+    if (isPublicOrUsableFromInline(typeDecl))
+      return;
+    if (foundDecls.insert(typeDecl).second)
+      workList.push_back(typeDecl);
   }
 
+  /// Walk into the type of this var if it contributes to the parent's layout.
   void visitAbstractStorageDecl(AbstractStorageDecl *decl) {
     if (!contributesToParentTypeStorage(decl))
       return;
-    decl->getInterfaceType().walk(findTypeDecls);
+    decl->getInterfaceType().walk(*this);
   }
 
+  /// Walk into each associated type.
   void visitEnumElementDecl(EnumElementDecl *decl) {
     auto params = decl->getParameterList();
     if (!params) return;
     for (auto param : *params) {
-      param->getInterfaceType().walk(findTypeDecls);
+      param->getInterfaceType().walk(*this);
     }
   }
 
+  /// Walk into inherited types, generic requirements, and extensions.
   void visitNominalTypeDecl(NominalTypeDecl *decl) {
     for (auto inherited : decl->getInherited())
-      inherited.getType().walk(findTypeDecls);
+      inherited.getType().walk(*this);
+    for (auto extension : decl->getExtensions())
+      workList.push_back(extension);
+  }
+
+  /// Walk into generic requirements.
+  void visitRequirements(const GenericContext *decl) {
     for (auto requirement : decl->getGenericRequirements()) {
-      requirement.getFirstType().walk(findTypeDecls);
+      requirement.getFirstType().walk(*this);
       if (requirement.getKind() != RequirementKind::Layout)
-        requirement.getSecondType().walk(findTypeDecls);
+        requirement.getSecondType().walk(*this);
     }
   }
 
-  bool walkToDeclPre(Decl *decl) {
+  /// Walk into the underlying type.
+  void visitTypeAliasDecl(TypeAliasDecl *decl) {
+    decl->getUnderlyingTypeLoc().getType().walk(*this);
+  }
+
+  /// Walk into the inherited conformances.
+  void visitExtensionDecl(ExtensionDecl *decl) {
+    for (auto inherited : decl->getInherited())
+      inherited.getType().walk(*this);
+  }
+
+  /// Walk the provided type, finding all referenced type declarations and
+  /// walking them as well.
+  Action walkToTypePre(Type type) override {
+    if (auto ty = dyn_cast<NominalOrBoundGenericNominalType>(type.getPointer()))
+      addIfNonPublic(ty->getDecl());
+
+    if (auto enumType = dyn_cast<EnumType>(type.getPointer()))
+      addIfNonPublic(enumType->getDecl());
+
+    if (auto alias = dyn_cast<NameAliasType>(type.getPointer()))
+      addIfNonPublic(alias->getDecl());
+
+    return Action::Continue;
+  }
+
+  bool walkToDeclPre(Decl *decl) override {
+    if (auto genericContext = decl->getAsGenericContext()) {
+      visitRequirements(genericContext);
+      // Don't return, as we still want to visit these decls.
+    }
+
     // If we see an abstract storage decl that contributes to
     // type layout, walk into its interface type.
     if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
@@ -147,17 +142,52 @@ public:
     }
 
     // If we see a nominal type decl, walk its inherited types and generic
-    // requirements, and continue walking into it children.
+    // requirements, and continue walking into its children.
     if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
       visitNominalTypeDecl(nominal);
       return true;
     }
 
-    // Don't walk into function bodies
+    // If we see a typealias, walk into the RHS and collect the referenced
+    // types.
+    if (auto alias = dyn_cast<TypeAliasDecl>(decl)) {
+      visitTypeAliasDecl(alias);
+      return false;
+    }
+
+    // If we see an extension, it's of a type that's newly-exposed. Walk into
+    // it.
+    if (auto extension = dyn_cast<ExtensionDecl>(decl)) {
+      visitExtensionDecl(extension);
+      return true;
+    }
+
+    // Don't walk into function bodies.
     if (isa<AbstractFunctionDecl>(decl))
       return false;
 
     return true;
+  }
+public:
+  FindReferencedNonPublicTypeDecls(SmallPtrSetImpl<TypeDecl *> &foundDecls)
+    : foundDecls(foundDecls) {}
+
+  /// Searches through the module, walking through all declared types and
+  /// finding/exposing the layout-relevant bits.
+  void search(ModuleDecl *module) {
+    SmallVector<Decl *, 8> topLevelDecls;
+    module->getTopLevelDecls(topLevelDecls);
+    for (auto decl : topLevelDecls) {
+      auto vd = dyn_cast<ValueDecl>(decl);
+      if (!vd || !isPublicOrUsableFromInline(vd))
+        continue;
+      workList.push_back(vd);
+    }
+
+    while (!workList.empty()) {
+      Decl *d = workList.pop_back_val();
+      d->walk(*this);
+    }
   }
 };
 
