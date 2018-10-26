@@ -153,7 +153,9 @@ class ThisDerived1 : ThisBase1 {
 
 // COMMON_SELF_DOT_1: Begin completions
 // COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    derivedInstanceVar[#Int#]{{; name=.+$}}
-// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: derivedFunc0()[#Void#]{{; name=.+$}}
+// COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: derivedFunc0()[#Void#]
+// COMMON_SELF_DOT_1-DAG: Decl[Subscript]/CurrNominal/Erase[1]: [{#Double#}][#Int#]{{; name=.+$}}
+// COMMON_SELF_DOT_1-DAG: Decl[Subscript]/CurrNominal/Erase[1]: [{#s: String#}][#Int#]{{; name=.+$}}
 // COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: test1()[#Void#]{{; name=.+$}}
 // COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal: test2()[#Void#]{{; name=.+$}}
 // COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/CurrNominal:    derivedExtProp[#Int#]{{; name=.+$}}
@@ -162,6 +164,7 @@ class ThisDerived1 : ThisBase1 {
 // COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/Super:          baseInstanceVar[#Int#]{{; name=.+$}}
 // COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/Super:       baseFunc0()[#Void#]{{; name=.+$}}
 // COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/Super:       baseFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// COMMON_SELF_DOT_1-DAG: Decl[Subscript]/Super/Erase[1]:   [{#Int#}][#Double#]{{; name=.+$}}
 // COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/Super:          baseExtProp[#Int#]{{; name=.+$}}
 // COMMON_SELF_DOT_1-DAG: Decl[InstanceMethod]/Super:       baseExtInstanceFunc0()[#Void#]{{; name=.+$}}
 // COMMON_SELF_DOT_1-DAG: Decl[InstanceVar]/Super:          baseExtStaticProp[#Int#]{{; name=.+$}}
@@ -179,7 +182,7 @@ class ThisDerived1 : ThisBase1 {
 
   init(a : Int) {
     self.#^CONSTRUCTOR_SELF_DOT_1^#
-// CONSTRUCTOR_SELF_DOT_1: Begin completions, 16 items
+// CONSTRUCTOR_SELF_DOT_1: Begin completions, 19 items
 // CONSTRUCTOR_SELF_DOT_1-NOT: Decl[Constructor]
 
 // CONSTRUCTOR_SELF_DOT_1: End completions
@@ -193,7 +196,7 @@ class ThisDerived1 : ThisBase1 {
 // DESTRUCTOR_SELF_NO_DOT_1: End completions
 
     self.#^DESTRUCTOR_SELF_DOT_1^#
-// DESTRUCTOR_SELF_DOT_1: Begin completions, 16 items
+// DESTRUCTOR_SELF_DOT_1: Begin completions, 19 items
 // DESTRUCTOR_SELF_DOT_1: End completions
   }
 
@@ -205,7 +208,7 @@ class ThisDerived1 : ThisBase1 {
 
   func test2() {
     self.#^FUNC_SELF_DOT_1^#
-// FUNC_SELF_DOT_1: Begin completions, 16 items
+// FUNC_SELF_DOT_1: Begin completions, 19 items
 // FUNC_SELF_DOT_1: End completions
   }
 

@@ -145,7 +145,7 @@ public:
 
   /// \brief Complete expr-super after we have consumed the 'super' keyword and
   /// a dot.
-  virtual void completeExprSuperDot(SuperRefExpr *SRE) = 0;
+  virtual void completeExprSuperDot(SuperRefExpr *SRE, SourceLoc DotLoc) = 0;
 
   /// \brief Complete the argument to an Objective-C #keyPath
   /// expression.

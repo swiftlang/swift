@@ -894,7 +894,7 @@ ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletion) {
         if (auto *SRE = dyn_cast<SuperRefExpr>(superRef))
-          CodeCompletion->completeExprSuperDot(SRE);
+          CodeCompletion->completeExprSuperDot(SRE, dotLoc);
       }
 
       // Eat the code completion token because we handled it.

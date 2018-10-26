@@ -223,6 +223,7 @@ extension SuperBaseA {
 // COMMON_BASE_A_DOT-DAG: Decl[InstanceVar]/CurrNominal:    baseProp[#Int#]{{; name=.+$}}
 // COMMON_BASE_A_DOT-DAG: Decl[InstanceMethod]/CurrNominal: baseFunc0()[#Void#]{{; name=.+$}}
 // COMMON_BASE_A_DOT-DAG: Decl[InstanceMethod]/CurrNominal: baseFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// COMMON_BASE_A_DOT-DAG: Decl[Subscript]/CurrNominal/Erase[1]: [{#Int#}][#Double#]{{; name=.+$}}
 // COMMON_BASE_A_DOT-DAG: Decl[InstanceVar]/CurrNominal:    baseExtProp[#Int#]{{; name=.+$}}
 // COMMON_BASE_A_DOT-DAG: Decl[InstanceMethod]/CurrNominal: baseExtFunc0()[#Void#]{{; name=.+$}}
 // COMMON_BASE_A_DOT: End completions
@@ -242,7 +243,7 @@ class SuperDerivedA : SuperBaseA {
   init(a: Int) {
     super.#^CONSTRUCTOR_SUPER_DOT_1^#
     super(#^CONSTRUCTOR_SUPER_PAREN^#
-// CONSTRUCTOR_SUPER_DOT_1: Begin completions, 7 items
+// CONSTRUCTOR_SUPER_DOT_1: Begin completions, 8 items
 // CONSTRUCTOR_SUPER_DOT_1-DAG: Decl[Constructor]/CurrNominal: init()[#SuperBaseA#]{{; name=.+$}}
 // CONSTRUCTOR_SUPER_DOT_1: End completions
   }
@@ -273,7 +274,7 @@ class SuperDerivedA : SuperBaseA {
     var resyncParser = 42
 
     super.#^DESTRUCTOR_SUPER_DOT_1^#
-// DESTRUCTOR_SUPER_DOT_1: Begin completions, 6 items
+// DESTRUCTOR_SUPER_DOT_1: Begin completions, 7 items
 // DESTRUCTOR_SUPER_DOT_1: End completions
   }
 
@@ -285,7 +286,7 @@ class SuperDerivedA : SuperBaseA {
 
   func test2() {
     super.#^FUNC_SUPER_DOT_1^#
-// FUNC_SUPER_DOT_1: Begin completions, 6 items
+// FUNC_SUPER_DOT_1: Begin completions, 7 items
 // FUNC_SUPER_DOT_1: End completions
   }
 }
@@ -307,6 +308,7 @@ class SuperDerivedA : SuperBaseA {
 // COMMON_BASE_B_DOT-DAG: Decl[InstanceVar]/CurrNominal:    baseProp[#Int#]{{; name=.+$}}
 // COMMON_BASE_B_DOT-DAG: Decl[InstanceMethod]/CurrNominal: baseFunc0()[#Void#]{{; name=.+$}}
 // COMMON_BASE_B_DOT-DAG: Decl[InstanceMethod]/CurrNominal: baseFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// COMMON_BASE_B_DOT-DAG: Decl[Subscript]/CurrNominal/Erase[1]: [{#Int#}][#Double#]{{; name=.+$}}
 // COMMON_BASE_B_DOT-DAG: Decl[InstanceVar]/CurrNominal:    baseExtProp[#Int#]{{; name=.+$}}
 // COMMON_BASE_B_DOT-DAG: Decl[InstanceMethod]/CurrNominal: baseExtFunc0()[#Void#]{{; name=.+$}}
 // COMMON_BASE_B_DOT: End completions
@@ -409,7 +411,7 @@ class SuperDerivedB : SuperBaseB {
 
   init(int a: Int) {
     super.#^CONSTRUCTOR_SUPER_DOT_2^#
-// CONSTRUCTOR_SUPER_DOT_2: Begin completions, 9 items
+// CONSTRUCTOR_SUPER_DOT_2: Begin completions, 10 items
 // CONSTRUCTOR_SUPER_DOT_2-DAG: Decl[Constructor]/CurrNominal: init()[#SuperBaseB#]{{; name=.+$}}
 // CONSTRUCTOR_SUPER_DOT_2-DAG: Decl[Constructor]/CurrNominal: init({#a: Double#})[#SuperBaseB#]{{; name=.+$}}
 // CONSTRUCTOR_SUPER_DOT_2-DAG: Decl[Constructor]/ExprSpecific: init({#int: Int#})[#SuperBaseB#]{{; name=.+$}}
@@ -424,7 +426,7 @@ class SuperDerivedB : SuperBaseB {
     var resyncParser = 42
 
     super.#^DESTRUCTOR_SUPER_DOT_2^#
-// DESTRUCTOR_SUPER_DOT_2: Begin completions, 6 items
+// DESTRUCTOR_SUPER_DOT_2: Begin completions, 7 items
 // DESTRUCTOR_SUPER_DOT_2: End completions
   }
 
@@ -436,7 +438,7 @@ class SuperDerivedB : SuperBaseB {
 
   func test2() {
     super.#^FUNC_SUPER_DOT_2^#
-// FUNC_SUPER_DOT_2: Begin completions, 6 items
+// FUNC_SUPER_DOT_2: Begin completions, 7 items
 // FUNC_SUPER_DOT_2: End completions
   }
 
@@ -506,14 +508,14 @@ class Closures : SuperBaseA {
   func foo() {
     func inner() {
       super.#^CLOSURE_1^#
-      // CLOSURE_1: Begin completions, 6 items
+      // CLOSURE_1: Begin completions, 7 items
       // CLOSURE_1: End completions
     }
   }
 
   func bar() {
     let inner = { () -> Void in
-      // CLOSURE_2: Begin completions, 6 items
+      // CLOSURE_2: Begin completions, 7 items
       // CLOSURE_2: End completions
       super.#^CLOSURE_2^#
     }

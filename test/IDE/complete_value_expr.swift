@@ -340,6 +340,8 @@ var fooObject: FooStruct
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc2({#(x): Int#})[#Int#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: overloadedInstanceFunc2({#(x): Double#})[#Int#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: builderFunc1({#(a): Int#})[#FooStruct#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[Subscript]/CurrNominal/Erase[1]: [{#Int#}][#Double#]{{; name=.+$}}
+// FOO_OBJECT_DOT-NEXT: Decl[Subscript]/CurrNominal/Erase[1]: [{#Int#}, {#Int#}][#Double#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorVoidFunc1({#(a): Int#}, {#b: Float#})[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorVoidFunc2({#(a): Int#}, {#b: Float#}, {#c: Double#})[#Void#]{{; name=.+$}}
 // FOO_OBJECT_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: selectorVoidFunc3({#(a): Int#}, {#b: (Float, Double)#})[#Void#]{{; name=.+$}}
@@ -948,6 +950,7 @@ func testLookInProto1() {
 // PROTO_MEMBERS_1-NEXT: Decl[InstanceVar]/CurrNominal:    fooInstanceVar2[#Int#]{{; name=.+$}}
 // PROTO_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
 // PROTO_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_1-NEXT: Decl[Subscript]/CurrNominal/Erase[1]: [{#Int#}][#Double#]{{; name=.+$}}
 // PROTO_MEMBERS_1-NEXT: End completions
 }
 
@@ -962,6 +965,7 @@ func testLookInProto2() {
 // PROTO_MEMBERS_2-NEXT: Decl[InstanceVar]/CurrNominal:    fooInstanceVar2[#Int#]{{; name=.+$}}
 // PROTO_MEMBERS_2-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc0()[#Double#]{{; name=.+$}}
 // PROTO_MEMBERS_2-NEXT: Decl[InstanceMethod]/CurrNominal: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_2-NEXT: Decl[Subscript]/CurrNominal/Erase[1]: [{#Int#}][#Double#]{{; name=.+$}}
 // PROTO_MEMBERS_2-NEXT: End completions
 }
 
@@ -977,6 +981,7 @@ func testLookInProto3() {
 // PROTO_MEMBERS_3-NEXT: Decl[InstanceVar]/Super:          fooInstanceVar2[#Int#]{{; name=.+$}}
 // PROTO_MEMBERS_3-NEXT: Decl[InstanceMethod]/Super:       fooInstanceFunc0()[#Double#]{{; name=.+$}}
 // PROTO_MEMBERS_3-NEXT: Decl[InstanceMethod]/Super:       fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// PROTO_MEMBERS_3-NEXT: Decl[Subscript]/Super/Erase[1]:   [{#Int#}][#Double#]{{; name=.+$}}
 // PROTO_MEMBERS_3-NEXT: Decl[InstanceMethod]/CurrNominal: fooExInstanceFunc0()[#Double#]{{; name=.+$}}
 // PROTO_MEMBERS_3-NEXT: End completions
 }
@@ -1010,6 +1015,7 @@ func testResolveFuncParam3<Foo : FooProtocol>(_ foo: Foo) {
 // RESOLVE_FUNC_PARAM_3-NEXT: Decl[InstanceVar]/Super:    fooInstanceVar2[#Int#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_3-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc0()[#Double#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_3-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_3-NEXT: Decl[Subscript]/Super/Erase[1]: [{#Int#}][#Double#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_3-NEXT: End completions
 }
 
@@ -1024,6 +1030,7 @@ func testResolveFuncParam4<FooBar : FooProtocol & BarProtocol>(_ fooBar: FooBar)
 // RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceVar]/Super:    fooInstanceVar2[#Int#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc0()[#Double#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_4-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_4-NEXT: Decl[Subscript]/Super/Erase[1]: [{#Int#}][#Double#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_4-NEXT: End completions
 }
 
@@ -1039,6 +1046,7 @@ func testResolveFuncParam5<FooExBarEx : FooExProtocol & BarExProtocol>(_ a: FooE
 // RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceVar]/Super:    fooInstanceVar2[#Int#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc0()[#Double#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_5-NEXT: Decl[Subscript]/Super/Erase[1]: [{#Int#}][#Double#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_5-NEXT: Decl[InstanceMethod]/Super: fooExInstanceFunc0()[#Double#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_5-NEXT: End completions
 }
@@ -1051,6 +1059,7 @@ func testResolveFuncParam6<Foo : FooProtocol where Foo : FooClass>(_ foo: Foo) {
 // RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceVar]/Super:    fooInstanceVar2[#Int#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc0()[#Double#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// RESOLVE_FUNC_PARAM_6-NEXT: Decl[Subscript]/Super/Erase[1]: [{#Int#}][#Double#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceVar]/Super:    fooClassInstanceVar[#Int#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceMethod]/Super: fooClassInstanceFunc0()[#Void#]{{; name=.+$}}
 // RESOLVE_FUNC_PARAM_6-NEXT: Decl[InstanceMethod]/Super: fooClassInstanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
@@ -1072,6 +1081,7 @@ class TestResolveConstructorParam2 {
 // RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: Decl[InstanceVar]/Super:    fooInstanceVar2[#Int#]{{; name=.+$}}
 // RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc0()[#Double#]{{; name=.+$}}
 // RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: Decl[Subscript]/Super/Erase[1]: [{#Int#}][#Double#]{{; name=.+$}}
 // RESOLVE_CONSTRUCTOR_PARAM_2-NEXT: End completions
   }
 }
@@ -1085,6 +1095,7 @@ class TestResolveConstructorParam3<Foo : FooProtocol> {
 // RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: Decl[InstanceVar]/Super:    fooInstanceVar2[#Int#]{{; name=.+$}}
 // RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc0()[#Double#]{{; name=.+$}}
 // RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: Decl[InstanceMethod]/Super: fooInstanceFunc1({#(a): Int#})[#Double#]{{; name=.+$}}
+// RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: Decl[Subscript]/Super/Erase[1]: [{#Int#}][#Double#]{{; name=.+$}}
 // RESOLVE_CONSTRUCTOR_PARAM_3-NEXT: End completions
   }
 }

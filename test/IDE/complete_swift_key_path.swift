@@ -73,11 +73,12 @@ let _ = \Person.friends[0]#^OBJ_NODOT^#
 // OBJ-NODOT-NEXT: Decl[Subscript]/CurrNominal:        [{#Int#}][#Int#]; name=[Int]
 
 let _ = \Person.friends[0].#^OBJ_DOT^#
-// OBJ-DOT: Begin completions, 4 items
+// OBJ-DOT: Begin completions, 5 items
 // OBJ-DOT-NEXT: Decl[InstanceVar]/CurrNominal:      name[#String#]; name=name
 // OBJ-DOT-NEXT: Decl[InstanceVar]/CurrNominal:      friends[#[Person]#]; name=friends
 // OBJ-DOT-NEXT: Decl[InstanceVar]/CurrNominal:      bestFriend[#Person?#]; name=bestFriend
 // OBJ-DOT-NEXT: Decl[InstanceVar]/CurrNominal:      itself[#Person#]; name=itself
+// OBJ-DOT-NEXT: Decl[Subscript]/CurrNominal/Erase[1]: [{#Int#}][#Int#]; name=[Int]
 
 let _ = \Person.bestFriend#^OPTIONAL_NODOT^#
 // OPTIONAL-NODOT: Begin completions
@@ -94,6 +95,7 @@ let _ = \Person.bestFriend.#^OPTIONAL_DOT^#
 // OPTIONAL-DOT-NEXT: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.friends[#[Person]#]; name=friends
 // OPTIONAL-DOT-NEXT: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.bestFriend[#Person?#]; name=bestFriend
 // OPTIONAL-DOT-NEXT: Decl[InstanceVar]/CurrNominal/Erase[1]: ?.itself[#Person#]; name=itself
+// OPTIONAL-DOT-NEXT: Decl[Subscript]/CurrNominal/Erase[1]: ?[{#Int#}][#Int#]; name=[Int]
 // OPTIONAL-DOT: Decl[InstanceVar]/CurrNominal:      unsafelyUnwrapped[#Person#]; name=unsafelyUnwrapped
 
 let _ = \Person.bestFriend?#^UNWRAPPED_NODOT^#

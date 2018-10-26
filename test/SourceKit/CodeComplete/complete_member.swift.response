@@ -1,6 +1,17 @@
 {
   key.results: [
     {
+      key.kind: source.lang.swift.decl.function.subscript,
+      key.name: "[]",
+      key.sourcetext: "[<#T##Int#>]",
+      key.description: "[Int]",
+      key.typename: "Double",
+      key.context: source.codecompletion.context.thisclass,
+      key.num_bytes_to_erase: 1,
+      key.associated_usrs: "s:15complete_member11FooProtocolPySdSicip",
+      key.modulename: "complete_member"
+    },
+    {
       key.kind: source.lang.swift.decl.function.method.instance,
       key.name: "fooInstanceFunc0()",
       key.sourcetext: "fooInstanceFunc0()",

@@ -1447,7 +1447,7 @@ public:
   void completePostfixExpr(Expr *E, bool hasSpace) override;
   void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) override;
   void completeExprSuper(SuperRefExpr *SRE) override;
-  void completeExprSuperDot(SuperRefExpr *SRE) override;
+  void completeExprSuperDot(SuperRefExpr *SRE, SourceLoc DotLoc) override;
   void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) override;
 
   void completeTypeSimpleBeginning() override;
@@ -2653,9 +2653,8 @@ public:
     if (!ExprType || ExprType->is<AnyMetatypeType>())
       return;
 
-    // Subscript after '.' is valid only after type part of Swift keypath
-    // expression. (e.g. '\TyName.SubTy.[0])
-    if (HaveDot && !IsAfterSwiftKeyPathRoot)
+    if (!IsAfterSwiftKeyPathRoot &&
+        NumBytesToEraseDot > CodeCompletionResult::MaxNumBytesToErase)
       return;
 
     CommandWordsPairs Pairs;
@@ -2667,13 +2666,17 @@ public:
     setClangDeclKeywords(SD, Pairs, Builder);
 
     // '\TyName#^TOKEN^#' requires leading dot.
-    if (!HaveDot && IsAfterSwiftKeyPathRoot)
-      Builder.addLeadingDot();
-
-    if (NeedOptionalUnwrap) {
-      Builder.setNumBytesToErase(NumBytesToEraseDot);
-      Builder.addQuestionMark();
+    if (IsAfterSwiftKeyPathRoot) {
+      if (!HaveDot)
+        Builder.addLeadingDot();
+    } else {
+      if (HaveDot)
+        Builder.setNumBytesToErase(NumBytesToEraseDot);
     }
+
+    if (NeedOptionalUnwrap)
+      Builder.addQuestionMark();
+
 
     Builder.addLeftBracket();
     addParameters(Builder, SD->getIndices());
@@ -3156,12 +3159,6 @@ public:
     if (Type Unwrapped = ExprType->getOptionalObjectType()) {
       llvm::SaveAndRestore<bool> ChangeNeedOptionalUnwrap(NeedOptionalUnwrap,
                                                           true);
-      if (DotLoc.isValid()) {
-        NumBytesToEraseDot = Ctx.SourceMgr.getByteDistance(
-            DotLoc, Ctx.SourceMgr.getCodeCompletionLoc());
-      } else {
-        NumBytesToEraseDot = 0;
-      }
       if (NumBytesToEraseDot <= CodeCompletionResult::MaxNumBytesToErase) {
         if (!tryTupleExprCompletions(Unwrapped)) {
           lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
@@ -3201,6 +3198,14 @@ public:
       return;
     if (tryTupleExprCompletions(ExprType))
       return;
+
+    if (DotLoc.isValid()) {
+      NumBytesToEraseDot = Ctx.SourceMgr.getByteDistance(
+          DotLoc, Ctx.SourceMgr.getCodeCompletionLoc());
+    } else {
+      NumBytesToEraseDot = 0;
+    }
+
     // Don't check/return so we still add the members of Optional itself below
     tryUnwrappedCompletions(ExprType, isIUO);
 
@@ -4637,7 +4642,8 @@ void CodeCompletionCallbacksImpl::completeExprSuper(SuperRefExpr *SRE) {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
+void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE,
+                                                       SourceLoc DotLoc) {
   // Don't produce any results in an enum element.
   if (InEnumElementRawValue)
     return;
@@ -4649,6 +4655,7 @@ void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
   }
 
   ParsedExpr = SRE;
+  this->DotLoc = DotLoc;
   CurDeclContext = P.CurDeclContext;
 }
 
@@ -5651,7 +5658,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::SuperExprDot: {
     Lookup.setIsSuperRefExpr();
-    Lookup.setHaveDot(SourceLoc());
+    Lookup.setHaveDot(DotLoc);
     Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
     break;
   }
