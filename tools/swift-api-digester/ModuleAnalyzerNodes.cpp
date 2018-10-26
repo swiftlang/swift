@@ -377,14 +377,6 @@ StringRef SDKNodeDecl::getScreenInfo() const {
   return Ctx.buffer(OS.str());
 }
 
-bool SDKNodeDecl::isSDKPrivate() const {
-  if (getName().startswith("__"))
-    return true;
-  if (auto *PD = dyn_cast<SDKNodeDecl>(getParent()))
-    return PD->isSDKPrivate();
-  return false;
-}
-
 void SDKNodeDecl::printFullyQualifiedName(llvm::raw_ostream &OS) const {
   std::vector<NodePtr> Parent;
   for (auto *P = getParent(); isa<SDKNodeDecl>(P); P = P->getParent())

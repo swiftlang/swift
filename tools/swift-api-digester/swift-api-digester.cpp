@@ -848,8 +848,7 @@ void swift::ide::api::SDKNodeDeclVar::diagnose(SDKNode *Right) {
 }
 
 static bool shouldDiagnoseType(SDKNodeType *T) {
-  return T->isTopLevelType() &&
-    !cast<SDKNodeDecl>(T->getParent())->isSDKPrivate();
+  return T->isTopLevelType();
 }
 
 void swift::ide::api::SDKNodeType::diagnose(SDKNode *Right) {
@@ -1914,8 +1913,6 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
 }
 
 void DiagnosisEmitter::visitDecl(SDKNodeDecl *Node) {
-  if (Node->isSDKPrivate())
-    return;
   std::vector<NodeAnnotation> Scratch;
   for (auto Anno : Node->getAnnotations(Scratch))
     handle(Node, Anno);
