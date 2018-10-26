@@ -1,5 +1,6 @@
 
 /* Generic Signature Changes */
+Subscript ManagedBufferPointer.subscript(_:) has generic signature change from <τ_0_0, τ_0_1 where τ_0_0 : _HeapBufferHeader_> to <τ_0_0, τ_0_1 where τ_0_0 == _BridgingBufferHeader, τ_0_1 == AnyObject>
 
 /* RawRepresentable Changes */
 
@@ -8,12 +9,21 @@ Constructor AnyHashable.init(_box:) has been removed
 Constructor AnyHashable.init(_usingDefaultRepresentationOf:) has been removed
 Func AnyHashable._downCastConditional(into:) has been removed
 Struct _ConcreteHashableBox has been removed
+Constructor ManagedBufferPointer.init(_:_:_:) has been removed
+Func _ContiguousArrayStorage._getNonVerbatimBridgedHeapBuffer() has been removed
+Protocol _HeapBufferHeader_ has been removed
+Struct _HeapBufferHeader has been removed
+Var ManagedBufferPointer.value has been removed
 
 /* Moved Decls */
 
 /* Renamed Decls */
 
 /* Type Changes */
+Func _stdlib_NSDictionary_allKeys(_:) has return type change from ManagedBufferPointer<_HeapBufferHeader<Int>, AnyObject> to ManagedBufferPointer<_BridgingBufferHeader, AnyObject>
+Func _stdlib_NSSet_allObjects(_:) has return type change from ManagedBufferPointer<_HeapBufferHeader<Int>, AnyObject> to ManagedBufferPointer<_BridgingBufferHeader, AnyObject>
+Var ManagedBufferPointer.baseAddress has declared type change from UnsafeMutablePointer<τ_0_1> to UnsafeMutablePointer<AnyObject>
+Func __ContiguousArrayStorageBase._getNonVerbatimBridgingBuffer() is added to a non-resilient type
 
 /* Decl Attribute changes */
 
