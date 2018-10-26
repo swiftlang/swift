@@ -933,9 +933,6 @@ private:
     } else {
       TypeDecl *typeDecl = declContext->getSelfNominalTypeDecl();
       
-      TypeMatchOptions matchMode = TypeMatchFlags::AllowOverride;
-      matchMode |= TypeMatchFlags::AllowTopLevelOptionalMismatch;
-      
       if (!renamedParsedDeclName.ContextName.empty()) {
         auto contextIdentifier = D->getASTContext().getIdentifier(renamedParsedDeclName.ContextName);
         UnqualifiedLookup specificTypeLookup(contextIdentifier,
@@ -948,10 +945,10 @@ private:
           goto printing_rename_attribute;
         }
         
-        if (typeDecl->getDeclaredInterfaceType()->matches(specificTypeLookup.getSingleTypeResult()->getDeclaredInterfaceType(), matchMode)) {
+        if (typeDecl->getDeclaredInterfaceType()->matches(specificTypeLookup.getSingleTypeResult()->getDeclaredInterfaceType(), TypeMatchFlags::AllowOverride)) {
           // If the Context Name contain the name of the subclass then we would find the renamed in the superclass instead
           typeDecl = specificTypeLookup.getSingleTypeResult();
-        } else if (!specificTypeLookup.getSingleTypeResult()->getDeclaredInterfaceType()->matches(typeDecl->getDeclaredInterfaceType(), matchMode)) {
+        } else if (!specificTypeLookup.getSingleTypeResult()->getDeclaredInterfaceType()->matches(typeDecl->getDeclaredInterfaceType(), TypeMatchFlags::AllowOverride)) {
           // Failed and print the raw renamed attributed when there is no relationship between those 2 types
           renamedDecl = nullptr;
           goto printing_rename_attribute;
