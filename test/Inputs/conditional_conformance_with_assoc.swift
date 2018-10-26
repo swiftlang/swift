@@ -123,7 +123,7 @@ public func generic_generic<T: P2, U>(_: T.Type, _: U.Type)
 // CHECK-NEXT:    [[B_AT2_AT2_AT3_P3_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 2
 // CHECK-NEXT:    store i8** %T.AT2.AT2.AT3.P3, i8*** [[B_AT2_AT2_AT3_P3_PTR]], align 8
 
-// CHECK-NEXT:    [[Double_P1:%.*]] = call i8** @"$s34conditional_conformance_with_assoc6DoubleVyxq_GAA2P1A2A2P3R_AA2P23AT2RpzAafH_AhaGP3AT3RPzrlWa"(%swift.type* [[Double_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]])
+// CHECK-NEXT:    [[Double_P1:%.*]] = call i8** @swift_getWitnessTable
 // CHECK-NEXT:    call swiftcc void @"$s34conditional_conformance_with_assoc8takes_p1yyxmAA2P1RzlF"(%swift.type* [[Double_TYPE]], %swift.type* [[Double_TYPE]], i8** [[Double_P1]])
 // CHECK-NEXT:    ret void
 // CHECK-NEXT:  }
@@ -147,7 +147,7 @@ public func generic_concrete<T: P2>(_: T.Type)
 // CHECK-NEXT:    [[B_AT2_AT2_AT3_P3_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 2
 // CHECK-NEXT:    store i8** %T.AT2.AT2.AT3.P3, i8*** [[B_AT2_AT2_AT3_P3_PTR]], align 8
 
-// CHECK-NEXT:    [[Double_P1:%.*]] = call i8** @"$s34conditional_conformance_with_assoc6DoubleVyxq_GAA2P1A2A2P3R_AA2P23AT2RpzAafH_AhaGP3AT3RPzrlWa"(%swift.type* [[Double_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]])
+// CHECK-NEXT:    [[Double_P1:%.*]] = call i8** @swift_getWitnessTable
 // CHECK-NEXT:    call swiftcc void @"$s34conditional_conformance_with_assoc8takes_p1yyxmAA2P1RzlF"(%swift.type* [[Double_TYPE]], %swift.type* [[Double_TYPE]], i8** [[Double_P1]])
 // CHECK-NEXT:    ret void
 // CHECK-NEXT:  }
@@ -171,7 +171,7 @@ public func concrete_generic<U>(_: U.Type)
 // CHECK-NEXT:  store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @"$s34conditional_conformance_with_assoc6IsBothVAA2P2AAWP", i32 0, i32 0), i8*** [[B_AT2_P2_PTR]], align 8
 // CHECK-NEXT:  [[B_AT2_AT2_AT3_P3_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 2
 // CHECK-NEXT:  store i8** getelementptr inbounds ([2 x i8*], [2 x i8*]* @"$s34conditional_conformance_with_assoc4IsP3VAA0F0AAWP", i32 0, i32 0), i8*** [[B_AT2_AT2_AT3_P3_PTR]], align 8
-// CHECK-NEXT:  [[Double_P1:%.*]] = call i8** @"$s34conditional_conformance_with_assoc6DoubleVyxq_GAA2P1A2A2P3R_AA2P23AT2RpzAafH_AhaGP3AT3RPzrlWa"(%swift.type* [[Double_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]])
+// CHECK-NEXT:  [[Double_P1:%.*]] = call i8** @swift_getWitnessTable
 // CHECK-NEXT:  call swiftcc void @"$s34conditional_conformance_with_assoc8takes_p1yyxmAA2P1RzlF"(%swift.type* [[Double_TYPE]], %swift.type* [[Double_TYPE]], i8** [[Double_P1]])
 // CHECK-NEXT:  ret void
 // CHECK-NEXT:}
@@ -209,7 +209,7 @@ public func concrete_concrete() {
 // CHECK-NEXT:    store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @"$s34conditional_conformance_with_assoc6IsBothVAA2P2AAWP", i32 0, i32 0), i8*** [[B_AT2_P2_PTR]], align 8
 // CHECK-NEXT:    [[B_AT2_AT2_AT3_P3_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 2
 // CHECK-NEXT:    store i8** getelementptr inbounds ([2 x i8*], [2 x i8*]* @"$s34conditional_conformance_with_assoc4IsP3VAA0F0AAWP", i32 0, i32 0), i8*** [[B_AT2_AT2_AT3_P3_PTR]], align 8
-// CHECK-NEXT:    [[Double_P1:%.*]] = call i8** @"$s34conditional_conformance_with_assoc6DoubleVyxq_GAA2P1A2A2P3R_AA2P23AT2RpzAafH_AhaGP3AT3RPzrlWa"(%swift.type* [[Double_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]])
+// CHECK-NEXT:    [[Double_P1:%.*]] = call i8** @swift_getWitnessTable
 // CHECK-NEXT:    store atomic i8** [[Double_P1]], i8*** @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGACyxq_GAA2P1A2A0I0R_AA0H03AT2RpzAakM_AmaLP3AT3RPzrlWL" release, align 8
 // CHECK-NEXT:    br label %cont
 

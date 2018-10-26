@@ -120,8 +120,6 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
       continue;
 
     addSymbol(LinkEntity::forDirectProtocolWitnessTable(normalConformance));
-    addSymbol(
-        LinkEntity::forProtocolWitnessTableAccessFunction(normalConformance));
     addSymbol(LinkEntity::forProtocolConformanceDescriptor(normalConformance));
 
     // FIXME: the logic around visibility in extensions is confusing, and

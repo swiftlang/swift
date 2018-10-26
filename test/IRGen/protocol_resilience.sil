@@ -93,7 +93,7 @@ protocol InternalProtocol {
 // Witness table for conformance with resilient associated type
 
 // CHECK: @"$s19protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWP" = {{(protected )?}}hidden global [3 x i8*] [
-// CHECK-SAME:   i8* bitcast (i8** ()* @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWa" to i8*)
+// CHECK-SAME:   i8* bitcast (i8** ()* @"$s19protocol_resilience23ResilientConformingTypeVAC010resilient_A005OtherC8ProtocolAAWl"
 // CHECK-SAME:   @"symbolic 19protocol_resilience23ResilientConformingTypeV"
 // CHECK-SAME: ]
 
@@ -101,16 +101,13 @@ protocol InternalProtocol {
 
 // CHECK: @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAMc" =
 
-// CHECK-SAME: i32 131073,
+// CHECK-SAME: i32 131072,
 
 // -- number of witness table entries
 // CHECK-SAME:   i16 1,
 
 // -- size of private area + 'requires instantiation' bit (not set)
 // CHECK-SAME:   i16 0,
-
-// -- the template
-// CHECK-SAME:   @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWp"
 
 // -- instantiator function
 // CHECK-SAME:   i32 0
@@ -122,7 +119,7 @@ protocol InternalProtocol {
 // CHECK: "$s19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAMc" = hidden constant {
 
 // -- flags
-// CHECK-SAME: i32 196609,
+// CHECK-SAME: i32 196608,
 
 // CHECK-SAME: i32 3,
 
@@ -141,9 +138,6 @@ protocol InternalProtocol {
 
 // -- size of private area + 'requires instantiation' bit (not set)
 // CHECK-SAME:   i16 0,
-
-// -- the template
-// CHECK-SAME:   @"$s19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWp"
 
 // -- instantiator function
 // CHECK-SAME:   i32 0
@@ -373,20 +367,13 @@ bb0(%0 : $*ResilientConformingType):
 // CHECK-NEXT:    br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK:         [[WTABLE:%.*]] = call i8** @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWa"()
+// CHECK:         [[WTABLE:%.*]] = call i8** @swift_getWitnessTable
 // CHECK-NEXT:    store atomic i8** [[WTABLE]], i8*** @"$s19protocol_resilience23ResilientConformingTypeVAC010resilient_A005OtherC8ProtocolAAWL" release
 // CHECK-NEXT:    br label %cont
 
 // CHECK:       cont:
 // CHECK-NEXT:    [[RESULT:%.*]] = phi i8** [ [[CCHE:%.*]], %entry ], [ [[WTABLE:%.*]], %cacheIsNull ]
 // CHECK-NEXT:    ret i8** [[RESULT]]
-
-// Resilient conformance -- must call a runtime function
-
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} i8** @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWa"()
-// CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_instantiateWitnessTable(%swift.protocol_conformance_descriptor* bitcast ({{[{].*[}]}}* @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAMc" to %swift.protocol_conformance_descriptor*), %swift.type* null, i8*** null)
-// CHECK-NEXT:    ret i8** [[WTABLE]]
 
 
 //
@@ -494,13 +481,3 @@ sil_witness_table ConformsWithRequirements : ProtocolWithRequirements module pro
   method #ProtocolWithRequirements.first!1: @firstWitness
   method #ProtocolWithRequirements.second!1: @secondWitness
 }
-
-//
-// Witness table accessors for fragile conformances are emitted last
-//
-
-// Fragile conformance -- no runtime calls needed
-
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden i8** @"$s19protocol_resilience16ConformingStructVAA17ResilientProtocolAAWa"()
-// CHECK-NEXT:  entry:
-// CHECK-NEXT:    ret i8** getelementptr inbounds ([9 x i8*], [9 x i8*]* @"$s19protocol_resilience16ConformingStructVAA17ResilientProtocolAAWP", i32 0, i32 0)

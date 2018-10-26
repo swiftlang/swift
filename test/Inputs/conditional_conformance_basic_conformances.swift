@@ -55,17 +55,9 @@ public func single_generic<T: P2>(_: T.Type) {
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[T_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store i8** %T.P2, i8*** [[T_P2_PTR]], align 8
-// CHECK-NEXT:    [[Single_P1:%.*]] = call i8** @"$s42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlWa"(%swift.type* [[Single_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]])
+// CHECK-NEXT:    [[Single_P1:%.*]] = call i8** @swift_getWitnessTable
 // CHECK-NEXT:    call swiftcc void @"$s42conditional_conformance_basic_conformances8takes_p1yyxmAA2P1RzlF"(%swift.type* [[Single_TYPE]], %swift.type* [[Single_TYPE]], i8** [[Single_P1]])
 // CHECK-NEXT:    ret void
-// CHECK-NEXT:  }
-
-// Witness table accessor for Single : P1
-
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} i8** @"$s42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlWa"(%swift.type*, i8***)
-// CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TABLE:%.*]] = call i8** @swift_instantiateWitnessTable(%swift.protocol_conformance_descriptor* bitcast{{.*}}@"$s42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlMc"{{.*}}, %swift.type* %0, i8*** %1)
-// CHECK-NEXT:    ret i8** [[TABLE]]
 // CHECK-NEXT:  }
 
 
@@ -99,7 +91,7 @@ public func single_concrete() {
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$s42conditional_conformance_basic_conformances4IsP2VAA0F0AAWP", i32 0, i32 0), i8*** [[A_P2_PTR]], align 8
 
-// CHECK-NEXT:    [[Single_P1:%.*]] = call i8** @"$s42conditional_conformance_basic_conformances6SingleVyxGAA2P1A2A2P2RzlWa"(%swift.type* [[Single_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]]) [[ATTRS:#[0-9]+]]
+// CHECK-NEXT:    [[Single_P1:%.*]] = call i8** @swift_getWitnessTable
 // CHECK-NEXT:    store atomic i8** [[Single_P1]], i8*** @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGACyxGAA2P1A2A0G0RzlWL" release, align 8
 // CHECK-NEXT:    br label %cont
 
@@ -180,19 +172,10 @@ public func double_generic_generic<U: P2, V: P3>(_: U.Type, _: V.Type) {
 // CHECK-NEXT:    [[C_P3_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 1
 // CHECK-NEXT:    store i8** %V.P3, i8*** [[C_P3_PTR]], align 8
 
-// CHECK-NEXT:    [[Double_P1:%.*]] = call i8** @"$s42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlWa"(%swift.type* [[Double_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]])
+// CHECK-NEXT:    [[Double_P1:%.*]] = call i8** @swift_getWitnessTable
 // CHECK-NEXT:    call swiftcc void @"$s42conditional_conformance_basic_conformances8takes_p1yyxmAA2P1RzlF"(%swift.type* [[Double_TYPE]], %swift.type* [[Double_TYPE]], i8** [[Double_P1]])
 // CHECK-NEXT:    ret void
 // CHECK-NEXT:  }
-
-// witness table accessor for Double : P1
-
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} i8** @"$s42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlWa"(%swift.type*, i8***)
-// CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TABLE:%.*]] = call i8** @swift_instantiateWitnessTable(%swift.protocol_conformance_descriptor* bitcast{{.*}}@"$s42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlMc"{{.*}}, %swift.type* %0, i8*** %1)
-// CHECK-NEXT:    ret i8** [[TABLE]]
-// CHECK-NEXT:  }
-
 
 public func double_generic_concrete<X: P2>(_: X.Type) {
   takes_p1(Double<X, IsP3>.self)
@@ -209,7 +192,7 @@ public func double_generic_concrete<X: P2>(_: X.Type) {
 // CHECK-NEXT:    [[C_P3_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 1
 // CHECK-NEXT:    store i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$s42conditional_conformance_basic_conformances4IsP3VAA0F0AAWP", i32 0, i32 0), i8*** [[C_P3_PTR]], align 8
 
-// CHECK-NEXT:    [[Double_P1:%.*]] = call i8** @"$s42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlWa"(%swift.type* [[Double_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]])
+// CHECK-NEXT:    [[Double_P1:%.*]] = call i8** @swift_getWitnessTable
 // CHECK-NEXT:    call swiftcc void @"$s42conditional_conformance_basic_conformances8takes_p1yyxmAA2P1RzlF"(%swift.type* [[Double_TYPE]], %swift.type* [[Double_TYPE]], i8** [[Double_P1]])
 // CHECK-NEXT:    ret void
 // CHECK-NEXT:  }
@@ -245,7 +228,7 @@ public func double_concrete_concrete() {
 // CHECK-NEXT:    [[C_P3_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 1
 // CHECK-NEXT:    store i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$s42conditional_conformance_basic_conformances4IsP3VAA0F0AAWP", i32 0, i32 0), i8*** [[C_P3_PTR]], align 8
 
-// CHECK-NEXT:    [[Double_P1:%.*]] = call i8** @"$s42conditional_conformance_basic_conformances6DoubleVyxq_GAA2P1A2A2P2RzAA2P3R_rlWa"(%swift.type* [[Double_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]])
+// CHECK-NEXT:    [[Double_P1:%.*]] = call i8** @swift_getWitnessTable
 // CHECK-NEXT:    store atomic i8** [[Double_P1]], i8*** @"$s42conditional_conformance_basic_conformances6DoubleVyAA4IsP2VAA0F2P3VGACyxq_GAA2P1A2A0G0RzAA0H0R_rlWL" release, align 8
 // CHECK-NEXT:    br label %cont
 
@@ -303,5 +286,3 @@ protocol P5 {}
 
 struct SR7101<T> {}
 extension SR7101 : P5 where T == P4Typealias {}
-
-// CHECK: attributes [[ATTRS]] = { nounwind }

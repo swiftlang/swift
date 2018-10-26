@@ -100,9 +100,9 @@ public protocol Spoon { }
 // -- nominal type descriptor
 // CHECK-SAME:           @"$s28protocol_conformance_records17NativeGenericTypeVMn"
 // -- witness table accessor
-// CHECK-SAME:           @"$s28protocol_conformance_records17NativeGenericTypeVyxGAA5SpoonA2aERzlWa
+// CHECK-SAME:           @"$s28protocol_conformance_records17NativeGenericTypeVyxGAA5Spoon
 // -- flags
-// CHECK-SAME:           i32 131330
+// CHECK-SAME:           i32 131328
 // -- conditional requirement #1
 // CHECK-SAME:           i32 128,
 // CHECK-SAME:           i32 0,
@@ -118,10 +118,10 @@ extension NativeGenericType : Spoon where T: Spoon {
 // CHECK-SAME:           @"{{got.|__imp_}}$s18resilient_protocol22OtherResilientProtocolMp"
 // -- nominal type descriptor
 // CHECK-SAME:           @"{{got.|__imp_}}$sSiMn"
-// -- witness table accessor
-// CHECK-SAME:           @"$sSi18resilient_protocol22OtherResilientProtocol0B20_conformance_recordsWa"
+// -- witness table pattern
+// CHECK-SAME:           @"$sSi18resilient_protocol22OtherResilientProtocol0B20_conformance_recordsWp"
 // -- flags
-// CHECK-SAME:           i32 131145,
+// CHECK-SAME:           i32 131144,
 // -- module context for retroactive conformance
 // CHECK-SAME:           @"$s28protocol_conformance_recordsMXM"
 // CHECK-SAME:         }
@@ -133,10 +133,10 @@ extension Int : OtherResilientProtocol { }
 // CHECK-SAME:           @"$s28protocol_conformance_records9AssociateMp"
 // -- nominal type descriptor
 // CHECK-SAME:           @"$s28protocol_conformance_records9DependentVMn"
-// -- witness table accessor
-// CHECK-SAME:           @"$s28protocol_conformance_records9DependentVyxGAA9AssociateAAWa"
+// -- witness table pattern
+// CHECK-SAME:           @"$s28protocol_conformance_records9DependentVyxGAA9AssociateAAWp"
 // -- flags
-// CHECK-SAME:           i32 1
+// CHECK-SAME:           i32 0
 // -- number of words in witness table
 // CHECK-SAME:           i16 2,
 // -- number of private words in witness table + bit for "needs instantiation"

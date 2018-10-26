@@ -2013,13 +2013,10 @@ struct TargetGenericWitnessTable {
   /// to require instantiation.
   uint16_t WitnessTablePrivateSizeInWordsAndRequiresInstantiation;
 
-  /// The pattern.
-  RelativeDirectPointer<const TargetWitnessTable<Runtime>> Pattern;
-
   /// The instantiation function, which is called after the template is copied.
   RelativeDirectPointer<void(TargetWitnessTable<Runtime> *instantiatedTable,
                              const TargetMetadata<Runtime> *type,
-                             void ** const *instantiationArgs),
+                             const void * const *instantiationArgs),
                         /*nullable*/ true> Instantiator;
 
   using PrivateDataType = void *[swift::NumGenericMetadataPrivateDataWords];
@@ -2035,18 +2032,6 @@ struct TargetGenericWitnessTable {
   /// Whether the witness table is known to require instantiation.
   uint16_t requiresInstantiation() const {
     return WitnessTablePrivateSizeInWordsAndRequiresInstantiation & 0x01;
-  }
-
-  /// Retrieve the protocol conformance descriptor.
-  ConstTargetPointer<Runtime, TargetProtocolConformanceDescriptor<Runtime>>
-  getConformance() const {
-    return Pattern->Description;
-  }
-
-  /// Retrieve the protocol.
-  ConstTargetPointer<Runtime, TargetProtocolDescriptor<Runtime>>
-  getProtocol() const {
-    return Pattern->Description->getProtocol();
   }
 };
 using GenericWitnessTable = TargetGenericWitnessTable<InProcess>;
@@ -2279,15 +2264,8 @@ private:
   // Some description of the type that conforms to the protocol.
   TargetTypeReference<Runtime> TypeRef;
 
-  // The conformance, or a generator function for the conformance.
-  union {
-    /// A direct reference to the witness table for the conformance.
-    RelativeDirectPointer<const TargetWitnessTable<Runtime>> WitnessTable;
-    
-    /// A function that produces the witness table given an instance of the
-    /// type.
-    RelativeDirectPointer<WitnessTableAccessorFn> WitnessTableAccessor;
-  };
+  /// The witness table pattern, which may also serve as the witness table.
+  RelativeDirectPointer<const TargetWitnessTable<Runtime>> WitnessTablePattern;
 
   /// Various flags, including the kind of conformance.
   ConformanceFlags Flags;
@@ -2300,10 +2278,6 @@ public:
 
   TypeReferenceKind getTypeKind() const {
     return Flags.getTypeReferenceKind();
-  }
-
-  typename ConformanceFlags::ConformanceKind getConformanceKind() const {
-    return Flags.getConformanceKind();
   }
 
   const char *getDirectObjCClassName() const {
@@ -2325,6 +2299,18 @@ public:
     return this->template getTrailingObjects<RelativeContextPointer<Runtime>>();
   }
 
+  /// Whether this conformance is non-unique because it has been synthesized
+  /// for a foreign type.
+  bool isSynthesizedNonUnique() const {
+    return Flags.isSynthesizedNonUnique();
+  }
+
+  /// Whether this conformance has any conditional requirements that need to
+  /// be evaluated.
+  bool hasConditionalRequirements() const {
+    return Flags.getNumConditionalRequirements() > 0;
+  }
+
   /// Retrieve the conditional requirements that must also be
   /// satisfied
   llvm::ArrayRef<GenericRequirementDescriptor>
@@ -2333,31 +2319,12 @@ public:
             Flags.getNumConditionalRequirements()};
   }
 
-  /// Get the directly-referenced static witness table.
-  const swift::TargetWitnessTable<Runtime> *getStaticWitnessTable() const {
-    switch (getConformanceKind()) {
-    case ConformanceFlags::ConformanceKind::WitnessTable:
-      break;
-        
-    case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
-    case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor:
-      assert(false && "not witness table");
-    }
-    return WitnessTable;
+  /// Get the directly-referenced witness table pattern, which may also
+  /// serve as the witness table.
+  const swift::TargetWitnessTable<Runtime> *getWitnessTablePattern() const {
+    return WitnessTablePattern;
   }
-  
-  WitnessTableAccessorFn *getWitnessTableAccessor() const {
-    switch (getConformanceKind()) {
-    case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
-    case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor:
-      break;
-        
-    case ConformanceFlags::ConformanceKind::WitnessTable:
-      assert(false && "not witness table accessor");
-    }
-    return WitnessTableAccessor;
-  }
-  
+
   /// Get the canonical metadata for the type referenced by this record, or
   /// return null if the record references a generic or universal type.
   const TargetMetadata<Runtime> *getCanonicalTypeMetadata() const;

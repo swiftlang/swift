@@ -255,11 +255,6 @@ public:
     return mangleConformanceSymbol(Type(), C, "WI");
   }
 
-  std::string mangleProtocolWitnessTableAccessFunction(
-                                                const ProtocolConformance *C) {
-    return mangleConformanceSymbol(Type(), C, "Wa");
-  }
-
   std::string mangleProtocolWitnessTableLazyAccessFunction(Type type,
                                                 const ProtocolConformance *C) {
     return mangleConformanceSymbol(type, C, "Wl");
