@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-clang -c %S/Inputs/newtype.m -o %t/newtype.objc.o -I %S/Inputs/usr/include -fmodules
 // RUN: %target-build-swift -c -I %S/Inputs/usr/include -o %t/newtype.swift.o %s
-// RUN: %swiftc_driver %t/newtype.objc.o %t/newtype.swift.o -o %t/newtype
+// RUN: %target-swiftc_driver %t/newtype.objc.o %t/newtype.swift.o -o %t/newtype
 // RUN: %target-codesign %t/newtype
 // RUN: %target-run %t/newtype
 
