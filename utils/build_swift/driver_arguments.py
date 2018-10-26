@@ -898,19 +898,28 @@ def create_argument_parser():
                 'Swift')
 
     option('--android-icu-uc', store_path,
-           help='Path to a directory containing libicuuc.so')
+           help='Path to libicuuc.so')
     option('--android-icu-uc-include', store_path,
            help='Path to a directory containing headers for libicuuc')
     option('--android-icu-i18n', store_path,
-           help='Path to a directory containing libicui18n.so')
+           help='Path to libicui18n.so')
     option('--android-icu-i18n-include', store_path,
            help='Path to a directory containing headers libicui18n')
+    option('--android-icu-data', store_path,
+           help='Path to libicudata.so')
     option('--android-deploy-device-path', store_path,
            default=android.adb.commands.DEVICE_TEMP_DIR,
            help='Path on an Android device to which built Swift stdlib '
                 'products will be deployed. If running host tests, specify '
                 'the "{}" directory.'.format(
                     android.adb.commands.DEVICE_TEMP_DIR))
+
+    option('--android-arch', store,
+           choices=['armv7', 'aarch64'],
+           default='armv7',
+           help='The Android target architecture when building for Android. '
+                'Currently only armv7 and aarch64 are supported. '
+                '%(default)s is the default.')
 
     # -------------------------------------------------------------------------
     in_group('Unsupported options')
