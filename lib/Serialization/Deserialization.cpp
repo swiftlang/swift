@@ -1622,8 +1622,8 @@ giveUpFastPath:
                                            getXRefDeclNameForError());
       }
 
-      uint32_t paramIndex;
-      XRefGenericParamPathPieceLayout::readRecord(scratch, paramIndex);
+      uint32_t depth, paramIndex;
+      XRefGenericParamPathPieceLayout::readRecord(scratch, depth, paramIndex);
 
       pathTrace.addGenericParam(paramIndex);
 
@@ -1645,7 +1645,7 @@ giveUpFastPath:
           assert(paramList && "Couldn't find constrained extension");
         } else {
           // Simple case: use the nominal type's generic parameters.
-          paramList = nominal->getGenericParams();
+          paramList = nominal->getGenericParamsOfContext();
         }
       } else if (auto alias = dyn_cast<TypeAliasDecl>(base)) {
         paramList = alias->getGenericParams();
@@ -1660,6 +1660,18 @@ giveUpFastPath:
             "cross-reference to generic param for non-generic type",
             pathTrace, getXRefDeclNameForError());
       }
+
+      unsigned currentDepth = paramList->getDepth();
+      if (currentDepth < depth) {
+        return llvm::make_error<XRefError>(
+            "a containing type has been made non-generic",
+            pathTrace, getXRefDeclNameForError());
+      }
+      while (currentDepth > depth) {
+        paramList = paramList->getOuterParameters();
+        --currentDepth;
+      }
+
       if (paramIndex >= paramList->size()) {
         return llvm::make_error<XRefError>(
             "generic argument index out of bounds",

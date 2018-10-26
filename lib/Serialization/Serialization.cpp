@@ -2026,6 +2026,7 @@ void Serializer::writeCrossReference(const Decl *D) {
            "Cannot cross reference a generic type decl at module scope.");
     abbrCode = DeclTypeAbbrCodes[XRefGenericParamPathPieceLayout::Code];
     XRefGenericParamPathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                                genericParam->getDepth(),
                                                 genericParam->getIndex());
     return;
   }
