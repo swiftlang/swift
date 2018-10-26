@@ -524,6 +524,10 @@ public:
   LLVM_READONLY
   ASTContext &getASTContext() const;
 
+  /// Scaffolding to permit experimentation with finer-grained dependencies and
+  /// faster rebuilds.
+  bool getEnableExperimentalDependencies() const;
+
   /// Retrieve the set of protocols whose conformances will be
   /// associated with this declaration context.
   ///

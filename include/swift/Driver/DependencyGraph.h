@@ -141,11 +141,13 @@ private:
   /// \sa SourceFile::getInterfaceHash
   llvm::DenseMap<const void *, std::string> InterfaceHashes;
 
-  LoadResult loadFromBuffer(const void *node, llvm::MemoryBuffer &buffer);
+  LoadResult loadFromBuffer(const void *node, llvm::MemoryBuffer &buffer,
+                            const bool EnableExperimentalDependencies);
 
 protected:
   LoadResult loadFromString(const void *node, StringRef data);
-  LoadResult loadFromPath(const void *node, StringRef path);
+  LoadResult loadFromPath(const void *node, StringRef path,
+                          const bool EnableExperimentalDependencies);
 
   void addIndependentNode(const void *node) {
     bool newlyInserted = Provides.insert({node, {}}).second;
@@ -228,9 +230,10 @@ public:
   /// ("depends") are not cleared; new dependencies are considered additive.
   ///
   /// If \p node has already been marked, only its outgoing edges are updated.
-  LoadResult loadFromPath(T node, StringRef path) {
-    return DependencyGraphImpl::loadFromPath(Traits::getAsVoidPointer(node),
-                                             path);
+  LoadResult loadFromPath(T node, StringRef path,
+                          const bool EnableExperimentalDependencies) {
+    return DependencyGraphImpl::loadFromPath(
+        Traits::getAsVoidPointer(node), path, EnableExperimentalDependencies);
   }
 
   /// Load "depends" and "provides" data for \p node from a plain string.

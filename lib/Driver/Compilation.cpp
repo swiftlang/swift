@@ -117,7 +117,8 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          Optional<unsigned> BatchSizeLimit,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
-                         std::unique_ptr<UnifiedStatsReporter> StatsReporter)
+                         std::unique_ptr<UnifiedStatsReporter> StatsReporter,
+                         bool EnableExperimentalDependencies)
   : Diags(Diags), TheToolChain(TC),
     TheOutputInfo(OI),
     Level(Level),
@@ -138,7 +139,9 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     SaveTemps(SaveTemps),
     ShowDriverTimeCompilation(ShowDriverTimeCompilation),
     Stats(std::move(StatsReporter)),
-    FilelistThreshold(FilelistThreshold) {
+    FilelistThreshold(FilelistThreshold),
+    EnableExperimentalDependencies(EnableExperimentalDependencies) {
+        
 };
 
 static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
@@ -405,7 +408,9 @@ namespace driver {
         if (ReturnCode == EXIT_SUCCESS || ReturnCode == EXIT_FAILURE) {
           bool wasCascading = DepGraph.isMarked(FinishedCmd);
 
-          switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
+          switch (
+              DepGraph.loadFromPath(FinishedCmd, DependenciesFile,
+                                    Comp.getEnableExperimentalDependencies())) {
           case DependencyGraphImpl::LoadResult::HadError:
             if (ReturnCode == EXIT_SUCCESS) {
               dependencyLoadFailed(DependenciesFile);
@@ -696,7 +701,9 @@ namespace driver {
           if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
             DepGraph.addIndependentNode(Cmd);
           } else {
-            switch (DepGraph.loadFromPath(Cmd, DependenciesFile)) {
+            switch (DepGraph.loadFromPath(
+                Cmd, DependenciesFile,
+                Comp.getEnableExperimentalDependencies())) {
             case DependencyGraphImpl::LoadResult::HadError:
               dependencyLoadFailed(DependenciesFile, /*Warn=*/false);
               break;

@@ -624,6 +624,10 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
   return Depth + 1;
 }
 
+bool DeclContext::getEnableExperimentalDependencies() const {
+  return getASTContext().LangOpts.EnableExperimentalDependencies;
+}
+
 const Decl *
 IterableDeclContext::getDecl() const {
   switch (getIterableContextKind()) {
