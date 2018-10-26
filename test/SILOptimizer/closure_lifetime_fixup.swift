@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-sil -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -sil-verify-all -enable-sil-ownership -emit-sil -o - | %FileCheck %s
 
 func use_closure(_ c : () -> () ) {
   c()
