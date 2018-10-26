@@ -16,7 +16,6 @@
 
 #include "swift/Parse/Parser.h"
 #include "swift/AST/DiagnosticsParse.h"
-#include "swift/AST/Module.h"
 #include "swift/Basic/EditorPlaceholder.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/SyntaxParsingContext.h"
@@ -2668,7 +2667,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // The arguments to the func are defined in their own scope.
   Scope S(this, ScopeKind::ClosureParams);
   ParseFunctionBody cc(*this, closure);
-  
+
   // Handle parameters.
   if (params) {
     // Add the parameters into scope.

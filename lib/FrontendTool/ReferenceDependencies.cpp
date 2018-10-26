@@ -258,7 +258,7 @@ void ReferenceDependenciesEmitter::emitInterfaceHash() const {
   llvm::SmallString<32> interfaceHash;
   SF->getInterfaceHash(interfaceHash);
   out << reference_dependency_keys::interfaceHash << ": \"" << interfaceHash
-  << "\"\n";
+      << "\"\n";
 }
 
 ProvidesEmitter::CollectedDeclarations
@@ -275,7 +275,6 @@ ProvidesEmitter::emitTopLevelNames() const {
 
 void ProvidesEmitter::emitTopLevelDecl(const Decl *const D,
                                        CollectedDeclarations &cpd) const {
-
   switch (D->getKind()) {
   case DeclKind::Module:
     break;
@@ -428,8 +427,8 @@ void ProvidesEmitter::emitValueDecl(const ValueDecl *const VD) const {
 }
 
 void ProvidesEmitter::emitNominalTypes(
-     const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals)
-const {
+    const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals)
+    const {
   out << providesNominal << ":\n";
   for (auto entry : extendedNominals) {
     if (!entry.second)

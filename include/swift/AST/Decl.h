@@ -735,8 +735,6 @@ public:
     return *Context.get<ASTContext *>();
   }
 
-  bool getEnableExperimentalDependencies() const;
-
   const DeclAttributes &getAttrs() const {
     return Attrs;
   }
@@ -961,7 +959,7 @@ public:
     return Mem; 
   }
 
-  template <typename DeclT> static std::string getHash(const DeclT *D);
+  bool getEnableExperimentalDependencies() const;
 };
 
 /// \brief Use RAII to track Decl validation progress and non-reentrancy.
