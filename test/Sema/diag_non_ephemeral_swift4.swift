@@ -163,3 +163,18 @@ func testNonEphemeralInClosures() {
   fn(&local) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
 }
+
+struct S2 {
+  var ptr1: UnsafeMutableRawPointer
+  lazy var ptr2 = UnsafeMutableRawPointer(&globalS)
+}
+
+func testNonEphemeralInMemberwiseInit() {
+  var local = 0
+
+  _ = S2(ptr1: &globalS, ptr2: &local) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer?' to parameter expecting a pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer?' produces a pointer valid only for the duration of the call}}
+
+  _ = S2(ptr1: &local, ptr2: &globalS) // expected-warning {{passing temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call leads to undefined behaviour; this will be an error in a future release}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+}
