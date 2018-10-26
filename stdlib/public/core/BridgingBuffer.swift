@@ -10,28 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-@_fixed_layout
-@usableFromInline
 internal struct _BridgingBufferHeader {
-  @inlinable
   internal init(_ count: Int) { self.count = count }
-  @usableFromInline
   internal var count: Int
 }
 
-@usableFromInline
-@_fixed_layout
 internal final class _BridgingBufferStorage
   : ManagedBuffer<_BridgingBufferHeader, AnyObject> {
 }
 
-@usableFromInline
 internal typealias _BridgingBuffer
   = ManagedBufferPointer<_BridgingBufferHeader, AnyObject>
 
 extension ManagedBufferPointer
 where Header == _BridgingBufferHeader, Element == AnyObject {
-  @inlinable
   internal init(_ count: Int) {
     self.init(
       _uncheckedBufferClass: _BridgingBufferStorage.self,
@@ -41,7 +33,6 @@ where Header == _BridgingBufferHeader, Element == AnyObject {
     }
   }
 
-  @inlinable
   internal var count: Int {
     @inline(__always)
     get {
@@ -53,7 +44,6 @@ where Header == _BridgingBufferHeader, Element == AnyObject {
     }
   }
 
-  @inlinable
   internal subscript(i: Int) -> Element {
     @inline(__always)
     get {
@@ -61,7 +51,6 @@ where Header == _BridgingBufferHeader, Element == AnyObject {
     }
   }
 
-  @inlinable
   internal var baseAddress: UnsafeMutablePointer<Element> {
     @inline(__always)
     get {
@@ -69,7 +58,6 @@ where Header == _BridgingBufferHeader, Element == AnyObject {
     }
   }
 
-  @inlinable
   internal var storage: AnyObject? {
     @inline(__always)
     get {
