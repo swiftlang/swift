@@ -16,14 +16,12 @@ import SwiftShims
 
 /// Equivalent to `NSDictionary.allKeys`, but does not leave objects on the
 /// autorelease pool.
-@inlinable
+@usableFromInline
 internal func _stdlib_NSDictionary_allKeys(
   _ nsd: _NSDictionary
-) -> _HeapBuffer<Int, AnyObject> {
+) -> _BridgingBuffer {
   let count = nsd.count
-  let storage = _HeapBuffer<Int, AnyObject>(
-    _HeapBufferStorage<Int, AnyObject>.self, count, count)
-
+  let storage = _BridgingBuffer(count)
   nsd.getObjects(nil, andKeys: storage.baseAddress, count: count)
   return storage
 }
@@ -461,7 +459,7 @@ extension _CocoaDictionary: _DictionaryBuffer {
     @_effects(releasenone)
     get {
       let allKeys = _stdlib_NSDictionary_allKeys(self.object)
-      return Index(Index.Storage(self, allKeys, allKeys.value))
+      return Index(Index.Storage(self, allKeys, allKeys.count))
     }
   }
 
@@ -475,7 +473,7 @@ extension _CocoaDictionary: _DictionaryBuffer {
 
   internal func validate(_ index: Index) {
     _precondition(index.storage.base.object === self.object, "Invalid index")
-    _precondition(index.storage.currentKeyIndex < index.storage.allKeys.value,
+    _precondition(index.storage.currentKeyIndex < index.storage.allKeys.count,
       "Attempt to access endIndex")
   }
 
@@ -499,7 +497,7 @@ extension _CocoaDictionary: _DictionaryBuffer {
     }
 
     let allKeys = _stdlib_NSDictionary_allKeys(object)
-    for i in 0..<allKeys.value {
+    for i in 0..<allKeys.count {
       if _stdlib_NSObject_isEqual(key, allKeys[i]) {
         return Index(Index.Storage(self, allKeys, i))
       }
@@ -612,14 +610,14 @@ extension _CocoaDictionary.Index {
     // move both into the dictionary/set itself.
 
     /// An unowned array of keys.
-    internal var allKeys: _HeapBuffer<Int, AnyObject>
+    internal var allKeys: _BridgingBuffer
 
     /// Index into `allKeys`
     internal var currentKeyIndex: Int
 
     internal init(
       _ base: __owned _CocoaDictionary,
-      _ allKeys: __owned _HeapBuffer<Int, AnyObject>,
+      _ allKeys: __owned _BridgingBuffer,
       _ currentKeyIndex: Int
     ) {
       self.base = base
@@ -662,7 +660,7 @@ extension _CocoaDictionary.Index {
   internal var key: AnyObject {
     @_effects(readonly)
     get {
-      _precondition(storage.currentKeyIndex < storage.allKeys.value,
+      _precondition(storage.currentKeyIndex < storage.allKeys.count,
         "Attempting to access Dictionary elements using an invalid index")
       return storage.allKeys[storage.currentKeyIndex]
     }

@@ -21,13 +21,9 @@ func _stdlib_CFSetGetValues(_ nss: _NSSet, _: UnsafeMutablePointer<AnyObject>)
 
 /// Equivalent to `NSSet.allObjects`, but does not leave objects on the
 /// autorelease pool.
-@inlinable
-internal func _stdlib_NSSet_allObjects(
-  _ nss: _NSSet
-) -> _HeapBuffer<Int, AnyObject> {
-  let count = nss.count
-  let storage = _HeapBuffer<Int, AnyObject>(
-    _HeapBufferStorage<Int, AnyObject>.self, count, count)
+@usableFromInline
+internal func _stdlib_NSSet_allObjects(_ nss: _NSSet) -> _BridgingBuffer {
+  let storage = _BridgingBuffer(nss.count)
   _stdlib_CFSetGetValues(nss, storage.baseAddress)
   return storage
 }
@@ -338,7 +334,7 @@ extension _CocoaSet: _SetBuffer {
     @_effects(releasenone)
     get {
       let allKeys = _stdlib_NSSet_allObjects(self.object)
-      return Index(Index.Storage(self, allKeys, allKeys.value))
+      return Index(Index.Storage(self, allKeys, allKeys.count))
     }
   }
 
@@ -353,7 +349,7 @@ extension _CocoaSet: _SetBuffer {
   internal func validate(_ index: Index) {
     _precondition(index.storage.base.object === self.object,
       "Invalid index")
-    _precondition(index.storage.currentKeyIndex < index.storage.allKeys.value,
+    _precondition(index.storage.currentKeyIndex < index.storage.allKeys.count,
       "Attempt to access endIndex")
   }
 
@@ -377,7 +373,7 @@ extension _CocoaSet: _SetBuffer {
     }
 
     let allKeys = _stdlib_NSSet_allObjects(object)
-    for i in 0..<allKeys.value {
+    for i in 0..<allKeys.count {
       if _stdlib_NSObject_isEqual(element, allKeys[i]) {
         return Index(Index.Storage(self, allKeys, i))
       }
@@ -452,14 +448,14 @@ extension _CocoaSet.Index {
     // move both into the dictionary/set itself.
 
     /// An unowned array of keys.
-    internal var allKeys: _HeapBuffer<Int, AnyObject>
+    internal var allKeys: _BridgingBuffer
 
     /// Index into `allKeys`
     internal var currentKeyIndex: Int
 
     internal init(
       _ base: __owned _CocoaSet,
-      _ allKeys: __owned _HeapBuffer<Int, AnyObject>,
+      _ allKeys: __owned _BridgingBuffer,
       _ currentKeyIndex: Int
     ) {
       self.base = base
@@ -493,7 +489,7 @@ extension _CocoaSet.Index {
   internal var element: AnyObject {
     @_effects(readonly)
     get {
-      _precondition(storage.currentKeyIndex < storage.allKeys.value,
+      _precondition(storage.currentKeyIndex < storage.allKeys.count,
         "Attempting to access Set elements using an invalid index")
       return storage.allKeys[storage.currentKeyIndex]
     }

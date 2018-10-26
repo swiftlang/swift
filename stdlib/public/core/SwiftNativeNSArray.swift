@@ -163,14 +163,11 @@ extension __SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
       to: Optional<AnyObject>.self)
   }
 
-  @usableFromInline
-  internal typealias HeapBufferStorage = _HeapBufferStorage<Int, AnyObject>
-
   @inlinable
-  internal var _heapBufferBridged: HeapBufferStorage? {
+  internal var _heapBufferBridged: _BridgingBufferStorage? {
     if let ref =
       _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
-      return unsafeBitCast(ref, to: HeapBufferStorage.self)
+      return unsafeBitCast(ref, to: _BridgingBufferStorage.self)
     }
     return nil
   }
@@ -182,11 +179,11 @@ extension __SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   }
 
   @inlinable
-  internal func _destroyBridgedStorage(_ hb: HeapBufferStorage?) {
+  internal func _destroyBridgedStorage(_ hb: _BridgingBufferStorage?) {
     if let bridgedStorage = hb {
-      let heapBuffer = _HeapBuffer(bridgedStorage)
-      let count = heapBuffer.value
-      heapBuffer.baseAddress.deinitialize(count: count)
+      let buffer = _BridgingBuffer(bridgedStorage)
+      let count = buffer.count
+      buffer.baseAddress.deinitialize(count: count)
     }
   }
 
@@ -204,9 +201,9 @@ extension __SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
       
       // If we've already got a buffer of bridged objects, just use it
       if let bridgedStorage = _heapBufferBridged {
-        let heapBuffer = _HeapBuffer(bridgedStorage)
+        let bridgingBuffer = _BridgingBuffer(bridgedStorage)
         buffer = UnsafeBufferPointer(
-            start: heapBuffer.baseAddress, count: heapBuffer.value)
+            start: bridgingBuffer.baseAddress, count: bridgingBuffer.count)
       }
 
       // If elements are bridged verbatim, the native buffer is all we
@@ -218,7 +215,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
       }
       else {
         // Create buffer of bridged objects.
-        let objects = _nativeStorage._getNonVerbatimBridgedHeapBuffer()
+        let objects = _nativeStorage._getNonVerbatimBridgingBuffer()
         
         // Atomically store a reference to that buffer in self.
         if !_stdlib_atomicInitializeARCRef(
@@ -226,7 +223,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
 
           // Another thread won the race.  Throw out our buffer.
           _destroyBridgedStorage(
-            unsafeDowncast(objects.storage!, to: HeapBufferStorage.self))
+            unsafeDowncast(objects.storage!, to: _BridgingBufferStorage.self))
         }
         continue // Try again
       }
@@ -243,7 +240,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   @objc
   internal override var count: Int {
     if let bridgedStorage = _heapBufferBridged {
-      return _HeapBuffer(bridgedStorage).value
+      return _BridgingBuffer(bridgedStorage).count
     }
 
     // Check if elements are bridged verbatim.
@@ -314,10 +311,9 @@ internal class __ContiguousArrayStorageBase
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal func _getNonVerbatimBridgedHeapBuffer() ->
-    _HeapBuffer<Int, AnyObject> {
+  internal func _getNonVerbatimBridgingBuffer() -> _BridgingBuffer {
     _sanityCheckFailure(
-      "Concrete subclasses must implement _getNonVerbatimBridgedHeapBuffer")
+      "Concrete subclasses must implement _getNonVerbatimBridgingBuffer")
   }
 #endif
 
