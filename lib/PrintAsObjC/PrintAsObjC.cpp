@@ -912,16 +912,10 @@ private:
     }
     return hasPrintedAnything;
   }
-    
-  void printRenameForDecl(const AvailableAttr *AvAttr, const ValueDecl *D,
-                          bool includeQuotes) {
-    assert(!AvAttr->Rename.empty());
-    
-    auto renamedParsedDeclName = parseDeclName(AvAttr->Rename);
-    auto renamedDeclName = renamedParsedDeclName.formDeclName(D->getASTContext());
-    
+  
+  const ValueDecl *getRenameDecl(const ValueDecl *D, const ParsedDeclName renamedParsedDeclName) {
     auto declContext = D->getDeclContext();
-    const ValueDecl *renamedDecl = nullptr;
+    auto renamedDeclName = renamedParsedDeclName.formDeclName(D->getASTContext());
     
     if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D)) {
       UnqualifiedLookup lookup(renamedDeclName.getBaseIdentifier(),
@@ -929,7 +923,7 @@ private:
                                nullptr,
                                SourceLoc(),
                                UnqualifiedLookup::Flags::TypeLookup);
-      renamedDecl = lookup.getSingleTypeResult();
+      return lookup.getSingleTypeResult();
     } else {
       TypeDecl *typeDecl = declContext->getSelfNominalTypeDecl();
       
@@ -941,8 +935,7 @@ private:
                                              SourceLoc(),
                                              UnqualifiedLookup::Flags::TypeLookup);
         if (!specificTypeLookup.getSingleTypeResult()) {
-          renamedDecl = nullptr;
-          goto printing_rename_attribute;
+          return nullptr;
         }
         
         if (typeDecl->getDeclaredInterfaceType()->matches(specificTypeLookup.getSingleTypeResult()->getDeclaredInterfaceType(), TypeMatchFlags::AllowOverride)) {
@@ -950,15 +943,15 @@ private:
           typeDecl = specificTypeLookup.getSingleTypeResult();
         } else if (!specificTypeLookup.getSingleTypeResult()->getDeclaredInterfaceType()->matches(typeDecl->getDeclaredInterfaceType(), TypeMatchFlags::AllowOverride)) {
           // Failed and print the raw renamed attributed when there is no relationship between those 2 types
-          renamedDecl = nullptr;
-          goto printing_rename_attribute;
+          return nullptr;
         }
       }
       
+      const ValueDecl *renamedDecl = nullptr;
       SmallVector<ValueDecl *, 4> lookupResults;
       declContext->lookupQualified(
-        typeDecl,
-        renamedDeclName, NL_QualifiedDefault, lookupResults);
+                                   typeDecl,
+                                   renamedDeclName, NL_QualifiedDefault, lookupResults);
       for (auto candidate : lookupResults) {
         if (!shouldInclude(candidate))
           continue;
@@ -986,7 +979,7 @@ private:
               break;
             }
           }
-
+          
           if (!hasSameParameterTypes) {
             continue;
           }
@@ -999,9 +992,16 @@ private:
         }
         renamedDecl = candidate;
       }
+      return renamedDecl;
     }
+  }
+  
+  void printRenameForDecl(const AvailableAttr *AvAttr, const ValueDecl *D,
+                          bool includeQuotes) {
+    assert(!AvAttr->Rename.empty());
     
-  printing_rename_attribute:
+    const swift::ValueDecl * renamedDecl = getRenameDecl(D, parseDeclName(AvAttr->Rename));
+    
     if (renamedDecl) {
       SmallString<128> scratch;
       auto renamedObjCRuntimeName = renamedDecl->getObjCRuntimeName()
