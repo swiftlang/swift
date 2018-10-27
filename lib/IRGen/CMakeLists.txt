@@ -1,4 +1,4 @@
-add_swift_library(swiftIRGen STATIC
+add_swift_host_library(swiftIRGen STATIC
   AllocStackHoisting.cpp
   ClassLayout.cpp
   DebugTypeInfo.cpp

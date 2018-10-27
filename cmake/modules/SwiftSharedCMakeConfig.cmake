@@ -86,9 +86,9 @@ macro(swift_common_standalone_build_config_llvm product is_cross_compiling)
   # then applied to all targets. This causes issues in cross-compiling to
   # Windows from a Linux host.
   # 
-  # To work around this, we unconditionally remove the flag here and then 
-  # selectively add it to the per-target link flags; this is currently done
-  # in add_swift_library within AddSwift.cmake.
+  # To work around this, we unconditionally remove the flag here and then
+  # selectively add it to the per-target link flags; this is currently done in
+  # add_swift_host_library and add_swift_target_library within AddSwift.cmake.
   string(REGEX REPLACE "-Wl,-z,defs" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
   string(REGEX REPLACE "-Wl,-z,nodelete" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
 
