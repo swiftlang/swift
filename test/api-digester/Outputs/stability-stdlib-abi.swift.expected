@@ -6,14 +6,31 @@
 /* Removed Decls */
 Constructor AnyHashable.init(_box:) has been removed
 Constructor AnyHashable.init(_usingDefaultRepresentationOf:) has been removed
+Constructor ManagedBufferPointer.init(_:_:_:) has been removed
 Func AnyHashable._downCastConditional(into:) has been removed
+Func _ContiguousArrayStorage._getNonVerbatimBridgedHeapBuffer() has been removed
+Func _ContiguousArrayStorage._withVerbatimBridgedUnsafeBufferImpl(_:) has been removed
+Func __ContiguousArrayStorageBase._getNonVerbatimBridgedHeapBuffer() has been removed
+Func __EmptyArrayStorage._getNonVerbatimBridgedHeapBuffer() has been removed
+Func __SwiftDeferredNSArray._destroyBridgedStorage(_:) has been removed
+Func _stdlib_NSDictionary_allKeys(_:) has been removed
+Func _stdlib_NSSet_allObjects(_:) has been removed
+Protocol _HeapBufferHeader_ has been removed
 Struct _ConcreteHashableBox has been removed
+Struct _HeapBufferHeader has been removed
+Subscript ManagedBufferPointer.subscript(_:) has been removed
+Var ManagedBufferPointer.baseAddress has been removed
+Var ManagedBufferPointer.storage has been removed
+Var ManagedBufferPointer.value has been removed
+Var __SwiftDeferredNSArray._heapBufferBridged has been removed
+Var __SwiftDeferredNSArray._heapBufferBridgedPtr has been removed
 
 /* Moved Decls */
 
 /* Renamed Decls */
 
 /* Type Changes */
+Func __ContiguousArrayStorageBase._getNonVerbatimBridgingBuffer() is added to a non-resilient type
 
 /* Decl Attribute changes */
 

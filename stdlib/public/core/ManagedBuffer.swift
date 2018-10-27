@@ -12,7 +12,10 @@
 
 import SwiftShims
 
-@inlinable // FIXME(sil-serialize-all)
+@usableFromInline
+internal typealias _HeapObject = SwiftShims.HeapObject
+
+@usableFromInline
 @_silgen_name("swift_bufferAllocate")
 internal func _swift_bufferAllocate(
   bufferType type: AnyClass,

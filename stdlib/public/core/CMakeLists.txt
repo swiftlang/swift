@@ -35,6 +35,7 @@ set(SWIFTLIB_ESSENTIAL
   Bool.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
+  BridgingBuffer.swift
   Builtin.swift
   BuiltinMath.swift.gyb
   Character.swift
@@ -77,7 +78,6 @@ set(SWIFTLIB_ESSENTIAL
   Hasher.swift
   Hashing.swift
   HashTable.swift
-  HeapBuffer.swift
   ICU.swift
   Indices.swift
   InputStream.swift

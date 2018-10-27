@@ -58,7 +58,7 @@ func _stdlib_atomicCompareExchangeStrongPtr(
 ///   shared memory); and
 ///
 /// - the shared memory that you are accessing is located inside a heap
-///   allocation (a class instance property, a `_HeapBuffer`, a pointer to
+///   allocation (a class instance property, a `_BridgingBuffer`, a pointer to
 ///   an `Array` element etc.)
 ///
 /// If the conditions above are not met, the code will still compile, but the

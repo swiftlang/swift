@@ -23,6 +23,7 @@ namespace Lowering {
 
 class SILGenFunction;
 class LogicalPathComponent;
+class FormalEvaluationScope;
 
 class FormalAccess {
 public:
@@ -108,6 +109,9 @@ private:
 
 class FormalEvaluationContext {
   DiverseStack<FormalAccess, 128> stack;
+  FormalEvaluationScope *innermostScope = nullptr;
+
+  friend class FormalEvaluationScope;
 
 public:
   using stable_iterator = decltype(stack)::stable_iterator;
@@ -145,7 +149,13 @@ public:
   /// is the top element of the stack.
   void pop(stable_iterator stable_iter) { stack.pop(stable_iter); }
 
+  bool isInFormalEvaluationScope() const { return innermostScope != nullptr; }
+
   void dump(SILGenFunction &SGF);
+
+#ifndef NDEBUG
+  void checkCleanupDeactivation(CleanupHandle handle);
+#endif
 };
 
 /// A scope associated with the beginning of the evaluation of an lvalue.
@@ -182,8 +192,13 @@ public:
 class FormalEvaluationScope {
   SILGenFunction &SGF;
   llvm::Optional<FormalEvaluationContext::stable_iterator> savedDepth;
-  bool wasInFormalEvaluationScope;
+
+  /// The immediate outer evaluation scope.  This scope is only inserted
+  /// into the chain if it wasn't in an inout conversion scope on creation.
+  FormalEvaluationScope *previous;
   bool wasInInOutConversionScope;
+
+  friend class FormalEvaluationContext;
 
 public:
   FormalEvaluationScope(SILGenFunction &SGF);
@@ -217,6 +232,21 @@ public:
 private:
   void popImpl();
 };
+
+#ifndef NDEBUG
+inline void
+FormalEvaluationContext::checkCleanupDeactivation(CleanupHandle handle) {
+  // Start at the innermost scope depth.  Note that we pop scopes off the
+  // stack before we start emitting their cleanups.
+  if (!innermostScope) return;
+  assert(!innermostScope->isPopped());
+  for (auto i = find(*innermostScope->savedDepth), e = end(); i != e; ++i) {
+    auto &access = *i;
+    assert((access.isFinished() || access.getCleanup() != handle) &&
+           "popping active formal-evaluation cleanup");
+  }
+}
+#endif
 
 } // namespace Lowering
 } // namespace swift
