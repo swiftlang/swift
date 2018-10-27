@@ -3,7 +3,7 @@ if (SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
   set(EXTRA_AST_FLAGS "FORCE_BUILD_OPTIMIZED")
 endif()
 
-add_swift_library(swiftAST STATIC
+add_swift_host_library(swiftAST STATIC
   AccessScopeChecker.cpp
   AccessRequests.cpp
   ASTContext.cpp

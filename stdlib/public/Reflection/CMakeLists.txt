@@ -7,7 +7,7 @@ if (LLVM_ENABLE_ASSERTIONS)
 endif(LLVM_ENABLE_ASSERTIONS)
 
 
-add_swift_library(swiftReflection STATIC TARGET_LIBRARY FORCE_BUILD_FOR_HOST_SDK
+add_swift_target_library(swiftReflection STATIC TARGET_LIBRARY FORCE_BUILD_FOR_HOST_SDK
   MetadataSource.cpp
   TypeLowering.cpp
   TypeRef.cpp
