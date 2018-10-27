@@ -318,13 +318,8 @@ static void copyOrInitValuesInto(Initialization *init,
                 KIND == ImplodeKind::Copy, "Not handled by init");
   bool isInit = (KIND == ImplodeKind::Forward);
 
-  // First, unwrap one-element tuples, since we cannot lower them.
-  auto tupleType = dyn_cast<TupleType>(type);
-  if (tupleType && tupleType->getNumElements() == 1)
-    type = tupleType.getElementType(0);
-
   // If the element has non-tuple type, just serve it up to the initialization.
-  tupleType = dyn_cast<TupleType>(type);
+  auto tupleType = dyn_cast<TupleType>(type);
   if (!tupleType) {
     // We take the first value.
     ManagedValue result = values[0];
