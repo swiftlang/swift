@@ -13,11 +13,42 @@
 import SwiftShims
 
 
-@inlinable @inline(__always) // Fold away opt range and top-level fast-paths
+@usableFromInline
 @_effects(readonly)
 internal func _stringCompare(
-  _ lhs: _StringGuts, _ lhsRange: Range<Int>?,
-  _ rhs: _StringGuts, _ rhsRange: Range<Int>?,
+  _ lhs: _StringGuts, _ rhs: _StringGuts,
+  expecting: _StringComparisonResult
+) -> Bool {
+  _sanityCheck(expecting == .equal || expecting == .less)
+  if lhs.rawBits == rhs.rawBits {
+    return expecting == .equal
+  }
+  if _fastPath(lhs.isFastUTF8 && rhs.isFastUTF8) {
+    let isNFC = lhs.isNFC && rhs.isNFC
+    return lhs.withFastUTF8 { utf8Left in
+      return rhs.withFastUTF8 { utf8Right in
+        if isNFC {
+          let cmp = _binaryCompare(utf8Left, utf8Right)
+          if expecting == .equal {
+            return cmp == 0
+          }
+          _sanityCheck(expecting == .less)
+          return cmp < 0
+        }
+
+        return _stringCompare(utf8Left, utf8Right, expecting: expecting)
+      }
+    }
+  }
+  return _stringCompareSlow(
+    lhs, 0..<lhs.count, rhs, 0..<rhs.count, expecting: expecting)
+}
+
+@usableFromInline
+@_effects(readonly)
+internal func _stringCompare(
+  _ lhs: _StringGuts, _ lhsRange: Range<Int>,
+  _ rhs: _StringGuts, _ rhsRange: Range<Int>,
   expecting: _StringComparisonResult
 ) -> Bool {
   _sanityCheck(expecting == .equal || expecting == .less)
