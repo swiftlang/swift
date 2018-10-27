@@ -38,4 +38,15 @@ ResilientClassTestSuite.test("Category") {
   expectEqual(42, takesMyProtocol(ResilientFieldWithCategory()))
 }
 
+// rdar://problem/45569020 - Make sure we initialize the superclass first
+class ResilientSuperclass {
+  var value: ResilientInt?
+}
+
+class ResilientSubclass : ResilientSuperclass {}
+
+ResilientClassTestSuite.test("Superclass") {
+  _blackHole(ResilientSubclass())
+}
+
 runAllTests()

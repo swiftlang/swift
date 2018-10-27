@@ -2637,40 +2637,30 @@ swift::swift_updateClassMetadata(ClassMetadata *self,
   // though our superclass field references it statically.
   const ClassMetadata *super = nullptr;
 
-  // In assert builds, realize the superclass metadata even if we're
-  // on an older runtime.
-#ifndef NDEBUG
-  bool realizeSuperclass = true;
-#else
-  bool realizeSuperclass = requiresUpdate;
-#endif
-
-  if (realizeSuperclass) {
-    if (auto superclassNameBase = self->getDescription()->SuperclassType.get()) {
-      StringRef superclassName =
-        Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
-      SubstGenericParametersFromMetadata substitutions(self);
-      const Metadata *superclass =
-        _getTypeByMangledName(superclassName, substitutions);
-      if (!superclass) {
-        fatalError(0,
-                   "failed to demangle superclass of %s from mangled name '%s'\n",
-                   self->getDescription()->Name.get(),
-                   superclassName.str().c_str());
-      }
-
-      if (auto objcWrapper = dyn_cast<ObjCClassWrapperMetadata>(superclass))
-        superclass = objcWrapper->Class;
-
-      super = cast<ClassMetadata>(superclass);
+  if (auto superclassNameBase = self->getDescription()->SuperclassType.get()) {
+    StringRef superclassName =
+      Demangle::makeSymbolicMangledNameStringRef(superclassNameBase);
+    SubstGenericParametersFromMetadata substitutions(self);
+    const Metadata *superclass =
+      _getTypeByMangledName(superclassName, substitutions);
+    if (!superclass) {
+      fatalError(0,
+                 "failed to demangle superclass of %s from mangled name '%s'\n",
+                 self->getDescription()->Name.get(),
+                 superclassName.str().c_str());
     }
 
-    // Check that it matches what's already in there.
-    if (!super)
-      assert(self->Superclass == getRootSuperclass());
-    else
-      assert(self->Superclass == super);
+    if (auto objcWrapper = dyn_cast<ObjCClassWrapperMetadata>(superclass))
+      superclass = objcWrapper->Class;
+
+    super = cast<ClassMetadata>(superclass);
   }
+
+  // Check that it matches what's already in there.
+  if (!super)
+    assert(self->Superclass == getRootSuperclass());
+  else
+    assert(self->Superclass == super);
 
   (void) super;
 
