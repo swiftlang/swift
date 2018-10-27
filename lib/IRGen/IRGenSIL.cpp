@@ -1995,12 +1995,13 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     abortOnGraphOp(*this, errMessage.c_str());
 
     // Finally, we set up our explosion results full of undef values.
-    auto result = i->getResult(0);
-    ExplosionSchema schema = getTypeInfo(result->getType()).getSchema();
-    Explosion e;
-    for (auto &elt : schema)
-      e.add(llvm::UndefValue::get(elt.getScalarType()));
-    setLoweredExplosion(result, e);
+    for (auto result : i->getResults()) {
+      ExplosionSchema schema = getTypeInfo(result->getType()).getSchema();
+      Explosion e;
+      for (auto &elt : schema)
+        e.add(llvm::UndefValue::get(elt.getScalarType()));
+      setLoweredExplosion(result, e);
+    }
     return;
   }
 
