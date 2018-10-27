@@ -68,7 +68,7 @@ extension String : Equatable {
   @inlinable @inline(__always) // For the bitwise comparision
   @_effects(readonly)
   public static func == (lhs: String, rhs: String) -> Bool {
-    return _stringCompare(lhs._guts, nil, rhs._guts, nil, expecting: .equal)
+    return _stringCompare(lhs._guts, rhs._guts, expecting: .equal)
   }
 }
 
@@ -76,7 +76,7 @@ extension String : Comparable {
   @inlinable @inline(__always) // For the bitwise comparision
   @_effects(readonly)
   public static func < (lhs: String, rhs: String) -> Bool {
-    return _stringCompare(lhs._guts, nil, rhs._guts, nil, expecting: .less)
+    return _stringCompare(lhs._guts, rhs._guts, expecting: .less)
   }
 }
 

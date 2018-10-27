@@ -1020,9 +1020,9 @@ extension _StringObject {
     return sharedStorage.start
   }
 
-  @inlinable
+  @usableFromInline
   internal var sharedUTF8: UnsafeBufferPointer<UInt8> {
-    @inline(__always) get {
+    @_effects(releasenone) @inline(never) get {
       _sanityCheck(largeFastIsShared)
       let start = self.getSharedUTF8Start()
       return UnsafeBufferPointer(start: start, count: largeCount)
@@ -1121,22 +1121,21 @@ extension _StringObject {
   internal var fastUTF8: UnsafeBufferPointer<UInt8> {
     @inline(__always) get {
       _sanityCheck(self.isLarge && self.providesFastUTF8)
-      let start: UnsafePointer<UInt8>
-      let count = self.largeCount
       if _slowPath(self.largeFastIsShared) {
-        start = getSharedUTF8Start()
-      } else {
-        start = self.nativeUTF8Start
+        return sharedUTF8
       }
-      return UnsafeBufferPointer(start: start, count: count)
+      return UnsafeBufferPointer(
+        start: self.nativeUTF8Start, count: self.largeCount)
     }
   }
 
   // Whether the object stored can be bridged directly as a NSString
   @usableFromInline // @opaque
   internal var hasObjCBridgeableObject: Bool {
-    // Currently, all mortal objects can zero-cost bridge
-    return !self.isImmortal
+    @_effects(releasenone) get {
+      // Currently, all mortal objects can zero-cost bridge
+      return !self.isImmortal
+    }
   }
 
   // Fetch the stored subclass of NSString for bridging
