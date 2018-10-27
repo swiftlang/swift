@@ -2616,7 +2616,6 @@ swift::swift_updateClassMetadata(ClassMetadata *self,
                                  size_t numFields,
                                  const TypeLayout * const *fieldTypes,
                                  size_t *fieldOffsets) {
-#ifndef NDEBUG
   // If there is a mangled superclass name, demangle it to the superclass
   // type.
   const ClassMetadata *super = nullptr;
@@ -2645,7 +2644,6 @@ swift::swift_updateClassMetadata(ClassMetadata *self,
     assert(self->Superclass == getRootSuperclass());
   else
     assert(self->Superclass == super);
-#endif
 
   // FIXME: Plumb this through
 #if 1
