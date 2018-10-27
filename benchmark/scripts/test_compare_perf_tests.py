@@ -508,7 +508,7 @@ Total performance tests executed: 1
         )['DropWhileArray']
         self.assertEquals(
             (r.num_samples, r.min, r.max, r.samples.count),
-             # last 3 ventiles were outliers and were excluded from the sample
+            # last 3 ventiles were outliers and were excluded from the sample
             (200, 214, 215, 18))
 
     def test_parse_results_verbose(self):

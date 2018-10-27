@@ -245,7 +245,7 @@ class PerformanceTestResult(object):
                 runtimes = reduce(lambda l, x: l.append(l[-1] + x) or  # runnin
                                   l if l else [x], runtimes, None)     # total
             num_values = len(runtimes)
-            if self.num_samples < num_values: # remove repeated samples
+            if self.num_samples < num_values:  # remove repeated samples
                 quantile = num_values - 1
                 qs = [float(i) / float(quantile) for i in range(0, num_values)]
                 indices = [max(0, int(ceil(self.num_samples * float(q))) - 1)
