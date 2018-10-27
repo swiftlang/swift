@@ -245,7 +245,7 @@ WARNING(unreachable_code,none, "will never be executed", ())
 NOTE(unreachable_code_branch,none,
      "condition always evaluates to %select{false|true}0", (bool))
 NOTE(call_to_noreturn_note,none,
-     "a call to a never-returning function", ())
+     "call to never-returning function terminates the program", ())
 WARNING(unreachable_code_after_stmt,none,
         "code after '%select{return|break|continue|throw}0' will never "
         "be executed", (unsigned))
