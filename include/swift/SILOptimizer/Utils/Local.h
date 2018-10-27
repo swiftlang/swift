@@ -322,7 +322,7 @@ class BaseThreadingCloner : public SILClonerWithScopes<BaseThreadingCloner> {
 
   SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
 
-  SILValue remapValue(SILValue Value) {
+  SILValue getMappedValue(SILValue Value) {
     // If this is a use of an instruction in another block, then just use it.
     if (auto SI = Value->getDefiningInstruction()) {
       if (SI->getParent() != FromBB)
@@ -334,8 +334,7 @@ class BaseThreadingCloner : public SILClonerWithScopes<BaseThreadingCloner> {
       assert(isa<SILUndef>(Value) && "Unexpected Value kind");
       return Value;
     }
-
-    return SILCloner<BaseThreadingCloner>::remapValue(Value);
+    return SILCloner<BaseThreadingCloner>::getMappedValue(Value);
   }
 
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {

@@ -132,7 +132,7 @@ public:
   bool processTerminator(
       TermInst *terminator, SILBasicBlock *returnToBB,
       llvm::function_ref<SILBasicBlock *(SILBasicBlock *)> remapBlock,
-      llvm::function_ref<SILValue(SILValue)> remapValue) {
+      llvm::function_ref<SILValue(SILValue)> getMappedValue) {
     // A yield branches to the begin_apply return block passing the yielded
     // results as branch arguments. Collect the yields target block for
     // resuming later. Pass an integer token to the begin_apply return block
@@ -147,7 +147,7 @@ public:
       auto callerYields = BeginApply->getYieldedValues();
       assert(calleeYields.size() == callerYields.size());
       for (auto i : indices(calleeYields)) {
-        auto remappedYield = remapValue(calleeYields[i]);
+        auto remappedYield = getMappedValue(calleeYields[i]);
         callerYields[i]->replaceAllUsesWith(remappedYield);
       }
       Builder.createBranch(Loc, returnToBB);
@@ -471,14 +471,14 @@ void SILInlineCloner::visitTerminator(SILBasicBlock *BB) {
             [=](SILBasicBlock *Block) -> SILBasicBlock * {
               return this->remapBasicBlock(Block);
             },
-            [=](SILValue Val) -> SILValue { return this->remapValue(Val); }))
+            [=](SILValue Val) -> SILValue { return this->getMappedValue(Val); }))
       return;
   }
 
   // Modify return terminators to branch to the return-to BB, rather than
   // trying to clone the ReturnInst.
   if (auto *RI = dyn_cast<ReturnInst>(BB->getTerminator())) {
-    auto returnedValue = remapValue(RI->getOperand());
+    auto returnedValue = getMappedValue(RI->getOperand());
     getBuilder().createBranch(Loc.getValue(), ReturnToBB, returnedValue);
     return;
   }
@@ -499,7 +499,7 @@ void SILInlineCloner::visitTerminator(SILBasicBlock *BB) {
       return;
     case FullApplySiteKind::TryApplyInst:
       auto tryAI = cast<TryApplyInst>(Apply);
-      auto returnedValue = remapValue(TI->getOperand());
+      auto returnedValue = getMappedValue(TI->getOperand());
       getBuilder().createBranch(Loc.getValue(), tryAI->getErrorBB(),
                                 returnedValue);
       return;

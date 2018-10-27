@@ -1594,7 +1594,7 @@ StaticInitCloner::clone(SingleValueInstruction *InitVal) {
       }
     }
   }
-  return cast<SingleValueInstruction>(remapValue(InitVal));
+  return cast<SingleValueInstruction>(getMappedValue(InitVal));
 }
 
 Optional<FindLocalApplySitesResult>

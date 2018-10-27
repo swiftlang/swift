@@ -285,13 +285,13 @@ public:
   ///
   /// Assumes that `isValueCloned` is true.
   SILValue getOpValue(SILValue Value) {
-    return asImpl().remapValue(Value);
+    return asImpl().getMappedValue(Value);
   }
   template <size_t N, typename ArrayRefType>
   SmallVector<SILValue, N> getOpValueArray(ArrayRefType Values) {
     SmallVector<SILValue, N> Ret(Values.size());
     for (unsigned i = 0, e = Values.size(); i != e; ++i)
-      Ret[i] = asImpl().remapValue(Values[i]);
+      Ret[i] = asImpl().getMappedValue(Values[i]);
     return Ret;
   }
 
@@ -351,7 +351,7 @@ protected:
   ProtocolConformanceRef remapConformance(Type Ty, ProtocolConformanceRef C) {
     return C;
   }
-  SILValue remapValue(SILValue Value);
+  SILValue getMappedValue(SILValue Value);
   SILFunction *remapFunction(SILFunction *Func) { return Func; }
   SILBasicBlock *remapBasicBlock(SILBasicBlock *BB);
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned);
@@ -472,7 +472,7 @@ protected:
 
 template<typename ImplClass>
 SILValue
-SILCloner<ImplClass>::remapValue(SILValue Value) {
+SILCloner<ImplClass>::getMappedValue(SILValue Value) {
   auto VI = ValueMap.find(Value);
   if (VI != ValueMap.end())
     return VI->second;

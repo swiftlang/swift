@@ -175,8 +175,8 @@ public:
 
   SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
 
-  SILValue remapValue(SILValue Value) {
-    return SILCloner<InstructionsCloner>::remapValue(Value);
+  SILValue getMappedValue(SILValue Value) {
+    return SILCloner<InstructionsCloner>::getMappedValue(Value);
   }
 
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
