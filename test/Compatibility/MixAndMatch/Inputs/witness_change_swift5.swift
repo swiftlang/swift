@@ -1,19 +1,19 @@
 
-// Swift 3 sees the ObjC class NSRuncibleSpoon as the class, and uses methods
+// Swift 4 sees the ObjC class NSRuncibleSpoon as the class, and uses methods
 // with type signatures involving NSRuncibleSpoon to conform to protocols
-// across the language boundary. Swift 4 sees the type as bridged to
+// across the language boundary. Swift 5 sees the type as bridged to
 // a RuncibleSpoon value type, but still needs to be able to use conformances
-// declared by Swift 3.
+// declared by Swift 4.
 
-// Swift 4
+// Swift 5
 
 import SomeObjCModule
-import SomeSwift3Module
+import SomeSwift4Module
 
 public func testMixAndMatch(bridged: RuncibleSpoon, unbridged: NSRuncibleSpoon) {
   let objcInstanceViaClass
     = SomeObjCClass(someSwiftInitRequirement: bridged)
-  let objcClassAsProtocol: SomeSwift3Protocol.Type = SomeObjCClass.self
+  let objcClassAsProtocol: SomeSwift4Protocol.Type = SomeObjCClass.self
   let objcInstanceViaProtocol
     = objcClassAsProtocol.init(someSwiftInitRequirement: unbridged)
 
@@ -29,8 +29,8 @@ public func testMixAndMatch(bridged: RuncibleSpoon, unbridged: NSRuncibleSpoon) 
   objcInstanceViaProtocol.someSwiftMethodRequirement(unbridged)
 
   let swiftInstanceViaClass
-    = SomeSwift3Class(someObjCInitRequirement: unbridged)
-  let swiftClassAsProtocol: SomeObjCProtocol.Type = SomeSwift3Class.self
+    = SomeSwift4Class(someObjCInitRequirement: unbridged)
+  let swiftClassAsProtocol: SomeObjCProtocol.Type = SomeSwift4Class.self
   let swiftInstanceViaProtocol
     = swiftClassAsProtocol.init(someObjCInitRequirement: bridged)
   
@@ -46,15 +46,15 @@ public func testMixAndMatch(bridged: RuncibleSpoon, unbridged: NSRuncibleSpoon) 
   _ = unbridgedSink
 }
 
-public protocol SomeSwift4Protocol {
+public protocol SomeSwift5Protocol {
   init(someSwiftInitRequirement: RuncibleSpoon)
   func someSwiftMethodRequirement(_: RuncibleSpoon)
   var someSwiftPropertyRequirement: RuncibleSpoon { get }
 }
 
-extension SomeObjCClass: SomeSwift4Protocol {}
+extension SomeObjCClass: SomeSwift5Protocol {}
 
-public class SomeSwift4Class: NSObject {
+public class SomeSwift5Class: NSObject {
   public required init(someObjCInitRequirement x: RuncibleSpoon) {
     someObjCPropertyRequirement = x
   }
@@ -62,4 +62,4 @@ public class SomeSwift4Class: NSObject {
   public var someObjCPropertyRequirement: RuncibleSpoon
 }
 
-extension SomeSwift4Class: SomeObjCProtocol {}
+extension SomeSwift5Class: SomeObjCProtocol {}

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift-swift3 | %FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -8,7 +8,7 @@
 import Foundation
 
 class ObservedValue: NSObject {
-	dynamic var amount = 0
+	@objc dynamic var amount = 0
 }
 
 class ValueObserver: NSObject {
