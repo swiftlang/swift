@@ -125,7 +125,6 @@ extension String {
   ///   to allocate.
   ///
   /// - Complexity: O(*n*)
-  @inlinable
   public mutating func reserveCapacity(_ n: Int) {
     _guts.reserveCapacity(n)
   }

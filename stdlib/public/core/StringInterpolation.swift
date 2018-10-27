@@ -63,7 +63,7 @@
 public struct DefaultStringInterpolation: StringInterpolationProtocol {
   /// The string contents accumulated by this instance.
   @usableFromInline
-  internal var _storage: String = ""
+  internal var _storage: String
   
   /// Creates a string interpolation with storage pre-sized for a literal
   /// with the indicated attributes.
@@ -75,7 +75,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
     let capacityPerInterpolation = 2
     let initialCapacity = literalCapacity +
       interpolationCount * capacityPerInterpolation
-    _storage.reserveCapacity(initialCapacity)
+    _storage = String(_StringGuts(_initialCapacity: initialCapacity))
   }
   
   /// Appends a literal segment of a string interpolation.

@@ -910,21 +910,29 @@ extension _StringGuts {
     _invariantCheck()
   }
 
-  @inlinable // @testable
-  mutating func reserveCapacity(_ capacity: Int) {
-    // Small strings can accomodate small capacities
+  @inlinable internal
+  init(_initialCapacity capacity: Int) {
     if capacity <= _SmallUTF8String.capacity {
-      return
+      self.init()
+    } else {
+      let storage = _SwiftStringStorage<UInt8>.create(
+        capacity: capacity,
+        count: 0)
+      self.init(_large: storage)
     }
-    reserveCapacitySlow(capacity)
   }
 
-  @usableFromInline
-  mutating func reserveCapacitySlow(_ capacity: Int) {
+  @usableFromInline // @testable
+  mutating func reserveCapacity(_ capacity: Int) {
     if _fastPath(_isUniqueNative()) {
       if _fastPath(_object.nativeRawStorage.capacity >= capacity) {
         return
       }
+    }
+
+    // Small strings can accomodate small capacities
+    if capacity <= _SmallUTF8String.capacity {
+      return
     }
 
     let selfCount = self.count
