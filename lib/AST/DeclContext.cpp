@@ -314,6 +314,9 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
     // Default argument initializer contexts have their resilience expansion
     // set when they're type checked.
     if (isa<DefaultArgumentInitializer>(dc)) {
+      if (auto *EED = dyn_cast<EnumElementDecl>(dc->getParent())) {
+        return EED->getDefaultArgumentResilienceExpansion();
+      }
       return cast<AbstractFunctionDecl>(dc->getParent())
           ->getDefaultArgumentResilienceExpansion();
     }
