@@ -1569,8 +1569,7 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
   // Try to mangle a symbolic reference for a nominal type.
   if (AllowSymbolicReferences) {
     auto nominal = key->getAnyNominal();
-    if (nominal && !isa<ProtocolDecl>(nominal)
-        && (!CanSymbolicReference || CanSymbolicReference(nominal))) {
+    if (nominal && (!CanSymbolicReference || CanSymbolicReference(nominal))) {
       appendSymbolicReference(nominal);
       // Substitutions can refer back to the symbolic reference.
       addSubstitution(key.getPointer());
