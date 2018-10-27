@@ -112,7 +112,8 @@ public:
   /// instructions. `visitTerminator` is called in the same order, but only
   /// after mapping all blocks.
   void cloneReachableBlocks(SILBasicBlock *startBB,
-                            ArrayRef<SILBasicBlock *> exitBlocks);
+                            ArrayRef<SILBasicBlock *> exitBlocks,
+                            SILBasicBlock *insertAfterBB = nullptr);
 
   /// Clone all blocks in this function and all instructions in those
   /// blocks.
@@ -149,9 +150,7 @@ public:
   /// recordFoldedValue() are the only two ways for a visitor to map an original
   /// value to another value for use within the cloned region.
   void recordFoldedValue(SILValue origValue, SILValue mappedValue) {
-    auto iterAndInserted = ValueMap.insert({origValue, mappedValue});
-    (void)iterAndInserted;
-    assert(iterAndInserted.second && "Original value already mapped.");
+    asImpl().mapValue(origValue, mappedValue);
   }
 
   /// Mark a block containing an unreachable instruction for use in the `fixUp`
@@ -351,7 +350,11 @@ protected:
   ProtocolConformanceRef remapConformance(Type Ty, ProtocolConformanceRef C) {
     return C;
   }
+  /// Get the value that takes the place of the given `Value` within the cloned
+  /// region. The given value must already have been mapped by this cloner.
   SILValue getMappedValue(SILValue Value);
+  void mapValue(SILValue origValue, SILValue mappedValue);
+
   SILFunction *remapFunction(SILFunction *Func) { return Func; }
   SILBasicBlock *remapBasicBlock(SILBasicBlock *BB);
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned);
@@ -380,8 +383,7 @@ private:
 
   void clonePhiArgs(SILBasicBlock *oldBB);
 
-  void visitBlocksDepthFirst(SILBasicBlock *StartBB,
-                             SILBasicBlock *insertBeforeBB = nullptr);
+  void visitBlocksDepthFirst(SILBasicBlock *StartBB);
 
   /// Also perform fundamental cleanup first, then call the CRTP extension,
   /// `fixUp`.
@@ -470,6 +472,41 @@ protected:
   }
 };
 
+/// Clone a function without transforming it.
+class SILFunctionCloner : public SILClonerWithScopes<SILFunctionCloner> {
+  using SuperTy = SILClonerWithScopes<SILFunctionCloner>;
+  friend class SILCloner<SILFunctionCloner>;
+
+public:
+  SILFunctionCloner(SILFunction *newF) : SILClonerWithScopes(*newF) {}
+
+  /// Clone all blocks in this function and all instructions in those
+  /// blocks.
+  ///
+  /// This is used to clone an entire function without mutating the original
+  /// function.
+  ///
+  /// The new function is expected to be completely empty. Clone the entry
+  /// blocks arguments here. The cloned arguments become the inputs to the
+  /// general SILCloner, which expects the new entry block to be ready to emit
+  /// instructions into.
+  void cloneFunction(SILFunction *origF) {
+    SILFunction *newF = &Builder.getFunction();
+
+    auto *newEntryBB = newF->createBasicBlock();
+    newEntryBB->cloneArgumentList(origF->getEntryBlock());
+
+    // Copy the new entry block arguments into a separate vector purely to
+    // resolve the type mismatch between SILArgument* and SILValue.
+    SmallVector<SILValue, 8> entryArgs;
+    entryArgs.reserve(newF->getArguments().size());
+    transform(newF->getArguments(), std::back_inserter(entryArgs),
+              [](SILArgument *arg) -> SILValue { return arg; });
+
+    SuperTy::cloneFunctionBody(origF, newEntryBB, entryArgs);
+  }
+};
+
 template<typename ImplClass>
 SILValue
 SILCloner<ImplClass>::getMappedValue(SILValue Value) {
@@ -486,6 +523,13 @@ SILCloner<ImplClass>::getMappedValue(SILValue Value) {
   }
 
   llvm_unreachable("Unmapped value while cloning?");
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::mapValue(SILValue origValue, SILValue mappedValue) {
+  auto iterAndInserted = ValueMap.insert({origValue, mappedValue});
+  (void)iterAndInserted;
+  assert(iterAndInserted.second && "Original value already mapped.");
 }
 
 template<typename ImplClass>
@@ -512,12 +556,8 @@ SILCloner<ImplClass>::postProcess(SILInstruction *orig,
   // Otherwise, map the results over one-by-one.
   auto clonedResults = cloned->getResults();
   assert(origResults.size() == clonedResults.size());
-  for (auto i : indices(origResults)) {
-    SILValue origResult = origResults[i], clonedResult = clonedResults[i];
-    auto insertion = ValueMap.insert(std::make_pair(origResult, clonedResult));
-    if (!insertion.second)
-      insertion.first->second = clonedResult;
-  }
+  for (auto i : indices(origResults))
+    asImpl().mapValue(origResults[i], clonedResults[i]);
 }
 
 template<typename ImplClass>
@@ -530,16 +570,20 @@ void SILCloner<ImplClass>::visitInstructionsInBlock(SILBasicBlock* BB) {
 
 template <typename ImplClass>
 void SILCloner<ImplClass>::cloneReachableBlocks(
-    SILBasicBlock *startBB, ArrayRef<SILBasicBlock *> exitBlocks) {
+  SILBasicBlock *startBB, ArrayRef<SILBasicBlock *> exitBlocks,
+  SILBasicBlock *insertAfterBB) {
+
   SILFunction *F = startBB->getParent();
   assert(F == &Builder.getFunction()
          && "cannot clone region across functions.");
   assert(BBMap.empty() && "This API does not allow clients to map blocks.");
   assert(ValueMap.empty() && "Stale ValueMap.");
 
-  auto *ClonedStart = F->createBasicBlock();
-  BBMap.insert(std::make_pair(startBB, ClonedStart));
-  getBuilder().setInsertionPoint(ClonedStart);
+  auto *clonedStartBB = insertAfterBB ? F->createBasicBlockAfter(insertAfterBB)
+    : F->createBasicBlock();
+
+  BBMap.insert(std::make_pair(startBB, clonedStartBB));
+  getBuilder().setInsertionPoint(clonedStartBB);
   clonePhiArgs(startBB);
 
   // Premap exit blocks to terminate so that visitBlocksDepthFirst terminates
@@ -571,17 +615,8 @@ void SILCloner<ImplClass>::cloneFunctionBody(SILFunction *F,
 
   Builder.setInsertionPoint(clonedEntryBB);
 
-  // If the caller's BB is not the last BB in the calling function, then keep
-  // track of the next BB so we always insert new BBs before it; otherwise,
-  // we just leave the new BBs at the end as they are by default.
-  auto *callerF = clonedEntryBB->getParent();
-  auto IBI = std::next(SILFunction::iterator(clonedEntryBB));
-  SILBasicBlock *insertBeforeBB = IBI != callerF->end() ? &*IBI : nullptr;
-
-  // Visiting in pre-order provides a nice property for the individual
-  // instruction visitors. It allows those visitors to make use of dominance
-  // relationships, particularly the fact that operand values will be mapped.
-  visitBlocksDepthFirst(&*F->begin(), insertBeforeBB);
+  // This will layout all newly cloned blocks immediate after clonedEntryBB.
+  visitBlocksDepthFirst(&*F->begin());
 
   doFixUp(F);
 }
@@ -595,7 +630,7 @@ void SILCloner<ImplClass>::clonePhiArgs(SILBasicBlock *oldBB) {
     SILValue mappedArg = mappedBB->createPhiArgument(
       getOpType(Arg->getType()), Arg->getOwnershipKind());
 
-    ValueMap.insert(std::make_pair(Arg, mappedArg));
+    asImpl().mapValue(Arg, mappedArg);
   }
 }
 
@@ -603,10 +638,7 @@ void SILCloner<ImplClass>::clonePhiArgs(SILBasicBlock *oldBB) {
 // blocks on the first visit), mapping newly visited BBs to new BBs and cloning
 // all instructions into the caller.
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitBlocksDepthFirst(
-    SILBasicBlock *startBB, SILBasicBlock *insertBeforeBB) {
-  SILFunction &newF = getBuilder().getFunction();
-
+void SILCloner<ImplClass>::visitBlocksDepthFirst(SILBasicBlock *startBB) {
   // The caller clones startBB because it may be a function header, which
   // requires special handling.
   assert(BBMap.count(startBB) && "The caller must map the first BB.");
@@ -617,40 +649,53 @@ void SILCloner<ImplClass>::visitBlocksDepthFirst(
   //
   // FIXME: Add reverse iteration to SILSuccessor, then convert this to an RPOT
   // traversal. We would prefer to keep CFG regions in RPO order, and this would
-  // be more scalable for functions with many large switches.
+  // not create as large a worklist for functions with many large switches.
   SmallVector<SILBasicBlock *, 8> dfsWorklist(1, startBB);
+  // Keep a reference to the last cloned BB so blocks can be laid out in the
+  // order they are created, which differs from the order they are
+  // cloned. Blocks are created in BFS order but cloned in DFS preorder (when no
+  // critical edges are present).
+  SILBasicBlock *lastClonedBB = BBMap[startBB];
   while (!dfsWorklist.empty()) {
     auto *BB = dfsWorklist.pop_back_val();
     preorderBlocks.push_back(BB);
 
-    // Visit all dominating instructions before visiting block phi arguments so
-    // that all opened existentials are registered with the
-    // OpenedArchetypesTracker before subsituting the phi argument types.
+    // Phis are cloned during the first preorder walk so that successor phis
+    // exist before predecessor terminators are generated.
+    if (BB != startBB)
+      clonePhiArgs(BB);
+
+    // Non-terminating instructions are cloned in the first preorder walk so
+    // that all opened existentials are registered with OpenedArchetypesTracker
+    // before phi argument type substitution in successors.
     getBuilder().setInsertionPoint(BBMap[BB]);
     asImpl().visitInstructionsInBlock(BB);
 
-    unsigned succStartIdx = dfsWorklist.size();
-    for (auto &Succ : BB->getSuccessors()) {
+    unsigned dfsSuccStartIdx = dfsWorklist.size();
+    for (auto &succ : BB->getSuccessors()) {
       // Only visit a successor that has not already been visited and was not
       // premapped by the client.
-      if (BBMap.count(Succ))
+      if (BBMap.count(succ))
         continue;
 
-      // Map the successor to a new BB.
-      auto *MappedBB = insertBeforeBB
-        ? newF.createBasicBlockBefore(insertBeforeBB)
-        : newF.createBasicBlock();
+      // Map the successor to a new BB. Layout the cloned blocks in the order
+      // they are visited and cloned.
+      lastClonedBB =
+          getBuilder().getFunction().createBasicBlockAfter(lastClonedBB);
 
-      BBMap.insert(std::make_pair(Succ.getBB(), MappedBB));
+      BBMap.insert(std::make_pair(succ.getBB(), lastClonedBB));
 
-      clonePhiArgs(Succ);
-
-      dfsWorklist.push_back(Succ);
+      dfsWorklist.push_back(succ);
     }
-    // Reverse the worklist to pop the successors in forward order.
-    std::reverse(dfsWorklist.begin() + succStartIdx, dfsWorklist.end());
+    // Reverse the worklist to pop the successors in forward order. This
+    // precisely yields DFS preorder when no critical edges are present.
+    std::reverse(dfsWorklist.begin() + dfsSuccStartIdx, dfsWorklist.end());
   }
   // Visit terminators only after the CFG is valid so all branch targets exist.
+  //
+  // Visiting in pre-order provides a nice property for the individual
+  // instruction visitors. It allows those visitors to make use of dominance
+  // relationships, particularly the fact that operand values will be mapped.
   for (auto *origBB : preorderBlocks) {
     // Set the insertion point to the new mapped BB
     getBuilder().setInsertionPoint(BBMap[origBB]);
