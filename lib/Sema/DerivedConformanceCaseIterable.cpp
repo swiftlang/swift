@@ -32,10 +32,7 @@ static bool canDeriveConformance(NominalTypeDecl *type) {
 
   // "Simple" enums without availability attributes can derive
   // a CaseIterable conformance.
-  //
-  // FIXME: Lift the availability restriction.
-  return !enumDecl->hasPotentiallyUnavailableCaseValue()
-      && enumDecl->hasOnlyCasesWithoutAssociatedValues();
+  return enumDecl->hasOnlyCasesWithoutAssociatedValues();
 }
 
 /// Derive the implementation of allCases for a "simple" no-payload enum.
@@ -47,6 +44,10 @@ void deriveCaseIterable_enum_getter(AbstractFunctionDecl *funcDecl) {
 
   SmallVector<Expr *, 8> elExprs;
   for (EnumElementDecl *elt : parentEnum->getAllElements()) {
+    // Unavailable enum cases should not be included in allCases
+    if (AvailableAttr::isUnavailable(elt)) {
+      continue;
+    }
     auto *ref = new (C) DeclRefExpr(elt, DeclNameLoc(), /*implicit*/true);
     auto *base = TypeExpr::createImplicit(enumTy, C);
     auto *apply = new (C) DotSyntaxCallExpr(ref, SourceLoc(), base);

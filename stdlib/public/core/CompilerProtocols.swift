@@ -204,14 +204,15 @@ public func != <T : Equatable>(lhs: T, rhs: T) -> Bool
 /// =======================================
 ///
 /// The compiler can automatically provide an implementation of the
-/// `CaseIterable` requirements for any enumeration without associated values
-/// or `@available` attributes on its cases. The synthesized `allCases`
-/// collection provides the cases in order of their declaration.
+/// `CaseIterable` requirements for any enumeration without associated values.
+/// The synthesized `allCases` collection provides the cases in order of their
+/// declaration.
 ///
 /// You can take advantage of this compiler support when defining your own
 /// custom enumeration by declaring conformance to `CaseIterable` in the
-/// enumeration's original declaration. The `CompassDirection` example above
-/// demonstrates this automatic implementation.
+/// enumeration's original declaration or an extension in the same file. The
+/// `CompassDirection` example above demonstrates this automatic
+/// implementation.
 public protocol CaseIterable {
   /// A type that can represent a collection of all values of this type.
   associatedtype AllCases: Collection

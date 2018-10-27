@@ -245,6 +245,13 @@ extension OtherFileNonconforming: Hashable {
 extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension in a different file to the type}}
 extension YetOtherFileNonconforming: CaseIterable {} // expected-error {{does not conform}}
 
+// Verify conformance can be synthesized for enums with unavailable cases
+enum Availability: CaseIterable {
+  case available
+  @available(*, deprecated) case deprecated
+  @available(*, unavailable) case unavailable
+}
+
 // Verify that an indirect enum doesn't emit any errors as long as its "leaves"
 // are conformant.
 enum StringBinaryTree: Hashable {

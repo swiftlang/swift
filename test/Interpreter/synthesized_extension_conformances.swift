@@ -45,6 +45,21 @@ enum NoValues {
 }
 extension NoValues: CaseIterable {}
 
+enum SomeAvailable: CaseIterable {
+    case a
+    @available(*, unavailable)
+    case b // Should not be included in allCases
+    @available(*, deprecated)
+    case c
+    case d
+    case e
+    @available(swift, obsoleted: 4.0)
+    case f // Should not be included in allCases
+    @available(swift, obsoleted: 5.0)
+    case g
+    case h
+}
+
 // Cache some values, and make them all have the same width (within a type) for
 // formatting niceness.
 let SIOne = SInt(x: 1)
@@ -243,6 +258,9 @@ class TestCaseIterable : TestSuper {
     func test_allCases() {
         expectEqual(NoValues.allCases, [.a, .b, .c])
     }
+    func test_availableCases() {
+        expectEqual(SomeAvailable.allCases, [.a, .c, .d, .e, .g, .h])
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -270,6 +288,7 @@ for (name, test) in codable {
 
 var caseIterable = [
   "TestCaseIterable.test_allCases": TestCaseIterable.test_allCases,
+  "TestCaseIterable.test_availableCases": TestCaseIterable.test_availableCases,
 ]
 
 var CaseIterableTests = TestSuite("TestCaseIterable")

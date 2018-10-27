@@ -79,8 +79,7 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
         //
         // FIXME: Lift the availability restriction.
       case KnownProtocolKind::CaseIterable:
-        return !enumDecl->hasPotentiallyUnavailableCaseValue()
-            && enumDecl->hasOnlyCasesWithoutAssociatedValues();
+        return enumDecl->hasOnlyCasesWithoutAssociatedValues();
 
         // @objc enums can explicitly derive their _BridgedNSError conformance.
       case KnownProtocolKind::BridgedNSError:
