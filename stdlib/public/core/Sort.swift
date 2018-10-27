@@ -251,7 +251,12 @@ extension MutableCollection where Self: RandomAccessCollection {
         try buffer._stableSortImpl(by: areInIncreasingOrder)
     }
     if didSortUnsafeBuffer == nil {
-      try _stableSortImpl(by: areInIncreasingOrder)
+      // Fallback since we can't use an unsafe buffer: sort into an outside
+      // array, then copy elements back in.
+      let sortedElements = try sorted(by: areInIncreasingOrder)
+      for (i, j) in zip(indices, sortedElements.indices) {
+        self[i] = sortedElements[j]
+      }
     }
   }
 }
@@ -692,19 +697,5 @@ extension UnsafeMutableBufferPointer {
 
     // FIXME: Remove this, it works around rdar://problem/45044610
     precondition(result)
-  }
-}
-
-extension MutableCollection {
-  /// This unconstrained default implementation is a fallback stable sort that
-  /// sorts into an outside array, then copies elements back in.
-  @inlinable
-  public mutating func _stableSortImpl(
-    by areInIncreasingOrder: (Element, Element) throws -> Bool
-  ) rethrows {
-    let sortedElements = try sorted(by: areInIncreasingOrder)
-    for (i, j) in zip(indices, sortedElements.indices) {
-      self[i] = sortedElements[j]
-    }
   }
 }

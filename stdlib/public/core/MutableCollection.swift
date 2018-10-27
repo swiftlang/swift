@@ -179,12 +179,6 @@ where SubSequence: MutableCollection
   mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R?
-
-  /// Customization point for a stable sort of the collection's elements
-  /// according to the given comparison predicate.
-  mutating func _stableSortImpl(
-    by areInIncreasingOrder: (Element, Element) throws -> Bool
-  ) rethrows
 }
 
 // TODO: swift-3-indexing-model - review the following

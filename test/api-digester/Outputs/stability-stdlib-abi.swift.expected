@@ -1,5 +1,6 @@
 
 /* Generic Signature Changes */
+Func MutableCollection._partition(within:by:) has generic signature change from <τ_0_0 where τ_0_0 : MutableCollection, τ_0_0 : RandomAccessCollection> to <τ_0_0 where τ_0_0 : BidirectionalCollection, τ_0_0 : MutableCollection>
 
 /* RawRepresentable Changes */
 
@@ -8,6 +9,12 @@ Constructor AnyHashable.init(_box:) has been removed
 Constructor AnyHashable.init(_usingDefaultRepresentationOf:) has been removed
 Constructor ManagedBufferPointer.init(_:_:_:) has been removed
 Func AnyHashable._downCastConditional(into:) has been removed
+Func MutableCollection._heapSort(within:by:) has been removed
+Func MutableCollection._heapify(within:by:) has been removed
+Func MutableCollection._introSort(within:by:) has been removed
+Func MutableCollection._introSortImpl(within:by:depthLimit:) has been removed
+Func MutableCollection._siftDown(_:within:by:) has been removed
+Func MutableCollection._sort3(_:_:_:by:) has been removed
 Func _CocoaDictionary.Index.copy() has been removed
 Func _ContiguousArrayStorage._getNonVerbatimBridgedHeapBuffer() has been removed
 Func _ContiguousArrayStorage._withVerbatimBridgedUnsafeBufferImpl(_:) has been removed
@@ -27,19 +34,14 @@ Var _CocoaDictionary.Index._object has been removed
 Var _CocoaSet.Index._object has been removed
 Var __SwiftDeferredNSArray._heapBufferBridged has been removed
 Var __SwiftDeferredNSArray._heapBufferBridgedPtr has been removed
-Func MutableCollection._heapSort(within:by:) has been removed
-Func MutableCollection._heapify(within:by:) has been removed
-Func MutableCollection._introSort(within:by:) has been removed
-Func MutableCollection._introSortImpl(within:by:depthLimit:) has been removed
-Func MutableCollection._partition(within:by:) has been removed
-Func MutableCollection._siftDown(_:within:by:) has been removed
-Func MutableCollection._sort3(_:_:_:by:) has been removed
 
 /* Moved Decls */
 
 /* Renamed Decls */
+Func MutableCollection._partition(within:by:) has been renamed to Func MutableCollection._partitionImpl(by:)
 
 /* Type Changes */
+Func MutableCollection._partition(within:by:) has parameter 0 type change from Range<τ_0_0.Index> to (τ_0_0.Element) throws -> Bool
 Func __ContiguousArrayStorageBase._getNonVerbatimBridgingBuffer() is added to a non-resilient type
 Var _CocoaDictionary.Index._offset is added to a non-resilient type
 Var _CocoaDictionary.Index._storage in a non-resilient type changes position from 1 to 0
@@ -49,4 +51,3 @@ Var _CocoaSet.Index._storage in a non-resilient type changes position from 1 to 
 /* Decl Attribute changes */
 
 /* Protocol Requirement Changes */
-Func MutableCollection._stableSortImpl(by:) has been added as a protocol requirement
