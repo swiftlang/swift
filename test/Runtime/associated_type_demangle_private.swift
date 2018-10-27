@@ -29,4 +29,20 @@ AssociatedTypeDemangleTests.test("private types") {
   expectEqual(Foo.Inner.Innermost.self, getP_A(Foo.Inner.self))
 }
 
+private protocol P2 {
+  associatedtype A
+}
+
+struct Bar: P2 {
+  typealias A = Int
+}
+
+class C1<T> { }
+
+private class C2<T: P2>: C1<T.A> { }
+
+AssociatedTypeDemangleTests.test("private protocols") {
+  expectEqual("C2<Bar>", String(describing: C2<Bar>.self))
+}
+
 runAllTests()

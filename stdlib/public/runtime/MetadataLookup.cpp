@@ -475,6 +475,8 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
       if (node->getKind() == Demangle::Node::Kind::Protocol) {
         auto proto = llvm::cast<ProtocolDescriptor>(context);
         auto nameNode = node->getChild(1);
+        if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
+          return false;
         if (nameNode->getText() == proto->Name.get()) {
           node = node->getChild(0);
           break;

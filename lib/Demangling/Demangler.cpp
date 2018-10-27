@@ -1681,6 +1681,10 @@ NodePointer Demangler::popAssocTypeName() {
   if (Proto && !isProtocolNode(Proto))
     return nullptr;
 
+  // If we haven't seen a protocol, check for a symbolic reference.
+  if (!Proto)
+    Proto = popNode(Node::Kind::ProtocolSymbolicReference);
+
   NodePointer Id = popNode(Node::Kind::Identifier);
   NodePointer AssocTy = changeKind(Id, Node::Kind::DependentAssociatedTypeRef);
   addChild(AssocTy, Proto);
