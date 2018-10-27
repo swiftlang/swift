@@ -18,7 +18,6 @@ extension String : Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // For pre-normal fast paths
   public func hash(into hasher: inout Hasher) {
     if _fastPath(self._guts.isNFCFastUTF8) {
       self._guts.withFastUTF8 {
@@ -38,7 +37,8 @@ extension StringProtocol {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable
+  @_specialize(where Self == String)
+  @_specialize(where Self == Substring)
   public func hash(into hasher: inout Hasher) {
     _gutsSlice._normalizedHash(into: &hasher)
   }
