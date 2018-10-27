@@ -2038,19 +2038,19 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
     return Type();
   }
 
-  if (getLangOpts().DebugConstraintSolver) {
-    auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Type-checked expression---\n";
-    result->dump(log);
-    log << "\n";
-  }
-
   // If there's a listener, notify it that we've applied the solution.
   if (listener) {
     result = listener->appliedSolution(solution, result);
     if (!result) {
       return Type();
     }
+  }
+
+  if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
+    log << "---Type-checked expression---\n";
+    result->dump(log);
+    log << "\n";
   }
 
   // Unless the client has disabled them, perform syntactic checks on the
