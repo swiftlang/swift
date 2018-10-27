@@ -179,7 +179,7 @@ public class A {
 // This used to crash during mandatory inlining because noreturn folding would
 // create sil instructions with undef in unreachable code.
 func dontCrash() {
-  fatalError() // expected-note {{a call to a never-returning function}}
+  fatalError() // expected-note {{call to never-returning function terminates the program}}
   let k = "foo" // expected-warning {{will never be executed}}
   switch k {
   case "bar":

@@ -111,7 +111,7 @@ func whileTrueLoop() -> Int {
 }
 
 func testUnreachableAfterNoReturn(x: Int) -> Int {
-  exit(); // expected-note{{a call to a never-returning function}}
+  exit(); // expected-note{{call to never-returning function terminates the program}}
   return x; // expected-warning {{will never be executed}}
 }
 
@@ -132,13 +132,13 @@ func testReachableAfterNoReturnInADifferentBlock(x: Int) -> Int {
 
 func testUnreachableAfterNoReturnFollowedByACall() -> Int {
   let x:Int = 5
-  exit(); // expected-note{{a call to a never-returning function}}
+  exit(); // expected-note{{call to never-returning function terminates the program}}
   exit(); // expected-warning {{will never be executed}}
   return x
 }
 
 func testUnreachableAfterNoReturnMethod() -> Int {
-  TuringMachine().halt(); // expected-note{{a call to a never-returning function}}
+  TuringMachine().halt(); // expected-note{{call to never-returning function terminates the program}}
   return 0; // expected-warning {{will never be executed}}
 }
 

@@ -287,7 +287,7 @@ func test_raise_1() throws -> Int {
 }
 
 func test_raise_2() throws -> Int {
-  try raise() // expected-note {{a call to a never-returning function}}
+  try raise() // expected-note {{call to never-returning function terminates the program}}
   try raise() // expected-warning {{will never be executed}}
 }
 
@@ -330,7 +330,7 @@ func deferTryNoReturn() throws {
 func noReturnInDefer() {
   defer { // expected-warning {{'defer' statement before end of scope always executes immediately}}{{3-8=do}}
     _ = Lisp()
-    die() // expected-note {{a call to a never-returning function}}
+    die() // expected-note {{call to never-returning function terminates the program}}
     die() // expected-warning {{will never be executed}}
   }
 }
