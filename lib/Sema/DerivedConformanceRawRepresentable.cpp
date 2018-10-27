@@ -233,6 +233,9 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
   SmallVector<ASTNode, 4> cases;
   unsigned Idx = 0;
   for (auto elt : enumDecl->getAllElements()) {
+    if(AvailableAttr::isUnavailable(elt)) {
+      continue;
+    }
     LiteralExpr *litExpr = cloneRawLiteralExpr(C, elt->getRawValueExpr());
     if (isStringEnum) {
       // In case of a string enum we are calling the _findStringSwitchCase
