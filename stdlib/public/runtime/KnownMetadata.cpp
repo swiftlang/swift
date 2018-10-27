@@ -54,9 +54,11 @@ namespace ctypes {
   namespace {
     // Type definitions that map each names Swift builtin type to their
     // C counterparts.
+    using Bi1_ = uint8_t;
     using Bi8_ = uint8_t;
     using Bi16_ = uint16_t;
     using Bi32_ = uint32_t;
+    using Bi63_ = uint64_t;
     using Bi64_ = uint64_t;
     using Bi128_ = int128_like;
     using Bi256_ = int256_like;
