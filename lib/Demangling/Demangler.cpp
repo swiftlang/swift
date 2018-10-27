@@ -2684,6 +2684,7 @@ NodePointer Demangler::demangleFunctionEntity() {
     case 'U': Args = TypeAndIndex; Kind = Node::Kind::ExplicitClosure; break;
     case 'u': Args = TypeAndIndex; Kind = Node::Kind::ImplicitClosure; break;
     case 'A': Args = Index; Kind = Node::Kind::DefaultArgumentInitializer; break;
+    case 'a': Args = Index; Kind = Node::Kind::EnumElementDefaultArgumentInitializer; break;
     case 'p': return demangleEntity(Node::Kind::GenericTypeParamDecl);
     default: return nullptr;
   }

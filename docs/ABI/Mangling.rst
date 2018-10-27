@@ -261,6 +261,7 @@ Entities
   entity-spec ::= type 'fU' INDEX            // explicit anonymous closure expression
   entity-spec ::= type 'fu' INDEX            // implicit anonymous closure
   entity-spec ::= 'fA' INDEX                 // default argument N+1 generator
+  entity-spec ::= decl-name 'fa' INDEX       // enum element default argument N+1 generator
   entity-spec ::= 'fi'                       // non-local variable initializer
   entity-spec ::= 'fD'                       // deallocating destructor; untyped
   entity-spec ::= 'fd'                       // non-deallocating destructor; untyped

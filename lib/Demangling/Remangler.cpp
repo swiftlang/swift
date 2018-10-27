@@ -748,6 +748,12 @@ void Remangler::mangleDefaultArgumentInitializer(Node *node) {
   mangleChildNode(node, 1);
 }
 
+void Remangler::mangleEnumElementDefaultArgumentInitializer(Node *node) {
+  mangleChildNode(node, 0);
+  Buffer << "fa";
+  mangleChildNode(node, 1);
+}
+
 void Remangler::mangleDependentAssociatedTypeRef(Node *node) {
   mangleIdentifier(node);
   if (node->getNumChildren() != 0)

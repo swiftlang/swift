@@ -115,6 +115,9 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   case SILDeclRef::Kind::GlobalAccessor:
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::DefaultArgGenerator:
+    if (auto *ED = dyn_cast<EnumElementDecl>(ref.getDecl())) {
+      return ED->getFullName();
+    }
     return getMagicFunctionName(cast<AbstractFunctionDecl>(ref.getDecl()));
   case SILDeclRef::Kind::StoredPropertyInitializer:
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());

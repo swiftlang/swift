@@ -453,8 +453,14 @@ IsSerialized_t SILDeclRef::isSerialized() const {
     // Default argument generators are serialized if the function was
     // type-checked in Swift 4 mode.
     if (kind == SILDeclRef::Kind::DefaultArgGenerator) {
-      auto *afd = cast<AbstractFunctionDecl>(d);
-      switch (afd->getDefaultArgumentResilienceExpansion()) {
+      ResilienceExpansion expansion;
+      if (auto *EED = dyn_cast<EnumElementDecl>(d)) {
+        expansion = EED->getDefaultArgumentResilienceExpansion();
+      } else {
+        expansion = cast<AbstractFunctionDecl>(d)
+                       ->getDefaultArgumentResilienceExpansion();
+      }
+      switch (expansion) {
       case ResilienceExpansion::Minimal:
         return IsSerialized;
       case ResilienceExpansion::Maximal:
@@ -713,6 +719,10 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 
   case SILDeclRef::Kind::DefaultArgGenerator:
     assert(!isCurried);
+    if (auto *ED = dyn_cast<EnumElementDecl>(getDecl())) {
+      return mangler.mangleEnumElementDefaultArgument(ED, defaultArgIndex,
+                                                      SKind);
+    }
     return mangler.mangleDefaultArgumentEntity(
                                         cast<AbstractFunctionDecl>(getDecl()),
                                         defaultArgIndex,

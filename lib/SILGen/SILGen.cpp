@@ -834,6 +834,8 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
 void SILGenModule::emitEnumConstructor(EnumElementDecl *decl) {
   // Enum element constructors are always emitted by need, so don't need
   // delayed emission.
+  emitEnumDefaultArgGenerators(decl, decl->getParameterList());
+  
   SILDeclRef constant(decl);
   SILFunction *f = getFunction(constant, ForDefinition);
   preEmitFunction(constant, decl, f, decl);
@@ -1081,6 +1083,18 @@ void SILGenModule::emitGlobalAccessor(VarDecl *global,
       .emitGlobalAccessor(global, onceToken, onceFunc);
     postEmitFunction(accessor, f);
   });
+}
+
+void SILGenModule::emitEnumDefaultArgGenerators(EnumElementDecl *EED,
+                                                ParameterList *paramList) {
+  if (!paramList)
+    return;
+
+  // If we've seen this enum element before, skip emitting default arguments.
+  if (!emittedEnumElementDefaultArguments.insert(EED).second)
+    return;
+
+  emitDefaultArgGenerators(EED, paramList);
 }
 
 void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,

@@ -105,6 +105,10 @@ public:
                                           unsigned index,
                                           SymbolKind SKind);
 
+  std::string mangleEnumElementDefaultArgument(const EnumElementDecl *ED,
+                                               unsigned index,
+                                               SymbolKind SKind);
+
   std::string mangleInitializerEntity(const VarDecl *var, SymbolKind SKind);
 
   std::string mangleNominalType(const NominalTypeDecl *decl);

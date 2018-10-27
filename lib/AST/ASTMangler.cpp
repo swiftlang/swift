@@ -168,6 +168,16 @@ std::string ASTMangler::mangleDefaultArgumentEntity(const DeclContext *func,
   return finalize();
 }
 
+std::string ASTMangler::mangleEnumElementDefaultArgument(const EnumElementDecl *ED,
+                                                         unsigned index,
+                                                         SymbolKind SKind) {
+  beginMangling();
+  appendEntity(ED);
+  appendOperator("fa", Index(index));
+  appendSymbolKind(SKind);
+  return finalize();
+}
+
 std::string ASTMangler::mangleInitializerEntity(const VarDecl *var,
                                                 SymbolKind SKind) {
   beginMangling();

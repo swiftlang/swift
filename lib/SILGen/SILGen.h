@@ -60,6 +60,10 @@ public:
   /// Mapping from ProtocolConformances to emitted SILWitnessTables.
   llvm::DenseMap<ProtocolConformance*, SILWitnessTable*> emittedWitnessTables;
 
+  /// Set of enum elements that have had their default argument generators
+  /// computed.
+  llvm::DenseSet<EnumElementDecl *> emittedEnumElementDefaultArguments;
+
   struct DelayedFunction {
     /// Insert the entity after the given function when it's emitted.
     SILDeclRef insertAfter;
@@ -256,6 +260,10 @@ public:
   /// Emits default argument generators for the given parameter list.
   void emitDefaultArgGenerators(SILDeclRef::Loc decl,
                                 ParameterList *paramList);
+
+  /// Emits default argument generators for enum elements.
+  void emitEnumDefaultArgGenerators(EnumElementDecl *EED,
+                                    ParameterList *paramList);
 
   /// Emits the curry thunk between two uncurry levels of a function.
   void emitCurryThunk(SILDeclRef thunk);

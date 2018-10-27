@@ -2272,12 +2272,39 @@ static void emitTupleShuffleExprInto(RValueEmitter &emitter,
   innerTupleInit.SubInitializations.resize(innerTuple->getNumElements());
 
   // Map all the outer initializations to their appropriate targets.
-  for (unsigned outerIndex = 0; outerIndex != outerInits.size(); outerIndex++) {
-    auto innerMapping = E->getElementMapping()[outerIndex];
-    assert(innerMapping >= 0 &&
-           "non-argument tuple shuffle with default arguments or variadics?");
-    innerTupleInit.SubInitializations[innerMapping] =
-      std::move(outerInits[outerIndex]);
+  unsigned callerDefaultArgIndex = 0;
+  auto defaultArgsOwner = E->getDefaultArgsOwner();
+  auto shuffleIdxIt = E->getElementMapping().begin();
+  for (auto it = outerFields.begin(), e = outerFields.end(); it != e; ++it) {
+    auto &field = *it;
+    int shuffleIndex = *shuffleIdxIt++;
+
+    assert((shuffleIndex >= 0 || shuffleIndex != TupleShuffleExpr::Variadic) &&
+           "non-argument tuple shuffle with variadics?");
+
+    if (shuffleIndex == TupleShuffleExpr::CallerDefaultInitialize) {
+      auto *expr = E->getCallerDefaultArgs()[callerDefaultArgIndex++];
+      unsigned destIndex
+          = shuffleIdxIt - E->getElementMapping().begin() - 1;
+      emitter.SGF.emitExprInto(expr, outerInits[destIndex].get());
+      continue;
+    }
+
+    if (shuffleIndex == TupleShuffleExpr::DefaultInitialize) {
+      unsigned destIndex
+        = shuffleIdxIt - E->getElementMapping().begin() - 1;
+      auto resultType = field.getType()->getCanonicalType();
+      auto origResultType =
+          AbstractionPattern(outerTuple.getElementType(destIndex));
+      auto apply = emitter.SGF.emitApplyOfDefaultArgGenerator(E, defaultArgsOwner,
+                                                      destIndex, resultType,
+                                                      origResultType);
+      std::move(apply).forwardInto(emitter.SGF, E, outerInits[destIndex].get());
+      continue;
+    }
+
+    innerTupleInit.SubInitializations[shuffleIndex] =
+      std::move(outerInits[std::distance(outerFields.begin(), it)]);
   }
 
 #ifndef NDEBUG
@@ -2311,22 +2338,46 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
   visit(E->getSubExpr()).extractElements(elements);
   
   // Prepare a new tuple to hold the shuffled result.
-  RValue result(E->getType()->getCanonicalType());
+  CanTupleType outerTuple =
+    cast<TupleType>(E->getType()->getCanonicalType());
+  RValue result(outerTuple);
 
+  auto defaultArgsOwner = E->getDefaultArgsOwner();
   auto outerFields = E->getType()->castTo<TupleType>()->getElements();
   auto shuffleIndexIterator = E->getElementMapping().begin();
   auto shuffleIndexEnd = E->getElementMapping().end();
+  unsigned callerDefaultArgIndex = 0;
   (void)shuffleIndexEnd;
   for (auto &field : outerFields) {
-    (void) field;
     assert(shuffleIndexIterator != shuffleIndexEnd &&
            "ran out of shuffle indexes before running out of fields?!");
     int shuffleIndex = *shuffleIndexIterator++;
     
-    assert(shuffleIndex != TupleShuffleExpr::DefaultInitialize &&
-           shuffleIndex != TupleShuffleExpr::CallerDefaultInitialize &&
-           shuffleIndex != TupleShuffleExpr::Variadic &&
-           "Only argument tuples can have default initializers & varargs");
+    assert(shuffleIndex != TupleShuffleExpr::Variadic &&
+           "Only argument tuples can have varargs");
+
+    // If the shuffle index is CallerDefaultInitialize, we're supposed to
+    // use the caller-provided default value.
+    if (shuffleIndex == TupleShuffleExpr::CallerDefaultInitialize) {
+      auto arg = E->getCallerDefaultArgs()[callerDefaultArgIndex++];
+      result.addElement(visit(arg));
+      continue;
+    }
+
+    // If the shuffle index is DefaultInitialize, we're supposed to use the
+    // default value.
+    if (shuffleIndex == TupleShuffleExpr::DefaultInitialize) {
+      unsigned destIndex
+        = shuffleIndexIterator - E->getElementMapping().begin() - 1;
+      auto resultType = field.getType()->getCanonicalType();
+      auto origResultType =
+          AbstractionPattern(outerTuple.getElementType(destIndex));
+      auto apply = SGF.emitApplyOfDefaultArgGenerator(E, defaultArgsOwner,
+                                                      destIndex, resultType,
+                                                      origResultType);
+      result.addElement(std::move(apply));
+      continue;
+    }
 
     // Map from a different tuple element.
     result.addElement(

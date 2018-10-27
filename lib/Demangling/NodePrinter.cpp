@@ -328,6 +328,7 @@ private:
     case Node::Kind::Deallocator:
     case Node::Kind::DeclContext:
     case Node::Kind::DefaultArgumentInitializer:
+    case Node::Kind::EnumElementDefaultArgumentInitializer:
     case Node::Kind::DefaultAssociatedTypeMetadataAccessor:
     case Node::Kind::DefaultAssociatedConformanceAccessor:
     case Node::Kind::DependentAssociatedTypeRef:
@@ -1067,6 +1068,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::DefaultArgumentInitializer:
     return printEntity(Node, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/false, "default argument ",
+                       (int)Node->getChild(1)->getIndex());
+  case Node::Kind::EnumElementDefaultArgumentInitializer:
+    return printEntity(Node, asPrefixContext, TypePrinting::NoType,
+                       /*hasName*/false, "enum element default argument ",
                        (int)Node->getChild(1)->getIndex());
   case Node::Kind::DeclContext:
     print(Node->getChild(0));

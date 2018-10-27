@@ -821,8 +821,6 @@ ERROR(no_default_arg_subscript,none,
       "default arguments are not allowed in subscripts", ())
 ERROR(no_default_arg_curried,none,
       "default arguments are not allowed in curried parameter lists", ())
-ERROR(no_default_arg_enum_elt,none,
-      "default arguments are not allowed in enum cases", ())
 ERROR(var_pattern_in_var,none,
       "'%select{var|let}0' cannot appear nested inside another 'var' or "
       "'let' pattern", (unsigned))

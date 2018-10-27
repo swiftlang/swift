@@ -1027,6 +1027,11 @@ void Remangler::mangleDefaultArgumentInitializer(Node *node,
   mangleNamedEntity(node, 'I', "A", ctx);
 }
 
+void Remangler::mangleEnumElementDefaultArgumentInitializer(Node *node,
+                                                            EntityContext &ctx) {
+  mangleNamedEntity(node, 'I', "a", ctx);
+}
+
 void Remangler::mangleDeallocator(Node *node, EntityContext &ctx) {
   mangleSimpleEntity(node, 'F', "D", ctx);
 }

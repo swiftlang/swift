@@ -854,7 +854,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   ManagedValue emitInjectEnum(SILLocation loc,
-                              ArgumentSource payload,
+                              ArgumentSource &&payload,
                               SILType enumTy,
                               EnumElementDecl *element,
                               SGFContext C);

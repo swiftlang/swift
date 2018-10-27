@@ -5746,13 +5746,14 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     // See if there's a following argument type.
     ParserResult<ParameterList> ArgParams;
     SmallVector<Identifier, 4> argumentNames;
+    DefaultArgumentInfo DefaultArgs;
     if (Tok.isFollowingLParen()) {
       ArgParams = parseSingleParameterClause(ParameterContextKind::EnumElement,
-                                             &argumentNames);
+                                             &argumentNames, &DefaultArgs);
       if (ArgParams.isNull() || ArgParams.hasCodeCompletion())
         return ParserStatus(ArgParams);
     }
-    
+
     // See if there's a raw value expression.
     SourceLoc EqualsLoc;
     ParserResult<Expr> RawValueExpr;
@@ -5818,6 +5819,8 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
                                                  EqualsLoc,
                                                  LiteralRawValueExpr,
                                                  CurDeclContext);
+
+    DefaultArgs.setFunctionContext(CurDeclContext, result->getParameterList());
 
     if (NameLoc == CaseLoc) {
       result->setImplicit(); // Parse error
