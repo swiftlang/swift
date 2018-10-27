@@ -8,6 +8,7 @@ Constructor AnyHashable.init(_box:) has been removed
 Constructor AnyHashable.init(_usingDefaultRepresentationOf:) has been removed
 Constructor ManagedBufferPointer.init(_:_:_:) has been removed
 Func AnyHashable._downCastConditional(into:) has been removed
+Func _CocoaDictionary.Index.copy() has been removed
 Func _ContiguousArrayStorage._getNonVerbatimBridgedHeapBuffer() has been removed
 Func _ContiguousArrayStorage._withVerbatimBridgedUnsafeBufferImpl(_:) has been removed
 Func __ContiguousArrayStorageBase._getNonVerbatimBridgedHeapBuffer() has been removed
@@ -22,6 +23,8 @@ Subscript ManagedBufferPointer.subscript(_:) has been removed
 Var ManagedBufferPointer.baseAddress has been removed
 Var ManagedBufferPointer.storage has been removed
 Var ManagedBufferPointer.value has been removed
+Var _CocoaDictionary.Index._object has been removed
+Var _CocoaSet.Index._object has been removed
 Var __SwiftDeferredNSArray._heapBufferBridged has been removed
 Var __SwiftDeferredNSArray._heapBufferBridgedPtr has been removed
 
@@ -31,6 +34,10 @@ Var __SwiftDeferredNSArray._heapBufferBridgedPtr has been removed
 
 /* Type Changes */
 Func __ContiguousArrayStorageBase._getNonVerbatimBridgingBuffer() is added to a non-resilient type
+Var _CocoaDictionary.Index._offset is added to a non-resilient type
+Var _CocoaDictionary.Index._storage in a non-resilient type changes position from 1 to 0
+Var _CocoaSet.Index._offset is added to a non-resilient type
+Var _CocoaSet.Index._storage in a non-resilient type changes position from 1 to 0
 
 /* Decl Attribute changes */
 

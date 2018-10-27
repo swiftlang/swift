@@ -1943,7 +1943,7 @@ extension Dictionary.Index: Hashable {
 #if _runtime(_ObjC)
     guard _isNative else {
       hasher.combine(1 as UInt8)
-      hasher.combine(_asCocoa.storage.currentKeyIndex)
+      hasher.combine(_asCocoa._offset)
       return
     }
     hasher.combine(0 as UInt8)
