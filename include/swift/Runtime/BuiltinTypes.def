@@ -32,9 +32,11 @@
                   "Builtin.Vec" #Width "x" #ElementName)
 #endif
 
+BUILTIN_TYPE(Bi1_, "Builtin.Int1")
 BUILTIN_TYPE(Bi8_, "Builtin.Int8")
 BUILTIN_TYPE(Bi16_, "Builtin.Int16")
 BUILTIN_TYPE(Bi32_, "Builtin.Int32")
+BUILTIN_TYPE(Bi63_, "Builtin.Int63")
 BUILTIN_TYPE(Bi64_, "Builtin.Int64")
 BUILTIN_TYPE(Bi128_, "Builtin.Int128")
 BUILTIN_TYPE(Bi256_, "Builtin.Int256")
