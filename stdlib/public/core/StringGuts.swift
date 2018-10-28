@@ -36,19 +36,10 @@ internal struct _StringGuts {
 
 // Raw
 extension _StringGuts {
-  @usableFromInline
-  internal typealias RawBitPattern = _StringObject.RawBitPattern
-
   @inlinable
-  internal var rawBits: RawBitPattern {
+  internal var rawBits: _StringObject.RawBitPattern {
     @inline(__always) get { return _object.rawBits }
   }
-
-  @inlinable @inline(__always)
-  init(raw bits: RawBitPattern) {
-    self.init(_StringObject(raw: bits))
-  }
-
 }
 
 // Creation
@@ -92,6 +83,16 @@ extension _StringGuts {
 
   @inlinable
   internal var isEmpty: Bool { @inline(__always) get { return count == 0 } }
+
+  @inlinable
+  internal var isSmall: Bool {
+    @inline(__always) get { return _object.isSmall }
+  }
+
+  @inlinable
+  internal var asSmall: _SmallString {
+    @inline(__always) get { return _SmallString(_object) }
+  }
 
   @inlinable
   internal var isASCII: Bool  {
@@ -146,7 +147,7 @@ extension _StringGuts {
   ) rethrows -> R {
     _sanityCheck(isFastUTF8)
 
-    if _object.isSmall { return try _object.asSmallString.withUTF8(f) }
+    if self.isSmall { return try _SmallString(_object).withUTF8(f) }
 
     defer { _fixLifetime(self) }
     return try f(_object.fastUTF8)

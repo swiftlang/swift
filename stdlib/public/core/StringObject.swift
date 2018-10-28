@@ -78,7 +78,7 @@ extension _StringObject {
     object: AnyObject, discriminator: UInt, countAndFlags: CountAndFlags
   ) {
     let builtinRawObject: Builtin.Int64 = Builtin.reinterpretCast(object)
-    let builtinDiscrim: Builtin.Int64 = Builtin.reinterpretCast(discriminator)
+    let builtinDiscrim: Builtin.Int64 = discriminator._value
     self.init(
       bridgeObject: Builtin.reinterpretCast(
         Builtin.stringObjectOr_Int64(builtinRawObject, builtinDiscrim)),
@@ -88,10 +88,22 @@ extension _StringObject {
   // Initializer to use for tagged (unmanaged) values
   @inlinable @inline(__always)
   internal init(
-    valueBits: UInt, discriminator: UInt, countAndFlags: CountAndFlags
+    discriminator: UInt, valueLeading: UInt, valueTrailing: UInt
   ) {
-    let builtinValueBits: Builtin.Int64 = Builtin.reinterpretCast(valueBits)
-    let builtinDiscrim: Builtin.Int64 = Builtin.reinterpretCast(discriminator)
+    // NOTE: Do not use stringObjectOr, which is only meant for pointers.
+    _sanityCheck(valueTrailing & Nibbles.discriminatorMask == 0)
+    self.init(
+      bridgeObject: Builtin.valueToBridgeObject(valueTrailing | discriminator),
+      countAndFlags: CountAndFlags(rawUnchecked: valueLeading))
+  }
+
+  // Initializer to use for tagged (unmanaged) values
+  @inlinable @inline(__always)
+  internal init(
+    pointerBits: UInt, discriminator: UInt, countAndFlags: CountAndFlags
+  ) {
+    let builtinValueBits: Builtin.Int64 = pointerBits._value
+    let builtinDiscrim: Builtin.Int64 = discriminator._value
     self.init(
       bridgeObject: Builtin.valueToBridgeObject(Builtin.stringObjectOr_Int64(
         builtinValueBits, builtinDiscrim)),
@@ -99,11 +111,16 @@ extension _StringObject {
   }
 
   @inlinable @inline(__always)
-  internal init(raw bits: RawBitPattern) {
+  internal init(rawUncheckedValue bits: RawBitPattern) {
     self.init(zero:())
-    self._countAndFlags = Builtin.reinterpretCast(bits.0)
+    self._countAndFlags = CountAndFlags(rawUnchecked: bits.0)
     self._object = Builtin.reinterpretCast(bits.1)
     _sanityCheck(self.rawBits == bits)
+  }
+
+  @inlinable @inline(__always)
+  internal init(rawValue bits: RawBitPattern) {
+    self.init(rawUncheckedValue: bits)
     _invariantCheck()
   }
 
@@ -130,8 +147,13 @@ extension _StringObject.CountAndFlags {
   }
 
   @inlinable @inline(__always)
-  internal init(raw bits: RawBitPattern) {
+  internal init(rawUnchecked bits: RawBitPattern) {
     self._storage = bits
+  }
+
+  @inlinable @inline(__always)
+  internal init(raw bits: RawBitPattern) {
+    self.init(rawUnchecked: bits)
     _invariantCheck()
   }
 }
@@ -245,6 +267,18 @@ extension _StringObject.Nibbles {
     }
   }
 
+  // Mask for discriminator bits
+  @inlinable
+  static internal var discriminatorMask: UInt {
+    @inline(__always) get {
+#if arch(i386) || arch(arm)
+    unimplemented_utf8_32bit()
+#else
+    return ~largeAddressMask
+#endif
+    }
+  }
+
   // Discriminator for small strings
   @inlinable @inline(__always)
   internal static func small(isASCII: Bool) -> UInt {
@@ -252,6 +286,17 @@ extension _StringObject.Nibbles {
     unimplemented_utf8_32bit()
 #else
     return isASCII ? 0xE000_0000_0000_0000 : 0xA000_0000_0000_0000
+#endif
+  }
+
+  // Discriminator for small strings
+  @inlinable @inline(__always)
+  internal static func small(withCount count: Int, isASCII: Bool) -> UInt {
+#if arch(i386) || arch(arm)
+    unimplemented_utf8_32bit()
+#else
+    _sanityCheck(count <= _SmallString.capacity)
+    return small(isASCII: isASCII) | UInt(bitPattern: count) &<< 56
 #endif
   }
 
@@ -447,7 +492,7 @@ extension _StringObject {
     let discrim = Nibbles.small(isASCII: isASCII)
                 | (UInt(bitPattern: count) &<< 56)
     self = _StringObject(
-      valueBits: valueBits,
+      pointerBits: valueBits, // TODO: remove
       discriminator: discrim,
       countAndFlags: self._countAndFlags)
   }
@@ -464,18 +509,10 @@ extension _StringObject {
 #endif
     }
   }
-  @inlinable
-  internal var asSmallString: _SmallString {
-    @inline(__always)
-    get {
-      _sanityCheck(isSmall)
-      return _SmallString(raw:rawBits)
-    }
-  }
 
   @inlinable @inline(__always)
   internal init(_ small: _SmallString) {
-    self.init(raw: small.rawBits)
+    self.init(rawValue: small.rawBits)
   }
 
   // Canonical empty pattern: small zero-length string
@@ -768,7 +805,7 @@ extension _StringObject {
     let countAndFlags = CountAndFlags(count: bufPtr.count, isASCII: isASCII)
 
     self.init(
-      valueBits: biasedAddress,
+      pointerBits: biasedAddress,
       discriminator: Nibbles.largeImmortal(),
       countAndFlags: countAndFlags)
   }
@@ -855,7 +892,7 @@ extension _StringObject {
     // TODO(UTF8): Print out any useful internal information
     #if INTERNAL_CHECKS_ENABLED
     if isSmall {
-      asSmallString._dump()
+      _SmallString(self)._dump()
       return
     }
     if providesFastUTF8 && largeFastIsNative {
