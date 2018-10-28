@@ -86,6 +86,7 @@ extension _AbstractStringStorage {
 }
 #endif // _runtime(_ObjC)
 
+private typealias CountAndFlags = _StringObject.CountAndFlags
 
 //
 // TODO(UTF8 merge): Documentation about the runtime layout of these instances,
@@ -100,16 +101,17 @@ final internal class _StringStorage: _AbstractStringStorage {
   // which is not available for overridding.
   @nonobjc
   @usableFromInline
-  internal var _realCapacityAndFlags: Int
+  internal var _realCapacityAndFlags: UInt
 
   @nonobjc
   @usableFromInline
-  internal var _countAndFlags: Int
+  internal var _countAndFlags: _StringObject.CountAndFlags
 
   @nonobjc
   @inlinable
   override internal var count: Int {
-    @inline(__always) get { return _countAndFlags & _StringObject.countMask }
+    @inline(__always) get { return _countAndFlags.count }
+    @inline(__always) set { _countAndFlags.count = newValue }
   }
 
   @nonobjc
@@ -157,29 +159,30 @@ private func determineCodeUnitCapacity(_ desiredCapacity: Int) -> Int {
 extension _StringStorage {
   @_effects(releasenone)
   @nonobjc
-  private static func create(capacity: Int, count: Int = 0) -> _StringStorage {
-    _sanityCheck(capacity >= count)
+  private static func create(
+    capacity: Int, countAndFlags: CountAndFlags
+  ) -> _StringStorage {
+    _sanityCheck(capacity >= countAndFlags.count)
 
     let realCapacity = determineCodeUnitCapacity(capacity)
     _sanityCheck(realCapacity > capacity)
     return _StringStorage.create(
-      realCodeUnitCapacity: realCapacity, count: count)
+      realCodeUnitCapacity: realCapacity, countAndFlags: countAndFlags)
   }
 
   @inline(never) // rdar://problem/44542202
   @_effects(releasenone)
   @nonobjc
   private static func create(
-    realCodeUnitCapacity: Int, count: Int = 0
+    realCodeUnitCapacity: Int, countAndFlags: CountAndFlags
   ) -> _StringStorage {
     let storage = Builtin.allocWithTailElems_2(
       _StringStorage.self,
       realCodeUnitCapacity._builtinWordValue, UInt8.self,
       1._builtinWordValue, Optional<_StringBreadcrumbs>.self)
 
-    // TODO(UTF8 perf): Use or document flags
-    storage._realCapacityAndFlags = realCodeUnitCapacity
-    storage._countAndFlags = count
+    storage._realCapacityAndFlags = UInt(bitPattern: realCodeUnitCapacity)
+    storage._countAndFlags = countAndFlags
 
     storage._breadcrumbsAddress.initialize(to: nil)
     storage.terminator.pointee = 0 // nul-terminated
@@ -190,11 +193,14 @@ extension _StringStorage {
   @_effects(releasenone)
   @nonobjc
   internal static func create(
-    initializingFrom bufPtr: UnsafeBufferPointer<UInt8>, capacity: Int
+    initializingFrom bufPtr: UnsafeBufferPointer<UInt8>,
+    capacity: Int,
+    isASCII: Bool
   ) -> _StringStorage {
+    let countAndFlags = CountAndFlags(count: bufPtr.count, isASCII: isASCII)
     _sanityCheck(capacity >= bufPtr.count)
     let storage = _StringStorage.create(
-      capacity: capacity, count: bufPtr.count)
+      capacity: capacity, countAndFlags: countAndFlags)
     let addr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
     storage.mutableStart.initialize(from: addr, count: bufPtr.count)
     storage._invariantCheck()
@@ -204,10 +210,10 @@ extension _StringStorage {
   @_effects(releasenone)
   @nonobjc
   internal static func create(
-    initializingFrom bufPtr: UnsafeBufferPointer<UInt8>
+    initializingFrom bufPtr: UnsafeBufferPointer<UInt8>, isASCII: Bool
   ) -> _StringStorage {
     return _StringStorage.create(
-      initializingFrom: bufPtr, capacity: bufPtr.count)
+      initializingFrom: bufPtr, capacity: bufPtr.count, isASCII: isASCII)
   }
 }
 
@@ -250,6 +256,9 @@ extension _StringStorage {
   }
 
   @nonobjc
+  private var isASCII: Bool { return _countAndFlags.isASCII }
+
+  @nonobjc
   // @opaque
   internal var _breadcrumbsAddress: UnsafeMutablePointer<_StringBreadcrumbs?> {
     let raw = Builtin.getTailAddr_Word(
@@ -271,7 +280,8 @@ extension _StringStorage {
   // required nul-terminator
   @nonobjc
   private var realCapacity: Int {
-    return _realCapacityAndFlags & _StringObject.countMask
+    return Int(bitPattern:
+      _realCapacityAndFlags & _StringObject.Nibbles.largeAddressMask)
   }
 
   // The unused capacity available for appending. Note that this excludes the
@@ -304,6 +314,14 @@ extension _StringStorage {
     _sanityCheck(rawSelf + Int(_StringObject.nativeBias) == rawStart)
     _sanityCheck(self.realCapacity > self.count, "no room for nul-terminator")
     _sanityCheck(self.terminator.pointee == 0, "not nul terminated")
+
+    _countAndFlags._invariantCheck()
+    if isASCII {
+      _sanityCheck(_allASCII(self.codeUnits))
+    }
+    if let crumbs = _breadcrumbsAddress.pointee {
+      crumbs._invariantCheck()
+    }
   }
   #endif // INTERNAL_CHECKS_ENABLED
 }
@@ -311,14 +329,18 @@ extension _StringStorage {
 // Appending
 extension _StringStorage {
   @nonobjc
-  internal func appendInPlace(_ other: UnsafeBufferPointer<UInt8>) {
+  internal func appendInPlace(
+    _ other: UnsafeBufferPointer<UInt8>, isASCII: Bool
+  ) {
     _sanityCheck(self.capacity >= other.count)
     let oldTerminator = self.terminator
 
     let srcAddr = other.baseAddress._unsafelyUnwrappedUnchecked
     let srcCount = other.count
     self.mutableEnd.initialize(from: srcAddr, count: srcCount)
-    self._countAndFlags += srcCount
+    self._countAndFlags = CountAndFlags(
+      count: self.count + srcCount,
+      isASCII: self.isASCII && isASCII)
 
     _sanityCheck(oldTerminator + other.count == self.terminator)
     self.terminator.pointee = 0
@@ -328,7 +350,7 @@ extension _StringStorage {
 
   @nonobjc
   internal func appendInPlace<Iter: IteratorProtocol>(
-    _ other: inout Iter
+    _ other: inout Iter, isASCII: Bool
   ) where Iter.Element == UInt8 {
     let oldTerminator = self.terminator
     var srcCount = 0
@@ -337,7 +359,9 @@ extension _StringStorage {
       unusedStorage[srcCount] = cu
       srcCount += 1
     }
-    self._countAndFlags += srcCount
+    self._countAndFlags = CountAndFlags(
+      count: self.count + srcCount,
+      isASCII: self.isASCII && isASCII)
 
     _sanityCheck(oldTerminator + srcCount == self.terminator)
     self.terminator.pointee = 0
@@ -347,8 +371,7 @@ extension _StringStorage {
 
   @nonobjc
   internal func clear() {
-    // TODO(UTF8 perf flags): Clear or restore flags
-    self._countAndFlags &= ~_StringObject.countMask
+    self._countAndFlags = CountAndFlags(count: 0, isASCII: true)
   }
 }
 
@@ -367,46 +390,34 @@ extension _StringStorage {
   }
 }
 
-// For bridging literals
-//
-// TODO(UTF8): Unify impls with _StringStorage
-//
-@_fixed_layout
-@usableFromInline
+// For shared storage and bridging literals
 final internal class _SharedStringStorage: _AbstractStringStorage {
   @nonobjc
-  @usableFromInline
-  internal var owner: AnyObject?
+  internal var _owner: AnyObject?
 
   @nonobjc
-  @usableFromInline
-  internal var contents: UnsafeBufferPointer<UInt8>
+  internal var _start: UnsafePointer<UInt8>
 
   @nonobjc
-  internal var _breadcrumbs: _StringBreadcrumbs?
+  internal var _countAndFlags: _StringObject.CountAndFlags
 
   @nonobjc
-  @usableFromInline
-  internal var start: UnsafePointer<UInt8> {
-    return contents.baseAddress._unsafelyUnwrappedUnchecked
-  }
+  internal var _breadcrumbs: _StringBreadcrumbs? = nil
 
   @nonobjc
-  @usableFromInline
-  override internal var count: Int { return contents.count }
+  internal var start: UnsafePointer<UInt8> { return _start }
 
   @nonobjc
-  internal init(owner: AnyObject, contents bufPtr: UnsafeBufferPointer<UInt8>) {
-    self.owner = owner
-    self.contents = bufPtr
-    super.init()
-    self._invariantCheck()
-  }
+  override internal var count: Int { return _countAndFlags.count }
 
   @nonobjc
-  internal init(immortal bufPtr: UnsafeBufferPointer<UInt8>) {
-    self.owner = nil
-    self.contents = bufPtr
+  internal init(
+    immortal ptr: UnsafePointer<UInt8>,
+    countAndFlags: _StringObject.CountAndFlags
+  ) {
+    self._owner = nil
+    self._start = ptr
+    self._countAndFlags = countAndFlags
     super.init()
     self._invariantCheck()
   }
@@ -421,6 +432,10 @@ extension _SharedStringStorage {
   #else
   @nonobjc @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
+    if let crumbs = _breadcrumbs {
+      crumbs._invariantCheck()
+    }
+    _countAndFlags._invariantCheck()
   }
   #endif // INTERNAL_CHECKS_ENABLED
 }

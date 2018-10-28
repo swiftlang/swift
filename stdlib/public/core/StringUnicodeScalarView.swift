@@ -48,7 +48,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   @inlinable @inline(__always)
   public func index(after i: Index) -> Index {
     _sanityCheck(i < endIndex)
-    // TODO(UTF8): isKnownASCII bit fast-path...
+    // TODO(UTF8): isASCII bit fast-path...
 
     if _fastPath(_guts.isFastUTF8) {
       let len = _guts.fastUTF8ScalarLength(startingAt: i.encodedOffset)
@@ -65,7 +65,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   public func index(before i: Index) -> Index {
     precondition(i.encodedOffset > 0)
     if _fastPath(_guts.isFastUTF8) {
-      // TODO(UTF8): isKnownASCII bit fast-path...
+      // TODO(UTF8): isASCII bit fast-path...
 
       let len = _guts.withFastUTF8 { utf8 -> Int in
         return _utf8ScalarLength(utf8, endingAt: i.encodedOffset)
