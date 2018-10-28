@@ -982,6 +982,9 @@ namespace {
       if (P->isVariadic())
         OS << " variadic";
 
+      if (P->isAutoClosure())
+        OS << " autoclosure";
+
       if (P->getDefaultArgumentKind() != DefaultArgumentKind::None)
         printField("default_arg",
                    getDefaultArgumentKindString(P->getDefaultArgumentKind()));

@@ -1743,7 +1743,8 @@ public:
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
-  fromParameterType(Type paramTy, bool isVariadic, ValueOwnership ownership);
+  fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
+                    ValueOwnership ownership);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -5325,9 +5326,8 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 /// Create one from what's present in the parameter decl and type
 inline ParameterTypeFlags
 ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
+                                      bool isAutoClosure,
                                       ValueOwnership ownership) {
-  bool autoclosure = paramTy->is<AnyFunctionType>() &&
-                     paramTy->castTo<AnyFunctionType>()->isAutoClosure();
   bool escaping = paramTy->is<AnyFunctionType>() &&
                   !paramTy->castTo<AnyFunctionType>()->isNoEscape();
   // FIXME(Remove InOut): The last caller that needs this is argument
@@ -5339,7 +5339,7 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
            ownership == ValueOwnership::InOut);
     ownership = ValueOwnership::InOut;
   }
-  return {isVariadic, autoclosure, escaping, ownership};
+  return {isVariadic, isAutoClosure, escaping, ownership};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {
