@@ -12,8 +12,9 @@
 
 import SwiftShims
 
+@inline(never) // slow-path
 @_effects(releasenone)
-internal func _measureCharacterStride(
+private func _measureCharacterStrideICU(
   of utf8: UnsafeBufferPointer<UInt8>, startingAt i: Int
 ) -> Int {
   let iterator = _ThreadLocalStorage.getUBreakIterator(utf8)
@@ -29,8 +30,9 @@ internal func _measureCharacterStride(
   return utf8.count &- i
 }
 
+@inline(never) // slow-path
 @_effects(releasenone)
-internal func _measureCharacterStride(
+private func _measureCharacterStrideICU(
   of utf16: UnsafeBufferPointer<UInt16>, startingAt i: Int
 ) -> Int {
   let iterator = _ThreadLocalStorage.getUBreakIterator(utf16)
@@ -45,8 +47,9 @@ internal func _measureCharacterStride(
   return utf16.count &- i
 }
 
+@inline(never) // slow-path
 @_effects(releasenone)
-internal func _measureCharacterStride(
+private func _measureCharacterStrideICU(
   of utf8: UnsafeBufferPointer<UInt8>, endingAt i: Int
 ) -> Int {
   let iterator = _ThreadLocalStorage.getUBreakIterator(utf8)
@@ -61,8 +64,9 @@ internal func _measureCharacterStride(
   return i &- utf8.count
 }
 
+@inline(never) // slow-path
 @_effects(releasenone)
-internal func _measureCharacterStride(
+private func _measureCharacterStrideICU(
   of utf16: UnsafeBufferPointer<UInt16>, endingAt i: Int
 ) -> Int {
   let iterator = _ThreadLocalStorage.getUBreakIterator(utf16)
@@ -99,16 +103,15 @@ extension _StringGuts {
       return _foreignOpaqueCharacterStride(startingAt: i)
     }
 
-    // TODO(UTF8 perf): grapheme breaking fast-paths...
-
-    return self.withFastUTF8 {
-      return _measureCharacterStride(of: $0, startingAt: i)
+    return self.withFastUTF8 { utf8 in
+      // TODO(UTF8 perf): grapheme breaking fast-paths...
+      return _measureCharacterStrideICU(of: utf8, startingAt: i)
     }
   }
 
-  @usableFromInline @inline(never)
+  @inline(never)
   @_effects(releasenone)
-  internal func _foreignOpaqueCharacterStride(startingAt i: Int) -> Int {
+  private func _foreignOpaqueCharacterStride(startingAt i: Int) -> Int {
     _sanityCheck(isForeign)
 
     // TODO(UTF8 perf): grapheme breaking fast-paths...
@@ -128,7 +131,7 @@ extension _StringGuts {
         into: $0.baseAddress._unsafelyUnwrappedUnchecked)
     }
     return codeUnits.withUnsafeBufferPointer {
-      _measureCharacterStride(of: $0, startingAt: i)
+      _measureCharacterStrideICU(of: $0, startingAt: i)
     }
   }
 
@@ -142,13 +145,13 @@ extension _StringGuts {
     // TODO(UTF8 perf): grapheme breaking fast-paths...
 
     return self.withFastUTF8 {
-      return _measureCharacterStride(of: $0, endingAt: i)
+      return _measureCharacterStrideICU(of: $0, endingAt: i)
     }
   }
 
-  @usableFromInline @inline(never)
+  @inline(never)
   @_effects(releasenone)
-  internal func _foreignOpaqueCharacterStride(endingAt i: Int) -> Int {
+  private func _foreignOpaqueCharacterStride(endingAt i: Int) -> Int {
     _sanityCheck(isForeign)
 
     // TODO(UTF8 perf): grapheme breaking fast-paths...
@@ -168,7 +171,7 @@ extension _StringGuts {
         into: $0.baseAddress._unsafelyUnwrappedUnchecked)
     }
     return codeUnits.withUnsafeBufferPointer {
-      _measureCharacterStride(of: $0, endingAt: i)
+      _measureCharacterStrideICU(of: $0, endingAt: i)
     }
   }
 }

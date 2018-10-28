@@ -104,7 +104,7 @@ extension String: BidirectionalCollection {
   @inlinable @inline(__always)
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-    return __index(i, offsetBy: n)
+    return _index(i, offsetBy: n)
   }
 
   /// Returns an index that is the specified distance from the given index,
@@ -149,7 +149,7 @@ extension String: BidirectionalCollection {
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-    return __index(i, offsetBy: n, limitedBy: limit)
+    return _index(i, offsetBy: n, limitedBy: limit)
   }
 
   /// Returns the distance between two indices.
@@ -164,7 +164,7 @@ extension String: BidirectionalCollection {
   @inlinable @inline(__always)
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-    return __distance(from: start, to: end)
+    return _distance(from: start, to: end)
   }
 
   /// Accesses the character at the given position.
@@ -210,13 +210,14 @@ extension String: BidirectionalCollection {
     // Fast check if it's already been measured, otherwise check resiliently
     if let d = i.characterStride { return d }
 
-    // TODO: Known-single-scalar-grapheme fast path
     _boundsCheck(i)
+    // TODO: Known-single-scalar-grapheme fast path
     return _guts._opaqueCharacterStride(startingAt: i.encodedOffset)
   }
 
   @inlinable @inline(__always)
   internal func _characterStride(endingAt i: Index) -> Int {
+    _precondition(i.encodedOffset > 0, "String index is out of bounds")
     // TODO: Known-single-scalar-grapheme fast path
     return _guts._opaqueCharacterStride(endingAt: i.encodedOffset)
   }

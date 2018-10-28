@@ -95,6 +95,29 @@ extension String: RangeReplaceableCollection {
     self._guts.reserveCapacity(n)
   }
 
+  /// Appends the given string to this string.
+  ///
+  /// The following example builds a customized greeting by using the
+  /// `append(_:)` method:
+  ///
+  ///     var greeting = "Hello, "
+  ///     if let name = getUserName() {
+  ///         greeting.append(name)
+  ///     } else {
+  ///         greeting.append("friend")
+  ///     }
+  ///     print(greeting)
+  ///     // Prints "Hello, friend"
+  ///
+  /// - Parameter other: Another string.
+  public mutating func append(_ other: String) {
+    if self.isEmpty && !_guts.hasNativeStorage {
+      self = other
+      return
+    }
+    self._guts.append(other._guts)
+  }
+
   /// Appends the given character to the string.
   ///
   /// The following example adds an emoji globe to the end of a string.
@@ -115,19 +138,18 @@ extension String: RangeReplaceableCollection {
 
   public mutating func append(contentsOf newElements: Substring) {
     // TODO(UTF8 perf): This is a horribly slow means...
-    self.append(String(newElements))
+    self.append(newElements._ephemeralString)
   }
 
   /// Appends the characters in the given sequence to the string.
   ///
   /// - Parameter newElements: A sequence of characters.
+  @inlinable // @specializable
   public mutating func append<S : Sequence>(contentsOf newElements: S)
   where S.Iterator.Element == Character {
-    // TODO(UTF8 perf): This is a horribly slow means...
-    let scalars = String(
-      decoding: newElements.map { $0.unicodeScalars }.joined().map { $0.value },
-      as: UTF32.self)
-    self.append(scalars)
+    for c in newElements {
+      self.append(c._str)
+    }
   }
 
   /// Replaces the text within the specified bounds with the given characters.
@@ -151,10 +173,7 @@ extension String: RangeReplaceableCollection {
     _ bounds: Range<Index>,
     with newElements: C
   ) where C : Collection, C.Iterator.Element == Character {
-    // TODO(UTF8 perf): This is a horribly slow means...
-    let prefix = self[..<bounds.lowerBound]
-    let suffix = self[bounds.upperBound...]
-    self = prefix + String(newElements) + suffix
+    _guts.replaceSubrange(bounds, with: newElements)
   }
 
   /// Inserts a new character at the specified position.
@@ -218,10 +237,9 @@ extension String: RangeReplaceableCollection {
   /// - Returns: The character that was removed.
   @discardableResult
   public mutating func remove(at i: Index) -> Character {
-    // TODO(UTF8 perf): Operate on storage directly, sliding down elements
-    let c = self[i]
-    self.removeSubrange(i..<self.index(after: i))
-    return c
+    let result = self[i]
+    _guts.remove(from: i, to: self.index(after: i))
+    return result
   }
 
   /// Removes the characters in the given range.
@@ -235,9 +253,7 @@ extension String: RangeReplaceableCollection {
   /// - Parameter bounds: The range of the elements to remove. The upper and
   ///   lower bounds of `bounds` must be valid indices of the string.
   public mutating func removeSubrange(_ bounds: Range<Index>) {
-    // TODO(UTF8 perf): Operate on storage directly, sliding down elements
-    // TODO(UTF8 merge): replace with literal
-    self.replaceSubrange(bounds, with: String())
+    _guts.remove(from: bounds.lowerBound, to: bounds.upperBound)
   }
 
   /// Replaces this string with the empty string.
@@ -250,12 +266,11 @@ extension String: RangeReplaceableCollection {
   ///   optimization when you're planning to grow the string again. The
   ///   default value is `false`.
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
-    guard keepCapacity || _guts.uniqueNativeCapacity != nil else {
-      self = String()
+    guard keepCapacity else {
+      self = ""
       return
     }
-
-    unimplemented_utf8()
+    _guts.clear()
   }
 }
 
