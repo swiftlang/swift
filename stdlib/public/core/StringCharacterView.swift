@@ -60,10 +60,16 @@ extension String: BidirectionalCollection {
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
   public func index(after i: Index) -> Index {
-    // TODO(UTF8): populate the stride cache in the resultant iterator
+    _precondition(i < endIndex, "String index is out of bounds")
 
+    // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
     let stride = _characterStride(startingAt: i)
-    return Index(encodedOffset: i.encodedOffset &+ stride)
+    let nextOffset = i.encodedOffset &+ stride
+    let nextStride = _characterStride(
+      startingAt: Index(encodedOffset: nextOffset))
+
+    return Index(
+      encodedOffset: nextOffset, characterStride: nextStride)
   }
 
   /// Returns the position immediately before the given index.
@@ -72,12 +78,13 @@ extension String: BidirectionalCollection {
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
   public func index(before i: Index) -> Index {
+    _precondition(i > startIndex, "String index is out of bounds")
+
     // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
-
-    // TODO(UTF8): populate the stride cache in the resultant iterator
-
     let stride = _characterStride(endingAt: i)
-    return Index(encodedOffset: i.encodedOffset &- stride)
+    let priorOffset = i.encodedOffset &- stride
+    return Index(
+      encodedOffset: priorOffset, characterStride: stride)
   }
   /// Returns an index that is the specified distance from the given index.
   ///
@@ -210,15 +217,18 @@ extension String: BidirectionalCollection {
     // Fast check if it's already been measured, otherwise check resiliently
     if let d = i.characterStride { return d }
 
-    _boundsCheck(i)
+    if i == endIndex { return 0 }
+
     // TODO: Known-single-scalar-grapheme fast path
     return _guts._opaqueCharacterStride(startingAt: i.encodedOffset)
   }
 
   @inlinable @inline(__always)
   internal func _characterStride(endingAt i: Index) -> Int {
-    _precondition(i.encodedOffset > 0, "String index is out of bounds")
     // TODO: Known-single-scalar-grapheme fast path
+
+    if i == startIndex { return 0 }
+
     return _guts._opaqueCharacterStride(endingAt: i.encodedOffset)
   }
 }

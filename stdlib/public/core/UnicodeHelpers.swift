@@ -86,18 +86,29 @@ internal func _decodeUTF8(
 
 @inlinable
 internal func _decodeScalar(
-  _ utf8: UnsafeBufferPointer<UInt8>, startingIt i: Int
-) -> (Unicode.Scalar, nextScalarIndex: Int) {
+  _ utf8: UnsafeBufferPointer<UInt8>, startingAt i: Int
+) -> (Unicode.Scalar, scalarEndIndex: Int) {
   let cu0 = utf8[i]
   let len = _utf8ScalarLength(cu0)
+  let nextIdx = len &+ i
   switch  len {
-  case 1: return (_decodeUTF8(cu0), len)
-  case 2: return (_decodeUTF8(cu0, utf8[i &+ 1]), len)
-  case 3: return (_decodeUTF8(cu0, utf8[i &+ 1], utf8[i &+ 2]), len)
+  case 1: return (_decodeUTF8(cu0), nextIdx)
+  case 2: return (_decodeUTF8(cu0, utf8[i &+ 1]), nextIdx)
+  case 3: return (_decodeUTF8(cu0, utf8[i &+ 1], utf8[i &+ 2]), nextIdx)
   case 4:
-    return (_decodeUTF8(cu0, utf8[i &+ 1], utf8[i &+ 2], utf8[i &+ 3]), len)
+    return (_decodeUTF8(cu0, utf8[i &+ 1], utf8[i &+ 2], utf8[i &+ 3]), nextIdx)
   default: Builtin.unreachable()
   }
+}
+
+@inlinable
+internal func _decodeScalar(
+  _ utf8: UnsafeBufferPointer<UInt8>, endingAt i: Int
+) -> (Unicode.Scalar, scalarStartIndex: Int) {
+  let len = _utf8ScalarLength(utf8, endingAt: i)
+  let (scalar, endIdx) = _decodeScalar(utf8, startingAt: i &- len)
+  _sanityCheck(i == endIdx)
+  return (scalar, i &- len)
 }
 
 @inlinable @inline(__always)
@@ -106,6 +117,18 @@ internal func _utf8ScalarLength(_ x: UInt8) -> Int {
   if _isASCII(x) { return 1 }
   // TODO(UTF8): Not great codegen on x86
   return (~x).leadingZeroBitCount
+}
+
+@inlinable @inline(__always)
+internal func _utf8ScalarLength(
+  _ utf8: UnsafeBufferPointer<UInt8>, endingAt i: Int
+) -> Int {
+  var len = 1
+  while _isContinuation(utf8[i &- len]) {
+    len += 1
+  }
+  _sanityCheck(len == _utf8ScalarLength(utf8[i &- len]))
+  return len
 }
 
 @inlinable @inline(__always)
@@ -210,7 +233,7 @@ extension _StringGuts {
   @inlinable
   internal func fastUTF8Scalar(startingAt i: Int) -> Unicode.Scalar {
     _sanityCheck(isFastUTF8)
-    return self.withFastUTF8 { _decodeScalar($0, startingIt: i).0 }
+    return self.withFastUTF8 { _decodeScalar($0, startingAt: i).0 }
   }
 
   @usableFromInline
