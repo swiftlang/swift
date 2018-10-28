@@ -104,7 +104,8 @@ add_swift_host_library(swiftBasic STATIC
   LINK_LIBS
     swiftDemangling
     ${UUID_LIBRARIES}
-  LLVM_COMPONENT_DEPENDS support)
+  LINK_COMPONENTS
+    support)
 target_include_directories(swiftBasic
                            PRIVATE
                              ${UUID_INCLUDE_DIRS})
