@@ -12,6 +12,7 @@
     "SmallString.swift",
     "StaticString.swift",
     "String.swift",
+    "StringBreadcrumbs.swift",
     "StringBridge.swift",
     "StringCharacterView.swift",
     "StringComparable.swift",

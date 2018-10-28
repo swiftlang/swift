@@ -85,17 +85,18 @@ extension String.UTF16View: BidirectionalCollection {
     return Index(encodedOffset: i.encodedOffset &- len)
   }
 
-  @inlinable @inline(__always)
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     if _slowPath(_guts.isForeign) {
       return _foreignIndex(i, offsetBy: n)
     }
 
     // TODO(UTF8) known-ASCII fast path
-    return __index(i, offsetBy: n)
+
+    let lowerOffset = _getOffset(for: i)
+    let result = _getIndex(for: lowerOffset + n)
+    return result
   }
 
-  @inlinable @inline(__always)
   public func index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
@@ -103,18 +104,42 @@ extension String.UTF16View: BidirectionalCollection {
       return _foreignIndex(i, offsetBy: n, limitedBy: limit)
     }
 
-    // TODO(UTF8) known-ASCII fast paths
-    return __index(i, offsetBy: n, limitedBy: limit)
+    // TODO(UTF8) known-ASCII fast path
+
+    let iOffset = _getOffset(for: i)
+    let limitOffset = _getOffset(for: limit)
+
+    // If distance < 0, limit has no effect if it is greater than i.
+    if _slowPath(n < 0 && limit <= i && limitOffset > iOffset + n) {
+      return nil
+    }
+    //  If distance > 0, limit has no effect if it is less than i. Likewise,
+    if _slowPath(n >= 0 && limit >= i && limitOffset < iOffset + n) {
+      return nil
+    }
+
+    let result = _getIndex(for: iOffset + n)
+    return result
   }
 
-  @inlinable @inline(__always)
   public func distance(from start: Index, to end: Index) -> Int {
     if _slowPath(_guts.isForeign) {
       return _foreignDistance(from: start, to: end)
     }
 
     // TODO(UTF8) known-ASCII fast paths
-    return __distance(from: start, to: end)
+
+    let lower = _getOffset(for: start)
+    let upper = _getOffset(for: end)
+    return upper &- lower
+  }
+
+  @inlinable
+  public var count: Int {
+    if _slowPath(_guts.isForeign) {
+      return _foreignCount()
+    }
+    return _getOffset(for: endIndex)
   }
 
   /// Accesses the code unit at the given position.
@@ -330,6 +355,13 @@ extension String.UTF16View {
     _sanityCheck(_guts.isForeign)
     return Index(encodedOffset: i.encodedOffset + n)
   }
+
+  @usableFromInline @inline(never)
+  @_effects(releasenone)
+  internal func _foreignCount() -> Int {
+    _sanityCheck(_guts.isForeign)
+    return endIndex.encodedOffset - startIndex.encodedOffset
+  }
 }
 
 extension String.Index {
@@ -343,3 +375,55 @@ extension String.Index {
   }
 }
 
+// Breadcrumb-aware acceleration
+extension String.UTF16View {
+  // A simple heuristic we can always tweak later. Not needed for correctness
+  @inlinable
+  internal var _shortHeuristic: Int {  @inline(__always) get { return 32 } }
+
+  @usableFromInline
+  @_effects(releasenone)
+  internal func _getOffset(for idx: Index) -> Int {
+    // Trivial and common: start
+    if idx == startIndex { return 0 }
+
+    if idx.encodedOffset < _shortHeuristic || !_guts.hasBreadcrumbs {
+      return _distance(from: startIndex, to: idx)
+    }
+
+    // Simple and common: endIndex aka `length`.
+    let breadcrumbsPtr = _guts.getBreadcrumbsPtr()
+    if idx == endIndex { return breadcrumbsPtr.pointee.utf16Length }
+
+    // Otherwise, find the nearest lower-bound breadcrumb and count from there
+    let (crumb, crumbOffset) = breadcrumbsPtr.pointee.getBreadcrumb(
+      forIndex: idx)
+    return crumbOffset + _distance(from: crumb, to: idx)
+  }
+
+  @usableFromInline
+  @_effects(releasenone)
+  internal func _getIndex(for offset: Int) -> Index {
+    // Trivial and common: start
+    if offset == 0 { return startIndex }
+
+    if offset < _shortHeuristic || !_guts.hasBreadcrumbs {
+      return _index(startIndex, offsetBy: offset)
+    }
+
+    // Simple and common: endIndex aka `length`.
+    let breadcrumbsPtr = _guts.getBreadcrumbsPtr()
+    if offset == breadcrumbsPtr.pointee.utf16Length { return endIndex }
+
+    // Otherwise, find the nearest lower-bound breadcrumb and advance that
+    let (crumb, remaining) = breadcrumbsPtr.pointee.getBreadcrumb(
+      forOffset: offset)
+    return _index(crumb, offsetBy: remaining)
+  }
+}
+
+// TODO(UTF8 perf): Breadcrumb-accelerate:
+//   * distance
+//   * index(_:offsetBy), index(_:offsetBy:limitedBy:)
+//   * count
+//
