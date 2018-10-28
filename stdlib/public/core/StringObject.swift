@@ -19,32 +19,37 @@
 // String struct.
 //
 
-@_fixed_layout
-@usableFromInline
+@_fixed_layout @usableFromInline
 internal struct _StringObject {
+  // Abstract the count and performance-flags containing word
+  @_fixed_layout @usableFromInline
+  struct CountAndFlags {
+    @usableFromInline
+    var _storage: UInt
+
+    @inlinable @inline(__always)
+    internal init(zero: ()) { self._storage = 0 }
+  }
+
   //
-  // Laid out as (_otherBits, _object), which allows small string contents to
+  // Laid out as (_countAndFlags, _object), which allows small string contents to
   // naturally start on vector-alignment.
   //
-
   @usableFromInline
-  internal var _otherBits: UInt
+  internal var _countAndFlags: CountAndFlags
 
   @usableFromInline
   internal var _object: Builtin.BridgeObject
 
-  // @inlinable @inline(__always)
-  // internal init(_ otherBits: UInt, _ object: Builtin.BridgeObject) {
-  //   self._otherBits = otherBits
-  //   self._object = object
-  //   _invariantCheck()
-  // }
-
   @inlinable @inline(__always)
   internal init(zero: ()) {
-    self._otherBits = 0
+    self._countAndFlags = CountAndFlags(zero:())
     self._object = Builtin.reinterpretCast(0)
   }
+
+  // Namespace to hold magic numbers
+  @usableFromInline @_frozen
+  enum Nibbles {}
 }
 
 // Raw
@@ -54,24 +59,26 @@ extension _StringObject {
 
   @inlinable
   internal var rawBits: RawBitPattern {
-    @inline(__always) get { return (_otherBits, objectRawBits) }
+    @inline(__always) get { return (_countAndFlags.rawBits, objectRawBits) }
   }
 
   @inlinable @inline(__always)
-  internal init(rawObject: UInt, rawDiscrim: UInt, otherBits: UInt) {
+  internal init(
+    rawObject: UInt, rawDiscrim: UInt, countAndFlags: CountAndFlags
+  ) {
     let builtinRawObject: Builtin.Int64 = Builtin.reinterpretCast(rawObject)
     let builtinDiscrim: Builtin.Int64 = Builtin.reinterpretCast(rawDiscrim)
     self._object = Builtin.reinterpretCast(
       Builtin.stringObjectOr_Int64(builtinRawObject, builtinDiscrim))
 
-    self._otherBits = otherBits
+    self._countAndFlags = countAndFlags
     _invariantCheck()
   }
 
   @inlinable @inline(__always)
   internal init(raw bits: RawBitPattern) {
     self.init(zero:())
-    self._otherBits = bits.0
+    self._countAndFlags = CountAndFlags(raw: bits.0)
     self._object = Builtin.reinterpretCast(bits.1)
     _sanityCheck(self.rawBits == bits)
     _invariantCheck()
@@ -85,17 +92,25 @@ extension _StringObject {
   @inlinable @_transparent
   internal var undiscriminatedObjectRawBits: UInt {
     @inline(__always) get {
-#if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
-#else
-      return (objectRawBits & 0x00FF_FFFF_FFFF_FFFF)
-#endif
+      return (objectRawBits & Nibbles.largeAddressMask)
     }
   }
 
-  // Namespace to hold magic numbers
-  @usableFromInline @_frozen
-  enum Nibbles {}
+}
+extension _StringObject.CountAndFlags {
+  @usableFromInline
+  internal typealias RawBitPattern = UInt
+
+  @inlinable
+  internal var rawBits: RawBitPattern {
+    @inline(__always) get { return _storage }
+  }
+
+  @inlinable @inline(__always)
+  internal init(raw bits: RawBitPattern) {
+    self._storage = bits
+    _invariantCheck()
+  }
 }
 
 /*
@@ -165,7 +180,6 @@ extension _StringObject.Nibbles {
  │     32     │
  └────────────┘
 
-
  The rest of the "object" bit representation for large strings:
 
  ┌──────────┬─────────┬─────┬─────┬─────┬─────┬────────────┐
@@ -191,19 +205,20 @@ extension _StringObject.Nibbles {
 
  Other foreign forms are reserved for the future.
 
- All forms share the same structure for the rest of the bits:
-
- ┌────────────┬───────┐
- │   b63:48   │ b47:0 │
- ├────────────┼───────┤
- │ perf flags │ count │
- └────────────┴───────┘
-
- Allocation of performance flags is TBD, un-used bits will be reserved for
- future use. Count stores the number of code units: corresponds to `endIndex`.
-
 */
 extension _StringObject.Nibbles {
+  // Mask for address bits, i.e. non-discriminator and non-extra high bits
+  @inlinable
+  static internal var largeAddressMask: UInt {
+    @inline(__always) get {
+#if arch(i386) || arch(arm)
+    unimplemented_utf8_32bit()
+#else
+    return 0x00FF_FFFF_FFFF_FFFF
+#endif
+    }
+  }
+
   // Discriminator for small strings
   @inlinable @inline(__always)
   internal static func small(isASCII: Bool) -> UInt {
@@ -406,7 +421,9 @@ extension _StringObject {
     let discrim = Nibbles.small(isASCII: isASCII)
                 | (UInt(bitPattern: count) &<< 56)
     self = _StringObject(
-      rawObject: rawObject, rawDiscrim: discrim, otherBits: self._otherBits)
+      rawObject: rawObject,
+      rawDiscrim: discrim,
+      countAndFlags: self._countAndFlags)
   }
 
   @inlinable
@@ -438,7 +455,7 @@ extension _StringObject {
   // Canonical empty pattern: small zero-length string
   @inlinable @inline(__always)
   internal init(empty:()) {
-    self._otherBits = 0
+    self._countAndFlags = CountAndFlags(zero:())
     self._object = Builtin.reinterpretCast(Nibbles.emptyString)
 
     _sanityCheck(self.smallCount == 0)
@@ -446,61 +463,137 @@ extension _StringObject {
   }
 }
 
-// Extract
-extension _StringObject {
-  @inlinable
-  static var countMask: Int {
-    @inline(__always) get { return 0x0000_FFFF_FFFF_FFFF }
+/*
+
+ All non-small forms share the same structure for the other half of the bits
+ (i.e. non-object bits) as a word containing code unit count and various
+ performance flags. The top 16 bits are for performance flags, which are not
+ semantically relevant but communicate that some operations can be done more
+ efficiently on this particular string, and the lower 48 are the code unit
+ count (aka endIndex).
+
+┌─────────┬───────┬────────┬───────┐
+│   b63   │  b62  │ b61:48 │ b47:0 │
+├─────────┼───────┼────────┼───────┤
+│ isASCII │ isNFC │ TBD    │ count │
+└─────────┴───────┴────────┴───────┘
+
+ isASCII: set when all code units are known to be ASCII, enabling:
+   - Trivial Unicode scalars, they're just the code units
+   - Trivial UTF-16 transcoding (just bit-extend)
+   - Also, isASCII always implies isNFC
+ isNFC: set when the contents are in normal form C, enable:
+   - Trivial lexicographical comparisons: just memcmp
+
+ Allocation of more performance flags is TBD, un-used bits will be reserved for
+ future use. Count stores the number of code units: corresponds to `endIndex`.
+
+*/
+extension _StringObject.CountAndFlags {
+  @inlinable @inline(__always)
+  internal init(count: Int) {
+    self.init(zero:())
+    self.count = count
+    _invariantCheck()
+  }
+
+  @inlinable @inline(__always)
+  internal init(count: Int, isASCII: Bool) {
+    self.init(zero:())
+    self.count = count
+    if isASCII {
+      // ASCII also entails NFC
+      self._storage |= 0xC000_0000_0000_0000
+    }
+    _invariantCheck()
   }
 
   @inlinable
-  internal var largeCount: Int {
+  internal var countMask: UInt {
     @inline(__always) get {
 #if arch(i386) || arch(arm)
     unimplemented_utf8_32bit()
 #else
-      _sanityCheck(isLarge)
-      return Int(bitPattern: _otherBits) & _StringObject.countMask
+     return 0x0000_FFFF_FFFF_FFFF
 #endif
     }
+  }
+
+  @inlinable
+  internal var flagsMask: UInt { @inline(__always) get { return ~countMask} }
+
+  @inlinable
+  internal var count: Int {
+    @inline(__always) get { return Int(bitPattern: _storage & countMask) }
     @inline(__always) set {
+      _sanityCheck(newValue <= countMask, "too large")
+      _storage = (_storage & flagsMask) | UInt(bitPattern: newValue)
+    }
+  }
+
+  @inlinable
+  internal var isASCII: Bool {
 #if arch(i386) || arch(arm)
     unimplemented_utf8_32bit()
 #else
-      _sanityCheck(largeCount == 0)
-      _sanityCheck(newValue == newValue & _StringObject.countMask, "too large")
-      _otherBits |= UInt(bitPattern: newValue)
+    return 0 != _storage & 0x8000_0000_0000_0000
+#endif
+  }
+  @inlinable
+  internal var isNFC: Bool {
+#if arch(i386) || arch(arm)
+    unimplemented_utf8_32bit()
+#else
+    return 0 != _storage & 0x4000_0000_0000_0000
+#endif
+  }
+
+  #if !INTERNAL_CHECKS_ENABLED
+  @inlinable @inline(__always) internal func _invariantCheck() {}
+  #else
+  @usableFromInline @inline(never) @_effects(releasenone)
+  internal func _invariantCheck() {
+    if isASCII {
+      _sanityCheck(isNFC)
+    }
+  }
+  #endif // INTERNAL_CHECKS_ENABLED
+
+
+}
+
+// Extract
+extension _StringObject {
+  @inlinable
+  internal var largeCount: Int {
+    @inline(__always) get {
+      _sanityCheck(isLarge)
+      return _countAndFlags.count
+    }
+    @inline(__always) set {
+      _countAndFlags.count = newValue
       _sanityCheck(newValue == largeCount)
       _invariantCheck()
-#endif
     }
   }
 
   @inlinable
   internal var largeAddressBits: UInt {
     @inline(__always) get {
-#if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
-#else
       _sanityCheck(isLarge)
       return undiscriminatedObjectRawBits
-#endif
     }
   }
 
   @inlinable
   internal var nativeUTF8Start: UnsafePointer<UInt8> {
     @inline(__always) get {
-#if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
-#else
       _sanityCheck(largeFastIsNative)
-      let largeAddressBits = objectRawBits & 0x00FF_FFFF_FFFF_FFFF
+      let largeAddressBits = objectRawBits & Nibbles.largeAddressMask
 
       return UnsafePointer(
         bitPattern: largeAddressBits &+ _StringObject.nativeBias
       )._unsafelyUnwrappedUnchecked
-#endif
     }
   }
   @inlinable
@@ -554,26 +647,6 @@ extension _StringObject {
       return Builtin.reinterpretCast(largeAddressBits)
     }
   }
-
-  @_fixed_layout @usableFromInline
-  internal struct _StringObjectPerfFlags {
-    @usableFromInline
-    internal var bits: UInt16
-  }
-
-  @inlinable
-  internal var largePerfFlags: _StringObjectPerfFlags {
-    @inline(__always) get {
-#if arch(i386) || arch(arm)
-    unimplemented_utf8_32bit()
-#else
-      _sanityCheck(isLarge)
-      return Builtin.reinterpretCast(
-        UInt16(
-          truncatingIfNeeded: _otherBits & 0xFFFF_0000_0000_0000) &>> 48)
-#endif
-    }
-  }
 }
 
 // Aggregate queries / abstractions
@@ -586,15 +659,27 @@ extension _StringObject {
     @inline(__always) get { return isSmall ? smallCount : largeCount }
   }
 
-  // Whether the string is all ASCII
   //
+  // Whether the string is all ASCII
   //
   @inlinable
   internal var isASCII: Bool {
     @inline(__always) get {
       if isSmall { return smallIsASCII }
-      // TODO(UTF8 perf and testing): track known asciiness
-      return false
+      return _countAndFlags.isASCII
+    }
+  }
+
+  @inlinable
+  internal var isNFC: Bool {
+    @inline(__always) get {
+      if isSmall {
+        // TODO(UTF8 perf): Worth implementing more sophisiticated check, or
+        // else performing normalization on-construction, or else dedicating a
+        // small string bit to this. For now, approximate it with isASCII
+        return smallIsASCII
+      }
+      return _countAndFlags.isNFC
     }
   }
 
@@ -649,48 +734,49 @@ extension _StringObject {
 // Object creation
 extension _StringObject {
   @inlinable @inline(__always)
-  init(start: UnsafePointer<UInt8>, discrim: UInt, largeCount: Int) {
-    // TODO: Use with a perf flags helper
+  init(
+    start: UnsafePointer<UInt8>, discrim: UInt, countAndFlags: CountAndFlags
+  ) {
     self.init(
       rawObject: UInt(bitPattern: start) &- _StringObject.nativeBias,
       rawDiscrim: discrim,
-      otherBits: UInt(bitPattern: largeCount))
+      countAndFlags: countAndFlags)
   }
 
   @inlinable @inline(__always)
   init(immortal bufPtr: UnsafeBufferPointer<UInt8>, isASCII: Bool) {
-    // TODO(UTF8) perf flags to track known ascii
+    let countAndFlags = CountAndFlags(count: bufPtr.count, isASCII: isASCII)
     self.init(
       start: bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
       discrim: Nibbles.largeImmortal(),
-      largeCount: bufPtr.count)
+      countAndFlags: countAndFlags)
   }
   @inlinable @inline(__always)
-  init(_ storage: _StringStorage, isASCII: Bool) {
-    // TODO(UTF8) perf flags to track known ascii
+  init(_ storage: _StringStorage) {
     self.init(
       start: storage.start,
       discrim: Nibbles.largeMortal(),
-      largeCount: storage.count)
+      countAndFlags: storage._countAndFlags)
   }
 
-  @inlinable @inline(__always)
   init(_ storage: _SharedStringStorage, isASCII: Bool) {
-    // TODO(UTF8) perf flags to track known ascii
     self.init(
       rawObject: Builtin.reinterpretCast(storage),
       rawDiscrim: Nibbles.largeSharedMortal(),
-      otherBits: UInt(bitPattern: storage.count))
+      countAndFlags: storage._countAndFlags)
   }
 
-  init(cocoa: AnyObject, providesFastUTF8: Bool, length: Int) {
+  internal init(
+    cocoa: AnyObject, providesFastUTF8: Bool, isASCII: Bool, length: Int
+  ) {
+    let countAndFlags = CountAndFlags(count: length, isASCII: isASCII)
     let discrim = Nibbles.largeCocoa(providesFastUTF8: providesFastUTF8)
 
     // TODO: Use with a perf flags helper
     self.init(
       rawObject: Builtin.reinterpretCast(cocoa),
       rawDiscrim: discrim,
-      otherBits: UInt(bitPattern: length))
+      countAndFlags: countAndFlags)
 
     _sanityCheck(self.largeAddressBits == Builtin.reinterpretCast(cocoa))
     _sanityCheck(self.providesFastUTF8 == providesFastUTF8)
@@ -718,6 +804,7 @@ extension _StringObject {
     } else {
       _sanityCheck(isLarge)
       _sanityCheck(largeCount == count)
+      _countAndFlags._invariantCheck()
       if providesFastUTF8 && largeFastIsNative {
         _sanityCheck(!isSmall)
         _sanityCheck(!largeIsCocoa)
