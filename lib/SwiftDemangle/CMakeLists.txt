@@ -2,7 +2,7 @@ add_swift_host_library(swiftDemangle
                   SHARED
                     SwiftDemangle.cpp
                     MangleHack.cpp
-                  LINK_LIBRARIES
+                  LINK_LIBS
                     swiftDemangling)
 target_compile_definitions(swiftDemangle
                            PRIVATE

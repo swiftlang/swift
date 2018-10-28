@@ -1,7 +1,7 @@
 add_swift_host_library(swiftImmediate STATIC
   Immediate.cpp
   REPL.cpp
-  LINK_LIBRARIES
+  LINK_LIBS
     swiftIDE
     swiftFrontend
     swiftSILGen
