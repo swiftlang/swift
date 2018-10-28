@@ -1324,7 +1324,7 @@ endfunction()
 function(add_swift_host_library name)
   set(options FORCE_BUILD_OPTIMIZED)
   set(single_parameter_options)
-  set(multiple_parameter_options)
+  set(multiple_parameter_options GYB_SOURCES)
 
   cmake_parse_arguments(ASHL
                         "${options}"
@@ -1333,7 +1333,10 @@ function(add_swift_host_library name)
                         ${ARGN})
   set(ASHL_SOURCES ${ASHL_UNPARSED_ARGUMENTS})
 
-  llvm_add_library(${name} ${ASHL_UNPARSED_ARGUMENTS})
+  handle_gyb_sources(gyb_generated_targets ASHL_GYB_SOURCES
+    ${SWIFT_HOST_VARIANT_ARCH})
+  llvm_add_library(${name} ${ASHL_GYB_SOURCES} ${ASHL_UNPARSED_ARGUMENTS}
+    DEPENDS ${gyb_generated_targets})
   if(ASHL_FORCE_BUILD_OPTIMIZED)
     target_compile_options(${name} PRIVATE "-O2")
   endif()
