@@ -37,13 +37,15 @@ internal func _isASCII(_ x: UInt8) -> Bool {
   return x & 0b1000_0000 == 0
 }
 
-@inlinable @inline(__always)
+@inlinable
+@inline(__always)
 internal func _decodeUTF8(_ x: UInt8) -> Unicode.Scalar {
   _sanityCheck(_isASCII(x))
   return Unicode.Scalar(_unchecked: UInt32(x))
 }
 
-@inlinable @inline(__always)
+@inlinable
+@inline(__always)
 internal func _decodeUTF8(_ x: UInt8, _ y: UInt8) -> Unicode.Scalar {
   _sanityCheck(_utf8ScalarLength(x) == 2)
   _sanityCheck(_isContinuation(y))
@@ -52,7 +54,8 @@ internal func _decodeUTF8(_ x: UInt8, _ y: UInt8) -> Unicode.Scalar {
   return Unicode.Scalar(_unchecked: value)
 }
 
-@inlinable @inline(__always)
+@inlinable
+@inline(__always)
 internal func _decodeUTF8(
   _ x: UInt8, _ y: UInt8, _ z: UInt8
 ) -> Unicode.Scalar {
@@ -65,7 +68,8 @@ internal func _decodeUTF8(
   return Unicode.Scalar(_unchecked: value)
 }
 
-@inlinable @inline(__always)
+@inlinable
+@inline(__always)
 internal func _decodeUTF8(
   _ x: UInt8, _ y: UInt8, _ z: UInt8, _ w: UInt8
 ) -> Unicode.Scalar {
@@ -80,7 +84,23 @@ internal func _decodeUTF8(
   return Unicode.Scalar(_unchecked: value)
 }
 
-@usableFromInline @inline(__always)
+@inlinable
+internal func _decodeScalar(
+  _ utf8: UnsafeBufferPointer<UInt8>, startingIt i: Int
+) -> (Unicode.Scalar, nextScalarIndex: Int) {
+  let cu0 = utf8[i]
+  let len = _utf8ScalarLength(cu0)
+  switch  len {
+  case 1: return (_decodeUTF8(cu0), len)
+  case 2: return (_decodeUTF8(cu0, utf8[i &+ 1]), len)
+  case 3: return (_decodeUTF8(cu0, utf8[i &+ 1], utf8[i &+ 2]), len)
+  case 4:
+    return (_decodeUTF8(cu0, utf8[i &+ 1], utf8[i &+ 2], utf8[i &+ 3]), len)
+  default: Builtin.unreachable()
+  }
+}
+
+@inlinable @inline(__always)
 internal func _utf8ScalarLength(_ x: UInt8) -> Int {
   _sanityCheck(!_isContinuation(x))
   if _isASCII(x) { return 1 }
@@ -88,12 +108,13 @@ internal func _utf8ScalarLength(_ x: UInt8) -> Int {
   return (~x).leadingZeroBitCount
 }
 
-@usableFromInline @inline(__always)
+@inlinable @inline(__always)
 internal func _isContinuation(_ x: UInt8) -> Bool {
   return x & 0b1100_0000 == 0b1000_0000
 }
 
-@usableFromInline @inline(__always)
+@inlinable
+@inline(__always)
 internal func _continuationPayload(_ x: UInt8) -> UInt32 {
   return UInt32(x & 0x3F)
 }
@@ -125,6 +146,92 @@ internal func _numUTF16CodeUnits(_ scalar: Unicode.Scalar) -> Int {
   return scalar.value <= UInt16.max ? 1 : 2
 }
 
+//
+// Scalar helpers
+//
+extension _StringGuts {
+  @usableFromInline @inline(__always) // fast-path: fold common fastUTF8 check
+  internal func scalarAlign(_ idx: Index) -> Index {
+    // TODO(UTF8 perf): isASCII check
+
+    if _slowPath(idx.transcodedOffset != 0 || idx.encodedOffset == 0) {
+      // Transcoded indices are already scalar aligned
+      return String.Index(encodedOffset: idx.encodedOffset)
+    }
+    if _slowPath(self.isForeign) {
+      return foreignScalarAlign(idx)
+    }
+
+    return self.withFastUTF8 { utf8 in
+      var i = idx.encodedOffset
+      while _slowPath(_isContinuation(utf8[i])) {
+        i -= 1
+        // TODO(UTF8 merge): Verify it's not possible to form Substring from
+        // sub-scalar indices, otherwise `utf8` could start with continuation
+        // byte.
+        _sanityCheck(
+          i >= 0, "Malformed contents: starts with continuation byte")
+      }
+      // If no alignment is performed, keep grapheme cache
+      if i == idx.encodedOffset {
+        return idx
+      }
+
+      return Index(encodedOffset: i)
+    }
+  }
+
+  // TODO(UTF8): Should probably take a String.Index, assert no transcoding
+  @inlinable
+  internal func fastUTF8ScalarLength(startingAt i: Int) -> Int {
+    _sanityCheck(isFastUTF8)
+    let len = _utf8ScalarLength(self.withFastUTF8 { $0[i] })
+    _sanityCheck((1...4) ~= len)
+    return len
+  }
+
+  // TODO(UTF8): Should probably take a String.Index, assert no transcoding
+  @inlinable
+  internal func fastUTF8ScalarLength(endingAt i: Int) -> Int {
+    _sanityCheck(isFastUTF8)
+
+    return self.withFastUTF8 { utf8 in
+      _sanityCheck(i == utf8.count || !_isContinuation(utf8[i]))
+      var len = 1
+      while _isContinuation(utf8[i - len]) {
+        _sanityCheck(i - len > 0)
+        len += 1
+      }
+      _sanityCheck(len <= 4)
+      return len
+    }
+  }
+
+  @inlinable
+  internal func fastUTF8Scalar(startingAt i: Int) -> Unicode.Scalar {
+    _sanityCheck(isFastUTF8)
+    return self.withFastUTF8 { _decodeScalar($0, startingIt: i).0 }
+  }
+
+  @usableFromInline
+  @_effects(releasenone)
+  internal func isOnUnicodeScalarBoundary(_ i: String.Index) -> Bool {
+    // TODO(UTF8 perf): isASCII check
+    // TODO(UTF8): Guts bounds check helper, or something in terms of Index
+
+    // Beginning and end are always scalar aligned; mid-scalar never is
+    //
+    // TODO(UTF8 merge): Is this only under guarantee of well-formedness?
+    guard i.transcodedOffset == 0 else { return false }
+    if i == self.startIndex || i == self.endIndex { return true }
+
+    if _fastPath(isFastUTF8) {
+      return self.withFastUTF8 { return !_isContinuation($0[i.encodedOffset]) }
+    }
+
+    return i == foreignScalarAlign(i)
+  }
+}
 
 //
 // Error-correcting helpers (U+FFFD for unpaired surrogates) for accessing

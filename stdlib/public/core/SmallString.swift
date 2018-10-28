@@ -14,8 +14,6 @@
 // NOTE: This is a prototype, it does not have e.g. 32-bit support yet.
 //
 
-@usableFromInline typealias _SmallUTF8String = _SmallString
-
 @_fixed_layout @usableFromInline
 internal struct _SmallString {
   @usableFromInline
@@ -107,20 +105,19 @@ extension _SmallString {
 
 // Internal invariants
 extension _SmallString {
-  @inlinable @inline(__always)
+  #if !INTERNAL_CHECKS_ENABLED
+  @inlinable @inline(__always) internal func _invariantCheck() {}
+  #else
+  @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
-    #if INTERNAL_CHECKS_ENABLED
-    _sanityCheck(count <= _SmallString.capacity)
-
-    if self.isASCII {
-      _sanityCheck(computeIsASCII())
-      _sanityCheck(self.allSatisfy { $0 <= 0x7F })
-    } else {
-      _sanityCheck(!computeIsASCII())
-    }
-
-    #endif // INTERNAL_CHECKS_ENABLED
+    // Avoid `asStringObject`, which triggers more invariant checks (runtime)
+    var _object = _StringObject(zero:())
+    _object._otherBits = _storage.0
+    _object._object = Builtin.reinterpretCast(_storage.1)
+    _sanityCheck(_object.smallCount <= _SmallString.capacity)
+    _sanityCheck(_object.smallIsASCII == computeIsASCII())
   }
+  #endif // INTERNAL_CHECKS_ENABLED
 
   internal func _dump() {
     #if INTERNAL_CHECKS_ENABLED
@@ -165,6 +162,7 @@ extension _SmallString: RandomAccessCollection {
     }
   }
 
+  @usableFromInline // testable
   internal subscript(_ bounds: Range<Index>) -> SubSequence {
     @inline(__always) get {
       // TODO(UTF8 perf): In-register; just a couple shifts...
@@ -243,6 +241,7 @@ extension _SmallString {
 
 
   // Appending
+  @usableFromInline // testable
   internal init?(base: _StringGuts, appending other: _StringGuts) {
     guard (base.utf8Count + other.utf8Count) <= _SmallString.capacity else {
       return nil
@@ -265,6 +264,7 @@ extension _SmallString {
   // Resiliently create from a tagged cocoa string
   //
   @_effects(readonly) // @opaque
+  @usableFromInline // testable
   internal init(taggedCocoa cocoa: AnyObject) {
     self.init()
     self.withMutableCapacity {

@@ -29,6 +29,7 @@
     "StringNormalization.swift",
     "StringProtocol.swift",
     "StringRangeReplaceableCollection.swift",
+    "StringGutsRangeReplaceable.swift",
     "StringStorage.swift",
     "StringSwitch.swift",
     "StringTesting.swift",
