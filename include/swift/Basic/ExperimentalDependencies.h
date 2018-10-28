@@ -28,6 +28,8 @@ bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
                                const DependencyTracker &depTracker,
                                StringRef outputPath);
 
+class DependencyGraph {};
+
 } // end namespace ExperimentalDependencies
 } // end namespace swift
 

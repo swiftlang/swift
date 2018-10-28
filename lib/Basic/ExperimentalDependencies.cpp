@@ -123,6 +123,8 @@ private:
 };
 } // namespace
 
+static void unimplemented() { assert(false && "experimental dependencies unimplemented"); }
+
 bool ReferenceDependenciesEmitter::emit(DiagnosticEngine &diags,
                                         SourceFile *const SF,
                                         const DependencyTracker &depTracker,
@@ -158,12 +160,23 @@ void ReferenceDependenciesEmitter::emitDepends() const {
   DependsEmitter::emit(SF, depTracker, out);
 }
 
-void ProvidesEmitter::emit() const {}
-
-void DependsEmitter::emit() const {}
-
 bool swift::ExperimentalDependencies::emitReferenceDependencies(
     DiagnosticEngine &diags, SourceFile *SF,
     const DependencyTracker &depTracker, StringRef outputPath) {
   return ReferenceDependenciesEmitter::emit(diags, SF, depTracker, outputPath);
+}
+
+// stubs
+
+void ProvidesEmitter::emit() const {
+  (void)SF;
+  (void)out;
+  unimplemented();
+}
+
+void DependsEmitter::emit() const {
+  (void)SF;
+  (void)depTracker;
+  (void)out;
+  unimplemented();
 }
