@@ -1321,8 +1321,6 @@ endfunction()
 
 # Add a new Swift host library.
 #
-# NOTE: This has not had the parts of add_swift_library for targets excised yet.
-#
 # Usage:
 #   add_swift_host_library(name
 #     [SHARED]
@@ -1331,26 +1329,12 @@ endfunction()
 #     [LINK_LIBRARIES dep1 ...]
 #     [INTERFACE_LINK_LIBRARIES dep1 ...]
 #     [SWIFT_MODULE_DEPENDS dep1 ...]
-#     [FRAMEWORK_DEPENDS dep1 ...]
-#     [FRAMEWORK_DEPENDS_WEAK dep1 ...]
 #     [LLVM_COMPONENT_DEPENDS comp1 ...]
 #     [FILE_DEPENDS target1 ...]
-#     [TARGET_SDKS sdk1...]
 #     [C_COMPILE_FLAGS flag1...]
-#     [SWIFT_COMPILE_FLAGS flag1...]
 #     [LINK_FLAGS flag1...]
-#     [DONT_EMBED_BITCODE]
-#     [API_NOTES_NON_OVERLAY]
 #     [INSTALL]
-#     [IS_STDLIB]
-#     [IS_STDLIB_CORE]
-#     [TARGET_LIBRARY]
-#     [FORCE_BUILD_FOR_HOST_SDK]
 #     INSTALL_IN_COMPONENT comp
-#     DEPLOYMENT_VERSION_OSX version
-#     DEPLOYMENT_VERSION_IOS version
-#     DEPLOYMENT_VERSION_TVOS version
-#     DEPLOYMENT_VERSION_WATCHOS version
 #     source1 [source2 source3 ...])
 #
 # name
@@ -1368,272 +1352,67 @@ endfunction()
 # LINK_LIBRARIES
 #   Libraries this library depends on.
 #
-# SWIFT_MODULE_DEPENDS
-#   Swift modules this library depends on.
-#
-# SWIFT_MODULE_DEPENDS_OSX
-#   Swift modules this library depends on when built for OS X.
-#
-# SWIFT_MODULE_DEPENDS_IOS
-#   Swift modules this library depends on when built for iOS.
-#
-# SWIFT_MODULE_DEPENDS_TVOS
-#   Swift modules this library depends on when built for tvOS.
-#
-# SWIFT_MODULE_DEPENDS_WATCHOS
-#   Swift modules this library depends on when built for watchOS.
-#
-# SWIFT_MODULE_DEPENDS_FREEBSD
-#   Swift modules this library depends on when built for FreeBSD.
-#
-# SWIFT_MODULE_DEPENDS_LINUX
-#   Swift modules this library depends on when built for Linux.
-#
-# SWIFT_MODULE_DEPENDS_CYGWIN
-#   Swift modules this library depends on when built for Cygwin.
-#
-# SWIFT_MODULE_DEPENDS_HAIKU
-#   Swift modules this library depends on when built for Haiku.
-#
-# FRAMEWORK_DEPENDS
-#   System frameworks this library depends on.
-#
-# FRAMEWORK_DEPENDS_WEAK
-#   System frameworks this library depends on that should be weak-linked
-#
 # LLVM_COMPONENT_DEPENDS
 #   LLVM components this library depends on.
 #
 # FILE_DEPENDS
 #   Additional files this library depends on.
 #
-# TARGET_SDKS
-#   The set of SDKs in which this library is included. If empty, the library
-#   is included in all SDKs.
-#
 # C_COMPILE_FLAGS
 #   Extra compiler flags (C, C++, ObjC).
-#
-# SWIFT_COMPILE_FLAGS
-#   Extra compiler flags (Swift).
 #
 # LINK_FLAGS
 #   Extra linker flags.
 #
-# API_NOTES_NON_OVERLAY
-#   Generate API notes for non-overlayed modules with this target.
-#
-# DONT_EMBED_BITCODE
-#   Don't embed LLVM bitcode in this target, even if it is enabled globally.
-#
-# IS_STDLIB
-#   Treat the library as a part of the Swift standard library.
-#   IS_STDLIB implies TARGET_LIBRARY.
-#
-# IS_STDLIB_CORE
-#   Compile as the Swift standard library core.
-#
-# IS_SDK_OVERLAY
-#   Treat the library as a part of the Swift SDK overlay.
-#   IS_SDK_OVERLAY implies TARGET_LIBRARY and IS_STDLIB.
-#
-# TARGET_LIBRARY
-#   Build library for the target SDKs.
-#
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
-#
-# DEPLOYMENT_VERSION_OSX
-#   The minimum deployment version to build for if this is an OSX library.
-#
-# DEPLOYMENT_VERSION_IOS
-#   The minimum deployment version to build for if this is an iOS library.
-#
-# DEPLOYMENT_VERSION_TVOS
-#   The minimum deployment version to build for if this is an TVOS library.
-#
-# DEPLOYMENT_VERSION_WATCHOS
-#   The minimum deployment version to build for if this is an WATCHOS library.
-#
-# FORCE_BUILD_FOR_HOST_SDK
-#   Regardless of the defaults, also build this library for the host SDK.
 #
 # source1 ...
 #   Sources to add into this library.
 function(add_swift_host_library name)
-  set(SWIFTLIB_options
-        API_NOTES_NON_OVERLAY
-        DONT_EMBED_BITCODE
-        FORCE_BUILD_FOR_HOST_SDK
+  set(options
         FORCE_BUILD_OPTIMIZED
-        HAS_SWIFT_CONTENT
-        IS_SDK_OVERLAY
-        IS_STDLIB
-        IS_STDLIB_CORE
-        NOSWIFTRT
-        OBJECT_LIBRARY
         SHARED
-        STATIC
-        TARGET_LIBRARY)
-  set(SWIFTLIB_single_parameter_options
-        DEPLOYMENT_VERSION_IOS
-        DEPLOYMENT_VERSION_OSX
-        DEPLOYMENT_VERSION_TVOS
-        DEPLOYMENT_VERSION_WATCHOS
-        INSTALL_IN_COMPONENT)
-  set(SWIFTLIB_multiple_parameter_options
+        STATIC)
+  set(single_parameter_options)
+  set(multiple_parameter_options
         C_COMPILE_FLAGS
         DEPENDS
         FILE_DEPENDS
-        FRAMEWORK_DEPENDS
-        FRAMEWORK_DEPENDS_IOS_TVOS
-        FRAMEWORK_DEPENDS_OSX
-        FRAMEWORK_DEPENDS_WEAK
-        INCORPORATE_OBJECT_LIBRARIES
-        INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
         INTERFACE_LINK_LIBRARIES
         LINK_FLAGS
         LINK_LIBRARIES
-        LLVM_COMPONENT_DEPENDS
-        PRIVATE_LINK_LIBRARIES
-        SWIFT_COMPILE_FLAGS
-        SWIFT_COMPILE_FLAGS_IOS
-        SWIFT_COMPILE_FLAGS_OSX
-        SWIFT_COMPILE_FLAGS_TVOS
-        SWIFT_COMPILE_FLAGS_WATCHOS
-        SWIFT_MODULE_DEPENDS
-        SWIFT_MODULE_DEPENDS_CYGWIN
-        SWIFT_MODULE_DEPENDS_FREEBSD
-        SWIFT_MODULE_DEPENDS_HAIKU
-        SWIFT_MODULE_DEPENDS_IOS
-        SWIFT_MODULE_DEPENDS_LINUX
-        SWIFT_MODULE_DEPENDS_OSX
-        SWIFT_MODULE_DEPENDS_TVOS
-        SWIFT_MODULE_DEPENDS_WATCHOS
-        TARGET_SDKS)
+        LLVM_COMPONENT_DEPENDS)
 
-  cmake_parse_arguments(SWIFTLIB
-                        "${SWIFTLIB_options}"
-                        "${SWIFTLIB_single_parameter_options}"
-                        "${SWIFTLIB_multiple_parameter_options}"
+  cmake_parse_arguments(ASHL
+                        "${options}"
+                        "${single_parameter_options}"
+                        "${multiple_parameter_options}"
                         ${ARGN})
-  set(SWIFTLIB_SOURCES ${SWIFTLIB_UNPARSED_ARGUMENTS})
+  set(ASHL_SOURCES ${ASHL_UNPARSED_ARGUMENTS})
 
-  # Infer arguments.
+  translate_flags(ASHL "${options}")
 
-  if(SWIFTLIB_IS_SDK_OVERLAY)
-    set(SWIFTLIB_HAS_SWIFT_CONTENT TRUE)
-    set(SWIFTLIB_IS_STDLIB TRUE)
-    set(SWIFTLIB_TARGET_LIBRARY TRUE)
-
-    # Install to sdk-overlay by default, but don't hardcode it
-    if(NOT SWIFTLIB_INSTALL_IN_COMPONENT)
-      set(SWIFTLIB_INSTALL_IN_COMPONENT sdk-overlay)
-    endif()
-  endif()
-
-  # Standard library is always a target library.
-  if(SWIFTLIB_IS_STDLIB)
-    set(SWIFTLIB_HAS_SWIFT_CONTENT TRUE)
-    set(SWIFTLIB_TARGET_LIBRARY TRUE)
-  endif()
-
-  if(NOT SWIFTLIB_TARGET_LIBRARY)
-    set(SWIFTLIB_INSTALL_IN_COMPONENT dev)
-  endif()
-
-  # If target SDKs are not specified, build for all known SDKs.
-  if("${SWIFTLIB_TARGET_SDKS}" STREQUAL "")
-    set(SWIFTLIB_TARGET_SDKS ${SWIFT_SDKS})
-  endif()
-  list_replace(SWIFTLIB_TARGET_SDKS ALL_POSIX_PLATFORMS "ALL_APPLE_PLATFORMS;ANDROID;CYGWIN;FREEBSD;LINUX;HAIKU")
-  list_replace(SWIFTLIB_TARGET_SDKS ALL_APPLE_PLATFORMS "${SWIFT_APPLE_PLATFORMS}")
-
-  # All Swift code depends on the standard library, except for the standard
-  # library itself.
-  if(SWIFTLIB_HAS_SWIFT_CONTENT AND NOT SWIFTLIB_IS_STDLIB_CORE)
-    list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS Core)
-
-    # swiftSwiftOnoneSupport does not depend on itself, obviously.
-    if(NOT ${name} STREQUAL swiftSwiftOnoneSupport)
-      # All Swift code depends on the SwiftOnoneSupport in non-optimized mode,
-      # except for the standard library itself.
-      is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" optimized)
-      if(NOT optimized)
-        list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS SwiftOnoneSupport)
-      endif()
-    endif()
-  endif()
-
-  if((NOT "${SWIFT_BUILD_STDLIB}") AND
-     (NOT "${SWIFTLIB_SWIFT_MODULE_DEPENDS}" STREQUAL ""))
-    list(REMOVE_ITEM SWIFTLIB_SWIFT_MODULE_DEPENDS Core SwiftOnoneSupport)
-  endif()
-
-  translate_flags(SWIFTLIB "${SWIFTLIB_options}")
-  precondition(SWIFTLIB_INSTALL_IN_COMPONENT MESSAGE "INSTALL_IN_COMPONENT is required")
-
-  if(NOT SWIFTLIB_SHARED AND
-     NOT SWIFTLIB_STATIC AND
-     NOT SWIFTLIB_OBJECT_LIBRARY)
-    message(FATAL_ERROR
-        "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
-  endif()
-
-  precondition(SWIFTLIB_TARGET_LIBRARY NEGATE
-    MESSAGE "TARGET_LIBRARY inferred in add_swift_host_library?!")
-
-  set(sdk "${SWIFT_HOST_VARIANT_SDK}")
-  set(arch "${SWIFT_HOST_VARIANT_ARCH}")
-
-  # Collect compiler flags
-  set(swiftlib_swift_compile_flags_all ${SWIFTLIB_SWIFT_COMPILE_FLAGS})
-  if("${sdk}" STREQUAL "OSX")
-    list(APPEND swiftlib_swift_compile_flags_all
-      ${SWIFTLIB_SWIFT_COMPILE_FLAGS_OSX})
-  elseif("${sdk}" STREQUAL "IOS" OR "${sdk}" STREQUAL "IOS_SIMULATOR")
-    list(APPEND swiftlib_swift_compile_flags_all
-      ${SWIFTLIB_SWIFT_COMPILE_FLAGS_IOS})
-  elseif("${sdk}" STREQUAL "TVOS" OR "${sdk}" STREQUAL "TVOS_SIMULATOR")
-    list(APPEND swiftlib_swift_compile_flags_all
-      ${SWIFTLIB_SWIFT_COMPILE_FLAGS_TVOS})
-  elseif("${sdk}" STREQUAL "WATCHOS" OR "${sdk}" STREQUAL "WATCHOS_SIMULATOR")
-    list(APPEND swiftlib_swift_compile_flags_all
-      ${SWIFTLIB_SWIFT_COMPILE_FLAGS_WATCHOS})
+  if(NOT ASHL_SHARED AND NOT ASHL_STATIC)
+    message(FATAL_ERROR "Either SHARED or STATIC must be specified")
   endif()
 
   _add_swift_library_single(
     ${name}
     ${name}
-    ${SWIFTLIB_SHARED_keyword}
-    ${SWIFTLIB_STATIC_keyword}
-    ${SWIFTLIB_OBJECT_LIBRARY_keyword}
-    ${SWIFTLIB_SOURCES}
-    SDK ${sdk}
-    ARCHITECTURE ${arch}
-    DEPENDS ${SWIFTLIB_DEPENDS}
-    LINK_LIBRARIES ${SWIFTLIB_LINK_LIBRARIES}
-    FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
-    FRAMEWORK_DEPENDS_WEAK ${SWIFTLIB_FRAMEWORK_DEPENDS_WEAK}
-    LLVM_COMPONENT_DEPENDS ${SWIFTLIB_LLVM_COMPONENT_DEPENDS}
-    FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
-    C_COMPILE_FLAGS ${SWIFTLIB_C_COMPILE_FLAGS}
-    SWIFT_COMPILE_FLAGS ${swiftlib_swift_compile_flags_all}
-    LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
-    PRIVATE_LINK_LIBRARIES ${SWIFTLIB_PRIVATE_LINK_LIBRARIES}
-    INTERFACE_LINK_LIBRARIES ${SWIFTLIB_INTERFACE_LINK_LIBRARIES}
-    INCORPORATE_OBJECT_LIBRARIES ${SWIFTLIB_INCORPORATE_OBJECT_LIBRARIES}
-    INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY ${SWIFTLIB_INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY}
-    ${SWIFTLIB_DONT_EMBED_BITCODE_keyword}
-    ${SWIFTLIB_API_NOTES_NON_OVERLAY_keyword}
-    ${SWIFTLIB_IS_STDLIB_keyword}
-    ${SWIFTLIB_IS_STDLIB_CORE_keyword}
-    ${SWIFTLIB_IS_SDK_OVERLAY_keyword}
-    INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
-    DEPLOYMENT_VERSION_OSX "${SWIFTLIB_DEPLOYMENT_VERSION_OSX}"
-    DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
-    DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
-    DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
+    ${ASHL_SHARED_keyword}
+    ${ASHL_STATIC_keyword}
+    ${ASHL_SOURCES}
+    SDK ${SWIFT_HOST_VARIANT_SDK}
+    ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
+    DEPENDS ${ASHL_DEPENDS}
+    LINK_LIBRARIES ${ASHL_LINK_LIBRARIES}
+    LLVM_COMPONENT_DEPENDS ${ASHL_LLVM_COMPONENT_DEPENDS}
+    FILE_DEPENDS ${ASHL_FILE_DEPENDS}
+    C_COMPILE_FLAGS ${ASHL_C_COMPILE_FLAGS}
+    LINK_FLAGS ${ASHL_LINK_FLAGS}
+    INTERFACE_LINK_LIBRARIES ${ASHL_INTERFACE_LINK_LIBRARIES}
+    INSTALL_IN_COMPONENT "dev"
     )
 
   swift_install_in_component(dev
@@ -1641,8 +1420,8 @@ function(add_swift_host_library name)
     ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
     LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
     RUNTIME DESTINATION bin)
-  swift_is_installing_component(dev is_installing)
 
+  swift_is_installing_component(dev is_installing)
   if(NOT is_installing)
     set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
   else()
