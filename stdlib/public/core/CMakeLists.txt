@@ -134,6 +134,7 @@ set(SWIFTLIB_ESSENTIAL
   ShadowProtocols.swift
   Shims.swift
   Slice.swift
+  SmallBuffer.swift
   SmallString.swift
   Sort.swift
   StaticString.swift
@@ -147,6 +148,7 @@ set(SWIFTLIB_ESSENTIAL
   StringComparison.swift
   StringCreate.swift
   StringGuts.swift
+  StringGutsSlice.swift
   StringGutsRangeReplaceable.swift
   StringGutsVisitor.swift
   StringObject.swift

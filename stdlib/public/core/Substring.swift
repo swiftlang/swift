@@ -106,7 +106,7 @@ public struct Substring {
   }
 
   @inline(__always)
-  internal init(_ slice: _SlicedStringGuts) {
+  internal init(_ slice: _StringGutsSlice) {
     self.init(String(slice._guts)[slice.range])
   }
 

@@ -20,9 +20,15 @@ extension String : Hashable {
   ///   of this instance.
   @inlinable // For pre-normal fast paths
   public func hash(into hasher: inout Hasher) {
-    // TODO(UTF8 perf): pre-normal checks, fast-paths, etc.
+    if _fastPath(self._guts.isNFCFastUTF8) {
+      self._guts.withFastUTF8 {
+        hasher.combine(bytes: UnsafeRawBufferPointer($0))
+      }
+      hasher.combine(0xFF as UInt8) // terminator
+      return
+    }
 
-    _guts._normalizedHash(into: &hasher)
+    _gutsSlice._normalizedHash(into: &hasher)
   }
 }
 
@@ -34,24 +40,22 @@ extension StringProtocol {
   ///   of this instance.
   @inlinable
   public func hash(into hasher: inout Hasher) {
-    // TODO(UTF8 perf): skip extra copy
-    _ephemeralString.hash(into: &hasher)
+    _gutsSlice._normalizedHash(into: &hasher)
   }
 }
 
-extension _StringGuts {
+extension _StringGutsSlice {
   @usableFromInline // @opaque
   @inline(never) // slow-path
   internal func _normalizedHash(into hasher: inout Hasher) {
-    if self.isNFC && self.isFastUTF8 {
+    if self.isNFCFastUTF8 {
       self.withFastUTF8 {
         hasher.combine(bytes: UnsafeRawBufferPointer($0))
       }
     } else {
-      // TODO(UTF8 perf): Other fast-paths, incremental (non-allocating)
-      // normalization, etc.
-      String(self)._normalize().withUnsafeBytes {
-        hasher.combine(bytes: $0)
+      self.withNFCCodeUnitsIterator_2 {
+        var selfIter = $0
+        for cu in selfIter { hasher.combine(cu) }
       }
     }
 

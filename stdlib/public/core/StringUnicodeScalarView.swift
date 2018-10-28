@@ -52,7 +52,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
 
     if _fastPath(_guts.isFastUTF8) {
       let len = _guts.fastUTF8ScalarLength(startingAt: i.encodedOffset)
-      return Index(encodedOffset: i.encodedOffset &+ len)
+      return i.encoded(offsetBy: len)
     }
 
     return _foreignIndex(after: i)
@@ -71,7 +71,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
         return _utf8ScalarLength(utf8, endingAt: i.encodedOffset)
       }
       _sanityCheck(len <= 4, "invalid UTF8")
-      return Index(encodedOffset: i.encodedOffset &- len)
+      return i.encoded(offsetBy: -len)
     }
 
     return _foreignIndex(before: i)
@@ -362,18 +362,18 @@ extension String.UnicodeScalarView {
     let cu = _guts.foreignErrorCorrectedUTF16CodeUnit(at: i)
     let len = _isLeadingSurrogate(cu) ? 2 : 1
 
-    return Index(encodedOffset: i.encodedOffset + len)
+    return i.encoded(offsetBy: len)
   }
 
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _foreignIndex(before i: Index) -> Index {
     _sanityCheck(_guts.isForeign)
-    let priorIdx = String.Index(encodedOffset: i.encodedOffset - 1)
+    let priorIdx = i.priorEncoded
     let cu = _guts.foreignErrorCorrectedUTF16CodeUnit(at: priorIdx)
     let len = _isTrailingSurrogate(cu) ? 2 : 1
 
-    return Index(encodedOffset: i.encodedOffset - len)
+    return i.encoded(offsetBy: -len)
   }
 
   @usableFromInline @inline(never)
@@ -383,6 +383,6 @@ extension String.UnicodeScalarView {
     _sanityCheck(_guts.isOnUnicodeScalarBoundary(i),
       "should of been aligned prior")
 
-    return _guts.foreignErrorCorrectedScalar(startingAt: i)
+    return _guts.foreignErrorCorrectedScalar(startingAt: i).0
   }
 }

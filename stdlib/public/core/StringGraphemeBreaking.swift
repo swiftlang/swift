@@ -169,14 +169,14 @@ extension _StringGuts {
     }
 
     return self.withFastUTF8 { utf8 in
-      let (sc1, nextI) = _decodeScalar(utf8, startingAt: i)
-      if nextI == utf8.endIndex {
+      let (sc1, len) = _decodeScalar(utf8, startingAt: i)
+      if i &+ len == utf8.endIndex {
         // Last scalar is last grapheme
-        return nextI &- i
+        return len
       }
-      let (sc2, _) = _decodeScalar(utf8, startingAt: nextI)
+      let (sc2, _) = _decodeScalar(utf8, startingAt: i &+ len)
       if _fastPath(_hasGraphemeBreakBetween(sc1, sc2)) {
-        return nextI &- i
+        return len
       }
 
       return _measureCharacterStrideICU(of: utf8, startingAt: i)
@@ -233,14 +233,14 @@ extension _StringGuts {
     }
 
     return self.withFastUTF8 { utf8 in
-      let (sc2, prevI) = _decodeScalar(utf8, endingAt: i)
-      if prevI == utf8.startIndex {
+      let (sc2, len) = _decodeScalar(utf8, endingAt: i)
+      if i &- len == utf8.startIndex {
         // First scalar is first grapheme
-        return i &- prevI
+        return len
       }
-      let (sc1, _) = _decodeScalar(utf8, endingAt: prevI)
+      let (sc1, _) = _decodeScalar(utf8, endingAt: i &- len)
       if _fastPath(_hasGraphemeBreakBetween(sc1, sc2)) {
-        return i &- prevI
+        return len
       }
       return _measureCharacterStrideICU(of: utf8, endingAt: i)
     }

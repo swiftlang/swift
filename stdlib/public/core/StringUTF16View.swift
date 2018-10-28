@@ -53,9 +53,9 @@ extension String.UTF16View: BidirectionalCollection {
     // scalar, use a transcoded offset first.
     let len = _guts.fastUTF8ScalarLength(startingAt: i.encodedOffset)
     if len == 4 && i.transcodedOffset == 0 {
-      return Index(transcodedAfter: i)
+      return i.nextTranscoded
     }
-    return Index(encodedOffset: i.encodedOffset &+ len)
+    return i.strippingTranscoding.encoded(offsetBy: len)
   }
 
   @inlinable @inline(__always)
@@ -68,21 +68,19 @@ extension String.UTF16View: BidirectionalCollection {
 
     if i.transcodedOffset != 0 {
       _sanityCheck(i.transcodedOffset == 1)
-      return Index(encodedOffset: i.encodedOffset)
+      return i.strippingTranscoding
     }
 
     let len = _guts.fastUTF8ScalarLength(endingAt: i.encodedOffset)
     if len == 4 {
       // 2 UTF-16 code units comprise this scalar; advance to the beginning and
       // start mid-scalar transcoding
-      return Index(
-        encodedOffset: i.encodedOffset &- len,
-        transcodedOffset: 1)
+      return i.encoded(offsetBy: -len).nextTranscoded
     }
 
     // Single UTF-16 code unit
     _sanityCheck((1...3) ~= len)
-    return Index(encodedOffset: i.encodedOffset &- len)
+    return i.encoded(offsetBy: -len)
   }
 
   public func index(_ i: Index, offsetBy n: Int) -> Index {
@@ -295,14 +293,14 @@ extension String.UTF16View {
   @_effects(releasenone)
   internal func _foreignIndex(after i: Index) -> Index {
     _sanityCheck(_guts.isForeign)
-    return Index(encodedOffset: i.encodedOffset + 1)
+    return i.nextEncoded
   }
 
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _foreignIndex(before i: Index) -> Index {
     _sanityCheck(_guts.isForeign)
-    return Index(encodedOffset: i.encodedOffset - 1)
+    return i.priorEncoded
   }
 
   @usableFromInline @inline(never)
@@ -329,14 +327,14 @@ extension String.UTF16View {
     if n > 0 ? l >= 0 && l < n : l <= 0 && n < l {
       return nil
     }
-    return Index(encodedOffset: i.encodedOffset + n)
+    return i.encoded(offsetBy: n)
   }
 
   @usableFromInline @inline(never)
   @_effects(releasenone)
   internal func _foreignIndex(_ i: Index, offsetBy n: Int) -> Index {
     _sanityCheck(_guts.isForeign)
-    return Index(encodedOffset: i.encodedOffset + n)
+    return i.encoded(offsetBy: n)
   }
 
   @usableFromInline @inline(never)
