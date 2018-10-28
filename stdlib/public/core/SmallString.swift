@@ -31,11 +31,13 @@ internal struct _SmallString {
   @inlinable
   internal var leadingRawBits: UInt {
     @inline(__always) get { return _storage.0 }
+    @inline(__always) set { _storage.0 = newValue }
   }
 
   @inlinable
   internal var trailingRawBits: UInt {
     @inline(__always) get { return _storage.1 }
+    @inline(__always) set { _storage.1 = newValue }
   }
 
   @inlinable @inline(__always)
@@ -141,7 +143,7 @@ extension _SmallString {
 }
 
 // Provide a RAC interface
-extension _SmallString: RandomAccessCollection {
+extension _SmallString: RandomAccessCollection, MutableCollection {
   @usableFromInline
   internal typealias Index = Int
 
@@ -168,7 +170,12 @@ extension _SmallString: RandomAccessCollection {
       }
     }
     @inline(__always) set {
-      unimplemented_utf8()
+      _sanityCheck(idx >= 0 && idx <= 15)
+      if idx < 8 {
+        leadingRawBits._uncheckedSetByte(at: idx, to: newValue)
+      } else {
+        trailingRawBits._uncheckedSetByte(at: idx &- 8, to: newValue)
+      }
     }
   }
 
@@ -240,6 +247,9 @@ extension _SmallString {
     let count = input.count
     guard count <= _SmallString.capacity else { return nil }
 
+    // TODO(SIMD): The below can be replaced with just be a masked unaligned
+    // vector load
+
     let ptr = input.baseAddress._unsafelyUnwrappedUnchecked
 
     let low = _bytesToUInt(ptr, Swift.min(input.count, 8))
@@ -255,34 +265,30 @@ extension _SmallString {
       valueTrailing: high))
   }
 
-  // Appending
-  @usableFromInline // testable
-  @_effects(releasenone)
-  internal init?(
-    base: __shared _StringGuts, appending other: __shared _StringGuts
-  ) {
-    self.init(
-      base: _StringGutsSlice(base), appending: _StringGutsSlice(other))
-  }
+  @usableFromInline // @testable
+  internal init?(_ base: _SmallString, appending other: _SmallString) {
+    let totalCount = base.count + other.count
+    guard totalCount <= _SmallString.capacity else { return nil }
 
-  // Appending
-  @_effects(releasenone)
-  internal init?(
-    base: __shared _StringGutsSlice, appending other: __shared _StringGutsSlice
-  ) {
-    guard (base.utf8Count + other.utf8Count) <= _SmallString.capacity else {
-      return nil
-    }
-    self.init()
+    // TODO(SIMD): The below can be replaced with just be a couple vector ops
 
-    // TODO(UTF8 perf): In-register
-    self.withMutableExcessCapacity { capPtr in
-      return base.copyUTF8(into: capPtr)._unsafelyUnwrappedUnchecked
+    var result = base
+    var writeIdx = base.count
+    for readIdx in 0..<other.count {
+      result[writeIdx] = other[readIdx]
+      writeIdx &+= 1
     }
-    self.withMutableExcessCapacity { capPtr in
-      return other.copyUTF8(into: capPtr)._unsafelyUnwrappedUnchecked
-    }
-    _invariantCheck()
+    _sanityCheck(writeIdx == totalCount)
+
+    let isASCII = base.isASCII && other.isASCII
+    let smallDiscriminator = _StringObject.Nibbles.small(
+      withCount: totalCount, isASCII: isASCII)
+
+    let (leading, trailing) = result.zeroTerminatedRawCodeUnits
+    self.init(_StringObject(
+      discriminator: smallDiscriminator,
+      valueLeading: leading,
+      valueTrailing: trailing))
   }
 }
 
@@ -313,6 +319,17 @@ extension UInt {
     _sanityCheck(i >= 0 && i < MemoryLayout<UInt>.stride)
     let shift = UInt(bitPattern: i) &* 8
     return UInt8(truncatingIfNeeded: (self &>> shift))
+  }
+
+  // Sets the `i`th byte, from least-significant to most-significant
+  //
+  // TODO: endianess awareness day
+  @inlinable @inline(__always)
+  internal mutating func _uncheckedSetByte(at i: Int, to value: UInt8) {
+    _sanityCheck(i >= 0 && i < MemoryLayout<UInt>.stride)
+    let shift = UInt(bitPattern: i) &* 8
+    let valueMask = 0xFF &<< shift
+    self = (self & ~valueMask) | (UInt(truncatingIfNeeded: value) &<< shift)
   }
 }
 

@@ -145,19 +145,25 @@ extension _StringGuts {
   }
 
   internal mutating func append(_ other: _StringGuts) {
-    // TODO(UTF8 perf): Minor potential perf win to elevating smol fast-path
-    // prior to slicing.
+    if self.isSmall && other.isSmall {
+      if let smol = _SmallString(self.asSmall, appending: other.asSmall) {
+        self = _StringGuts(smol)
+        return
+      }
+    }
+
     append(_StringGutsSlice(other))
   }
 
   internal mutating func append(_ slicedOther: _StringGutsSlice) {
     defer { self._invariantCheck() }
 
-    // Try to form a small string if possible
-    if !hasNativeStorage {
-      if let smol = _SmallString(
-        base: _StringGutsSlice(self), appending: slicedOther
-      ) {
+    if self.isSmall && slicedOther._guts.isSmall {
+      // TODO: In-register slicing
+      let smolSelf = self.asSmall
+      if let smol = slicedOther.withFastUTF8({ otherUTF8 in
+        return _SmallString(smolSelf, appending: _SmallString(otherUTF8)!)
+      }) {
         self = _StringGuts(smol)
         return
       }
