@@ -133,17 +133,17 @@ extension StringProtocol {
   }
 
   @inlinable // Eliminate for String, Substring
-  internal var _slicedGuts: _SlicedStringGuts {
+  internal var _gutsSlice: _StringGutsSlice {
     @_specialize(where Self == String)
     @_specialize(where Self == Substring)
     @inline(__always) get {
       if let str = self as? String {
-        return _SlicedStringGuts(str._guts)
+        return _StringGutsSlice(str._guts)
       }
       if let subStr = self as? Substring {
-        return _SlicedStringGuts(subStr._wholeGuts, subStr._offsetRange)
+        return _StringGutsSlice(subStr._wholeGuts, subStr._offsetRange)
       }
-      return _SlicedStringGuts(String(self)._guts)
+      return _StringGutsSlice(String(self)._guts)
     }
   }
 }

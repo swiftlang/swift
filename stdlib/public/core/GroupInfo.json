@@ -20,6 +20,7 @@
     "StringCreate.swift",
     "StringObject.swift",
     "StringGuts.swift",
+    "StringGutsSlice.swift",
     "StringGutsVisitor.swift",
     "StringGraphemeBreaking.swift",
     "StringHashable.swift",
@@ -141,7 +142,8 @@
     "Builtin.swift",
     "VarArgs.swift",
     "CTypes.swift",
-    "MemoryLayout.swift"
+    "MemoryLayout.swift",
+    "SmallBuffer.swift"
   ],
   "KeyPaths": [
     "KeyPath.swift"

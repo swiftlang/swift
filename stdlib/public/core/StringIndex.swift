@@ -37,6 +37,7 @@ the default value being `0`.
 extension String.Index {
   @inlinable
   internal var orderingValue: UInt64 {
+    // TODO(UTF8 micro-perf): Consider mask instead of shift
     @inline(__always) get { return _rawBits &>> 14 }
   }
 
@@ -72,7 +73,7 @@ extension String.Index {
     unimplemented_utf8_32bit()
 #else
     _sanityCheck(encodedOffset == encodedOffset & 0x0000_FFFF_FFFF_FFFF)
-    _sanityCheck(transcodedOffset <= 3)
+    _sanityCheck((0...3) ~= transcodedOffset)
     let pos = UInt64(truncatingIfNeeded: encodedOffset)
     let trans = UInt64(truncatingIfNeeded: transcodedOffset)
 
@@ -115,27 +116,63 @@ extension String.Index {
   #endif // INTERNAL_CHECKS_ENABLED
 }
 
-// Creation helpers
+// Creation helpers, which will make migration easier if we decide to use and
+// propagate the reserved bits.
 extension String.Index {
-  @inlinable @inline(__always)
-  internal init(transcodedAfter i: String.Index) {
-    _sanityCheck((0...2) ~= i.transcodedOffset)
-    self.init(
-      encodedOffset: i.encodedOffset, transcodedOffset: i.transcodedOffset &+ 1)
-  }
-  @inlinable @inline(__always)
-  internal init(transcodedBefore i: String.Index) {
-    _sanityCheck((1...3) ~= i.transcodedOffset)
-    self.init(
-      encodedOffset: i.encodedOffset, transcodedOffset: i.transcodedOffset &- 1)
-  }
-
   @inlinable
   internal var strippingTranscoding: String.Index {
     @inline(__always) get {
       return String.Index(encodedOffset: self.encodedOffset)
     }
   }
+
+  @inlinable
+  internal var nextEncoded: String.Index {
+    @inline(__always) get {
+      _sanityCheck(self.transcodedOffset == 0)
+      return String.Index(encodedOffset: self.encodedOffset &+ 1)
+    }
+  }
+
+  @inlinable
+  internal var priorEncoded: String.Index {
+    @inline(__always) get {
+      _sanityCheck(self.transcodedOffset == 0)
+      return String.Index(encodedOffset: self.encodedOffset &- 1)
+    }
+  }
+
+  @inlinable
+  internal var nextTranscoded: String.Index {
+    @inline(__always) get {
+      return String.Index(
+        encodedOffset: self.encodedOffset,
+        transcodedOffset: self.transcodedOffset &+ 1)
+    }
+  }
+
+  @inlinable
+  internal var priorTranscoded: String.Index {
+    @inline(__always) get {
+      return String.Index(
+        encodedOffset: self.encodedOffset,
+        transcodedOffset: self.transcodedOffset &- 1)
+    }
+  }
+
+  // Get an index with an encoded offset relative to this one.
+  // Note: strips any transcoded offset.
+  @inlinable @inline(__always)
+  internal func encoded(offsetBy n: Int) -> String.Index {
+    return String.Index(encodedOffset: self.encodedOffset &+ n)
+  }
+
+  @inlinable @inline(__always)
+  internal func transcoded(withOffset n: Int) -> String.Index {
+    _sanityCheck(self.transcodedOffset == 0)
+    return String.Index(encodedOffset: self.encodedOffset, transcodedOffset: n)
+  }
+
 }
 
 extension String.Index: Equatable {

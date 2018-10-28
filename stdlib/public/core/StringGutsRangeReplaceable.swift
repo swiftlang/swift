@@ -147,16 +147,16 @@ extension _StringGuts {
   internal mutating func append(_ other: _StringGuts) {
     // TODO(UTF8 perf): Minor potential perf win to elevating smol fast-path
     // prior to slicing.
-    append(_SlicedStringGuts(other))
+    append(_StringGutsSlice(other))
   }
 
-  internal mutating func append(_ slicedOther: _SlicedStringGuts) {
+  internal mutating func append(_ slicedOther: _StringGutsSlice) {
     defer { self._invariantCheck() }
 
     // Try to form a small string if possible
     if !hasNativeStorage {
       if let smol = _SmallString(
-        base: _SlicedStringGuts(self), appending: slicedOther
+        base: _StringGutsSlice(self), appending: slicedOther
       ) {
         self = _StringGuts(smol)
         return
@@ -187,7 +187,7 @@ extension _StringGuts {
   }
 
   @inline(never) // slow-path
-  private mutating func _foreignAppendInPlace(_ other: _SlicedStringGuts) {
+  private mutating func _foreignAppendInPlace(_ other: _StringGutsSlice) {
     _sanityCheck(!other.isFastUTF8)
     _sanityCheck(self.uniqueNativeUnusedCapacity != nil)
 
@@ -200,7 +200,7 @@ extension _StringGuts {
   }
 
   internal mutating func clear() {
-    guard hasNativeStorage else {
+    guard isUniqueNative else {
       self = _StringGuts()
       return
     }
@@ -218,6 +218,9 @@ extension _StringGuts {
 
     if isUniqueNative {
       _object.nativeStorage.remove(from: lowerOffset, to: upperOffset)
+      // We re-initialize from the modified storage to pick up new count, flags,
+      // etc.
+      self = _StringGuts(self._object.nativeStorage)
       return
     }
 
@@ -242,7 +245,9 @@ extension _StringGuts {
         }
         return
       }
-      // TODO(UTF8 perf): Probably also worth checking contiguous Substring
+      // TODO(UTF8 perf): Iterate and insert
+      // TODO(UTF8 merge): Needed for `reserveCapacity` test in
+      //   validation-test/stdlib/String.swift
     }
 
     var result = String()

@@ -51,7 +51,9 @@ extension String: BidirectionalCollection {
 
   /// The number of characters in a string.
   public var count: Int {
-    @inline(__always) get { return distance(from: startIndex, to: endIndex) }
+    @inline(__always) get {
+      return distance(from: startIndex, to: endIndex)
+    }
   }
 
   /// Returns the position immediately after the given index.
@@ -83,8 +85,7 @@ extension String: BidirectionalCollection {
     // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
     let stride = _characterStride(endingAt: i)
     let priorOffset = i.encodedOffset &- stride
-    return Index(
-      encodedOffset: priorOffset, characterStride: stride)
+    return Index(encodedOffset: priorOffset, characterStride: stride)
   }
   /// Returns an index that is the specified distance from the given index.
   ///
@@ -244,7 +245,7 @@ extension String {
     //   ICU treats isolated surrogates as isolated graphemes
     if distance == 1 {
       return Character(
-        String(_guts.foreignErrorCorrectedScalar(startingAt: position)))
+        String(_guts.foreignErrorCorrectedScalar(startingAt: position).0))
     }
 
     let start = position.encodedOffset
