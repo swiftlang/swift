@@ -1325,7 +1325,6 @@ endfunction()
 #     [LINK_LIBS lib1 ...]
 #     [SWIFT_MODULE_DEPENDS dep1 ...]
 #     [LINK_COMPONENTS comp1 ...]
-#     [LINK_FLAGS flag1...]
 #     [INSTALL]
 #     INSTALL_IN_COMPONENT comp
 #     source1 [source2 source3 ...])
@@ -1348,9 +1347,6 @@ endfunction()
 # LINK_COMPONENTS
 #   LLVM components this library depends on.
 #
-# LINK_FLAGS
-#   Extra linker flags.
-#
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
 #
@@ -1364,7 +1360,6 @@ function(add_swift_host_library name)
   set(single_parameter_options)
   set(multiple_parameter_options
         DEPENDS
-        LINK_FLAGS
         LINK_LIBS
         LINK_COMPONENTS)
 
@@ -1392,7 +1387,6 @@ function(add_swift_host_library name)
     DEPENDS ${ASHL_DEPENDS}
     LINK_LIBRARIES ${ASHL_LINK_LIBS}
     LLVM_COMPONENT_DEPENDS ${ASHL_LINK_COMPONENTS}
-    LINK_FLAGS ${ASHL_LINK_FLAGS}
     INSTALL_IN_COMPONENT "dev"
     )
 
