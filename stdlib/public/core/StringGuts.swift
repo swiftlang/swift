@@ -952,6 +952,7 @@ extension _StringGuts {
     _invariantCheck()
   }
 
+  @usableFromInline
   internal
   mutating func append(_ other: _UnmanagedASCIIString) {
     guard other.count > 0 else { return  }

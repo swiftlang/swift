@@ -108,7 +108,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
   public mutating func appendInterpolation<T>(_ value: T)
     where T: TextOutputStreamable, T: CustomStringConvertible
   {
-    value.write(to: &_storage)
+    value.write(to: &self)
   }
   
   /// Interpolates the given value's textual representation into the
@@ -130,7 +130,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
   public mutating func appendInterpolation<T>(_ value: T)
     where T: TextOutputStreamable
   {
-    value.write(to: &_storage)
+    value.write(to: &self)
   }
   
   /// Interpolates the given value's textual representation into the
@@ -154,7 +154,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
   public mutating func appendInterpolation<T>(_ value: T)
     where T: CustomStringConvertible
   {
-    _storage += value.description
+    value.description.write(to: &self)
   }
   
   /// Interpolates the given value's textual representation into the
@@ -176,7 +176,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @inlinable
   public mutating func appendInterpolation<T>(_ value: T) {
-    _print_unlocked(value, &_storage)
+    _print_unlocked(value, &self)
   }
   
   /// Creates a string from this instance, consuming the instance in the
@@ -191,6 +191,20 @@ extension DefaultStringInterpolation: CustomStringConvertible {
   @inlinable
   public var description: String {
     return _storage
+  }
+}
+
+extension DefaultStringInterpolation: TextOutputStream {
+  @inlinable
+  public mutating func write(_ string: String) {
+    // Most interpolations will not append to an empty string, so we bypass the
+    // empty-singleton check.
+    _storage._guts._appendSlow(string._guts)
+  }
+  
+  @inlinable
+  public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
+    _storage._guts.append(_UnmanagedString(buffer))
   }
 }
 
