@@ -4927,14 +4927,14 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
                     unsigned index) {
   auto &tc = cs.getTypeChecker();
 
-  auto defArg = getDefaultArgumentInfo(cast<ValueDecl>(owner.getDecl()), index);
+  const auto *param = getParameterAt(cast<ValueDecl>(owner.getDecl()), index);
   Expr *init = nullptr;
-  switch (defArg.first) {
+  switch (param->getDefaultArgumentKind()) {
   case DefaultArgumentKind::None:
     llvm_unreachable("No default argument here?");
 
   case DefaultArgumentKind::Normal:
-    return {nullptr, defArg.first};
+    return {nullptr, param->getDefaultArgumentKind()};
 
   case DefaultArgumentKind::Inherited:
     // Update the owner to reflect inheritance here.
@@ -4987,16 +4987,18 @@ getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
   }
 
   // Convert the literal to the appropriate type.
-  auto defArgType = owner.getDecl()->getDeclContext()
-                       ->mapTypeIntoContext(defArg.second);
-  auto resultTy = tc.typeCheckExpression(
-      init, dc, TypeLoc::withoutLoc(defArgType), CTP_CannotFail);
+  auto defArgType = owner.getDecl()->getDeclContext()->mapTypeIntoContext(
+      param->getInterfaceType());
+  auto resultTy =
+      tc.typeCheckParameterDefault(init, dc, defArgType,
+                                   /*isAutoClosure=*/param->isAutoClosure(),
+                                   /*canFail=*/false);
   assert(resultTy && "Conversion cannot fail");
   (void)resultTy;
 
   cs.cacheExprTypes(init);
 
-  return {init, defArg.first};
+  return {init, param->getDefaultArgumentKind()};
 }
 
 static Expr *lookThroughIdentityExprs(Expr *expr) {

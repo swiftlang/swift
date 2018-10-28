@@ -2242,6 +2242,10 @@ bool TypeResolver::resolveASTFunctionTypeParams(
       variadic = true;
     }
 
+    bool autoclosure = false;
+    if (auto *ATR = dyn_cast<AttributedTypeRepr>(eltTypeRepr))
+      autoclosure = ATR->getAttrs().has(TAK_autoclosure);
+
     Type ty = resolveType(eltTypeRepr, thisElementOptions);
     if (!ty) return true;
 
@@ -2281,8 +2285,8 @@ bool TypeResolver::resolveASTFunctionTypeParams(
       ownership = ValueOwnership::Default;
       break;
     }
-    ParameterTypeFlags paramFlags =
-        ParameterTypeFlags::fromParameterType(ty, variadic, ownership);
+    auto paramFlags = ParameterTypeFlags::fromParameterType(
+        ty, variadic, autoclosure, ownership);
     elements.emplace_back(ty, Identifier(), paramFlags);
   }
 
