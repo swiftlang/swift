@@ -21,6 +21,9 @@ internal class _AbstractStringStorage: _SwiftNativeNSString, _NSStringCore {
   // Abstract interface
   internal var asString: String { get { Builtin.unreachable() } }
   internal var count: Int { get { Builtin.unreachable() } }
+  internal func getOrComputeBreadcrumbs() -> _StringBreadcrumbs {
+    Builtin.unreachable()
+  }
 }
 
 // ObjC interfaces
@@ -83,6 +86,13 @@ extension _AbstractStringStorage {
 }
 #endif // _runtime(_ObjC)
 
+
+//
+// TODO(UTF8 merge): Documentation about the runtime layout of these instances,
+// which is growing in complexity. For now, the second trailing allocation holds
+// an Optional<_StringBreadcrumbs>.
+//
+
 @_fixed_layout
 @usableFromInline
 final internal class _StringStorage: _AbstractStringStorage {
@@ -112,6 +122,9 @@ final internal class _StringStorage: _AbstractStringStorage {
     _sanityCheckFailure("Use the create method")
   }
 
+  deinit {
+    _breadcrumbsAddress.deinitialize(count: 1)
+  }
 }
 
 // Determine the actual number of code unit capacity to request from malloc. We
@@ -159,9 +172,10 @@ extension _StringStorage {
   private static func create(
     realCodeUnitCapacity: Int, count: Int = 0
   ) -> _StringStorage {
-    let storage = Builtin.allocWithTailElems_1(
+    let storage = Builtin.allocWithTailElems_2(
       _StringStorage.self,
-      realCodeUnitCapacity._builtinWordValue, UInt8.self)
+      realCodeUnitCapacity._builtinWordValue, UInt8.self,
+      1._builtinWordValue, Optional<_StringBreadcrumbs>.self)
 
     // TODO(UTF8 perf): Use or document flags
     storage._realCapacityAndFlags = realCodeUnitCapacity
@@ -233,6 +247,17 @@ extension _StringStorage {
     @inline(__always) get {
       return UnsafeBufferPointer(start: start, count: count)
     }
+  }
+
+  @nonobjc
+  // @opaque
+  internal var _breadcrumbsAddress: UnsafeMutablePointer<_StringBreadcrumbs?> {
+    let raw = Builtin.getTailAddr_Word(
+      start._rawValue,
+      realCapacity._builtinWordValue,
+      UInt8.self,
+      Optional<_StringBreadcrumbs>.self)
+    return UnsafeMutablePointer(raw)
   }
 
   // The total capacity available for code units. Note that this excludes the
@@ -356,6 +381,9 @@ final internal class _SharedStringStorage: _AbstractStringStorage {
   @nonobjc
   @usableFromInline
   internal var contents: UnsafeBufferPointer<UInt8>
+
+  @nonobjc
+  internal var _breadcrumbs: _StringBreadcrumbs?
 
   @nonobjc
   @usableFromInline
