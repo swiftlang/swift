@@ -183,6 +183,10 @@ extension _StringObject.Nibbles {
 
  TODO(UTF8): Allocate the rest of the bits appropriately
 
+ TODO(UTF8): For Foreign strings, consider allocating a bit for whether they can
+ provide contiguous UTF-16 code units, which would allow us to avoid doing the
+ full call for non-contiguous NSString.
+
  objectAddr: The address of the beginning of the potentially-managed object.
 
  Other foreign forms are reserved for the future.

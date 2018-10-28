@@ -68,12 +68,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
       // TODO(UTF8): isKnownASCII bit fast-path...
 
       let len = _guts.withFastUTF8 { utf8 -> Int in
-        var len = 1
-        while _isContinuation(utf8[i.encodedOffset &- len]) {
-          len += 1
-        }
-        _sanityCheck(len == _utf8ScalarLength(utf8[i.encodedOffset - len]))
-        return len
+        return _utf8ScalarLength(utf8, endingAt: i.encodedOffset)
       }
       _sanityCheck(len <= 4, "invalid UTF8")
       return Index(encodedOffset: i.encodedOffset &- len)

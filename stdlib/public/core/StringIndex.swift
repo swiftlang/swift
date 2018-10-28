@@ -62,7 +62,7 @@ extension String.Index {
 
   @usableFromInline
   internal var characterStride: Int? {
-    let value = (_rawBits & 0x00FC_0000_0000_0000) &>> 50
+    let value = (_rawBits & 0x3F00) &>> 8
     return value > 0 ? Int(truncatingIfNeeded: value) : nil
   }
 
@@ -96,7 +96,7 @@ extension String.Index {
     if _slowPath(characterStride > 63) { return }
 
     _sanityCheck(characterStride == characterStride & 0x3F)
-    self._rawBits |= UInt64(truncatingIfNeeded: characterStride)
+    self._rawBits |= UInt64(truncatingIfNeeded: characterStride &<< 8)
     self._invariantCheck()
   }
 
