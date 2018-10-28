@@ -13,13 +13,14 @@
 import SwiftShims
 
 extension StringProtocol {
+  @inlinable
   @_specialize(where Self == String, R == String)
   @_specialize(where Self == String, R == Substring)
   @_specialize(where Self == Substring, R == String)
   @_specialize(where Self == Substring, R == Substring)
   @_effects(readonly)
   public static func == <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-    return lhs._slicedGuts.compare(with: rhs._slicedGuts) == .equal
+    return lhs._gutsSlice.compare(with: rhs._gutsSlice, expecting: .equal)
   }
 
   @inlinable @inline(__always) // forward to other operator
@@ -28,13 +29,14 @@ extension StringProtocol {
     return !(lhs == rhs)
   }
 
+  @inlinable
   @_specialize(where Self == String, R == String)
   @_specialize(where Self == String, R == Substring)
   @_specialize(where Self == Substring, R == String)
   @_specialize(where Self == Substring, R == Substring)
   @_effects(readonly)
   public static func < <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-    return lhs._slicedGuts.compare(with: rhs._slicedGuts) == .less
+    return lhs._gutsSlice.compare(with: rhs._gutsSlice, expecting: .less)
   }
 
   @inlinable @inline(__always) // forward to other operator
@@ -70,7 +72,7 @@ extension String : Equatable {
       }
     }
 
-    return lhs._slicedGuts.compare(with: rhs._slicedGuts) == .equal
+    return lhs._gutsSlice.compare(with: rhs._gutsSlice, expecting: .equal)
   }
 }
 
@@ -88,7 +90,7 @@ extension String : Comparable {
       }
     }
 
-    return lhs._slicedGuts.compare(with: rhs._slicedGuts) == .less
+    return lhs._gutsSlice.compare(with: rhs._gutsSlice, expecting: .less)
   }
 }
 

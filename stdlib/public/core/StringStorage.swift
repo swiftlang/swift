@@ -294,7 +294,7 @@ extension _StringStorage {
   private var unusedStorage: UnsafeMutableBufferPointer<UInt8> {
     @inline(__always) get {
       return UnsafeMutableBufferPointer(
-        start: mutableEnd, count: capacity)
+        start: mutableEnd, count: unusedCapacity)
     }
   }
 

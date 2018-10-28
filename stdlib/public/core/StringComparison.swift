@@ -33,12 +33,13 @@ internal enum _StringComparisonResult: Int {
   }
 }
 
-extension _SlicedStringGuts {
+extension _StringGutsSlice {
   @inline(__always)
   @_effects(readonly)
   internal func withNFCCodeUnitsIterator<R>(
     _ f: (_NormalizedUTF8CodeUnitIterator) throws -> R
   ) rethrows -> R {
+    defer { _fixLifetime(self) }
     if self.isNFCFastUTF8 {
       // TODO(UTF8 perf): Faster iterator if we're already normal
       return try self.withFastUTF8 {
@@ -52,6 +53,14 @@ extension _SlicedStringGuts {
     }
     return try f(_NormalizedUTF8CodeUnitIterator(
       foreign: self._guts, range: self.range))
+  }
+  @inline(__always)
+  @_effects(readonly)
+  internal func withNFCCodeUnitsIterator_2<R>(
+    _ f: (_NormalizedUTF8CodeUnitIterator_2) throws -> R
+  ) rethrows -> R {
+    defer { _fixLifetime(self) }
+    return try f(_NormalizedUTF8CodeUnitIterator_2(self))
   }
 }
 
@@ -73,34 +82,49 @@ internal func _binaryCompare<UInt8>(
 }
 
 // Double dispatch functions
-extension _SlicedStringGuts {
+extension _StringGutsSlice {
   @usableFromInline
   @_effects(readonly)
   internal func compare(
-    with other: _SlicedStringGuts
-  ) -> _StringComparisonResult {
+    with other: _StringGutsSlice, expecting: _StringComparisonResult
+  ) -> Bool {
+    if self._guts.rawBits == other._guts.rawBits
+    && self._offsetRange == other._offsetRange {
+      return expecting == .equal
+    }
+
     if _fastPath(self.isNFCFastUTF8 && other.isNFCFastUTF8) {
       Builtin.onFastPath() // aggressively inline / optimize
       return self.withFastUTF8 { nfcSelf in
         return other.withFastUTF8 { nfcOther in
-          return _StringComparisonResult(
+          return expecting == _StringComparisonResult(
             signedNotation: _binaryCompare(nfcSelf, nfcOther))
         }
       }
     }
 
-    return _slowCompare(with: other)
+    if _fastPath(self.isFastUTF8 && other.isFastUTF8) {
+      Builtin.onFastPath() // aggressively inline / optimize
+      let isEqual = self.withFastUTF8 { utf8Self in
+        return other.withFastUTF8 { utf8Other in
+          return 0 == _binaryCompare(utf8Self, utf8Other)
+        }
+      }
+      if isEqual { return expecting == .equal }
+    }
+
+    return expecting == _slowCompare(with: other)
   }
 
   @inline(never) // opaque slow-path
   @_effects(readonly)
   internal func _slowCompare(
-    with other: _SlicedStringGuts
+    with other: _StringGutsSlice
   ) -> _StringComparisonResult {
-    return self.withNFCCodeUnitsIterator {
+    return self.withNFCCodeUnitsIterator_2 {
       var selfIter = $0
-      return other.withNFCCodeUnitsIterator {
-        let otherIter = $0
+      return other.withNFCCodeUnitsIterator_2 {
+        var otherIter = $0
         return selfIter.compare(with: otherIter)
       }
     }

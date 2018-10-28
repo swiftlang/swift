@@ -1250,7 +1250,7 @@ extension String : LosslessStringConvertible {
 extension String {
   public // @testable
   func _withNFCCodeUnits(_ f: (UInt8) throws -> Void) rethrows {
-    try _slicedGuts.withNFCCodeUnitsIterator { 
+    try _gutsSlice.withNFCCodeUnitsIterator_2 {
       for cu in $0 {
         try f(cu)
       }

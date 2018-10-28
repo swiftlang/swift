@@ -34,6 +34,12 @@ extension Unicode.Scalar {
     return 0 != __swift_stdlib_unorm2_hasBoundaryBefore(
       _Normalization._nfcNormalizer, value)
   }
+  internal var _isNFCQCYes: Bool {
+    return __swift_stdlib_u_getIntPropertyValue(
+      // FIXME(UTF8): use the enum, not magic number
+      Builtin.reinterpretCast(value), Builtin.reinterpretCast(0x100E)
+    ) == 1
+  }
 }
 
 internal func _tryNormalize(
@@ -117,8 +123,8 @@ extension _StringGuts {
       return true
     }
 
-    let cu = foreignErrorCorrectedUTF16CodeUnit(at: index)
-    return Unicode.Scalar(cu)?._hasNormalizationBoundaryBefore ?? false
+    let scalar = foreignErrorCorrectedScalar(startingAt: index).0
+    return scalar._hasNormalizationBoundaryBefore
   }
 }
 extension UnsafeBufferPointer where Element == UInt8 {
@@ -299,7 +305,7 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
           return nil
         }
 
-        let (cu, nextIndex) = _decodeScalar(buffer, startingAt: index)
+        let (cu, len) = _decodeScalar(buffer, startingAt: index)
         let utf16 = cu.utf16
         switch utf16.count {
         case 1:
@@ -316,7 +322,7 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
         default:
           _conditionallyUnreachable()
         }
-        index = nextIndex
+        index = index &+ len
       } while !buffer.hasNormalizationBoundary(before: index)
       return outputIndex
     }
@@ -324,10 +330,7 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
 
   struct _ForeignStringGutsSource: _SegmentSource {
     var remaining: Int {
-      // not exact since we skip invalid CUs but it's just to get an approximate
-      // size for allocating the buffer. Use isEmpty to determine if we're done
-      // reading code from the source
-      return guts.count - index.encodedOffset
+      return range.upperBound.encodedOffset - index.encodedOffset
     }
     var isEmpty: Bool {
       return index >= range.upperBound
@@ -358,10 +361,15 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
           return nil
         }
 
-        let cu = guts.foreignErrorCorrectedUTF16CodeUnit(at: index)
-        output[outputIndex] = cu
-        index = index._next()
+        let (scalar, len) = guts.foreignErrorCorrectedScalar(startingAt: index)
+        output[outputIndex] = scalar.utf16[0]
         outputIndex += 1
+        index = index.nextEncoded
+        if len == 2 {
+          output[outputIndex] = scalar.utf16[1]
+          outputIndex += 1
+          index = index.nextEncoded
+        }
       } while !guts.foreignHasNormalizationBoundary(before: index)
 
       return outputIndex
@@ -463,4 +471,234 @@ extension _SegmentSource {
     return tryFill(into: _castOutputBuffer(output))
   }
 }
+
+// Just for testing!
+
+extension Unicode.Scalar {
+ public // Just for testin! TODO(UTF8): Internalize
+ func hasBinaryProperty(
+    _ property: __swift_stdlib_UProperty
+  ) -> Bool {
+    return __swift_stdlib_u_hasBinaryProperty(
+      Builtin.reinterpretCast(value), property
+    ) != 0
+  }
+
+  public // Just for testin! TODO(UTF8): Remove
+  var hasNormalizationBoundaryBefore: Bool {
+    return _hasNormalizationBoundaryBefore
+  }
+}
+
+
+internal struct _NormalizedUTF8CodeUnitIterator_2: Sequence, IteratorProtocol {
+  private var outputBuffer = _SmallBuffer<UInt8>()
+  private var outputPosition = 0
+  private var outputBufferCount = 0
+
+  private var gutsSlice: _StringGutsSlice
+  private var readPosition: String.Index
+
+  private var _backupIsEmpty = false
+
+  internal init(_ sliced: _StringGutsSlice) {
+    self.gutsSlice = sliced
+    self.readPosition = self.gutsSlice.range.lowerBound
+  }
+
+  internal mutating func next() -> UInt8? {
+    return _next()
+  }
+}
+
+extension _NormalizedUTF8CodeUnitIterator_2 {
+  // The thresdhold we try to stay within while filling. Always leaves enough
+  // code units at the end to finish a scalar, but not necessarily enough to
+  // finish a segment.
+  private var outputBufferThreshold: Int {
+    return outputBuffer.capacity - 4
+  }
+
+  private var outputBufferEmpty: Bool {
+    return outputPosition == outputBufferCount
+  }
+  private var outputBufferFull: Bool {
+    return outputBufferCount >= outputBufferThreshold
+  }
+
+  private var inputBufferEmpty: Bool {
+    return gutsSlice.range.isEmpty
+  }
+}
+
+extension _NormalizedUTF8CodeUnitIterator_2 {
+  @_effects(releasenone)
+  private mutating func _next() -> UInt8? {
+    defer { _fixLifetime(self) }
+    if _slowPath(outputBufferEmpty) {
+      if _slowPath(inputBufferEmpty) {
+        return nil
+      }
+      fill()
+      if _slowPath(outputBufferEmpty) {
+        //_sanityCheck(inputBufferEmpty)
+        return nil
+      }
+    }
+    _sanityCheck(!outputBufferEmpty)
+
+    _sanityCheck(outputPosition < outputBufferCount)
+    let result = outputBuffer[outputPosition]
+    outputPosition &+= 1
+    return result
+  }
+
+  // Try to fill from the start without using ICU's normalizer. Returns number
+  // of code units filled in.
+  @inline(__always)
+  @_effects(releasenone)
+  private mutating func fastPathFill() -> (numRead: Int, numWritten: Int) {
+    // Quick check if a scalar is NFC and a segment starter
+    @inline(__always) func isNFCStarter(_ scalar: Unicode.Scalar) -> Bool {
+      // Fast-path: All scalars up through U+02FF are NFC and have boundaries
+      // before them
+      if scalar.value < 0x300 { return true }
+
+      // Otherwise, consult the properties
+      return scalar._hasNormalizationBoundaryBefore && scalar._isNFCQCYes
+    }
+
+    // TODO: Additional fast-path: All CCC-ascending NFC_QC segments are NFC
+    // TODO: Just freakin do normalization and don't bother with ICU
+    var outputCount = 0
+    let outputEnd = outputBufferThreshold
+    var inputCount = 0
+    let inputEnd = gutsSlice.count
+    if _fastPath(gutsSlice.isFastUTF8) {
+      gutsSlice.withFastUTF8 { utf8 in
+        while inputCount < inputEnd && outputCount < outputEnd {
+          // TODO: Slightly faster code-unit scan for latiny (<0xCC)
+
+          // Check scalar-based fast-paths
+          let (scalar, len) = _decodeScalar(utf8, startingAt: inputCount)
+          _sanityCheck(inputCount &+ len <= inputEnd)
+
+          if _slowPath(
+               !utf8.hasNormalizationBoundary(before: inputCount &+ len)
+            || !isNFCStarter(scalar)
+          ) {
+            break 
+          }
+          inputCount &+= len
+
+          for cu in UTF8.encode(scalar)._unsafelyUnwrappedUnchecked {
+            outputBuffer[outputCount] = cu
+            outputCount &+= 1
+          }
+
+          _sanityCheck(inputCount == outputCount,
+            "non-normalizing UTF-8 fast path should be 1-to-1 in code units")
+        }
+      }
+    } else { // Foreign
+      while inputCount < inputEnd && outputCount < outputEnd {
+        let startIdx = gutsSlice.range.lowerBound.encoded(
+          offsetBy: inputCount)
+        let (scalar, len) = gutsSlice.foreignErrorCorrectedScalar(
+          startingAt: startIdx)
+        _sanityCheck(inputCount &+ len <= inputEnd)
+
+        if _slowPath(
+             !gutsSlice.foreignHasNormalizationBoundary(
+               before: startIdx.encoded(offsetBy: len))
+          || !isNFCStarter(scalar)
+        ) {
+          break 
+        }
+        inputCount &+= len
+
+        for cu in UTF8.encode(scalar)._unsafelyUnwrappedUnchecked {
+          outputBuffer[outputCount] = cu
+          outputCount &+= 1
+        }
+
+        _sanityCheck(inputCount <= outputCount,
+          "non-normalizing UTF-16 fast path shoule be 1-to-many in code units")
+      }
+    }
+    return (inputCount, outputCount)
+  }
+
+  @_effects(releasenone)
+  private mutating func fill() {
+    _sanityCheck(outputBufferEmpty)
+
+    let priorInputCount = gutsSlice._offsetRange.count
+
+    outputPosition = 0
+    let (inputCount, outputCount) = fastPathFill()
+    self.outputBufferCount = outputCount
+
+    // Check if we filled in any, and adjust our scanning range appropriately
+    if inputCount > 0 {
+      _sanityCheck(outputCount > 0)
+      gutsSlice._offsetRange = Range(uncheckedBounds: (
+        gutsSlice._offsetRange.lowerBound + inputCount,
+        gutsSlice._offsetRange.upperBound))
+      _sanityCheck(gutsSlice._offsetRange.count >= 0)
+      return
+    }
+
+    let remaining: Int = gutsSlice.withNFCCodeUnitsIterator {
+      var nfc = $0
+      while !outputBufferFull, let cu = nfc.next() {
+        outputBuffer[outputBufferCount] = cu
+        outputBufferCount &+= 1
+      }
+      return nfc.utf16Iterator.source.remaining
+    }
+
+    if !(outputBufferCount == 0 || remaining < priorInputCount) {
+      // TODO: _sanityCheck(outputBufferCount == 0 || remaining < priorInputCount)
+    }
+
+    gutsSlice._offsetRange = Range(uncheckedBounds: (
+      gutsSlice._offsetRange.lowerBound + (priorInputCount - remaining),
+      gutsSlice._offsetRange.upperBound))
+
+    _sanityCheck(outputBufferFull || gutsSlice._offsetRange.isEmpty)
+    _sanityCheck(gutsSlice._offsetRange.count >= 0)
+  }
+
+  @_effects(readonly)
+  internal mutating func compare(
+    with other: _NormalizedUTF8CodeUnitIterator_2
+  ) -> _StringComparisonResult {
+    var iter = self
+    var mutableOther = other
+
+    while let cu = iter.next() {
+      if let otherCU = mutableOther.next() {
+        let result = _lexicographicalCompare(cu, otherCU)
+        if result == .equal {
+          continue
+        } else {
+          return result
+        }
+      } else {
+        //other returned nil, we are greater
+        return .greater
+      }
+    }
+
+    //we ran out of code units, either we are equal, or only we ran out and
+    //other is greater
+    if let _ = mutableOther.next() {
+      return .less
+    } else {
+      return .equal
+    }
+  }
+}
+
 

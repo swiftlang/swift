@@ -50,6 +50,7 @@ extension _StringGuts {
       _form: ._small
     )
     if _object.isSmall {
+      result._capacity = _SmallString.capacity
       return result
     }
     if _object.largeIsCocoa {

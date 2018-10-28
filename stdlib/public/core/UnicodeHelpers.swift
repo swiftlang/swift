@@ -87,16 +87,15 @@ internal func _decodeUTF8(
 @inlinable
 internal func _decodeScalar(
   _ utf8: UnsafeBufferPointer<UInt8>, startingAt i: Int
-) -> (Unicode.Scalar, scalarEndIndex: Int) {
+) -> (Unicode.Scalar, scalarLength: Int) {
   let cu0 = utf8[i]
   let len = _utf8ScalarLength(cu0)
-  let nextIdx = len &+ i
   switch  len {
-  case 1: return (_decodeUTF8(cu0), nextIdx)
-  case 2: return (_decodeUTF8(cu0, utf8[i &+ 1]), nextIdx)
-  case 3: return (_decodeUTF8(cu0, utf8[i &+ 1], utf8[i &+ 2]), nextIdx)
+  case 1: return (_decodeUTF8(cu0), len)
+  case 2: return (_decodeUTF8(cu0, utf8[i &+ 1]), len)
+  case 3: return (_decodeUTF8(cu0, utf8[i &+ 1], utf8[i &+ 2]), len)
   case 4:
-    return (_decodeUTF8(cu0, utf8[i &+ 1], utf8[i &+ 2], utf8[i &+ 3]), nextIdx)
+    return (_decodeUTF8(cu0, utf8[i &+ 1], utf8[i &+ 2], utf8[i &+ 3]), len)
   default: Builtin.unreachable()
   }
 }
@@ -104,11 +103,11 @@ internal func _decodeScalar(
 @inlinable
 internal func _decodeScalar(
   _ utf8: UnsafeBufferPointer<UInt8>, endingAt i: Int
-) -> (Unicode.Scalar, scalarStartIndex: Int) {
+) -> (Unicode.Scalar, scalarLength: Int) {
   let len = _utf8ScalarLength(utf8, endingAt: i)
-  let (scalar, endIdx) = _decodeScalar(utf8, startingAt: i &- len)
-  _sanityCheck(i == endIdx)
-  return (scalar, i &- len)
+  let (scalar, scalarLen) = _decodeScalar(utf8, startingAt: i &- len)
+  _sanityCheck(len == scalarLen)
+  return (scalar, len)
 }
 
 @inlinable @inline(__always)
@@ -270,7 +269,7 @@ extension _StringGuts {
   @_effects(releasenone)
   internal func foreignErrorCorrectedScalar(
     startingAt idx: String.Index
-  ) -> Unicode.Scalar {
+  ) -> (Unicode.Scalar, scalarLength: Int) {
     _sanityCheck(idx.transcodedOffset == 0)
     _sanityCheck(idx.encodedOffset < self.count)
 
@@ -278,7 +277,7 @@ extension _StringGuts {
     let leading = _getForeignCodeUnit(at: start)
 
     if _fastPath(!_isSurrogate(leading)) {
-      return Unicode.Scalar(_unchecked: UInt32(leading))
+      return (Unicode.Scalar(_unchecked: UInt32(leading)), 1)
     }
 
     // Validate foreign strings on-read: trailing surrogates are invalid,
@@ -288,21 +287,22 @@ extension _StringGuts {
     // it's not set in the condition here.
     let nextOffset = start &+ 1
     if _slowPath(_isTrailingSurrogate(leading) || nextOffset == self.count) {
-      return Unicode.Scalar._replacementCharacter
+      return (Unicode.Scalar._replacementCharacter, 1)
     }
     let trailing = _getForeignCodeUnit(at: nextOffset)
     if _slowPath(!_isTrailingSurrogate(trailing)) {
-      return Unicode.Scalar._replacementCharacter
+      return (Unicode.Scalar._replacementCharacter, 1)
     }
 
-    return Unicode.Scalar(
-      _unchecked: _decodeSurrogatePair(leading: leading, trailing: trailing))
+    return (Unicode.Scalar(
+      _unchecked: _decodeSurrogatePair(leading: leading, trailing: trailing)),
+      2)
   }
 
   @_effects(releasenone)
   internal func foreignErrorCorrectedScalar(
     endingAt idx: String.Index
-  ) -> Unicode.Scalar {
+  ) -> (Unicode.Scalar, scalarLength: Int) {
     _sanityCheck(idx.transcodedOffset == 0)
     _sanityCheck(idx.encodedOffset <= self.count)
     _sanityCheck(idx.encodedOffset > 0)
@@ -310,7 +310,7 @@ extension _StringGuts {
     let end = idx.encodedOffset
     let trailing = _getForeignCodeUnit(at: end &- 1)
     if _fastPath(!_isSurrogate(trailing)) {
-      return Unicode.Scalar(_unchecked: UInt32(trailing))
+      return (Unicode.Scalar(_unchecked: UInt32(trailing)), 1)
     }
 
     // Validate foreign strings on-read: trailing surrogates are invalid,
@@ -320,15 +320,16 @@ extension _StringGuts {
     // it's not set in the condition here.
     let priorOffset = end &- 2
     if _slowPath(_isLeadingSurrogate(trailing) || priorOffset < 0) {
-      return Unicode.Scalar._replacementCharacter
+      return (Unicode.Scalar._replacementCharacter, 1)
     }
     let leading = _getForeignCodeUnit(at: priorOffset)
     if _slowPath(!_isLeadingSurrogate(leading)) {
-      return Unicode.Scalar._replacementCharacter
+      return (Unicode.Scalar._replacementCharacter, 1)
     }
 
-    return Unicode.Scalar(
-      _unchecked: _decodeSurrogatePair(leading: leading, trailing: trailing))
+    return (Unicode.Scalar(
+      _unchecked: _decodeSurrogatePair(leading: leading, trailing: trailing)),
+      2)
   }
 
   @_effects(releasenone)
@@ -376,12 +377,5 @@ extension _StringGuts {
     _sanityCheck(idx.encodedOffset > 0,
       "Error-correction shouldn't give trailing surrogate at position zero")
     return String.Index(encodedOffset: idx.encodedOffset &- 1)
-  }
-}
-
-extension String.Index {
-  internal func _next() -> String.Index {
-    let offset = self.encodedOffset
-    return String.Index(encodedOffset: offset + 1)
   }
 }

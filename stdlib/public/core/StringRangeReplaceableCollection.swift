@@ -152,7 +152,7 @@ extension String: RangeReplaceableCollection {
   }
 
   public mutating func append(contentsOf newElements: Substring) {
-    self._guts.append(newElements._slicedGuts)
+    self._guts.append(newElements._gutsSlice)
   }
 
   /// Appends the characters in the given sequence to the string.
