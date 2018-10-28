@@ -99,7 +99,7 @@ internal var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding {
 }
 
 // Resiliently write a tagged cocoa string's contents into a buffer
-@_effects(readonly) // @opaque
+@_effects(releasenone) // @opaque
 internal func _bridgeTagged(
   _ cocoa: _CocoaString,
   intoUTF8 bufPtr: UnsafeMutableBufferPointer<UInt8>
@@ -107,17 +107,12 @@ internal func _bridgeTagged(
   _sanityCheck(_isObjCTaggedPointer(cocoa))
   let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
   let length = _stdlib_binary_CFStringGetLength(cocoa)
-  _sanityCheck(length <= _SmallUTF8String.capacity)
+  _sanityCheck(length <= _SmallString.capacity)
   var count = 0
   let numCharWritten = _swift_stdlib_CFStringGetBytes(
     cocoa, _swift_shims_CFRange(location: 0, length: length),
     kCFStringEncodingUTF8, 0, 0, ptr, bufPtr.count, &count)
   return length == numCharWritten ? count : nil
-}
-
-@_effects(releasenone)
-internal func _bridgeToCocoa(_ small: _SmallUTF8String) -> _CocoaString {
-  unimplemented_utf8()
 }
 
 internal func _cocoaUTF8Pointer(_ str: _CocoaString) -> UnsafePointer<UInt8>? {
@@ -155,7 +150,7 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
   if let abstract = cocoaString as? _AbstractStringStorage {
     return abstract.asString._guts
   } else if _isObjCTaggedPointer(cocoaString) {
-    return _StringGuts(_SmallUTF8String(taggedCocoa: cocoaString))
+    return _StringGuts(_SmallString(taggedCocoa: cocoaString))
   }
 
   // "copy" it into a value to be sure nobody will modify behind
@@ -172,7 +167,7 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
     = _stdlib_binary_CFStringCreateCopy(cocoaString) as AnyObject
 
   if _isObjCTaggedPointer(immutableCopy) {
-    return _StringGuts(_SmallUTF8String(taggedCocoa: immutableCopy))
+    return _StringGuts(_SmallString(taggedCocoa: immutableCopy))
   }
 
   let (start, isUTF16) = _getCocoaStringPointer(immutableCopy)

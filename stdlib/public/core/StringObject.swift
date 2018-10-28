@@ -132,7 +132,7 @@ extension _StringObject {
 */
 extension _StringObject.Nibbles {
   // The canonical empty sting is an empty small string
-  @usableFromInline
+  @inlinable
   internal static var emptyString: UInt {
     @inline(__always) get { return _StringObject.Nibbles.small(isASCII: true) }
   }
@@ -445,13 +445,18 @@ extension _StringObject {
 // Extract
 extension _StringObject {
   @inlinable
+  static var countMask: Int {
+    @inline(__always) get { return 0x0000_FFFF_FFFF_FFFF }
+  }
+
+  @inlinable
   internal var largeCount: Int {
     @inline(__always) get {
 #if arch(i386) || arch(arm)
     unimplemented_utf8_32bit()
 #else
       _sanityCheck(isLarge)
-      return Int(bitPattern: (_otherBits & 0x0000_FFFF_FFFF_FFFF))
+      return Int(bitPattern: _otherBits) & _StringObject.countMask
 #endif
     }
     @inline(__always) set {
@@ -459,7 +464,7 @@ extension _StringObject {
     unimplemented_utf8_32bit()
 #else
       _sanityCheck(largeCount == 0)
-      _sanityCheck(newValue == newValue & 0x0000_FFFF_FFFF_FFFF, "too large")
+      _sanityCheck(newValue == newValue & _StringObject.countMask, "too large")
       _otherBits |= UInt(bitPattern: newValue)
       _sanityCheck(newValue == largeCount)
       _invariantCheck()
@@ -691,9 +696,11 @@ extension _StringObject {
 
 // Internal invariants
 extension _StringObject {
-  @inlinable @inline(__always)
+  #if !INTERNAL_CHECKS_ENABLED
+  @inlinable @inline(__always) internal func _invariantCheck() {}
+  #else
+  @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
-    #if INTERNAL_CHECKS_ENABLED
     _sanityCheck(MemoryLayout<_StringObject>.size == 16)
     if isForeign {
       _sanityCheck(largeIsCocoa, "No other foreign forms yet")
@@ -717,6 +724,8 @@ extension _StringObject {
         } else {
           _sanityCheck(hasNativeStorage)
           _sanityCheck(hasObjCBridgeableObject)
+          _sanityCheck(nativeStorage.count == self.count)
+          nativeStorage._invariantCheck()
         }
       }
       if largeIsCocoa {
@@ -729,9 +738,10 @@ extension _StringObject {
         }
       }
     }
-    #endif // INTERNAL_CHECKS_ENABLED
   }
+  #endif // INTERNAL_CHECKS_ENABLED
 
+  @inline(never)
   internal func _dump() {
     // TODO(UTF8): Print out any useful internal information
     #if INTERNAL_CHECKS_ENABLED
@@ -740,7 +750,13 @@ extension _StringObject {
       return
     }
     if providesFastUTF8 && largeFastIsNative {
-      print("Native")
+      let repr = _StringGuts(self)._classify()
+      print("""
+        Native(\
+        owner: \(repr._objectIdentifier!), \
+        count: \(repr._count), \
+        capacity: \(repr._capacity))
+        """)
     } else if largeIsCocoa {
       print("Cocoa")
     } else {

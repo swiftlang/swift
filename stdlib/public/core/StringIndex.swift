@@ -105,12 +105,14 @@ extension String.Index {
     self.init(encodedOffset: pos, transcodedOffset: 0, characterStride: char)
   }
 
-  @inlinable @inline(__always)
+  #if !INTERNAL_CHECKS_ENABLED
+  @inlinable @inline(__always) internal func _invariantCheck() {}
+  #else
+  @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
-    #if INTERNAL_CHECKS_ENABLED
     _sanityCheck(encodedOffset >= 0)
-    #endif
   }
+  #endif // INTERNAL_CHECKS_ENABLED
 }
 
 // Creation helpers

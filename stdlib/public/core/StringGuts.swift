@@ -103,36 +103,14 @@ extension _StringGuts {
     @inline(__always) get { return _object.isASCII }
   }
 
-  internal var nativeCapacity: Int? {
-      guard hasNativeStorage else { return nil }
-      return _object.nativeStorage.capacity
-  }
-
-  internal var nativeUnusedCapacity: Int? {
-      guard hasNativeStorage else { return nil }
-      return _object.nativeStorage.unusedCapacity
-  }
-
-  // If natively stored and uniquely referenced, return the storage's total
-  // capacity. Otherwise, nil.
-  internal var uniqueNativeCapacity: Int? {
-    @inline(__always) mutating get {
-      guard isUniqueNative else { return nil }
-      return _object.nativeStorage.capacity
-    }
-  }
-
-  // If natively stored and uniquely referenced, return the storage's spare
-  // capacity. Otherwise, nil.
-  internal var uniqueNativeUnusedCapacity: Int? {
-    @inline(__always) mutating get {
-      guard isUniqueNative else { return nil }
-      return _object.nativeStorage.unusedCapacity
-    }
-  }
-
   @inlinable
   internal var hasNativeStorage: Bool { return _object.hasNativeStorage }
+
+  internal var hasSharedStorage: Bool { return _object.hasSharedStorage }
+
+  internal var hasBreadcrumbs: Bool {
+    return hasNativeStorage || hasSharedStorage
+  }
 }
 
 //
@@ -174,9 +152,11 @@ extension _StringGuts {
 
 // Internal invariants
 extension _StringGuts {
-  @inlinable @inline(__always)
+  #if !INTERNAL_CHECKS_ENABLED
+  @inlinable @inline(__always) internal func _invariantCheck() {}
+  #else
+  @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
-    #if INTERNAL_CHECKS_ENABLED
     _object._invariantCheck()
     #if arch(i386) || arch(arm)
     _sanityCheck(MemoryLayout<String>.size == 12, """
@@ -189,130 +169,10 @@ extension _StringGuts {
     this if you change it
     """)
     #endif
-    #endif // INTERNAL_CHECKS_ENABLED
   }
+  #endif // INTERNAL_CHECKS_ENABLED
 
   internal func _dump() { _object._dump() }
-}
-
-// Append
-extension _StringGuts {
-  @usableFromInline // @testable
-  internal var isUniqueNative: Bool {
-    @inline(__always) mutating get {
-      // Note: mutating so that self is `inout`.
-      guard hasNativeStorage else { return false }
-      defer { _fixLifetime(self) }
-      var bits: UInt = _object.largeAddressBits
-      return _isUnique_native(&bits)
-    }
-  }
-
-  internal mutating func reserveCapacity(_ n: Int) {
-    // Check if there's nothing to do
-    if n <= _SmallString.capacity { return }
-    if let currentCap = self.uniqueNativeCapacity, currentCap >= n { return }
-
-    // Grow
-    self.grow(n)
-  }
-
-  // Grow to accomodate at least `n` code units
-  internal mutating func grow(_ n: Int) {
-    defer { self._invariantCheck() }
-
-    _sanityCheck(
-      self.uniqueNativeCapacity == nil || self.uniqueNativeCapacity! < n)
-
-    if _fastPath(isFastUTF8) {
-      let storage = self.withFastUTF8 {
-        _StringStorage.create(initializingFrom: $0, capacity: n)
-      }
-
-      // TODO(UTF8): Track known ascii
-      self = _StringGuts(storage)
-      return
-    }
-
-    _foreignGrow(n)
-  }
-
-  @inline(never) // slow-path
-  internal mutating func _foreignGrow(_ n: Int) {
-    // TODO(UTF8 perf): skip the intermediary arrays
-    let selfUTF8 = Array(String(self).utf8)
-    selfUTF8.withUnsafeBufferPointer {
-      self = _StringGuts(_StringStorage.create(
-        initializingFrom: $0, capacity: n))
-    }
-  }
-
-  internal mutating func append(_ other: _StringGuts) {
-    defer { self._invariantCheck() }
-
-    // Try to form a small string if possible
-    if !hasNativeStorage {
-      if let smol = _SmallString(base: self, appending: other) {
-        self = _StringGuts(smol)
-        return
-      }
-    }
-
-    // See if we can accomodate without growing or copying. If we have
-    // sufficient capacity, we do not need to grow, and we can skip the copy if
-    // unique. Otherwise, growth is required.
-    let otherUTF8Count = other.utf8Count
-    let sufficientCapacity: Bool
-    if let unused = self.nativeUnusedCapacity, unused >= otherUTF8Count {
-      sufficientCapacity = true
-    } else {
-      sufficientCapacity = false
-    }
-    if !self.isUniqueNative || !sufficientCapacity {
-      let totalCount = self.utf8Count + otherUTF8Count
-
-      // Non-unique storage: just make a copy of the appropriate size, otherwise
-      // grow like an array.
-      let growthTarget: Int
-      if sufficientCapacity {
-        growthTarget = totalCount
-      } else {
-        growthTarget = Swift.max(
-          totalCount, _growArrayCapacity(nativeCapacity ?? 0))
-      }
-      self.grow(growthTarget)
-    }
-
-    _sanityCheck(self.uniqueNativeUnusedCapacity != nil,
-      "growth should produce uniqueness")
-
-    if other.isFastUTF8 {
-      other.withFastUTF8 { self.appendInPlace($0) }
-      return
-    }
-    _foreignAppendInPlace(other)
-  }
-
-  internal mutating func appendInPlace(_ other: UnsafeBufferPointer<UInt8>) {
-    self._object.nativeStorage.appendInPlace(other)
-
-    // We re-initialize from the modified storage to pick up new count, flags,
-    // etc.
-    self = _StringGuts(self._object.nativeStorage)
-  }
-
-  @inline(never) // slow-path
-  internal mutating func _foreignAppendInPlace(_ other: _StringGuts) {
-    _sanityCheck(!other.isFastUTF8)
-    _sanityCheck(self.uniqueNativeUnusedCapacity != nil)
-
-    var iter = String(other).utf8.makeIterator()
-    self._object.nativeStorage.appendInPlace(&iter)
-
-    // We re-initialize from the modified storage to pick up new count, flags,
-    // etc.
-    self = _StringGuts(self._object.nativeStorage)
-  }
 }
 
 // C String interop

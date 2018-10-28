@@ -142,6 +142,8 @@ extension FixedWidthInteger {
   @inlinable // FIXME(sil-serialize-all)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   public init?<S : StringProtocol>(_ text: S, radix: Int = 10) {
+    _precondition(2...36 ~= radix, "Radix not in range 2...36")
+
     // TODO(UTF8 perf): fast paths...
 
     var iter = text.utf8.makeIterator()

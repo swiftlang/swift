@@ -74,13 +74,15 @@ public struct Character {
 }
 
 extension Character {
-  @inlinable @inline(__always)
+  #if !INTERNAL_CHECKS_ENABLED
+  @inlinable @inline(__always) internal func _invariantCheck() {}
+  #else
+  @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
-    #if INTERNAL_CHECKS_ENABLED
     _sanityCheck(_str.count == 1)
     _sanityCheck(_str._guts.isFastUTF8)
-    #endif
   }
+  #endif // INTERNAL_CHECKS_ENABLED
 }
 
 extension Character {

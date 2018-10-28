@@ -691,31 +691,24 @@ extension Unicode.Scalar.Properties {
   /// all current case mappings. In the event more space is needed, it will be
   /// allocated on the heap.
   internal func _applyMapping(_ u_strTo: _U_StrToX) -> String {
-    let utf16Length = UnicodeScalar(UInt32(_value))!.utf16.count
-    var utf16 = _utf16CodeUnits
-
     // TODO(UTF8 perf): Stack buffer first and then detect real count
     let count = 64
     var array = Array<UInt16>(repeating: 0, count: count)
     let len: Int = array.withUnsafeMutableBufferPointer { bufPtr in
-      return withUnsafePointer(to: &utf16) {
-        (tuplePtr) -> Int in
-        return tuplePtr.withMemoryRebound(to: UInt16.self, capacity: 2) {
-          (utf16Pointer) -> Int in
-          var err = __swift_stdlib_U_ZERO_ERROR
-          let correctSize = u_strTo(
-            bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
-            Int32(bufPtr.count),
-            utf16Pointer,
-            Int32(utf16Length),
-            "",
-            &err)
-          guard err.isSuccess else {
-            fatalError("Unexpected error case-converting Unicode scalar.")
-          }
-          // TODO: _sanityCheck(count == correctSize, "inconsistent ICU behavior")
-          return Int(correctSize)
+      return _scalar.withUTF16CodeUnits { utf16 in
+        var err = __swift_stdlib_U_ZERO_ERROR
+        let correctSize = u_strTo(
+          bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+          Int32(bufPtr.count),
+          utf16.baseAddress._unsafelyUnwrappedUnchecked,
+          Int32(utf16.count),
+          "",
+          &err)
+        guard err.isSuccess else {
+          fatalError("Unexpected error case-converting Unicode scalar.")
         }
+        // TODO: _sanityCheck(count == correctSize, "inconsistent ICU behavior")
+        return Int(correctSize)
       }
     }
     // TODO: replace `len` with `count`
