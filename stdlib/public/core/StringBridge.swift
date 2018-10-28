@@ -183,8 +183,8 @@ extension String {
     // TODO(UTF8): create and use a visit pattern on _StringGuts to handle each
     // form, rather than querying object directly. Presumably there will be
     // other such visitors.
-    if _guts._object.isSmall {
-      return _guts._object.asSmallString.withUTF8 { bufPtr in
+    if _guts.isSmall {
+      return _guts.asSmall.withUTF8 { bufPtr in
         // TODO(UTF8 perf): worth isASCII check for different encoding?
         return _swift_stdlib_CFStringCreateWithBytes(
             nil, bufPtr.baseAddress._unsafelyUnwrappedUnchecked,

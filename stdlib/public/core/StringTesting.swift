@@ -49,7 +49,7 @@ extension _StringGuts {
       _capacity: nativeCapacity ?? 0,
       _form: ._small
     )
-    if _object.isSmall {
+    if self.isSmall {
       result._capacity = _SmallString.capacity
       return result
     }

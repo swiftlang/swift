@@ -235,6 +235,6 @@ extension Character: Hashable {
 extension Character {
   @usableFromInline // @testable
   internal var _isSmall: Bool {
-    return _str._guts._object.isSmall
+    return _str._guts.isSmall
   }
 }
