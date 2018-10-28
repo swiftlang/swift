@@ -35,4 +35,5 @@ add_subdirectory(Utils)
 
 add_swift_host_library(swiftSILOptimizer STATIC
   ${SILOPTIMIZER_SOURCES}
-  LINK_LIBRARIES swiftSIL)
+  LINK_LIBS
+    swiftSIL)

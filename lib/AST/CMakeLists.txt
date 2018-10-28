@@ -62,7 +62,7 @@ add_swift_host_library(swiftAST STATIC
   TypeWalker.cpp
   USRGeneration.cpp
 
-  LINK_LIBRARIES
+  LINK_LIBS
     swiftMarkup
     swiftBasic
     swiftSyntax

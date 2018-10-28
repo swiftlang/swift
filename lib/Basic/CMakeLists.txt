@@ -101,7 +101,7 @@ add_swift_host_library(swiftBasic STATIC
 
   UnicodeExtendedGraphemeClusters.cpp.gyb
 
-  LINK_LIBRARIES
+  LINK_LIBS
     swiftDemangling
     ${UUID_LIBRARIES}
   LLVM_COMPONENT_DEPENDS support)

@@ -1322,7 +1322,7 @@ endfunction()
 #     [SHARED]
 #     [STATIC]
 #     [DEPENDS dep1 ...]
-#     [LINK_LIBRARIES dep1 ...]
+#     [LINK_LIBS lib1 ...]
 #     [INTERFACE_LINK_LIBRARIES dep1 ...]
 #     [SWIFT_MODULE_DEPENDS dep1 ...]
 #     [LLVM_COMPONENT_DEPENDS comp1 ...]
@@ -1343,7 +1343,7 @@ endfunction()
 # DEPENDS
 #   Targets that this library depends on.
 #
-# LINK_LIBRARIES
+# LINK_LIBS
 #   Libraries this library depends on.
 #
 # LLVM_COMPONENT_DEPENDS
@@ -1367,7 +1367,7 @@ function(add_swift_host_library name)
         DEPENDS
         INTERFACE_LINK_LIBRARIES
         LINK_FLAGS
-        LINK_LIBRARIES
+        LINK_LIBS
         LLVM_COMPONENT_DEPENDS)
 
   cmake_parse_arguments(ASHL
@@ -1392,7 +1392,7 @@ function(add_swift_host_library name)
     SDK ${SWIFT_HOST_VARIANT_SDK}
     ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
     DEPENDS ${ASHL_DEPENDS}
-    LINK_LIBRARIES ${ASHL_LINK_LIBRARIES}
+    LINK_LIBRARIES ${ASHL_LINK_LIBS}
     LLVM_COMPONENT_DEPENDS ${ASHL_LLVM_COMPONENT_DEPENDS}
     LINK_FLAGS ${ASHL_LINK_FLAGS}
     INTERFACE_LINK_LIBRARIES ${ASHL_INTERFACE_LINK_LIBRARIES}

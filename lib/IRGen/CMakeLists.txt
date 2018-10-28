@@ -49,7 +49,7 @@ add_swift_host_library(swiftIRGen STATIC
   SwiftTargetInfo.cpp
   TypeLayoutDumper.cpp
   TypeLayoutVerifier.cpp
-  LINK_LIBRARIES
+  LINK_LIBS
     swiftAST
     swiftLLVMPasses
     swiftSIL
