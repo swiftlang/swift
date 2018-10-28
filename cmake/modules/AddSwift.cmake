@@ -1326,7 +1326,6 @@ endfunction()
 #     [INTERFACE_LINK_LIBRARIES dep1 ...]
 #     [SWIFT_MODULE_DEPENDS dep1 ...]
 #     [LLVM_COMPONENT_DEPENDS comp1 ...]
-#     [FILE_DEPENDS target1 ...]
 #     [C_COMPILE_FLAGS flag1...]
 #     [LINK_FLAGS flag1...]
 #     [INSTALL]
@@ -1351,9 +1350,6 @@ endfunction()
 # LLVM_COMPONENT_DEPENDS
 #   LLVM components this library depends on.
 #
-# FILE_DEPENDS
-#   Additional files this library depends on.
-#
 # C_COMPILE_FLAGS
 #   Extra compiler flags (C, C++, ObjC).
 #
@@ -1374,7 +1370,6 @@ function(add_swift_host_library name)
   set(multiple_parameter_options
         C_COMPILE_FLAGS
         DEPENDS
-        FILE_DEPENDS
         INTERFACE_LINK_LIBRARIES
         LINK_FLAGS
         LINK_LIBRARIES
@@ -1404,7 +1399,6 @@ function(add_swift_host_library name)
     DEPENDS ${ASHL_DEPENDS}
     LINK_LIBRARIES ${ASHL_LINK_LIBRARIES}
     LLVM_COMPONENT_DEPENDS ${ASHL_LLVM_COMPONENT_DEPENDS}
-    FILE_DEPENDS ${ASHL_FILE_DEPENDS}
     C_COMPILE_FLAGS ${ASHL_C_COMPILE_FLAGS}
     LINK_FLAGS ${ASHL_LINK_FLAGS}
     INTERFACE_LINK_LIBRARIES ${ASHL_INTERFACE_LINK_LIBRARIES}
