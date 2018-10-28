@@ -1319,49 +1319,12 @@ endfunction()
 #
 # Usage:
 #   add_swift_host_library(name
-#     [SHARED]
-#     [STATIC]
-#     [DEPENDS dep1 ...]
-#     [LINK_LIBS lib1 ...]
-#     [SWIFT_MODULE_DEPENDS dep1 ...]
-#     [LINK_COMPONENTS comp1 ...]
-#     [INSTALL]
-#     INSTALL_IN_COMPONENT comp
-#     source1 [source2 source3 ...])
-#
-# name
-#   Name of the library (e.g., swiftParse).
-#
-# SHARED
-#   Build a shared library.
-#
-# STATIC
-#   Build a static library.
-#
-# DEPENDS
-#   Targets that this library depends on.
-#
-# LINK_LIBS
-#   Libraries this library depends on.
-#
-# LINK_COMPONENTS
-#   LLVM components this library depends on.
-#
-# INSTALL_IN_COMPONENT comp
-#   The Swift installation component that this library belongs to.
-#
-# source1 ...
-#   Sources to add into this library.
+#     [FORCE_BUILD_OPTIMIZED]
+#     [...]
 function(add_swift_host_library name)
-  set(options
-        FORCE_BUILD_OPTIMIZED
-        SHARED
-        STATIC)
+  set(options FORCE_BUILD_OPTIMIZED)
   set(single_parameter_options)
-  set(multiple_parameter_options
-        DEPENDS
-        LINK_LIBS
-        LINK_COMPONENTS)
+  set(multiple_parameter_options)
 
   cmake_parse_arguments(ASHL
                         "${options}"
@@ -1370,25 +1333,10 @@ function(add_swift_host_library name)
                         ${ARGN})
   set(ASHL_SOURCES ${ASHL_UNPARSED_ARGUMENTS})
 
-  translate_flags(ASHL "${options}")
-
-  if(NOT ASHL_SHARED AND NOT ASHL_STATIC)
-    message(FATAL_ERROR "Either SHARED or STATIC must be specified")
+  llvm_add_library(${name} ${ASHL_UNPARSED_ARGUMENTS})
+  if(ASHL_FORCE_BUILD_OPTIMIZED)
+    target_compile_options(${name} PRIVATE "-O2")
   endif()
-
-  _add_swift_library_single(
-    ${name}
-    ${name}
-    ${ASHL_SHARED_keyword}
-    ${ASHL_STATIC_keyword}
-    ${ASHL_SOURCES}
-    SDK ${SWIFT_HOST_VARIANT_SDK}
-    ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
-    DEPENDS ${ASHL_DEPENDS}
-    LINK_LIBRARIES ${ASHL_LINK_LIBS}
-    LLVM_COMPONENT_DEPENDS ${ASHL_LINK_COMPONENTS}
-    INSTALL_IN_COMPONENT "dev"
-    )
 
   swift_install_in_component(dev
     TARGETS ${name}
