@@ -1323,7 +1323,6 @@ endfunction()
 #     [STATIC]
 #     [DEPENDS dep1 ...]
 #     [LINK_LIBS lib1 ...]
-#     [INTERFACE_LINK_LIBRARIES dep1 ...]
 #     [SWIFT_MODULE_DEPENDS dep1 ...]
 #     [LINK_COMPONENTS comp1 ...]
 #     [LINK_FLAGS flag1...]
@@ -1365,7 +1364,6 @@ function(add_swift_host_library name)
   set(single_parameter_options)
   set(multiple_parameter_options
         DEPENDS
-        INTERFACE_LINK_LIBRARIES
         LINK_FLAGS
         LINK_LIBS
         LINK_COMPONENTS)
@@ -1395,7 +1393,6 @@ function(add_swift_host_library name)
     LINK_LIBRARIES ${ASHL_LINK_LIBS}
     LLVM_COMPONENT_DEPENDS ${ASHL_LINK_COMPONENTS}
     LINK_FLAGS ${ASHL_LINK_FLAGS}
-    INTERFACE_LINK_LIBRARIES ${ASHL_INTERFACE_LINK_LIBRARIES}
     INSTALL_IN_COMPONENT "dev"
     )
 
