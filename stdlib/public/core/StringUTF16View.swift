@@ -200,23 +200,6 @@ extension String {
   public init(_ utf16: UTF16View) {
     self.init(utf16._guts)
   }
-
-  #if _runtime(_ObjC)
-  // These may become less important once <rdar://problem/19255291> is addressed.
-  @available(
-    *, unavailable,
-    message: "Indexing a String's UTF16View requires a String.UTF16View.Index, which can be constructed from Int when Foundation is imported")
-  public subscript(i: Int) -> UTF16.CodeUnit {
-    Builtin.unreachable()
-  }
-
-  @available(
-    *, unavailable,
-    message: "Slicing a String's UTF16View requires a Range<String.UTF16View.Index>, String.UTF16View.Index can be constructed from Int when Foundation is imported")
-  public subscript(bounds: Range<Int>) -> UTF16View {
-    Builtin.unreachable()
-  }
-#endif
 }
 
 // Index conversions
