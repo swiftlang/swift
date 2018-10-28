@@ -3,9 +3,10 @@ add_swift_host_library(swiftDemangle
                     SwiftDemangle.cpp
                     MangleHack.cpp
                   LINK_LIBRARIES
-                    swiftDemangling
-                  C_COMPILE_FLAGS
-                    -DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1)
+                    swiftDemangling)
+target_compile_definitions(swiftDemangle
+                           PRIVATE
+                             LLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1)
 
 swift_install_in_component(compiler
     TARGETS swiftDemangle
