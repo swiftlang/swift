@@ -859,7 +859,7 @@ extension String: _ExpressibleByBuiltinStringLiteral {
       self = String(_StringGuts(smol))
       return
     }
-    self.init(_StringGuts(bufPtr, isKnownASCII: Bool(isASCII)))
+    self.init(_StringGuts(bufPtr, isASCII: Bool(isASCII)))
   }
 }
 

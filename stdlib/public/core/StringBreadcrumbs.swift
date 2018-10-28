@@ -55,6 +55,8 @@ internal final class _StringBreadcrumbs {
 
     self.utf16Length = i
     _sanityCheck(self.crumbs.count == 1 + (self.utf16Length / stride))
+
+    _invariantCheck()
   }
 }
 
@@ -92,6 +94,14 @@ extension _StringBreadcrumbs {
 
     return (crumb, lowerBound &* stride)
   }
+
+  #if !INTERNAL_CHECKS_ENABLED
+  @nonobjc @inline(__always) internal func _invariantCheck() {}
+  #else
+  @nonobjc @inline(never) @_effects(releasenone)
+  internal func _invariantCheck() {
+  }
+  #endif // INTERNAL_CHECKS_ENABLED
 }
 
 extension _StringGuts {

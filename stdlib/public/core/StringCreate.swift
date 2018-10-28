@@ -12,17 +12,33 @@
 // String Creation Helpers
 //===----------------------------------------------------------------------===//
 
+internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
+  // NOTE: Avoiding for-in syntax to avoid bounds checks
+  //
+  // TODO(UTF8 perf): Vectorize and/or incorporate into validity checking,
+  // perhaps both.
+  //
+  let ptr = input.baseAddress._unsafelyUnwrappedUnchecked
+  var i = 0
+  while i < input.count {
+    guard ptr[i] <= 0x7F else { return false }
+    i &+= 1
+  }
+  return true
+}
+
 extension String {
   @usableFromInline
   internal static func _fromASCII(
     _ input: UnsafeBufferPointer<UInt8>
   ) -> String {
+    _sanityCheck(_allASCII(input), "not actually ASCII")
+
     if let smol = _SmallString(input) {
       return String(_StringGuts(smol))
     }
 
-    // TODO(UTF8): Do we want to do remember ASCII-ness?
-    let storage = _StringStorage.create(initializingFrom: input)
+    let storage = _StringStorage.create(initializingFrom: input, isASCII: true)
     return storage.asString
   }
 
@@ -73,8 +89,9 @@ extension String {
       return String(_StringGuts(smol))
     }
 
-    // TODO(UTF8): Do we want to do an ascii scan?
-    let storage = _StringStorage.create(initializingFrom: input)
+    let isASCII = false // TODO: _allASCII(input)
+    let storage = _StringStorage.create(
+      initializingFrom: input, isASCII: isASCII)
     return storage.asString
   }
 

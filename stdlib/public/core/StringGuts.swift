@@ -59,14 +59,14 @@ extension _StringGuts {
   }
 
   @inlinable @inline(__always)
-  internal init(_ bufPtr: UnsafeBufferPointer<UInt8>, isKnownASCII: Bool) {
-    self.init(_StringObject(immortal: bufPtr, isASCII: isKnownASCII))
+  internal init(_ bufPtr: UnsafeBufferPointer<UInt8>, isASCII: Bool) {
+    self.init(_StringObject(immortal: bufPtr, isASCII: isASCII))
   }
 
   @inlinable @inline(__always)
   internal init(_ storage: _StringStorage) {
     // TODO(UTF8): We should probably store perf flags on the storage's capacity
-    self.init(_StringObject(storage, isASCII: false))
+    self.init(_StringObject(storage))
   }
 
   internal init(_ storage: _SharedStringStorage) {
@@ -83,9 +83,14 @@ extension _StringGuts {
     self.init(_StringObject(storage, isASCII: false))
   }
 
-  internal init(cocoa: AnyObject, providesFastUTF8: Bool, length: Int) {
+  internal init(
+    cocoa: AnyObject, providesFastUTF8: Bool, isASCII: Bool, length: Int
+  ) {
     self.init(_StringObject(
-      cocoa: cocoa, providesFastUTF8: providesFastUTF8, length: length))
+      cocoa: cocoa,
+      providesFastUTF8: providesFastUTF8,
+      isASCII: isASCII,
+      length: length))
   }
 }
 
@@ -99,7 +104,7 @@ extension _StringGuts {
   internal var isEmpty: Bool { @inline(__always) get { return count == 0 } }
 
   @inlinable
-  internal var isKnownASCII: Bool  {
+  internal var isASCII: Bool  {
     @inline(__always) get { return _object.isASCII }
   }
 

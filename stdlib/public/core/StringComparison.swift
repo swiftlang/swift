@@ -88,7 +88,7 @@ internal func _compareStringsCanonical(
     return .equal
   }
   
-  if left.isKnownASCII && right.isKnownASCII {
+  if left.isASCII && right.isASCII {
     return left.withFastUTF8 { l in
       return right.withFastUTF8 { r in 
         return _StringComparison(signedNotation: l.compareASCII(to: r))

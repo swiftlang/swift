@@ -44,7 +44,7 @@ extension String {
 extension _StringGuts {
   internal func _classify() -> _StringRepresentation {
     var result = _StringRepresentation(
-      _isASCII: self.isKnownASCII,
+      _isASCII: self.isASCII,
       _count: self.count,
       _capacity: nativeCapacity ?? 0,
       _form: ._small

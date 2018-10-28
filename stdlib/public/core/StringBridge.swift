@@ -60,25 +60,6 @@ internal func _cocoaStringCopyCharacters(
     destination)
 }
 
-
-@_effects(releasenone)
-internal func _cocoaStringSlice(
-  _ target: _CocoaString, _ bounds: Range<Int>
-) -> _CocoaString {
-  let cfSelf: _swift_shims_CFStringRef = target
-
-  _sanityCheck(
-    _swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
-    "Known contiguously stored strings should already be converted to Swift")
-
-  let cfResult = _swift_stdlib_CFStringCreateWithSubstring(
-    nil, cfSelf, _swift_shims_CFRange(
-      location: bounds.lowerBound, length: bounds.count)) as AnyObject
-
-  return cfResult
-}
-
-
 @_effects(readonly)
 internal func _cocoaStringSubscript(
   _ target: _CocoaString, _ position: Int
@@ -91,10 +72,10 @@ internal func _cocoaStringSubscript(
 // Conversion from NSString to Swift's native representation
 //
 
-internal var kCFStringEncodingASCII : _swift_shims_CFStringEncoding {
+private var kCFStringEncodingASCII : _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x0600 }
 }
-internal var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding {
+private var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x8000100 }
 }
 
@@ -115,6 +96,7 @@ internal func _bridgeTagged(
   return length == numCharWritten ? count : nil
 }
 
+@_effects(releasenone) // @opaque
 internal func _cocoaUTF8Pointer(_ str: _CocoaString) -> UnsafePointer<UInt8>? {
   // TODO(UTF8): Is there a better interface here? This requires nul
   // termination and may assume ASCII.
@@ -125,23 +107,25 @@ internal func _cocoaUTF8Pointer(_ str: _CocoaString) -> UnsafePointer<UInt8>? {
   return ptr._asUInt8
 }
 
-@_effects(readonly)
-internal func _getCocoaStringPointer(
-  _ cfImmutableValue: _CocoaString
-) -> (UnsafeRawPointer?, isUTF16: Bool)  {
-  let nulTerminatedASCII = _cocoaUTF8Pointer(cfImmutableValue)
+private enum CocoaStringPointer {
+  case ascii(UnsafePointer<UInt8>)
+  case utf8(UnsafePointer<UInt8>)
+  case utf16(UnsafePointer<UInt16>)
+  case none
+}
 
-  // start will hold the base pointer of contiguous storage, if it
-  // is found.
-  var start: UnsafeRawPointer?
-  let isUTF16 = (nulTerminatedASCII == nil)
-  if isUTF16 {
-    let utf16Buf = _swift_stdlib_CFStringGetCharactersPtr(cfImmutableValue)
-    start = UnsafeRawPointer(utf16Buf)
-  } else {
-    start = UnsafeRawPointer(nulTerminatedASCII)
+@_effects(readonly)
+private func _getCocoaStringPointer(
+  _ cfImmutableValue: _CocoaString
+) -> CocoaStringPointer {
+  if let utf8Ptr = _cocoaUTF8Pointer(cfImmutableValue) {
+    // TODO(UTF8 perf): Remember Cocoa ASCII-ness
+    return .utf8(utf8Ptr)
   }
-  return (start, isUTF16: isUTF16)
+  if let utf16Ptr = _swift_stdlib_CFStringGetCharactersPtr(cfImmutableValue) {
+    return .utf16(utf16Ptr)
+  }
+  return .none
 }
 
 @usableFromInline
@@ -170,13 +154,19 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
     return _StringGuts(_SmallString(taggedCocoa: immutableCopy))
   }
 
-  let (start, isUTF16) = _getCocoaStringPointer(immutableCopy)
+  let (fastUTF8, isASCII): (Bool, Bool)
+  switch _getCocoaStringPointer(immutableCopy) {
+    case .ascii(_): (fastUTF8, isASCII) = (true, true)
+    case .utf8(_): (fastUTF8, isASCII) = (true, false)
+    default:  (fastUTF8, isASCII) = (false, false)
+  }
   let length = _stdlib_binary_CFStringGetLength(immutableCopy)
 
-  // Detect fast-UTF8 Cocoa
-  let fastUTF8 = !isUTF16 && start != nil
   return _StringGuts(
-    cocoa: immutableCopy, providesFastUTF8: fastUTF8, length: length)
+    cocoa: immutableCopy,
+    providesFastUTF8: fastUTF8,
+    isASCII: isASCII,
+    length: length)
 }
 
 extension String {
@@ -195,7 +185,7 @@ extension String {
     // other such visitors.
     if _guts._object.isSmall {
       return _guts._object.asSmallString.withUTF8 { bufPtr in
-        // TODO(UTF8 perf): worth isKnownASCII check for different encoding?
+        // TODO(UTF8 perf): worth isASCII check for different encoding?
         return _swift_stdlib_CFStringCreateWithBytes(
             nil, bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
             bufPtr.count,
@@ -204,7 +194,9 @@ extension String {
       }
     }
     if _guts._object.isImmortal {
-      return _SharedStringStorage(immortal: _guts._object.fastUTF8)
+      return _SharedStringStorage(
+        immortal: _guts._object.fastUTF8.baseAddress!,
+        countAndFlags: _guts._object._countAndFlags)
     }
 
     _sanityCheck(_guts._object.hasObjCBridgeableObject,

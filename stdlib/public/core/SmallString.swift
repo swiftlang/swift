@@ -112,7 +112,7 @@ extension _SmallString {
   internal func _invariantCheck() {
     // Avoid `asStringObject`, which triggers more invariant checks (runtime)
     var _object = _StringObject(zero:())
-    _object._otherBits = _storage.0
+    _object._countAndFlags = _StringObject.CountAndFlags(raw: _storage.0)
     _object._object = Builtin.reinterpretCast(_storage.1)
     _sanityCheck(_object.smallCount <= _SmallString.capacity)
     _sanityCheck(_object.smallIsASCII == computeIsASCII())
