@@ -2385,43 +2385,43 @@ macro(add_swift_lib_subdirectory name)
 endmacro()
 
 function(add_swift_host_tool executable)
-  set(ADDSWIFTHOSTTOOL_multiple_parameter_options
+  set(ASHT_multiple_parameter_options
         SWIFT_COMPONENT
         COMPILE_FLAGS
         DEPENDS
         SWIFT_MODULE_DEPENDS)
 
   cmake_parse_arguments(
-      ADDSWIFTHOSTTOOL # prefix
+      ASHT # prefix
       "" # options
       "" # single-value args
-      "${ADDSWIFTHOSTTOOL_multiple_parameter_options}" # multi-value args
+      "${ASHT_multiple_parameter_options}" # multi-value args
       ${ARGN})
 
   # Configure variables for this subdirectory.
   set(VARIANT_SUFFIX "-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
   set(MODULE_VARIANT_SUFFIX "-swiftmodule${VARIANT_SUFFIX}")
 
-  foreach(mod ${ADDSWIFTHOSTTOOL_SWIFT_MODULE_DEPENDS})
-    list(APPEND ADDSWIFTHOSTTOOL_DEPENDS "swift${mod}${MODULE_VARIANT_SUFFIX}")
-    list(APPEND ADDSWIFTHOSTTOOL_DEPENDS "swift${mod}${VARIANT_SUFFIX}")
+  foreach(mod ${ASHT_SWIFT_MODULE_DEPENDS})
+    list(APPEND ASHT_DEPENDS "swift${mod}${MODULE_VARIANT_SUFFIX}")
+    list(APPEND ASHT_DEPENDS "swift${mod}${VARIANT_SUFFIX}")
   endforeach()
 
   # Create the executable rule.
   add_swift_executable(
     ${executable} 
-    ${ADDSWIFTHOSTTOOL_UNPARSED_ARGUMENTS}
-    DEPENDS ${ADDSWIFTHOSTTOOL_DEPENDS}
-    COMPILE_FLAGS ${ADDSWIFTHOSTTOOL_COMPILE_FLAGS}
+    ${ASHT_UNPARSED_ARGUMENTS}
+    DEPENDS ${ASHT_DEPENDS}
+    COMPILE_FLAGS ${ASHT_COMPILE_FLAGS}
   )
 
   # And then create the install rule if we are asked to.
-  if (ADDSWIFTHOSTTOOL_SWIFT_COMPONENT)
-    swift_install_in_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
+  if (ASHT_SWIFT_COMPONENT)
+    swift_install_in_component(${ASHT_SWIFT_COMPONENT}
       TARGETS ${executable}
       RUNTIME DESTINATION bin)
 
-    swift_is_installing_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
+    swift_is_installing_component(${ASHT_SWIFT_COMPONENT}
       is_installing)
   
     if(NOT is_installing)
