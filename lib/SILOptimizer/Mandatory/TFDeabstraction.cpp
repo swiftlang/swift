@@ -2880,11 +2880,8 @@ void TFDeabstractionPass::run() {
   // TODO: Rework the heuristics in inlineCalls() to be smarter.  In an ideal
   // world, we would be lazy about inlining, and only inline calls due to actual
   // inter-op value uses.
-  if (module->getSwiftModule() == tfModule) {
-    for (auto &fn : *module)
-      fn.skippedByDeabstraction = true;
+  if (module->getSwiftModule() == tfModule)
     return;
-  }
 
   TensorFunctionClassifier tfc;
   ConstExprEvaluator constantEvaluator(*module);
@@ -2897,10 +2894,8 @@ void TFDeabstractionPass::run() {
   for (auto &fn : *module) {
     // There's no point in deabstracting things defined in other modules,
     // because we won't lower them.
-    if (fn.isAvailableExternally()) {
-      fn.skippedByDeabstraction = true;
+    if (fn.isAvailableExternally())
       continue;
-    }
 
     // If this function is a building block of larger tensor programs (e.g.
     // the ops defined in the TensorFlow module), then don't transform it in
@@ -2913,10 +2908,8 @@ void TFDeabstractionPass::run() {
     // Once it can handle non-deabstracted code, turn deabstraction off entirely
     // in dynamic compilation mode.
     if (!tfc.shouldBePartitioned(&fn, /*forceTFFunctions*/false) &&
-        !llvm::TFDynamicCompilation) {
-      fn.skippedByDeabstraction = true;
+        !llvm::TFDynamicCompilation)
       continue;
-    }
 
     // If something crashes, make sure the pretty stack trace says what we
     // were doing.
