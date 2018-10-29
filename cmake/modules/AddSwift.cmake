@@ -2385,16 +2385,15 @@ macro(add_swift_lib_subdirectory name)
 endmacro()
 
 function(add_swift_host_tool executable)
-  set(ASHT_multiple_parameter_options
-        SWIFT_COMPONENT
-        DEPENDS)
+  set(options)
+  set(single_parameter_options SWIFT_COMPONENT)
+  set(multiple_parameter_options DEPENDS)
 
-  cmake_parse_arguments(
-      ASHT # prefix
-      "" # options
-      "" # single-value args
-      "${ASHT_multiple_parameter_options}" # multi-value args
-      ${ARGN})
+  cmake_parse_arguments(ASHT
+                        "${options}"
+                        "${single_parameter_options}"
+                        "${multiple_parameter_options}"
+                        ${ARGN})
 
   # Create the executable rule.
   add_swift_executable(
