@@ -12,16 +12,97 @@
 
 internal
 struct _NormalizedCodeUnitIterator: IteratorProtocol {
-  var segmentBuffer = _FixedArray16<CodeUnit>(allZeros:())
-  var overflowBuffer: [CodeUnit]? = nil
-  var normalizationBuffer: [CodeUnit]? = nil
+  internal typealias CodeUnit = UInt16
+  var segmentBuffer = NormalizationBuffer()
+  var intermediateBuffer = NormalizationBuffer()
   var source: _SegmentSource
-  var segmentBufferIndex = 0
-  var segmentBufferCount = 0
-  var overflowBufferIndex = 0
-  var overflowBufferCount = 0
   
-  typealias CodeUnit = UInt16
+  internal struct NormalizationBuffer {  
+    enum Mode {
+      case stack, heap
+    }
+    var stackStorage = _FixedArray16<CodeUnit>(allZeros: ())
+    var heapStorage: [CodeUnit] = []
+    var count = 0
+    var readIndex = 0
+    var mode: Mode = .stack
+    
+    internal mutating func reset() {
+      count = 0
+      readIndex = 0
+    }
+    
+    internal var isStackBased: Bool {
+      return mode == .stack
+    }
+    
+    internal var canRead: Bool {
+      return readIndex < count
+    }
+    
+    internal mutating func read() -> CodeUnit {
+      _sanityCheck(canRead)
+      
+      defer { readIndex += 1 }
+      return self[readIndex]
+    }
+    
+    internal mutating func promote(toSize size: Int, multiplier: Int = 1) {
+      if isStackBased {
+        heapStorage = [CodeUnit](repeating: 0, count: (size + count) * multiplier)
+        for i in 0..<count {
+          heapStorage[i] = stackStorage[i]
+        }
+        mode = .heap
+      } else {
+        fatalError("Invariant violated, a single heap allocation buffer is sufficient")
+      }
+    }
+    
+    internal subscript(index: Int) -> CodeUnit {
+      _sanityCheck(index < count)
+      _sanityCheck(index >= 0)
+      if isStackBased {
+        return stackStorage[index]
+      } else {
+        return heapStorage[index]
+      }
+    }
+    
+    // Comment explaining the contract
+    mutating func fill(promotionSize: Int, using f: (UnsafeMutableBufferPointer<CodeUnit>) throws -> Int?) rethrows {
+      if isStackBased { 
+        if let filled = try stackStorage.withUnsafeMutableBufferPointer({ try f($0) }) {
+          count = filled
+          return
+        }
+        promote(toSize: promotionSize)
+      }
+      
+      guard let filled = try heapStorage.withUnsafeMutableBufferPointer({ try f($0) }) else {
+        fatalError()
+      }
+      count = filled
+    }
+    
+    internal mutating func withUnsafeBufferPointer(
+      _ f: (UnsafeBufferPointer<CodeUnit>) throws -> Void
+    ) rethrows {
+      if isStackBased {
+        try stackStorage.withUnsafeBufferPointer { arrayBuffer in
+          let slice = arrayBuffer[0..<count]
+          let buffer = UnsafeBufferPointer(rebasing: slice)
+          try f(buffer)
+        }
+      } else {
+        try heapStorage.withUnsafeBufferPointer { arrayBuffer in 
+          let slice = arrayBuffer[0..<count]
+          let buffer = UnsafeBufferPointer(rebasing: slice)
+          try f(buffer)
+        }
+      }
+    }
+  }
   
   init<Source: BidirectionalCollection>
     (_ collection: Source)
@@ -141,86 +222,38 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
     }
   }
   
-  mutating func next() -> CodeUnit? {
-    if segmentBufferCount == segmentBufferIndex {
-      segmentBuffer = _FixedArray16<CodeUnit>(allZeros:())
-      segmentBufferCount = 0
-      segmentBufferIndex = 0
+  private mutating func fillIntermediateBuffer() {
+    intermediateBuffer.fill(promotionSize: source.remaining) {
+      return source.tryFill(buffer: $0)
     }
-    
-    if overflowBufferCount == overflowBufferIndex {
-      overflowBufferCount = 0
-      overflowBufferIndex = 0
-    }
-    
-    if source.remaining <= 0 
-    && segmentBufferCount == 0 
-    && overflowBufferCount == 0 {
-      // Our source of code units to normalize is empty and our buffers from 
-      // previous normalizations are also empty.
-      return nil
-    }
-    
-    if segmentBufferCount == 0 && overflowBufferCount == 0 {
-      //time to fill a buffer if possible. Otherwise we are done, return nil
-      // Normalize segment, and then compare first code unit
-      var intermediateBuffer = _FixedArray16<CodeUnit>(allZeros:())
-      if overflowBuffer == nil, 
-         let filled = source.tryFill(buffer: &intermediateBuffer) 
-      {
-        guard let count = _tryNormalize(
-          _castOutputBuffer(&intermediateBuffer, 
-          endingAt: filled), 
-          into: &segmentBuffer
-        ) 
-        else {
-          fatalError("Output buffer was not big enough, this should not happen")
-        }
-        segmentBufferCount = count
-      } else {
-        let size = source.remaining * _Normalization._maxNFCExpansionFactor
-        if overflowBuffer == nil {
-          overflowBuffer = Array(repeating: 0, count: size)
-          normalizationBuffer = Array(repeating:0, count: size)
-        }
-        
-        guard let count = normalizationBuffer!.withUnsafeMutableBufferPointer({
-          (normalizationBufferPtr) -> Int? in
-          guard let filled = source.tryFill(buffer: normalizationBufferPtr) 
-          else {
-            fatalError("Invariant broken, buffer should have space")
-          }
-          return overflowBuffer!.withUnsafeMutableBufferPointer { 
-            (overflowBufferPtr) -> Int? in
-            return _tryNormalize(
-              UnsafeBufferPointer( rebasing: normalizationBufferPtr[..<filled]), 
-              into: overflowBufferPtr
-            )
-          }
-        }) else {
-          fatalError("Invariant broken, overflow buffer should have space")
-        }
-        
-        overflowBufferCount = count
+  }
+  
+  private mutating func normalizeIntoSegmentBuffer() {
+    let size = source.remaining + intermediateBuffer.count 
+      * _Normalization._maxNFCExpansionFactor
+    intermediateBuffer.withUnsafeBufferPointer { intermediateBuff in
+      segmentBuffer.fill(promotionSize: size) {
+        return _tryNormalize(intermediateBuff, into: $0)
       }
-    } 
-    
-    //exactly one of the buffers should have code units for us to return
-    _sanityCheck((segmentBufferCount == 0) 
-              != ((overflowBuffer?.count ?? 0) == 0))
-    
-    if segmentBufferIndex < segmentBufferCount {
-      let index = segmentBufferIndex
-      segmentBufferIndex += 1
-      return segmentBuffer[index]
-    } else if overflowBufferIndex < overflowBufferCount {
-      _sanityCheck(overflowBufferIndex < overflowBuffer!.count)
-      let index = overflowBufferIndex
-      overflowBufferIndex += 1
-      return overflowBuffer![index]
-    } else {
-        return nil
     }
+  }
+  
+  internal mutating func next() -> CodeUnit? {    
+    if !segmentBuffer.canRead {
+      if source.remaining <= 0{
+        // Our source of code units to normalize is empty and our buffer from 
+        // previous normalizations is also empty.
+        return nil
+      }
+    
+      //time to fill the buffer if possible. Otherwise we are done, return nil
+      // Normalize segment, and then compare first code unit
+      segmentBuffer.reset()
+      fillIntermediateBuffer()
+      normalizeIntoSegmentBuffer()
+    }
+    
+    return segmentBuffer.read()
   }
 }
 
