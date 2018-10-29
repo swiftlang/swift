@@ -383,6 +383,25 @@ extension Double : _CVarArgPassedAsDouble, _CVarArgAligned {
   }
 }
 
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+extension Float80 : CVarArg, _CVarArgAligned {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs.
+  @inlinable // FIXME(sil-serialize-all)
+  public var _cVarArgEncoding: [Int] {
+    return _encodeBitsAsWords(self)
+  }
+  
+  /// Returns the required alignment in bytes of
+  /// the value returned by `_cVarArgEncoding`.
+  @inlinable // FIXME(sil-serialize-all)
+  public var _cVarArgAlignment: Int {
+    // FIXME: alignof differs from the ABI alignment on some architectures
+    return MemoryLayout.alignment(ofValue: self)
+  }
+}
+#endif
+
 #if arch(x86_64) || arch(s390x)
 
 /// An object that can manage the lifetime of storage backing a
