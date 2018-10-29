@@ -7,6 +7,12 @@
 
 // RUN: not %target-swift-frontend %s -emit-sil
 
+// One day, if we're lucky, this test will start failing by emitting SIL
+// instead of diagnosing an error. If you are reading this comment because that
+// joyous day has finally arrived, please remove the "not" in the RUN line.
+// Until then, we will at least make sure we don't regress and start crashing
+// again.
+
 func f() -> Int {
     return { a in
         { [unowned a] b in
