@@ -186,8 +186,8 @@ extension String.UTF16View: BidirectionalCollection {
       return _foreignIndex(i, offsetBy: n)
     }
 
-    let lowerOffset = _getOffset(for: i)
-    let result = _getIndex(for: lowerOffset + n)
+    let lowerOffset = _nativeGetOffset(for: i)
+    let result = _nativeGetIndex(for: lowerOffset + n)
     return result
   }
 
@@ -199,8 +199,8 @@ extension String.UTF16View: BidirectionalCollection {
       return _foreignIndex(i, offsetBy: n, limitedBy: limit)
     }
 
-    let iOffset = _getOffset(for: i)
-    let limitOffset = _getOffset(for: limit)
+    let iOffset = _nativeGetOffset(for: i)
+    let limitOffset = _nativeGetOffset(for: limit)
 
     // If distance < 0, limit has no effect if it is greater than i.
     if _slowPath(n < 0 && limit <= i && limitOffset > iOffset + n) {
@@ -211,7 +211,7 @@ extension String.UTF16View: BidirectionalCollection {
       return nil
     }
 
-    let result = _getIndex(for: iOffset + n)
+    let result = _nativeGetIndex(for: iOffset + n)
     return result
   }
 
@@ -221,8 +221,8 @@ extension String.UTF16View: BidirectionalCollection {
       return _foreignDistance(from: start, to: end)
     }
 
-    let lower = _getOffset(for: start)
-    let upper = _getOffset(for: end)
+    let lower = _nativeGetOffset(for: start)
+    let upper = _nativeGetOffset(for: end)
     return upper &- lower
   }
 
@@ -231,7 +231,7 @@ extension String.UTF16View: BidirectionalCollection {
     if _slowPath(_guts.isForeign) {
       return _foreignCount()
     }
-    return _getOffset(for: endIndex)
+    return _nativeGetOffset(for: endIndex)
   }
 
   /// Accesses the code unit at the given position.
@@ -458,7 +458,7 @@ extension String.UTF16View {
 
   @usableFromInline
   @_effects(releasenone)
-  internal func _getOffset(for idx: Index) -> Int {
+  internal func _nativeGetOffset(for idx: Index) -> Int {
     // Trivial and common: start
     if idx == startIndex { return 0 }
 
@@ -478,7 +478,7 @@ extension String.UTF16View {
 
   @usableFromInline
   @_effects(releasenone)
-  internal func _getIndex(for offset: Int) -> Index {
+  internal func _nativeGetIndex(for offset: Int) -> Index {
     // Trivial and common: start
     if offset == 0 { return startIndex }
 
@@ -493,7 +493,40 @@ extension String.UTF16View {
     // Otherwise, find the nearest lower-bound breadcrumb and advance that
     let (crumb, remaining) = breadcrumbsPtr.pointee.getBreadcrumb(
       forOffset: offset)
-    return _index(crumb, offsetBy: remaining)
+    if remaining == 0 { return crumb }
+
+    return _guts.withFastUTF8 { utf8 in
+      var readIdx = crumb.encodedOffset
+      var readEnd = utf8.count
+      _sanityCheck(readIdx < readEnd)
+
+      var utf16I = 0
+      let utf16End: Int = remaining
+
+      // Adjust for sub-scalar initial transcoding: If we're starting the scan
+      // at a trailing surrogate, then we set our starting count to be -1 so as
+      // offset counting the leading surrogate.
+      if crumb.transcodedOffset != 0 {
+        utf16I = -1
+      }
+
+      while true {
+        let len = _utf8ScalarLength(utf8[readIdx])
+        let utf16Len = len == 4 ? 2 : 1
+        utf16I &+= utf16Len
+
+        if utf16I >= utf16End {
+          // Uncommon: final sub-scalar transcoded offset
+          if _slowPath(utf16I > utf16End) {
+            _sanityCheck(utf16Len == 2)
+            return Index(encodedOffset: readIdx, transcodedOffset: 1)
+          }
+          return Index(encodedOffset: readIdx &+ len)
+        }
+
+        readIdx &+= len
+      }
+    }
   }
 }
 
