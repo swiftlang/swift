@@ -370,7 +370,12 @@ final class TestRunner {
 #endif
 
   private static func getResourceUtilization() -> rusage {
-    var u = rusage(); getrusage(RUSAGE_SELF, &u); return u
+#if canImport(Darwin)
+   let rusageSelf = RUSAGE_SELF
+#else
+   let rusageSelf = RUSAGE_SELF.rawValue
+#endif
+    var u = rusage(); getrusage(rusageSelf, &u); return u
   }
 
   /// Returns maximum resident set size (MAX_RSS) delta in bytes.
@@ -378,11 +383,22 @@ final class TestRunner {
   /// This method of estimating memory usage is valid only for executing single
   /// benchmark. That's why we don't worry about reseting the `baseline` in
   /// `resetMeasurements`.
+  ///
+  /// FIXME: This current implementation doesn't work on Linux. It is disabled
+  /// permanently to avoid linker errors. Feel free to fix.
   func measureMemoryUsage() -> Int? {
+#if os(Linux)
+    return nil
+#else
     guard c.logMemory else { return nil }
     let current = TestRunner.getResourceUtilization()
     let maxRSS = current.ru_maxrss - baseline.ru_maxrss
-    let pages = { maxRSS / sysconf(_SC_PAGESIZE) }
+#if canImport(Darwin)
+    let pageSize = _SC_PAGESIZE
+#else
+    let pageSize = Int32(_SC_PAGESIZE)
+#endif
+    let pages = { maxRSS / sysconf(pageSize) }
     func deltaEquation(_ stat: KeyPath<rusage, Int>) -> String {
       let b = baseline[keyPath: stat], c = current[keyPath: stat]
       return "\(c) - \(b) = \(c - b)"
@@ -394,6 +410,7 @@ final class TestRunner {
             VCS \(deltaEquation(\rusage.ru_nvcsw))
         """)
     return maxRSS
+#endif
   }
 
   private func startMeasurement() {
