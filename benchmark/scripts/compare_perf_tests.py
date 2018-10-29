@@ -51,6 +51,14 @@ class Sample(namedtuple('Sample', 'i num_iters runtime')):
         return 's({0.i!r}, {0.num_iters!r}, {0.runtime!r})'.format(self)
 
 
+class Yield(namedtuple('Yield', 'before_sample after')):
+    u"""Meta-measurement of when the Benchmark_X voluntarily yielded process.
+
+    `before_sample`: index of measurement taken just after returning from yield
+    `after`: time elapsed since the previous yield in microseconds (μs)
+    """
+
+
 class PerformanceTestSamples(object):
     """Collection of runtime samples from the benchmark execution.
 
@@ -69,7 +77,7 @@ class PerformanceTestSamples(object):
             self.add(sample)
 
     def __str__(self):
-        """Text summary of benchmark statisctics."""
+        """Text summary of benchmark statistics."""
         return (
             '{0.name!s} n={0.count!r} '
             'Min={0.min!r} Q1={0.q1!r} M={0.median!r} Q3={0.q3!r} '
@@ -211,31 +219,60 @@ class PerformanceTestResult(object):
     Reported by the test driver (Benchmark_O, Benchmark_Onone, Benchmark_Osize
     or Benchmark_Driver).
 
-    It depends on the log format emitted by the test driver in the form:
-    #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),MAX_RSS(B)
-
-    The last column, MAX_RSS, is emitted only for runs instrumented by the
-    Benchmark_Driver to measure rough memory use during the execution of the
-    benchmark.
+    It suppors 2 log formats emitted by the test driver. Legacy format with
+    statistics for normal distribution (MEAN, SD):
+        #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),MAX_RSS(B)
+    And new quantiles format with variable number of columns:
+        #,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs)
+        #,TEST,SAMPLES,MIN(μs),Q1(μs),Q2(μs),Q3(μs),MAX(μs),MAX_RSS(B)
+    The number of columns between MIN and MAX depends on the test driver's
+    `--quantile`parameter. In both cases, the last column, MAX_RSS is optional.
     """
 
-    def __init__(self, csv_row):
-        """Initialize from a row with 8 or 9 columns with benchmark summary.
+    def __init__(self, csv_row, quantiles=False, memory=False, delta=False):
+        """Initialize from a row of multiple columns with benchmark summary.
 
         The row is an iterable, such as a row provided by the CSV parser.
         """
-        self.test_num = csv_row[0]      # Ordinal number of the test
-        self.name = csv_row[1]          # Name of the performance test
-        self.num_samples = (            # Number of measurement samples taken
-            int(csv_row[2]))
-        self.min = int(csv_row[3])      # Minimum runtime (μs)
-        self.max = int(csv_row[4])      # Maximum runtime (μs)
-        self.mean = float(csv_row[5])   # Mean (average) runtime (μs)
-        self.sd = float(csv_row[6])     # Standard Deviation (μs)
-        self.median = int(csv_row[7])   # Median runtime (μs)
-        self.max_rss = (                # Maximum Resident Set Size (B)
-            int(csv_row[8]) if len(csv_row) > 8 else None)
-        self.samples = None
+        self.test_num = csv_row[0]          # Ordinal number of the test
+        self.name = csv_row[1]              # Name of the performance test
+        self.num_samples = int(csv_row[2])  # Number of measurements taken
+
+        if quantiles:  # Variable number of columns representing quantiles
+            runtimes = csv_row[3:-1] if memory else csv_row[3:]
+            if delta:
+                runtimes = [int(x) if x else 0 for x in runtimes]
+                runtimes = reduce(lambda l, x: l.append(l[-1] + x) or  # runnin
+                                  l if l else [x], runtimes, None)     # total
+            num_values = len(runtimes)
+            if self.num_samples < num_values:  # remove repeated samples
+                quantile = num_values - 1
+                qs = [float(i) / float(quantile) for i in range(0, num_values)]
+                indices = [max(0, int(ceil(self.num_samples * float(q))) - 1)
+                           for q in qs]
+                runtimes = [runtimes[indices.index(i)]
+                            for i in range(0, self.num_samples)]
+
+            self.samples = PerformanceTestSamples(
+                self.name,
+                [Sample(None, None, int(runtime)) for runtime in runtimes])
+            self.samples.exclude_outliers(top_only=True)
+            sams = self.samples
+            self.min, self.max, self.median, self.mean, self.sd = \
+                sams.min, sams.max, sams.median, sams.mean, sams.sd
+            self.max_rss = (                # Maximum Resident Set Size (B)
+                int(csv_row[-1]) if memory else None)
+        else:  # Legacy format with statistics for normal distribution.
+            self.min = int(csv_row[3])      # Minimum runtime (μs)
+            self.max = int(csv_row[4])      # Maximum runtime (μs)
+            self.mean = float(csv_row[5])   # Mean (average) runtime (μs)
+            self.sd = float(csv_row[6])     # Standard Deviation (μs)
+            self.median = int(csv_row[7])   # Median runtime (μs)
+            self.max_rss = (                # Maximum Resident Set Size (B)
+                int(csv_row[8]) if len(csv_row) > 8 else None)
+            self.samples = None
+        self.yields = None
+        self.setup = None
 
     def __repr__(self):
         """Short summary for debugging purposes."""
@@ -253,6 +290,7 @@ class PerformanceTestResult(object):
         The use case here is comparing test results parsed from concatenated
         log files from multiple runs of benchmark driver.
         """
+        # Statistics
         if self.samples and r.samples:
             map(self.samples.add, r.samples.samples)
             sams = self.samples
@@ -266,8 +304,14 @@ class PerformanceTestResult(object):
                 (self.mean * self.num_samples) + (r.mean * r.num_samples)
             ) / float(self.num_samples + r.num_samples)
             self.num_samples += r.num_samples
-            self.max_rss = min(self.max_rss, r.max_rss)
-            self.median, self.sd = 0, 0
+            self.median, self.sd = None, None
+
+        # Metadata
+        def minimum(a, b):  # work around None being less than everything
+            return (min(filter(lambda x: x is not None, [a, b])) if any([a, b])
+                    else None)
+        self.max_rss = minimum(self.max_rss, r.max_rss)
+        self.setup = minimum(self.setup, r.setup)
 
 
 class ResultComparison(object):
@@ -307,39 +351,47 @@ class LogParser(object):
     def __init__(self):
         """Create instance of `LogParser`."""
         self.results = []
+        self.quantiles, self.delta, self.memory = False, False, False
         self._reset()
 
     def _reset(self):
         """Reset parser to the default state for reading a new result."""
-        self.samples, self.num_iters = [], 1
-        self.max_rss, self.mem_pages = None, None
+        self.samples, self.yields, self.num_iters = [], [], 1
+        self.setup, self.max_rss, self.mem_pages = None, None, None
         self.voluntary_cs, self.involuntary_cs = None, None
 
     # Parse lines like this
     # #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs)
-    results_re = re.compile(r'( *\d+[, \t]*[\w.]+[, \t]*' +
-                            r'[, \t]*'.join([r'[\d.]+'] * 6) +
-                            r'[, \t]*[\d.]*)')  # optional MAX_RSS(B)
+    results_re = re.compile(
+        r'( *\d+[, \t]+[\w.]+[, \t]+' +  # #,TEST
+        r'[, \t]+'.join([r'\d+'] * 2) +  # at least 2...
+        r'(?:[, \t]+\d*)*)')             # ...or more numeric columns
 
     def _append_result(self, result):
-        columns = result.split(',')
-        if len(columns) < 8:
-            columns = result.split()
-        r = PerformanceTestResult(columns)
-        if self.max_rss:
-            r.max_rss = self.max_rss
-            r.mem_pages = self.mem_pages
-            r.voluntary_cs = self.voluntary_cs
-            r.involuntary_cs = self.involuntary_cs
+        columns = result.split(',') if ',' in result else result.split()
+        r = PerformanceTestResult(
+            columns, quantiles=self.quantiles, memory=self.memory,
+            delta=self.delta)
+        r.setup = self.setup
+        r.max_rss = r.max_rss or self.max_rss
+        r.mem_pages = self.mem_pages
+        r.voluntary_cs = self.voluntary_cs
+        r.involuntary_cs = self.involuntary_cs
         if self.samples:
             r.samples = PerformanceTestSamples(r.name, self.samples)
             r.samples.exclude_outliers()
         self.results.append(r)
+        r.yields = self.yields or None
         self._reset()
 
     def _store_memory_stats(self, max_rss, mem_pages):
         self.max_rss = int(max_rss)
         self.mem_pages = int(mem_pages)
+
+    def _configure_format(self, header):
+        self.quantiles = 'MEAN' not in header
+        self.memory = 'MAX_RSS' in header
+        self.delta = '𝚫' in header
 
     # Regular expression and action to take when it matches the parsed line
     state_actions = {
@@ -354,6 +406,17 @@ class LogParser(object):
         (lambda self, i, runtime:
          self.samples.append(
              Sample(int(i), int(self.num_iters), int(runtime)))),
+
+        re.compile(r'\s+SetUp (\d+)'):
+        (lambda self, setup: setattr(self, 'setup', int(setup))),
+
+        re.compile(r'\s+Yielding after ~(\d+) μs'):
+        (lambda self, since_last_yield:
+            self.yields.append(
+                Yield(len(self.samples), int(since_last_yield)))),
+
+        re.compile(r'( *#[, \t]+TEST[, \t]+SAMPLES[, \t]+MIN.*)'):
+        _configure_format,
 
         # Environmental statistics: memory usage and context switches
         re.compile(r'\s+MAX_RSS \d+ - \d+ = (\d+) \((\d+) pages\)'):

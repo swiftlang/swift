@@ -96,15 +96,16 @@ class Test_parse_args(unittest.TestCase):
              "(choose from 'O', 'Onone', 'Osize')"],
             err.getvalue())
 
-    def test_iterations(self):
-        self.assertEquals(parse_args(['run']).iterations, 1)
-        self.assertEquals(parse_args(['run', '-i', '3']).iterations, 3)
+    def test_independent_samples(self):
+        self.assertEquals(parse_args(['run']).independent_samples, 1)
+        self.assertEquals(parse_args(['run', '-i', '3']).independent_samples,
+                          3)
         with captured_output() as (out, err):
             self.assertRaises(SystemExit,
                               parse_args, ['run', '-i', '-3'])
         self.assert_contains(
-            ['error:',
-             "argument -i/--iterations: invalid positive_int value: '-3'"],
+            ['error:', "argument -i/--independent-samples: " +
+             "invalid positive_int value: '-3'"],
             err.getvalue())
 
     def test_output_dir(self):
@@ -278,30 +279,40 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         self.subprocess_mock.assert_called_with(
             ('/benchmarks/Benchmark_O', 'b', '--memory'))
 
+    def test_report_quantiles(self):
+        """Use delta compression for quantile reports."""
+        self.driver.run('b', quantile=4)
+        self.subprocess_mock.assert_called_with(
+            ('/benchmarks/Benchmark_O', 'b', '--quantile=4', '--delta'))
+
     def test_run_benchmark_independent_samples(self):
-        self.driver.args.iterations = 3
+        """Extract up to 20 measurements from an independent run."""
+        self.driver.args.independent_samples = 3
         r = self.driver.run_independent_samples('b1')
         self.assertEquals(self.subprocess_mock.calls.count(
-            ('/benchmarks/Benchmark_O', 'b1', '--memory')), 3)
+            ('/benchmarks/Benchmark_O', 'b1', '--num-iters=1', '--memory',
+             '--quantile=20', '--delta')), 3)
         self.assertEquals(r.num_samples, 3)  # results are merged
 
     def test_run_and_log(self):
         def mock_run(test):
             self.assertEquals(test, 'b1')
             return PerformanceTestResult(
-                '3,b1,1,123,123,123,0,123,888'.split(','))
+                '3,b1,5,101,1,1,1,1,888'.split(','),
+                quantiles=True, delta=True, memory=True)
         driver = BenchmarkDriver(tests=['b1'], args=Stub(output_dir=None))
         driver.run_independent_samples = mock_run  # patching
 
         with captured_output() as (out, _):
             log = driver.run_and_log()
 
-        csv_log = '3,b1,1,123,123,123,0,123,888\n'
+        header = '#,TEST,SAMPLES,MIN(μs),Q1(μs),MEDIAN(μs),Q3(μs),MAX(μs),' +\
+            'MAX_RSS(B)\n'
+        csv_log = '3,b1,5,101,102,103,104,105,888\n'
         self.assertEquals(log, None)
         self.assertEquals(
             out.getvalue(),
-            '#,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),' +
-            'MAX_RSS(B)\n' +
+            header +
             csv_log +
             '\n' +
             'Total performance tests executed: 1\n')
@@ -309,13 +320,13 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         with captured_output() as (out, _):
             log = driver.run_and_log(csv_console=False)
 
-        self.assertEquals(log, csv_log)
+        self.assertEquals(log, header + csv_log)
         self.assertEquals(
             out.getvalue(),
-            '  # TEST                      SAMPLES MIN(μs) MAX(μs)' +
-            ' MEAN(μs) SD(μs) MEDIAN(μs) MAX_RSS(B)\n' +
-            '  3 b1                              1     123     123' +
-            '      123      0        123        888\n' +
+            '  # TEST                      SAMPLES MIN(μs) Q1(μs)' +
+            ' MEDIAN(μs) Q3(μs) MAX(μs) MAX_RSS(B)\n' +
+            '  3 b1                              5     101    102' +
+            '        103    104     105        888\n' +
             '\n' +
             'Total performance tests executed: 1\n')
 
@@ -410,9 +421,9 @@ class TestLoggingReportFormatter(unittest.TestCase):
         self.assertEquals(f.format(lr), 'INFO Hi!')
 
 
-def _PTR(min=700, mem_pages=1000):
+def _PTR(min=700, mem_pages=1000, setup=None):
     """Create PerformanceTestResult Stub."""
-    return Stub(min=min, mem_pages=mem_pages)
+    return Stub(min=min, mem_pages=mem_pages, setup=setup)
 
 
 def _run(test, num_samples=None, num_iters=None, verbose=None,
@@ -537,13 +548,18 @@ class TestBenchmarkDoctor(unittest.TestCase):
             self.logs['info'])
 
     def test_benchmark_runtime_range(self):
-        """Optimized benchmark should run in less then 2500 μs.
+        """Optimized benchmark should run in less then 1000 μs.
 
-        With runtimes less than 2500 μs there is better than 1:4 chance of
-        being interrupted in the middle of measurement due to elapsed 10 ms
-        quantum used by macos scheduler.
+        Even on calm machine, benchmark with runtime of 2500 μs has 1:4 chance
+        of being interrupted in the middle of measurement due to elapsed 10 ms
+        quantum used by macos scheduler. Linux scheduler's quantum is 6ms.
+        Driver yielding the process before the 10ms quantum elapses helped
+        a lot, but benchmarks with runtimes under 1ms usually exhibit a strong
+        mode which is best for accurate performance charaterization.
+        To minimize the number of involuntary context switches that corrupt our
+        measurements, we should strive to stay in the microbenchmark range.
 
-        Warn about longer runtime. Runtimes over half a second are an error.
+        Warn about longer runtime. Runtimes over 10ms are an error.
         """
         def measurements(name, runtime):
             return {'name': name,
@@ -553,7 +569,7 @@ class TestBenchmarkDoctor(unittest.TestCase):
         with captured_output() as (out, _):
             doctor = BenchmarkDoctor(self.args, BenchmarkDriverMock([]))
             doctor.analyze(measurements('Cheetah', 200))
-            doctor.analyze(measurements('Hare', 2501))
+            doctor.analyze(measurements('Hare', 1001))
             doctor.analyze(measurements('Tortoise', 500000))
             doctor.analyze({'name': 'OverheadTurtle',
                             'OverheadTurtle O i1a': _PTR(min=800000),
@@ -562,17 +578,17 @@ class TestBenchmarkDoctor(unittest.TestCase):
 
         self.assertIn('runtime: ', output)
         self.assertNotIn('Cheetah', output)
-        self.assert_contains(["'Hare' execution took at least 2501 μs."],
+        self.assert_contains(["'Hare' execution took at least 1001 μs."],
                              self.logs['warning'])
         self.assert_contains(
-            ["Decrease the workload of 'Hare' by a factor of 2, "
-             "to be less than 2500 μs."], self.logs['info'])
+            ["Decrease the workload of 'Hare' by a factor of 2 (10), "
+             "to be less than 1000 μs."], self.logs['info'])
         self.assert_contains(
             ["'Tortoise' execution took at least 500000 μs."],
             self.logs['error'])
         self.assert_contains(
-            ["Decrease the workload of 'Tortoise' by a factor of 256, "
-             "to be less than 2500 μs."], self.logs['info'])
+            ["Decrease the workload of 'Tortoise' by a factor of 512 (1000), "
+             "to be less than 1000 μs."], self.logs['info'])
         self.assert_contains(
             ["'OverheadTurtle' execution took at least 600000 μs"
              " (excluding the setup overhead)."],
@@ -604,6 +620,29 @@ class TestBenchmarkDoctor(unittest.TestCase):
         self.assert_contains(
             ["Move initialization of benchmark data to the `setUpFunction` "
              "registered in `BenchmarkInfo`."], self.logs['info'])
+
+    def test_benchmark_setup_takes_reasonable_time(self):
+        """Setup < 200 ms (20% extra on top of the typical 1 s measurement)"""
+        with captured_output() as (out, _):
+            doctor = BenchmarkDoctor(self.args, BenchmarkDriverMock([]))
+            doctor.analyze({
+                'name': 'NormalSetup',
+                'NormalSetup O i1a': _PTR(setup=199999),
+                'NormalSetup O i2a': _PTR(setup=200001)})
+            doctor.analyze({
+                'name': 'LongSetup',
+                'LongSetup O i1a': _PTR(setup=200001),
+                'LongSetup O i2a': _PTR(setup=200002)})
+        output = out.getvalue()
+
+        self.assertIn('runtime: ', output)
+        self.assertNotIn('NormalSetup', output)
+        self.assert_contains(
+            ["'LongSetup' setup took at least 200001 μs."],
+            self.logs['error'])
+        self.assert_contains(
+            ["The `setUpFunction` should take no more than 200 ms."],
+            self.logs['info'])
 
     def test_benchmark_has_constant_memory_use(self):
         """Benchmark's memory footprint must not vary with num-iters."""
