@@ -16,8 +16,9 @@ import SwiftShims
 // StringGuts is a parameterization over String's representations. It provides
 // functionality and guidance for efficiently working with Strings.
 //
-@_fixed_layout @usableFromInline
-internal struct _StringGuts {
+@_fixed_layout
+public // SPI(corelibs-foundation)
+struct _StringGuts {
   @usableFromInline
   internal var _object: _StringObject
 
@@ -287,3 +288,43 @@ extension _StringGuts {
     @inline(__always) get { return Index(encodedOffset: self.count) }
   }
 }
+
+// Old SPI(corelibs-foundation)
+extension _StringGuts {
+  @available(*, deprecated)
+  public // SPI(corelibs-foundation)
+  var _isContiguousASCII: Bool {
+    return !isSmall && isFastUTF8 && isASCII
+  }
+
+  @available(*, deprecated)
+  public // SPI(corelibs-foundation)
+  var _isContiguousUTF16: Bool {
+    return false
+  }
+
+  // FIXME: Remove. Still used by swift-corelibs-foundation
+  @available(*, deprecated)
+  public var startASCII: UnsafeMutablePointer<UInt8> {
+    return UnsafeMutablePointer(mutating: _object.fastUTF8.baseAddress!)
+  }
+
+  // FIXME: Remove. Still used by swift-corelibs-foundation
+  @available(*, deprecated)
+  public var startUTF16: UnsafeMutablePointer<UTF16.CodeUnit> {
+    fatalError("Not contiguous UTF-16")
+  }
+}
+
+@available(*, deprecated)
+public // SPI(corelibs-foundation)
+func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
+  guard let s = p else { return nil }
+  let count = Int(_swift_stdlib_strlen(s))
+  var result = [CChar](repeating: 0, count: count + 1)
+  for i in 0..<count {
+    result[i] = s[i]
+  }
+  return result
+}
+
