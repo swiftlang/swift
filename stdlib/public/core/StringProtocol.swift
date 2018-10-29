@@ -34,7 +34,7 @@ public protocol StringProtocol
   associatedtype UnicodeScalarView : BidirectionalCollection
   where UnicodeScalarView.Element == Unicode.Scalar,
         UnicodeScalarView.Index == Index
-        
+
   associatedtype SubSequence = Substring
 
   var utf8: UTF8View { get }
@@ -119,13 +119,32 @@ public protocol StringProtocol
 }
 
 extension StringProtocol {
-  // TODO(UTF8): Wean NSStringAPI.swift off of this
+  // TODO(UTF8 perf): Make a _SharedString for some Substrings
+  //
+  // TODO(UTF8 perf): Make a closure-based call with stack-allocated
+  // _SharedString for some Substrings
+  //
   public // @SPI(NSStringAPI.swift)
   var _ephemeralString: String {
-    if let str = self as? String {
-      return str
+    @_specialize(where Self == String)
+    @_specialize(where Self == Substring)
+    get { return String(self) }
+  }
+
+  @inlinable // Eliminate for String, Substring
+  internal var _slicedGuts: _SlicedStringGuts {
+    @_specialize(where Self == String)
+    @_specialize(where Self == Substring)
+    @inline(__always) get {
+      if let str = self as? String {
+        return _SlicedStringGuts(str._guts)
+      }
+      if let subStr = self as? Substring {
+        return _SlicedStringGuts(subStr._wholeGuts, subStr._offsetRange)
+      }
+      return _SlicedStringGuts(String(self)._guts)
     }
-    // TODO: Smol check and then shared storage substring
-    return String(self)
   }
 }
+
+

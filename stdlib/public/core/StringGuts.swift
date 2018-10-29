@@ -65,20 +65,10 @@ extension _StringGuts {
 
   @inlinable @inline(__always)
   internal init(_ storage: _StringStorage) {
-    // TODO(UTF8): We should probably store perf flags on the storage's capacity
     self.init(_StringObject(storage))
   }
 
   internal init(_ storage: _SharedStringStorage) {
-    // TODO(UTF8 perf): Is it better, or worse, to throw the object away if
-    // immortal? We could avoid having to ARC the object itself when owner is
-    // nil, at the cost of repeatedly creating a new one when this string is
-    // bridged back-and-forth to ObjC. For now, we're choosing to keep the
-    // object allocation, perform some ARC, and require a dependent load for
-    // literals that have bridged back in from ObjC. Long term, we will likely
-    // emit some kind of "immortal" object for literals with efficient bridging
-    // anyways, so this may be a short-term decision.
-
     // TODO(UTF8): We should probably store perf flags in the object
     self.init(_StringObject(storage, isASCII: false))
   }
@@ -106,6 +96,22 @@ extension _StringGuts {
   @inlinable
   internal var isASCII: Bool  {
     @inline(__always) get { return _object.isASCII }
+  }
+
+  @inlinable
+  internal var isFastASCII: Bool  {
+    @inline(__always) get { return isFastUTF8 && _object.isASCII }
+  }
+
+  @inlinable
+  internal var isNFC: Bool  {
+    @inline(__always) get { return _object.isNFC }
+  }
+
+  @inlinable
+  internal var isNFCFastUTF8: Bool  {
+    // TODO(UTF8 perf): Consider a dedicated bit for this...
+    @inline(__always) get { return _object.isNFC && isFastUTF8 }
   }
 
   @inlinable
@@ -144,6 +150,17 @@ extension _StringGuts {
 
     defer { _fixLifetime(self) }
     return try f(_object.fastUTF8)
+  }
+
+  @inlinable @inline(__always)
+  internal func withFastUTF8<R>(
+    range: Range<Int>,
+    _ f: (UnsafeBufferPointer<UInt8>) throws -> R
+  ) rethrows -> R {
+    return try self.withFastUTF8 { wholeUTF8 in
+      let slicedUTF8 = UnsafeBufferPointer(rebasing: wholeUTF8[range])
+      return try f(slicedUTF8)
+    }
   }
 
   @inlinable @inline(__always)
@@ -214,6 +231,105 @@ extension _StringGuts {
   // Contents of the buffer are unspecified if nil is returned.
   @inlinable
   internal func copyUTF8(into mbp: UnsafeMutableBufferPointer<UInt8>) -> Int? {
+    // TODO(UTF8 perf): minor perf win by avoiding slicing if fast...
+    return _SlicedStringGuts(self).copyUTF8(into: mbp)
+  }
+
+  internal var utf8Count: Int {
+    @inline(__always) get {
+      if _fastPath(self.isFastUTF8) { return count }
+      return _SlicedStringGuts(self).utf8Count
+    }
+  }
+
+}
+
+// Index
+extension _StringGuts {
+  @usableFromInline
+  internal typealias Index = String.Index
+
+  @inlinable
+  internal var startIndex: String.Index {
+    @inline(__always) get { return Index(encodedOffset: 0) }
+  }
+  @inlinable
+  internal var endIndex: String.Index {
+    @inline(__always) get { return Index(encodedOffset: self.count) }
+  }
+}
+
+// A sliced _StringGuts, convenient for unifying String/Substring comparison,
+// hashing, and RRC.
+@_fixed_layout
+@usableFromInline
+internal struct _SlicedStringGuts {
+  @usableFromInline
+  internal var _guts: _StringGuts
+
+  @usableFromInline
+  internal var _offsetRange: Range<Int>
+
+  @inlinable @inline(__always)
+  internal init(_ guts: _StringGuts) {
+    self._guts = guts
+    self._offsetRange = 0..<self._guts.count
+  }
+
+  @inlinable @inline(__always)
+  internal init(_ guts: _StringGuts, _ offsetRange: Range<Int>) {
+    self._guts = guts
+    self._offsetRange = offsetRange
+  }
+
+  @inlinable
+  internal var count: Int {
+    @inline(__always) get { return _offsetRange.count }
+  }
+
+  @inlinable
+  internal var isNFCFastUTF8: Bool {
+    @inline(__always) get { return _guts.isNFCFastUTF8 }
+  }
+
+  @inlinable
+  internal var isASCII: Bool {
+    @inline(__always) get { return _guts.isASCII }
+  }
+
+  @inlinable
+  internal var isFastUTF8: Bool {
+    @inline(__always) get { return _guts.isFastUTF8 }
+  }
+
+  internal var utf8Count: Int {
+    @inline(__always) get {
+      if _fastPath(self.isFastUTF8) {
+        return _offsetRange.count
+      }
+      return Substring(self).utf8.count
+    }
+  }
+
+  @inlinable
+  internal var range: Range<String.Index> {
+    @inline(__always) get {
+      return String.Index(encodedOffset: _offsetRange.lowerBound)
+         ..< String.Index(encodedOffset: _offsetRange.upperBound)
+    }
+  }
+
+  @inlinable @inline(__always)
+  internal func withFastUTF8<R>(
+    _ f: (UnsafeBufferPointer<UInt8>) throws -> R
+  ) rethrows -> R {
+    return try _guts.withFastUTF8(range: _offsetRange, f)
+  }
+
+  // Copy UTF-8 contents. Returns number written or nil if not enough space.
+  // Contents of the buffer are unspecified if nil is returned.
+  @inlinable
+  internal func copyUTF8(into mbp: UnsafeMutableBufferPointer<UInt8>) -> Int? {
     let ptr = mbp.baseAddress._unsafelyUnwrappedUnchecked
     if _fastPath(self.isFastUTF8) {
       return self.withFastUTF8 { utf8 in
@@ -235,7 +351,7 @@ extension _StringGuts {
   ) -> Int? {
     var ptr = mbp.baseAddress._unsafelyUnwrappedUnchecked
     var numWritten = 0
-    for cu in String(self).utf8 {
+    for cu in Substring(self).utf8 {
       guard numWritten < mbp.count else { return nil }
       ptr.initialize(to: cu)
       ptr += 1
@@ -243,37 +359,5 @@ extension _StringGuts {
     }
 
     return numWritten
-  }
-
-  internal var utf8Count: Int {
-    @inline(__always) get {
-      // TODO: Might be worth burning a bit for count-is-UTF-8, regardless of
-      // fast status.
-      if _fastPath(self.isFastUTF8) {
-        return self.count
-      }
-      return _foreignUTF8Count()
-    }
-  }
-
-  @_effects(releasenone)
-  @inline(never) // slow-path
-  internal func _foreignUTF8Count() -> Int {
-    return String(self).utf8.count
-  }
-}
-
-// Index
-extension _StringGuts {
-  @usableFromInline
-  internal typealias Index = String.Index
-
-  @inlinable
-  internal var startIndex: String.Index {
-    @inline(__always) get { return Index(encodedOffset: 0) }
-  }
-  @inlinable
-  internal var endIndex: String.Index {
-    @inline(__always) get { return Index(encodedOffset: self.count) }
   }
 }

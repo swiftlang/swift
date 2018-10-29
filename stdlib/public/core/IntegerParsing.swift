@@ -139,10 +139,21 @@ extension FixedWidthInteger {
   ///     `radix`.
   ///   - radix: The radix, or base, to use for converting `text` to an integer
   ///     value. `radix` must be in the range `2...36`. The default is 10.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // @specializable
   @_semantics("optimize.sil.specialize.generic.partial.never")
   public init?<S : StringProtocol>(_ text: S, radix: Int = 10) {
     _precondition(2...36 ~= radix, "Radix not in range 2...36")
+
+    if let str = text as? String, str._guts.isFastUTF8 {
+      guard let ret = str._guts.withFastUTF8 ({ utf8 -> Self? in
+        var iter = utf8.makeIterator()
+        return _parseASCII(codeUnits: &iter, radix: Self(radix))
+      }) else {
+        return nil
+      }
+      self = ret
+      return
+    }
 
     // TODO(UTF8 perf): fast paths...
 

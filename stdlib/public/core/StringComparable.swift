@@ -13,62 +13,82 @@
 import SwiftShims
 
 extension StringProtocol {
-  @inlinable
-  @inline(__always) // de-virtualize
-  public static func ==<S: StringProtocol>(lhs: Self, rhs: S) -> Bool {
-    // TODO(UTF8 perf): This is a horribly slow means...
-    return String(lhs) == String(rhs)
+  @_specialize(where Self == String, R == String)
+  @_specialize(where Self == String, R == Substring)
+  @_specialize(where Self == Substring, R == String)
+  @_specialize(where Self == Substring, R == Substring)
+  @_effects(readonly)
+  public static func == <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
+    return lhs._slicedGuts.compare(with: rhs._slicedGuts) == .equal
   }
 
-  @inlinable
-  @inline(__always) // de-virtualize
-  public static func !=<S: StringProtocol>(lhs: Self, rhs: S) -> Bool {
-    // TODO(UTF8 perf): This is a horribly slow means...
-    return String(lhs) != String(rhs)
+  @inlinable @inline(__always) // forward to other operator
+  @_effects(readonly)
+  public static func != <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
+    return !(lhs == rhs)
   }
 
-  @inlinable
-  @inline(__always) // de-virtualize
+  @_specialize(where Self == String, R == String)
+  @_specialize(where Self == String, R == Substring)
+  @_specialize(where Self == Substring, R == String)
+  @_specialize(where Self == Substring, R == Substring)
+  @_effects(readonly)
   public static func < <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-    // TODO(UTF8 perf): This is a horribly slow means...
-    return String(lhs) < String(rhs)
+    return lhs._slicedGuts.compare(with: rhs._slicedGuts) == .less
   }
 
-  @inlinable
-  @inline(__always) // de-virtualize
+  @inlinable @inline(__always) // forward to other operator
+  @_effects(readonly)
   public static func > <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-    // TODO(UTF8 perf): This is a horribly slow means...
-    return String(lhs) > String(rhs)
+    return rhs < lhs
   }
 
-  @inlinable
-  @inline(__always) // de-virtualize
+  @inlinable @inline(__always) // forward to other operator
+  @_effects(readonly)
   public static func <= <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-    // TODO(UTF8 perf): This is a horribly slow means...
-    return String(lhs) <= String(rhs)
+    return !(rhs < lhs)
   }
 
-  @inlinable
-  @inline(__always) // de-virtualize
+  @inlinable @inline(__always) // forward to other operator
+  @_effects(readonly)
   public static func >= <R: StringProtocol>(lhs: Self, rhs: R) -> Bool {
-    // TODO(UTF8 perf): This is a horribly slow means...
-    return String(lhs) >= String(rhs)
+    return !(lhs < rhs)
   }
 }
 
 extension String : Equatable {
   @inlinable @inline(__always) // For the bitwise comparision
-  public static func ==(lhs: String, rhs: String) -> Bool {
+  @_effects(readonly)
+  public static func == (lhs: String, rhs: String) -> Bool {
     if lhs._guts.rawBits == rhs._guts.rawBits { return true }
-    return _compareStringsEqual(lhs, rhs)
+    if _fastPath(lhs._guts.isNFCFastUTF8 && rhs._guts.isNFCFastUTF8) {
+      Builtin.onFastPath() // aggressively inline / optimize
+      return lhs._guts.withFastUTF8 { nfcSelf in
+        return rhs._guts.withFastUTF8 { nfcOther in
+          return _binaryCompare(nfcSelf, nfcOther) == 0
+        }
+      }
+    }
+
+    return lhs._slicedGuts.compare(with: rhs._slicedGuts) == .equal
   }
 }
 
 extension String : Comparable {
   @inlinable @inline(__always) // For the bitwise comparision
+  @_effects(readonly)
   public static func < (lhs: String, rhs: String) -> Bool {
     if lhs._guts.rawBits == rhs._guts.rawBits { return false }
-    return _compareStringsLess(lhs, rhs)
+    if _fastPath(lhs._guts.isNFCFastUTF8 && rhs._guts.isNFCFastUTF8) {
+      Builtin.onFastPath() // aggressively inline / optimize
+      return lhs._guts.withFastUTF8 { nfcSelf in
+        return rhs._guts.withFastUTF8 { nfcOther in
+          return _binaryCompare(nfcSelf, nfcOther) < 0
+        }
+      }
+    }
+
+    return lhs._slicedGuts.compare(with: rhs._slicedGuts) == .less
   }
 }
 

@@ -898,6 +898,7 @@ extension String: CustomDebugStringConvertible {
 }
 
 extension String {
+  @inlinable // Forward inlinability to append
   @_effects(readonly) @_semantics("string.concat")
   public static func + (lhs: String, rhs: String) -> String {
     var result = lhs
@@ -906,6 +907,7 @@ extension String {
   }
 
   // String append
+  @inlinable // Forward inlinability to append
   public static func += (lhs: inout String, rhs: String) {
     lhs.append(rhs)
   }
@@ -1014,18 +1016,80 @@ internal func _stdlib_NSStringUppercaseString(_ str: AnyObject) -> _CocoaString
 
 // Unicode algorithms
 extension String {
- /// Returns a lowercase version of the string.
- ///
- /// Here's an example of transforming a string to all lowercase letters.
- ///
- ///     let cafe = "BBQ Café 🍵"
- ///     print(cafe.lowercased())
- ///     // Prints "bbq café 🍵"
- ///
- /// - Returns: A lowercase copy of the string.
- ///
- /// - Complexity: O(*n*)
- public func lowercased() -> String {
+  @inline(__always)
+  internal func _uppercaseASCII(_ x: UInt8) -> UInt8 {
+    /// A "table" for which ASCII characters need to be upper cased.
+    /// To determine which bit corresponds to which ASCII character, subtract 1
+    /// from the ASCII value of that character and divide by 2. The bit is set iff
+    /// that character is a lower case character.
+    let _lowercaseTable: UInt64 =
+      0b0001_1111_1111_1111_0000_0000_0000_0000 &<< 32
+
+    // Lookup if it should be shifted in our ascii table, then we subtract 0x20 if
+    // it should, 0x0 if not.
+    // This code is equivalent to:
+    // This code is equivalent to:
+    // switch sourcex {
+    // case let x where (x >= 0x41 && x <= 0x5a):
+    //   return x &- 0x20
+    // case let x:
+    //   return x
+    // }
+    let isLower = _lowercaseTable &>> UInt64(((x &- 1) & 0b0111_1111) &>> 1)
+    let toSubtract = (isLower & 0x1) &<< 5
+    return x &- UInt8(truncatingIfNeeded: toSubtract)
+  }
+
+  @inline(__always)
+  internal func _lowercaseASCII(_ x: UInt8) -> UInt8 {
+    /// A "table" for which ASCII characters need to be lower cased.
+    /// To determine which bit corresponds to which ASCII character, subtract 1
+    /// from the ASCII value of that character and divide by 2. The bit is set iff
+    /// that character is a upper case character.
+    let _uppercaseTable: UInt64 =
+      0b0000_0000_0000_0000_0001_1111_1111_1111 &<< 32
+
+    // Lookup if it should be shifted in our ascii table, then we add 0x20 if
+    // it should, 0x0 if not.
+    // This code is equivalent to:
+    // This code is equivalent to:
+    // switch sourcex {
+    // case let x where (x >= 0x41 && x <= 0x5a):
+    //   return x &- 0x20
+    // case let x:
+    //   return x
+    // }
+    let isUpper = _uppercaseTable &>> UInt64(((x &- 1) & 0b0111_1111) &>> 1)
+    let toAdd = (isUpper & 0x1) &<< 5
+    return x &+ UInt8(truncatingIfNeeded: toAdd)
+  }
+
+
+  /// Returns a lowercase version of the string.
+  ///
+  /// Here's an example of transforming a string to all lowercase letters.
+  ///
+  ///     let cafe = "BBQ Café 🍵"
+  ///     print(cafe.lowercased())
+  ///     // Prints "bbq café 🍵"
+  ///
+  /// - Returns: A lowercase copy of the string.
+  ///
+  /// - Complexity: O(*n*)
+  @_effects(releasenone)
+  public func lowercased() -> String {
+    if _fastPath(_guts.isFastASCII) {
+      return _guts.withFastUTF8 { utf8 in
+        // TODO(UTF8 perf): code-unit appendInPlace on guts
+        var result = String()
+        result.reserveCapacity(utf8.count)
+        for u8 in utf8 {
+          result._guts.append(String(Unicode.Scalar(_lowercaseASCII(u8)))._guts)
+        }
+        return result
+      }
+    }
+
     // TODO(UTF8 perf): This is a horribly slow means...
     let codeUnits = Array(self.utf16).withUnsafeBufferPointer {
       (uChars: UnsafeBufferPointer<UInt16>) -> Array<UInt16> in
@@ -1059,20 +1123,33 @@ extension String {
       return result
     }
     return codeUnits.withUnsafeBufferPointer { String._uncheckedFromUTF16($0) }
- }
+  }
 
- /// Returns an uppercase version of the string.
- ///
- /// The following example transforms a string to uppercase letters:
- ///
- ///     let cafe = "Café 🍵"
- ///     print(cafe.uppercased())
- ///     // Prints "CAFÉ 🍵"
- ///
- /// - Returns: An uppercase copy of the string.
- ///
- /// - Complexity: O(*n*)
- public func uppercased() -> String {
+  /// Returns an uppercase version of the string.
+  ///
+  /// The following example transforms a string to uppercase letters:
+  ///
+  ///     let cafe = "Café 🍵"
+  ///     print(cafe.uppercased())
+  ///     // Prints "CAFÉ 🍵"
+  ///
+  /// - Returns: An uppercase copy of the string.
+  ///
+  /// - Complexity: O(*n*)
+  @_effects(releasenone)
+  public func uppercased() -> String {
+    if _fastPath(_guts.isFastASCII) {
+      return _guts.withFastUTF8 { utf8 in
+        // TODO(UTF8 perf): code-unit appendInPlace on guts
+        var result = String()
+        result.reserveCapacity(utf8.count)
+        for u8 in utf8 {
+          result._guts.append(String(Unicode.Scalar(_uppercaseASCII(u8)))._guts)
+        }
+        return result
+      }
+    }
+
     // TODO(UTF8 perf): This is a horribly slow means...
     let codeUnits = Array(self.utf16).withUnsafeBufferPointer {
       (uChars: UnsafeBufferPointer<UInt16>) -> Array<UInt16> in
@@ -1106,14 +1183,14 @@ extension String {
       return result
     }
     return codeUnits.withUnsafeBufferPointer { String._uncheckedFromUTF16($0) }
- }
+  }
 
- /// Creates an instance from the description of a given
- /// `LosslessStringConvertible` instance.
- @inlinable @inline(__always)
- public init<T : LosslessStringConvertible>(_ value: T) {
-   self = value.description
- }
+  /// Creates an instance from the description of a given
+  /// `LosslessStringConvertible` instance.
+  @inlinable @inline(__always)
+  public init<T : LosslessStringConvertible>(_ value: T) {
+    self = value.description
+  }
 }
 
 extension String: CustomStringConvertible {

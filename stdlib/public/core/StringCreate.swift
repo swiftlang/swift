@@ -65,7 +65,11 @@ extension String {
   @usableFromInline
   internal static func _fromUTF8Repairing(
     _ input: UnsafeBufferPointer<UInt8>
-  ) -> (String, Bool) {
+  ) -> (result: String, repairsMade: Bool) {
+    if _allASCII(input) {
+      return (String._uncheckedFromUTF8(input, asciiPreScanResult: true), false)
+    }
+
     // TODO(UTF8 perf): More efficient validation
 
     // TODO(UTF8 perf): Skip intermediary array
@@ -89,7 +93,22 @@ extension String {
       return String(_StringGuts(smol))
     }
 
-    let isASCII = false // TODO: _allASCII(input)
+    let isASCII = _allASCII(input)
+    let storage = _StringStorage.create(
+      initializingFrom: input, isASCII: isASCII)
+    return storage.asString
+  }
+
+  // If we've already pre-scanned for ASCII, just supply the result
+  @usableFromInline
+  internal static func _uncheckedFromUTF8(
+    _ input: UnsafeBufferPointer<UInt8>, asciiPreScanResult: Bool
+  ) -> String {
+    if let smol = _SmallString(input) {
+      return String(_StringGuts(smol))
+    }
+
+    let isASCII = asciiPreScanResult
     let storage = _StringStorage.create(
       initializingFrom: input, isASCII: isASCII)
     return storage.asString
@@ -120,15 +139,12 @@ extension String {
   internal func _withUnsafeBufferPointerToUTF8<R>(
     _ body: (UnsafeBufferPointer<UTF8.CodeUnit>) throws -> R
   ) rethrows -> R {
-    if isEmpty {
-      var nothing: UInt8 = 0
-      return try body(UnsafeBufferPointer(start: &nothing, count: 0))
+    return try self.withUnsafeBytes { rawBufPtr in
+      let rawPtr = rawBufPtr.baseAddress._unsafelyUnwrappedUnchecked
+      return try body(UnsafeBufferPointer(
+        start: rawPtr.assumingMemoryBound(to: UInt8.self),
+        count: rawBufPtr.count))
     }
-    if _fastPath(_guts.isFastUTF8) {
-      return try _guts.withFastUTF8(body)
-    }
-
-    unimplemented_utf8()
   }
 
   @usableFromInline @inline(never) // slow-path

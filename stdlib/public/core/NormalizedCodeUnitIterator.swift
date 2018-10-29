@@ -142,7 +142,8 @@ internal struct _NormalizedUTF8CodeUnitIterator: IteratorProtocol {
   var bufferIndex = 0
   var bufferCount = 0
 
-  internal init(_ guts: _StringGuts, range: Range<String.Index>) {
+  internal init(foreign guts: _StringGuts, range: Range<String.Index>) {
+    _sanityCheck(guts.isForeign)
     utf16Iterator = _NormalizedCodeUnitIterator(guts, range)
   }
 
@@ -188,7 +189,7 @@ internal struct _NormalizedUTF8CodeUnitIterator: IteratorProtocol {
 
   internal mutating func compare(
     with other: _NormalizedUTF8CodeUnitIterator
-  ) -> _StringComparison {
+  ) -> _StringComparisonResult {
     var mutableOther = other
 
     for cu in self {
@@ -240,7 +241,7 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
 
   mutating func compare(
     with other: _NormalizedCodeUnitIterator
-  ) -> _StringComparison {
+  ) -> _StringComparisonResult {
     var mutableOther = other
     for cu in IteratorSequence(self) {
       if let otherCU = mutableOther.next() {
