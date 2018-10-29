@@ -81,12 +81,17 @@ from SwiftVectorTypes import all_vector_counts
 
       // SIMDMaskVector conformance -----------------------------------------
       @_transparent
-      public static func &&(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+      public static func .&(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
         return ${Self}(lhs._value & rhs._value)
       }
 
       @_transparent
-      public static func ||(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+      public static func .^(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+        return ${Self}(lhs._value & rhs._value)
+      }
+
+      @_transparent
+      public static func .|(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
         return ${Self}(lhs._value | rhs._value)
       }
 

@@ -2,11 +2,16 @@ public protocol SIMDMask : SIMDVector
                      where Element == Bool, Mask == Self {  
   /// A mask vector with each lane is true where the corresponding
   /// lanes of both arguments are true, and false otherwise.
-  static func &&(lhs: Self, rhs: Self) -> Self
+  static func .&(lhs: Self, rhs: Self) -> Self
+  
+  /// A mask vector with each lane is true where the corresponding
+  /// lanes of the two arguments are different, and false where they
+  /// are the same.
+  static func .^(lhs: Self, rhs: Self) -> Self
   
   /// A mask vector with each lane is true where the corresponding
   /// lanes of either argument is true, and false otherwise.
-  static func ||(lhs: Self, rhs: Self) -> Self
+  static func .|(lhs: Self, rhs: Self) -> Self
   
   func _all() -> Bool
   func _any() -> Bool
@@ -20,23 +25,33 @@ public extension SIMDMask {
   }
   
   @_transparent
-  static func &&(lhs: Self, rhs: Bool) -> Self {
-    return lhs && Self(repeating: rhs)
+  static func .&(lhs: Self, rhs: Bool) -> Self {
+    return lhs .& Self(repeating: rhs)
   }
   
   @_transparent
-  static func &&(lhs: Bool, rhs: Self) -> Self {
-    return rhs && lhs
+  static func .&(lhs: Bool, rhs: Self) -> Self {
+    return rhs .& lhs
   }
   
   @_transparent
-  static func ||(lhs: Self, rhs: Bool) -> Self {
-    return lhs || Self(repeating: rhs)
+  static func .^(lhs: Self, rhs: Bool) -> Self {
+    return lhs .^ Self(repeating: rhs)
   }
   
   @_transparent
-  static func ||(lhs: Bool, rhs: Self) -> Self {
-    return rhs || lhs
+  static func .^(lhs: Bool, rhs: Self) -> Self {
+    return rhs .^ lhs
+  }
+  
+  @_transparent
+  static func .|(lhs: Self, rhs: Bool) -> Self {
+    return lhs .| Self(repeating: rhs)
+  }
+  
+  @_transparent
+  static func .|(lhs: Bool, rhs: Self) -> Self {
+    return rhs .| lhs
   }
   
   @inlinable
@@ -59,7 +74,7 @@ public extension SIMDMask {
 public extension SIMDMask {
   @_transparent
   func replacing(with other: Self, where mask: Self) -> Self {
-    return self && !mask || other && mask
+    return self .& !mask .| other .& mask
   }
 }
 

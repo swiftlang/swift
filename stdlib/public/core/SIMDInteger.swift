@@ -56,7 +56,7 @@ public protocol SIMDIntegerVector : SIMDVector
   
   static func &-(lhs: Self, rhs: Self) -> Self
   
-  static func .&*(lhs: Self, rhs: Self) -> Self
+  static func &*(lhs: Self, rhs: Self) -> Self
   
   static func /(lhs: Self, rhs: Self) -> Self
   
@@ -318,13 +318,13 @@ public extension SIMDIntegerVector {
   }
   
   @_transparent
-  static func .&*(lhs: Self, rhs: Element) -> Self {
-    return lhs .&* Self(repeating: rhs)
+  static func &*(lhs: Self, rhs: Element) -> Self {
+    return lhs &* Self(repeating: rhs)
   }
   
   @_transparent
-  static func .&*(lhs: Element, rhs: Self) -> Self {
-    return rhs .&* lhs
+  static func &*(lhs: Element, rhs: Self) -> Self {
+    return rhs &* lhs
   }
   
   @_transparent
@@ -370,12 +370,12 @@ public extension SIMDIntegerVector {
   
   @_transparent
   static func &*=(lhs: inout Self, rhs: Self) {
-    lhs = lhs .&* rhs
+    lhs = lhs &* rhs
   }
   
   @_transparent
   static func &*=(lhs: inout Self, rhs: Element) {
-    lhs = lhs .&* rhs
+    lhs = lhs &* rhs
   }
   
   @_transparent

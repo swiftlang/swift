@@ -4,8 +4,9 @@ infix operator .< : ComparisonPrecedence
 infix operator .<= : ComparisonPrecedence
 infix operator .> : ComparisonPrecedence
 infix operator .>= : ComparisonPrecedence
-infix operator .*  : MultiplicationPrecedence
-infix operator .&* : MultiplicationPrecedence
+infix operator .& : LogicalConjunctionPrecedence
+infix operator .^ : LogicalConjunctionPrecedence
+infix operator .| : LogicalDisjunctionPrecedence
 
 /// A computational vector type.
 public protocol SIMDVector : Hashable,

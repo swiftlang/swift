@@ -106,7 +106,7 @@ public extension ${Element} {
 
 %   end
     // MARK: Arithmetic operators
-%   for (op, inst) in [('+','add'), ('-','sub'), ('.*','mul'), ('/','div')]:
+%   for (op, inst) in [('+','add'), ('-','sub'), ('*','mul'), ('/','div')]:
     @_transparent
     public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
       return ${Self}(Builtin.f${inst}_${LLVM}(lhs._value, rhs._value))

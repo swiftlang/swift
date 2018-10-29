@@ -148,7 +148,7 @@ public extension ${Element} {
     }
 
     // MARK: Arithmetic operators
-%   for (op, inst) in [('&+','add'), ('&-','sub'), ('.&*','mul')]:
+%   for (op, inst) in [('&+','add'), ('&-','sub'), ('&*','mul')]:
     @_transparent
     public static func ${op}(lhs: ${Self}, rhs: ${Self}) -> ${Self} {
       return ${Self}(Builtin.${inst}_${LLVM}(lhs._value, rhs._value))
@@ -169,7 +169,7 @@ public extension ${Element} {
       let rhsValue = rhs._value
 %   end
 %   if signed:
-      _precondition(!any(lhs .== .min && rhs .== -1),
+      _precondition(!any(lhs .== .min .& rhs .== -1),
                     "Division results in an overflow.")
       return ${Self}(Builtin.sdiv_${LLVM}(lhs._value, rhsValue))
 %   else:
@@ -191,7 +191,7 @@ public extension ${Element} {
       let rhsValue = rhs._value
 %   end
 %   if signed:
-      _precondition(!any(lhs .== .min && rhs .== -1),
+      _precondition(!any(lhs .== .min .& rhs .== -1),
                     "Division results in an overflow in remainder operation.")
       return ${Self}(Builtin.srem_${LLVM}(lhs._value, rhsValue))
 %   else:
