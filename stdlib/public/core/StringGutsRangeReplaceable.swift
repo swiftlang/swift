@@ -233,7 +233,10 @@ extension _StringGuts {
 
     // TODO(cleanup): Add append on guts taking range, use that
     var result = String()
-    result.reserveCapacity(self.count &- (upperOffset &- lowerOffset))
+    // FIXME: It should be okay to get rid of excess capacity
+    // here. rdar://problem/45635432
+    result.reserveCapacity(
+      nativeCapacity ?? (count &- (upperOffset &- lowerOffset)))
     result.append(contentsOf: String(self)[..<lower])
     result.append(contentsOf: String(self)[upper...])
     self = result._guts
@@ -258,6 +261,11 @@ extension _StringGuts {
     }
 
     var result = String()
+    // FIXME: It should be okay to get rid of excess capacity
+    // here. rdar://problem/45635432
+    if let capacity = self.nativeCapacity {
+      result.reserveCapacity(capacity)
+    }
     let selfStr = String(self)
     result.append(contentsOf: selfStr[..<bounds.lowerBound])
     result.append(contentsOf: newElements)
