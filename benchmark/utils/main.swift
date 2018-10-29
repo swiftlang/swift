@@ -96,10 +96,12 @@ import NSError
 import NSStringConversion
 import NopDeinit
 import ObjectAllocation
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import ObjectiveCBridging
 import ObjectiveCBridgingStubs
 #if !(SWIFT_PACKAGE || Xcode)
 import ObjectiveCNoBridgingStubs
+#endif
 #endif
 import ObserverClosure
 import ObserverForwarderStruct
@@ -265,10 +267,12 @@ registerBenchmark(NSStringConversion)
 registerBenchmark(NibbleSort)
 registerBenchmark(NopDeinit)
 registerBenchmark(ObjectAllocation)
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 registerBenchmark(ObjectiveCBridging)
 registerBenchmark(ObjectiveCBridgingStubs)
 #if !(SWIFT_PACKAGE || Xcode)
 registerBenchmark(ObjectiveCNoBridgingStubs)
+#endif
 #endif
 registerBenchmark(ObserverClosure)
 registerBenchmark(ObserverForwarderStruct)
