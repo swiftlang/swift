@@ -28,9 +28,30 @@ bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
                                const DependencyTracker &depTracker,
                                StringRef outputPath);
 
-class DependencyGraph {};
-  
- 
+class CompilationUnit {
+public:
+  StringRef getSourceFilename() const;
+  StringRef getSwiftDepsFilename() const;
+};
+
+class Node {
+public:
+  CompilationUnit &getContainer() const;
+  StringRef getNonuniqueID() const;
+  StringRef getFingerprint() const;
+};
+
+class Graph {
+  std::vector<const CompilationUnit> compilationUnits;
+  std::vector<Node> nodes;
+
+  llvm::ArrayRef<Node> getDependentsOf(const Node &);
+  const CompilationUnit &getContainerOf(const Node &);
+
+public:
+  std::pair<Graph, std::vector<CompilationUnit>>
+      compilationsRequiredAfterReadingNewNodes(llvm::ArrayRef<Node>);
+};
 
 } // end namespace experimental_dependencies
 } // end namespace swift

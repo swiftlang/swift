@@ -40,35 +40,7 @@ using namespace experimental_dependencies;
 
 namespace {
   
-  template <typename ContainerType>
-  class Supplier {
-    ContainerType &container;
-    std::string fingerprint;
-    std::string nonuniqueID;
-    std::vector<Supplier*> suppliers;
-    std::vector<Supplier*> customers;
-  };
-  
-  class FileBasedCompilationUnit;
-  
-  using FileBasedSupplier = Supplier<FileBasedCompilationUnit>;
-  
-  class FileBasedCompilationUnit {
-    std::string sourceFilename;
-    std::string dependencyFilename;
-    
-    std::vector<FileBasedSupplier> suppliers;
-  };
-  
-  template <typename ContainerType>
-  class Network {
-    std::vector<ContainerType> containers;
-    std::vector<Supplier<ContainerType>> suppliers;
-    
-    std::vector<Supplier<ContainerType> *> suppliersAffectedByChangeTo(Supplier<ContainerType>& changedSupplier) {
-      
-    }
-  };
+
 } // namespace
 
 

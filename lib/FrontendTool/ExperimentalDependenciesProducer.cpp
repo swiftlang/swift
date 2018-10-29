@@ -138,6 +138,7 @@ void ReferenceDependenciesEmitter::emit() const {
   out << "### Swift experimental dependencies file v0 ###\n";
   CollectedDeclarations cpd;
   cpd.collectDeclarationsFrom(SF);
+  unimplemented();
 }
 
 bool swift::experimental_dependencies::emitReferenceDependencies(
@@ -203,7 +204,6 @@ void CollectedDeclarations::collectDeclarationsFrom(const SourceFile *const SF) 
         // These can occur in malformed ASTs.
         break;
     }
-  unimplemented();
 }
 
 void CollectedDeclarations::collectExtensionAndContents(const ExtensionDecl *const ED) {
