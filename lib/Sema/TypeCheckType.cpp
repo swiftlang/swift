@@ -149,6 +149,9 @@ Type TypeResolution::resolveDependentMemberType(
   }
 
   assert(stage == TypeResolutionStage::Interface);
+  if (!getGenericSignature())
+    return ErrorType::get(baseTy);
+
   auto builder = getGenericSignatureBuilder();
   auto baseEquivClass =
     builder->resolveEquivalenceClass(
