@@ -84,7 +84,7 @@ public struct DefaultStringInterpolation: StringInterpolationProtocol {
   /// interpreting string interpolations.
   @inlinable
   public mutating func appendLiteral(_ literal: String) {
-    _storage += literal
+    literal.write(to: &self)
   }
   
   /// Interpolates the given value's textual representation into the
