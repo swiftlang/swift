@@ -2,14 +2,15 @@ add_swift_host_tool(swift-ide-test
   swift-ide-test.cpp
   ModuleAPIDiff.cpp
   XMLValidator.cpp
-  LINK_LIBRARIES
-    swiftDriver
-    swiftFrontend
-    swiftIDE
   LLVM_COMPONENT_DEPENDS
     DebugInfoCodeView
   SWIFT_COMPONENT tools
 )
+target_link_libraries(swift-ide-test
+                      PRIVATE
+                        swiftDriver
+                        swiftFrontend
+                        swiftIDE)
 
 # If libxml2 is available, make it available for swift-ide-test.
 if(SWIFT_HAVE_LIBXML)
