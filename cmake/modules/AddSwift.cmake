@@ -2387,7 +2387,7 @@ endmacro()
 function(add_swift_host_tool executable)
   set(options)
   set(single_parameter_options SWIFT_COMPONENT)
-  set(multiple_parameter_options DEPENDS)
+  set(multiple_parameter_options)
 
   cmake_parse_arguments(ASHT
                         "${options}"
@@ -2395,12 +2395,7 @@ function(add_swift_host_tool executable)
                         "${multiple_parameter_options}"
                         ${ARGN})
 
-  # Create the executable rule.
-  add_swift_executable(
-    ${executable} 
-    ${ASHT_UNPARSED_ARGUMENTS}
-    DEPENDS ${ASHT_DEPENDS}
-  )
+  add_llvm_executable(${executable} ${ASHT_UNPARSED_ARGUMENTS})
 
   # And then create the install rule if we are asked to.
   if (ASHT_SWIFT_COMPONENT)
