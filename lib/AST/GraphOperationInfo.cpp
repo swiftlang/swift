@@ -70,7 +70,8 @@ int64_t GraphOperationInfo::getIntAttr(unsigned attrIdx,
                                        StringRef attrName) const {
   auto attr = inst->getAttribute(attrIdx);
   auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
-  assert(attrInfo.first == attrName);
+  assert(attrInfo && "attribute has malformed name");
+  assert(attrInfo->first == attrName);
   auto attrValue = attr.value;
   return attrValue.getIntegerValue().getLimitedValue();
 }
@@ -79,7 +80,8 @@ std::string GraphOperationInfo::getStringAttr(unsigned attrIdx,
                                               StringRef attrName) const {
   auto attr = inst->getAttribute(attrIdx);
   auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
-  assert(attrInfo.first == attrName);
+  assert(attrInfo && "attribute has malformed name");
+  assert(attrInfo->first == attrName);
   auto attrValue = attr.value;
   return attrValue.getStringValue().str();
 }
@@ -117,11 +119,13 @@ GraphOperationInfo::getArgumentLoweringSuffix(ArgumentLowering lowering) {
 /// ArgumentLowering.  If the name is empty, this defaults to
 /// ArgumentLowering::Input.  If the name is non-empty but there is no
 /// modifier specified, then this defaults to
-/// ArgumentLowering::NormalAttribute.
-std::pair<StringRef, GraphOperationInfo::ArgumentLowering>
+/// ArgumentLowering::NormalAttribute.  If the modifier is invalid, returns
+/// None (e.g  "value$bla").
+/// TODO(SR-9250): Most callers should not have to deal with the Optional.
+llvm::Optional<std::pair<StringRef, GraphOperationInfo::ArgumentLowering>>
 GraphOperationInfo::decodeArgumentName(StringRef Name) {
   if (Name.empty())
-    return {Name, ArgumentLowering::Input};
+    return {{Name, ArgumentLowering::Input}};
 
   auto dollarLoc = Name.find('$');
   auto lowering = ArgumentLowering::NormalAttribute;
@@ -135,16 +139,19 @@ GraphOperationInfo::decodeArgumentName(StringRef Name) {
           .Case("dtype", ArgumentLowering::TFDataTypeAttribute)
           .Case("out", ArgumentLowering::Out)
           .Default(None);
-    assert(loweringOpt && "invalid attribute modifier");
+    if (!loweringOpt)
+      return None;
     lowering = *loweringOpt;
   }
-  return {Name.substr(0, dollarLoc), lowering};
+  return {{Name.substr(0, dollarLoc), lowering}};
 }
 
 /// Returns this argument's name, without suffix, and the ArgumentLowering.
 std::pair<StringRef, GraphOperationInfo::ArgumentLowering>
 GraphOperationInfo::StructuredArgument::getArgumentNameAndLowering() const {
-  return decodeArgumentName(Name);
+  auto decoded = decodeArgumentName(Name);
+  assert(decoded && "argument has malformed name");
+  return *decoded;
 }
 
 /// Return true if the specified type is TensorHandle<T>, ResourceHandle, or

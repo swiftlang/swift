@@ -56,11 +56,26 @@ public func packResultsToAggregate_externalStructFixedLayout() {
 // CHECK: [[C1:%.*]] = struct $Tensor<Float> ([[C0]] : $TensorHandle<Float>)
 // CHECK: [[C2:%.*]] = struct $ExternalStructFixedLayout ([[C1]] : $Tensor<Float>)
 
-public func unpackAggregate_basic() {
-  struct Foo {
-    let x: Tensor<Float>
-    let y: (Tensor<Float>, (a: Tensor<Int32>, b: Tensor<Bool>))
+struct Foo {
+  let x: Tensor<Float>
+  let y: (Tensor<Float>, (a: Tensor<Int32>, b: Tensor<Bool>))
+}
+extension Foo : TensorGroup {
+  public func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?) {
+    fatalError("dummy conformance")
   }
+  public static var _typeList: [TensorDataType] {
+    fatalError("dummy conformance")
+  }
+  public static var _unknownShapeList: [TensorShape?] {
+    fatalError("dummy conformance")
+  }
+  public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
+    fatalError("dummy conformance")
+  }
+}
+
+public func unpackAggregate_basic() {
   let foo = Foo(x: Tensor(1), y: (Tensor(2), (a: Tensor(3), b: Tensor(false))))
   // expected-error @+1 {{op named 'SomeOp5' is not registered in TensorFlow}}
   let _: Tensor<Float> = #tfop("SomeOp5", [foo])
@@ -74,16 +89,12 @@ public func unpackAggregate_basic() {
 // CHECK: graph_op "SomeOp5"({{\[}}[[D_Foo_x]] : $TensorHandle<Float>, [[D_Foo_y_0]] : $TensorHandle<Float>, [[D_Foo_y_1_a]] : $TensorHandle<Int32>, [[D_Foo_y_1_b]] : $TensorHandle<Bool>{{\]}})
 
 @inlinable @inline(__always)
-public func genericUnpackedAggregate<T>(t: T) -> Tensor<Float> {
+public func genericUnpackedAggregate<T : TensorGroup>(t: T) -> Tensor<Float> {
   // expected-error @+1 {{op named 'SomeOp6' is not registered in TensorFlow}}
   return #tfop("SomeOp6", [t])
 }
 
 public func unpackAggregate_generic() {
-  struct Foo {
-    let x: Tensor<Float>
-    let y: (Tensor<Float>, (a: Tensor<Int32>, b: Tensor<Bool>))
-  }
   let foo = Foo(x: Tensor(1), y: (Tensor(2), (a: Tensor(3), b: Tensor(false))))
   let _: Tensor<Float> = genericUnpackedAggregate(t: foo)
 }

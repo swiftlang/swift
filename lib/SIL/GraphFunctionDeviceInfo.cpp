@@ -39,9 +39,10 @@ bool CanRunOnDevice(llvm::StringRef opType,
   unsigned dtypeAttr = 0;
   for (const auto &attr : attributes) {
     auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
-    std::string name = attrInfo.first.str();
+    assert(attrInfo && "attribute has malformed name");
+    std::string name = attrInfo->first.str();
     auto attrValue = attr.value;
-    if (attrInfo.second ==
+    if (attrInfo->second ==
         GraphOperationInfo::ArgumentLowering::TFDataTypeAttribute) {
       switch (attrValue.getKind()) {
       case SymbolicValue::Integer:

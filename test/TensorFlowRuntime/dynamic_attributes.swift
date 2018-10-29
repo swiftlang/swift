@@ -343,7 +343,7 @@ DynamicAttributeTests.test("NormalAttribute Array<String>") {
   let (parsedA, parsedB): (Tensor<Float>, Tensor<Float>) = #tfop(
     "ParseSingleExample", exampleBytes,
     [Tensor<Float>([0]), Tensor<Float>([0])],
-    num_sparse: 0, sparse_keys: loadStringArrayEmpty(),
+    num_sparse: Int64(0), sparse_keys: loadStringArrayEmpty(),
     dense_keys: loadStringArrayAB(),
     sparse_types$dtype: [] as [TensorDataType],
     Tdense$dtype: [Float.tensorFlowDataType, Float.tensorFlowDataType],

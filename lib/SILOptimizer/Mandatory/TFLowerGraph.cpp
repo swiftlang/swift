@@ -948,8 +948,9 @@ static void decodeShapeArrayAtAttr(const ASTContext &ctx,
   auto *inst = graphOpInfo.getInst();
   auto attr = inst->getAttribute(attrIdx);
   auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
-  assert(attrInfo.second == GraphOperationInfo::ArgumentLowering::NormalAttribute);
-  assert(attrInfo.first == attrName);
+  assert(attrInfo && "attribute has malformed name");
+  assert(attrInfo->second == GraphOperationInfo::ArgumentLowering::NormalAttribute);
+  assert(attrInfo->first == attrName);
   decodeShapeArray(ctx, attr.value, dims, numDims, dimPtrs);
 }
 
@@ -1627,13 +1628,14 @@ TFGraphFunctionLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     // Look at which attribute comes next.
     auto attr = inst->getAttribute(nextAttributeNumber++);
     auto attrInfo = GraphOperationInfo::decodeArgumentName(attr.name.str());
+    assert(attrInfo && "attribute has malformed name");
     auto attrValue = attr.value;
 
     // Convert the not-necessarily-nul-terminated StringRef to an std::string
     // so we can guarantee null termination for the "const char*" taking APIs.
-    std::string name = attrInfo.first.str();
+    std::string name = attrInfo->first.str();
 
-    switch (attrInfo.second) {
+    switch (attrInfo->second) {
     case GraphOperationInfo::ArgumentLowering::Input:
       assert(0 && "Input classes cannot exist for attributes");
     case GraphOperationInfo::ArgumentLowering::Out:

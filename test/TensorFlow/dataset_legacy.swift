@@ -7,7 +7,7 @@ public func testDatasetWithFakeData() {
     "tfc.makeIteratorGetNextWithDatasets",
     dataSource: "fake",
     filePath: "dummy_path",
-    batchSize: 1,
+    batchSize: Int64(1),
     outputShapes: [TensorShape()])
   let y = Tensor<Float>(handle: x) + 1
   _hostOp(y.array.scalars[0])
@@ -25,7 +25,7 @@ public func testDatasetWithMNIST() {
     "tfc.makeIteratorGetNextWithDatasets",
     dataSource: "mnist",
     filePath: "some_path",
-    batchSize: 64,
+    batchSize: Int64(64),
     output_shapes: [TensorShape(64,224,224,3), TensorShape(64)])
   let images : TensorHandle<Float> = #tfop("Identity", images1)
   let labels : TensorHandle<Int32> = #tfop("Identity", labels1)

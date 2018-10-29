@@ -1609,6 +1609,8 @@ namespace {
       assert(expr->isTFOp() && "Unexpected expression");
       auto &tc = CS.getTypeChecker();
       auto locator = CS.getConstraintLocator(expr);
+      auto tensorArrayProtoTy = tc.Context.getProtocol(
+          KnownProtocolKind::TensorArrayProtocol)->getDeclaredType();
 
       // The TensorFlow module defines the "TensorHandle" type, which is the
       // representation of a tensor value.  If we can't find it, then we reject
@@ -1673,6 +1675,17 @@ namespace {
 
         // We infer the type of inputs from context.
         auto ty = CS.createTypeVariable(locator, 0);
+        if (!sawAttribute) {
+          // It is an input.
+          // All inputs must conform to TensorArrayProtocol.
+          auto constraintLocator = CS.getConstraintLocator(
+            expr,
+            {ConstraintLocator::ApplyArgument,
+             LocatorPathElt::getTupleElement(i)},
+            0);
+          CS.addConstraint(ConstraintKind::ConformsTo, ty, tensorArrayProtoTy,
+                           constraintLocator);
+        }
         argTypes.push_back(TupleTypeElt(ty, tt->getElementName(i)));
       }
 

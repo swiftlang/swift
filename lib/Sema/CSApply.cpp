@@ -29,7 +29,9 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/TensorFlow.h" // SWIFT_ENABLE_TENSORFLOW
 #include "swift/Basic/StringExtras.h"
+#include "swift/SIL/GraphOperationInfo.h" // SWIFT_ENABLE_TENSORFLOW
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
@@ -420,6 +422,9 @@ namespace {
   /// \brief Rewrites an expression by applying the solution of a constraint
   /// system to that expression.
   class ExprRewriter : public ExprVisitor<ExprRewriter, Expr *> {
+  // SWIFT_ENABLE_TENSORFLOW
+  private:
+    tf::AttributeTypeClassifier atc;
   public:
     ConstraintSystem &cs;
     DeclContext *dc;
@@ -2406,8 +2411,115 @@ namespace {
 
     // SWIFT_ENABLE_TENSORFLOW
     Expr *visitTFOp(ObjectLiteralExpr *expr) {
+      auto &ctx = cs.TC.Context;
+
+      auto diagnose = [&](SourceLoc loc, const Twine &message) {
+        cs.TC.diagnose(loc, diag::invalid_tfop, message.str());
+      };
+
       // All #tfop operands are RValues.
       expr->setArg(cs.coerceToRValue(expr->getArg()));
+
+      // We do most of the typechecking for #tfop here in CSApply instead of
+      // generating constraints for #tfop in CSGen because #tfop allows many
+      // different types of arguments and results that are inconvenient or
+      // impossible to generate constraints for. For example:
+      // - NormalAttributes allow >10 different types, we would have to generate
+      //   a huge disjunction constraint to constraint all the different types,
+      //   and then we would have to add custom code to CSDiag that understands
+      //   how to create a nice error message for the disjunction constraint
+      //   failure.
+      // - Results can be arbitrary tuples of TensorFlow values, and there is
+      //   no nice way to constraint something to be an arbitrary tuple.
+      //
+      // It's much easier to check #tfop after we know what all the argument and
+      // result types are.
+
+      // Check arguments.
+      auto stringTy = ctx.getStringDecl()->getDeclaredInterfaceType();
+      auto *args = dyn_cast<TupleExpr>(expr->getArg());
+      if (!args) {
+        // CSGen has already ensured that the argument is a string in the
+        // single argument case.
+        assert(cs.getType(expr->getArg())->isEqual(stringTy) &&
+               "single argument should be string");
+        return expr;
+      }
+
+      for (unsigned i = 0, e = args->getNumElements(); i != e; ++i) {
+        auto argExpr = args->getElement(i);
+        auto argType = cs.getType(argExpr);
+
+        // CSGen has already ensured that the first argument is a string, so skip
+        // the first argument.
+        if (i == 0) {
+          assert(argType->isEqual(stringTy) &&
+                 "first argument should be string");
+          continue;
+        }
+
+        auto argLoc = argExpr->getLoc();
+        auto argNameAndLowering = tf::GraphOperationInfo::decodeArgumentName(
+            args->getElementName(i).str());
+        if (!argNameAndLowering) {
+          diagnose(argLoc, "argument name has invalid modifier");
+          return nullptr;
+        }
+        auto argLowering = argNameAndLowering->second;
+        switch (argLowering) {
+        case tf::GraphOperationInfo::ArgumentLowering::Input:
+          // CSGen has already ensured that all inputs conform to
+          // TensorArrayProtocol.
+          break;
+        case tf::GraphOperationInfo::ArgumentLowering::NormalAttribute:
+          if (atc.classifyNormalAttribute(argType) ==
+              tf::AttributeTypeClassifier::Normal::Unsupported) {
+            diagnose(
+                argLoc,
+                StringRef("attribute requires ") +
+                    tf::AttributeTypeClassifier::normalSupportedTypesDesc +
+                    ", but got type '" + argType->getString() + "'");
+            return nullptr;
+          }
+          break;
+        case tf::GraphOperationInfo::ArgumentLowering::TensorAttribute:
+          // See the comment on the declaration of the enum case
+          // `GraphOperationInfo::ArgumentLowering::TensorAttribute` for more
+          // information on why these are not allowed in #tfop's.
+          diagnose(argLoc, "$tensor attributes are not allowed in #tfop's");
+          return nullptr;
+        case tf::GraphOperationInfo::ArgumentLowering::ShapeAttribute:
+          if (atc.classifyShapeAttribute(argType) ==
+              tf::AttributeTypeClassifier::Shape::Unsupported) {
+            diagnose(
+                argLoc,
+                StringRef("$shape attribute requires ")+
+                    tf::AttributeTypeClassifier::shapeSupportedTypesDesc +
+                    ", but got type '" + argType->getString() + "'");
+            return nullptr;
+          }
+          break;
+        case tf::GraphOperationInfo::ArgumentLowering::TFDataTypeAttribute:
+          if (atc.classifyTFDataTypeAttribute(argType) ==
+              tf::AttributeTypeClassifier::TFDataType::Unsupported) {
+            diagnose(
+                argLoc,
+                StringRef("$dtype attribute requires ") +
+                    tf::AttributeTypeClassifier::tfDataTypeSupportedTypesDesc +
+                    ", but got type '" + argType->getString() + "'");
+            return nullptr;
+          }
+          break;
+        case tf::GraphOperationInfo::ArgumentLowering::Out:
+          // SILGen generates $out attributes. It does not make sense to specify
+          // them in code.
+          diagnose(argLoc, "$out attributes are not allowed in #tfop's");
+          return nullptr;
+        }
+      }
+
+      // TODO(SR-9428): Check result types.
+
       return expr;
     }
 
