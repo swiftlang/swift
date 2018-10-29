@@ -55,7 +55,7 @@ func literals() {
 // CHECK-LABEL: sil hidden @$s11expressions8literalsyyF
 // CHECK: integer_literal $Builtin.Int2048, 1
 // CHECK: float_literal $Builtin.FPIEEE{{64|80}}, {{0x3FF4000000000000|0x3FFFA000000000000000}}
-// CHECK: string_literal utf16 "foö"
+// CHECK: string_literal utf8 "foö"
 // CHECK: string_literal utf8 "foo"
 
 func bar(_ x: Int) {}
@@ -489,7 +489,7 @@ func magic_identifier_expansion(_ a: Int = #column) {
 func print_string() {
   // CHECK-LABEL: print_string
   var str = "\u{08}\u{09}\thello\r\n\0wörld\u{1e}\u{7f}"
-  // CHECK: string_literal utf16 "\u{08}\t\thello\r\n\0wörld\u{1E}\u{7F}"
+  // CHECK: string_literal utf8 "\u{08}\t\thello\r\n\0wörld\u{1E}\u{7F}"
 }
 
 
