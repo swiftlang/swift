@@ -12,126 +12,116 @@
 
 import SwiftShims
 
-internal enum _StringComparison: Int {
+@_frozen
+@usableFromInline
+internal enum _StringComparisonResult: Int {
   case less = -1
   case equal = 0
   case greater = 1
-  
-  @usableFromInline internal
-  var flipped: _StringComparison {
-    switch self {
-      case .less: return .greater
-      case .equal: return .equal
-      case .greater: return .less
+
+  @inlinable
+  internal var flipped: _StringComparisonResult {
+    @inline(__always) get {
+      return _StringComparisonResult(
+        rawValue: -self.rawValue)._unsafelyUnwrappedUnchecked
     }
   }
-  
-  @inline(__always)
-  @usableFromInline internal
-  init(signedNotation int: Int) {
+
+  @inlinable @inline(__always)
+  internal init(signedNotation int: Int) {
     self = int < 0 ? .less : int == 0 ? .equal : .greater
   }
 }
 
-@inlinable // For pre-normal fast path
-@_effects(readonly)
-internal func _compareStringsEqual(_ lhs: String, _ rhs: String) -> Bool {
-  // TODO(UTF8): Known-prenormal check / perf flag, memcmp call
-
-  return _compareStringsCanonicalEquivalent(lhs, rhs)
-}
-
-@inlinable // For pre-normal fast path
-@_effects(readonly)
-internal func _compareStringsLess(_ lhs: String, _ rhs: String) -> Bool {
-  // TODO(UTF8): Known-prenormal check / perf flag, memcmp call
-
-  return _compareStringsCanonicalLess(lhs, rhs)
-}
-
-extension UnsafeBufferPointer where Element == UInt8 {
-  @inlinable // FIXME(sil-serialize-all)
-  internal func compareASCII(to other: UnsafeBufferPointer<UInt8>) -> Int {
-    if self.baseAddress == other.baseAddress {
-      return (self.count &- other.count).signum()
-    }
-    var cmp = Int(truncatingIfNeeded:
-      _stdlib_memcmp(
-        self.baseAddress!, other.baseAddress!,
-        Swift.min(self.count, other.count)))
-    if cmp == 0 {
-      cmp = self.count &- other.count
-    }
-    return cmp.signum()
-  }
-}
-
-extension _StringGuts {
+extension _SlicedStringGuts {
   @inline(__always)
-  @inlinable
-  public func _bitwiseEqualTo(_ other: _StringGuts) -> Bool {
-    return self.rawBits == other.rawBits
+  @_effects(readonly)
+  internal func withNFCCodeUnits<R>(
+    _ f: (_NormalizedUTF8CodeUnitIterator) throws -> R
+  ) rethrows -> R {
+    if self.isNFCFastUTF8 {
+      // TODO(UTF8 perf): Faster iterator if we're already normal
+      return try self.withFastUTF8 {
+        return try f(_NormalizedUTF8CodeUnitIterator($0, range: 0..<$0.count))
+      }
+    }
+    if self.isFastUTF8 {
+      return try self.withFastUTF8 {
+        return try f(_NormalizedUTF8CodeUnitIterator($0, range: 0..<$0.count))
+      }
+    }
+    return try f(_NormalizedUTF8CodeUnitIterator(
+      foreign: self._guts, range: self.range))
   }
 }
 
-@_effects(readonly)
-internal func _compareStringsCanonical(
-  _ lhs: String, _ rhs: String
-) -> _StringComparison {
-  // TODO(UTF8): fast paths, incremental comparison and normalization, etc.
-  
-  let left = lhs._guts
-  let right = rhs._guts
-  
-  // Bitwise equality implies string equality
-  if left._bitwiseEqualTo(right) {
-    return .equal
+// Perform a binary comparison of bytes in memory. Return value is negative if
+// less, 0 if equal, positive if greater.
+@inlinable @inline(__always) // Memcmp wrapper
+internal func _binaryCompare<UInt8>(
+  _ lhs: UnsafeBufferPointer<UInt8>, _ rhs: UnsafeBufferPointer<UInt8>
+) -> Int {
+  var cmp = Int(truncatingIfNeeded:
+    _stdlib_memcmp(
+      lhs.baseAddress._unsafelyUnwrappedUnchecked,
+      rhs.baseAddress._unsafelyUnwrappedUnchecked,
+      Swift.min(lhs.count, rhs.count)))
+  if cmp == 0 {
+    cmp = lhs.count &- rhs.count
   }
-  
-  if left.isASCII && right.isASCII {
-    return left.withFastUTF8 { l in
-      return right.withFastUTF8 { r in 
-        return _StringComparison(signedNotation: l.compareASCII(to: r))
+  return cmp
+}
+
+// Double dispatch functions
+extension _SlicedStringGuts {
+  @usableFromInline
+  @_effects(readonly)
+  internal func compare(
+    with other: _SlicedStringGuts
+  ) -> _StringComparisonResult {
+    if _fastPath(self.isNFCFastUTF8 && other.isNFCFastUTF8) {
+      Builtin.onFastPath() // aggressively inline / optimize
+      return self.withFastUTF8 { nfcSelf in
+        return other.withFastUTF8 { nfcOther in
+          return _StringComparisonResult(
+            signedNotation: _binaryCompare(nfcSelf, nfcOther))
+        }
+      }
+    }
+
+    return _slowCompare(with: other)
+  }
+
+  @inline(never) // opaque slow-path
+  @_effects(readonly)
+  internal func _slowCompare(
+    with other: _SlicedStringGuts
+  ) -> _StringComparisonResult {
+    return self.withNFCCodeUnits {
+      var selfIter = $0
+      return other.withNFCCodeUnits {
+        var otherIter = $0
+        return selfIter.compare(with: otherIter)
       }
     }
   }
-  return _compareStringsSlow(lhs, rhs)
 }
-
-// internal func _findDiffIdx(
 
 internal func _lexicographicalCompare(
   _ lhs: UInt8, _ rhs: UInt8
-) -> _StringComparison {
+) -> _StringComparisonResult {
   return lhs < rhs ? .less : (lhs > rhs ? .greater : .equal)
 }
 
 internal func _lexicographicalCompare(
   _ lhs: UInt16, _ rhs: UInt16
-) -> _StringComparison {
+) -> _StringComparisonResult {
   return lhs < rhs ? .less : (lhs > rhs ? .greater : .equal)
-}
-
-
-@usableFromInline @inline(never)// @opaque slowish-path
-@_effects(readonly)
-internal func _compareStringsCanonicalEquivalent(
-  _ lhs: String, _ rhs: String
-) -> Bool {
-  return _compareStringsCanonical(lhs, rhs) == .equal
-}
-
-@usableFromInline @inline(never)// @opaque slowish-path
-@_effects(readonly)
-internal func _compareStringsCanonicalLess(
-  _ lhs: String, _ rhs: String
-) -> Bool {
-  return _compareStringsCanonical(lhs, rhs) == .less
 }
 
 internal func _lexicographicalCompare(
   _ lhs: Int, _ rhs: Int
-) -> _StringComparison {
+) -> _StringComparisonResult {
   // TODO: inspect code quality
   return lhs < rhs ? .less : (lhs > rhs ? .greater : .equal)
 }
@@ -139,7 +129,7 @@ internal func _lexicographicalCompare(
 @_effects(readonly)
 internal func _lexicographicalCompare(
   _ lhs: Array<UInt8>, _ rhs: Array<UInt8>
-) -> _StringComparison {
+) -> _StringComparisonResult {
   // Check for a difference in overlapping contents
   let count = Swift.min(lhs.count, rhs.count)
   for idx in 0..<count {
@@ -155,52 +145,3 @@ internal func _lexicographicalCompare(
   return lhs.count < rhs.count ? .less : .greater
 }
 
-// @opaque
-@_effects(readonly)
-@inline(never) // slow-path
-internal func _compareStringsSlow(
-  _ lhs: String, _ rhs: String
-) -> _StringComparison {
-  // TODO(UTF8): fast paths, incremental comparison and normalization, etc.
-
-  let left = lhs._guts
-  let right = rhs._guts
-  
-  let lhsRange = lhs.startIndex..<lhs.endIndex
-  let rhsRange = rhs.startIndex..<rhs.endIndex
-  
-  switch (left.isFastUTF8, right.isFastUTF8) {
-  case (true, true):
-    return left.withFastUTF8 { leftUTF8 in
-      return right.withFastUTF8 { rightUTF8 in 
-        var leftIterator = 
-          _NormalizedUTF8CodeUnitIterator(leftUTF8, range: 0..<leftUTF8.count)
-        let rightIterator =
-          _NormalizedUTF8CodeUnitIterator(rightUTF8, range: 0..<rightUTF8.count)
-        return leftIterator.compare(with: rightIterator)
-      }
-    }
-  case (true, false):
-    return left.withFastUTF8 { leftUTF8 in
-      var leftIterator =
-        _NormalizedUTF8CodeUnitIterator(leftUTF8, range: 0..<leftUTF8.count)
-      let rightIterator =
-        _NormalizedUTF8CodeUnitIterator(right, range: rhsRange)
-      return leftIterator.compare(with: rightIterator)
-    }
-  case (false, true):
-    return right.withFastUTF8 { rightUTF8 in
-      var leftIterator =
-        _NormalizedUTF8CodeUnitIterator(left, range: lhsRange)
-      let rightIterator =
-        _NormalizedUTF8CodeUnitIterator(rightUTF8, range: 0..<rightUTF8.count)
-      return leftIterator.compare(with: rightIterator)
-    }
-  case (false, false):
-    var leftIterator 
-      = _NormalizedUTF8CodeUnitIterator(left, range: lhsRange)
-    let rightIterator 
-      = _NormalizedUTF8CodeUnitIterator(right, range: rhsRange)
-    return leftIterator.compare(with: rightIterator)
-  }
-}

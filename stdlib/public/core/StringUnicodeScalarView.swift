@@ -213,8 +213,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   ///
   /// - Parameter c: The character to append to the string.
   public mutating func append(_ c: Unicode.Scalar) {
-    // TODO(UTF8 perf): This is a horribly slow means...
-    self.append(contentsOf: [c])
+    self._guts.append(String(c)._guts)
   }
 
   /// Appends the Unicode scalar values in the given sequence to the view.

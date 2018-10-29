@@ -113,7 +113,7 @@ extension String.UTF16View: BidirectionalCollection {
     if _slowPath(n < 0 && limit <= i && limitOffset > iOffset + n) {
       return nil
     }
-    //  If distance > 0, limit has no effect if it is less than i. Likewise,
+    // If distance > 0, limit has no effect if it is less than i.
     if _slowPath(n >= 0 && limit >= i && limitOffset < iOffset + n) {
       return nil
     }

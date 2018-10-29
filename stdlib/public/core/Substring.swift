@@ -105,6 +105,11 @@ public struct Substring {
     _invariantCheck()
   }
 
+  @inline(__always)
+  internal init(_ slice: _SlicedStringGuts) {
+    self.init(String(slice._guts)[slice.range])
+  }
+
   /// Creates an empty substring.
   @inlinable @inline(__always)
   public init() {
@@ -114,23 +119,23 @@ public struct Substring {
 
 extension Substring {
   @inlinable
-  internal var wholeGuts: _StringGuts {
+  internal var _wholeGuts: _StringGuts {
     @inline(__always) get { return _slice.base._guts }
   }
   @inlinable
-  internal var wholeString: String {
-    @inline(__always) get { return String(self.wholeGuts) }
+  internal var _wholeString: String {
+    @inline(__always) get { return String(self._wholeGuts) }
   }
-  @usableFromInline // TODO(UTF8 merge): for testing, drop this decl after merge
-  internal var _wholeString: String { return wholeString }
 
   @inlinable
-  internal var offsetRange: Range<Int> {
-    let start = _slice.startIndex
-    let end = _slice.endIndex
-    _sanityCheck(start.transcodedOffset == 0 && end.transcodedOffset == 0)
+  internal var _offsetRange: Range<Int> {
+    @inline(__always) get {
+      let start = _slice.startIndex
+      let end = _slice.endIndex
+      _sanityCheck(start.transcodedOffset == 0 && end.transcodedOffset == 0)
 
-    return Range(uncheckedBounds: (start.encodedOffset, end.encodedOffset))
+      return Range(uncheckedBounds: (start.encodedOffset, end.encodedOffset))
+    }
   }
 
   #if !INTERNAL_CHECKS_ENABLED
@@ -138,7 +143,7 @@ extension Substring {
   #else
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
-    self.wholeString._invariantCheck()
+    self._wholeString._invariantCheck()
   }
   #endif // INTERNAL_CHECKS_ENABLED
 }
@@ -425,7 +430,7 @@ extension Substring {
   @inlinable
   public var utf8: UTF8View {
     get {
-      return wholeString.utf8[startIndex..<endIndex]
+      return _wholeString.utf8[startIndex..<endIndex]
     }
     set {
       self = Substring(newValue)
@@ -551,7 +556,7 @@ extension Substring {
   @inlinable
   public var utf16: UTF16View {
     get {
-      return wholeString.utf16[startIndex..<endIndex]
+      return _wholeString.utf16[startIndex..<endIndex]
     }
     set {
       self = Substring(newValue)
@@ -677,7 +682,7 @@ extension Substring {
   @inlinable
   public var unicodeScalars: UnicodeScalarView {
     get {
-      return wholeString.unicodeScalars[startIndex..<endIndex]
+      return _wholeString.unicodeScalars[startIndex..<endIndex]
     }
     set {
       self = Substring(newValue)
@@ -717,8 +722,19 @@ extension Substring.UnicodeScalarView : RangeReplaceableCollection {
 }
 
 extension Substring : RangeReplaceableCollection {
+  @_specialize(where S == String)
+  @_specialize(where S == Substring)
+  @_specialize(where S == Array<Character>)
   public init<S : Sequence>(_ elements: S)
   where S.Element == Character {
+    if let str = elements as? String {
+      self = str[...]
+      return
+    }
+    if let subStr = elements as? Substring {
+      self = subStr
+      return
+    }
     self = String(elements)[...]
   }
 
