@@ -19,7 +19,7 @@ if (LLVM_ENABLE_ASSERTIONS)
     "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp")
 endif(LLVM_ENABLE_ASSERTIONS)
 
-add_swift_target_library(swiftReflection STATIC TARGET_LIBRARY
+add_swift_target_library(swiftReflection STATIC
   ${swiftReflection_SOURCES}
   C_COMPILE_FLAGS ${SWIFT_RUNTIME_CXX_FLAGS}
   LINK_FLAGS ${SWIFT_RUNTIME_LINK_FLAGS}

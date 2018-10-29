@@ -896,8 +896,7 @@ endif()
 #
 # We must include stdlib/ before tools/ because stdlib/CMakeLists.txt
 # declares the swift-stdlib-* set of targets. These targets will then
-# implicitly depend on any targets declared with IS_STDLIB or
-# TARGET_LIBRARY.
+# implicitly depend on any targets declared with IS_STDLIB.
 #
 # One such library that declares IS_STDLIB is SwiftSyntax, living in
 # tools/SwiftSyntax. If we include stdlib/ after tools/,
