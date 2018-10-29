@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift
 //
-// TODO: Disabling deabstration-inlining during dynamic compilation broke this test.
-// : %target-run-dynamic-compilation-swift
+// TODO(SR-9110): Make this pass in dynamic compilation mode.
+// %target-run-dynamic-compilation-swift
 //
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
