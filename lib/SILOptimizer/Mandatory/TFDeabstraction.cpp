@@ -2908,6 +2908,10 @@ void TFDeabstractionPass::run() {
     // However, in dynamic compilation mode, deabstract everything in this
     // module because dynamic compilation mode executes functions individually
     // rather than inlining them into large tensor programs.
+    //
+    // TODO(marcrasi): IRGen should be able to handle non-deabstracted code.
+    // Once it can handle non-deabstracted code, turn deabstraction off entirely
+    // in dynamic compilation mode.
     if (!tfc.shouldBePartitioned(&fn, /*forceTFFunctions*/false) &&
         !llvm::TFDynamicCompilation) {
       fn.skippedByDeabstraction = true;
