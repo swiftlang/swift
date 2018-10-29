@@ -1,15 +1,18 @@
 // swift-tools-version:4.2
-
 import PackageDescription
-import Foundation
+
+import class Foundation.FileManager
+import struct Foundation.URL
 
 // This is a stop gap hack so we can edit benchmarks in Xcode.
 let singleSourceLibraries: [String] = {
-  let f = FileManager.`default`
+  // FIXME: Side-effects in the package manifest file are not supported may lead
+  // to unexpected behavior. For e.g., SwiftPM might not pick up the updates
+  // in this directory due to manifest caching.
   let dirURL = URL(fileURLWithPath: "single-source").absoluteURL
-  let fileURLs = try! f.contentsOfDirectory(at: dirURL,
-                                            includingPropertiesForKeys: nil)
-  return fileURLs.flatMap { (path: URL) -> String? in
+  let fileURLs = try! FileManager.default.contentsOfDirectory(at: dirURL, includingPropertiesForKeys: nil)
+
+  return fileURLs.compactMap{ path in
     let c = path.lastPathComponent.split(separator: ".")
     // Too many components. Must be a gyb file.
     if c.count > 2 {
@@ -30,66 +33,74 @@ let singleSourceLibraries: [String] = {
 }()
 
 let multiSourceLibraries: [String] = {
-  let f = FileManager.`default`
+  // FIXME: Side-effects in the package manifest file are not supported may lead
+  // to unexpected behavior. For e.g., SwiftPM might not pick up the updates
+  // in this directory due to manifest caching.
   let dirURL = URL(fileURLWithPath: "multi-source").absoluteURL
-  let fileURLs = try! f.contentsOfDirectory(at: dirURL,
-                                            includingPropertiesForKeys: nil)
-  return fileURLs.map { (path: URL) -> String in
-    return path.lastPathComponent
-  }
+  let fileURLs = try! FileManager.default.contentsOfDirectory(at: dirURL, includingPropertiesForKeys: nil)
+  return fileURLs.map{ return $0.lastPathComponent }
 }()
 
-var products: [Product] = []
-products.append(.library(name: "TestsUtils", type: .static, targets: ["TestsUtils"]))
-products.append(.library(name: "DriverUtils", type: .static, targets: ["DriverUtils"]))
-products.append(.library(name: "ObjectiveCTests", type: .static, targets: ["ObjectiveCTests"]))
-products.append(.executable(name: "SwiftBench", targets: ["SwiftBench"]))
-products.append(.library(name: "PrimsSplit", type: .static, targets: ["PrimsSplit"]))
-products += singleSourceLibraries.map { .library(name: $0, type: .static, targets: [$0]) }
-products += multiSourceLibraries.map { .library(name: $0, type: .static, targets: [$0]) }
+// Targets.
+var targets: [Target] = [
+  .target(
+    name: "TestsUtils",
+    path: "utils",
+    sources: ["TestsUtils.swift"]
+  ),
 
-var targets: [Target] = []
-targets.append(.target(name: "TestsUtils", path: "utils", sources: ["TestsUtils.swift"]))
-targets.append(.systemLibrary(name: "LibProc", path: "utils/LibProc"))
-targets.append(
-  .target(name: "DriverUtils",
-    dependencies: [.target(name: "TestsUtils"), "LibProc"],
+  .systemLibrary(
+    name: "LibProc",
+    path: "utils/LibProc"
+  ),
+
+  .target(
+    name: "DriverUtils",
+    dependencies: ["TestsUtils", "LibProc"],
     path: "utils",
-    sources: ["DriverUtils.swift", "ArgParse.swift"]))
-targets.append(
-    .target(name: "SwiftBench",
-    dependencies: [
-      .target(name: "TestsUtils"),
-      .target(name: "ObjectiveCTests"),
-      .target(name: "DriverUtils"),
-    ] + singleSourceLibraries.map { .target(name: $0) }
-    + multiSourceLibraries.map { .target(name: $0) },
-    path: "utils",
-    sources: ["main.swift"]))
-targets.append(
-  .target(name: "ObjectiveCTests",
+    sources: ["DriverUtils.swift", "ArgParse.swift"]
+  ),
+
+  .target(
+    name: "ObjectiveCTests",
     path: "utils/ObjectiveCTests",
-    publicHeadersPath: "."))
-targets += singleSourceLibraries.map { x in
-    return .target(name: x,
-      dependencies: [
-        .target(name: "TestsUtils"),
-        .target(name: "ObjectiveCTests"),
-      ],
-      path: "single-source",
-      sources: ["\(x).swift"])
-}
-targets += multiSourceLibraries.map { x in
-  return .target(name: x,
+    publicHeadersPath: "."
+  )
+]
+
+targets += [
+  .target(
+    name: "SwiftBench",
     dependencies: [
-      .target(name: "TestsUtils")
-    ],
-    path: "multi-source/\(x)")
+      "TestsUtils",
+      "ObjectiveCTests",
+      "DriverUtils",
+    ] + singleSourceLibraries.map{ .target(name: $0) } + multiSourceLibraries.map{ .target(name: $0) },
+    path: "utils",
+    sources: ["main.swift"]
+  )
+]
+
+targets += singleSourceLibraries.map{
+  .target(name: $0,
+    dependencies: ["TestsUtils", "ObjectiveCTests"],
+    path: "single-source",
+    sources: ["\($0).swift"]
+  )
 }
 
-let p = Package(
-  name: "swiftbench",
-  products: products,
+targets += multiSourceLibraries.map{
+  return .target(name: $0,
+    dependencies: ["TestsUtils"],
+    path: "multi-source/\($0)"
+  )
+}
+
+let package = Package(
+  name: "SwiftBench",
+  products: [
+    .executable(name: "SwiftBench", targets: ["SwiftBench"]),
+  ],
   targets: targets,
   swiftLanguageVersions: [.v4]
 )

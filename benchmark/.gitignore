@@ -1,0 +1,2 @@
+# Ignore SwiftPM's default build directory.
+.build
