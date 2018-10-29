@@ -1,4 +1,4 @@
-add_swift_executable(swift-stdlib-tool
+add_swift_host_tool(swift-stdlib-tool
   swift-stdlib-tool.mm)
 
 find_library(FOUNDATION NAMES Foundation)

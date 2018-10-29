@@ -1535,6 +1535,14 @@ public:
                             sgm.getASTContext().getIdentifier("errorInMain"),
                             sgm.Types.getEmptyTupleType(), {}, {error});
 
+        // Then end the lifetime of the error.
+        //
+        // We do this to appease the ownership verifier. We do not care about
+        // actually destroying the value since we are going to immediately exit,
+        // so this saves us a slight bit of code-size since end_lifetime is
+        // stripped out after ownership is removed.
+        SGF.B.createEndLifetime(moduleLoc, error);
+
         // Signal an abnormal exit by returning 1.
         SGF.Cleanups.emitCleanupsForReturn(CleanupLocation::get(moduleLoc),
                                            IsForUnwind);

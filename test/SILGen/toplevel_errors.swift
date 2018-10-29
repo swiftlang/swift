@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 enum MyError : Error {
   case A, B
@@ -21,6 +21,7 @@ throw MyError.A
 
 // CHECK: bb2([[T0:%.*]] : @owned $Error):
 // CHECK: builtin "errorInMain"([[T0]] : $Error)
+// CHECK: end_lifetime [[T0]]
 // CHECK: [[T0:%.*]] = integer_literal $Builtin.Int32, 1
 // CHECK: [[T1:%.*]] = struct $Int32 ([[T0]] : $Builtin.Int32)
 // CHECK: br bb1([[T1]] : $Int32)
