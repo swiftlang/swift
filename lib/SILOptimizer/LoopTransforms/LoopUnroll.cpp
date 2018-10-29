@@ -33,6 +33,8 @@ using llvm::MapVector;
 namespace {
 
 /// Clone the basic blocks in a loop.
+///
+/// Currently invalidates the DomTree.
 class LoopCloner : public SILCloner<LoopCloner> {
   SILLoop *Loop;
 
@@ -52,12 +54,12 @@ public:
 
 protected:
   // SILCloner CRTP override.
-  SILValue remapValue(SILValue V) {
+  SILValue getMappedValue(SILValue V) {
     if (auto *BB = V->getParentBlock()) {
       if (!Loop->contains(BB))
         return V;
     }
-    return SILCloner<LoopCloner>::remapValue(V);
+    return SILCloner<LoopCloner>::getMappedValue(V);
   }
   // SILCloner CRTP override.
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
@@ -279,7 +281,7 @@ void LoopCloner::collectLoopLiveOutValues(
           auto ArgumentValue = SILValue(Arg);
           if (!LoopLiveOutValues.count(ArgumentValue))
             LoopLiveOutValues[ArgumentValue].push_back(
-                remapValue(ArgumentValue));
+                getMappedValue(ArgumentValue));
         }
       }
     }
@@ -295,7 +297,7 @@ void LoopCloner::collectLoopLiveOutValues(
           assert(UsedValue == result && "Instructions must match");
 
           if (!LoopLiveOutValues.count(UsedValue))
-            LoopLiveOutValues[UsedValue].push_back(remapValue(result));
+            LoopLiveOutValues[UsedValue].push_back(getMappedValue(result));
         }
       }
     }
