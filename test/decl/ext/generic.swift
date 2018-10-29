@@ -167,3 +167,11 @@ public typealias Array2 = Array
 extension Array2 where QQQ : VVV {}
 // expected-error@-1 {{use of undeclared type 'QQQ'}}
 // expected-error@-2 {{use of undeclared type 'VVV'}}
+
+// https://bugs.swift.org/browse/SR-9009
+func foo() {
+  extension Array where Element : P1 {
+  // expected-error@-1 {{declaration is only valid at file scope}}
+    func foo() -> Element.AssocType {}
+  }
+}
