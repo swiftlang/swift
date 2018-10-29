@@ -350,8 +350,8 @@ internal func unimplemented_utf8_32bit(
 /// [equivalence]: http://www.unicode.org/glossary/#canonical_equivalent
 @_fixed_layout
 public struct String {
-  @usableFromInline
-  internal var _guts: _StringGuts
+  public // @SPI(Foundation)
+  var _guts: _StringGuts
 
   @inlinable @inline(__always)
   internal init(_ _guts: _StringGuts) {
