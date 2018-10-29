@@ -1983,12 +1983,13 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       astCtx.getProtocol(KnownProtocolKind::TensorGroup);
   assert(tensorGroupProto && "could not find TensorGroup protocol");
 
-  if (CurSILFn->skippedByDeabstraction) {
-    // graph_ops do make it here when building functions that don't get
-    // deabstracted (e.g. TensorFlow stdlib functions).
-    // IRGen is currently not powerful enough to handle graph_ops in functions
-    // that don't get deabstractd. For these cases, we abort here with an error
-    // message.
+  if (!llvm::TFDynamicCompilation) {
+    // If we are not in dynamic compilation mode, then deabstraction may not
+    // have transformed the graph_ops into a form that we can lower, so do not
+    // try to lower the graph_ops.
+    // TODO(marcrasi): Once we make deabstraction unnecessary for IRGen, we
+    // should be able to lower everything no matter what the mode is, so remove
+    // this check.
     const std::string errMessage = "!!! Compiler bug -- graph_op " +
                               opInfo.getOperationName().str() +
                               " cannot be lowered to LLVM IR !!!\n";
