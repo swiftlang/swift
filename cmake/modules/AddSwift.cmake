@@ -2388,8 +2388,7 @@ function(add_swift_host_tool executable)
   set(ASHT_multiple_parameter_options
         SWIFT_COMPONENT
         COMPILE_FLAGS
-        DEPENDS
-        SWIFT_MODULE_DEPENDS)
+        DEPENDS)
 
   cmake_parse_arguments(
       ASHT # prefix
@@ -2397,15 +2396,6 @@ function(add_swift_host_tool executable)
       "" # single-value args
       "${ASHT_multiple_parameter_options}" # multi-value args
       ${ARGN})
-
-  # Configure variables for this subdirectory.
-  set(VARIANT_SUFFIX "-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
-  set(MODULE_VARIANT_SUFFIX "-swiftmodule${VARIANT_SUFFIX}")
-
-  foreach(mod ${ASHT_SWIFT_MODULE_DEPENDS})
-    list(APPEND ASHT_DEPENDS "swift${mod}${MODULE_VARIANT_SUFFIX}")
-    list(APPEND ASHT_DEPENDS "swift${mod}${VARIANT_SUFFIX}")
-  endforeach()
 
   # Create the executable rule.
   add_swift_executable(
