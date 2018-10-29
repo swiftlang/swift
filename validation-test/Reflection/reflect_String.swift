@@ -29,6 +29,7 @@ reflect(object: obj)
 // CHECK-64-NEXT: (class_instance size=32 alignment=8 stride=32
 // CHECK-64-NEXT:   (field name=t offset=16
 // CHECK-64-NEXT:     (struct size=16 alignment=8 stride=16 num_extra_inhabitants=1
+
 // (unstable implementation details omitted)
 
 // CHECK-32: Reflecting an object.

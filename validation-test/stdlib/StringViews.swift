@@ -59,7 +59,7 @@ tests.test("decoding") {
     winterUTF8,
     winter.utf8
   )
-  
+
   expectEqualSequence(
     [0xd83c, 0xdfc2, 0x2603, 0x2745, 0x2746, 0x2744, 0xfe0e, 0x26c4,
       0xfe0f, 0x2744, 0xfe0f,
@@ -148,7 +148,7 @@ tests.test("index-mapping/unicode-scalar-to-utf8/\(id)") {
       replacementUTF8,
       replacementUTF8
     ] as [[UTF8.CodeUnit]],
-    
+
     winter.unicodeScalars.indices.map {
       i in (0..<3).map {
         let w = winter
@@ -178,8 +178,21 @@ tests.test("index-mapping/utf16-to-utf8/\(id)") {
   expectEqualSequence(
     [
       [0xf0, 0x9f, 0x8f],
-      // does not align with any utf8 code unit
-      id == "legacy" ? [] : replacementUTF8,
+
+      // TODO(UTF8 merge): Verify reasoning below:
+      //
+      // Prior to UTF-8 String, this tested for empty array in "legacy mode" or
+      // the replacemnet character otherwise. However, SE-0180 (String Index
+      // Overhual) dictates subscript behavior should treat it as emergent
+      // behavior from its encoded offset, hence we should get the same 3 code
+      // units as prior for non-scalar-aligned UTF-16 offsets applied to the
+      // UTF-8 view.
+      //
+      // Old code:
+      //   // does not align with any utf8 code unit
+      //   id == "legacy" ? [] : replacementUTF8,
+      id == "legacy" ? [] : [0xf0, 0x9f, 0x8f],
+
       [0xe2, 0x98, 0x83],
       [0xe2, 0x9d, 0x85],
       [0xe2, 0x9d, 0x86],
@@ -223,7 +236,7 @@ tests.test("index-mapping/utf16-to-utf8/\(id)") {
 tests.test("index-mapping/utf8-to-utf8/\(id)") {
   // should always succeed
   for i in winter.utf8.indices {
-    expectEqual(i, mapIndex(i, winter.utf8)!)      
+    expectEqual(i, mapIndex(i, winter.utf8)!)
   }
 }
 }
@@ -240,7 +253,7 @@ func checkToUTF16(
 func err(_ codeUnit: Unicode.UTF16.CodeUnit) -> Unicode.UTF16.CodeUnit? {
   return id == "legacy" ? nil : codeUnit
 }
-  
+
 tests.test("index-mapping/character-to-utf16/\(id)") {
   expectEqualSequence(
     [
@@ -253,19 +266,19 @@ tests.test("index-mapping/character-to-utf16/\(id)") {
       0x2744, // 0xfe0f,
       replacementUTF16, 0x20, replacementUTF16, replacementUTF16
     ] as [UTF16.CodeUnit],
-    
+
     winter.indices.map {
       winter.utf16[mapIndex($0, winter.utf16)!]
     },
     sameValue: ==)
 
   expectEqual(winter.utf16.endIndex, mapIndex(winter.endIndex, winter.utf16))
-  
+
   expectEqualSequence(
     summerBytes.map { UTF16.CodeUnit($0) },
     summer.indices.map { summer.utf16[mapIndex($0, summer.utf16)!] }
   )
-  
+
   expectEqual(summer.utf16.endIndex, mapIndex(summer.endIndex, summer.utf16))
 }
 
@@ -281,7 +294,7 @@ tests.test("index-mapping/unicode-scalar-to-utf16/\(id)") {
       0x2744, 0xfe0f,
       replacementUTF16, 0x20, replacementUTF16, replacementUTF16
     ] as [UTF16.CodeUnit],
-    
+
     winter.unicodeScalars.indices.map {
       winter.utf16[mapIndex($0, winter.utf16)!]
     })
@@ -289,7 +302,7 @@ tests.test("index-mapping/unicode-scalar-to-utf16/\(id)") {
   expectEqual(
     winter.utf16.endIndex,
     mapIndex(winter.unicodeScalars.endIndex, winter.utf16))
-  
+
   expectEqualSequence(
     summerBytes.map { UTF16.CodeUnit($0) },
     summer.unicodeScalars.indices.map {
@@ -331,12 +344,12 @@ tests.test("index-mapping/utf8-to-utf16/\(id)") {
   expectEqual(
     winter.utf16.endIndex,
     mapIndex(winter.utf8.endIndex, winter.utf16)!)
-  
+
   expectEqualSequence(
     summerBytes.map { UTF16.CodeUnit($0) },
     summer.utf8.indices.map { summer.utf16[mapIndex($0, summer.utf16)!] }
   )
-  
+
   expectNotNil(mapIndex(summer.utf8.endIndex, summer.utf16))
   expectEqual(
     summer.utf16.endIndex,
@@ -367,7 +380,7 @@ tests.test("index-mapping/character-to-unicode-scalar/\(id)") {
     UnicodeScalar(0x2744)!, // 0xfe0f
     replacementScalar, UnicodeScalar(0x20)!, replacementScalar, replacementScalar
   ]
-  
+
   expectEqualSequence(
     winterCharacterUnicodeScalars,
     winter.indices.map {
@@ -376,12 +389,12 @@ tests.test("index-mapping/character-to-unicode-scalar/\(id)") {
     })
 
   expectEqual(winter.unicodeScalars.endIndex, mapIndex(winter.endIndex, winter.unicodeScalars))
-  
+
   expectEqualSequence(
     summerBytes.map { UnicodeScalar($0) },
     summer.indices.map { summer.unicodeScalars[mapIndex($0, summer.unicodeScalars)!] }
   )
-  
+
   expectEqual(summer.unicodeScalars.endIndex, mapIndex(summer.endIndex, summer.unicodeScalars))
 }
 
@@ -395,19 +408,19 @@ tests.test("index-mapping/utf8-to-unicode-scalar/\(id)") {
     UnicodeScalar(0x2746), err(0x2746), err(0x2746),
     UnicodeScalar(0x2744), err(0x2744), err(0x2744),
     UnicodeScalar(0xfe0e), err(0xfe0e), err(0xfe0e),
-    UnicodeScalar(0x26c4), err(0x26c4), err(0x26c4), 
+    UnicodeScalar(0x26c4), err(0x26c4), err(0x26c4),
     UnicodeScalar(0xfe0f), err(0xfe0f), err(0xfe0f),
     UnicodeScalar(0x2744), err(0x2744), err(0x2744),
     UnicodeScalar(0xfe0f), err(0xfe0f), err(0xfe0f),
-    replacementScalar, 
+    replacementScalar,
       err(replacementScalar.value), err(replacementScalar.value),
     UnicodeScalar(0x20),
-    replacementScalar, 
+    replacementScalar,
       err(replacementScalar.value), err(replacementScalar.value),
-    replacementScalar, 
+    replacementScalar,
       err(replacementScalar.value), err(replacementScalar.value)
   ]
-  
+
   expectEqualSequence(
     winterUtf8UnicodeScalars,
     winter.utf8.indices.map {
@@ -420,7 +433,7 @@ tests.test("index-mapping/utf8-to-unicode-scalar/\(id)") {
   expectEqual(
     winter.unicodeScalars.endIndex,
     mapIndex(winter.utf8.endIndex, winter.unicodeScalars)!)
-  
+
   expectEqualSequence(
     summerBytes.map { UnicodeScalar($0) as UnicodeScalar? },
     summer.utf8.indices.map {
@@ -437,16 +450,30 @@ tests.test("index-mapping/utf8-to-unicode-scalar/\(id)") {
 
 tests.test("index-mapping/utf16-to-unicode-scalar/\(id)") {
   let winterUtf16UnicodeScalars: [UnicodeScalar?] = [
-    UnicodeScalar(0x1f3c2), err(replacementScalar.value),
-    UnicodeScalar(0x2603), 
-    UnicodeScalar(0x2745), 
-    UnicodeScalar(0x2746), 
+    UnicodeScalar(0x1f3c2),
+
+  // TODO(UTF8 merge): Verify reasoning below:
+  //
+  // Prior to UTF-8 String, this tested for empty array in "legacy mode" or
+  // the replacemnet character otherwise. However, SE-0180 (String Index
+  // Overhual) dictates subscript behavior should treat it as emergent
+  // behavior from its encoded offset, hence we should get the same 3 code
+  // units as prior for non-scalar-aligned UTF-16 offsets applied to the
+  // UTF-8 view.
+  //
+  // Old code:
+  //   err(replacementScalar.value),
+    err(0x1f3c2),
+
+    UnicodeScalar(0x2603),
+    UnicodeScalar(0x2745),
+    UnicodeScalar(0x2746),
     UnicodeScalar(0x2744), UnicodeScalar(0xfe0e),
     UnicodeScalar(0x26c4), UnicodeScalar(0xfe0f),
     UnicodeScalar(0x2744), UnicodeScalar(0xfe0f),
     replacementScalar, UnicodeScalar(0x20), replacementScalar, replacementScalar
   ]
-  
+
   expectEqualSequence(
     winterUtf16UnicodeScalars,
     winter.utf16.indices.map {
@@ -459,7 +486,7 @@ tests.test("index-mapping/utf16-to-unicode-scalar/\(id)") {
   expectEqual(
     winter.unicodeScalars.endIndex,
     mapIndex(winter.utf16.endIndex, winter.unicodeScalars)!)
-  
+
   expectEqualSequence(
     summerBytes.map { UnicodeScalar($0) as UnicodeScalar? },
     summer.utf16.indices.map {
@@ -486,17 +513,17 @@ func checkToCharacter(
 func err(_ c: Character) -> Character? {
   return id == "legacy" ? nil : c
 }
-  
+
 tests.test("index-mapping/unicode-scalar-to-character/\(id)") {
   let winterUnicodeScalarCharacters: [Character?] = [
-    "🏂", "☃", "❅", "❆", "❄︎", err("\u{FE0E}"), "⛄️", err("\u{FE0F}"), 
+    "🏂", "☃", "❅", "❆", "❄︎", err("\u{FE0E}"), "⛄️", err("\u{FE0F}"),
     "❄️", err("\u{FE0F}"),
     replacementCharacter, "\u{20}", replacementCharacter, replacementCharacter
   ]
-  
+
   expectEqualSequence(
     winterUnicodeScalarCharacters,
-    
+
     winter.unicodeScalars.indices.map {
       i in mapIndex(i, winter).map {
         winter[$0]
@@ -504,12 +531,12 @@ tests.test("index-mapping/unicode-scalar-to-character/\(id)") {
     }, sameValue: ==)
 
   expectEqual(winter.endIndex, mapIndex(winter.unicodeScalars.endIndex, winter)!)
-  
+
   expectEqualSequence(
     summerBytes.map { Character(UnicodeScalar($0)) },
     summer.unicodeScalars.indices.map { summer[mapIndex($0, summer)!] }
   )
-  
+
   expectEqual(summer.endIndex, mapIndex(summer.unicodeScalars.endIndex, summer)!)
 }
 
@@ -521,11 +548,11 @@ tests.test("index-mapping/utf8-to-character/\(id)") {
     "☃", err("☃"), err("☃"),
     "❅", err("❅"), err("❅"),
     "❆", err("❆"), err("❆"),
-    "❄︎", err("❄︎"), err("❄︎"), 
+    "❄︎", err("❄︎"), err("❄︎"),
       err("\u{fe0e}"), err("\u{fe0e}"), err("\u{fe0e}"),
-    "⛄️", err("⛄️"), err("⛄️"), 
+    "⛄️", err("⛄️"), err("⛄️"),
       err("\u{fe0f}"), err("\u{fe0f}"), err("\u{fe0f}"),
-    "❄️", err("❄️"), err("❄️"), 
+    "❄️", err("❄️"), err("❄️"),
       err("\u{fe0f}"), err("\u{fe0f}"), err("\u{fe0f}"),
     replacementCharacter, err(replacementCharacter), err(replacementCharacter),
     "\u{20}",
@@ -545,7 +572,7 @@ tests.test("index-mapping/utf8-to-character/\(id)") {
   expectEqual(
     winter.endIndex,
     mapIndex(winter.utf8.endIndex, winter)!)
-  
+
   expectEqualSequence(
     summerBytes.map { Character(UnicodeScalar($0)) },
     summer.utf8.indices.map { summer[mapIndex($0, summer)!] }
@@ -559,11 +586,27 @@ tests.test("index-mapping/utf8-to-character/\(id)") {
 
 tests.test("index-mapping/utf16-to-character/\(id)") {
   let winterUtf16Characters: [Character?] = [
-      "🏂", err(replacementCharacter), "☃", "❅", "❆", "❄︎", err("\u{fe0e}"), 
+      "🏂",
+
+      // TODO(UTF8 merge): Verify reasoning below:
+      //
+      // Prior to UTF-8 String, this tested for empty array in "legacy mode" or
+      // the replacemnet character otherwise. However, SE-0180 (String Index
+      // Overhual) dictates subscript behavior should treat it as emergent
+      // behavior from its encoded offset, hence we should get the same 3 code
+      // units as prior for non-scalar-aligned UTF-16 offsets applied to the UTF-8
+      // view. Under a mixed-encoding String model, we necessarily have to clamp
+      // all indices to the nearest prior scalar boundary...
+      //
+      // Old code:
+      //  err(replacementCharacter),
+      err("🏂"),
+
+      "☃", "❅", "❆", "❄︎", err("\u{fe0e}"),
       "⛄️", err("\u{fe0f}"), "❄️", err("\u{fe0f}"),
     replacementCharacter, "\u{20}", replacementCharacter, replacementCharacter
   ]
-  
+
   expectEqualSequence(
     winterUtf16Characters,
     winter.utf16.indices.map {
@@ -576,7 +619,7 @@ tests.test("index-mapping/utf16-to-character/\(id)") {
   expectEqual(
     winter.endIndex,
     mapIndex(winter.utf16.endIndex, winter)!)
-  
+
   expectEqualSequence(
     summerBytes.map { Character(UnicodeScalar($0)) },
     summer.utf16.indices.map {
@@ -621,7 +664,7 @@ tests.test("UTF8 indexes") {
   // always si0.distance(to: si1)
   for si0 in s.indices {
     for (ds, si1) in s.indices[si0..<s.endIndex].enumerated() {
-      
+
       // Map those unicode scalar indices into utf8 indices
       let u8i1 = si1.samePosition(in: u8)
       let u8i0 = si0.samePosition(in: u8)
@@ -631,14 +674,14 @@ tests.test("UTF8 indexes") {
       // reaching u8i1) by counting leading bytes traversed
       var u8i0a = u8i0! // <========== NOTE SOURCE COMPATIBILITY BREAKAGE
       var dsa = 0      // number of Unicode scalars it has advanced over
-      
+
       while true {
         //===--- loop condition -------------------------------------------===//
         let b = u8[u8i0a]
         let isLeadingByte = !UTF8.isContinuation(b)
-        if dsa == ds && isLeadingByte { break } // 
+        if dsa == ds && isLeadingByte { break } //
         //===--------------------------------------------------------------===//
-        
+
         expectNotEqual(u8i0a, u8i1) // We're not there yet
 
         if isLeadingByte { // On a unicode scalar boundary?
@@ -652,7 +695,7 @@ tests.test("UTF8 indexes") {
             // thus shouldn't convert to a UTF8 position
             expectNil(u16.index(after: u16i0a).samePosition(in: u8))
           }
-          
+
           dsa = dsa.advanced(by: 1) // we're moving off the beginning of a new Unicode scalar
         }
         else {
