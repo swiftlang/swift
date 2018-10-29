@@ -408,9 +408,7 @@ namespace driver {
         if (ReturnCode == EXIT_SUCCESS || ReturnCode == EXIT_FAILURE) {
           bool wasCascading = DepGraph.isMarked(FinishedCmd);
 
-          switch (
-              DepGraph.loadFromPath(FinishedCmd, DependenciesFile,
-                                    Comp.getEnableExperimentalDependencies())) {
+          switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile)) {
           case DependencyGraphImpl::LoadResult::HadError:
             if (ReturnCode == EXIT_SUCCESS) {
               dependencyLoadFailed(DependenciesFile);
@@ -701,9 +699,7 @@ namespace driver {
           if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
             DepGraph.addIndependentNode(Cmd);
           } else {
-            switch (DepGraph.loadFromPath(
-                Cmd, DependenciesFile,
-                Comp.getEnableExperimentalDependencies())) {
+            switch (DepGraph.loadFromPath(Cmd, DependenciesFile)) {
             case DependencyGraphImpl::LoadResult::HadError:
               dependencyLoadFailed(DependenciesFile, /*Warn=*/false);
               break;

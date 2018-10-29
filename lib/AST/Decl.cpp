@@ -6220,10 +6220,6 @@ void Decl::setClangNode(ClangNode Node) {
   *(ptr - 1) = Node.getOpaqueValue();
 }
 
-bool Decl::getEnableExperimentalDependencies() const {
-  return getASTContext().LangOpts.EnableExperimentalDependencies;
-}
-
 // See swift/Basic/Statistic.h for declaration: this enables tracing Decls, is
 // defined here to avoid too much layering violation / circular linkage
 // dependency.
