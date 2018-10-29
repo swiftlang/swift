@@ -133,20 +133,21 @@ class BenchmarkDriver(object):
             benchmarks.intersection(set(self.all_tests)).union(indexed_names)))
 
     def run(self, test, num_samples=None, num_iters=None,
-            verbose=None, measure_memory=False):
+            verbose=None, measure_memory=False, quantile=None):
         """Execute benchmark and gather results."""
-        num_samples = num_samples or 1
+        num_samples = num_samples or 0
         num_iters = num_iters or 0  # automatically determine N to run for 1s
 
         cmd = self._cmd_run(
-            test, num_samples, num_iters, verbose, measure_memory)
+            test, num_samples, num_iters, verbose, measure_memory, quantile)
         output = self._invoke(cmd)
         result = self.parser.results_from_string(output).items()[0][1]
         return result
 
-    def _cmd_run(self, test, num_samples, num_iters, verbose, measure_memory):
+    def _cmd_run(self, test, num_samples, num_iters, verbose, measure_memory,
+                 quantile):
         cmd = [self.test_harness, test]
-        if num_samples > 1:
+        if num_samples > 0:
             cmd.append('--num-samples={0}'.format(num_samples))
         if num_iters > 0:
             cmd.append('--num-iters={0}'.format(num_iters))
@@ -154,6 +155,9 @@ class BenchmarkDriver(object):
             cmd.append('--verbose')
         if measure_memory:
             cmd.append('--memory')
+        if quantile:
+            cmd.append('--quantile={0}'.format(quantile))
+            cmd.append('--delta')
         return cmd
 
     def run_independent_samples(self, test):
@@ -166,8 +170,9 @@ class BenchmarkDriver(object):
             return a
 
         return reduce(merge_results,
-                      [self.run(test, measure_memory=True)
-                       for _ in range(self.args.iterations)])
+                      [self.run(test, measure_memory=True,
+                                num_iters=1, quantile=20)
+                       for _ in range(self.args.independent_samples)])
 
     def log_results(self, output, log_file=None):
         """Log output to `log_file`.
@@ -182,7 +187,7 @@ class BenchmarkDriver(object):
         with open(log_file, 'w') as f:
             f.write(output)
 
-    RESULT = '{:>3} {:<25} {:>7} {:>7} {:>7} {:>8} {:>6} {:>10} {:>10}'
+    RESULT = '{:>3} {:<25} {:>7} {:>7} {:>6} {:>10} {:>6} {:>7} {:>10}'
 
     def run_and_log(self, csv_console=True):
         """Run benchmarks and continuously log results to the console.
@@ -201,14 +206,15 @@ class BenchmarkDriver(object):
         def console_log(values):
             print(format(values))
 
-        console_log(['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'MAX(μs)',  # header
-                    'MEAN(μs)', 'SD(μs)', 'MEDIAN(μs)', 'MAX_RSS(B)'])
-
         def result_values(r):
-            return map(str, [r.test_num, r.name, r.num_samples, r.min, r.max,
-                             int(r.mean), int(r.sd), r.median, r.max_rss])
+            return map(str, [r.test_num, r.name, r.num_samples, r.min,
+                             r.samples.q1, r.median, r.samples.q3, r.max,
+                             r.max_rss])
 
-        results = []
+        header = ['#', 'TEST', 'SAMPLES', 'MIN(μs)', 'Q1(μs)', 'MEDIAN(μs)',
+                  'Q3(μs)', 'MAX(μs)', 'MAX_RSS(B)']
+        console_log(header)
+        results = [header]
         for test in self.tests:
             result = result_values(self.run_independent_samples(test))
             console_log(result)
@@ -290,6 +296,7 @@ class BenchmarkDoctor(object):
             self._name_matches_capital_words_convention,
             self._name_is_at_most_40_chars_long,
             self._no_setup_overhead,
+            self._reasonable_setup_time,
             self._optimized_runtime_in_range,
             self._constant_memory_use
         ]
@@ -341,15 +348,20 @@ class BenchmarkDoctor(object):
               for correction in [(setup / i) for i in [1, 2]]
               ] for result in i_series])
 
-        if 2500 < runtime:
-            log = (BenchmarkDoctor.log_runtime.warning if runtime < 500000 else
+        threshold = 1000
+        if threshold < runtime:
+            log = (BenchmarkDoctor.log_runtime.warning if runtime < 10000 else
                    BenchmarkDoctor.log_runtime.error)
             caveat = '' if setup == 0 else ' (excluding the setup overhead)'
             log("'%s' execution took at least %d μs%s.", name, runtime, caveat)
-            factor = int(pow(2, math.ceil(math.log(runtime / 2500.0, 2))))
+
+            def factor(base):  # suitable divisior that's integer power of base
+                return int(pow(base, math.ceil(
+                    math.log(runtime / float(threshold), base))))
+
             BenchmarkDoctor.log_runtime.info(
-                "Decrease the workload of '%s' by a factor of %d, "
-                "to be less than 2500 μs.", name, factor)
+                "Decrease the workload of '%s' by a factor of %d (%d), to be "
+                "less than %d μs.", name, factor(2), factor(10), threshold)
 
     @staticmethod
     def _setup_overhead(measurements):
@@ -371,6 +383,17 @@ class BenchmarkDoctor(object):
             BenchmarkDoctor.log_runtime.info(
                 'Move initialization of benchmark data to the `setUpFunction` '
                 'registered in `BenchmarkInfo`.')
+
+    @staticmethod
+    def _reasonable_setup_time(measurements):
+        setup = min([result.setup
+                     for result in BenchmarkDoctor._select(measurements)])
+        if 200000 < setup:  # 200 ms
+            BenchmarkDoctor.log_runtime.error(
+                "'%s' setup took at least %d μs.",
+                measurements['name'], setup)
+            BenchmarkDoctor.log_runtime.info(
+                'The `setUpFunction` should take no more than 200 ms.')
 
     @staticmethod
     def _constant_memory_use(measurements):
@@ -603,7 +626,7 @@ def parse_args(args):
         help='Run benchmarks and output results to stdout',
         parents=[shared_benchmarks_parser])
     run_parser.add_argument(
-        '-i', '--iterations',
+        '-i', '--independent-samples',
         help='number of times to run each test (default: 1)',
         type=positive_int, default=1)
     run_parser.add_argument(
