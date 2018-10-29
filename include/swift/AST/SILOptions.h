@@ -109,7 +109,7 @@ public:
   std::string SILOutputFileNameForDebugging;
 
   /// If set to true, compile with the SIL Ownership Model enabled.
-  bool EnableSILOwnership = false;
+  bool EnableSILOwnership = true;
 
   /// When parsing SIL, assume unqualified ownership.
   bool AssumeUnqualifiedOwnershipWhenParsing = false;
