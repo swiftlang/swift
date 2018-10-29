@@ -164,6 +164,24 @@
 /*********************************** s390x ************************************/
 
 // Top byte of pointers is unused, and heap objects are eight-byte aligned.
-#define SWIFT_ABI_S390X_SWIFT_SPARE_BITS_MASK 0x0000000000000007ULL
+// On s390x it is theoretically possible to have high bit set but in practice
+// it is unlikely.
+#define SWIFT_ABI_S390X_SWIFT_SPARE_BITS_MASK 0xFF00000000000007ULL
+
+// Objective-C reserves just the high bit for tagged pointers.
+#define SWIFT_ABI_S390X_OBJC_RESERVED_BITS_MASK 0x8000000000000000ULL
+#define SWIFT_ABI_S390X_OBJC_NUM_RESERVED_LOW_BITS 0
+
+// BridgeObject uses this bit to indicate whether it holds an ObjC object or
+// not.
+#define SWIFT_ABI_S390X_IS_OBJC_BIT 0x4000000000000000ULL
+
+// ObjC weak reference discriminator is the high bit
+// reserved for ObjC tagged pointers plus the LSB.
+#define SWIFT_ABI_S390X_OBJC_WEAK_REFERENCE_MARKER_MASK  \
+  (SWIFT_ABI_S390X_OBJC_RESERVED_BITS_MASK |          \
+   1<<SWIFT_ABI_S390X_OBJC_NUM_RESERVED_LOW_BITS)
+#define SWIFT_ABI_S390X_OBJC_WEAK_REFERENCE_MARKER_VALUE \
+  (1<<SWIFT_ABI_S390X_OBJC_NUM_RESERVED_LOW_BITS)
 
 #endif /* SWIFT_ABI_SYSTEM_H */
