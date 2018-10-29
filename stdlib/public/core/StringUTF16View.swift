@@ -497,7 +497,7 @@ extension String.UTF16View {
 
     return _guts.withFastUTF8 { utf8 in
       var readIdx = crumb.encodedOffset
-      var readEnd = utf8.count
+      let readEnd = utf8.count
       _sanityCheck(readIdx < readEnd)
 
       var utf16I = 0
