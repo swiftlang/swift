@@ -112,7 +112,7 @@ extension _SmallString {
   internal func _invariantCheck() {
     // Avoid `asStringObject`, which triggers more invariant checks (runtime)
     var _object = _StringObject(zero:())
-    _object._countAndFlags = _StringObject.CountAndFlags(raw: _storage.0)
+    _object._countAndFlags = Builtin.reinterpretCast(_storage.0)
     _object._object = Builtin.reinterpretCast(_storage.1)
     _sanityCheck(_object.smallCount <= _SmallString.capacity)
     _sanityCheck(_object.smallIsASCII == computeIsASCII())
@@ -242,7 +242,19 @@ extension _SmallString {
 
   // Appending
   @usableFromInline // testable
-  internal init?(base: _StringGuts, appending other: _StringGuts) {
+  @_effects(releasenone)
+  internal init?(
+    base: __shared _StringGuts, appending other: __shared _StringGuts
+  ) {
+    self.init(
+      base: _SlicedStringGuts(base), appending: _SlicedStringGuts(other))
+  }
+
+  // Appending
+  @_effects(releasenone)
+  internal init?(
+    base: __shared _SlicedStringGuts, appending other: __shared _SlicedStringGuts
+  ) {
     guard (base.utf8Count + other.utf8Count) <= _SmallString.capacity else {
       return nil
     }

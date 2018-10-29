@@ -43,12 +43,18 @@ extension _StringGuts {
   @usableFromInline // @opaque
   @inline(never) // slow-path
   internal func _normalizedHash(into hasher: inout Hasher) {
-    // TODO(UTF8 perf): fast-paths, incremental (non-allocating) normalization,
-    // etc. This approach is very slow.
-
-    String(self)._normalize().withUnsafeBytes {
-      hasher.combine(bytes: $0)
+    if self.isNFC && self.isFastUTF8 {
+      self.withFastUTF8 {
+        hasher.combine(bytes: UnsafeRawBufferPointer($0))
+      }
+    } else {
+      // TODO(UTF8 perf): Other fast-paths, incremental (non-allocating)
+      // normalization, etc.
+      String(self)._normalize().withUnsafeBytes {
+        hasher.combine(bytes: $0)
+      }
     }
+
     hasher.combine(0xFF as UInt8) // terminator
   }
 }

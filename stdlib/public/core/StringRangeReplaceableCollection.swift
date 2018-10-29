@@ -51,9 +51,14 @@ extension String: RangeReplaceableCollection {
   ///
   /// - Parameter other: A string instance or another sequence of
   ///   characters.
-  @inlinable // FIXME(sil-serialize-all)
+  @_specialize(where S == String)
+  @_specialize(where S == Substring)
   public init<S : Sequence & LosslessStringConvertible>(_ other: S)
   where S.Element == Character {
+    if let str = other as? String {
+      self = str
+      return
+    }
     self = other.description
   }
 
@@ -72,9 +77,19 @@ extension String: RangeReplaceableCollection {
   ///
   /// - Parameter characters: A string instance or another sequence of
   ///   characters.
-  @inlinable // specialize
+  @_specialize(where S == String)
+  @_specialize(where S == Substring)
+  @_specialize(where S == Array<Character>)
   public init<S : Sequence>(_ characters: S)
   where S.Iterator.Element == Character {
+    if let str = characters as? String {
+      self = str
+      return
+    }
+    if let subStr = characters as? Substring {
+      self.init(subStr)
+      return
+    }
     self = ""
     self.append(contentsOf: characters)
   }
@@ -137,16 +152,25 @@ extension String: RangeReplaceableCollection {
   }
 
   public mutating func append(contentsOf newElements: Substring) {
-    // TODO(UTF8 perf): This is a horribly slow means...
-    self.append(newElements._ephemeralString)
+    self._guts.append(newElements._slicedGuts)
   }
 
   /// Appends the characters in the given sequence to the string.
   ///
   /// - Parameter newElements: A sequence of characters.
-  @inlinable // @specializable
+  @_specialize(where S == String)
+  @_specialize(where S == Substring)
+  @_specialize(where S == Array<Character>)
   public mutating func append<S : Sequence>(contentsOf newElements: S)
   where S.Iterator.Element == Character {
+    if let str = newElements as? String {
+      self.append(str)
+      return
+    }
+    if let substr = newElements as? Substring {
+      self.append(contentsOf: substr)
+      return
+    }
     for c in newElements {
       self.append(c._str)
     }
@@ -188,7 +212,6 @@ extension String: RangeReplaceableCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the string.
   public mutating func insert(_ newElement: Character, at i: Index) {
-    // TODO(UTF8 perf): Operate on storage direclty, sliding down elements
     self.replaceSubrange(i..<i, with: newElement._str)
   }
 
@@ -212,9 +235,7 @@ extension String: RangeReplaceableCollection {
   public mutating func insert<S : Collection>(
     contentsOf newElements: S, at i: Index
   ) where S.Element == Character {
-    // TODO(UTF8 perf): Operate on storage direclty, sliding down elements
-    // TODO(UTF8 perf): This is a horribly slow means...
-    self.replaceSubrange(i..<i, with: String(newElements))
+    self.replaceSubrange(i..<i, with: newElements)
   }
 
   /// Removes and returns the character at the specified position.

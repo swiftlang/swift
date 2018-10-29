@@ -205,6 +205,7 @@ extension String {
 
 extension Character : Equatable {
   @inlinable @inline(__always)
+  @_effects(readonly)
   public static func == (lhs: Character, rhs: Character) -> Bool {
     return lhs._str == rhs._str
   }
@@ -212,6 +213,7 @@ extension Character : Equatable {
 
 extension Character : Comparable {
   @inlinable @inline(__always)
+  @_effects(readonly)
   public static func < (lhs: Character, rhs: Character) -> Bool {
     return lhs._str < rhs._str
   }

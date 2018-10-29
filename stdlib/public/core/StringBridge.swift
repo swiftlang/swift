@@ -119,8 +119,8 @@ private func _getCocoaStringPointer(
   _ cfImmutableValue: _CocoaString
 ) -> CocoaStringPointer {
   if let utf8Ptr = _cocoaUTF8Pointer(cfImmutableValue) {
-    // TODO(UTF8 perf): Remember Cocoa ASCII-ness
-    return .utf8(utf8Ptr)
+    // NOTE: CFStringGetCStringPointer means ASCII
+    return .ascii(utf8Ptr)
   }
   if let utf16Ptr = _swift_stdlib_CFStringGetCharactersPtr(cfImmutableValue) {
     return .utf16(utf16Ptr)

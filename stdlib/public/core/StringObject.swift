@@ -78,7 +78,7 @@ extension _StringObject {
   @inlinable @inline(__always)
   internal init(raw bits: RawBitPattern) {
     self.init(zero:())
-    self._countAndFlags = CountAndFlags(raw: bits.0)
+    self._countAndFlags = Builtin.reinterpretCast(bits.0)
     self._object = Builtin.reinterpretCast(bits.1)
     _sanityCheck(self.rawBits == bits)
     _invariantCheck()
@@ -675,8 +675,8 @@ extension _StringObject {
     @inline(__always) get {
       if isSmall {
         // TODO(UTF8 perf): Worth implementing more sophisiticated check, or
-        // else performing normalization on-construction, or else dedicating a
-        // small string bit to this. For now, approximate it with isASCII
+        // else performing normalization on-construction. For now, approximate
+        // it with isASCII
         return smallIsASCII
       }
       return _countAndFlags.isNFC

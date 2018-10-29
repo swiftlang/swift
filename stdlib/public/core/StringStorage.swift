@@ -157,19 +157,6 @@ private func determineCodeUnitCapacity(_ desiredCapacity: Int) -> Int {
 
 // Creation
 extension _StringStorage {
-  @_effects(releasenone)
-  @nonobjc
-  private static func create(
-    capacity: Int, countAndFlags: CountAndFlags
-  ) -> _StringStorage {
-    _sanityCheck(capacity >= countAndFlags.count)
-
-    let realCapacity = determineCodeUnitCapacity(capacity)
-    _sanityCheck(realCapacity > capacity)
-    return _StringStorage.create(
-      realCodeUnitCapacity: realCapacity, countAndFlags: countAndFlags)
-  }
-
   @inline(never) // rdar://problem/44542202
   @_effects(releasenone)
   @nonobjc
@@ -186,8 +173,23 @@ extension _StringStorage {
 
     storage._breadcrumbsAddress.initialize(to: nil)
     storage.terminator.pointee = 0 // nul-terminated
-    storage._invariantCheck()
+
+    // NOTE: We can't _invariantCheck() now, because code units have not been
+    // initialized. But, _StringGuts's initializer will.
     return storage
+  }
+
+  @_effects(releasenone)
+  @nonobjc
+  private static func create(
+    capacity: Int, countAndFlags: CountAndFlags
+  ) -> _StringStorage {
+    _sanityCheck(capacity >= countAndFlags.count)
+
+    let realCapacity = determineCodeUnitCapacity(capacity)
+    _sanityCheck(realCapacity > capacity)
+    return _StringStorage.create(
+      realCodeUnitCapacity: realCapacity, countAndFlags: countAndFlags)
   }
 
   @_effects(releasenone)
@@ -311,6 +313,7 @@ extension _StringStorage {
     let rawSelf = UnsafeRawPointer(Builtin.bridgeToRawPointer(self))
     let rawStart = UnsafeRawPointer(start)
     _sanityCheck(unusedCapacity >= 0)
+    _sanityCheck(count <= capacity)
     _sanityCheck(rawSelf + Int(_StringObject.nativeBias) == rawStart)
     _sanityCheck(self.realCapacity > self.count, "no room for nul-terminator")
     _sanityCheck(self.terminator.pointee == 0, "not nul terminated")
@@ -328,6 +331,7 @@ extension _StringStorage {
 
 // Appending
 extension _StringStorage {
+  @_effects(releasenone)
   @nonobjc
   internal func appendInPlace(
     _ other: UnsafeBufferPointer<UInt8>, isASCII: Bool
@@ -348,6 +352,7 @@ extension _StringStorage {
     _invariantCheck()
   }
 
+  @_effects(releasenone)
   @nonobjc
   internal func appendInPlace<Iter: IteratorProtocol>(
     _ other: inout Iter, isASCII: Bool
@@ -377,6 +382,7 @@ extension _StringStorage {
 
 // Removing
 extension _StringStorage {
+  @_effects(releasenone)
   @nonobjc
   internal func remove(from lower: Int, to upper: Int) {
     _sanityCheck(lower <= upper)
@@ -385,7 +391,37 @@ extension _StringStorage {
     let upperPtr = mutableStart + upper
     let tailCount = mutableEnd - upperPtr
     lowerPtr.moveInitialize(from: upperPtr, count: tailCount)
-    self._countAndFlags -= (upper &- lower)
+    self.count -= (upper &- lower)
+    self.terminator.pointee = 0
+    _invariantCheck()
+  }
+
+  @_effects(releasenone)
+  @nonobjc
+  internal func replace(
+    from lower: Int, to upper: Int, with replacement: UnsafeBufferPointer<UInt8>
+  ) {
+    _sanityCheck(lower <= upper)
+
+    let lowerPtr = mutableStart + lower
+    let upperPtr = mutableStart + upper
+
+    let replCount = replacement.count
+    _sanityCheck((upper - lower) + replCount <= unusedCapacity)
+
+    // Position the tail
+    let tailCount = mutableEnd - upperPtr
+    let tailPtr = lowerPtr + replCount
+    tailPtr.moveInitialize(from: upperPtr, count: tailCount)
+
+    // Copy in the contents
+    lowerPtr.moveInitialize(
+      from: UnsafeMutablePointer(
+        mutating: replacement.baseAddress._unsafelyUnwrappedUnchecked),
+      count: replCount)
+
+    self.count = lower + replCount + tailCount
+    self.terminator.pointee = 0
     _invariantCheck()
   }
 }
