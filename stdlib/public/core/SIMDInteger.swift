@@ -149,7 +149,7 @@ public extension SIMDIntegerVector {
   @inlinable
   static func >= <Scalar>(lhs: Scalar, rhs: Self) -> Mask
   where Scalar : BinaryInteger {
-    return rhs <= rhs
+    return rhs <= lhs
   }
   
   // MARK: Bitwise operators
