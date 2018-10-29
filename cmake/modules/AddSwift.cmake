@@ -2002,8 +2002,19 @@ function(add_swift_target_library name)
           FILES "${UNIVERSAL_LIBRARY_NAME}"
           DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
           PERMISSIONS ${file_permissions})
-      swift_is_installing_component("${SWIFTLIB_INSTALL_IN_COMPONENT}" is_installing)
+      if(sdk STREQUAL WINDOWS)
+        foreach(arch ${SWIFT_SDK_WINDOWS_ARCHITECTURES})
+          if(TARGET ${name}-windows-${arch}_IMPLIB)
+            get_target_property(import_library ${name}-windows-${arch}_IMPLIB IMPORTED_LOCATION)
+            swift_install_in_component(${SWIFTLIB_INSTALL_IN_COMPONENT}
+              FILES ${import_library}
+              DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${arch}"
+              PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
+          endif()
+        endforeach()
+      endif()
 
+      swift_is_installing_component("${SWIFTLIB_INSTALL_IN_COMPONENT}" is_installing)
       if(NOT is_installing)
         set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${VARIANT_NAME})
       else()
