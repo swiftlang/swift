@@ -23,14 +23,16 @@ class FrontendOptions;
 class SourceFile;
 
 /// Emit a Swift-style dependencies file for \p SF.
-namespace ExperimentalDependencies {
+namespace experimental_dependencies {
 bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
                                const DependencyTracker &depTracker,
                                StringRef outputPath);
 
 class DependencyGraph {};
+  
+ 
 
-} // end namespace ExperimentalDependencies
+} // end namespace experimental_dependencies
 } // end namespace swift
 
 #endif /* ExperimentalDependencies_h */

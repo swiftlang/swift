@@ -1,4 +1,5 @@
 add_swift_library(swiftFrontendTool STATIC
+  ExperimentalDependenciesProducer.cpp
   FrontendTool.cpp
   ImportedModules.cpp
   ReferenceDependencies.cpp
