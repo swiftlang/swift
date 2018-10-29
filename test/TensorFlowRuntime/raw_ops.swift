@@ -35,56 +35,59 @@ public func testPointwiseBinaryOp<T : AccelerableByTensorFlow & Equatable>(
 
 // TODO(mazare): group all these tests in a single function once this does
 // not cause an XLA compilation error anymore.
+// TODO(marcrasi): Pass `Raw.xxxx` directly to `testPointwiseBinaryOp` rather
+// than wrapping it in a closure, once IRGen can handle non-deabstracted
+// functions.
 RawOpsTests.testAllBackends("AddOp") {
-  testPointwiseBinaryOp(tfOp: Raw.add, swiftOp: { $0 + $1 })
+  testPointwiseBinaryOp(tfOp: { (x: Tensor<Float>, y: Tensor<Float>) in Raw.add(x, y) }, swiftOp: { $0 + $1 })
 }
 
 RawOpsTests.testAllBackends("SubOp") {
-  testPointwiseBinaryOp(tfOp: Raw.sub, swiftOp: { $0 - $1 })
+  testPointwiseBinaryOp(tfOp: { (x: Tensor<Float>, y: Tensor<Float>) in Raw.sub(x, y) }, swiftOp: { $0 - $1 })
 }
 
 RawOpsTests.testAllBackends("MulOp") {
-  testPointwiseBinaryOp(tfOp: Raw.mul, swiftOp: { $0 * $1 })
+  testPointwiseBinaryOp(tfOp: { (x: Tensor<Float>, y: Tensor<Float>) in Raw.mul(x, y) }, swiftOp: { $0 * $1 })
 }
 
 RawOpsTests.testAllBackends("DivOp") {
-  testPointwiseBinaryOp(tfOp: Raw.div, swiftOp: { $0 / $1 })
+  testPointwiseBinaryOp(tfOp: { (x: Tensor<Float>, y: Tensor<Float>) in Raw.div(x, y) }, swiftOp: { $0 / $1 })
 }
 
 RawOpsTests.testAllBackends("FloorDivOp") {
-  testPointwiseBinaryOp(tfOp: Raw.floorDiv, swiftOp: { ($0 / $1).rounded(.down) })
+  testPointwiseBinaryOp(tfOp: { (x: Tensor<Float>, y: Tensor<Float>) in Raw.floorDiv(x, y) }, swiftOp: { ($0 / $1).rounded(.down) })
 }
 
 RawOpsTests.testAllBackends("MinimumOp") {
-  testPointwiseBinaryOp(tfOp: Raw.minimum, swiftOp: min)
+  testPointwiseBinaryOp(tfOp: { (x: Tensor<Float>, y: Tensor<Float>) in Raw.minimum(x, y) }, swiftOp: min)
 }
 
 RawOpsTests.testAllBackends("MaximumOp") {
-  testPointwiseBinaryOp(tfOp: Raw.maximum, swiftOp: max)
+  testPointwiseBinaryOp(tfOp: { (x: Tensor<Float>, y: Tensor<Float>) in Raw.maximum(x, y) }, swiftOp: max)
 }
 
 RawOpsTests.testAllBackends("MaximumOp") {
-  testPointwiseBinaryOp(tfOp: Raw.maximum, swiftOp: max)
+  testPointwiseBinaryOp(tfOp: { (x: Tensor<Float>, y: Tensor<Float>) in Raw.maximum(x, y) }, swiftOp: max)
 }
 
 RawOpsTests.testAllBackends("EqualOp") {
-  testPointwiseBinaryOp(tfOp: Raw.equal, swiftOp: { $0 == $1 })
+  testPointwiseBinaryOp(tfOp: { (x: Tensor<Float>, y: Tensor<Float>) in Raw.equal(x, y) }, swiftOp: { $0 == $1 })
 }
 
 RawOpsTests.testAllBackends("LessOp") {
-  testPointwiseBinaryOp(tfOp: Raw.less, swiftOp: { $0 < $1 })
+  testPointwiseBinaryOp(tfOp: { (x: Tensor<Float>, y: Tensor<Float>) in Raw.less(x, y) }, swiftOp: { $0 < $1 })
 }
 
 RawOpsTests.testAllBackends("LessEqualOp") {
-  testPointwiseBinaryOp(tfOp: Raw.lessEqual, swiftOp: { $0 <= $1 })
+  testPointwiseBinaryOp(tfOp: { (x: Tensor<Float>, y: Tensor<Float>) in Raw.lessEqual(x, y) }, swiftOp: { $0 <= $1 })
 }
 
 RawOpsTests.testAllBackends("GreaterOp") {
-  testPointwiseBinaryOp(tfOp: Raw.greater, swiftOp: { $0 > $1 })
+  testPointwiseBinaryOp(tfOp: { (x: Tensor<Float>, y: Tensor<Float>) in Raw.greater(x, y) }, swiftOp: { $0 > $1 })
 }
 
 RawOpsTests.testAllBackends("GreaterEqualOp") {
-  testPointwiseBinaryOp(tfOp: Raw.greaterEqual, swiftOp: { $0 >= $1 })
+  testPointwiseBinaryOp(tfOp: { (x: Tensor<Float>, y: Tensor<Float>) in Raw.greaterEqual(x, y) }, swiftOp: { $0 >= $1 })
 }
 
 runAllTests()

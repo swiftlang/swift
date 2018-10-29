@@ -225,6 +225,16 @@ void TFDeabstraction::inlineCalls() {
     if (callee.getInlineStrategy() == NoInline)
       return false;
 
+    // In dynamic compliation mode, do not inline functions from the same
+    // module. (We still inline functions from other modules, because there is a
+    // risk that the other module was not compiled in dynamic compilation mode
+    // and therefore its functions are not deabstracted or lowered. For
+    // example, we do not compile the standard library in dynamic compilation
+    // mode.)
+    if (llvm::TFDynamicCompilation && !isAcceleratorOnly(fn) &&
+        !callee.isAvailableExternally())
+      return false;
+
     // Check for array internals which we could be inlined, but prefer to
     // leave in abstracted form for easier analysis.  For things like
     // Tensor<Float>([[1,2],[3,4]]), we prefer to see higher level array
@@ -2885,10 +2895,25 @@ void TFDeabstractionPass::run() {
   // iff they look like they could be the top level of a deabstraction
   // context.
   for (auto &fn : *module) {
+    // There's no point in deabstracting things defined in other modules,
+    // because we won't lower them.
+    if (fn.isAvailableExternally()) {
+      fn.skippedByDeabstraction = true;
+      continue;
+    }
+
     // If this function is a building block of larger tensor programs (e.g.
     // the ops defined in the TensorFlow module), then don't transform it in
     // isolation.
-    if (!tfc.shouldBePartitioned(&fn, /*forceTFFunctions*/false)) {
+    // However, in dynamic compilation mode, deabstract everything in this
+    // module because dynamic compilation mode executes functions individually
+    // rather than inlining them into large tensor programs.
+    //
+    // TODO(marcrasi): IRGen should be able to handle non-deabstracted code.
+    // Once it can handle non-deabstracted code, turn deabstraction off entirely
+    // in dynamic compilation mode.
+    if (!tfc.shouldBePartitioned(&fn, /*forceTFFunctions*/false) &&
+        !llvm::TFDynamicCompilation) {
       fn.skippedByDeabstraction = true;
       continue;
     }
