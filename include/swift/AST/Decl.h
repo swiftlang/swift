@@ -958,10 +958,6 @@ public:
     assert(Mem); 
     return Mem; 
   }
-
-  /// Scaffolding to permit experimentation with finer-grained dependencies and
-  /// faster rebuilds.
-  bool getEnableExperimentalDependencies() const;
 };
 
 /// \brief Use RAII to track Decl validation progress and non-reentrancy.
