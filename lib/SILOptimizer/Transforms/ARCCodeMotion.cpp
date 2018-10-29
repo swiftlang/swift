@@ -96,10 +96,6 @@ STATISTIC(NumReleasesHoisted, "Number of releases hoisted");
 
 llvm::cl::opt<bool> DisableARCCodeMotion("disable-arc-cm", llvm::cl::init(false));
 
-/// Disable optimization if we have to break critical edges in the function.
-llvm::cl::opt<bool>
-DisableIfWithCriticalEdge("disable-with-critical-edge", llvm::cl::init(false));
-
 //===----------------------------------------------------------------------===//
 //                             Block State 
 //===----------------------------------------------------------------------===//
@@ -111,21 +107,21 @@ struct BlockState {
   /// NOTE: we could do the data flow with BBSetIn or BBSetOut, but that would
   /// require us to create a temporary copy to check whether the BBSet has
   /// changed after the genset and killset has been applied.
-  llvm::SmallBitVector BBSetIn;
+  SmallBitVector BBSetIn;
 
   /// A bit vector for which the ith bit represents the ith refcounted root in
   /// RCRootVault.
-  llvm::SmallBitVector BBSetOut;
+  SmallBitVector BBSetOut;
 
   /// A bit vector for which the ith bit represents the ith refcounted root in
   /// RCRootVault. If the bit is set, that means this basic block creates a
   /// retain which can be sunk or a release which can be hoisted.
-  llvm::SmallBitVector BBGenSet;
+  SmallBitVector BBGenSet;
 
   /// A bit vector for which the ith bit represents the ith refcounted root in
   /// RCRootVault. If this bit is set, that means this basic block stops retain
   /// or release of the refcounted root to be moved across.
-  llvm::SmallBitVector BBKillSet;
+  SmallBitVector BBKillSet;
 
   /// A bit vector for which the ith bit represents the ith refcounted root in
   /// RCRootVault. If this bit is set, that means this is potentially a retain
@@ -134,7 +130,7 @@ struct BlockState {
   ///
   /// NOTE: this vector contains an approximation of whether there will be a
   /// retain or release to a certain point of a basic block.
-  llvm::SmallBitVector BBMaxSet;
+  SmallBitVector BBMaxSet;
 };
 
 /// CodeMotionContext - This is the base class which retain code motion and
@@ -271,7 +267,7 @@ class RetainBlockState : public BlockState {
 public:
   /// Check whether the BBSetOut has changed. If it does, we need to rerun
   /// the data flow on this block's successors to reach fixed point.
-  bool updateBBSetOut(llvm::SmallBitVector &X) {
+  bool updateBBSetOut(SmallBitVector &X) {
     if (BBSetOut == X)
       return false;
     BBSetOut = X;
@@ -306,7 +302,8 @@ class RetainCodeMotionContext : public CodeMotionContext {
     // end, this function is called many times.
     //
     // These terminator instructions block.
-    if (isa<ReturnInst>(II) || isa<ThrowInst>(II) || isa<UnreachableInst>(II))
+    if (isa<ReturnInst>(II) || isa<ThrowInst>(II) || isa<UnwindInst>(II) ||
+        isa<UnreachableInst>(II))
       return true;
     // Identical RC root blocks code motion, we will be able to move this retain
     // further once we move the blocking retain.
@@ -622,7 +619,7 @@ class ReleaseBlockState : public BlockState {
 public:
   /// Check whether the BBSetIn has changed. If it does, we need to rerun
   /// the data flow on this block's predecessors to reach fixed point.
-  bool updateBBSetIn(llvm::SmallBitVector &X) {
+  bool updateBBSetIn(SmallBitVector &X) {
     if (BBSetIn == X)
       return false;
     BBSetIn = X;
@@ -1075,9 +1072,7 @@ static void eliminateRetainsPrecedingProgramTerminationPoints(SILFunction *f) {
     // such a case, we can ignore it. All other functions though imply we must
     // bail. If we don't have a function here, check for side
     if (auto apply = FullApplySite::isa(&*iter)) {
-      SILFunction *callee = apply.getCalleeFunction();
-      if (!callee ||
-          !callee->hasSemanticsAttr(SEMANTICS_ARC_PROGRAMTERMINATION_POINT)) {
+      if (!apply.isCalleeKnownProgramTerminationPoint()) {
         continue;
       }
     } else {
@@ -1155,11 +1150,6 @@ public:
     if (!F->shouldOptimize())
       return;
 
-    // Return if there is critical edge and we are disabling critical edge
-    // splitting.
-    if (DisableIfWithCriticalEdge && hasCriticalEdges(*F, false))
-      return;
-
     LLVM_DEBUG(llvm::dbgs() << "*** ARCCM on function: " << F->getName()
                             << " ***\n");
 
@@ -1169,7 +1159,7 @@ public:
     //
     // TODO: maybe we can do this lazily or maybe we should disallow SIL passes
     // to create critical edges.
-    bool EdgeChanged = splitAllCriticalEdges(*F, false, nullptr, nullptr);
+    bool EdgeChanged = splitAllCriticalEdges(*F, nullptr, nullptr);
     if (EdgeChanged)
       POA->invalidateFunction(F);
 

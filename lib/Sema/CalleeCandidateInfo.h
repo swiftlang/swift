@@ -45,21 +45,19 @@ namespace swift {
     CC_GeneralMismatch          ///< Something else is wrong.
   };
 
-  /// This is a candidate for a callee, along with an uncurry level.
+  /// This is a candidate for a callee.
   ///
-  /// The uncurry level specifies how far much of a curried value has already
-  /// been applied.  For example, in a funcdecl of:
-  ///     func f(a:Int)(b:Double) -> Int
-  /// Uncurry level of 0 indicates that we're looking at the "a" argument, an
-  /// uncurry level of 1 indicates that we're looking at the "b" argument.
+  /// `skipCurriedSelf` specifies that function type associated with this
+  /// candidate might have a curried self parameter which needs to be
+  /// skipped.
   ///
-  /// entityType specifies a specific type to use for this decl/expr that may be
-  /// more resolved than the concrete type.  For example, it may have generic
+  /// `entityType` specifies a specific type to use for this decl/expr that may
+  /// be more resolved than the concrete type.  For example, it may have generic
   /// arguments substituted in.
   ///
-  struct UncurriedCandidate {
+  struct OverloadCandidate {
     PointerUnion<ValueDecl *, Expr*> declOrExpr;
-    unsigned level;
+    bool skipCurriedSelf;
     Type entityType;
     
     // If true, entityType is written in terms of caller archetypes,
@@ -70,11 +68,12 @@ namespace swift {
     //
     // FIXME: Clean this up.
     bool substituted;
-    
-    UncurriedCandidate(ValueDecl *decl, unsigned level);
-    UncurriedCandidate(Expr *expr, Type type)
-    : declOrExpr(expr), level(0), entityType(type), substituted(true) {}
-    
+
+    OverloadCandidate(ValueDecl *decl, bool skipCurriedSelf);
+    OverloadCandidate(Expr *expr, Type type)
+        : declOrExpr(expr), skipCurriedSelf(false), entityType(type),
+          substituted(true) {}
+
     ValueDecl *getDecl() const {
       return declOrExpr.dyn_cast<ValueDecl*>();
     }
@@ -82,25 +81,24 @@ namespace swift {
     Expr *getExpr() const {
       return declOrExpr.dyn_cast<Expr*>();
     }
-    
-    Type getUncurriedType() const {
+
+    Type getType() const {
       // Start with the known type of the decl.
       auto type = entityType;
-      for (unsigned i = 0, e = level; i != e; ++i) {
+      if (skipCurriedSelf) {
         auto funcTy = type->getAs<AnyFunctionType>();
         if (!funcTy) return Type();
         type = funcTy->getResult();
       }
-      
       return type;
     }
-    
-    AnyFunctionType *getUncurriedFunctionType() const {
-      if (auto type = getUncurriedType())
+
+    AnyFunctionType *getFunctionType() const {
+      if (auto type = getType())
         return type->getAs<AnyFunctionType>();
       return nullptr;
     }
-    
+
     /// Given a function candidate with an uncurry level, return the parameter
     /// type at the specified uncurry level.  If there is an error getting to
     /// the specified input, this returns a null Type.
@@ -112,20 +110,18 @@ namespace swift {
       return FunctionType::composeInput(ctx, params, false);
     }
 
-    bool hasParameters() const {
-      return getUncurriedFunctionType();
-    }
+    bool hasParameters() const { return getFunctionType(); }
 
     ArrayRef<AnyFunctionType::Param> getParameters() const {
       assert(hasParameters());
-      return getUncurriedFunctionType()->getParams();
+      return getFunctionType()->getParams();
     }
     
     /// Given a function candidate with an uncurry level, return the parameter
     /// type at the specified uncurry level.  If there is an error getting to
     /// the specified input, this returns a null Type.
     Type getResultType() const {
-      if (auto *funcTy = getUncurriedFunctionType())
+      if (auto *funcTy = getFunctionType())
         return funcTy->getResult();
       return Type();
     }
@@ -150,8 +146,8 @@ namespace swift {
     bool hasTrailingClosure;
     
     /// This is the list of candidates identified.
-    SmallVector<UncurriedCandidate, 4> candidates;
-    
+    SmallVector<OverloadCandidate, 4> candidates;
+
     /// This tracks how close the candidates are, after filtering.
     CandidateCloseness closeness = CC_GeneralMismatch;
     
@@ -196,28 +192,23 @@ namespace swift {
 
     using ClosenessResultTy = std::pair<CandidateCloseness, FailedArgumentInfo>;
     using ClosenessPredicate =
-        const std::function<ClosenessResultTy(UncurriedCandidate)> &;
+        const std::function<ClosenessResultTy(OverloadCandidate)> &;
 
     /// After the candidate list is formed, it can be filtered down to discard
     /// obviously mismatching candidates and compute a "closeness" for the
     /// resultant set.
     ClosenessResultTy
-    evaluateCloseness(UncurriedCandidate candidate,
+    evaluateCloseness(OverloadCandidate candidate,
                       ArrayRef<AnyFunctionType::Param> actualArgs);
-    
+
     void filterListArgs(ArrayRef<AnyFunctionType::Param> actualArgs);
-    void filterList(Type actualArgsType, ArrayRef<Identifier> argLabels) {
-      return filterListArgs(decomposeArgType(actualArgsType, argLabels));
-    }
     void filterList(ClosenessPredicate predicate);
     void filterContextualMemberList(Expr *argExpr);
     
     bool empty() const { return candidates.empty(); }
     unsigned size() const { return candidates.size(); }
-    UncurriedCandidate operator[](unsigned i) const {
-      return candidates[i];
-    }
-    
+    OverloadCandidate operator[](unsigned i) const { return candidates[i]; }
+
     /// Given a set of parameter lists from an overload group, and a list of
     /// arguments, emit a diagnostic indicating any partially matching
     /// overloads.

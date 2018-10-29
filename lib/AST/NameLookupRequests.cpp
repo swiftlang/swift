@@ -121,11 +121,31 @@ void ExtendedNominalRequest::noteCycleStep(DiagnosticEngine &diags) const {
 void SelfBoundsFromWhereClauseRequest::diagnoseCycle(
                                               DiagnosticEngine &diags) const {
   // FIXME: Improve this diagnostic.
+  auto subject = std::get<0>(getStorage());
+  Decl *decl = subject.dyn_cast<TypeDecl *>();
+  if (decl == nullptr)
+    decl = subject.get<ExtensionDecl *>();
+  diags.diagnose(decl, diag::circular_reference);
+}
+
+void SelfBoundsFromWhereClauseRequest::noteCycleStep(
+                                              DiagnosticEngine &diags) const {
+  // FIXME: Customize this further.
+  auto subject = std::get<0>(getStorage());
+  Decl *decl = subject.dyn_cast<TypeDecl *>();
+  if (decl == nullptr)
+    decl = subject.get<ExtensionDecl *>();
+  diags.diagnose(decl, diag::circular_reference_through);
+}
+
+void TypeDeclsFromWhereClauseRequest::diagnoseCycle(
+                                              DiagnosticEngine &diags) const {
+  // FIXME: Improve this diagnostic.
   auto ext = std::get<0>(getStorage());
   diags.diagnose(ext, diag::circular_reference);
 }
 
-void SelfBoundsFromWhereClauseRequest::noteCycleStep(
+void TypeDeclsFromWhereClauseRequest::noteCycleStep(
                                               DiagnosticEngine &diags) const {
   auto ext = std::get<0>(getStorage());
   // FIXME: Customize this further.

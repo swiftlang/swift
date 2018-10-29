@@ -169,7 +169,7 @@ struct MagicKingdom<K> : Kingdom {
 }
 func magify<T>(_ t: T) -> MagicKingdom<T> { return MagicKingdom() }
 func foo(_ pair: (Int, Int)) -> Victory<(x: Int, y: Int)> {
-  return Victory(magify(pair)) // expected-error {{initializer 'init' requires the types '(x: Int, y: Int)' and '(Int, Int)' be equivalent}}
+  return Victory(magify(pair)) // expected-error {{initializer 'init(_:)' requires the types '(x: Int, y: Int)' and '(Int, Int)' be equivalent}}
 }
 
 
@@ -244,4 +244,11 @@ func microwave() -> Dinner? {
 func microwave() -> Dinner {
   let d: Dinner? = nil
   return (n: d) // expected-error{{cannot convert return expression of type '(n: Dinner?)' to return type 'Dinner'}}
+}
+
+// Tuple conversion with an optional
+func f(b: Bool) -> (a: Int, b: String)? {
+  let x = 3
+  let y = ""
+  return b ? (x, y) : nil
 }

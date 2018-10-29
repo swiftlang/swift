@@ -22,7 +22,11 @@
 #define TAPI_NAMESPACE_V1_BEGIN namespace tapi { inline namespace v1 {
 #define TAPI_NAMESPACE_V1_END } }
 
+#if defined(_WIN32)
+#define TAPI_PUBLIC
+#else
 #define TAPI_PUBLIC __attribute__((visibility ("default")))
+#endif
 
 #endif // TAPI_DEFINES_H
 

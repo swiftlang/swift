@@ -1,4 +1,6 @@
-// RUN: %target-run-simple-swift
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -o %t/Error -DPTR_SIZE_%target-ptrsize -module-name main %s
+// RUN: %target-run %t/Error
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -113,7 +115,18 @@ ErrorTests.test("try!")
   .code {
     expectCrashLater()
     let _: () = try! { throw SillyError.JazzHands }()
-  }
+}
+
+ErrorTests.test("try!/location")
+  .skip(.custom({ _isFastAssertConfiguration() },
+                reason: "trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches(_isDebugAssertConfiguration()
+                        ? "test/stdlib/Error.swift, line 128"
+                        : "")
+  .code {
+    expectCrashLater()
+    let _: () = try! { throw SillyError.JazzHands }()
+}
 
 ErrorTests.test("try?") {
   var value = try? { () throws -> Int in return 1 }()
@@ -141,6 +154,41 @@ ErrorTests.test("existential in lvalue") {
     expectEqual(0, e?._code)
   }
   expectEqual(0, LifetimeTracked.instances)
+}
+
+enum UnsignedError: UInt, Error {
+#if PTR_SIZE_64
+case negativeOne = 0xFFFFFFFFFFFFFFFF
+#elseif PTR_SIZE_32
+case negativeOne = 0xFFFFFFFF
+#else
+#error ("Unknown pointer size")
+#endif
+}
+
+ErrorTests.test("unsigned raw value") {
+  let negOne: Error = UnsignedError.negativeOne
+  expectEqual(-1, negOne._code)
+}
+
+ErrorTests.test("test dealloc empty error box") {
+  struct Foo<T>: Error { let value: T }
+
+  func makeFoo<T>() throws -> Foo<T> {
+    throw Foo(value: "makeFoo throw error")
+  }
+
+  func makeError<T>(of: T.Type) throws -> Error {
+    return try makeFoo() as Foo<T>
+  }
+
+  do {
+    _ = try makeError(of: Int.self)
+  } catch let foo as Foo<String> {
+    expectEqual(foo.value, "makeFoo throw error")
+  } catch {
+    expectUnreachableCatch(error)
+  }
 }
 
 runAllTests()

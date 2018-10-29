@@ -337,15 +337,15 @@ ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
   }
 #include "swift/AST/ReferenceStorage.def"
 
-ManagedValue SILGenBuilder::createOwnedPHIArgument(SILType type) {
-  SILPHIArgument *arg =
-      getInsertionBB()->createPHIArgument(type, ValueOwnershipKind::Owned);
+ManagedValue SILGenBuilder::createOwnedPhiArgument(SILType type) {
+  SILPhiArgument *arg =
+      getInsertionBB()->createPhiArgument(type, ValueOwnershipKind::Owned);
   return SGF.emitManagedRValueWithCleanup(arg);
 }
 
-ManagedValue SILGenBuilder::createGuaranteedPHIArgument(SILType type) {
-  SILPHIArgument *arg =
-      getInsertionBB()->createPHIArgument(type, ValueOwnershipKind::Guaranteed);
+ManagedValue SILGenBuilder::createGuaranteedPhiArgument(SILType type) {
+  SILPhiArgument *arg =
+      getInsertionBB()->createPhiArgument(type, ValueOwnershipKind::Guaranteed);
   return SGF.emitManagedBorrowedArgumentWithCleanup(arg);
 }
 
@@ -970,4 +970,10 @@ void SILGenBuilder::emitDestructureValueOperation(
       loc, value.forward(SGF), [&](unsigned index, SILValue subValue) {
         return func(index, cloner.clone(subValue));
       });
+}
+
+ManagedValue SILGenBuilder::createProjectBox(SILLocation loc, ManagedValue mv,
+                                             unsigned index) {
+  auto *pbi = SILBuilder::createProjectBox(loc, mv.getValue(), index);
+  return ManagedValue::forUnmanaged(pbi);
 }

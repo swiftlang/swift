@@ -203,6 +203,20 @@ static bool isAddressForLoad(SILInstruction *I, SILBasicBlock *&singleBlock) {
   return true;
 }
 
+/// Returns true if \p I is a dead struct_element_addr or tuple_element_addr.
+static bool isDeadAddrProjection(SILInstruction *I) {
+  if (!isa<StructElementAddrInst>(I) && !isa<TupleElementAddrInst>(I))
+    return false;
+
+  // Recursively search for uses which are dead themselves.
+  for (auto UI : cast<SingleValueInstruction>(I)->getUses()) {
+    SILInstruction *II = UI->getUser();
+    if (!isDeadAddrProjection(II))
+      return false;
+  }
+  return true;
+}
+
 /// Returns true if this AllocStacks is captured.
 /// Sets \p inSingleBlock to true if all uses of \p ASI are in a single block.
 static bool isCaptured(AllocStackInst *ASI, bool &inSingleBlock) {
@@ -264,6 +278,9 @@ bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI) {
     // If we haven't already promoted the AllocStack, we may see
     // DebugValueAddr uses.
     if (isa<DebugValueAddrInst>(II))
+      continue;
+
+    if (isDeadAddrProjection(II))
       continue;
 
     // Can't do anything else with it.
@@ -468,8 +485,8 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *ASI) {
     // with our running value.
     if (isLoadFromStack(Inst, ASI)) {
       if (!RunningVal) {
-        assert(ASI->getElementType().isVoid() &&
-               "Expected initialization of non-void type!");
+        // Loading without a previous store is only acceptable if the type is
+        // Void (= empty tuple) or a tuple of Voids.
         RunningVal = SILUndef::get(ASI->getElementType(), ASI->getModule());
       }
       replaceLoad(cast<LoadInst>(Inst), RunningVal, ASI);
@@ -538,7 +555,7 @@ void StackAllocationPromoter::addBlockArguments(BlockSet &PhiBlocks) {
   LLVM_DEBUG(llvm::dbgs() << "*** Adding new block arguments.\n");
 
   for (auto *Block : PhiBlocks)
-    Block->createPHIArgument(ASI->getElementType(), ValueOwnershipKind::Owned);
+    Block->createPhiArgument(ASI->getElementType(), ValueOwnershipKind::Owned);
 }
 
 SILValue
@@ -889,7 +906,7 @@ bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc,
 bool MemoryToRegisters::run() {
   bool Changed = false;
 
-  Changed = splitAllCriticalEdges(F, true, DT, nullptr);
+  F.verifyCriticalEdges();
 
   // Compute dominator tree node levels for the function.
   DomTreeLevelMap DomTreeLevels;

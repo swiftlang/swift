@@ -10,5 +10,5 @@ protocol P {
   func foo(_: String)
 }
 
-// CHECK: define {{.*}} @"$S4test1CCAA1PA2aDP3fooyySSFTW"
+// CHECK: define {{.*}} @"$s4test1CCAA1PA2aDP3fooyySSFTW"
 extension C: P { }

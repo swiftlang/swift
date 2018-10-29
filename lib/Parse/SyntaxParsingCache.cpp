@@ -37,6 +37,7 @@ bool SyntaxParsingCache::nodeCanBeReused(const Syntax &Node, size_t NodeStart,
   if (auto NextNode = Node.getData().getNextNode()) {
     auto NextLeafNode = NextNode->getFirstToken();
     auto NextRawNode = NextLeafNode->getRaw();
+    assert(NextRawNode->isPresent());
     NextLeafNodeLength += NextRawNode->getTokenText().size();
     for (auto TriviaPiece : NextRawNode->getLeadingTrivia()) {
       NextLeafNodeLength += TriviaPiece.getTextLength();
@@ -66,7 +67,7 @@ llvm::Optional<Syntax> SyntaxParsingCache::lookUpFrom(const Syntax &Node,
   size_t ChildStart = NodeStart;
   for (size_t I = 0, E = Node.getNumChildren(); I < E; ++I) {
     llvm::Optional<Syntax> Child = Node.getChild(I);
-    if (!Child.hasValue()) {
+    if (!Child.hasValue() || Child->isMissing()) {
       continue;
     }
     auto ChildEnd = ChildStart + Child->getTextLength();
@@ -79,17 +80,21 @@ llvm::Optional<Syntax> SyntaxParsingCache::lookUpFrom(const Syntax &Node,
   return llvm::None;
 }
 
-llvm::Optional<Syntax> SyntaxParsingCache::lookUp(size_t NewPosition,
-                                                  SyntaxKind Kind) {
-  // Undo the edits in reverse order
-  size_t OldPosition = NewPosition;
-  for (auto I = Edits.rbegin(), E = Edits.rend(); I != E; ++I) {
+size_t SyntaxParsingCache::translateToPreEditPosition(
+    size_t PostEditPosition, llvm::SmallVector<SourceEdit, 4> Edits) {
+  size_t Position = PostEditPosition;
+  for (auto I = Edits.begin(), E = Edits.end(); I != E; ++I) {
     auto Edit = *I;
-    if (Edit.End <= OldPosition) {
-      OldPosition =
-          OldPosition - Edit.ReplacementLength + Edit.originalLength();
+    if (Edit.End + Edit.ReplacementLength - Edit.originalLength() <= Position) {
+      Position = Position - Edit.ReplacementLength + Edit.originalLength();
     }
   }
+  return Position;
+}
+
+llvm::Optional<Syntax> SyntaxParsingCache::lookUp(size_t NewPosition,
+                                                  SyntaxKind Kind) {
+  size_t OldPosition = translateToPreEditPosition(NewPosition, Edits);
 
   auto Node = lookUpFrom(OldSyntaxTree, /*NodeStart=*/0, OldPosition, Kind);
   if (Node.hasValue()) {

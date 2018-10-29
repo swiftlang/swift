@@ -213,7 +213,6 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addSimplifyCFG();
   P.addArrayElementPropagation();
   // End of unrolling passes.
-  P.addRemovePins();
   P.addABCOpt();
   // Cleanup.
   P.addDCE();
@@ -246,6 +245,9 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
 
   // Promote stack allocations to values.
   P.addMem2Reg();
+
+  // Run the existential specializer Pass.
+  P.addExistentialSpecializer();
 
   // Cleanup, which is important if the inliner has restarted the pass pipeline.
   P.addPerformanceConstantPropagation();
@@ -303,7 +305,14 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   P.addSimplifyCFG();
 
   P.addCSE();
-  P.addRedundantLoadElimination();
+  if (OpLevel == OptimizationLevelKind::HighLevel) {
+    // Early RLE does not touch loads from Arrays. This is important because
+    // later array optimizations, like ABCOpt, get confused if an array load in
+    // a loop is converted to a pattern with a phi argument.
+    P.addEarlyRedundantLoadElimination();
+  } else {
+    P.addRedundantLoadElimination();
+  }
 
   P.addPerformanceConstantPropagation();
   P.addCSE();
@@ -331,7 +340,6 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   P.addRetainSinking();
   P.addReleaseHoisting();
   P.addARCSequenceOpts();
-  P.addRemovePins();
 }
 
 static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {
@@ -488,6 +496,10 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
   // Optimize access markers for improved IRGen after all other optimizations.
   P.addAccessEnforcementOpts();
   P.addAccessEnforcementWMO();
+  P.addAccessEnforcementDom();
+  // addAccessEnforcementDom might provide potential for LICM:
+  // A loop might have only one dynamic access now, i.e. hoistable
+  P.addLICM();
 
   // Only has an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();

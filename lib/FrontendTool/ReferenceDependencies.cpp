@@ -17,14 +17,16 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/ReferenceDependencyKeys.h"
 #include "swift/Frontend/FrontendOptions.h"
-#include "swift/Frontend/ReferenceDependencyKeys.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
@@ -65,11 +67,6 @@ public:
                    llvm::raw_ostream &out);
 
 private:
-  /// Opens file for reference dependencies. Emits diagnostic if needed.
-  ///
-  /// \return nullptr on error
-  static std::unique_ptr<llvm::raw_fd_ostream> openFile(DiagnosticEngine &diags,
-                                                        StringRef OutputPath);
   /// Emits all the dependency information.
   void emit() const;
 
@@ -189,36 +186,18 @@ static std::string escape(DeclBaseName name) {
   return llvm::yaml::escape(name.userFacingName());
 }
 
-std::unique_ptr<llvm::raw_fd_ostream>
-ReferenceDependenciesEmitter::openFile(DiagnosticEngine &diags,
-                                       StringRef outputPath) {
-  // Before writing to the dependencies file path, preserve any previous file
-  // that may have been there. No error handling -- this is just a nicety, it
-  // doesn't matter if it fails.
-  llvm::sys::fs::rename(outputPath, outputPath + "~");
-
-  std::error_code EC;
-  auto out = llvm::make_unique<llvm::raw_fd_ostream>(outputPath, EC,
-                                                     llvm::sys::fs::F_None);
-
-  if (out->has_error() || EC) {
-    diags.diagnose(SourceLoc(), diag::error_opening_output, outputPath,
-                   EC.message());
-    out->clear_error();
-    return nullptr;
-  }
-  return out;
-}
-
 bool ReferenceDependenciesEmitter::emit(DiagnosticEngine &diags,
                                         SourceFile *const SF,
                                         const DependencyTracker &depTracker,
                                         StringRef outputPath) {
-  const std::unique_ptr<llvm::raw_ostream> out = openFile(diags, outputPath);
-  if (!out.get())
-    return true;
-  ReferenceDependenciesEmitter::emit(SF, depTracker, *out);
-  return false;
+  // Before writing to the dependencies file path, preserve any previous file
+  // that may have been there. No error handling -- this is just a nicety, it
+  // doesn't matter if it fails.
+  llvm::sys::fs::rename(outputPath, outputPath + "~");
+  return withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
+    ReferenceDependenciesEmitter::emit(SF, depTracker, out);
+    return false;
+  });
 }
 
 void ReferenceDependenciesEmitter::emit(SourceFile *SF,
@@ -343,7 +322,7 @@ void ProvidesEmitter::emitExtensionDecl(const ExtensionDecl *const ED,
   auto *NTD = ED->getExtendedNominal();
   if (!NTD)
     return;
-  if (NTD->hasAccess() && NTD->getFormalAccess() <= AccessLevel::FilePrivate) {
+  if (NTD->getFormalAccess() <= AccessLevel::FilePrivate) {
     return;
   }
 
@@ -367,7 +346,7 @@ void ProvidesEmitter::emitNominalTypeDecl(const NominalTypeDecl *const NTD,
                                           CollectedDeclarations &cpd) const {
   if (!NTD->hasName())
     return;
-  if (NTD->hasAccess() && NTD->getFormalAccess() <= AccessLevel::FilePrivate) {
+  if (NTD->getFormalAccess() <= AccessLevel::FilePrivate) {
     return;
   }
   out << "- \"" << escape(NTD->getName()) << "\"\n";
@@ -382,7 +361,7 @@ void ProvidesEmitter::CollectedDeclarations::findNominalsAndOperators(
     if (!VD)
       continue;
 
-    if (VD->hasAccess() && VD->getFormalAccess() <= AccessLevel::FilePrivate) {
+    if (VD->getFormalAccess() <= AccessLevel::FilePrivate) {
       continue;
     }
 
@@ -402,7 +381,7 @@ void ProvidesEmitter::CollectedDeclarations::findNominalsAndOperators(
 void ProvidesEmitter::emitValueDecl(const ValueDecl *const VD) const {
   if (!VD->hasName())
     return;
-  if (VD->hasAccess() && VD->getFormalAccess() <= AccessLevel::FilePrivate) {
+  if (VD->getFormalAccess() <= AccessLevel::FilePrivate) {
     return;
   }
   out << "- \"" << escape(VD->getBaseName()) << "\"\n";
@@ -584,8 +563,7 @@ void DependsEmitter::emitMembers(
   out << dependsMember << ":\n";
   for (auto &entry : sortedMembers) {
     assert(entry.first.first != nullptr);
-    if (entry.first.first->hasAccess() &&
-        entry.first.first->getFormalAccess() <= AccessLevel::FilePrivate)
+    if (entry.first.first->getFormalAccess() <= AccessLevel::FilePrivate)
       continue;
 
     out << "- ";
@@ -610,8 +588,7 @@ void DependsEmitter::emitNominalTypes(
       isCascading |= i->second;
     }
 
-    if (i->first.first->hasAccess() &&
-        i->first.first->getFormalAccess() <= AccessLevel::FilePrivate)
+    if (i->first.first->getFormalAccess() <= AccessLevel::FilePrivate)
       continue;
 
     out << "- ";

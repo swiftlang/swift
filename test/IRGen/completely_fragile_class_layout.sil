@@ -1,6 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+
 // RUN: %target-swift-frontend  -I %t -emit-ir -enable-resilience %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+
+// RUN: %target-swift-frontend  -I %t -emit-ir -enable-resilience %s -read-type-info-path=%S/Inputs/legacy_type_info/a.yaml | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+
 // RUN: %target-swift-frontend  -I %t -emit-ir -enable-resilience -O %s
 
 // We only use fragile class layouts when Objective-C interop is enabled.
@@ -26,13 +30,40 @@ public class ClassWithResilientField {
 
 sil_vtable ClassWithResilientField {}
 
+public class SubclassOfClassWithResilientField : ClassWithResilientField {}
+
+sil_vtable SubclassOfClassWithResilientField {}
+
+
 // Field offsets are statically known:
-// CHECK-DAG: @"$S31completely_fragile_class_layout23ClassWithResilientFieldC5firstSivpWvd" = hidden constant i64 16, align 8
-// CHECK-DAG: @"$S31completely_fragile_class_layout23ClassWithResilientFieldC6second16resilient_struct4SizeVvpWvd" = hidden constant i64 24, align 8
-// CHECK-DAG: @"$S31completely_fragile_class_layout23ClassWithResilientFieldC5thirdSivpWvd" = hidden constant i64 40, align 8
+// CHECK-DAG: @"$s31completely_fragile_class_layout23ClassWithResilientFieldC5firstSivpWvd" = hidden constant i64 16, align 8
+// CHECK-DAG: @"$s31completely_fragile_class_layout23ClassWithResilientFieldC6second16resilient_struct4SizeVvpWvd" = hidden constant i64 24, align 8
+// CHECK-DAG: @"$s31completely_fragile_class_layout23ClassWithResilientFieldC5thirdSivpWvd" = hidden constant i64 40, align 8
+
+
+// RO-data for ClassWithResilientField:
+// CHECK-LABEL: @_DATA__TtC31completely_fragile_class_layout23ClassWithResilientField = private constant {
+
+// -- flags: compiled with ARC, has update callback
+// CHECK-SAME: i32 192,
+
+// -- the update callback
+// CHECK-SAME: @"$s31completely_fragile_class_layout23ClassWithResilientFieldCMU"
+
+// CHECK-SAME: }, section "__DATA, __objc_const", align 8
 
 // Class has static metadata:
-// CHECK-LABEL: $S31completely_fragile_class_layout23ClassWithResilientFieldCMf
+// CHECK-LABEL: @"$s31completely_fragile_class_layout23ClassWithResilientFieldCMf"
+
+
+// Subclass also has static metadata:
+// CHECK-LABEL: @"$s31completely_fragile_class_layout33SubclassOfClassWithResilientFieldCMf" = internal global <{{.*}}> <{
+
+// Superclass field is filled in statically:
+// CHECK-SAME: @"$s31completely_fragile_class_layout23ClassWithResilientFieldCMf"
+
+// CHECK-SAME: }>
+
 
 // rdar://problem/41308521 -- enum lowering needs to pretend payloads are
 // resilient and not use spare bits, even when bypassing resilience while
@@ -60,8 +91,22 @@ public class ClassWithResilientEnum {
 sil_vtable ClassWithResilientEnum {}
 
 // Field offsets are statically known:
-// CHECK-LABEL: @"$S31completely_fragile_class_layout22ClassWithResilientEnumC5firstAA0hfG7PayloadOvpWvd" = hidden constant i64 16, align 8
-// CHECK-LABEL: @"$S31completely_fragile_class_layout22ClassWithResilientEnumC6seconds4Int8VvpWvd" = hidden constant i64 25, align 8
+// CHECK-LABEL: @"$s31completely_fragile_class_layout22ClassWithResilientEnumC5firstAA0hfG7PayloadOvpWvd" = hidden constant i64 16, align 8
+// CHECK-LABEL: @"$s31completely_fragile_class_layout22ClassWithResilientEnumC6seconds4Int8VvpWvd" = hidden constant i64 25, align 8
+
+
+// Make sure extra inhabitants work when reading a legacy layout -- the
+// Optional<ResilientRef> should be 8 bytes in size, not 9
+public class ClassWithResilientRef {
+  var first: ResilientRef?
+  var second: Int
+}
+
+sil_vtable ClassWithResilientRef {}
+
+// Field offsets are statically known:
+// CHECK-LABEL: @"$s31completely_fragile_class_layout21ClassWithResilientRefC5first16resilient_struct0gH0VSgvpWvd" = hidden constant i64 16, align 8
+// CHECK-LABEL: @"$s31completely_fragile_class_layout21ClassWithResilientRefC6secondSivpWvd" = hidden constant i64 24, align 8
 
 
 // When allocating a class with resiliently-sized fields, we must still load
@@ -72,7 +117,7 @@ sil_vtable ClassWithResilientEnum {}
 sil @allocClassWithResilientField : $@convention(thin) () -> () {
 bb0:
 
-// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S31completely_fragile_class_layout23ClassWithResilientFieldCMa"(i64 0)
+// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s31completely_fragile_class_layout23ClassWithResilientFieldCMa"(i64 0)
 // CHECK-NEXT: [[META:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT: [[META_ADDR:%.*]] = bitcast %swift.type* [[META]] to i8*
 // CHECK-NEXT: [[SIZE_ADDR:%.*]] = getelementptr inbounds i8, i8* [[META_ADDR]], i32 48
@@ -108,10 +153,28 @@ bb0:
   return %result : $()
 }
 
-// Metadata accessor for ClassWithResilientField is trivial:
-// CHECK-LABEL: define swiftcc %swift.metadata_response @"$S31completely_fragile_class_layout23ClassWithResilientFieldCMa
-// CHECK: call %objc_class* @swift_getInitializedObjCClass(%objc_class* {{.*}} @"$S31completely_fragile_class_layout23ClassWithResilientFieldCMf"
-// CHECK: ret
+
+// Metadata accessor for ClassWithResilientField uses singleton initialization:
+
+// CHECK-LABEL: define swiftcc %swift.metadata_response @"$s31completely_fragile_class_layout23ClassWithResilientFieldCMa
+
+// CHECK:      [[CACHE:%.*]] = load %swift.type*, %swift.type** getelementptr inbounds ({ %swift.type*, i8* }, { %swift.type*, i8* }* @"$s31completely_fragile_class_layout23ClassWithResilientFieldCMl", i32 0, i32 0)
+// CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
+// CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
+
+// CHECK: cacheIsNull:
+// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$s31completely_fragile_class_layout23ClassWithResilientFieldCMn" to %swift.type_descriptor*))
+// CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
+// CHECK-NEXT: [[STATUS:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 1
+// CHECK-NEXT: br label %cont
+
+// CHECK: cont:
+// CHECK-NEXT: [[NEW_METADATA:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
+// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ 0, %entry ], [ [[STATUS]], %cacheIsNull ]
+// CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[NEW_METADATA]], 0
+// CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
+// CHECK-NEXT: ret %swift.metadata_response [[T1]]
+
 
 // Accessing a field whose offset depends on resilient types should
 // use the field offset global.
@@ -120,7 +183,7 @@ bb0:
 sil @accessClassWithResilientField : $@convention(thin) (@guaranteed ClassWithResilientField) -> Int {
 bb0(%0 : @guaranteed $ClassWithResilientField):
 
-// CHECK:        [[OFFSET:%.*]] = load i64, i64* @"$S31completely_fragile_class_layout23ClassWithResilientFieldC5thirdSivpWvd", align 8
+// CHECK:        [[OFFSET:%.*]] = load i64, i64* @"$s31completely_fragile_class_layout23ClassWithResilientFieldC5thirdSivpWvd", align 8
 // CHECK-NEXT:   [[SELF_ADDR:%.*]] = bitcast %T31completely_fragile_class_layout23ClassWithResilientFieldC* %0 to i8*
 // CHECK-NEXT:   [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[SELF_ADDR]], i64 [[OFFSET]]
 // CHECK-NEXT:   [[FIELD_PTR2:%.*]] = bitcast i8* [[FIELD_ADDR]] to %TSi*
@@ -135,7 +198,92 @@ bb0(%0 : @guaranteed $ClassWithResilientField):
   return %2 : $Int
 }
 
-// Metadata accessor for ClassWithResilientEnum is trivial:
-// CHECK-LABEL: define swiftcc %swift.metadata_response @"$S31completely_fragile_class_layout22ClassWithResilientEnumCMa
-// CHECK: call %objc_class* @swift_getInitializedObjCClass(%objc_class* {{.*}} @"$S31completely_fragile_class_layout22ClassWithResilientEnumCMf"
-// CHECK: ret
+
+// Objective-C metadata update callback function for ClassWithResilientField:
+
+// CHECK-LABEL: define internal %objc_class* @"$s31completely_fragile_class_layout23ClassWithResilientFieldCMU"(%objc_class*, i8*)
+// CHECK: entry:
+// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$s31completely_fragile_class_layout23ClassWithResilientFieldCMa"(i64 0)
+// CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
+// CHECK-NEXT: [[RESULT:%.*]] = bitcast %swift.type* [[METADATA]] to %objc_class*
+// CHECK-NEXT: ret %objc_class* [[RESULT]]
+
+
+// Metadata initialization function for ClassWithResilientField calls swift_updateClassMetadata():
+
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s31completely_fragile_class_layout23ClassWithResilientFieldCMr"(%swift.type*, i8*, i8**)
+
+// CHECK: entry:
+// CHECK-NEXT: [[FIELDS:%.*]] = alloca [3 x i8**]
+// CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* %0 to [[INT]]*
+// CHECK-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], [[INT]] {{11|14}}
+// CHECK-NEXT: [[FIELDS_ADDR:%.*]] = bitcast [3 x i8**]* [[FIELDS]] to i8*
+// CHECK-NEXT: call void @llvm.lifetime.start.p0i8(i64 {{12|24}}, i8* [[FIELDS_ADDR]])
+// CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds [3 x i8**], [3 x i8**]* [[FIELDS]], i32 0, i32 0
+
+// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 319)
+// CHECK-NEXT: [[SIZE_METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT: [[STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
+// CHECK-NEXT: [[RESULT:%.*]] = icmp ule [[INT]] [[STATUS]], 63
+// CHECK-NEXT: br i1 [[RESULT]], label %dependency-satisfied, label %metadata-dependencies.cont
+
+// CHECK: dependency-satisfied:
+
+// -- ClassLayoutFlags = 0x100 (HasStaticVTable)
+// CHECK:      void @swift_updateClassMetadata(%swift.type* %0, [[INT]] 256, [[INT]] 3, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+
+// CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
+// CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$s31completely_fragile_class_layout23ClassWithResilientFieldC1s16resilient_struct4SizeVvpWvd"
+
+// CHECK-native:      [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* {{.*}}
+// CHECK-native-NEXT: store [[INT]] [[FIELD_OFFSET]], [[INT]]* @"$s31completely_fragile_class_layout23ClassWithResilientFieldC5colors5Int32VvpWvd"
+
+// CHECK:      br label %metadata-dependencies.cont
+
+// CHECK: metadata-dependencies.cont:
+
+// CHECK-NEXT: [[PENDING_METADATA:%.*]] = phi %swift.type* [ [[SIZE_METADATA]], %entry ], [ null, %dependency-satisfied ]
+// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ 63, %entry ], [ 0, %dependency-satisfied ]
+// CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[PENDING_METADATA]], 0
+// CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
+// CHECK-NEXT: ret %swift.metadata_response [[T1]]
+
+
+// Metadata initialization function for SubclassOfClassWithResilientField:
+
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s31completely_fragile_class_layout33SubclassOfClassWithResilientFieldCMr"(%swift.type*, i8*, i8**)
+
+// CHECK: entry:
+// CHECK-NEXT: [[FIELDS:%.*]] = alloca [0 x i8**]
+// CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* %0 to [[INT]]*
+// CHECK-NEXT: [[FIELDS_DEST:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[METADATA_ADDR]], [[INT]] {{11|14}}
+// CHECK-NEXT: [[FIELDS_ADDR:%.*]] = bitcast [0 x i8**]* [[FIELDS]] to i8*
+// CHECK-NEXT: call void @llvm.lifetime.start.p0i8(i64 0, i8* [[FIELDS_ADDR]])
+// CHECK-NEXT: [[FIELDS_PTR:%.*]] = getelementptr inbounds [0 x i8**], [0 x i8**]* [[FIELDS]], i32 0, i32 0
+
+// -- ClassLayoutFlags = 0x100 (HasStaticVTable)
+// CHECK:      void @swift_updateClassMetadata(%swift.type* %0, [[INT]] 256, [[INT]] 0, i8*** [[FIELDS_PTR]], [[INT]]* [[FIELDS_DEST]])
+
+// CHECK: ret %swift.metadata_response zeroinitializer
+
+// Metadata accessor for ClassWithResilientEnum looks like singleton initialization:
+
+// CHECK-LABEL: define swiftcc %swift.metadata_response @"$s31completely_fragile_class_layout22ClassWithResilientEnumCMa
+
+// CHECK:      [[CACHE:%.*]] = load %swift.type*, %swift.type** getelementptr inbounds ({ %swift.type*, i8* }, { %swift.type*, i8* }* @"$s31completely_fragile_class_layout22ClassWithResilientEnumCMl", i32 0, i32 0)
+// CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
+// CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
+
+// CHECK: cacheIsNull:
+// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$s31completely_fragile_class_layout22ClassWithResilientEnumCMn" to %swift.type_descriptor*))
+// CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
+// CHECK-NEXT: [[STATUS:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 1
+// CHECK-NEXT: br label %cont
+
+// CHECK: cont:
+// CHECK-NEXT: [[NEW_METADATA:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
+// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ 0, %entry ], [ [[STATUS]], %cacheIsNull ]
+// CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[NEW_METADATA]], 0
+// CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
+// CHECK-NEXT: ret %swift.metadata_response [[T1]]
+

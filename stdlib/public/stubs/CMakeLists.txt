@@ -4,7 +4,9 @@ set(swift_stubs_sources
     GlobalObjects.cpp
     KeyPaths.cpp
     LibcShims.cpp
+    Random.cpp
     Stubs.cpp
+    ThreadLocalStorage.cpp
     MathStubs.cpp
 )
 set(swift_stubs_objc_sources
@@ -24,7 +26,7 @@ set(swift_stubs_c_compile_flags ${SWIFT_RUNTIME_CORE_CXX_FLAGS})
 list(APPEND swift_stubs_c_compile_flags -DswiftCore_EXPORTS)
 list(APPEND swift_stubs_c_compile_flags -I${SWIFT_SOURCE_DIR}/include)
 
-add_swift_library(swiftStdlibStubs
+add_swift_target_library(swiftStdlibStubs
                   OBJECT_LIBRARY TARGET_LIBRARY
                     ${swift_stubs_sources}
                     ${swift_stubs_objc_sources}

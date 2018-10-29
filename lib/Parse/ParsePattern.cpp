@@ -18,6 +18,7 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/SyntaxParsingContext.h"
@@ -169,6 +170,23 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
                                           SyntaxKind::FunctionParameterList);
     }
     rightParenLoc = consumeToken(tok::r_paren);
+
+    // Per SE-0155, enum elements may not have empty parameter lists.
+    if (paramContext == ParameterContextKind::EnumElement) {
+      decltype(diag::enum_element_empty_arglist) diagnostic;
+      if (Context.isSwiftVersionAtLeast(5)) {
+        diagnostic = diag::enum_element_empty_arglist;
+      } else {
+        diagnostic = diag::enum_element_empty_arglist_swift4;
+      }
+
+      diagnose(leftParenLoc, diagnostic)
+        .highlight({leftParenLoc, rightParenLoc});
+      diagnose(leftParenLoc, diag::enum_element_empty_arglist_delete)
+        .fixItRemoveChars(leftParenLoc, rightParenLoc);
+      diagnose(leftParenLoc, diag::enum_element_empty_arglist_add_void)
+        .fixItInsert(leftParenLoc, "Void");
+    }
     return ParserStatus();
   }
 
@@ -584,14 +602,6 @@ mapParsedParameters(Parser &parser,
       DefaultArgumentKind kind = getDefaultArgKind(param.DefaultArg);
       result->setDefaultArgumentKind(kind);
       result->setDefaultValue(param.DefaultArg);
-      if (kind == DefaultArgumentKind::Normal) {
-        SourceRange defaultArgRange = param.DefaultArg->getSourceRange();
-        CharSourceRange charRange =
-            Lexer::getCharSourceRangeFromSourceRange(parser.SourceMgr,
-                                                     defaultArgRange);
-        StringRef defaultArgText = parser.SourceMgr.extractText(charRange);
-        result->setDefaultValueStringRepresentation(defaultArgText);
-      }
     }
 
     elements.push_back(result);
@@ -898,11 +908,27 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
 ///
 ParserResult<Pattern> Parser::parsePattern() {
   SyntaxParsingContext PatternCtx(SyntaxContext, SyntaxContextKind::Pattern);
+  bool isLet = (InVarOrLetPattern != IVOLP_InVar);
+  auto specifier = isLet
+    ? VarDecl::Specifier::Let
+    : VarDecl::Specifier::Var;
   switch (Tok.getKind()) {
   case tok::l_paren:
     return parsePatternTuple();
     
   case tok::kw__:
+    // Normally, '_' is invalid in type context for patterns, but they show up
+    // in interface files as the name for type members that are non-public.
+    // Treat them as an implicitly synthesized NamedPattern with a nameless
+    // VarDecl inside.
+    if (CurDeclContext->isTypeContext() &&
+        SF.Kind == SourceFileKind::Interface) {
+      PatternCtx.setCreateSyntax(SyntaxKind::IdentifierPattern);
+      auto VD = new (Context) VarDecl(
+        /*IsStatic*/false, specifier, /*IsCaptureList*/false,
+        consumeToken(tok::kw__), Identifier(), CurDeclContext);
+      return makeParserResult(new (Context) NamedPattern(VD, /*implicit*/true));
+    }
     PatternCtx.setCreateSyntax(SyntaxKind::WildcardPattern);
     return makeParserResult(new (Context) AnyPattern(consumeToken(tok::kw__)));
     
@@ -910,10 +936,6 @@ ParserResult<Pattern> Parser::parsePattern() {
     PatternCtx.setCreateSyntax(SyntaxKind::IdentifierPattern);
     Identifier name;
     SourceLoc loc = consumeIdentifier(&name);
-    bool isLet = (InVarOrLetPattern != IVOLP_InVar);
-    auto specifier = isLet
-                   ? VarDecl::Specifier::Let
-                   : VarDecl::Specifier::Var;
     if (Tok.isIdentifierOrUnderscore() && !Tok.isContextualDeclKeyword())
       diagnoseConsecutiveIDs(name.str(), loc, isLet ? "constant" : "variable");
 
@@ -1016,6 +1038,9 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
   SyntaxParsingContext TuplePatternCtxt(SyntaxContext,
                                         SyntaxKind::TuplePattern);
   StructureMarkerRAII ParsingPatternTuple(*this, Tok);
+  if (ParsingPatternTuple.isFailed()) {
+    return makeParserError();
+  }
   SourceLoc LPLoc = consumeToken(tok::l_paren);
   SourceLoc RPLoc;
 

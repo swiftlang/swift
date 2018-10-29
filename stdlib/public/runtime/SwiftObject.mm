@@ -474,9 +474,9 @@ bool swift::usesNativeSwiftReferenceCounting(const ClassMetadata *theClass) {
 /// reference-counting.  The metadata is known to correspond to a class
 /// type, but note that does not imply being known to be a ClassMetadata
 /// due to the existence of ObjCClassWrapper.
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 bool
-_objcClassUsesNativeSwiftReferenceCounting(const Metadata *theClass) {
+_swift_objcClassUsesNativeSwiftReferenceCounting(const Metadata *theClass) {
 #if SWIFT_OBJC_INTEROP
   // If this is ObjC wrapper metadata, the class is definitely not using
   // Swift ref-counting.
@@ -489,16 +489,17 @@ _objcClassUsesNativeSwiftReferenceCounting(const Metadata *theClass) {
 #endif
 }
 
-// The non-pointer bits, excluding the ObjC tag bits.
+// The non-pointer bits, excluding the tag bits.
 static auto const unTaggedNonNativeBridgeObjectBits
   = heap_object_abi::SwiftSpareBitsMask
-  & ~heap_object_abi::ObjCReservedBitsMask;
+  & ~heap_object_abi::ObjCReservedBitsMask
+  & ~heap_object_abi::BridgeObjectTagBitsMask;
 
 #if SWIFT_OBJC_INTEROP
 
 #if defined(__x86_64__)
 static uintptr_t const objectPointerIsObjCBit = 0x4000000000000000ULL;
-#elif defined(__arm64__)
+#elif defined(__arm64__) || defined(__arch64__) || defined(_M_ARM64)
 static uintptr_t const objectPointerIsObjCBit = 0x4000000000000000ULL;
 #else
 static uintptr_t const objectPointerIsObjCBit = 0x00000002U;
@@ -579,9 +580,15 @@ static bool isNonNative_unTagged_bridgeObject(void *object) {
   static_assert((heap_object_abi::SwiftSpareBitsMask & objectPointerIsObjCBit) ==
                 objectPointerIsObjCBit,
                 "isObjC bit not within spare bits");
-  return (uintptr_t(object) & objectPointerIsObjCBit) != 0;
+  return (uintptr_t(object) & objectPointerIsObjCBit) != 0
+      && (uintptr_t(object) & heap_object_abi::BridgeObjectTagBitsMask) == 0;
 }
 #endif
+
+/// Return true iff the given BridgeObject is a tagged value.
+static bool isBridgeObjectTaggedPointer(void *object) {
+	return (uintptr_t(object) & heap_object_abi::BridgeObjectTagBitsMask) != 0;
+}
 
 // Mask out the spare bits in a bridgeObject, returning the object it
 // encodes.
@@ -593,7 +600,7 @@ static void* toPlainObject_unTagged_bridgeObject(void *object) {
 
 void *swift::swift_bridgeObjectRetain(void *object) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isObjCTaggedPointer(object) || isBridgeObjectTaggedPointer(object))
     return object;
 #endif
 
@@ -615,7 +622,7 @@ void *swift::swift_bridgeObjectRetain(void *object) {
 SWIFT_RUNTIME_EXPORT
 void *swift::swift_nonatomic_bridgeObjectRetain(void *object) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isObjCTaggedPointer(object) || isBridgeObjectTaggedPointer(object))
     return object;
 #endif
 
@@ -637,7 +644,7 @@ void *swift::swift_nonatomic_bridgeObjectRetain(void *object) {
 SWIFT_RUNTIME_EXPORT
 void swift::swift_bridgeObjectRelease(void *object) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isObjCTaggedPointer(object) || isBridgeObjectTaggedPointer(object))
     return;
 #endif
 
@@ -654,7 +661,7 @@ void swift::swift_bridgeObjectRelease(void *object) {
 
 void swift::swift_nonatomic_bridgeObjectRelease(void *object) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isObjCTaggedPointer(object) || isBridgeObjectTaggedPointer(object))
     return;
 #endif
 
@@ -671,7 +678,7 @@ void swift::swift_nonatomic_bridgeObjectRelease(void *object) {
 
 void *swift::swift_bridgeObjectRetain_n(void *object, int n) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isObjCTaggedPointer(object) || isBridgeObjectTaggedPointer(object))
     return object;
 #endif
 
@@ -694,7 +701,7 @@ void *swift::swift_bridgeObjectRetain_n(void *object, int n) {
 
 void swift::swift_bridgeObjectRelease_n(void *object, int n) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isObjCTaggedPointer(object) || isBridgeObjectTaggedPointer(object))
     return;
 #endif
 
@@ -712,7 +719,7 @@ void swift::swift_bridgeObjectRelease_n(void *object, int n) {
 
 void *swift::swift_nonatomic_bridgeObjectRetain_n(void *object, int n) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isObjCTaggedPointer(object) || isBridgeObjectTaggedPointer(object))
     return object;
 #endif
 
@@ -735,7 +742,7 @@ void *swift::swift_nonatomic_bridgeObjectRetain_n(void *object, int n) {
 
 void swift::swift_nonatomic_bridgeObjectRelease_n(void *object, int n) {
 #if SWIFT_OBJC_INTEROP
-  if (isObjCTaggedPointer(object))
+  if (isObjCTaggedPointer(object) || isBridgeObjectTaggedPointer(object))
     return;
 #endif
 
@@ -1356,52 +1363,6 @@ bool swift::swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
 #endif
 }
 
-/// Return true if the given bits of a Builtin.BridgeObject refer to a
-/// native swift object whose strong reference count is 1.
-bool swift::swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject(
-  uintptr_t bits
-) {
-  auto bridgeObject = (void*)bits;
-
-  if (isObjCTaggedPointer(bridgeObject))
-    return false;
-
-  const auto object = toPlainObject_unTagged_bridgeObject(bridgeObject);
-
-  // Note: we could just return false if all spare bits are set,
-  // but in that case the cost of a deeper check for a unique native
-  // object is going to be a negligible cost for a possible big win.
-#if SWIFT_OBJC_INTEROP
-  if (isNonNative_unTagged_bridgeObject(bridgeObject))
-    return swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(object);
-#endif
-  return swift_isUniquelyReferencedOrPinned_nonNull_native(
-                                                   (const HeapObject *)object);
-}
-
-
-/// Given a non-nil object reference, return true if the object is a
-/// native swift object and either its strong reference count is 1 or
-/// its pinned flag is set.
-bool swift::swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(
-                                                          const void *object) {
-  assert(object != nullptr);
-  return
-#if SWIFT_OBJC_INTEROP
-    usesNativeSwiftReferenceCounting_nonNull(object) &&
-#endif
-    swift_isUniquelyReferencedOrPinned_nonNull_native(
-                                                    (const HeapObject*)object);
-}
-
-// Given a non-@objc object reference, return true iff the
-// object is non-nil and either has a strong reference count of 1
-// or is pinned.
-bool swift::swift_isUniquelyReferencedOrPinned_native(const HeapObject *object){
-  return object != nullptr &&
-         swift_isUniquelyReferencedOrPinned_nonNull_native(object);
-}
-
 // Given a non-@objc object reference, return true iff the
 // object is non-nil and has a strong reference count greather than 1
 bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
@@ -1447,24 +1408,14 @@ bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
   return isEscaping;
 }
 
-/// Given a non-nil native swift object reference, return true if
-/// either the object has a strong reference count of 1 or its
-/// pinned flag is set.
-bool swift::swift_isUniquelyReferencedOrPinned_nonNull_native(
-    const HeapObject *object) {
-  assert(object != nullptr);
-  assert(!object->refCounts.isDeiniting());
-  return object->refCounts.isUniquelyReferencedOrPinned();
-}
-
 struct ClassExtents {
   size_t negative;
   size_t positive; 
 };
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 ClassExtents
-_getSwiftClassInstanceExtents(const Metadata *c) {
+_swift_getSwiftClassInstanceExtents(const Metadata *c) {
   assert(c && c->isClassObject());
   auto metaData = c->getClassObject();
   return ClassExtents{
@@ -1475,14 +1426,14 @@ _getSwiftClassInstanceExtents(const Metadata *c) {
 
 #if SWIFT_OBJC_INTEROP
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 ClassExtents
-_getObjCClassInstanceExtents(const ClassMetadata* c) {
+_swift_getObjCClassInstanceExtents(const ClassMetadata* c) {
   // Pure ObjC classes never have negative extents.
   if (c->isPureObjC())
     return ClassExtents{0, class_getInstanceSize(class_const_cast(c))};
 
-  return _getSwiftClassInstanceExtents(c);
+  return _swift_getSwiftClassInstanceExtents(c);
 }
 
 SWIFT_CC(swift)

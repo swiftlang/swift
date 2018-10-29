@@ -242,7 +242,7 @@ enum E7: String {
 // XCHECK2-NEXT: +
 // XCHECK2-NEXT: s:s1poiyS2i_SitF
 // XCHECK2-NEXT: (Int, Int) -> Int{{$}}
-// XCHECK2-NEXT: $SS2i_SitcD
+// XCHECK2-NEXT: $sS2i_SitcD
 // XCHECK2-NEXT: Swift{{$}}
 // XCHECK2-NEXT: <Group>Math/Integers</Group>
 // XCHECK2-NEXT: SYSTEM
@@ -254,7 +254,7 @@ enum E7: String {
 // CHECK3-NEXT: x{{$}}
 // CHECK3-NEXT: s:11cursor_info3gooyySiF1xL_Sivp{{$}}
 // CHECK3-NEXT: Int{{$}}
-// CHECK3-NEXT: $SSiD
+// CHECK3-NEXT: $sSiD
 // CHECK3-NEXT: <Declaration>let x: <Type usr="s:Si">Int</Type></Declaration>
 // CHECK3-NEXT: <decl.var.parameter><syntaxtype.keyword>let</syntaxtype.keyword> <decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>
 
@@ -263,7 +263,7 @@ enum E7: String {
 // CHECK4-NEXT: fooIntVar{{$}}
 // CHECK4-NEXT: c:@fooIntVar{{$}}
 // CHECK4-NEXT: Int32{{$}}
-// CHECK4-NEXT: $Ss5Int32VD
+// CHECK4-NEXT: $ss5Int32VD
 // CHECK4-NEXT: Foo{{$}}
 // CHECK4-NEXT: <Declaration>var fooIntVar: <Type usr="s:s5Int32V">Int32</Type></Declaration>
 // CHECK4-NEXT: <decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooIntVar</decl.name>: <decl.var.type><ref.struct usr="s:s5Int32V">Int32</ref.struct></decl.var.type></decl.var.global>
@@ -280,7 +280,7 @@ enum E7: String {
 // CHECK6-NEXT: fooSwiftFunc
 // CHECK6-NEXT: s:14FooSwiftModule03fooB4FuncSiyF
 // CHECK6-NEXT: () -> Int
-// CHECK6-NEXT: $SSiycD
+// CHECK6-NEXT: $sSiycD
 // CHECK6-NEXT: FooSwiftModule
 // CHECK6-NEXT: <Declaration>func fooSwiftFunc() -&gt; <Type usr="s:Si">Int</Type></Declaration>
 // CHECK6-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooSwiftFunc</decl.name>() -&gt; <decl.function.returntype><ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype></decl.function.free>
@@ -291,7 +291,7 @@ enum E7: String {
 // CHECK7-NEXT: S1
 // CHECK7-NEXT: s:11cursor_info2S1V
 // CHECK7-NEXT: S1.Type
-// CHECK7-NEXT: $S
+// CHECK7-NEXT: $s
 // CHECK7-NEXT: <Declaration>struct S1</Declaration>
 // CHECK7-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S1</decl.name></decl.struct>
 // CHECK7-NEXT: <Class file="{{[^"]+}}cursor_info.swift" line="13" column="8"><Name>S1</Name><USR>s:11cursor_info2S1V</USR><Declaration>struct S1</Declaration><CommentParts><Abstract><Para>Aaa.  S1.  Bbb.</Para></Abstract></CommentParts></Class>
@@ -301,8 +301,8 @@ enum E7: String {
 // CHECK8-NEXT: init
 // CHECK8-NEXT: s:11cursor_info2CCC1xACSi_tcfc
 // CHECK8-NEXT: (CC.Type) -> (Int) -> CC
-// CHECK8-NEXT: $S1x11cursor_info2CCCSi_tcD
-// CHECK8-NEXT: <Container>$S11cursor_info2CCCD</Container>
+// CHECK8-NEXT: $s1x11cursor_info2CCCSi_tcD
+// CHECK8-NEXT: <Container>$s11cursor_info2CCCD</Container>
 // CHECK8-NEXT: <Declaration>convenience init(x: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK8-NEXT: <decl.function.constructor><syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
@@ -407,7 +407,7 @@ enum E7: String {
 // CHECK29-NEXT: deinit
 // CHECK29-NEXT: s:11cursor_info2C3Cfd
 // CHECK29-NEXT: (C3) -> ()
-// CHECK29-NEXT: $SyycD
+// CHECK29-NEXT: $syycD
 // CHECK29-NEXT: <Declaration>deinit</Declaration>
 // CHECK29-NEXT: <decl.function.destructor><syntaxtype.keyword>deinit</syntaxtype.keyword></decl.function.destructor>
 
@@ -416,7 +416,7 @@ enum E7: String {
 // CHECK30-NEXT: init(x:)
 // CHECK30-NEXT: s:11cursor_info2C3C1xACSgSi_tcfc
 // CHECK30-NEXT: (C3.Type) -> (Int) -> C3?
-// CHECK30-NEXT: $S1x11cursor_info2C3CSgSi_tcD
+// CHECK30-NEXT: $s1x11cursor_info2C3CSgSi_tcD
 // CHECK30-NEXT: <Declaration>init!(x: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK30-NEXT: <decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>!(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
@@ -425,7 +425,7 @@ enum E7: String {
 // CHECK31-NEXT: init(y:)
 // CHECK31-NEXT: s:11cursor_info2C3C1yACSgSi_tcfc
 // CHECK31-NEXT: (C3.Type) -> (Int) -> C3?
-// CHECK31-NEXT: $S1y11cursor_info2C3CSgSi_tcD
+// CHECK31-NEXT: $s1y11cursor_info2C3CSgSi_tcD
 // CHECK31-NEXT: <Declaration>init?(y: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK31-NEXT: <decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>?(<decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
@@ -434,7 +434,7 @@ enum E7: String {
 // CHECK32-NEXT: init(z:)
 // CHECK32-NEXT: s:11cursor_info2C3C1zACSi_tKcfc
 // CHECK32-NEXT: (C3.Type) -> (Int) throws -> C3
-// CHECK32-NEXT: $S1z11cursor_info2C3CSi_tKcD
+// CHECK32-NEXT: $s1z11cursor_info2C3CSi_tKcD
 // CHECK32-NEXT: <Declaration>init(z: <Type usr="s:Si">Int</Type>) throws</Declaration>
 // CHECK32-NEXT: <decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>z</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) <syntaxtype.keyword>throws</syntaxtype.keyword></decl.function.constructor>
 
@@ -727,7 +727,7 @@ enum E7: String {
 // CHECK87-NEXT: HasLocalizationKey
 // CHECK87-NEXT: s:11cursor_info18HasLocalizationKeyV
 // CHECK87-NEXT: HasLocalizationKey.Type
-// CHECK87-NEXT: $S
+// CHECK87-NEXT: $s
 // CHECK87-NEXT: <Declaration>struct HasLocalizationKey</Declaration>
 // CHECK87-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>HasLocalizationKey</decl.name></decl.struct>
 // CHECK87-NEXT: <Class file="{{[^"]+}}cursor_info.swift" line="212" column="8"><Name>HasLocalizationKey</Name><USR>s:11cursor_info18HasLocalizationKeyV</USR><Declaration>struct HasLocalizationKey</Declaration><CommentParts><Abstract><Para>Brief.</Para></Abstract></CommentParts></Class>
@@ -738,7 +738,7 @@ enum E7: String {
 // CHECK88-NEXT: hasLocalizationKey2
 // CHECK88-NEXT: s:11cursor_info19hasLocalizationKey2yyF
 // CHECK88-NEXT: () -> ()
-// CHECK88-NEXT: $S
+// CHECK88-NEXT: $s
 // CHECK88-NEXT: <Declaration>func hasLocalizationKey2()</Declaration>
 // CHECK88-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>hasLocalizationKey2</decl.name>()</decl.function.free>
 // CHECK88-NEXT: <Function file="{{[^"]+}}cursor_info.swift" line="215" column="6"><Name>hasLocalizationKey2()</Name><USR>s:11cursor_info19hasLocalizationKey2yyF</USR><Declaration>func hasLocalizationKey2()</Declaration><CommentParts></CommentParts></Function

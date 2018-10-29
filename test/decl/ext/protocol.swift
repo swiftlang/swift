@@ -180,7 +180,9 @@ extension S1 {
 // Protocol extensions with additional requirements
 // ----------------------------------------------------------------------------
 extension P4 where Self.AssocP4 : P1 {
-  func extP4a() { // expected-note 2 {{found this candidate}}
+// expected-note@-1 {{candidate requires that 'Int' conform to 'P1' (requirement specified as 'Self.AssocP4' == 'P1')}}
+// expected-note@-2 {{candidate requires that 'S4aHelper' conform to 'P1' (requirement specified as 'Self.AssocP4' == 'P1')}}
+  func extP4a() {
     acceptsP1(reqP4a())
   }
 }
@@ -206,12 +208,14 @@ struct S4d : P4 {
   func reqP4a() -> Bool { return false }
 }
 
-extension P4 where Self.AssocP4 == Int {
-  func extP4Int() { } // expected-note {{candidate requires that the types 'Bool' and 'Int' be equivalent (requirement specified as 'Self.AssocP4' == 'Int')}}
+extension P4 where Self.AssocP4 == Int { // expected-note {{where 'Self.AssocP4' = 'Bool'}}
+  func extP4Int() { }
 }
 
 extension P4 where Self.AssocP4 == Bool {
-  func extP4a() -> Bool { return reqP4a() } // expected-note 2 {{found this candidate}}
+// expected-note@-1 {{candidate requires that the types 'Int' and 'Bool' be equivalent (requirement specified as 'Self.AssocP4' == 'Bool')}}
+// expected-note@-2 {{candidate requires that the types 'S4aHelper' and 'Bool' be equivalent (requirement specified as 'Self.AssocP4' == 'Bool')}}
+  func extP4a() -> Bool { return reqP4a() }
 }
 
 func testP4(_ s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {
@@ -219,13 +223,13 @@ func testP4(_ s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {
   //        because they don't match on conformance and same-type
   //        requirement of different overloads, but diagnostic
   //        could be improved to point out exactly what is missing in each case.
-  s4a.extP4a() // expected-error{{ambiguous reference to member 'extP4a()'}}
+  s4a.extP4a() // expected-error{{ambiguous reference to instance method 'extP4a()'}}
   s4b.extP4a() // ok
-  s4c.extP4a() // expected-error{{ambiguous reference to member 'extP4a()'}}
+  s4c.extP4a() // expected-error{{ambiguous reference to instance method 'extP4a()'}}
   s4c.extP4Int() // okay
   var b1 = s4d.extP4a() // okay, "Bool" version
   b1 = true // checks type above
-  s4d.extP4Int() // expected-error{{value of type 'S4d' has no member 'extP4Int'}}
+  s4d.extP4Int() // expected-error{{referencing instance method 'extP4Int()' on 'P4' requires the types 'Bool' and 'Int' be equivalent}}
   _ = b1
 }
 
@@ -866,26 +870,26 @@ extension PConstrained6 {
   var prop2: Int { return 0 } // expected-note{{'prop2' previously declared here}}
 
   subscript (key: Int) -> Int { return key }
-  subscript (key: Double) -> Double { return key } // expected-note{{'subscript' previously declared here}}
+  subscript (key: Double) -> Double { return key } // expected-note{{'subscript(_:)' previously declared here}}
 }
 
 extension PConstrained6 {
   var prop2: Int { return 0 } // expected-error{{invalid redeclaration of 'prop2'}}
-  subscript (key: Double) -> Double { return key } // expected-error{{invalid redeclaration of 'subscript'}}
+  subscript (key: Double) -> Double { return key } // expected-error{{invalid redeclaration of 'subscript(_:)'}}
 }
 
 extension PConstrained6 where Assoc : PConstrained5 {
   var prop1: Int { return 0 } // okay
   var prop3: Int { return 0 } // expected-note{{'prop3' previously declared here}}
   subscript (key: Int) -> Int { return key } // ok
-  subscript (key: String) -> String { return key } // expected-note{{'subscript' previously declared here}}
+  subscript (key: String) -> String { return key } // expected-note{{'subscript(_:)' previously declared here}}
 
   func foo() { } // expected-note{{'foo()' previously declared here}}
 }
 
 extension PConstrained6 where Assoc : PConstrained5 {
   var prop3: Int { return 0 } // expected-error{{invalid redeclaration of 'prop3'}}
-  subscript (key: String) -> String { return key } // expected-error{{invalid redeclaration of 'subscript'}}
+  subscript (key: String) -> String { return key } // expected-error{{invalid redeclaration of 'subscript(_:)'}}
   func foo() { } // expected-error{{invalid redeclaration of 'foo()'}}
 }
 
@@ -912,6 +916,7 @@ public protocol ReallyRaw : RawRepresentable {
 }
 
 public extension ReallyRaw where RawValue: SignedInteger {
+  // expected-warning@+1 {{'public' modifier is redundant for initializer declared in a public extension}}
   public init?(rawValue: RawValue) {
     self = unsafeBitCast(rawValue, to: Self.self)
   }

@@ -9,9 +9,15 @@ Mangling
 --------
 ::
 
-  mangled-name ::= '$S' global
+  mangled-name ::= '$s' global  // Swift stable mangling
+  mangled-name ::= '_T0' global // Swift 4.0
+  mangled-name ::= '$S' global  // Swift 4.2
 
-All Swift-mangled names begin with this prefix.
+All Swift-mangled names begin with a common prefix. Since Swift 4.0, the
+compiler has used variations of the mangling described in this document, though
+pre-stable versions may not exactly conform to this description. By using
+distinct prefixes, tools can attempt to accommodate bugs and version variations
+in pre-stable versions of Swift.
 
 The basic mangling scheme is a list of 'operators' where the operators are
 structured in a post-fix order. For example the mangling may start with an
@@ -19,8 +25,6 @@ identifier but only later in the mangling a type-like operator defines how this
 identifier has to be interpreted::
 
   4Test3FooC   // The trailing 'C' says that 'Foo' is a class in module 'Test'
-
-
 
 Operators are either identifiers or a sequence of one or more characters,
 like ``C`` for class.
@@ -42,6 +46,48 @@ mangled name will start with the module name (after the ``_S``).
 In the following, productions which are only _part_ of an operator, are
 named with uppercase letters.
 
+Symbolic references
+~~~~~~~~~~~~~~~~~~~
+
+The Swift compiler emits mangled names into binary images to encode
+references to types for runtime instantiation and reflection. In a binary,
+these mangled names may embed pointers to runtime data
+structures in order to more efficiently represent locally-defined types.
+We call these pointers **symbolic references**.
+These references will be introduced by a control character in the range
+`\x01` ... `\x1F`, which indicates the kind of symbolic reference, followed by
+some number of arbitrary bytes *which may include null bytes*. Code that
+processes mangled names out of Swift binaries needs to be aware of symbolic
+references in order to properly terminate strings; a null terminator may be
+part of a symbolic reference.
+
+::
+
+  symbolic-reference ::= [\x01-\x17] .{4} // Relative symbolic reference
+   #if sizeof(void*) == 8
+     symbolic-reference ::= [\x18-\x1F] .{8} // Absolute symbolic reference
+   #elif sizeof(void*) == 4
+     symbolic-reference ::= [\x18-\x1F] .{4} // Absolute symbolic reference
+   #endif
+
+Symbolic references are only valid in compiler-emitted metadata structures
+and must only appear in read-only parts of a binary image. APIs and tools
+that interpret Swift mangled names from potentially uncontrolled inputs must
+refuse to interpret symbolic references.
+
+The following symbolic reference kinds are currently implemented:
+
+::
+
+   {any-generic-type, protocol} ::= '\x01' .{4}              // Reference points directly to context descriptor
+   {any-generic-type, protocol} ::= '\x02' .{4}              // Reference points indirectly to context descriptor
+   // The grammatical role of the symbolic reference is determined by the
+   // kind of context descriptor referenced
+
+   protocol-conformance-ref ::= '\x03' .{4}  // Reference points directly to protocol conformance descriptor (NOT IMPLEMENTED)
+   protocol-conformance-ref ::= '\x04' .{4}  // Reference points indirectly to protocol conformance descriptor (NOT IMPLEMENTED)
+
+
 Globals
 ~~~~~~~
 
@@ -59,11 +105,13 @@ Globals
   global ::= nominal-type 'Ml'           // in-place type initialization cache
   global ::= nominal-type 'Mm'           // class metaclass
   global ::= nominal-type 'Mn'           // nominal type descriptor
+  global ::= nominal-type 'Mu'           // class method lookup function
+  global ::= nominal-type 'MU'           // ObjC metadata update callback function
   global ::= module 'MXM'                // module descriptor
   global ::= context 'MXE'               // extension descriptor
   global ::= context 'MXX'               // anonymous context descriptor
   global ::= context identifier 'MXY'    // anonymous context descriptor
-  global ::= type assoc_type_path 'MXA'  // generic parameter ref
+  global ::= type assoc-type-list 'MXA'  // generic parameter ref
   global ::= protocol 'Mp'               // protocol descriptor
 
   global ::= nominal-type 'Mo'           // class metadata immediate member base offset
@@ -81,23 +129,21 @@ Globals
 
   global ::= protocol-conformance 'Mc'   // protocol conformance descriptor
   global ::= protocol-conformance 'WP'   // protocol witness table
-  global ::= protocol-conformance 'Wa'   // protocol witness table accessor
+  global ::= protocol-conformance 'Wa'   // protocol witness table accessor (HISTORICAL)
 
-  global ::= protocol-conformance 'WG'   // generic protocol witness table
+  global ::= protocol-conformance 'WG'   // generic protocol witness table (HISTORICAL)
   global ::= protocol-conformance 'Wp'   // protocol witness table pattern
-  global ::= protocol-conformance 'Wr'   // resilient witness table
+  global ::= protocol-conformance 'Wr'   // resilient witness table (HISTORICAL)
   global ::= protocol-conformance 'WI'   // generic protocol witness table instantiation function
   global ::= type protocol-conformance 'WL'   // lazy protocol witness table cache variable
 
-  global ::= protocol-conformance identifier 'Wt' // associated type metadata accessor
-  global ::= protocol-conformance assoc_type_path nominal-type 'WT' // associated type witness table accessor
+  global ::= protocol-conformance identifier 'Wt' // associated type metadata accessor (HISTORICAL)
+  global ::= protocol-conformance assoc-type-list nominal-type 'WT' // associated type witness table accessor
   global ::= type protocol-conformance 'Wl' // lazy protocol witness table accessor
 
   global ::= type 'WV'                   // value witness table
   global ::= entity 'Wvd'                // field offset
   global ::= entity 'WC'                 // resilient enum tag index
-
-  assoc_type_path ::= identifier '_' identifier*
 
 A direct symbol resolves directly to the address of an object.  An
 indirect symbol resolves to the address of a pointer to the object.
@@ -115,6 +161,9 @@ field offsets are therefore required when accessing fields in generic
 types where the metadata itself has unknown layout.)
 
 ::
+
+  global ::= global 'Tj'                 // resilient method dispatch thunk
+  global ::= global 'Tq'                 // method descriptor
 
   global ::= global 'TO'                 // ObjC-as-swift thunk
   global ::= global 'To'                 // swift-as-ObjC thunk
@@ -134,6 +183,12 @@ types where the metadata itself has unknown layout.)
   global ::= entity generic-signature? type type* 'Tk' // key path setter
   global ::= type generic-signature 'TH' // key path equality
   global ::= type generic-signature 'Th' // key path hasher
+
+  global ::= protocol 'TL'               // protocol requirements base descriptor
+  global ::= assoc-type-name 'Tl'        // associated type descriptor
+  global ::= assoc-type-name 'TM'        // default associated type witness accessor (HISTORICAL)
+  global ::= type assoc-type-path protocol 'Tn' // associated conformance descriptor
+  global ::= type assoc-type-path protocol 'TN' // default associated conformance witness accessor
 
   REABSTRACT-THUNK-TYPE ::= 'R'          // reabstraction thunk helper function
   REABSTRACT-THUNK-TYPE ::= 'r'          // reabstraction thunk
@@ -215,7 +270,7 @@ Entities
   entity-spec ::= decl-name label-list? type 'v' ACCESSOR                           // variable
   entity-spec ::= decl-name type 'fp'                                               // generic type parameter
   entity-spec ::= decl-name type 'fo'                                               // enum element (currently not used)
-  entity-spec ::= identifier 'Qa'                                                   // associated type declaration
+  entity-spec ::= identifier 'Qa'                                                   // associated type declaration
 
   ACCESSOR ::= 'm'                           // materializeForSet
   ACCESSOR ::= 's'                           // setter
@@ -232,7 +287,7 @@ Entities
   ADDRESSOR-KIND ::= 'u'                     // unsafe addressor (no owner)
   ADDRESSOR-KIND ::= 'O'                     // owning addressor (non-native owner)
   ADDRESSOR-KIND ::= 'o'                     // owning addressor (native owner)
-  ADDRESSOR-KIND ::= 'p'                     // pinning addressor (native owner)
+  ADDRESSOR-KIND ::= 'p'                     // pinning addressor (native owner), not used anymore
 
   decl-name ::= identifier
   decl-name ::= identifier 'L' INDEX                  // locally-discriminated declaration
@@ -262,17 +317,17 @@ return value are bridged and the type of pattern outlined.
 
 ::
 
-  bridge-spec := bridged-kind bridged-param* bridged-return '_'
+  bridge-spec ::= bridged-kind bridged-param* bridged-return '_'
 
-  bridged-param := 'n' // not bridged parameter
-  bridged-param := 'b' // bridged parameter
+  bridged-param ::= 'n' // not bridged parameter
+  bridged-param ::= 'b' // bridged parameter
 
-  bridged-return := 'n' // not bridged return
-  bridged-return := 'b' // bridged return
+  bridged-return ::= 'n' // not bridged return
+  bridged-return ::= 'b' // bridged return
 
-  bridged-kind := 'm' // bridged method
-  bridged-kind := 'a' // bridged property (by address)
-  bridged-kind := 'p' // bridged property (by value)
+  bridged-kind ::= 'm' // bridged method
+  bridged-kind ::= 'a' // bridged property (by address)
+  bridged-kind ::= 'p' // bridged property (by value)
 
 Declaration Contexts
 ~~~~~~~~~~~~~~~~~~~~
@@ -332,7 +387,7 @@ Types
   any-generic-type ::= context decl-name 'a'     // typealias type (used in DWARF and USRs)
 
   any-generic-type ::= standard-substitutions
-  
+
   standard-substitutions ::= 'S' KNOWN-TYPE-KIND       // known nominal type substitution
   standard-substitutions ::= 'S' NATURAL KNOWN-TYPE-KIND    // repeated known type substitutions of the same kind
 
@@ -417,12 +472,12 @@ Types
   type ::= type 'Xp'                         // existential metatype without representation
   type ::= type 'Xm' METATYPE-REPR           // existential metatype with representation
   type ::= 'Xe'                              // error or unresolved type
- 
+
   bound-generic-type ::= type 'y' (type* '_')* type* retroactive-conformance* 'G'   // one type-list per nesting level of type
   bound-generic-type ::= substitution
 
   FUNCTION-KIND ::= 'f'                      // @thin function type
-  FUNCTION-KIND ::= 'U'                      // uncurried function type (currently not used) 
+  FUNCTION-KIND ::= 'U'                      // uncurried function type (currently not used)
   FUNCTION-KIND ::= 'K'                      // @auto_closure function type (noescape)
   FUNCTION-KIND ::= 'B'                      // objc block function type
   FUNCTION-KIND ::= 'C'                      // C function pointer type
@@ -431,10 +486,10 @@ Types
 
   function-signature ::= params-type params-type throws? // results and parameters
 
-  params-type := type 'z'? 'h'?              // tuple in case of multiple parameters or a single parameter with a single tuple type
+  params-type ::= type 'z'? 'h'?              // tuple in case of multiple parameters or a single parameter with a single tuple type
                                              // with optional inout convention, shared convention. parameters don't have labels,
                                              // they are mangled separately as part of the entity.
-  params-type := empty-list                  // shortcut for no parameters
+  params-type ::= empty-list                  // shortcut for no parameters
 
   throws ::= 'K'                             // 'throws' annotation on function types
 
@@ -474,7 +529,7 @@ Types
   associated-type ::= substitution
   associated-type ::= protocol 'QP'          // self type of protocol
   associated-type ::= archetype identifier 'Qa' // associated type
-  
+
   assoc-type-name ::= identifier                // associated type name without protocol
   assoc-type-name ::= identifier protocol 'P'   //
 
@@ -541,7 +596,9 @@ Generics
 
 ::
 
-  protocol-conformance ::= type protocol module generic-signature?
+  protocol-conformance-context ::= protocol module generic-signature?
+
+  protocol-conformance ::= type protocol-conformance-context
 
 ``<protocol-conformance>`` refers to a type's conformance to a protocol. The
 named module is the one containing the extension or type declaration that
@@ -549,9 +606,25 @@ declared the conformance.
 
 ::
 
+  protocol-conformance ::= type protocol
+
+If ``type`` is a generic parameter or associated type of one, then no module
+is mangled, because the conformance must be resolved from the generic
+environment.
+
   protocol-conformance ::= context identifier protocol identifier generic-signature?  // Property behavior conformance
 
 Property behaviors are implemented using private protocol conformances.
+
+::
+
+  concrete-protocol-conformance ::= type protocol-conformance-ref
+  protocol-conformance-ref ::= protocol module?
+
+A compact representation used to represent mangled protocol conformance witness
+arguments at runtime. The ``module`` is only specified for conformances that
+are "retroactive", meaning that the context in which the conformance is defined
+is in neither the protocol or type module.
 
 ::
 
@@ -582,15 +655,15 @@ Property behaviors are implemented using private protocol conformances.
   GENERIC-PARAM-INDEX ::= INDEX              // depth = 0,   idx = N+1
   GENERIC-PARAM-INDEX ::= 'd' INDEX INDEX    // depth = M+1, idx = N
 
-  LAYOUT-CONSTRAINT ::= 'N'  // NativeRefCountedObject 
-  LAYOUT-CONSTRAINT ::= 'R'  // RefCountedObject 
-  LAYOUT-CONSTRAINT ::= 'T'  // Trivial 
+  LAYOUT-CONSTRAINT ::= 'N'  // NativeRefCountedObject
+  LAYOUT-CONSTRAINT ::= 'R'  // RefCountedObject
+  LAYOUT-CONSTRAINT ::= 'T'  // Trivial
   LAYOUT-CONSTRAINT ::= 'C'  // Class
-  LAYOUT-CONSTRAINT ::= 'D'  // NativeClass 
-  LAYOUT-CONSTRAINT ::= 'E' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of exact size 
-  LAYOUT-CONSTRAINT ::= 'e' LAYOUT-SIZE  // Trivial of exact size 
-  LAYOUT-CONSTRAINT ::= 'M' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of size at most N bits 
-  LAYOUT-CONSTRAINT ::= 'm' LAYOUT-SIZE  // Trivial of size at most N bits 
+  LAYOUT-CONSTRAINT ::= 'D'  // NativeClass
+  LAYOUT-CONSTRAINT ::= 'E' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of exact size
+  LAYOUT-CONSTRAINT ::= 'e' LAYOUT-SIZE  // Trivial of exact size
+  LAYOUT-CONSTRAINT ::= 'M' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of size at most N bits
+  LAYOUT-CONSTRAINT ::= 'm' LAYOUT-SIZE  // Trivial of size at most N bits
   LAYOUT-CONSTRAINT ::= 'U'  // Unknown layout
 
   LAYOUT-SIZE ::= INDEX // Size only

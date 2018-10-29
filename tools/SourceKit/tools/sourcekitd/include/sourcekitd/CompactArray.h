@@ -102,7 +102,9 @@ protected:
   CompactArrayReaderImpl(void *Buf) : Buf(Buf) {}
 
   uint64_t getEntriesBufSize() const {
-    return *(uint64_t*)Buf;
+    uint64_t result;
+    std::memcpy(&result, Buf, sizeof result);
+    return result;
   }
   const uint8_t *getEntriesBufStart() const {
     return (const uint8_t *)(((uint64_t*)Buf)+1);

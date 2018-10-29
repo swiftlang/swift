@@ -21,7 +21,7 @@ public struct PersonNameComponents : ReferenceConvertible, Hashable, Equatable, 
         _handle = _MutableHandle(adoptingReference: NSPersonNameComponents())
     }
     
-    fileprivate init(reference: NSPersonNameComponents) {
+    fileprivate init(reference: __shared NSPersonNameComponents) {
         _handle = _MutableHandle(reference: reference)
     }
 
@@ -129,6 +129,7 @@ extension PersonNameComponents : _ObjectiveCBridgeable {
         return true
     }
 
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSPersonNameComponents?) -> PersonNameComponents {
         var result: PersonNameComponents?
         _forceBridgeFromObjectiveC(source!, result: &result)

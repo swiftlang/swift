@@ -50,7 +50,7 @@ public struct TimeZone : Hashable, Equatable, ReferenceConvertible {
     /// An example identifier is "America/Los_Angeles".
     ///
     /// If `identifier` is an unknown identifier, then returns `nil`.
-    public init?(identifier: String) {
+    public init?(identifier: __shared String) {
         if let r = NSTimeZone(name: identifier) {
             _wrapped = r
             _autoupdating = false
@@ -83,7 +83,7 @@ public struct TimeZone : Hashable, Equatable, ReferenceConvertible {
     ///
     /// - parameter abbreviation: The abbreviation for the time zone.
     /// - returns: A time zone identified by abbreviation determined by resolving the abbreviation to an identifier using the abbreviation dictionary and then returning the time zone for that identifier. Returns `nil` if there is no match for abbreviation.
-    public init?(abbreviation: String) {
+    public init?(abbreviation: __shared String) {
         if let r = NSTimeZone(abbreviation: abbreviation) {
             _wrapped = r
             _autoupdating = false
@@ -262,6 +262,7 @@ extension TimeZone : _ObjectiveCBridgeable {
         return true
     }
     
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSTimeZone?) -> TimeZone {
         var result: TimeZone?
         _forceBridgeFromObjectiveC(source!, result: &result)

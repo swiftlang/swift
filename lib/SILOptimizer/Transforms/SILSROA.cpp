@@ -138,6 +138,8 @@ bool SROAMemoryUseAnalyzer::analyze() {
     return false;
   }
 
+  bool hasBenefit = false;
+
   // Go through uses of the memory allocation of AI...
   for (auto *Operand : getNonDebugUses(SILValue(AI))) {
     SILInstruction *User = Operand->getUser();
@@ -150,6 +152,9 @@ bool SROAMemoryUseAnalyzer::analyze() {
         LLVM_DEBUG(llvm::dbgs() << "        Found a store into the "
                                    "projection.\n");
         Stores.push_back(SI);
+        SILValue Src = SI->getSrc();
+        if (isa<StructInst>(Src) || isa<TupleInst>(Src))
+          hasBenefit = true;
         continue;
       } else {
         LLVM_DEBUG(llvm::dbgs() << "        Found a store of the "
@@ -163,6 +168,11 @@ bool SROAMemoryUseAnalyzer::analyze() {
     if (auto *LI = dyn_cast<LoadInst>(User)) {
       LLVM_DEBUG(llvm::dbgs() << "        Found a load of the projection.\n");
       Loads.push_back(LI);
+      for (auto useIter = LI->use_begin(), End = LI->use_end();
+           !hasBenefit && useIter != End; useIter++) {
+        hasBenefit = (isa<StructExtractInst>(useIter->get()) ||
+                      isa<TupleExtractInst>(useIter->get()));
+      }
       continue;
     }
 
@@ -171,6 +181,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
     if (auto *ASI = dyn_cast<StructElementAddrInst>(User)) {
       LLVM_DEBUG(llvm::dbgs() << "        Found a struct subprojection!\n");
       ExtractInsts.push_back(ASI);
+      hasBenefit = true;
       continue;
     }
 
@@ -179,6 +190,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
     if (auto *TSI = dyn_cast<TupleElementAddrInst>(User)) {
       LLVM_DEBUG(llvm::dbgs() << "        Found a tuple subprojection!\n");
       ExtractInsts.push_back(TSI);
+      hasBenefit = true;
       continue;
     }
 
@@ -195,7 +207,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
 
   // Analysis was successful. We can break up this allocation!
   ++NumChoppedAllocas;
-  return true;
+  return hasBenefit;
 }
 
 void

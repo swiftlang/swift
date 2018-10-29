@@ -253,7 +253,7 @@ class ClassWithUnavailableInitializer {
   convenience init(s: String) {
         // expected-note@-1 {{add @available attribute to enclosing initializer}}
     
-    self.init(5) // expected-error {{'init' is only available on OS X 10.51 or newer}}
+    self.init(5) // expected-error {{'init(_:)' is only available on OS X 10.51 or newer}}
         // expected-note@-1 {{add 'if #available' version check}}
   }
   
@@ -267,12 +267,12 @@ func callUnavailableInitializer() {
       // expected-note@-1 2{{add @available attribute to enclosing global function}}
 
   _ = ClassWithUnavailableInitializer()
-  _ = ClassWithUnavailableInitializer(5) // expected-error {{'init' is only available on OS X 10.51 or newer}}
+  _ = ClassWithUnavailableInitializer(5) // expected-error {{'init(_:)' is only available on OS X 10.51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
   
   let i = ClassWithUnavailableInitializer.self 
   _ = i.init()
-  _ = i.init(5) // expected-error {{'init' is only available on OS X 10.51 or newer}}
+  _ = i.init(5) // expected-error {{'init(_:)' is only available on OS X 10.51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 }
 
@@ -290,7 +290,7 @@ class SubOfClassWithUnavailableInitializer : SuperWithWithUnavailableInitializer
   override init(_ val: Int) {
         // expected-note@-1 {{add @available attribute to enclosing initializer}}
 
-    super.init(5) // expected-error {{'init' is only available on OS X 10.51 or newer}}
+    super.init(5) // expected-error {{'init(_:)' is only available on OS X 10.51 or newer}}
         // expected-note@-1 {{add 'if #available' version check}}
   }
   

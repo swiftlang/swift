@@ -181,7 +181,7 @@ public:
   void printMemReduction(SILFunction &Fn) {
     LSLocation L;
     LSLocationList Locs;
-    llvm::DenseSet<LSLocation> SLocs;
+    LSLocationList SLocs;
     unsigned Counter = 0;
     for (auto &BB : Fn) {
       for (auto &II : BB) {
@@ -212,7 +212,7 @@ public:
         // Reduction should not care about the order of the memory locations in
         // the set.
         for (auto I = Locs.begin(); I != Locs.end(); ++I) {
-          SLocs.insert(*I);
+          SLocs.push_back(*I);
         }
 
         // This should get the original (unexpanded) location back.

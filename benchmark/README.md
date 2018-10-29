@@ -154,7 +154,7 @@ To add a new multiple file test:
     instance of BenchmarkInfo (specified in the template below).
 
 2.  In `CMakeLists.txt` add the new directory name to
-    `SWIFT_MULTISOURCE_SWIFT3_BENCHES`, and set `YourTestName_sources` to the
+    `SWIFT_MULTISOURCE_SWIFT_BENCHES`, and set `YourTestName_sources` to the
     list of source file paths.
 
 3.  Edit `main.swift`. Import and register your new Swift module.

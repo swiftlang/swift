@@ -121,7 +121,7 @@ ERROR(error_mode_cannot_emit_module,none,
 ERROR(error_mode_cannot_emit_module_doc,none,
       "this mode does not support emitting module documentation files", ())
 ERROR(error_mode_cannot_emit_interface,none,
-      "this mode does not support emitting textual interface files", ())
+      "this mode does not support emitting parseable interface files", ())
 
 WARNING(emit_reference_dependencies_without_primary_file,none,
   "ignoring -emit-reference-dependencies (requires -primary-file)", ())
@@ -259,6 +259,14 @@ ERROR(error_invalid_debug_prefix_map, none,
 
 ERROR(invalid_vfs_overlay_file,none,
       "invalid virtual overlay file '%0'", (StringRef))
+
+WARNING(parseable_interface_scoped_import_unsupported,none,
+        "scoped imports are not yet supported in parseable module interfaces",
+        ())
+ERROR(error_extracting_version_from_parseable_interface,none,
+      "error extracting version from parseable module interface", ())
+ERROR(error_extracting_flags_from_parseable_interface,none,
+      "error extracting flags from parseable module interface", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

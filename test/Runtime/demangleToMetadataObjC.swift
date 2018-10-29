@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift-swift3
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
@@ -6,6 +6,7 @@ import StdlibUnittest
 import Foundation
 import CoreFoundation
 import CoreLocation
+import Dispatch
 
 let DemangleToMetadataTests = TestSuite("DemangleToMetadataObjC")
 
@@ -59,7 +60,7 @@ DemangleToMetadataTests.test("Imported swift_wrapper types") {
 }
 
 DemangleToMetadataTests.test("Imported enum types") {
-  expectEqual(NSURLSessionTask.State.self,
+  expectEqual(URLSessionTask.State.self,
     _typeByMangledName("So21NSURLSessionTaskStateV")!)
 }
 
@@ -83,6 +84,16 @@ DemangleToMetadataTests.test("synthesized declarations") {
   let error = NSError(domain: NSCocoaErrorDomain, code: 0)
   let reflectionString = String(reflecting: CLError(_nsError: error))
   expectTrue(reflectionString.hasPrefix("__C_Synthesized.related decl 'e' for CLError(_nsError:"))
+}
+
+DemangleToMetadataTests.test("members of runtime-only Objective-C classes") {
+  expectEqual(DispatchQueue.Attributes.self,
+    _typeByMangledName("So17OS_dispatch_queueC8DispatchE10AttributesV")!)
+}
+
+DemangleToMetadataTests.test("runtime conformance lookup via foreign superclasses") {
+  expectEqual(Set<CFMutableString>.self,
+    _typeByMangledName("ShySo18CFMutableStringRefaG")!)
 }
 
 runAllTests()

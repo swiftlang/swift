@@ -88,7 +88,7 @@ bool swift::mayDecrementRefCount(SILInstruction *User,
 }
 
 bool swift::mayCheckRefCount(SILInstruction *User) {
-  return isa<IsUniqueInst>(User) || isa<IsUniqueOrPinnedInst>(User) ||
+  return isa<IsUniqueInst>(User) ||
          isa<IsEscapingClosureInst>(User);
 }
 
@@ -662,7 +662,7 @@ findMatchingRetains(SILBasicBlock *BB) {
 
       // If this is a SILArgument of current basic block, we can split it up to
       // values in the predecessors.
-      auto *SA = dyn_cast<SILPHIArgument>(R.second);
+      auto *SA = dyn_cast<SILPhiArgument>(R.second);
       if (SA && SA->getParent() != R.first)
         SA = nullptr;
 
@@ -670,10 +670,9 @@ findMatchingRetains(SILBasicBlock *BB) {
         if (HandledBBs.find(X) != HandledBBs.end())
           continue;
         // Try to use the predecessor edge-value.
-        if (SA && SA->getIncomingValue(X)) {
-          WorkList.push_back(std::make_pair(X, SA->getIncomingValue(X)));
-        }
-        else 
+        if (SA && SA->getIncomingPhiValue(X)) {
+          WorkList.push_back(std::make_pair(X, SA->getIncomingPhiValue(X)));
+        } else
           WorkList.push_back(std::make_pair(X, R.second));
    
         HandledBBs.insert(X);
@@ -1093,11 +1092,8 @@ bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
 //===----------------------------------------------------------------------===//
 
 static bool ignorableApplyInstInUnreachableBlock(const ApplyInst *AI) {
-  const auto *Fn = AI->getReferencedFunction();
-  if (!Fn)
-    return false;
-
-  return Fn->hasSemanticsAttr("arc.programtermination_point");
+  auto applySite = FullApplySite(const_cast<ApplyInst *>(AI));
+  return applySite.isCalleeKnownProgramTerminationPoint();
 }
 
 static bool ignorableBuiltinInstInUnreachableBlock(const BuiltinInst *BI) {

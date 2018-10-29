@@ -27,7 +27,7 @@ func g(_ x: Int, _ y: Int) -> () {} // expected-note{{found this candidate}}
 C(g) // expected-error{{ambiguous use of 'g'}}
 
 func h<T>(_ x: T) -> () {}
-C(h) // expected-error{{ambiguous use of 'init'}}
+C(h) // expected-error{{ambiguous use of 'init(_:)'}}
 
 func rdar29691909_callee(_ o: AnyObject?) -> Any? { return o } // expected-note {{found this candidate}}
 func rdar29691909_callee(_ o: AnyObject) -> Any { return o } // expected-note {{found this candidate}}

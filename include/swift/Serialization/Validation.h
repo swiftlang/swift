@@ -20,6 +20,7 @@
 
 namespace swift {
 
+class ModuleFile;
 enum class ResilienceStrategy : unsigned;
 
 namespace serialization {
@@ -146,6 +147,24 @@ public:
 ValidationInfo
 validateSerializedAST(StringRef data,
                       ExtendedValidationInfo *extendedInfo = nullptr);
+
+/// Emit diagnostics explaining a failure to load a serialized AST.
+///
+/// - \p Ctx is an AST context through which any diagnostics are surfaced.
+/// - \p diagLoc is the (possibly invalid) location used in the diagnostics.
+/// - \p loadInfo and \p extendedInfo describe the attempt to load an AST
+///   (\ref validateSerializedAST). Note that loadInfo.Status must not be
+///   Status::Valid.
+/// - \p moduleBufferID and \p moduleDocBufferID are the buffer identifiers
+///   of the module input and doc input buffers respectively (\ref 
+///   SerializedModuleLoader::loadAST, \ref ModuleFile::load).
+/// - \p loadedModuleFile is an invalid loaded module.
+/// - \p ModuleName is the name used to refer to the module in diagnostics.
+void diagnoseSerializedASTLoadFailure(
+    ASTContext &Ctx, SourceLoc diagLoc, const ValidationInfo &loadInfo,
+    const ExtendedValidationInfo &extendedInfo, StringRef moduleBufferID,
+    StringRef moduleDocBufferID, ModuleFile *loadedModuleFile,
+    Identifier ModuleName);
 
 } // end namespace serialization
 } // end namespace swift

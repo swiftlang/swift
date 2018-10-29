@@ -1,5 +1,5 @@
+#include "swift/Basic/ReferenceDependencyKeys.h"
 #include "swift/Driver/DependencyGraph.h"
-#include "swift/Frontend/ReferenceDependencyKeys.h"
 #include "gtest/gtest.h"
 
 using namespace swift;

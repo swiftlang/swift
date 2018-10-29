@@ -1,7 +1,8 @@
-// RUN: %target-swift-frontend %s -emit-sil -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -enable-sil-ownership -sil-verify-all -emit-sil -o - -I %S/Inputs/usr/include | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation
+import ClosureLifetimeFixupObjC
 
 @objc
 public protocol DangerousEscaper {
@@ -9,7 +10,7 @@ public protocol DangerousEscaper {
   func malicious(_ mayActuallyEscape: () -> ())
 }
 
-// CHECK: sil @$S27closure_lifetime_fixup_objc19couldActuallyEscapeyyyyc_AA16DangerousEscaper_ptF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (), @guaranteed DangerousEscaper) -> () {
+// CHECK: sil @$s27closure_lifetime_fixup_objc19couldActuallyEscapeyyyyc_AA16DangerousEscaper_ptF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (), @guaranteed DangerousEscaper) -> () {
 // CHECK: bb0([[ARG:%.*]] : $@callee_guaranteed () -> (), [[SELF:%.*]] : $DangerousEscaper):
 // CHECK:   [[OE:%.*]] = open_existential_ref [[SELF]]
 
@@ -21,7 +22,7 @@ public protocol DangerousEscaper {
 // CHECK:   [[OPT_CLOSURE:%.*]] = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt.1, [[ARG]] : $@callee_guaranteed () -> ()
 
 // CHECK:   [[NE:%.*]] = convert_escape_to_noescape [[ARG]] : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
-// CHECK:   [[WITHOUT_ACTUALLY_ESCAPING_THUNK:%.*]] = function_ref @$SIg_Ieg_TR : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+// CHECK:   [[WITHOUT_ACTUALLY_ESCAPING_THUNK:%.*]] = function_ref @$sIg_Ieg_TR : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
 // CHECK:   [[C:%.*]] = partial_apply [callee_guaranteed] [[WITHOUT_ACTUALLY_ESCAPING_THUNK]]([[NE]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
 
 // Sentinel without actually escaping closure (3).
@@ -32,7 +33,7 @@ public protocol DangerousEscaper {
 // CHECK:   [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage @callee_guaranteed () -> ()
 // CHECK:   [[CLOSURE_ADDR:%.*]] = project_block_storage [[BLOCK_STORAGE]] : $*@block_storage @callee_guaranteed () -> ()
 // CHECK:   store [[SENTINEL]] to [[CLOSURE_ADDR]] : $*@callee_guaranteed () -> ()
-// CHECK:   [[BLOCK_INVOKE:%.*]] = function_ref @$SIeg_IyB_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+// CHECK:   [[BLOCK_INVOKE:%.*]] = function_ref @$sIeg_IyB_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
 // CHECK:   [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] : $*@block_storage @callee_guaranteed () -> (), invoke [[BLOCK_INVOKE]] : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
 
 // Optional sentinel (4).
@@ -84,9 +85,9 @@ public func dontCrash() {
 func getDispatchQueue() -> DispatchQueue
 
 // We must not release the closure after calling super.deinit.
-// CHECK: sil hidden @$S27closure_lifetime_fixup_objc1CCfD : $@convention(method) (@owned C) -> () {
+// CHECK: sil hidden @$s27closure_lifetime_fixup_objc1CCfD : $@convention(method) (@owned C) -> () {
 // CHECK: bb0([[SELF:%.*]] : $C):
-// CHECK:   [[F:%.*]] = function_ref @$S27closure_lifetime_fixup_objc1CCfdyyXEfU_
+// CHECK:   [[F:%.*]] = function_ref @$s27closure_lifetime_fixup_objc1CCfdyyXEfU_
 // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[F]](%0)
 // CHECK:   [[OPT:%.*]] = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt.1, [[PA]]
 // CHECK:   [[DEINIT:%.*]] = objc_super_method [[SELF]] : $C, #NSObject.deinit!deallocator.1.foreign
@@ -100,3 +101,10 @@ class C: NSObject {
     getDispatchQueue().sync(execute: { _ = self })
   }
 }
+
+// Make sure that we obey ownership invariants when we emit load_borrow.
+internal typealias MyBlock = @convention(block) () -> Void
+func getBlock(noEscapeBlock: () -> Void ) -> MyBlock {
+  return block_create_noescape(noEscapeBlock)
+}
+

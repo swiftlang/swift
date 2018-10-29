@@ -14,12 +14,39 @@
 import Glibc
 #else
 import Darwin
+import LibProc
 #endif
 
 import TestsUtils
 
 struct BenchResults {
-  let sampleCount, min, max, mean, sd, median, maxRSS: UInt64
+  typealias T = Int
+  private let samples: [T]
+  let maxRSS: Int?
+  let stats: Stats
+
+  init(_ samples: [T], maxRSS: Int?) {
+    self.samples = samples.sorted()
+    self.maxRSS = maxRSS
+    self.stats = self.samples.reduce(into: Stats(), Stats.collect)
+  }
+
+  /// Return measured value for given `quantile`.
+  ///
+  /// Equivalent to quantile estimate type R-1, SAS-3. See:
+  /// https://en.wikipedia.org/wiki/Quantile#Estimating_quantiles_from_a_sample
+  subscript(_ quantile: Double) -> T {
+    let index = Swift.max(0,
+      Int((Double(samples.count) * quantile).rounded(.up)) - 1)
+    return samples[index]
+  }
+
+  var sampleCount: T { return samples.count }
+  var min: T { return samples.first! }
+  var max: T { return samples.last! }
+  var mean: T { return Int(stats.mean.rounded()) }
+  var sd: T { return Int(stats.standardDeviation.rounded()) }
+  var median: T { return self[0.5] }
 }
 
 public var registeredBenchmarks: [BenchmarkInfo] = []
@@ -41,13 +68,19 @@ struct TestConfig {
   /// instruments.
   let sampleTime: Double
 
-  /// If we are asked to have a fixed number of iterations, the number of fixed
-  /// iterations. The default value of 0 means: automatically compute the
-  /// number of iterations to measure the test for a specified sample time.
-  let fixedNumIters: UInt
+  /// Number of iterations averaged in the sample.
+  /// When not specified, we'll compute the number of iterations to be averaged
+  /// in the sample from the actual runtime and the desired `sampleTime`.
+  let numIters: Int?
 
   /// The number of samples we should take of each test.
   let numSamples: Int
+
+  /// Quantiles to report in results.
+  let quantile: Int?
+
+  /// Report quantiles with delta encoding.
+  let delta: Bool
 
   /// Is verbose output enabled?
   let verbose: Bool
@@ -57,7 +90,7 @@ struct TestConfig {
 
   /// After we run the tests, should the harness sleep to allow for utilities
   /// like leaks that require a PID to run on the test harness.
-  let afterRunSleep: Int?
+  let afterRunSleep: UInt32?
 
   /// The list of tests to run.
   let tests: [(index: String, info: BenchmarkInfo)]
@@ -69,8 +102,11 @@ struct TestConfig {
     struct PartialTestConfig {
       var delim: String?
       var tags, skipTags: Set<BenchmarkCategory>?
-      var numSamples, afterRunSleep: Int?
-      var fixedNumIters: UInt?
+      var numSamples: UInt?
+      var numIters: UInt?
+      var quantile: UInt?
+      var delta: Bool?
+      var afterRunSleep: UInt32?
       var sampleTime: Double?
       var verbose: Bool?
       var logMemory: Bool?
@@ -95,11 +131,18 @@ struct TestConfig {
     let p = ArgumentParser(into: PartialTestConfig())
     p.addArgument("--num-samples", \.numSamples,
                   help: "number of samples to take per benchmark; default: 1",
-                  parser: { Int($0) })
-    p.addArgument("--num-iters", \.fixedNumIters,
+                  parser: { UInt($0) })
+    p.addArgument("--num-iters", \.numIters,
                   help: "number of iterations averaged in the sample;\n" +
                         "default: auto-scaled to measure for `sample-time`",
                   parser: { UInt($0) })
+    p.addArgument("--quantile", \.quantile,
+                  help: "report quantiles instead of normal dist. stats;\n" +
+                        "use 4 to get a five-number summary with quartiles,\n" +
+                        "10 (deciles), 20 (ventiles), 100 (percentiles), etc.",
+                  parser: { UInt($0) })
+    p.addArgument("--delta", \.delta, defaultValue: true,
+                  help: "report quantiles with delta encoding")
     p.addArgument("--sample-time", \.sampleTime,
                   help: "duration of test measurement in seconds\ndefault: 1",
                   parser: finiteDouble)
@@ -119,7 +162,7 @@ struct TestConfig {
                   parser: tags)
     p.addArgument("--sleep", \.afterRunSleep,
                   help: "number of seconds to sleep after benchmarking",
-                  parser: { Int($0) })
+                  parser: { UInt32($0) })
     p.addArgument("--list", \.action, defaultValue: .listTests,
                   help: "don't run the tests, just log the list of test \n" +
                         "numbers, names and tags (respects specified filters)")
@@ -130,8 +173,10 @@ struct TestConfig {
     // Configure from the command line arguments, filling in the defaults.
     delim = c.delim ?? ","
     sampleTime = c.sampleTime ?? 1.0
-    fixedNumIters = c.fixedNumIters ?? 0
-    numSamples = c.numSamples ?? 1
+    numIters = c.numIters.map { Int($0) }
+    numSamples = Int(c.numSamples ?? 1)
+    quantile = c.quantile.map { Int($0) }
+    delta = c.delta ?? false
     verbose = c.verbose ?? false
     logMemory = c.logMemory ?? false
     afterRunSleep = c.afterRunSleep
@@ -159,7 +204,9 @@ struct TestConfig {
             Verbose: \(verbose)
             LogMemory: \(logMemory)
             SampleTime: \(sampleTime)
-            FixedIters: \(fixedNumIters)
+            NumIters: \(numIters ?? 0)
+            Quantile: \(quantile ?? 0)
+            Delimiter: \(String(reflecting: delim))
             Tests Filter: \(c.tests ?? [])
             Tests to run: \(testList)
 
@@ -172,8 +219,8 @@ struct TestConfig {
   ///
   /// - Parameters:
   ///   - registeredBenchmarks: List of all performance tests to be filtered.
-  ///   - specifiedTests: List of explicitly specified tests to run. These can be
-  ///     specified either by a test name or a test number.
+  ///   - specifiedTests: List of explicitly specified tests to run. These can
+  ///     be specified either by a test name or a test number.
   ///   - tags: Run tests tagged with all of these categories.
   ///   - skipTags: Don't run tests tagged with any of these categories.
   /// - Returns: An array of test number and benchmark info tuples satisfying
@@ -203,37 +250,28 @@ struct TestConfig {
   }
 }
 
-func internalMeanSD(_ inputs: [UInt64]) -> (UInt64, UInt64) {
-  // If we are empty, return 0, 0.
-  if inputs.isEmpty {
-    return (0, 0)
-  }
+struct Stats {
+    var n: Int = 0
+    var S: Double = 0.0
+    var mean: Double = 0.0
+    var variance: Double { return n < 2 ? 0.0 : S / Double(n - 1) }
+    var standardDeviation: Double { return variance.squareRoot() }
 
-  // If we have one element, return elt, 0.
-  if inputs.count == 1 {
-    return (inputs[0], 0)
-  }
+    static func collect(_ s: inout Stats, _ x: Int){
+        Stats.runningMeanVariance(&s, Double(x))
+    }
 
-  // Ok, we have 2 elements.
-
-  var sum1: UInt64 = 0
-  var sum2: UInt64 = 0
-
-  for i in inputs {
-    sum1 += i
-  }
-
-  let mean: UInt64 = sum1 / UInt64(inputs.count)
-
-  for i in inputs {
-    sum2 = sum2 &+ UInt64((Int64(i) &- Int64(mean))&*(Int64(i) &- Int64(mean)))
-  }
-
-  return (mean, UInt64(sqrt(Double(sum2)/(Double(inputs.count) - 1))))
-}
-
-func internalMedian(_ inputs: [UInt64]) -> UInt64 {
-  return inputs.sorted()[inputs.count / 2]
+    /// Compute running mean and variance using B. P. Welford's method.
+    ///
+    /// See Knuth TAOCP vol 2, 3rd edition, page 232, or
+    /// https://www.johndcook.com/blog/standard_deviation/
+    static func runningMeanVariance(_ s: inout Stats, _ x: Double){
+        let n = s.n + 1
+        let (k, M_, S_) = (Double(n), s.mean, s.S)
+        let M = M_ + (x - M_) / k
+        let S = S_ + (x - M_) * (x - M)
+        (s.n, s.mean, s.S) = (n, M, S)
+    }
 }
 
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
@@ -245,205 +283,282 @@ func stopTrackingObjects(_: UnsafePointer<CChar>) -> Int
 
 #endif
 
+final class Timer {
 #if os(Linux)
-class Timer {
   typealias TimeT = timespec
+
   func getTime() -> TimeT {
-    var ticks = timespec(tv_sec: 0, tv_nsec: 0)
-    clock_gettime(CLOCK_REALTIME, &ticks)
-    return ticks
+    var ts = timespec(tv_sec: 0, tv_nsec: 0)
+    clock_gettime(CLOCK_REALTIME, &ts)
+    return ts
   }
-  func diffTimeInNanoSeconds(from start_ticks: TimeT, to end_ticks: TimeT) -> UInt64 {
-    var elapsed_ticks = timespec(tv_sec: 0, tv_nsec: 0)
-    if end_ticks.tv_nsec - start_ticks.tv_nsec < 0 {
-      elapsed_ticks.tv_sec = end_ticks.tv_sec - start_ticks.tv_sec - 1
-      elapsed_ticks.tv_nsec = end_ticks.tv_nsec - start_ticks.tv_nsec + 1000000000
+
+  func diffTimeInNanoSeconds(from start: TimeT, to end: TimeT) -> UInt64 {
+    let oneSecond = 1_000_000_000 // ns
+    var elapsed = timespec(tv_sec: 0, tv_nsec: 0)
+    if end.tv_nsec - start.tv_nsec < 0 {
+      elapsed.tv_sec = end.tv_sec - start.tv_sec - 1
+      elapsed.tv_nsec = end.tv_nsec - start.tv_nsec + oneSecond
     } else {
-      elapsed_ticks.tv_sec = end_ticks.tv_sec - start_ticks.tv_sec
-      elapsed_ticks.tv_nsec = end_ticks.tv_nsec - start_ticks.tv_nsec
+      elapsed.tv_sec = end.tv_sec - start.tv_sec
+      elapsed.tv_nsec = end.tv_nsec - start.tv_nsec
     }
-    return UInt64(elapsed_ticks.tv_sec) * UInt64(1000000000) + UInt64(elapsed_ticks.tv_nsec)
+    return UInt64(elapsed.tv_sec) * UInt64(oneSecond) + UInt64(elapsed.tv_nsec)
   }
-}
 #else
-class Timer {
   typealias TimeT = UInt64
   var info = mach_timebase_info_data_t(numer: 0, denom: 0)
+
   init() {
     mach_timebase_info(&info)
   }
+
   func getTime() -> TimeT {
     return mach_absolute_time()
   }
-  func diffTimeInNanoSeconds(from start_ticks: TimeT, to end_ticks: TimeT) -> UInt64 {
-    let elapsed_ticks = end_ticks - start_ticks
-    return elapsed_ticks * UInt64(info.numer) / UInt64(info.denom)
-  }
-}
-#endif
 
-class SampleRunner {
-  let timer = Timer()
-  let baseline = SampleRunner.getResourceUtilization()
+  func diffTimeInNanoSeconds(from start: TimeT, to end: TimeT) -> UInt64 {
+    let elapsed = end - start
+    return elapsed * UInt64(info.numer) / UInt64(info.denom)
+  }
+#endif
+}
+
+extension UInt64 {
+  var microseconds: Int { return Int(self / 1000) }
+}
+
+/// Performance test runner that measures benchmarks and reports the results.
+final class TestRunner {
   let c: TestConfig
+  let timer = Timer()
+  var start, end, lastYield: Timer.TimeT
+  let baseline = TestRunner.getResourceUtilization()
+  let schedulerQuantum = UInt64(10_000_000) // nanoseconds (== 10ms, macos)
 
   init(_ config: TestConfig) {
     self.c = config
+    let now = timer.getTime()
+    (start, end, lastYield) = (now, now, now)
   }
+
+  /// Offer to yield CPU to other processes and return current time on resume.
+  func yield() -> Timer.TimeT {
+    sched_yield()
+    return timer.getTime()
+  }
+
+#if os(Linux)
+  private static func getExecutedInstructions() -> UInt64 {
+    // FIXME: there is a Linux PMC API you can use to get this, but it's
+    // not quite so straightforward.
+    return 0
+  }
+#else
+  private static func getExecutedInstructions() -> UInt64 {
+    if #available(OSX 10.9, iOS 7.0, *) {
+      var u = rusage_info_v4()
+      let p = UnsafeMutablePointer(&u)
+      p.withMemoryRebound(to: Optional<rusage_info_t>.self, capacity: 1) { up in
+        let _ = proc_pid_rusage(getpid(), RUSAGE_INFO_V4, up)
+      }
+      return u.ri_instructions
+    } else {
+      return 0
+    }
+  }
+#endif
 
   private static func getResourceUtilization() -> rusage {
     var u = rusage(); getrusage(RUSAGE_SELF, &u); return u
   }
 
-  /// Returns maximum resident set size (MAX_RSS) delta in bytes
-  func measureMemoryUsage() -> Int {
-      var current = SampleRunner.getResourceUtilization()
-      let maxRSS = current.ru_maxrss - baseline.ru_maxrss
-
-      if c.verbose {
-        let pages = maxRSS / sysconf(_SC_PAGESIZE)
-        func deltaEquation(_ stat: KeyPath<rusage, Int>) -> String {
-          let b = baseline[keyPath: stat], c = current[keyPath: stat]
-          return "\(c) - \(b) = \(c - b)"
-        }
-        print("""
-                  MAX_RSS \(deltaEquation(\rusage.ru_maxrss)) (\(pages) pages)
-                  ICS \(deltaEquation(\rusage.ru_nivcsw))
-                  VCS \(deltaEquation(\rusage.ru_nvcsw))
-              """)
-      }
-      return maxRSS
+  /// Returns maximum resident set size (MAX_RSS) delta in bytes.
+  ///
+  /// This method of estimating memory usage is valid only for executing single
+  /// benchmark. That's why we don't worry about reseting the `baseline` in
+  /// `resetMeasurements`.
+  func measureMemoryUsage() -> Int? {
+    guard c.logMemory else { return nil }
+    let current = TestRunner.getResourceUtilization()
+    let maxRSS = current.ru_maxrss - baseline.ru_maxrss
+    let pages = { maxRSS / sysconf(_SC_PAGESIZE) }
+    func deltaEquation(_ stat: KeyPath<rusage, Int>) -> String {
+      let b = baseline[keyPath: stat], c = current[keyPath: stat]
+      return "\(c) - \(b) = \(c - b)"
+    }
+    logVerbose(
+        """
+            MAX_RSS \(deltaEquation(\rusage.ru_maxrss)) (\(pages()) pages)
+            ICS \(deltaEquation(\rusage.ru_nivcsw))
+            VCS \(deltaEquation(\rusage.ru_nvcsw))
+        """)
+    return maxRSS
   }
 
-  func run(_ name: String, fn: (Int) -> Void, num_iters: UInt) -> UInt64 {
-    // Start the timer.
+  private func startMeasurement() {
+    let spent = timer.diffTimeInNanoSeconds(from: lastYield, to: end)
+    let nextSampleEstimate = UInt64(Double(lastSampleTime) * 1.5)
+
+    if (spent + nextSampleEstimate < schedulerQuantum) {
+        start = timer.getTime()
+    } else {
+        logVerbose("    Yielding after ~\(spent.microseconds) μs")
+        let now = yield()
+        (start, lastYield) = (now, now)
+    }
+  }
+
+  private func stopMeasurement() {
+    end = timer.getTime()
+  }
+
+  private func resetMeasurements() {
+    let now = yield()
+    (start, end, lastYield) = (now, now, now)
+  }
+
+  /// Time in nanoseconds spent running the last function
+  var lastSampleTime: UInt64 {
+    return timer.diffTimeInNanoSeconds(from: start, to: end)
+  }
+
+  /// Measure the `fn` and return the average sample time per iteration (μs).
+  func measure(_ name: String, fn: (Int) -> Void, numIters: Int) -> Int {
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
     name.withCString { p in startTrackingObjects(p) }
 #endif
-    let start_ticks = timer.getTime()
-    fn(Int(num_iters))
-    // Stop the timer.
-    let end_ticks = timer.getTime()
+
+    startMeasurement()
+    fn(numIters)
+    stopMeasurement()
+
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
     name.withCString { p in stopTrackingObjects(p) }
 #endif
 
-    // Compute the spent time and the scaling factor.
-    return timer.diffTimeInNanoSeconds(from: start_ticks, to: end_ticks)
+    return lastSampleTime.microseconds / numIters
   }
-}
 
-/// Invoke the benchmark entry point and return the run time in milliseconds.
-func runBench(_ test: BenchmarkInfo, _ c: TestConfig) -> BenchResults? {
-  var samples = [UInt64](repeating: 0, count: c.numSamples)
+  func logVerbose(_ msg: @autoclosure () -> String) {
+    if c.verbose { print(msg()) }
+  }
 
-  // Before we do anything, check that we actually have a function to
-  // run. If we don't it is because the benchmark is not supported on
-  // the platform and we should skip it.
-  guard let testFn = test.runFunction else {
-    if c.verbose {
-	print("Skipping unsupported benchmark \(test.name)!")
+  /// Run the benchmark and return the measured results.
+  func run(_ test: BenchmarkInfo) -> BenchResults? {
+    // Before we do anything, check that we actually have a function to
+    // run. If we don't it is because the benchmark is not supported on
+    // the platform and we should skip it.
+    guard let testFn = test.runFunction else {
+      logVerbose("Skipping unsupported benchmark \(test.name)!")
+      return nil
     }
-    return nil
-  }
+    logVerbose("Running \(test.name) for \(c.numSamples) samples.")
 
-  if c.verbose {
-    print("Running \(test.name) for \(c.numSamples) samples.")
-  }
+    var samples: [Int] = []
+    samples.reserveCapacity(c.numSamples)
 
-  let sampler = SampleRunner(c)
-  test.setUpFunction?()
+    func addSample(_ time: Int) {
+      logVerbose("    Sample \(samples.count),\(time)")
+      samples.append(time)
+    }
 
-  for s in 0..<c.numSamples {
-    let nsPerSecond = 1_000_000_000.0 // nanoseconds
-    let time_per_sample = UInt64(c.sampleTime * nsPerSecond)
+    resetMeasurements()
+    test.setUpFunction?()
 
-    var scale : UInt
-    var elapsed_time : UInt64 = 0
-    if c.fixedNumIters == 0 {
-      elapsed_time = sampler.run(test.name, fn: testFn, num_iters: 1)
-
-      if elapsed_time > 0 {
-        scale = UInt(time_per_sample / elapsed_time)
+    // Determine number of iterations for testFn to run for desired time.
+    func iterationsPerSampleTime() -> (numIters: Int, oneIter: Int) {
+      let oneIter = measure(test.name, fn: testFn, numIters: 1)
+      if oneIter > 0 {
+        let timePerSample = Int(c.sampleTime * 1_000_000.0) // microseconds (μs)
+        return (max(timePerSample / oneIter, 1), oneIter)
       } else {
-        if c.verbose {
-          print("    Warning: elapsed time is 0. This can be safely ignored if the body is empty.")
-        }
-        scale = 1
-      }
-    } else {
-      // Compute the scaling factor if a fixed c.fixedNumIters is not specified.
-      scale = c.fixedNumIters
-      if scale == 1 {
-        elapsed_time = sampler.run(test.name, fn: testFn, num_iters: 1)
+        return (1, oneIter)
       }
     }
-    // Make integer overflow less likely on platforms where Int is 32 bits wide.
-    // FIXME: Switch BenchmarkInfo to use Int64 for the iteration scale, or fix
-    // benchmarks to not let scaling get off the charts.
-    scale = min(scale, UInt(Int.max) / 10_000)
 
-    // Rerun the test with the computed scale factor.
-    if scale > 1 {
-      if c.verbose {
-        print("    Measuring with scale \(scale).")
-      }
-      elapsed_time = sampler.run(test.name, fn: testFn, num_iters: scale)
-    } else {
-      scale = 1
+    let numIters = min( // Cap to prevent overflow on 32-bit systems when scaled
+      Int.max / 10_000, // by the inner loop multiplier inside the `testFn`.
+      c.numIters ?? {
+        let (numIters, oneIter) = iterationsPerSampleTime()
+        if numIters == 1 { addSample(oneIter) }
+        else { resetMeasurements() } // for accurate yielding reports
+        return numIters
+      }())
+
+    logVerbose("    Measuring with scale \(numIters).")
+    for _ in samples.count..<c.numSamples {
+      addSample(measure(test.name, fn: testFn, numIters: numIters))
     }
-    // save result in microseconds or k-ticks
-    samples[s] = elapsed_time / UInt64(scale) / 1000
-    if c.verbose {
-      print("    Sample \(s),\(samples[s])")
-    }
+
+    test.tearDownFunction?()
+
+    return BenchResults(samples, maxRSS: measureMemoryUsage())
   }
-  test.tearDownFunction?()
 
-  let (mean, sd) = internalMeanSD(samples)
-
-  // Return our benchmark results.
-  return BenchResults(sampleCount: UInt64(samples.count),
-                      min: samples.min()!, max: samples.max()!,
-                      mean: mean, sd: sd, median: internalMedian(samples),
-                      maxRSS: UInt64(sampler.measureMemoryUsage()))
-}
-
-/// Execute benchmarks and continuously report the measurement results.
-func runBenchmarks(_ c: TestConfig) {
-  let withUnit = {$0 + "(us)"}
-  let header = (
-    ["#", "TEST", "SAMPLES"] +
-    ["MIN", "MAX", "MEAN", "SD", "MEDIAN"].map(withUnit)
-    + (c.logMemory ? ["MAX_RSS(B)"] : [])
-  ).joined(separator: c.delim)
-  print(header)
-
-  var testCount = 0
-
-  func report(_ index: String, _ t: BenchmarkInfo, results: BenchResults?) {
-    func values(r: BenchResults) -> [String] {
-      return ([r.sampleCount, r.min, r.max, r.mean, r.sd, r.median] +
-              (c.logMemory ? [r.maxRSS] : [])).map { String($0) }
+  var header: String {
+    let withUnit = {$0 + "(μs)"}
+    let withDelta = {"𝚫" + $0}
+    func quantiles(q: Int) -> [String] {
+      // See https://en.wikipedia.org/wiki/Quantile#Specialized_quantiles
+      let prefix = [
+        2: "MEDIAN", 3: "T", 4: "Q", 5: "QU", 6: "S", 7: "O", 10: "D",
+        12: "Dd", 16: "H", 20: "V", 33: "TT", 100: "P", 1000: "Pr"
+      ][q, default: "\(q)-q"]
+      let base20 = "0123456789ABCDEFGHIJ".map { String($0) }
+      let index: (Int) -> String =
+        { q == 2 ? "" : q <= 20 ?  base20[$0] : String($0) }
+      let tail = (1..<q).map { prefix + index($0) } + ["MAX"]
+      return [withUnit("MIN")] + tail.map(c.delta ? withDelta : withUnit)
     }
-    let benchmarkStats = (
-      [index, t.name] + (results.map(values) ?? ["Unsupported"])
+    return (
+      ["#", "TEST", "SAMPLES"] +
+      (c.quantile.map(quantiles)
+        ?? ["MIN", "MAX", "MEAN", "SD", "MEDIAN"].map(withUnit)) +
+      (c.logMemory ? ["MAX_RSS(B)"] : [])
     ).joined(separator: c.delim)
+  }
 
-    print(benchmarkStats)
-    fflush(stdout)
+  /// Execute benchmarks and continuously report the measurement results.
+  func runBenchmarks() {
+    var testCount = 0
 
-    if (results != nil) {
-      testCount += 1
+    func report(_ index: String, _ t: BenchmarkInfo, results: BenchResults?) {
+      func values(r: BenchResults) -> [String] {
+        func quantiles(q: Int) -> [Int] {
+          let qs = (0...q).map { i in r[Double(i) / Double(q)] }
+          return c.delta ?
+            qs.reduce(into: (encoded: [], last: 0)) {
+              $0.encoded.append($1 - $0.last); $0.last = $1
+            }.encoded : qs
+        }
+        return (
+          [r.sampleCount] +
+          (c.quantile.map(quantiles)
+            ?? [r.min,  r.max, r.mean, r.sd, r.median]) +
+          [r.maxRSS].compactMap { $0 }
+        ).map { (c.delta && $0 == 0) ? "" : String($0) } // drop 0s in deltas
+      }
+      let benchmarkStats = (
+        [index, t.name] + (results.map(values) ?? ["Unsupported"])
+      ).joined(separator: c.delim)
+
+      print(benchmarkStats)
+      fflush(stdout)
+
+      if (results != nil) {
+        testCount += 1
+      }
     }
-  }
 
-  for (index, test) in c.tests {
-    report(index, test, results:runBench(test, c))
-  }
+    print(header)
 
-  print("")
-  print("Totals\(c.delim)\(testCount)")
+    for (index, test) in c.tests {
+      report(index, test, results:run(test))
+    }
+
+    print("\nTotal performance tests executed: \(testCount)")
+  }
 }
 
 public func main() {
@@ -452,14 +567,14 @@ public func main() {
   case .listTests:
     print("#\(config.delim)Test\(config.delim)[Tags]")
     for (index, t) in config.tests {
-    let testDescription = [String(index), t.name, t.tags.sorted().description]
-      .joined(separator: config.delim)
-    print(testDescription)
+      let testDescription = [index, t.name, t.tags.sorted().description]
+        .joined(separator: config.delim)
+      print(testDescription)
     }
   case .run:
-    runBenchmarks(config)
+    TestRunner(config).runBenchmarks()
     if let x = config.afterRunSleep {
-      sleep(UInt32(x))
+      sleep(x)
     }
   }
 }

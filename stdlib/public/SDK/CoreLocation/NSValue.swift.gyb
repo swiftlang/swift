@@ -2,7 +2,37 @@
 import Foundation
 
 %{
-from gyb_foundation_support import ObjectiveCBridgeableImplementationForNSValue
+from gyb_foundation_support import \
+  ObjectiveCBridgeableImplementationForNSValueWithCategoryMethods
 }%
 
-${ ObjectiveCBridgeableImplementationForNSValue("CLLocationCoordinate2D") }
+// Get the ObjC type used by -[NSValue valueWithMKCoordinate:]
+// to instantiate the resulting NSValue objects, in case these get changed
+// in the future. This is extra tricky because MapKit *might not be loaded*,
+// in which case we need to fall back to the static @encode string.
+private let CLLocationCoordinate2DInNSValueObjCType: UnsafePointer<CChar> = {
+  let factorySel = Selector(("valueWithMKCoordinate:"))
+  guard let opaqueFactoryMethod = NSValue.method(for: factorySel) else {
+    return _getObjCTypeEncoding(CLLocationCoordinate2D.self)
+  }
+  typealias FactoryMethodType =
+      @convention(c) (AnyClass, Selector, CLLocationCoordinate2D) -> NSValue
+  let factoryMethod =
+      unsafeBitCast(opaqueFactoryMethod, to: FactoryMethodType.self)
+  return factoryMethod(NSValue.self, factorySel, .init()).objCType
+}()
+
+${ ObjectiveCBridgeableImplementationForNSValueWithCategoryMethods(
+  Type="CLLocationCoordinate2D",
+  initializer="""{
+    var addressableValue = $0
+    return NSValue(bytes: &addressableValue,
+                   objCType: CLLocationCoordinate2DInNSValueObjCType)
+  }""",
+  getter="""{
+    var result = CLLocationCoordinate2D()
+    $0.getValue(&result)
+    return result
+  }""",
+  objCType="{ _ in CLLocationCoordinate2DInNSValueObjCType }",
+) }

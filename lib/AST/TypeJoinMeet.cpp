@@ -51,6 +51,9 @@ struct TypeJoin : CanTypeVisitor<TypeJoin, CanType> {
   }
 
   static CanType getSuperclassJoin(CanType first, CanType second);
+  CanType computeProtocolCompositionJoin(ArrayRef<Type> firstMembers,
+                                         ArrayRef<Type> secondMembers);
+
 
   CanType visitErrorType(CanType second);
   CanType visitTupleType(CanType second);
@@ -105,10 +108,10 @@ public:
 
     // Likewise, rather than making every visitor deal with Any,
     // always dispatch to the protocol composition side of the join.
-    if (first->isAny())
+    if (first->is<ProtocolCompositionType>())
       return TypeJoin(second).visit(first);
 
-    if (second->isAny())
+    if (second->is<ProtocolCompositionType>())
       return TypeJoin(first).visit(second);
 
     // Otherwise the first type might be an optional (or not), so
@@ -172,7 +175,7 @@ CanType TypeJoin::visitStructType(CanType second) {
   assert(First != second);
 
   // Deal with inout cases in visitInOutType.
-  if (auto inoutTy = First->getAs<InOutType>())
+  if (First->is<InOutType>())
     return TypeJoin(second).visit(First);
 
   // FIXME: When possible we should return a protocol or protocol
@@ -182,16 +185,6 @@ CanType TypeJoin::visitStructType(CanType second) {
 
 CanType TypeJoin::visitClassType(CanType second) {
   return getSuperclassJoin(First, second);
-}
-
-CanType TypeJoin::visitProtocolType(CanType second) {
-  assert(First != second);
-
-  // FIXME: We should compute a tighter bound and/or return nullptr if
-  // we cannot. We do this now because existing tests rely on
-  // producing Any for the join of protocols that have a common
-  // supertype.
-  return TheAnyType;
 }
 
 CanType TypeJoin::visitBoundGenericClassType(CanType second) {
@@ -233,7 +226,7 @@ CanType TypeJoin::visitBoundGenericStructType(CanType second) {
   assert(First != second);
 
   // Deal with inout cases in visitInOutType.
-  if (auto inoutTy = First->getAs<InOutType>())
+  if (First->is<InOutType>())
     return TypeJoin(second).visit(First);
 
   return Unimplemented;
@@ -352,16 +345,111 @@ CanType TypeJoin::visitGenericFunctionType(CanType second) {
   return Unimplemented;
 }
 
+// Use the distributive law to compute the join of the protocol
+// compositions.
+//
+//   (A ^ B) v (C ^ D)
+// = (A v C) ^ (A v D) ^ (B v C) ^ (B v D)
+//
+// In general this law only applies to distributive lattices.
+//
+// In our case, this should be safe because our meet operation only
+// produces an existing nominal type when it is one of the operands of
+// the operation. So we can never arbitrarily climb down the lattice
+// in ways that would break distributivity.
+//
+CanType TypeJoin::computeProtocolCompositionJoin(ArrayRef<Type> firstMembers,
+                                                 ArrayRef<Type> secondMembers) {
+  SmallVector<Type, 8> result;
+  for (auto first : firstMembers) {
+    for (auto second : secondMembers) {
+      auto joined = Type::join(first, second);
+      if (!joined)
+        return Unimplemented;
+
+      if ((*joined)->isAny())
+        continue;
+
+      result.push_back(*joined);
+    }
+  }
+
+  if (result.empty())
+    return TheAnyType;
+
+  auto &ctx = result[0]->getASTContext();
+  return ProtocolCompositionType::get(ctx, result, false)->getCanonicalType();
+}
+
 CanType TypeJoin::visitProtocolCompositionType(CanType second) {
+  // The join of Any and a no-escape function doesn't exist; it isn't
+  // Any. If it were Any, it would mean we would allow these functions
+  // to escape through Any.
   if (second->isAny()) {
     auto *fnTy = First->getAs<AnyFunctionType>();
     if (fnTy && fnTy->getExtInfo().isNoEscape())
       return Nonexistent;
 
-    return second;
+    return TheAnyType;
   }
 
-  return Unimplemented;
+  assert(First != second);
+
+  // FIXME: Handle other types here.
+  if (!First->isExistentialType())
+    return Unimplemented;
+
+  SmallVector<Type, 1> protocolType;
+  ArrayRef<Type> firstMembers;
+  if (First->is<ProtocolType>()) {
+    protocolType.push_back(First);
+    firstMembers = protocolType;
+  } else {
+    firstMembers = cast<ProtocolCompositionType>(First)->getMembers();
+  }
+  auto secondMembers = cast<ProtocolCompositionType>(second)->getMembers();
+
+  return computeProtocolCompositionJoin(firstMembers, secondMembers);
+}
+
+CanType TypeJoin::visitProtocolType(CanType second) {
+  assert(First != second);
+
+  assert(!First->is<ProtocolCompositionType>() &&
+         !second->is<ProtocolCompositionType>());
+
+  // FIXME: Handle other types here.
+  if (First->getKind() != second->getKind())
+    return TheAnyType;
+
+  auto *firstDecl =
+    cast<ProtocolDecl>(First->getNominalOrBoundGenericNominal());
+
+  auto *secondDecl =
+    cast<ProtocolDecl>(second->getNominalOrBoundGenericNominal());
+
+  if (firstDecl->getInheritedProtocols().empty() &&
+      secondDecl->getInheritedProtocols().empty())
+    return TheAnyType;
+
+  if (firstDecl->inheritsFrom(secondDecl))
+    return second;
+
+  if (secondDecl->inheritsFrom(firstDecl))
+    return First;
+
+  // One isn't the supertype of the other, so instead, treat each as
+  // if it's a protocol composition of its inherited members, and join
+  // those.
+  SmallVector<Type, 4> firstMembers;
+  for (auto *decl : firstDecl->getInheritedProtocols())
+    firstMembers.push_back(decl->getDeclaredInterfaceType());
+
+  SmallVector<Type, 4> secondMembers;
+  for (auto *decl : secondDecl->getInheritedProtocols())
+    secondMembers.push_back(decl->getDeclaredInterfaceType());
+
+  return computeProtocolCompositionJoin(firstMembers, secondMembers);
 }
 
 CanType TypeJoin::visitLValueType(CanType second) { return Unimplemented; }

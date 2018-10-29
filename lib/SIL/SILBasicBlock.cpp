@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/ADT/STLExtras.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
@@ -23,6 +24,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/Strings.h"
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -134,8 +136,8 @@ void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
     return;
   }
 
-  for (auto *PHIArg : Other->getPHIArguments()) {
-    createPHIArgument(PHIArg->getType(), PHIArg->getOwnershipKind(),
+  for (auto *PHIArg : Other->getPhiArguments()) {
+    createPhiArgument(PHIArg->getType(), PHIArg->getOwnershipKind(),
                       PHIArg->getDecl());
   }
 }
@@ -182,7 +184,7 @@ SILFunctionArgument *SILBasicBlock::replaceFunctionArgument(
 
 /// Replace the ith BB argument with a new one with type Ty (and optional
 /// ValueDecl D).
-SILPHIArgument *SILBasicBlock::replacePHIArgument(unsigned i, SILType Ty,
+SILPhiArgument *SILBasicBlock::replacePhiArgument(unsigned i, SILType Ty,
                                                   ValueOwnershipKind Kind,
                                                   const ValueDecl *D) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
@@ -195,7 +197,7 @@ SILPHIArgument *SILBasicBlock::replacePHIArgument(unsigned i, SILType Ty,
   // Notify the delete handlers that this argument is being deleted.
   M.notifyDeleteHandlers(ArgumentList[i]);
 
-  SILPHIArgument *NewArg = new (M) SILPHIArgument(Ty, Kind, D);
+  SILPhiArgument *NewArg = new (M) SILPhiArgument(Ty, Kind, D);
   NewArg->setParent(this);
 
   // TODO: When we switch to malloc/free allocation we'll be leaking memory
@@ -205,7 +207,7 @@ SILPHIArgument *SILBasicBlock::replacePHIArgument(unsigned i, SILType Ty,
   return NewArg;
 }
 
-SILPHIArgument *SILBasicBlock::createPHIArgument(SILType Ty,
+SILPhiArgument *SILBasicBlock::createPhiArgument(SILType Ty,
                                                  ValueOwnershipKind Kind,
                                                  const ValueDecl *D) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
@@ -213,10 +215,10 @@ SILPHIArgument *SILBasicBlock::createPHIArgument(SILType Ty,
          Kind != ValueOwnershipKind::Any);
   if (Ty.isTrivial(getModule()))
     Kind = ValueOwnershipKind::Trivial;
-  return new (getModule()) SILPHIArgument(this, Ty, Kind, D);
+  return new (getModule()) SILPhiArgument(this, Ty, Kind, D);
 }
 
-SILPHIArgument *SILBasicBlock::insertPHIArgument(arg_iterator Iter, SILType Ty,
+SILPhiArgument *SILBasicBlock::insertPhiArgument(arg_iterator Iter, SILType Ty,
                                                  ValueOwnershipKind Kind,
                                                  const ValueDecl *D) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
@@ -224,7 +226,7 @@ SILPHIArgument *SILBasicBlock::insertPHIArgument(arg_iterator Iter, SILType Ty,
          Kind != ValueOwnershipKind::Any);
   if (Ty.isTrivial(getModule()))
     Kind = ValueOwnershipKind::Trivial;
-  return new (getModule()) SILPHIArgument(this, Iter, Ty, Kind, D);
+  return new (getModule()) SILPhiArgument(this, Iter, Ty, Kind, D);
 }
 
 void SILBasicBlock::eraseArgument(int Index) {
@@ -335,18 +337,17 @@ bool SILBasicBlock::isEntry() const {
   return this == &*getParent()->begin();
 }
 
-SILBasicBlock::PHIArgumentArrayRefTy SILBasicBlock::getPHIArguments() const {
-  return PHIArgumentArrayRefTy(getArguments(),
-                               [](SILArgument *A) -> SILPHIArgument * {
-    return cast<SILPHIArgument>(A);
+/// Declared out of line so we can have a declaration of SILArgument.
+PhiArgumentArrayRef SILBasicBlock::getPhiArguments() const {
+  return PhiArgumentArrayRef(getArguments(), [](SILArgument *arg) {
+    return cast<SILPhiArgument>(arg);
   });
 }
 
-SILBasicBlock::FunctionArgumentArrayRefTy
-SILBasicBlock::getFunctionArguments() const {
-  return FunctionArgumentArrayRefTy(getArguments(),
-                                    [](SILArgument *A) -> SILFunctionArgument* {
-    return cast<SILFunctionArgument>(A);
+/// Declared out of line so we can have a declaration of SILArgument.
+FunctionArgumentArrayRef SILBasicBlock::getFunctionArguments() const {
+  return FunctionArgumentArrayRef(getArguments(), [](SILArgument *arg) {
+    return cast<SILFunctionArgument>(arg);
   });
 }
 

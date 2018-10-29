@@ -5,8 +5,9 @@
 // REQUIRES: tsan_runtime
 // UNSUPPORTED: OS=tvos
 
-// https://bugs.swift.org/browse/SR-6622
-// XFAIL: linux
+// FIXME: This should be covered by "tsan_runtime"; older versions of Apple OSs
+// don't support TSan.
+// UNSUPPORTED: remote_run
 
 #if os(macOS) || os(iOS)
 import Darwin

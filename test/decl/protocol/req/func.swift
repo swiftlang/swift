@@ -74,7 +74,7 @@ struct X2x : P2 { // expected-error{{type 'X2x' does not conform to protocol 'P2
 // Mismatch in parameter types
 struct X2y : P2 { // expected-error{{type 'X2y' does not conform to protocol 'P2'}}
   typealias Assoc = X1a
-  func f1(x: X1b) { } // expected-note{{candidate has non-matching type '(X1b) -> ()'}}
+  func f1(x: X1b) { }
 }
 
 // Ambiguous deduction
@@ -96,7 +96,7 @@ struct X3a : P3 {
   typealias Assoc = X1a
 }
 
-prefix func ~~(_: X3a) -> X1a {} // expected-note{{candidate has non-matching type '(X3a) -> X1a'}} expected-note{{candidate is prefix, not postfix as required}}
+prefix func ~~(_: X3a) -> X1a {}
 
 // FIXME: Add example with overloaded prefix/postfix
 
@@ -105,7 +105,7 @@ struct X3z : P3 { // expected-error{{type 'X3z' does not conform to protocol 'P3
   typealias Assoc = X1a
 }
 
-postfix func ~~(_: X3z) -> X1a {} // expected-note{{candidate is postfix, not prefix as required}} expected-note{{candidate has non-matching type '(X3z) -> X1a'}}
+postfix func ~~(_: X3z) -> X1a {} // expected-note{{candidate is postfix, not prefix as required}}
 
 // Protocol with postfix unary function
 postfix operator ~~
@@ -119,14 +119,14 @@ struct X4a : P4 {
   typealias Assoc = X1a
 }
 
-postfix func ~~(_: X4a) -> X1a {} // expected-note{{candidate has non-matching type '(X4a) -> X1a'}} expected-note{{candidate is postfix, not prefix as required}}
+postfix func ~~(_: X4a) -> X1a {}
 
 // Prefix/postfix mismatch.
 struct X4z : P4 { // expected-error{{type 'X4z' does not conform to protocol 'P4'}}
   typealias Assoc = X1a
 }
 
-prefix func ~~(_: X4z) -> X1a {} // expected-note{{candidate has non-matching type '(X4z) -> X1a'}} expected-note{{candidate is prefix, not postfix as required}}
+prefix func ~~(_: X4z) -> X1a {} // expected-note{{candidate is prefix, not postfix as required}}
 
 // Objective-C protocol
 @objc protocol P5 {
@@ -192,7 +192,7 @@ protocol P6 {
 }
 struct X6 : P6 { // expected-error{{type 'X6' does not conform to protocol 'P6'}}
   func foo(_ x: Missing) { } // expected-error{{use of undeclared type 'Missing'}}
-  func bar() { } // expected-note{{candidate has non-matching type '() -> ()'}}
+  func bar() { }
 }
 
 protocol P6Ownership {
@@ -266,7 +266,14 @@ protocol P12 {
 struct XIndexType : P11 { }
 
 struct X12 : P12 { // expected-error{{type 'X12' does not conform to protocol 'P12'}}
-  func getIndex() -> XIndexType { return XIndexType() } // expected-note{{inferred type 'XIndexType' (by matching requirement 'getIndex()') is invalid: does not conform to 'P1'}}
+  func getIndex() -> XIndexType { return XIndexType() } // expected-note{{candidate would match and infer 'Index' = 'XIndexType' if 'XIndexType' conformed to 'P1'}}
 }
 
 func ==(x: X12.Index, y: X12.Index) -> Bool { return true }
+
+protocol P13 {}
+protocol P14 {
+  static prefix func %%%(_: Self.Type)
+}
+prefix func %%%<P: P13>(_: P.Type) { }
+struct X13: P14, P13 { }

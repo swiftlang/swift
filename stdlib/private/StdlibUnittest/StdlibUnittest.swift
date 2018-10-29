@@ -294,19 +294,6 @@ public func expectNotEqual<T : Equatable>(_ expected: T, _ actual: T,
   }
 }
 
-// Cannot write a sane set of overloads using generics because of:
-// <rdar://problem/17015923> Array -> NSArray implicit conversion insanity
-public func expectOptionalEqual<T : Equatable>(
-  _ expected: T, _ actual: T?,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
-) {
-  expectOptionalEqual(expected, actual, message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) {$0 == $1}
-}
-
 public func expectOptionalEqual<T>(
   _ expected: T, _ actual: T?,
   _ message: @autoclosure () -> String = "",
@@ -322,146 +309,6 @@ public func expectOptionalEqual<T>(
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
   }
 }
-
-public func expectEqual<T : Equatable>(_ expected: T?, _ actual: T?,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
-  if expected != actual {
-    expectationFailure(
-      "expected: \"\(expected.debugDescription)\" (of type \(String(reflecting: type(of: expected))))\n"
-      + "actual: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
-      trace: message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-  }
-}
-
-public func expectNotEqual<T : Equatable>(
-  _ expected: T?, _ actual: T?,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
-) {
-  if expected == actual {
-    expectationFailure(
-      "unexpected value: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
-      trace: message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-  }
-}
-
-// Array<T> is not Equatable if T is.  Provide additional overloads.
-// Same for Dictionary.
-
-public func expectEqual<T : Equatable>(
-  _ expected: ContiguousArray<T>, _ actual: ContiguousArray<T>,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
-) {
-  expectEqualTest(expected, actual, message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) { $0 == $1 }
-}
-
-public func expectOptionalEqual<T : Equatable>(
-    _ expected: ContiguousArray<T>, _ actual: ContiguousArray<T>?,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
-  if (actual == nil) || expected != actual! {
-    expectationFailure(
-      "expected: \"\(expected)\" (of type \(String(reflecting: type(of: expected))))"
-      + "actual: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
-      trace: message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-  }
-}
-
-
-public func expectEqual<T : Equatable>(
-  _ expected: ArraySlice<T>, _ actual: ArraySlice<T>,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
-) {
-  expectEqualTest(expected, actual, message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) { $0 == $1 }
-}
-
-public func expectOptionalEqual<T : Equatable>(
-    _ expected: ArraySlice<T>, _ actual: ArraySlice<T>?,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
-  if (actual == nil) || expected != actual! {
-    expectationFailure(
-      "expected: \"\(expected)\" (of type \(String(reflecting: type(of: expected))))"
-      + "actual: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
-      trace: message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-  }
-}
-
-
-public func expectEqual<T : Equatable>(
-  _ expected: Array<T>, _ actual: Array<T>,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
-) {
-  expectEqualTest(expected, actual, message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) { $0 == $1 }
-}
-
-public func expectOptionalEqual<T : Equatable>(
-    _ expected: Array<T>, _ actual: Array<T>?,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
-  if (actual == nil) || expected != actual! {
-    expectationFailure(
-      "expected: \"\(expected)\" (of type \(String(reflecting: type(of: expected))))"
-      + "actual: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
-      trace: message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-  }
-}
-
-
-public func expectEqual<T, U : Equatable>(
-  _ expected: Dictionary<T, U>, _ actual: Dictionary<T, U>,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
-) {
-  expectEqualTest(expected, actual, message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) { $0 == $1 }
-}
-
-public func expectOptionalEqual<T, U : Equatable>(
-    _ expected: Dictionary<T, U>, _ actual: Dictionary<T, U>?,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
-  if (actual == nil) || expected != actual! {
-    expectationFailure(
-      "expected: \"\(expected)\" (of type \(String(reflecting: type(of: expected))))"
-      + "actual: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
-      trace: message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-  }
-}
-
 
 public func expectEqual(
   _ expected: Any.Type, _ actual: Any.Type,
@@ -2531,7 +2378,7 @@ public func checkHashable<Instances: Collection>(
           """,
           stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
         expectEqual(
-          x._rawHashValue(seed: (0, 0)), y._rawHashValue(seed: (0, 0)),
+          x._rawHashValue(seed: 0), y._rawHashValue(seed: 0),
           """
           _rawHashValue expected to match, found to differ
           lhs (at index \(i)): \(x)
@@ -2552,8 +2399,8 @@ public func checkHashable<Instances: Collection>(
           """,
           stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
         expectTrue(
-          (0..<10 as Range<UInt64>).contains { i in
-            x._rawHashValue(seed: (0, i)) != y._rawHashValue(seed: (0, i))
+          (0..<10).contains { i in
+            x._rawHashValue(seed: i) != y._rawHashValue(seed: i)
           },
           """
           _rawHashValue(seed:) expected to differ, found to match

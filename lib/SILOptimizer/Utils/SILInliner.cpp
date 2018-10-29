@@ -13,8 +13,10 @@
 #define DEBUG_TYPE "sil-inliner"
 
 #include "swift/SILOptimizer/Utils/SILInliner.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/TypeSubstCloner.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
@@ -59,19 +61,14 @@ static bool canInlineBeginApply(BeginApplyInst *BA) {
   return true;
 }
 
-bool SILInliner::canInline(FullApplySite AI) {
-  if (auto BA = dyn_cast<BeginApplyInst>(AI)) {
+bool SILInliner::canInlineApplySite(FullApplySite apply) {
+  if (auto BA = dyn_cast<BeginApplyInst>(apply))
     return canInlineBeginApply(BA);
-  }
+
   return true;
 }
 
-bool SILInliner::canInlineFunction(FullApplySite AI) {
-  if (!canInline(AI))
-    return false;
-  return AI.getFunction() != &Original;
-}
-
+namespace swift {
 /// Utility class for rewiring control-flow of inlined begin_apply functions.
 class BeginApplySite {
   SILLocation Loc;
@@ -100,7 +97,7 @@ public:
     return BeginApplySite(BeginApply, Loc, Builder);
   }
 
-  void preprocess(SILBasicBlock *ReturnToBB) {
+  void preprocess(SILBasicBlock *returnToBB) {
     // Get the end_apply, abort_apply instructions.
     auto Token = BeginApply->getTokenResult();
     for (auto *TokenUse : Token->getUses()) {
@@ -192,7 +189,9 @@ public:
     return false;
   }
 
-  /// Complete the begin_apply-specific inlining work.
+  /// Complete the begin_apply-specific inlining work. Delete vestiges of the
+  /// apply site except the callee value. Return a valid iterator after the
+  /// original begin_apply.
   void complete() {
     // If there was no yield in the coroutine, then control never reaches
     // the end of the begin_apply, so all the downstream code is unreachable.
@@ -225,199 +224,312 @@ public:
     assert(!BeginApply->hasUsesOfAnyResult());
   }
 };
+} // namespace swift
 
-/// \brief Inlines the callee of a given ApplyInst (which must be the value of a
-/// FunctionRefInst referencing a function with a known body), into the caller
-/// containing the ApplyInst, which must be the same function as provided to the
-/// constructor of SILInliner. It only performs one step of inlining: it does
-/// not recursively inline functions called by the callee.
-///
-/// It is the responsibility of the caller of this function to delete
-/// the given ApplyInst when inlining is successful.
-///
-/// \returns true on success or false if it is unable to inline the function
-/// (for any reason).
-void SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
-  assert(canInlineFunction(AI) &&
-         "Asked to inline function that is unable to be inlined?!");
+namespace swift {
+class SILInlineCloner
+    : public TypeSubstCloner<SILInlineCloner, SILOptFunctionBuilder> {
+  friend class SILInstructionVisitor<SILInlineCloner>;
+  friend class SILCloner<SILInlineCloner>;
+  using SuperTy = TypeSubstCloner<SILInlineCloner, SILOptFunctionBuilder>;
+  using InlineKind = SILInliner::InlineKind;
+
+  SILOptFunctionBuilder &FuncBuilder;
+  InlineKind IKind;
+
+  // The original, noninlined apply site. These become invalid after fixUp,
+  // which is called as the last step in SILCloner::cloneFunctionBody.
+  FullApplySite Apply;
+  Optional<BeginApplySite> BeginApply;
+
+  SILInliner::DeletionFuncTy DeletionCallback;
+
+  /// \brief The location representing the inlined instructions.
+  ///
+  /// This location wraps the call site AST node that is being inlined.
+  /// Alternatively, it can be the SIL file location of the call site (in case
+  /// of SIL-to-SIL transformations).
+  Optional<SILLocation> Loc;
+  const SILDebugScope *CallSiteScope = nullptr;
+  llvm::SmallDenseMap<const SILDebugScope *, const SILDebugScope *, 8>
+      InlinedScopeCache;
+
+  // Block in the original caller serving as the successor of the inlined
+  // control path.
+  SILBasicBlock *ReturnToBB = nullptr;
+
+  // Keep track of the next instruction after inlining the call.
+  SILBasicBlock::iterator NextIter;
+
+public:
+  SILInlineCloner(SILFunction *CalleeFunction, FullApplySite Apply,
+                  SILOptFunctionBuilder &FuncBuilder, InlineKind IKind,
+                  SubstitutionMap ApplySubs,
+                  SILOpenedArchetypesTracker &OpenedArchetypesTracker,
+                  SILInliner::DeletionFuncTy deletionCallback);
+
+  SILFunction *getCalleeFunction() const { return &Original; }
+
+  SILBasicBlock::iterator cloneInline(ArrayRef<SILValue> AppliedArgs);
+
+protected:
+  SILValue borrowFunctionArgument(SILValue callArg, FullApplySite AI);
+
+  void visitDebugValueInst(DebugValueInst *Inst);
+  void visitDebugValueAddrInst(DebugValueAddrInst *Inst);
+
+  void visitTerminator(SILBasicBlock *BB);
+
+  /// This hook is called after either of the top-level visitors:
+  /// cloneReachableBlocks or cloneSILFunction.
+  ///
+  /// After fixUp, the SIL must be valid and semantically equivalent to the SIL
+  /// before cloning.
+  void fixUp(SILFunction *calleeFunction);
+
+  const SILDebugScope *getOrCreateInlineScope(const SILDebugScope *DS);
+
+  void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
+    // We just updated the debug scope information. Intentionally
+    // don't call SILClonerWithScopes<SILInlineCloner>::postProcess().
+    SILCloner<SILInlineCloner>::postProcess(Orig, Cloned);
+  }
+
+  SILLocation remapLocation(SILLocation InLoc) {
+    // For performance inlining return the original location.
+    if (IKind == InlineKind::PerformanceInline)
+      return InLoc;
+    // Inlined location wraps the call site that is being inlined, regardless
+    // of the input location.
+    return Loc.hasValue()
+               ? Loc.getValue()
+               : MandatoryInlinedLocation::getMandatoryInlinedLocation(
+                     (Decl *)nullptr);
+  }
+
+  const SILDebugScope *remapScope(const SILDebugScope *DS) {
+    if (IKind == InlineKind::MandatoryInline)
+      // Transparent functions are absorbed into the call
+      // site. No soup, err, debugging for you!
+      return CallSiteScope;
+    else
+      // Create an inlined version of the scope.
+      return getOrCreateInlineScope(DS);
+  }
+};
+} // namespace swift
+
+SILBasicBlock::iterator
+SILInliner::inlineFunction(SILFunction *calleeFunction, FullApplySite apply,
+                           ArrayRef<SILValue> appliedArgs) {
+  assert(canInlineApplySite(apply)
+         && "Asked to inline function that is unable to be inlined?!");
+
+  SILInlineCloner cloner(calleeFunction, apply, FuncBuilder, IKind, ApplySubs,
+                         OpenedArchetypesTracker, DeletionCallback);
+  return cloner.cloneInline(appliedArgs);
+}
+
+SILInlineCloner::SILInlineCloner(
+    SILFunction *calleeFunction, FullApplySite apply,
+    SILOptFunctionBuilder &funcBuilder, InlineKind inlineKind,
+    SubstitutionMap applySubs,
+    SILOpenedArchetypesTracker &openedArchetypesTracker,
+    SILInliner::DeletionFuncTy deletionCallback)
+    : SuperTy(*apply.getFunction(), *calleeFunction, applySubs,
+              openedArchetypesTracker, /*Inlining=*/true),
+      FuncBuilder(funcBuilder), IKind(inlineKind), Apply(apply),
+      DeletionCallback(deletionCallback) {
 
   SILFunction &F = getBuilder().getFunction();
-  assert(AI.getFunction() && AI.getFunction() == &F &&
-         "Inliner called on apply instruction in wrong function?");
-  assert(((CalleeFunction->getRepresentation()
-             != SILFunctionTypeRepresentation::ObjCMethod &&
-           CalleeFunction->getRepresentation()
-             != SILFunctionTypeRepresentation::CFunctionPointer) ||
-          IKind == InlineKind::PerformanceInline) &&
-         "Cannot inline Objective-C methods or C functions in mandatory "
-         "inlining");
-
-  CalleeEntryBB = &*CalleeFunction->begin();
+  assert(apply.getFunction() && apply.getFunction() == &F
+         && "Inliner called on apply instruction in wrong function?");
+  assert(((calleeFunction->getRepresentation()
+               != SILFunctionTypeRepresentation::ObjCMethod
+           && calleeFunction->getRepresentation()
+                  != SILFunctionTypeRepresentation::CFunctionPointer)
+          || IKind == InlineKind::PerformanceInline)
+         && "Cannot inline Objective-C methods or C functions in mandatory "
+            "inlining");
 
   // Compute the SILLocation which should be used by all the inlined
   // instructions.
-  if (IKind == InlineKind::PerformanceInline) {
-    Loc = InlinedLocation::getInlinedLocation(AI.getLoc());
-  } else {
+  if (IKind == InlineKind::PerformanceInline)
+    Loc = InlinedLocation::getInlinedLocation(apply.getLoc());
+  else {
     assert(IKind == InlineKind::MandatoryInline && "Unknown InlineKind.");
-    Loc = MandatoryInlinedLocation::getMandatoryInlinedLocation(AI.getLoc());
+    Loc = MandatoryInlinedLocation::getMandatoryInlinedLocation(apply.getLoc());
   }
 
-  auto AIScope = AI.getDebugScope();
+  auto applyScope = apply.getDebugScope();
   // FIXME: Turn this into an assertion instead.
-  if (!AIScope)
-    AIScope = AI.getFunction()->getDebugScope();
+  if (!applyScope)
+    applyScope = apply.getFunction()->getDebugScope();
 
   if (IKind == InlineKind::MandatoryInline) {
     // Mandatory inlining: every instruction inherits scope/location
     // from the call site.
-    CallSiteScope = AIScope;
+    CallSiteScope = applyScope;
   } else {
     // Performance inlining. Construct a proper inline scope pointing
     // back to the call site.
-    CallSiteScope = new (F.getModule())
-        SILDebugScope(AI.getLoc(), nullptr, AIScope, AIScope->InlinedCallSite);
+    CallSiteScope = new (F.getModule()) SILDebugScope(
+        apply.getLoc(), nullptr, applyScope, applyScope->InlinedCallSite);
   }
   assert(CallSiteScope && "call site has no scope");
   assert(CallSiteScope->getParentFunction() == &F);
 
-  // If the caller's BB is not the last BB in the calling function, then keep
-  // track of the next BB so we always insert new BBs before it; otherwise,
-  // we just leave the new BBs at the end as they are by default.
-  auto IBI = std::next(SILFunction::iterator(AI.getParent()));
-  InsertBeforeBB = IBI != F.end() ? &*IBI : nullptr;
+  // Set up the coroutine-specific inliner if applicable.
+  BeginApply = BeginApplySite::get(apply, Loc.getValue(), getBuilder());
+}
 
-  BBMap.clear();
-  // Do not allow the entry block to be cloned again
-  SILBasicBlock::iterator InsertPoint =
-      SILBasicBlock::iterator(AI.getInstruction());
-  BBMap.insert(std::make_pair(CalleeEntryBB, AI.getParent()));
-  getBuilder().setInsertionPoint(InsertPoint);
-
-  // Clear argument map and map ApplyInst arguments to the arguments of the
-  // callee's entry block.
-  ValueMap.clear();
-  assert(CalleeFunction->getArguments().size() == Args.size()
+// Clone the entire callee function into the caller function at the apply site.
+// Delete the original apply and all dead arguments except the callee. Return an
+// iterator the the first instruction after the original apply.
+SILBasicBlock::iterator
+SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
+  assert(getCalleeFunction()->getArguments().size() == AppliedArgs.size()
          && "Unexpected number of callee arguments.");
-  auto calleeConv = CalleeFunction->getConventions();
-  for (unsigned argIdx = 0, endIdx = Args.size(); argIdx < endIdx; ++argIdx) {
-    SILValue callArg = Args[argIdx];
+
+  getBuilder().setInsertionPoint(Apply.getInstruction());
+
+  SmallVector<SILValue, 4> entryArgs;
+  entryArgs.reserve(AppliedArgs.size());
+  auto calleeConv = getCalleeFunction()->getConventions();
+  for (unsigned argIdx = 0, endIdx = AppliedArgs.size(); argIdx < endIdx;
+       ++argIdx) {
+    SILValue callArg = AppliedArgs[argIdx];
     // Insert begin/end borrow for guaranteed arguments.
     if (argIdx >= calleeConv.getSILArgIndexOfFirstParam()
         && calleeConv.getParamInfoForSILArg(argIdx).isGuaranteed()) {
-      callArg = borrowFunctionArgument(callArg, AI);
+      callArg = borrowFunctionArgument(callArg, Apply);
     }
-    auto *calleeArg = CalleeFunction->getArgument(argIdx);
-    ValueMap.insert(std::make_pair(calleeArg, callArg));
+    entryArgs.push_back(callArg);
   }
 
-  // Set up the coroutine-specific inliner if applicable.
-  auto BeginApply = BeginApplySite::get(AI, Loc.getValue(), getBuilder());
+  // Create the return block and set ReturnToBB for use in visitTerminator
+  // callbacks.
+  SILBasicBlock *callerBB = Apply.getParent();
+  switch (Apply.getKind()) {
+  case FullApplySiteKind::ApplyInst: {
+    auto *AI = dyn_cast<ApplyInst>(Apply);
 
-  // Recursively visit callee's BB in depth-first preorder, starting with the
-  // entry block, cloning all instructions other than terminators.
-  visitSILBasicBlock(CalleeEntryBB);
-
-  // If we're inlining into a normal apply and the callee's entry
-  // block ends in a return, then we can avoid a split.
-  if (auto nonTryAI = dyn_cast<ApplyInst>(AI)) {
-    if (auto *RI = dyn_cast<ReturnInst>(CalleeEntryBB->getTerminator())) {
-      // Replace all uses of the apply instruction with the operands of the
-      // return instruction, appropriately mapped.
-      nonTryAI->replaceAllUsesWith(remapValue(RI->getOperand()));
-      return;
-    }
-  }
-
-  // If we're inlining into a try_apply, we already have a return-to BB.
-  SILBasicBlock *ReturnToBB;
-
-  if (auto tryAI = dyn_cast<TryApplyInst>(AI)) {
-    ReturnToBB = tryAI->getNormalBB();
-
-  // Otherwise, split the caller's basic block to create a return-to BB.
-  } else {
-    SILBasicBlock *CallerBB = AI.getParent();
     // Split the BB and do NOT create a branch between the old and new
     // BBs; we will create the appropriate terminator manually later.
-    ReturnToBB = CallerBB->split(InsertPoint);
-    // Place the return-to BB after all the other mapped BBs.
-    if (InsertBeforeBB)
-      F.getBlocks().splice(SILFunction::iterator(InsertBeforeBB), F.getBlocks(),
-                           SILFunction::iterator(ReturnToBB));
-    else
-      F.getBlocks().splice(F.getBlocks().end(), F.getBlocks(),
-                           SILFunction::iterator(ReturnToBB));
+    ReturnToBB =
+      callerBB->split(std::next(Apply.getInstruction()->getIterator()));
 
     // Create an argument on the return-to BB representing the returned value.
-    if (auto apply = dyn_cast<ApplyInst>(AI.getInstruction())) {
-      auto *RetArg = ReturnToBB->createPHIArgument(apply->getType(),
-                                                   ValueOwnershipKind::Owned);
-      // Replace all uses of the ApplyInst with the new argument.
-      apply->replaceAllUsesWith(RetArg);
-    } else {
-      // Handle begin_apply.
-      BeginApply->preprocess(ReturnToBB);
-    }
+    auto *retArg =
+        ReturnToBB->createPhiArgument(AI->getType(), ValueOwnershipKind::Owned);
+    // Replace all uses of the ApplyInst with the new argument.
+    AI->replaceAllUsesWith(retArg);
+    break;
+  }
+  case FullApplySiteKind::BeginApplyInst:
+    ReturnToBB =
+      callerBB->split(std::next(Apply.getInstruction()->getIterator()));
+    BeginApply->preprocess(ReturnToBB);
+    break;
+
+  case FullApplySiteKind::TryApplyInst:
+    ReturnToBB = cast<TryApplyInst>(Apply)->getNormalBB();
+    break;
   }
 
-  // Now iterate over the callee BBs and fix up the terminators.
-  for (auto BI = BBMap.begin(), BE = BBMap.end(); BI != BE; ++BI) {
-    getBuilder().setInsertionPoint(BI->second);
+  // Visit original BBs in depth-first preorder, starting with the
+  // entry block, cloning all instructions and terminators.
+  //
+  // NextIter is initialized during `fixUp`.
+  cloneFunctionBody(getCalleeFunction(), callerBB, entryArgs);
 
-    // Coroutine terminators need special handling.
-    if (BeginApply) {
-      if (BeginApply->processTerminator(
-            BI->first->getTerminator(), ReturnToBB,
+  // As a trivial optimization, if the apply block falls through, merge it. The
+  // fall through is likely the ReturnToBB, but that is not guaranteed.
+  if (auto *BI = dyn_cast<BranchInst>(callerBB->getTerminator())) {
+    // FIXME: should be an assert once critical edges are fixed.
+    // assert(BI->getDestBB()->getSinglePredecessorBlock() &&
+    //       "the return block cannot have other predecessors.");
+    if (BI->getDestBB()->getSinglePredecessorBlock()) {
+      SILInstruction *firstInlinedInst = &*NextIter;
+      if (firstInlinedInst == BI)
+        firstInlinedInst = &BI->getDestBB()->front();
+
+      mergeBasicBlockWithSuccessor(BI->getParent(), /*DT*/ nullptr,
+                                   /*LI*/ nullptr);
+      NextIter = firstInlinedInst->getIterator();
+      ReturnToBB = nullptr;
+    }
+  }
+  return NextIter;
+}
+
+void SILInlineCloner::visitTerminator(SILBasicBlock *BB) {
+  // Coroutine terminators need special handling.
+  if (BeginApply) {
+    if (BeginApply->processTerminator(
+            BB->getTerminator(), ReturnToBB,
             [=](SILBasicBlock *Block) -> SILBasicBlock * {
               return this->remapBasicBlock(Block);
             },
-            [=](SILValue Val) -> SILValue {
-              return this->remapValue(Val);
-            }))
-        continue;
-    }
+            [=](SILValue Val) -> SILValue { return this->remapValue(Val); }))
+      return;
+  }
 
-    // Modify return terminators to branch to the return-to BB, rather than
-    // trying to clone the ReturnInst.
-    if (auto *RI = dyn_cast<ReturnInst>(BI->first->getTerminator())) {
-      auto thrownValue = remapValue(RI->getOperand());
-      getBuilder().createBranch(Loc.getValue(), ReturnToBB,
-                                thrownValue);
-      continue;
-    }
+  // Modify return terminators to branch to the return-to BB, rather than
+  // trying to clone the ReturnInst.
+  if (auto *RI = dyn_cast<ReturnInst>(BB->getTerminator())) {
+    auto returnedValue = remapValue(RI->getOperand());
+    getBuilder().createBranch(Loc.getValue(), ReturnToBB, returnedValue);
+    return;
+  }
 
-    // Modify throw terminators to branch to the error-return BB, rather than
-    // trying to clone the ThrowInst.
-    if (auto *TI = dyn_cast<ThrowInst>(BI->first->getTerminator())) {
-      auto tryAI = dyn_cast<TryApplyInst>(AI);
-      if (!tryAI) {
-        assert((isa<ApplyInst>(AI)
-                  ? cast<ApplyInst>(AI)->isNonThrowing()
-                  : cast<BeginApplyInst>(AI)->isNonThrowing()) &&
-               "apply of a function with error result must be non-throwing");
-        getBuilder().createUnreachable(Loc.getValue());
-        continue;
-      }
-
+  // Modify throw terminators to branch to the error-return BB, rather than
+  // trying to clone the ThrowInst.
+  if (auto *TI = dyn_cast<ThrowInst>(BB->getTerminator())) {
+    switch (Apply.getKind()) {
+    case FullApplySiteKind::ApplyInst:
+      assert(cast<ApplyInst>(Apply)->isNonThrowing()
+             && "apply of a function with error result must be non-throwing");
+      getBuilder().createUnreachable(Loc.getValue());
+      return;
+    case FullApplySiteKind::BeginApplyInst:
+      assert(cast<BeginApplyInst>(Apply)->isNonThrowing()
+             && "apply of a function with error result must be non-throwing");
+      getBuilder().createUnreachable(Loc.getValue());
+      return;
+    case FullApplySiteKind::TryApplyInst:
+      auto tryAI = cast<TryApplyInst>(Apply);
       auto returnedValue = remapValue(TI->getOperand());
       getBuilder().createBranch(Loc.getValue(), tryAI->getErrorBB(),
                                 returnedValue);
-      continue;
+      return;
     }
-
-    // Otherwise use normal visitor, which clones the existing instruction
-    // but remaps basic blocks and values.
-    visit(BI->first->getTerminator());
   }
-
-  // Clean up after inlining into a begin_apply.
-  if (BeginApply)
-    BeginApply->complete();
+  // Otherwise use normal visitor, which clones the existing instruction
+  // but remaps basic blocks and values.
+  visit(BB->getTerminator());
 }
 
-SILValue SILInliner::borrowFunctionArgument(SILValue callArg,
-                                            FullApplySite AI) {
+void SILInlineCloner::fixUp(SILFunction *calleeFunction) {
+  // "Completing" the BeginApply only fixes the end of the apply scope. The
+  // begin_apply itself lingers.
+  if (BeginApply)
+    BeginApply->complete();
+
+  NextIter = std::next(Apply.getInstruction()->getIterator());
+
+  assert(!Apply.getInstruction()->hasUsesOfAnyResult());
+
+  auto deleteCallback = [this](SILInstruction *deletedI) {
+    if (DeletionCallback)
+      DeletionCallback(deletedI);
+  };
+  NextIter = recursivelyDeleteTriviallyDeadInstructions(Apply.getInstruction(),
+                                                        true, deleteCallback);
+}
+
+SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
+                                                 FullApplySite AI) {
   if (!AI.getFunction()->hasQualifiedOwnership()
       || callArg.getOwnershipKind() != ValueOwnershipKind::Owned) {
     return callArg;
@@ -436,23 +548,23 @@ SILValue SILInliner::borrowFunctionArgument(SILValue callArg,
   return borrow;
 }
 
-void SILInliner::visitDebugValueInst(DebugValueInst *Inst) {
+void SILInlineCloner::visitDebugValueInst(DebugValueInst *Inst) {
   // The mandatory inliner drops debug_value instructions when inlining, as if
   // it were a "nodebug" function in C.
   if (IKind == InlineKind::MandatoryInline) return;
 
-  return SILCloner<SILInliner>::visitDebugValueInst(Inst);
+  return SILCloner<SILInlineCloner>::visitDebugValueInst(Inst);
 }
-void SILInliner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
+void SILInlineCloner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
   // The mandatory inliner drops debug_value_addr instructions when inlining, as
   // if it were a "nodebug" function in C.
   if (IKind == InlineKind::MandatoryInline) return;
 
-  return SILCloner<SILInliner>::visitDebugValueAddrInst(Inst);
+  return SILCloner<SILInlineCloner>::visitDebugValueAddrInst(Inst);
 }
 
 const SILDebugScope *
-SILInliner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
+SILInlineCloner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
   if (!CalleeScope)
     return CallSiteScope;
   auto it = InlinedScopeCache.find(CalleeScope);
@@ -467,7 +579,7 @@ SILInliner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
   if (ParentFunction)
     ParentFunction = remapParentFunction(
         FuncBuilder, M, ParentFunction, SubsMap,
-        CalleeFunction->getLoweredFunctionType()->getGenericSignature(),
+        getCalleeFunction()->getLoweredFunctionType()->getGenericSignature(),
         ForInlining);
 
   auto *ParentScope = CalleeScope->Parent.dyn_cast<const SILDebugScope *>();
@@ -504,10 +616,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::DebugValueInst:
   case SILInstructionKind::DebugValueAddrInst:
   case SILInstructionKind::StringLiteralInst:
-  case SILInstructionKind::ConstStringLiteralInst:
   case SILInstructionKind::FixLifetimeInst:
   case SILInstructionKind::EndBorrowInst:
-  case SILInstructionKind::EndBorrowArgumentInst:
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::FunctionRefInst:
@@ -681,11 +791,9 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::RefTailAddrInst:
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::StoreBorrowInst:
-  case SILInstructionKind::StrongPinInst:
   case SILInstructionKind::StrongReleaseInst:
   case SILInstructionKind::SetDeallocatingInst:
   case SILInstructionKind::StrongRetainInst:
-  case SILInstructionKind::StrongUnpinInst:
   case SILInstructionKind::SuperMethodInst:
   case SILInstructionKind::ObjCSuperMethodInst:
   case SILInstructionKind::SwitchEnumAddrInst:
@@ -698,7 +806,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::UnconditionalCheckedCastValueInst:
   case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueInst:
-  case SILInstructionKind::IsUniqueOrPinnedInst:
   case SILInstructionKind::InitBlockStorageHeaderInst:
   case SILInstructionKind::SelectEnumAddrInst:
   case SILInstructionKind::SelectEnumInst:

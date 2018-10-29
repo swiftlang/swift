@@ -33,6 +33,6 @@ add_subdirectory(Transforms)
 add_subdirectory(UtilityPasses)
 add_subdirectory(Utils)
 
-add_swift_library(swiftSILOptimizer STATIC
+add_swift_host_library(swiftSILOptimizer STATIC
   ${SILOPTIMIZER_SOURCES}
   LINK_LIBRARIES swiftSIL)

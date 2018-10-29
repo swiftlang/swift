@@ -1,19 +1,21 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -verify %s
 sil_stage canonical
 
+typealias Void = ()
+
 struct Empty<T> {}
 
 enum SinglePayload<T> {
   case A(T)
-  case B()
+  case B(Void)
   case C(Empty<T>)
 }
 
 enum MultiPayload<T, U> {
   case A(T)
   case B(U)
-  case C()
-  case D()
+  case C(Void)
+  case D(Void)
   case E(Empty<T>)
   case F(Empty<U>)
 }

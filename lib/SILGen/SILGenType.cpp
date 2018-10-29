@@ -622,7 +622,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // looking for the conformance of 'Self'.
   if (reqtSubMap) {
     auto requirement = conformance.getRequirement();
-    auto self = requirement->getProtocolSelfType()->getCanonicalType();
+    auto self = requirement->getSelfInterfaceType()->getCanonicalType();
 
     conformance = *reqtSubMap.lookupConformance(self, requirement);
   }
@@ -640,13 +640,28 @@ SILFunction *SILGenModule::emitProtocolWitness(
                                        reqtOrigTy->getExtInfo());
   }
 
+  // Coroutine lowering requires us to provide these substitutions
+  // in order to recreate the appropriate yield types for the accessor
+  // because they aren't reflected in the accessor's AST type.
+  // But this is expensive, so we only do it for coroutine lowering.
+  // When they're part of the AST function type, we can remove this
+  // parameter completely.
+  Optional<SubstitutionMap> witnessSubsForTypeLowering;
+  if (auto accessor = dyn_cast<AccessorDecl>(requirement.getDecl())) {
+    if (accessor->isCoroutine()) {
+      witnessSubsForTypeLowering =
+        witness.getSubstitutions().mapReplacementTypesOutOfContext();
+    }
+  }
+
   // FIXME: this needs to pull out the conformances/witness-tables for any
   // conditional requirements from the witness table and pass them to the
   // underlying function in the thunk.
 
   // Lower the witness thunk type with the requirement's abstraction level.
   auto witnessSILFnType = getNativeSILFunctionType(
-      M, AbstractionPattern(reqtOrigTy), reqtSubstTy, witnessRef, conformance);
+      M, AbstractionPattern(reqtOrigTy), reqtSubstTy,
+      requirement, witnessRef, witnessSubsForTypeLowering, conformance);
 
   // Mangle the name of the witness thunk.
   Mangle::ASTMangler NewMangler;
@@ -683,31 +698,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // archetypes of the witness thunk generic environment.
   auto witnessSubs = witness.getSubstitutions();
 
-  // Open-code protocol witness thunks for materializeForSet.
-  if (auto witnessFn = dyn_cast<AccessorDecl>(witnessRef.getDecl())) {
-    if (witnessFn->isMaterializeForSet()) {
-      assert(!isFree);
-
-      auto *proto = cast<ProtocolDecl>(requirement.getDecl()->getDeclContext());
-      auto selfInterfaceType = proto->getSelfInterfaceType().subst(reqtSubMap);
-      auto selfType = GenericEnvironment::mapTypeIntoContext(
-          genericEnv, selfInterfaceType);
-
-      auto reqFn = cast<AccessorDecl>(requirement.getDecl());
-      assert(reqFn->isMaterializeForSet());
-
-      if (SGF.maybeEmitMaterializeForSetThunk(conformance, linkage,
-                                              selfInterfaceType, selfType,
-                                              genericEnv, reqFn, witnessFn,
-                                              witnessSubs))
-        return f;
-
-      // Proceed down the normal path.
-    }
-  }
-
   SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
-                          requirement, witnessRef,
+                          requirement, reqtSubMap, witnessRef,
                           witnessSubs, isFree);
 
   return f;
@@ -760,17 +752,36 @@ public:
     SILFunction *witnessFn = SGM.emitProtocolWitness(
         ProtocolConformanceRef(Proto), SILLinkage::Private, IsNotSerialized,
         requirementRef, witnessRef, isFree, witness);
-    auto entry = SILDefaultWitnessTable::Entry(requirementRef, witnessFn);
+    auto entry = SILWitnessTable::MethodWitness{requirementRef, witnessFn};
     DefaultWitnesses.push_back(entry);
   }
 
   void addAssociatedType(AssociatedType req) {
-    // Add a dummy entry for the metatype itself.
-    addMissingDefault();
+    Type witness = Proto->getDefaultTypeWitness(req.getAssociation());
+    if (!witness)
+      return addMissingDefault();
+
+    Type witnessInContext = Proto->mapTypeIntoContext(witness);
+    auto entry = SILWitnessTable::AssociatedTypeWitness{
+                                          req.getAssociation(),
+                                          witnessInContext->getCanonicalType()};
+    DefaultWitnesses.push_back(entry);
   }
 
   void addAssociatedConformance(const AssociatedConformance &req) {
-    addMissingDefault();
+    auto witness =
+        Proto->getDefaultAssociatedConformanceWitness(
+          req.getAssociation(),
+          req.getAssociatedRequirement());
+    if (!witness)
+      return addMissingDefault();
+
+    auto entry =
+        SILWitnessTable::AssociatedTypeProtocolWitness{
+          req.getAssociation(),
+          req.getAssociatedRequirement(),
+          *witness};
+    DefaultWitnesses.push_back(entry);
   }
 };
 

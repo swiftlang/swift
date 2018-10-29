@@ -1,11 +1,20 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Process.h"
 #include "gtest/gtest.h"
+
+#if __has_include(<sys/mman.h>)
+# include <sys/mman.h>
+# define HAS_MMAP 1
+#else
+# define HAS_MMAP 0
+#endif
 
 using namespace swift;
 using namespace llvm;
@@ -635,6 +644,29 @@ TEST_F(LexerTest, getLocForStartOfToken) {
   }
 }
 
+TEST_F(LexerTest, getLocForStartOfTokenWithCustomSourceLocation) {
+  const char *Source =
+      "aaa \n"
+      // This next line is exactly 50 bytes to make it easy to compare with the
+      // previous test.
+      "#sourceLocation(file: \"custom-50.swuft\", line: 9)\n"
+      " \tbbb \"hello\" \"-\\(val)-\"";
+
+  unsigned BufferID = SourceMgr.addMemBufferCopy(Source);
+
+  // First is character offset, second is its token offset.
+  unsigned Offs[][2] =
+    { {1, 0}, {2, 0}, {3, 3}, {4, 4},
+      {56, 56}, {59, 57}, {64, 61},
+      // interpolated string
+      {70, 69}, {73, 73}, {74, 73}, {75, 73}, {76, 76}, {77, 69} };
+
+  for (auto Pair : Offs) {
+    ASSERT_EQ(Lexer::getLocForStartOfToken(SourceMgr, BufferID, Pair[0]),
+              SourceMgr.getLocForOffset(BufferID, Pair[1]));
+  }
+}
+
 TEST_F(LexerTest, NestedSubLexers) {
   const char *Source = "aaa0 bbb1 ccc2 ddd3 eee4 fff5 ggg6";
 
@@ -783,3 +815,37 @@ TEST_F(LexerTest, DiagnoseEmbeddedNulOffset) {
   ASSERT_FALSE(containsPrefix(
       DiagConsumer.messages, "1, 4: nul character embedded in middle of file"));
 }
+
+#if HAS_MMAP
+
+// This test requires mmap because llvm::sys::Memory doesn't support protecting
+// pages to have no permissions.
+TEST_F(LexerTest, EncodedStringSegmentPastTheEnd) {
+  size_t PageSize = llvm::sys::Process::getPageSize();
+
+  void *FirstPage = mmap(/*addr*/nullptr, PageSize * 2, PROT_NONE,
+                         MAP_PRIVATE | MAP_ANON, /*fd*/-1, /*offset*/0);
+  SWIFT_DEFER { (void)munmap(FirstPage, PageSize * 2); };
+  ASSERT_NE(FirstPage, MAP_FAILED);
+  int ProtectResult = mprotect(FirstPage, PageSize, PROT_READ | PROT_WRITE);
+  ASSERT_EQ(ProtectResult, 0);
+
+  auto check = [FirstPage, PageSize](StringRef Input, StringRef Expected) {
+    char *StartPtr = static_cast<char *>(FirstPage) + PageSize - Input.size();
+    memcpy(StartPtr, Input.data(), Input.size());
+
+    SmallString<64> Buffer;
+    StringRef Escaped = Lexer::getEncodedStringSegment({StartPtr, Input.size()},
+                                                       Buffer);
+    EXPECT_EQ(Escaped, Expected);
+  };
+
+  check("needs escaping\\r",
+        "needs escaping\r");
+  check("does not need escaping",
+        "does not need escaping");
+  check("invalid escape at the end \\",
+        "invalid escape at the end ");
+}
+
+#endif // HAS_MMAP

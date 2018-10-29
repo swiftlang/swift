@@ -601,3 +601,11 @@ func test3() {
     _ = b
   }
 }
+
+// rdar://problem/22587551
+class ShadowingGenericParameter<T> {
+  typealias T = Int
+  func foo (t : T) {}
+}
+
+_ = ShadowingGenericParameter<String>().foo(t: "hi")

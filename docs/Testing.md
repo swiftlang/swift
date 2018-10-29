@@ -126,6 +126,9 @@ out with ``lit.py -h``. We document some of the more useful ones below:
 * ``--param remote_run_identity=<FILE>`` provides an SSH private key to be used
   when testing with `remote_run_host`. (`remote-run` does not support
   passwords.)
+* ``--param remote_run_extra_args="ARG1 ARG2 ..."`` provides a list of extra
+  arguments to pass to `remote-run`. (This can be used with `remote-run`'s `-o`
+  option to pass extra options to SSH.)
 * ``--param remote_run_skip_upload_stdlib`` assumes that the standard library
   binaries have already been uploaded to `remote_run_tmpdir` and are up to date.
   This is meant for repeat runs and probably shouldn't be used in automation.
@@ -307,6 +310,9 @@ code for the target that is not the build machine:
 
 * ``%target-os``: the target operating system (``macosx``, ``darwin``,
   ``linux``, ``freebsd``, ``windows-cygnus``, ``windows-gnu``).
+
+* ``%target-is-simulator``: ``true`` if the target is a simulator (iOS,
+  watchOS, tvOS), otherwise ``false``.
 
 * ``%target-object-format``: the platform's object format (``elf``, ``macho``,
   ``coff``).

@@ -203,8 +203,7 @@ static bool tryExtendLifetimeToLastUse(
   // Handle an apply.
   if (auto SingleApplyUser = FullApplySite::isa(SingleUser)) {
     // FIXME: Don't know how-to handle begin_apply/end_apply yet.
-    if (auto *Begin =
-            dyn_cast<BeginApplyInst>(SingleApplyUser.getInstruction())) {
+    if (isa<BeginApplyInst>(SingleApplyUser.getInstruction())) {
       return false;
     }
 
@@ -460,10 +459,12 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *CB) {
 
   for (auto LifetimeEndPoint : LifetimeEndPoints) {
     SILBuilderWithScope B(LifetimeEndPoint);
-    auto IsEscaping =
-        B.createIsEscapingClosure(Loc, B.createLoadBorrow(generatedLoc, Slot),
-                                  IsEscapingClosureInst::ObjCEscaping);
-    B.createCondFail(Loc, IsEscaping);
+    SILValue isEscaping;
+    B.emitScopedBorrowOperation(generatedLoc, Slot, [&](SILValue value) {
+      isEscaping = B.createIsEscapingClosure(
+          Loc, value, IsEscapingClosureInst::ObjCEscaping);
+    });
+    B.createCondFail(Loc, isEscaping);
     B.createDestroyAddr(generatedLoc, Slot);
     // Store None to it.
     B.createStore(generatedLoc,

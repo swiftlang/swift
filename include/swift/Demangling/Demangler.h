@@ -280,6 +280,17 @@ public:
   }
 };
 
+/// Kinds of symbolic reference supported.
+enum class SymbolicReferenceKind : uint8_t {
+  /// A symbolic reference to a context descriptor, representing the
+  /// (unapplied generic) context.
+  Context,  
+};
+
+using SymbolicReferenceResolver_t = NodePointer (SymbolicReferenceKind,
+                                                 Directness,
+                                                 int32_t, const void *);
+
 /// The demangler.
 ///
 /// It de-mangles a string and it also owns the returned node-tree. This means
@@ -296,13 +307,12 @@ protected:
 
   Vector<NodePointer> NodeStack;
   Vector<NodePointer> Substitutions;
-  Vector<unsigned> PendingSubstitutions;
 
   static const int MaxNumWords = 26;
   StringRef Words[MaxNumWords];
   int NumWords = 0;
   
-  std::function<NodePointer (int32_t, const void *)> SymbolicReferenceResolver;
+  std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver;
 
   bool nextIf(StringRef str) {
     if (!Text.substr(Pos).startswith(str)) return false;
@@ -473,7 +483,8 @@ protected:
 
   NodePointer demangleObjCTypeName();
   NodePointer demangleTypeMangling();
-  NodePointer demangleSymbolicReference(const void *at);
+  NodePointer demangleSymbolicReference(unsigned char rawKind,
+                                        const void *at);
 
   void dump();
 
@@ -484,7 +495,7 @@ public:
 
   /// Install a resolver for symbolic references in a mangled string.
   void setSymbolicReferenceResolver(
-                  std::function<NodePointer (int32_t, const void*)> resolver) {
+                          std::function<SymbolicReferenceResolver_t> resolver) {
     SymbolicReferenceResolver = resolver;
   }
   

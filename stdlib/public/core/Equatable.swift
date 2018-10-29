@@ -188,6 +188,8 @@ extension Equatable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
+  // transparent because sometimes types that use this generate compile-time
+  // warnings, e.g. that an expression always evaluates to true
   @_transparent
   public static func != (lhs: Self, rhs: Self) -> Bool {
     return !(lhs == rhs)
@@ -244,7 +246,7 @@ extension Equatable {
 /// - Parameters:
 ///   - lhs: A reference to compare.
 ///   - rhs: Another reference to compare.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
@@ -266,7 +268,7 @@ public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
 /// - Parameters:
 ///   - lhs: A reference to compare.
 ///   - rhs: Another reference to compare.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   return !(lhs === rhs)
 }

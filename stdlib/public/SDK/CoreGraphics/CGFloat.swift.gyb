@@ -56,13 +56,6 @@ public struct CGFloat {
     self.native = value.native
   }
 
-% for src_ty in all_integer_types(word_bits):
-  @_transparent public init(_ value: ${src_ty.stdlib_name}) {
-    self.native = NativeType(value)
-  }
-
-% end
-
   /// The native value.
   public var native: NativeType
 }
@@ -214,22 +207,22 @@ extension CGFloat : BinaryFloatingPoint {
   }
 
   @_transparent
-  public static func +=(_ lhs: inout CGFloat, _ rhs: CGFloat) {
+  public static func +=(lhs: inout CGFloat, rhs: CGFloat) {
     lhs.native += rhs.native
   }
 
   @_transparent
-  public static func -=(_ lhs: inout CGFloat, _ rhs: CGFloat) {
+  public static func -=(lhs: inout CGFloat, rhs: CGFloat) {
     lhs.native -= rhs.native
   }
 
   @_transparent
-  public static func *=(_ lhs: inout CGFloat, _ rhs: CGFloat) {
+  public static func *=(lhs: inout CGFloat, rhs: CGFloat) {
     lhs.native *= rhs.native
   }
 
   @_transparent
-  public static func /=(_ lhs: inout CGFloat, _ rhs: CGFloat) {
+  public static func /=(lhs: inout CGFloat, rhs: CGFloat) {
     lhs.native /= rhs.native
   }
 
@@ -575,7 +568,7 @@ public func remquo(_ x: CGFloat, _ y: CGFloat) -> (CGFloat, Int) {
   return (CGFloat(rem), quo)
 }
 
-@available(*, deprecated: 4.2, message:
+@available(swift, deprecated: 4.2, message:
            "use CGFloat(nan: CGFloat.RawSignificand) instead.")
 @_transparent
 public func nan(_ tag: String) -> CGFloat {

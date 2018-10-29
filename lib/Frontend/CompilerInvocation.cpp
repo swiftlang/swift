@@ -59,7 +59,11 @@ void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
 }
 
 void CompilerInvocation::setTargetTriple(StringRef Triple) {
-  LangOpts.setTarget(llvm::Triple(Triple));
+  setTargetTriple(llvm::Triple(Triple));
+}
+
+void CompilerInvocation::setTargetTriple(const llvm::Triple &Triple) {
+  LangOpts.setTarget(Triple);
   updateRuntimeLibraryPath(SearchPathOpts, LangOpts.Target);
 }
 
@@ -126,6 +130,50 @@ generateOptimizationRemarkRegex(DiagnosticEngine &Diags, ArgList &Args,
   return Pattern;
 }
 
+// Lifted from the clang driver.
+static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
+  const bool Escape = std::strpbrk(Arg, "\"\\$ ");
+
+  if (!TempDir.empty() && StringRef(Arg).startswith(TempDir)) {
+    // Don't write temporary file names in the debug info. This would prevent
+    // incremental llvm compilation because we would generate different IR on
+    // every compiler invocation.
+    Arg = "<temporary-file>";
+  }
+
+  if (!Escape) {
+    OS << Arg;
+    return;
+  }
+
+  // Quote and escape. This isn't really complete, but good enough.
+  OS << '"';
+  while (const char c = *Arg++) {
+    if (c == '"' || c == '\\' || c == '$')
+      OS << '\\';
+    OS << c;
+  }
+  OS << '"';
+}
+
+/// Save a copy of any flags marked as ParseableInterfaceOption, if running
+/// in a mode that is going to emit a .swiftinterface file.
+static void SaveParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
+                                       ArgList &Args, DiagnosticEngine &Diags) {
+  if (!Args.hasArg(options::OPT_emit_interface_path) &&
+      !Args.hasArg(options::OPT_emit_parseable_module_interface_path))
+    return;
+  ArgStringList RenderedArgs;
+  for (auto A : Args) {
+    if (A->getOption().hasFlag(options::ParseableInterfaceOption))
+      A->render(Args, RenderedArgs);
+  }
+  llvm::raw_string_ostream OS(Opts.ParseableInterfaceFlags);
+  interleave(RenderedArgs,
+             [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
+             [&] { OS << " "; });
+}
+
 static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           DiagnosticEngine &Diags,
                           const FrontendOptions &FrontendOpts) {
@@ -160,6 +208,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableExperimentalPropertyBehaviors |=
     Args.hasArg(OPT_enable_experimental_property_behaviors);
+
+  Opts.EnableOperatorDesignatedTypes |=
+      Args.hasArg(OPT_enable_operator_designated_types);
+
+  Opts.SolverEnableOperatorDesignatedTypes |=
+      Args.hasArg(OPT_solver_enable_operator_designated_types);
 
   if (auto A = Args.getLastArg(OPT_enable_deserialization_recovery,
                                OPT_disable_deserialization_recovery)) {
@@ -259,6 +313,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EvaluatorCycleDiagnostics = CycleDiagnosticKind::DebugDiagnose;
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_output_request_graphviz)) {
+    Opts.RequestEvaluatorGraphVizPath = A->getValue();
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_solver_memory_threshold)) {
     unsigned threshold;
     if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
@@ -281,7 +339,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.SolverShrinkUnsolvedThreshold = threshold;
   }
 
-  if (const Arg *A = Args.getLastArg(OPT_solver_disable_shrink))
+  if (Args.getLastArg(OPT_solver_disable_shrink))
     Opts.SolverDisableShrink = true;
 
   if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
@@ -316,6 +374,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         Opts.WarnSwift3ObjCInference = Swift3ObjCInferenceWarnings::Complete;
     }
   }
+
+  Opts.WarnImplicitOverrides =
+    Args.hasArg(OPT_warn_implicit_overrides);
 
   Opts.EnableNSKeyedArchiverDiagnostics =
       Args.hasFlag(OPT_enable_nskeyedarchiver_diagnostics,
@@ -515,32 +576,6 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   return false;
 }
 
-// Lifted from the clang driver.
-static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
-  const bool Escape = std::strpbrk(Arg, "\"\\$ ");
-
-  if (StringRef(Arg).startswith(TempDir)) {
-    // Don't write temporary file names in the debug info. This would prevent
-    // incremental llvm compilation because we would generate different IR on
-    // every compiler invocation.
-    Arg = "<temporary-file>";
-  }
-
-  if (!Escape) {
-    OS << Arg;
-    return;
-  }
-
-  // Quote and escape. This isn't really complete, but good enough.
-  OS << '"';
-  while (const char c = *Arg++) {
-    if (c == '"' || c == '\\' || c == '$')
-      OS << '\\';
-    OS << c;
-  }
-  OS << '"';
-}
-
 /// Parse -enforce-exclusivity=... options
 void parseExclusivityEnforcementOptions(const llvm::opt::Arg *A,
                                         SILOptions &Opts,
@@ -598,14 +633,22 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       return true;
     }
   }
+  if (Args.hasArg(OPT_sil_existential_specializer)) {
+    Opts.ExistentialSpecializer = true;
+  }
   if (const Arg *A = Args.getLastArg(OPT_num_threads)) {
     if (StringRef(A->getValue()).getAsInteger(10, Opts.NumThreads)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
       return true;
     }
+    if (environmentVariableRequestedMaximumDeterminism()) {
+      Opts.NumThreads = 1;
+      Diags.diagnose(SourceLoc(), diag::remark_max_determinism_overriding,
+                     "-num-threads");
+    }
   }
-  
+
   if (Args.hasArg(OPT_sil_merge_partial_modules))
     Opts.MergePartialModules = true;
 
@@ -1002,6 +1045,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.EnableResilienceBypass = true;
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_read_type_info_path_EQ)) {
+    Opts.ReadTypeInfoPath = A->getValue();
+  }
+
   for (const auto &Lib : Args.getAllArgValues(options::OPT_autolink_library))
     Opts.LinkLibraries.push_back(LinkLibrary(Lib, LibraryKind::Library));
 
@@ -1022,9 +1069,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   return false;
 }
 
-static std::string getScriptFileName(StringRef name, bool isSwiftVersion3) {
-  StringRef langVer = isSwiftVersion3 ? "3" : "4";
-  return (Twine(name) + langVer + ".json").str();
+static std::string getScriptFileName(StringRef name) {
+  return (Twine(name) + "4" + ".json").str();
 }
 
 static bool ParseMigratorArgs(MigratorOptions &Opts,
@@ -1057,7 +1103,6 @@ static bool ParseMigratorArgs(MigratorOptions &Opts,
     Opts.APIDigesterDataStorePaths.push_back(DataPath->getValue());
   } else {
     auto &Triple = LangOpts.Target;
-    bool isSwiftVersion3 = LangOpts.isSwiftVersion3();
 
     llvm::SmallString<128> basePath;
     if (auto DataDir = Args.getLastArg(OPT_api_diff_data_dir)) {
@@ -1071,23 +1116,18 @@ static bool ParseMigratorArgs(MigratorOptions &Opts,
     llvm::SmallString<128> dataPath(basePath);
 
     if (Triple.isMacOSX())
-      llvm::sys::path::append(dataPath,
-                              getScriptFileName("macos", isSwiftVersion3));
+      llvm::sys::path::append(dataPath, getScriptFileName("macos"));
     else if (Triple.isiOS())
-      llvm::sys::path::append(dataPath,
-                              getScriptFileName("ios", isSwiftVersion3));
+      llvm::sys::path::append(dataPath, getScriptFileName("ios"));
     else if (Triple.isTvOS())
-      llvm::sys::path::append(dataPath,
-                              getScriptFileName("tvos", isSwiftVersion3));
+      llvm::sys::path::append(dataPath, getScriptFileName("tvos"));
     else if (Triple.isWatchOS())
-      llvm::sys::path::append(dataPath,
-                              getScriptFileName("watchos", isSwiftVersion3));
+      llvm::sys::path::append(dataPath, getScriptFileName("watchos"));
     else
       Supported = false;
     if (Supported) {
       llvm::SmallString<128> authoredDataPath(basePath);
-      llvm::sys::path::append(authoredDataPath,
-                              getScriptFileName("overlay", isSwiftVersion3));
+      llvm::sys::path::append(authoredDataPath, getScriptFileName("overlay"));
       // Add authored list first to take higher priority.
       Opts.APIDigesterDataStorePaths.push_back(authoredDataPath.str());
       Opts.APIDigesterDataStorePaths.push_back(dataPath.str());
@@ -1146,6 +1186,8 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
+  SaveParseableInterfaceArgs(ParseableInterfaceOpts, ParsedArgs, Diags);
+
   if (ParseFrontendArgs(FrontendOpts, ParsedArgs, Diags,
                         ConfigurationFileBuffers)) {
     return true;
@@ -1203,6 +1245,7 @@ CompilerInvocation::loadFromSerializedAST(StringRef data) {
   if (info.status != serialization::Status::Valid)
     return info.status;
 
+  LangOpts.EffectiveLanguageVersion = info.compatibilityVersion;
   setTargetTriple(info.targetTriple);
   if (!extendedInfo.getSDKPath().empty())
     setSDKPath(extendedInfo.getSDKPath());

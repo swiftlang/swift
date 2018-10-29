@@ -49,9 +49,11 @@ bool swift::shouldDiagnoseObjCReason(ObjCReason reason, ASTContext &ctx) {
 
   case ObjCReason::MemberOfObjCSubclass:
   case ObjCReason::MemberOfObjCMembersClass:
+  case ObjCReason::ElementOfObjCEnum:
   case ObjCReason::Accessor:
     return false;
   }
+  llvm_unreachable("unhandled reason");
 }
 
 unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
@@ -73,9 +75,11 @@ unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
 
   case ObjCReason::MemberOfObjCSubclass:
   case ObjCReason::MemberOfObjCMembersClass:
+  case ObjCReason::ElementOfObjCEnum:
   case ObjCReason::Accessor:
     llvm_unreachable("should not diagnose this @objc reason");
   }
+  llvm_unreachable("unhandled reason");
 }
 
 /// Emit an additional diagnostic describing why we are applying @objc to the
@@ -474,10 +478,6 @@ bool swift::isRepresentableInObjC(
     case AccessorKind::Set:
       return true;
 
-    case AccessorKind::MaterializeForSet:
-      // materializeForSet is synthesized, so never complain about it
-      return false;
-
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
       if (Diagnose) {
@@ -759,6 +759,11 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   if (!VD->hasInterfaceType()) {
     VD->getASTContext().getLazyResolver()->resolveDeclSignature(
                                               const_cast<VarDecl *>(VD));
+    if (!VD->hasInterfaceType()) {
+      VD->diagnose(diag::recursive_type_reference, VD->getDescriptiveKind(),
+                   VD->getName());
+      return false;
+    }
   }
 
   Type T = VD->getDeclContext()->mapTypeIntoContext(VD->getInterfaceType());
@@ -819,7 +824,7 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   if (SubscriptType->getParams().size() != 1)
     return false;
 
-  Type IndicesType = SubscriptType->getParams()[0].getType();
+  Type IndicesType = SubscriptType->getParams()[0].getOldType();
   if (IndicesType->hasError())
     return false;
 
@@ -967,7 +972,7 @@ void swift::checkBridgedFunctions(ASTContext &ctx) {
   }
 }
 
-#pragma mark @objc declaration handling
+#pragma mark "@objc declaration handling"
 
 /// Whether this declaration is a member of a class extension marked @objc.
 static bool isMemberOfObjCClassExtension(const ValueDecl *VD) {
@@ -1039,7 +1044,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   }
 
   // Destructors are always @objc, with -dealloc as their entry point.
-  if (auto deinit = dyn_cast<DestructorDecl>(VD))
+  if (isa<DestructorDecl>(VD))
     return ObjCReason(ObjCReason::ImplicitlyObjC);
 
   ProtocolDecl *protocolContext =
@@ -1273,6 +1278,14 @@ IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     // as an arithmetic type in C.
     if (isEnumObjC(enumDecl))
       isObjC = ObjCReason(ObjCReason::ExplicitlyObjC);
+  } else if (auto enumElement = dyn_cast<EnumElementDecl>(VD)) {
+    // Enum elements can be @objc so long as the containing enum is @objc.
+    if (enumElement->getParentEnum()->isObjC()) {
+      if (enumElement->getAttrs().hasAttribute<ObjCAttr>())
+        isObjC = ObjCReason::ExplicitlyObjC;
+      else
+        isObjC = ObjCReason::ElementOfObjCEnum;
+    }
   } else if (auto proto = dyn_cast<ProtocolDecl>(VD)) {
     if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
       isObjC = ObjCReason(ObjCReason::ExplicitlyObjC);
@@ -1358,9 +1371,9 @@ IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
 }
 
 /// Infer the Objective-C name for a given declaration.
-static void inferObjCName(ValueDecl *decl) {
-  if (isa<DestructorDecl>(decl))
-    return;
+static ObjCSelector inferObjCName(ValueDecl *decl) {
+  if (auto destructor = dyn_cast<DestructorDecl>(decl))
+    return destructor->getObjCSelector();
 
   auto attr = decl->getAttrs().getAttribute<ObjCAttr>();
 
@@ -1410,7 +1423,7 @@ static void inferObjCName(ValueDecl *decl) {
           // Override the name on the attribute.
           setObjCName(overriddenSelector);
         }
-        return;
+        return overriddenSelector;
       }
 
       // Handle properties.
@@ -1441,14 +1454,15 @@ static void inferObjCName(ValueDecl *decl) {
         if (shouldFixName) {
           setObjCName(overriddenNameAsSel);
         }
-        return;
+        return overriddenNameAsSel;
       }
     }
   }
 
   // If the decl already has a name, do nothing; the protocol conformance
   // checker will handle any mismatches.
-  if (attr && attr->hasName()) return;
+  if (attr && attr->hasName())
+    return *attr->getName();
 
   // When no override determined the Objective-C name, look for
   // requirements for which this declaration is a witness.
@@ -1492,7 +1506,10 @@ static void inferObjCName(ValueDecl *decl) {
   // If we have a name, install it via an @objc attribute.
   if (requirementObjCName) {
     setObjCName(*requirementObjCName);
+    return *requirementObjCName;
   }
+
+  return *decl->getObjCRuntimeName(true);
 }
 
 /// Mark the given declaration as being Objective-C compatible (or
@@ -1521,94 +1538,83 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
     ctx.getLazyResolver()->resolveDeclSignature(D);
   }
 
-  if (!isa<AccessorDecl>(D) && !isa<TypeDecl>(D)) {
-    useObjectiveCBridgeableConformances(D->getInnermostDeclContext(),
-                                        D->getInterfaceType());
+  if (!isa<TypeDecl>(D) && !isa<AccessorDecl>(D) && !isa<EnumElementDecl>(D)) {
+    if (ctx.getLazyResolver()) {
+      // Only record conformances when we have a lazy resolver.
+      useObjectiveCBridgeableConformances(D->getInnermostDeclContext(),
+                                          D->getInterfaceType());
+    }
   }
 
-  // Record the name of this Objective-C method in its class.
-  if (auto classDecl = D->getDeclContext()->getSelfClassDecl()) {
-    if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
-      // Determine the foreign error convention.
-      if (auto baseMethod = method->getOverriddenDecl()) {
-        // If the overridden method has a foreign error convention,
-        // adopt it.  Set the foreign error convention for a throwing
-        // method.  Note that the foreign error convention affects the
-        // selector, so we perform this before inferring a selector.
-        if (method->hasThrows()) {
-          if (auto baseErrorConvention
-                = baseMethod->getForeignErrorConvention()) {
-            errorConvention = baseErrorConvention;
-          }
-
-          assert(errorConvention && "Missing error convention");
-          method->setForeignErrorConvention(*errorConvention);
+  if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
+    // Determine the foreign error convention.
+    if (auto baseMethod = method->getOverriddenDecl()) {
+      // If the overridden method has a foreign error convention,
+      // adopt it.  Set the foreign error convention for a throwing
+      // method.  Note that the foreign error convention affects the
+      // selector, so we perform this before inferring a selector.
+      if (method->hasThrows()) {
+        if (auto baseErrorConvention
+              = baseMethod->getForeignErrorConvention()) {
+          errorConvention = baseErrorConvention;
         }
-      } else if (method->hasThrows()) {
-        // Attach the foreign error convention.
+
         assert(errorConvention && "Missing error convention");
         method->setForeignErrorConvention(*errorConvention);
       }
-
-      // Infer the Objective-C name for this method.
-      inferObjCName(method);
-
-      // ... then record it.
-      classDecl->recordObjCMethod(method);
-
-      // Swift does not permit class methods with Objective-C selectors 'load',
-      // 'alloc', or 'allocWithZone:'.
-      if (!method->isInstanceMember()) {
-        auto isForbiddenSelector = [&](ObjCSelector sel)
-        -> Optional<Diag<unsigned, DeclName, ObjCSelector>> {
-          switch (sel.getNumArgs()) {
-          case 0:
-            if (sel.getSelectorPieces().front() == ctx.Id_load ||
-                sel.getSelectorPieces().front() == ctx.Id_alloc)
-              return diag::objc_class_method_not_permitted;
-            // Swift 3 and earlier allowed you to override `initialize`, but
-            // Swift's semantics do not guarantee that it will be called at
-            // the point you expect. It is disallowed in Swift 4 and later.
-            if (sel.getSelectorPieces().front() == ctx.Id_initialize) {
-              if (ctx.LangOpts.isSwiftVersion3())
-                return
-                  diag::objc_class_method_not_permitted_swift3_compat_warning;
-              else
-                return diag::objc_class_method_not_permitted;
-            }
-            return None;
-          case 1:
-            if (sel.getSelectorPieces().front() == ctx.Id_allocWithZone)
-              return diag::objc_class_method_not_permitted;
-            return None;
-          default:
-            return None;
-          }
-        };
-        auto sel = method->getObjCSelector();
-        if (auto diagID = isForbiddenSelector(sel)) {
-          auto diagInfo = getObjCMethodDiagInfo(method);
-          method->diagnose(*diagID, diagInfo.first, diagInfo.second, sel);
-        }
-      }
-    } else if (isa<VarDecl>(D)) {
-      // Infer the Objective-C name for this property.
-      inferObjCName(D);
-    }
-  } else if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
-    if (method->hasThrows()) {
+    } else if (method->hasThrows()) {
       // Attach the foreign error convention.
       assert(errorConvention && "Missing error convention");
       method->setForeignErrorConvention(*errorConvention);
     }
-  }
 
-  // Record this method in the source-file-specific Objective-C method
-  // table.
-  if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
-    if (auto sourceFile = method->getParentSourceFile()) {
-      sourceFile->ObjCMethods[method->getObjCSelector()].push_back(method);
+    // Infer the Objective-C name for this method.
+    auto selector = inferObjCName(method);
+
+    // Swift does not permit class methods with Objective-C selectors 'load',
+    // 'alloc', or 'allocWithZone:'. Check for these cases.
+    if (!method->isInstanceMember()) {
+      auto isForbiddenSelector = [&](ObjCSelector sel)
+      -> Optional<Diag<unsigned, DeclName, ObjCSelector>> {
+        switch (sel.getNumArgs()) {
+        case 0:
+          if (sel.getSelectorPieces().front() == ctx.Id_load ||
+              sel.getSelectorPieces().front() == ctx.Id_alloc)
+            return diag::objc_class_method_not_permitted;
+          // Swift 3 and earlier allowed you to override `initialize`, but
+          // Swift's semantics do not guarantee that it will be called at
+          // the point you expect. It is disallowed in Swift 4 and later.
+          if (sel.getSelectorPieces().front() == ctx.Id_initialize)
+            return diag::objc_class_method_not_permitted;
+          return None;
+        case 1:
+          if (sel.getSelectorPieces().front() == ctx.Id_allocWithZone)
+            return diag::objc_class_method_not_permitted;
+          return None;
+        default:
+          return None;
+        }
+      };
+      if (auto diagID = isForbiddenSelector(selector)) {
+        auto diagInfo = getObjCMethodDiagInfo(method);
+        method->diagnose(*diagID, diagInfo.first, diagInfo.second, selector);
+      }
     }
+
+    // Record the method in the class, if it's a member of one.
+    if (auto classDecl = D->getDeclContext()->getSelfClassDecl()) {
+      classDecl->recordObjCMethod(method, selector);
+    }
+
+    // Record the method in the source file.
+    if (auto sourceFile = method->getParentSourceFile()) {
+      sourceFile->ObjCMethods[selector].push_back(method);
+    }
+  } else if (isa<VarDecl>(D)) {
+    // Infer the Objective-C name for this property.
+    (void)inferObjCName(D);
+
+    // FIXME: We should have a class-based table to check for conflicts.
   }
 
   // Special handling for Swift 3 @objc inference rules that are no longer

@@ -58,7 +58,7 @@ class Node(object):
 
     def requires_validation(self):
         """
-        Returns `True` if this node should have a `valitate` method associated.
+        Returns `True` if this node should have a `validate` method associated.
         """
         return self.is_buildable()
 

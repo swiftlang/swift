@@ -6,7 +6,7 @@ public struct S<Type>
 
 public func foo<Type>(_ values : [S<Type>])
 {
-  // CHECK: define {{.*}}$S12generic_arg53fooyySayAA1SVyxGGlFAESgAEXEfU_
+  // CHECK: define {{.*}}$s12generic_arg53fooyySayAA1SVyxGGlFAESgAEXEfU_
   // CHECK: call void @llvm.dbg.declare
   // CHECK: call void @llvm.dbg.declare(metadata %[[TY:.*]]** %[[ALLOCA:[^,]+]],
   // CHECK-SAME:       metadata ![[ARG:[0-9]+]],
@@ -17,7 +17,7 @@ public func foo<Type>(_ values : [S<Type>])
   // CHECK-SAME:                        line: [[@LINE+4]],
   // CHECK-SAME:     type: ![[TY:.*]])
   // CHECK: ![[TY]] = !DICompositeType(
-  // CHECK-SAME:              identifier: "$S12generic_arg51SVyxGD")
+  // CHECK-SAME:              identifier: "$s12generic_arg51SVyxGD")
   let _ = values.flatMap { arg in
     return .some(arg)
   }

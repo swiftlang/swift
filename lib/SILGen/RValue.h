@@ -172,6 +172,9 @@ public:
   static RValue forInContext() {
     return RValue(InContext);
   }
+
+  static unsigned getRValueSize(CanType substType);
+  static unsigned getRValueSize(AbstractionPattern origType, CanType substType);
   
   /// Create an RValue to which values will be subsequently added using
   /// addElement(), with the level of tuple expansion in the input specified
@@ -351,6 +354,8 @@ public:
 
   /// Borrow all subvalues of the rvalue.
   RValue borrow(SILGenFunction &SGF, SILLocation loc) const &;
+
+  RValue copyForDiagnostics() const;
 
   static bool areObviouslySameValue(SILValue lhs, SILValue rhs);
   bool isObviouslyEqual(const RValue &rhs) const;

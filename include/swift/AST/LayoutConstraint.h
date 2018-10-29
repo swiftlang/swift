@@ -343,6 +343,10 @@ public:
   bool hasLocation() const { return Loc.isValid(); }
   LayoutConstraint getLayoutConstraint() const { return Layout; }
 
+  void setLayoutConstraint(LayoutConstraint value) {
+    Layout = value;
+  }
+
   bool isNull() const { return Layout.isNull(); }
 
   LayoutConstraintLoc clone(ASTContext &ctx) const { return *this; }

@@ -69,7 +69,7 @@ bb0:
 // CHECK: [[BOX3_COPY_PB:%.*]] = project_box [[BOX3_COPY]]
 
 // CHECK-NOT: function_ref @closure0 :
-// CHECK: [[CLOSURE_PROMOTE:%.*]] = function_ref @$S8closure0Tf2iii_n
+// CHECK: [[CLOSURE_PROMOTE:%.*]] = function_ref @$s8closure0Tf2iii_n
 // CHECK-NOT: function_ref @closure0 :
 
 // The Foo variable is loaded from and retained, because it is a reference type
@@ -138,7 +138,7 @@ bb0:
   // CHECK: [[BOX3_COPY_PB:%.*]] = project_box [[BOX3_COPY]]
 
   // CHECK-NOT: function_ref @closure_indirect_result :
-  // CHECK: [[CLOSURE_PROMOTE:%.*]] = function_ref @$S23closure_indirect_resultTf2niii_n
+  // CHECK: [[CLOSURE_PROMOTE:%.*]] = function_ref @$s23closure_indirect_resultTf2niii_n
   // CHECK-NOT: function_ref @closure_indirect_result :
   %17 = function_ref @closure_indirect_result : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Foo>, @owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> @out Int
 
@@ -164,7 +164,7 @@ bb0:
   return %21 : $@callee_owned () -> @out Int
 }
 
-// CHECK-LABEL: sil private @$S8closure0Tf2iii_n : $@convention(thin) (@owned Foo, @owned Baz, Int) -> (Int, Builtin.Int64) {
+// CHECK-LABEL: sil private @$s8closure0Tf2iii_n : $@convention(thin) (@owned Foo, @owned Baz, Int) -> (Int, Builtin.Int64) {
 // CHECK: bb0([[ORIGINAL_ARG0:%.*]] : @owned $Foo, [[ORIGINAL_ARG1:%.*]] : @owned $Baz, [[ARG2:%.*]] : @trivial $Int):
 // CHECK:   [[ARG0:%.*]] = begin_borrow [[ORIGINAL_ARG0]]
 // CHECK:   [[ARG1:%.*]] = begin_borrow [[ORIGINAL_ARG1]]
@@ -174,7 +174,7 @@ bb0:
 // CHECK:   [[METHOD_FOO:%.*]] = class_method [[ARG0_COPY]] : $Foo, #Foo.foo!1 : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
 // CHECK:   [[BORROWED_ARG0_COPY:%.*]] = begin_borrow [[ARG0_COPY]]
 // CHECK:   [[APPLY_FOO:%.*]] = apply [[METHOD_FOO]]([[BORROWED_ARG0_COPY]]) : $@convention(method) (@guaranteed Foo) -> Int
-// CHECK:   end_borrow [[BORROWED_ARG0_COPY]] from [[ARG0_COPY]]
+// CHECK:   end_borrow [[BORROWED_ARG0_COPY]]
 // CHECK:   destroy_value [[ARG0_COPY]]
 
 // CHECK: [[EXTRACT_BAZ_X:%.*]] = struct_extract [[ARG1]] : $Baz, #Baz.x
@@ -185,16 +185,16 @@ bb0:
 
 // The release of %2 is replaced by a release_value of the Baz argument, since
 // it is a non-trivial aggregate
-// CHECK: end_borrow [[ARG1]] from [[ORIGINAL_ARG1]]
+// CHECK: end_borrow [[ARG1]]
 // CHECK: destroy_value [[ORIGINAL_ARG1]] : $Baz
 
 // The release of %0 is replaced by a strong_release of the Foo argument, since
 // it is a reference type
-// CHECK: end_borrow [[ARG0]] from [[ORIGINAL_ARG0]]
+// CHECK: end_borrow [[ARG0]]
 // CHECK: destroy_value [[ORIGINAL_ARG0]]
 // CHECK: [[RESULT:%.*]] = tuple ([[RETVAL]] : $Int, [[EXTRACT_INT_VALUE]] : $Builtin.Int64)
 // CHECK: return [[RESULT]] : $(Int, Builtin.Int64)
-// CHECK: } // end sil function '$S8closure0Tf2iii_n'
+// CHECK: } // end sil function '$s8closure0Tf2iii_n'
 
 sil private @closure0 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Foo>, @owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> (Int, Builtin.Int64) {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Foo>, %2 : @owned $<τ_0_0> { var τ_0_0 } <Baz>, %4 : @owned $<τ_0_0> { var τ_0_0 } <Int>):
@@ -208,7 +208,7 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Foo>, %2 : @owned $<τ_0_0> { var τ_0
   %10 = class_method %8 : $Foo, #Foo.foo!1 : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
   %9 = begin_borrow %8 : $Foo
   %11 = apply %10(%9) : $@convention(method) (@guaranteed Foo) -> Int
-  end_borrow %9 from %8 : $Foo, $Foo
+  end_borrow %9 : $Foo
   destroy_value %8 : $Foo
   %12 = struct_element_addr %3 : $*Baz, #Baz.x
   %13 = load [trivial] %12 : $*Int
@@ -255,7 +255,7 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Foo>):
   %10 = class_method %8 : $Foo, #Foo.foo!1 : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
   %9 = begin_borrow %8 : $Foo
   %11 = apply %10(%9) : $@convention(method) (@guaranteed Foo) -> Int
-  end_borrow %9 from %8 : $Foo, $Foo
+  end_borrow %9 : $Foo
   destroy_value %8 : $Foo
   %12 = function_ref @mutate_foo : $@convention(thin) (@inout Foo) -> ()
   %13 = apply %12(%1) : $@convention(thin) (@inout Foo) -> ()
@@ -276,7 +276,7 @@ bb0(%0 : @trivial $*Int, %1 : @trivial $*Int):
   %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   copy_addr %1 to [initialization] %4a : $*Int
   %6 = function_ref @apply : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
-  // CHECK: [[PROMOTED:%[0-9a-zA-Z]+]] = function_ref @$S27closureWithGenericSignatureTf2ni_n : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <Int>, Int) -> ()
+  // CHECK: [[PROMOTED:%[0-9a-zA-Z]+]] = function_ref @$s27closureWithGenericSignatureTf2ni_n : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <Int>, Int) -> ()
   %7 = function_ref @closureWithGenericSignature : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <Int>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> ()
   %8 = copy_value %4 : $<τ_0_0> { var τ_0_0 } <Int>
   %9 = copy_value %2 : $<τ_0_0> { var τ_0_0 } <Int>
@@ -291,12 +291,12 @@ bb0(%0 : @trivial $*Int, %1 : @trivial $*Int):
   return %16 : $()
 }
 
-// CHECK: sil @$S27closureWithGenericSignatureTf2ni_n : $@convention(thin) <{{[^>]+}}> (@owned <τ_0_0> { var τ_0_0 } <Int>, Int) -> ()
+// CHECK: sil @$s27closureWithGenericSignatureTf2ni_n : $@convention(thin) <{{[^>]+}}> (@owned <τ_0_0> { var τ_0_0 } <Int>, Int) -> ()
 sil @closureWithGenericSignature : $@convention(thin) <T> (@owned <τ_0_0> { var τ_0_0 } <Int>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> () {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Int>, %2 : @owned $<τ_0_0> { var τ_0_0 } <Int>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Int>, 0
-  %4 = function_ref @$Ss1poiyS2i_SitF : $@convention(thin) (Int, Int) -> Int
+  %4 = function_ref @$ss1poiyS2i_SitF : $@convention(thin) (Int, Int) -> Int
   %5 = load [trivial] %3 : $*Int
   %6 = load [trivial] %3 : $*Int
   %7 = apply %4(%5, %6) : $@convention(thin) (Int, Int) -> Int
@@ -307,7 +307,7 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Int>, %2 : @owned $<τ_0_0> { var τ_0
   return %11 : $()
 }
 
-sil [transparent] [serialized] @$Ss1poiyS2i_SitF : $@convention(thin) (Int, Int) -> Int
+sil [transparent] [serialized] @$ss1poiyS2i_SitF : $@convention(thin) (Int, Int) -> Int
 
 sil private @closure_indirect_result : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Foo>, @owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> @out Int {
 bb0(%0: @trivial $*Int, %1 : @owned $<τ_0_0> { var τ_0_0 } <Foo>, %2 : @owned $<τ_0_0> { var τ_0_0 } <Baz>, %4 : @owned $<τ_0_0> { var τ_0_0 } <Int>):
@@ -320,7 +320,7 @@ bb0(%0: @trivial $*Int, %1 : @owned $<τ_0_0> { var τ_0_0 } <Foo>, %2 : @owned 
   %10 = class_method %8 : $Foo, #Foo.foo!1 : (Foo) -> () -> Int, $@convention(method) (@guaranteed Foo) -> Int
   %9 = begin_borrow %8 : $Foo
   %11 = apply %10(%9) : $@convention(method) (@guaranteed Foo) -> Int
-  end_borrow %9 from %8 : $Foo, $Foo
+  end_borrow %9 : $Foo
   destroy_value %8 : $Foo
   %12 = struct_element_addr %3 : $*Baz, #Baz.x
   %13 = load [trivial] %12 : $*Int
@@ -406,7 +406,7 @@ bb0:
   // CHECK: [[BOX2_COPY:%.*]] = copy_value [[BOX2]]
   // CHECK: [[BOX2_COPY_PB:%.*]] = project_box [[BOX2_COPY]]
   // CHECK-NOT: function_ref @closure_indirect_result :
-  // CHECK: [[SPECIALIZED_FUNC:%.*]] = function_ref @$S23closure_projection_testTf2ni_n : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Baz>, @owned Baz) -> ()
+  // CHECK: [[SPECIALIZED_FUNC:%.*]] = function_ref @$s23closure_projection_testTf2ni_n : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Baz>, @owned Baz) -> ()
   // CHECK-NOT: function_ref @closure_projection_test :
   // CHECK: [[LOADBAZ:%.*]] = load [copy] [[BOX2_COPY_PB]] : $*Baz
   // CHECK: destroy_value [[BOX2_COPY]]
@@ -425,7 +425,7 @@ bb0:
   return %21 : $@callee_owned () -> ()
 }
 
-// CHECK-LABEL: sil @$S23closure_projection_testTf2ni_n : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Baz>, @owned Baz) -> () {
+// CHECK-LABEL: sil @$s23closure_projection_testTf2ni_n : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Baz>, @owned Baz) -> () {
 // CHECK: bb0([[UNPROMOTED_BAZ:%.*]] : @owned $<τ_0_0> { var τ_0_0 } <Baz>, [[BAZ:%.*]] : @owned $Baz):
 // CHECK:   [[BORROWED_BAZ:%.*]] = begin_borrow [[BAZ]] : $Baz
 // CHECK:   [[X:%.*]] = struct_extract [[BORROWED_BAZ]] : $Baz, #Baz.x
@@ -435,11 +435,11 @@ bb0:
 // CHECK:   [[BAR2_COPY:%.*]] = copy_value [[BAR2]]
 // CHECK:   [[BAR2_COPY_BORROW:%.*]] = begin_borrow [[BAR2_COPY]]
 // CHECK:   apply {{%.*}}([[BAR_COPY]], [[BAR2_COPY_BORROW]], [[X]])
-// CHECK:   end_borrow [[BAR2_COPY_BORROW]] from [[BAR2_COPY]]
+// CHECK:   end_borrow [[BAR2_COPY_BORROW]]
 // CHECK:   destroy_value [[BAR2_COPY]]
-// CHECK:   end_borrow [[BORROWED_BAZ]] from [[BAZ]]
+// CHECK:   end_borrow [[BORROWED_BAZ]]
 // CHECK:   destroy_value [[BAZ]]
-// CHECK: } // end sil function '$S23closure_projection_testTf2ni_n'
+// CHECK: } // end sil function '$s23closure_projection_testTf2ni_n'
 sil @closure_projection_test : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Baz>) -> () {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Baz>, %1 : @owned $<τ_0_0> { var τ_0_0 } <Baz>):
   %0a = project_box %0 : $<τ_0_0> { var τ_0_0 } <Baz>, 0
@@ -451,7 +451,7 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Baz>, %1 : @owned $<τ_0_0> { var τ_0
   %7 = begin_borrow %6 : $Bar
   %8 = function_ref @destructured_baz_user : $@convention(thin) (@owned Bar, @guaranteed Bar, Int) -> ()
   apply %8(%5, %7, %4) : $@convention(thin) (@owned Bar, @guaranteed Bar, Int) -> ()
-  end_borrow %7 from %6 : $Bar, $Bar
+  end_borrow %7 : $Bar
   destroy_value %6 : $Bar
 
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Baz>, 0
@@ -463,7 +463,7 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Baz>, %1 : @owned $<τ_0_0> { var τ_0
   %14 = begin_borrow %13 : $Bar
   %15 = function_ref @destructured_baz_user : $@convention(thin) (@owned Bar, @guaranteed Bar, Int) -> ()
   apply %15(%12, %14, %11) : $@convention(thin) (@owned Bar, @guaranteed Bar, Int) -> ()
-  end_borrow %14 from %13 : $Bar, $Bar
+  end_borrow %14 : $Bar
   destroy_value %13 : $Bar
 
   destroy_value %1 : $<τ_0_0> { var τ_0_0 } <Baz>

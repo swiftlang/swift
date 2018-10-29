@@ -53,45 +53,42 @@ unwind:
 // CHECK:  [[TEMP:%.*]] = alloc_stack $Indirect<SomeSubclass>
 // CHECK:  [[MK_IND:%.*]] = function_ref @make_indirect
 // CHECK:  apply [[MK_IND]]<SomeSubclass>([[TEMP]])
-// CHECK:  br bb3
+// CHECK:  destroy_addr [[TEMP]] : $*Indirect<SomeSubclass>
+// CHECK:  cond_br %0, bb3, bb5
 
 // CHECK:bb1:
 // CHECK:  [[I2:%.*]] = integer_literal $Builtin.Int32, 2000
 // CHECK:  apply [[MARKER2]]([[I2]])
 // CHECK:  dealloc_stack [[TEMP]] : $*Indirect<SomeSubclass>
-// CHECK:  br bb5
+// CHECK:  br bb4
 
 // CHECK: bb2:
 // CHECK:  [[I3:%.*]] = integer_literal $Builtin.Int32, 3000
 // CHECK:  apply [[MARKER2]]([[I3]])
 // CHECK:  dealloc_stack [[TEMP]] : $*Indirect<SomeSubclass>
-// CHECK:  br bb7
+// CHECK:  br bb6
 
 // CHECK: bb3:
-// CHECK:  destroy_addr [[TEMP]] : $*Indirect<SomeSubclass>
-// CHECK:  cond_br %0, bb4, bb6
-
-// CHECK: bb4:
 // CHECK:   [[I4:%.*]] = integer_literal $Builtin.Int32, 10
 // CHECK:   apply [[MARKER]]([[I4]])
 // CHECK:   br bb1
 
-// CHECK: bb5:
+// CHECK: bb4:
 // CHECK:   [[I5:%.*]] = integer_literal $Builtin.Int32, 20
 // CHECK:   apply [[MARKER]]([[I5]])
-// CHECK:  br bb8
+// CHECK:  br bb7
 
-// CHECK: bb6:
+// CHECK: bb5:
 // CHECK:   [[I6:%.*]] = integer_literal $Builtin.Int32, 11
 // CHECK:   apply [[MARKER]]([[I6]])
 // CHECK:   br bb2
 
-// CHECK: bb7:
+// CHECK: bb6:
 // CHECK:   [[I7:%.*]] = integer_literal $Builtin.Int32, 21
 // CHECK:   [[MARKER]]([[I7]])
-// CHECK:  br bb8
+// CHECK:  br bb7
 
-// CHECK:bb8:
+// CHECK:bb7:
 // CHECK:  return
 // CHECK:}
 
@@ -200,37 +197,34 @@ cont:
 // CHECK-NEXT:   %2 = function_ref @marker
 // CHECK-NEXT:   %3 = integer_literal $Builtin.Int32, 1000
 // CHECK-NEXT:   %4 = apply %2(%3)
-// CHECK-NEXT:   br bb3
+// CHECK-NEXT:   cond_br %0, bb3, bb5
 
 // CHECK:      bb1:
 // CHECK-NEXT:   [[T0:%.*]] = integer_literal $Builtin.Int32, 2000
 // CHECK-NEXT:   apply %2([[T0]])
 // CHECK-NEXT:   destroy_value %1 : $SomeClass
 // CHECK-NEXT:   tuple ()
-// CHECK-NEXT:   br bb5
+// CHECK-NEXT:   br bb4
 
 // CHECK:      bb2:
 // CHECK-NEXT:   [[T1:%.*]] = integer_literal $Builtin.Int32, 3000
 // CHECK-NEXT:   apply %2([[T1]])
 // CHECK-NEXT:   destroy_value %1 : $SomeClass
-// CHECK-NEXT:   br bb7
+// CHECK-NEXT:   br bb6
 
 // CHECK:      bb3:
-// CHECK-NEXT:   cond_br %0, bb4, bb6
-
-// CHECK:      bb4:
 // CHECK-NEXT:   br bb1
 
-// CHECK:      bb5:
-// CHECK-NEXT:   br bb8
+// CHECK:      bb4:
+// CHECK-NEXT:   br bb7
 
-// CHECK:      bb6:
+// CHECK:      bb5:
 // CHECK-NEXT:   br bb2
 
-// CHECK:      bb7:
-// CHECK-NEXT:   br bb8
+// CHECK:      bb6:
+// CHECK-NEXT:   br bb7
 
-// CHECK:      bb8:
+// CHECK:      bb7:
 // CHECK-NEXT:   [[T0:%.*]] = tuple ()
 // CHECK-NEXT:   return [[T0]] : $()
 
@@ -304,7 +298,7 @@ unwind:
 // CHECK-NEXT:   %1 = alloc_stack $Builtin.Int8
 // CHECK-NEXT:   %2 = integer_literal $Builtin.Int8, 8
 // CHECK-NEXT:   store %2 to [trivial] %1 : $*Builtin.Int8
-// CHECK-NEXT:   br bb3
+// CHECK-NEXT:   cond_br %0, bb3, bb5
 
 // CHECK:      bb1:
 // CHECK-NEXT:   // function_ref
@@ -312,7 +306,7 @@ unwind:
 // CHECK-NEXT:   apply [[USE]](%1) : $@convention(thin) (@in Builtin.Int8) -> ()
 // CHECK-NEXT:   dealloc_stack %1 : $*Builtin.Int8
 // CHECK-NEXT:   tuple ()
-// CHECK-NEXT:   br bb5
+// CHECK-NEXT:   br bb4
 
 // CHECK:      bb2:
 // CHECK-NEXT:   [[T0:%.*]] = integer_literal $Builtin.Int32, 3000
@@ -320,26 +314,23 @@ unwind:
 // CHECK-NEXT:   [[MARKER:%.*]] = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK-NEXT:   apply [[MARKER]]([[T0]]) : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK-NEXT:   dealloc_stack %1 : $*Builtin.Int8
-// CHECK-NEXT:   br bb7
+// CHECK-NEXT:   br bb6
 
 // CHECK:      bb3:
-// CHECK-NEXT:   cond_br %0, bb4, bb6
-
-// CHECK:      bb4:
 // CHECK-NEXT:   [[T0:%.*]] = integer_literal $Builtin.Int8, 8
 // CHECK-NEXT:   store [[T0]] to [trivial] %1 : $*Builtin.Int8
 // CHECK-NEXT:   br bb1
 
-// CHECK:      bb5:
-// CHECK-NEXT:   br bb8
+// CHECK:      bb4:
+// CHECK-NEXT:   br bb7
 
-// CHECK:      bb6:
+// CHECK:      bb5:
 // CHECK-NEXT:   br bb2
 
-// CHECK:      bb7:
-// CHECK-NEXT:   br bb8
+// CHECK:      bb6:
+// CHECK-NEXT:   br bb7
 
-// CHECK:      bb8:
+// CHECK:      bb7:
 // CHECK-NEXT:   [[T0:%.*]] = tuple ()
 // CHECK-NEXT:   return [[T0]] : $()
 // CHECK:      }

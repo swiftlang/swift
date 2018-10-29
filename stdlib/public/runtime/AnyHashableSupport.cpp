@@ -88,16 +88,8 @@ static const Metadata *findHashableBaseTypeImpl(const Metadata *type) {
   }
   // By this point, `type` is known to conform to `Hashable`.
 
-  const Metadata *baseTypeThatConformsToHashable = type;
-  while (true) {
-    const Metadata *superclass =
-        _swift_class_getSuperclass(baseTypeThatConformsToHashable);
-    if (!superclass)
-      break;
-    if (!swift_conformsToProtocol(superclass, &HashableProtocolDescriptor))
-      break;
-    baseTypeThatConformsToHashable = superclass;
-  }
+  const Metadata *baseTypeThatConformsToHashable =
+    findConformingSuperclass(type, &HashableProtocolDescriptor);
   HashableConformances.getOrInsert(HashableConformanceKey{type},
                                    baseTypeThatConformsToHashable);
   return baseTypeThatConformsToHashable;
@@ -137,7 +129,7 @@ void _swift_makeAnyHashableUsingDefaultRepresentation(
 // public func _makeAnyHashableUpcastingToHashableBaseType<H : Hashable>(
 //   _ value: H,
 //   storingResultInto result: UnsafeMutablePointer<AnyHashable>)
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 void _swift_makeAnyHashableUpcastingToHashableBaseType(
   OpaqueValue *value,
   const void *anyHashableResultPointer,
@@ -151,8 +143,8 @@ void _swift_makeAnyHashableUpcastingToHashableBaseType(
 #if SWIFT_OBJC_INTEROP
     id srcObject;
     memcpy(&srcObject, value, sizeof(id));
-    // Do we have a _SwiftValue?
-    if (_SwiftValue *srcSwiftValue = getAsSwiftValue(srcObject)) {
+    // Do we have a __SwiftValue?
+    if (__SwiftValue *srcSwiftValue = getAsSwiftValue(srcObject)) {
       // If so, extract the boxed value and try to cast it.
       const Metadata *unboxedType;
       const OpaqueValue *unboxedValue;

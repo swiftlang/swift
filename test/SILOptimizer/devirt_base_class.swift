@@ -34,7 +34,7 @@ private func foo(_ a: A) -> Int {
 
 // Check that invocation of addConstraint() gets completely devirtualized and inlined
 //
-// CHECK-LABEL: sil private [noinline] @$S17devirt_base_class2F233_{{.*}}4test
+// CHECK-LABEL: sil private [noinline] @$s17devirt_base_class2F233_{{.*}}4test
 // CHECK-NOT: class_method
 // CHECK-NOT: function_ref
 // CHECK: return

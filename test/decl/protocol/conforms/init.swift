@@ -76,3 +76,14 @@ class Foo : P2 {
     self.value = value
   }
 }
+
+
+// This used to produce a bogus diagnostic with an unknown location
+class Base : P1 {}
+// expected-error@-1 {{initializer requirement 'init()' can only be satisfied by a 'required' initializer in non-final class 'Base'}}
+
+class Middle : Base {
+  init(i: Int) {}
+}
+
+class Derived : Middle {}

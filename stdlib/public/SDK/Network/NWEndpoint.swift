@@ -79,13 +79,13 @@ private func getaddrinfo_numeric(_ string: String, family: Int32 = 0) -> NWEndpo
 	var result: NWEndpoint.Host? = nil
 
 	if let sa = addrinfo.pointee.ai_addr {
-		if (sa.pointee.sa_family == AF_INET) {
+		if sa.pointee.sa_family == AF_INET {
 			sa.withMemoryRebound(to: sockaddr_in.self, capacity: 1, { (sin) -> Void in
 				result = NWEndpoint.Host.ipv4(IPv4Address(sin.pointee.sin_addr, interface))
 			})
-		} else if (sa.pointee.sa_family == AF_INET6) {
+		} else if sa.pointee.sa_family == AF_INET6 {
 			sa.withMemoryRebound(to: sockaddr_in6.self, capacity: 1, { (sin6) -> Void in
-				if (sin6.pointee.sin6_scope_id != 0) {
+				if sin6.pointee.sin6_scope_id != 0 {
 					interface = NWInterface(Int(sin6.pointee.sin6_scope_id))
 				}
 				let ipv6 = IPv6Address(sin6.pointee.sin6_addr, interface);
@@ -107,7 +107,7 @@ private func getnameinfo_numeric(address: UnsafeRawPointer) -> String {
 	var result : String? = nil
 	let maxLen = socklen_t(100)
 	let storage = UnsafeMutablePointer<Int8>.allocate(capacity: Int(maxLen))
-	if (getnameinfo(sa, socklen_t(sa.pointee.sa_len), storage, maxLen, nil, 0, NI_NUMERICHOST) == 0) {
+	if getnameinfo(sa, socklen_t(sa.pointee.sa_len), storage, maxLen, nil, 0, NI_NUMERICHOST) == 0 {
 		result = String(cString: storage)
 	}
 	storage.deallocate()
@@ -212,7 +212,7 @@ public struct IPv4Address: IPAddress, Hashable, CustomDebugStringConvertible {
 	/// - Parameter interface: An optional network interface to scope the address to. Defaults to nil.
 	/// - Returns: An IPv4Address or nil if the Data parameter did not contain an IPv4 address.
 	public init?(_ rawValue: Data, _ interface: NWInterface? = nil) {
-		if (rawValue.count != MemoryLayout<in_addr>.size) {
+		if rawValue.count != MemoryLayout<in_addr>.size {
 			return nil
 		}
 		let v4 = rawValue.withUnsafeBytes { (ptr: UnsafePointer<in_addr>) -> in_addr in
@@ -378,7 +378,7 @@ public struct IPv6Address: IPAddress, Hashable, CustomDebugStringConvertible {
 	/// - Parameter interface: An optional interface the address is scoped to. Defaults to nil.
 	/// - Returns: nil unless the raw data contained an IPv6 address
 	public init?(_ rawValue: Data, _ interface: NWInterface? = nil) {
-		if (rawValue.count != MemoryLayout<in6_addr>.size) {
+		if rawValue.count != MemoryLayout<in6_addr>.size {
 			return nil
 		}
 		let v6 = rawValue.withUnsafeBytes { (ptr: UnsafePointer<in6_addr>) -> in6_addr in
@@ -571,7 +571,7 @@ public enum NWEndpoint: Hashable, CustomDebugStringConvertible {
 			var hints = addrinfo(ai_flags: AI_DEFAULT, ai_family: AF_INET6, ai_socktype: SOCK_STREAM, ai_protocol: 0,
 								 ai_addrlen: 0, ai_canonname: nil, ai_addr: nil, ai_next: nil)
 			var resolved : UnsafeMutablePointer<addrinfo>? = nil
-			if (getaddrinfo(nil, service, &hints, &resolved) != 0) {
+			if getaddrinfo(nil, service, &hints, &resolved) != 0 {
 				return nil
 			}
 
@@ -630,31 +630,30 @@ public enum NWEndpoint: Hashable, CustomDebugStringConvertible {
 		if let nwinterface = nw_endpoint_copy_interface(nw) {
 			interface = NWInterface(nwinterface)
 		}
-		if (nw_endpoint_get_type(nw) == Network.nw_endpoint_type_host)
-		{
+		if nw_endpoint_get_type(nw) == Network.nw_endpoint_type_host {
 			let host = NWEndpoint.Host.name(String(cString: nw_endpoint_get_hostname(nw)), interface)
 			self = .hostPort(host: host, port: NWEndpoint.Port(nw_endpoint_get_port(nw)))
-		} else if (nw_endpoint_get_type(nw) == Network.nw_endpoint_type_address) {
+		} else if nw_endpoint_get_type(nw) == Network.nw_endpoint_type_address {
 			let port = NWEndpoint.Port(nw_endpoint_get_port(nw))
 			let address = nw_endpoint_get_address(nw)
-			if (address.pointee.sa_family == AF_INET && address.pointee.sa_len == MemoryLayout<sockaddr_in>.size) {
+			if address.pointee.sa_family == AF_INET && address.pointee.sa_len == MemoryLayout<sockaddr_in>.size {
                 let host = address.withMemoryRebound(to: sockaddr_in.self, capacity: 1) {
                     (sin: UnsafePointer<sockaddr_in>) -> NWEndpoint.Host in
 					return NWEndpoint.Host.ipv4(IPv4Address(sin.pointee.sin_addr, interface))
 				}
 				self = .hostPort(host: host, port: port)
-			} else if (address.pointee.sa_family == AF_INET6 &&
-				address.pointee.sa_len == MemoryLayout<sockaddr_in6>.size) {
+			} else if address.pointee.sa_family == AF_INET6 &&
+				address.pointee.sa_len == MemoryLayout<sockaddr_in6>.size {
 				let host = address.withMemoryRebound(to: sockaddr_in6.self, capacity: 1) {
                     (sin6) -> NWEndpoint.Host in
-					if (interface == nil && sin6.pointee.sin6_scope_id != 0) {
+					if interface == nil && sin6.pointee.sin6_scope_id != 0 {
 						interface = NWInterface(Int(sin6.pointee.sin6_scope_id))
 					}
 					return NWEndpoint.Host.ipv6(IPv6Address(sin6.pointee.sin6_addr,
                                                                                       interface))
 				}
 				self = .hostPort(host: host, port: port)
-			} else if (address.pointee.sa_family == AF_UNIX) {
+			} else if address.pointee.sa_family == AF_UNIX {
 				// sockaddr_un is very difficult to deal with in swift. Fortunately, nw_endpoint_copy_address_string
 				// already does exactly what we need.
 				let path = nw_endpoint_copy_address_string(nw)
@@ -663,7 +662,7 @@ public enum NWEndpoint: Hashable, CustomDebugStringConvertible {
 			} else {
 				return nil
 			}
-		} else if (nw_endpoint_get_type(nw) == Network.nw_endpoint_type_bonjour_service) {
+		} else if nw_endpoint_get_type(nw) == Network.nw_endpoint_type_bonjour_service {
 			self = .service(name: String(cString: nw_endpoint_get_bonjour_service_name(nw)),
 							type: String(cString: nw_endpoint_get_bonjour_service_type(nw)),
 							domain: String(cString: nw_endpoint_get_bonjour_service_domain(nw)),

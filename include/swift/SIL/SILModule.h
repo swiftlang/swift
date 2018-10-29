@@ -343,11 +343,9 @@ public:
   /// should contain source files.
   ///
   /// If a source file is provided, SIL will only be emitted for decls in that
-  /// source file, starting from the specified element number.
+  /// source file.
   static std::unique_ptr<SILModule>
-  constructSIL(ModuleDecl *M, SILOptions &Options, FileUnit *sf = nullptr,
-               Optional<unsigned> startElem = None,
-               bool isWholeModule = false);
+  constructSIL(ModuleDecl *M, SILOptions &Options, FileUnit *sf = nullptr);
 
   /// \brief Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
@@ -380,8 +378,7 @@ public:
     return wholeModule;
   }
 
-  /// Returns true if it is the OnoneSupport module.
-  bool isOnoneSupportModule() const;
+  bool isStdlibModule() const;
 
   /// Returns true if it is the optimized OnoneSupport module.
   bool isOptimizedOnoneSupportModule() const;

@@ -387,7 +387,7 @@ fileprivate struct _JSONEncodingStorage {
         return array
     }
 
-    fileprivate mutating func push(container: NSObject) {
+    fileprivate mutating func push(container: __owned NSObject) {
         self.containers.append(container)
     }
 
@@ -961,7 +961,7 @@ fileprivate class _JSONReferencingEncoder : _JSONEncoder {
 
     /// Initializes `self` by referencing the given dictionary container in the given encoder.
     fileprivate init(referencing encoder: _JSONEncoder,
-                     key: CodingKey, convertedKey: CodingKey, wrapping dictionary: NSMutableDictionary) {
+                     key: CodingKey, convertedKey: __shared CodingKey, wrapping dictionary: NSMutableDictionary) {
         self.encoder = encoder
         self.reference = .dictionary(dictionary, convertedKey.stringValue)
         super.init(options: encoder.options, codingPath: encoder.codingPath)
@@ -1077,7 +1077,7 @@ open class JSONDecoder {
             guard !stringKey.isEmpty else { return stringKey }
         
             // Find the first non-underscore character
-            guard let firstNonUnderscore = stringKey.index(where: { $0 != "_" }) else {
+            guard let firstNonUnderscore = stringKey.firstIndex(where: { $0 != "_" }) else {
                 // Reached the end without finding an _
                 return stringKey
             }
@@ -1273,7 +1273,7 @@ fileprivate struct _JSONDecodingStorage {
         return self.containers.last!
     }
 
-    fileprivate mutating func push(container: Any) {
+    fileprivate mutating func push(container: __owned Any) {
         self.containers.append(container)
     }
 
@@ -1616,7 +1616,7 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
         return _JSONUnkeyedDecodingContainer(referencing: self.decoder, wrapping: array)
     }
 
-    private func _superDecoder(forKey key: CodingKey) throws -> Decoder {
+    private func _superDecoder(forKey key: __owned CodingKey) throws -> Decoder {
         self.decoder.codingPath.append(key)
         defer { self.decoder.codingPath.removeLast() }
 
@@ -2523,7 +2523,7 @@ fileprivate var _iso8601Formatter: ISO8601DateFormatter = {
 // Error Utilities
 //===----------------------------------------------------------------------===//
 
-fileprivate extension EncodingError {
+extension EncodingError {
     /// Returns a `.invalidValue` error describing the given invalid floating-point value.
     ///
     ///

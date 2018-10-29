@@ -515,7 +515,8 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     llvm::Value *index = getArg(argv, "index");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
-    type.storeExtraInhabitant(IGF, index, dest, concreteType);
+    type.storeExtraInhabitant(IGF, index, dest, concreteType,
+                              /*outlined*/ true);
     IGF.Builder.CreateRetVoid();
     return;
   }
@@ -524,7 +525,8 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     Address src = getArgAs(IGF, argv, type, "src");
     getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
 
-    llvm::Value *idx = type.getExtraInhabitantIndex(IGF, src, concreteType);
+    llvm::Value *idx = type.getExtraInhabitantIndex(IGF, src, concreteType,
+                                                    /*outlined*/ true);
     IGF.Builder.CreateRet(idx);
     return;
   }

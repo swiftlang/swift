@@ -56,6 +56,23 @@ bb0(%0 : $S1):
   return %6 : $()
 }
 
+// CHECK-LABEL: sil @dont_sroa_without_benefit : $@convention(thin) (S1) -> S1
+// CHECK:      bb0
+// CHECK-NEXT:   alloc_stack $S1
+// CHECK-NEXT:   store %0 to %1 : $*S1
+// CHECK-NEXT:   load %1 : $*S1
+// CHECK-NEXT:   dealloc_stack %1 : $*S1
+// CHECK-NEXT:   return
+sil @dont_sroa_without_benefit : $@convention(thin) (S1) -> S1 {
+bb0(%0 : $S1):
+  %1 = alloc_stack $S1
+  store %0 to %1 : $*S1
+  %3 = load %1 : $*S1
+  dealloc_stack %1 : $*S1
+  return %3 : $S1
+}
+
+
 ///////////////////////////////
 // Struct With Struct Fields //
 ///////////////////////////////

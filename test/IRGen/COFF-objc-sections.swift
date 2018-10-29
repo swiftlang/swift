@@ -18,7 +18,7 @@ extension C : P {
 class D {
 }
 
-// CHECK-COFF-NOT: @"$S4main1CCMf" = {{.*}}, section "__DATA,__objc_data, regular"
+// CHECK-COFF-NOT: @"$s4main1CCMf" = {{.*}}, section "__DATA,__objc_data, regular"
 // CHECK-COFF: @"\01l_OBJC_LABEL_PROTOCOL_$_P" = {{.*}}, section ".objc_protolist$B"
 // CHECK-COFF: @"\01l_OBJC_PROTOCOL_REFERENCE_$_P" = {{.*}}, section ".objc_protorefs$B"
 // CHECK-COFF: @"\01l_OBJC_CLASS_REF_$_I" = {{.*}}, section ".objc_classrefs$B"

@@ -194,14 +194,14 @@ struct GenericTypeContext<T>: GenericWitnessTest {
   typealias Tee = T
 
   var a: T
-  // CHECK-LABEL: sil private @$S23interface_type_mangling18GenericTypeContextV09closureIndF0yyqd__lF3fooL_yyx_qd__tr__lF
+  // CHECK-LABEL: sil private @$s23interface_type_mangling18GenericTypeContextV09closureIndF0yyqd__lF3fooL_yyx_qd__tr__lF
   func closureInGenericContext<U>(_ b: U) {
     func foo(_ x: T, _ y: U) { }
 
     foo(a, b)
   }
 
-  // CHECK-LABEL: sil private @$S23interface_type_mangling18GenericTypeContextV09closureInd8PropertyF0xvg3fooL_xylF
+  // CHECK-LABEL: sil private @$s23interface_type_mangling18GenericTypeContextV09closureInd8PropertyF0xvg3fooL_xylF
   var closureInGenericPropertyContext: T {
     func foo() -> T { }
 
@@ -210,15 +210,15 @@ struct GenericTypeContext<T>: GenericWitnessTest {
 
   // FIXME: Demangling for generic params at depth is wrong.
   // CHECK-LABEL: twoParamsAtDepth<A, B>(_: A1, y: B1) -> ()
-  // CHECK-LABEL: sil hidden @$S23interface_type_mangling18GenericTypeContextV16twoParamsAtDepth_1yyqd___qd_0_tr0_lF
+  // CHECK-LABEL: sil hidden @$s23interface_type_mangling18GenericTypeContextV16twoParamsAtDepth_1yyqd___qd_0_tr0_lF
   func twoParamsAtDepth<A, B>(_ x: A, y: B) {}
 }
 
 // CHECK-LABEL: protocol witness for interface_type_mangling.GenericWitnessTest.closureInGenericContext<A>(A1) -> () in conformance interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling
-// CHECK-LABEL: @$S23interface_type_mangling18GenericTypeContextVyxGAA0D11WitnessTestA2aEP09closureIndF0yyqd__lFTW
+// CHECK-LABEL: @$s23interface_type_mangling18GenericTypeContextVyxGAA0D11WitnessTestA2aEP09closureIndF0yyqd__lFTW
 
 // CHECK-LABEL: protocol witness for interface_type_mangling.GenericWitnessTest.closureInGenericPropertyContext.getter : A.Tee in conformance interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling
-// CHECK-LABEL: @$S23interface_type_mangling18GenericTypeContextVyxGAA0D11WitnessTestA2aEP09closureInd8PropertyF03TeeQzvgTW
+// CHECK-LABEL: @$s23interface_type_mangling18GenericTypeContextVyxGAA0D11WitnessTestA2aEP09closureInd8PropertyF03TeeQzvgTW
 
 // CHECK-LABEL: protocol witness for interface_type_mangling.GenericWitnessTest.twoParamsAtDepth<A, B>(_: A1, y: B1) -> () in conformance interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling
-// CHECK-LABEL: @$S23interface_type_mangling18GenericTypeContextVyxGAA0D11WitnessTestA2aEP16twoParamsAtDepth_1yyqd___qd_0_tr0_lFTW
+// CHECK-LABEL: @$s23interface_type_mangling18GenericTypeContextVyxGAA0D11WitnessTestA2aEP16twoParamsAtDepth_1yyqd___qd_0_tr0_lFTW

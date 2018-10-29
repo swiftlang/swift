@@ -70,30 +70,44 @@ void OwnedFormalAccess::finishImpl(SILGenFunction &SGF) {
 
 FormalEvaluationScope::FormalEvaluationScope(SILGenFunction &SGF)
     : SGF(SGF), savedDepth(SGF.FormalEvalContext.stable_begin()),
-      wasInFormalEvaluationScope(SGF.InFormalEvaluationScope),
+      previous(SGF.FormalEvalContext.innermostScope),
       wasInInOutConversionScope(SGF.InInOutConversionScope) {
   if (wasInInOutConversionScope) {
     savedDepth.reset();
+    assert(isPopped());
     return;
   }
-  SGF.InFormalEvaluationScope = true;
+  SGF.FormalEvalContext.innermostScope = this;
 }
 
 FormalEvaluationScope::FormalEvaluationScope(FormalEvaluationScope &&o)
-    : SGF(o.SGF), savedDepth(o.savedDepth),
-      wasInFormalEvaluationScope(o.wasInFormalEvaluationScope),
+    : SGF(o.SGF), savedDepth(o.savedDepth), previous(o.previous),
       wasInInOutConversionScope(o.wasInInOutConversionScope) {
+
+  // Replace the scope in the active-scope chain if it's present.
+  if (!o.isPopped()) {
+    for (auto c = &SGF.FormalEvalContext.innermostScope; ; c = &(*c)->previous){
+      if (*c == &o) {
+        *c = this;
+        break;
+      }
+    }
+  }
+
   o.savedDepth.reset();
   assert(o.isPopped());
 }
 
 void FormalEvaluationScope::popImpl() {
-  // Pop the SGF.InFormalEvaluationScope bit.
-  SGF.InFormalEvaluationScope = wasInFormalEvaluationScope;
+  auto &context = SGF.FormalEvalContext;
+
+  // Remove the innermost scope from the chain.
+  assert(context.innermostScope == this &&
+         "popping formal-evaluation scopes out of order");
+  context.innermostScope = previous;
 
   // Check to see if there is anything going on here.
 
-  auto &context = SGF.FormalEvalContext;
   using iterator = FormalEvaluationContext::iterator;
   using stable_iterator = FormalEvaluationContext::stable_iterator;
 
@@ -125,8 +139,10 @@ void FormalEvaluationScope::popImpl() {
     assert(!access.isFinished() && "Can not finish a formal access cleanup "
                                    "twice");
 
-    // and deactivate the cleanup. This will set the isFinished bit for owned
-    // FormalAccess.
+    // Set the finished bit to appease various invariants.
+    access.setFinished();
+
+    // Deactivate the cleanup.
     SGF.Cleanups.setCleanupState(access.getCleanup(), CleanupState::Dead);
 
     // Attempt to diagnose problems where obvious aliasing introduces illegal

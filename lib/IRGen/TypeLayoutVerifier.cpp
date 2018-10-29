@@ -314,7 +314,7 @@ void IRGenModule::emitTypeVerifier() {
   {
     llvm::BasicBlock *EntryBB = &EntryFunction->getEntryBlock();
     llvm::BasicBlock::iterator IP = EntryBB->getFirstInsertionPt();
-    IRBuilder Builder(getLLVMContext(), DebugInfo);
+    IRBuilder Builder(getLLVMContext(), DebugInfo != nullptr);
     Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
     if (DebugInfo)
       DebugInfo->setEntryPointLoc(Builder);

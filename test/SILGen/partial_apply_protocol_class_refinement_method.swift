@@ -4,7 +4,7 @@
 protocol P { func foo() }
 protocol Q: class, P {}
 
-// CHECK-LABEL: sil hidden @$S46partial_apply_protocol_class_refinement_method0A5ApplyyyycAA1Q_pF : $@convention
+// CHECK-LABEL: sil hidden @$s46partial_apply_protocol_class_refinement_method0A5ApplyyyycAA1Q_pF : $@convention
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Q):
 func partialApply(_ q: Q) -> () -> () {
   // CHECK: [[OPENED:%.*]] = open_existential_ref [[ARG]]

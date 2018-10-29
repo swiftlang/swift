@@ -49,9 +49,12 @@ extern "C" CFHashCode CFStringHashCString(const uint8_t *bytes, CFIndex len);
 
 using namespace swift;
 
+// NOTE: older runtimes called these _SwiftNativeNSXXXBase. The two must
+// coexist, so these were renamed. The old names must not be used in the new
+// runtime.
 % for Class in ('Array', 'Dictionary', 'Set', 'String', 'Enumerator', 'Data', 'IndexSet'):
 SWIFT_RUNTIME_STDLIB_API
-@interface _SwiftNativeNS${Class}Base : NS${Class}
+@interface __SwiftNativeNS${Class}Base : NS${Class}
 {
  @private
   SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
@@ -59,7 +62,7 @@ SWIFT_RUNTIME_STDLIB_API
 @end
 
 
-@implementation _SwiftNativeNS${Class}Base
+@implementation __SwiftNativeNS${Class}Base
 
 - (id)retain {
   auto SELF = reinterpret_cast<HeapObject *>(self);
@@ -102,7 +105,7 @@ SWIFT_RUNTIME_STDLIB_API
 @end
 % end
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 bool
 swift_stdlib_NSObject_isEqual(NSObject *lhs,
                               NSObject *rhs) {

@@ -330,6 +330,7 @@ static StringRef getStateName(MetadataState state) {
   case MetadataState::LayoutComplete: return "layout-complete";
   case MetadataState::Abstract: return "abstract";
   }
+  llvm_unreachable("unhandled state");
 }
 
 void FulfillmentMap::dump() const {

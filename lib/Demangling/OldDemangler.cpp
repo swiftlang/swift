@@ -1017,6 +1017,8 @@ private:
         parentOrModule->getKind() != Node::Kind::Function &&
         parentOrModule->getKind() != Node::Kind::Extension) {
       parentOrModule = demangleBoundGenericArgs(parentOrModule);
+      if (!parentOrModule)
+        return nullptr;
 
       // Rebuild this type with the new parent type, which may have
       // had its generic arguments applied.

@@ -657,6 +657,11 @@ static llvm::cl::opt<bool>
     DisableObjCInterop("disable-objc-interop",
                        llvm::cl::desc("Disable ObjC interop."),
                        llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<std::string>
+GraphVisPath("output-request-graphviz",
+             llvm::cl::desc("Emit GraphViz output visualizing the request graph."),
+             llvm::cl::cat(Category));
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -1470,7 +1475,8 @@ static int doInputCompletenessTest(StringRef SourceFilename) {
 
   llvm::raw_ostream &OS = llvm::outs();
   OS << SourceFilename << ": ";
-  if (isSourceInputComplete(std::move(FileBufOrErr.get())).IsComplete) {
+  if (isSourceInputComplete(std::move(FileBufOrErr.get()),
+                            SourceFileKind::REPL).IsComplete) {
     OS << "IS_COMPLETE\n";
   } else {
     OS << "IS_INCOMPLETE\n";
@@ -1622,6 +1628,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       case NodeKind::Class:
       case NodeKind::Enum:
       case NodeKind::OtherNominalType:
+      case NodeKind::TypeAlias:
         break;
 
       case NodeKind::BoundGenericStructure:
@@ -2142,11 +2149,6 @@ public:
   ASTCommentPrinter(SourceManager &SM, XMLValidator &TheXMLValidator)
       : OS(llvm::outs()), SM(SM), TheXMLValidator(TheXMLValidator) {}
 
-  StringRef getBufferIdentifier(SourceLoc Loc) {
-    unsigned BufferID = SM.findBufferContainingLoc(Loc);
-    return SM.getIdentifierForBuffer(BufferID);
-  }
-
   void printWithEscaping(StringRef Str) {
     for (char C : Str) {
       switch (C) {
@@ -2191,9 +2193,6 @@ public:
         break;
       case AccessorKind::MutableAddress:
         OS << "<mutableAddressor for ";
-        break;
-      case AccessorKind::MaterializeForSet:
-        OS << "<materializeForSet for ";
         break;
       case AccessorKind::Read:
         OS << "<read accessor for ";
@@ -2288,7 +2287,7 @@ public:
       SourceLoc Loc = D->getLoc();
       if (Loc.isValid()) {
         auto LineAndColumn = SM.getLineAndColumn(Loc);
-        OS << getBufferIdentifier(VD->getLoc())
+        OS << SM.getDisplayNameForLoc(VD->getLoc())
            << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
       }
       OS << Decl::getKindName(VD->getKind()) << "/";
@@ -2305,7 +2304,7 @@ public:
       SourceLoc Loc = D->getLoc();
       if (Loc.isValid()) {
         auto LineAndColumn = SM.getLineAndColumn(Loc);
-        OS << getBufferIdentifier(D->getLoc())
+        OS << SM.getDisplayNameForLoc(D->getLoc())
         << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
       }
       OS << Decl::getKindName(D->getKind()) << "/";
@@ -2434,17 +2433,10 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
       continue;
     }
 
-    auto isClangModule = [](const ModuleDecl *M) -> bool {
-      if (!M->getFiles().empty())
-        if (M->getFiles().front()->getKind() == FileUnitKind::ClangModule)
-          return true;
-      return false;
-    };
-
     SmallVector<ModuleDecl::ImportedModule, 16> scratch;
     M->forAllVisibleModules({}, [&](const ModuleDecl::ImportedModule &next) {
       llvm::outs() << next.second->getName();
-      if (isClangModule(next.second))
+      if (next.second->isClangModule())
         llvm::outs() << " (Clang)";
       llvm::outs() << ":\n";
 
@@ -2456,7 +2448,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
           llvm::outs() << "." << accessPathPiece.first;
         }
 
-        if (isClangModule(import.second))
+        if (import.second->isClangModule())
           llvm::outs() << " (Clang)";
         llvm::outs() << "\n";
       }
@@ -2912,10 +2904,13 @@ static int doTestCreateCompilerInvocation(ArrayRef<const char *> Args) {
   DiagnosticEngine Diags(SM);
   Diags.addConsumer(PDC);
 
-  std::unique_ptr<CompilerInvocation> CI =
-    driver::createCompilerInvocation(Args, Diags);
+  CompilerInvocation CI;
+  bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
+      Args, Diags, [&](ArrayRef<const char *> FrontendArgs) {
+    return CI.parseArgs(FrontendArgs, Diags);
+  });
 
-  if (!CI) {
+  if (HadError) {
     llvm::errs() << "error: unable to create a CompilerInvocation\n";
     return 1;
   }
@@ -3047,6 +3042,8 @@ int main(int argc, char *argv[]) {
   InitInvok.setSDKPath(options::SDK);
   InitInvok.getLangOptions().CollectParsedToken = true;
   InitInvok.getLangOptions().BuildSyntaxTree = true;
+  InitInvok.getLangOptions().RequestEvaluatorGraphVizPath =
+    options::GraphVisPath;
   if (options::DisableObjCInterop) {
     InitInvok.getLangOptions().EnableObjCInterop = false;
   } else if (options::EnableObjCInterop) {
@@ -3096,8 +3093,7 @@ int main(int argc, char *argv[]) {
   InitInvok.getLangOptions().InferImportAsMember |=
     options::InferImportAsMember;
   InitInvok.getLangOptions().EnableSwift3ObjCInference =
-    options::EnableSwift3ObjCInference ||
-    InitInvok.getLangOptions().isSwiftVersion3();
+    options::EnableSwift3ObjCInference;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
   InitInvok.getClangImporterOptions().InferImportAsMember |=

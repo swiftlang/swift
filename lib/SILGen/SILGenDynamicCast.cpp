@@ -155,6 +155,12 @@ namespace {
         if (operandValue.getType().isAddress()) {
           operandValue = SGF.B.createLoadTake(Loc, operandValue);
         }
+
+        // If we are not supposed to destroy this value on failure, then we need
+        // to borrow it.
+        if (!shouldDestroyOnFailure(consumption)) {
+          operandValue = operandValue.borrow(SGF, Loc);
+        }
         SGF.B.createCheckedCastBranch(Loc, /*exact*/ false, operandValue,
                                       origTargetTL.getLoweredType(), trueBB,
                                       falseBB, TrueCount, FalseCount);
@@ -171,8 +177,16 @@ namespace {
           result = finishFromResultBuffer(hasAbstraction, resultBuffer,
                                           abstraction, origTargetTL, ctx);
         } else {
-          ManagedValue argument =
-              SGF.B.createOwnedPHIArgument(origTargetTL.getLoweredType());
+          // If we had copy_on_success, then we need to use a guaranteed
+          // argument.
+          ManagedValue argument;
+          if (!shouldTakeOnSuccess(consumption)) {
+            argument = SGF.B.createGuaranteedPhiArgument(
+                origTargetTL.getLoweredType());
+          } else {
+            argument =
+                SGF.B.createOwnedPhiArgument(origTargetTL.getLoweredType());
+          }
           result = finishFromResultScalar(hasAbstraction, argument, consumption,
                                           abstraction, origTargetTL, ctx);
         }
@@ -207,7 +221,7 @@ namespace {
         if (shouldDestroyOnFailure(consumption)) {
           {
             FullExpr argScope(SGF.Cleanups, CleanupLocation::get(Loc));
-            SGF.B.createOwnedPHIArgument(operandValue.getType());
+            SGF.B.createOwnedPhiArgument(operandValue.getType());
           }
           handleFalse(None);
           assert(!SGF.B.hasValidInsertionPoint() &&
@@ -215,7 +229,18 @@ namespace {
           return;
         }
 
-        handleFalse(SGF.B.createOwnedPHIArgument(operandValue.getType()));
+        switch (consumption) {
+        case CastConsumptionKind::BorrowAlways:
+        case CastConsumptionKind::CopyOnSuccess:
+          SGF.B.createGuaranteedPhiArgument(operandValue.getType());
+          handleFalse(None);
+          break;
+        case CastConsumptionKind::TakeAlways:
+        case CastConsumptionKind::TakeOnSuccess:
+          handleFalse(SGF.B.createOwnedPhiArgument(operandValue.getType()));
+          break;
+        }
+
         assert(!SGF.B.hasValidInsertionPoint() && "handler did not end block");
       }
     }
@@ -302,264 +327,6 @@ void SILGenFunction::emitCheckedCastBranch(
     llvm::function_ref<void(Optional<ManagedValue>)> handleFalse,
     ProfileCounter TrueCount, ProfileCounter FalseCount) {
   CheckedCastEmitter emitter(*this, loc, sourceType, targetType);
-  emitter.emitConditional(src.getFinalManagedValue(), src.getFinalConsumption(),
-                          ctx, handleTrue, handleFalse, TrueCount, FalseCount);
-}
-
-namespace {
-  class CheckedCastEmitterOld {
-    SILGenFunction &SGF;
-    SILLocation Loc;
-    CanType SourceType;
-    CanType TargetType;
-
-    enum class CastStrategy : uint8_t {
-      Address,
-      Scalar,
-    };
-    CastStrategy Strategy;
-
-  public:
-    CheckedCastEmitterOld(SILGenFunction &SGF, SILLocation loc, Type sourceType,
-                          Type targetType)
-        : SGF(SGF), Loc(loc), SourceType(sourceType->getCanonicalType()),
-          TargetType(targetType->getCanonicalType()),
-          Strategy(computeStrategy()) {}
-
-    bool isOperandIndirect() const { return Strategy == CastStrategy::Address; }
-
-    ManagedValue emitOperand(Expr *operand) {
-      AbstractionPattern mostGeneral =
-          SGF.SGM.Types.getMostGeneralAbstraction();
-      auto &origSourceTL = SGF.getTypeLowering(mostGeneral, SourceType);
-
-      SGFContext ctx;
-
-      std::unique_ptr<TemporaryInitialization> temporary;
-      if (isOperandIndirect() && SGF.silConv.useLoweredAddresses()) {
-        temporary = SGF.emitTemporary(Loc, origSourceTL);
-        ctx = SGFContext(temporary.get());
-      }
-
-      auto result =
-          SGF.emitRValueAsOrig(operand, mostGeneral, origSourceTL, ctx);
-
-      if (isOperandIndirect() && SGF.silConv.useLoweredAddresses()) {
-        // Force the result into the temporary if it's not already there.
-        if (!result.isInContext()) {
-          result.forwardInto(SGF, Loc, temporary->getAddress());
-          temporary->finishInitialization(SGF);
-        }
-        return temporary->getManagedAddress();
-      }
-
-      return result;
-    }
-
-    RValue emitUnconditionalCast(ManagedValue operand, SGFContext ctx) {
-      // The cast functions don't know how to work with anything but
-      // the most general possible abstraction level.
-      AbstractionPattern abstraction =
-          SGF.SGM.Types.getMostGeneralAbstraction();
-      auto &origTargetTL = SGF.getTypeLowering(abstraction, TargetType);
-      auto &substTargetTL = SGF.getTypeLowering(TargetType);
-      bool hasAbstraction =
-          (origTargetTL.getLoweredType() != substTargetTL.getLoweredType());
-
-      // If we're using checked_cast_addr, take the operand (which
-      // should be an address) and build into the destination buffer.
-      if (Strategy == CastStrategy::Address &&
-          SGF.silConv.useLoweredAddresses()) {
-        SILValue resultBuffer =
-            createAbstractResultBuffer(hasAbstraction, origTargetTL, ctx);
-        SGF.B.createUnconditionalCheckedCastAddr(
-            Loc, operand.forward(SGF), SourceType, resultBuffer, TargetType);
-        return RValue(SGF, Loc, TargetType,
-                      finishFromResultBuffer(hasAbstraction, resultBuffer,
-                                             abstraction, origTargetTL, ctx));
-      }
-
-      SILValue resultScalar;
-      if (Strategy == CastStrategy::Address) {
-        resultScalar = SGF.B.createUnconditionalCheckedCastValue(
-            Loc, operand.forward(SGF), origTargetTL.getLoweredType());
-      } else {
-        resultScalar = SGF.B.createUnconditionalCheckedCast(
-            Loc, operand.forward(SGF), origTargetTL.getLoweredType());
-      }
-
-      return RValue(SGF, Loc, TargetType,
-                    finishFromResultScalar(hasAbstraction, resultScalar,
-                                           CastConsumptionKind::TakeAlways,
-                                           abstraction, origTargetTL, ctx));
-    }
-
-    /// Emit a conditional cast.
-    void emitConditional(ManagedValue operand, CastConsumptionKind consumption,
-                         SGFContext ctx,
-                         llvm::function_ref<void(ManagedValue)> handleTrue,
-                         llvm::function_ref<void()> handleFalse,
-                         ProfileCounter TrueCount = ProfileCounter(),
-                         ProfileCounter FalseCount = ProfileCounter()) {
-      // The cast instructions don't know how to work with anything
-      // but the most general possible abstraction level.
-      AbstractionPattern abstraction = SGF.SGM.Types.getMostGeneralAbstraction();
-      auto &origTargetTL = SGF.getTypeLowering(abstraction, TargetType);
-      auto &substTargetTL = SGF.getTypeLowering(TargetType);
-      bool hasAbstraction =
-        (origTargetTL.getLoweredType() != substTargetTL.getLoweredType());
-
-      SILBasicBlock *falseBB = SGF.B.splitBlockForFallthrough();
-      SILBasicBlock *trueBB = SGF.B.splitBlockForFallthrough();
-
-      // Emit the branch.
-      SILValue scalarOperandValue;
-      SILValue resultBuffer;
-      if (Strategy == CastStrategy::Address) {
-        assert(operand.getType().isAddress());
-        resultBuffer =
-          createAbstractResultBuffer(hasAbstraction, origTargetTL, ctx);
-        SGF.B.createCheckedCastAddrBranch(
-            Loc, consumption, operand.forward(SGF), SourceType, resultBuffer,
-            TargetType, trueBB, falseBB, TrueCount, FalseCount);
-      } else {
-        // Tolerate being passed an address here.  It comes up during switch
-        //emission.
-        scalarOperandValue = operand.forward(SGF);
-        if (scalarOperandValue->getType().isAddress()) {
-          scalarOperandValue = SGF.B.emitLoadValueOperation(
-              Loc, scalarOperandValue, LoadOwnershipQualifier::Take);
-        }
-        SGF.B.createCheckedCastBranch(Loc, /*exact*/ false, scalarOperandValue,
-                                      origTargetTL.getLoweredType(), trueBB,
-                                      falseBB, TrueCount, FalseCount);
-      }
-
-      // Emit the success block.
-      SGF.B.setInsertionPoint(trueBB);
-      {
-        FullExpr scope(SGF.Cleanups, CleanupLocation::get(Loc));
-
-        ManagedValue result;
-        if (Strategy == CastStrategy::Address) {
-          result = finishFromResultBuffer(hasAbstraction, resultBuffer,
-                                          abstraction, origTargetTL, ctx);
-        } else {
-          SILValue argument = trueBB->createPHIArgument(
-              origTargetTL.getLoweredType(), ValueOwnershipKind::Owned);
-          result = finishFromResultScalar(hasAbstraction, argument, consumption,
-                                          abstraction, origTargetTL, ctx);
-        }
-
-        handleTrue(result);
-        assert(!SGF.B.hasValidInsertionPoint() && "handler did not end block");
-      }
-
-      // Emit the failure block.
-      SGF.B.setInsertionPoint(falseBB);
-      {
-        FullExpr scope(SGF.Cleanups, CleanupLocation::get(Loc));
-
-        // If we're using the scalar strategy, handle the consumption rules.
-        if (Strategy != CastStrategy::Address &&
-            shouldDestroyOnFailure(consumption)) {
-          SGF.B.emitDestroyValueOperation(Loc, scalarOperandValue);
-        }
-
-        handleFalse();
-        assert(!SGF.B.hasValidInsertionPoint() && "handler did not end block");
-      }
-    }
-
-    SILValue createAbstractResultBuffer(bool hasAbstraction,
-                                        const TypeLowering &origTargetTL,
-                                        SGFContext ctx) {
-      // Note that the conditions here must exactly match the criteria in
-      // finishFromResultBuffer.
-      if (!hasAbstraction) {
-        if (auto address = ctx.getAddressForInPlaceInitialization(SGF, Loc))
-          return address;
-      }
-
-      return SGF.emitTemporaryAllocation(Loc, origTargetTL.getLoweredType());
-    }
-
-    ManagedValue finishFromResultBuffer(bool hasAbstraction,
-                                        SILValue buffer,
-                                        AbstractionPattern abstraction,
-                                        const TypeLowering &origTargetTL,
-                                        SGFContext ctx) {
-      // Note that the conditions here must exactly match the criteria in
-      // createAbstractResultBuffer.
-      if (!hasAbstraction) {
-        if (ctx.finishInPlaceInitialization(SGF))
-          return ManagedValue::forInContext();
-      }
-
-      ManagedValue result;
-      if (!origTargetTL.isAddressOnly()) {
-        result = SGF.emitLoad(Loc, buffer, origTargetTL, ctx, IsTake);
-      } else {
-        result = SGF.emitManagedBufferWithCleanup(buffer, origTargetTL);
-      }
-
-      if (hasAbstraction) {
-        result = SGF.emitOrigToSubstValue(Loc, result, abstraction,
-                                          TargetType, ctx);
-      }
-      return result;
-    }
-
-    /// Our cast succeeded and gave us this abstracted value.
-    ManagedValue finishFromResultScalar(bool hasAbstraction, SILValue value,
-                                        CastConsumptionKind consumption,
-                                        AbstractionPattern abstraction,
-                                        const TypeLowering &origTargetTL,
-                                        SGFContext ctx) {
-      // Retain the result if this is copy-on-success.
-      if (!shouldTakeOnSuccess(consumption))
-        value = origTargetTL.emitCopyValue(SGF.B, Loc, value);
-
-      // Enter a cleanup for the +1 result.
-      ManagedValue result
-        = SGF.emitManagedRValueWithCleanup(value, origTargetTL);
-
-      // Re-abstract if necessary.
-      if (hasAbstraction) {
-        result = SGF.emitOrigToSubstValue(Loc, result, abstraction,
-                                          TargetType, ctx);
-      }
-      return result;
-    }
-
-  private:
-    CastStrategy computeStrategy() const {
-      if (canUseScalarCheckedCastInstructions(SGF.SGM.M,
-                                              SourceType, TargetType))
-        return CastStrategy::Scalar;
-      return CastStrategy::Address;
-    }
-  };
-} // end anonymous namespace
-
-void SILGenFunction::emitCheckedCastBranchOld(
-    SILLocation loc, Expr *source, Type targetType, SGFContext ctx,
-    llvm::function_ref<void(ManagedValue)> handleTrue,
-    llvm::function_ref<void()> handleFalse, ProfileCounter TrueCount,
-    ProfileCounter FalseCount) {
-  CheckedCastEmitterOld emitter(*this, loc, source->getType(), targetType);
-  ManagedValue operand = emitter.emitOperand(source);
-  emitter.emitConditional(operand, CastConsumptionKind::TakeAlways, ctx,
-                          handleTrue, handleFalse, TrueCount, FalseCount);
-}
-
-void SILGenFunction::emitCheckedCastBranchOld(
-    SILLocation loc, ConsumableManagedValue src, Type sourceType,
-    CanType targetType, SGFContext ctx,
-    llvm::function_ref<void(ManagedValue)> handleTrue,
-    llvm::function_ref<void()> handleFalse, ProfileCounter TrueCount,
-    ProfileCounter FalseCount) {
-  CheckedCastEmitterOld emitter(*this, loc, sourceType, targetType);
   emitter.emitConditional(src.getFinalManagedValue(), src.getFinalConsumption(),
                           ctx, handleTrue, handleFalse, TrueCount, FalseCount);
 }
@@ -768,7 +535,7 @@ RValue Lowering::emitConditionalCheckedCast(
   if (resultObjectTemp) {
     result = SGF.manageBufferForExprResult(resultBuffer, resultTL, C);
   } else {
-    auto argument = contBlock->createPHIArgument(resultTL.getLoweredType(),
+    auto argument = contBlock->createPhiArgument(resultTL.getLoweredType(),
                                                  ValueOwnershipKind::Owned);
     result = SGF.emitManagedRValueWithCleanup(argument, resultTL);
   }
@@ -821,7 +588,7 @@ SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
       });
 
   auto contBB = scope.exit();
-  auto isa = contBB->createPHIArgument(i1Ty, ValueOwnershipKind::Trivial);
+  auto isa = contBB->createPhiArgument(i1Ty, ValueOwnershipKind::Trivial);
   return isa;
 }
 

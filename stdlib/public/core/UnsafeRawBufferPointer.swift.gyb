@@ -686,7 +686,6 @@ extension Unsafe${Mutable}RawBufferPointer : CustomDebugStringConvertible {
 }
 
 extension ${Self} {
-  @inlinable // FIXME(sil-serialize-all)
   @available(*, unavailable, 
     message: "use 'Unsafe${Mutable}RawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
   public subscript(bounds: Range<Int>) -> ${Self} {

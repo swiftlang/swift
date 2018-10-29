@@ -74,83 +74,83 @@ extension PrivateStruct {
 }
 
 public extension PublicStruct {
-  public func extMemberPublic() {}
+  public func extMemberPublic() {} // expected-warning {{'public' modifier is redundant for instance method declared in a public extension}} {{3-10=}}
   fileprivate func extFuncPublic() {}
   private func extImplPublic() {}
 }
 internal extension PublicStruct {
-  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-9=internal}}
+  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-10=}}
   fileprivate func extFuncInternal() {}
   private func extImplInternal() {}
 }
 fileprivate extension PublicStruct {
-  public func extMemberFilePrivate() {} // expected-warning {{declaring a public instance method in a fileprivate extension}} {{3-9=fileprivate}}
-  fileprivate func extFuncFilePrivate() {}
+  public func extMemberFilePrivate() {} // expected-warning {{declaring a public instance method in a fileprivate extension}} {{3-10=}}
+  fileprivate func extFuncFilePrivate() {} // expected-warning {{'fileprivate' modifier is redundant for instance method declared in a fileprivate extension}} {{3-15=}}
   private func extImplFilePrivate() {}
 }
 private extension PublicStruct {
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=fileprivate}}
-  fileprivate func extFuncPrivate() {}
+  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-10=}}
+  fileprivate func extFuncPrivate() {} // expected-warning {{'fileprivate' modifier is redundant for instance method declared in a private (equivalent to fileprivate) extension}} {{3-15=}}
   private func extImplPrivate() {}
 }
 public extension InternalStruct { // expected-error {{extension of internal struct cannot be declared public}} {{1-8=}}
-  public func extMemberPublic() {}
+  public func extMemberPublic() {} // expected-warning {{'public' modifier is redundant for instance method declared in a public extension}} {{3-10=}}
   fileprivate func extFuncPublic() {}
   private func extImplPublic() {}
 }
 internal extension InternalStruct {
-  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-9=internal}}
+  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-10=}}
   fileprivate func extFuncInternal() {}
   private func extImplInternal() {}
 }
 fileprivate extension InternalStruct {
-  public func extMemberFilePrivate() {} // expected-warning {{declaring a public instance method in a fileprivate extension}} {{3-9=fileprivate}}
-  fileprivate func extFuncFilePrivate() {}
+  public func extMemberFilePrivate() {} // expected-warning {{declaring a public instance method in a fileprivate extension}} {{3-10=}}
+  fileprivate func extFuncFilePrivate() {} // expected-warning {{'fileprivate' modifier is redundant for instance method declared in a fileprivate extension}} {{3-15=}}
   private func extImplFilePrivate() {}
 }
 private extension InternalStruct {
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=fileprivate}}
-  fileprivate func extFuncPrivate() {}
+  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-10=}}
+  fileprivate func extFuncPrivate() {} // expected-warning {{'fileprivate' modifier is redundant for instance method declared in a private (equivalent to fileprivate) extension}} {{3-15=}}
   private func extImplPrivate() {}
 }
 public extension FilePrivateStruct { // expected-error {{extension of fileprivate struct cannot be declared public}} {{1-8=}}
-  public func extMemberPublic() {}
+  public func extMemberPublic() {} // expected-warning {{'public' modifier is redundant for instance method declared in a public extension}} {{3-10=}}
   fileprivate func extFuncPublic() {}
   private func extImplPublic() {}
 }
 internal extension FilePrivateStruct { // expected-error {{extension of fileprivate struct cannot be declared internal}} {{1-10=}}
-  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-9=internal}}
+  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-10=}}
   fileprivate func extFuncInternal() {}
   private func extImplInternal() {}
 }
 fileprivate extension FilePrivateStruct {
-  public func extMemberFilePrivate() {} // expected-warning {{declaring a public instance method in a fileprivate extension}} {{3-9=fileprivate}}
-  fileprivate func extFuncFilePrivate() {}
+  public func extMemberFilePrivate() {} // expected-warning {{declaring a public instance method in a fileprivate extension}} {{3-10=}}
+  fileprivate func extFuncFilePrivate() {} // expected-warning {{'fileprivate' modifier is redundant for instance method declared in a fileprivate extension}} {{3-15=}}
   private func extImplFilePrivate() {}
 }
 private extension FilePrivateStruct {
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=fileprivate}}
-  fileprivate func extFuncPrivate() {}
+  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-10=}}
+  fileprivate func extFuncPrivate() {} // expected-warning {{'fileprivate' modifier is redundant for instance method declared in a private (equivalent to fileprivate) extension}} {{3-15=}}
   private func extImplPrivate() {}
 }
 public extension PrivateStruct { // expected-error {{extension of private struct cannot be declared public}} {{1-8=}}
-  public func extMemberPublic() {}
+  public func extMemberPublic() {} // expected-warning {{'public' modifier is redundant for instance method declared in a public extension}} {{3-10=}}
   fileprivate func extFuncPublic() {}
   private func extImplPublic() {}
 }
 internal extension PrivateStruct { // expected-error {{extension of private struct cannot be declared internal}} {{1-10=}}
-  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-9=internal}}
+  public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}} {{3-10=}}
   fileprivate func extFuncInternal() {}
   private func extImplInternal() {}
 }
 fileprivate extension PrivateStruct { // expected-error {{extension of private struct cannot be declared fileprivate}} {{1-13=}}
-  public func extMemberFilePrivate() {} // expected-warning {{declaring a public instance method in a fileprivate extension}} {{3-9=fileprivate}}
-  fileprivate func extFuncFilePrivate() {}
+  public func extMemberFilePrivate() {} // expected-warning {{declaring a public instance method in a fileprivate extension}} {{3-10=}}
+  fileprivate func extFuncFilePrivate() {} // expected-warning {{'fileprivate' modifier is redundant for instance method declared in a fileprivate extension}} {{3-15=}}
   private func extImplFilePrivate() {}
 }
 private extension PrivateStruct {
-  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-9=fileprivate}}
-  fileprivate func extFuncPrivate() {}
+  public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}} {{3-10=}}
+  fileprivate func extFuncPrivate() {} // expected-warning {{'fileprivate' modifier is redundant for instance method declared in a private (equivalent to fileprivate) extension}} {{3-15=}}
   private func extImplPrivate() {}
 }
 
@@ -174,7 +174,7 @@ public class Base {
 
 
 public extension Base {
-  open func extMemberPublic() {} // expected-warning {{declaring open instance method in public extension}}
+  open func extMemberPublic() {} // expected-warning {{declaring open instance method in a public extension}}
 }
 internal extension Base {
   open func extMemberInternal() {} // expected-warning {{declaring open instance method in an internal extension}}
@@ -650,12 +650,10 @@ fileprivate struct EquatablishOuter {
   internal struct Inner : Equatablish {}
 }
 private func ==(lhs: EquatablishOuter.Inner, rhs: EquatablishOuter.Inner) {}
-// expected-note@-1 {{candidate has non-matching type}}
 
 fileprivate struct EquatablishOuter2 {
   internal struct Inner : Equatablish {
     fileprivate static func ==(lhs: Inner, rhs: Inner) {}
-    // expected-note@-1 {{candidate has non-matching type}}
   }
 }
 
@@ -669,7 +667,6 @@ internal struct EquatablishOuterProblem2 {
   public struct Inner : Equatablish {
     fileprivate static func ==(lhs: Inner, rhs: Inner) {} // expected-error {{method '==' must be as accessible as its enclosing type because it matches a requirement in protocol 'Equatablish'}} {{none}}
     // expected-note@-1 {{mark the operator function as 'internal' to satisfy the requirement}} {{5-16=internal}}
-    // expected-note@-2 {{candidate has non-matching type}}
   }
 }
 
@@ -679,7 +676,6 @@ internal struct EquatablishOuterProblem3 {
 }
 private func ==(lhs: EquatablishOuterProblem3.Inner, rhs: EquatablishOuterProblem3.Inner) {}
 // expected-note@-1 {{mark the operator function as 'internal' to satisfy the requirement}} {{1-8=internal}}
-// expected-note@-2 {{candidate has non-matching type}}
 
 
 public protocol AssocTypeProto {
@@ -724,3 +720,90 @@ public typealias BadPublicComposition2 = PublicClass & InternalProto // expected
 public typealias BadPublicComposition3<T> = InternalGenericClass<T> & PublicProto // expected-error {{type alias cannot be declared public because its underlying type uses an internal type}}
 public typealias BadPublicComposition4 = InternalGenericClass<Int> & PublicProto // expected-error {{type alias cannot be declared public because its underlying type uses an internal type}}
 public typealias BadPublicComposition5 = PublicGenericClass<InternalStruct> & PublicProto // expected-error {{type alias cannot be declared public because its underlying type uses an internal type}}
+
+
+open class ClassWithProperties {
+  open open(set) var openProp = 0 // expected-warning {{'open(set)' modifier is redundant for an open property}} {{8-18=}}
+  public public(set) var publicProp = 0 // expected-warning {{'public(set)' modifier is redundant for a public property}} {{10-22=}}
+  internal internal(set) var internalProp = 0 // expected-warning {{'internal(set)' modifier is redundant for an internal property}} {{12-26=}}
+  fileprivate fileprivate(set) var fileprivateProp = 0 // expected-warning {{'fileprivate(set)' modifier is redundant for a fileprivate property}} {{15-32=}}
+  private private(set) var privateProp = 0 // expected-warning {{'private(set)' modifier is redundant for a private property}} {{11-24=}}
+  internal(set) var defaultProp = 0 // expected-warning {{'internal(set)' modifier is redundant for an internal property}} {{3-17=}}
+}
+
+extension ClassWithProperties {
+  // expected-warning@+1 {{'internal(set)' modifier is redundant for an internal property}} {{12-26=}}
+  internal internal(set) var defaultExtProp: Int {
+    get { return 42 }
+    set {}
+  }
+  // expected-warning@+1 {{'internal(set)' modifier is redundant for an internal property}} {{3-17=}}
+  internal(set) var defaultExtProp2: Int {
+    get { return 42 }
+    set {}
+  }
+}
+
+public extension ClassWithProperties {
+  // expected-warning@+2 {{'public' modifier is redundant for property declared in a public extension}} {{3-10=}}
+  // expected-warning@+1 {{'public(set)' modifier is redundant for a public property}} {{10-22=}}
+  public public(set) var publicExtProp: Int {
+    get { return 42 }
+    set {}
+  }
+  // expected-warning@+1 {{'public(set)' modifier is redundant for a public property}} {{3-15=}}
+  public(set) var publicExtProp2: Int {
+    get { return 42 }
+    set {}
+  }
+}
+
+internal extension ClassWithProperties {
+  // expected-warning@+2 {{'internal' modifier is redundant for property declared in an internal extension}} {{3-12=}}
+  // expected-warning@+1 {{'internal(set)' modifier is redundant for an internal property}} {{12-26=}}
+  internal internal(set) var internalExtProp: Int {
+    get { return 42 }
+    set {}
+  }
+  // expected-warning@+1 {{'internal(set)' modifier is redundant for an internal property}} {{3-17=}}
+  internal(set) var internalExtProp2: Int {
+    get { return 42 }
+    set {}
+  }
+}
+
+fileprivate extension ClassWithProperties {
+  // expected-warning@+2 {{'fileprivate' modifier is redundant for property declared in a fileprivate extension}} {{3-15=}}
+  // expected-warning@+1 {{'fileprivate(set)' modifier is redundant for a fileprivate property}} {{15-32=}}
+  fileprivate fileprivate(set) var fileprivateExtProp: Int {
+    get { return 42 }
+    set {}
+  }
+  // expected-warning@+1 {{'fileprivate(set)' modifier is redundant for a fileprivate property}} {{3-20=}}
+  fileprivate(set) var fileprivateExtProp2: Int {
+    get { return 42 }
+    set {}
+  }
+  private(set) var fileprivateExtProp3: Int {
+    get { return 42 }
+    set {}
+  }
+}
+
+private extension ClassWithProperties {
+  // expected-warning@+2 {{'fileprivate' modifier is redundant for property declared in a private (equivalent to fileprivate) extension}} {{3-15=}}
+  // expected-warning@+1 {{'fileprivate(set)' modifier is redundant for a fileprivate property}} {{15-32=}}
+  fileprivate fileprivate(set) var privateExtProp: Int {
+    get { return 42 }
+    set {}
+  }
+  // expected-warning@+1 {{'fileprivate(set)' modifier is redundant for a fileprivate property}} {{3-20=}}
+  fileprivate(set) var privateExtProp2: Int {
+    get { return 42 }
+    set {}
+  }
+  private(set) var privateExtProp3: Int {
+    get { return 42 }
+    set {}
+  }
+}

@@ -1,15 +1,10 @@
-// We need to require macOS because swiftSyntax currently doesn't build on Linux
-// REQUIRES: OS=macosx
 // RUN: %target-swift-ide-test -syntax-coloring -source-filename %s | %FileCheck %s
-// RUN: %target-swift-ide-test -syntax-coloring -typecheck -source-filename %s | %FileCheck %s -check-prefixes CHECK,CHECK-OLD
-// RUN: %swift-swiftsyntax-test -classify-syntax -source-file %s | %FileCheck %s --check-prefixes CHECK,CHECK-NEW
-// XFAIL: broken_std_regex
+// RUN: %target-swift-ide-test -syntax-coloring -typecheck -source-filename %s | %FileCheck %s
 
 enum List<T> {
   case Nil
   // rdar://21927124
-  // CHECK-OLD: <attr-builtin>indirect</attr-builtin> <kw>case</kw> Cons(T, List)
-  // CHECK-NEW: <attr-builtin>indirect</attr-builtin> <kw>case</kw> Cons(<type>T</type>, <type>List</type>)
+  // CHECK: <attr-builtin>indirect</attr-builtin> <kw>case</kw> Cons(T, List)
   indirect case Cons(T, List)
 }
 
@@ -85,8 +80,7 @@ class Attributes {
 // CHECK: <attr-builtin>@IBOutlet</attr-builtin> <kw>var</kw> v0: <type>Int</type>
   @IBOutlet var v0: Int
 
-// CHECK-OLD: <attr-builtin>@IBOutlet</attr-builtin> <attr-id>@IBOutlet</attr-id> <kw>var</kw> v1: <type>String</type>
-// CHECK-NEW: <attr-builtin>@IBOutlet</attr-builtin> <attr-builtin>@IBOutlet</attr-builtin> <kw>var</kw> v1: <type>String</type>
+// CHECK: <attr-builtin>@IBOutlet</attr-builtin> <attr-id>@IBOutlet</attr-id> <kw>var</kw> v1: <type>String</type>
   @IBOutlet @IBOutlet var v1: String
 
 // CHECK: <attr-builtin>@objc</attr-builtin> <attr-builtin>@IBOutlet</attr-builtin> <kw>var</kw> v2: <type>String</type>
@@ -239,8 +233,7 @@ func f(x: Int) -> Int {
    )
    """
 
-  // CHECK-OLD: <str>"</str>\<anchor>(</anchor><int>1</int><anchor>)</anchor>\<anchor>(</anchor><int>1</int><anchor>)</anchor><str>"</str>
-  // CHECK-NEW: <str>"</str>\<anchor>(</anchor><int>1</int><anchor>)</anchor><str></str>\<anchor>(</anchor><int>1</int><anchor>)</anchor><str>"</str>
+  // CHECK: <str>"</str>\<anchor>(</anchor><int>1</int><anchor>)</anchor>\<anchor>(</anchor><int>1</int><anchor>)</anchor><str>"</str>
   "\(1)\(1)"
 }
 
@@ -330,17 +323,13 @@ func funcTakingIn(in internalName: Int) {}
 _ = 123
 // CHECK: <int>123</int>
 _ = -123
-// CHECK-OLD: <int>-123</int>
-// CHECK-NEW: -<int>123</int>
+// CHECK: <int>-123</int>
 _ = -1
-// CHECK-OLD: <int>-1</int>
-// CHECK-NEW: -<int>1</int>
+// CHECK: <int>-1</int>
 _ = -0x123
-// CHECK-OLD: <int>-0x123</int>
-// CHECK-NEW: -<int>0x123</int>
+// CHECK: <int>-0x123</int>
 _ = -3.1e-5
-// CHECK-OLD: <float>-3.1e-5</float>
-// CHECK-NEW: <float>3.1e-5</float>
+// CHECK: <float>-3.1e-5</float>
 
 "--\"\(x) --"
 // CHECK: <str>"--\"</str>\<anchor>(</anchor>x<anchor>)</anchor><str> --"</str>
@@ -397,15 +386,12 @@ class Ownership {
   weak var w
   // CHECK: <attr-builtin>unowned</attr-builtin> <kw>var</kw> u
   unowned var u
-  // CHECK-OLD: <attr-builtin>unowned(unsafe)</attr-builtin> <kw>var</kw> uu
-  // CHECK-NEW: <attr-builtin>unowned</attr-builtin>(unsafe) <kw>var</kw> uu
+  // CHECK: <attr-builtin>unowned(unsafe)</attr-builtin> <kw>var</kw> uu
   unowned(unsafe) var uu
 }
-// CHECK-OLD: <kw>let</kw> closure = { [<attr-builtin>weak</attr-builtin> x=bindtox, <attr-builtin>unowned</attr-builtin> y=bindtoy, <attr-builtin>unowned(unsafe)</attr-builtin> z=bindtoz] <kw>in</kw> }
-// FIXME: CHECK-NEW: <kw>let</kw> closure = { [weak x=bindtox, unowned y=bindtoy, unowned(unsafe) z=bindtoz] <kw>in</kw> }
+// CHECK: <kw>let</kw> closure = { [<attr-builtin>weak</attr-builtin> x=bindtox, <attr-builtin>unowned</attr-builtin> y=bindtoy, <attr-builtin>unowned(unsafe)</attr-builtin> z=bindtoz] <kw>in</kw> }
 let closure = { [weak x=bindtox, unowned y=bindtoy, unowned(unsafe) z=bindtoz] in }
 
 protocol FakeClassRestrictedProtocol : `class` {}
-// CHECK-OLD: <kw>protocol</kw> FakeClassRestrictedProtocol : <type>`class`</type> {}
+// CHECK: <kw>protocol</kw> FakeClassRestrictedProtocol : <type>`class`</type> {}
 // FIXME: rdar://42801404: OLD and NEW should be the same '<type>`class`</type>'.
-// CHECK-NEW: <kw>protocol</kw> FakeClassRestrictedProtocol : `<type>class</type>` {}

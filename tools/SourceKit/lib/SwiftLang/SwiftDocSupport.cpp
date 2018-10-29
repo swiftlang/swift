@@ -416,21 +416,9 @@ static bool initDocEntityInfo(const Decl *D,
     case DeclContextKind::FileUnit: {
       if (auto *CD = D->getClangDecl()) {
         if (auto *M = CD->getImportedOwningModule()) {
-          const clang::Module *Root = M->getTopLevelModule();
-
-          // If Root differs from the owning module, then the owning module is
-          // a sub-module.
-          if (M != Root) {
+          if (M->isSubModule()) {
             llvm::raw_svector_ostream OS(Info.SubModuleName);
-            llvm::SmallVector<StringRef, 4> Names;
-
-            // Climb up and collect sub-module names.
-            for (auto Current = M; Current != Root; Current = Current->Parent) {
-              Names.insert(Names.begin(), Current->Name);
-            }
-            OS << Root->Name;
-            std::for_each(Names.begin(), Names.end(),
-                          [&](StringRef N) { OS << "." << N; });
+            ModuleDecl::ReverseFullNameIterator(M).printForward(OS);
           }
         }
       }
@@ -972,8 +960,7 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
     return true;
 
   ASTContext &Ctx = CI.getASTContext();
-  // Setup a typechecker for protocol conformance resolving.
-  OwnedResolver TypeResolver = createLazyResolver(Ctx);
+  (void)createTypeChecker(Ctx);
 
   SourceTextInfo IFaceInfo;
   if (getModuleInterfaceInfo(Ctx, ModuleName, IFaceInfo))
@@ -1101,7 +1088,7 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
   CI.performSema();
 
   // Setup a typechecker for protocol conformance resolving.
-  OwnedResolver TypeResolver = createLazyResolver(Ctx);
+  (void)createTypeChecker(Ctx);
 
   SourceTextInfo SourceInfo;
   if (getSourceTextInfo(CI, SourceInfo))
@@ -1347,7 +1334,7 @@ void SwiftLangSupport::findLocalRenameRanges(
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  getASTManager().processASTAsync(Invok, ASTConsumer, &OncePerASTToken);
+  getASTManager()->processASTAsync(Invok, ASTConsumer, &OncePerASTToken);
 }
 
 SourceFile *SwiftLangSupport::getSyntacticSourceFile(
@@ -1355,7 +1342,7 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
     CompilerInstance &ParseCI, std::string &Error) {
   CompilerInvocation Invocation;
 
-  bool Failed = getASTManager().initCompilerInvocationNoInputs(
+  bool Failed = getASTManager()->initCompilerInvocationNoInputs(
       Invocation, Args, ParseCI.getDiags(), Error);
   if (Failed) {
     Error = "Compiler invocation init failed";
@@ -1410,7 +1397,7 @@ void SwiftLangSupport::getDocInfo(llvm::MemoryBuffer *InputBuf,
 
   CompilerInvocation Invocation;
   std::string Error;
-  bool Failed = getASTManager().initCompilerInvocationNoInputs(
+  bool Failed = getASTManager()->initCompilerInvocationNoInputs(
       Invocation, Args, CI.getDiags(), Error, /*AllowInputs=*/false);
 
   if (Failed) {
@@ -1446,7 +1433,7 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
   CI.addDiagnosticConsumer(&PrintDiags);
   std::vector<StringRef> Groups;
   std::string Error;
-  if (getASTManager().initCompilerInvocationNoInputs(Invocation, Args,
+  if (getASTManager()->initCompilerInvocationNoInputs(Invocation, Args,
                                                      CI.getDiags(), Error)) {
     Receiver(Groups, Error);
     return;
@@ -1459,7 +1446,8 @@ findModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args,
 
   ASTContext &Ctx = CI.getASTContext();
   // Setup a typechecker for protocol conformance resolving.
-  OwnedResolver TypeResolver = createLazyResolver(Ctx);
+  (void)createTypeChecker(Ctx);
+
   // Load standard library so that Clang importer can use it.
   auto *Stdlib = getModuleByFullName(Ctx, Ctx.StdlibModuleName);
   if (!Stdlib) {

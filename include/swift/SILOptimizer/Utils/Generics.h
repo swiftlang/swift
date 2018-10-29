@@ -55,7 +55,7 @@ void trySpecializeApplyOfGeneric(
 class ReabstractionInfo {
   /// A 1-bit means that this parameter/return value is converted from indirect
   /// to direct.
-  llvm::SmallBitVector Conversions;
+  SmallBitVector Conversions;
 
   /// If set, indirect to direct conversions should be performed by the generic
   /// specializer.

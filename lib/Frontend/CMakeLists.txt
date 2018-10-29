@@ -1,4 +1,4 @@
-add_swift_library(swiftFrontend STATIC
+add_swift_host_library(swiftFrontend STATIC
   ArgsToFrontendInputsConverter.cpp
   ArgsToFrontendOptionsConverter.cpp
   ArgsToFrontendOutputsConverter.cpp
@@ -7,7 +7,7 @@ add_swift_library(swiftFrontend STATIC
   Frontend.cpp
   FrontendInputsAndOutputs.cpp
   FrontendOptions.cpp
-  OutputFileMap.cpp
+  ParseableInterfaceSupport.cpp
   PrintingDiagnosticConsumer.cpp
   SerializedDiagnosticConsumer.cpp
   DEPENDS
@@ -17,6 +17,8 @@ add_swift_library(swiftFrontend STATIC
     swiftMigrator
     swiftOption
     swiftParseSIL
+    swiftSILGen
+    swiftSILOptimizer
     swiftSema
     swiftSerialization)
 

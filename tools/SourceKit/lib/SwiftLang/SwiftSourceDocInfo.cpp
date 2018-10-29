@@ -562,7 +562,7 @@ tryRemappingLocToLatestSnapshot(SwiftLangSupport &Lang,
                                 StringRef Filename,
                          ArrayRef<ImmutableTextSnapshotRef> PreviousASTSnaps) {
   ImmutableTextSnapshotRef LatestSnap;
-  if (auto EditorDoc = Lang.getEditorDocuments().findByPath(Filename))
+  if (auto EditorDoc = Lang.getEditorDocuments()->findByPath(Filename))
     LatestSnap = EditorDoc->getLatestSnapshot();
   if (!LatestSnap)
     return Range;
@@ -684,8 +684,7 @@ getParamParentNameOffset(const ValueDecl *VD, SourceLoc Cursor) {
   if (Loc.isInvalid())
     return None;
   auto &SM = VD->getASTContext().SourceMgr;
-  return SM.getLocOffsetInBuffer(Loc, SM.getIDForBufferIdentifier(SM.
-    getBufferIdentifierForLoc(Loc)).getValue());
+  return SM.getLocOffsetInBuffer(Loc, SM.findBufferContainingLoc(Loc));
 }
 
 /// Returns true for failure to resolve.
@@ -873,7 +872,8 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   auto ClangNode = VD->getClangNode();
   if (ClangNode) {
     auto ClangMod = Importer->getClangOwningModule(ClangNode);
-    ModuleName = ClangMod->getFullModuleName();
+    if (ClangMod)
+      ModuleName = ClangMod->getFullModuleName();
   } else if (VD->getLoc().isInvalid() && VD->getModuleContext() != MainModule) {
     ModuleName = VD->getModuleContext()->getName().str();
   }
@@ -1143,7 +1143,7 @@ public:
     // blocked waiting on the AST to be fully typechecked.
 
     ImmutableTextSnapshotRef InputSnap;
-    if (auto EditorDoc = Lang.getEditorDocuments().findByPath(InputFile))
+    if (auto EditorDoc = Lang.getEditorDocuments()->findByPath(InputFile))
       InputSnap = EditorDoc->getLatestSnapshot();
       if (!InputSnap)
         return false;
@@ -1372,7 +1372,7 @@ static void resolveCursor(SwiftLangSupport &Lang,
   const void *Once = nullptr;
   if (CancelOnSubsequentRequest)
     Once = Actionables ? &OncePerASTTokenWithActionables : &OncePerASTToken;
-  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer), Once);
+  Lang.getASTManager()->processASTAsync(Invok, std::move(Consumer), Once);
 }
 
 static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
@@ -1459,7 +1459,7 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
   auto Consumer = std::make_shared<NameInfoConsumer>(
     InputFile, Offset, Lang, Invok, TryExistingAST, Input, Receiver);
 
-  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer), nullptr);
+  Lang.getASTManager()->processASTAsync(Invok, std::move(Consumer), nullptr);
 }
 
 static void resolveRange(SwiftLangSupport &Lang,
@@ -1547,7 +1547,7 @@ static void resolveRange(SwiftLangSupport &Lang,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
   const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
-  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer), Once);
+  Lang.getASTManager()->processASTAsync(Invok, std::move(Consumer), Once);
 }
 
 void SwiftLangSupport::getCursorInfo(
@@ -1773,7 +1773,7 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
   const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
-  Lang.getASTManager().processASTAsync(Invok, std::move(Consumer), Once);
+  Lang.getASTManager()->processASTAsync(Invok, std::move(Consumer), Once);
 }
 
 void SwiftLangSupport::getCursorInfoFromUSR(
@@ -2021,5 +2021,5 @@ semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  getASTManager().processASTAsync(Invok, std::move(Consumer), &OncePerASTToken);
+  getASTManager()->processASTAsync(Invok, std::move(Consumer), &OncePerASTToken);
 }

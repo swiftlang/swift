@@ -513,7 +513,7 @@ do {
 }
 
 struct InitTwo {
-  init(_ x: Int, _ y: Int) {} // expected-note 5 {{'init' declared here}}
+  init(_ x: Int, _ y: Int) {} // expected-note 5 {{'init(_:_:)' declared here}}
 }
 
 struct InitTuple {
@@ -564,7 +564,7 @@ do {
 }
 
 struct SubscriptTwo {
-  subscript(_ x: Int, _ y: Int) -> Int { get { return 0 } set { } } // expected-note 5 {{'subscript' declared here}}
+  subscript(_ x: Int, _ y: Int) -> Int { get { return 0 } set { } } // expected-note 5 {{'subscript(_:_:)' declared here}}
 }
 
 struct SubscriptTuple {
@@ -915,7 +915,7 @@ struct GenericInitLabeled<T> {
 }
 
 struct GenericInitTwo<T> {
-  init(_ x: T, _ y: T) {} // expected-note 10 {{'init' declared here}}
+  init(_ x: T, _ y: T) {} // expected-note 10 {{'init(_:_:)' declared here}}
 }
 
 struct GenericInitTuple<T> {
@@ -1041,7 +1041,7 @@ struct GenericSubscriptLabeled<T> {
 }
 
 struct GenericSubscriptTwo<T> {
-  subscript(_ x: T, _ y: T) -> Int { get { return 0 } set { } } // expected-note 5 {{'subscript' declared here}}
+  subscript(_ x: T, _ y: T) -> Int { get { return 0 } set { } } // expected-note 5 {{'subscript(_:_:)' declared here}}
 }
 
 struct GenericSubscriptLabeledTuple<T> {
@@ -1631,13 +1631,13 @@ do {
 
 // https://bugs.swift.org/browse/SR-6509
 public extension Optional {
-  public func apply<Result>(_ transform: ((Wrapped) -> Result)?) -> Result? {
+  func apply<Result>(_ transform: ((Wrapped) -> Result)?) -> Result? {
     return self.flatMap { value in
       transform.map { $0(value) }
     }
   }
 
-  public func apply<Value, Result>(_ value: Value?) -> Result?
+  func apply<Value, Result>(_ value: Value?) -> Result?
     where Wrapped == (Value) -> Result {
     return value.apply(self)
   }

@@ -850,10 +850,10 @@ struct WillSetDidSetDisambiguate3 {
 }
 
 protocol ProtocolGetSet1 {
-  var a: Int // expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
+  var a: Int // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{13-13= { get <#set#> \}}}
 }
 protocol ProtocolGetSet2 {
-  var a: Int {} // expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
+  var a: Int {} // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-16={ get <#set#> \}}}
 }
 protocol ProtocolGetSet3 {
   var a: Int { get }
@@ -869,16 +869,20 @@ protocol ProtocolGetSet6 {
 }
 
 protocol ProtocolWillSetDidSet1 {
-  var a: Int { willSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} expected-error {{expected get or set in a protocol property}}
+  var a: Int { willSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-25={ get <#set#> \}}} expected-error {{expected get or set in a protocol property}}
 }
 protocol ProtocolWillSetDidSet2 {
-  var a: Int { didSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} expected-error {{expected get or set in a protocol property}}
+  var a: Int { didSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-24={ get <#set#> \}}} expected-error {{expected get or set in a protocol property}}
 }
 protocol ProtocolWillSetDidSet3 {
-  var a: Int { willSet didSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} expected-error 2 {{expected get or set in a protocol property}}
+  var a: Int { willSet didSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-32={ get <#set#> \}}} expected-error 2 {{expected get or set in a protocol property}}
+
 }
 protocol ProtocolWillSetDidSet4 {
-  var a: Int { didSet willSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} expected-error 2 {{expected get or set in a protocol property}}
+  var a: Int { didSet willSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-32={ get <#set#> \}}} expected-error 2 {{expected get or set in a protocol property}}
+}
+protocol ProtocolWillSetDidSet5 {
+  let a: Int { didSet willSet }  // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-32={ get <#set#> \}}} {{none}} expected-error 2 {{expected get or set in a protocol property}} expected-error {{'let' declarations cannot be computed properties}} {{3-6=var}}
 }
 
 var globalDidsetWillSet: Int {  // expected-error {{non-member observing properties require an initializer}}
@@ -1263,3 +1267,25 @@ class WeakFixItTest {
   // expected-error @+1 {{'weak' variable should have optional type '(WFI_P1 & WFI_P2)?'}} {{18-18=(}} {{33-33=)?}}
   weak var bar : WFI_P1 & WFI_P2
 }
+
+// SR-8811
+// Stored properties cannot have uninhabited types
+
+struct SR8811 {
+  var x: Never // expected-error {{stored property 'x' cannot have enum type 'Never' with no cases}}
+  
+  var y: (Int, Never, Bool) // expected-error {{stored property 'y' cannot have tuple type '(Int, Never, Bool)' containing enum with no cases}}
+}
+
+let sr8811x: Never // expected-error {{constant 'sr8811x' cannot have enum type 'Never' with no cases}}
+
+var sr8811y: (Int, Never) // expected-error {{variable 'sr8811y' cannot have tuple type '(Int, Never)' containing enum with no cases}}
+
+// Ok
+var sr8811z: Never {
+  return fatalError()
+}
+
+enum SR8811EmptyGenericEnum<A> {}
+
+let sr8811z: SR8811EmptyGenericEnum<Int> // expected-error {{constant 'sr8811z' cannot have enum type 'SR8811EmptyGenericEnum<Int>' with no cases}}

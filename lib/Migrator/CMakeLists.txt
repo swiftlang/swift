@@ -1,13 +1,8 @@
 set(datafiles
-  macos3.json
   macos4.json
-  ios3.json
   ios4.json
-  tvos3.json
   tvos4.json
-  watchos3.json
   watchos4.json
-  overlay3.json
   overlay4.json
 )
 set(SWIFTLIB_DIR
@@ -47,7 +42,7 @@ swift_install_in_component(compiler
   FILES ${datafiles}
 DESTINATION "lib/swift/migrator")
 
-add_swift_library(swiftMigrator STATIC
+add_swift_host_library(swiftMigrator STATIC
   APIDiffMigratorPass.cpp
   EditorAdapter.cpp
   FixitApplyDiagnosticConsumer.cpp

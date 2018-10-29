@@ -50,7 +50,7 @@ extension _UnmanagedString where CodeUnit == UInt8 {
     hasher._core.combine(0xFF as UInt8) // terminator
   }
 
-  internal func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+  internal func _rawHashValue(seed: Int) -> Int {
     return Hasher._hash(seed: seed, bytes: rawBuffer)
   }
 }
@@ -61,7 +61,7 @@ extension _UnmanagedString where CodeUnit == UInt16 {
     hasher._core.combine(0xFF as UInt8) // terminator
   }
 
-  internal func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+  internal func _rawHashValue(seed: Int) -> Int {
     var core = Hasher.Core(seed: seed)
     self.hashUTF16(into: &core)
     return Int(truncatingIfNeeded: core.finalize())
@@ -74,7 +74,7 @@ extension _UnmanagedOpaqueString {
     hasher._core.combine(0xFF as UInt8) // terminator
   }
 
-  internal func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+  internal func _rawHashValue(seed: Int) -> Int {
     var core = Hasher.Core(seed: seed)
     self.hashUTF16(into: &core)
     return Int(truncatingIfNeeded: core.finalize())
@@ -94,7 +94,7 @@ extension _SmallUTF8String {
 #endif // 64-bit
   }
 
-  internal func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+  internal func _rawHashValue(seed: Int) -> Int {
 #if arch(i386) || arch(arm)
     unsupportedOn32bit()
 #else
@@ -149,7 +149,7 @@ extension _StringGuts {
 
   @_effects(releasenone) // FIXME: Is this valid in the opaque case?
   @usableFromInline
-  internal func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+  internal func _rawHashValue(seed: Int) -> Int {
     if _isSmall {
       return _smallUTF8String._rawHashValue(seed: seed)
     }
@@ -166,10 +166,7 @@ extension _StringGuts {
 
   @_effects(releasenone) // FIXME: Is this valid in the opaque case?
   @usableFromInline
-  internal func _rawHashValue(
-    _ range: Range<Int>,
-    seed: (UInt64, UInt64)
-  ) -> Int {
+  internal func _rawHashValue(_ range: Range<Int>, seed: Int) -> Int {
     if _isSmall {
       return _smallUTF8String[range]._rawHashValue(seed: seed)
     }
@@ -197,7 +194,7 @@ extension String : Hashable {
   }
 
   @inlinable
-  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+  public func _rawHashValue(seed: Int) -> Int {
     return _guts._rawHashValue(seed: seed)
   }
 }
@@ -214,7 +211,7 @@ extension StringProtocol {
   }
 
   @inlinable
-  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+  public func _rawHashValue(seed: Int) -> Int {
     return _wholeString._guts._rawHashValue(_encodedOffsetRange, seed: seed)
   }
 }

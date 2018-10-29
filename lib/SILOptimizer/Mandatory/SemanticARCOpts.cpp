@@ -66,7 +66,7 @@ static bool optimizeGuaranteedArgument(SILArgument *Arg,
     // 1. copy_value.
     // 2. begin_borrow.
     // 3. end_borrow.
-    if (!all_of(Checker.LifetimeEndingUsers, [](SILInstruction *I) -> bool {
+    if (!all_of(Checker.lifetimeEndingUsers, [](SILInstruction *I) -> bool {
           return isa<DestroyValueInst>(I);
         }))
       continue;
@@ -74,7 +74,7 @@ static bool optimizeGuaranteedArgument(SILArgument *Arg,
     // Extra copy values that we should visit recursively.
     llvm::SmallVector<CopyValueInst *, 8> NewCopyInsts;
     llvm::SmallVector<SILInstruction *, 8> NewBorrowInsts;
-    if (!all_of(Checker.RegularUsers, [&](SILInstruction *I) -> bool {
+    if (!all_of(Checker.regularUsers, [&](SILInstruction *I) -> bool {
           if (auto *CVI = dyn_cast<CopyValueInst>(I)) {
             NewCopyInsts.push_back(CVI);
             return true;
@@ -94,8 +94,8 @@ static bool optimizeGuaranteedArgument(SILArgument *Arg,
     CVI->eraseFromParent();
     ++NumEliminatedInsts;
 
-    while (!Checker.LifetimeEndingUsers.empty()) {
-      Checker.LifetimeEndingUsers.pop_back_val()->eraseFromParent();
+    while (!Checker.lifetimeEndingUsers.empty()) {
+      Checker.lifetimeEndingUsers.pop_back_val()->eraseFromParent();
       ++NumEliminatedInsts;
     }
 
@@ -119,6 +119,16 @@ static bool optimizeGuaranteedArgument(SILArgument *Arg,
             Worklist.push_back(BBIUseCopyValue);
           }
         }
+
+        // First go through and eliminate all end borrows.
+        SmallVector<EndBorrowInst *, 4> endBorrows;
+        copy(BBI->getEndBorrows(), std::back_inserter(endBorrows));
+        while (!endBorrows.empty()) {
+          endBorrows.pop_back_val()->eraseFromParent();
+          ++NumEliminatedInsts;
+        }
+
+        // Then eliminate BBI itself.
         BBI->replaceAllUsesWith(BBI->getOperand());
         BBI->eraseFromParent();
         ++NumEliminatedInsts;
@@ -148,9 +158,12 @@ struct SemanticARCOpts : SILFunctionTransform {
   void run() override {
     bool MadeChange = false;
     SILFunction *F = getFunction();
+    if (!F->getModule().isStdlibModule()) {
+      return;
+    }
 
     DeadEndBlocks DEBlocks(F);
-    OwnershipChecker Checker{F->getModule(), DEBlocks, {}, {}, {}};
+    OwnershipChecker Checker{{}, {}, {}, {}, F->getModule(), DEBlocks};
 
     // First as a special case, handle guaranteed SIL function arguments.
     //

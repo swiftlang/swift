@@ -10,7 +10,7 @@ func main() -> Void
     var out_only = 2013
 
     var backward_ptr  =
-    // CHECK: define internal {{.*}} i1 @"$S4mainAAyyFSbSS_SStcfU_"(
+    // CHECK: define internal {{.*}} i1 @"$s4mainAAyyFSbSS_SStcfU_"(
     // CHECK: %[[RANDOM_STR_ADDR:.*]] = alloca %TSS*, align {{(4|8)}}
 
     // FIXME(TODO: JIRA): i386 String is temporarily larger, and that causes the

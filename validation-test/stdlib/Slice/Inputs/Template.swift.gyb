@@ -17,7 +17,6 @@ class TestParameters(object):
   prefix = []
   suffix = []
   base = ''
-  base_slice = ''
   traversal = ''
   mutable = False
   range_replaceable = False
@@ -46,7 +45,7 @@ def all_tests():
       ('WithPrefixAndSuffix', '[-9999, -9998, -9997, -9996, -9995]',
        '[-9994, -9993, -9992]')
     ]:
-      test.name = test.base_slice + '_Of_' + test.base + '_' + name + '.swift'
+      test.name = 'Slice_Of_' + test.base + '_' + name + '.swift'
       test.prefix = prefix
       test.suffix
       yield test
@@ -94,7 +93,7 @@ let prefix: [Int] = ${test.prefix}
 let suffix: [Int] = ${test.suffix}
 
 func makeCollection(elements: [OpaqueValue<Int>])
-  -> ${test.base_slice}<${test.base}<OpaqueValue<Int>>> {
+  -> Slice<${test.base}<OpaqueValue<Int>>> {
   var baseElements = prefix.map(OpaqueValue.init)
   baseElements.append(contentsOf: elements)
   baseElements.append(contentsOf: suffix.map(OpaqueValue.init))
@@ -105,13 +104,11 @@ func makeCollection(elements: [OpaqueValue<Int>])
   let endIndex = base.index(
     base.startIndex,
     offsetBy: numericCast(prefix.count + elements.count))
-  return ${test.base_slice}(
-    base: base,
-    bounds: startIndex..<endIndex)
+  return Slice(base: base, bounds: startIndex..<endIndex)
 }
 
 func makeCollectionOfEquatable(elements: [MinimalEquatableValue])
-  -> ${test.base_slice}<${test.base}<MinimalEquatableValue>> {
+  -> Slice<${test.base}<MinimalEquatableValue>> {
   var baseElements = prefix.map(MinimalEquatableValue.init)
   baseElements.append(contentsOf: elements)
   baseElements.append(contentsOf: suffix.map(MinimalEquatableValue.init))
@@ -122,13 +119,11 @@ func makeCollectionOfEquatable(elements: [MinimalEquatableValue])
   let endIndex = base.index(
     base.startIndex,
     offsetBy: numericCast(prefix.count + elements.count))
-  return ${test.base_slice}(
-    base: base,
-    bounds: startIndex..<endIndex)
+  return Slice(base: base, bounds: startIndex..<endIndex)
 }
 
 func makeCollectionOfComparable(elements: [MinimalComparableValue])
-  -> ${test.base_slice}<${test.base}<MinimalComparableValue>> {
+  -> Slice<${test.base}<MinimalComparableValue>> {
   var baseElements = prefix.map(MinimalComparableValue.init)
   baseElements.append(contentsOf: elements)
   baseElements.append(contentsOf: suffix.map(MinimalComparableValue.init))
@@ -139,9 +134,7 @@ func makeCollectionOfComparable(elements: [MinimalComparableValue])
   let endIndex = base.index(
     base.startIndex,
     offsetBy: numericCast(prefix.count + elements.count))
-  return ${test.base_slice}(
-    base: base,
-    bounds: startIndex..<endIndex)
+  return Slice(base: base, bounds: startIndex..<endIndex)
 }
 
 var resiliencyChecks = CollectionMisuseResiliencyChecks.all

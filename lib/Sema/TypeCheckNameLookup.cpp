@@ -376,6 +376,9 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   if (options.contains(NameLookupFlags::ProtocolMembers))
     subOptions |= NL_ProtocolMembers;
 
+  if (options.contains(NameLookupFlags::IncludeAttributeImplements))
+    subOptions |= NL_IncludeAttributeImplements;
+
   // We handle our own overriding/shadowing filtering.
   subOptions &= ~NL_RemoveOverridden;
   subOptions &= ~NL_RemoveNonVisible;
@@ -447,7 +450,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     subOptions |= NL_IgnoreAccessControl;
 
-  if (!dc->lookupQualified(type, name, subOptions, this, decls))
+  if (!dc->lookupQualified(type, name, subOptions, nullptr, decls))
     return result;
 
   // Look through the declarations, keeping only the unique type declarations.
@@ -457,9 +460,11 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     auto *typeDecl = cast<TypeDecl>(decl);
 
     // FIXME: This should happen before we attempt shadowing checks.
-    validateDecl(typeDecl);
-    if (!typeDecl->hasInterfaceType()) // FIXME: recursion-breaking hack
-      continue;
+    if (!typeDecl->hasInterfaceType()) {
+      dc->getASTContext().getLazyResolver()->resolveDeclSignature(typeDecl);
+      if (!typeDecl->hasInterfaceType()) // FIXME: recursion-breaking hack
+        continue;
+    }
 
     auto memberType = typeDecl->getDeclaredInterfaceType();
 
@@ -548,7 +553,9 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
           ProtocolConformanceState::CheckingTypeWitnesses)
         continue;
 
-      auto typeDecl = concrete->getTypeWitnessAndDecl(assocType, this).second;
+      auto lazyResolver = dc->getASTContext().getLazyResolver();
+      auto typeDecl =
+        concrete->getTypeWitnessAndDecl(assocType, lazyResolver).second;
 
       assert(typeDecl && "Missing type witness?");
 

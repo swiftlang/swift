@@ -89,6 +89,7 @@ VarDecl *getDisjointAccessLocation(const AccessedStorage &storage) {
   case AccessedStorage::Nested:
     llvm_unreachable("Unexpected Nested access.");
   }
+  llvm_unreachable("unhandled kind");
 }
 
 namespace {
@@ -100,7 +101,7 @@ namespace {
 // The existence of unidentified access complicates this problem. For this
 // optimization to be valid, Global and Class property access must always be
 // identifiable. findAccessedStorage() in MemAccessUtils enforces a short list
-// of unidentified producers (non-address PHIArgument, PointerToAddress, Undef,
+// of unidentified producers (non-address PhiArgument, PointerToAddress, Undef,
 // & local-init). We cannot allow the address of a global variable or class
 // property to be exposed via one of these instructions, unless the declaration
 // is considered "visible externally".

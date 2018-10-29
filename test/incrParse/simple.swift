@@ -13,16 +13,7 @@
 // RUN: %validate-incrparse %s --test-case LAST_CHARACTER_OF_STRUCT
 // RUN: %validate-incrparse %s --test-case ADD_ARRAY_CLOSE_BRACKET
 // RUN: %validate-incrparse %s --test-case ADD_IF_OPEN_BRACE
-// We need to require macOS since %incr-transfer-roundtrip uses swiftSyntax
-// which is not available on Linux
-// FIXME: Remove the requires flag when swiftSyntax builds on Linux
-// REQUIRES: OS=macosx
-// RUN: %incr-transfer-roundtrip %s --test-case REPLACE
-// RUN: %incr-transfer-roundtrip %s --test-case INSERT
-// RUN: %incr-transfer-roundtrip %s --test-case REMOVE
-// RUN: %incr-transfer-roundtrip %s --test-case CLASS_SURROUNDING
-// RUN: %incr-transfer-roundtrip %s --test-case MULTI_EDIT
-// RUN: %incr-transfer-roundtrip %s --test-case REPLACE_WITH_MULTI_BYTE_CHAR
+// RUN: %validate-incrparse %s --test-case EXTEND_IDENTIFIER
 
 func start() {}
 
@@ -30,8 +21,8 @@ func start() {}
 func foo() {
 }
 
-_ = <<REPLACE<6|||7>>></reparse REPLACE>
-_ = <<REPLACE_BY_LONGER<6|||"Hello World">>>
+_ = <<REPLACE<6|||7>>>
+_ = <<REPLACE_BY_LONGER<6|||"Hello World">>></reparse REPLACE>
 _ = <<REPLACE_BY_SHORTER<"Hello again"|||"a">>>
 <<INSERT<|||foo()>>>
 <<REMOVE<print("abc")|||>>>
@@ -62,3 +53,5 @@ var computedVar: [Int] {
 if true <<ADD_IF_OPEN_BRACE<|||{>>>
   _ = 5
 }
+
+let y<<EXTEND_IDENTIFIER<|||ou>>> = 42

@@ -18,6 +18,7 @@
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/FileSystem.h"
 
 using namespace swift;
 
@@ -61,6 +62,12 @@ void Evaluator::registerRequestFunctions(
 Evaluator::Evaluator(DiagnosticEngine &diags,
                      CycleDiagnosticKind shouldDiagnoseCycles)
   : diags(diags), shouldDiagnoseCycles(shouldDiagnoseCycles) { }
+
+void Evaluator::emitRequestEvaluatorGraphViz(llvm::StringRef graphVizPath) {
+  std::error_code error;
+  llvm::raw_fd_ostream out(graphVizPath, error, llvm::sys::fs::F_Text);
+  printDependenciesGraphviz(out);
+}
 
 bool Evaluator::checkDependency(const AnyRequest &request) {
   // If there is an active request, record it's dependency on this request.

@@ -184,7 +184,8 @@ public:
   }
 
   bool overlaps(CharSourceRange Other) const {
-    return contains(Other.getStart()) || contains(Other.getEnd());
+    if (getByteLength() == 0 || Other.getByteLength() == 0) return false;
+    return contains(Other.getStart()) || Other.contains(getStart());
   }
 
   StringRef str() const {

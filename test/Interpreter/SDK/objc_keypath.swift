@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift-swift3 | %FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -7,7 +7,7 @@ import Foundation
 
 class Person : NSObject {
   @objc(firstNameString) var firstName: String
-  var lastName: String
+  @objc var lastName: String
 
   init(firstName: String, lastName: String) {
     self.firstName = firstName
@@ -20,11 +20,11 @@ class Person : NSObject {
 }
 
 class Band : NSObject {
-  var members: [Person] = []
+  @objc var members: [Person] = []
 }
 
 class RecordLabel : NSObject {
-  var bands: [String : Band] = [:]
+  @objc var bands: [String : Band] = [:]
 }
 
 let band = Band()

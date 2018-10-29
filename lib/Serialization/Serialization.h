@@ -34,7 +34,8 @@ namespace serialization {
 
 using FilenamesTy = ArrayRef<std::string>;
 
-class Serializer {
+class SerializerBase {
+protected:
   SmallVector<char, 0> Buffer;
   llvm::BitstreamWriter Out{Buffer};
 
@@ -50,6 +51,21 @@ class Serializer {
   /// serialized. Any other decls will be cross-referenced instead.
   const SourceFile *SF = nullptr;
 
+  /// Record the name of a block.
+  void emitBlockID(unsigned ID, StringRef name,
+                   SmallVectorImpl<unsigned char> &nameBuffer);
+
+  /// Record the name of a record within a block.
+  void emitRecordID(unsigned ID, StringRef name,
+                    SmallVectorImpl<unsigned char> &nameBuffer);
+
+  void writeToStream(raw_ostream &os);
+
+public:
+  SerializerBase(ArrayRef<unsigned char> signature, ModuleOrSourceFile DC);
+};
+
+class Serializer : public SerializerBase {
 public:
   /// Stores a declaration or a type to be written to the AST file.
   ///
@@ -87,7 +103,17 @@ private:
   /// A map from Types and Decls to their serialized IDs.
   llvm::DenseMap<DeclTypeUnion, DeclID> DeclAndTypeIDs;
 
+  /// A map from non-identifier uniqued strings to their serialized IDs.
+  ///
+  /// Since we never remove items from this map, we can use a BumpPtrAllocator
+  /// to back the entries.
+  llvm::StringMap<IdentifierID, llvm::BumpPtrAllocator> UniquedStringIDs;
+
   /// A map from Identifiers to their serialized IDs.
+  ///
+  /// This is stored separately from \p UniquedStringIDs because it's faster
+  /// to do lookups in, even though that may lead to some duplication between
+  /// identifier and non-identifier strings.
   llvm::DenseMap<Identifier, IdentifierID> IdentifierIDs;
 
   /// A map from DeclContexts to their serialized IDs.
@@ -185,8 +211,9 @@ private:
   /// SILLayouts that need to be serialized.
   std::queue<SILLayout *> SILLayoutsToWrite;
 
-  /// All identifiers that need to be serialized.
-  std::vector<Identifier> IdentifiersToWrite;
+  /// All uniqued strings that need to be serialized (identifiers and
+  /// non-identifiers).
+  std::vector<StringRef> StringsToWrite;
 
   /// The abbreviation code for each record in the "decls-and-types" block.
   ///
@@ -252,11 +279,11 @@ private:
   /// The last assigned DeclID for types from this module.
   uint32_t /*TypeID*/ LastTypeID = 0;
 
-  /// The last assigned IdentifierID for types from this module.
+  /// The last assigned IdentifierID for uniqued strings from this module.
   ///
   /// Note that special module IDs and IDs of special names must not be valid
   /// IdentifierIDs, except that 0 will always represent the empty identifier.
-  uint32_t /*IdentifierID*/ LastIdentifierID =
+  uint32_t /*IdentifierID*/ LastUniquedStringID =
       serialization::NUM_SPECIAL_IDS - 1;
 
   /// The last assigned GenericSignatureID for generic signature from this
@@ -302,15 +329,9 @@ private:
   /// Writes the BLOCKINFO block for the serialized module file.
   void writeBlockInfoBlock();
 
-  /// Writes the BLOCKINFO block for the module documentation file.
-  void writeDocBlockInfoBlock();
-
   /// Writes the Swift module file header and name, plus metadata determining
   /// if the module can be loaded.
   void writeHeader(const SerializationOptions &options = {});
-
-  /// Writes the Swift doc module file header and name.
-  void writeDocHeader();
 
   /// Writes the dependencies used to build this module: its imported
   /// modules and its source files.
@@ -323,6 +344,10 @@ private:
 
   /// Writes a generic parameter list.
   bool writeGenericParams(const GenericParamList *genericParams);
+
+  /// Writes the body text of the provided funciton, if the function is
+  /// inlinable and has body text.
+  void writeInlinableBodyTextIfNeeded(const AbstractFunctionDecl *decl);
 
   /// Writes a list of protocol conformances.
   void writeConformances(ArrayRef<ProtocolConformanceRef> conformances,
@@ -424,20 +449,14 @@ private:
   void writeAST(ModuleOrSourceFile DC,
                 bool enableNestedTypeLookupTable);
 
-  void writeToStream(raw_ostream &os);
-
-  template <size_t N>
-  Serializer(const unsigned char (&signature)[N], ModuleOrSourceFile DC);
+  using SerializerBase::SerializerBase;
+  using SerializerBase::writeToStream;
 
 public:
   /// Serialize a module to the given stream.
   static void writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
                             const SILModule *M,
                             const SerializationOptions &options);
-
-  /// Serialize module documentation to the given stream.
-  static void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                               StringRef GroupInfoPath, ASTContext &Ctx);
 
   /// Records the use of the given Type.
   ///
@@ -452,6 +471,23 @@ public:
   ///
   /// \returns The ID for the given DeclBaseName in this module.
   IdentifierID addDeclBaseNameRef(DeclBaseName ident);
+
+  /// Records the use of the given string, which will only be stored once in
+  /// the resulting module file.
+  ///
+  /// \returns A pair containing the copy of the string now owned by the
+  /// Serializer and the ID for the string in this module.
+  /// \sa addUniquedStringRef
+  std::pair<StringRef, IdentifierID> addUniquedString(StringRef str);
+
+  /// Records the use of the given string, which will only be stored once in
+  /// the resulting module file.
+  ///
+  /// \returns The ID for the given string in this module.
+  /// \sa addUniquedString
+  IdentifierID addUniquedStringRef(StringRef str) {
+    return addUniquedString(str).second;
+  }
 
   /// Records the use of the given Decl.
   ///
@@ -530,6 +566,10 @@ public:
   void writeGenericRequirements(ArrayRef<Requirement> requirements,
                                 const std::array<unsigned, 256> &abbrCodes);
 };
+
+/// Serialize module documentation to the given stream.
+void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
+                      StringRef GroupInfoPath);
 } // end namespace serialization
 } // end namespace swift
 #endif

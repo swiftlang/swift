@@ -6,7 +6,7 @@ struct Huge {
   var x, y, z, w, v: Builtin.Word
 }
 
-@_alignment(32)
+@_alignment(16)
 struct HugeAlignment {
   var x, y, z, w, v: Builtin.Word
 }
@@ -66,8 +66,8 @@ entry(%o : $*Huge, %x : $Huge):
 // CHECK-NOT:     alloca
 // CHECK:         [[CLOSURE:%.*]] = call noalias %swift.refcounted* @swift_allocObject
 // CHECK:         bitcast %swift.refcounted* [[CLOSURE]] to <{ %swift.refcounted, %T17indirect_argument4HugeV }>*
-// CHECK:         call swiftcc void @"$S24huge_partial_applicationTA"(%T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}) %0, %swift.refcounted* swiftself [[CLOSURE]])
-// CHECK:       define internal swiftcc void @"$S24huge_partial_applicationTA"(%T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}), %swift.refcounted* swiftself)
+// CHECK:         call swiftcc void @"$s24huge_partial_applicationTA"(%T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}) %0, %swift.refcounted* swiftself [[CLOSURE]])
+// CHECK:       define internal swiftcc void @"$s24huge_partial_applicationTA"(%T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}), %swift.refcounted* swiftself)
 // CHECK:         [[TMP_ARG:%.*]] = alloca
 // CHECK-NOT:     tail
 // CHECK:         call swiftcc void @huge_partial_application(%T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}) %0, %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}) [[TMP_ARG]])
@@ -83,8 +83,8 @@ entry(%x : $Huge, %y : $Huge):
 // CHECK:         [[TMP_RET:%.*]] = alloca
 // CHECK:         [[CLOSURE:%.*]] = call noalias %swift.refcounted* @swift_allocObject
 // CHECK:         bitcast %swift.refcounted* [[CLOSURE]] to <{ %swift.refcounted, %T17indirect_argument4HugeV }>*
-// CHECK:         call swiftcc void @"$S30huge_partial_application_stretTA"(%T17indirect_argument4HugeV* noalias nocapture sret [[TMP_RET]], %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}) %1, %swift.refcounted* swiftself [[CLOSURE]])
-// CHECK:       define internal swiftcc void @"$S30huge_partial_application_stretTA"(%T17indirect_argument4HugeV* noalias nocapture sret, %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}), %swift.refcounted* swiftself)
+// CHECK:         call swiftcc void @"$s30huge_partial_application_stretTA"(%T17indirect_argument4HugeV* noalias nocapture sret [[TMP_RET]], %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}) %1, %swift.refcounted* swiftself [[CLOSURE]])
+// CHECK:       define internal swiftcc void @"$s30huge_partial_application_stretTA"(%T17indirect_argument4HugeV* noalias nocapture sret, %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}), %swift.refcounted* swiftself)
 // CHECK:         [[TMP_ARG:%.*]] = alloca
 // CHECK-NOT:     tail
 // CHECK:         call swiftcc void @huge_partial_application_stret(%T17indirect_argument4HugeV* noalias nocapture sret %0, %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}) %1, %T17indirect_argument4HugeV* noalias nocapture dereferenceable({{.*}}) [[TMP_ARG]])

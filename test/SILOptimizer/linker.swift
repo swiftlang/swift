@@ -3,21 +3,21 @@
 // RUN: %target-swift-frontend %s -I %t -emit-sil | %FileCheck %s
 // RUN: %target-swift-frontend %s -I %t -O -emit-sil | %FileCheck %s --check-prefix=OPT
 
-// CHECK: sil [serialized] [noinline] @$Ss11doSomethingyyF : $@convention(thin) () -> (){{$}}
-// OPT: sil public_external [noinline] @$Ss11doSomethingyyF : $@convention(thin) () -> () {
+// CHECK: sil [serialized] [noinline] @$ss11doSomethingyyF : $@convention(thin) () -> (){{$}}
+// OPT: sil public_external [noinline] @$ss11doSomethingyyF : $@convention(thin) () -> () {
 doSomething()
 
-// CHECK: sil @$Ss12doSomething2yyF : $@convention(thin) () -> ()
+// CHECK: sil @$ss12doSomething2yyF : $@convention(thin) () -> ()
 // CHECK-NOT: return
 doSomething2()
 
-// CHECK: sil [serialized] [noinline] @$Ss16callDoSomething3yyF : $@convention(thin) () -> (){{$}}
-// OPT: sil public_external [noinline] @$Ss16callDoSomething3yyF : $@convention(thin) () -> () {
+// CHECK: sil [serialized] [noinline] @$ss16callDoSomething3yyF : $@convention(thin) () -> (){{$}}
+// OPT: sil public_external [noinline] @$ss16callDoSomething3yyF : $@convention(thin) () -> () {
 
 // OPT: sil @unknown
 
-// OPT: sil @$Ss1AVABycfC
+// OPT: sil @$ss1AVABycfC
 
-// OPT: sil [noinline] @$Ss12doSomething3yyxlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> (){{$}}
+// OPT: sil [noinline] @$ss12doSomething3yyxlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> (){{$}}
 
 callDoSomething3()

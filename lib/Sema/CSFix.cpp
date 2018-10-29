@@ -34,15 +34,15 @@ ConstraintFix::~ConstraintFix() {}
 
 Expr *ConstraintFix::getAnchor() const { return getLocator()->getAnchor(); }
 
-void ConstraintFix::print(llvm::raw_ostream &Out, SourceManager *sm) const {
+void ConstraintFix::print(llvm::raw_ostream &Out) const {
   Out << "[fix: ";
   Out << getName();
   Out << ']';
   Out << " @ ";
-  getLocator()->dump(sm, Out);
+  getLocator()->dump(&CS.getASTContext().SourceMgr, Out);
 }
 
-void ConstraintFix::dump(SourceManager *sm) const { print(llvm::errs(), sm); }
+void ConstraintFix::dump() const {print(llvm::errs()); }
 
 std::string ForceDowncast::getName() const {
   llvm::SmallString<16> name;
@@ -52,95 +52,96 @@ std::string ForceDowncast::getName() const {
   return name.c_str();
 }
 
-bool ForceDowncast::diagnose(Expr *expr, const Solution &solution) const {
-  MissingExplicitConversionFailure failure(expr, solution, getLocator(),
-                                           DowncastTo);
-  return failure.diagnose();
+bool ForceDowncast::diagnose(Expr *expr, bool asNote) const {
+  MissingExplicitConversionFailure failure(expr, getConstraintSystem(),
+                                           getLocator(), DowncastTo);
+  return failure.diagnose(asNote);
 }
 
 ForceDowncast *ForceDowncast::create(ConstraintSystem &cs, Type toType,
                                      ConstraintLocator *locator) {
-  return new (cs.getAllocator()) ForceDowncast(toType, locator);
+  return new (cs.getAllocator()) ForceDowncast(cs, toType, locator);
 }
 
-bool ForceOptional::diagnose(Expr *root, const Solution &solution) const {
-  MissingOptionalUnwrapFailure failure(root, solution, getLocator());
-  return failure.diagnose();
+bool ForceOptional::diagnose(Expr *root, bool asNote) const {
+  MissingOptionalUnwrapFailure failure(root, getConstraintSystem(),
+                                       getLocator());
+  return failure.diagnose(asNote);
 }
 
 ForceOptional *ForceOptional::create(ConstraintSystem &cs,
                                      ConstraintLocator *locator) {
-  return new (cs.getAllocator()) ForceOptional(locator);
+  return new (cs.getAllocator()) ForceOptional(cs, locator);
 }
 
-bool UnwrapOptionalBase::diagnose(Expr *root, const Solution &solution) const {
+bool UnwrapOptionalBase::diagnose(Expr *root, bool asNote) const {
   bool resultIsOptional =
       getKind() == FixKind::UnwrapOptionalBaseWithOptionalResult;
-  MemberAccessOnOptionalBaseFailure failure(root, solution, getLocator(),
-                                            MemberName, resultIsOptional);
-  return failure.diagnose();
+  MemberAccessOnOptionalBaseFailure failure(
+      root, getConstraintSystem(), getLocator(), MemberName, resultIsOptional);
+  return failure.diagnose(asNote);
 }
 
 UnwrapOptionalBase *UnwrapOptionalBase::create(ConstraintSystem &cs,
                                                DeclName member,
                                                ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      UnwrapOptionalBase(FixKind::UnwrapOptionalBase, member, locator);
+      UnwrapOptionalBase(cs, FixKind::UnwrapOptionalBase, member, locator);
 }
 
 UnwrapOptionalBase *UnwrapOptionalBase::createWithOptionalResult(
     ConstraintSystem &cs, DeclName member, ConstraintLocator *locator) {
   return new (cs.getAllocator()) UnwrapOptionalBase(
-      FixKind::UnwrapOptionalBaseWithOptionalResult, member, locator);
+      cs, FixKind::UnwrapOptionalBaseWithOptionalResult, member, locator);
 }
 
-bool AddAddressOf::diagnose(Expr *root, const Solution &solution) const {
-  MissingAddressOfFailure failure(root, solution, getLocator());
-  return failure.diagnose();
+bool AddAddressOf::diagnose(Expr *root, bool asNote) const {
+  MissingAddressOfFailure failure(root, getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
 }
 
 AddAddressOf *AddAddressOf::create(ConstraintSystem &cs,
                                    ConstraintLocator *locator) {
-  return new (cs.getAllocator()) AddAddressOf(locator);
+  return new (cs.getAllocator()) AddAddressOf(cs, locator);
 }
 
-bool TreatRValueAsLValue::diagnose(Expr *root, const Solution &solution) const {
-  RValueTreatedAsLValueFailure failure(solution, getLocator());
-  return failure.diagnose();
+bool TreatRValueAsLValue::diagnose(Expr *root, bool asNote) const {
+  RValueTreatedAsLValueFailure failure(getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
 }
 
 TreatRValueAsLValue *TreatRValueAsLValue::create(ConstraintSystem &cs,
                                    ConstraintLocator *locator) {
-  return new (cs.getAllocator()) TreatRValueAsLValue(locator);
+  return new (cs.getAllocator()) TreatRValueAsLValue(cs, locator);
 }
 
-
-bool CoerceToCheckedCast::diagnose(Expr *root, const Solution &solution) const {
-  MissingForcedDowncastFailure failure(root, solution, getLocator());
-  return failure.diagnose();
+bool CoerceToCheckedCast::diagnose(Expr *root, bool asNote) const {
+  MissingForcedDowncastFailure failure(root, getConstraintSystem(),
+                                       getLocator());
+  return failure.diagnose(asNote);
 }
 
 CoerceToCheckedCast *CoerceToCheckedCast::create(ConstraintSystem &cs,
                                                  ConstraintLocator *locator) {
-  return new (cs.getAllocator()) CoerceToCheckedCast(locator);
+  return new (cs.getAllocator()) CoerceToCheckedCast(cs, locator);
 }
 
-bool MarkExplicitlyEscaping::diagnose(Expr *root,
-                                      const Solution &solution) const {
-  NoEscapeFuncToTypeConversionFailure failure(root, solution, getLocator(),
-                                              ConvertTo);
-  return failure.diagnose();
+bool MarkExplicitlyEscaping::diagnose(Expr *root, bool asNote) const {
+  NoEscapeFuncToTypeConversionFailure failure(root, getConstraintSystem(),
+                                              getLocator(), ConvertTo);
+  return failure.diagnose(asNote);
 }
 
 MarkExplicitlyEscaping *
 MarkExplicitlyEscaping::create(ConstraintSystem &cs, ConstraintLocator *locator,
                                Type convertingTo) {
-  return new (cs.getAllocator()) MarkExplicitlyEscaping(locator, convertingTo);
+  return new (cs.getAllocator())
+      MarkExplicitlyEscaping(cs, locator, convertingTo);
 }
 
-bool RelabelArguments::diagnose(Expr *root, const Solution &solution) const {
-  LabelingFailure failure(solution, getLocator(), getLabels());
-  return failure.diagnose();
+bool RelabelArguments::diagnose(Expr *root, bool asNote) const {
+  LabelingFailure failure(getConstraintSystem(), getLocator(), getLabels());
+  return failure.diagnose(asNote);
 }
 
 RelabelArguments *
@@ -149,29 +150,43 @@ RelabelArguments::create(ConstraintSystem &cs,
                          ConstraintLocator *locator) {
   unsigned size = totalSizeToAlloc<Identifier>(correctLabels.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(RelabelArguments));
-  return new (mem) RelabelArguments(correctLabels, locator);
+  return new (mem) RelabelArguments(cs, correctLabels, locator);
 }
 
-bool MissingConformance::diagnose(Expr *root, const Solution &solution) const {
-  MissingConformanceFailure failure(root, solution, getLocator(),
+bool MissingConformance::diagnose(Expr *root, bool asNote) const {
+  MissingConformanceFailure failure(root, getConstraintSystem(), getLocator(),
                                     {NonConformingType, Protocol});
-  return failure.diagnose();
+  return failure.diagnose(asNote);
 }
 
 MissingConformance *MissingConformance::create(ConstraintSystem &cs, Type type,
                                                ProtocolDecl *protocol,
                                                ConstraintLocator *locator) {
-  return new (cs.getAllocator()) MissingConformance(type, protocol, locator);
+  return new (cs.getAllocator())
+      MissingConformance(cs, type, protocol, locator);
 }
 
-bool SkipSameTypeRequirement::diagnose(Expr *root,
-                                       const Solution &solution) const {
-  SameTypeRequirementFailure failure(root, solution, LHS, RHS, getLocator());
-  return failure.diagnose();
+bool SkipSameTypeRequirement::diagnose(Expr *root, bool asNote) const {
+  SameTypeRequirementFailure failure(root, getConstraintSystem(), LHS, RHS,
+                                     getLocator());
+  return failure.diagnose(asNote);
 }
 
 SkipSameTypeRequirement *
 SkipSameTypeRequirement::create(ConstraintSystem &cs, Type lhs, Type rhs,
                                 ConstraintLocator *locator) {
-  return new (cs.getAllocator()) SkipSameTypeRequirement(lhs, rhs, locator);
+  return new (cs.getAllocator()) SkipSameTypeRequirement(cs, lhs, rhs, locator);
+}
+
+bool SkipSuperclassRequirement::diagnose(Expr *root, bool asNote) const {
+  SuperclassRequirementFailure failure(root, getConstraintSystem(), LHS, RHS,
+                                       getLocator());
+  return failure.diagnose(asNote);
+}
+
+SkipSuperclassRequirement *
+SkipSuperclassRequirement::create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      SkipSuperclassRequirement(cs, lhs, rhs, locator);
 }

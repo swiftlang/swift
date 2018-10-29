@@ -17,36 +17,36 @@ import SwiftShims
 /// initialized.  See stdlib/runtime/GlobalObjects.cpp for details.
 /// Because it's statically referenced, it requires non-lazy realization
 /// by the Objective-C runtime.
+///
+/// NOTE: older runtimes called this _EmptyArrayStorage. The two must
+/// coexist, so it was renamed. The old name must not be used in the new
+/// runtime.
 @_fixed_layout
 @usableFromInline
 @_objc_non_lazy_realization
-internal final class _EmptyArrayStorage
-  : _ContiguousArrayStorageBase {
+internal final class __EmptyArrayStorage
+  : __ContiguousArrayStorageBase {
 
   @inlinable
   @nonobjc
   internal init(_doNotCallMe: ()) {
-    _sanityCheckFailure("creating instance of _EmptyArrayStorage")
+    _sanityCheckFailure("creating instance of __EmptyArrayStorage")
   }
   
 #if _runtime(_ObjC)
-  @inlinable
   override internal func _withVerbatimBridgedUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R? {
     return try body(UnsafeBufferPointer(start: nil, count: 0))
   }
 
-  @inlinable
   @nonobjc
   override internal func _getNonVerbatimBridgedCount() -> Int {
     return 0
   }
 
-  @inlinable
-  override internal func _getNonVerbatimBridgedHeapBuffer() -> _HeapBuffer<Int, AnyObject> {
-    return _HeapBuffer<Int, AnyObject>(
-      _HeapBufferStorage<Int, AnyObject>.self, 0, 0)
+  override internal func _getNonVerbatimBridgingBuffer() -> _BridgingBuffer {
+    return _BridgingBuffer(0)
   }
 #endif
 
@@ -65,7 +65,7 @@ internal final class _EmptyArrayStorage
 /// The empty array prototype.  We use the same object for all empty
 /// `[Native]Array<Element>`s.
 @inlinable
-internal var _emptyArrayStorage : _EmptyArrayStorage {
+internal var _emptyArrayStorage : __EmptyArrayStorage {
   return Builtin.bridgeFromRawPointer(
     Builtin.addressof(&_swiftEmptyArrayStorage))
 }
@@ -75,7 +75,7 @@ internal var _emptyArrayStorage : _EmptyArrayStorage {
 @usableFromInline
 internal final class _ContiguousArrayStorage<
   Element
-> : _ContiguousArrayStorageBase {
+> : __ContiguousArrayStorageBase {
 
   @inlinable // FIXME(sil-serialize-all)
   deinit {
@@ -87,7 +87,6 @@ internal final class _ContiguousArrayStorage<
   /// If the `Element` is bridged verbatim, invoke `body` on an
   /// `UnsafeBufferPointer` to the elements and return the result.
   /// Otherwise, return `nil`.
-  @inlinable
   internal final override func _withVerbatimBridgedUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R? {
@@ -100,7 +99,6 @@ internal final class _ContiguousArrayStorage<
 
   /// If `Element` is bridged verbatim, invoke `body` on an
   /// `UnsafeBufferPointer` to the elements.
-  @inlinable
   internal final func _withVerbatimBridgedUnsafeBufferImpl(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> Void
   ) rethrows {
@@ -116,7 +114,6 @@ internal final class _ContiguousArrayStorage<
   /// Returns the number of elements in the array.
   ///
   /// - Precondition: `Element` is bridged non-verbatim.
-  @inlinable
   @nonobjc
   override internal func _getNonVerbatimBridgedCount() -> Int {
     _sanityCheck(
@@ -128,15 +125,12 @@ internal final class _ContiguousArrayStorage<
   /// Bridge array elements and return a new buffer that owns them.
   ///
   /// - Precondition: `Element` is bridged non-verbatim.
-  @inlinable
-  override internal func _getNonVerbatimBridgedHeapBuffer() ->
-    _HeapBuffer<Int, AnyObject> {
+  override internal func _getNonVerbatimBridgingBuffer() -> _BridgingBuffer {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(Element.self),
       "Verbatim bridging should be handled separately")
     let count = countAndCapacity.count
-    let result = _HeapBuffer<Int, AnyObject>(
-      _HeapBufferStorage<Int, AnyObject>.self, count, count)
+    let result = _BridgingBuffer(count)
     let resultPtr = result.baseAddress
     let p = _elementPointer
     for i in 0..<count {
@@ -199,7 +193,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
          realMinimumCapacity._builtinWordValue, Element.self)
 
       let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(_storage))
-      let endAddr = storageAddr + _stdlib_malloc_size(storageAddr)
+      let endAddr = storageAddr + _swift_stdlib_malloc_size(storageAddr)
       let realCapacity = endAddr.assumingMemoryBound(to: Element.self) - firstElementAddress
 
       _initStorageHeader(
@@ -223,7 +217,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   }
 
   @inlinable
-  internal init(_ storage: _ContiguousArrayStorageBase) {
+  internal init(_ storage: __ContiguousArrayStorageBase) {
     _storage = storage
   }
 
@@ -314,11 +308,6 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     return isUniquelyReferenced()
   }
 
-  @inlinable
-  internal mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
-    return isUniquelyReferencedOrPinned()
-  }
-
   /// If this buffer is backed by a `_ContiguousArrayBuffer`
   /// containing the same number of elements as `self`, return it.
   /// Otherwise, return `nil`.
@@ -394,7 +383,7 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   /// just-initialized memory.
   @inlinable
   @discardableResult
-  internal func _copyContents(
+  internal __consuming func _copyContents(
     subRange bounds: Range<Int>,
     initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {
@@ -435,14 +424,6 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
     return _isUnique(&_storage)
   }
 
-  /// Returns `true` iff this buffer's storage is either
-  /// uniquely-referenced or pinned.  NOTE: this does not mean
-  /// the buffer is mutable; see the comment on isUniquelyReferenced.
-  @inlinable
-  internal mutating func isUniquelyReferencedOrPinned() -> Bool {
-    return _isUniqueOrPinned(&_storage)
-  }
-
 #if _runtime(_ObjC)
   /// Convert to an NSArray.
   ///
@@ -450,14 +431,14 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   ///
   /// - Complexity: O(1).
   @inlinable
-  internal func _asCocoaArray() -> _NSArrayCore {
+  internal __consuming func _asCocoaArray() -> _NSArrayCore {
     if count == 0 {
       return _emptyArrayStorage
     }
     if _isBridgedVerbatimToObjectiveC(Element.self) {
       return _storage
     }
-    return _SwiftDeferredNSArray(_nativeStorage: _storage)
+    return __SwiftDeferredNSArray(_nativeStorage: _storage)
   }
 #endif
 
@@ -515,13 +496,13 @@ internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
   }
 
   @usableFromInline
-  internal var _storage: _ContiguousArrayStorageBase
+  internal var _storage: __ContiguousArrayStorageBase
 }
 
 /// Append the elements of `rhs` to `lhs`.
 @inlinable
 internal func += <Element, C : Collection>(
-  lhs: inout _ContiguousArrayBuffer<Element>, rhs: C
+  lhs: inout _ContiguousArrayBuffer<Element>, rhs: __owned C
 ) where C.Element == Element {
 
   let oldCount = lhs.count
@@ -575,7 +556,7 @@ extension _ContiguousArrayBuffer : RandomAccessCollection {
 
 extension Sequence {
   @inlinable
-  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     return _copySequenceToContiguousArray(self)
   }
 }
@@ -608,14 +589,14 @@ internal func _copySequenceToContiguousArray<
 
 extension Collection {
   @inlinable
-  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     return _copyCollectionToContiguousArray(self)
   }
 }
 
 extension _ContiguousArrayBuffer {
   @inlinable
-  internal func _copyToContiguousArray() -> ContiguousArray<Element> {
+  internal __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     return ContiguousArray(_buffer: self)
   }
 }

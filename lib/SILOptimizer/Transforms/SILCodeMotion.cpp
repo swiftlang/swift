@@ -890,7 +890,7 @@ static bool hoistSILArgumentReleaseInst(SILBasicBlock *BB) {
 
   // Make sure we can get all the incoming values.
   llvm::SmallVector<SILValue, 4> PredValues;
-  if (!SA->getIncomingValues(PredValues))
+  if (!SA->getIncomingPhiValues(PredValues))
     return false;
 
   // Ok, we can get all the incoming values and create releases for them.
@@ -1245,7 +1245,7 @@ static bool sinkArgument(EnumCaseDataflowContext &Context, SILBasicBlock *BB, un
     BB->getArgument(ArgNum)->replaceAllUsesWith(FSI);
 
     const auto &ArgType = FSI->getOperand(*DifferentOperandIndex)->getType();
-    BB->replacePHIArgument(ArgNum, ArgType, ValueOwnershipKind::Owned);
+    BB->replacePhiArgument(ArgNum, ArgType, ValueOwnershipKind::Owned);
 
     // Update all branch instructions in the predecessors to pass the new
     // argument to this BB.

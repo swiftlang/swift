@@ -164,10 +164,25 @@ public:
   }
 };
 
-llvm::Constant *IRGenModule::getTypeRef(CanType type) {
+llvm::Constant *IRGenModule::getTypeRef(CanType type, MangledTypeRefRole role) {
+  switch (role) {
+  case MangledTypeRefRole::DefaultAssociatedTypeWitness:
+  case MangledTypeRefRole::Metadata:
+    // Note that we're using all of the nominal types referenced by this type.
+    type.findIf([&](CanType type) -> bool {
+      if (auto nominal = type.getAnyNominal())
+        this->IRGen.noteUseOfTypeMetadata(nominal);
+      return false;
+    });
+    break;
+
+  case MangledTypeRefRole::Reflection:
+    break;
+  }
+
   IRGenMangler Mangler;
   auto SymbolicName = Mangler.mangleTypeForReflection(*this, type);
-  return getAddrOfStringForTypeRef(SymbolicName);
+  return getAddrOfStringForTypeRef(SymbolicName, role);
 }
 
 class ReflectionMetadataBuilder {
@@ -210,7 +225,7 @@ protected:
   /// Add a 32-bit relative offset to a mangled typeref string
   /// in the typeref reflection section.
   void addTypeRef(CanType type) {
-    B.addRelativeAddress(IGM.getTypeRef(type));
+    B.addRelativeAddress(IGM.getTypeRef(type, MangledTypeRefRole::Reflection));
   }
 
   /// Add a 32-bit relative offset to a mangled nominal type string
@@ -220,11 +235,14 @@ protected:
       IRGenMangler mangler;
       SymbolicMangling mangledStr;
       mangledStr.String = mangler.mangleBareProtocol(proto);
-      auto mangledName = IGM.getAddrOfStringForTypeRef(mangledStr);
+      auto mangledName =
+        IGM.getAddrOfStringForTypeRef(mangledStr,
+                                      MangledTypeRefRole::Reflection);
       B.addRelativeAddress(mangledName);
     } else {
       CanType type = nominal->getDeclaredType()->getCanonicalType();
-      B.addRelativeAddress(IGM.getTypeRef(type));
+      B.addRelativeAddress(
+        IGM.getTypeRef(type, MangledTypeRefRole::Reflection));
     }
   }
 
@@ -607,7 +625,8 @@ public:
       MetadataSourceEncoder Encoder(OS);
       Encoder.visit(Source);
 
-      auto EncodedSource = IGM.getAddrOfStringForTypeRef(OS.str());
+      auto EncodedSource =
+        IGM.getAddrOfStringForTypeRef(OS.str(), MangledTypeRefRole::Metadata);
       B.addRelativeAddress(EncodedSource);
     }
   }

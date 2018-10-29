@@ -85,7 +85,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
 
   bool visitAnyFunctionType(AnyFunctionType *ty) {
     for (const auto &param : ty->getParams()) {
-      if (doIt(param.getType()))
+      if (doIt(param.getOldType()))
         return true;
     }
 

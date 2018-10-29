@@ -14,9 +14,9 @@
 #include "SILFormat.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
-#include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/FileSystem.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -26,20 +26,15 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
-#include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Timer.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Strings.h"
-
-#include "clang/Basic/Module.h"
-
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Bitcode/BitstreamWriter.h"
@@ -52,9 +47,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/YAMLParser.h"
 
 #include <vector>
 
@@ -109,6 +102,7 @@ namespace {
         case DeclBaseName::Kind::Destructor:
           return static_cast<uint8_t>(DeclNameKind::Destructor);
       }
+      llvm_unreachable("unhandled kind");
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -338,6 +332,7 @@ namespace {
       case DeclBaseName::Kind::Destructor:
         return static_cast<uint8_t>(DeclNameKind::Destructor);
       }
+      llvm_unreachable("unhandled kind");
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -485,10 +480,24 @@ static const Decl *getDeclForContext(const DeclContext *DC) {
 
 namespace {
   struct Accessors {
+    uint8_t OpaqueReadOwnership;
     uint8_t ReadImpl, WriteImpl, ReadWriteImpl;
     SmallVector<AccessorDecl *, 8> Decls;
   };
 } // end anonymous namespace
+
+static uint8_t getRawOpaqueReadOwnership(swift::OpaqueReadOwnership ownership) {
+  switch (ownership) {
+#define CASE(KIND)                                            \
+  case swift::OpaqueReadOwnership::KIND:                      \
+    return uint8_t(serialization::OpaqueReadOwnership::KIND);
+  CASE(Owned)
+  CASE(Borrowed)
+  CASE(OwnedOrBorrowed)
+#undef CASE
+  }
+  llvm_unreachable("bad kind");  
+}
 
 static uint8_t getRawReadImplKind(swift::ReadImplKind kind) {
   switch (kind) {
@@ -529,7 +538,6 @@ static unsigned getRawReadWriteImplKind(swift::ReadWriteImplKind kind) {
     return uint8_t(serialization::ReadWriteImplKind::KIND);
   CASE(Immutable)
   CASE(Stored)
-  CASE(MaterializeForSet)
   CASE(MutableAddress)
   CASE(MaterializeToTemporary)
   CASE(Modify)
@@ -540,6 +548,8 @@ static unsigned getRawReadWriteImplKind(swift::ReadWriteImplKind kind) {
 
 static Accessors getAccessors(const AbstractStorageDecl *storage) {
   Accessors accessors;
+  accessors.OpaqueReadOwnership =
+    getRawOpaqueReadOwnership(storage->getOpaqueReadOwnership());
   auto impl = storage->getImplInfo();
   accessors.ReadImpl = getRawReadImplKind(impl.getReadImpl());
   accessors.WriteImpl = getRawWriteImplKind(impl.getWriteImpl());
@@ -678,8 +688,8 @@ IdentifierID Serializer::addDeclBaseNameRef(DeclBaseName ident) {
     if (id != 0)
       return id;
 
-    id = ++LastIdentifierID;
-    IdentifiersToWrite.push_back(ident.getIdentifier());
+    id = ++LastUniquedStringID;
+    StringsToWrite.push_back(ident.getIdentifier().str());
     return id;
   }
   case DeclBaseName::Kind::Subscript:
@@ -689,6 +699,25 @@ IdentifierID Serializer::addDeclBaseNameRef(DeclBaseName ident) {
   case DeclBaseName::Kind::Destructor:
     return DESTRUCTOR_ID;
   }
+  llvm_unreachable("unhandled kind");
+}
+
+std::pair<StringRef, IdentifierID> Serializer::addUniquedString(StringRef str) {
+  if (str.empty())
+    return {str, 0};
+
+  decltype(UniquedStringIDs)::iterator iter;
+  bool isNew;
+  std::tie(iter, isNew) =
+      UniquedStringIDs.insert({str, LastUniquedStringID + 1});
+
+  if (!isNew)
+    return {iter->getKey(), iter->getValue()};
+
+  ++LastUniquedStringID;
+  // Note that we use the string data stored in the StringMap.
+  StringsToWrite.push_back(iter->getKey());
+  return {iter->getKey(), LastUniquedStringID};
 }
 
 IdentifierID Serializer::addModuleRef(const ModuleDecl *M) {
@@ -742,38 +771,35 @@ NormalConformanceID Serializer::addConformanceRef(
 }
 
 /// Record the name of a block.
-static void emitBlockID(llvm::BitstreamWriter &out, unsigned ID,
-                        StringRef name,
-                        SmallVectorImpl<unsigned char> &nameBuffer) {
+void SerializerBase::emitBlockID(unsigned ID, StringRef name,
+                                 SmallVectorImpl<unsigned char> &nameBuffer) {
   SmallVector<unsigned, 1> idBuffer;
   idBuffer.push_back(ID);
-  out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETBID, idBuffer);
+  Out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETBID, idBuffer);
 
   // Emit the block name if present.
   if (name.empty())
     return;
   nameBuffer.resize(name.size());
   memcpy(nameBuffer.data(), name.data(), name.size());
-  out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_BLOCKNAME, nameBuffer);
+  Out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_BLOCKNAME, nameBuffer);
 }
 
-/// Record the name of a record within a block.
-static void emitRecordID(llvm::BitstreamWriter &out, unsigned ID,
-                         StringRef name,
-                         SmallVectorImpl<unsigned char> &nameBuffer) {
+void SerializerBase::emitRecordID(unsigned ID, StringRef name,
+                                  SmallVectorImpl<unsigned char> &nameBuffer) {
   assert(ID < 256 && "can't fit record ID in next to name");
   nameBuffer.resize(name.size()+1);
   nameBuffer[0] = ID;
   memcpy(nameBuffer.data()+1, name.data(), name.size());
-  out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETRECORDNAME, nameBuffer);
+  Out.EmitRecord(llvm::bitc::BLOCKINFO_CODE_SETRECORDNAME, nameBuffer);
 }
 
 void Serializer::writeBlockInfoBlock() {
   BCBlockRAII restoreBlock(Out, llvm::bitc::BLOCKINFO_BLOCK_ID, 2);
 
   SmallVector<unsigned char, 64> nameBuffer;
-#define BLOCK(X) emitBlockID(Out, X ## _ID, #X, nameBuffer)
-#define BLOCK_RECORD(K, X) emitRecordID(Out, K::X, #X, nameBuffer)
+#define BLOCK(X) emitBlockID(X ## _ID, #X, nameBuffer)
+#define BLOCK_RECORD(K, X) emitRecordID(K::X, #X, nameBuffer)
 
   BLOCK(MODULE_BLOCK);
 
@@ -855,7 +881,6 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_WITNESS_ASSOC_ENTRY);
   BLOCK_RECORD(sil_block, SIL_WITNESS_CONDITIONAL_CONFORMANCE);
   BLOCK_RECORD(sil_block, SIL_DEFAULT_WITNESS_TABLE);
-  BLOCK_RECORD(sil_block, SIL_DEFAULT_WITNESS_TABLE_ENTRY);
   BLOCK_RECORD(sil_block, SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY);
   BLOCK_RECORD(sil_block, SIL_INST_WITNESS_METHOD);
   BLOCK_RECORD(sil_block, SIL_SPECIALIZE_ATTR);
@@ -863,7 +888,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_TWO_OPERANDS_EXTRA_ATTR);
 
   // These layouts can exist in both decl blocks and sil blocks.
-#define BLOCK_RECORD_WITH_NAMESPACE(K, X) emitRecordID(Out, X, #X, nameBuffer)
+#define BLOCK_RECORD_WITH_NAMESPACE(K, X) emitRecordID(X, #X, nameBuffer)
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::INVALID_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
@@ -904,28 +929,6 @@ void Serializer::writeBlockInfoBlock() {
 #undef BLOCK_RECORD
 }
 
-void Serializer::writeDocBlockInfoBlock() {
-  BCBlockRAII restoreBlock(Out, llvm::bitc::BLOCKINFO_BLOCK_ID, 2);
-
-  SmallVector<unsigned char, 64> nameBuffer;
-#define BLOCK(X) emitBlockID(Out, X ## _ID, #X, nameBuffer)
-#define BLOCK_RECORD(K, X) emitRecordID(Out, K::X, #X, nameBuffer)
-
-  BLOCK(MODULE_DOC_BLOCK);
-
-  BLOCK(CONTROL_BLOCK);
-  BLOCK_RECORD(control_block, METADATA);
-  BLOCK_RECORD(control_block, MODULE_NAME);
-  BLOCK_RECORD(control_block, TARGET);
-
-  BLOCK(COMMENT_BLOCK);
-  BLOCK_RECORD(comment_block, DECL_COMMENTS);
-  BLOCK_RECORD(comment_block, GROUP_NAMES);
-
-#undef BLOCK
-#undef BLOCK_RECORD
-}
-
 void Serializer::writeHeader(const SerializationOptions &options) {
   {
     BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 3);
@@ -945,7 +948,8 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         versionString.tell() - shortVersionStringLength - 1;
     versionString << ")/" << version::getSwiftFullVersion();
     Metadata.emit(ScratchRecord,
-                  VERSION_MAJOR, VERSION_MINOR, shortVersionStringLength,
+                  SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR,
+                  shortVersionStringLength,
                   compatibilityVersionStringLength,
                   versionString.str());
 
@@ -996,70 +1000,15 @@ void Serializer::writeHeader(const SerializationOptions &options) {
   }
 }
 
-void Serializer::writeDocHeader() {
-  {
-    BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 3);
-    control_block::ModuleNameLayout ModuleName(Out);
-    control_block::MetadataLayout Metadata(Out);
-    control_block::TargetLayout Target(Out);
-
-    auto& LangOpts = M->getASTContext().LangOpts;
-    Metadata.emit(ScratchRecord,
-                  VERSION_MAJOR, VERSION_MINOR,
-                  /*short version string length*/0, /*compatibility length*/0,
-                  version::getSwiftFullVersion(
-                    LangOpts.EffectiveLanguageVersion));
-
-    Target.emit(ScratchRecord, LangOpts.Target.str());
-  }
-}
-
-static void
-removeDuplicateImports(SmallVectorImpl<ModuleDecl::ImportedModule> &imports) {
-  std::sort(imports.begin(), imports.end(),
-            [](const ModuleDecl::ImportedModule &lhs,
-               const ModuleDecl::ImportedModule &rhs) -> bool {
-    // Arbitrarily sort by name to get a deterministic order.
-    // FIXME: Submodules don't get sorted properly here.
-    if (lhs.second != rhs.second)
-      return lhs.second->getName().str() < rhs.second->getName().str();
-    using AccessPathElem = std::pair<Identifier, SourceLoc>;
-    return std::lexicographical_compare(lhs.first.begin(), lhs.first.end(),
-                                        rhs.first.begin(), rhs.first.end(),
-                                        [](const AccessPathElem &lElem,
-                                           const AccessPathElem &rElem) {
-      return lElem.first.str() < rElem.first.str();
-    });
-  });
-  auto last = std::unique(imports.begin(), imports.end(),
-                          [](const ModuleDecl::ImportedModule &lhs,
-                             const ModuleDecl::ImportedModule &rhs) -> bool {
-    if (lhs.second != rhs.second)
-      return false;
-    return ModuleDecl::isSameAccessPath(lhs.first, rhs.first);
-  });
-  imports.erase(last, imports.end());
-}
-
 using ImportPathBlob = llvm::SmallString<64>;
 static void flattenImportPath(const ModuleDecl::ImportedModule &import,
                               ImportPathBlob &out) {
-  ArrayRef<FileUnit *> files = import.second->getFiles();
-  if (auto clangModule = dyn_cast<ClangModuleUnit>(files.front())) {
-    // FIXME: This is an awful hack to handle Clang submodules.
-    // Once Swift has a native notion of submodules, this can go away.
-    const clang::Module *submodule = clangModule->getClangModule();
-    SmallVector<StringRef, 4> submoduleNames;
-    do {
-      submoduleNames.push_back(submodule->Name);
-      submodule = submodule->Parent;
-    } while (submodule);
-    interleave(submoduleNames.rbegin(), submoduleNames.rend(),
-               [&out](StringRef next) { out.append(next); },
-               [&out] { out.push_back('\0'); });
-  } else {
-    out.append(import.second->getName().str());
-  }
+  SmallVector<StringRef, 4> reverseSubmoduleNames(
+      import.second->getReverseFullModuleName(), {});
+
+  interleave(reverseSubmoduleNames.rbegin(), reverseSubmoduleNames.rend(),
+             [&out](StringRef next) { out.append(next); },
+             [&out] { out.push_back('\0'); });
 
   if (import.first.empty())
     return;
@@ -1089,20 +1038,17 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
       SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false, path);
   }
 
-  // FIXME: Having to deal with private imports as a superset of public imports
-  // is inefficient.
-  SmallVector<ModuleDecl::ImportedModule, 8> publicImports;
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;
-  for (auto file : M->getFiles()) {
-    file->getImportedModules(publicImports, ModuleDecl::ImportFilter::Public);
-    file->getImportedModules(allImports, ModuleDecl::ImportFilter::All);
-  }
+  M->getImportedModules(allImports, ModuleDecl::ImportFilter::All);
+  ModuleDecl::removeDuplicateImports(allImports);
 
-  llvm::SmallSet<ModuleDecl::ImportedModule, 8, ModuleDecl::OrderImportedModules>
-    publicImportSet;
+  // Collect the public imports as a subset so that we can mark them with an
+  // extra flag.
+  SmallVector<ModuleDecl::ImportedModule, 8> publicImports;
+  M->getImportedModules(publicImports, ModuleDecl::ImportFilter::Public);
+  llvm::SmallSet<ModuleDecl::ImportedModule, 8,
+                 ModuleDecl::OrderImportedModules> publicImportSet;
   publicImportSet.insert(publicImports.begin(), publicImports.end());
-
-  removeDuplicateImports(allImports);
 
   auto clangImporter =
     static_cast<ClangImporter *>(M->getASTContext().getClangModuleLoader());
@@ -1200,8 +1146,6 @@ static uint8_t getRawStableAddressorKind(swift::AddressorKind kind) {
     return uint8_t(serialization::AddressorKind::Owning);
   case swift::AddressorKind::NativeOwning:
     return uint8_t(serialization::AddressorKind::NativeOwning);
-  case swift::AddressorKind::NativePinning:
-    return uint8_t(serialization::AddressorKind::NativePinning);
   }
   llvm_unreachable("bad addressor kind");
 }
@@ -1213,6 +1157,7 @@ static uint8_t getRawStableResilienceExpansion(swift::ResilienceExpansion e) {
   case swift::ResilienceExpansion::Maximal:
     return uint8_t(serialization::ResilienceExpansion::Maximal);
   }
+  llvm_unreachable("unhandled expansion");
 }
 
 void Serializer::writeParameterList(const ParameterList *PL) {
@@ -1389,6 +1334,20 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
           addTypeRef(req.getFirstType()), size, alignment);
     }
   }
+}
+
+void Serializer::writeInlinableBodyTextIfNeeded(
+  const AbstractFunctionDecl *AFD) {
+  using namespace decls_block;
+
+  if (AFD->getResilienceExpansion() != swift::ResilienceExpansion::Minimal)
+    return;
+  if (!AFD->hasInlinableBodyText()) return;
+  SmallString<128> scratch;
+  auto body = AFD->getInlinableBodyText(scratch);
+
+  unsigned abbrCode = DeclTypeAbbrCodes[InlinableBodyTextLayout::Code];
+  InlinableBodyTextLayout::emitRecord(Out, ScratchRecord, abbrCode, body);
 }
 
 bool Serializer::writeGenericParams(const GenericParamList *genericParams) {
@@ -1590,18 +1549,21 @@ void Serializer::writeNormalConformance(
       // If there is no witness, we're done.
       if (!witness.getDecl()) return;
 
-      if (auto *genericEnv = witness.getSyntheticEnvironment()) {
-        // Generic signature.
-        auto *genericSig = genericEnv->getGenericSignature();
-        data.push_back(addGenericSignatureRef(genericSig));
-      } else {
-        data.push_back(/*null generic signature*/0);
-      }
+      auto subs = witness.getSubstitutions();
 
-      data.push_back(
-        addSubstitutionMapRef(witness.getRequirementToSyntheticSubs()));
-      data.push_back(
-        addSubstitutionMapRef(witness.getSubstitutions()));
+      // Canonicalize away typealiases, since these substitutions aren't used
+      // for diagnostics and we reference fewer declarations that way.
+      subs = subs.getCanonical();
+
+      // Map archetypes to type parameters, since we always substitute them
+      // away. Note that in a merge-modules pass, we're serializing conformances
+      // that we deserialized, so they will already have their replacement types
+      // in terms of interface types; hence the hasArchetypes() check is
+      // necessary for correctness, not just as a fast path.
+      if (subs.hasArchetypes())
+        subs = subs.mapReplacementTypesOutOfContext();
+
+      data.push_back(addSubstitutionMapRef(subs));
   });
 
   unsigned numSignatureConformances =
@@ -1803,6 +1765,16 @@ void Serializer::writeMembers(DeclID parentID,
           !VD->getBaseName().empty()) {
         std::unique_ptr<DeclMembersTable> &memberTable =
           DeclMemberNames[VD->getBaseName()].second;
+        if (!memberTable) {
+          memberTable = llvm::make_unique<DeclMembersTable>();
+        }
+        (*memberTable)[parentID].push_back(memberID);
+      }
+
+      // Same as above, but for @_implements attributes
+      if (auto A = VD->getAttrs().getAttribute<ImplementsAttr>()) {
+        std::unique_ptr<DeclMembersTable> &memberTable =
+          DeclMemberNames[A->getMemberName().getBaseName()].second;
         if (!memberTable) {
           memberTable = llvm::make_unique<DeclMembersTable>();
         }
@@ -2186,6 +2158,12 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   if (DA->isNotSerialized())
     return;
 
+  // Ignore attributes that have been marked invalid. (This usually means
+  // type-checking removed them, but only provided a warning rather than an
+  // error.)
+  if (DA->isInvalid())
+    return;
+
   switch (DA->getKind()) {
   case DAK_RawDocComment:
   case DAK_ReferenceOwnership: // Serialized as part of the type.
@@ -2414,9 +2392,19 @@ void Serializer::writePatternBindingInitializer(PatternBindingDecl *binding,
                                                 unsigned bindingIndex) {
   using namespace decls_block;
   auto abbrCode = DeclTypeAbbrCodes[PatternBindingInitializerLayout::Code];
+
+  StringRef initStr;
+  SmallString<128> scratch;
+  auto &entry = binding->getPatternList()[bindingIndex];
+  auto varDecl = entry.getAnchoringVarDecl();
+  if (entry.hasInitStringRepresentation() &&
+      varDecl->isInitExposedToClients()) {
+    initStr = entry.getInitStringRepresentation(scratch);
+  }
+
   PatternBindingInitializerLayout::emitRecord(Out, ScratchRecord,
                                               abbrCode, addDeclRef(binding),
-                                              bindingIndex);
+                                              bindingIndex, initStr);
 }
 
 void
@@ -2652,8 +2640,7 @@ void Serializer::writeDecl(const Decl *D) {
   }
 
   if (auto *value = dyn_cast<ValueDecl>(D)) {
-    if (value->hasAccess() &&
-        value->getFormalAccess() <= swift::AccessLevel::FilePrivate &&
+    if (value->getFormalAccess() <= swift::AccessLevel::FilePrivate &&
         !value->getDeclContext()->isLocalContext()) {
       // FIXME: We shouldn't need to encode this for /all/ private decls.
       // In theory we can follow the same rules as mangling and only include
@@ -2694,6 +2681,7 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(extension->getDeclContext());
     Type baseTy = extension->getExtendedType();
     assert(!baseTy->hasUnboundGenericType());
+    assert(!baseTy->hasArchetype());
 
     // FIXME: Use the canonical type here in order to minimize circularity
     // issues at deserialization time. A known problematic case here is
@@ -2715,8 +2703,10 @@ void Serializer::writeDecl(const Decl *D) {
                           nullptr, /*sorted=*/true);
 
     SmallVector<TypeID, 8> inheritedAndDependencyTypes;
-    for (auto inherited : extension->getInherited())
+    for (auto inherited : extension->getInherited()) {
+      assert(!inherited.getType()->hasArchetype());
       inheritedAndDependencyTypes.push_back(addTypeRef(inherited.getType()));
+    }
     size_t numInherited = inheritedAndDependencyTypes.size();
 
     llvm::SmallSetVector<Type, 4> dependencies;
@@ -2842,10 +2832,14 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(op->getDeclContext());
     auto nameID = addDeclBaseNameRef(op->getName());
     auto groupID = addDeclRef(op->getPrecedenceGroup());
+    SmallVector<DeclID, 1> designatedNominalTypeDeclIDs;
+    for (auto *decl : op->getDesignatedNominalTypes())
+      designatedNominalTypeDeclIDs.push_back(addDeclRef(decl));
 
     unsigned abbrCode = DeclTypeAbbrCodes[InfixOperatorLayout::Code];
-    InfixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                    nameID, contextID, groupID);
+    InfixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode, nameID,
+                                    contextID, groupID,
+                                    designatedNominalTypeDeclIDs);
     break;
   }
 
@@ -2854,11 +2848,14 @@ void Serializer::writeDecl(const Decl *D) {
     verifyAttrSerializable(op);
 
     auto contextID = addDeclContextRef(op->getDeclContext());
+    SmallVector<DeclID, 1> designatedNominalTypeDeclIDs;
+    for (auto *decl : op->getDesignatedNominalTypes())
+      designatedNominalTypeDeclIDs.push_back(addDeclRef(decl));
 
     unsigned abbrCode = DeclTypeAbbrCodes[PrefixOperatorLayout::Code];
     PrefixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                      addDeclBaseNameRef(op->getName()),
-                                     contextID);
+                                     contextID, designatedNominalTypeDeclIDs);
     break;
   }
 
@@ -2867,11 +2864,14 @@ void Serializer::writeDecl(const Decl *D) {
     verifyAttrSerializable(op);
 
     auto contextID = addDeclContextRef(op->getDeclContext());
+    SmallVector<DeclID, 1> designatedNominalTypeDeclIDs;
+    for (auto *decl : op->getDesignatedNominalTypes())
+      designatedNominalTypeDeclIDs.push_back(addDeclRef(decl));
 
     unsigned abbrCode = DeclTypeAbbrCodes[PostfixOperatorLayout::Code];
     PostfixOperatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                       addDeclBaseNameRef(op->getName()),
-                                      contextID);
+                                      contextID, designatedNominalTypeDeclIDs);
     break;
   }
 
@@ -2959,8 +2959,10 @@ void Serializer::writeDecl(const Decl *D) {
                           nullptr, /*sorted=*/true);
 
     SmallVector<TypeID, 4> inheritedTypes;
-    for (auto inherited : theStruct->getInherited())
+    for (auto inherited : theStruct->getInherited()) {
+      assert(!inherited.getType()->hasArchetype());
       inheritedTypes.push_back(addTypeRef(inherited.getType()));
+    }
 
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(theStruct->getFormalAccess());
@@ -2995,8 +2997,10 @@ void Serializer::writeDecl(const Decl *D) {
                           nullptr, /*sorted=*/true);
 
     SmallVector<TypeID, 4> inheritedAndDependencyTypes;
-    for (auto inherited : theEnum->getInherited())
+    for (auto inherited : theEnum->getInherited()) {
+      assert(!inherited.getType()->hasArchetype());
       inheritedAndDependencyTypes.push_back(addTypeRef(inherited.getType()));
+    }
 
     llvm::SmallSetVector<Type, 4> dependencyTypes;
     for (const EnumElementDecl *nextElt : theEnum->getAllElements()) {
@@ -3048,8 +3052,10 @@ void Serializer::writeDecl(const Decl *D) {
                           nullptr, /*sorted=*/true);
 
     SmallVector<TypeID, 4> inheritedTypes;
-    for (auto inherited : theClass->getInherited())
+    for (auto inherited : theClass->getInherited()) {
+      assert(!inherited.getType()->hasArchetype());
       inheritedTypes.push_back(addTypeRef(inherited.getType()));
+    }
 
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(theClass->getFormalAccess());
@@ -3087,8 +3093,10 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(proto->getDeclContext());
 
     SmallVector<DeclID, 8> inherited;
-    for (auto element : proto->getInherited())
+    for (auto element : proto->getInherited()) {
+      assert(!element.getType()->hasArchetype());
       inherited.push_back(addTypeRef(element.getType()));
+    }
 
     uint8_t rawAccessLevel = getRawStableAccessLevel(proto->getFormalAccess());
 
@@ -3147,6 +3155,7 @@ void Serializer::writeDecl(const Decl *D) {
                           var->hasNonPatternBindingInit(),
                           var->isGetterMutating(),
                           var->isSetterMutating(),
+                          accessors.OpaqueReadOwnership,
                           accessors.ReadImpl,
                           accessors.WriteImpl,
                           accessors.ReadWriteImpl,
@@ -3168,8 +3177,10 @@ void Serializer::writeDecl(const Decl *D) {
     // Only save the text for normal default arguments, not any of the special
     // ones.
     StringRef defaultArgumentText;
+    SmallString<128> scratch;
     if (param->getDefaultArgumentKind() == swift::DefaultArgumentKind::Normal)
-      defaultArgumentText = param->getDefaultValueStringRepresentation();
+      defaultArgumentText =
+        param->getDefaultValueStringRepresentation(scratch);
 
     unsigned abbrCode = DeclTypeAbbrCodes[ParamLayout::Code];
     ParamLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -3244,6 +3255,8 @@ void Serializer::writeDecl(const Decl *D) {
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
 
+    writeInlinableBodyTextIfNeeded(fn);
+
     break;
   }
 
@@ -3301,6 +3314,8 @@ void Serializer::writeDecl(const Decl *D) {
     if (auto errorConvention = fn->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
 
+    writeInlinableBodyTextIfNeeded(fn);
+
     break;
   }
 
@@ -3321,12 +3336,12 @@ void Serializer::writeDecl(const Decl *D) {
     // of the ABI. That isn't the case for Swift enums.
     auto RawValueKind = EnumElementRawValueKind::None;
     bool Negative = false;
-    Identifier RawValueText;
+    StringRef RawValueText;
     if (elem->getParentEnum()->isObjC()) {
       // Currently ObjC enums always have integer raw values.
       RawValueKind = EnumElementRawValueKind::IntegerLiteral;
       auto ILE = cast<IntegerLiteralExpr>(elem->getRawValueExpr());
-      RawValueText = M->getASTContext().getIdentifier(ILE->getDigitsText());
+      RawValueText = ILE->getDigitsText();
       Negative = ILE->isNegative();
     }
 
@@ -3340,7 +3355,7 @@ void Serializer::writeDecl(const Decl *D) {
                                   elem->hasAssociatedValues(),
                                   (unsigned)RawValueKind,
                                   Negative,
-                                  addDeclBaseNameRef(RawValueText),
+                                  addUniquedStringRef(RawValueText),
                                   rawResilienceExpansion,
                                   elem->getFullName().getArgumentNames().size()+1,
                                   nameComponentsAndDependencies);
@@ -3382,6 +3397,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 subscript->isObjC(),
                                 subscript->isGetterMutating(),
                                 subscript->isSetterMutating(),
+                                accessors.OpaqueReadOwnership,
                                 accessors.ReadImpl,
                                 accessors.WriteImpl,
                                 accessors.ReadWriteImpl,
@@ -3452,6 +3468,8 @@ void Serializer::writeDecl(const Decl *D) {
 
     if (auto errorConvention = ctor->getForeignErrorConvention())
       writeForeignErrorConvention(*errorConvention);
+
+    writeInlinableBodyTextIfNeeded(ctor);
     break;
   }
 
@@ -3468,6 +3486,7 @@ void Serializer::writeDecl(const Decl *D) {
                                  dtor->isObjC(),
                                  addGenericEnvironmentRef(
                                                 dtor->getGenericEnvironment()));
+    writeInlinableBodyTextIfNeeded(dtor);
     break;
   }
 
@@ -3633,12 +3652,14 @@ void Serializer::writeType(Type ty) {
   case TypeKind::NameAlias: {
     auto alias = cast<NameAliasType>(ty.getPointer());
     const TypeAliasDecl *typeAlias = alias->getDecl();
+    auto underlyingType = typeAlias->getUnderlyingTypeLoc().getType();
 
     unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
     NameAliasTypeLayout::emitRecord(
                            Out, ScratchRecord, abbrCode,
                            addDeclRef(typeAlias, /*allowTypeAliasXRef*/true),
                            addTypeRef(alias->getParent()),
+                           addTypeRef(underlyingType),
                            addTypeRef(alias->getSinglyDesugaredType()),
                            addSubstitutionMapRef(alias->getSubstitutionMap()));
     break;
@@ -4048,6 +4069,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<VarPatternLayout>();
   registerDeclTypeAbbr<AnyPatternLayout>();
   registerDeclTypeAbbr<TypedPatternLayout>();
+  registerDeclTypeAbbr<InlinableBodyTextLayout>();
   registerDeclTypeAbbr<GenericParamListLayout>();
   registerDeclTypeAbbr<GenericParamLayout>();
   registerDeclTypeAbbr<GenericRequirementLayout>();
@@ -4162,9 +4184,9 @@ void Serializer::writeAllIdentifiers() {
   // Make sure no identifier has an offset of 0.
   stringData.push_back('\0');
 
-  for (Identifier ident : IdentifiersToWrite) {
+  for (StringRef str : StringsToWrite) {
     IdentifierOffsets.push_back(stringData.size());
-    stringData.append(ident.get());
+    stringData.append(str);
     stringData.push_back('\0');
   }
 
@@ -4306,397 +4328,6 @@ writeDeclMembersTable(const decl_member_tables_block::DeclMembersLayout &mems,
   }
 
   mems.emit(scratch, tableOffset, hashTableBlob);
-}
-
-namespace {
-
-struct DeclCommentTableData {
-  StringRef Brief;
-  RawComment Raw;
-  uint32_t Group;
-  uint32_t Order;
-};
-
-class DeclCommentTableInfo {
-public:
-  using key_type = StringRef;
-  using key_type_ref = key_type;
-  using data_type = DeclCommentTableData;
-  using data_type_ref = const data_type &;
-  using hash_value_type = uint32_t;
-  using offset_type = unsigned;
-
-  hash_value_type ComputeHash(key_type_ref key) {
-    assert(!key.empty());
-    // FIXME: DJB seed=0, audit whether the default seed could be used.
-    return llvm::djbHash(key, 0);
-  }
-
-  std::pair<unsigned, unsigned>
-  EmitKeyDataLength(raw_ostream &out, key_type_ref key, data_type_ref data) {
-    uint32_t keyLength = key.size();
-    const unsigned numLen = 4;
-
-    // Data consists of brief comment length and brief comment text,
-    uint32_t dataLength = numLen + data.Brief.size();
-    // number of raw comments,
-    dataLength += numLen;
-    // for each raw comment: column number of the first line, length of each
-    // raw comment and its text.
-    for (auto C : data.Raw.Comments)
-      dataLength += numLen + numLen + C.RawText.size();
-
-    // Group Id.
-    dataLength += numLen;
-
-    // Source order.
-    dataLength += numLen;
-    endian::Writer writer(out, little);
-    writer.write<uint32_t>(keyLength);
-    writer.write<uint32_t>(dataLength);
-    return { keyLength, dataLength };
-  }
-
-  void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
-    out << key;
-  }
-
-  void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
-                unsigned len) {
-    endian::Writer writer(out, little);
-    writer.write<uint32_t>(data.Brief.size());
-    out << data.Brief;
-    writer.write<uint32_t>(data.Raw.Comments.size());
-    for (auto C : data.Raw.Comments) {
-      writer.write<uint32_t>(C.StartColumn);
-      writer.write<uint32_t>(C.RawText.size());
-      out << C.RawText;
-    }
-    writer.write<uint32_t>(data.Group);
-    writer.write<uint32_t>(data.Order);
-  }
-};
-
-} // end unnamed namespace
-
-using FileNameToGroupNameMap = llvm::StringMap<std::string>;
-using pFileNameToGroupNameMap = std::unique_ptr<FileNameToGroupNameMap>;
-
-class YamlGroupInputParser {
-  StringRef RecordPath;
-  std::string Separator = "/";
-  static llvm::StringMap<pFileNameToGroupNameMap> AllMaps;
-
-  bool parseRoot(FileNameToGroupNameMap &Map, llvm::yaml::Node *Root,
-                 StringRef ParentName) {
-    auto *MapNode = dyn_cast<llvm::yaml::MappingNode>(Root);
-    if (!MapNode) {
-      return true;
-    }
-    for (auto &Pair : *MapNode) {
-      auto *Key = dyn_cast_or_null<llvm::yaml::ScalarNode>(Pair.getKey());
-      auto *Value = dyn_cast_or_null<llvm::yaml::SequenceNode>(Pair.getValue());
-
-      if (!Key || !Value) {
-        return true;
-      }
-      llvm::SmallString<16> GroupNameStorage;
-      StringRef GroupName = Key->getValue(GroupNameStorage);
-      std::string CombinedName;
-      if (!ParentName.empty()) {
-        CombinedName = (llvm::Twine(ParentName) + Separator + GroupName).str();
-      } else {
-        CombinedName = GroupName;
-      }
-
-      for (llvm::yaml::Node &Entry : *Value) {
-        if (auto *FileEntry= dyn_cast<llvm::yaml::ScalarNode>(&Entry)) {
-          llvm::SmallString<16> FileNameStorage;
-          StringRef FileName = FileEntry->getValue(FileNameStorage);
-          llvm::SmallString<32> GroupNameAndFileName;
-          GroupNameAndFileName.append(CombinedName);
-          GroupNameAndFileName.append(Separator);
-          GroupNameAndFileName.append(llvm::sys::path::stem(FileName));
-          Map[FileName] = GroupNameAndFileName.str();
-        } else if (Entry.getType() == llvm::yaml::Node::NodeKind::NK_Mapping) {
-          if (parseRoot(Map, &Entry, CombinedName))
-            return true;
-        } else
-          return true;
-      }
-    }
-    return false;
-  }
-
-public:
-  YamlGroupInputParser(StringRef RecordPath): RecordPath(RecordPath) {}
-
-  FileNameToGroupNameMap* getParsedMap() {
-    return AllMaps[RecordPath].get();
-  }
-
-  // Parse the Yaml file that contains the group information.
-  // True on failure; false on success.
-  bool parse() {
-    // If we have already parsed this group info file, return false;
-    auto FindMap = AllMaps.find(RecordPath);
-    if (FindMap != AllMaps.end())
-      return false;
-
-    auto Buffer = llvm::MemoryBuffer::getFile(RecordPath);
-    if (!Buffer) {
-      // The group info file does not exist.
-      return true;
-    }
-    llvm::SourceMgr SM;
-    llvm::yaml::Stream YAMLStream(Buffer.get()->getMemBufferRef(), SM);
-    llvm::yaml::document_iterator I = YAMLStream.begin();
-    if (I == YAMLStream.end()) {
-      // Cannot parse correctly.
-      return true;
-    }
-    llvm::yaml::Node *Root = I->getRoot();
-    if (!Root) {
-      // Cannot parse correctly.
-      return true;
-    }
-
-    // The format is a map of ("group0" : ["file1", "file2"]), meaning all
-    // symbols from file1 and file2 belong to "group0".
-    auto *Map = dyn_cast<llvm::yaml::MappingNode>(Root);
-    if (!Map) {
-      return true;
-    }
-    pFileNameToGroupNameMap pMap(new FileNameToGroupNameMap());
-    std::string Empty;
-    if (parseRoot(*pMap, Root, Empty))
-      return true;
-
-    // Save the parsed map to the owner.
-    AllMaps[RecordPath] = std::move(pMap);
-    return false;
-  }
-};
-
-llvm::StringMap<pFileNameToGroupNameMap> YamlGroupInputParser::AllMaps;
-
-class DeclGroupNameContext {
-  struct GroupNameCollector {
-    const std::string NullGroupName = "";
-    const bool Enable;
-    GroupNameCollector(bool Enable) : Enable(Enable) {}
-    virtual ~GroupNameCollector() = default;
-    virtual StringRef getGroupNameInternal(const Decl *VD) = 0;
-    StringRef getGroupName(const Decl *VD) {
-      return Enable ? getGroupNameInternal(VD) : StringRef(NullGroupName);
-    };
-  };
-
-  class GroupNameCollectorFromJson : public GroupNameCollector {
-    StringRef RecordPath;
-    FileNameToGroupNameMap* pMap = nullptr;
-    ASTContext &Ctx;
-
-  public:
-    GroupNameCollectorFromJson(StringRef RecordPath, ASTContext &Ctx) :
-      GroupNameCollector(!RecordPath.empty()), RecordPath(RecordPath),
-      Ctx(Ctx) {}
-    StringRef getGroupNameInternal(const Decl *VD) override {
-      // We need the file path, so there has to be a location.
-      if (VD->getLoc().isInvalid())
-        return NullGroupName;
-      auto PathOp = VD->getDeclContext()->getParentSourceFile()->getBufferID();
-      if (!PathOp.hasValue())
-        return NullGroupName;
-      StringRef FullPath =
-        VD->getASTContext().SourceMgr.getIdentifierForBuffer(PathOp.getValue());
-      if (!pMap) {
-        YamlGroupInputParser Parser(RecordPath);
-        if (!Parser.parse()) {
-
-          // Get the file-name to group map if parsing correctly.
-          pMap = Parser.getParsedMap();
-        }
-      }
-      if (!pMap)
-        return NullGroupName;
-      StringRef FileName = llvm::sys::path::filename(FullPath);
-      auto Found = pMap->find(FileName);
-      if (Found == pMap->end()) {
-        Ctx.Diags.diagnose(SourceLoc(), diag::error_no_group_info, FileName);
-        return NullGroupName;
-      }
-      return Found->second;
-    }
-  };
-
-  llvm::MapVector<StringRef, unsigned> Map;
-  std::vector<StringRef> ViewBuffer;
-  std::unique_ptr<GroupNameCollector> pNameCollector;
-
-public:
-  DeclGroupNameContext(StringRef RecordPath, ASTContext &Ctx) :
-    pNameCollector(new GroupNameCollectorFromJson(RecordPath, Ctx)) {}
-  uint32_t getGroupSequence(const Decl *VD) {
-    return Map.insert(std::make_pair(pNameCollector->getGroupName(VD),
-                                     Map.size())).first->second;
-  }
-
-  ArrayRef<StringRef> getOrderedGroupNames() {
-    ViewBuffer.clear();
-    for (auto It = Map.begin(); It != Map.end(); ++ It) {
-      ViewBuffer.push_back(It->first);
-    }
-    return llvm::makeArrayRef(ViewBuffer);
-  }
-
-  bool isEnable() {
-    return pNameCollector->Enable;
-  }
-};
-
-static void writeGroupNames(const comment_block::GroupNamesLayout &GroupNames,
-                            ArrayRef<StringRef> Names) {
-  llvm::SmallString<32> Blob;
-  llvm::raw_svector_ostream BlobStream(Blob);
-  endian::Writer Writer(BlobStream, little);
-  Writer.write<uint32_t>(Names.size());
-  for (auto N : Names) {
-    Writer.write<uint32_t>(N.size());
-    BlobStream << N;
-  }
-  SmallVector<uint64_t, 8> Scratch;
-  GroupNames.emit(Scratch, BlobStream.str());
-}
-
-static void writeDeclCommentTable(
-    const comment_block::DeclCommentListLayout &DeclCommentList,
-    const SourceFile *SF, const ModuleDecl *M,
-    DeclGroupNameContext &GroupContext) {
-
-  struct DeclCommentTableWriter : public ASTWalker {
-    llvm::BumpPtrAllocator Arena;
-    llvm::SmallString<512> USRBuffer;
-    llvm::OnDiskChainedHashTableGenerator<DeclCommentTableInfo> generator;
-    DeclGroupNameContext &GroupContext;
-    unsigned SourceOrder;
-
-    DeclCommentTableWriter(DeclGroupNameContext &GroupContext) :
-      GroupContext(GroupContext) {}
-
-    void resetSourceOrder() {
-      SourceOrder = 0;
-    }
-
-    StringRef copyString(StringRef String) {
-      char *Mem = static_cast<char *>(Arena.Allocate(String.size(), 1));
-      std::copy(String.begin(), String.end(), Mem);
-      return StringRef(Mem, String.size());
-    }
-
-    void writeDocForExtensionDecl(ExtensionDecl *ED) {
-      RawComment Raw = ED->getRawComment();
-      if (Raw.Comments.empty() && !GroupContext.isEnable())
-        return;
-      // Compute USR.
-      {
-        USRBuffer.clear();
-        llvm::raw_svector_ostream OS(USRBuffer);
-        if (ide::printExtensionUSR(ED, OS))
-          return;
-      }
-      generator.insert(copyString(USRBuffer.str()),
-                       { ED->getBriefComment(), Raw,
-                         GroupContext.getGroupSequence(ED),
-                         SourceOrder++ });
-    }
-
-    bool walkToDeclPre(Decl *D) override {
-      if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-        writeDocForExtensionDecl(ED);
-        return true;
-      }
-
-      auto *VD = dyn_cast<ValueDecl>(D);
-      if (!VD)
-        return true;
-
-      RawComment Raw = VD->getRawComment();
-      // When building the stdlib we intend to serialize unusual comments.
-      // This situation is represented by GroupContext.isEnable().  In that
-      // case, we perform fewer serialization checks.
-      if (!GroupContext.isEnable()) {
-        // Skip the decl if it cannot have a comment.
-        if (!VD->canHaveComment()) {
-          return true;
-        }
-
-        // Skip the decl if it does not have a comment.
-        if (Raw.Comments.empty())
-          return true;
-
-        // Skip the decl if it's not visible to clients. The use of
-        // getEffectiveAccess is unusual here; we want to take the testability
-        // state into account and emit documentation if and only if they are
-        // visible to clients (which means public ordinarily, but
-        // public+internal when testing enabled).
-        if (VD->getEffectiveAccess() < swift::AccessLevel::Public)
-          return true;
-      }
-
-      // Compute USR.
-      {
-        USRBuffer.clear();
-        llvm::raw_svector_ostream OS(USRBuffer);
-        if (ide::printDeclUSR(VD, OS))
-          return true;
-      }
-
-      generator.insert(copyString(USRBuffer.str()),
-                       { VD->getBriefComment(), Raw,
-                         GroupContext.getGroupSequence(VD),
-                         SourceOrder++ });
-      return true;
-    }
-
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      return { false, S };
-    }
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      return { false, E };
-    }
-
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
-    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-    bool walkToParameterListPre(ParameterList *PL) override { return false; }
-  };
-
-  DeclCommentTableWriter Writer(GroupContext);
-
-  ArrayRef<const FileUnit *> files;
-  SmallVector<const FileUnit *, 1> Scratch;
-  if (SF) {
-    Scratch.push_back(SF);
-    files = llvm::makeArrayRef(Scratch);
-  } else {
-    files = M->getFiles();
-  }
-  for (auto nextFile : files) {
-    Writer.resetSourceOrder();
-    const_cast<FileUnit *>(nextFile)->walk(Writer);
-  }
-  SmallVector<uint64_t, 8> scratch;
-  llvm::SmallString<32> hashTableBlob;
-  uint32_t tableOffset;
-  {
-    llvm::raw_svector_ostream blobStream(hashTableBlob);
-    // Make sure that no bucket is at offset 0
-    endian::write<uint32_t>(blobStream, 0, little);
-    tableOffset = Writer.generator.Emit(blobStream);
-  }
-
-  DeclCommentList.emit(scratch, tableOffset, hashTableBlob);
 }
 
 namespace {
@@ -5031,14 +4662,13 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
   }
 }
 
-void Serializer::writeToStream(raw_ostream &os) {
+void SerializerBase::writeToStream(raw_ostream &os) {
   os.write(Buffer.data(), Buffer.size());
   os.flush();
 }
 
-template <size_t N>
-Serializer::Serializer(const unsigned char (&signature)[N],
-                       ModuleOrSourceFile DC) {
+SerializerBase::SerializerBase(ArrayRef<unsigned char> signature,
+                               ModuleOrSourceFile DC) {
   for (unsigned char byte : signature)
     Out.Emit(byte, 8);
 
@@ -5046,11 +4676,10 @@ Serializer::Serializer(const unsigned char (&signature)[N],
   this->SF = DC.dyn_cast<SourceFile *>();
 }
 
-
 void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
                                const SILModule *SILMod,
                                const SerializationOptions &options) {
-  Serializer S{MODULE_SIGNATURE, DC};
+  Serializer S{SWIFTMODULE_SIGNATURE, DC};
 
   // FIXME: This is only really needed for debugging. We don't actually use it.
   S.writeBlockInfoBlock();
@@ -5066,43 +4695,6 @@ void Serializer::writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
   S.writeToStream(os);
 }
 
-void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                                  StringRef GroupInfoPath, ASTContext &Ctx) {
-  Serializer S{MODULE_DOC_SIGNATURE, DC};
-  // FIXME: This is only really needed for debugging. We don't actually use it.
-  S.writeDocBlockInfoBlock();
-
-  {
-    BCBlockRAII moduleBlock(S.Out, MODULE_DOC_BLOCK_ID, 2);
-    S.writeDocHeader();
-    {
-      BCBlockRAII restoreBlock(S.Out, COMMENT_BLOCK_ID, 4);
-      DeclGroupNameContext GroupContext(GroupInfoPath, Ctx);
-      comment_block::DeclCommentListLayout DeclCommentList(S.Out);
-      writeDeclCommentTable(DeclCommentList, S.SF, S.M, GroupContext);
-      comment_block::GroupNamesLayout GroupNames(S.Out);
-
-      // FIXME: Multi-file compilation may cause group id collision.
-      writeGroupNames(GroupNames, GroupContext.getOrderedGroupNames());
-    }
-  }
-
-  S.writeToStream(os);
-}
-
-static inline bool
-withOutputFile(ASTContext &ctx, StringRef outputPath,
-               llvm::function_ref<void(raw_ostream &)> action){
-  std::error_code EC = swift::atomicallyWritingToFile(outputPath,
-                                                      action);
-  if (!EC)
-    return false;
-
-  ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                     outputPath, EC.message());
-  return true;
-}
-
 void swift::serialize(ModuleOrSourceFile DC,
                       const SerializationOptions &options,
                       const SILModule *M) {
@@ -5115,20 +4707,23 @@ void swift::serialize(ModuleOrSourceFile DC,
     return;
   }
 
-  bool hadError = withOutputFile(getContext(DC), options.OutputPath,
+  bool hadError = withOutputFile(getContext(DC).Diags,
+                                 options.OutputPath,
                                  [&](raw_ostream &out) {
     SharedTimer timer("Serialization, swiftmodule");
     Serializer::writeToStream(out, DC, M, options);
+    return false;
   });
   if (hadError)
     return;
 
   if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
-    (void)withOutputFile(getContext(DC), options.DocOutputPath,
+    (void)withOutputFile(getContext(DC).Diags,
+                         options.DocOutputPath,
                          [&](raw_ostream &out) {
       SharedTimer timer("Serialization, swiftdoc");
-      Serializer::writeDocToStream(out, DC, options.GroupInfoPath,
-                                   getContext(DC));
+      writeDocToStream(out, DC, options.GroupInfoPath);
+      return false;
     });
   }
 }

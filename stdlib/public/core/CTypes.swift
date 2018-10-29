@@ -160,7 +160,7 @@ public struct OpaquePointer {
 }
 
 extension OpaquePointer: Equatable {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // unsafe-performance
   public static func == (lhs: OpaquePointer, rhs: OpaquePointer) -> Bool {
     return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
   }
@@ -193,7 +193,7 @@ extension Int {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // unsafe-performance
   public init(bitPattern pointer: OpaquePointer?) {
     self.init(bitPattern: UnsafeRawPointer(pointer))
   }
@@ -207,7 +207,7 @@ extension UInt {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // unsafe-performance
   public init(bitPattern pointer: OpaquePointer?) {
     self.init(bitPattern: UnsafeRawPointer(pointer))
   }
@@ -216,20 +216,20 @@ extension UInt {
 /// A wrapper around a C `va_list` pointer.
 @_fixed_layout
 public struct CVaListPointer {
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal var value: UnsafeMutableRawPointer
+  @usableFromInline // unsafe-performance
+  internal var _value: UnsafeMutableRawPointer
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // unsafe-performance
   public // @testable
   init(_fromUnsafeMutablePointer from: UnsafeMutableRawPointer) {
-    value = from
+    _value = from
   }
 }
 
 extension CVaListPointer : CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
   public var debugDescription: String {
-    return value.debugDescription
+    return _value.debugDescription
   }
 }
 

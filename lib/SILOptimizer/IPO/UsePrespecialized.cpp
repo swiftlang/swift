@@ -148,7 +148,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     } else if (auto oldPApply = dyn_cast<PartialApplyInst>(AI)) {
       oldPApply->replaceAllUsesWith(cast<PartialApplyInst>(NewAI));
     } else {
-      assert(isa<TryApplyInst>(NewAI));
+      assert(isa<TryApplyInst>(NewAI) || isa<BeginApplyInst>(NewAI));
     }
     recursivelyDeleteTriviallyDeadInstructions(AI.getInstruction(), true);
     Changed = true;

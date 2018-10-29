@@ -443,7 +443,10 @@ DECL_NODES = [
              Child('GenericWhereClause', kind='GenericWhereClause',
                    is_optional=True),
              # the body is not necessary inside a protocol definition
-             Child('Accessor', kind='AccessorBlock', is_optional=True),
+             Child('Accessor', kind='Syntax', is_optional=True,
+                   node_choices=[
+                      Child('Accessors', kind='AccessorBlock'),
+                      Child('Getter', kind='CodeBlock')]),
          ]),
 
     # access-level-modifier -> 'private' | 'private' '(' 'set' ')'
@@ -502,10 +505,9 @@ DECL_NODES = [
                    text_choices=[
                       'get', 'set', 'didSet', 'willSet', 'unsafeAddress', 
                       'addressWithOwner', 'addressWithNativeOwner', 
-                      'addressWithPinnedNativeOwner', 'unsafeMutableAddress', 
+                      'unsafeMutableAddress', 
                       'mutableAddressWithOwner', 
                       'mutableAddressWithNativeOwner', 
-                      'mutableAddressWithPinnedNativeOwner',
                       '_read', '_modify'
                    ]),
              Child('Parameter', kind='AccessorParameter', is_optional=True),
@@ -517,10 +519,7 @@ DECL_NODES = [
     Node('AccessorBlock', kind="Syntax", traits=['Braced'],
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
-             Child('AccessorListOrStmtList', kind='Syntax',
-                   node_choices=[
-                      Child('Accessors', kind='AccessorList'),
-                      Child('Statements', kind='CodeBlockItemList')]),
+             Child('Accessors', kind='AccessorList'),
              Child('RightBrace', kind='RightBraceToken'),
          ]),
 
@@ -531,7 +530,10 @@ DECL_NODES = [
              Child('Pattern', kind='Pattern'),
              Child('TypeAnnotation', kind='TypeAnnotation', is_optional=True),
              Child('Initializer', kind='InitializerClause', is_optional=True),
-             Child('Accessor', kind='AccessorBlock', is_optional=True),
+             Child('Accessor', kind='Syntax', is_optional=True,
+                   node_choices=[
+                      Child('Accessors', kind='AccessorBlock'),
+                      Child('Getter', kind='CodeBlock')]),
              Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
@@ -660,23 +662,26 @@ DECL_NODES = [
                        'PrefixOperatorToken',
                        'PostfixOperatorToken',
                    ]),
-             Child('InfixOperatorGroup', kind='InfixOperatorGroup',
+             Child('OperatorPrecedenceAndTypes', kind='OperatorPrecedenceAndTypes',
                    description='''
-                   Optionally specify a precedence group
+                   Optionally specify a precedence group and designated types.
                    ''',
                    is_optional=True),
          ]),
 
-    # infix-operator-group -> ':' identifier
-    Node('InfixOperatorGroup', kind='Syntax',
+    Node('IdentifierList', kind='SyntaxCollection',
+         element='IdentifierToken'),
+
+    # infix-operator-group -> ':' identifier ','? identifier?
+    Node('OperatorPrecedenceAndTypes', kind='Syntax',
          description='''
-         A clause to specify precedence group in infix operator declaration.
+         A clause to specify precedence group in infix operator declarations, and designated types in any operator declaration.
          ''',
          children=[
              Child('Colon', kind='ColonToken'),
-             Child('PrecedenceGroupName', kind='IdentifierToken',
+             Child('PrecedenceGroupAndDesignatedTypes', kind='IdentifierList',
                    description='''
-                   The name of the precedence group for the operator
+                   The precedence group and designated types for this operator
                    '''),
          ]),
 

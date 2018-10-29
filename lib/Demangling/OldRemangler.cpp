@@ -728,7 +728,7 @@ void Remangler::mangleTypeMetadataInstantiationFunction(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
-void Remangler::mangleTypeMetadataInPlaceInitializationCache(Node *node) {
+void Remangler::mangleTypeMetadataSingletonInitializationCache(Node *node) {
   Out << "Ml";
   mangleSingleChildNode(node); // type
 }
@@ -775,6 +775,10 @@ void Remangler::mangleFullTypeMetadata(Node *node) {
 void Remangler::mangleProtocolDescriptor(Node *node) {
   Out << "Mp";
   mangleProtocolWithoutPrefix(node->begin()[0]);
+}
+
+void Remangler::mangleProtocolRequirementsBaseDescriptor(Node *node) {
+  Out << "<protocol-requirements-base-descriptor>";
 }
 
 void Remangler::mangleProtocolWitnessTablePattern(Node *node) {
@@ -876,9 +880,25 @@ void Remangler::mangleLazyProtocolWitnessTableCacheVariable(Node *node) {
   mangleChildNodes(node); // type, protocol conformance
 }
 
+void Remangler::mangleAssociatedTypeDescriptor(Node *node) {
+  Out << "<associated-type-descriptor>";
+}
+
+void Remangler::mangleAssociatedConformanceDescriptor(Node *node) {
+  Out << "<associated-conformance-descriptor>";
+}
+
+void Remangler::mangleDefaultAssociatedConformanceAccessor(Node *node) {
+  Out << "<default-associated-conformance-descriptor>";
+}
+
 void Remangler::mangleAssociatedTypeMetadataAccessor(Node *node) {
   Out << "Wt";
   mangleChildNodes(node); // protocol conformance, identifier
+}
+
+void Remangler::mangleDefaultAssociatedTypeMetadataAccessor(Node *node) {
+  Out << "<default-associated-type-metadata-accessor>";
 }
 
 void Remangler::mangleAssociatedTypeWitnessTableAccessor(Node *node) {
@@ -1899,6 +1919,12 @@ void Remangler::mangleBoundGenericTypeAlias(Node *node) {
   mangleAnyNominalType(node, ctx);
 }
 
+void Remangler::mangleBoundGenericFunction(Node *node) {
+  EntityContext ctx;
+  // Not really a nominal type, but it works for functions, too.
+  mangleAnyNominalType(node, ctx);
+}
+
 void Remangler::mangleTypeList(Node *node) {
   mangleChildNodes(node); // all types
   Out << '_';
@@ -1931,12 +1957,24 @@ void Remangler::mangleGenericTypeParamDecl(Node *node) {
   unreachable("todo");
 }
 
-void Remangler::mangleCurryThunk(Node *node, EntityContext &ctx) {
+void Remangler::mangleCurryThunk(Node *node) {
   Out << "<curry-thunk>";
 }
 
-void Remangler::mangleDispatchThunk(Node *node, EntityContext &ctx) {
+void Remangler::mangleDispatchThunk(Node *node) {
   Out << "<dispatch-thunk>";
+}
+
+void Remangler::mangleMethodDescriptor(Node *node) {
+  Out << "<method-descriptor>";
+}
+
+void Remangler::mangleMethodLookupFunction(Node *node) {
+  Out << "<method-lookup-function>";
+}
+
+void Remangler::mangleObjCMetadataUpdateFunction(Node *node) {
+  Out << "<objc-metadata-update-function>";
 }
 
 void Remangler::mangleEmptyList(Node *node) {
@@ -2122,11 +2160,11 @@ void Remangler::mangleAssociatedTypeGenericParamRef(Node *node) {
   unreachable("unsupported");
 }
 
-void Remangler::mangleUnresolvedSymbolicReference(Node *node, EntityContext&) {
+void Remangler::mangleTypeSymbolicReference(Node *node, EntityContext&) {
   unreachable("unsupported");
 }
 
-void Remangler::mangleSymbolicReference(Node *node, EntityContext&) {
+void Remangler::mangleProtocolSymbolicReference(Node *node, EntityContext&) {
   unreachable("unsupported");
 }
 

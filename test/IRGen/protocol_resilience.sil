@@ -12,38 +12,12 @@ import SwiftShims
 import resilient_protocol
 
 
-// Generic witness table pattern for ConformingType : ResilientProtocol
-
-// CHECK: @"$S19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWG"
-
-// CHECK-SAME: internal constant %swift.generic_witness_table_cache {
-
-// -- number of witness table entries
-// CHECK-SAME:   i16 1,
-
-// -- size of private area
-// CHECK-SAME:   i16 0,
-
-// -- the protocol descriptor
-// CHECK-SAME:   @"{{got.|__imp_}}$S18resilient_protocol22OtherResilientProtocolMp"
-
-// -- the template
-// CHECK-SAME:   @"$S19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWp"
-
-// -- resilient witnesses
-// CHECK-SAME:   i32 0,
-
-// -- instantiator function
-// CHECK-SAME:   i32 0
-
-// CHECK-SAME: }
-
 // Protocol descriptor for ResilientProtocol
 // CHECK: [[RESILIENT_PROTOCOL_NAME:@.*]] = private constant [18 x i8] c"ResilientProtocol\00
 // CHECK: [[ASSOCIATED_TYPES_T:@.*]] = private constant [2 x i8] c"T\00"
-// CHECK: @"$S19protocol_resilience17ResilientProtocolMp" = {{(dllexport )?}}{{(protected )?}}constant
+// CHECK: @"$s19protocol_resilience17ResilientProtocolMp" = {{(dllexport )?}}{{(protected )?}}constant
 // CHECK-SAME:   i32 196675,
-// CHECK-SAME:   @"$S19protocol_resilienceMXM"
+// CHECK-SAME:   @"$s19protocol_resilienceMXM"
 // CHECK-SAME:   [[RESILIENT_PROTOCOL_NAME]]
 // CHECK-SAME:   i32 1,
 // CHECK-SAME:   i32 8,
@@ -51,40 +25,30 @@ import resilient_protocol
 
 // Requirement signature
 // CHECK-SAME:   i32 128,
-// CHECK-SAME:   @"$Sx1T_MXA"
-// CHECK-SAME:   @"$S19protocol_resilience17ResilientProtocolMp"
+// CHECK-SAME:   @"$sx1T19protocol_resilience17ResilientProtocolP_MXA"
+// CHECK-SAME:   @"$s19protocol_resilience17ResilientProtocolMp"
 
 // Protocol requirements
-// CHECK-SAME:   %swift.protocol_requirement { i32 6, i32 0, i32 0 },
-// CHECK-SAME:   %swift.protocol_requirement { i32 7, i32 0, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 8, i32 0 },
+// CHECK-SAME:   %swift.protocol_requirement { i32 7, i32 0 },
+
+// CHECK-SAME:   %swift.protocol_requirement { i32 17, i32 0 },
+
+// CHECK-SAME:   %swift.protocol_requirement { i32 17, i32 0 },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 17,
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP10noDefaultAyyFTj" to [[INT]]),
-// CHECK-SAME:     i32 0
-// CHECK-SAME:   },
-
-// CHECK-SAME:   %swift.protocol_requirement { i32 17,
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP10noDefaultByyFTj" to [[INT]]),
-// CHECK-SAME:     i32 0
-// CHECK-SAME:   },
-
-// CHECK-SAME:   %swift.protocol_requirement { i32 17,
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP8defaultCyyFTj" to [[INT]]),
 // CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @defaultC to [[INT]]),
 // CHECK-SAME:   },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 17,
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP8defaultDyyFTj" to [[INT]]),
 // CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.opaque*, %swift.type*, i8**)* @defaultD to [[INT]]),
 // CHECK-SAME:   },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 1,
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP8defaultEyyFZTj" to [[INT]]),
 // CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @defaultE to [[INT]]),
 // CHECK-SAME:   },
 
 // CHECK-SAME:   %swift.protocol_requirement { i32 1,
-// CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @"$S19protocol_resilience17ResilientProtocolP8defaultFyyFZTj" to [[INT]]),
 // CHECK-SAME:     i32{{ | trunc \(i64 }}sub ([[INT]] ptrtoint (void (%swift.type*, %swift.type*, i8**)* @defaultF to [[INT]]),
 // CHECK-SAME:   }
 // CHECK-SAME: }
@@ -100,12 +64,11 @@ public protocol ResilientProtocol {
   static func defaultF()
 }
 
-
 // Protocol is not public -- doesn't need default witness table
 
-// CHECK: @"$S19protocol_resilience16InternalProtocolMp" = hidden constant
+// CHECK: @"$s19protocol_resilience16InternalProtocolMp" = hidden constant
 // CHECK-SAME:   i32 65603,
-// CHECK-SAME:   @"$S19protocol_resilienceMXM"
+// CHECK-SAME:   @"$s19protocol_resilienceMXM"
 // CHECK-SAME:   i32 0,
 // CHECK-SAME:   i32 1,
 // CHECK-SAME:   i32 0,
@@ -115,64 +78,71 @@ protocol InternalProtocol {
   func f()
 }
 
-
 // Generic witness table pattern for ConformsWithRequirements : ProtocolWithRequirements
 
-// CHECK: @"$S19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWp"
+// CHECK: @"$s19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWp" =
 
-// CHECK-SAME: internal constant [2 x i8*] [
+// CHECK-SAME: internal constant [1 x i8*] [
 
 // -- conformance descriptor
-// CHECK-SAME: "$S19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAMc"
-
-// -- type metadata for associated type
-// CHECK-SAME: "$SSiMa"
+// CHECK-SAME: "$s19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAMc"
 
 // CHECK-SAME: ]
 
 
-// CHECK: @"$S19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWG"
+// Witness table for conformance with resilient associated type
+
+// CHECK: @"$s19protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWP" = {{(protected )?}}hidden global [3 x i8*] [
+// CHECK-SAME:   i8* bitcast (i8** ()* @"$s19protocol_resilience23ResilientConformingTypeVAC010resilient_A005OtherC8ProtocolAAWl"
+// CHECK-SAME:   @"symbolic 19protocol_resilience23ResilientConformingTypeV"
+// CHECK-SAME: ]
+
+// Protocol conformance descriptor for ResilientConformingType : OtherResilientProtocol
+
+// CHECK: @"$s19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAMc" =
+
+// CHECK-SAME: i32 131072,
 
 // -- number of witness table entries
-// CHECK-SAME:   i16 2,
+// CHECK-SAME:   i16 1,
 
-// -- size of private area
+// -- size of private area + 'requires instantiation' bit (not set)
 // CHECK-SAME:   i16 0,
-
-// -- the protocol descriptor
-// CHECK-SAME:   @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsMp"
-
-// -- the template
-// CHECK-SAME:   @"$S19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWp"
-
-// -- resilient witnesses
-// CHECK-SAME:   @"$S19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWr"
 
 // -- instantiator function
 // CHECK-SAME:   i32 0
 
 // CHECK-SAME: }
 
+// ConformsWithRequirements protocol conformance descriptor
 
-// CHECK: @"$S19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWr"
+// CHECK: "$s19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAMc" = hidden constant {
 
-// CHECK-SAME: internal constant {
+// -- flags
+// CHECK-SAME: i32 196608,
 
-// CHECK-SAME: @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsP5firstyyFTj"
+// CHECK-SAME: i32 3,
+
+// -- type metadata for associated type
+// CHECK-SAME: @"{{got.|__imp_}}$s1T18resilient_protocol24ProtocolWithRequirementsPTl"
+// CHECK-SAME: @"symbolic Si"
+
+// CHECK-SAME: @"{{got.|__imp_}}$s18resilient_protocol24ProtocolWithRequirementsP5firstyyFTq"
 // CHECK-SAME: @firstWitness
 
-// CHECK-SAME: @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsP6secondyyFTj"
+// CHECK-SAME: @"{{got.|__imp_}}$s18resilient_protocol24ProtocolWithRequirementsP6secondyyFTq"
 // CHECK-SAME: @secondWitness
 
+// -- number of witness table entries
+// CHECK-SAME:   i16 1,
+
+// -- size of private area + 'requires instantiation' bit (not set)
+// CHECK-SAME:   i16 0,
+
+// -- instantiator function
+// CHECK-SAME:   i32 0
+
 // CHECK-SAME: }
-
-
-// Witness table for conformance with resilient associated type
-
-// CHECK: @"$S19protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWP" = {{(protected )?}}hidden constant [3 x i8*] [
-// CHECK-SAME:   i8* bitcast (%swift.metadata_response ([[INT]])* @"$S19protocol_resilience23ResilientConformingTypeVMa" to i8*),
-// CHECK-SAME:   i8* bitcast (i8** ()* @"$S19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWa" to i8*)
-// CHECK-SAME: ]
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
@@ -184,7 +154,6 @@ bb0(%0 : $*Self):
   %result = tuple ()
   return %result : $()
 }
-
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defaultD(%swift.opaque* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
@@ -317,7 +286,7 @@ bb0(%0 : $*ConformingStruct):
   // concrete Self type.
 
   // CHECK-NEXT: [[SELF:%.*]] = bitcast %T19protocol_resilience16ConformingStructV* %0 to %swift.opaque*
-  // CHECK-NEXT: call swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself [[SELF]], %swift.type* bitcast ({{i32|i64}}* {{.*}}) to %swift.type*), i8** getelementptr inbounds ([9 x i8*], [9 x i8*]* @"$S19protocol_resilience16ConformingStructVAA17ResilientProtocolAAWP", i32 0, i32 0))
+  // CHECK-NEXT: call swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself [[SELF]], %swift.type* bitcast ({{i32|i64}}* {{.*}}) to %swift.type*), i8** %SelfWitnessTable)
   %fn1 = function_ref @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
   %ignore1 = apply %fn1<ConformingStruct>(%0) : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
 
@@ -334,11 +303,11 @@ sil @noDefaultB : $@convention(witness_method: ResilientProtocol) (@in_guarantee
 bb0(%0 : $*ConformingStruct):
 
   // Make sure we can partially apply direct references to default implementations
-
+  // CHECK-NEXT: [[CONF:%.*]] = bitcast i8** %SelfWitnessTable to i8*
   // CHECK-NEXT: [[CONTEXT:%.*]] = call noalias %swift.refcounted* @swift_allocObject({{.*}})
   // CHECK-NEXT: [[LAYOUT:%.*]] = bitcast %swift.refcounted* [[CONTEXT]] to <{ %swift.refcounted, i8* }>*
   // CHECK-NEXT: [[WTABLE:%.*]] = getelementptr inbounds <{ %swift.refcounted, i8* }>, <{ %swift.refcounted, i8* }>* [[LAYOUT]], i32 0, i32 1
-  // CHECK-NEXT: store i8* bitcast ([9 x i8*]* @"$S19protocol_resilience16ConformingStructVAA17ResilientProtocolAAWP" to i8*), i8** [[WTABLE]]
+  // CHECK-NEXT: store i8* [[CONF]], i8** [[WTABLE]]
 
   %fn1 = function_ref @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
   %ignore1 = partial_apply %fn1<ConformingStruct>() : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
@@ -349,9 +318,9 @@ bb0(%0 : $*ConformingStruct):
 }
 
 sil_witness_table ConformingStruct : ResilientProtocol module protocol_resilience {
-  associated_type T: ResilientConformingType
   associated_type_protocol (T: OtherResilientProtocol): ResilientConformingType: OtherResilientProtocol module protocol_resilience
 
+  associated_type T: ResilientConformingType
   method #ResilientProtocol.noDefaultA!1: @noDefaultA
   method #ResilientProtocol.noDefaultB!1: @noDefaultB
   method #ResilientProtocol.defaultC!1: @defaultC
@@ -378,8 +347,8 @@ bb0(%0 : $*ResilientConformingType):
 
   // CHECK-NEXT: entry:
   // CHECK-NEXT: [[ARG:%.*]] = bitcast %T19protocol_resilience23ResilientConformingTypeV* %0 to %swift.opaque*
-  // CHECK-NEXT: [[WTABLE:%.*]] = call i8** @"$S19protocol_resilience23ResilientConformingTypeVAC010resilient_A005OtherC8ProtocolAAWl"()
-  // CHECK-NEXT: call swiftcc void @doSomething(%swift.opaque* noalias nocapture [[ARG]], %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @"$S19protocol_resilience23ResilientConformingTypeVMf", i32 0, i32 1) to %swift.type*), i8** [[WTABLE]])
+  // CHECK-NEXT: [[WTABLE:%.*]] = call i8** @"$s19protocol_resilience23ResilientConformingTypeVAC010resilient_A005OtherC8ProtocolAAWl"()
+  // CHECK-NEXT: call swiftcc void @doSomething(%swift.opaque* noalias nocapture [[ARG]], %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @"$s19protocol_resilience23ResilientConformingTypeVMf", i32 0, i32 1) to %swift.type*), i8** [[WTABLE]])
 
   %fn = function_ref @doSomething : $@convention(thin) <T : OtherResilientProtocol> (@in T) -> ()
   %ignore = apply %fn<ResilientConformingType>(%0) : $@convention(thin) <T : OtherResilientProtocol> (@in T) -> ()
@@ -391,27 +360,20 @@ bb0(%0 : $*ResilientConformingType):
 
 // Caching witness table accessor
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden i8** @"$S19protocol_resilience23ResilientConformingTypeVAC010resilient_A005OtherC8ProtocolAAWl"()
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden i8** @"$s19protocol_resilience23ResilientConformingTypeVAC010resilient_A005OtherC8ProtocolAAWl"()
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[CACHE:%.*]] = load i8**, i8*** @"$S19protocol_resilience23ResilientConformingTypeVAC010resilient_A005OtherC8ProtocolAAWL"
+// CHECK-NEXT:    [[CACHE:%.*]] = load i8**, i8*** @"$s19protocol_resilience23ResilientConformingTypeVAC010resilient_A005OtherC8ProtocolAAWL"
 // CHECK-NEXT:    [[COND:%.*]] = icmp eq i8** [[CACHE]], null
 // CHECK-NEXT:    br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK:         [[WTABLE:%.*]] = call i8** @"$S19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWa"()
-// CHECK-NEXT:    store atomic i8** [[WTABLE]], i8*** @"$S19protocol_resilience23ResilientConformingTypeVAC010resilient_A005OtherC8ProtocolAAWL" release
+// CHECK:         [[WTABLE:%.*]] = call i8** @swift_getWitnessTable
+// CHECK-NEXT:    store atomic i8** [[WTABLE]], i8*** @"$s19protocol_resilience23ResilientConformingTypeVAC010resilient_A005OtherC8ProtocolAAWL" release
 // CHECK-NEXT:    br label %cont
 
 // CHECK:       cont:
 // CHECK-NEXT:    [[RESULT:%.*]] = phi i8** [ [[CCHE:%.*]], %entry ], [ [[WTABLE:%.*]], %cacheIsNull ]
 // CHECK-NEXT:    ret i8** [[RESULT]]
-
-// Resilient conformance -- must call a runtime function
-
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} i8** @"$S19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWa"()
-// CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[WTABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$S19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWG", %swift.type* null, i8*** null)
-// CHECK-NEXT:    ret i8** [[WTABLE]]
 
 
 //
@@ -443,8 +405,8 @@ bb0(%0 : $*AnotherConformingStruct):
 
   // CHECK-NEXT: entry:
   // CHECK-NEXT: [[ARG:%.*]] = bitcast %T19protocol_resilience23AnotherConformingStructV* %0 to %swift.opaque*
-  // CHECK-NEXT: [[WTABLE:%.*]] = call i8** @"$S19protocol_resilience23AnotherConformingStructVAcA29RefinesOtherResilientProtocolAAWl"()
-  // CHECK-NEXT: call swiftcc void @doSomethingRefined(%swift.opaque* noalias nocapture [[ARG]], %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @"$S19protocol_resilience23AnotherConformingStructVMf", i32 0, i32 1) to %swift.type*), i8** [[WTABLE]])
+  // CHECK-NEXT: [[WTABLE:%.*]] = call i8** @"$s19protocol_resilience23AnotherConformingStructVAcA29RefinesOtherResilientProtocolAAWl"()
+  // CHECK-NEXT: call swiftcc void @doSomethingRefined(%swift.opaque* noalias nocapture [[ARG]], %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @"$s19protocol_resilience23AnotherConformingStructVMf", i32 0, i32 1) to %swift.type*), i8** [[WTABLE]])
 
   %fn = function_ref @doSomethingRefined : $@convention(thin) <T : RefinesOtherResilientProtocol> (@in T) -> ()
   %ignore = apply %fn<AnotherConformingStruct>(%0) : $@convention(thin) <T : RefinesOtherResilientProtocol> (@in T) -> ()
@@ -470,8 +432,8 @@ struct ConformsWithResilientAssoc : HasResilientAssoc {
 }
 
 sil_witness_table ConformsWithResilientAssoc : HasResilientAssoc module protocol_resilience {
-  associated_type T: ResilientConformingType
   associated_type_protocol (T: OtherResilientProtocol): ResilientConformingType: OtherResilientProtocol module protocol_resilience
+  associated_type T: ResilientConformingType
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @doSomethingAssoc(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.HasResilientAssoc)
@@ -487,7 +449,7 @@ bb0(%0 : $*ConformsWithResilientAssoc):
 
   // CHECK-NEXT: entry:
   // CHECK-NEXT: [[ARG:%.*]] = bitcast %T19protocol_resilience26ConformsWithResilientAssocV* %0 to %swift.opaque*
-  // CHECK-NEXT: call swiftcc void @doSomethingAssoc(%swift.opaque* noalias nocapture [[ARG]], %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @"$S19protocol_resilience26ConformsWithResilientAssocVMf", i32 0, i32 1) to %swift.type*), i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @"$S19protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWP", i32 0, i32 0))
+  // CHECK-NEXT: call swiftcc void @doSomethingAssoc(%swift.opaque* noalias nocapture [[ARG]], %swift.type* bitcast ({{i32|i64}}* getelementptr inbounds ({{.*}} @"$s19protocol_resilience26ConformsWithResilientAssocVMf", i32 0, i32 1) to %swift.type*), i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @"$s19protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWP", i32 0, i32 0))
 
   %fn = function_ref @doSomethingAssoc : $@convention(thin) <T : HasResilientAssoc> (@in T) -> ()
   %ignore = apply %fn<ConformsWithResilientAssoc>(%0) : $@convention(thin) <T : HasResilientAssoc> (@in T) -> ()
@@ -519,13 +481,3 @@ sil_witness_table ConformsWithRequirements : ProtocolWithRequirements module pro
   method #ProtocolWithRequirements.first!1: @firstWitness
   method #ProtocolWithRequirements.second!1: @secondWitness
 }
-
-//
-// Witness table accessors for fragile conformances are emitted last
-//
-
-// Fragile conformance -- no runtime calls needed
-
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden i8** @"$S19protocol_resilience16ConformingStructVAA17ResilientProtocolAAWa"()
-// CHECK-NEXT:  entry:
-// CHECK-NEXT:    ret i8** getelementptr inbounds ([9 x i8*], [9 x i8*]* @"$S19protocol_resilience16ConformingStructVAA17ResilientProtocolAAWP", i32 0, i32 0)

@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "definite-init"
 #include "DIMemoryUseCollectorOwnership.h"
 #include "swift/AST/Expr.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -1476,15 +1477,15 @@ void ElementUseCollector::collectClassSelfUses(
 }
 
 //===----------------------------------------------------------------------===//
-//                    DelegatingValueTypeInitUseCollector
+//                         DelegatingInitUseCollector
 //===----------------------------------------------------------------------===//
 
 static void
-collectValueTypeDelegatingInitUses(const DIMemoryObjectInfo &TheMemory,
-                                   DIElementUseInfo &UseInfo,
-                                   SingleValueInstruction *I) {
+collectDelegatingInitUses(const DIMemoryObjectInfo &TheMemory,
+                          DIElementUseInfo &UseInfo,
+                          SingleValueInstruction *I) {
   for (auto *Op : I->getUses()) {
-    auto *User = Op->getUser();
+    SILInstruction *User = Op->getUser();
 
     // destroy_addr is a release of the entire value. This can result from an
     // early release due to a conditional initializer.
@@ -1519,13 +1520,48 @@ collectValueTypeDelegatingInitUses(const DIMemoryObjectInfo &TheMemory,
 
     // Look through begin_access
     if (auto *BAI = dyn_cast<BeginAccessInst>(User)) {
-      collectValueTypeDelegatingInitUses(TheMemory, UseInfo, BAI);
+      collectDelegatingInitUses(TheMemory, UseInfo, BAI);
       continue;
     }
 
     // Ignore end_access
     if (isa<EndAccessInst>(User))
       continue;
+    
+    // A load of the value that's only used to handle a type(of:) query before
+    // self has been initialized can just use the initializer's metatype
+    // argument. For value types, there's no metatype subtyping to worry about,
+    // and for class convenience initializers, `self` notionally has the
+    // original Self type as its dynamic type before theoretically being
+    // rebound.
+    //
+    // This is necessary for source compatibility; previously, convenience
+    // initializers behaved like in Objective-C where the initializer received
+    // an uninitialized object to fill in, and type(of: self) worked by asking
+    // for the dynamic type of that uninitialized object.
+    if (isa<LoadInst>(User)) {
+      auto UserVal = cast<SingleValueInstruction>(User);
+      if (UserVal->hasOneUse()
+          && isa<ValueMetatypeInst>(UserVal->getSingleUse()->get())) {
+        Kind = DIUseKind::LoadForTypeOfSelf;
+      }
+    }
+    // value_metatype may appear on a borrowed load, in which case there'll
+    // be an end_borrow use in addition to the value_metatype.
+    if (isa<LoadBorrowInst>(User)) {
+      auto UserVal = cast<SingleValueInstruction>(User);
+      bool onlyUseIsValueMetatype = true;
+      for (auto use : UserVal->getUses()) {
+        if (isa<EndBorrowInst>(use->getUser())
+            || isa<ValueMetatypeInst>(use->getUser()))
+          continue;
+        onlyUseIsValueMetatype = false;
+        break;
+      }
+      if (onlyUseIsValueMetatype) {
+        Kind = DIUseKind::LoadForTypeOfSelf;
+      }
+    }
 
     // We can safely handle anything else as an escape.  They should all happen
     // after self.init is invoked.
@@ -1534,17 +1570,17 @@ collectValueTypeDelegatingInitUses(const DIMemoryObjectInfo &TheMemory,
 }
 
 //===----------------------------------------------------------------------===//
-//                   DelegatingClassInitElementUseCollector
+//                        ClassInitElementUseCollector
 //===----------------------------------------------------------------------===//
 
 namespace {
 
-class DelegatingClassInitElementUseCollector {
+class ClassInitElementUseCollector {
   const DIMemoryObjectInfo &TheMemory;
   DIElementUseInfo &UseInfo;
 
 public:
-  DelegatingClassInitElementUseCollector(const DIMemoryObjectInfo &TheMemory,
+  ClassInitElementUseCollector(const DIMemoryObjectInfo &TheMemory,
                                          DIElementUseInfo &UseInfo)
       : TheMemory(TheMemory), UseInfo(UseInfo) {}
 
@@ -1552,15 +1588,15 @@ public:
 
   // *NOTE* Even though this takes a SILInstruction it actually only accepts
   // load_borrow and load instructions. This is enforced via an assert.
-  void collectDelegatingClassInitSelfLoadUses(MarkUninitializedInst *MUI,
-                                              SingleValueInstruction *LI);
+  void collectClassInitSelfLoadUses(MarkUninitializedInst *MUI,
+                                    SingleValueInstruction *LI);
 };
 
 } // end anonymous namespace
 
 /// collectDelegatingClassInitSelfUses - Collect uses of the self argument in a
 /// delegating-constructor-for-a-class case.
-void DelegatingClassInitElementUseCollector::collectClassInitSelfUses() {
+void ClassInitElementUseCollector::collectClassInitSelfUses() {
   // When we're analyzing a delegating constructor, we aren't field sensitive at
   // all.  Just treat all members of self as uses of the single
   // non-field-sensitive value.
@@ -1668,8 +1704,7 @@ void DelegatingClassInitElementUseCollector::collectClassInitSelfUses() {
 
     // Loads of the box produce self, so collect uses from them.
     if (isa<LoadInst>(User) || isa<LoadBorrowInst>(User)) {
-      collectDelegatingClassInitSelfLoadUses(MUI,
-                                        cast<SingleValueInstruction>(User));
+      collectClassInitSelfLoadUses(MUI, cast<SingleValueInstruction>(User));
       continue;
     }
 
@@ -1691,8 +1726,8 @@ void DelegatingClassInitElementUseCollector::collectClassInitSelfUses() {
   gatherDestroysOfContainer(MUI, UseInfo);
 }
 
-void DelegatingClassInitElementUseCollector::
-collectDelegatingClassInitSelfLoadUses(MarkUninitializedInst *MUI,
+void ClassInitElementUseCollector::
+collectClassInitSelfLoadUses(MarkUninitializedInst *MUI,
                                        SingleValueInstruction *LI) {
   assert(isa<LoadBorrowInst>(LI) || isa<LoadInst>(LI));
 
@@ -1775,10 +1810,7 @@ collectDelegatingClassInitSelfLoadUses(MarkUninitializedInst *MUI,
 //===----------------------------------------------------------------------===//
 
 static bool shouldPerformClassInitSelf(const DIMemoryObjectInfo &MemoryInfo) {
-  if (MemoryInfo.isDelegatingInit()) {
-    assert(MemoryInfo.isClassInitSelf());
-    return true;
-  }
+  assert(!MemoryInfo.isDelegatingInit());
 
   return MemoryInfo.isNonDelegatingInit() &&
          MemoryInfo.getType()->getClassOrBoundGenericClass() != nullptr &&
@@ -1792,18 +1824,17 @@ void swift::ownership::collectDIElementUsesFrom(
     const DIMemoryObjectInfo &MemoryInfo, DIElementUseInfo &UseInfo,
     bool isDIFinished, bool TreatAddressToPointerAsInout) {
 
-  if (MemoryInfo.isDelegatingInit() && !MemoryInfo.isClassInitSelf()) {
+  if (MemoryInfo.isDelegatingInit()) {
     // When we're analyzing a delegating constructor, we aren't field sensitive
     // at all. Just treat all members of self as uses of the single
     // non-field-sensitive value.
     assert(MemoryInfo.NumElements == 1 && "delegating inits only have 1 bit");
-    collectValueTypeDelegatingInitUses(MemoryInfo, UseInfo,
-                                       MemoryInfo.MemoryInst);
+    collectDelegatingInitUses(MemoryInfo, UseInfo, MemoryInfo.MemoryInst);
     return;
   }
 
   if (shouldPerformClassInitSelf(MemoryInfo)) {
-    DelegatingClassInitElementUseCollector UseCollector(MemoryInfo, UseInfo);
+    ClassInitElementUseCollector UseCollector(MemoryInfo, UseInfo);
     UseCollector.collectClassInitSelfUses();
     return;
   }

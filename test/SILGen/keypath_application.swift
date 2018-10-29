@@ -17,9 +17,8 @@ func loadable(readonly: A, writable: inout A,
   // CHECK: store [[ROOT_COPY]] to [init] [[ROOT_TMP]]
   // CHECK: [[KP_COPY:%.*]] = copy_value %3
   // CHECK: [[PROJECT:%.*]] = function_ref @{{.*}}_projectKeyPathReadOnly
-  // CHECK: [[BORROWED_KP_COPY:%.*]] = begin_borrow [[KP_COPY]]
   // CHECK: [[RESULT_TMP:%.*]] = alloc_stack $B
-  // CHECK: apply [[PROJECT]]<A, B>([[RESULT_TMP]], [[ROOT_TMP]], [[BORROWED_KP_COPY]])
+  // CHECK: apply [[PROJECT]]<A, B>([[RESULT_TMP]], [[ROOT_TMP]], [[KP_COPY]])
   // CHECK: [[RESULT:%.*]] = load [take] [[RESULT_TMP]]
   // CHECK: destroy_value [[RESULT]]
   _ = readonly[keyPath: kp]
@@ -134,32 +133,28 @@ func writebackNesting(x: inout Int,
                       z: WritableKeyPath<Int, Int>,
                       w: Int) -> Int {
   // -- get 'b'
-  // CHECK: function_ref @$SSi19keypath_applicationE1bSivg
+  // CHECK: function_ref @$sSi19keypath_applicationE1bSivg
   // -- apply keypath y
   // CHECK: [[PROJECT_FN:%.*]] = function_ref @{{.*}}_projectKeyPathWritable
   // CHECK: [[PROJECT_RET:%.*]] = apply [[PROJECT_FN]]
-  // CHECK: [[PROJECT_RET_BORROW:%.*]] = begin_borrow [[PROJECT_RET]]
-  // CHECK: [[PROJECT_RET_BORROW_OWNER:%.*]] = tuple_extract [[PROJECT_RET_BORROW]] {{.*}}, 1
-  // CHECK: [[OWNER_Y:%.*]] = copy_value [[PROJECT_RET_BORROW_OWNER]]
+  // CHECK: ({{%.*}}, [[OWNER_Y:%.*]]) = destructure_tuple [[PROJECT_RET]]
   // -- get 'u'
-  // CHECK: function_ref @$SSi19keypath_applicationE1uSivg
+  // CHECK: function_ref @$sSi19keypath_applicationE1uSivg
   // -- apply keypath z
   // CHECK: [[PROJECT_FN:%.*]] = function_ref @{{.*}}_projectKeyPathWritable
   // CHECK: [[PROJECT_RET:%.*]] = apply [[PROJECT_FN]]
-  // CHECK: [[PROJECT_RET_BORROW:%.*]] = begin_borrow [[PROJECT_RET]]
-  // CHECK: [[PROJECT_RET_BORROW_OWNER:%.*]] = tuple_extract [[PROJECT_RET_BORROW]] {{.*}}, 1
-  // CHECK: [[OWNER_Z:%.*]] = copy_value [[PROJECT_RET_BORROW_OWNER]]
+  // CHECK: ({{%.*}}, [[OWNER_Z:%.*]]) = destructure_tuple [[PROJECT_RET]]
 
   // -- set 'tt'
-  // CHECK: function_ref @$SSi19keypath_applicationE2ttSivs
+  // CHECK: function_ref @$sSi19keypath_applicationE2ttSivs
   // -- destroy owner for keypath projection z
   // CHECK: destroy_value [[OWNER_Z]]
   // -- set 'u'
-  // CHECK: function_ref @$SSi19keypath_applicationE1uSivs
+  // CHECK: function_ref @$sSi19keypath_applicationE1uSivs
   // -- destroy owner for keypath projection y
   // CHECK: destroy_value [[OWNER_Y]]
   // -- set 'b'
-  // CHECK: function_ref @$SSi19keypath_applicationE1bSivs
+  // CHECK: function_ref @$sSi19keypath_applicationE1bSivs
 
   x.b[keyPath: y].u[keyPath: z].tt = w
 }

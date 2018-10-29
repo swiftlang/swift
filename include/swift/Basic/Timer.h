@@ -20,6 +20,22 @@
 namespace swift {
   /// A convenience class for declaring a timer that's part of the Swift
   /// compilation timers group.
+  ///
+  /// Please don't use this class directly for anything other than the flat,
+  /// top-level compilation-phase timing numbers; unadorned SharedTimers are
+  /// enabled, summed and reported via -debug-time-compilation, using LLVM's
+  /// built-in logic for timer groups, and that logic doesn't work right if
+  /// there's any nesting or reentry in timers at all (crashes on reentry,
+  /// simply mis-reports nesting). Additional SharedTimers also confuse users
+  /// who are expecting to see only top-level phase timings when they pass
+  /// -debug-time-compilation.
+  ///
+  /// Instead, please use FrontendStatsTracer objects and the -stats-output-dir
+  /// subsystem in include/swift/Basic/Statistic.h. In addition to not
+  /// interfering with users passing -debug-time-compilation, the
+  /// FrontendStatsTracer objects automatically instantiate nesting-safe and
+  /// reentry-safe SharedTimers themselves, as well as supporting event and
+  /// source-entity tracing and profiling.
   class SharedTimer {
     enum class State {
       Initial,

@@ -56,6 +56,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Chars
     single-source/ClassArrayGetter
     single-source/Combos
+    single-source/CountAlgo
     single-source/DataBenchmarks
     single-source/DeadArray
     single-source/DictOfArraysToArrayOfDicts
@@ -71,6 +72,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DictionaryGroup
     single-source/DictionaryKeysContains
     single-source/DictionaryLiteral
+    single-source/DictionaryOfAnyHashableStrings
     single-source/DictionaryRemove
     single-source/DictionarySubscriptDefault
     single-source/DictionarySwap
@@ -87,6 +89,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Hash
     single-source/HashQuadratic
     single-source/Histogram
+    single-source/InsertCharacter  
     single-source/Integrate
     single-source/IterateData
     single-source/Join
@@ -169,16 +172,13 @@ set(SWIFT_BENCH_MODULES
     single-source/XorLoop
 )
 
-set(SWIFT_MULTISOURCE_SWIFT3_BENCHES
+set(SWIFT_MULTISOURCE_SWIFT_BENCHES
   multi-source/PrimsSplit
 )
 
 set(PrimsSplit_sources
     multi-source/PrimsSplit/Prims.swift
     multi-source/PrimsSplit/Prims_main.swift)
-
-set(SWIFT_MULTISOURCE_SWIFT4_BENCHES
-)
 
 set(BENCH_DRIVER_LIBRARY_FLAGS)
 if (SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)

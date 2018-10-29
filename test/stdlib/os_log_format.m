@@ -3,6 +3,7 @@
 // RUN: %target-run %t/os_log_format | %FileCheck %s
 
 // REQUIRES: objc_interop
+// REQUIRES: executable_test
 
 #import <Foundation/Foundation.h>
 #import <stdint.h>

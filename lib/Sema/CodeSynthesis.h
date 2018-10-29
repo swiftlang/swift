@@ -51,7 +51,8 @@ public:
   enum Kind {
     Getter,
     Setter,
-    MaterializeForSet,
+    ReadCoroutine,
+    ModifyCoroutine,
     LazyGetter,
     LazySetter,
   };
@@ -65,7 +66,8 @@ private:
     switch (kind) {
     case Kind::Getter:
     case Kind::Setter:
-    case Kind::MaterializeForSet:
+    case Kind::ReadCoroutine:
+    case Kind::ModifyCoroutine:
       return Members::indexOf<void>();
     case Kind::LazyGetter:
     case Kind::LazySetter:

@@ -1,26 +1,64 @@
 
 /* Generic Signature Changes */
 cake1: Func P1.P1Constraint() has generic signature change from <Self where Self : P1, Self : P2> to <Self where Self : P1>
+cake1: Protocol P3 has generic signature change from <Self : P1, Self : P2> to <Self : P1, Self : P4>
 
 /* RawRepresentable Changes */
 
 /* Removed Decls */
+cake1: AssociatedType RequiementChanges.removedType has been removed
 cake1: Constructor Somestruct2.init(_:) has been removed
 cake1: Func C4.foo() has been removed
+cake1: Func RequiementChanges.removedFunc() has been removed
+cake1: Subscript RemoveSetters.subscript(_:) has removed its setter
+cake1: Var GlobalVarChangedToLet has removed its setter
+cake1: Var RemoveSetters.Value has removed its setter
+cake1: Var RequiementChanges.removedVar has been removed
 
 /* Moved Decls */
+cake1: Class ClassToStruct has been changed to a Struct
+cake1: InfixOperator ..*.. has been changed to a PrefixOperator
+cake1: Protocol ProtocolToEnum has been changed to a Enum
 
 /* Renamed Decls */
-cake1: Struct Somestruct2 has been renamed to Struct NSSomestruct2
 cake1: Func S1.foo5(x:y:) has been renamed to Func S1.foo5(x:y:z:)
+cake1: Struct Somestruct2 has been renamed to Struct NSSomestruct2
 
 /* Type Changes */
+cake1: AssociatedType AssociatedTypePro.T3 has default type change from C1 to C6
 cake1: Constructor S1.init(_:) has parameter 0 type change from Int to Double
 cake1: Func C1.foo2(_:) has parameter 0 type change from Int to () -> ()
+cake1: Func C7.foo(_:_:) has removed default argument from parameter 0
+cake1: Func C7.foo(_:_:) has removed default argument from parameter 1
+cake1: Func ownershipChange(_:_:) has parameter 0 changing from InOut to Default
+cake1: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned
+cake1: TypeAlias TChangesFromIntToString.T has underlying type change from Int to String
 
 /* Decl Attribute changes */
+cake1: Func C1.foo1() is now not static
+cake1: Func FinalFuncContainer.NewFinalFunc() is now with final
+cake1: Func FinalFuncContainer.NoLongerFinalFunc() is now without final
+cake1: Func S1.foo1() has self access kind changing from NonMutating to Mutating
+cake1: Func S1.foo3() is now static
 cake1: Var C1.CIIns1 changes from weak to strong
 cake1: Var C1.CIIns2 changes from strong to weak
-cake1: Func C1.foo1() is now not static
-cake1: Func S1.foo1() is now mutating
-cake1: Func S1.foo3() is now static
+
+/* Conformance changes */
+cake1: Func ObjCProtocol.removeOptional() is no longer an optional requirement
+cake1: Protocol P3 has removed inherited protocol P2
+cake1: Struct fixedLayoutStruct has removed conformance to P1
+cake2: Protocol P3 has added inherited protocol P4
+
+/* Protocol Requirement Change */
+cake1: AssociatedType AssociatedTypePro.T1 has removed default type Int
+cake2: AssociatedType RequiementChanges.addedTypeWithoutDefault has been added as a protocol requirement
+cake2: Func RequiementChanges.addedFunc() has been added as a protocol requirement
+cake2: Var RequiementChanges.addedVar has been added as a protocol requirement
+
+/* Class Inheritance Change */
+cake1: Class C4 has changed its super class from OldType to NewType
+cake1: Class SubGenericClass has changed its super class from GenericClass<P1> to GenericClass<P2>
+cake1: Class SuperClassRemoval has removed its super class C3
+cake1: Func ClassWithOpenMember.bar() is no longer open for subclassing
+cake1: Func ClassWithOpenMember.foo() is no longer open for subclassing
+cake1: Var ClassWithOpenMember.property is no longer open for subclassing

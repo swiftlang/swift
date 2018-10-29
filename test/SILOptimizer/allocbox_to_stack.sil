@@ -224,8 +224,8 @@ enum SomeUnion {
 
 
 
-sil @$S1t9SomeUnionO1yfMS0_FCS_9SomeClassS0_ : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion
-sil @$S1t9SomeClassCCfMS0_FT_S0_ : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass
+sil @$s1t9SomeUnionO1yfMS0_FCS_9SomeClassS0_ : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion
+sil @$s1t9SomeClassCCfMS0_FT_S0_ : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass
 
 // CHECK-LABEL: sil @union_test
 sil @union_test : $@convention(thin) () -> () {
@@ -233,9 +233,9 @@ bb0:
 // CHECK: [[UNION:%.*]] = alloc_stack
   %1 = alloc_box ${ var SomeUnion }
   %1a = project_box %1 : ${ var SomeUnion }, 0
-  %2 = function_ref @$S1t9SomeUnionO1yfMS0_FCS_9SomeClassS0_ : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion // user: %7
+  %2 = function_ref @$s1t9SomeUnionO1yfMS0_FCS_9SomeClassS0_ : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion // user: %7
   %3 = metatype $@thin SomeUnion.Type
-  %4 = function_ref @$S1t9SomeClassCCfMS0_FT_S0_ : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass // user: %6
+  %4 = function_ref @$s1t9SomeClassCCfMS0_FT_S0_ : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass // user: %6
   %5 = metatype $@thick SomeClass.Type
   %6 = apply %4(%5) : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass
   %7 = apply %2(%6, %3) : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion
@@ -325,7 +325,7 @@ bb0(%0 : $Builtin.Int1):
   cond_br %0, bb1, bb3
 
 bb1:
-  %7 = function_ref @$S1t9SomeClassCCfMS0_FT_S0_ : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass // user: %6
+  %7 = function_ref @$s1t9SomeClassCCfMS0_FT_S0_ : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass // user: %6
   %8 = metatype $@thick SomeClass.Type
   %9 = apply %7(%8) : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass
 
@@ -353,9 +353,9 @@ bb3:
   br bb2
 }
 
-// CHECK-LABEL: sil @$S6struct5apply1fS2iyc_tF
+// CHECK-LABEL: sil @$s6struct5apply1fS2iyc_tF
 // struct.apply (f : () -> Swift.Int) -> Swift.Int
-sil @$S6struct5apply1fS2iyc_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> Int {
+sil @$s6struct5apply1fS2iyc_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> Int {
 bb0(%0 : $@callee_owned () -> Int):
   debug_value %0 : $@callee_owned () -> Int, let, name "f" // id: %1
   strong_retain %0 : $@callee_owned () -> Int     // id: %2
@@ -364,17 +364,17 @@ bb0(%0 : $@callee_owned () -> Int):
   return %3 : $Int                                // id: %5
 }
 
-// CHECK-LABEL: sil @$S6struct6escape1fSiycSiyc_tF
+// CHECK-LABEL: sil @$s6struct6escape1fSiycSiyc_tF
 // struct.escape (f : () -> Swift.Int) -> () -> Swift.Int
-sil @$S6struct6escape1fSiycSiyc_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int {
+sil @$s6struct6escape1fSiycSiyc_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int {
 bb0(%0 : $@callee_owned () -> Int):
   debug_value %0 : $@callee_owned () -> Int, let, name "f" // id: %1
   return %0 : $@callee_owned () -> Int            // id: %2
 }
 
-// CHECK-LABEL: sil @$S6struct8useStack1tySi_tF
+// CHECK-LABEL: sil @$s6struct8useStack1tySi_tF
 // struct.useStack (t : Swift.Int) -> ()
-sil @$S6struct8useStack1tySi_tF : $@convention(thin) (Int) -> () {
+sil @$s6struct8useStack1tySi_tF : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   debug_value %0 : $Int, let, name "t" // id: %1
   // CHECK: alloc_stack
@@ -382,10 +382,10 @@ bb0(%0 : $Int):
   %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   store %0 to %2a : $*Int                        // id: %3
   // function_ref struct.apply (f : () -> Swift.Int) -> Swift.Int
-  %4 = function_ref @$S6struct5apply1fS2iyc_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> Int // user: %8
-  // CHECK: [[FUNC:%[a-zA-Z0-9]+]] = function_ref @$S6struct8useStack1tySi_tFSiycfU_Tf0s_n
+  %4 = function_ref @$s6struct5apply1fS2iyc_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> Int // user: %8
+  // CHECK: [[FUNC:%[a-zA-Z0-9]+]] = function_ref @$s6struct8useStack1tySi_tFSiycfU_Tf0s_n
   // function_ref struct.(useStack (t : Swift.Int) -> ()).(closure #1)
-  %5 = function_ref @$S6struct8useStack1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int // user: %7
+  %5 = function_ref @$s6struct8useStack1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int // user: %7
   strong_retain %2 : $<τ_0_0> { var τ_0_0 } <Int>     // id: %6
   // CHECK: [[PA:%[a-zA-Z0-9]+]] = partial_apply [[FUNC]]
   %7 = partial_apply %5(%2) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int // user: %8
@@ -395,10 +395,10 @@ bb0(%0 : $Int):
   return %10 : $()                                // id: %11
 }
 
-// CHECK-LABEL: sil shared @$S6struct8useStack1tySi_tFSiycfU_Tf0s_n
-// CHECK-LABEL: sil private @$S6struct8useStack1tySi_tFSiycfU_
+// CHECK-LABEL: sil shared @$s6struct8useStack1tySi_tFSiycfU_Tf0s_n
+// CHECK-LABEL: sil private @$s6struct8useStack1tySi_tFSiycfU_
 // struct.(useStack (t : Swift.Int) -> ()).(closure #1)
-sil private @$S6struct8useStack1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
+sil private @$s6struct8useStack1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
 bb0(%0 : $<τ_0_0> { var τ_0_0 } <Int>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
@@ -414,9 +414,9 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <Int>):
 // Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
 sil [transparent] @_TFsoP2ppUs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@inout τ_0_0) -> @out τ_0_0
 
-// CHECK-LABEL: sil @$S6struct6useBox1tySi_tF
+// CHECK-LABEL: sil @$s6struct6useBox1tySi_tF
 // struct.useBox (t : Swift.Int) -> ()
-sil @$S6struct6useBox1tySi_tF : $@convention(thin) (Int) -> () {
+sil @$s6struct6useBox1tySi_tF : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   debug_value %0 : $Int, let, name "t" // id: %1
   // CHECK: alloc_box
@@ -424,9 +424,9 @@ bb0(%0 : $Int):
   %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   store %0 to %2a : $*Int                        // id: %3
   // function_ref struct.escape (f : () -> Swift.Int) -> () -> Swift.Int
-  %4 = function_ref @$S6struct6escape1fSiycSiyc_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int // user: %8
+  %4 = function_ref @$s6struct6escape1fSiycSiyc_tF : $@convention(thin) (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int // user: %8
   // function_ref struct.(useBox (t : Swift.Int) -> ()).(closure #1)
-  %5 = function_ref @$S6struct6useBox1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int // user: %7
+  %5 = function_ref @$s6struct6useBox1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int // user: %7
   strong_retain %2 : $<τ_0_0> { var τ_0_0 } <Int>     // id: %6
   %7 = partial_apply %5(%2) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int // user: %8
   %8 = apply %4(%7) : $@convention(thin) (@owned @callee_owned () -> Int) -> @owned @callee_owned () -> Int // user: %9
@@ -436,9 +436,9 @@ bb0(%0 : $Int):
   return %11 : $()                                // id: %12
 }
 
-// CHECK-LABEL: sil private @$S6struct6useBox1tySi_tFSiycfU_
+// CHECK-LABEL: sil private @$s6struct6useBox1tySi_tFSiycfU_
 // struct.(useBox (t : Swift.Int) -> ()).(closure #1)
-sil private @$S6struct6useBox1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
+sil private @$s6struct6useBox1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
 bb0(%0 : $<τ_0_0> { var τ_0_0 } <Int>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
@@ -501,7 +501,7 @@ bb0(%0 : $*T):
   %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <T>, 0
   // CHECK: copy_addr %0 to [initialization] [[STACK]] : $*T
   copy_addr %0 to [initialization] %4a : $*T
-  // CHECK: [[CLOSURE:%[0-9a-zA-Z]+]] = function_ref @$S21closure_to_specializeTf0ns_n
+  // CHECK: [[CLOSURE:%[0-9a-zA-Z]+]] = function_ref @$s21closure_to_specializeTf0ns_n
   // CHECK: partial_apply [[CLOSURE]]<T>([[STACK]])
   %6 = partial_apply %3<T>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
   %7 = apply %2<T>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> ()
@@ -513,7 +513,7 @@ bb0(%0 : $*T):
   return %9 : $()
 }
 
-// CHECK-LABEL: sil shared @$S21closure_to_specializeTf0ns_n : $@convention(thin) <T where T : P> (@inout_aliasable T) -> @out T
+// CHECK-LABEL: sil shared @$s21closure_to_specializeTf0ns_n : $@convention(thin) <T where T : P> (@inout_aliasable T) -> @out T
 sil shared @closure_to_specialize : $@convention(thin) <T where T : P> (@owned <τ_0_0> { var τ_0_0 } <T>) -> @out T {
 // CHECK: bb0
 bb0(%0 : $*T, %1 : $<τ_0_0> { var τ_0_0 } <T>):
@@ -623,7 +623,7 @@ bb0(%0 : $Int, %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>):
   return %8 : $Bool
 }
 
-// CHECK-LABEL: sil shared @$S8closure2Tf0ns_n
+// CHECK-LABEL: sil shared @$s8closure2Tf0ns_n
 // CHECK: bb0
 // CHECK: return
 // CHECK-NOT: bb1

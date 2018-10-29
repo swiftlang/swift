@@ -11,13 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Subsystems.h"
-#include "swift/AST/AccessScopeChecker.h"
 #include "swift/AST/AccessRequests.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
-#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Types.h"
 
 #include "llvm/Support/MathExtras.h"
@@ -55,7 +54,6 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
       return storage->getFormalAccess();
     case AccessorKind::Set:
     case AccessorKind::MutableAddress:
-    case AccessorKind::MaterializeForSet:
     case AccessorKind::Modify:
       return storage->getSetterFormalAccess();
     case AccessorKind::WillSet:
@@ -63,6 +61,14 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
       // These are only needed to synthesize the setter.
       return AccessLevel::Private;
     }
+  }
+
+  DeclContext *DC = D->getDeclContext();
+
+  // Special case for generic parameters; we just give them a dummy
+  // access level.
+  if (auto genericParam = dyn_cast<GenericTypeParamDecl>(D)) {
+    return AccessLevel::Internal;
   }
 
   // Special case for associated types: inherit access from protocol.
@@ -82,7 +88,6 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
     }
   }
 
-  DeclContext *DC = D->getDeclContext();
   switch (DC->getContextKind()) {
   case DeclContextKind::TopLevelCodeDecl:
     // Variables declared in a top-level 'guard' statement can be accessed in
@@ -114,6 +119,7 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
   case DeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(DC)->getDefaultAccessLevel();
   }
+  llvm_unreachable("unhandled kind");
 }
 
 void AccessLevelRequest::diagnoseCycle(DiagnosticEngine &diags) const {
@@ -200,57 +206,46 @@ void SetterAccessLevelRequest::cacheResult(AccessLevel value) const {
 llvm::Expected<std::pair<AccessLevel, AccessLevel>>
 DefaultAndMaxAccessLevelRequest::evaluate(Evaluator &evaluator,
                                           ExtensionDecl *ED) const {
+  auto &Ctx = ED->getASTContext();
   assert(!ED->hasDefaultAccessLevel());
-
-  LazyResolver *Resolver = ED->getASTContext().getLazyResolver();
-  Resolver->resolveExtension(ED);
 
   AccessLevel maxAccess = AccessLevel::Public;
 
-  if (NominalTypeDecl *nominal = ED->getExtendedNominal()) {
-    maxAccess = std::max(nominal->getFormalAccess(),
-                         AccessLevel::FilePrivate);
-  }
+  if (GenericParamList *genericParams = ED->getGenericParams()) {
+    // Only check the trailing 'where' requirements. Other requirements come
+    // from the extended type and have already been checked.
+    DirectlyReferencedTypeDecls typeDecls =
+      evaluateOrDefault(Ctx.evaluator, TypeDeclsFromWhereClauseRequest{ED}, {});
 
-  if (const GenericParamList *genericParams = ED->getGenericParams()) {
-    auto getTypeAccess = [ED](const TypeLoc &TL) -> AccessLevel {
-      if (!TL.getType())
-        return AccessLevel::Public;
-      auto accessScope =
-          TypeReprAccessScopeChecker::getAccessScope(TL.getTypeRepr(),
-                                                     ED->getDeclContext());
+    Optional<AccessScope> maxScope = AccessScope::getPublic();
+
+    for (auto *typeDecl : typeDecls) {
+      if (isa<TypeAliasDecl>(typeDecl) || isa<NominalTypeDecl>(typeDecl)) {
+        auto scope = typeDecl->getFormalAccessScope(ED->getDeclContext());
+        maxScope = maxScope->intersectWith(scope);
+      }
+    }
+
+    if (!maxScope.hasValue()) {
       // This is an error case and will be diagnosed elsewhere.
-      if (!accessScope.hasValue())
-        return AccessLevel::Public;
-
-      if (accessScope->isPublic())
-        return AccessLevel::Public;
-      if (isa<ModuleDecl>(accessScope->getDeclContext()))
-        return AccessLevel::Internal;
+      maxAccess = AccessLevel::Public;
+    } else if (maxScope->isPublic()) {
+      maxAccess = AccessLevel::Public;
+    } else if (isa<ModuleDecl>(maxScope->getDeclContext())) {
+      maxAccess = AccessLevel::Internal;
+    } else {
       // Because extensions are always at top-level, they should never
       // reference declarations not at the top level. (And any such references
       // should be diagnosed elsewhere.) This code should not crash if that
       // occurs, though.
-      return AccessLevel::FilePrivate;
-    };
-
-    // Only check the trailing 'where' requirements. Other requirements come
-    // from the extended type and have already been checked.
-    for (const RequirementRepr &req : genericParams->getTrailingRequirements()){
-      switch (req.getKind()) {
-      case RequirementReprKind::TypeConstraint:
-        maxAccess = std::min(getTypeAccess(req.getSubjectLoc()), maxAccess);
-        maxAccess = std::min(getTypeAccess(req.getConstraintLoc()), maxAccess);
-        break;
-      case RequirementReprKind::LayoutConstraint:
-        maxAccess = std::min(getTypeAccess(req.getSubjectLoc()), maxAccess);
-        break;
-      case RequirementReprKind::SameType:
-        maxAccess = std::min(getTypeAccess(req.getFirstTypeLoc()), maxAccess);
-        maxAccess = std::min(getTypeAccess(req.getSecondTypeLoc()), maxAccess);
-        break;
-      }
+      maxAccess = AccessLevel::FilePrivate;
     }
+  }
+
+  if (NominalTypeDecl *nominal = ED->getExtendedNominal()) {
+    maxAccess = std::min(maxAccess,
+                         std::max(nominal->getFormalAccess(),
+                                  AccessLevel::FilePrivate));
   }
 
   AccessLevel defaultAccess;

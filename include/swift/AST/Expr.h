@@ -144,7 +144,7 @@ protected:
     IsTypeDefaulted : 1,
     /// Number of comma source locations.
     NumCommas : 32 - 1 - NumExprBits,
-    /// Number of entries in the collection. If this is a DictionaryLiteral,
+    /// Number of entries in the collection. If this is a DictionaryExpr,
     /// each entry is a Tuple with the key and value pair.
     NumSubExprs : 32
   );
@@ -536,22 +536,11 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(llvm::function_ref<Type(const Expr *)> getType,
-                llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc)
-          const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getType,
-                llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc)
-          const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
-
-  void dump(raw_ostream &OS) const;
-  void print(raw_ostream &OS, unsigned Indent = 0) const;
-  void print(raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getType,
-             llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
-             unsigned Indent = 0) const;
+  void dump(raw_ostream &OS, unsigned Indent = 0) const;
+  void dump(raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getType,
+            llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
+            unsigned Indent = 0) const;
+  
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
 
   // Only allow allocation of Exprs using the allocator in ASTContext
@@ -866,12 +855,6 @@ public:
 
     /// A UTF-16 string.
     UTF16,
-
-    /// A UTF-8 constant string.
-    UTF8ConstString,
-
-    /// A UTF-16 constant string.
-    UTF16ConstString,
 
     /// A single UnicodeScalar, passed as an integer.
     OneUnicodeScalar
@@ -2120,10 +2103,10 @@ public:
   /// that trailing commas are currently allowed, and that invalid code may have
   /// stray or missing commas.
   MutableArrayRef<SourceLoc> getCommaLocs() {
-    return {getTrailingSourceLocs(), Bits.CollectionExpr.NumCommas};
+    return {getTrailingSourceLocs(), static_cast<size_t>(Bits.CollectionExpr.NumCommas)};
   }
   ArrayRef<SourceLoc> getCommaLocs() const {
-    return {getTrailingSourceLocs(), Bits.CollectionExpr.NumCommas};
+    return {getTrailingSourceLocs(), static_cast<size_t>(Bits.CollectionExpr.NumCommas)};
   }
   unsigned getNumCommas() const { return Bits.CollectionExpr.NumCommas; }
 
@@ -2917,7 +2900,7 @@ public:
 
   ArrayRef<int> getElementMapping() const {
     return {getTrailingObjects<int>(),
-            Bits.TupleShuffleExpr.NumElementMappings};
+            static_cast<size_t>(Bits.TupleShuffleExpr.NumElementMappings)};
   }
 
   /// What is the type impact of this shuffle?
@@ -2944,7 +2927,7 @@ public:
   /// Retrieve the argument indices for the variadic arguments.
   ArrayRef<unsigned> getVariadicArgs() const {
     return {getTrailingObjects<unsigned>(),
-            Bits.TupleShuffleExpr.NumVariadicArgs};
+            static_cast<size_t>(Bits.TupleShuffleExpr.NumVariadicArgs)};
   }
 
   /// Retrieve the owner of the default arguments.
@@ -2953,13 +2936,13 @@ public:
   /// Retrieve the caller-defaulted arguments.
   ArrayRef<Expr *> getCallerDefaultArgs() const {
     return {getTrailingObjects<Expr*>(),
-            Bits.TupleShuffleExpr.NumCallerDefaultArgs};
+            static_cast<size_t>(Bits.TupleShuffleExpr.NumCallerDefaultArgs)};
   }
 
   /// Retrieve the caller-defaulted arguments.
   MutableArrayRef<Expr *> getCallerDefaultArgs() {
     return {getTrailingObjects<Expr*>(),
-            Bits.TupleShuffleExpr.NumCallerDefaultArgs};
+            static_cast<size_t>(Bits.TupleShuffleExpr.NumCallerDefaultArgs)};
   }
 
   static bool classof(const Expr *E) {
@@ -3347,6 +3330,25 @@ public:
   }
 };
 
+/// The not-yet-actually-surfaced '...' varargs expansion operator,
+/// which splices an array into a sequence of variadic arguments.
+class VarargExpansionExpr : public Expr {
+  Expr *SubExpr;
+
+public:
+  VarargExpansionExpr(Expr *subExpr, bool implicit, Type type = Type())
+    : Expr(ExprKind::VarargExpansion, implicit, type), SubExpr(subExpr) {}
+
+  SWIFT_FORWARD_SOURCE_LOCS_TO(SubExpr)
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *subExpr) { SubExpr = subExpr; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::VarargExpansion;
+  }
+};
+
 /// SequenceExpr - A list of binary operations which has not yet been
 /// folded into a tree.  The operands all have even indices, while the
 /// subexpressions with odd indices are all (potentially overloaded)
@@ -3639,6 +3641,9 @@ public:
   /// This routine cannot change whether a closure has a single expression as
   /// its body; it can only update that expression.
   void setSingleExpressionBody(Expr *NewBody);
+
+  /// \brief Is this a completely empty closure?
+  bool hasEmptyBody() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Closure;
@@ -4757,7 +4762,8 @@ public:
       Subscript,
       OptionalForce,
       OptionalChain,
-      OptionalWrap
+      OptionalWrap,
+      Identity,
     };
   
   private:
@@ -4771,9 +4777,11 @@ public:
     } Decl;
     
     
-    llvm::PointerIntPair<Expr *, 3, Kind> SubscriptIndexExprAndKind;
-    ArrayRef<Identifier> SubscriptLabels;
-    ArrayRef<ProtocolConformanceRef> SubscriptHashableConformances;
+    Expr *SubscriptIndexExpr;
+    const Identifier *SubscriptLabelsData;
+    const ProtocolConformanceRef *SubscriptHashableConformancesData;
+    unsigned SubscriptSize;
+    Kind KindValue;
     Type ComponentType;
     SourceLoc Loc;
     
@@ -4898,75 +4906,89 @@ public:
                        SourceLoc());
     }
     
+    static Component forIdentity(SourceLoc selfLoc) {
+      return Component(nullptr, {}, nullptr, {}, {},
+                       Kind::Identity, Type(),
+                       selfLoc);
+    }
+    
     SourceLoc getLoc() const {
       return Loc;
     }
     
     Kind getKind() const {
-      return SubscriptIndexExprAndKind.getInt();
+      return KindValue;
     }
     
     bool isValid() const {
       return getKind() != Kind::Invalid;
     }
-    
+
     bool isResolved() const {
       if (!getComponentType())
         return false;
-      
+
       switch (getKind()) {
       case Kind::Subscript:
       case Kind::OptionalChain:
       case Kind::OptionalWrap:
       case Kind::OptionalForce:
       case Kind::Property:
+      case Kind::Identity:
         return true;
-      
+
       case Kind::UnresolvedSubscript:
       case Kind::UnresolvedProperty:
       case Kind::Invalid:
         return false;
       }
+      llvm_unreachable("unhandled kind");
     }
-    
+
     Expr *getIndexExpr() const {
       switch (getKind()) {
       case Kind::Subscript:
       case Kind::UnresolvedSubscript:
-        return SubscriptIndexExprAndKind.getPointer();
-        
+        return SubscriptIndexExpr;
+
       case Kind::Invalid:
       case Kind::OptionalChain:
       case Kind::OptionalWrap:
       case Kind::OptionalForce:
       case Kind::UnresolvedProperty:
       case Kind::Property:
+      case Kind::Identity:
         return nullptr;
       }
+      llvm_unreachable("unhandled kind");
     }
 
     ArrayRef<Identifier> getSubscriptLabels() const {
       switch (getKind()) {
       case Kind::Subscript:
       case Kind::UnresolvedSubscript:
-        return SubscriptLabels;
-        
+        return {SubscriptLabelsData, (size_t)SubscriptSize};
+
       case Kind::Invalid:
       case Kind::OptionalChain:
       case Kind::OptionalWrap:
       case Kind::OptionalForce:
       case Kind::UnresolvedProperty:
       case Kind::Property:
+      case Kind::Identity:
         llvm_unreachable("no subscript labels for this kind");
       }
+      llvm_unreachable("unhandled kind");
     }
-    
+
     ArrayRef<ProtocolConformanceRef>
     getSubscriptIndexHashableConformances() const {
       switch (getKind()) {
       case Kind::Subscript:
-        return SubscriptHashableConformances;
-        
+        if (!SubscriptHashableConformancesData)
+          return {};
+        return {SubscriptHashableConformancesData, (size_t)SubscriptSize};
+
       case Kind::UnresolvedSubscript:
       case Kind::Invalid:
       case Kind::OptionalChain:
@@ -4974,10 +4996,12 @@ public:
       case Kind::OptionalForce:
       case Kind::UnresolvedProperty:
       case Kind::Property:
+      case Kind::Identity:
         return {};
       }
+      llvm_unreachable("unhandled kind");
     }
-    
+
     void setSubscriptIndexHashableConformances(
       ArrayRef<ProtocolConformanceRef> hashables);
 
@@ -4993,10 +5017,12 @@ public:
       case Kind::OptionalWrap:
       case Kind::OptionalForce:
       case Kind::Property:
+      case Kind::Identity:
         llvm_unreachable("no unresolved name for this kind");
       }
+      llvm_unreachable("unhandled kind");
     }
-    
+
     ConcreteDeclRef getDeclRef() const {
       switch (getKind()) {
       case Kind::Property:
@@ -5009,10 +5035,12 @@ public:
       case Kind::OptionalChain:
       case Kind::OptionalWrap:
       case Kind::OptionalForce:
+      case Kind::Identity:
         llvm_unreachable("no decl ref for this kind");
       }
+      llvm_unreachable("unhandled kind");
     }
-    
+
     Type getComponentType() const {
       return ComponentType;
     }

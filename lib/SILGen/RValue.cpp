@@ -39,7 +39,7 @@ static unsigned getTupleSize(CanType t) {
   return 1;
 }
 
-static unsigned getRValueSize(AbstractionPattern pattern, CanType formalType) {
+unsigned RValue::getRValueSize(AbstractionPattern pattern, CanType formalType) {
   if (pattern.isTuple()) {
     unsigned count = 0;
     auto formalTupleType = cast<TupleType>(formalType);
@@ -54,7 +54,7 @@ static unsigned getRValueSize(AbstractionPattern pattern, CanType formalType) {
 }
 
 /// Return the number of rvalue elements in the given canonical type.
-static unsigned getRValueSize(CanType type) {
+unsigned RValue::getRValueSize(CanType type) {
   if (auto tupleType = dyn_cast<TupleType>(type)) {
     unsigned count = 0;
     for (auto eltType : tupleType.getElementTypes())
@@ -367,7 +367,7 @@ static void copyOrInitValuesInto(Initialization *init,
   ManagedValue scalar = implodeTupleValues<KIND>(values, SGF, type, loc);
 
   // This will have just used up the first values in the list, pop them off.
-  values = values.slice(getRValueSize(type));
+  values = values.slice(RValue::getRValueSize(type));
 
   init->copyOrInitValueInto(SGF, loc, scalar, isInit);
   init->finishInitialization(SGF);
@@ -635,9 +635,10 @@ getElementRange(CanTupleType tupleType, unsigned eltIndex) {
   assert(eltIndex < tupleType->getNumElements());
   unsigned begin = 0;
   for (unsigned i = 0; i < eltIndex; ++i) {
-    begin += getRValueSize(tupleType.getElementType(i));
+    begin += RValue::getRValueSize(tupleType.getElementType(i));
   }
-  unsigned end = begin + getRValueSize(tupleType.getElementType(eltIndex));
+  unsigned end =
+    begin + RValue::getRValueSize(tupleType.getElementType(eltIndex));
   return { begin, end };
 }
 
@@ -811,4 +812,14 @@ SILType RValue::getLoweredImplodedTupleType(SILGenFunction &SGF) const & {
       SGF.silConv.useLoweredAddresses())
     return loweredType.getAddressType();
   return loweredType.getObjectType();
+}
+
+RValue RValue::copyForDiagnostics() const {
+  assert(!isInSpecialState());
+  assert(isComplete());
+  RValue result(type);
+  for (auto value : values)
+    result.values.push_back(value);
+  result.elementsToBeAdded = 0;
+  return result;
 }

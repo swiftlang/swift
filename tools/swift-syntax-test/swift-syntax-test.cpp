@@ -33,7 +33,9 @@
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxData.h"
 #include "swift/Syntax/SyntaxNodes.h"
+#include "llvm/Support/BinaryByteStream.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FileOutputBuffer.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/raw_ostream.h"
@@ -149,6 +151,21 @@ OmitNodeIds("omit-node-ids",
                            "include the IDs of the serialized nodes."));
 
 static llvm::cl::opt<bool>
+SerializeAsByteTree("serialize-byte-tree",
+                    llvm::cl::desc("If specified the syntax tree will be "
+                                   "serialized in the ByteTree format instead "
+                                   "of JSON."));
+
+static llvm::cl::opt<bool>
+AddByteTreeFields("add-bytetree-fields",
+                  llvm::cl::desc("If specified, further fields will be added "
+                                 "to the syntax tree if it is serialized as a "
+                                 "ByteTree. This is to test forward "
+                                 "compatibility with future versions of "
+                                 "SwiftSyntax that might add more fields to "
+                                 "syntax nodes."));
+
+static llvm::cl::opt<bool>
 IncrementalSerialization("incremental-serialization",
                          llvm::cl::desc("If specified, the serialized syntax "
                                         "tree will omit nodes that have not "
@@ -196,6 +213,11 @@ Visual("v",
        llvm::cl::desc("Print visually"),
        llvm::cl::cat(Category),
        llvm::cl::init(false));
+
+static llvm::cl::opt<std::string>
+GraphVisPath("output-request-graphviz",
+             llvm::cl::desc("Emit GraphViz output visualizing the request graph."),
+             llvm::cl::cat(Category));
 } // end namespace options
 
 namespace {
@@ -224,11 +246,10 @@ struct ByteBasedSourceRange {
 
   bool empty() { return Start == End; }
 
-  SourceRange toSourceRange(SourceManager &SourceMgr, unsigned BufferID) {
+  CharSourceRange toCharSourceRange(SourceManager &SourceMgr, unsigned BufferID) {
     auto StartLoc = SourceMgr.getLocForOffset(BufferID, Start);
-    // SourceRange includes the last offset, we don't. So subtract 1
-    auto EndLoc = SourceMgr.getLocForOffset(BufferID, End - 1);
-    return SourceRange(StartLoc, EndLoc);
+    auto EndLoc = SourceMgr.getLocForOffset(BufferID, End);
+    return CharSourceRange(SourceMgr, StartLoc, EndLoc);
   }
 };
 
@@ -517,12 +538,11 @@ bool verifyReusedRegions(ByteBasedSourceRangeSet ExpectedReparseRegions,
   bool NoUnexpectedParse = true;
 
   for (auto ReparseRegion : UnexpectedReparseRegions.Ranges) {
-    auto ReparseRange = ReparseRegion.toSourceRange(SourceMgr, BufferID);
+    auto ReparseRange = ReparseRegion.toCharSourceRange(SourceMgr, BufferID);
 
     // To improve the ergonomics when writing tests we do not want to complain
     // about reparsed whitespaces.
-    auto RangeStr =
-        CharSourceRange(SourceMgr, ReparseRange.Start, ReparseRange.End).str();
+    auto RangeStr = ReparseRange.str();
     llvm::Regex WhitespaceOnlyRegex("^[ \t\r\n]*$");
     if (WhitespaceOnlyRegex.match(RangeStr)) {
       continue;
@@ -578,6 +598,7 @@ int parseFile(
   CompilerInvocation Invocation;
   Invocation.getLangOptions().BuildSyntaxTree = true;
   Invocation.getLangOptions().VerifySyntaxTree = options::VerifySyntaxTree;
+  Invocation.getLangOptions().RequestEvaluatorGraphVizPath = options::GraphVisPath;
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(InputFileName);
   Invocation.setMainExecutablePath(
     llvm::sys::fs::getMainExecutable(MainExecutablePath,
@@ -700,35 +721,63 @@ int doSerializeRawTree(const char *MainExecutablePath,
                        const StringRef InputFile) {
   return parseFile(MainExecutablePath, InputFile,
     [](SourceFile *SF, SyntaxParsingCache *SyntaxCache) -> int {
-    auto SerializeTree = [](llvm::raw_ostream &os, RC<RawSyntax> Root,
-                            SyntaxParsingCache *SyntaxCache) {
-      std::unordered_set<unsigned> ReusedNodeIds;
-      if (options::IncrementalSerialization && SyntaxCache) {
-        ReusedNodeIds = SyntaxCache->getReusedNodeIds();
-      }
-
-      swift::json::Output::UserInfoMap JsonUserInfo;
-      JsonUserInfo[swift::json::OmitNodesUserInfoKey] = &ReusedNodeIds;
-      if (options::OmitNodeIds) {
-        JsonUserInfo[swift::json::DontSerializeNodeIdsUserInfoKey] =
-            (void *)true;
-      }
-      swift::json::Output out(os, JsonUserInfo);
-      out << *Root;
-      os << "\n";
-    };
-
     auto Root = SF->getSyntaxRoot().getRaw();
+    std::unordered_set<unsigned> ReusedNodeIds;
+    if (options::IncrementalSerialization && SyntaxCache) {
+      ReusedNodeIds = SyntaxCache->getReusedNodeIds();
+    }
 
-    if (!options::OutputFilename.empty()) {
-      std::error_code errorCode;
-      llvm::raw_fd_ostream os(options::OutputFilename, errorCode,
-                              llvm::sys::fs::F_None);
-      assert(!errorCode && "Couldn't open output file");
+    if (options::SerializeAsByteTree) {
+      if (options::OutputFilename.empty()) {
+        llvm::errs() << "Cannot serialize syntax tree as ByteTree to stdout\n";
+        return EXIT_FAILURE;
+      }
 
-      SerializeTree(os, Root, SyntaxCache);
+      swift::ExponentialGrowthAppendingBinaryByteStream Stream(
+          llvm::support::endianness::little);
+      Stream.reserve(32 * 1024);
+      std::map<void *, void *> UserInfo;
+      UserInfo[swift::byteTree::UserInfoKeyReusedNodeIds] = &ReusedNodeIds;
+      if (options::AddByteTreeFields) {
+        UserInfo[swift::byteTree::UserInfoKeyAddInvalidFields] = (void *)true;
+      }
+      swift::byteTree::ByteTreeWriter::write(Stream,
+                                             byteTree::SYNTAX_TREE_VERSION,
+                                             *Root, UserInfo);
+      auto OutputBufferOrError = llvm::FileOutputBuffer::create(
+          options::OutputFilename, Stream.data().size());
+      assert(OutputBufferOrError && "Couldn't open output file");
+      auto &OutputBuffer = OutputBufferOrError.get();
+      memcpy(OutputBuffer->getBufferStart(), Stream.data().data(),
+             Stream.data().size());
+      auto Error = OutputBuffer->commit();
+      (void)Error;
+      assert(!Error && "Unable to write output file");
     } else {
-      SerializeTree(llvm::outs(), Root, SyntaxCache);
+      // Serialize as JSON
+      auto SerializeTree = [&ReusedNodeIds](llvm::raw_ostream &os,
+                                            RC<RawSyntax> Root,
+                                            SyntaxParsingCache *SyntaxCache) {
+        swift::json::Output::UserInfoMap JsonUserInfo;
+        JsonUserInfo[swift::json::OmitNodesUserInfoKey] = &ReusedNodeIds;
+        if (options::OmitNodeIds) {
+          JsonUserInfo[swift::json::DontSerializeNodeIdsUserInfoKey] =
+              (void *)true;
+        }
+        swift::json::Output out(os, JsonUserInfo);
+        out << *Root;
+        os << "\n";
+      };
+
+      if (!options::OutputFilename.empty()) {
+        std::error_code errorCode;
+        llvm::raw_fd_ostream os(options::OutputFilename, errorCode,
+                                llvm::sys::fs::F_None);
+        assert(!errorCode && "Couldn't open output file");
+        SerializeTree(os, Root, SyntaxCache);
+      } else {
+        SerializeTree(llvm::outs(), Root, SyntaxCache);
+      }
     }
     return EXIT_SUCCESS;
   });

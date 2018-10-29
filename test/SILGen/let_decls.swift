@@ -8,10 +8,6 @@ func takeClosure(_ a : () -> Int) {}
 // CHECK-LABEL: sil hidden @{{.*}}test1
 func test1(_ a : Int) -> Int {
   // CHECK-NOT: alloc_box
-  // FIXME(integers): the following check should be updated for the new way +
-  // gets invoked. <rdar://problem/29939484>
-  // XCHECK-NOT: alloc_stack
-
   let (b,c) = (a, 32)
 
   return b+c
@@ -44,7 +40,7 @@ func test2() {
 
 // The closure just returns its value, which it captured directly.
 
-// CHECK: sil private @$S9let_decls5test2yyFSiyXEfU_ : $@convention(thin) (Int) -> Int
+// CHECK: sil private @$s9let_decls5test2yyFSiyXEfU_ : $@convention(thin) (Int) -> Int
 // CHECK: bb0(%0 : @trivial $Int):
 // CHECK:  return %0 : $Int
 
@@ -206,7 +202,7 @@ func produceNMSubscriptableRValue() -> NonMutableSubscriptable {}
 // CHECK: bb0(%0 : @trivial $Int):
 // CHECK: [[FR1:%[0-9]+]] = function_ref @{{.*}}produceNMSubscriptableRValue
 // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[FR1]]()
-// CHECK: [[GETFN:%[0-9]+]] = function_ref @$S9let_decls23NonMutableSubscriptableV{{[_0-9a-zA-Z]*}}ig
+// CHECK: [[GETFN:%[0-9]+]] = function_ref @$s9let_decls23NonMutableSubscriptableV{{[_0-9a-zA-Z]*}}ig
 // CHECK-NEXT: [[RES2:%[0-9]+]] = apply [[GETFN]](%0, [[RES]])
 // CHECK-NEXT: return [[RES2]]
 func test_nm_subscript_get(_ a : Int) -> Int {
@@ -217,7 +213,7 @@ func test_nm_subscript_get(_ a : Int) -> Int {
 // CHECK: bb0(%0 : @trivial $Int):
 // CHECK: [[FR1:%[0-9]+]] = function_ref @{{.*}}produceNMSubscriptableRValue
 // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[FR1]]()
-// CHECK: [[SETFN:%[0-9]+]] = function_ref @$S9let_decls23NonMutableSubscriptableV{{[_0-9a-zA-Z]*}}is
+// CHECK: [[SETFN:%[0-9]+]] = function_ref @$s9let_decls23NonMutableSubscriptableV{{[_0-9a-zA-Z]*}}is
 // CHECK-NEXT: [[RES2:%[0-9]+]] = apply [[SETFN]](%0, %0, [[RES]])
 func test_nm_subscript_set(_ a : Int) {
   produceNMSubscriptableRValue()[a] = a
@@ -243,13 +239,13 @@ func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
   // The setter isn't mutating, so we need to load the box.
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]]
   // CHECK: [[VVAL:%[0-9]+]] = load [trivial] [[READ]]
-  // CHECK: [[SETFN:%[0-9]+]] = function_ref @$S9let_decls17WeirdPropertyTestV1pSivs
+  // CHECK: [[SETFN:%[0-9]+]] = function_ref @$s9let_decls17WeirdPropertyTestV1pSivs
   // CHECK: apply [[SETFN]](%1, [[VVAL]])
   v.p = i
   
   // The getter is mutating, so it takes the box address.
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
-  // CHECK: [[GETFN:%[0-9]+]] = function_ref @$S9let_decls17WeirdPropertyTestV1pSivg
+  // CHECK: [[GETFN:%[0-9]+]] = function_ref @$s9let_decls17WeirdPropertyTestV1pSivg
   // CHECK-NEXT: [[RES:%[0-9]+]] = apply [[GETFN]]([[WRITE]])
   // CHECK: return [[RES]]
   return v.p
@@ -344,12 +340,11 @@ func testDebugValue(_ a : Int, b : SimpleProtocol) -> Int {
 // CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyTupleArgument
 func testAddressOnlyTupleArgument(_ bounds: (start: SimpleProtocol, pastEnd: Int)) {
 // CHECK:       bb0(%0 : @trivial $*SimpleProtocol, %1 : @trivial $Int):
-// CHECK-NEXT:    %2 = alloc_stack $(start: SimpleProtocol, pastEnd: Int), let, name "bounds"
+// CHECK-NEXT:    %2 = alloc_stack $(start: SimpleProtocol, pastEnd: Int), let, name "bounds", argno 1
 // CHECK-NEXT:    %3 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 0
 // CHECK-NEXT:    copy_addr %0 to [initialization] %3 : $*SimpleProtocol
 // CHECK-NEXT:    %5 = tuple_element_addr %2 : $*(start: SimpleProtocol, pastEnd: Int), 1
 // CHECK-NEXT:    store %1 to [trivial] %5 : $*Int
-// CHECK-NEXT:    debug_value_addr %2
 // CHECK-NEXT:    destroy_addr %2 : $*(start: SimpleProtocol, pastEnd: Int)
 // CHECK-NEXT:    dealloc_stack %2 : $*(start: SimpleProtocol, pastEnd: Int)
 }
@@ -398,7 +393,7 @@ struct StructMemberTest {
   func testIntMemberLoad() -> Int {
     return i
   }
-  // CHECK-LABEL: sil hidden @$S9let_decls16StructMemberTestV07testIntD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
+  // CHECK-LABEL: sil hidden @$s9let_decls16StructMemberTestV07testIntD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $StructMemberTest):
   // CHECK:  debug_value [[ARG]] : $StructMemberTest, let, name "self"
   // CHECK:  [[TRIVIAL_VALUE:%.*]] = struct_extract [[ARG]] : $StructMemberTest, #StructMemberTest.i
@@ -410,7 +405,7 @@ struct StructMemberTest {
   func testRecursiveIntMemberLoad() -> Int {
     return s.i
   }
-  // CHECK-LABEL: sil hidden @$S9let_decls16StructMemberTestV016testRecursiveIntD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
+  // CHECK-LABEL: sil hidden @$s9let_decls16StructMemberTestV016testRecursiveIntD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $StructMemberTest):
   // CHECK:  debug_value %0 : $StructMemberTest, let, name "self"
   // CHECK:  %2 = struct_extract %0 : $StructMemberTest, #StructMemberTest.s
@@ -421,7 +416,7 @@ struct StructMemberTest {
   func testTupleMemberLoad() -> Int {
     return t.1.i
   }
-  // CHECK-LABEL: sil hidden @$S9let_decls16StructMemberTestV09testTupleD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
+  // CHECK-LABEL: sil hidden @$s9let_decls16StructMemberTestV09testTupleD4LoadSiyF : $@convention(method) (@guaranteed StructMemberTest)
   // CHECK: bb0(%0 : @guaranteed $StructMemberTest):
   // CHECK-NEXT:   debug_value %0 : $StructMemberTest, let, name "self"
   // CHECK-NEXT:   [[T0:%.*]] = struct_extract %0 : $StructMemberTest, #StructMemberTest.t
@@ -483,10 +478,10 @@ func testLetPropertyAccessOnLValueBase(_ a : LetPropertyStruct) -> Int {
 
 var addressOnlyGetOnlyGlobalProperty : SimpleProtocol { get {} }
 
-// CHECK-LABEL: sil hidden @$S9let_decls018testAddressOnlyGetE14GlobalPropertyAA14SimpleProtocol_pyF
+// CHECK-LABEL: sil hidden @$s9let_decls018testAddressOnlyGetE14GlobalPropertyAA14SimpleProtocol_pyF
 // CHECK: bb0(%0 : @trivial $*SimpleProtocol):
 // CHECK-NEXT:   // function_ref
-// CHECK-NEXT:  %1 = function_ref @$S9let_decls014addressOnlyGetD14GlobalPropertyAA14SimpleProtocol_pvg
+// CHECK-NEXT:  %1 = function_ref @$s9let_decls014addressOnlyGetD14GlobalPropertyAA14SimpleProtocol_pvg
 // CHECK-NEXT:  %2 = apply %1(%0) : $@convention(thin) () -> @out SimpleProtocol
 // CHECK-NEXT:  %3 = tuple ()
 // CHECK-NEXT:  return %3 : $()

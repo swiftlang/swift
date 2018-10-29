@@ -253,12 +253,16 @@ struct ArgumentInitHelper {
       // argument if we're responsible for it.
     }
     SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(argrv.getValue());
-    if (argrv.getType().isAddress())
-      SGF.B.createDebugValueAddr(loc, argrv.getValue(),
-                                 SILDebugVariable(vd->isLet(), ArgNo));
-    else
-      SGF.B.createDebugValue(loc, argrv.getValue(),
-                             SILDebugVariable(vd->isLet(), ArgNo));
+    SILValue value = argrv.getValue();
+    SILDebugVariable varinfo(vd->isLet(), ArgNo);
+    if (!argrv.getType().isAddress()) {
+      SGF.B.createDebugValue(loc, value, varinfo);
+    } else {
+      if (auto AllocStack = dyn_cast<AllocStackInst>(value))
+        AllocStack->setArgNo(ArgNo);
+      else
+        SGF.B.createDebugValueAddr(loc, value, varinfo);
+    }
   }
 
   void emitParam(ParamDecl *PD) {

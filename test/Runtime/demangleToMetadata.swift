@@ -45,6 +45,10 @@ func f1_owned(x: __owned AnyObject) { }
 
 func f2_variadic_inout(x: ()..., y: inout ()) { }
 
+func f1_escaping(_: @escaping (Int) -> Float) { }
+func f1_autoclosure(_: @autoclosure () -> Float) { }
+func f1_escaping_autoclosure(_: @autoclosure @escaping () -> Float) { }
+
 DemangleToMetadataTests.test("function types") {
   // Conventions
   expectEqual(type(of: f0), _typeByMangledName("yyc")!)
@@ -77,6 +81,13 @@ DemangleToMetadataTests.test("function types") {
   // A function type that hasn't been built before.
   expectEqual("(Int, Float, Double, String, Character, UInt, Bool) -> ()",
     String(describing: _typeByMangledName("yySi_SfSdSSs9CharacterVSuSbtc")!))
+
+  // Escaping
+  expectEqual(type(of: f1_escaping), _typeByMangledName("ySfSicc")!)
+
+  // Autoclosure
+  expectEqual(type(of: f1_autoclosure), _typeByMangledName("ySfyXKc")!)
+  expectEqual(type(of: f1_escaping_autoclosure), _typeByMangledName("ySfyXAc")!)
 }
 
 DemangleToMetadataTests.test("metatype types") {
@@ -230,6 +241,11 @@ DemangleToMetadataTests.test("demangle built-in types") {
   expectEqual(Builtin.NativeObject.self, _typeByMangledName("Bo")!)
   expectEqual(Builtin.BridgeObject.self, _typeByMangledName("Bb")!)
   expectEqual(Builtin.UnsafeValueBuffer.self, _typeByMangledName("BB")!)
+
+  expectEqual(Builtin.FPIEEE32.self, _typeByMangledName("Bf32_")!)
+  expectEqual(Builtin.FPIEEE64.self, _typeByMangledName("Bf64_")!)
+
+  expectEqual(Builtin.Vec4xFPIEEE32.self, _typeByMangledName("Bf32_Bv4_")!)
 }
 
 class CG4<T: P1, U: P2> {
@@ -367,7 +383,7 @@ DemangleToMetadataTests.test("Nested types in extensions") {
     _typeByMangledName("4main4SG11VA2A2P1RzlE016InnerTConformsToC0VA2A2P3Rd__rlE018InnermostUConformsfG0VyAA08ConformsfC0V_AA0jf5P2AndG0V_AA0jF3P4aVG")!)
 
   // Failure case: Dictionary's outer `Key: Hashable` constraint not sastified
-  // TODO: expectNil(_typeByMangledName("s10DictionaryV4mainE5InnerVyAC12ConformsToP1VSi_AC12ConformsToP1VG"))
+  expectNil(_typeByMangledName("s10DictionaryV4mainE5InnerVyAC12ConformsToP1VSi_AC12ConformsToP1VG"))
   // Failure case: Dictionary's inner `V: P1` constraint not satisfied
   expectNil(_typeByMangledName("s10DictionaryV4mainE5InnerVySSSi_AC12ConformsToP2VG"))
 
@@ -383,8 +399,6 @@ DemangleToMetadataTests.test("Nested types in extensions") {
 //
 // Nested types in same-type-constrained extensions
 //
-
-/* TODO
 
 struct SG12<T: P1, U: P2> {}
 
@@ -419,8 +433,6 @@ DemangleToMetadataTests.test("Nested types in same-type-constrained extensions")
   // T != ConformsToP1 in InnerTEqualsConformsToP1
   // V !: P3 in InnerTEqualsConformsToP1
 }
-
- */
 
 runAllTests()
 

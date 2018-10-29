@@ -17,8 +17,10 @@
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
 #include "ConstraintGraph.h"
+#include "CSDiagnostics.h"
 #include "TypeCheckType.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallString.h"
@@ -81,11 +83,15 @@ ConstraintSystem::~ConstraintSystem() {
 }
 
 void ConstraintSystem::incrementScopeCounter() {
-  SWIFT_FUNC_STAT;
   CountScopes++;
   // FIXME: (transitional) increment the redundant "always-on" counter.
   if (TC.Context.Stats)
     TC.Context.Stats->getFrontendCounters().NumConstraintScopes++;
+}
+
+void ConstraintSystem::incrementLeafScopes() {
+  if (TC.Context.Stats)
+    TC.Context.Stats->getFrontendCounters().NumLeafScopes++;
 }
 
 bool ConstraintSystem::hasFreeTypeVariables() {
@@ -475,7 +481,7 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
   // pointing at a generic TypeAliasDecl here. If we find a way to
   // handle generic TypeAliases elsewhere, this can just become a
   // call to BoundGenericType::get().
-  return TC.applyUnboundGenericArguments(
+  return TypeChecker::applyUnboundGenericArguments(
       unbound, unboundDecl,
       SourceLoc(), TypeResolution::forContextual(DC), arguments);
 }
@@ -588,25 +594,6 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
     });
 }
 
-/// Remove argument labels from the function type.
-static Type removeArgumentLabels(Type type, unsigned numArgumentLabels) {
-  // If there is nothing to remove, don't.
-  if (numArgumentLabels == 0) return type;
-  
-  auto fnType = type->getAs<FunctionType>();
-
-  // Drop argument labels from the input type.
-  llvm::SmallVector<AnyFunctionType::Param, 4> unlabeledParams;
-  unlabeledParams.reserve(fnType->getNumParams());
-  for (const auto &param : fnType->getParams())
-    unlabeledParams.push_back(param.getWithoutLabel());
-
-  return FunctionType::get(
-      unlabeledParams,
-      removeArgumentLabels(fnType->getResult(), numArgumentLabels - 1),
-      fnType->getExtInfo());
-}
-
 Type ConstraintSystem::openFunctionType(
        AnyFunctionType *funcType,
        unsigned numArgumentLabelsToRemove,
@@ -643,7 +630,7 @@ Type ConstraintSystem::openFunctionType(
         FunctionType::ExtInfo().withThrows(genericFn->throws()));
   }
 
-  return removeArgumentLabels(funcType, numArgumentLabelsToRemove);
+  return funcType->removeArgumentLabels(numArgumentLabelsToRemove);
 }
 
 Optional<Type> ConstraintSystem::isArrayType(Type type) {
@@ -700,26 +687,12 @@ bool ConstraintSystem::isAnyHashableType(Type type) {
   return false;
 }
 
-static Type withParens(ConstraintSystem &cs, Type type, ParenType *parenType) {
-  auto flags = parenType->getParameterFlags().withInOut(type->is<InOutType>());
-  return ParenType::get(cs.getASTContext(), type->getInOutObjectType(), flags);
-}
-
 Type ConstraintSystem::getFixedTypeRecursive(Type type,
                                              TypeMatchOptions &flags,
-                                             bool wantRValue,
-                                             bool retainParens) {
+                                             bool wantRValue) {
 
   if (wantRValue)
     type = type->getRValueType();
-
-  if (auto *parenTy = dyn_cast<ParenType>(type.getPointer())) {
-    if (retainParens) {
-      auto fixed = getFixedTypeRecursive(parenTy->getUnderlyingType(), flags,
-                                         wantRValue, retainParens);
-      return withParens(*this, fixed, parenTy);
-    }
-  }
 
   if (auto depMemType = type->getAs<DependentMemberType>()) {
     if (!depMemType->getBase()->isTypeVariableOrMember()) return type;
@@ -732,12 +705,12 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type,
     // new constraint.
     flags |= TMF_GenerateConstraints;
 
-    return getFixedTypeRecursive(newType, flags, wantRValue, retainParens);
+    return getFixedTypeRecursive(newType, flags, wantRValue);
   }
 
   if (auto typeVar = type->getAs<TypeVariableType>()) {
     if (auto fixed = getFixedType(typeVar))
-      return getFixedTypeRecursive(fixed, flags, wantRValue, retainParens);
+      return getFixedTypeRecursive(fixed, flags, wantRValue);
 
     return getRepresentative(typeVar);
   }
@@ -832,8 +805,7 @@ void ConstraintSystem::recordOpenedTypes(
   SmallVector<LocatorPathElt, 2> pathElts;
   Expr *anchor = locator.getLocatorParts(pathElts);
   if (!pathElts.empty() &&
-      (pathElts.back().getKind() == ConstraintLocator::Archetype ||
-       pathElts.back().getKind() == ConstraintLocator::AssociatedType))
+      pathElts.back().getKind() == ConstraintLocator::GenericParameter)
     return;
 
   // If the locator is empty, ignore it.
@@ -980,10 +952,11 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   // Unqualified reference to a type.
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
     // Resolve the reference to this type declaration in our current context.
-    auto type = TC.resolveTypeInContext(typeDecl, nullptr,
-                                        TypeResolution::forContextual(useDC),
-                                        TypeResolverContext::InExpression,
-                                        /*isSpecialized=*/false);
+    auto type = TypeChecker::resolveTypeInContext(
+                                      typeDecl, nullptr,
+                                      TypeResolution::forContextual(useDC),
+                                      TypeResolverContext::InExpression,
+                                      /*isSpecialized=*/false);
 
     // Open the type.
     type = openUnboundGenericType(type, locator);
@@ -1007,26 +980,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
   assert(!valueType->hasUnboundGenericType() &&
          !valueType->hasTypeParameter());
-
-  // If this is a let-param whose type is a type variable, this is an untyped
-  // closure param that may be bound to an inout type later. References to the
-  // param should have lvalue type instead. Express the relationship with a new
-  // constraint.
-  if (auto *param = dyn_cast<ParamDecl>(varDecl)) {
-    if (param->isLet() && valueType->is<TypeVariableType>()) {
-      auto found = OpenedParameterTypes.find(param);
-      if (found != OpenedParameterTypes.end())
-        return { found->second, found->second };
-
-      auto typeVar = createTypeVariable(getConstraintLocator(locator),
-                                        TVO_CanBindToLValue);
-      addConstraint(ConstraintKind::BindParam, valueType, typeVar,
-                    getConstraintLocator(locator));
-      OpenedParameterTypes.insert(std::make_pair(param, typeVar));
-      return { typeVar, typeVar };
-    }
-  }
-
   return { valueType, valueType };
 }
 
@@ -1067,8 +1020,6 @@ static void bindArchetypesFromContext(
     ConstraintLocator *locatorPtr,
     const OpenedTypeMap &replacements) {
 
-  auto *genericEnv = cs.DC->getGenericEnvironmentOfContext();
-
   auto bindContextArchetype = [&](Type paramTy, Type contextTy) {
     auto found = replacements.find(cast<GenericTypeParamType>(
                                      paramTy->getCanonicalType()));
@@ -1104,7 +1055,7 @@ static void bindArchetypesFromContext(
       break;
 
     for (auto *paramTy : genericSig->getGenericParams()) {
-      Type contextTy = genericEnv->mapTypeIntoContext(paramTy);
+      Type contextTy = cs.DC->mapTypeIntoContext(paramTy);
       bindContextArchetype(paramTy, contextTy);
     }
 
@@ -1123,14 +1074,11 @@ void ConstraintSystem::openGeneric(
     return;
 
   auto locatorPtr = getConstraintLocator(locator);
-  auto *genericEnv = innerDC->getGenericEnvironmentOfContext();
 
   // Create the type variables for the generic parameters.
   for (auto gp : sig->getGenericParams()) {
-    auto contextTy = GenericEnvironment::mapTypeIntoContext(genericEnv, gp);
-    if (auto *archetype = contextTy->getAs<ArchetypeType>())
-      locatorPtr = getConstraintLocator(
-          locator.withPathElement(LocatorPathElt(archetype)));
+    locatorPtr = getConstraintLocator(
+        locator.withPathElement(LocatorPathElt(gp)));
 
     auto typeVar = createTypeVariable(locatorPtr,
                                       TVO_PrefersSubtypeBinding);
@@ -1459,7 +1407,7 @@ static void tryOptimizeGenericDisjunction(ConstraintSystem &cs,
 
     auto funcType = AFD->getInterfaceType();
     auto hasAnyOrOptional = funcType.findIf([](Type type) -> bool {
-      if (auto objType = type->getOptionalObjectType())
+      if (type->getOptionalObjectType())
         return true;
 
       return type->isAny();
@@ -2080,4 +2028,335 @@ bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
   case FunctionRefKind::DoubleApply:
     return true;
   }
+  llvm_unreachable("unhandled kind");
+}
+
+bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
+  if (TC.getLangOpts().DebugConstraintSolver) {
+    auto &log = TC.Context.TypeCheckerDebug->getStream();
+    log << "---Attempting to salvage and emit diagnostics---\n";
+  }
+
+  // Attempt to solve again, capturing all states that come from our attempts to
+  // select overloads or bind type variables.
+  //
+  // FIXME: can this be removed?  We need to arrange for recordFixes to be
+  // eliminated.
+  viable.clear();
+
+  {
+    // Set up solver state.
+    SolverState state(expr, *this, FreeTypeVariableBinding::Disallow);
+    state.recordFixes = true;
+
+    // Solve the system.
+    solve(viable);
+
+    // Check whether we have a best solution; this can happen if we found
+    // a series of fixes that worked.
+    if (auto best = findBestSolution(viable, state.ExprWeights,
+                                     /*minimize=*/true)) {
+      if (*best != 0)
+        viable[0] = std::move(viable[*best]);
+      viable.erase(viable.begin() + 1, viable.end());
+      return false;
+    }
+
+    // FIXME: If we were able to actually fix things along the way,
+    // we may have to hunt for the best solution. For now, we don't care.
+
+    // Before removing any "fixed" solutions, let's check
+    // if ambiguity is caused by fixes and diagnose if possible.
+    if (diagnoseAmbiguityWithFixes(expr, viable))
+      return true;
+
+    // Remove solutions that require fixes; the fixes in those systems should
+    // be diagnosed rather than any ambiguity.
+    auto hasFixes = [](const Solution &sol) { return !sol.Fixes.empty(); };
+    auto newEnd = std::remove_if(viable.begin(), viable.end(), hasFixes);
+    viable.erase(newEnd, viable.end());
+
+    // If there are multiple solutions, try to diagnose an ambiguity.
+    if (viable.size() > 1) {
+      if (getASTContext().LangOpts.DebugConstraintSolver) {
+        auto &log = getASTContext().TypeCheckerDebug->getStream();
+        log << "---Ambiguity error: " << viable.size()
+            << " solutions found---\n";
+        int i = 0;
+        for (auto &solution : viable) {
+          log << "---Ambiguous solution #" << i++ << "---\n";
+          solution.dump(log);
+          log << "\n";
+        }
+      }
+
+      if (diagnoseAmbiguity(expr, viable)) {
+        return true;
+      }
+    }
+
+    // Fall through to produce diagnostics.
+  }
+
+  if (getExpressionTooComplex(viable)) {
+    TC.diagnose(expr->getLoc(), diag::expression_too_complex)
+        .highlight(expr->getSourceRange());
+    return true;
+  }
+
+  // If all else fails, diagnose the failure by looking through the system's
+  // constraints.
+  diagnoseFailureForExpr(expr);
+  return true;
+}
+
+bool ConstraintSystem::diagnoseAmbiguityWithFixes(
+    Expr *expr, ArrayRef<Solution> solutions) {
+  if (solutions.empty())
+    return false;
+
+  auto getOverloadDecl = [&](SelectedOverload &overload) -> ValueDecl * {
+    auto &choice = overload.choice;
+    return choice.isDecl() ? choice.getDecl() : nullptr;
+  };
+
+  // Problems related to fixes forming ambiguous solution set
+  // could only be diagnosed (at the moment), if all of the fixes
+  // are attached to the same anchor, which means they fix
+  // different overloads of the same declaration.
+  Expr *commonAnchor = nullptr;
+  SmallPtrSet<ValueDecl *, 4> distinctChoices;
+  SmallVector<std::pair<const Solution *, const ConstraintFix *>, 4>
+      viableSolutions;
+
+  bool diagnosable = llvm::all_of(solutions, [&](const Solution &solution) {
+    ArrayRef<ConstraintFix *> fixes = solution.Fixes;
+
+    // Currently only support a single fix in a solution,
+    // but ultimately should be able to deal with multiple.
+    if (fixes.size() != 1)
+      return false;
+
+    const auto *fix = fixes.front();
+    if (commonAnchor && commonAnchor != fix->getAnchor())
+      return false;
+
+    commonAnchor = fix->getAnchor();
+
+    SmallVector<SelectedOverload, 2> overloads;
+    solution.getOverloadChoices(commonAnchor, overloads);
+    // There is unfortunately no way, at the moment, to figure out
+    // what declaration the fix is attached to, so we have to make
+    // sure that there is only one declaration associated with common
+    // anchor to be sure that the right problem is being diagnosed.
+    if (overloads.size() != 1)
+      return false;
+
+    auto *decl = getOverloadDecl(overloads.front());
+    if (!decl)
+      return false;
+
+    // If this declaration is distinct, let's record this solution
+    // as viable, otherwise we'd produce the same diagnostic multiple
+    // times, which means that actual problem is elsewhere.
+    if (distinctChoices.insert(decl).second)
+      viableSolutions.push_back({&solution, fix});
+    return true;
+  });
+
+  if (!diagnosable || viableSolutions.size() < 2)
+    return false;
+
+  auto *decl = *distinctChoices.begin();
+  assert(solverState);
+
+  bool diagnosed = true;
+  {
+    DiagnosticTransaction transaction(TC.Diags);
+
+    TC.diagnose(commonAnchor->getLoc(), diag::ambiguous_reference_to_decl,
+                decl->getDescriptiveKind(), decl->getFullName());
+
+    for (const auto &viable : viableSolutions) {
+      // Create scope so each applied solution is rolled back.
+      ConstraintSystem::SolverScope scope(*this);
+      applySolution(*viable.first);
+      // All of the solutions supposed to produce a "candidate" note.
+      diagnosed &= viable.second->diagnose(expr, /*asNote*/ true);
+    }
+
+    // If not all of the fixes produced a note, we can't diagnose this.
+    if (!diagnosed)
+      transaction.abort();
+  }
+
+  return diagnosed;
+}
+
+/// \brief Determine the number of distinct overload choices in the
+/// provided set.
+static unsigned countDistinctOverloads(ArrayRef<OverloadChoice> choices) {
+  llvm::SmallPtrSet<void *, 4> uniqueChoices;
+  unsigned result = 0;
+  for (auto choice : choices) {
+    if (uniqueChoices.insert(choice.getOpaqueChoiceSimple()).second)
+      ++result;
+  }
+  return result;
+}
+
+/// \brief Determine the name of the overload in a set of overload choices.
+static DeclName getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
+  DeclName name;
+  for (auto choice : choices) {
+    if (!choice.isDecl())
+      continue;
+
+    DeclName nextName = choice.getDecl()->getFullName();
+    if (!name) {
+      name = nextName;
+      continue;
+    }
+
+    if (name != nextName) {
+      // Assume all choices have the same base name and only differ in
+      // argument labels. This may not be a great assumption, but we don't
+      // really have a way to recover for diagnostics otherwise.
+      return name.getBaseName();
+    }
+  }
+
+  return name;
+}
+
+bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
+                                         ArrayRef<Solution> solutions) {
+  // Produce a diff of the solutions.
+  SolutionDiff diff(solutions);
+
+  // Find the locators which have the largest numbers of distinct overloads.
+  Optional<unsigned> bestOverload;
+  // Overloads are scored by lexicographical comparison of (# of distinct
+  // overloads, depth, *reverse* of the index). N.B. - cannot be used for the
+  // reversing: the score version of index == 0 should be > than that of 1, but
+  // -0 == 0 < UINT_MAX == -1, whereas ~0 == UINT_MAX > UINT_MAX - 1 == ~1.
+  auto score = [](unsigned distinctOverloads, unsigned depth, unsigned index) {
+    return std::make_tuple(distinctOverloads, depth, ~index);
+  };
+  auto bestScore = score(0, 0, std::numeric_limits<unsigned>::max());
+
+  // Get a map of expressions to their depths and post-order traversal indices.
+  // Heuristically, all other things being equal, we should complain about the
+  // ambiguous expression that (1) has the most overloads, (2) is deepest, or
+  // (3) comes earliest in the expression.
+  auto depthMap = expr->getDepthMap();
+  auto indexMap = expr->getPreorderIndexMap();
+
+  for (unsigned i = 0, n = diff.overloads.size(); i != n; ++i) {
+    auto &overload = diff.overloads[i];
+
+    // If we can't resolve the locator to an anchor expression with no path,
+    // we can't diagnose this well.
+    auto *anchor = simplifyLocatorToAnchor(*this, overload.locator);
+    if (!anchor)
+      continue;
+    auto it = indexMap.find(anchor);
+    if (it == indexMap.end())
+      continue;
+    unsigned index = it->second;
+    it = depthMap.find(anchor);
+    if (it == depthMap.end())
+      continue;
+    unsigned depth = it->second;
+
+    // If we don't have a name to hang on to, it'll be hard to diagnose this
+    // overload.
+    if (!getOverloadChoiceName(overload.choices))
+      continue;
+
+    unsigned distinctOverloads = countDistinctOverloads(overload.choices);
+
+    // We need at least two overloads to make this interesting.
+    if (distinctOverloads < 2)
+      continue;
+
+    // If we have more distinct overload choices for this locator than for
+    // prior locators, just keep this locator.
+    auto thisScore = score(distinctOverloads, depth, index);
+    if (thisScore > bestScore) {
+      bestScore = thisScore;
+      bestOverload = i;
+      continue;
+    }
+
+    // We have better results. Ignore this one.
+  }
+
+  // FIXME: Should be able to pick the best locator, e.g., based on some
+  // depth-first numbering of expressions.
+  if (bestOverload) {
+    auto &overload = diff.overloads[*bestOverload];
+    auto name = getOverloadChoiceName(overload.choices);
+    auto anchor = simplifyLocatorToAnchor(*this, overload.locator);
+
+    // Emit the ambiguity diagnostic.
+    auto &tc = getTypeChecker();
+    tc.diagnose(anchor->getLoc(),
+                name.isOperator() ? diag::ambiguous_operator_ref
+                                  : diag::ambiguous_decl_ref,
+                name);
+
+    TrailingClosureAmbiguityFailure failure(expr, *this, anchor,
+                                            overload.choices);
+    if (failure.diagnoseAsNote())
+      return true;
+
+    // Emit candidates.  Use a SmallPtrSet to make sure only emit a particular
+    // candidate once.  FIXME: Why is one candidate getting into the overload
+    // set multiple times? (See also tryDiagnoseTrailingClosureAmbiguity.)
+    SmallPtrSet<Decl *, 8> EmittedDecls;
+    for (auto choice : overload.choices) {
+      switch (choice.getKind()) {
+      case OverloadChoiceKind::Decl:
+      case OverloadChoiceKind::DeclViaDynamic:
+      case OverloadChoiceKind::DeclViaBridge:
+      case OverloadChoiceKind::DeclViaUnwrappedOptional:
+        // FIXME: show deduced types, etc, etc.
+        if (EmittedDecls.insert(choice.getDecl()).second)
+          tc.diagnose(choice.getDecl(), diag::found_candidate);
+        break;
+
+      case OverloadChoiceKind::KeyPathApplication:
+      case OverloadChoiceKind::DynamicMemberLookup:
+        // Skip key path applications and dynamic member lookups, since we don't
+        // want them to noise up unrelated subscript diagnostics.
+        break;
+
+      case OverloadChoiceKind::BaseType:
+      case OverloadChoiceKind::TupleIndex:
+        // FIXME: Actually diagnose something here.
+        break;
+      }
+    }
+
+    return true;
+  }
+
+  // FIXME: If we inferred different types for literals (for example),
+  // could diagnose ambiguity that way as well.
+
+  return false;
+}
+
+Expr *constraints::simplifyLocatorToAnchor(ConstraintSystem &cs,
+                                           ConstraintLocator *locator) {
+  if (!locator || !locator->getAnchor())
+    return nullptr;
+
+  SourceRange range;
+  locator = simplifyLocator(cs, locator, range);
+  if (!locator->getAnchor() || !locator->getPath().empty())
+    return nullptr;
+
+  return locator->getAnchor();
 }

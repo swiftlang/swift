@@ -13,8 +13,7 @@ func f4<T>(x: T, y: T) { }
 // Non-protocol type constraints.
 func f6<T : Wonka>(x: T) {} // expected-error{{use of undeclared type 'Wonka'}}
 
-// FIXME: The term 'inherit' is unfortunate here.
-func f7<T : Int>(x: T) {} // expected-error{{inheritance from non-protocol, non-class type 'Int'}}
+func f7<T : Int>(x: T) {} // expected-error{{type 'T' constrained to non-protocol, non-class type 'Int'}}
 
 func f8<T> (x: Int) {} //expected-error{{generic parameter 'T' is not used in function signature}}
 
@@ -39,13 +38,13 @@ protocol P {
 
 func f12<T : P>(x: T) -> T.A<Int> {} // expected-error {{cannot specialize non-generic type 'T.A'}}{{29-34=}}
 
-func f13<T : P>(x: T) -> T.B<Int> {} // expected-error {{cannot specialize non-generic type 'Int'}}{{29-34=}}
+func f13<T : P>(x: T) -> T.B<Int> {} // expected-error {{cannot specialize non-generic type 'T.B' (aka 'Int')}}{{29-34=}}
 
 func f14<T : P>(x: T) -> T.C<Int> {}
 
 func f15<T : P>(x: T) -> T.D<Int> {}
 
-func f16<T : P>(x: T) -> T.D {} // expected-error {{reference to generic type 'G' requires arguments in <...>}}
+func f16<T : P>(x: T) -> T.D {} // expected-error {{reference to generic type 'T.D' (aka 'G') requires arguments in <...>}}
 
 func f17<T : P>(x: T) -> T.E<Int> {}
 

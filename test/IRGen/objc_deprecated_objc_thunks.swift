@@ -11,7 +11,7 @@ class ObjCSubclass : NSObject {
   func foo() { }
 }
 
-// CHECK-LABEL: define hidden void @"$S016objc_deprecated_A7_thunks12ObjCSubclassC3fooyyFTo"(%0*, i8*)
+// CHECK-LABEL: define hidden void @"$s016objc_deprecated_A7_thunks12ObjCSubclassC3fooyyFTo"(%0*, i8*)
 // CHECK: entry:
 // CHECK: [[SELF:%[0-9]+]] = bitcast %0* %0 to %objc_object*
 // CHECK-NEXT: call void @swift_objc_swift3ImplicitObjCEntrypoint(%objc_object* [[SELF]], i8* %1, i8* getelementptr inbounds ({{.*}}[[FILENAME_STR]]{{.*}}), i64 [[FILENAME_LENGTH:[0-9]+]], i64 11, i64 3, i8* {{.*}})

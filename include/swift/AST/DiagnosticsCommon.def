@@ -17,8 +17,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE)))
-#  error Must define either DIAG or the set {ERROR,WARNING,NOTE}
+#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE) && defined(REMARK)))
+#  error Must define either DIAG or the set {ERROR,WARNING,NOTE,REMARK}
 #endif
 
 #ifndef ERROR
@@ -34,6 +34,11 @@
 #ifndef NOTE
 #  define NOTE(ID,Options,Text,Signature) \
   DIAG(NOTE,ID,Options,Text,Signature)
+#endif
+
+#ifndef REMARK
+#  define REMARK(ID,Options,Text,Signature) \
+  DIAG(REMARK,ID,Options,Text,Signature)
 #endif
 
 ERROR(invalid_diagnostic,none,
@@ -58,6 +63,9 @@ NOTE(brace_stmt_suggest_do,none,
 NOTE(while_parsing_as_left_angle_bracket,none,
      "while parsing this '<' as a type parameter bracket", ())
 
+// Generic determinism-forcing override.
+REMARK(remark_max_determinism_overriding,none,
+         "SWIFTC_MAXIMUM_DETERMINISM overriding %0", (StringRef))
 
 // FIXME: This is used both as a parse error (a literal "super" outside a
 // method) and a type-checker error ("super" in a method of a non-class type).

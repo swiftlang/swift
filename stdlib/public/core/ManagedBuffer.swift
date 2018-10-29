@@ -12,7 +12,10 @@
 
 import SwiftShims
 
-@inlinable // FIXME(sil-serialize-all)
+@usableFromInline
+internal typealias _HeapObject = SwiftShims.HeapObject
+
+@usableFromInline
 @_silgen_name("swift_bufferAllocate")
 internal func _swift_bufferAllocate(
   bufferType type: AnyClass,
@@ -65,7 +68,7 @@ open class ManagedBuffer<Header, Element> {
   @inlinable // FIXME(sil-serialize-all)
   public final var capacity: Int {
     let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(self))
-    let endAddr = storageAddr + _stdlib_malloc_size(storageAddr)
+    let endAddr = storageAddr + _swift_stdlib_malloc_size(storageAddr)
     let realCapacity = endAddr.assumingMemoryBound(to: Element.self) -
       firstElementAddress
     return realCapacity
@@ -244,8 +247,8 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
     addressWithNativeOwner {
       return (UnsafePointer(_headerPointer), _nativeBuffer)
     }
-    mutableAddressWithNativeOwner {
-      return (_headerPointer, _nativeBuffer)
+    _modify {
+      yield &_headerPointer.pointee
     }
   }
 
@@ -419,7 +422,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// The actual number of bytes allocated for this object.
   @inlinable // FIXME(sil-serialize-all)
   internal var _capacityInBytes: Int {
-    return _stdlib_malloc_size(_address)
+    return _swift_stdlib_malloc_size(_address)
   }
 
   /// The address of this instance in a convenient pointer-to-bytes form
@@ -542,11 +545,6 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
 public func isKnownUniquelyReferenced<T : AnyObject>(_ object: inout T) -> Bool
 {
   return _isUnique(&object)
-}
-
-@inlinable
-internal func _isKnownUniquelyReferencedOrPinned<T : AnyObject>(_ object: inout T) -> Bool {
-  return _isUniqueOrPinned(&object)
 }
 
 /// Returns a Boolean value indicating whether the given object is known to

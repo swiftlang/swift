@@ -9,7 +9,7 @@ func foo(_ x: Float) -> Float {
   return bar(x);
 }
 
-// CHECK-LABEL: sil hidden @$S18mandatory_inlining3foo{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s18mandatory_inlining3foo{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $Float):
 // CHECK-NEXT: debug_value %0 : $Float, let, name "x"
 // CHECK-NEXT: return %0
@@ -18,7 +18,7 @@ func foo(_ x: Float) -> Float {
   return baz(x)
 }
 
-// CHECK-LABEL: sil hidden [transparent] @$S18mandatory_inlining3bar{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [transparent] @$s18mandatory_inlining3bar{{[_0-9a-zA-Z]*}}F
   // CHECK-NOT: function_ref
   // CHECK-NOT: apply
   // CHECK: return
@@ -27,21 +27,21 @@ func foo(_ x: Float) -> Float {
   return x
 }
 
-// CHECK-LABEL: sil hidden [transparent] @$S18mandatory_inlining3baz{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [transparent] @$s18mandatory_inlining3baz{{[_0-9a-zA-Z]*}}F
 // CHECK: return
 
 func spam(_ x: Int) -> Int {
   return x
 }
 
-// CHECK-LABEL: sil hidden @$S18mandatory_inlining4spam{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s18mandatory_inlining4spam{{[_0-9a-zA-Z]*}}F
 
 @_transparent func ham(_ x: Int) -> Int {
   return spam(x)
 }
 
-// CHECK-LABEL: sil hidden [transparent] @$S18mandatory_inlining3ham{{[_0-9a-zA-Z]*}}F
-  // CHECK: function_ref @$S18mandatory_inlining4spam{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [transparent] @$s18mandatory_inlining3ham{{[_0-9a-zA-Z]*}}F
+  // CHECK: function_ref @$s18mandatory_inlining4spam{{[_0-9a-zA-Z]*}}F
   // CHECK: apply
   // CHECK: return
 
@@ -49,8 +49,8 @@ func eggs(_ x: Int) -> Int {
   return ham(x)
 }
 
-// CHECK-LABEL: sil hidden @$S18mandatory_inlining4eggs{{[_0-9a-zA-Z]*}}F
-  // CHECK: function_ref @$S18mandatory_inlining4spam{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s18mandatory_inlining4eggs{{[_0-9a-zA-Z]*}}F
+  // CHECK: function_ref @$s18mandatory_inlining4spam{{[_0-9a-zA-Z]*}}F
   // CHECK: apply
   // CHECK: return
 
@@ -76,7 +76,7 @@ func test_auto_closure_without_capture() -> Bool {
 
 // This should be fully inlined and simply return false, which is easier to check for
 
-// CHECK-LABEL: sil hidden @$S18mandatory_inlining33test_auto_closure_without_captureSbyF
+// CHECK-LABEL: sil hidden @$s18mandatory_inlining33test_auto_closure_without_captureSbyF
   // CHECK: [[FV:%.*]] = integer_literal $Builtin.Int1, 0
   // CHECK: [[FALSE:%.*]] = struct $Bool ([[FV:%.*]] : $Builtin.Int1)
   // CHECK: return [[FALSE]]
@@ -108,7 +108,7 @@ func test_chained_short_circuit(_ x: Bool, y: Bool, z: Bool) -> Bool {
 // left (i.e. the autoclosure and the short-circuiting boolean operators are
 // recursively inlined properly)
 
-// CHECK-LABEL: sil hidden @$S18mandatory_inlining26test_chained_short_circuit{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s18mandatory_inlining26test_chained_short_circuit{{[_0-9a-zA-Z]*}}F
   // CHECK-NOT: = apply [transparent]
   // CHECK: return
 
@@ -121,7 +121,7 @@ enum X {
 
 func testInlineUnionElement() -> X {
   return X.onetransp
-  // CHECK-LABEL: sil hidden @$S18mandatory_inlining22testInlineUnionElementAA1XOyF
+  // CHECK-LABEL: sil hidden @$s18mandatory_inlining22testInlineUnionElementAA1XOyF
   // CHECK: enum $X, #X.onetransp!enumelt
   // CHECK-NOT: = apply
   // CHECK: return
@@ -146,16 +146,16 @@ func test_let_auto_closure_with_value_capture(_ x: Bool) -> Bool {
 
 class C {}
 
-// CHECK-LABEL: sil hidden [transparent] @$S18mandatory_inlining25class_constrained_generic{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [transparent] @$s18mandatory_inlining25class_constrained_generic{{[_0-9a-zA-Z]*}}F
 @_transparent
 func class_constrained_generic<T : C>(_ o: T) -> AnyClass? {
   // CHECK: return
   return T.self
 }
 
-// CHECK-LABEL: sil hidden @$S18mandatory_inlining6invokeyyAA1CCF : $@convention(thin) (@guaranteed C) -> () {
+// CHECK-LABEL: sil hidden @$s18mandatory_inlining6invokeyyAA1CCF : $@convention(thin) (@guaranteed C) -> () {
 func invoke(_ c: C) {
-  // CHECK-NOT: function_ref @$S18mandatory_inlining25class_constrained_generic{{[_0-9a-zA-Z]*}}F
+  // CHECK-NOT: function_ref @$s18mandatory_inlining25class_constrained_generic{{[_0-9a-zA-Z]*}}F
   // CHECK-NOT: apply
   // CHECK: init_existential_metatype
   _ = class_constrained_generic(c)

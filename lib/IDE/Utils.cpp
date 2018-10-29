@@ -99,10 +99,11 @@ static const char *skipStringInCode(const char *p, const char *End) {
 }
 
 SourceCompleteResult
-ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
+ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf,
+                           SourceFileKind SFKind) {
   SourceManager SM;
   auto BufferID = SM.addNewSourceBuffer(std::move(MemBuf));
-  ParserUnit Parse(SM, BufferID);
+  ParserUnit Parse(SM, SFKind, BufferID);
   Parser &P = Parse.getParser();
 
   bool Done;
@@ -187,8 +188,10 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf) {
   return SCR;
 }
 
-SourceCompleteResult ide::isSourceInputComplete(StringRef Text) {
-  return ide::isSourceInputComplete(llvm::MemoryBuffer::getMemBufferCopy(Text));
+SourceCompleteResult
+ide::isSourceInputComplete(StringRef Text,SourceFileKind SFKind) {
+  return ide::isSourceInputComplete(llvm::MemoryBuffer::getMemBufferCopy(Text),
+                                    SFKind);
 }
 
 // Adjust the cc1 triple string we got from clang, to make sure it will be
@@ -904,8 +907,7 @@ public:
   }
 
   void replaceText(SourceManager &SM, CharSourceRange Range, StringRef Text) {
-    auto BufferId = SM.getIDForBufferIdentifier(SM.
-      getBufferIdentifierForLoc(Range.getStart())).getValue();
+    auto BufferId = SM.findBufferContainingLoc(Range.getStart());
     if (BufferId == InterestedId) {
       HasChange = true;
       auto StartLoc = SM.getLocOffsetInBuffer(Range.getStart(), BufferId);
@@ -947,4 +949,50 @@ accept(SourceManager &SM, RegionType RegionType,
   for (const auto &Replacement : Replacements) {
     Impl.accept(SM, Replacement.Range, Replacement.Text);
   }
+}
+
+bool swift::ide::isFromClang(const Decl *D) {
+  if (getEffectiveClangNode(D))
+    return true;
+  if (auto *Ext = dyn_cast<ExtensionDecl>(D))
+    return static_cast<bool>(extensionGetClangNode(Ext));
+  return false;
+}
+
+ClangNode swift::ide::getEffectiveClangNode(const Decl *decl) {
+  // Directly...
+  if (auto clangNode = decl->getClangNode())
+    return clangNode;
+
+  // Or via the nested "Code" enum.
+  if (auto nominal =
+      const_cast<NominalTypeDecl *>(dyn_cast<NominalTypeDecl>(decl))) {
+    auto &ctx = nominal->getASTContext();
+    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+    for (auto code : nominal->lookupDirect(ctx.Id_Code, flags)) {
+      if (auto clangDecl = code->getClangDecl())
+        return clangDecl;
+    }
+  }
+
+  return ClangNode();
+}
+
+/// Retrieve the Clang node for the given extension, if it has one.
+ClangNode swift::ide::extensionGetClangNode(const ExtensionDecl *ext) {
+  // If it has a Clang node (directly),
+  if (ext->hasClangNode()) return ext->getClangNode();
+
+  // Check whether it was syntheszed into a module-scope context.
+  if (!isa<ClangModuleUnit>(ext->getModuleScopeContext()))
+    return ClangNode();
+
+  // It may have a global imported as a member.
+  for (auto member : ext->getMembers()) {
+    if (auto clangNode = getEffectiveClangNode(member))
+      return clangNode;
+  }
+
+  return ClangNode();
 }

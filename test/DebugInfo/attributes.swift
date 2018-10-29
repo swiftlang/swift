@@ -24,9 +24,9 @@ class SwiftClass {
 var strongRef0 : ObjCClass
 var strongRef1 : SwiftClass = SwiftClass()
 
-// CHECK-DAG: !DIDerivedType(tag: DW_TAG_typedef, name: "$S10attributes10SwiftClassCSgXwD"
+// CHECK-DAG: !DIDerivedType(tag: DW_TAG_typedef, name: "$s10attributes10SwiftClassCSgXwD"
 weak var    weakRef1    : SwiftClass? = strongRef1
-// CHECK-DAG: !DIDerivedType(tag: DW_TAG_typedef, name: "$S10attributes10SwiftClassCXoD"
+// CHECK-DAG: !DIDerivedType(tag: DW_TAG_typedef, name: "$s10attributes10SwiftClassCXoD"
 unowned var unownedRef1 : SwiftClass
 
 protocol Protocol1 : class {

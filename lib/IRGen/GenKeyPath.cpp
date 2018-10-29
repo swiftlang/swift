@@ -940,50 +940,30 @@ emitKeyPathComponent(IRGenModule &IGM,
       } else {
         if (auto overridden = declRef.getOverriddenVTableEntry())
           declRef = overridden;
+        if (auto overridden = declRef.getOverriddenWitnessTableEntry())
+          declRef = overridden;
 
         auto dc = declRef.getDecl()->getDeclContext();
 
-        // If the method context is resilient, use the dispatch thunk as a
-        // stable identifier for the storage.
-        if (IGM.isResilient(cast<NominalTypeDecl>(dc),
+        // We can use a method descriptor if we have a class or resilient
+        // protocol.
+        if (isa<ClassDecl>(dc) ||
+            IGM.isResilient(cast<NominalTypeDecl>(dc),
                             ResilienceExpansion::Minimal)) {
           idKind = KeyPathComponentHeader::Pointer;
-          idValue = IGM.getAddrOfDispatchThunk(declRef, NotForDefinition);
+          idValue = IGM.getAddrOfMethodDescriptor(declRef, NotForDefinition);
           idResolved = true;
           break;
         }
       
         idKind = KeyPathComponentHeader::VTableOffset;
-        if (isa<ClassDecl>(dc) && !cast<ClassDecl>(dc)->isForeign()) {
-          auto declaringClass =
-            cast<ClassDecl>(declRef.getDecl()->getDeclContext());
-          auto &metadataLayout = IGM.getClassMetadataLayout(declaringClass);
-
-          // For a class method, we don't necessarily need the absolute offset,
-          // only an offset that's unique to this method. For a class with
-          // resilient ancestry, all of the superclass methods will be
-          // identified by their dispatch thunk (see above), so we can use
-          // relative offsets from the dynamic base offset to identify the local
-          // class's own methods.
-          auto methodInfo = metadataLayout.getMethodOffsetInfo(declRef);
-          Size offset;
-          if (methodInfo.isStatic())
-            offset = methodInfo.getStaticOffset();
-          else
-            offset = methodInfo.getRelativeOffset();
-
-          idValue = llvm::ConstantInt::get(IGM.SizeTy, offset.getValue());
-          idResolved = true;
-        } else if (auto methodProto = dyn_cast<ProtocolDecl>(dc)) {
-          auto &protoInfo = IGM.getProtocolInfo(methodProto,
-                                                ProtocolInfoKind::Full);
-          auto index = protoInfo.getFunctionIndex(
-                               cast<AbstractFunctionDecl>(declRef.getDecl()));
-          idValue = llvm::ConstantInt::get(IGM.SizeTy, -index.getValue());
-          idResolved = true;
-        } else {
-          llvm_unreachable("neither a class nor protocol dynamic method?");
-        }
+        auto methodProto = cast<ProtocolDecl>(dc);
+        auto &protoInfo = IGM.getProtocolInfo(methodProto,
+                                              ProtocolInfoKind::Full);
+        auto index = protoInfo.getFunctionIndex(
+                             cast<AbstractFunctionDecl>(declRef.getDecl()));
+        idValue = llvm::ConstantInt::get(IGM.SizeTy, -index.getValue());
+        idResolved = true;
       }
       break;
     }

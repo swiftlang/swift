@@ -1,0 +1,36 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -early-redundant-load-elim | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+
+// Check that earlyl redundant load elimination ignores arrays.
+
+
+// CHECK-LABEL: test_array
+// CHECK: %1 = load
+// CHECK: %2 = load
+// CHECK: %3 = tuple (%1 {{.*}}, %2 {{.*}})
+sil @test_array : $@convention(thin) (@inout Array<Int>) -> (Array<Int>, Array<Int>) {
+bb0(%0 : $*Array<Int>):
+  %1 = load %0 : $*Array<Int>
+  %2 = load %0 : $*Array<Int>
+  %3 = tuple (%1: $Array<Int>, %2: $Array<Int>)
+  return %3 : $(Array<Int>, Array<Int>)
+}
+
+// CHECK-LABEL: test_non_array
+// CHECK: %1 = load
+// CHECK: %2 = tuple (%1 {{.*}}, %1 {{.*}})
+sil @test_non_array : $@convention(thin) (@inout Int) -> (Int, Int) {
+bb0(%0 : $*Int):
+  %1 = load %0 : $*Int
+  %2 = load %0 : $*Int
+  %3 = tuple (%1: $Int, %2: $Int)
+  return %3 : $(Int, Int)
+}
+
+

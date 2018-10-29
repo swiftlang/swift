@@ -9,6 +9,8 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out %t/libA.%target-dylib-extension %t/libB.%target-dylib-extension %t/libC.%target-dylib-extension |  %FileCheck %s
 
+// REQUIRES: executable_test
+
 import A
 import B
 import C

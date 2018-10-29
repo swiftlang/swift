@@ -21,9 +21,9 @@
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Driver/Util.h"
-#include "swift/Frontend/OutputFileMap.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -308,22 +308,19 @@ public:
   ///
   /// \param C The Compilation which this Job will eventually be part of
   /// \param JA The Action for which a Job should be created
-  /// \param OI The OutputInfo for which a Job should be created
   /// \param OFM The OutputFileMap for which a Job should be created
-  /// \param TC The tool chain which should be used to create the Job
   /// \param AtTopLevel indicates whether or not this is a top-level Job
   /// \param JobCache maps existing Action/ToolChain pairs to Jobs
   ///
   /// \returns a Job for the given Action/ToolChain pair
   Job *buildJobsForAction(Compilation &C, const JobAction *JA,
-                          const OutputInfo &OI, const OutputFileMap *OFM,
-                          StringRef workingDirectory, const ToolChain &TC,
+                          const OutputFileMap *OFM,
+                          StringRef workingDirectory,
                           bool AtTopLevel, JobCacheMap &JobCache) const;
 
 private:
   void computeMainOutput(Compilation &C, const JobAction *JA,
-                         const OutputInfo &OI, const OutputFileMap *OFM,
-                         const ToolChain &TC, bool AtTopLevel,
+                         const OutputFileMap *OFM, bool AtTopLevel,
                          SmallVectorImpl<const Action *> &InputActions,
                          SmallVectorImpl<const Job *> &InputJobs,
                          const TypeToPathMap *OutputMap,
@@ -333,7 +330,7 @@ private:
                          llvm::SmallString<128> &Buf,
                          CommandOutput *Output) const;
 
-  void chooseSwiftModuleOutputPath(Compilation &C, const OutputInfo &OI,
+  void chooseSwiftModuleOutputPath(Compilation &C,
                                    const OutputFileMap *OFM,
                                    const TypeToPathMap *OutputMap,
                                    StringRef workingDirectory,
@@ -343,39 +340,44 @@ private:
                                       const TypeToPathMap *OutputMap,
                                       StringRef workingDirectory,
                                       CommandOutput *Output) const;
+
+  void chooseParseableInterfacePath(Compilation &C, const JobAction *JA,
+                                    StringRef workingDirectory,
+                                    llvm::SmallString<128> &buffer,
+                                    CommandOutput *output) const;
+
   void chooseRemappingOutputPath(Compilation &C, const TypeToPathMap *OutputMap,
                                  CommandOutput *Output) const;
 
   void chooseSerializedDiagnosticsPath(Compilation &C, const JobAction *JA,
-                                       const OutputInfo &OI,
                                        const TypeToPathMap *OutputMap,
                                        StringRef workingDirectory,
                                        CommandOutput *Output) const;
 
-  void chooseDependenciesOutputPaths(Compilation &C, const OutputInfo &OI,
+  void chooseDependenciesOutputPaths(Compilation &C,
                                      const TypeToPathMap *OutputMap,
                                      StringRef workingDirectory,
                                      llvm::SmallString<128> &Buf,
                                      CommandOutput *Output) const;
 
-  void chooseOptimizationRecordPath(Compilation &C, const OutputInfo &OI,
+  void chooseOptimizationRecordPath(Compilation &C,
                                     StringRef workingDirectory,
                                     llvm::SmallString<128> &Buf,
                                     CommandOutput *Output) const;
 
-  void chooseObjectiveCHeaderOutputPath(Compilation &C, const OutputInfo &OI,
+  void chooseObjectiveCHeaderOutputPath(Compilation &C,
                                         const TypeToPathMap *OutputMap,
                                         StringRef workingDirectory,
                                         CommandOutput *Output) const;
 
-  void chooseLoadedModuleTracePath(Compilation &C, const OutputInfo &OI,
+  void chooseLoadedModuleTracePath(Compilation &C,
                                    StringRef workingDirectory,
                                    llvm::SmallString<128> &Buf,
                                    CommandOutput *Output) const;
 
-  void chooseTBDPath(Compilation &C, const OutputInfo &OI,
-                     const TypeToPathMap *OutputMap, StringRef workingDirectory,
-                     llvm::SmallString<128> &Buf, CommandOutput *Output) const;
+  void chooseTBDPath(Compilation &C, const TypeToPathMap *OutputMap,
+                     StringRef workingDirectory, llvm::SmallString<128> &Buf,
+                     CommandOutput *Output) const;
 
 public:
   /// Handle any arguments which should be treated before building actions or

@@ -173,9 +173,18 @@ public:
   /// location.
   ///
   /// Clients should prefer this constructor.
-  SILBuilder(SILInstruction *I, SILBuilderContext &C)
+  SILBuilder(SILInstruction *I, const SILDebugScope *DS, SILBuilderContext &C)
       : TempContext(C.getModule()), C(C), F(I->getFunction()) {
+    assert(DS && "instruction has no debug scope");
+    setCurrentDebugScope(DS);
     setInsertionPoint(I);
+  }
+
+  SILBuilder(SILBasicBlock *BB, const SILDebugScope *DS, SILBuilderContext &C)
+      : TempContext(C.getModule()), C(C), F(BB->getParent()) {
+    assert(DS && "block has no debug scope");
+    setCurrentDebugScope(DS);
+    setInsertionPoint(BB);
   }
 
   // Allow a pass to override the current SIL module conventions. This should
@@ -264,6 +273,7 @@ public:
   /// setInsertionPoint - Set the insertion point to insert before the specified
   /// instruction.
   void setInsertionPoint(SILInstruction *I) {
+    assert(I && "can't set insertion point to a null instruction");
     setInsertionPoint(I->getParent(), I->getIterator());
   }
 
@@ -276,6 +286,7 @@ public:
   /// setInsertionPoint - Set the insertion point to insert at the end of the
   /// specified block.
   void setInsertionPoint(SILBasicBlock *BB) {
+    assert(BB && "can't set insertion point to a null basic block");
     setInsertionPoint(BB, BB->end());
   }
 
@@ -588,21 +599,6 @@ public:
         getSILDebugLocation(Loc), text.toStringRef(Out), encoding, getModule()));
   }
 
-  ConstStringLiteralInst *
-  createConstStringLiteral(SILLocation Loc, StringRef text,
-                           ConstStringLiteralInst::Encoding encoding) {
-    return insert(ConstStringLiteralInst::create(getSILDebugLocation(Loc), text,
-                                                 encoding, getModule()));
-  }
-
-  ConstStringLiteralInst *
-  createConstStringLiteral(SILLocation Loc, const Twine &text,
-                           ConstStringLiteralInst::Encoding encoding) {
-    SmallVector<char, 256> Out;
-    return insert(ConstStringLiteralInst::create(
-        getSILDebugLocation(Loc), text.toStringRef(Out), encoding, getModule()));
-  }
-
   /// If \p LV is non-trivial, return a \p Qualifier load of \p LV. If \p LV is
   /// trivial, use trivial instead.
   ///
@@ -669,6 +665,13 @@ public:
                       BeginBorrowInst(getSILDebugLocation(Loc), LV));
   }
 
+  // Pass in an address or value, perform a begin_borrow/load_borrow and pass
+  // the value to the passed in closure. After the closure has finished
+  // executing, automatically insert the end_borrow. The closure can assume that
+  // it will receive a loaded loadable value.
+  void emitScopedBorrowOperation(SILLocation loc, SILValue original,
+                                 function_ref<void(SILValue)> &&fun);
+
   /// Utility function that returns a trivial store if the stored type is
   /// trivial and a \p Qualifier store if the stored type is non-trivial.
   ///
@@ -714,16 +717,15 @@ public:
     return lowering.emitStore(*this, Loc, Src, DestAddr, Qualifier);
   }
 
-  EndBorrowInst *createEndBorrow(SILLocation Loc, SILValue BorrowedValue,
-                                 SILValue OriginalValue) {
-    return insert(new (getModule()) EndBorrowInst(
-        getSILDebugLocation(Loc), BorrowedValue, OriginalValue));
+  EndBorrowInst *createEndBorrow(SILLocation loc, SILValue borrowedValue) {
+    return insert(new (getModule())
+                      EndBorrowInst(getSILDebugLocation(loc), borrowedValue));
   }
 
-  EndBorrowArgumentInst *createEndBorrowArgument(SILLocation Loc,
-                                                 SILValue Arg) {
-    return insert(new (getModule()) EndBorrowArgumentInst(
-        getSILDebugLocation(Loc), cast<SILArgument>(Arg)));
+  EndBorrowInst *createEndBorrow(SILLocation Loc, SILValue BorrowedValue,
+                                 SILValue OriginalValue) {
+    return insert(new (getModule())
+                      EndBorrowInst(getSILDebugLocation(Loc), BorrowedValue));
   }
 
   BeginAccessInst *createBeginAccess(SILLocation loc, SILValue address,
@@ -1588,16 +1590,6 @@ public:
     return insert(new (getModule()) StrongReleaseInst(
         getSILDebugLocation(Loc), Operand, atomicity));
   }
-  StrongPinInst *createStrongPin(SILLocation Loc, SILValue Operand,
-                                 Atomicity atomicity) {
-    return insert(new (getModule()) StrongPinInst(getSILDebugLocation(Loc),
-                                                    Operand, atomicity));
-  }
-  StrongUnpinInst *createStrongUnpin(SILLocation Loc, SILValue Operand,
-                                     Atomicity atomicity) {
-    return insert(new (getModule()) StrongUnpinInst(getSILDebugLocation(Loc),
-                                                      Operand, atomicity));
-  }
 
   EndLifetimeInst *createEndLifetime(SILLocation Loc, SILValue Operand) {
     return insert(new (getModule())
@@ -1631,12 +1623,6 @@ public:
     auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
     return insert(new (getModule()) IsUniqueInst(getSILDebugLocation(Loc),
                                                    operand, Int1Ty));
-  }
-  IsUniqueOrPinnedInst *createIsUniqueOrPinned(SILLocation Loc,
-                                               SILValue value) {
-    auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
-    return insert(new (getModule()) IsUniqueOrPinnedInst(
-        getSILDebugLocation(Loc), value, Int1Ty));
   }
   IsEscapingClosureInst *createIsEscapingClosure(SILLocation Loc,
                                                  SILValue operand,
@@ -2153,10 +2139,8 @@ public:
   ///
   /// Clients should prefer this constructor.
   SILBuilderWithScope(SILInstruction *I, SILBuilderContext &C)
-    : SILBuilder(I, C) {
-    assert(I->getDebugScope() && "instruction has no debug scope");
-    setCurrentDebugScope(I->getDebugScope());
-  }
+    : SILBuilder(I, I->getDebugScope(), C)
+  {}
 
   explicit SILBuilderWithScope(
       SILInstruction *I,
@@ -2218,7 +2202,9 @@ public:
   SavedInsertionPointRAII &operator=(SavedInsertionPointRAII &&) = delete;
 
   ~SavedInsertionPointRAII() {
-    if (SavedIP.is<SILInstruction *>()) {
+    if (SavedIP.isNull()) {
+      Builder.clearInsertionPoint();
+    } else if (SavedIP.is<SILInstruction *>()) {
       Builder.setInsertionPoint(SavedIP.get<SILInstruction *>());
     } else {
       Builder.setInsertionPoint(SavedIP.get<SILBasicBlock *>());

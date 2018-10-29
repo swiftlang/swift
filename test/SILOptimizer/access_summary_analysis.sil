@@ -479,7 +479,7 @@ bb0(%0 : @trivial $*Int, %1 : @trivial $*Int, %2 : @trivial $*Int):
   %6 = begin_borrow %5 : $@callee_owned (Int) -> @error Error
   %7 = function_ref @takesGuaranteedNoEscapeClosureTakingArgumentThrowing : $@convention(thin) (@guaranteed @callee_owned (Int) -> @error Error) -> ()
   %8 = apply %7(%6) : $@convention(thin) (@guaranteed @callee_owned (Int) -> @error Error) -> ()
-  end_borrow %6 from %5 : $@callee_owned (Int) -> @error Error, $@callee_owned (Int) -> @error Error
+  end_borrow %6 : $@callee_owned (Int) -> @error Error
   destroy_value %5 : $@callee_owned (Int) -> @error Error
   %9999 = tuple ()
   return %9999 : $()
@@ -499,7 +499,7 @@ entry:
   %n2 = mark_dependence %n : $@noescape @callee_guaranteed () -> () on %e : $@callee_guaranteed () -> ()
   %f2 = function_ref @use : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   apply %f2(%n2) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
-  end_borrow %b from %e : $@callee_guaranteed () -> (), $@callee_guaranteed () -> ()
+  end_borrow %b : $@callee_guaranteed () -> ()
   destroy_value %e : $@callee_guaranteed () -> ()
   %t = tuple ()
   return %t : $()

@@ -3,15 +3,15 @@
 public protocol Error {}
 // CHECK: [[ERROR_NAME:@.*]] = private constant [6 x i8] c"Error\00"
 
-// CHECK-LABEL: @"$Ss5ErrorMp" = {{(dllexport )?}}{{(protected )?}}constant
+// CHECK-LABEL: @"$ss5ErrorMp" = {{(dllexport )?}}{{(protected )?}}constant
 // --                 0x0000_0047: special protocol 01, non-class, unique, protocol context
 // CHECK-SAME:         i32 327747,
-// CHECK-SAME:         i32{{.*}}@"$SsMXM"
+// CHECK-SAME:         i32{{.*}}@"$ssMXM"
 // CHECK-SAME:         i32{{.*}}[[ERROR_NAME]]
 // CHECK-SAME:         i32 0, i32 0, i32 0 }
 
 public protocol PlainOldProtocol {}
-// CHECK-LABEL: @"$Ss16PlainOldProtocolMp" = {{(dllexport )?}}{{(protected )?}}constant
+// CHECK-LABEL: @"$ss16PlainOldProtocolMp" = {{(dllexport )?}}{{(protected )?}}constant
 // --                 0x0000_0007: no special protocol, non-class, unique, protocol context
 // CHECK-SAME:         i32 65603,
 // CHECK-SAME:         i32 0,

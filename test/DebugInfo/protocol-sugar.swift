@@ -5,4 +5,4 @@ typealias C = B & A
 protocol D {}
 var p: (C & D)?
 // CHECK-DAG: !DIGlobalVariable(name: "p", {{.*}}type: ![[TY:[0-9]+]]
-// CHECK-DAG: ![[TY]] = {{.*}}identifier: "$S4main1A_AA1BAA1DpSgD"
+// CHECK-DAG: ![[TY]] = {{.*}}identifier: "$s4main1A_AA1BAA1DpSgD"

@@ -169,7 +169,7 @@ extension Measurement {
     ///
     /// If `lhs.unit == rhs.unit`, returns `lhs.value == rhs.value`. Otherwise, converts `rhs` to the same unit as `lhs` and then compares the resulting values.
     /// - returns: `true` if the measurements are equal.
-    public static func ==<LeftHandSideType, RightHandSideType>(_ lhs: Measurement<LeftHandSideType>, _ rhs: Measurement<RightHandSideType>) -> Bool {
+    public static func ==<LeftHandSideType, RightHandSideType>(lhs: Measurement<LeftHandSideType>, rhs: Measurement<RightHandSideType>) -> Bool {
         if lhs.unit == rhs.unit {
             return lhs.value == rhs.value
         } else {
@@ -206,9 +206,15 @@ extension Measurement {
 
 // Implementation note: similar to NSArray, NSDictionary, etc., NSMeasurement's import as an ObjC generic type is suppressed by the importer. Eventually we will need a more general purpose mechanism to correctly import generic types.
 
+// FIXME: Remove @usableFromInline from MeasurementBridgeType once
+// rdar://problem/44662501 is fixed. (The Radar basically just says "look
+// through typealiases and inherited protocols when printing extensions".)
+
 #if DEPLOYMENT_RUNTIME_SWIFT
+@usableFromInline
 internal typealias MeasurementBridgeType = _ObjectTypeBridgeable
 #else
+@usableFromInline
 internal typealias MeasurementBridgeType = _ObjectiveCBridgeable
 #endif
 
@@ -232,6 +238,7 @@ extension Measurement : MeasurementBridgeType {
         }
     }
 
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSMeasurement?) -> Measurement {
         let u = source!.unit as! UnitType
         return Measurement(value: source!.doubleValue, unit: u)

@@ -12,7 +12,7 @@
 
 @_exported import Foundation // Clang module
 
-public extension Progress {
+extension Progress {
     @available(macOS 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *)
     public var estimatedTimeRemaining: TimeInterval? {
         get {

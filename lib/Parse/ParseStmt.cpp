@@ -102,7 +102,16 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
     consumeToken();
     return makeParserError();
   }
-  
+
+  if (Tok.is(tok::pound) && Tok.isAtStartOfLine() &&
+      peekToken().is(tok::code_complete)) {
+    consumeToken();
+    if (CodeCompletion)
+      CodeCompletion->completeAfterPoundDirective();
+    consumeToken(tok::code_complete);
+    return makeParserCodeCompletionStatus();
+  }
+
   if (isStartOfStmt()) {
     ParserResult<Stmt> Res = parseStmt();
     if (Res.isNonNull())
@@ -221,24 +230,16 @@ bool Parser::isTerminatorForBraceItemListKind(BraceItemListKind Kind,
 
 void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
                                  TopLevelCodeDecl *TLCD) {
+  SourceLoc EndLoc = PreviousLoc;
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
-  // Consume tokens up to code completion token.
-  while (Tok.isNot(tok::code_complete, tok::eof)) {
-    consumeToken();
-  }
-  // Consume the code completion token, if there is one.
-  consumeIf(tok::code_complete);
-  // Also perform the same recovery as the main parser to capture tokens from
-  // this decl that are past the code completion token.
-  skipUntilDeclStmtRBrace(tok::l_brace);
-  SourceLoc EndLoc = Tok.getLoc();
-  State->delayTopLevel(TLCD, { BeginLoc, EndLoc },
+  State->delayTopLevel(TLCD, {BeginLoc, EndLoc},
                        BeginParserPosition.PreviousLoc);
 
   // Skip the rest of the file to prevent the parser from constructing the AST
   // for it.  Forward references are not allowed at the top level.
-  skipUntil(tok::eof);
+  while (!Tok.is(tok::eof))
+    consumeToken();
 }
 
 ///   brace-item:
@@ -352,6 +353,11 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                             ? BraceItemListKind::ActiveConditionalBlock
                             : BraceItemListKind::InactiveConditionalBlock);
         });
+      if (IfConfigResult.hasCodeCompletion() && isCodeCompletionFirstPass()) {
+        consumeDecl(BeginParserPosition, None, IsTopLevel);
+        return IfConfigResult;
+      }
+      BraceItemsStatus |= IfConfigResult;
       if (auto ICD = IfConfigResult.getPtrOrNull()) {
         Result = ICD;
         // Add the #if block itself
@@ -814,6 +820,8 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
         .fixItRemoveChars(tryLoc, yieldLoc);
     }
 
+    SyntaxParsingContext YieldsCtxt(SyntaxContext, SyntaxKind::YieldList);
+
     SmallVector<Identifier, 4> yieldLabels;
     SmallVector<SourceLoc, 4> yieldLabelLocs;
     Expr *trailingClosure = nullptr;
@@ -825,7 +833,7 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
                            yields, yieldLabels, yieldLabelLocs,
                            rpLoc,
                            trailingClosure,
-                           SyntaxKind::YieldStmt);
+                           SyntaxKind::ExprList);
     assert(trailingClosure == nullptr);
     assert(yieldLabels.empty());
     assert(yieldLabelLocs.empty());
@@ -922,7 +930,6 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
                        /*NameLoc=*/ SourceLoc(),
                        /*Throws=*/ false, /*ThrowsLoc=*/ SourceLoc(),
                        /*generic params*/ nullptr,
-                       /*selfDecl*/ nullptr,
                        params,
                        TypeLoc(),
                        CurDeclContext);
@@ -969,6 +976,47 @@ namespace {
   };
 } // unnamed namespace
 
+static void parseWhereGuard(Parser &P, GuardedPattern &result,
+                            ParserStatus &status,
+                            GuardedPatternContext parsingContext,
+                            bool isExprBasic) {
+  if (P.Tok.is(tok::kw_where)) {
+    SyntaxParsingContext WhereClauseCtxt(P.SyntaxContext,
+                                         SyntaxKind::WhereClause);
+    result.WhereLoc = P.consumeToken(tok::kw_where);
+    SourceLoc startOfGuard = P.Tok.getLoc();
+
+    auto diagKind = [=]() -> Diag<> {
+      switch (parsingContext) {
+      case GuardedPatternContext::Case:
+        return diag::expected_case_where_expr;
+      case GuardedPatternContext::Catch:
+        return diag::expected_catch_where_expr;
+      }
+      llvm_unreachable("bad context");
+    }();
+    ParserResult<Expr> guardResult = P.parseExprImpl(diagKind, isExprBasic);
+    status |= guardResult;
+
+    // Use the parsed guard expression if possible.
+    if (guardResult.isNonNull()) {
+      result.Guard = guardResult.get();
+
+      // Otherwise, fake up an ErrorExpr.
+    } else {
+      // If we didn't consume any tokens failing to parse the
+      // expression, don't put in the source range of the ErrorExpr.
+      SourceRange errorRange;
+      if (startOfGuard == P.Tok.getLoc()) {
+        errorRange = result.WhereLoc;
+      } else {
+        errorRange = SourceRange(startOfGuard, P.PreviousLoc);
+      }
+      result.Guard = new (P.Context) ErrorExpr(errorRange);
+    }
+  }
+}
+
 /// Parse a pattern-matching clause for a case or catch statement,
 /// including the guard expression:
 ///
@@ -979,10 +1027,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
                                 GuardedPatternContext parsingContext,
                                 bool isFirstPattern) {
   ParserResult<Pattern> patternResult;
-  auto setErrorResult = [&] () {
-    patternResult = makeParserErrorResult(new (P.Context)
-      AnyPattern(SourceLoc()));
-  };
+
   bool isExprBasic = [&]() -> bool {
     switch (parsingContext) {
     // 'case' is terminated with a colon and so allows a trailing closure.
@@ -997,7 +1042,6 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
 
   // Do some special-case code completion for the start of the pattern.
   if (P.Tok.is(tok::code_complete)) {
-    setErrorResult();
     if (P.CodeCompletion) {
       switch (parsingContext) {
       case GuardedPatternContext::Case:
@@ -1007,26 +1051,22 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
         P.CodeCompletion->completePostfixExprBeginning(nullptr);
         break;
       }
-      P.consumeToken();
-    } else {
-      result.ThePattern = patternResult.get();
-      status.setHasCodeCompletion();
-      return;
     }
+    auto loc = P.consumeToken(tok::code_complete);
+    result.ThePattern = new (P.Context) AnyPattern(loc);
+    status.setHasCodeCompletion();
+    return;
   }
   if (parsingContext == GuardedPatternContext::Case &&
       P.Tok.isAny(tok::period_prefix, tok::period) &&
       P.peekToken().is(tok::code_complete)) {
-    setErrorResult();
-    if (P.CodeCompletion) {
-      P.consumeToken();
+    P.consumeToken();
+    if (P.CodeCompletion)
       P.CodeCompletion->completeCaseStmtDotPrefix();
-      P.consumeToken();
-    } else {
-      result.ThePattern = patternResult.get();
-      status.setHasCodeCompletion();
-      return;
-    }
+    auto loc = P.consumeToken(tok::code_complete);
+    result.ThePattern = new (P.Context) AnyPattern(loc);
+    status.setHasCodeCompletion();
+    return;
   }
 
   // If this is a 'catch' clause and we have "catch {" or "catch where...",
@@ -1045,7 +1085,6 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
                                                  namePattern, /*implicit*/true);
     patternResult = makeParserResult(varPattern);
   }
-
 
   // Okay, if the special code-completion didn't kick in, parse a
   // matching pattern.
@@ -1075,26 +1114,28 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
       if (VD->hasName()) P.addToScope(VD);
       boundDecls.push_back(VD);
     });
+
+    // Now that we have them, mark them as being initialized without a PBD.
+    for (auto VD : boundDecls)
+      VD->setHasNonPatternBindingInit();
+
+    // Parse the optional 'where' guard.
+    parseWhereGuard(P, result, status, parsingContext, isExprBasic);
   } else {
     // If boundDecls already contains variables, then we must match the
     // same number and same names in this pattern as were declared in a
     // previous pattern (and later we will make sure they have the same
     // types).
+    Scope guardScope(&P, ScopeKind::CaseVars);
     SmallVector<VarDecl*, 4> repeatedDecls;
     patternResult.get()->forEachVariable([&](VarDecl *VD) {
       if (!VD->hasName())
         return;
       
-      for (auto repeat : repeatedDecls)
-        if (repeat->getName() == VD->getName())
-          P.addToScope(VD); // will diagnose a duplicate declaration
-
       bool found = false;
       for (auto previous : boundDecls) {
         if (previous->hasName() && previous->getName() == VD->getName()) {
           found = true;
-          // Use the same local discriminator.
-          VD->setLocalDiscriminator(previous->getLocalDiscriminator());
           break;
         }
       }
@@ -1104,6 +1145,9 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
         status.setIsParseError();
       }
       repeatedDecls.push_back(VD);
+      P.setLocalDiscriminator(VD);
+      if (VD->hasName())
+        P.addToScope(VD);
     });
     
     for (auto previous : boundDecls) {
@@ -1125,47 +1169,10 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
       VD->setHasNonPatternBindingInit();
       VD->setImplicit();
     }
-  }
-  
-  // Now that we have them, mark them as being initialized without a PBD.
-  for (auto VD : boundDecls)
-    VD->setHasNonPatternBindingInit();
 
-  // Parse the optional 'where' guard.
-  if (P.Tok.is(tok::kw_where)) {
-    SyntaxParsingContext WhereClauseCtxt(P.SyntaxContext,
-                                         SyntaxKind::WhereClause);
-    result.WhereLoc = P.consumeToken(tok::kw_where);
-    SourceLoc startOfGuard = P.Tok.getLoc();
-
-    auto diagKind = [=]() -> Diag<> {
-      switch (parsingContext) {
-      case GuardedPatternContext::Case:
-        return diag::expected_case_where_expr;
-      case GuardedPatternContext::Catch:
-        return diag::expected_catch_where_expr;
-      }
-      llvm_unreachable("bad context");
-    }();
-    ParserResult<Expr> guardResult = P.parseExprImpl(diagKind, isExprBasic);
-    status |= guardResult;
-
-    // Use the parsed guard expression if possible.
-    if (guardResult.isNonNull()) {
-      result.Guard = guardResult.get();
-
-    // Otherwise, fake up an ErrorExpr.
-    } else {
-      // If we didn't consume any tokens failing to parse the
-      // expression, don't put in the source range of the ErrorExpr.
-      SourceRange errorRange;
-      if (startOfGuard == P.Tok.getLoc()) {
-        errorRange = result.WhereLoc;
-      } else {
-        errorRange = SourceRange(startOfGuard, P.PreviousLoc);
-      }
-      result.Guard = new (P.Context) ErrorExpr(errorRange);
-    }
+    // Parse the optional 'where' guard, with this particular pattern's bound
+    // vars in scope.
+    parseWhereGuard(P, result, status, parsingContext, isExprBasic);
   }
 }
 
@@ -1227,6 +1234,11 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
   }
 
   StructureMarkerRAII ParsingAvailabilitySpecList(*this, Tok);
+
+  if (ParsingAvailabilitySpecList.isFailed()) {
+    return makeParserError();
+  }
+    
   SourceLoc LParenLoc = consumeToken(tok::l_paren);
 
   SmallVector<AvailabilitySpec *, 5> Specs;
@@ -1353,15 +1365,11 @@ Parser::parseStmtConditionElement(SmallVectorImpl<StmtConditionElement> &result,
   }
 
   // Handle code completion after the #.
-  if (Tok.is(tok::pound) && peekToken().is(tok::code_complete)) {
-    consumeToken(); // '#' token.
-    auto CodeCompletionPos = consumeToken();
-    auto Expr = new (Context) CodeCompletionExpr(CodeCompletionPos);
-    if (CodeCompletion)
-      CodeCompletion->completeAfterPound(Expr, ParentKind);
-    result.push_back(Expr);
-    Status.setHasCodeCompletion();
-    return Status;
+  if (Tok.is(tok::pound) && peekToken().is(tok::code_complete) &&
+      Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
+    auto Expr = parseExprPoundCodeCompletion(ParentKind);
+    Status |= Expr;
+    result.push_back(Expr.get());
   }
 
   // Parse the basic expression case.  If we have a leading let/var/case

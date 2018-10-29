@@ -34,6 +34,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/TypeLowering.h"
 
@@ -217,27 +218,42 @@ MetadataDependency MetadataDependencyCollector::finish(IRGenFunction &IGF) {
 }
 
 
-llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef str) {
-  return getAddrOfStringForTypeRef(SymbolicMangling{str,{}});
+llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef str,
+                                                       MangledTypeRefRole role){
+  return getAddrOfStringForTypeRef(SymbolicMangling{str, {}}, role);
 }
 
 llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
-                                             const SymbolicMangling &mangling) {
+                                             const SymbolicMangling &mangling,
+                                             MangledTypeRefRole role) {
   // Create a symbol name for the symbolic mangling. This is used as the
   // uniquing key both for ODR coalescing and within this TU.
   IRGenMangler mangler;
   std::string symbolName =
-    mangler.mangleSymbolNameForSymbolicMangling(mangling);
+    mangler.mangleSymbolNameForSymbolicMangling(mangling, role);
 
   // See if we emitted the constant already.
   auto &entry = StringsForTypeRef[symbolName];
-  if (entry.second)
+  if (entry.second) {
     return entry.second;
+  }
   
   ConstantInitBuilder B(*this);
   auto S = B.beginStruct();
   S.setPacked(true);
-  
+
+  switch (role) {
+  case MangledTypeRefRole::DefaultAssociatedTypeWitness:
+    // The 0xFF prefix identifies a default associated type witness.
+    S.addInt(Int8Ty,
+             ProtocolRequirementFlags::AssociatedTypeInProtocolContextByte);
+    break;
+
+  case MangledTypeRefRole::Metadata:
+  case MangledTypeRefRole::Reflection:
+    break;
+  }
+
   unsigned pos = 0;
   for (auto &symbolic : mangling.SymbolicReferences) {
     assert(symbolic.second >= pos
@@ -246,22 +262,40 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
       // Emit the preceding literal chunk.
       auto literalChunk = StringRef(mangling.String.data() + pos,
                                     symbolic.second - pos);
-      assert(literalChunk.back() == '\1' && "should be prefixed with \\1");
       auto literal = llvm::ConstantDataArray::getString(getLLVMContext(),
                                                         literalChunk,
                                                         /*null*/ false);
       S.add(literal);
     }
     
-    // The symbolic reference is to the type context descriptor of the
-    // referenced type.
-    // We currently only allow symbolic references to nominal type contexts.
-    auto nominal = cast<NominalTypeDecl>(symbolic.first);
-    S.addRelativeAddress(
-         getAddrOfTypeContextDescriptor(const_cast<NominalTypeDecl*>(nominal),
-                                        DontRequireMetadata));
+    ConstantReference ref;
+    unsigned char baseKind;
+    if (auto ctype = symbolic.first.dyn_cast<const NominalTypeDecl*>()) {
+      auto type = const_cast<NominalTypeDecl*>(ctype);
+      if (auto proto = dyn_cast<ProtocolDecl>(type)) {
+        // The symbolic reference is to the protocol descriptor of the
+        // referenced protocol.
+        ref = getAddrOfLLVMVariableOrGOTEquivalent(
+          LinkEntity::forProtocolDescriptor(proto));
+      } else {
+        // The symbolic reference is to the type context descriptor of the
+        // referenced type.
+        IRGen.noteUseOfTypeContextDescriptor(type, DontRequireMetadata);
+        ref = getAddrOfLLVMVariableOrGOTEquivalent(
+          LinkEntity::forNominalTypeDescriptor(type));
+      }
+      // \1 - direct reference, \2 - indirect reference
+      baseKind = 1;
+    } else {
+      llvm_unreachable("unhandled symbolic referent");
+    }
     
-    pos = symbolic.second + 4;
+    // add kind byte. indirect kinds are the direct kind + 1
+    unsigned char kind = ref.isIndirect() ? baseKind + 1 : baseKind;
+    S.add(llvm::ConstantInt::get(Int8Ty, kind));
+    // add relative reference
+    S.addRelativeAddress(ref.getValue());
+    pos = symbolic.second + 5;
   }
   
   // Add the last literal bit, if any.
@@ -284,7 +318,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
                                       nullptr,
                                       symbolName);
   var->setVisibility(llvm::GlobalValue::HiddenVisibility);
-  var->setAlignment(1);
+  var->setAlignment(2);
   setTrueConstGlobal(var);
   var->setSection(getReflectionTypeRefSectionName());
   
@@ -407,20 +441,19 @@ llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
   auto theDecl = type->getClassOrBoundGenericClass();
   assert(theDecl && "emitting constant heap metadata ref for non-class type?");
 
+  // If the class metadata is initialized from a pattern, we don't even have
+  // an uninitialized metadata symbol we could return, so just fail.
+  if (doesClassMetadataRequireRelocation(IGM, theDecl))
+    return nullptr;
+
   // If the class must not require dynamic initialization --- e.g. if it
   // is a super reference --- then respect everything that might impose that.
   if (!allowDynamicUninitialized) {
     if (doesClassMetadataRequireInitialization(IGM, theDecl))
       return nullptr;
-
-  // Otherwise, just respect genericity.
-  } else if (theDecl->isGenericContext() && !isTypeErasedGenericClass(theDecl)){
-    return nullptr;
   }
 
   // For imported classes, use the ObjC class symbol.
-  // This incidentally cannot coincide with most of the awkward cases, like
-  // having parent metadata.
   if (!hasKnownSwiftMetadata(IGM, theDecl))
     return IGM.getAddrOfObjCClass(theDecl, NotForDefinition);
 
@@ -810,31 +843,25 @@ namespace {
   public:
     EmitTypeMetadataRef(IRGenFunction &IGF) : IGF(IGF) {}
 
-#define TREAT_AS_OPAQUE(KIND)                                             \
-    MetadataResponse visit##KIND##Type(Can##KIND##Type type,              \
-                                       DynamicMetadataRequest request) {  \
-      return visitOpaqueType(type);                                       \
-    }
-    TREAT_AS_OPAQUE(BuiltinInteger)
-    TREAT_AS_OPAQUE(BuiltinFloat)
-    TREAT_AS_OPAQUE(BuiltinVector)
-    TREAT_AS_OPAQUE(BuiltinRawPointer)
-#undef TREAT_AS_OPAQUE
-
     MetadataResponse emitDirectMetadataRef(CanType type) {
       return MetadataResponse::forComplete(IGF.IGM.getAddrOfTypeMetadata(type));
     }
 
     /// The given type should use opaque type info.  We assume that
-    /// the runtime always provides an entry for such a type;  right
-    /// now, that mapping is as one of the power-of-two integer types.
-    MetadataResponse visitOpaqueType(CanType type) {
+    /// the runtime always provides an entry for such a type.
+    MetadataResponse visitBuiltinIntegerType(CanBuiltinIntegerType type,
+                                             DynamicMetadataRequest request) {
+      // If the size isn't a power up two, round up to the next power of two
+      // and use the corresponding integer type.
       auto &opaqueTI = cast<FixedTypeInfo>(IGF.IGM.getTypeInfoForLowered(type));
       unsigned numBits = opaqueTI.getFixedSize().getValueInBits();
-      if (!llvm::isPowerOf2_32(numBits))
+      if (!llvm::isPowerOf2_32(numBits)) {
         numBits = llvm::NextPowerOf2(numBits);
-      auto intTy = BuiltinIntegerType::get(numBits, IGF.IGM.Context);
-      return emitDirectMetadataRef(CanType(intTy));
+        type = CanBuiltinIntegerType(
+                 BuiltinIntegerType::get(numBits, IGF.IGM.Context));
+      }
+
+      return emitDirectMetadataRef(type);
     }
 
     MetadataResponse
@@ -858,6 +885,24 @@ namespace {
     MetadataResponse
     visitBuiltinUnsafeValueBufferType(CanBuiltinUnsafeValueBufferType type,
                                       DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
+    visitBuiltinRawPointerType(CanBuiltinRawPointerType type,
+                               DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
+    visitBuiltinFloatType(CanBuiltinFloatType type,
+                          DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
+    visitBuiltinVectorType(CanBuiltinVectorType type,
+                           DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);
     }
 
@@ -910,9 +955,18 @@ namespace {
       auto params = type.getParams();
       auto numParams = params.size();
 
+      // Retrieve the ABI parameter flags from the type-level parameter
+      // flags.
+      auto getABIParameterFlags = [](ParameterTypeFlags flags) {
+        return ParameterFlags()
+            .withValueOwnership(flags.getValueOwnership())
+            .withVariadic(flags.isVariadic())
+            .withAutoClosure(flags.isAutoClosure());
+      };
+
       bool hasFlags = false;
       for (auto param : params) {
-        if (!param.getParameterFlags().isNone()) {
+        if (!getABIParameterFlags(param.getParameterFlags()).isNone()) {
           hasFlags = true;
           break;
         }
@@ -955,11 +1009,7 @@ namespace {
               auto param = params[index];
               auto flags = param.getParameterFlags();
 
-              auto parameterFlags =
-                  ParameterFlags()
-                      .withValueOwnership(flags.getValueOwnership())
-                      .withVariadic(flags.isVariadic());
-
+              auto parameterFlags = getABIParameterFlags(flags);
               processor(index, getFunctionParameterRef(param), parameterFlags);
             }
           };
@@ -1314,7 +1364,7 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM,
   }
 
   // For in-place initialization, drill to the first element of the cache.
-  case CacheStrategy::InPlaceInitialization:
+  case CacheStrategy::SingletonInitialization:
     cacheVariable =
       llvm::ConstantExpr::getBitCast(cacheVariable,
                                      IGM.TypeMetadataPtrTy->getPointerTo());
@@ -1383,7 +1433,7 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM,
   // is done within the runtime.
   llvm::BasicBlock *completionCheckBB = nullptr;
   llvm::Value *directState = nullptr;
-  if (cacheStrategy == CacheStrategy::InPlaceInitialization) {
+  if (cacheStrategy == CacheStrategy::SingletonInitialization) {
     directState = response.getDynamicState();
     completionCheckBB = IGF.Builder.GetInsertBlock();
   } else {
@@ -1699,8 +1749,8 @@ irgen::createTypeMetadataAccessFunction(IRGenModule &IGM, CanType type,
       break;
 
     // For in-place initialization, drill down to the first element.
-    case CacheStrategy::InPlaceInitialization:
-      cacheVariable = IGM.getAddrOfTypeMetadataInPlaceInitializationCache(
+    case CacheStrategy::SingletonInitialization:
+      cacheVariable = IGM.getAddrOfTypeMetadataSingletonInitializationCache(
                                           type->getAnyNominal(), ForDefinition);
       break;
     }

@@ -14,7 +14,7 @@ import Foundation
 @_exported import AppKit
 
 // NSCollectionView extensions
-public extension IndexPath {
+extension IndexPath {
     
     /// Initialize for use with `NSCollectionView`.
     public init(item: Int, section: Int) {
@@ -51,7 +51,7 @@ public extension IndexPath {
     
 }
 
-public extension URLResourceValues {
+extension URLResourceValues {
     /// Returns all thumbnails as a single NSImage.
     @available(macOS 10.10, *)
     public var thumbnail : NSImage? {

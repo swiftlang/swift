@@ -23,7 +23,7 @@ using namespace swift;
 using namespace ide;
 using namespace api;
 
-inline raw_ostream &swift::ide::api::
+raw_ostream &swift::ide::api::
 operator<<(raw_ostream &Out, const SDKNodeKind Value) {
   switch (Value) {
 #define NODE_KIND(Name, Value) case SDKNodeKind::Name: return Out << #Value;
@@ -32,11 +32,24 @@ operator<<(raw_ostream &Out, const SDKNodeKind Value) {
   llvm_unreachable("Undefined SDK node kind.");
 }
 
-inline raw_ostream &swift::ide::api::
+raw_ostream &swift::ide::api::
 operator<<(raw_ostream &Out, const NodeAnnotation Value) {
 #define NODE_ANNOTATION(X) if (Value == NodeAnnotation::X) { return Out << #X; }
 #include "swift/IDE/DigesterEnums.def"
   llvm_unreachable("Undefined SDK node kind.");
+}
+
+StringRef swift::ide::api::getDeclKindStr(const DeclKind Value)  {
+  switch (Value) {
+#define DECL(X, PARENT) case DeclKind::X: return #X;
+#include "swift/AST/DeclNodes.def"
+  } 
+  llvm_unreachable("Unhandled DeclKind in switch.");
+}
+
+raw_ostream &swift::ide::api::operator<<(raw_ostream &Out,
+    const DeclKind Value) {
+  return Out << getDeclKindStr(Value);
 }
 
 Optional<SDKNodeKind> swift::ide::api::parseSDKNodeKind(StringRef Content) {
@@ -269,6 +282,7 @@ bool APIDiffItem::operator==(const APIDiffItem &Other) const {
   case APIDiffItemKind::ADK_SpecialCaseDiffItem:
     return true;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 namespace {
@@ -282,6 +296,7 @@ static const char* getKeyContent(DiffItemKeyKind KK) {
 #define DIFF_ITEM_KEY_KIND(NAME) case DiffItemKeyKind::KK_##NAME: return #NAME;
 #include "swift/IDE/DigesterEnums.def"
   }
+  llvm_unreachable("unhandled kind");
 }
 
 static DiffItemKeyKind parseKeyKind(StringRef Content) {
@@ -354,6 +369,7 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
       SpecialCaseDiffItem(Usr, SpecialCaseId);
   }
   }
+  llvm_unreachable("unhandled kind");
 }
 } // end anonymous namespace
 

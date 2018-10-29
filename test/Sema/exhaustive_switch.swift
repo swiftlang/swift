@@ -864,7 +864,6 @@ public enum NonExhaustivePayload {
   case milliseconds(Int)
   case microseconds(Int)
   case nanoseconds(Int)
-  @_downgrade_exhaustivity_check
   case never
 }
 
@@ -963,27 +962,6 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   @unknown case _: break
   } // no-warning
 
-  // Test interaction with @_downgrade_exhaustivity_check.
-  switch (value, interval) { // expected-warning {{switch must be exhaustive}} {{none}}
-  // expected-note@-1 {{add missing case: '(_, .milliseconds(_))'}}
-  // expected-note@-2 {{add missing case: '(_, .microseconds(_))'}}
-  // expected-note@-3 {{add missing case: '(_, .nanoseconds(_))'}}
-  // expected-note@-4 {{add missing case: '(_, .never)'}}
-  case (_, .seconds): break
-  case (.a, _): break
-  case (.b, _): break
-  }
-
-  switch (value, interval) { // expected-warning {{switch must be exhaustive}} {{none}}
-  // expected-note@-1 {{add missing case: '(_, .seconds(_))'}}
-  // expected-note@-2 {{add missing case: '(_, .milliseconds(_))'}}
-  // expected-note@-3 {{add missing case: '(_, .microseconds(_))'}}
-  // expected-note@-4 {{add missing case: '(_, .nanoseconds(_))'}}
-  case (_, .never): break
-  case (.a, _): break
-  case (.b, _): break
-  }
-
   // Test payloaded enums.
   switch payload { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b(_)'}} {{none}} expected-note {{handle unknown values using "@unknown default"}} {{none}}
   case .a: break
@@ -1048,7 +1026,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   }
 }
 
-public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: NonExhaustivePayload, for interval: TemporalProxy, flag: Bool) {
+public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: NonExhaustivePayload, flag: Bool) {
   switch value { // expected-error {{switch must be exhaustive}} {{none}} expected-note {{add missing case: '.b'}}
   case .a: break
   }
@@ -1121,19 +1099,6 @@ public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: Non
   case (_, .a): break
   case (_, .b): break
   @unknown case _: break
-  }
-
-  // Test interaction with @_downgrade_exhaustivity_check.
-  switch (value, interval) { // no-warning
-  case (_, .seconds): break
-  case (.a, _): break
-  case (.b, _): break
-  }
-
-  switch (value, interval) { // no-warning
-  case (_, .never): break
-  case (.a, _): break
-  case (.b, _): break
   }
 
   // Test payloaded enums.

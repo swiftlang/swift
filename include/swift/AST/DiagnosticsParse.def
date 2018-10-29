@@ -1,8 +1,9 @@
+
 //===--- DiagnosticsParse.def - Diagnostics Text ----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -138,6 +139,10 @@ ERROR(lex_invalid_u_escape,none,
       "\\u{...} escape sequence expects between 1 and 8 hex digits", ())
 ERROR(lex_invalid_u_escape_rbrace,none,
       "expected '}' in \\u{...} escape sequence", ())
+ERROR(lex_invalid_escape_delimiter,none,
+      "too many '#' characters in delimited escape", ())
+ERROR(lex_invalid_closing_delimiter,none,
+      "too many '#' characters in closing delimiter", ())
 
 ERROR(lex_invalid_unicode_scalar,none,
       "invalid unicode scalar", ())
@@ -262,8 +267,8 @@ ERROR(conflicting_accessor,none,
       (unsigned, StringRef, StringRef))
 NOTE(previous_accessor,none,
      "%select{|previous definition of }1%0 %select{defined |}1here", (StringRef, bool))
-ERROR(expected_accessor_name,none,
-      "expected %select{%error|setter|%error|willSet|didSet}0 parameter name",
+ERROR(expected_accessor_parameter_name,none,
+      "expected %select{setter|willSet|didSet}0 parameter name",
       (unsigned))
 ERROR(expected_rparen_set_name,none,
       "expected ')' after setter parameter name",())
@@ -426,6 +431,11 @@ ERROR(deprecated_operator_body_use_group,PointsToFirstBadToken,
       "use a precedence group instead", ())
 ERROR(operator_decl_no_fixity,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
+
+ERROR(operator_decl_expected_type,none,
+      "expected designated type in operator declaration", ())
+ERROR(operator_decl_trailing_comma,none,
+      "trailing comma in operator declaration", ())
 
 // PrecedenceGroup
 ERROR(precedencegroup_not_infix,none,
@@ -866,6 +876,18 @@ ERROR(initializer_as_typed_pattern,none,
 ERROR(unlabeled_parameter_following_variadic_parameter,none,
       "a parameter following a variadic parameter requires a label", ())
 
+ERROR(enum_element_empty_arglist,none,
+      "enum element with associated values must have at least one "
+      "associated value", ())
+WARNING(enum_element_empty_arglist_swift4,none,
+        "enum element with associated values must have at least one "
+        "associated value; this will be an error in the future "
+        "version of Swift", ())
+NOTE(enum_element_empty_arglist_delete,none,
+     "did you mean to remove the empty associated value list?", ())
+NOTE(enum_element_empty_arglist_add_void,none,
+     "did you mean to explicitly add a 'Void' associated value?", ())
+
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics
 //------------------------------------------------------------------------------
@@ -1276,7 +1298,9 @@ ERROR(swift_native_objc_runtime_base_must_be_identifier,none,
       "@_swift_native_objc_runtime_base class name must be an identifier", ())
 
 ERROR(attr_interpolated_string,none,
-"%0 cannot be an interpolated string literal", (StringRef))
+"'%0' cannot be an interpolated string literal", (StringRef))
+ERROR(attr_extended_escaping_string,none,
+"'%0' cannot be an extended escaping string literal", (StringRef))
 
 ERROR(attr_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
@@ -1315,6 +1339,20 @@ ERROR(attr_availability_expected_equal,none,
 
 ERROR(attr_availability_expected_version,none,
       "expected version number in '%0' attribute", (StringRef))
+
+WARNING(attr_availability_swift_expected_option,none,
+      "expected 'introduced', 'deprecated', or 'obsoleted' in '%0' attribute "
+      "for platform 'swift'", (StringRef))
+WARNING(attr_availability_swift_expected_deprecated_version,none,
+      "expected version number with 'deprecated' in '%0' attribute for "
+      "platform 'swift'", (StringRef))
+WARNING(attr_availability_swift_infeasible_option,none,
+      "'%0' cannot be used in '%1' attribute for platform 'swift'",
+      (StringRef, StringRef))
+
+WARNING(attr_availability_nonspecific_platform_unexpected_version,none,
+      "unexpected version number in '%0' attribute for non-specific platform "
+      "'*'", (StringRef))
 
 // autoclosure
 ERROR(attr_autoclosure_expected_r_paren,PointsToFirstBadToken,
@@ -1445,9 +1483,6 @@ ERROR(where_without_generic_params,none,
       "'where' clause cannot be attached to "
       "%select{a non-generic|a protocol|an associated type}0 "
       "declaration", (unsigned))
-WARNING(swift3_where_inside_brackets,none,
-        "'where' clause next to generic parameters is deprecated "
-        "and will be removed in the future version of Swift", ())
 ERROR(where_inside_brackets,none,
         "'where' clause next to generic parameters is obsolete, "
         "must be written following the declaration's type", ())

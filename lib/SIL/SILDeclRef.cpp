@@ -48,13 +48,21 @@ swift::getMethodDispatch(AbstractFunctionDecl *method) {
     if (method->isFinal())
       return MethodDispatch::Static;
 
-    // Members defined directly inside a class are dynamically dispatched.
-    if (isa<ClassDecl>(dc))
-      return MethodDispatch::Class;
-
     // Imported class methods are dynamically dispatched.
     if (method->isObjC() && method->hasClangNode())
       return MethodDispatch::Class;
+
+    // Members defined directly inside a class are dynamically dispatched.
+    if (isa<ClassDecl>(dc)) {
+      // Native convenience initializers are not dynamically dispatched unless
+      // required.
+      if (auto ctor = dyn_cast<ConstructorDecl>(method)) {
+        if (!ctor->isRequired() && !ctor->isDesignatedInit()
+            && !requiresForeignEntryPoint(ctor))
+          return MethodDispatch::Static;
+      }
+      return MethodDispatch::Class;
+    }
   }
 
   // Otherwise, it can be referenced statically.
@@ -273,12 +281,21 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
       return maybeAddExternal(SILLinkage::PublicNonABI);
   }
 
-  bool neverPublic = false;
+  enum class Limit {
+    /// No limit.
+    None,
+    /// The declaration is emitted on-demand; it should end up with internal
+    /// or shared linkage.
+    OnDemand,
+    /// The declaration should never be made public.
+    NeverPublic 
+  };
+  auto limit = Limit::None;
 
   // ivar initializers and destroyers are completely contained within the class
   // from which they come, and never get seen externally.
   if (isIVarInitializerOrDestroyer()) {
-    neverPublic = true;
+    limit = Limit::NeverPublic;
   }
 
   // Stored property initializers get the linkage of their containing type.
@@ -305,13 +322,21 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     // FIXME: This should always be true.
     if (d->getDeclContext()->getParentModule()->getResilienceStrategy() ==
         ResilienceStrategy::Resilient)
-      neverPublic = true;
+      limit = Limit::NeverPublic;
   }
 
   // The global addressor is never public for resilient globals.
   if (kind == Kind::GlobalAccessor) {
     if (cast<VarDecl>(d)->isResilient()) {
-      neverPublic = true;
+      limit = Limit::NeverPublic;
+    }
+  }
+
+  // Forced-static-dispatch functions are created on-demand and have
+  // at best shared linkage.
+  if (auto fn = dyn_cast<FuncDecl>(d)) {
+    if (fn->hasForcedStaticDispatch()) {
+      limit = Limit::OnDemand;
     }
   }
   
@@ -332,14 +357,19 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     return maybeAddExternal(SILLinkage::Private);
 
   case AccessLevel::Internal:
+    if (limit == Limit::OnDemand)
+      return SILLinkage::Shared;
     return maybeAddExternal(SILLinkage::Hidden);
 
   case AccessLevel::Public:
   case AccessLevel::Open:
-    if (neverPublic)
+    if (limit == Limit::OnDemand)
+      return SILLinkage::Shared;
+    if (limit == Limit::NeverPublic)
       return maybeAddExternal(SILLinkage::Hidden);
     return maybeAddExternal(SILLinkage::Public);
   }
+  llvm_unreachable("unhandled access");
 }
 
 SILDeclRef SILDeclRef::getDefaultArgGenerator(Loc loc,
@@ -430,6 +460,14 @@ IsSerialized_t SILDeclRef::isSerialized() const {
       }
     }
 
+    // 'read' and 'modify' accessors synthesized on-demand are serialized if
+    // visible outside the module.
+    if (auto fn = dyn_cast<FuncDecl>(d))
+      if (!isClangImported() &&
+          fn->hasForcedStaticDispatch() &&
+          fn->getEffectiveAccess() >= AccessLevel::Public)
+        return IsSerialized;
+
     dc = getDecl()->getInnermostDeclContext();
 
     // Enum element constructors are serialized if the enum is
@@ -495,7 +533,10 @@ bool SILDeclRef::isNoinline() const {
   if (auto InlineA = getDecl()->getAttrs().getAttribute<InlineAttr>())
     if (InlineA->getKind() == InlineKind::Never)
       return true;
-   return false;
+  if (auto *semanticsA = getDecl()->getAttrs().getAttribute<SemanticsAttr>())
+    if (semanticsA->Value.equals("keypath.entry"))
+      return true;
+  return false;
 }
 
 /// \brief True if the function has noinline attribute.
@@ -686,17 +727,15 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 bool SILDeclRef::requiresNewVTableEntry() const {
   if (cast<AbstractFunctionDecl>(getDecl())->needsNewVTableEntry())
     return true;
-  if (kind == SILDeclRef::Kind::Allocator) {
-    auto *cd = cast<ConstructorDecl>(getDecl());
-    if (cd->isRequired()) {
-      auto *baseCD = cd->getOverriddenDecl();
-      if(!baseCD ||
-         !baseCD->isRequired() ||
-         baseCD->hasClangNode())
-        return true;
-    }
-  }
   return false;
+}
+
+bool SILDeclRef::requiresNewWitnessTableEntry() const {
+  return requiresNewWitnessTableEntry(cast<AbstractFunctionDecl>(getDecl()));
+}
+
+bool SILDeclRef::requiresNewWitnessTableEntry(AbstractFunctionDecl *func) {
+  return func->getOverriddenDecls().empty();
 }
 
 SILDeclRef SILDeclRef::getOverridden() const {
@@ -711,18 +750,34 @@ SILDeclRef SILDeclRef::getOverridden() const {
 
 SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
   if (auto overridden = getOverridden()) {
-    // If we overrode a foreign decl, a dynamic method, this is an
+    // If we overrode a foreign decl or dynamic method, if this is an
     // accessor for a property that overrides an ObjC decl, or if it is an
     // @NSManaged property, then it won't be in the vtable.
     if (overridden.getDecl()->hasClangNode())
       return SILDeclRef();
-
-    // If we overrode a non-required initializer, there won't be a vtable
-    // slot for the allocator.
+    
+    // An @objc convenience initializer can be "overridden" in the sense that
+    // its selector is reclaimed by a subclass's convenience init with the
+    // same name. The AST models this as an override for the purposes of
+    // ObjC selector validation, but it isn't for Swift method dispatch
+    // purposes.
     if (overridden.kind == SILDeclRef::Kind::Allocator) {
-      if (!cast<ConstructorDecl>(overridden.getDecl())->isRequired())
+      auto overriddenCtor = cast<ConstructorDecl>(overridden.getDecl());
+      if (!overriddenCtor->isDesignatedInit()
+          && !overriddenCtor->isRequired())
         return SILDeclRef();
-    } else if (overridden.getDecl()->isDynamic()) {
+    }
+
+    // Initializing entry points for initializers won't be in the vtable.
+    // For Swift designated initializers, they're only used in super.init
+    // chains, which can always be statically resolved. Other native Swift
+    // initializers only have allocating entry points. ObjC initializers always
+    // have the initializing entry point (corresponding to the -init method)
+    // but those are never in the vtable.
+    if (overridden.kind == SILDeclRef::Kind::Initializer) {
+      return SILDeclRef();
+    }
+    if (overridden.getDecl()->isDynamic()) {
       return SILDeclRef();
     }
     
@@ -742,6 +797,54 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     return overridden;
   }
   return SILDeclRef();
+}
+
+SILDeclRef SILDeclRef::getOverriddenWitnessTableEntry() const {
+  auto bestOverridden =
+    getOverriddenWitnessTableEntry(cast<AbstractFunctionDecl>(getDecl()));
+  return SILDeclRef(bestOverridden, kind, isCurried);
+}
+
+AbstractFunctionDecl *SILDeclRef::getOverriddenWitnessTableEntry(
+                                                 AbstractFunctionDecl *func) {
+  if (!isa<ProtocolDecl>(func->getDeclContext()))
+    return func;
+
+  AbstractFunctionDecl *bestOverridden = nullptr;
+
+  SmallVector<AbstractFunctionDecl *, 4> stack;
+  SmallPtrSet<AbstractFunctionDecl *, 4> visited;
+  stack.push_back(func);
+  visited.insert(func);
+
+  while (!stack.empty()) {
+    auto current = stack.back();
+    stack.pop_back();
+
+    auto overriddenDecls = current->getOverriddenDecls();
+    if (overriddenDecls.empty()) {
+      // This entry introduced a witness table entry. Determine whether it is
+      // better than the best entry we've seen thus far.
+      if (!bestOverridden ||
+          ProtocolDecl::compare(
+                        cast<ProtocolDecl>(current->getDeclContext()),
+                        cast<ProtocolDecl>(bestOverridden->getDeclContext()))
+            < 0) {
+        bestOverridden = cast<AbstractFunctionDecl>(current);
+      }
+
+      continue;
+    }
+
+    // Add overridden declarations to the stack.
+    for (auto overridden : overriddenDecls) {
+      auto overriddenFunc = cast<AbstractFunctionDecl>(overridden);
+      if (visited.insert(overriddenFunc).second)
+        stack.push_back(overriddenFunc);
+    }
+  }
+
+  return bestOverridden;
 }
 
 SILDeclRef SILDeclRef::getOverriddenVTableEntry() const {

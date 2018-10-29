@@ -122,9 +122,6 @@ namespace swift {
     /// completions.
     bool CodeCompleteCallPatternHeuristics = false;
 
-    /// Disable constraint system performance hacks.
-    bool DisableConstraintSolverPerformanceHacks = false;
-
     ///
     /// Flags for use by tests
     ///
@@ -176,6 +173,10 @@ namespace swift {
     CycleDiagnosticKind EvaluatorCycleDiagnostics =
         CycleDiagnosticKind::NoDiagnose;
 
+    /// \brief The path to which we should emit GraphViz output for the complete
+    /// request-evaluator graph.
+    std::string RequestEvaluatorGraphVizPath;
+
     /// \brief The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
     unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
@@ -188,6 +189,16 @@ namespace swift {
 
     /// Disable the shrink phase of the expression type checker.
     bool SolverDisableShrink = false;
+
+    /// Disable constraint system performance hacks.
+    bool DisableConstraintSolverPerformanceHacks = false;
+
+    /// \brief Enable experimental operator designated types feature.
+    bool EnableOperatorDesignatedTypes = false;
+
+    /// \brief Enable constraint solver support for experimental
+    ///        operator protocol designator feature.
+    bool SolverEnableOperatorDesignatedTypes = false;
 
     /// The maximum depth to which to test decl circularity.
     unsigned MaxCircularityDepth = 500;
@@ -243,6 +254,9 @@ namespace swift {
     /// of Swift do not.
     Swift3ObjCInferenceWarnings WarnSwift3ObjCInference =
       Swift3ObjCInferenceWarnings::None;
+
+    /// Diagnose implicit 'override'.
+    bool WarnImplicitOverrides = false;
 
     /// Diagnose uses of NSCoding with classes that have unstable mangled names.
     bool EnableNSKeyedArchiverDiagnostics = true;

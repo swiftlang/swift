@@ -279,7 +279,8 @@ private:
 };
 }
 
-using LookupTableMap = llvm::StringMap<std::unique_ptr<SwiftLookupTable>>;
+using LookupTableMap =
+    llvm::DenseMap<StringRef, std::unique_ptr<SwiftLookupTable>>;
 
 /// The result of importing a clang type. It holds both the Swift Type
 /// as well as a bool in which 'true' indicates either:
@@ -488,10 +489,6 @@ public:
   importer::EnumKind getEnumKind(const clang::EnumDecl *decl) {
     return getNameImporter().getEnumKind(decl);
   }
-
-  // TODO: drop this accessor as soon as we further de-couple the swift name
-  // lookup tables from the Impl.
-  LookupTableMap &getLookupTables() { return LookupTables; }
 
 private:
   /// A mapping from imported declarations to their "alternate" declarations,
@@ -960,6 +957,11 @@ public:
   /// \brief Determines whether the given type matches an implicit type
   /// bound of "Hashable", which is used to validate NSDictionary/NSSet.
   bool matchesHashableBound(Type type);
+
+  /// \brief Determines whether the type declared by the given declaration
+  /// is over-aligned.
+  bool isOverAligned(const clang::TypeDecl *typeDecl);
+  bool isOverAligned(clang::QualType type);
 
   /// \brief Look up and attempt to import a Clang declaration with
   /// the given name.

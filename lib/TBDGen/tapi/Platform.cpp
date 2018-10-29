@@ -96,6 +96,7 @@ StringRef getPlatformName(Platform platform) {
   case Platform::bridgeOS:
     return "bridgeOS";
   }
+  llvm_unreachable("unknown platform");
 }
 
 std::string getOSAndEnvironmentName(Platform platform, std::string version) {
@@ -119,6 +120,7 @@ std::string getOSAndEnvironmentName(Platform platform, std::string version) {
   case Platform::bridgeOS:
     return "bridgeos" + version;
   }
+  llvm_unreachable("unknown platform");
 }
 
 raw_ostream &operator<<(raw_ostream &os, Platform platform) {

@@ -1,0 +1,7 @@
+module X {
+  explicit module Submodule {}
+}
+
+module Y {
+  explicit module Submodule {}
+}

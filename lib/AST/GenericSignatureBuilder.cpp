@@ -27,6 +27,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeWalker.h"
@@ -1065,6 +1066,7 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
       rootType = parentType;
       return false;
     }
+    llvm_unreachable("unhandled kind");
   }).isNull();
 
   // If we didn't already find a redundancy, check our end state.
@@ -1326,6 +1328,7 @@ const RequirementSource *RequirementSource::withoutRedundantSubpath(
     return parent->withoutRedundantSubpath(builder, start, end)
       ->viaSuperclass(builder, getProtocolConformance());
   }
+  llvm_unreachable("unhandled kind");
 }
 
 const RequirementSource *RequirementSource::getRoot() const {
@@ -1400,6 +1403,7 @@ RequirementSource::visitPotentialArchetypesAlongPath(
     return replaceSelfWithType(parentType, getStoredType());
   }
   }
+  llvm_unreachable("unhandled kind");
 }
 
 Type RequirementSource::getStoredType() const {
@@ -1450,16 +1454,9 @@ SourceLoc RequirementSource::getLoc() const {
   if (auto typeRepr = getTypeRepr())
     return typeRepr->getStartLoc();
 
-  if (auto requirementRepr = getRequirementRepr()) {
-    switch (requirementRepr->getKind()) {
-    case RequirementReprKind::LayoutConstraint:
-    case RequirementReprKind::TypeConstraint:
-      return requirementRepr->getColonLoc();
+  if (auto requirementRepr = getRequirementRepr())
+    return requirementRepr->getSeparatorLoc();
 
-    case RequirementReprKind::SameType:
-      return requirementRepr->getEqualLoc();
-    }
-  }
   if (parent)
     return parent->getLoc();
 
@@ -1677,22 +1674,24 @@ const RequirementSource *FloatingRequirementSource::getSource(
 }
 
 SourceLoc FloatingRequirementSource::getLoc() const {
+  // For an explicit abstract protocol source, we can get a more accurate source
+  // location from the written protocol requirement.
+  if (kind == Kind::AbstractProtocol && isExplicit()) {
+    auto written = protocolReq.written;
+    if (auto typeRepr = written.dyn_cast<const TypeRepr *>())
+      return typeRepr->getLoc();
+    if (auto requirementRepr = written.dyn_cast<const RequirementRepr *>())
+      return requirementRepr->getSeparatorLoc();
+  }
+
   if (auto source = storage.dyn_cast<const RequirementSource *>())
     return source->getLoc();
 
   if (auto typeRepr = storage.dyn_cast<const TypeRepr *>())
     return typeRepr->getLoc();
 
-  if (auto requirementRepr = storage.dyn_cast<const RequirementRepr *>()) {
-    switch (requirementRepr->getKind()) {
-    case RequirementReprKind::LayoutConstraint:
-    case RequirementReprKind::TypeConstraint:
-      return requirementRepr->getColonLoc();
-
-    case RequirementReprKind::SameType:
-      return requirementRepr->getEqualLoc();
-    }
-  }
+  if (auto requirementRepr = storage.dyn_cast<const RequirementRepr *>())
+    return requirementRepr->getSeparatorLoc();
 
   return SourceLoc();
 }
@@ -1751,6 +1750,7 @@ bool FloatingRequirementSource::isExplicit() const {
       return false;
     }
   }
+  llvm_unreachable("unhandled kind");
 }
 
 
@@ -1770,6 +1770,7 @@ FloatingRequirementSource FloatingRequirementSource::asInferred(
                                   protocolReq.protocol, typeRepr,
                                   /*inferred=*/true);
   }
+  llvm_unreachable("unhandled kind");
 }
 
 bool FloatingRequirementSource::isRecursive(
@@ -1977,15 +1978,6 @@ bool EquivalenceClass::recordConformanceConstraint(
 }
 
 template<typename T>
-Type Constraint<T>::getSubjectDependentType(
-                      TypeArrayView<GenericTypeParamType> genericParams) const {
-  if (auto type = subject.dyn_cast<Type>())
-    return type;
-
-  return subject.get<PotentialArchetype *>()->getDependentType(genericParams);
-}
-
-template<typename T>
 bool Constraint<T>::isSubjectEqualTo(Type type) const {
   return getSubjectDependentType({ })->isEqual(type);
 }
@@ -2127,8 +2119,9 @@ TypeDecl *EquivalenceClass::lookupNestedType(
     ProtocolDecl *proto = conforms.first;
 
     // Look for an associated type and/or concrete type with this name.
-    for (auto member : proto->lookupDirect(name,
-                                           /*ignoreNewExtensions=*/true)) {
+    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+    for (auto member : proto->lookupDirect(name, flags)) {
       // If this is an associated type, record whether it is the best
       // associated type we've seen thus far.
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
@@ -2205,7 +2198,7 @@ TypeDecl *EquivalenceClass::lookupNestedType(
         Requirement(RequirementKind::SameType,
                     DependentMemberType::get(anchorType, bestAssocType),
                     DependentMemberType::get(anchorType, assocType)),
-        inferredSource, nullptr);
+        nullptr, inferredSource, nullptr, nullptr);
     }
   }
 
@@ -2594,6 +2587,7 @@ ConstraintResult GenericSignatureBuilder::handleUnresolvedRequirement(
   case UnresolvedHandlingKind::GenerateUnresolved:
     return ConstraintResult::Unresolved;
   }
+  llvm_unreachable("unhandled handling");
 }
 
 bool GenericSignatureBuilder::addConditionalRequirements(
@@ -3439,7 +3433,7 @@ bool RewriteTreeNode::enumerateRulesRec(
     lhs.push_back(assocType);
 
   SWIFT_DEFER {
-    if (auto assocType = getMatch())
+    if (getMatch())
       lhs.pop_back();
   };
 
@@ -4165,11 +4159,17 @@ static ConstraintResult visitInherited(
   // Visit all of the inherited types.
   auto typeDecl = decl.dyn_cast<TypeDecl *>();
   auto extDecl = decl.dyn_cast<ExtensionDecl *>();
+  ASTContext &ctx = typeDecl ? typeDecl->getASTContext()
+                             : extDecl->getASTContext();
+  auto &evaluator = ctx.evaluator;
   ArrayRef<TypeLoc> inheritedTypes = typeDecl ? typeDecl->getInherited()
                                               : extDecl->getInherited();
   for (unsigned index : indices(inheritedTypes)) {
-    Type inheritedType = typeDecl ? typeDecl->getInheritedType(index)
-                                  : extDecl->getInheritedType(index);
+    Type inheritedType
+      = evaluateOrDefault(evaluator,
+                          InheritedTypeRequest{decl, index,
+                            TypeResolutionStage::Structural},
+                          Type());
     if (!inheritedType) continue;
 
     const auto &inherited = inheritedTypes[index];
@@ -4218,23 +4218,20 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       return inheritedReqResult;
   }
 
-  if (auto resolver = getLazyResolver())
-    resolver->resolveTrailingWhereClause(proto);
-
   // Add any requirements in the where clause on the protocol.
-  if (auto WhereClause = proto->getTrailingWhereClause()) {
-    for (auto &req : WhereClause->getRequirements()) {
-      // If we're only looking at same-type constraints, skip everything else.
-      if (onlySameTypeConstraints &&
-          req.getKind() != RequirementReprKind::SameType)
-        continue;
+  RequirementRequest::visitRequirements(proto, TypeResolutionStage::Structural,
+      [&](const Requirement &req, RequirementRepr *reqRepr) {
+        // If we're only looking at same-type constraints, skip everything else.
+        if (onlySameTypeConstraints &&
+            req.getKind() != RequirementKind::SameType)
+          return false;
 
-      auto innerSource = FloatingRequirementSource::viaProtocolRequirement(
-          source, proto, &req, /*inferred=*/false);
-      addRequirement(&req, innerSource, &protocolSubMap,
-                     proto->getModuleContext());
-    }
-  }
+        auto innerSource = FloatingRequirementSource::viaProtocolRequirement(
+            source, proto, reqRepr, /*inferred=*/false);
+        addRequirement(req, reqRepr, innerSource, &protocolSubMap,
+                       nullptr);
+        return false;
+      });
 
   // Remaining logic is not relevant in ObjC protocol cases.
   if (proto->isObjC())
@@ -4364,21 +4361,20 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       }
 
       // Add requirements from this associated type's where clause.
-      if (auto WhereClause = assocTypeDecl->getTrailingWhereClause()) {
-        for (auto &req : WhereClause->getRequirements()) {
-          // If we're only looking at same-type constraints, skip everything
-          // else.
-          if (onlySameTypeConstraints &&
-              req.getKind() != RequirementReprKind::SameType)
-            continue;
+      RequirementRequest::visitRequirements(assocTypeDecl,
+                                            TypeResolutionStage::Structural,
+          [&](const Requirement &req, RequirementRepr *reqRepr) {
+            // If we're only looking at same-type constraints, skip everything else.
+            if (onlySameTypeConstraints &&
+                req.getKind() != RequirementKind::SameType)
+              return false;
 
-          auto innerSource =
-            FloatingRequirementSource::viaProtocolRequirement(
-                                      source, proto, &req, /*inferred=*/false);
-          addRequirement(&req, innerSource, &protocolSubMap,
-                         /*inferForModule=*/nullptr);
-        }
-      }
+            auto innerSource = FloatingRequirementSource::viaProtocolRequirement(
+                source, proto, reqRepr, /*inferred=*/false);
+            addRequirement(req, reqRepr, innerSource, &protocolSubMap,
+                           /*inferForModule=*/nullptr);
+            return false;
+          });
 
       // Check whether we inherited any types with the same name.
       auto knownInherited =
@@ -4387,9 +4383,12 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
       bool shouldWarnAboutRedeclaration =
         source->kind == RequirementSource::RequirementSignatureSelf &&
+        !assocTypeDecl->getAttrs().hasAttribute<NonOverrideAttr>() &&
+        !assocTypeDecl->getAttrs().hasAttribute<OverrideAttr>() &&
         assocTypeDecl->getDefaultDefinitionLoc().isNull() &&
         (!assocTypeDecl->getInherited().empty() ||
-         assocTypeDecl->getTrailingWhereClause());
+         assocTypeDecl->getTrailingWhereClause() ||
+         getASTContext().LangOpts.WarnImplicitOverrides);
       for (auto inheritedType : knownInherited->second) {
         // If we have inherited associated type...
         if (auto inheritedAssocTypeDecl =
@@ -4582,7 +4581,7 @@ ConstraintResult GenericSignatureBuilder::addLayoutRequirement(
       Impl->HadAnyError = true;
 
       Diags.diagnose(source.getLoc(), diag::requires_not_suitable_archetype,
-                     TypeLoc::withoutLoc(concreteType));
+                     concreteType);
       return ConstraintResult::Concrete;
     }
 
@@ -4715,8 +4714,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
 
       Impl->HadAnyError = true;
       Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
-                     TypeLoc::withoutLoc(subjectType),
-                     TypeLoc::withoutLoc(constraintType));
+                     subjectType, constraintType);
     }
 
     return ConstraintResult::Conflicting;
@@ -4764,7 +4762,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
       if (source.getLoc().isValid()) {
         Impl->HadAnyError = true;
         Diags.diagnose(source.getLoc(), diag::requires_not_suitable_archetype,
-                       TypeLoc::withoutLoc(subjectType));
+                       subjectType);
       }
 
       return ConstraintResult::Concrete;
@@ -4928,8 +4926,11 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenTypeParameters(
   if (equivClass2)
     equivClass->modified(*this);
 
-  // Same-type requirements.
+  // Same-type requirements, delayed requirements.
   if (equivClass2) {
+    Impl->DelayedRequirements.append(equivClass2->delayedRequirements.begin(),
+                                     equivClass2->delayedRequirements.end());
+
     equivClass->sameTypeConstraints.insert(
                                    equivClass->sameTypeConstraints.end(),
                                    equivClass2->sameTypeConstraints.begin(),
@@ -5159,8 +5160,18 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementBetweenConcrete(
     }
   } matcher(*this, source, type1, type2, diagnoseMismatch);
 
-  return matcher.match(type1, type2) ? ConstraintResult::Resolved
-                                     : ConstraintResult::Conflicting;
+  if (matcher.match(type1, type2)) {
+    // Warn if neither side of the requirement contains a type parameter.
+    if (source.isTopLevel() && source.getLoc().isValid()) {
+      Diags.diagnose(source.getLoc(),
+                     diag::requires_no_same_type_archetype,
+                     type1, type2);
+    }
+
+    return ConstraintResult::Resolved;
+  }
+
+  return ConstraintResult::Conflicting;
 }
 
 ConstraintResult GenericSignatureBuilder::addSameTypeRequirement(
@@ -5275,9 +5286,7 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
 
   auto visitType = [&](Type inheritedType, const TypeRepr *typeRepr) {
     if (inferForModule) {
-      inferRequirements(*inferForModule,
-                        TypeLoc(const_cast<TypeRepr *>(typeRepr),
-                                inheritedType),
+      inferRequirements(*inferForModule, inheritedType, typeRepr,
                         getFloatingSource(typeRepr, /*forInferred=*/true));
     }
 
@@ -5290,20 +5299,20 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
   return visitInherited(decl, visitType);
 }
 
-ConstraintResult GenericSignatureBuilder::addRequirement(
-                                                 const RequirementRepr *req,
-                                                 ModuleDecl *inferForModule) {
-  return addRequirement(req,
-                        FloatingRequirementSource::forExplicit(req),
-                        nullptr,
-                        inferForModule);
+ConstraintResult
+GenericSignatureBuilder::addRequirement(const Requirement &req,
+                                        FloatingRequirementSource source,
+                                        ModuleDecl *inferForModule) {
+  return addRequirement(req, nullptr, source, nullptr, inferForModule);
 }
 
-ConstraintResult GenericSignatureBuilder::addRequirement(
-                                             const RequirementRepr *Req,
-                                             FloatingRequirementSource source,
-                                             const SubstitutionMap *subMap,
-                                             ModuleDecl *inferForModule) {
+ConstraintResult
+GenericSignatureBuilder::addRequirement(const Requirement &req,
+                                        const RequirementRepr *reqRepr,
+                                        FloatingRequirementSource source,
+                                        const SubstitutionMap *subMap,
+                                        ModuleDecl *inferForModule) {
+  // Local substitution for types in the requirement.
   auto subst = [&](Type t) {
     if (subMap)
       return t.subst(*subMap, SubstFlags::UseErrorType);
@@ -5311,97 +5320,21 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
     return t;
   };
 
-  auto getInferredTypeLoc = [=](Type type, TypeLoc existingTypeLoc) {
-    if (subMap) return TypeLoc::withoutLoc(type);
-    return existingTypeLoc;
-  };
-
-  switch (Req->getKind()) {
-  case RequirementReprKind::LayoutConstraint: {
-    auto subject = subst(Req->getSubject());
-    if (inferForModule) {
-      inferRequirements(*inferForModule,
-                        getInferredTypeLoc(subject, Req->getSubjectLoc()),
-                        source.asInferred(Req->getSubjectLoc().getTypeRepr()));
-    }
-
-    return addLayoutRequirement(subject,
-                                Req->getLayoutConstraint(),
-                                source,
-                                UnresolvedHandlingKind::GenerateConstraints);
-  }
-
-  case RequirementReprKind::TypeConstraint: {
-    auto subject = subst(Req->getSubject());
-    auto constraint = subst(Req->getConstraint());
-    if (inferForModule) {
-      inferRequirements(*inferForModule,
-                        getInferredTypeLoc(subject, Req->getSubjectLoc()),
-                        source.asInferred(Req->getSubjectLoc().getTypeRepr()));
-      inferRequirements(*inferForModule,
-                        getInferredTypeLoc(constraint,
-                                           Req->getConstraintLoc()),
-                        source.asInferred(
-                                      Req->getConstraintLoc().getTypeRepr()));
-    }
-    return addTypeRequirement(subject, constraint, source,
-                              UnresolvedHandlingKind::GenerateConstraints,
-                              inferForModule);
-  }
-
-  case RequirementReprKind::SameType: {
-    // Warn if neither side of the requirement contains a type parameter.
-    if (!Req->getFirstType()->hasTypeParameter() &&
-        !Req->getSecondType()->hasTypeParameter() &&
-        !Req->getFirstType()->hasError() &&
-        !Req->getSecondType()->hasError()) {
-      Diags.diagnose(Req->getEqualLoc(),
-                     diag::requires_no_same_type_archetype,
-                     Req->getFirstType(), Req->getSecondType())
-        .highlight(Req->getFirstTypeLoc().getSourceRange())
-        .highlight(Req->getSecondTypeLoc().getSourceRange());
-    }
-
-    auto firstType = subst(Req->getFirstType());
-    auto secondType = subst(Req->getSecondType());
-    if (inferForModule) {
-      inferRequirements(*inferForModule,
-                        getInferredTypeLoc(firstType, Req->getFirstTypeLoc()),
-                        source.asInferred(
-                                        Req->getFirstTypeLoc().getTypeRepr()));
-      inferRequirements(*inferForModule,
-                        getInferredTypeLoc(secondType,
-                                           Req->getSecondTypeLoc()),
-                        source.asInferred(
-                                        Req->getSecondTypeLoc().getTypeRepr()));
-    }
-    return addRequirement(Requirement(RequirementKind::SameType,
-                                      firstType, secondType),
-                          source, nullptr);
-  }
-  }
-
-  llvm_unreachable("Unhandled requirement?");
-}
-
-ConstraintResult
-GenericSignatureBuilder::addRequirement(const Requirement &req,
-                                        FloatingRequirementSource source,
-                                        ModuleDecl *inferForModule) {
-  auto firstType = req.getFirstType();
-
+  auto firstType = subst(req.getFirstType());
   switch (req.getKind()) {
   case RequirementKind::Superclass:
   case RequirementKind::Conformance: {
-    auto secondType = req.getSecondType();
+    auto secondType = subst(req.getSecondType());
 
     if (inferForModule) {
-      inferRequirements(*inferForModule, TypeLoc::withoutLoc(firstType),
-                        FloatingRequirementSource::forInferred(
-                            nullptr));
-      inferRequirements(*inferForModule, TypeLoc::withoutLoc(secondType),
-                        FloatingRequirementSource::forInferred(
-                            nullptr));
+      inferRequirements(*inferForModule, firstType,
+                        RequirementRepr::getFirstTypeRepr(reqRepr),
+                        source.asInferred(
+                          RequirementRepr::getFirstTypeRepr(reqRepr)));
+      inferRequirements(*inferForModule, secondType,
+                        RequirementRepr::getSecondTypeRepr(reqRepr),
+                        source.asInferred(
+                          RequirementRepr::getSecondTypeRepr(reqRepr)));
     }
 
     return addTypeRequirement(firstType, secondType, source,
@@ -5411,8 +5344,10 @@ GenericSignatureBuilder::addRequirement(const Requirement &req,
 
   case RequirementKind::Layout: {
     if (inferForModule) {
-      inferRequirements(*inferForModule, TypeLoc::withoutLoc(firstType),
-                        FloatingRequirementSource::forInferred(nullptr));
+      inferRequirements(*inferForModule, firstType,
+                        RequirementRepr::getFirstTypeRepr(reqRepr),
+                        source.asInferred(
+                          RequirementRepr::getFirstTypeRepr(reqRepr)));
     }
 
     return addLayoutRequirement(firstType, req.getLayoutConstraint(), source,
@@ -5420,15 +5355,17 @@ GenericSignatureBuilder::addRequirement(const Requirement &req,
   }
 
   case RequirementKind::SameType: {
-    auto secondType = req.getSecondType();
+    auto secondType = subst(req.getSecondType());
 
     if (inferForModule) {
-      inferRequirements(*inferForModule, TypeLoc::withoutLoc(firstType),
-                        FloatingRequirementSource::forInferred(
-                            nullptr));
-      inferRequirements(*inferForModule, TypeLoc::withoutLoc(secondType),
-                        FloatingRequirementSource::forInferred(
-                            nullptr));
+      inferRequirements(*inferForModule, firstType,
+                        RequirementRepr::getFirstTypeRepr(reqRepr),
+                        source.asInferred(
+                          RequirementRepr::getFirstTypeRepr(reqRepr)));
+      inferRequirements(*inferForModule, secondType,
+                        RequirementRepr::getSecondTypeRepr(reqRepr),
+                        source.asInferred(
+                          RequirementRepr::getSecondTypeRepr(reqRepr)));
     }
 
     return addSameTypeRequirement(
@@ -5497,8 +5434,7 @@ public:
       return Action::Continue;
 
     /// Retrieve the substitution.
-    auto subMap = ty->getContextSubstitutionMap(&module, decl,
-                                                decl->getGenericEnvironment());
+    auto subMap = ty->getContextSubstitutionMap(&module, decl);
 
     // Handle the requirements.
     // FIXME: Inaccurate TypeReprs.
@@ -5513,13 +5449,15 @@ public:
 
 void GenericSignatureBuilder::inferRequirements(
                                           ModuleDecl &module,
-                                          TypeLoc type,
+                                          Type type,
+                                          const TypeRepr *typeRepr,
                                           FloatingRequirementSource source) {
-  if (!type.getType())
+  if (!type)
     return;
+
   // FIXME: Crummy source-location information.
   InferRequirementsWalker walker(module, *this, source);
-  type.getType().walk(walker);
+  type.walk(walker);
 }
 
 void GenericSignatureBuilder::inferRequirements(
@@ -5530,7 +5468,8 @@ void GenericSignatureBuilder::inferRequirements(
     return;
 
   for (auto P : *params) {
-    inferRequirements(module, P->getTypeLoc(),
+    inferRequirements(module, P->getTypeLoc().getType(),
+                      P->getTypeLoc().getTypeRepr(),
                       FloatingRequirementSource::forInferred(
                           P->getTypeLoc().getTypeRepr()));
   }
@@ -7306,19 +7245,18 @@ void GenericSignatureBuilder::enumerateRequirements(
     // Enumerate conformance requirements.
     SmallVector<ProtocolDecl *, 4> protocols;
     DenseMap<ProtocolDecl *, const RequirementSource *> protocolSources;
-    if (equivClass) {
-      for (const auto &conforms : equivClass->conformsTo) {
-        protocols.push_back(conforms.first);
-        assert(protocolSources.count(conforms.first) == 0 && 
-               "redundant protocol requirement?");
 
-        protocolSources.insert(
-          {conforms.first,
-           *getBestConstraintSource<ProtocolDecl *>(conforms.second,
-             [&](ProtocolDecl *proto) {
-               return proto == conforms.first;
-             })});
-      }
+    for (const auto &conforms : equivClass->conformsTo) {
+      protocols.push_back(conforms.first);
+      assert(protocolSources.count(conforms.first) == 0 &&
+             "redundant protocol requirement?");
+
+      protocolSources.insert(
+        {conforms.first,
+         *getBestConstraintSource<ProtocolDecl *>(conforms.second,
+           [&](ProtocolDecl *proto) {
+             return proto == conforms.first;
+           })});
     }
 
     // Sort the protocols in canonical order.
@@ -7602,5 +7540,3 @@ void GenericSignatureBuilder::verifyGenericSignaturesInModule(
     verifyGenericSignature(context, canGenericSig);
   }
 }
-
-

@@ -1795,4 +1795,40 @@ mirrors.test("SymbolicReferenceInsideType") {
   expectEqual(expected, output)
 }
 
+protocol P1 { }
+protocol P2 { }
+protocol P3 { }
+
+struct ConformsToP1: P1 { }
+struct ConformsToP2: P2 { }
+struct ConformsToP3: P3 { }
+
+struct OuterTwoParams<T: P1, U: P2> {}
+
+struct ConformsToP1AndP2 : P1, P2 { }
+
+extension OuterTwoParams where U == T {
+  struct InnerEqualParams<V: P3> {
+    var x: T
+    var y: U
+    var z: V
+  }
+}
+
+mirrors.test("GenericNestedWithSameTypeConstraints") {
+  let value = OuterTwoParams.InnerEqualParams(x: ConformsToP1AndP2(),
+                                              y: ConformsToP1AndP2(),
+                                              z: ConformsToP3())
+  var output = ""
+  dump(value, to: &output)
+
+  let expected =
+    "▿ (extension in Mirror):Mirror.OuterTwoParams<Mirror.ConformsToP1AndP2, Mirror.ConformsToP1AndP2>.InnerEqualParams<Mirror.ConformsToP3>\n" +
+    "  - x: Mirror.ConformsToP1AndP2\n" +
+    "  - y: Mirror.ConformsToP1AndP2\n" +
+    "  - z: Mirror.ConformsToP3\n"
+
+  expectEqual(expected, output)
+}
+
 runAllTests()

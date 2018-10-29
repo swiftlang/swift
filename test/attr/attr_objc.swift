@@ -841,17 +841,17 @@ class infer_instanceVar1 {
   var observingAccessorsVar1: Int {
   // CHECK: @objc var observingAccessorsVar1: Int {
     willSet {}
-    // CHECK-NEXT: {{^}} final willSet {}
+    // CHECK-NEXT: {{^}} willSet {}
     didSet {}
-    // CHECK-NEXT: {{^}} final didSet {}
+    // CHECK-NEXT: {{^}} didSet {}
   }
 
   @objc var observingAccessorsVar1_: Int {
   // CHECK: {{^}} @objc var observingAccessorsVar1_: Int {
     willSet {}
-    // CHECK-NEXT: {{^}} final willSet {}
+    // CHECK-NEXT: {{^}} willSet {}
     didSet {}
-    // CHECK-NEXT: {{^}} final didSet {}
+    // CHECK-NEXT: {{^}} didSet {}
   }
 
 
@@ -941,11 +941,12 @@ class infer_instanceVar1 {
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
   var var_PlainEnum: PlainEnum
-// CHECK-LABEL: {{^}}  var var_PlainEnum: PlainEnum
+  // expected-error@-1 {{stored property 'var_PlainEnum' cannot have enum type 'PlainEnum' with no cases}}
 
   @objc var var_PlainEnum_: PlainEnum
   // expected-error@-1 {{property cannot be marked @objc because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{non-'@objc' enums cannot be represented in Objective-C}}
+  // expected-error@-3 {{stored property 'var_PlainEnum_' cannot have enum type 'PlainEnum' with no cases}}
 
   var var_PlainProtocol: PlainProtocol
 // CHECK-LABEL: {{^}}  var var_PlainProtocol: PlainProtocol
@@ -1271,6 +1272,7 @@ class infer_instanceVar1 {
   // expected-error@-1 {{'unowned' may only be applied to class and class-bound protocol types, not 'PlainStruct'}}
   unowned var var_Unowned_bad3: PlainEnum
   // expected-error@-1 {{'unowned' may only be applied to class and class-bound protocol types, not 'PlainEnum'}}
+  // expected-error@-2 {{stored property 'var_Unowned_bad3' cannot have enum type 'PlainEnum' with no cases}}
   unowned var var_Unowned_bad4: String
   // expected-error@-1 {{'unowned' may only be applied to class and class-bound protocol types, not 'String'}}
 // CHECK-NOT: @objc{{.*}}Unowned_fail
@@ -2291,13 +2293,10 @@ class User: NSObject {
   }
 }
 
-// 'dynamic' methods cannot be @inlinable or @usableFromInline
+// 'dynamic' methods cannot be @inlinable.
 class BadClass {
   @inlinable @objc dynamic func badMethod1() {}
   // expected-error@-1 {{'@inlinable' attribute cannot be applied to 'dynamic' declarations}}
-
-  @usableFromInline @objc dynamic func badMethod2() {}
-  // expected-error@-1 {{'@usableFromInline' attribute cannot be applied to 'dynamic' declarations}}
 }
 
 @objc

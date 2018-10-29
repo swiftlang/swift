@@ -10,7 +10,7 @@ func foo1<T:P>(_ t: T, _ dt: T.DT1) -> T.DT1 {
   return dttmp
 }
 
-// CHECK: define {{.*}}@"$S4main4foo2yyxAA1PRzlF"
+// CHECK: define {{.*}}@"$s4main4foo2yyxAA1PRzlF"
 public func foo2<S:P>(_ s: S) {
   // CHECK: call void @llvm.dbg.value(metadata %swift.type* %S.DT1,
   // CHECK-SAME:                     metadata ![[META:[0-9]+]]

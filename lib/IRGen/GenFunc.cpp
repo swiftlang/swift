@@ -165,13 +165,14 @@ namespace {
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
-                                         SILType T)
+                                         SILType T, bool isOutlined)
     const override {
       return getFunctionPointerExtraInhabitantIndex(IGF, src);
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
-                              Address dest, SILType T) const override {
+                              Address dest, SILType T, bool isOutlined)
+    const override {
       return storeFunctionPointerExtraInhabitant(IGF, index, dest);
     }
   };
@@ -411,7 +412,8 @@ namespace {
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
-                                         SILType T) const override {
+                                         SILType T, bool isOutlined)
+    const override {
       src = projectFunction(IGF, src);
       return getFunctionPointerExtraInhabitantIndex(IGF, src);
     }
@@ -425,7 +427,8 @@ namespace {
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
-                              Address dest, SILType T) const override {
+                              Address dest, SILType T, bool isOutlined)
+    const override {
       dest = projectFunction(IGF, dest);
       return storeFunctionPointerExtraInhabitant(IGF, index, dest);
     }
@@ -570,7 +573,11 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
   case SILFunctionType::Representation::Thick: {
     SpareBitVector spareBits;
     spareBits.append(IGM.getFunctionPointerSpareBits());
-    spareBits.append(IGM.getHeapObjectSpareBits());
+    // Although the context pointer of a closure (at least, an escaping one)
+    // is a refcounted pointer, we'd like to reserve the right to pack small
+    // contexts into the pointer value, so let's not take any spare bits from
+    // it.
+    spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
     
     if (T->isNoEscape()) {
       // @noescape thick functions are trivial types.
@@ -703,6 +710,7 @@ static CanType getArgumentLoweringType(CanType type,
   case ParameterConvention::Indirect_InoutAliasable:
     return CanInOutType::get(type);
   }
+  llvm_unreachable("unhandled convention");
 }
 
 static bool isABIIgnoredParameterWithoutStorage(IRGenModule &IGM,

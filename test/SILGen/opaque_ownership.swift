@@ -20,7 +20,7 @@ public protocol Decoder {
 
 // Test open_existential_value ownership
 // ---
-// CHECK-LABEL: sil @$Ss11takeDecoder4fromBi1_s0B0_p_tKF : $@convention(thin) (@in_guaranteed Decoder) -> (Builtin.Int1, @error Error) {
+// CHECK-LABEL: sil @$ss11takeDecoder4fromBi1_s0B0_p_tKF : $@convention(thin) (@in_guaranteed Decoder) -> (Builtin.Int1, @error Error) {
 // CHECK: bb0(%0 : @guaranteed $Decoder):
 // CHECK:  [[OPENED:%.*]] = open_existential_value %0 : $Decoder to $@opened("{{.*}}") Decoder
 // CHECK:  [[WT:%.*]] = witness_method $@opened("{{.*}}") Decoder, #Decoder.unkeyedContainer!1 : <Self where Self : Decoder> (Self) -> () throws -> UnkeyedDecodingContainer, %3 : $@opened("{{.*}}") Decoder : $@convention(witness_method: Decoder) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out UnkeyedDecodingContainer, @error Error)
@@ -31,11 +31,11 @@ public protocol Decoder {
 // CHECK:  [[OPENED2:%.*]] = open_existential_value [[BORROW2]] : $UnkeyedDecodingContainer to $@opened("{{.*}}") UnkeyedDecodingContainer
 // CHECK:  [[WT2:%.*]] = witness_method $@opened("{{.*}}") UnkeyedDecodingContainer, #UnkeyedDecodingContainer.isAtEnd!getter.1 : <Self where Self : UnkeyedDecodingContainer> (Self) -> () -> Builtin.Int1, [[OPENED2]] : $@opened("{{.*}}") UnkeyedDecodingContainer : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1
 // CHECK:  [[RET2:%.*]] = apply [[WT2]]<@opened("{{.*}}") UnkeyedDecodingContainer>([[OPENED2]]) : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1
-// CHECK:  end_borrow [[BORROW2]] from [[RET1]] : $UnkeyedDecodingContainer, $UnkeyedDecodingContainer
+// CHECK:  end_borrow [[BORROW2]] : $UnkeyedDecodingContainer
 // CHECK:  destroy_value [[RET1]] : $UnkeyedDecodingContainer
 // CHECK-NOT:  destroy_value %0 : $Decoder
 // CHECK:  return [[RET2]] : $Builtin.Int1
-// CHECK-LABEL: } // end sil function '$Ss11takeDecoder4fromBi1_s0B0_p_tKF'
+// CHECK-LABEL: } // end sil function '$ss11takeDecoder4fromBi1_s0B0_p_tKF'
 public func takeDecoder(from decoder: Decoder) throws -> Builtin.Int1 {
   let container = try decoder.unkeyedContainer()
   return container.isAtEnd
@@ -43,12 +43,14 @@ public func takeDecoder(from decoder: Decoder) throws -> Builtin.Int1 {
 
 // Test unsafe_bitwise_cast nontrivial ownership.
 // ---
-// CHECK-LABEL: sil @$Ss13unsafeBitCast_2toq_x_q_mtr0_lF : $@convention(thin) <T, U> (@in_guaranteed T, @thick U.Type) -> @out U {
+// CHECK-LABEL: sil @$ss13unsafeBitCast_2toq_x_q_mtr0_lF : $@convention(thin) <T, U> (@in_guaranteed T, @thick U.Type) -> @out U {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $T, [[ARG1:%.*]] : @trivial $@thick U.Type):
-// CHECK:   [[RESULT:%.*]] = unchecked_bitwise_cast [[ARG0]] : $T to $U
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG0]] : $T
+// CHECK:   [[RESULT:%.*]] = unchecked_bitwise_cast [[ARG_COPY]] : $T to $U
 // CHECK:   [[RESULT_COPY:%.*]] = copy_value [[RESULT]] : $U
+// CHECK:   destroy_value [[ARG_COPY]] : $T
 // CHECK:   return [[RESULT_COPY]] : $U
-// CHECK-LABEL: } // end sil function '$Ss13unsafeBitCast_2toq_x_q_mtr0_lF'
+// CHECK-LABEL: } // end sil function '$ss13unsafeBitCast_2toq_x_q_mtr0_lF'
 public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
   return Builtin.reinterpretCast(x)
 }
@@ -150,12 +152,12 @@ public struct Int64 : ExpressibleByIntegerLiteral, _ExpressibleByBuiltinIntegerL
 
 // Test ownership of multi-case Enum values in the context of @trivial to @in thunks.
 // ---
-// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @$Ss17FloatingPointSignOSQsSQ2eeoiySbx_xtFZTW : $@convention(witness_method: Equatable) (@in_guaranteed FloatingPointSign, @in_guaranteed FloatingPointSign, @thick FloatingPointSign.Type) -> Bool {
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @$ss17FloatingPointSignOSQsSQ2eeoiySbx_xtFZTW : $@convention(witness_method: Equatable) (@in_guaranteed FloatingPointSign, @in_guaranteed FloatingPointSign, @thick FloatingPointSign.Type) -> Bool {
 // CHECK: bb0(%0 : @trivial $FloatingPointSign, %1 : @trivial $FloatingPointSign, %2 : @trivial $@thick FloatingPointSign.Type):
-// CHECK:   %3 = function_ref @$Ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
+// CHECK:   %3 = function_ref @$ss2eeoiySbx_xtSYRzSQ8RawValueRpzlF : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
 // CHECK:   %4 = apply %3<FloatingPointSign>(%0, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
 // CHECK:   return %4 : $Bool
-// CHECK-LABEL: } // end sil function '$Ss17FloatingPointSignOSQsSQ2eeoiySbx_xtFZTW'
+// CHECK-LABEL: } // end sil function '$ss17FloatingPointSignOSQsSQ2eeoiySbx_xtFZTW'
 public enum FloatingPointSign: Int64 {
   /// The sign for a positive value.
   case plus
@@ -168,18 +170,18 @@ public enum FloatingPointSign: Int64 {
 // Test open_existential_value used in a conversion context.
 // (the actual bridging call is dropped because we don't import Swift).
 // ---
-// CHECK-OSX-LABEL: sil @$Ss26_unsafeDowncastToAnyObject04fromD0yXlyp_tF : $@convention(thin) (@in_guaranteed Any) -> @owned AnyObject {
+// CHECK-OSX-LABEL: sil @$ss26_unsafeDowncastToAnyObject04fromD0yXlyp_tF : $@convention(thin) (@in_guaranteed Any) -> @owned AnyObject {
 // CHECK-OSX: bb0(%0 : @guaranteed $Any):
 // CHECK-OSX:   [[COPY:%.*]] = copy_value %0 : $Any
 // CHECK-OSX:   [[BORROW2:%.*]] = begin_borrow [[COPY]] : $Any
 // CHECK-OSX:   [[VAL:%.*]] = open_existential_value [[BORROW2]] : $Any to $@opened
 // CHECK-OSX:   [[COPY2:%.*]] = copy_value [[VAL]] : $@opened
 // CHECK-OSX:   destroy_value [[COPY2]] : $@opened
-// CHECK-OSX:   end_borrow [[BORROW2]] from [[COPY]] : $Any, $Any
+// CHECK-OSX:   end_borrow [[BORROW2]] : $Any
 // CHECK-OSX:   destroy_value [[COPY]] : $Any
 // CHECK-OSX-NOT:   destroy_value %0 : $Any
 // CHECK-OSX:   return undef : $AnyObject
-// CHECK-OSX-LABEL: } // end sil function '$Ss26_unsafeDowncastToAnyObject04fromD0yXlyp_tF'
+// CHECK-OSX-LABEL: } // end sil function '$ss26_unsafeDowncastToAnyObject04fromD0yXlyp_tF'
 public func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
   return any as AnyObject
 }
@@ -190,13 +192,13 @@ public protocol Error {}
 #if os(macOS)
 // Test open_existential_box_value in a conversion context.
 // ---
-// CHECK-OSX-LABEL: sil @$Ss3foo1eys5Error_pSg_tF : $@convention(thin) (@guaranteed Optional<Error>) -> () {
+// CHECK-OSX-LABEL: sil @$ss3foo1eys5Error_pSg_tF : $@convention(thin) (@guaranteed Optional<Error>) -> () {
 // CHECK-OSX: [[BORROW:%.*]] = begin_borrow %{{.*}} : $Error
 // CHECK-OSX: [[VAL:%.*]] = open_existential_box_value [[BORROW]] : $Error to $@opened
 // CHECK-OSX: [[COPY:%.*]] = copy_value [[VAL]] : $@opened
 // CHECK-OSX: [[ANY:%.*]] = init_existential_value [[COPY]] : $@opened
-// CHECK-OSX: end_borrow [[BORROW]] from %{{.*}} : $Error, $Error
-// CHECK-OSX-LABEL: } // end sil function '$Ss3foo1eys5Error_pSg_tF'
+// CHECK-OSX: end_borrow [[BORROW]] : $Error
+// CHECK-OSX-LABEL: } // end sil function '$ss3foo1eys5Error_pSg_tF'
 public func foo(e: Error?) {
   if let u = e {
     let a: Any = u
@@ -232,20 +234,18 @@ public struct EnumIter<Base : IP> : IP, Seq {
 
 // Test passing a +1 RValue to @in_guaranteed.
 // ---
-// CHECK-LABEL: sil @$Ss7EnumSeqV12makeIterators0A4IterVy0D0QzGyF : $@convention(method) <Base where Base : Seq> (@in_guaranteed EnumSeq<Base>) -> @out EnumIter<Base.Iterator> {
+// CHECK-LABEL: sil @$ss7EnumSeqV12makeIterators0A4IterVy0D0QzGyF : $@convention(method) <Base where Base : Seq> (@in_guaranteed EnumSeq<Base>) -> @out EnumIter<Base.Iterator> {
 // CHECK: bb0(%0 : @guaranteed $EnumSeq<Base>):
 // CHECK:  [[MT:%.*]] = metatype $@thin EnumIter<Base.Iterator>.Type
 // CHECK:  [[FIELD:%.*]] = struct_extract %0 : $EnumSeq<Base>, #EnumSeq._base
 // CHECK:  [[COPY:%.*]] = copy_value [[FIELD]] : $Base
-// CHECK:  [[BORROW:%.*]] = begin_borrow [[COPY]] : $Base
 // CHECK:  [[WT:%.*]] = witness_method $Base, #Seq.makeIterator!1 : <Self where Self : Seq> (Self) -> () -> Self.Iterator : $@convention(witness_method: Seq) <τ_0_0 where τ_0_0 : Seq> (@in_guaranteed τ_0_0) -> @out τ_0_0.Iterator
-// CHECK:  [[ITER:%.*]] = apply [[WT]]<Base>([[BORROW]]) : $@convention(witness_method: Seq) <τ_0_0 where τ_0_0 : Seq> (@in_guaranteed τ_0_0) -> @out τ_0_0.Iterator
-// CHECK:  end_borrow [[BORROW]] from [[COPY]] : $Base, $Base
+// CHECK:  [[ITER:%.*]] = apply [[WT]]<Base>([[COPY]]) : $@convention(witness_method: Seq) <τ_0_0 where τ_0_0 : Seq> (@in_guaranteed τ_0_0) -> @out τ_0_0.Iterator
 // CHECK:  destroy_value [[COPY]] : $Base
-// CHECK: [[FN:%.*]] = function_ref @$Ss8EnumIterV5_baseAByxGx_tcfC : $@convention(method) <τ_0_0 where τ_0_0 : IP> (@in τ_0_0, @thin EnumIter<τ_0_0>.Type) -> @out EnumIter<τ_0_0>
+// CHECK: [[FN:%.*]] = function_ref @$ss8EnumIterV5_baseAByxGx_tcfC : $@convention(method) <τ_0_0 where τ_0_0 : IP> (@in τ_0_0, @thin EnumIter<τ_0_0>.Type) -> @out EnumIter<τ_0_0>
 // CHECK:  [[RET:%.*]] = apply [[FN]]<Base.Iterator>([[ITER]], [[MT]]) : $@convention(method) <τ_0_0 where τ_0_0 : IP> (@in τ_0_0, @thin EnumIter<τ_0_0>.Type) -> @out EnumIter<τ_0_0>
 // CHECK:  return [[RET]] : $EnumIter<Base.Iterator>
-// CHECK-LABEL: } // end sil function '$Ss7EnumSeqV12makeIterators0A4IterVy0D0QzGyF'
+// CHECK-LABEL: } // end sil function '$ss7EnumSeqV12makeIterators0A4IterVy0D0QzGyF'
 public struct EnumSeq<Base : Seq> : Seq {
   public typealias Iterator = EnumIter<Base.Iterator>
 

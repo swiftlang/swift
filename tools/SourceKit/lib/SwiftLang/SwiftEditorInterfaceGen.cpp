@@ -661,7 +661,7 @@ void SwiftLangSupport::editorOpenTypeInterface(EditorConsumer &Consumer,
 
   CompilerInvocation Invocation;
   std::string Error;
-  if (getASTManager().initCompilerInvocation(Invocation, Args, CI.getDiags(),
+  if (getASTManager()->initCompilerInvocation(Invocation, Args, CI.getDiags(),
                                              StringRef(), Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
@@ -701,7 +701,7 @@ void SwiftLangSupport::editorOpenInterface(EditorConsumer &Consumer,
 
   CompilerInvocation Invocation;
   std::string Error;
-  if (getASTManager().initCompilerInvocationNoInputs(Invocation, Args,
+  if (getASTManager()->initCompilerInvocationNoInputs(Invocation, Args,
                                                      CI.getDiags(), Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
@@ -775,7 +775,7 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(StringRef Name,
   auto AstConsumer = std::make_shared<PrimaryFileInterfaceConsumer>(Name,
     SourceName, IFaceGenContexts, Consumer, Invocation);
   static const char OncePerASTToken = 0;
-  getASTManager().processASTAsync(Invocation, AstConsumer, &OncePerASTToken);
+  getASTManager()->processASTAsync(Invocation, AstConsumer, &OncePerASTToken);
 }
 
 void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
@@ -794,7 +794,7 @@ void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,
   std::string Error;
 
   ArrayRef<const char *> SwiftArgs = UsingSwiftArgs ? Args : llvm::None;
-  if (getASTManager().initCompilerInvocationNoInputs(Invocation, SwiftArgs,
+  if (getASTManager()->initCompilerInvocationNoInputs(Invocation, SwiftArgs,
                                                      CI.getDiags(), Error)) {
     Consumer.handleRequestError(Error.c_str());
     return;
@@ -844,7 +844,7 @@ void SwiftLangSupport::findInterfaceDocument(StringRef ModuleName,
 
   CompilerInvocation Invocation;
   std::string Error;
-  if (getASTManager().initCompilerInvocation(Invocation, Args, CI.getDiags(),
+  if (getASTManager()->initCompilerInvocation(Invocation, Args, CI.getDiags(),
                                              StringRef(), Error)) {
     Info.Error = Error;
     return Receiver(Info);

@@ -240,6 +240,7 @@ func structuralSameType3<T, U, V, W>(_: T, _: U, _: V, _: W)
   where X1<T, U> == X1<V, W> { }
 // expected-error@-1{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}
 // expected-error@-2{{same-type requirement makes generic parameters 'U' and 'W' equivalent}}
+// expected-warning@-3{{neither type in same-type constraint ('X1<T, U>' or 'X1<V, W>') refers to a generic parameter or associated type}}
 
 protocol P2 {
   associatedtype Assoc1
@@ -281,3 +282,30 @@ func test9<T: P6, U: P6>(_ t: T, u: U)
 
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: generic parameter τ_0_0.Bar.Foo cannot be equal to both 'Y.Foo' (aka 'X') and 'Z'
+
+func testMetatypeSameType<T, U>(_ t: T, _ u: U)
+  where T.Type == U.Type { }
+// expected-error@-1{{same-type requirement makes generic parameters 'T' and 'U' equivalent}}
+// expected-warning@-2{{neither type in same-type constraint ('T.Type' or 'U.Type') refers to a generic parameter or associated type}}
+
+func testSameTypeCommutativity1<U, T>(_ t: T, _ u: U)
+  where T.Type == U { } // Equivalent to U == T.Type
+// expected-error@-1{{same-type requirement makes generic parameter 'U' non-generic}}
+
+func testSameTypeCommutativity2<U, T: P1>(_ t: T, _ u: U)
+  where U? == T.Assoc { } // Ok, equivalent to T.Assoc == U?
+
+func testSameTypeCommutativity3<U, T: P1>(_ t: T, _ u: U)
+  where (U) -> () == T.Assoc { } // Ok, equivalent to T.Assoc == (U) -> ()
+
+func testSameTypeCommutativity4<U, T>(_ t: T, _ u: U)
+  where (U) -> () == T { } // Equivalent to T == (U) -> ()
+// expected-error@-1{{same-type requirement makes generic parameter 'T' non-generic}}
+
+func testSameTypeCommutativity5<U, T: P1>(_ t: T, _ u: U)
+  where P1 & P2 == T.Assoc { } // Ok, equivalent to T.Assoc == P1 & P2
+
+// FIXME: Error emitted twice.
+func testSameTypeCommutativity6<U, T: P1>(_ t: T, _ u: U)
+  where U & P2 == T.Assoc { } // Equivalent to T.Assoc == U & P2
+// expected-error@-1 2 {{non-protocol, non-class type 'U' cannot be used within a protocol-constrained type}}

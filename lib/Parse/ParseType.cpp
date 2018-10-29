@@ -438,8 +438,8 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
           .useArguments(TupleTypeNode->getElements())
           .useRightParen(TupleTypeNode->getRightParen());
       } else {
-        Builder
-          .addTupleTypeElement(SyntaxFactory::makeTupleTypeElement(InputNode));
+        Builder.addTupleTypeElement(SyntaxFactory::makeTupleTypeElement(
+            InputNode, /*TrailingComma=*/None, Context.getSyntaxArena()));
       }
       SyntaxContext->addSyntax(Builder.build());
     }
@@ -645,13 +645,15 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
     ITR = IdentTypeRepr::create(Context, ComponentsR);
   }
 
-  if (Status.hasCodeCompletion() && CodeCompletion) {
+  if (Status.hasCodeCompletion()) {
     if (Tok.isNot(tok::code_complete)) {
       // We have a dot.
       consumeToken();
-      CodeCompletion->completeTypeIdentifierWithDot(ITR);
+      if (CodeCompletion)
+        CodeCompletion->completeTypeIdentifierWithDot(ITR);
     } else {
-      CodeCompletion->completeTypeIdentifierWithoutDot(ITR);
+      if (CodeCompletion)
+        CodeCompletion->completeTypeIdentifierWithoutDot(ITR);
     }
     // Eat the code completion token because we handled it.
     consumeToken(tok::code_complete);
@@ -719,7 +721,8 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
 
   if (SyntaxContext->isEnabled() && Status.isSuccess()) {
     auto LastNode = SyntaxFactory::makeCompositionTypeElement(
-        SyntaxContext->popIf<TypeSyntax>().getValue(), None);
+        SyntaxContext->popIf<TypeSyntax>().getValue(), None,
+        SyntaxContext->getArena());
     SyntaxContext->addSyntax(LastNode);
   }
   SyntaxContext->collectNodesInPlace(SyntaxKind::CompositionTypeElementList);
@@ -851,6 +854,11 @@ ParserResult<TypeRepr> Parser::parseOldStyleProtocolComposition() {
 ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   SyntaxParsingContext TypeContext(SyntaxContext, SyntaxKind::TupleType);
   Parser::StructureMarkerRAII ParsingTypeTuple(*this, Tok);
+   
+  if (ParsingTypeTuple.isFailed()) {
+    return makeParserError();
+  }
+
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
   SourceLoc EllipsisLoc;
   unsigned EllipsisIdx;

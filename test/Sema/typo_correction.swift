@@ -119,7 +119,7 @@ protocol P { // expected-note {{'P' previously declared here}}
 protocol P {} // expected-error {{invalid redeclaration of 'P'}}
 
 func hasTypo() {
-  _ = P.a.a // expected-error {{type 'Generic' has no member 'a'}}
+  _ = P.a.a // expected-error {{type 'P.a' (aka 'Generic') has no member 'a'}}
 }
 
 // Typo correction with AnyObject.
@@ -164,5 +164,16 @@ class CircularValidationWithTypo {
 
   var abababab = cdcdcdc { // expected-error {{use of unresolved identifier 'cdcdcdc'}}
     didSet { }
+  }
+}
+
+// Crash with invalid extension that has not been bound -- https://bugs.swift.org/browse/SR-8984
+protocol PP {}
+
+func boo() { // expected-note {{did you mean 'boo'?}}
+  extension PP { // expected-error {{declaration is only valid at file scope}}
+    func g() {
+      booo() // expected-error {{use of unresolved identifier 'booo'}}
+    }
   }
 }

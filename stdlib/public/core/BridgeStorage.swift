@@ -60,7 +60,15 @@ struct _BridgeStorage<
     _sanityCheck(_usesNativeSwiftReferenceCounting(NativeClass.self))
     rawValue = Builtin.reinterpretCast(native)
   }
-  
+
+#if !(arch(i386) || arch(arm))
+  @inlinable
+  @inline(__always)
+  internal init(taggedPayload: UInt) {
+    rawValue = _bridgeObject(taggingPayload: taggedPayload)
+  }
+#endif
+
   @inlinable // FIXME(sil-serialize-all)
   public // @testable
   var spareBits: Int {
@@ -79,13 +87,6 @@ struct _BridgeStorage<
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
-  public // @testable
-  mutating func isUniquelyReferencedOrPinnedNative() -> Bool {
-    return _isUniqueOrPinned(&rawValue)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
   public // @testable
   var isNative: Bool {
     @inline(__always) get {
@@ -100,7 +101,8 @@ struct _BridgeStorage<
   public // @testable
   func isNativeWithClearedSpareBits(_ bits: Int) -> Bool {
     return (_bitPattern(rawValue) &
-            (_objCTaggedPointerBits | _objectPointerIsObjCBit |
+            (_bridgeObjectTaggedPointerBits | _objCTaggedPointerBits |
+             _objectPointerIsObjCBit |
              (UInt(bits)) << _objectPointerLowSpareBitShift)) == 0
   }
 
@@ -137,14 +139,6 @@ struct _BridgeStorage<
   mutating func isUniquelyReferenced_native_noSpareBits() -> Bool {
     _sanityCheck(isNative)
     return _isUnique_native(&rawValue)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @inline(__always)
-  public // @testable
-  mutating func isUniquelyReferencedOrPinned_native_noSpareBits() -> Bool {
-    _sanityCheck(isNative)
-    return _isUniqueOrPinned_native(&rawValue)
   }
 
   @inlinable // FIXME(sil-serialize-all)

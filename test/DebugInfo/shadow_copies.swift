@@ -16,7 +16,7 @@ class ClassB : ClassA
 {
     override init (_ input : Int64)
     {
-    // CHECK: @"$S{{.*}}6ClassBCyACs5Int64Vcfc"
+    // CHECK: @"$s{{.*}}6ClassBCyACs5Int64Vcfc"
     // CHECK:  alloca {{.*}}ClassBC*
     // CHECK:  alloca i64
     // CHECK-NOT: alloca

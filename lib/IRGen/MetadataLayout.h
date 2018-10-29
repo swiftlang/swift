@@ -160,6 +160,7 @@ public:
     case MetadataLayout::Kind::ForeignClass:
       return false;
     }
+    llvm_unreachable("unhandled kind");
   }
 };
 
@@ -239,19 +240,7 @@ public:
 
   Size getInstanceAlignMaskOffset() const;
 
-  /// Returns the start of the vtable in the class metadata.
-  Offset getVTableOffset(IRGenFunction &IGF) const;
-
-  /// Returns the size of the vtable, in words.
-  unsigned getVTableSize() const {
-    return MethodInfos.size();
-  }
-
   MethodInfo getMethodInfo(IRGenFunction &IGF, SILDeclRef method) const;
-
-  /// Return the information necessary to compute the offset of a method's
-  /// vtable entry in the class object.
-  StoredOffset getMethodOffsetInfo(SILDeclRef method) const;
 
   Offset getFieldOffset(IRGenFunction &IGF, VarDecl *field) const;
 

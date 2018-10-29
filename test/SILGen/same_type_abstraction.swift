@@ -11,8 +11,8 @@ struct Abstracted<T: Associated, U: Associated> {
 struct S1 {}
 struct S2 {}
 
-// CHECK-LABEL: sil hidden @$S21same_type_abstraction28callClosureWithConcreteTypes{{[_0-9a-zA-Z]*}}F
-// CHECK:         function_ref @$S{{.*}}TR :
+// CHECK-LABEL: sil hidden @$s21same_type_abstraction28callClosureWithConcreteTypes{{[_0-9a-zA-Z]*}}F
+// CHECK:         function_ref @$s{{.*}}TR :
 func callClosureWithConcreteTypes<T: Associated, U: Associated>(x: Abstracted<T, U>, arg: S1) -> S2 where T.Assoc == S1, U.Assoc == S2 {
   return x.closure(arg)
 }
@@ -27,7 +27,7 @@ protocol MyProtocol {
 }
 
 extension MyProtocol where Data == (ReadData, ReadData) {
-  // CHECK-LABEL: sil hidden @$S21same_type_abstraction10MyProtocolPAA8ReadDataQz_AEt0G0RtzrlE07currentG0AE_AEtyF : $@convention(method) <Self where Self : MyProtocol, Self.Data == (Self.ReadData, Self.ReadData)> (@in_guaranteed Self) -> (@out Self.ReadData, @out Self.ReadData)
+  // CHECK-LABEL: sil hidden @$s21same_type_abstraction10MyProtocolPAA8ReadDataQz_AEt0G0RtzrlE07currentG0AE_AEtyF : $@convention(method) <Self where Self : MyProtocol, Self.Data == (Self.ReadData, Self.ReadData)> (@in_guaranteed Self) -> (@out Self.ReadData, @out Self.ReadData)
   func currentData() -> Data {
     // CHECK: bb0(%0 : @trivial $*Self.ReadData, %1 : @trivial $*Self.ReadData, %2 : @trivial $*Self):
     // CHECK:   [[READ_FN:%.*]] = witness_method $Self, #MyProtocol.readData!1 : {{.*}} : $@convention(witness_method: MyProtocol) <τ_0_0 where τ_0_0 : MyProtocol> (@in_guaranteed τ_0_0) -> @out τ_0_0.ReadData
@@ -50,7 +50,7 @@ protocol Refined : Associated {
 }
 
 extension Refined {
-  // CHECK-LABEL: sil hidden @$S21same_type_abstraction7RefinedPAAE12withElementsx5AssocQz_tcfC : $@convention(method) <Self where Self : Refined> (@in Self.Assoc, @thick Self.Type) -> @out Self
+  // CHECK-LABEL: sil hidden @$s21same_type_abstraction7RefinedPAAE12withElementsx5AssocQz_tcfC : $@convention(method) <Self where Self : Refined> (@in Self.Assoc, @thick Self.Type) -> @out Self
   init(withElements newElements: Key) {
     self.init()
   }

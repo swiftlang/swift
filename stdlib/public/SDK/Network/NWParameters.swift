@@ -356,7 +356,7 @@ public final class NWParameters : CustomDebugStringConvertible {
 	/// idempotent data on the connection before the connection may move
 	/// into ready state. As a side effect, this may implicitly enable
 	/// fast open for protocols in the stack, even if they did not have
-	/// fast open expliclty enabled on them (such as the option to enable
+	/// fast open explicitly enabled on them (such as the option to enable
 	/// TCP Fast Open).
 	public var allowFastOpen: Bool {
 		set {

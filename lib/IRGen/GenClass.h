@@ -70,6 +70,11 @@ namespace irgen {
     ForMetaClass = true
   };
 
+  enum HasUpdateCallback_t : bool {
+    DoesNotHaveUpdateCallback = false,
+    HasUpdateCallback = true
+  };
+
   std::pair<Size,Size>
   emitClassPrivateDataFields(IRGenModule &IGM,
                              ConstantStructBuilder &builder,
@@ -155,9 +160,17 @@ namespace irgen {
   bool doesClassMetadataRequireRelocation(IRGenModule &IGM,
                                           ClassDecl *theClass);
 
-  /// Does the class have a non-fixed layout, or generic ancestry?
+  /// Does the class require at least in-place initialization because of
+  /// non-fixed size properties or generic ancestry? If the class requires
+  /// relocation, this also returns true.
   bool doesClassMetadataRequireInitialization(IRGenModule &IGM,
                                               ClassDecl *theClass);
+
+  /// Does the class require at least an in-place update on newer Objective-C
+  /// runtimes? If the class requires full initialization or relocation, this
+  /// also returns true.
+  bool doesClassMetadataRequireUpdate(IRGenModule &IGM,
+                                      ClassDecl *theClass);
 
   /// Load the instance size and alignment mask from a reference to
   /// class type metadata of the given type.

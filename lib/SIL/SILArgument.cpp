@@ -64,14 +64,96 @@ SILModule &SILArgument::getModule() const {
 //                              SILBlockArgument
 //===----------------------------------------------------------------------===//
 
-static SILValue getIncomingValueForPred(const SILBasicBlock *BB,
-                                        const SILBasicBlock *Pred,
-                                        unsigned Index) {
+// FIXME: SILPhiArgument should only refer to branch arguments. They usually
+// need to be distinguished from projections and casts. Actual phi block
+// arguments are substitutable with their incoming values. It is also needlessly
+// expensive to call this helper instead of simply specifying phis with an
+// opcode. It results in repeated CFG traversals and repeated, unnecessary
+// switching over terminator opcodes.
+bool SILPhiArgument::isPhiArgument() {
+  // No predecessors indicates an unreachable block.
+  if (getParent()->pred_empty())
+    return false;
+
+  // Multiple predecessors require phis.
+  auto *predBB = getParent()->getSinglePredecessorBlock();
+  if (!predBB)
+    return true;
+
+  auto *TI = predBB->getTerminator();
+  return isa<BranchInst>(TI) || isa<CondBranchInst>(TI);
+}
+
+static SILValue getIncomingPhiValueForPred(const SILBasicBlock *BB,
+                                           const SILBasicBlock *Pred,
+                                           unsigned Index) {
+  const TermInst *TI = Pred->getTerminator();
+  if (auto *BI = dyn_cast<BranchInst>(TI))
+    return BI->getArg(Index);
+
+  // FIXME: Disallowing critical edges in SIL would enormously simplify phi and
+  // branch handling and reduce expensive analysis invalidation. If that is
+  // done, then only BranchInst will participate in phi operands, eliminating
+  // the need to search for the appropriate CondBranchInst operand.
+  return cast<CondBranchInst>(TI)->getArgForDestBB(BB, Index);
+}
+
+SILValue SILPhiArgument::getIncomingPhiValue(SILBasicBlock *predBB) {
+  if (!isPhiArgument())
+    return SILValue();
+
+  SILBasicBlock *Parent = getParent();
+  assert(!Parent->pred_empty());
+
+  unsigned Index = getIndex();
+
+  assert(Parent->pred_end()
+         != std::find(Parent->pred_begin(), Parent->pred_end(), predBB));
+
+  return getIncomingPhiValueForPred(Parent, predBB, Index);
+}
+
+bool SILPhiArgument::getIncomingPhiValues(
+    llvm::SmallVectorImpl<SILValue> &ReturnedPhiValues) {
+  if (!isPhiArgument())
+    return false;
+
+  SILBasicBlock *Parent = getParent();
+  assert(!Parent->pred_empty());
+
+  unsigned Index = getIndex();
+  for (SILBasicBlock *Pred : getParent()->getPredecessorBlocks()) {
+    SILValue Value = getIncomingPhiValueForPred(Parent, Pred, Index);
+    assert(Value);
+    ReturnedPhiValues.push_back(Value);
+  }
+  return true;
+}
+
+bool SILPhiArgument::getIncomingPhiValues(
+    llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
+        &ReturnedPredBBAndPhiValuePairs) {
+  if (!isPhiArgument())
+    return false;
+
+  SILBasicBlock *Parent = getParent();
+  assert(!Parent->pred_empty());
+
+  unsigned Index = getIndex();
+  for (SILBasicBlock *Pred : getParent()->getPredecessorBlocks()) {
+    SILValue Value = getIncomingPhiValueForPred(Parent, Pred, Index);
+    assert(Value);
+    ReturnedPredBBAndPhiValuePairs.push_back({Pred, Value});
+  }
+  return true;
+}
+
+static SILValue getSingleTerminatorOperandForPred(const SILBasicBlock *BB,
+                                                  const SILBasicBlock *Pred,
+                                                  unsigned Index) {
   const TermInst *TI = Pred->getTerminator();
 
   switch (TI->getTermKind()) {
-  // TODO: This list is conservative. I think we can probably handle more of
-  // these.
   case TermKind::UnreachableInst:
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
@@ -98,15 +180,7 @@ static SILValue getIncomingValueForPred(const SILBasicBlock *BB,
   llvm_unreachable("Unhandled TermKind?!");
 }
 
-SILValue SILPHIArgument::getSingleIncomingValue() const {
-  const SILBasicBlock *Parent = getParent();
-  const SILBasicBlock *PredBB = Parent->getSinglePredecessorBlock();
-  if (!PredBB)
-    return SILValue();
-  return getIncomingValueForPred(Parent, PredBB, getIndex());
-}
-
-bool SILPHIArgument::getIncomingValues(
+bool SILPhiArgument::getSingleTerminatorOperands(
     llvm::SmallVectorImpl<SILValue> &OutArray) {
   SILBasicBlock *Parent = getParent();
 
@@ -115,7 +189,7 @@ bool SILPHIArgument::getIncomingValues(
 
   unsigned Index = getIndex();
   for (SILBasicBlock *Pred : getParent()->getPredecessorBlocks()) {
-    SILValue Value = getIncomingValueForPred(Parent, Pred, Index);
+    SILValue Value = getSingleTerminatorOperandForPred(Parent, Pred, Index);
     if (!Value)
       return false;
     OutArray.push_back(Value);
@@ -124,7 +198,7 @@ bool SILPHIArgument::getIncomingValues(
   return true;
 }
 
-bool SILPHIArgument::getIncomingValues(
+bool SILPhiArgument::getSingleTerminatorOperands(
     llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>> &OutArray) {
   SILBasicBlock *Parent = getParent();
 
@@ -133,7 +207,7 @@ bool SILPHIArgument::getIncomingValues(
 
   unsigned Index = getIndex();
   for (SILBasicBlock *Pred : getParent()->getPredecessorBlocks()) {
-    SILValue Value = getIncomingValueForPred(Parent, Pred, Index);
+    SILValue Value = getSingleTerminatorOperandForPred(Parent, Pred, Index);
     if (!Value)
       return false;
     OutArray.push_back({Pred, Value});
@@ -142,69 +216,31 @@ bool SILPHIArgument::getIncomingValues(
   return true;
 }
 
-SILValue SILPHIArgument::getIncomingValue(unsigned BBIndex) {
-  SILBasicBlock *Parent = getParent();
-
-  if (Parent->pred_empty())
+SILValue SILPhiArgument::getSingleTerminatorOperand() const {
+  const SILBasicBlock *Parent = getParent();
+  const SILBasicBlock *PredBB = Parent->getSinglePredecessorBlock();
+  if (!PredBB)
     return SILValue();
-
-  unsigned Index = getIndex();
-
-  // We could do an early check if the size of the pred list is <= BBIndex, but
-  // that would involve walking the linked list anyways, so we just iterate once
-  // over the loop.
-
-  // We use this funky loop since predecessors are stored in a linked list but
-  // we want array like semantics.
-  unsigned BBCount = 0;
-  for (SILBasicBlock *Pred : Parent->getPredecessorBlocks()) {
-    // If BBCount is not BBIndex, continue.
-    if (BBCount < BBIndex) {
-      BBCount++;
-      continue;
-    }
-
-    // This will return an empty SILValue if we found something we do not
-    // understand.
-    return getIncomingValueForPred(Parent, Pred, Index);
-  }
-
-  return SILValue();
+  return getSingleTerminatorOperandForPred(Parent, PredBB, getIndex());
 }
 
-SILValue SILPHIArgument::getIncomingValue(SILBasicBlock *BB) {
-  SILBasicBlock *Parent = getParent();
-
-  assert(!Parent->pred_empty() && "Passed in non-predecessor BB!");
-  unsigned Index = getIndex();
-
-  // We could do an early check if the size of the pred list is <= BBIndex, but
-  // that would involve walking the linked list anyways, so we just iterate once
-  // over the loop.
-
-  auto Target = std::find(Parent->pred_begin(), Parent->pred_end(), BB);
-  if (Target == Parent->pred_end())
-    return SILValue();
-  return getIncomingValueForPred(Parent, BB, Index);
-}
-
-const SILPHIArgument *BranchInst::getArgForOperand(const Operand *oper) const {
+const SILPhiArgument *BranchInst::getArgForOperand(const Operand *oper) const {
   assert(oper->getUser() == this);
-  return cast<SILPHIArgument>(
+  return cast<SILPhiArgument>(
       getDestBB()->getArgument(oper->getOperandNumber()));
 }
 
-const SILPHIArgument *
+const SILPhiArgument *
 CondBranchInst::getArgForOperand(const Operand *oper) const {
   assert(oper->getUser() == this);
 
   unsigned operIdx = oper->getOperandNumber();
   if (isTrueOperandIndex(operIdx)) {
-    return cast<SILPHIArgument>(getTrueBB()->getArgument(
+    return cast<SILPhiArgument>(getTrueBB()->getArgument(
         operIdx - getTrueOperands().front().getOperandNumber()));
   }
   if (isFalseOperandIndex(operIdx)) {
-    return cast<SILPHIArgument>(getFalseBB()->getArgument(
+    return cast<SILPhiArgument>(getFalseBB()->getArgument(
         operIdx - getFalseOperands().front().getOperandNumber()));
   }
   return nullptr;

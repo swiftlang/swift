@@ -24,7 +24,7 @@ bb0(%0 : $*TestView, %1 : $@callee_owned (@inout TestView) ->()):
 // CHECK-LABEL: sil @testSpecializeThunk : $@convention(thin) (@inout TestView, TestRange, @in TestSlice) -> () {
 // CHECK: bb0(%0 : $*TestView, %1 : $TestRange, %2 : $TestSlice):
 // CHECK:   [[CLOSURE:%.*]] = function_ref @closure : $@convention(thin) (@inout TestView, TestRange, @in TestSlice) -> ()
-// CHECK:   [[SPECIALIZED:%.*]] = function_ref @$S5thunk7closure4main9TestRangeVAC0D5SliceVTf1nc_n : $@convention(thin) (@inout TestView, TestRange, @in TestSlice) -> @out () // user: %6
+// CHECK:   [[SPECIALIZED:%.*]] = function_ref @$s5thunk7closure4main9TestRangeVAC0D5SliceVTf1nc_n : $@convention(thin) (@inout TestView, TestRange, @in TestSlice) -> @out () // user: %6
 // CHECK:   [[THUNK:%.*]] = function_ref @thunk : $@convention(thin) (@inout TestView, @owned @callee_owned (@inout TestView) -> ()) -> @out ()
 // CHECK:   [[CALL:%.*]] = apply [[SPECIALIZED]](%0, %1, %2) : $@convention(thin) (@inout TestView, TestRange, @in TestSlice) -> @out ()
 // CHECK:   %{{.*}} = tuple ()

@@ -20,7 +20,7 @@ import SwiftShims
 
 @usableFromInline
 internal typealias _ArrayBridgeStorage
-  = _BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>
+  = _BridgeStorage<__ContiguousArrayStorageBase, _NSArrayCore>
 
 @usableFromInline
 @_fixed_layout
@@ -43,7 +43,7 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
   /// - Precondition: The elements actually have dynamic type `U`, and `U`
   ///   is a class or `@objc` existential.
   @inlinable
-  internal func cast<U>(toBufferOf _: U.Type) -> _ArrayBuffer<U> {
+  __consuming internal func cast<U>(toBufferOf _: U.Type) -> _ArrayBuffer<U> {
     _sanityCheck(_isClassOrObjCExistential(Element.self))
     _sanityCheck(_isClassOrObjCExistential(U.self))
     return _ArrayBuffer<U>(storage: _storage)
@@ -60,7 +60,7 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
   /// - Precondition: `U` is a class or `@objc` existential derived from
   /// `Element`.
   @inlinable
-  internal func downcast<U>(
+  __consuming internal func downcast<U>(
     toBufferWithDeferredTypeCheckOf _: U.Type
   ) -> _ArrayBuffer<U> {
     _sanityCheck(_isClassOrObjCExistential(Element.self))
@@ -123,25 +123,6 @@ extension _ArrayBuffer {
     return _isNative
   }
 
-  /// Returns `true` iff this buffer's storage is either
-  /// uniquely-referenced or pinned.
-  @inlinable
-  internal mutating func isUniquelyReferencedOrPinned() -> Bool {
-    if !_isClassOrObjCExistential(Element.self) {
-      return _storage.isUniquelyReferencedOrPinned_native_noSpareBits()
-    }
-
-    // This is a performance optimization. This code used to be:
-    //
-    //   return _storage.isUniquelyReferencedOrPinnedNative() && _isNative.
-    //
-    // SR-6437
-    if !_storage.isUniquelyReferencedOrPinnedNative() {
-      return false
-    }
-    return _isNative
-  }
-
   /// Convert to an NSArray.
   ///
   /// O(1) if the element type is bridged verbatim, O(*n*) otherwise.
@@ -169,11 +150,6 @@ extension _ArrayBuffer {
   @inlinable
   internal mutating func isMutableAndUniquelyReferenced() -> Bool {
     return isUniquelyReferenced()
-  }
-
-  @inlinable
-  internal mutating func isMutableAndUniquelyReferencedOrPinned() -> Bool {
-    return isUniquelyReferencedOrPinned()
   }
 
   /// If this buffer is backed by a `_ContiguousArrayBuffer`
@@ -238,7 +214,7 @@ extension _ArrayBuffer {
   /// just-initialized memory.
   @inlinable
   @discardableResult
-  internal func _copyContents(
+  __consuming internal func _copyContents(
     subRange bounds: Range<Int>,
     initializing target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element> {

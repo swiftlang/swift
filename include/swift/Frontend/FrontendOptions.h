@@ -72,10 +72,6 @@ public:
   /// The path to which we should store indexing data, if any.
   std::string IndexStorePath;
 
-  /// The path to which we should emit GraphViz output for the complete
-  /// request-evaluator graph.
-  std::string RequestEvaluatorGraphVizPath;
-
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
@@ -204,6 +200,9 @@ public:
   /// Indicates that the frontend should emit "verbose" SIL
   /// (if asked to emit SIL).
   bool EmitVerboseSIL = false;
+
+  /// If set, find and import parseable modules from .swiftinterface files.
+  bool EnableParseableModuleInterface = false;
 
   /// If set, this module is part of a mixed Objective-C/Swift framework, and
   /// the Objective-C half should implicitly be visible to the Swift sources.

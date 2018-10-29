@@ -30,7 +30,7 @@ extension Array : _ObjectiveCBridgeable {
   ///
   /// The provided `NSArray` will be copied to ensure that the copy can
   /// not be mutated by other code.
-  internal init(_cocoaArray: NSArray) {
+  internal init(_cocoaArray: __shared NSArray) {
     assert(_isBridgedVerbatimToObjectiveC(Element.self),
       "Array can be backed by NSArray only when the element type can be bridged verbatim to Objective-C")
     // FIXME: We would like to call CFArrayCreateCopy() to avoid doing an
@@ -84,6 +84,7 @@ extension Array : _ObjectiveCBridgeable {
     return result != nil
   }
 
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSArray?
   ) -> Array {
@@ -153,7 +154,7 @@ extension NSArray {
   /// Discussion: After an immutable array has been initialized in
   /// this way, it cannot be modified.
   @nonobjc
-  public convenience init(array anArray: NSArray) {
+  public convenience init(array anArray: __shared NSArray) {
     self.init(array: anArray as Array)
   }
 }

@@ -43,9 +43,12 @@ bb2:
   return %r : $()
 
 bb3:
-  unwind
+  br bb5
 
 bb4:
+  br bb5
+
+bb5:
   unwind
 }
 

@@ -1335,10 +1335,6 @@ void TypeConverter::insert(TypeKey k, const TypeLowering *tl) {
 static CanTupleType getLoweredTupleType(TypeConverter &tc,
                                         AbstractionPattern origType,
                                         CanTupleType substType) {
-  // We can't lower InOutType, and we can't lower an unlabeled one
-  // element vararg tuple either, because lowering strips off flags,
-  // which would end up producing a ParenType.
-  assert(!shouldExpandTupleType(substType));
   assert(origType.matchesTuple(substType));
 
   // Does the lowered tuple type differ from the substituted type in
@@ -1356,6 +1352,7 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
     // Make sure we don't have something non-materializable.
     auto Flags = substElt.getParameterFlags();
     assert(Flags.getValueOwnership() == ValueOwnership::Default);
+    assert(!Flags.isVariadic());
 
     SILType silType = tc.getLoweredType(origEltType, substEltType);
     CanType loweredSubstEltType = silType.getASTType();
@@ -1363,8 +1360,8 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
     changed = (changed || substEltType != loweredSubstEltType ||
                !Flags.isNone());
 
-    // Note: we drop any parameter flags such as @escaping, @autoclosure and
-    // varargs.
+    // Note: we drop @escaping and @autoclosure which can still appear on
+    // materializable tuple types.
     //
     // FIXME: Replace this with an assertion that the original tuple element
     // did not have any flags.
@@ -1372,7 +1369,7 @@ static CanTupleType getLoweredTupleType(TypeConverter &tc,
                              substElt.getName(),
                              ParameterTypeFlags());
   }
-  
+
   if (!changed) return substType;
 
   // The cast should succeed, because if we end up with a one-element
@@ -1962,53 +1959,6 @@ TypeConverter::getProtocolDispatchStrategy(ProtocolDecl *P) {
   return ProtocolDispatchStrategy::Swift;
 }
 
-CanSILFunctionType TypeConverter::getMaterializeForSetCallbackType(
-    AbstractStorageDecl *storage, CanGenericSignature genericSig, Type selfType,
-    SILFunctionTypeRepresentation rep,
-    Optional<ProtocolConformanceRef> witnessMethodConformance) {
-  auto &ctx = M.getASTContext();
-
-  // Get lowered formal types for callback parameters.
-  auto selfMetatypeType = MetatypeType::get(selfType,
-                                            MetatypeRepresentation::Thick);
-
-  auto canSelfType = selfType->getCanonicalType(genericSig);
-  auto canSelfMetatypeType = selfMetatypeType->getCanonicalType(genericSig);
-  auto selfConvention = (storage->isSetterMutating()
-                         ? ParameterConvention::Indirect_Inout
-                         : ParameterConvention::Indirect_In_Guaranteed);
-
-  {
-    GenericContextScope scope(*this, genericSig);
-
-    // If 'self' is a metatype, make it @thin or @thick as needed, but not inside
-    // selfMetatypeType.
-    if (auto metatype = canSelfType->getAs<MetatypeType>()) {
-      if (!metatype->hasRepresentation())
-        canSelfType = getLoweredType(metatype).getASTType();
-    }
-  }
-
-  // Create the SILFunctionType for the callback.
-  SILParameterInfo params[] = {
-    { ctx.TheRawPointerType, ParameterConvention::Direct_Unowned },
-    { ctx.TheUnsafeValueBufferType, ParameterConvention::Indirect_Inout },
-    { canSelfType, selfConvention },
-    { canSelfMetatypeType, ParameterConvention::Direct_Unowned },
-  };
-  ArrayRef<SILResultInfo> results = {};
-
-  auto extInfo = SILFunctionType::ExtInfo().withRepresentation(rep);
-
-  if (genericSig && genericSig->areAllParamsConcrete())
-    genericSig = nullptr;
-
-  return SILFunctionType::get(genericSig, extInfo, SILCoroutineKind::None,
-                              /*callee*/ ParameterConvention::Direct_Unowned,
-                              params, {}, results, None, ctx,
-                              witnessMethodConformance);
-}
-
 /// If a capture references a local function, return a reference to that
 /// function.
 static Optional<AnyFunctionRef>
@@ -2124,8 +2074,6 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
           case ReadWriteImplKind::Modify:
             collectFunctionCaptures(capturedVar->getModifyCoroutine());
             break;
-          case ReadWriteImplKind::MaterializeForSet:
-            llvm_unreachable("local variable with materializeForSet?");
           }
         }
 

@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1 
+// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 class A {
@@ -45,7 +45,7 @@ func f10<T : GB<A>>(_: T) where T : GA<A> {}
 
 func f11<T : GA<T>>(_: T) { } // expected-error{{superclass constraint 'T' : 'GA<T>' is recursive}}
 func f12<T : GA<U>, U : GB<T>>(_: T, _: U) { } // expected-error{{superclass constraint 'U' : 'GB<T>' is recursive}} // expected-error{{superclass constraint 'T' : 'GA<U>' is recursive}}
-func f13<T : U, U : GA<T>>(_: T, _: U) { } // expected-error{{inheritance from non-protocol, non-class type 'U'}}
+func f13<T : U, U : GA<T>>(_: T, _: U) { } // expected-error{{type 'T' constrained to non-protocol, non-class type 'U'}}
 
 // rdar://problem/24730536
 // Superclass constraints can be used to resolve nested types to concrete types.
@@ -204,3 +204,13 @@ func g<T : Init & Derived>(_: T.Type) {
   _ = T(x: ())
   _ = T(y: ())
 }
+
+// Binding a class-constrained generic parameter to a subclass existential is
+// not sound.
+struct G<T : Base> {}
+// expected-note@-1 2 {{requirement specified as 'T' : 'Base' [with T = Base & P]}}
+
+_ = G<Base & P>() // expected-error {{'G' requires that 'Base & P' inherit from 'Base'}}
+
+func badClassConstrainedType(_: G<Base & P>) {}
+// expected-error@-1 {{'G' requires that 'Base & P' inherit from 'Base'}}

@@ -62,5 +62,4 @@ testObject3 = TestStruct(foo: 42)
 func mutateThis(mutatee: inout Int) {
     mutatee = 666
 }
-// FIXME: should be {{cannot mutate property 'foo' of immutable value 'testObject3'}}
-mutateThis(mutatee: &testObject3.foo) // expected-error {{immutable value 'testObject3' must not be passed inout}}
+mutateThis(mutatee: &testObject3.foo) // expected-error {{cannot mutate property 'foo' of immutable value 'testObject3'}}

@@ -356,6 +356,7 @@ extension DispatchData {
 		return true
 	}
 
+	@_effects(readonly)
 	public static func _unconditionallyBridgeFromObjectiveC(_ source: __DispatchData?) -> DispatchData {
 		var result: DispatchData?
 		_forceBridgeFromObjectiveC(source!, result: &result)

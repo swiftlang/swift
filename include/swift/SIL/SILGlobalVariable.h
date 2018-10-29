@@ -158,6 +158,11 @@ public:
   static bool isValidStaticInitializerInst(const SILInstruction *I,
                                            SILModule &M);
 
+  /// Returns the usub_with_overflow builtin if \p TE extracts the result of
+  /// such a subtraction, which is required to have an integer_literal as right
+  /// operand.
+  static BuiltinInst *getOffsetSubtract(const TupleExtractInst *TE, SILModule &M);
+
   void dropAllReferences() {
     StaticInitializerBlock.dropAllReferences();
   }

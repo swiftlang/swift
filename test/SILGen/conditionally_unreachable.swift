@@ -16,20 +16,20 @@ func condUnreachable() {
   }
 }
 
-// RAW-LABEL: sil hidden @$S25conditionally_unreachable15condUnreachableyyF 
+// RAW-LABEL: sil hidden @$s25conditionally_unreachable15condUnreachableyyF 
 // RAW:         cond_br {{%.*}}, [[YEA:bb[0-9]+]], [[NAY:bb[0-9]+]]
 // RAW:       [[YEA]]:
 // RAW:         function_ref @foo
 // RAW:       [[NAY]]:
 // RAW:         builtin "conditionallyUnreachable"
 
-// DEBUG-LABEL: sil hidden @$S25conditionally_unreachable15condUnreachableyyF 
+// DEBUG-LABEL: sil hidden @$s25conditionally_unreachable15condUnreachableyyF 
 // DEBUG-NOT:     cond_br
 // DEBUG:         function_ref @foo
 // DEBUG-NOT:     {{ unreachable}}
 // DEBUG:         return
 
-// RELEASE-LABEL: sil hidden @$S25conditionally_unreachable15condUnreachableyyF 
+// RELEASE-LABEL: sil hidden @$s25conditionally_unreachable15condUnreachableyyF 
 // RELEASE-NOT:     cond_br
 // RELEASE-NOT:     function_ref @foo
 // RELEASE-NOT:     return

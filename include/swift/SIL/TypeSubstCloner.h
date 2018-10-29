@@ -135,8 +135,8 @@ public:
   using SILClonerWithScopes<ImplClass>::getTypeInClonedContext;
   using SILClonerWithScopes<ImplClass>::getOpType;
   using SILClonerWithScopes<ImplClass>::getOpBasicBlock;
-  using SILClonerWithScopes<ImplClass>::doPostProcess;
-  using SILClonerWithScopes<ImplClass>::ValueMap;
+  using SILClonerWithScopes<ImplClass>::recordClonedInstruction;
+  using SILClonerWithScopes<ImplClass>::recordFoldedValue;
   using SILClonerWithScopes<ImplClass>::addBlockWithUnreachable;
   using SILClonerWithScopes<ImplClass>::OpenedArchetypesTracker;
 
@@ -193,7 +193,7 @@ protected:
                                  Helper.getArguments(), Inst->isNonThrowing(),
                                  GenericSpecializationInformation::create(
                                    Inst, getBuilder()));
-    doPostProcess(Inst, N);
+    recordClonedInstruction(Inst, N);
   }
 
   void visitTryApplyInst(TryApplyInst *Inst) {
@@ -205,7 +205,7 @@ protected:
         getOpBasicBlock(Inst->getErrorBB()),
         GenericSpecializationInformation::create(
           Inst, getBuilder()));
-    doPostProcess(Inst, N);
+    recordClonedInstruction(Inst, N);
   }
 
   void visitPartialApplyInst(PartialApplyInst *Inst) {
@@ -217,7 +217,7 @@ protected:
         Helper.getSubstitutions(), Helper.getArguments(), ParamConvention,
         GenericSpecializationInformation::create(
           Inst, getBuilder()));
-    doPostProcess(Inst, N);
+    recordClonedInstruction(Inst, N);
   }
 
   /// Attempt to simplify a conditional checked cast.
@@ -258,7 +258,7 @@ protected:
     // there is no need for an upcast and we can just use the operand.
     if (getOpType(Upcast->getType()) ==
         getOpValue(Upcast->getOperand())->getType()) {
-      ValueMap.insert({SILValue(Upcast), getOpValue(Upcast->getOperand())});
+      recordFoldedValue(SILValue(Upcast), getOpValue(Upcast->getOperand()));
       return;
     }
     super::visitUpcastInst(Upcast);
@@ -268,7 +268,7 @@ protected:
     // If the substituted type is trivial, ignore the copy.
     SILType copyTy = getOpType(Copy->getType());
     if (copyTy.isTrivial(Copy->getModule())) {
-      ValueMap.insert({SILValue(Copy), getOpValue(Copy->getOperand())});
+      recordFoldedValue(SILValue(Copy), getOpValue(Copy->getOperand()));
       return;
     }
     super::visitCopyValueInst(Copy);
@@ -297,15 +297,15 @@ protected:
     if (SubsMap.empty())
       return false;
 
-    auto Params = Sig->getSubstitutableParams();
-    return std::any_of(Params.begin(), Params.end(), [&](Type ParamType) {
-      // FIXME: It would be more elegant to run
-      // SubsMap.mapReplacementTypesOutOfContext() bup front, but it can assert.
-      Type Substitution = Type(ParamType).subst(SubsMap)->mapTypeOutOfContext();
-      return !Substitution->isOpenedExistential() &&
-             (Substitution->getCanonicalType() !=
-              ParamType->getCanonicalType());
+    bool Result = false;
+    Sig->forEachParam([&](GenericTypeParamType *ParamType, bool Canonical) {
+      if (!Canonical)
+        return;
+      if (!Type(ParamType).subst(SubsMap)->isEqual(ParamType))
+        Result = true;
     });
+
+    return Result;
   }
 
   enum { ForInlining = true };
@@ -314,7 +314,7 @@ protected:
   /// \param SubsMap - the substitutions of the inlining/specialization process.
   /// \param RemappedSig - the generic signature.
   static SILFunction *remapParentFunction(FunctionBuilderTy &FuncBuilder,
-					  SILModule &M,
+                                          SILModule &M,
                                           SILFunction *ParentFunction,
                                           SubstitutionMap SubsMap,
                                           GenericSignature *RemappedSig,
@@ -325,14 +325,15 @@ protected:
     if (!RemappedSig || !OriginalEnvironment)
       return ParentFunction;
 
-    if (!substitutionsChangeGenericTypeParameters(SubsMap, RemappedSig))
-      return ParentFunction;
-
     if (SubsMap.hasArchetypes())
       SubsMap = SubsMap.mapReplacementTypesOutOfContext();
 
-    // This is a bug in mapReplacementTypesOutOfContext(). Archetypes can't be
-    // mangled, only type parameters can; ignore this for now.
+    if (!substitutionsChangeGenericTypeParameters(SubsMap, RemappedSig))
+      return ParentFunction;
+
+    // Note that mapReplacementTypesOutOfContext() can't do anything for
+    // opened existentials, and since archetypes can't be mangled, ignore
+    // this case for now.
     if (SubsMap.hasArchetypes())
       return ParentFunction;
 

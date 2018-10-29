@@ -65,7 +65,7 @@ bb0(%metatype : $Optional<@thick T.Type>):
 // CHECK:       [[T0:%.*]] = bitcast [[SWIFTCLASS]]* %0 to %swift.type**
 // CHECK-NEXT:  [[TYPE:%.*]] = load %swift.type*, %swift.type** [[T0]],
 // CHECK-NEXT:  [[T0:%.*]] = bitcast [[SWIFTCLASS]]* %0 to i8*
-// CHECK-NEXT:  call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[T0]], %swift.type* [[TYPE]], {{.*}} @"$S10objc_casts10ClassProtoMp"
+// CHECK-NEXT:  call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[T0]], %swift.type* [[TYPE]], {{.*}} @"$s10objc_casts10ClassProtoMp"
 sil hidden @swift_class_bounded_to_cp : $@convention(thin) <T: SwiftClass> (@owned T) -> @owned ClassProto {
 entry(%a : $T):
   %0 = unconditional_checked_cast %a : $T to $ClassProto
@@ -77,7 +77,7 @@ entry(%a : $T):
 // CHECK:       [[T0:%.*]] = bitcast [[OBJCCLASS]]* %0 to %objc_object*
 // CHECK-NEXT:  [[TYPE:%.*]] = call %swift.type* @swift_getObjectType(%objc_object* [[T0]])
 // CHECK-NEXT:  [[T0:%.*]] = bitcast [[OBJCCLASS]]* %0 to i8*
-// CHECK-NEXT:  call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[T0]], %swift.type* [[TYPE]], {{.*}} @"$S10objc_casts10ClassProtoMp"
+// CHECK-NEXT:  call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[T0]], %swift.type* [[TYPE]], {{.*}} @"$s10objc_casts10ClassProtoMp"
 sil hidden @objc_class_bounded_to_cp : $@convention(thin) <T: NSObject> (@owned T) -> @owned ClassProto {
 entry(%a : $T):
   %0 = unconditional_checked_cast %a : $T to $ClassProto

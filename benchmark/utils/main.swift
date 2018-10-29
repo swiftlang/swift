@@ -44,6 +44,7 @@ import CharacterProperties
 import Chars
 import ClassArrayGetter
 import Combos
+import CountAlgo
 import DataBenchmarks
 import DeadArray
 import DictOfArraysToArrayOfDicts
@@ -59,6 +60,7 @@ import DictionaryCopy
 import DictionaryGroup
 import DictionaryKeysContains
 import DictionaryLiteral
+import DictionaryOfAnyHashableStrings
 import DictionaryRemove
 import DictionarySubscriptDefault
 import DictionarySwap
@@ -75,6 +77,7 @@ import Hanoi
 import Hash
 import HashQuadratic
 import Histogram
+import InsertCharacter
 import Integrate
 import IterateData
 import Join
@@ -207,6 +210,7 @@ registerBenchmark(CharacterPropertiesStashedMemo)
 registerBenchmark(CharacterPropertiesPrecomputed)
 registerBenchmark(Chars)
 registerBenchmark(Combos)
+registerBenchmark(CountAlgo)
 registerBenchmark(ClassArrayGetter)
 registerBenchmark(DataBenchmarks)
 registerBenchmark(DeadArray)
@@ -223,6 +227,7 @@ registerBenchmark(DictionaryCopy)
 registerBenchmark(DictionaryGroup)
 registerBenchmark(DictionaryKeysContains)
 registerBenchmark(DictionaryLiteral)
+registerBenchmark(DictionaryOfAnyHashableStrings)
 registerBenchmark(DictionaryRemove)
 registerBenchmark(DictionarySubscriptDefault)
 registerBenchmark(DictionarySwap)
@@ -239,6 +244,7 @@ registerBenchmark(Hanoi)
 registerBenchmark(HashTest)
 registerBenchmark(HashQuadratic)
 registerBenchmark(Histogram)
+registerBenchmark(InsertCharacter)
 registerBenchmark(IntegrateTest)
 registerBenchmark(IterateData)
 registerBenchmark(Join)

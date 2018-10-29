@@ -20,6 +20,7 @@
 #include "SwitchEnumBuilder.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/ProfileCounter.h"
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -79,6 +80,14 @@ SILBasicBlock *SILGenFunction::createBasicBlock(FunctionSection section) {
   llvm_unreachable("bad function section");
 }
 
+SILBasicBlock *
+SILGenFunction::createBasicBlockAndBranch(SILLocation loc,
+                                          SILBasicBlock *destBB) {
+  auto *newBB = createBasicBlock();
+  SILGenBuilder(B, newBB).createBranch(loc, destBB);
+  return newBB;
+}
+
 void SILGenFunction::eraseBasicBlock(SILBasicBlock *block) {
   assert(block->pred_empty() && "erasing block with predecessors");
   assert(block->empty() && "erasing block with content");
@@ -87,6 +96,76 @@ void SILGenFunction::eraseBasicBlock(SILBasicBlock *block) {
     StartOfPostmatter = next_or_end(blockIt, F.end());
   }
   block->eraseFromParent();
+}
+
+// Merge blocks during a single traversal of the block list. Only unconditional
+// branch edges are visited. Consequently, this takes only as much time as a
+// linked list traversal and requires no additional storage.
+//
+// For each block, check if it can be merged with its successor. Place the
+// merged block at the successor position in the block list.
+//
+// Typically, the successor occurs later in the list. This is most efficient
+// because merging moves instructions from the successor to the
+// predecessor. This way, instructions will only be moved once. Furthermore, the
+// merged block will be visited again to determine if it can be merged with it's
+// successor, and so on, so no edges are skipped.
+//
+// In rare cases, the predessor is merged with its earlier successor, which has
+// already been visited. If the successor can also be merged, then it has
+// already happened, and there is no need to revisit the merged block.
+void SILGenFunction::mergeCleanupBlocks() {
+  for (auto bbPos = F.begin(), bbEnd = F.end(), nextPos = bbPos; bbPos != bbEnd;
+       bbPos = nextPos) {
+    // A forward iterator refering to the next unprocessed block in the block
+    // list. If blocks are merged and moved, then this will be updated.
+    nextPos = std::next(bbPos);
+
+    // Consider the current block as the predecessor.
+    auto *predBB = &*bbPos;
+    auto *BI = dyn_cast<BranchInst>(predBB->getTerminator());
+    if (!BI)
+      continue;
+
+    // predBB has an unconditional branch to succBB. If succBB has no other
+    // predecessors, then merge the blocks.
+    auto *succBB = BI->getDestBB();
+    if (!succBB->getSinglePredecessorBlock())
+      continue;
+
+    // Before merging, establish iterators that won't be invalidated by erasing
+    // succBB. Use a reverse iterator to remember the position before a block.
+    //
+    // Remember the block before the current successor as a position for placing
+    // the merged block.
+    auto beforeSucc = std::next(SILFunction::reverse_iterator(succBB));
+
+    // Remember the position before the current predecessor to avoid skipping
+    // blocks or revisiting blocks unnecessarilly.
+    auto beforePred = std::next(SILFunction::reverse_iterator(predBB));
+    // Since succBB will be erased, move before it.
+    if (beforePred == SILFunction::reverse_iterator(succBB))
+      ++beforePred;
+
+    // Merge `predBB` with `succBB`. This erases `succBB`.
+    mergeBasicBlockWithSingleSuccessor(predBB, succBB);
+
+    // If predBB is first in the list, then it must be the entry block which
+    // cannot be moved.
+    if (beforePred != F.rend()) {
+      // Move the merged block into the successor position. (If the blocks are
+      // not already adjacent, then the first is typically the trampoline.)
+      assert(beforeSucc != F.rend()
+             && "entry block cannot have a predecessor.");
+      predBB->moveAfter(&*beforeSucc);
+    }
+    // If after moving predBB there are no more blocks to process, then break.
+    if (beforePred == F.rbegin())
+      break;
+
+    // Update the loop iterator to the next unprocessed block.
+    nextPos = SILFunction::iterator(&*std::prev(beforePred));
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -146,8 +225,7 @@ static void emitOrDeleteBlock(SILGenFunction &SGF, JumpDest &dest,
     SGF.B.emitBlock(BB, BranchLoc);
 }
 
-Condition SILGenFunction::emitCondition(Expr *E, bool hasFalseCode,
-                                        bool invertValue,
+Condition SILGenFunction::emitCondition(Expr *E, bool invertValue,
                                         ArrayRef<SILType> contArgs,
                                         ProfileCounter NumTrueTaken,
                                         ProfileCounter NumFalseTaken) {
@@ -162,12 +240,12 @@ Condition SILGenFunction::emitCondition(Expr *E, bool hasFalseCode,
   }
   assert(V->getType().castTo<BuiltinIntegerType>()->isFixedWidth(1));
 
-  return emitCondition(V, E, hasFalseCode, invertValue, contArgs, NumTrueTaken,
+  return emitCondition(V, E, invertValue, contArgs, NumTrueTaken,
                        NumFalseTaken);
 }
 
 Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
-                                        bool hasFalseCode, bool invertValue,
+                                        bool invertValue,
                                         ArrayRef<SILType> contArgs,
                                         ProfileCounter NumTrueTaken,
                                         ProfileCounter NumFalseTaken) {
@@ -177,25 +255,16 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
   SILBasicBlock *ContBB = createBasicBlock();
 
   for (SILType argTy : contArgs) {
-    ContBB->createPHIArgument(argTy, ValueOwnershipKind::Owned);
-  }
-  
-  SILBasicBlock *FalseBB, *FalseDestBB;
-  if (hasFalseCode) {
-    FalseBB = FalseDestBB = createBasicBlock();
-  } else {
-    FalseBB = nullptr;
-    FalseDestBB = ContBB;
+    ContBB->createPhiArgument(argTy, ValueOwnershipKind::Owned);
   }
 
+  SILBasicBlock *FalseBB = createBasicBlock();
   SILBasicBlock *TrueBB = createBasicBlock();
 
   if (invertValue)
-    B.createCondBranch(Loc, V, FalseDestBB, TrueBB, NumFalseTaken,
-                       NumTrueTaken);
+    B.createCondBranch(Loc, V, FalseBB, TrueBB, NumFalseTaken, NumTrueTaken);
   else
-    B.createCondBranch(Loc, V, TrueBB, FalseDestBB, NumTrueTaken,
-                       NumFalseTaken);
+    B.createCondBranch(Loc, V, TrueBB, FalseBB, NumTrueTaken, NumFalseTaken);
 
   return Condition(TrueBB, FalseBB, ContBB, Loc);
 }
@@ -507,8 +576,7 @@ void StmtEmitter::visitDeferStmt(DeferStmt *S) {
 void StmtEmitter::visitIfStmt(IfStmt *S) {
   Scope condBufferScope(SGF.Cleanups, S);
   
-  // Create a continuation block.  We need it if there is a labeled break out
-  // of the if statement or if there is an if/then/else.
+  // Create a continuation block.
   JumpDest contDest = createJumpDest(S->getThenStmt());
   auto contBB = contDest.getBlock();
 
@@ -685,7 +753,7 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   // Create the throw destination at the end of the function.
   JumpDest throwDest = createJumpDest(S->getBody(),
                                       FunctionSection::Postmatter);
-  SILArgument *exnArg = throwDest.getBlock()->createPHIArgument(
+  SILArgument *exnArg = throwDest.getBlock()->createPhiArgument(
       exnTL.getLoweredType(), ValueOwnershipKind::Owned);
 
   // We always need a continuation block because we might fall out of
@@ -732,6 +800,12 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
     // Emit all the catch clauses, branching to the end destination if
     // we fall out of one.
     SGF.emitCatchDispatch(S, exn, S->getCatches(), endDest);
+
+    // We assume that exn's cleanup is still valid at this point. To ensure that
+    // we do not re-emit it and do a double consume, we rely on us having
+    // finished emitting code and thus unsetting the insertion point here. This
+    // assert is to make sure this invariant is clear in the code and validated.
+    assert(!SGF.B.hasValidInsertionPoint());
   }
 
   if (hasLabel) {
@@ -774,7 +848,7 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
     // to the continuation block.
     auto NumTrueTaken = SGF.loadProfilerCount(S->getBody());
     auto NumFalseTaken = SGF.loadProfilerCount(S);
-    Condition Cond = SGF.emitCondition(S->getCond(), /*hasFalseCode*/ false,
+    Condition Cond = SGF.emitCondition(S->getCond(),
                                        /*invertValue*/ false, /*contArgs*/ {},
                                        NumTrueTaken, NumFalseTaken);
 
@@ -881,8 +955,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
           // condition.
           // If it fails, loop around as if 'continue' happened.
           if (auto *Where = S->getWhere()) {
-            auto cond =
-                SGF.emitCondition(Where, /*hasFalse*/ false, /*invert*/ true);
+            auto cond = SGF.emitCondition(Where, /*invert*/ true);
             // If self is null, branch to the epilog.
             cond.enterTrue(SGF);
             SGF.Cleanups.emitBranchAndCleanups(loopDest, Where, {});
@@ -991,7 +1064,7 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
   // For now, don't try to re-use destination blocks for multiple
   // failure sites.
   SILBasicBlock *destBB = createBasicBlock(FunctionSection::Postmatter);
-  SILValue exn = destBB->createPHIArgument(getSILType(exnResult),
+  SILValue exn = destBB->createPhiArgument(getSILType(exnResult),
                                            ValueOwnershipKind::Owned);
 
   assert(B.hasValidInsertionPoint() && B.insertingAtEndOfBlock());

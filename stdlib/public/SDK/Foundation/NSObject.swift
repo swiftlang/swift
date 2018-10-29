@@ -13,7 +13,10 @@
 @_exported import Foundation // Clang module
 import ObjectiveC
 
+// This exists to allow for dynamic dispatch on KVO methods added to NSObject.
+// Extending NSObject with these methods would disallow overrides.
 public protocol _KeyValueCodingAndObserving {}
+extension NSObject : _KeyValueCodingAndObserving {}
 
 public struct NSKeyValueObservedChange<Value> {
     public typealias Kind = NSKeyValueChange
@@ -35,26 +38,29 @@ public protocol NSKeyValueObservingCustomization : NSObjectProtocol {
 
 fileprivate extension NSObject {
     
-    @objc class func _old_unswizzled_automaticallyNotifiesObservers(forKey key: String?) -> Bool {
+    @objc class func __old_unswizzled_automaticallyNotifiesObservers(forKey key: String?) -> Bool {
         fatalError("Should never be reached")
     }
     
-    @objc class func _old_unswizzled_keyPathsForValuesAffectingValue(forKey key: String?) -> Set<String> {
+    @objc class func __old_unswizzled_keyPathsForValuesAffectingValue(forKey key: String?) -> Set<String> {
         fatalError("Should never be reached")
     }
 
 }
 
-@objc private class _KVOKeyPathBridgeMachinery : NSObject {
+// NOTE: older overlays called this _KVOKeyPathBridgeMachinery. The two
+// must coexist, so it was renamed. The old name must not be used in the
+// new runtime.
+@objc private class __KVOKeyPathBridgeMachinery : NSObject {
     @nonobjc static var keyPathTable: [String : AnyKeyPath] = {
         /*
          Move all our methods into place. We want the following:
-         _KVOKeyPathBridgeMachinery's automaticallyNotifiesObserversForKey:, and keyPathsForValuesAffectingValueForKey: methods replaces NSObject's versions of them
-         NSObject's automaticallyNotifiesObserversForKey:, and keyPathsForValuesAffectingValueForKey: methods replace NSObject's _old_unswizzled_* methods
-         NSObject's _old_unswizzled_* methods replace _KVOKeyPathBridgeMachinery's methods, and are never invoked
+         __KVOKeyPathBridgeMachinery's automaticallyNotifiesObserversForKey:, and keyPathsForValuesAffectingValueForKey: methods replaces NSObject's versions of them
+         NSObject's automaticallyNotifiesObserversForKey:, and keyPathsForValuesAffectingValueForKey: methods replace NSObject's __old_unswizzled_* methods
+         NSObject's _old_unswizzled_* methods replace __KVOKeyPathBridgeMachinery's methods, and are never invoked
          */
         let rootClass: AnyClass = NSObject.self
-        let bridgeClass: AnyClass = _KVOKeyPathBridgeMachinery.self
+        let bridgeClass: AnyClass = __KVOKeyPathBridgeMachinery.self
         
         let dependentSel = #selector(NSObject.keyPathsForValuesAffectingValue(forKey:))
         let rootDependentImpl = class_getClassMethod(rootClass, dependentSel)!
@@ -62,9 +68,9 @@ fileprivate extension NSObject {
         method_exchangeImplementations(rootDependentImpl, bridgeDependentImpl) // NSObject <-> Us
         
         let originalDependentImpl = class_getClassMethod(bridgeClass, dependentSel)! //we swizzled it onto this class, so this is actually NSObject's old implementation
-        let originalDependentSel = #selector(NSObject._old_unswizzled_keyPathsForValuesAffectingValue(forKey:))
+        let originalDependentSel = #selector(NSObject.__old_unswizzled_keyPathsForValuesAffectingValue(forKey:))
         let dummyDependentImpl = class_getClassMethod(rootClass, originalDependentSel)!
-        method_exchangeImplementations(originalDependentImpl, dummyDependentImpl) // NSObject's original version <-> NSObject's _old_unswizzled_ version
+        method_exchangeImplementations(originalDependentImpl, dummyDependentImpl) // NSObject's original version <-> NSObject's __old_unswizzled_ version
         
         let autoSel = #selector(NSObject.automaticallyNotifiesObservers(forKey:))
         let rootAutoImpl = class_getClassMethod(rootClass, autoSel)!
@@ -72,62 +78,66 @@ fileprivate extension NSObject {
         method_exchangeImplementations(rootAutoImpl, bridgeAutoImpl) // NSObject <-> Us
         
         let originalAutoImpl = class_getClassMethod(bridgeClass, autoSel)! //we swizzled it onto this class, so this is actually NSObject's old implementation
-        let originalAutoSel = #selector(NSObject._old_unswizzled_automaticallyNotifiesObservers(forKey:))
+        let originalAutoSel = #selector(NSObject.__old_unswizzled_automaticallyNotifiesObservers(forKey:))
         let dummyAutoImpl = class_getClassMethod(rootClass, originalAutoSel)!
-        method_exchangeImplementations(originalAutoImpl, dummyAutoImpl) // NSObject's original version <-> NSObject's _old_unswizzled_ version
+        method_exchangeImplementations(originalAutoImpl, dummyAutoImpl) // NSObject's original version <-> NSObject's __old_unswizzled_ version
         
         return [:]
     }()
     
     @nonobjc static var keyPathTableLock = NSLock()
     
-    @nonobjc fileprivate static func _bridgeKeyPath(_ keyPath:AnyKeyPath) -> String {
+    @nonobjc fileprivate static func _bridgeKeyPath(_ keyPath: __owned AnyKeyPath) -> String {
         guard let keyPathString = keyPath._kvcKeyPathString else { fatalError("Could not extract a String from KeyPath \(keyPath)") }
-        _KVOKeyPathBridgeMachinery.keyPathTableLock.lock()
-        defer { _KVOKeyPathBridgeMachinery.keyPathTableLock.unlock() }
-        _KVOKeyPathBridgeMachinery.keyPathTable[keyPathString] = keyPath
+        __KVOKeyPathBridgeMachinery.keyPathTableLock.lock()
+        defer { __KVOKeyPathBridgeMachinery.keyPathTableLock.unlock() }
+        __KVOKeyPathBridgeMachinery.keyPathTable[keyPathString] = keyPath
         return keyPathString
     }
     
     @nonobjc fileprivate static func _bridgeKeyPath(_ keyPath:String?) -> AnyKeyPath? {
         guard let keyPath = keyPath else { return nil }
-        _KVOKeyPathBridgeMachinery.keyPathTableLock.lock()
-        defer { _KVOKeyPathBridgeMachinery.keyPathTableLock.unlock() }
-        let path = _KVOKeyPathBridgeMachinery.keyPathTable[keyPath]
+        __KVOKeyPathBridgeMachinery.keyPathTableLock.lock()
+        defer { __KVOKeyPathBridgeMachinery.keyPathTableLock.unlock() }
+        let path = __KVOKeyPathBridgeMachinery.keyPathTable[keyPath]
         return path
     }
     
     @objc override class func automaticallyNotifiesObservers(forKey key: String) -> Bool {
         //This is swizzled so that it's -[NSObject automaticallyNotifiesObserversForKey:]
-        if let customizingSelf = self as? NSKeyValueObservingCustomization.Type, let path = _KVOKeyPathBridgeMachinery._bridgeKeyPath(key) {
+        if let customizingSelf = self as? NSKeyValueObservingCustomization.Type, let path = __KVOKeyPathBridgeMachinery._bridgeKeyPath(key) {
             return customizingSelf.automaticallyNotifiesObservers(for: path)
         } else {
-            return self._old_unswizzled_automaticallyNotifiesObservers(forKey: key) //swizzled to be NSObject's original implementation
+            return self.__old_unswizzled_automaticallyNotifiesObservers(forKey: key) //swizzled to be NSObject's original implementation
         }
     }
     
     @objc override class func keyPathsForValuesAffectingValue(forKey key: String?) -> Set<String> {
         //This is swizzled so that it's -[NSObject keyPathsForValuesAffectingValueForKey:]
-        if let customizingSelf = self as? NSKeyValueObservingCustomization.Type, let path = _KVOKeyPathBridgeMachinery._bridgeKeyPath(key!) {
+        if let customizingSelf = self as? NSKeyValueObservingCustomization.Type, let path = __KVOKeyPathBridgeMachinery._bridgeKeyPath(key!) {
             let resultSet = customizingSelf.keyPathsAffectingValue(for: path)
             return Set(resultSet.lazy.map {
                 guard let str = $0._kvcKeyPathString else { fatalError("Could not extract a String from KeyPath \($0)") }
                 return str
             })
         } else {
-            return self._old_unswizzled_keyPathsForValuesAffectingValue(forKey: key) //swizzled to be NSObject's original implementation
+            return self.__old_unswizzled_keyPathsForValuesAffectingValue(forKey: key) //swizzled to be NSObject's original implementation
         }
     }
 }
 
 func _bridgeKeyPathToString(_ keyPath:AnyKeyPath) -> String {
-    return _KVOKeyPathBridgeMachinery._bridgeKeyPath(keyPath)
+    return __KVOKeyPathBridgeMachinery._bridgeKeyPath(keyPath)
 }
 
 func _bridgeStringToKeyPath(_ keyPath:String) -> AnyKeyPath? {
-    return _KVOKeyPathBridgeMachinery._bridgeKeyPath(keyPath)
+    return __KVOKeyPathBridgeMachinery._bridgeKeyPath(keyPath)
 }
 
+// NOTE: older overlays called this NSKeyValueObservation. We now use
+// that name in the source code, but add an underscore to the runtime
+// name to avoid conflicts when both are loaded into the same process.
+@objc(_NSKeyValueObservation)
 public class NSKeyValueObservation : NSObject {
     
     @nonobjc weak var object : NSObject?
@@ -139,8 +149,8 @@ public class NSKeyValueObservation : NSObject {
         let bridgeClass: AnyClass = NSKeyValueObservation.self
         let observeSel = #selector(NSObject.observeValue(forKeyPath:of:change:context:))
         let swapSel = #selector(NSKeyValueObservation._swizzle_me_observeValue(forKeyPath:of:change:context:))
-        let rootObserveImpl = class_getInstanceMethod(bridgeClass, observeSel)
-        let swapObserveImpl = class_getInstanceMethod(bridgeClass, swapSel)
+        let rootObserveImpl = class_getInstanceMethod(bridgeClass, observeSel)!
+        let swapObserveImpl = class_getInstanceMethod(bridgeClass, swapSel)!
         method_exchangeImplementations(rootObserveImpl, swapObserveImpl)
         return nil
     }()
@@ -179,7 +189,7 @@ public class NSKeyValueObservation : NSObject {
     }
 }
 
-public extension _KeyValueCodingAndObserving {
+extension _KeyValueCodingAndObserving {
     
     ///when the returned NSKeyValueObservation is deinited or invalidated, it will stop observing
     public func observe<Value>(
@@ -199,29 +209,27 @@ public extension _KeyValueCodingAndObserving {
         return result
     }
     
-    public func willChangeValue<Value>(for keyPath: KeyPath<Self, Value>) {
+    public func willChangeValue<Value>(for keyPath: __owned KeyPath<Self, Value>) {
         (self as! NSObject).willChangeValue(forKey: _bridgeKeyPathToString(keyPath))
     }
     
-    public func willChange<Value>(_ changeKind: NSKeyValueChange, valuesAt indexes: IndexSet, for keyPath: KeyPath<Self, Value>) {
+    public func willChange<Value>(_ changeKind: NSKeyValueChange, valuesAt indexes: IndexSet, for keyPath: __owned KeyPath<Self, Value>) {
         (self as! NSObject).willChange(changeKind, valuesAt: indexes, forKey: _bridgeKeyPathToString(keyPath))
     }
     
-    public func willChangeValue<Value>(for keyPath: KeyPath<Self, Value>, withSetMutation mutation: NSKeyValueSetMutationKind, using set: Set<Value>) -> Void {
+    public func willChangeValue<Value>(for keyPath: __owned KeyPath<Self, Value>, withSetMutation mutation: NSKeyValueSetMutationKind, using set: Set<Value>) -> Void {
         (self as! NSObject).willChangeValue(forKey: _bridgeKeyPathToString(keyPath), withSetMutation: mutation, using: set)
     }
     
-    public func didChangeValue<Value>(for keyPath: KeyPath<Self, Value>) {
+    public func didChangeValue<Value>(for keyPath: __owned KeyPath<Self, Value>) {
         (self as! NSObject).didChangeValue(forKey: _bridgeKeyPathToString(keyPath))
     }
     
-    public func didChange<Value>(_ changeKind: NSKeyValueChange, valuesAt indexes: IndexSet, for keyPath: KeyPath<Self, Value>) {
+    public func didChange<Value>(_ changeKind: NSKeyValueChange, valuesAt indexes: IndexSet, for keyPath: __owned KeyPath<Self, Value>) {
         (self as! NSObject).didChange(changeKind, valuesAt: indexes, forKey: _bridgeKeyPathToString(keyPath))
     }
     
-    public func didChangeValue<Value>(for keyPath: KeyPath<Self, Value>, withSetMutation mutation: NSKeyValueSetMutationKind, using set: Set<Value>) -> Void {
+    public func didChangeValue<Value>(for keyPath: __owned KeyPath<Self, Value>, withSetMutation mutation: NSKeyValueSetMutationKind, using set: Set<Value>) -> Void {
         (self as! NSObject).didChangeValue(forKey: _bridgeKeyPathToString(keyPath), withSetMutation: mutation, using: set)
     }
 }
-
-extension NSObject : _KeyValueCodingAndObserving {}

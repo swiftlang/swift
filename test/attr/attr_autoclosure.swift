@@ -125,7 +125,7 @@ class TestFunc12 {
 
 enum AutoclosureFailableOf<T> {
   case Success(@autoclosure () -> T)
-  case Failure()
+  case Failure
 }
 
 let _ : AutoclosureFailableOf<Int> = .Success(42)

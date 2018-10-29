@@ -16,7 +16,7 @@ func isOn(_ b: Binary) -> Bool {
 
 // First, check that we don't assign fresh locations to each case statement,
 // except for any relevant debug value instructions.
-// CHECK-LABEL: sil hidden @$S16switch_debuginfo5test11iySi_tF
+// CHECK-LABEL: sil hidden @$s16switch_debuginfo5test11iySi_tF
 func test1(i: Int) {
   switch i {
            // CHECK-NOT: [[LOC]]:[[@LINE+1]]
@@ -35,7 +35,7 @@ func test1(i: Int) {
 }
 
 // Next, check that case statements and switch subjects have the same locations.
-// CHECK-LABEL: sil hidden @$S16switch_debuginfo5test21sySS_tF
+// CHECK-LABEL: sil hidden @$s16switch_debuginfo5test21sySS_tF
 func test2(s: String) {
   switch s {
   case "a": // CHECK: string_literal utf8 "a", [[LOC]]:[[@LINE-1]]:10
@@ -48,7 +48,7 @@ func test2(s: String) {
 }
 
 // Fallthrough shouldn't affect case statement locations.
-// CHECK-LABEL: sil hidden @$S16switch_debuginfo5test31sySS_tF
+// CHECK-LABEL: sil hidden @$s16switch_debuginfo5test31sySS_tF
 func test3(s: String) {
   switch s {
   case "a", "b":
@@ -67,7 +67,7 @@ func test3(s: String) {
 }
 
 // It should be possible to set breakpoints on where clauses.
-// CHECK-LABEL: sil hidden @$S16switch_debuginfo5test41byAA6BinaryO_tF
+// CHECK-LABEL: sil hidden @$s16switch_debuginfo5test41byAA6BinaryO_tF
 func test4(b: Binary) {
   switch b {
   case let _        // CHECK-NOT: [[LOC]]:[[@LINE]]
@@ -82,7 +82,7 @@ func test4(b: Binary) {
 }
 
 // Check that we set the right locations before/after nested switches.
-// CHECK-LABEL: sil hidden @$S16switch_debuginfo5test51sySS_tF
+// CHECK-LABEL: sil hidden @$s16switch_debuginfo5test51sySS_tF
 func test5(s: String) {
   switch s {
   case "a":         // CHECK: string_literal utf8 "a", [[LOC]]:[[@LINE-1]]:10

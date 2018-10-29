@@ -116,9 +116,15 @@ std::unique_ptr<Job> ToolChain::constructJob(
 
   const char *responseFilePath = nullptr;
   const char *responseFileArg = nullptr;
-  if (invocationInfo.allowsResponseFiles &&
-      !llvm::sys::commandLineFitsWithinSystemLimits(
-          executablePath, invocationInfo.Arguments)) {
+
+  const bool forceResponseFiles =
+      C.getArgs().hasArg(options::OPT_driver_force_response_files);
+  assert((invocationInfo.allowsResponseFiles || !forceResponseFiles) &&
+         "Cannot force response file if platform does not allow it");
+
+  if (forceResponseFiles || (invocationInfo.allowsResponseFiles &&
+                             !llvm::sys::commandLineFitsWithinSystemLimits(
+                                 executablePath, invocationInfo.Arguments))) {
     responseFilePath = context.getTemporaryFilePath("arguments", "resp");
     responseFileArg = C.getArgs().MakeArgString(Twine("@") + responseFilePath);
   }
@@ -290,7 +296,7 @@ static void
 sortJobsToMatchCompilationInputs(ArrayRef<const Job *> unsortedJobs,
                                  SmallVectorImpl<const Job *> &sortedJobs,
                                  Compilation &C) {
-  llvm::StringMap<const Job *> jobsByInput;
+  llvm::DenseMap<StringRef, const Job *> jobsByInput;
   for (const Job *J : unsortedJobs) {
     const CompileJobAction *CJA = cast<CompileJobAction>(&J->getSource());
     const InputAction *IA = findSingleSwiftInput(CJA);
@@ -338,6 +344,18 @@ ToolChain::constructBatchJob(ArrayRef<const Job *> unsortedJobs,
   JobContext context{C, inputJobs.getArrayRef(), inputActions.getArrayRef(),
                      *output, OI};
   auto invocationInfo = constructInvocation(*batchCJA, context);
+  // Batch mode can produce quite long command lines; in almost every case these
+  // will trigger use of supplementary output file maps, but in some rare corner
+  // cases (very few files, very long paths) they might not. However, in those
+  // cases we _should_ degrade to using response files to pass arguments to the
+  // frontend, which is done automatically by code elsewhere.
+  //
+  // The `allowsResponseFiles` flag on the `invocationInfo` we have here exists
+  // only to model external tools that don't know about response files, such as
+  // platform linkers; when talking to the frontend (which we control!) it
+  // should always be true. But double check with an assert here in case someone
+  // failed to set it in `constructInvocation`.
+  assert(invocationInfo.allowsResponseFiles);
   return llvm::make_unique<BatchJob>(
       *batchCJA, inputJobs.takeVector(), std::move(output), executablePath,
       std::move(invocationInfo.Arguments),

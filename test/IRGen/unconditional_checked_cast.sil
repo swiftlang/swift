@@ -14,7 +14,7 @@ sil_vtable D {}
 // CHECK: entry:
 // CHECK-NEXT: [[INPUTPTR:%[0-9]+]] = load %T26unconditional_checked_cast1CC*, %T26unconditional_checked_cast1CC** [[INPUTPTRPTR:%[0-9]+]], align 8
 // CHECK-NEXT: [[I8INPUTPTR:%[0-9]+]] = bitcast %T26unconditional_checked_cast1CC* [[INPUTPTR]] to i8*
-// CHECK-NEXT: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S26unconditional_checked_cast1DCMa"(i64 0)
+// CHECK-NEXT: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s26unconditional_checked_cast1DCMa"(i64 0)
 // CHECK-NEXT: [[T0:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[T1:%.*]] = bitcast %swift.type* [[T0]] to i8*
 // CHECK-NEXT: [[I8RESULTPTR:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[I8INPUTPTR]], i8* [[T1]])

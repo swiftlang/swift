@@ -34,6 +34,7 @@ namespace swift {
   class Type;
   class TypeDecl;
   class ValueDecl;
+  struct SelfBounds;
 
 /// LookupResultEntry - One result of unqualified lookup.
 struct LookupResultEntry {
@@ -373,6 +374,12 @@ SmallVector<std::pair<SourceLoc, NominalTypeDecl *>, 4>
 getDirectlyInheritedNominalTypeDecls(
                       llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
                       bool &anyObject);
+
+/// Retrieve the set of nominal type declarations that appear as the
+/// constraint type of any "Self" constraints in the where clause of the
+/// given protocol or protocol extension.
+SelfBounds getSelfBoundsFromWhereClause(
+    llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl);
 
 } // end namespace swift
 

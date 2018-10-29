@@ -25,7 +25,7 @@ extension ObjectUID {
 
 class Base {}
 
-// CHECK-LABEL: sil hidden @$S25protocol_class_refinement12getObjectUID{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s25protocol_class_refinement12getObjectUID{{[_0-9a-zA-Z]*}}F
 func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   var x = x
   // CHECK: [[XBOX:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : ObjectUID> { var τ_0_0 } <T>
@@ -54,14 +54,13 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: destroy_addr [[X_TMP]]
   // -- call nextCLSID from protocol ext
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*T
-  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @$S25protocol_class_refinement3UIDPAAE9nextCLSIDSivs
+  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @$s25protocol_class_refinement3UIDPAAE9nextCLSIDSivs
   // CHECK: apply [[SET_NEXTCLSID]]<T>([[UID]], [[WRITE]])
   x.nextCLSID = x.uid()
 
   // -- call x.uid()
   // CHECK: [[READ1:%.*]] = begin_access [read] [unknown] [[PB]] : $*T
   // CHECK: [[X1:%.*]] = load [copy] [[READ1]]
-  // CHECK: [[BORROWED_X1:%.*]] = begin_borrow [[X1]]
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*T
   // CHECK: [[X:%.*]] = load [copy] [[READ]]
   // CHECK: [[X_TMP:%.*]] = alloc_stack
@@ -71,9 +70,8 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: [[UID:%.*]] = apply [[GET_UID]]<T>([[X_TMP]])
   // CHECK: destroy_addr [[X_TMP]]
   // -- call secondNextCLSID from class-constrained protocol ext
-  // CHECK: [[SET_SECONDNEXT:%.*]] = function_ref @$S25protocol_class_refinement9ObjectUIDPAAE15secondNextCLSIDSivs
-  // CHECK: apply [[SET_SECONDNEXT]]<T>([[UID]], [[BORROWED_X1]])
-  // CHECK: end_borrow [[BORROWED_X1]] from [[X1]]
+  // CHECK: [[SET_SECONDNEXT:%.*]] = function_ref @$s25protocol_class_refinement9ObjectUIDPAAE15secondNextCLSIDSivs
+  // CHECK: apply [[SET_SECONDNEXT]]<T>([[UID]], [[X1]])
   // CHECK: destroy_value [[X1]]
   x.secondNextCLSID = x.uid()
   return (x.iid, x.clsid, x.nextCLSID, x.secondNextCLSID)
@@ -81,7 +79,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: return
 }
 
-// CHECK-LABEL: sil hidden @$S25protocol_class_refinement16getBaseObjectUID{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s25protocol_class_refinement16getBaseObjectUID{{[_0-9a-zA-Z]*}}F
 func getBaseObjectUID<T: UID>(x: T) -> (Int, Int, Int) where T: Base {
   var x = x
   // CHECK: [[XBOX:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : Base, τ_0_0 : UID> { var τ_0_0 } <T>
@@ -110,7 +108,7 @@ func getBaseObjectUID<T: UID>(x: T) -> (Int, Int, Int) where T: Base {
   // CHECK: destroy_addr [[X_TMP]]
   // -- call nextCLSID from protocol ext
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]] : $*T
-  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @$S25protocol_class_refinement3UIDPAAE9nextCLSIDSivs
+  // CHECK: [[SET_NEXTCLSID:%.*]] = function_ref @$s25protocol_class_refinement3UIDPAAE9nextCLSIDSivs
   // CHECK: apply [[SET_NEXTCLSID]]<T>([[UID]], [[WRITE]])
   x.nextCLSID = x.uid()
   return (x.iid, x.clsid, x.nextCLSID)

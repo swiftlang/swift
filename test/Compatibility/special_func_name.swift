@@ -14,11 +14,10 @@ struct S12 : P1 { // expected-error {{type 'S12' does not conform to protocol 'P
 }
 
 protocol P2 {
-  init(_: Int) // expected-note {{protocol requires initializer 'init' with type 'Int'; do you want to add a stub?}}
+  init(_: Int) // expected-note {{protocol requires initializer 'init(_:)' with type 'Int'; do you want to add a stub?}}
 }
 
 struct S21 : P2 { // expected-error {{type 'S21' does not conform to protocol 'P2'}}
-  // expected-note@-1 {{candidate has non-matching type '()'}}
   static func `init`(_: Int) {}
 }
 

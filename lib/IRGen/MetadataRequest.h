@@ -509,8 +509,8 @@ enum class CacheStrategy {
   /// A simple lazy cache.
   Lazy,
 
-  /// An InPlaceValueMetadataCache initialization cache.
-  InPlaceInitialization,
+  /// An SingletonMetadataCache initialization cache.
+  SingletonInitialization,
 };
 
 /// Emit a type metadata access function using the given generator function.

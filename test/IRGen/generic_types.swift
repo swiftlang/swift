@@ -8,13 +8,13 @@
 // CHECK: [[C:%T13generic_types1CC]] = type
 // CHECK: [[D:%T13generic_types1DC]] = type
 
-// CHECK-LABEL: @"$S13generic_types1ACMI" = internal global [16 x i8*] zeroinitializer, align 8
+// CHECK-LABEL: @"$s13generic_types1ACMI" = internal global [16 x i8*] zeroinitializer, align 8
 
-// CHECK-LABEL: @"$S13generic_types1ACMn" = hidden constant
+// CHECK-LABEL: @"$s13generic_types1ACMn" = hidden constant
 // CHECK-SAME:   i32 -2147483440,
-// CHECK-SAME:   @"$S13generic_typesMXM"
+// CHECK-SAME:   @"$s13generic_typesMXM"
 //               <name>
-// CHECK-SAME:   @"$S13generic_types1ACMa"
+// CHECK-SAME:   @"$s13generic_types1ACMa"
 // -- superclass
 // CHECK-SAME:   i32 0,
 // -- negative size in words
@@ -28,9 +28,9 @@
 // -- field offset vector offset
 // CHECK-SAME:   i32 16,
 // -- instantiation cache
-// CHECK-SAME:   @"$S13generic_types1ACMI"
+// CHECK-SAME:   @"$s13generic_types1ACMI"
 // -- instantiation pattern
-// CHECK-SAME:   @"$S13generic_types1ACMP"
+// CHECK-SAME:   @"$s13generic_types1ACMP"
 // -- num generic params
 // CHECK-SAME:   i16 1,
 // -- num generic requirement
@@ -42,70 +42,56 @@
 // -- parameter descriptor 1
 // CHECK-SAME:   i8 -128,
 
-// CHECK-LABEL: @"$S13generic_types1ACMP" = internal constant
+// CHECK-LABEL: @"$s13generic_types1ACMP" = internal constant
 // -- instantiation function
-// CHECK-SAME:   @"$S13generic_types1ACMi"
+// CHECK-SAME:   @"$s13generic_types1ACMi"
 // -- heap destructor
-// CHECK-SAME:   void ([[A]]*)* @"$S13generic_types1ACfD"
+// CHECK-SAME:   void ([[A]]*)* @"$s13generic_types1ACfD"
 // -- ivar destroyer
 // CHECK-SAME:   i32 0,
 // -- flags
 // CHECK-SAME:   i32 {{3|2}},
 // CHECK-SAME: }
 
-// CHECK-LABEL: @"$S13generic_types1BCMI" = internal global [16 x i8*] zeroinitializer, align 8
+// CHECK-LABEL: @"$s13generic_types1BCMI" = internal global [16 x i8*] zeroinitializer, align 8
 
-// CHECK-LABEL: @"$S13generic_types1BCMn" = hidden constant
-// CHECK-SAME:   @"$S13generic_types1BCMa"
-// CHECK-SAME:   @"$S13generic_types1BCMI"
-// CHECK-SAME:   @"$S13generic_types1BCMP"
+// CHECK-LABEL: @"$s13generic_types1BCMn" = hidden constant
+// CHECK-SAME:   @"$s13generic_types1BCMa"
+// CHECK-SAME:   @"$s13generic_types1BCMI"
+// CHECK-SAME:   @"$s13generic_types1BCMP"
 
-// CHECK-LABEL: @"$S13generic_types1BCMP" = internal constant
+// CHECK-LABEL: @"$s13generic_types1BCMP" = internal constant
 // -- instantiation function
-// CHECK-SAME:   @"$S13generic_types1BCMi"
+// CHECK-SAME:   @"$s13generic_types1BCMi"
 // -- heap destructor
-// CHECK-SAME:   void ([[B]]*)* @"$S13generic_types1BCfD"
+// CHECK-SAME:   void ([[B]]*)* @"$s13generic_types1BCfD"
 // -- ivar destroyer
 // CHECK-SAME:   i32 0,
 // -- class flags
 // CHECK-SAME:   i32 {{3|2}},
 // CHECK-SAME: }
 
-// CHECK-LABEL: @"$S13generic_types1CCMP" = internal constant
+// CHECK-LABEL: @"$s13generic_types1CCMP" = internal constant
 // -- instantiation function
-// CHECK-SAME:   @"$S13generic_types1CCMi"
+// CHECK-SAME:   @"$s13generic_types1CCMi"
 // -- heap destructor
-// CHECK-SAME:   void ([[C]]*)* @"$S13generic_types1CCfD"
+// CHECK-SAME:   void ([[C]]*)* @"$s13generic_types1CCfD"
 // -- ivar destroyer
 // CHECK-SAME:   i32 0,
 // -- class flags
 // CHECK-SAME:   i32 {{3|2}},
 // CHECK-SAME: }
 
-// CHECK-LABEL: @"$S13generic_types1DCMP" = internal constant
+// CHECK-LABEL: @"$s13generic_types1DCMP" = internal constant
 // -- instantiation function
-// CHECK-SAME:   @"$S13generic_types1DCMi"
+// CHECK-SAME:   @"$s13generic_types1DCMi"
 // -- heap destructor
-// CHECK-SAME:   void ([[D]]*)* @"$S13generic_types1DCfD"
+// CHECK-SAME:   void ([[D]]*)* @"$s13generic_types1DCfD"
 // -- ivar destroyer
 // CHECK-SAME:   i32 0,
 // -- class flags
 // CHECK-SAME:   i32 {{3|2}},
 // CHECK-SAME: }
-
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$S13generic_types1ACMi"(%swift.type_descriptor*, i8**, i8**) {{.*}} {
-// CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
-// CHECK:   %T = load %swift.type*, %swift.type** [[T0]],
-// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2)
-// CHECK-NEXT:   ret %swift.type* [[METADATA]]
-// CHECK: }
-
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$S13generic_types1BCMi"(%swift.type_descriptor*, i8**, i8**) {{.*}} {
-// CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
-// CHECK:   %T = load %swift.type*, %swift.type** [[T0]],
-// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2)
-// CHECK-NEXT: ret %swift.type* [[METADATA]]
-// CHECK: }
 
 class A<T> {
   var x = 0
@@ -149,3 +135,38 @@ func testFixed() {
   var a = F(value: ClassA()).value
   var b = F(value: ClassB()).value
 }
+
+// Checking generic requirement encoding
+protocol P1 { }
+protocol P2 {
+  associatedtype A
+}
+
+struct X1: P1 { }
+struct X2: P2 {
+  typealias A = X1
+}
+
+// Check for correct root generic parameters in the generic requirements of X3.
+// CHECK-LABEL: @"$sq_1A13generic_types2P2P_MXA" = linkonce_odr hidden constant
+
+// Root: generic parameter 1
+// CHECK-SAME: i32 1
+
+// Protocol P2
+// CHECK-SAME: $s13generic_types2P2Mp
+struct X3<T, U> where U: P2, U.A: P1 { }
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$s13generic_types1ACMi"(%swift.type_descriptor*, i8**, i8*) {{.*}} {
+// CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
+// CHECK:   %T = load %swift.type*, %swift.type** [[T0]],
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8* %2)
+// CHECK-NEXT:   ret %swift.type* [[METADATA]]
+// CHECK: }
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$s13generic_types1BCMi"(%swift.type_descriptor*, i8**, i8*) {{.*}} {
+// CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
+// CHECK:   %T = load %swift.type*, %swift.type** [[T0]],
+// CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8* %2)
+// CHECK-NEXT: ret %swift.type* [[METADATA]]
+// CHECK: }

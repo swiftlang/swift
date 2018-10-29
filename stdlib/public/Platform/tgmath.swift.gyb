@@ -292,8 +292,8 @@ public func ${bfunc}(_ lhs: ${T}, _ rhs: ${T}) -> ${T} {
 %  if T == 'Float80':
 #if (arch(i386) || arch(x86_64)) && !os(Windows)
 %  else:
-//  lgamma not avaialable on Windows, apparently?
-#if !os(Windows) && !os(Android)
+//  lgamma not available on Windows, apparently?
+#if !os(Windows)
 %  end
 @_transparent
 public func lgamma(_ x: ${T}) -> (${T}, Int) {
@@ -326,7 +326,7 @@ public func remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) {
 %  if T == 'Float80':
 #if (arch(i386) || arch(x86_64)) && !os(Windows)
 %  end
-@available(*, deprecated: 4.2, message:
+@available(swift, deprecated: 4.2, message:
            "use ${T}(nan: ${T}.RawSignificand) instead.")
 @_transparent
 public func nan(_ tag: String) -> ${T} {

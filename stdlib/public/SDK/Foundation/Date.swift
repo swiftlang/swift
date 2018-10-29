@@ -257,6 +257,7 @@ extension Date : _ObjectiveCBridgeable {
         return true
     }
 
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSDate?) -> Date {
         var result: Date?
         _forceBridgeFromObjectiveC(source!, result: &result)

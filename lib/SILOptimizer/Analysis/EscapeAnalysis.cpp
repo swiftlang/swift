@@ -1120,7 +1120,7 @@ void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
         continue;
 
       llvm::SmallVector<SILValue,4> Incoming;
-      if (!BBArg->getIncomingValues(Incoming)) {
+      if (!BBArg->getSingleTerminatorOperands(Incoming)) {
         // We don't know where the block argument comes from -> treat it
         // conservatively.
         ConGraph->setEscapesGlobal(ArgNode);
@@ -1239,12 +1239,6 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
           return;
         }
         break;
-      case ArrayCallKind::kGetArrayOwner:
-        if (CGNode *BufferNode = ConGraph->getNode(ASC.getSelf(), this)) {
-          ConGraph->defer(ConGraph->getNode(ASC.getCallResult(), this),
-                          BufferNode);
-        }
-        return;
       case ArrayCallKind::kGetElement:
         if (CGNode *AddrNode = ConGraph->getNode(ASC.getSelf(), this)) {
           CGNode *DestNode = nullptr;
@@ -1398,8 +1392,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::Name##ReleaseInst:
 #include "swift/AST/ReferenceStorage.def"
     case SILInstructionKind::StrongReleaseInst:
-    case SILInstructionKind::ReleaseValueInst:
-    case SILInstructionKind::StrongUnpinInst: {
+    case SILInstructionKind::ReleaseValueInst: {
       SILValue OpV = I->getOperand(0);
       if (CGNode *AddrNode = ConGraph->getNode(OpV, this)) {
         // A release instruction may deallocate the pointer operand. This may
@@ -1557,7 +1550,6 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::BridgeObjectToRefInst:
     case SILInstructionKind::UncheckedAddrCastInst:
     case SILInstructionKind::UnconditionalCheckedCastInst:
-    case SILInstructionKind::StrongPinInst:
     // DO NOT use LOADABLE_REF_STORAGE because unchecked references don't have
     // retain/release instructions that trigger the 'default' case.
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \

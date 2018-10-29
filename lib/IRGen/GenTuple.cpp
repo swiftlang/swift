@@ -122,6 +122,15 @@ namespace {
 
     /// Given the address of a tuple, project out the address of a
     /// single element.
+    Address projectFieldAddress(IRGenFunction &IGF,
+                                Address addr,
+                                SILType T,
+                                const TupleFieldInfo &field) const {
+      return asImpl().projectElementAddress(IGF, addr, T, field.Index);
+    }
+
+    /// Given the address of a tuple, project out the address of a
+    /// single element.
     Address projectElementAddress(IRGenFunction &IGF,
                                   Address tuple,
                                   SILType T,
@@ -162,65 +171,6 @@ namespace {
                               Address src, SILType T,
                               bool isOutlined) const override {
       llvm_unreachable("unexploded tuple as argument?");
-    }
-
-    // For now, just use extra inhabitants from the first element.
-    // FIXME: generalize
-    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
-      if (asImpl().getFields().empty()) return false;
-      return asImpl().getFields()[0].getTypeInfo().mayHaveExtraInhabitants(IGM);
-    }
-
-    // This is dead code in NonFixedTupleTypeInfo.
-    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const {
-      if (asImpl().getFields().empty()) return 0;
-      auto &eltTI = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
-      return eltTI.getFixedExtraInhabitantCount(IGM);
-    }
-
-    // This is dead code in NonFixedTupleTypeInfo.
-    APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
-                                       unsigned bits,
-                                       unsigned index) const {
-      auto &eltTI = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
-      return eltTI.getFixedExtraInhabitantValue(IGM, bits, index);
-    }
-        
-    // This is dead code in NonFixedTupleTypeInfo.
-    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const {
-      if (asImpl().getFields().empty())
-        return APInt();
-      
-      const FixedTypeInfo &fieldTI
-        = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
-      auto size = asImpl().getFixedSize().getValueInBits();
-      
-      if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal))
-        return APInt(size, 0);
-      
-      APInt firstMask = fieldTI.getFixedExtraInhabitantMask(IGM);
-      return firstMask.zextOrTrunc(size);
-    }
-
-    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                         Address tupleAddr,
-                                         SILType tupleType) const override {
-      Address eltAddr =
-        asImpl().projectElementAddress(IGF, tupleAddr, tupleType, 0);
-      auto &elt = asImpl().getFields()[0];
-      return elt.getTypeInfo().getExtraInhabitantIndex(IGF, eltAddr,
-                                               elt.getType(IGF.IGM, tupleType));
-    }
-  
-    void storeExtraInhabitant(IRGenFunction &IGF,
-                              llvm::Value *index,
-                              Address tupleAddr,
-                              SILType tupleType) const override {
-      Address eltAddr =
-        asImpl().projectElementAddress(IGF, tupleAddr, tupleType, 0);
-      auto &elt = asImpl().getFields()[0];
-      elt.getTypeInfo().storeExtraInhabitant(IGF, index, eltAddr,
-                                             elt.getType(IGF.IGM, tupleType));
     }
     
     void verify(IRGenTypeVerifierFunction &IGF,

@@ -68,7 +68,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   DirectlyReferencedTypeDecls evaluate(
@@ -114,7 +114,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   DirectlyReferencedTypeDecls evaluate(
@@ -140,7 +140,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   llvm::Expected<ClassDecl *>
@@ -165,7 +165,7 @@ public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
   llvm::Expected<NominalTypeDecl *>
@@ -182,26 +182,56 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
+struct SelfBounds {
+  llvm::TinyPtrVector<NominalTypeDecl *> decls;
+  bool anyObject = false;
+};
+
 /// Request the nominal types that occur as the right-hand side of "Self: Foo"
 /// constraints in the "where" clause of a protocol extension.
 class SelfBoundsFromWhereClauseRequest :
     public SimpleRequest<SelfBoundsFromWhereClauseRequest,
                          CacheKind::Uncached,
-                         llvm::TinyPtrVector<NominalTypeDecl *>,
+                         SelfBounds,
+                         llvm::PointerUnion<TypeDecl *, ExtensionDecl *>> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  SelfBounds evaluate(Evaluator &evaluator,
+                      llvm::PointerUnion<TypeDecl *, ExtensionDecl *>) const;
+
+public:
+  // Cycle handling
+  SelfBounds breakCycle() const { return { }; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+
+/// Request all type aliases and nominal types that appear in the "where"
+/// clause of an extension.
+class TypeDeclsFromWhereClauseRequest :
+    public SimpleRequest<TypeDeclsFromWhereClauseRequest,
+                         CacheKind::Uncached,
+                         DirectlyReferencedTypeDecls,
                          ExtensionDecl *> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
-  friend class SimpleRequest;
+  friend SimpleRequest;
 
   // Evaluation.
-  llvm::TinyPtrVector<NominalTypeDecl *> evaluate(Evaluator &evaluator,
-                                                  ExtensionDecl *ext) const;
+  DirectlyReferencedTypeDecls evaluate(Evaluator &evaluator,
+                                       ExtensionDecl *ext) const;
 
 public:
   // Cycle handling
-  llvm::TinyPtrVector<NominalTypeDecl *> breakCycle() const { return { }; }
+  DirectlyReferencedTypeDecls breakCycle() const { return { }; }
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 };

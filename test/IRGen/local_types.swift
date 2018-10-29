@@ -5,14 +5,14 @@
 import local_types_helper
 
 public func singleFunc() {
-  // CHECK-DAG: @"$S11local_types10singleFuncyyF06SingleD6StructL_VMf" = internal constant
+  // CHECK-DAG: @"$s11local_types10singleFuncyyF06SingleD6StructL_VMf" = internal constant
   struct SingleFuncStruct {
     let i: Int
   }
 }
 
 public let singleClosure: () -> () = {
-  // CHECK-DAG: @"$S11local_types13singleClosureyycvpfiyycfU_06SingleD6StructL_VMf" = internal constant
+  // CHECK-DAG: @"$s11local_types13singleClosureyycvpfiyycfU_06SingleD6StructL_VMf" = internal constant
   struct SingleClosureStruct {
     let i: Int
   }
@@ -20,7 +20,7 @@ public let singleClosure: () -> () = {
 
 public struct PatternStruct {
   public var singlePattern: Int = ({
-    // CHECK-DAG: @"$S11local_types13PatternStructV06singleC0SivpfiSiyXEfU_06SinglecD0L_VMf" = internal constant
+    // CHECK-DAG: @"$s11local_types13PatternStructV06singleC0SivpfiSiyXEfU_06SinglecD0L_VMf" = internal constant
     struct SinglePatternStruct {
       let i: Int
     }
@@ -34,7 +34,7 @@ public func topLevelIfConfig() {
 }
 #else
 public func topLevelIfConfig() {
-  // CHECK-DAG: @"$S11local_types16topLevelIfConfigyyF17LocalClassEnabledL_CMm" = internal global %objc_class
+  // CHECK-DAG: @"$s11local_types16topLevelIfConfigyyF17LocalClassEnabledL_CMm" = internal global %objc_class
   class LocalClassEnabled {}
 }
 #endif
@@ -46,7 +46,7 @@ public struct NominalIfConfig {
   }
   #else
   public func method() {
-    // CHECK-DAG: @"$S11local_types15NominalIfConfigV6methodyyF17LocalClassEnabledL_CMm" = internal global %objc_class
+    // CHECK-DAG: @"$s11local_types15NominalIfConfigV6methodyyF17LocalClassEnabledL_CMm" = internal global %objc_class
     class LocalClassEnabled {}
   }
   #endif
@@ -59,17 +59,17 @@ public func innerIfConfig() {
     class LocalClassDisabled {}
   }
   #else
-  // CHECK-DAG: @"$S11local_types13innerIfConfigyyF17LocalClassEnabledL_CMm" = internal global %objc_class
+  // CHECK-DAG: @"$s11local_types13innerIfConfigyyF17LocalClassEnabledL_CMm" = internal global %objc_class
   class LocalClassEnabled {}
   func inner() {
-    // CHECK-DAG: @"$S11local_types13innerIfConfigyyF0C0L0_yyF17LocalClassEnabledL_CMm" = internal global %objc_class
+    // CHECK-DAG: @"$s11local_types13innerIfConfigyyF0C0L0_yyF17LocalClassEnabledL_CMm" = internal global %objc_class
     class LocalClassEnabled {}
   }
   #endif
 }
 
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S11local_types8callTestyyF"() {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s11local_types8callTestyyF"() {{.*}} {
 public func callTest() {
   test()
 } // CHECK: {{^[}]$}}

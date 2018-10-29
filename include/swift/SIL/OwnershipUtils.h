@@ -14,6 +14,7 @@
 #define SWIFT_SIL_OWNERSHIPUTILS_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/SIL/SILValue.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -63,22 +64,27 @@ struct ErrorBehaviorKind {
 /// use with SILPasses. It uses the actual checker as an internal PImpl detail
 /// so types/etc do not leak.
 struct OwnershipChecker {
-  /// The module that we are in.
-  SILModule &Mod;
-
-  /// A cache of dead-end basic blocks that we use to determine if we can
-  /// ignore "leaks".
-  DeadEndBlocks &DEBlocks;
+  /// The list of regular users from the last run of the checker.
+  SmallVector<SILInstruction *, 16> regularUsers;
 
   /// The list of regular users from the last run of the checker.
-  SmallVector<SILInstruction *, 16> RegularUsers;
-
-  /// The list of regular users from the last run of the checker.
-  SmallVector<SILInstruction *, 16> LifetimeEndingUsers;
+  SmallVector<SILInstruction *, 16> lifetimeEndingUsers;
 
   /// The live blocks for the SILValue we processed. This can be used to
   /// determine if a block is in the "live" region of our SILInstruction.
-  SmallPtrSet<SILBasicBlock *, 32> LiveBlocks;
+  SmallPtrSet<SILBasicBlock *, 32> liveBlocks;
+
+  /// The list of implicit regular users from the last run of the checker.
+  ///
+  /// This is used to encode end of scope like instructions.
+  SmallVector<SILInstruction *, 4> endScopeRegularUsers;
+
+  /// The module that we are in.
+  SILModule &mod;
+
+  /// A cache of dead-end basic blocks that we use to determine if we can
+  /// ignore "leaks".
+  DeadEndBlocks &deadEndBlocks;
 
   bool checkValue(SILValue Value);
 };
@@ -93,8 +99,24 @@ bool valueHasLinearLifetime(SILValue value,
                             ArrayRef<BranchPropagatedUser> consumingUses,
                             ArrayRef<BranchPropagatedUser> nonConsumingUses,
                             SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-                            DeadEndBlocks &deBlocks,
+                            DeadEndBlocks &deadEndBlocks,
                             ownership::ErrorBehaviorKind errorBehavior);
+
+/// Returns true if v is an address or trivial.
+bool isValueAddressOrTrivial(SILValue v, SILModule &m);
+
+/// These operations forward both owned and guaranteed ownership.
+bool isOwnershipForwardingValueKind(SILNodeKind kind);
+
+/// These operations forward guaranteed ownership, but don't necessarily forward
+/// owned values.
+bool isGuaranteedForwardingValueKind(SILNodeKind kind);
+
+bool isGuaranteedForwardingValue(SILValue value);
+
+bool isGuaranteedForwardingInst(SILInstruction *i);
+
+bool isOwnershipForwardingInst(SILInstruction *i);
 
 } // namespace swift
 

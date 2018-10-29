@@ -48,7 +48,10 @@ TYPE("dependencies",        Dependencies,              "d",               "")
 TYPE("autolink",            AutolinkFile,              "autolink",        "")
 TYPE("swiftmodule",         SwiftModuleFile,           "swiftmodule",     "")
 TYPE("swiftdoc",            SwiftModuleDocFile,        "swiftdoc",        "")
-TYPE("swiftinterface",      SwiftModuleInterfaceFile,  "swiftinterface",  "")
+TYPE("swiftinterface",      SwiftParseableInterfaceFile, \
+                                                       "swiftinterface",  "")
+TYPE("swiftinterfacedeps",  SwiftParseableInterfaceDeps, \
+                                                       "sid",             "")
 TYPE("assembly",            Assembly,                  "s",               "")
 TYPE("raw-sil",             RawSIL,                    "sil",             "")
 TYPE("raw-sib",             RawSIB,                    "sib",             "")

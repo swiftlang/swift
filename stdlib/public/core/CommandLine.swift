@@ -13,7 +13,7 @@
 import SwiftShims
 
 /// Command-line arguments for the current process.
-@_frozen // FIXME(sil-serialize-all)
+@_frozen // namespace
 public enum CommandLine {
   /// The backing static variable for argument count may come either from the
   /// entry point or it may need to be computed e.g. if we're in the REPL.
@@ -31,7 +31,6 @@ public enum CommandLine {
       =  _swift_stdlib_getUnsafeArgvArgc(&_argc)
 
   /// Access to the raw argc value from C.
-  @inlinable // FIXME(sil-serialize-all)
   public static var argc: Int32 {
     _ = CommandLine.unsafeArgv // Force evaluation of argv.
     return _argc
@@ -39,7 +38,6 @@ public enum CommandLine {
 
   /// Access to the raw argv value from C. Accessing the argument vector
   /// through this pointer is unsafe.
-  @inlinable // FIXME(sil-serialize-all)
   public static var unsafeArgv:
     UnsafeMutablePointer<UnsafeMutablePointer<Int8>?> {
     return _unsafeArgv

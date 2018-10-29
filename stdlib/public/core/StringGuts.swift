@@ -365,7 +365,7 @@ extension _StringGuts {
       unsupportedOn32bit()
 #else
       return _SmallUTF8String(
-        _rawBits: (_otherBits, _object.asSmallUTF8SecondWord))
+        _rawBits: (low: _otherBits, high: _object.asSmallUTF8SecondWord))
 #endif
     }
   }

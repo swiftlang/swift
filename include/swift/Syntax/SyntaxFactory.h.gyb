@@ -49,19 +49,19 @@ struct SyntaxFactory {
                                OwnedString Text, const Trivia &LeadingTrivia,
                                const Trivia &TrailingTrivia,
                                SourcePresence Presence,
-                               SyntaxArena *Arena = nullptr);
+                               RC<SyntaxArena> Arena = nullptr);
 
   /// Collect a list of tokens into a piece of "unknown" syntax.
   static UnknownSyntax makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens,
-                                         SyntaxArena *Arena = nullptr);
+                                         RC<SyntaxArena> Arena = nullptr);
 
   static Optional<Syntax> createSyntax(SyntaxKind Kind,
                                        llvm::ArrayRef<Syntax> Elements,
-                                       SyntaxArena *Arena = nullptr);
+                                       RC<SyntaxArena> Arena = nullptr);
 
   static RC<RawSyntax> createRaw(SyntaxKind Kind,
                                  llvm::ArrayRef<RC<RawSyntax>> Elements,
-                                 SyntaxArena *Arena = nullptr);
+                                 RC<SyntaxArena> Arena = nullptr);
 
   /// Count the number of children for a given syntax node kind,
   /// returning a pair of mininum and maximum count of children. The gap
@@ -83,36 +83,36 @@ struct SyntaxFactory {
 %     end
 %     child_params = ', '.join(child_params)
   static ${node.name} make${node.syntax_kind}(${child_params},
-                                              SyntaxArena *Arena = nullptr);
+                                              RC<SyntaxArena> Arena = nullptr);
 %   elif node.is_syntax_collection():
   static ${node.name} make${node.syntax_kind}(
       const std::vector<${node.collection_element_type}> &elts,
-      SyntaxArena *Arena = nullptr);
+      RC<SyntaxArena> Arena = nullptr);
 %   end
 
-  static ${node.name} makeBlank${node.syntax_kind}(SyntaxArena *Arena = nullptr);
+  static ${node.name} makeBlank${node.syntax_kind}(RC<SyntaxArena> Arena = nullptr);
 % end
 
 % for token in SYNTAX_TOKENS:
 %   if token.is_keyword:
   static TokenSyntax make${token.name}Keyword(const Trivia &LeadingTrivia,
                                               const Trivia &TrailingTrivia,
-                                              SyntaxArena *Arena = nullptr);
+                                              RC<SyntaxArena> Arena = nullptr);
 %   elif token.text:
   static TokenSyntax make${token.name}Token(const Trivia &LeadingTrivia,
                                             const Trivia &TrailingTrivia,
-                                            SyntaxArena *Arena = nullptr);
+                                            RC<SyntaxArena> Arena = nullptr);
 %   else:
   static TokenSyntax make${token.name}(OwnedString Text,
                                        const Trivia &LeadingTrivia,
                                        const Trivia &TrailingTrivia,
-                                       SyntaxArena *Arena = nullptr);
+                                       RC<SyntaxArena> Arena = nullptr);
 %   end
 % end
 
 #pragma mark - Convenience APIs
 
-  static TupleTypeSyntax makeVoidTupleType(SyntaxArena *Arena = nullptr);
+  static TupleTypeSyntax makeVoidTupleType(RC<SyntaxArena> Arena = nullptr);
 
   /// Creates an labelled TupleTypeElementSyntax with the provided label,
   /// colon, type and optional trailing comma.
@@ -120,53 +120,53 @@ struct SyntaxFactory {
       llvm::Optional<TokenSyntax> Label,
       llvm::Optional<TokenSyntax> Colon, TypeSyntax Type,
       llvm::Optional<TokenSyntax> TrailingComma = llvm::None,
-      SyntaxArena *Arena = nullptr);
+      RC<SyntaxArena> Arena = nullptr);
 
   /// Creates an unlabelled TupleTypeElementSyntax with the provided type and
   /// optional trailing comma.
   static TupleTypeElementSyntax
   makeTupleTypeElement(TypeSyntax Type,
                        llvm::Optional<TokenSyntax> TrailingComma = llvm::None,
-                       SyntaxArena *Arena = nullptr);
+                       RC<SyntaxArena> Arena = nullptr);
 
   /// Creates a TypeIdentifierSyntax with the provided name and leading/trailing
   /// trivia.
   static TypeSyntax makeTypeIdentifier(OwnedString TypeName,
                                        const Trivia &LeadingTrivia = {},
                                        const Trivia &TrailingTrivia = {},
-                                       SyntaxArena *Arena = nullptr);
+                                       RC<SyntaxArena> Arena = nullptr);
 
   /// Creates a GenericParameterSyntax with no inheritance clause and an
   /// optional trailing comma.
   static GenericParameterSyntax
   makeGenericParameter(TokenSyntax Name,
                        llvm::Optional<TokenSyntax> TrailingComma,
-                       SyntaxArena *Arena = nullptr);
+                       RC<SyntaxArena> Arena = nullptr);
 
   /// Creates a TypeIdentifierSyntax for the `Any` type.
   static TypeSyntax makeAnyTypeIdentifier(const Trivia &LeadingTrivia = {},
                                           const Trivia &TrailingTrivia = {},
-                                          SyntaxArena *Arena = nullptr);
+                                          RC<SyntaxArena> Arena = nullptr);
 
   /// Creates a TypeIdentifierSyntax for the `Self` type.
   static TypeSyntax makeSelfTypeIdentifier(const Trivia &LeadingTrivia = {},
                                            const Trivia &TrailingTrivia = {},
-                                           SyntaxArena *Arena = nullptr);
+                                           RC<SyntaxArena> Arena = nullptr);
 
   /// Creates a TokenSyntax for the `Type` identifier.
   static TokenSyntax makeTypeToken(const Trivia &LeadingTrivia = {},
                                    const Trivia &TrailingTrivia = {},
-                                   SyntaxArena *Arena = nullptr);
+                                   RC<SyntaxArena> Arena = nullptr);
 
   /// Creates a TokenSyntax for the `Protocol` identifier.
   static TokenSyntax makeProtocolToken(const Trivia &LeadingTrivia = {},
                                        const Trivia &TrailingTrivia = {},
-                                       SyntaxArena *Arena = nullptr);
+                                       RC<SyntaxArena> Arena = nullptr);
 
   /// Creates an `==` operator token.
   static TokenSyntax makeEqualityOperator(const Trivia &LeadingTrivia = {},
                                           const Trivia &TrailingTrivia = {},
-                                          SyntaxArena *Arena = nullptr);
+                                          RC<SyntaxArena> Arena = nullptr);
 
   /// Whether a raw node `Member` can serve as a member in a syntax collection
   /// of the given syntax collection kind.

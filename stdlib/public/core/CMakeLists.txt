@@ -31,9 +31,11 @@ set(SWIFTLIB_ESSENTIAL
   Assert.swift
   AssertCommon.swift
   BidirectionalCollection.swift
+  Bitset.swift
   Bool.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
+  BridgingBuffer.swift
   Builtin.swift
   BuiltinMath.swift.gyb
   Character.swift
@@ -51,6 +53,11 @@ set(SWIFTLIB_ESSENTIAL
   CTypes.swift
   DebuggerSupport.swift
   Dictionary.swift
+  DictionaryBridging.swift
+  DictionaryBuilder.swift
+  DictionaryCasting.swift
+  DictionaryStorage.swift
+  DictionaryVariant.swift
   DropWhile.swift
   Dump.swift
   EmptyCollection.swift
@@ -60,7 +67,7 @@ set(SWIFTLIB_ESSENTIAL
   FixedArray.swift.gyb
   FlatMap.swift
   Flatten.swift
-  FloatingPoint.swift.gyb
+  FloatingPoint.swift
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
   Hashable.swift
@@ -68,17 +75,18 @@ set(SWIFTLIB_ESSENTIAL
   # if we do so, the compiler crashes.
   AnyHashable.swift
   # END WORKAROUND
-  HashedCollectionsAnyHashableExtensions.swift
   Hasher.swift
   Hashing.swift
-  HeapBuffer.swift
+  HashTable.swift
   ICU.swift
   Indices.swift
   InputStream.swift
   IntegerParsing.swift
-  Integers.swift.gyb
+  Integers.swift
+  IntegerTypes.swift.gyb
   Join.swift
   KeyPath.swift
+  KeyValuePairs.swift
   LazyCollection.swift
   LazySequence.swift
   LifetimeManager.swift
@@ -89,6 +97,8 @@ set(SWIFTLIB_ESSENTIAL
   Mirrors.swift.gyb
   Misc.swift
   MutableCollection.swift
+  NativeDictionary.swift
+  NativeSet.swift
   NewtypeWrapper.swift
   NormalizedCodeUnitIterator.swift
   ObjectIdentifier.swift
@@ -115,6 +125,12 @@ set(SWIFTLIB_ESSENTIAL
   SequenceWrapper.swift
   Set.swift
   SetAlgebra.swift
+  SetAnyHashableExtensions.swift
+  SetBridging.swift
+  SetBuilder.swift
+  SetCasting.swift
+  SetStorage.swift
+  SetVariant.swift
   ShadowProtocols.swift
   Shims.swift
   Slice.swift
@@ -157,7 +173,6 @@ set(SWIFTLIB_ESSENTIAL
   Unmanaged.swift
   UnmanagedOpaqueString.swift
   UnmanagedString.swift
-  UnsafeBitMap.swift
   UnsafeBufferPointer.swift.gyb
   UnsafeRawBufferPointer.swift.gyb
   UnsafePointer.swift
@@ -243,13 +258,12 @@ endif()
 
 list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
 list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
-list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-sil-ownership")
 if(SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING)
   list(APPEND swift_stdlib_compile_flags "-enforce-exclusivity=checked")
 endif()
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
-  add_swift_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
+  add_swift_target_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
       ${SWIFTLIB_ESSENTIAL})
   target_link_libraries(swift_stdlib_essential ${RUNTIME_DEPENDENCY})
 endif()
@@ -260,7 +274,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
    list(APPEND swift_core_private_link_libraries swiftImageInspectionShared)
 endif()
 
-add_swift_library(swiftCore
+add_swift_target_library(swiftCore
                   ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
                     ${SWIFTLIB_SOURCES}
                   # The copy_shim_headers target dependency is required to let the

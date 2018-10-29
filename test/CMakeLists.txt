@@ -44,13 +44,11 @@ function(get_test_dependencies SDK result_var_name)
       sil-func-extractor sil-llvm-gen sil-nm sil-passpipeline-dumper
       lldb-moduleimport-test swift-reflection-dump swift-remoteast-test
       swift-api-digester swift-refactor swift-demangle-yamldump)
-  if (TARGET swift-swiftsyntax-test)
-    list(APPEND deps_binaries swift-swiftsyntax-test)
-  endif()
   if(NOT SWIFT_BUILT_STANDALONE)
     list(APPEND deps_binaries FileCheck arcmt-test c-arcmt-test c-index-test
          clang llc llvm-cov llvm-dwarfdump llvm-link llvm-as llvm-dis
-         llvm-bcanalyzer llvm-nm llvm-readobj llvm-profdata count not)
+         llvm-bcanalyzer llvm-nm llvm-readobj llvm-profdata count not
+         llvm-strings)
   endif()
   if(SWIFT_BUILD_SOURCEKIT)
     list(APPEND deps_binaries sourcekitd-test complete-test)
@@ -318,6 +316,11 @@ foreach(SDK ${SWIFT_SDKS})
             COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE}"
             USES_TERMINAL)
 
+        set(test_dependencies_target_name
+            "swift${test_subset_target_suffix}${test_mode_target_suffix}${VARIANT_SUFFIX}-test-depends")
+        add_custom_target("${test_dependencies_target_name}"
+            DEPENDS ${dependencies})
+
         add_custom_target("${test_target_name}-custom"
             ${command_upload_stdlib}
             ${command_upload_swift_reflection_test}
@@ -327,6 +330,7 @@ foreach(SDK ${SWIFT_SDKS})
               ${LIT_ARGS}
               "--param" "swift_test_subset=${test_subset}"
               "--param" "swift_test_mode=${test_mode}"
+              ${SWIFT_LIT_TEST_PATHS}
             DEPENDS ${dependencies}
             COMMENT "Running ${test_subset} Swift tests for ${VARIANT_TRIPLE} from custom test locations"
             USES_TERMINAL)
@@ -355,5 +359,8 @@ foreach(test_mode ${TEST_MODES})
         DEPENDS "${test_target_name}${SWIFT_PRIMARY_VARIANT_SUFFIX}")
     set_property(TARGET "${test_target_name}"
         PROPERTY FOLDER "Tests/check-swift")
+
+    add_custom_target("swift${test_subset_target_suffix}${test_mode_target_suffix}-test-depends"
+        DEPENDS "swift${test_subset_target_suffix}${test_mode_target_suffix}${SWIFT_PRIMARY_VARIANT_SUFFIX}-test-depends")
   endforeach()
 endforeach()

@@ -24,6 +24,8 @@
 
 #include "swift/Basic/LLVM.h"
 
+#include "llvm/ADT/StringExtras.h"
+
 using namespace llvm::sys;
 
 namespace swift {
@@ -92,13 +94,15 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
     SmallVector<const char *, 128> Argv;
     Argv.push_back(T->ExecPath);
     Argv.append(T->Args.begin(), T->Args.end());
-    Argv.push_back(0);
+    Argv.push_back(nullptr);
 
-    const char *const *envp = T->Env.empty() ? nullptr : T->Env.data();
+    llvm::Optional<llvm::ArrayRef<llvm::StringRef>> Envp =
+        T->Env.empty() ? decltype(Envp)(None)
+                       : decltype(Envp)(llvm::toStringRefArray(T->Env.data()));
 
     bool ExecutionFailed = false;
-    ProcessInfo PI = ExecuteNoWait(T->ExecPath, Argv.data(),
-                                   (const char **)envp,
+    ProcessInfo PI = ExecuteNoWait(T->ExecPath,
+                                   llvm::toStringRefArray(Argv.data()), Envp,
                                    /*redirects*/None, /*memoryLimit*/0,
                                    /*ErrMsg*/nullptr, &ExecutionFailed);
     if (ExecutionFailed) {

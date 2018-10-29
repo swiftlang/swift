@@ -310,7 +310,7 @@ sil @unknown_use : $@convention(thin) () -> () {
 // CHECK-NEXT: [[ARR:%.*]] = apply [[ASFUN]]
 // CHECK-NEXT: [[OWNER:%.*]] = tuple_extract [[ARR]]{{.*}}, 0
 // CHECK-NOT:    apply [[ACFUN]]
-// CHECK:      [[AEFUN:%.*]] = function_ref @$SSa6appendyyxF
+// CHECK:      [[AEFUN:%.*]] = function_ref @$sSa6appendyyxnF
 // CHECK-NEXT: [[STACK:%.*]] = alloc_stack $MyInt
 // CHECK-NEXT: store %{{[0-9]+}} to [[STACK]]
 // CHECK-NEXT: apply [[AEFUN]]<MyInt>([[STACK]]
@@ -357,13 +357,12 @@ sil [_semantics "array.append_contentsOf"] @arrayAppendContentsOfHello : $@conve
 // CHECK:      strong_retain %1 : $Hello
 // CHECK-NEXT: store %1 to %{{[0-9]+}} : $*Hello
 // CHECK-NOT:     apply
-// CHECK:      [[AEFUN:%.*]] = function_ref @$SSa6appendyyxF
+// CHECK:      [[AEFUN:%.*]] = function_ref @$sSa6appendyyxnF
 // CHECK-NEXT: strong_retain %1 : $Hello
 // CHECK-NEXT: [[STACK:%.*]] = alloc_stack $Hello
 // CHECK-NEXT: store %1 to [[STACK]]
 // CHECK-NEXT: apply [[AEFUN]]<Hello>([[STACK]], %0)
 // CHECK-NEXT: dealloc_stack [[STACK]]
-// CHECK-NEXT: strong_release %1
 // CHECK-NEXT: release_value [[OWNER]]
 // CHECK-NEXT: return
 sil @append_contentsOf_class : $@convention(thin) (@inout Array<Hello>, @owned Hello) -> @owned Hello {

@@ -30,6 +30,10 @@ public extension Dictionary.Keys {
   public func foo() {}
 }
 
+public extension Dictionary.Keys where Key: P1 {
+  public func bar() {}
+}
+
 public protocol InitProto {
   init(x: Int)
 }

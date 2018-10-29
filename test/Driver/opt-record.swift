@@ -8,30 +8,33 @@
 
 var a: Int = 1
 
+#sourceLocation(file: "custom.swuft", line: 2000)
 func foo() {
   a = 2
 }
+#sourceLocation() // reset
 
 public func bar() {
+  foo()
   // YAML:      --- !Passed
   // YAML-NEXT: Pass:            sil-inliner
   // YAML-NEXT: Name:            sil.Inlined
   // YAML-NEXT: DebugLoc:
   // YAML-NEXT:   File:            {{.*}}opt-record.swift
-  // YAML-NEXT:   Line:            42
+  // YAML-NEXT:   Line:            [[@LINE-6]]
   // YAML-NEXT:   Column:          3
   // YAML-NEXT: Function:        'bar()'
   // YAML-NEXT: Args:
   // YAML-NEXT:   - Callee:          '"optrecordmod.foo()"'
   // YAML-NEXT:     DebugLoc:
-  // YAML-NEXT:       File:            {{.*}}opt-record.swift
-  // YAML-NEXT:       Line:            11
+  // YAML-NEXT:       File:            custom.swuft
+  // YAML-NEXT:       Line:            2000
   // YAML-NEXT:       Column:          6
   // YAML-NEXT:   - String:          ' inlined into '
   // YAML-NEXT:   - Caller:          '"optrecordmod.bar()"'
   // YAML-NEXT:     DebugLoc:
   // YAML-NEXT:       File:            {{.*}}opt-record.swift
-  // YAML-NEXT:       Line:            15
+  // YAML-NEXT:       Line:            [[@LINE-20]]
   // YAML-NEXT:       Column:          13
   // YAML-NEXT:   - String:          ' (cost = '
   // YAML-NEXT:   - Cost:            '{{.*}}'
@@ -39,5 +42,4 @@ public func bar() {
   // YAML-NEXT:   - Benefit:         '{{.*}}'
   // YAML-NEXT:   - String:          ')'
   // YAML-NEXT: ...
-  foo()
 }

@@ -567,3 +567,16 @@ DebugValueAddrInst *SILBuilder::createDebugValueAddr(SILLocation Loc,
   return insert(DebugValueAddrInst::create(getSILDebugLocation(Loc), src,
                                            getModule(), Var));
 }
+
+void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,
+                                           function_ref<void(SILValue)> &&fun) {
+  if (original->getType().isAddress()) {
+    original = createLoadBorrow(loc, original);
+  } else {
+    original = createBeginBorrow(loc, original);
+  }
+
+  fun(original);
+
+  createEndBorrow(loc, original);
+}

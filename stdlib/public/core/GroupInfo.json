@@ -68,7 +68,7 @@
     "Range.swift",
     "ClosedRange.swift",
     "CollectionOfOne.swift",
-    "HeapBuffer.swift",
+    "BridgingBuffer.swift",
     "Sequence.swift",
     "SequenceAlgorithms.swift",
     "RangeReplaceableCollection.swift",
@@ -76,6 +76,7 @@
     "WriteBackMutableSlice.swift",
     "UnfoldSequence.swift",
     "UIntBuffer.swift",
+    "KeyValuePairs.swift",
     {
       "Type-erased": [
         "ExistentialCollection.swift"
@@ -111,9 +112,22 @@
         "SliceBuffer.swift",
         "SwiftNativeNSArray.swift"],
       "HashedCollections": [
+        "HashTable.swift",
         "Dictionary.swift",
-        "HashedCollectionsAnyHashableExtensions.swift",
+        "NativeDictionary.swift",
+        "DictionaryBridging.swift",
+        "DictionaryBuilder.swift",
+        "DictionaryCasting.swift",
+        "DictionaryStorage.swift",
+        "DictionaryVariant.swift",
         "Set.swift",
+        "NativeSet.swift",
+        "SetAnyHashableExtensions.swift",
+        "SetBridging.swift",
+        "SetBuilder.swift",
+        "SetCasting.swift",
+        "SetStorage.swift",
+        "SetVariant.swift"
       ]
     }
   ],
@@ -141,6 +155,7 @@
     {
     "Integers": [
       "Integers.swift",
+      "IntegerTypes.swift",
       "IntegerParsing.swift"],
     "Floating": [
       "FloatingPoint.swift",
@@ -164,12 +179,16 @@
   "Playground": [
     "PlaygroundDisplay.swift"
   ],
-  "Misc": [
-    "AnyHashable.swift",
-    "Interval.swift",
-    "Hashing.swift",
-    "SipHash.swift",
+  "Hashing": [
+    "Hashable.swift",
     "Hasher.swift",
+    "SipHash.swift",
+    "AnyHashable.swift",
+    "Hashing.swift",
+    "Bitset.swift"
+  ],
+  "Misc": [
+    "Interval.swift",
     "ErrorType.swift",
     "InputStream.swift",
     "LifetimeManager.swift",
@@ -190,11 +209,9 @@
     "CommandLine.swift",
     "Tuple.swift",
     "NewtypeWrapper.swift",
-    "UnsafeBitMap.swift",
     "DebuggerSupport.swift",
     "Equatable.swift",
     "Comparable.swift",
-    "Hashable.swift",
     "Codable.swift",
     "MigrationSupport.swift"
   ]

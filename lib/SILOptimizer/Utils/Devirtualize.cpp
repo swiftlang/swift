@@ -249,7 +249,7 @@ SILValue swift::getInstanceWithExactDynamicType(SILValue S, SILModule &M,
     // Traverse the chain of predecessors.
     if (isa<BranchInst>(SinglePred->getTerminator()) ||
         isa<CondBranchInst>(SinglePred->getTerminator())) {
-      S = cast<SILPHIArgument>(Arg)->getIncomingValue(SinglePred);
+      S = cast<SILPhiArgument>(Arg)->getIncomingPhiValue(SinglePred);
       continue;
     }
 
@@ -319,11 +319,6 @@ SILType swift::getExactDynamicType(SILValue S, SILModule &M,
         ResultType = V->getType();
         continue;
       }
-      // Look through strong_pin instructions.
-      if (auto pin = dyn_cast<StrongPinInst>(V)) {
-        WorkList.push_back(pin->getOperand());
-        continue;
-      }
     }
 
     auto Arg = dyn_cast<SILArgument>(V);
@@ -379,8 +374,7 @@ SILType swift::getExactDynamicType(SILValue S, SILModule &M,
     // It is a BB argument, look through incoming values. If they all have the
     // same exact type, then we consider it to be the type of the BB argument.
     SmallVector<SILValue, 4> IncomingValues;
-
-    if (Arg->getIncomingValues(IncomingValues)) {
+    if (Arg->getSingleTerminatorOperands(IncomingValues)) {
       for (auto InValue : IncomingValues) {
         WorkList.push_back(InValue);
       }
@@ -504,7 +498,7 @@ static TryApplyInst *replaceTryApplyInst(SILBuilder &B, SILLocation Loc,
     ResultBB = NormalBB;
   } else {
     ResultBB = B.getFunction().createBasicBlockBefore(NormalBB);
-    ResultBB->createPHIArgument(NewResultTy, ValueOwnershipKind::Owned);
+    ResultBB->createPhiArgument(NewResultTy, ValueOwnershipKind::Owned);
   }
 
   // We can always just use the original error BB because we'll be

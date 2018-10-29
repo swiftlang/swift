@@ -52,9 +52,9 @@ sil_vtable Hash {
 }
 
 sil_vtable MD5 {
-  #Hash.init!initializer.1: @_TFC4main3MD5cfMS0_FT_S0_	// main.MD5.init (main.MD5.Type)() -> main.MD5
-  #Hash.update!1: @_TFC4main4Hash6updatefS0_FT_T_	// main.Hash.update (main.Hash)() -> ()
-  #Hash.hash!1: @_TFC4main4Hash4hashfS0_FT_T_	// main.Hash.hash (main.Hash)() -> ()
+  #Hash.init!initializer.1: @_TFC4main3MD5cfMS0_FT_S0_ [override]	// main.MD5.init (main.MD5.Type)() -> main.MD5
+  #Hash.update!1: @_TFC4main4Hash6updatefS0_FT_T_ [inherited]	// main.Hash.update (main.Hash)() -> ()
+  #Hash.hash!1: @_TFC4main4Hash4hashfS0_FT_T_ [inherited]	// main.Hash.hash (main.Hash)() -> ()
 }
 
 

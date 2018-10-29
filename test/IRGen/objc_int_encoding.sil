@@ -5,7 +5,7 @@
 // CHECK-64: [[INT_UINT_METHOD_ENCODING:@.*]] = private unnamed_addr constant {{.*}} c"Q24@0:8q16\00"
 // CHECK-32: [[INT_UINT_METHOD_ENCODING:@.*]] = private unnamed_addr constant {{.*}} c"I12@0:4i8\00"
 
-// CHECK: @_INSTANCE_METHODS__TtC17objc_int_encoding3Foo = private constant {{.*}} [[SELECTOR]], {{.*}} [[INT_UINT_METHOD_ENCODING]], {{.*}} @"$S17objc_int_encoding3FooC3foo1xSuSi_tFTo"
+// CHECK: @_INSTANCE_METHODS__TtC17objc_int_encoding3Foo = private constant {{.*}} [[SELECTOR]], {{.*}} [[INT_UINT_METHOD_ENCODING]], {{.*}} @"$s17objc_int_encoding3FooC3foo1xSuSi_tFTo"
 
 sil_stage canonical
 
@@ -19,11 +19,11 @@ class Foo: NSObject {
   @objc func foo(x: Int) -> UInt
 }
 
-sil hidden @$S17objc_int_encoding3FooC3foo1xSuSi_tFTo : $@convention(objc_method) (Int, @guaranteed Foo) -> UInt {
+sil hidden @$s17objc_int_encoding3FooC3foo1xSuSi_tFTo : $@convention(objc_method) (Int, @guaranteed Foo) -> UInt {
 entry(%0 : @trivial $Int, %1 : @owned $Foo):
   unreachable
 }
-sil @$S17objc_int_encoding3FooCACycfcTo : $@convention(objc_method) (@owned Foo) -> @owned Foo {
+sil @$s17objc_int_encoding3FooCACycfcTo : $@convention(objc_method) (@owned Foo) -> @owned Foo {
 entry(%1 : @owned $Foo):
   unreachable
 }

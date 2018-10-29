@@ -42,16 +42,25 @@ void anchorForGetMainExecutable() {}
 
 using namespace llvm::MachO;
 
-static bool validateModule(llvm::StringRef data, bool Verbose,
-                           swift::serialization::ValidationInfo &info,
-                           swift::serialization::ExtendedValidationInfo &extendedInfo) {
+static bool
+validateModule(llvm::StringRef data, bool Verbose,
+               swift::serialization::ValidationInfo &info,
+               swift::serialization::ExtendedValidationInfo &extendedInfo) {
   info = swift::serialization::validateSerializedAST(data, &extendedInfo);
   if (info.status != swift::serialization::Status::Valid)
+    return false;
+
+  swift::CompilerInvocation CI;
+  if (CI.loadFromSerializedAST(data) != swift::serialization::Status::Valid)
     return false;
 
   if (Verbose) {
     if (!info.shortVersion.empty())
       llvm::outs() << "- Swift Version: " << info.shortVersion << "\n";
+    llvm::outs() << "- Compatibility Version: "
+                 << CI.getLangOptions()
+                        .EffectiveLanguageVersion.asAPINotesVersionString()
+                 << "\n";
     llvm::outs() << "- Target: " << info.targetTriple << "\n";
     if (!extendedInfo.getSDKPath().empty())
       llvm::outs() << "- SDK path: " << extendedInfo.getSDKPath() << "\n";

@@ -151,10 +151,6 @@ void SILWitnessTable::convertToDefinition(
   }
 }
 
-Identifier SILWitnessTable::getIdentifier() const {
-  return Mod.getASTContext().getIdentifier(Name);
-}
-
 bool SILWitnessTable::conformanceIsSerialized(ProtocolConformance *conformance) {
   // Serialize witness tables for conformances synthesized by
   // the ClangImporter.

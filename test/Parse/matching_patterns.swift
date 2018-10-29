@@ -280,7 +280,8 @@ case (1, 2, 3):
 
 // patterns in expression-only positions are errors.
 case +++(_, var d, 3):
-// expected-error@-1{{'+++' is not a prefix unary operator}}
+// expected-error@-1{{'_' can only appear in a pattern or on the left side of an assignment}}
+// expected-error@-2{{'var' binding pattern cannot appear in an expression}}
   ()
 case (_, var e, 3) +++ (1, 2, 3):
 // expected-error@-1{{'_' can only appear in a pattern}}

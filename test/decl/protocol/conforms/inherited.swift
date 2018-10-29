@@ -106,7 +106,7 @@ class A : P1, P2, P3, P4, P5, P6, P7, P8, P9, P10 {
   }
 
   // P3
-  subscript (i: Int) -> A { // expected-error{{protocol 'P3' requirement 'subscript' cannot be satisfied by a non-final class ('A') because it uses 'Self' in a non-parameter, non-result type position}}
+  subscript (i: Int) -> A { // expected-error{{protocol 'P3' requirement 'subscript(_:)' cannot be satisfied by a non-final class ('A') because it uses 'Self' in a non-parameter, non-result type position}}
     get {
      return self
     }

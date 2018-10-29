@@ -14,6 +14,7 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
+#include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Statistic.h"
@@ -26,7 +27,6 @@
 #include "swift/Driver/Job.h"
 #include "swift/Driver/ParseableOutput.h"
 #include "swift/Driver/ToolChain.h"
-#include "swift/Frontend/OutputFileMap.h"
 #include "swift/Option/Options.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
@@ -115,7 +115,6 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          unsigned BatchSeed,
                          Optional<unsigned> BatchCount,
                          Optional<unsigned> BatchSizeLimit,
-                         bool ForceOneBatchRepartition,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
                          std::unique_ptr<UnifiedStatsReporter> StatsReporter)
@@ -136,7 +135,6 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     BatchSeed(BatchSeed),
     BatchCount(BatchCount),
     BatchSizeLimit(BatchSizeLimit),
-    ForceOneBatchRepartition(ForceOneBatchRepartition),
     SaveTemps(SaveTemps),
     ShowDriverTimeCompilation(ShowDriverTimeCompilation),
     Stats(std::move(StatsReporter)),
@@ -886,42 +884,6 @@ namespace driver {
         });
     }
 
-    // Due to the multiplication of the number of additional files and the
-    // number of files in a batch, it's pretty easy to construct too-long
-    // command lines here, which will then fail to exec. We address this crudely
-    // by re-forming batches with a finer partition when we overflow.
-    //
-    // Now that we're passing OutputFileMaps to frontends, this should never
-    // happen, but keep this as insurance, because the decision to pass output
-    // file maps cannot know the exact length of the command line, so may
-    // possibly fail to use the OutputFileMap.
-    //
-    // In order to be able to exercise as much of the code paths as possible,
-    // take a flag to force a retry, but only once.
-    bool shouldRetryWithMorePartitions(std::vector<const Job *> const &Batches,
-                                       bool &PretendTheCommandLineIsTooLongOnce,
-                                       size_t &NumPartitions) {
-
-      // Stop rebatching if we can't subdivide batches any further.
-      if (NumPartitions > PendingExecution.size())
-        return false;
-
-      for (auto const *B : Batches) {
-        if (!llvm::sys::commandLineFitsWithinSystemLimits(B->getExecutable(),
-                                                          B->getArguments()) ||
-            PretendTheCommandLineIsTooLongOnce) {
-          PretendTheCommandLineIsTooLongOnce = false;
-          // To avoid redoing the batch loop too many times, repartition pretty
-          // aggressively by doubling partition count / halving size.
-          NumPartitions *= 2;
-          LLVM_DEBUG(llvm::dbgs()
-                     << "Should have used a supplementary output file map.\n");
-          return true;
-        }
-      }
-      return false;
-    }
-
     // Selects the number of partitions based on the user-provided batch
     // count and/or the number of parallel tasks we can run, subject to a
     // fixed per-batch safety cap, to avoid overcommitting memory.
@@ -1049,28 +1011,19 @@ namespace driver {
       size_t NumPartitions = pickNumberOfPartitions();
       CommandSetVector Batchable, NonBatchable;
       std::vector<const Job *> Batches;
-      bool PretendTheCommandLineIsTooLongOnce =
-          Comp.getForceOneBatchRepartition();
-      do {
-        // We might be restarting loop; clear these before proceeding.
-        Batchable.clear();
-        NonBatchable.clear();
-        Batches.clear();
 
-        // Split the batchable from non-batchable pending jobs.
-        getPendingBatchableJobs(Batchable, NonBatchable);
+      // Split the batchable from non-batchable pending jobs.
+      getPendingBatchableJobs(Batchable, NonBatchable);
 
-        // Partition the batchable jobs into sets.
-        BatchPartition Partition(NumPartitions);
-        partitionIntoBatches(Batchable.takeVector(), Partition);
+      // Partition the batchable jobs into sets.
+      BatchPartition Partition(NumPartitions);
+      partitionIntoBatches(Batchable.takeVector(), Partition);
 
-        // Construct a BatchJob from each batch in the partition.
-        for (auto const &Batch : Partition) {
-          formBatchJobFromPartitionBatch(Batches, Batch);
-        }
+      // Construct a BatchJob from each batch in the partition.
+      for (auto const &Batch : Partition) {
+        formBatchJobFromPartitionBatch(Batches, Batch);
+      }
 
-      } while (shouldRetryWithMorePartitions(
-          Batches, PretendTheCommandLineIsTooLongOnce, NumPartitions));
       PendingExecution.clear();
 
       // Save batches so we can locate and decompose them on task-exit.

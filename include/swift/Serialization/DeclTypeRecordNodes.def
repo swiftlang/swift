@@ -77,7 +77,7 @@
 #endif
 
 // These IDs must \em not be renumbered or reordered without incrementing
-// VERSION_MAJOR in ModuleFormat.h. Names, however, may change.
+// the version in ModuleFormat.h. Names, however, may change.
 FIRST_TYPE(BUILTIN_ALIAS, 1)
 TYPE(GENERIC_TYPE_PARAM)
 TYPE(DEPENDENT_MEMBER)
@@ -180,6 +180,7 @@ OTHER(NORMAL_PROTOCOL_CONFORMANCE_ID, 246)
 OTHER(PROTOCOL_CONFORMANCE_XREF, 247)
 OTHER(MEMBERS, 248)
 OTHER(XREF, 249)
+OTHER(INLINABLE_BODY_TEXT, 250)
 
 #undef RECORD
 #undef DECLTYPERECORDNODES_HAS_RECORD_VAL

@@ -78,6 +78,20 @@ bool SILLoop::canDuplicate(SILInstruction *I) const {
     return false;
   }
 
+  // The entire coroutine execution must be within the loop.
+  // Note that we don't have to worry about the reverse --- a loop which
+  // contains an end_apply or abort_apply of an external begin_apply ---
+  // because that wouldn't be structurally valid in the first place.
+  if (auto BAI = dyn_cast<BeginApplyInst>(I)) {
+    for (auto UI : BAI->getTokenResult()->getUses()) {
+      auto User = UI->getUser();
+      assert(isa<EndApplyInst>(User) || isa<AbortApplyInst>(User));
+      if (!contains(User))
+        return false;
+    }
+    return true;
+  }
+
   if (isa<ThrowInst>(I))
     return false;
 

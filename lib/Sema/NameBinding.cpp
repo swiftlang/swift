@@ -131,6 +131,7 @@ static bool isNominalImportKind(ImportKind kind) {
   case ImportKind::Func:
     return false;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 static const char *getImportKindString(ImportKind kind) {

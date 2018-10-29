@@ -89,13 +89,9 @@ ERROR(inout_argument_alias,none,
 NOTE(previous_inout_alias,none,
       "previous aliasing argument", ())
 
-WARNING(exclusivity_access_required_warn,none,
-        "overlapping accesses to %0, but "
-        "%select{initialization|read|modification|deinitialization}1 requires "
-        "exclusive access; "
-        "%select{consider copying to a local variable|"
-                "consider calling MutableCollection.swapAt(_:_:)}2",
-        (StringRef, unsigned, bool))
+ERROR(unimplemented_generator_witnesses,none,
+      "protocol conformance emission for generator coroutines is unimplemented",
+      ())
 
 ERROR(exclusivity_access_required,none,
       "overlapping accesses to %0, but "
@@ -109,11 +105,6 @@ ERROR(exclusivity_access_required_unknown_decl,none,
         "overlapping accesses, but "
         "%select{initialization|read|modification|deinitialization}0 requires "
         "exclusive access; consider copying to a local variable", (unsigned))
-
-WARNING(exclusivity_access_required_unknown_decl_warn,none,
-        "overlapping accesses, but "
-        "%select{initialization|read|modification|deinitialization}0 requires "
-"exclusive access; consider copying to a local variable", (unsigned))
 
 NOTE(exclusivity_conflicting_access,none,
      "conflicting access is here", ())

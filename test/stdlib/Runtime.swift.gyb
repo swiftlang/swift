@@ -39,7 +39,7 @@ func _stdlib_demangleName(_ mangledName: String) -> String {
 
     if let demangledNamePtr = demangledNamePtr {
       let demangledName = String(cString: demangledNamePtr)
-      _stdlib_free(demangledNamePtr)
+      _swift_stdlib_free(demangledNamePtr)
       return demangledName
     }
     return mangledName
@@ -168,14 +168,14 @@ class Class2ConformsToP1<T : CustomReflectable> : CustomReflectable, Q1 {
 class ClassDoesNotConformToP1 : Q1 {}
 
 Runtime.test("dynamicCasting with as") {
-  var someP1Value = StructConformsToP1()
-  var someP1Value2 = Struct2ConformsToP1(StructConformsToP1())
-  var someNotP1Value = StructDoesNotConformToP1()
-  var someP2Value = Struct3ConformsToP2()
-  var someP2Value2 = Struct4ConformsToP2(Struct3ConformsToP2())
-  var someP1Ref = ClassConformsToP1()
-  var someP1Ref2 = Class2ConformsToP1(ClassConformsToP1())
-  var someNotP1Ref = ClassDoesNotConformToP1()
+  let someP1Value = StructConformsToP1()
+  let someP1Value2 = Struct2ConformsToP1(StructConformsToP1())
+  let someNotP1Value = StructDoesNotConformToP1()
+  let someP2Value = Struct3ConformsToP2()
+  let someP2Value2 = Struct4ConformsToP2(Struct3ConformsToP2())
+  let someP1Ref = ClassConformsToP1()
+  let someP1Ref2 = Class2ConformsToP1(ClassConformsToP1())
+  let someNotP1Ref = ClassDoesNotConformToP1()
 
   expectTrue(someP1Value is P1)
   expectTrue(someP1Value2 is P1)
@@ -270,7 +270,7 @@ Runtime.test("dynamicCasting with as") {
   let doesThrow: (Int) throws -> Int = { $0 }
   let doesNotThrow: (String) -> String = { $0 }
 
-  var any: Any = doesThrow
+  _ = doesThrow
 
   expectTrue(doesThrow as Any is (Int) throws -> Int)
   expectFalse(doesThrow as Any is (String) throws -> Int)
@@ -364,18 +364,18 @@ Runtime.test("demangleName") {
   expectEqual("", _stdlib_demangleName(""))
   expectEqual("abc", _stdlib_demangleName("abc"))
   expectEqual("\0", _stdlib_demangleName("\0"))
-  expectEqual("Swift.Double", _stdlib_demangleName("$SSdD"))
+  expectEqual("Swift.Double", _stdlib_demangleName("$sSdD"))
   expectEqual("x.a : x.Foo<x.Foo<x.Foo<Swift.Int, Swift.Int>, x.Foo<Swift.Int, Swift.Int>>, x.Foo<x.Foo<Swift.Int, Swift.Int>, x.Foo<Swift.Int, Swift.Int>>>",
-      _stdlib_demangleName("$S1x1aAA3FooCyADyADySiSiGADySiSiGGADyADySiSiGADySiSiGGGvp"))
-  expectEqual("Foobar", _stdlib_demangleName("$S13__lldb_expr_46FoobarCD"))
+      _stdlib_demangleName("$s1x1aAA3FooCyADyADySiSiGADySiSiGGADyADySiSiGADySiSiGGGvp"))
+  expectEqual("Foobar", _stdlib_demangleName("$s13__lldb_expr_46FoobarCD"))
 }
 
 % for optionality in ['', '?']:
 Runtime.test("_stdlib_atomicCompareExchangeStrongPtr") {
   typealias IntPtr = UnsafeMutablePointer<Int>
-  var origP1: IntPtr${optionality} = IntPtr(bitPattern: 0x10101010)!
-  var origP2: IntPtr${optionality} = IntPtr(bitPattern: 0x20202020)!
-  var origP3: IntPtr${optionality} = IntPtr(bitPattern: 0x30303030)!
+  let origP1: IntPtr${optionality} = IntPtr(bitPattern: 0x10101010)!
+  let origP2: IntPtr${optionality} = IntPtr(bitPattern: 0x20202020)!
+  let origP3: IntPtr${optionality} = IntPtr(bitPattern: 0x30303030)!
 
   do {
     var object = origP1
@@ -428,7 +428,7 @@ Runtime.test("_stdlib_atomicCompareExchangeStrongPtr") {
 
 Runtime.test("casting AnyObject to class metatypes") {
   do {
-    var ao: AnyObject = SomeClass()
+    let ao: AnyObject = SomeClass()
     expectTrue(ao as? Any.Type == nil)
     expectTrue(ao as? AnyClass == nil)
   }
@@ -558,6 +558,14 @@ Runtime.test("SwiftError layout constants for LLDB") {
   let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)
 #elseif os(Linux)
   let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)
+#elseif os(Android)
+  #if arch(arm)
+    let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0xffffffff as UInt)
+  #elseif arch(arm64)
+    let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)
+  #else
+    _UnimplementedError()
+  #endif
 #else
   _UnimplementedError()
 #endif
@@ -574,7 +582,7 @@ Runtime.test("SwiftError layout constants for LLDB") {
   expectEqual(40, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
   expectEqual(72, sizeof_SwiftError.load(as: UInt.self))
 #endif
-#elseif os(Linux)
+#elseif os(Linux) || os(Android)
   expectEqual(16, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
   expectEqual(32, sizeof_SwiftError.load(as: UInt.self))
 #else
@@ -710,44 +718,6 @@ BitTwiddlingTestSuite.test("_isPowerOf2/UInt") {
 }
 
 var AvailabilityVersionsTestSuite = TestSuite("AvailabilityVersions")
-
-AvailabilityVersionsTestSuite.test("lexicographic_compare") {
-  func version(
-    _ major: Int,
-    _ minor: Int,
-    _ patch: Int
-  ) -> _SwiftNSOperatingSystemVersion {
-    return _SwiftNSOperatingSystemVersion(
-      majorVersion: major,
-      minorVersion: minor,
-      patchVersion: patch
-    )
-  }
-
-  checkComparable(.eq, version(0, 0, 0), version(0, 0, 0))
-
-  checkComparable(.lt, version(0, 0, 0), version(0, 0, 1))
-  checkComparable(.lt, version(0, 0, 0), version(0, 1, 0))
-  checkComparable(.lt, version(0, 0, 0), version(1, 0, 0))
-
-  checkComparable(.lt, version(10, 9, 0), version(10, 10, 0))
-  checkComparable(.lt, version(10, 9, 11), version(10, 10, 0))
-  checkComparable(.lt, version(10, 10, 3), version(10, 11, 0))
-
-  checkComparable(.lt, version(8, 3, 0), version(9, 0, 0))
-
-  checkComparable(.lt, version(0, 11, 0), version(10, 10, 4))
-  checkComparable(.lt, version(0, 10, 0), version(10, 10, 4))
-  checkComparable(.lt, version(3, 2, 1), version(4, 3, 2))
-  checkComparable(.lt, version(1, 2, 3), version(2, 3, 1))
-
-  checkComparable(.eq, version(10, 11, 12), version(10, 11, 12))
-
-  checkEquatable(true, version(1, 2, 3), version(1, 2, 3))
-  checkEquatable(false, version(1, 2, 3), version(1, 2, 42))
-  checkEquatable(false, version(1, 2, 3), version(1, 42, 3))
-  checkEquatable(false, version(1, 2, 3), version(42, 2, 3))
-}
 
 AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
   func isAtLeastOS(_ major: Int, _ minor: Int, _ patch: Int) -> Bool {

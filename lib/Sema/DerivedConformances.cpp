@@ -47,8 +47,7 @@ Type DerivedConformance::getProtocolType() const {
   return Protocol->getDeclaredType();
 }
 
-bool DerivedConformance::derivesProtocolConformance(TypeChecker &TC,
-                                                    DeclContext *DC,
+bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
                                                     NominalTypeDecl *Nominal,
                                                     ProtocolDecl *Protocol) {
   // Only known protocols can be derived.
@@ -73,7 +72,7 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &TC,
         // Enums without associated values can implicitly derive Equatable
         // conformance.
       case KnownProtocolKind::Equatable:
-        return canDeriveEquatable(TC, DC, Nominal);
+        return canDeriveEquatable(DC, Nominal);
 
         // "Simple" enums without availability attributes can explicitly derive
         // a CaseIterable conformance.
@@ -126,10 +125,10 @@ bool DerivedConformance::derivesProtocolConformance(TypeChecker &TC,
     }
 
     // Structs can explicitly derive Equatable conformance.
-    if (auto structDecl = dyn_cast<StructDecl>(Nominal)) {
+    if (isa<StructDecl>(Nominal)) {
       switch (*knownProtocol) {
         case KnownProtocolKind::Equatable:
-          return canDeriveEquatable(TC, DC, Nominal);
+          return canDeriveEquatable(DC, Nominal);
         default:
           return false;
       }
@@ -158,8 +157,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
             ConformanceCheckFlags::SkipConditionalRequirements)) {
       auto DC = conformance->getConcrete()->getDeclContext();
       // Check whether this nominal type derives conformances to the protocol.
-      if (!DerivedConformance::derivesProtocolConformance(tc, DC, nominal,
-                                                          proto))
+      if (!DerivedConformance::derivesProtocolConformance(DC, nominal, proto))
         return nullptr;
     }
 
@@ -286,7 +284,6 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
 
   auto &C = tc.Context;
   auto parentDC = property->getDeclContext();
-  auto selfDecl = ParamDecl::createSelf(SourceLoc(), parentDC, isStatic);
   ParameterList *params = ParameterList::createEmpty(C);
 
   Type propertyInterfaceType = property->getInterfaceType();
@@ -296,7 +293,7 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
     AccessorKind::Get, AddressorKind::NotAddressor, property,
     /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-    /*GenericParams=*/nullptr, selfDecl, params,
+    /*GenericParams=*/nullptr, params,
     TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
@@ -343,9 +340,7 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);
   propPat->setType(propertyContextType);
 
-  propPat = new (C) TypedPattern(propPat,
-                                 TypeLoc::withoutLoc(propertyContextType),
-                                 /*implicit*/ true);
+  propPat = TypedPattern::createImplicit(C, propPat, propertyContextType);
   propPat->setType(propertyContextType);
 
   auto *pbDecl = PatternBindingDecl::createImplicit(
@@ -363,19 +358,6 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
       Protocol->isSpecificProtocol(KnownProtocolKind::Hashable)) {
     auto ED = dyn_cast<EnumDecl>(Nominal);
     allowCrossfileExtensions = ED && ED->hasOnlyCasesWithoutAssociatedValues();
-  }
-
-  if (TC.Context.isSwiftVersion3()) {
-    // In Swift 3, a 'private' property can't be accessed in any extensions, so
-    // we can't synthesize anything that uses them. Thus, we stick to the old
-    // rule for synthesis, which is never in an extension except for the
-    // Equatable/Hashable cases mentioned above.
-    if (!allowCrossfileExtensions && Nominal != ConformanceDecl) {
-      TC.diagnose(ConformanceDecl->getLoc(),
-                  diag::swift3_cannot_synthesize_in_extension,
-                  getProtocolType());
-      return true;
-    }
   }
 
   if (!allowCrossfileExtensions &&

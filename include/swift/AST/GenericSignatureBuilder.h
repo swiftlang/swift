@@ -574,19 +574,8 @@ public:
   ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
-  ConstraintResult addRequirement(const RequirementRepr *req,
-                                  ModuleDecl *inferForModule);
-
-  /// \brief Add a new requirement.
-  ///
-  /// \param inferForModule Infer additional requirements from the types
-  /// relative to the given module.
-  ///
-  /// \returns true if this requirement makes the set of requirements
-  /// inconsistent, in which case a diagnostic will have been issued.
-  ConstraintResult addRequirement(const RequirementRepr *Req,
+  ConstraintResult addRequirement(const Requirement &req,
                                   FloatingRequirementSource source,
-                                  const SubstitutionMap *subMap,
                                   ModuleDecl *inferForModule);
 
   /// \brief Add an already-checked requirement.
@@ -600,7 +589,9 @@ public:
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
   ConstraintResult addRequirement(const Requirement &req,
+                                  const RequirementRepr *reqRepr,
                                   FloatingRequirementSource source,
+                                  const SubstitutionMap *subMap,
                                   ModuleDecl *inferForModule);
 
   /// \brief Add all of a generic signature's parameters and requirements.
@@ -618,7 +609,9 @@ public:
   /// where \c Dictionary requires that its key type be \c Hashable,
   /// the requirement \c K : Hashable is inferred from the parameter type,
   /// because the type \c Dictionary<K,V> cannot be formed without it.
-  void inferRequirements(ModuleDecl &module, TypeLoc type,
+  void inferRequirements(ModuleDecl &module,
+                         Type type,
+                         const TypeRepr *typeRepr,
                          FloatingRequirementSource source);
 
   /// Infer requirements from the given pattern, recursively.
@@ -1459,6 +1452,11 @@ public:
   /// Whether this is an explicitly-stated requirement.
   bool isExplicit() const;
 
+  /// Whether this is a top-level requirement written in source.
+  /// FIXME: This is a hack because expandConformanceRequirement()
+  /// is too eager; we should remove this once we fix it properly.
+  bool isTopLevel() const { return kind == Explicit; }
+
   /// Return the "inferred" version of this source, if it isn't already
   /// inferred.
   FloatingRequirementSource asInferred(const TypeRepr *typeRepr) const;
@@ -1739,10 +1737,20 @@ inline bool isErrorResult(GenericSignatureBuilder::ConstraintResult result) {
   case GenericSignatureBuilder::ConstraintResult::Unresolved:
     return false;
   }
+  llvm_unreachable("unhandled result");
 }
 
 /// Canonical ordering for dependent types.
 int compareDependentTypes(Type type1, Type type2);
+
+template<typename T>
+Type GenericSignatureBuilder::Constraint<T>::getSubjectDependentType(
+                      TypeArrayView<GenericTypeParamType> genericParams) const {
+  if (auto type = subject.dyn_cast<Type>())
+    return type;
+
+  return subject.get<PotentialArchetype *>()->getDependentType(genericParams);
+}
 
 } // end namespace swift
 

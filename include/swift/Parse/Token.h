@@ -45,7 +45,10 @@ class Token {
   /// Modifiers for string literals
   unsigned MultilineString : 1;
 
-  // Padding bits == 32 - sizeof(Kind) * 8 - 3;
+  /// Length of custom delimiter of "raw" string literals
+  unsigned CustomDelimiterLen : 8;
+
+  // Padding bits == 32 - 11;
 
   /// \brief The length of the comment that precedes the token.
   unsigned CommentLength;
@@ -62,8 +65,8 @@ class Token {
 public:
   Token(tok Kind, StringRef Text, unsigned CommentLength = 0)
           : Kind(Kind), AtStartOfLine(false), EscapedIdentifier(false),
-            MultilineString(false), CommentLength(CommentLength),
-            Text(Text) {}
+            MultilineString(false), CustomDelimiterLen(0),
+            CommentLength(CommentLength), Text(Text) {}
 
   Token() : Token(tok::NUM_TOKENS, {}, 0) {}
 
@@ -217,6 +220,21 @@ public:
     default: return false;
     }
   }
+
+  /// \brief True if the string literal token is multiline.
+  bool isMultilineString() const {
+    return MultilineString;
+  }
+  /// \brief Count of extending escaping '#'.
+  unsigned getCustomDelimiterLen() const {
+    return CustomDelimiterLen;
+  }
+  /// \brief Set characteristics of string literal token.
+  void setStringLiteral(bool IsMultilineString, unsigned CustomDelimiterLen) {
+    assert(Kind == tok::string_literal);
+    this->MultilineString = IsMultilineString;
+    this->CustomDelimiterLen = CustomDelimiterLen;
+  }
   
   /// getLoc - Return a source location identifier for the specified
   /// offset in the current file.
@@ -265,17 +283,15 @@ public:
   void setText(StringRef T) { Text = T; }
 
   /// \brief Set the token to the specified kind and source range.
-  void setToken(tok K, StringRef T, unsigned CommentLength = 0,
-                bool MultilineString = false) {
+  void setToken(tok K, StringRef T, unsigned CommentLength = 0) {
     Kind = K;
     Text = T;
     this->CommentLength = CommentLength;
     EscapedIdentifier = false;
-    this->MultilineString = MultilineString;
-  }
-
-  bool IsMultilineString() const {
-    return MultilineString;
+    this->MultilineString = false;
+    this->CustomDelimiterLen = 0;
+    assert(this->CustomDelimiterLen == CustomDelimiterLen &&
+           "custom string delimiter length > 255");
   }
 };
   

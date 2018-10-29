@@ -18,7 +18,7 @@ Tests.test("DefaultReturnType") {
 Tests.test("ExplicitTypeContext") {
   expectEqualSequence(["hello", "world"],
     ["hello", "world"].flatMap { $0 } as [String])
-  expectEqualSequence("helloworld".characters,
+  expectEqualSequence("helloworld",
     ["hello", "world"].flatMap { $0 } as [Character])
 }
 

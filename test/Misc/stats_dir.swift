@@ -24,12 +24,15 @@
 // RUN: %{python} %utils/process-stats-dir.py --compare-to-csv-baseline %t/driver.csv %t
 
 // RUN: %target-swiftc_driver -c -o %t/out.o -stats-output-dir %t/this/is/not/a/directory %s 2>&1 | %FileCheck -check-prefix=CHECK-NODIR %s
+// RUN: %target-swiftc_driver -c -o %t/out.o -stats-output-dir %t %s 2>&1 | %FileCheck -allow-empty -check-prefix=CHECK-SILENT %s
 
 // CHECK: {{"AST.NumSourceLines"	[1-9][0-9]*$}}
 // CHECK: {{"IRModule.NumIRFunctions"	[1-9][0-9]*$}}
 // CHECK: {{"LLVM.NumLLVMBytesOutput"	[1-9][0-9]*$}}
 
 // CHECK-NODIR: {{Error opening -stats-output-dir file}}
+
+// CHECK-SILENT-NOT: {{---}}
 
 public func foo() {
     print("hello")

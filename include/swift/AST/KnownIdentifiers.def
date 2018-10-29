@@ -100,11 +100,11 @@ IDENTIFIER(stringValue)
 IDENTIFIER(super)
 IDENTIFIER(superDecoder)
 IDENTIFIER(superEncoder)
-#if __APPLE__ && !SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
+#if SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT
+IDENTIFIER_WITH_NAME(SwiftObject, "_TtCs12_SwiftObject")
+#else
 // Pre-stable ABI uses un-mangled name for SwiftObject.
 IDENTIFIER(SwiftObject)
-#else
-IDENTIFIER_WITH_NAME(SwiftObject, "_TtCs12_SwiftObject")
 #endif
 IDENTIFIER(to)
 IDENTIFIER(toRaw)
@@ -163,8 +163,6 @@ IDENTIFIER(unicodeScalarLiteral)
 IDENTIFIER(stringLiteral)
 IDENTIFIER_(builtinUTF16StringLiteral)
 IDENTIFIER_(builtinStringLiteral)
-IDENTIFIER_(builtinConstUTF16StringLiteral)
-IDENTIFIER_(builtinConstStringLiteral)
 IDENTIFIER(StringLiteralType)
 IDENTIFIER(stringInterpolation)
 IDENTIFIER(stringInterpolationSegment)

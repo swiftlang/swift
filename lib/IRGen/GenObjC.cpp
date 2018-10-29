@@ -278,7 +278,8 @@ namespace {
       return APInt(bits, 0);
     }
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
-                                         SILType T) const override {
+                                         SILType T,
+                                         bool isOutlined) const override {
       src = IGF.Builder.CreateBitCast(src, IGF.IGM.SizeTy->getPointerTo());
       auto val = IGF.Builder.CreateLoad(src);
       auto isNonzero = IGF.Builder.CreateICmpNE(val,
@@ -288,7 +289,8 @@ namespace {
       return IGF.Builder.CreateSExt(isNonzero, IGF.IGM.Int32Ty);
     }
     void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
-                              Address dest, SILType T) const override {
+                              Address dest, SILType T, bool isOutlined)
+    const override {
       // There's only one extra inhabitant, 0.
       dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.SizeTy->getPointerTo());
       IGF.Builder.CreateStore(llvm::ConstantInt::get(IGF.IGM.SizeTy, 0), dest);
@@ -587,7 +589,7 @@ static llvm::Value *emitSuperArgument(IRGenFunction &IGF,
   } else {
     searchClass = cast<MetatypeType>(searchClass).getInstanceType();
     ClassDecl *searchClassDecl = searchClass.getClassOrBoundGenericClass();
-    if (doesClassMetadataRequireInitialization(IGF.IGM, searchClassDecl)) {
+    if (doesClassMetadataRequireUpdate(IGF.IGM, searchClassDecl)) {
       searchValue = emitClassHeapMetadataRef(IGF, searchClass,
                                              MetadataValueType::ObjCClass,
                                              MetadataState::Complete,
@@ -659,6 +661,7 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
       case ObjCMessageKind::Super:
         return IGF.IGM.getObjCMsgSendSuperStret2Fn();
       }
+      llvm_unreachable("unhandled kind");
     } else {
       switch (kind) {
       case ObjCMessageKind::Normal:
@@ -670,6 +673,7 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
       case ObjCMessageKind::Super:
         return IGF.IGM.getObjCMsgSendSuper2Fn();
       }
+      llvm_unreachable("unhandled kind");
     }
   }();
 

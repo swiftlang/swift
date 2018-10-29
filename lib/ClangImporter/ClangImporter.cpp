@@ -407,8 +407,6 @@ void ClangImporter::clearTypeResolver() {
 
 #pragma mark Module loading
 
-#define SHIMS_INCLUDE_FLAG "-isystem"
-
 static void
 getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
                              ASTContext &ctx,
@@ -439,7 +437,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
       "-fretain-comments-from-system-headers",
 
-      SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
+      "-isystem", searchPathOpts.RuntimeResourcePath,
   });
 
   // Enable Position Independence.  `-fPIC` is not supported on Windows, which
@@ -535,7 +533,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     // using Glibc or a libc that respects that flag. This will cause some
     // source breakage however (specifically with strerror_r()) on Linux
     // without a workaround.
-    if (triple.isOSFuchsia()) {
+    if (triple.isOSFuchsia() || triple.isAndroid()) {
       // Many of the modern libc features are hidden behind feature macros like
       // _GNU_SOURCE or _XOPEN_SOURCE.
       invocationArgStrs.insert(invocationArgStrs.end(), {
@@ -783,6 +781,7 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
     assert(0 && "unexpected ASTReader failure for PCH validation");
     return false;
   }
+  llvm_unreachable("unhandled result");
 }
 
 Optional<std::string>
@@ -1451,12 +1450,8 @@ void ClangImporter::collectSubModuleNames(
     if (!submodule)
       return;
   }
-  auto submoduleNameLength = submodule->getFullModuleName().length();
-  for (auto sub : submodule->submodules()) {
-    std::string full = sub->getFullModuleName();
-    full.erase(0, submoduleNameLength + 1);
-    names.push_back(std::move(full));
-  }
+  for (auto sub : submodule->submodules())
+    names.push_back(sub->Name);
 }
 
 bool ClangImporter::isModuleImported(const clang::Module *M) {
@@ -2016,72 +2011,89 @@ getClangOwningModule(ClangNode Node, const clang::ASTContext &ClangCtx) {
   return nullptr;
 }
 
+static const clang::Module *
+getClangTopLevelOwningModule(ClangNode Node,
+                             const clang::ASTContext &ClangCtx) {
+  const clang::Module *OwningModule = getClangOwningModule(Node, ClangCtx);
+  if (!OwningModule)
+    return nullptr;
+  return OwningModule->getTopLevelModule();
+}
+
 static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
                                 const ValueDecl *VD) {
-  // Include a value from module X if:
-  // * no particular module was requested, or
-  // * module X was specifically requested.
-  if (!ModuleFilter)
-    return true;
+  assert(ModuleFilter);
 
   auto ContainingUnit = VD->getDeclContext()->getModuleScopeContext();
   if (ModuleFilter == ContainingUnit)
     return true;
 
+  // The rest of this function is looking to see if the Clang entity that
+  // caused VD to be imported has redeclarations in the filter module.
   auto Wrapper = dyn_cast<ClangModuleUnit>(ContainingUnit);
   if (!Wrapper)
     return false;
 
   auto ClangNode = VD->getClangNode();
-  assert(ClangNode);
+  if (!ClangNode) {
+    // If we synthesized a ValueDecl, it won't have a Clang node. But so far
+    // all the situations where we synthesize top-level declarations are
+    // situations where we don't have to worry about C redeclarations.
+    // We should only consider the declaration visible from its owning module.
+    auto *SynthesizedTypeAttr =
+        VD->getAttrs().getAttribute<ClangImporterSynthesizedTypeAttr>();
+    assert(SynthesizedTypeAttr);
 
+    // When adding new ClangImporterSynthesizedTypeAttr::Kinds, make sure that
+    // the above statement still holds: "we don't want to allow these
+    // declarations to be treated as present in multiple modules".
+    switch (SynthesizedTypeAttr->getKind()) {
+    case ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapper:
+    case ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapperAnon:
+      break;
+    }
+
+    return false;
+  }
+
+  // Macros can be "redeclared" by putting an equivalent definition in two
+  // different modules. (We don't actually check the equivalence.)
+  // FIXME: We're also not checking if the redeclaration is in /this/ module.
+  if (ClangNode.getAsMacro())
+    return true;
+
+  const clang::Decl *D = ClangNode.castAsDecl();
   auto &ClangASTContext = ModuleFilter->getClangASTContext();
-  auto OwningClangModule = getClangOwningModule(ClangNode, ClangASTContext);
 
   // We don't handle Clang submodules; pop everything up to the top-level
   // module.
-  if (OwningClangModule)
-    OwningClangModule = OwningClangModule->getTopLevelModule();
-
+  auto OwningClangModule = getClangTopLevelOwningModule(ClangNode,
+                                                        ClangASTContext);
   if (OwningClangModule == ModuleFilter->getClangModule())
     return true;
 
-  if (auto D = ClangNode.getAsDecl()) {
-    // Handle redeclared decls.
-    if (isa<clang::FunctionDecl>(D) || isa<clang::VarDecl>(D) ||
-        isa<clang::TypedefNameDecl>(D)) {
-      for (auto Redeclaration : D->redecls()) {
-        if (Redeclaration == D)
-          continue;
-        auto OwningClangModule = getClangOwningModule(Redeclaration,
-                                                      ClangASTContext);
-        if (OwningClangModule)
-          OwningClangModule = OwningClangModule->getTopLevelModule();
-
-        if (OwningClangModule == ModuleFilter->getClangModule())
-          return true;
-      }
-    } else if (isa<clang::TagDecl>(D)) {
-      for (auto Redeclaration : D->redecls()) {
-        if (Redeclaration == D)
-          continue;
-        if (!cast<clang::TagDecl>(Redeclaration)->isCompleteDefinition())
-          continue;
-        auto OwningClangModule = getClangOwningModule(Redeclaration,
-                                                      ClangASTContext);
-        if (OwningClangModule)
-          OwningClangModule = OwningClangModule->getTopLevelModule();
-
-        if (OwningClangModule == ModuleFilter->getClangModule())
-          return true;
-      }
-    }
+  // Handle redeclarable Clang decls by checking each redeclaration.
+  bool IsTagDecl = isa<clang::TagDecl>(D);
+  if (!(IsTagDecl || isa<clang::FunctionDecl>(D) || isa<clang::VarDecl>(D) ||
+        isa<clang::TypedefNameDecl>(D))) {
+    return false;
   }
 
-  // Macros can be "redeclared" too, by putting an equivalent definition in two
-  // different modules.
-  if (ClangNode.getAsMacro())
-    return true;
+  for (auto Redeclaration : D->redecls()) {
+    if (Redeclaration == D)
+      continue;
+
+    // For enums, structs, and unions, only count definitions when looking to
+    // see what other modules they appear in.
+    if (IsTagDecl)
+      if (!cast<clang::TagDecl>(Redeclaration)->isCompleteDefinition())
+        continue;
+
+    auto OwningClangModule = getClangTopLevelOwningModule(Redeclaration,
+                                                          ClangASTContext);
+    if (OwningClangModule == ModuleFilter->getClangModule())
+      return true;
+  }
 
   return false;
 }
@@ -2111,12 +2123,14 @@ public:
 
 class FilteringVisibleDeclConsumer : public swift::VisibleDeclConsumer {
   swift::VisibleDeclConsumer &NextConsumer;
-  const ClangModuleUnit *ModuleFilter = nullptr;
+  const ClangModuleUnit *ModuleFilter;
 
 public:
   FilteringVisibleDeclConsumer(swift::VisibleDeclConsumer &consumer,
                                const ClangModuleUnit *CMU)
-      : NextConsumer(consumer), ModuleFilter(CMU) {}
+      : NextConsumer(consumer), ModuleFilter(CMU) {
+    assert(CMU);
+  }
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
     if (isVisibleFromModule(ModuleFilter, VD))
@@ -2126,13 +2140,14 @@ public:
 
 class FilteringDeclaredDeclConsumer : public swift::VisibleDeclConsumer {
   swift::VisibleDeclConsumer &NextConsumer;
-  const ClangModuleUnit *ModuleFilter = nullptr;
+  const ClangModuleUnit *ModuleFilter;
 
 public:
   FilteringDeclaredDeclConsumer(swift::VisibleDeclConsumer &consumer,
                                 const ClangModuleUnit *CMU)
-      : NextConsumer(consumer),
-        ModuleFilter(CMU) {}
+      : NextConsumer(consumer), ModuleFilter(CMU) {
+    assert(CMU);
+  }
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
     if (isDeclaredInModule(ModuleFilter, VD))
@@ -2637,7 +2652,9 @@ ClangModuleUnit::lookupNestedType(Identifier name,
       isa<StructDecl>(baseType) && !baseType->hasLazyMembers() &&
       baseType->isChildContextOf(this)) {
     auto *mutableBase = const_cast<NominalTypeDecl *>(baseType);
-    auto codeEnum = mutableBase->lookupDirect(name,/*ignoreNewExtensions*/true);
+    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+    auto codeEnum = mutableBase->lookupDirect(name, flags);
     // Double-check that we actually have a good result. It's possible what we
     // found is /not/ a synthesized error struct, but just something that looks
     // like it. But if we still found a good result we should return that.
@@ -2871,10 +2888,7 @@ void ClangModuleUnit::lookupObjCMethods(
   auto &clangCtx = clangSema.getASTContext();
   for (auto objcMethod : objcMethods) {
     // Verify that this method came from this module.
-    auto owningClangModule = getClangOwningModule(objcMethod, clangCtx);
-    if (owningClangModule)
-      owningClangModule = owningClangModule->getTopLevelModule();
-
+    auto owningClangModule = getClangTopLevelOwningModule(objcMethod, clangCtx);
     if (owningClangModule != clangModule) continue;
 
     // If we found a property accessor, import the property.
@@ -3086,7 +3100,8 @@ void ClangModuleUnit::getImportedModules(
   switch (filter) {
   case ModuleDecl::ImportFilter::All:
   case ModuleDecl::ImportFilter::Private:
-    imports.push_back({ModuleDecl::AccessPathTy(), owner.getStdlibModule()});
+    if (auto stdlib = owner.getStdlibModule())
+      imports.push_back({ModuleDecl::AccessPathTy(), stdlib});
     break;
   case ModuleDecl::ImportFilter::Public:
     break;
@@ -3291,7 +3306,7 @@ bool ClangImporter::Implementation::forEachLookupTable(
   // Collect and sort the set of module names.
   SmallVector<StringRef, 4> moduleNames;
   for (const auto &entry : LookupTables) {
-    moduleNames.push_back(entry.first());
+    moduleNames.push_back(entry.first);
   }
   llvm::array_pod_sort(moduleNames.begin(), moduleNames.end());
 
@@ -3599,7 +3614,7 @@ void ClangImporter::Implementation::dumpSwiftLookupTables() {
   // Sort the module names so we can print in a deterministic order.
   SmallVector<StringRef, 4> moduleNames;
   for (const auto &lookupTable : LookupTables) {
-    moduleNames.push_back(lookupTable.first());
+    moduleNames.push_back(lookupTable.first);
   }
   array_pod_sort(moduleNames.begin(), moduleNames.end());
 

@@ -270,7 +270,7 @@ func classAnyObject(_ obj: NSObject) {
 }
 
 // Protocol conformances
-class Wobbler : NSWobbling { // expected-note{{candidate has non-matching type '()'}}
+class Wobbler : NSWobbling {
   @objc func wobble() { }
 
   func returnMyself() -> Self { return self } // expected-error{{non-'@objc' method 'returnMyself()' does not satisfy requirement of '@objc' protocol 'NSWobbling'}}{{none}}
@@ -280,7 +280,7 @@ class Wobbler : NSWobbling { // expected-note{{candidate has non-matching type '
 extension Wobbler : NSMaybeInitWobble { // expected-error{{type 'Wobbler' does not conform to protocol 'NSMaybeInitWobble'}}
 }
 
-@objc class Wobbler2 : NSObject, NSWobbling { // expected-note{{candidate has non-matching type '()'}}
+@objc class Wobbler2 : NSObject, NSWobbling {
   func wobble() { }
   func returnMyself() -> Self { return self }
 }

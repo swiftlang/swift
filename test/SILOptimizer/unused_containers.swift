@@ -5,7 +5,7 @@
 // FIXME: https://bugs.swift.org/browse/SR-7806
 // REQUIRES: CPU=arm64 || CPU=x86_64
 
-//CHECK-LABEL: @$S17unused_containers16empty_array_testyyF
+//CHECK-LABEL: @$s17unused_containers16empty_array_testyyF
 //CHECK: bb0:
 //CHECK-NEXT: tuple
 //CHECK-NEXT: return
@@ -13,7 +13,7 @@ func empty_array_test() {
   let unused : [Int] = []
 }
 
-//CHECK-LABEL: @$S17unused_containers14empty_dic_testyyF
+//CHECK-LABEL: @$s17unused_containers14empty_dic_testyyF
 //CHECK: bb0:
 //CHECK-NEXT: tuple
 //CHECK-NEXT: return
@@ -21,7 +21,7 @@ func empty_dic_test() {
   let unused : [Int: Int] = [:]
 }
 
-//CHECK-LABEL: sil hidden @$S17unused_containers0A12_string_testyyF
+//CHECK-LABEL: sil hidden @$s17unused_containers0A12_string_testyyF
 //CHECK-NEXT: bb0:
 //CHECK-NEXT: tuple
 //CHECK-NEXT: return

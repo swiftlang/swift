@@ -1,5 +1,3 @@
-// XFAIL: linux
-
 // Make sure the indexing invocation through the driver works.
 
 // RUN: %empty-directory(%t)

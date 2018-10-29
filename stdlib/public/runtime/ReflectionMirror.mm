@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Reflection.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Config.h"
@@ -171,6 +172,7 @@ static bool loadSpecialReferenceStorage(OpaqueValue *fieldData,
                               reinterpret_cast<OpaqueValue *>(temporaryValue));
 
   type->deallocateBufferIn(&temporaryBuffer);
+  swift_unknownObjectRelease(strongValue);
   
   return true;
 }
@@ -253,6 +255,47 @@ struct TupleImpl : ReflectionMirrorImpl {
     return AnyReturn(result);
   }
 };
+  
+struct swift_closure {
+  void *fptr;
+  HeapObject *context;
+};
+SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift) swift_closure
+MANGLE_SYM(s20_playgroundPrintHookySScSgvg)();
+
+static bool _shouldReportMissingReflectionMetadataWarnings() {
+  // Missing metadata warnings noise up playground sessions and aren't really
+  // actionable in playground contexts. If we're running in a playground,
+  // suppress warnings.
+  //
+  // Guesstimate whether we're in a playground by looking at the
+  // _playgroundPrintHook variable in the standard library, which is set during
+  // playground execution.
+  auto hook = MANGLE_SYM(s20_playgroundPrintHookySScSgvg)();
+  if (hook.fptr) {
+    swift_release(hook.context);
+    return false;
+  } else {
+    return true;
+  }
+}
+
+/// Raise a warning about reflection metadata that could not be found
+/// at runtime. This is usually mostly harmless, but it's good to alert
+/// users that it happens.
+static void
+missing_reflection_metadata_warning(const char *fmt, ...) {
+  bool shouldWarn =
+    SWIFT_LAZY_CONSTANT(_shouldReportMissingReflectionMetadataWarnings());
+  
+  if (!shouldWarn)
+    return;
+  
+  va_list args;
+  va_start(args, fmt);
+  
+  warningv(0, fmt, args);
+}
 
 static std::pair<StringRef /*name*/, FieldType /*fieldInfo*/>
 getFieldAt(const Metadata *base, unsigned index) {
@@ -262,9 +305,11 @@ getFieldAt(const Metadata *base, unsigned index) {
   // back to returning an empty tuple as a standin.
   auto failedToFindMetadata = [&]() -> std::pair<StringRef, FieldType> {
     auto typeName = swift_getTypeName(base, /*qualified*/ true);
-    warning(0, "SWIFT RUNTIME BUG: no field metadata for type '%*s' that claims "
-               "to be reflectable\n",
-               (int)typeName.length, typeName.data);
+    missing_reflection_metadata_warning(
+      "warning: the Swift runtime found no field metadata for "
+      "type '%*s' that claims to be reflectable. Its fields will show up as "
+      "'unknown' in Mirrors\n",
+      (int)typeName.length, typeName.data);
     return {"unknown",
             FieldType()
               .withType(TypeInfo(&METADATA_SYM(EMPTY_TUPLE_MANGLING), {}))
@@ -288,53 +333,28 @@ getFieldAt(const Metadata *base, unsigned index) {
   if (!field.hasMangledTypeName())
     return {name, FieldType().withIndirect(field.isIndirectCase())};
 
-  std::vector<const ContextDescriptor *> descriptorPath;
-  {
-    const auto *parent = reinterpret_cast<
-                            const ContextDescriptor *>(baseDesc);
-    while (parent) {
-      if (parent->isGeneric())
-        descriptorPath.push_back(parent);
-
-      parent = parent->Parent.get();
-    }
-  }
-
   auto typeName = field.getMangledTypeName(0);
 
-  auto typeInfo = _getTypeByMangledName(
-      typeName,
-      [&](unsigned depth, unsigned index) -> const Metadata * {
-        if (depth >= descriptorPath.size())
-          return nullptr;
+  SubstGenericParametersFromMetadata substitutions(base);
+  auto typeInfo = _getTypeByMangledName(typeName, substitutions);
 
-        unsigned currentDepth = 0;
-        unsigned flatIndex = index;
-        const ContextDescriptor *currentContext = descriptorPath.back();
-
-        for (const auto *context : llvm::reverse(descriptorPath)) {
-          if (currentDepth >= depth)
-            break;
-
-          flatIndex += context->getNumGenericParams();
-          currentContext = context;
-          ++currentDepth;
-        }
-
-        if (index >= currentContext->getNumGenericParams())
-          return nullptr;
-
-        return base->getGenericArgs()[flatIndex];
-      });
+  // Complete the type metadata before returning it to the caller.
+  if (typeInfo) {
+    typeInfo = TypeInfo(swift_checkMetadataState(MetadataState::Complete,
+                                                 typeInfo).Value,
+                        typeInfo.getReferenceOwnership());
+  }
 
   // If demangling the type failed, pretend it's an empty type instead with
   // a log message.
   if (typeInfo == nullptr) {
     typeInfo = TypeInfo(&METADATA_SYM(EMPTY_TUPLE_MANGLING), {});
-    warning(0, "SWIFT RUNTIME BUG: unable to demangle type of field '%*s'. "
-               "mangled type name is '%*s'\n",
-               (int)name.size(), name.data(),
-               (int)typeName.size(), typeName.data());
+    missing_reflection_metadata_warning(
+      "warning: the Swift runtime was unable to demangle the type "
+      "of field '%*s'. the mangled type name is '%*s'. this field will "
+      "show up as an empty tuple in Mirrors\n",
+      (int)name.size(), name.data(),
+      (int)typeName.size(), typeName.data());
   }
 
   return {name, FieldType()

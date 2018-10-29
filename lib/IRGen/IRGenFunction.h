@@ -406,10 +406,6 @@ public:
   void emitNativeStrongRelease(llvm::Value *value, Atomicity atomicity);
   void emitNativeSetDeallocating(llvm::Value *value);
 
-  //   - other operations
-  llvm::Value *emitNativeTryPin(llvm::Value *object, Atomicity atomicity);
-  void emitNativeUnpin(llvm::Value *handle, Atomicity atomicity);
-
   // Routines for the ObjC reference-counting style.
   void emitObjCStrongRetain(llvm::Value *value);
   llvm::Value *emitObjCRetainCall(llvm::Value *value);
@@ -434,7 +430,7 @@ public:
   void emitErrorStrongRelease(llvm::Value *value);
 
   llvm::Value *emitIsUniqueCall(llvm::Value *value, SourceLoc loc,
-                                bool isNonNull, bool checkPinned);
+                                bool isNonNull);
 
   llvm::Value *emitIsEscapingClosureCall(llvm::Value *value, SourceLoc loc,
                                          unsigned verificationType);

@@ -98,7 +98,7 @@ public func <=> <T: Comparable>(
 }
 
 public func expectEqual<V: Comparable>(
-  _ expected: DictionaryLiteral<Any.Type, V>, _ actual: TypeIndexed<V>,
+  _ expected: KeyValuePairs<Any.Type, V>, _ actual: TypeIndexed<V>,
   _ message: @autoclosure () -> String = "",
   showFrame: Bool = true,
   stackTrace: SourceLocStack = SourceLocStack(),  

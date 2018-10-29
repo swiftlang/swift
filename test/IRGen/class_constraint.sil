@@ -23,4 +23,4 @@ bb0(%0 : $T):
   return %3 : $()
 }
 // CHECK: define {{.*}}void @foo(%T16class_constraint1AC*, %swift.type* %T)
-// CHECK: store i8** @"$S16class_constraint1ACAA1PAAWP",
+// CHECK: store i8** @"$s16class_constraint1ACAA1PAAWP",

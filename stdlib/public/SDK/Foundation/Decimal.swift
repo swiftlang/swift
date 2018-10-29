@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,6 +13,8 @@
 @_exported import Foundation // Clang module
 import _SwiftCoreFoundationOverlayShims
 
+// The methods in this extension exist to match the protocol requirements of FloatinPoint, even if we can't conform directly.
+// If it becomes clear that conformance is truly impossible, we can deprecate some of the methods (e.g. isEqual(to:)) in favor of operators.
 extension Decimal {
     public typealias RoundingMode = NSDecimalNumber.RoundingMode
     public typealias CalculationError = NSDecimalNumber.CalculationError
@@ -217,28 +219,28 @@ extension Decimal : SignedNumeric {
       fatalError()
   }
 
-  public static func +=(_ lhs: inout Decimal, _ rhs: Decimal) {
+  public static func +=(lhs: inout Decimal, rhs: Decimal) {
       var rhs = rhs
       _ = withUnsafeMutablePointer(to: &lhs) {
           NSDecimalAdd($0, $0, &rhs, .plain)
       }
   }
 
-  public static func -=(_ lhs: inout Decimal, _ rhs: Decimal) {
+  public static func -=(lhs: inout Decimal, rhs: Decimal) {
       var rhs = rhs
       _ = withUnsafeMutablePointer(to: &lhs) {
           NSDecimalSubtract($0, $0, &rhs, .plain)
       }
   }
 
-  public static func *=(_ lhs: inout Decimal, _ rhs: Decimal) {
+  public static func *=(lhs: inout Decimal, rhs: Decimal) {
       var rhs = rhs
       _ = withUnsafeMutablePointer(to: &lhs) {
           NSDecimalMultiply($0, $0, &rhs, .plain)
       }
   }
 
-  public static func /=(_ lhs: inout Decimal, _ rhs: Decimal) {
+  public static func /=(lhs: inout Decimal, rhs: Decimal) {
       var rhs = rhs
       _ = withUnsafeMutablePointer(to: &lhs) {
           NSDecimalDivide($0, $0, &rhs, .plain)
@@ -362,11 +364,33 @@ extension Decimal {
     }
     
     public init(_ value: UInt64) {
-        self.init(Double(value))
+        self = Decimal()
+        if value == 0 {
+            return
+        }
+
+        var compactValue = value
+        var exponent: Int32 = 0
+        while compactValue % 10 == 0 {
+            compactValue /= 10
+            exponent += 1
+        }
+        _isCompact = 1
+        _exponent = exponent
+
+        let wordCount = ((UInt64.bitWidth - compactValue.leadingZeroBitCount) + (UInt16.bitWidth - 1)) / UInt16.bitWidth
+        _length = UInt32(wordCount)
+        _mantissa.0 = UInt16(truncatingIfNeeded: compactValue >> 0)
+        _mantissa.1 = UInt16(truncatingIfNeeded: compactValue >> 16)
+        _mantissa.2 = UInt16(truncatingIfNeeded: compactValue >> 32)
+        _mantissa.3 = UInt16(truncatingIfNeeded: compactValue >> 48)
     }
     
     public init(_ value: Int64) {
-        self.init(Double(value))
+        self.init(value.magnitude)
+        if value < 0 {
+            _isNegative = 1
+        }
     }
     
     public init(_ value: UInt) {
@@ -430,7 +454,7 @@ extension Decimal {
 }
 
 extension Decimal : CustomStringConvertible {
-    public init?(string: String, locale: Locale? = nil) {
+    public init?(string: __shared String, locale: __shared Locale? = nil) {
         let scan = Scanner(string: string)
         var theDecimal = Decimal()
         scan.locale = locale
@@ -463,6 +487,7 @@ extension Decimal : _ObjectiveCBridgeable {
         return true
     }
 
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSDecimalNumber?) -> Decimal {
         guard let src = source else { return Decimal(_exponent: 0, _length: 0, _isNegative: 0, _isCompact: 0, _reserved: 0, _mantissa: (0, 0, 0, 0, 0, 0, 0, 0)) }
         return src.decimalValue

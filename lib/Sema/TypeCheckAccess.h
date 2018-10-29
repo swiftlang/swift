@@ -17,90 +17,22 @@
 #ifndef TYPECHECKACCESS_H
 #define TYPECHECKACCESS_H
 
-#include "swift/AST/AccessScope.h"
-#include "swift/AST/TypeLoc.h"
-#include "llvm/ADT/STLExtras.h"
-
 namespace swift {
 
 class Decl;
-class DeclContext;
-class GenericParamList;
 class TypeChecker;
-class ValueDecl;
-class RequirementRepr;
 
-/// A uniquely-typed boolean to reduce the chances of accidentally inverting
-/// a check.
+/// Checks the given declaration's signature does not reference any other
+/// declarations that are less visible than the declaration itself.
 ///
-/// \see checkTypeAccess
-enum class DowngradeToWarning: bool {
-  No,
-  Yes
-};
+/// \p D must be a ValueDecl or a Decl that can appear in a type context.
+void checkAccessControl(TypeChecker &TC, Decl *D);
 
-/// \see checkTypeAccess
-using CheckTypeAccessCallback =
-    void(AccessScope, const TypeRepr *, DowngradeToWarning);
-
-class AccessControlCheckerBase {
-protected:
-  TypeChecker &TC;
-  bool checkUsableFromInline;
-
-  void checkTypeAccessImpl(
-      TypeLoc TL, AccessScope contextAccessScope,
-      const DeclContext *useDC,
-      llvm::function_ref<CheckTypeAccessCallback> diagnose);
-
-  void checkTypeAccess(
-      TypeLoc TL, const ValueDecl *context,
-      llvm::function_ref<CheckTypeAccessCallback> diagnose);
-
-  void checkRequirementAccess(
-      ArrayRef<RequirementRepr> requirements,
-      AccessScope accessScope,
-      const DeclContext *useDC,
-      llvm::function_ref<CheckTypeAccessCallback> diagnose);
-
-  AccessControlCheckerBase(TypeChecker &TC, bool checkUsableFromInline)
-    : TC(TC), checkUsableFromInline(checkUsableFromInline) {}
-
-public:
-  void checkGenericParamAccess(
-    const GenericParamList *params,
-    const Decl *owner,
-    AccessScope accessScope,
-    AccessLevel contextAccess);
-
-  void checkGenericParamAccess(
-    const GenericParamList *params,
-    const ValueDecl *owner);
-};
-
-class AccessControlChecker : public AccessControlCheckerBase {
-public:
-  explicit AccessControlChecker(TypeChecker &TC)
-    : AccessControlCheckerBase(TC, /*checkUsableFromInline=*/false) {}
-
-  void check(Decl *D);
-
-  static void checkAccessControl(TypeChecker &TC, Decl *D) {
-    AccessControlChecker(TC).check(D);
-  }
-};
-
-class UsableFromInlineChecker : public AccessControlCheckerBase {
-public:
-  explicit UsableFromInlineChecker(TypeChecker &TC)
-    : AccessControlCheckerBase(TC, /*checkUsableFromInline=*/true) {}
-
-  void check(Decl *D);
-
-  static void checkUsableFromInline(TypeChecker &TC, Decl *D) {
-    UsableFromInlineChecker(TC).check(D);
-  }
-};
+/// Checks that the generic parameters of the given extension do not reference
+/// any other declarations that are less visible than the user-specified access
+/// on the extension.
+void checkExtensionGenericParamAccess(TypeChecker &TC, const ExtensionDecl *ED,
+                                      AccessLevel userSpecifiedAccess);
 
 } // end namespace swift
 

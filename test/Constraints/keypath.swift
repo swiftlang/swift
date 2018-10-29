@@ -7,7 +7,7 @@ struct S {
     let _: WritableKeyPath<S, Int> = \.i // no error for Swift 3/4
 
     S()[keyPath: \.i] = 1
-    // expected-error@-1 {{cannot assign to immutable expression}}
+    // expected-error@-1 {{cannot assign through subscript: function call returns immutable value}}
   }
 }
 

@@ -24,12 +24,12 @@
 #include "ImportedModules.h"
 #include "ReferenceDependencies.h"
 #include "TBD.h"
-#include "TextualInterfaceGeneration.h"
 
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/FileSystem.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ASTMangler.h"
@@ -50,6 +50,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
+#include "swift/Frontend/ParseableInterfaceSupport.h"
 #include "swift/Immediate/Immediate.h"
 #include "swift/Index/IndexRecord.h"
 #include "swift/Option/Options.h"
@@ -312,30 +313,6 @@ static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
                   PSPs.OutputFilename, opts.EmitSortedSIL);
 }
 
-/// A wrapper around swift::atomicallyWritingToFile that handles diagnosing any
-/// filesystem errors and ignores empty output paths.
-///
-/// \returns true if there were any errors, either from the filesystem
-/// operations or from \p action returning true.
-static bool atomicallyWritingToTextFile(
-    StringRef outputPath, DiagnosticEngine &diags,
-    llvm::function_ref<bool(llvm::raw_pwrite_stream &)> action) {
-  assert(!outputPath.empty());
-
-  bool actionFailed = false;
-  std::error_code EC =
-      swift::atomicallyWritingToFile(outputPath,
-                                     [&](llvm::raw_pwrite_stream &out) {
-    actionFailed = action(out);
-  });
-  if (EC) {
-    diags.diagnose(SourceLoc(), diag::error_opening_output,
-                   outputPath, EC.message());
-    return true;
-  }
-  return actionFailed;
-}
-
 /// Prints the Objective-C "generated header" interface for \p M to \p
 /// outputPath.
 ///
@@ -348,27 +325,29 @@ static bool printAsObjCIfNeeded(StringRef outputPath, ModuleDecl *M,
                                 StringRef bridgingHeader, bool moduleIsPublic) {
   if (outputPath.empty())
     return false;
-  return atomicallyWritingToTextFile(outputPath, M->getDiags(),
-                                     [&](raw_ostream &out) -> bool {
+  return withOutputFile(M->getDiags(), outputPath,
+                        [&](raw_ostream &out) -> bool {
     auto requiredAccess = moduleIsPublic ? AccessLevel::Public
                                          : AccessLevel::Internal;
     return printAsObjC(out, M, bridgingHeader, requiredAccess);
   });
 }
 
-/// Prints the stable textual interface for \p M to \p outputPath.
+/// Prints the stable parseable interface for \p M to \p outputPath.
 ///
 /// ...unless \p outputPath is empty, in which case it does nothing.
 ///
 /// \returns true if there were any errors
 ///
-/// \see swift::emitModuleInterface
-static bool printModuleInterfaceIfNeeded(StringRef outputPath, ModuleDecl *M) {
+/// \see swift::emitParseableInterface
+static bool printParseableInterfaceIfNeeded(StringRef outputPath,
+                                            ParseableInterfaceOptions const &Opts,
+                                            ModuleDecl *M) {
   if (outputPath.empty())
     return false;
-  return atomicallyWritingToTextFile(outputPath, M->getDiags(),
-                                     [M](raw_ostream &out) -> bool {
-    return swift::emitModuleInterface(out, M);
+  return withOutputFile(M->getDiags(), outputPath,
+                        [M, Opts](raw_ostream &out) -> bool {
+    return swift::emitParseableInterface(out, Opts, M);
   });
 }
 
@@ -499,7 +478,6 @@ static void countStatsPostSema(UnifiedStatsReporter &Stats,
   auto const &AST = Instance.getASTContext();
   C.NumLoadedModules = AST.LoadedModules.size();
   C.NumImportedExternalDefinitions = AST.ExternalDefinitions.size();
-  C.NumASTBytesAllocated = AST.getAllocator().getBytesAllocated();
 
   if (auto *D = Instance.getDependencyTracker()) {
     C.NumDependencies = D->getDependencies().size();
@@ -819,7 +797,7 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   if (!opts.InputsAndOutputs.hasPrimaryInputs()) {
     // If there are no primary inputs the compiler is in WMO mode and builds one
     // SILModule for the entire module.
-    auto SM = performSILGeneration(mod, SILOpts, true);
+    auto SM = performSILGeneration(mod, SILOpts);
     std::deque<PostSILGenInputs> PSGIs;
     const PrimarySpecificPaths PSPs =
         Instance.getPrimarySpecificPathsForWholeModuleOptimizationMode();
@@ -832,7 +810,7 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   // once for each such input.
   std::deque<PostSILGenInputs> PSGIs;
   for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
-    auto SM = performSILGeneration(*PrimaryFile, SILOpts, None);
+    auto SM = performSILGeneration(*PrimaryFile, SILOpts);
     const PrimarySpecificPaths PSPs =
         Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
     PSGIs.push_back(PostSILGenInputs{std::move(SM), true, PrimaryFile, PSPs});
@@ -846,7 +824,7 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
       if (Invocation.getFrontendOptions().InputsAndOutputs.isInputPrimary(
               SASTF->getFilename())) {
         assert(PSGIs.empty() && "Can only handle one primary AST input");
-        auto SM = performSILGeneration(*SASTF, SILOpts, None);
+        auto SM = performSILGeneration(*SASTF, SILOpts);
         const PrimarySpecificPaths &PSPs =
             Instance.getPrimarySpecificPathsForPrimary(SASTF->getFilename());
         PSGIs.push_back(
@@ -868,11 +846,39 @@ emitIndexData(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   return hadEmitIndexDataError;
 }
 
-/// Emits the request-evaluator graph to the given file in GraphViz format.
-void emitRequestEvaluatorGraphViz(ASTContext &ctx, StringRef graphVizPath) {
-  std::error_code error;
-  llvm::raw_fd_ostream out(graphVizPath, error, llvm::sys::fs::F_Text);
-  ctx.evaluator.printDependenciesGraphviz(out);
+/// Emits all "one-per-module" supplementary outputs that don't depend on
+/// anything past type-checking.
+///
+/// These are extracted out so that they can be invoked early when using
+/// `-typecheck`, but skipped for any mode that runs SIL diagnostics if there's
+/// an error found there (to get those diagnostics back to the user faster).
+static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
+    CompilerInstance &Instance, CompilerInvocation &Invocation,
+    bool moduleIsPublic) {
+  const FrontendOptions &opts = Invocation.getFrontendOptions();
+
+  // Record whether we failed to emit any of these outputs, but keep going; one
+  // failure does not mean skipping the rest.
+  bool hadAnyError = false;
+
+  if (opts.InputsAndOutputs.hasObjCHeaderOutputPath()) {
+    hadAnyError |= printAsObjCIfNeeded(
+        Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
+        Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
+  }
+
+  if (opts.InputsAndOutputs.hasParseableInterfaceOutputPath()) {
+    hadAnyError |= printParseableInterfaceIfNeeded(
+        Invocation.getParseableInterfaceOutputPathForWholeModule(),
+        Invocation.getParseableInterfaceOptions(),
+        Instance.getMainModule());
+  }
+
+  {
+    hadAnyError |= writeTBDIfNeeded(Invocation, Instance);
+  }
+
+  return hadAnyError;
 }
 
 static bool performCompileStepsPostSILGen(
@@ -909,24 +915,17 @@ static bool performCompile(CompilerInstance &Instance,
     return compileLLVMIR(Invocation, Instance, Stats);
 
   if (FrontendOptions::shouldActionOnlyParse(Action)) {
+    bool ParseDelayedDeclListsOnEnd =
+      Action == FrontendOptions::ActionType::DumpParse ||
+      Invocation.getDiagnosticOptions().VerifyMode != DiagnosticOptions::NoVerify;
     Instance.performParseOnly(/*EvaluateConditionals*/
-                    Action == FrontendOptions::ActionType::EmitImportedModules);
+                    Action == FrontendOptions::ActionType::EmitImportedModules,
+                              ParseDelayedDeclListsOnEnd);
   } else if (Action == FrontendOptions::ActionType::ResolveImports) {
     Instance.performParseAndResolveImportsOnly();
   } else {
     Instance.performSema();
   }
-
-  SWIFT_DEFER {
-    // Emit request-evaluator graph via GraphViz, if requested.
-    if (!Invocation.getFrontendOptions().RequestEvaluatorGraphVizPath.empty() &&
-        Instance.hasASTContext()) {
-      ASTContext &ctx = Instance.getASTContext();
-      emitRequestEvaluatorGraphViz(
-        ctx,
-        Invocation.getFrontendOptions().RequestEvaluatorGraphVizPath);
-    }
-  };
 
   ASTContext &Context = Instance.getASTContext();
   if (Action == FrontendOptions::ActionType::Parse)
@@ -980,9 +979,6 @@ static bool performCompile(CompilerInstance &Instance,
     return true;
   }
 
-  if (writeTBDIfNeeded(Invocation, Instance))
-    return true;
-
   // FIXME: This is still a lousy approximation of whether the module file will
   // be externally consumed.
   bool moduleIsPublic =
@@ -992,17 +988,14 @@ static bool performCompile(CompilerInstance &Instance,
 
   // We've just been told to perform a typecheck, so we can return now.
   if (Action == FrontendOptions::ActionType::Typecheck) {
-    const bool hadPrintAsObjCError =
-        Invocation.getFrontendOptions()
-            .InputsAndOutputs.hasObjCHeaderOutputPath() &&
-        printAsObjCIfNeeded(
-            Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
-            Instance.getMainModule(), opts.ImplicitObjCHeaderPath,
-            moduleIsPublic);
-
-    const bool hadEmitIndexDataError = emitIndexData(Invocation, Instance);
-
-    return hadPrintAsObjCError || hadEmitIndexDataError || Context.hadError();
+    if (emitIndexData(Invocation, Instance))
+      return true;
+    if (emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance,
+                                                            Invocation,
+                                                            moduleIsPublic)) {
+      return true;
+    }
+    return false;
   }
 
   assert(FrontendOptions::doesActionGenerateSIL(Action) &&
@@ -1049,35 +1042,6 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
   if (Invocation.getSILOptions().MergePartialModules)
     SM->linkAllFromCurrentModule();
   return false;
-}
-
-static SerializationOptions
-computeSerializationOptions(const CompilerInvocation &Invocation,
-                            const SupplementaryOutputPaths &outs,
-                            bool moduleIsPublic) {
-  const FrontendOptions &opts = Invocation.getFrontendOptions();
-
-  SerializationOptions serializationOpts;
-  serializationOpts.OutputPath = outs.ModuleOutputPath.c_str();
-  serializationOpts.DocOutputPath = outs.ModuleDocOutputPath.c_str();
-  serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
-  if (opts.SerializeBridgingHeader && !outs.ModuleOutputPath.empty())
-    serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
-  serializationOpts.ModuleLinkName = opts.ModuleLinkName;
-  serializationOpts.ExtraClangOptions =
-      Invocation.getClangImporterOptions().ExtraArgs;
-  serializationOpts.EnableNestedTypeLookupTable =
-      opts.EnableSerializationNestedTypeLookupTable;
-  if (!Invocation.getIRGenOptions().ForceLoadSymbolName.empty())
-    serializationOpts.AutolinkForceLoad = true;
-
-  // Options contain information about the developer's computer,
-  // so only serialize them if the module isn't going to be shipped to
-  // the public.
-  serializationOpts.SerializeOptionsForDebugging =
-      !moduleIsPublic || opts.AlwaysSerializeDebuggingOptions;
-
-  return serializationOpts;
 }
 
 /// Perform SIL optimization passes if optimizations haven't been disabled.
@@ -1144,7 +1108,7 @@ static void generateIR(IRGenOptions &IRGenOpts, std::unique_ptr<SILModule> SM,
   IRModule = MSF.is<SourceFile *>()
                  ? performIRGeneration(IRGenOpts, *MSF.get<SourceFile *>(),
                                        std::move(SM), OutputFilename, PSPs,
-                                       LLVMContext, 0, &HashGlobal)
+                                       LLVMContext, &HashGlobal)
                  : performIRGeneration(IRGenOpts, MSF.get<ModuleDecl *>(),
                                        std::move(SM), OutputFilename, PSPs,
                                        LLVMContext, parallelOutputFilenames,
@@ -1287,6 +1251,9 @@ static bool performCompileStepsPostSILGen(
     SM->verify();
   }
 
+  emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance, Invocation,
+                                                      moduleIsPublic);
+
   // This is the action to be used to serialize SILModule.
   // It may be invoked multiple times, but it will perform
   // serialization only once. The serialization may either happen
@@ -1299,7 +1266,7 @@ static bool performCompileStepsPostSILGen(
       return;
 
     SerializationOptions serializationOpts =
-        computeSerializationOptions(Invocation, outs, moduleIsPublic);
+        Invocation.computeSerializationOptions(outs, moduleIsPublic);
     serialize(MSF, serializationOpts, SM.get());
   };
 
@@ -1323,14 +1290,6 @@ static bool performCompileStepsPostSILGen(
   performSILInstCountIfNeeded(&*SM);
 
   setPrivateDiscriminatorIfNeeded(IRGenOpts, MSF);
-
-  (void)printAsObjCIfNeeded(PSPs.SupplementaryOutputs.ObjCHeaderOutputPath,
-                            Instance.getMainModule(),
-                            opts.ImplicitObjCHeaderPath, moduleIsPublic);
-
-  (void)printModuleInterfaceIfNeeded(
-      PSPs.SupplementaryOutputs.ModuleInterfaceOutputPath,
-      Instance.getMainModule());
 
   if (Action == FrontendOptions::ActionType::EmitSIB)
     return serializeSIB(SM.get(), PSPs, Instance.getASTContext(), MSF);
@@ -1370,6 +1329,16 @@ static bool performCompileStepsPostSILGen(
     return true;
 
   runSILLoweringPasses(*SM);
+
+  // TODO: at this point we need to flush any the _tracing and profiling_
+  // in the UnifiedStatsReporter, because the those subsystems of the USR
+  // retain _pointers into_ the SILModule, and the SILModule's lifecycle is
+  // not presently such that it will outlive the USR (indeed, as it's
+  // destroyed on a separate thread, this fact isn't even _deterministic_
+  // after this point). If future plans require the USR tracing or
+  // profiling entities after this point, more rearranging will be required.
+  if (Stats)
+    Stats->flushTracesAndProfiles();
 
   if (Action == FrontendOptions::ActionType::DumpTypeInfo)
     return performDumpTypeInfo(IRGenOpts, *SM, getGlobalLLVMContext());

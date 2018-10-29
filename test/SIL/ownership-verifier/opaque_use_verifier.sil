@@ -32,7 +32,7 @@ bb0(%0 : @owned $T):
   %2 = copy_value %1 : $T
   %9 = function_ref @opaque_identity : $@convention(thin) <T> (@in T) -> @out T
   %11 = apply %9<T>(%2) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
-  end_borrow %1 from %0 : $T, $T
+  end_borrow %1 : $T
   destroy_value %0 : $T
   return %11 : $T
 }
@@ -42,7 +42,7 @@ bb0(%0 : @owned $T):
   %1 = begin_borrow %0 : $T
   %9 = function_ref @opaque_copy : $@convention(thin) <T> (@in_guaranteed T) -> @out T
   %11 = apply %9<T>(%1) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0
-  end_borrow %1 from %0 : $T, $T
+  end_borrow %1 : $T
   destroy_value %0 : $T
   return %11 : $T
 }
@@ -53,7 +53,7 @@ bb0(%0 : @guaranteed $T):
   %2 = begin_borrow %1 : $T
   %3 = function_ref @opaque_copy : $@convention(thin) <T> (@in_guaranteed T) -> @out T
   %4 = apply %3<T>(%2) : $@convention(thin) <T> (@in_guaranteed T) -> @out T
-  end_borrow %2 from %1 : $T, $T
+  end_borrow %2 : $T
   destroy_value %1 : $T
   return %4 : $T
 }
@@ -74,8 +74,18 @@ bb0(%0 : @owned $AnyObject):
   %9 = copy_value %8 : $AnyObject
   %10 = unconditional_checked_cast_value %9 : $AnyObject to $@thick AnyObject.Type
   %11 = apply %6(%10) : $@convention(thin) (@thick AnyObject.Type) -> ()
-  end_borrow %8 from %0 : $AnyObject, $AnyObject
+  end_borrow %8 : $AnyObject
   destroy_value %0 : $AnyObject
   %18 = tuple ()
   return %18 : $()
+}
+
+sil @passTrivialAsOpaqueValue : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : @trivial $Builtin.Int64):
+  %1 = function_ref @opaque_copy : $@convention(thin) <T> (@in_guaranteed T) -> @out T
+  %2 = apply %1<Builtin.Int64>(%0) : $@convention(thin) <T> (@in_guaranteed T) -> @out T
+  %3 = function_ref @opaque_arg_copy : $@convention(thin) <T> (@in T) -> @out T
+  apply %3<Builtin.Int64>(%0) : $@convention(thin) <T> (@in T) -> @out T
+  %9999 = tuple()
+  return %9999 : $()
 }

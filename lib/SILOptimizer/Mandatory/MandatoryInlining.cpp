@@ -13,14 +13,15 @@
 #define DEBUG_TYPE "mandatory-inlining"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/ImmutableSet.h"
 #include "llvm/ADT/Statistic.h"
@@ -40,44 +41,6 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
                      U &&...args) {
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
-
-namespace {
-
-/// A helper class to update an instruction iterator if
-/// removal of instructions would invalidate it.
-class DeleteInstructionsHandler : public DeleteNotificationHandler {
-  SILBasicBlock::iterator &CurrentI;
-  SILModule &Module;
-
-public:
-  DeleteInstructionsHandler(SILBasicBlock::iterator &I)
-      : CurrentI(I), Module(I->getModule()) {
-    Module.registerDeleteNotificationHandler(this);
-  }
-
-  ~DeleteInstructionsHandler() override {
-     // Unregister the handler.
-    Module.removeDeleteNotificationHandler(this);
-  }
-
-  // Handling of instruction removal notifications.
-  bool needsNotifications() override { return true; }
-
-  // Handle notifications about removals of instructions.
-  void handleDeleteNotification(SILNode *node) override {
-    if (auto DeletedI = dyn_cast<SILInstruction>(node)) {
-      if (CurrentI == SILBasicBlock::iterator(DeletedI)) {
-        if (CurrentI != CurrentI->getParent()->begin()) {
-          --CurrentI;
-        } else {
-          ++CurrentI;
-        }
-      }
-    }
-  }
-};
-
-} // end of namespace
 
 /// \brief Fixup reference counts after inlining a function call (which is a
 /// no-op unless the function is a thick function). Note that this function
@@ -172,18 +135,7 @@ static SILValue cleanupLoadedCalleeValue(SILValue CalleeValue, LoadInst *LI) {
 
 /// \brief Removes instructions that create the callee value if they are no
 /// longer necessary after inlining.
-static void cleanupCalleeValue(
-    SILValue CalleeValue,
-    ArrayRef<SILValue> FullArgs) {
-  SmallVector<SILInstruction*, 16> InstsToDelete;
-  for (SILValue V : FullArgs) {
-    if (V != CalleeValue)
-      if (auto *I = V->getDefiningInstruction())
-        if (isInstructionTriviallyDead(I))
-          InstsToDelete.push_back(I);
-  }
-  recursivelyDeleteTriviallyDeadInstructions(InstsToDelete, true);
-
+static void cleanupCalleeValue(SILValue CalleeValue) {
   // Handle the case where the callee of the apply is a load instruction. If we
   // fail to optimize, return. Otherwise, see if we can look through other
   // abstractions on our callee.
@@ -232,6 +184,95 @@ static void cleanupCalleeValue(
     FRI->eraseFromParent();
   }
 }
+
+namespace {
+/// Cleanup dead closures after inlining.
+class ClosureCleanup {
+  using DeadInstSet = SmallBlotSetVector<SILInstruction *, 4>;
+
+  /// A helper class to update an instruction iterator if
+  /// removal of instructions would invalidate it.
+  ///
+  /// Since this is called by the SILModule callback, the instruction may longer
+  /// be well-formed. Do not visit its operands. However, it's position in the
+  /// basic block is still valid.
+  ///
+  /// FIXME: Using the Module's callback mechanism is undesirable. Instead,
+  /// cleanupCalleeValue could be easily rewritten to use its own instruction
+  /// deletion helper and pass a callback to tryDeleteDeadClosure and
+  /// recursivelyDeleteTriviallyDeadInstructions.
+  class IteratorUpdateHandler : public DeleteNotificationHandler {
+    SILModule &Module;
+    SILBasicBlock::iterator CurrentI;
+    DeadInstSet &DeadInsts;
+
+  public:
+    IteratorUpdateHandler(SILBasicBlock::iterator I, DeadInstSet &DeadInsts)
+        : Module(I->getModule()), CurrentI(I), DeadInsts(DeadInsts) {
+      Module.registerDeleteNotificationHandler(this);
+    }
+
+    ~IteratorUpdateHandler() override {
+      // Unregister the handler.
+      Module.removeDeleteNotificationHandler(this);
+    }
+
+    SILBasicBlock::iterator getIterator() const { return CurrentI; }
+
+    // Handling of instruction removal notifications.
+    bool needsNotifications() override { return true; }
+
+    // Handle notifications about removals of instructions.
+    void handleDeleteNotification(SILNode *node) override {
+      auto deletedI = dyn_cast<SILInstruction>(node);
+      if (!deletedI)
+        return;
+
+      DeadInsts.erase(deletedI);
+
+      if (CurrentI == SILBasicBlock::iterator(deletedI))
+        ++CurrentI;
+    }
+  };
+
+  SmallBlotSetVector<SILInstruction *, 4> deadFunctionVals;
+
+public:
+  /// This regular instruction deletion callback checks for any function-type
+  /// values that may be unused after deleting the given instruction.
+  void recordDeadFunction(SILInstruction *deletedInst) {
+    // If the deleted instruction was already recorded as a function producer,
+    // delete it from the map and record its operands instead.
+    deadFunctionVals.erase(deletedInst);
+    for (auto &operand : deletedInst->getAllOperands()) {
+      SILValue operandVal = operand.get();
+      if (!operandVal->getType().is<SILFunctionType>())
+        continue;
+
+      // Simply record all function-producing instructions used by dead
+      // code. Checking for a single use would not be precise because
+      // `deletedInst` could itself use `deadInst` multiple times.
+      if (auto *deadInst = operandVal->getDefiningInstruction())
+        deadFunctionVals.insert(deadInst);
+    }
+  }
+
+  // Note: instructions in the `deadFunctionVals` set may use each other, so the
+  // set needs to continue to be updated (by this handler) when deleting
+  // instructions. This assumes that DeadFunctionValSet::erase() is stable.
+  SILBasicBlock::iterator cleanupDeadClosures(SILBasicBlock::iterator II) {
+    IteratorUpdateHandler iteratorUpdate(II, deadFunctionVals);
+    for (Optional<SILInstruction *> I : deadFunctionVals) {
+      if (!I.hasValue())
+        continue;
+
+      if (auto *SVI = dyn_cast<SingleValueInstruction>(I.getValue()))
+        cleanupCalleeValue(SVI);
+    }
+    return iteratorUpdate.getIterator();
+  }
+};
+} // end of namespace
 
 static void collectPartiallyAppliedArguments(
     PartialApplyInst *PAI,
@@ -492,7 +533,10 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
   SmallVector<SILValue, 32> FullArgs;
 
   for (auto BI = F->begin(), BE = F->end(); BI != BE; ++BI) {
-    for (auto II = BI->begin(), IE = BI->end(); II != IE; ++II) {
+    // While iterating over this block, instructions are inserted and deleted.
+    for (auto II = BI->begin(), nextI = II; II != BI->end(); II = nextI) {
+      nextI = std::next(II);
+
       FullApplySite InnerAI = FullApplySite::isa(&*II);
 
       if (!InnerAI)
@@ -551,10 +595,9 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
         OpenedArchetypesTracker.registerUsedOpenedArchetypes(PAI);
       }
 
-      SILInliner Inliner(FuncBuilder, *F, *CalleeFunction,
-                         SILInliner::InlineKind::MandatoryInline, Subs,
-                         OpenedArchetypesTracker);
-      if (!Inliner.canInlineFunction(InnerAI)) {
+      SILInliner Inliner(FuncBuilder, SILInliner::InlineKind::MandatoryInline,
+                         Subs, OpenedArchetypesTracker);
+      if (!Inliner.canInlineApplySite(InnerAI)) {
         // See comment above about casting when devirtualizing and how this
         // sometimes causes II and InnerAI to be different and even in different
         // blocks.
@@ -580,33 +623,26 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
         fixupReferenceCounts(II, CalleeValue, CaptureArgs, IsCalleeGuaranteed);
       }
 
-      // Decrement our iterator (carefully, to avoid going off the front) so it
-      // is valid after inlining is done.  Inlining deletes the apply, and can
-      // introduce multiple new basic blocks.
-      II = prev_or_default(II, ApplyBlock->begin(), ApplyBlock->end());
+      // Register a callback to record potentially unused function values after
+      // inlining.
+      ClosureCleanup closureCleanup;
+      Inliner.setDeletionCallback([&closureCleanup](SILInstruction *I) {
+        closureCleanup.recordDeadFunction(I);
+      });
 
-      Inliner.inlineFunction(InnerAI, FullArgs);
-
-      // We were able to inline successfully. Remove the apply.
-      InnerAI.getInstruction()->eraseFromParent();
-
-      // Reestablish our iterator if it wrapped.
-      if (II == ApplyBlock->end())
-        II = ApplyBlock->begin();
-
-      // Update the iterator when instructions are removed.
-      DeleteInstructionsHandler DeletionHandler(II);
-
-      // Now that the IR is correct, see if we can remove dead callee
-      // computations (e.g. dead partial_apply closures).
-      cleanupCalleeValue(CalleeValue, FullArgs);
-
-      // Reposition iterators possibly invalidated by mutation.
-      BI = SILFunction::iterator(ApplyBlock);
-      IE = ApplyBlock->end();
-      assert(BI == SILFunction::iterator(II->getParent()) &&
-             "Mismatch between the instruction and basic block");
+      // Inlining deletes the apply, and can introduce multiple new basic
+      // blocks. After this, CalleeValue and other instructions may be invalid.
+      nextI = Inliner.inlineFunction(CalleeFunction, InnerAI, FullArgs);
       ++NumMandatoryInlines;
+
+      // The IR is now valid, and trivial dead arguments are removed. However,
+      // we may be able to remove dead callee computations (e.g. dead
+      // partial_apply closures).
+      nextI = closureCleanup.cleanupDeadClosures(nextI);
+
+      assert(nextI == ApplyBlock->end()
+             || nextI->getParent() == ApplyBlock
+                    && "Mismatch between the instruction and basic block");
     }
   }
 

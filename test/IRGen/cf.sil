@@ -9,19 +9,19 @@
 // CHECK: [[MUTABLE_REFRIGERATOR:%TSo24CCMutableRefrigeratorRefa]] = type
 // CHECK: [[OBJC:%objc_object]] = type
 
-// CHECK: @"$SSo17CCRefrigeratorRefaN" = linkonce_odr hidden constant <{ {{.*}} }> <{ i8** @"$SBOWV", [[INT]] 515, {{.*}}"$SSo17CCRefrigeratorRefaMn", [[TYPE]]* null, i8* null }>
+// CHECK: @"$sSo17CCRefrigeratorRefaN" = linkonce_odr hidden constant <{ {{.*}} }> <{ i8** @"$sBOWV", [[INT]] 515, {{.*}}"$sSo17CCRefrigeratorRefaMn", [[TYPE]]* null, i8* null }>
 
 // CHECK: [[MUTABLE_REFRIGERATOR_NAME:@.*]] = private constant [52 x i8] c"CCMutableRefrigerator\00NCCMutableRefrigeratorRef\00St\00\00"
 
-// CHECK-64: @"$SSo24CCMutableRefrigeratorRefaMn" = linkonce_odr hidden constant
+// CHECK-64: @"$sSo24CCMutableRefrigeratorRefaMn" = linkonce_odr hidden constant
 // -- is imported, foreign init, is class, is nonunique
 // CHECK-64-SAME: <i32 0x0006_0010>
 // CHECK-64-SAME: [[MUTABLE_REFRIGERATOR_NAME]]
-// CHECK-64-SAME: @"$SSo24CCMutableRefrigeratorRefaMa"
-// CHECK-64-SAME: @"$SSo24CCMutableRefrigeratorRefaMr"
+// CHECK-64-SAME: @"$sSo24CCMutableRefrigeratorRefaMa"
+// CHECK-64-SAME: @"$sSo24CCMutableRefrigeratorRefaMr"
 
-// CHECK-64: @"$SSo24CCMutableRefrigeratorRefaN" = linkonce_odr hidden global <{ {{.*}} }> <{
-// CHECK-64-SAME: i8** @"$SBOWV", i64 515, {{.*}}"$SSo24CCMutableRefrigeratorRefaMn", %swift.type* null, i8* null }>
+// CHECK-64: @"$sSo24CCMutableRefrigeratorRefaN" = linkonce_odr hidden global <{ {{.*}} }> <{
+// CHECK-64-SAME: i8** @"$sBOWV", i64 515, {{.*}}"$sSo24CCMutableRefrigeratorRefaMn", %swift.type* null, i8* null }>
 
 sil_stage canonical
 
@@ -42,21 +42,21 @@ bb0(%0 : $CCRefrigerator, %1: $CCMutableRefrigerator):
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @call_generic
 // CHECK-SAME:    ([[REFRIGERATOR]]*, [[MUTABLE_REFRIGERATOR]]*) {{.*}} {
 // CHECK:      [[T0:%.*]] = bitcast [[REFRIGERATOR]]* %0 to [[OBJC]]*
-// CHECK-NEXT: [[T1:%.*]] = call swiftcc %swift.metadata_response @"$SSo17CCRefrigeratorRefaMa"([[INT]] 0)
+// CHECK-NEXT: [[T1:%.*]] = call swiftcc %swift.metadata_response @"$sSo17CCRefrigeratorRefaMa"([[INT]] 0)
 // CHECK-NEXT: [[T2:%.*]] = extractvalue %swift.metadata_response [[T1]], 0
 // CHECK-NEXT: call swiftcc void @generic_function([[OBJC]]* [[T0]], [[TYPE]]* [[T2]])
 // CHECK:      [[T0:%.*]] = bitcast [[MUTABLE_REFRIGERATOR]]* %1 to [[OBJC]]*
-// CHECK-NEXT: [[T1:%.*]] = call swiftcc %swift.metadata_response @"$SSo24CCMutableRefrigeratorRefaMa"([[INT]] 0)
+// CHECK-NEXT: [[T1:%.*]] = call swiftcc %swift.metadata_response @"$sSo24CCMutableRefrigeratorRefaMa"([[INT]] 0)
 // CHECK-NEXT: [[T2:%.*]] = extractvalue %swift.metadata_response [[T1]], 0
 // CHECK-NEXT: call swiftcc void @generic_function([[OBJC]]* [[T0]], [[TYPE]]* [[T2]])
 // CHECK-NEXT: ret void
 
-// CHECK-LABEL:    define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSo17CCRefrigeratorRefaMa"(
-// CHECK-32:      call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata([[INT]] %0, [[TYPE]]* bitcast (i8* getelementptr inbounds (i8, i8* bitcast ({{.*}}* @"$SSo17CCRefrigeratorRefaN" to i8*), [[INT]] 4) to [[TYPE]]*))
-// CHECK-64:      call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata([[INT]] %0, [[TYPE]]* bitcast (i8* getelementptr inbounds (i8, i8* bitcast ({{.*}}* @"$SSo17CCRefrigeratorRefaN" to i8*), [[INT]] 8) to [[TYPE]]*))
+// CHECK-LABEL:    define linkonce_odr hidden swiftcc %swift.metadata_response @"$sSo17CCRefrigeratorRefaMa"(
+// CHECK-32:      call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata([[INT]] %0, [[TYPE]]* bitcast (i8* getelementptr inbounds (i8, i8* bitcast ({{.*}}* @"$sSo17CCRefrigeratorRefaN" to i8*), [[INT]] 4) to [[TYPE]]*))
+// CHECK-64:      call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata([[INT]] %0, [[TYPE]]* bitcast (i8* getelementptr inbounds (i8, i8* bitcast ({{.*}}* @"$sSo17CCRefrigeratorRefaN" to i8*), [[INT]] 8) to [[TYPE]]*))
 
-// CHECK-LABEL:    define internal swiftcc %swift.metadata_response @"$SSo24CCMutableRefrigeratorRefaMr"(%swift.type*, i8*, i8**)
-// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$SSo17CCRefrigeratorRefaMa"([[INT]] 255)
+// CHECK-LABEL:    define internal swiftcc %swift.metadata_response @"$sSo24CCMutableRefrigeratorRefaMr"(%swift.type*, i8*, i8**)
+// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$sSo17CCRefrigeratorRefaMa"([[INT]] 255)
 // CHECK-NEXT: [[T1:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT: extractvalue %swift.metadata_response [[T0]], 1
 // CHECK-NEXT: [[T2:%.*]] = bitcast %swift.type* %0 to %swift.type**

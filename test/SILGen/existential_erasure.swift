@@ -23,7 +23,7 @@ func useP(_ x: P) { }
 
 func throwingFunc() throws -> Bool { return true }
 
-// CHECK-LABEL: sil hidden @$S19existential_erasure5PQtoPyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden @$s19existential_erasure5PQtoPyyF : $@convention(thin) () -> () {
 func PQtoP() {
   // CHECK: [[PQ_PAYLOAD:%.*]] = open_existential_addr immutable_access [[PQ:%.*]] : $*P & Q to $*[[OPENED_TYPE:@opened(.*) P & Q]]
   // CHECK: [[P_PAYLOAD:%.*]] = init_existential_addr [[P:%.*]] : $*P, $[[OPENED_TYPE]]
@@ -39,36 +39,35 @@ func PQtoP() {
 // Make sure uninitialized existentials are properly deallocated when we
 // have an early return.
 
-// CHECK-LABEL: sil hidden @$S19existential_erasure19openExistentialToP1yyAA1P_pKF
+// CHECK-LABEL: sil hidden @$s19existential_erasure19openExistentialToP1yyAA1P_pKF
 func openExistentialToP1(_ p: P) throws {
 // CHECK: bb0(%0 : @trivial $*P):
 // CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*P to $*[[OPEN_TYPE:@opened\(.*\) P]]
 // CHECK:   [[RESULT:%.*]] = alloc_stack $P
-// CHECK:   [[RESULT_ADDR:%.*]] = init_existential_addr [[RESULT]] : $*P, $[[OPEN_TYPE]]
-// CHECK:   [[FUNC:%.*]] = function_ref @$S19existential_erasure12throwingFuncSbyKF
+// CHECK:   [[FUNC:%.*]] = function_ref @$s19existential_erasure12throwingFuncSbyKF
 // CHECK:   try_apply [[FUNC]]()
 //
 // CHECK: bb1([[SUCCESS:%.*]] : @trivial $Bool):
 // CHECK:   [[METHOD:%.*]] = witness_method $[[OPEN_TYPE]], #P.downgrade!1 : {{.*}}, [[OPEN]]
+// CHECK:   [[RESULT_ADDR:%.*]] = init_existential_addr [[RESULT]] : $*P, $[[OPEN_TYPE]]
 // CHECK:   apply [[METHOD]]<[[OPEN_TYPE]]>([[RESULT_ADDR]], [[SUCCESS]], [[OPEN]])
 // CHECK:   dealloc_stack [[RESULT]]
 // CHECK:   return
 //
 // CHECK: bb2([[FAILURE:%.*]] : @owned $Error):
-// CHECK:   deinit_existential_addr [[RESULT]]
 // CHECK:   dealloc_stack [[RESULT]]
 // CHECK:   throw [[FAILURE]]
 //
   try useP(p.downgrade(throwingFunc()))
 }
 
-// CHECK-LABEL: sil hidden @$S19existential_erasure19openExistentialToP2yyAA1P_pKF
+// CHECK-LABEL: sil hidden @$s19existential_erasure19openExistentialToP2yyAA1P_pKF
 func openExistentialToP2(_ p: P) throws {
 // CHECK: bb0(%0 : @trivial $*P):
 // CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*P to $*[[OPEN_TYPE:@opened\(.*\) P]]
 // CHECK:   [[RESULT:%.*]] = alloc_stack $P
-// CHECK:   [[RESULT_ADDR:%.*]] = init_existential_addr [[RESULT]] : $*P, $[[OPEN_TYPE]]
 // CHECK:   [[METHOD:%.*]] = witness_method $[[OPEN_TYPE]], #P.upgrade!1 : {{.*}}, [[OPEN]]
+// CHECK:   [[RESULT_ADDR:%.*]] = init_existential_addr [[RESULT]] : $*P, $[[OPEN_TYPE]]
 // CHECK:   try_apply [[METHOD]]<[[OPEN_TYPE]]>([[RESULT_ADDR]], [[OPEN]])
 //
 // CHECK: bb1
@@ -91,21 +90,24 @@ extension Error {
   }
 }
 
-// CHECK-LABEL: sil hidden @$S19existential_erasure12errorHandlerys5Error_psAC_pKF
+// CHECK-LABEL: sil hidden @$s19existential_erasure12errorHandlerys5Error_psAC_pKF
 func errorHandler(_ e: Error) throws -> Error {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Error):
 // CHECK:  debug_value [[ARG]] : $Error
 // CHECK:  [[OPEN:%.*]] = open_existential_box [[ARG]] : $Error to $*[[OPEN_TYPE:@opened\(.*\) Error]]
+// CHECK:  [[FUNC:%.*]] = function_ref @$ss5ErrorP19existential_erasureE17returnOrThrowSelf{{[_0-9a-zA-Z]*}}F
 // CHECK:  [[RESULT:%.*]] = alloc_existential_box $Error, $[[OPEN_TYPE]]
 // CHECK:  [[ADDR:%.*]] = project_existential_box $[[OPEN_TYPE]] in [[RESULT]] : $Error
-// CHECK:  [[FUNC:%.*]] = function_ref @$Ss5ErrorP19existential_erasureE17returnOrThrowSelf{{[_0-9a-zA-Z]*}}F
+// CHECK:  store [[RESULT]] to [init] [[RESULT_BUF:%.*]] :
 // CHECK:  try_apply [[FUNC]]<[[OPEN_TYPE]]>([[ADDR]], [[OPEN]])
 //
 // CHECK: bb1
-// CHECK:  return [[RESULT]] : $Error
+// CHECK:  [[RESULT2:%.*]] = load [take] [[RESULT_BUF]]
+// CHECK:  return [[RESULT2]] : $Error
 //
 // CHECK: bb2([[FAILURE:%.*]] : @owned $Error):
-// CHECK:  dealloc_existential_box [[RESULT]]
+// CHECK:  [[RESULT3:%.*]] = load [take] [[RESULT_BUF]]
+// CHECK:  dealloc_existential_box [[RESULT3]]
 // CHECK:  throw [[FAILURE]] : $Error
 //
   return try e.returnOrThrowSelf()
@@ -117,7 +119,7 @@ func errorHandler(_ e: Error) throws -> Error {
 class EraseDynamicSelf {
   required init() {}
 
-// CHECK-LABEL: sil hidden @$S19existential_erasure16EraseDynamicSelfC7factoryACXDyFZ : $@convention(method) (@thick EraseDynamicSelf.Type) -> @owned EraseDynamicSelf
+// CHECK-LABEL: sil hidden @$s19existential_erasure16EraseDynamicSelfC7factoryACXDyFZ : $@convention(method) (@thick EraseDynamicSelf.Type) -> @owned EraseDynamicSelf
 // CHECK:  [[ANY:%.*]] = alloc_stack $Any
 // CHECK:  init_existential_addr [[ANY]] : $*Any, $@dynamic_self EraseDynamicSelf
 //

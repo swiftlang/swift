@@ -36,8 +36,8 @@ endfunction()
 
 # Add default compiler and linker flags to 'target'.
 #
-# FIXME: this is a HACK.  All SourceKit CMake code using this function
-# should be rewritten to use 'add_swift_library'.
+# FIXME: this is a HACK.  All SourceKit CMake code using this function should be
+# rewritten to use 'add_swift_host_library' or 'add_swift_target_library'.
 function(add_sourcekit_default_compiler_flags target)
   set(sdk "${SWIFT_HOST_VARIANT_SDK}")
   set(arch "${SWIFT_HOST_VARIANT_ARCH}")
@@ -66,19 +66,16 @@ function(add_sourcekit_default_compiler_flags target)
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
     RESULT_VAR_NAME link_flags)
 
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-    # TODO(compnerd) this should really use target_compile_options but the use
-    # of keyword and non-keyword flags prevents this
-    list(APPEND c_compile_flags "-fblocks")
-    # TODO(compnerd) this should really use target_link_libraries but the use of
-    # explicit_llvm_config using target_link_libraries without keywords on
-    # executables causes conflicts here
-    list(APPEND link_flags "-L${SWIFT_PATH_TO_LIBDISPATCH_BUILD}")
-    list(APPEND link_flags "-lBlocksRuntime")
-    # NOTE(compnerd) since we do not use target_link_libraries, we do not get
-    # the implicit dependency tracking.  Add an explicit dependency until we can
-    # use target_link_libraries.
-    add_dependencies(${target} BlocksRuntime)
+  # TODO(compnerd) this should really use target_compile_options but the use
+  # of keyword and non-keyword flags prevents this
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    list(APPEND c_compile_flags -fblocks)
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    if(SWIFT_COMPILER_IS_MSVC_LIKE)
+      list(APPEND c_compile_flags -Xclang;-fblocks)
+    else()
+      list(APPEND c_compile_flags -fblocks)
+    endif()
   endif()
 
   # Convert variables to space-separated strings.
@@ -106,7 +103,7 @@ macro(add_sourcekit_library name)
   cmake_parse_arguments(SOURCEKITLIB
       "SHARED"
       "INSTALL_IN_COMPONENT"
-      "LINK_LIBS;DEPENDS;LLVM_COMPONENT_DEPENDS"
+      "HEADERS;LINK_LIBS;DEPENDS;LLVM_COMPONENT_DEPENDS"
       ${ARGN})
   set(srcs ${SOURCEKITLIB_UNPARSED_ARGUMENTS})
 
@@ -158,7 +155,7 @@ macro(add_sourcekit_library name)
   set(prefixed_link_libraries)
   foreach(dep ${SOURCEKITLIB_LINK_LIBS})
     if("${dep}" MATCHES "^clang")
-      set(dep "${LLVM_LIBRARY_OUTPUT_INTDIR}/lib${dep}.a")
+      set(dep "${LLVM_LIBRARY_OUTPUT_INTDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}${dep}${CMAKE_STATIC_LIBRARY_SUFFIX}")
     endif()
     list(APPEND prefixed_link_libraries "${dep}")
   endforeach()
@@ -202,6 +199,9 @@ macro(add_sourcekit_library name)
       LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
       ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
       RUNTIME DESTINATION "bin")
+  swift_install_in_component("${SOURCEKITLIB_INSTALL_IN_COMPONENT}"
+    FILES ${SOURCEKITLIB_HEADERS}
+    DESTINATION "include/SourceKit")
   set_target_properties(${name} PROPERTIES FOLDER "SourceKit libraries")
   add_sourcekit_default_compiler_flags("${name}")
 endmacro()
@@ -338,31 +338,33 @@ macro(add_sourcekit_framework name)
         LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
         ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
         RUNTIME DESTINATION bin)
-    set_target_properties(${name} PROPERTIES FOLDER "SourceKit frameworks")
     set_output_directory(${name}
         BINARY_DIR ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR}
         LIBRARY_DIR ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
-    set_target_properties(${name} PROPERTIES FRAMEWORK TRUE)
-    set_target_properties(${name} PROPERTIES PUBLIC_HEADER "${headers}")
-    set_target_properties(${name} PROPERTIES MACOSX_FRAMEWORK_INFO_PLIST "${SOURCEKIT_SOURCE_DIR}/cmake/MacOSXFrameworkInfo.plist.in")
-    set_target_properties(${name} PROPERTIES MACOSX_FRAMEWORK_IDENTIFIER "com.apple.${name}")
-    set_target_properties(${name} PROPERTIES MACOSX_FRAMEWORK_SHORT_VERSION_STRING "1.0")
-    set_target_properties(${name} PROPERTIES MACOSX_FRAMEWORK_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}")
-    set_target_properties(${name} PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
-    set_target_properties(${name} PROPERTIES INSTALL_NAME_DIR "@rpath")
+    set_target_properties(${name} PROPERTIES
+                          BUILD_WITH_INSTALL_RPATH TRUE
+                          FOLDER "SourceKit frameworks"
+                          FRAMEWORK TRUE
+                          INSTALL_NAME_DIR "@rpath"
+                          MACOSX_FRAMEWORK_INFO_PLIST "${SOURCEKIT_SOURCE_DIR}/cmake/MacOSXFrameworkInfo.plist.in"
+                          MACOSX_FRAMEWORK_IDENTIFIER "com.apple.${name}"
+                          MACOSX_FRAMEWORK_SHORT_VERSION_STRING "1.0"
+                          MACOSX_FRAMEWORK_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}"
+                          PUBLIC_HEADER "${headers}")
   else()
     swift_install_in_component(${SOURCEKITFW_INSTALL_IN_COMPONENT}
         DIRECTORY ${framework_location}
         DESTINATION lib${LLVM_LIBDIR_SUFFIX}
         USE_SOURCE_PERMISSIONS)
-    set_target_properties(${name} PROPERTIES FOLDER "SourceKit frameworks")
     set_output_directory(${name}
         BINARY_DIR ${framework_location}
         LIBRARY_DIR ${framework_location})
-    set_target_properties(${name} PROPERTIES PREFIX "")
-    set_target_properties(${name} PROPERTIES SUFFIX "")
-    set_target_properties(${name} PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
-    set_target_properties(${name} PROPERTIES INSTALL_NAME_DIR "@rpath/${name}.framework")
+    set_target_properties(${name} PROPERTIES
+                          BUILD_WITH_INSTALL_RPATH TRUE
+                          FOLDER "SourceKit frameworks"
+                          INSTALL_NAME_DIR "@rpath/${name}.framework"
+                          PREFIX ""
+                          SUFFIX "")
 
     foreach(hdr ${headers})
       get_filename_component(hdrname ${hdr} NAME)

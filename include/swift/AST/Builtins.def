@@ -114,6 +114,8 @@ BUILTIN_UNARY_OPERATION(FNeg, "fneg", "n", FloatOrVector)
 // It has only an effect if the argument is a load or call.
 // TODO: consider printing a warning if it is not used on a load or call.
 BUILTIN_UNARY_OPERATION(AssumeNonNegative, "assumeNonNegative", "n", Integer)
+// It only works on i1.
+BUILTIN_UNARY_OPERATION(AssumeTrue, "assume", "", Integer)
 
 #undef BUILTIN_UNARY_OPERATION
 
@@ -165,14 +167,6 @@ BUILTIN_SIL_OPERATION(Release, "release", Special)
 
 /// autorelease: T -> ()
 BUILTIN_SIL_OPERATION(Autorelease, "autorelease", Special)
-
-// The pin operations return T only because Optional isn't intrinsic.
-
-/// tryPin: Builtin.NativeObject -> T
-BUILTIN_SIL_OPERATION(TryPin, "tryPin", Special)
-
-/// unpin: T -> ()
-BUILTIN_SIL_OPERATION(Unpin, "unpin", Special)
 
 /// Load has type (Builtin.RawPointer) -> T
 BUILTIN_SIL_OPERATION(Load, "load", Special)
@@ -359,21 +353,12 @@ BUILTIN_SIL_OPERATION(FixLifetime, "fixLifetime", Special)
 /// references with a strong reference count of one.
 BUILTIN_SIL_OPERATION(IsUnique, "isUnique", Special)
 
-/// isUniqueOrPinned : <T> (inout T[?]) -> Int1
-///
-/// This builtin has the same semantics as isUnique except that it also returns
-/// true if the object is marked pinned regardless of the reference count. This
-/// allows for simultaneous non-structural modification of multiple subobjects.
-BUILTIN_SIL_OPERATION(IsUniqueOrPinned, "isUniqueOrPinned", Special)
-
 /// IsUnique_native : <T> (inout T[?]) -> Int1
 ///
 /// These variants of isUnique implicitly cast to a non-null NativeObject before
 /// checking uniqueness. This allows an object reference statically typed as
 /// BridgeObject to be treated as a native object by the runtime.
 BUILTIN_SIL_OPERATION(IsUnique_native, "isUnique_native", Special)
-BUILTIN_SIL_OPERATION(IsUniqueOrPinned_native, "isUniqueOrPinned_native",
-                      Special)
 
 /// bindMemory : <T> (Builtin.RawPointer, Builtin.Word, T.Type) -> ()
 BUILTIN_SIL_OPERATION(BindMemory, "bindMemory", Special)
@@ -390,11 +375,6 @@ BUILTIN_SIL_OPERATION(AllocWithTailElems, "allocWithTailElems", Special)
 /// Projects the first tail-allocated element of type E from a class C.
 BUILTIN_SIL_OPERATION(ProjectTailElems, "projectTailElems", Special)
 
-/// identityKeyPath : <T> () -> WritableKeyPath<T, T>
-///
-/// Creates an identity key path object. (TODO: replace with proper syntax)
-BUILTIN_SIL_OPERATION(IdentityKeyPath, "identityKeyPath", Special)
-
 #undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.
@@ -403,9 +383,6 @@ BUILTIN_SIL_OPERATION(IdentityKeyPath, "identityKeyPath", Special)
 #define BUILTIN_RUNTIME_CALL(Id, Name, Attrs) \
   BUILTIN(Id, Name, Attrs)
 #endif
-
-/// willThrow: Error -> ()
-BUILTIN_RUNTIME_CALL(WillThrow, "willThrow", "n")
 
 /// unexpectedError: Error -> ()
 BUILTIN_RUNTIME_CALL(UnexpectedError, "unexpectedError", "")
@@ -435,6 +412,9 @@ BUILTIN_MISC_OPERATION(Strideof, "strideof", "n", Special)
 
 /// IsPOD has type T.Type -> Bool
 BUILTIN_MISC_OPERATION(IsPOD, "ispod", "n", Special)
+
+/// IsBitwiseTakable has type T.Type -> Bool
+BUILTIN_MISC_OPERATION(IsBitwiseTakable, "isbitwisetakable", "n", Special)
 
 /// IsSameMetatype has type (Any.Type, Any.Type) -> Bool
 BUILTIN_MISC_OPERATION(IsSameMetatype, "is_same_metatype", "n", Special)
@@ -552,6 +532,9 @@ BUILTIN_MISC_OPERATION(GetObjCTypeEncoding, "getObjCTypeEncoding", "n", Special)
 
 // Swift3ImplicitObjCEntrypoint has type () -> ()
 BUILTIN_MISC_OPERATION(Swift3ImplicitObjCEntrypoint, "swift3ImplicitObjCEntrypoint", "", Special)
+
+/// willThrow: Error -> ()
+BUILTIN_MISC_OPERATION(WillThrow, "willThrow", "", Special)
 
 #undef BUILTIN_MISC_OPERATION
 

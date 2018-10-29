@@ -1,23 +1,23 @@
 // RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -parse-as-library -enable-sil-ownership %s | %FileCheck %s
 
-// CHECK-LABEL: sil hidden @$S5decls11void_returnyyF
+// CHECK-LABEL: sil hidden @$s5decls11void_returnyyF
 // CHECK: = tuple
 // CHECK: return
 func void_return() {
 }
 
-// CHECK-LABEL: sil hidden @$S5decls14typealias_declyyF
+// CHECK-LABEL: sil hidden @$s5decls14typealias_declyyF
 func typealias_decl() {
   typealias a = Int
 }
 
-// CHECK-LABEL: sil hidden @$S5decls15simple_patternsyyF
+// CHECK-LABEL: sil hidden @$s5decls15simple_patternsyyF
 func simple_patterns() {
   _ = 4
   var _ : Int
 }
 
-// CHECK-LABEL: sil hidden @$S5decls13named_patternSiyF
+// CHECK-LABEL: sil hidden @$s5decls13named_patternSiyF
 func named_pattern() -> Int {
   var local_var : Int = 4
 
@@ -28,7 +28,7 @@ func named_pattern() -> Int {
 
 func MRV() -> (Int, Float, (), Double) {}
 
-// CHECK-LABEL: sil hidden @$S5decls14tuple_patternsyyF
+// CHECK-LABEL: sil hidden @$s5decls14tuple_patternsyyF
 func tuple_patterns() {
   var (a, b) : (Int, Float)
   // CHECK: [[ABOX:%[0-9]+]] = alloc_box ${ var Int }
@@ -55,9 +55,7 @@ func tuple_patterns() {
   // CHECK: [[HADDR:%[0-9]+]] = alloc_box ${ var Double }
   // CHECK: [[PBH:%.*]] = project_box [[HADDR]]
   // CHECK: [[EFGH:%[0-9]+]] = apply
-  // CHECK: [[E:%[0-9]+]] = tuple_extract {{.*}}, 0
-  // CHECK: [[F:%[0-9]+]] = tuple_extract {{.*}}, 1
-  // CHECK: [[H:%[0-9]+]] = tuple_extract {{.*}}, 2
+  // CHECK: ([[E:%[0-9]+]], [[F:%[0-9]+]], [[H:%[0-9]+]]) = destructure_tuple
   // CHECK: store [[E]] to [trivial] [[PBE]]
   // CHECK: store [[F]] to [trivial] [[PBF]]
   // CHECK: store [[H]] to [trivial] [[PBH]]
@@ -79,13 +77,12 @@ func tuple_patterns() {
   // CHECK: [[KADDR:%[0-9]+]] = alloc_box ${ var () }
   // CHECK-NOT: alloc_box ${ var Double }
   // CHECK: [[J_K_:%[0-9]+]] = apply
-  // CHECK: [[J:%[0-9]+]] = tuple_extract {{.*}}, 0
-  // CHECK: [[K:%[0-9]+]] = tuple_extract {{.*}}, 2
+  // CHECK: ([[J:%[0-9]+]], [[K:%[0-9]+]], {{%[0-9]+}}) = destructure_tuple
   // CHECK: store [[J]] to [trivial] [[PBJ]]
   var (j,_,k,_) : (Int, Float, (), Double) = MRV()
 }
 
-// CHECK-LABEL: sil hidden @$S5decls16simple_arguments{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s5decls16simple_arguments{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : @trivial $Int, %1 : @trivial $Int):
 // CHECK: [[X:%[0-9]+]] = alloc_box ${ var Int }
 // CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
@@ -99,14 +96,14 @@ func simple_arguments(x: Int, y: Int) -> Int {
   return x+y
 }
 
-// CHECK-LABEL: sil hidden @$S5decls14tuple_argument{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s5decls14tuple_argument{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : @trivial $Int, %1 : @trivial $Float):
 // CHECK: [[UNIT:%[0-9]+]] = tuple ()
 // CHECK: [[TUPLE:%[0-9]+]] = tuple (%0 : $Int, %1 : $Float, [[UNIT]] : $())
 func tuple_argument(x: (Int, Float, ())) {
 }
 
-// CHECK-LABEL: sil hidden @$S5decls14inout_argument{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s5decls14inout_argument{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : @trivial $*Int, %1 : @trivial $Int):
 // CHECK: [[X_LOCAL:%[0-9]+]] = alloc_box ${ var Int }
 // CHECK: [[PBX:%.*]] = project_box [[X_LOCAL]]
@@ -117,10 +114,10 @@ func inout_argument(x: inout Int, y: Int) {
 
 var global = 42
 
-// CHECK-LABEL: sil hidden @$S5decls16load_from_global{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s5decls16load_from_global{{[_0-9a-zA-Z]*}}F
 func load_from_global() -> Int {
   return global
-  // CHECK: [[ACCESSOR:%[0-9]+]] = function_ref @$S5decls6globalSivau
+  // CHECK: [[ACCESSOR:%[0-9]+]] = function_ref @$s5decls6globalSivau
   // CHECK: [[PTR:%[0-9]+]] = apply [[ACCESSOR]]()
   // CHECK: [[ADDR:%[0-9]+]] = pointer_to_address [[PTR]]
   // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[ADDR]] : $*Int
@@ -128,13 +125,13 @@ func load_from_global() -> Int {
   // CHECK: return [[VALUE]]
 }
 
-// CHECK-LABEL: sil hidden @$S5decls15store_to_global{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @$s5decls15store_to_global{{[_0-9a-zA-Z]*}}F
 func store_to_global(x: Int) {
   var x = x
   global = x
   // CHECK: [[XADDR:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK: [[PBX:%.*]] = project_box [[XADDR]]
-  // CHECK: [[ACCESSOR:%[0-9]+]] = function_ref @$S5decls6globalSivau
+  // CHECK: [[ACCESSOR:%[0-9]+]] = function_ref @$s5decls6globalSivau
   // CHECK: [[PTR:%[0-9]+]] = apply [[ACCESSOR]]()
   // CHECK: [[ADDR:%[0-9]+]] = pointer_to_address [[PTR]]
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PBX]] : $*Int
@@ -148,7 +145,7 @@ func store_to_global(x: Int) {
 struct S {
   var x:Int
 
-  // CHECK-LABEL: sil hidden @$S5decls1SVACycfC
+  // CHECK-LABEL: sil hidden @$s5decls1SVACycfC
   init() {
     x = 219
   }

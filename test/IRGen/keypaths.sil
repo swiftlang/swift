@@ -171,10 +171,10 @@ sil_vtable C {}
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
 //              -- instantiable in-line, size 16
 // CHECK-32-SAME: <i32 0x8000_0010>,
-// -- computed, settable, nonmutating, identified by vtable, no args
-// CHECK-SAME: <i32 0x0250_0000>,
+// -- computed, settable, nonmutating, identified by pointer, no args
+// CHECK-SAME: <i32 0x0240_0000>,
 // CHECK-64-SAME: [4 x i8] zeroinitializer,
-// CHECK-SAME: [[WORD]]
+// CHECK-SAME: %swift.method_descriptor* getelementptr inbounds (<{{.*}}>, <{{.*}}>* @"$s8keypaths1CCMn", i32 0, i32 13),
 // CHECK-SAME: void (%TSi*, %T8keypaths1CC**)* @l_get,
 // CHECK-SAME: void (%TSi*, %T8keypaths1CC**)* @l_set }>
 
@@ -223,13 +223,13 @@ sil_vtable C {}
 // CHECK-64-SAME: i32 36 }>
 
 // -- %t
-// CHECK: [[KP_T:@keypath.*]] = private global <{ {{.*}} }> <{ {{.*}} i32 1, {{.*}} @"$S8keypaths1GV1xxvpMV",
+// CHECK: [[KP_T:@keypath.*]] = private global <{ {{.*}} }> <{ {{.*}} i32 1, {{.*}} @"$s8keypaths1GV1xxvpMV",
 // CHECK-SAME:   %swift.type* (i8*)* [[T_GET_TYPE_A:@[A-Za-z0-9._]*]],
 //            -- computed get-only property
 // CHECK-SAME:   <i32 0x0208_0000>
 
 // -- %u
-// CHECK: [[KP_U:@keypath.*]] = private global <{ {{.*}} }> <{ {{.*}} i32 3, {{.*}} @"$S8keypaths1GVyxqd__cSHRd__luipMV",
+// CHECK: [[KP_U:@keypath.*]] = private global <{ {{.*}} }> <{ {{.*}} i32 3, {{.*}} @"$s8keypaths1GVyxqd__cSHRd__luipMV",
 // CHECK-SAME:   %swift.type* (i8*)* [[U_GET_TYPE_A:@[A-Za-z0-9._]*]],
 // CHECK-SAME:   %swift.type* (i8*)* [[U_GET_TYPE_B:@[A-Za-z0-9._]*]],
 // CHECK-SAME:   i8** (i8*)* [[U_GET_WITNESS_HASHABLE:@[A-Za-z0-9._]*]],
@@ -260,7 +260,7 @@ entry:
 
   %k = keypath $KeyPath<S, Int>, (root $S; gettable_property $Int, id @k_id : $@convention(thin) () -> (), getter @k_get : $@convention(thin) (@in_guaranteed S) -> @out Int)
   %l = keypath $KeyPath<C, Int>, (root $C; settable_property $Int, id #C.w!getter.1, getter @l_get : $@convention(thin) (@in_guaranteed C) -> @out Int, setter @l_set : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ())
-  %m = keypath $KeyPath<S, () -> ()>, (root $S; settable_property $() -> (), id ##S.reabstracted, getter @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed (@in_guaranteed ()) -> @out (), setter @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed (@in_guaranteed ()) -> @out (), @inout S) -> ())
+  %m = keypath $KeyPath<S, () -> ()>, (root $S; settable_property $() -> (), id ##S.reabstracted, getter @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed () -> @out (), setter @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed () -> @out (), @inout S) -> ())
 
   return undef : $()
 }
@@ -271,8 +271,8 @@ sil @k_get : $@convention(thin) (@in_guaranteed S) -> @out Int
 sil @l_get : $@convention(thin) (@in_guaranteed C) -> @out Int
 sil @l_set : $@convention(thin) (@in_guaranteed Int, @in_guaranteed C) -> ()
 
-sil @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed (@in_guaranteed ()) -> @out ()
-sil @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed (@in_guaranteed ()) -> @out (), @inout S) -> ()
+sil @m_get : $@convention(thin) (@in_guaranteed S) -> @out @callee_guaranteed () -> @out ()
+sil @m_set : $@convention(thin) (@in_guaranteed @callee_guaranteed () -> @out (), @inout S) -> ()
 
 struct Gen<T, U> {
   var x: T
@@ -297,7 +297,7 @@ entry:
   %j = keypath $KeyPath<Gen<U,U>, U>, <A> (root $Gen<A, A>; stored_property #Gen.y : $A) <U>
 
   // CHECK: [[PTR:%.*]] = bitcast i8* [[ARGS:%.*]] to
-  // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S8keypaths3FooVMa"([[WORD]] 0, %swift.type* %T)
+  // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s8keypaths3FooVMa"([[WORD]] 0, %swift.type* %T)
   // CHECK: [[FOO_T:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
   // CHECK: store %swift.type* [[FOO_T]], %swift.type** [[PTR]]
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_I]] to i8*), i8* [[ARGS]])
@@ -309,7 +309,7 @@ entry:
 // CHECK: define private %swift.type* [[I_GET_GEN_A_A]](i8*)
 // CHECK:   [[BUF:%.*]] = bitcast i8* %0
 // CHECK:   [[A:%.*]] = load %swift.type*, %swift.type** [[BUF]]
-// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S8keypaths3GenVMa"([[WORD]] 0, %swift.type* [[A]], %swift.type* [[A]])
+// CHECK:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s8keypaths3GenVMa"([[WORD]] 0, %swift.type* [[A]], %swift.type* [[A]])
 // CHECK:   [[GEN:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK:   ret %swift.type* [[GEN]]
 

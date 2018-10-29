@@ -5,8 +5,8 @@ class C {}
 protocol P: class {}
 protocol Q: class {}
 
-// CHECK: @"$S29type_layout_reference_storage26ReferenceStorageTypeLayoutVMn" = hidden constant {{.*}} @"$S29type_layout_reference_storage26ReferenceStorageTypeLayoutVMP"
-// CHECK: define internal %swift.type* @"$S29type_layout_reference_storage26ReferenceStorageTypeLayoutVMi"
+// CHECK: @"$s29type_layout_reference_storage26ReferenceStorageTypeLayoutVMn" = hidden constant {{.*}} @"$s29type_layout_reference_storage26ReferenceStorageTypeLayoutVMP"
+// CHECK: define internal %swift.type* @"$s29type_layout_reference_storage26ReferenceStorageTypeLayoutVMi"
 struct ReferenceStorageTypeLayout<T, Native : C, Unknown : AnyObject> {
   var z: T
 
@@ -130,10 +130,6 @@ public class Base {
    var a: UInt32 = 0
 }
 // CHECK-LABEL: %swift.metadata_response @{{.*}}7DerivedCMr"(
-// CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_{{.*}}_pod, i32 0, i32 0),
-// CHECK-32: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_4_{{.*}}_pod, i32 0, i32 0),
-// CHECK: store i8** getelementptr inbounds (i8*, i8** @"$SBoWV", i32 8),
-// CHECK: call swiftcc %swift.metadata_response @"$S29type_layout_reference_storage4BaseCMa"
 // CHECK: call void @swift_initClassMetadata
 // CHECK: ret
 public class Derived<T> : Base {

@@ -1666,7 +1666,7 @@ typed, so aliasing of classes is constrained by the type system as follows:
 A violation of the above aliasing rules only results in undefined
 behavior if the aliasing references are dereferenced within Swift code.
 For example,
-``_SwiftNativeNS[Array|Dictionary|String]`` classes alias with
+``__SwiftNativeNS[Array|Dictionary|String]`` classes alias with
 ``NS[Array|Dictionary|String]`` classes even though they are not
 statically related. Since Swift never directly accesses stored
 properties on the Foundation classes, this aliasing does not pose a
@@ -2881,16 +2881,6 @@ The second operand may have either object or address type.  In the
 latter case, the dependency is on the current value stored in the
 address.
 
-strong_pin
-``````````
-
-TODO: Fill me in!
-
-strong_unpin
-````````````
-
-TODO: Fill me in!
-
 is_unique
 `````````
 
@@ -2908,22 +2898,6 @@ strong reference count is greater than 1.
 
 A discussion of the semantics can be found here:
 :ref:`arcopts.is_unique`.
-
-is_unique_or_pinned
-```````````````````
-
-::
-
-  sil-instruction ::= 'is_unique_or_pinned' sil-operand
-
-  %1 = is_unique_or_pinned %0 : $*T
-  // $T must be a reference-counted type
-  // %1 will be of type Builtin.Int1
-
-Checks whether %0 is the address of either a unique reference to a
-memory object or a reference to a pinned object. Returns 1 if the
-strong reference count is 1 or the object has been marked pinned by
-strong_pin.
 
 is_escaping_closure
 ```````````````````

@@ -14,6 +14,7 @@
 #define SWIFT_SILOPTIMIZER_ANALYSIS_ALIASANALYSIS_H
 
 #include "swift/Basic/ValueEnumerator.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
@@ -305,7 +306,7 @@ bool isLetPointer(SILValue V);
 } // end namespace swift
 
 namespace llvm {
-  template <> struct llvm::DenseMapInfo<AliasKeyTy> {
+  template <> struct DenseMapInfo<AliasKeyTy> {
     static inline AliasKeyTy getEmptyKey() {
       auto Allone = std::numeric_limits<size_t>::max();
       return {0, Allone, nullptr, nullptr};
@@ -330,7 +331,7 @@ namespace llvm {
     }
   };
 
-  template <> struct llvm::DenseMapInfo<MemBehaviorKeyTy> {
+  template <> struct DenseMapInfo<MemBehaviorKeyTy> {
     static inline MemBehaviorKeyTy getEmptyKey() {
       auto Allone = std::numeric_limits<size_t>::max();
       return {0, Allone, RetainObserveKind::RetainObserveKindEnd};

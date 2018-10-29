@@ -17,7 +17,7 @@ import Foundation
 
 public protocol _INIntentSetImageKeyPath { }
 
-public extension _INIntentSetImageKeyPath {
+extension _INIntentSetImageKeyPath {
     
     @available(iOS 12.0, watchOS 5.0, macOS 10.14, *)
     public func setImage<Value>(_ image: INImage?, forParameterNamed parameterName: KeyPath<Self, Value>) {

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library -swift-version 4
+// RUN: %target-typecheck-verify-swift -parse-as-library
 
 lazy func lazy_func() {} // expected-error {{'lazy' may only be used on 'var' declarations}} {{1-6=}}
 
@@ -10,7 +10,7 @@ struct S {
 
 protocol SomeProtocol {
   lazy var x : Int  // expected-error {{'lazy' isn't allowed on a protocol requirement}} {{3-8=}}
-  // expected-error@-1 {{property in protocol must have explicit { get } or { get set } specifier}}
+  // expected-error@-1 {{property in protocol must have explicit { get } or { get set } specifier}} {{19-19= { get <#set#> \}}}
   // expected-error@-2 {{lazy properties must have an initializer}}
   lazy var y : Int { get } // expected-error {{'lazy' isn't allowed on a protocol requirement}} {{3-8=}}
   // expected-error@-1 {{'lazy' must not be used on a computed property}}

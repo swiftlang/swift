@@ -162,17 +162,34 @@ public extension CustomNSError {
   }
 }
 
-extension CustomNSError where Self: RawRepresentable, Self.RawValue: SignedInteger {
-  // The error code of Error with integral raw values is the raw value.
-  public var errorCode: Int {
-    return numericCast(self.rawValue)
-  }
+/// Convert an arbitrary binary integer to an Int, reinterpreting signed
+/// -> unsigned if needed but trapping if the result is otherwise not
+/// expressible.
+func unsafeBinaryIntegerToInt<T: BinaryInteger>(_ value: T) -> Int {
+    if T.isSigned {
+        return numericCast(value)
+    }
+
+    let uintValue: UInt = numericCast(value)
+    return Int(bitPattern: uintValue)
 }
 
-extension CustomNSError where Self: RawRepresentable, Self.RawValue: UnsignedInteger {
+/// Convert from an Int to an arbitrary binary integer, reinterpreting signed ->
+/// unsigned if needed but trapping if the result is otherwise not expressible.
+func unsafeBinaryIntegerFromInt<T: BinaryInteger>(_ value: Int) -> T {
+  if T.isSigned {
+    return numericCast(value)
+  }
+
+  let uintValue = UInt(bitPattern: value)
+  return numericCast(uintValue)
+}
+
+extension CustomNSError
+    where Self: RawRepresentable, Self.RawValue: FixedWidthInteger {
   // The error code of Error with integral raw values is the raw value.
   public var errorCode: Int {
-    return numericCast(self.rawValue)
+    return unsafeBinaryIntegerToInt(self.rawValue)
   }
 }
 
@@ -185,13 +202,7 @@ public extension Error where Self : CustomNSError {
 }
 
 public extension Error where Self: CustomNSError, Self: RawRepresentable,
-    Self.RawValue: SignedInteger {
-  /// Default implementation for customized NSErrors.
-  var _code: Int { return self.errorCode }  
-}
-
-public extension Error where Self: CustomNSError, Self: RawRepresentable,
-    Self.RawValue: UnsignedInteger {
+    Self.RawValue: FixedWidthInteger {
   /// Default implementation for customized NSErrors.
   var _code: Int { return self.errorCode }  
 }
@@ -348,7 +359,7 @@ extension CFError : Error {
 public protocol _ObjectiveCBridgeableError : Error {
   /// Produce a value of the error type corresponding to the given NSError,
   /// or return nil if it cannot be bridged.
-  init?(_bridgedNSError: NSError)
+  init?(_bridgedNSError: __shared NSError)
 }
 
 /// A hook for the runtime to use _ObjectiveCBridgeableError in order to
@@ -384,31 +395,15 @@ extension _BridgedNSError {
   public var _domain: String { return Self._nsErrorDomain }
 }
 
-extension _BridgedNSError where Self.RawValue: SignedInteger {
+extension _BridgedNSError where Self.RawValue: FixedWidthInteger {
   public var _code: Int { return Int(rawValue) }
 
-  public init?(_bridgedNSError: NSError) {
+  public init?(_bridgedNSError: __shared NSError) {
     if _bridgedNSError.domain != Self._nsErrorDomain {
       return nil
     }
 
     self.init(rawValue: RawValue(_bridgedNSError.code))
-  }
-
-  public var hashValue: Int { return _code }
-}
-
-extension _BridgedNSError where Self.RawValue: UnsignedInteger {
-  public var _code: Int {
-    return Int(bitPattern: UInt(rawValue))
-  }
-
-  public init?(_bridgedNSError: NSError) {
-    if _bridgedNSError.domain != Self._nsErrorDomain {
-      return nil
-    }
-
-    self.init(rawValue: RawValue(UInt(bitPattern: _bridgedNSError.code)))
   }
 
   public var hashValue: Int { return _code }
@@ -433,28 +428,18 @@ public protocol _BridgedStoredNSError :
   init(_nsError error: NSError)
 }
 
-/// TODO: Better way to do this?
-internal func _stringDictToAnyHashableDict(_ input: [String : Any])
-    -> [AnyHashable : Any] {
-  var result = [AnyHashable : Any](minimumCapacity: input.count)
-  for (k, v) in input {
-    result[k] = v
-  }
-  return result
-}
-
 /// Various helper implementations for _BridgedStoredNSError
 extension _BridgedStoredNSError {
   public var code: Code {
-    return Code(rawValue: numericCast(_nsError.code))!
+    return Code(rawValue: unsafeBinaryIntegerFromInt(_nsError.code))!
   }
 
   /// Initialize an error within this domain with the given ``code``
   /// and ``userInfo``.
   public init(_ code: Code, userInfo: [String : Any] = [:]) {
     self.init(_nsError: NSError(domain: Self.errorDomain,
-                                code: numericCast(code.rawValue),
-                                userInfo: _stringDictToAnyHashableDict(userInfo)))
+                                code: unsafeBinaryIntegerToInt(code.rawValue),
+                                userInfo: userInfo))
   }
 
   /// The user-info dictionary for an error that was bridged from
@@ -463,7 +448,7 @@ extension _BridgedStoredNSError {
 }
 
 /// Implementation of _ObjectiveCBridgeableError for all _BridgedStoredNSErrors.
-public extension _BridgedStoredNSError {
+extension _BridgedStoredNSError {
   /// Default implementation of ``init(_bridgedNSError:)`` to provide
   /// bridging from NSError.
   public init?(_bridgedNSError error: NSError) {
@@ -488,8 +473,7 @@ public extension _BridgedStoredNSError {
   var errorUserInfo: [String : Any] {
     var result: [String : Any] = [:]
     for (key, value) in _nsError.userInfo {
-      guard let stringKey = key.base as? String else { continue }
-      result[stringKey] = value
+      result[key] = value
     }
     return result
   }
@@ -552,6 +536,7 @@ extension _SwiftNewtypeWrapper where Self.RawValue == Error {
   }
 
   @inlinable // FIXME(sil-serialize-all)
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSError?
   ) -> Self {
@@ -617,9 +602,9 @@ public extension CocoaError {
   }
 }
 
-public extension CocoaError {
+extension CocoaError {
     public static func error(_ code: CocoaError.Code, userInfo: [AnyHashable : Any]? = nil, url: URL? = nil) -> Error {
-        var info: [AnyHashable : Any] = userInfo ?? [:]
+        var info: [String : Any] = userInfo as? [String : Any] ?? [:]
         if let url = url {
             info[NSURLErrorKey] = url
         }
@@ -1821,7 +1806,7 @@ public struct URLError : _BridgedStoredNSError {
   }
 }
 
-public extension URLError.Code {
+extension URLError.Code {
   public static var unknown: URLError.Code {
     return URLError.Code(rawValue: -1)
   }
@@ -1984,7 +1969,7 @@ public extension URLError.Code {
   }
 }
 
-public extension URLError {
+extension URLError {
   private var _nsUserInfo: [AnyHashable : Any] {
     return (self as NSError).userInfo
   }
@@ -2009,7 +1994,7 @@ public extension URLError {
   }
 }
 
-public extension URLError {
+extension URLError {
   public static var unknown: URLError.Code {
     return .unknown
   }

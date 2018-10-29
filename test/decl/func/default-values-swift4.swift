@@ -109,4 +109,5 @@ public func evilCode(
       versionedFunction()
       // expected-error@-1 {{global function 'versionedFunction()' is internal and cannot be referenced from a default argument value}}
     }
+    return 0
   }()) {}

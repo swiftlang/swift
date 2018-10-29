@@ -386,6 +386,7 @@ public:
   
   template<typename StmtTy>
   bool typeCheckStmt(StmtTy *&S) {
+    FrontendStatsTracer StatsTracer(TC.Context.Stats, "typecheck-stmt", S);
     PrettyStackTraceStmt trace(TC.Context, "type-checking", S);
     StmtTy *S2 = cast_or_null<StmtTy>(visit(S));
     if (S2 == nullptr)
@@ -1537,6 +1538,7 @@ void TypeChecker::checkDefaultArguments(ParameterList *params,
 bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                                      SourceLoc EndTypeCheckLoc) {
   validateDecl(AFD);
+  checkDefaultArguments(AFD->getParameters(), AFD);
 
   if (!AFD->getBody())
     return false;
@@ -1558,9 +1560,6 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   if (AFD->isBodyTypeChecked())
     return false;
 
-  if (!AFD->getBody())
-    return false;
-
   FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-fn", AFD);
   PrettyStackTraceDecl StackEntry("type-checking", AFD);
 
@@ -1579,7 +1578,9 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   if (error)
     return true;
 
-  performAbstractFuncDeclDiagnostics(*this, AFD);
+  if (AFD->getBody())
+    performAbstractFuncDeclDiagnostics(*this, AFD);
+
   return false;
 }
 
@@ -1587,9 +1588,6 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
 // named function or an anonymous func expression.
 bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
                                              SourceLoc EndTypeCheckLoc) {
-  // Check the default argument definitions.
-  checkDefaultArguments(FD->getParameters(), FD);
-
   // Clang imported inline functions do not have a Swift body to
   // typecheck.
   if (FD->getClangDecl())
@@ -1692,12 +1690,8 @@ static bool isKnownEndOfConstructor(ASTNode N) {
 
 bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
                                                 SourceLoc EndTypeCheckLoc) {
-  // Check the default argument definitions.
-  checkDefaultArguments(ctor->getParameters(), ctor);
-
   BraceStmt *body = ctor->getBody();
-  if (!body)
-    return true;
+  assert(body);
 
   // For constructors, we make sure that the body ends with a "return" stmt,
   // which we either implicitly synthesize, or the user can write.  This
@@ -1826,8 +1820,7 @@ bool TypeChecker::typeCheckDestructorBodyUntil(DestructorDecl *DD,
   StmtChecker SC(*this, static_cast<AbstractFunctionDecl *>(DD));
   SC.EndTypeCheckLoc = EndTypeCheckLoc;
   BraceStmt *Body = DD->getBody();
-  if (!Body)
-    return false;
+  assert(Body);
 
   bool HadError = SC.typeCheckBody(Body);
 

@@ -56,8 +56,8 @@ static bool isSubstitutableFor(Type type, ArchetypeType *archetype,
   return true;
 }
 
-UncurriedCandidate::UncurriedCandidate(ValueDecl *decl, unsigned level)
-: declOrExpr(decl), level(level), substituted(false) {
+OverloadCandidate::OverloadCandidate(ValueDecl *decl, bool skipCurriedSelf)
+    : declOrExpr(decl), skipCurriedSelf(skipCurriedSelf), substituted(false) {
 
   if (auto *PD = dyn_cast<ParamDecl>(decl)) {
     if (PD->hasValidSignature())
@@ -89,21 +89,21 @@ UncurriedCandidate::UncurriedCandidate(ValueDecl *decl, unsigned level)
   }
 }
 
-ArrayRef<Identifier> UncurriedCandidate::getArgumentLabels(
-                                       SmallVectorImpl<Identifier> &scratch) {
+ArrayRef<Identifier>
+OverloadCandidate::getArgumentLabels(SmallVectorImpl<Identifier> &scratch) {
   scratch.clear();
   if (auto decl = getDecl()) {
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
       if (func->hasImplicitSelfDecl()) {
-        if (level == 0) {
+        if (!skipCurriedSelf) {
           scratch.push_back(Identifier());
           return scratch;
         }
 
-        --level;
+        skipCurriedSelf = false;
       }
 
-      if (level == 0) {
+      if (!skipCurriedSelf) {
         // Retrieve the argument labels of the corresponding parameter list.
         for (auto param : *func->getParameters()) {
           scratch.push_back(param->getArgumentName());
@@ -112,20 +112,18 @@ ArrayRef<Identifier> UncurriedCandidate::getArgumentLabels(
       }
     } else if (auto enumElt = dyn_cast<EnumElementDecl>(decl)) {
       // 'self'
-      if (level == 0) {
+      if (!skipCurriedSelf) {
         scratch.push_back(Identifier());
         return scratch;
       }
       
       // The associated data of the case.
-      if (level == 1) {
-        auto *paramList = enumElt->getParameterList();
-        if (!paramList) return { };
-        for (auto param : *paramList) {
-          scratch.push_back(param->getArgumentName());
-        }
-        return scratch;
+      auto *paramList = enumElt->getParameterList();
+      if (!paramList) return { };
+      for (auto param : *paramList) {
+        scratch.push_back(param->getArgumentName());
       }
+      return scratch;
     }
   }
 
@@ -138,14 +136,15 @@ ArrayRef<Identifier> UncurriedCandidate::getArgumentLabels(
   return scratch;
 }
 
-void UncurriedCandidate::dump() const {
+void OverloadCandidate::dump() const {
   if (auto decl = getDecl())
     decl->dumpRef(llvm::errs());
   else
     llvm::errs() << "<<EXPR>>";
-  llvm::errs() << " - uncurry level " << level;
-  
-  if (auto FT = getUncurriedFunctionType())
+  llvm::errs() << " - ignore curried self = " << (skipCurriedSelf ? "yes"
+                                                                  : "no");
+
+  if (auto FT = getFunctionType())
     llvm::errs() << " - type: " << Type(FT) << "\n";
   else
     llvm::errs() << " - type <<NONFUNCTION>>: " << entityType << "\n";
@@ -190,7 +189,7 @@ void CalleeCandidateInfo::filterList(ClosenessPredicate predicate) {
       
       // Likewise, if the candidate is inaccessible from the scope it is being
       // accessed from, mark it as inaccessible or a general mismatch.
-      if (VD->hasAccess() && !VD->isAccessibleFrom(CS.DC)) {
+      if (!VD->isAccessibleFrom(CS.DC)) {
         // If this was an exact match, downgrade it to inaccessible, so that
         // accessible decls that are also an exact match will take precedence.
         // Otherwise consider it to be a general mismatch so we only list it in
@@ -310,9 +309,8 @@ static bool findGenericSubstitutions(DeclContext *dc, Type paramType,
 /// Determine how close an argument list is to an already decomposed argument
 /// list.  If the closeness is a miss by a single argument, then this returns
 /// information about that failure.
-CalleeCandidateInfo::ClosenessResultTy
-CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
-                                       ArrayRef<AnyFunctionType::Param> actualArgs) {
+CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
+    OverloadCandidate candidate, ArrayRef<AnyFunctionType::Param> actualArgs) {
   auto *dc = candidate.getDecl()
   ? candidate.getDecl()->getInnermostDeclContext()
   : nullptr;
@@ -321,8 +319,8 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
     return {CC_GeneralMismatch, {}};
 
   auto candArgs = candidate.getParameters();
-  llvm::SmallBitVector candDefaultMap =
-    computeDefaultMap(candArgs, candidate.getDecl(), candidate.level);
+  SmallBitVector candDefaultMap =
+    computeDefaultMap(candArgs, candidate.getDecl(), candidate.skipCurriedSelf);
   
   struct OurListener : public MatchCallArgumentListener {
     CandidateCloseness result = CC_ExactMatch;
@@ -400,11 +398,11 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
     // If parameter is marked as @autoclosure, we are
     // only interested in it's resulting type.
     if (param.isAutoClosure()) {
-      if (auto fnType = param.getType()->getAs<AnyFunctionType>())
+      if (auto fnType = param.getOldType()->getAs<AnyFunctionType>())
         return fnType->getResult();
     }
     
-    return param.getType();
+    return param.getOldType();
   };
   
   for (unsigned i = 0, e = paramBindings.size(); i != e; ++i) {
@@ -537,7 +535,7 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
   // Check to see if the first argument expects an inout argument, but is not
   // an lvalue.
   if (candArgs[0].isInOut() &&
-      !(actualArgs[0].getType()->hasLValueType() || actualArgs[0].isInOut())) {
+      !(actualArgs[0].getOldType()->hasLValueType() || actualArgs[0].isInOut())) {
     return { CC_NonLValueInOut, {}};
   }
   
@@ -589,28 +587,27 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
                                      /*implicitDotSyntax=*/false);
   }
   
-  // Determine the callee level for a "bare" reference to the given
-  // declaration.
-  auto getCalleeLevel = [implicitDotSyntax](ValueDecl *decl) -> unsigned {
+  // Determine if we need to skip "self" to get to a "bare" reference.
+  auto skipCurriedSelf = [implicitDotSyntax](ValueDecl *decl) -> bool {
     if (auto func = dyn_cast<FuncDecl>(decl)) {
       if (func->isOperator() && func->getDeclContext()->isTypeContext() &&
           !implicitDotSyntax)
-        return 1;
+        return true;
     }
     
-    return 0;
+    return false;
   };
   
   if (auto declRefExpr = dyn_cast<DeclRefExpr>(fn)) {
     auto decl = declRefExpr->getDecl();
-    candidates.push_back({ decl, getCalleeLevel(decl) });
+    candidates.push_back({ decl, skipCurriedSelf(decl) });
     declName = decl->getBaseName().userFacingName();
     return;
   }
   
   if (auto declRefExpr = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
     auto decl = declRefExpr->getDecl();
-    candidates.push_back({ decl, getCalleeLevel(decl) });
+    candidates.push_back({ decl, skipCurriedSelf(decl) });
     
     if (auto selfTy = decl->getDeclContext()->getSelfInterfaceType())
       declName = selfTy.getString() + ".init";
@@ -621,7 +618,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
   
   if (auto overloadedDRE = dyn_cast<OverloadedDeclRefExpr>(fn)) {
     for (auto cand : overloadedDRE->getDecls()) {
-      candidates.push_back({ cand, getCalleeLevel(cand) });
+      candidates.push_back({ cand, skipCurriedSelf(cand) });
     }
     
     if (!candidates.empty())
@@ -671,12 +668,13 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
         baseType = CS.getType(AE->getArg())->getWithoutSpecifierType();
 
       for (auto &C : candidates) {
-        C.level += 1;
+        bool hadCurriedSelf = C.skipCurriedSelf;
 
+        C.skipCurriedSelf = true;
         baseType = replaceTypeVariablesWithUnresolved(baseType);
 
         // Compute a new substituted type if we have a base type to apply.
-        if (baseType && C.level == 1 && C.getDecl()) {
+        if (baseType && !hadCurriedSelf && C.getDecl()) {
           baseType = baseType
             ->getWithoutSpecifierType()
             ->getMetatypeInstanceType();
@@ -691,7 +689,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
           }
         }
       }
-      
+
       return;
     }
   }
@@ -709,19 +707,27 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
   
   // Otherwise, we couldn't tell structurally what is going on here, so try to
   // dig something out of the constraint system.
-  unsigned uncurryLevel = 0;
+  bool hasCurriedSelf = false;
   
   // The candidate list of an unresolved_dot_expr is the candidate list of the
   // base uncurried by one level, and we refer to the name of the member, not to
   // the name of any base.
   if (auto UDE = dyn_cast<UnresolvedDotExpr>(fn)) {
     declName = UDE->getName().getBaseName().userFacingName();
-    uncurryLevel = 1;
-    
+    hasCurriedSelf = true;
+
+    // If base is a module or metatype, this is just a simple
+    // reference so its curry level should be 0.
+    if (auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase())) {
+      if (auto baseType = DRE->getType())
+        hasCurriedSelf = !(baseType->is<ModuleType>() ||
+                           baseType->is<AnyMetatypeType>());
+    }
+
     // If we actually resolved the member to use, return it.
     auto loc = CS.getConstraintLocator(UDE, ConstraintLocator::Member);
     if (auto *member = CS.findResolvedMemberRef(loc)) {
-      candidates.push_back({ member, uncurryLevel });
+      candidates.push_back({ member, hasCurriedSelf });
       return;
     }
     
@@ -729,7 +735,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     auto ctorLoc =
     CS.getConstraintLocator(UDE, ConstraintLocator::ConstructorMember);
     if (auto *member = CS.findResolvedMemberRef(ctorLoc)) {
-      candidates.push_back({ member, uncurryLevel });
+      candidates.push_back({ member, hasCurriedSelf });
       return;
     }
     
@@ -745,7 +751,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
   }
   
   if (isa<MemberRefExpr>(fn))
-    uncurryLevel = 1;
+    hasCurriedSelf = true;
   
   // Scan to see if we have a disjunction constraint for this callee.
   for (auto &constraint : CS.getConstraints()) {
@@ -759,7 +765,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
         continue;
       auto c = bindOverload->getOverloadChoice();
       if (c.isDecl())
-        candidates.push_back({ c.getDecl(), uncurryLevel });
+        candidates.push_back({ c.getDecl(), hasCurriedSelf });
     }
     
     // If we found some candidates, then we're done.
@@ -780,7 +786,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
 void CalleeCandidateInfo::filterListArgs(ArrayRef<AnyFunctionType::Param> actualArgs) {
   // Now that we have the candidate list, figure out what the best matches from
   // the candidate list are, and remove all the ones that aren't at that level.
-  filterList([&](UncurriedCandidate candidate) -> ClosenessResultTy {
+  filterList([&](OverloadCandidate candidate) -> ClosenessResultTy {
     // If this isn't a function or isn't valid at this uncurry level, treat it
     // as a general mismatch.
     if (!candidate.hasParameters())
@@ -794,7 +800,7 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
   
   // If the argument is not present then we expect members without arguments.
   if (!argExpr) {
-    return filterList([&](UncurriedCandidate candidate) -> ClosenessResultTy {
+    return filterList([&](OverloadCandidate candidate) -> ClosenessResultTy {
       // If this candidate has no arguments, then we're a match.
       if (!candidate.hasParameters())
         return {CC_ExactMatch, {}};
@@ -856,13 +862,13 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
     auto decl = cand.getDecl();
     
     // If this is a method or enum case member (not a var or subscript), then
-    // the uncurry level is 1 if self has already been applied.
-    unsigned uncurryLevel = 0;
+    // we need to skip `self` if it has already been applied.
+    bool hasCurriedSelf = false;
     if (decl->getDeclContext()->isTypeContext() &&
         selfAlreadyApplied && !isa<SubscriptDecl>(decl))
-      uncurryLevel = 1;
+      hasCurriedSelf = true;
     
-    candidates.push_back({ decl, uncurryLevel });
+    candidates.push_back({ decl, hasCurriedSelf });
     
     // If we have a base type for this member, try to perform substitutions into
     // it to get a simpler and more concrete type.

@@ -623,6 +623,7 @@ extension Unicode.Scalar.Properties {
   ///
   /// This property corresponds to the `Emoji` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  @available(macOS 10.12.2, iOS 10.2, tvOS 10.1, watchOS 3.1.1, *)
   public var isEmoji: Bool {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_EMOJI)
   }
@@ -639,6 +640,7 @@ extension Unicode.Scalar.Properties {
   ///
   /// This property corresponds to the `Emoji_Presentation` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  @available(macOS 10.12.2, iOS 10.2, tvOS 10.1, watchOS 3.1.1, *)
   public var isEmojiPresentation: Bool {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_EMOJI_PRESENTATION)
   }
@@ -652,6 +654,7 @@ extension Unicode.Scalar.Properties {
   ///
   /// This property corresponds to the `Emoji_Modifier` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  @available(macOS 10.12.2, iOS 10.2, tvOS 10.1, watchOS 3.1.1, *)
   public var isEmojiModifier: Bool {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_EMOJI_MODIFIER)
   }
@@ -661,6 +664,7 @@ extension Unicode.Scalar.Properties {
   ///
   /// This property corresponds to the `Emoji_Modifier_Base` property in the
   /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  @available(macOS 10.12.2, iOS 10.2, tvOS 10.1, watchOS 3.1.1, *)
   public var isEmojiModifierBase: Bool {
     return _hasBinaryProperty(__swift_stdlib_UCHAR_EMOJI_MODIFIER_BASE)
   }

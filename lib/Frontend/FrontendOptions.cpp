@@ -124,7 +124,7 @@ void FrontendOptions::forAllOutputPaths(
       input.getPrimarySpecificPaths().SupplementaryOutputs;
   const std::string *outputs[] = {&outs.ModuleOutputPath,
                                   &outs.ModuleDocOutputPath,
-                                  &outs.ModuleInterfaceOutputPath,
+                                  &outs.ParseableInterfaceOutputPath,
                                   &outs.ObjCHeaderOutputPath};
   for (const std::string *next : outputs) {
     if (!next->empty())
@@ -192,6 +192,7 @@ FrontendOptions::formatForPrincipalOutputFileForAction(ActionType action) {
   case ActionType::EmitImportedModules:
     return TY_ImportedModules;
   }
+  llvm_unreachable("unhandled action");
 }
 
 bool FrontendOptions::canActionEmitDependencies(ActionType action) {
@@ -225,6 +226,7 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   case ActionType::EmitImportedModules:
     return true;
   }
+  llvm_unreachable("unhandled action");
 }
 
 bool FrontendOptions::canActionEmitReferenceDependencies(ActionType action) {
@@ -258,6 +260,7 @@ bool FrontendOptions::canActionEmitReferenceDependencies(ActionType action) {
   case ActionType::EmitImportedModules:
     return true;
   }
+  llvm_unreachable("unhandled action");
 }
 
 bool FrontendOptions::canActionEmitObjCHeader(ActionType action) {
@@ -291,6 +294,7 @@ bool FrontendOptions::canActionEmitObjCHeader(ActionType action) {
   case ActionType::EmitImportedModules:
     return true;
   }
+  llvm_unreachable("unhandled action");
 }
 
 bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
@@ -324,6 +328,7 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   case ActionType::EmitImportedModules:
     return true;
   }
+  llvm_unreachable("unhandled action");
 }
 
 bool FrontendOptions::canActionEmitModule(ActionType action) {
@@ -357,6 +362,7 @@ bool FrontendOptions::canActionEmitModule(ActionType action) {
   case ActionType::EmitImportedModules:
     return true;
   }
+  llvm_unreachable("unhandled action");
 }
 
 bool FrontendOptions::canActionEmitModuleDoc(ActionType action) {
@@ -368,7 +374,6 @@ bool FrontendOptions::canActionEmitInterface(ActionType action) {
   case ActionType::NoneAction:
   case ActionType::Parse:
   case ActionType::ResolveImports:
-  case ActionType::Typecheck:
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
@@ -384,6 +389,7 @@ bool FrontendOptions::canActionEmitInterface(ActionType action) {
   case ActionType::REPL:
   case ActionType::EmitImportedModules:
     return false;
+  case ActionType::Typecheck:
   case ActionType::MergeModules:
   case ActionType::EmitModuleOnly:
   case ActionType::EmitSIL:
@@ -394,6 +400,7 @@ bool FrontendOptions::canActionEmitInterface(ActionType action) {
   case ActionType::EmitObject:
     return true;
   }
+  llvm_unreachable("unhandled action");
 }
 
 bool FrontendOptions::doesActionProduceOutput(ActionType action) {
@@ -463,6 +470,7 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   case ActionType::DumpTypeInfo:
     return true;
   }
+  llvm_unreachable("unhandled action");
 }
 
 bool FrontendOptions::doesActionGenerateSIL(ActionType action) {
@@ -496,6 +504,7 @@ bool FrontendOptions::doesActionGenerateSIL(ActionType action) {
   case ActionType::DumpTypeInfo:
     return true;
   }
+  llvm_unreachable("unhandled action");
 }
 
 

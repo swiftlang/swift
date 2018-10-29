@@ -19,7 +19,7 @@ internal final class _MutableHandle<MutableType : NSObject>
   where MutableType : NSCopying {
     fileprivate var _pointer : MutableType
     
-    init(reference : MutableType) {
+    init(reference : __shared MutableType) {
         _pointer = reference.copy() as! MutableType
     }
     
@@ -61,10 +61,4 @@ extension _MutableBoxing {
         }
         return whatToDo(_handle._pointer)
     }
-}
-
-internal enum _MutableUnmanagedWrapper<ImmutableType : NSObject, MutableType : NSObject>
-  where MutableType : NSMutableCopying{
-    case Immutable(Unmanaged<ImmutableType>)
-    case Mutable(Unmanaged<MutableType>)
 }

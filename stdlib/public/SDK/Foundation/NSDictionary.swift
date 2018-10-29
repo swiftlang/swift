@@ -34,7 +34,7 @@ extension Dictionary {
   ///
   /// The provided `NSDictionary` will be copied to ensure that the copy can
   /// not be mutated by other code.
-  public init(_cocoaDictionary: _NSDictionary) {
+  fileprivate init(_cocoaDictionary: __shared _NSDictionary) {
     assert(
       _isBridgedVerbatimToObjectiveC(Key.self) &&
       _isBridgedVerbatimToObjectiveC(Value.self),
@@ -121,10 +121,11 @@ extension Dictionary : _ObjectiveCBridgeable {
       return result != nil
     }
 
-    result = Swift._dictionaryBridgeFromObjectiveCConditional(anyDict)
+    result = anyDict as? Dictionary
     return result != nil
   }
 
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(
     _ d: NSDictionary?
   ) -> Dictionary {
@@ -165,7 +166,7 @@ extension NSDictionary : Sequence {
       return nil
     }
 
-    internal init(_ _dict: NSDictionary) {
+    internal init(_ _dict: __shared NSDictionary) {
       _fastIterator = NSFastEnumerationIterator(_dict)
     }
   }
@@ -173,7 +174,7 @@ extension NSDictionary : Sequence {
   // Bridging subscript.
   @objc
   public subscript(key: Any) -> Any? {
-    @objc(_swift_objectForKeyedSubscript:)
+    @objc(__swift_objectForKeyedSubscript:)
     get {
       // Deliberately avoid the subscript operator in case the dictionary
       // contains non-copyable keys. This is rare since NSMutableDictionary
@@ -193,11 +194,11 @@ extension NSDictionary : Sequence {
 extension NSMutableDictionary {
   // Bridging subscript.
   @objc override public subscript(key: Any) -> Any? {
-    @objc(_swift_objectForKeyedSubscript:)
+    @objc(__swift_objectForKeyedSubscript:)
     get {
       return self.object(forKey: key)
     }
-    @objc(_swift_setObject:forKeyedSubscript:)
+    @objc(__swift_setObject:forKeyedSubscript:)
     set {
       // FIXME: Unfortunate that the `NSCopying` check has to be done at
       // runtime.
@@ -218,8 +219,8 @@ extension NSDictionary {
   /// - Returns: An initialized dictionary--which might be different
   ///   than the original receiver--containing the keys and values
   ///   found in `otherDictionary`.
-  @objc(_swiftInitWithDictionary_NSDictionary:)
-  public convenience init(dictionary otherDictionary: NSDictionary) {
+  @objc(__swiftInitWithDictionary_NSDictionary:)
+  public convenience init(dictionary otherDictionary: __shared NSDictionary) {
     // FIXME(performance)(compiler limitation): we actually want to do just
     // `self = otherDictionary.copy()`, but Swift does not have factory
     // initializers right now.

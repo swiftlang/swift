@@ -19,10 +19,14 @@
 #include "Constraint.h"
 #include "ConstraintSystem.h"
 #include "OverloadChoice.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
+#include <tuple>
 
 namespace swift {
 namespace constraints {
@@ -32,7 +36,7 @@ namespace constraints {
 /// the problem, parent expression and some utility methods.
 class FailureDiagnostic {
   Expr *E;
-  const Solution &solution;
+  ConstraintSystem &CS;
   ConstraintLocator *Locator;
 
   Expr *Anchor;
@@ -41,9 +45,9 @@ class FailureDiagnostic {
   bool HasComplexLocator;
 
 public:
-  FailureDiagnostic(Expr *expr, const Solution &solution,
+  FailureDiagnostic(Expr *expr, ConstraintSystem &cs,
                     ConstraintLocator *locator)
-      : E(expr), solution(solution), Locator(locator) {
+      : E(expr), CS(cs), Locator(locator) {
     std::tie(Anchor, HasComplexLocator) = computeAnchor();
   }
 
@@ -53,12 +57,23 @@ public:
   /// failure location, types and declarations deduced by
   /// constraint system, and other auxiliary information.
   ///
+  /// \param asNote In ambiguity cases it's beneficial to
+  /// produce diagnostic as a note instead of an error if possible.
+  ///
   /// \returns true If the problem has been successfully diagnosed
   /// and diagnostic message emitted, false otherwise.
-  virtual bool diagnose() = 0;
+  bool diagnose(bool asNote = false);
+
+  /// Try to produce an error diagnostic for the problem at hand.
+  virtual bool diagnoseAsError() = 0;
+
+  /// Instead of producing an error diagnostic, attempt to
+  /// produce a "note" to complement some other diagnostic
+  /// e.g. ambiguity error.
+  virtual bool diagnoseAsNote();
 
   ConstraintSystem &getConstraintSystem() const {
-    return solution.getConstraintSystem();
+    return CS;
   }
 
   Expr *getParentExpr() const { return E; }
@@ -71,38 +86,47 @@ public:
 
   /// Resolve type variables present in the raw type, if any.
   Type resolveType(Type rawType) const {
-    return solution.simplifyType(rawType);
+    return CS.simplifyType(rawType);
   }
 
   template <typename... ArgTypes>
   InFlightDiagnostic emitDiagnostic(ArgTypes &&... Args) const;
 
 protected:
-  TypeChecker &getTypeChecker() const { return getConstraintSystem().TC; }
+  TypeChecker &getTypeChecker() const { return CS.TC; }
 
-  DeclContext *getDC() const { return getConstraintSystem().DC; }
+  DeclContext *getDC() const { return CS.DC; }
 
-  const Solution &getSolution() const { return solution; }
+  ASTContext &getASTContext() const { return CS.getASTContext(); }
 
   Optional<std::pair<Type, ConversionRestrictionKind>>
-  restrictionForType(Type type) const {
-    for (auto &restriction : solution.ConstraintRestrictions) {
-      if (restriction.first.first->isEqual(type))
+  getRestrictionForType(Type type) const {
+    for (auto &restriction : CS.ConstraintRestrictions) {
+      if (std::get<0>(restriction)->isEqual(type))
         return std::pair<Type, ConversionRestrictionKind>(
-            restriction.first.second, restriction.second);
+            std::get<1>(restriction), std::get<2>(restriction));
     }
     return None;
   }
 
+  ValueDecl *getResolvedMemberRef(UnresolvedDotExpr *member) {
+    auto locator = CS.getConstraintLocator(member, ConstraintLocator::Member);
+    return CS.findResolvedMemberRef(locator);
+  }
+
   Optional<SelectedOverload>
   getOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
-    return solution.getOverloadChoiceIfAvailable(locator);
+    if (auto *overload = getResolvedOverload(locator))
+      return Optional<SelectedOverload>(
+           {overload->Choice, overload->OpenedFullType, overload->ImpliedType});
+    return None;
   }
 
   /// Retrieve overload choice resolved for given locator
   /// by the constraint solver.
-  ResolvedOverloadSetListItem *getResolvedOverload(ConstraintLocator *locator) {
-    auto resolvedOverload = getConstraintSystem().getResolvedOverloadSets();
+  ResolvedOverloadSetListItem *
+  getResolvedOverload(ConstraintLocator *locator) const {
+    auto resolvedOverload = CS.getResolvedOverloadSets();
     while (resolvedOverload) {
       if (resolvedOverload->Locator == locator)
         return resolvedOverload;
@@ -127,6 +151,7 @@ protected:
   using PathEltKind = ConstraintLocator::PathElementKind;
   using DiagOnDecl = Diag<DescriptiveDeclKind, DeclName, Type, Type>;
   using DiagInReference = Diag<DescriptiveDeclKind, DeclName, Type, Type, Type>;
+  using DiagAsNote = Diag<Type, Type, Type, Type, StringRef>;
 
   const ValueDecl *AffectedDecl;
   /// If possible, find application expression associated
@@ -135,9 +160,23 @@ protected:
   const ApplyExpr *Apply = nullptr;
 
 public:
-  RequirementFailure(Expr *expr, const Solution &solution,
+  RequirementFailure(ConstraintSystem &cs, Expr *expr, RequirementKind kind,
                      ConstraintLocator *locator)
-      : FailureDiagnostic(expr, solution, locator), AffectedDecl(getDeclRef()) {
+      : FailureDiagnostic(expr, cs, locator), AffectedDecl(getDeclRef()) {
+    assert(locator);
+    assert(AffectedDecl);
+
+    auto path = locator->getPath();
+    assert(!path.empty());
+
+    auto &last = path.back();
+    assert(last.getKind() == ConstraintLocator::TypeParameterRequirement);
+    assert(static_cast<RequirementKind>(last.getValue2()) == kind);
+
+    // It's possible sometimes not to have no base expression.
+    if (!expr)
+      return;
+
     auto *anchor = getAnchor();
     expr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
       auto *AE = dyn_cast<ApplyExpr>(subExpr);
@@ -161,13 +200,17 @@ public:
   /// The generic base type where failing requirement comes from.
   Type getOwnerType() const;
 
+  /// Generic context associated with the failure.
+  const GenericContext *getGenericContext() const;
+
   /// Generic requirement associated with the failure.
   const Requirement &getRequirement() const;
 
   virtual Type getLHS() const = 0;
   virtual Type getRHS() const = 0;
 
-  bool diagnose() override;
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
 
 protected:
   /// Retrieve declaration contextual where current
@@ -176,6 +219,7 @@ protected:
 
   virtual DiagOnDecl getDiagnosticOnDecl() const = 0;
   virtual DiagInReference getDiagnosticInRereference() const = 0;
+  virtual DiagAsNote getDiagnosticAsNote() const = 0;
 
   /// Determine whether it would be possible to diagnose
   /// current requirement failure.
@@ -212,13 +256,13 @@ class MissingConformanceFailure final : public RequirementFailure {
   ProtocolDecl *Protocol;
 
 public:
-  MissingConformanceFailure(Expr *expr, const Solution &solution,
+  MissingConformanceFailure(Expr *expr, ConstraintSystem &cs,
                             ConstraintLocator *locator,
                             std::pair<Type, ProtocolDecl *> conformance)
-      : RequirementFailure(expr, solution, locator),
+      : RequirementFailure(cs, expr, RequirementKind::Conformance, locator),
         NonConformingType(conformance.first), Protocol(conformance.second) {}
 
-  bool diagnose() override;
+  bool diagnoseAsError() override;
 
 private:
   /// The type which was expected, by one of the generic requirements,
@@ -235,6 +279,10 @@ protected:
 
   DiagInReference getDiagnosticInRereference() const override {
     return diag::type_does_not_conform_in_decl_ref;
+  }
+
+  DiagAsNote getDiagnosticAsNote() const override {
+    return diag::candidate_types_conformance_requirement;
   }
 };
 
@@ -257,9 +305,10 @@ class SameTypeRequirementFailure final : public RequirementFailure {
   Type LHS, RHS;
 
 public:
-  SameTypeRequirementFailure(Expr *expr, const Solution &solution, Type lhs,
+  SameTypeRequirementFailure(Expr *expr, ConstraintSystem &cs, Type lhs,
                              Type rhs, ConstraintLocator *locator)
-      : RequirementFailure(expr, solution, locator), LHS(lhs), RHS(rhs) {}
+      : RequirementFailure(cs, expr, RequirementKind::SameType, locator),
+        LHS(lhs), RHS(rhs) {}
 
   Type getLHS() const override { return LHS; }
   Type getRHS() const override { return RHS; }
@@ -271,6 +320,49 @@ protected:
 
   DiagInReference getDiagnosticInRereference() const override {
     return diag::types_not_equal_in_decl_ref;
+  }
+
+  DiagAsNote getDiagnosticAsNote() const override {
+    return diag::candidate_types_equal_requirement;
+  }
+};
+
+/// Diagnose failures related to superclass generic requirements, e.g.
+/// ```swift
+/// class A {
+/// }
+///
+/// class B {
+/// }
+///
+/// func foo<T>(_ t: [T]) where T: A {}
+/// foo([B()])
+/// ```
+///
+/// `A` is not the superclass of `B`, which is required by `foo<T>`.
+class SuperclassRequirementFailure final : public RequirementFailure {
+  Type LHS, RHS;
+
+public:
+  SuperclassRequirementFailure(Expr *expr, ConstraintSystem &cs, Type lhs,
+                               Type rhs, ConstraintLocator *locator)
+      : RequirementFailure(cs, expr, RequirementKind::Superclass, locator),
+        LHS(lhs), RHS(rhs) {}
+
+  Type getLHS() const override { return LHS; }
+  Type getRHS() const override { return RHS; }
+
+protected:
+  DiagOnDecl getDiagnosticOnDecl() const override {
+    return diag::types_not_inherited_decl;
+  }
+
+  DiagInReference getDiagnosticInRereference() const override {
+    return diag::types_not_inherited_in_decl_ref;
+  }
+
+  DiagAsNote getDiagnosticAsNote() const override {
+    return diag::candidate_types_inheritance_requirement;
   }
 };
 
@@ -286,11 +378,11 @@ class LabelingFailure final : public FailureDiagnostic {
   ArrayRef<Identifier> CorrectLabels;
 
 public:
-  LabelingFailure(const Solution &solution, ConstraintLocator *locator,
+  LabelingFailure(ConstraintSystem &cs, ConstraintLocator *locator,
                   ArrayRef<Identifier> labels)
-      : FailureDiagnostic(nullptr, solution, locator), CorrectLabels(labels) {}
+      : FailureDiagnostic(nullptr, cs, locator), CorrectLabels(labels) {}
 
-  bool diagnose() override;
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose errors related to converting function type which
@@ -299,32 +391,32 @@ class NoEscapeFuncToTypeConversionFailure final : public FailureDiagnostic {
   Type ConvertTo;
 
 public:
-  NoEscapeFuncToTypeConversionFailure(Expr *expr, const Solution &solution,
+  NoEscapeFuncToTypeConversionFailure(Expr *expr, ConstraintSystem &cs,
                                       ConstraintLocator *locator,
                                       Type toType = Type())
-      : FailureDiagnostic(expr, solution, locator), ConvertTo(toType) {}
+      : FailureDiagnostic(expr, cs, locator), ConvertTo(toType) {}
 
-  bool diagnose() override;
+  bool diagnoseAsError() override;
 };
 
 class MissingForcedDowncastFailure final : public FailureDiagnostic {
 public:
-  MissingForcedDowncastFailure(Expr *expr, const Solution &solution,
+  MissingForcedDowncastFailure(Expr *expr, ConstraintSystem &cs,
                                ConstraintLocator *locator)
-      : FailureDiagnostic(expr, solution, locator) {}
+      : FailureDiagnostic(expr, cs, locator) {}
 
-  bool diagnose() override;
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose failures related to passing value of some type
 /// to `inout` parameter, without explicitly specifying `&`.
 class MissingAddressOfFailure final : public FailureDiagnostic {
 public:
-  MissingAddressOfFailure(Expr *expr, const Solution &solution,
+  MissingAddressOfFailure(Expr *expr, ConstraintSystem &cs,
                           ConstraintLocator *locator)
-      : FailureDiagnostic(expr, solution, locator) {}
+      : FailureDiagnostic(expr, cs, locator) {}
 
-  bool diagnose() override;
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose failures related attempt to implicitly convert types which
@@ -334,11 +426,11 @@ class MissingExplicitConversionFailure final : public FailureDiagnostic {
   Type ConvertingTo;
 
 public:
-  MissingExplicitConversionFailure(Expr *expr, const Solution &solution,
+  MissingExplicitConversionFailure(Expr *expr, ConstraintSystem &cs,
                                    ConstraintLocator *locator, Type toType)
-      : FailureDiagnostic(expr, solution, locator), ConvertingTo(toType) {}
+      : FailureDiagnostic(expr, cs, locator), ConvertingTo(toType) {}
 
-  bool diagnose() override;
+  bool diagnoseAsError() override;
 
 private:
   bool exprNeedsParensBeforeAddingAs(Expr *expr) {
@@ -373,24 +465,24 @@ class MemberAccessOnOptionalBaseFailure final : public FailureDiagnostic {
   bool ResultTypeIsOptional;
 
 public:
-  MemberAccessOnOptionalBaseFailure(Expr *expr, const Solution &solution,
+  MemberAccessOnOptionalBaseFailure(Expr *expr, ConstraintSystem &cs,
                                     ConstraintLocator *locator,
                                     DeclName memberName, bool resultOptional)
-      : FailureDiagnostic(expr, solution, locator), Member(memberName),
+      : FailureDiagnostic(expr, cs, locator), Member(memberName),
         ResultTypeIsOptional(resultOptional) {}
 
-  bool diagnose() override;
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose failures related to use of the unwrapped optional types,
 /// which require some type of force-unwrap e.g. "!" or "try!".
 class MissingOptionalUnwrapFailure final : public FailureDiagnostic {
 public:
-  MissingOptionalUnwrapFailure(Expr *expr, const Solution &solution,
+  MissingOptionalUnwrapFailure(Expr *expr, ConstraintSystem &cs,
                                ConstraintLocator *locator)
-      : FailureDiagnostic(expr, solution, locator) {}
+      : FailureDiagnostic(expr, cs, locator) {}
 
-  bool diagnose() override;
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose errors associated with rvalues in positions
@@ -398,10 +490,72 @@ public:
 class RValueTreatedAsLValueFailure final : public FailureDiagnostic {
 
 public:
-  RValueTreatedAsLValueFailure(const Solution &solution, ConstraintLocator *locator)
-    : FailureDiagnostic(nullptr, solution, locator) {}
+  RValueTreatedAsLValueFailure(ConstraintSystem &cs, ConstraintLocator *locator)
+      : FailureDiagnostic(nullptr, cs, locator) {}
 
-  bool diagnose() override;
+  bool diagnoseAsError() override;
+};
+
+class TrailingClosureAmbiguityFailure final : public FailureDiagnostic {
+  ArrayRef<OverloadChoice> Choices;
+
+public:
+  TrailingClosureAmbiguityFailure(Expr *root, ConstraintSystem &cs,
+                                  Expr *anchor,
+                                  ArrayRef<OverloadChoice> choices)
+      : FailureDiagnostic(root, cs, cs.getConstraintLocator(anchor)),
+        Choices(choices) {}
+
+  bool diagnoseAsError() override { return false; }
+
+  bool diagnoseAsNote() override;
+};
+
+/// Diagnose errors related to assignment expressions e.g.
+/// trying to assign something to immutable value, or trying
+/// to access mutating member on immutable base.
+class AssignmentFailure final : public FailureDiagnostic {
+  SourceLoc Loc;
+  Diag<StringRef> DeclDiagnostic;
+  Diag<Type> TypeDiagnostic;
+
+public:
+  AssignmentFailure(Expr *destExpr, ConstraintSystem &cs,
+                    SourceLoc diagnosticLoc);
+
+  AssignmentFailure(Expr *destExpr, ConstraintSystem &cs,
+                    SourceLoc diagnosticLoc, Diag<StringRef> declDiag,
+                    Diag<Type> typeDiag)
+      : FailureDiagnostic(destExpr, cs, cs.getConstraintLocator(destExpr)),
+        Loc(diagnosticLoc), DeclDiagnostic(declDiag), TypeDiagnostic(typeDiag) {
+  }
+
+  bool diagnoseAsError() override;
+
+private:
+  void fixItChangeInoutArgType(const Expr *arg, Type actualType,
+                               Type neededType) const;
+
+  /// Given an expression that has a non-lvalue type, dig into it until
+  /// we find the part of the expression that prevents the entire subexpression
+  /// from being mutable.  For example, in a sequence like "x.v.v = 42" we want
+  /// to complain about "x" being a let property if "v.v" are both mutable.
+  ///
+  /// \returns The base subexpression that looks immutable (or that can't be
+  /// analyzed any further) along with a decl extracted from it if we could.
+  std::pair<Expr *, ValueDecl *> resolveImmutableBase(Expr *expr) const;
+
+  static Diag<StringRef> findDeclDiagonstic(ASTContext &ctx, Expr *destExpr);
+
+  static bool isLoadedLValue(Expr *expr) {
+    expr = expr->getSemanticsProvidingExpr();
+    if (isa<LoadExpr>(expr))
+      return true;
+    if (auto ifExpr = dyn_cast<IfExpr>(expr))
+      return isLoadedLValue(ifExpr->getThenExpr()) &&
+             isLoadedLValue(ifExpr->getElseExpr());
+    return false;
+  }
 };
 
 } // end namespace constraints

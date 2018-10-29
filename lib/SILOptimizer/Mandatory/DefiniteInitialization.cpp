@@ -59,13 +59,9 @@ static InFlightDiagnostic diagnose(SILModule &M, SILLocation loc,
 /// Insert a CFG diamond at the position specified by the SILBuilder, with a
 /// conditional branch based on "Cond".
 ///
-/// This returns the true, false, and continuation block.  If createTrueBB or
-/// createFalseBB is false, then only one of the two blocks is created - a CFG
-/// triangle instead of a diamond. The SILBuilder is left at the start of the
-/// ContBB block.
+/// This returns the true, false, and continuation block. The SILBuilder is left
+/// at the start of the ContBB block.
 static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
-                             bool createTrueBB,
-                             bool createFalseBB,
                              SILBasicBlock *&TrueBB,
                              SILBasicBlock *&FalseBB,
                              SILBasicBlock *&ContBB) {
@@ -74,37 +70,21 @@ static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
   // Start by splitting the current block.
   ContBB = StartBB->split(B.getInsertionPoint());
 
-  // Create the true block if requested.
-  SILBasicBlock *TrueDest;
-  if (!createTrueBB) {
-    TrueDest = ContBB;
-    TrueBB = nullptr;
-  } else {
-    TrueDest = StartBB->getParent()->createBasicBlock();
-    B.moveBlockTo(TrueDest, ContBB);
-    B.setInsertionPoint(TrueDest);
-    B.createBranch(Loc, ContBB);
-    TrueBB = TrueDest;
-  }
-  
-  // Create the false block if requested.
-  SILBasicBlock *FalseDest;
-  if (!createFalseBB) {
-    FalseDest = ContBB;
-    FalseBB = nullptr;
-  } else {
-    FalseDest = StartBB->getParent()->createBasicBlock();
-    B.moveBlockTo(FalseDest, ContBB);
-    B.setInsertionPoint(FalseDest);
-    B.createBranch(Loc, ContBB);
-    FalseBB = FalseDest;
-  }
-  
+  TrueBB = StartBB->getParent()->createBasicBlock();
+  B.moveBlockTo(TrueBB, ContBB);
+  B.setInsertionPoint(TrueBB);
+  B.createBranch(Loc, ContBB);
+
+  FalseBB = StartBB->getParent()->createBasicBlock();
+  B.moveBlockTo(FalseBB, ContBB);
+  B.setInsertionPoint(FalseBB);
+  B.createBranch(Loc, ContBB);
+
   // Now that we have our destinations, insert a conditional branch on the
   // condition.
   B.setInsertionPoint(StartBB);
-  B.createCondBranch(Loc, Cond, TrueDest, FalseDest);
-  
+  B.createCondBranch(Loc, Cond, TrueBB, FalseBB);
+
   B.setInsertionPoint(ContBB, ContBB->begin());
 }
 
@@ -158,7 +138,7 @@ namespace {
     //   F,F -> No
     //   F,T -> Yes
     //   T,F -> Partial
-    llvm::SmallBitVector Data;
+    SmallBitVector Data;
   public:
     AvailabilitySet(unsigned NumElts) {
       Data.resize(NumElts*2, true);
@@ -480,6 +460,7 @@ namespace {
 
     void handleStoreUse(unsigned UseID);
     void handleLoadUse(unsigned UseID);
+    void handleLoadForTypeOfSelfUse(const DIMemoryUse &Use);
     void handleInOutUse(const DIMemoryUse &Use);
     void handleEscapeUse(const DIMemoryUse &Use);
 
@@ -542,8 +523,21 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     // Keep track of all the uses that aren't loads or escapes.  These are
     // important uses that we'll visit, but we don't consider them definition
     // points for liveness computation purposes.
-    if (Use.Kind == DIUseKind::Load || Use.Kind == DIUseKind::Escape)
+    switch (Use.Kind) {
+    case DIUseKind::Load:
+    case DIUseKind::LoadForTypeOfSelf:
+    case DIUseKind::Escape:
       continue;
+    case DIUseKind::Assign:
+    case DIUseKind::IndirectIn:
+    case DIUseKind::InitOrAssign:
+    case DIUseKind::InOutArgument:
+    case DIUseKind::Initialization:
+    case DIUseKind::InOutSelfArgument:
+    case DIUseKind::PartialStore:
+    case DIUseKind::SelfInit:
+      break;
+    }
 
     NonLoadUses[Use.Inst] = ui;
 
@@ -790,6 +784,8 @@ void LifetimeChecker::doIt() {
     case DIUseKind::SelfInit:
       handleSelfInitUse(Use);
       break;
+    case DIUseKind::LoadForTypeOfSelf:
+      handleLoadForTypeOfSelfUse(Use);
     }
   }
 
@@ -824,6 +820,27 @@ void LifetimeChecker::handleLoadUse(unsigned UseID) {
   // If the value is not definitively initialized, emit an error.
   if (!isInitializedAtUse(Use, &IsSuperInitComplete, &FailedSelfUse))
     return handleLoadUseFailure(Use, IsSuperInitComplete, FailedSelfUse);
+}
+
+void LifetimeChecker::handleLoadForTypeOfSelfUse(const DIMemoryUse &Use) {
+  bool IsSuperInitComplete, FailedSelfUse;
+  // If the value is not definitively initialized, replace the
+  // value_metatype instruction with the metatype argument that was passed into
+  // the initializer.
+  if (!isInitializedAtUse(Use, &IsSuperInitComplete, &FailedSelfUse)) {
+    auto load = cast<SingleValueInstruction>(Use.Inst);
+    
+    ValueMetatypeInst *valueMetatype = nullptr;
+    for (auto use : load->getUses()) {
+      valueMetatype = dyn_cast<ValueMetatypeInst>(use->getUser());
+      if (valueMetatype)
+        break;
+    }
+    assert(valueMetatype);
+    auto metatypeArgument = load->getFunction()->getSelfMetadataArgument();
+    replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument,
+                                     [](SILInstruction*) { });
+  }
 }
 
 void LifetimeChecker::emitSelfConsumedDiagnostic(SILInstruction *Inst) {
@@ -1126,7 +1143,6 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
         case AccessorKind::MutableAddress:
         case AccessorKind::DidSet:
         case AccessorKind::WillSet:
-        case AccessorKind::MaterializeForSet:
           return true;
         }
         llvm_unreachable("bad kind");
@@ -1481,8 +1497,9 @@ bool LifetimeChecker::diagnoseMethodCall(const DIMemoryUse &Use,
     // the generic error that we would emit before.
     //
     // That is the only case where we support pattern matching a release.
-    if (Release && AI &&
-        !AI->getSubstCalleeType()->getExtInfo().hasGuaranteedSelfParam())
+    if (Release && AI /*
+        && (!AI->getSubstCalleeType()->hasSelfParam()
+            || !AI->getSubstCalleeType()->getSelfParameter().isGuaranteed())*/)
       MI = nullptr;
 
     if (AI && MI) {
@@ -1931,12 +1948,13 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
     auto SILMetatypeTy = SILType::getPrimitiveObjectType(MetatypeTy);
     SILValue Metatype;
 
-    // In an inherited convenience initializer, we must use the dynamic
-    // type of the object since nothing is initialized yet.
-    if (TheMemory.isDelegatingInit())
-      Metatype = B.createValueMetatype(Loc, SILMetatypeTy, Pointer);
-    else
-      Metatype = B.createMetatype(Loc, SILMetatypeTy);
+    // A convenience initializer should never deal in partially allocated
+    // objects.
+    assert(!TheMemory.isDelegatingInit());
+
+    // In a designated initializer, we know the class of the thing
+    // we're cleaning up statically.
+    Metatype = B.createMetatype(Loc, SILMetatypeTy);
 
     // We've already destroyed any instance variables initialized by this
     // constructor, now destroy instance variables initialized by subclass
@@ -2229,8 +2247,6 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
       
       SILBasicBlock *TrueBB, *FalseBB, *ContBB;
       InsertCFGDiamond(CondVal, Loc, B,
-                       /*createTrueBB=*/true,
-                       /*createFalseBB=*/false,
                        TrueBB, FalseBB, ContBB);
 
       // Emit a destroy_addr in the taken block.
@@ -2352,8 +2368,6 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
       SILBasicBlock *ReleaseBlock, *DeallocBlock, *ContBlock;
 
       InsertCFGDiamond(CondVal, Loc, B,
-                       /*createTrueBB=*/true,
-                       /*createFalseBB=*/false,
                        ReleaseBlock, DeallocBlock, ContBlock);
 
       // Set up the initialized release block.
@@ -2377,8 +2391,6 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
     SILBasicBlock *ReleaseBlock, *ConsumedBlock, *ContBlock;
 
     InsertCFGDiamond(CondVal, Loc, B,
-                     /*createTrueBB=*/true,
-                     /*createFalseBB=*/true,
                      ReleaseBlock, ConsumedBlock, ContBlock);
 
     // If true, self is fully initialized; just release it as usual.
@@ -2466,8 +2478,6 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         SILBasicBlock *ConsumedBlock, *DeallocBlock, *ContBlock;
 
         InsertCFGDiamond(CondVal, Loc, B,
-                         /*createTrueBB=*/true,
-                         /*createFalseBB=*/true,
                          ConsumedBlock, DeallocBlock, ContBlock);
 
         // If true, self.init or super.init was called and self was consumed.
@@ -2502,8 +2512,6 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
         SILBasicBlock *LiveBlock, *DeallocBlock, *ContBlock;
 
         InsertCFGDiamond(CondVal, Loc, B,
-                         /*createTrueBB=*/true,
-                         /*createFalseBB=*/true,
                          LiveBlock, DeallocBlock, ContBlock);
 
         // If true, self was consumed or is fully initialized.
@@ -2674,7 +2682,7 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
 
   // Check locally to see if any elements are satisfied within the block, and
   // keep track of which ones are still needed in the NeededElements set.
-  llvm::SmallBitVector NeededElements(TheMemory.NumElements);
+  SmallBitVector NeededElements(TheMemory.NumElements);
   NeededElements.set(FirstElt, FirstElt+NumElts);
   
   // If there is a store in the current block, scan the block to see if the

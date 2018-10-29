@@ -20,7 +20,7 @@ struct Some : SomeP {
 // The passed argument is accessed again inside assignNonConflict to unwrap the
 // existential.
 //
-// INLINE-LABEL: $S5Onone16testNestedAccessyyF
+// INLINE-LABEL: $s5Onone16testNestedAccessyyF
 // INLINE: [[OUTER:%.*]] = begin_access [modify] [static] %0 : $*SomeP
 // INLINE: [[INNERREAD:%.*]] = begin_access [read] [static] [[OUTER]] : $*SomeP
 // INLINE: [[INNERMOD:%.*]] = begin_access [modify] [static] [[OUTER]] : $*SomeP

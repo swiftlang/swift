@@ -168,29 +168,6 @@ HeapObject *swift_tryRetain(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
 bool swift_isDeallocating(HeapObject *object);
 
-/// Attempts to atomically pin an object and increment its reference
-/// count.  Returns nil if the object was already pinned.
-///
-/// The standard protocol is that the caller is responsible for
-/// calling swift_unpin on the return value.
-///
-/// The object reference may not be nil.
-SWIFT_RUNTIME_EXPORT
-HeapObject *swift_tryPin(HeapObject *object);
-
-SWIFT_RUNTIME_EXPORT
-HeapObject *swift_nonatomic_tryPin(HeapObject *object);
-
-/// Given that an object is pinned, atomically unpin it and decrement
-/// the reference count.
-///
-/// The object reference may be nil (to simplify the protocol).
-SWIFT_RUNTIME_EXPORT
-void swift_unpin(HeapObject *object);
-
-SWIFT_RUNTIME_EXPORT
-void swift_nonatomic_unpin(HeapObject *object);
-
 /// Atomically decrements the retain count of an object.  If the
 /// retain count reaches zero, the object is destroyed as follows:
 ///
@@ -244,21 +221,10 @@ bool swift_isUniquelyReferencedNonObjC(const void *);
 SWIFT_RUNTIME_EXPORT
 bool swift_isUniquelyReferencedNonObjC_nonNull(const void *);
 
-/// Is this non-null pointer a reference to an object that uses Swift
-/// reference counting and is either uniquely referenced or pinned?
-SWIFT_RUNTIME_EXPORT
-bool swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(const void *);
-
 /// Is this non-null BridgeObject a unique reference to an object
 /// that uses Swift reference counting?
 SWIFT_RUNTIME_EXPORT
 bool swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(
-  uintptr_t bits);
-
-/// Is this non-null BridgeObject a unique or pinned reference to an
-/// object that uses Swift reference counting?
-SWIFT_RUNTIME_EXPORT
-bool swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject(
   uintptr_t bits);
 
 /// Is this native Swift pointer a non-null unique reference to
@@ -266,21 +232,10 @@ bool swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject(
 SWIFT_RUNTIME_EXPORT
 bool swift_isUniquelyReferenced_native(const struct HeapObject *);
 
-/// Is this native Swift pointer a non-null unique or pinned reference
-/// to an object?
-SWIFT_RUNTIME_EXPORT
-bool swift_isUniquelyReferencedOrPinned_native(const struct HeapObject *);
-
 /// Is this non-null native Swift pointer a unique reference to
 /// an object?
 SWIFT_RUNTIME_EXPORT
 bool swift_isUniquelyReferenced_nonNull_native(const struct HeapObject *);
-
-/// Does this non-null native Swift pointer refer to an object that
-/// is either uniquely referenced or pinned?
-SWIFT_RUNTIME_EXPORT
-bool swift_isUniquelyReferencedOrPinned_nonNull_native(
-  const struct HeapObject *);
 
 /// Is this native Swift pointer non-null and has a reference count greater than
 /// one.

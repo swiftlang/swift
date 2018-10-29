@@ -1,4 +1,4 @@
-// swift-tools-version:4.0
+// swift-tools-version:4.2
 
 import PackageDescription
 import Foundation
@@ -39,37 +39,38 @@ let multiSourceLibraries: [String] = {
   }
 }()
 
-let p = Package(
-  name: "swiftbench",
-  products: [
-    .library(name: "TestsUtils", type: .static, targets: ["TestsUtils"]),
-    .library(name: "DriverUtils", type: .static, targets: ["DriverUtils"]),
-    .library(name: "ObjectiveCTests", type: .static, targets: ["ObjectiveCTests"]),
-    .executable(name: "SwiftBench", targets: ["SwiftBench"]),
-    .library(name: "PrimsSplit", type: .static, targets: ["PrimsSplit"])
-  ] + singleSourceLibraries.map { .library(name: $0, type: .static, targets: [$0]) }
-    + multiSourceLibraries.map { .library(name: $0, type: .static, targets: [$0]) },
-  targets: [
-    .target(name: "TestsUtils",
-      path: "utils",
-      sources: ["TestsUtils.swift"]),
-    .target(name: "DriverUtils",
-      dependencies: [.target(name: "TestsUtils")],
-      path: "utils",
-      sources: ["DriverUtils.swift", "ArgParse.swift"]),
+var products: [Product] = []
+products.append(.library(name: "TestsUtils", type: .static, targets: ["TestsUtils"]))
+products.append(.library(name: "DriverUtils", type: .static, targets: ["DriverUtils"]))
+products.append(.library(name: "ObjectiveCTests", type: .static, targets: ["ObjectiveCTests"]))
+products.append(.executable(name: "SwiftBench", targets: ["SwiftBench"]))
+products.append(.library(name: "PrimsSplit", type: .static, targets: ["PrimsSplit"]))
+products += singleSourceLibraries.map { .library(name: $0, type: .static, targets: [$0]) }
+products += multiSourceLibraries.map { .library(name: $0, type: .static, targets: [$0]) }
+
+var targets: [Target] = []
+targets.append(.target(name: "TestsUtils", path: "utils", sources: ["TestsUtils.swift"]))
+targets.append(.systemLibrary(name: "LibProc", path: "utils/LibProc"))
+targets.append(
+  .target(name: "DriverUtils",
+    dependencies: [.target(name: "TestsUtils"), "LibProc"],
+    path: "utils",
+    sources: ["DriverUtils.swift", "ArgParse.swift"]))
+targets.append(
     .target(name: "SwiftBench",
-            dependencies: [
-              .target(name: "TestsUtils"),
-              .target(name: "ObjectiveCTests"),
-              .target(name: "DriverUtils"),
-            ] + singleSourceLibraries.map { .target(name: $0) }
-              + multiSourceLibraries.map { .target(name: $0) },
-            path: "utils",
-            sources: ["main.swift"]),
-    .target(name: "ObjectiveCTests",
-      path: "utils/ObjectiveCTests",
-      publicHeadersPath: "."),
-  ] + singleSourceLibraries.map { x in
+    dependencies: [
+      .target(name: "TestsUtils"),
+      .target(name: "ObjectiveCTests"),
+      .target(name: "DriverUtils"),
+    ] + singleSourceLibraries.map { .target(name: $0) }
+    + multiSourceLibraries.map { .target(name: $0) },
+    path: "utils",
+    sources: ["main.swift"]))
+targets.append(
+  .target(name: "ObjectiveCTests",
+    path: "utils/ObjectiveCTests",
+    publicHeadersPath: "."))
+targets += singleSourceLibraries.map { x in
     return .target(name: x,
       dependencies: [
         .target(name: "TestsUtils"),
@@ -77,12 +78,18 @@ let p = Package(
       ],
       path: "single-source",
       sources: ["\(x).swift"])
-  } + multiSourceLibraries.map { x in
-    return .target(name: x,
-      dependencies: [
-        .target(name: "TestsUtils")
-      ],
-      path: "multi-source/\(x)")
-  },
-  swiftLanguageVersions: [4]
+}
+targets += multiSourceLibraries.map { x in
+  return .target(name: x,
+    dependencies: [
+      .target(name: "TestsUtils")
+    ],
+    path: "multi-source/\(x)")
+}
+
+let p = Package(
+  name: "swiftbench",
+  products: products,
+  targets: targets,
+  swiftLanguageVersions: [.v4]
 )

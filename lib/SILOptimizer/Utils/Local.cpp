@@ -175,6 +175,13 @@ namespace {
 void swift::
 recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
                                            bool Force, CallbackTy Callback) {
+  SILBasicBlock::iterator instIter;
+  recursivelyDeleteTriviallyDeadInstructions(IA, instIter, Force, Callback);
+}
+
+void swift::recursivelyDeleteTriviallyDeadInstructions(
+    ArrayRef<SILInstruction *> IA, SILBasicBlock::iterator &InstIter,
+    bool Force, CallbackTy Callback) {
   // Delete these instruction and others that become dead after it's deleted.
   llvm::SmallPtrSet<SILInstruction *, 8> DeadInsts;
   for (auto I : IA) {
@@ -217,8 +224,7 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
 
     for (auto I : DeadInsts) {
       // This will remove this instruction and all its uses.
-      
-      eraseFromParentWithDebugInsts(I);
+      eraseFromParentWithDebugInsts(I, InstIter);
     }
 
     NextInsts.swap(DeadInsts);
@@ -232,12 +238,13 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
 /// \param I The instruction to be deleted.
 /// \param Force If Force is set, don't check if the top level instruction is
 ///        considered dead - delete it regardless.
-void swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
-                                                       bool Force,
-                                                       CallbackTy Callback) {
-
+SILBasicBlock::iterator
+swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I, bool Force,
+                                                  CallbackTy Callback) {
+  SILBasicBlock::iterator nextI = std::next(I->getIterator());
   ArrayRef<SILInstruction *> AI = ArrayRef<SILInstruction *>(I);
-  recursivelyDeleteTriviallyDeadInstructions(AI, Force, Callback);
+  recursivelyDeleteTriviallyDeadInstructions(AI, nextI, Force, Callback);
+  return nextI;
 }
 
 void swift::eraseUsesOfInstruction(SILInstruction *Inst,
@@ -326,6 +333,43 @@ bool swift::mayBindDynamicSelf(SILFunction *F) {
         return true;
     }
   }
+  return false;
+}
+
+static SILValue skipAddrProjections(SILValue V) {
+  for (;;) {
+    switch (V->getKind()) {
+      case ValueKind::IndexAddrInst:
+      case ValueKind::IndexRawPointerInst:
+      case ValueKind::StructElementAddrInst:
+      case ValueKind::TupleElementAddrInst:
+        V = cast<SingleValueInstruction>(V)->getOperand(0);
+        break;
+      default:
+        return V;
+    }
+  }
+  llvm_unreachable("there is no escape from an infinite loop");
+}
+
+/// Check whether the \p addr is an address of a tail-allocated array element.
+bool swift::isAddressOfArrayElement(SILValue addr) {
+  addr = stripAddressProjections(addr);
+  if (auto *MD = dyn_cast<MarkDependenceInst>(addr))
+    addr = stripAddressProjections(MD->getValue());
+
+  // High-level SIL: check for an get_element_address array semantics call.
+  if (auto *PtrToAddr = dyn_cast<PointerToAddressInst>(addr))
+    if (auto *SEI = dyn_cast<StructExtractInst>(PtrToAddr->getOperand())) {
+      ArraySemanticsCall Call(SEI->getOperand());
+      if (Call && Call.getKind() == ArrayCallKind::kGetElementAddress)
+        return true;
+    }
+
+  // Check for an tail-address (of an array buffer object).
+  if (isa<RefTailAddrInst>(skipAddrProjections(addr)))
+    return true;
+
   return false;
 }
 
@@ -505,7 +549,7 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
     auto *CurBB = B->getInsertionPoint()->getParent();
 
     auto *ContBB = CurBB->split(B->getInsertionPoint());
-    ContBB->createPHIArgument(DestTy, ValueOwnershipKind::Owned);
+    ContBB->createPhiArgument(DestTy, ValueOwnershipKind::Owned);
 
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> CaseBBs;
     CaseBBs.push_back(std::make_pair(SomeDecl, SomeBB));
@@ -1292,6 +1336,25 @@ void ValueLifetimeAnalysis::dump() const {
   llvm::errs() << '\n';
 }
 
+// FIXME: Remove this. SILCloner should not create critical edges.
+bool EdgeThreadingCloner::splitCriticalEdges(DominanceInfo *DT,
+                                             SILLoopInfo *LI) {
+  bool changed = false;
+  // Remove any critical edges that the EdgeThreadingCloner may have
+  // accidentally created.
+  for (unsigned succIdx = 0, succEnd = FromBB->getSuccessors().size();
+       succIdx != succEnd; ++succIdx) {
+    if (nullptr != splitCriticalEdge(FromBB->getTerminator(), succIdx, DT, LI))
+      changed |= true;
+  }
+  for (unsigned succIdx = 0, succEnd = DestBB->getSuccessors().size();
+       succIdx != succEnd; ++succIdx) {
+    auto *newBB = splitCriticalEdge(DestBB->getTerminator(), succIdx, DT, LI);
+    changed |= (newBB != nullptr);
+  }
+  return changed;
+}
+
 bool swift::simplifyUsers(SingleValueInstruction *I) {
   bool Changed = false;
 
@@ -1492,56 +1555,6 @@ bool swift::calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl) {
   llvm_unreachable("Unhandled access level in switch.");
 }
 
-void swift::hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,
-                                    DominanceInfo *DomTree) {
-  SILValue V = Op.get();
-  SILInstruction *Prev = nullptr;
-  auto *InsertPt = InsertBefore;
-  while (true) {
-    SILValue Incoming = stripSinglePredecessorArgs(V);
-    
-    // Forward the incoming arg from a single predecessor.
-    if (V != Incoming) {
-      if (V == Op.get()) {
-        // If we are the operand itself set the operand to the incoming
-        // argument.
-        Op.set(Incoming);
-        V = Incoming;
-      } else {
-        // Otherwise, set the previous projections operand to the incoming
-        // argument.
-        assert(Prev && "Must have seen a projection");
-        Prev->setOperand(0, Incoming);
-        V = Incoming;
-      }
-    }
-    
-    switch (V->getKind()) {
-      case ValueKind::StructElementAddrInst:
-      case ValueKind::TupleElementAddrInst:
-      case ValueKind::RefElementAddrInst:
-      case ValueKind::RefTailAddrInst:
-      case ValueKind::UncheckedTakeEnumDataAddrInst: {
-        auto *Inst = cast<SingleValueInstruction>(V);
-        // We are done once the current projection dominates the insert point.
-        if (DomTree->dominates(Inst->getParent(), InsertBefore->getParent()))
-          return;
-        
-        // Move the current projection and memorize it for the next iteration.
-        Prev = Inst;
-        Inst->moveBefore(InsertPt);
-        InsertPt = Inst;
-        V = Inst->getOperand(0);
-        continue;
-      }
-      default:
-        assert(DomTree->dominates(V->getParentBlock(), InsertBefore->getParent()) &&
-               "The projected value must dominate the insertion point");
-        return;
-    }
-  }
-}
-
 void StaticInitCloner::add(SILInstruction *InitVal) {
   // Don't schedule an instruction twice for cloning.
   if (NumOpsToClone.count(InitVal) != 0)
@@ -1581,9 +1594,76 @@ StaticInitCloner::clone(SingleValueInstruction *InitVal) {
       }
     }
   }
-  assert(ValueMap.count(InitVal) != 0 &&
-         "Could not schedule all instructions for cloning");
-  return cast<SingleValueInstruction>(ValueMap[InitVal]);
+  return cast<SingleValueInstruction>(remapValue(InitVal));
 }
 
+Optional<FindLocalApplySitesResult>
+swift::findLocalApplySites(FunctionRefInst *FRI) {
+  SmallVector<Operand *, 32> worklist(FRI->use_begin(), FRI->use_end());
 
+  Optional<FindLocalApplySitesResult> f;
+  f.emplace();
+
+  // Optimistically state that we have no escapes before our def-use dataflow.
+  f->escapes = false;
+
+  while (!worklist.empty()) {
+    auto *op = worklist.pop_back_val();
+    auto *user = op->getUser();
+
+    // If we have a full apply site as our user.
+    if (auto apply = FullApplySite::isa(user)) {
+      if (apply.getCallee() == op->get()) {
+        f->fullApplySites.push_back(apply);
+        continue;
+      }
+    }
+
+    // If we have a partial apply as a user, start tracking it, but also look at
+    // its users.
+    if (auto *pai = dyn_cast<PartialApplyInst>(user)) {
+      if (pai->getCallee() == op->get()) {
+        // Track the partial apply that we saw so we can potentially eliminate
+        // dead closure arguments.
+        f->partialApplySites.push_back(pai);
+        // Look to see if we can find a full application of this partial apply
+        // as well.
+        copy(pai->getUses(), std::back_inserter(worklist));
+        continue;
+      }
+    }
+
+    // Otherwise, see if we have any function casts to look through...
+    switch (user->getKind()) {
+    case SILInstructionKind::ThinToThickFunctionInst:
+    case SILInstructionKind::ConvertFunctionInst:
+    case SILInstructionKind::ConvertEscapeToNoEscapeInst:
+      copy(cast<SingleValueInstruction>(user)->getUses(),
+           std::back_inserter(worklist));
+      continue;
+
+    // Look through any reference count instructions since these are not
+    // escapes:
+    case SILInstructionKind::CopyValueInst:
+      copy(cast<CopyValueInst>(user)->getUses(), std::back_inserter(worklist));
+      continue;
+    case SILInstructionKind::StrongRetainInst:
+    case SILInstructionKind::StrongReleaseInst:
+    case SILInstructionKind::RetainValueInst:
+    case SILInstructionKind::ReleaseValueInst:
+    case SILInstructionKind::DestroyValueInst:
+      continue;
+    default:
+      break;
+    }
+
+    // But everything else is considered an escape.
+    f->escapes = true;
+  }
+
+  // If we did escape and didn't find any apply sites, then we have no
+  // information for our users that is interesting.
+  if (f->escapes && f->partialApplySites.empty() && f->fullApplySites.empty())
+    return None;
+  return f;
+}

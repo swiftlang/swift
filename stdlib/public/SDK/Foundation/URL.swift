@@ -47,7 +47,7 @@ public struct URLResourceValues {
         return (_values[key] as? NSNumber)?.intValue
     }
     
-    private mutating func _set(_ key : URLResourceKey, newValue : Any?) {
+    private mutating func _set(_ key : URLResourceKey, newValue : __owned Any?) {
         _keys.insert(key)
         _values[key] = newValue
     }
@@ -536,7 +536,7 @@ public struct URL : ReferenceConvertible, Equatable {
     /// Initialize with string.
     ///
     /// Returns `nil` if a `URL` cannot be formed with the string (for example, if the string contains characters that are illegal in a URL, or is an empty string).
-    public init?(string: String) {
+    public init?(string: __shared String) {
         guard !string.isEmpty else { return nil }
         
         if let inner = NSURL(string: string) {
@@ -549,7 +549,7 @@ public struct URL : ReferenceConvertible, Equatable {
     /// Initialize with string, relative to another URL.
     ///
     /// Returns `nil` if a `URL` cannot be formed with the string (for example, if the string contains characters that are illegal in a URL, or is an empty string).
-    public init?(string: String, relativeTo url: URL?) {
+    public init?(string: __shared String, relativeTo url: __shared URL?) {
         guard !string.isEmpty else { return nil }
         
         if let inner = NSURL(string: string, relativeTo: url) {
@@ -564,7 +564,7 @@ public struct URL : ReferenceConvertible, Equatable {
     /// If an empty string is used for the path, then the path is assumed to be ".".
     /// - note: This function avoids an extra file system access to check if the file URL is a directory. You should use it if you know the answer already.
     @available(macOS 10.11, iOS 9.0, *)
-    public init(fileURLWithPath path: String, isDirectory: Bool, relativeTo base: URL?) {
+    public init(fileURLWithPath path: __shared String, isDirectory: Bool, relativeTo base: __shared URL?) {
         _url = URL._converted(from: NSURL(fileURLWithPath: path.isEmpty ? "." : path, isDirectory: isDirectory, relativeTo: base))
     }
     
@@ -572,7 +572,7 @@ public struct URL : ReferenceConvertible, Equatable {
     ///
     /// If an empty string is used for the path, then the path is assumed to be ".".
     @available(macOS 10.11, iOS 9.0, *)
-    public init(fileURLWithPath path: String, relativeTo base: URL?) {
+    public init(fileURLWithPath path: __shared String, relativeTo base: __shared URL?) {
         _url = URL._converted(from: NSURL(fileURLWithPath: path.isEmpty ? "." : path, relativeTo: base))
     }
     
@@ -580,14 +580,14 @@ public struct URL : ReferenceConvertible, Equatable {
     ///
     /// If an empty string is used for the path, then the path is assumed to be ".".
     /// - note: This function avoids an extra file system access to check if the file URL is a directory. You should use it if you know the answer already.
-    public init(fileURLWithPath path: String, isDirectory: Bool) {
+    public init(fileURLWithPath path: __shared String, isDirectory: Bool) {
         _url = URL._converted(from: NSURL(fileURLWithPath: path.isEmpty ? "." : path, isDirectory: isDirectory))
     }
     
     /// Initializes a newly created file URL referencing the local file or directory at path.
     ///
     /// If an empty string is used for the path, then the path is assumed to be ".".
-    public init(fileURLWithPath path: String) {
+    public init(fileURLWithPath path: __shared String) {
         _url = URL._converted(from: NSURL(fileURLWithPath: path.isEmpty ? "." : path))
     }
     
@@ -595,7 +595,7 @@ public struct URL : ReferenceConvertible, Equatable {
     ///
     /// If the data representation is not a legal URL string as ASCII bytes, the URL object may not behave as expected. If the URL cannot be formed then this will return nil.
     @available(macOS 10.11, iOS 9.0, *)
-    public init?(dataRepresentation: Data, relativeTo url: URL?, isAbsolute: Bool = false) {
+    public init?(dataRepresentation: __shared Data, relativeTo url: __shared URL?, isAbsolute: Bool = false) {
         guard dataRepresentation.count > 0 else { return nil }
         
         if isAbsolute {
@@ -607,7 +607,7 @@ public struct URL : ReferenceConvertible, Equatable {
 
     /// Initializes a URL that refers to a location specified by resolving bookmark data.
     @available(swift, obsoleted: 4.2)
-    public init?(resolvingBookmarkData data: Data, options: BookmarkResolutionOptions = [], relativeTo url: URL? = nil, bookmarkDataIsStale: inout Bool) throws {
+    public init?(resolvingBookmarkData data: __shared Data, options: BookmarkResolutionOptions = [], relativeTo url: __shared URL? = nil, bookmarkDataIsStale: inout Bool) throws {
         var stale : ObjCBool = false
         _url = URL._converted(from: try NSURL(resolvingBookmarkData: data, options: options, relativeTo: url, bookmarkDataIsStale: &stale))
         bookmarkDataIsStale = stale.boolValue
@@ -615,7 +615,7 @@ public struct URL : ReferenceConvertible, Equatable {
 
     /// Initializes a URL that refers to a location specified by resolving bookmark data.
     @available(swift, introduced: 4.2)
-    public init(resolvingBookmarkData data: Data, options: BookmarkResolutionOptions = [], relativeTo url: URL? = nil, bookmarkDataIsStale: inout Bool) throws {
+    public init(resolvingBookmarkData data: __shared Data, options: BookmarkResolutionOptions = [], relativeTo url: __shared URL? = nil, bookmarkDataIsStale: inout Bool) throws {
         var stale : ObjCBool = false
         _url = URL._converted(from: try NSURL(resolvingBookmarkData: data, options: options, relativeTo: url, bookmarkDataIsStale: &stale))
         bookmarkDataIsStale = stale.boolValue
@@ -623,12 +623,12 @@ public struct URL : ReferenceConvertible, Equatable {
     
     /// Creates and initializes an NSURL that refers to the location specified by resolving the alias file at url. If the url argument does not refer to an alias file as defined by the NSURLIsAliasFileKey property, the NSURL returned is the same as url argument. This method fails and returns nil if the url argument is unreachable, or if the original file or directory could not be located or is not reachable, or if the original file or directory is on a volume that could not be located or mounted. The URLBookmarkResolutionWithSecurityScope option is not supported by this method.
     @available(macOS 10.10, iOS 8.0, *)
-    public init(resolvingAliasFileAt url: URL, options: BookmarkResolutionOptions = []) throws {
+    public init(resolvingAliasFileAt url: __shared URL, options: BookmarkResolutionOptions = []) throws {
         self.init(reference: try NSURL(resolvingAliasFileAt: url, options: options))
     }
 
     /// Initializes a newly created URL referencing the local file or directory at the file system representation of the path. File system representation is a null-terminated C string with canonical UTF-8 encoding.
-    public init(fileURLWithFileSystemRepresentation path: UnsafePointer<Int8>, isDirectory: Bool, relativeTo baseURL: URL?) {
+    public init(fileURLWithFileSystemRepresentation path: UnsafePointer<Int8>, isDirectory: Bool, relativeTo baseURL: __shared URL?) {
         _url = URL._converted(from: NSURL(fileURLWithFileSystemRepresentation: path, isDirectory: isDirectory, relativeTo: baseURL))
     }
     
@@ -1175,7 +1175,7 @@ public struct URL : ReferenceConvertible, Equatable {
         }
     }
     
-    fileprivate init(reference: NSURL) {
+    fileprivate init(reference: __shared NSURL) {
         _url = URL._converted(from: reference).copy() as! NSURL
     }
     
@@ -1205,6 +1205,7 @@ extension URL : _ObjectiveCBridgeable {
         return true
     }
 
+    @_effects(readonly)
     public static func _unconditionallyBridgeFromObjectiveC(_ source: NSURL?) -> URL {
         var result: URL?
         _forceBridgeFromObjectiveC(source!, result: &result)

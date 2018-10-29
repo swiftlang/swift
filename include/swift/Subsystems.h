@@ -66,6 +66,7 @@ namespace swift {
   class TopLevelContext;
   struct TypeLoc;
   class UnifiedStatsReporter;
+  enum class SourceFileKind;
 
   /// Used to optionally maintain SIL parsing context for the parser.
   ///
@@ -236,21 +237,14 @@ namespace swift {
 
   /// Turn the given module into SIL IR.
   ///
-  /// The module must contain source files.
-  ///
-  /// if \p wholeModuleCompilation is true, the optimizer assumes that the SIL
-  /// of all files in the module is present in the SILModule.
+  /// The module must contain source files. The optimizer will assume that the
+  /// SIL of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule>
-  performSILGeneration(ModuleDecl *M, SILOptions &options,
-                       bool wholeModuleCompilation = false);
+  performSILGeneration(ModuleDecl *M, SILOptions &options);
 
   /// Turn a source file into SIL IR.
-  ///
-  /// If \p StartElem is provided, the module is assumed to be only part of the
-  /// SourceFile, and any optimizations should take that into account.
   std::unique_ptr<SILModule>
-  performSILGeneration(FileUnit &SF, SILOptions &options,
-                       Optional<unsigned> StartElem = None);
+  performSILGeneration(FileUnit &SF, SILOptions &options);
 
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
 
@@ -282,7 +276,6 @@ namespace swift {
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                       llvm::LLVMContext &LLVMContext,
-                      unsigned StartElem = 0,
                       llvm::GlobalVariable **outModuleHash = nullptr);
 
   /// Given an already created LLVM module, construct a pass pipeline and run
@@ -332,11 +325,11 @@ namespace swift {
   /// A convenience wrapper for Parser functionality.
   class ParserUnit {
   public:
-    ParserUnit(SourceManager &SM, unsigned BufferID,
+    ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                const LangOptions &LangOpts, StringRef ModuleName,
                SyntaxParsingCache *SyntaxCache = nullptr);
-    ParserUnit(SourceManager &SM, unsigned BufferID);
-    ParserUnit(SourceManager &SM, unsigned BufferID,
+    ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID);
+    ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                unsigned Offset, unsigned EndOffset);
 
     ~ParserUnit();

@@ -38,17 +38,17 @@ public var global4: Int
 
 weak var global5: @sil_weak C?
 
-// CHECK: sil_global private @$S11global_decl7global133_EB6670D548223EDC99AF0D8F02575BC4LLAA1SVvp : $S
-sil_global private @$S11global_decl7global133_EB6670D548223EDC99AF0D8F02575BC4LLAA1SVvp : $S
+// CHECK: sil_global private @$s11global_decl7global133_EB6670D548223EDC99AF0D8F02575BC4LLAA1SVvp : $S
+sil_global private @$s11global_decl7global133_EB6670D548223EDC99AF0D8F02575BC4LLAA1SVvp : $S
 
-// CHECK: sil_global private @$S11global_decl7global233_EB6670D548223EDC99AF0D8F02575BC4LLAA1CCvp : $C
-sil_global private @$S11global_decl7global233_EB6670D548223EDC99AF0D8F02575BC4LLAA1CCvp : $C
+// CHECK: sil_global private @$s11global_decl7global233_EB6670D548223EDC99AF0D8F02575BC4LLAA1CCvp : $C
+sil_global private @$s11global_decl7global233_EB6670D548223EDC99AF0D8F02575BC4LLAA1CCvp : $C
 
-// CHECK: sil_global hidden @$S11global_decl7global3AA1EOvp : $E
-sil_global hidden @$S11global_decl7global3AA1EOvp : $E
+// CHECK: sil_global hidden @$s11global_decl7global3AA1EOvp : $E
+sil_global hidden @$s11global_decl7global3AA1EOvp : $E
 
-// CHECK: sil_global @$S11global_decl7global4Sivp : $Int
-sil_global @$S11global_decl7global4Sivp : $Int
+// CHECK: sil_global @$s11global_decl7global4Sivp : $Int
+sil_global @$s11global_decl7global4Sivp : $Int
 
-// CHECK: sil_global hidden @$S11global_decl7global5AA1CCSgXwvp : $@sil_weak Optional<C>
-sil_global hidden @$S11global_decl7global5AA1CCSgXwvp : $@sil_weak Optional<C>
+// CHECK: sil_global hidden @$s11global_decl7global5AA1CCSgXwvp : $@sil_weak Optional<C>
+sil_global hidden @$s11global_decl7global5AA1CCSgXwvp : $@sil_weak Optional<C>

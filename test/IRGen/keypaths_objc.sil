@@ -25,7 +25,7 @@ sil @x_get : $@convention(thin) (@in_guaranteed C) -> @out NSString
 // CHECK: [[KEYPATH_B:@keypath.*]] = private global
 // --             class mutable stored property with indirect offset
 // CHECK-SAME: <i32 0x03fffffd>,
-// CHECK-SAME: @"$S13keypaths_objc1CC6storedSivpWvd"
+// CHECK-SAME: @"$s13keypaths_objc1CC6storedSivpWvd"
 
 // CHECK-LABEL: define swiftcc void @objc_only_property()
 sil @objc_only_property : $@convention(thin) () -> () {
@@ -35,12 +35,12 @@ entry:
   unreachable
 }
 
-sil hidden @$S13keypaths_objc1CC1xSo8NSStringCvgTo : $@convention(objc_method) (@guaranteed C) -> NSString {
+sil hidden @$s13keypaths_objc1CC1xSo8NSStringCvgTo : $@convention(objc_method) (@guaranteed C) -> NSString {
 entry(%0 : @guaranteed $C):
   unreachable
 }
 
-sil hidden @$S13keypaths_objc1CCACycfcTo : $@convention(objc_method) (@objc_metatype C.Type) -> @owned C {
+sil hidden @$s13keypaths_objc1CCACycfcTo : $@convention(objc_method) (@objc_metatype C.Type) -> @owned C {
 entry(%0 : @trivial $@objc_metatype C.Type):
   unreachable
 }

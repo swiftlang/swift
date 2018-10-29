@@ -14,10 +14,10 @@ struct S {
 
 func example(_ os: S?)
 
-// CHECK-LABEL: define hidden swiftcc void @"$S35reference_storage_extra_inhabitants7exampleyyAA1SVSgF"
+// CHECK-LABEL: define hidden swiftcc void @"$s35reference_storage_extra_inhabitants7exampleyyAA1SVSgF"
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    %1 = icmp eq [[WORD]] %0, 1
-sil hidden @$S35reference_storage_extra_inhabitants7exampleyyAA1SVSgF : $@convention(thin) (Optional<S>) -> () {
+sil hidden @$s35reference_storage_extra_inhabitants7exampleyyAA1SVSgF : $@convention(thin) (Optional<S>) -> () {
 bb0(%0 : $Optional<S>):
   switch_enum %0 : $Optional<S>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1 // id: %2
 

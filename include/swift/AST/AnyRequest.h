@@ -158,17 +158,19 @@ public:
     return *this;
   }
 
-  AnyRequest(AnyRequest &other)
-    : storageKind(other.storageKind), stored(other.stored) { }
-
-  AnyRequest(const AnyRequest &&other)
-    : storageKind(other.storageKind), stored(other.stored) { }
-
+  // Create a local template typename `ValueType` in the template specialization
+  // so that we can refer to it in the SFINAE condition as well as the body of
+  // the template itself.  The SFINAE condition allows us to remove this
+  // constructor from candidacy when evaluating explicit construction with an
+  // instance of `AnyRequest`.  If we do not do so, we will find ourselves with
+  // ambiguity with this constructor and the defined move constructor above.
   /// Construct a new instance with the given value.
-  template<typename T>
-  explicit AnyRequest(T&& value) : storageKind(StorageKind::Normal) {
-    using ValueType =
-        typename std::remove_cv<typename std::remove_reference<T>::type>::type;
+  template <typename T,
+            typename ValueType = typename std::remove_cv<
+                typename std::remove_reference<T>::type>::type,
+            typename = typename std::enable_if<
+                !std::is_same<ValueType, AnyRequest>::value>::type>
+  explicit AnyRequest(T &&value) : storageKind(StorageKind::Normal) {
     stored = llvm::IntrusiveRefCntPtr<HolderBase>(
         new Holder<ValueType>(std::forward<T>(value)));
   }

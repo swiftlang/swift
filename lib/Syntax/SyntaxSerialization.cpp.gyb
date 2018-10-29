@@ -21,7 +21,8 @@
 namespace swift {
 namespace byteTree {
 void ObjectTraits<ArrayRef<RC<syntax::RawSyntax>>>::write(
-    ByteTreeWriter &Writer, const ArrayRef<RC<syntax::RawSyntax>> &Layout) {
+    ByteTreeWriter &Writer, const ArrayRef<RC<syntax::RawSyntax>> &Layout,
+    UserInfoMap &UserInfo) {
   for (unsigned I = 0, E = Layout.size(); I < E; ++I) {
     if (Layout[I]) {
       Writer.write(*Layout[I], /*Index=*/I);
@@ -57,6 +58,7 @@ uint8_t WrapperTypeTraits<tok>::numericValue(const tok &Value) {
     case tok::NUM_TOKENS:
       llvm_unreachable("Should not get serialized in a syntax tree");
   }
+  llvm_unreachable("unhandled token");
 }
 } // namespace byteTree
 } // namespace swift

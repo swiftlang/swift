@@ -61,7 +61,8 @@ public:
 
   void updateCode(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
     BufferID = SM.addNewSourceBuffer(std::move(Buffer));
-    Parser.reset(new ParserUnit(SM, BufferID, CompInv.getLangOptions(),
+    Parser.reset(new ParserUnit(SM, SourceFileKind::Main,
+                                BufferID, CompInv.getLangOptions(),
                                 CompInv.getModuleName()));
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
     auto &P = Parser->getParser();
@@ -210,7 +211,7 @@ public:
           Formatted = "";
 
         Output.replace(Offset, Length, Formatted);
-        Doc.updateCode(llvm::MemoryBuffer::getMemBuffer(Output));        
+        Doc.updateCode(llvm::MemoryBuffer::getMemBufferCopy(Output));
       }
       if (Filename == "-" || (!InPlace && OutputFilename == "-")) {
         llvm::outs() << Output;

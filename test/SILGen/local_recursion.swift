@@ -1,7 +1,7 @@
 // RUN: %target-swift-emit-silgen  -parse-as-library -enable-sil-ownership %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -enable-astscope-lookup  -parse-as-library -enable-sil-ownership %s | %FileCheck %s
 
-// CHECK-LABEL: sil hidden @$S15local_recursionAA_1yySi_SitF : $@convention(thin) (Int, Int) -> () {
+// CHECK-LABEL: sil hidden @$s15local_recursionAA_1yySi_SitF : $@convention(thin) (Int, Int) -> () {
 // CHECK:       bb0([[X:%0]] : @trivial $Int, [[Y:%1]] : @trivial $Int):
 func local_recursion(_ x: Int, y: Int) {
   func self_recursive(_ a: Int) {
@@ -9,7 +9,7 @@ func local_recursion(_ x: Int, y: Int) {
   }
 
   // Invoke local functions by passing all their captures.
-  // CHECK: [[SELF_RECURSIVE_REF:%.*]] = function_ref [[SELF_RECURSIVE:@\$S15local_recursionAA_1yySi_SitF14self_recursiveL_yySiF]]
+  // CHECK: [[SELF_RECURSIVE_REF:%.*]] = function_ref [[SELF_RECURSIVE:@\$s15local_recursionAA_1yySi_SitF14self_recursiveL_yySiF]]
   // CHECK: apply [[SELF_RECURSIVE_REF]]([[X]], [[X]])
   self_recursive(x)
 
@@ -22,7 +22,7 @@ func local_recursion(_ x: Int, y: Int) {
   // CHECK: apply [[B]]([[Y]])
   // CHECK: end_borrow [[B]]
   // CHECK: destroy_value [[CLOSURE_COPY]]
-  // CHECK: end_borrow [[BORROWED_CLOSURE]] from [[CLOSURE]]
+  // CHECK: end_borrow [[BORROWED_CLOSURE]]
   sr(y)
 
   func mutually_recursive_1(_ a: Int) {
@@ -32,7 +32,7 @@ func local_recursion(_ x: Int, y: Int) {
     mutually_recursive_1(y + b)
   }
 
-  // CHECK: [[MUTUALLY_RECURSIVE_REF:%.*]] = function_ref [[MUTUALLY_RECURSIVE_1:@\$S15local_recursionAA_1yySi_SitF20mutually_recursive_1L_yySiF]]
+  // CHECK: [[MUTUALLY_RECURSIVE_REF:%.*]] = function_ref [[MUTUALLY_RECURSIVE_1:@\$s15local_recursionAA_1yySi_SitF20mutually_recursive_1L_yySiF]]
   // CHECK: apply [[MUTUALLY_RECURSIVE_REF]]([[X]], [[Y]], [[X]])
   mutually_recursive_1(x)
 
@@ -46,7 +46,7 @@ func local_recursion(_ x: Int, y: Int) {
     return transitive_capture_1(y + b)
   }
 
-  // CHECK: [[TRANS_CAPTURE_REF:%.*]] = function_ref [[TRANS_CAPTURE:@\$S15local_recursionAA_1yySi_SitF20transitive_capture_2L_yS2iF]]
+  // CHECK: [[TRANS_CAPTURE_REF:%.*]] = function_ref [[TRANS_CAPTURE:@\$s15local_recursionAA_1yySi_SitF20transitive_capture_2L_yS2iF]]
   // CHECK: apply [[TRANS_CAPTURE_REF]]([[X]], [[X]], [[Y]])
   transitive_capture_2(x)
 
@@ -59,17 +59,17 @@ func local_recursion(_ x: Int, y: Int) {
   // CHECK: apply [[B]]([[X]])
   // CHECK: end_borrow [[B]]
   // CHECK: destroy_value [[CLOSURE_COPY]]
-  // CHECK: end_borrow [[BORROWED_CLOSURE]] from [[CLOSURE]]
+  // CHECK: end_borrow [[BORROWED_CLOSURE]]
   tc(x)
 
-  // CHECK: [[CLOSURE_REF:%.*]] = function_ref @$S15local_recursionAA_1yySi_SitFySiXEfU_
+  // CHECK: [[CLOSURE_REF:%.*]] = function_ref @$s15local_recursionAA_1yySi_SitFySiXEfU_
   // CHECK: apply [[CLOSURE_REF]]([[X]], [[X]], [[Y]])
   let _: Void = {
     self_recursive($0)
     transitive_capture_2($0)
   }(x)
 
-  // CHECK: [[CLOSURE_REF:%.*]] = function_ref @$S15local_recursionAA_1yySi_SitFySicfU0_
+  // CHECK: [[CLOSURE_REF:%.*]] = function_ref @$s15local_recursionAA_1yySi_SitFySicfU0_
   // CHECK: [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE_REF]]([[X]], [[Y]])
   // CHECK: [[BORROWED_CLOSURE:%.*]] = begin_borrow [[CLOSURE]]
   // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[BORROWED_CLOSURE]]
@@ -77,7 +77,7 @@ func local_recursion(_ x: Int, y: Int) {
   // CHECK: apply [[B]]([[X]])
   // CHECK: end_borrow [[B]]
   // CHECK: destroy_value [[CLOSURE_COPY]]
-  // CHECK: end_borrow [[BORROWED_CLOSURE]] from [[CLOSURE]]
+  // CHECK: end_borrow [[BORROWED_CLOSURE]]
   let f: (Int) -> () = {
     self_recursive($0)
     transitive_capture_2($0)
@@ -92,7 +92,7 @@ func local_recursion(_ x: Int, y: Int) {
 
 // CHECK: sil private [[MUTUALLY_RECURSIVE_1]]
 // CHECK: bb0([[A:%0]] : @trivial $Int, [[Y:%1]] : @trivial $Int, [[X:%2]] : @trivial $Int):
-// CHECK:   [[MUTUALLY_RECURSIVE_REF:%.*]] = function_ref [[MUTUALLY_RECURSIVE_2:@\$S15local_recursionAA_1yySi_SitF20mutually_recursive_2L_yySiF]]
+// CHECK:   [[MUTUALLY_RECURSIVE_REF:%.*]] = function_ref [[MUTUALLY_RECURSIVE_2:@\$s15local_recursionAA_1yySi_SitF20mutually_recursive_2L_yySiF]]
 // CHECK:   apply [[MUTUALLY_RECURSIVE_REF]]({{.*}}, [[X]], [[Y]])
 // CHECK: sil private [[MUTUALLY_RECURSIVE_2]]
 // CHECK: bb0([[B:%0]] : @trivial $Int, [[X:%1]] : @trivial $Int, [[Y:%2]] : @trivial $Int):
@@ -100,7 +100,7 @@ func local_recursion(_ x: Int, y: Int) {
 // CHECK:   apply [[MUTUALLY_RECURSIVE_REF]]({{.*}}, [[Y]], [[X]])
 
 
-// CHECK: sil private [[TRANS_CAPTURE_1:@\$S15local_recursionAA_1yySi_SitF20transitive_capture_1L_yS2iF]]
+// CHECK: sil private [[TRANS_CAPTURE_1:@\$s15local_recursionAA_1yySi_SitF20transitive_capture_1L_yS2iF]]
 // CHECK: bb0([[A:%0]] : @trivial $Int, [[X:%1]] : @trivial $Int):
 
 // CHECK: sil private [[TRANS_CAPTURE]]

@@ -24,6 +24,65 @@ CHANGELOG
 Swift 5.0
 ---------
 
+* [SR-7251][]:
+
+  In Swift 5 mode, attempting to declare a static property with the same name as a
+  nested type is now always correctly rejected. Previously, it was possible to
+  perform such a redeclaration in an extension of a generic type.
+  
+  For example:
+  ```swift
+  struct Foo<T> {}
+  extension Foo {
+    struct i {}
+    
+    // compiler error: Invalid redeclaration of 'i'
+    // (prior to Swift 5, this did not produce an error)
+    static var i: Int { return 0 }
+  }
+  ```
+
+* [SR-4248][]:
+
+  In Swift 5 mode, when casting an optional value to a generic placeholder type,
+  the compiler will be more conservative with the unwrapping of the value. The 
+  result of such a cast now more closely matches the result you would get in a
+  non-generic context.
+  
+  For example:
+  ```swift
+  func forceCast<U>(_ value: Any?, to type: U.Type) -> U {
+    return value as! U
+  }
+
+  let value: Any? = 42
+  print(forceCast(value, to: Any.self)) 
+  // prints: Optional(42)
+  // (prior to Swift 5, this would print: 42)
+  
+  print(value as! Any)                  
+  // prints: Optional(42)
+  ```
+
+* [SE-0227][]:
+
+  Key paths now support the `\.self` keypath, which is a `WritableKeyPath`
+  that refers to its entire input value:
+
+    ```swift
+    let id = \Int.self
+
+    var x = 2
+    print(x[keyPath: id]) // prints 2
+    x[keyPath: id] = 3
+    print(x[keyPath: id]) // prints 3
+    ```
+
+* [SE-0214][]:
+
+  Renamed the `DictionaryLiteral` type to `KeyValuePairs`.
+  A typealias preserves the old name for compatibility.
+
 * [SR-2608][]
 
   Default arguments are now printed in SourceKit-generated interfaces for Swift
@@ -66,6 +125,47 @@ Swift 5.0
 
 Swift 4.2
 ---------
+
+### 2018-09-17 (Xcode 10.0)
+
+* [SE-0202][]
+
+  The standard library now provides a unified set of randomization functionality.
+  Integer types, floating point types, and Bool all introduce a new static
+  method that creates a random value.
+  
+  ```swift
+  let diceRoll = Int.random(in: 1 ... 6)
+  let randomUnit = Double.random(in: 0 ..< 1)
+  let randomBool = Bool.random()
+  ```
+  
+  There are also additions to select a random element from a collection or
+  shuffle its contents.
+  
+  ```swift
+  let greetings = ["hey", "hello", "hi", "hola"]
+  let randomGreeting = greetings.randomElement()! // This returns an Optional
+  let newGreetings = greetings.shuffled() // ["hola", "hi", "hey", "hello"]
+  ```
+
+  Core to the randomization functionality is a new `RandomNumberGenerator`
+  protocol. The standard library defines its own random number generator
+  called `SystemRandomNumberGenerator` which is backed by a secure and
+  thread-safe random number generator on each platform. All the randomization
+  functions have a `using:` parameter that take a `RandomNumberGenerator` that
+  users can pass in their own random number generator.
+  
+  ```swift
+  struct MersenneTwister: RandomNumberGenerator {
+    func next() -> UInt64 {
+      // implementation
+    }
+  }
+  
+  var mt = MersenneTwister()
+  let diceRoll = Int.random(in: 1 ... 6, using: &mt)
+  ```
 
 * [SE-0194][]
 
@@ -271,8 +371,6 @@ Swift 4.2
   a dynamic cast such as `value as? P`, where the dynamic type of `value`
   conditionally conforms to `P`, will succeed when the conditional
   requirements are met.
-
-**Add new entries to the top of this section, not here!**
 
 Swift 4.1
 ---------
@@ -7147,6 +7245,20 @@ Swift 1.0
 [SE-0210]: <https://github.com/apple/swift-evolution/blob/master/proposals/0210-key-path-offset.md>
 [SE-0211]: <https://github.com/apple/swift-evolution/blob/master/proposals/0211-unicode-scalar-properties.md>
 [SE-0212]: <https://github.com/apple/swift-evolution/blob/master/proposals/0212-compiler-version-directive.md>
+[SE-0213]: <https://github.com/apple/swift-evolution/blob/master/proposals/0213-literal-init-via-coercion.md>
+[SE-0214]: <https://github.com/apple/swift-evolution/blob/master/proposals/0214-DictionaryLiteral.md>
+[SE-0215]: <https://github.com/apple/swift-evolution/blob/master/proposals/0215-conform-never-to-hashable-and-equatable.md>
+[SE-0216]: <https://github.com/apple/swift-evolution/blob/master/proposals/0216-dynamic-callable.md>
+[SE-0217]: <https://github.com/apple/swift-evolution/blob/master/proposals/0217-bangbang.md>
+[SE-0218]: <https://github.com/apple/swift-evolution/blob/master/proposals/0218-introduce-compact-map-values.md>
+[SE-0219]: <https://github.com/apple/swift-evolution/blob/master/proposals/0219-package-manager-dependency-mirroring.md>
+[SE-0220]: <https://github.com/apple/swift-evolution/blob/master/proposals/0220-count-where.md>
+[SE-0221]: <https://github.com/apple/swift-evolution/blob/master/proposals/0221-character-properties.md>
+[SE-0222]: <https://github.com/apple/swift-evolution/blob/master/proposals/0222-lazy-compactmap-sequence.md>
+[SE-0223]: <https://github.com/apple/swift-evolution/blob/master/proposals/0223-array-uninitialized-initializer.md>
+[SE-0224]: <https://github.com/apple/swift-evolution/blob/master/proposals/0224-ifswift-lessthan-operator.md>
+[SE-0225]: <https://github.com/apple/swift-evolution/blob/master/proposals/0225-binaryinteger-iseven-isodd-ismultiple.md>
+[SE-0226]: <https://github.com/apple/swift-evolution/blob/master/proposals/0226-package-manager-target-based-dep-resolution.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>
@@ -7157,3 +7269,5 @@ Swift 1.0
 [SR-2388]: <https://bugs.swift.org/browse/SR-2388>
 [SR-2394]: <https://bugs.swift.org/browse/SR-2394>
 [SR-2608]: <https://bugs.swift.org/browse/SR-2608>
+[SR-4248]: <https://bugs.swift.org/browse/SR-4248>
+[SR-7251]: <https://bugs.swift.org/browse/SR-7251>

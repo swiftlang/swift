@@ -85,12 +85,6 @@ class NullEditorConsumer : public EditorConsumer {
     return SyntaxTreeTransferMode::Off;
   }
 
-  bool syntaxReuseInfoEnabled() override { return false; }
-
-  void
-  handleSyntaxReuseRegions(std::vector<SourceFileRange> ReuseRegions) override {
-  }
-
 public:
   bool needsSema = false;
 };
@@ -128,7 +122,7 @@ public:
   }
 
   void addNotificationReceiver(DocumentUpdateNotificationReceiver Receiver) {
-    Ctx.getNotificationCenter().addDocumentUpdateNotificationReceiver(Receiver);
+    Ctx.getNotificationCenter()->addDocumentUpdateNotificationReceiver(Receiver);
   }
 
   void open(const char *DocName, StringRef Text,

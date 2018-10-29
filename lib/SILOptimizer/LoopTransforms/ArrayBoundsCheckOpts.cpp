@@ -87,42 +87,6 @@ static SILValue getArrayStructPointer(ArrayCallKind K, SILValue Array) {
   return Array;
 }
 
-/// Check whether the store is to the address obtained from a getElementAddress
-/// semantic call.
-///  %40 = function_ref @getElementAddress
-///  %42 = apply %40(%28, %37)
-///  %43 = struct_extract %42
-///  %44 = pointer_to_address strict %43
-///  store %1 to %44 : $*Int
-static bool isArrayEltStore(StoreInst *SI) {
-  // Strip the MarkDependenceInst (new array implementation) where the above
-  // pattern looks like the following.
-  // %40 = function_ref @getElementAddress
-  // %41 = apply %40(%21, %35)
-  // %42 = struct_element_addr %0 : $*Array<Int>, #Array._buffer
-  // %43 = struct_element_addr %42 : $*_ArrayBuffer<Int>, #_ArrayBuffer._storage
-  // %44 = struct_element_addr %43 : $*_BridgeStorage
-  // %45 = load %44 : $*Builtin.BridgeObject
-  // %46 = unchecked_ref_cast %45 : $... to $_ContiguousArrayStorageBase
-  // %47 = unchecked_ref_cast %46 : $... to $Builtin.NativeObject
-  // %48 = struct_extract %41 : $..., #UnsafeMutablePointer._rawValue
-  // %49 = pointer_to_address %48 : $Builtin.RawPointer to strict $*Int
-  // %50 = mark_dependence %49 : $*Int on %47 : $Builtin.NativeObject
-  // store %1 to %50 : $*Int
-  SILValue Dest = SI->getDest();
-  if (auto *MD = dyn_cast<MarkDependenceInst>(Dest))
-    Dest = MD->getOperand(0);
-
-  if (auto *PtrToAddr =
-          dyn_cast<PointerToAddressInst>(stripAddressProjections(Dest)))
-    if (auto *SEI = dyn_cast<StructExtractInst>(PtrToAddr->getOperand())) {
-      ArraySemanticsCall Call(SEI->getOperand());
-      if (Call && Call.getKind() == ArrayCallKind::kGetElementAddress)
-        return true;
-    }
-  return false;
-}
-
 static bool isReleaseSafeArrayReference(SILValue Ref,
                                         ArraySet &ReleaseSafeArrayReferences,
                                         RCIdentityFunctionInfo *RCIA) {
@@ -185,7 +149,7 @@ mayChangeArraySize(SILInstruction *I, ArrayCallKind &Kind, SILValue &Array,
   // stored in a runtime allocated object sub field of an alloca.
   if (auto *SI = dyn_cast<StoreInst>(I)) {
     auto Ptr = SI->getDest();
-    return isa<AllocStackInst>(Ptr) || isArrayEltStore(SI)
+    return isa<AllocStackInst>(Ptr) || isAddressOfArrayElement(SI->getDest())
                ? ArrayBoundsEffect::kNone
                : ArrayBoundsEffect::kMayChangeAny;
   }

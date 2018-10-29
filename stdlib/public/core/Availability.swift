@@ -29,14 +29,11 @@ public func _stdlib_isOSVersionAtLeast(
   // that this function was called by a compiler optimization pass. If it is
   // replaced that pass needs to be updated.
   let runningVersion = _swift_stdlib_operatingSystemVersion()
-  let queryVersion = _SwiftNSOperatingSystemVersion(
-    majorVersion: Int(major),
-    minorVersion: Int(minor),
-    patchVersion: Int(patch)
-  )
-
-  let result = runningVersion >= queryVersion
   
+  let result =
+    (runningVersion.majorVersion,runningVersion.minorVersion,runningVersion.patchVersion)
+    >= (Int(major),Int(minor),Int(patch))
+
   return result._value
 #else
   // FIXME: As yet, there is no obvious versioning standard for platforms other
@@ -44,50 +41,4 @@ public func _stdlib_isOSVersionAtLeast(
   // rdar://problem/18881232
   return false._value
 #endif
-}
-
-extension _SwiftNSOperatingSystemVersion : Comparable {
-
-  @inlinable // FIXME(sil-serialize-all)
-  public static func == (
-    lhs: _SwiftNSOperatingSystemVersion,
-    rhs: _SwiftNSOperatingSystemVersion
-  ) -> Bool {
-    return lhs.majorVersion == rhs.majorVersion &&
-           lhs.minorVersion == rhs.minorVersion &&
-           lhs.patchVersion == rhs.patchVersion
-  }
-
-  /// Lexicographic comparison of version components.
-  @inlinable // FIXME(sil-serialize-all)
-  public static func < (
-    lhs: _SwiftNSOperatingSystemVersion,
-    rhs: _SwiftNSOperatingSystemVersion
-  ) -> Bool {
-    guard lhs.majorVersion == rhs.majorVersion else {
-      return lhs.majorVersion < rhs.majorVersion
-    }
-
-    guard lhs.minorVersion == rhs.minorVersion else {
-      return lhs.minorVersion < rhs.minorVersion
-    }
-
-    return lhs.patchVersion < rhs.patchVersion
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public static func >= (
-    lhs: _SwiftNSOperatingSystemVersion,
-    rhs: _SwiftNSOperatingSystemVersion
-  ) -> Bool {
-    guard lhs.majorVersion == rhs.majorVersion else {
-      return lhs.majorVersion >= rhs.majorVersion
-    }
-
-    guard lhs.minorVersion == rhs.minorVersion else {
-      return lhs.minorVersion >= rhs.minorVersion
-    }
-
-    return lhs.patchVersion >= rhs.patchVersion
-  }
 }

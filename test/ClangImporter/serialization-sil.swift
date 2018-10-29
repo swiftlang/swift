@@ -1,20 +1,20 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/Test.swiftmodule -emit-sil -o /dev/null -module-name Test %s -sdk "" -import-objc-header %S/Inputs/serialization-sil.h -enable-sil-ownership
-// RUN: %target-sil-func-extractor %t/Test.swiftmodule -sil-print-debuginfo  -func='$S4Test16testPartialApplyyySoAA_pF' -o - | %FileCheck %s
+// RUN: %target-sil-func-extractor %t/Test.swiftmodule -sil-print-debuginfo  -func='$s4Test16testPartialApplyyySoAA_pF' -o - | %FileCheck %s
 
 // REQUIRES: objc_interop
 
 // @_transparent to force serialization.
 @_transparent
 public func testPartialApply(_ obj: Test) {
-  // CHECK-LABEL: @$S4Test16testPartialApplyyySoAA_pF : $@convention(thin) (@guaranteed Test) -> () {
+  // CHECK-LABEL: @$s4Test16testPartialApplyyySoAA_pF : $@convention(thin) (@guaranteed Test) -> () {
   if let curried1 = obj.normalObject {
     // CHECK: dynamic_method_br [[CURRIED1_OBJ:%.+]] : $@opened([[CURRIED1_EXISTENTIAL:.+]]) Test, #Test.normalObject!1.foreign, [[CURRIED1_TRUE:[^,]+]], [[CURRIED1_FALSE:[^,]+]]
     // CHECK: [[CURRIED1_FALSE]]:
     // CHECK: [[CURRIED1_TRUE]]([[CURRIED1_METHOD:%.+]] : $@convention(objc_method) (@opened([[CURRIED1_EXISTENTIAL]]) Test) -> @autoreleased AnyObject):
     // CHECK: [[CURRIED1_PARTIAL:%.+]] = partial_apply [callee_guaranteed] [[CURRIED1_METHOD]]([[CURRIED1_OBJ]]) : $@convention(objc_method) (@opened([[CURRIED1_EXISTENTIAL]]) Test) -> @autoreleased AnyObject
-    // CHECK: [[CURRIED1_THUNK:%.+]] = function_ref @$SyXlIego_ypIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> @owned AnyObject) -> @out Any
+    // CHECK: [[CURRIED1_THUNK:%.+]] = function_ref @$syXlIego_ypIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> @owned AnyObject) -> @out Any
     // CHECK: = partial_apply [callee_guaranteed] [[CURRIED1_THUNK]]([[CURRIED1_PARTIAL]])
     curried1()
   }
@@ -41,4 +41,4 @@ public func testPartialApply(_ obj: Test) {
     // CHECK: = apply [[PROP2_PARTIAL]]() : $@callee_guaranteed () -> UnsafeMutableRawPointer
     _ = prop2
   }
-} // CHECK: // end sil function '$S4Test16testPartialApplyyySoAA_pF'
+} // CHECK: // end sil function '$s4Test16testPartialApplyyySoAA_pF'

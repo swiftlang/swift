@@ -21,7 +21,7 @@ class Bar<T, U, V>: P {
   func generic_method<Z>(x: Z)
 }
 sil_vtable Bar {}
-sil @$S19sil_witness_methods3BarCfD : $@convention(method) <T, U, V> (Bar<T, U, V>) -> ()
+sil @$s19sil_witness_methods3BarCfD : $@convention(method) <T, U, V> (Bar<T, U, V>) -> ()
 
 struct X {}
 struct Y {}
@@ -123,7 +123,7 @@ entry(%z : $*Z, %x : $@thick Bar<T, U, V>.Type):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @call_concrete_witness() {{.*}} {
-// CHECK:         call swiftcc %swift.type* @concrete_type_concrete_method_witness(%T19sil_witness_methods3FooV* {{.*}}, %swift.type* {{.*}} @"$S19sil_witness_methods3FooVMf", {{.*}})
+// CHECK:         call swiftcc %swift.type* @concrete_type_concrete_method_witness(%T19sil_witness_methods3FooV* {{.*}}, %swift.type* {{.*}} @"$s19sil_witness_methods3FooVMf", {{.*}})
 sil @call_concrete_witness : $(Foo) -> () {
 entry(%x : $Foo):
   %m = alloc_stack $Foo
@@ -135,7 +135,7 @@ entry(%x : $Foo):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @call_concrete_static_witness() {{.*}} {
-// CHECK:         call swiftcc %swift.type* @concrete_type_concrete_static_method_witness(%swift.type* {{.*}} @"$S19sil_witness_methods3FooVMf", {{.*}} %swift.type* {{.*}} @"$S19sil_witness_methods3FooVMf", {{.*}})
+// CHECK:         call swiftcc %swift.type* @concrete_type_concrete_static_method_witness(%swift.type* {{.*}} @"$s19sil_witness_methods3FooVMf", {{.*}} %swift.type* {{.*}} @"$s19sil_witness_methods3FooVMf", {{.*}})
 sil @call_concrete_static_witness : $() -> () {
 entry:
   %m = metatype $@thick Foo.Type
@@ -148,8 +148,8 @@ entry:
 // CHECK:         [[CONTEXT:%.*]] = call noalias %swift.refcounted* @swift_allocObject({{.*}})
 // CHECK:         [[LAYOUT:%.*]] = bitcast %swift.refcounted* [[CONTEXT]] to <{ %swift.refcounted, i8* }>*
 // CHECK:         [[WTABLE:%.*]] = getelementptr inbounds <{ %swift.refcounted, i8* }>, <{ %swift.refcounted, i8* }>* [[LAYOUT]], i32 0, i32 1
-// CHECK:         store i8* null, i8** [[WTABLE]]
-// CHECK:         [[RESULT:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (%swift.type* (%T19sil_witness_methods3BarCyAA3FooVA2EG**, %swift.refcounted*)* @"$S36generic_type_concrete_method_witnessTA" to i8*), %swift.refcounted* undef }, %swift.refcounted* [[CONTEXT]], 1
+// CHECK:         store i8* bitcast (i8** @"$s19sil_witness_methods3BarCyxq_q0_GAA1PAAWP" to i8*), i8** [[WTABLE]]
+// CHECK:         [[RESULT:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (%swift.type* (%T19sil_witness_methods3BarCyAA3FooVA2EG**, %swift.refcounted*)* @"$s36generic_type_concrete_method_witnessTA" to i8*), %swift.refcounted* undef }, %swift.refcounted* [[CONTEXT]], 1
 // CHECK:         ret { i8*, %swift.refcounted* } [[RESULT]]
 
 sil @partial_apply_concrete_witness : $() -> @callee_owned (@in Bar<Foo, Foo, Foo>) -> @thick Bar<Foo, Foo, Foo>.Type {

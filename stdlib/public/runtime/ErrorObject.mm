@@ -45,14 +45,18 @@ using namespace swift::hashable_support;
 /// A subclass of NSError used to represent bridged native Swift errors.
 /// This type cannot be subclassed, and should not ever be instantiated
 /// except by the Swift runtime.
-@interface _SwiftNativeNSError : NSError
+///
+/// NOTE: older runtimes called this _SwiftNativeNSError. The two must
+/// coexist, so it was renamed. The old name must not be used in the new
+/// runtime.
+@interface __SwiftNativeNSError : NSError
 @end
 
-@implementation _SwiftNativeNSError
+@implementation __SwiftNativeNSError
 
 + (instancetype)allocWithZone:(NSZone *)zone {
   (void)zone;
-  swift::crash("_SwiftNativeNSError cannot be instantiated");
+  swift::crash("__SwiftNativeNSError cannot be instantiated");
 }
 
 - (void)dealloc {
@@ -94,7 +98,7 @@ using namespace swift::hashable_support;
 
 - (id)copyWithZone:(NSZone *)zone {
   (void)zone;
-  // _SwiftNativeNSError is immutable, so we can return the same instance back.
+  // __SwiftNativeNSError is immutable, so we can return the same instance back.
   return [self retain];
 }
 
@@ -158,7 +162,7 @@ const Metadata *swift::getNSErrorMetadata() {
 }
 
 static Class getSwiftNativeNSErrorClass() {
-  return SWIFT_LAZY_CONSTANT([_SwiftNativeNSError class]);
+  return SWIFT_LAZY_CONSTANT([__SwiftNativeNSError class]);
 }
 
 /// Allocate a catchable error object.
@@ -242,23 +246,28 @@ static const WitnessTable *getNSErrorConformanceToError() {
   // safe to assume that that's been linked in if a user is using NSError in
   // their Swift source.
 
-  auto getter = getErrorBridgingInfo().GetCFErrorErrorConformance;
-  assert(getter &&
+  auto conformance = getErrorBridgingInfo().CFErrorErrorConformance;
+  assert(conformance &&
          "Foundation overlay not loaded, or 'CFError : Error' conformance "
          "not available");
-  return getter();
+  return swift_getWitnessTable(conformance,
+                               conformance->getCanonicalTypeMetadata(),
+                               nullptr);
 }
 
 static const HashableWitnessTable *getNSErrorConformanceToHashable() {
-  auto getter = getErrorBridgingInfo().GetNSObjectHashableConformance;
-  assert(getter &&
+  auto conformance = getErrorBridgingInfo().NSObjectHashableConformance;
+  assert(conformance &&
          "ObjectiveC overlay not loaded, or 'NSObject : Hashable' conformance "
          "not available");
-  return getter();
+  return (const HashableWitnessTable *)swift_getWitnessTable(
+           conformance,
+           conformance->getCanonicalTypeMetadata(),
+           nullptr);
 }
 
 bool SwiftError::isPureNSError() const {
-  // We can do an exact type check; _SwiftNativeNSError shouldn't be subclassed
+  // We can do an exact type check; __SwiftNativeNSError shouldn't be subclassed
   // or proxied.
   return _swift_getClass(this) != (ClassMetadata *)getSwiftNativeNSErrorClass();
 }
@@ -473,7 +482,7 @@ swift::tryDynamicCastNSErrorObjectToValue(HeapObject *object,
 
   NSError *srcInstance = reinterpret_cast<NSError *>(object);
 
-  // A _SwiftNativeNSError box can always be unwrapped to cast the value back
+  // A __SwiftNativeNSError box can always be unwrapped to cast the value back
   // out as an Error existential.
   if (!reinterpret_cast<SwiftError*>(srcInstance)->isPureNSError()) {
     ProtocolDescriptorRef theErrorProtocol(&PROTOCOL_DESCR_SYM(s5Error),
@@ -555,8 +564,9 @@ swift::swift_errorRelease(SwiftError *error) {
 }
 
 /// Breakpoint hook for debuggers.
-void
-swift::swift_willThrow(SwiftError *error) {
+SWIFT_CC(swift) void
+swift::swift_willThrow(SWIFT_CONTEXT void *unused,
+                       SWIFT_ERROR_RESULT SwiftError **error) {
   // empty
 }
 

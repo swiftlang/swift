@@ -32,13 +32,6 @@ AccessScopeChecker::visitDecl(ValueDecl *VD) {
   if (!VD || isa<GenericTypeParamDecl>(VD))
     return true;
 
-  // FIXME: Figure out why AssociatedTypeDecls don't always have an access
-  // level here.
-  if (!VD->hasAccess()) {
-    if (isa<AssociatedTypeDecl>(VD))
-      return true;
-  }
-
   auto AS = VD->getFormalAccessScope(File, TreatUsableFromInlineAsPublic);
   Scope = Scope->intersectWith(AS);
   return Scope.hasValue();
@@ -70,21 +63,14 @@ TypeReprAccessScopeChecker::getAccessScope(TypeRepr *TR, const DeclContext *useD
 }
 
 TypeAccessScopeChecker::TypeAccessScopeChecker(const DeclContext *useDC,
-                                               bool treatUsableFromInlineAsPublic,
-                                               bool canonicalizeParentTypes)
-  : AccessScopeChecker(useDC, treatUsableFromInlineAsPublic),
-    CanonicalizeParentTypes(canonicalizeParentTypes) {}
+                                               bool treatUsableFromInlineAsPublic)
+  : AccessScopeChecker(useDC, treatUsableFromInlineAsPublic) {}
 
 TypeWalker::Action
 TypeAccessScopeChecker::walkToTypePre(Type T) {
   ValueDecl *VD;
-  if (auto *BNAD = dyn_cast<NameAliasType>(T.getPointer())) {
-    if (CanonicalizeParentTypes &&
-        BNAD->getDecl()->getUnderlyingTypeLoc().getType()->hasTypeParameter())
-      VD = nullptr;
-    else
-      VD = BNAD->getDecl();
-  }
+  if (auto *BNAD = dyn_cast<NameAliasType>(T.getPointer()))
+    VD = BNAD->getDecl();
   else if (auto *NTD = T->getAnyNominal())
     VD = NTD;
   else
@@ -93,39 +79,13 @@ TypeAccessScopeChecker::walkToTypePre(Type T) {
   if (!visitDecl(VD))
     return Action::Stop;
 
-  if (!CanonicalizeParentTypes) {
-    return Action::Continue;
-  }
-
-  Type nominalParentTy;
-  if (auto nominalTy = dyn_cast<NominalType>(T.getPointer())) {
-    nominalParentTy = nominalTy->getParent();
-  } else if (auto genericTy = dyn_cast<BoundGenericType>(T.getPointer())) {
-    nominalParentTy = genericTy->getParent();
-    for (auto genericArg : genericTy->getGenericArgs())
-      genericArg.walk(*this);
-  } else if (auto NameAliasTy =
-             dyn_cast<NameAliasType>(T.getPointer())) {
-    // The parent type would have been lost previously, so look right through
-    // this type.
-    if (NameAliasTy->getDecl()->getUnderlyingTypeLoc().getType()
-        ->hasTypeParameter())
-      Type(NameAliasTy->getSinglyDesugaredType()).walk(*this);
-  } else {
-    return Action::Continue;
-  }
-
-  if (nominalParentTy)
-    nominalParentTy->getCanonicalType().walk(*this);
-  return Action::SkipChildren;
+  return Action::Continue;
 }
 
 Optional<AccessScope>
 TypeAccessScopeChecker::getAccessScope(Type T, const DeclContext *useDC,
-                                       bool treatUsableFromInlineAsPublic,
-                                       bool canonicalizeParentTypes) {
-  TypeAccessScopeChecker checker(useDC, treatUsableFromInlineAsPublic,
-                                 canonicalizeParentTypes);
+                                       bool treatUsableFromInlineAsPublic) {
+  TypeAccessScopeChecker checker(useDC, treatUsableFromInlineAsPublic);
   T.walk(checker);
   return checker.Scope;
 }

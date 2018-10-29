@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-sil-ownership -semantic-arc-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -enable-sil-ownership -semantic-arc-opts %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -70,7 +70,7 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   %2 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
   %3 = begin_borrow %1 : $Builtin.NativeObject
   apply %2(%3) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  end_borrow %3 from %1 : $Builtin.NativeObject, $Builtin.NativeObject
+  end_borrow %3 : $Builtin.NativeObject
   destroy_value %1 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
@@ -87,9 +87,9 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   %2 = begin_borrow %1 : $Builtin.NativeObject
   %3 = copy_value %2 : $Builtin.NativeObject
   %4 = begin_borrow %3 : $Builtin.NativeObject
-  end_borrow %4 from %3 : $Builtin.NativeObject, $Builtin.NativeObject
+  end_borrow %4 : $Builtin.NativeObject
   destroy_value %3 : $Builtin.NativeObject
-  end_borrow %2 from %1 : $Builtin.NativeObject, $Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
   destroy_value %1 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()

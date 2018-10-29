@@ -7,10 +7,11 @@ sil @marker : $(Builtin.Int32) -> ()
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @test_simple
 // CHECK-32-SAME:  i8* noalias dereferenceable([[BUFFER_SIZE:16]]))
 // CHECK-64-SAME:  (i8* noalias dereferenceable([[BUFFER_SIZE:32]]))
+// CHECK-SAME:  [[CORO_ATTRIBUTES:#[0-9]+]]
 sil @test_simple : $@yield_once () -> () {
 entry:
-  // CHECK-32:      [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:4]], i8* %0, i8* bitcast (void (i8*, i1)* @"$SIet_TC" to i8*), i8* bitcast (i8* (i32)* @malloc to i8*), i8* bitcast (void (i8*)* @free to i8*))
-  // CHECK-64:      [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], i8* %0, i8* bitcast (void (i8*, i1)* @"$SIet_TC" to i8*), i8* bitcast (i8* (i64)* @malloc to i8*), i8* bitcast (void (i8*)* @free to i8*))
+  // CHECK-32:      [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:4]], i8* %0, i8* bitcast (void (i8*, i1)* @"$sIet_TC" to i8*), i8* bitcast (i8* (i32)* @malloc to i8*), i8* bitcast (void (i8*)* @free to i8*))
+  // CHECK-64:      [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], i8* %0, i8* bitcast (void (i8*, i1)* @"$sIet_TC" to i8*), i8* bitcast (i8* (i64)* @malloc to i8*), i8* bitcast (void (i8*)* @free to i8*))
   // CHECK-NEXT:    [[BEGIN:%.*]] = call i8* @llvm.coro.begin(token [[ID]], i8* null)
 
   // CHECK-NEXT:    call swiftcc void @marker(i32 1000)
@@ -42,7 +43,7 @@ unwind:
   // CHECK-NEXT:    unreachable
 }
 
-// CHECK-LABEL:     declare{{( dllimport)?}}{{( protected)?}} swiftcc void @"$SIet_TC"
+// CHECK-LABEL:     declare{{( dllimport)?}}{{( protected)?}} swiftcc void @"$sIet_TC"
 // CHECK-SAME:      (i8* noalias dereferenceable([[BUFFER_SIZE]]), i1)
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_simple_call(i1)
@@ -88,3 +89,6 @@ cont:
   %ret = tuple ()
   return %ret : $()
 }
+
+// CHECK:       attributes [[CORO_ATTRIBUTES]] =
+// CHECK-SAME:    noinline

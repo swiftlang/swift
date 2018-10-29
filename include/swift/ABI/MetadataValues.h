@@ -110,6 +110,9 @@ enum class NominalTypeKind : uint32_t {
 #include "MetadataKind.def"
 };
 
+/// The maximum supported type alignment.
+const size_t MaximumAlignment = 16;
+
 /// Flags stored in the value-witness table.
 template <typename int_type>
 class TargetValueWitnessFlags {
@@ -119,7 +122,7 @@ public:
   // flags for the struct. (The "non-inline" and "has-extra-inhabitants" bits
   // still require additional fixup.)
   enum : int_type {
-    AlignmentMask =       0x0000FFFF,
+    AlignmentMask =       0x000000FF,
     IsNonPOD =            0x00010000,
     IsNonInline =         0x00020000,
     HasExtraInhabitants = 0x00040000,
@@ -241,7 +244,6 @@ public:
 
 public:
   constexpr TargetExtraInhabitantFlags() : Data(0) {}
-
   /// The number of extra inhabitants in the type's representation.
   int getNumExtraInhabitants() const { return Data & NumExtraInhabitantsMask; }
 
@@ -322,7 +324,8 @@ public:
     Init,
     Getter,
     Setter,
-    MaterializeForSet,
+    ModifyCoroutine,
+    ReadCoroutine,
   };
 
 private:
@@ -542,7 +545,8 @@ public:
     Init,
     Getter,
     Setter,
-    MaterializeForSet,
+    ReadCoroutine,
+    ModifyCoroutine,
     AssociatedTypeAccessFunction,
     AssociatedConformanceAccessFunction,
   };
@@ -576,6 +580,19 @@ public:
   bool isInstance() const { return Value & IsInstanceMask; }
 
   int_type getIntValue() const { return Value; }
+
+  enum : uintptr_t {
+    /// Bit used to indicate that an associated type witness is a pointer to
+    /// a mangled name (vs. a pointer to metadata).
+    AssociatedTypeMangledNameBit = 0x01,
+  };
+
+  enum : uint8_t {
+    /// Prefix byte used to identify an associated type whose mangled name
+    /// is relative to the protocol's context rather than the conforming
+    /// type's context.
+    AssociatedTypeInProtocolContextByte = 0xFF
+  };
 };
 
 /// Flags that go in a TargetConformanceDescriptor structure.
@@ -583,24 +600,9 @@ class ConformanceFlags {
 public:
   typedef uint32_t int_type;
 
-  enum class ConformanceKind {
-    /// A direct reference to a protocol witness table.
-    WitnessTable,
-    /// A function pointer that can be called to access the protocol witness
-    /// table.
-    WitnessTableAccessor,
-    /// A function pointer that can be called to access the protocol witness
-    /// table whose conformance is conditional on additional requirements that
-    /// must first be evaluated and then provided to the accessor function.
-    ConditionalWitnessTableAccessor,
-
-    First_Kind = WitnessTable,
-    Last_Kind = ConditionalWitnessTableAccessor,
-  };
-
 private:
   enum : int_type {
-    ConformanceKindMask = 0x07,      // 8 conformance kinds
+    UnusedLowBits = 0x07,      // historical conformance kind
 
     TypeMetadataKindMask = 0x7 << 3, // 8 type reference kinds
     TypeMetadataKindShift = 3,
@@ -610,16 +612,15 @@ private:
 
     NumConditionalRequirementsMask = 0xFF << 8,
     NumConditionalRequirementsShift = 8,
+
+    HasResilientWitnessesMask = 0x01 << 16,
+    HasGenericWitnessTableMask = 0x01 << 17,
   };
 
   int_type Value;
 
 public:
   ConformanceFlags(int_type value = 0) : Value(value) {}
-
-  ConformanceFlags withConformanceKind(ConformanceKind kind) const {
-    return ConformanceFlags((Value & ~ConformanceKindMask) | int_type(kind));
-  }
 
   ConformanceFlags withTypeReferenceKind(TypeReferenceKind kind) const {
     return ConformanceFlags((Value & ~TypeMetadataKindMask)
@@ -643,9 +644,18 @@ public:
                             | (n << NumConditionalRequirementsShift));
   }
 
-  /// Retrieve the conformance kind.
-  ConformanceKind getConformanceKind() const {
-    return ConformanceKind(Value & ConformanceKindMask);
+  ConformanceFlags withHasResilientWitnesses(bool hasResilientWitnesses) const {
+    return ConformanceFlags((Value & ~HasResilientWitnessesMask)
+                            | (hasResilientWitnesses? HasResilientWitnessesMask
+                                                    : 0));
+  }
+
+  ConformanceFlags withHasGenericWitnessTable(
+                                           bool hasGenericWitnessTable) const {
+    return ConformanceFlags((Value & ~HasGenericWitnessTableMask)
+                            | (hasGenericWitnessTable
+                                 ? HasGenericWitnessTableMask
+                                 : 0));
   }
 
   /// Retrieve the type reference kind kind.
@@ -677,6 +687,17 @@ public:
   unsigned getNumConditionalRequirements() const {
     return (Value & NumConditionalRequirementsMask)
               >> NumConditionalRequirementsShift;
+  }
+
+  /// Whether this conformance has any resilient witnesses.
+  bool hasResilientWitnesses() const {
+    return Value & HasResilientWitnessesMask;
+  }
+
+  /// Whether this conformance has a generic witness table that may need to
+  /// be instantiated.
+  bool hasGenericWitnessTable() const {
+    return Value & HasGenericWitnessTableMask;
   }
 
   int_type getIntValue() const { return Value; }
@@ -835,7 +856,11 @@ using FunctionTypeFlags = TargetFunctionTypeFlags<size_t>;
 
 template <typename int_type>
 class TargetParameterTypeFlags {
-  enum : int_type { ValueOwnershipMask = 0x7F, VariadicMask = 0x80 };
+  enum : int_type {
+    ValueOwnershipMask = 0x7F,
+    VariadicMask       = 0x80,
+    AutoClosureMask    = 0x100,
+  };
   int_type Data;
 
   constexpr TargetParameterTypeFlags(int_type Data) : Data(Data) {}
@@ -855,8 +880,15 @@ public:
                                               (isVariadic ? VariadicMask : 0));
   }
 
+  constexpr TargetParameterTypeFlags<int_type>
+  withAutoClosure(bool isAutoClosure) const {
+    return TargetParameterTypeFlags<int_type>(
+        (Data & ~AutoClosureMask) | (isAutoClosure ? AutoClosureMask : 0));
+  }
+
   bool isNone() const { return Data == 0; }
   bool isVariadic() const { return Data & VariadicMask; }
+  bool isAutoClosure() const { return Data & AutoClosureMask; }
 
   ValueOwnership getValueOwnership() const {
     return (ValueOwnership)(Data & ValueOwnershipMask);
@@ -980,8 +1012,6 @@ enum class ExclusivityFlags : uintptr_t {
   // Read or Modify).
   ActionMask       = 0x1,
 
-  // Downgrade exclusivity failures to a warning.
-  WarningOnly      = 0x10,
   // The runtime should track this access to check against subsequent accesses.
   Tracking         = 0x20
 };
@@ -996,9 +1026,6 @@ static inline ExclusivityFlags &operator|=(ExclusivityFlags &lhs,
 static inline ExclusivityFlags getAccessAction(ExclusivityFlags flags) {
   return ExclusivityFlags(uintptr_t(flags)
                         & uintptr_t(ExclusivityFlags::ActionMask));
-}
-static inline bool isWarningOnly(ExclusivityFlags flags) {
-  return uintptr_t(flags) & uintptr_t(ExclusivityFlags::WarningOnly);
 }
 static inline bool isTracking(ExclusivityFlags flags) {
   return uintptr_t(flags) & uintptr_t(ExclusivityFlags::Tracking);
@@ -1236,23 +1263,27 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
 
     // Type-specific flags:
 
-    /// The kind of reference that this class makes to its superclass
+    /// The kind of reference that this class makes to its resilient superclass
     /// descriptor.  A TypeReferenceKind.
     ///
     /// Only meaningful for class descriptors.
-    Class_SuperclassReferenceKind = 10,
-    Class_SuperclassReferenceKind_width = 3,
+    Class_ResilientSuperclassReferenceKind = 9,
+    Class_ResilientSuperclassReferenceKind_width = 3,
 
     /// Whether the immediate class members in this metadata are allocated
     /// at negative offsets.  For now, we don't use this.
-    Class_AreImmediateMembersNegative = 13,
+    Class_AreImmediateMembersNegative = 12,
 
     /// Set if the context descriptor is for a class with resilient ancestry.
     ///
     /// Only meaningful for class descriptors.
-    Class_HasResilientSuperclass = 14,
+    Class_HasResilientSuperclass = 13,
 
-    /// Set if the context descriptor is includes metadata for dynamically
+    /// Set if the context descriptor includes metadata for dynamically
+    /// installing method overrides at metadata instantiation time.
+    Class_HasOverrideTable = 14,
+
+    /// Set if the context descriptor includes metadata for dynamically
     /// constructing a class's vtables at metadata instantiation time.
     ///
     /// Only meaningful for class descriptors.
@@ -1271,7 +1302,7 @@ public:
 
     /// The type requires non-trivial singleton initialization using the
     /// "in-place" code pattern.
-    InPlaceMetadataInitialization = 1,
+    SingletonMetadataInitialization = 1,
 
     /// The type requires non-trivial singleton initialization using the
     /// "foreign" code pattern.
@@ -1287,8 +1318,8 @@ public:
                                  getMetadataInitialization,
                                  setMetadataInitialization)
 
-  bool hasInPlaceMetadataInitialization() const {
-    return getMetadataInitialization() == InPlaceMetadataInitialization;
+  bool hasSingletonMetadataInitialization() const {
+    return getMetadataInitialization() == SingletonMetadataInitialization;
   }
 
   bool hasForeignMetadataInitialization() const {
@@ -1300,6 +1331,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasVTable,
                                 class_hasVTable,
                                 class_setHasVTable)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasOverrideTable,
+                                class_hasOverrideTable,
+                                class_setHasOverrideTable)
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasResilientSuperclass,
                                 class_hasResilientSuperclass,
                                 class_setHasResilientSuperclass)
@@ -1307,11 +1341,11 @@ public:
                                 class_areImmediateMembersNegative,
                                 class_setAreImmediateMembersNegative)
 
-  FLAGSET_DEFINE_FIELD_ACCESSORS(Class_SuperclassReferenceKind,
-                                 Class_SuperclassReferenceKind_width,
+  FLAGSET_DEFINE_FIELD_ACCESSORS(Class_ResilientSuperclassReferenceKind,
+                                 Class_ResilientSuperclassReferenceKind_width,
                                  TypeReferenceKind,
-                                 class_getSuperclassReferenceKind,
-                                 class_setSuperclassReferenceKind)
+                                 class_getResilientSuperclassReferenceKind,
+                                 class_setResilientSuperclassReferenceKind)
 };
 
 /// Flags for protocol context descriptors. These values are used as the

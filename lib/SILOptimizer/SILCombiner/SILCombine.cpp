@@ -347,12 +347,15 @@ class SILCombine : public SILFunctionTransform {
   void run() override {
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
+    auto *PCA = PM->getAnalysis<ProtocolConformanceAnalysis>();
+    auto *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();
 
     SILOptFunctionBuilder FuncBuilder(*this);
     // Create a SILBuilder with a tracking list for newly added
     // instructions, which we will periodically move to our worklist.
     SILBuilder B(*getFunction(), &TrackingList);
-    SILCombiner Combiner(FuncBuilder, B, AA, DA, getOptions().RemoveRuntimeAsserts);
+    SILCombiner Combiner(FuncBuilder, B, AA, DA, PCA, CHA,
+                         getOptions().RemoveRuntimeAsserts);
     bool Changed = Combiner.runOnFunction(*getFunction());
     assert(TrackingList.empty() &&
            "TrackingList should be fully processed by SILCombiner");

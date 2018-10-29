@@ -335,6 +335,7 @@ public:
     UserInaccessible = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 7),
   };
 
+  LLVM_READNONE
   static uint64_t getOptions(DeclAttrKind DK);
 
   uint64_t getOptions() const {
@@ -386,6 +387,7 @@ public:
     return canAttributeAppearOnDecl(getKind(), D);
   }
 
+  LLVM_READONLY
   static bool canAttributeAppearOnDecl(DeclAttrKind DK, const Decl *D);
 
   /// Returns true if multiple instances of an attribute kind
@@ -439,6 +441,7 @@ public:
     return isNotSerialized(getKind());
   }
 
+  LLVM_READNONE
   static bool canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK);
 
   /// Returns the source name of the attribute, without the @ or any arguments.
@@ -1286,6 +1289,7 @@ public:
     case Kind::NSErrorWrapperAnon:
       return "E";
     }
+    llvm_unreachable("unhandled kind");
   }
 
   static bool classof(const DeclAttribute *DA) {

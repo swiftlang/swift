@@ -486,14 +486,14 @@ extension MutableCollection where Self: RandomAccessCollection {
     within range: Range<Index>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows {
-    var i = idx
-    var countToIndex = distance(from: range.lowerBound, to: i)
-    var countFromIndex = distance(from: i, to: range.upperBound)
+    var idx = idx
+    var countToIndex = distance(from: range.lowerBound, to: idx)
+    var countFromIndex = distance(from: idx, to: range.upperBound)
     // Check if left child is within bounds. If not, stop iterating, because
     // there are no children of the given node in the heap.
     while countToIndex + 1 < countFromIndex {
-      let left = index(i, offsetBy: countToIndex + 1)
-      var largest = i
+      let left = index(idx, offsetBy: countToIndex + 1)
+      var largest = idx
       if try areInIncreasingOrder(self[largest], self[left]) {
         largest = left
       }
@@ -504,13 +504,13 @@ extension MutableCollection where Self: RandomAccessCollection {
           largest = right
         }
       }
-      // If a child is bigger than the current node, swap them and continue sifting
-      // down.
-      if largest != i {
+      // If a child is bigger than the current node, swap them and continue 
+      // sifting down.
+      if largest != idx {
         swapAt(idx, largest)
-        i = largest
-        countToIndex = distance(from: range.lowerBound, to: i)
-        countFromIndex = distance(from: i, to: range.upperBound)
+        idx = largest
+        countToIndex = distance(from: range.lowerBound, to: idx)
+        countFromIndex = distance(from: idx, to: range.upperBound)
       } else {
         break
       }
@@ -540,7 +540,8 @@ extension MutableCollection where Self: RandomAccessCollection {
   }
 
   @inlinable
-  internal mutating func _heapSort(
+  public // @testable
+  mutating func _heapSort(
     within range: Range<Index>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows {

@@ -56,7 +56,6 @@ CONSTANT_OWNERSHIP_INST(Owned, CopyBlockWithoutEscaping)
 CONSTANT_OWNERSHIP_INST(Owned, CopyValue)
 CONSTANT_OWNERSHIP_INST(Owned, KeyPath)
 CONSTANT_OWNERSHIP_INST(Owned, PartialApply)
-CONSTANT_OWNERSHIP_INST(Owned, StrongPin)
 CONSTANT_OWNERSHIP_INST(Owned, InitExistentialValue)
 CONSTANT_OWNERSHIP_INST(Owned, GlobalValue) // TODO: is this correct?
 
@@ -89,7 +88,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, InitExistentialAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, InitExistentialMetatype)
 CONSTANT_OWNERSHIP_INST(Trivial, IntegerLiteral)
 CONSTANT_OWNERSHIP_INST(Trivial, IsUnique)
-CONSTANT_OWNERSHIP_INST(Trivial, IsUniqueOrPinned)
 CONSTANT_OWNERSHIP_INST(Trivial, IsEscapingClosure)
 CONSTANT_OWNERSHIP_INST(Trivial, MarkUninitializedBehavior)
 CONSTANT_OWNERSHIP_INST(Trivial, Metatype)
@@ -108,7 +106,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, RefTailAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, RefToRawPointer)
 CONSTANT_OWNERSHIP_INST(Trivial, SelectEnumAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, StringLiteral)
-CONSTANT_OWNERSHIP_INST(Trivial, ConstStringLiteral)
 CONSTANT_OWNERSHIP_INST(Trivial, StructElementAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, SuperMethod)
 CONSTANT_OWNERSHIP_INST(Trivial, ObjCSuperMethod)
@@ -280,7 +277,7 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitSILUndef(SILUndef *Arg) {
 }
 
 ValueOwnershipKind
-ValueOwnershipKindClassifier::visitSILPHIArgument(SILPHIArgument *Arg) {
+ValueOwnershipKindClassifier::visitSILPhiArgument(SILPhiArgument *Arg) {
   return Arg->getOwnershipKind();
 }
 
@@ -404,6 +401,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, AShr)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Add)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, And)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, AssumeNonNegative)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, AssumeTrue)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, BitCast)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, ExactSDiv)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, ExactUDiv)
@@ -473,6 +471,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, Sizeof)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Strideof)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, StringObjectOr)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, IsPOD)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, IsBitwiseTakable)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, IsSameMetatype)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Alignof)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, AllocRaw)

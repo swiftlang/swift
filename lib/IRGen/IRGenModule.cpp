@@ -235,8 +235,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   ProtocolRequirementStructTy =
       createStructType(*this, "swift.protocol_requirement", {
     Int32Ty,                // flags
-    Int32Ty,                // thunk
-    Int32Ty                 // default implementation
+    RelativeAddressTy,      // default implementation
   });
   
   // A tuple type metadata record has a couple extra fields.
@@ -350,8 +349,15 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   MethodDescriptorStructTy
     = createStructType(*this, "swift.method_descriptor", {
+      Int32Ty,
       RelativeAddressTy,
-      Int32Ty
+    });
+
+  MethodOverrideDescriptorStructTy
+    = createStructType(*this, "swift.method_override_descriptor", {
+      RelativeAddressTy,
+      RelativeAddressTy,
+      RelativeAddressTy
     });
 
   TypeMetadataRecordTy
@@ -454,7 +460,6 @@ IRGenModule::~IRGenModule() {
   destroyClangTypeConverter();
   destroyMetadataLayoutMap();
   delete &Types;
-  delete DebugInfo;
 }
 
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
@@ -705,6 +710,12 @@ llvm::Module *IRGenModule::releaseModule() {
 bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
   if (Opts.UseJIT)
     return false;
+
+  // Regardless of the access level, if the witness table is shared it means
+  // we can safely not emit it. Every other module which needs it will generate
+  // its own shared copy of it.
+  if (wt->getLinkage() == SILLinkage::Shared)
+    return true;
 
   NominalTypeDecl *ConformingTy =
     wt->getConformance()->getType()->getNominalOrBoundGenericNominal();

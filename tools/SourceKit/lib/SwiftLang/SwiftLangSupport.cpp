@@ -173,12 +173,16 @@ UIdent UIdentVisitor::visitExtensionDecl(const ExtensionDecl *D) {
 }
 
 SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
-    : SKCtx(SKCtx), CCCache(new SwiftCompletionCache) {
+    : NotificationCtr(SKCtx.getNotificationCenter()),
+      CCCache(new SwiftCompletionCache) {
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
   RuntimeResourcePath = LibPath.str();
 
-  ASTMgr.reset(new SwiftASTManager(*this));
+  Stats = std::make_shared<SwiftStatistics>();
+  EditorDocuments = std::make_shared<SwiftEditorDocumentFileMap>();
+  ASTMgr = std::make_shared<SwiftASTManager>(EditorDocuments, Stats,
+                                             RuntimeResourcePath);
   // By default, just use the in-memory cache.
   CCCache->inMemory = llvm::make_unique<ide::CodeCompletionCache>();
 }
@@ -213,8 +217,6 @@ UIdent SwiftLangSupport::getUIDForAccessor(const ValueDecl *D,
                                            AccessorKind AccKind,
                                            bool IsRef) {
   switch (AccKind) {
-  case AccessorKind::MaterializeForSet:
-    llvm_unreachable("unexpected MaterializeForSet");
   case AccessorKind::Get:
     return IsRef ? KindRefAccessorGetter : KindDeclAccessorGetter;
   case AccessorKind::Set:
@@ -581,6 +583,9 @@ UIdent SwiftLangSupport::getUIDForSymbol(SymbolInfo sym, bool isRef) {
       llvm_unreachable("missing extension sub kind");
     }
 
+  case SymbolKind::Module:
+    return KindRefModule;
+
   default:
     // TODO: reconsider whether having a default case is a good idea.
     return UIdent();
@@ -682,7 +687,6 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
     // Ignore these.
     case DAK_ShowInInterface:
     case DAK_RawDocComment:
-    case DAK_DowngradeExhaustivityCheck:
     case DAK_HasInitialValue:
       return None;
     default:
@@ -768,7 +772,7 @@ std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
 
 void SwiftLangSupport::getStatistics(StatisticsReceiver receiver) {
   std::vector<Statistic *> stats = {
-#define SWIFT_STATISTIC(VAR, UID, DESC) &Stats.VAR,
+#define SWIFT_STATISTIC(VAR, UID, DESC) &Stats->VAR,
 #include "SwiftStatistics.def"
   };
   receiver(stats);

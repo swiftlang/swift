@@ -117,6 +117,15 @@ public:
     return Witness(requirement);
   }
 
+  /// Create a witness for the given requirement.
+  ///
+  /// Deserialized witnesses do not have a synthetic environment.
+  static Witness forDeserialized(ValueDecl *decl,
+                                 SubstitutionMap substitutions) {
+    // TODO: It's probably a good idea to have a separate 'deserialized' bit.
+    return Witness(decl, substitutions, nullptr, SubstitutionMap());
+  }
+
   /// Create a witness that requires substitutions.
   ///
   /// \param decl The declaration for the witness.

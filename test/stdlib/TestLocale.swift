@@ -94,7 +94,9 @@ class TestLocale : TestLocaleSuper {
         
         expectEqual(".", locale.decimalSeparator)
         expectEqual(",", locale.groupingSeparator)
-        expectEqual("HK$", locale.currencySymbol)
+        if #available(macOS 10.11, *) {
+          expectEqual("HK$", locale.currencySymbol)
+        }
         expectEqual("HKD", locale.currencyCode)
         
         expectTrue(Locale.availableIdentifiers.count > 0)

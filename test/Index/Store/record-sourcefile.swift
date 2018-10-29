@@ -4,8 +4,6 @@
 // RUN: c-index-test core -print-record %t/idx1 | %FileCheck %s
 // RUN: c-index-test core -print-record %t/idx2 | %FileCheck %s
 
-// XFAIL: linux
-
 // CHECK: record-sourcefile.swift
 // CHECK: ------------
 // CHECK: struct/Swift | S1 | s:4file2S1V | <no-cgname> | Def,Ref,RelCont -

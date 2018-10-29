@@ -9,14 +9,14 @@ import Foundation
 // guard.
 
 // CHECK-LABEL: define{{.*}} @{{.*}}dontHoist
-// CHECK-NOT: S10Foundation11MeasurementVySo17NSUnitTemperature
-// CHECK: call swiftcc i1 @"$Ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"(
-// CHECK: S10Foundation11MeasurementVySo17NSUnitTemperature
+// CHECK-NOT: s10Foundation11MeasurementVySo17NSUnitTemperature
+// CHECK: call swiftcc i1 @"$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"(
+// CHECK: s10Foundation11MeasurementVySo17NSUnitTemperature
 
 // OPT-LABEL: define{{.*}} @{{.*}}dontHoist
 // OPT-NOT: S10Foundation11MeasurementVySo17NSUnitTemperature
 // OPT: call {{.*}} @_swift_stdlib_operatingSystemVersion(
-// OPT: S10Foundation11MeasurementVySo17NSUnitTemperature
+// OPT: s10Foundation11MeasurementVySo17NSUnitTemperature
 
 public func dontHoist() {
   if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
@@ -32,9 +32,9 @@ public func dontHoist() {
 // a single call into _swift_stdlib_operatingSystemVersion.
 
 // CHECK-LABEL: define{{.*}} @{{.*}}multipleAvailabilityChecks
-// CHECK: call swiftcc i1 @"$Ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"(
-// CHECK: call swiftcc i1 @"$Ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"(
-// CHECK: call swiftcc i1 @"$Ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"(
+// CHECK: call swiftcc i1 @"$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"(
+// CHECK: call swiftcc i1 @"$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"(
+// CHECK: call swiftcc i1 @"$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"(
 // CHECK: ret void
 
 // OPT-LABEL: define{{.*}} @{{.*}}multipleAvailabilityChecks

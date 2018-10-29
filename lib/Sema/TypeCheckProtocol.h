@@ -33,6 +33,7 @@ class AccessScope;
 class AssociatedTypeDecl;
 class AvailabilityContext;
 class DeclContext;
+class FuncDecl;
 class NormalProtocolConformance;
 class ProtocolDecl;
 class TypeChecker;
@@ -77,6 +78,9 @@ public:
   Type getRequirement() const { return Requirement; }
   bool isConformanceRequirement() const {
     return Requirement->isExistentialType();
+  }
+  bool isSuperclassRequirement() const {
+    return !isConformanceRequirement();
   }
   bool isError() const {
     return Requirement->is<ErrorType>();
@@ -166,6 +170,9 @@ enum class MatchKind : uint8_t {
 
   /// \brief The types conflict.
   TypeConflict,
+
+  /// \brief The witness would match if an additional requirement were met.
+  MissingRequirement,
 
   /// The witness throws, but the requirement does not.
   ThrowsConflict,
@@ -351,6 +358,17 @@ struct RequirementMatch {
            "Should (or should not) have witness type");
   }
 
+  RequirementMatch(ValueDecl *witness, MatchKind kind, Requirement requirement,
+                   Optional<RequirementEnvironment> env = None,
+                   ArrayRef<OptionalAdjustment> optionalAdjustments = {})
+      : Witness(witness), Kind(kind), WitnessType(requirement.getFirstType()),
+        MissingRequirement(requirement), ReqEnv(std::move(env)),
+        OptionalAdjustments(optionalAdjustments.begin(),
+                            optionalAdjustments.end()) {
+    assert(hasWitnessType() && hasRequirement() &&
+           "Should have witness type and requirement");
+  }
+
   /// \brief The witness that matches the (implied) requirement.
   ValueDecl *Witness;
 
@@ -359,6 +377,9 @@ struct RequirementMatch {
 
   /// \brief The type of the witness when it is referenced.
   Type WitnessType;
+
+  /// \brief Requirement not met.
+  Optional<Requirement> MissingRequirement;
 
   /// \brief The requirement environment to use for the witness thunk.
   Optional<RequirementEnvironment> ReqEnv;
@@ -381,6 +402,7 @@ struct RequirementMatch {
     case MatchKind::WitnessInvalid:
     case MatchKind::KindConflict:
     case MatchKind::TypeConflict:
+    case MatchKind::MissingRequirement:
     case MatchKind::StaticNonStaticConflict:
     case MatchKind::SettableConflict:
     case MatchKind::PrefixNonPrefixConflict:
@@ -403,6 +425,7 @@ struct RequirementMatch {
     case MatchKind::ExactMatch:
     case MatchKind::RenamedMatch:
     case MatchKind::TypeConflict:
+    case MatchKind::MissingRequirement:
     case MatchKind::OptionalityConflict:
       return true;
 
@@ -423,6 +446,9 @@ struct RequirementMatch {
 
     llvm_unreachable("Unhandled MatchKind in switch.");
   }
+
+  /// \brief Determine whether this requirement match has a requirement.
+  bool hasRequirement() { return Kind == MatchKind::MissingRequirement; }
 
   swift::Witness getWitness(ASTContext &ctx) const;
 };
@@ -451,6 +477,8 @@ protected:
 
   WitnessChecker(TypeChecker &tc, ProtocolDecl *proto,
                  Type adoptee, DeclContext *dc);
+
+  bool isMemberOperator(FuncDecl *decl, Type type);
 
   /// Gather the value witnesses for the given requirement.
   ///
@@ -830,6 +858,11 @@ public:
   ///
   /// \returns \c true if an error occurred, \c false otherwise
   Optional<InferredTypeWitnesses> solve(ConformanceChecker &checker);
+
+  /// Find an associated type declaration that provides a default definition.
+  static AssociatedTypeDecl *findDefaultedAssociatedType(
+                                                 TypeChecker &tc,
+                                                 AssociatedTypeDecl *assocType);
 };
 
 /// \brief Match the given witness to the given requirement.

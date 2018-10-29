@@ -178,7 +178,12 @@ public:
 
     // Build a SubstitutionMap.
     auto *genericSig = decl->getGenericSignature();
-    auto genericParams = genericSig->getSubstitutableParams();
+
+    SmallVector<GenericTypeParamType *, 4> genericParams;
+    genericSig->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
+      if (canonical)
+        genericParams.push_back(gp);
+    });
     if (genericParams.size() != args.size())
       return Type();
 
@@ -359,10 +364,9 @@ public:
       auto flags = param.getFlags();
       auto ownership = flags.getValueOwnership();
       auto parameterFlags = ParameterTypeFlags()
-                                .withInOut(ownership == ValueOwnership::InOut)
-                                .withShared(ownership == ValueOwnership::Shared)
-                                .withOwned(ownership == ValueOwnership::Owned)
-                                .withVariadic(flags.isVariadic());
+                                .withValueOwnership(ownership)
+                                .withVariadic(flags.isVariadic())
+                                .withAutoClosure(flags.isAutoClosure());
 
       funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
     }
@@ -402,8 +406,10 @@ public:
     if (!base->isTypeParameter())
       return Type();
 
+    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
     for (auto member : protocol->lookupDirect(Ctx.getIdentifier(member),
-                                              /*ignoreNew=*/true)) {
+                                              flags)) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member))
         return DependentMemberType::get(base, assocType);
     }
@@ -1166,26 +1172,26 @@ public:
 
   Result<std::pair<Type, RemoteAddress>>
   getDynamicTypeAndAddressClassExistential(RemoteAddress object) {
-    auto pointed = Reader.readPointedValue(object.getAddressData());
-    if (!pointed)
+    auto pointerval = Reader.readPointerValue(object.getAddressData());
+    if (!pointerval)
       return getFailure<std::pair<Type, RemoteAddress>>();
-    auto result = Reader.readMetadataFromInstance(*pointed);
+    auto result = Reader.readMetadataFromInstance(*pointerval);
     if (!result)
       return getFailure<std::pair<Type, RemoteAddress>>();
     auto typeResult = Reader.readTypeFromMetadata(result.getValue());
     if (!typeResult)
       return getFailure<std::pair<Type, RemoteAddress>>();
     return std::make_pair<Type, RemoteAddress>(std::move(typeResult),
-                                               std::move(object));
+                                               RemoteAddress(*pointerval));
   }
 
   Result<std::pair<Type, RemoteAddress>>
   getDynamicTypeAndAddressErrorExistential(RemoteAddress object) {
-    auto pointed = Reader.readPointedValue(object.getAddressData());
-    if (!pointed)
+    auto pointerval = Reader.readPointerValue(object.getAddressData());
+    if (!pointerval)
       return getFailure<std::pair<Type, RemoteAddress>>();
     auto result =
-        Reader.readMetadataAndValueErrorExistential(RemoteAddress(*pointed));
+        Reader.readMetadataAndValueErrorExistential(RemoteAddress(*pointerval));
     if (!result)
       return getFailure<std::pair<Type, RemoteAddress>>();
     RemoteAddress metadataAddress = result->first;
@@ -1222,10 +1228,10 @@ public:
     // 1) Loading a pointer from the input address
     // 2) Reading it as metadata and resolving the type
     // 3) Wrapping the resolved type in an existential metatype.
-    auto pointed = Reader.readPointedValue(object.getAddressData());
-    if (!pointed)
+    auto pointerval = Reader.readPointerValue(object.getAddressData());
+    if (!pointerval)
       return getFailure<std::pair<Type, RemoteAddress>>();
-    auto typeResult = Reader.readTypeFromMetadata(*pointed);
+    auto typeResult = Reader.readTypeFromMetadata(*pointerval);
     if (!typeResult)
       return getFailure<std::pair<Type, RemoteAddress>>();
     auto wrappedType = ExistentialMetatypeType::get(typeResult);

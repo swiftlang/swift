@@ -3413,7 +3413,6 @@ public:
             name = bestAccessor->getStorage()->getFullName();
             break;
 
-          case AccessorKind::MaterializeForSet:
           case AccessorKind::Address:
           case AccessorKind::MutableAddress:
           case AccessorKind::Read:
@@ -3448,13 +3447,9 @@ public:
             if (bestMethod->isStatic())
               fnType = fnType->getResult()->getAs<FunctionType>();
 
-            // Drop the argument labels.
-            // FIXME: They never should have been in the type anyway.
-            Type type = fnType->getUnlabeledType(TC.Context);
-
             // Coerce to this type.
             out << " as ";
-            type.print(out);
+            fnType->print(out);
           }
         }
 
@@ -3757,33 +3752,37 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     }
 
     void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
-      // Warn about interpolated segments that contain optionals.
+      // Warn about interpolated segments that contain optionals or function.
       for (auto &segment : E->getSegments()) {
         // Allow explicit casts.
         if (auto paren = dyn_cast<ParenExpr>(segment))
           if (isa<ExplicitCastExpr>(paren->getSubExpr()))
             continue;
 
-        // Bail out if we don't have an optional.
-        if (!segment->getType()->getRValueType()->getOptionalObjectType())
+        bool isOptional = bool(segment->getType()->getRValueType()->getOptionalObjectType());
+        bool isFunction = segment->getType()->getRValueType()->is<AnyFunctionType>();
+
+        // Bail out if we don't have an optional and a function.
+        if (!isOptional && !isFunction)
           continue;
 
         TC.diagnose(segment->getStartLoc(),
-                    diag::optional_in_string_interpolation_segment)
+                    diag::debug_description_in_string_interpolation_segment, isFunction)
           .highlight(segment->getSourceRange());
 
         // Suggest 'String(describing: <expr>)'.
         auto segmentStart = segment->getStartLoc().getAdvancedLoc(1);
         TC.diagnose(segment->getLoc(),
-                    diag::silence_optional_in_interpolation_segment_call)
+                    diag::silence_debug_description_in_interpolation_segment_call)
           .highlight(segment->getSourceRange())
           .fixItInsert(segmentStart, "String(describing: ")
           .fixItInsert(segment->getEndLoc(), ")");
 
-        // Suggest inserting a default value.
-        TC.diagnose(segment->getLoc(), diag::default_optional_to_any)
-          .highlight(segment->getSourceRange())
-          .fixItInsert(segment->getEndLoc(), " ?? <#default value#>");
+        // Suggest inserting a default value about an optional.
+        if (isOptional)
+            TC.diagnose(segment->getLoc(), diag::default_optional_to_any)
+              .highlight(segment->getSourceRange())
+              .fixItInsert(segment->getEndLoc(), " ?? <#default value#>");
       }
     }
 
@@ -3922,7 +3921,8 @@ void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
 //===----------------------------------------------------------------------===//
 
 void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
-                        AccessLevel desiredAccess, bool isForSetter) {
+                        AccessLevel desiredAccess, bool isForSetter,
+                        bool shouldUseDefaultAccess) {
   StringRef fixItString;
   switch (desiredAccess) {
   case AccessLevel::Private:      fixItString = "private ";      break;
@@ -3968,9 +3968,14 @@ void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
     // this function is sometimes called to make access narrower, so assuming
     // that a broader scope is acceptable breaks some diagnostics.
     if (attr->getAccess() != desiredAccess) {
-      // This uses getLocation() instead of getRange() because we don't want to
-      // replace the "(set)" part of a setter attribute.
-      diag.fixItReplace(attr->getLocation(), fixItString.drop_back());
+      if (shouldUseDefaultAccess) {
+        // Remove the attribute if replacement is not preferred.
+        diag.fixItRemove(attr->getRange());
+      } else {
+        // This uses getLocation() instead of getRange() because we don't want to
+        // replace the "(set)" part of a setter attribute.
+        diag.fixItReplace(attr->getLocation(), fixItString.drop_back());
+      }
       attr->setInvalid();
     }
 

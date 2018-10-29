@@ -58,34 +58,11 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
   return silGlobal;
 }
 
-/// True if the global stored property requires lazy initialization.
-static bool isGlobalLazilyInitialized(VarDecl *var) {
-  assert(!var->getDeclContext()->isLocalContext() &&
-         "not a global variable!");
-  assert(var->hasStorage() &&
-         "not a stored global variable!");
-
-  // Imports from C are never lazily initialized.
-  if (var->hasClangNode())
-    return false;
-
-  if (var->isDebuggerVar())
-    return false;
-
-  // Top-level global variables in the main source file and in the REPL are not
-  // lazily initialized.
-  auto sourceFileContext = dyn_cast<SourceFile>(var->getDeclContext());
-  if (!sourceFileContext)
-    return true;
-
-  return !sourceFileContext->isScriptMode();
-}
-
 ManagedValue
 SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var) {
   assert(!VarLocs.count(var));
 
-  if (isGlobalLazilyInitialized(var)) {
+  if (var->isLazilyInitializedGlobal()) {
     // Call the global accessor to get the variable's address.
     SILFunction *accessorFn = SGM.getFunction(
                             SILDeclRef(var, SILDeclRef::Kind::GlobalAccessor),

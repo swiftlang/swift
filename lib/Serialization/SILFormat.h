@@ -76,6 +76,7 @@ enum CastConsumptionKindEncoding : uint8_t {
   SIL_CAST_CONSUMPTION_TAKE_ALWAYS,
   SIL_CAST_CONSUMPTION_TAKE_ON_SUCCESS,
   SIL_CAST_CONSUMPTION_COPY_ON_SUCCESS,
+  SIL_CAST_CONSUMPTION_BORROW_ALWAYS,
 };
 
 enum class KeyPathComponentKindEncoding : uint8_t {
@@ -107,7 +108,7 @@ enum {
 /// \sa SIL_INDEX_BLOCK_ID
 namespace sil_index_block {
   // These IDs must \em not be renumbered or reordered without incrementing
-  // VERSION_MAJOR.
+  // the module version.
   enum RecordKind {
     SIL_FUNC_NAMES = 1,
     SIL_FUNC_OFFSETS,
@@ -139,7 +140,7 @@ namespace sil_index_block {
 /// \sa SIL_BLOCK_ID
 namespace sil_block {
   // These IDs must \em not be renumbered or reordered without incrementing
-  // VERSION_MAJOR.
+  // the module version.
   enum RecordKind : uint8_t {
     SIL_FUNCTION = 1,
     SIL_BASIC_BLOCK,
@@ -164,7 +165,6 @@ namespace sil_block {
     SIL_WITNESS_ASSOC_ENTRY,
     SIL_WITNESS_CONDITIONAL_CONFORMANCE,
     SIL_DEFAULT_WITNESS_TABLE,
-    SIL_DEFAULT_WITNESS_TABLE_ENTRY,
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY,
     SIL_INST_WITNESS_METHOD,
     SIL_SPECIALIZE_ATTR,
@@ -261,12 +261,6 @@ namespace sil_block {
     DeclIDField,  // ID of ProtocolDecl
     SILLinkageField  // Linkage
     // Default witness table entries will be serialized after.
-  >;
-
-  using DefaultWitnessTableEntryLayout = BCRecordLayout<
-    SIL_DEFAULT_WITNESS_TABLE_ENTRY,
-    DeclIDField,  // SILFunction name
-    BCArray<ValueIDField> // SILDeclRef
   >;
 
   using DefaultWitnessTableNoEntryLayout = BCRecordLayout<

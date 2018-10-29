@@ -23,6 +23,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/Support/Debug.h"
@@ -77,7 +78,6 @@ public:
   IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
   IGNORED_ATTR(DiscardableResult)
-  IGNORED_ATTR(DowngradeExhaustivityCheck)
   IGNORED_ATTR(DynamicMemberLookup)
   IGNORED_ATTR(Effects)
   IGNORED_ATTR(Exported)
@@ -213,14 +213,8 @@ public:
     // 'final' only makes sense in the context of a class declaration.
     // Reject it on global functions, protocols, structs, enums, etc.
     if (!D->getDeclContext()->getSelfClassDecl()) {
-      if (TC.Context.isSwiftVersion3() && 
-          D->getDeclContext()->getExtendedProtocolDecl())
-        TC.diagnose(attr->getLocation(), 
-          diag::protocol_extension_cannot_be_final)
-          .fixItRemove(attr->getRange());
-      else
-        TC.diagnose(attr->getLocation(), diag::member_cannot_be_final)
-          .fixItRemove(attr->getRange());
+      TC.diagnose(attr->getLocation(), diag::member_cannot_be_final)
+        .fixItRemove(attr->getRange());
 
       // Remove the attribute so child declarations are not flagged as final
       // and duplicate the error message.
@@ -258,6 +252,7 @@ public:
   void visitLLDBDebuggerFunctionAttr(LLDBDebuggerFunctionAttr *attr);
   void visitNSManagedAttr(NSManagedAttr *attr);
   void visitOverrideAttr(OverrideAttr *attr);
+  void visitNonOverrideAttr(NonOverrideAttr *attr);
   void visitAccessControlAttr(AccessControlAttr *attr);
   void visitSetterAccessAttr(SetterAccessAttr *attr);
   bool visitAbstractAccessControlAttr(AbstractAccessControlAttr *attr);
@@ -569,8 +564,16 @@ visitLLDBDebuggerFunctionAttr(LLDBDebuggerFunctionAttr *attr) {
 
 void AttributeEarlyChecker::visitOverrideAttr(OverrideAttr *attr) {
   if (!isa<ClassDecl>(D->getDeclContext()) &&
+      !isa<ProtocolDecl>(D->getDeclContext()) &&
       !isa<ExtensionDecl>(D->getDeclContext()))
     diagnoseAndRemoveAttr(attr, diag::override_nonclass_decl);
+}
+
+void AttributeEarlyChecker::visitNonOverrideAttr(NonOverrideAttr *attr) {
+  if (!isa<ClassDecl>(D->getDeclContext()) &&
+      !isa<ProtocolDecl>(D->getDeclContext()) &&
+      !isa<ExtensionDecl>(D->getDeclContext()))
+    diagnoseAndRemoveAttr(attr, diag::nonoverride_wrong_decl_context);
 }
 
 void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
@@ -776,7 +779,6 @@ public:
     IGNORED_ATTR(ClangImporterSynthesizedType)
     IGNORED_ATTR(Consuming)
     IGNORED_ATTR(Convenience)
-    IGNORED_ATTR(DowngradeExhaustivityCheck)
     IGNORED_ATTR(Dynamic)
     IGNORED_ATTR(Effects)
     IGNORED_ATTR(Exported)
@@ -862,6 +864,8 @@ public:
   void visitImplementsAttr(ImplementsAttr *attr);
 
   void visitFrozenAttr(FrozenAttr *attr);
+
+  void visitNonOverrideAttr(NonOverrideAttr *attr);
 };
 } // end anonymous namespace
 
@@ -1510,17 +1514,23 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
 
     if (auto extAttr =
         extension->getAttrs().getAttribute<AccessControlAttr>()) {
-      // Extensions are top level declarations, for which the literally lowest
-      // access level `private` is equivalent to `fileprivate`.
-      AccessLevel extAccess = std::max(extAttr->getAccess(),
-                                       AccessLevel::FilePrivate);
-      if (attr->getAccess() > extAccess) {
+      AccessLevel defaultAccess = extension->getDefaultAccessLevel();
+      if (attr->getAccess() > defaultAccess) {
         auto diag = TC.diagnose(attr->getLocation(),
                                 diag::access_control_ext_member_more,
                                 attr->getAccess(),
                                 D->getDescriptiveKind(),
                                 extAttr->getAccess());
-        swift::fixItAccess(diag, cast<ValueDecl>(D), extAccess);
+        swift::fixItAccess(diag, cast<ValueDecl>(D), defaultAccess, false,
+                           true);
+        return;
+      } else if (attr->getAccess() == defaultAccess) {
+        TC.diagnose(attr->getLocation(),
+                    diag::access_control_ext_member_redundant,
+                    attr->getAccess(),
+                    D->getDescriptiveKind(),
+                    extAttr->getAccess())
+          .fixItRemove(attr->getRange());
         return;
       }
     }
@@ -1556,6 +1566,15 @@ AttributeChecker::visitSetterAccessAttr(SetterAccessAttr *attr) {
                 getterAccess, storageKind, attr->getAccess());
     attr->setInvalid();
     return;
+
+  } else if (attr->getAccess() == getterAccess) {
+    TC.diagnose(attr->getLocation(),
+                diag::access_control_setter_redundant,
+                attr->getAccess(),
+                D->getDescriptiveKind(),
+                getterAccess)
+      .fixItRemove(attr->getRange());
+    return;
   }
 }
 
@@ -1581,131 +1600,9 @@ static void collectUsedGenericParameters(
 static void checkSpecializeAttrRequirements(
     SpecializeAttr *attr,
     AbstractFunctionDecl *FD,
-    ArrayRef<RequirementRepr> requirements,
-    SmallPtrSet<TypeBase *, 4> constrainedGenericParams,
+    const SmallPtrSet<TypeBase *, 4> &constrainedGenericParams,
     TypeChecker &TC) {
   auto genericSig = FD->getGenericSignature();
-  bool isInvalidAttr = false;
-
-  // Check that requirements are defined only on
-  // generic parameter types and not on their associated or dependent types or
-  // other generic types using these parameters.
-  for (auto &req : requirements) {
-    if (req.getKind() == RequirementReprKind::SameType) {
-      auto firstType = req.getFirstType();
-      auto secondType = req.getSecondType();
-
-      if (!firstType || firstType->is<ErrorType>() ||
-          firstType->hasArchetype()) {
-        isInvalidAttr = true;
-        continue;
-      }
-
-      if (!secondType || secondType->is<ErrorType>() ||
-          secondType->hasArchetype()) {
-        isInvalidAttr = true;
-        continue;
-      }
-
-      collectUsedGenericParameters(firstType, constrainedGenericParams);
-      collectUsedGenericParameters(secondType, constrainedGenericParams);
-
-      // One of the types should be concrete and the other one should not.
-      bool isFirstTypeNonConcrete = firstType->hasTypeParameter();
-      bool isSecondTypeNonConcrete = secondType->hasTypeParameter();
-
-      if (isFirstTypeNonConcrete && isSecondTypeNonConcrete) {
-        TC.diagnose(attr->getLocation(),
-                    diag::specialize_attr_non_concrete_same_type_req)
-            .highlight(req.getSourceRange());
-        continue;
-      }
-      if (!(isFirstTypeNonConcrete ^ isSecondTypeNonConcrete)) {
-        TC.diagnose(attr->getLocation(),
-                    diag::specialize_attr_only_one_concrete_same_type_req)
-            .highlight(req.getSourceRange());
-        continue;
-      }
-      if (isFirstTypeNonConcrete) {
-        if (!isa<GenericTypeParamType>(firstType->getCanonicalType())) {
-          TC.diagnose(attr->getLocation(),
-                      diag::specialize_attr_only_generic_param_req)
-              .highlight(req.getFirstTypeRepr()->getSourceRange());
-        }
-      }
-      if (isSecondTypeNonConcrete) {
-        if (!isa<GenericTypeParamType>(secondType->getCanonicalType())) {
-          TC.diagnose(attr->getLocation(),
-                      diag::specialize_attr_only_generic_param_req)
-              .highlight(req.getSecondTypeRepr()->getSourceRange());
-        }
-      }
-      continue;
-    }
-
-    if (req.getKind() == RequirementReprKind::LayoutConstraint ||
-        req.getKind() == RequirementReprKind::TypeConstraint) {
-      auto subjectType = req.getSubject();
-
-      // Skip any unknown or error types.
-      if (!subjectType || subjectType->is<ErrorType>() ||
-          subjectType->hasArchetype()) {
-        isInvalidAttr = true;
-        continue;
-      }
-
-      if (req.getKind() == RequirementReprKind::TypeConstraint) {
-        auto constraint = req.getConstraint();
-
-        if (!constraint || constraint->hasError() ||
-            constraint->hasArchetype()) {
-          isInvalidAttr = true;
-          continue;
-        }
-
-        auto nominalTy = constraint->getNominalOrBoundGenericNominal();
-        if (!nominalTy) {
-          TC.diagnose(attr->getLocation(),
-                      diag::specialize_attr_non_nominal_type_constraint_req)
-              .highlight(req.getSourceRange());
-          continue;
-        }
-
-        auto proto = dyn_cast<ProtocolDecl>(nominalTy);
-        if (!proto) {
-          TC.diagnose(attr->getLocation(),
-                      diag::specialize_attr_non_protocol_type_constraint_req)
-              .highlight(req.getSourceRange());
-        }
-      }
-
-      bool isSubjectNonConcrete = subjectType->hasTypeParameter();
-
-      if (isSubjectNonConcrete) {
-        collectUsedGenericParameters(subjectType, constrainedGenericParams);
-        if (!isa<GenericTypeParamType>(subjectType->getCanonicalType())) {
-          TC.diagnose(attr->getLocation(),
-                      diag::specialize_attr_only_generic_param_req)
-              .highlight(req.getSubjectRepr()->getSourceRange());
-        }
-      }
-
-      if (req.getKind() == RequirementReprKind::TypeConstraint) {
-        TC.diagnose(attr->getLocation(),
-                    diag::specialize_attr_unsupported_kind_of_req)
-            .highlight(req.getSourceRange());
-      }
-      continue;
-    }
-
-    TC.diagnose(attr->getLocation(),
-                diag::specialize_attr_unsupported_kind_of_req)
-        .highlight(req.getSourceRange());
-  }
-
-  if (isInvalidAttr) {
-    attr->setInvalid();
-  }
 
   if (!attr->isFullSpecialization())
     return;
@@ -1731,6 +1628,37 @@ static void checkSpecializeAttrRequirements(
       }
     }
   }
+}
+
+/// Retrieve the canonical version of the given requirement.
+static Requirement getCanonicalRequirement(const Requirement &req) {
+  switch (req.getKind()) {
+  case RequirementKind::Conformance:
+  case RequirementKind::SameType:
+  case RequirementKind::Superclass:
+    return Requirement(req.getKind(), req.getFirstType()->getCanonicalType(),
+                       req.getSecondType()->getCanonicalType());
+
+  case RequirementKind::Layout:
+    return Requirement(req.getKind(), req.getFirstType()->getCanonicalType(),
+                       req.getLayoutConstraint());
+  }
+  llvm_unreachable("unhandled kind");
+}
+
+/// Require that the given type either not involve type parameters or be
+/// a type parameter.
+static bool diagnoseIndirectGenericTypeParam(SourceLoc loc, Type type,
+                                             TypeRepr *typeRepr) {
+  if (type->hasTypeParameter() && !type->is<GenericTypeParamType>()) {
+    type->getASTContext().Diags.diagnose(
+        loc,
+        diag::specialize_attr_only_generic_param_req)
+      .highlight(typeRepr->getSourceRange());
+    return true;
+  }
+
+  return false;
 }
 
 /// Type check that a set of requirements provided by @_specialize.
@@ -1768,163 +1696,112 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   // First, add the old generic signature.
   Builder.addGenericSignature(genericSig);
 
-  SmallVector<Requirement, 4> convertedRequirements;
-  SmallVector<RequirementRepr, 4> resolvedRequirements;
-
   // Set of generic parameters being constrained. It is used to
   // determine if a full specialization misses requirements for
   // some of the generic parameters.
   SmallPtrSet<TypeBase *, 4> constrainedGenericParams;
 
-  // Go over the set of requirements and resolve their types.
-  for (auto &req : trailingWhereClause->getRequirements()) {
-    if (req.getKind() == RequirementReprKind::SameType) {
-      auto firstType = TC.resolveType(req.getFirstTypeRepr(),
-                                      TypeResolution::forContextual(FD), None);
-      auto secondType = TC.resolveType(req.getSecondTypeRepr(),
-                                       TypeResolution::forContextual(FD), None);
-      Type interfaceFirstType;
-      Type interfaceSecondType;
+  // Go over the set of requirements, adding them to the builder.
+  SmallVector<Requirement, 4> convertedRequirements;
+  RequirementRequest::visitRequirements(
+      WhereClauseOwner(FD, attr), TypeResolutionStage::Interface,
+      [&](const Requirement &req, RequirementRepr *reqRepr) {
+        // Collect all of the generic parameters used by these types.
+        switch (req.getKind()) {
+        case RequirementKind::Conformance:
+        case RequirementKind::SameType:
+        case RequirementKind::Superclass:
+          collectUsedGenericParameters(req.getSecondType(),
+                                       constrainedGenericParams);
+          LLVM_FALLTHROUGH;
 
-      // Map types to their interface types.
-      if (firstType)
-        interfaceFirstType = firstType->mapTypeOutOfContext();
-      if (secondType)
-        interfaceSecondType = secondType->mapTypeOutOfContext();
+        case RequirementKind::Layout:
+          collectUsedGenericParameters(req.getFirstType(),
+                                       constrainedGenericParams);
+          break;
+        }
 
-      collectUsedGenericParameters(interfaceFirstType,
-                                   constrainedGenericParams);
-      collectUsedGenericParameters(interfaceSecondType,
-                                   constrainedGenericParams);
+        // Check additional constraints.
+        // FIXME: These likely aren't fundamental limitations.
+        switch (req.getKind()) {
+        case RequirementKind::SameType: {
+          bool firstHasTypeParameter = req.getFirstType()->hasTypeParameter();
+          bool secondHasTypeParameter = req.getSecondType()->hasTypeParameter();
 
-      // Skip any unknown or error types.
-      if (!firstType || firstType->is<ErrorType>() || !secondType ||
-          secondType->is<ErrorType>())
-        continue;
+          // Exactly one type can have a type parameter.
+          if (firstHasTypeParameter == secondHasTypeParameter) {
+            TC.diagnose(
+                attr->getLocation(),
+                firstHasTypeParameter
+                  ? diag::specialize_attr_non_concrete_same_type_req
+                  : diag::specialize_attr_only_one_concrete_same_type_req)
+              .highlight(reqRepr->getSourceRange());
+            return false;
+          }
 
-      Type genericType;
-      Type concreteType;
-      if (interfaceFirstType->hasTypeParameter()) {
-        genericType = interfaceFirstType;
-        concreteType = interfaceSecondType;
-      } else {
-        genericType = interfaceSecondType;
-        concreteType = interfaceFirstType;
-      }
-      // Add a resolved requirement.
-      if (interfaceFirstType->hasTypeParameter()) {
-        resolvedRequirements.push_back(RequirementRepr::getSameType(
-            TypeLoc(req.getFirstTypeRepr(), genericType), req.getEqualLoc(),
-            TypeLoc(req.getSecondTypeRepr(), concreteType)));
-      } else {
-        resolvedRequirements.push_back(RequirementRepr::getSameType(
-            TypeLoc(req.getFirstTypeRepr(), concreteType), req.getEqualLoc(),
-            TypeLoc(req.getSecondTypeRepr(), genericType)));
-      }
+          // We either need a fully-concrete type or a generic type parameter.
+          if (diagnoseIndirectGenericTypeParam(attr->getLocation(),
+                                               req.getFirstType(),
+                                               reqRepr->getFirstTypeRepr()) ||
+              diagnoseIndirectGenericTypeParam(attr->getLocation(),
+                                               req.getSecondType(),
+                                               reqRepr->getSecondTypeRepr())) {
+            return false;
+          }
+          break;
+        }
 
-      // Convert the requirement into a form which uses canonical interface
-      // types.
-      Requirement convertedRequirement(RequirementKind::SameType,
-                                       genericType->getCanonicalType(),
-                                       concreteType->getCanonicalType());
-      convertedRequirements.push_back(convertedRequirement);
-      continue;
-    }
+        case RequirementKind::Superclass:
+          TC.diagnose(attr->getLocation(),
+                      diag::specialize_attr_non_protocol_type_constraint_req)
+            .highlight(reqRepr->getSourceRange());
+          return false;
 
-    if (req.getKind() == RequirementReprKind::LayoutConstraint) {
-      auto subjectType = TC.resolveType(req.getSubjectRepr(),
-                                        TypeResolution::forContextual(FD),
-                                        None);
-      Type interfaceSubjectType;
+        case RequirementKind::Conformance:
+          if (diagnoseIndirectGenericTypeParam(attr->getLocation(),
+                                               req.getFirstType(),
+                                               reqRepr->getSubjectRepr())) {
+            return false;
+          }
 
-      // Map types to their interface types.
-      if (subjectType)
-        interfaceSubjectType = subjectType->mapTypeOutOfContext();
+          if (!req.getSecondType()->is<ProtocolType>()) {
+            TC.diagnose(attr->getLocation(),
+                        diag::specialize_attr_non_protocol_type_constraint_req)
+              .highlight(reqRepr->getSourceRange());
+            return false;
+          }
 
-      collectUsedGenericParameters(interfaceSubjectType,
-                                   constrainedGenericParams);
+          TC.diagnose(attr->getLocation(),
+                      diag::specialize_attr_unsupported_kind_of_req)
+            .highlight(reqRepr->getSourceRange());
 
-      // Skip any unknown or error types.
-      if (!subjectType || subjectType->is<ErrorType>() ||
-          !req.getLayoutConstraint() ||
-          !req.getLayoutConstraint()->isKnownLayout())
-        continue;
+          return false;
 
-      // Re-create a requirement using the resolved interface types.
-      auto resolvedReq = RequirementRepr::getLayoutConstraint(
-          TypeLoc(req.getSubjectRepr(), interfaceSubjectType),
-          req.getColonLoc(),
-          req.getLayoutConstraintLoc());
+        case RequirementKind::Layout:
+          if (diagnoseIndirectGenericTypeParam(attr->getLocation(),
+                                               req.getFirstType(),
+                                               reqRepr->getSubjectRepr())) {
+            return false;
+          }
+          break;
+        }
 
-      // Add a resolved requirement.
-      resolvedRequirements.push_back(resolvedReq);
-
-      // Convert the requirement into a form which uses canonical interface
-      // types.
-      Requirement convertedRequirement(
-          RequirementKind::Layout,
-          interfaceSubjectType->getCanonicalType(),
-          req.getLayoutConstraint());
-      convertedRequirements.push_back(convertedRequirement);
-      continue;
-    }
-
-    if (req.getKind() == RequirementReprKind::TypeConstraint) {
-      auto subjectType = TC.resolveType(req.getSubjectRepr(),
-                                        TypeResolution::forContextual(FD),
-                                        None);
-      auto constraint = TC.resolveType(req.getConstraintLoc().getTypeRepr(),
-                                       TypeResolution::forContextual(FD),
-                                       None);
-
-      Type interfaceSubjectType;
-
-      // Map types to their interface types.
-      if (subjectType)
-        interfaceSubjectType = subjectType->mapTypeOutOfContext();
-
-      collectUsedGenericParameters(interfaceSubjectType,
-                                   constrainedGenericParams);
-
-      // Skip any unknown or error types.
-      if (!subjectType || subjectType->hasError() ||
-          !constraint || constraint->hasError())
-        continue;
-
-
-      auto interfaceLayoutConstraint = constraint->mapTypeOutOfContext();
-
-      // Re-create a requirement using the resolved interface types.
-      auto resolvedReq = RequirementRepr::getTypeConstraint(
-          TypeLoc(req.getSubjectRepr(), interfaceSubjectType),
-          req.getColonLoc(),
-          TypeLoc(req.getConstraintRepr(), interfaceLayoutConstraint));
-
-      // Add a resolved requirement.
-      resolvedRequirements.push_back(resolvedReq);
-
-      // Convert the requirement into a form which uses canonical interface
-      // types.
-      Requirement convertedRequirement(
-          RequirementKind::Conformance,
-          interfaceSubjectType->getCanonicalType(),
-          interfaceLayoutConstraint->getCanonicalType());
-      convertedRequirements.push_back(convertedRequirement);
-      continue;
-    }
-  }
+        // Add the requirement to the generic signature builder.
+        using FloatingRequirementSource =
+          GenericSignatureBuilder::FloatingRequirementSource;
+        Builder.addRequirement(req, reqRepr,
+                               FloatingRequirementSource::forExplicit(reqRepr),
+                               nullptr, DC->getParentModule());
+        convertedRequirements.push_back(getCanonicalRequirement(req));
+        return false;
+      });
 
   // Check the validity of provided requirements.
-  checkSpecializeAttrRequirements(attr, FD, resolvedRequirements,
-                                  constrainedGenericParams, TC);
+  checkSpecializeAttrRequirements(attr, FD, constrainedGenericParams, TC);
 
-  // Store converted requirements in the attribute so that they are
-  // serialized later.
+  // Store the converted requirements in the attribute so that
+  // they are serialized later.
   attr->setRequirements(DC->getASTContext(), convertedRequirements);
-
-  // Add the requirements to the builder.
-  for (auto &req : resolvedRequirements)
-    Builder.addRequirement(&req, DC->getParentModule());
 
   // Check the result.
   (void)std::move(Builder).computeGenericSignature(
@@ -1958,16 +1835,6 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
                           diag::usable_from_inline_attr_with_explicit_access,
                           VD->getFullName(),
                           VD->getFormalAccess());
-    return;
-  }
-
-  // Symbols of dynamically-dispatched declarations are never referenced
-  // directly, so marking them as @usableFromInline does not make sense.
-  if (VD->isDynamic()) {
-    if (attr->isImplicit())
-      attr->setInvalid();
-    else
-      diagnoseAndRemoveAttr(attr, diag::usable_from_inline_dynamic_not_supported);
     return;
   }
 
@@ -2043,8 +1910,8 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   options |= TypeResolutionFlags::AllowUnboundGenerics;
 
   DeclContext *DC = D->getDeclContext();
-  Type T = TC.resolveType(ProtoTypeLoc.getTypeRepr(),
-                          TypeResolution::forContextual(DC), options);
+  auto resolution = TypeResolution::forContextual(DC);
+  Type T = resolution.resolveType(ProtoTypeLoc.getTypeRepr(), options);
   ProtoTypeLoc.setType(T);
 
   // Definite error-types were already diagnosed in resolveType.
@@ -2097,6 +1964,12 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   if (ED->getFormalAccess() < AccessLevel::Public &&
       !ED->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
+  }
+}
+
+void AttributeChecker::visitNonOverrideAttr(NonOverrideAttr *attr) {
+  if (auto overrideAttr = D->getAttrs().getAttribute<OverrideAttr>()) {
+    diagnoseAndRemoveAttr(overrideAttr, diag::nonoverride_and_override_attr);
   }
 }
 

@@ -166,6 +166,16 @@ def _apply_default_arguments(args):
     if not args.android or not args.build_android:
         args.build_android = False
 
+    # --test-paths implies --test and/or --validation-test
+    # depending on what directories/files have been specified.
+    if args.test_paths:
+        for path in args.test_paths:
+            if path.startswith('test'):
+                args.test = True
+            elif path.startswith('validation-test'):
+                args.test = True
+                args.validation_test = True
+
     # --validation-test implies --test.
     if args.validation_test:
         args.test = True
@@ -504,6 +514,9 @@ def create_argument_parser():
 
     option(['-p', '--swiftpm'], store_true('build_swiftpm'),
            help='build swiftpm')
+
+    option(['--swiftsyntax'], store_true('build_swiftsyntax'),
+           help='build swiftSyntax')
 
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
@@ -971,6 +984,7 @@ SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift.
                      /lldb                       (optional)
                      /llbuild                    (optional)
                      /swiftpm                    (optional, requires llbuild)
+                     /swift-syntax               (optional, requires swiftpm)
                      /compiler-rt                (optional)
                      /swift-corelibs-xctest      (optional)
                      /swift-corelibs-foundation  (optional)

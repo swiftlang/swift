@@ -10,4 +10,4 @@
 //
 // Make sure that it actually works. (The link step fails if -num-threads is not ignored.)
 //
-// RUN: %swiftc_driver -enable-batch-mode -num-threads 2 %t/main.swift -import-objc-header %t/bridgingHeader.h
+// RUN: %swiftc_driver -enable-batch-mode -num-threads 2 -c %t/main.swift -import-objc-header %t/bridgingHeader.h -o %t/main.o

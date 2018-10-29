@@ -58,6 +58,8 @@ NOTE(extended_type_declared_here,none,
 
 ERROR(ambiguous_member_overload_set,none,
       "ambiguous reference to member %0", (DeclName))
+ERROR(ambiguous_reference_to_decl,none,
+      "ambiguous reference to %0 %1", (DescriptiveDeclKind, DeclName))
 
 ERROR(ambiguous_subscript,none,
       "ambiguous subscript with base type %0 and index type %1",
@@ -499,8 +501,6 @@ ERROR(expr_swift_keypath_invalid_component,none,
       "invalid component of Swift key path", ())
 ERROR(expr_swift_keypath_not_starting_with_type,none,
       "a Swift key path must begin with a type", ())
-ERROR(expr_swift_keypath_unimplemented_component,none,
-      "key path support for %0 components is not implemented", (StringRef))
 ERROR(expr_smart_keypath_value_covert_to_contextual_type,none,
       "key path value type %0 cannot be converted to contextual type %1",
       (Type, Type))
@@ -689,10 +689,11 @@ ERROR(use_nonmatching_operator,none,
       "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
       (DeclName, unsigned))
 ERROR(unsupported_recursion_in_associated_type_reference,none,
-      "unsupported recursion for reference to associated type %0 of type %1",
-      (DeclName, Type))
+      "unsupported recursion for reference to %select{associated type|type alias}0 %1 of type %2",
+      (bool, DeclName, Type))
 ERROR(broken_associated_type_witness,none,
-      "reference to invalid associated type %0 of type %1", (DeclName, Type))
+      "reference to invalid %select{associated type|type alias}0 %1 of type %2",
+      (bool, DeclName, Type))
 
 ERROR(unspaced_binary_operator_fixit,none,
       "missing whitespace between %0 and %1 operators",
@@ -705,7 +706,6 @@ NOTE(unspaced_binary_operators_candidate,none,
 ERROR(unspaced_unary_operator,none,
       "unary operators must not be juxtaposed; parenthesize inner expression",
       ())
-
 
 ERROR(use_unresolved_identifier,none,
       "use of unresolved %select{identifier|operator}1 %0", (DeclName, bool))
@@ -1180,9 +1180,19 @@ ERROR(access_control_setter_more,none,
       "%select{variable|property|subscript}1 cannot have "
       "%select{%error|a fileprivate|an internal|a public|an open}2 setter",
       (AccessLevel, unsigned, AccessLevel))
+WARNING(access_control_setter_redundant,none,
+      "'%select{private|fileprivate|internal|public|open}0(set)' modifier is "
+      "redundant for %select{a private|a fileprivate|an internal|a public|an open}2 "
+      "%1",
+      (AccessLevel, DescriptiveDeclKind, AccessLevel))
 WARNING(access_control_ext_member_more,none,
     "declaring %select{%error|a fileprivate|an internal|a public|open}0 %1 in "
-    "%select{a private|a fileprivate|an internal|public|%error}2 extension",
+    "%select{a private|a fileprivate|an internal|a public|%error}2 extension",
+    (AccessLevel, DescriptiveDeclKind, AccessLevel))
+WARNING(access_control_ext_member_redundant,none,
+    "'%select{%error|fileprivate|internal|public|%error}0' modifier is redundant "
+    "for %1 declared in %select{a private (equivalent to fileprivate)|a fileprivate"
+    "|an internal|a public|%error}2 extension",
     (AccessLevel, DescriptiveDeclKind, AccessLevel))
 ERROR(access_control_ext_requirement_member_more,none,
     "cannot declare %select{%error|a fileprivate|an internal|a public|an open}0 %1 "
@@ -1254,12 +1264,6 @@ ERROR(missing_unimplemented_init_runtime,none,
       "standard library error: missing _unimplementedInitializer", ())
 ERROR(missing_undefined_runtime,none,
       "standard library error: missing _undefined", ())
-WARNING(unsupported_synthesize_init_variadic,none,
-        "synthesizing a variadic inherited initializer for subclass %0 is "
-        "unsupported",
-        (Type))
-NOTE(variadic_superclass_init_here,none,
-     "variadic superclass initializer defined here", ())
 
 WARNING(expr_dynamic_lookup_swift3_objc_inference,none,
         "reference to %0 %1 of %2 depends on '@objc' inference "
@@ -1326,6 +1330,7 @@ WARNING(pattern_type_access_inferred_warn,none,
         "because its type %6 uses "
         "%select{a private|a fileprivate|an internal|%error|%error}5 type",
         (bool, bool, bool, AccessLevel, bool, AccessLevel, Type))
+
 ERROR(pattern_type_not_usable_from_inline,none,
       "type referenced from a '@usableFromInline' "
       "%select{%select{variable|constant}0|property}1 "
@@ -1336,6 +1341,10 @@ WARNING(pattern_type_not_usable_from_inline_warn,none,
         "%select{%select{variable|constant}0|property}1 "
         "should be '@usableFromInline' or public",
         (bool, bool))
+ERROR(pattern_type_not_usable_from_inline_fixed_layout,none,
+      "type referenced from a stored property in a @_fixed_layout struct must "
+      "be '@usableFromInline' or public",
+      (/*ignored*/bool, /*ignored*/bool))
 ERROR(pattern_type_not_usable_from_inline_inferred,none,
       "type referenced from a '@usableFromInline' "
       "%select{%select{variable|constant}0|property}1 "
@@ -1348,19 +1357,29 @@ WARNING(pattern_type_not_usable_from_inline_inferred_warn,none,
         "with inferred type %2 "
         "should be '@usableFromInline' or public",
         (bool, bool, Type))
+ERROR(pattern_type_not_usable_from_inline_inferred_fixed_layout,none,
+      "type referenced from a stored property with inferred type %2 in a "
+      "@_fixed_layout struct must be '@usableFromInline' or public",
+      (/*ignored*/bool, /*ignored*/bool, Type))
+
 ERROR(pattern_binds_no_variables,none,
       "%select{property|global variable}0 declaration does not bind any "
       "variables",
       (unsigned))
 
+ERROR(pattern_no_uninhabited_type,none,
+      "%select{%select{variable|constant}0|stored property}1 %2 cannot have "
+      "enum type %3 with no cases",
+      (bool, bool, Identifier, Type))
+ERROR(pattern_no_uninhabited_tuple_type,none,
+      "%select{%select{variable|constant}0|stored property}1 %2 cannot have "
+      "tuple type %3 containing enum with no cases",
+      (bool, bool, Identifier, Type))
+
 ERROR(nscoding_unstable_mangled_name,none,
       "%select{private|fileprivate|nested|local}0 class %1 has an "
       "unstable name when archiving via 'NSCoding'",
       (unsigned, Type))
-WARNING(nscoding_unstable_mangled_name_warn,none,
-        "%select{private|fileprivate|nested|local}0 class %1 has an "
-        "unstable name when archiving via 'NSCoding'",
-        (unsigned, Type))
 NOTE(unstable_mangled_name_add_objc_new,none,
      "for new classes, use '@objc' to specify a unique, prefixed Objective-C "
      "runtime name", ())
@@ -1486,7 +1505,7 @@ ERROR(extension_nongeneric_trailing_where,none,
       "trailing 'where' clause for extension of non-generic type %0",
       (DeclName))
 ERROR(extension_protocol_inheritance,none,
-      "extension of protocol %0 cannot have an inheritance clause", (Type))
+      "extension of protocol %0 cannot have an inheritance clause", (DeclName))
 ERROR(objc_generic_extension_using_type_parameter,none,
       "extension of a generic Objective-C class cannot access the class's "
       "generic parameters at runtime", ())
@@ -1535,12 +1554,22 @@ ERROR(types_not_equal_decl,none,
 ERROR(types_not_equal_in_decl_ref,none,
       "referencing %0 %1 on %2 requires the types %3 and %4 be equivalent",
       (DescriptiveDeclKind, DeclName, Type, Type, Type))
+ERROR(types_not_inherited_decl,none,
+      "%0 %1 requires that %2 inherit from %3",
+      (DescriptiveDeclKind, DeclName, Type, Type))
+ERROR(types_not_inherited_in_decl_ref,none,
+      "referencing %0 %1 on %2 requires that %3 inherit from %4",
+      (DescriptiveDeclKind, DeclName, Type, Type, Type))
 NOTE(where_requirement_failure_one_subst,none,
      "where %0 = %1", (Type, Type))
 NOTE(where_requirement_failure_both_subst,none,
      "where %0 = %1, %2 = %3", (Type, Type, Type, Type))
 NOTE(requirement_implied_by_conditional_conformance,none,
      "requirement from conditional conformance of %0 to %1", (Type, Type))
+NOTE(candidate_types_conformance_requirement,none,
+     "candidate requires that %0 conform to %1 "
+     "(requirement specified as %2 == %3%4)",
+     (Type, Type, Type, Type, StringRef))
 NOTE(candidate_types_equal_requirement,none,
      "candidate requires that the types %0 and %1 be equivalent "
      "(requirement specified as %2 == %3%4)",
@@ -1603,10 +1632,6 @@ ERROR(requirement_restricts_self,none,
       "%0 requirement %1 cannot add constraint '%2%select{:|:| ==|:}3 %4' on "
       "'Self'",
       (DescriptiveDeclKind, DeclName, StringRef, unsigned, StringRef))
-WARNING(requirement_restricts_self_swift3,none,
-        "adding constraint '%2%select{:|:| ==|:}3 %4' on 'Self' via %0 "
-        "requirement %1 is deprecated in Swift 3",
-        (DescriptiveDeclKind, DeclName, StringRef, unsigned, StringRef))
 ERROR(witness_argument_name_mismatch,none,
       "%select{method|initializer}0 %1 has different argument labels from those "
       "required by protocol %2 (%3)", (bool, DeclName, Type, DeclName))
@@ -1669,6 +1694,11 @@ ERROR(type_witness_objc_generic_parameter,none,
 NOTE(witness_fix_access,none,
      "mark the %0 as '%select{%error|fileprivate|internal|public|%error}1' to "
      "satisfy the requirement", (DescriptiveDeclKind, AccessLevel))
+WARNING(assoc_type_default_conformance_failed,none,
+        "default type %0 for associated type %1 does not satisfy constraint "
+        "%2: %3", (Type, DeclName, Type, Type))
+NOTE(assoc_type_default_here,none,
+     "associated type %0 has default type %1 written here", (DeclName, Type))
 
 ERROR(protocol_access,none,
       "%select{protocol must be declared %select{"
@@ -1749,9 +1779,18 @@ NOTE(bad_associated_type_deduction,none,
      "unable to infer associated type %0 for protocol %1",
      (DeclName, DeclName))
 NOTE(associated_type_deduction_witness_failed,none,
-     "inferred type %1 (by matching requirement %0) is invalid: "
-     "does not %select{inherit from|conform to}3 %2",
+     "candidate would match and infer %0 = %1 if %1 "
+     "%select{inherited from|conformed to}3 %2",
      (DeclName, Type, Type, bool))
+NOTE(associated_type_witness_conform_impossible,none,
+     "candidate can not infer %0 = %1 because %1 "
+     "is not a nominal type and so can't conform to %2",
+     (DeclName, Type, Type))
+NOTE(associated_type_witness_inherit_impossible,none,
+     "candidate can not infer %0 = %1 because %1 "
+     "is not a class type and so can't inherit from %2",
+     (DeclName, Type, Type))
+
 NOTE(ambiguous_associated_type_deduction,none,
      "ambiguous inference of associated type %0: %1 vs. %2",
      (DeclName, Type, Type))
@@ -1772,6 +1811,9 @@ NOTE(protocol_witness_kind_conflict,none,
      "a subscript}0", (RequirementKind))
 NOTE(protocol_witness_type_conflict,none,
      "candidate has non-matching type %0%1", (Type, StringRef))
+NOTE(protocol_witness_missing_requirement,none,
+     "candidate would match if %0 %select{conformed to|subclassed|"
+     "was the same type as}2 %1", (Type, Type, unsigned))
 
 NOTE(protocol_witness_optionality_conflict,none,
      "candidate %select{type has|result type has|parameter type has|"
@@ -1891,11 +1933,11 @@ ERROR(protocol_composition_one_class,none,
 
 ERROR(requires_conformance_nonprotocol,none,
       "type %0 constrained to non-protocol, non-class type %1",
-      (TypeLoc, TypeLoc))
+      (Type, Type))
 ERROR(requires_not_suitable_archetype,none,
       "type %0 in conformance requirement does not refer to a "
       "generic parameter or associated type",
-      (TypeLoc))
+      (Type))
 WARNING(requires_no_same_type_archetype,none,
         "neither type in same-type constraint (%0 or %1) refers to a "
         "generic parameter or associated type",
@@ -2027,6 +2069,9 @@ NOTE(overridden_here_can_be_objc,none,
 
 ERROR(missing_override,none,
       "overriding declaration requires an 'override' keyword", ())
+WARNING(missing_override_warn,none,
+        "implicit override should be marked with 'override' or suppressed "
+        "with '@_nonoverride'", ())
 
 ERROR(multiple_override,none,
       "%0 has already been overridden", (DeclName))
@@ -2090,6 +2135,10 @@ NOTE(override_type_mismatch_with_fixits_init,none,
      (unsigned, Type))
 ERROR(override_nonclass_decl,none,
       "'override' can only be specified on class members", ())
+ERROR(nonoverride_wrong_decl_context,none,
+      "'@_nonoverride' can only be specified on class or protocol members", ())
+ERROR(nonoverride_and_override_attr,none,
+      "'override' cannot be combined with '@_nonoverride'", ())
 ERROR(override_property_type_mismatch,none,
       "property %0 with type %1 cannot override a property with type %2",
       (Identifier, Type, Type))
@@ -2113,9 +2162,6 @@ ERROR(override_dynamic_self_mismatch,none,
       "cannot override a Self return type with a non-Self return type",
       ())
 ERROR(override_class_declaration_in_extension,none,
-      "cannot override a non-dynamic class declaration from an extension",
-      ())
-WARNING(override_class_declaration_in_extension_warning,none,
       "cannot override a non-dynamic class declaration from an extension",
       ())
 ERROR(override_throws,none,
@@ -2215,8 +2261,6 @@ ERROR(inheritance_from_cf_class,none,
 ERROR(inheritance_from_objc_runtime_visible_class,none,
       "cannot inherit from class %0 because it is only visible via the "
       "Objective-C runtime", (Identifier))
-WARNING(class_inherits_anyobject,none,
-        "conformance of class %0 to 'AnyObject' is redundant", (Type))
 
 // Enums
 ERROR(enum_case_access,none,
@@ -2242,7 +2286,7 @@ ERROR(multiple_enum_raw_types,none,
 ERROR(raw_type_not_first,none,
   "raw type %0 must appear first in the enum inheritance clause", (Type))
 ERROR(raw_type_not_literal_convertible,none,
-      "raw type %0 is not expressible by any literal",
+      "raw type %0 is not expressible by a string, integer, or floating-point literal",
       (Type))
 ERROR(enum_raw_type_not_equatable,none,
       "RawRepresentable conformance cannot be synthesized because raw type %0 is not "
@@ -2308,9 +2352,6 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
      "construct %0 from unwrapped %1 value", (Type, Type))
 
 // Derived conformances
-ERROR(swift3_cannot_synthesize_in_extension,none,
-      "implementation of %0 cannot be automatically synthesized in an extension "
-      "in Swift 3", (Type))
 ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,
       "implementation of %0 for non-final class cannot be automatically "
       "synthesized in extension because initializer requirement %1 can only be "
@@ -2454,9 +2495,6 @@ ERROR(override_static,none,
 
 ERROR(member_cannot_be_final,none,
       "only classes and class members may be marked with 'final'",
-      ())
-WARNING(protocol_extension_cannot_be_final,none,
-      "functions in a protocol extension do not need to be marked with 'final'",
       ())
 
 ERROR(final_not_allowed_here,none,
@@ -3002,11 +3040,11 @@ NOTE(force_optional_to_any,none,
 NOTE(silence_optional_to_any,none,
      "explicitly cast to %0 with '%1' to silence this warning",
      (Type, StringRef))
-WARNING(optional_in_string_interpolation_segment,none,
-        "string interpolation produces a debug description for an optional "
+WARNING(debug_description_in_string_interpolation_segment,none,
+        "string interpolation produces a debug description for %select{an optional|a function}0 "
         "value; did you mean to make this explicit?",
-        ())
-NOTE(silence_optional_in_interpolation_segment_call,none,
+        (bool))
+NOTE(silence_debug_description_in_interpolation_segment_call,none,
      "use 'String(describing:)' to silence this warning", ())
 
 ERROR(invalid_noescape_use,none,
@@ -3114,6 +3152,9 @@ ERROR(assignment_bang_has_immutable_subcomponent,none,
 NOTE(change_to_mutating,none,
      "mark %select{method|accessor}0 'mutating' to make 'self' mutable",
      (bool))
+NOTE(masked_instance_variable,none,
+     "add explicit 'self.' to refer to mutable property of %0",
+     (Type))
 
 ERROR(assignment_let_property_delegating_init,none,
       "'let' property %0 may not be initialized directly; use "
@@ -3264,10 +3305,6 @@ NOTE(unowned_assignment_requires_strong,none,
 ERROR(isa_collection_downcast_pattern_value_unimplemented,none,
       "collection downcast in cast pattern is not implemented; use an explicit "
       "downcast to %0 instead", (Type))
-
-WARNING(swift3_ignore_specialized_enum_element_call,none,
-        "cannot specialize enum case; ignoring generic argument, "
-        "which will be rejected in future version of Swift", ())
 
 //------------------------------------------------------------------------------
 // MARK: Error-handling diagnostics
@@ -3771,11 +3808,6 @@ ERROR(objc_class_method_not_permitted,none,
       OBJC_DIAG_SELECT " defines Objective-C class method %2, which is "
       "not permitted by Swift", (unsigned, DeclName, ObjCSelector))
 
-WARNING(objc_class_method_not_permitted_swift3_compat_warning,none,
-      OBJC_DIAG_SELECT " defines Objective-C class method %2, which is "
-      "not guaranteed to be invoked by Swift and will be disallowed in future "
-      "versions", (unsigned, DeclName, ObjCSelector))
-
 ERROR(objc_witness_selector_mismatch,none,
       "Objective-C method %2 provided by " OBJC_DIAG_SELECT
       " does not match the requirement's selector (%3)",
@@ -3988,9 +4020,6 @@ WARNING(inlinable_implies_usable_from_inline,none,
 
 ERROR(usable_from_inline_attr_in_protocol,none,
       "'@usableFromInline' attribute cannot be used in protocols", ())
-
-ERROR(usable_from_inline_dynamic_not_supported,none,
-      "'@usableFromInline' attribute cannot be applied to 'dynamic' declarations", ())
 
 #define FRAGILE_FUNC_KIND \
   "%select{a '@_transparent' function|" \

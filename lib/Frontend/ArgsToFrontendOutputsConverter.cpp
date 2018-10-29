@@ -14,9 +14,9 @@
 #include "ArgsToFrontendInputsConverter.h"
 #include "ArgsToFrontendOptionsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Frontend/Frontend.h"
-#include "swift/Frontend/OutputFileMap.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "swift/Strings.h"
@@ -294,13 +294,13 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
   auto loadedModuleTrace = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_loaded_module_trace_path);
   auto TBD = getSupplementaryFilenamesFromArguments(options::OPT_emit_tbd_path);
-  auto moduleInterfaceOutput = getSupplementaryFilenamesFromArguments(
-      options::OPT_emit_interface_path);
+  auto parseableInterfaceOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_parseable_module_interface_path);
 
   if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
       !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
-      !moduleInterfaceOutput) {
+      !parseableInterfaceOutput) {
     return None;
   }
   std::vector<SupplementaryOutputPaths> result;
@@ -318,7 +318,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.FixItsOutputPath = (*fixItsOutput)[i];
     sop.LoadedModuleTracePath = (*loadedModuleTrace)[i];
     sop.TBDPath = (*TBD)[i];
-    sop.ModuleInterfaceOutputPath = (*moduleInterfaceOutput)[i];
+    sop.ParseableInterfaceOutputPath = (*parseableInterfaceOutput)[i];
 
     result.push_back(sop);
   }
@@ -395,7 +395,8 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       defaultSupplementaryOutputPathExcludingExtension);
 
   // There is no non-path form of -emit-interface-path
-  auto moduleInterfaceOutputPath = pathsFromArguments.ModuleInterfaceOutputPath;
+  auto parseableInterfaceOutputPath =
+      pathsFromArguments.ParseableInterfaceOutputPath;
 
   ID emitModuleOption;
   std::string moduleExtension;
@@ -418,7 +419,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.FixItsOutputPath = fixItsOutputPath;
   sop.LoadedModuleTracePath = loadedModuleTracePath;
   sop.TBDPath = tbdPath;
-  sop.ModuleInterfaceOutputPath = moduleInterfaceOutputPath;
+  sop.ParseableInterfaceOutputPath = parseableInterfaceOutputPath;
   return sop;
 }
 
@@ -493,7 +494,8 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
       {file_types::TY_SerializedDiagnostics, paths.SerializedDiagnosticsPath},
       {file_types::TY_ModuleTrace, paths.LoadedModuleTracePath},
       {file_types::TY_TBD, paths.TBDPath},
-      {file_types::TY_SwiftModuleInterfaceFile,paths.ModuleInterfaceOutputPath}
+      {file_types::TY_SwiftParseableInterfaceFile,
+       paths.ParseableInterfaceOutputPath}
   };
   for (const std::pair<file_types::ID, std::string &> &typeAndString :
        typesAndStrings) {

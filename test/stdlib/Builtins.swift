@@ -29,6 +29,10 @@ var tests = TestSuite("Builtins")
 
 class X {}
 
+struct W {
+    weak var weakX: X?
+}
+
 tests.test("_isUnique/NativeObject") {
   var a: Builtin.NativeObject = Builtin.castToNativeObject(X())
   expectNotEqual(false, _isUnique_native(&a))
@@ -86,17 +90,6 @@ tests.test("_isUnique_native/SpareBitTrap")
   _ = _isUnique_native(&b)
 }
 
-tests.test("_isUniqueOrPinned_native/SpareBitTrap")
-  .skip(.custom(
-    { !_isStdlibInternalChecksEnabled() },
-    reason: "sanity checks are disabled in this build of stdlib"))
-  .code {
-  // Fake an ObjC pointer.
-  var b = _makeObjCBridgeObject(X())
-  expectCrashLater()
-  _ = _isUniqueOrPinned_native(&b)
-}
-
 tests.test("_isUnique_native/NonNativeTrap")
   .skip(.custom(
     { !_isStdlibInternalChecksEnabled() },
@@ -105,16 +98,6 @@ tests.test("_isUnique_native/NonNativeTrap")
   var x = XObjC()
   expectCrashLater()
   _ = _isUnique_native(&x)
-}
-
-tests.test("_isUniqueOrPinned_native/NonNativeTrap")
-  .skip(.custom(
-    { !_isStdlibInternalChecksEnabled() },
-    reason: "sanity checks are disabled in this build of stdlib"))
-  .code {
-  var x = XObjC()
-  expectCrashLater()
-  _ = _isUniqueOrPinned_native(&x)
 }
 #endif // _ObjC
 
@@ -292,6 +275,13 @@ tests.test("_isPOD") {
   expectTrue(_isPOD(Int.self))
   expectFalse(_isPOD(X.self))
   expectFalse(_isPOD(P.self))
+}
+
+tests.test("_isBitwiseTakable") {
+  expectTrue(_isBitwiseTakable(Int.self))
+  expectTrue(_isBitwiseTakable(X.self))
+  expectTrue(_isBitwiseTakable(P.self))
+  expectFalse(_isBitwiseTakable(W.self))
 }
 
 tests.test("_isOptional") {

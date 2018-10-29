@@ -63,12 +63,6 @@ public:
   /// Resolve the generic environment of the given protocol.
   virtual void resolveProtocolEnvironment(ProtocolDecl *proto) = 0;
 
-  /// Resolve the trailing where clause of the given protocol in-place.
-  virtual void resolveTrailingWhereClause(ProtocolDecl *proto) = 0;
-
-  /// Bind an extension to its extended type.
-  virtual void bindExtension(ExtensionDecl *ext) = 0;
-
   /// Resolve the type of an extension.
   ///
   /// This can be called to ensure that the members of an extension can be
@@ -93,6 +87,23 @@ class LazyContextData {
 public:
   /// The lazy member loader for this context.
   LazyMemberLoader *loader;
+};
+
+/// A class that can lazily parse members for an iterable decl context.
+class LazyMemberParser {
+public:
+  virtual ~LazyMemberParser() = default;
+
+  /// Populates a given decl context \p IDC with all of its members.
+  ///
+  /// The implementation should add the members to IDC.
+  virtual void parseMembers(IterableDeclContext *IDC) = 0;
+
+  /// Return whether the iterable decl context needs parsing.
+  virtual bool hasUnparsedMembers(const IterableDeclContext *IDC) = 0;
+
+  /// Parse all delayed decl list members.
+  virtual void parseAllDelayedDeclLists() = 0;
 };
 
 /// Context data for generic contexts.
