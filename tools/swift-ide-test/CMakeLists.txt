@@ -2,8 +2,6 @@ add_swift_host_tool(swift-ide-test
   swift-ide-test.cpp
   ModuleAPIDiff.cpp
   XMLValidator.cpp
-  LLVM_COMPONENT_DEPENDS
-    DebugInfoCodeView
   SWIFT_COMPONENT tools
 )
 target_link_libraries(swift-ide-test
