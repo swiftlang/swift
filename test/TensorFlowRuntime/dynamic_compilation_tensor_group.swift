@@ -5,10 +5,11 @@ import TensorFlow
 import TensorFlowUnittest
 import StdlibUnittest
 
-var DynamicCompilationGenericsTest = TestSuite("DynamicCompilationGenerics")
+var TensorGroupTest = TestSuite("TensorGroup")
 
 /// This function cannot be compiled in graph mode because it passes a value
 /// of generic type T to a #tfop.
+/// T is address-only because it is generic.
 @inline(never)
 func tensorSliceDataset<T: TensorGroup>(_ t: T) -> VariantHandle {
   return #tfop("TensorSliceDataset", [t], Toutput_types$dtype: T._typeList,
@@ -17,6 +18,7 @@ func tensorSliceDataset<T: TensorGroup>(_ t: T) -> VariantHandle {
 
 /// This function cannot be compiled in graph mode because it executes a #tfop
 /// with generic return type T.
+/// T is address-only because it is generic.
 @inline(never)
 func first<T: TensorGroup>(_ dataset: VariantHandle) -> T {
   let iterator: ResourceHandle = #tfop(
@@ -29,6 +31,17 @@ func first<T: TensorGroup>(_ dataset: VariantHandle) -> T {
 
 /// This function cannot be compiled in graph mode because it executes a #tfop
 /// with generic return type T.
+/// T is address-only because it is generic.
+@inline(never)
+func pack<T: TensorGroup, Scalar: AccelerableByTensorFlow>(
+    _ t: T
+) -> Tensor<Scalar> {
+  return #tfop("Pack", [t], T$dtype: Scalar.tensorFlowDataType)
+}
+
+/// This function cannot be compiled in graph mode because it executes a #tfop
+/// with generic return type T.
+/// T is address-only because it is generic.
 @inline(never)
 func unpack<T: TensorGroup, Scalar: AccelerableByTensorFlow>(
     _ tensor: Tensor<Scalar>
@@ -62,24 +75,43 @@ extension EmptyExample : TensorGroup {
   init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {}
 }
 
-DynamicCompilationGenericsTest.testAllBackends("dataset") {
+TensorGroupTest.testAllBackends("dataset, address-only") {
   let dataset = tensorSliceDataset(Example(x: Tensor([1, 2, 3]), y: Tensor([4, 5, 6])))
   let example: Example = first(dataset)
   expectEqual(1, example.x.scalar!)
   expectEqual(4, example.y.scalar!)
 }
 
-DynamicCompilationGenericsTest.testAllBackends("unpack") {
+TensorGroupTest.testAllBackends("input, address-only") {
+  let example = Example(x: Tensor([1, 2]), y: Tensor([3, 4]))
+  let packed: Tensor<Float> = pack(example)
+  expectEqual(ShapedArray(shape: [2, 2], scalars: [1, 2, 3, 4]), packed.array)
+}
+
+TensorGroupTest.testAllBackends("output, address-only") {
   let tensor = Tensor<Float>([[1, 2], [3, 4]])
   let example: Example = unpack(tensor)
   expectEqual(ShapedArray([1, 2]), example.x.array)
   expectEqual(ShapedArray([3, 4]), example.y.array)
 }
 
-DynamicCompilationGenericsTest.testAllBackends("unpack to empty struct") {
+TensorGroupTest.testAllBackends("output to empty struct, address-only") {
   let tensor = Tensor<Float>(shape: [0], scalars: [])
   let example: EmptyExample = unpack(tensor)
   expectEqual(EmptyExample(), example)
 }
+
+// When the input is a loadable type that conforms to TensorGroup, the
+// graph_op receives the input as a value (rather than an address as in the
+// address-only tests), so this tests a different code path that handles
+// values.
+TensorGroupTest.testAllBackends("input, loadable") {
+  let example = Example(x: Tensor([1, 2]), y: Tensor([3, 4]))
+  let packed: Tensor<Float> = #tfop("Pack", [example],
+                                    T$dtype: Float.tensorFlowDataType)
+  expectEqual(ShapedArray(shape: [2, 2], scalars: [1, 2, 3, 4]), packed.array)
+}
+
+// TODO(marcrasi): Loadable output tests, once that is implemented.
 
 runAllTests()

@@ -527,6 +527,7 @@ public:
   };
   llvm::IntegerType *Int64Ty;          /// i64
   // SWIFT_ENABLE_TENSORFLOW
+  llvm::Type *DoubleTy;                /// double
   llvm::Type *FloatTy;                 /// float
 
   union {

@@ -14,6 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+import CTensorFlow
+
 /// A protocol for types that can be used as tensor operation inputs and
 /// outputs. When a TensorGroup is used as an input, it gets passed to the
 /// tensor operation as an input list whose elements are the tensor fields of
@@ -47,5 +49,84 @@ public extension TensorGroup {
   /// represents unknown shape.
   static var _unknownShapeList: [TensorShape?] {
     return Array(repeating: nil, count: Int(_tensorHandleCount))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Conform standard TensorFlow types to TensorGroup
+//===----------------------------------------------------------------------===//
+
+extension TensorHandle : TensorGroup where Scalar : AccelerableByTensorFlow {
+  public static var _typeList: [TensorDataType] {
+    return [Scalar.tensorFlowDataType]
+  }
+
+  public func _unpackTensorHandles(
+      into address: UnsafeMutablePointer<CTensorHandle>?) {
+    address!.initialize(to: _cTensorHandle)
+  }
+
+  public convenience init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
+    self.init(_owning: tensorHandles!.pointee)
+  }
+}
+
+extension ResourceHandle : TensorGroup {
+  public static var _typeList: [TensorDataType] {
+    return [TensorDataType(TF_RESOURCE)]
+  }
+
+  public func _unpackTensorHandles(
+      into address: UnsafeMutablePointer<CTensorHandle>?) {
+    address!.initialize(to: _cTensorHandle)
+  }
+
+  public convenience init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
+    self.init(owning: tensorHandles!.pointee)
+  }
+}
+
+extension VariantHandle : TensorGroup {
+  public static var _typeList: [TensorDataType] {
+    return [TensorDataType(TF_VARIANT)]
+  }
+
+  public func _unpackTensorHandles(
+      into address: UnsafeMutablePointer<CTensorHandle>?) {
+    address!.initialize(to: _cTensorHandle)
+  }
+
+  public convenience init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
+    self.init(owning: tensorHandles!.pointee)
+  }
+}
+
+extension Tensor : TensorGroup where Scalar : AccelerableByTensorFlow {
+  public static var _typeList: [TensorDataType] {
+    return [Scalar.tensorFlowDataType]
+  }
+
+  public func _unpackTensorHandles(
+      into address: UnsafeMutablePointer<CTensorHandle>?) {
+    address!.initialize(to: handle._cTensorHandle)
+  }
+
+  public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
+    self.init(handle: TensorHandle(_owning: tensorHandles!.pointee))
+  }
+}
+
+extension TensorElementLiteral : TensorGroup where Scalar : AccelerableByTensorFlow {
+  public static var _typeList: [TensorDataType] {
+    return [Scalar.tensorFlowDataType]
+  }
+
+  public func _unpackTensorHandles(
+      into address: UnsafeMutablePointer<CTensorHandle>?) {
+    address!.initialize(to: handle._cTensorHandle)
+  }
+
+  public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
+    self.init(handle: TensorHandle(_owning: tensorHandles!.pointee))
   }
 }

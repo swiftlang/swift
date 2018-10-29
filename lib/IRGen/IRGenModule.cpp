@@ -164,6 +164,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   Int32PtrTy = Int32Ty->getPointerTo();
   Int64Ty = llvm::Type::getInt64Ty(getLLVMContext());
   // SWIFT_ENABLE_TENSORFLOW
+  DoubleTy = llvm::Type::getDoubleTy(getLLVMContext());
   FloatTy = llvm::Type::getFloatTy(getLLVMContext());
 
   Int8PtrTy = llvm::Type::getInt8PtrTy(getLLVMContext());
