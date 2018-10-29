@@ -28,42 +28,64 @@ let largeString: String = {
   return result
 }()
 
+extension FixedWidthInteger {
+  var hexStr: String { return "0x\(String(self, radix: 16, uppercase: true))" }
+}
+
 let StringBreadcrumbsTests = TestSuite("StringBreadcrumbsTests")
 
-StringBreadcrumbsTests.test("largeString") {
-  var utf16CodeUnits = Array(largeString.utf16)
-  var utf16Indices = Array(largeString.utf16.indices)
+func validateBreadcrumbs(_ str: String) {
+  var utf16CodeUnits = Array(str.utf16)
+  var utf16Indices = Array(str.utf16.indices)
   var outputBuffer = Array<UInt16>(repeating: 0, count: utf16CodeUnits.count)
 
   for i in 0..<(utf16CodeUnits.count-1) {
     for j in (i+1)..<utf16CodeUnits.count {
       let range = Range(uncheckedBounds: (i, j))
-      let indexRange = largeString._toUTF16Indices(range)
 
-      // Range<String.Index> from Range<Int>
+      let indexRange = str._toUTF16Indices(range)
+      // Range<String.Index> <=> Range<Int>
+      expectEqual(utf16Indices[i], indexRange.lowerBound)
+      expectEqual(utf16Indices[j], indexRange.upperBound)
       expectEqualSequence(
-        utf16CodeUnits[i..<j], largeString.utf16[indexRange])
-
-      // Copy characters      
-      outputBuffer.withUnsafeMutableBufferPointer {
-        largeString._copyUTF16CodeUnits(into: $0, range: range)
-      }
-      expectEqualSequence(utf16CodeUnits[i..<j], outputBuffer[..<range.count])
-
-      // Range<Int> from Range<String.Index>
-      let roundTripOffsets = largeString._toUTF16Offsets(indexRange)
+        utf16CodeUnits[i..<j], str.utf16[indexRange])
+      let roundTripOffsets = str._toUTF16Offsets(indexRange)
       expectEqualSequence(range, roundTripOffsets)
 
       // Single Int <=> String.Index
-      expectEqual(indexRange.lowerBound, largeString._toUTF16Index(i))
-      expectEqual(indexRange.upperBound, largeString._toUTF16Index(j))
-      expectEqual(i, largeString._toUTF16Offset(indexRange.lowerBound))
-      expectEqual(j, largeString._toUTF16Offset(indexRange.upperBound))
+      expectEqual(indexRange.lowerBound, str._toUTF16Index(i))
+      expectEqual(indexRange.upperBound, str._toUTF16Index(j))
+      expectEqual(i, str._toUTF16Offset(indexRange.lowerBound))
+      expectEqual(j, str._toUTF16Offset(indexRange.upperBound))
+
+      // Copy characters
+      outputBuffer.withUnsafeMutableBufferPointer {
+        str._copyUTF16CodeUnits(into: $0, range: range)
+      }
+      expectEqualSequence(utf16CodeUnits[i..<j], outputBuffer[..<range.count])
     }
   }
 }
 
-// TODO(String testing): hammer breadcrumb boundaries more, maybe internals too
+StringBreadcrumbsTests.test("largeString") {
+  validateBreadcrumbs(largeString)
+}
+
+// Test various boundary conditions with surrogate pairs aligning or not
+// aligning
+StringBreadcrumbsTests.test("surrogates-heavy") {
+  let nonBMP = String(repeating: "𓀀", count: 1 + (64 / 2))
+
+  // Mis-align the hieroglyphics by 1,2,3 UTF-8 and UTF-16 code units
+  validateBreadcrumbs(nonBMP)
+  validateBreadcrumbs("a" + nonBMP)
+  validateBreadcrumbs("ab" + nonBMP)
+  validateBreadcrumbs("abc" + nonBMP)
+  validateBreadcrumbs("é" + nonBMP)
+  validateBreadcrumbs("是" + nonBMP)
+  validateBreadcrumbs("aé" + nonBMP)
+}
+
+// TODO(String testing): test breadcrumb validity after mutation
 
 runAllTests()
-
