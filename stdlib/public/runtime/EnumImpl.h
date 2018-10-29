@@ -110,16 +110,19 @@ inline unsigned getEnumTagSinglePayloadImpl(
       unsigned caseIndexFromExtraTagBits =
           payloadSize >= 4 ? 0 : (extraTagBits - 1U) << (payloadSize * 8U);
 
+#if defined(__BIG_ENDIAN__)
+      // On BE high order bytes contain the index
+      unsigned long caseIndexFromValue = 0;
+      unsigned numPayloadTagBytes = std::min(size_t(8), payloadSize);
+      if (numPayloadTagBytes)
+        memcpy(reinterpret_cast<uint8_t *>(&caseIndexFromValue) + 8 -
+               numPayloadTagBytes,
+               valueAddr, numPayloadTagBytes);
+#else
       // In practice we should need no more than four bytes from the payload
       // area.
       unsigned caseIndexFromValue = 0;
       unsigned numPayloadTagBytes = std::min(size_t(4), payloadSize);
-#if defined(__BIG_ENDIAN__)
-      if (numPayloadTagBytes)
-        small_memcpy(reinterpret_cast<uint8_t *>(&caseIndexFromValue) + 4 -
-                         numPayloadTagBytes,
-                     valueAddr, numPayloadTagBytes, true);
-#else
       if (numPayloadTagBytes)
         small_memcpy(&caseIndexFromValue, valueAddr,
                      numPayloadTagBytes, true);
@@ -192,6 +195,8 @@ inline void storeEnumTagSinglePayloadImpl(
                  reinterpret_cast<uint8_t *>(&payloadIndex) + 4 -
                      numPayloadTagBytes,
                  numPayloadTagBytes, true);
+  if (payloadSize > 4)
+	    memset(valueAddr + 4, 0, payloadSize - 4);
   if (numExtraTagBytes)
     small_memcpy(extraTagBitAddr,
                  reinterpret_cast<uint8_t *>(&extraTagIndex) + 4 -
