@@ -2067,6 +2067,9 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     LLVM_DEBUG(llvm::dbgs()
                << " Adding input of type " << opInput->getType() << ".\n");
 
+    // If this is a known TensorFlow value, add it directly.
+    // TODO: We could also handle concrete structs of known TensorFlow values
+    // here, to avoid falling through to the slower TensorGroup case.
     if (tf::isTensorFlowValue(opInput->getType())) {
       auto *tensorHandleValue = getLoweredSingletonExplosion(opInput);
       auto *opAddInputFromTensorHandleFn =
@@ -2079,6 +2082,9 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       return llvm::ConstantInt::get(IGM.Int32Ty, 1);
     }
 
+    // Otherwise, this must conform to TensorGroup so we can add it using
+    // TFC_OpAddInputFromTensorGroup.
+
     auto canType = opInput->getType().getASTType()->getCanonicalType();
     auto conformance = tfModule->lookupConformance(canType,
                                                    tensorGroupProto);
@@ -2086,15 +2092,27 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     auto *typeMetadata = emitTypeMetadataRef(canType);
     auto *wtable = emitWitnessTableRef(*this, canType, *conformance);
 
-    auto *tensorHandleValue = getLoweredAddress(opInput).getAddress();
-    auto *tensorHandleValueUntyped =
-        Builder.CreateBitCast(tensorHandleValue, IGM.Int8PtrTy);
+    llvm::Value *opInputAddr;
+    if (opInput->getType().isAddress()) {
+      opInputAddr = getLoweredAddress(opInput).getAddress();
+    } else {
+      // It is a value, so we must store it to the stack to get an address.
+      Explosion value = getLoweredExplosion(opInput);
+      auto &typeInfo =
+          cast<LoadableTypeInfo>(getTypeInfo(opInput->getType()));
+      auto stackAddr = typeInfo.allocateStack(*this, opInput->getType(),
+                                              StringRef());
+      typeInfo.initialize(*this, value, stackAddr.getAddress(),
+                          false);
+      opInputAddr = stackAddr.getAddress().getAddress();
+    }
+    opInputAddr = Builder.CreateBitCast(opInputAddr, IGM.Int8PtrTy);
 
     auto *opAddInputFromTensorGroupFn =
         IGM.getTFC_OpAddInputFromTensorGroupFn();
     auto *numInputs = Builder.CreateCall(
         opAddInputFromTensorGroupFn,
-        {op, tensorHandleValueUntyped, status, typeMetadata, wtable});
+        {op, opInputAddr, status, typeMetadata, wtable});
     checkOk(status);
     return numInputs;
   };
@@ -2226,37 +2244,46 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
       auto *attrNameValAddr = IGM.getAddrOfGlobalString(argumentName.c_str());
 
-      // Deabstraction extracts builtin types out of stdlib types, so we match
-      // on builtin types. If we remove that part of deabstraction, we should
-      // change this to match on stdlib types.
+      // Handle basic scalar types by looking at the underlying llvm scalar
+      // type. This is independent of all the Swift abstractions around the
+      // type, so we can handle basic scalar types without worrying about Swift
+      // abstractions (e.g. Int64 vs Builtin.Int64).
+      ExplosionSchema schema = getTypeInfo(silType).getSchema();
+      llvm::Type *singleScalarType = nullptr;
+      if (schema.size() == 1 && schema[0].isScalar())
+        singleScalarType = schema[0].getScalarType();
 
-      if (astType->isBuiltinIntegerType(1)) {
+      if (singleScalarType == IGM.Int1Ty) {
         auto *fn = IGM.getTFE_OpSetAttrBoolFn();
         auto *attrValue = getLoweredSingletonExplosion(silValue);
         Builder.CreateCall(fn, {op, attrNameValAddr, attrValue});
         break;
       }
 
-      if (astType->isBuiltinIntegerType(64)) {
+      if (singleScalarType == IGM.Int64Ty) {
         auto *fn = IGM.getTFE_OpSetAttrIntFn();
         auto *attrValue = getLoweredSingletonExplosion(silValue);
         Builder.CreateCall(fn, {op, attrNameValAddr, attrValue});
         break;
       }
 
-      if (auto floatType = dyn_cast<BuiltinFloatType>(astType)) {
+      if (singleScalarType == IGM.DoubleTy) {
         auto *fn = IGM.getTFE_OpSetAttrFloatFn();
         auto *attrValue = getLoweredSingletonExplosion(silValue);
-        if (floatType->getFPKind() == BuiltinFloatType::IEEE32) {
-          Builder.CreateCall(fn, {op, attrNameValAddr, attrValue});
-          break;
-        }
-        if (floatType->getFPKind() == BuiltinFloatType::IEEE64) {
-          auto *truncValue = Builder.CreateFPTrunc(attrValue, IGM.FloatTy);
-          Builder.CreateCall(fn, {op, attrNameValAddr, truncValue});
-          break;
-        }
+        auto *truncValue = Builder.CreateFPTrunc(attrValue, IGM.FloatTy);
+        Builder.CreateCall(fn, {op, attrNameValAddr, truncValue});
+        break;
       }
+
+      if (singleScalarType == IGM.FloatTy) {
+        auto *fn = IGM.getTFE_OpSetAttrFloatFn();
+        auto *attrValue = getLoweredSingletonExplosion(silValue);
+        Builder.CreateCall(fn, {op, attrNameValAddr, attrValue});
+        break;
+      }
+
+      // It is not a basic scalar type. Inspect the astType to figure out how
+      // to handle it.
 
       if (astType->isEqual(
           astCtx.getStringDecl()->getDeclaredInterfaceType())) {
@@ -2362,14 +2389,24 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
       auto *attrNameValAddr = IGM.getAddrOfGlobalString(argumentName.c_str());
 
-      // Deabstraction extracts the Builtin.Int32 that's inside the
-      // TensorDataType.
-      if (astType->isBuiltinIntegerType(32)) {
+      // Handle basic scalar types by looking at the underlying llvm scalar
+      // type. This is independent of all the Swift abstractions around the
+      // type, so we can handle basic scalar types without worrying about Swift
+      // abstractions (e.g. Int64 vs Builtin.Int64).
+      ExplosionSchema schema = getTypeInfo(silType).getSchema();
+      llvm::Type *singleScalarType = nullptr;
+      if (schema.size() == 1 && schema[0].isScalar())
+        singleScalarType = schema[0].getScalarType();
+
+      if (singleScalarType == IGM.Int32Ty) {
         auto *fn = IGM.getTFE_OpSetAttrTypeFn();
         auto *attrValue = getLoweredSingletonExplosion(silValue);
         Builder.CreateCall(fn, {op, attrNameValAddr, attrValue});
         break;
       }
+
+      // It is not a basic scalar type. Inspect the astType to figure out how
+      // to handle it.
 
       if (astType->isEqual(getArrayType(
           astCtx,
