@@ -160,6 +160,10 @@ namespace {
 
     /// Process all of the top-level loops in the function in post-order.
     void processLoops() {
+      if (auto outs = getTFDumpIntermediateStream()) {
+        dumpTopLevelLoopInfo(outs, "Before");
+      }
+
       // Apply the standard SIL loop canonicalization transformations.  This
       // automatically gives us the following invariants: loops are guaranteed
       // to have a single preheader, a single backedge block, and exit??
@@ -180,6 +184,11 @@ namespace {
 
       for (auto *loop : LI)
         processLoop(loop);
+
+      if (auto outs = getTFDumpIntermediateStream()) {
+        dumpTopLevelLoopInfo(outs, "After");
+      }
+
     }
 
 
@@ -189,6 +198,18 @@ namespace {
                                      SILBasicBlock *endBB);
     void processLoop(SILLoop *loop);
     void ensureSingleExitFromLoops();
+
+    // Dump top-level loop information for debugging purposes.
+    void dumpTopLevelLoopInfo(llvm::raw_ostream* outs, const char* stage) {
+      *outs << "--- XLA CFG Loops " << stage << " Canonicalize: " << F->getName()
+            << "\n";
+      for (auto *loop : LI.getTopLevelLoops()) {
+        loop->print(*outs);
+      }
+      *outs << "\n--- XLA CFG Loops " << stage << " Canonicalize end\n";
+      outs->flush();
+    }
+
   };
 } // end anonymous namespace
 
