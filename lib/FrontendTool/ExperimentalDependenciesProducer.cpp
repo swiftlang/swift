@@ -152,15 +152,16 @@ public:
 
   class ProviderNames {
   public:
-    const std::vector<std::string> dynamicLookupNames;
-    const std::vector<std::string> extendedNominalContextualNames;
+    const std::vector<std::string> topLevelNames;
     const std::vector<std::string>
         extendedNominalContextualNamesThatCouldAddMembers;
-    const std::vector<std::pair<std::string, std::string>> holdersAndMembers;
+    const std::vector<std::pair<std::string, std::string>>
+        holdersAndMaybeMembers;
+    const std::vector<std::string> dynamicLookupNames;
 
   private:
     static std::vector<std::string>
-    getDynamicLookupNames(const ProviderDeclarations &);
+    getTopLevelNames(const ProviderDeclarations &);
 
     static std::vector<std::string>
     getExtendedNominalContextualNames(const ProviderDeclarations &,
@@ -168,6 +169,12 @@ public:
 
     static std::vector<std::pair<std::string, std::string>>
     getHoldersAndMembers(const ProviderDeclarations &);
+
+    static std::vector<std::pair<std::string, std::string>>
+    getHoldersAndMaybeMembers(const ProviderDeclarations &);
+
+    static std::vector<std::string>
+    getDynamicLookupNames(const ProviderDeclarations &);
 
     static std::string getContextualName(const NominalTypeDecl *const NTD) {
       Mangle::ASTMangler Mangler;
@@ -194,6 +201,12 @@ public:
     void emitMembers() const;
     void emitDynamicLookupMembers() const;
     void emitInterfaceHash() const;
+
+    void emitSectionOfIndividualNames(StringRef sectionKey,
+                                      ArrayRef<std::string> names) const;
+    void emitSectionOfNamePairs(
+        StringRef sectionKey,
+        ArrayRef<std::pair<std::string, std::string>> pairs) const;
 
   public:
     Provides(const ProviderNames &, const InterfaceHash &, YAMLEmitter &);
@@ -236,30 +249,44 @@ void SQ::Provides::emit() const {
   emitInterfaceHash();
 }
 
-void SQ::Provides::emitTopLevelNames() const {}
+void SQ::Provides::emitTopLevelNames() const {
+  emitSectionOfIndividualNames(reference_dependency_keys::providesTopLevel,
+                               pns.topLevelNames);
+}
 
 void SQ::Provides::emitNominalTypes() const {
-  emitter.emitSectionStart(reference_dependency_keys::providesNominal);
-  for (StringRef n : pns.extendedNominalContextualNamesThatCouldAddMembers)
-    emitter.emitName(n);
+  emitSectionOfIndividualNames(
+      reference_dependency_keys::providesNominal,
+      pns.extendedNominalContextualNamesThatCouldAddMembers);
 }
 
 void SQ::Provides::emitMembers() const {
-  emitter.emitSectionStart(reference_dependency_keys::providesMember);
-  for (StringRef n : pns.extendedNominalContextualNames)
-    emitter.emitDoubleNameLine(n, "");
-  for (std::pair<StringRef, StringRef> hm : pns.holdersAndMembers)
-    emitter.emitDoubleNameLine(hm.first, hm.second);
+  emitSectionOfNamePairs(reference_dependency_keys::providesMember,
+                         pns.holdersAndMaybeMembers);
 }
 
 void SQ::Provides::emitDynamicLookupMembers() const {
-  emitter.emitSectionStart(reference_dependency_keys::providesDynamicLookup);
-  for (StringRef n : pns.dynamicLookupNames)
-    emitter.emitName(n);
+  emitSectionOfIndividualNames(reference_dependency_keys::providesDynamicLookup,
+                               pns.dynamicLookupNames);
 }
 void SQ::Provides::emitInterfaceHash() const {
   emitter.emitSingleValueSection(reference_dependency_keys::interfaceHash,
                                  interfaceHash.contents);
+}
+
+void SQ::Provides::emitSectionOfIndividualNames(
+    StringRef sectionKey, ArrayRef<std::string> names) const {
+  emitter.emitSectionStart(sectionKey);
+  for (StringRef n : names)
+    emitter.emitName(n);
+}
+
+void SQ::Provides::emitSectionOfNamePairs(
+    StringRef sectionKey,
+    ArrayRef<std::pair<std::string, std::string>> pairs) const {
+  emitter.emitSectionStart(sectionKey);
+  for (std::pair<StringRef, StringRef> p : pairs)
+    emitter.emitDoubleNameLine(p.first, p.second);
 }
 
 SQ::ProviderDeclarations::ProviderDeclarations(const SourceFile *SF)
@@ -447,12 +474,43 @@ SQ::ProviderDeclarations::getTopLevelDecls(const SourceFile *const SF) {
 }
 
 SQ::ProviderNames::ProviderNames(const SQ::ProviderDeclarations &pd)
-    : dynamicLookupNames(getDynamicLookupNames(pd)),
-      extendedNominalContextualNames(
-          getExtendedNominalContextualNames(pd, false)),
+    : topLevelNames(getTopLevelNames(pd)),
       extendedNominalContextualNamesThatCouldAddMembers(
           getExtendedNominalContextualNames(pd, true)),
-      holdersAndMembers(getHoldersAndMembers(pd)) {}
+      holdersAndMaybeMembers(getHoldersAndMaybeMembers(pd)),
+      dynamicLookupNames(getDynamicLookupNames(pd)) {}
+
+std::vector<std::string>
+SQ::ProviderNames::getTopLevelNames(const ProviderDeclarations &pd) {}
+
+std::vector<std::string> SQ::ProviderNames::getExtendedNominalContextualNames(
+    const ProviderDeclarations &pd, const bool onlyIfCouldAddMembers) {
+  std::vector<std::string> extendedNominalContextualNames;
+  for (const auto &p : pd.extendedNominals) {
+    if (!onlyIfCouldAddMembers || p.second)
+      extendedNominalContextualNames.push_back(getContextualName(p.first));
+  }
+  return extendedNominalContextualNames;
+}
+
+std::vector<std::pair<std::string, std::string>>
+SQ::ProviderNames::getHoldersAndMaybeMembers(const ProviderDeclarations &pd) {
+  std::vector<std::pair<std::string, std::string>> holdersAndMaybeMembers;
+  for (std::string n : getExtendedNominalContextualNames(pd, false))
+    holdersAndMaybeMembers.push_back(std::make_pair(n, ""));
+  for (auto p : getHoldersAndMembers(pd))
+    holdersAndMaybeMembers.push_back(p);
+  return holdersAndMaybeMembers;
+}
+
+std::vector<std::pair<std::string, std::string>>
+SQ::ProviderNames::getHoldersAndMembers(const ProviderDeclarations &pd) {
+  std::vector<std::pair<std::string, std::string>> holdersAndMembers;
+  for (auto p : pd.holdersAndMembers)
+    holdersAndMembers.push_back(std::make_pair(
+        getContextualName(p.first), p.second->getBaseName().userFacingName()));
+  return holdersAndMembers;
+}
 
 std::vector<std::string>
 SQ::ProviderNames::getDynamicLookupNames(const ProviderDeclarations &pd) {
@@ -468,25 +526,6 @@ SQ::ProviderNames::getDynamicLookupNames(const ProviderDeclarations &pd) {
   for (auto &dbn : names)
     nameStrings.push_back(dbn.userFacingName().str());
   return nameStrings;
-}
-
-std::vector<std::string> SQ::ProviderNames::getExtendedNominalContextualNames(
-    const ProviderDeclarations &pd, const bool onlyIfCouldAddMembers) {
-  std::vector<std::string> extendedNominalContextualNames;
-  for (const auto &p : pd.extendedNominals) {
-    if (!onlyIfCouldAddMembers || p.second)
-      extendedNominalContextualNames.push_back(getContextualName(p.first));
-  }
-  return extendedNominalContextualNames;
-}
-
-std::vector<std::pair<std::string, std::string>>
-SQ::ProviderNames::getHoldersAndMembers(const ProviderDeclarations &pd) {
-  std::vector<std::pair<std::string, std::string>> holdersAndMembers;
-  for (auto p : pd.holdersAndMembers)
-    holdersAndMembers.push_back(std::make_pair(
-        getContextualName(p.first), p.second->getBaseName().userFacingName()));
-  return holdersAndMembers;
 }
 
 SQ::Depends::Depends(const SourceFile *const SF,
