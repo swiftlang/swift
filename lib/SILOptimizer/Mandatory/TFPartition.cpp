@@ -3001,7 +3001,12 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
 
     // The send is at the beginning of each caseBB.
     BH.setInsertionPoint(&caseBB->front());
-    auto loc = caseBB->front().getLoc();
+    // The first inst of `caseBB` could originate from a return statement of a
+    // function that's been inlined here, in which case its LocationKind can be
+    // ReturnKind. But SILVerifier requires that we use a RegularKind
+    // for the SILLocation of the synthesized host code here (such as
+    // `caseIdInst`). This is achieved via getAsRegularLocationWithOverwrite().
+    auto loc = caseBB->front().getLoc().getAsRegularLocationWithOverwrite();
     // `caseId` must be of a type conforming to `AccelerableByTensorFlow`, so we
     // chose Int32 here.
     auto caseIdInst = createSomeIntegerValue(caseId /*caseEntry.index()*/, BH,
