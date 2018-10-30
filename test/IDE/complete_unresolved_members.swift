@@ -68,6 +68,10 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_CLOSURE_1 | %FileCheck %s -check-prefix=STATIC_CLOSURE_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOADED_METHOD_1 | %FileCheck %s -check-prefix=OVERLOADED_METHOD_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOADED_INIT_1 | %FileCheck %s -check-prefix=OVERLOADED_METHOD_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OVERLOADED_INIT_2 | %FileCheck %s -check-prefix=OVERLOADED_METHOD_1
+
 enum SomeEnum1 {
   case South
   case North
@@ -494,3 +498,25 @@ func testHasStaticClosure() {
 // STATIC_CLOSURE_1-DAG: Decl[StaticVar]/CurrNominal:        create[#() -> HasCreator#];
 // STATIC_CLOSURE_1-NOT: create_curried
 // STATIC_CLOSURE_1: End completions
+
+struct HasOverloaded {
+  init(e: SomeEnum1) {}
+  init(e: SomeEnum2) {}
+  func takeEnum(_ e: SomeEnum1) -> Int { return 0 }
+  func takeEnum(_ e: SomeEnum2) -> Int { return 0 }
+}
+func testOverload(val: HasOverloaded) {
+  let _ = val.takeEnum(.#^OVERLOADED_METHOD_1^#)
+// OVERLOADED_METHOD_1: Begin completions, 4 items
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific:     South[#SomeEnum1#]; name=South
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific:     North[#SomeEnum1#]; name=North
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific:     East[#SomeEnum2#]; name=East
+// OVERLOADED_METHOD_1-DAG: Decl[EnumElement]/ExprSpecific:     West[#SomeEnum2#]; name=West
+// OVERLOADED_METHOD_1: End completions
+
+  let _ = HasOverloaded.init(e: .#^OVERLOADED_INIT_1^#)
+// Same as OVERLOADED_METHOD_1.
+
+  let _ = HasOverloaded(e: .#^OVERLOADED_INIT_2^#)
+// Same as OVERLOADED_METHOD_1.
+}
