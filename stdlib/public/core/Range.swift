@@ -406,29 +406,17 @@ extension Range: Hashable where Bound: Hashable {
 }
 
 extension Range: Codable where Bound: Codable {
-  private enum CodingKeys: String, CodingKey {
-    case lowerBound = "from"
-    case upperBound = "upTo"
-  }
-
   public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    let lowerBound = try container.decode(Bound.self, forKey: .lowerBound)
-    let upperBound = try container.decode(Bound.self, forKey: .upperBound)
-    guard lowerBound <= upperBound else {
-      throw DecodingError.dataCorruptedError(
-        forKey: CodingKeys.upperBound,
-        in: container,
-        debugDescription: "upperBound (upTo) cannot be less than lowerBound (from)"
-      )
-    }
+    var container = try decoder.unkeyedContainer()
+    let lowerBound = try container.decode(Bound.self)
+    let upperBound = try container.decode(Bound.self)
     self = lowerBound..<upperBound
   }
 
   public func encode(to encoder: Encoder) throws {
-    var container = encoder.container(keyedBy: CodingKeys.self)
-    try container.encode(self.lowerBound, forKey: .lowerBound)
-    try container.encode(self.upperBound, forKey: .upperBound)
+    var container = encoder.unkeyedContainer()
+    try container.encode(self.lowerBound)
+    try container.encode(self.upperBound)
   }
 }
 
@@ -475,18 +463,14 @@ extension PartialRangeUpTo: RangeExpression {
 }
 
 extension PartialRangeUpTo: Codable where Bound: Codable {
-  private enum CodingKeys: String, CodingKey {
-    case upperBound = "fromStartUpTo"
-  }
-
   public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    self = try (..<container.decode(Bound.self, forKey: .upperBound))
+    var container = try decoder.unkeyedContainer()
+    self = try (..<container.decode(Bound.self))
   }
 
   public func encode(to encoder: Encoder) throws {
-    var container = encoder.container(keyedBy: CodingKeys.self)
-    try container.encode(self.upperBound, forKey: .upperBound)
+    var container = encoder.unkeyedContainer()
+    try container.encode(self.upperBound)
   }
 }
 
@@ -532,18 +516,14 @@ extension PartialRangeThrough: RangeExpression {
 }
 
 extension PartialRangeThrough: Codable where Bound: Codable {
-  private enum CodingKeys: String, CodingKey {
-    case upperBound = "fromStartThrough"
-  }
-
   public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    self = try (...container.decode(Bound.self, forKey: .upperBound))
+    var container = try decoder.unkeyedContainer()
+    self = try (...container.decode(Bound.self))
   }
 
   public func encode(to encoder: Encoder) throws {
-    var container = encoder.container(keyedBy: CodingKeys.self)
-    try container.encode(self.upperBound, forKey: .upperBound)
+    var container = encoder.unkeyedContainer()
+    try container.encode(self.upperBound)
   }
 }
 
@@ -684,18 +664,14 @@ extension PartialRangeFrom: Sequence
 }
 
 extension PartialRangeFrom: Codable where Bound: Codable {
-  private enum CodingKeys: String, CodingKey {
-    case lowerBound = "toEndFrom"
-  }
-
   public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    self = try container.decode(Bound.self, forKey: .lowerBound)...
+    var container = try decoder.unkeyedContainer()
+    self = try container.decode(Bound.self)...
   }
 
   public func encode(to encoder: Encoder) throws {
-    var container = encoder.container(keyedBy: CodingKeys.self)
-    try container.encode(self.lowerBound, forKey: .lowerBound)
+    var container = encoder.unkeyedContainer()
+    try container.encode(self.lowerBound)
   }
 }
 

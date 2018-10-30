@@ -490,28 +490,16 @@ public typealias CountableClosedRange<Bound: Strideable> = ClosedRange<Bound>
   where Bound.Stride : SignedInteger
 
 extension ClosedRange: Codable where Bound: Codable {
-  private enum CodingKeys: String, CodingKey {
-    case lowerBound = "from"
-    case upperBound = "through"
-  }
-
   public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    let lowerBound = try container.decode(Bound.self, forKey: .lowerBound)
-    let upperBound = try container.decode(Bound.self, forKey: .upperBound)
-    guard lowerBound <= upperBound else {
-      throw DecodingError.dataCorruptedError(
-        forKey: CodingKeys.upperBound,
-        in: container,
-        debugDescription: "upperBound (through) cannot be less than lowerBound (from)"
-      )
-    }
+    var container = try decoder.unkeyedContainer()
+    let lowerBound = try container.decode(Bound.self)
+    let upperBound = try container.decode(Bound.self)
     self = lowerBound...upperBound
   }
 
   public func encode(to encoder: Encoder) throws {
-    var container = encoder.container(keyedBy: CodingKeys.self)
-    try container.encode(self.lowerBound, forKey: .lowerBound)
-    try container.encode(self.upperBound, forKey: .upperBound)
+    var container = encoder.unkeyedContainer()
+    try container.encode(self.lowerBound)
+    try container.encode(self.upperBound)
   }
 }
