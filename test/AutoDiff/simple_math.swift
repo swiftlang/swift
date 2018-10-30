@@ -48,4 +48,12 @@ SimpleMathTests.test("FunctionCall") {
   expectEqual(3, #gradient(foo, wrt: .0)(3, 4))
 }
 
+SimpleMathTests.test("ResultSelection") {
+  func foo(_ x: Float, _ y: Float) -> (Float, Float) {
+    return (x + 1, y + 2)
+  }
+  expectEqual((1, 0), #gradient(foo, result: .0)(3, 3))
+  expectEqual((0, 1), #gradient(foo, result: .1)(3, 3))
+}
+
 runAllTests()

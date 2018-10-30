@@ -3509,6 +3509,7 @@ Parser::parsePlatformVersionConstraintSpec() {
 ///   expr-gradient-body:
 ///     '('
 ///       expr
+///       (',' 'result' ':' expr-gradient-param-index)?
 ///       (',' 'wrt' ':' expr-gradient-param-list)?
 ///     ')'
 ///   expr-gradient-param-list:
@@ -3560,6 +3561,23 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
     return makeParserCodeCompletionResult<Expr>();
   if (originalFnParseResult.isParseError())
     return errorAndSkipToEnd();
+  // If found comma, parse 'result:'.
+  unsigned resultIndex = 0;
+  if (Tok.is(tok::comma) && peekToken().is(tok::identifier) &&
+      peekToken().getText() == "result") {
+    consumeToken(tok::comma);
+    consumeToken(tok::identifier);
+    // Parse 'result' ':'.
+    if (parseToken(tok::colon, diag::expected_parameter_colon))
+      return errorAndSkipToEnd();
+    // Parse '.' '<index>'.
+    SourceLoc indexLoc;
+    if (parseToken(tok::period_prefix,
+                   diag::gradient_expr_expected_result_index) ||
+        parseUnsignedInteger(resultIndex, indexLoc,
+                             diag::gradient_expr_expected_result_index))
+      return errorAndSkipToEnd();
+  }
   // If found comma, parse 'wrt:'.
   SmallVector<AutoDiffIndexParameter, 8> params;
   if (consumeIf(tok::comma)) {
@@ -3624,17 +3642,17 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
   case ExprKind::Gradient:
     result = GradientExpr::create(Context, poundGradLoc, lParenLoc,
                                   originalFnParseResult.get(), params,
-                                  rParenLoc);
+                                  resultIndex, rParenLoc);
     break;
   case ExprKind::ChainableGradient:
     result = ChainableGradientExpr::create(Context, poundGradLoc, lParenLoc,
                                            originalFnParseResult.get(), params,
-                                           rParenLoc);
+                                           resultIndex, rParenLoc);
     break;
   case ExprKind::ValueAndGradient:
     result = ValueAndGradientExpr::create(Context, poundGradLoc, lParenLoc,
                                           originalFnParseResult.get(), params,
-                                          rParenLoc);
+                                          resultIndex, rParenLoc);
     break;
   default:
     llvm_unreachable("Not a reverse AD expression");

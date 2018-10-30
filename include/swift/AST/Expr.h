@@ -3826,6 +3826,10 @@ public:
   MutableArrayRef<AutoDiffIndexParameter> getParameters() {
     return { getParametersData(), NumParameters };
   }
+  
+  unsigned getResultIndex() const {
+    return ResultIndex;
+  }
 
   SourceRange getSourceRange() const {
     return SourceRange(Loc, RParenLoc);
@@ -3845,6 +3849,8 @@ private:
   Expr *OriginalExpr;
   /// The number of parameters in the parameter list.
   unsigned NumParameters;
+  /// The index of the result to differentiate from.
+  unsigned ResultIndex;
   /// The location of ')'.
   SourceLoc RParenLoc;
 
@@ -3853,7 +3859,7 @@ protected:
                                SourceLoc lParenLoc,
                                Expr *originalExpr,
                                ArrayRef<AutoDiffIndexParameter> parameters,
-                               SourceLoc rParenLoc);
+                               unsigned resultIndex, SourceLoc rParenLoc);
 };
 
 /// Gradient expression - An expression that produces the automatically
@@ -3869,7 +3875,7 @@ public:
   static GradientExpr *create(ASTContext &ctx, SourceLoc loc,
                               SourceLoc lParenLoc, Expr *originalExpr,
                               ArrayRef<AutoDiffIndexParameter> parameters,
-                              SourceLoc rParenLoc);
+                              unsigned resultIndex, SourceLoc rParenLoc);
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Gradient;
@@ -3878,9 +3884,9 @@ public:
 private:
   explicit GradientExpr(SourceLoc loc, SourceLoc lParenLoc, Expr *originalExpr,
                         ArrayRef<AutoDiffIndexParameter> params,
-                        SourceLoc rParenLoc)
+                        unsigned resultIndex, SourceLoc rParenLoc)
     : ReverseAutoDiffExpr(ExprKind::Gradient, loc, lParenLoc, originalExpr,
-                          params, rParenLoc) {}
+                          params, resultIndex, rParenLoc) {}
 };
   
 /// Chainable gradient expression - An expression that produces the
@@ -3898,6 +3904,7 @@ public:
   static ChainableGradientExpr *create(ASTContext &ctx, SourceLoc loc,
                                        SourceLoc lParenLoc, Expr *originalExpr,
                                    ArrayRef<AutoDiffIndexParameter> parameters,
+                                       unsigned resultIndex,
                                        SourceLoc rParenLoc);
   
   static bool classof(const Expr *E) {
@@ -3908,9 +3915,9 @@ private:
   explicit ChainableGradientExpr(SourceLoc loc, SourceLoc lParenLoc,
                                  Expr *originalExpr,
                                  ArrayRef<AutoDiffIndexParameter> params,
-                                 SourceLoc rParenLoc)
+                                 unsigned resultIndex, SourceLoc rParenLoc)
   : ReverseAutoDiffExpr(ExprKind::ChainableGradient, loc, lParenLoc,
-                        originalExpr, params, rParenLoc) {}
+                        originalExpr, params, resultIndex, rParenLoc) {}
 };
 
 /// ValueAndGradient expression - An expression that produces an automatically
@@ -3927,6 +3934,7 @@ public:
   static ValueAndGradientExpr *create(ASTContext &ctx, SourceLoc loc,
                                       SourceLoc lParenLoc, Expr *originalExpr,
                                       ArrayRef<AutoDiffIndexParameter> params,
+                                      unsigned resultIndex,
                                       SourceLoc rParenLoc);
 
   static bool classof(const Expr *E) {
@@ -3937,9 +3945,9 @@ private:
   explicit ValueAndGradientExpr(SourceLoc loc, SourceLoc lParenLoc,
                                 Expr *originalExpr,
                                 ArrayRef<AutoDiffIndexParameter> params,
-                                SourceLoc rParenLoc)
+                                unsigned resultIndex, SourceLoc rParenLoc)
     : ReverseAutoDiffExpr(ExprKind::ValueAndGradient, loc, lParenLoc,
-                          originalExpr, params, rParenLoc) {}
+                          originalExpr, params, resultIndex, rParenLoc) {}
 };
 
 /// The `#adjoint(...)` expression returns the declared adjoint of functions

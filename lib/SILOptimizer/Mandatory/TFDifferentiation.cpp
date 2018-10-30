@@ -4160,7 +4160,7 @@ static SILFunction *lookupOrSynthesizeGradient(ADContext &context,
       args.push_back(arg);
     // If it's not seedable, we need to create a default seed.
     if (!config.isSeedable()) {
-      auto seedTy = origTy->getSingleResult().getType();
+      auto seedTy = origTy->getResults()[config.getSourceIndex()].getType();
       auto seedSILTy = SILType::getPrimitiveObjectType(seedTy);
       // Call `<seed type>.init(1)` to create a default
       // seed to feed into the canonical gradient.

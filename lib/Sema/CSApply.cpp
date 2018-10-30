@@ -7435,7 +7435,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         auto replacement =
           GradientExpr::create(tc.Context, apply->getFn()->getLoc(),
                                apply->getArg()->getStartLoc(), arg, {},
-                               apply->getArg()->getEndLoc());
+                               /*resultIndex*/ 0, apply->getArg()->getEndLoc());
         cs.setType(replacement, simplifyType(openedType));
         return replacement;
       }
@@ -7444,9 +7444,10 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         auto *tup = cast<TupleExpr>(apply->getArg());
         auto arg = tup->getElement(0);
         auto replacement =
-        ValueAndGradientExpr::create(tc.Context, apply->getFn()->getLoc(),
-                                     apply->getArg()->getStartLoc(), arg, {},
-                                     apply->getArg()->getEndLoc());
+          ValueAndGradientExpr::create(tc.Context, apply->getFn()->getLoc(),
+                                       apply->getArg()->getStartLoc(), arg, {},
+                                       /*resultIndex*/ 0,
+                                       apply->getArg()->getEndLoc());
         cs.setType(replacement, simplifyType(openedType));
         return replacement;
       }
