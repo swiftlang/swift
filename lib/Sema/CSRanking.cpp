@@ -357,13 +357,10 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
 
 /// Retrieve the adjusted parameter type for overloading purposes.
 static Type getAdjustedParamType(const AnyFunctionType::Param &param) {
-  if (auto funcTy = param.getOldType()->getAs<FunctionType>()) {
-    if (funcTy->isAutoClosure()) {
-      return funcTy->getResult();
-    }
-  }
-
-  return param.getOldType();
+  auto type = param.getOldType();
+  if (param.isAutoClosure())
+    return type->castTo<FunctionType>()->getResult();
+  return type;
 }
 
 // Is a particular parameter of a function or subscript declaration

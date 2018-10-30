@@ -297,13 +297,12 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
   if (type->hasError())
     return None;
 
-  // Don't deduce autoclosure types.
+#ifndef NDEBUG
   if (shouldBindToValueType(constraint)) {
-    if (auto funcTy = type->getAs<FunctionType>()) {
-      if (funcTy->isAutoClosure())
-        type = funcTy->getResult();
-    }
+    if (auto funcTy = type->getAs<FunctionType>())
+      assert(!funcTy->isAutoClosure());
   }
+#endif
 
   // If the source of the binding is 'OptionalObject' constraint
   // and type variable is on the left-hand side, that means

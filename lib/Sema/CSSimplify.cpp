@@ -835,7 +835,42 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   ConstraintKind subKind = (isOperator
                             ? ConstraintKind::OperatorArgumentConversion
                             : ConstraintKind::ArgumentConversion);
-  
+
+  // Check whether argument of the call at given position refers to
+  // parameter marked as `@autoclosure. This function is used to
+  // maintain source compatibility with Swift versions < 5,
+  // previously examples like following used to type-check:
+  //
+  // func foo(_ x: @autoclosure () -> Int) {}
+  // func bar(_ y: @autoclosure () -> Int) {
+  //   foo(y)
+  // }
+  auto isAutoClosureArg = [&](Expr *anchor, unsigned argIdx) -> bool {
+    assert(anchor);
+
+    auto *call = dyn_cast<ApplyExpr>(anchor);
+    if (!call)
+      return false;
+
+    Expr *argExpr = nullptr;
+    if (auto *PE = dyn_cast<ParenExpr>(call->getArg())) {
+      assert(argsWithLabels.size() == 1);
+      argExpr = PE->getSubExpr();
+    } else if (auto *TE = dyn_cast<TupleExpr>(call->getArg())) {
+      argExpr = TE->getElement(argIdx);
+    }
+
+    if (!argExpr)
+      return false;
+
+    if (auto *DRE = dyn_cast<DeclRefExpr>(argExpr)) {
+      if (auto *param = dyn_cast<ParamDecl>(DRE->getDecl()))
+        return param->isAutoClosure();
+    }
+
+    return false;
+  };
+
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
        paramIdx != numParams; ++paramIdx){
     // Skip unfulfilled parameters. There's nothing to do for them.
@@ -846,13 +881,39 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     const auto &param = params[paramIdx];
     auto paramTy = param.getOldType();
 
+    if (param.isAutoClosure())
+      paramTy = paramTy->castTo<FunctionType>()->getResult();
+
     // Compare each of the bound arguments for this parameter.
     for (auto argIdx : parameterBindings[paramIdx]) {
       auto loc = locator.withPathElement(LocatorPathElt::
                                             getApplyArgToParam(argIdx,
                                                                paramIdx));
       auto argTy = argsWithLabels[argIdx].getOldType();
-      cs.addConstraint(subKind, argTy, paramTy, loc, /*isFavored=*/false);
+
+      // If parameter was marked as `@autoclosure` and argument
+      // is itself `@autoclosure` function type in Swift < 5,
+      // let's fix that up by making it look like argument is
+      // called implicitly.
+      if (!cs.getASTContext().isSwiftVersionAtLeast(5)) {
+        if (param.isAutoClosure() &&
+            isAutoClosureArg(locator.getAnchor(), argIdx)) {
+          argTy = argTy->castTo<FunctionType>()->getResult();
+          cs.increaseScore(SK_FunctionConversion);
+        }
+      }
+
+      // If argument comes for declaration it should loose
+      // `@autoclosure` flag, because in context it's used
+      // as a function type represented by autoclosure.
+      assert(!argsWithLabels[argIdx].isAutoClosure());
+
+      cs.addConstraint(
+          subKind, argTy, paramTy,
+          param.isAutoClosure()
+              ? loc.withPathElement(ConstraintLocator::AutoclosureResult)
+              : loc,
+          /*isFavored=*/false);
     }
   }
 
