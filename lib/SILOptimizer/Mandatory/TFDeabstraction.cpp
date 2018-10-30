@@ -2877,7 +2877,7 @@ void TFDeabstractionPass::run() {
   SILModule *module = getModule();
   auto &ctx = module->getASTContext();
 
-  assert(llvm::TFDynamicCompilation || !TFDisableDeabstraction &&
+  assert((llvm::TFDynamicCompilation || !TFDisableDeabstraction) &&
          "If deabstraction is disabled, dynamic compilation must be enabled.");
 
   // If the TensorFlow module hasn't been imported by the program, don't do
