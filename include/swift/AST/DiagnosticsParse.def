@@ -1670,6 +1670,8 @@ ERROR(expr_expected_label,none,
       "expected label '%1' in '%0' expression", (StringRef, StringRef))
 ERROR(expr_expected_function_to_differentiate,none,
       "expected a function to be differentiated", ())
+ERROR(gradient_expr_expected_result_index,none,
+      "expected a result index with a leading dot", ())
 ERROR(gradient_expr_expected_parameter,none,
       "expected a parameter, which must be the index of a function parameter "
       "with a leading dot (e.g. '.0')", ())

@@ -243,6 +243,11 @@ private:
   friend class CleanupLocation;
 
   void setLocationKind(LocationKind K) { KindData |= (K & LocationKindMask); }
+  // SWIFT_ENABLE_TENSORFLOW
+  // TODO: Assess if this API can be unified with the one above.
+  void setAndOverwriteLocationKind(LocationKind K) {
+    KindData = (K & LocationKindMask);
+  }
   void setStorageKind(StorageKind K) { KindData |= (K & StorageKindMask); }
   unsigned getSpecialFlags() const { return KindData & SpecialFlagsMask; }
   void setSpecialFlags(unsigned Flags) {
@@ -432,6 +437,18 @@ public:
   SILLocation getAsRegularLocation() {
     SILLocation RegularLoc = *this;
     RegularLoc.setLocationKind(RegularKind);
+    return RegularLoc;
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Convert a specialized location kind into a regular location, by completely
+  /// overwriting the existing location kind in `RegularLoc`. In contrast, the
+  /// above function does a bitwise OR on the existing location kind and
+  /// RegularKind.
+  // TODO: Assess if these two APIs can be unified.
+  SILLocation getAsRegularLocationWithOverwrite() {
+    SILLocation RegularLoc = *this;
+    RegularLoc.setAndOverwriteLocationKind(RegularKind);
     return RegularLoc;
   }
 
