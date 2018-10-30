@@ -725,6 +725,24 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
                    << SILPrintContext(llvm::dbgs()).getID(nearestCommonPD)
                    << "\n");
 
+  // Compute the set of preheaders of loops that are unrelated to our loop w.r.t
+  // nesting. This will be used when needing to identify cases where a loop
+  // from outside is moved into the current loop. e.g.,
+  //   while ... {
+  //     if ... {
+  //       for(...) {...} // This should be nested into the while loop.
+  //       break;
+  //     }
+  //   }
+  SmallPtrSet<SILBasicBlock *, 32> unrelatedPreheaders;
+  for (auto *otherLoop : *LI) {
+    // If loop and otherLoop are not nested into either, remember the preheader.
+    if (!otherLoop->contains(loop) && !loop->contains(otherLoop)) {
+      unrelatedPreheaders.insert(otherLoop->getLoopPreheader());
+    }
+  }
+
+
   // Collect all the blocks from each exiting block up to nearest common PD.
   SmallPtrSet<SILBasicBlock *, 32> blocksToBeMoved;
   for (SILBasicBlock *exitBlock : exitBlockList) {
@@ -749,38 +767,17 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
           continue;
         }
 
-        // Check if this is a preheader of another loop.
+        // Check if `succ` is a preheader of another loop.
         SILLoop *succBlockLoop = nullptr;
-        if (SILBasicBlock* succBlockLoopHeader = succ->getSingleSuccessorBlock()) {
-          succBlockLoop = LI->getLoopFor(succBlockLoopHeader);
-          if (succBlockLoop &&
-              LI->getLoopFor(succ) != succBlockLoop &&
-              succBlockLoop->getHeader() == succBlockLoopHeader &&
-              !succBlockLoop->contains(loop) &&
-              !loop->contains(succBlockLoop)) {
-            // `succ` is a pre-header of a loop that does not contain this loop
-            // or contained within this loop. Before moving this loop into our
-            // loop, we should first perform the canonicalization on that loop
-            // first.
-            SingleExitLoopTransformer::doIt(deviceInfo, LI, DI, succBlockLoop, PDI);
-            // // Remove from the top-level loops before making it a child.
-            // if (succBlockLoop->getParentLoop() == nullptr) {
-            //   LI->removeLoop(llvm::find(*LI, succBlockLoop));
-            // }
-            // loop->addChildLoop(succBlockLoop);
-            // // Add the block to this loop and all its parents.
-            // for (SILBasicBlock* bb : succBlockLoop->getBlocks()) {
-            //   auto *L = loop;
-            //   while (L) {
-            //     L->addBlockEntry(bb);
-            //     L = L->getParentLoop();
-            //   }
-            // }
-            // Reinitialize succ as it might have been changed by the transformer.
-            // succ = succBlockLoop->getHeader();
-          } else {
-            succBlockLoop = nullptr;
-          }
+        if (unrelatedPreheaders.count(succ) > 0) {
+          // We are about a move a loop from outside. Perform canonicalization
+          // of that loop first.
+          SILBasicBlock *unrelatedHeader = succ->getSingleSuccessorBlock();
+          assert(unrelatedHeader &&
+                 "There should be a single successor for a preheader.");
+          succBlockLoop = LI->getLoopFor(unrelatedHeader);
+          SingleExitLoopTransformer::doIt(deviceInfo, LI, DI, succBlockLoop,
+                                          PDI);
         }
 
         if (DI->properlyDominates(header, succ)) {
@@ -800,16 +797,23 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
 
         // Clone the block and rewire the edge.
         SILBasicBlock *clonedSucc = cloner.initAndCloneBlock(succ);
+        // If `succ` is a preheader of an unrelated loop, we will have to clone
+        // the entire loop now so that we can also incrementally update LoopInfo.
         if (succBlockLoop) {
-          // We will have to clone the entire loop now.
           SILLoop *clonedLoop =
               cloner.cloneLoop(LI, succBlockLoop, succBlockLoop->getHeader());
-          //clonedLoop->setParentLoop(loop->getParentLoop());
-          if (clonedLoop->getParentLoop() == nullptr) {
-            LI->addTopLevelLoop(clonedLoop);
+          changeBranchTarget(clonedSucc->getTerminator(), 0,
+                             clonedLoop->getHeader(), /*preserveArgs*/ true);
+          // Note that all the nodes of `clonedLoop` should be moved into the
+          // current loop.  We do that here itself as an optimization and also
+          // because the dominator and post-dominator information for the new
+          // blocks in `clonedLoop` are stale and cannot be relied upon.
+          for (SILBasicBlock *bb : clonedLoop->getBlocks()) {
+            blocksToBeMoved.insert(bb);
           }
-          changeBranchTarget(clonedSucc->getTerminator(), 0, clonedLoop->getHeader(), /*preserveArgs*/ true);
-          // succBlockLoop->addBasicBlockToLoop(clonedSucc, LI->getBase());
+          // Add the header to worklist for processing the exit edge.
+          // (Other successor edges are already processed above.)
+          worklist.insert(clonedLoop->getHeader());
         }
         changeBranchTarget(current->getTerminator(), edgeIdx, clonedSucc,
                            /*preserveArgs*/ true);
@@ -833,26 +837,24 @@ void SingleExitLoopTransformer::ensureSingleExitBlock() {
     if (outsideBlockLoop == nullptr) {
       loop->addBasicBlockToLoop(outsideBlock, LI->getBase());
     } else {
-      // FIXME: We don't deal with cases where the nodes being moved in
-      // belong to another loop yet. e.g.,
+      // We deal with the case where the nodes being moved in
+      // belong to another loop. e.g.,
       // while ... {
       //   if ... {
       //     for(...) {...}
       //     break;
       //   }
       // }
-      // Check that `loop` is nested within `reachableLoop`.
-      // assert(outsideBlockLoop->contains(loop) &&
-      //        "Nodes being moved belong to a non-nested loop.");
       if (outsideBlockLoop->contains(loop)) {
-        // `loop` is nested within `outsideBlockLoop`.
-        // Move the node into our loop.
+        // `loop` is nested within `outsideBlockLoop`.  Move the node from
+        // `outsideBlockLoop` into our `loop`.
         outsideBlockLoop->removeBlockFromLoop(outsideBlock);
         LI->changeLoopFor(outsideBlock, nullptr);
         loop->addBasicBlockToLoop(outsideBlock, LI->getBase());
       } else {
         if (!loop->contains(outsideBlockLoop)) {
           if (outsideBlockLoop->getParentLoop() == nullptr) {
+            // Remove from top-level loops as we are nesting it in `loop`.
             LI->removeLoop(llvm::find(*LI, outsideBlockLoop));
           }
           loop->addChildLoop(outsideBlockLoop);
