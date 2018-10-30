@@ -551,14 +551,13 @@ static SILFunction *genGetterFromInit(SILOptFunctionBuilder &FunctionBuilder,
   if (!InitF->hasQualifiedOwnership())
     GetterF->setUnqualifiedOwnership();
 
-  auto *EntryBB = GetterF->createBasicBlock();
-  // Copy InitF into GetterF
-  BasicBlockCloner Cloner(&*InitF->begin(), EntryBB, /*WithinFunction=*/false);
-  Cloner.clone();
+  // Copy InitF into GetterF, including the entry arguments.
+  SILFunctionCloner Cloner(GetterF);
+  Cloner.cloneFunction(InitF);
   GetterF->setInlined();
 
   // Find the store instruction
-  auto BB = EntryBB;
+  auto *BB = GetterF->getEntryBlock();
   SILValue Val;
   SILInstruction *Store;
   for (auto II = BB->begin(), E = BB->end(); II != E;) {
