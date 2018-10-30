@@ -55,6 +55,18 @@ static llvm::cl::opt<bool> TFPromoteGlobalVariables(
         "If enabled, promote global variables into SSA with a best "
         "effort to minimize sends/recvs. This is a performance optimization."));
 
+// TODO(marcrasi): This is a very temporary option allowing us to
+// incrementally add IRGen support for non-deabstracted functions. As soon as
+// IRGen fully supports non-deabstracted functions, remove this flag and make
+// TFDeabstraction always be off for non-graph-only functions in dynamic
+// compilation mode.
+static llvm::cl::opt<bool>
+TFDisableDeabstraction(
+    "tf-disable-deabstraction", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Disables deabstraction for everything except graph-only functions. "
+        "-tf-dynamic-compilation must also be enabled when this is on."));
+
 template<typename...T, typename...U>
 static InFlightDiagnostic
 diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
@@ -2865,6 +2877,9 @@ void TFDeabstractionPass::run() {
   SILModule *module = getModule();
   auto &ctx = module->getASTContext();
 
+  assert((llvm::TFDynamicCompilation || !TFDisableDeabstraction) &&
+         "If deabstraction is disabled, dynamic compilation must be enabled.");
+
   // If the TensorFlow module hasn't been imported by the program, don't do
   // anything.  This avoids impacting compile time for non-TensorFlow using
   // Swift programs by doing extraneous analysis.
@@ -2892,6 +2907,9 @@ void TFDeabstractionPass::run() {
   // iff they look like they could be the top level of a deabstraction
   // context.
   for (auto &fn : *module) {
+    if (TFDisableDeabstraction && !isAcceleratorOnly(fn))
+      continue;
+
     // There's no point in deabstracting things defined in other modules,
     // because we won't lower them.
     if (fn.isAvailableExternally())
@@ -2951,6 +2969,9 @@ void TFDeabstractionPass::run() {
   // of the functions would be dead after the first round, but some stragglers
   // remain as in the example above.
   for (auto &fn : *module) {
+    if (TFDisableDeabstraction && !isAcceleratorOnly(fn))
+      continue;
+
     // Skip if it is already partitioned, or if it was ignored only because it
     // operated on tensor values.
     if (partitionedFunctions.count(&fn) > 0 ||
