@@ -837,12 +837,7 @@ Protocols
 
 There are very few safe changes to make to protocols and their members:
 
-- A new non-type requirement may be added to a protocol, as long as it has an
-  unconstrained default implementation.
-- A new associated type requirement may be added as long as it has a default.
 - A default may be added to an associated type.
-- Removing a default from an associated type is a `binary-compatible
-  source-breaking change`.
 - A new optional requirement may be added to an ``@objc`` protocol.
 - All members may be reordered, including associated types.
 - Changing *internal* parameter names of function and subscript requirements
@@ -853,39 +848,32 @@ There are very few safe changes to make to protocols and their members:
   be added to a function requirement without any additional versioning
   information.
 
-Note that clients can use a protocol as an existential type as long as it does
-not have any associated types or requirements containing ``Self`` in
-non-covariant position. Therefore adding such a requirement becomes a
-`binary-compatible source-breaking change`.
+New requirements can be added to a protocol. However, restrictions around
+existential types mean that adding new associated types or non-type requirements
+involving ``Self`` can break source compatibility. For this reason, the following
+are `binary-compatible source-breaking changes`:
 
-Adding such requirements to protocols that already contain such requirements and
-cannot be used as existential types, on the other hand, is always
-source-compatible.
+- A new non-type requirement may be added to a protocol, as long as it has an
+  unconstrained default implementation in a protocol extension of the
+  protocol itself or some other protocol it refines.
+- A new associated type requirement may be added as long as it has a
+  default.
 
 All other changes to the protocol itself are forbidden, including:
 
 - Adding or removing refined protocols.
 - Removing any existing requirements (type or non-type).
+- Removing the default type of an associated type.
 - Making an existing requirement optional.
 - Making a non-``@objc`` protocol ``@objc`` or vice versa.
-- Adding or removing constraints from an associated type, including inherited
-  associated types.
+- Adding or removing protocols and superclasses from the inheritance
+  clause of an associated type.
+- Adding or removing constraints from the ``where`` clause of
+  the protocol or an associated type.
 
 Protocol extensions may be more freely modified; `see below`__.
 
 __ #protocol-extensions
-
-.. note::
-
-    A protocol's associated types are used in computing the "generic signature"
-    that uniquely identifies a generic function. Adding an associated type
-    could perturb the generic signature and thus change the identity of a
-    function, breaking binary compatibility.
-    
-    It may be possible to allow adding associated types as long as they have
-    proper availability annotations, but this is not in scope for the initial
-    version of Swift ABI stability.
-
 
 Classes
 ~~~~~~~
