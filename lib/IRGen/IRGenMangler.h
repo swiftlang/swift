@@ -30,7 +30,8 @@ enum class MangledTypeRefRole;
 /// A mangling string that includes embedded symbolic references.
 struct SymbolicMangling {
   std::string String;
-  std::vector<std::pair<const DeclContext *, unsigned>> SymbolicReferences;
+  std::vector<std::pair<Mangle::ASTMangler::SymbolicReferent, unsigned>>
+    SymbolicReferences;
 };
 
 /// The mangler for all kind of symbols produced in IRGen.
@@ -249,11 +250,6 @@ public:
     return mangleConformanceSymbol(Type(), C, "Wp");
   }
 
-  std::string mangleGenericProtocolWitnessTableCache(
-                                                const ProtocolConformance *C) {
-    return mangleConformanceSymbol(Type(), C, "WG");
-  }
-
   std::string mangleGenericProtocolWitnessTableInstantiationFunction(
                                                 const ProtocolConformance *C) {
     return mangleConformanceSymbol(Type(), C, "WI");
@@ -417,6 +413,10 @@ public:
 
   SymbolicMangling mangleTypeForReflection(IRGenModule &IGM,
                                            Type Ty);
+  
+  SymbolicMangling mangleProtocolConformanceForReflection(IRGenModule &IGM,
+                                            Type Ty,
+                                            ProtocolConformanceRef conformance);
 
   std::string mangleTypeForLLVMTypeName(CanType Ty);
 
@@ -426,6 +426,9 @@ public:
                                               const SymbolicMangling &mangling,
                                               MangledTypeRefRole role);
 protected:
+  SymbolicMangling
+  withSymbolicReferences(IRGenModule &IGM,
+                         llvm::function_ref<void ()> body);
 
   std::string mangleTypeSymbol(Type type, const char *Op) {
     beginMangling();

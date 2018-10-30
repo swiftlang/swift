@@ -1259,6 +1259,15 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
         RequiresSpecialization = true;
     }
 
+    /// The number of entries in the witness table.
+    unsigned getTableSize() const { return TableSize; }
+
+    /// The number of private entries in the witness table.
+    unsigned getTablePrivateSize() const { return NextPrivateDataIndex; }
+
+    /// Whether this witness table must be specialized at runtime.
+    bool requiresSpecialization() const { return RequiresSpecialization; }
+
     /// The top-level entry point.
     void build();
 
@@ -1421,6 +1430,10 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
       Table.addBitCast(wtableAccessFunction, IGM.Int8PtrTy);
     }
 
+    /// Build the instantiation function that runs at the end of witness
+    /// table specialization.
+    llvm::Constant *buildInstantiationFunction();
+
   private:
     void addConditionalConformances() {
       for (auto conditional : SILConditionalConformances) {
@@ -1432,8 +1445,6 @@ llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
         ConditionalRequirementPrivateDataIndices.push_back(reqtIndex);
       }
     }
-
-    llvm::Constant *buildInstantiationFunction();
 
     llvm::Constant *
     getAssociatedTypeWitnessTableAccessFunction(
@@ -1899,6 +1910,10 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   assert(isDependentConformance(&Conformance) || needsUniquing);
 
   Explosion params = IGF.collectParameters();
+  llvm::Value *conformanceDescriptor =
+      IGF.Builder.CreateBitCast(
+        IGM.getAddrOfProtocolConformanceDescriptor(&Conformance),
+        IGM.ProtocolConformanceDescriptorPtrTy);
   llvm::Value *metadata;
   llvm::Value *instantiationArgs;
 
@@ -1911,75 +1926,10 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
         llvm::ConstantPointerNull::get(IGF.IGM.WitnessTablePtrPtrTy);
   }
 
-  // Okay, we need a cache.  Build the cache structure.
-  //  struct GenericWitnessTable {
-  //    /// The size of the witness table in words.
-  //    uint16_t WitnessTableSizeInWords;
-  //
-  //    /// The amount of private storage to allocate before the address point,
-  //    /// in words. This memory is zeroed out in the instantiated witness table
-  //    /// template.
-  //    /// The low bit is used to indicate whether this witness table is known
-  //    /// to require instantiation.
-  //    uint16_t WitnessTablePrivateSizeInWordsAndRequiresInstantiation;
-  //
-  //    /// The pattern.
-  //    RelativeDirectPointer<WitnessTable> WitnessTable;
-  //
-  //    /// The instantiation function, which is called after the template is copied.
-  //    RelativeDirectPointer<void(WitnessTable *, const Metadata *, void * const *)>
-  //                               Instantiator;
-  //
-  //    /// Private data for the instantiator.  Out-of-line so that the rest
-  //    /// of this structure can be constant.
-  //    RelativeDirectPointer<PrivateDataType> PrivateData;
-  //  };
-
-  // First, create the global.  We have to build this in two phases because
-  // it contains relative pointers.
-  auto cache = cast<llvm::GlobalVariable>(
-    IGM.getAddrOfGenericWitnessTableCache(&Conformance, ForDefinition));
-
-  // We need an instantiation function if the base conformance
-  // is non-dependent.
-  llvm::Constant *instantiationFn;
-  if (SpecializedBaseConformances.empty() &&
-      ConditionalRequirementPrivateDataIndices.empty()) {
-    instantiationFn = nullptr;
-  } else {
-    instantiationFn = buildInstantiationFunction();
-  }
-
-  // Fill in the global.
-  auto cacheTy = cast<llvm::StructType>(cache->getValueType());
-  ConstantInitBuilder cacheInitBuilder(IGM);
-  auto cacheData = cacheInitBuilder.beginStruct(cacheTy);
-  // WitnessTableSizeInWords
-  cacheData.addInt(IGM.Int16Ty, TableSize);
-  // WitnessTablePrivateSizeInWordsAndRequiresInstantiation
-  cacheData.addInt(IGM.Int16Ty,
-                   (NextPrivateDataIndex << 1) | RequiresSpecialization);
-  // RelativePointer<WitnessTable>
-  cacheData.addRelativeAddress(wtable);
-  // Instantiation function
-  cacheData.addRelativeAddressOrNull(instantiationFn);
-  // Private data
-  {
-    auto privateDataTy =
-      llvm::ArrayType::get(IGM.Int8PtrTy,
-                           swift::NumGenericMetadataPrivateDataWords);
-    auto privateDataInit = llvm::Constant::getNullValue(privateDataTy);
-    auto privateData =
-      new llvm::GlobalVariable(IGM.Module, privateDataTy, /*constant*/ false,
-                               llvm::GlobalVariable::InternalLinkage,
-                               privateDataInit, "");
-    cacheData.addRelativeAddress(privateData);
-  }
-  cacheData.finishAndSetAsInitializer(cache);
-  cache->setConstant(true);
-
-  auto call = IGF.Builder.CreateCall(IGM.getGetGenericWitnessTableFn(),
-                                     {cache, metadata, instantiationArgs});
+  // Okay, we need runtime specialization.  Build the call.
+  auto call = IGF.Builder.CreateCall(
+                IGM.getInstantiateWitnessTableFn(),
+                {conformanceDescriptor, metadata, instantiationArgs});
 
   call->setDoesNotThrow();
 
@@ -1988,6 +1938,12 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
 }
 
 llvm::Constant *WitnessTableBuilder::buildInstantiationFunction() {
+  // We need an instantiation function if the base conformance
+  // is non-dependent.
+  if (SpecializedBaseConformances.empty() &&
+      ConditionalRequirementPrivateDataIndices.empty())
+    return nullptr;
+
   llvm::Function *fn =
     IGM.getAddrOfGenericWitnessTableInstantiationFunction(&Conformance);
   IRGenFunction IGF(IGM, fn);
@@ -2062,18 +2018,16 @@ namespace {
     ConstantStructBuilder &B;
     const NormalProtocolConformance *Conformance;
     SILWitnessTable *SILWT;
-    ArrayRef<llvm::Constant *> ResilientWitnesses;
+    ConformanceDescription Description;
     ConformanceFlags Flags;
 
   public:
     ProtocolConformanceDescriptorBuilder(
                                  IRGenModule &IGM,
                                  ConstantStructBuilder &B,
-                                 const NormalProtocolConformance *conformance,
-                                 SILWitnessTable *SILWT,
-                                 ArrayRef<llvm::Constant *> resilientWitnesses)
-      : IGM(IGM), B(B), Conformance(conformance), SILWT(SILWT),
-        ResilientWitnesses(resilientWitnesses) { }
+                                 const ConformanceDescription &description)
+      : IGM(IGM), B(B), Conformance(description.conformance),
+        SILWT(description.wtable), Description(description) { }
 
     void layout() {
       addProtocol();
@@ -2083,6 +2037,7 @@ namespace {
       addContext();
       addConditionalRequirements();
       addResilientWitnesses();
+      addGenericWitnessTable();
 
       B.suggestType(IGM.ProtocolConformanceDescriptorTy);
     }
@@ -2091,8 +2046,7 @@ namespace {
       // Relative reference to the protocol descriptor.
       auto protocol = Conformance->getProtocol();
       auto descriptorRef = IGM.getAddrOfLLVMVariableOrGOTEquivalent(
-                    LinkEntity::forProtocolDescriptor(protocol),
-                    IGM.getPointerAlignment(), IGM.ProtocolDescriptorStructTy);
+                                   LinkEntity::forProtocolDescriptor(protocol));
       B.addRelativeAddress(descriptorRef);
     }
 
@@ -2144,7 +2098,10 @@ namespace {
       Flags = Flags.withIsRetroactive(Conformance->isRetroactive());
       Flags =
         Flags.withIsSynthesizedNonUnique(Conformance->isSynthesizedNonUnique());
-      Flags = Flags.withHasResilientWitnesses(!ResilientWitnesses.empty());
+      Flags = Flags.withHasResilientWitnesses(
+                                      !Description.resilientWitnesses.empty());
+      Flags =
+        Flags.withHasGenericWitnessTable(Description.requiresSpecialization);
 
       // Add the flags.
       B.addInt32(Flags.getIntValue());
@@ -2172,11 +2129,11 @@ namespace {
     }
 
     void addResilientWitnesses() {
-      if (ResilientWitnesses.empty())
+      if (Description.resilientWitnesses.empty())
         return;
 
       // TargetResilientWitnessesHeader
-      auto witnesses = ResilientWitnesses;
+      ArrayRef<llvm::Constant *> witnesses = Description.resilientWitnesses;
       B.addInt32(witnesses.size());
       for (const auto &entry : SILWT->getEntries()) {
         // Add the requirement descriptor.
@@ -2185,8 +2142,7 @@ namespace {
           auto assocType = entry.getAssociatedTypeWitness().Requirement;
           auto assocTypeDescriptor =
             IGM.getAddrOfLLVMVariableOrGOTEquivalent(
-              LinkEntity::forAssociatedTypeDescriptor(assocType),
-              Alignment(4), IGM.ProtocolRequirementStructTy);
+              LinkEntity::forAssociatedTypeDescriptor(assocType));
           B.addRelativeAddress(assocTypeDescriptor);
         } else if (entry.getKind() == SILWitnessTable::AssociatedTypeProtocol) {
           // Associated conformance descriptor.
@@ -2198,16 +2154,14 @@ namespace {
                                   witness.Protocol);
           auto assocConformanceDescriptor =
             IGM.getAddrOfLLVMVariableOrGOTEquivalent(
-              LinkEntity::forAssociatedConformanceDescriptor(requirement),
-              Alignment(4), IGM.ProtocolRequirementStructTy);
+              LinkEntity::forAssociatedConformanceDescriptor(requirement));
           B.addRelativeAddress(assocConformanceDescriptor);
         } else if (entry.getKind() == SILWitnessTable::Method) {
           // Method descriptor.
           auto declRef = entry.getMethodWitness().Requirement;
           auto requirement =
             IGM.getAddrOfLLVMVariableOrGOTEquivalent(
-              LinkEntity::forMethodDescriptor(declRef),
-              Alignment(4), IGM.ProtocolRequirementStructTy);
+              LinkEntity::forMethodDescriptor(declRef));
           B.addRelativeAddress(requirement);
         } else {
           // Not part of the resilient witness table.
@@ -2219,6 +2173,35 @@ namespace {
         witnesses = witnesses.drop_front();
       }
       assert(witnesses.empty() && "Wrong # of resilient witnesses");
+    }
+
+    void addGenericWitnessTable() {
+      if (!Description.requiresSpecialization)
+        return;
+
+      // WitnessTableSizeInWords
+      B.addInt(IGM.Int16Ty, Description.witnessTableSize);
+      // WitnessTablePrivateSizeInWordsAndRequiresInstantiation
+      B.addInt(IGM.Int16Ty,
+               (Description.witnessTablePrivateSize << 1) |
+                Description.requiresSpecialization);
+      // RelativePointer<WitnessTable>
+      B.addRelativeAddress(Description.pattern);
+      // Instantiation function
+      B.addRelativeAddressOrNull(Description.instantiationFn);
+      // Private data
+      {
+        auto privateDataTy =
+          llvm::ArrayType::get(IGM.Int8PtrTy,
+                               swift::NumGenericMetadataPrivateDataWords);
+        auto privateDataInit = llvm::Constant::getNullValue(privateDataTy);
+        auto privateData =
+          new llvm::GlobalVariable(IGM.Module, privateDataTy,
+                                   /*constant*/ false,
+                                   llvm::GlobalVariable::InternalLinkage,
+                                   privateDataInit, "");
+        B.addRelativeAddress(privateData);
+      }
     }
   };
 }
@@ -2233,9 +2216,7 @@ void IRGenModule::emitProtocolConformance(
   // Form the protocol conformance descriptor.
   ConstantInitBuilder initBuilder(*this);
   auto init = initBuilder.beginStruct();
-  ProtocolConformanceDescriptorBuilder builder(*this, init, conformance,
-                                               record.wtable,
-                                               record.resilientWitnesses);
+  ProtocolConformanceDescriptorBuilder builder(*this, init, record);
   builder.layout();
 
   auto var =
@@ -2406,17 +2387,15 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
                                       conf->getType());
   PrettyStackTraceDecl stackTraceRAII2("...conforming to", conf->getProtocol());
 
-  // Build the witnesses.
+  // Build the witness table.
   ConstantInitBuilder builder(*this);
   auto wtableContents = builder.beginArray(Int8PtrTy);
   WitnessTableBuilder wtableBuilder(*this, wtableContents, wt);
   wtableBuilder.build();
 
-  // Collect the resilient witnesses, which will end up in the protocol
-  // conformance descriptor.
-  ConformanceDescription description(conf, wt);
-  wtableBuilder.collectResilientWitnesses(description.resilientWitnesses);
-  addProtocolConformance(std::move(description));
+  SmallVector<llvm::Constant *, 4> resilientWitnesses;
+  // Collect the resilient witnesses to go into the conformance descriptor.
+  wtableBuilder.collectResilientWitnesses(resilientWitnesses);
 
   // Produce the initializer value.
   auto initializer = wtableContents.finishAndCreateFuture();
@@ -2429,8 +2408,22 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   global->setConstant(isDependent || isConstantWitnessTable(wt));
   global->setAlignment(getWitnessTableAlignment().getValue());
 
+  // Collect the information that will go into the protocol conformance
+  // descriptor.
+  ConformanceDescription description(conf, wt, global,
+                                     wtableBuilder.getTableSize(),
+                                     wtableBuilder.getTablePrivateSize(),
+                                     wtableBuilder.requiresSpecialization());
+
+  // Build the instantiation function, we if need one.
+  description.instantiationFn = wtableBuilder.buildInstantiationFunction();
+  description.resilientWitnesses = std::move(resilientWitnesses);
+
   // Always emit an accessor function.
   wtableBuilder.buildAccessFunction(global);
+
+  // Record this conformance descriptor.
+  addProtocolConformance(std::move(description));
 
   // Behavior conformances can't be reflected.
   if (conf->isBehaviorConformance())

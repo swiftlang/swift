@@ -354,15 +354,30 @@ public:
     // demangling out of the referenced context descriptors in the target
     // process.
     Dem.setSymbolicReferenceResolver(
-      [this, &reader](int32_t offset, const void *base) -> Demangle::NodePointer {
-        // Resolve the reference to a remote address.
-        auto remoteAddress = getRemoteAddrOfTypeRefPointer(base);
-        if (remoteAddress == 0)
+    [this, &reader](SymbolicReferenceKind kind,
+                    Directness directness,
+                    int32_t offset, const void *base) -> Demangle::NodePointer {
+      // Resolve the reference to a remote address.
+      auto remoteAddress = getRemoteAddrOfTypeRefPointer(base);
+      if (remoteAddress == 0)
+        return nullptr;
+      
+      auto address = remoteAddress + offset;
+      if (directness == Directness::Indirect) {
+        if (auto indirectAddress = reader.readPointerValue(address)) {
+          address = *indirectAddress;
+        } else {
           return nullptr;
-        
-        return reader.readDemanglingForContextDescriptor(remoteAddress + offset,
-                                                         Dem);
-      });
+        }
+      }
+      
+      switch (kind) {
+      case Demangle::SymbolicReferenceKind::Context:
+        return reader.readDemanglingForContextDescriptor(address, Dem);
+      }
+      
+      return nullptr;
+    });
   }
 
   TypeConverter &getTypeConverter() { return TC; }

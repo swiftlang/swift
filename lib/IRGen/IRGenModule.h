@@ -457,12 +457,36 @@ struct ConformanceDescription {
   /// The witness table.
   SILWitnessTable *wtable;
 
+  /// The witness table pattern, which is also a complete witness table
+  /// when \c requiresSpecialization is \c false.
+  llvm::Constant *pattern;
+
+  /// The size of the witness table.
+  const uint16_t witnessTableSize;
+
+  /// The private size of the witness table, allocated
+  const uint16_t witnessTablePrivateSize;
+
+  /// Whether this witness table requires runtime specialization.
+  const unsigned requiresSpecialization : 1;
+
+  /// The instantiation function, to be run at the end of witness table
+  /// instantiation.
+  llvm::Constant *instantiationFn = nullptr;
+
   /// The resilient witnesses, if any.
   SmallVector<llvm::Constant *, 4> resilientWitnesses;
 
   ConformanceDescription(const NormalProtocolConformance *conformance,
-                         SILWitnessTable *wtable)
-    : conformance(conformance), wtable(wtable) { }
+                         SILWitnessTable *wtable,
+                         llvm::Constant *pattern,
+                         uint16_t witnessTableSize,
+                         uint16_t witnessTablePrivateSize,
+                         bool requiresSpecialization)
+    : conformance(conformance), wtable(wtable), pattern(pattern),
+      witnessTableSize(witnessTableSize),
+      witnessTablePrivateSize(witnessTablePrivateSize),
+      requiresSpecialization(requiresSpecialization) { }
 };
 
 /// IRGenModule - Primary class for emitting IR for global declarations.
@@ -621,7 +645,6 @@ public:
   llvm::CallingConv::ID SwiftCC;       /// swift calling convention
 
   Signature getAssociatedTypeWitnessTableAccessFunctionSignature();
-  llvm::StructType *getGenericWitnessTableCacheTy();
 
   /// Get the bit width of an integer type for the target platform.
   unsigned getBuiltinIntegerWidth(BuiltinIntegerType *t);
@@ -1298,12 +1321,10 @@ public:
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfWitnessTable(const NormalProtocolConformance *C,
                                       ConstantInit definition = ConstantInit());
-  llvm::Constant *getAddrOfWitnessTablePattern(const NormalProtocolConformance *C,
+  llvm::Constant *getAddrOfWitnessTablePattern(
+                                      const NormalProtocolConformance *C,
                                       ConstantInit definition = ConstantInit());
 
-  llvm::Constant *
-  getAddrOfGenericWitnessTableCache(const NormalProtocolConformance *C,
-                                    ForDefinition_t forDefinition);
   llvm::Function *
   getAddrOfGenericWitnessTableInstantiationFunction(
                                     const NormalProtocolConformance *C);
@@ -1321,8 +1342,7 @@ public:
   GenericEnvironment *getGenericEnvironment();
 
   ConstantReference
-  getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity, Alignment alignment,
-       llvm::Type *defaultType,
+  getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
        ConstantReference::Directness forceIndirect = ConstantReference::Direct);
 
   llvm::Constant *
@@ -1356,21 +1376,17 @@ private:
                                    llvm::function_ref<void()> emit);
   
   llvm::Constant *getAddrOfLLVMVariable(LinkEntity entity,
-                                        Alignment alignment,
                                         ConstantInit definition,
-                                        llvm::Type *defaultType,
-                                        DebugTypeInfo debugType);
+                                        DebugTypeInfo debugType,
+                                        llvm::Type *overrideDeclType = nullptr);
   llvm::Constant *getAddrOfLLVMVariable(LinkEntity entity,
-                                        Alignment alignment,
                                         ForDefinition_t forDefinition,
-                                        llvm::Type *defaultType,
                                         DebugTypeInfo debugType);
   ConstantReference getAddrOfLLVMVariable(LinkEntity entity,
-                                        Alignment alignment,
                                         ConstantInit definition,
-                                        llvm::Type *defaultType,
                                         DebugTypeInfo debugType,
-                                        SymbolReferenceKind refKind);
+                                        SymbolReferenceKind refKind,
+                                        llvm::Type *overrideDeclType = nullptr);
 
   void emitLazyPrivateDefinitions();
   void addRuntimeResolvableType(NominalTypeDecl *nominal);

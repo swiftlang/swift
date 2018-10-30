@@ -45,6 +45,10 @@ func f1_owned(x: __owned AnyObject) { }
 
 func f2_variadic_inout(x: ()..., y: inout ()) { }
 
+func f1_escaping(_: @escaping (Int) -> Float) { }
+func f1_autoclosure(_: @autoclosure () -> Float) { }
+func f1_escaping_autoclosure(_: @autoclosure @escaping () -> Float) { }
+
 DemangleToMetadataTests.test("function types") {
   // Conventions
   expectEqual(type(of: f0), _typeByMangledName("yyc")!)
@@ -77,6 +81,13 @@ DemangleToMetadataTests.test("function types") {
   // A function type that hasn't been built before.
   expectEqual("(Int, Float, Double, String, Character, UInt, Bool) -> ()",
     String(describing: _typeByMangledName("yySi_SfSdSSs9CharacterVSuSbtc")!))
+
+  // Escaping
+  expectEqual(type(of: f1_escaping), _typeByMangledName("ySfSicc")!)
+
+  // Autoclosure
+  expectEqual(type(of: f1_autoclosure), _typeByMangledName("ySfyXKc")!)
+  expectEqual(type(of: f1_escaping_autoclosure), _typeByMangledName("ySfyXAc")!)
 }
 
 DemangleToMetadataTests.test("metatype types") {

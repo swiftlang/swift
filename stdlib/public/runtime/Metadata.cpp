@@ -3761,13 +3761,13 @@ class WitnessTableCacheEntry :
   /// The generic table.  This is only kept around so that we can
   /// compute the size of an entry correctly in case of a race to
   /// allocate the entry.
-  GenericWitnessTable * const GenericTable;
+  const GenericWitnessTable * const GenericTable;
 
 public:
   /// Do the structural initialization necessary for this entry to appear
   /// in a concurrent map.
   WitnessTableCacheEntry(const Metadata *type,
-                         GenericWitnessTable *genericTable,
+                         const GenericWitnessTable *genericTable,
                          void ** const *instantiationArgs)
     : Type(type), GenericTable(genericTable) {}
 
@@ -3781,7 +3781,7 @@ public:
   }
 
   static size_t getExtraAllocationSize(const Metadata *type,
-                                       GenericWitnessTable *genericTable,
+                                       const GenericWitnessTable *genericTable,
                                        void ** const *instantiationArgs) {
     return getWitnessTableSize(genericTable);
   }
@@ -3790,7 +3790,7 @@ public:
     return getWitnessTableSize(GenericTable);
   }
 
-  static size_t getWitnessTableSize(GenericWitnessTable *genericTable) {
+  static size_t getWitnessTableSize(const GenericWitnessTable *genericTable) {
     auto protocol = genericTable->getProtocol();
     size_t numPrivateWords = genericTable->getWitnessTablePrivateSizeInWords();
     size_t numRequirementWords =
@@ -3798,7 +3798,7 @@ public:
     return (numPrivateWords + numRequirementWords) * sizeof(void*);
   }
 
-  WitnessTable *allocate(GenericWitnessTable *genericTable,
+  WitnessTable *allocate(const GenericWitnessTable *genericTable,
                          void ** const *instantiationArgs);
 };
 
@@ -3809,7 +3809,7 @@ using GenericWitnessTableCache =
 using LazyGenericWitnessTableCache = Lazy<GenericWitnessTableCache>;
 
 /// Fetch the cache for a generic witness-table structure.
-static GenericWitnessTableCache &getCache(GenericWitnessTable *gen) {
+static GenericWitnessTableCache &getCache(const GenericWitnessTable *gen) {
   // Keep this assert even if you change the representation above.
   static_assert(sizeof(LazyGenericWitnessTableCache) <=
                 sizeof(GenericWitnessTable::PrivateDataType),
@@ -3823,14 +3823,15 @@ static GenericWitnessTableCache &getCache(GenericWitnessTable *gen) {
 /// If there's no initializer, no private storage, and all requirements
 /// are present, we don't have to instantiate anything; just return the
 /// witness table template.
-static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
+static bool doesNotRequireInstantiation(
+                              ProtocolConformanceDescriptor *conformance,
+                              const GenericWitnessTable *genericTable) {
   // If the table says it requires instantiation, it does.
   if (genericTable->requiresInstantiation()) {
     return false;
   }
 
   // If we have resilient witnesses, we require instantiation.
-  auto conformance = genericTable->getConformance();
   if (!conformance->getResilientWitnesses().empty()) {
     return false;
   }
@@ -3855,8 +3856,9 @@ static bool doesNotRequireInstantiation(GenericWitnessTable *genericTable) {
 
 /// Initialize witness table entries from order independent resilient
 /// witnesses stored in the generic witness table structure itself.
-static void initializeResilientWitnessTable(GenericWitnessTable *genericTable,
-                                            void **table) {
+static void initializeResilientWitnessTable(
+                                        const GenericWitnessTable *genericTable,
+                                        void **table) {
   auto conformance = genericTable->getConformance();
   auto protocol = conformance->getProtocol();
 
@@ -3906,7 +3908,7 @@ static void initializeResilientWitnessTable(GenericWitnessTable *genericTable,
 /// Instantiate a brand new witness table for a resilient or generic
 /// protocol conformance.
 WitnessTable *
-WitnessTableCacheEntry::allocate(GenericWitnessTable *genericTable,
+WitnessTableCacheEntry::allocate(const GenericWitnessTable *genericTable,
                                  void ** const *instantiationArgs) {
   // The number of witnesses provided by the table pattern.
   size_t numPatternWitnesses = genericTable->WitnessTableSizeInWords;
@@ -3952,10 +3954,11 @@ WitnessTableCacheEntry::allocate(GenericWitnessTable *genericTable,
 }
 
 const WitnessTable *
-swift::swift_getGenericWitnessTable(GenericWitnessTable *genericTable,
-                                    const Metadata *type,
-                                    void **const *instantiationArgs) {
-  if (doesNotRequireInstantiation(genericTable)) {
+swift::swift_instantiateWitnessTable(ProtocolConformanceDescriptor *conformance,
+                                     const Metadata *type,
+                                     void **const *instantiationArgs) {
+  auto genericTable = conformance->getGenericWitnessTable();
+  if (doesNotRequireInstantiation(conformance, genericTable)) {
     return genericTable->Pattern;
   }
 
@@ -4686,6 +4689,8 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
   if (!verificationEnabled) return;
   
   Demangle::Demangler Dem;
+  Dem.setSymbolicReferenceResolver(ResolveToDemanglingForContext(Dem));
+
   auto node = _swift_buildDemanglingForMetadata(metadata, Dem);
   // If the mangled node involves types in an AnonymousContext, then by design,
   // it cannot be looked up by name.
