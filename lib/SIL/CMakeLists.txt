@@ -43,7 +43,7 @@ add_swift_host_library(swiftSIL STATIC
   SILVTable.cpp
   SILWitnessTable.cpp
   TypeLowering.cpp
-  ValueOwnershipKindClassifier.cpp
+  ValueOwnership.cpp
   LINK_LIBRARIES
     swiftSerialization
     swiftSema

@@ -379,6 +379,8 @@ public:
   ///
   /// An example of a SILValue without ownership semantics is a
   /// struct_element_addr.
+  ///
+  /// NOTE: This is implemented in ValueOwnership.cpp not SILValue.cpp.
   ValueOwnershipKind getOwnershipKind() const;
 
   /// Verify that this SILValue and its uses respects ownership invariants.
