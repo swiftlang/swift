@@ -1649,6 +1649,13 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitPoundAssertStmt(PoundAssertStmt *S) {
+    printCommon(S, "pound_assert");
+    OS << " message=" << QuotedString(S->getMessage()) << "\n";
+    printRec(S->getCondition());
+    OS << ")";
+  }
+
   void visitDoCatchStmt(DoCatchStmt *S) {
     printCommon(S, "do_catch_stmt") << '\n';
     printRec(S->getBody());

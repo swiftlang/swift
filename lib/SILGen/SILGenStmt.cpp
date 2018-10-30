@@ -507,6 +507,26 @@ void StmtEmitter::visitYieldStmt(YieldStmt *S) {
   SGF.emitYield(S, sources, origTypes, SGF.CoroutineUnwindDest);
 }
 
+void StmtEmitter::visitPoundAssertStmt(PoundAssertStmt *S) {
+  SILValue condition;
+  {
+    FullExpr scope(SGF.Cleanups, CleanupLocation(S));
+    condition =
+        SGF.emitRValueAsSingleValue(S->getCondition()).getUnmanagedValue();
+  }
+
+  // Sema forces conditions to have Builtin.i1 type.
+  assert(condition->getType().castTo<BuiltinIntegerType>()->isFixedWidth(1));
+
+  SILValue message = SGF.B.createStringLiteral(
+      S, S->getMessage(), StringLiteralInst::Encoding::UTF8);
+
+  auto resultType = SGF.getASTContext().TheEmptyTupleType;
+  SGF.B.createBuiltin(
+      S, SGF.getASTContext().getIdentifier("poundAssert"),
+      SGF.getLoweredType(resultType), {}, {condition, message});
+}
+
 namespace {
   // This is a little cleanup that ensures that there are no jumps out of a
   // defer body.  The cleanup is only active and installed when emitting the

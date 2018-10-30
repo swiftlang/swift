@@ -946,6 +946,14 @@ static ValueDecl *getGetObjCTypeEncodingOperation(ASTContext &Context,
   return builder.build(Id);
 }
 
+static ValueDecl *getPoundAssert(ASTContext &Context, Identifier Id) {
+  auto int1Type = BuiltinIntegerType::get(1, Context);
+  auto optionalRawPointerType = BoundGenericEnumType::get(
+      Context.getOptionalDecl(), Type(), {Context.TheRawPointerType});
+  return getBuiltinFunction(Id, {int1Type, optionalRawPointerType},
+                            Context.TheEmptyTupleType);
+}
+
 static ValueDecl *getTSanInoutAccess(ASTContext &Context, Identifier Id) {
   // <T> T -> ()
   BuiltinGenericSignatureBuilder builder(Context);
@@ -1862,6 +1870,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::GetObjCTypeEncoding:
     return getGetObjCTypeEncodingOperation(Context, Id);
+
+  case BuiltinValueKind::PoundAssert:
+    return getPoundAssert(Context, Id);
 
   case BuiltinValueKind::TSanInoutAccess:
     return getTSanInoutAccess(Context, Id);

@@ -229,6 +229,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'YieldStmt': 224,
     'YieldList': 225,
     'IdentifierList': 226,
+    'PoundAssertStmt': 227,
 }
 
 

@@ -553,6 +553,13 @@ public:
     
     return TS;
   }
+
+  Stmt *visitPoundAssertStmt(PoundAssertStmt *PA) {
+    Expr *C = PA->getCondition();
+    TC.typeCheckCondition(C, DC);
+    PA->setCondition(C);
+    return PA;
+  }
     
   Stmt *visitDeferStmt(DeferStmt *DS) {
     TC.typeCheckDecl(DS->getTempDecl());
