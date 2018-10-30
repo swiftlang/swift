@@ -104,12 +104,19 @@ public:
 
   class ProviderDeclarations {
   public:
-    const std::vector<const ValueDecl *> classMembers;
+    const std::vector<const PrecedenceGroupDecl *> precedenceGroups;
+    const std::vector<const NominalTypeDecl *> topLevelVisibleNominals;
+    const std::vector<const ValueDecl *> topLevelVisibleValues;
+    const std::vector<const OperatorDecl *> topLevelOperators;
+    const std::vector<const FuncDecl *> nestedOperators;
+
     /// Records every nominal declaration, and whether or not the declaration
     /// changes the externally-observable shape of the type.
     llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
     const std::vector<std::pair<const NominalTypeDecl *, const ValueDecl *>>
         holdersAndMembers;
+
+    const std::vector<const ValueDecl *> classMembers;
 
   public:
     ProviderDeclarations(const SourceFile *SF);
@@ -132,9 +139,22 @@ public:
     static std::vector<const NominalTypeDecl *>
     getTopLevelVisibleNominals(const SourceFile *SF);
 
+    static std::vector<const ValueDecl *>
+    getTopLevelVisibleValues(const SourceFile *SF);
+
+    static std::vector<const OperatorDecl *>
+    getTopLevelOperators(const SourceFile *SF);
+
+    static std::vector<const FuncDecl *>
+    getNestedOperators(const SourceFile *SF);
+
     static void addExtendedNominalMembers(
         const DeclRange members,
         llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals);
+
+    static void
+    addNestedOperators(const DeclRange members,
+                       std::vector<const FuncDecl *> &nestedOperators);
 
     template <DeclKind, typename DeclT>
     static std::vector<const DeclT *> getTopLevelDecls(const SourceFile *);
@@ -290,61 +310,15 @@ void SQ::Provides::emitSectionOfNamePairs(
 }
 
 SQ::ProviderDeclarations::ProviderDeclarations(const SourceFile *SF)
-    : classMembers(getClassMembers(SF)),
+    : precedenceGroups(
+          getTopLevelDecls<DeclKind::PrecedenceGroup, PrecedenceGroupDecl>(SF)),
+      topLevelVisibleNominals(getTopLevelVisibleNominals(SF)),
+      topLevelVisibleValues(getTopLevelVisibleValues(SF)),
+      topLevelOperators(getTopLevelOperators(SF)),
+      nestedOperators(getNestedOperators(SF)),
       extendedNominals(getExtendedNominals(SF)),
-      holdersAndMembers(getHoldersAndMembers(SF)) {}
-
-std::vector<const ValueDecl *>
-SQ::ProviderDeclarations::getClassMembers(const SourceFile *SF) {
-  struct NameCollector : public VisibleDeclConsumer {
-    std::vector<const ValueDecl *> classMembers;
-    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-      classMembers.push_back(VD);
-    }
-  } collect;
-  SF->lookupClassMembers({}, collect);
-  return collect.classMembers;
-}
-
-llvm::MapVector<const NominalTypeDecl *, bool>
-SQ::ProviderDeclarations::getExtendedNominals(const SourceFile *SF) {
-  llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
-  for (const ExtensionDecl *const ED : getTopLevelVisibleExtensions(SF)) {
-    const bool extendsVisibleTypes =
-        areAnyExtendedTypesVisibleOutsideThisFile(ED);
-    if (!extendsVisibleTypes && !areAnyMembersVisibleOutsideThisFile(ED))
-      continue;
-    extendedNominals[ED->getExtendedNominal()] |= extendsVisibleTypes;
-    addExtendedNominalMembers(ED->getMembers(), extendedNominals);
-  }
-  for (const NominalTypeDecl *const NTD : getTopLevelVisibleNominals(SF)) {
-    extendedNominals[NTD] |= true;
-    addExtendedNominalMembers(NTD->getMembers(), extendedNominals);
-  }
-  return extendedNominals;
-}
-
-void SQ::ProviderDeclarations::addExtendedNominalMembers(
-    const DeclRange members,
-    llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals) {
-  for (const Decl *D : members) {
-    if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
-      extendedNominals[NTD] |= true;
-      addExtendedNominalMembers(NTD->getMembers(), extendedNominals);
-    }
-  }
-}
-// FINDING OPERATORS???
-std::vector<const ExtensionDecl *>
-SQ::ProviderDeclarations::getTopLevelVisibleExtensions(const SourceFile *SF) {
-  std::vector<const ExtensionDecl *> extensions;
-  for (const ExtensionDecl *const ED :
-       getTopLevelDecls<DeclKind::Extension, ExtensionDecl>(SF))
-    if (const NominalTypeDecl *const NTD = ED->getExtendedNominal())
-      if (isVisibleOutsideItsFile(NTD))
-        extensions.push_back(ED);
-  return extensions;
-}
+      holdersAndMembers(getHoldersAndMembers(SF)),
+      classMembers(getClassMembers(SF)) {}
 
 std::vector<const NominalTypeDecl *>
 SQ::ProviderDeclarations::getTopLevelVisibleNominals(const SourceFile *SF) {
@@ -367,16 +341,71 @@ SQ::ProviderDeclarations::getTopLevelVisibleNominals(const SourceFile *SF) {
   return nominals;
 }
 
-// getnonchanging
-// for (const ExtensionDecl *const ED: getTopLevelDecls<DeclKind::Extension,
-// ExtensionDecl>(SF))  if (const NominalTypeDecl *const NTD =
-// ED->getExtendedNominal())  if (isVisibleOutsideItsFile(NTD))
-// extendedNominalsThatCouldAddMembers.push_back(NTD);
-//
-//
-//
-// return extendedNominalsThatCouldAddMembers;
-//}
+std::vector<const ValueDecl *>
+SQ::ProviderDeclarations::getTopLevelVisibleValues(const SourceFile *SF) {
+  std::vector<const ValueDecl *> values;
+  for (const Decl *const D : SF->Decls)
+    switch (D->getKind()) {
+    default:
+      break;
+
+    case DeclKind::TypeAlias:
+    case DeclKind::Var:
+    case DeclKind::Func:
+    case DeclKind::Accessor: {
+      const ValueDecl *const VD = cast<ValueDecl>(D);
+      if (VD->hasName() && isVisibleOutsideItsFile(VD))
+        values.push_back(VD);
+      break;
+    }
+    }
+  return values;
+}
+
+std::vector<const OperatorDecl *>
+SQ::ProviderDeclarations::getTopLevelOperators(const SourceFile *SF) {
+  std::vector<const OperatorDecl *> operators;
+  for (const Decl *const D : SF->Decls)
+    switch (D->getKind()) {
+    default:
+      break;
+
+    case DeclKind::InfixOperator:
+    case DeclKind::PrefixOperator:
+    case DeclKind::PostfixOperator:
+      operators.push_back(cast<OperatorDecl>(D));
+      break;
+    }
+  return operators;
+}
+
+std::vector<const FuncDecl *>
+SQ::ProviderDeclarations::getNestedOperators(const SourceFile *SF) {
+  std::vector<const FuncDecl *> nestedOps;
+  for (const ExtensionDecl *const ED : getTopLevelVisibleExtensions(SF))
+    addNestedOperators(ED->getMembers(), nestedOps);
+  for (const NominalTypeDecl *const NTD : getTopLevelVisibleNominals(SF))
+    addNestedOperators(NTD->getMembers(), nestedOps);
+  return nestedOps;
+}
+
+llvm::MapVector<const NominalTypeDecl *, bool>
+SQ::ProviderDeclarations::getExtendedNominals(const SourceFile *SF) {
+  llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
+  for (const ExtensionDecl *const ED : getTopLevelVisibleExtensions(SF)) {
+    const bool extendsVisibleTypes =
+        areAnyExtendedTypesVisibleOutsideThisFile(ED);
+    if (!extendsVisibleTypes && !areAnyMembersVisibleOutsideThisFile(ED))
+      continue;
+    extendedNominals[ED->getExtendedNominal()] |= extendsVisibleTypes;
+    addExtendedNominalMembers(ED->getMembers(), extendedNominals);
+  }
+  for (const NominalTypeDecl *const NTD : getTopLevelVisibleNominals(SF)) {
+    extendedNominals[NTD] |= true;
+    addExtendedNominalMembers(NTD->getMembers(), extendedNominals);
+  }
+  return extendedNominals;
+}
 
 std::vector<std::pair<const NominalTypeDecl *, const ValueDecl *>>
 SQ::ProviderDeclarations::getHoldersAndMembers(const SourceFile *SF) {
@@ -391,6 +420,56 @@ SQ::ProviderDeclarations::getHoldersAndMembers(const SourceFile *SF) {
   }
   return holdersAndMembers;
 }
+
+std::vector<const ValueDecl *>
+SQ::ProviderDeclarations::getClassMembers(const SourceFile *SF) {
+  struct NameCollector : public VisibleDeclConsumer {
+    std::vector<const ValueDecl *> classMembers;
+    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+      classMembers.push_back(VD);
+    }
+  } collect;
+  SF->lookupClassMembers({}, collect);
+  return collect.classMembers;
+}
+
+void SQ::ProviderDeclarations::addExtendedNominalMembers(
+    const DeclRange members,
+    llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals) {
+  for (const Decl *D : members) {
+    if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
+      extendedNominals[NTD] |= true;
+      addExtendedNominalMembers(NTD->getMembers(), extendedNominals);
+    }
+  }
+}
+
+void SQ::ProviderDeclarations::addNestedOperators(
+    const DeclRange members, std::vector<const FuncDecl *> &nestedOperators) {
+  for (const Decl *D : members) {
+    if (const ValueDecl *const VD = dyn_cast<ValueDecl>(D)) {
+      if (isVisibleOutsideItsFile(VD) && VD->getFullName().isOperator()) {
+        nestedOperators.push_back(cast<FuncDecl>(VD));
+        continue;
+      }
+    }
+    if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
+      addNestedOperators(NTD->getMembers(), nestedOperators);
+    }
+  }
+}
+
+std::vector<const ExtensionDecl *>
+SQ::ProviderDeclarations::getTopLevelVisibleExtensions(const SourceFile *SF) {
+  std::vector<const ExtensionDecl *> extensions;
+  for (const ExtensionDecl *const ED :
+       getTopLevelDecls<DeclKind::Extension, ExtensionDecl>(SF))
+    if (const NominalTypeDecl *const NTD = ED->getExtendedNominal())
+      if (isVisibleOutsideItsFile(NTD))
+        extensions.push_back(ED);
+  return extensions;
+}
+
 
 std::vector<const ExtensionDecl *>
 SQ::ProviderDeclarations::getExtensionsWithJustMembers(const SourceFile *SF) {
@@ -481,7 +560,21 @@ SQ::ProviderNames::ProviderNames(const SQ::ProviderDeclarations &pd)
       dynamicLookupNames(getDynamicLookupNames(pd)) {}
 
 std::vector<std::string>
-SQ::ProviderNames::getTopLevelNames(const ProviderDeclarations &pd) {}
+SQ::ProviderNames::getTopLevelNames(const ProviderDeclarations &pd) {
+  std::vector<std::string> tops;
+  for (const PrecedenceGroupDecl *const PGD : pd.precedenceGroups)
+    tops.push_back(DeclBaseName(PGD->getName()).userFacingName());
+  for (const NominalTypeDecl *const NTD : pd.topLevelVisibleNominals)
+    tops.push_back(DeclBaseName(NTD->getName()).userFacingName());
+  for (const ValueDecl *const VD : pd.topLevelVisibleValues)
+    tops.push_back(DeclBaseName(VD->getBaseName()).userFacingName());
+  for (const OperatorDecl *const OD : pd.topLevelOperators)
+    tops.push_back(DeclBaseName(OD->getName()).userFacingName());
+  for (const FuncDecl *const OD : pd.nestedOperators)
+    tops.push_back(DeclBaseName(OD->getName()).userFacingName());
+
+  return tops;
+}
 
 std::vector<std::string> SQ::ProviderNames::getExtendedNominalContextualNames(
     const ProviderDeclarations &pd, const bool onlyIfCouldAddMembers) {
@@ -537,393 +630,3 @@ void SQ::Depends::emit() const {
   abort();
 }
 
-// namespace {
-//
-//
-//
-//  /// Emits the reference dependencies from the frontend so that the driver
-//  /// can compute a dependency graph for the whole module, and use it to
-//  decide
-//  /// which files need to be recompiled when doing incremental compilation.
-//  class ReferenceDependenciesEmitter {
-//    SourceFile *const SF;
-//    const DependencyTracker &depTracker;
-//    llvm::raw_ostream &out;
-//
-//    ReferenceDependenciesEmitter(SourceFile *const SF,
-//                                 const DependencyTracker &depTracker,
-//                                 llvm::raw_ostream &out)
-//    : SF(SF), depTracker(depTracker), out(out) {}
-//
-//  public:
-//    /// Emits the provided and depended-upon dependencies to a file
-//    ///
-//    /// \param diags Where problems opening the file are emitted
-//    /// \param SF The SourceFile containing the code with the dependences
-//    /// \param depTracker The entities depended-upon
-//    /// \param outputPath Where the dependencies are written
-//    ///
-//    /// \return true on error
-//    static bool emit(DiagnosticEngine &diags, SourceFile *SF,
-//                     const DependencyTracker &depTracker, StringRef
-//                     outputPath);
-//
-//    /// Emit the dependencies.
-//    static void emit(SourceFile *SF, const DependencyTracker &depTracker,
-//                     llvm::raw_ostream &out);
-//
-//  private:
-//    /// Emits all the dependency information.
-//    void emit() const;
-//  };
-//
-//  class CollectedDeclarations {
-//    /// All of these used to be provided as top-level names
-//    struct StatusQuoTopLevels {
-//      /// Used to be provided as top-level, getName()->userFacingName()
-//      llvm::SmallVector<const NominalTypeDecl*, 16> nominals;
-//
-//      /// Used to be provided as top-levels,
-//      element->getName()->userFacingName() llvm::SmallVector<const
-//      OperatorDecl *, 8> operators;
-//
-//      /// Used to be provided as top-levels,
-//      element->getName()->userFacingName() llvm::SmallVector<const FuncDecl *,
-//      8> memberOperatorsTreatedAsTop;
-//
-//      /// Used to be provided as top level,
-//      element->getName()->userFacingName() llvm::SmallVector<const
-//      PrecedenceGroupDecl *, 4> precedenceGroups;
-//
-//      /// Used to be provided as element->getBaseName().getMemberFacingName()
-//      llvm::SmallVector<const ValueDecl *, 32> values;
-//
-//      template<typename DeclT>
-//      static std::string getProvidedTopLevelName(const DeclT *const D) {
-//        return DeclBaseName(D->getName()).userFacingName();
-//      }
-//
-//    } top;
-//
-//
-//
-//    /// Records every nominal declaration, and whether or not the declaration
-//    /// changes the externally-observable shape of the type.
-//    /// Used to be provided as:
-//    /// member type with empty member,
-//    llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
-//
-//
-//
-//    /// Records extension declarations which are not introducing a conformance
-//    /// to a public protocol and add a public member.
-//    /// Used to be provided as:
-//    /// member type with empty member,
-//    llvm::SmallVector<const ExtensionDecl *, 8> extensionsWithJustMembers;
-//
-//    /// Records types for which members must be emitted.
-//    /// Right now, only extension members are emitted individually.
-//    /// Also emit with empty member as a wildcard.
-//    std::vector<const std::pair<const NominalTypeDecl*, std::vector<const
-//    ValueDecl*>>> holdersAndMembers; static std::string
-//    getProvidedContextualName(const ExtensionDecl *const ED) {
-//      return getProvidedContextualName(ED->getExtendedNominal());
-//    }
-//    static std::string getProvidedContextualName(const NominalTypeDecl *const
-//    NTD) {
-//      Mangle::ASTMangler Mangler;
-//      return Mangler.mangleTypeAsContextUSR(NTD);
-//    }
-//
-//    /// used for dynamicLookupMembers
-//    std::vector<const ValueDecl *>classMembers;
-//
-//
-//    /// Recursively computes the transitive closure over members
-//    /// adding memberOperatorsTreatedAsTop and extendedNominals to the
-//    receiver. void findNominalsAndOperators(const DeclRange members);
-//
-//    static bool extendedTypeIsPrivate(const TypeLoc inheritedType);
-//    static bool declIsPrivate(const Decl *const member);
-//
-//    void collectExtensionAndContents(const ExtensionDecl *const ED);
-//    void collectNominalAndContents(const NominalTypeDecl *const NTD);
-//    void collectTopLevelValue(const ValueDecl *const VD);
-//    void collectTopLevel(const Decl *const);
-//
-//    void collectMembers();
-//    void collectExtendedNominal(const NominalTypeDecl *const NTD, bool
-//    changesShape); void collectExtensionWithJustMembers(const ExtensionDecl
-//    *const ED);
-//
-//    void collectClassMembers(const SourceFile *const);
-//  public:
-//    void collectDeclarationsFrom(const SourceFile *const SF);
-//  };
-//
-//} // namespace
-//
-// template<>
-// std::string CollectedDeclarations::StatusQuoTopLevels::
-// getProvidedTopLevelName<ValueDecl>(const ValueDecl *const VD) {
-//  return VD->getBaseName().userFacingName();
-//}
-//
-//
-// static bool isVisibleOutsideItsFile(const ValueDecl *const VD) {
-//  return VD->getFormalAccess() > AccessLevel::FilePrivate;
-//}
-// static void unimplemented() { assert(false && "experimental dependencies
-// unimplemented"); }
-//
-// bool ReferenceDependenciesEmitter::emit(DiagnosticEngine &diags,
-//                                        SourceFile *const SF,
-//                                        const DependencyTracker &depTracker,
-//                                        StringRef outputPath) {
-//  // Before writing to the dependencies file path, preserve any previous file
-//  // that may have been there. No error handling -- this is just a nicety, it
-//  // doesn't matter if it fails.
-//  llvm::sys::fs::rename(outputPath, outputPath + "~");
-//  return withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
-//    ReferenceDependenciesEmitter::emit(SF, depTracker, out);
-//    return false;
-//  });
-//}
-//
-// void ReferenceDependenciesEmitter::emit(SourceFile *SF,
-//                                        const DependencyTracker &depTracker,
-//                                        llvm::raw_ostream &out) {
-//  ReferenceDependenciesEmitter(SF, depTracker, out).emit();
-//}
-//
-// void ReferenceDependenciesEmitter::emit() const {
-//  assert(SF && "Cannot emit reference dependencies without a SourceFile");
-//  out << "### Swift experimental dependencies file v0 ###\n";
-//  CollectedDeclarations cpd;
-//  cpd.collectDeclarationsFrom(SF);
-//  (void)depTracker;
-//  unimplemented();
-//}
-//
-//
-//
-//// stubs
-//
-// void CollectedDeclarations::collectDeclarationsFrom(const SourceFile *const
-// SF) {
-//  for (const Decl *D : SF->Decls)
-//    collectTopLevel(D);
-//  collectMembers();
-//  collectClassMembers(SF);
-//}
-//
-// void CollectedDeclarations::collectTopLevel(const Decl *const D) {
-//  switch (D->getKind()) {
-//    case DeclKind::Module:
-//      break;
-//
-//    case DeclKind::Import:
-//      // FIXME: Handle re-exported decls.
-//      break;
-//
-//    case DeclKind::Extension:
-//      collectExtensionAndContents(cast<ExtensionDecl>(D));
-//      break;
-//
-//    case DeclKind::InfixOperator:
-//    case DeclKind::PrefixOperator:
-//    case DeclKind::PostfixOperator:
-//      top.operators.push_back(cast<OperatorDecl>(D));
-//      break;
-//
-//    case DeclKind::PrecedenceGroup:
-//      top.precedenceGroups.push_back(cast<PrecedenceGroupDecl>(D));
-//      break;
-//
-//    case DeclKind::Enum:
-//    case DeclKind::Struct:
-//    case DeclKind::Class:
-//    case DeclKind::Protocol:
-//      collectNominalAndContents(cast<NominalTypeDecl>(D));
-//      break;
-//
-//    case DeclKind::TypeAlias:
-//    case DeclKind::Var:
-//    case DeclKind::Func:
-//    case DeclKind::Accessor:
-//      collectTopLevelValue(cast<ValueDecl>(D));
-//      break;
-//
-//    case DeclKind::PatternBinding:
-//    case DeclKind::TopLevelCode:
-//    case DeclKind::IfConfig:
-//    case DeclKind::PoundDiagnostic:
-//      // No action necessary.
-//      break;
-//
-//    case DeclKind::EnumCase:
-//    case DeclKind::GenericTypeParam:
-//    case DeclKind::AssociatedType:
-//    case DeclKind::Param:
-//    case DeclKind::Subscript:
-//    case DeclKind::Constructor:
-//    case DeclKind::Destructor:
-//    case DeclKind::EnumElement:
-//    case DeclKind::MissingMember:
-//      // These can occur in malformed ASTs.
-//      break;
-//  }
-//}
-//
-// void CollectedDeclarations::collectExtensionAndContents(const ExtensionDecl
-// *const ED) {
-//  const NominalTypeDecl *const NTD = ED->getExtendedNominal();
-//  if (!NTD || !isVisibleOutsideItsFile(NTD))
-//    return;
-//
-//  // Check if the extension is just adding members, or if it is
-//  // introducing a conformance to a public protocol.
-//  bool justMembers =
-//  std::all_of(ED->getInherited().begin(), ED->getInherited().end(),
-//              extendedTypeIsPrivate);
-//  if (justMembers) {
-//    if (std::all_of(ED->getMembers().begin(), ED->getMembers().end(),
-//                    declIsPrivate)) {
-//      return;
-//    }
-//    extensionsWithJustMembers.push_back(ED);
-//  }
-//  extendedNominals[NTD] |= !justMembers;
-//  findNominalsAndOperators(ED->getMembers());
-//}
-//
-// void CollectedDeclarations::collectNominalAndContents(const NominalTypeDecl
-// *const NTD) {
-//  if (!NTD->hasName() || !isVisibleOutsideItsFile(NTD)) {
-//    return;
-//  }
-//  top.nominals.push_back(NTD);
-//  extendedNominals[NTD] |= true;
-//  findNominalsAndOperators(NTD->getMembers());
-//}
-//
-// void CollectedDeclarations::collectTopLevelValue(const ValueDecl *const VD) {
-//  if (!VD->hasName() || !isVisibleOutsideItsFile(VD))
-//    return;
-//  top.values.push_back(VD);
-//}
-//
-// void CollectedDeclarations::CollectedDeclarations::findNominalsAndOperators(
-//                                                                      const
-//                                                                      DeclRange
-//                                                                      members)
-//                                                                      {
-//  for (const Decl *D : members) {
-//    auto *VD = dyn_cast<ValueDecl>(D);
-//    if (!VD || !isVisibleOutsideItsFile(VD))
-//      continue;
-//
-//    if (VD->getFullName().isOperator()) {
-//      top.memberOperatorsTreatedAsTop.push_back(cast<FuncDecl>(VD));
-//      continue;
-//    }
-//
-//    auto nominal = dyn_cast<NominalTypeDecl>(D);
-//    if (!nominal)
-//      continue;
-//    extendedNominals[nominal] |= true;
-//    findNominalsAndOperators(nominal->getMembers());
-//  }
-//}
-//
-// bool CollectedDeclarations::extendedTypeIsPrivate(const TypeLoc
-// inheritedType) {
-//  auto type = inheritedType.getType();
-//  if (!type)
-//    return true;
-//
-//  if (!type->isExistentialType()) {
-//    // Be conservative. We don't know how to deal with other extended types.
-//    return false;
-//  }
-//
-//  auto layout = type->getExistentialLayout();
-//  assert(!layout.explicitSuperclass && "Should not have a subclass existential
-//  "
-//         "in the inheritance clause of an extension");
-//  for (auto protoTy : layout.getProtocols()) {
-//    if (!declIsPrivate(protoTy->getDecl()))
-//      return false;
-//  }
-//
-//  return true;
-//}
-//
-// bool CollectedDeclarations::declIsPrivate(const Decl *const member) {
-//  auto *VD = dyn_cast<ValueDecl>(member);
-//  if (!VD) {
-//    switch (member->getKind()) {
-//      case DeclKind::Import:
-//      case DeclKind::PatternBinding:
-//      case DeclKind::EnumCase:
-//      case DeclKind::TopLevelCode:
-//      case DeclKind::IfConfig:
-//      case DeclKind::PoundDiagnostic:
-//        return true;
-//
-//      case DeclKind::Extension:
-//      case DeclKind::InfixOperator:
-//      case DeclKind::PrefixOperator:
-//      case DeclKind::PostfixOperator:
-//        return false;
-//
-//      default:
-//        llvm_unreachable("everything else is a ValueDecl");
-//    }
-//  }
-//
-//  return !isVisibleOutsideItsFile(VD);
-//}
-//
-// void CollectedDeclarations::collectMembers() {
-//  for (auto entry: extendedNominals)
-//    collectExtendedNominal(entry.first, entry.second);
-//  for (auto *ED: extensionsWithJustMembers)
-//    collectExtensionWithJustMembers(ED);
-//}
-//
-// void CollectedDeclarations::collectClassMembers(const SourceFile *const SF) {
-//  class NameCollector : public VisibleDeclConsumer {
-//  private:
-//    std::vector<const ValueDecl*> &classMembers;
-//
-//  public:
-//    NameCollector(std::vector<const ValueDecl*> &classMembers)
-//    : classMembers(classMembers) {}
-//
-//    void foundDecl(ValueDecl *VD, DeclVisibilityKind) override {
-//      classMembers.push_back(VD);
-//    }
-//  };
-//  NameCollector collector(classMembers);
-//  SF->lookupClassMembers({}, collector);
-//}
-//
-// void CollectedDeclarations::collectExtendedNominal(const NominalTypeDecl
-// *const NTD, bool changesShape) {
-//  holdersAndMembers.push_back(std::make_pair(NTD, std::vector<const
-//  ValueDecl*>()));
-//}
-//
-// void CollectedDeclarations::collectExtensionWithJustMembers(const
-// ExtensionDecl *const ED) {
-//  std::vector<const ValueDecl *>members;
-//  for (auto *member : ED->getMembers()) {
-//    auto *VD = dyn_cast<ValueDecl>(member);
-//    if (!VD || !VD->hasName() || !isVisibleOutsideItsFile(VD))
-//      continue;
-//    members.push_back(VD);
-//  }
-//  holdersAndMembers.push_back(std::make_pair(ED->getExtendedNominal(),
-//  members));
-//}
