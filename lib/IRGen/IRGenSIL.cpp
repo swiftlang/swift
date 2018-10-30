@@ -2804,17 +2804,40 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     checkOk(status);
   }
 
-  // Calculate how many outputs we have.
-  llvm::Value *expectedReturnValueCount = nullptr;
+  // If we have any opaque TensorGroup results, then we need to do extra runtime
+  // work to determine the number of TensorFlow outputs and to allocate space
+  // for them. This flag determines whether we need to do the extra work. We
+  // compute the flag by iterating over all the results and checking if they are
+  // known TensorFlow values that do not need to go through the TensorGroup
+  // machinery.
+  // TODO: We can add more types of known TensorFlow values to reduce the amount
+  // of work that happens at runtime.
+  bool hasOpaqueTensorGroupResults = false;
+  if (outParameterAddress.isValid()) {
+    LLVM_DEBUG(llvm::dbgs() << " Has indirect result of type "
+               << outParameterCanType << ".\n");
+    hasOpaqueTensorGroupResults = true;
+  } else {
+    LLVM_DEBUG(llvm::dbgs() << " Has " << i->getNumResults()
+               << " direct result(s):\n");
+    for (auto silResult : i->getResults()) {
+      LLVM_DEBUG(llvm::dbgs() << "  Direct result of type "
+                 << silResult->getType() << ".\n");
+      if (silResult->getType().getASTType() == astCtx.TheEmptyTupleType)
+        continue;
+      if (tf::isTensorFlowValue(silResult->getType()))
+        continue;
+      hasOpaqueTensorGroupResults = true;
+      break;
+    }
+  }
+  LLVM_DEBUG(llvm::dbgs() << " hasOpaqueTensorGroupResults: "
+             << hasOpaqueTensorGroupResults << ".\n");
 
-  // If we see any TensorGroup results, the size of the buffer depends on a
-  // runtime call, and therefore we must allocate it on the heap.
-  bool returnValuesHeapAllocated = false;
-
-  // We cache type metadatas and TensorGroup witnesses for direct results so
-  // that we can reuse them when we're actually constructing the results. We
-  // cache a `nullptr` for results that are known TensorFlow values that do not
-  // need to go through the TensorGroup machinery.
+  // We cache type metadatas and TensorGroup witnesses for opaque TensorGroup
+  // direct results so that we can reuse them when we're actually constructing
+  // the results. We cache a `nullptr` for results that are known TensorFlow
+  // values that do not need to go through the TensorGroup machinery.
   SmallVector<llvm::Value*, 4> directResultTypeMetadatas;
   SmallVector<llvm::Value*, 4> directResultTensorGroupWitnessTables;
 
@@ -2822,46 +2845,33 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   // can reuse them when we're actually constructing the results.
   SmallVector<llvm::Value*, 4> directResultCTensorHandleCounts;
 
+  // Calculate how many outputs we have.
+  llvm::Value *expectedReturnValueCount = nullptr;
   if (outParameterAddress.isValid()) {
     // If we have an out parameter, then calculate the number of outputs
-    // required to fill it.
-    LLVM_DEBUG(llvm::dbgs() << " Counting outputs for indirect result of type "
-               << outParameterCanType << ".\n");
+    // required to fill it by calling TFC_GetTensorGroupCHandleCount.
     auto *getTensorGroupCHandleCountFn =
         IGM.getTFC_GetTensorGroupCHandleCountFn();
     expectedReturnValueCount = Builder.CreateCall(
         getTensorGroupCHandleCountFn,
         {outParameterTypeMetadata, outParameterTypeMetadata,
          outParameterTensorGroupWitnessTable});
-
-    // The calculation happens at runtime, so the output buffer must be heap
-    // allocated.
-    returnValuesHeapAllocated = true;
   } else {
     // If we're returning results directly, we must iterate over the results and
     // add up their counts.
-    LLVM_DEBUG(llvm::dbgs() << " Returns " << i->getNumResults()
-               << " direct result(s).\n");
     expectedReturnValueCount = llvm::ConstantInt::get(IGM.Int32Ty, 0);
     for (auto silResult : i->getResults()) {
-      LLVM_DEBUG(llvm::dbgs() << "  Counting outputs for result of type "
-                 << silResult->getType() << ".\n");
-
       // If the result is Void, it corresponds to 0 outputs.
       if (silResult->getType().getASTType() == astCtx.TheEmptyTupleType) {
         directResultTypeMetadatas.push_back(nullptr);
         directResultTensorGroupWitnessTables.push_back(nullptr);
         auto *cTensorHandleCount = llvm::ConstantInt::get(IGM.Int32Ty, 0);
         directResultCTensorHandleCounts.push_back(cTensorHandleCount);
-        expectedReturnValueCount = Builder.CreateAdd(expectedReturnValueCount,
-                                                     cTensorHandleCount);
         continue;
       }
 
       // If the result is a known TensorFlow type, it corresponds to just 1
       // output.
-      // TODO: We could also handle concrete structs of known TensorFlow values
-      // here, to avoid falling through to the slower TensorGroup case.
       if (tf::isTensorFlowValue(silResult->getType())) {
         directResultTypeMetadatas.push_back(nullptr);
         directResultTensorGroupWitnessTables.push_back(nullptr);
@@ -2874,6 +2884,9 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
       // Otherwise, the result type must conform to TensorGroup, so we ask the
       // TensorGroup for the number of outputs that it needs.
+
+      assert(hasOpaqueTensorGroupResults &&
+             "found an unexpected opaque TensorGroup result");
 
       // Emit the type metadata and witness table.
       auto canType = silResult->getType().getASTType()->getCanonicalType();
@@ -2890,16 +2903,12 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       // in this result, and store the information.
       auto *getTensorGroupCHandleCountFn =
           IGM.getTFC_GetTensorGroupCHandleCountFn();
-      auto cTensorHandleCount = Builder.CreateCall(
+      auto *cTensorHandleCount = Builder.CreateCall(
           getTensorGroupCHandleCountFn,
           {typeMetadata, typeMetadata, witnessTable});
       directResultCTensorHandleCounts.push_back(cTensorHandleCount);
       expectedReturnValueCount = Builder.CreateAdd(expectedReturnValueCount,
                                                    cTensorHandleCount);
-
-      // The calculation happens at runtime, so the output buffer must be heap
-      // allocated.
-      returnValuesHeapAllocated = true;
     }
   }
   assert(expectedReturnValueCount &&
@@ -2908,7 +2917,9 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   // Now that we have calculated how many outputs we expect, allocate space for
   // them.
   llvm::Value *returnValuesAddress = nullptr;
-  if (returnValuesHeapAllocated) {
+  if (hasOpaqueTensorGroupResults) {
+    // We need to allocate space on the heap because we calculate the buffer
+    // size at runtime when we have opaque TensorGroup results.
     LLVM_DEBUG(llvm::dbgs() << " Allocating output buffer on the heap.\n");
     auto *allocateCHandleBufferFn = IGM.getTFC_AllocateCHandleBufferFn();
     returnValuesAddress = Builder.CreateCall(allocateCHandleBufferFn,
@@ -2993,8 +3004,6 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       }
 
       // If the result is a known TensorFlow type, get it directly.
-      // TODO: We could also handle concrete structs of known TensorFlow values
-      // here, to avoid falling through to the slower TensorGroup case.
       if (tf::isTensorFlowValue(silResult->getType())) {
         auto cTensorHandle = Builder.CreateLoad(tfOutputAddr,
                                                 IGM.getPointerAlignment());
@@ -3024,6 +3033,9 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
       // Otherwise, the result type  must conform to TensorGroup, so we can
       // create it using TFC_InitTensorGroup.
+
+      assert(hasOpaqueTensorGroupResults &&
+             "found an unexpected opaque TensorGroup result");
 
       // Look up the type metadata and witness table. (We cached them earlier
       // while calculating the size of the output buffer).
@@ -3058,7 +3070,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   }
 
   // If we allocated the output buffer on the heap, remember to deallocate it.
-  if (returnValuesHeapAllocated) {
+  if (hasOpaqueTensorGroupResults) {
     LLVM_DEBUG(llvm::dbgs()
                << " Deallocating the heap-allocated output buffer.\n");
     auto *deallocateCHandleBufferFn = IGM.getTFC_DeallocateCHandleBufferFn();
