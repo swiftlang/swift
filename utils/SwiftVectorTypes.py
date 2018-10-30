@@ -10,7 +10,6 @@
 
 from SwiftIntTypes import all_integer_types
 all_vector_counts = [2,3,4,8,16,32,64]
-vector_max_bits = 512
 
 class SwiftVectorType(object):
   def __init__(self, element, count):
@@ -24,4 +23,4 @@ class SwiftVectorType(object):
     return SwiftVectorType(SwiftIntegerType(false, self.element.bits, true), count)
 
 def all_vector_types(element):
-  return [SwiftVectorType(element,c) for c in all_vector_counts if c*element.bits <= vector_max_bits]
+  return [SwiftVectorType(element,c) for c in all_vector_counts]

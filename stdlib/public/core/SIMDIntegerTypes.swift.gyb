@@ -236,20 +236,18 @@ public extension ${Element} {
 %    other_bits = other_type.bits
 %    other_signed = other_type.is_signed
 %    Other = other_type.stdlib_name
-%    if other_bits*count <= 512:
-%     OtherLLVM = 'Vec' + str(llvmN) + 'x' + other_type.builtin_name
+%    OtherLLVM = 'Vec' + str(llvmN) + 'x' + other_type.builtin_name
     @_transparent
     public init(truncatingIfNeeded other: ${Other}.Vector${count}) {
-%     if other_bits >= bits:
+%    if other_bits >= bits:
       self.init(Builtin.truncOrBitCast_${OtherLLVM}_${LLVM}(other._value))
-%     elif other_signed:
+%    elif other_signed:
       self.init(Builtin.sext_${OtherLLVM}_${LLVM}(other._value))
-%     else:
+%    else:
       self.init(Builtin.zext_${OtherLLVM}_${LLVM}(other._value))
-%     end
+%    end
     }
 
-%    end
 %   end
   }
 

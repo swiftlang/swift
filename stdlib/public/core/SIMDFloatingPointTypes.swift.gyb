@@ -1,7 +1,7 @@
 %{
 eltsizes = [32, 64]
 fltnames = {32:'Float', 64:'Double'}
-counts = [2,3,4,8,16]
+counts = [2,3,4,8,16,32,64]
 def llvmFloatVec(bits, count):
   return 'Vec' + str(count) + 'xFPIEEE' + str(bits)
 }%
@@ -14,11 +14,10 @@ public extension ${Element} {
 %  # for us. And it does, but we end up triggering asserts for some operations,
 %  # so it ends up being simpler to pad at the Swift level instead.
 %  llvmN = N if N != 3 else 4
-%  if bits*llvmN <= 512:
-%   LLVM = llvmFloatVec(bits, llvmN)
-%   Self = 'Vector' + str(N)
-%   BitPattern = 'Int' + str(bits) + '.Vector' + str(N)
-%   BitPatternLLVM = 'Vec' + str(llvmN) + 'xInt' + str(bits)
+%  LLVM = llvmFloatVec(bits, llvmN)
+%  Self = 'Vector' + str(N)
+%  BitPattern = 'Int' + str(bits) + '.Vector' + str(N)
+%  BitPatternLLVM = 'Vec' + str(llvmN) + 'xInt' + str(bits)
   @_fixed_layout
   struct ${Self} : SIMDFloatingPointVector, SIMDVector${N} {
 
@@ -151,7 +150,7 @@ public extension ${Element} {
 
     // Conversion from other floating-point vectors.
 %   for otherBits in eltsizes:
-%    if otherBits != bits and otherBits*llvmN <= 512:
+%    if otherBits != bits:
 %     OtherElement = {32:'Float', 64:'Double'}[otherBits]
     @_transparent
     public init(_ other: ${OtherElement}.Vector${N}) {
@@ -166,7 +165,6 @@ public extension ${Element} {
 
     // Conversion from integer vectors.
 %   for otherBits in [8,16,32,64]:
-%    if otherBits*llvmN <= 512:
     @_transparent
     public init(_ other: Int${otherBits}.Vector${N}) {
       _value = Builtin.sitofp_Vec${llvmN}xInt${otherBits}_${LLVM}(other._value)
@@ -176,11 +174,9 @@ public extension ${Element} {
     public init(_ other: UInt${otherBits}.Vector${N}) {
       _value = Builtin.uitofp_Vec${llvmN}xInt${otherBits}_${LLVM}(other._value)
     }
-%    end
 %   end
   }
 
-%  end
 % end
 }
 

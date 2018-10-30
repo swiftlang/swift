@@ -6,7 +6,6 @@ from SwiftVectorTypes import all_vector_counts
 %for bits in _all_integer_type_bitwidths:
   public enum Mask${bits} {
 % for N in all_vector_counts:
-%  if bits*N <= 512:
 %   Self = 'Vector' + str(N)
 %   Value = 'Int' + str(bits) + '.Vector' + str(N)
     @_fixed_layout
@@ -124,7 +123,7 @@ from SwiftVectorTypes import all_vector_counts
       // should be able to vectorize the for-loop in the generic init above,
       // but it doesn't always happen in practice, so we have this workaround.
 %   for otherBits in [8,16,32,64]:
-%    if otherBits*N <= 512 and otherBits != bits:
+%    if otherBits != bits:
       @inlinable
       public init(_ other: Mask${otherBits}.Vector${N}) {
         _value = Int${bits}.Vector${N}(truncatingIfNeeded: other._value)
@@ -134,7 +133,6 @@ from SwiftVectorTypes import all_vector_counts
 %   end
     }
 
-%  end
 % end
   }
 %end
