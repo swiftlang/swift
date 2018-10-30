@@ -147,12 +147,12 @@ extension FixedWidthInteger {
   @inline(__always)
   @inlinable // FIXME(sil-serialize-all)
   internal func _fullShiftLeft<N: FixedWidthInteger>(_ n: N) -> Self {
-    return (self &<< ((n &+ 1) &>> 1)) &<< (n &>> 1)
+    return (self &<< ((n &+ (1 as N)) &>> 1)) &<< (n &>> (1 as N))
   }
   @inline(__always)
   @inlinable // FIXME(sil-serialize-all)
   internal func _fullShiftRight<N: FixedWidthInteger>(_ n: N) -> Self {
-    return (self &>> ((n &+ 1) &>> 1)) &>> (n &>> 1)
+    return (self &>> ((n &+ (1 as N)) &>> 1)) &>> (n &>> (1 as N))
   }
   @inline(__always)
   @inlinable // FIXME(sil-serialize-all)
