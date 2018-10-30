@@ -15,6 +15,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/Support/MD5.h"
+#include <vector>
 
 namespace swift {
 class DependencyTracker;
