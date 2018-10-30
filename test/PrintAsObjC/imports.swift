@@ -9,12 +9,6 @@
 
 // REQUIRES: objc_interop
 
-// CHECK: #pragma clang diagnostic push
-
-// CHECK: #if __has_warning("-Watimport-in-framework-header")
-// CHECK-NEXT: #pragma clang diagnostic ignored "-Watimport-in-framework-header"
-// CHECK-NEXT: #endif
-
 // CHECK: @import Base;
 // CHECK-NEXT: @import Base.ExplicitSub;
 // CHECK-NEXT: @import Base.ExplicitSub.ExSub;
@@ -24,8 +18,6 @@
 // CHECK-NEXT: @import MostlyPrivate1_Private;
 // CHECK-NEXT: @import MostlyPrivate2_Private;
 // CHECK-NEXT: @import ctypes.bits;
-
-// CHECK: #pragma clang diagnostic pop
 
 // NEGATIVE-NOT: ctypes;
 // NEGATIVE-NOT: ImSub;
