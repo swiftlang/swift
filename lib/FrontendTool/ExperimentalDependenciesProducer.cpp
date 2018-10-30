@@ -105,9 +105,9 @@ public:
   class ProviderDeclarations {
   public:
     const std::vector<const ValueDecl *> classMembers;
-    const std::vector<const NominalTypeDecl *> extendedNominals;
-    const std::vector<const NominalTypeDecl *>
-        extendedNominalsThatCouldNotChangeTheShapeOfTheType;
+    /// Records every nominal declaration, and whether or not the declaration
+    /// changes the externally-observable shape of the type.
+    llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
     const std::vector<std::pair<const NominalTypeDecl *, const ValueDecl *>>
         holdersAndMembers;
 
@@ -116,21 +116,25 @@ public:
 
   private:
     static std::vector<const ValueDecl *> getClassMembers(const SourceFile *);
-    static std::vector<const NominalTypeDecl *>
+
+    static llvm::MapVector<const NominalTypeDecl *, bool>
     getExtendedNominals(const SourceFile *);
-    static std::set<const NominalTypeDecl *>
-    getExtendedNominalsThatCouldNotChangeTheShapeOfTheType(const SourceFile *);
+
     static std::vector<std::pair<const NominalTypeDecl *, const ValueDecl *>>
     getHoldersAndMembers(const SourceFile *);
+
     static std::vector<const ExtensionDecl *>
     getExtensionsWithJustMembers(const SourceFile *);
+
     static std::vector<const ExtensionDecl *>
     getTopLevelVisibleExtensions(const SourceFile *SF);
+
     static std::vector<const NominalTypeDecl *>
     getTopLevelVisibleNominals(const SourceFile *SF);
+
     static void addExtendedNominalMembers(
         const DeclRange members,
-        std::vector<const NominalTypeDecl *> &extendedNominals);
+        llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals);
 
     template <DeclKind, typename DeclT>
     static std::vector<const DeclT *> getTopLevelDecls(const SourceFile *);
@@ -149,6 +153,7 @@ public:
   class ProviderNames {
   public:
     const std::vector<std::string> dynamicLookupNames;
+    const std::vector<std::string> extendedNominalContextualNames;
     const std::vector<std::string>
         extendedNominalContextualNamesThatCouldAddMembers;
     const std::vector<std::pair<std::string, std::string>> holdersAndMembers;
@@ -156,9 +161,11 @@ public:
   private:
     static std::vector<std::string>
     getDynamicLookupNames(const ProviderDeclarations &);
+
     static std::vector<std::string>
-    getExtendedNominalContextualNamesThatCouldAddMembers(
-        const ProviderDeclarations &);
+    getExtendedNominalContextualNames(const ProviderDeclarations &,
+                                      bool onlyCouldAddMembers);
+
     static std::vector<std::pair<std::string, std::string>>
     getHoldersAndMembers(const ProviderDeclarations &);
 
@@ -230,18 +237,21 @@ void SQ::Provides::emit() const {
 }
 
 void SQ::Provides::emitTopLevelNames() const {}
+
 void SQ::Provides::emitNominalTypes() const {
   emitter.emitSectionStart(reference_dependency_keys::providesNominal);
-  for (StringRef n : pns.extendedNominalsContextualNamesThatCanChangeShape)
+  for (StringRef n : pns.extendedNominalContextualNamesThatCouldAddMembers)
     emitter.emitName(n);
 }
+
 void SQ::Provides::emitMembers() const {
   emitter.emitSectionStart(reference_dependency_keys::providesMember);
-  for (StringRef n : pns.extendedNominalContextualNamesThatCouldAddMembers)
+  for (StringRef n : pns.extendedNominalContextualNames)
     emitter.emitDoubleNameLine(n, "");
   for (std::pair<StringRef, StringRef> hm : pns.holdersAndMembers)
     emitter.emitDoubleNameLine(hm.first, hm.second);
 }
+
 void SQ::Provides::emitDynamicLookupMembers() const {
   emitter.emitSectionStart(reference_dependency_keys::providesDynamicLookup);
   for (StringRef n : pns.dynamicLookupNames)
@@ -255,8 +265,6 @@ void SQ::Provides::emitInterfaceHash() const {
 SQ::ProviderDeclarations::ProviderDeclarations(const SourceFile *SF)
     : classMembers(getClassMembers(SF)),
       extendedNominals(getExtendedNominals(SF)),
-      extendedNominalsThatCouldNotChangeTheShapeOfTheType(
-          getExtendedNominalsThatCouldNotChangeTheShapeOfTheType(SF)),
       holdersAndMembers(getHoldersAndMembers(SF)) {}
 
 std::vector<const ValueDecl *>
@@ -271,32 +279,30 @@ SQ::ProviderDeclarations::getClassMembers(const SourceFile *SF) {
   return collect.classMembers;
 }
 
-std::vector<const NominalTypeDecl *>
+llvm::MapVector<const NominalTypeDecl *, bool>
 SQ::ProviderDeclarations::getExtendedNominals(const SourceFile *SF) {
-  std::vector<const NominalTypeDecl *> extendedNominals;
+  llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
   for (const ExtensionDecl *const ED : getTopLevelVisibleExtensions(SF)) {
-    extendedNominals.push_back(ED->getExtendedNominal());
+    const bool extendsVisibleTypes =
+        areAnyExtendedTypesVisibleOutsideThisFile(ED);
+    if (!extendsVisibleTypes && !areAnyMembersVisibleOutsideThisFile(ED))
+      continue;
+    extendedNominals[ED->getExtendedNominal()] |= extendsVisibleTypes;
     addExtendedNominalMembers(ED->getMembers(), extendedNominals);
   }
   for (const NominalTypeDecl *const NTD : getTopLevelVisibleNominals(SF)) {
-    extendedNominals.push_back(NTD);
+    extendedNominals[NTD] |= true;
     addExtendedNominalMembers(NTD->getMembers(), extendedNominals);
   }
   return extendedNominals;
 }
 
-std::set<const NominalTypeDecl *> SQ::ProviderDeclarations::
-    getExtendedNominalsThatCouldNotChangeTheShapeOfTheType(
-        const SourceFile *SF) {
-  getTopLevelVisibleExtensions(SF) XXXX
-}
-
 void SQ::ProviderDeclarations::addExtendedNominalMembers(
     const DeclRange members,
-    std::vector<const NominalTypeDecl *> &extendedNominals) {
+    llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals) {
   for (const Decl *D : members) {
     if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
-      extendedNominals.push_back(NTD);
+      extendedNominals[NTD] |= true;
       addExtendedNominalMembers(NTD->getMembers(), extendedNominals);
     }
   }
@@ -442,8 +448,10 @@ SQ::ProviderDeclarations::getTopLevelDecls(const SourceFile *const SF) {
 
 SQ::ProviderNames::ProviderNames(const SQ::ProviderDeclarations &pd)
     : dynamicLookupNames(getDynamicLookupNames(pd)),
+      extendedNominalContextualNames(
+          getExtendedNominalContextualNames(pd, false)),
       extendedNominalContextualNamesThatCouldAddMembers(
-          getExtendedNominalContextualNamesThatCouldAddMembers(pd)),
+          getExtendedNominalContextualNames(pd, true)),
       holdersAndMembers(getHoldersAndMembers(pd)) {}
 
 std::vector<std::string>
@@ -462,15 +470,14 @@ SQ::ProviderNames::getDynamicLookupNames(const ProviderDeclarations &pd) {
   return nameStrings;
 }
 
-std::vector<std::string>
-SQ::ProviderNames::getExtendedNominalContextualNamesThatCouldAddMembers(
-    const ProviderDeclarations &pd) {
-  std::vector<std::string> extendedNominalContextualNamesThatCouldAddMembers;
-  for (const NominalTypeDecl *const NTD :
-       pd.extendedNominalsThatCouldAddMembers)
-    extendedNominalContextualNamesThatCouldAddMembers.push_back(
-        getContextualName(NTD));
-  return extendedNominalContextualNamesThatCouldAddMembers;
+std::vector<std::string> SQ::ProviderNames::getExtendedNominalContextualNames(
+    const ProviderDeclarations &pd, const bool onlyIfCouldAddMembers) {
+  std::vector<std::string> extendedNominalContextualNames;
+  for (const auto &p : pd.extendedNominals) {
+    if (!onlyIfCouldAddMembers || p.second)
+      extendedNominalContextualNames.push_back(getContextualName(p.first));
+  }
+  return extendedNominalContextualNames;
 }
 
 std::vector<std::pair<std::string, std::string>>
