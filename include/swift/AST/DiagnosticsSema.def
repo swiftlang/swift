@@ -1865,9 +1865,6 @@ NOTE(declared_protocol_conformance_here,none,
      "%0 implicitly conforms to protocol %2}1 here",
      (Type, unsigned, DeclName, DeclName))
 
-WARNING(witness_unavailable_warn,none,
-        "unavailable %0 %1 was used to satisfy a requirement of protocol %2",
-        (DescriptiveDeclKind, DeclName, DeclName))
 ERROR(witness_unavailable,none,
         "unavailable %0 %1 was used to satisfy a requirement of protocol %2",
         (DescriptiveDeclKind, DeclName, DeclName))
