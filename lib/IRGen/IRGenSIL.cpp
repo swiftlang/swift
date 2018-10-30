@@ -2083,7 +2083,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     }
 
     // Otherwise, this must conform to TensorGroup so we can add it using
-    // TFCOpAddInputFromTensorGroup.
+    // TFC_OpAddInputFromTensorGroup.
 
     auto canType = opInput->getType().getASTType()->getCanonicalType();
     auto conformance = tfModule->lookupConformance(canType,

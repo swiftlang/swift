@@ -56,7 +56,7 @@ public extension TensorGroup {
 // Conform standard TensorFlow types to TensorGroup
 //===----------------------------------------------------------------------===//
 
-extension TensorHandle : TensorGroup where Scalar : AccelerableByTensorFlow {
+extension TensorHandle : TensorGroup {
   public static var _typeList: [TensorDataType] {
     return [Scalar.tensorFlowDataType]
   }
@@ -101,7 +101,7 @@ extension VariantHandle : TensorGroup {
   }
 }
 
-extension Tensor : TensorGroup where Scalar : AccelerableByTensorFlow {
+extension Tensor : TensorGroup {
   public static var _typeList: [TensorDataType] {
     return [Scalar.tensorFlowDataType]
   }
@@ -116,7 +116,7 @@ extension Tensor : TensorGroup where Scalar : AccelerableByTensorFlow {
   }
 }
 
-extension TensorElementLiteral : TensorGroup where Scalar : AccelerableByTensorFlow {
+extension TensorElementLiteral : TensorGroup {
   public static var _typeList: [TensorDataType] {
     return [Scalar.tensorFlowDataType]
   }
