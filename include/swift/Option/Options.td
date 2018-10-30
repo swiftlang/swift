@@ -129,6 +129,10 @@ def driver_always_rebuild_dependents :
   Flag<["-"], "driver-always-rebuild-dependents">, InternalDebugOpt,
   HelpText<"Always rebuild dependents of files that have been modified">;
 
+def enable_experimental_dependencies :
+Flag<["-"], "enable-experimental-dependencies">, Flags<[FrontendOption, HelpHidden]>,
+HelpText<"Experimental work-in-progress to be more selective about incremental recompilation">;
+
 def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;
 
