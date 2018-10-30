@@ -4,9 +4,9 @@
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=FRAMEWORK %s < %t.framework/Headers/mixed.h
 // RUN: %check-in-clang -Watimport-in-framework-header -F %S/Inputs/ %t.framework/Headers/mixed.h
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name Mixed -import-objc-header %S/Inputs/Mixed.framework/Headers/Mixed.h %s -typecheck -emit-objc-header-path %t.framework/mixed-header.h
-// RUN: %FileCheck -check-prefix=CHECK -check-prefix=HEADER %s < %t.framework/mixed-header.h
-// RUN: %check-in-clang -Watimport-in-framework-header -include %S/Inputs/Mixed.framework/Headers/Mixed.h %t.framework/mixed-header.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name Mixed -import-objc-header %S/Inputs/Mixed.framework/Headers/Mixed.h %s -typecheck -emit-objc-header-path %t.framework/Headers/mixed-header.h
+// RUN: %FileCheck -check-prefix=CHECK -check-prefix=HEADER %s < %t.framework/Headers/mixed-header.h
+// RUN: %check-in-clang -Watimport-in-framework-header -include %S/Inputs/Mixed.framework/Headers/Mixed.h %t.framework/Headers/mixed-header.h
 
 // REQUIRES: objc_interop
 
