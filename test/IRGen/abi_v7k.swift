@@ -3,6 +3,7 @@
 
 // REQUIRES: CPU=armv7k
 // REQUIRES: OS=watchos
+// REQUIRES: rdar45306568
 
 // CHECK-LABEL: define hidden swiftcc float @"$s8test_v7k9addFloats{{.*}}"(float, float)
 // CHECK: fadd float %0, %1
