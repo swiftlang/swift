@@ -2065,7 +2065,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   //   results together, and add those;
   auto unpackAndAddInput = [&](SILValue opInput) -> llvm::Value* {
     LLVM_DEBUG(llvm::dbgs()
-               << " Adding input of type " << opInput->getType() << ".\n");
+               << "   Adding input of type " << opInput->getType() << ".\n");
 
     // If this is a known TensorFlow value, add it directly.
     // TODO: We could also handle concrete structs of known TensorFlow values
@@ -2122,6 +2122,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   Address outParameterAddress;
   llvm::Value *outParameterTypeMetadata = nullptr;
   llvm::Value *outParameterTensorGroupWitnessTable = nullptr;
+  CanType outParameterCanType;
 
   // Handle inputs and dynamic attributes.
 
@@ -2157,7 +2158,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         structuredArgument.getArgumentNameAndLowering();
     std::string argumentName = std::get<0>(argumentNameAndLowering);
     auto argumentLowering = std::get<1>(argumentNameAndLowering);
-    LLVM_DEBUG(llvm::dbgs() << "IRGen graph_op argument " << argumentName
+    LLVM_DEBUG(llvm::dbgs() << " IRGen graph_op argument " << argumentName
                << " with lowering " << (unsigned)argumentLowering << "\n");
     switch (argumentLowering) {
     case GraphOperationInfo::ArgumentLowering::UnknownShapeListAttribute:
@@ -2182,14 +2183,14 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
 
       switch (structuredArgument.getKind()) {
       case GraphOperationInfo::SAK_Single: {
-        LLVM_DEBUG(llvm::dbgs() << " Adding a single input.\n");
+        LLVM_DEBUG(llvm::dbgs() << "  Adding a single input.\n");
         auto tensorHandle = structuredArgument.getSingleArgument();
         listLength = unpackAndAddInput(tensorHandle);
         break;
       }
       case GraphOperationInfo::SAK_List: {
         LLVM_DEBUG(llvm::dbgs()
-                   << " Adding input list of size "
+                   << "  Adding input list of size "
                    << structuredArgument.getArgumentList().size() << ".\n");
         listLength = llvm::ConstantInt::get(IGM.Int32Ty, 0);
         for (auto tensorHandle : structuredArgument.getArgumentList()) {
@@ -2223,13 +2224,14 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       auto silValue = structuredArgument.getSingleArgument();
       outParameterAddress = getLoweredAddress(silValue);
 
-      auto canType = silValue->getType().getASTType()->getCanonicalType();
-      auto conformance = tfModule->lookupConformance(canType,
+      outParameterCanType =
+          silValue->getType().getASTType()->getCanonicalType();
+      auto conformance = tfModule->lookupConformance(outParameterCanType,
                                                      tensorGroupProto);
       assert(conformance && "out type does not conform to TensorGroup");
-      outParameterTypeMetadata = emitTypeMetadataRef(canType);
+      outParameterTypeMetadata = emitTypeMetadataRef(outParameterCanType);
       outParameterTensorGroupWitnessTable =
-          emitWitnessTableRef(*this, canType, *conformance);
+          emitWitnessTableRef(*this, outParameterCanType, *conformance);
       break;
     }
     case GraphOperationInfo::ArgumentLowering::NormalAttribute: {
@@ -2239,7 +2241,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       auto silType = silValue->getType();
       auto astType = silType.getASTType();
 
-      LLVM_DEBUG(llvm::dbgs() << " Adding dynamic NormalAttribute of type "
+      LLVM_DEBUG(llvm::dbgs() << "  Adding dynamic NormalAttribute of type "
                  << astType << "\n");
 
       auto *attrNameValAddr = IGM.getAddrOfGlobalString(argumentName.c_str());
@@ -2384,7 +2386,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       auto silType = silValue->getType();
       auto astType = silType.getASTType();
 
-      LLVM_DEBUG(llvm::dbgs() << " Adding dynamic TFDataTypeAttribute of type "
+      LLVM_DEBUG(llvm::dbgs() << "  Adding dynamic TFDataTypeAttribute of type "
                  << astType << "\n");
 
       auto *attrNameValAddr = IGM.getAddrOfGlobalString(argumentName.c_str());
@@ -2428,7 +2430,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       auto silType = silValue->getType();
       auto astType = silType.getASTType();
 
-      LLVM_DEBUG(llvm::dbgs() << " Adding dynamic ShapeAttribute of type "
+      LLVM_DEBUG(llvm::dbgs() << "  Adding dynamic ShapeAttribute of type "
                  << astType << "\n");
 
       assert(0 && "TODO: implement dynamic ShapeAttribute");
@@ -2598,7 +2600,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
           // TODO: confirm unit test coverage for float-typed attr.
           setAttrFn = IGM.getTFE_OpSetAttrFloatFn();
           auto value = attr.value.getFloatValue();
-          LLVM_DEBUG(llvm::dbgs() << " Setting float-typed attr " << attrName
+          LLVM_DEBUG(llvm::dbgs() << "  Setting float-typed attr " << attrName
                                   << " with value " << attr.value << ".\n");
           // TensorFlow only supports 32-bit float attributes.  If we got a 16
           // or 64 bit one, convert it to float.
@@ -2608,7 +2610,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
           attrVal = llvm::ConstantFP::get(IGM.FloatTy, value.convertToFloat());
         } else {
           auto value = attr.value.getIntegerValue();
-          LLVM_DEBUG(llvm::dbgs() << " Setting int-typed attr " << attrName
+          LLVM_DEBUG(llvm::dbgs() << "  Setting int-typed attr " << attrName
                                   << " with value " << attr.value << ".\n");
           if (value.getBitWidth() == 1) {
             setAttrFn = IGM.getTFE_OpSetAttrBoolFn();
@@ -2802,38 +2804,124 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     checkOk(status);
   }
 
-  // Calculate how many results we have, and allocate space for them.
+  // Calculate how many outputs we have.
   llvm::Value *expectedReturnValueCount = nullptr;
-  llvm::Value *returnValuesAddress = nullptr;
+
+  // If we see any TensorGroup results, the size of the buffer depends on a
+  // runtime call, and therefore we must allocate it on the heap.
+  bool returnValuesHeapAllocated = false;
+
+  // We cache type metadatas and TensorGroup witnesses for direct results so
+  // that we can reuse them when we're actually constructing the results. We
+  // cache a `nullptr` for results that are known TensorFlow values that do not
+  // need to go through the TensorGroup machinery.
+  SmallVector<llvm::Value*, 4> directResultTypeMetadatas;
+  SmallVector<llvm::Value*, 4> directResultTensorGroupWitnessTables;
+
+  // We also cache the CTensorHandle counts for the direct results, so that we
+  // can reuse them when we're actually constructing the results.
+  SmallVector<llvm::Value*, 4> directResultCTensorHandleCounts;
+
   if (outParameterAddress.isValid()) {
-    // If we have an out parameter, then we need to call generic functions that
-    // calculate how many results we have and allocate space for them.
-    LLVM_DEBUG(llvm::dbgs() << " Returns indirect result.\n");
+    // If we have an out parameter, then calculate the number of outputs
+    // required to fill it.
+    LLVM_DEBUG(llvm::dbgs() << " Counting outputs for indirect result of type "
+               << outParameterCanType << ".\n");
     auto *getTensorGroupCHandleCountFn =
         IGM.getTFC_GetTensorGroupCHandleCountFn();
     expectedReturnValueCount = Builder.CreateCall(
         getTensorGroupCHandleCountFn,
         {outParameterTypeMetadata, outParameterTypeMetadata,
          outParameterTensorGroupWitnessTable});
-    auto *allocateTensorGroupCHandleBufferFn =
-        IGM.getTFC_AllocateTensorGroupCHandleBufferFn();
-    returnValuesAddress = Builder.CreateCall(
-        allocateTensorGroupCHandleBufferFn,
-        {outParameterTypeMetadata, outParameterTypeMetadata,
-         outParameterTensorGroupWitnessTable});
+
+    // The calculation happens at runtime, so the output buffer must be heap
+    // allocated.
+    returnValuesHeapAllocated = true;
+  } else {
+    // If we're returning results directly, we must iterate over the results and
+    // add up their counts.
+    LLVM_DEBUG(llvm::dbgs() << " Returns " << i->getNumResults()
+               << " direct result(s).\n");
+    expectedReturnValueCount = llvm::ConstantInt::get(IGM.Int32Ty, 0);
+    for (auto silResult : i->getResults()) {
+      LLVM_DEBUG(llvm::dbgs() << "  Counting outputs for result of type "
+                 << silResult->getType() << ".\n");
+
+      // If the result is Void, it corresponds to 0 outputs.
+      if (silResult->getType().getASTType() == astCtx.TheEmptyTupleType) {
+        directResultTypeMetadatas.push_back(nullptr);
+        directResultTensorGroupWitnessTables.push_back(nullptr);
+        auto *cTensorHandleCount = llvm::ConstantInt::get(IGM.Int32Ty, 0);
+        directResultCTensorHandleCounts.push_back(cTensorHandleCount);
+        expectedReturnValueCount = Builder.CreateAdd(expectedReturnValueCount,
+                                                     cTensorHandleCount);
+        continue;
+      }
+
+      // If the result is a known TensorFlow type, it corresponds to just 1
+      // output.
+      // TODO: We could also handle concrete structs of known TensorFlow values
+      // here, to avoid falling through to the slower TensorGroup case.
+      if (tf::isTensorFlowValue(silResult->getType())) {
+        directResultTypeMetadatas.push_back(nullptr);
+        directResultTensorGroupWitnessTables.push_back(nullptr);
+        auto *cTensorHandleCount = llvm::ConstantInt::get(IGM.Int32Ty, 1);
+        directResultCTensorHandleCounts.push_back(cTensorHandleCount);
+        expectedReturnValueCount = Builder.CreateAdd(expectedReturnValueCount,
+                                                     cTensorHandleCount);
+        continue;
+      }
+
+      // Otherwise, the result type must conform to TensorGroup, so we ask the
+      // TensorGroup for the number of outputs that it needs.
+
+      // Emit the type metadata and witness table.
+      auto canType = silResult->getType().getASTType()->getCanonicalType();
+      auto conformance = tfModule->lookupConformance(canType,
+                                                     tensorGroupProto);
+      assert(conformance && "out type does not conform to TensorGroup");
+      auto *typeMetadata = emitTypeMetadataRef(canType);
+      directResultTypeMetadatas.push_back(typeMetadata);
+      auto *witnessTable =
+          emitWitnessTableRef(*this, canType, *conformance);
+      directResultTensorGroupWitnessTables.push_back(witnessTable);
+
+      // Call TFC_GetTensorGroupCHandleCount to get the number of CTensorHandles
+      // in this result, and store the information.
+      auto *getTensorGroupCHandleCountFn =
+          IGM.getTFC_GetTensorGroupCHandleCountFn();
+      auto cTensorHandleCount = Builder.CreateCall(
+          getTensorGroupCHandleCountFn,
+          {typeMetadata, typeMetadata, witnessTable});
+      directResultCTensorHandleCounts.push_back(cTensorHandleCount);
+      expectedReturnValueCount = Builder.CreateAdd(expectedReturnValueCount,
+                                                   cTensorHandleCount);
+
+      // The calculation happens at runtime, so the output buffer must be heap
+      // allocated.
+      returnValuesHeapAllocated = true;
+    }
+  }
+  assert(expectedReturnValueCount &&
+         "should have set expectedReturnValueCount");
+
+  // Now that we have calculated how many outputs we expect, allocate space for
+  // them.
+  llvm::Value *returnValuesAddress = nullptr;
+  if (returnValuesHeapAllocated) {
+    LLVM_DEBUG(llvm::dbgs() << " Allocating output buffer on the heap.\n");
+    auto *allocateCHandleBufferFn = IGM.getTFC_AllocateCHandleBufferFn();
+    returnValuesAddress = Builder.CreateCall(allocateCHandleBufferFn,
+                                             {expectedReturnValueCount});
     returnValuesAddress = Builder.CreateBitCast(returnValuesAddress,
                                                 IGM.Int8PtrPtrTy);
   } else {
-    // If we're returning results directly, we can tell how many results we have
-    // by looking at the instruction.
-    LLVM_DEBUG(llvm::dbgs() << " Returns " << i->getNumResults()
-               << " direct result(s).\n");
-    expectedReturnValueCount = llvm::ConstantInt::get(IGM.Int32Ty,
-                                                      i->getNumResults());
+    LLVM_DEBUG(llvm::dbgs() << " Allocating output buffer on the stack.\n");
     returnValuesAddress = createAlloca(IGM.Int8PtrTy, expectedReturnValueCount,
                                        IGM.getPointerAlignment(),
                                        "returnValues").getAddress();
   }
+  assert(returnValuesAddress && "should have set returnValuesAddress");
 
   // Now we execute the TFE op as in:
   //   TFE_TensorHandle* retval = <allocated above>
@@ -2865,6 +2953,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     // If we have an out parameter, store the results there.
     assert(i->getNumResults() == 0 &&
            "can't handle direct and indirect results at the same time");
+    LLVM_DEBUG(llvm::dbgs() << " Storing result to output parameter address.\n");
     auto *initTensorGroupFn = IGM.getTFC_InitTensorGroupFn();
     auto *outParameterAddressOpaque = Builder.CreateBitCast(
         outParameterAddress.getAddress(), IGM.OpaquePtrTy);
@@ -2877,29 +2966,106 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
                         outParameterTensorGroupWitnessTable});
   } else {
     // There is no out parameter. Return the results directly.
-    for (unsigned resultIdx : range(i->getNumResults())) {
-      auto resultIdxVal = llvm::ConstantInt::get(IGM.Int32Ty, resultIdx);
-      auto resultAddr = Builder.CreateInBoundsGEP(returnValuesAddress,
-                                                  resultIdxVal);
-      auto cTensorHandle = Builder.CreateLoad(resultAddr,
-                                              IGM.getPointerAlignment());
+    LLVM_DEBUG(llvm::dbgs() << " Creating direct results.\n");
 
-      // Wrap `cTensorHandle` into a _AnyTensorHandle object, and get an untyped
-      // pointer to the _AnyTensorHandle.
-      auto *createHandleFn = IGM.getTFC_CreateTensorHandleFromCFn();
-      llvm::Value *tensorHandle = Builder.CreateCall(createHandleFn,
-                                                     {cTensorHandle});
+    // Keep track of the TF output that we are on. There is not necessarily a
+    // 1:1 correspondence between TF outputs and SIL results because a SIL
+    // result may be a type conforming to TensorGroup that takes 0, 1, or more
+    // TF outputs.
+    llvm::Value *tfOutputIdx = llvm::ConstantInt::get(IGM.Int32Ty, 0);
 
-      // Cast to a pointer of the expected result type (for example,
-      // TensorHandle<Float>).
-      SILValue result = i->getResults()[resultIdx];
-      tensorHandle = Builder.CreateBitCast(
-          tensorHandle, IGM.getStorageType(result->getType()));
+    // Loop over the graph_op SIL results.
+    for (unsigned silResultIdx : range(i->getNumResults())) {
+      // The result that we need to store to.
+      SILValue silResult = i->getResults()[silResultIdx];
+      LLVM_DEBUG(llvm::dbgs() << "  Creating direct result of type "
+                 << silResult->getType() << ".\n");
 
+      // The address where TFE_Execute put the remaining result(s).
+      auto tfOutputAddr = Builder.CreateInBoundsGEP(returnValuesAddress,
+                                                    tfOutputIdx);
+
+      // If the result is Void, it corresponds to 0 outputs.
+      if (silResult->getType().getASTType() == astCtx.TheEmptyTupleType) {
+        Explosion e;
+        setLoweredExplosion(silResult, e);
+        continue;
+      }
+
+      // If the result is a known TensorFlow type, get it directly.
+      // TODO: We could also handle concrete structs of known TensorFlow values
+      // here, to avoid falling through to the slower TensorGroup case.
+      if (tf::isTensorFlowValue(silResult->getType())) {
+        auto cTensorHandle = Builder.CreateLoad(tfOutputAddr,
+                                                IGM.getPointerAlignment());
+
+        // Wrap `cTensorHandle` into a _AnyTensorHandle object, and get an untyped
+        // pointer to the _AnyTensorHandle.
+        auto *createHandleFn = IGM.getTFC_CreateTensorHandleFromCFn();
+        llvm::Value *tensorHandle = Builder.CreateCall(createHandleFn,
+                                                       {cTensorHandle});
+
+        // Cast to a pointer of the expected result type (for example,
+        // TensorHandle<Float>).
+        tensorHandle = Builder.CreateBitCast(
+            tensorHandle, IGM.getStorageType(silResult->getType()));
+
+        // Set the result.
+        Explosion e;
+        e.add(tensorHandle);
+        setLoweredExplosion(silResult, e);
+
+        // We consumed one output.
+        tfOutputIdx = Builder.CreateAdd(
+            tfOutputIdx, llvm::ConstantInt::get(IGM.Int32Ty, 1));
+
+        continue;
+      }
+
+      // Otherwise, the result type  must conform to TensorGroup, so we can
+      // create it using TFC_InitTensorGroup.
+
+      // Look up the type metadata and witness table. (We cached them earlier
+      // while calculating the size of the output buffer).
+      auto *typeMetadata = directResultTypeMetadatas[silResultIdx];
+      auto *witnessTable = directResultTensorGroupWitnessTables[silResultIdx];
+
+      // Allocate some space on the stack for the result.
+      auto &typeInfo =
+          cast<LoadableTypeInfo>(getTypeInfo(silResult->getType()));
+      auto resultStackAddr = typeInfo.allocateStack(*this, silResult->getType(),
+                                                    StringRef());
+
+      // Call TFC_InitTensorGroup.
+      auto *initTensorGroupFn = IGM.getTFC_InitTensorGroupFn();
+      auto *resultStackAddrOpaque = Builder.CreateBitCast(
+          resultStackAddr.getAddress().getAddress(), IGM.OpaquePtrTy);
+      auto *tfOutputAddrUntyped = Builder.CreateBitCast(
+          tfOutputAddr, IGM.Int8PtrTy);
+      Builder.CreateCall(initTensorGroupFn,
+                         {resultStackAddrOpaque, tfOutputAddrUntyped,
+                          typeMetadata, witnessTable});
+
+      // Set the result.
       Explosion e;
-      e.add(tensorHandle);
-      setLoweredExplosion(result, e);
+      typeInfo.loadAsTake(*this, resultStackAddr.getAddress(), e);
+      setLoweredExplosion(silResult, e);
+
+      // Increment tfOutputIdx by the number of outputs that we used.
+      tfOutputIdx = Builder.CreateAdd(
+          tfOutputIdx, directResultCTensorHandleCounts[silResultIdx]);
     }
+  }
+
+  // If we allocated the output buffer on the heap, remember to deallocate it.
+  if (returnValuesHeapAllocated) {
+    LLVM_DEBUG(llvm::dbgs()
+               << " Deallocating the heap-allocated output buffer.\n");
+    auto *deallocateCHandleBufferFn = IGM.getTFC_DeallocateCHandleBufferFn();
+    auto *returnValuesAddressUntyped = Builder.CreateBitCast(
+        returnValuesAddress, IGM.Int8PtrTy);
+    Builder.CreateCall(deallocateCHandleBufferFn,
+                       {returnValuesAddressUntyped});
   }
 }
 

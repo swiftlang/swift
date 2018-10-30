@@ -1425,10 +1425,16 @@ FUNCTION(TFC_OpAddInputFromTensorGroup,
          ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy, WitnessTablePtrTy),
          ATTRS(NoUnwind))
 
-FUNCTION(TFC_AllocateTensorGroupCHandleBuffer,
-         _swift_tfc_AllocateTensorGroupCHandleBuffer, SwiftCC,
+FUNCTION(TFC_AllocateCHandleBuffer,
+         _swift_tfc_AllocateCHandleBuffer, SwiftCC,
          RETURNS(Int8PtrTy),
-         ARGS(TypeMetadataPtrTy, TypeMetadataPtrTy, WitnessTablePtrTy),
+         ARGS(Int32Ty),
+         ATTRS(NoUnwind))
+
+FUNCTION(TFC_DeallocateCHandleBuffer,
+         _swift_tfc_DeallocateCHandleBuffer, SwiftCC,
+         RETURNS(),
+         ARGS(Int8PtrTy),
          ATTRS(NoUnwind))
 
 FUNCTION(TFC_GetTensorGroupCHandleCount,

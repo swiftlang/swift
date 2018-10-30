@@ -1195,25 +1195,30 @@ func _TFCOpAddInputFromTensorGroup<T : TensorGroup>(
 }
 
 /// Initializes a TensorGroup value, taking ownership of all the tensor
-/// handles in `tensorHandles`. Also deallocates `tensorHandles`.
+/// handles in `tensorHandles`.
 @usableFromInline
 @_silgen_name("_swift_tfc_InitTensorGroup")
 func _TFCInitTensorGroup<T : TensorGroup>(
     _ tensorHandles: UnsafeMutablePointer<CTensorHandle>
 ) -> T {
-  let t = T(_owning: tensorHandles)
-  tensorHandles.deallocate()
-  return t
+  return T(_owning: tensorHandles)
 }
 
-/// Allocates a buffer with enough capacity to hold all the CTensorHandles for
-/// a TensorGroup of type T.
+/// Allocates a buffer of CTensorHandles on the heap.
 @usableFromInline
-@_silgen_name("_swift_tfc_AllocateTensorGroupCHandleBuffer")
-func _TFCAllocateTensorGroupCHandleBuffer<T : TensorGroup>(
-  _ type: T.Type
-) -> UnsafeMutablePointer<CTensorHandle> {
-  return UnsafeMutablePointer.allocate(capacity: Int(T._tensorHandleCount))
+@_silgen_name("_swift_tfc_AllocateCHandleBuffer")
+func _TFCAllocateCHandleBuffer(_ capacity: Int32)
+    -> UnsafeMutablePointer<CTensorHandle> {
+  return UnsafeMutablePointer.allocate(capacity: Int(capacity))
+}
+
+/// Deallocates a buffer of CTensorHandles.
+@usableFromInline
+@_silgen_name("_swift_tfc_DeallocateCHandleBuffer")
+func _TFCDeallocateCHandleBuffer(
+    _ buffer: UnsafeMutablePointer<CTensorHandle>
+) {
+  buffer.deallocate()
 }
 
 /// Returns the number of CTensorHandles in a TensorGroup of type T.
