@@ -401,3 +401,29 @@ public func deabstractedCallee(_ t: Tensor<Float>) -> Tensor<Float> {
 public func inlineDeabstracted_b() -> Tensor<Float> {
   return deabstractedCallee([1, 2, 3])
 }
+
+// b/118507040: The SIL location of a synthesized host instruction for
+// switch_case based control flow handling cannot be ReturnKind.
+@inline(never)
+func foo() -> Int32? {
+  return 0
+}
+
+func getLogpLex() {
+  if let _ = foo() {
+    _ = Tensor<Float>(1.0)
+    return
+  } else {
+    // For the SILLocation associated with this return stmt/inst,
+    // The LocationKind is ReturnKind.
+    //
+    // When we synthesize host code to send case id #1 to the accelerator, make
+    // sure the host inst will NOT use ReturnKind as the LocationKind.
+    return
+  }
+}
+
+public func b118507040() {
+  getLogpLex()
+  _ = Tensor<Float>(1.0)
+}
