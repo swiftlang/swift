@@ -5254,8 +5254,9 @@ namespace  {
                      ChildExpr(ChildExpr), Predicate(Predicate) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      // Finish if we found the target.
-      if (E == ChildExpr)
+      // Finish if we found the target. 'ChildExpr' might have been replaced
+      // with typechecked expression. In that case, match the position.
+      if (E == ChildExpr || arePositionsSame(E, ChildExpr))
         return { false, nullptr };
 
       if (Predicate(E, Parent))
@@ -5266,13 +5267,6 @@ namespace  {
     Expr *walkToExprPost(Expr *E) override {
       if (Predicate(E, Parent))
         Ancestors.pop_back();
-
-      // 'ChildExpr' might have been replaced with typechecked expression. In
-      // that case, find deepest expression that position is the same as the
-      // target.
-      if (arePositionsSame(E, ChildExpr))
-        return nullptr;
-
       return E;
     }
 
