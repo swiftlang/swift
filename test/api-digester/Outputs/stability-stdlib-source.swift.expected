@@ -7,9 +7,22 @@
 Func Collection.prefix(through:) has been removed
 Func Collection.prefix(upTo:) has been removed
 Func Collection.suffix(from:) has been removed
+Func FixedWidthInteger.&*(_:_:) has been removed
+Func FixedWidthInteger.&*=(_:_:) has been removed
+Func FixedWidthInteger.&+(_:_:) has been removed
+Func FixedWidthInteger.&+=(_:_:) has been removed
+Func FixedWidthInteger.&-(_:_:) has been removed
+Func FixedWidthInteger.&-=(_:_:) has been removed
+Func FixedWidthInteger.addingReportingOverflow(_:) has been removed
+Func FixedWidthInteger.dividedReportingOverflow(by:) has been removed
+Func FixedWidthInteger.multipliedReportingOverflow(by:) has been removed
+Func FixedWidthInteger.remainderReportingOverflow(dividingBy:) has been removed
+Func FixedWidthInteger.subtractingReportingOverflow(_:) has been removed
 Func Sequence.filter(_:) has been removed
 Func Sequence.forEach(_:) has been removed
 Func Sequence.map(_:) has been removed
+Func SignedInteger.&+(_:_:) has been removed
+Func SignedInteger.&-(_:_:) has been removed
 Func _SequenceWrapper.filter(_:) has been removed
 Func _SequenceWrapper.forEach(_:) has been removed
 Func _SequenceWrapper.map(_:) has been removed
@@ -36,3 +49,8 @@ Var Set.first has been removed
 /* Decl Attribute changes */
 
 /* Protocol Requirement Changes */
+Func BinaryInteger.addingReportingOverflow(_:) has been added as a protocol requirement
+Func BinaryInteger.dividedReportingOverflow(by:) has been added as a protocol requirement
+Func BinaryInteger.multipliedReportingOverflow(by:) has been added as a protocol requirement
+Func BinaryInteger.remainderReportingOverflow(dividingBy:) has been added as a protocol requirement
+Func BinaryInteger.subtractingReportingOverflow(_:) has been added as a protocol requirement

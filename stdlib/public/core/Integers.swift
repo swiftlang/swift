@@ -690,7 +690,7 @@ public protocol BinaryInteger :
   /// the operation.
   ///
   /// For arbitrary-width integer types where the result can never overflow,
-  /// the `overflow` field of the result should always be `false`.
+  /// the `overflow` field of the result is always `false`.
   ///
   /// - Parameter rhs: The value to subtract from this value.
   /// - Returns: A tuple containing the result of the subtraction along with a
@@ -707,7 +707,7 @@ public protocol BinaryInteger :
   /// Boolean value indicating whether overflow occurred in the operation.
   ///
   /// For arbitrary-width integer types where the result can never overflow,
-  /// the `overflow` field of the result should always be `false`.
+  /// the `overflow` field of the result is always `false`.
   ///
   /// - Parameter rhs: The value to multiply by this value.
   /// - Returns: A tuple containing the result of the multiplication along with
@@ -728,8 +728,8 @@ public protocol BinaryInteger :
   /// the result of `x.dividedReportingOverflow(by: 0)` is `(x, true)`.
   ///
   /// For arbitrary-width integer types where the result can never overflow,
-  /// the `overflow` field of the result should always be `false`, except in
-  /// the case of division by zero.
+  /// the `overflow` field of the result is always `false`, except in the case
+  /// of division by zero.
   ///
   /// - Parameter rhs: The value to divide this value by.
   /// - Returns: A tuple containing the result of the division along with a
@@ -750,8 +750,8 @@ public protocol BinaryInteger :
   /// `(x, true)`.
   ///
   /// For arbitrary-width integer types where the result can never overflow,
-  /// the `overflow` field of the result should always be `false`, except in
-  /// the case of division by zero.
+  /// the `overflow` field of the result is always `false`, except in the case
+  /// of division by zero.
   ///
   /// - Parameter rhs: The value to divide this value by.
   /// - Returns: A tuple containing the result of the operation along with a
@@ -1352,28 +1352,33 @@ extension BinaryInteger {
 //  Default implementations, which make sense only for arbitrary-size integers.
 //  These are then made unavailable on FixedWidthInteger, and concrete fixed-
 //  width types should implement them.
-  @inlinable
+  @available(*, deprecated, message:
+  "Types conforming to BinaryInteger should provide an implementation of this operation.")
   public func addingReportingOverflow(_ rhs: Self) -> (partialValue: Self, overflow: Bool) {
     return (self + rhs, false)
   }
   
-  @inlinable
+  @available(*, deprecated, message:
+  "Types conforming to BinaryInteger should provide an implementation of this operation.")
   public func subtractingReportingOverflow(_ rhs: Self) -> (partialValue: Self, overflow: Bool) {
     return (self - rhs, false)
   }
   
-  @inlinable
+  @available(*, deprecated, message:
+  "Types conforming to BinaryInteger should provide an implementation of this operation.")
   public func multipliedReportingOverflow(by rhs: Self) -> (partialValue: Self, overflow: Bool) {
     return (self * rhs, false)
   }
   
-  @inlinable
+  @available(*, deprecated, message:
+  "Types conforming to BinaryInteger should provide an implementation of this operation.")
   public func dividedReportingOverflow(by rhs: Self) -> (partialValue: Self, overflow: Bool) {
     guard rhs != 0 else { return (self, true) }
     return (self / rhs, false)
   }
   
-  @inlinable
+  @available(*, deprecated, message:
+  "Types conforming to BinaryInteger should provide an implementation of this operation.")
   public func remainderReportingOverflow(dividingBy rhs: Self) -> (partialValue: Self, overflow: Bool) {
     guard rhs != 0 else { return (self, true) }
     return (self % rhs, false)
