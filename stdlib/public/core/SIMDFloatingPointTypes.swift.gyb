@@ -8,6 +8,8 @@ def llvmFloatVec(bits, count):
 
 %for bits in eltsizes:
 % Element = fltnames[bits]
+extension ${Element}: SIMDVectorizable {}
+
 public extension ${Element} {
 % for N in counts:
 %  # In theory, LLVM should handle padding 3-element vectors out to 4-element

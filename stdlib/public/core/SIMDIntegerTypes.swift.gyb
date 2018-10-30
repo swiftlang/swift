@@ -11,6 +11,8 @@ fltnames = {32:'Float', 64:'Double'}
 % bits = element_type.bits
 % signed = element_type.is_signed
 % Element = element_type.stdlib_name
+extension ${Element}: SIMDVectorizable {}
+
 public extension ${Element} {
 % for vector_type in all_vector_types(element_type):
 % LLVM = vector_type.builtin_name

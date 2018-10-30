@@ -1,3 +1,16 @@
+public protocol SIMDVectorizable {
+%for N in [2,3,4,8,16,32,64]:
+  associatedtype Vector${N}: SIMDVector${N}
+  where Vector${N}.Element == Self
+%end
+}
+
+%for N in [2,3,4,8,16,32,64]:
+extension SIMD {
+  public typealias Vector${N}<T> = T.Vector${N} where T: SIMDVectorizable
+}
+%end
+
 %for N in [2,3,4,8,16,32,64]:
 /// A computational vector with ${N} elements.
 public protocol SIMDVector${N} : SIMDVector where Mask : SIMDVector${N} {
