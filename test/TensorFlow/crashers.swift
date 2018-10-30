@@ -427,3 +427,10 @@ public func b118507040() {
   getLogpLex()
   _ = Tensor<Float>(1.0)
 }
+
+// Make sure that #tfop can deal with operands that are LValues.
+func tfopLValueOperand() -> Tensor<Float> {
+  var t = Tensor<Float>(0)
+  t = #tfop("Add", t, Tensor<Float>(1), T$dtype: Float.tensorFlowDataType)
+  return t
+}
