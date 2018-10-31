@@ -2655,7 +2655,7 @@ static SourceLoc collectMembersForInit(ResolvedCursorInfo CursorInfo,
   
   return targetLocation;
 }
-
+  
 bool RefactoringActionMemberwiseInitLocalRefactoring::
 isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
   
@@ -2679,6 +2679,15 @@ bool RefactoringActionMemberwiseInitLocalRefactoring::performChange() {
   generateMemberwiseInit(EditConsumer, SM, memberNameVector,
                          memberTypeVector, targetLocation);
   
+  return false;
+}
+  
+bool RefactoringActionCustomizeEquatableConformance::
+isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+  return true;
+}
+
+bool RefactoringActionCustomizeEquatableConformance::performChange() {
   return false;
 }
 

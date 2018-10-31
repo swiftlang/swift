@@ -1,0 +1,16 @@
+class Animal: Equatable {
+  var age: Int
+  var kind: AnimalKind
+  var gender: Gender
+  init(age: Int, kind: AnimalKind, gender: Gender) {
+    self.age = age
+    self.kind = kind
+    self.gender = gender
+  }
+  // Auto-generated function
+  static func == (lhs: Animal, rhs: Animal) -> Bool {
+    return lhs.age == rhs.age &&
+           lhs.kind == rhs.kind &&
+           lhs.gender == rhs.gender
+  }
+}
