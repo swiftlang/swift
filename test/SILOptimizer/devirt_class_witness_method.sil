@@ -3,22 +3,30 @@ sil_stage canonical
 // RUN: %FileCheck -check-prefix=YAML -input-file=%t.opt.yaml %s
 
 import Builtin
-
+enum Error {}
 protocol P {
   func f()
+  func g() throws
 }
 
 extension P {
   func f()
+  func g() throws
 }
 
 class C<T, U> : P {}
 
 sil hidden_external [transparent] [thunk] @witness_thunk : $@convention(witness_method: P) <τ_0_0><τ_1_0, τ_1_1 where τ_0_0 : C<τ_1_0, τ_1_1>> (@in_guaranteed τ_0_0) -> ()
+sil hidden_external [transparent] [thunk] @witness_thunk2 : $@convention(witness_method: P) <τ_0_0><τ_1_0, τ_1_1 where τ_0_0 : C<τ_1_0, τ_1_1>> (@in_guaranteed τ_0_0) -> ()
 
 // CHECK-LABEL: sil hidden @caller : $@convention(thin) <T, U> (@owned C<T, U>) -> ()
 // CHECK: [[FN:%.*]] = function_ref @witness_thunk
 // CHECK: apply [[FN]]<C<T, U>, T, U>(
+// CHECK: return
+
+// CHECK-LABEL: sil hidden @caller2
+// CHECK: witness_method
+// CHECK: try_apply
 // CHECK: return
 
 // YAML:      --- !Passed
@@ -26,7 +34,7 @@ sil hidden_external [transparent] [thunk] @witness_thunk : $@convention(witness_
 // YAML-NEXT: Name:            sil.WitnessMethodDevirtualized
 // YAML-NEXT: DebugLoc:
 // YAML-NEXT:   File:            {{.*}}/devirt_class_witness_method.sil
-// YAML-NEXT:   Line:            47
+// YAML-NEXT:   Line:            55
 // YAML-NEXT:   Column:          8
 // YAML-NEXT: Function:        caller
 // YAML-NEXT: Args:
@@ -34,7 +42,7 @@ sil hidden_external [transparent] [thunk] @witness_thunk : $@convention(witness_
 // YAML-NEXT:   - Method:          '"witness_thunk"'
 // YAML-NEXT:     DebugLoc:
 // YAML-NEXT:       File:            {{.*}}/devirt_class_witness_method.sil
-// YAML-NEXT:       Line:            17
+// YAML-NEXT:       Line:            19
 // YAML-NEXT:       Column:          44
 // YAML-NEXT: ...
 
@@ -51,10 +59,31 @@ bb0(%0 : $C<T, U>):
   return %9 : $()
 }
 
+sil hidden @caller2 : $@convention(thin) <T, U> (@owned C<T, U>) -> () {
+bb0(%0 : $C<T, U>):
+  strong_retain %0 : $C<T, U>
+  %4 = alloc_stack $C<T, U>
+  store %0 to %4 : $*C<T, U>
+  %6 = witness_method $C<T, U>, #P.g!1 : <Self where Self : P> (Self) -> () throws -> () : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @error Error
+  try_apply %6<C<T, U>>(%4) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @error Error, normal bb1, error bb2
+
+bb1(%8 : $()):
+  br bb3
+
+bb2(%11 : $Error):
+  br bb3
+
+bb3:
+  dealloc_stack %4 : $*C<T, U>
+  strong_release %0 : $C<T, U>
+  %9 = tuple ()
+  return %9 : $()
+}
 sil_vtable C {}
 
 sil_witness_table hidden <T, U> C<T, U>: P module clsx {
   method #P.f!1: <Self where Self : P> (Self) -> () -> () : @witness_thunk
+  method #P.g!1: <Self where Self : P> (Self) -> () throws -> () : @witness_thunk2
 }
 
 sil_default_witness_table hidden P {
