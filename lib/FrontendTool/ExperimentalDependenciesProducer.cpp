@@ -101,6 +101,8 @@ public:
         << "\"]\n";
   }
   };
+ 
+  
 
   class ProviderDeclarations {
   public:
@@ -658,3 +660,38 @@ void SQ::Depends::emit() const {
   abort();
 }
 
+namespace SQ2 {
+  class Subsection {};
+  class TopLevelPrecedenceGroups: Subsection {};
+  class TopLevelVisibleNominals: Subsection {};
+  class TopLevelVisibleValues: Subsection {};
+  class TopLevelNestOperators: Subsection {};
+  class NominalTypeExtendedNominalContextualNames: Subsection {};
+  class MemberExtendedNominalContextualNames: Subsection {};
+  class MemberHoldersAndMembers: Subsection {};
+  class DynamicLookupNames: Subsection {};
+  class InterfaceHash: Subsection {};
+  
+  template <typename SubsectionT, typename InputT, typename OutputT> class Stage {
+  private:
+    const InputT input;
+    std::vector<OutputT> _output;
+    void computeOutput() = 0;
+  public:
+    Stage(const InputT input): input(input) {
+      computeOutput();
+    }
+    std::vector<OutputT> output() const { return _output; }
+    typename std::vector<OutputT>::const_iterator begin() { return output().begin(); }
+    typename std::vector<OutputT>::const_iterator end() { return output().end(); }
+ };
+  
+  template <typename SubsectionT, typename DeclT>
+  class DeclarationGatherer:
+  Stage<SubsectionT, const SourceFile*, std::forward_iterator_tag> {};
+  
+  template <typename SubsectionT> class Namer: Stage<SubsectionT> {};
+  
+  
+  
+}
