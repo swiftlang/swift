@@ -4,7 +4,6 @@
 /* RawRepresentable Changes */
 
 /* Removed Decls */
-Func Sequence.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has generic signature change from <τ_0_0 where τ_0_0 : Sequence, τ_0_0.SubSequence == AnySequence<τ_0_0.Element>> to <τ_0_0 where τ_0_0 : Sequence>
 Func _DropWhileSequence.drop(while:) has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
 Func _DropWhileSequence.makeIterator() has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
 Struct _DropWhileSequence has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
@@ -50,6 +49,7 @@ Func _SequenceWrapper.forEach(_:) has been removed
 Func _SequenceWrapper.map(_:) has been removed
 Func _SequenceWrapper.prefix(_:) has been removed
 Func _SequenceWrapper.prefix(while:) has been removed
+Func _SequenceWrapper.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
 Func _SequenceWrapper.suffix(_:) has been removed
 Func __ContiguousArrayStorageBase._getNonVerbatimBridgedHeapBuffer() has been removed
 Func __EmptyArrayStorage._getNonVerbatimBridgedHeapBuffer() has been removed
@@ -110,6 +110,8 @@ Func Sequence.dropFirst(_:) has return type change from τ_0_0.SubSequence to Dr
 Func Sequence.dropLast(_:) has return type change from τ_0_0.SubSequence to Array<τ_0_0.Element>
 Func Sequence.prefix(_:) has return type change from τ_0_0.SubSequence to PrefixSequence<τ_0_0>
 Func Sequence.prefix(while:) has return type change from τ_0_0.SubSequence to Array<τ_0_0.Element>
+Func Sequence.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has return type change from Array<τ_0_0.SubSequence> to Array<ArraySlice<τ_0_0.Element>>
+Func Sequence.split(separator:maxSplits:omittingEmptySubsequences:) has return type change from Array<τ_0_0.SubSequence> to Array<ArraySlice<τ_0_0.Element>>
 Func Sequence.suffix(_:) has return type change from τ_0_0.SubSequence to Array<τ_0_0.Element>
 Func _AnySequenceBox._dropLast(_:) has return type change from _AnySequenceBox<τ_0_0> to Array<τ_0_0>
 Func _AnySequenceBox._prefix(while:) has return type change from _AnySequenceBox<τ_0_0> to Array<τ_0_0>
