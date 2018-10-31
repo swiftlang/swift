@@ -1,5 +1,6 @@
+// SWIFT_ENABLE_TENSORFLOW
+// UNSUPPORTED: macosx
 // RUN: %scale-test --begin 8 --end 16 --step 1 --select NumLeafScopes %s -Xfrontend=-swift-version -Xfrontend=5 -Xfrontend=-solver-disable-shrink -Xfrontend=-disable-constraint-solver-performance-hacks -Xfrontend=-solver-enable-operator-designated-types
-// UNSUPPORTED: tensorflow
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 

@@ -1,3 +1,4 @@
+// SWIFT_ENABLE_TENSORFLOW
 // UNSUPPORTED: tensorflow
 // RUN: %empty-directory(%t.mod)
 // RUN: %empty-directory(%t.sdk)

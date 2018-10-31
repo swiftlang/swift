@@ -23,6 +23,7 @@ extension ExpressibleByIntegerLiteral
   }
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 //===----------------------------------------------------------------------===//
 //===--- AdditiveArithmetic -----------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -146,6 +147,7 @@ public extension AdditiveArithmetic where Self : ExpressibleByIntegerLiteral {
 /// the required mutating methods. Extensions to `Numeric` provide default
 /// implementations for the protocol's nonmutating methods based on the
 /// mutating variants.
+// SWIFT_ENABLE_TENSORFLOW
 public protocol Numeric : AdditiveArithmetic, ExpressibleByIntegerLiteral {
   /// Creates a new instance from the given integer, if it can be represented
   /// exactly.
