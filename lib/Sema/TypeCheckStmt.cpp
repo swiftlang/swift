@@ -1495,7 +1495,7 @@ void TypeChecker::checkDefaultArguments(ParameterList *params,
   // caller.
   if (auto *func = dyn_cast<AbstractFunctionDecl>(VD)) {
     auto expansion = func->getResilienceExpansion();
-    if (!Context.isSwiftVersion3() && access.isPublic())
+    if (access.isPublic())
       expansion = ResilienceExpansion::Minimal;
 
     func->setDefaultArgumentResilienceExpansion(expansion);

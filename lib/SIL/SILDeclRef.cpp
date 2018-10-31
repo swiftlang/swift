@@ -887,8 +887,8 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   if (isThunk() || isForeign)
     return SubclassScope::NotApplicable;
 
-  // Default arg generators only need to be visible in Swift 3.
-  if (isDefaultArgGenerator() && !context->getASTContext().isSwiftVersion3())
+  // Default arg generators are not visible.
+  if (isDefaultArgGenerator())
     return SubclassScope::NotApplicable;
 
   auto *classType = context->getSelfClassDecl();
