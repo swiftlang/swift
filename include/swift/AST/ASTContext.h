@@ -924,9 +924,6 @@ public:
   CanGenericSignature getExistentialSignature(CanType existential,
                                               ModuleDecl *mod);
 
-  /// Whether our effective Swift version is in the Swift 3 family.
-  bool isSwiftVersion3() const { return LangOpts.isSwiftVersion3(); }
-
   /// Whether our effective Swift version is at least 'major'.
   ///
   /// This is usually the check you want; for example, when introducing

@@ -170,9 +170,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(SILDeclRef(AFD).asForeign());
   }
 
-  auto publicDefaultArgGenerators =
-      SwiftModule->getASTContext().isSwiftVersion3() ||
-      SwiftModule->isTestingEnabled();
+  auto publicDefaultArgGenerators = SwiftModule->isTestingEnabled();
   if (!publicDefaultArgGenerators)
     return;
 
