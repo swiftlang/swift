@@ -201,7 +201,9 @@ public:
       return Mangler.mangleTypeAsContextUSR(NTD);
     }
     
-    template<typename DeclT> std::vector<std::string> getTopLevelNamesFromDecls(std::vector<const DeclT*>);
+    template<typename DeclT> static void addTopLevelNamesFromDecls(std::vector<std::string>::iterator,
+                                                                   const std::vector<const DeclT*>&
+                                                                   );
 
   public:
     ProviderNames(const ProviderDeclarations &);
@@ -561,23 +563,37 @@ SQ::ProviderNames::ProviderNames(const SQ::ProviderDeclarations &pd)
       holdersAndMaybeMembers(getHoldersAndMaybeMembers(pd)),
       dynamicLookupNames(getDynamicLookupNames(pd)) {}
 
+template<>
+void SQ::ProviderNames::addTopLevelNamesFromDecls<ValueDecl>(std::vector<std::string>::iterator dest,
+                                                             const std::vector<const ValueDecl*> &decls) {
+  for (const ValueDecl *const D : decls)
+    *dest++ = DeclBaseName(D->getBaseName()).userFacingName();
+}
+
+template<typename DeclT>
+void SQ::ProviderNames::addTopLevelNamesFromDecls(std::vector<std::string>::iterator dest,
+                                                  const std::vector<const DeclT*> &decls
+                                                  ) {
+  for (const DeclT *const D : decls)
+    *dest++ = DeclBaseName(D->getName()).userFacingName();
+}
+
 std::vector<std::string>
 SQ::ProviderNames::getTopLevelNames(const ProviderDeclarations &pd) {
   std::vector<std::string> tops;
-  for (const PrecedenceGroupDecl *const PGD : pd.precedenceGroups)
-    tops.push_back(DeclBaseName(PGD->getName()).userFacingName());
-  for (const NominalTypeDecl *const NTD : pd.topLevelVisibleNominals)
-    tops.push_back(DeclBaseName(NTD->getName()).userFacingName());
-  for (const ValueDecl *const VD : pd.topLevelVisibleValues)
-    tops.push_back(DeclBaseName(VD->getBaseName()).userFacingName());
-  for (const OperatorDecl *const OD : pd.topLevelOperators)
-    tops.push_back(DeclBaseName(OD->getName()).userFacingName());
-  for (const FuncDecl *const OD : pd.nestedOperators)
-    tops.push_back(DeclBaseName(OD->getName()).userFacingName());
+  addTopLevelNamesFromDecls(tops.end(), pd.precedenceGroups);
+  addTopLevelNamesFromDecls(tops.end(), pd.topLevelVisibleNominals);
+  addTopLevelNamesFromDecls(tops.end(), pd.topLevelVisibleValues);
+  addTopLevelNamesFromDecls(tops.end(), pd.topLevelOperators);
+  addTopLevelNamesFromDecls(tops.end(), pd.nestedOperators);
 
   return tops;
 }
-XXX getTopLevelNamesFromDecls
+
+
+
+
+
 std::vector<std::string> SQ::ProviderNames::getExtendedNominalContextualNames(
     const ProviderDeclarations &pd, const bool onlyIfCouldAddMembers) {
   std::vector<std::string> extendedNominalContextualNames;
