@@ -9,7 +9,7 @@ import TensorFlow
 // the body of a loop during canonicalization.
 //expected-warning @+1 {{value implicitly copied to the host}}
 public func testLoopWithNestedLoopsRequiringCloning(
-	_ breakIndex:Int32, _ repetitions: Int32) -> Tensor<Int32> {
+  _ breakIndex:Int32, _ repetitions: Int32) -> Tensor<Int32> {
 	var result = Tensor<Int32>(0)
 	for _ in 1...repetitions {
 		var i = result
@@ -71,6 +71,7 @@ public func testLoopWithNestedLoopsRequiringCloning(
 // CHECK:               {condition Header: {{.*}}
 // CHECK:                 block {{.*}}
 // CHECK:                 block {{.*}}}]}
+// ---The body of this loop is cloned above---
 // CHECK:           <while Preheader: {{.*}}, Header: {{.*}}, exit: {{.*}}
 // CHECK:             [sequence
 // CHECK:               {condition Header: {{.*}}
@@ -141,7 +142,7 @@ public func testLoopWithDoublyNestedLoopsRequiringCloning(
 // CHECK:         Loop at depth 3 containing: {{.*}}
 // CHECK:             Loop at depth 4 containing: {{.*}}
 
-// CHECK: --- XLA CFG Loops Before Canonicalize end
+// CHECK-LABEL: --- XLA CFG Loops Before Canonicalize end
 // CHECK: Loop at depth 1 containing: {{.*}}
 // CHECK:     Loop at depth 2 containing: {{.*}}
 // CHECK:         Loop at depth 3 containing: {{.*}}
@@ -150,7 +151,7 @@ public func testLoopWithDoublyNestedLoopsRequiringCloning(
 // CHECK:         Loop at depth 3 containing: {{.*}}
 
 //-- Check the structure of the SESE region. (Note the cloned doubly nested loop.)
-// CHECK: --- XLA CFG Canonicalize: {{.*}}LoopWithDoublyNestedLoopsRequiringCloning{{.*}}
+// CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}LoopWithDoublyNestedLoopsRequiringCloning{{.*}}
 // CHECK: [sequence
 // CHECK:   <while Preheader: {{.*}}, Header: {{.*}}, exit: {{.*}}
 // CHECK:     [sequence
@@ -175,6 +176,7 @@ public func testLoopWithDoublyNestedLoopsRequiringCloning(
 // CHECK:               {condition Header: {{.*}}
 // CHECK:                 block {{.*}}
 // CHECK:                 block {{.*}}}]}
+// ---The body of this loop is cloned above---
 // CHECK:           <while Preheader: {{.*}}, Header: {{.*}}, exit: {{.*}}
 // CHECK:             [sequence
 // CHECK:               {condition Header: {{.*}}
