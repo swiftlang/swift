@@ -1674,6 +1674,40 @@ public:
   }
 };
 
+/// Flags for Builtin.IntegerLiteral values.
+class IntegerLiteralFlags {
+public:
+  enum : size_t {
+    IsNegativeFlag = 0x1,
+
+    // Save some space for other flags.
+
+    BitWidthShift = 8,
+  };
+
+private:
+  size_t Data;
+
+  explicit IntegerLiteralFlags(size_t data) : Data(data) {}
+
+public:
+  constexpr IntegerLiteralFlags(size_t bitWidth, bool isNegative)
+    : Data((bitWidth << BitWidthShift)
+           | (isNegative ? IsNegativeFlag : 0)) {}
+
+  /// Return true if the value is negative.
+  bool isNegative() const { return Data & IsNegativeFlag; }
+
+  /// Return the minimum number of bits necessary to store the value in
+  /// two's complement, including a leading sign bit.
+  unsigned getBitWidth() const { return Data >> BitWidthShift; }
+
+  size_t getOpaqueValue() const { return Data; }
+  static IntegerLiteralFlags getFromOpaqueValue(size_t value) {
+    return IntegerLiteralFlags(value);
+  }
+};
+
 } // end namespace swift
 
 #endif /* SWIFT_ABI_METADATAVALUES_H */

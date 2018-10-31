@@ -636,6 +636,8 @@ public:
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
   llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
   llvm::PointerType *WitnessTablePtrPtrTy;   /// i8***
+  llvm::Type *FloatTy;
+  llvm::Type *DoubleTy;
 
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 

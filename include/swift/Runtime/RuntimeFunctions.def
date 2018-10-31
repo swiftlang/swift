@@ -1247,6 +1247,16 @@ FUNCTION(VerifyTypeLayoutAttribute, _swift_debug_verifyTypeLayoutAttribute,
          ARGS(TypeMetadataPtrTy, Int8PtrTy, Int8PtrTy, SizeTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
+// float swift_intToFloat32(const size_t *data, IntegerLiteralFlags flags);
+FUNCTION(IntToFloat32, swift_intToFloat32, SwiftCC,
+         RETURNS(FloatTy),
+         ARGS(SizeTy->getPointerTo(), SizeTy),
+         ATTRS(NoUnwind, ReadOnly))
+FUNCTION(IntToFloat64, swift_intToFloat64, SwiftCC,
+         RETURNS(DoubleTy),
+         ARGS(SizeTy->getPointerTo(), SizeTy),
+         ATTRS(NoUnwind, ReadOnly))
+
 #undef RETURNS
 #undef ARGS
 #undef ATTRS
