@@ -870,12 +870,8 @@ namespace {
         return !cacheVal.second;
       }
       case ExprKind::IntegerLiteral: {
-        // FIXME: The magic number 128 is bad and we should actually figure out
-        // the bitwidth.  But it's too early in Sema to get it.
         auto *ILE = cast<IntegerLiteralExpr>(EL);
-        auto cacheVal =
-            IntLiteralCache.insert(
-                {ILE->getValue(ILE->getDigitsText(), 128, ILE->isNegative()), ILE});
+        auto cacheVal = IntLiteralCache.insert({ILE->getRawValue(), ILE});
         PrevPattern = (cacheVal.first != IntLiteralCache.end())
                     ? cacheVal.first->getSecond()
                     : nullptr;
