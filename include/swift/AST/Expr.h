@@ -789,10 +789,12 @@ public:
   static IntegerLiteralExpr *
   createFromUnsigned(ASTContext &C, unsigned value);
 
+  /// Returns the value of the literal, appropriately constructed in the
+  /// target type.
   APInt getValue() const;
-  static APInt getValue(StringRef Text, unsigned BitWidth, bool Negative);
 
-  APInt getRawMagnitude() const;
+  /// Returns the raw value of the literal without any truncation.
+  APInt getRawValue() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::IntegerLiteral;
