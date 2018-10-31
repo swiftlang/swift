@@ -62,6 +62,7 @@ set(swift_runtime_sources
     MetadataLookup.cpp
     MutexPThread.cpp
     MutexWin32.cpp
+    Numeric.cpp
     Once.cpp
     Portability.cpp
     ProtocolConformance.cpp
