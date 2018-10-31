@@ -329,10 +329,16 @@ public extension Tensor {
   ///   - shape: The dimensions of the tensor.
   ///   - repeatedValue: The scalar value to repeat.
   ///
+  // TODO: Deprecate this in favor of `init(repeating:shape:)`.
   @inlinable @inline(__always)
   init(shape: TensorShape, repeating repeatedValue: Scalar) {
-    self = Raw.fill(
-      dims: Tensor<Int32>(shape.dimensions), value: Tensor(repeatedValue))
+    self.init(repeating: repeatedValue, shape: shape)
+  }
+
+  @inlinable @inline(__always)
+  init(repeating repeatedValue: Scalar, shape: TensorShape) {
+    self = Raw.fill(dims: Tensor<Int32>(shape.dimensions),
+                    value: Tensor(repeatedValue))
   }
 
   /// Creates a tensor by broadcasting the given scalar to a given rank with

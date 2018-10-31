@@ -7,13 +7,16 @@ struct Vector {
 }
 
 extension Vector : VectorNumeric {
-  typealias ScalarElement = Float
-  typealias Dimensionality = Int
-  init(_ scalar: ScalarElement) {
+  typealias Scalar = Float
+  typealias Shape = Int
+  init(_ scalar: Scalar) {
     self.init(x: scalar, y: scalar)
   }
-  init(dimensionality: Int, repeating value: ScalarElement) {
-    precondition(dimensionality == 2)
+  static var zero: Vector {
+    return Vector(0)
+  }
+  init(repeating value: Scalar, shape: Int) {
+    precondition(shape == 2)
     self.init(value)
   }
   static func + (a: Vector, b: Vector) -> Vector {
@@ -22,8 +25,8 @@ extension Vector : VectorNumeric {
   static func - (a: Vector, b: Vector) -> Vector {
     return Vector(x: a.x-b.x, y: a.y-b.y)
   }
-  static func * (a: Vector, b: Vector) -> Vector {
-    return Vector(x: a.x*b.x, y: a.y*b.y)
+  static func * (a: Scalar, b: Vector) -> Vector {
+    return Vector(x: a*b.x, y: a*b.y)
   }
 }
 
@@ -43,12 +46,12 @@ public func foo_indir_ret<T>(x: Float, y: Float, t: T) -> (T, T) {
 }
 
 @_silgen_name("foo_generic_vector")
-public func foo_generic_vector<T : VectorNumeric>(x: T, y: T) -> T where T.ScalarElement : FloatingPoint {
+public func foo_generic_vector<T : VectorNumeric>(x: T, y: T) -> T where T.Scalar : FloatingPoint {
   return x
 }
 
 @_silgen_name("foo_generic_vector_and_scalar")
-public func foo_generic_vector_and_scalar<T : FloatingPoint, U : VectorNumeric>(x: T, y: U) -> U where U.ScalarElement : FloatingPoint { return y }
+public func foo_generic_vector_and_scalar<T : FloatingPoint, U : VectorNumeric>(x: T, y: U) -> U where U.Scalar : FloatingPoint { return y }
 
 let _ = #gradient(foo)
 let _ = #gradient(foo, wrt: .0)

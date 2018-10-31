@@ -68,6 +68,7 @@ PROTOCOL(Encodable)
 PROTOCOL(Decodable)
 // SWIFT_ENABLE_TENSORFLOW
 PROTOCOL(AccelerableByTensorFlow)
+PROTOCOL(AdditiveArithmetic)
 PROTOCOL(Numeric)
 PROTOCOL(FloatingPoint)
 PROTOCOL(ParameterGroup)

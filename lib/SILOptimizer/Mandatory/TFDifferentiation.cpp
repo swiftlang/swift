@@ -237,9 +237,9 @@ static FuncDecl *findAssociativeOperatorDeclInProtocol(DeclName operatorName,
   assert(operatorName.isOperator());
   // Find the operator requirement in the `VectorNumeric` protocol
   // declaration and cache it.
-  auto plusLookUp = protocol->lookupDirect(operatorName);
+  auto opLookUp = protocol->lookupDirect(operatorName);
   // Find the `+` with type siguature `(Self, Self) -> Self`.
-  for (auto *decl : plusLookUp) {
+  for (auto *decl : opLookUp) {
     auto *fd = dyn_cast<FuncDecl>(decl);
     if (!fd || !fd->isBinaryOperator() || !fd->isStatic())
       continue;
@@ -871,14 +871,15 @@ private:
   /// The Numeric protocol in the standard library.
   ProtocolDecl *numericProtocol =
       astCtx.getProtocol(KnownProtocolKind::Numeric);
+  /// The AdditiveArithmetic protocol in the standard library.
+  ProtocolDecl *additiveArithmeticProtocol =
+    astCtx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   /// The FloatingPoint protocol in the stanard library.
   ProtocolDecl *floatingPointProtocol =
       astCtx.getProtocol(KnownProtocolKind::FloatingPoint);
 
-  /// `VectorNumeric.+` declaration.
-  mutable FuncDecl *cachedVectorPlusFn = nullptr;
-  /// `Numeric.+` declaration.
-  mutable FuncDecl *cachedNumericPlusFn = nullptr;
+  /// `AdditiveArithmetic.+` declaration.
+  mutable FuncDecl *cachedPlusFn = nullptr;
 
 public:
   /// Construct an ADContext for the given module.
@@ -908,26 +909,21 @@ public:
     return numericProtocol;
   }
 
+  ProtocolDecl *getAdditiveArithmeticProtocol() const {
+    return additiveArithmeticProtocol;
+  }
+
   ProtocolDecl *getFloatingPointProtocol() const {
     return floatingPointProtocol;
   }
 
-  FuncDecl *getVectorPlusDecl() const {
-    if (!cachedVectorPlusFn) {
-      cachedVectorPlusFn = findAssociativeOperatorDeclInProtocol(
-          astCtx.getIdentifier("+"), vectorNumericProtocol);
-      assert(cachedVectorPlusFn && "VectorNumeric.+ not found");
+  FuncDecl *getPlusDecl() const {
+    if (!cachedPlusFn) {
+      cachedPlusFn = findAssociativeOperatorDeclInProtocol(
+          astCtx.getIdentifier("+"), additiveArithmeticProtocol);
+      assert(cachedPlusFn && "AdditiveArithmetic.+ not found");
     }
-    return cachedVectorPlusFn;
-  }
-
-  FuncDecl *getNumericPlusDecl() const {
-    if (!cachedNumericPlusFn) {
-      cachedNumericPlusFn = findAssociativeOperatorDeclInProtocol(
-          astCtx.getIdentifier("+"), numericProtocol);
-      assert(cachedNumericPlusFn && "Numeric.+ not found");
-    }
-    return cachedNumericPlusFn;
+    return cachedPlusFn;
   }
 
   /// Retrieves the file unit that contains implicit declarations in the
@@ -1699,7 +1695,7 @@ static void convertIntToIndirectExpressible(intmax_t scalar,
 /// The specified type must satisfy **one** of these requirements:
 /// - It is a builtin floating point type like `Builtin.FPIEEE32`.
 /// - It conforms to `FloatingPoint`.
-/// - It conforms `VectorNumeric` and its nested type `ScalarElement` conforms
+/// - It conforms `VectorNumeric` and its nested type `Scalar` conforms
 ///   to `FloatingPoint`.
 ///
 /// The root address derivation of `seedBufAccess` must be the result of
@@ -1733,16 +1729,17 @@ static void createScalarValueIndirect(intmax_t scalar, CanType type,
     return;
   }
   // Real vector gets initialized through
-  // `<target_type>.ScalarElement.IntegerLiteralType
+  // `<target_type>.Scalar.IntegerLiteralType
   //     .init(_builtinIntegerLiteral:)`,
-  // `<target_type>.ScalarElement.init(integerLiteral:)` and
+  // `<target_type>.Scalar.init(integerLiteral:)` and
   // `<target_type>.init(_:)`.
+  // TODO: Remove and reject this case. Real vectors should never be a seed.
   case TangentSpace::Kind::RealVector: {
     auto *targetTypeDecl = tangentSpace->getRealVectorSpace();
     auto &astCtx = context.getASTContext();
     auto &module = context.getModule();
     // Create a scalar value from the specified integer literal.
-    DeclName scalarDeclName(astCtx.getIdentifier("ScalarElement"));
+    DeclName scalarDeclName(astCtx.getIdentifier("Scalar"));
     auto currencyDeclLookUpResult =
         targetTypeDecl->lookupDirect(scalarDeclName);
     auto *scalarElemAlias = cast<TypeAliasDecl>(currencyDeclLookUpResult[0]);
@@ -1753,7 +1750,7 @@ static void createScalarValueIndirect(intmax_t scalar, CanType type,
                                        scalarElemAlias);
     scalarTy = scalarTy.subst(currencySubMap)->getCanonicalType();
     auto *scalarTyDecl = scalarTy.getAnyNominal();
-    assert(scalarTyDecl && "ScalarElement must be a nominal type");
+    assert(scalarTyDecl && "Scalar must be a nominal type");
     // %0 = ... : $<scalar type>
     auto scalarBuf = builder.createAllocStack(
         loc, SILType::getPrimitiveObjectType(scalarTy));
@@ -3993,21 +3990,9 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
   }
   case TangentSpace::Kind::RealScalar:
   case TangentSpace::Kind::RealVector: {
-    FuncDecl *combinerFuncDecl = nullptr;
-    ProtocolDecl *proto = nullptr;
     auto *adjointTyDecl = tangentSpace->getRealScalarOrVectorSpace();
-    // If the type conforms to `VectorNumeric`, then combine them using
-    // `VectorNumeric.+`.
-    if (tangentSpace->isRealVectorSpace()) {
-      combinerFuncDecl = getContext().getVectorPlusDecl();
-      proto = getContext().getVectorNumericProtocol();
-    }
-    // If the type conforms to `FloatingPoint`, then use `Numeric.+`.
-    else {
-      assert(tangentSpace->isRealScalarSpace());
-      combinerFuncDecl = getContext().getNumericPlusDecl();
-      proto = getContext().getNumericProtocol();
-    }
+    auto *proto = getContext().getAdditiveArithmeticProtocol();
+    auto *combinerFuncDecl = getContext().getPlusDecl();
     // Call the combiner function and return.
     auto adjointParentModule = adjointTyDecl->getModuleContext();
     auto confRef = *adjointParentModule->lookupConformance(adjointASTTy, proto);
@@ -4019,7 +4004,7 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
     // Ensure the witness method is linked.
     getModule().lookUpFunctionInWitnessTable(confRef, declRef);
     auto subMap =
-        SubstitutionMap::getProtocolSubstitutions(proto, adjointASTTy, confRef);
+      SubstitutionMap::getProtocolSubstitutions(proto, adjointASTTy, confRef);
     // %1 = metatype $T.Type
     auto metatypeType =
         CanMetatypeType::get(adjointASTTy, MetatypeRepresentation::Thick);

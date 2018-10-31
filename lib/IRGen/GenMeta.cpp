@@ -4051,6 +4051,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::AccelerableByTensorFlow:
   case KnownProtocolKind::FloatingPoint:
+  case KnownProtocolKind::AdditiveArithmetic:
   case KnownProtocolKind::Numeric:
   case KnownProtocolKind::ParameterGroup:
   case KnownProtocolKind::Parameterized:
