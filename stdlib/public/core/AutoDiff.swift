@@ -21,40 +21,38 @@
 //===----------------------------------------------------------------------===//
 
 /// A type that represents an unranked vector space. Values of this type are
-/// elements in this vector space and with a specific dimensionality.
-public protocol VectorNumeric {
-  /// The type of scalars in the real vector space.
-  associatedtype ScalarElement
+/// elements in this vector space and with a specific shape.
+public protocol VectorNumeric : AdditiveArithmetic {
+  /// The type of scalars in the vector space.
+  associatedtype Scalar : AdditiveArithmetic
 
   /// The type whose values specifies the dimensionality of an object in the
-  /// real vector space.
-  associatedtype Dimensionality
+  /// vector space.
+  associatedtype Shape
 
-  /// Create a scalar in the real vector space that the type represents.
-  ///
-  /// - Parameter scalar: the scalar
-  init(_ scalar: ScalarElement)
+  // TODO: This is a degenerate API. To be removed.
+  init(_ scalar: Scalar)
 
-  /// Create an object in the real vector space with the specified
-  /// dimensionality by repeatedly filling the object with the specified
-  /// value.
+  /// Create an object in the vector space with the specified shape by
+  /// repeatedly filling the object with the specified scalar value.
   ///
   /// - Parameters:
-  ///   - dimensionality: the dimensionality
-  ///   - repeatedValue: the value repeat for the specified dimensionality
-  init(dimensionality: Dimensionality, repeating repeatedValue: ScalarElement)
+  ///   - shape: the shape
+  ///   - repeatedValue: the value repeat for the specified shape
+  init(repeating repeatedValue: Scalar, shape: Shape)
 
-  static func + (lhs: Self, rhs: Self) -> Self
-  static func + (lhs: Self, rhs: ScalarElement) -> Self
-  static func + (lhs: ScalarElement, rhs: Self) -> Self
+  static func * (lhs: Scalar, rhs: Self) -> Self
+  static func *= (lhs: inout Self, rhs: Scalar)
+}
 
-  static func - (lhs: Self, rhs: Self) -> Self
-  static func - (lhs: Self, rhs: ScalarElement) -> Self
-  static func - (lhs: ScalarElement, rhs: Self) -> Self
+public extension VectorNumeric {
+  static func * (lhs: Self, rhs: Scalar) -> Self {
+    return rhs * lhs
+  }
 
-  static func * (lhs: Self, rhs: Self) -> Self
-  static func * (lhs: Self, rhs: ScalarElement) -> Self
-  static func * (lhs: ScalarElement, rhs: Self) -> Self
+  static func *= (lhs: inout Self, rhs: Scalar) {
+    lhs = rhs * lhs
+  }
 }
 
 /// A type that mathematically represents a differentiable manifold whose
@@ -64,17 +62,17 @@ public protocol VectorNumeric {
 /// elements are of `Tangent` type.
 public protocol Differentiable {
   /// The tangent vector space of this differentiable manifold.
-  associatedtype TangentVector : VectorNumeric
-    where TangentVector.ScalarElement : FloatingPoint
+  associatedtype TangentVector : Differentiable
+    where TangentVector.TangentVector == TangentVector
   /// The cotangent space of this differentiable manifold.
-  associatedtype CotangentVector : VectorNumeric
-    where TangentVector.ScalarElement : FloatingPoint
+  associatedtype CotangentVector : Differentiable
+    where CotangentVector.CotangentVector == CotangentVector
 
   /// Returns `self` moved along the value space towards the given tangent
   /// vector. In Riemannian geometry (mathematics), this represents an
   /// exponential map.
   func moved(toward direction: TangentVector) -> Self
-  
+
   /// Convert a cotangent vector to its corresponding tangent vector.
   func tangentVector(from cotangent: CotangentVector) -> TangentVector
 }
@@ -89,32 +87,6 @@ public extension Differentiable
 public extension Differentiable where TangentVector == CotangentVector {
   func tangentVector(from cotangent: CotangentVector) -> TangentVector {
     return cotangent
-  }
-}
-
-public extension VectorNumeric {
-  static func + (lhs: Self, rhs: ScalarElement) -> Self {
-    return lhs + Self(rhs)
-  }
-
-  static func + (lhs: ScalarElement, rhs: Self) -> Self {
-    return Self(lhs) + rhs
-  }
-
-  static func - (lhs: Self, rhs: ScalarElement) -> Self {
-    return lhs - Self(rhs)
-  }
-
-  static func - (lhs: ScalarElement, rhs: Self) -> Self {
-    return Self(lhs) - rhs
-  }
-
-  static func * (lhs: Self, rhs: ScalarElement) -> Self {
-    return lhs * Self(rhs)
-  }
-
-  static func * (lhs: ScalarElement, rhs: Self) -> Self {
-    return Self(lhs) * rhs
   }
 }
 
