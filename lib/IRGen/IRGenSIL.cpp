@@ -2194,6 +2194,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
                    << structuredArgument.getArgumentList().size() << ".\n");
         listLength = llvm::ConstantInt::get(IGM.Int32Ty, 0);
         for (auto tensorHandle : structuredArgument.getArgumentList()) {
+          // Note that `CreateAdd` constant-folds ConstantInts.
           listLength = Builder.CreateAdd(listLength,
                                          unpackAndAddInput(tensorHandle));
         }
@@ -2877,6 +2878,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         directResultTensorGroupWitnessTables.push_back(nullptr);
         auto *cTensorHandleCount = llvm::ConstantInt::get(IGM.Int32Ty, 1);
         directResultCTensorHandleCounts.push_back(cTensorHandleCount);
+        // Note that `CreateAdd` constant-folds ConstantInts.
         expectedReturnValueCount = Builder.CreateAdd(expectedReturnValueCount,
                                                      cTensorHandleCount);
         continue;
@@ -3025,6 +3027,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
         setLoweredExplosion(silResult, e);
 
         // We consumed one output.
+        // Note that `CreateAdd` constant-folds ConstantInts.
         tfOutputIdx = Builder.CreateAdd(
             tfOutputIdx, llvm::ConstantInt::get(IGM.Int32Ty, 1));
 
