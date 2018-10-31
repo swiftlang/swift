@@ -144,9 +144,12 @@ public:
 /// \param[out] extendedInfo If present, will be populated with additional
 /// compilation options serialized into the AST at build time that may be
 /// necessary to load it properly.
+/// \param[out] dependencies If present, will be populated with list of
+/// input files the module depends on, if present in INPUT_BLOCK.
 ValidationInfo
 validateSerializedAST(StringRef data,
-                      ExtendedValidationInfo *extendedInfo = nullptr);
+                      ExtendedValidationInfo *extendedInfo = nullptr,
+                      SmallVectorImpl<StringRef> *dependencies = nullptr);
 
 /// Emit diagnostics explaining a failure to load a serialized AST.
 ///

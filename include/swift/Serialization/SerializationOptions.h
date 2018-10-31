@@ -34,12 +34,14 @@ namespace swift {
     StringRef ImportedHeader;
     StringRef ModuleLinkName;
     ArrayRef<std::string> ExtraClangOptions;
+    ArrayRef<std::string> Dependencies;
 
     bool AutolinkForceLoad = false;
     bool EnableNestedTypeLookupTable = false;
     bool SerializeAllSIL = false;
     bool SerializeOptionsForDebugging = false;
     bool IsSIB = false;
+    bool SerializeFileDependencies = false;
   };
 
 } // end namespace swift

@@ -822,6 +822,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(input_block, IMPORTED_HEADER_CONTENTS);
   BLOCK_RECORD(input_block, MODULE_FLAGS);
   BLOCK_RECORD(input_block, SEARCH_PATH);
+  BLOCK_RECORD(input_block, FILE_DEPENDENCY);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
 #define RECORD(X) BLOCK_RECORD(decls_block, X);
@@ -1026,6 +1027,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   input_block::ImportedHeaderLayout ImportedHeader(Out);
   input_block::ImportedHeaderContentsLayout ImportedHeaderContents(Out);
   input_block::SearchPathLayout SearchPath(Out);
+  input_block::FileDependencyLayout FileDependency(Out);
 
   if (options.SerializeOptionsForDebugging) {
     const SearchPathOptions &searchPathOpts = M->getASTContext().SearchPathOpts;
@@ -1036,6 +1038,12 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
                       framepath.Path);
     for (auto &path : searchPathOpts.ImportSearchPaths)
       SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false, path);
+  }
+
+  if (options.SerializeFileDependencies) {
+    for (auto const &dep : options.Dependencies) {
+      FileDependency.emit(ScratchRecord, dep);
+    }
   }
 
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;

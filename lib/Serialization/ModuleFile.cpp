@@ -232,6 +232,35 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
   return result;
 }
 
+static bool
+validateInputBlock(llvm::BitstreamCursor &cursor,
+                   SmallVectorImpl<uint64_t> &scratch,
+                   SmallVectorImpl<StringRef> &dependencies) {
+  while (!cursor.AtEndOfStream()) {
+    auto entry = cursor.advance();
+    if (entry.Kind == llvm::BitstreamEntry::EndBlock)
+      break;
+
+    if (entry.Kind == llvm::BitstreamEntry::Error)
+      return true;
+
+    scratch.clear();
+    StringRef blobData;
+    unsigned kind = cursor.readRecord(entry.ID, scratch, &blobData);
+    switch (kind) {
+    case input_block::FILE_DEPENDENCY:
+      dependencies.push_back(blobData);
+      break;
+    default:
+      // Unknown metadata record, possibly for use by a future version of the
+      // module format.
+      break;
+    }
+  }
+  return false;
+}
+
+
 bool serialization::isSerializedAST(StringRef data) {
   StringRef signatureStr(reinterpret_cast<const char *>(SWIFTMODULE_SIGNATURE),
                          llvm::array_lengthof(SWIFTMODULE_SIGNATURE));
@@ -240,7 +269,8 @@ bool serialization::isSerializedAST(StringRef data) {
 
 ValidationInfo serialization::validateSerializedAST(
     StringRef data,
-    ExtendedValidationInfo *extendedInfo) {
+    ExtendedValidationInfo *extendedInfo,
+    SmallVectorImpl<StringRef> *dependencies) {
   ValidationInfo result;
 
   // Check 32-bit alignment.
@@ -270,6 +300,13 @@ ValidationInfo serialization::validateSerializedAST(
                                     extendedInfo);
       if (result.status == Status::Malformed)
         return result;
+    } else if (dependencies &&
+               topLevelEntry.ID == INPUT_BLOCK_ID) {
+      cursor.EnterSubBlock(INPUT_BLOCK_ID);
+      if (validateInputBlock(cursor, scratch, *dependencies)) {
+        result.status = Status::Malformed;
+        return result;
+      }
     } else {
       if (cursor.SkipBlock()) {
         result.status = Status::Malformed;
