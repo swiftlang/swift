@@ -235,8 +235,7 @@ extension Hasher { // Combining integers
     self._combine(bytes: UInt64(truncatingIfNeeded: value), count: 1)
   }
 
-  @usableFromInline
-  @_effects(releasenone)
+  @inline(__always)
   internal mutating func _combine(bytes: UInt64, count: Int) {
     _sanityCheck(count >= 0 && count < 8)
     let count = UInt64(truncatingIfNeeded: count)
