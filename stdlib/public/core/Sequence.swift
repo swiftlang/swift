@@ -348,62 +348,6 @@ public protocol Sequence {
   ///   In this case, see the documentation of `Collection.underestimatedCount`.
   var underestimatedCount: Int { get }
 
-  /// Returns the longest possible subsequences of the sequence, in order, that
-  /// don't contain elements satisfying the given predicate.
-  ///
-  /// The resulting array consists of at most `maxSplits + 1` subsequences.
-  /// Elements that are used to split the sequence are not returned as part of
-  /// any subsequence.
-  ///
-  /// The following examples show the effects of the `maxSplits` and
-  /// `omittingEmptySubsequences` parameters when splitting a string using a
-  /// closure that matches spaces. The first use of `split` returns each word
-  /// that was originally separated by one or more spaces.
-  ///
-  ///     let line = "BLANCHE:   I don't want realism. I want magic!"
-  ///     print(line.split(whereSeparator: { $0 == " " })
-  ///               .map(String.init))
-  ///     // Prints "["BLANCHE:", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
-  ///
-  /// The second example passes `1` for the `maxSplits` parameter, so the
-  /// original string is split just once, into two new strings.
-  ///
-  ///     print(
-  ///         line.split(maxSplits: 1, whereSeparator: { $0 == " " })
-  ///             .map(String.init))
-  ///     // Prints "["BLANCHE:", "  I don\'t want realism. I want magic!"]"
-  ///
-  /// The final example passes `false` for the `omittingEmptySubsequences`
-  /// parameter, so the returned array contains empty strings where spaces
-  /// were repeated.
-  ///
-  ///     print(line.split(omittingEmptySubsequences: false,
-  ///                      whereSeparator: { $0 == " " })
-  ///          ).map(String.init))
-  ///     // Prints "["BLANCHE:", "", "", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
-  ///
-  /// - Parameters:
-  ///   - maxSplits: The maximum number of times to split the sequence, or one
-  ///     less than the number of subsequences to return. If `maxSplits + 1`
-  ///     subsequences are returned, the last one is a suffix of the original
-  ///     sequence containing the remaining elements. `maxSplits` must be
-  ///     greater than or equal to zero. The default value is `Int.max`.
-  ///   - omittingEmptySubsequences: If `false`, an empty subsequence is
-  ///     returned in the result for each pair of consecutive elements
-  ///     satisfying the `isSeparator` predicate and for each element at the
-  ///     start or end of the sequence satisfying the `isSeparator` predicate.
-  ///     If `true`, only nonempty subsequences are returned. The default
-  ///     value is `true`.
-  ///   - isSeparator: A closure that returns `true` if its argument should be
-  ///     used to split the sequence; otherwise, `false`.
-  /// - Returns: An array of subsequences, split from this sequence's elements.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  __consuming func split(
-    maxSplits: Int, omittingEmptySubsequences: Bool,
-    whereSeparator isSeparator: (Element) throws -> Bool
-  ) rethrows -> [SubSequence]
-
   func _customContainsEquatableElement(
     _ element: Element
   ) -> Bool?
@@ -861,7 +805,7 @@ extension Sequence where Element : Equatable {
     separator: Element,
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true
-  ) -> [SubSequence] {
+  ) -> [ArraySlice<Element>] {
     return split(
       maxSplits: maxSplits,
       omittingEmptySubsequences: omittingEmptySubsequences,
@@ -925,47 +869,13 @@ extension Sequence {
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
     whereSeparator isSeparator: (Element) throws -> Bool
-  ) rethrows -> [AnySequence<Element>] {
+  ) rethrows -> [ArraySlice<Element>] {
     _precondition(maxSplits >= 0, "Must take zero or more splits")
-    var result: [AnySequence<Element>] = []
-    var subSequence: [Element] = []
-
-    @discardableResult
-    func appendSubsequence() -> Bool {
-      if subSequence.isEmpty && omittingEmptySubsequences {
-        return false
-      }
-      result.append(AnySequence(subSequence))
-      subSequence = []
-      return true
-    }
-
-    if maxSplits == 0 {
-      // We aren't really splitting the sequence.  Convert `self` into an
-      // `Array` using a fast entry point.
-      subSequence = Array(self)
-      appendSubsequence()
-      return result
-    }
-
-    var iterator = self.makeIterator()
-    while let element = iterator.next() {
-      if try isSeparator(element) {
-        if !appendSubsequence() {
-          continue
-        }
-        if result.count == maxSplits {
-          break
-        }
-      } else {
-        subSequence.append(element)
-      }
-    }
-    while let element = iterator.next() {
-      subSequence.append(element)
-    }
-    appendSubsequence()
-    return result
+    let whole = Array(self)
+    return try whole.split(
+                  maxSplits: maxSplits, 
+                  omittingEmptySubsequences: omittingEmptySubsequences, 
+                  whereSeparator: isSeparator)
   }
 
   /// Returns a subsequence, up to the given maximum length, containing the
@@ -1021,11 +931,11 @@ extension Sequence {
     }
   }
 
-  /// Returns a subsequence containing all but the given number of initial
+  /// Returns a sequence containing all but the given number of initial
   /// elements.
   ///
   /// If the number of elements to drop exceeds the number of elements in
-  /// the sequence, the result is an empty subsequence.
+  /// the sequence, the result is an empty sequence.
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
   ///     print(numbers.dropFirst(2))
@@ -1035,7 +945,7 @@ extension Sequence {
   ///
   /// - Parameter k: The number of elements to drop from the beginning of
   ///   the sequence. `k` must be greater than or equal to zero.
-  /// - Returns: A subsequence starting after the specified number of
+  /// - Returns: A sequence starting after the specified number of
   ///   elements.
   ///
   /// - Complexity: O(1), with O(*k*) deferred to each iteration of the result,
@@ -1046,12 +956,12 @@ extension Sequence {
     return DropFirstSequence(self, dropping: k)
   }
 
-  /// Returns a subsequence containing all but the given number of final
+  /// Returns a sequence containing all but the given number of final
   /// elements.
   ///
   /// The sequence must be finite. If the number of elements to drop exceeds
   /// the number of elements in the sequence, the result is an empty
-  /// subsequence.
+  /// sequence.
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
   ///     print(numbers.dropLast(2))
@@ -1061,7 +971,7 @@ extension Sequence {
   ///
   /// - Parameter n: The number of elements to drop off the end of the
   ///   sequence. `n` must be greater than or equal to zero.
-  /// - Returns: A subsequence leaving off the specified number of elements.
+  /// - Returns: A sequence leaving off the specified number of elements.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @inlinable
@@ -1092,7 +1002,7 @@ extension Sequence {
     return result
   }
 
-  /// Returns a subsequence by skipping the initial, consecutive elements that
+  /// Returns a sequence by skipping the initial, consecutive elements that
   /// satisfy the given predicate.
   ///
   /// The following example uses the `drop(while:)` method to skip over the
@@ -1110,7 +1020,7 @@ extension Sequence {
   /// - Parameter predicate: A closure that takes an element of the sequence as
   ///   its argument and returns a Boolean value indicating whether the
   ///   element should be included in the result.
-  /// - Returns: A subsequence starting after the initial, consecutive elements
+  /// - Returns: A sequence starting after the initial, consecutive elements
   ///   that satisfy `predicate`.
   ///
   /// - Complexity: O(*k*), where *k* is the number of elements to drop from
@@ -1122,7 +1032,7 @@ extension Sequence {
     return try DropWhileSequence(self, predicate: predicate)
   }
 
-  /// Returns a subsequence, up to the specified maximum length, containing the
+  /// Returns a sequence, up to the specified maximum length, containing the
   /// initial elements of the sequence.
   ///
   /// If the maximum length exceeds the number of elements in the sequence,
@@ -1136,7 +1046,7 @@ extension Sequence {
   ///
   /// - Parameter maxLength: The maximum number of elements to return. The
   ///   value of `maxLength` must be greater than or equal to zero.
-  /// - Returns: A subsequence starting at the beginning of this sequence
+  /// - Returns: A sequence starting at the beginning of this sequence
   ///   with at most `maxLength` elements.
   ///
   /// - Complexity: O(1)
@@ -1145,7 +1055,7 @@ extension Sequence {
     return PrefixSequence(self, maxLength: maxLength)
   }
 
-  /// Returns a subsequence containing the initial, consecutive elements that
+  /// Returns a sequence containing the initial, consecutive elements that
   /// satisfy the given predicate.
   ///
   /// The following example uses the `prefix(while:)` method to find the
@@ -1163,7 +1073,7 @@ extension Sequence {
   /// - Parameter predicate: A closure that takes an element of the sequence as
   ///   its argument and returns a Boolean value indicating whether the
   ///   element should be included in the result.
-  /// - Returns: A subsequence of the initial, consecutive elements that
+  /// - Returns: A sequence of the initial, consecutive elements that
   ///   satisfy `predicate`.
   ///
   /// - Complexity: O(*k*), where *k* is the length of the result.

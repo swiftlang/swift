@@ -944,16 +944,6 @@ SequenceTypeTests.test("flatMap/Sequence/TransformProducesOptional") {
 }
 
 //===----------------------------------------------------------------------===//
-// split()
-//===----------------------------------------------------------------------===//
-
-SequenceTypeTests.test("Sequence/split/dispatch") {
-  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  _ = tester.split { $0.value == 1 }
-  expectCustomizable(tester, tester.log.split)
-}
-
-//===----------------------------------------------------------------------===//
 // zip()
 //===----------------------------------------------------------------------===//
 

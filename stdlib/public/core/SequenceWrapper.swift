@@ -69,17 +69,3 @@ extension _SequenceWrapper {
     return _base._copyToContiguousArray()
   }
 }
-
-extension _SequenceWrapper where SubSequence == Base.SubSequence {  
-  @inlinable // generic-performance
-  public __consuming func split(
-    maxSplits: Int, omittingEmptySubsequences: Bool,
-    whereSeparator isSeparator: (Element) throws -> Bool
-  ) rethrows -> [SubSequence] {
-    return try _base.split(
-      maxSplits: maxSplits,
-      omittingEmptySubsequences: omittingEmptySubsequences,
-      whereSeparator: isSeparator
-    )
-  }
-}
