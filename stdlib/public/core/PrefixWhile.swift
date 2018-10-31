@@ -72,8 +72,6 @@ extension LazyPrefixWhileSequence.Iterator: IteratorProtocol, Sequence {
 }
 
 extension LazyPrefixWhileSequence: Sequence {
-  public typealias SubSequence = AnySequence<Element> // >:(
-  
   @inlinable // lazy-performance
   public __consuming func makeIterator() -> Iterator {
     return Iterator(_base: _base.makeIterator(), predicate: _predicate)

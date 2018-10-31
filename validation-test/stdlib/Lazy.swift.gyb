@@ -856,8 +856,7 @@ tests.test("LazyMapSequence/AssociatedTypes") {
   typealias Subject = LazyMapSequence<Base, OpaqueValue<Int32>>
   expectSequenceAssociatedTypes(
     sequenceType: Subject.self,
-    iteratorType: LazyMapSequence<Base, OpaqueValue<Int32>>.Iterator.self,
-    subSequenceType: AnySequence<OpaqueValue<Int32>>.self)
+    iteratorType: LazyMapSequence<Base, OpaqueValue<Int32>>.Iterator.self)
 }
 
 tests.test("LazyMapCollection/AssociatedTypes") {
@@ -1136,8 +1135,7 @@ tests.test("LazyFilterSequence/AssociatedTypes") {
   typealias Subject = LazyFilterSequence<Base>
   expectSequenceAssociatedTypes(
     sequenceType: Subject.self,
-    iteratorType: LazyFilterSequence<Base>.Iterator.self,
-    subSequenceType: AnySequence<OpaqueValue<Int>>.self)
+    iteratorType: LazyFilterSequence<Base>.Iterator.self)
 }
 
 tests.test("LazyFilterCollection/AssociatedTypes") {
@@ -1334,8 +1332,7 @@ tests.test("LazyPrefixWhileSequence/AssociatedTypes") {
   typealias Subject = LazyPrefixWhileSequence<Base>
   expectSequenceAssociatedTypes(
     sequenceType: Subject.self,
-    iteratorType: LazyPrefixWhileSequence<Base>.Iterator.self,
-    subSequenceType: AnySequence<OpaqueValue<Int>>.self)
+    iteratorType: LazyPrefixWhileSequence<Base>.Iterator.self)
 }
 
 tests.test("LazyPrefixWhileCollection/AssociatedTypes") {
@@ -1392,8 +1389,7 @@ tests.test("LazyDropWhileSequence/AssociatedTypes") {
   typealias Subject = LazyDropWhileSequence<Base>
   expectSequenceAssociatedTypes(
     sequenceType: Subject.self,
-    iteratorType: LazyDropWhileSequence<Base>.Iterator.self,
-    subSequenceType: AnySequence<OpaqueValue<Int>>.self)
+    iteratorType: LazyDropWhileSequence<Base>.Iterator.self)
 }
 
 tests.test("LazyDropWhileCollection/AssociatedTypes") {

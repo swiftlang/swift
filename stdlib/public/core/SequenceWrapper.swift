@@ -21,7 +21,6 @@ public // @testable
 protocol _SequenceWrapper : Sequence {
   associatedtype Base : Sequence where Base.Element == Element
   associatedtype Iterator = Base.Iterator
-  associatedtype SubSequence = Base.SubSequence
 
   var _base: Base { get }
 }

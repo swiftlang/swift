@@ -1,5 +1,9 @@
 
 /* Generic Signature Changes */
+Protocol Collection has generic signature change from <Self : Sequence, Self.Index : Comparable, Self.Index == Self.Indices.Element, Self.Indices : Collection, Self.Indices == Self.Indices.SubSequence, Self.SubSequence : Collection, Self.Indices.Element == Self.Indices.Index, Self.Indices.Index == Self.SubSequence.Index, Self.SubSequence.Index == Self.Indices.Indices.Element, Self.Indices.Indices.Element == Self.Indices.Indices.Index, Self.Indices.Indices.Index == Self.SubSequence.Indices.Element, Self.SubSequence.Indices.Element == Self.SubSequence.Indices.Index, Self.SubSequence.Indices.Index == Self.SubSequence.Indices.Indices.Element, Self.SubSequence.Indices.Indices.Element == Self.SubSequence.Indices.Indices.Index> to <Self : Sequence, Self.Element == Self.SubSequence.Element, Self.Index : Comparable, Self.Index == Self.Indices.Element, Self.Indices : Collection, Self.Indices == Self.Indices.SubSequence, Self.SubSequence : Collection, Self.SubSequence == Self.SubSequence.SubSequence, Self.Indices.Element == Self.Indices.Index, Self.Indices.Index == Self.SubSequence.Index, Self.SubSequence.Index == Self.Indices.Indices.Element, Self.Indices.Indices.Element == Self.Indices.Indices.Index, Self.Indices.Indices.Index == Self.SubSequence.Indices.Element, Self.SubSequence.Indices.Element == Self.SubSequence.Indices.Index, Self.SubSequence.Indices.Index == Self.SubSequence.Indices.Indices.Element, Self.SubSequence.Indices.Indices.Element == Self.SubSequence.Indices.Indices.Index>
+Protocol Sequence has generic signature change from <Self.Element == Self.Iterator.Element, Self.Iterator : IteratorProtocol, Self.SubSequence : Sequence, Self.SubSequence == Self.SubSequence.SubSequence, Self.Iterator.Element == Self.SubSequence.Element, Self.SubSequence.Element == Self.SubSequence.Iterator.Element> to <Self.Element == Self.Iterator.Element, Self.Iterator : IteratorProtocol>
+AssociatedType Sequence.SubSequence has been removed
+AssociatedType _SequenceWrapper.SubSequence has been removed
 
 /* RawRepresentable Changes */
 
@@ -27,6 +31,29 @@ Func _SequenceWrapper.prefix(while:) has been removed
 Func _SequenceWrapper.split(maxSplits:omittingEmptySubsequences:whereSeparator:) has been removed
 Func _SequenceWrapper.suffix(_:) has been removed
 Struct Iterator has been removed
+TypeAlias AnyIterator.SubSequence has been removed
+TypeAlias AnySequence.SubSequence has been removed
+TypeAlias EmptyCollection.Iterator.SubSequence has been removed
+TypeAlias EnumeratedSequence.Iterator.SubSequence has been removed
+TypeAlias EnumeratedSequence.SubSequence has been removed
+TypeAlias FlattenSequence.Iterator.SubSequence has been removed
+TypeAlias FlattenSequence.SubSequence has been removed
+TypeAlias IteratorSequence.SubSequence has been removed
+TypeAlias JoinedSequence.SubSequence has been removed
+TypeAlias LazyFilterSequence.Iterator.SubSequence has been removed
+TypeAlias LazyFilterSequence.SubSequence has been removed
+TypeAlias LazyMapSequence.Iterator.SubSequence has been removed
+TypeAlias LazyMapSequence.SubSequence has been removed
+TypeAlias LazyPrefixWhileSequence.Iterator.SubSequence has been removed
+TypeAlias LazyPrefixWhileSequence.SubSequence has been removed
+TypeAlias LazySequence.SubSequence has been removed
+TypeAlias PartialRangeFrom.SubSequence has been removed
+TypeAlias ReversedCollection.Iterator.SubSequence has been removed
+TypeAlias StrideThrough.SubSequence has been removed
+TypeAlias StrideTo.SubSequence has been removed
+TypeAlias UnfoldSequence.SubSequence has been removed
+TypeAlias UnsafeRawBufferPointer.Iterator.SubSequence has been removed
+TypeAlias Zip2Sequence.SubSequence has been removed
 Var AnyBidirectionalCollection.first has been removed
 Var AnyBidirectionalCollection.last has been removed
 Var AnyCollection.first has been removed

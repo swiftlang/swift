@@ -201,7 +201,6 @@ extension LoggingSequence: LoggingType {
 extension LoggingSequence: Sequence {
   public typealias Element = Base.Element
   public typealias Iterator = LoggingIterator<Base.Iterator>
-  public typealias SubSequence = Base.SubSequence
 
   public func makeIterator() -> Iterator {
     SequenceLog.makeIterator[selfType] += 1
@@ -250,6 +249,7 @@ public typealias LoggingCollection<Base: Collection> = LoggingSequence<Base>
 extension LoggingCollection: Collection {  
   public typealias Index = Base.Index
   public typealias Indices = Base.Indices
+  public typealias SubSequence = Base.SubSequence
 
   public var startIndex: Index {
     CollectionLog.startIndex[selfType] += 1

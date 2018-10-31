@@ -1,12 +1,16 @@
 
 /* Generic Signature Changes */
+Func _DropWhileSequence.drop(while:) has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
+Func _DropWhileSequence.makeIterator() has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
+Protocol Collection has generic signature change from <τ_0_0 : Sequence, τ_0_0.Index : Comparable, τ_0_0.Index == τ_0_0.Indices.Element, τ_0_0.Indices : Collection, τ_0_0.Indices == τ_0_0.Indices.SubSequence, τ_0_0.SubSequence : Collection, τ_0_0.Indices.Element == τ_0_0.Indices.Index, τ_0_0.Indices.Index == τ_0_0.SubSequence.Index, τ_0_0.SubSequence.Index == τ_0_0.Indices.Indices.Element, τ_0_0.Indices.Indices.Element == τ_0_0.Indices.Indices.Index, τ_0_0.Indices.Indices.Index == τ_0_0.SubSequence.Indices.Element, τ_0_0.SubSequence.Indices.Element == τ_0_0.SubSequence.Indices.Index, τ_0_0.SubSequence.Indices.Index == τ_0_0.SubSequence.Indices.Indices.Element, τ_0_0.SubSequence.Indices.Indices.Element == τ_0_0.SubSequence.Indices.Indices.Index> to <τ_0_0 : Sequence, τ_0_0.Element == τ_0_0.SubSequence.Element, τ_0_0.Index : Comparable, τ_0_0.Index == τ_0_0.Indices.Element, τ_0_0.Indices : Collection, τ_0_0.Indices == τ_0_0.Indices.SubSequence, τ_0_0.SubSequence : Collection, τ_0_0.SubSequence == τ_0_0.SubSequence.SubSequence, τ_0_0.Indices.Element == τ_0_0.Indices.Index, τ_0_0.Indices.Index == τ_0_0.SubSequence.Index, τ_0_0.SubSequence.Index == τ_0_0.Indices.Indices.Element, τ_0_0.Indices.Indices.Element == τ_0_0.Indices.Indices.Index, τ_0_0.Indices.Indices.Index == τ_0_0.SubSequence.Indices.Element, τ_0_0.SubSequence.Indices.Element == τ_0_0.SubSequence.Indices.Index, τ_0_0.SubSequence.Indices.Index == τ_0_0.SubSequence.Indices.Indices.Element, τ_0_0.SubSequence.Indices.Indices.Element == τ_0_0.SubSequence.Indices.Indices.Index>
+Protocol Sequence has generic signature change from <τ_0_0.Element == τ_0_0.Iterator.Element, τ_0_0.Iterator : IteratorProtocol, τ_0_0.SubSequence : Sequence, τ_0_0.SubSequence == τ_0_0.SubSequence.SubSequence, τ_0_0.Iterator.Element == τ_0_0.SubSequence.Element, τ_0_0.SubSequence.Element == τ_0_0.SubSequence.Iterator.Element> to <τ_0_0.Element == τ_0_0.Iterator.Element, τ_0_0.Iterator : IteratorProtocol>
+Struct _DropWhileSequence has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
+AssociatedType Sequence.SubSequence has been removed
+AssociatedType _SequenceWrapper.SubSequence has been removed
 
 /* RawRepresentable Changes */
 
 /* Removed Decls */
-Func _DropWhileSequence.drop(while:) has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
-Func _DropWhileSequence.makeIterator() has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
-Struct _DropWhileSequence has generic signature change from <τ_0_0 where τ_0_0 : IteratorProtocol> to <τ_0_0 where τ_0_0 : Sequence>
 Constructor AnyHashable.init(_box:) has been removed
 Constructor AnyHashable.init(_usingDefaultRepresentationOf:) has been removed
 Constructor ManagedBufferPointer.init(_:_:_:) has been removed

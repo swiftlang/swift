@@ -331,9 +331,10 @@ public protocol Sequence {
   associatedtype Iterator : IteratorProtocol where Iterator.Element == Element
 
   /// A type that represents a subsequence of some of the sequence's elements.
-  associatedtype SubSequence : Sequence = AnySequence<Element>
-    where Element == SubSequence.Element,
-          SubSequence.SubSequence == SubSequence
+  // associatedtype SubSequence : Sequence = AnySequence<Element>
+  //   where Element == SubSequence.Element,
+  //         SubSequence.SubSequence == SubSequence
+  // typealias SubSequence = AnySequence<Element>
 
   /// Returns an iterator over the elements of this sequence.
   __consuming func makeIterator() -> Iterator
@@ -1152,3 +1153,10 @@ extension IteratorSequence: IteratorProtocol, Sequence {
     return _base.next()
   }
 }
+
+/* FIXME: ideally for compatability we would declare
+extension Sequence {
+  @available(swift, deprecated: 5, message: "")
+  public typealias SubSequence = AnySequence<Element>
+}
+*/
