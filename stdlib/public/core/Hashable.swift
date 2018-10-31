@@ -130,8 +130,6 @@ public protocol Hashable : Equatable {
 }
 
 extension Hashable {
-  @inlinable
-  @inline(__always)
   public func _rawHashValue(seed: Int) -> Int {
     var hasher = Hasher(_seed: seed)
     hasher.combine(self)
