@@ -7,6 +7,7 @@
 Constructor AnyHashable.init(_box:) has been removed
 Constructor AnyHashable.init(_usingDefaultRepresentationOf:) has been removed
 Constructor ManagedBufferPointer.init(_:_:_:) has been removed
+Constructor Zip2Sequence.init(_sequence1:_sequence2:) has been removed
 Constructor _BridgeableMetatype.init(value:) has been removed
 Func AnyHashable._downCastConditional(into:) has been removed
 Func _CocoaDictionary.Index.copy() has been removed
