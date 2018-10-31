@@ -28,11 +28,13 @@ extension Hasher {
     fileprivate var v1: UInt64 = 0x646f72616e646f6d
     fileprivate var v2: UInt64 = 0x6c7967656e657261
     fileprivate var v3: UInt64 = 0x7465646279746573
+#if false // FIXME: Temporarily disabled
     // The fields below are reserved for future use. They aren't currently used.
     fileprivate var v4: UInt64 = 0
     fileprivate var v5: UInt64 = 0
     fileprivate var v6: UInt64 = 0
     fileprivate var v7: UInt64 = 0
+#endif
 
     @inline(__always)
     fileprivate init(rawSeed: (UInt64, UInt64)) {
