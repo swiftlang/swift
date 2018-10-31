@@ -1,7 +1,7 @@
 // RUN: %target-swiftc_driver -O %s -o /dev/null 2>&1 | %FileCheck -allow-empty -check-prefix=DEFAULT %s
 // RUN: %target-swiftc_driver -O -Rpass=sil-inliner %s -o /dev/null 2>&1 | %FileCheck -check-prefix=REMARK_PASSED %s
 // RUN: %target-swiftc_driver -O -Rpass-missed=sil-inliner %s -o /dev/null 2>&1 | %FileCheck -check-prefix=REMARK_MISSED %s
-
+// REQUIRES: rdar42247881
 // DEFAULT-NOT: remark
 
 func big() {
