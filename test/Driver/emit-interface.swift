@@ -26,14 +26,3 @@
 // CHECK-FILELIST: swift -frontend
 // CHECK-FILELIST-SAME: -supplementary-output-file-map
 // CHECK-FILELIST-NOT: emit-interface.swift{{ }}
-
-
-// Actually run this and make sure the flags show up in the interface
-
-// RUN: %swiftc_driver -target x86_64-apple-macosx10.9 %s -emit-parseable-module-interface -o %t/foo -module-name foo -force-single-frontend-invocation -driver-filelist-threshold=0 2>&1
-// RUN: %FileCheck %s < %t/foo.swiftinterface --check-prefix CHECK-FILELIST-INTERFACE
-
-// CHECK-FILELIST-INTERFACE: swift-module-flags:
-// CHECK-FILELIST-INTERFACE-SAME: -target x86_64-apple-macosx10.9
-// CHECK-FILELIST-INTERFACE-SAME: -module-name foo
-
