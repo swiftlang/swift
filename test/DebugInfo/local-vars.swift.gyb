@@ -2,7 +2,6 @@
 // test only verifies that the variables show up in the debug info at
 // all. There are other tests testing liveness and representation.
 
-// REQUIRES: rdar45708367
 // RUN: %gyb %s -o %t.swift
 // RUN: %target-swift-frontend %t.swift -g -emit-ir -o - | %FileCheck %t.swift
 // RUN: %target-swift-frontend %t.swift -g -c -o %t.o
