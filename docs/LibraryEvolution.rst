@@ -851,7 +851,7 @@ There are very few safe changes to make to protocols and their members:
 New requirements can be added to a protocol. However, restrictions around
 existential types mean that adding new associated types or non-type requirements
 involving ``Self`` can break source compatibility. For this reason, the following
-are `binary-compatible source-breaking changes`:
+are `binary-compatible source-breaking changes <binary-compatible source-breaking change>`:
 
 - A new non-type requirement may be added to a protocol, as long as it has an
   unconstrained default implementation in a protocol extension of the
