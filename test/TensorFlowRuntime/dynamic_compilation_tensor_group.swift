@@ -12,7 +12,7 @@ var TensorGroupTest = TestSuite("TensorGroup")
 /// T is address-only because it is generic.
 @inline(never)
 func tensorSliceDataset<T: TensorGroup>(_ t: T) -> VariantHandle {
-  return #tfop("TensorSliceDataset", t, Toutput_types$dtype: T._typeList,
+  return #tfop("TensorSliceDataset", t, Toutput_types$dtype: T._outputTypeList,
                output_shapes: T._unknownShapeList)
 }
 
@@ -23,9 +23,9 @@ func tensorSliceDataset<T: TensorGroup>(_ t: T) -> VariantHandle {
 func first<T: TensorGroup>(_ dataset: VariantHandle) -> T {
   let iterator: ResourceHandle = #tfop(
     "IteratorV2", shared_name: "blah", container: "earth",
-    output_types$dtype: T._typeList, output_shapes: T._unknownShapeList)
+    output_types$dtype: T._outputTypeList, output_shapes: T._unknownShapeList)
   #tfop("MakeIterator", dataset, iterator) as Void
-  return #tfop("IteratorGetNext", iterator, output_types$dtype: T._typeList,
+  return #tfop("IteratorGetNext", iterator, output_types$dtype: T._outputTypeList,
                output_shapes: T._unknownShapeList)
 }
 
@@ -46,7 +46,7 @@ func pack<T: TensorGroup, Scalar: AccelerableByTensorFlow>(
 func unpack<T: TensorGroup, Scalar: AccelerableByTensorFlow>(
     _ tensor: Tensor<Scalar>
 ) -> T {
-  return #tfop("Unpack", tensor, num: Int64(T._tensorHandleCount),
+  return #tfop("Unpack", tensor, num: Int64(T._outputTensorHandleCount),
                T$dtype: Scalar.tensorFlowDataType)
 }
 
@@ -55,8 +55,9 @@ struct Example {
 }
 
 extension Example : TensorGroup {
-  static let _typeList: [TensorDataType] =
+  static let _outputTypeList: [TensorDataType] =
       [Float.tensorFlowDataType, Float.tensorFlowDataType]
+  var _inputTensorHandleCount: Int32 { get { return Int32(Example._outputTypeList.count) } }
   func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?) {
    address!.advanced(by: 0).initialize(to: x.handle._cTensorHandle)
    address!.advanced(by: 1).initialize(to: y.handle._cTensorHandle)
@@ -70,7 +71,8 @@ extension Example : TensorGroup {
 struct EmptyExample : Equatable {}
 
 extension EmptyExample : TensorGroup {
-  static let _typeList: [TensorDataType] = []
+  static let _outputTypeList: [TensorDataType] = []
+  var _inputTensorHandleCount: Int32 { get { return Int32(EmptyExample._outputTypeList.count) } }
   func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?) {}
   init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {}
 }
@@ -116,10 +118,30 @@ TensorGroupTest.testAllBackends("input, loadable") {
 TensorGroupTest.testAllBackends("output, loadable") {
   let tensor = Tensor<Float>(shape: [2, 2], scalars: [1, 2, 3, 4])
   let example: Example = #tfop("Unpack", tensor,
-                               num: Int64(Example._tensorHandleCount),
+                               num: Int64(Example._outputTensorHandleCount),
                                T$dtype: Float.tensorFlowDataType)
   expectEqual(ShapedArray(shape: [2], scalars: [1, 2]), example.x.array)
   expectEqual(ShapedArray(shape: [2], scalars: [3, 4]), example.y.array)
+}
+
+@inline(never)
+func some_tf_op(n : Int) {
+  var arr: [Tensor<Float>] = []
+  var arr_exp: [Float] = []
+  for i in 0..<n {
+    arr.append(Tensor<Float>([Float(i), 2, 3]))
+    arr_exp.insert(contentsOf: [Float(i), 2, 3], at: arr_exp.count)
+  }
+
+  let actual: Tensor<Float> = #tfop("Pack",
+    [arr], T$dtype: Float.tensorFlowDataType, axis: 0)
+  let expected  = ShapedArray<Float>(shape: [n, 3], scalars: arr_exp)
+  expectEqual(expected, actual.array)
+}
+
+// Test packing dynamic arrays.
+TensorGroupTest.testAllBackends("input, array") {
+  some_tf_op(n: 32)
 }
 
 runAllTests()
