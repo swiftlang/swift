@@ -113,6 +113,8 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     }
 
     locator = cs.getConstraintLocator(member);
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+    locator = cs.getConstraintLocator(locator, PathEltKind::UnresolvedMember);
   } else if (isa<SubscriptExpr>(anchor)) {
     ConstraintLocatorBuilder subscript(locator);
     locator = cs.getConstraintLocator(
