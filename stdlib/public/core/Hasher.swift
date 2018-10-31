@@ -16,26 +16,6 @@
 
 import SwiftShims
 
-extension _SipHash13Core {
-  @inlinable
-  @inline(__always)
-  internal init() {
-    self.init(rawSeed: Hasher._executionSeed)
-  }
-
-  @inlinable
-  @inline(__always)
-  internal init(seed: Int) {
-    let executionSeed = Hasher._executionSeed
-    // Prevent sign-extending the supplied seed; this makes testing slightly
-    // easier.
-    let seed = UInt(bitPattern: seed)
-    self.init(rawSeed: (
-      executionSeed.0 ^ UInt64(truncatingIfNeeded: seed),
-      executionSeed.1))
-  }
-}
-
 /// The universal hash function used by `Set` and `Dictionary`.
 ///
 /// `Hasher` can be used to map an arbitrary sequence of bytes to an integer
@@ -61,9 +41,6 @@ extension _SipHash13Core {
 ///   versions of the standard library.
 @_fixed_layout
 public struct Hasher {
-  @usableFromInline
-  internal typealias _Core = _SipHash13Core
-
   internal var _tail: _TailBuffer
 
   internal var _core: _Core
