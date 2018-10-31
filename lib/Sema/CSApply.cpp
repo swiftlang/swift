@@ -5456,9 +5456,9 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
 }
 
 static void checkNonEphemeralArgumentConversion(
-    ConstraintSystem &cs, const Expr *argExpr, Type argType,
-    AnyFunctionType::Param param, AnyFunctionType *fnType,
-    const ValueDecl *callee, ConstraintLocatorBuilder argLocator) {
+    ConstraintSystem &cs, ConstraintLocatorBuilder argLocator,
+    const Expr *argExpr, Type argType, AnyFunctionType::Param param,
+    AnyFunctionType *fnType, const ValueDecl *callee) {
   assert(param.isNonEphemeral());
 
   // Look through optional evaluation expressions – these can occur when we
@@ -5489,10 +5489,12 @@ static void checkNonEphemeralArgumentConversion(
   else if (isa<StringToPointerExpr>(subExpr))
     conversion = ConversionRestrictionKind::StringToPointer;
 
-  if (conversion && !cs.isConversionNonEphemeral(*conversion, argLocator))
-    diagnoseIllegalNonEphemeralConversion(
-        cs.TC, argExpr, argType, param.getPlainType(), callee, fnType,
-        /*downgradeToWarning*/ true);
+  if (conversion && cs.isConversionNonEphemeral(*conversion, argLocator) ==
+                        ConversionEphemeralness::Ephemeral)
+    diagnoseIllegalNonEphemeralConversion(cs.getASTContext(), argExpr, argType,
+                                          param.getPlainType(), callee, fnType,
+                                          argLocator.getAnchor(),
+                                          /*downgradeToWarning*/ true);
 }
 
 Expr *ExprRewriter::coerceCallArguments(
@@ -5693,10 +5695,9 @@ Expr *ExprRewriter::coerceCallArguments(
     // conversion to a non-ephemeral parameter. Emit a warning if this is the
     // case (which will become an error in Swift versions > 5).
     if (!tc.Context.isSwiftVersionAtLeast(5) && param.isNonEphemeral())
-      checkNonEphemeralArgumentConversion(cs, convertedArg,
+      checkNonEphemeralArgumentConversion(cs, argLocator, convertedArg,
                                           argType->getRValueType(), param,
-                                          funcType, callee.getDecl(),
-                                          argLocator);
+                                          funcType, callee.getDecl());
 
     // Add the converted argument.
     fromTupleExpr[argIdx] = convertedArg;

@@ -2361,16 +2361,17 @@ Expr *constraints::simplifyLocatorToAnchor(ConstraintSystem &cs,
   return locator->getAnchor();
 }
 
-bool ConstraintSystem::isConversionNonEphemeral(
-    ConversionRestrictionKind conversion, ConstraintLocatorBuilder locator) {
+ConversionEphemeralness
+ConstraintSystem::isConversionNonEphemeral(ConversionRestrictionKind conversion,
+                                           ConstraintLocatorBuilder locator) {
   switch (conversion) {
   case ConversionRestrictionKind::ArrayToPointer:
   case ConversionRestrictionKind::StringToPointer:
     // Always ephemeral.
-    return false;
+    return ConversionEphemeralness::Ephemeral;
   case ConversionRestrictionKind::InoutToPointer: {
     // Ephemeral, except if the expression is a reference to a global or
-    // static stored variable.
+    // static stored variable, or a simple stored property on such a variable.
     SourceRange range;
     auto *argLoc = simplifyLocator(*this, getConstraintLocator(locator), range);
     auto *expr = argLoc->getAnchor()->getSemanticsProvidingExpr();
@@ -2404,38 +2405,44 @@ bool ConstraintSystem::isConversionNonEphemeral(
       if (!isDirectlyAccessedStoredVar(member))
         return false;
 
-      auto type = simplifyType(getType(baseExpr))->getAs<LValueType>();
-      if (!type)
-        return false;
+      // The member is simple if it is either static
+      if (member->isStatic())
+        return true;
 
-      return type->getObjectType()->is<StructType>();
+      // ... or it's an instance member on an lvalue struct base.
+      auto lvalueTy = simplifyType(getType(baseExpr))->getAs<LValueType>();
+      return lvalueTy && lvalueTy->getObjectType()->is<StructType>();
     };
 
     auto isValidBaseDecl = [&](ValueDecl *baseDecl) -> bool {
       if (!isDirectlyAccessedStoredVar(baseDecl))
         return false;
 
+      // The base decl must either be static or global in order for it to be
+      // non-ephemeral.
       return baseDecl->isStatic() ||
              baseDecl->getDeclContext()->isModuleScopeContext();
     };
 
+    bool isMember = false;
     while (true) {
       subExpr = subExpr->getSemanticsProvidingExpr();
 
-      // We can look through any number of force values.
       if (auto *fve = dyn_cast<ForceValueExpr>(subExpr)) {
         subExpr = fve->getSubExpr();
         continue;
       }
 
       if (auto *tee = dyn_cast<TupleElementExpr>(subExpr)) {
+        isMember = true;
         subExpr = tee->getBase();
         continue;
       }
 
       if (auto *mre = dyn_cast<MemberRefExpr>(subExpr)) {
         if (!isSimpleMember(mre->getBase(), mre->getMember().getDecl()))
-          return false;
+          return ConversionEphemeralness::Ephemeral;
+        isMember = true;
         subExpr = mre->getBase();
         continue;
       }
@@ -2444,13 +2451,14 @@ bool ConstraintSystem::isConversionNonEphemeral(
         auto choice = findOverloadChoice(
             getConstraintLocator(subExpr, ConstraintLocator::Member));
         if (!choice)
-          return false;
+          return ConversionEphemeralness::Unresolved;
 
         if (choice->getKind() != OverloadChoiceKind::TupleIndex)
           if (!choice->isDecl() ||
               !isSimpleMember(ude->getBase(), choice->getDecl()))
-            return false;
+            return ConversionEphemeralness::Ephemeral;
 
+        isMember = true;
         subExpr = ude->getBase();
         continue;
       }
@@ -2458,14 +2466,23 @@ bool ConstraintSystem::isConversionNonEphemeral(
       break;
     }
 
-    if (auto *dre = dyn_cast<DeclRefExpr>(subExpr))
-      return isValidBaseDecl(dre->getDecl());
+    // First check if the base expr is a metatype – if so, we're dealing with
+    // a static member, which is non-ephemeral.
+    if (isMember && simplifyType(getType(subExpr))->is<AnyMetatypeType>())
+      return ConversionEphemeralness::NonEphemeral;
+
+    // Otherwise, check to see if we have a base decl.
+    if (auto *dre = dyn_cast<DeclRefExpr>(subExpr)) {
+      if (!isValidBaseDecl(dre->getDecl()))
+        return ConversionEphemeralness::Ephemeral;
+      return ConversionEphemeralness::NonEphemeral;
+    }
 
     auto choice = findOverloadChoice(getConstraintLocator(subExpr));
-    if (!choice || !choice->isDecl())
-      return false;
+    if (!choice || !choice->isDecl() || !isValidBaseDecl(choice->getDecl()))
+      return ConversionEphemeralness::Ephemeral;
 
-    return isValidBaseDecl(choice->getDecl());
+    return ConversionEphemeralness::NonEphemeral;
   }
   case ConversionRestrictionKind::TupleToTuple:
   case ConversionRestrictionKind::DeepEquality:
@@ -2486,6 +2503,6 @@ bool ConstraintSystem::isConversionNonEphemeral(
   case ConversionRestrictionKind::HashableToAnyHashable:
   case ConversionRestrictionKind::CFTollFreeBridgeToObjC:
   case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
-    return true;
+    return ConversionEphemeralness::NonEphemeral;
   }
 }

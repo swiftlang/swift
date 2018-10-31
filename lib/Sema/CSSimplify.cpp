@@ -2200,9 +2200,21 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         bool allowEphemeral = (!isConstraintNonEphemeral ||
                                !getASTContext().isSwiftVersionAtLeast(5));
 
-        auto tryPointerConversion = [&](ConversionRestrictionKind conversion) {
-          if (allowEphemeral || isConversionNonEphemeral(conversion, locator))
+        auto tryPointerConversion =
+            [&](ConversionRestrictionKind conversion) -> bool {
+          if (allowEphemeral) {
             conversionsOrFixes.push_back(conversion);
+            return true;
+          }
+          switch (isConversionNonEphemeral(conversion, locator)) {
+          case ConversionEphemeralness::Unresolved:
+            return false;
+          case ConversionEphemeralness::NonEphemeral:
+            conversionsOrFixes.push_back(conversion);
+            return true;
+          case ConversionEphemeralness::Ephemeral:
+            return true;
+          }
         };
 
         switch (pointerKind) {
@@ -2224,14 +2236,19 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               // FIXME: If the base is still a type variable, we can't tell
               // what to do here. Might have to try \c ArrayToPointer and make
               // it more robust.
-              if (baseIsArray)
-                tryPointerConversion(ConversionRestrictionKind::ArrayToPointer);
+              if (baseIsArray) {
+                if (!tryPointerConversion(
+                        ConversionRestrictionKind::ArrayToPointer))
+                  return formUnsolvedResult();
+              }
 
               // Only try an inout-to-pointer conversion if we know it's not
               // an array being converted to a raw pointer type. Such
               // conversions can only use array-to-pointer.
               if (!baseIsArray || !isRawPointerKind(pointerKind))
-                tryPointerConversion(ConversionRestrictionKind::InoutToPointer);
+                if (!tryPointerConversion(
+                        ConversionRestrictionKind::InoutToPointer))
+                  return formUnsolvedResult();
             }
           }
 
@@ -2261,16 +2278,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                 // conversion.
                 if (type1PointerKind != pointerKind)
                   increaseScore(ScoreKind::SK_ValueToPointerConversion);
-                tryPointerConversion(
-                    ConversionRestrictionKind::PointerToPointer);
+                if (!tryPointerConversion(
+                        ConversionRestrictionKind::PointerToPointer))
+                  return formUnsolvedResult();
               }
               // UnsafeMutableRawPointer -> UnsafeRawPointer
               else if (type1PointerKind == PTK_UnsafeMutableRawPointer &&
                        pointerKind == PTK_UnsafeRawPointer) {
                 if (type1PointerKind != pointerKind)
                   increaseScore(ScoreKind::SK_ValueToPointerConversion);
-                tryPointerConversion(
-                    ConversionRestrictionKind::PointerToPointer);
+                if (!tryPointerConversion(
+                        ConversionRestrictionKind::PointerToPointer))
+                  return formUnsolvedResult();
               }
             }
             // UnsafePointer and UnsafeRawPointer can also be converted from an
@@ -2281,8 +2300,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                 || pointerKind == PTK_UnsafeRawPointer) {
               if (!isAutoClosureArgument) {
                 if (isArrayType(type1))
-                  tryPointerConversion(
-                      ConversionRestrictionKind::ArrayToPointer);
+                  if (!tryPointerConversion(
+                          ConversionRestrictionKind::ArrayToPointer))
+                    return formUnsolvedResult();
 
                 // The pointer can be converted from a string, if the element
                 // type is compatible.
@@ -2291,16 +2311,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
                   if (baseTy->isTypeVariableOrMember() ||
                       isStringCompatiblePointerBaseType(TC, DC, baseTy))
-                    tryPointerConversion(
-                        ConversionRestrictionKind::StringToPointer);
+                    if (!tryPointerConversion(
+                            ConversionRestrictionKind::StringToPointer))
+                      return formUnsolvedResult();
                 }
               }
 
               if (type1IsPointer && optionalityMatches &&
                   (type1PointerKind == PTK_UnsafePointer ||
                    type1PointerKind == PTK_AutoreleasingUnsafeMutablePointer)) {
-                tryPointerConversion(
-                    ConversionRestrictionKind::PointerToPointer);
+                if (!tryPointerConversion(
+                        ConversionRestrictionKind::PointerToPointer))
+                  return formUnsolvedResult();
               }
             }
           }
@@ -2311,7 +2333,9 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           // inout reference to a scalar if the parameter accepts ephemeral
           // arguments.
           if (!isAutoClosureArgument && type1->is<InOutType>())
-            tryPointerConversion(ConversionRestrictionKind::InoutToPointer);
+            if (!tryPointerConversion(
+                    ConversionRestrictionKind::InoutToPointer))
+              return formUnsolvedResult();
           break;
         }
       }

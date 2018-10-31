@@ -81,6 +81,7 @@ ConstraintLocator *FailureDiagnostic::getCalleeLocator(Expr *expr) const {
       return cs.getConstraintLocator(fnLocator,
                                      ConstraintLocator::ConstructorMember);
     }
+    // Otherwise fall through and look for locators anchored on the fn expr.
     expr = fnExpr;
   }
 
@@ -93,6 +94,10 @@ ConstraintLocator *FailureDiagnostic::getCalleeLocator(Expr *expr) const {
       return cs.getConstraintLocator(locator, ConstraintLocator::Member);
     }
   }
+
+  if (isa<UnresolvedMemberExpr>(expr))
+    return cs.getConstraintLocator(locator,
+                                   ConstraintLocator::UnresolvedMember);
 
   if (isa<SubscriptExpr>(expr))
     return cs.getConstraintLocator(locator, ConstraintLocator::SubscriptMember);
@@ -1119,8 +1124,8 @@ Diag<StringRef> AssignmentFailure::findDeclDiagonstic(ASTContext &ctx,
 
 bool NonEphemeralConversionFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
-  auto *locator = getLocator();
-  auto path = locator->getPath();
+  auto *argLocator = getLocator();
+  auto path = argLocator->getPath();
 
   // Look through generic argument path components – these can occur if for
   // example we have an ephemeral conversion within an optional-to-optional
@@ -1138,12 +1143,20 @@ bool NonEphemeralConversionFailure::diagnoseAsError() {
     return false;
 
   SourceRange range;
-  auto *argExpr = getAnchor();
-  auto *applyExpr = dyn_cast<ApplyExpr>(locator->getAnchor());
-  if (!applyExpr)
+  auto *simplifiedArgLocator = simplifyLocator(cs, argLocator, range);
+  long simplifiedPathCount = simplifiedArgLocator->getPath().size();
+
+  // If we were unable to simplify the argument locator down to at least the
+  // apply-arg-to-param path element, then we don't know how to diagnose this.
+  if (simplifiedPathCount > lastEltIter - path.rbegin())
     return false;
 
-  auto overload = getOverloadChoiceIfAvailable(getCalleeLocator(applyExpr));
+  auto *argExpr = simplifiedArgLocator->getAnchor();
+  auto *anchor = argLocator->getAnchor();
+  if (!argExpr || !anchor)
+    return false;
+
+  auto overload = getOverloadChoiceIfAvailable(getCalleeLocator(anchor));
   if (!overload)
     return false;
 
@@ -1157,8 +1170,9 @@ bool NonEphemeralConversionFailure::diagnoseAsError() {
   ValueDecl *callee =
       overload->choice.isDecl() ? overload->choice.getDecl() : nullptr;
 
-  diagnoseIllegalNonEphemeralConversion(cs.TC, argExpr, getType(argExpr),
-                                        param.getPlainType(), callee, fnType,
+  diagnoseIllegalNonEphemeralConversion(getASTContext(), argExpr,
+                                        getType(argExpr), param.getPlainType(),
+                                        callee, fnType, anchor,
                                         /*downgradeToWarning*/ false);
   return true;
 }

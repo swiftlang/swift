@@ -2563,8 +2563,9 @@ public:
                                          ConstraintLocator *memberLocator,
                                          bool includeInaccessibleMembers);
 
-  bool isConversionNonEphemeral(ConversionRestrictionKind conversion,
-                                ConstraintLocatorBuilder locator);
+  ConversionEphemeralness
+  isConversionNonEphemeral(ConversionRestrictionKind conversion,
+                           ConstraintLocatorBuilder locator);
 
 private:  
   /// \brief Attempt to simplify the given construction constraint.
@@ -3760,10 +3761,11 @@ bool diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
                                        DeclName memberName, bool resultOptional,
                                        SourceRange memberRange);
 
-void diagnoseIllegalNonEphemeralConversion(TypeChecker &TC, const Expr *argExpr,
+void diagnoseIllegalNonEphemeralConversion(ASTContext &ctx, const Expr *argExpr,
                                            Type argType, Type paramType,
                                            const ValueDecl *callee,
                                            AnyFunctionType *fnType,
+                                           const Expr *anchor,
                                            bool downgradeToWarning);
 
 // Return true if, when replacing "<expr>" with "<expr> ?? T", parentheses need

@@ -483,6 +483,11 @@ mapParsedParameters(Parser &parser,
                                                              parsingEnumElt);
       }
       param->getTypeLoc() = TypeLoc(type);
+
+      if (auto *ATR = dyn_cast<AttributedTypeRepr>(type)) {
+        auto &attrs = ATR->getAttrs();
+        param->setNonEphemeral(attrs.has(TypeAttrKind::TAK_nonEphemeral));
+      }
     } else if (paramContext != Parser::ParameterContextKind::Closure) {
       // Non-closure parameters require a type.
       if (!param->isInvalid())

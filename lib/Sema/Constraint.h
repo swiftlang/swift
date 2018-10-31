@@ -227,6 +227,24 @@ enum class ConversionRestrictionKind {
   ObjCTollFreeBridgeToCF
 };
 
+/// Specifies whether a given conversion requires the creation of a temporary
+/// value which is only valid for a limited scope. For example, the
+/// array-to-pointer conversion produces a pointer that is only valid for the
+/// duration of the call that it's passed to. Such ephemeral conversions cannot
+/// be passed to non-ephemeral parameters.
+enum class ConversionEphemeralness {
+  /// The conversion requires the creation of a temporary value.
+  Ephemeral,
+
+  /// The conversion does not require the creation of a temporary value.
+  NonEphemeral,
+
+  /// It is not currently known whether the conversion will produce a temporary
+  /// value or not. This can occur for example with an inout-to-pointer
+  /// conversion of a member whose base type is an unresolved type variable.
+  Unresolved,
+};
+
 /// Return a string representation of a conversion restriction.
 llvm::StringRef getName(ConversionRestrictionKind kind);
 

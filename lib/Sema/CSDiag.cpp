@@ -161,6 +161,15 @@ void constraints::simplifyLocator(Expr *&anchor,
         continue;
       }
 
+      if (auto *subscriptExpr = dyn_cast<SubscriptExpr>(anchor)) {
+        targetAnchor = subscriptExpr->getBase();
+        targetPath.push_back(path[0]);
+
+        anchor = subscriptExpr->getIndex();
+        path = path.slice(1);
+        continue;
+      }
+
       if (auto objectLiteralExpr = dyn_cast<ObjectLiteralExpr>(anchor)) {
         targetAnchor = nullptr;
         targetPath.clear();
@@ -8417,13 +8426,15 @@ bool swift::diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
 }
 
 void swift::diagnoseIllegalNonEphemeralConversion(
-    TypeChecker &TC, const Expr *argExpr, Type argType, Type paramType,
-    const ValueDecl *callee, AnyFunctionType *fnType, bool downgradeToWarning) {
+    ASTContext &ctx, const Expr *argExpr, Type argType, Type paramType,
+    const ValueDecl *callee, AnyFunctionType *fnType, const Expr *anchor,
+    bool downgradeToWarning) {
+  auto &diags = ctx.Diags;
 
   auto emitArgumentConversionNote = [&]() {
-    TC.diagnose(argExpr->getLoc(),
-                diag::ephemeral_pointer_argument_conversion_note,
-                argType->getWithoutSpecifierType(), paramType)
+    diags.diagnose(argExpr->getLoc(),
+                   diag::ephemeral_pointer_argument_conversion_note,
+                   argType->getWithoutSpecifierType(), paramType)
         .highlight(argExpr->getSourceRange());
   };
 
@@ -8438,8 +8449,14 @@ void swift::diagnoseIllegalNonEphemeralConversion(
     auto instanceTy = fnType->getResult();
 
     // Strip off a level of optionality if we have a failable initializer.
-    if (constructor->getFailability() != OptionalTypeKind::OTK_None)
+    switch (constructor->getFailability()) {
+    case OTK_Optional:
+    case OTK_ImplicitlyUnwrappedOptional:
       instanceTy = instanceTy->getOptionalObjectType();
+      break;
+    case OTK_None:
+      break;
+    }
 
     auto isPointerType = [](Type ty, const ASTContext &ctx) -> bool {
       if (auto nominalTy = ty->getAs<NominalType>())
@@ -8456,7 +8473,7 @@ void swift::diagnoseIllegalNonEphemeralConversion(
 
     ConstructorKind constructorKind;
     auto parameterCount = constructor->getParameters()->size();
-    if (isPointerType(instanceTy, TC.Context) && parameterCount == 1) {
+    if (isPointerType(instanceTy, ctx) && parameterCount == 1) {
       constructorKind = CK_Pointer;
     } else if (instanceTy->getAnyBufferPointerElementType() &&
                parameterCount == 2) {
@@ -8469,8 +8486,8 @@ void swift::diagnoseIllegalNonEphemeralConversion(
                       ? diag::cannot_construct_dangling_pointer_warning
                       : diag::cannot_construct_dangling_pointer;
 
-    TC.diagnose(argExpr->getLoc(), diagID, instanceTy, constructorKind)
-        .highlight(argExpr->getSourceRange());
+    diags.diagnose(anchor->getLoc(), diagID, instanceTy, constructorKind)
+        .highlight(anchor->getSourceRange());
 
     emitArgumentConversionNote();
     return true;
@@ -8482,7 +8499,7 @@ void swift::diagnoseIllegalNonEphemeralConversion(
   auto diagID = downgradeToWarning ? diag::cannot_convert_non_ephemeral_warning
                                    : diag::cannot_convert_non_ephemeral;
 
-  TC.diagnose(argExpr->getLoc(), diagID, paramType)
+  diags.diagnose(argExpr->getLoc(), diagID, paramType)
       .highlight(argExpr->getSourceRange());
 
   emitArgumentConversionNote();
