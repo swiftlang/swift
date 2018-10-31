@@ -1445,7 +1445,7 @@ ImportedType ClangImporter::Implementation::importType(
   // This bans some trickery that the redefinition types enable, but is a more
   // sane model overall.
   auto &clangContext = getClangASTContext();
-  if (clangContext.getLangOpts().ObjC1) {
+  if (clangContext.getLangOpts().ObjC) {
     if (clangContext.hasSameUnqualifiedType(
           type, clangContext.getObjCIdRedefinitionType()) &&
         !clangContext.hasSameUnqualifiedType(

@@ -1042,7 +1042,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                    clang::VK_RValue,
                                                    clang::OK_BitField);
     
-    auto cGetterBody = new (Ctx) clang::ReturnStmt(clang::SourceLocation(),
+    auto cGetterBody = clang::ReturnStmt::Create(Ctx, clang::SourceLocation(),
                                                    cGetterExpr,
                                                    nullptr);
     cGetterDecl->setBody(cGetterBody);
