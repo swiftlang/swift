@@ -41,6 +41,7 @@
 #include "llvm/Bitcode/RecordLayout.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/Chrono.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
@@ -1040,10 +1041,10 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
       SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false, path);
   }
 
-  if (options.SerializeFileDependencies) {
-    for (auto const &dep : options.Dependencies) {
-      FileDependency.emit(ScratchRecord, dep);
-    }
+  for (auto const &dep : options.Dependencies) {
+    FileDependency.emit(ScratchRecord, dep.Size,
+                        llvm::sys::toTimeT(dep.LastModTime),
+                        dep.Path);
   }
 
   SmallVector<ModuleDecl::ImportedModule, 8> allImports;

@@ -155,7 +155,7 @@ swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
   if (!OutBuf)
     return false;
 
-  SmallVector<StringRef, 16> AllDeps;
+  SmallVector<SerializationOptions::FileDependency, 16> AllDeps;
   auto VI = serialization::validateSerializedAST(
       OutBuf.get()->getBuffer(),
       /*ExtendedValidationInfo=*/nullptr, &AllDeps);
@@ -163,15 +163,11 @@ swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
   if (VI.status != serialization::Status::Valid)
     return false;
 
-  // Append the .swiftinterface input file we're reading, then stat() every entry in the vector and
-  // check none are newer than the .swiftmodule (OutStatus).
-  AllDeps.push_back(InPath);
-
   for (auto In : AllDeps) {
-    auto InStatus = FS.status(In);
+    auto InStatus = FS.status(In.Path);
     if (!InStatus ||
-        (InStatus.get().getLastModificationTime() >
-         OutStatus.get().getLastModificationTime())) {
+        (InStatus.get().getSize() != In.Size) ||
+        (InStatus.get().getLastModificationTime() != In.LastModTime)) {
       return false;
     }
   }
@@ -234,9 +230,21 @@ static bool buildSwiftModuleFromSwiftInterface(
     std::string OutPathStr = OutPath;
     serializationOpts.OutputPath = OutPathStr.c_str();
     serializationOpts.SerializeAllSIL = true;
-    serializationOpts.SerializeFileDependencies = true;
-    serializationOpts.Dependencies =
-      SubInstance.getDependencyTracker()->getDependencies();
+    auto DTDeps = SubInstance.getDependencyTracker()->getDependencies();
+    SmallVector<std::string, 16> DepNames(DTDeps.begin(), DTDeps.end());
+    DepNames.push_back(InPath);
+    SmallVector<SerializationOptions::FileDependency, 16> Deps;
+    for (auto const &Dep : DepNames) {
+      auto DepStatus = FS.status(Dep);
+      if (!DepStatus) {
+        SubError = true;
+        return;
+      }
+      Deps.push_back(SerializationOptions::FileDependency{
+          DepStatus.get().getSize(), DepStatus.get().getLastModificationTime(),
+          Dep});
+    }
+    serializationOpts.Dependencies = Deps;
     SILMod->setSerializeSILAction([&]() {
         serialize(Mod, serializationOpts, SILMod.get());
       });

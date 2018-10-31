@@ -14,6 +14,7 @@
 #include "DeserializationErrors.h"
 #include "DocFormat.h"
 #include "swift/Serialization/ModuleFormat.h"
+#include "swift/Serialization/SerializationOptions.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -28,6 +29,7 @@
 #include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/Chrono.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
@@ -232,10 +234,9 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
   return result;
 }
 
-static bool
-validateInputBlock(llvm::BitstreamCursor &cursor,
-                   SmallVectorImpl<uint64_t> &scratch,
-                   SmallVectorImpl<StringRef> &dependencies) {
+static bool validateInputBlock(
+    llvm::BitstreamCursor &cursor, SmallVectorImpl<uint64_t> &scratch,
+    SmallVectorImpl<SerializationOptions::FileDependency> &dependencies) {
   while (!cursor.AtEndOfStream()) {
     auto entry = cursor.advance();
     if (entry.Kind == llvm::BitstreamEntry::EndBlock)
@@ -249,7 +250,8 @@ validateInputBlock(llvm::BitstreamCursor &cursor,
     unsigned kind = cursor.readRecord(entry.ID, scratch, &blobData);
     switch (kind) {
     case input_block::FILE_DEPENDENCY:
-      dependencies.push_back(blobData);
+      dependencies.push_back(SerializationOptions::FileDependency{
+          scratch[0], llvm::sys::toTimePoint(scratch[1]), blobData});
       break;
     default:
       // Unknown metadata record, possibly for use by a future version of the
@@ -270,7 +272,7 @@ bool serialization::isSerializedAST(StringRef data) {
 ValidationInfo serialization::validateSerializedAST(
     StringRef data,
     ExtendedValidationInfo *extendedInfo,
-    SmallVectorImpl<StringRef> *dependencies) {
+    SmallVectorImpl<SerializationOptions::FileDependency> *dependencies) {
   ValidationInfo result;
 
   // Check 32-bit alignment.
@@ -301,6 +303,7 @@ ValidationInfo serialization::validateSerializedAST(
       if (result.status == Status::Malformed)
         return result;
     } else if (dependencies &&
+               result.status == Status::Valid &&
                topLevelEntry.ID == INPUT_BLOCK_ID) {
       cursor.EnterSubBlock(INPUT_BLOCK_ID);
       if (validateInputBlock(cursor, scratch, *dependencies)) {
