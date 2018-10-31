@@ -52,6 +52,10 @@ Var _CocoaDictionary.Index._offset is added to a non-resilient type
 Var _CocoaDictionary.Index._storage in a non-resilient type changes position from 1 to 0
 Var _CocoaSet.Index._offset is added to a non-resilient type
 Var _CocoaSet.Index._storage in a non-resilient type changes position from 1 to 0
+Var _SipHashState.v4 is added to a non-resilient type
+Var _SipHashState.v5 is added to a non-resilient type
+Var _SipHashState.v6 is added to a non-resilient type
+Var _SipHashState.v7 is added to a non-resilient type
 
 /* Decl Attribute changes */
 
