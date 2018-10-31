@@ -52,6 +52,9 @@ CURSOR_REFACTORING(TrailingClosure, "Convert To Trailing Closure", trailingclosu
 
 CURSOR_REFACTORING(MemberwiseInitLocalRefactoring, "Generate Memberwise Initializer", memberwise.init.local.refactoring)
 
+CURSOR_REFACTORING(CustomizeEquatableConformance, "Customize Equatable Conformance",
+    customize.equatable.conformance)
+
 RANGE_REFACTORING(ExtractExpr, "Extract Expression", extract.expr)
 
 RANGE_REFACTORING(ExtractFunction, "Extract Method", extract.function)
