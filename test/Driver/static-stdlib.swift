@@ -1,5 +1,5 @@
 // Statically link a "hello world" program
-// XFAIL: linux
+// XFAIL: linux, win32
 // REQUIRES: static_stdlib
 // REQUIRES: executable_test
 

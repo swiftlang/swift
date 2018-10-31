@@ -64,13 +64,13 @@
 // REQUIRES: CODEGENERATOR=X86
 
 
-// CHECK: bin/swift
-// CHECK: Driver/driver-compile.swift
+// CHECK: bin{{/|\\\\}}swift
+// CHECK: Driver{{/|\\\\}}driver-compile.swift
 // CHECK: -o
 
-// COMPLEX: bin/swift
+// COMPLEX: bin{{/|\\\\}}swift
 // COMPLEX: -c
-// COMPLEX: Driver/driver-compile.swift
+// COMPLEX: Driver{{/|\\\\}}driver-compile.swift
 // COMPLEX-DAG: -sdk {{.*}}/Inputs/clang-importer-sdk
 // COMPLEX-DAG: -foo -bar
 // COMPLEX-DAG: -Xllvm -baz
@@ -78,59 +78,59 @@
 // COMPLEX-DAG: -F /path/to/frameworks -Fsystem /path/to/systemframeworks -F /path/to/more/frameworks
 // COMPLEX-DAG: -I /path/to/headers -I path/to/more/headers
 // COMPLEX-DAG: -module-cache-path /tmp/modules
-// COMPLEX-DAG: -emit-reference-dependencies-path {{(.*/)?driver-compile[^ /]+}}.swiftdeps
+// COMPLEX-DAG: -emit-reference-dependencies-path {{(.*(/|\\))?driver-compile[^ /]+}}.swiftdeps
 // COMPLEX: -o {{.+}}.o
 
 
-// AST-STDOUT: bin/swift
+// AST-STDOUT: bin{{/|\\\\}}swift
 // AST-STDOUT: -dump-ast
 // AST-STDOUT: -o -
 
-// AST-O: bin/swift
+// AST-O: bin{{/|\\\\}}swift
 // AST-O: -dump-ast
 // AST-O: -o output.ast
 
-// SILGEN: bin/swift
+// SILGEN: bin{{/|\\\\}}swift
 // SILGEN: -emit-silgen
 // SILGEN: -o -
 
-// SIL: bin/swift
+// SIL: bin{{/|\\\\}}swift
 // SIL: -emit-sil{{ }}
 // SIL: -o -
 
-// IR: bin/swift
+// IR: bin{{/|\\\\}}swift
 // IR: -emit-ir
 // IR: -o -
 
-// BC: bin/swift
+// BC: bin{{/|\\\\}}swift
 // BC: -emit-bc
 // BC: -o {{[^-]}}
 
-// ASM: bin/swift
+// ASM: bin{{/|\\\\}}swift
 // ASM: -S{{ }}
 // ASM: -o -
 
-// OBJ: bin/swift
+// OBJ: bin{{/|\\\\}}swift
 // OBJ: -c{{ }}
 // OBJ: -o {{[^-]}}
 
-// DUPLICATE-NAME: error: filename "driver-compile.swift" used twice: '{{.*}}test/Driver/driver-compile.swift' and '{{.*}}driver-compile.swift'
+// DUPLICATE-NAME: error: filename "driver-compile.swift" used twice: '{{.*}}test{{[/\\]}}Driver{{[/\\]}}driver-compile.swift' and '{{.*}}driver-compile.swift'
 // DUPLICATE-NAME: note: filenames are used to distinguish private declarations with the same name
 
-// FILELIST: bin/swift
+// FILELIST: bin{{/|\\\\}}swift
 // FILELIST: -filelist [[SOURCES:(["][^"]+sources[^"]+["]|[^ ]+sources[^ ]+)]]
 // FILELIST: -primary-filelist  {{(["][^"]+primaryInputs[^"]+["]|[^ ]+primaryInputs[^ ]+)}}
 // FILELIST: -supplementary-output-file-map {{(["][^"]+supplementaryOutputs[^"]+["]|[^ ]+supplementaryOutputs[^ ]+)}}
 // FILELIST: -output-filelist {{[^-]}}
-// FILELIST-NEXT: bin/swift
+// FILELIST-NEXT: bin{{/|\\\\}}swift
 // FILELIST: -filelist [[SOURCES]]
 // FILELIST: -primary-filelist  {{(["][^"]+primaryInputs[^"]+["]|[^ ]+primaryInputs[^ ]+)}}
 // FILELIST: -supplementary-output-file-map {{(["][^"]+supplementaryOutputs[^"]+["]|[^ ]+supplementaryOutputs[^ ]+)}}
 // FILELIST: -output-filelist {{[^-]}}
 
-// UPDATE-CODE: DISTINCTIVE-PATH/usr/bin/swift
+// UPDATE-CODE: DISTINCTIVE-PATH{{/|\\\\}}usr{{/|\\\\}}bin{{/|\\\\}}swift
 // UPDATE-CODE: -frontend -c
 // UPDATE-CODE: -emit-remap-file-path {{.+}}.remap
 
-// NO-REFERENCE-DEPENDENCIES: bin/swift
+// NO-REFERENCE-DEPENDENCIES: bin{{/|\\\\}}swift
 // NO-REFERENCE-DEPENDENCIES-NOT: -emit-reference-dependencies

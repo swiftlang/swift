@@ -29,7 +29,7 @@
 // Clean up the test executable because hard links are expensive.
 // RUN: rm -f %t/bin/swiftc
 
-// CHECK: bin/ld{{"? }}
+// CHECK: {{(bin/)?}}ld{{"? }}
 // CHECK-NO-RUNTIME-NOT: libclang_rt
 // CHECK-MACOS-SAME: {{[^ ]+/lib/clang/darwin/libclang_rt.osx.a}}
 // CHECK-IOS-SAME: {{[^ ]+/lib/clang/darwin/libclang_rt.ios.a}}

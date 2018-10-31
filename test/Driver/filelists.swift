@@ -1,3 +1,4 @@
+// UNSUPPORTED: win32
 // RUN: %empty-directory(%t)
 // RUN: touch %t/a.swift %t/b.swift %t/c.swift
 

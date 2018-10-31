@@ -7,17 +7,17 @@
 
 // CLANGSUB: swift
 // CLANGSUB-SAME: -o [[OBJECTFILE:.*]]
-// CLANGSUB: swift-autolink-extract [[OBJECTFILE]]
-// CLANGSUB-SAME: -o [[AUTOLINKFILE:.*]]
-// CLANGSUB: {{[^ ]+}}/Inputs/fake-toolchain/clang++
+// CLANGSUB: swift-autolink-extract{{(\.exe)?"?}} [[OBJECTFILE]]
+// CLANGSUB-SAME: -o {{"?}}[[AUTOLINKFILE:.*]]
+// CLANGSUB: {{[^ ]+(\\\\|/)}}Inputs{{/|\\\\}}fake-toolchain{{/|\\\\}}clang++
 // CLANGSUB-DAG: [[OBJECTFILE]]
 // CLANGSUB-DAG: @[[AUTOLINKFILE]]
 // CLANGSUB: -o tools_directory
 
 // BINUTILS: swift
 // BINUTILS-SAME: -o [[OBJECTFILE:.*]]
-// BINUTILS: swift-autolink-extract [[OBJECTFILE]]
-// BINUTILS-SAME: -o [[AUTOLINKFILE:.*]]
+// BINUTILS: swift-autolink-extract{{(\.exe)?"?}} [[OBJECTFILE]]
+// BINUTILS-SAME: -o {{"?}}[[AUTOLINKFILE:.*]]
 // BINUTILS: clang++
 // BINUTILS-DAG: [[OBJECTFILE]]
 // BINUTILS-DAG: @[[AUTOLINKFILE]]
@@ -32,5 +32,5 @@
 
 // LDSUB: swift
 // LDSUB-SAME: -o [[OBJECTFILE:.*]]
-// LDSUB: {{[^ ]+}}/Inputs/fake-toolchain/ld [[OBJECTFILE]]
+// LDSUB: {{[^ ]+(\\\\|/)}}Inputs{{/|\\\\}}fake-toolchain{{(\\\\|/)ld"?}} [[OBJECTFILE]]
 // LDSUB: -o tools_directory

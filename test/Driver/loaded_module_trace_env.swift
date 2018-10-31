@@ -6,7 +6,7 @@
 // CHECK: "name":"loaded_module_trace_env"
 // CHECK: "arch":"{{[^"]*}}"
 // CHECK: "swiftmodules":[
-// CHECK: "{{[^"]*}}/Swift.swiftmodule"
-// CHECK: "{{[^"]*}}/SwiftOnoneSupport.swiftmodule"
+// CHECK: "{{[^"]*(/|\\\\)}}Swift.swiftmodule"
+// CHECK: "{{[^"]*(/|\\\\)}}SwiftOnoneSupport.swiftmodule"
 // CHECK: ]
 // CHECK: }

@@ -9,9 +9,9 @@
 // CHECK: "name":"loaded_module_trace"
 // CHECK: "arch":"{{[^"]*}}"
 // CHECK: "swiftmodules":[
-// CHECK: "{{[^"]*}}/Module2.swiftmodule"
-// CHECK: "{{[^"]*}}/Swift.swiftmodule"
-// CHECK: "{{[^"]*}}/SwiftOnoneSupport.swiftmodule"
+// CHECK: "{{[^"]*(/|\\\\)}}Module2.swiftmodule"
+// CHECK: "{{[^"]*(/|\\\\)}}Swift.swiftmodule"
+// CHECK: "{{[^"]*(/|\\\\)}}SwiftOnoneSupport.swiftmodule"
 // CHECK: ]
 // CHECK: }
 
