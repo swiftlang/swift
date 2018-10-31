@@ -49,11 +49,6 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
     return _ArrayBuffer<U>(storage: _storage)
   }
 
-  /// The spare bits that are set when a native array needs deferred
-  /// element type checking.
-  @inlinable
-  internal var deferredTypeCheckMask: Int { return 1 }
-  
   /// Returns an `_ArrayBuffer<U>` containing the same elements,
   /// deferring checking each element's `U`-ness until it is accessed.
   ///
@@ -71,8 +66,7 @@ internal struct _ArrayBuffer<Element> : _ArrayBufferProtocol {
     // _sanityCheck(U.self is Element.Type)
 
     return _ArrayBuffer<U>(
-      storage: _ArrayBridgeStorage(
-        native: _native._storage, bits: deferredTypeCheckMask))
+      storage: _ArrayBridgeStorage(native: _native._storage, isFlagged: true))
   }
 
   @inlinable
@@ -109,7 +103,7 @@ extension _ArrayBuffer {
   @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {
     if !_isClassOrObjCExistential(Element.self) {
-      return _storage.isUniquelyReferenced_native_noSpareBits()
+      return _storage.isUniquelyReferencedUnflaggedNative()
     }
 
     // This is a performance optimization. This code used to be:
@@ -532,7 +526,7 @@ extension _ArrayBuffer {
     if !_isClassOrObjCExistential(Element.self) {
       return true
     } else {
-      return _storage.isNativeWithClearedSpareBits(deferredTypeCheckMask)
+      return _storage.isUnflaggedNative
     }
   }
 
@@ -543,7 +537,7 @@ extension _ArrayBuffer {
   internal var _native: NativeBuffer {
     return NativeBuffer(
       _isClassOrObjCExistential(Element.self)
-      ? _storage.nativeInstance : _storage.nativeInstance_noSpareBits)
+      ? _storage.nativeInstance : _storage.unflaggedNativeInstance)
   }
 
   /// Fast access to the native representation.
@@ -551,7 +545,7 @@ extension _ArrayBuffer {
   /// - Precondition: `_isNativeTypeChecked`.
   @inlinable
   internal var _nativeTypeChecked: NativeBuffer {
-    return NativeBuffer(_storage.nativeInstance_noSpareBits)
+    return NativeBuffer(_storage.unflaggedNativeInstance)
   }
 
   @inlinable
