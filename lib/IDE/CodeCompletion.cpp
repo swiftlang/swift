@@ -2172,7 +2172,7 @@ public:
 
       Builder.addCallParameter(param->getArgumentName(), type,
                                param->isVariadic(), /*Outermost*/ true,
-                               param->isInOut(), isIUO);
+                               param->isInOut(), isIUO, param->isAutoClosure());
     }
   }
 
@@ -2270,12 +2270,12 @@ public:
         auto isIUO =
             PD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
         Builder.addCallParameter(argName, bodyName, ParamType,
-                                 Param.isVariadic(), /*TopLevel*/true,
-                                 Param.isInOut(), isIUO);
-      } else {
-        Builder.addCallParameter(Param.getLabel(), ParamType,
                                  Param.isVariadic(), /*TopLevel*/ true,
-                                 Param.isInOut(), /*isIUO*/ false);
+                                 Param.isInOut(), isIUO, Param.isAutoClosure());
+      } else {
+        Builder.addCallParameter(
+            Param.getLabel(), ParamType, Param.isVariadic(), /*TopLevel*/ true,
+            Param.isInOut(), /*isIUO*/ false, Param.isAutoClosure());
       }
       modifiedBuilder = true;
       NeedComma = true;
@@ -2490,7 +2490,7 @@ public:
         Builder.addCallParameter(Ctx.Id_self, SelfParam.getPlainType(),
                                  /*IsVarArg*/ false, /*TopLevel*/ true,
                                  SelfParam.isInOut(),
-                                 /*isIUO*/ false);
+                                 /*isIUO*/ false, /*isAutoClosure*/ false);
         Builder.addRightParen();
       } else if (trivialTrailingClosure) {
         Builder.addBraceStmtWithCursor(" { code }");
@@ -3336,7 +3336,8 @@ public:
     assert(RHSType && resultType);
     builder.addCallParameter(Identifier(), Identifier(), RHSType,
                              /*IsVarArg*/ false, /*TopLevel*/ true,
-                             /*IsInOut*/ false, /*isIUO*/ false);
+                             /*IsInOut*/ false, /*isIUO*/ false,
+                             /*isAutoClosure*/ false);
     addTypeAnnotation(builder, resultType);
   }
 
@@ -3359,7 +3360,8 @@ public:
     builder.addWhitespace(" ");
     if (RHSType)
       builder.addCallParameter(Identifier(), Identifier(), RHSType, false, true,
-                               /*IsInOut*/ false, /*isIUO*/ false);
+                               /*IsInOut*/ false, /*isIUO*/ false,
+                               /*isAutoClosure*/ false);
     if (resultType)
       addTypeAnnotation(builder, resultType);
   }
@@ -3648,19 +3650,19 @@ public:
       builder.addLeftParen();
       builder.addCallParameter(context.getIdentifier("red"), floatType, false,
                                true, /*IsInOut*/ false,
-                               /*isIUO*/ false);
+                               /*isIUO*/ false, /*isAutoClosure*/ false);
       builder.addComma();
       builder.addCallParameter(context.getIdentifier("green"), floatType, false,
-                               true, /*IsInOut*/ false,
-                               /*isIUO*/ false);
+                               true, /*IsInOut*/ false, /*isIUO*/ false,
+                               /*isAutoClosure*/ false);
       builder.addComma();
       builder.addCallParameter(context.getIdentifier("blue"), floatType, false,
-                               true, /*IsInOut*/ false,
-                               /*isIUO*/ false);
+                               true, /*IsInOut*/ false, /*isIUO*/ false,
+                               /*isAutoClosure*/ false);
       builder.addComma();
       builder.addCallParameter(context.getIdentifier("alpha"), floatType, false,
-                               true, /*IsInOut*/ false,
-                               /*isIUO*/ false);
+                               true, /*IsInOut*/ false, /*isIUO*/ false,
+                               /*isAutoClosure*/ false);
       builder.addRightParen();
     });
 
@@ -3670,7 +3672,7 @@ public:
       builder.addLeftParen();
       builder.addCallParameter(context.getIdentifier("resourceName"),
                                stringType, false, true, /*IsInOut*/ false,
-                               /*isIUO*/ false);
+                               /*isIUO*/ false, /*isAutoClosure*/ false);
       builder.addRightParen();
     });
 
