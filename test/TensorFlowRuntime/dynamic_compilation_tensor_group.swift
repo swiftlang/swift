@@ -1,4 +1,4 @@
-// RUN: %target-run-dynamic-compilation-swift
+// RUN: %target-run-disable-deabstraction-swift
 // REQUIRES: executable_test
 
 import TensorFlow
@@ -12,7 +12,7 @@ var TensorGroupTest = TestSuite("TensorGroup")
 /// T is address-only because it is generic.
 @inline(never)
 func tensorSliceDataset<T: TensorGroup>(_ t: T) -> VariantHandle {
-  return #tfop("TensorSliceDataset", [t], Toutput_types$dtype: T._typeList,
+  return #tfop("TensorSliceDataset", t, Toutput_types$dtype: T._typeList,
                output_shapes: T._unknownShapeList)
 }
 
@@ -36,7 +36,7 @@ func first<T: TensorGroup>(_ dataset: VariantHandle) -> T {
 func pack<T: TensorGroup, Scalar: AccelerableByTensorFlow>(
     _ t: T
 ) -> Tensor<Scalar> {
-  return #tfop("Pack", [t], T$dtype: Scalar.tensorFlowDataType)
+  return #tfop("Pack", t, T$dtype: Scalar.tensorFlowDataType)
 }
 
 /// This function cannot be compiled in graph mode because it executes a #tfop
@@ -89,10 +89,10 @@ TensorGroupTest.testAllBackends("input, address-only") {
 }
 
 TensorGroupTest.testAllBackends("output, address-only") {
-  let tensor = Tensor<Float>([[1, 2], [3, 4]])
+  let tensor = Tensor<Float>(shape: [2, 2], scalars: [1, 2, 3, 4])
   let example: Example = unpack(tensor)
-  expectEqual(ShapedArray([1, 2]), example.x.array)
-  expectEqual(ShapedArray([3, 4]), example.y.array)
+  expectEqual(ShapedArray(shape: [2], scalars: [1, 2]), example.x.array)
+  expectEqual(ShapedArray(shape: [2], scalars: [3, 4]), example.y.array)
 }
 
 TensorGroupTest.testAllBackends("output to empty struct, address-only") {
@@ -107,11 +107,19 @@ TensorGroupTest.testAllBackends("output to empty struct, address-only") {
 // values.
 TensorGroupTest.testAllBackends("input, loadable") {
   let example = Example(x: Tensor([1, 2]), y: Tensor([3, 4]))
-  let packed: Tensor<Float> = #tfop("Pack", [example],
+  let packed: Tensor<Float> = #tfop("Pack", example,
                                     T$dtype: Float.tensorFlowDataType)
-  expectEqual(ShapedArray(shape: [2, 2], scalars: [1, 2, 3, 4]), packed.array)
+  expectEqual(ShapedArray(shape: [2, 2], scalars: [1, 2, 3, 4]),
+              packed.array)
 }
 
-// TODO(marcrasi): Loadable output tests, once that is implemented.
+TensorGroupTest.testAllBackends("output, loadable") {
+  let tensor = Tensor<Float>(shape: [2, 2], scalars: [1, 2, 3, 4])
+  let example: Example = #tfop("Unpack", tensor,
+                               num: Int64(Example._tensorHandleCount),
+                               T$dtype: Float.tensorFlowDataType)
+  expectEqual(ShapedArray(shape: [2], scalars: [1, 2]), example.x.array)
+  expectEqual(ShapedArray(shape: [2], scalars: [3, 4]), example.y.array)
+}
 
 runAllTests()

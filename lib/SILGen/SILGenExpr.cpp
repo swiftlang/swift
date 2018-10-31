@@ -2853,8 +2853,7 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
   } else {
     auto address = SGF.getBufferForExprResult(E, resultTL.getLoweredType(), C);
     opBuilder.addArgument(address, "$out");
-    auto voidTy = SGF.getLoweredType(SGF.getASTContext().TheEmptyTupleType);
-    opBuilder.build(SGF.B, SGF.getASTContext(), E, voidTy);
+    opBuilder.build(SGF.B, SGF.getASTContext(), E, /*resultSilTypes=*/{});
     return RValue(SGF, E, SGF.manageBufferForExprResult(address, resultTL, C));
   }
 }

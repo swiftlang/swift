@@ -492,10 +492,8 @@ static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
         }
         return nullptr;
       }
-      assert(origInst->getNumResults() == 1 &&
-             origInst->getResult(0)->getType().getASTType() ==
-                ctx.TheEmptyTupleType &&
-             "graph_op with out parameter must return the empty tuple");
+      assert(origInst->getNumResults() == 0 &&
+             "graph_op with out parameter must have 0 results");
       // There should only be one output parameter because output parameter is
       // still a single value or single aggregate.
       assert(!outParameterAddress && "there is more than one out parameter");
@@ -549,7 +547,8 @@ static GraphOperationInst *simplifyOperands(GraphOperationInst *origInst,
   newInst->setDebugLocation(origInst->getDebugLocation());
 
   // Replace the old with the new and delete the old instruction.
-  origInst->replaceAllUsesPairwiseWith(newInst);
+  if (origInst->getNumResults() > 0)
+    origInst->replaceAllUsesPairwiseWith(newInst);
 
   // Remove the StructInst and other random values that we leave around in the
   // program, now that we directly refer to the TensorFlow values.
