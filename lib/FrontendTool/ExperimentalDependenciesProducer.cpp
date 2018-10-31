@@ -200,6 +200,8 @@ public:
       Mangle::ASTMangler Mangler;
       return Mangler.mangleTypeAsContextUSR(NTD);
     }
+    
+    template<typename DeclT> std::vector<std::string> getTopLevelNamesFromDecls(std::vector<const DeclT*>);
 
   public:
     ProviderNames(const ProviderDeclarations &);
@@ -575,7 +577,7 @@ SQ::ProviderNames::getTopLevelNames(const ProviderDeclarations &pd) {
 
   return tops;
 }
-
+XXX getTopLevelNamesFromDecls
 std::vector<std::string> SQ::ProviderNames::getExtendedNominalContextualNames(
     const ProviderDeclarations &pd, const bool onlyIfCouldAddMembers) {
   std::vector<std::string> extendedNominalContextualNames;
@@ -599,9 +601,19 @@ SQ::ProviderNames::getHoldersAndMaybeMembers(const ProviderDeclarations &pd) {
 std::vector<std::pair<std::string, std::string>>
 SQ::ProviderNames::getHoldersAndMembers(const ProviderDeclarations &pd) {
   std::vector<std::pair<std::string, std::string>> holdersAndMembers;
+  
   for (auto p : pd.holdersAndMembers)
     holdersAndMembers.push_back(std::make_pair(
         getContextualName(p.first), p.second->getBaseName().userFacingName()));
+  
+//  std::transform(pd.holdersAndMembers.begin(), pd.holdersAndMembers.end(),
+//                 holdersAndMembers.begin(),
+//                 [](std::pair<const NominalTypeDecl *, const ValueDecl *> &p)
+//                 -> std::pair<std::string, std::string> {
+//                   return std::make_pair(
+//                                         getContextualName(p.first),
+//                                         p.second->getBaseName().userFacingName()); } );
+  
   return holdersAndMembers;
 }
 
