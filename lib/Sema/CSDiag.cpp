@@ -8445,7 +8445,7 @@ void swift::diagnoseIllegalNonEphemeralConversion(
       if (auto nominalTy = ty->getAs<NominalType>())
         if (nominalTy->getDecl() == ctx.getOpaquePointerDecl())
           return true;
-      return !ty->getAnyPointerElementType().isNull();
+      return (bool)ty->getAnyPointerElementType();
     };
 
     // This must stay in sync with diag::cannot_construct_dangling_pointer.

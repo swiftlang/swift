@@ -1121,8 +1121,20 @@ bool NonEphemeralConversionFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
   auto *locator = getLocator();
   auto path = locator->getPath();
-  if (path.empty() ||
-      path.back().getKind() != ConstraintLocator::ApplyArgToParam)
+
+  // Look through generic argument path components – these can occur if for
+  // example we have an ephemeral conversion within an optional-to-optional
+  // conversion.
+  auto lastEltIter =
+      std::find_if(path.rbegin(), path.rend(), [](LocatorPathElt elt) {
+        return elt.getKind() != ConstraintLocator::GenericArgument;
+      });
+
+  if (lastEltIter == path.rend())
+    return false;
+
+  auto lastElt = *lastEltIter;
+  if (lastElt.getKind() != ConstraintLocator::ApplyArgToParam)
     return false;
 
   SourceRange range;
@@ -1139,7 +1151,7 @@ bool NonEphemeralConversionFailure::diagnoseAsError() {
   if (!fnType)
     return false;
 
-  auto paramIdx = path.back().getValue2();
+  auto paramIdx = lastElt.getValue2();
   auto param = fnType->getParams()[paramIdx];
 
   ValueDecl *callee =

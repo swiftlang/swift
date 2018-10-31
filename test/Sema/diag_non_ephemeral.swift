@@ -1,35 +1,65 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -enable-resilience -o %t -module-name=diag_non_ephemeral_module %S/Inputs/diag_non_ephemeral_module.swift
+// RUN: %target-typecheck-verify-swift -swift-version 5 -I %t
+
+import diag_non_ephemeral_module
 
 var str = ""
+var optionalStr: String?
+
 var arr: [Int8] = [5]
+var optionalArr: [Int8]?
+
 var value: Int8 = 5
 
-func foo(_ x: @_nonEphemeral UnsafeMutableRawPointer, _ y: Int) {}
-func bar(_ x: @_nonEphemeral UnsafePointer<Int8>, _ y: Int) {}
-func baz(_ x: @_nonEphemeral UnsafeRawPointer) {}
-func qux(_ x: @_nonEphemeral UnsafeMutablePointer<Int8>) {}
+func takesMutableRaw(_ x: @_nonEphemeral UnsafeMutableRawPointer, _ y: Int) {}
+func takesConst(_ x: @_nonEphemeral UnsafePointer<Int8>, _ y: Int) {}
+func takesRaw(_ x: @_nonEphemeral UnsafeRawPointer) {}
+func takesMutable(_ x: @_nonEphemeral UnsafeMutablePointer<Int8>) {}
+func takesOptMutableRaw(_ x: @_nonEphemeral UnsafeMutableRawPointer?) {}
+func takesOptConst(_ x: @_nonEphemeral UnsafePointer<Int8>?) {}
 
-foo(&arr, 5) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
+takesMutableRaw(&arr, 5) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
 // expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
 
-bar(str, 5) // expected-error {{cannot pass temporary pointer argument of type 'UnsafePointer<Int8>' to parameter expecting a pointer that outlives the duration of the call}}
+takesConst(str, 5) // expected-error {{cannot pass temporary pointer argument of type 'UnsafePointer<Int8>' to parameter expecting a pointer that outlives the duration of the call}}
 // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call}}
 
-bar(arr, 5) // expected-error {{cannot pass temporary pointer argument of type 'UnsafePointer<Int8>' to parameter expecting a pointer that outlives the duration of the call}}
+takesConst(arr, 5) // expected-error {{cannot pass temporary pointer argument of type 'UnsafePointer<Int8>' to parameter expecting a pointer that outlives the duration of the call}}
 // expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call}}
 
-baz(&arr) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
+takesRaw(&arr) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
 // expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
 
-qux(&arr) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutablePointer<Int8>' to parameter expecting a pointer that outlives the duration of the call}}
+takesMutable(&arr) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutablePointer<Int8>' to parameter expecting a pointer that outlives the duration of the call}}
 // expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeMutablePointer<Int8>' produces a pointer valid only for the duration of the call}}
 
-// These are all okay, `value` is a top-level variable and therefore gets a static pointer value.
-foo(&value, 5)
-foo(&str, 5)
-baz(&value)
-baz(&str)
-qux(&value)
+takesOptMutableRaw(&arr) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutableRawPointer?' to parameter expecting a pointer that outlives the duration of the call}}
+// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeMutableRawPointer?' produces a pointer valid only for the duration of the call}}
+
+// FIXME(SR-9100): This currently uses inout-to-pointer instead of array-to-pointer.
+takesOptMutableRaw(&optionalArr)
+
+takesOptConst(arr) // expected-error {{cannot pass temporary pointer argument of type 'UnsafePointer<Int8>?' to parameter expecting a pointer that outlives the duration of the call}}
+// expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafePointer<Int8>?' produces a pointer valid only for the duration of the call}}
+
+takesOptConst(optionalArr) // expected-error {{cannot pass temporary pointer argument of type 'UnsafePointer<Int8>?' to parameter expecting a pointer that outlives the duration of the call}}
+// expected-note@-1 {{implicit argument conversion from '[Int8]?' to 'UnsafePointer<Int8>?' produces a pointer valid only for the duration of the call}}
+
+takesOptConst(str) // expected-error {{cannot pass temporary pointer argument of type 'UnsafePointer<Int8>?' to parameter expecting a pointer that outlives the duration of the call}}
+// expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>?' produces a pointer valid only for the duration of the call}}
+
+takesOptConst(optionalStr) // expected-error {{cannot pass temporary pointer argument of type 'UnsafePointer<Int8>?' to parameter expecting a pointer that outlives the duration of the call}}
+// expected-note@-1 {{implicit argument conversion from 'String?' to 'UnsafePointer<Int8>?' produces a pointer valid only for the duration of the call}}
+
+// These are all okay, `value` and `str` are top-level variables and therefore get static pointer values when used with inout.
+takesMutableRaw(&value, 5)
+takesMutableRaw(&str, 5)
+takesRaw(&value)
+takesRaw(&str)
+takesMutable(&value)
+takesOptMutableRaw(&value)
+takesOptMutableRaw(&str)
 
 struct S {
   var storedProperty: Int8 = 0
@@ -51,98 +81,112 @@ var globalTupleOfS = (S(), S())
 var globalOptOfS: S?
 var globalWithObservers: Int8 = 0 { didSet {} }
 
-// These are all okay, we can get stable pointer values through force unwraps and stored field accesses on global structure and tuple variables.
-foo(&globalS, 5)
-baz(&globalC)
-baz(&globalS.storedProperty)
-baz(&globalTupleOfS.0)
-baz(&globalTupleOfS.0.storedProperty)
-baz(&globalOptOfS!)
-baz(&globalOptOfS!.storedProperty)
+var globalResilient = ResilientStruct()
+var globalOptOfResilient: ResilientStruct?
+var globalFragile = FragileStruct()
 
-// But we cannot do the same for class bases, properties with observers, computed properties or subscripts.
+// These are all okay, we can get stable pointer values through force unwraps and stored field accesses on global fragile structure and tuple variables.
+takesMutableRaw(&globalS, 5)
+takesRaw(&globalC)
+takesRaw(&globalS.storedProperty)
+takesRaw(&globalTupleOfS.0)
+takesRaw(&globalTupleOfS.0.storedProperty)
+takesRaw(&globalOptOfS!)
+takesRaw(&globalOptOfS!.storedProperty)
+takesRaw(&globalResilient)
+takesRaw(&globalOptOfResilient!)
+takesRaw(&globalFragile)
+takesRaw(&globalFragile.storedProperty)
 
-foo(&globalC.storedProperty, 5) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
+// But we cannot do the same for class or resilient struct bases, properties with observers, computed properties or subscripts.
+
+takesMutableRaw(&globalResilient.storedProperty, 5) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
 
-baz(&globalC.storedPropertyWithObservers) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
+takesMutableRaw(&globalOptOfResilient!.storedProperty, 5) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+
+takesMutableRaw(&globalC.storedProperty, 5) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
+// expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+
+takesRaw(&globalC.storedPropertyWithObservers) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
 
-baz(&globalC.computedProperty) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
+takesRaw(&globalC.computedProperty) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
 
-baz(&globalC[]) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
+takesRaw(&globalC[]) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
 
-baz(&globalS[]) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
+takesRaw(&globalS[]) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
 
-baz(&globalS.storedPropertyWithObservers) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
+takesRaw(&globalS.storedPropertyWithObservers) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
 
-baz(&globalTupleOfS.0.storedPropertyWithObservers) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
+takesRaw(&globalTupleOfS.0.storedPropertyWithObservers) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
 
-baz(&globalTupleOfS.0.computedProperty) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
+takesRaw(&globalTupleOfS.0.computedProperty) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
 
-baz(&globalOptOfS!.computedProperty) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
+takesRaw(&globalOptOfS!.computedProperty) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
 
-baz(&globalOptOfS!.storedPropertyWithObservers) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
+takesRaw(&globalOptOfS!.storedPropertyWithObservers) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
 
-baz(&globalWithObservers) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
+takesRaw(&globalWithObservers) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
 // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
 
 // The following are not okay as they're local.
 func testInoutToPointerOfLocal() {
   var local: Int8 = 0
 
-  foo(&local, 5) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
+  takesMutableRaw(&local, 5) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
   // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
 
-  baz(&local) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
+  takesRaw(&local) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
   // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
 
-  qux(&local) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutablePointer<Int8>' to parameter expecting a pointer that outlives the duration of the call}}
+  takesMutable(&local) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutablePointer<Int8>' to parameter expecting a pointer that outlives the duration of the call}}
   // expected-note@-1 {{implicit argument conversion from 'Int8' to 'UnsafeMutablePointer<Int8>' produces a pointer valid only for the duration of the call}}
 }
 
 // Check that @_non_ephemeral is preserved through type inference.
-let f1 = foo
+let f1 = takesMutableRaw
 f1(&arr, 5) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
 // expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
 
-let f2 = bar
+let f2 = takesConst
 f2(arr, 5) // expected-error {{cannot pass temporary pointer argument of type 'UnsafePointer<Int8>' to parameter expecting a pointer that outlives the duration of the call}}
 // expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call}}
 
-let f3 = baz
+let f3 = takesRaw
 f3(&arr) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
 // expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
 
-let f4 = qux
+let f4 = takesMutable
 f4(&arr) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutablePointer<Int8>' to parameter expecting a pointer that outlives the duration of the call}}
 // expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafeMutablePointer<Int8>' produces a pointer valid only for the duration of the call}}
 
 struct S1 {
-  static func foo(_ x: String = "", ptr: @_nonEphemeral UnsafeMutableRawPointer) {}
-  func bar(ptr: @_nonEphemeral UnsafeMutableRawPointer = UnsafeMutableRawPointer(&globalS)) {}
+  static func takesMutableRaw(_ x: String = "", ptr: @_nonEphemeral UnsafeMutableRawPointer) {}
+  func takesConst(ptr: @_nonEphemeral UnsafeMutableRawPointer = UnsafeMutableRawPointer(&globalS)) {}
 }
 
 func testNonEphemeralInMethods() {
   var local = 0
 
-  S1.foo(ptr: &local) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
+  S1.takesMutableRaw(ptr: &local) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
 
-  S1.foo("", ptr: &local) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
+  S1.takesMutableRaw("", ptr: &local) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
 
   let s1 = S1()
-  s1.bar() // okay.
-  s1.bar(ptr: &local) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
+  s1.takesConst() // okay.
+  s1.takesConst(ptr: &local) // expected-error {{cannot pass temporary pointer argument of type 'UnsafeMutableRawPointer' to parameter expecting a pointer that outlives the duration of the call}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
 }
 
@@ -181,10 +225,10 @@ func testNonEphemeralInMemberwiseInit() {
 
 // Allow the stripping of @_nonEphemeral. This is unfortunate, but ensures we don't force the user to write things
 // like `func higherOrder(_ fn: (@_nonEphemeral UnsafeMutableRawPointer) -> Void) {}`, given that the attribute is non-user-facing.
-let f5: (UnsafeMutableRawPointer, Int) -> Void = foo
-let f6: (UnsafePointer<Int8>, Int) -> Void = bar
-let f7: (UnsafeRawPointer) -> Void = baz
-let f8: (UnsafeMutablePointer<Int8>) -> Void = qux
+let f5: (UnsafeMutableRawPointer, Int) -> Void = takesMutableRaw
+let f6: (UnsafePointer<Int8>, Int) -> Void = takesConst
+let f7: (UnsafeRawPointer) -> Void = takesRaw
+let f8: (UnsafeMutablePointer<Int8>) -> Void = takesMutable
 
 func higherOrder(_ fn: (UnsafeMutableRawPointer, Int) -> Void) {}
-higherOrder(foo)
+higherOrder(takesMutableRaw)

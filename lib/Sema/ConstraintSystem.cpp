@@ -2388,25 +2388,31 @@ bool ConstraintSystem::isConversionNonEphemeral(
       return None;
     };
 
-    auto isStoredVarDecl = [](ValueDecl *decl) -> bool {
+    auto isDirectlyAccessedStoredVar = [&](ValueDecl *decl) -> bool {
       auto *asd = dyn_cast_or_null<AbstractStorageDecl>(decl);
-      return asd && asd->getReadWriteImpl() == ReadWriteImplKind::Stored;
+      if (!asd)
+        return false;
+
+      // Check what access strategy is used for a read-write access. It must be
+      // direct-to-storage in order for the conversion to be non-ephemeral.
+      auto access = asd->getAccessStrategy(AccessSemantics::Ordinary,
+                                           AccessKind::ReadWrite, DC);
+      return access.getKind() == AccessStrategy::Storage;
     };
 
     auto isSimpleMember = [&](Expr *baseExpr, ValueDecl *member) -> bool {
-      if (!isStoredVarDecl(member))
+      if (!isDirectlyAccessedStoredVar(member))
         return false;
 
       auto type = simplifyType(getType(baseExpr))->getAs<LValueType>();
       if (!type)
         return false;
 
-      auto baseType = type->getObjectType();
-      return baseType->is<StructType>() || baseType->is<TupleType>();
+      return type->getObjectType()->is<StructType>();
     };
 
     auto isValidBaseDecl = [&](ValueDecl *baseDecl) -> bool {
-      if (!isStoredVarDecl(baseDecl))
+      if (!isDirectlyAccessedStoredVar(baseDecl))
         return false;
 
       return baseDecl->isStatic() ||

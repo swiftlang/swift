@@ -2221,17 +2221,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
               auto baseIsArray = isArrayType(simplifiedInoutBaseType);
 
-              auto simplifiedDestType = getFixedTypeRecursive(
-                  pointeeTy, /*wantRValue*/ kind == ConstraintKind::Equal);
-
               // FIXME: If the base is still a type variable, we can't tell
               // what to do here. Might have to try \c ArrayToPointer and make
               // it more robust.
               if (baseIsArray)
                 tryPointerConversion(ConversionRestrictionKind::ArrayToPointer);
 
-              if (!baseIsArray || !simplifiedDestType->isEqual(
-                                      getASTContext().TheEmptyTupleType))
+              // Only try an inout-to-pointer conversion if we know it's not
+              // an array being converted to a raw pointer type. Such
+              // conversions can only use array-to-pointer.
+              if (!baseIsArray || !isRawPointerKind(pointerKind))
                 tryPointerConversion(ConversionRestrictionKind::InoutToPointer);
             }
           }

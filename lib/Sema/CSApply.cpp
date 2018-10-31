@@ -5455,6 +5455,46 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
   return false;
 }
 
+static void checkNonEphemeralArgumentConversion(
+    ConstraintSystem &cs, const Expr *argExpr, Type argType,
+    AnyFunctionType::Param param, AnyFunctionType *fnType,
+    const ValueDecl *callee, ConstraintLocatorBuilder argLocator) {
+  assert(param.isNonEphemeral());
+
+  // Look through optional evaluation expressions – these can occur when we
+  // have an optional-to-optional conversion followed by a pointer conversion.
+  auto *subExpr = argExpr;
+  while (true) {
+    subExpr = subExpr->getValueProvidingExpr();
+    if (auto *oee = dyn_cast<OptionalEvaluationExpr>(subExpr)) {
+      subExpr = oee->getSubExpr();
+      continue;
+    }
+    if (auto *ioe = dyn_cast<InjectIntoOptionalExpr>(subExpr)) {
+      subExpr = ioe->getSubExpr();
+      continue;
+    }
+    if (auto *boe = dyn_cast<BindOptionalExpr>(subExpr)) {
+      subExpr = boe->getSubExpr();
+      continue;
+    }
+    break;
+  }
+
+  Optional<ConversionRestrictionKind> conversion;
+  if (isa<InOutToPointerExpr>(subExpr))
+    conversion = ConversionRestrictionKind::InoutToPointer;
+  else if (isa<ArrayToPointerExpr>(subExpr))
+    conversion = ConversionRestrictionKind::ArrayToPointer;
+  else if (isa<StringToPointerExpr>(subExpr))
+    conversion = ConversionRestrictionKind::StringToPointer;
+
+  if (conversion && !cs.isConversionNonEphemeral(*conversion, argLocator))
+    diagnoseIllegalNonEphemeralConversion(
+        cs.TC, argExpr, argType, param.getPlainType(), callee, fnType,
+        /*downgradeToWarning*/ true);
+}
+
 Expr *ExprRewriter::coerceCallArguments(
     Expr *arg, AnyFunctionType *funcType,
     ApplyExpr *apply,
@@ -5652,18 +5692,11 @@ Expr *ExprRewriter::coerceCallArguments(
     // If the Swift version is < 5, we might have allowed an ephemeral
     // conversion to a non-ephemeral parameter. Emit a warning if this is the
     // case (which will become an error in Swift versions > 5).
-    if (!tc.Context.isSwiftVersionAtLeast(5) && param.isNonEphemeral()) {
-      auto argType = cs.getType(arg)->getRValueType();
-      auto result = solution.ConstraintRestrictions.find(
-          {argType->getCanonicalType(), paramType->getCanonicalType()});
-      if (result != solution.ConstraintRestrictions.end()) {
-        auto restriction = result->getSecond();
-        if (!cs.isConversionNonEphemeral(restriction, argLocator))
-          diagnoseIllegalNonEphemeralConversion(tc, arg, argType, paramType,
-                                                callee.getDecl(), funcType,
-                                                /*downgradeToWarning*/ true);
-      }
-    }
+    if (!tc.Context.isSwiftVersionAtLeast(5) && param.isNonEphemeral())
+      checkNonEphemeralArgumentConversion(cs, convertedArg,
+                                          argType->getRValueType(), param,
+                                          funcType, callee.getDecl(),
+                                          argLocator);
 
     // Add the converted argument.
     fromTupleExpr[argIdx] = convertedArg;

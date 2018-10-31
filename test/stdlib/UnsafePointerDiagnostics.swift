@@ -122,6 +122,7 @@ func unsafePointerInitEphemeralConversions() {
   var foo = 0
   var str = ""
   var arr = [0]
+  var optionalArr: [Int]? = [0]
   var c: C?
 
   _ = UnsafePointer(&foo) // expected-error {{initialization of 'UnsafePointer<Int>' results in a dangling pointer}}
@@ -141,6 +142,9 @@ func unsafePointerInitEphemeralConversions() {
 
   _ = UnsafePointer(&arr) // expected-error {{initialization of 'UnsafePointer<Int>' results in a dangling pointer}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafePointer(optionalArr) // expected-error {{initialization of 'UnsafePointer<Int>' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]?' to 'UnsafePointer<Int>?' produces a pointer valid only for the duration of the call}}
 
 
   _ = UnsafeMutablePointer(&foo) // expected-error {{initialization of 'UnsafeMutablePointer<Int>' results in a dangling pointer}}
@@ -167,6 +171,9 @@ func unsafePointerInitEphemeralConversions() {
   _ = UnsafeMutablePointer(mutating: &arr) // expected-error {{initialization of 'UnsafeMutablePointer<Int>' results in a dangling pointer}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call}}
 
+  _ = UnsafeMutablePointer(mutating: optionalArr) // expected-error {{initialization of 'UnsafeMutablePointer<Int>' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]?' to 'UnsafePointer<Int>?' produces a pointer valid only for the duration of the call}}
+
 
   _ = UnsafeRawPointer(&foo) // expected-error {{initialization of 'UnsafeRawPointer' results in a dangling pointer}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
@@ -179,6 +186,9 @@ func unsafePointerInitEphemeralConversions() {
 
   _ = UnsafeRawPointer(&arr) // expected-error {{initialization of 'UnsafeRawPointer' results in a dangling pointer}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeRawPointer(optionalArr) // expected-error {{initialization of 'UnsafeRawPointer' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]?' to 'UnsafeRawPointer?' produces a pointer valid only for the duration of the call}}
 
 
   _ = UnsafeMutableRawPointer(&foo) // expected-error {{initialization of 'UnsafeMutableRawPointer' results in a dangling pointer}}
@@ -199,6 +209,9 @@ func unsafePointerInitEphemeralConversions() {
   _ = UnsafeMutableRawPointer(mutating: &arr) // expected-error {{initialization of 'UnsafeMutableRawPointer' results in a dangling pointer}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeRawPointer' produces a pointer valid only for the duration of the call}}
 
+  _ = UnsafeMutableRawPointer(mutating: optionalArr) // expected-error {{initialization of 'UnsafeMutableRawPointer' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]?' to 'UnsafeRawPointer?' produces a pointer valid only for the duration of the call}}
+
 
   _ = AutoreleasingUnsafeMutablePointer(&c) // expected-error {{initialization of 'AutoreleasingUnsafeMutablePointer<C?>' results in a dangling pointer}}
   // expected-note@-1 {{implicit argument conversion from 'C?' to 'AutoreleasingUnsafeMutablePointer<C?>' produces a pointer valid only for the duration of the call}}
@@ -215,6 +228,9 @@ func unsafePointerInitEphemeralConversions() {
 
   _ = UnsafeBufferPointer(start: &arr, count: 0) // expected-error {{initialization of 'UnsafeBufferPointer<Int>' results in a dangling buffer pointer}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>?' produces a pointer valid only for the duration of the call}}
+
+  _ = UnsafeBufferPointer(start: optionalArr, count: 0) // expected-error {{initialization of 'UnsafeBufferPointer<Int>' results in a dangling buffer pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]?' to 'UnsafePointer<Int>?' produces a pointer valid only for the duration of the call}}
 
 
   _ = UnsafeMutableBufferPointer(start: &foo, count: 0) // expected-error {{initialization of 'UnsafeMutableBufferPointer<Int>' results in a dangling buffer pointer}}
@@ -236,6 +252,9 @@ func unsafePointerInitEphemeralConversions() {
   _ = UnsafeRawBufferPointer(start: &arr, count: 0) // expected-error {{initialization of 'UnsafeRawBufferPointer' results in a dangling buffer pointer}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeRawPointer?' produces a pointer valid only for the duration of the call}}
 
+  _ = UnsafeRawBufferPointer(start: optionalArr, count: 0) // expected-error {{initialization of 'UnsafeRawBufferPointer' results in a dangling buffer pointer}}
+  // expected-note@-1 {{implicit argument conversion from '[Int]?' to 'UnsafeRawPointer?' produces a pointer valid only for the duration of the call}}
+
 
   _ = UnsafeMutableRawBufferPointer(start: &foo, count: 0) // expected-error {{initialization of 'UnsafeMutableRawBufferPointer' results in a dangling buffer pointer}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer?' produces a pointer valid only for the duration of the call}}
@@ -244,11 +263,11 @@ func unsafePointerInitEphemeralConversions() {
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafeMutableRawPointer?' produces a pointer valid only for the duration of the call}}
 
 
-  // FIX-ME: Currently produces ambiguity error instead of custom non-ephemeral error.
+  // FIXME: Currently produces ambiguity error instead of custom non-ephemeral error.
   _ = OpaquePointer(&foo) // expected-error {{cannot invoke initializer for type 'OpaquePointer' with an argument list of type '(inout Int)'}}
   // expected-note@-1 {{overloads for 'OpaquePointer' exist with these partially matching parameter lists:}}
 
-  // FIX-ME: Currently produces ambiguity error instead of custom non-ephemeral error.
+  // FIXME: Currently produces ambiguity error instead of custom non-ephemeral error.
   _ = OpaquePointer(&arr) // expected-error {{cannot invoke initializer for type 'OpaquePointer' with an argument list of type '(inout [Int])'}}
   // expected-note@-1 {{overloads for 'OpaquePointer' exist with these partially matching parameter lists:}}
 
@@ -272,6 +291,6 @@ func unsafePointerInitNonEphemeralConversions() {
   _ = UnsafeRawBufferPointer(start: &global, count: 0)
   _ = UnsafeMutableRawBufferPointer(start: &global, count: 0)
 
-  // FIX-ME: This is currently ambiguous.
+  // FIXME: This is currently ambiguous.
   _ = OpaquePointer(&global) // expected-error {{ambiguous use of 'init(_:)'}}
 }
