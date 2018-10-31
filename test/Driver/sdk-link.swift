@@ -6,6 +6,7 @@
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
+// REQUIRES: rdar42247881
 
 import Foundation
 
