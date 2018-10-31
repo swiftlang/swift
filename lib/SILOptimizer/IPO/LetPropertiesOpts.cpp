@@ -401,7 +401,6 @@ static bool isProjectionOfProperty(SILValue addr, VarDecl *Property) {
 // Analyze the init value being stored by the instruction into a property.
 bool
 LetPropertiesOpt::analyzeInitValue(SILInstruction *I, VarDecl *Property) {
-  SmallVector<SILInstruction *, 8> ReverseInsns;
   SILValue value;
   if (auto SI = dyn_cast<StructInst>(I)) {
     value = SI->getFieldValue(Property);
@@ -422,16 +421,10 @@ LetPropertiesOpt::analyzeInitValue(SILInstruction *I, VarDecl *Property) {
   }
 
   // Bail if a value of a property is not a statically known constant init.
-  if (!analyzeStaticInitializer(value, ReverseInsns))
-    return false;
-
-  // Fill in the InitSequence by reversing the instructions and
-  // setting the result index.
   InitSequence sequence;
-  while (!ReverseInsns.empty()) {
-    sequence.Instructions.push_back(ReverseInsns.pop_back_val());
-  }
   sequence.Result = value;
+  if (!analyzeStaticInitializer(value, sequence.Instructions))
+    return false;
 
   auto &cachedSequence = InitMap[Property];
   if (cachedSequence.isValid() &&
