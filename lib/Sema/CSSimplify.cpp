@@ -1103,19 +1103,6 @@ ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator) {
-  // An @autoclosure function type can be a subtype of a
-  // non-@autoclosure function type.
-  if (func1->isAutoClosure() != func2->isAutoClosure()) {
-    // If the 2nd type is an autoclosure, then the first type needs wrapping in a
-    // closure despite already being a function type.
-    if (func2->isAutoClosure())
-      return getTypeMatchFailure(locator);
-    if (kind < ConstraintKind::Subtype)
-      return getTypeMatchFailure(locator);
-
-    increaseScore(SK_FunctionConversion);
-  }
-  
   // A non-throwing function can be a subtype of a throwing function.
   if (func1->throws() != func2->throws()) {
     // Cannot drop 'throws'.
@@ -2002,14 +1989,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::Function: {
       auto func1 = cast<FunctionType>(desugar1);
       auto func2 = cast<FunctionType>(desugar2);
-
-      // If the 2nd type is an autoclosure, then we don't actually want to
-      // treat these as parallel. The first type needs wrapping in a closure
-      // despite already being a function type.
-      if (!func1->isAutoClosure() && func2->isAutoClosure()) {
-        increaseScore(SK_FunctionConversion);
-        break;
-      }
       return matchFunctionTypes(func1, func2, kind, flags, locator);
     }
 
@@ -2221,15 +2200,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     if (type1->is<LValueType>() && !type2->is<InOutType>())
       conversionsOrFixes.push_back(
         ConversionRestrictionKind::LValueToRValue);
-
-    // An expression can be converted to an auto-closure function type, creating
-    // an implicit closure.
-    if (auto function2 = type2->getAs<FunctionType>()) {
-      if (function2->isAutoClosure())
-        return matchTypes(
-            type1, function2->getResult(), kind, subflags,
-            locator.withPathElement(ConstraintLocator::AutoclosureResult));
-    }
 
     // It is never legal to form an autoclosure that results in these
     // implicit conversions to pointer types.
