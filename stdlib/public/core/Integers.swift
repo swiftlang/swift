@@ -24,10 +24,10 @@ extension ExpressibleByIntegerLiteral
 }
 
 //===----------------------------------------------------------------------===//
-//===--- Arithmetic -------------------------------------------------------===//
+//===--- AdditiveArithmetic -----------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-public protocol Arithmetic {
+public protocol AdditiveArithmetic : Equatable {
   static var zero: Self { get }
 
   /// Adds two values and produces their sum.
@@ -88,39 +88,9 @@ public protocol Arithmetic {
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
   static func -=(lhs: inout Self, rhs: Self)
-
-  /// Multiplies two values and produces their product.
-  ///
-  /// The multiplication operator (`*`) calculates the product of its two
-  /// arguments. For example:
-  ///
-  ///     2 * 3                   // 6
-  ///     100 * 21                // 2100
-  ///     -10 * 15                // -150
-  ///     3.5 * 2.25              // 7.875
-  ///
-  /// You cannot use `*` with arguments of different types. To multiply values
-  /// of different types, convert one of the values to the other value's type.
-  ///
-  ///     let x: Int8 = 21
-  ///     let y: Int = 1000000
-  ///     Int(x) * y              // 21000000
-  ///
-  /// - Parameters:
-  ///   - lhs: The first value to multiply.
-  ///   - rhs: The second value to multiply.
-  static func *(lhs: Self, rhs: Self) -> Self
-
-  /// Multiplies two values and stores the result in the left-hand-side
-  /// variable.
-  ///
-  /// - Parameters:
-  ///   - lhs: The first value to multiply.
-  ///   - rhs: The second value to multiply.
-  static func *=(lhs: inout Self, rhs: Self)
 }
 
-public extension Arithmetic where Self : ExpressibleByIntegerLiteral {
+public extension AdditiveArithmetic where Self : ExpressibleByIntegerLiteral {
   static var zero: Self {
     return 0
   }
@@ -164,7 +134,7 @@ public extension Arithmetic where Self : ExpressibleByIntegerLiteral {
 /// the required mutating methods. Extensions to `Numeric` provide default
 /// implementations for the protocol's nonmutating methods based on the
 /// mutating variants.
-public protocol Numeric : Arithmetic, Equatable, ExpressibleByIntegerLiteral {
+public protocol Numeric : AdditiveArithmetic, ExpressibleByIntegerLiteral {
   /// Creates a new instance from the given integer, if it can be represented
   /// exactly.
   ///
@@ -202,6 +172,36 @@ public protocol Numeric : Arithmetic, Equatable, ExpressibleByIntegerLiteral {
   /// a value of the same type, even in a generic context, using the function
   /// instead of the `magnitude` property is encouraged.
   var magnitude: Magnitude { get }
+
+  /// Multiplies two values and produces their product.
+  ///
+  /// The multiplication operator (`*`) calculates the product of its two
+  /// arguments. For example:
+  ///
+  ///     2 * 3                   // 6
+  ///     100 * 21                // 2100
+  ///     -10 * 15                // -150
+  ///     3.5 * 2.25              // 7.875
+  ///
+  /// You cannot use `*` with arguments of different types. To multiply values
+  /// of different types, convert one of the values to the other value's type.
+  ///
+  ///     let x: Int8 = 21
+  ///     let y: Int = 1000000
+  ///     Int(x) * y              // 21000000
+  ///
+  /// - Parameters:
+  ///   - lhs: The first value to multiply.
+  ///   - rhs: The second value to multiply.
+  static func *(lhs: Self, rhs: Self) -> Self
+
+  /// Multiplies two values and stores the result in the left-hand-side
+  /// variable.
+  ///
+  /// - Parameters:
+  ///   - lhs: The first value to multiply.
+  ///   - rhs: The second value to multiply.
+  static func *=(lhs: inout Self, rhs: Self)
 }
 
 /// A type that can represent both positive and negative values.
