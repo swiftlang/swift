@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -solver-enable-operator-designated-types -solver-disable-shrink -disable-constraint-solver-performance-hacks
+// UNSUPPORTED: tensorflow
 
 // rdar://problem/32998180
 func checksum(value: UInt16) -> UInt16 {
