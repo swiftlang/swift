@@ -22,13 +22,12 @@ enum E {
 // CHECK: %2 = icmp eq i8 %0, %1
 // CHECK: ret i1 %2
 
-// Check for the presence of the hashValue getter, calling Hasher.init() and
-// Hasher.finalize().
+// Check for the presence of the default hashValue implementation, calling
+// _rawHashValue(seed:) with a seed of 0.
 
 // CHECK-NORMAL-LABEL:define hidden swiftcc i{{.*}} @"$s12enum_derived1EO9hashValueSivg"(i8)
 // CHECK-TESTABLE-LABEL:define{{( dllexport)?}}{{( protected)?}} swiftcc i{{.*}} @"$s12enum_derived1EO9hashValueSivg"(i8)
-// CHECK: call swiftcc void @"$ss6HasherV5_seedABSi_tcfC"(%Ts6HasherV* {{.*}})
-// CHECK: call swiftcc i{{[0-9]+}} @"$ss6HasherV9_finalizeSiyF"(%Ts6HasherV* {{.*}})
+// CHECK: call swiftcc i{{[0-9]+}} @"$sSHsE13_rawHashValue4seedS2i_tF"(i{{[0-9]+}} 0,
 // CHECK: ret i{{[0-9]+}} %{{[0-9]+}}
 
 // Check if the hash(into:) method can be compiled to a simple zext instruction
