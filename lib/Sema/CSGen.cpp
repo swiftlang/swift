@@ -1220,17 +1220,7 @@ namespace {
         if (IntegerLiteralExpr *intLit = dyn_cast<IntegerLiteralExpr>(expr)) {
           unsigned maxWidth =
               maxIntType->castTo<BuiltinIntegerType>()->getGreatestWidth();
-          APInt magnitude = intLit->getRawMagnitude();
-          unsigned magWidth = magnitude.getActiveBits();
-          bool isNegative = intLit->isNegative();
-
-          // Compute the literal bit width in the signed two's complement form.
-          // This is generally one more than the magnitude width, but is the
-          // same when the literal is of the form -2^i (for some Nat `i`).
-          unsigned signedLitWidth =
-              (isNegative && (magnitude.countTrailingZeros() == magWidth - 1))
-                  ? magWidth
-                  : (magWidth + 1);
+          unsigned signedLitWidth = intLit->getRawValue().getMinSignedBits();
 
           if (signedLitWidth > maxWidth) { // overflow?
             CS.TC.diagnose(expr->getLoc(),

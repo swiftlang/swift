@@ -1346,13 +1346,17 @@ END_CAN_TYPE_WRAPPER(BuiltinVectorType, BuiltinType)
 class BuiltinIntegerWidth {
   /// Tag values for abstract integer sizes.
   enum : unsigned {
-    Least_SpecialValue = ~2U,
-    /// The size of a pointer on the target system.
-    PointerWidth = ~0U,
-    
     /// Inhabitants stolen for use as DenseMap special values.
-    DenseMapEmpty = ~1U,
-    DenseMapTombstone = ~2U,
+    DenseMapEmpty = ~0U,
+    DenseMapTombstone = ~1U,
+
+    /// An arbitrary-precision integer.
+    ArbitraryWidth = ~2U,
+
+    /// The size of a pointer on the target system.
+    PointerWidth = ~3U,
+    
+    Least_SpecialValue = ~3U,
   };
   
   unsigned RawValue;
@@ -1372,6 +1376,10 @@ public:
   static BuiltinIntegerWidth pointer() {
     return BuiltinIntegerWidth(PointerWidth);
   }
+
+  static BuiltinIntegerWidth arbitrary() {
+    return BuiltinIntegerWidth(ArbitraryWidth);
+  }
   
   /// Is this a fixed width?
   bool isFixedWidth() const { return RawValue < Least_SpecialValue; }
@@ -1384,6 +1392,9 @@ public:
   
   /// Is this the abstract target pointer width?
   bool isPointerWidth() const { return RawValue == PointerWidth; }
+
+  /// Is this the abstract arbitrary-width value?
+  bool isArbitraryWidth() const { return RawValue == ArbitraryWidth; }
   
   /// Get the least supported value for the width.
   ///
@@ -1393,6 +1404,8 @@ public:
       return getFixedWidth();
     if (isPointerWidth())
       return 32;
+    if (isArbitraryWidth())
+      return 1;
     llvm_unreachable("impossible width value");
   }
   
@@ -1404,8 +1417,16 @@ public:
       return getFixedWidth();
     if (isPointerWidth())
       return 64;
+    if (isArbitraryWidth())
+      return ~0U;
     llvm_unreachable("impossible width value");
   }
+
+  /// Parse a value of this bit-width.
+  ///
+  /// If the radix is 0, it is autosensed.
+  APInt parse(StringRef text, unsigned radix, bool negate,
+              bool *hadError = nullptr) const;
   
   friend bool operator==(BuiltinIntegerWidth a, BuiltinIntegerWidth b) {
     return a.RawValue == b.RawValue;
@@ -1440,7 +1461,8 @@ public:
     return get(BuiltinIntegerWidth::pointer(), C);
   }
   
-  /// Return the bit width of the integer.
+  /// Return the bit width of the integer.  Always returns a non-arbitrary
+  /// width.
   BuiltinIntegerWidth getWidth() const {
     return Width;
   }
