@@ -105,12 +105,14 @@ extension Hasher._Core {
       executionSeed.1))
   }
 
+  @inline(__always)
   internal mutating func compress(_ m: UInt64) {
     _state.v3 ^= m
     _state._round()
     _state.v0 ^= m
   }
 
+  @inline(__always)
   internal mutating func finalize(tailAndByteCount: UInt64) -> UInt64 {
     compress(tailAndByteCount)
     _state.v2 ^= 0xff
