@@ -57,16 +57,12 @@ public extension Tensor where Scalar : Numeric {
 }
 
 //===----------------------------------------------------------------------===//
-// Vector numeric properties and element-wise arithmetics
+// Additive group
 //===----------------------------------------------------------------------===//
 
-extension Tensor : VectorNumeric where Scalar : Numeric {
-  public typealias ScalarElement = Scalar
-  public typealias Dimensionality = TensorShape
-
-  @inlinable @inline(__always)
-  public init(dimensionality: TensorShape, repeating repeatedValue: Scalar) {
-    self.init(shape: dimensionality, repeating: repeatedValue)
+extension Tensor : AdditiveArithmetic where Scalar : Numeric {
+  public static var zero: Tensor {
+    return Tensor(zeros: [])
   }
 
   /// Adds two tensors and produces their sum.
@@ -84,53 +80,18 @@ extension Tensor : VectorNumeric where Scalar : Numeric {
   public static func - (lhs: Tensor, rhs: Tensor) -> Tensor {
     return Raw.sub(lhs, rhs)
   }
+}
 
-  /// Multiplies two tensors and produces their product.
-  /// - Note: `*` supports broadcasting.
-  @inlinable @inline(__always)
-  @differentiable(reverse, adjoint: _adjointMultiply(_:_:originalValue:seed:))
-  public static func * (lhs: Tensor, rhs: Tensor) -> Tensor {
-    return Raw.mul(lhs, rhs)
-  }
+//===----------------------------------------------------------------------===//
+// Vector space
+//===----------------------------------------------------------------------===//
 
-  /// Adds the scalar to every scalar of the tensor and produces the sum.
-  @inlinable @inline(__always)
-  public static func + (lhs: Scalar, rhs: Tensor) -> Tensor {
-    return Tensor(lhs) + rhs
-  }
-
-  /// Adds the scalar to every scalar of the tensor and produces the sum.
-  @inlinable @inline(__always)
-  public static func + (lhs: Tensor, rhs: Scalar) -> Tensor {
-    return lhs + Tensor(rhs)
-  }
-
-  /// Subtracts the scalar from every scalar of the tensor and produces the
-  /// difference.
-  @inlinable @inline(__always)
-  public static func - (lhs: Scalar, rhs: Tensor) -> Tensor {
-    return Tensor(lhs) - rhs
-  }
-
-  /// Subtracts the scalar from every scalar of the tensor and produces the
-  /// difference.
-  @inlinable @inline(__always)
-  public static func - (lhs: Tensor, rhs: Scalar) -> Tensor {
-    return lhs - Tensor(rhs)
-  }
-
+extension Tensor : VectorNumeric where Scalar : Numeric {
   /// Multiplies the scalar with every scalar of the tensor and produces the
   /// product.
   @inlinable @inline(__always)
   public static func * (lhs: Scalar, rhs: Tensor) -> Tensor {
     return Tensor(lhs) * rhs
-  }
-
-  /// Multiplies the scalar with every scalar of the tensor and produces the
-  /// product.
-  @inlinable @inline(__always)
-  public static func * (lhs: Tensor, rhs: Scalar) -> Tensor {
-    return lhs * Tensor(rhs)
   }
 }
 
@@ -139,7 +100,37 @@ extension Tensor : Differentiable where Scalar : FloatingPoint {
   public typealias CotangentVector = Tensor
 }
 
+//===----------------------------------------------------------------------===//
+// Additional element-wise operators
+//===----------------------------------------------------------------------===//
+
 public extension Tensor where Scalar : Numeric {
+  /// Adds the scalar to every scalar of the tensor and produces the sum.
+  @inlinable @inline(__always)
+  static func + (lhs: Scalar, rhs: Tensor) -> Tensor {
+    return Tensor(lhs) + rhs
+  }
+
+  /// Adds the scalar to every scalar of the tensor and produces the sum.
+  @inlinable @inline(__always)
+  static func + (lhs: Tensor, rhs: Scalar) -> Tensor {
+    return lhs + Tensor(rhs)
+  }
+
+  /// Subtracts the scalar from every scalar of the tensor and produces the
+  /// difference.
+  @inlinable @inline(__always)
+  static func - (lhs: Scalar, rhs: Tensor) -> Tensor {
+    return Tensor(lhs) - rhs
+  }
+
+  /// Subtracts the scalar from every scalar of the tensor and produces the
+  /// difference.
+  @inlinable @inline(__always)
+  static func - (lhs: Tensor, rhs: Scalar) -> Tensor {
+    return lhs - Tensor(rhs)
+  }
+
   /// Adds two tensors and stores the result in the left-hand-side variable.
   /// - Note: `+=` supports broadcasting.
   @inlinable @inline(__always)
@@ -169,6 +160,21 @@ public extension Tensor where Scalar : Numeric {
     lhs = lhs - rhs
   }
 
+  /// Multiplies two tensors and produces their product.
+  /// - Note: `*` supports broadcasting.
+  @inlinable @inline(__always)
+  @differentiable(reverse, adjoint: _adjointMultiply(_:_:originalValue:seed:))
+  static func * (lhs: Tensor, rhs: Tensor) -> Tensor {
+    return Raw.mul(lhs, rhs)
+  }
+
+  /// Multiplies the scalar with every scalar of the tensor and produces the
+  /// product.
+  @inlinable @inline(__always)
+  static func * (lhs: Tensor, rhs: Scalar) -> Tensor {
+    return lhs * Tensor(rhs)
+  }
+
   /// Multiplies two tensors and stores the result in the left-hand-side
   /// variable.
   /// - Note: `*=` supports broadcasting.
@@ -177,8 +183,6 @@ public extension Tensor where Scalar : Numeric {
     lhs = lhs * rhs
   }
 
-  /// Multiplies the scalar with every scalar of the tensor and stores the
-  /// result in the left-hand-side variable.
   @inlinable @inline(__always)
   static func *= (lhs: inout Tensor, rhs: Scalar) {
     lhs = lhs * rhs
