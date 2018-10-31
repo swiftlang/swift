@@ -1203,6 +1203,14 @@ public:
       auto function = v.getFunctionValue();
       *this << "@" << function->getName();
       *this << " : $" << function->getLoweredFunctionType();
+      switch (v.getFunctionSubConvention()) {
+      case FunctionSubConvention::Normal:
+        *this << " (N)";
+        break;
+      case FunctionSubConvention::Witness:
+        *this << " (W)";
+        break;
+      }
       return;
     }
     case SymbolicValue::Aggregate: {

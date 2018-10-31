@@ -57,6 +57,7 @@ struct Example {
 extension Example : TensorGroup {
   static let _typeList: [TensorDataType] =
       [Float.tensorFlowDataType, Float.tensorFlowDataType]
+  static let _unknownShapeList: [TensorShape?] = [nil, nil]
   func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?) {
    address!.advanced(by: 0).initialize(to: x.handle._cTensorHandle)
    address!.advanced(by: 1).initialize(to: y.handle._cTensorHandle)
@@ -71,6 +72,7 @@ struct EmptyExample : Equatable {}
 
 extension EmptyExample : TensorGroup {
   static let _typeList: [TensorDataType] = []
+  static let _unknownShapeList: [TensorShape?] = []
   func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?) {}
   init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {}
 }

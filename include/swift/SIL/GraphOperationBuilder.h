@@ -50,11 +50,7 @@ public:
                        llvm::StringRef name = llvm::StringRef());
 
   /// Add an attribute with known constant value to the GraphOperationInst.
-  /// Returns a reference to the attribute, valid for the lifetime of the
-  /// GraphOperationBuilder, that you can use to mutate the attribute before
-  /// buiding the GraphOperationInst.
-  GraphOperationAttribute &addAttribute(
-      const GraphOperationAttribute &attribute);
+  void addAttribute(const GraphOperationAttribute &attribute);
 
   ArrayRef<GraphOperationAttribute> getAttributes() const { return Attributes; }
 

@@ -28,6 +28,14 @@ public protocol TensorGroup {
   /// The types of the tensor stored properties in this type.
   static var _typeList: [TensorDataType] { get }
 
+  /// An array of `nil`s with the same number of elements as `_typeList`. The
+  /// `nil` represents unknown shape.
+  // TODO: This is a protocol requirement so that conformances can provide
+  // custom const-evaluable implementations. When the const-evaluator is
+  // powerful enough to evaluate the default implementation, remove this
+  // requirement.
+  static var _unknownShapeList: [TensorShape?] { get }
+
   /// Writes the tensor handles to `address`, which must be allocated
   /// with enough capacity to hold `_tensorHandleCount` handles. The tensor
   /// handles written to `address` are borrowed: this container still
@@ -45,8 +53,8 @@ public extension TensorGroup {
     return Int32(_typeList.count)
   }
 
-  /// An array of `nil`s with size equal to `_tensorHandleCount`. The `nil`
-  /// represents unknown shape.
+  /// An array of `nil`s with the same number of elements as `_typeList`. The
+  /// `nil` represents unknown shape.
   static var _unknownShapeList: [TensorShape?] {
     return Array(repeating: nil, count: Int(_tensorHandleCount))
   }
@@ -57,8 +65,14 @@ public extension TensorGroup {
 //===----------------------------------------------------------------------===//
 
 extension TensorHandle : TensorGroup {
+  @inlinable
   public static var _typeList: [TensorDataType] {
     return [Scalar.tensorFlowDataType]
+  }
+
+  @inlinable
+  public static var _unknownShapeList: [TensorShape?] {
+    return [nil]
   }
 
   public func _unpackTensorHandles(
@@ -72,6 +86,7 @@ extension TensorHandle : TensorGroup {
 }
 
 extension ResourceHandle : TensorGroup {
+  @inlinable
   public static var _typeList: [TensorDataType] {
     return [TensorDataType(TF_RESOURCE)]
   }
@@ -87,6 +102,7 @@ extension ResourceHandle : TensorGroup {
 }
 
 extension VariantHandle : TensorGroup {
+  @inlinable
   public static var _typeList: [TensorDataType] {
     return [TensorDataType(TF_VARIANT)]
   }
@@ -102,8 +118,14 @@ extension VariantHandle : TensorGroup {
 }
 
 extension Tensor : TensorGroup {
+  @inlinable
   public static var _typeList: [TensorDataType] {
     return [Scalar.tensorFlowDataType]
+  }
+
+  @inlinable
+  public static var _unknownShapeList: [TensorShape?] {
+    return [nil]
   }
 
   public func _unpackTensorHandles(
@@ -117,8 +139,14 @@ extension Tensor : TensorGroup {
 }
 
 extension TensorElementLiteral : TensorGroup {
+  @inlinable
   public static var _typeList: [TensorDataType] {
     return [Scalar.tensorFlowDataType]
+  }
+
+  @inlinable
+  public static var _unknownShapeList: [TensorShape?] {
+    return [nil]
   }
 
   public func _unpackTensorHandles(

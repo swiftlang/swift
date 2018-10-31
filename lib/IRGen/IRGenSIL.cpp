@@ -2161,12 +2161,6 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     LLVM_DEBUG(llvm::dbgs() << " IRGen graph_op argument " << argumentName
                << " with lowering " << (unsigned)argumentLowering << "\n");
     switch (argumentLowering) {
-    case GraphOperationInfo::ArgumentLowering::UnknownShapeListAttribute:
-      assert(0 && "UnknownShapeListAttribute should have been eliminated "
-                  "by deabstraction");
-    case GraphOperationInfo::ArgumentLowering::TypeListAttribute:
-      assert(0 && "TypeListAttribute should have been eliminated by "
-                  "deabstraction");
     case GraphOperationInfo::ArgumentLowering::TensorAttribute:
       // See the comment on the declaration of the enum case
       // `GraphOperationInfo::ArgumentLowering::TensorAttribute` for more
@@ -2451,12 +2445,6 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       assert(0 && "Input classes cannot exist for attributes");
     case GraphOperationInfo::ArgumentLowering::Out:
       assert(0 && "Attributes cannot be output parameters");
-    case GraphOperationInfo::ArgumentLowering::UnknownShapeListAttribute:
-      assert(0 && "UnknownShapeListAttribute should have been eliminated "
-                  "by deabstraction");
-    case GraphOperationInfo::ArgumentLowering::TypeListAttribute:
-      assert(0 && "TypeListAttribute should have been eliminated by "
-                  "deabstraction");
     case GraphOperationInfo::ArgumentLowering::NormalAttribute: // No modifier.
       // We add attributes based on what the type of the value is.
       switch (attr.value.getKind()) {

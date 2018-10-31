@@ -55,13 +55,9 @@ void GraphOperationBuilder::addListArgument(OperandValueArrayRef arguments,
 }
 
 /// Add an attribute with known constant value to the GraphOperationInst.
-/// Returns a reference to the attribute, valid for the lifetime of the
-/// GraphOperationBuilder, that you can use to mutate the attribute before
-/// buiding the GraphOperationInst.
-GraphOperationAttribute &GraphOperationBuilder::addAttribute(
+void GraphOperationBuilder::addAttribute(
     const GraphOperationAttribute &attribute) {
   Attributes.push_back(attribute);
-  return Attributes.back();
 }
 
 /// Build the GraphOperationInst.

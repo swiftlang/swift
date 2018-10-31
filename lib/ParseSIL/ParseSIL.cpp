@@ -1019,7 +1019,34 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
     SILLocation funcLoc = RegularLocation(P.getEndOfPreviousLoc());
     if (SP.parseSILFunctionRef(funcLoc, func))
       return true;
-    value = SymbolicValue::getFunction(func);
+
+    Identifier subConventionId;
+    FunctionSubConvention subConvention;
+    if (!P.Tok.is(tok::l_paren)) {
+      P.diagnose(P.Tok, diag::sil_const_expected_fn_sub_conv);
+      return true;
+    }
+    P.consumeToken();
+    if (!P.Tok.is(tok::identifier)) {
+      P.diagnose(P.Tok, diag::sil_const_expected_fn_sub_conv);
+      return true;
+    }
+    P.consumeIdentifier(&subConventionId);
+    if (subConventionId.str() == "N") {
+      subConvention = FunctionSubConvention::Normal;
+    } else if (subConventionId.str() == "W") {
+      subConvention = FunctionSubConvention::Witness;
+    } else {
+      P.diagnose(P.Tok, diag::sil_const_expected_fn_sub_conv);
+      return true;
+    }
+    if (!P.Tok.is(tok::r_paren)) {
+      P.diagnose(P.Tok, diag::sil_const_expected_fn_sub_conv);
+      return true;
+    }
+    P.consumeToken();
+
+    value = SymbolicValue::getFunction(func, subConvention);
     return false;
   }
   // Handle aggregate literals.

@@ -106,10 +106,6 @@ GraphOperationInfo::getArgumentLoweringSuffix(ArgumentLowering lowering) {
     return "$tensor";
   case ArgumentLowering::ShapeAttribute:
     return "$shape";
-  case ArgumentLowering::UnknownShapeListAttribute:
-    return "$unknownShapeList";
-  case ArgumentLowering::TypeListAttribute:
-    return "$typeList";
   case ArgumentLowering::TFDataTypeAttribute:
     return "$dtype";
   case ArgumentLowering::Out:
@@ -136,8 +132,6 @@ GraphOperationInfo::decodeArgumentName(StringRef Name) {
           .Case("", ArgumentLowering::NormalAttribute)
           .Case("tensor", ArgumentLowering::TensorAttribute)
           .Case("shape", ArgumentLowering::ShapeAttribute)
-          .Case("unknownShapeList", ArgumentLowering::UnknownShapeListAttribute)
-          .Case("typeList", ArgumentLowering::TypeListAttribute)
           .Case("dtype", ArgumentLowering::TFDataTypeAttribute)
           .Case("out", ArgumentLowering::Out)
           .Default(None);

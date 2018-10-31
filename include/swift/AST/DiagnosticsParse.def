@@ -1713,6 +1713,8 @@ ERROR(sil_const_array_expected_rsquare,PointsToFirstBadToken,
       "expected ']' at end of array 'SymbolicValue'", ())
 ERROR(sil_const_aggregate_expected_rparen,PointsToFirstBadToken,
       "expected ')' at end of aggregate 'SymbolicValue'", ())
+ERROR(sil_const_expected_fn_sub_conv,PointsToFirstBadToken,
+      "expected '(N)' or '(W)' function substitution convention", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
