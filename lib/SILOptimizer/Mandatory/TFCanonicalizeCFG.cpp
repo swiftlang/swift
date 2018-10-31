@@ -524,6 +524,14 @@ class SingleExitLoopTransformer {
         DI->recalculate(*transformer.currentFn);
         PDI->recalculate(*transformer.currentFn);
       }
+
+#ifndef NDEBUG
+      {
+        // Verify that the loop is OK after all the transformations.
+        llvm::DenseSet<const SILLoop*> nestedLoops;
+        loop->verifyLoopNest(&nestedLoops);
+      }
+#endif
       return loopChanged;
     }
 
