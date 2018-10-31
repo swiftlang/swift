@@ -717,6 +717,8 @@ void ASTMangler::appendType(Type type) {
         llvm_unreachable("impossible width value");
       return;
     }
+    case TypeKind::BuiltinIntegerLiteral:
+      return appendOperator("BI");
     case TypeKind::BuiltinRawPointer:
       return appendOperator("Bp");
     case TypeKind::BuiltinNativeObject:

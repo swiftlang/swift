@@ -546,6 +546,8 @@ ERROR(sil_operand_not_ref_storage_address,none,
       (StringRef, StringRef, ReferenceOwnership))
 ERROR(sil_integer_literal_not_integer_type,none,
       "integer_literal instruction requires a 'Builtin.Int<n>' type", ())
+ERROR(sil_integer_literal_not_well_formed,none,
+      "integer_literal value not well-formed for type %0", (Type))
 ERROR(sil_float_literal_not_float_type,none,
       "float_literal instruction requires a 'Builtin.FP<n>' type", ())
 ERROR(sil_substitutions_on_non_polymorphic_type,none,

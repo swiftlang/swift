@@ -1026,6 +1026,12 @@ private:
       break;
     }
 
+    case TypeKind::BuiltinIntegerLiteral: {
+      Encoding = llvm::dwarf::DW_ATE_unsigned; // ?
+      SizeInBits = getSizeOfBasicType(DbgTy);
+      break;
+    }
+
     case TypeKind::BuiltinFloat: {
       auto *FloatTy = BaseTy->castTo<BuiltinFloatType>();
       // Assuming that the bitwidth and FloatTy->getFPKind() are identical.

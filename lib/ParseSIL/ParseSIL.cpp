@@ -276,14 +276,29 @@ namespace {
 
     bool parseVerbatim(StringRef identifier);
 
-    template <typename T> bool parseInteger(T &Result, const Diagnostic &D) {
+    template <typename T>
+    bool parseInteger(T &Result, const Diagnostic &D) {
       if (!P.Tok.is(tok::integer_literal)) {
         P.diagnose(P.Tok, D);
         return true;
       }
-      P.Tok.getText().getAsInteger(0, Result);
+      bool error = parseIntegerLiteral(P.Tok.getText(), 0, Result);
       P.consumeToken(tok::integer_literal);
-      return false;
+      return error;
+    }
+
+    template <typename T>
+    bool parseIntegerLiteral(StringRef text, unsigned radix, T &result) {
+      text = prepareIntegerLiteralForParsing(text);
+      return text.getAsInteger(radix, result);
+    }
+
+    StringRef prepareIntegerLiteralForParsing(StringRef text) {
+      // tok::integer_literal can contain characters that the library
+      // parsing routines don't expect.
+      if (text.contains('_'))
+        text = P.copyAndStripUnderscores(text);
+      return text;
     }
 
     /// @}
@@ -1352,7 +1367,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
       } else
         break;
     } else if (ParseState < 2 && P.Tok.is(tok::integer_literal)) {
-      P.Tok.getText().getAsInteger(0, uncurryLevel);
+      parseIntegerLiteral(P.Tok.getText(), 0, uncurryLevel);
       P.consumeToken(tok::integer_literal);
       ParseState = 2;
     } else
@@ -1475,7 +1490,7 @@ bool SILParser::parseSILDebugVar(SILDebugVariable &Var) {
         return true;
       }
       uint16_t ArgNo;
-      if (P.Tok.getText().getAsInteger(0, ArgNo))
+      if (parseIntegerLiteral(P.Tok.getText(), 0, ArgNo))
         return true;
       Var.ArgNo = ArgNo;
     } else if (Key == "let") {
@@ -1916,7 +1931,7 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
            return true;
          
          if (!P.Tok.is(tok::integer_literal)
-             || P.Tok.getText().getAsInteger(0, index))
+             || parseIntegerLiteral(P.Tok.getText(), 0, index))
            return true;
          
          P.consumeToken(tok::integer_literal);
@@ -2342,21 +2357,20 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
     }
     
-    auto intTy = Ty.getAs<BuiltinIntegerType>();
+    auto intTy = Ty.getAs<AnyBuiltinIntegerType>();
     if (!intTy) {
       P.diagnose(P.Tok, diag::sil_integer_literal_not_integer_type);
       return true;
     }
-    
-    APInt value(intTy->getGreatestWidth(), 0);
-    bool error = P.Tok.getText().getAsInteger(0, value);
-    assert(!error && "integer_literal token did not parse as APInt?!");
-    (void)error;
-    
-    if (Negative)
-      value = -value; 
-    if (value.getBitWidth() != intTy->getGreatestWidth())
-      value = value.zextOrTrunc(intTy->getGreatestWidth());
+
+    StringRef text = prepareIntegerLiteralForParsing(P.Tok.getText());
+
+    bool error;
+    APInt value = intTy->getWidth().parse(text, 0, Negative, &error);
+    if (error) {
+      P.diagnose(P.Tok, diag::sil_integer_literal_not_well_formed, intTy);
+      return true;
+    }
 
     P.consumeToken(tok::integer_literal);
     if (parseSILDebugLocation(InstLoc, B))
@@ -2381,9 +2395,11 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       P.diagnose(P.Tok, diag::sil_float_literal_not_float_type);
       return true;
     }
+
+    StringRef text = prepareIntegerLiteralForParsing(P.Tok.getText());
     
     APInt bits(floatTy->getBitWidth(), 0);
-    bool error = P.Tok.getText().getAsInteger(0, bits);
+    bool error = text.getAsInteger(0, bits);
     assert(!error && "float_literal token did not parse as APInt?!");
     (void)error;
     
@@ -2508,7 +2524,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     }
     
     unsigned Index;
-    bool error = P.Tok.getText().getAsInteger(0, Index);
+    bool error = parseIntegerLiteral(P.Tok.getText(), 0, Index);
     assert(!error && "project_box index did not parse as integer?!");
     (void)error;
 
@@ -3912,7 +3928,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     unsigned Field = 0;
     TupleType *TT = Val->getType().getAs<TupleType>();
     if (P.Tok.isNot(tok::integer_literal) ||
-        P.Tok.getText().getAsInteger(10, Field) ||
+        parseIntegerLiteral(P.Tok.getText(), 10, Field) ||
         Field >= TT->getNumElements()) {
       P.diagnose(P.Tok, diag::sil_tuple_inst_wrong_field);
       return true;

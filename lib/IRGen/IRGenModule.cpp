@@ -48,6 +48,7 @@
 #include "llvm/Support/MD5.h"
 
 #include "GenEnum.h"
+#include "GenIntegerLiteral.h"
 #include "GenType.h"
 #include "IRGenModule.h"
 #include "IRGenDebugInfo.h"
