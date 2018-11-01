@@ -1692,7 +1692,7 @@ public:
                     ProtocolDecl *protocol,
                     ProtocolConformanceRef conformance,
                     DeclName name,
-                    MutableArrayRef<Expr *> arguments,
+                    ArrayRef<Expr *> arguments,
                     Diag<> brokenProtocolDiag);
 
   /// \brief Determine whether the given type contains the given protocol.
