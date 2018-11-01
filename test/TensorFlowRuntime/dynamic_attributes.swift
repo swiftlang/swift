@@ -133,6 +133,34 @@ func loadVALIDString() -> String {
   return VALIDString
 }
 
+var stringArrayAB = ["a", "b"]
+@inline(never)
+func loadStringArrayAB() -> [String] {
+  return stringArrayAB
+}
+
+var stringArrayEmpty: [String] = []
+@inline(never)
+func loadStringArrayEmpty() -> [String] {
+  return stringArrayEmpty
+}
+
+var shape = TensorShape([1])
+@inline(never)
+func loadShape() -> TensorShape {
+  return shape
+}
+@inline(never)
+func loadOptionalShape() -> TensorShape? {
+  return shape
+}
+
+var unknownShape: TensorShape? = nil
+@inline(never)
+func loadUnknownShape() -> TensorShape? {
+  return unknownShape
+}
+
 // ==== Convolution Helper Values ====
 // Helper values for tests involving convolution ops.
 
@@ -299,6 +327,33 @@ DynamicAttributeTests.test("NormalAttribute Array<TensorShape?>") {
   check(dataset: dataset)
 }
 
+DynamicAttributeTests.test("NormalAttribute Array<String>") {
+  // "ParseSingleExample" is the easiest-to-test Op with a list(string) attr,
+  // so we use "ParseSingleExample" for this test.
+
+  // Create a StringTensor containing the serialized bytes of an example
+  // with features {"a": [1.0], "b": [2.0], "c": [3.0]}.
+  let exampleBytesBase64 = StringTensor(
+    "Ci0KDQoBYRIIEgYKBAAAgD8KDQoBYhIIEgYKBAAAAEAKDQoBYxIIEgYKBAAAQEA=")
+  let exampleBytes: StringTensor = #tfop("DecodeBase64", exampleBytesBase64)
+
+  // Call "ParseSingleExample" with the "dense_keys" list(string) attr. We
+  // only select 2 out of the 3 keys from the example, to verify that the
+  // "dense_keys" argument is actually having an effect.
+  let (parsedA, parsedB): (Tensor<Float>, Tensor<Float>) = #tfop(
+    "ParseSingleExample", exampleBytes,
+    [Tensor<Float>([0]), Tensor<Float>([0])],
+    num_sparse: 0, sparse_keys: loadStringArrayEmpty(),
+    dense_keys: loadStringArrayAB(),
+    sparse_types$dtype: [] as [TensorDataType],
+    Tdense$dtype: [Float.tensorFlowDataType, Float.tensorFlowDataType],
+    dense_shapes: [TensorShape([1]), TensorShape([1])]
+  )
+
+  expectEqual(ShapedArray<Float>([1]), parsedA.array)
+  expectEqual(ShapedArray<Float>([2]), parsedB.array)
+}
+
 DynamicAttributeTests.test("TFDataTypeAttribute TensorDataType") {
   let t1 = Tensor<Int32>(-1)
   let t1Result: Tensor<Int32> = #tfop("Abs", t1, T$dtype: loadDtypeInt32())
@@ -318,6 +373,29 @@ DynamicAttributeTests.test("TFDataTypeAttribute Array<TensorDataType>") {
     output_shapes: [nil, nil] as [TensorShape?]
   )
   check(dataset: dataset)
+}
+
+DynamicAttributeTests.test("ShapeAttribute TensorShape") {
+  let t = Tensor<Float>([5.0])
+  let result: Tensor<Float> = #tfop("EnsureShape", t, shape$shape: loadShape(),
+                                    T$dtype: Float.tensorFlowDataType)
+  expectEqual(t, result)
+}
+
+DynamicAttributeTests.test("ShapeAttribute TensorShape? non-nil") {
+  let t = Tensor<Float>([5.0])
+  let result: Tensor<Float> = #tfop("EnsureShape", t,
+                                    shape$shape: loadOptionalShape(),
+                                    T$dtype: Float.tensorFlowDataType)
+  expectEqual(t, result)
+}
+
+DynamicAttributeTests.test("ShapeAttribute TensorShape? nil") {
+  let t = Tensor<Float>([5.0])
+  let result: Tensor<Float> = #tfop("EnsureShape", t,
+                                    shape$shape: loadUnknownShape(),
+                                    T$dtype: Float.tensorFlowDataType)
+  expectEqual(t, result)
 }
 
 runAllTests()
