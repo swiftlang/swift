@@ -59,14 +59,14 @@ enum class UnknownReason {
 
 /// Determines how to substitute the function's generic arguments when
 /// evaluating an apply of the function.
-enum class FunctionSubConvention {
+enum class FunctionSubstitutionConvention {
   /// Use the apply instruction's subtitution map.
   Normal,
 
   /// Transform the apply instruction's subtitution map that is written in terms
   /// of the requirement's generic signature to a substitution map that is
   /// written in terms of the witness signature. (See
-  // `getWitnessMethodSubstitutions` in Devirtualize.cpp for more information).
+  /// `getWitnessMethodSubstitutions` in Devirtualize.cpp for more information).
   Witness
 };
 
@@ -216,8 +216,9 @@ private:
     /// This is the number of elements for an RK_Aggregate representation.
     unsigned aggregate_numElements;
 
-    /// This is the FunctionSubConvention for an RK_Function representation.
-    FunctionSubConvention function_subConvention;
+    /// This is the FunctionSubstitutionConvention for an RK_Function
+    /// representation.
+    FunctionSubstitutionConvention function_subConvention;
   } aux;
 
 public:
@@ -308,7 +309,7 @@ public:
   }
 
   static SymbolicValue getFunction(SILFunction *fn,
-                                   FunctionSubConvention fnSubConv) {
+                                   FunctionSubstitutionConvention fnSubConv) {
     assert(fn && "Function cannot be null");
     SymbolicValue result;
     result.representationKind = RK_Function;
@@ -322,7 +323,7 @@ public:
     return value.function;
   }
 
-  FunctionSubConvention getFunctionSubConvention() const {
+  FunctionSubstitutionConvention getFunctionSubstitutionConvention() const {
     assert(getKind() == Function);
     return aux.function_subConvention;
   }

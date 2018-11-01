@@ -1203,11 +1203,11 @@ public:
       auto function = v.getFunctionValue();
       *this << "@" << function->getName();
       *this << " : $" << function->getLoweredFunctionType();
-      switch (v.getFunctionSubConvention()) {
-      case FunctionSubConvention::Normal:
+      switch (v.getFunctionSubstitutionConvention()) {
+      case FunctionSubstitutionConvention::Normal:
         *this << " (N)";
         break;
-      case FunctionSubConvention::Witness:
+      case FunctionSubstitutionConvention::Witness:
         *this << " (W)";
         break;
       }

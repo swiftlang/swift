@@ -221,7 +221,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
 
   if (auto *fri = dyn_cast<FunctionRefInst>(value))
     return SymbolicValue::getFunction(fri->getReferencedFunction(),
-                                      FunctionSubConvention::Normal);
+                                      FunctionSubstitutionConvention::Normal);
   
   if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(value))
     return getConstantValue(tttfi->getOperand());
@@ -331,7 +331,8 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
 
     // If we were able to resolve it, then we can proceed.
     if (fn)
-      return SymbolicValue::getFunction(fn, FunctionSubConvention::Witness);
+      return SymbolicValue::getFunction(
+          fn, FunctionSubstitutionConvention::Witness);
 
     LLVM_DEBUG(llvm::dbgs()
                << "ConstExpr Unresolved witness: " << *value << "\n");
@@ -932,8 +933,8 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     // Get the substitution map of the call.  This maps from the callee's space
     // into the caller's world.
     SubstitutionMap callSubMap;
-    if (calleeFn.getFunctionSubConvention() ==
-        FunctionSubConvention::Witness) {
+    if (calleeFn.getFunctionSubstitutionConvention() ==
+        FunctionSubstitutionConvention::Witness) {
       // Get the conformance out of the SILFunctionType and map it into our
       // current type space.
       auto conformance = calleeFnType->getWitnessMethodConformance();
