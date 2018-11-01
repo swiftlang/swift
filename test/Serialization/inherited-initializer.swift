@@ -14,8 +14,8 @@ func testSimple() {
   // CHECK: apply [[INIT]]([[ARG]], {{%.+}})
   _ = InheritsInit()
 
-  // CHECK: [[VALUE:%.+]] = integer_literal $Builtin.Int2048, 5
-  // CHECK: [[ARG:%.+]] = apply {{%.+}}([[VALUE]], {{%.+}}) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
+  // CHECK: [[VALUE:%.+]] = integer_literal $Builtin.IntLiteral, 5
+  // CHECK: [[ARG:%.+]] = apply {{%.+}}([[VALUE]], {{%.+}}) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
   // CHECK: [[INIT:%.+]] = function_ref @$s4main12InheritsInitCyACSicfC
   // CHECK: apply [[INIT]]([[ARG]], {{%.+}})
   _ = InheritsInit(5)

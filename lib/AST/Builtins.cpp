@@ -1114,7 +1114,7 @@ static ValueDecl *getCheckedConversionOperation(ASTContext &Context,
 static ValueDecl *getIntToFPWithOverflowOperation(ASTContext &Context,
                                                   Identifier Id, Type InputTy,
                                                   Type OutputTy) {
-  auto InTy = InputTy->getAs<AnyBuiltinIntegerType>();
+  auto InTy = InputTy->getAs<BuiltinIntegerLiteralType>();
   auto OutTy = OutputTy->getAs<BuiltinFloatType>();
   if (!InTy || !OutTy)
     return nullptr;

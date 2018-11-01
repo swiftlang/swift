@@ -1070,8 +1070,13 @@ static bool areCertainlyEqualIndices(const Expr *e1, const Expr *e2) {
   }
 
   // Compare a variety of literals.
-  if (auto *il1 = dyn_cast<IntegerLiteralExpr>(e1))
-    return il1->getValue() == cast<IntegerLiteralExpr>(e2)->getValue();
+  if (auto *il1 = dyn_cast<IntegerLiteralExpr>(e1)) {
+    const auto &val1 = il1->getValue();
+    const auto &val2 = cast<IntegerLiteralExpr>(e2)->getValue();
+    // If the integers are arbitrary-precision, their bit-widths may differ,
+    // but only if they represent different values.
+    return val1.getBitWidth() == val2.getBitWidth() && val1 == val2;
+  }
   if (auto *il1 = dyn_cast<FloatLiteralExpr>(e1))
     return il1->getValue().bitwiseIsEqual(
                                         cast<FloatLiteralExpr>(e2)->getValue());

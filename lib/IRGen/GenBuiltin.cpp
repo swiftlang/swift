@@ -777,28 +777,12 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   // We are currently emitting code for '_convertFromBuiltinIntegerLiteral',
   // which will call the builtin and pass it a non-compile-time-const parameter.
   if (Builtin.ID == BuiltinValueKind::IntToFPWithOverflow) {
-    if (Builtin.Types[0]->is<BuiltinIntegerLiteralType>()) {
-      auto toType =
-        IGF.IGM.getStorageTypeForLowered(Builtin.Types[1]->getCanonicalType());
-      auto result = emitIntegerLiteralToFP(IGF, args, toType);
-      out.add(result);
-      return;
-    }
-    auto ToTy =
+    assert(Builtin.Types[0]->is<BuiltinIntegerLiteralType>());
+    auto toType =
       IGF.IGM.getStorageTypeForLowered(Builtin.Types[1]->getCanonicalType());
-    llvm::Value *Arg = args.claimNext();
-    unsigned bitSize = Arg->getType()->getScalarSizeInBits();
-    if (bitSize > 64) {
-      // TODO: the integer literal bit size is 2048, but we only have a 64-bit
-      // conversion function available (on all platforms).
-      Arg = IGF.Builder.CreateTrunc(Arg, IGF.IGM.Int64Ty);
-    } else if (bitSize < 64) {
-      // Just for completeness. IntToFPWithOverflow is currently only used to
-      // convert 2048 bit integer literals.
-      Arg = IGF.Builder.CreateSExt(Arg, IGF.IGM.Int64Ty);
-    }
-    llvm::Value *V = IGF.Builder.CreateSIToFP(Arg, ToTy);
-    return out.add(V);
+    auto result = emitIntegerLiteralToFP(IGF, args, toType);
+    out.add(result);
+    return;
   }
 
   if (Builtin.ID == BuiltinValueKind::Once

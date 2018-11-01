@@ -233,7 +233,7 @@ public protocol ExpressibleByNilLiteral {
 }
 
 public protocol _ExpressibleByBuiltinIntegerLiteral {
-  init(_builtinIntegerLiteral value: _MaxBuiltinIntegerType)
+  init(_builtinIntegerLiteral value: Builtin.IntLiteral)
 }
 
 /// A type that can be initialized with an integer literal.

@@ -1868,9 +1868,7 @@ namespace {
                tc.Context.Id_IntegerLiteralType,
                initName,
                builtinProtocol,
-               // Note that 'MaxIntegerType' is guaranteed to be available.
-               // Otherwise it would be caught by CSGen::visitLiteralExpr
-               tc.getMaxIntegerType(dc),
+               tc.Context.TheIntegerLiteralType,
                builtinInitName,
                nullptr,
                diag::integer_literal_broken_proto,

@@ -857,7 +857,7 @@ APInt IntegerLiteralExpr::getRawValue() const {
 APInt IntegerLiteralExpr::getValue() const {
   assert(!getType().isNull() && "Semantic analysis has not completed");
   assert(!getType()->hasError() && "Should have a valid type");
-  auto width = getType()->castTo<BuiltinIntegerType>()->getWidth();
+  auto width = getType()->castTo<AnyBuiltinIntegerType>()->getWidth();
   return width.parse(getDigitsText(), /*radix*/ 0, isNegative());
 }
 

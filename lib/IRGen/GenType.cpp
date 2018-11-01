@@ -44,7 +44,7 @@
 #include "Outlining.h"
 #include "ProtocolInfo.h"
 #include "ReferenceTypeInfo.h"
-#include "ScalarTypeInfo.h"
+#include "ScalarPairTypeInfo.h"
 #include "NativeConventionSchema.h"
 #include "IRGenMangler.h"
 #include "NonFixedTypeInfo.h"

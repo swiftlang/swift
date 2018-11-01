@@ -1265,12 +1265,11 @@ static LiteralExpr *getAutomaticRawValueExpr(TypeChecker &TC,
                                                  /*Implicit=*/true);
     }
     // If the prevValue is not a well-typed integer, then break.
-    // This could happen if the literal value overflows _MaxBuiltinIntegerType.
     if (!prevValue->getType())
       return nullptr;
 
     if (auto intLit = dyn_cast<IntegerLiteralExpr>(prevValue)) {
-      APInt nextVal = intLit->getValue() + 1;
+      APInt nextVal = intLit->getValue().sextOrSelf(128) + 1;
       bool negative = nextVal.slt(0);
       if (negative)
         nextVal = -nextVal;
