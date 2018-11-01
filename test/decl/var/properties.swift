@@ -1270,6 +1270,6 @@ class WeakFixItTest {
 
 // SR-8811 (Warning)
 
-let sr8811x = fatalError() // expected-warning {{variable 'sr8811x' inferred to have type 'Never', which may be unexpected}}
+let sr8811x = fatalError() // expected-warning {{variable 'sr8811x' inferred to have type 'Never', which may be unexpected}} expected-note {{add an explicit type annotation to silence this warning}}
 
 let sr8811y: Never = fatalError() // Ok
