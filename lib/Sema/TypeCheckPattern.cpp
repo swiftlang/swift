@@ -1091,11 +1091,12 @@ recur:
     var->getTypeLoc().setType(var->getType());
 
     // If we are inferring a variable to have type AnyObject.Type,
-    // "()", or optional thereof, emit a diagnostic.  In the first 2 cases, the
-    // coder probably forgot a cast and expected a concrete type.  In the later
-    // case, they probably didn't mean to bind to a variable, or there is some
-    // other bug.  We always tell them that they can silence the warning with an
-    // explicit type annotation (and provide a fixit) as a note.
+    // "()", an uninhabited type, or optional thereof, emit a diagnostic.
+    // In the first 2 cases, the coder probably forgot a cast and expected a
+    // concrete type.  In the later case, they probably didn't mean to bind to
+    // a variable, or there is some other bug.  We always tell them that they
+    // can silence the warning with an explicit type annotation
+    // (and provide a fixit) as a note.
     Type diagTy = type->getOptionalObjectType();
     if (!diagTy) diagTy = type;
     
@@ -1108,6 +1109,8 @@ recur:
     } else if (auto MTT = diagTy->getAs<AnyMetatypeType>()) {
       if (MTT->getInstanceType()->isAnyObject())
         shouldRequireType = true;
+    } else if (diagTy->isStructurallyUninhabited()) {
+      shouldRequireType = true;
     }
     
     if (shouldRequireType &&
