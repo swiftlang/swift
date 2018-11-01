@@ -3369,6 +3369,10 @@ public:
     Printer << BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER;
   }
 
+  void visitBuiltinIntegerLiteralType(BuiltinIntegerLiteralType *T) {
+    Printer << BUILTIN_TYPE_NAME_INTLITERAL;
+  }
+
   void visitBuiltinVectorType(BuiltinVectorType *T) {
     llvm::SmallString<32> UnderlyingStrVec;
     StringRef UnderlyingStr;

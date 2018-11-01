@@ -646,32 +646,54 @@ IntegerLiteralInst::IntegerLiteralInst(SILDebugLocation Loc, SILType Ty,
 IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc,
                                                SILType Ty, const APInt &Value,
                                                SILModule &M) {
-  auto intTy = Ty.castTo<BuiltinIntegerType>();
-  assert(intTy->getGreatestWidth() == Value.getBitWidth() &&
-         "IntegerLiteralInst APInt value's bit width doesn't match type");
-  (void)intTy;
+#ifndef NDEBUG
+  if (auto intTy = Ty.getAs<BuiltinIntegerType>()) {
+    assert(intTy->getGreatestWidth() == Value.getBitWidth() &&
+           "IntegerLiteralInst APInt value's bit width doesn't match type");
+  } else {
+    assert(Ty.is<BuiltinIntegerLiteralType>());
+    assert(Value.getBitWidth() == Value.getMinSignedBits());
+  }
+#endif
 
   void *buf = allocateLiteralInstWithBitSize<IntegerLiteralInst>(M,
                                                           Value.getBitWidth());
   return ::new (buf) IntegerLiteralInst(Loc, Ty, Value);
 }
 
+static APInt getAPInt(AnyBuiltinIntegerType *anyIntTy, intmax_t value) {
+  // If we're forming a fixed-width type, build using the greatest width.
+  if (auto intTy = dyn_cast<BuiltinIntegerType>(anyIntTy))
+    return APInt(intTy->getGreatestWidth(), value);
+
+  // Otherwise, build using the size of the type and then truncate to the
+  // minimum width necessary.
+  APInt result(8 * sizeof(value), value, /*signed*/ true);
+  result = result.trunc(result.getMinSignedBits());
+  return result;
+}
+
 IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc,
                                                SILType Ty, intmax_t Value,
                                                SILModule &M) {
-  auto intTy = Ty.castTo<BuiltinIntegerType>();
-  return create(Loc, Ty,
-                APInt(intTy->getGreatestWidth(), Value), M);
+  auto intTy = Ty.castTo<AnyBuiltinIntegerType>();
+  return create(Loc, Ty, getAPInt(intTy, Value), M);
+}
+
+static SILType getGreatestIntegerType(Type type, SILModule &M) {
+  if (auto intTy = type->getAs<BuiltinIntegerType>()) {
+    return SILType::getBuiltinIntegerType(intTy->getGreatestWidth(),
+                                          M.getASTContext());
+  } else {
+    assert(type->is<BuiltinIntegerLiteralType>());
+    return SILType::getBuiltinIntegerLiteralType(M.getASTContext());
+  }
 }
 
 IntegerLiteralInst *IntegerLiteralInst::create(IntegerLiteralExpr *E,
                                                SILDebugLocation Loc,
                                                SILModule &M) {
-  return create(
-      Loc, SILType::getBuiltinIntegerType(
-               E->getType()->castTo<BuiltinIntegerType>()->getGreatestWidth(),
-               M.getASTContext()),
-      E->getValue(), M);
+  return create(Loc, getGreatestIntegerType(E->getType(), M), E->getValue(), M);
 }
 
 /// getValue - Return the APInt for the underlying integer literal.

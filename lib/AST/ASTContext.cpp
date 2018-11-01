@@ -511,6 +511,8 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
                                BuiltinUnsafeValueBufferType(*this)),
     TheSILTokenType(new (*this, AllocationArena::Permanent)
                       SILTokenType(*this)),
+    TheIntegerLiteralType(new (*this, AllocationArena::Permanent)
+                               BuiltinIntegerLiteralType(*this)),
     TheIEEE32Type(new (*this, AllocationArena::Permanent)
                     BuiltinFloatType(BuiltinFloatType::IEEE32,*this)),
     TheIEEE64Type(new (*this, AllocationArena::Permanent)

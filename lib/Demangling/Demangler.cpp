@@ -982,6 +982,10 @@ NodePointer Demangler::demangleBuiltinType() {
       Ty = createNode(Node::Kind::BuiltinTypeName, name);
       break;
     }
+    case 'I':
+      Ty = createNode(Node::Kind::BuiltinTypeName,
+                      BUILTIN_TYPE_NAME_INTLITERAL);
+      break;
     case 'v': {
       int elts = demangleIndex() - 1;
       if (elts <= 0 || elts > maxTypeSize)

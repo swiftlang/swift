@@ -16,6 +16,7 @@
 
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/Numeric.h"
 #include "MetadataImpl.h"
 #include "Private.h"
 #include <cstring>
@@ -65,6 +66,7 @@ namespace ctypes {
     using Bi512_ = int512_like;
 
     using Bw = intptr_t;
+    using BL_ = IntegerLiteral;
 
     using Bf16_ = uint16_t;
     using Bf32_ = float;

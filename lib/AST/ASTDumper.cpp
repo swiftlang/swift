@@ -3193,6 +3193,7 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
+    TRIVIAL_TYPE_PRINTER(BuiltinIntegerLiteral, builtin_integer_literal)
     TRIVIAL_TYPE_PRINTER(BuiltinRawPointer, builtin_raw_pointer)
     TRIVIAL_TYPE_PRINTER(BuiltinNativeObject, builtin_native_object)
     TRIVIAL_TYPE_PRINTER(BuiltinBridgeObject, builtin_bridge_object)

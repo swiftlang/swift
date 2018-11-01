@@ -1828,7 +1828,7 @@ namespace {
     Expr *handleIntegerLiteralExpr(LiteralExpr *expr) {
       // If the literal has been assigned a builtin integer type,
       // don't mess with it.
-      if (cs.getType(expr)->is<BuiltinIntegerType>())
+      if (cs.getType(expr)->is<AnyBuiltinIntegerType>())
         return expr;
 
       auto &tc = cs.getTypeChecker();

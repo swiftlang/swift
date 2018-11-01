@@ -17,6 +17,7 @@
 #include "llvm/IR/Constants.h"
 
 #include "GenConstant.h"
+#include "GenIntegerLiteral.h"
 #include "GenStruct.h"
 #include "GenTuple.h"
 #include "TypeInfo.h"
@@ -29,19 +30,27 @@ using namespace irgen;
 
 llvm::Constant *irgen::emitConstantInt(IRGenModule &IGM,
                                        IntegerLiteralInst *ILI) {
-  APInt value = ILI->getValue();
   BuiltinIntegerWidth width
-    = ILI->getType().castTo<BuiltinIntegerType>()->getWidth();
+    = ILI->getType().castTo<AnyBuiltinIntegerType>()->getWidth();
+
+  // Handle arbitrary-precision integers.
+  if (width.isArbitraryWidth()) {
+    auto pair = emitConstantIntegerLiteral(IGM, ILI);
+    auto type = IGM.getIntegerLiteralTy();
+    return llvm::ConstantStruct::get(type, { pair.Data, pair.Flags });
+  }
+
+  APInt value = ILI->getValue();
 
   // The value may need truncation if its type had an abstract size.
-  if (!width.isFixedWidth()) {
-    assert(width.isPointerWidth() && "impossible width value");
-
+  if (width.isPointerWidth()) {
     unsigned pointerWidth = IGM.getPointerSize().getValueInBits();
     assert(pointerWidth <= value.getBitWidth()
            && "lost precision at AST/SIL level?!");
     if (pointerWidth < value.getBitWidth())
       value = value.trunc(pointerWidth);
+  } else {
+    assert(width.isFixedWidth() && "impossible width value");
   }
 
   return llvm::ConstantInt::get(IGM.LLVMContext, value);

@@ -1468,7 +1468,7 @@ public:
   }
 
   void checkIntegerLiteralInst(IntegerLiteralInst *ILI) {
-    require(ILI->getType().is<BuiltinIntegerType>(),
+    require(ILI->getType().is<AnyBuiltinIntegerType>(),
             "invalid integer literal type");
   }
 
