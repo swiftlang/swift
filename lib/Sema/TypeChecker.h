@@ -1393,15 +1393,6 @@ public:
 
   bool typeCheckCompletionSequence(Expr *&expr, DeclContext *DC);
 
-  /// \brief Type check the given expression assuming that its children
-  /// have already been fully type-checked.
-  ///
-  /// \param expr The expression to type-check, which will be modified in
-  /// place.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  bool typeCheckExpressionShallow(Expr *&expr, DeclContext *dc);
-
   /// Check the key-path expression.
   ///
   /// Returns the type of the last component of the key-path.

@@ -3630,26 +3630,6 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   return result;
 }
 
-Expr *ConstraintSystem::generateConstraintsShallow(Expr *expr) {
-  // Sanitize the expression.
-  expr = SanitizeExpr(*this).walkToExprPost(expr);
-
-  cacheSubExprTypes(expr);
-
-  // Visit the top-level expression generating constraints.
-  ConstraintGenerator cg(*this);
-  auto type = cg.visit(expr);
-  if (!type)
-    return nullptr;
-  
-  this->optimizeConstraints(expr);
-  
-  auto &CS = CG.getConstraintSystem();
-  CS.setType(expr, type);
-
-  return expr;
-}
-
 Type ConstraintSystem::generateConstraints(Pattern *pattern,
                                            ConstraintLocatorBuilder locator) {
   ConstraintGenerator cg(*this);
