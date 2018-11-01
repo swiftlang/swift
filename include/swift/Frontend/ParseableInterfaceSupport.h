@@ -49,6 +49,11 @@ bool emitParseableInterface(raw_ostream &out,
                             ParseableInterfaceOptions const &Opts,
                             ModuleDecl *M);
 
+/// Extract the specified-or-defaulted -module-cache-path that winds up in
+/// the clang importer, for reuse as the .swiftmodule cache path when
+/// building a ParseableInterfaceModuleLoader.
+std::string
+getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 
 /// A ModuleLoader that runs a subordinate \c CompilerInvocation and \c
 /// CompilerInstance to convert .swiftinterface files to .swiftmodule

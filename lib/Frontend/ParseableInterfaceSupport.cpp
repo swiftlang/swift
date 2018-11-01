@@ -21,6 +21,9 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "clang/Basic/Module.h"
+#include "clang/Frontend/CompilerInstance.h"
+#include "clang/Lex/Preprocessor.h"
+#include "clang/Lex/HeaderSearch.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/CommandLine.h"
@@ -337,6 +340,23 @@ llvm::Regex swift::getSwiftInterfaceToolsVersionRegex() {
 llvm::Regex swift::getSwiftInterfaceModuleFlagsRegex() {
   return llvm::Regex("^// " SWIFT_MODULE_FLAGS_KEY ": (.*)$",
                      llvm::Regex::Newline);
+}
+
+/// Extract the specified-or-defaulted -module-cache-path that winds up in
+/// the clang importer, for reuse as the .swiftmodule cache path when
+/// building a ParseableInterfaceModuleLoader.
+std::string
+swift::getModuleCachePathFromClang(const clang::CompilerInstance &Clang) {
+  if (!Clang.hasPreprocessor())
+    return "";
+  std::string SpecificModuleCachePath = Clang.getPreprocessor()
+    .getHeaderSearchInfo()
+    .getModuleCachePath();
+
+  // The returned-from-clang module cache path includes a suffix directory
+  // that is specific to the clang version and invocation; we want the
+  // directory above that.
+  return llvm::sys::path::parent_path(SpecificModuleCachePath);
 }
 
 /// Prints the imported modules in \p M to \p out in the form of \c import

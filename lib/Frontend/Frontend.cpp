@@ -36,9 +36,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
-#include "clang/Frontend/CompilerInstance.h"
-#include "clang/Lex/Preprocessor.h"
-#include "clang/Lex/HeaderSearch.h"
 
 using namespace swift;
 
@@ -308,20 +305,8 @@ bool CompilerInstance::setUpModuleLoaders() {
       Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
       return true;
     }
-    // Capture the specified-or-defaulted -module-cache-path that winds up in
-    // the clang importer, for reuse as the .swiftmodule cache path when
-    // building the ParseableInterfaceModuleLoader below.
-    //
-    // The returned-from-clang module cache path includes a suffix directory
-    // that is specific to the clang version and invocation; we want the
-    // directory above that.
     auto const &Clang = clangImporter->getClangInstance();
-    if (Clang.hasPreprocessor()) {
-      std::string SpecificModuleCachePath = Clang.getPreprocessor()
-                                                .getHeaderSearchInfo()
-                                                .getModuleCachePath();
-      ModuleCachePath = llvm::sys::path::parent_path(SpecificModuleCachePath);
-    }
+    ModuleCachePath = getModuleCachePathFromClang(Clang);
     Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
   }
   if (Invocation.getFrontendOptions().EnableParseableModuleInterface) {
