@@ -110,6 +110,8 @@ namespace irgen {
   class ClangTypeConverter;
   class ClassMetadataLayout;
   class ConformanceInfo;
+  struct ConstantIntegerLiteral;
+  class ConstantIntegerLiteralMap;
   class DebugTypeInfo;
   class EnumImplStrategy;
   class EnumMetadataLayout;
@@ -730,6 +732,8 @@ public:
   llvm::Type *getValueWitnessTy(ValueWitness index);
   Signature getValueWitnessSignature(ValueWitness index);
 
+  llvm::StructType *getIntegerLiteralTy();
+
   void unimplemented(SourceLoc, StringRef Message);
   LLVM_ATTRIBUTE_NORETURN
   void fatal_unimplemented(SourceLoc, StringRef Message);
@@ -759,6 +763,7 @@ private:
   llvm::Type *ValueWitnessTys[MaxNumValueWitnesses];
   llvm::FunctionType *AssociatedTypeWitnessTableAccessFunctionTy = nullptr;
   llvm::StructType *GenericWitnessTableCacheTy = nullptr;
+  llvm::StructType *IntegerLiteralTy = nullptr;
   
   llvm::DenseMap<llvm::Type *, SpareBitVector> SpareBitsForTypes;
   
@@ -865,6 +870,8 @@ public:
                                                     CanDependentMemberType dmt);
   ConstantReference getConstantReferenceForProtocolDescriptor(ProtocolDecl *proto);
 
+  ConstantIntegerLiteral getConstantIntegerLiteral(APInt value);
+
   void addUsedGlobal(llvm::GlobalValue *global);
   void addCompilerUsedGlobal(llvm::GlobalValue *global);
   void addObjCClass(llvm::Constant *addr, bool nonlazy);
@@ -935,6 +942,8 @@ private:
   llvm::StringMap<std::pair<llvm::GlobalVariable*, llvm::Constant*>> FieldNames;
   llvm::StringMap<llvm::Constant*> ObjCSelectorRefs;
   llvm::StringMap<llvm::Constant*> ObjCMethodNames;
+
+  std::unique_ptr<ConstantIntegerLiteralMap> ConstantIntegerLiterals;
 
   /// Maps to constant swift 'String's.
   llvm::StringMap<llvm::Constant*> GlobalConstantStrings;

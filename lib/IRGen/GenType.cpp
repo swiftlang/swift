@@ -1594,7 +1594,8 @@ convertPrimitiveBuiltin(IRGenModule &IGM, CanType canTy) {
     }
     llvm_unreachable("bad builtin floating-point type kind");
   case TypeKind::BuiltinInteger: {
-    unsigned BitWidth = IGM.getBuiltinIntegerWidth(cast<BuiltinIntegerType>(ty));
+    auto intTy = cast<BuiltinIntegerType>(ty);
+    unsigned BitWidth = IGM.getBuiltinIntegerWidth(intTy);
     unsigned ByteSize = (BitWidth+7U)/8U;
     // Round up the memory size and alignment to a power of 2.
     if (!llvm::isPowerOf2_32(ByteSize))
@@ -1664,6 +1665,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
                            getFixedBufferAlignment(IGM));
   case TypeKind::BuiltinRawPointer:
     return &getRawPointerTypeInfo();
+  case TypeKind::BuiltinIntegerLiteral:
+    return &getIntegerLiteralTypeInfo();
   case TypeKind::BuiltinFloat:
   case TypeKind::BuiltinInteger:
   case TypeKind::BuiltinVector: {

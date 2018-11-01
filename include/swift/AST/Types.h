@@ -1436,15 +1436,31 @@ public:
   }
 };
 
+/// An abstract base class for the two integer types.
+class AnyBuiltinIntegerType : public BuiltinType {
+protected:
+  AnyBuiltinIntegerType(TypeKind kind, const ASTContext &C)
+    : BuiltinType(kind, C) {}
+
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() >= TypeKind::First_AnyBuiltinIntegerType &&
+           T->getKind() <= TypeKind::Last_AnyBuiltinIntegerType;
+  }
+
+  BuiltinIntegerWidth getWidth() const; // defined inline below
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(AnyBuiltinIntegerType, BuiltinType)
+
 /// The builtin integer types.  These directly correspond
 /// to LLVM IR integer types.  They lack signedness and have an arbitrary
 /// bitwidth.
-class BuiltinIntegerType : public BuiltinType {
+class BuiltinIntegerType : public AnyBuiltinIntegerType {
   friend class ASTContext;
 private:
   BuiltinIntegerWidth Width;
   BuiltinIntegerType(BuiltinIntegerWidth BitWidth, const ASTContext &C)
-    : BuiltinType(TypeKind::BuiltinInteger, C), Width(BitWidth) {}
+    : AnyBuiltinIntegerType(TypeKind::BuiltinInteger, C), Width(BitWidth) {}
   
 public:
   /// Get a builtin integer type.
@@ -1500,8 +1516,31 @@ public:
     return T->getKind() == TypeKind::BuiltinInteger;
   }
 };
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinIntegerType, BuiltinType)
-  
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinIntegerType, AnyBuiltinIntegerType)
+
+/// BuiltinIntegerLiteralType - The builtin arbitrary-precision integer type.
+/// Useful for constructing integer literals.
+class BuiltinIntegerLiteralType : public AnyBuiltinIntegerType {
+  friend class ASTContext;
+  BuiltinIntegerLiteralType(const ASTContext &C)
+    : AnyBuiltinIntegerType(TypeKind::BuiltinIntegerLiteral, C) {}
+public:
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::BuiltinIntegerLiteral;
+  }
+
+  BuiltinIntegerWidth getWidth() const = delete;
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinIntegerLiteralType, AnyBuiltinIntegerType);
+
+inline BuiltinIntegerWidth AnyBuiltinIntegerType::getWidth() const {
+  if (auto intTy = dyn_cast<BuiltinIntegerType>(this)) {
+    return intTy->getWidth();
+  } else {
+    return BuiltinIntegerWidth::arbitrary();
+  }
+}
+
 class BuiltinFloatType : public BuiltinType {
   friend class ASTContext;
 public:

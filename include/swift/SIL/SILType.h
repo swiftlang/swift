@@ -516,6 +516,8 @@ public:
   static SILType getRawPointerType(const ASTContext &C);
   /// Get a builtin integer type as a SILType.
   static SILType getBuiltinIntegerType(unsigned bitWidth, const ASTContext &C);
+  /// Get the IntegerLiteral type as a SILType.
+  static SILType getBuiltinIntegerLiteralType(const ASTContext &C);
   /// Get a builtin floating-point type as a SILType.
   static SILType getBuiltinFloatType(BuiltinFloatType::FPKind Kind,
                                      const ASTContext &C);

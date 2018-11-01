@@ -2039,9 +2039,8 @@ public:
     void verifyChecked(IfExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying IfExpr", E);
 
-      auto condTy
-        = E->getCondExpr()->getType()->getAs<BuiltinIntegerType>();
-      if (!condTy || !condTy->isFixedWidth() || condTy->getFixedWidth() != 1) {
+      auto condTy = E->getCondExpr()->getType();
+      if (!condTy->isBuiltinIntegerType(1)) {
         Out << "IfExpr condition is not an i1\n";
         abort();
       }

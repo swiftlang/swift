@@ -28,6 +28,7 @@
 #include "Explosion.h"
 #include "GenCall.h"
 #include "GenCast.h"
+#include "GenIntegerLiteral.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
@@ -690,10 +691,20 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   if (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
       Builtin.ID == BuiltinValueKind::UToUCheckedTrunc ||
       Builtin.ID == BuiltinValueKind::SToUCheckedTrunc) {
+    bool Signed = (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc);
+
+    auto FromType = Builtin.Types[0]->getCanonicalType();
+    auto ToTy = cast<llvm::IntegerType>(
+      IGF.IGM.getStorageTypeForLowered(Builtin.Types[1]->getCanonicalType()));
+
+    // Handle the arbitrary-precision truncate specially.
+    if (isa<BuiltinIntegerLiteralType>(FromType)) {
+      emitIntegerLiteralCheckedTrunc(IGF, args, ToTy, Signed, out);
+      return;
+    }
+
     auto FromTy =
-      IGF.IGM.getStorageTypeForLowered(Builtin.Types[0]->getCanonicalType());
-    auto ToTy =
-      IGF.IGM.getStorageTypeForLowered(Builtin.Types[1]->getCanonicalType());
+      IGF.IGM.getStorageTypeForLowered(FromType);
 
     // Compute the result for SToSCheckedTrunc_IntFrom_IntTo(Arg):
     //   Res = trunc_IntTo(Arg)
@@ -709,7 +720,6 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     //   return (Res, OverflowFlag)
     llvm::Value *Arg = args.claimNext();
     llvm::Value *Res = IGF.Builder.CreateTrunc(Arg, ToTy);
-    bool Signed = (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc);
     llvm::Value *Ext = Signed ? IGF.Builder.CreateSExt(Res, FromTy) :
                                 IGF.Builder.CreateZExt(Res, FromTy);
     llvm::Value *OverflowCond = IGF.Builder.CreateICmpEQ(Arg, Ext);
@@ -767,6 +777,13 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   // We are currently emitting code for '_convertFromBuiltinIntegerLiteral',
   // which will call the builtin and pass it a non-compile-time-const parameter.
   if (Builtin.ID == BuiltinValueKind::IntToFPWithOverflow) {
+    if (Builtin.Types[0]->is<BuiltinIntegerLiteralType>()) {
+      auto toType =
+        IGF.IGM.getStorageTypeForLowered(Builtin.Types[1]->getCanonicalType());
+      auto result = emitIntegerLiteralToFP(IGF, args, toType);
+      out.add(result);
+      return;
+    }
     auto ToTy =
       IGF.IGM.getStorageTypeForLowered(Builtin.Types[1]->getCanonicalType());
     llvm::Value *Arg = args.claimNext();
