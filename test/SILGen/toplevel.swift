@@ -13,7 +13,7 @@ func trap() -> Never {
 // -- initialize x
 // CHECK: alloc_global @$s8toplevel1xSiv
 // CHECK: [[X:%[0-9]+]] = global_addr @$s8toplevel1xSivp : $*Int
-// CHECK: integer_literal $Builtin.Int2048, 999
+// CHECK: integer_literal $Builtin.IntLiteral, 999
 // CHECK: store {{.*}} to [trivial] [[X]]
 
 var x = 999
@@ -23,7 +23,7 @@ func print_x() {
 }
 
 // -- assign x
-// CHECK: integer_literal $Builtin.Int2048, 0
+// CHECK: integer_literal $Builtin.IntLiteral, 0
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[X]] : $*Int
 // CHECK: assign {{.*}} to [[WRITE]]
 // CHECK: [[PRINT_X:%[0-9]+]] = function_ref @$s8toplevel7print_xyyF :

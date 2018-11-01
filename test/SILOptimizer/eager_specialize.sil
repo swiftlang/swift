@@ -154,11 +154,11 @@ bb0(%0 : $*T, %1 : $*T, %2 : $*T):
   %5 = function_ref @$ss2neoiySbx_xts9EquatableRzlFZ : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
   %6 = alloc_stack $T
   copy_addr %2 to [initialization] %6 : $*T
-  %8 = witness_method $T, #_ExpressibleByBuiltinIntegerLiteral.init!allocator.1 : $@convention(witness_method: _ExpressibleByBuiltinIntegerLiteral) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.Int2048, @thick τ_0_0.Type) -> @out τ_0_0
+  %8 = witness_method $T, #_ExpressibleByBuiltinIntegerLiteral.init!allocator.1 : $@convention(witness_method: _ExpressibleByBuiltinIntegerLiteral) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.IntLiteral, @thick τ_0_0.Type) -> @out τ_0_0
   %9 = metatype $@thick T.Type
-  %10 = integer_literal $Builtin.Int2048, 0
+  %10 = integer_literal $Builtin.IntLiteral, 0
   %11 = alloc_stack $T
-  %12 = apply %8<T>(%11, %10, %9) : $@convention(witness_method: _ExpressibleByBuiltinIntegerLiteral) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.Int2048, @thick τ_0_0.Type) -> @out τ_0_0
+  %12 = apply %8<T>(%11, %10, %9) : $@convention(witness_method: _ExpressibleByBuiltinIntegerLiteral) <τ_0_0 where τ_0_0 : _ExpressibleByBuiltinIntegerLiteral> (Builtin.IntLiteral, @thick τ_0_0.Type) -> @out τ_0_0
   %13 = apply %5<T>(%6, %11) : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0) -> Bool
   %14 = struct_extract %13 : $Bool, #Bool._value
   dealloc_stack %11 : $*T

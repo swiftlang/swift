@@ -39,10 +39,11 @@ namespace {
     char data[16];
   };
 
-  struct alignas(32) int256_like {
+  static_assert(MaximumAlignment == 16, "max alignment was hardcoded");
+  struct alignas(16) int256_like {
     char data[32];
   };
-  struct alignas(64) int512_like {
+  struct alignas(16) int512_like {
     char data[64];
   };
 
@@ -122,8 +123,9 @@ namespace {
   SET_FIXED_ALIGNMENT(uint32_t, 4)
   SET_FIXED_ALIGNMENT(uint64_t, 8)
   SET_FIXED_ALIGNMENT(int128_like, 16)
-  SET_FIXED_ALIGNMENT(int256_like, 32)
-  SET_FIXED_ALIGNMENT(int512_like, 64)
+  static_assert(MaximumAlignment == 16, "max alignment was hardcoded");
+  SET_FIXED_ALIGNMENT(int256_like, 16)
+  SET_FIXED_ALIGNMENT(int512_like, 16)
 
 #undef SET_FIXED_ALIGNMENT
 

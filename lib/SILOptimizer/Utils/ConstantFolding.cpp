@@ -772,11 +772,10 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
       }
     }
 
-
-    // Assume that we are converting from a literal if the Source size is
-    // 2048. Is there a better way to identify conversions from literals?
-    bool Literal = (SrcBitWidth == 2048 ||
-                    isa<BuiltinIntegerLiteralType>(SrcTy));
+    // Assume that we're converting from a literal if the source type is
+    // IntegerLiteral.  Is there a better way to identify this if we start
+    // using Builtin.IntegerLiteral in an exposed type?
+    bool Literal = isa<BuiltinIntegerLiteralType>(SrcTy);
 
     // FIXME: This will prevent hard error in cases the error is coming
     // from ObjC interoperability code. Currently, we treat NSUInteger as
