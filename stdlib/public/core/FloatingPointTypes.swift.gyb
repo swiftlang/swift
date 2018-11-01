@@ -1438,8 +1438,8 @@ extension ${Self}: BinaryFloatingPoint {
 extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLiteral {
   @_transparent
   public
-  init(_builtinIntegerLiteral value: Builtin.Int${builtinIntLiteralBits}){
-    self = ${Self}(Builtin.itofp_with_overflow_Int${builtinIntLiteralBits}_FPIEEE${bits}(value))
+  init(_builtinIntegerLiteral value: Builtin.IntLiteral){
+    self = ${Self}(Builtin.itofp_with_overflow_IntLiteral_FPIEEE${bits}(value))
   }
 
   /// Creates a new value from the given integer literal.

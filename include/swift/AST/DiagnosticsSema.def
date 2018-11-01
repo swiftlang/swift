@@ -2619,8 +2619,6 @@ NOTE(found_candidate,none,
 NOTE(found_candidate_type,none,
      "found candidate with type %0", (Type))
 
-ERROR(no_MaxBuiltinIntegerType_found,none,
-   "standard library error: _MaxBuiltinIntegerType is not properly defined", ())
 ERROR(no_MaxBuiltinFloatType_found,none,
    "standard library error: _MaxBuiltinFloatType is not properly defined", ())
 ERROR(integer_literal_overflows_maxwidth, none,

@@ -302,10 +302,10 @@ bb0(%0 : $*Int64):
 sil @trivial_witness_method_caller : $@convention(thin) () -> () {
   %0 = alloc_box ${ var Int64 }, var, name "x"
   %1 = project_box %0 : ${ var Int64 }, 0
-  %2 = function_ref @$ss5Int64V22_builtinIntegerLiteralABBi2048__tcfC : $@convention(method) (Builtin.Int2048, @thin Int64.Type) -> Int64 // user: %5
+  %2 = function_ref @$ss5Int64V22_builtinIntegerLiteralABBI__tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int64.Type) -> Int64 // user: %5
   %3 = metatype $@thin Int64.Type
-  %4 = integer_literal $Builtin.Int2048, 0
-  %5 = apply %2(%4, %3) : $@convention(method) (Builtin.Int2048, @thin Int64.Type) -> Int64
+  %4 = integer_literal $Builtin.IntLiteral, 0
+  %5 = apply %2(%4, %3) : $@convention(method) (Builtin.IntLiteral, @thin Int64.Type) -> Int64
   store %5 to %1 : $*Int64
   %6 = function_ref @trivial_witness_method : $@convention(witness_method: P) (@inout Int64) -> Int64
   %7 = apply %6 (%1) : $@convention(witness_method: P) (@inout Int64) -> Int64
@@ -314,7 +314,7 @@ sil @trivial_witness_method_caller : $@convention(thin) () -> () {
 }
 
 // Int64.init(_builtinIntegerLiteral:)
-sil [transparent] [serialized] @$ss5Int64V22_builtinIntegerLiteralABBi2048__tcfC : $@convention(method) (Builtin.Int2048, @thin Int64.Type) -> Int64
+sil [transparent] [serialized] @$ss5Int64V22_builtinIntegerLiteralABBI__tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int64.Type) -> Int64
 
 
 // We can inline function_refs with c calling convention.
@@ -711,13 +711,13 @@ bb0:
 // CHECK-LABEL: [noinline] @noinline_callee
 sil [noinline] @noinline_callee : $@convention(thin) () -> Int {
 bb0:
-  %0 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+  %0 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBI_Si : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
   %1 = metatype $@thin Int.Type
-  %2 = integer_literal $Builtin.Int2048, 0
-  %3 = apply %0(%2, %1) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+  %2 = integer_literal $Builtin.IntLiteral, 0
+  %3 = apply %0(%2, %1) : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
   return %3 : $Int
 }
-sil [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+sil [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBI_Si : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
 
 sil @unknown_function : $@convention(thin) () -> ()
 

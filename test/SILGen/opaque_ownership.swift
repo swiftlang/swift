@@ -111,7 +111,7 @@ public func == <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
   return lhs.rawValue == rhs.rawValue
 }
 
-public typealias _MaxBuiltinIntegerType = Builtin.Int2048
+public typealias _MaxBuiltinIntegerType = Builtin.IntLiteral
 
 public protocol _ExpressibleByBuiltinIntegerLiteral {
   init(_builtinIntegerLiteral value: _MaxBuiltinIntegerType)
@@ -139,7 +139,7 @@ public protocol ExpressibleByExtendedGraphemeClusterLiteral {}
 public struct Int64 : ExpressibleByIntegerLiteral, _ExpressibleByBuiltinIntegerLiteral, Equatable {
   public var _value: Builtin.Int64
   public init(_builtinIntegerLiteral x: _MaxBuiltinIntegerType) {
-    _value = Builtin.s_to_s_checked_trunc_Int2048_Int64(x).0
+    _value = Builtin.s_to_s_checked_trunc_IntLiteral_Int64(x).0
   }
   public typealias IntegerLiteralType = Int64
   public init(integerLiteral value: Int64) {

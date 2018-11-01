@@ -132,13 +132,13 @@ func testSwitch() {
   switch (switchfoo(), switchbar()) {
   // CHECK: store {{.*}}, loc "{{.*}}":[[@LINE-1]]
   case (1,2):
-  // CHECK: integer_literal $Builtin.Int2048, 2, loc "{{.*}}":[[@LINE-3]]:10
+  // CHECK: integer_literal $Builtin.IntLiteral, 2, loc "{{.*}}":[[@LINE-3]]:10
   // FIXME: Location info is missing.
   // CHECK: cond_br
   //
     var z: Int = 200
   // CHECK: [[VAR_Z:%[0-9]+]] = alloc_box ${ var Int }, var, name "z"{{.*}}line:[[@LINE-1]]:9
-  // CHECK: integer_literal $Builtin.Int2048, 200, loc "{{.*}}":[[@LINE-2]]:18
+  // CHECK: integer_literal $Builtin.IntLiteral, 200, loc "{{.*}}":[[@LINE-2]]:18
     x = z
   // CHECK:  destroy_value [[VAR_Z]]{{.*}}, loc "{{.*}}":[[@LINE-1]]:9, {{.*}}:cleanup
   case (3, let y):
@@ -178,7 +178,7 @@ func testFor() {
 
   // CHECK-LABEL: sil hidden @$s13sil_locations7testForyyF
   // CHECK: [[VAR_Y_IN_FOR:%[0-9]+]]  = alloc_box ${ var Int }, var, name "y", loc "{{.*}}":[[@LINE-10]]:9
-  // CHECK: integer_literal $Builtin.Int2048, 300, loc "{{.*}}":[[@LINE-11]]:18
+  // CHECK: integer_literal $Builtin.IntLiteral, 300, loc "{{.*}}":[[@LINE-11]]:18
   // CHECK: destroy_value [[VAR_Y_IN_FOR]] : ${ var Int }
   // CHECK: br bb{{.*}}, loc "{{.*}}":[[@LINE-10]]:7
   // CHECK: destroy_value [[VAR_Y_IN_FOR]] : ${ var Int }
@@ -193,8 +193,8 @@ func testTuples() {
   var d = "foo"
   // CHECK-LABEL: sil hidden @$s13sil_locations10testTuplesyyF
   // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-4]]:11
-  // CHECK: integer_literal $Builtin.Int2048, 2, loc "{{.*}}":[[@LINE-5]]:12
-  // CHECK: integer_literal $Builtin.Int2048, 3, loc "{{.*}}":[[@LINE-6]]:14
+  // CHECK: integer_literal $Builtin.IntLiteral, 2, loc "{{.*}}":[[@LINE-5]]:12
+  // CHECK: integer_literal $Builtin.IntLiteral, 3, loc "{{.*}}":[[@LINE-6]]:14
   // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-6]]:12
   // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-7]]:16  
 }
@@ -245,8 +245,8 @@ func containers() -> ([Int], Dictionary<String, Int>) {
   
   // CHECK: string_literal utf8 "Ankeny", loc "{{.*}}":[[@LINE-4]]:23
 
-  // CHECK: integer_literal $Builtin.Int2048, 1, loc "{{.*}}":[[@LINE-6]]:33
-  // CHECK: integer_literal $Builtin.Int2048, 2, loc "{{.*}}":[[@LINE-7]]:48
+  // CHECK: integer_literal $Builtin.IntLiteral, 1, loc "{{.*}}":[[@LINE-6]]:33
+  // CHECK: integer_literal $Builtin.IntLiteral, 2, loc "{{.*}}":[[@LINE-7]]:48
 
   
   

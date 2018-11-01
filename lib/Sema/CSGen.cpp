@@ -1203,34 +1203,6 @@ namespace {
       if (!protocol)
         return nullptr;
 
-      // Make sure that MaxIntegerType is defined if it would used later
-      // during constraint solving (CSApply).
-      if (isa<IntegerLiteralExpr>(expr) ||
-          (isa<MagicIdentifierLiteralExpr>(expr) &&
-           dyn_cast<MagicIdentifierLiteralExpr>(expr)->isColumn())) {
-
-        auto maxIntType = CS.TC.getMaxIntegerType(CS.DC);
-        if (maxIntType.isNull()) {
-          CS.TC.diagnose(expr->getLoc(), diag::no_MaxBuiltinIntegerType_found);
-          return nullptr;
-        }
-
-        // In the case of integer literal, make sure that the literal value
-        // will fit within the bit width of the maximum integer type.
-        if (IntegerLiteralExpr *intLit = dyn_cast<IntegerLiteralExpr>(expr)) {
-          unsigned maxWidth =
-              maxIntType->castTo<BuiltinIntegerType>()->getGreatestWidth();
-          unsigned signedLitWidth = intLit->getRawValue().getMinSignedBits();
-
-          if (signedLitWidth > maxWidth) { // overflow?
-            CS.TC.diagnose(expr->getLoc(),
-                           diag::integer_literal_overflows_maxwidth, maxWidth,
-                           signedLitWidth);
-            return nullptr;
-          }
-        }
-      }
-
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       TVO_PrefersSubtypeBinding);
       CS.addConstraint(ConstraintKind::LiteralConformsTo, tv,

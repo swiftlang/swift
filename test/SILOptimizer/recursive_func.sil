@@ -19,11 +19,11 @@ sil @main : $@convention(c) (Builtin.Int32, Builtin.RawPointer) -> Builtin.Int32
 bb0(%c : $Builtin.Int32, %v : $Builtin.RawPointer):
   // function_ref test.test (Swift.Int) -> ()
   %0 = function_ref @_TF4test4testFSiT_ : $@convention(thin) (Int) -> () // user: %5
-  // function_ref Swift.Int._convertFromBuiltinIntegerLiteral (Swift.Int.Type)(Builtin.Int2048) -> Swift.Int
-  %1 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int // user: %4
+  // function_ref Swift.Int._convertFromBuiltinIntegerLiteral (Swift.Int.Type)(Builtin.IntLiteral) -> Swift.Int
+  %1 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBI_Si : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %4
   %2 = metatype $@thin Int.Type                   // user: %4
-  %3 = integer_literal $Builtin.Int2048, 1000     // user: %4
-  %4 = apply %1(%3, %2) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int // user: %5
+  %3 = integer_literal $Builtin.IntLiteral, 1000     // user: %4
+  %4 = apply %1(%3, %2) : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %5
   %5 = apply %0(%4) : $@convention(thin) (Int) -> ()
   %6 = integer_literal $Builtin.Int32, 0
   return %6 : $Builtin.Int32
@@ -37,11 +37,11 @@ bb0(%0 : $Int, %1 : $REC):
   %4 = function_ref @_TFSb21_getBuiltinLogicValuefSbFT_Bi1_ : $@convention(method) (Bool) -> Builtin.Int1 // user: %11
   // function_ref Swift.>= @infix (Swift.Int, Swift.Int) -> Swift.Bool
   %5 = function_ref @_TFsoi2geFTSiSi_Sb : $@convention(thin) (Int, Int) -> Bool // user: %10
-  // function_ref Swift.Int._convertFromBuiltinIntegerLiteral (Swift.Int.Type)(Builtin.Int2048) -> Swift.Int
-  %6 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int // user: %9
+  // function_ref Swift.Int._convertFromBuiltinIntegerLiteral (Swift.Int.Type)(Builtin.IntLiteral) -> Swift.Int
+  %6 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBI_Si : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %9
   %7 = metatype $@thin Int.Type                   // user: %9
-  %8 = integer_literal $Builtin.Int2048, 2        // user: %9
-  %9 = apply %6(%8, %7) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int // user: %10
+  %8 = integer_literal $Builtin.IntLiteral, 2        // user: %9
+  %9 = apply %6(%8, %7) : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %10
   %10 = apply %5(%0, %9) : $@convention(thin) (Int, Int) -> Bool // user: %11
   %11 = apply %4(%10) : $@convention(method) (Bool) -> Builtin.Int1 // user: %12
   cond_br %11, bb1, bb2                           // id: %12
@@ -51,22 +51,22 @@ bb1:                                              // Preds: bb0
   %14 = class_method %1 : $REC, #REC.recursive!1 : (REC) -> (Int) -> (), $@convention(method) (Int, @guaranteed REC) -> () // user: %21
   // function_ref Swift.- @infix (Swift.Int, Swift.Int) -> Swift.Int
   %15 = function_ref @_TFsoi1sFTSiSi_Si : $@convention(thin) (Int, Int) -> Int // user: %20
-  // function_ref Swift.Int._convertFromBuiltinIntegerLiteral (Swift.Int.Type)(Builtin.Int2048) -> Swift.Int
-  %16 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int // user: %19
+  // function_ref Swift.Int._convertFromBuiltinIntegerLiteral (Swift.Int.Type)(Builtin.IntLiteral) -> Swift.Int
+  %16 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBI_Si : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %19
   %17 = metatype $@thin Int.Type                  // user: %19
-  %18 = integer_literal $Builtin.Int2048, 2       // user: %19
-  %19 = apply %16(%18, %17) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int // user: %20
+  %18 = integer_literal $Builtin.IntLiteral, 2       // user: %19
+  %19 = apply %16(%18, %17) : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %20
   %20 = apply %15(%0, %19) : $@convention(thin) (Int, Int) -> Int // user: %21
   %21 = apply %14(%20, %1) : $@convention(method) (Int, @guaranteed REC) -> ()
   strong_retain %1 : $REC                         // id: %22
   %23 = class_method %1 : $REC, #REC.recursive!1 : (REC) -> (Int) -> (), $@convention(method) (Int, @guaranteed REC) -> () // user: %30
   // function_ref Swift.- @infix (Swift.Int, Swift.Int) -> Swift.Int
   %24 = function_ref @_TFsoi1sFTSiSi_Si : $@convention(thin) (Int, Int) -> Int // user: %29
-  // function_ref Swift.Int._convertFromBuiltinIntegerLiteral (Swift.Int.Type)(Builtin.Int2048) -> Swift.Int
-  %25 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int // user: %28
+  // function_ref Swift.Int._convertFromBuiltinIntegerLiteral (Swift.Int.Type)(Builtin.IntLiteral) -> Swift.Int
+  %25 = function_ref @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBI_Si : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %28
   %26 = metatype $@thin Int.Type                  // user: %28
-  %27 = integer_literal $Builtin.Int2048, 1       // user: %28
-  %28 = apply %25(%27, %26) : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int // user: %29
+  %27 = integer_literal $Builtin.IntLiteral, 1       // user: %28
+  %28 = apply %25(%27, %26) : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %29
   %29 = apply %24(%0, %28) : $@convention(thin) (Int, Int) -> Int // user: %30
   %30 = apply %23(%29, %1) : $@convention(method) (Int, @guaranteed REC) -> ()
   br bb2                                          // id: %31
@@ -83,8 +83,8 @@ sil [transparent] @_TFSb21_getBuiltinLogicValuefSbFT_Bi1_ : $@convention(method)
 // Swift.>= @infix (Swift.Int, Swift.Int) -> Swift.Bool
 sil [transparent] @_TFsoi2geFTSiSi_Sb : $@convention(thin) (Int, Int) -> Bool
 
-// Swift.Int._convertFromBuiltinIntegerLiteral (Swift.Int.Type)(Builtin.Int2048) -> Swift.Int
-sil [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBi2048_Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+// Swift.Int._convertFromBuiltinIntegerLiteral (Swift.Int.Type)(Builtin.IntLiteral) -> Swift.Int
+sil [transparent] @_TFSi33_convertFromBuiltinIntegerLiteralfMSiFBI_Si : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
 
 // Swift.- @infix (Swift.Int, Swift.Int) -> Swift.Int
 sil [transparent] @_TFsoi1sFTSiSi_Si : $@convention(thin) (Int, Int) -> Int
