@@ -486,6 +486,13 @@ private:
     case Node::Kind::AssociatedTypeGenericParamRef:
     case Node::Kind::ExtensionDescriptor:
     case Node::Kind::AnonymousContext:
+    case Node::Kind::AnyProtocolConformanceList:
+    case Node::Kind::ConcreteProtocolConformance:
+    case Node::Kind::DependentAssociatedConformance:
+    case Node::Kind::DependentProtocolConformanceAssociated:
+    case Node::Kind::DependentProtocolConformanceInherited:
+    case Node::Kind::DependentProtocolConformanceRoot:
+    case Node::Kind::ProtocolConformanceRef:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -2084,6 +2091,39 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::AssociatedTypeGenericParamRef:
     Printer << "generic parameter reference for associated type ";
+    printChildren(Node);
+    return nullptr;
+  case Node::Kind::AnyProtocolConformanceList:
+    printChildren(Node);
+    return nullptr;
+  case Node::Kind::ConcreteProtocolConformance:
+    Printer << "concrete protocol conformance ";
+    if (Node->hasIndex())
+      Printer << "#" << Node->getIndex() << " ";
+    printChildren(Node);
+    return nullptr;
+  case Node::Kind::DependentAssociatedConformance:
+    Printer << "dependent associated conformance ";
+    printChildren(Node);
+    return nullptr;
+  case Node::Kind::DependentProtocolConformanceAssociated:
+    Printer << "dependent associated protocol conformance ";
+    if (Node->hasIndex())
+      Printer << "#" << Node->getIndex() << " ";
+    printChildren(Node);
+    return nullptr;
+  case Node::Kind::DependentProtocolConformanceInherited:
+    Printer << "dependent inherited protocol conformance ";
+    if (Node->hasIndex())
+      Printer << "#" << Node->getIndex() << " ";
+    printChildren(Node);
+    return nullptr;
+  case Node::Kind::DependentProtocolConformanceRoot:
+    Printer << "dependent root protocol conformance #" << Node->getIndex()
+      << " ";
+    printChildren(Node);
+    return nullptr;
+  case Node::Kind::ProtocolConformanceRef:
     printChildren(Node);
     return nullptr;
   }

@@ -87,6 +87,8 @@ The following symbolic reference kinds are currently implemented:
    protocol-conformance-ref ::= '\x03' .{4}  // Reference points directly to protocol conformance descriptor (NOT IMPLEMENTED)
    protocol-conformance-ref ::= '\x04' .{4}  // Reference points indirectly to protocol conformance descriptor (NOT IMPLEMENTED)
 
+   dependent-associated-conformance ::= '\x05' .{4}  // Reference points directly to associated conformance descriptor (NOT IMPLEMENTED)
+   dependent-associated-conformance ::= '\x06' .{4}  // Reference points indirectly to associated conformance descriptor (NOT IMPLEMENTED)
 
 Globals
 ~~~~~~~
@@ -619,13 +621,43 @@ Property behaviors are implemented using private protocol conformances.
 
 ::
 
-  concrete-protocol-conformance ::= type protocol-conformance-ref
+  concrete-protocol-conformance ::= type protocol-conformance-ref any-protocol-conformance-list 'HC'
   protocol-conformance-ref ::= protocol module?
 
+  any-protocol-conformance ::= concrete-protocol-conformance
+  any-protocol-conformance ::= dependent-protocol-conformance
+
+  any-protocol-conformance-list ::= any-protocol-conformance '_' any-protocol-conformance-list
+  any-protocol-conformance-list ::= empty-list
+
+  DEPENDENT-CONFORMANCE-INDEX ::= INDEX
+
+  dependent-protocol-conformance ::= type protocol 'HD' DEPENDENT-CONFORMANCE-INDEX
+  dependent-protocol-conformance ::= dependent-protocol-conformance protocol 'HI' DEPENDENT-CONFORMANCE-INDEX
+  dependent-protocol-conformance ::= dependent-protocol-conformance
+      dependent-associated-conformance 'HA' DEPENDENT-CONFORMANCE-INDEX
+
+  dependent-associated-conformance ::= type protocol
+
 A compact representation used to represent mangled protocol conformance witness
-arguments at runtime. The ``module`` is only specified for conformances that
-are "retroactive", meaning that the context in which the conformance is defined
-is in neither the protocol or type module.
+arguments at runtime. The ``module`` is only specified for conformances that are
+"retroactive", meaning that the context in which the conformance is defined is
+in neither the protocol or type module. The concrete protocol conformances that
+follow are for the conditional conformance requirements.
+
+Dependent protocol conformances mangle the access path required to extract a
+protocol conformance from some conformance passed into the environment. The
+first case (operator "HD") is the leaf requirement, containing a dependent type
+and the protocol it conforms to. The remaining dependent protocol conformance
+manglings describe lookups performed on their child dependent protocol
+conformances. The "HI" operator retrieves the named inherited protocol from the
+witness table produced by the child. The "HA" operator refers to an associated
+conformance within the witness table, identified by the dependent type and
+protocol. In all cases, the DEPENDENT-CONFORMANCE-INDEX is an INDEX value
+indicating the position of the appropriate value within the generic environment
+(for "HD") or witness table (for "HI" and "HA") when it is known to be at a
+fixed position. A position of zero is used to indicate "unknown"; all other
+values are adjusted by 1.
 
 ::
 
