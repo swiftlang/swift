@@ -1979,9 +1979,12 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   // TODO: As an optimization, do this lookup once per CurSILFn
   auto tfModule = astCtx.getLoadedModule(astCtx.Id_TensorFlow);
   assert(tfModule && "could not find TensorFlow module");
-  auto tensorGroupProto =
-      astCtx.getProtocol(KnownProtocolKind::TensorGroup);
-  assert(tensorGroupProto && "could not find TensorGroup protocol");
+  auto inputTensorGroupProto =
+      astCtx.getProtocol(KnownProtocolKind::InputTensorGroup);
+  auto outputTensorGroupProto =
+      astCtx.getProtocol(KnownProtocolKind::OutputTensorGroup);
+  assert(inputTensorGroupProto && "could not find InputTensorGroup protocol");
+  assert(outputTensorGroupProto && "could not find OutputTensorGroup protocol");
 
   if (!llvm::TFDynamicCompilation) {
     // If we are not in dynamic compilation mode, then deabstraction may not
@@ -2051,25 +2054,18 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   // returns an Int32 value for the number of inputs that it has added. There
   // are a few different cases that can be unpacked:
   // - if `opInput` is a TensorFlow value, then we just add its handle;
-  // - if `opInput` is an archetype conforming to TensorGroup, then we
+  // - if `opInput` is an archetype conforming to InputTensorGroup, then we
   //   ask the conformance for the handles and add those;
   // This function crashes if it receives an unhandled case. Earlier
   // typechecking should ensure that inputs match the cases that this function
   // handles.
-  //
-  // TODO: We should also handle the following cases:
-  // - if `opInput` is an array of TensorFlow values, then we add all the
-  //   elements' handles;
-  // - if `opInput` is an array of archetypes conforming to TensorGroup,
-  //   then we ask the conformance for all the elements' handles, flatten the
-  //   results together, and add those;
   auto unpackAndAddInput = [&](SILValue opInput) -> llvm::Value* {
     LLVM_DEBUG(llvm::dbgs()
                << "   Adding input of type " << opInput->getType() << ".\n");
 
     // If this is a known TensorFlow value, add it directly.
     // TODO: We could also handle concrete structs of known TensorFlow values
-    // here, to avoid falling through to the slower TensorGroup case.
+    // here, to avoid falling through to the slower InputTensorGroup case.
     if (tf::isTensorFlowValue(opInput->getType())) {
       auto *tensorHandleValue = getLoweredSingletonExplosion(opInput);
       auto *opAddInputFromTensorHandleFn =
@@ -2082,13 +2078,13 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       return llvm::ConstantInt::get(IGM.Int32Ty, 1);
     }
 
-    // Otherwise, this must conform to TensorGroup so we can add it using
+    // Otherwise, this must conform to InputTensorGroup so we can add it using
     // TFC_OpAddInputFromTensorGroup.
 
     auto canType = opInput->getType().getASTType()->getCanonicalType();
-    auto conformance = tfModule->lookupConformance(canType,
-                                                   tensorGroupProto);
-    assert(conformance && "input type does not conform to TensorGroup");
+    auto conformance =
+        tfModule->lookupConformance(canType, inputTensorGroupProto);
+    assert(conformance && "input type does not conform to InputTensorGroup");
     auto *typeMetadata = emitTypeMetadataRef(canType);
     auto *wtable = emitWitnessTableRef(*this, canType, *conformance);
 
@@ -2222,8 +2218,8 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       outParameterCanType =
           silValue->getType().getASTType()->getCanonicalType();
       auto conformance = tfModule->lookupConformance(outParameterCanType,
-                                                     tensorGroupProto);
-      assert(conformance && "out type does not conform to TensorGroup");
+                                                     outputTensorGroupProto);
+      assert(conformance && "out type does not conform to OutputTensorGroup");
       outParameterTypeMetadata = emitTypeMetadataRef(outParameterCanType);
       outParameterTensorGroupWitnessTable =
           emitWitnessTableRef(*this, outParameterCanType, *conformance);
@@ -2876,13 +2872,13 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       // TensorGroup for the number of outputs that it needs.
 
       assert(hasOpaqueTensorGroupResults &&
-             "found an unexpected opaque TensorGroup result");
+             "found an unexpected opaque OutputTensorGroup result");
 
       // Emit the type metadata and witness table.
       auto canType = silResult->getType().getASTType()->getCanonicalType();
       auto conformance = tfModule->lookupConformance(canType,
-                                                     tensorGroupProto);
-      assert(conformance && "out type does not conform to TensorGroup");
+                                                     outputTensorGroupProto);
+      assert(conformance && "out type does not conform to OutputTensorGroup");
       auto *typeMetadata = emitTypeMetadataRef(canType);
       directResultTypeMetadatas.push_back(typeMetadata);
       auto *witnessTable =
