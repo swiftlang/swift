@@ -3277,7 +3277,7 @@ namespace {
         ConditionalCheckedCastExpr *cast
           = new (tc.Context) ConditionalCheckedCastExpr(
                                sub, expr->getLoc(), SourceLoc(),
-                               TypeLoc::withoutLoc(toType));
+                               expr->getCastTypeLoc());
         cs.setType(cast, toOptType);
         cs.setType(cast->getCastTypeLoc(), toType);
         if (expr->isImplicit())
