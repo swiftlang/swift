@@ -76,6 +76,22 @@ DatasetAPITests.testAllBackends("SingleValueBatched") {
   expectEqual([4], iterator.next()!.scalars)
 }
 
+// TODO(SR-9156): Make this test work in graph mode.
+#if TF_DYNAMIC_COMPILATION
+DatasetAPITests.testAllBackends("DoubleValueDatasetIteration") {
+  let scalars1 = Tensor<Float>(rangeFrom: 0, to: 5, stride: 1)
+  let scalars2 = Tensor<Int32>(rangeFrom: 5, to: 10, stride: 1)
+  let datasetLeft = Dataset(elements: scalars1)
+  let datasetRight = Dataset(elements: scalars2)
+  var i: Int32 = 0
+  for pair in zip(datasetLeft, datasetRight) {
+    expectEqual(scalars1[i].array, pair.a.array)
+    expectEqual(scalars2[i].array, pair.b.array)
+    i += 1
+  }
+}
+#endif // TF_DYNAMIC_COMPILATION
+
 #endif //!CUDA
 
 runAllTests()
