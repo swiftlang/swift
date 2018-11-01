@@ -3092,6 +3092,18 @@ namespace {
       llvm_unreachable("found KeyPathDotExpr in CSGen");
     }
 
+    Type visitTapExpr(TapExpr *expr) {
+      auto locator = CS.getConstraintLocator(expr);
+      auto tv = CS.createTypeVariable(locator);
+
+      if (auto subExpr = expr->getSubExpr()) {
+        auto subExprType = CS.getType(subExpr);
+        CS.addConstraint(ConstraintKind::Bind, subExprType, tv, locator);
+      }
+
+      return tv;
+    }
+
     enum class TypeOperation { None,
                                Join,
                                JoinInout,

@@ -497,6 +497,7 @@ namespace {
                                             SGFContext C);
     RValue visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
                                         SGFContext C);
+    RValue visitTapExpr(TapExpr *E, SGFContext C);
   };
 } // end anonymous namespace
 
@@ -5561,6 +5562,32 @@ RValue RValueEmitter::visitForeignObjectConversionExpr(
 RValue RValueEmitter::visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
                                                    SGFContext C) {
   llvm_unreachable("unevaluated_instance expression can never be evaluated");
+}
+
+RValue RValueEmitter::visitTapExpr(TapExpr *E, SGFContext C) {
+  // This implementation is not very robust; if TapExpr were to ever become
+  // user-accessible (as some sort of "with" statement), it should probably
+  // permit a full pattern binding, saving the unused parts and "re-structuring"
+  // them to return the modified value.
+
+  auto Var = E->getVar();
+  auto VarType = E->getType()->getCanonicalType();
+
+  Scope outerScope(SGF, CleanupLocation(E));
+
+  // Initialize the var with our SubExpr.
+  auto VarInit =
+    SGF.emitInitializationForVarDecl(Var, /*forceImmutable=*/false);
+  SGF.emitExprInto(E->getSubExpr(), VarInit.get(), SILLocation(E));
+
+  // Emit the body and let it mutate the var if it chooses.
+  SGF.emitStmt(E->getBody());
+
+  // Retrieve and return the var, making it +1 so it survives the scope.
+  auto result = SGF.emitRValueForDecl(SILLocation(E), Var, 
+                                      VarType, AccessSemantics::Ordinary, C);
+  result = std::move(result).ensurePlusOne(SGF, SILLocation(E));
+  return outerScope.popPreservingValue(std::move(result));
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

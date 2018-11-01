@@ -1081,6 +1081,8 @@ public:
 
   bool typeCheckClosureBody(ClosureExpr *closure);
 
+  bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
+
   void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
   void processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
