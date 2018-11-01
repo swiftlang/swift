@@ -4055,8 +4055,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Numeric:
   case KnownProtocolKind::ParameterGroup:
   case KnownProtocolKind::Parameterized:
-  case KnownProtocolKind::InputTensorGroup:
-  case KnownProtocolKind::OutputTensorGroup:
+  case KnownProtocolKind::TensorArrayProtocol:
+  case KnownProtocolKind::TensorGroup:
   case KnownProtocolKind::TensorProtocol:
   case KnownProtocolKind::TensorSendableReceivable:
   case KnownProtocolKind::VectorNumeric:

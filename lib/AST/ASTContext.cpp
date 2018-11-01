@@ -972,8 +972,8 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::AccelerableByTensorFlow:
   case KnownProtocolKind::ParameterGroup:
   case KnownProtocolKind::Parameterized:
-  case KnownProtocolKind::InputTensorGroup:
-  case KnownProtocolKind::OutputTensorGroup:
+  case KnownProtocolKind::TensorArrayProtocol:
+  case KnownProtocolKind::TensorGroup:
   case KnownProtocolKind::TensorSendableReceivable:
   case KnownProtocolKind::TensorProtocol:
     M = getLoadedModule(Id_TensorFlow);
