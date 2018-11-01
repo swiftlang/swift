@@ -226,6 +226,8 @@ static FunctionRefInst *findReferenceToVisibleFunction(SILValue value) {
     return findReferenceToVisibleFunction(thinToThick->getOperand());
   if (auto *convertFn = dyn_cast<ConvertFunctionInst>(inst))
     return findReferenceToVisibleFunction(convertFn->getOperand());
+  if (auto *partialApply = dyn_cast<PartialApplyInst>(inst))
+    return findReferenceToVisibleFunction(partialApply->getCallee());
   return nullptr;
 }
 
@@ -1568,7 +1570,7 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
         newFunc, oldFunc, pai->getCallee(), builder, loc, substituteOperand);
     return builder.createPartialApply(
         loc, innerNewFunc, pai->getSubstitutionMap(), newArgs,
-        pai->getOrigCalleeType()->getCalleeConvention());
+        ParameterConvention::Direct_Guaranteed);
   }
   llvm_unreachable("Unhandled function convertion instruction");
 }
@@ -4004,7 +4006,7 @@ void AdjointEmitter::accumulateMaterializedAdjointsIndirect(
     // Ensure the witness method is linked.
     getModule().lookUpFunctionInWitnessTable(confRef, declRef);
     auto subMap =
-      SubstitutionMap::getProtocolSubstitutions(proto, adjointASTTy, confRef);
+        SubstitutionMap::getProtocolSubstitutions(proto, adjointASTTy, confRef);
     // %1 = metatype $T.Type
     auto metatypeType =
         CanMetatypeType::get(adjointASTTy, MetatypeRepresentation::Thick);

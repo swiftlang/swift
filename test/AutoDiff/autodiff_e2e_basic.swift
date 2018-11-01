@@ -11,7 +11,7 @@ func adjointId(_ x: Float, originalValue: Float, seed: Float) -> Float {
 
 _ = #gradient(id)(2)
 
-// CHECK: @{{.*}}id{{.*}}__grad_src_0_wrt_0
+// CHECK-LABEL: @{{.*}}id{{.*}}__grad_src_0_wrt_0
 // CHECK-LABEL: @{{.*}}id{{.*}}__grad_src_0_wrt_0_s_p
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
@@ -41,7 +41,7 @@ let x = #gradient(sigmoid)(3)
 let (value: y, gradient: z) = #valueAndGradient(sigmoid)(4)
 print(x * z)
 
-// CHECK: @{{.*}}sigmoid{{.*}}__grad_src_0_wrt_0
+// CHECK-LABEL: @{{.*}}sigmoid{{.*}}__grad_src_0_wrt_0
 // CHECK: @{{.*}}sigmoid{{.*}}__grad_src_0_wrt_0_s_p
 // CHECK: @{{.*}}sigmoid{{.*}}__grad_src_0_wrt_0_p
 
@@ -51,7 +51,6 @@ public func publicFunc(_ x: Float) -> Float {
 }
 _ = #gradient(publicFunc)
 
-// CHECK: sil non_abi @{{.*}}publicFunc{{.*}}__grad_src_0_wrt_0
-// CHECK: sil non_abi @{{.*}}publicFunc{{.*}}__primal_src_0_wrt_0
-// CHECK: sil non_abi @{{.*}}publicFunc{{.*}}__adjoint_src_0_wrt_0
-
+// CHECK-LABEL: @{{.*}}publicFunc{{.*}}__grad_src_0_wrt_0
+// CHECK: @{{.*}}publicFunc{{.*}}__primal_src_0_wrt_0
+// CHECK: @{{.*}}publicFunc{{.*}}__adjoint_src_0_wrt_0
