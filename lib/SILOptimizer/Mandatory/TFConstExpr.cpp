@@ -782,7 +782,6 @@ SubstitutionMap getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI,
 /// information about the error.
 llvm::Optional<SymbolicValue>
 ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
-
   auto conventions = apply->getSubstCalleeConv();
 
   // Determine the callee.
