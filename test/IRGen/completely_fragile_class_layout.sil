@@ -37,8 +37,8 @@ sil_vtable SubclassOfClassWithResilientField {}
 
 // Field offsets are statically known:
 // CHECK-DAG: @"$s31completely_fragile_class_layout23ClassWithResilientFieldC5firstSivpWvd" = hidden constant i64 16, align 8
-// CHECK-DAG: @"$s31completely_fragile_class_layout23ClassWithResilientFieldC6second16resilient_struct4SizeVvpWvd" = hidden constant i64 24, align 8
-// CHECK-DAG: @"$s31completely_fragile_class_layout23ClassWithResilientFieldC5thirdSivpWvd" = hidden constant i64 40, align 8
+// CHECK-DAG: @"$s31completely_fragile_class_layout23ClassWithResilientFieldC6second16resilient_struct4SizeVvpWvd" = hidden global i64 24, align 8
+// CHECK-DAG: @"$s31completely_fragile_class_layout23ClassWithResilientFieldC5thirdSivpWvd" = hidden global i64 40, align 8
 
 
 // RO-data for ClassWithResilientField:
@@ -91,8 +91,8 @@ public class ClassWithResilientEnum {
 sil_vtable ClassWithResilientEnum {}
 
 // Field offsets are statically known:
-// CHECK-LABEL: @"$s31completely_fragile_class_layout22ClassWithResilientEnumC5firstAA0hfG7PayloadOvpWvd" = hidden constant i64 16, align 8
-// CHECK-LABEL: @"$s31completely_fragile_class_layout22ClassWithResilientEnumC6seconds4Int8VvpWvd" = hidden constant i64 25, align 8
+// CHECK-LABEL: @"$s31completely_fragile_class_layout22ClassWithResilientEnumC5firstAA0hfG7PayloadOvpWvd" = hidden global i64 16, align 8
+// CHECK-LABEL: @"$s31completely_fragile_class_layout22ClassWithResilientEnumC6seconds4Int8VvpWvd" = hidden global i64 25, align 8
 
 
 // Make sure extra inhabitants work when reading a legacy layout -- the
@@ -105,8 +105,8 @@ public class ClassWithResilientRef {
 sil_vtable ClassWithResilientRef {}
 
 // Field offsets are statically known:
-// CHECK-LABEL: @"$s31completely_fragile_class_layout21ClassWithResilientRefC5first16resilient_struct0gH0VSgvpWvd" = hidden constant i64 16, align 8
-// CHECK-LABEL: @"$s31completely_fragile_class_layout21ClassWithResilientRefC6secondSivpWvd" = hidden constant i64 24, align 8
+// CHECK-LABEL: @"$s31completely_fragile_class_layout21ClassWithResilientRefC5first16resilient_struct0gH0VSgvpWvd" = hidden global i64 16, align 8
+// CHECK-LABEL: @"$s31completely_fragile_class_layout21ClassWithResilientRefC6secondSivpWvd" = hidden global i64 24, align 8
 
 
 // When allocating a class with resiliently-sized fields, we must still load
