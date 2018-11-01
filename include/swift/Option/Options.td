@@ -284,7 +284,7 @@ def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
 
 def module_link_name : Separate<["-"], "module-link-name">,
-  Flags<[FrontendOption]>,
+  Flags<[FrontendOption, ParseableInterfaceOption]>,
   HelpText<"Library to link against when using this module">;
 def module_link_name_EQ : Joined<["-"], "module-link-name=">,
   Flags<[FrontendOption]>, Alias<module_link_name>;
