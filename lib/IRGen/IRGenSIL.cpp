@@ -2795,8 +2795,6 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
   // compute the flag by iterating over all the results and checking if they are
   // known TensorFlow values that do not need to go through the TensorGroup
   // machinery.
-  // TODO: We can add more types of known TensorFlow values to reduce the amount
-  // of work that happens at runtime.
   bool hasOpaqueTensorGroupResults = false;
   if (outParameterAddress.isValid()) {
     LLVM_DEBUG(llvm::dbgs() << " Has indirect result of type "
@@ -2808,9 +2806,7 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     for (auto silResult : i->getResults()) {
       LLVM_DEBUG(llvm::dbgs() << "  Direct result of type "
                  << silResult->getType() << ".\n");
-      if (silResult->getType().getASTType() == astCtx.TheEmptyTupleType)
-        continue;
-      if (tf::isTensorFlowValue(silResult->getType()))
+      if (tf::isTensorFlowValueOrAggregate(silResult->getType().getASTType()))
         continue;
       hasOpaqueTensorGroupResults = true;
       break;
@@ -2846,23 +2842,16 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
     // add up their counts.
     expectedReturnValueCount = llvm::ConstantInt::get(IGM.Int32Ty, 0);
     for (auto silResult : i->getResults()) {
-      // If the result is Void, it corresponds to 0 outputs.
-      if (silResult->getType().getASTType() == astCtx.TheEmptyTupleType) {
+      // If the result is a known TensorFlow type or aggregate of known
+      // TensorFlow types, then we can count it directly.
+      SmallVector<Type, 4> flattenedTensorFlowTypes;
+      if (tf::flattenTensorFlowValueAggregate(
+              silResult->getType().getASTType(), flattenedTensorFlowTypes)) {
         directResultTypeMetadatas.push_back(nullptr);
         directResultTensorGroupWitnessTables.push_back(nullptr);
-        auto *cTensorHandleCount = llvm::ConstantInt::get(IGM.Int32Ty, 0);
+        auto *cTensorHandleCount = llvm::ConstantInt::get(
+            IGM.Int32Ty, flattenedTensorFlowTypes.size());
         directResultCTensorHandleCounts.push_back(cTensorHandleCount);
-        continue;
-      }
-
-      // If the result is a known TensorFlow type, it corresponds to just 1
-      // output.
-      if (tf::isTensorFlowValue(silResult->getType())) {
-        directResultTypeMetadatas.push_back(nullptr);
-        directResultTensorGroupWitnessTables.push_back(nullptr);
-        auto *cTensorHandleCount = llvm::ConstantInt::get(IGM.Int32Ty, 1);
-        directResultCTensorHandleCounts.push_back(cTensorHandleCount);
-        // Note that `CreateAdd` constant-folds ConstantInts.
         expectedReturnValueCount = Builder.CreateAdd(expectedReturnValueCount,
                                                      cTensorHandleCount);
         continue;
@@ -2982,39 +2971,40 @@ void IRGenSILFunction::visitGraphOperationInst(GraphOperationInst *i) {
       auto tfOutputAddr = Builder.CreateInBoundsGEP(returnValuesAddress,
                                                     tfOutputIdx);
 
-      // If the result is Void, it corresponds to 0 outputs.
-      if (silResult->getType().getASTType() == astCtx.TheEmptyTupleType) {
+      // If the result is a known TensorFlow type or aggregate of known
+      // TensorFlow types, get them directly.
+      SmallVector<Type, 4> flattenedTensorFlowTypes;
+      if (tf::flattenTensorFlowValueAggregate(
+              silResult->getType().getASTType(), flattenedTensorFlowTypes)) {
         Explosion e;
+        for (auto tensorFlowType : flattenedTensorFlowTypes) {
+          auto cTensorHandle = Builder.CreateLoad(tfOutputAddr,
+                                                  IGM.getPointerAlignment());
+
+          // Wrap `cTensorHandle` into a _AnyTensorHandle object, and get an
+          // untyped pointer to the _AnyTensorHandle.
+          auto *createHandleFn = IGM.getTFC_CreateTensorHandleFromCFn();
+          llvm::Value *tensorHandle = Builder.CreateCall(createHandleFn,
+                                                         {cTensorHandle});
+
+          // Cast to a pointer of the expected result type (for example,
+          // TensorHandle<Float>).
+          auto silType = SILType::getPrimitiveObjectType(
+              tensorFlowType->getCanonicalType());
+          tensorHandle = Builder.CreateBitCast(tensorHandle,
+                                               IGM.getStorageType(silType));
+
+          // Set the result.
+          e.add(tensorHandle);
+
+          // We consumed one output.
+          // Note that `CreateAdd` constant-folds ConstantInts.
+          tfOutputIdx = Builder.CreateAdd(
+              tfOutputIdx, llvm::ConstantInt::get(IGM.Int32Ty, 1));
+          tfOutputAddr = Builder.CreateInBoundsGEP(returnValuesAddress,
+                                                      tfOutputIdx);
+        }
         setLoweredExplosion(silResult, e);
-        continue;
-      }
-
-      // If the result is a known TensorFlow type, get it directly.
-      if (tf::isTensorFlowValue(silResult->getType())) {
-        auto cTensorHandle = Builder.CreateLoad(tfOutputAddr,
-                                                IGM.getPointerAlignment());
-
-        // Wrap `cTensorHandle` into a _AnyTensorHandle object, and get an untyped
-        // pointer to the _AnyTensorHandle.
-        auto *createHandleFn = IGM.getTFC_CreateTensorHandleFromCFn();
-        llvm::Value *tensorHandle = Builder.CreateCall(createHandleFn,
-                                                       {cTensorHandle});
-
-        // Cast to a pointer of the expected result type (for example,
-        // TensorHandle<Float>).
-        tensorHandle = Builder.CreateBitCast(
-            tensorHandle, IGM.getStorageType(silResult->getType()));
-
-        // Set the result.
-        Explosion e;
-        e.add(tensorHandle);
-        setLoweredExplosion(silResult, e);
-
-        // We consumed one output.
-        // Note that `CreateAdd` constant-folds ConstantInts.
-        tfOutputIdx = Builder.CreateAdd(
-            tfOutputIdx, llvm::ConstantInt::get(IGM.Int32Ty, 1));
-
         continue;
       }
 
