@@ -152,8 +152,7 @@ ParseableInterfaceModuleLoader::configureSubInvocationAndOutputPaths(
 // Check that the output .swiftmodule file is at least as new as all the
 // dependencies it read when it was built last time.
 static bool
-swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
-                      StringRef InPath, StringRef OutPath) {
+swiftModuleIsUpToDate(clang::vfs::FileSystem &FS, StringRef OutPath) {
 
   if (!FS.exists(OutPath))
     return false;
@@ -180,8 +179,20 @@ swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
     if (!InStatus ||
         (InStatus.get().getSize() != In.Size) ||
         (InStatus.get().getLastModificationTime() != In.LastModTime)) {
+      LLVM_DEBUG(llvm::dbgs() << "Dep " << In.Path
+                 << " is directly out of date\n");
       return false;
     }
+    // Recursively probe any .swiftmodules for up-to-date-ness.
+    auto Ext = llvm::sys::path::extension(In.Path);
+    auto Ty = file_types::lookupTypeForExtension(Ext);
+    if (Ty == file_types::TY_SwiftModuleFile &&
+        !swiftModuleIsUpToDate(FS, In.Path)) {
+      LLVM_DEBUG(llvm::dbgs() << "Dep " << In.Path
+                 << " is indirectly out of date\n");
+      return false;
+    }
+    LLVM_DEBUG(llvm::dbgs() << "Dep " << In.Path << " is up to date\n");
   }
   return true;
 }
@@ -301,7 +312,7 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
   configureSubInvocationAndOutputPaths(SubInvocation, InPath, OutPath);
 
   // Evaluate if we need to run this sub-invocation, and if so run it.
-  if (!swiftModuleIsUpToDate(FS, InPath, OutPath)) {
+  if (!swiftModuleIsUpToDate(FS, OutPath)) {
     if (buildSwiftModuleFromSwiftInterface(FS, Diags, SubInvocation, InPath,
                                            OutPath))
       return std::make_error_code(std::errc::invalid_argument);
