@@ -18,6 +18,7 @@
 #include "swift/AST/Module.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/ParseableInterfaceSupport.h"
+#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "clang/Basic/Module.h"
@@ -203,6 +204,11 @@ static bool buildSwiftModuleFromSwiftInterface(
     // module-serialization task we're trying to do here.
     LLVM_DEBUG(llvm::dbgs() << "Setting up instance\n");
     CompilerInstance SubInstance;
+
+    // FIXME: Temporary: this should forward to the outer Diags somehow.
+    PrintingDiagnosticConsumer PDC;
+    SubInstance.addDiagnosticConsumer(&PDC);
+
     SubInstance.createDependencyTracker(/*TrackSystemDeps=*/false);
     if (SubInstance.setup(SubInvocation)) {
       SubError = true;
