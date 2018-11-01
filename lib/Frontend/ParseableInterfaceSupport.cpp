@@ -166,6 +166,7 @@ swiftModuleIsUpToDate(clang::vfs::FileSystem &FS,
   if (!OutBuf)
     return false;
 
+  LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << OutPath << "\n");
   SmallVector<SerializationOptions::FileDependency, 16> AllDeps;
   auto VI = serialization::validateSerializedAST(
       OutBuf.get()->getBuffer(),
@@ -209,7 +210,8 @@ static bool buildSwiftModuleFromSwiftInterface(
     // Build the .swiftmodule; this is a _very_ abridged version of the logic in
     // performCompile in libFrontendTool, specialized, to just the one
     // module-serialization task we're trying to do here.
-    LLVM_DEBUG(llvm::dbgs() << "Setting up instance\n");
+    LLVM_DEBUG(llvm::dbgs() << "Setting up instance to compile "
+               << InPath << " to " << OutPath << "\n");
     CompilerInstance SubInstance;
 
     // FIXME: Temporary: this should forward to the outer Diags somehow.
@@ -225,6 +227,7 @@ static bool buildSwiftModuleFromSwiftInterface(
     LLVM_DEBUG(llvm::dbgs() << "Performing sema\n");
     SubInstance.performSema();
     if (SubInstance.getASTContext().hadError()) {
+      LLVM_DEBUG(llvm::dbgs() << "encountered errors\n");
       SubError = true;
       return;
     }
@@ -235,6 +238,7 @@ static bool buildSwiftModuleFromSwiftInterface(
     if (SILMod) {
       LLVM_DEBUG(llvm::dbgs() << "Running SIL diagnostic passes\n");
       if (runSILDiagnosticPasses(*SILMod)) {
+        LLVM_DEBUG(llvm::dbgs() << "encountered errors\n");
         SubError = true;
         return;
       }
@@ -311,8 +315,11 @@ std::error_code ParseableInterfaceModuleLoader::openModuleFiles(
       CacheDir, llvm::sys::path::filename(OutPath), ModuleDocFilename,
       ModuleBuffer, ModuleDocBuffer, Scratch);
   LLVM_DEBUG(llvm::dbgs() << "Loaded " << OutPath
-             << " via normal module loader with error: "
-             << ErrorCode.message() << "\n");
+             << " via normal module loader");
+  if (ErrorCode) {
+    LLVM_DEBUG(llvm::dbgs() << " with error: " << ErrorCode.message());
+  }
+  LLVM_DEBUG(llvm::dbgs() << "\n");
   return ErrorCode;
 }
 
