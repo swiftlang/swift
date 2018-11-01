@@ -919,23 +919,7 @@ public:
   }
 
   /// Determine whether this entity will be weak-imported.
-  bool isWeakImported(ModuleDecl *module) const {
-    if (getKind() == Kind::SILGlobalVariable &&
-        getSILGlobalVariable()->getDecl())
-      return getSILGlobalVariable()->getDecl()->isWeakImported(module);
-
-    if (getKind() == Kind::SILFunction) {
-      if (auto clangOwner = getSILFunction()->getClangNodeOwner())
-        return clangOwner->isWeakImported(module);
-      if (getSILFunction()->isWeakLinked())
-        return getSILFunction()->isAvailableExternally();
-    }
-
-    if (!isDeclKind(getKind()))
-      return false;
-
-    return getDecl()->isWeakImported(module);
-  }
+  bool isWeakImported(ModuleDecl *module) const;
   
   /// Return the source file whose codegen should trigger emission of this
   /// link entity, if one can be identified.

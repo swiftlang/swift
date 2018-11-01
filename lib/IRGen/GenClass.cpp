@@ -993,17 +993,17 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   SILType selfType = getSelfType(D);
   auto &classTI = getTypeInfo(selfType).as<ClassTypeInfo>();
 
-  // FIXME: For now, always use the fragile layout when emitting metadata.
+  // Use the fragile layout when emitting metadata.
   auto &fragileLayout =
     classTI.getClassLayout(*this, selfType, /*forBackwardDeployment=*/true);
 
-  // ... but still compute the resilient layout for better test coverage.
+  // The resilient layout tells us what parts of the metadata can be
+  // updated at runtime by the Objective-C metadata update callback.
   auto &resilientLayout =
     classTI.getClassLayout(*this, selfType, /*forBackwardDeployment=*/false);
-  (void) resilientLayout;
 
   // Emit the class metadata.
-  emitClassMetadata(*this, D, fragileLayout);
+  emitClassMetadata(*this, D, fragileLayout, resilientLayout);
 
   IRGen.addClassForEagerInitialization(D);
 

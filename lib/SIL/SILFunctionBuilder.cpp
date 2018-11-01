@@ -57,9 +57,6 @@ static void addFunctionAttributes(SILFunction *F, DeclAttributes &Attrs,
   // @_silgen_name and @_cdecl functions may be called from C code somewhere.
   if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>())
     F->setHasCReferences(true);
-
-  if (Attrs.hasAttribute<WeakLinkedAttr>())
-    F->setWeakLinked();
 }
 
 SILFunction *
@@ -114,6 +111,9 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
 
     if (constant.isForeign && decl->hasClangNode())
       F->setClangNodeOwner(decl);
+
+    if (decl->isWeakImported(/*fromModule=*/nullptr))
+      F->setWeakLinked();
 
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();
